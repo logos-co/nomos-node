@@ -69,12 +69,13 @@ impl<I: NetworkBackend + Send + 'static> ServiceCore for NetworkService<I> {
 
     async fn run(mut self) {
         let Self {
-            service_state,
+            service_state: ServiceStateHandle {
+                mut inbound_relay, ..
+            },
             mut backend,
         } = self;
-        let mut relay = service_state.inbound_relay;
 
-        while let Some(msg) = relay.recv().await {
+        while let Some(msg) = inbound_relay.recv().await {
             match msg {
                 NetworkMsg::Broadcast(msg) => backend.broadcast(msg),
                 NetworkMsg::Subscribe { kind, sender } => {
