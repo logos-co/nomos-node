@@ -12,27 +12,25 @@ use std::fmt::Debug;
 use tokio::sync::broadcast;
 use tokio::sync::oneshot;
 
-pub type NetworkData = Box<[u8]>;
-
 #[derive(Debug)]
-pub enum NetworkMsg {
-    Broadcast(NetworkData),
+pub enum NetworkMsg<T> {
+    Broadcast(T),
     Subscribe {
         kind: EventKind,
-        sender: oneshot::Sender<broadcast::Receiver<NetworkEvent>>,
+        sender: oneshot::Sender<broadcast::Receiver<NetworkEvent<T>>>,
     },
 }
 
-impl RelayMessage for NetworkMsg {}
+impl<T: 'static> RelayMessage for NetworkMsg<T> {}
 
 #[derive(Debug)]
 pub enum EventKind {
     Message,
 }
 
-#[derive(Debug)]
-pub enum NetworkEvent {
-    RawMessage(NetworkData),
+#[derive(Debug, Clone)]
+pub enum NetworkEvent<T> {
+    RawMessage(T),
 }
 
 pub struct NetworkConfig<I: NetworkBackend> {
@@ -53,7 +51,7 @@ impl<I: NetworkBackend + Send + 'static> ServiceData for NetworkService<I> {
     type Settings = NetworkConfig<I>;
     type State = NetworkState<I>;
     type StateOperator = NoOperator<Self::State>;
-    type Message = NetworkMsg;
+    type Message = NetworkMsg<I::Message>;
 }
 
 #[async_trait]
@@ -81,7 +79,7 @@ impl<I: NetworkBackend + Send + 'static> ServiceCore for NetworkService<I> {
                 NetworkMsg::Subscribe { kind, sender } => {
                     sender.send(backend.subscribe(kind)).unwrap_or_else(|_| {
                         tracing::warn!(
-                            "client hung up before as subscription handle could be established"
+                            "client hung up before a subscription handle could be established"
                         )
                     })
                 }
