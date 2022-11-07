@@ -8,7 +8,7 @@ const BROADCAST_CHANNEL_BUF: usize = 16;
 
 pub struct Waku {
     waku: WakuNodeHandle<Running>,
-    message_event: Sender<NetworkEvent<WakuMessage>>,
+    message_event: Sender<NetworkEvent>,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -18,10 +18,31 @@ pub struct WakuConfig {
     initial_peers: Vec<Multiaddr>,
 }
 
+#[derive(Debug)]
+pub enum WakuBackendMessage {
+    Broadcast {
+        message: WakuMessage,
+        topic: Option<WakuPubSubTopic>,
+    },
+}
+
+#[derive(Debug)]
+pub enum EventKind {
+    Message,
+}
+
+#[derive(Debug, Clone)]
+pub enum NetworkEvent {
+    RawMessage(WakuMessage),
+}
+
+#[async_trait::async_trait]
 impl NetworkBackend for Waku {
     type Config = WakuConfig;
     type State = NoState<WakuConfig>;
-    type Message = WakuMessage;
+    type Message = WakuBackendMessage;
+    type EventKind = EventKind;
+    type NetworkEvent = NetworkEvent;
 
     fn new(config: Self::Config) -> Self {
         let waku = waku_new(Some(config.inner)).unwrap().start().unwrap();
@@ -53,7 +74,7 @@ impl NetworkBackend for Waku {
         }
     }
 
-    fn subscribe(&mut self, kind: EventKind) -> Receiver<NetworkEvent<Self::Message>> {
+    async fn subscribe(&mut self, kind: Self::EventKind) -> Receiver<Self::NetworkEvent> {
         match kind {
             EventKind::Message => {
                 tracing::debug!("processed subscription to incoming messages");
@@ -62,8 +83,20 @@ impl NetworkBackend for Waku {
         }
     }
 
-    fn broadcast(&self, msg: Self::Message) {
-        let msg_id = self.waku.relay_publish_message(&msg, None, None).unwrap();
-        tracing::debug!("sent msg {:?} with id {}", msg.payload(), msg_id);
+    async fn send(&self, msg: Self::Message) {
+        match msg {
+            WakuBackendMessage::Broadcast { message, topic } => {
+                match self.waku.relay_publish_message(&message, topic, None) {
+                    Ok(id) => tracing::debug!(
+                        "successfully broadcast message with id: {id}, raw contents: {:?}",
+                        message.payload()
+                    ),
+                    Err(e) => tracing::error!(
+                        "could not broadcast message due to {e}, raw contents {:?}",
+                        message.payload()
+                    ),
+                }
+            }
+        };
     }
 }

@@ -8,30 +8,32 @@ use overwatch::services::{
     state::{NoOperator, ServiceState},
     ServiceCore, ServiceData, ServiceId,
 };
-use std::fmt::Debug;
+use std::fmt::{self, Debug};
 use tokio::sync::broadcast;
 use tokio::sync::oneshot;
 
-#[derive(Debug)]
-pub enum NetworkMsg<T> {
-    Broadcast(T),
+pub enum NetworkMsg<B: NetworkBackend> {
+    Send(B::Message),
     Subscribe {
-        kind: EventKind,
-        sender: oneshot::Sender<broadcast::Receiver<NetworkEvent<T>>>,
+        kind: B::EventKind,
+        sender: oneshot::Sender<broadcast::Receiver<B::NetworkEvent>>,
     },
 }
 
-impl<T: 'static> RelayMessage for NetworkMsg<T> {}
-
-#[derive(Debug)]
-pub enum EventKind {
-    Message,
+impl<B: NetworkBackend> Debug for NetworkMsg<B> {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Self::Send(msg) => write!(fmt, "NetworkMsg::Send({:?})", msg),
+            Self::Subscribe { kind, sender } => write!(
+                fmt,
+                "NetworkMsg::Subscribe{{ kind: {:?}, sender: {:?}}}",
+                kind, sender
+            ),
+        }
+    }
 }
 
-#[derive(Debug, Clone)]
-pub enum NetworkEvent<T> {
-    RawMessage(T),
-}
+impl<T: NetworkBackend + 'static> RelayMessage for NetworkMsg<T> {}
 
 pub struct NetworkConfig<I: NetworkBackend> {
     pub backend: I::Config,
@@ -46,12 +48,12 @@ pub struct NetworkState<I: NetworkBackend> {
     _backend: I::State,
 }
 
-impl<I: NetworkBackend + Send + 'static> ServiceData for NetworkService<I> {
+impl<B: NetworkBackend + Send + 'static> ServiceData for NetworkService<B> {
     const SERVICE_ID: ServiceId = "Network";
-    type Settings = NetworkConfig<I>;
-    type State = NetworkState<I>;
+    type Settings = NetworkConfig<B>;
+    type State = NetworkState<B>;
     type StateOperator = NoOperator<Self::State>;
-    type Message = NetworkMsg<I::Message>;
+    type Message = NetworkMsg<B>;
 }
 
 #[async_trait]
@@ -75,14 +77,19 @@ impl<I: NetworkBackend + Send + 'static> ServiceCore for NetworkService<I> {
 
         while let Some(msg) = inbound_relay.recv().await {
             match msg {
-                NetworkMsg::Broadcast(msg) => backend.broadcast(msg),
-                NetworkMsg::Subscribe { kind, sender } => {
-                    sender.send(backend.subscribe(kind)).unwrap_or_else(|_| {
+                NetworkMsg::Send(msg) => {
+                    // split sending in two steps to help the compiler understand we do not
+                    // need to hold an instance of &I (which is not send) across an await point
+                    let _send = backend.send(msg);
+                    _send.await
+                }
+                NetworkMsg::Subscribe { kind, sender } => sender
+                    .send(backend.subscribe(kind).await)
+                    .unwrap_or_else(|_| {
                         tracing::warn!(
                             "client hung up before a subscription handle could be established"
                         )
-                    })
-                }
+                    }),
             }
         }
     }
