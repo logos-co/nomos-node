@@ -7,7 +7,7 @@ pub use self::waku::Waku;
 
 #[async_trait::async_trait]
 pub trait NetworkBackend {
-    type Config: Clone + Send + Sync + 'static;
+    type Config: Clone + Debug + Send + Sync + 'static;
     type State: ServiceState<Settings = Self::Config> + Clone;
     type Message: Debug + Send + Sync + 'static;
     type EventKind: Debug + Send + Sync + 'static;

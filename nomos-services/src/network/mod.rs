@@ -35,17 +35,23 @@ impl<B: NetworkBackend> Debug for NetworkMsg<B> {
 
 impl<T: NetworkBackend + 'static> RelayMessage for NetworkMsg<T> {}
 
-pub struct NetworkConfig<I: NetworkBackend> {
-    pub backend: I::Config,
+pub struct NetworkConfig<B: NetworkBackend> {
+    pub backend: B::Config,
 }
 
-pub struct NetworkService<I: NetworkBackend + Send + 'static> {
-    backend: I,
+impl<B: NetworkBackend> Debug for NetworkConfig<B> {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        write!(fmt, "NetworkConfig {{ backend: {:?}}}", self.backend)
+    }
+}
+
+pub struct NetworkService<B: NetworkBackend + Send + 'static> {
+    backend: B,
     service_state: ServiceStateHandle<Self>,
 }
 
-pub struct NetworkState<I: NetworkBackend> {
-    _backend: I::State,
+pub struct NetworkState<B: NetworkBackend> {
+    _backend: B::State,
 }
 
 impl<B: NetworkBackend + Send + 'static> ServiceData for NetworkService<B> {
@@ -57,10 +63,10 @@ impl<B: NetworkBackend + Send + 'static> ServiceData for NetworkService<B> {
 }
 
 #[async_trait]
-impl<I: NetworkBackend + Send + 'static> ServiceCore for NetworkService<I> {
+impl<B: NetworkBackend + Send + 'static> ServiceCore for NetworkService<B> {
     fn init(mut service_state: ServiceStateHandle<Self>) -> Self {
         Self {
-            backend: <I as NetworkBackend>::new(
+            backend: <B as NetworkBackend>::new(
                 service_state.settings_reader.get_updated_settings().backend,
             ),
             service_state,
@@ -95,7 +101,7 @@ impl<I: NetworkBackend + Send + 'static> ServiceCore for NetworkService<I> {
     }
 }
 
-impl<I: NetworkBackend> Clone for NetworkConfig<I> {
+impl<B: NetworkBackend> Clone for NetworkConfig<B> {
     fn clone(&self) -> Self {
         NetworkConfig {
             backend: self.backend.clone(),
@@ -103,7 +109,7 @@ impl<I: NetworkBackend> Clone for NetworkConfig<I> {
     }
 }
 
-impl<I: NetworkBackend> Clone for NetworkState<I> {
+impl<B: NetworkBackend> Clone for NetworkState<B> {
     fn clone(&self) -> Self {
         NetworkState {
             _backend: self._backend.clone(),
@@ -111,12 +117,12 @@ impl<I: NetworkBackend> Clone for NetworkState<I> {
     }
 }
 
-impl<I: NetworkBackend + Send + 'static> ServiceState for NetworkState<I> {
-    type Settings = NetworkConfig<I>;
+impl<B: NetworkBackend + Send + 'static> ServiceState for NetworkState<B> {
+    type Settings = NetworkConfig<B>;
 
     fn from_settings(settings: &Self::Settings) -> Self {
         Self {
-            _backend: I::State::from_settings(&settings.backend),
+            _backend: B::State::from_settings(&settings.backend),
         }
     }
 }

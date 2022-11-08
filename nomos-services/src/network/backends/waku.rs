@@ -11,7 +11,7 @@ pub struct Waku {
     message_event: Sender<NetworkEvent>,
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct WakuConfig {
     #[serde(flatten)]
     inner: WakuNodeConfig,
