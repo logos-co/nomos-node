@@ -8,6 +8,7 @@ use overwatch::services::{
     state::{NoOperator, ServiceState},
     ServiceCore, ServiceData, ServiceId,
 };
+use serde::{Deserialize, Serialize};
 use std::fmt::{self, Debug};
 use tokio::sync::broadcast;
 use tokio::sync::oneshot;
@@ -35,6 +36,7 @@ impl<B: NetworkBackend> Debug for NetworkMsg<B> {
 
 impl<T: NetworkBackend + 'static> RelayMessage for NetworkMsg<T> {}
 
+#[derive(Serialize, Deserialize)]
 pub struct NetworkConfig<B: NetworkBackend> {
     pub backend: B::Config,
 }
