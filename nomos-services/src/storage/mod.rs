@@ -137,31 +137,19 @@ impl<Backend: StorageBackend + Send + Sync + 'static> ServiceCore for StorageSer
         } = self;
         let backend = &mut backend;
         while let Some(msg) = inbound_relay.recv().await {
-            match msg {
+            if let Err(e) = match msg {
                 StorageMsg::Load { key, reply_channel } => {
-                    if let Err(e) = Self::handle_load(backend, key, reply_channel).await {
-                        // TODO: add proper logging
-                        println!("{e}");
-                    }
+                    Self::handle_load(backend, key, reply_channel).await
                 }
-                StorageMsg::Store { key, value } => {
-                    if let Err(e) = Self::handle_store(backend, key, value).await {
-                        // TODO: add proper logging
-                        println!("{e}");
-                    }
-                }
+                StorageMsg::Store { key, value } => Self::handle_store(backend, key, value).await,
                 StorageMsg::Remove { key, reply_channel } => {
-                    if let Err(e) = Self::handle_remove(backend, key, reply_channel).await {
-                        // TODO: add proper logging
-                        println!("{e}");
-                    }
+                    Self::handle_remove(backend, key, reply_channel).await
                 }
                 StorageMsg::Execute { transaction } => {
-                    if let Err(e) = Self::handle_execute(backend, transaction).await {
-                        // TODO: add proper logging
-                        println!("{e}");
-                    }
+                    Self::handle_execute(backend, transaction).await
                 }
+            } {
+                println!("{e}");
             }
         }
     }
