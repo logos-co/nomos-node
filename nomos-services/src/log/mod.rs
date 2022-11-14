@@ -4,6 +4,7 @@ use overwatch::services::{
     state::{NoOperator, NoState},
     ServiceCore, ServiceData,
 };
+use serde::{Serialize, Deserialize};
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use tracing::Level;
@@ -12,7 +13,7 @@ use tracing_subscriber::{filter::LevelFilter, prelude::*};
 
 pub struct Logger(Option<WorkerGuard>);
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum LoggerBackend {
     Gelf {
         addr: SocketAddr,
@@ -25,14 +26,15 @@ pub enum LoggerBackend {
     Stderr,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct LoggerSettings {
     backend: LoggerBackend,
     format: LoggerFormat,
+    #[serde(with = "serde_level")]
     level: Level,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum LoggerFormat {
     Json,
     Plain,
@@ -99,5 +101,19 @@ impl ServiceCore for Logger {
     async fn run(self) {
         // keep the handle alive without stressing the runtime
         futures::pending!()
+    }
+}
+
+
+mod serde_level {
+    use super::Level;
+    use serde::{Serializer, Serialize, Deserialize, Deserializer, de::Error};
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Level, D::Error> where D: Deserializer<'de> {
+        <String>::deserialize(deserializer).and_then(|v| v.parse().map_err(|e| D::Error::custom(format!("invalid log level {}", e))))
+    }
+
+    pub fn serialize<S>(value: &Level, serializer: S) -> Result<S::Ok, S::Error> where S: Serializer {
+        value.as_str().serialize(serializer)
     }
 }
