@@ -16,6 +16,9 @@ tokio = { version = "1", features = ["sync"] }
 thiserror = "1.0"
 tracing = "0.1"
 waku = { git = "https://github.com/waku-org/waku-rust-bindings" }
+tracing-appender = "0.2"
+tracing-subscriber =  { version = "0.3", features = ["json"] }
+tracing-gelf = "0.7"
 
 [dev-dependencies]
 tempfile = "3.3"
