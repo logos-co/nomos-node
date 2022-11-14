@@ -149,6 +149,7 @@ impl<Backend: StorageBackend + Send + Sync + 'static> ServiceCore for StorageSer
                     Self::handle_execute(backend, transaction).await
                 }
             } {
+                // TODO: add proper logging
                 println!("{e}");
             }
         }
