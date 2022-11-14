@@ -1,10 +1,9 @@
 pub mod backends;
 
 // std
-
-use async_trait::async_trait;
 use std::fmt::{Debug, Formatter};
 // crates
+use async_trait::async_trait;
 use bytes::Bytes;
 use overwatch::services::handle::ServiceStateHandle;
 // internal
@@ -15,32 +14,109 @@ use overwatch::services::{ServiceCore, ServiceData, ServiceId};
 
 pub enum StorageMsg<Backend: StorageBackend> {
     Load {
-        key: Box<[u8]>,
+        key: Bytes,
         reply_channel: tokio::sync::oneshot::Sender<Bytes>,
     },
     Store {
-        key: Box<[u8]>,
+        key: Bytes,
         value: Bytes,
     },
     Remove {
-        key: Box<[u8]>,
+        key: Bytes,
+        reply_channel: Option<tokio::sync::oneshot::Sender<Bytes>>,
     },
     Execute {
         transaction: Backend::Transaction,
     },
 }
 
+//
 impl<Backend: StorageBackend> Debug for StorageMsg<Backend> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        todo!()
+        match self {
+            StorageMsg::Load { key, .. } => {
+                write!(f, "Load {{ {key:?} }}")
+            }
+            StorageMsg::Store { key, value } => {
+                write!(f, "Store {{ {key:?}, {value:?}}}")
+            }
+            StorageMsg::Remove { key, .. } => {
+                write!(f, "Remove {{ {key:?} }}")
+            }
+            StorageMsg::Execute { .. } => write!(f, "Execute transaction"),
+        }
     }
 }
 
 impl<Backend: StorageBackend + 'static> RelayMessage for StorageMsg<Backend> {}
 
+#[derive(Debug, thiserror::Error)]
+enum StorageServiceError<Backend: StorageBackend> {
+    #[error("Couldn't send a reply")]
+    ReplyError(Bytes),
+    #[error("Storage backend error")]
+    BackendError(#[source] Backend::Error),
+}
+
 pub struct StorageService<Backend: StorageBackend + Send + Sync + 'static> {
     backend: Backend,
     service_state: ServiceStateHandle<Self>,
+}
+
+impl<Backend: StorageBackend + Send + Sync + 'static> StorageService<Backend> {
+    async fn handle_load(
+        backend: &Backend,
+        key: Bytes,
+        reply_channel: tokio::sync::oneshot::Sender<Bytes>,
+    ) -> Result<(), StorageServiceError<Backend>> {
+        let result: Bytes = backend
+            .load(&key)
+            .await
+            .map_err(StorageServiceError::BackendError)?;
+        reply_channel
+            .send(result)
+            .map_err(StorageServiceError::ReplyError)
+    }
+
+    async fn handle_remove(
+        backend: &Backend,
+        key: Bytes,
+        reply_channel: Option<tokio::sync::oneshot::Sender<Bytes>>,
+    ) -> Result<(), StorageServiceError<Backend>> {
+        if let Some((result, reply_channel)) = backend
+            .remove(&key)
+            .await
+            .map_err(StorageServiceError::BackendError)?
+            .zip(reply_channel)
+        {
+            reply_channel
+                .send(result)
+                .map_err(StorageServiceError::ReplyError)?;
+        }
+
+        Ok(())
+    }
+
+    async fn handle_store(
+        backend: &Backend,
+        key: Bytes,
+        value: Bytes,
+    ) -> Result<(), StorageServiceError<Backend>> {
+        backend
+            .store(&key, value)
+            .await
+            .map_err(StorageServiceError::BackendError)
+    }
+
+    async fn handle_execute(
+        backend: &Backend,
+        transaction: Backend::Transaction,
+    ) -> Result<(), StorageServiceError<Backend>> {
+        backend
+            .execute(transaction)
+            .await
+            .map_err(StorageServiceError::BackendError)
+    }
 }
 
 #[async_trait]
@@ -52,8 +128,42 @@ impl<Backend: StorageBackend + Send + Sync + 'static> ServiceCore for StorageSer
         }
     }
 
-    async fn run(self) {
-        todo!()
+    async fn run(mut self) {
+        let Self {
+            mut backend,
+            service_state: ServiceStateHandle {
+                mut inbound_relay, ..
+            },
+        } = self;
+        let backend = &mut backend;
+        while let Some(msg) = inbound_relay.recv().await {
+            match msg {
+                StorageMsg::Load { key, reply_channel } => {
+                    if let Err(e) = Self::handle_load(backend, key, reply_channel).await {
+                        // TODO: add proper logging
+                        println!("{e}");
+                    }
+                }
+                StorageMsg::Store { key, value } => {
+                    if let Err(e) = Self::handle_store(backend, key, value).await {
+                        // TODO: add proper logging
+                        println!("{e}");
+                    }
+                }
+                StorageMsg::Remove { key, reply_channel } => {
+                    if let Err(e) = Self::handle_remove(backend, key, reply_channel).await {
+                        // TODO: add proper logging
+                        println!("{e}");
+                    }
+                }
+                StorageMsg::Execute { transaction } => {
+                    if let Err(e) = Self::handle_execute(backend, transaction).await {
+                        // TODO: add proper logging
+                        println!("{e}");
+                    }
+                }
+            }
+        }
     }
 }
 
