@@ -15,18 +15,8 @@ pub trait StorageBackend {
     type Error: Error + 'static;
     type Transaction: Send + Sync;
     fn new(config: Self::Settings) -> Self;
-    async fn store<K: AsRef<[u8]> + Send + Sync, T: Into<Bytes> + Send + Sync>(
-        &self,
-        key: K,
-        value: T,
-    ) -> Result<(), Self::Error>;
-    async fn load<K: AsRef<[u8]> + Send + Sync, T: From<Bytes> + Sized>(
-        &self,
-        key: &K,
-    ) -> Result<Option<T>, Self::Error>;
-    async fn remove<K: AsRef<[u8]> + Send + Sync, T: From<Bytes>>(
-        &self,
-        key: &K,
-    ) -> Result<Option<T>, Self::Error>;
-    async fn execute(&self, transaction: Self::Transaction) -> Result<(), Self::Error>;
+    async fn store(&mut self, key: Bytes, value: Bytes) -> Result<(), Self::Error>;
+    async fn load(&mut self, key: &[u8]) -> Result<Option<Bytes>, Self::Error>;
+    async fn remove(&mut self, key: &[u8]) -> Result<Option<Bytes>, Self::Error>;
+    async fn execute(&mut self, transaction: Self::Transaction) -> Result<(), Self::Error>;
 }
