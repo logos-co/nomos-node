@@ -1,6 +1,5 @@
 #[cfg(feature = "mock")]
 pub mod mock;
-pub mod sled;
 
 // std
 use async_trait::async_trait;
