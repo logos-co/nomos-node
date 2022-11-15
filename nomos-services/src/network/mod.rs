@@ -14,7 +14,7 @@ use tokio::sync::broadcast;
 use tokio::sync::oneshot;
 
 pub enum NetworkMsg<B: NetworkBackend> {
-    Send(B::Message),
+    Process(B::Message),
     Subscribe {
         kind: B::EventKind,
         sender: oneshot::Sender<broadcast::Receiver<B::NetworkEvent>>,
@@ -24,7 +24,7 @@ pub enum NetworkMsg<B: NetworkBackend> {
 impl<B: NetworkBackend> Debug for NetworkMsg<B> {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Self::Send(msg) => write!(fmt, "NetworkMsg::Send({:?})", msg),
+            Self::Process(msg) => write!(fmt, "NetworkMsg::Process({:?})", msg),
             Self::Subscribe { kind, sender } => write!(
                 fmt,
                 "NetworkMsg::Subscribe{{ kind: {:?}, sender: {:?}}}",
@@ -85,10 +85,10 @@ impl<B: NetworkBackend + Send + 'static> ServiceCore for NetworkService<B> {
 
         while let Some(msg) = inbound_relay.recv().await {
             match msg {
-                NetworkMsg::Send(msg) => {
+                NetworkMsg::Process(msg) => {
                     // split sending in two steps to help the compiler understand we do not
                     // need to hold an instance of &I (which is not send) across an await point
-                    let _send = backend.send(msg);
+                    let _send = backend.process(msg);
                     _send.await
                 }
                 NetworkMsg::Subscribe { kind, sender } => sender

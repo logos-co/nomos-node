@@ -2,7 +2,11 @@ use super::*;
 use ::waku::*;
 use overwatch::services::state::NoState;
 use serde::{Deserialize, Serialize};
-use tokio::sync::broadcast::{self, Receiver, Sender};
+use tokio::sync::{
+    broadcast::{self, Receiver, Sender},
+    oneshot,
+};
+use tracing::{debug, error};
 
 const BROADCAST_CHANNEL_BUF: usize = 16;
 
@@ -23,6 +27,22 @@ pub enum WakuBackendMessage {
     Broadcast {
         message: WakuMessage,
         topic: Option<WakuPubSubTopic>,
+    },
+    RelaySubscribe {
+        topic: WakuPubSubTopic,
+    },
+    RelayUnsubscribe {
+        topic: WakuPubSubTopic,
+    },
+    StoreQuery {
+        query: StoreQuery,
+        peer_id: PeerId,
+        response: oneshot::Sender<StoreResponse>,
+    },
+    LightpushPublish {
+        message: WakuMessage,
+        topic: Option<WakuPubSubTopic>,
+        peer_id: PeerId,
     },
 }
 
@@ -58,12 +78,12 @@ impl NetworkBackend for Waku {
         let tx = message_event.clone();
         waku_set_event_callback(move |sig| match sig.event() {
             Event::WakuMessage(ref msg_event) => {
-                tracing::debug!("received message event");
+                debug!("received message event");
                 if tx
                     .send(NetworkEvent::RawMessage(msg_event.waku_message().clone()))
                     .is_err()
                 {
-                    tracing::debug!("no active receiver");
+                    debug!("no active receiver");
                 }
             }
             _ => tracing::warn!("unsupported event"),
@@ -77,17 +97,17 @@ impl NetworkBackend for Waku {
     async fn subscribe(&mut self, kind: Self::EventKind) -> Receiver<Self::NetworkEvent> {
         match kind {
             EventKind::Message => {
-                tracing::debug!("processed subscription to incoming messages");
+                debug!("processed subscription to incoming messages");
                 self.message_event.subscribe()
             }
         }
     }
 
-    async fn send(&self, msg: Self::Message) {
+    async fn process(&self, msg: Self::Message) {
         match msg {
             WakuBackendMessage::Broadcast { message, topic } => {
                 match self.waku.relay_publish_message(&message, topic, None) {
-                    Ok(id) => tracing::debug!(
+                    Ok(id) => debug!(
                         "successfully broadcast message with id: {id}, raw contents: {:?}",
                         message.payload()
                     ),
@@ -97,6 +117,57 @@ impl NetworkBackend for Waku {
                     ),
                 }
             }
+            WakuBackendMessage::LightpushPublish {
+                message,
+                topic,
+                peer_id,
+            } => match self.waku.lightpush_publish(&message, topic, peer_id, None) {
+                Ok(id) => debug!(
+                    "successfully published lighpush message with id: {id}, raw contents: {:?}",
+                    message.payload()
+                ),
+                Err(e) => tracing::error!(
+                    "could not publish lightpush message due to {e}, raw contents {:?}",
+                    message.payload()
+                ),
+            },
+            WakuBackendMessage::RelaySubscribe { topic } => {
+                match self.waku.relay_subscribe(Some(topic.clone())) {
+                    Ok(_) => debug!("successfully subscribed to topic {:?}", topic),
+                    Err(e) => {
+                        tracing::error!("could not subscribe to topic {:?} due to {e}", topic)
+                    }
+                }
+            }
+            WakuBackendMessage::RelayUnsubscribe { topic } => {
+                match self.waku.relay_unsubscribe(Some(topic.clone())) {
+                    Ok(_) => debug!("successfully unsubscribed to topic {:?}", topic),
+                    Err(e) => {
+                        tracing::error!("could not unsubscribe to topic {:?} due to {e}", topic)
+                    }
+                }
+            }
+            WakuBackendMessage::StoreQuery {
+                query,
+                peer_id,
+                response,
+            } => match self.waku.store_query(&query, &peer_id, None) {
+                Ok(res) => {
+                    debug!(
+                        "successfully retrieved stored messages with options {:?}",
+                        query
+                    );
+                    response
+                        .send(res)
+                        .unwrap_or_else(|_| error!("client hung up store query handle"));
+                }
+                Err(e) => {
+                    error!(
+                        "could not retrieve store messages due to {e}, options: {:?}",
+                        query
+                    )
+                }
+            },
         };
     }
 }
