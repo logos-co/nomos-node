@@ -12,3 +12,8 @@ overwatch = { git = "https://github.com/logos-co/Overwatch", branch = "main" }
 tokio = { version = "1", features = ["sync"] }
 thiserror = "1.0"
 tracing = "0.1"
+dashmap = { version = "5.4", optional = true }
+
+[features]
+default = []
+mock = ["dashmap"]

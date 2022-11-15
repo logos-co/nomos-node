@@ -12,10 +12,11 @@ use overwatch::services::relay::RelayMessage;
 use overwatch::services::state::{NoOperator, NoState};
 use overwatch::services::{ServiceCore, ServiceData, ServiceId};
 
+/// Storage message that maps to [`StorageBackend`] trait
 pub enum StorageMsg<Backend: StorageBackend> {
     Load {
         key: Bytes,
-        reply_channel: tokio::sync::oneshot::Sender<Bytes>,
+        reply_channel: tokio::sync::oneshot::Sender<Option<Bytes>>,
     },
     Store {
         key: Bytes,
@@ -30,7 +31,7 @@ pub enum StorageMsg<Backend: StorageBackend> {
     },
 }
 
-//
+// Implement `Debug` manually to avoid constraining `Backend` to `Debug`
 impl<Backend: StorageBackend> Debug for StorageMsg<Backend> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -50,26 +51,30 @@ impl<Backend: StorageBackend> Debug for StorageMsg<Backend> {
 
 impl<Backend: StorageBackend + 'static> RelayMessage for StorageMsg<Backend> {}
 
+/// Storage error
+/// Errors that may happen when performing storage operations
 #[derive(Debug, thiserror::Error)]
 enum StorageServiceError<Backend: StorageBackend> {
     #[error("Couldn't send a reply")]
-    ReplyError(Bytes),
+    ReplyError(Option<Bytes>),
     #[error("Storage backend error")]
     BackendError(#[source] Backend::Error),
 }
 
+/// Storage service that wraps a [`StorageBackend`]
 pub struct StorageService<Backend: StorageBackend + Send + Sync + 'static> {
     backend: Backend,
     service_state: ServiceStateHandle<Self>,
 }
 
 impl<Backend: StorageBackend + Send + Sync + 'static> StorageService<Backend> {
+    /// Handle load message
     async fn handle_load(
         backend: &Backend,
         key: Bytes,
-        reply_channel: tokio::sync::oneshot::Sender<Bytes>,
+        reply_channel: tokio::sync::oneshot::Sender<Option<Bytes>>,
     ) -> Result<(), StorageServiceError<Backend>> {
-        let result: Bytes = backend
+        let result: Option<Bytes> = backend
             .load(&key)
             .await
             .map_err(StorageServiceError::BackendError)?;
@@ -78,6 +83,7 @@ impl<Backend: StorageBackend + Send + Sync + 'static> StorageService<Backend> {
             .map_err(StorageServiceError::ReplyError)
     }
 
+    /// Handle remove message
     async fn handle_remove(
         backend: &Backend,
         key: Bytes,
@@ -91,12 +97,13 @@ impl<Backend: StorageBackend + Send + Sync + 'static> StorageService<Backend> {
         {
             reply_channel
                 .send(result)
-                .map_err(StorageServiceError::ReplyError)?;
+                .map_err(|b| StorageServiceError::ReplyError(Some(b)))?;
         }
 
         Ok(())
     }
 
+    /// Handle store message
     async fn handle_store(
         backend: &Backend,
         key: Bytes,
@@ -108,6 +115,7 @@ impl<Backend: StorageBackend + Send + Sync + 'static> StorageService<Backend> {
             .map_err(StorageServiceError::BackendError)
     }
 
+    /// Handle execute message
     async fn handle_execute(
         backend: &Backend,
         transaction: Backend::Transaction,
