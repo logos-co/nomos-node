@@ -24,11 +24,56 @@ pub enum StorageMsg<Backend: StorageBackend> {
     },
     Remove {
         key: Bytes,
-        reply_channel: Option<tokio::sync::oneshot::Sender<Bytes>>,
+        reply_channel: tokio::sync::oneshot::Sender<Option<Bytes>>,
     },
     Execute {
         transaction: Backend::Transaction,
     },
+}
+
+pub struct StorageReplyReceiver<T>(tokio::sync::oneshot::Receiver<T>);
+
+impl<T> StorageReplyReceiver<T> {
+    pub async fn recv<Output>(self) -> Result<Output, tokio::sync::oneshot::error::RecvError>
+    where
+        Output: From<T>,
+    {
+        self.0.await.map(Output::from)
+    }
+
+    pub fn into_inner(self) -> tokio::sync::oneshot::Receiver<T> {
+        self.0
+    }
+}
+
+impl<Backend: StorageBackend> StorageMsg<Backend> {
+    pub fn new_load_message(
+        key: Bytes,
+    ) -> (StorageMsg<Backend>, StorageReplyReceiver<Option<Bytes>>) {
+        let (reply_channel, receiver) = tokio::sync::oneshot::channel();
+        (
+            Self::Load { key, reply_channel },
+            StorageReplyReceiver(receiver),
+        )
+    }
+
+    pub fn new_store_message(key: Bytes, value: Bytes) -> StorageMsg<Backend> {
+        StorageMsg::Store { key, value }
+    }
+
+    pub fn new_remove_message(
+        key: Bytes,
+    ) -> (StorageMsg<Backend>, StorageReplyReceiver<Option<Bytes>>) {
+        let (reply_channel, receiver) = tokio::sync::oneshot::channel();
+        (
+            Self::Remove { key, reply_channel },
+            StorageReplyReceiver(receiver),
+        )
+    }
+
+    pub fn new_transaction_message(transaction: Backend::Transaction) -> StorageMsg<Backend> {
+        Self::Execute { transaction }
+    }
 }
 
 // Implement `Debug` manually to avoid constraining `Backend` to `Debug`
@@ -87,20 +132,15 @@ impl<Backend: StorageBackend + Send + Sync + 'static> StorageService<Backend> {
     async fn handle_remove(
         backend: &Backend,
         key: Bytes,
-        reply_channel: Option<tokio::sync::oneshot::Sender<Bytes>>,
+        reply_channel: tokio::sync::oneshot::Sender<Option<Bytes>>,
     ) -> Result<(), StorageServiceError<Backend>> {
-        if let Some((result, reply_channel)) = backend
+        let result: Option<Bytes> = backend
             .remove(&key)
             .await
-            .map_err(StorageServiceError::BackendError)?
-            .zip(reply_channel)
-        {
-            reply_channel
-                .send(result)
-                .map_err(|b| StorageServiceError::ReplyError(Some(b)))?;
-        }
-
-        Ok(())
+            .map_err(StorageServiceError::BackendError)?;
+        reply_channel
+            .send(result)
+            .map_err(StorageServiceError::ReplyError)
     }
 
     /// Handle store message
