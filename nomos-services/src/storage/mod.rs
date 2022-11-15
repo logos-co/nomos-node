@@ -31,9 +31,12 @@ pub enum StorageMsg<Backend: StorageBackend> {
     },
 }
 
+/// Reply channel for storage messages
 pub struct StorageReplyReceiver<T>(tokio::sync::oneshot::Receiver<T>);
 
 impl<T> StorageReplyReceiver<T> {
+    /// Receive and transform the reply into the desired type
+    /// Target type must implement `From` from the original backend stored type.
     pub async fn recv<Output>(self) -> Result<Output, tokio::sync::oneshot::error::RecvError>
     where
         Output: From<T>,
@@ -115,7 +118,7 @@ pub struct StorageService<Backend: StorageBackend + Send + Sync + 'static> {
 impl<Backend: StorageBackend + Send + Sync + 'static> StorageService<Backend> {
     /// Handle load message
     async fn handle_load(
-        backend: &Backend,
+        backend: &mut Backend,
         key: Bytes,
         reply_channel: tokio::sync::oneshot::Sender<Option<Bytes>>,
     ) -> Result<(), StorageServiceError<Backend>> {
@@ -130,7 +133,7 @@ impl<Backend: StorageBackend + Send + Sync + 'static> StorageService<Backend> {
 
     /// Handle remove message
     async fn handle_remove(
-        backend: &Backend,
+        backend: &mut Backend,
         key: Bytes,
         reply_channel: tokio::sync::oneshot::Sender<Option<Bytes>>,
     ) -> Result<(), StorageServiceError<Backend>> {
@@ -145,19 +148,19 @@ impl<Backend: StorageBackend + Send + Sync + 'static> StorageService<Backend> {
 
     /// Handle store message
     async fn handle_store(
-        backend: &Backend,
+        backend: &mut Backend,
         key: Bytes,
         value: Bytes,
     ) -> Result<(), StorageServiceError<Backend>> {
         backend
-            .store(&key, value)
+            .store(key, value)
             .await
             .map_err(StorageServiceError::BackendError)
     }
 
     /// Handle execute message
     async fn handle_execute(
-        backend: &Backend,
+        backend: &mut Backend,
         transaction: Backend::Transaction,
     ) -> Result<(), StorageServiceError<Backend>> {
         backend
