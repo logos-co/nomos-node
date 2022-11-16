@@ -29,7 +29,6 @@ impl StorageBackend for SledBackend {
         Self(
             sled::open(config.db_path)
                 // TODO: We should probably make initialization failable
-                .map_err(|e| panic!("{e:?}"))
                 .unwrap(),
         )
     }
