@@ -1,5 +1,7 @@
 #[cfg(feature = "mock")]
 pub mod mock;
+#[cfg(feature = "sled")]
+pub mod sled;
 
 // std
 use std::error::Error;
