@@ -2,15 +2,19 @@ pub mod backends;
 
 // std
 use std::fmt::{Debug, Formatter};
+use std::marker::PhantomData;
 // crates
 use async_trait::async_trait;
 use bytes::Bytes;
 use overwatch::services::handle::ServiceStateHandle;
+use serde::de::DeserializeOwned;
 // internal
+use crate::storage::backends::StorageSerde;
 use backends::StorageBackend;
 use overwatch::services::relay::RelayMessage;
 use overwatch::services::state::{NoOperator, NoState};
 use overwatch::services::{ServiceCore, ServiceData, ServiceId};
+use serde::Serialize;
 
 /// Storage message that maps to [`StorageBackend`] trait
 pub enum StorageMsg<Backend: StorageBackend> {
@@ -32,45 +36,73 @@ pub enum StorageMsg<Backend: StorageBackend> {
 }
 
 /// Reply channel for storage messages
-pub struct StorageReplyReceiver<T>(tokio::sync::oneshot::Receiver<T>);
+pub struct StorageReplyReceiver<T, Backend> {
+    channel: tokio::sync::oneshot::Receiver<T>,
+    _backend: PhantomData<Backend>,
+}
 
-impl<T> StorageReplyReceiver<T> {
+impl<T, Backend> StorageReplyReceiver<T, Backend> {
+    pub fn new(channel: tokio::sync::oneshot::Receiver<T>) -> Self {
+        Self {
+            channel,
+            _backend: Default::default(),
+        }
+    }
+
+    pub fn into_inner(self) -> tokio::sync::oneshot::Receiver<T> {
+        self.channel
+    }
+}
+
+impl<Backend: StorageBackend> StorageReplyReceiver<Bytes, Backend> {
     /// Receive and transform the reply into the desired type
     /// Target type must implement `From` from the original backend stored type.
     pub async fn recv<Output>(self) -> Result<Output, tokio::sync::oneshot::error::RecvError>
     where
-        Output: From<T>,
+        Output: DeserializeOwned,
     {
-        self.0.await.map(Output::from)
-    }
-
-    pub fn into_inner(self) -> tokio::sync::oneshot::Receiver<T> {
-        self.0
+        self.channel
+            .await
+            // TODO: This should probably just return a result anyway. But for now we can consider in infallible.
+            .map(|b| {
+                Backend::SerdeOperator::deserialize(b)
+                    .expect("Recovery from storage should never fail")
+            })
     }
 }
 
 impl<Backend: StorageBackend> StorageMsg<Backend> {
-    pub fn new_load_message(
-        key: Bytes,
-    ) -> (StorageMsg<Backend>, StorageReplyReceiver<Option<Bytes>>) {
+    pub fn new_load_message<K: Serialize>(
+        key: K,
+    ) -> (
+        StorageMsg<Backend>,
+        StorageReplyReceiver<Option<Bytes>, Backend>,
+    ) {
+        let key = Backend::SerdeOperator::serialize(key);
         let (reply_channel, receiver) = tokio::sync::oneshot::channel();
         (
             Self::Load { key, reply_channel },
-            StorageReplyReceiver(receiver),
+            StorageReplyReceiver::new(receiver),
         )
     }
 
-    pub fn new_store_message(key: Bytes, value: Bytes) -> StorageMsg<Backend> {
+    pub fn new_store_message<K: Serialize, V: Serialize>(key: K, value: V) -> StorageMsg<Backend> {
+        let key = Backend::SerdeOperator::serialize(key);
+        let value = Backend::SerdeOperator::serialize(value);
         StorageMsg::Store { key, value }
     }
 
-    pub fn new_remove_message(
-        key: Bytes,
-    ) -> (StorageMsg<Backend>, StorageReplyReceiver<Option<Bytes>>) {
+    pub fn new_remove_message<K: Serialize>(
+        key: K,
+    ) -> (
+        StorageMsg<Backend>,
+        StorageReplyReceiver<Option<Bytes>, Backend>,
+    ) {
+        let key = Backend::SerdeOperator::serialize(key);
         let (reply_channel, receiver) = tokio::sync::oneshot::channel();
         (
             Self::Remove { key, reply_channel },
-            StorageReplyReceiver(receiver),
+            StorageReplyReceiver::new(receiver),
         )
     }
 
