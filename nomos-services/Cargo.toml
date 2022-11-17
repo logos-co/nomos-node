@@ -12,6 +12,7 @@ overwatch = { git = "https://github.com/logos-co/Overwatch", branch = "main" }
 multiaddr = "0.15"
 serde = "1.0"
 sled = { version = "0.34", optional = true }
+surrealdb = { version = "1.0.0-alpha", optional = true }
 tokio = { version = "1", features = ["sync"] }
 thiserror = "1.0"
 tracing = "0.1"
@@ -25,3 +26,6 @@ tokio = { version = "1", features = ["sync", "macros", "time"] }
 default = []
 mock = []
 sled-backend = ["sled"]
+# patch.exe must be in the path for building in windows mscv, you can find it in Git distributions usually under `Gid/usr/bin`
+# check https://github.com/DelSkayn/rquickjs/issues/88 for more information.
+surreal = ["surrealdb"]
