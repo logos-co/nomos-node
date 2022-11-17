@@ -18,6 +18,12 @@ pub trait StorageSerde {
     fn deserialize<T: DeserializeOwned>(buff: Bytes) -> Result<T, Self::Error>;
 }
 
+/// Trait to abstract storage transactions return and operation types
+pub trait StorageTransaction: Send + Sync {
+    type Result: Send + Sync;
+    type Transaction: Send + Sync;
+}
+
 /// Main storage functionality trait
 #[async_trait]
 pub trait StorageBackend {
@@ -28,7 +34,7 @@ pub trait StorageBackend {
     /// Backend transaction type
     /// Usually it will be some function that modifies the storage directly or operates
     /// over the backend as per the backend specification.
-    type Transaction: Send + Sync;
+    type Transaction: StorageTransaction;
     /// Operator to dump/load custom types into the defined backend store type [`Bytes`]
     type SerdeOperator: StorageSerde + Send + Sync + 'static;
     fn new(config: Self::Settings) -> Self;
@@ -36,5 +42,8 @@ pub trait StorageBackend {
     async fn load(&mut self, key: &[u8]) -> Result<Option<Bytes>, Self::Error>;
     async fn remove(&mut self, key: &[u8]) -> Result<Option<Bytes>, Self::Error>;
     /// Execute a transaction in the current backend
-    async fn execute(&mut self, transaction: Self::Transaction) -> Result<(), Self::Error>;
+    async fn execute(
+        &mut self,
+        transaction: Self::Transaction,
+    ) -> Result<<Self::Transaction as StorageTransaction>::Result, Self::Error>;
 }

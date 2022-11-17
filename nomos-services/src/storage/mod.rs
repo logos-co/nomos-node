@@ -9,7 +9,7 @@ use bytes::Bytes;
 use overwatch::services::handle::ServiceStateHandle;
 use serde::de::DeserializeOwned;
 // internal
-use crate::storage::backends::StorageSerde;
+use crate::storage::backends::{StorageSerde, StorageTransaction};
 use backends::StorageBackend;
 use overwatch::services::relay::RelayMessage;
 use overwatch::services::state::{NoOperator, NoState};
@@ -32,6 +32,8 @@ pub enum StorageMsg<Backend: StorageBackend> {
     },
     Execute {
         transaction: Backend::Transaction,
+        reply_channel:
+            tokio::sync::oneshot::Sender<<Backend::Transaction as StorageTransaction>::Result>,
     },
 }
 
@@ -106,8 +108,20 @@ impl<Backend: StorageBackend> StorageMsg<Backend> {
         )
     }
 
-    pub fn new_transaction_message(transaction: Backend::Transaction) -> StorageMsg<Backend> {
-        Self::Execute { transaction }
+    pub fn new_transaction_message(
+        transaction: Backend::Transaction,
+    ) -> (
+        StorageMsg<Backend>,
+        StorageReplyReceiver<<Backend::Transaction as StorageTransaction>::Result, Backend>,
+    ) {
+        let (reply_channel, receiver) = tokio::sync::oneshot::channel();
+        (
+            Self::Execute {
+                transaction,
+                reply_channel,
+            },
+            StorageReplyReceiver::new(receiver),
+        )
     }
 }
 
@@ -135,8 +149,8 @@ impl<Backend: StorageBackend + 'static> RelayMessage for StorageMsg<Backend> {}
 /// Errors that may happen when performing storage operations
 #[derive(Debug, thiserror::Error)]
 enum StorageServiceError<Backend: StorageBackend> {
-    #[error("Couldn't send a reply")]
-    ReplyError(Option<Bytes>),
+    #[error("Couldn't send a reply for operation `{operation}` with key [{key:?}]")]
+    ReplyError { operation: String, key: Bytes },
     #[error("Storage backend error")]
     BackendError(#[source] Backend::Error),
 }
@@ -160,7 +174,10 @@ impl<Backend: StorageBackend + Send + Sync + 'static> StorageService<Backend> {
             .map_err(StorageServiceError::BackendError)?;
         reply_channel
             .send(result)
-            .map_err(StorageServiceError::ReplyError)
+            .map_err(|_| StorageServiceError::ReplyError {
+                operation: "Load".to_string(),
+                key,
+            })
     }
 
     /// Handle remove message
@@ -175,7 +192,10 @@ impl<Backend: StorageBackend + Send + Sync + 'static> StorageService<Backend> {
             .map_err(StorageServiceError::BackendError)?;
         reply_channel
             .send(result)
-            .map_err(StorageServiceError::ReplyError)
+            .map_err(|_| StorageServiceError::ReplyError {
+                operation: "Remove".to_string(),
+                key,
+            })
     }
 
     /// Handle store message
@@ -194,11 +214,20 @@ impl<Backend: StorageBackend + Send + Sync + 'static> StorageService<Backend> {
     async fn handle_execute(
         backend: &mut Backend,
         transaction: Backend::Transaction,
+        reply_channel: tokio::sync::oneshot::Sender<
+            <Backend::Transaction as StorageTransaction>::Result,
+        >,
     ) -> Result<(), StorageServiceError<Backend>> {
-        backend
+        let result = backend
             .execute(transaction)
             .await
-            .map_err(StorageServiceError::BackendError)
+            .map_err(StorageServiceError::BackendError)?;
+        reply_channel
+            .send(result)
+            .map_err(|_| StorageServiceError::ReplyError {
+                operation: "Execute".to_string(),
+                key: Bytes::new(),
+            })
     }
 }
 
@@ -228,9 +257,10 @@ impl<Backend: StorageBackend + Send + Sync + 'static> ServiceCore for StorageSer
                 StorageMsg::Remove { key, reply_channel } => {
                     Self::handle_remove(backend, key, reply_channel).await
                 }
-                StorageMsg::Execute { transaction } => {
-                    Self::handle_execute(backend, transaction).await
-                }
+                StorageMsg::Execute {
+                    transaction,
+                    reply_channel,
+                } => Self::handle_execute(backend, transaction, reply_channel).await,
             } {
                 // TODO: add proper logging
                 println!("{e}");

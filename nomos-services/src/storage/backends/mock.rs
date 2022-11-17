@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::marker::PhantomData;
 // std
 // crates
-use crate::storage::backends::StorageSerde;
+use crate::storage::backends::{StorageSerde, StorageTransaction};
 use async_trait::async_trait;
 use bytes::Bytes;
 use thiserror::Error;
@@ -10,10 +10,17 @@ use thiserror::Error;
 use super::StorageBackend;
 
 #[derive(Debug, Error)]
+#[error("Errors in MockStorage should not happen")]
 pub enum MockStorageError {}
 
 pub type MockStorageTransaction = Box<dyn Fn(&mut HashMap<Bytes, Bytes>) + Send + Sync>;
 
+impl StorageTransaction for MockStorageTransaction {
+    type Result = ();
+    type Transaction = Self;
+}
+
+//
 pub struct MockStorage<SerdeOp> {
     inner: HashMap<Bytes, Bytes>,
     _serde_op: PhantomData<SerdeOp>,
