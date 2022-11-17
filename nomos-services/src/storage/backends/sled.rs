@@ -17,11 +17,13 @@ pub struct SledBackendSettings {
 }
 
 pub type SledTransaction = Box<
-    dyn Fn(&TransactionalTree) -> ConflictableTransactionResult<Bytes, sled::Error> + Send + Sync,
+    dyn Fn(&TransactionalTree) -> ConflictableTransactionResult<Option<Bytes>, sled::Error>
+        + Send
+        + Sync,
 >;
 
 impl StorageTransaction for SledTransaction {
-    type Result = TransactionResult<Bytes, sled::Error>;
+    type Result = TransactionResult<Option<Bytes>, sled::Error>;
     type Transaction = Self;
 }
 
