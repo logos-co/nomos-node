@@ -1,8 +1,7 @@
-use std::marker::PhantomData;
 // std
+use std::marker::PhantomData;
 use std::path::PathBuf;
 // crates
-use crate::storage::backends::{StorageSerde, StorageTransaction};
 use async_trait::async_trait;
 use bytes::Bytes;
 use sled::transaction::{
@@ -10,12 +9,18 @@ use sled::transaction::{
 };
 // internal
 use super::StorageBackend;
+use crate::storage::backends::{StorageSerde, StorageTransaction};
 
+/// Sled backend setting
 #[derive(Clone)]
 pub struct SledBackendSettings {
+    /// File path to the db file
     db_path: PathBuf,
 }
 
+/// Sled transaction type
+/// Function that takes a reference to the transactional tree. No `&mut` needed as sled operations
+/// work over simple `&`.
 pub type SledTransaction = Box<
     dyn Fn(&TransactionalTree) -> ConflictableTransactionResult<Option<Bytes>, sled::Error>
         + Send
