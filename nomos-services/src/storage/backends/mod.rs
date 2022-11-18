@@ -47,3 +47,30 @@ pub trait StorageBackend {
         transaction: Self::Transaction,
     ) -> Result<<Self::Transaction as StorageTransaction>::Result, Self::Error>;
 }
+
+#[cfg(test)]
+pub mod testing {
+    use crate::storage::backends::StorageSerde;
+    use bytes::Bytes;
+    use serde::de::DeserializeOwned;
+    use serde::Serialize;
+    use thiserror::Error;
+
+    pub struct NoStorageSerde;
+
+    #[derive(Error, Debug)]
+    #[error("Fake error")]
+    pub struct NoError;
+
+    impl StorageSerde for NoStorageSerde {
+        type Error = NoError;
+
+        fn serialize<T: Serialize>(_value: T) -> Bytes {
+            Bytes::new()
+        }
+
+        fn deserialize<T: DeserializeOwned>(_buff: Bytes) -> Result<T, Self::Error> {
+            Err(NoError)
+        }
+    }
+}
