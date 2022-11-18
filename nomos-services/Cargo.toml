@@ -17,6 +17,10 @@ thiserror = "1.0"
 tracing = "0.1"
 waku = { git = "https://github.com/waku-org/waku-rust-bindings" }
 
+[dev-dependencies]
+tempfile = "3.3"
+tokio = { version = "1", features = ["sync", "macros", "time"] }
+
 [features]
 default = []
 mock = []
