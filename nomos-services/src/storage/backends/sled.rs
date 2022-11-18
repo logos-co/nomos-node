@@ -90,16 +90,14 @@ mod test {
         let key = "foo";
         let value = "bar";
 
-        {
-            let mut sled_db: SledBackend<NoStorageSerde> = SledBackend::new(sled_settings);
-            sled_db
-                .store(key.as_bytes().into(), value.as_bytes().into())
-                .await?;
-            let load_value = sled_db.load(key.as_bytes()).await?;
-            assert_eq!(load_value, Some(value.as_bytes().into()));
-            let removed_value = sled_db.remove(key.as_bytes()).await?;
-            assert_eq!(removed_value, Some(value.as_bytes().into()));
-        }
+        let mut sled_db: SledBackend<NoStorageSerde> = SledBackend::new(sled_settings);
+        sled_db
+            .store(key.as_bytes().into(), value.as_bytes().into())
+            .await?;
+        let load_value = sled_db.load(key.as_bytes()).await?;
+        assert_eq!(load_value, Some(value.as_bytes().into()));
+        let removed_value = sled_db.remove(key.as_bytes()).await?;
+        assert_eq!(removed_value, Some(value.as_bytes().into()));
 
         Ok(())
     }
@@ -114,20 +112,18 @@ mod test {
         let key = "foo";
         let value = "bar";
 
-        {
-            let mut sled_db: SledBackend<NoStorageSerde> = SledBackend::new(sled_settings);
-            let result = sled_db
-                .execute(Box::new(move |tx| {
-                    let key = key.clone();
-                    let value = value.clone();
-                    tx.insert(key, value)?;
-                    let result = tx.get(key)?;
-                    tx.remove(key)?;
-                    Ok(result.map(|ivec| ivec.to_vec().into()))
-                }))
-                .await??;
-            assert_eq!(result, Some(value.as_bytes().into()))
-        }
+        let mut sled_db: SledBackend<NoStorageSerde> = SledBackend::new(sled_settings);
+        let result = sled_db
+            .execute(Box::new(move |tx| {
+                let key = key.clone();
+                let value = value.clone();
+                tx.insert(key, value)?;
+                let result = tx.get(key)?;
+                tx.remove(key)?;
+                Ok(result.map(|ivec| ivec.to_vec().into()))
+            }))
+            .await??;
+        assert_eq!(result, Some(value.as_bytes().into()));
 
         Ok(())
     }
