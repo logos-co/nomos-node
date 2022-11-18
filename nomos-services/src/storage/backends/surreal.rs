@@ -1,6 +1,7 @@
+use std::future::Future;
 use std::marker::PhantomData;
+use std::pin::Pin;
 // std
-use std::path::{Path, PathBuf};
 // crates
 use async_trait::async_trait;
 use bytes::Bytes;
@@ -8,18 +9,26 @@ use surrealdb::{Datastore, Error, Transaction};
 // internal
 use crate::storage::backends::{StorageBackend, StorageSerde, StorageTransaction};
 
+/// SurrealDb backend settings
 #[derive(Clone, Debug)]
 pub struct SurrealSettings {
-    database_address: PathBuf,
+    /// Connection address
+    database_address: String,
 }
 
+/// SurrealDb backend wrapper
 pub struct SurrealBackend<SerdeOp> {
     surreal: Datastore,
     _serde_op: PhantomData<SerdeOp>,
 }
 
-pub type SurrealTransaction =
-    Box<dyn Fn(Transaction) -> Result<Option<Bytes>, Error> + Send + Sync>;
+/// SurrealDb transaction
+/// An asynchronous executor that operates over a surreal [`Transaction`]
+pub type SurrealTransaction = Box<
+    dyn Fn(Transaction) -> Pin<Box<dyn Future<Output = Result<Option<Bytes>, Error>> + Send + Sync>>
+        + Send
+        + Sync,
+>;
 
 impl StorageTransaction for SurrealTransaction {
     type Result = Result<Option<Bytes>, Error>;
@@ -34,25 +43,41 @@ impl<SerdeOp: StorageSerde + Send + Sync + 'static> StorageBackend for SurrealBa
     type SerdeOperator = SerdeOp;
 
     fn new(config: Self::Settings) -> Self {
-        todo!()
+        // TODO: should we changes `new` to async?
+        let surreal =
+            futures::executor::block_on(Datastore::new(config.database_address.as_str())).unwrap();
+        Self {
+            surreal,
+            _serde_op: Default::default(),
+        }
     }
 
     async fn store(&mut self, key: Bytes, value: Bytes) -> Result<(), Self::Error> {
-        todo!()
+        let mut tx = self.surreal.transaction(true, false).await?;
+        let _ = tx.set(key, value).await?;
+        tx.commit().await
     }
 
     async fn load(&mut self, key: &[u8]) -> Result<Option<Bytes>, Self::Error> {
-        todo!()
+        let mut tx = self.surreal.transaction(true, false).await?;
+        let result = tx.get(key).await?;
+        let _ = tx.commit().await?;
+        Ok(result.map(Bytes::from))
     }
 
     async fn remove(&mut self, key: &[u8]) -> Result<Option<Bytes>, Self::Error> {
-        todo!()
+        let mut tx = self.surreal.transaction(true, false).await?;
+        let value = tx.get(key).await?;
+        let _ = tx.del(key).await?;
+        let _ = tx.commit().await;
+        Ok(value.map(Bytes::from))
     }
 
     async fn execute(
         &mut self,
         transaction: Self::Transaction,
     ) -> Result<<Self::Transaction as StorageTransaction>::Result, Self::Error> {
-        todo!()
+        let tx = self.surreal.transaction(true, false).await?;
+        Ok(transaction(tx).await)
     }
 }
