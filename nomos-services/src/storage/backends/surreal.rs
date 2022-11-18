@@ -81,3 +81,63 @@ impl<SerdeOp: StorageSerde + Send + Sync + 'static> StorageBackend for SurrealBa
         Ok(transaction(tx).await)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::super::testing::NoStorageSerde;
+    use super::*;
+
+    #[tokio::test]
+    async fn test_store_load_remove() -> Result<(), Error> {
+        let config: SurrealSettings = SurrealSettings {
+            database_address: "memory".to_string(),
+        };
+
+        let mut surreal_db: SurrealBackend<NoStorageSerde> = SurrealBackend::new(config);
+        let key = "foo";
+        let value = "bar";
+        let _ = StorageBackend::store(
+            &mut surreal_db,
+            key.as_bytes().into(),
+            value.as_bytes().into(),
+        )
+        .await?;
+
+        let load_value = StorageBackend::load(&mut surreal_db, key.as_bytes()).await?;
+        assert_eq!(load_value, Some(value.as_bytes().into()));
+
+        let removed_value = StorageBackend::remove(&mut surreal_db, key.as_bytes()).await?;
+        assert_eq!(removed_value, Some(value.as_bytes().into()));
+
+        let load_value = StorageBackend::load(&mut surreal_db, key.as_bytes()).await?;
+        assert_eq!(load_value, None);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_transaction() -> Result<(), Error> {
+        let config: SurrealSettings = SurrealSettings {
+            database_address: "memory".to_string(),
+        };
+
+        let mut surreal_db: SurrealBackend<NoStorageSerde> = SurrealBackend::new(config);
+        let key = "foo";
+        let value = "bar";
+
+        let result = StorageBackend::execute(
+            &mut surreal_db,
+            Box::new(move |mut tx| {
+                Box::pin(async move {
+                    tx.set(key.clone(), value).await?;
+                    let value = tx.get(key.clone()).await?;
+                    tx.del(key.clone()).await?;
+                    Ok(value.map(Bytes::from))
+                })
+            }),
+        )
+        .await??;
+        assert_eq!(result, Some(value.as_bytes().into()));
+        Ok(())
+    }
+}

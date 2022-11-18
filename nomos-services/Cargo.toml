@@ -23,6 +23,9 @@ waku = { git = "https://github.com/waku-org/waku-rust-bindings" }
 tempfile = "3.3"
 tokio = { version = "1", features = ["sync", "macros", "time"] }
 
+[dev-dependencies]
+tokio = { version = "1", features = ["sync", "macros", "rt"]}
+
 [features]
 default = []
 mock = []
