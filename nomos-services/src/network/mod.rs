@@ -8,59 +8,67 @@ use overwatch::services::{
     state::{NoOperator, ServiceState},
     ServiceCore, ServiceData, ServiceId,
 };
-use std::fmt::Debug;
+use serde::{Deserialize, Serialize};
+use std::fmt::{self, Debug};
 use tokio::sync::broadcast;
 use tokio::sync::oneshot;
 
-pub type NetworkData = Box<[u8]>;
-
-#[derive(Debug)]
-pub enum NetworkMsg {
-    Broadcast(NetworkData),
+pub enum NetworkMsg<B: NetworkBackend> {
+    Process(B::Message),
     Subscribe {
-        kind: EventKind,
-        sender: oneshot::Sender<broadcast::Receiver<NetworkEvent>>,
+        kind: B::EventKind,
+        sender: oneshot::Sender<broadcast::Receiver<B::NetworkEvent>>,
     },
 }
 
-impl RelayMessage for NetworkMsg {}
-
-#[derive(Debug)]
-pub enum EventKind {
-    Message,
+impl<B: NetworkBackend> Debug for NetworkMsg<B> {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Self::Process(msg) => write!(fmt, "NetworkMsg::Process({:?})", msg),
+            Self::Subscribe { kind, sender } => write!(
+                fmt,
+                "NetworkMsg::Subscribe{{ kind: {:?}, sender: {:?}}}",
+                kind, sender
+            ),
+        }
+    }
 }
 
-#[derive(Debug)]
-pub enum NetworkEvent {
-    RawMessage(NetworkData),
+impl<T: NetworkBackend + 'static> RelayMessage for NetworkMsg<T> {}
+
+#[derive(Serialize, Deserialize)]
+pub struct NetworkConfig<B: NetworkBackend> {
+    pub backend: B::Config,
 }
 
-pub struct NetworkConfig<I: NetworkBackend> {
-    pub backend: I::Config,
+impl<B: NetworkBackend> Debug for NetworkConfig<B> {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        write!(fmt, "NetworkConfig {{ backend: {:?}}}", self.backend)
+    }
 }
 
-pub struct NetworkService<I: NetworkBackend + Send + 'static> {
-    backend: I,
+pub struct NetworkService<B: NetworkBackend + Send + 'static> {
+    backend: B,
     service_state: ServiceStateHandle<Self>,
 }
 
-pub struct NetworkState<I: NetworkBackend> {
-    _backend: I::State,
+pub struct NetworkState<B: NetworkBackend> {
+    _backend: B::State,
 }
 
-impl<I: NetworkBackend + Send + 'static> ServiceData for NetworkService<I> {
+impl<B: NetworkBackend + Send + 'static> ServiceData for NetworkService<B> {
     const SERVICE_ID: ServiceId = "Network";
-    type Settings = NetworkConfig<I>;
-    type State = NetworkState<I>;
+    type Settings = NetworkConfig<B>;
+    type State = NetworkState<B>;
     type StateOperator = NoOperator<Self::State>;
-    type Message = NetworkMsg;
+    type Message = NetworkMsg<B>;
 }
 
 #[async_trait]
-impl<I: NetworkBackend + Send + 'static> ServiceCore for NetworkService<I> {
+impl<B: NetworkBackend + Send + 'static> ServiceCore for NetworkService<B> {
     fn init(mut service_state: ServiceStateHandle<Self>) -> Self {
         Self {
-            backend: <I as NetworkBackend>::new(
+            backend: <B as NetworkBackend>::new(
                 service_state.settings_reader.get_updated_settings().backend,
             ),
             service_state,
@@ -77,20 +85,25 @@ impl<I: NetworkBackend + Send + 'static> ServiceCore for NetworkService<I> {
 
         while let Some(msg) = inbound_relay.recv().await {
             match msg {
-                NetworkMsg::Broadcast(msg) => backend.broadcast(msg),
-                NetworkMsg::Subscribe { kind, sender } => {
-                    sender.send(backend.subscribe(kind)).unwrap_or_else(|_| {
-                        tracing::warn!(
-                            "client hung up before as subscription handle could be established"
-                        )
-                    })
+                NetworkMsg::Process(msg) => {
+                    // split sending in two steps to help the compiler understand we do not
+                    // need to hold an instance of &I (which is not send) across an await point
+                    let _send = backend.process(msg);
+                    _send.await
                 }
+                NetworkMsg::Subscribe { kind, sender } => sender
+                    .send(backend.subscribe(kind).await)
+                    .unwrap_or_else(|_| {
+                        tracing::warn!(
+                            "client hung up before a subscription handle could be established"
+                        )
+                    }),
             }
         }
     }
 }
 
-impl<I: NetworkBackend> Clone for NetworkConfig<I> {
+impl<B: NetworkBackend> Clone for NetworkConfig<B> {
     fn clone(&self) -> Self {
         NetworkConfig {
             backend: self.backend.clone(),
@@ -98,7 +111,7 @@ impl<I: NetworkBackend> Clone for NetworkConfig<I> {
     }
 }
 
-impl<I: NetworkBackend> Clone for NetworkState<I> {
+impl<B: NetworkBackend> Clone for NetworkState<B> {
     fn clone(&self) -> Self {
         NetworkState {
             _backend: self._backend.clone(),
@@ -106,12 +119,12 @@ impl<I: NetworkBackend> Clone for NetworkState<I> {
     }
 }
 
-impl<I: NetworkBackend + Send + 'static> ServiceState for NetworkState<I> {
-    type Settings = NetworkConfig<I>;
+impl<B: NetworkBackend + Send + 'static> ServiceState for NetworkState<B> {
+    type Settings = NetworkConfig<B>;
 
     fn from_settings(settings: &Self::Settings) -> Self {
         Self {
-            _backend: I::State::from_settings(&settings.backend),
+            _backend: B::State::from_settings(&settings.backend),
         }
     }
 }

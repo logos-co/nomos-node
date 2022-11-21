@@ -13,6 +13,9 @@ serde = "1.0"
 tokio = { version = "1", features = ["sync"] }
 thiserror = "1.0"
 tracing = "0.1"
+waku = { git = "https://github.com/waku-org/waku-rust-bindings" }
+multiaddr = "0.15"
+
 
 [features]
 default = []
