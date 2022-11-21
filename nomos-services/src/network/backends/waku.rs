@@ -22,23 +22,25 @@ pub struct WakuConfig {
     initial_peers: Vec<Multiaddr>,
 }
 
+/// Interaction with Waku node
 #[derive(Debug)]
 pub enum WakuBackendMessage {
+    /// Send a message to the network
     Broadcast {
         message: WakuMessage,
         topic: Option<WakuPubSubTopic>,
     },
-    RelaySubscribe {
-        topic: WakuPubSubTopic,
-    },
-    RelayUnsubscribe {
-        topic: WakuPubSubTopic,
-    },
+    /// Subscribe to a particular Waku topic
+    RelaySubscribe { topic: WakuPubSubTopic },
+    /// Unsubscribe from a particular Waku topic
+    RelayUnsubscribe { topic: WakuPubSubTopic },
+    /// Retrieve old messages from another peer
     StoreQuery {
         query: StoreQuery,
         peer_id: PeerId,
         response: oneshot::Sender<StoreResponse>,
     },
+    /// Send a message using Waku Light Push
     LightpushPublish {
         message: WakuMessage,
         topic: Option<WakuPubSubTopic>,
