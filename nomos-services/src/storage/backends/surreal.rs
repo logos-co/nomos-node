@@ -59,7 +59,7 @@ impl<SerdeOp: StorageSerde + Send + Sync + 'static> StorageBackend for SurrealBa
     }
 
     async fn load(&mut self, key: &[u8]) -> Result<Option<Bytes>, Self::Error> {
-        let mut tx = self.surreal.transaction(true, false).await?;
+        let mut tx = self.surreal.transaction(false, false).await?;
         let result = tx.get(key).await?;
         let _ = tx.commit().await?;
         Ok(result.map(Bytes::from))
