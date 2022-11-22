@@ -8,7 +8,7 @@ edition = "2021"
 [dependencies]
 async-trait = "0.1"
 bytes = "1.2"
-overwatch = { git = "https://github.com/logos-co/Overwatch", branch = "main" }
+overwatch-rs = { git = "https://github.com/logos-co/Overwatch", branch = "main" }
 multiaddr = "0.15"
 serde = "1.0"
 sled = { version = "0.34", optional = true }
