@@ -1,5 +1,5 @@
 use super::*;
-use overwatch::services::state::ServiceState;
+use overwatch_rs::services::state::ServiceState;
 use tokio::sync::broadcast::Receiver;
 
 mod waku;

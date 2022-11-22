@@ -1,10 +1,10 @@
-use overwatch::services::{
+use overwatch_rs::services::{
     handle::ServiceStateHandle,
     relay::NoMessage,
     state::{NoOperator, NoState},
     ServiceCore, ServiceData,
 };
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use tracing::Level;
@@ -104,16 +104,24 @@ impl ServiceCore for Logger {
     }
 }
 
-
 mod serde_level {
     use super::Level;
-    use serde::{Serializer, Serialize, Deserialize, Deserializer, de::Error};
+    use serde::{de::Error, Deserialize, Deserializer, Serialize, Serializer};
 
-    pub fn deserialize<'de, D>(deserializer: D) -> Result<Level, D::Error> where D: Deserializer<'de> {
-        <String>::deserialize(deserializer).and_then(|v| v.parse().map_err(|e| D::Error::custom(format!("invalid log level {}", e))))
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Level, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        <String>::deserialize(deserializer).and_then(|v| {
+            v.parse()
+                .map_err(|e| D::Error::custom(format!("invalid log level {}", e)))
+        })
     }
 
-    pub fn serialize<S>(value: &Level, serializer: S) -> Result<S::Ok, S::Error> where S: Serializer {
+    pub fn serialize<S>(value: &Level, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
         value.as_str().serialize(serializer)
     }
 }
