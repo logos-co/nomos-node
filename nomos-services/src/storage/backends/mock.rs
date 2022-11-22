@@ -46,7 +46,7 @@ impl<SerdeOp: StorageSerde + Send + Sync + 'static> StorageBackend for MockStora
     }
 
     async fn load(&mut self, key: &[u8]) -> Result<Option<Bytes>, Self::Error> {
-        Ok(self.inner.get(key).map(|b| Bytes::copy_from_slice(b)))
+        Ok(self.inner.get(key).map(|b| b.clone()))
     }
 
     async fn remove(&mut self, key: &[u8]) -> Result<Option<Bytes>, Self::Error> {
