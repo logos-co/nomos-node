@@ -12,6 +12,7 @@ rand = "0.8"
 overwatch-rs = { git = "https://github.com/logos-co/Overwatch", branch = "main" }
 async-trait = "0.1"
 nomos-network = { path = "../network" }
+nomos-mempool = { path = "../mempool" }
 nomos-core = { path = "../../nomos-core" }
 tokio = { version = "1", features = ["sync"] }
 tokio-stream = "0.1"
