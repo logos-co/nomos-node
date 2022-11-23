@@ -24,6 +24,7 @@ jobs:
   test:
     name: Test Suite
     strategy:
+      fail-fast: false # all OSes should be tested even if one fails (default: true)
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
     runs-on: ${{ matrix.os }}
