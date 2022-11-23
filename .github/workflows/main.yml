@@ -44,6 +44,7 @@ jobs:
         continue-on-error: true
         with:
           command: build
+          args: --all-features
       - uses: actions-rs/cargo@v1
         continue-on-error: true
         with:
