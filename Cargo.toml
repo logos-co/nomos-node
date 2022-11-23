@@ -3,5 +3,6 @@
 members = [
     "nomos-services/log",
     "nomos-services/network",
-    "nomos-services/storage"
+    "nomos-services/storage",
+    "nomos-services/consensus"
 ]
