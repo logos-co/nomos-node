@@ -9,8 +9,8 @@ use bytes::Bytes;
 use overwatch_rs::services::handle::ServiceStateHandle;
 use serde::de::DeserializeOwned;
 // internal
-use crate::storage::backends::{StorageSerde, StorageTransaction};
 use backends::StorageBackend;
+use backends::{StorageSerde, StorageTransaction};
 use overwatch_rs::services::relay::RelayMessage;
 use overwatch_rs::services::state::{NoOperator, NoState};
 use overwatch_rs::services::{ServiceCore, ServiceData, ServiceId};

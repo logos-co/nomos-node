@@ -1,0 +1,25 @@
+[package]
+name = "nomos-storage"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+async-trait = "0.1"
+tokio = { version = "1", features = ["sync"] }
+bytes = "1.2"
+overwatch-rs = { git = "https://github.com/logos-co/Overwatch", branch = "main" }
+serde = "1.0"
+sled = { version = "0.34", optional = true }
+thiserror = "1.0"
+tracing = "0.1"
+
+[dev-dependencies]
+tempfile = "3.3"
+tokio = { version = "1", features = ["sync", "macros", "time"] }
+
+[features]
+default = []
+mock = []
+sled-backend = ["sled"]
