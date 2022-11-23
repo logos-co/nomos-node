@@ -1,9 +1,9 @@
 # copy of https://github.com/actions-rs/meta/blob/master/recipes/quickstart.md
-# These tasks are supposed to run when updating the main branch.
-# The steps are identical to those that run on PRs, but this script includes macos environment.
+# Steps for checking PRs.
 on:
-  push:
-    branches: [main]
+  pull_request:
+    branches:
+      - "*"
 
 name: CI
 
@@ -30,7 +30,7 @@ jobs:
     strategy:
       fail-fast: false # all OSes should be tested even if one fails (default: true)
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        os: [ubuntu-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v2
