@@ -49,6 +49,7 @@ jobs:
         continue-on-error: true
         with:
           command: test
+          args: --all-features
 
   lints:
     name: Rust lints
