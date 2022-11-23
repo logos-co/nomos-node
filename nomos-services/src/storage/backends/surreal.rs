@@ -59,10 +59,12 @@ impl<SerdeOp: StorageSerde + Send + Sync + 'static> StorageBackend for SurrealBa
     }
 
     async fn load(&mut self, key: &[u8]) -> Result<Option<Bytes>, Self::Error> {
-        let mut tx = self.surreal.transaction(false, false).await?;
-        let result = tx.get(key).await?;
-        let _ = tx.commit().await?;
-        Ok(result.map(Bytes::from))
+        self.surreal
+            .transaction(false, false)
+            .await?
+            .get(key)
+            .await
+            .map(|v| v.map(Bytes::from))
     }
 
     async fn remove(&mut self, key: &[u8]) -> Result<Option<Bytes>, Self::Error> {
@@ -96,7 +98,7 @@ mod tests {
         let mut surreal_db: SurrealBackend<NoStorageSerde> = SurrealBackend::new(config);
         let key = "foo";
         let value = "bar";
-        let _ = StorageBackend::store(
+        StorageBackend::store(
             &mut surreal_db,
             key.as_bytes().into(),
             value.as_bytes().into(),
@@ -129,9 +131,9 @@ mod tests {
             &mut surreal_db,
             Box::new(move |mut tx| {
                 Box::pin(async move {
-                    tx.set(key.clone(), value).await?;
-                    let value = tx.get(key.clone()).await?;
-                    tx.del(key.clone()).await?;
+                    tx.set(key, value).await?;
+                    let value = tx.get(key).await?;
+                    tx.del(key).await?;
                     Ok(value.map(Bytes::from))
                 })
             }),

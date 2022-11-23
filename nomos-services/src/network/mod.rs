@@ -2,7 +2,7 @@ pub mod backends;
 
 use async_trait::async_trait;
 use backends::NetworkBackend;
-use overwatch::services::{
+use overwatch_rs::services::{
     handle::ServiceStateHandle,
     relay::RelayMessage,
     state::{NoOperator, ServiceState},

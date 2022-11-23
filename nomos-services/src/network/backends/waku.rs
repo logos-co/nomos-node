@@ -1,6 +1,6 @@
 use super::*;
 use ::waku::*;
-use overwatch::services::state::NoState;
+use overwatch_rs::services::state::NoState;
 use serde::{Deserialize, Serialize};
 use tokio::sync::{
     broadcast::{self, Receiver, Sender},
