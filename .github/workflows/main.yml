@@ -5,7 +5,7 @@ on:
   push:
     branches: [main]
 
-name: CI
+name: Main branch updates check
 
 jobs:
   check:
@@ -30,7 +30,7 @@ jobs:
     strategy:
       fail-fast: false # all OSes should be tested even if one fails (default: true)
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        os: [ubuntu-latest, windows-latest] # macos-latest might be readded later
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v2

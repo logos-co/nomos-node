@@ -5,7 +5,7 @@ on:
     branches:
       - "*"
 
-name: CI
+name: PR check
 
 jobs:
   check:
@@ -27,6 +27,7 @@ jobs:
 
   test:
     name: Test Suite
+    if: ${{ !startsWith(github.event.pull_request.title, "[WIP]") && !contains(github.event.label.name,  'DO NOT MERGE') }}
     strategy:
       fail-fast: false # all OSes should be tested even if one fails (default: true)
       matrix:
