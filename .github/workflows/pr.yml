@@ -31,7 +31,7 @@ jobs:
     strategy:
       fail-fast: false # all OSes should be tested even if one fails (default: true)
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        os: [ubuntu-latest, windows-latest] # macos-latest removed because 1 min on macos is x10 on GH runtime.
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v2
