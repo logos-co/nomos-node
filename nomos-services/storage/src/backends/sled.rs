@@ -9,7 +9,7 @@ use sled::transaction::{
 };
 // internal
 use super::StorageBackend;
-use crate::storage::backends::{StorageSerde, StorageTransaction};
+use crate::backends::{StorageSerde, StorageTransaction};
 
 /// Sled backend setting
 #[derive(Clone)]
@@ -115,8 +115,8 @@ mod test {
         let mut sled_db: SledBackend<NoStorageSerde> = SledBackend::new(sled_settings);
         let result = sled_db
             .execute(Box::new(move |tx| {
-                let key = key.clone();
-                let value = value.clone();
+                let key = key;
+                let value = value;
                 tx.insert(key, value)?;
                 let result = tx.get(key)?;
                 tx.remove(key)?;

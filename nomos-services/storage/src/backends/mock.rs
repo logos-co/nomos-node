@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::marker::PhantomData;
 // std
 // crates
-use crate::storage::backends::{StorageSerde, StorageTransaction};
+use crate::backends::{StorageSerde, StorageTransaction};
 use async_trait::async_trait;
 use bytes::Bytes;
 use thiserror::Error;
