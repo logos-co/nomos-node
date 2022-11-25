@@ -6,14 +6,15 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-async-trait = "0.1"
-tokio = { version = "1", features = ["sync"] }
-bytes = "1.2"
-overwatch-rs = { git = "https://github.com/logos-co/Overwatch", branch = "main" }
-serde = "1.0"
+async-trait = { workspace = true }
+tokio = { workspace = true, features = ["sync"] }
+bytes = { workspace = true } 
+overwatch-rs = { workspace = true }
+serde = { workspace = true }
 sled = { version = "0.34", optional = true }
-thiserror = "1.0"
-tracing = "0.1"
+thiserror = { workspace = true }
+tracing = { workspace = true } 
+
 
 [dev-dependencies]
 tempfile = "3.3"
