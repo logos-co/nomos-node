@@ -27,7 +27,7 @@ pub struct Metrics<E: MetricData> {
 
 #[derive(Debug, Clone)]
 #[repr(transparent)]
-struct MetricsBackend<E> {
+pub struct MetricsBackend<E> {
     stack: Arc<Mutex<HashMap<ServiceId, E>>>,
 }
 
@@ -62,7 +62,7 @@ pub enum MetricsMessage<E: MetricData> {
 impl<E> RelayMessage for MetricsMessage<E> where E: MetricData {}
 
 impl<E: MetricData> ServiceData for Metrics<E> {
-    const SERVICE_ID: &'static str = "Metrics";
+    const SERVICE_ID: ServiceId = "Metrics";
     type Settings = ();
     type State = NoState<Self::Settings>;
     type StateOperator = NoOperator<Self::State>;

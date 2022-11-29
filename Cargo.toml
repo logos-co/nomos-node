@@ -1,8 +1,8 @@
 [workspace]
-
 members = [
+    "nomos-services/graphql",
     "nomos-services/log",
     "nomos-services/metrics",
     "nomos-services/network",
-    "nomos-services/storage"
+    "nomos-services/storage",
 ]

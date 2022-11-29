@@ -8,7 +8,6 @@ edition = "2021"
 [dependencies]
 async-trait = "0.1"
 async-graphql = "4"
-async-graphql-axum = "4"
 clap = { version = "4", features = ["derive", "env"] }
 overwatch-rs = { git = "https://github.com/logos-co/Overwatch", branch = "main" }
 parking_lot = "0.12"
