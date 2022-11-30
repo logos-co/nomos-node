@@ -7,9 +7,11 @@ edition = "2021"
 
 [dependencies]
 async-trait = "0.1"
-async-graphql = "4"
+async-graphql = "5"
 clap = { version = "4", features = ["derive", "env"] }
+metrics-derive = { path = "../metrics-derive" }
 overwatch-rs = { git = "https://github.com/logos-co/Overwatch", branch = "main" }
+once_cell = "1.16"
 parking_lot = "0.12"
 serde = { version = "1", features = ["derive"] }
 tokio = { version = "1", features = ["sync", "macros", "time"] }

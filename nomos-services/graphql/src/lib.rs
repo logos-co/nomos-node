@@ -1,14 +1,24 @@
-use async_graphql::{Schema, EmptyMutation, EmptySubscription};
+use async_graphql::{EmptyMutation, EmptySubscription, Schema};
 use async_graphql_axum::{GraphQLRequest, GraphQLResponse};
-use axum::{Extension, Server, Router, http::{HeaderValue, header::{CONTENT_TYPE, USER_AGENT}}, extract::Path, routing::post};
+use axum::{
+    extract::Path,
+    http::{
+        header::{CONTENT_TYPE, USER_AGENT},
+        HeaderValue,
+    },
+    routing::post,
+    Extension, Router, Server,
+};
 use overwatch_rs::services::{
     handle::ServiceStateHandle,
     relay::NoMessage,
     state::{NoOperator, NoState},
     ServiceCore, ServiceData, ServiceId,
 };
-use tower_http::{cors::{CorsLayer, Any}, trace::TraceLayer};
-
+use tower_http::{
+    cors::{Any, CorsLayer},
+    trace::TraceLayer,
+};
 
 /// Configuration for the GraphQl Server
 #[derive(Debug, Clone, clap::Args)]
@@ -17,7 +27,11 @@ pub struct GraphqlServerSettings {
     #[arg(short, long = "graphql-addr", env = "METRICS_GRAPHQL_BIND_ADDRESS")]
     pub address: std::net::SocketAddr,
     /// Max query depth allowed
-    #[arg(long = "graphql-max-depth", default_value_t = 20, env = "METRICS_GRAPHQL_MAX_DEPTH")]
+    #[arg(
+        long = "graphql-max-depth",
+        default_value_t = 20,
+        env = "METRICS_GRAPHQL_MAX_DEPTH"
+    )]
     pub max_depth: usize,
     /// Max query complexity allowed
     #[arg(
@@ -45,18 +59,13 @@ async fn graphql_handler(
 #[derive(Debug, Clone)]
 pub struct Graphql {
     settings: GraphqlServerSettings,
-    // metrics: metrics::MetricsBackend<E>,
+    metrics: metrics::MetricsBackend,
 }
 
 #[async_graphql::Object]
 impl Graphql {
-    // async fn metrics(&self) -> metrics::MetricsBackend<E> {
-        
-    //     todo!()
-    // }
-
-    async fn hello(&self) -> String {
-        "Hello World!".to_string()
+    async fn metrics(&self) -> &metrics::MetricsBackend {
+        &self.metrics
     }
 }
 
@@ -77,6 +86,7 @@ impl ServiceCore for Graphql {
     fn init(mut service_state: ServiceStateHandle<Self>) -> Self {
         Self {
             settings: service_state.settings_reader.get_updated_settings(),
+            metrics: metrics::MetricsBackend::new(),
         }
     }
 
@@ -88,7 +98,12 @@ impl ServiceCore for Graphql {
                 builder = builder.allow_origin(Any);
             }
             for origin in &self.settings.cors_origins {
-                builder = builder.allow_origin(origin.as_str().parse::<HeaderValue>().expect("fail to parse origin"));
+                builder = builder.allow_origin(
+                    origin
+                        .as_str()
+                        .parse::<HeaderValue>()
+                        .expect("fail to parse origin"),
+                );
             }
             let cors = builder
                 .allow_headers([CONTENT_TYPE, USER_AGENT])
@@ -109,4 +124,3 @@ impl ServiceCore for Graphql {
         });
     }
 }
-

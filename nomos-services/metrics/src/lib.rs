@@ -1,76 +1,50 @@
+use metrics_derive::MetricsData;
 use overwatch_rs::services::{
     handle::ServiceStateHandle,
     relay::{InboundRelay, RelayMessage},
     state::{NoOperator, NoState},
     ServiceCore, ServiceData, ServiceId,
 };
-use parking_lot::Mutex;
-use serde::{de::DeserializeOwned, Serialize};
-use std::{collections::HashMap, sync::Arc};
-
-pub trait MetricData:
-    core::fmt::Debug
-    + Clone
-    + Serialize
-    + DeserializeOwned
-    + async_graphql::OutputType
-    + Send
-    + Sync
-    + 'static
-{
-}
 
 #[repr(transparent)]
-pub struct Metrics<E: MetricData> {
-    inbound_relay: InboundRelay<MetricsMessage<E>>,
+pub struct Metrics {
+    inbound_relay: InboundRelay<MetricsMessage>,
 }
 
-#[derive(Debug, Clone)]
-#[repr(transparent)]
-pub struct MetricsBackend<E> {
-    stack: Arc<Mutex<HashMap<ServiceId, E>>>,
+#[derive(Debug, Clone, PartialEq, Eq, async_graphql::SimpleObject)]
+pub struct FooMetic {
+    pub foo: u32,
 }
 
-impl<E> Default for MetricsBackend<E> {
-    fn default() -> Self {
-        Self {
-            stack: Arc::new(Mutex::new(HashMap::new())),
-        }
-    }
-}
-
-#[async_graphql::Object]
-impl<E: MetricData> MetricsBackend<E> {
-    pub async fn load(&self, name: String) -> Option<E> {
-        let map = self.stack.lock();
-        map.get(name.as_str()).cloned()
-    }
+#[derive(Debug, Clone, PartialEq, Eq, MetricsData)]
+pub enum MetricData {
+    Foo(FooMetic),
 }
 
 #[derive(Debug)]
-pub enum MetricsMessage<E: MetricData> {
+pub enum MetricsMessage {
     Load {
         service_id: ServiceId,
-        tx: tokio::sync::oneshot::Sender<Option<E>>,
+        tx: tokio::sync::oneshot::Sender<Option<MetricData>>,
     },
     Update {
         service_id: ServiceId,
-        data: E,
+        data: MetricData,
     },
 }
 
-impl<E> RelayMessage for MetricsMessage<E> where E: MetricData {}
+impl RelayMessage for MetricsMessage {}
 
-impl<E: MetricData> ServiceData for Metrics<E> {
+impl ServiceData for Metrics {
     const SERVICE_ID: ServiceId = "Metrics";
     type Settings = ();
     type State = NoState<Self::Settings>;
     type StateOperator = NoOperator<Self::State>;
-    type Message = MetricsMessage<E>;
+    type Message = MetricsMessage;
 }
 
 #[async_trait::async_trait]
-impl<E: MetricData> ServiceCore for Metrics<E> {
+impl ServiceCore for Metrics {
     fn init(service_state: ServiceStateHandle<Self>) -> Self {
         Self {
             inbound_relay: service_state.inbound_relay,
@@ -80,7 +54,7 @@ impl<E: MetricData> ServiceCore for Metrics<E> {
     async fn run(self) {
         let Self { mut inbound_relay } = self;
 
-        let backend = MetricsBackend::<E>::default();
+        let backend = MetricsBackend::default();
 
         // thread for handling update metrics
         tokio::spawn(async move {
