@@ -1,8 +1,8 @@
+use std::fmt::Debug;
+
 pub mod backend;
 pub mod frontend;
 
-use std::error::Error;
-use std::fmt::Debug;
 // use metrics_derive::MetricsData;
 use overwatch_rs::services::{
     handle::ServiceStateHandle,
@@ -14,11 +14,11 @@ use overwatch_rs::services::{
 #[async_trait::async_trait]
 pub trait MetricsBackend {
     type MetricsData: Clone + Send + Sync + Debug + 'static;
-    type Error: Error + Send + Sync;
+    type Error: Send + Sync;
     type Settings: Clone + Send + Sync + 'static;
     fn init(config: Self::Settings) -> Self;
-    async fn update(&mut self, data: Self::MetricsData);
-    async fn load(&mut self, service_id: &ServiceId) -> Option<&Self::MetricsData>;
+    async fn update(&mut self, service_id: ServiceId, data: Self::MetricsData);
+    async fn load(&mut self, service_id: ServiceId) -> Option<&Self::MetricsData>;
 }
 
 pub struct MetricsService<Backend: MetricsBackend> {
@@ -33,6 +33,7 @@ pub enum MetricsMessage<Data> {
         reply_channel: tokio::sync::oneshot::Sender<Option<Data>>,
     },
     Update {
+        service_id: ServiceId,
         data: Data,
     },
 }
@@ -62,8 +63,12 @@ impl<Backend: MetricsBackend> MetricsService<Backend> {
         }
     }
 
-    async fn handle_update(backend: &mut Backend, metrics: Backend::MetricsData) {
-        backend.update(metrics).await;
+    async fn handle_update(
+        backend: &mut Backend,
+        service_id: &ServiceId,
+        metrics: Backend::MetricsData,
+    ) {
+        backend.update(service_id, metrics).await;
     }
 }
 
@@ -94,8 +99,8 @@ impl<Backend: MetricsBackend + Send + Sync + 'static> ServiceCore for MetricsSer
                     } => {
                         MetricsService::handle_load(&mut backend, &service_id, reply_channel).await;
                     }
-                    MetricsMessage::Update { data } => {
-                        MetricsService::handle_update(&mut backend, data).await;
+                    MetricsMessage::Update { service_id, data } => {
+                        MetricsService::handle_update(&mut backend, &service_id, data).await;
                     }
                 }
             }
