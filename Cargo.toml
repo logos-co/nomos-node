@@ -1,6 +1,5 @@
 [workspace]
 members = [
-    "nomos-services/graphql",
     "nomos-services/log",
     "nomos-services/metrics",
     "nomos-services/metrics-derive",
