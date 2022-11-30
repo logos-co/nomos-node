@@ -1,1 +1,2 @@
-mod graphql;
+#[cfg(feature = "gql")]
+pub mod graphql;
