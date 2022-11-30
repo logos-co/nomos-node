@@ -84,7 +84,8 @@ impl ServiceData for Graphql {
 #[async_trait::async_trait]
 impl ServiceCore for Graphql {
     fn init(mut service_state: ServiceStateHandle<Self>) -> Self {
-        let (graphql_settings, metrics_backend) = service_state.settings_reader.get_updated_settings();
+        let (graphql_settings, metrics_backend) =
+            service_state.settings_reader.get_updated_settings();
         Self {
             settings: graphql_settings,
             metrics: metrics_backend,
