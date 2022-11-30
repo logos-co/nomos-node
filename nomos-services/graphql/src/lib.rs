@@ -72,9 +72,9 @@ impl Graphql {
 impl ServiceData for Graphql {
     const SERVICE_ID: ServiceId = "Graphql";
 
-    type Settings = GraphqlServerSettings;
+    type Settings = (GraphqlServerSettings, metrics::MetricsBackend);
 
-    type State = NoState<GraphqlServerSettings>;
+    type State = NoState<(GraphqlServerSettings, metrics::MetricsBackend)>;
 
     type StateOperator = NoOperator<Self::State>;
 
@@ -84,9 +84,10 @@ impl ServiceData for Graphql {
 #[async_trait::async_trait]
 impl ServiceCore for Graphql {
     fn init(mut service_state: ServiceStateHandle<Self>) -> Self {
+        let (graphql_settings, metrics_backend) = service_state.settings_reader.get_updated_settings();
         Self {
-            settings: service_state.settings_reader.get_updated_settings(),
-            metrics: metrics::MetricsBackend::new(),
+            settings: graphql_settings,
+            metrics: metrics_backend,
         }
     }
 
