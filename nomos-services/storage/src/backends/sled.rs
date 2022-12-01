@@ -9,7 +9,7 @@ use sled::transaction::{
 };
 // internal
 use super::StorageBackend;
-use crate::storage::backends::{StorageSerde, StorageTransaction};
+use crate::backends::{StorageSerde, StorageTransaction};
 
 /// Sled backend setting
 #[derive(Clone)]
