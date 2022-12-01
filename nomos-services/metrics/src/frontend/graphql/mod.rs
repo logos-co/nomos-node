@@ -1,7 +1,7 @@
 // std
 
 // crates
-use async_graphql::{Any, EmptyMutation, EmptySubscription, Schema};
+use async_graphql::{EmptyMutation, EmptySubscription, Schema};
 use async_graphql_axum::{GraphQLRequest, GraphQLResponse};
 use axum::{
     extract::Path,
@@ -12,11 +12,14 @@ use axum::{
     routing::post,
     Extension, Router, Server,
 };
-use tower_http::{cors::CorsLayer, trace::TraceLayer};
+use tower_http::{
+    cors::{Any, CorsLayer},
+    trace::TraceLayer,
+};
 
 // internal
-use crate::{MetricsBackend, MetricsService};
-use overwatch_rs::services::relay::Relay;
+use crate::{MetricsBackend, MetricsMessage, MetricsService, OwnedServiceId};
+use overwatch_rs::services::relay::{OutboundRelay, Relay};
 use overwatch_rs::services::{
     handle::ServiceStateHandle,
     relay::NoMessage,
@@ -49,24 +52,27 @@ pub struct GraphqlServerSettings {
     pub cors_origins: Vec<String>,
 }
 
-async fn graphql_handler<Backend: MetricsBackend>(
+async fn graphql_handler<Backend: MetricsBackend + Send + 'static + Sync>(
     Path(path): Path<String>,
     schema: Extension<Schema<Graphql<Backend>, EmptyMutation, EmptySubscription>>,
     req: GraphQLRequest,
-) -> GraphQLResponse {
+) -> GraphQLResponse
+where
+    Backend::MetricsData: async_graphql::OutputType,
+{
     drop(path);
     let request = req.into_inner();
     let resp = schema.execute(request).await;
     GraphQLResponse::from(resp)
 }
 
-#[derive(Debug)]
-pub struct Graphql<Backend: MetricsBackend + Send> {
+#[derive(Clone)]
+pub struct Graphql<Backend: MetricsBackend + Send + Sync + 'static> {
     settings: GraphqlServerSettings,
     backend_channel: Relay<MetricsService<Backend>>,
 }
 
-impl<Backend: MetricsBackend> ServiceData for Graphql<Backend> {
+impl<Backend: MetricsBackend + Send + Sync + 'static> ServiceData for Graphql<Backend> {
     const SERVICE_ID: ServiceId = "GraphqlMetrics";
 
     type Settings = GraphqlServerSettings;
@@ -78,8 +84,33 @@ impl<Backend: MetricsBackend> ServiceData for Graphql<Backend> {
     type Message = NoMessage;
 }
 
+#[async_graphql::Object]
+impl<Backend: MetricsBackend + Send + Sync + 'static> Graphql<Backend>
+where
+    Backend::MetricsData: async_graphql::OutputType,
+{
+    pub async fn load(
+        &self,
+        service_id: OwnedServiceId,
+    ) -> async_graphql::Result<Option<<Backend as MetricsBackend>::MetricsData>> {
+        // let (tx, rx) = tokio::sync::oneshot::channel();
+        // self.backend_channel.send(MetricsMessage::Load {
+        //     service_id: service_id.into(),
+        //     reply_channel: tx,
+        // }).await.map_err(|(e, _)| async_graphql::Error::new(e))?;
+        // rx.await.map_err(|e| {
+        //     tracing::error!(err = ?e, "GraphqlMetrics: recv error");
+        //     async_graphql::Error::new("GraphqlMetrics: recv error")
+        // })
+        Ok(None)
+    }
+}
+
 #[async_trait::async_trait]
-impl<Backend: MetricsBackend> ServiceCore for Graphql<Backend> {
+impl<Backend: MetricsBackend + Clone + Send + Sync + 'static> ServiceCore for Graphql<Backend>
+where
+    Backend::MetricsData: async_graphql::OutputType,
+{
     fn init(mut service_state: ServiceStateHandle<Self>) -> Self {
         let settings = service_state.settings_reader.get_updated_settings();
         let backend_channel: Relay<MetricsService<Backend>> =
@@ -111,7 +142,7 @@ impl<Backend: MetricsBackend> ServiceCore for Graphql<Backend> {
 
             let addr = self.settings.address;
             let router = Router::new()
-                .route("/*path", post(graphql_handler))
+                .route("/*path", post(graphql_handler::<Backend>))
                 .layer(Extension(self))
                 .layer(cors)
                 .layer(TraceLayer::new_for_http());

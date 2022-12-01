@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use std::fmt::Debug;
 // crates
 // internal
-use crate::MetricsBackend;
+use crate::{MetricsBackend, OwnedServiceId};
 use overwatch_rs::services::ServiceId;
 
 pub struct MapMetricsBackend<MetricsData>(HashMap<ServiceId, MetricsData>);
@@ -24,7 +24,7 @@ impl<MetricsData: Clone + Debug + Send + Sync + 'static> MetricsBackend
         self.0.insert(service_id, data);
     }
 
-    async fn load(&mut self, service_id: ServiceId) -> Option<&Self::MetricsData> {
-        self.0.get(&service_id)
+    async fn load(&self, service_id: &OwnedServiceId) -> Option<&Self::MetricsData> {
+        self.0.get(service_id.as_ref())
     }
 }

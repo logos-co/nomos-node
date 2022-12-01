@@ -18,7 +18,7 @@ pub trait MetricsBackend {
     type Settings: Clone + Send + Sync + 'static;
     fn init(config: Self::Settings) -> Self;
     async fn update(&mut self, service_id: ServiceId, data: Self::MetricsData);
-    async fn load(&mut self, service_id: ServiceId) -> Option<&Self::MetricsData>;
+    async fn load(&self, service_id: &OwnedServiceId) -> Option<&Self::MetricsData>;
 }
 
 pub struct MetricsService<Backend: MetricsBackend> {
@@ -26,10 +26,67 @@ pub struct MetricsService<Backend: MetricsBackend> {
     backend: Backend,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Ord, PartialOrd)]
+pub struct OwnedServiceId {
+    id: String,
+}
+
+impl From<ServiceId> for OwnedServiceId {
+    fn from(id: ServiceId) -> Self {
+        Self { id: id.into() }
+    }
+}
+
+impl From<String> for OwnedServiceId {
+    fn from(id: String) -> Self {
+        Self { id }
+    }
+}
+
+impl core::fmt::Display for OwnedServiceId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.id)
+    }
+}
+
+impl AsRef<str> for OwnedServiceId {
+    fn as_ref(&self) -> &str {
+        &self.id
+    }
+}
+
+impl async_graphql::InputType for OwnedServiceId {
+    type RawValueType = Self;
+
+    fn type_name() -> std::borrow::Cow<'static, str> {
+        <String as async_graphql::InputType>::type_name()
+    }
+
+    fn create_type_info(registry: &mut async_graphql::registry::Registry) -> String {
+        <String as async_graphql::InputType>::create_type_info(registry)
+    }
+
+    fn parse(
+        value: Option<async_graphql::Value>,
+    ) -> async_graphql::InputValueResult<OwnedServiceId> {
+        <String as async_graphql::InputType>::parse(value)
+            .map(Self::from)
+            .map_err(async_graphql::InputValueError::propagate)
+    }
+
+    fn to_value(&self) -> async_graphql::Value {
+        <String as async_graphql::InputType>::to_value(&self.id)
+    }
+
+    fn as_raw_value(&self) -> Option<&Self::RawValueType> {
+        Some(self)
+    }
+}
+
 #[derive(Debug)]
 pub enum MetricsMessage<Data> {
     Load {
-        service_id: ServiceId,
+        service_id: OwnedServiceId,
         reply_channel: tokio::sync::oneshot::Sender<Option<Data>>,
     },
     Update {
@@ -51,7 +108,7 @@ impl<Backend: MetricsBackend> ServiceData for MetricsService<Backend> {
 impl<Backend: MetricsBackend> MetricsService<Backend> {
     async fn handle_load(
         backend: &mut Backend,
-        service_id: &ServiceId,
+        service_id: &OwnedServiceId,
         reply_channel: tokio::sync::oneshot::Sender<Option<Backend::MetricsData>>,
     ) {
         let metrics = backend.load(service_id).await.cloned();
