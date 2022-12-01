@@ -8,7 +8,8 @@ pub struct Member<'view, const C: usize> {
     committees: Committees<'view, C>,
 }
 
-/// Just a newtype index to be able to implement parent/children methods
+/// #Just a newtype index to be able to implement parent/children methods
+#[derive(Copy, Clone)]
 pub struct Committee(usize);
 
 pub struct Committees<'view, const C: usize> {
@@ -69,7 +70,9 @@ impl Committee {
 impl<'view, const C: usize> Member<'view, C> {
     /// Return other members of this committee
     pub fn peers(&self) -> &[NodeId] {
-        todo!();
+        self.committees
+            .get_committee_members(self.committee)
+            .unwrap()
     }
 
     /// Return the participant in the parent committee this member should interact
