@@ -24,9 +24,8 @@ pub type Stake = u64;
 
 use crate::network::NetworkAdapter;
 use nomos_network::NetworkService;
-use overwatch_rs::services::relay::Relay;
+use overwatch_rs::services::relay::{OutboundRelay, Relay};
 use std::collections::{BTreeMap, HashSet};
-use std::marker::PhantomData;
 
 const COMMITTEE_SIZE: usize = 1;
 
@@ -39,7 +38,7 @@ pub struct CarnotConsensus<Network: NetworkAdapter + Send + Sync + 'static> {
     service_state: ServiceStateHandle<Self>,
     // underlying networking backend. We need this so we can relay and check the types properly
     // when implementing ServiceCore for CarnotConsensus
-    _network: PhantomData<Network>,
+    network_relay: Relay<NetworkService<<Network as NetworkAdapter>::Backend>>,
 }
 
 impl<Network: NetworkAdapter + Send + Sync + 'static> ServiceData for CarnotConsensus<Network> {
@@ -53,15 +52,20 @@ impl<Network: NetworkAdapter + Send + Sync + 'static> ServiceData for CarnotCons
 #[async_trait::async_trait]
 impl<Network: NetworkAdapter + Send + Sync + 'static> ServiceCore for CarnotConsensus<Network> {
     fn init(service_state: ServiceStateHandle<Self>) -> Self {
+        let network_relay = service_state.overwatch_handle.relay();
         Self {
             service_state,
-            _network: Default::default(),
+            network_relay,
         }
     }
 
     async fn run(mut self) {
-        let network_relay: Relay<NetworkService<<Network as NetworkAdapter>::Backend>> =
-            self.service_state.overwatch_handle.relay();
+        let network_relay: OutboundRelay<_> = self
+            .network_relay
+            .connect()
+            .await
+            .expect("Relay connection with NetworkService should succeed");
+
         let network_adapter = Network::new(network_relay);
         let block_stream = self.subscribe_to_incoming_blocks().await;
         // TODO: fix
