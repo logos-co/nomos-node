@@ -19,7 +19,7 @@ use tower_http::{
 
 // internal
 use crate::{MetricsBackend, MetricsMessage, MetricsService, OwnedServiceId};
-use overwatch_rs::services::relay::{OutboundRelay, Relay};
+use overwatch_rs::services::relay::Relay;
 use overwatch_rs::services::{
     handle::ServiceStateHandle,
     relay::NoMessage,
@@ -93,16 +93,23 @@ where
         &self,
         service_id: OwnedServiceId,
     ) -> async_graphql::Result<Option<<Backend as MetricsBackend>::MetricsData>> {
-        // let (tx, rx) = tokio::sync::oneshot::channel();
-        // self.backend_channel.send(MetricsMessage::Load {
-        //     service_id: service_id.into(),
-        //     reply_channel: tx,
-        // }).await.map_err(|(e, _)| async_graphql::Error::new(e))?;
-        // rx.await.map_err(|e| {
-        //     tracing::error!(err = ?e, "GraphqlMetrics: recv error");
-        //     async_graphql::Error::new("GraphqlMetrics: recv error")
-        // })
-        Ok(None)
+        let replay = self
+            .backend_channel
+            .connect()
+            .await
+            .map_err(|e| async_graphql::Error::new(e.to_string()))?;
+        let (tx, rx) = tokio::sync::oneshot::channel();
+        replay
+            .send(MetricsMessage::Load {
+                service_id,
+                reply_channel: tx,
+            })
+            .await
+            .map_err(|(e, _)| async_graphql::Error::new(e.to_string()))?;
+        rx.await.map_err(|e| {
+            tracing::error!(err = ?e, "GraphqlMetrics: recv error");
+            async_graphql::Error::new("GraphqlMetrics: recv error")
+        })
     }
 }
 
@@ -111,7 +118,7 @@ impl<Backend: MetricsBackend + Clone + Send + Sync + 'static> ServiceCore for Gr
 where
     Backend::MetricsData: async_graphql::OutputType,
 {
-    fn init(mut service_state: ServiceStateHandle<Self>) -> Self {
+    fn init(service_state: ServiceStateHandle<Self>) -> Self {
         let settings = service_state.settings_reader.get_updated_settings();
         let backend_channel: Relay<MetricsService<Backend>> =
             service_state.overwatch_handle.relay();

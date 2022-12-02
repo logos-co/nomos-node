@@ -55,6 +55,7 @@ impl AsRef<str> for OwnedServiceId {
     }
 }
 
+#[cfg(feature = "async-graphql")]
 impl async_graphql::InputType for OwnedServiceId {
     type RawValueType = Self;
 
@@ -131,7 +132,7 @@ impl<Backend: MetricsBackend> MetricsService<Backend> {
 
 #[async_trait::async_trait]
 impl<Backend: MetricsBackend + Send + Sync + 'static> ServiceCore for MetricsService<Backend> {
-    fn init(mut service_state: ServiceStateHandle<Self>) -> Self {
+    fn init(service_state: ServiceStateHandle<Self>) -> Self {
         let settings = service_state.settings_reader.get_updated_settings();
         let backend = Backend::init(settings);
         let inbound_relay = service_state.inbound_relay;

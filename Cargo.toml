@@ -2,7 +2,6 @@
 members = [
     "nomos-services/log",
     "nomos-services/metrics",
-    "nomos-services/metrics-derive",
     "nomos-services/network",
     "nomos-services/storage",
 ]
