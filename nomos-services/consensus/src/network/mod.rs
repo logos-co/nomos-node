@@ -1,5 +1,4 @@
-#[cfg(feature = "waku")]
-pub mod waku;
+pub mod adapters;
 
 use crate::{Approval, Block};
 use futures::Stream;

@@ -11,7 +11,7 @@ pub struct WakuAdapter {
 }
 
 impl NetworkAdapter for WakuAdapter {
-    type Backend = ();
+    type Backend = Waku;
 
     fn new(
         network_relay: OutboundRelay<<NetworkService<Self::Backend> as ServiceData>::Message>,
