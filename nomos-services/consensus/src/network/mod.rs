@@ -1,21 +1,22 @@
 pub mod adapters;
 mod messages;
 
-use crate::{Approval, Block};
+use crate::{Approval, Block, BlockChunk, View};
+use async_trait::async_trait;
 use futures::Stream;
 use nomos_network::backends::NetworkBackend;
 use nomos_network::NetworkService;
 use overwatch_rs::services::relay::OutboundRelay;
 use overwatch_rs::services::ServiceData;
 
+#[async_trait::async_trait]
 pub trait NetworkAdapter {
     type Backend: NetworkBackend + Send + Sync + 'static;
-    fn new(
+    async fn new(
         network_relay: OutboundRelay<<NetworkService<Self::Backend> as ServiceData>::Message>,
     ) -> Self;
-
-    fn proposals_stream(&self) -> Box<dyn Stream<Item = Block>>;
-    fn broadcast_block(&self, block: Block);
-    fn approvals_stream(&self) -> Box<dyn Stream<Item = Approval>>;
-    fn forward_approval(&self, approval: Approval);
+    async fn proposal_chunks_stream(&self) -> Box<dyn Stream<Item = BlockChunk>>;
+    async fn broadcast_block_chunk(&self, view: View, block: BlockChunk);
+    async fn approvals_stream(&self) -> Box<dyn Stream<Item = Approval>>;
+    async fn forward_approval(&self, approval: Approval);
 }
