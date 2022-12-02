@@ -96,15 +96,6 @@ impl NetworkBackend for Waku {
         }
     }
 
-    async fn subscribe(&mut self, kind: Self::EventKind) -> Receiver<Self::NetworkEvent> {
-        match kind {
-            EventKind::Message => {
-                debug!("processed subscription to incoming messages");
-                self.message_event.subscribe()
-            }
-        }
-    }
-
     async fn process(&self, msg: Self::Message) {
         match msg {
             WakuBackendMessage::Broadcast { message, topic } => {
@@ -171,5 +162,14 @@ impl NetworkBackend for Waku {
                 }
             },
         };
+    }
+
+    async fn subscribe(&mut self, kind: Self::EventKind) -> Receiver<Self::NetworkEvent> {
+        match kind {
+            EventKind::Message => {
+                debug!("processed subscription to incoming messages");
+                self.message_event.subscribe()
+            }
+        }
     }
 }
