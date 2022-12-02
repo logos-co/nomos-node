@@ -1,5 +1,4 @@
 use super::*;
-use ::waku::*;
 use overwatch_rs::services::state::NoState;
 use serde::{Deserialize, Serialize};
 use tokio::sync::{
@@ -7,6 +6,7 @@ use tokio::sync::{
     oneshot,
 };
 use tracing::{debug, error};
+use waku_bindings::*;
 
 const BROADCAST_CHANNEL_BUF: usize = 16;
 
