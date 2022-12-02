@@ -68,7 +68,7 @@ macro_rules! registry_init {
 
 #[async_trait::async_trait]
 impl ServiceCore for Logger {
-    fn init(mut service_state: ServiceStateHandle<Self>) -> Self {
+    fn init(service_state: ServiceStateHandle<Self>) -> Self {
         let config = service_state.settings_reader.get_updated_settings();
         let (non_blocking, _guard) = match config.backend {
             LoggerBackend::Gelf { addr } => {
