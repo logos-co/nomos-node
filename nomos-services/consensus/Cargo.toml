@@ -13,3 +13,7 @@ async-trait = "0.1"
 nomos-network = { path = "../network" }
 tokio = { version = "1", features = ["sync"] }
 futures = "0.3"
+
+[features]
+default = []
+waku = ["nomos-network/waku"]

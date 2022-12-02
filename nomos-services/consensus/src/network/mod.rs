@@ -1,3 +1,6 @@
+#[cfg(feature = "waku")]
+pub mod waku;
+
 use crate::{Approval, Block};
 use futures::Stream;
 use nomos_network::backends::NetworkBackend;
