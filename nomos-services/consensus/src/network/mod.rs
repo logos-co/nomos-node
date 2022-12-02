@@ -1,4 +1,3 @@
-use crate::overlay::Overlay;
 use crate::{Approval, Block};
 use futures::Stream;
 use nomos_network::backends::NetworkBackend;
