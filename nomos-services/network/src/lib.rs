@@ -66,7 +66,7 @@ impl<B: NetworkBackend + Send + 'static> ServiceData for NetworkService<B> {
 
 #[async_trait]
 impl<B: NetworkBackend + Send + 'static> ServiceCore for NetworkService<B> {
-    fn init(mut service_state: ServiceStateHandle<Self>) -> Self {
+    fn init(service_state: ServiceStateHandle<Self>) -> Self {
         Self {
             backend: <B as NetworkBackend>::new(
                 service_state.settings_reader.get_updated_settings().backend,

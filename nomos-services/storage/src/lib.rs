@@ -233,7 +233,7 @@ impl<Backend: StorageBackend + Send + Sync + 'static> StorageService<Backend> {
 
 #[async_trait]
 impl<Backend: StorageBackend + Send + Sync + 'static> ServiceCore for StorageService<Backend> {
-    fn init(mut service_state: ServiceStateHandle<Self>) -> Self {
+    fn init(service_state: ServiceStateHandle<Self>) -> Self {
         Self {
             backend: Backend::new(service_state.settings_reader.get_updated_settings()),
             service_state,
