@@ -1,4 +1,5 @@
 pub mod adapters;
+mod messages;
 
 use crate::{Approval, Block};
 use futures::Stream;

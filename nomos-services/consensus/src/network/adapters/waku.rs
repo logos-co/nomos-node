@@ -1,5 +1,5 @@
-use super::NetworkAdapter;
-use crate::{Approval, Block};
+use crate::network::NetworkAdapter;
+use crate::{Approval, Block, BlockChunk};
 use futures::Stream;
 use nomos_network::backends::Waku;
 use nomos_network::NetworkService;
@@ -19,7 +19,7 @@ impl NetworkAdapter for WakuAdapter {
         todo!()
     }
 
-    fn proposals_stream(&self) -> Box<dyn Stream<Item = Block>> {
+    fn proposals_stream(&self) -> Box<dyn Stream<Item = BlockChunk>> {
         todo!()
     }
 

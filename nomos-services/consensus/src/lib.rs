@@ -113,8 +113,20 @@ impl ViewGenerator {
     }
 }
 
+/// A block
 #[derive(Clone)]
 pub struct Block;
+
+/// A block chunk, N pieces are necessary to reconstruct the full block
+#[derive(Clone, Copy)]
+pub struct BlockChunk;
+
+impl Block {
+    /// Fake implementation of erasure coding protocol
+    pub fn chunk<const SIZE: usize>(self) -> [BlockChunk; SIZE] {
+        [BlockChunk; SIZE]
+    }
+}
 
 #[derive(Hash, Eq, PartialEq)]
 pub struct Approval;
