@@ -138,10 +138,10 @@ impl View {
     ) {
         let overlay = O::new(self, node_id);
 
-        let block = overlay.reconstruct_proposal_block(&adapter).await;
+        let block = overlay.reconstruct_proposal_block(adapter).await;
         // TODO: verify?
-        overlay.broadcast_block(block.clone(), &adapter).await;
-        self.approve(&overlay, block, &adapter).await;
+        overlay.broadcast_block(block.clone(), adapter).await;
+        self.approve(&overlay, block, adapter).await;
     }
 
     async fn approve<'view, Network: NetworkAdapter, O: Overlay<'view, Network>>(
@@ -152,12 +152,12 @@ impl View {
     ) {
         // wait for approval in the overlay, if necessary
         let mut approvals = HashSet::new();
-        let mut stream = overlay.collect_approvals(block, &adapter).await;
+        let mut stream = overlay.collect_approvals(block, adapter).await;
         while let Some(approval) = stream.recv().await {
             approvals.insert(approval);
             if approvals.len() > Self::APPROVAL_THRESHOLD {
                 let self_approval = self.craft_proof_of_approval(approvals.into_iter());
-                overlay.forward_approval(self_approval, &adapter).await;
+                overlay.forward_approval(self_approval, adapter).await;
                 return;
             }
         }
