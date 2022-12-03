@@ -1,11 +1,11 @@
 # copy of https://github.com/actions-rs/meta/blob/master/recipes/quickstart.md
-# These tasks are supposed to run when updating the main branch.
-# The steps are identical to those that run on PRs, but this script includes macos environment.
+# Steps for checking PRs.
 on:
-  push:
-    branches: [main]
+  pull_request:
+    branches:
+      - "*"
 
-name: Main branch updates check
+name: PR check
 
 jobs:
   check:
@@ -27,6 +27,7 @@ jobs:
 
   test:
     name: Test Suite
+    if: ${{ !startsWith(github.event.pull_request.title, '[WIP]') && !contains(github.event.label.name,  'DO NOT MERGE') }}
     strategy:
       fail-fast: false # all OSes should be tested even if one fails (default: true)
       matrix:
