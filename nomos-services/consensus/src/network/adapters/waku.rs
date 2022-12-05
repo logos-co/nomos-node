@@ -2,8 +2,6 @@
 // crates
 use futures::{Stream, StreamExt};
 use once_cell::sync::Lazy;
-use tokio::sync::broadcast::Receiver;
-use tokio::sync::oneshot::error::RecvError;
 use tokio_stream::wrappers::BroadcastStream;
 // internal
 use crate::network::messages::{ApprovalMsg, ProposalChunkMsg};
@@ -43,7 +41,12 @@ pub struct WakuAdapter {
 }
 
 impl WakuAdapter {
-    async fn message_subscriber_channel(&self) -> Result<Receiver<NetworkEvent>, RecvError> {
+    async fn message_subscriber_channel(
+        &self,
+    ) -> Result<
+        tokio::sync::broadcast::Receiver<NetworkEvent>,
+        tokio::sync::oneshot::error::RecvError,
+    > {
         let (sender, receiver) = tokio::sync::oneshot::channel();
         if let Err((_, _e)) = self
             .network_relay
