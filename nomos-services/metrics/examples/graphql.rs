@@ -1,5 +1,9 @@
-use metrics::{MetricsService, frontend::graphql::{GraphqlServerSettings, Graphql}, backend::map::MapMetricsBackend};
 use clap::Parser;
+use metrics::{
+    backend::map::MapMetricsBackend,
+    frontend::graphql::{Graphql, GraphqlServerSettings},
+    MetricsService,
+};
 use overwatch_rs::{overwatch::OverwatchRunner, services::handle::ServiceHandle};
 
 #[derive(overwatch_derive::Services)]
@@ -19,8 +23,6 @@ pub struct MetricsData {
     duration: u64,
 }
 
-
-
 fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let settings = Args::parse();
     let graphql = OverwatchRunner::<Services>::run(
@@ -28,9 +30,9 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             graphql: settings.graphql,
             metrics: (),
         },
-        None
+        None,
     );
-    
+
     tracing_subscriber::fmt::fmt()
         .with_env_filter(std::env::var("RUST_LOG").unwrap_or_else(|_| "info".to_owned()))
         .with_file(false)

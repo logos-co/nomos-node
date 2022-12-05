@@ -4,13 +4,13 @@
 use async_graphql::{EmptyMutation, EmptySubscription, Schema};
 use async_graphql_axum::{GraphQLRequest, GraphQLResponse};
 use axum::{
-    extract::Path,
+    extract::State,
     http::{
         header::{CONTENT_TYPE, USER_AGENT},
         HeaderValue,
     },
     routing::post,
-    Extension, Router, Server,
+    Router, Server,
 };
 use tower_http::{
     cors::{Any, CorsLayer},
@@ -54,14 +54,12 @@ pub struct GraphqlServerSettings {
 }
 
 async fn graphql_handler<Backend: MetricsBackend + Send + 'static + Sync>(
-    Path(path): Path<String>,
-    schema: Extension<Schema<Graphql<Backend>, EmptyMutation, EmptySubscription>>,
+    schema: State<Schema<Graphql<Backend>, EmptyMutation, EmptySubscription>>,
     req: GraphQLRequest,
 ) -> GraphQLResponse
 where
     Backend::MetricsData: async_graphql::OutputType,
 {
-    drop(path);
     let request = req.into_inner();
     let resp = schema.execute(request).await;
     GraphQLResponse::from(resp)
@@ -130,45 +128,46 @@ where
     }
 
     async fn run(self) {
-        // thread for handling graphql query
-        tokio::spawn(async move {
-            let mut builder = CorsLayer::new();
-            if self.settings.cors_origins.is_empty() {
-                builder = builder.allow_origin(Any);
-            }
-            for origin in &self.settings.cors_origins {
-                builder = builder.allow_origin(
-                    origin
-                        .as_str()
-                        .parse::<HeaderValue>()
-                        .expect("fail to parse origin"),
-                );
-            }
-            let cors = builder
-                .allow_headers([CONTENT_TYPE, USER_AGENT])
-                .allow_methods(Any);
+        let mut builder = CorsLayer::new();
+        if self.settings.cors_origins.is_empty() {
+            builder = builder.allow_origin(Any);
+        }
+        for origin in &self.settings.cors_origins {
+            builder = builder.allow_origin(
+                origin
+                    .as_str()
+                    .parse::<HeaderValue>()
+                    .expect("fail to parse origin"),
+            );
+        }
+        let cors = builder
+            .allow_headers([CONTENT_TYPE, USER_AGENT])
+            .allow_methods(Any);
 
-            let addr = self.settings.address;
-            let max_complexity = self.settings.max_complexity;
-            let max_depth = self.settings.max_depth;
-            let schema = async_graphql::Schema::build(self, async_graphql::EmptyMutation, async_graphql::EmptySubscription)
-                .limit_complexity(max_complexity)
-                .limit_depth(max_depth)
-                .extension(async_graphql::extensions::Tracing)
-                .finish();
-    
-            tracing::info!(schema = %schema.sdl(), "GraphQL schema definition");
-            let router = Router::new()
-                .route("/*path", post(graphql_handler::<Backend>))
-                .layer(Extension(schema))
-                .layer(cors)
-                .layer(TraceLayer::new_for_http());
+        let addr = self.settings.address;
+        let max_complexity = self.settings.max_complexity;
+        let max_depth = self.settings.max_depth;
+        let schema = async_graphql::Schema::build(
+            self,
+            async_graphql::EmptyMutation,
+            async_graphql::EmptySubscription,
+        )
+        .limit_complexity(max_complexity)
+        .limit_depth(max_depth)
+        .extension(async_graphql::extensions::Tracing)
+        .finish();
 
-            tracing::info!("Metrics Service GraphQL server listening: {}", addr);
-            Server::bind(&addr)
-                .serve(router.into_make_service())
-                .await
-                .unwrap();
-        });
+        tracing::info!(schema = %schema.sdl(), "GraphQL schema definition");
+        let router = Router::new()
+            .route("/", post(graphql_handler::<Backend>))
+            .with_state(schema)
+            .layer(cors)
+            .layer(TraceLayer::new_for_http());
+
+        tracing::info!("Metrics Service GraphQL server listening: {}", addr);
+        Server::bind(&addr)
+            .serve(router.into_make_service())
+            .await
+            .unwrap();
     }
 }
