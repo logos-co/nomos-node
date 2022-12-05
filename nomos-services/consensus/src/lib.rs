@@ -112,13 +112,20 @@ impl ViewGenerator {
 pub struct Block;
 
 /// A block chunk, N pieces are necessary to reconstruct the full block
-#[derive(Clone, Copy)]
-pub struct BlockChunk;
+#[derive(Clone, Copy, Debug)]
+pub struct BlockChunk {
+    index: u8,
+}
 
 impl Block {
     /// Fake implementation of erasure coding protocol
     pub fn chunk<const SIZE: usize>(self) -> [BlockChunk; SIZE] {
-        [BlockChunk; SIZE]
+        // TODO: this is a completely temporary and fake implementation
+        (0..SIZE)
+            .map(|i| BlockChunk { index: i as u8 })
+            .collect::<Vec<_>>()
+            .try_into()
+            .expect("This should not fail unless chunking exceed memory limits")
     }
 }
 
@@ -136,7 +143,7 @@ pub struct View {
 impl View {
     const APPROVAL_THRESHOLD: usize = 1;
 
-    // TODO: might want to encode steps in the typesystem
+    // TODO: might want to encode steps in the type system
     async fn resolve<'view, Network: NetworkAdapter, O: Overlay<'view, Network>>(
         &'view self,
         node_id: NodeId,
