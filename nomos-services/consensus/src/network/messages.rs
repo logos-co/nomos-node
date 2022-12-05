@@ -1,27 +1,26 @@
 use crate::{Approval, BlockChunk, NodeId};
 
 pub struct ProposalChunkMsg {
-    index: u8,
-    chunk: BlockChunk,
+    pub chunk: BlockChunk,
 }
 
 // TODO: this is completely temporal and match no reality at all, but it will help use fake some of the process
 impl ProposalChunkMsg {
     pub fn as_bytes<const SIZE: usize>(&self) -> [u8; SIZE] {
-        [self.index; SIZE]
+        [self.chunk.index; SIZE]
     }
 
     pub fn from_bytes<const SIZE: usize>(data: [u8; SIZE]) -> Self {
+        let index = data[0];
         Self {
-            index: data[0],
-            chunk: BlockChunk,
+            chunk: BlockChunk { index },
         }
     }
 }
 
 pub struct ApprovalMsg {
-    source: NodeId,
-    approval: Approval,
+    pub source: NodeId,
+    pub approval: Approval,
 }
 
 impl ApprovalMsg {
