@@ -17,22 +17,23 @@ use overwatch_rs::services::ServiceData;
 
 use waku_bindings::{Encoding, WakuContentTopic, WakuMessage, WakuPubSubTopic};
 
-const WAKU_CARNOT_PUB_SUB_TOPIC: Lazy<WakuPubSubTopic> =
+static WAKU_CARNOT_PUB_SUB_TOPIC: Lazy<WakuPubSubTopic> =
     Lazy::new(|| WakuPubSubTopic::new("CarnotSim".to_string(), Encoding::Proto));
 
-const WAKU_CARNOT_BLOCK_CONTENT_TOPIC: Lazy<WakuContentTopic> = Lazy::new(|| WakuContentTopic {
+static WAKU_CARNOT_BLOCK_CONTENT_TOPIC: Lazy<WakuContentTopic> = Lazy::new(|| WakuContentTopic {
     application_name: "CarnotSim".to_string(),
     version: 1,
     content_topic_name: "CarnotBlock".to_string(),
     encoding: Encoding::Proto,
 });
 
-const WAKU_CARNOT_APPROVAL_CONTENT_TOPIC: Lazy<WakuContentTopic> = Lazy::new(|| WakuContentTopic {
-    application_name: "CarnotSim".to_string(),
-    version: 1,
-    content_topic_name: "CarnotApproval".to_string(),
-    encoding: Encoding::Proto,
-});
+static WAKU_CARNOT_APPROVAL_CONTENT_TOPIC: Lazy<WakuContentTopic> =
+    Lazy::new(|| WakuContentTopic {
+        application_name: "CarnotSim".to_string(),
+        version: 1,
+        content_topic_name: "CarnotApproval".to_string(),
+        encoding: Encoding::Proto,
+    });
 
 // TODO: ehm...this should be here, but we will change it whenever the chunking is decided.
 const CHUNK_SIZE: usize = 8;
@@ -138,7 +139,7 @@ impl NetworkAdapter for WakuAdapter {
                                 == message.content_topic().content_topic_name
                             {
                                 let payload = message.payload();
-                                Some(ApprovalMsg::from_bytes(payload.try_into().unwrap()).approval)
+                                Some(ApprovalMsg::from_bytes(payload).approval)
                             } else {
                                 None
                             }
