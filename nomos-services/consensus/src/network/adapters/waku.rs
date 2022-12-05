@@ -4,15 +4,16 @@ use futures::{Stream, StreamExt};
 use once_cell::sync::Lazy;
 use tokio_stream::wrappers::BroadcastStream;
 // internal
-use crate::network::messages::{ApprovalMsg, ProposalChunkMsg};
-use crate::network::NetworkAdapter;
+use crate::network::{
+    messages::{ApprovalMsg, ProposalChunkMsg},
+    NetworkAdapter,
+};
 use crate::{Approval, BlockChunk, View};
-use nomos_network::backends::waku::{EventKind, Waku};
-use nomos_network::backends::waku::{NetworkEvent, WakuBackendMessage};
-use nomos_network::{NetworkMsg, NetworkService};
-use overwatch_rs::services::relay::OutboundRelay;
-use overwatch_rs::services::ServiceData;
-
+use nomos_network::{
+    backends::waku::{EventKind, NetworkEvent, Waku, WakuBackendMessage},
+    NetworkMsg, NetworkService,
+};
+use overwatch_rs::services::{relay::OutboundRelay, ServiceData};
 use waku_bindings::{Encoding, WakuContentTopic, WakuMessage, WakuPubSubTopic};
 
 static WAKU_CARNOT_PUB_SUB_TOPIC: Lazy<WakuPubSubTopic> =
