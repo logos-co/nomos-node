@@ -8,8 +8,7 @@ use sled::transaction::{
     ConflictableTransactionResult, TransactionError, TransactionResult, TransactionalTree,
 };
 // internal
-use super::StorageBackend;
-use crate::backends::{StorageSerde, StorageTransaction};
+use super::{StorageBackend, StorageSerde, StorageTransaction};
 
 /// Sled backend setting
 #[derive(Clone)]

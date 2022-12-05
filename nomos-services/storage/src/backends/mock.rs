@@ -2,12 +2,11 @@ use std::collections::HashMap;
 use std::marker::PhantomData;
 // std
 // crates
-use crate::backends::{StorageSerde, StorageTransaction};
 use async_trait::async_trait;
 use bytes::Bytes;
 use thiserror::Error;
 // internal
-use super::StorageBackend;
+use super::{StorageBackend, StorageSerde, StorageTransaction};
 
 #[derive(Debug, Error)]
 #[error("Errors in MockStorage should not happen")]
@@ -46,7 +45,7 @@ impl<SerdeOp: StorageSerde + Send + Sync + 'static> StorageBackend for MockStora
     }
 
     async fn load(&mut self, key: &[u8]) -> Result<Option<Bytes>, Self::Error> {
-        Ok(self.inner.get(key).cloned())
+        Ok(self.inner.get(key).map(|b| b.clone()))
     }
 
     async fn remove(&mut self, key: &[u8]) -> Result<Option<Bytes>, Self::Error> {
