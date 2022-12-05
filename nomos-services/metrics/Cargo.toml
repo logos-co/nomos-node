@@ -3,22 +3,26 @@ name = "metrics"
 version = "0.1.0"
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[[example]]
+name = "graphql"
+path = "examples/graphql.rs"
+features = ["gql"]
 
 [dependencies]
 axum = { version = "0.6", optional = true }
-async-graphql = { version = "5", optional = true }
+async-graphql = { version = "5", optional = true, features = ["tracing"] }
 async-graphql-axum = { version = "5", optional = true }
 async-trait = "0.1"
-clap = { version = "4", features = ["derive", "env"] }
+clap = { version = "4", features = ["derive", "env"], optional = true }
 overwatch-rs = { git = "https://github.com/logos-co/Overwatch", branch = "main" }
+overwatch-derive = { git = "https://github.com/logos-co/Overwatch", branch = "main" }
 once_cell = "1.16"
 parking_lot = "0.12"
 serde = { version = "1", features = ["derive"] }
 tokio = { version = "1", features = ["sync", "macros", "time"] }
 tracing = "0.1"
 tracing-appender = "0.2"
-tracing-subscriber =  { version = "0.3", features = ["json"] }
+tracing-subscriber =  { version = "0.3", features = ["json", "env-filter"] }
 tracing-gelf = "0.7"
 tower-http = { version = "0.3", features = ["cors", "trace"], optional = true }
 futures = "0.3"
@@ -26,4 +30,4 @@ futures = "0.3"
 
 [features]
 default = []
-gql = ["axum", "async-graphql", "async-graphql-axum", "tower-http"]
+gql = ["clap", "axum", "async-graphql", "async-graphql-axum", "tower-http"]

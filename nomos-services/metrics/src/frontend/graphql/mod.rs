@@ -29,9 +29,10 @@ use overwatch_rs::services::{
 
 /// Configuration for the GraphQl Server
 #[derive(Debug, Clone, clap::Args)]
+#[cfg(feature = "gql")]
 pub struct GraphqlServerSettings {
     /// Socket where the GraphQL will be listening on for incoming requests.
-    #[arg(short, long = "graphql-addr", env = "METRICS_GRAPHQL_BIND_ADDRESS")]
+    #[arg(short, long = "graphql-addr", default_value_t = std::net::SocketAddr::new(std::net::IpAddr::V4(std::net::Ipv4Addr::new(127, 0, 0, 1)), 8080), env = "METRICS_GRAPHQL_BIND_ADDRESS")]
     pub address: std::net::SocketAddr,
     /// Max query depth allowed
     #[arg(
@@ -148,9 +149,18 @@ where
                 .allow_methods(Any);
 
             let addr = self.settings.address;
+            let max_complexity = self.settings.max_complexity;
+            let max_depth = self.settings.max_depth;
+            let schema = async_graphql::Schema::build(self, async_graphql::EmptyMutation, async_graphql::EmptySubscription)
+                .limit_complexity(max_complexity)
+                .limit_depth(max_depth)
+                .extension(async_graphql::extensions::Tracing)
+                .finish();
+    
+            tracing::info!(schema = %schema.sdl(), "GraphQL schema definition");
             let router = Router::new()
                 .route("/*path", post(graphql_handler::<Backend>))
-                .layer(Extension(self))
+                .layer(Extension(schema))
                 .layer(cors)
                 .layer(TraceLayer::new_for_http());
 

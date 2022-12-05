@@ -6,6 +6,7 @@ use std::fmt::Debug;
 use crate::{MetricsBackend, OwnedServiceId};
 use overwatch_rs::services::ServiceId;
 
+#[derive(Debug, Clone)]
 pub struct MapMetricsBackend<MetricsData>(HashMap<ServiceId, MetricsData>);
 
 #[async_trait::async_trait]
