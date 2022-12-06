@@ -6,10 +6,6 @@ pipeline {
     }
   }
 
-  environment {
-    GOCACHE = '/tmp/'
-  }
-
   options {
     disableConcurrentBuilds()
     buildDiscarder(logRotator(
@@ -22,6 +18,7 @@ pipeline {
     GIT_COMMITTER_NAME = 'status-im-auto'
     GIT_COMMITTER_EMAIL = 'auto@status.im'
     GIT_SSH_COMMAND = 'ssh -o StrictHostKeyChecking=no'
+    GOCACHE = '/tmp/'
   }
 
   stages {
