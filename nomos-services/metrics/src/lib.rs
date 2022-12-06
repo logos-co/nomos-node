@@ -18,7 +18,7 @@ pub trait MetricsBackend {
     type Settings: Clone + Send + Sync + 'static;
     fn init(config: Self::Settings) -> Self;
     async fn update(&mut self, service_id: ServiceId, data: Self::MetricsData);
-    async fn load(&self, service_id: &OwnedServiceId) -> Option<&Self::MetricsData>;
+    async fn load(&self, service_id: &OwnedServiceId) -> Option<Self::MetricsData>;
 }
 
 pub struct MetricsService<Backend: MetricsBackend> {
@@ -112,7 +112,7 @@ impl<Backend: MetricsBackend> MetricsService<Backend> {
         service_id: &OwnedServiceId,
         reply_channel: tokio::sync::oneshot::Sender<Option<Backend::MetricsData>>,
     ) {
-        let metrics = backend.load(service_id).await.cloned();
+        let metrics = backend.load(service_id).await;
         if let Err(e) = reply_channel.send(metrics) {
             tracing::error!(
                 "Failed to send metric data for service: {service_id}. data: {:?}",

@@ -25,7 +25,7 @@ impl<MetricsData: Clone + Debug + Send + Sync + 'static> MetricsBackend
         self.0.insert(service_id, data);
     }
 
-    async fn load(&self, service_id: &OwnedServiceId) -> Option<&Self::MetricsData> {
-        self.0.get(service_id.as_ref())
+    async fn load(&self, service_id: &OwnedServiceId) -> Option<Self::MetricsData> {
+        self.0.get(service_id.as_ref()).cloned()
     }
 }
