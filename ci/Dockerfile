@@ -1,4 +1,4 @@
-FROM rust:slim-bullseye
+FROM rust:1.65.0-slim-bullseye
 
 LABEL maintainer="augustinas@status.im"
 LABEL source="https://github.com/logos-co/nomos-research"
@@ -15,7 +15,6 @@ RUN apt-get update && apt-get install -yq \
     golang/bullseye-backports
 
 RUN pip install ghp-import
-
 
 # Jenkins user needs a specific UID/GID to work.
 RUN groupadd -g 1001 jenkins \

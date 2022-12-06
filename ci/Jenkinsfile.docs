@@ -6,6 +6,10 @@ pipeline {
     }
   }
 
+  environment {
+    GOCACHE = '/tmp/'
+  }
+
   options {
     disableConcurrentBuilds()
     buildDiscarder(logRotator(
