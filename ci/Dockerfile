@@ -1,25 +1,22 @@
-FROM rust:alpine
+FROM rust:slim-bullseye
 
 LABEL maintainer="augustinas@status.im"
 LABEL source="https://github.com/logos-co/nomos-research"
 LABEL description="nomos-research ci build image"
 
-# Dependecies for publishing documentation.
-RUN apk add --no-cache \
-    openssh-client-common \
-    openssh-client-default \
-    git py3-pip musl-dev go
+# Using backports for go 1.19
+RUN echo 'deb http://deb.debian.org/debian bullseye-backports main' >> /etc/apt/sources.list
 
-# Configure Go
-ENV GOROOT /usr/lib/go
-ENV GOPATH /go
-ENV PATH /go/bin:$PATH
-ENV GOCACHE=/tmp/
-
-RUN mkdir -p ${GOPATH}/src ${GOPATH}/bin
+# Dependecies for publishing documentation and building waku-bindings.
+RUN apt-get update && apt-get install -yq \
+    openssh-client git python3-pip clang \
+    golang-src/bullseye-backports \
+    golang-doc/bullseye-backports \
+    golang/bullseye-backports
 
 RUN pip install ghp-import
 
+
 # Jenkins user needs a specific UID/GID to work.
-RUN addgroup -g 1001 jenkins \
- && adduser -D -u 1001 -G jenkins jenkins
+RUN groupadd -g 1001 jenkins \
+ && useradd -u 1001 -g jenkins jenkins
