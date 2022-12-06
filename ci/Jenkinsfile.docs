@@ -27,7 +27,7 @@ pipeline {
       }
     }
 
-    stage('Publish Dev') {
+    stage('Publish') {
       steps {
         sshagent(credentials: ['status-im-auto-ssh']) {
           sh 'ghp-import -p target/doc'
