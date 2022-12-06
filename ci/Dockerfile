@@ -8,7 +8,7 @@ LABEL description="nomos-research ci build image"
 RUN apk add --no-cache \
     openssh-client-common \
     openssh-client-default \
-    git py3-pip
+    git py3-pip musl-dev
 
 RUN pip install ghp-import
 
