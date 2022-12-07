@@ -18,6 +18,7 @@ pipeline {
     GIT_COMMITTER_NAME = 'status-im-auto'
     GIT_COMMITTER_EMAIL = 'auto@status.im'
     GIT_SSH_COMMAND = 'ssh -o StrictHostKeyChecking=no'
+    GOPATH  = '/tmp/go'
     GOCACHE = '/tmp/'
   }
 
