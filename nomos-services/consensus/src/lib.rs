@@ -67,7 +67,7 @@ impl<Network: NetworkAdapter + Send + Sync + 'static> ServiceCore for CarnotCons
             .await
             .expect("Relay connection with NetworkService should succeed");
 
-        let network_adapter = Network::new(network_relay);
+        let network_adapter = Network::new(network_relay).await;
 
         // TODO: fix
         let node_id = self
