@@ -66,16 +66,16 @@ impl<B: NetworkBackend + Send + 'static> ServiceData for NetworkService<B> {
 
 #[async_trait]
 impl<B: NetworkBackend + Send + 'static> ServiceCore for NetworkService<B> {
-    fn init(service_state: ServiceStateHandle<Self>) -> Self {
-        Self {
+    fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, overwatch_rs::DynError> {
+        Ok(Self {
             backend: <B as NetworkBackend>::new(
                 service_state.settings_reader.get_updated_settings().backend,
             ),
             service_state,
-        }
+        })
     }
 
-    async fn run(mut self) {
+    async fn run(mut self) -> Result<(), overwatch_rs::DynError> {
         let Self {
             service_state: ServiceStateHandle {
                 mut inbound_relay, ..
@@ -100,6 +100,7 @@ impl<B: NetworkBackend + Send + 'static> ServiceCore for NetworkService<B> {
                     }),
             }
         }
+        Ok(())
     }
 }
 
@@ -121,10 +122,9 @@ impl<B: NetworkBackend> Clone for NetworkState<B> {
 
 impl<B: NetworkBackend + Send + 'static> ServiceState for NetworkState<B> {
     type Settings = NetworkConfig<B>;
+    type Error = <B::State as ServiceState>::Error;
 
-    fn from_settings(settings: &Self::Settings) -> Self {
-        Self {
-            _backend: B::State::from_settings(&settings.backend),
-        }
+    fn from_settings(settings: &Self::Settings) -> Result<Self, Self::Error> {
+        B::State::from_settings(&settings.backend).map(|_backend| Self { _backend })
     }
 }

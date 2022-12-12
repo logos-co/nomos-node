@@ -94,6 +94,7 @@ where
     ) -> async_graphql::Result<Option<<Backend as MetricsBackend>::MetricsData>> {
         let replay = self
             .backend_channel
+            .clone()
             .connect()
             .await
             .map_err(|e| async_graphql::Error::new(e.to_string()))?;
@@ -117,17 +118,17 @@ impl<Backend: MetricsBackend + Clone + Send + Sync + 'static> ServiceCore for Gr
 where
     Backend::MetricsData: async_graphql::OutputType,
 {
-    fn init(service_state: ServiceStateHandle<Self>) -> Self {
+    fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, overwatch_rs::DynError> {
         let settings = service_state.settings_reader.get_updated_settings();
         let backend_channel: Relay<MetricsService<Backend>> =
             service_state.overwatch_handle.relay();
-        Self {
+        Ok(Self {
             settings,
             backend_channel,
-        }
+        })
     }
 
-    async fn run(self) {
+    async fn run(self) -> Result<(), overwatch_rs::DynError> {
         let mut builder = CorsLayer::new();
         if self.settings.cors_origins.is_empty() {
             builder = builder.allow_origin(Any);
@@ -167,7 +168,7 @@ where
         tracing::info!("Metrics Service GraphQL server listening: {}", addr);
         Server::bind(&addr)
             .serve(router.into_make_service())
-            .await
-            .unwrap();
+            .await?;
+        Ok(())
     }
 }

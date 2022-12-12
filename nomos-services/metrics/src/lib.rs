@@ -132,36 +132,34 @@ impl<Backend: MetricsBackend> MetricsService<Backend> {
 
 #[async_trait::async_trait]
 impl<Backend: MetricsBackend + Send + Sync + 'static> ServiceCore for MetricsService<Backend> {
-    fn init(service_state: ServiceStateHandle<Self>) -> Self {
+    fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, overwatch_rs::DynError> {
         let settings = service_state.settings_reader.get_updated_settings();
         let backend = Backend::init(settings);
         let inbound_relay = service_state.inbound_relay;
-        Self {
+        Ok(Self {
             inbound_relay,
             backend,
-        }
+        })
     }
 
-    async fn run(self) {
+    async fn run(self) -> Result<(), overwatch_rs::DynError> {
         let Self {
             mut inbound_relay,
             mut backend,
         } = self;
-        // thread for handling update metrics
-        tokio::spawn(async move {
-            while let Some(message) = inbound_relay.recv().await {
-                match message {
-                    MetricsMessage::Load {
-                        service_id,
-                        reply_channel,
-                    } => {
-                        MetricsService::handle_load(&mut backend, &service_id, reply_channel).await;
-                    }
-                    MetricsMessage::Update { service_id, data } => {
-                        MetricsService::handle_update(&mut backend, &service_id, data).await;
-                    }
+        while let Some(message) = inbound_relay.recv().await {
+            match message {
+                MetricsMessage::Load {
+                    service_id,
+                    reply_channel,
+                } => {
+                    MetricsService::handle_load(&mut backend, &service_id, reply_channel).await;
+                }
+                MetricsMessage::Update { service_id, data } => {
+                    MetricsService::handle_update(&mut backend, &service_id, data).await;
                 }
             }
-        });
+        }
+        Ok(())
     }
 }

@@ -1,18 +1,23 @@
-use std::{collections::HashMap, sync::{Arc, Mutex}};
+use std::{
+    collections::HashMap,
+    sync::{Arc, Mutex},
+};
 
 use clap::Parser;
 use metrics::{
     frontend::graphql::{Graphql, GraphqlServerSettings},
-    MetricsService, OwnedServiceId, MetricsBackend,
+    MetricsBackend, MetricsService, OwnedServiceId,
 };
-use overwatch_rs::{overwatch::OverwatchRunner, services::{handle::ServiceHandle, ServiceId}};
+use overwatch_rs::{
+    overwatch::OverwatchRunner,
+    services::{handle::ServiceHandle, ServiceId},
+};
 
 #[derive(Debug, Clone)]
 pub struct ConcurrentMapMetricsBackend(Arc<Mutex<HashMap<ServiceId, MetricsData>>>);
 
 #[async_trait::async_trait]
-impl MetricsBackend for ConcurrentMapMetricsBackend
-{
+impl MetricsBackend for ConcurrentMapMetricsBackend {
     type MetricsData = MetricsData;
     type Error = ();
     type Settings = &'static [ServiceId];
@@ -30,9 +35,7 @@ impl MetricsBackend for ConcurrentMapMetricsBackend
                 tokio::time::sleep(std::time::Duration::from_secs(1)).await;
                 let mut map = map.lock().unwrap();
                 for src in config.iter() {
-                    map.insert(*src, MetricsData {
-                        duration,
-                    });
+                    map.insert(*src, MetricsData { duration });
                 }
                 duration += 1;
             }
@@ -66,7 +69,6 @@ pub struct MetricsData {
     duration: u64,
 }
 
-
 fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let settings = Args::parse();
     let graphql = OverwatchRunner::<Services>::run(
@@ -75,7 +77,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             metrics: &["Foo", "Network"],
         },
         None,
-    );
+    )?;
 
     tracing_subscriber::fmt::fmt()
         .with_env_filter(std::env::var("RUST_LOG").unwrap_or_else(|_| "info".to_owned()))
