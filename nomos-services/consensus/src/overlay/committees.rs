@@ -1,4 +1,5 @@
 use super::*;
+use crate::network::NetworkAdapter;
 use rand::{seq::SliceRandom, SeedableRng};
 
 /// View of the tree overlay centered around a specific member
@@ -88,25 +89,31 @@ impl<'view, const C: usize> Member<'view, C> {
 }
 
 #[async_trait::async_trait]
-impl<'view, const C: usize> Overlay<'view> for Member<'view, C> {
+impl<'view, Network: NetworkAdapter + Send + Sync, const C: usize> Overlay<'view, Network>
+    for Member<'view, C>
+{
     fn new(view: &'view View, node: NodeId) -> Self {
         let committees = Committees::new(view);
         committees.into_member(node).unwrap()
     }
 
-    async fn reconstruct_proposal_block(&self) -> Block {
+    async fn reconstruct_proposal_block(&self, adapter: &Network) -> Block {
         todo!()
     }
 
-    async fn broadcast_block(&self, _block: Block) {
+    async fn broadcast_block(&self, _block: Block, adapter: &Network) {
         todo!()
     }
 
-    async fn collect_approvals(&self, _block: Block) -> tokio::sync::mpsc::Receiver<Approval> {
+    async fn collect_approvals(
+        &self,
+        _block: Block,
+        adapter: &Network,
+    ) -> tokio::sync::mpsc::Receiver<Approval> {
         todo!()
     }
 
-    async fn forward_approval(&self, _approval: Approval) {
+    async fn forward_approval(&self, _approval: Approval, adapter: &Network) {
         todo!()
     }
 }

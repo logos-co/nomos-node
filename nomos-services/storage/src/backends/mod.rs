@@ -52,7 +52,7 @@ pub trait StorageBackend: Sized {
 
 #[cfg(test)]
 pub mod testing {
-    use crate::backends::StorageSerde;
+    use super::StorageSerde;
     use bytes::Bytes;
     use serde::de::DeserializeOwned;
     use serde::Serialize;
