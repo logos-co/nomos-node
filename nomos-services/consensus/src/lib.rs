@@ -44,11 +44,11 @@ impl ServiceData for CarnotConsensus {
 
 #[async_trait::async_trait]
 impl ServiceCore for CarnotConsensus {
-    fn init(service_state: ServiceStateHandle<Self>) -> Self {
-        Self { service_state }
+    fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, overwatch_rs::DynError> {
+        Ok(Self { service_state })
     }
 
-    async fn run(mut self) {
+    async fn run(mut self) -> Result<(), overwatch_rs::DynError> {
         let block_stream = self.subscribe_to_incoming_blocks().await;
         // TODO: fix
         let node_id = self
