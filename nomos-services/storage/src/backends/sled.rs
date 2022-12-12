@@ -10,6 +10,14 @@ use sled::transaction::{
 // internal
 use super::{StorageBackend, StorageSerde, StorageTransaction};
 
+#[derive(Debug, thiserror::Error)]
+pub enum Error {
+    #[error(transparent)]
+    Transaction(#[from] TransactionError),
+    #[error(transparent)]
+    Error(#[from] sled::Error),
+}
+
 /// Sled backend setting
 #[derive(Clone)]
 pub struct SledBackendSettings {
@@ -32,25 +40,30 @@ impl StorageTransaction for SledTransaction {
 }
 
 /// Sled storage backend
+
 pub struct SledBackend<SerdeOp> {
     sled: sled::Db,
     _serde_op: PhantomData<SerdeOp>,
 }
 
+impl<SerdeOp> core::fmt::Debug for SledBackend<SerdeOp> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        format!("SledBackend {{ sled: {:?} }}", self.sled).fmt(f)
+    }
+}
+
 #[async_trait]
 impl<SerdeOp: StorageSerde + Send + Sync + 'static> StorageBackend for SledBackend<SerdeOp> {
     type Settings = SledBackendSettings;
-    type Error = TransactionError;
+    type Error = Error;
     type Transaction = SledTransaction;
     type SerdeOperator = SerdeOp;
 
-    fn new(config: Self::Settings) -> Self {
-        Self {
-            sled: sled::open(config.db_path)
-                // TODO: We should probably make initialization failable
-                .unwrap(),
+    fn new(config: Self::Settings) -> Result<Self, Self::Error> {
+        Ok(Self {
+            sled: sled::open(config.db_path)?,
             _serde_op: Default::default(),
-        }
+        })
     }
 
     async fn store(&mut self, key: Bytes, value: Bytes) -> Result<(), Self::Error> {
@@ -81,7 +94,8 @@ mod test {
     use tempfile::TempDir;
 
     #[tokio::test]
-    async fn test_store_load_remove() -> Result<(), TransactionError> {
+    async fn test_store_load_remove(
+    ) -> Result<(), <SledBackend<NoStorageSerde> as StorageBackend>::Error> {
         let temp_path = TempDir::new().unwrap();
         let sled_settings = SledBackendSettings {
             db_path: temp_path.path().to_path_buf(),
@@ -89,7 +103,7 @@ mod test {
         let key = "foo";
         let value = "bar";
 
-        let mut sled_db: SledBackend<NoStorageSerde> = SledBackend::new(sled_settings);
+        let mut sled_db: SledBackend<NoStorageSerde> = SledBackend::new(sled_settings)?;
         sled_db
             .store(key.as_bytes().into(), value.as_bytes().into())
             .await?;
@@ -102,7 +116,8 @@ mod test {
     }
 
     #[tokio::test]
-    async fn test_transaction() -> Result<(), TransactionError> {
+    async fn test_transaction() -> Result<(), <SledBackend<NoStorageSerde> as StorageBackend>::Error>
+    {
         let temp_path = TempDir::new().unwrap();
 
         let sled_settings = SledBackendSettings {
@@ -111,11 +126,11 @@ mod test {
         let key = "foo";
         let value = "bar";
 
-        let mut sled_db: SledBackend<NoStorageSerde> = SledBackend::new(sled_settings);
+        let mut sled_db: SledBackend<NoStorageSerde> = SledBackend::new(sled_settings)?;
         let result = sled_db
             .execute(Box::new(move |tx| {
-                let key = key.clone();
-                let value = value.clone();
+                let key = key;
+                let value = value;
                 tx.insert(key, value)?;
                 let result = tx.get(key)?;
                 tx.remove(key)?;
