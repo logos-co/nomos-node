@@ -1,5 +1,5 @@
 use super::*;
-use ::waku::*;
+use ::waku_bindings::*;
 use overwatch_rs::services::state::NoState;
 use serde::{Deserialize, Serialize};
 use tokio::sync::{

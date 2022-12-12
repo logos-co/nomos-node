@@ -25,6 +25,12 @@ pub struct MockStorage<SerdeOp> {
     _serde_op: PhantomData<SerdeOp>,
 }
 
+impl<SerdeOp> core::fmt::Debug for MockStorage<SerdeOp> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        format!("MockStorage {{ inner: {:?} }}", self.inner).fmt(f)
+    }
+}
+
 #[async_trait]
 impl<SerdeOp: StorageSerde + Send + Sync + 'static> StorageBackend for MockStorage<SerdeOp> {
     type Settings = ();
@@ -32,11 +38,11 @@ impl<SerdeOp: StorageSerde + Send + Sync + 'static> StorageBackend for MockStora
     type Transaction = MockStorageTransaction;
     type SerdeOperator = SerdeOp;
 
-    fn new(_config: Self::Settings) -> Self {
-        Self {
+    fn new(_config: Self::Settings) -> Result<Self, Self::Error> {
+        Ok(Self {
             inner: HashMap::new(),
             _serde_op: Default::default(),
-        }
+        })
     }
 
     async fn store(&mut self, key: Bytes, value: Bytes) -> Result<(), Self::Error> {
@@ -45,7 +51,7 @@ impl<SerdeOp: StorageSerde + Send + Sync + 'static> StorageBackend for MockStora
     }
 
     async fn load(&mut self, key: &[u8]) -> Result<Option<Bytes>, Self::Error> {
-        Ok(self.inner.get(key).map(|b| b.clone()))
+        Ok(self.inner.get(key).cloned())
     }
 
     async fn remove(&mut self, key: &[u8]) -> Result<Option<Bytes>, Self::Error> {

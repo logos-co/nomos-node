@@ -28,18 +28,18 @@ pub trait StorageTransaction: Send + Sync {
 
 /// Main storage functionality trait
 #[async_trait]
-pub trait StorageBackend {
+pub trait StorageBackend: Sized {
     /// Backend settings
     type Settings: Clone + Send + Sync + 'static;
     /// Backend operations error type
-    type Error: Error + 'static;
+    type Error: Error + 'static + Send + Sync;
     /// Backend transaction type
     /// Usually it will be some function that modifies the storage directly or operates
     /// over the backend as per the backend specification.
     type Transaction: StorageTransaction;
     /// Operator to dump/load custom types into the defined backend store type [`Bytes`]
     type SerdeOperator: StorageSerde + Send + Sync + 'static;
-    fn new(config: Self::Settings) -> Self;
+    fn new(config: Self::Settings) -> Result<Self, Self::Error>;
     async fn store(&mut self, key: Bytes, value: Bytes) -> Result<(), Self::Error>;
     async fn load(&mut self, key: &[u8]) -> Result<Option<Bytes>, Self::Error>;
     async fn remove(&mut self, key: &[u8]) -> Result<Option<Bytes>, Self::Error>;
