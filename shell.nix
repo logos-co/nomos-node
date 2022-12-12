@@ -17,7 +17,7 @@ pkgs.mkShell {
 
   buildInputs = with pkgs; [
     pkg-config
-    rust-bin.stable.latest.minimal # 1.65.0
-    go_1_19 # 1.19.3
+    rust-bin.stable."1.65.0".default
+    go_1_19
   ];
 }
