@@ -8,6 +8,30 @@ pub use prometheus::{
 };
 
 #[derive(Debug, Clone)]
+pub struct MetricsData {
+    ty: MetricDataType,
+    id: String,
+}
+
+impl MetricsData {
+    #[inline]
+    pub fn new(ty: MetricDataType, id: String) -> Self {
+        Self { ty, id }
+    }
+
+    #[inline]
+    pub fn ty(&self) -> &MetricDataType {
+        &self.ty
+    }
+
+    #[inline]
+    pub fn id(&self) -> &str {
+        &self.id
+    }
+}
+
+
+#[derive(Debug, Clone)]
 pub enum MetricDataType {
     IntCounter(IntCounter),
     Counter(Counter),
@@ -137,7 +161,6 @@ where
 }
 
 #[derive(Debug, Clone)]
-#[repr(transparent)]
 pub struct Gauge(prometheus::Gauge);
 
 impl Deref for Gauge {
@@ -322,7 +345,6 @@ impl async_graphql::OutputType for Counter {
 }
 
 #[derive(Debug, Clone)]
-#[repr(transparent)]
 pub struct Histogram(prometheus::Histogram);
 
 impl Histogram {
@@ -379,7 +401,6 @@ impl async_graphql::OutputType for Histogram {
 }
 
 #[derive(Debug, Clone)]
-#[repr(transparent)]
 pub struct IntCounter(prometheus::IntCounter);
 
 impl IntCounter {
