@@ -2,6 +2,7 @@ use std::fmt::Debug;
 
 pub mod backend;
 pub mod frontend;
+pub mod types;
 
 // use metrics_derive::MetricsData;
 use overwatch_rs::services::{
