@@ -1,0 +1,46 @@
+pipeline {
+  agent {
+    dockerfile {
+      label 'linux'
+      dir 'ci'
+    }
+  }
+
+  environment {
+    GOPATH  = '/tmp/go'
+    GOCACHE = '/tmp/'
+  }
+
+  options {
+    disableConcurrentBuilds()
+    buildDiscarder(logRotator(
+      numToKeepStr: '20',
+      daysToKeepStr: '30',
+    ))
+  }
+
+  stages {
+    stage('Check') {
+      steps {
+      	sh 'cargo check'
+      	sh 'cargo fmt -- --check'
+	sh 'cargo clippy'
+      }
+    }
+
+    stage('Build') {
+      steps {
+        sh 'cargo build --all --all-features'
+      }
+    }
+
+    stage('Test') {
+      steps {
+        sh 'cargo test --all --all-features'
+      }
+    }
+  }
+  post {
+    cleanup { cleanWs() }
+  }
+}
