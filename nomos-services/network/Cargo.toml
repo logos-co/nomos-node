@@ -22,4 +22,5 @@ tracing-gelf = "0.7"
 futures = "0.3"
 
 [features]
-default = ["waku-bindings"]
+default = []
+waku = ["waku-bindings"]
