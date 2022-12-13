@@ -21,9 +21,9 @@ pipeline {
   stages {
     stage('Check') {
       steps { script {
-      	nix.shell('cargo check')
+      	nix.shell('cargo check --all --all-features')
       	nix.shell('cargo fmt -- --check')
-	nix.shell('cargo clippy')
+	nix.shell('cargo clippy --all --all-features -- --deny warnings')
       } }
     }
 
