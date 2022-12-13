@@ -7,6 +7,10 @@
 mod network;
 pub mod overlay;
 
+// std
+use std::collections::{BTreeMap, HashSet};
+// crates
+// internal
 use crate::network::NetworkAdapter;
 use nomos_core::block::Block;
 use nomos_network::NetworkService;
@@ -18,7 +22,6 @@ use overwatch_rs::services::{
     state::{NoOperator, NoState},
     ServiceCore, ServiceData, ServiceId,
 };
-use std::collections::{BTreeMap, HashSet};
 
 // Raw bytes for now, could be a ed25519 public key
 pub type NodeId = [u8; 32];

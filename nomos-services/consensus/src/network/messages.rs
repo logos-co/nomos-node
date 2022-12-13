@@ -1,5 +1,9 @@
-use crate::{Approval, NodeId};
+// std
 
+// crates
+
+// internal
+use crate::{Approval, NodeId};
 use nomos_core::block::BlockChunk;
 
 pub struct ProposalChunkMsg {

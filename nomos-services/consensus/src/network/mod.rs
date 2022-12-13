@@ -1,9 +1,13 @@
 pub mod adapters;
 mod messages;
 
+// std
+
+// crates
+use futures::Stream;
+// internal
 use crate::network::messages::{ApprovalMsg, ProposalChunkMsg};
 use crate::{Approval, View};
-use futures::Stream;
 use nomos_core::block::BlockChunk;
 use nomos_network::backends::NetworkBackend;
 use nomos_network::NetworkService;

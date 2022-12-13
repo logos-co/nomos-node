@@ -1,6 +1,10 @@
+// std
+
+// crates
+use rand::{seq::SliceRandom, SeedableRng};
+// internal
 use super::*;
 use crate::network::NetworkAdapter;
-use rand::{seq::SliceRandom, SeedableRng};
 
 /// View of the tree overlay centered around a specific member
 pub struct Member<'view, const C: usize> {
