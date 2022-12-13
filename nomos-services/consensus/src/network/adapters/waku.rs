@@ -8,7 +8,8 @@ use crate::network::{
     messages::{ApprovalMsg, ProposalChunkMsg},
     NetworkAdapter,
 };
-use crate::{Approval, BlockChunk, View};
+use crate::{Approval, View};
+use nomos_core::block::BlockChunk;
 use nomos_network::{
     backends::waku::{EventKind, NetworkEvent, Waku, WakuBackendMessage},
     NetworkMsg, NetworkService,

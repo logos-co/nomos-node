@@ -2,8 +2,9 @@ pub mod adapters;
 mod messages;
 
 use crate::network::messages::{ApprovalMsg, ProposalChunkMsg};
-use crate::{Approval, BlockChunk, View};
+use crate::{Approval, View};
 use futures::Stream;
+use nomos_core::block::BlockChunk;
 use nomos_network::backends::NetworkBackend;
 use nomos_network::NetworkService;
 use overwatch_rs::services::relay::OutboundRelay;

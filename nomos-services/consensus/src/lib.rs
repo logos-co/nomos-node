@@ -7,24 +7,24 @@
 mod network;
 pub mod overlay;
 
+use crate::network::NetworkAdapter;
+use nomos_core::block::Block;
+use nomos_network::NetworkService;
 use overlay::{Member, Overlay};
+use overwatch_rs::services::relay::{OutboundRelay, Relay};
 use overwatch_rs::services::{
     handle::ServiceStateHandle,
     relay::NoMessage,
     state::{NoOperator, NoState},
     ServiceCore, ServiceData, ServiceId,
 };
+use std::collections::{BTreeMap, HashSet};
 
 // Raw bytes for now, could be a ed25519 public key
 pub type NodeId = [u8; 32];
 // Random seed for each round provided by the protocol
 pub type Seed = [u8; 32];
 pub type Stake = u64;
-
-use crate::network::NetworkAdapter;
-use nomos_network::NetworkService;
-use overwatch_rs::services::relay::{OutboundRelay, Relay};
-use std::collections::{BTreeMap, HashSet};
 
 const COMMITTEE_SIZE: usize = 1;
 
@@ -104,28 +104,6 @@ struct ViewGenerator;
 impl ViewGenerator {
     async fn next(&mut self) -> View {
         todo!()
-    }
-}
-
-/// A block
-#[derive(Clone)]
-pub struct Block;
-
-/// A block chunk, N pieces are necessary to reconstruct the full block
-#[derive(Clone, Copy, Debug)]
-pub struct BlockChunk {
-    index: u8,
-}
-
-impl Block {
-    /// Fake implementation of erasure coding protocol
-    pub fn chunk<const SIZE: usize>(self) -> [BlockChunk; SIZE] {
-        // TODO: this is a completely temporary and fake implementation
-        (0..SIZE)
-            .map(|i| BlockChunk { index: i as u8 })
-            .collect::<Vec<_>>()
-            .try_into()
-            .expect("This should not fail unless chunking exceed memory limits")
     }
 }
 

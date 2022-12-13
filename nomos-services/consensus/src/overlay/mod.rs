@@ -1,4 +1,5 @@
-use super::{Approval, Block, NodeId, View};
+use super::{Approval, NodeId, View};
+use nomos_core::block::Block;
 
 #[allow(unused)]
 mod committees;
