@@ -13,6 +13,8 @@ use std::collections::{BTreeMap, HashSet};
 // internal
 use crate::network::NetworkAdapter;
 use nomos_core::block::Block;
+use nomos_core::crypto::PublicKey;
+use nomos_core::staking::Stake;
 use nomos_network::NetworkService;
 use overlay::{Member, Overlay};
 use overwatch_rs::services::relay::{OutboundRelay, Relay};
@@ -24,10 +26,9 @@ use overwatch_rs::services::{
 };
 
 // Raw bytes for now, could be a ed25519 public key
-pub type NodeId = [u8; 32];
+pub type NodeId = PublicKey;
 // Random seed for each round provided by the protocol
 pub type Seed = [u8; 32];
-pub type Stake = u64;
 
 const COMMITTEE_SIZE: usize = 1;
 
