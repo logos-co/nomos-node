@@ -1,6 +1,13 @@
 pub mod backends;
+// std
+use std::fmt::{self, Debug};
 
+// crates
 use async_trait::async_trait;
+use serde::{Deserialize, Serialize};
+use tokio::sync::broadcast;
+use tokio::sync::oneshot;
+// internal
 use backends::NetworkBackend;
 use overwatch_rs::services::{
     handle::ServiceStateHandle,
@@ -8,10 +15,6 @@ use overwatch_rs::services::{
     state::{NoOperator, ServiceState},
     ServiceCore, ServiceData, ServiceId,
 };
-use serde::{Deserialize, Serialize};
-use std::fmt::{self, Debug};
-use tokio::sync::broadcast;
-use tokio::sync::oneshot;
 
 pub enum NetworkMsg<B: NetworkBackend> {
     Process(B::Message),

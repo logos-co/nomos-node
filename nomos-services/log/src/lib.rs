@@ -1,15 +1,18 @@
+// std
+use std::net::SocketAddr;
+use std::path::PathBuf;
+// crates
+use serde::{Deserialize, Serialize};
+use tracing::Level;
+use tracing_appender::non_blocking::WorkerGuard;
+use tracing_subscriber::{filter::LevelFilter, prelude::*};
+// internal
 use overwatch_rs::services::{
     handle::ServiceStateHandle,
     relay::NoMessage,
     state::{NoOperator, NoState},
     ServiceCore, ServiceData,
 };
-use serde::{Deserialize, Serialize};
-use std::net::SocketAddr;
-use std::path::PathBuf;
-use tracing::Level;
-use tracing_appender::non_blocking::WorkerGuard;
-use tracing_subscriber::{filter::LevelFilter, prelude::*};
 
 pub struct Logger(Option<WorkerGuard>);
 

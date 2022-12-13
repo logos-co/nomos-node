@@ -1,10 +1,13 @@
-use super::{Approval, Block, NodeId, View};
-
 #[allow(unused)]
 mod committees;
 
+// std
+// crates
+// internal
+use super::{Approval, NodeId, View};
 use crate::network::NetworkAdapter;
 pub use committees::Member;
+use nomos_core::block::Block;
 
 // Dissamination overlay, tied to a specific view
 #[async_trait::async_trait]
