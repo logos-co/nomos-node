@@ -22,9 +22,9 @@ pipeline {
   stages {
     stage('Check') {
       steps {
-      	sh 'cargo check'
+      	sh 'cargo check --all --all-features'
       	sh 'cargo fmt -- --check'
-	sh 'cargo clippy'
+	sh 'cargo clippy --all --all-features -- --deny warnings'
       }
     }
 

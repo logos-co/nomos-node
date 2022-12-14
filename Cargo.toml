@@ -1,7 +1,10 @@
 [workspace]
 members = [
+    "nomos-core",
     "nomos-services/log",
     "nomos-services/metrics",
     "nomos-services/network",
     "nomos-services/storage",
+    "nomos-services/consensus",
+    "nomos-services/mempool"
 ]

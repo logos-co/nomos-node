@@ -3,9 +3,7 @@ use overwatch_rs::services::state::ServiceState;
 use tokio::sync::broadcast::Receiver;
 
 #[cfg(feature = "waku")]
-mod waku;
-#[cfg(feature = "waku")]
-pub use self::waku::Waku;
+pub mod waku;
 
 #[async_trait::async_trait]
 pub trait NetworkBackend {

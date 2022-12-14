@@ -8,13 +8,13 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use overwatch_rs::services::handle::ServiceStateHandle;
 use serde::de::DeserializeOwned;
+use serde::Serialize;
 // internal
 use backends::StorageBackend;
 use backends::{StorageSerde, StorageTransaction};
 use overwatch_rs::services::relay::RelayMessage;
 use overwatch_rs::services::state::{NoOperator, NoState};
 use overwatch_rs::services::{ServiceCore, ServiceData, ServiceId};
-use serde::Serialize;
 
 /// Storage message that maps to [`StorageBackend`] trait
 pub enum StorageMsg<Backend: StorageBackend> {

@@ -1,5 +1,4 @@
 use super::*;
-use ::waku_bindings::*;
 use overwatch_rs::services::state::NoState;
 use serde::{Deserialize, Serialize};
 use tokio::sync::{
@@ -7,6 +6,7 @@ use tokio::sync::{
     oneshot,
 };
 use tracing::{debug, error};
+use waku_bindings::*;
 
 const BROADCAST_CHANNEL_BUF: usize = 16;
 
@@ -96,15 +96,6 @@ impl NetworkBackend for Waku {
         }
     }
 
-    async fn subscribe(&mut self, kind: Self::EventKind) -> Receiver<Self::NetworkEvent> {
-        match kind {
-            EventKind::Message => {
-                debug!("processed subscription to incoming messages");
-                self.message_event.subscribe()
-            }
-        }
-    }
-
     async fn process(&self, msg: Self::Message) {
         match msg {
             WakuBackendMessage::Broadcast { message, topic } => {
@@ -171,5 +162,14 @@ impl NetworkBackend for Waku {
                 }
             },
         };
+    }
+
+    async fn subscribe(&mut self, kind: Self::EventKind) -> Receiver<Self::NetworkEvent> {
+        match kind {
+            EventKind::Message => {
+                debug!("processed subscription to incoming messages");
+                self.message_event.subscribe()
+            }
+        }
     }
 }
