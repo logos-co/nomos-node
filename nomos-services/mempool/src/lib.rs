@@ -105,7 +105,7 @@ where
         })
     }
 
-    #[allow(unreachable_code, unused)]
+    #[allow(unreachable_code, unused, clippy::diverging_sub_expression)]
     async fn run(mut self) -> Result<(), overwatch_rs::DynError> {
         let Self {
             service_state,
