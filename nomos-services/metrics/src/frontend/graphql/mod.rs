@@ -28,7 +28,7 @@ use overwatch_rs::services::{
 };
 
 /// Configuration for the GraphQl Server
-#[derive(Debug, Clone, clap::Args)]
+#[derive(Debug, Clone, clap::Args, serde::Deserialize, serde::Serialize)]
 #[cfg(feature = "gql")]
 pub struct GraphqlServerSettings {
     /// Socket where the GraphQL will be listening on for incoming requests.

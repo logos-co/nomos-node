@@ -30,7 +30,6 @@ impl MetricsData {
     }
 }
 
-
 #[derive(Debug, Clone)]
 pub enum MetricDataType {
     IntCounter(IntCounter),
