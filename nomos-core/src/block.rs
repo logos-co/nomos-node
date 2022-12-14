@@ -1,6 +1,14 @@
 /// A block
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Block;
+
+/// A block header
+#[derive(Clone, Debug)]
+pub struct BlockHeader;
+
+/// Identifier of a block
+#[derive(Clone, Debug)]
+pub struct BlockId;
 
 /// A block chunk, N pieces are necessary to reconstruct the full block
 #[derive(Clone, Copy, Debug)]
