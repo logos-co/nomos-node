@@ -6,11 +6,16 @@ use std::{
 use clap::Parser;
 use metrics::{
     frontend::graphql::{Graphql, GraphqlServerSettings},
-    MetricsBackend, MetricsService, OwnedServiceId,
+    MetricsBackend, MetricsMessage, MetricsService, OwnedServiceId,
 };
 use overwatch_rs::{
     overwatch::OverwatchRunner,
-    services::{handle::ServiceHandle, ServiceId},
+    services::{
+        handle::{ServiceHandle, ServiceStateHandle},
+        relay::{NoMessage, Relay},
+        state::{NoOperator, NoState},
+        ServiceCore, ServiceData, ServiceId,
+    },
 };
 
 #[derive(Debug, Clone)]
@@ -24,23 +29,10 @@ impl MetricsBackend for ConcurrentMapMetricsBackend {
 
     fn init(config: Self::Settings) -> Self {
         let mut map = HashMap::with_capacity(config.len());
-        for svc in config.iter() {
-            map.insert(*svc, MetricsData::default());
+        for service_id in config {
+            map.insert(*service_id, MetricsData::default());
         }
-        let map = Arc::new(Mutex::new(map));
-        let t_map = map.clone();
-        tokio::spawn(async move {
-            let mut duration = 0;
-            loop {
-                tokio::time::sleep(std::time::Duration::from_secs(1)).await;
-                let mut map = map.lock().unwrap();
-                for src in config.iter() {
-                    map.insert(*src, MetricsData { duration });
-                }
-                duration += 1;
-            }
-        });
-        Self(t_map)
+        Self(Arc::new(Mutex::new(map)))
     }
 
     async fn update(&mut self, service_id: ServiceId, data: Self::MetricsData) {
@@ -52,10 +44,77 @@ impl MetricsBackend for ConcurrentMapMetricsBackend {
     }
 }
 
+#[derive(Clone)]
+pub struct MetricsUpdater<Backend: MetricsBackend + Send + Sync + 'static> {
+    backend_channel: Relay<MetricsService<Backend>>,
+}
+
+impl<Backend: MetricsBackend + Send + Sync + 'static> ServiceData for MetricsUpdater<Backend> {
+    const SERVICE_ID: ServiceId = "MetricsUpdater";
+
+    type Settings = ();
+
+    type State = NoState<()>;
+
+    type StateOperator = NoOperator<Self::State>;
+
+    type Message = NoMessage;
+}
+
+#[async_trait::async_trait]
+impl<Backend: MetricsBackend<MetricsData = MetricsData> + Clone + Send + Sync + 'static> ServiceCore
+    for MetricsUpdater<Backend>
+where
+    Backend::MetricsData: async_graphql::OutputType,
+{
+    fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, overwatch_rs::DynError> {
+        let backend_channel: Relay<MetricsService<Backend>> =
+            service_state.overwatch_handle.relay();
+        Ok(Self { backend_channel })
+    }
+
+    async fn run(self) -> Result<(), overwatch_rs::DynError> {
+        let mut duration = 0;
+        loop {
+            tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+            duration += 1;
+            let replay = self.backend_channel.clone().connect().await.map_err(|e| {
+                tracing::error!(err = ?e, "Metrics Updater: relay connect error");
+                e
+            })?;
+
+            if duration % 2 == 0 {
+                replay
+                    .send(MetricsMessage::Update {
+                        service_id: "Foo",
+                        data: MetricsData { duration },
+                    })
+                    .await
+                    .map_err(|(e, _)| {
+                        tracing::error!(err = ?e, "Metrics Updater: relay send error");
+                        e
+                    })?;
+            } else {
+                replay
+                    .send(MetricsMessage::Update {
+                        service_id: "Bar",
+                        data: MetricsData { duration },
+                    })
+                    .await
+                    .map_err(|(e, _)| {
+                        tracing::error!(err = ?e, "Metrics Updater: send error");
+                        e
+                    })?;
+            }
+        }
+    }
+}
+
 #[derive(overwatch_derive::Services)]
 struct Services {
     graphql: ServiceHandle<Graphql<ConcurrentMapMetricsBackend>>,
     metrics: ServiceHandle<MetricsService<ConcurrentMapMetricsBackend>>,
+    updater: ServiceHandle<MetricsUpdater<ConcurrentMapMetricsBackend>>,
 }
 
 #[derive(clap::Parser)]
@@ -74,7 +133,8 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let graphql = OverwatchRunner::<Services>::run(
         ServicesServiceSettings {
             graphql: settings.graphql,
-            metrics: &["Foo", "Network"],
+            metrics: &["Foo", "Bar"],
+            updater: (),
         },
         None,
     )?;
