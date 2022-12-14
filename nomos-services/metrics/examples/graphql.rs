@@ -74,39 +74,25 @@ where
     }
 
     async fn run(self) -> Result<(), overwatch_rs::DynError> {
-        let mut duration = 0;
-        loop {
-            tokio::time::sleep(std::time::Duration::from_secs(1)).await;
-            duration += 1;
-            let replay = self.backend_channel.clone().connect().await.map_err(|e| {
-                tracing::error!(err = ?e, "Metrics Updater: relay connect error");
+        let replay = self.backend_channel.connect().await.map_err(|e| {
+            tracing::error!(err = ?e, "Metrics Updater: relay connect error");
+            e
+        })?;
+        let tags = ["foo", "bar", "baz"].iter().cycle();
+        for (duration, service_id) in tags.enumerate() {
+            let message = MetricsMessage::Update {
+                service_id,
+                data: MetricsData {
+                    duration: duration as u64,
+                },
+            };
+            replay.send(message).await.map_err(|(e, _)| {
+                tracing::error!(err = ?e, "Metrics Updater: relay send error");
                 e
             })?;
-
-            if duration % 2 == 0 {
-                replay
-                    .send(MetricsMessage::Update {
-                        service_id: "Foo",
-                        data: MetricsData { duration },
-                    })
-                    .await
-                    .map_err(|(e, _)| {
-                        tracing::error!(err = ?e, "Metrics Updater: relay send error");
-                        e
-                    })?;
-            } else {
-                replay
-                    .send(MetricsMessage::Update {
-                        service_id: "Bar",
-                        data: MetricsData { duration },
-                    })
-                    .await
-                    .map_err(|(e, _)| {
-                        tracing::error!(err = ?e, "Metrics Updater: send error");
-                        e
-                    })?;
-            }
+            tokio::time::sleep(std::time::Duration::from_secs(1)).await;
         }
+        Ok(())
     }
 }
 
