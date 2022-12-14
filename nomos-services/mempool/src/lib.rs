@@ -8,6 +8,7 @@ use tokio::sync::oneshot::Sender;
 /// internal
 pub mod backend;
 use backend::Pool;
+use nomos_core::block::{BlockHeader, BlockId};
 use nomos_network::{
     backends::{waku::NetworkEvent, NetworkBackend},
     NetworkService,
@@ -18,7 +19,6 @@ use overwatch_rs::services::{
     state::{NoOperator, NoState},
     ServiceCore, ServiceData, ServiceId,
 };
-pub type BlockId = [u8; 32];
 
 pub struct Mempool<
     N: NetworkBackend + Send + Sync + 'static,
@@ -45,7 +45,7 @@ pub enum MempoolMsg<Tx, Id> {
     },
     MarkInBlock {
         ids: Vec<Id>,
-        block: BlockId,
+        block: BlockHeader,
     },
 }
 

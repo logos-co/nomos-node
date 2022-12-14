@@ -9,6 +9,7 @@ edition = "2021"
 async-trait = "0.1"
 overwatch-rs = { git = "https://github.com/logos-co/Overwatch", branch = "main" }
 nomos-network = { path = "../network", features = ["waku"] }
+nomos-core = { path = "../../nomos-core" }
 tracing = "0.1"
 tokio = { version = "1", features = ["sync"] }
 futures = "0.3"
