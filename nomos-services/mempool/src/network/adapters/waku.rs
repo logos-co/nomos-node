@@ -30,7 +30,10 @@ pub struct WakuAdapter {
 #[async_trait::async_trait]
 impl NetworkAdapter for WakuAdapter {
     type Backend = Waku;
+    // TODO: This can be probably generic, but we would have to bind it to some deserialization trait
     type Tx = Transaction;
+    type Id = u64;
+
     async fn new(
         network_relay: OutboundRelay<<NetworkService<Self::Backend> as ServiceData>::Message>,
     ) -> Self {
@@ -47,7 +50,9 @@ impl NetworkAdapter for WakuAdapter {
         };
         Self { network_relay }
     }
-    async fn transactions_stream(&self) -> Box<dyn Stream<Item = Self::Tx>> {
+    async fn transactions_stream(
+        &self,
+    ) -> Box<dyn Stream<Item = (Self::Tx, Self::Id)> + Unpin + Send> {
         let (sender, receiver) = tokio::sync::oneshot::channel();
         if let Err((_, _e)) = self
             .network_relay
@@ -60,22 +65,22 @@ impl NetworkAdapter for WakuAdapter {
             todo!("log error");
         };
         let receiver = receiver.await.unwrap();
-        Box::new(
-            BroadcastStream::new(receiver).filter_map(|event| async move {
+        Box::new(Box::pin(BroadcastStream::new(receiver).filter_map(
+            |event| async move {
                 match event {
                     Ok(NetworkEvent::RawMessage(message)) => {
                         if message.content_topic().content_topic_name
                             == WAKU_CARNOT_TX_CONTENT_TOPIC.content_topic_name
                         {
                             let tx = TransactionMsg::from_bytes(message.payload()).unwrap();
-                            Some(tx.tx)
+                            Some((tx.tx, tx.id))
                         } else {
                             None
                         }
                     }
                     Err(_e) => None,
                 }
-            }),
-        )
+            },
+        )))
     }
 }

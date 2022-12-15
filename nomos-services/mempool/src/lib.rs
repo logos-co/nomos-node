@@ -1,20 +1,18 @@
 pub mod backend;
 pub mod network;
 
-/// std
+// std
 use std::fmt::{Debug, Error, Formatter};
 
-/// crates
-use tokio::sync::broadcast::Receiver;
+// crates
+use futures::StreamExt;
 use tokio::sync::oneshot::Sender;
 
-/// internal
+// internal
+use crate::network::NetworkAdapter;
 use backend::MemPool;
 use nomos_core::block::{BlockHeader, BlockId};
-use nomos_network::{
-    backends::{waku::NetworkEvent, NetworkBackend},
-    NetworkService,
-};
+use nomos_network::{backends::NetworkBackend, NetworkService};
 use overwatch_rs::services::{
     handle::ServiceStateHandle,
     relay::{OutboundRelay, Relay, RelayMessage},
@@ -31,7 +29,7 @@ pub struct MempoolService<
     P::Id: Debug + Send + Sync + 'static,
 {
     service_state: ServiceStateHandle<Self>,
-    network_relay: Relay<NetworkService<N>>,
+    network_relay: Relay<NetworkService<B>>,
     pool: P,
 }
 
@@ -112,12 +110,11 @@ where
         })
     }
 
-    #[allow(unreachable_code, unused, clippy::diverging_sub_expression)]
     async fn run(mut self) -> Result<(), overwatch_rs::DynError> {
         let Self {
-            service_state,
+            mut service_state,
             network_relay,
-            pool,
+            mut pool,
         } = self;
 
         let network_relay: OutboundRelay<_> = network_relay
@@ -125,8 +122,8 @@ where
             .await
             .expect("Relay connection with NetworkService should succeed");
 
-        // Separate function so that we can specialize it for different network backends
-        let network_txs: Receiver<NetworkEvent> = todo!();
+        let adapter = N::new(network_relay).await;
+        let mut network_txs = adapter.transactions_stream().await;
 
         loop {
             tokio::select! {
@@ -140,17 +137,18 @@ where
                         MempoolMsg::View { ancestor_hint, rx } => {
                             rx.send(pool.view(ancestor_hint)).unwrap_or_else(|_| {
                                 tracing::debug!("could not send back pool view")
-                            })
+                            });
                         }
                         MempoolMsg::MarkInBlock { ids, block } => {
                             pool.mark_in_block(ids, block);
                         }
-                        MempoolMsg::Prune { ids } => pool.prune(ids),
+                        MempoolMsg::Prune { ids } => { pool.prune(ids); },
                     }
                 }
-                Ok(msg) = network_txs.recv() => {
-                    // filter incoming transactions and add them to the pool
-                    todo!()
+                Some((tx, id)) = network_txs.next() => {
+                    pool.add_tx(tx, id).unwrap_or_else(|e| {
+                        tracing::debug!("could not add tx to the pool due to: {}", e)
+                    });
                 }
             }
         }
