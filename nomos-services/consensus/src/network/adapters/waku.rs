@@ -72,25 +72,23 @@ impl NetworkAdapter for WakuAdapter {
         Box::new(
             BroadcastStream::new(stream_channel).filter_map(|msg| async move {
                 match msg {
-                    Ok(event) => match event {
-                        NetworkEvent::RawMessage(message) => {
-                            // TODO: this should actually check the whole content topic,
-                            // waiting for this [PR](https://github.com/waku-org/waku-rust-bindings/pull/28)
-                            if WAKU_CARNOT_BLOCK_CONTENT_TOPIC.content_topic_name
-                                == message.content_topic().content_topic_name
-                            {
-                                let payload = message.payload();
-                                Some(
-                                    ProposalChunkMsg::from_bytes::<CHUNK_SIZE>(
-                                        payload.try_into().unwrap(),
-                                    )
-                                    .chunk,
+                    Ok(NetworkEvent::RawMessage(message)) => {
+                        // TODO: this should actually check the whole content topic,
+                        // waiting for this [PR](https://github.com/waku-org/waku-rust-bindings/pull/28)
+                        if WAKU_CARNOT_BLOCK_CONTENT_TOPIC.content_topic_name
+                            == message.content_topic().content_topic_name
+                        {
+                            let payload = message.payload();
+                            Some(
+                                ProposalChunkMsg::from_bytes::<CHUNK_SIZE>(
+                                    payload.try_into().unwrap(),
                                 )
-                            } else {
-                                None
-                            }
+                                .chunk,
+                            )
+                        } else {
+                            None
                         }
-                    },
+                    }
                     Err(_e) => None,
                 }
             }),

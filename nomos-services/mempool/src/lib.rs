@@ -1,4 +1,5 @@
 pub mod backend;
+pub mod network;
 
 /// std
 use std::fmt::{Debug, Error, Formatter};
