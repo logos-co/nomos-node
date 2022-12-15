@@ -1,3 +1,5 @@
+pub mod backend;
+
 /// std
 use std::fmt::{Debug, Error, Formatter};
 
@@ -6,8 +8,7 @@ use tokio::sync::broadcast::Receiver;
 use tokio::sync::oneshot::Sender;
 
 /// internal
-pub mod backend;
-use backend::Pool;
+use backend::MemPool;
 use nomos_core::block::{BlockHeader, BlockId};
 use nomos_network::{
     backends::{waku::NetworkEvent, NetworkBackend},
@@ -20,8 +21,11 @@ use overwatch_rs::services::{
     ServiceCore, ServiceData, ServiceId,
 };
 
-pub struct Mempool<N: NetworkBackend + Send + Sync + 'static, P: Pool + Send + Sync + 'static>
-where
+pub struct MempoolService<
+    N: NetworkBackend + Send + Sync + 'static,
+    P: MemPool + Send + Sync + 'static,
+> where
+    P::Settings: Clone + Send + Sync + 'static,
     P::Tx: Debug + Send + Sync + 'static,
     P::Id: Debug + Send + Sync + 'static,
 {
@@ -73,34 +77,37 @@ impl<Tx: Debug, Id: Debug> Debug for MempoolMsg<Tx, Id> {
 
 impl<Tx: 'static, Id: 'static> RelayMessage for MempoolMsg<Tx, Id> {}
 
-impl<N, P> ServiceData for Mempool<N, P>
+impl<N, P> ServiceData for MempoolService<N, P>
 where
     N: NetworkBackend + Send + Sync + 'static,
-    P: Pool + Send + Sync + 'static,
+    P: MemPool + Send + Sync + 'static,
+    P::Settings: Clone + Send + Sync + 'static,
     P::Id: Debug + Send + Sync + 'static,
     P::Tx: Debug + Send + Sync + 'static,
 {
     const SERVICE_ID: ServiceId = "Mempool";
-    type Settings = ();
+    type Settings = P::Settings;
     type State = NoState<Self::Settings>;
     type StateOperator = NoOperator<Self::State>;
-    type Message = MempoolMsg<<P as Pool>::Tx, <P as Pool>::Id>;
+    type Message = MempoolMsg<<P as MemPool>::Tx, <P as MemPool>::Id>;
 }
 
 #[async_trait::async_trait]
-impl<N, P> ServiceCore for Mempool<N, P>
+impl<N, P> ServiceCore for MempoolService<N, P>
 where
-    P: Pool + Send + Sync + 'static,
+    P: MemPool + Send + Sync + 'static,
+    P::Settings: Clone + Send + Sync + 'static,
     P::Id: Debug + Send + Sync + 'static,
     P::Tx: Debug + Send + Sync + 'static,
     N: NetworkBackend + Send + Sync + 'static,
 {
     fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, overwatch_rs::DynError> {
         let network_relay = service_state.overwatch_handle.relay();
+        let pool_settings = service_state.settings_reader.get_updated_settings();
         Ok(Self {
             service_state,
             network_relay,
-            pool: P::new(),
+            pool: P::new(pool_settings),
         })
     }
 
