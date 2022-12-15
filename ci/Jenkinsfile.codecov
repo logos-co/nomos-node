@@ -1,0 +1,37 @@
+pipeline {
+  agent {
+    dockerfile {
+      label 'linux'
+      dir 'ci'
+    }
+  }
+
+  options {
+    disableConcurrentBuilds()
+    buildDiscarder(logRotator(
+      numToKeepStr: '20',
+      daysToKeepStr: '30',
+    ))
+  }
+
+  environment {
+    COVOUTPUT = '/tmp/cov'
+    GIT_COMMITTER_NAME = 'status-im-auto'
+    GIT_COMMITTER_EMAIL = 'auto@status.im'
+    GIT_SSH_COMMAND = 'ssh -o StrictHostKeyChecking=no'
+    GOPATH  = '/tmp/go'
+    GOCACHE = '/tmp/'
+    RUSTFLAGS="-C instrument-coverage"
+  }
+
+  stages {
+    stage('Codecov') {
+      steps {
+        sh 'cargo test --all-features'
+      }
+      steps {
+	sh 'grcov . --binary-path ./target/debug/ -s . -t html --branch --ignore-not-existing --ignore '../*' --ignore "/*" -o $COVOUTPUT'
+      }
+    }
+  }
+}

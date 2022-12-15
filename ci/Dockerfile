@@ -15,7 +15,8 @@ RUN apt-get update && apt-get install -yq \
     golang/bullseye-backports
 
 RUN pip install ghp-import
-RUN rustup component add rustfmt clippy
+RUN rustup component add rustfmt clippy llvm-tools-preview
+RUN cargo install grcov
 
 # Jenkins user needs a specific UID/GID to work.
 RUN groupadd -g 1001 jenkins \
