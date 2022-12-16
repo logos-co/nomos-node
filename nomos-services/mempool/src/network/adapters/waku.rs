@@ -1,13 +1,15 @@
 use bincode::config::{Fixint, LittleEndian, NoLimit, WriteFixedArrayLength};
+use std::marker::PhantomData;
 // std
 // crates
 use futures::{Stream, StreamExt};
 use once_cell::sync::Lazy;
+use serde::de::DeserializeOwned;
+use serde::Serialize;
 use tokio_stream::wrappers::BroadcastStream;
 // internal
 use crate::network::messages::TransactionMsg;
 use crate::network::NetworkAdapter;
-use nomos_core::transactions::Transaction;
 use nomos_network::backends::waku::{EventKind, NetworkEvent, Waku, WakuBackendMessage};
 use nomos_network::{NetworkMsg, NetworkService};
 use overwatch_rs::services::relay::OutboundRelay;
@@ -24,16 +26,20 @@ static WAKU_CARNOT_TX_CONTENT_TOPIC: Lazy<WakuContentTopic> = Lazy::new(|| WakuC
     encoding: Encoding::Proto,
 });
 
-pub struct WakuAdapter {
+pub struct WakuAdapter<Tx, Id> {
     network_relay: OutboundRelay<<NetworkService<Waku> as ServiceData>::Message>,
+    _tx: PhantomData<(Tx, Id)>,
 }
 
 #[async_trait::async_trait]
-impl NetworkAdapter for WakuAdapter {
+impl<Tx, Id> NetworkAdapter for WakuAdapter<Tx, Id>
+where
+    Tx: Serialize + DeserializeOwned + Send + Sync + 'static,
+    Id: Serialize + DeserializeOwned + Send + Sync + 'static,
+{
     type Backend = Waku;
-    // TODO: This can be probably generic, but we would have to bind it to some deserialization trait
-    type Tx = Transaction;
-    type Id = u64;
+    type Tx = Tx;
+    type Id = Id;
 
     async fn new(
         network_relay: OutboundRelay<<NetworkService<Self::Backend> as ServiceData>::Message>,
@@ -49,7 +55,10 @@ impl NetworkAdapter for WakuAdapter {
             // a problem. But definitely something to consider.
             todo!("log error");
         };
-        Self { network_relay }
+        Self {
+            network_relay,
+            _tx: Default::default(),
+        }
     }
     async fn transactions_stream(
         &self,
