@@ -1,3 +1,4 @@
+use bincode::config::{Fixint, LittleEndian, NoLimit, WriteFixedArrayLength};
 // std
 // crates
 use futures::{Stream, StreamExt};
@@ -72,7 +73,18 @@ impl NetworkAdapter for WakuAdapter {
                         if message.content_topic().content_topic_name
                             == WAKU_CARNOT_TX_CONTENT_TOPIC.content_topic_name
                         {
-                            let tx = TransactionMsg::from_bytes(message.payload()).unwrap();
+                            let (tx, _): (TransactionMsg<Self::Tx, Self::Id>, _) =
+                                // TODO: This should be temporary, we can probably extract this so we can use/try/test a variety of encodings
+                                bincode::serde::decode_from_slice(
+                                    message.payload(),
+                                    bincode::config::Configuration::<
+                                        LittleEndian,
+                                        Fixint,
+                                        WriteFixedArrayLength,
+                                        NoLimit,
+                                    >::default(),
+                                )
+                                .unwrap();
                             Some((tx.tx, tx.id))
                         } else {
                             None

@@ -1,5 +1,10 @@
+// std
 use std::error::Error;
+// crates
+use serde::{Deserialize, Serialize};
+// internal
 
+#[derive(Serialize, Deserialize)]
 pub enum Transaction {
     None,
 }
