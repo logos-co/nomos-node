@@ -30,7 +30,7 @@ pipeline {
         sh 'cargo test --all-features'
       }
       steps {
-	sh 'grcov . --binary-path ./target/debug/ -s . -t html --branch --ignore-not-existing --ignore '../*' --ignore "/*" -o $COVOUTPUT'
+	sh 'grcov . --binary-path ./target/debug/ -s . -t html --branch --ignore-not-existing --ignore "../*" --ignore "/*" -o $COVOUTPUT'
       }
     }
   }
