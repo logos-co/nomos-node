@@ -38,8 +38,6 @@ pipeline {
     stage('Test') {
       steps {
         sh 'cargo test --all'
-      }
-      steps {
         sh 'cargo test --all --all-features'
       }
     }

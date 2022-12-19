@@ -37,8 +37,6 @@ pipeline {
     stage('Test') {
       steps { script {
         nix.shell('cargo test --all')
-      } }
-      steps { script {
         nix.shell('cargo test --all --all-features')
       } }
     }
