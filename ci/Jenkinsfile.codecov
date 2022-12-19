@@ -28,8 +28,6 @@ pipeline {
     stage('Codecov') {
       steps {
         sh 'cargo test --all-features'
-      }
-      steps {
 	sh 'grcov . --binary-path ./target/debug/ -s . -t html --branch --ignore-not-existing --ignore "../*" --ignore "/*" -o $COVOUTPUT'
       }
     }
