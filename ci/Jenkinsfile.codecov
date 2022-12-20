@@ -31,6 +31,14 @@ pipeline {
 	sh 'grcov . --binary-path ./target/debug/ -s . -t html --branch --ignore-not-existing --ignore "../*" --ignore "/*" -o $COVOUTPUT'
       }
     }
+    stage('Upload') {
+      steps {
+	sh 'cd $COVOUTPUT'
+        sh 'curl -Os https://uploader.codecov.io/latest/linux/codecov'
+	sh 'chmod +x codecov'
+	sh './codecov'
+      }
+    }
   }
   post {
     cleanup { cleanWs() }
