@@ -13,7 +13,7 @@ pub trait FountainCode {
     fn encode(
         block: &[u8],
         settings: &Self::Settings,
-    ) -> Box<dyn Iterator<Item = Bytes> + Send + Sync>;
+    ) -> Box<dyn Stream<Item = Bytes> + Send + Sync + Unpin>;
     async fn decode(
         stream: impl Stream<Item = Bytes> + Send + Sync + Unpin,
         settings: &Self::Settings,
