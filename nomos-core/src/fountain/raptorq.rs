@@ -16,7 +16,10 @@ pub struct RaptorQSettings {
 #[async_trait::async_trait]
 impl FountainCode for RaptorQFountain {
     type Settings = RaptorQSettings;
-    fn encode(&self, block: &[u8], settings: &Self::Settings) -> Box<dyn Iterator<Item = Bytes>> {
+    fn encode(
+        block: &[u8],
+        settings: &Self::Settings,
+    ) -> Box<dyn Iterator<Item = Bytes> + Send + Sync> {
         let encoder = Encoder::new(block, settings.transmission_information);
         Box::new(
             encoder
@@ -33,11 +36,45 @@ impl FountainCode for RaptorQFountain {
         let mut decoder = Decoder::new(settings.transmission_information);
         while let Some(chunk) = stream.next().await {
             let packet = EncodingPacket::deserialize(&chunk);
-            decoder.add_new_packet(packet);
-            if let Some(result) = decoder.get_result() {
+            if let Some(result) = decoder.decode(packet) {
                 return Ok(Bytes::from(result));
             }
         }
         Err("Stream ended before decoding was complete".to_string())
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::fountain::raptorq::RaptorQFountain;
+    use crate::fountain::FountainCode;
+    use bytes::Bytes;
+    use rand::RngCore;
+
+    #[tokio::test]
+    async fn random_encode_decode() -> Result<(), String> {
+        const TRANSFER_LENGTH: usize = 1024;
+        // build settings
+        let settings = super::RaptorQSettings {
+            transmission_information: raptorq::ObjectTransmissionInformation::with_defaults(
+                TRANSFER_LENGTH as u64,
+                1000,
+            ),
+            repair_packets_per_block: 10,
+        };
+
+        // create random payload
+        let mut payload = [0u8; TRANSFER_LENGTH];
+        rand::thread_rng().fill_bytes(&mut payload);
+        let payload = Bytes::from(payload.to_vec());
+
+        // encode payload
+        let encoded = RaptorQFountain::encode(&payload, &settings);
+
+        // reconstruct
+        let decoded = RaptorQFountain::decode(futures::stream::iter(encoded), &settings).await?;
+
+        assert_eq!(decoded, payload);
+        Ok(())
     }
 }
