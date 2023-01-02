@@ -19,14 +19,14 @@ impl FountainCode for RaptorQFountain {
     fn encode(
         block: &[u8],
         settings: &Self::Settings,
-    ) -> Box<dyn Iterator<Item = Bytes> + Send + Sync> {
+    ) -> Box<dyn Stream<Item = Bytes> + Send + Sync + Unpin> {
         let encoder = Encoder::new(block, settings.transmission_information);
-        Box::new(
+        Box::new(futures::stream::iter(
             encoder
                 .get_encoded_packets(settings.repair_packets_per_block)
                 .into_iter()
                 .map(|packet| packet.serialize().into()),
-        )
+        ))
     }
 
     async fn decode(
@@ -50,6 +50,7 @@ mod test {
     use crate::fountain::FountainCode;
     use bytes::Bytes;
     use rand::RngCore;
+    use std::pin::Pin;
 
     #[tokio::test]
     async fn random_encode_decode() -> Result<(), String> {
@@ -69,10 +70,10 @@ mod test {
         let payload = Bytes::from(payload.to_vec());
 
         // encode payload
-        let encoded = RaptorQFountain::encode(&payload, &settings);
+        let encoded = Pin::new(RaptorQFountain::encode(&payload, &settings));
 
         // reconstruct
-        let decoded = RaptorQFountain::decode(futures::stream::iter(encoded), &settings).await?;
+        let decoded = RaptorQFountain::decode(encoded, &settings).await?;
 
         assert_eq!(decoded, payload);
         Ok(())
