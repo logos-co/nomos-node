@@ -50,7 +50,6 @@ mod test {
     use crate::fountain::FountainCode;
     use bytes::Bytes;
     use rand::RngCore;
-    use std::pin::Pin;
 
     #[tokio::test]
     async fn random_encode_decode() -> Result<(), String> {
@@ -70,7 +69,7 @@ mod test {
         let payload = Bytes::from(payload.to_vec());
 
         // encode payload
-        let encoded = Pin::new(RaptorQFountain::encode(&payload, &settings));
+        let encoded = RaptorQFountain::encode(&payload, &settings);
 
         // reconstruct
         let decoded = RaptorQFountain::decode(encoded, &settings).await?;
