@@ -93,19 +93,23 @@ impl<'view, const C: usize> Member<'view, C> {
 }
 
 #[async_trait::async_trait]
-impl<'view, Network: NetworkAdapter + Send + Sync, const C: usize> Overlay<'view, Network>
-    for Member<'view, C>
+impl<
+        'view,
+        Network: NetworkAdapter + Send + Sync,
+        Fountain: FountainCode + Send + Sync,
+        const C: usize,
+    > Overlay<'view, Network, Fountain> for Member<'view, C>
 {
     fn new(view: &'view View, node: NodeId) -> Self {
         let committees = Committees::new(view);
         committees.into_member(node).unwrap()
     }
 
-    async fn reconstruct_proposal_block(&self, adapter: &Network) -> Block {
+    async fn reconstruct_proposal_block(&self, adapter: &Network, fountain: &Fountain) -> Block {
         todo!()
     }
 
-    async fn broadcast_block(&self, _block: Block, adapter: &Network) {
+    async fn broadcast_block(&self, _block: Block, adapter: &Network, fountain: &Fountain) {
         todo!()
     }
 

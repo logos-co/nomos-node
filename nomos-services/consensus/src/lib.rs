@@ -18,6 +18,7 @@ use crate::network::NetworkAdapter;
 use leadership::{Leadership, LeadershipResult};
 use nomos_core::block::Block;
 use nomos_core::crypto::PublicKey;
+use nomos_core::fountain::FountainCode;
 use nomos_core::staking::Stake;
 use nomos_mempool::{backend::MemPool, network::NetworkAdapter as MempoolAdapter, MempoolService};
 use nomos_network::NetworkService;
@@ -38,13 +39,23 @@ pub type Seed = [u8; 32];
 
 const COMMITTEE_SIZE: usize = 1;
 
-#[derive(Clone)]
-pub struct CarnotSettings {
+pub struct CarnotSettings<Fountain: FountainCode> {
     private_key: [u8; 32],
+    fountain_settings: Fountain::Settings,
 }
 
-pub struct CarnotConsensus<A, P, M>
+impl<Fountain: FountainCode> Clone for CarnotSettings<Fountain> {
+    fn clone(&self) -> Self {
+        Self {
+            private_key: self.private_key,
+            fountain_settings: self.fountain_settings.clone(),
+        }
+    }
+}
+
+pub struct CarnotConsensus<A, P, M, F>
 where
+    F: FountainCode + Send + Sync + 'static,
     A: NetworkAdapter + Send + Sync + 'static,
     P: MemPool + Send + Sync + 'static,
     P::Settings: Clone + Send + Sync + 'static,
@@ -57,10 +68,12 @@ where
     // when implementing ServiceCore for CarnotConsensus
     network_relay: Relay<NetworkService<A::Backend>>,
     mempool_relay: Relay<MempoolService<M, P>>,
+    _fountain: std::marker::PhantomData<F>,
 }
 
-impl<A, P, M> ServiceData for CarnotConsensus<A, P, M>
+impl<A, P, M, F> ServiceData for CarnotConsensus<A, P, M, F>
 where
+    F: FountainCode + Send + Sync + 'static,
     A: NetworkAdapter + Send + Sync + 'static,
     P: MemPool + Send + Sync + 'static,
     P::Settings: Clone + Send + Sync + 'static,
@@ -69,15 +82,16 @@ where
     M: MempoolAdapter<Tx = P::Tx> + Send + Sync + 'static,
 {
     const SERVICE_ID: ServiceId = "Carnot";
-    type Settings = CarnotSettings;
+    type Settings = CarnotSettings<F>;
     type State = NoState<Self::Settings>;
     type StateOperator = NoOperator<Self::State>;
     type Message = NoMessage;
 }
 
 #[async_trait::async_trait]
-impl<A, P, M> ServiceCore for CarnotConsensus<A, P, M>
+impl<A, P, M, F> ServiceCore for CarnotConsensus<A, P, M, F>
 where
+    F: FountainCode + Send + Sync + 'static,
     A: NetworkAdapter + Send + Sync + 'static,
     P: MemPool + Send + Sync + 'static,
     P::Settings: Clone + Send + Sync + 'static,
@@ -91,6 +105,7 @@ where
         Ok(Self {
             service_state,
             network_relay,
+            _fountain: Default::default(),
             mempool_relay,
         })
     }
@@ -110,28 +125,28 @@ where
             .await
             .expect("Relay connection with MemPoolService should succeed");
 
+        let CarnotSettings {
+            private_key,
+            fountain_settings,
+        } = self.service_state.settings_reader.get_updated_settings();
+
         let network_adapter = A::new(network_relay).await;
 
         let tip = Tip;
 
-        // TODO: fix
-        let priv_key = self
-            .service_state
-            .settings_reader
-            .get_updated_settings()
-            .private_key;
-        let node_id = priv_key;
+        let fountain = F::new(fountain_settings);
 
-        let leadership = Leadership::new(priv_key, mempool_relay);
+        let leadership = Leadership::new(private_key, mempool_relay);
         loop {
             let view = view_generator.next().await;
             // if we want to process multiple views at the same time this can
             // be spawned as a separate future
             // TODO: add leadership module
-            view.resolve::<A, Member<'_, COMMITTEE_SIZE>, _, _>(
-                node_id,
+            view.resolve::<A, Member<'_, COMMITTEE_SIZE>, _, _, _>(
+                private_key,
                 &tip,
                 &network_adapter,
+                &fountain,
                 &leadership,
             )
             .await;
@@ -139,8 +154,9 @@ where
     }
 }
 
-impl<A, P, M> CarnotConsensus<A, P, M>
+impl<A, P, M, F> CarnotConsensus<A, P, M, F>
 where
+    F: FountainCode + Send + Sync + 'static,
     A: NetworkAdapter + Send + Sync + 'static,
     P: MemPool + Send + Sync + 'static,
     P::Settings: Clone + Send + Sync + 'static,
@@ -182,15 +198,17 @@ impl View {
     const APPROVAL_THRESHOLD: usize = 1;
 
     // TODO: might want to encode steps in the type system
-    async fn resolve<'view, A, O, Tx, Id>(
+    async fn resolve<'view, A, O, F, Tx, Id>(
         &'view self,
         node_id: NodeId,
         tip: &Tip,
         adapter: &A,
+        fountain: &F,
         leadership: &Leadership<Tx, Id>,
     ) where
         A: NetworkAdapter + Send + Sync + 'static,
-        O: Overlay<'view, A>,
+        F: FountainCode,
+        O: Overlay<'view, A, F>,
     {
         let overlay = O::new(self, node_id);
 
@@ -199,14 +217,21 @@ impl View {
         {
             block
         } else {
-            overlay.reconstruct_proposal_block(adapter).await
+            overlay.reconstruct_proposal_block(adapter, fountain).await
         };
         // TODO: verify?
-        overlay.broadcast_block(block.clone(), adapter).await;
+        overlay
+            .broadcast_block(block.clone(), adapter, fountain)
+            .await;
         self.approve(&overlay, block, adapter).await;
     }
 
-    async fn approve<'view, Network: NetworkAdapter, O: Overlay<'view, Network>>(
+    async fn approve<
+        'view,
+        Network: NetworkAdapter,
+        Fountain: FountainCode,
+        O: Overlay<'view, Network, Fountain>,
+    >(
         &'view self,
         overlay: &O,
         block: Block,
