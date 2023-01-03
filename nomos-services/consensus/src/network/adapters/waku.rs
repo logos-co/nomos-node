@@ -1,5 +1,6 @@
 // std
 // crates
+use bytes::Bytes;
 use futures::{Stream, StreamExt};
 use tokio_stream::wrappers::BroadcastStream;
 // internal
@@ -8,7 +9,6 @@ use crate::network::{
     NetworkAdapter,
 };
 use crate::{Approval, View};
-use nomos_core::block::BlockChunk;
 use nomos_network::{
     backends::waku::{EventKind, NetworkEvent, Waku, WakuBackendMessage},
     NetworkMsg, NetworkService,
@@ -24,9 +24,6 @@ static WAKU_CARNOT_BLOCK_CONTENT_TOPIC: WakuContentTopic =
 
 static WAKU_CARNOT_APPROVAL_CONTENT_TOPIC: WakuContentTopic =
     WakuContentTopic::new("CarnotSim", 1, "CarnotApproval", Encoding::Proto);
-
-// TODO: ehm...this should be here, but we will change it whenever the chunking is decided.
-const CHUNK_SIZE: usize = 8;
 
 pub struct WakuAdapter {
     network_relay: OutboundRelay<<NetworkService<Waku> as ServiceData>::Message>,
@@ -64,7 +61,7 @@ impl NetworkAdapter for WakuAdapter {
         Self { network_relay }
     }
 
-    async fn proposal_chunks_stream(&self) -> Box<dyn Stream<Item = BlockChunk>> {
+    async fn proposal_chunks_stream(&self) -> Box<dyn Stream<Item = Bytes>> {
         let stream_channel = self
             .message_subscriber_channel()
             .await
@@ -72,23 +69,20 @@ impl NetworkAdapter for WakuAdapter {
         Box::new(
             BroadcastStream::new(stream_channel).filter_map(|msg| async move {
                 match msg {
-                    Ok(NetworkEvent::RawMessage(message)) => {
-                        // TODO: this should actually check the whole content topic,
-                        // waiting for this [PR](https://github.com/waku-org/waku-rust-bindings/pull/28)
-                        if WAKU_CARNOT_BLOCK_CONTENT_TOPIC.content_topic_name
-                            == message.content_topic().content_topic_name
-                        {
-                            let payload = message.payload();
-                            Some(
-                                ProposalChunkMsg::from_bytes::<CHUNK_SIZE>(
-                                    payload.try_into().unwrap(),
-                                )
-                                .chunk,
-                            )
-                        } else {
-                            None
+                    Ok(event) => match event {
+                        NetworkEvent::RawMessage(message) => {
+                            // TODO: this should actually check the whole content topic,
+                            // waiting for this [PR](https://github.com/waku-org/waku-rust-bindings/pull/28)
+                            if WAKU_CARNOT_BLOCK_CONTENT_TOPIC.content_topic_name
+                                == message.content_topic().content_topic_name
+                            {
+                                let payload = message.payload();
+                                Some(ProposalChunkMsg::from_bytes(payload).chunk)
+                            } else {
+                                None
+                            }
                         }
-                    }
+                    },
                     Err(_e) => None,
                 }
             }),
@@ -98,7 +92,7 @@ impl NetworkAdapter for WakuAdapter {
     async fn broadcast_block_chunk(&self, _view: View, chunk_message: ProposalChunkMsg) {
         // TODO: probably later, depending on the view we should map to different content topics
         // but this is an ongoing idea that should/will be discus.
-        let message = WakuMessage::new::<[u8; CHUNK_SIZE]>(
+        let message = WakuMessage::new(
             chunk_message.as_bytes(),
             WAKU_CARNOT_BLOCK_CONTENT_TOPIC.clone(),
             1,
