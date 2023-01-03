@@ -6,13 +6,17 @@ use raptorq::{Decoder, Encoder, EncodingPacket, ObjectTransmissionInformation};
 // internal
 use crate::fountain::{FountainCode, FountainError};
 
+/// [RaptorQ](https://en.wikipedia.org/wiki/Raptor_code#RaptorQ_code) implementation of [`FountainCode`] trait
 pub struct RaptorQFountain;
 
+/// Settings for [`RaptorQFountain`] code
 pub struct RaptorQSettings {
     pub transmission_information: ObjectTransmissionInformation,
     pub repair_packets_per_block: u32,
 }
 
+/// RaptorQ implementation of [`FountainCode`] trait
+/// Wrapper around the [`raptorq`](https://crates.io/crates/raptorq) crate
 #[async_trait::async_trait]
 impl FountainCode for RaptorQFountain {
     type Settings = RaptorQSettings;
