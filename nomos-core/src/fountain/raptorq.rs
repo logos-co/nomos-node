@@ -49,6 +49,7 @@ mod test {
     use crate::fountain::raptorq::RaptorQFountain;
     use crate::fountain::{FountainCode, FountainError};
     use bytes::Bytes;
+    use futures::StreamExt;
     use rand::RngCore;
 
     #[tokio::test]
@@ -76,5 +77,30 @@ mod test {
 
         assert_eq!(decoded, payload);
         Ok(())
+    }
+
+    #[tokio::test]
+    async fn random_encode_decode_fails() {
+        const TRANSFER_LENGTH: usize = 1024;
+        // build settings
+        let settings = super::RaptorQSettings {
+            transmission_information: raptorq::ObjectTransmissionInformation::with_defaults(
+                TRANSFER_LENGTH as u64,
+                1000,
+            ),
+            repair_packets_per_block: 10,
+        };
+
+        // create random payload
+        let mut payload = [0u8; TRANSFER_LENGTH];
+        rand::thread_rng().fill_bytes(&mut payload);
+        let payload = Bytes::from(payload.to_vec());
+
+        // encode payload
+        let encoded = RaptorQFountain::encode(&payload, &settings);
+
+        // reconstruct skipping packets, must fail
+        let decoded = RaptorQFountain::decode(encoded.skip(400), &settings).await;
+        assert!(decoded.is_err());
     }
 }
