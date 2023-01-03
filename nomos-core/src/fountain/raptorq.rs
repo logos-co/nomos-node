@@ -4,7 +4,7 @@ use bytes::Bytes;
 use futures::{Stream, StreamExt};
 use raptorq::{Decoder, Encoder, EncodingPacket, ObjectTransmissionInformation};
 // internal
-use crate::fountain::FountainCode;
+use crate::fountain::{FountainCode, FountainError};
 
 pub struct RaptorQFountain;
 
@@ -32,7 +32,7 @@ impl FountainCode for RaptorQFountain {
     async fn decode(
         mut stream: impl Stream<Item = Bytes> + Send + Sync + Unpin,
         settings: &Self::Settings,
-    ) -> Result<Bytes, String> {
+    ) -> Result<Bytes, FountainError> {
         let mut decoder = Decoder::new(settings.transmission_information);
         while let Some(chunk) = stream.next().await {
             let packet = EncodingPacket::deserialize(&chunk);
@@ -40,19 +40,19 @@ impl FountainCode for RaptorQFountain {
                 return Ok(Bytes::from(result));
             }
         }
-        Err("Stream ended before decoding was complete".to_string())
+        Err("Stream ended before decoding was complete".into())
     }
 }
 
 #[cfg(test)]
 mod test {
     use crate::fountain::raptorq::RaptorQFountain;
-    use crate::fountain::FountainCode;
+    use crate::fountain::{FountainCode, FountainError};
     use bytes::Bytes;
     use rand::RngCore;
 
     #[tokio::test]
-    async fn random_encode_decode() -> Result<(), String> {
+    async fn random_encode_decode() -> Result<(), FountainError> {
         const TRANSFER_LENGTH: usize = 1024;
         // build settings
         let settings = super::RaptorQSettings {
