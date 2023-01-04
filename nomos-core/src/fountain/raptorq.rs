@@ -108,7 +108,7 @@ mod test {
         let raptor = RaptorQFountain::new(settings);
 
         // encode payload
-        let encoded = raptor::encode(&payload);
+        let encoded = raptor.encode(&payload);
 
         // reconstruct skipping packets, must fail
         let decoded = raptor.decode(encoded.skip(400)).await;
