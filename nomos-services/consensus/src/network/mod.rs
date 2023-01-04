@@ -1,5 +1,5 @@
 pub mod adapters;
-mod messages;
+pub mod messages;
 
 // std
 use bytes::Bytes;
@@ -19,8 +19,8 @@ pub trait NetworkAdapter {
     async fn new(
         network_relay: OutboundRelay<<NetworkService<Self::Backend> as ServiceData>::Message>,
     ) -> Self;
-    async fn proposal_chunks_stream(&self) -> Box<dyn Stream<Item = Bytes>>;
-    async fn broadcast_block_chunk(&self, view: View, chunk_msg: ProposalChunkMsg);
+    async fn proposal_chunks_stream(&self) -> Box<dyn Stream<Item = Bytes> + Send + Sync + Unpin>;
+    async fn broadcast_block_chunk(&self, view: &View, chunk_msg: ProposalChunkMsg);
     async fn approvals_stream(&self) -> Box<dyn Stream<Item = Approval>>;
     async fn forward_approval(&self, approval: ApprovalMsg);
 }

@@ -61,13 +61,13 @@ impl NetworkAdapter for WakuAdapter {
         Self { network_relay }
     }
 
-    async fn proposal_chunks_stream(&self) -> Box<dyn Stream<Item = Bytes>> {
+    async fn proposal_chunks_stream(&self) -> Box<dyn Stream<Item = Bytes> + Send + Sync + Unpin> {
         let stream_channel = self
             .message_subscriber_channel()
             .await
             .unwrap_or_else(|_e| todo!("handle error"));
-        Box::new(
-            BroadcastStream::new(stream_channel).filter_map(|msg| async move {
+        Box::new(BroadcastStream::new(stream_channel).filter_map(|msg| {
+            Box::pin(async move {
                 match msg {
                     Ok(event) => match event {
                         NetworkEvent::RawMessage(message) => {
@@ -85,11 +85,11 @@ impl NetworkAdapter for WakuAdapter {
                     },
                     Err(_e) => None,
                 }
-            }),
-        )
+            })
+        }))
     }
 
-    async fn broadcast_block_chunk(&self, _view: View, chunk_message: ProposalChunkMsg) {
+    async fn broadcast_block_chunk(&self, _view: &View, chunk_message: ProposalChunkMsg) {
         // TODO: probably later, depending on the view we should map to different content topics
         // but this is an ongoing idea that should/will be discus.
         let message = WakuMessage::new(

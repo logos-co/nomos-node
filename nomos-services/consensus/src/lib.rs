@@ -215,15 +215,22 @@ impl View {
         let block = if let LeadershipResult::Leader { block, .. } =
             leadership.try_propose_block(self, tip).await
         {
-            block
+            Ok(block)
         } else {
             overlay.reconstruct_proposal_block(adapter, fountain).await
         };
-        // TODO: verify?
-        overlay
-            .broadcast_block(block.clone(), adapter, fountain)
-            .await;
-        self.approve(&overlay, block, adapter).await;
+        match block {
+            Ok(block) => {
+                // TODO: verify?
+                overlay
+                    .broadcast_block(block.clone(), adapter, fountain)
+                    .await;
+                self.approve(&overlay, block, adapter).await;
+            }
+            Err(_e) => {
+                // TODO: log error
+            }
+        }
     }
 
     async fn approve<

@@ -20,4 +20,8 @@ impl Block {
     pub fn as_bytes(&self) -> Bytes {
         Bytes::new()
     }
+
+    pub fn from_bytes(_: Bytes) -> Self {
+        Self
+    }
 }
