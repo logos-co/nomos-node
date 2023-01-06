@@ -1,13 +1,12 @@
 pub mod backends;
-// std
+
 use std::fmt::{self, Debug};
 
-// crates
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use tokio::sync::broadcast;
 use tokio::sync::oneshot;
-// internal
+
 use backends::NetworkBackend;
 use overwatch_rs::services::{
     handle::ServiceStateHandle,
