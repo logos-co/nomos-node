@@ -1,27 +1,13 @@
-use std::{
-    collections::HashMap,
-    sync::{Arc, Mutex},
-};
-
 use clap::Parser;
 use nomos_http::*;
-use overwatch_rs::{
-    overwatch::OverwatchRunner,
-    services::{
-        handle::{ServiceHandle, ServiceStateHandle},
-        relay::{NoMessage, Relay},
-        state::{NoOperator, NoState},
-        ServiceCore, ServiceData, ServiceId,
-    },
-    DynError,
-};
+use overwatch_rs::{overwatch::OverwatchRunner, services::handle::ServiceHandle};
 
 #[derive(Debug, Clone)]
 pub struct Foo;
 
 #[derive(overwatch_derive::Services)]
 struct Services {
-    http: ServiceHandle<HttpServer>,
+    http: ServiceHandle<HttpRouter>,
 }
 
 #[derive(clap::Parser)]
@@ -39,10 +25,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         None,
     )?;
 
-    tracing_subscriber::fmt::fmt()
-        //.with_env_filter(std::env::var("RUST_LOG").unwrap_or_else(|_| "info".to_owned()))
-        .with_file(false)
-        .init();
+    tracing_subscriber::fmt::fmt().with_file(false).init();
 
     tracing::info!("overwatch ready");
     app.wait_finished();
