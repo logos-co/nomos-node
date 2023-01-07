@@ -7,7 +7,7 @@ pub struct Foo;
 
 #[derive(overwatch_derive::Services)]
 struct Services {
-    http: ServiceHandle<HttpRouter>,
+    http: ServiceHandle<HttpService>,
 }
 
 #[derive(clap::Parser)]
