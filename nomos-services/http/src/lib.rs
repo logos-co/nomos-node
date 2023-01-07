@@ -6,8 +6,9 @@ use axum::{
         header::{CONTENT_TYPE, USER_AGENT},
         HeaderValue,
     },
-    routing::{post, get},
-    Router, Server, response::Html,
+    response::Html,
+    routing::get,
+    Router, Server,
 };
 use tower_http::{
     cors::{Any, CorsLayer},
@@ -15,7 +16,6 @@ use tower_http::{
 };
 
 // internal
-use overwatch_rs::services::relay::Relay;
 use overwatch_rs::services::{
     handle::ServiceStateHandle,
     relay::NoMessage,
@@ -33,22 +33,13 @@ pub struct ServerSettings {
     pub cors_origins: Vec<String>,
 }
 
-pub trait Data {
-
-}
-
-pub trait Abstration {
-    
-}
-
 #[derive(Clone)]
-pub struct HttpServer<HTTPAbstration: ServiceCore> {
+pub struct HttpRouter {
     settings: ServerSettings,
-    http_abstraction_channel: Relay<HTTPAbstration>,
 }
 
-impl<Backend: ServiceCore + Send + Sync + 'static> ServiceData for HttpServer<Backend> {
-    const SERVICE_ID: ServiceId = "HttpServer";
+impl ServiceData for HttpRouter {
+    const SERVICE_ID: ServiceId = "HttpRouter";
 
     type Settings = ServerSettings;
 
@@ -64,16 +55,10 @@ async fn handler() -> Html<&'static str> {
 }
 
 #[async_trait::async_trait]
-impl<HTTPAbstration: ServiceCore + Send + Sync + 'static> ServiceCore for HttpServer<HTTPAbstration>
-{
+impl ServiceCore for HttpRouter {
     fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, overwatch_rs::DynError> {
         let settings = service_state.settings_reader.get_updated_settings();
-        let http_abstraction_channel: Relay<HTTPAbstration> =
-            service_state.overwatch_handle.relay();
-        Ok(Self {
-            settings,
-            http_abstraction_channel,
-        })
+        Ok(Self { settings })
     }
 
     async fn run(mut self) -> Result<(), overwatch_rs::DynError> {
@@ -101,9 +86,10 @@ impl<HTTPAbstration: ServiceCore + Send + Sync + 'static> ServiceCore for HttpSe
             .layer(TraceLayer::new_for_http());
 
         tracing::info!("HTTP server listening: {}", addr);
-        let mut srv = Server::bind(&addr).serve(router.into_make_service());
-        let conn = self.http_abstraction_channel.connect().await?;
-        
+        Server::bind(&addr)
+            .serve(router.into_make_service())
+            .await?;
+
         Ok(())
     }
 }
