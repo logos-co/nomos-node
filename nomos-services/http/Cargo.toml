@@ -4,8 +4,8 @@ version = "0.1.0"
 edition = "2021"
 
 [[example]]
-name = "graphql"
-path = "examples/graphql.rs"
+name = "axum"
+path = "examples/axum.rs"
 features = ["http"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
