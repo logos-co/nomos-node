@@ -40,15 +40,18 @@ where
         network_relay: OutboundRelay<<NetworkService<Self::Backend> as ServiceData>::Message>,
     ) -> Self {
         // Subscribe to the carnot pubsub topic
-        if let Err((_, _e)) = network_relay
+        if let Err((e, _)) = network_relay
             .send(NetworkMsg::Process(WakuBackendMessage::RelaySubscribe {
                 topic: WAKU_CARNOT_PUB_SUB_TOPIC.clone(),
             }))
             .await
         {
-            // We could actually panic, but as we could try to reconnect later it should not be
+            // We panic, but as we could try to reconnect later it should not be
             // a problem. But definitely something to consider.
-            todo!("log error");
+            panic!(
+                "Couldn't send subscribe message to the network service: {}",
+                e
+            );
         };
         Self {
             network_relay,
