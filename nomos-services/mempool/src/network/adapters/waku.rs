@@ -4,7 +4,6 @@ use std::marker::PhantomData;
 // crates
 use futures::{Stream, StreamExt};
 use serde::de::DeserializeOwned;
-use serde::Serialize;
 use tokio_stream::wrappers::BroadcastStream;
 // internal
 use crate::network::messages::TransactionMsg;
@@ -21,16 +20,15 @@ static WAKU_CARNOT_PUB_SUB_TOPIC: WakuPubSubTopic =
 static WAKU_CARNOT_TX_CONTENT_TOPIC: WakuContentTopic =
     WakuContentTopic::new("CarnotSim", 1, "CarnotTx", Encoding::Proto);
 
-pub struct WakuAdapter<Tx, Id> {
+pub struct WakuAdapter<Tx> {
     network_relay: OutboundRelay<<NetworkService<Waku> as ServiceData>::Message>,
-    _tx: PhantomData<(Tx, Id)>,
+    _tx: PhantomData<Tx>,
 }
 
 #[async_trait::async_trait]
-impl<Tx, Id> NetworkAdapter for WakuAdapter<Tx, Id>
+impl<Tx> NetworkAdapter for WakuAdapter<Tx>
 where
-    Tx: Serialize + DeserializeOwned + Send + Sync + 'static,
-    Id: Serialize + DeserializeOwned + Send + Sync + 'static,
+    Tx: DeserializeOwned + Send + Sync + 'static,
 {
     type Backend = Waku;
     type Tx = Tx;
