@@ -3,7 +3,6 @@ use std::marker::PhantomData;
 // std
 // crates
 use futures::{Stream, StreamExt};
-use once_cell::sync::Lazy;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use tokio_stream::wrappers::BroadcastStream;

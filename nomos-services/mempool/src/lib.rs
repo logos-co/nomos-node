@@ -12,7 +12,7 @@ use tokio::sync::oneshot::Sender;
 use crate::network::NetworkAdapter;
 use backend::MemPool;
 use nomos_core::block::{BlockHeader, BlockId};
-use nomos_network::{backends::NetworkBackend, NetworkService};
+use nomos_network::NetworkService;
 use overwatch_rs::services::{
     handle::ServiceStateHandle,
     relay::{OutboundRelay, Relay, RelayMessage},
@@ -21,7 +21,7 @@ use overwatch_rs::services::{
 };
 
 pub struct MempoolService<
-    N: NetworkBackend + Send + Sync + 'static,
+    N: NetworkAdapter<Tx = P::Tx, Id = P::Id> + Send + Sync + 'static,
     P: MemPool + Send + Sync + 'static,
 > where
     P::Settings: Clone + Send + Sync + 'static,
@@ -29,7 +29,7 @@ pub struct MempoolService<
     P::Id: Debug + Send + Sync + 'static,
 {
     service_state: ServiceStateHandle<Self>,
-    network_relay: Relay<NetworkService<N>>,
+    network_relay: Relay<NetworkService<N::Backend>>,
     pool: P,
 }
 
@@ -78,7 +78,7 @@ impl<Tx: 'static, Id: 'static> RelayMessage for MempoolMsg<Tx, Id> {}
 
 impl<N, P> ServiceData for MempoolService<N, P>
 where
-    N: NetworkBackend + Send + Sync + 'static,
+    N: NetworkAdapter<Tx = P::Tx, Id = P::Id> + Send + Sync + 'static,
     P: MemPool + Send + Sync + 'static,
     P::Settings: Clone + Send + Sync + 'static,
     P::Id: Debug + Send + Sync + 'static,
@@ -98,7 +98,7 @@ where
     P::Settings: Clone + Send + Sync + 'static,
     P::Id: Debug + Send + Sync + 'static,
     P::Tx: Debug + Send + Sync + 'static,
-    N: NetworkBackend + Send + Sync + 'static,
+    N: NetworkAdapter<Tx = P::Tx, Id = P::Id> + Send + Sync + 'static,
 {
     fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, overwatch_rs::DynError> {
         let network_relay = service_state.overwatch_handle.relay();
