@@ -20,12 +20,11 @@ use overwatch_rs::services::{
     ServiceCore, ServiceData, ServiceId,
 };
 
-pub struct Mempool<
-    N: NetworkBackend + Send + Sync + 'static,
-    Tx: Debug + Send + Sync + 'static,
-    Id: Debug + Send + Sync + 'static,
-    P: Pool<Tx = Tx, Id = Id> + Send + Sync + 'static,
-> {
+pub struct Mempool<N: NetworkBackend + Send + Sync + 'static, P: Pool + Send + Sync + 'static>
+where
+    P::Tx: Debug + Send + Sync + 'static,
+    P::Id: Debug + Send + Sync + 'static,
+{
     service_state: ServiceStateHandle<Self>,
     network_relay: Relay<NetworkService<N>>,
     pool: P,
@@ -74,26 +73,26 @@ impl<Tx: Debug, Id: Debug> Debug for MempoolMsg<Tx, Id> {
 
 impl<Tx: 'static, Id: 'static> RelayMessage for MempoolMsg<Tx, Id> {}
 
-impl<
-        N: NetworkBackend + Send + Sync + 'static,
-        Tx: Debug + Send + Sync + 'static,
-        Id: Debug + Send + Sync + 'static,
-        P: Pool<Tx = Tx, Id = Id> + Send + Sync + 'static,
-    > ServiceData for Mempool<N, Tx, Id, P>
+impl<N, P> ServiceData for Mempool<N, P>
+where
+    N: NetworkBackend + Send + Sync + 'static,
+    P: Pool + Send + Sync + 'static,
+    P::Id: Debug + Send + Sync + 'static,
+    P::Tx: Debug + Send + Sync + 'static,
 {
     const SERVICE_ID: ServiceId = "Mempool";
     type Settings = ();
     type State = NoState<Self::Settings>;
     type StateOperator = NoOperator<Self::State>;
-    type Message = MempoolMsg<Tx, Id>;
+    type Message = MempoolMsg<<P as Pool>::Tx, <P as Pool>::Id>;
 }
 
 #[async_trait::async_trait]
-impl<N, Tx, Id, P> ServiceCore for Mempool<N, Tx, Id, P>
+impl<N, P> ServiceCore for Mempool<N, P>
 where
-    Tx: Debug + Send + Sync + 'static,
-    Id: Debug + Send + Sync + 'static,
-    P: Pool<Tx = Tx, Id = Id> + Send + Sync + 'static,
+    P: Pool + Send + Sync + 'static,
+    P::Id: Debug + Send + Sync + 'static,
+    P::Tx: Debug + Send + Sync + 'static,
     N: NetworkBackend + Send + Sync + 'static,
 {
     fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, overwatch_rs::DynError> {
