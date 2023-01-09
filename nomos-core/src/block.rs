@@ -10,12 +10,6 @@ pub struct BlockHeader;
 #[derive(Clone, Debug)]
 pub struct BlockId;
 
-#[derive(Clone, Debug)]
-pub struct Tx;
-
-#[derive(Clone, Debug)]
-pub struct TxId;
-
 /// A block chunk, N pieces are necessary to reconstruct the full block
 #[derive(Clone, Copy, Debug)]
 pub struct BlockChunk {

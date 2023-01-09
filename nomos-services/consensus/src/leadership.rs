@@ -2,15 +2,14 @@
 use std::marker::PhantomData;
 // crates
 // internal
+use nomos_core::crypto::PrivateKey;
 use nomos_mempool::MempoolMsg;
 
 use super::*;
 
-pub type Key = [u8; 32];
-
 // TODO: take care of sensitve material
 struct Enclave {
-    key: Key,
+    key: PrivateKey,
 }
 
 pub struct Leadership<Tx, Id> {
@@ -29,7 +28,7 @@ pub enum LeadershipResult<'view> {
 }
 
 impl<Tx, Id> Leadership<Tx, Id> {
-    pub fn new(key: Key, mempool: OutboundRelay<MempoolMsg<Tx, Id>>) -> Self {
+    pub fn new(key: PrivateKey, mempool: OutboundRelay<MempoolMsg<Tx, Id>>) -> Self {
         Self {
             key: Enclave { key },
             mempool,
