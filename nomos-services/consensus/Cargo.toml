@@ -16,8 +16,7 @@ nomos-core = { path = "../../nomos-core" }
 tokio = { version = "1", features = ["sync"] }
 tokio-stream = "0.1"
 futures = "0.3"
-waku-bindings = { version = "0.1.0-beta1", optional = true}
-once_cell = "1.16"
+waku-bindings = { version = "0.1.0-beta2", optional = true}
 
 [features]
 default = []
