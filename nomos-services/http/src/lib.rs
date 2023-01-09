@@ -6,27 +6,27 @@ use std::fmt::{self, Debug};
 // crates
 use overwatch_rs::services::{
     handle::ServiceStateHandle,
-    relay::{InboundRelay, NoMessage, RelayMessage},
-    state::{NoOperator, NoState, ServiceState},
+    relay::{InboundRelay, RelayMessage},
+    state::{NoOperator, NoState},
     ServiceCore, ServiceData, ServiceId,
 };
 use serde::{Deserialize, Serialize};
-use tokio::sync::{broadcast::Sender, oneshot::Receiver};
+use tokio::sync::oneshot::{Receiver, Sender};
 
 // internal
-use backends::HttpServer;
+use backends::HttpBackend;
 
 #[derive(Serialize, Deserialize)]
-pub struct Config<B: HttpServer> {
+pub struct Config<B: HttpBackend> {
     pub backend: B::Config,
 }
 
-pub struct HttpService<B: HttpServer> {
+pub struct HttpService<B: HttpBackend> {
     backend: B,
     inbound_relay: InboundRelay<HttpMsg<B>>,
 }
 
-impl<B: HttpServer> ServiceData for HttpService<B> {
+impl<B: HttpBackend> ServiceData for HttpService<B> {
     const SERVICE_ID: ServiceId = "Http";
     type Settings = Config<B>;
     type State = NoState<Self::Settings>;
@@ -34,47 +34,72 @@ impl<B: HttpServer> ServiceData for HttpService<B> {
     type Message = HttpMsg<B>;
 }
 
-pub enum HttpMsg<B: HttpServer> {
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum HttpMethod {
+    GET,
+    POST,
+    PUT,
+    PATCH,
+    DELETE,
+}
+
+#[derive(PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct Route<B: HttpBackend> {
+    pub method: HttpMethod,
+    pub path: String,
+    pub handler: B::Handler,
+}
+
+impl<B: HttpBackend> core::fmt::Debug for Route<B> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Route")
+            .field("method", &self.method)
+            .field("path", &self.path)
+            .finish()
+    }
+}
+
+pub enum HttpMsg<B: HttpBackend> {
     AddHandler {
         service_id: ServiceId,
-        route: String, // /metrics/ {GET/POST}
-        rx: Sender<Receiver<B::Response>>,
+        route: Route<B>, // /metrics/ {GET/POST}
+        tx: Sender<Receiver<B::Response>>,
     },
 }
 
-impl<B: HttpServer + 'static> RelayMessage for HttpMsg<B> {}
+impl<B: HttpBackend + 'static> RelayMessage for HttpMsg<B> {}
 
-impl<B: HttpServer> Debug for HttpMsg<B> {
+impl<B: HttpBackend> Debug for HttpMsg<B> {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Self::AddHandler {
                 service_id,
                 route,
-                rx,
+                tx: _,
             } => write!(
                 fmt,
-                "HttpMsg::AddHandler{{ sender: {:?}, route: {:?}, rx: {:?} }}",
-                service_id, route, rx
+                "HttpMsg::AddHandler {{ sender: {:?}, route: {:?} }}",
+                service_id, route
             ),
         }
     }
 }
 
 #[async_trait::async_trait]
-impl<B: HttpServer> ServiceCore for HttpService<B> {
+impl<B: HttpBackend> ServiceCore for HttpService<B> {
     fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, overwatch_rs::DynError> {
         let inbound_relay = service_state.inbound_relay;
-        Ok(Self {
-            backend: <B as HttpServer>::new(
-                service_state.settings_reader.get_updated_settings().backend,
-            ),
-            inbound_relay,
-        })
+        <B as HttpBackend>::new(service_state.settings_reader.get_updated_settings().backend).map(
+            |backend| Self {
+                backend,
+                inbound_relay,
+            },
+        )
     }
 
     async fn run(mut self) -> Result<(), overwatch_rs::DynError> {
         let Self {
-            mut backend,
+            backend,
             mut inbound_relay,
         } = self;
 
@@ -88,22 +113,24 @@ impl<B: HttpServer> ServiceCore for HttpService<B> {
 
         // backend.add_route(todo!());
 
-        loop {
-            // select
-            // handle the HttpMsg
-            while let Some(HttpMsg::AddHandler {
-                service_id,
-                route,
-                rx,
-            }) = inbound_relay.recv().await
-            {}
-            // backend.run()
+        while let Some(msg) = inbound_relay.recv().await {
+            match msg {
+                HttpMsg::AddHandler {
+                    service_id,
+                    route,
+                    // TODO: discuss do we actually need this sender.
+                    tx: _,
+                } => {
+                    // create route
+                    backend.add_route(service_id, route);
+                }
+            }
         }
         Ok(())
     }
 }
 
-impl<B: HttpServer> Clone for Config<B> {
+impl<B: HttpBackend> Clone for Config<B> {
     fn clone(&self) -> Self {
         Self {
             backend: self.backend.clone(),
