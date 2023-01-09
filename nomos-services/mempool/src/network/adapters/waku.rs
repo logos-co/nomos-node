@@ -34,7 +34,6 @@ where
 {
     type Backend = Waku;
     type Tx = Tx;
-    type Id = Id;
 
     async fn new(
         network_relay: OutboundRelay<<NetworkService<Self::Backend> as ServiceData>::Message>,
@@ -58,9 +57,7 @@ where
             _tx: Default::default(),
         }
     }
-    async fn transactions_stream(
-        &self,
-    ) -> Box<dyn Stream<Item = (Self::Tx, Self::Id)> + Unpin + Send> {
+    async fn transactions_stream(&self) -> Box<dyn Stream<Item = Self::Tx> + Unpin + Send> {
         let (sender, receiver) = tokio::sync::oneshot::channel();
         if let Err((_, _e)) = self
             .network_relay
@@ -80,7 +77,7 @@ where
                         if message.content_topic().content_topic_name
                             == WAKU_CARNOT_TX_CONTENT_TOPIC.content_topic_name
                         {
-                            let (tx, _): (TransactionMsg<Self::Tx, Self::Id>, _) =
+                            let (tx, _): (TransactionMsg<Self::Tx>, _) =
                                 // TODO: This should be temporary, we can probably extract this so we can use/try/test a variety of encodings
                                 bincode::serde::decode_from_slice(
                                     message.payload(),
@@ -92,7 +89,7 @@ where
                                     >::default(),
                                 )
                                 .unwrap();
-                            Some((tx.tx, tx.id))
+                            Some(tx.tx)
                         } else {
                             None
                         }

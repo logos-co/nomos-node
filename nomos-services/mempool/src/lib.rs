@@ -21,7 +21,7 @@ use overwatch_rs::services::{
 };
 
 pub struct MempoolService<
-    N: NetworkAdapter<Tx = P::Tx, Id = P::Id> + Send + Sync + 'static,
+    N: NetworkAdapter<Tx = P::Tx> + Send + Sync + 'static,
     P: MemPool + Send + Sync + 'static,
 > where
     P::Settings: Clone + Send + Sync + 'static,
@@ -35,7 +35,6 @@ pub struct MempoolService<
 
 pub enum MempoolMsg<Tx, Id> {
     AddTx {
-        id: Id,
         tx: Tx,
     },
     View {
@@ -61,7 +60,7 @@ impl<Tx: Debug, Id: Debug> Debug for MempoolMsg<Tx, Id> {
                     ancestor_hint
                 )
             }
-            Self::AddTx { id, tx } => write!(f, "MempoolMsg::AddTx{{id: {:?}, tx: {:?}}}", id, tx),
+            Self::AddTx { tx } => write!(f, "MempoolMsg::AddTx{{tx: {:?}}}", tx),
             Self::Prune { ids } => write!(f, "MempoolMsg::Prune{{ids: {:?}}}", ids),
             Self::MarkInBlock { ids, block } => {
                 write!(
@@ -78,7 +77,7 @@ impl<Tx: 'static, Id: 'static> RelayMessage for MempoolMsg<Tx, Id> {}
 
 impl<N, P> ServiceData for MempoolService<N, P>
 where
-    N: NetworkAdapter<Tx = P::Tx, Id = P::Id> + Send + Sync + 'static,
+    N: NetworkAdapter<Tx = P::Tx> + Send + Sync + 'static,
     P: MemPool + Send + Sync + 'static,
     P::Settings: Clone + Send + Sync + 'static,
     P::Id: Debug + Send + Sync + 'static,
@@ -98,7 +97,7 @@ where
     P::Settings: Clone + Send + Sync + 'static,
     P::Id: Debug + Send + Sync + 'static,
     P::Tx: Debug + Send + Sync + 'static,
-    N: NetworkAdapter<Tx = P::Tx, Id = P::Id> + Send + Sync + 'static,
+    N: NetworkAdapter<Tx = P::Tx> + Send + Sync + 'static,
 {
     fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, overwatch_rs::DynError> {
         let network_relay = service_state.overwatch_handle.relay();
@@ -129,8 +128,8 @@ where
             tokio::select! {
                 Some(msg) = service_state.inbound_relay.recv() => {
                     match msg {
-                        MempoolMsg::AddTx { id, tx } => {
-                            pool.add_tx(tx, id).unwrap_or_else(|e| {
+                        MempoolMsg::AddTx { tx } => {
+                            pool.add_tx(tx).unwrap_or_else(|e| {
                                 tracing::debug!("could not add tx to the pool due to: {}", e)
                             });
                         }
@@ -145,8 +144,8 @@ where
                         MempoolMsg::Prune { ids } => { pool.prune(ids); },
                     }
                 }
-                Some((tx, id)) = network_txs.next() => {
-                    pool.add_tx(tx, id).unwrap_or_else(|e| {
+                Some(tx) = network_txs.next() => {
+                    pool.add_tx(tx).unwrap_or_else(|e| {
                         tracing::debug!("could not add tx to the pool due to: {}", e)
                     });
                 }
