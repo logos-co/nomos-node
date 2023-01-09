@@ -29,7 +29,7 @@ pub struct MempoolService<
     P::Id: Debug + Send + Sync + 'static,
 {
     service_state: ServiceStateHandle<Self>,
-    network_relay: Relay<NetworkService<B>>,
+    network_relay: Relay<NetworkService<N>>,
     pool: P,
 }
 
