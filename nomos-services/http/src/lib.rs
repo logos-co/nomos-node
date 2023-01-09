@@ -1,7 +1,10 @@
-mod backends;
+pub mod backends;
 
 // std
-use std::fmt::{self, Debug};
+use std::{
+    collections::HashMap,
+    fmt::{self, Debug},
+};
 
 // crates
 use overwatch_rs::services::{
@@ -11,12 +14,12 @@ use overwatch_rs::services::{
     ServiceCore, ServiceData, ServiceId,
 };
 use serde::{Deserialize, Serialize};
-use tokio::sync::oneshot::{Receiver, Sender};
+use tokio::sync::broadcast::Sender;
 
 // internal
 use backends::HttpBackend;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Config<B: HttpBackend> {
     pub backend: B::Config,
 }
@@ -44,13 +47,12 @@ pub enum HttpMethod {
 }
 
 #[derive(PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct Route<B: HttpBackend> {
+pub struct Route {
     pub method: HttpMethod,
     pub path: String,
-    pub handler: B::Handler,
 }
 
-impl<B: HttpBackend> core::fmt::Debug for Route<B> {
+impl core::fmt::Debug for Route {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Route")
             .field("method", &self.method)
@@ -59,11 +61,18 @@ impl<B: HttpBackend> core::fmt::Debug for Route<B> {
     }
 }
 
+#[derive(Clone)]
+pub struct HttpRequest<Req, Res> {
+    pub query: HashMap<String, String>,
+    pub payload: Req,
+    pub res_tx: Sender<Res>,
+}
+
 pub enum HttpMsg<B: HttpBackend> {
     AddHandler {
         service_id: ServiceId,
-        route: Route<B>, // /metrics/ {GET/POST}
-        tx: Sender<Receiver<B::Response>>,
+        route: Route,
+        req_stream: Sender<HttpRequest<B::Request, B::Response>>,
     },
 }
 
@@ -75,7 +84,7 @@ impl<B: HttpBackend> Debug for HttpMsg<B> {
             Self::AddHandler {
                 service_id,
                 route,
-                tx: _,
+                req_stream: _,
             } => write!(
                 fmt,
                 "HttpMsg::AddHandler {{ sender: {:?}, route: {:?} }}",
@@ -103,30 +112,24 @@ impl<B: HttpBackend> ServiceCore for HttpService<B> {
             mut inbound_relay,
         } = self;
 
-        // 1.
-        // Create router.
-        // Pass it to the backend.
-        //
-        // 2.
-        // Get a router object.
-        // Store it in this scope.
-
-        // backend.add_route(todo!());
-
-        while let Some(msg) = inbound_relay.recv().await {
-            match msg {
-                HttpMsg::AddHandler {
-                    service_id,
-                    route,
-                    // TODO: discuss do we actually need this sender.
-                    tx: _,
-                } => {
-                    // create route
-                    backend.add_route(service_id, route);
+        loop {
+            tokio::select! {
+                Some(msg) = inbound_relay.recv() => {
+                    match msg {
+                        HttpMsg::AddHandler {
+                            service_id,
+                            route,
+                            req_stream,
+                        } => {
+                            backend.add_route(service_id, route, req_stream);
+                        }
+                    }
+                }
+                _server_exit = backend.run() => {
+                    todo!()
                 }
             }
         }
-        Ok(())
     }
 }
 

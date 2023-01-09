@@ -1,24 +1,26 @@
 // std
-use std::{collections::HashMap, pin::Pin, sync::Arc};
+use std::{
+    collections::HashMap,
+    future::Future,
+    sync::{Arc, Mutex},
+};
 
 // crates
-use axum::{
-    extract::{Extension, Path},
-    response::IntoResponse,
-    routing::{delete, get, patch, post, put},
-    Router,
-};
+use axum::{extract::Query, routing::get, Router};
 use overwatch_rs::services::state::NoState;
-use parking_lot::Mutex;
-use std::future::Future;
+use serde_json::Value;
+use tokio::sync::{
+    broadcast::{self, Sender},
+    oneshot::{self, Receiver},
+};
 
 // internal
 use super::HttpBackend;
-use crate::HttpMethod;
+use crate::{HttpMethod, HttpRequest};
 
 /// Configuration for the Http Server
 #[derive(Debug, Clone, clap::Args, serde::Deserialize, serde::Serialize)]
-pub struct ServerSettings {
+pub struct AxumBackendSettings {
     /// Socket where the server will be listening on for incoming requests.
     #[arg(short, long = "addr", default_value_t = std::net::SocketAddr::new(std::net::IpAddr::V4(std::net::Ipv4Addr::new(127, 0, 0, 1)), 8080), env = "HTTP_ADDRESS")]
     pub address: std::net::SocketAddr,
@@ -29,66 +31,18 @@ pub struct ServerSettings {
 
 pub trait HandlerOutput<T>: Future<Output = T> + Sized + Send {}
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct AxumBackend {
-    get_handles: Arc<Mutex<HashMap<String, <Self as HttpBackend>::Handler>>>,
-    post_handlers: Arc<Mutex<HashMap<String, <Self as HttpBackend>::Handler>>>,
-    patch_handlers: Arc<Mutex<HashMap<String, <Self as HttpBackend>::Handler>>>,
-    put_handlers: Arc<Mutex<HashMap<String, <Self as HttpBackend>::Handler>>>,
-    delete_handlers: Arc<Mutex<HashMap<String, <Self as HttpBackend>::Handler>>>,
-    config: ServerSettings,
-}
-
-async fn handle_get_plugins(
-    Extension(backend): Extension<AxumBackend>,
-    Path(path): Path<String>,
-) -> impl IntoResponse + Send + Sync + 'static {
-    match backend.get_handles.lock().get(&path) {
-        Some(f) => Ok(f(()).await),
-        None => Err(()),
-    }
-}
-
-async fn handle_post_plugins(
-    Extension(backend): Extension<AxumBackend>,
-    Path(path): Path<String>,
-) -> impl IntoResponse + Send + Sync + 'static {
-    todo!()
-}
-
-async fn handle_patch_plugins(
-    Extension(backend): Extension<AxumBackend>,
-    Path(path): Path<String>,
-) -> impl IntoResponse + Send + Sync + 'static {
-    todo!()
-}
-
-async fn handle_put_plugins(
-    Extension(backend): Extension<AxumBackend>,
-    Path(path): Path<String>,
-) -> impl IntoResponse + Send + Sync + 'static {
-    todo!()
-}
-
-async fn handle_delete_plugins(
-    Extension(backend): Extension<AxumBackend>,
-    Path(path): Path<String>,
-) -> impl IntoResponse + Send + Sync + 'static {
-    todo!()
+    config: AxumBackendSettings,
+    router: Arc<Mutex<Router>>,
 }
 
 #[async_trait::async_trait]
 impl HttpBackend for AxumBackend {
-    type Config = ServerSettings;
-
-    type State = NoState<ServerSettings>;
-
+    type Config = AxumBackendSettings;
+    type State = NoState<AxumBackendSettings>;
     type Request = ();
-
     type Response = String;
-
-    type Handler =
-        Box<dyn Send + Sync + Fn(Self::Request) -> Pin<Box<dyn Future<Output = Self::Response>>>>;
 
     fn new(config: Self::Config) -> Result<Self, overwatch_rs::DynError>
     where
@@ -96,44 +50,48 @@ impl HttpBackend for AxumBackend {
     {
         Ok(Self {
             config,
-            get_handles: Arc::new(Mutex::new(HashMap::new())),
-            post_handlers: Arc::new(Mutex::new(HashMap::new())),
-            patch_handlers: Arc::new(Mutex::new(HashMap::new())),
-            put_handlers: Arc::new(Mutex::new(HashMap::new())),
-            delete_handlers: Arc::new(Mutex::new(HashMap::new())),
+            router: Default::default(),
         })
     }
 
-    fn add_route(&self, service_id: overwatch_rs::services::ServiceId, route: crate::Route<Self>) {
+    fn add_route(
+        &self,
+        service_id: overwatch_rs::services::ServiceId,
+        route: crate::Route,
+        req_stream: Sender<HttpRequest<Self::Request, Self::Response>>,
+    ) {
+        let router = &mut *self.router.lock().unwrap();
+        let path = format!("/{}/{}", service_id, route.path);
         match route.method {
             HttpMethod::GET => {
-                self.get_handles.lock().insert(route.path, route.handler);
+                *router = router.clone().route(
+                    &path,
+                    // TODO: Extract the stream handling to `to_handler` or similar function.
+                    get(|Query(query): Query<HashMap<String, String>>| async move {
+                        let (tx, mut rx) = broadcast::channel(1);
+
+                        // Write Self::Request type message to req_stream.
+                        // TODO: handle result.
+                        req_stream.send(HttpRequest {
+                            query,
+                            payload: (),
+                            res_tx: tx,
+                        });
+
+                        // Wait for a response, then pass or serialize it?
+                        match rx.recv().await {
+                            Ok(res) => res,
+                            Err(err) => err.to_string(),
+                        }
+                    }),
+                )
             }
-            HttpMethod::POST => {
-                self.post_handlers.lock().insert(route.path, route.handler);
-            }
-            HttpMethod::PATCH => {
-                self.patch_handlers.lock().insert(route.path, route.handler);
-            }
-            HttpMethod::PUT => {
-                self.put_handlers.lock().insert(route.path, route.handler);
-            }
-            HttpMethod::DELETE => {
-                self.delete_handlers
-                    .lock()
-                    .insert(route.path, route.handler);
-            }
-        }
+            _ => todo!(),
+        };
     }
 
     async fn run(&self) -> Result<(), overwatch_rs::DynError> {
-        let router = Router::new()
-            .route("/plugins/get/:path", get(handle_get_plugins))
-            .route("/plugins/post/:path", post(handle_post_plugins))
-            .route("/plugins/patch/:path", patch(handle_patch_plugins))
-            .route("/plugins/put/:path", put(handle_put_plugins))
-            .route("/plugins/delete/:path", delete(handle_delete_plugins));
-
+        let router = self.router.lock().unwrap().clone();
         axum::Server::bind(&"0.0.0.0:3000".parse().unwrap())
             .serve(router.into_make_service())
             .await?;
