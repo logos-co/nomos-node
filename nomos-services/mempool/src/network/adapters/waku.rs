@@ -16,15 +16,11 @@ use overwatch_rs::services::relay::OutboundRelay;
 use overwatch_rs::services::ServiceData;
 use waku_bindings::{Encoding, WakuContentTopic, WakuPubSubTopic};
 
-static WAKU_CARNOT_PUB_SUB_TOPIC: Lazy<WakuPubSubTopic> =
-    Lazy::new(|| WakuPubSubTopic::new("CarnotSim".to_string(), Encoding::Proto));
+static WAKU_CARNOT_PUB_SUB_TOPIC: WakuPubSubTopic =
+    WakuPubSubTopic::new("CarnotSim", Encoding::Proto);
 
-static WAKU_CARNOT_TX_CONTENT_TOPIC: Lazy<WakuContentTopic> = Lazy::new(|| WakuContentTopic {
-    application_name: "CarnotSim".to_string(),
-    version: 1,
-    content_topic_name: "CarnotTx".to_string(),
-    encoding: Encoding::Proto,
-});
+static WAKU_CARNOT_TX_CONTENT_TOPIC: WakuContentTopic =
+    WakuContentTopic::new("CarnotSim", 1, "CarnotTx", Encoding::Proto);
 
 pub struct WakuAdapter<Tx, Id> {
     network_relay: OutboundRelay<<NetworkService<Waku> as ServiceData>::Message>,
