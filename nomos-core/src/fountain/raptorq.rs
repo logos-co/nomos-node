@@ -57,7 +57,10 @@ mod test {
     use crate::fountain::{FountainCode, FountainError};
     use bytes::Bytes;
     use futures::StreamExt;
-    use rand::RngCore;
+    use rand::{RngCore, SeedableRng};
+
+    // completely random seed
+    const SEED: u64 = 1889;
 
     #[tokio::test]
     async fn random_encode_decode() -> Result<(), FountainError> {
@@ -75,7 +78,8 @@ mod test {
 
         // create random payload
         let mut payload = [0u8; TRANSFER_LENGTH];
-        rand::thread_rng().fill_bytes(&mut payload);
+        let mut r = rand::prelude::StdRng::seed_from_u64(SEED);
+        r.fill_bytes(&mut payload);
         let payload = Bytes::from(payload.to_vec());
 
         // encode payload
@@ -102,7 +106,8 @@ mod test {
 
         // create random payload
         let mut payload = [0u8; TRANSFER_LENGTH];
-        rand::thread_rng().fill_bytes(&mut payload);
+        let mut r = rand::prelude::StdRng::seed_from_u64(SEED);
+        r.fill_bytes(&mut payload);
         let payload = Bytes::from(payload.to_vec());
 
         let raptor = RaptorQFountain::new(settings);
