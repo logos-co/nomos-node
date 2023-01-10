@@ -8,7 +8,6 @@ pub mod waku;
 #[cfg(feature = "mock")]
 pub mod mock;
 
-
 #[async_trait::async_trait]
 pub trait NetworkBackend {
     type Config: Clone + Debug + Send + Sync + 'static;

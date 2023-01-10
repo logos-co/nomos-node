@@ -21,3 +21,4 @@ waku-bindings = { version = "0.1.0-beta2", optional = true}
 [features]
 default = []
 waku = ["nomos-network/waku", "waku-bindings"]
+mock = ["nomos-network/mock"]
