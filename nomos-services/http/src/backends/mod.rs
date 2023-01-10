@@ -7,7 +7,7 @@ use overwatch_rs::{
     services::{state::ServiceState, ServiceId},
     DynError,
 };
-use tokio::sync::broadcast::Sender;
+use tokio::sync::mpsc::Sender;
 
 use crate::{HttpRequest, Route};
 
@@ -17,6 +17,7 @@ pub trait HttpBackend: Send + Sync + 'static {
     type State: ServiceState<Settings = Self::Config> + Clone;
     type Request: Clone + Send;
     type Response: Clone + Send;
+    type Error: std::fmt::Display;
 
     fn new(config: Self::Config) -> Result<Self, DynError>
     where

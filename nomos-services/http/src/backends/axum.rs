@@ -1,22 +1,31 @@
 // std
-use std::{
-    collections::HashMap,
-    future::Future,
-    sync::{Arc, Mutex},
-};
+use std::{collections::HashMap, future::Future, sync::Arc};
 
 // crates
 use axum::{extract::Query, routing::get, Router};
-use overwatch_rs::services::state::NoState;
-use serde_json::Value;
-use tokio::sync::{
-    broadcast::{self, Sender},
-    oneshot::{self, Receiver},
-};
+use overwatch_rs::{services::state::NoState, DynError};
+use parking_lot::Mutex;
+use tokio::sync::mpsc::Sender;
 
 // internal
 use super::HttpBackend;
 use crate::{HttpMethod, HttpRequest};
+
+#[derive(Debug, thiserror::Error)]
+pub enum AxnumBackendError {
+    #[error("axum backend: send error: {0}")]
+    SendError(
+        #[from]
+        tokio::sync::mpsc::error::SendError<
+            HttpRequest<
+                <AxumBackend as HttpBackend>::Request,
+                <AxumBackend as HttpBackend>::Response,
+            >,
+        >,
+    ),
+    #[error("axum backend: {0}")]
+    Any(DynError),
+}
 
 /// Configuration for the Http Server
 #[derive(Debug, Clone, clap::Args, serde::Deserialize, serde::Serialize)]
@@ -43,6 +52,7 @@ impl HttpBackend for AxumBackend {
     type State = NoState<AxumBackendSettings>;
     type Request = ();
     type Response = String;
+    type Error = AxnumBackendError;
 
     fn new(config: Self::Config) -> Result<Self, overwatch_rs::DynError>
     where
@@ -60,7 +70,7 @@ impl HttpBackend for AxumBackend {
         route: crate::Route,
         req_stream: Sender<HttpRequest<Self::Request, Self::Response>>,
     ) {
-        let router = &mut *self.router.lock().unwrap();
+        let mut router = self.router.lock();
         let path = format!("/{}/{}", service_id, route.path);
         match route.method {
             HttpMethod::GET => {
@@ -68,20 +78,27 @@ impl HttpBackend for AxumBackend {
                     &path,
                     // TODO: Extract the stream handling to `to_handler` or similar function.
                     get(|Query(query): Query<HashMap<String, String>>| async move {
-                        let (tx, mut rx) = broadcast::channel(1);
+                        let (tx, mut rx) = tokio::sync::mpsc::channel(1);
 
                         // Write Self::Request type message to req_stream.
-                        // TODO: handle result.
-                        req_stream.send(HttpRequest {
-                            query,
-                            payload: (),
-                            res_tx: tx,
-                        });
-
-                        // Wait for a response, then pass or serialize it?
-                        match rx.recv().await {
-                            Ok(res) => res,
-                            Err(err) => err.to_string(),
+                        // TODO: handle result in a more elegant way.
+                        // Currently, convert to Result<String, String>
+                        match req_stream
+                            .send(HttpRequest {
+                                query,
+                                payload: (),
+                                res_tx: tx,
+                            })
+                            .await
+                        {
+                            Ok(_) => {
+                                // Wait for a response, then pass or serialize it?
+                                match rx.recv().await {
+                                    Some(res) => Ok(res),
+                                    None => Ok(String::new()),
+                                }
+                            }
+                            Err(e) => Err(AxnumBackendError::SendError(e).to_string()),
                         }
                     }),
                 )
@@ -91,7 +108,7 @@ impl HttpBackend for AxumBackend {
     }
 
     async fn run(&self) -> Result<(), overwatch_rs::DynError> {
-        let router = self.router.lock().unwrap().clone();
+        let router = self.router.lock().clone();
         axum::Server::bind(&"0.0.0.0:3000".parse().unwrap())
             .serve(router.into_make_service())
             .await?;
