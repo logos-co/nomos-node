@@ -39,7 +39,7 @@ pub enum MempoolMsg<Tx, Id> {
     },
     View {
         ancestor_hint: BlockId,
-        rx: Sender<Box<dyn Iterator<Item = Tx> + Send>>,
+        tx: Sender<Box<dyn Iterator<Item = Tx> + Send>>,
     },
     Prune {
         ids: Vec<Id>,
@@ -133,8 +133,8 @@ where
                                 tracing::debug!("could not add tx to the pool due to: {}", e)
                             });
                         }
-                        MempoolMsg::View { ancestor_hint, rx } => {
-                            rx.send(pool.view(ancestor_hint)).unwrap_or_else(|_| {
+                        MempoolMsg::View { ancestor_hint, tx } => {
+                            tx.send(pool.view(ancestor_hint)).unwrap_or_else(|_| {
                                 tracing::debug!("could not send back pool view")
                             });
                         }
