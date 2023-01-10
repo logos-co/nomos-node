@@ -37,4 +37,4 @@ async-graphql = { version = "5", features = ["tracing"] }
 
 [features]
 default = []
-http = ["clap", "axum", "serde_json"]
+http = ["clap", "axum", "serde_json", "parking_lot", "hyper"]

@@ -71,10 +71,29 @@ pub struct HttpRequest<Req, Res> {
 
 pub enum HttpMsg<B: HttpBackend> {
     AddHandler {
+        // TODO: If possible, this should be extracted from the
+        // relay itself.
         service_id: ServiceId,
         route: Route,
         req_stream: Sender<HttpRequest<B::Request, B::Response>>,
     },
+}
+
+impl<B: HttpBackend> HttpMsg<B> {
+    pub fn add_get_handler<P: Into<String>>(
+        service_id: ServiceId,
+        path: P,
+        req_stream: Sender<HttpRequest<B::Request, B::Response>>,
+    ) -> Self {
+        Self::AddHandler {
+            service_id,
+            route: Route {
+                method: HttpMethod::GET,
+                path: path.into(),
+            },
+            req_stream,
+        }
+    }
 }
 
 impl<B: HttpBackend + 'static> RelayMessage for HttpMsg<B> {}
@@ -113,58 +132,37 @@ impl<B: HttpBackend> ServiceCore for HttpService<B> {
             mut inbound_relay,
         } = self;
 
-        // TODO: not quite sure if this will restart the server every time
-        loop {
-            tokio::select! {
-                Some(msg) = inbound_relay.recv() => {
-                    match msg {
-                        HttpMsg::AddHandler {
-                            service_id,
-                            route,
-                            req_stream,
-                        } => {
-                            backend.add_route(service_id, route, req_stream);
+        let backend = Arc::new(backend);
+        let (stop_tx, mut stop_rx) = oneshot::channel();
+        tokio::spawn({
+            let backend = backend.clone();
+            async move {
+                loop {
+                    tokio::select! {
+                        Some(msg) = inbound_relay.recv() => {
+                            match msg {
+                                HttpMsg::AddHandler {
+                                    service_id,
+                                    route,
+                                    req_stream,
+                                } => {
+                                    backend.add_route(service_id, route, req_stream);
+                                }
+                            }
+                        }
+                        _server_exit = &mut stop_rx => {
+                            break;
                         }
                     }
                 }
-                _server_exit = backend.run() => {
-                    todo!()
-                }
             }
-        }
-
-        // let backend = Arc::new(backend);
-        // let (stop_tx, mut stop_rx) = oneshot::channel();
-        // let tbc = backend.clone();
-        // tokio::spawn(async move {
-        //     loop {
-        //         tokio::select! {
-        //             Some(msg) = inbound_relay.recv() => {
-        //                 match msg {
-        //                     HttpMsg::AddHandler {
-        //                         service_id,
-        //                         route,
-        //                         req_stream,
-        //                     } => {
-        //                         tbc.add_route(service_id, route, req_stream);
-        //                     }
-        //                 }
-        //             }
-        //             _server_exit = &mut stop_rx => {
-        //                 break;
-        //             }
-        //         }
-        //     }
-        // });
-        // backend
-        //     .run()
-        //     .await
-        //     .map_err(|e| {
-        //         if stop_tx.send(()).is_err() {
-        //             tracing::error!("HTTP service: failed to send stop signal to HTTP backend.");
-        //         }
-        //         e
-        //     })
+        });
+        backend.run().await.map_err(|e| {
+            if stop_tx.send(()).is_err() {
+                tracing::error!("HTTP service: failed to send stop signal to HTTP backend.");
+            }
+            e
+        })
     }
 }
 
