@@ -35,7 +35,7 @@ impl<Tx, Id> Leadership<Tx, Id> {
         }
     }
 
-    #[allow(unused)]
+    #[allow(unused, clippy::diverging_sub_expression)]
     pub async fn try_propose_block<'view>(
         &self,
         view: &'view View,
