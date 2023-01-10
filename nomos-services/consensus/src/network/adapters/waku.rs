@@ -16,13 +16,13 @@ use nomos_network::{
 use overwatch_rs::services::{relay::OutboundRelay, ServiceData};
 use waku_bindings::{Encoding, WakuContentTopic, WakuMessage, WakuPubSubTopic};
 
-static WAKU_CARNOT_PUB_SUB_TOPIC: WakuPubSubTopic =
+const WAKU_CARNOT_PUB_SUB_TOPIC: WakuPubSubTopic =
     WakuPubSubTopic::new("CarnotSim", Encoding::Proto);
 
-static WAKU_CARNOT_BLOCK_CONTENT_TOPIC: WakuContentTopic =
+const WAKU_CARNOT_BLOCK_CONTENT_TOPIC: WakuContentTopic =
     WakuContentTopic::new("CarnotSim", 1, "CarnotBlock", Encoding::Proto);
 
-static WAKU_CARNOT_APPROVAL_CONTENT_TOPIC: WakuContentTopic =
+const WAKU_CARNOT_APPROVAL_CONTENT_TOPIC: WakuContentTopic =
     WakuContentTopic::new("CarnotSim", 1, "CarnotApproval", Encoding::Proto);
 
 pub struct WakuAdapter {
