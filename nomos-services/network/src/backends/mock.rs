@@ -1,4 +1,4 @@
-use std::{collections::HashMap, sync::{Arc, Mutex}};
+use std::{collections::HashMap, sync::Arc};
 
 use super::*;
 use overwatch_rs::services::state::NoState;
@@ -7,6 +7,7 @@ use tokio::sync::{
     broadcast::{self, Receiver, Sender},
 };
 use tracing::debug;
+use parking_lot::Mutex;
 
 const BROADCAST_CHANNEL_BUF: usize = 16;
 
@@ -20,7 +21,7 @@ pub enum MockMessage {
     },
 }
 
-pub struct Mock {
+pub struct Mock { 
     #[allow(clippy::type_complexity)]
     weighted_messages: Arc<Mutex<HashMap<u64, Vec<(usize, String)>>>>,
     messages: Arc<Mutex<HashMap<u64, Vec<String>>>>,
@@ -77,7 +78,7 @@ impl NetworkBackend for Mock {
         match msg {
             MockBackendMessage::Normal { topic, msg } => {
                 debug!("processed normal message");
-                let mut normal_msgs = self.messages.lock().unwrap();
+                let mut normal_msgs = self.messages.lock();
                 normal_msgs.entry(topic).or_insert_with(Vec::new).push(msg.clone());
                 drop(normal_msgs);
                 let _ = self.message_event.send(NetworkEvent::RawMessage(MockMessage::Normal {
@@ -87,7 +88,7 @@ impl NetworkBackend for Mock {
             }
             MockBackendMessage::Weighted { topic, weight, msg} => {
                 debug!("processed weighted message");
-                let mut weighted_msgs = self.weighted_messages.lock().unwrap();
+                let mut weighted_msgs = self.weighted_messages.lock();
                 weighted_msgs.entry(topic).or_insert_with(Vec::new).push((weight, msg.clone()));
                 drop(weighted_msgs);
                 let _ = self.message_event.send(NetworkEvent::RawMessage(MockMessage::Weighted { weight, msg, topic }));
