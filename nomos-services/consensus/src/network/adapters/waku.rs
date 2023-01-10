@@ -94,7 +94,7 @@ impl NetworkAdapter for WakuAdapter {
         // but this is an ongoing idea that should/will be discus.
         let message = WakuMessage::new(
             chunk_message.as_bytes(),
-            WAKU_CARNOT_BLOCK_CONTENT_TOPIC.clone(),
+            WAKU_CARNOT_BLOCK_CONTENT_TOPIC,
             1,
             chrono::Utc::now().timestamp() as usize,
         );
@@ -141,7 +141,7 @@ impl NetworkAdapter for WakuAdapter {
     async fn forward_approval(&self, approval_message: ApprovalMsg) {
         let message = WakuMessage::new(
             approval_message.as_bytes(),
-            WAKU_CARNOT_APPROVAL_CONTENT_TOPIC.clone(),
+            WAKU_CARNOT_APPROVAL_CONTENT_TOPIC,
             1,
             chrono::Utc::now().timestamp() as usize,
         );
