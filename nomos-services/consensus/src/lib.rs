@@ -19,7 +19,7 @@ use leadership::{Leadership, LeadershipResult};
 use nomos_core::block::Block;
 use nomos_core::crypto::PublicKey;
 use nomos_core::staking::Stake;
-use nomos_mempool::{backend::Pool, Mempool};
+use nomos_mempool::{backend::MemPool, network::NetworkAdapter as MempoolAdapter, MempoolService};
 use nomos_network::NetworkService;
 use overlay::{Member, Overlay};
 use overwatch_rs::services::relay::{OutboundRelay, Relay};
@@ -43,26 +43,30 @@ pub struct CarnotSettings {
     private_key: [u8; 32],
 }
 
-pub struct CarnotConsensus<A, P>
+pub struct CarnotConsensus<A, P, M>
 where
     A: NetworkAdapter + Send + Sync + 'static,
-    P: Pool + Send + Sync + 'static,
+    P: MemPool + Send + Sync + 'static,
+    P::Settings: Clone + Send + Sync + 'static,
     P::Tx: Debug + Send + Sync + 'static,
     P::Id: Debug + Send + Sync + 'static,
+    M: MempoolAdapter<Tx = P::Tx> + Send + Sync + 'static,
 {
     service_state: ServiceStateHandle<Self>,
     // underlying networking backend. We need this so we can relay and check the types properly
     // when implementing ServiceCore for CarnotConsensus
     network_relay: Relay<NetworkService<A::Backend>>,
-    mempool_relay: Relay<Mempool<A::Backend, P>>,
+    mempool_relay: Relay<MempoolService<M, P>>,
 }
 
-impl<A, P> ServiceData for CarnotConsensus<A, P>
+impl<A, P, M> ServiceData for CarnotConsensus<A, P, M>
 where
     A: NetworkAdapter + Send + Sync + 'static,
-    P: Pool + Send + Sync + 'static,
+    P: MemPool + Send + Sync + 'static,
+    P::Settings: Clone + Send + Sync + 'static,
     P::Tx: Debug + Send + Sync + 'static,
     P::Id: Debug + Send + Sync + 'static,
+    M: MempoolAdapter<Tx = P::Tx> + Send + Sync + 'static,
 {
     const SERVICE_ID: ServiceId = "Carnot";
     type Settings = CarnotSettings;
@@ -72,12 +76,14 @@ where
 }
 
 #[async_trait::async_trait]
-impl<A, P> ServiceCore for CarnotConsensus<A, P>
+impl<A, P, M> ServiceCore for CarnotConsensus<A, P, M>
 where
     A: NetworkAdapter + Send + Sync + 'static,
-    P: Pool + Send + Sync + 'static,
+    P: MemPool + Send + Sync + 'static,
+    P::Settings: Clone + Send + Sync + 'static,
     P::Tx: Debug + Send + Sync + 'static,
     P::Id: Debug + Send + Sync + 'static,
+    M: MempoolAdapter<Tx = P::Tx> + Send + Sync + 'static,
 {
     fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, overwatch_rs::DynError> {
         let network_relay = service_state.overwatch_handle.relay();
@@ -102,7 +108,7 @@ where
             .mempool_relay
             .connect()
             .await
-            .expect("Relay connection with MempoolService should succeed");
+            .expect("Relay connection with MemPoolService should succeed");
 
         let network_adapter = A::new(network_relay).await;
 
@@ -133,12 +139,14 @@ where
     }
 }
 
-impl<A, P> CarnotConsensus<A, P>
+impl<A, P, M> CarnotConsensus<A, P, M>
 where
     A: NetworkAdapter + Send + Sync + 'static,
-    P: Pool + Send + Sync + 'static,
+    P: MemPool + Send + Sync + 'static,
+    P::Settings: Clone + Send + Sync + 'static,
     P::Tx: Debug + Send + Sync + 'static,
     P::Id: Debug + Send + Sync + 'static,
+    M: MempoolAdapter<Tx = P::Tx> + Send + Sync + 'static,
 {
     // Build a service that generates new views as they become available
     async fn view_generator(&self) -> ViewGenerator {
