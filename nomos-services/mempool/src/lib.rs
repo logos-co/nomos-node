@@ -139,9 +139,9 @@ where
                             });
                         }
                         MempoolMsg::MarkInBlock { ids, block } => {
-                            pool.mark_in_block(ids, block);
+                            pool.mark_in_block(&ids, block);
                         }
-                        MempoolMsg::Prune { ids } => { pool.prune(ids); },
+                        MempoolMsg::Prune { ids } => { pool.prune(&ids); },
                     }
                 }
                 Some(tx) = network_txs.next() => {
