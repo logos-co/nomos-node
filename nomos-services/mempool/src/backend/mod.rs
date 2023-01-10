@@ -1,3 +1,6 @@
+#[cfg(feature = "mock")]
+pub mod mockpool;
+
 use nomos_core::block::{BlockHeader, BlockId};
 
 pub trait MemPool {
