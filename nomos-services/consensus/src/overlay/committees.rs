@@ -1,9 +1,11 @@
 // std
-
+use std::pin::Pin;
 // crates
+use futures::StreamExt;
 use rand::{seq::SliceRandom, SeedableRng};
 // internal
 use super::*;
+use crate::network::messages::ProposalChunkMsg;
 use crate::network::NetworkAdapter;
 
 /// View of the tree overlay centered around a specific member
@@ -93,20 +95,38 @@ impl<'view, const C: usize> Member<'view, C> {
 }
 
 #[async_trait::async_trait]
-impl<'view, Network: NetworkAdapter + Send + Sync, const C: usize> Overlay<'view, Network>
-    for Member<'view, C>
+impl<
+        'view,
+        Network: NetworkAdapter + Send + Sync,
+        Fountain: FountainCode + Send + Sync,
+        const C: usize,
+    > Overlay<'view, Network, Fountain> for Member<'view, C>
 {
     fn new(view: &'view View, node: NodeId) -> Self {
         let committees = Committees::new(view);
         committees.into_member(node).unwrap()
     }
 
-    async fn reconstruct_proposal_block(&self, adapter: &Network) -> Block {
-        todo!()
+    async fn reconstruct_proposal_block(
+        &self,
+        adapter: &Network,
+        fountain: &Fountain,
+    ) -> Result<Block, FountainError> {
+        let message_stream = adapter.proposal_chunks_stream().await;
+        fountain.decode(message_stream).await.map(Block::from_bytes)
     }
 
-    async fn broadcast_block(&self, _block: Block, adapter: &Network) {
-        todo!()
+    async fn broadcast_block(&self, block: Block, adapter: &Network, fountain: &Fountain) {
+        let block_bytes = block.as_bytes();
+        let encoded_stream = fountain.encode(&block_bytes);
+        encoded_stream
+            .for_each_concurrent(None, |chunk| async move {
+                let message = ProposalChunkMsg { chunk };
+                adapter
+                    .broadcast_block_chunk(self.committees.view, message)
+                    .await;
+            })
+            .await;
     }
 
     async fn collect_approvals(
