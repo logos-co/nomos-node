@@ -1,14 +1,15 @@
 use nomos_core::block::{BlockHeader, BlockId};
 
-pub trait Pool {
+pub trait MemPool {
+    type Settings;
     type Tx;
     type Id;
 
     /// Construct a new empty pool
-    fn new() -> Self;
+    fn new(settings: Self::Settings) -> Self;
 
     /// Add a new transaction to the mempool, for example because we received it from the network
-    fn add_tx(&mut self, tx: Self::Tx, id: Self::Id) -> Result<(), overwatch_rs::DynError>;
+    fn add_tx(&mut self, tx: Self::Tx) -> Result<(), overwatch_rs::DynError>;
 
     /// Return a view over the transactions contained in the mempool.
     /// Implementations should provide *at least* all the transactions which have not been marked as

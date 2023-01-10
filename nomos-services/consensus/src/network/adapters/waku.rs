@@ -1,7 +1,6 @@
 // std
 // crates
 use futures::{Stream, StreamExt};
-use once_cell::sync::Lazy;
 use tokio_stream::wrappers::BroadcastStream;
 // internal
 use crate::network::{
@@ -17,23 +16,14 @@ use nomos_network::{
 use overwatch_rs::services::{relay::OutboundRelay, ServiceData};
 use waku_bindings::{Encoding, WakuContentTopic, WakuMessage, WakuPubSubTopic};
 
-static WAKU_CARNOT_PUB_SUB_TOPIC: Lazy<WakuPubSubTopic> =
-    Lazy::new(|| WakuPubSubTopic::new("CarnotSim".to_string(), Encoding::Proto));
+static WAKU_CARNOT_PUB_SUB_TOPIC: WakuPubSubTopic =
+    WakuPubSubTopic::new("CarnotSim", Encoding::Proto);
 
-static WAKU_CARNOT_BLOCK_CONTENT_TOPIC: Lazy<WakuContentTopic> = Lazy::new(|| WakuContentTopic {
-    application_name: "CarnotSim".to_string(),
-    version: 1,
-    content_topic_name: "CarnotBlock".to_string(),
-    encoding: Encoding::Proto,
-});
+static WAKU_CARNOT_BLOCK_CONTENT_TOPIC: WakuContentTopic =
+    WakuContentTopic::new("CarnotSim", 1, "CarnotBlock", Encoding::Proto);
 
-static WAKU_CARNOT_APPROVAL_CONTENT_TOPIC: Lazy<WakuContentTopic> =
-    Lazy::new(|| WakuContentTopic {
-        application_name: "CarnotSim".to_string(),
-        version: 1,
-        content_topic_name: "CarnotApproval".to_string(),
-        encoding: Encoding::Proto,
-    });
+static WAKU_CARNOT_APPROVAL_CONTENT_TOPIC: WakuContentTopic =
+    WakuContentTopic::new("CarnotSim", 1, "CarnotApproval", Encoding::Proto);
 
 // TODO: ehm...this should be here, but we will change it whenever the chunking is decided.
 const CHUNK_SIZE: usize = 8;
@@ -82,25 +72,23 @@ impl NetworkAdapter for WakuAdapter {
         Box::new(
             BroadcastStream::new(stream_channel).filter_map(|msg| async move {
                 match msg {
-                    Ok(event) => match event {
-                        NetworkEvent::RawMessage(message) => {
-                            // TODO: this should actually check the whole content topic,
-                            // waiting for this [PR](https://github.com/waku-org/waku-rust-bindings/pull/28)
-                            if WAKU_CARNOT_BLOCK_CONTENT_TOPIC.content_topic_name
-                                == message.content_topic().content_topic_name
-                            {
-                                let payload = message.payload();
-                                Some(
-                                    ProposalChunkMsg::from_bytes::<CHUNK_SIZE>(
-                                        payload.try_into().unwrap(),
-                                    )
-                                    .chunk,
+                    Ok(NetworkEvent::RawMessage(message)) => {
+                        // TODO: this should actually check the whole content topic,
+                        // waiting for this [PR](https://github.com/waku-org/waku-rust-bindings/pull/28)
+                        if WAKU_CARNOT_BLOCK_CONTENT_TOPIC.content_topic_name
+                            == message.content_topic().content_topic_name
+                        {
+                            let payload = message.payload();
+                            Some(
+                                ProposalChunkMsg::from_bytes::<CHUNK_SIZE>(
+                                    payload.try_into().unwrap(),
                                 )
-                            } else {
-                                None
-                            }
+                                .chunk,
+                            )
+                        } else {
+                            None
                         }
-                    },
+                    }
                     Err(_e) => None,
                 }
             }),
