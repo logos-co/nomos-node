@@ -4,6 +4,7 @@ pub mod backends;
 use std::{
     collections::HashMap,
     fmt::{self, Debug},
+    sync::Arc,
 };
 
 // crates
@@ -14,7 +15,7 @@ use overwatch_rs::services::{
     ServiceCore, ServiceData, ServiceId,
 };
 use serde::{Deserialize, Serialize};
-use tokio::sync::broadcast::Sender;
+use tokio::sync::{mpsc::Sender, oneshot};
 
 // internal
 use backends::HttpBackend;
@@ -61,7 +62,7 @@ impl core::fmt::Debug for Route {
     }
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct HttpRequest<Req, Res> {
     pub query: HashMap<String, String>,
     pub payload: Req,
@@ -112,6 +113,7 @@ impl<B: HttpBackend> ServiceCore for HttpService<B> {
             mut inbound_relay,
         } = self;
 
+        // TODO: not quite sure if this will restart the server every time
         loop {
             tokio::select! {
                 Some(msg) = inbound_relay.recv() => {
@@ -130,6 +132,39 @@ impl<B: HttpBackend> ServiceCore for HttpService<B> {
                 }
             }
         }
+
+        // let backend = Arc::new(backend);
+        // let (stop_tx, mut stop_rx) = oneshot::channel();
+        // let tbc = backend.clone();
+        // tokio::spawn(async move {
+        //     loop {
+        //         tokio::select! {
+        //             Some(msg) = inbound_relay.recv() => {
+        //                 match msg {
+        //                     HttpMsg::AddHandler {
+        //                         service_id,
+        //                         route,
+        //                         req_stream,
+        //                     } => {
+        //                         tbc.add_route(service_id, route, req_stream);
+        //                     }
+        //                 }
+        //             }
+        //             _server_exit = &mut stop_rx => {
+        //                 break;
+        //             }
+        //         }
+        //     }
+        // });
+        // backend
+        //     .run()
+        //     .await
+        //     .map_err(|e| {
+        //         if stop_tx.send(()).is_err() {
+        //             tracing::error!("HTTP service: failed to send stop signal to HTTP backend.");
+        //         }
+        //         e
+        //     })
     }
 }
 

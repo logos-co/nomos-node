@@ -11,7 +11,7 @@ use std::{
     collections::HashMap,
     sync::{Arc, Mutex},
 };
-use tokio::sync::broadcast::{self, channel};
+use tokio::sync::mpsc::channel;
 
 use metrics::{MetricsBackend, MetricsMessage, MetricsService, OwnedServiceId};
 use overwatch_rs::services::{
@@ -110,12 +110,11 @@ impl<Backend: MetricsBackend + Send + Sync + 'static, H: HttpBackend> ServiceDat
 }
 
 #[async_trait::async_trait]
-impl<
-        Backend: MetricsBackend<MetricsData = MetricsData> + Clone + Send + Sync + 'static,
-        H: HttpBackend,
-    > ServiceCore for MetricsUpdater<Backend, H>
+impl<Backend, H> ServiceCore for MetricsUpdater<Backend, H>
 where
+    Backend: MetricsBackend<MetricsData = MetricsData> + Clone + Send + Sync + 'static,
     Backend::MetricsData: async_graphql::OutputType,
+    H: HttpBackend<Response = String>,
 {
     fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, overwatch_rs::DynError> {
         let backend_channel: Relay<MetricsService<Backend>> =
@@ -138,7 +137,7 @@ where
             e
         })?;
 
-        let (req_stream, mut req_rx) = broadcast::channel(1);
+        let (req_stream, mut req_rx) = channel(1);
 
         _ = http
             .send(HttpMsg::AddHandler {
@@ -154,9 +153,11 @@ where
 
         // Handle the http request to metrics service.
         tokio::spawn(async move {
-            while let Ok(req) = req_rx.recv().await {
+            while let Some(req) = req_rx.recv().await {
                 // TODO: handle request.
-                req.res_tx.send("metrics".to_string());
+                if let Err(e) = req.res_tx.send("metrics".to_string()).await {
+                    tracing::error!("metrics updater send error: {e}");
+                }
             }
         });
 
