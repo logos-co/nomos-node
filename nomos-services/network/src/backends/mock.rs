@@ -3,9 +3,7 @@ use std::{collections::HashMap, sync::Arc};
 use super::*;
 use overwatch_rs::services::state::NoState;
 use serde::{Deserialize, Serialize};
-use tokio::sync::{
-    broadcast::{self, Receiver, Sender},
-};
+use tokio::sync::broadcast::{self, Receiver, Sender};
 use tracing::debug;
 use parking_lot::Mutex;
 
