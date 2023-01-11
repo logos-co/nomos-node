@@ -18,9 +18,6 @@ use overwatch_rs::{overwatch::OverwatchRunner, services::handle::ServiceHandle};
 use parking_lot::Mutex;
 use tokio::sync::mpsc::channel;
 
-#[derive(Debug, Clone)]
-pub struct Foo;
-
 #[derive(overwatch_derive::Services)]
 struct Services {
     http: ServiceHandle<HttpService<AxumBackend>>,
@@ -87,7 +84,7 @@ where
         let (hello_req_tx, mut hello_res_rx) = channel(1);
 
         // Register on http service to receive GET requests.
-        // Once registered, the dummy endpoint will be accessable at `http://{addr}/dummy/`.
+        // Once registered, the dummy endpoint will be accessible at `http://{addr}/dummy/`.
         http.send(HttpMsg::add_get_handler(Self::SERVICE_ID, "", hello_req_tx))
             .await
             .expect("send message to http service");

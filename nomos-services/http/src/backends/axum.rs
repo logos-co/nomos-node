@@ -1,5 +1,5 @@
 // std
-use std::{collections::HashMap, convert::Infallible, future::Future, sync::Arc};
+use std::{collections::HashMap, convert::Infallible, sync::Arc};
 
 // crates
 use axum::{extract::Query, http::HeaderValue, routing::get, Router};
@@ -45,15 +45,13 @@ pub struct AxumBackendSettings {
             std::net::IpAddr::V4(std::net::Ipv4Addr::new(127, 0, 0, 1)),
             8080,
         ),
-        env = "METRICS_GRAPHQL_BIND_ADDRESS"
+        env = "HTTP_BIND_ADDRESS"
     )]
     pub address: std::net::SocketAddr,
     /// Allowed origins for this server deployment requests.
     #[arg(long = "http-cors-origin")]
     pub cors_origins: Vec<String>,
 }
-
-pub trait HandlerOutput<T>: Future<Output = T> + Sized + Send {}
 
 #[derive(Clone, Debug)]
 pub struct AxumBackend {
