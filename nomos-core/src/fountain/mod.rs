@@ -1,3 +1,5 @@
+#[cfg(feature = "mock")]
+pub mod mock;
 #[cfg(feature = "raptor")]
 pub mod raptorq;
 

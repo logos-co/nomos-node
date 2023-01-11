@@ -24,3 +24,4 @@ tokio = { version = "1.23", features = ["macros", "rt"] }
 [features]
 default = []
 raptor = ["raptorq"]
+mock = []
