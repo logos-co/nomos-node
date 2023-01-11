@@ -110,7 +110,7 @@ impl HttpBackend for AxumBackend {
 
     async fn run(&self) -> Result<(), overwatch_rs::DynError> {
         let make_service = make_service_fn(|_| {
-            let router = self.router.clone().lock().clone();
+            let router = self.router.lock().clone();
             async move { Ok::<_, Infallible>(router) }
         });
 

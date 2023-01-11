@@ -108,8 +108,8 @@ async fn handle_hello<H: HttpBackend>(
     counter: Arc<Mutex<i32>>,
     req: HttpRequest<H::Request, String>,
 ) {
-    *counter.clone().lock() += 1;
-    let count = *counter.clone().lock();
+    *counter.lock() += 1;
+    let count = *counter.lock();
 
     if let Err(e) = req.res_tx.send(format!("hello count: {}", count)).await {
         tracing::error!("dummy service send error: {e}");
