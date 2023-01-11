@@ -29,7 +29,7 @@ struct Config {
 }
 
 #[derive(Services)]
-struct Services {
+struct Nomos {
     logging: ServiceHandle<Logger>,
     network: ServiceHandle<NetworkService<Waku>>,
     #[cfg(feature = "metrics")]
@@ -40,8 +40,8 @@ fn main() -> Result<()> {
     tracing_subscriber::fmt::init();
     let Args { config } = Args::parse();
     let config = serde_yaml::from_reader::<_, Config>(std::fs::File::open(config)?)?;
-    let app = OverwatchRunner::<Services>::run(
-        ServicesServiceSettings {
+    let app = OverwatchRunner::<Nomos>::run(
+        NomosServiceSettings {
             network: config.network,
             logging: config.log,
             #[cfg(feature = "metrics")]
