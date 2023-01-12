@@ -8,7 +8,7 @@ pub mod waku;
 #[async_trait::async_trait]
 pub trait NetworkBackend {
     type Settings: Clone + Debug + Send + Sync + 'static;
-    type State: ServiceState<Settings = Self::Settings> + Clone;
+    type State: ServiceState<Settings = Self::Settings> + Clone + Send + Sync;
     type Message: Debug + Send + Sync + 'static;
     type EventKind: Debug + Send + Sync + 'static;
     type NetworkEvent: Debug + Send + Sync + 'static;
