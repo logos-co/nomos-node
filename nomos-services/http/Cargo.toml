@@ -6,7 +6,7 @@ edition = "2021"
 [[example]]
 name = "axum"
 path = "examples/axum.rs"
-features = ["http"]
+required-features = ["http"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -29,11 +29,6 @@ tracing-gelf = "0.7"
 tower = { version = "0.4", optional = true }
 tower-http = { version = "0.3", features = ["cors", "trace"] }
 tokio = { version = "1", features = ["sync"] }
-
-
-[dev-dependencies]
-metrics = { path = "../metrics/" }
-async-graphql = { version = "5", features = ["tracing"] }
 
 [features]
 default = []
