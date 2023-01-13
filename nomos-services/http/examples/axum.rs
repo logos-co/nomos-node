@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use clap::Parser;
-use nomos_http::bridge::{HttpBridge, HttpBridgeRunner};
+use nomos_http::bridge::{HttpBridgeRunner, HttpBridgeService};
 use nomos_http::{
     backends::axum::{AxumBackend, AxumBackendSettings},
     http::*,
@@ -125,7 +125,7 @@ fn dummy_router(handle: overwatch_rs::overwatch::handle::OverwatchHandle) -> Htt
 #[derive(overwatch_derive::Services)]
 struct Services {
     http: ServiceHandle<HttpService<AxumBackend>>,
-    router: ServiceHandle<HttpBridge>,
+    router: ServiceHandle<HttpBridgeService>,
     dummy: ServiceHandle<DummyService>,
 }
 
