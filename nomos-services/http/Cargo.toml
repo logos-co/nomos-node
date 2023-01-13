@@ -13,6 +13,7 @@ required-features = ["http"]
 [dependencies]
 axum = { version = "0.6", optional = true }
 async-trait = "0.1"
+bytes = "1.3"
 clap = { version = "4", features = ["derive", "env"], optional = true }
 futures = "0.3"
 hyper = { version = "0.14", optional = true }
@@ -29,7 +30,6 @@ tracing-gelf = "0.7"
 tower = { version = "0.4", optional = true }
 tower-http = { version = "0.3", features = ["cors", "trace"] }
 tokio = { version = "1", features = ["sync", "macros"] }
-bytes = "1.3.0"
 
 [features]
 default = []

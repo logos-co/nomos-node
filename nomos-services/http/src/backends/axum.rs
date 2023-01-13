@@ -17,7 +17,7 @@ use tower_http::{
 
 // internal
 use super::HttpBackend;
-use crate::{HttpMethod, HttpRequest};
+use crate::http::{HttpMethod, HttpRequest, Route};
 
 /// Configuration for the Http Server
 #[derive(Debug, Clone, clap::Args, serde::Deserialize, serde::Serialize)]
@@ -87,7 +87,7 @@ impl HttpBackend for AxumBackend {
     fn add_route(
         &self,
         service_id: overwatch_rs::services::ServiceId,
-        route: crate::Route,
+        route: Route,
         req_stream: Sender<HttpRequest>,
     ) {
         let path = format!("/{}/{}", service_id.to_lowercase(), route.path);

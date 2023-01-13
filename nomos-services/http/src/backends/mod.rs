@@ -7,7 +7,7 @@ use overwatch_rs::services::{state::ServiceState, ServiceId};
 use serde::{de::DeserializeOwned, Serialize};
 use tokio::sync::mpsc::Sender;
 
-use crate::{HttpRequest, Route};
+use crate::http::{HttpRequest, Route};
 
 pub type Payload = Box<dyn DeserializeOwned>;
 pub type Response = Box<dyn Serialize>;
