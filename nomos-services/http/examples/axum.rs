@@ -1,7 +1,9 @@
+use std::error::Error;
 use std::sync::Arc;
 
 use clap::Parser;
-use nomos_http::bridge::{HttpBridgeRunner, HttpBridgeService};
+use nomos_http::backends::HttpBackend;
+use nomos_http::bridge::{build_http_bridge, HttpBridgeRunner, HttpBridgeService};
 use nomos_http::{
     backends::axum::{AxumBackend, AxumBackendSettings},
     http::*,
@@ -14,7 +16,6 @@ use overwatch_rs::services::{
 };
 use overwatch_rs::{overwatch::OverwatchRunner, services::handle::ServiceHandle};
 use parking_lot::Mutex;
-use tokio::sync::mpsc::channel;
 use tokio::sync::oneshot;
 
 pub struct DummyService {
@@ -72,37 +73,15 @@ async fn handle_hello(counter: Arc<Mutex<i32>>, reply_channel: oneshot::Sender<i
     }
 }
 
-fn dummy_router(handle: overwatch_rs::overwatch::handle::OverwatchHandle) -> HttpBridgeRunner {
+fn dummy_router<B>(handle: overwatch_rs::overwatch::handle::OverwatchHandle) -> HttpBridgeRunner
+where
+    B: HttpBackend + Send + Sync + 'static,
+    B::Error: Error + Send + Sync + 'static,
+{
     Box::new(Box::pin(async move {
-        let http = handle
-            .clone()
-            .relay::<HttpService<AxumBackend>>()
-            .connect()
-            .await
-            .map_err(|e| {
-                tracing::error!(err = ?e, "http relay connect error");
-                e
-            })
-            .unwrap();
-
-        let dummy = handle
-            .clone()
-            .relay::<DummyService>()
-            .connect()
+        let (dummy, mut hello_res_rx) = build_http_bridge::<DummyService, B, _>(handle, "")
             .await
             .unwrap();
-
-        let (hello_req_tx, mut hello_res_rx) = channel(1);
-
-        // Register on http service to receive GET requests.
-        // Once registered, the dummy endpoint will be accessible at `http://{addr}/dummy/`.
-        http.send(HttpMsg::add_get_handler(
-            DummyService::SERVICE_ID,
-            "",
-            hello_req_tx,
-        ))
-        .await
-        .expect("send message to http service");
 
         while let Some(HttpRequest { res_tx, .. }) = hello_res_rx.recv().await {
             let (sender, receiver) = oneshot::channel();
@@ -145,7 +124,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                 backend: settings.http,
             },
             router: nomos_http::bridge::HttpBridgeSettings {
-                runners: vec![Arc::new(Box::new(dummy_router))],
+                runners: vec![Arc::new(Box::new(dummy_router::<AxumBackend>))],
             },
             dummy: (),
         },

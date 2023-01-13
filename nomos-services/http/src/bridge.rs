@@ -27,44 +27,29 @@ pub type HttpBridge = Arc<
 >;
 
 // TODO: Add error handling
-pub fn build_http_bridge<S, B, P, F, FF>(path: P, runner: F) -> HttpBridge
+pub async fn build_http_bridge<S, B, P>(
+    handle: overwatch_rs::overwatch::handle::OverwatchHandle,
+    path: P,
+) -> Result<(OutboundRelay<S::Message>, Receiver<HttpRequest>), overwatch_rs::DynError>
 where
     S: ServiceCore + Send + Sync + 'static,
     B: HttpBackend + Send + Sync + 'static,
     B::Error: Error + Send + Sync + 'static,
-    P: Into<String> + Clone + Send + Sync + 'static,
-    F: FnOnce(OutboundRelay<S::Message>, Receiver<HttpRequest>) -> FF + Send + Sync + 'static,
-    FF: Future<Output = Result<(), overwatch_rs::DynError>> + Send,
+    P: Into<String> + Send + Sync + 'static,
 {
-    Arc::new(Box::new(
-        move |handle: overwatch_rs::overwatch::handle::OverwatchHandle| {
-            let p = path.clone();
-            Box::new(Box::pin(async move {
-                let http_relay = handle
-                    .clone()
-                    .relay::<HttpService<B>>()
-                    .connect()
-                    .await
-                    .map_err(|e| {
-                        tracing::error!(err = ?e, "http relay connect error");
-                        e
-                    })
-                    .unwrap();
+    let http_relay = handle.clone().relay::<HttpService<B>>().connect().await?;
 
-                let service_relay = handle.clone().relay::<S>().connect().await.unwrap();
+    let service_relay = handle.clone().relay::<S>().connect().await?;
 
-                let (http_sender, http_receiver) = channel(1);
+    let (http_sender, http_receiver) = channel(1);
 
-                // Register on http service to receive GET requests.
-                http_relay
-                    .send(HttpMsg::add_get_handler(S::SERVICE_ID, p, http_sender))
-                    .await
-                    .expect("send message to http service");
-                runner(service_relay, http_receiver).await?;
-                Ok(())
-            }))
-        },
-    ))
+    // Register on http service to receive GET requests.
+    http_relay
+        .send(HttpMsg::add_get_handler(S::SERVICE_ID, path, http_sender))
+        .await
+        .map_err(|(e, _)| e)?;
+
+    Ok((service_relay, http_receiver))
 }
 
 pub struct HttpBridgeService {
