@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{error::Error, sync::Arc};
 
 use clap::Parser;
 use nomos_http::{
@@ -49,12 +49,20 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     Ok(())
 }
 
-pub struct DummyService<H: HttpBackend> {
+pub struct DummyService<H>
+where
+    H: HttpBackend + Send + Sync + 'static,
+    <H as HttpBackend>::Error: Error + Send + Sync + 'static,
+{
     counter: Arc<Mutex<i32>>,
     http_relay: Relay<HttpService<H>>,
 }
 
-impl<H: HttpBackend> ServiceData for DummyService<H> {
+impl<H> ServiceData for DummyService<H>
+where
+    H: HttpBackend + Send + Sync + 'static,
+    <H as HttpBackend>::Error: Error + Send + Sync + 'static,
+{
     const SERVICE_ID: ServiceId = "Dummy";
     type Settings = ();
     type State = NoState<()>;
@@ -63,9 +71,10 @@ impl<H: HttpBackend> ServiceData for DummyService<H> {
 }
 
 #[async_trait::async_trait]
-impl<H> ServiceCore for DummyService<H>
+impl<H: HttpBackend> ServiceCore for DummyService<H>
 where
-    H: HttpBackend<Response = String>,
+    H: HttpBackend + Send + Sync + 'static,
+    <H as HttpBackend>::Error: Error + Send + Sync + 'static,
 {
     fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, overwatch_rs::DynError> {
         let http_relay: Relay<HttpService<H>> = service_state.overwatch_handle.relay();
@@ -94,21 +103,22 @@ where
 
         // Handle the http request to dummy service.
         while let Some(req) = hello_res_rx.recv().await {
-            handle_hello::<H>(counter.clone(), req).await;
+            handle_hello(counter.clone(), req).await;
         }
 
         Ok(())
     }
 }
 
-async fn handle_hello<H: HttpBackend>(
-    counter: Arc<Mutex<i32>>,
-    req: HttpRequest<H::Request, String>,
-) {
+async fn handle_hello(counter: Arc<Mutex<i32>>, req: HttpRequest) {
     *counter.lock() += 1;
     let count = *counter.lock();
 
-    if let Err(e) = req.res_tx.send(format!("hello count: {}", count)).await {
+    if let Err(e) = req
+        .res_tx
+        .send(format!("hello count: {}", count).into())
+        .await
+    {
         tracing::error!("dummy service send error: {e}");
     }
 }

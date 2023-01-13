@@ -3,6 +3,7 @@ pub mod backends;
 // std
 use std::{
     collections::HashMap,
+    error::Error,
     fmt::{self, Debug},
     sync::Arc,
 };
@@ -27,7 +28,7 @@ pub struct Config<B: HttpBackend> {
 
 pub struct HttpService<B: HttpBackend> {
     backend: B,
-    inbound_relay: InboundRelay<HttpMsg<B>>,
+    inbound_relay: InboundRelay<HttpMsg>,
 }
 
 impl<B: HttpBackend> ServiceData for HttpService<B> {
@@ -35,7 +36,7 @@ impl<B: HttpBackend> ServiceData for HttpService<B> {
     type Settings = Config<B>;
     type State = NoState<Self::Settings>;
     type StateOperator = NoOperator<Self::State>;
-    type Message = HttpMsg<B>;
+    type Message = HttpMsg;
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -63,27 +64,29 @@ impl core::fmt::Debug for Route {
 }
 
 #[derive(Debug, Clone)]
-pub struct HttpRequest<Req, Res> {
+pub struct HttpRequest {
     pub query: HashMap<String, String>,
-    pub payload: Req,
-    pub res_tx: Sender<Res>,
+    pub payload: Option<bytes::Bytes>,
+    pub res_tx: Sender<bytes::Bytes>,
 }
 
-pub enum HttpMsg<B: HttpBackend> {
+// HttpMsg is a message that is sent via the relay to communicate with
+// the HttpService.
+pub enum HttpMsg {
     AddHandler {
         // TODO: If possible, this should be extracted from the
         // relay itself.
         service_id: ServiceId,
         route: Route,
-        req_stream: Sender<HttpRequest<B::Request, B::Response>>,
+        req_stream: Sender<HttpRequest>,
     },
 }
 
-impl<B: HttpBackend> HttpMsg<B> {
+impl HttpMsg {
     pub fn add_get_handler<P: Into<String>>(
         service_id: ServiceId,
         path: P,
-        req_stream: Sender<HttpRequest<B::Request, B::Response>>,
+        req_stream: Sender<HttpRequest>,
     ) -> Self {
         Self::AddHandler {
             service_id,
@@ -96,9 +99,9 @@ impl<B: HttpBackend> HttpMsg<B> {
     }
 }
 
-impl<B: HttpBackend + 'static> RelayMessage for HttpMsg<B> {}
+impl RelayMessage for HttpMsg {}
 
-impl<B: HttpBackend> Debug for HttpMsg<B> {
+impl Debug for HttpMsg {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Self::AddHandler {
@@ -115,15 +118,19 @@ impl<B: HttpBackend> Debug for HttpMsg<B> {
 }
 
 #[async_trait::async_trait]
-impl<B: HttpBackend> ServiceCore for HttpService<B> {
+impl<B> ServiceCore for HttpService<B>
+where
+    B: HttpBackend + Send + Sync + 'static,
+    <B as HttpBackend>::Error: Error + Send + Sync + 'static,
+{
     fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, overwatch_rs::DynError> {
         let inbound_relay = service_state.inbound_relay;
-        <B as HttpBackend>::new(service_state.settings_reader.get_updated_settings().backend).map(
-            |backend| Self {
+        <B as HttpBackend>::new(service_state.settings_reader.get_updated_settings().backend)
+            .map(|backend| Self {
                 backend,
                 inbound_relay,
-            },
-        )
+            })
+            .map_err(|e| Box::new(e) as Box<dyn Error + Send + Sync>)
     }
 
     async fn run(mut self) -> Result<(), overwatch_rs::DynError> {
