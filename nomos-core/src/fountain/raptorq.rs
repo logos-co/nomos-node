@@ -7,9 +7,12 @@ use raptorq::{Decoder, Encoder, EncodingPacket, ObjectTransmissionInformation};
 use crate::fountain::{FountainCode, FountainError};
 
 /// [RaptorQ](https://en.wikipedia.org/wiki/Raptor_code#RaptorQ_code) implementation of [`FountainCode`] trait
-pub struct RaptorQFountain;
+pub struct RaptorQFountain {
+    settings: RaptorQSettings,
+}
 
 /// Settings for [`RaptorQFountain`] code
+#[derive(Clone, Debug)]
 pub struct RaptorQSettings {
     pub transmission_information: ObjectTransmissionInformation,
     pub repair_packets_per_block: u32,
@@ -20,24 +23,24 @@ pub struct RaptorQSettings {
 #[async_trait::async_trait]
 impl FountainCode for RaptorQFountain {
     type Settings = RaptorQSettings;
-    fn encode(
-        block: &[u8],
-        settings: &Self::Settings,
-    ) -> Box<dyn Stream<Item = Bytes> + Send + Sync + Unpin> {
-        let encoder = Encoder::new(block, settings.transmission_information);
+    fn new(settings: Self::Settings) -> Self {
+        Self { settings }
+    }
+    fn encode(&self, block: &[u8]) -> Box<dyn Stream<Item = Bytes> + Send + Sync + Unpin> {
+        let encoder = Encoder::new(block, self.settings.transmission_information);
         Box::new(futures::stream::iter(
             encoder
-                .get_encoded_packets(settings.repair_packets_per_block)
+                .get_encoded_packets(self.settings.repair_packets_per_block)
                 .into_iter()
                 .map(|packet| packet.serialize().into()),
         ))
     }
 
     async fn decode(
+        &self,
         mut stream: impl Stream<Item = Bytes> + Send + Sync + Unpin,
-        settings: &Self::Settings,
     ) -> Result<Bytes, FountainError> {
-        let mut decoder = Decoder::new(settings.transmission_information);
+        let mut decoder = Decoder::new(self.settings.transmission_information);
         while let Some(chunk) = stream.next().await {
             let packet = EncodingPacket::deserialize(&chunk);
             if let Some(result) = decoder.decode(packet) {
@@ -54,7 +57,10 @@ mod test {
     use crate::fountain::{FountainCode, FountainError};
     use bytes::Bytes;
     use futures::StreamExt;
-    use rand::RngCore;
+    use rand::{RngCore, SeedableRng};
+
+    // completely random seed
+    const SEED: u64 = 1889;
 
     #[tokio::test]
     async fn random_encode_decode() -> Result<(), FountainError> {
@@ -68,16 +74,19 @@ mod test {
             repair_packets_per_block: 10,
         };
 
+        let raptor = RaptorQFountain::new(settings);
+
         // create random payload
         let mut payload = [0u8; TRANSFER_LENGTH];
-        rand::thread_rng().fill_bytes(&mut payload);
+        let mut r = rand::prelude::StdRng::seed_from_u64(SEED);
+        r.fill_bytes(&mut payload);
         let payload = Bytes::from(payload.to_vec());
 
         // encode payload
-        let encoded = RaptorQFountain::encode(&payload, &settings);
+        let encoded = raptor.encode(&payload);
 
         // reconstruct
-        let decoded = RaptorQFountain::decode(encoded, &settings).await?;
+        let decoded = raptor.decode(encoded).await?;
 
         assert_eq!(decoded, payload);
         Ok(())
@@ -97,14 +106,17 @@ mod test {
 
         // create random payload
         let mut payload = [0u8; TRANSFER_LENGTH];
-        rand::thread_rng().fill_bytes(&mut payload);
+        let mut r = rand::prelude::StdRng::seed_from_u64(SEED);
+        r.fill_bytes(&mut payload);
         let payload = Bytes::from(payload.to_vec());
 
+        let raptor = RaptorQFountain::new(settings);
+
         // encode payload
-        let encoded = RaptorQFountain::encode(&payload, &settings);
+        let encoded = raptor.encode(&payload);
 
         // reconstruct skipping packets, must fail
-        let decoded = RaptorQFountain::decode(encoded.skip(400), &settings).await;
+        let decoded = raptor.decode(encoded.skip(400)).await;
         assert!(decoded.is_err());
     }
 }

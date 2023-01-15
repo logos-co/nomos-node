@@ -1,5 +1,5 @@
 // std
-use std::{collections::HashMap, convert::Infallible, future::Future, sync::Arc};
+use std::{collections::HashMap, convert::Infallible, sync::Arc};
 
 // crates
 use axum::{extract::Query, http::HeaderValue, routing::get, Router};
@@ -17,35 +17,19 @@ use tower_http::{
 
 // internal
 use super::HttpBackend;
-use crate::{HttpMethod, HttpRequest};
-
-#[derive(Debug, thiserror::Error)]
-pub enum AxnumBackendError {
-    #[error("axum backend: send error: {0}")]
-    SendError(
-        #[from]
-        tokio::sync::mpsc::error::SendError<
-            HttpRequest<
-                <AxumBackend as HttpBackend>::Request,
-                <AxumBackend as HttpBackend>::Response,
-            >,
-        >,
-    ),
-    #[error("axum backend: {0}")]
-    Any(DynError),
-}
+use crate::http::{HttpMethod, HttpRequest, Route};
 
 /// Configuration for the Http Server
 #[derive(Debug, Clone, clap::Args, serde::Deserialize, serde::Serialize)]
 pub struct AxumBackendSettings {
     /// Socket where the server will be listening on for incoming requests.
     #[arg(
-        short, long = "http-addr", 
+        short, long = "http-addr",
         default_value_t = std::net::SocketAddr::new(
             std::net::IpAddr::V4(std::net::Ipv4Addr::new(127, 0, 0, 1)),
             8080,
         ),
-        env = "METRICS_GRAPHQL_BIND_ADDRESS"
+        env = "HTTP_BIND_ADDRESS"
     )]
     pub address: std::net::SocketAddr,
     /// Allowed origins for this server deployment requests.
@@ -53,7 +37,14 @@ pub struct AxumBackendSettings {
     pub cors_origins: Vec<String>,
 }
 
-pub trait HandlerOutput<T>: Future<Output = T> + Sized + Send {}
+#[derive(Debug, thiserror::Error)]
+pub enum AxnumBackendError {
+    #[error("axum backend: send error: {0}")]
+    SendError(#[from] tokio::sync::mpsc::error::SendError<HttpRequest>),
+
+    #[error("axum backend: {0}")]
+    Any(DynError),
+}
 
 #[derive(Clone, Debug)]
 pub struct AxumBackend {
@@ -65,11 +56,9 @@ pub struct AxumBackend {
 impl HttpBackend for AxumBackend {
     type Config = AxumBackendSettings;
     type State = NoState<AxumBackendSettings>;
-    type Request = ();
-    type Response = String;
     type Error = AxnumBackendError;
 
-    fn new(config: Self::Config) -> Result<Self, overwatch_rs::DynError>
+    fn new(config: Self::Config) -> Result<Self, Self::Error>
     where
         Self: Sized,
     {
@@ -98,8 +87,8 @@ impl HttpBackend for AxumBackend {
     fn add_route(
         &self,
         service_id: overwatch_rs::services::ServiceId,
-        route: crate::Route,
-        req_stream: Sender<HttpRequest<Self::Request, Self::Response>>,
+        route: Route,
+        req_stream: Sender<HttpRequest>,
     ) {
         let path = format!("/{}/{}", service_id.to_lowercase(), route.path);
         match route.method {
@@ -122,7 +111,7 @@ impl HttpBackend for AxumBackend {
 }
 
 impl AxumBackend {
-    fn add_get_route(&self, path: &str, req_stream: Sender<HttpRequest<(), String>>) {
+    fn add_get_route(&self, path: &str, req_stream: Sender<HttpRequest>) {
         let mut router = self.router.lock();
         *router = router.clone().route(
             path,
@@ -136,7 +125,7 @@ impl AxumBackend {
                 match req_stream
                     .send(HttpRequest {
                         query,
-                        payload: (),
+                        payload: None,
                         res_tx: tx,
                     })
                     .await

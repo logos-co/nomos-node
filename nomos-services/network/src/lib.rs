@@ -41,7 +41,7 @@ impl<T: NetworkBackend + 'static> RelayMessage for NetworkMsg<T> {}
 
 #[derive(Serialize, Deserialize)]
 pub struct NetworkConfig<B: NetworkBackend> {
-    pub backend: B::Config,
+    pub backend: B::Settings,
 }
 
 impl<B: NetworkBackend> Debug for NetworkConfig<B> {

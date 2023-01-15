@@ -60,13 +60,13 @@ pub enum NetworkEvent {
 
 #[async_trait::async_trait]
 impl NetworkBackend for Waku {
-    type Config = WakuConfig;
+    type Settings = WakuConfig;
     type State = NoState<WakuConfig>;
     type Message = WakuBackendMessage;
     type EventKind = EventKind;
     type NetworkEvent = NetworkEvent;
 
-    fn new(config: Self::Config) -> Self {
+    fn new(config: Self::Settings) -> Self {
         let waku = waku_new(Some(config.inner)).unwrap().start().unwrap();
         waku.relay_subscribe(None).unwrap();
         tracing::info!("waku listening on {}", waku.listen_addresses().unwrap()[0]);

@@ -103,7 +103,8 @@ impl ServiceCore for Logger {
 
     async fn run(self) -> Result<(), overwatch_rs::DynError> {
         // keep the handle alive without stressing the runtime
-        Ok(futures::pending!())
+        futures::pending!();
+        Ok(())
     }
 }
 
