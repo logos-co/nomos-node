@@ -2,7 +2,13 @@
 use std::{collections::HashMap, sync::Arc};
 
 // crates
-use axum::{body::Body, extract::Query, http::HeaderValue, routing::get, Router};
+use async_graphql_axum::GraphQLRequest;
+use axum::{
+    extract::Query,
+    http::HeaderValue,
+    routing::{get, post},
+    Extension, Router,
+};
 use hyper::{
     header::{CONTENT_TYPE, USER_AGENT},
     Request,
@@ -19,7 +25,7 @@ use tower_service::Service;
 
 // internal
 use super::HttpBackend;
-use crate::http::{HttpMethod, HttpRequest, Route};
+use crate::http::{GraphqlRequest, HttpMethod, HttpRequest, Route};
 
 /// Configuration for the Http Server
 #[derive(Debug, Clone, clap::Args, serde::Deserialize, serde::Serialize)]
@@ -44,21 +50,26 @@ pub enum AxnumBackendError {
     #[error("axum backend: send error: {0}")]
     SendError(#[from] tokio::sync::mpsc::error::SendError<HttpRequest>),
 
+    #[error("axum backend: send error graphql endpoint error")]
+    SendGraphqlError,
+
     #[error("axum backend: {0}")]
     Any(DynError),
 }
 
-#[derive(Clone, Debug)]
-pub struct AxumBackend {
+#[derive(Debug, Clone)]
+pub struct AxumBackend<G> {
     config: AxumBackendSettings,
     router: Arc<Mutex<Router>>,
+    marker: core::marker::PhantomData<G>,
 }
 
 #[async_trait::async_trait]
-impl HttpBackend for AxumBackend {
+impl<G: async_graphql::ObjectType + Clone + 'static + Default> HttpBackend for AxumBackend<G> {
     type Config = AxumBackendSettings;
     type State = NoState<AxumBackendSettings>;
     type Error = AxnumBackendError;
+    type GraphqlQuery = G;
 
     fn new(config: Self::Config) -> Result<Self, Self::Error>
     where
@@ -83,7 +94,11 @@ impl HttpBackend for AxumBackend {
         let router = Router::new().layer(cors).layer(TraceLayer::new_for_http());
         let router = Arc::new(Mutex::new(router));
 
-        Ok(Self { config, router })
+        Ok(Self {
+            config,
+            router,
+            marker: core::marker::PhantomData,
+        })
     }
 
     fn add_route(
@@ -97,6 +112,16 @@ impl HttpBackend for AxumBackend {
             HttpMethod::GET => self.add_get_route(&path, req_stream),
             _ => todo!(),
         };
+    }
+
+    fn add_graphql_endpoint(
+        &self,
+        service_id: overwatch_rs::services::ServiceId,
+        path: String,
+        req_stream: Sender<GraphqlRequest<Self::GraphqlQuery>>,
+    ) {
+        let path = format!("/{}/{}", service_id.to_lowercase(), path);
+        self.add_graphql_endpoint(&path, req_stream);
     }
 
     async fn run(&self) -> Result<(), overwatch_rs::DynError> {
@@ -113,7 +138,7 @@ impl HttpBackend for AxumBackend {
     }
 }
 
-impl AxumBackend {
+impl<G: async_graphql::ObjectType + Clone + Default + 'static> AxumBackend<G> {
     fn add_get_route(&self, path: &str, req_stream: Sender<HttpRequest>) {
         let mut router = self.router.lock();
         *router = router.clone().route(
@@ -146,35 +171,44 @@ impl AxumBackend {
         )
     }
 
-    fn add_post_handler(&self, path: &str, req_stream: Sender<HttpRequest>) {
+    fn add_graphql_endpoint(&self, path: &str, req_stream: Sender<GraphqlRequest<G>>) {
         let mut router = self.router.lock();
         *router = router.clone().route(
             path,
             // TODO: Extract the stream handling to `to_handler` or similar function.
-            post(|Query(query): Query<HashMap<String, String>>| async move {
-                let (tx, mut rx) = tokio::sync::mpsc::channel(1);
-
-                // Write Self::Request type message to req_stream.
-                // TODO: handle result in a more elegant way.
-                // Currently, convert to Result<String, String>
-                match req_stream
-                    .send(HttpRequest {
-                        query,
-                        payload: None,
-                        res_tx: tx,
-                    })
-                    .await
-                {
-                    Ok(_) => {
-                        // Wait for a response, then pass or serialize it?
-                        match rx.recv().await {
-                            Some(res) => Ok(res),
-                            None => Ok("".into()),
+            post(
+                |Query(_query): Query<HashMap<String, String>>,
+                 Extension(schema): Extension<
+                    async_graphql::Schema<
+                        G,
+                        async_graphql::EmptyMutation,
+                        async_graphql::EmptySubscription,
+                    >,
+                >,
+                 req: GraphQLRequest| async move {
+                    let (tx, mut rx) = tokio::sync::mpsc::channel(1);
+                    // Write Self::Request type message to req_stream.
+                    // TODO: handle result in a more elegant way.
+                    // Currently, convert to Result<String, String>
+                    match req_stream
+                        .send(GraphqlRequest {
+                            schema,
+                            res_tx: tx,
+                            req: req.into_inner(),
+                        })
+                        .await
+                    {
+                        Ok(_) => {
+                            // Wait for a response, then pass or serialize it?
+                            match rx.recv().await {
+                                Some(res) => Ok(serde_json::to_string(&res).unwrap()),
+                                None => Ok("".into()),
+                            }
                         }
+                        Err(_e) => Err(AxnumBackendError::SendGraphqlError.to_string()),
                     }
-                    Err(e) => Err(AxnumBackendError::SendError(e).to_string()),
-                }
-            }),
+                },
+            ),
         )
     }
 }
