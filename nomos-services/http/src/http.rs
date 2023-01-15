@@ -78,6 +78,11 @@ pub enum HttpMsg {
         route: Route,
         req_stream: Sender<HttpRequest>,
     },
+    AddGraphqlEndpoint {
+        service_id: ServiceId,
+        path: String,
+        schema: Arc<async_graphql::Schema<()>>,
+    },
 }
 
 impl HttpMsg {
@@ -90,6 +95,21 @@ impl HttpMsg {
             service_id,
             route: Route {
                 method: HttpMethod::GET,
+                path: path.into(),
+            },
+            req_stream,
+        }
+    }
+
+    pub fn add_post_handler<P: Into<String>>(
+        service_id: ServiceId,
+        path: P,
+        req_stream: Sender<HttpRequest>,
+    ) -> Self {
+        Self::AddHandler {
+            service_id,
+            route: Route {
+                method: HttpMethod::POST,
                 path: path.into(),
             },
             req_stream,

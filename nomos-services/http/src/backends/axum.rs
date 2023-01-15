@@ -145,4 +145,36 @@ impl AxumBackend {
             }),
         )
     }
+
+    fn add_post_handler(&self, path: &str, req_stream: Sender<HttpRequest>) {
+        let mut router = self.router.lock();
+        *router = router.clone().route(
+            path,
+            // TODO: Extract the stream handling to `to_handler` or similar function.
+            post(|Query(query): Query<HashMap<String, String>>| async move {
+                let (tx, mut rx) = tokio::sync::mpsc::channel(1);
+
+                // Write Self::Request type message to req_stream.
+                // TODO: handle result in a more elegant way.
+                // Currently, convert to Result<String, String>
+                match req_stream
+                    .send(HttpRequest {
+                        query,
+                        payload: None,
+                        res_tx: tx,
+                    })
+                    .await
+                {
+                    Ok(_) => {
+                        // Wait for a response, then pass or serialize it?
+                        match rx.recv().await {
+                            Some(res) => Ok(res),
+                            None => Ok("".into()),
+                        }
+                    }
+                    Err(e) => Err(AxnumBackendError::SendError(e).to_string()),
+                }
+            }),
+        )
+    }
 }

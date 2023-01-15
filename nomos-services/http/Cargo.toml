@@ -32,6 +32,9 @@ tower-http = { version = "0.3", features = ["cors", "trace"] }
 tokio = { version = "1", features = ["sync", "macros"] }
 tower-service = "0.3.2"
 
+[dev-dependencies]
+metrics = { path = "../metrics", features = ["gql"] }
+
 [features]
 default = []
 http = ["clap", "axum", "serde_json", "parking_lot", "hyper"]

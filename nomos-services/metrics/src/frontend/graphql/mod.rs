@@ -53,7 +53,7 @@ pub struct GraphqlServerSettings {
     pub cors_origins: Vec<String>,
 }
 
-async fn graphql_handler<Backend: MetricsBackend + Send + 'static + Sync>(
+pub async fn graphql_handler<Backend: MetricsBackend + Send + 'static + Sync>(
     schema: State<Schema<Graphql<Backend>, EmptyMutation, EmptySubscription>>,
     req: GraphQLRequest,
 ) -> GraphQLResponse
