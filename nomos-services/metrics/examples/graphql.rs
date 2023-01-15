@@ -6,7 +6,7 @@ use std::{
 use clap::Parser;
 use metrics::{
     frontend::graphql::{Graphql, GraphqlServerSettings},
-    MetricsBackend, MetricsMessage, MetricsService, OwnedServiceId,
+    GraphqlData, MetricsBackend, MetricsMessage, MetricsService, OwnedServiceId,
 };
 use overwatch_rs::{
     overwatch::OverwatchRunner,
@@ -112,6 +112,35 @@ pub struct Args {
 #[derive(Debug, Default, Clone, async_graphql::SimpleObject)]
 pub struct MetricsData {
     duration: u64,
+}
+
+#[derive(Debug, Clone)]
+pub enum ParseMetricsDataError {
+    TryFromSliceError(core::array::TryFromSliceError),
+}
+
+impl std::fmt::Display for ParseMetricsDataError {
+    fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        Ok(())
+    }
+}
+
+impl std::error::Error for ParseMetricsDataError {}
+
+impl GraphqlData for MetricsData {
+    type Error = ParseMetricsDataError;
+
+    fn try_from_bytes(src: &[u8]) -> Result<Self, Self::Error> {
+        src.try_into()
+            .map(|v| Self {
+                duration: u64::from_be_bytes(v),
+            })
+            .map_err(ParseMetricsDataError::TryFromSliceError)
+    }
+
+    fn try_into_bytes(self) -> Result<bytes::Bytes, Self::Error> {
+        Ok(self.duration.to_be_bytes().to_vec().into())
+    }
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
