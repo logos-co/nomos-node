@@ -8,6 +8,11 @@ name = "axum"
 path = "examples/axum.rs"
 required-features = ["http"]
 
+[[example]]
+name = "graphql"
+path = "examples/axum.rs"
+required-features = ["http", "gql"]
+
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
@@ -42,4 +47,4 @@ once_cell = "1.17"
 [features]
 default = []
 http = ["clap", "axum", "serde_json", "parking_lot", "hyper"]
-gql = ["async-graphql"]
+gql = ["async-graphql", "async-graphql-axum"]

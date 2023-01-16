@@ -13,7 +13,7 @@ use axum::{
 
 use hyper::{
     header::{CONTENT_TYPE, USER_AGENT},
-    Request,
+    Body, Request,
 };
 use overwatch_rs::{services::state::NoState, DynError};
 use parking_lot::Mutex;
