@@ -138,22 +138,27 @@ impl AxumBackend {
     }
 
     fn add_data_route(&self, method: HttpMethod, path: &str, req_stream: Sender<HttpRequest>) {
-        let handler_fn = |Query(query): Query<HashMap<String, String>>, payload: Option<Bytes>| async move {
-            handle_req(req_stream, query, payload).await
+        let handler = match method {
+            HttpMethod::POST => post(
+                |Query(query): Query<HashMap<String, String>>, payload: Option<Bytes>| async move {
+                    handle_req(req_stream, query, payload).await
+                },
+            ),
+            HttpMethod::PUT => put(
+                |Query(query): Query<HashMap<String, String>>, payload: Option<Bytes>| async move {
+                    handle_req(req_stream, query, payload).await
+                },
+            ),
+            HttpMethod::PATCH => patch(
+                |Query(query): Query<HashMap<String, String>>, payload: Option<Bytes>| async move {
+                    handle_req(req_stream, query, payload).await
+                },
+            ),
+            _ => unimplemented!(),
         };
-
-        let handlers = {
-            let mut handlers = HashMap::new();
-            handlers.insert(HttpMethod::POST, post(handler_fn.clone()));
-            handlers.insert(HttpMethod::PUT, put(handler_fn.clone()));
-            handlers.insert(HttpMethod::PATCH, patch(handler_fn));
-            handlers
-        };
-
-        let handler = handlers.get(&method).unwrap_or_else(|| unimplemented!());
 
         let mut router = self.router.lock();
-        *router = router.clone().route(path, handler.clone())
+        *router = router.clone().route(path, handler)
     }
 }
 
