@@ -4,11 +4,13 @@ use std::{collections::HashMap, sync::Arc};
 // crates
 use async_graphql_axum::GraphQLRequest;
 use axum::{
+    body::Bytes,
     extract::Query,
     http::HeaderValue,
-    routing::{get, post},
+    routing::{get, patch, post, put},
     Router,
 };
+
 use hyper::{
     header::{CONTENT_TYPE, USER_AGENT},
     Request,
@@ -104,6 +106,9 @@ impl HttpBackend for AxumBackend {
         let path = format!("/{}/{}", service_id.to_lowercase(), route.path);
         match route.method {
             HttpMethod::GET => self.add_get_route(&path, req_stream),
+            HttpMethod::POST | HttpMethod::PUT | HttpMethod::PATCH => {
+                self.add_data_route(route.method, &path, req_stream)
+            }
             _ => todo!(),
         };
     }
@@ -137,32 +142,34 @@ impl AxumBackend {
         let mut router = self.router.lock();
         *router = router.clone().route(
             path,
-            // TODO: Extract the stream handling to `to_handler` or similar function.
             get(|Query(query): Query<HashMap<String, String>>| async move {
-                let (tx, mut rx) = tokio::sync::mpsc::channel(1);
-
-                // Write Self::Request type message to req_stream.
-                // TODO: handle result in a more elegant way.
-                // Currently, convert to Result<String, String>
-                match req_stream
-                    .send(HttpRequest {
-                        query,
-                        payload: None,
-                        res_tx: tx,
-                    })
-                    .await
-                {
-                    Ok(_) => {
-                        // Wait for a response, then pass or serialize it?
-                        match rx.recv().await {
-                            Some(res) => Ok(res),
-                            None => Ok("".into()),
-                        }
-                    }
-                    Err(e) => Err(AxnumBackendError::SendError(e).to_string()),
-                }
+                handle_req(req_stream, query, None).await
             }),
         )
+    }
+
+    fn add_data_route(&self, method: HttpMethod, path: &str, req_stream: Sender<HttpRequest>) {
+        let handler = match method {
+            HttpMethod::POST => post(
+                |Query(query): Query<HashMap<String, String>>, payload: Option<Bytes>| async move {
+                    handle_req(req_stream, query, payload).await
+                },
+            ),
+            HttpMethod::PUT => put(
+                |Query(query): Query<HashMap<String, String>>, payload: Option<Bytes>| async move {
+                    handle_req(req_stream, query, payload).await
+                },
+            ),
+            HttpMethod::PATCH => patch(
+                |Query(query): Query<HashMap<String, String>>, payload: Option<Bytes>| async move {
+                    handle_req(req_stream, query, payload).await
+                },
+            ),
+            _ => unimplemented!(),
+        };
+
+        let mut router = self.router.lock();
+        *router = router.clone().route(path, handler)
     }
 
     fn add_graphql_endpoint(&self, path: &str, req_stream: Sender<GraphqlRequest>) {
@@ -195,5 +202,33 @@ impl AxumBackend {
                 },
             ),
         )
+    }
+}
+
+async fn handle_req(
+    req_stream: Sender<HttpRequest>,
+    query: HashMap<String, String>,
+    payload: Option<Bytes>,
+) -> Result<String, String> {
+    let (tx, mut rx) = tokio::sync::mpsc::channel(1);
+    // Write Self::Request type message to req_stream.
+    // TODO: handle result in a more elegant way.
+    // Currently, convert to Result<String, String>
+    match req_stream
+        .send(HttpRequest {
+            query,
+            payload,
+            res_tx: tx,
+        })
+        .await
+    {
+        Ok(_) => {
+            // Wait for a response, then pass or serialize it?
+            match rx.recv().await {
+                Some(res) => Ok(serde_json::to_string(&res).unwrap()),
+                None => Ok("".into()),
+            }
+        }
+        Err(_e) => Err(AxnumBackendError::SendGraphqlError.to_string()),
     }
 }
