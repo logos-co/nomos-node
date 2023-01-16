@@ -1,4 +1,5 @@
 use std::error::Error;
+use std::str::from_utf8;
 use std::sync::Arc;
 
 use clap::Parser;
@@ -26,16 +27,23 @@ where
     B::Error: Error + Send + Sync + 'static,
 {
     Box::new(Box::pin(async move {
+        // TODO: Graphql supports http GET requests, should nomos support that?
         let (dummy, mut hello_res_rx) =
             build_http_bridge::<DummyGraphqlService, B, _>(handle, HttpMethod::POST, "")
                 .await
                 .unwrap();
 
-        tracing::info!("register handler");
-        while (hello_res_rx.recv().await).is_some() {
-            // TODO: Parsing Graphql request.
-            tracing::info!("got req");
-            let req = todo!();
+        while let Some(HttpRequest {
+            query: _,
+            payload,
+            res_tx,
+        }) = hello_res_rx.recv().await
+        {
+            // TODO: Move to the graphql frontend as a helper function?
+            let payload = payload.ok_or("empty payload")?;
+            let query_str = from_utf8(&payload)?;
+            let req = async_graphql::http::parse_query_string(query_str)?;
+
             let (sender, receiver) = oneshot::channel();
             dummy
                 .send(DummyGraphqlMsg {
@@ -44,8 +52,11 @@ where
                 })
                 .await
                 .unwrap();
+
             let res = receiver.await.unwrap();
-            //res_tx.send(res.into()).await.unwrap();
+            let res = serde_json::to_string(&res)?;
+
+            res_tx.send(res.into()).await.unwrap();
         }
         Ok(())
     }))
