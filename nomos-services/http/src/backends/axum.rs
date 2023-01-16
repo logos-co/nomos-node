@@ -1,19 +1,21 @@
 // std
-use std::{collections::HashMap, convert::Infallible, sync::Arc};
+use std::{collections::HashMap, sync::Arc};
 
 // crates
-use axum::{extract::Query, http::HeaderValue, routing::get, Router};
+use axum::{body::Body, extract::Query, http::HeaderValue, routing::get, Router};
 use hyper::{
     header::{CONTENT_TYPE, USER_AGENT},
-    service::make_service_fn,
+    Request,
 };
 use overwatch_rs::{services::state::NoState, DynError};
 use parking_lot::Mutex;
 use tokio::sync::mpsc::Sender;
+use tower::make::Shared;
 use tower_http::{
     cors::{Any, CorsLayer},
     trace::TraceLayer,
 };
+use tower_service::Service;
 
 // internal
 use super::HttpBackend;
@@ -98,13 +100,14 @@ impl HttpBackend for AxumBackend {
     }
 
     async fn run(&self) -> Result<(), overwatch_rs::DynError> {
-        let make_service = make_service_fn(|_| {
-            let router = self.router.lock().clone();
-            async move { Ok::<_, Infallible>(router) }
+        let router = self.router.clone();
+        let service = tower::service_fn(move |request: Request<Body>| {
+            let mut router = router.lock().clone();
+            async move { router.call(request).await }
         });
 
         axum::Server::bind(&self.config.address)
-            .serve(make_service)
+            .serve(Shared::new(service))
             .await?;
         Ok(())
     }
