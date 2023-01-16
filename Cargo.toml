@@ -9,3 +9,7 @@ members = [
     "nomos-services/mempool",
     "nomos-node"
 ]
+
+[patch.'https://github.com/logos-co/Overwatch']
+overwatch-rs = { git = "https://github.com/Zeegomo/Overwatch", branch = "relax-type-bounds" }
+overwatch-derive = { git = "https://github.com/Zeegomo/Overwatch", branch = "relax-type-bounds" }
