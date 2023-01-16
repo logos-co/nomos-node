@@ -1,7 +1,7 @@
 use nomos_core::block::{BlockHeader, BlockId};
 
 pub trait MemPool {
-    type Settings;
+    type Settings: Clone;
     type Tx;
     type Id;
 

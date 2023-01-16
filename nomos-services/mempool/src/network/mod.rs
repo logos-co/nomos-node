@@ -13,7 +13,7 @@ use overwatch_rs::services::ServiceData;
 
 #[async_trait::async_trait]
 pub trait NetworkAdapter {
-    type Backend: NetworkBackend + Send + Sync + 'static;
+    type Backend: NetworkBackend + 'static;
     type Tx: Send + Sync + 'static;
     async fn new(
         network_relay: OutboundRelay<<NetworkService<Self::Backend> as ServiceData>::Message>,
