@@ -542,7 +542,7 @@ impl<'de> Deserialize<'de> for Histogram {
         // TODO: this implementation is not correct because we cannot set samples for histogram,
         // need to wait prometheus support serde.
         SerializableHistogramOpts::deserialize(deserializer).map(
-            |SerializableHistogramOpts { val, opts }| {
+            |SerializableHistogramOpts { val: _, opts }| {
                 let x = prometheus::Histogram::with_opts(opts.clone()).unwrap();
                 Self { val: x, opts }
             },

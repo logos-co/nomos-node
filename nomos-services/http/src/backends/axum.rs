@@ -7,7 +7,7 @@ use axum::{
     extract::Query,
     http::HeaderValue,
     routing::{get, post},
-    Extension, Router,
+    Router,
 };
 use hyper::{
     header::{CONTENT_TYPE, USER_AGENT},
