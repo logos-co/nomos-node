@@ -3,9 +3,7 @@ use std::sync::Arc;
 
 use clap::Parser;
 use nomos_http::backends::HttpBackend;
-use nomos_http::bridge::{
-    build_graphql_bridge, build_http_bridge, HttpBridgeRunner, HttpBridgeService,
-};
+use nomos_http::bridge::{build_http_bridge, HttpBridgeRunner, HttpBridgeService};
 use nomos_http::{
     backends::axum::{AxumBackend, AxumBackendSettings},
     http::*,
@@ -29,11 +27,15 @@ where
 {
     Box::new(Box::pin(async move {
         let (dummy, mut hello_res_rx) =
-            build_graphql_bridge::<DummyGraphqlService, B, _>(handle, "graphql")
+            build_http_bridge::<DummyGraphqlService, B, _>(handle, HttpMethod::POST, "")
                 .await
                 .unwrap();
 
-        while let Some(GraphqlRequest { res_tx, req }) = hello_res_rx.recv().await {
+        tracing::info!("register handler");
+        while (hello_res_rx.recv().await).is_some() {
+            // TODO: Parsing Graphql request.
+            tracing::info!("got req");
+            let req = todo!();
             let (sender, receiver) = oneshot::channel();
             dummy
                 .send(DummyGraphqlMsg {
@@ -43,7 +45,7 @@ where
                 .await
                 .unwrap();
             let res = receiver.await.unwrap();
-            res_tx.send(res).await.unwrap();
+            //res_tx.send(res.into()).await.unwrap();
         }
         Ok(())
     }))
@@ -146,7 +148,6 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             router: nomos_http::bridge::HttpBridgeSettings {
                 runners: vec![Arc::new(Box::new(dummy_graphql_router::<AxumBackend>))],
             },
-            dummy: (),
             dummy_graphql: (),
         },
         None,

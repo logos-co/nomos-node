@@ -1,16 +1,20 @@
-use crate::backends::HttpBackend;
-use crate::http::{GraphqlRequest, HttpMethod, HttpMsg, HttpRequest, HttpService};
-use async_trait::async_trait;
-use overwatch_rs::services::handle::ServiceStateHandle;
-use overwatch_rs::services::relay::{NoMessage, OutboundRelay};
-use overwatch_rs::services::state::{NoOperator, NoState};
-use overwatch_rs::services::{ServiceCore, ServiceData, ServiceId};
-use overwatch_rs::DynError;
 use std::error::Error;
 use std::fmt::{Debug, Formatter};
 use std::future::Future;
 use std::sync::Arc;
+
+use async_trait::async_trait;
+use overwatch_rs::services::handle::ServiceStateHandle;
+use overwatch_rs::services::relay::{NoMessage, OutboundRelay};
+use overwatch_rs::services::{
+    state::{NoOperator, NoState},
+    ServiceCore, ServiceData, ServiceId,
+};
+use overwatch_rs::DynError;
 use tokio::sync::mpsc::{channel, Receiver};
+
+use crate::backends::HttpBackend;
+use crate::http::{HttpMethod, HttpMsg, HttpRequest, HttpService};
 
 pub type HttpBridgeRunner =
     Box<dyn Future<Output = Result<(), overwatch_rs::DynError>> + Send + Unpin + 'static>;
@@ -56,35 +60,6 @@ where
         .map_err(|(e, _)| e)?;
 
     Ok((service_relay, http_receiver))
-}
-
-pub async fn build_graphql_bridge<S, B, P>(
-    handle: overwatch_rs::overwatch::handle::OverwatchHandle,
-    path: P,
-) -> Result<(OutboundRelay<S::Message>, Receiver<GraphqlRequest>), overwatch_rs::DynError>
-where
-    S: ServiceCore + Send + Sync + 'static,
-    B: HttpBackend + Send + Sync + 'static,
-    B::Error: Error + Send + Sync + 'static,
-    P: Into<String> + Send + Sync + 'static,
-{
-    let http_relay = handle.clone().relay::<HttpService<B>>().connect().await?;
-
-    let service_relay = handle.clone().relay::<S>().connect().await?;
-
-    let (graphql_sender, graphql_receiver) = channel(1);
-
-    // Register on http service to receive GET requests.
-    http_relay
-        .send(HttpMsg::add_graphql_endpoint(
-            S::SERVICE_ID,
-            path,
-            graphql_sender,
-        ))
-        .await
-        .map_err(|(e, _)| e)?;
-
-    Ok((service_relay, graphql_receiver))
 }
 
 pub struct HttpBridgeService {

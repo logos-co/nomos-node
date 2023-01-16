@@ -10,7 +10,7 @@ required-features = ["http"]
 
 [[example]]
 name = "graphql"
-path = "examples/axum.rs"
+path = "examples/graphql.rs"
 required-features = ["http", "gql"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html

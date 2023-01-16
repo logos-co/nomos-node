@@ -2,7 +2,6 @@
 use std::{collections::HashMap, sync::Arc};
 
 // crates
-use async_graphql_axum::GraphQLRequest;
 use axum::{
     body::Bytes,
     extract::Query,
@@ -27,7 +26,7 @@ use tower_service::Service;
 
 // internal
 use super::HttpBackend;
-use crate::http::{GraphqlRequest, HttpMethod, HttpRequest, Route};
+use crate::http::{HttpMethod, HttpRequest, Route};
 
 /// Configuration for the Http Server
 #[derive(Debug, Clone, clap::Args, serde::Deserialize, serde::Serialize)]
@@ -113,16 +112,6 @@ impl HttpBackend for AxumBackend {
         };
     }
 
-    fn add_graphql_endpoint(
-        &self,
-        service_id: overwatch_rs::services::ServiceId,
-        path: String,
-        req_stream: Sender<GraphqlRequest>,
-    ) {
-        let path = format!("/{}/{}", service_id.to_lowercase(), path);
-        self.add_graphql_endpoint(&path, req_stream);
-    }
-
     async fn run(&self) -> Result<(), overwatch_rs::DynError> {
         let router = self.router.clone();
         let service = tower::service_fn(move |request: Request<Body>| {
@@ -170,38 +159,6 @@ impl AxumBackend {
 
         let mut router = self.router.lock();
         *router = router.clone().route(path, handler)
-    }
-
-    fn add_graphql_endpoint(&self, path: &str, req_stream: Sender<GraphqlRequest>) {
-        let mut router = self.router.lock();
-        *router = router.clone().route(
-            path,
-            // TODO: Extract the stream handling to `to_handler` or similar function.
-            post(
-                |Query(_query): Query<HashMap<String, String>>, req: GraphQLRequest| async move {
-                    let (tx, mut rx) = tokio::sync::mpsc::channel(1);
-                    // Write Self::Request type message to req_stream.
-                    // TODO: handle result in a more elegant way.
-                    // Currently, convert to Result<String, String>
-                    match req_stream
-                        .send(GraphqlRequest {
-                            res_tx: tx,
-                            req: req.into_inner(),
-                        })
-                        .await
-                    {
-                        Ok(_) => {
-                            // Wait for a response, then pass or serialize it?
-                            match rx.recv().await {
-                                Some(res) => Ok(serde_json::to_string(&res).unwrap()),
-                                None => Ok("".into()),
-                            }
-                        }
-                        Err(_e) => Err(AxnumBackendError::SendGraphqlError.to_string()),
-                    }
-                },
-            ),
-        )
     }
 }
 
