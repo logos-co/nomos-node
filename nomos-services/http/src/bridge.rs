@@ -46,7 +46,7 @@ where
 
     // Register on http service to receive GET requests.
     http_relay
-        .send(HttpMsg::<B::GraphqlQuery>::add_http_handler(
+        .send(HttpMsg::add_http_handler(
             method,
             S::SERVICE_ID,
             path,
@@ -61,13 +61,7 @@ where
 pub async fn build_graphql_bridge<S, B, P>(
     handle: overwatch_rs::overwatch::handle::OverwatchHandle,
     path: P,
-) -> Result<
-    (
-        OutboundRelay<S::Message>,
-        Receiver<GraphqlRequest<B::GraphqlQuery>>,
-    ),
-    overwatch_rs::DynError,
->
+) -> Result<(OutboundRelay<S::Message>, Receiver<GraphqlRequest>), overwatch_rs::DynError>
 where
     S: ServiceCore + Send + Sync + 'static,
     B: HttpBackend + Send + Sync + 'static,
@@ -82,7 +76,7 @@ where
 
     // Register on http service to receive GET requests.
     http_relay
-        .send(HttpMsg::<B::GraphqlQuery>::add_graphql_endpoint(
+        .send(HttpMsg::add_graphql_endpoint(
             S::SERVICE_ID,
             path,
             graphql_sender,

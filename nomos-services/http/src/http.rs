@@ -26,7 +26,7 @@ pub struct Config<B: HttpBackend> {
 
 pub struct HttpService<B: HttpBackend> {
     backend: B,
-    inbound_relay: InboundRelay<HttpMsg<<B as HttpBackend>::GraphqlQuery>>,
+    inbound_relay: InboundRelay<HttpMsg>,
 }
 
 impl<B: HttpBackend + 'static> ServiceData for HttpService<B> {
@@ -34,7 +34,7 @@ impl<B: HttpBackend + 'static> ServiceData for HttpService<B> {
     type Settings = Config<B>;
     type State = NoState<Self::Settings>;
     type StateOperator = NoOperator<Self::State>;
-    type Message = HttpMsg<B::GraphqlQuery>;
+    type Message = HttpMsg;
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -69,9 +69,7 @@ impl core::fmt::Debug for Route {
 //     fn new(query: Self::Query, mutation: Self::Mutation, subscription: Self::Subscription) -> GraphqlRequest<Self>;
 // }
 
-pub struct GraphqlRequest<Q: async_graphql::ObjectType + 'static + Default> {
-    pub schema:
-        async_graphql::Schema<Q, async_graphql::EmptyMutation, async_graphql::EmptySubscription>,
+pub struct GraphqlRequest {
     pub req: async_graphql::Request,
     pub res_tx: Sender<async_graphql::Response>,
 }
@@ -85,7 +83,7 @@ pub struct HttpRequest {
 
 // HttpMsg is a message that is sent via the relay to communicate with
 // the HttpService.
-pub enum HttpMsg<Q: Default + async_graphql::ObjectType + 'static> {
+pub enum HttpMsg {
     AddHandler {
         // TODO: If possible, this should be extracted from the
         // relay itself.
@@ -96,11 +94,11 @@ pub enum HttpMsg<Q: Default + async_graphql::ObjectType + 'static> {
     AddGraphqlEndpoint {
         service_id: ServiceId,
         path: String,
-        req_stream: Sender<GraphqlRequest<Q>>,
+        req_stream: Sender<GraphqlRequest>,
     },
 }
 
-impl<Q: async_graphql::ObjectType + Default + 'static> HttpMsg<Q> {
+impl HttpMsg {
     pub fn add_http_handler<P: Into<String>>(
         method: HttpMethod,
         service_id: ServiceId,
@@ -135,7 +133,7 @@ impl<Q: async_graphql::ObjectType + Default + 'static> HttpMsg<Q> {
     pub fn add_graphql_endpoint<P: Into<String>>(
         service_id: ServiceId,
         path: P,
-        req_stream: Sender<GraphqlRequest<Q>>,
+        req_stream: Sender<GraphqlRequest>,
     ) -> Self {
         Self::AddGraphqlEndpoint {
             service_id,
@@ -145,9 +143,9 @@ impl<Q: async_graphql::ObjectType + Default + 'static> HttpMsg<Q> {
     }
 }
 
-impl<Q: async_graphql::ObjectType + Default + 'static> RelayMessage for HttpMsg<Q> {}
+impl RelayMessage for HttpMsg {}
 
-impl<Q: async_graphql::ObjectType + Default + 'static> Debug for HttpMsg<Q> {
+impl Debug for HttpMsg {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Self::AddHandler {

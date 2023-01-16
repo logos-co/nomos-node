@@ -117,39 +117,44 @@ where
                 .await
                 .unwrap();
 
-        while let Some(GraphqlRequest { res_tx, .. }) = hello_res_rx.recv().await {
+        while let Some(GraphqlRequest { res_tx, req }) = hello_res_rx.recv().await {
             let (sender, receiver) = oneshot::channel();
             dummy
                 .send(DummyGraphqlMsg {
+                    req,
                     reply_channel: sender,
                 })
                 .await
                 .unwrap();
-            let value = receiver.await.unwrap();
-            res_tx
-                .send(async_graphql::Response::new(
-                    async_graphql::InputType::to_value(&DummyGraphql { val: value }),
-                ))
-                .await
-                .unwrap();
+            let res = receiver.await.unwrap();
+            res_tx.send(res).await.unwrap();
         }
         Ok(())
     }))
 }
 
-#[derive(Debug, Clone, Default, async_graphql::SimpleObject, async_graphql::InputObject)]
+#[derive(Debug, Clone, Default)]
 pub struct DummyGraphql {
-    val: i32,
+    val: Arc<Mutex<i32>>,
+}
+
+#[async_graphql::Object]
+impl DummyGraphql {
+    async fn val(&self) -> i32 {
+        let mut val = self.val.lock();
+        *val += 1;
+        *val
+    }
 }
 
 pub struct DummyGraphqlService {
-    counter: Arc<Mutex<i32>>,
     service_state: ServiceStateHandle<Self>,
 }
 
 #[derive(Debug)]
 pub struct DummyGraphqlMsg {
-    reply_channel: oneshot::Sender<i32>,
+    req: async_graphql::Request,
+    reply_channel: oneshot::Sender<async_graphql::Response>,
 }
 
 impl RelayMessage for DummyGraphqlMsg {}
@@ -165,23 +170,35 @@ impl ServiceData for DummyGraphqlService {
 #[async_trait::async_trait]
 impl ServiceCore for DummyGraphqlService {
     fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, overwatch_rs::DynError> {
-        Ok(Self {
-            counter: Default::default(),
-            service_state,
-        })
+        Ok(Self { service_state })
     }
 
     async fn run(self) -> Result<(), overwatch_rs::DynError> {
         let Self {
-            counter,
             service_state: ServiceStateHandle {
                 mut inbound_relay, ..
             },
         } = self;
 
+        static SCHEMA: once_cell::sync::Lazy<
+            async_graphql::Schema<
+                DummyGraphql,
+                async_graphql::EmptyMutation,
+                async_graphql::EmptySubscription,
+            >,
+        > = once_cell::sync::Lazy::new(|| {
+            async_graphql::Schema::build(
+                DummyGraphql::default(),
+                async_graphql::EmptyMutation,
+                async_graphql::EmptySubscription,
+            )
+            .finish()
+        });
+
         // Handle the http request to dummy service.
         while let Some(msg) = inbound_relay.recv().await {
-            handle_hello(counter.clone(), msg.reply_channel).await;
+            let res = SCHEMA.execute(msg.req).await;
+            msg.reply_channel.send(res).unwrap();
         }
 
         Ok(())
@@ -190,7 +207,7 @@ impl ServiceCore for DummyGraphqlService {
 
 #[derive(overwatch_derive::Services)]
 struct Services {
-    http: ServiceHandle<HttpService<AxumBackend<DummyGraphql>>>,
+    http: ServiceHandle<HttpService<AxumBackend>>,
     router: ServiceHandle<HttpBridgeService>,
     dummy: ServiceHandle<DummyService>,
     dummy_graphql: ServiceHandle<DummyGraphqlService>,
@@ -213,8 +230,8 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             },
             router: nomos_http::bridge::HttpBridgeSettings {
                 runners: vec![
-                    Arc::new(Box::new(dummy_router::<AxumBackend<DummyGraphql>>)),
-                    Arc::new(Box::new(dummy_graphql_router::<AxumBackend<DummyGraphql>>)),
+                    Arc::new(Box::new(dummy_router::<AxumBackend>)),
+                    Arc::new(Box::new(dummy_graphql_router::<AxumBackend>)),
                 ],
             },
             dummy: (),

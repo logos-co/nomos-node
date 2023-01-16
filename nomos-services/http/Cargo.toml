@@ -37,6 +37,7 @@ tower-service = "0.3.2"
 
 [dev-dependencies]
 metrics = { path = "../metrics", features = ["gql"] }
+once_cell = "1.17"
 
 [features]
 default = []

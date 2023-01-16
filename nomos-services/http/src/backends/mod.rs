@@ -17,7 +17,7 @@ pub trait HttpBackend {
     type Config: Clone + Debug + Send + Sync + 'static;
     type State: ServiceState<Settings = Self::Config> + Clone;
     type Error: std::fmt::Display;
-    type GraphqlQuery: Default + async_graphql::ObjectType + 'static;
+    // type GraphqlQuery: Default + async_graphql::ObjectType + 'static;
     // TODO: add below
     // type GraphqlConfig: Clone + Debug + Send + Sync + 'static;
 
@@ -32,7 +32,7 @@ pub trait HttpBackend {
         &self,
         service_id: ServiceId,
         path: String,
-        req_stream: Sender<GraphqlRequest<Self::GraphqlQuery>>,
+        req_stream: Sender<GraphqlRequest>,
     );
 
     async fn run(&self) -> Result<(), overwatch_rs::DynError>;
