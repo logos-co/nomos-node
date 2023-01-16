@@ -55,13 +55,13 @@ impl<Fountain: FountainCode> Clone for CarnotSettings<Fountain> {
 
 pub struct CarnotConsensus<A, P, M, F>
 where
-    F: FountainCode + Send + Sync + 'static,
-    A: NetworkAdapter + Send + Sync + 'static,
-    P: MemPool + Send + Sync + 'static,
-    P::Settings: Clone + Send + Sync + 'static,
-    P::Tx: Debug + Send + Sync + 'static,
-    P::Id: Debug + Send + Sync + 'static,
-    M: MempoolAdapter<Tx = P::Tx> + Send + Sync + 'static,
+    F: FountainCode,
+    A: NetworkAdapter,
+    M: MempoolAdapter<Tx = P::Tx>,
+    P: MemPool,
+    P::Tx: Debug + 'static,
+    P::Id: Debug + 'static,
+    A::Backend: 'static,
 {
     service_state: ServiceStateHandle<Self>,
     // underlying networking backend. We need this so we can relay and check the types properly
@@ -73,13 +73,12 @@ where
 
 impl<A, P, M, F> ServiceData for CarnotConsensus<A, P, M, F>
 where
-    F: FountainCode + Send + Sync + 'static,
-    A: NetworkAdapter + Send + Sync + 'static,
-    P: MemPool + Send + Sync + 'static,
-    P::Settings: Clone + Send + Sync + 'static,
-    P::Tx: Debug + Send + Sync + 'static,
-    P::Id: Debug + Send + Sync + 'static,
-    M: MempoolAdapter<Tx = P::Tx> + Send + Sync + 'static,
+    F: FountainCode,
+    A: NetworkAdapter,
+    P: MemPool,
+    P::Tx: Debug,
+    P::Id: Debug,
+    M: MempoolAdapter<Tx = P::Tx>,
 {
     const SERVICE_ID: ServiceId = "Carnot";
     type Settings = CarnotSettings<F>;
@@ -94,7 +93,7 @@ where
     F: FountainCode + Send + Sync + 'static,
     A: NetworkAdapter + Send + Sync + 'static,
     P: MemPool + Send + Sync + 'static,
-    P::Settings: Clone + Send + Sync + 'static,
+    P::Settings: Send + Sync + 'static,
     P::Tx: Debug + Send + Sync + 'static,
     P::Id: Debug + Send + Sync + 'static,
     M: MempoolAdapter<Tx = P::Tx> + Send + Sync + 'static,

@@ -20,13 +20,13 @@ use overwatch_rs::services::{
     ServiceCore, ServiceData, ServiceId,
 };
 
-pub struct MempoolService<
-    N: NetworkAdapter<Tx = P::Tx> + Send + Sync + 'static,
-    P: MemPool + Send + Sync + 'static,
-> where
-    P::Settings: Clone + Send + Sync + 'static,
-    P::Tx: Debug + Send + Sync + 'static,
-    P::Id: Debug + Send + Sync + 'static,
+pub struct MempoolService<N, P>
+where
+    N: NetworkAdapter<Tx = P::Tx>,
+    P: MemPool,
+    P::Settings: Clone,
+    P::Tx: Debug + 'static,
+    P::Id: Debug + 'static,
 {
     service_state: ServiceStateHandle<Self>,
     network_relay: Relay<NetworkService<N::Backend>>,
@@ -77,11 +77,11 @@ impl<Tx: 'static, Id: 'static> RelayMessage for MempoolMsg<Tx, Id> {}
 
 impl<N, P> ServiceData for MempoolService<N, P>
 where
-    N: NetworkAdapter<Tx = P::Tx> + Send + Sync + 'static,
-    P: MemPool + Send + Sync + 'static,
-    P::Settings: Clone + Send + Sync + 'static,
-    P::Id: Debug + Send + Sync + 'static,
-    P::Tx: Debug + Send + Sync + 'static,
+    N: NetworkAdapter<Tx = P::Tx>,
+    P: MemPool,
+    P::Settings: Clone,
+    P::Tx: Debug + 'static,
+    P::Id: Debug + 'static,
 {
     const SERVICE_ID: ServiceId = "Mempool";
     type Settings = P::Settings;
@@ -93,10 +93,10 @@ where
 #[async_trait::async_trait]
 impl<N, P> ServiceCore for MempoolService<N, P>
 where
-    P: MemPool + Send + Sync + 'static,
+    P: MemPool + Send + 'static,
     P::Settings: Clone + Send + Sync + 'static,
-    P::Id: Debug + Send + Sync + 'static,
-    P::Tx: Debug + Send + Sync + 'static,
+    P::Id: Debug + Send + 'static,
+    P::Tx: Debug + Send + 'static,
     N: NetworkAdapter<Tx = P::Tx> + Send + Sync + 'static,
 {
     fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, overwatch_rs::DynError> {
