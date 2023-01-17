@@ -6,7 +6,7 @@ use std::{
 use clap::Parser;
 use metrics::{
     frontend::graphql::{Graphql, GraphqlServerSettings},
-    GraphqlData, MetricsBackend, MetricsMessage, MetricsService, OwnedServiceId,
+    MetricsBackend, MetricsMessage, MetricsService, OwnedServiceId,
 };
 use overwatch_rs::{
     overwatch::OverwatchRunner,
@@ -126,22 +126,6 @@ impl std::fmt::Display for ParseMetricsDataError {
 }
 
 impl std::error::Error for ParseMetricsDataError {}
-
-impl GraphqlData for MetricsData {
-    type Error = ParseMetricsDataError;
-
-    fn try_from_bytes(src: &[u8]) -> Result<Self, Self::Error> {
-        src.try_into()
-            .map(|v| Self {
-                duration: u64::from_be_bytes(v),
-            })
-            .map_err(ParseMetricsDataError::TryFromSliceError)
-    }
-
-    fn try_into_bytes(self) -> Result<bytes::Bytes, Self::Error> {
-        Ok(self.duration.to_be_bytes().to_vec().into())
-    }
-}
 
 fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let settings = Args::parse();

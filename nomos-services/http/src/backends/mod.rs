@@ -4,13 +4,9 @@ pub mod axum;
 use std::fmt::Debug;
 
 use overwatch_rs::services::{state::ServiceState, ServiceId};
-use serde::{de::DeserializeOwned, Serialize};
 use tokio::sync::mpsc::Sender;
 
 use crate::http::{HttpRequest, Route};
-
-pub type Payload = Box<dyn DeserializeOwned>;
-pub type Response = Box<dyn Serialize>;
 
 #[async_trait::async_trait]
 pub trait HttpBackend {
