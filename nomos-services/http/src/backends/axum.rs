@@ -103,6 +103,7 @@ impl HttpBackend for AxumBackend {
         req_stream: Sender<HttpRequest>,
     ) {
         let path = format!("/{}/{}", service_id.to_lowercase(), route.path);
+        tracing::info!("Axum backend: adding route {}", path);
         match route.method {
             HttpMethod::GET => self.add_get_route(&path, req_stream),
             HttpMethod::POST | HttpMethod::PUT | HttpMethod::PATCH => {

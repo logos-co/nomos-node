@@ -61,19 +61,6 @@ impl core::fmt::Debug for Route {
     }
 }
 
-// pub trait GraphqlSchema: Sized + Send + Sync + 'static {
-//     type Query: async_graphql::ObjectType + 'static;
-//     type Mutation: async_graphql::ObjectType + 'static;
-//     type Subscription: async_graphql::SubscriptionType + 'static;
-
-//     fn new(query: Self::Query, mutation: Self::Mutation, subscription: Self::Subscription) -> GraphqlRequest<Self>;
-// }
-
-// pub struct GraphqlRequest {
-//     pub req: async_graphql::Request,
-//     pub res_tx: Sender<async_graphql::Response>,
-// }
-
 #[derive(Debug, Clone)]
 pub struct HttpRequest {
     pub query: HashMap<String, String>,
@@ -91,11 +78,6 @@ pub enum HttpMsg {
         route: Route,
         req_stream: Sender<HttpRequest>,
     },
-    //    AddGraphqlEndpoint {
-    //        service_id: ServiceId,
-    //        path: String,
-    //        req_stream: Sender<GraphqlRequest>,
-    //    },
 }
 
 impl HttpMsg {
@@ -129,18 +111,6 @@ impl HttpMsg {
             req_stream,
         }
     }
-
-    //    pub fn add_graphql_endpoint<P: Into<String>>(
-    //        service_id: ServiceId,
-    //        path: P,
-    //        req_stream: Sender<GraphqlRequest>,
-    //    ) -> Self {
-    //        Self::AddGraphqlEndpoint {
-    //            service_id,
-    //            path: path.into(),
-    //            req_stream,
-    //        }
-    //    }
 }
 
 impl RelayMessage for HttpMsg {}
@@ -157,15 +127,6 @@ impl Debug for HttpMsg {
                 "HttpMsg::AddHandler {{ sender: {:?}, route: {:?} }}",
                 service_id, route
             ),
-            //             Self::AddGraphqlEndpoint {
-            //                 service_id,
-            //                 path,
-            //                 req_stream: _,
-            //             } => write!(
-            //                 fmt,
-            //                 "HttpMsg::AddGraphqlEndpoint {{ sender: {:?}, path: {:?} }}",
-            //                 service_id, path
-            //             ),
         }
     }
 }
@@ -199,28 +160,21 @@ where
             async move {
                 loop {
                     tokio::select! {
-                                            Some(msg) = inbound_relay.recv() => {
-                                                match msg {
-                                                    HttpMsg::AddHandler {
-                                                        service_id,
-                                                        route,
-                                                        req_stream,
-                                                    } => {
-                                                        backend.add_route(service_id, route, req_stream);
-                                                    },
-                    //                                HttpMsg::AddGraphqlEndpoint {
-                    //                                    service_id,
-                    //                                    path,
-                    //                                    req_stream,
-                    //                                } => {
-                    //                                    backend.add_graphql_endpoint(service_id, path, req_stream);
-                    //                                }
-                                                }
-                                            }
-                                            _server_exit = &mut stop_rx => {
-                                                break;
-                                            }
-                                        }
+                        Some(msg) = inbound_relay.recv() => {
+                            match msg {
+                                HttpMsg::AddHandler {
+                                    service_id,
+                                    route,
+                                    req_stream,
+                                } => {
+                                    backend.add_route(service_id, route, req_stream);
+                                },
+                            }
+                        }
+                        _server_exit = &mut stop_rx => {
+                            break;
+                        }
+                    }
                 }
             }
         });
