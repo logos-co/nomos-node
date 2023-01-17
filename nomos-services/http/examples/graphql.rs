@@ -1,7 +1,7 @@
 use std::error::Error;
-use std::str::from_utf8;
 use std::sync::Arc;
 
+use bytes::Bytes;
 use clap::Parser;
 use nomos_http::backends::HttpBackend;
 use nomos_http::bridge::{build_http_bridge, HttpBridgeRunner, HttpBridgeService};
@@ -9,7 +9,7 @@ use nomos_http::{
     backends::axum::{AxumBackend, AxumBackendSettings},
     http::*,
 };
-use overwatch_rs::services::relay::RelayMessage;
+use overwatch_rs::services::relay::{OutboundRelay, RelayMessage};
 use overwatch_rs::services::{
     handle::ServiceStateHandle,
     state::{NoOperator, NoState},
@@ -39,27 +39,42 @@ where
             res_tx,
         }) = hello_res_rx.recv().await
         {
-            // TODO: Move to the graphql frontend as a helper function?
-            let payload = payload.ok_or("empty payload")?;
-            let query_str = from_utf8(&payload)?;
-            let req = async_graphql::http::parse_query_string(query_str)?;
-
-            let (sender, receiver) = oneshot::channel();
-            dummy
-                .send(DummyGraphqlMsg {
-                    req,
-                    reply_channel: sender,
-                })
-                .await
-                .unwrap();
-
-            let res = receiver.await.unwrap();
-            let res = serde_json::to_string(&res)?;
+            let res = match handle_graphql_req(payload, dummy.clone()).await {
+                Ok(r) => r,
+                Err(err) => {
+                    tracing::error!(err);
+                    err.to_string()
+                }
+            };
 
             res_tx.send(res.into()).await.unwrap();
         }
         Ok(())
     }))
+}
+
+async fn handle_graphql_req(
+    payload: Option<Bytes>,
+    dummy: OutboundRelay<DummyGraphqlMsg>,
+) -> Result<String, overwatch_rs::DynError> {
+    // TODO: Move to the graphql frontend as a helper function?
+    let payload = payload.ok_or("empty payload")?;
+    let req = async_graphql::http::receive_batch_json(&payload[..])
+        .await?
+        .into_single()?;
+
+    let (sender, receiver) = oneshot::channel();
+    dummy
+        .send(DummyGraphqlMsg {
+            req,
+            reply_channel: sender,
+        })
+        .await
+        .unwrap();
+
+    let res = receiver.await.unwrap();
+    let res = serde_json::to_string(&res)?;
+    Ok(res)
 }
 
 #[derive(Debug, Clone, Default)]
