@@ -167,7 +167,7 @@ async fn handle_req(
     req_stream: Sender<HttpRequest>,
     query: HashMap<String, String>,
     payload: Option<Bytes>,
-) -> Result<String, String> {
+) -> Result<Bytes, String> {
     let (tx, mut rx) = tokio::sync::mpsc::channel(1);
     // Write Self::Request type message to req_stream.
     // TODO: handle result in a more elegant way.
@@ -182,10 +182,8 @@ async fn handle_req(
     {
         Ok(_) => {
             // Wait for a response, then pass or serialize it?
-            match rx.recv().await {
-                Some(res) => Ok(serde_json::to_string(&res).unwrap()),
-                None => Ok("".into()),
-            }
+            let res = rx.recv().await.ok_or("".into());
+            res
         }
         Err(_e) => Err(AxnumBackendError::SendGraphqlError.to_string()),
     }
