@@ -101,13 +101,7 @@ impl HttpBackend for AxumBackend {
     ) {
         let path = format!("/{}/{}", service_id.to_lowercase(), route.path);
         tracing::info!("Axum backend: adding route {}", path);
-        match route.method {
-            HttpMethod::GET => self.add_get_route(&path, req_stream),
-            HttpMethod::POST | HttpMethod::PUT | HttpMethod::PATCH => {
-                self.add_data_route(route.method, &path, req_stream)
-            }
-            _ => todo!(),
-        };
+        self.add_data_route(route.method, &path, req_stream);
     }
 
     async fn run(&self) -> Result<(), overwatch_rs::DynError> {
@@ -125,18 +119,11 @@ impl HttpBackend for AxumBackend {
 }
 
 impl AxumBackend {
-    fn add_get_route(&self, path: &str, req_stream: Sender<HttpRequest>) {
-        let mut router = self.router.lock();
-        *router = router.clone().route(
-            path,
-            get(|Query(query): Query<HashMap<String, String>>| async move {
-                handle_req(req_stream, query, None).await
-            }),
-        )
-    }
-
     fn add_data_route(&self, method: HttpMethod, path: &str, req_stream: Sender<HttpRequest>) {
         let handler = match method {
+            HttpMethod::GET => get(|Query(query): Query<HashMap<String, String>>| async move {
+                handle_req(req_stream, query, None).await
+            }),
             HttpMethod::POST => post(
                 |Query(query): Query<HashMap<String, String>>, payload: Option<Bytes>| async move {
                     handle_req(req_stream, query, payload).await
@@ -168,7 +155,7 @@ async fn handle_req(
     let (tx, mut rx) = tokio::sync::mpsc::channel(1);
     // Write Self::Request type message to req_stream.
     // TODO: handle result in a more elegant way.
-    // Currently, convert to Result<String, String>
+    // Currently, convert to Result<Bytes, String>
     match req_stream
         .send(HttpRequest {
             query,
