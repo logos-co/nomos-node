@@ -47,7 +47,7 @@ pub struct AxumBackendSettings {
 }
 
 #[derive(Debug, thiserror::Error)]
-pub enum AxnumBackendError {
+pub enum AxumBackendError {
     #[error("axum backend: send error: {0}")]
     SendError(#[from] tokio::sync::mpsc::error::SendError<HttpRequest>),
 
@@ -68,7 +68,7 @@ pub struct AxumBackend {
 impl HttpBackend for AxumBackend {
     type Config = AxumBackendSettings;
     type State = NoState<AxumBackendSettings>;
-    type Error = AxnumBackendError;
+    type Error = AxumBackendError;
 
     fn new(config: Self::Config) -> Result<Self, Self::Error>
     where

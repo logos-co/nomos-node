@@ -11,20 +11,9 @@ use overwatch_rs::services::{
     ServiceCore, ServiceData, ServiceId,
 };
 
-pub trait GraphqlData: Sized {
-    type Error: std::error::Error + Send + Sync + 'static;
-
-    fn try_from_bytes(src: &[u8]) -> Result<Self, Self::Error>;
-
-    fn try_into_bytes(self) -> Result<bytes::Bytes, Self::Error>;
-}
-
 #[async_trait::async_trait]
 pub trait MetricsBackend {
-    #[cfg(not(feature = "gql"))]
     type MetricsData: Clone + Send + Sync + Debug + 'static;
-    #[cfg(feature = "gql")]
-    type MetricsData: GraphqlData + Clone + Send + Sync + Debug + 'static;
     type Error: Send + Sync;
     type Settings: Clone + Send + Sync + 'static;
     fn init(config: Self::Settings) -> Self;
