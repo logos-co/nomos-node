@@ -76,7 +76,7 @@ pub fn deserializer(data: &[u8]) -> Deserializer<'_> {
     }
 }
 
-/// Return a serializer for wire format
+/// Return a serializer for wire format.
 ///
 /// We only operator on in-memory slices as to abstract
 /// any underlying protocol. See https://sans-io.readthedocs.io/how-to-sans-io.html
@@ -86,11 +86,12 @@ pub fn serializer(buffer: &mut Vec<u8>) -> Serializer<&'_ mut Vec<u8>> {
     }
 }
 
-/// Return a serializer for wire format
+/// Return a serializer for wire format that overwrites (but now grow) the provided
+/// buffer.
 ///
 /// We only operator on in-memory slices as to abstract
 /// any underlying protocol. See https://sans-io.readthedocs.io/how-to-sans-io.html
-pub fn serializer_into_slice(buffer: &mut [u8]) -> Serializer<&'_ mut [u8]> {
+pub fn serializer_into_buffer(buffer: &mut [u8]) -> Serializer<&'_ mut [u8]> {
     Serializer {
         inner: bincode::Serializer::new(buffer, *OPTIONS),
     }
@@ -121,7 +122,7 @@ mod tests {
     fn ser_de_slice() {
         let tmp = String::from("much wow, very cool");
         let mut buf = vec![0; 1024];
-        let _ = serializer_into_slice(&mut buf)
+        let _ = serializer_into_buffer(&mut buf)
             .serialize_into(&tmp)
             .unwrap();
         let deserialized = deserializer(&buf).deserialize::<String>().unwrap();

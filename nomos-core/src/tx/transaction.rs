@@ -1,7 +1,5 @@
 use crate::account::AccountId;
 use crate::crypto::Signature;
-use crate::wire::{self, deserializer};
-use thiserror::Error;
 
 /// Verified transactions
 ///
@@ -19,28 +17,55 @@ pub struct Transaction {
     _signature: Signature,
 }
 
-#[derive(Error, Debug)]
-pub enum TransactionError {
-    #[error(transparent)]
-    InvalidStructure(#[from] wire::Error),
-    #[error("Invalid Signature")]
-    InvalidSignature,
-}
+mod serde {
+    use super::*;
+    use ::serde::{Deserialize, Deserializer, Serialize, Serializer};
+    // We have this additional definition so that we can automatically derive
+    // Serialize/Deserialize for the type while still being able to check
+    // the signature while deserializing.
+    // This would also allow to control ser/de independently from the Rust
+    // representation.
+    #[derive(Serialize, Deserialize)]
+    struct WireTransaction {
+        from: AccountId,
+        to: AccountId,
+        value: u64,
+        signature: Signature,
+    }
 
-impl Transaction {
-    pub fn validate(data: &[u8]) -> Result<Transaction, TransactionError> {
-        let mut deserializer = deserializer(data);
-        let from = deserializer.deserialize::<AccountId>()?;
-        let to = deserializer.deserialize::<AccountId>()?;
-        let value = deserializer.deserialize::<u64>()?;
-        let signature = deserializer.deserialize::<Signature>()?;
+    impl<'de> Deserialize<'de> for Transaction {
+        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: Deserializer<'de>,
+        {
+            let WireTransaction {
+                from,
+                to,
+                value,
+                signature,
+            } = WireTransaction::deserialize(deserializer)?;
+            //TODO: check signature
+            Ok(Transaction {
+                from,
+                to,
+                value,
+                _signature: signature,
+            })
+        }
+    }
 
-        // TODO: validate signature
-        Ok(Transaction {
-            from,
-            to,
-            value,
-            _signature: signature,
-        })
+    impl Serialize for Transaction {
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+        {
+            WireTransaction {
+                from: self.from.clone(),
+                to: self.to.clone(),
+                value: self.value,
+                signature: self._signature,
+            }
+            .serialize(serializer)
+        }
     }
 }
