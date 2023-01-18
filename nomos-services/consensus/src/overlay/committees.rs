@@ -95,12 +95,8 @@ impl<'view, const C: usize> Member<'view, C> {
 }
 
 #[async_trait::async_trait]
-impl<
-        'view,
-        Network: NetworkAdapter + Send + Sync,
-        Fountain: FountainCode + Send + Sync,
-        const C: usize,
-    > Overlay<'view, Network, Fountain> for Member<'view, C>
+impl<'view, Network: NetworkAdapter + Sync, Fountain: FountainCode + Sync, const C: usize>
+    Overlay<'view, Network, Fountain> for Member<'view, C>
 {
     fn new(view: &'view View, node: NodeId) -> Self {
         let committees = Committees::new(view);
