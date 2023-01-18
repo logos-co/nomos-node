@@ -12,7 +12,7 @@ pub struct Block;
 pub struct BlockHeader;
 
 /// Identifier of a block
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Ord, PartialOrd, Eq, PartialEq, Hash)]
 pub struct BlockId;
 
 impl Block {
@@ -23,5 +23,11 @@ impl Block {
 
     pub fn from_bytes(_: Bytes) -> Self {
         Self
+    }
+}
+
+impl BlockHeader {
+    pub fn id(&self) -> BlockId {
+        BlockId
     }
 }
