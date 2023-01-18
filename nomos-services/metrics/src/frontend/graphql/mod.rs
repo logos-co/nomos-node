@@ -1,9 +1,6 @@
 // std
 
 // crates
-use async_graphql::{EmptyMutation, EmptySubscription, Schema};
-use async_graphql_axum::{GraphQLRequest, GraphQLResponse};
-use axum::extract::State;
 use nomos_http::backends::HttpBackend;
 use nomos_http::bridge::{build_http_bridge, HttpBridgeRunner};
 use nomos_http::http::{handle_graphql_req, HttpMethod, HttpRequest};
@@ -80,18 +77,6 @@ where
         }
         Ok(())
     }))
-}
-
-pub async fn graphql_handler<Backend: MetricsBackend + Clone + Send + 'static + Sync>(
-    schema: State<Schema<Graphql<Backend>, EmptyMutation, EmptySubscription>>,
-    req: GraphQLRequest,
-) -> GraphQLResponse
-where
-    Backend::MetricsData: async_graphql::OutputType,
-{
-    let request = req.into_inner();
-    let resp = schema.execute(request).await;
-    GraphQLResponse::from(resp)
 }
 
 #[derive(Debug)]
