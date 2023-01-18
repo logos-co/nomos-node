@@ -97,21 +97,6 @@ impl HttpMsg {
             req_stream,
         }
     }
-
-    pub fn add_post_handler<P: Into<String>>(
-        service_id: ServiceId,
-        path: P,
-        req_stream: Sender<HttpRequest>,
-    ) -> Self {
-        Self::AddHandler {
-            service_id,
-            route: Route {
-                method: HttpMethod::POST,
-                path: path.into(),
-            },
-            req_stream,
-        }
-    }
 }
 
 impl RelayMessage for HttpMsg {}
