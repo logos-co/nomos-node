@@ -38,7 +38,7 @@ where
 
 impl<Id, Tx> MemPool for MockPool<Id, Tx>
 where
-    Id: From<Tx> + PartialOrd + Ord + Eq + Hash + Send + Clone,
+    Id: From<Tx> + PartialOrd + Ord + Eq + Hash + Clone,
     Tx: Clone + Send + Sync + 'static + Hash,
 {
     type Settings = ();
