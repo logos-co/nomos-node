@@ -3,26 +3,15 @@
 // crates
 use async_graphql::{EmptyMutation, EmptySubscription, Schema};
 use async_graphql_axum::{GraphQLRequest, GraphQLResponse};
-use axum::{
-    extract::State,
-    http::{
-        header::{CONTENT_TYPE, USER_AGENT},
-        HeaderValue,
-    },
-    routing::post,
-    Router, Server,
-};
-use tower_http::{
-    cors::{Any, CorsLayer},
-    trace::TraceLayer,
-};
-
+use axum::extract::State;
+use nomos_http::backends::HttpBackend;
+use nomos_http::bridge::{build_http_bridge, HttpBridgeRunner};
+use nomos_http::http::{handle_graphql_req, HttpMethod, HttpRequest};
 // internal
 use crate::{MetricsBackend, MetricsMessage, MetricsService, OwnedServiceId};
-use overwatch_rs::services::relay::Relay;
+use overwatch_rs::services::relay::{Relay, RelayMessage};
 use overwatch_rs::services::{
     handle::ServiceStateHandle,
-    relay::NoMessage,
     state::{NoOperator, NoState},
     ServiceCore, ServiceData, ServiceId,
 };
@@ -31,9 +20,6 @@ use overwatch_rs::services::{
 #[derive(Debug, Clone, clap::Args, serde::Deserialize, serde::Serialize)]
 #[cfg(feature = "gql")]
 pub struct GraphqlServerSettings {
-    /// Socket where the GraphQL will be listening on for incoming requests.
-    #[arg(short, long = "graphql-addr", default_value_t = std::net::SocketAddr::new(std::net::IpAddr::V4(std::net::Ipv4Addr::new(127, 0, 0, 1)), 8080), env = "METRICS_GRAPHQL_BIND_ADDRESS")]
-    pub address: std::net::SocketAddr,
     /// Max query depth allowed
     #[arg(
         long = "graphql-max-depth",
@@ -53,7 +39,50 @@ pub struct GraphqlServerSettings {
     pub cors_origins: Vec<String>,
 }
 
-pub async fn graphql_handler<Backend: MetricsBackend + Send + 'static + Sync>(
+pub fn metrics_graphql_router<MB, B>(
+    handle: overwatch_rs::overwatch::handle::OverwatchHandle,
+) -> HttpBridgeRunner
+where
+    MB: MetricsBackend + Clone + Send + 'static + Sync,
+    MB::MetricsData: async_graphql::OutputType,
+    B: HttpBackend + Send + Sync + 'static,
+    B::Error: std::error::Error + Send + Sync + 'static,
+{
+    Box::new(Box::pin(async move {
+        // TODO: Graphql supports http GET requests, should nomos support that?
+        let (relay, mut res_rx) =
+            build_http_bridge::<Graphql<MB>, B, _>(handle, HttpMethod::POST, "")
+                .await
+                .unwrap();
+
+        while let Some(HttpRequest {
+            query: _,
+            payload,
+            res_tx,
+        }) = res_rx.recv().await
+        {
+            let res = match handle_graphql_req(payload, relay.clone(), |req, tx| {
+                Ok(GraphqlMetricsMessage {
+                    req,
+                    reply_channel: tx,
+                })
+            })
+            .await
+            {
+                Ok(r) => r,
+                Err(err) => {
+                    tracing::error!(err);
+                    err.to_string()
+                }
+            };
+
+            res_tx.send(res.into()).await.unwrap();
+        }
+        Ok(())
+    }))
+}
+
+pub async fn graphql_handler<Backend: MetricsBackend + Clone + Send + 'static + Sync>(
     schema: State<Schema<Graphql<Backend>, EmptyMutation, EmptySubscription>>,
     req: GraphQLRequest,
 ) -> GraphQLResponse
@@ -65,13 +94,29 @@ where
     GraphQLResponse::from(resp)
 }
 
-#[derive(Clone)]
-pub struct Graphql<Backend: MetricsBackend + Send + Sync + 'static> {
+#[derive(Debug)]
+pub struct GraphqlMetricsMessage {
+    req: async_graphql::Request,
+    reply_channel: tokio::sync::oneshot::Sender<async_graphql::Response>,
+}
+
+impl RelayMessage for GraphqlMetricsMessage {}
+
+pub struct Graphql<Backend>
+where
+    Backend: MetricsBackend + Send + Sync + 'static,
+    Backend::MetricsData: async_graphql::OutputType,
+{
+    service_state: Option<ServiceStateHandle<Self>>,
     settings: GraphqlServerSettings,
     backend_channel: Relay<MetricsService<Backend>>,
 }
 
-impl<Backend: MetricsBackend + Send + Sync + 'static> ServiceData for Graphql<Backend> {
+impl<Backend> ServiceData for Graphql<Backend>
+where
+    Backend: MetricsBackend + Send + Sync + 'static,
+    Backend::MetricsData: async_graphql::OutputType,
+{
     const SERVICE_ID: ServiceId = "GraphqlMetrics";
 
     type Settings = GraphqlServerSettings;
@@ -80,7 +125,7 @@ impl<Backend: MetricsBackend + Send + Sync + 'static> ServiceData for Graphql<Ba
 
     type StateOperator = NoOperator<Self::State>;
 
-    type Message = NoMessage;
+    type Message = GraphqlMetricsMessage;
 }
 
 #[async_graphql::Object]
@@ -114,40 +159,25 @@ where
 }
 
 #[async_trait::async_trait]
-impl<Backend: MetricsBackend + Clone + Send + Sync + 'static> ServiceCore for Graphql<Backend>
+impl<Backend: MetricsBackend + Send + Sync + 'static> ServiceCore for Graphql<Backend>
 where
     Backend::MetricsData: async_graphql::OutputType,
 {
     fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, overwatch_rs::DynError> {
-        let settings = service_state.settings_reader.get_updated_settings();
         let backend_channel: Relay<MetricsService<Backend>> =
             service_state.overwatch_handle.relay();
+        let settings = service_state.settings_reader.get_updated_settings();
         Ok(Self {
             settings,
+            service_state: Some(service_state),
             backend_channel,
         })
     }
 
-    async fn run(self) -> Result<(), overwatch_rs::DynError> {
-        let mut builder = CorsLayer::new();
-        if self.settings.cors_origins.is_empty() {
-            builder = builder.allow_origin(Any);
-        }
-        for origin in &self.settings.cors_origins {
-            builder = builder.allow_origin(
-                origin
-                    .as_str()
-                    .parse::<HeaderValue>()
-                    .expect("fail to parse origin"),
-            );
-        }
-        let cors = builder
-            .allow_headers([CONTENT_TYPE, USER_AGENT])
-            .allow_methods(Any);
-
-        let addr = self.settings.address;
+    async fn run(mut self) -> Result<(), overwatch_rs::DynError> {
         let max_complexity = self.settings.max_complexity;
         let max_depth = self.settings.max_depth;
+        let mut inbound_relay = self.service_state.take().unwrap().inbound_relay;
         let schema = async_graphql::Schema::build(
             self,
             async_graphql::EmptyMutation,
@@ -159,16 +189,12 @@ where
         .finish();
 
         tracing::info!(schema = %schema.sdl(), "GraphQL schema definition");
-        let router = Router::new()
-            .route("/", post(graphql_handler::<Backend>))
-            .with_state(schema)
-            .layer(cors)
-            .layer(TraceLayer::new_for_http());
 
-        tracing::info!("Metrics Service GraphQL server listening: {}", addr);
-        Server::bind(&addr)
-            .serve(router.into_make_service())
-            .await?;
+        while let Some(msg) = inbound_relay.recv().await {
+            let res = schema.execute(msg.req).await;
+            msg.reply_channel.send(res).unwrap();
+        }
+
         Ok(())
     }
 }
