@@ -51,9 +51,6 @@ pub enum AxumBackendError {
     #[error("axum backend: send error: {0}")]
     SendError(#[from] tokio::sync::mpsc::error::SendError<HttpRequest>),
 
-    #[error("axum backend: send error graphql endpoint error")]
-    SendGraphqlError,
-
     #[error("axum backend: {0}")]
     Any(DynError),
 }
@@ -185,6 +182,6 @@ async fn handle_req(
             let res = rx.recv().await.ok_or("".into());
             res
         }
-        Err(_e) => Err(AxnumBackendError::SendGraphqlError.to_string()),
+        Err(_e) => Err(AxumBackendError::SendError(_e).to_string()),
     }
 }
