@@ -166,7 +166,7 @@ async fn handle_req(
     {
         Ok(_) => {
             // Wait for a response, then pass or serialize it?
-            let res = rx.recv().await.ok_or("".into());
+            let res = rx.recv().await.ok_or_else(|| "".into());
             res
         }
         Err(_e) => Err(AxumBackendError::SendError(_e).to_string()),
