@@ -75,6 +75,7 @@ impl HttpBackend for AxumBackend {
         if config.cors_origins.is_empty() {
             builder = builder.allow_origin(Any);
         }
+
         for origin in &config.cors_origins {
             builder = builder.allow_origin(
                 origin
@@ -83,12 +84,16 @@ impl HttpBackend for AxumBackend {
                     .expect("fail to parse origin"),
             );
         }
-        let cors = builder
-            .allow_headers([CONTENT_TYPE, USER_AGENT])
-            .allow_methods(Any);
 
-        let router = Router::new().layer(cors).layer(TraceLayer::new_for_http());
-        let router = Arc::new(Mutex::new(router));
+        let router = Arc::new(Mutex::new(
+            Router::new()
+                .layer(
+                    builder
+                        .allow_headers([CONTENT_TYPE, USER_AGENT])
+                        .allow_methods(Any),
+                )
+                .layer(TraceLayer::new_for_http()),
+        ));
 
         Ok(Self { config, router })
     }
@@ -166,8 +171,7 @@ async fn handle_req(
     {
         Ok(_) => {
             // Wait for a response, then pass or serialize it?
-            let res = rx.recv().await.ok_or_else(|| "".into());
-            res
+            rx.recv().await.ok_or_else(|| "".into())
         }
         Err(_e) => Err(AxumBackendError::SendError(_e).to_string()),
     }
