@@ -19,6 +19,26 @@ use overwatch_rs::{overwatch::OverwatchRunner, services::handle::ServiceHandle};
 use parking_lot::Mutex;
 use tokio::sync::oneshot;
 
+async fn handle_dummy_graphql(msg: DummyGraphqlMsg) {
+    static SCHEMA: once_cell::sync::Lazy<
+        async_graphql::Schema<
+            DummyGraphql,
+            async_graphql::EmptyMutation,
+            async_graphql::EmptySubscription,
+        >,
+    > = once_cell::sync::Lazy::new(|| {
+        async_graphql::Schema::build(
+            DummyGraphql::default(),
+            async_graphql::EmptyMutation,
+            async_graphql::EmptySubscription,
+        )
+        .finish()
+    });
+
+    let res = SCHEMA.execute(msg.req).await;
+    msg.reply_channel.send(res).unwrap();
+}
+
 fn dummy_graphql_router<B>(
     handle: overwatch_rs::overwatch::handle::OverwatchHandle,
 ) -> HttpBridgeRunner
@@ -124,25 +144,9 @@ impl ServiceCore for DummyGraphqlService {
             },
         } = self;
 
-        static SCHEMA: once_cell::sync::Lazy<
-            async_graphql::Schema<
-                DummyGraphql,
-                async_graphql::EmptyMutation,
-                async_graphql::EmptySubscription,
-            >,
-        > = once_cell::sync::Lazy::new(|| {
-            async_graphql::Schema::build(
-                DummyGraphql::default(),
-                async_graphql::EmptyMutation,
-                async_graphql::EmptySubscription,
-            )
-            .finish()
-        });
-
         // Handle the http request to dummy service.
         while let Some(msg) = inbound_relay.recv().await {
-            let res = SCHEMA.execute(msg.req).await;
-            msg.reply_channel.send(res).unwrap();
+            handle_dummy_graphql(msg).await;
         }
 
         Ok(())
