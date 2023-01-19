@@ -9,7 +9,6 @@ use axum::{
     routing::{get, patch, post, put},
     Router,
 };
-
 use hyper::{
     header::{CONTENT_TYPE, USER_AGENT},
     Body, Request,
@@ -125,25 +124,15 @@ impl HttpBackend for AxumBackend {
 
 impl AxumBackend {
     fn add_data_route(&self, method: HttpMethod, path: &str, req_stream: Sender<HttpRequest>) {
+        let handle_data = |Query(query): Query<HashMap<String, String>>, payload: Option<Bytes>| async move {
+            handle_req(req_stream, query, payload).await
+        };
+
         let handler = match method {
-            HttpMethod::GET => get(|Query(query): Query<HashMap<String, String>>| async move {
-                handle_req(req_stream, query, None).await
-            }),
-            HttpMethod::POST => post(
-                |Query(query): Query<HashMap<String, String>>, payload: Option<Bytes>| async move {
-                    handle_req(req_stream, query, payload).await
-                },
-            ),
-            HttpMethod::PUT => put(
-                |Query(query): Query<HashMap<String, String>>, payload: Option<Bytes>| async move {
-                    handle_req(req_stream, query, payload).await
-                },
-            ),
-            HttpMethod::PATCH => patch(
-                |Query(query): Query<HashMap<String, String>>, payload: Option<Bytes>| async move {
-                    handle_req(req_stream, query, payload).await
-                },
-            ),
+            HttpMethod::GET => get(handle_data),
+            HttpMethod::POST => post(handle_data),
+            HttpMethod::PUT => put(handle_data),
+            HttpMethod::PATCH => patch(handle_data),
             _ => unimplemented!(),
         };
 
@@ -158,9 +147,6 @@ async fn handle_req(
     payload: Option<Bytes>,
 ) -> Result<Bytes, String> {
     let (tx, mut rx) = tokio::sync::mpsc::channel(1);
-    // Write Self::Request type message to req_stream.
-    // TODO: handle result in a more elegant way.
-    // Currently, convert to Result<Bytes, String>
     match req_stream
         .send(HttpRequest {
             query,
@@ -169,10 +155,7 @@ async fn handle_req(
         })
         .await
     {
-        Ok(_) => {
-            // Wait for a response, then pass or serialize it?
-            rx.recv().await.ok_or_else(|| "".into())
-        }
-        Err(_e) => Err(AxumBackendError::SendError(_e).to_string()),
+        Ok(_) => rx.recv().await.ok_or_else(|| "".into()),
+        Err(e) => Err(AxumBackendError::SendError(e).to_string()),
     }
 }

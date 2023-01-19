@@ -73,8 +73,6 @@ pub struct HttpRequest {
 // the HttpService.
 pub enum HttpMsg {
     AddHandler {
-        // TODO: If possible, this should be extracted from the
-        // relay itself.
         service_id: ServiceId,
         route: Route,
         req_stream: Sender<HttpRequest>,
