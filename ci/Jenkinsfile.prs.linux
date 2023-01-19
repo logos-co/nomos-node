@@ -30,6 +30,7 @@ pipeline {
 
     stage('Build') {
       steps {
+        sh 'cargo build'
         sh 'cargo build --all --all-features'
       }
     }
