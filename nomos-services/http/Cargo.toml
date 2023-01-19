@@ -46,4 +46,4 @@ once_cell = "1.17"
 [features]
 default = []
 http = ["clap", "axum", "serde_json", "parking_lot", "hyper", "tower"]
-gql = ["async-graphql"]
+gql = ["async-graphql", "serde_json"]
