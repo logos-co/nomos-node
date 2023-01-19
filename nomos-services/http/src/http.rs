@@ -185,7 +185,7 @@ impl<B: HttpBackend> Clone for Config<B> {
 #[cfg(feature = "gql")]
 pub async fn handle_graphql_req<M, F>(
     payload: Option<Bytes>,
-    dummy: OutboundRelay<M>,
+    relay: OutboundRelay<M>,
     f: F,
 ) -> Result<String, overwatch_rs::DynError>
 where
@@ -200,7 +200,7 @@ where
         .into_single()?;
 
     let (sender, receiver) = oneshot::channel();
-    dummy.send(f(req, sender)?).await.map_err(|_| {
+    relay.send(f(req, sender)?).await.map_err(|_| {
         tracing::error!(err = "failed to send graphql request to the http service");
         "failed to send graphql request to the frontend"
     })?;

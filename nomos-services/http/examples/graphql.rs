@@ -19,7 +19,22 @@ use overwatch_rs::{overwatch::OverwatchRunner, services::handle::ServiceHandle};
 use parking_lot::Mutex;
 use tokio::sync::oneshot;
 
-async fn handle_dummy_graphql(msg: DummyGraphqlMsg) {
+async fn handle_count(counter: Arc<Mutex<i32>>, reply_channel: oneshot::Sender<i32>) {
+    *counter.lock() += 1;
+    let count = *counter.lock();
+
+    if let Err(e) = reply_channel.send(count) {
+        tracing::error!("dummy service send error: {e}");
+    }
+}
+
+fn dummy_graphql_router<B>(
+    handle: overwatch_rs::overwatch::handle::OverwatchHandle,
+) -> HttpBridgeRunner
+where
+    B: HttpBackend + Send + Sync + 'static,
+    B::Error: Error + Send + Sync + 'static,
+{
     static SCHEMA: once_cell::sync::Lazy<
         async_graphql::Schema<
             DummyGraphql,
@@ -35,17 +50,6 @@ async fn handle_dummy_graphql(msg: DummyGraphqlMsg) {
         .finish()
     });
 
-    let res = SCHEMA.execute(msg.req).await;
-    msg.reply_channel.send(res).unwrap();
-}
-
-fn dummy_graphql_router<B>(
-    handle: overwatch_rs::overwatch::handle::OverwatchHandle,
-) -> HttpBridgeRunner
-where
-    B: HttpBackend + Send + Sync + 'static,
-    B::Error: Error + Send + Sync + 'static,
-{
     Box::new(Box::pin(async move {
         // TODO: Graphql supports http GET requests, should nomos support that?
         let (dummy, mut hello_res_rx) =
@@ -59,7 +63,7 @@ where
             res_tx,
         }) = hello_res_rx.recv().await
         {
-            let res = match handle_graphql_req(payload, dummy.clone()).await {
+            let res = match handle_graphql_req(&SCHEMA, payload, dummy.clone()).await {
                 Ok(r) => r,
                 Err(err) => {
                     tracing::error!(err);
@@ -74,6 +78,11 @@ where
 }
 
 async fn handle_graphql_req(
+    schema: &async_graphql::Schema<
+        DummyGraphql,
+        async_graphql::EmptyMutation,
+        async_graphql::EmptySubscription,
+    >,
     payload: Option<Bytes>,
     dummy: OutboundRelay<DummyGraphqlMsg>,
 ) -> Result<String, overwatch_rs::DynError> {
@@ -86,14 +95,14 @@ async fn handle_graphql_req(
     let (sender, receiver) = oneshot::channel();
     dummy
         .send(DummyGraphqlMsg {
-            req,
             reply_channel: sender,
         })
         .await
         .unwrap();
 
-    let res = receiver.await.unwrap();
-    let res = serde_json::to_string(&res)?;
+    // wait for the dummy service to respond
+    receiver.await.unwrap();
+    let res = serde_json::to_string(&schema.execute(req).await)?;
     Ok(res)
 }
 
@@ -112,13 +121,13 @@ impl DummyGraphql {
 }
 
 pub struct DummyGraphqlService {
+    val: Arc<Mutex<i32>>,
     service_state: ServiceStateHandle<Self>,
 }
 
 #[derive(Debug)]
 pub struct DummyGraphqlMsg {
-    req: async_graphql::Request,
-    reply_channel: oneshot::Sender<async_graphql::Response>,
+    reply_channel: oneshot::Sender<i32>,
 }
 
 impl RelayMessage for DummyGraphqlMsg {}
@@ -134,7 +143,10 @@ impl ServiceData for DummyGraphqlService {
 #[async_trait::async_trait]
 impl ServiceCore for DummyGraphqlService {
     fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, overwatch_rs::DynError> {
-        Ok(Self { service_state })
+        Ok(Self {
+            service_state,
+            val: Arc::new(Mutex::new(0)),
+        })
     }
 
     async fn run(self) -> Result<(), overwatch_rs::DynError> {
@@ -142,11 +154,12 @@ impl ServiceCore for DummyGraphqlService {
             service_state: ServiceStateHandle {
                 mut inbound_relay, ..
             },
+            val,
         } = self;
 
         // Handle the http request to dummy service.
         while let Some(msg) = inbound_relay.recv().await {
-            handle_dummy_graphql(msg).await;
+            handle_count(val.clone(), msg.reply_channel).await;
         }
 
         Ok(())
@@ -166,7 +179,7 @@ pub struct Args {
     http: AxumBackendSettings,
 }
 
-fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+fn main() -> Result<(), overwatch_rs::DynError> {
     tracing_subscriber::fmt::fmt().with_file(false).init();
 
     let settings = Args::parse();
