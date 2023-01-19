@@ -19,5 +19,6 @@ pub trait HttpBackend {
         Self: Sized;
 
     fn add_route(&self, service_id: ServiceId, route: Route, req_stream: Sender<HttpRequest>);
+
     async fn run(&self) -> Result<(), overwatch_rs::DynError>;
 }

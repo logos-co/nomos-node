@@ -13,14 +13,6 @@ pub struct MetricsData {
     id: String,
 }
 
-#[derive(Debug, thiserror::Error)]
-pub enum ParseMetricsDataError {
-    #[error("fail to encode metrics data: {0}")]
-    EncodeError(serde_json::Error),
-    #[error("fail to decode metrics data: {0}")]
-    DecodeError(serde_json::Error),
-}
-
 impl MetricsData {
     #[inline]
     pub fn new(ty: MetricDataType, id: String) -> Self {
@@ -105,7 +97,6 @@ impl async_graphql::OutputType for MetricDataType {
 #[derive(Debug, Clone)]
 pub struct GenericGauge<T: Atomic> {
     val: core::GenericGauge<T>,
-    opts: Opts,
 }
 
 impl<T: Atomic> Deref for GenericGauge<T> {
@@ -127,12 +118,11 @@ impl<T: Atomic> GenericGauge<T> {
         name: S1,
         help: S2,
     ) -> Result<Self, prometheus::Error> {
-        let opts = Opts::new(name, help);
-        core::GenericGauge::<T>::with_opts(opts.clone()).map(|val| Self { val, opts })
+        core::GenericGauge::<T>::new(name, help).map(|v| Self { val: v })
     }
 
     pub fn with_opts(opts: Opts) -> Result<Self, prometheus::Error> {
-        core::GenericGauge::<T>::with_opts(opts.clone()).map(|val| Self { val, opts })
+        core::GenericGauge::<T>::with_opts(opts).map(|v| Self { val: v })
     }
 }
 
@@ -173,7 +163,6 @@ where
 #[derive(Debug, Clone)]
 pub struct GenericCounter<T: Atomic> {
     ctr: core::GenericCounter<T>,
-    opts: Opts,
 }
 
 impl<T: Atomic> Deref for GenericCounter<T> {
@@ -195,12 +184,11 @@ impl<T: Atomic> GenericCounter<T> {
         name: S1,
         help: S2,
     ) -> Result<Self, prometheus::Error> {
-        let opts = Opts::new(name, help);
-        core::GenericCounter::<T>::with_opts(opts.clone()).map(|ctr| Self { ctr, opts })
+        core::GenericCounter::<T>::new(name, help).map(|ctr| Self { ctr })
     }
 
     pub fn with_opts(opts: Opts) -> Result<Self, prometheus::Error> {
-        core::GenericCounter::<T>::with_opts(opts.clone()).map(|ctr| Self { ctr, opts })
+        core::GenericCounter::<T>::with_opts(opts).map(|ctr| Self { ctr })
     }
 }
 
@@ -241,12 +229,11 @@ where
 #[derive(Debug, Clone)]
 pub struct Histogram {
     val: prometheus::Histogram,
-    opts: HistogramOpts,
 }
 
 impl Histogram {
     pub fn with_opts(opts: HistogramOpts) -> Result<Self, prometheus::Error> {
-        prometheus::Histogram::with_opts(opts.clone()).map(|val| Self { val, opts })
+        prometheus::Histogram::with_opts(opts).map(|val| Self { val })
     }
 }
 
@@ -303,7 +290,6 @@ macro_rules! metric_typ {
             #[derive(Clone)]
             pub struct $ty {
                 val: prometheus::$ty,
-                opts: Opts,
             }
 
             impl std::fmt::Debug for $ty {
@@ -317,17 +303,14 @@ macro_rules! metric_typ {
                     name: S1,
                     help: S2,
                 ) -> Result<Self, prometheus::Error> {
-                    let opts = Opts::new(name, help);
-                    prometheus::$ty::with_opts(opts.clone()).map(|val| Self {
+                    prometheus::$ty::new(name, help).map(|val| Self {
                         val,
-                        opts,
                     })
                 }
 
                 pub fn with_opts(opts: Opts) -> Result<Self, prometheus::Error> {
                     prometheus::$ty::with_opts(opts.clone()).map(|val| Self {
                         val,
-                        opts,
                     })
                 }
             }

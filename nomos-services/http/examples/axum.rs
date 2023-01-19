@@ -79,9 +79,10 @@ where
     B::Error: Error + Send + Sync + 'static,
 {
     Box::new(Box::pin(async move {
-        let (dummy, mut hello_res_rx) = build_http_bridge::<DummyService, B, _>(handle, "")
-            .await
-            .unwrap();
+        let (dummy, mut hello_res_rx) =
+            build_http_bridge::<DummyService, B, _>(handle, HttpMethod::GET, "")
+                .await
+                .unwrap();
 
         while let Some(HttpRequest { res_tx, .. }) = hello_res_rx.recv().await {
             let (sender, receiver) = oneshot::channel();

@@ -1,16 +1,20 @@
-use crate::backends::HttpBackend;
-use crate::http::{HttpMsg, HttpRequest, HttpService};
-use async_trait::async_trait;
-use overwatch_rs::services::handle::ServiceStateHandle;
-use overwatch_rs::services::relay::{NoMessage, OutboundRelay};
-use overwatch_rs::services::state::{NoOperator, NoState};
-use overwatch_rs::services::{ServiceCore, ServiceData, ServiceId};
-use overwatch_rs::DynError;
 use std::error::Error;
 use std::fmt::{Debug, Formatter};
 use std::future::Future;
 use std::sync::Arc;
+
+use async_trait::async_trait;
+use overwatch_rs::services::handle::ServiceStateHandle;
+use overwatch_rs::services::relay::{NoMessage, OutboundRelay};
+use overwatch_rs::services::{
+    state::{NoOperator, NoState},
+    ServiceCore, ServiceData, ServiceId,
+};
+use overwatch_rs::DynError;
 use tokio::sync::mpsc::{channel, Receiver};
+
+use crate::backends::HttpBackend;
+use crate::http::{HttpMethod, HttpMsg, HttpRequest, HttpService};
 
 pub type HttpBridgeRunner =
     Box<dyn Future<Output = Result<(), overwatch_rs::DynError>> + Send + Unpin + 'static>;
@@ -29,6 +33,7 @@ pub type HttpBridge = Arc<
 // TODO: Add error handling
 pub async fn build_http_bridge<S, B, P>(
     handle: overwatch_rs::overwatch::handle::OverwatchHandle,
+    method: HttpMethod,
     path: P,
 ) -> Result<(OutboundRelay<S::Message>, Receiver<HttpRequest>), overwatch_rs::DynError>
 where
@@ -45,7 +50,12 @@ where
 
     // Register on http service to receive GET requests.
     http_relay
-        .send(HttpMsg::add_get_handler(S::SERVICE_ID, path, http_sender))
+        .send(HttpMsg::add_http_handler(
+            method,
+            S::SERVICE_ID,
+            path,
+            http_sender,
+        ))
         .await
         .map_err(|(e, _)| e)?;
 

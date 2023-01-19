@@ -6,10 +6,11 @@ use std::{
     sync::Arc,
 };
 
+use bytes::Bytes;
 // crates
 use overwatch_rs::services::{
     handle::ServiceStateHandle,
-    relay::{InboundRelay, RelayMessage},
+    relay::{InboundRelay, OutboundRelay, RelayMessage},
     state::{NoOperator, NoState},
     ServiceCore, ServiceData, ServiceId,
 };
@@ -81,7 +82,8 @@ pub enum HttpMsg {
 }
 
 impl HttpMsg {
-    pub fn add_get_handler<P: Into<String>>(
+    pub fn add_http_handler<P: Into<String>>(
+        method: HttpMethod,
         service_id: ServiceId,
         path: P,
         req_stream: Sender<HttpRequest>,
@@ -89,7 +91,7 @@ impl HttpMsg {
         Self::AddHandler {
             service_id,
             route: Route {
-                method: HttpMethod::GET,
+                method,
                 path: path.into(),
             },
             req_stream,
@@ -152,7 +154,7 @@ where
                                     req_stream,
                                 } => {
                                     backend.add_route(service_id, route, req_stream);
-                                }
+                                },
                             }
                         }
                         _server_exit = &mut stop_rx => {
@@ -177,4 +179,33 @@ impl<B: HttpBackend> Clone for Config<B> {
             backend: self.backend.clone(),
         }
     }
+}
+
+// TODO: optimize error construct?
+#[cfg(feature = "gql")]
+pub async fn handle_graphql_req<M, F>(
+    payload: Option<Bytes>,
+    relay: OutboundRelay<M>,
+    f: F,
+) -> Result<String, overwatch_rs::DynError>
+where
+    F: FnOnce(
+        async_graphql::Request,
+        oneshot::Sender<async_graphql::Response>,
+    ) -> Result<M, overwatch_rs::DynError>,
+{
+    let payload = payload.ok_or("empty payload")?;
+    let req = async_graphql::http::receive_batch_json(&payload[..])
+        .await?
+        .into_single()?;
+
+    let (sender, receiver) = oneshot::channel();
+    relay.send(f(req, sender)?).await.map_err(|_| {
+        tracing::error!(err = "failed to send graphql request to the http service");
+        "failed to send graphql request to the frontend"
+    })?;
+
+    let res = receiver.await.unwrap();
+    let res = serde_json::to_string(&res)?;
+    Ok(res)
 }

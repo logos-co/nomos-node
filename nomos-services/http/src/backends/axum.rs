@@ -2,10 +2,17 @@
 use std::{collections::HashMap, sync::Arc};
 
 // crates
-use axum::{body::Body, extract::Query, http::HeaderValue, routing::get, Router};
+use axum::{
+    body::Bytes,
+    extract::Query,
+    http::HeaderValue,
+    routing::{get, patch, post, put},
+    Router,
+};
+
 use hyper::{
     header::{CONTENT_TYPE, USER_AGENT},
-    Request,
+    Body, Request,
 };
 use overwatch_rs::{services::state::NoState, DynError};
 use parking_lot::Mutex;
@@ -48,7 +55,7 @@ pub enum AxumBackendError {
     Any(DynError),
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug, Clone)]
 pub struct AxumBackend {
     config: AxumBackendSettings,
     router: Arc<Mutex<Router>>,
@@ -68,6 +75,7 @@ impl HttpBackend for AxumBackend {
         if config.cors_origins.is_empty() {
             builder = builder.allow_origin(Any);
         }
+
         for origin in &config.cors_origins {
             builder = builder.allow_origin(
                 origin
@@ -76,12 +84,16 @@ impl HttpBackend for AxumBackend {
                     .expect("fail to parse origin"),
             );
         }
-        let cors = builder
-            .allow_headers([CONTENT_TYPE, USER_AGENT])
-            .allow_methods(Any);
 
-        let router = Router::new().layer(cors).layer(TraceLayer::new_for_http());
-        let router = Arc::new(Mutex::new(router));
+        let router = Arc::new(Mutex::new(
+            Router::new()
+                .layer(
+                    builder
+                        .allow_headers([CONTENT_TYPE, USER_AGENT])
+                        .allow_methods(Any),
+                )
+                .layer(TraceLayer::new_for_http()),
+        ));
 
         Ok(Self { config, router })
     }
@@ -93,10 +105,8 @@ impl HttpBackend for AxumBackend {
         req_stream: Sender<HttpRequest>,
     ) {
         let path = format!("/{}/{}", service_id.to_lowercase(), route.path);
-        match route.method {
-            HttpMethod::GET => self.add_get_route(&path, req_stream),
-            _ => todo!(),
-        };
+        tracing::info!("Axum backend: adding route {}", path);
+        self.add_data_route(route.method, &path, req_stream);
     }
 
     async fn run(&self) -> Result<(), overwatch_rs::DynError> {
@@ -114,35 +124,55 @@ impl HttpBackend for AxumBackend {
 }
 
 impl AxumBackend {
-    fn add_get_route(&self, path: &str, req_stream: Sender<HttpRequest>) {
-        let mut router = self.router.lock();
-        *router = router.clone().route(
-            path,
-            // TODO: Extract the stream handling to `to_handler` or similar function.
-            get(|Query(query): Query<HashMap<String, String>>| async move {
-                let (tx, mut rx) = tokio::sync::mpsc::channel(1);
-
-                // Write Self::Request type message to req_stream.
-                // TODO: handle result in a more elegant way.
-                // Currently, convert to Result<String, String>
-                match req_stream
-                    .send(HttpRequest {
-                        query,
-                        payload: None,
-                        res_tx: tx,
-                    })
-                    .await
-                {
-                    Ok(_) => {
-                        // Wait for a response, then pass or serialize it?
-                        match rx.recv().await {
-                            Some(res) => Ok(res),
-                            None => Ok("".into()),
-                        }
-                    }
-                    Err(e) => Err(AxumBackendError::SendError(e).to_string()),
-                }
+    fn add_data_route(&self, method: HttpMethod, path: &str, req_stream: Sender<HttpRequest>) {
+        let handler = match method {
+            HttpMethod::GET => get(|Query(query): Query<HashMap<String, String>>| async move {
+                handle_req(req_stream, query, None).await
             }),
-        )
+            HttpMethod::POST => post(
+                |Query(query): Query<HashMap<String, String>>, payload: Option<Bytes>| async move {
+                    handle_req(req_stream, query, payload).await
+                },
+            ),
+            HttpMethod::PUT => put(
+                |Query(query): Query<HashMap<String, String>>, payload: Option<Bytes>| async move {
+                    handle_req(req_stream, query, payload).await
+                },
+            ),
+            HttpMethod::PATCH => patch(
+                |Query(query): Query<HashMap<String, String>>, payload: Option<Bytes>| async move {
+                    handle_req(req_stream, query, payload).await
+                },
+            ),
+            _ => unimplemented!(),
+        };
+
+        let mut router = self.router.lock();
+        *router = router.clone().route(path, handler)
+    }
+}
+
+async fn handle_req(
+    req_stream: Sender<HttpRequest>,
+    query: HashMap<String, String>,
+    payload: Option<Bytes>,
+) -> Result<Bytes, String> {
+    let (tx, mut rx) = tokio::sync::mpsc::channel(1);
+    // Write Self::Request type message to req_stream.
+    // TODO: handle result in a more elegant way.
+    // Currently, convert to Result<Bytes, String>
+    match req_stream
+        .send(HttpRequest {
+            query,
+            payload,
+            res_tx: tx,
+        })
+        .await
+    {
+        Ok(_) => {
+            // Wait for a response, then pass or serialize it?
+            rx.recv().await.ok_or_else(|| "".into())
+        }
+        Err(_e) => Err(AxumBackendError::SendError(_e).to_string()),
     }
 }
