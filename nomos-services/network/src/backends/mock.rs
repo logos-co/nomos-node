@@ -46,6 +46,14 @@ pub enum MockBackendMessage {
         weight: usize,
         msg: String,
     },
+    Query {
+        topic: u64,
+        tx: oneshot::Sender<Vec<String>>,
+    },
+    QueryWeighted {
+        topic: u64,
+        tx: oneshot::Sender<Vec<(usize, String)>>,
+    },
 }
 
 #[derive(Debug)]
@@ -60,13 +68,13 @@ pub enum NetworkEvent {
 
 #[async_trait::async_trait]
 impl NetworkBackend for Mock {
-    type Config = MockConfig;
+    type Settings = MockConfig;
     type State = NoState<MockConfig>;
     type Message = MockBackendMessage;
     type EventKind = EventKind;
     type NetworkEvent = NetworkEvent;
 
-    fn new(config: Self::Config) -> Self {
+    fn new(config: Self::Settings) -> Self {
         let message_event = broadcast::channel(BROADCAST_CHANNEL_BUF).0;
         Self {
             messages: Arc::new(Mutex::new(
@@ -117,6 +125,26 @@ impl NetworkBackend for Mock {
                         topic,
                     }));
             }
+            MockBackendMessage::Query { topic, tx } => {
+                debug!("processed query");
+                let normal_msgs = self.messages.lock();
+                let msgs = normal_msgs
+                    .get(&topic)
+                    .cloned()
+                    .unwrap_or(Vec::new());
+                drop(normal_msgs);
+                let _ = tx.send(msgs);
+            },
+            MockBackendMessage::QueryWeighted { topic, tx } => {
+                debug!("processed query");
+                let weighted_msgs = self.weighted_messages.lock();
+                let msgs = weighted_msgs
+                    .get(&topic)
+                    .cloned()
+                    .unwrap_or(Vec::new());
+                drop(weighted_msgs);
+                let _ = tx.send(msgs);
+            },
         };
     }
 

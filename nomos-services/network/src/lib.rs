@@ -50,7 +50,7 @@ impl<B: NetworkBackend> Debug for NetworkConfig<B> {
     }
 }
 
-pub struct NetworkService<B: NetworkBackend + 'static> {
+pub struct NetworkService<B: NetworkBackend + Send + 'static> {
     backend: B,
     service_state: ServiceStateHandle<Self>,
 }
@@ -59,7 +59,7 @@ pub struct NetworkState<B: NetworkBackend> {
     _backend: B::State,
 }
 
-impl<B: NetworkBackend + 'static> ServiceData for NetworkService<B> {
+impl<B: NetworkBackend + Send + 'static> ServiceData for NetworkService<B> {
     const SERVICE_ID: ServiceId = "Network";
     type Settings = NetworkConfig<B>;
     type State = NetworkState<B>;
