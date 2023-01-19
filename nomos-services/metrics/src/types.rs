@@ -3,7 +3,7 @@ use ::core::ops::{Deref, DerefMut};
 use async_graphql::{parser::types::Field, ContextSelectionSet, Positioned, ServerResult, Value};
 use prometheus::HistogramOpts;
 pub use prometheus::{
-    core::{self, Atomic},
+    core::{self, Atomic, GenericCounter as PrometheusGenericCounter},
     labels, opts, Opts,
 };
 
@@ -95,19 +95,21 @@ impl async_graphql::OutputType for MetricDataType {
 }
 
 #[derive(Debug, Clone)]
-pub struct GenericGauge<T: Atomic>(core::GenericGauge<T>);
+pub struct GenericGauge<T: Atomic> {
+    val: core::GenericGauge<T>,
+}
 
 impl<T: Atomic> Deref for GenericGauge<T> {
     type Target = core::GenericGauge<T>;
 
     fn deref(&self) -> &Self::Target {
-        &self.0
+        &self.val
     }
 }
 
 impl<T: Atomic> DerefMut for GenericGauge<T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
+        &mut self.val
     }
 }
 
@@ -116,12 +118,11 @@ impl<T: Atomic> GenericGauge<T> {
         name: S1,
         help: S2,
     ) -> Result<Self, prometheus::Error> {
-        let opts = Opts::new(name, help);
-        core::GenericGauge::<T>::with_opts(opts).map(Self)
+        core::GenericGauge::<T>::new(name, help).map(|v| Self { val: v })
     }
 
     pub fn with_opts(opts: Opts) -> Result<Self, prometheus::Error> {
-        core::GenericGauge::<T>::with_opts(opts).map(Self)
+        core::GenericGauge::<T>::with_opts(opts).map(|v| Self { val: v })
     }
 }
 
@@ -155,84 +156,26 @@ where
         ctx: &ContextSelectionSet<'_>,
         field: &Positioned<Field>,
     ) -> ServerResult<Value> {
-        <<T as Atomic>::T as async_graphql::OutputType>::resolve(&self.0.get(), ctx, field).await
+        <<T as Atomic>::T as async_graphql::OutputType>::resolve(&self.val.get(), ctx, field).await
     }
 }
 
 #[derive(Debug, Clone)]
-pub struct Gauge(prometheus::Gauge);
-
-impl Deref for Gauge {
-    type Target = prometheus::Gauge;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
+pub struct GenericCounter<T: Atomic> {
+    ctr: core::GenericCounter<T>,
 }
-
-impl DerefMut for Gauge {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
-}
-
-impl Gauge {
-    pub fn new<S1: Into<String>, S2: Into<String>>(
-        name: S1,
-        help: S2,
-    ) -> Result<Self, prometheus::Error> {
-        prometheus::Gauge::new(name, help).map(Self)
-    }
-
-    pub fn with_opts(opts: Opts) -> Result<Self, prometheus::Error> {
-        prometheus::Gauge::with_opts(opts).map(Self)
-    }
-}
-
-#[cfg(feature = "async-graphql")]
-#[async_trait::async_trait]
-impl async_graphql::OutputType for Gauge {
-    fn type_name() -> std::borrow::Cow<'static, str> {
-        std::borrow::Cow::Borrowed("Gauge")
-    }
-
-    fn create_type_info(registry: &mut async_graphql::registry::Registry) -> String {
-        registry.create_output_type::<Self, _>(async_graphql::registry::MetaTypeId::Scalar, |_| {
-            async_graphql::registry::MetaType::Scalar {
-                name: Self::type_name().to_string(),
-                description: None,
-                is_valid: None,
-                visible: None,
-                inaccessible: false,
-                tags: Vec::new(),
-                specified_by_url: None,
-            }
-        })
-    }
-
-    async fn resolve(
-        &self,
-        ctx: &ContextSelectionSet<'_>,
-        field: &Positioned<Field>,
-    ) -> ServerResult<Value> {
-        <f64 as async_graphql::OutputType>::resolve(&self.0.get(), ctx, field).await
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct GenericCounter<T: Atomic>(core::GenericCounter<T>);
 
 impl<T: Atomic> Deref for GenericCounter<T> {
     type Target = core::GenericCounter<T>;
 
     fn deref(&self) -> &Self::Target {
-        &self.0
+        &self.ctr
     }
 }
 
 impl<T: Atomic> DerefMut for GenericCounter<T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
+        &mut self.ctr
     }
 }
 
@@ -241,11 +184,11 @@ impl<T: Atomic> GenericCounter<T> {
         name: S1,
         help: S2,
     ) -> Result<Self, prometheus::Error> {
-        core::GenericCounter::<T>::new(name, help).map(Self)
+        core::GenericCounter::<T>::new(name, help).map(|ctr| Self { ctr })
     }
 
     pub fn with_opts(opts: Opts) -> Result<Self, prometheus::Error> {
-        core::GenericCounter::<T>::with_opts(opts).map(Self)
+        core::GenericCounter::<T>::with_opts(opts).map(|ctr| Self { ctr })
     }
 }
 
@@ -279,76 +222,18 @@ where
         ctx: &ContextSelectionSet<'_>,
         field: &Positioned<Field>,
     ) -> ServerResult<Value> {
-        <<T as Atomic>::T as async_graphql::OutputType>::resolve(&self.0.get(), ctx, field).await
+        <<T as Atomic>::T as async_graphql::OutputType>::resolve(&self.ctr.get(), ctx, field).await
     }
 }
 
 #[derive(Debug, Clone)]
-pub struct Counter(prometheus::Counter);
-
-impl Deref for Counter {
-    type Target = prometheus::Counter;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
+pub struct Histogram {
+    val: prometheus::Histogram,
 }
-
-impl DerefMut for Counter {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
-}
-
-impl Counter {
-    pub fn new<S1: Into<String>, S2: Into<String>>(
-        name: S1,
-        help: S2,
-    ) -> Result<Self, prometheus::Error> {
-        prometheus::Counter::new(name, help).map(Self)
-    }
-
-    pub fn with_opts(opts: Opts) -> Result<Self, prometheus::Error> {
-        prometheus::Counter::with_opts(opts).map(Self)
-    }
-}
-
-#[cfg(feature = "async-graphql")]
-#[async_trait::async_trait]
-impl async_graphql::OutputType for Counter {
-    fn type_name() -> std::borrow::Cow<'static, str> {
-        std::borrow::Cow::Borrowed("Counter")
-    }
-
-    fn create_type_info(registry: &mut async_graphql::registry::Registry) -> String {
-        registry.create_output_type::<Self, _>(async_graphql::registry::MetaTypeId::Scalar, |_| {
-            async_graphql::registry::MetaType::Scalar {
-                name: Self::type_name().to_string(),
-                description: None,
-                is_valid: None,
-                visible: None,
-                inaccessible: false,
-                tags: Vec::new(),
-                specified_by_url: None,
-            }
-        })
-    }
-
-    async fn resolve(
-        &self,
-        ctx: &ContextSelectionSet<'_>,
-        field: &Positioned<Field>,
-    ) -> ServerResult<Value> {
-        <f64 as async_graphql::OutputType>::resolve(&self.0.get(), ctx, field).await
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct Histogram(prometheus::Histogram);
 
 impl Histogram {
     pub fn with_opts(opts: HistogramOpts) -> Result<Self, prometheus::Error> {
-        prometheus::Histogram::with_opts(opts).map(Self)
+        prometheus::Histogram::with_opts(opts).map(|val| Self { val })
     }
 }
 
@@ -356,18 +241,18 @@ impl Deref for Histogram {
     type Target = prometheus::Histogram;
 
     fn deref(&self) -> &Self::Target {
-        &self.0
+        &self.val
     }
 }
 
 impl DerefMut for Histogram {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
+        &mut self.val
     }
 }
 
 #[cfg(feature = "async-graphql")]
-#[derive(async_graphql::SimpleObject)]
+#[derive(async_graphql::SimpleObject, Debug, Clone, Copy)]
 #[graphql(name = "Histogram")]
 struct HistogramSample {
     count: u64,
@@ -391,131 +276,95 @@ impl async_graphql::OutputType for Histogram {
         field: &Positioned<Field>,
     ) -> ServerResult<Value> {
         let sample = HistogramSample {
-            count: self.0.get_sample_count(),
-            sum: self.0.get_sample_sum(),
+            count: self.val.get_sample_count(),
+            sum: self.val.get_sample_sum(),
         };
 
         <HistogramSample as async_graphql::OutputType>::resolve(&sample, ctx, field).await
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct IntCounter(prometheus::IntCounter);
-
-impl IntCounter {
-    pub fn new<S1: Into<String>, S2: Into<String>>(
-        name: S1,
-        help: S2,
-    ) -> Result<Self, prometheus::Error> {
-        prometheus::IntCounter::new(name, help).map(Self)
-    }
-
-    pub fn with_opts(opts: Opts) -> Result<Self, prometheus::Error> {
-        prometheus::IntCounter::with_opts(opts).map(Self)
-    }
-}
-
-impl Deref for IntCounter {
-    type Target = prometheus::IntCounter;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl DerefMut for IntCounter {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
-}
-
-#[cfg(feature = "async-graphql")]
-#[async_trait::async_trait]
-impl async_graphql::OutputType for IntCounter {
-    fn type_name() -> std::borrow::Cow<'static, str> {
-        std::borrow::Cow::Borrowed("IntCounter")
-    }
-
-    fn create_type_info(registry: &mut async_graphql::registry::Registry) -> String {
-        registry.create_output_type::<Self, _>(async_graphql::registry::MetaTypeId::Scalar, |_| {
-            async_graphql::registry::MetaType::Scalar {
-                name: Self::type_name().to_string(),
-                description: None,
-                is_valid: None,
-                visible: None,
-                inaccessible: false,
-                tags: Vec::new(),
-                specified_by_url: None,
+macro_rules! metric_typ {
+    ($($ty: ident::$setter:ident($primitive:ident)::$name: literal), +$(,)?) => {
+        $(
+            #[derive(Clone)]
+            pub struct $ty {
+                val: prometheus::$ty,
             }
-        })
-    }
 
-    async fn resolve(
-        &self,
-        ctx: &ContextSelectionSet<'_>,
-        field: &Positioned<Field>,
-    ) -> ServerResult<Value> {
-        <u64 as async_graphql::OutputType>::resolve(&self.0.get(), ctx, field).await
-    }
-}
-
-#[derive(Debug, Clone)]
-#[repr(transparent)]
-pub struct IntGauge(prometheus::IntGauge);
-
-impl Deref for IntGauge {
-    type Target = prometheus::IntGauge;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl DerefMut for IntGauge {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
-}
-
-impl IntGauge {
-    pub fn new<S1: Into<String>, S2: Into<String>>(
-        name: S1,
-        help: S2,
-    ) -> Result<Self, prometheus::Error> {
-        prometheus::IntGauge::new(name, help).map(Self)
-    }
-
-    pub fn with_opts(opts: Opts) -> Result<Self, prometheus::Error> {
-        prometheus::IntGauge::with_opts(opts).map(Self)
-    }
-}
-
-#[cfg(feature = "async-graphql")]
-#[async_trait::async_trait]
-impl async_graphql::OutputType for IntGauge {
-    fn type_name() -> std::borrow::Cow<'static, str> {
-        std::borrow::Cow::Borrowed("IntGauge")
-    }
-
-    fn create_type_info(registry: &mut async_graphql::registry::Registry) -> String {
-        registry.create_output_type::<Self, _>(async_graphql::registry::MetaTypeId::Scalar, |_| {
-            async_graphql::registry::MetaType::Scalar {
-                name: Self::type_name().to_string(),
-                description: None,
-                is_valid: None,
-                visible: None,
-                inaccessible: false,
-                tags: Vec::new(),
-                specified_by_url: None,
+            impl std::fmt::Debug for $ty {
+                fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                    <prometheus::$ty as std::fmt::Debug>::fmt(&self.val, f)
+                }
             }
-        })
-    }
 
-    async fn resolve(
-        &self,
-        ctx: &ContextSelectionSet<'_>,
-        field: &Positioned<Field>,
-    ) -> ServerResult<Value> {
-        <i64 as async_graphql::OutputType>::resolve(&self.0.get(), ctx, field).await
-    }
+            impl $ty {
+                pub fn new<S1: Into<String>, S2: Into<String>>(
+                    name: S1,
+                    help: S2,
+                ) -> Result<Self, prometheus::Error> {
+                    prometheus::$ty::new(name, help).map(|val| Self {
+                        val,
+                    })
+                }
+
+                pub fn with_opts(opts: Opts) -> Result<Self, prometheus::Error> {
+                    prometheus::$ty::with_opts(opts.clone()).map(|val| Self {
+                        val,
+                    })
+                }
+            }
+
+            impl Deref for $ty {
+                type Target = prometheus::$ty;
+
+                fn deref(&self) -> &Self::Target {
+                    &self.val
+                }
+            }
+
+            impl DerefMut for $ty {
+                fn deref_mut(&mut self) -> &mut Self::Target {
+                    &mut self.val
+                }
+            }
+
+            #[cfg(feature = "async-graphql")]
+            #[async_trait::async_trait]
+            impl async_graphql::OutputType for $ty {
+                fn type_name() -> std::borrow::Cow<'static, str> {
+                    std::borrow::Cow::Borrowed($name)
+                }
+
+                fn create_type_info(registry: &mut async_graphql::registry::Registry) -> String {
+                    registry.create_output_type::<Self, _>(async_graphql::registry::MetaTypeId::Scalar, |_| {
+                        async_graphql::registry::MetaType::Scalar {
+                            name: Self::type_name().to_string(),
+                            description: None,
+                            is_valid: None,
+                            visible: None,
+                            inaccessible: false,
+                            tags: Vec::new(),
+                            specified_by_url: None,
+                        }
+                    })
+                }
+
+                async fn resolve(
+                    &self,
+                    ctx: &ContextSelectionSet<'_>,
+                    field: &Positioned<Field>,
+                ) -> ServerResult<Value> {
+                    <$primitive as async_graphql::OutputType>::resolve(&self.val.get(), ctx, field).await
+                }
+            }
+        )*
+    };
+}
+
+metric_typ! {
+    IntCounter::inc_by(u64)::"IntCounter",
+    Counter::inc_by(f64)::"Counter",
+    IntGauge::set(i64)::"IntGauge",
+    Gauge::set(f64)::"Gauge",
 }
