@@ -1,25 +1,21 @@
 // std
-
 // crates
-
+use bytes::Bytes;
 // internal
 use crate::{Approval, NodeId};
-use nomos_core::block::BlockChunk;
 
 pub struct ProposalChunkMsg {
-    pub chunk: BlockChunk,
+    pub chunk: Bytes,
 }
 
-// TODO: this is completely temporal and match no reality at all, but it will help use fake some of the process
 impl ProposalChunkMsg {
-    pub fn as_bytes<const SIZE: usize>(&self) -> [u8; SIZE] {
-        [self.chunk.index; SIZE]
+    pub fn as_bytes(&self) -> &[u8] {
+        &self.chunk
     }
 
-    pub fn from_bytes<const SIZE: usize>(data: [u8; SIZE]) -> Self {
-        let index = data[0];
+    pub fn from_bytes(data: &[u8]) -> Self {
         Self {
-            chunk: BlockChunk { index },
+            chunk: Bytes::from(data.to_vec()),
         }
     }
 }

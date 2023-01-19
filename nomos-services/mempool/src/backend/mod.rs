@@ -1,7 +1,10 @@
+#[cfg(feature = "mock")]
+pub mod mockpool;
+
 use nomos_core::block::{BlockHeader, BlockId};
 
 pub trait MemPool {
-    type Settings;
+    type Settings: Clone;
     type Tx;
     type Id;
 
@@ -19,9 +22,9 @@ pub trait MemPool {
     fn view(&self, ancestor_hint: BlockId) -> Box<dyn Iterator<Item = Self::Tx> + Send>;
 
     /// Record that a set of transactions were included in a block
-    fn mark_in_block(&mut self, txs: Vec<Self::Id>, block: BlockHeader);
+    fn mark_in_block(&mut self, txs: &[Self::Id], block: BlockHeader);
 
     /// Signal that a set of transactions can't be possibly requested anymore and can be
     /// discarded.
-    fn prune(&mut self, txs: Vec<Self::Id>);
+    fn prune(&mut self, txs: &[Self::Id]);
 }

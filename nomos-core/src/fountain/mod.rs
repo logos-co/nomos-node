@@ -1,3 +1,5 @@
+#[cfg(feature = "mock")]
+pub mod mock;
 #[cfg(feature = "raptor")]
 pub mod raptorq;
 
@@ -29,15 +31,13 @@ impl From<&str> for FountainError {
 /// Chop a block of data into chunks and reassembling trait
 #[async_trait::async_trait]
 pub trait FountainCode {
-    type Settings;
+    type Settings: Clone + Send + Sync + 'static;
+    fn new(settings: Self::Settings) -> Self;
     /// Encode a block of data into a stream of chunks
-    fn encode(
-        block: &[u8],
-        settings: &Self::Settings,
-    ) -> Box<dyn Stream<Item = Bytes> + Send + Sync + Unpin>;
+    fn encode(&self, block: &[u8]) -> Box<dyn Stream<Item = Bytes> + Send + Sync + Unpin>;
     /// Decode a stream of chunks into a block of data
     async fn decode(
+        &self,
         stream: impl Stream<Item = Bytes> + Send + Sync + Unpin,
-        settings: &Self::Settings,
     ) -> Result<Bytes, FountainError>;
 }

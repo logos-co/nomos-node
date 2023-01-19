@@ -41,7 +41,7 @@ impl<T: NetworkBackend + 'static> RelayMessage for NetworkMsg<T> {}
 
 #[derive(Serialize, Deserialize)]
 pub struct NetworkConfig<B: NetworkBackend> {
-    pub backend: B::Config,
+    pub backend: B::Settings,
 }
 
 impl<B: NetworkBackend> Debug for NetworkConfig<B> {
@@ -50,7 +50,7 @@ impl<B: NetworkBackend> Debug for NetworkConfig<B> {
     }
 }
 
-pub struct NetworkService<B: NetworkBackend + Send + 'static> {
+pub struct NetworkService<B: NetworkBackend + 'static> {
     backend: B,
     service_state: ServiceStateHandle<Self>,
 }
@@ -59,7 +59,7 @@ pub struct NetworkState<B: NetworkBackend> {
     _backend: B::State,
 }
 
-impl<B: NetworkBackend + Send + 'static> ServiceData for NetworkService<B> {
+impl<B: NetworkBackend + 'static> ServiceData for NetworkService<B> {
     const SERVICE_ID: ServiceId = "Network";
     type Settings = NetworkConfig<B>;
     type State = NetworkState<B>;
@@ -68,7 +68,11 @@ impl<B: NetworkBackend + Send + 'static> ServiceData for NetworkService<B> {
 }
 
 #[async_trait]
-impl<B: NetworkBackend + Send + 'static> ServiceCore for NetworkService<B> {
+impl<B> ServiceCore for NetworkService<B>
+where
+    B: NetworkBackend + Send + 'static,
+    B::State: Send + Sync,
+{
     fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, overwatch_rs::DynError> {
         Ok(Self {
             backend: <B as NetworkBackend>::new(
@@ -123,7 +127,7 @@ impl<B: NetworkBackend> Clone for NetworkState<B> {
     }
 }
 
-impl<B: NetworkBackend + Send + 'static> ServiceState for NetworkState<B> {
+impl<B: NetworkBackend> ServiceState for NetworkState<B> {
     type Settings = NetworkConfig<B>;
     type Error = <B::State as ServiceState>::Error;
 
