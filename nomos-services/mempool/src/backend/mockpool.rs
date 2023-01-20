@@ -83,4 +83,9 @@ where
             self.pending_txs.remove(tx_id);
         }
     }
+
+    #[cfg(feature = "metrics")]
+    fn pending_tx_count(&self) -> usize {
+        self.pending_txs.len()
+    }
 }

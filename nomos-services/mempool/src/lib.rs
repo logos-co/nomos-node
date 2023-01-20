@@ -33,6 +33,11 @@ where
     pool: P,
 }
 
+#[cfg(feature = "metrics")]
+pub struct MempoolMetrics {
+    pub txs: usize,
+}
+
 pub enum MempoolMsg<Tx, Id> {
     AddTx {
         tx: Tx,
@@ -47,6 +52,10 @@ pub enum MempoolMsg<Tx, Id> {
     MarkInBlock {
         ids: Vec<Id>,
         block: BlockHeader,
+    },
+    #[cfg(feature = "metrics")]
+    Metrics {
+        reply_channel: Sender<MempoolMetrics>,
     },
 }
 
@@ -69,6 +78,8 @@ impl<Tx: Debug, Id: Debug> Debug for MempoolMsg<Tx, Id> {
                     ids, block
                 )
             }
+            #[cfg(feature = "metrics")]
+            Self::Metrics { .. } => write!(f, "MempoolMsg::Metrics"),
         }
     }
 }
@@ -142,6 +153,15 @@ where
                             pool.mark_in_block(&ids, block);
                         }
                         MempoolMsg::Prune { ids } => { pool.prune(&ids); },
+                        #[cfg(feature = "metrics")]
+                        MempoolMsg::Metrics { reply_channel } => {
+                            let metrics = MempoolMetrics {
+                                txs: pool.pending_tx_count(),
+                            };
+                            reply_channel.send(metrics).unwrap_or_else(|_| {
+                                tracing::debug!("could not send back mempool metrics")
+                            });
+                        }
                     }
                 }
                 Some(tx) = network_txs.next() => {

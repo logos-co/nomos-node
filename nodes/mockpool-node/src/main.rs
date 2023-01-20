@@ -1,3 +1,4 @@
+mod bridges;
 mod tx;
 
 use clap::Parser;
