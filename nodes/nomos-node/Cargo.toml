@@ -10,9 +10,9 @@ clap = { version = "4", features = ["derive"] }
 overwatch-rs = { git = "https://github.com/logos-co/Overwatch", branch = "main" }
 overwatch-derive = { git = "https://github.com/logos-co/Overwatch", branch = "main" }
 tracing = "0.1"
-nomos-network = { path = "../nomos-services/network", features = ["waku"] }
-metrics = { path = "../nomos-services/metrics", optional = true }
-nomos-log = { path = "../nomos-services/log" }
+nomos-network = { path = "../../nomos-services/network", features = ["waku"] }
+metrics = { path = "../../nomos-services/metrics", optional = true }
+nomos-log = { path = "../../nomos-services/log" }
 tracing-subscriber = "0.3"
 serde_yaml = "0.9"
 color-eyre = "0.6.0"

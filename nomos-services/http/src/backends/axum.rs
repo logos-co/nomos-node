@@ -62,11 +62,11 @@ pub struct AxumBackend {
 
 #[async_trait::async_trait]
 impl HttpBackend for AxumBackend {
-    type Config = AxumBackendSettings;
+    type Settings = AxumBackendSettings;
     type State = NoState<AxumBackendSettings>;
     type Error = AxumBackendError;
 
-    fn new(config: Self::Config) -> Result<Self, Self::Error>
+    fn new(config: Self::Settings) -> Result<Self, Self::Error>
     where
         Self: Sized,
     {

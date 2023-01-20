@@ -185,11 +185,11 @@ fn main() -> Result<(), overwatch_rs::DynError> {
     let settings = Args::parse();
     let app = OverwatchRunner::<Services>::run(
         ServicesServiceSettings {
-            http: nomos_http::http::Config {
+            http: nomos_http::http::HttpServiceSettings {
                 backend: settings.http,
             },
             router: nomos_http::bridge::HttpBridgeSettings {
-                runners: vec![Arc::new(Box::new(dummy_graphql_router::<AxumBackend>))],
+                bridges: vec![Arc::new(Box::new(dummy_graphql_router::<AxumBackend>))],
             },
             dummy_graphql: (),
         },

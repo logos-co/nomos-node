@@ -8,5 +8,6 @@ members = [
     "nomos-services/consensus",
     "nomos-services/mempool",
     "nomos-services/http",
-    "nomos-node"
+    "nodes/nomos-node",
+    "nodes/mockpool-node"
 ]

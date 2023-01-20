@@ -1,0 +1,24 @@
+[package]
+name = "mockpool-node"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+blake2 = "0.10"
+bincode = "2.0.0-rc.2"
+clap = { version = "4", features = ["derive"] }
+overwatch-rs = { git = "https://github.com/logos-co/Overwatch", branch = "main" }
+overwatch-derive = { git = "https://github.com/logos-co/Overwatch", branch = "main" }
+tracing = "0.1"
+nomos-core = { path = "../../nomos-core" }
+nomos-network = { path = "../../nomos-services/network", features = ["waku"] }
+metrics = { path = "../../nomos-services/metrics" }
+nomos-log = { path = "../../nomos-services/log" }
+nomos-mempool = { path = "../../nomos-services/mempool", features = ["waku", "mock"] }
+nomos-http = { path = "../../nomos-services/http" }
+tracing-subscriber = "0.3"
+serde_yaml = "0.9"
+color-eyre = "0.6.0"
+serde = "1"
