@@ -3,7 +3,6 @@ mod tx;
 
 use clap::Parser;
 use color_eyre::eyre::{eyre, Result};
-use metrics::{backend::map::MapMetricsBackend, types::MetricsData, MetricsService};
 use nomos_http::backends::axum::AxumBackend;
 use nomos_http::bridge::{HttpBridgeService, HttpBridgeSettings};
 use nomos_http::http::HttpService;
@@ -31,7 +30,6 @@ struct Args {
 struct Config {
     log: <Logger as ServiceData>::Settings,
     network: <NetworkService<Waku> as ServiceData>::Settings,
-    metrics: <MetricsService<MapMetricsBackend<MetricsData>> as ServiceData>::Settings,
     http: <HttpService<AxumBackend> as ServiceData>::Settings,
 }
 
@@ -39,7 +37,6 @@ struct Config {
 struct MockPoolNode {
     logging: ServiceHandle<Logger>,
     network: ServiceHandle<NetworkService<Waku>>,
-    metrics: ServiceHandle<MetricsService<MapMetricsBackend<MetricsData>>>,
     mockpool: ServiceHandle<MempoolService<WakuAdapter<Tx>, MockPool<TxId, Tx>>>,
     http: ServiceHandle<HttpService<AxumBackend>>,
     bridges: ServiceHandle<HttpBridgeService>,
@@ -54,7 +51,6 @@ fn main() -> Result<()> {
         MockPoolNodeServiceSettings {
             network: config.network,
             logging: config.log,
-            metrics: config.metrics,
             http: config.http,
             mockpool: (),
             bridges: HttpBridgeSettings { bridges },

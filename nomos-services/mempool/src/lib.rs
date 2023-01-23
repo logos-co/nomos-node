@@ -35,7 +35,7 @@ where
 
 #[cfg(feature = "metrics")]
 pub struct MempoolMetrics {
-    pub txs: usize,
+    pub pending_txs: usize,
 }
 
 pub enum MempoolMsg<Tx, Id> {
@@ -156,7 +156,7 @@ where
                         #[cfg(feature = "metrics")]
                         MempoolMsg::Metrics { reply_channel } => {
                             let metrics = MempoolMetrics {
-                                txs: pool.pending_tx_count(),
+                                pending_txs: pool.pending_tx_count(),
                             };
                             reply_channel.send(metrics).unwrap_or_else(|_| {
                                 tracing::debug!("could not send back mempool metrics")
