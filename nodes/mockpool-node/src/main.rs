@@ -4,7 +4,7 @@ mod tx;
 use clap::Parser;
 use color_eyre::eyre::{eyre, Result};
 use nomos_http::backends::axum::AxumBackend;
-use nomos_http::bridge::{HttpBridgeService, HttpBridgeSettings};
+use nomos_http::bridge::{HttpBridge, HttpBridgeService, HttpBridgeSettings};
 use nomos_http::http::HttpService;
 use nomos_log::Logger;
 use nomos_mempool::backend::mockpool::MockPool;
@@ -17,7 +17,9 @@ use overwatch_rs::{
     services::{handle::ServiceHandle, ServiceData},
 };
 use serde::Deserialize;
+use std::sync::Arc;
 use tx::{Tx, TxId};
+
 /// Simple program to greet a person
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -46,7 +48,7 @@ fn main() -> Result<()> {
     tracing_subscriber::fmt::init();
     let Args { config } = Args::parse();
     let config = serde_yaml::from_reader::<_, Config>(std::fs::File::open(config)?)?;
-    let bridges = Vec::new();
+    let bridges: Vec<HttpBridge> = vec![Arc::new(Box::new(bridges::mempool_metrics_bridge))];
     let app = OverwatchRunner::<MockPoolNode>::run(
         MockPoolNodeServiceSettings {
             network: config.network,
