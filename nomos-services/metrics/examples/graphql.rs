@@ -114,6 +114,19 @@ pub struct MetricsData {
     duration: u64,
 }
 
+#[derive(Debug, Clone)]
+pub enum ParseMetricsDataError {
+    TryFromSliceError(core::array::TryFromSliceError),
+}
+
+impl std::fmt::Display for ParseMetricsDataError {
+    fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        Ok(())
+    }
+}
+
+impl std::error::Error for ParseMetricsDataError {}
+
 fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let settings = Args::parse();
     let graphql = OverwatchRunner::<Services>::run(

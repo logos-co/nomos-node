@@ -29,6 +29,7 @@ pipeline {
 
     stage('Build') {
       steps { script {
+        nix.shell('cargo build')
         nix.shell('cargo build --all --all-features')
       } }
     }
