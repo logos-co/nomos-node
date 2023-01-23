@@ -18,6 +18,7 @@ nomos-log = { path = "../../nomos-services/log" }
 nomos-mempool = { path = "../../nomos-services/mempool", features = ["waku", "mock"] }
 nomos-http = { path = "../../nomos-services/http" }
 tracing-subscriber = "0.3"
+tokio = {version = "1.24", features = ["sync"] }
 serde_yaml = "0.9"
 color-eyre = "0.6.0"
 serde = "1"
