@@ -51,6 +51,7 @@ fn main() -> Result<()> {
     let bridges: Vec<HttpBridge> = vec![
         Arc::new(Box::new(bridges::mempool_metrics_bridge)),
         Arc::new(Box::new(bridges::waku_info_bridge)),
+        Arc::new(Box::new(bridges::mempool_add_tx_bridge)),
     ];
     let app = OverwatchRunner::<MockPoolNode>::run(
         MockPoolNodeServiceSettings {

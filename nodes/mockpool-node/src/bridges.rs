@@ -83,11 +83,7 @@ pub fn mempool_add_tx_bridge(
                 })
                 .await
                 .unwrap();
-            res_tx
-                // TODO: use serde to serialize metrics
-                .send(b"".to_vec().into())
-                .await
-                .unwrap();
+            res_tx.send(b"".to_vec().into()).await.unwrap();
         }
         Ok(())
     }))
