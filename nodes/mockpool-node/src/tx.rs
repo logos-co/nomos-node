@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use std::hash::{Hash, Hasher};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct Tx(nomos_core::tx::Tx);
+pub struct Tx(pub String);
 
 impl Hash for Tx {
     fn hash<H: Hasher>(&self, _state: &mut H) {
