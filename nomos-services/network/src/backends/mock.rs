@@ -23,6 +23,22 @@ pub enum MockMessage {
     },
 }
 
+impl MockMessage {
+    pub fn topic(&self) -> u64 { 
+        match self {
+            Self::Normal { topic, .. } => *topic,
+            Self::Weighted { topic, .. } => *topic,
+        }
+    }
+
+    pub fn msg(&self) -> String {
+        match self {
+            Self::Normal { msg, .. } => msg.clone(),
+            Self::Weighted { msg, .. } => msg.clone(),
+        }
+    }
+}
+
 pub struct Mock {
     #[allow(clippy::type_complexity)]
     weighted_messages: Arc<Mutex<HashMap<u64, Vec<(usize, String)>>>>,
