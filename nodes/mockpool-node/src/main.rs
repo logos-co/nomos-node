@@ -48,7 +48,10 @@ fn main() -> Result<()> {
     tracing_subscriber::fmt::init();
     let Args { config } = Args::parse();
     let config = serde_yaml::from_reader::<_, Config>(std::fs::File::open(config)?)?;
-    let bridges: Vec<HttpBridge> = vec![Arc::new(Box::new(bridges::mempool_metrics_bridge))];
+    let bridges: Vec<HttpBridge> = vec![
+        Arc::new(Box::new(bridges::mempool_metrics_bridge)),
+        Arc::new(Box::new(bridges::waku_info_bridge)),
+    ];
     let app = OverwatchRunner::<MockPoolNode>::run(
         MockPoolNodeServiceSettings {
             network: config.network,
