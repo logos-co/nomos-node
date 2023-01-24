@@ -1,5 +1,4 @@
 // std
-
 // crates
 use tokio::sync::oneshot;
 // internal
@@ -41,6 +40,52 @@ pub fn mempool_metrics_bridge(
             res_tx
                 // TODO: use serde to serialize metrics
                 .send(format!("{{\"pending_tx\": {}}}", metrics.pending_txs).into())
+                .await
+                .unwrap();
+        }
+        Ok(())
+    }))
+}
+
+pub fn mempool_add_tx_bridge(
+    handle: overwatch_rs::overwatch::handle::OverwatchHandle,
+) -> HttpBridgeRunner {
+    Box::new(Box::pin(async move {
+        let (mempool_channel, mut http_request_channel) = build_http_bridge::<
+            MempoolService<WakuAdapter<Tx>, MockPool<TxId, Tx>>,
+            AxumBackend,
+            _,
+        >(
+            handle.clone(),
+            HttpMethod::POST,
+            "mempool/addtx",
+        )
+        .await
+        .unwrap();
+        let (sender, receiver) = oneshot::channel();
+        let waku_channel = handle
+            .relay::<NetworkService<Waku>>()
+            .connect()
+            .await
+            .unwrap();
+        waku_channel
+            .send(NetworkMsg::Process(WakuBackendMessage::Info {
+                reply_channel: sender,
+            }))
+            .await
+            .unwrap();
+        let waku_info: WakuInfo = receiver.await.unwrap();
+        let waku_peer_id = waku_info.peer_id.unwrap();
+        while let Some(HttpRequest { res_tx, .. }) = http_request_channel.recv().await {
+            mempool_channel
+                .send(MempoolMsg::AddTx {
+                    tx: Tx(format!("Tx: {waku_peer_id}")),
+                })
+                .await
+                .unwrap();
+            res_tx
+                // TODO: use serde to serialize metrics
+                .send(b"".to_vec().into())
                 .await
                 .unwrap();
         }
