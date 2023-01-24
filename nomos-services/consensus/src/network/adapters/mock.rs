@@ -2,13 +2,19 @@ use bytes::Bytes;
 use nomos_core::block::BlockHeader;
 use nomos_network::{
     backends::mock::{EventKind, Mock, MockBackendMessage, MockMessage, NetworkEvent},
-    NetworkMsg, NetworkService
+    NetworkMsg, NetworkService,
 };
 use overwatch_rs::services::{relay::OutboundRelay, ServiceData};
 use tokio_stream::Stream;
 use tokio_stream::{wrappers::BroadcastStream, StreamExt};
 
-use crate::{network::{messages::{ApprovalMsg, ProposalChunkMsg}, NetworkAdapter}, Approval, View};
+use crate::{
+    network::{
+        messages::{ApprovalMsg, ProposalChunkMsg},
+        NetworkAdapter,
+    },
+    Approval, View,
+};
 
 const CHUNK_SIZE: usize = 8;
 

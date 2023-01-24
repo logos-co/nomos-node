@@ -9,7 +9,7 @@ use tracing::debug;
 
 const BROADCAST_CHANNEL_BUF: usize = 16;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum MockMessage {
     Normal {
         topic: u64,
@@ -31,7 +31,9 @@ pub struct Mock {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct MockConfig {
-    initial_peers: Vec<u64>,
+    pub initial_peers: Vec<u64>,
+    pub predefined_messages: Vec<MockMessage>,
+    pub duration: std::time::Duration,
 }
 
 /// Interaction with Mock node
@@ -76,6 +78,23 @@ impl NetworkBackend for Mock {
 
     fn new(config: Self::Settings) -> Self {
         let message_event = broadcast::channel(BROADCAST_CHANNEL_BUF).0;
+
+        // send predefined messages
+        let tx = message_event.clone();
+        tokio::spawn(async move {
+            for msg in config.predefined_messages {
+                tokio::time::sleep(config.duration).await;
+                match tx.clone().send(NetworkEvent::RawMessage(msg)) {
+                    Ok(peers) => {
+                        tracing::debug!("sent message to {} peers", peers);
+                    }
+                    Err(e) => {
+                        tracing::error!("error sending message: {:?}", e);
+                    }
+                };
+            }
+        });
+
         Self {
             messages: Arc::new(Mutex::new(
                 config
@@ -128,23 +147,17 @@ impl NetworkBackend for Mock {
             MockBackendMessage::Query { topic, tx } => {
                 debug!("processed query");
                 let normal_msgs = self.messages.lock();
-                let msgs = normal_msgs
-                    .get(&topic)
-                    .cloned()
-                    .unwrap_or(Vec::new());
+                let msgs = normal_msgs.get(&topic).cloned().unwrap_or(Vec::new());
                 drop(normal_msgs);
                 let _ = tx.send(msgs);
-            },
+            }
             MockBackendMessage::QueryWeighted { topic, tx } => {
                 debug!("processed query");
                 let weighted_msgs = self.weighted_messages.lock();
-                let msgs = weighted_msgs
-                    .get(&topic)
-                    .cloned()
-                    .unwrap_or(Vec::new());
+                let msgs = weighted_msgs.get(&topic).cloned().unwrap_or(Vec::new());
                 drop(weighted_msgs);
                 let _ = tx.send(msgs);
-            },
+            }
         };
     }
 
