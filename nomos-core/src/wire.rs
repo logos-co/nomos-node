@@ -113,7 +113,7 @@ mod tests {
     fn ser_de() {
         let tmp = String::from("much wow, very cool");
         let mut buf = Vec::new();
-        let _ = serializer(&mut buf).serialize_into(&tmp).unwrap();
+        serializer(&mut buf).serialize_into(&tmp).unwrap();
         let deserialized = deserializer(&buf).deserialize::<String>().unwrap();
         assert_eq!(tmp, deserialized);
     }
@@ -122,7 +122,7 @@ mod tests {
     fn ser_de_slice() {
         let tmp = String::from("much wow, very cool");
         let mut buf = vec![0; 1024];
-        let _ = serializer_into_buffer(&mut buf)
+        serializer_into_buffer(&mut buf)
             .serialize_into(&tmp)
             .unwrap();
         let deserialized = deserializer(&buf).deserialize::<String>().unwrap();
