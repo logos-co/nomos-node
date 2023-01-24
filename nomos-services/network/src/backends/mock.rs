@@ -3,6 +3,7 @@ use std::{collections::HashMap, sync::Arc};
 use super::*;
 use overwatch_rs::services::state::NoState;
 use parking_lot::Mutex;
+use rand::distributions::DistString;
 use serde::{Deserialize, Serialize};
 use tokio::sync::broadcast::{self, Receiver, Sender};
 use tracing::debug;
@@ -81,19 +82,7 @@ impl NetworkBackend for Mock {
 
         // send predefined messages
         let tx = message_event.clone();
-        tokio::spawn(async move {
-            for msg in config.predefined_messages {
-                tokio::time::sleep(config.duration).await;
-                match tx.clone().send(NetworkEvent::RawMessage(msg)) {
-                    Ok(peers) => {
-                        tracing::debug!("sent message to {} peers", peers);
-                    }
-                    Err(e) => {
-                        tracing::error!("error sending message: {:?}", e);
-                    }
-                };
-            }
-        });
+        MockMessageProducer::new(tx, config.predefined_messages, config.duration).run();
 
         Self {
             messages: Arc::new(Mutex::new(
@@ -168,5 +157,71 @@ impl NetworkBackend for Mock {
                 self.message_event.subscribe()
             }
         }
+    }
+}
+
+struct MockMessageProducer {
+    topic: u64,
+    predefined_messages: Vec<MockMessage>,
+    duration: std::time::Duration,
+    tx: Sender<NetworkEvent>,
+}
+
+impl MockMessageProducer {
+    fn new(
+        tx: Sender<NetworkEvent>,
+        predefined_messages: Vec<MockMessage>,
+        duration: std::time::Duration,
+    ) -> Self {
+        Self {
+            topic: predefined_messages.len() as u64,
+            predefined_messages,
+            duration,
+            tx,
+        }
+    }
+
+    fn run(self) {
+        tokio::spawn(async move {
+            for msg in self.predefined_messages {
+                tokio::time::sleep(self.duration).await;
+                match self.tx.clone().send(NetworkEvent::RawMessage(msg)) {
+                    Ok(peers) => {
+                        tracing::debug!("sent message to {} peers", peers);
+                    }
+                    Err(e) => {
+                        tracing::error!("error sending message: {:?}", e);
+                    }
+                };
+            }
+
+            let mut topic = self.topic;
+            loop {
+                tokio::time::sleep(self.duration).await;
+                let msg = if topic % 2 == 0 {
+                    MockMessage::Normal {
+                        topic,
+                        msg: rand::distributions::Alphanumeric
+                            .sample_string(&mut rand::thread_rng(), 16),
+                    }
+                } else {
+                    MockMessage::Weighted {
+                        topic,
+                        weight: rand::random(),
+                        msg: rand::distributions::Alphanumeric
+                            .sample_string(&mut rand::thread_rng(), 16),
+                    }
+                };
+                match self.tx.clone().send(NetworkEvent::RawMessage(msg)) {
+                    Ok(peers) => {
+                        tracing::debug!("sent message to {} peers", peers);
+                    }
+                    Err(e) => {
+                        tracing::error!("error sending message: {:?}", e);
+                    }
+                };
+                topic += 1;
+            }
+        });
     }
 }

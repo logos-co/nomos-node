@@ -16,6 +16,7 @@ tokio = { version = "1", features = ["sync"] }
 thiserror = "1.0"
 tracing = "0.1"
 waku-bindings = { version = "0.1.0-beta2", optional = true }
+rand = { version = "0.8", optional = true }
 tracing-appender = "0.2"
 tracing-subscriber =  { version = "0.3", features = ["json"] }
 tracing-gelf = "0.7"
@@ -25,4 +26,4 @@ parking_lot = "0.12"
 [features]
 default = []
 waku = ["waku-bindings"]
-mock = []
+mock = ["rand"]
