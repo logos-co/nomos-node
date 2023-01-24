@@ -1,12 +1,12 @@
 use bytes::Bytes;
-use nomos_core::block::BlockHeader;
+
 use nomos_network::{
-    backends::mock::{EventKind, Mock, MockBackendMessage, MockMessage, NetworkEvent},
+    backends::mock::{EventKind, Mock, NetworkEvent},
     NetworkMsg, NetworkService,
 };
 use overwatch_rs::services::{relay::OutboundRelay, ServiceData};
 use tokio_stream::Stream;
-use tokio_stream::{wrappers::BroadcastStream, StreamExt};
+
 
 use crate::{
     network::{
@@ -58,7 +58,7 @@ impl NetworkAdapter for MockAdapter {
         todo!()
     }
 
-    async fn broadcast_block_chunk(&self, _view: &View, chunk_message: ProposalChunkMsg) {
+    async fn broadcast_block_chunk(&self, _view: &View, _chunk_message: ProposalChunkMsg) {
         todo!()
     }
 
@@ -66,7 +66,7 @@ impl NetworkAdapter for MockAdapter {
         todo!()
     }
 
-    async fn forward_approval(&self, approval_message: ApprovalMsg) {
+    async fn forward_approval(&self, _approval_message: ApprovalMsg) {
         todo!()
     }
 }

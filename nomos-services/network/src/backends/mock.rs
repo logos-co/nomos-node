@@ -28,6 +28,8 @@ pub struct Mock {
     weighted_messages: Arc<Mutex<HashMap<u64, Vec<(usize, String)>>>>,
     messages: Arc<Mutex<HashMap<u64, Vec<String>>>>,
     message_event: Sender<NetworkEvent>,
+    subscribe_tx: tokio::sync::mpsc::UnboundedSender<u64>,
+    unsubscribe_tx: tokio::sync::mpsc::UnboundedSender<u64>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -48,6 +50,12 @@ pub enum MockBackendMessage {
         topic: u64,
         weight: usize,
         msg: String,
+    },
+    RelaySubscribe {
+        topic: u64,
+    },
+    RelayUnSubscribe {
+        topic: u64,
     },
     Query {
         topic: u64,
@@ -83,8 +91,15 @@ impl NetworkBackend for Mock {
         // send predefined messages
         let tx = message_event.clone();
         MockMessageProducer::new(tx, config.predefined_messages, config.duration).run();
+        let (subscribe_tx, subscribe_rx) = tokio::sync::mpsc::unbounded_channel();
+        let (unsubscribe_tx, unsubscribe_rx) = tokio::sync::mpsc::unbounded_channel();
+
+        // subscribe processor
+        MockSubscriber::new(subscribe_rx, unsubscribe_rx).run();
 
         Self {
+            subscribe_tx,
+            unsubscribe_tx,
             messages: Arc::new(Mutex::new(
                 config
                     .initial_peers
@@ -133,17 +148,35 @@ impl NetworkBackend for Mock {
                         topic,
                     }));
             }
+            MockBackendMessage::RelaySubscribe { topic } => {
+                debug!("processed relay subscription for topic: {topic}");
+                match self.subscribe_tx.send(topic) {
+                    Ok(_) => {}
+                    Err(e) => {
+                        tracing::error!("failed to send subscription: {e}");
+                    }
+                }
+            }
+            MockBackendMessage::RelayUnSubscribe { topic } => {
+                debug!("processed relay unsubscription for topic: {topic}");
+                match self.unsubscribe_tx.send(topic) {
+                    Ok(_) => {}
+                    Err(e) => {
+                        tracing::error!("failed to send subscription: {e}");
+                    }
+                }
+            }
             MockBackendMessage::Query { topic, tx } => {
                 debug!("processed query");
                 let normal_msgs = self.messages.lock();
-                let msgs = normal_msgs.get(&topic).cloned().unwrap_or(Vec::new());
+                let msgs = normal_msgs.get(&topic).cloned().unwrap_or_default();
                 drop(normal_msgs);
                 let _ = tx.send(msgs);
             }
             MockBackendMessage::QueryWeighted { topic, tx } => {
                 debug!("processed query");
                 let weighted_msgs = self.weighted_messages.lock();
-                let msgs = weighted_msgs.get(&topic).cloned().unwrap_or(Vec::new());
+                let msgs = weighted_msgs.get(&topic).cloned().unwrap_or_default();
                 drop(weighted_msgs);
                 let _ = tx.send(msgs);
             }
@@ -221,6 +254,49 @@ impl MockMessageProducer {
                     }
                 };
                 topic += 1;
+            }
+        });
+    }
+}
+
+struct MockSubscriber {
+    subscribed_topics: HashMap<u64, usize>,
+    subscribe_rx: tokio::sync::mpsc::UnboundedReceiver<u64>,
+    unsubscribe_rx: tokio::sync::mpsc::UnboundedReceiver<u64>,
+}
+
+impl MockSubscriber {
+    fn new(
+        subscribe_rx: tokio::sync::mpsc::UnboundedReceiver<u64>,
+        unsubscribe_rx: tokio::sync::mpsc::UnboundedReceiver<u64>,
+    ) -> Self {
+        Self {
+            subscribed_topics: Default::default(),
+            subscribe_rx,
+            unsubscribe_rx,
+        }
+    }
+
+    fn run(mut self) {
+        tokio::spawn(async move {
+            loop {
+                tokio::select! {
+                    Some(topic) = self.subscribe_rx.recv() => {
+                        tracing::debug!("subscribed to topic: {}", topic);
+                        self.subscribed_topics.entry(topic).and_modify(|v| *v += 1).or_insert(1);
+
+                    }
+                    Some(topic) = self.unsubscribe_rx.recv() => {
+                        tracing::debug!("unsubscribed from topic: {}", topic);
+                        self.subscribed_topics.entry(topic).and_modify(|v| {
+                            if *v == 0 {
+                                panic!("unsubscribed from topic {} more times than subscribed", topic);
+                            } else {
+                                *v -= 1;
+                            }
+                        });
+                    }
+                }
             }
         });
     }
