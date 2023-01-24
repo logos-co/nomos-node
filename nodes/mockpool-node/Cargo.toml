@@ -15,8 +15,8 @@ tracing = "0.1"
 nomos-core = { path = "../../nomos-core" }
 nomos-network = { path = "../../nomos-services/network", features = ["waku"] }
 nomos-log = { path = "../../nomos-services/log" }
-nomos-mempool = { path = "../../nomos-services/mempool", features = ["waku", "mock"] }
-nomos-http = { path = "../../nomos-services/http" }
+nomos-mempool = { path = "../../nomos-services/mempool", features = ["waku", "mock", "metrics"] }
+nomos-http = { path = "../../nomos-services/http", features = ["http"] }
 tracing-subscriber = "0.3"
 tokio = {version = "1.24", features = ["sync"] }
 serde_yaml = "0.9"
