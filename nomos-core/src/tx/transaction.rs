@@ -17,7 +17,7 @@ pub struct Transaction {
     _signature: Signature,
 }
 
-pub mod serde {
+mod serde {
     use super::*;
     use ::serde::{Deserialize, Deserializer, Serialize, Serializer};
     // We have this additional definition so that we can automatically derive
