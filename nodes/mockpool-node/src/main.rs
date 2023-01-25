@@ -43,7 +43,28 @@ struct MockPoolNode {
     http: ServiceHandle<HttpService<AxumBackend>>,
     bridges: ServiceHandle<HttpBridgeService>,
 }
-
+/// Mockpool node
+/// Minimal configuration file:
+///
+/// ```yaml
+/// log:
+///   backend: "Stdout"
+///   format: "Json"
+///   level: "debug"
+/// network:
+///   backend:
+///     host: 0.0.0.0
+///     port: 3000
+///     log_level: "fatal"
+///     nodeKey: null
+///     discV5BootstrapNodes: []
+///     initial_peers: []
+/// http:
+///   backend:
+///     address: 0.0.0.0:8080
+///     cors_origins: []
+///
+/// ```
 fn main() -> Result<()> {
     let Args { config } = Args::parse();
     let config = serde_yaml::from_reader::<_, Config>(std::fs::File::open(config)?)?;
