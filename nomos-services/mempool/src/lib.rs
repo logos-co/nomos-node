@@ -33,7 +33,6 @@ where
     pool: P,
 }
 
-#[cfg(feature = "metrics")]
 pub struct MempoolMetrics {
     pub pending_txs: usize,
 }
@@ -53,7 +52,6 @@ pub enum MempoolMsg<Tx, Id> {
         ids: Vec<Id>,
         block: BlockHeader,
     },
-    #[cfg(feature = "metrics")]
     Metrics {
         reply_channel: Sender<MempoolMetrics>,
     },
@@ -78,7 +76,6 @@ impl<Tx: Debug, Id: Debug> Debug for MempoolMsg<Tx, Id> {
                     ids, block
                 )
             }
-            #[cfg(feature = "metrics")]
             Self::Metrics { .. } => write!(f, "MempoolMsg::Metrics"),
         }
     }
@@ -153,7 +150,6 @@ where
                             pool.mark_in_block(&ids, block);
                         }
                         MempoolMsg::Prune { ids } => { pool.prune(&ids); },
-                        #[cfg(feature = "metrics")]
                         MempoolMsg::Metrics { reply_channel } => {
                             let metrics = MempoolMetrics {
                                 pending_txs: pool.pending_tx_count(),
