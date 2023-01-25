@@ -21,9 +21,7 @@ pub fn mempool_metrics_bridge(
             AxumBackend,
             _,
         >(
-            handle,
-            HttpMethod::GET,
-            "mempool/metrics",
+            handle, HttpMethod::GET, "metrics"
         )
         .await
         .unwrap();
@@ -58,7 +56,7 @@ pub fn mempool_add_tx_bridge(
         >(
             handle.clone(),
             HttpMethod::POST,
-            "mempool/addtx",
+            "addtx",
         )
         .await
         .unwrap();
@@ -93,14 +91,13 @@ pub fn waku_info_bridge(
     handle: overwatch_rs::overwatch::handle::OverwatchHandle,
 ) -> HttpBridgeRunner {
     Box::new(Box::pin(async move {
-        let (waku_channel, mut http_request_channel) =
-            build_http_bridge::<NetworkService<Waku>, AxumBackend, _>(
-                handle,
-                HttpMethod::GET,
-                "network/info",
-            )
-            .await
-            .unwrap();
+        let (waku_channel, mut http_request_channel) = build_http_bridge::<
+            NetworkService<Waku>,
+            AxumBackend,
+            _,
+        >(handle, HttpMethod::GET, "info")
+        .await
+        .unwrap();
 
         while let Some(HttpRequest { res_tx, .. }) = http_request_channel.recv().await {
             let (sender, receiver) = oneshot::channel();
