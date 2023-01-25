@@ -84,7 +84,6 @@ where
         }
     }
 
-    #[cfg(feature = "metrics")]
     fn pending_tx_count(&self) -> usize {
         self.pending_txs.len()
     }

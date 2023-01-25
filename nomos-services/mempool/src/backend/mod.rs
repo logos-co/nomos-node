@@ -28,6 +28,5 @@ pub trait MemPool {
     /// discarded.
     fn prune(&mut self, txs: &[Self::Id]);
 
-    #[cfg(feature = "metrics")]
     fn pending_tx_count(&self) -> usize;
 }

@@ -61,25 +61,14 @@ pub fn mempool_add_tx_bridge(
         )
         .await
         .unwrap();
-        let (sender, receiver) = oneshot::channel();
-        let waku_channel = handle
-            .relay::<NetworkService<Waku>>()
-            .connect()
-            .await
-            .unwrap();
-        waku_channel
-            .send(NetworkMsg::Process(WakuBackendMessage::Info {
-                reply_channel: sender,
-            }))
-            .await
-            .unwrap();
-        let waku_info: WakuInfo = receiver.await.unwrap();
-        let waku_peer_id = waku_info.peer_id.unwrap();
         while let Some(HttpRequest {
             res_tx, payload, ..
         }) = http_request_channel.recv().await
         {
-            if let Some(data) = payload.and_then(|b| String::from_utf8(b.into_vec()).ok()) {
+            if let Some(data) = payload
+                .as_ref()
+                .and_then(|b| String::from_utf8(b.to_vec()).ok())
+            {
                 mempool_channel
                     .send(MempoolMsg::AddTx { tx: Tx(data) })
                     .await
