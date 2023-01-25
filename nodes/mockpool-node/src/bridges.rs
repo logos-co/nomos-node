@@ -1,6 +1,7 @@
 // std
 // crates
 use tokio::sync::oneshot;
+use tracing::debug;
 // internal
 use crate::tx::{Tx, TxId};
 use nomos_http::backends::axum::AxumBackend;
@@ -74,15 +75,24 @@ pub fn mempool_add_tx_bridge(
             .unwrap();
         let waku_info: WakuInfo = receiver.await.unwrap();
         let waku_peer_id = waku_info.peer_id.unwrap();
-        while let Some(HttpRequest { res_tx, .. }) = http_request_channel.recv().await {
-            mempool_channel
-                .send(MempoolMsg::AddTx {
-                    tx: Tx(format!("Tx: {waku_peer_id}")),
-                })
-                .await
-                .unwrap();
-            res_tx.send(b"".to_vec().into()).await.unwrap();
+        while let Some(HttpRequest {
+            res_tx, payload, ..
+        }) = http_request_channel.recv().await
+        {
+            if let Some(data) = payload.and_then(|b| String::from_utf8(b.into_vec()).ok()) {
+                mempool_channel
+                    .send(MempoolMsg::AddTx { tx: Tx(data) })
+                    .await
+                    .unwrap();
+                res_tx.send(b"".to_vec().into()).await.unwrap();
+            } else {
+                debug!(
+                    "Invalid payload, {:?}. Empty or couldn't transform into a utf8 String",
+                    payload
+                );
+            }
         }
+
         Ok(())
     }))
 }
