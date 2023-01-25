@@ -1,15 +1,9 @@
 use blake2::{Blake2b512, Digest};
 use serde::{Deserialize, Serialize};
-use std::hash::{Hash, Hasher};
+use std::hash::Hash;
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, Hash)]
 pub struct Tx(pub String);
-
-impl Hash for Tx {
-    fn hash<H: Hasher>(&self, _state: &mut H) {
-        todo!("why da fuck do we need this?")
-    }
-}
 
 #[derive(Debug, Eq, Hash, PartialEq, Ord, Clone, PartialOrd)]
 pub struct TxId([u8; 32]);
