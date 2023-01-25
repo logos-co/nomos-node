@@ -77,7 +77,6 @@ impl NetworkBackend for Waku {
 
     fn new(config: Self::Settings) -> Self {
         let waku = waku_new(Some(config.inner)).unwrap().start().unwrap();
-        waku.relay_subscribe(None).unwrap();
         tracing::info!("waku listening on {}", waku.listen_addresses().unwrap()[0]);
         for peer in &config.initial_peers {
             if let Err(e) = waku.connect_peer_with_address(peer, None) {
