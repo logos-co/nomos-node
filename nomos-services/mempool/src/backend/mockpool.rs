@@ -38,7 +38,7 @@ where
 
 impl<Id, Tx> MemPool for MockPool<Id, Tx>
 where
-    Id: From<Tx> + PartialOrd + Ord + Eq + Hash + Clone,
+    Id: for<'t> From<&'t Tx> + PartialOrd + Ord + Eq + Hash + Clone,
     Tx: Clone + Send + Sync + 'static + Hash,
 {
     type Settings = ();
@@ -50,7 +50,7 @@ where
     }
 
     fn add_tx(&mut self, tx: Self::Tx) -> Result<(), overwatch_rs::DynError> {
-        let id = Id::from(tx.clone());
+        let id = Id::from(&tx);
         if self.pending_txs.contains_key(&id) || self.in_block_txs_by_id.contains_key(&id) {
             return Ok(());
         }

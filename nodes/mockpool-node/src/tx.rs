@@ -8,8 +8,8 @@ pub struct Tx(pub String);
 #[derive(Debug, Eq, Hash, PartialEq, Ord, Clone, PartialOrd)]
 pub struct TxId([u8; 32]);
 
-impl From<Tx> for TxId {
-    fn from(tx: Tx) -> Self {
+impl From<&Tx> for TxId {
+    fn from(tx: &Tx) -> Self {
         let mut hasher = Blake2b512::new();
         hasher.update(bincode::serde::encode_to_vec(tx, bincode::config::standard()).unwrap());
         let mut id = [0u8; 32];
