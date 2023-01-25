@@ -7,7 +7,6 @@ use nomos_network::{
 use overwatch_rs::services::{relay::OutboundRelay, ServiceData};
 use tokio_stream::Stream;
 
-
 use crate::{
     network::{
         messages::{ApprovalMsg, ProposalChunkMsg},
@@ -16,13 +15,15 @@ use crate::{
     Approval, View,
 };
 
-const CHUNK_SIZE: usize = 8;
-
-pub struct MockAdapter {
-    network_relay: OutboundRelay<<NetworkService<Mock> as ServiceData>::Message>,
+pub struct MockAdapter<D = rand::distributions::Standard>
+where D: rand::distributions::Distribution<usize> + core::fmt::Debug + Clone + Send + Sync + 'static
+{
+    network_relay: OutboundRelay<<NetworkService<Mock<D>> as ServiceData>::Message>,
 }
 
-impl MockAdapter {
+impl<D> MockAdapter<D>
+where D: rand::distributions::Distribution<usize> + core::fmt::Debug + Clone + Send + Sync + 'static
+{
     async fn message_subscriber_channel(
         &self,
     ) -> Result<
@@ -45,8 +46,10 @@ impl MockAdapter {
 }
 
 #[async_trait::async_trait]
-impl NetworkAdapter for MockAdapter {
-    type Backend = Mock;
+impl<D> NetworkAdapter for MockAdapter<D> 
+where D: rand::distributions::Distribution<usize> + core::fmt::Debug + Clone + Send + Sync + 'static
+{
+    type Backend = Mock<D>;
 
     async fn new(
         network_relay: OutboundRelay<<NetworkService<Self::Backend> as ServiceData>::Message>,
