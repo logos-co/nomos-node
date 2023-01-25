@@ -21,8 +21,8 @@ use tokio::sync::{mpsc::Sender, oneshot};
 use crate::backends::HttpBackend;
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct Config<B: HttpBackend> {
-    pub backend: B::Config,
+pub struct HttpServiceSettings<B: HttpBackend> {
+    pub backend: B::Settings,
 }
 
 pub struct HttpService<B: HttpBackend> {
@@ -32,7 +32,7 @@ pub struct HttpService<B: HttpBackend> {
 
 impl<B: HttpBackend + 'static> ServiceData for HttpService<B> {
     const SERVICE_ID: ServiceId = "Http";
-    type Settings = Config<B>;
+    type Settings = HttpServiceSettings<B>;
     type State = NoState<Self::Settings>;
     type StateOperator = NoOperator<Self::State>;
     type Message = HttpMsg;
@@ -171,7 +171,7 @@ where
     }
 }
 
-impl<B: HttpBackend> Clone for Config<B> {
+impl<B: HttpBackend> Clone for HttpServiceSettings<B> {
     fn clone(&self) -> Self {
         Self {
             backend: self.backend.clone(),

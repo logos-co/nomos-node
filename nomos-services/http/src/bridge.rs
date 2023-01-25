@@ -68,13 +68,13 @@ pub struct HttpBridgeService {
 
 #[derive(Clone)]
 pub struct HttpBridgeSettings {
-    pub runners: Vec<HttpBridge>,
+    pub bridges: Vec<HttpBridge>,
 }
 
 impl Debug for HttpBridgeSettings {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("RouterSettings")
-            .field("runners len", &self.runners.len())
+            .field("runners len", &self.bridges.len())
             .finish()
     }
 }
@@ -90,7 +90,7 @@ impl ServiceData for HttpBridgeService {
 #[async_trait]
 impl ServiceCore for HttpBridgeService {
     fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, DynError> {
-        let runners = service_state.settings_reader.get_updated_settings().runners;
+        let runners = service_state.settings_reader.get_updated_settings().bridges;
         let runners: Vec<_> = runners
             .into_iter()
             .map(|r| (r)(service_state.overwatch_handle.clone()))

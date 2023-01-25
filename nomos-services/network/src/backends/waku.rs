@@ -15,6 +15,12 @@ pub struct Waku {
     message_event: Sender<NetworkEvent>,
 }
 
+#[derive(Serialize, Deserialize, Debug)]
+pub struct WakuInfo {
+    pub listen_addresses: Option<Vec<Multiaddr>>,
+    pub peer_id: Option<PeerId>,
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct WakuConfig {
     #[serde(flatten)]
@@ -46,6 +52,9 @@ pub enum WakuBackendMessage {
         topic: Option<WakuPubSubTopic>,
         peer_id: PeerId,
     },
+    Info {
+        reply_channel: oneshot::Sender<WakuInfo>,
+    },
 }
 
 #[derive(Debug)]
@@ -68,7 +77,6 @@ impl NetworkBackend for Waku {
 
     fn new(config: Self::Settings) -> Self {
         let waku = waku_new(Some(config.inner)).unwrap().start().unwrap();
-        waku.relay_subscribe(None).unwrap();
         tracing::info!("waku listening on {}", waku.listen_addresses().unwrap()[0]);
         for peer in &config.initial_peers {
             if let Err(e) = waku.connect_peer_with_address(peer, None) {
@@ -161,6 +169,19 @@ impl NetworkBackend for Waku {
                     )
                 }
             },
+            WakuBackendMessage::Info { reply_channel } => {
+                let listen_addresses = self.waku.listen_addresses().ok();
+                let peer_id = self.waku.peer_id().ok();
+                if reply_channel
+                    .send(WakuInfo {
+                        listen_addresses,
+                        peer_id,
+                    })
+                    .is_err()
+                {
+                    error!("could not send waku info");
+                }
+            }
         };
     }
 

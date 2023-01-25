@@ -10,11 +10,11 @@ use crate::http::{HttpRequest, Route};
 
 #[async_trait::async_trait]
 pub trait HttpBackend {
-    type Config: Clone + Debug + Send + Sync + 'static;
-    type State: ServiceState<Settings = Self::Config> + Clone;
+    type Settings: Clone + Debug + Send + Sync + 'static;
+    type State: ServiceState<Settings = Self::Settings> + Clone;
     type Error: std::fmt::Display;
 
-    fn new(config: Self::Config) -> Result<Self, Self::Error>
+    fn new(config: Self::Settings) -> Result<Self, Self::Error>
     where
         Self: Sized;
 
