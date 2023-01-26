@@ -110,7 +110,7 @@ impl NetworkAdapter for WakuAdapter {
         };
     }
 
-    async fn approvals_stream(&self) -> Box<dyn Stream<Item = Approval>> {
+    async fn approvals_stream(&self) -> Box<dyn Stream<Item = Approval> + Send> {
         let stream_channel = self
             .message_subscriber_channel()
             .await
