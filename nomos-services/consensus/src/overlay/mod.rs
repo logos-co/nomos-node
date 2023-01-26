@@ -1,5 +1,4 @@
-#[allow(unused)]
-mod committees;
+pub mod committees;
 mod flat;
 
 // std

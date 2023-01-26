@@ -8,6 +8,7 @@ use crate::network::{
     messages::{ApprovalMsg, ProposalChunkMsg},
     NetworkAdapter,
 };
+use crate::overlay::committees::Committee;
 use crate::{Approval, View};
 use nomos_network::{
     backends::waku::{EventKind, NetworkEvent, Waku, WakuBackendMessage},
@@ -18,12 +19,6 @@ use waku_bindings::{Encoding, WakuContentTopic, WakuMessage, WakuPubSubTopic};
 
 const WAKU_CARNOT_PUB_SUB_TOPIC: WakuPubSubTopic =
     WakuPubSubTopic::new("CarnotSim", Encoding::Proto);
-
-const WAKU_CARNOT_BLOCK_CONTENT_TOPIC: WakuContentTopic =
-    WakuContentTopic::new("CarnotSim", 1, "CarnotBlock", Encoding::Proto);
-
-const WAKU_CARNOT_APPROVAL_CONTENT_TOPIC: WakuContentTopic =
-    WakuContentTopic::new("CarnotSim", 1, "CarnotApproval", Encoding::Proto);
 
 pub struct WakuAdapter {
     network_relay: OutboundRelay<<NetworkService<Waku> as ServiceData>::Message>,
@@ -61,7 +56,11 @@ impl NetworkAdapter for WakuAdapter {
         Self { network_relay }
     }
 
-    async fn proposal_chunks_stream(&self) -> Box<dyn Stream<Item = Bytes> + Send + Sync + Unpin> {
+    async fn proposal_chunks_stream(
+        &self,
+        committee: Committee,
+        view: &View,
+    ) -> Box<dyn Stream<Item = Bytes> + Send + Sync + Unpin> {
         let stream_channel = self
             .message_subscriber_channel()
             .await
@@ -89,7 +88,12 @@ impl NetworkAdapter for WakuAdapter {
         }))
     }
 
-    async fn broadcast_block_chunk(&self, _view: &View, chunk_message: ProposalChunkMsg) {
+    async fn broadcast_block_chunk(
+        &self,
+        committee: Committee,
+        view: &View,
+        chunk_message: ProposalChunkMsg,
+    ) {
         // TODO: probably later, depending on the view we should map to different content topics
         // but this is an ongoing idea that should/will be discus.
         let message = WakuMessage::new(
@@ -110,7 +114,11 @@ impl NetworkAdapter for WakuAdapter {
         };
     }
 
-    async fn approvals_stream(&self) -> Box<dyn Stream<Item = Approval> + Send> {
+    async fn approvals_stream(
+        &self,
+        committee: Committee,
+        view: &View,
+    ) -> Box<dyn Stream<Item = Approval> + Send> {
         let stream_channel = self
             .message_subscriber_channel()
             .await
@@ -138,7 +146,12 @@ impl NetworkAdapter for WakuAdapter {
         )
     }
 
-    async fn forward_approval(&self, approval_message: ApprovalMsg) {
+    async fn forward_approval(
+        &self,
+        committee: Committee,
+        view: &View,
+        approval_message: ApprovalMsg,
+    ) {
         let message = WakuMessage::new(
             approval_message.as_bytes(),
             WAKU_CARNOT_APPROVAL_CONTENT_TOPIC,
