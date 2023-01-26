@@ -1,10 +1,16 @@
 use super::*;
 use futures::{select, FutureExt};
 use overwatch_rs::services::state::NoState;
-use parking_lot::Mutex;
+
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, sync::Arc};
-use tokio::sync::broadcast::{self, Receiver, Sender};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::{Arc, Mutex},
+};
+use tokio::sync::{
+    broadcast::{self, Receiver, Sender},
+    mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender},
+};
 use tracing::debug;
 
 const BROADCAST_CHANNEL_BUF: usize = 16;
@@ -33,7 +39,7 @@ impl MockContentTopic {
     }
 }
 
-/// A mock pubsub topic in the form of `/mock/v2/{topic_name}/{encoding}`
+/// A mock pubsub topic in the form of `/mock/{topic_name}/`
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct MockPubSubTopic {
     pub topic_name: &'static str,
@@ -71,10 +77,11 @@ impl MockMessage {
 pub struct Mock<D: rand::distributions::Distribution<usize>> {
     messages: Arc<Mutex<HashMap<&'static str, Vec<String>>>>,
     message_event: Sender<NetworkEvent>,
-    subscribe_tx: async_channel::Sender<&'static str>,
-    subscribe_rx: async_channel::Receiver<&'static str>,
-    unsubscribe_tx: async_channel::Sender<&'static str>,
-    unsubscribe_rx: async_channel::Receiver<&'static str>,
+    subscribed_topics: HashSet<&'static str>,
+    subscribe_tx: UnboundedSender<&'static str>,
+    subscribe_rx: UnboundedReceiver<&'static str>,
+    unsubscribe_tx: UnboundedSender<&'static str>,
+    unsubscribe_rx: UnboundedReceiver<&'static str>,
     config: MockConfig<D>,
 }
 
@@ -85,12 +92,13 @@ pub struct MockConfig<D = rand::distributions::Standard> {
     pub distributions: D,
     pub seed: u64,
     pub version: usize,
+    pub weights: Option<Vec<usize>>,
 }
 
 /// Interaction with Mock node
 #[derive(Debug)]
 pub enum MockBackendMessage {
-    Normal {
+    Broadcast {
         topic: &'static str,
         msg: String,
     },
@@ -117,18 +125,60 @@ pub enum NetworkEvent {
 }
 
 impl<D: rand::distributions::Distribution<usize> + Clone + Debug + Send + Sync + 'static> Mock<D> {
-    pub fn producer(&self) -> MockProducer<D> {
-        MockProducer::<D>::new(
-            self.message_event.clone(),
-            self.config.predefined_messages.clone(),
-            self.config.duration,
-            self.config.distributions.clone(),
-            self.config.seed,
-        )
+    /// Run producer message handler
+    pub async fn run_producer_handler(&self) {
+        use rand::SeedableRng;
+        let messages = self
+            .config
+            .distributions
+            .clone()
+            .sample_iter(rand::rngs::StdRng::seed_from_u64(self.config.seed))
+            .take(self.config.predefined_messages.len())
+            .map(|idx| self.config.predefined_messages[idx].clone())
+            .collect::<Vec<_>>();
+
+        for msg in messages {
+            tokio::time::sleep(self.config.duration).await;
+            match self.message_event.send(NetworkEvent::RawMessage(msg)) {
+                Ok(peers) => {
+                    tracing::debug!("sent message to {} peers", peers);
+                }
+                Err(e) => {
+                    tracing::error!("error sending message: {:?}", e);
+                }
+            };
+        }
     }
 
-    pub fn subscriber(&self) -> MockSubscriber {
-        MockSubscriber::new(self.subscribe_rx.clone(), self.unsubscribe_rx.clone())
+    /// Run subscriber message handler.
+    pub async fn run_subscribe_handler(&mut self) {
+        loop {
+            select! {
+                topic = self.subscribe_rx.recv().fuse() => {
+                    match topic {
+                        Some(topic) => {
+                            tracing::debug!("subscribed to topic: {}", topic);
+                            self.subscribed_topics.insert(topic);
+                        },
+                        None => {
+                            tracing::error!("error subscribing to topic");
+                        }
+                    }
+                }
+                topic = self.unsubscribe_rx.recv().fuse() => {
+                    match topic {
+                        Some(topic) => {
+                            tracing::debug!("unsubscribed from topic: {}", topic);
+                            self.subscribed_topics.remove(topic);
+                        }
+                        None => {
+                            tracing::error!("error unsubscribing from topic");
+                        }
+                    }
+                }
+                default => {}
+            }
+        }
     }
 }
 
@@ -145,10 +195,11 @@ impl<D: rand::distributions::Distribution<usize> + Debug + Clone + Send + Sync +
     fn new(config: Self::Settings) -> Self {
         let message_event = broadcast::channel(BROADCAST_CHANNEL_BUF).0;
 
-        let (subscribe_tx, subscribe_rx) = async_channel::unbounded();
-        let (unsubscribe_tx, unsubscribe_rx) = async_channel::unbounded();
+        let (subscribe_tx, subscribe_rx) = unbounded_channel();
+        let (unsubscribe_tx, unsubscribe_rx) = unbounded_channel();
 
         Self {
+            subscribed_topics: HashSet::new(),
             subscribe_tx,
             subscribe_rx,
             unsubscribe_tx,
@@ -167,9 +218,9 @@ impl<D: rand::distributions::Distribution<usize> + Debug + Clone + Send + Sync +
 
     async fn process(&self, msg: Self::Message) {
         match msg {
-            MockBackendMessage::Normal { topic, msg } => {
+            MockBackendMessage::Broadcast { topic, msg } => {
                 debug!("processed normal message");
-                let mut normal_msgs = self.messages.lock();
+                let mut normal_msgs = self.messages.lock().unwrap();
                 normal_msgs
                     .entry(topic)
                     .or_insert_with(Vec::new)
@@ -186,7 +237,7 @@ impl<D: rand::distributions::Distribution<usize> + Debug + Clone + Send + Sync +
             }
             MockBackendMessage::RelaySubscribe { topic } => {
                 debug!("processed relay subscription for topic: {topic}");
-                match self.subscribe_tx.send(topic).await {
+                match self.subscribe_tx.send(topic) {
                     Ok(_) => {}
                     Err(e) => {
                         tracing::error!("failed to send subscription: {e}");
@@ -195,7 +246,7 @@ impl<D: rand::distributions::Distribution<usize> + Debug + Clone + Send + Sync +
             }
             MockBackendMessage::RelayUnSubscribe { topic } => {
                 debug!("processed relay unsubscription for topic: {topic}");
-                match self.unsubscribe_tx.send(topic).await {
+                match self.unsubscribe_tx.send(topic) {
                     Ok(_) => {}
                     Err(e) => {
                         tracing::error!("failed to send subscription: {e}");
@@ -204,7 +255,7 @@ impl<D: rand::distributions::Distribution<usize> + Debug + Clone + Send + Sync +
             }
             MockBackendMessage::Query { topic, tx } => {
                 debug!("processed query");
-                let normal_msgs = self.messages.lock();
+                let normal_msgs = self.messages.lock().unwrap();
                 let msgs = normal_msgs.get(&topic).cloned().unwrap_or_default();
                 drop(normal_msgs);
                 let _ = tx.send(msgs);
@@ -217,112 +268,6 @@ impl<D: rand::distributions::Distribution<usize> + Debug + Clone + Send + Sync +
             EventKind::Message => {
                 debug!("processed subscription to incoming messages");
                 self.message_event.subscribe()
-            }
-        }
-    }
-}
-
-/// handle mock messages producer
-pub struct MockProducer<D: rand::distributions::Distribution<usize> = rand::distributions::Standard>
-{
-    distributions: D,
-    predefined_messages: Vec<MockMessage>,
-    duration: std::time::Duration,
-    tx: Sender<NetworkEvent>,
-    seed: u64,
-}
-
-impl<D: rand::distributions::Distribution<usize>> MockProducer<D> {
-    pub fn new(
-        tx: Sender<NetworkEvent>,
-        predefined_messages: Vec<MockMessage>,
-        duration: std::time::Duration,
-        distributions: D,
-        seed: u64,
-    ) -> Self {
-        Self {
-            predefined_messages,
-            duration,
-            tx,
-            distributions,
-            seed,
-        }
-    }
-
-    pub async fn run(self) {
-        use rand::SeedableRng;
-        let messages = self
-            .distributions
-            .sample_iter(rand::rngs::StdRng::seed_from_u64(self.seed))
-            .take(self.predefined_messages.len())
-            .map(|idx| self.predefined_messages[idx].clone())
-            .collect::<Vec<_>>();
-
-        for msg in messages {
-            tokio::time::sleep(self.duration).await;
-            match self.tx.clone().send(NetworkEvent::RawMessage(msg)) {
-                Ok(peers) => {
-                    tracing::debug!("sent message to {} peers", peers);
-                }
-                Err(e) => {
-                    tracing::error!("error sending message: {:?}", e);
-                }
-            };
-        }
-    }
-}
-
-/// handle mock subscribe messages
-pub struct MockSubscriber {
-    subscribed_topics: HashMap<&'static str, usize>,
-    subscribe_rx: async_channel::Receiver<&'static str>,
-    unsubscribe_rx: async_channel::Receiver<&'static str>,
-}
-
-impl MockSubscriber {
-    pub fn new(
-        subscribe_rx: async_channel::Receiver<&'static str>,
-        unsubscribe_rx: async_channel::Receiver<&'static str>,
-    ) -> Self {
-        Self {
-            subscribed_topics: Default::default(),
-            subscribe_rx,
-            unsubscribe_rx,
-        }
-    }
-
-    pub async fn run(mut self) {
-        loop {
-            select! {
-                topic = self.subscribe_rx.recv().fuse() => {
-                    match topic {
-                        Ok(topic) => {
-                            tracing::debug!("subscribed to topic: {}", topic);
-                            self.subscribed_topics.entry(topic).and_modify(|v| *v += 1).or_insert(1);
-                        },
-                        Err(e) => {
-                            tracing::error!("error subscribing to topic: {:?}", e);
-                        }
-                    }
-                }
-                topic = self.unsubscribe_rx.recv().fuse() => {
-                    match topic {
-                        Ok(topic) => {
-                            tracing::debug!("unsubscribed from topic: {}", topic);
-                            self.subscribed_topics.entry(topic).and_modify(|v| {
-                                if *v == 0 {
-                                    panic!("unsubscribed from topic {} more times than subscribed", topic);
-                                } else {
-                                    *v -= 1;
-                                }
-                            });
-                        }
-                        Err(e) => {
-                            tracing::error!("error unsubscribing from topic: {:?}", e);
-                        }
-                    }
-                }
-                default => {}
             }
         }
     }

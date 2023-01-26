@@ -16,13 +16,15 @@ use crate::{
 };
 
 pub struct MockAdapter<D = rand::distributions::Standard>
-where D: rand::distributions::Distribution<usize> + core::fmt::Debug + Clone + Send + Sync + 'static
+where
+    D: rand::distributions::Distribution<usize> + core::fmt::Debug + Clone + Send + Sync + 'static,
 {
     network_relay: OutboundRelay<<NetworkService<Mock<D>> as ServiceData>::Message>,
 }
 
 impl<D> MockAdapter<D>
-where D: rand::distributions::Distribution<usize> + core::fmt::Debug + Clone + Send + Sync + 'static
+where
+    D: rand::distributions::Distribution<usize> + core::fmt::Debug + Clone + Send + Sync + 'static,
 {
     async fn message_subscriber_channel(
         &self,
@@ -46,8 +48,9 @@ where D: rand::distributions::Distribution<usize> + core::fmt::Debug + Clone + S
 }
 
 #[async_trait::async_trait]
-impl<D> NetworkAdapter for MockAdapter<D> 
-where D: rand::distributions::Distribution<usize> + core::fmt::Debug + Clone + Send + Sync + 'static
+impl<D> NetworkAdapter for MockAdapter<D>
+where
+    D: rand::distributions::Distribution<usize> + core::fmt::Debug + Clone + Send + Sync + 'static,
 {
     type Backend = Mock<D>;
 

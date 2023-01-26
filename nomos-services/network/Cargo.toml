@@ -7,12 +7,12 @@ edition = "2021"
 
 [dependencies]
 async-trait = "0.1"
-async-channel = { version = "1.8", optional = true }
 bytes = "1.2"
 chrono = { version = "0.4", optional = true }
 overwatch-rs = { git = "https://github.com/logos-co/Overwatch", branch = "main" }
 multiaddr = "0.15"
 serde = "1.0"
+sscanf = { version = "0.4", optional = true }
 sled = { version = "0.34", optional = true }
 tokio = { version = "1", features = ["sync"] }
 thiserror = "1.0"
@@ -28,4 +28,4 @@ parking_lot = "0.12"
 [features]
 default = []
 waku = ["waku-bindings"]
-mock = ["rand", "async-channel", "chrono"]
+mock = ["rand", "chrono"]
