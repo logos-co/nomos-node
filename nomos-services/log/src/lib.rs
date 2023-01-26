@@ -118,7 +118,7 @@ mod serde_level {
     {
         <String>::deserialize(deserializer).and_then(|v| {
             v.parse()
-                .map_err(|e| D::Error::custom(format!("invalid log level {}", e)))
+                .map_err(|e| D::Error::custom(format!("invalid log level {e}")))
         })
     }
 
