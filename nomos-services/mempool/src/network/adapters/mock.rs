@@ -51,6 +51,7 @@ where
             _tx: Default::default(),
         }
     }
+
     async fn transactions_stream(&self) -> Box<dyn Stream<Item = Self::Tx> + Unpin + Send> {
         let (sender, receiver) = tokio::sync::oneshot::channel();
         if let Err((_, e)) = self

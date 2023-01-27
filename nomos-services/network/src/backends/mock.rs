@@ -125,15 +125,9 @@ impl Mock {
     pub async fn run_producer_handler(&self) -> Result<(), overwatch_rs::DynError> {
         match &self.config.weights {
             // if user provides weights, then we send the predefined messages according to the weights endlessly
-            Some(weights) => {
-                self.run_endless_producer(weights).await?;
-                Ok(())
-            }
+            Some(weights) => self.run_endless_producer(weights).await,
             // if user do not provide weights, then we just send the predefined messages one by one in order
-            None => {
-                self.run_in_order_producer().await?;
-                Ok(())
-            }
+            None => self.run_in_order_producer().await,
         }
     }
 
