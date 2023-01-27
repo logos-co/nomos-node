@@ -1,7 +1,10 @@
+// internal
 use super::*;
+
+// crates
 use futures::{select, FutureExt};
 use overwatch_rs::services::state::NoState;
-
+use rand::{distributions::{WeightedIndex, Distribution}, rngs::StdRng, SeedableRng};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{HashMap, HashSet},
@@ -126,28 +129,43 @@ pub enum NetworkEvent {
 
 impl<D: rand::distributions::Distribution<usize> + Clone + Debug + Send + Sync + 'static> Mock<D> {
     /// Run producer message handler
-    pub async fn run_producer_handler(&self) {
-        use rand::SeedableRng;
-        let messages = self
-            .config
-            .distributions
-            .clone()
-            .sample_iter(rand::rngs::StdRng::seed_from_u64(self.config.seed))
-            .take(self.config.predefined_messages.len())
-            .map(|idx| self.config.predefined_messages[idx].clone())
-            .collect::<Vec<_>>();
-
-        for msg in messages {
-            tokio::time::sleep(self.config.duration).await;
-            match self.message_event.send(NetworkEvent::RawMessage(msg)) {
-                Ok(peers) => {
-                    tracing::debug!("sent message to {} peers", peers);
+    pub async fn run_producer_handler(&self) -> Result<(), overwatch_rs::DynError> {
+        match &self.config.weights {
+            // if user provides weights, then we send the predefined messages according to the weights endlessly
+            Some(weights) => {
+                let dist = WeightedIndex::new(weights.iter())?;
+                let mut rng = StdRng::seed_from_u64(self.config.seed);
+                loop {
+                    let idx = dist.sample(&mut rng);
+                    tokio::time::sleep(self.config.duration).await;
+                    match self.message_event.send(NetworkEvent::RawMessage(
+                        self.config.predefined_messages[idx].clone(),
+                    )) {
+                        Ok(peers) => {
+                            tracing::debug!("sent message to {} peers", peers);
+                        }
+                        Err(e) => {
+                            tracing::error!("error sending message: {:?}", e);
+                        }
+                    };
                 }
-                Err(e) => {
-                    tracing::error!("error sending message: {:?}", e);
+            },
+            // if user do not provide weights, then we just send the predefined messages one by one in order
+            None => {
+                for msg in &self.config.predefined_messages {
+                    tokio::time::sleep(self.config.duration).await;
+                    match self.message_event.send(NetworkEvent::RawMessage(msg.clone())) {
+                        Ok(peers) => {
+                            tracing::debug!("sent message to {} peers", peers);
+                        }
+                        Err(e) => {
+                            tracing::error!("error sending message: {:?}", e);
+                        }
+                    };
                 }
-            };
+            },
         }
+        Ok(())
     }
 
     /// Run subscriber message handler.
