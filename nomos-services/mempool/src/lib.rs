@@ -61,19 +61,14 @@ impl<Tx: Debug, Id: Debug> Debug for MempoolMsg<Tx, Id> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
         match self {
             Self::View { ancestor_hint, .. } => {
-                write!(
-                    f,
-                    "MempoolMsg::View {{ ancestor_hint: {:?}}}",
-                    ancestor_hint
-                )
+                write!(f, "MempoolMsg::View {{ ancestor_hint: {ancestor_hint:?}}}")
             }
-            Self::AddTx { tx } => write!(f, "MempoolMsg::AddTx{{tx: {:?}}}", tx),
-            Self::Prune { ids } => write!(f, "MempoolMsg::Prune{{ids: {:?}}}", ids),
+            Self::AddTx { tx } => write!(f, "MempoolMsg::AddTx{{tx: {tx:?}}}"),
+            Self::Prune { ids } => write!(f, "MempoolMsg::Prune{{ids: {ids:?}}}"),
             Self::MarkInBlock { ids, block } => {
                 write!(
                     f,
-                    "MempoolMsg::MarkInBlock{{ids: {:?}, block: {:?}}}",
-                    ids, block
+                    "MempoolMsg::MarkInBlock{{ids: {ids:?}, block: {block:?}}}"
                 )
             }
             Self::Metrics { .. } => write!(f, "MempoolMsg::Metrics"),

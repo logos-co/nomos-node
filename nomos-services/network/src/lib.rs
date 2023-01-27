@@ -27,11 +27,10 @@ pub enum NetworkMsg<B: NetworkBackend> {
 impl<B: NetworkBackend> Debug for NetworkMsg<B> {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Self::Process(msg) => write!(fmt, "NetworkMsg::Process({:?})", msg),
+            Self::Process(msg) => write!(fmt, "NetworkMsg::Process({msg:?})"),
             Self::Subscribe { kind, sender } => write!(
                 fmt,
-                "NetworkMsg::Subscribe{{ kind: {:?}, sender: {:?}}}",
-                kind, sender
+                "NetworkMsg::Subscribe{{ kind: {kind:?}, sender: {sender:?}}}"
             ),
         }
     }
