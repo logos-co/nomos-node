@@ -25,6 +25,9 @@ tracing-gelf = "0.7"
 futures = "0.3"
 parking_lot = "0.12"
 
+[dev-dependencies]
+tokio = { version = "1", features = ["full"] }
+
 [features]
 default = []
 waku = ["waku-bindings"]

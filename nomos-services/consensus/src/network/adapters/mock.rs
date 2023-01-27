@@ -15,13 +15,11 @@ use crate::{
     Approval, View,
 };
 
-pub struct MockAdapter
-{
+pub struct MockAdapter {
     network_relay: OutboundRelay<<NetworkService<Mock> as ServiceData>::Message>,
 }
 
-impl MockAdapter
-{
+impl MockAdapter {
     async fn message_subscriber_channel(
         &self,
     ) -> Result<
@@ -44,8 +42,7 @@ impl MockAdapter
 }
 
 #[async_trait::async_trait]
-impl NetworkAdapter for MockAdapter
-{
+impl NetworkAdapter for MockAdapter {
     type Backend = Mock;
 
     async fn new(

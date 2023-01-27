@@ -16,8 +16,7 @@ use crate::network::NetworkAdapter;
 const MOCK_PUB_SUB_TOPIC: &str = "MockPubSubTopic";
 const MOCK_CONTENT_TOPIC: &str = "MockContentTopic";
 
-pub struct MockAdapter<Tx>
-{
+pub struct MockAdapter<Tx> {
     network_relay: OutboundRelay<<NetworkService<Mock> as ServiceData>::Message>,
     _tx: PhantomData<Tx>,
 }
@@ -25,7 +24,7 @@ pub struct MockAdapter<Tx>
 #[async_trait::async_trait]
 impl<Tx> NetworkAdapter for MockAdapter<Tx>
 where
-    Tx: From<String> + DeserializeOwned + Send + Sync + 'static
+    Tx: From<String> + DeserializeOwned + Send + Sync + 'static,
 {
     type Backend = Mock;
     type Tx = Tx;
@@ -54,7 +53,7 @@ where
     }
     async fn transactions_stream(&self) -> Box<dyn Stream<Item = Self::Tx> + Unpin + Send> {
         let (sender, receiver) = tokio::sync::oneshot::channel();
-        if let Err((_, _e)) = self
+        if let Err((_, e)) = self
             .network_relay
             .send(NetworkMsg::Subscribe {
                 kind: EventKind::Message,
@@ -62,7 +61,7 @@ where
             })
             .await
         {
-            todo!("log error");
+            tracing::error!(err = ?e);
         };
         let receiver = receiver.await.unwrap();
         Box::new(Box::pin(BroadcastStream::new(receiver).filter_map(
@@ -81,3 +80,6 @@ where
         )))
     }
 }
+
+#[cfg(test)]
+mod tests {}

@@ -2,25 +2,24 @@
 use super::*;
 
 // crates
-use futures::{select, FutureExt};
 use overwatch_rs::services::state::NoState;
-use rand::{distributions::{WeightedIndex, Distribution}, rngs::StdRng, SeedableRng};
+use rand::{
+    distributions::{Distribution, WeightedIndex},
+    rngs::StdRng,
+    SeedableRng,
+};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{HashMap, HashSet},
     sync::{Arc, Mutex},
 };
-use tokio::sync::{
-    broadcast::{self, Receiver, Sender},
-    mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender},
-};
+use tokio::sync::broadcast::{self, Receiver, Sender};
 use tracing::debug;
 
 const BROADCAST_CHANNEL_BUF: usize = 16;
 
 pub type MockMessageVersion = usize;
 
-/// A mock content topic `/{application_name}/{version}/{content_topic_name}`
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct MockContentTopic {
     pub application_name: &'static str,
@@ -42,7 +41,6 @@ impl MockContentTopic {
     }
 }
 
-/// A mock pubsub topic in the form of `/mock/{topic_name}/`
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct MockPubSubTopic {
     pub topic_name: &'static str,
@@ -80,11 +78,7 @@ impl MockMessage {
 pub struct Mock {
     messages: Arc<Mutex<HashMap<&'static str, Vec<String>>>>,
     message_event: Sender<NetworkEvent>,
-    subscribed_topics: HashSet<&'static str>,
-    subscribe_tx: UnboundedSender<&'static str>,
-    subscribe_rx: UnboundedReceiver<&'static str>,
-    unsubscribe_tx: UnboundedSender<&'static str>,
-    unsubscribe_rx: UnboundedReceiver<&'static str>,
+    subscribed_topics: Arc<Mutex<HashSet<&'static str>>>,
     config: MockConfig,
 }
 
@@ -148,12 +142,15 @@ impl Mock {
                         }
                     };
                 }
-            },
+            }
             // if user do not provide weights, then we just send the predefined messages one by one in order
             None => {
                 for msg in &self.config.predefined_messages {
                     tokio::time::sleep(self.config.duration).await;
-                    match self.message_event.send(NetworkEvent::RawMessage(msg.clone())) {
+                    match self
+                        .message_event
+                        .send(NetworkEvent::RawMessage(msg.clone()))
+                    {
                         Ok(peers) => {
                             tracing::debug!("sent message to {} peers", peers);
                         }
@@ -162,47 +159,14 @@ impl Mock {
                         }
                     };
                 }
-            },
-        }
-        Ok(())
-    }
-
-    /// Run subscriber message handler.
-    pub async fn run_subscribe_handler(&mut self) {
-        loop {
-            select! {
-                topic = self.subscribe_rx.recv().fuse() => {
-                    match topic {
-                        Some(topic) => {
-                            tracing::debug!("subscribed to topic: {}", topic);
-                            self.subscribed_topics.insert(topic);
-                        },
-                        None => {
-                            tracing::error!("error subscribing to topic");
-                        }
-                    }
-                }
-                topic = self.unsubscribe_rx.recv().fuse() => {
-                    match topic {
-                        Some(topic) => {
-                            tracing::debug!("unsubscribed from topic: {}", topic);
-                            self.subscribed_topics.remove(topic);
-                        }
-                        None => {
-                            tracing::error!("error unsubscribing from topic");
-                        }
-                    }
-                }
-                default => {}
             }
         }
+        Ok(())
     }
 }
 
 #[async_trait::async_trait]
-impl
-    NetworkBackend for Mock
-{
+impl NetworkBackend for Mock {
     type Settings = MockConfig;
     type State = NoState<MockConfig>;
     type Message = MockBackendMessage;
@@ -212,15 +176,8 @@ impl
     fn new(config: Self::Settings) -> Self {
         let message_event = broadcast::channel(BROADCAST_CHANNEL_BUF).0;
 
-        let (subscribe_tx, subscribe_rx) = unbounded_channel();
-        let (unsubscribe_tx, unsubscribe_rx) = unbounded_channel();
-
         Self {
-            subscribed_topics: HashSet::new(),
-            subscribe_tx,
-            subscribe_rx,
-            unsubscribe_tx,
-            unsubscribe_rx,
+            subscribed_topics: Arc::new(Mutex::new(HashSet::new())),
             messages: Arc::new(Mutex::new(
                 config
                     .predefined_messages
@@ -254,21 +211,11 @@ impl
             }
             MockBackendMessage::RelaySubscribe { topic } => {
                 debug!("processed relay subscription for topic: {topic}");
-                match self.subscribe_tx.send(topic) {
-                    Ok(_) => {}
-                    Err(e) => {
-                        tracing::error!("failed to send subscription: {e}");
-                    }
-                }
+                self.subscribed_topics.lock().unwrap().insert(topic);
             }
             MockBackendMessage::RelayUnSubscribe { topic } => {
                 debug!("processed relay unsubscription for topic: {topic}");
-                match self.unsubscribe_tx.send(topic) {
-                    Ok(_) => {}
-                    Err(e) => {
-                        tracing::error!("failed to send subscription: {e}");
-                    }
-                }
+                self.subscribed_topics.lock().unwrap().remove(topic);
             }
             MockBackendMessage::Query { topic, tx } => {
                 debug!("processed query");
@@ -287,5 +234,100 @@ impl
                 self.message_event.subscribe()
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_mock_network() {
+        let config = MockConfig {
+            predefined_messages: vec![
+                MockMessage {
+                    payload: "foo".to_string(),
+                    content_topic: MockContentTopic {
+                        application_name: "mock network",
+                        version: 0,
+                        content_topic_name: "foo",
+                    },
+                    version: 0,
+                    timestamp: 0,
+                },
+                MockMessage {
+                    payload: "bar".to_string(),
+                    content_topic: MockContentTopic {
+                        application_name: "mock network",
+                        version: 0,
+                        content_topic_name: "bar",
+                    },
+                    version: 0,
+                    timestamp: 0,
+                },
+            ],
+            duration: tokio::time::Duration::from_secs(1),
+            seed: 0,
+            version: 1,
+            weights: None,
+        };
+
+        let mock = Arc::new(Mock::new(config));
+        // run producer
+        let task = mock.clone();
+        tokio::spawn(async move {
+            task.run_producer_handler().await.unwrap();
+        });
+
+        static FOO_BROADCAST_MESSAGES: &[&str] = &["foo1", "foo2"];
+        static BAR_BROADCAST_MESSAGES: &[&str] = &["bar1"];
+
+        // broadcast
+        for val in FOO_BROADCAST_MESSAGES {
+            mock.process(MockBackendMessage::Broadcast {
+                topic: "foo",
+                msg: val.to_string(),
+            })
+            .await;
+        }
+
+        for val in BAR_BROADCAST_MESSAGES {
+            mock.process(MockBackendMessage::Broadcast {
+                topic: "bar",
+                msg: val.to_string(),
+            })
+            .await;
+        }
+
+        // query
+        let (qtx, qrx) = oneshot::channel();
+        mock.process(MockBackendMessage::Query {
+            topic: "foo",
+            tx: qtx,
+        })
+        .await;
+        let query_result = qrx.await.unwrap();
+        assert_eq!(query_result.len(), 2);
+        for idx in 0..FOO_BROADCAST_MESSAGES.len() {
+            assert_eq!(&query_result[idx], FOO_BROADCAST_MESSAGES[idx]);
+        }
+
+        // subscribe
+        mock.process(MockBackendMessage::RelaySubscribe { topic: "foo" })
+            .await;
+        mock.process(MockBackendMessage::RelaySubscribe { topic: "bar" })
+            .await;
+        assert!(mock.subscribed_topics.lock().unwrap().contains("foo"));
+        assert!(mock.subscribed_topics.lock().unwrap().contains("bar"));
+
+        // unsubscribe
+        mock.process(MockBackendMessage::RelayUnSubscribe { topic: "foo" })
+            .await;
+        assert!(!mock.subscribed_topics.lock().unwrap().contains("foo"));
+        assert!(mock.subscribed_topics.lock().unwrap().contains("bar"));
+        mock.process(MockBackendMessage::RelayUnSubscribe { topic: "bar" })
+            .await;
+        assert!(!mock.subscribed_topics.lock().unwrap().contains("foo"));
+        assert!(!mock.subscribed_topics.lock().unwrap().contains("bar"));
     }
 }
