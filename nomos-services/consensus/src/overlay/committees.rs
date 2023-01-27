@@ -9,6 +9,8 @@ use crate::network::NetworkAdapter;
 
 /// View of the tree overlay centered around a specific member
 pub struct Member<'view, const C: usize> {
+    // id is not used now, but gonna probably used it for later checking later on
+    #[allow(dead_code)]
     id: NodeId,
     committee: Committee,
     committees: Committees<'view, C>,
