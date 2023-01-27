@@ -27,4 +27,6 @@ pub trait MemPool {
     /// Signal that a set of transactions can't be possibly requested anymore and can be
     /// discarded.
     fn prune(&mut self, txs: &[Self::Id]);
+
+    fn pending_tx_count(&self) -> usize;
 }

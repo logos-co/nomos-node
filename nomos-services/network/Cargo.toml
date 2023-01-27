@@ -17,8 +17,8 @@ sled = { version = "0.34", optional = true }
 tokio = { version = "1", features = ["sync"] }
 thiserror = "1.0"
 tracing = "0.1"
-waku-bindings = { version = "0.1.0-beta2", optional = true }
 rand = { version = "0.8", optional = true }
+waku-bindings = { version = "0.1.0-beta3", optional = true }
 tracing-appender = "0.2"
 tracing-subscriber =  { version = "0.3", features = ["json"] }
 tracing-gelf = "0.7"

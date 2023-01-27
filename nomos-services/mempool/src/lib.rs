@@ -33,6 +33,10 @@ where
     pool: P,
 }
 
+pub struct MempoolMetrics {
+    pub pending_txs: usize,
+}
+
 pub enum MempoolMsg<Tx, Id> {
     AddTx {
         tx: Tx,
@@ -47,6 +51,9 @@ pub enum MempoolMsg<Tx, Id> {
     MarkInBlock {
         ids: Vec<Id>,
         block: BlockHeader,
+    },
+    Metrics {
+        reply_channel: Sender<MempoolMetrics>,
     },
 }
 
@@ -69,6 +76,7 @@ impl<Tx: Debug, Id: Debug> Debug for MempoolMsg<Tx, Id> {
                     ids, block
                 )
             }
+            Self::Metrics { .. } => write!(f, "MempoolMsg::Metrics"),
         }
     }
 }
@@ -142,6 +150,14 @@ where
                             pool.mark_in_block(&ids, block);
                         }
                         MempoolMsg::Prune { ids } => { pool.prune(&ids); },
+                        MempoolMsg::Metrics { reply_channel } => {
+                            let metrics = MempoolMetrics {
+                                pending_txs: pool.pending_tx_count(),
+                            };
+                            reply_channel.send(metrics).unwrap_or_else(|_| {
+                                tracing::debug!("could not send back mempool metrics")
+                            });
+                        }
                     }
                 }
                 Some(tx) = network_txs.next() => {
