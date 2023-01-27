@@ -82,4 +82,38 @@ where
 }
 
 #[cfg(test)]
-mod tests {}
+mod tests {
+    // use nomos_network::{backends::mock::{MockConfig, MockMessage, MockContentTopic}, NetworkConfig};
+    // use overwatch_rs::{overwatch::*, services::{ServiceCore, handle::ServiceHandle, relay::relay}};
+    // use overwatch_derive::*;
+
+    // use crate::{MempoolService, backend::mockpool::MockPool};
+
+    // use super::*;
+
+    #[tokio::test]
+    async fn test_mock_adapter() {
+        //TODO: finish this test case
+        // let (mut inbound, outbound) = relay(10);
+        // let adapter = MockAdapter::<String>::new(outbound).await;
+        // let mut stream = adapter.transactions_stream().await;
+        // tokio::spawn(async move {
+        //     while let Some(msg) = adapter.transactions_stream().await.next().await {
+
+        //     }
+        // });
+        // // let (sender, _receiver) = tokio::sync::oneshot::channel();
+        // if let Err((_, e)) = adapter
+        //     .network_relay
+        //     .send(NetworkMsg::Process(MockBackendMessage::Broadcast {
+        //         topic: MOCK_PUB_SUB_TOPIC,
+        //         msg: "hello".to_string(),
+        //     }))
+        //     .await
+        // {
+        //     tracing::error!(err = ?e);
+        // };
+        // let message = stream.next().await.unwrap();
+        // assert_eq!(message, "hello");
+    }
+}

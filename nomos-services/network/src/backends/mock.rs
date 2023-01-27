@@ -91,7 +91,7 @@ pub struct MockConfig {
     pub weights: Option<Vec<usize>>,
 }
 
-/// Interaction with Mock node
+/// Interaction with Mock backend
 #[derive(Debug)]
 pub enum MockBackendMessage {
     Broadcast {
@@ -126,40 +126,50 @@ impl Mock {
         match &self.config.weights {
             // if user provides weights, then we send the predefined messages according to the weights endlessly
             Some(weights) => {
-                let dist = WeightedIndex::new(weights.iter())?;
-                let mut rng = StdRng::seed_from_u64(self.config.seed);
-                loop {
-                    let idx = dist.sample(&mut rng);
-                    tokio::time::sleep(self.config.duration).await;
-                    match self.message_event.send(NetworkEvent::RawMessage(
-                        self.config.predefined_messages[idx].clone(),
-                    )) {
-                        Ok(peers) => {
-                            tracing::debug!("sent message to {} peers", peers);
-                        }
-                        Err(e) => {
-                            tracing::error!("error sending message: {:?}", e);
-                        }
-                    };
-                }
+                self.run_endless_producer(weights).await?;
+                Ok(())
             }
             // if user do not provide weights, then we just send the predefined messages one by one in order
             None => {
-                for msg in &self.config.predefined_messages {
-                    tokio::time::sleep(self.config.duration).await;
-                    match self
-                        .message_event
-                        .send(NetworkEvent::RawMessage(msg.clone()))
-                    {
-                        Ok(peers) => {
-                            tracing::debug!("sent message to {} peers", peers);
-                        }
-                        Err(e) => {
-                            tracing::error!("error sending message: {:?}", e);
-                        }
-                    };
-                }
+                self.run_in_order_producer().await?;
+                Ok(())
             }
+        }
+    }
+
+    async fn run_endless_producer(&self, weights: &[usize]) -> Result<(), overwatch_rs::DynError> {
+        let dist = WeightedIndex::new(weights.iter())?;
+        let mut rng = StdRng::seed_from_u64(self.config.seed);
+        loop {
+            let idx = dist.sample(&mut rng);
+            tokio::time::sleep(self.config.duration).await;
+            match self.message_event.send(NetworkEvent::RawMessage(
+                self.config.predefined_messages[idx].clone(),
+            )) {
+                Ok(peers) => {
+                    tracing::debug!("sent message to {} peers", peers);
+                }
+                Err(e) => {
+                    tracing::error!("error sending message: {:?}", e);
+                }
+            };
+        }
+    }
+
+    async fn run_in_order_producer(&self) -> Result<(), overwatch_rs::DynError> {
+        for msg in &self.config.predefined_messages {
+            tokio::time::sleep(self.config.duration).await;
+            match self
+                .message_event
+                .send(NetworkEvent::RawMessage(msg.clone()))
+            {
+                Ok(peers) => {
+                    tracing::debug!("sent message to {} peers", peers);
+                }
+                Err(e) => {
+                    tracing::error!("error sending message: {:?}", e);
+                }
+            };
         }
         Ok(())
     }
@@ -194,12 +204,12 @@ impl NetworkBackend for Mock {
         match msg {
             MockBackendMessage::Broadcast { topic, msg } => {
                 debug!("processed normal message");
-                let mut normal_msgs = self.messages.lock().unwrap();
-                normal_msgs
+                self.messages
+                    .lock()
+                    .unwrap()
                     .entry(topic)
                     .or_insert_with(Vec::new)
                     .push(msg.clone());
-                drop(normal_msgs);
                 let _ = self
                     .message_event
                     .send(NetworkEvent::RawMessage(MockMessage {
