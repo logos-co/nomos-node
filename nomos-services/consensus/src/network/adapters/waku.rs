@@ -1,4 +1,5 @@
 // std
+use std::borrow::Cow;
 // crates
 use bytes::Bytes;
 use futures::{Stream, StreamExt};
@@ -19,6 +20,9 @@ use waku_bindings::{Encoding, WakuContentTopic, WakuMessage, WakuPubSubTopic};
 
 const WAKU_CARNOT_PUB_SUB_TOPIC: WakuPubSubTopic =
     WakuPubSubTopic::new("CarnotSim", Encoding::Proto);
+
+const APPLICATION_NAME: &str = "CarnotSim";
+const VERSION: usize = 1;
 
 pub struct WakuAdapter {
     network_relay: OutboundRelay<<NetworkService<Waku> as ServiceData>::Message>,
@@ -65,27 +69,33 @@ impl NetworkAdapter for WakuAdapter {
             .message_subscriber_channel()
             .await
             .unwrap_or_else(|_e| todo!("handle error"));
-        Box::new(BroadcastStream::new(stream_channel).filter_map(|msg| {
-            Box::pin(async move {
-                match msg {
-                    Ok(event) => match event {
-                        NetworkEvent::RawMessage(message) => {
-                            // TODO: this should actually check the whole content topic,
-                            // waiting for this [PR](https://github.com/waku-org/waku-rust-bindings/pull/28)
-                            if WAKU_CARNOT_BLOCK_CONTENT_TOPIC.content_topic_name
-                                == message.content_topic().content_topic_name
-                            {
-                                let payload = message.payload();
-                                Some(ProposalChunkMsg::from_bytes(payload).chunk)
-                            } else {
-                                None
-                            }
+        let content_topic = WakuContentTopic {
+            application_name: Cow::Borrowed(APPLICATION_NAME),
+            version: VERSION,
+            content_topic_name: Cow::Owned(format!("proposal-{}-{}", committee.id(), view.id())),
+            encoding: Encoding::Proto,
+        };
+        Box::new(
+            BroadcastStream::new(stream_channel)
+                .zip(futures::stream::repeat(content_topic))
+                .filter_map(|(msg, content_topic)| {
+                    Box::pin(async move {
+                        match msg {
+                            Ok(event) => match event {
+                                NetworkEvent::RawMessage(message) => {
+                                    if &content_topic == message.content_topic() {
+                                        let payload = message.payload();
+                                        Some(ProposalChunkMsg::from_bytes(payload).chunk)
+                                    } else {
+                                        None
+                                    }
+                                }
+                            },
+                            Err(_e) => None,
                         }
-                    },
-                    Err(_e) => None,
-                }
-            })
-        }))
+                    })
+                }),
+        )
     }
 
     async fn broadcast_block_chunk(
@@ -94,11 +104,16 @@ impl NetworkAdapter for WakuAdapter {
         view: &View,
         chunk_message: ProposalChunkMsg,
     ) {
-        // TODO: probably later, depending on the view we should map to different content topics
-        // but this is an ongoing idea that should/will be discus.
+        let content_topic = WakuContentTopic {
+            application_name: Cow::Borrowed(APPLICATION_NAME),
+            version: VERSION,
+            content_topic_name: Cow::Owned(format!("proposal-{}-{}", committee.id(), view.id())),
+            encoding: Encoding::Proto,
+        };
+
         let message = WakuMessage::new(
             chunk_message.as_bytes(),
-            WAKU_CARNOT_BLOCK_CONTENT_TOPIC,
+            content_topic,
             1,
             chrono::Utc::now().timestamp() as usize,
         );
@@ -119,30 +134,34 @@ impl NetworkAdapter for WakuAdapter {
         committee: Committee,
         view: &View,
     ) -> Box<dyn Stream<Item = Approval> + Send> {
+        let content_topic = WakuContentTopic {
+            application_name: Cow::Borrowed(APPLICATION_NAME),
+            version: VERSION,
+            content_topic_name: Cow::Owned(format!("approval-{}-{}", committee.id(), view.id())),
+            encoding: Encoding::Proto,
+        };
         let stream_channel = self
             .message_subscriber_channel()
             .await
             .unwrap_or_else(|_e| todo!("handle error"));
         Box::new(
-            BroadcastStream::new(stream_channel).filter_map(|msg| async move {
-                match msg {
-                    Ok(event) => match event {
-                        NetworkEvent::RawMessage(message) => {
-                            // TODO: this should actually check the whole content topic,
-                            // waiting for this [PR](https://github.com/waku-org/waku-rust-bindings/pull/28)
-                            if WAKU_CARNOT_APPROVAL_CONTENT_TOPIC.content_topic_name
-                                == message.content_topic().content_topic_name
-                            {
-                                let payload = message.payload();
-                                Some(ApprovalMsg::from_bytes(payload).approval)
-                            } else {
-                                None
+            BroadcastStream::new(stream_channel)
+                .zip(futures::stream::repeat(content_topic))
+                .filter_map(|(msg, content_topic)| async move {
+                    match msg {
+                        Ok(event) => match event {
+                            NetworkEvent::RawMessage(message) => {
+                                if &content_topic == message.content_topic() {
+                                    let payload = message.payload();
+                                    Some(ApprovalMsg::from_bytes(payload).approval)
+                                } else {
+                                    None
+                                }
                             }
-                        }
-                    },
-                    Err(_e) => None,
-                }
-            }),
+                        },
+                        Err(_e) => None,
+                    }
+                }),
         )
     }
 
@@ -152,9 +171,16 @@ impl NetworkAdapter for WakuAdapter {
         view: &View,
         approval_message: ApprovalMsg,
     ) {
+        let content_topic = WakuContentTopic {
+            application_name: Cow::Borrowed(APPLICATION_NAME),
+            version: VERSION,
+            content_topic_name: Cow::Owned(format!("approval-{}-{}", committee.id(), view.id())),
+            encoding: Encoding::Proto,
+        };
+
         let message = WakuMessage::new(
             approval_message.as_bytes(),
-            WAKU_CARNOT_APPROVAL_CONTENT_TOPIC,
+            content_topic,
             1,
             chrono::Utc::now().timestamp() as usize,
         );

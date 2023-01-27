@@ -1,4 +1,5 @@
 // std
+use std::fmt::Display;
 use std::pin::Pin;
 // crates
 use futures::StreamExt;
@@ -54,6 +55,9 @@ impl<'view, const C: usize> Committees<'view, C> {
 }
 
 impl Committee {
+    pub fn id(&self) -> usize {
+        self.0
+    }
     /// Return the left and right children committee, if any
     pub fn children(&self) -> (Committee, Committee) {
         (
@@ -112,19 +116,24 @@ impl<'view, Network: NetworkAdapter + Sync, Fountain: FountainCode + Sync, const
         adapter: &Network,
         fountain: &Fountain,
     ) -> Result<Block, FountainError> {
-        let message_stream = adapter.proposal_chunks_stream().await;
+        let committee = self.committee;
+        let view = self.committees.view;
+        let message_stream = adapter.proposal_chunks_stream(committee, view).await;
         fountain.decode(message_stream).await.map(Block::from_bytes)
     }
 
     async fn broadcast_block(&self, block: Block, adapter: &Network, fountain: &Fountain) {
+        let (left_child, right_child) = self.children_committes();
+        let view = self.committees.view;
         let block_bytes = block.as_bytes();
         let encoded_stream = fountain.encode(&block_bytes);
         encoded_stream
             .for_each_concurrent(None, |chunk| async move {
                 let message = ProposalChunkMsg { chunk };
-                adapter
-                    .broadcast_block_chunk(self.committees.view, message)
-                    .await;
+                futures::join!(
+                    adapter.broadcast_block_chunk(left_child, view, message.clone()),
+                    adapter.broadcast_block_chunk(right_child, view, message.clone()),
+                );
             })
             .await;
     }

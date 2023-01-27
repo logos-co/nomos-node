@@ -4,6 +4,7 @@ use bytes::Bytes;
 // internal
 use crate::{Approval, NodeId};
 
+#[derive(Clone)]
 pub struct ProposalChunkMsg {
     pub chunk: Bytes,
 }
