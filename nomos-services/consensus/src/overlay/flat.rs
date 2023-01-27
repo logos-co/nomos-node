@@ -7,9 +7,10 @@ use futures::StreamExt;
 use super::*;
 use crate::network::messages::{ApprovalMsg, ProposalChunkMsg};
 use crate::network::NetworkAdapter;
+use crate::overlay::committees::Committee;
 
 const DEFAULT_THRESHOLD: Threshold = Threshold::new(2, 3);
-
+const FLAT_COMMITTEE: Committee = Committee::new_flat();
 /// The share of nodes that need to approve a block for it to be valid
 /// expressed as a fraction of the total number of nodes
 #[derive(Copy, Clone, Debug)]
@@ -63,7 +64,9 @@ impl<'view, Network: NetworkAdapter + Sync, Fountain: FountainCode + Sync>
         adapter: &Network,
         fountain: &Fountain,
     ) -> Result<Block, FountainError> {
-        let message_stream = adapter.proposal_chunks_stream().await;
+        let message_stream = adapter
+            .proposal_chunks_stream(FLAT_COMMITTEE, self.view)
+            .await;
         fountain.decode(message_stream).await.map(Block::from_bytes)
     }
 
@@ -73,7 +76,9 @@ impl<'view, Network: NetworkAdapter + Sync, Fountain: FountainCode + Sync>
         encoded_stream
             .for_each_concurrent(None, |chunk| async move {
                 let message = ProposalChunkMsg { chunk };
-                adapter.broadcast_block_chunk(self.view, message).await;
+                adapter
+                    .broadcast_block_chunk(FLAT_COMMITTEE, self.view, message)
+                    .await;
             })
             .await;
     }
@@ -86,10 +91,14 @@ impl<'view, Network: NetworkAdapter + Sync, Fountain: FountainCode + Sync>
         // in the flat overlay, there's no need to wait for anyone before approving the block
         let approval = self.approve(block);
         adapter
-            .forward_approval(ApprovalMsg {
-                approval,
-                source: self.node_id,
-            })
+            .forward_approval(
+                FLAT_COMMITTEE,
+                self.view,
+                ApprovalMsg {
+                    approval,
+                    source: self.node_id,
+                },
+            )
             .await;
         Ok(())
     }
@@ -98,7 +107,7 @@ impl<'view, Network: NetworkAdapter + Sync, Fountain: FountainCode + Sync>
         // for now, let's pretend that consensus is reached as soon as the
         // block is approved by a share of the nodes
         let mut approvals = HashSet::new();
-        let mut stream = Box::into_pin(adapter.approvals_stream().await);
+        let mut stream = Box::into_pin(adapter.approvals_stream(FLAT_COMMITTEE, self.view).await);
 
         // Shadow the original binding so that it can't be directly accessed
         // ever again.

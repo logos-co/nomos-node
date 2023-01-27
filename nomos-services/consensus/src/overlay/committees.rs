@@ -1,6 +1,4 @@
 // std
-use std::fmt::Display;
-use std::pin::Pin;
 // crates
 use futures::StreamExt;
 use rand::{seq::SliceRandom, SeedableRng};
@@ -55,6 +53,9 @@ impl<'view, const C: usize> Committees<'view, C> {
 }
 
 impl Committee {
+    pub const fn new_flat() -> Self {
+        Self(0)
+    }
     pub fn id(&self) -> usize {
         self.0
     }
@@ -130,10 +131,25 @@ impl<'view, Network: NetworkAdapter + Sync, Fountain: FountainCode + Sync, const
         encoded_stream
             .for_each_concurrent(None, |chunk| async move {
                 let message = ProposalChunkMsg { chunk };
-                futures::join!(
-                    adapter.broadcast_block_chunk(left_child, view, message.clone()),
-                    adapter.broadcast_block_chunk(right_child, view, message.clone()),
-                );
+                futures::future::join_all(
+                    left_child
+                        .map(|left_child| {
+                            adapter.broadcast_block_chunk(left_child, view, message.clone())
+                        })
+                        .into_iter()
+                        .chain(
+                            right_child
+                                .map(|right_child| {
+                                    adapter.broadcast_block_chunk(
+                                        right_child,
+                                        view,
+                                        message.clone(),
+                                    )
+                                })
+                                .into_iter(),
+                        ),
+                )
+                .await;
             })
             .await;
     }
@@ -141,7 +157,7 @@ impl<'view, Network: NetworkAdapter + Sync, Fountain: FountainCode + Sync, const
     async fn approve_and_forward(
         &self,
         _block: &Block,
-        adapter: &Network,
+        _adapter: &Network,
     ) -> Result<(), Box<dyn Error>> {
         // roughly, we want to do something like this:
         // 1. wait for left and right children committees to approve
@@ -153,7 +169,7 @@ impl<'view, Network: NetworkAdapter + Sync, Fountain: FountainCode + Sync, const
         todo!()
     }
 
-    async fn wait_for_consensus(&self, _approval: &Block, adapter: &Network) {
+    async fn wait_for_consensus(&self, _approval: &Block, _adapter: &Network) {
         // maybe the leader publishing the QC?
     }
 }
