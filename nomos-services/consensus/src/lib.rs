@@ -10,7 +10,8 @@ pub mod overlay;
 mod tip;
 
 // std
-use std::collections::{BTreeMap, HashSet};
+use std::collections::BTreeMap;
+use std::error::Error;
 use std::fmt::Debug;
 // crates
 // internal
@@ -140,15 +141,27 @@ where
             let view = view_generator.next().await;
             // if we want to process multiple views at the same time this can
             // be spawned as a separate future
-            // TODO: add leadership module
-            view.resolve::<A, Member<'_, COMMITTEE_SIZE>, _, _, _>(
-                private_key,
-                &tip,
-                &network_adapter,
-                &fountain,
-                &leadership,
-            )
-            .await;
+
+            // FIXME: this should probably have a timer to detect failed rounds
+            let res = view
+                .resolve::<A, Member<'_, COMMITTEE_SIZE>, _, _, _>(
+                    private_key,
+                    &tip,
+                    &network_adapter,
+                    &fountain,
+                    &leadership,
+                )
+                .await;
+            match res {
+                Ok(_block) => {
+                    // resolved block, mark as verified and possibly update the tip
+                    // not sure what mark as verified means, e.g. if we want an event subscription
+                    // system for this to be used for example by the ledger, storage and mempool
+                }
+                Err(e) => {
+                    tracing::error!("Error while resolving view: {}", e);
+                }
+            }
         }
     }
 }
@@ -194,8 +207,6 @@ pub struct View {
 }
 
 impl View {
-    const APPROVAL_THRESHOLD: usize = 1;
-
     // TODO: might want to encode steps in the type system
     async fn resolve<'view, A, O, F, Tx, Id>(
         &'view self,
@@ -204,60 +215,48 @@ impl View {
         adapter: &A,
         fountain: &F,
         leadership: &Leadership<Tx, Id>,
-    ) where
+    ) -> Result<Block, Box<dyn Error>>
+    where
         A: NetworkAdapter + Send + Sync + 'static,
         F: FountainCode,
         O: Overlay<'view, A, F>,
     {
         let overlay = O::new(self, node_id);
+        // FIXME: this is still a working in progress and best-of-my-understanding
+        //       of the consensus protocol, having pseudocode would be very helpful
 
+        // Consensus in Carnot is achieved in 4 steps from the point of view of a node:
+        // 1) The node receives a block proposal from a leader and verifies it
+        // 2, The node signals to the network its approval for the block.
+        //    Depending on the overlay, this may require waiting for a certain number
+        //    of other approvals.
+        // 3) The node waits for consensus to be reached and mark the block as verified
+        // 4) Upon verifing a block B, if B.parent = B' and B'.parent = B'' and
+        //    B'.view = B''.view + 1, then the node commits B''.
+        //    This happens implicitly at the chain level and does not require any
+        //    explicit action from the node.
+
+        // 1) Collect and verify block proposal.
+        //    If this node is the leader this is trivial
         let block = if let LeadershipResult::Leader { block, .. } =
             leadership.try_propose_block(self, tip).await
         {
-            Ok(block)
+            block
         } else {
-            overlay.reconstruct_proposal_block(adapter, fountain).await
+            overlay
+                .reconstruct_proposal_block(adapter, fountain)
+                .await?
+            // TODO: reshare the block?
+            // TODO: verify
         };
-        match block {
-            Ok(block) => {
-                // TODO: verify?
-                overlay
-                    .broadcast_block(block.clone(), adapter, fountain)
-                    .await;
-                self.approve(&overlay, block, adapter).await;
-            }
-            Err(_e) => {
-                // TODO: log error
-            }
-        }
-    }
 
-    async fn approve<
-        'view,
-        Network: NetworkAdapter,
-        Fountain: FountainCode,
-        O: Overlay<'view, Network, Fountain>,
-    >(
-        &'view self,
-        overlay: &O,
-        block: Block,
-        adapter: &Network,
-    ) {
-        // wait for approval in the overlay, if necessary
-        let mut approvals = HashSet::new();
-        let mut stream = overlay.collect_approvals(block, adapter).await;
-        while let Some(approval) = stream.recv().await {
-            approvals.insert(approval);
-            if approvals.len() > Self::APPROVAL_THRESHOLD {
-                let self_approval = self.craft_proof_of_approval(approvals.into_iter());
-                overlay.forward_approval(self_approval, adapter).await;
-                return;
-            }
-        }
-    }
+        // 2) Signal approval to the network
+        overlay.approve_and_forward(&block, adapter).await?;
 
-    fn craft_proof_of_approval(&self, _approvals: impl Iterator<Item = Approval>) -> Approval {
-        todo!()
+        // 3) Wait for consensus
+        overlay.wait_for_consensus(&block, adapter).await;
+
+        Ok(block)
     }
 
     pub fn is_leader(&self, _node_id: NodeId) -> bool {
