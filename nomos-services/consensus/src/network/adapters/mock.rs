@@ -15,16 +15,12 @@ use crate::{
     Approval, View,
 };
 
-pub struct MockAdapter<D = rand::distributions::Standard>
-where
-    D: rand::distributions::Distribution<usize> + core::fmt::Debug + Clone + Send + Sync + 'static,
+pub struct MockAdapter
 {
-    network_relay: OutboundRelay<<NetworkService<Mock<D>> as ServiceData>::Message>,
+    network_relay: OutboundRelay<<NetworkService<Mock> as ServiceData>::Message>,
 }
 
-impl<D> MockAdapter<D>
-where
-    D: rand::distributions::Distribution<usize> + core::fmt::Debug + Clone + Send + Sync + 'static,
+impl MockAdapter
 {
     async fn message_subscriber_channel(
         &self,
@@ -48,11 +44,9 @@ where
 }
 
 #[async_trait::async_trait]
-impl<D> NetworkAdapter for MockAdapter<D>
-where
-    D: rand::distributions::Distribution<usize> + core::fmt::Debug + Clone + Send + Sync + 'static,
+impl NetworkAdapter for MockAdapter
 {
-    type Backend = Mock<D>;
+    type Backend = Mock;
 
     async fn new(
         network_relay: OutboundRelay<<NetworkService<Self::Backend> as ServiceData>::Message>,
