@@ -77,7 +77,7 @@ impl MockMessage {
     }
 }
 
-pub struct Mock<D: rand::distributions::Distribution<usize>> {
+pub struct Mock {
     messages: Arc<Mutex<HashMap<&'static str, Vec<String>>>>,
     message_event: Sender<NetworkEvent>,
     subscribed_topics: HashSet<&'static str>,
@@ -85,14 +85,13 @@ pub struct Mock<D: rand::distributions::Distribution<usize>> {
     subscribe_rx: UnboundedReceiver<&'static str>,
     unsubscribe_tx: UnboundedSender<&'static str>,
     unsubscribe_rx: UnboundedReceiver<&'static str>,
-    config: MockConfig<D>,
+    config: MockConfig,
 }
 
 #[derive(Clone, Debug, Serialize)]
-pub struct MockConfig<D = rand::distributions::Standard> {
+pub struct MockConfig {
     pub predefined_messages: Vec<MockMessage>,
     pub duration: std::time::Duration,
-    pub distributions: D,
     pub seed: u64,
     pub version: usize,
     pub weights: Option<Vec<usize>>,
@@ -127,7 +126,7 @@ pub enum NetworkEvent {
     RawMessage(MockMessage),
 }
 
-impl<D: rand::distributions::Distribution<usize> + Clone + Debug + Send + Sync + 'static> Mock<D> {
+impl Mock {
     /// Run producer message handler
     pub async fn run_producer_handler(&self) -> Result<(), overwatch_rs::DynError> {
         match &self.config.weights {
@@ -201,11 +200,11 @@ impl<D: rand::distributions::Distribution<usize> + Clone + Debug + Send + Sync +
 }
 
 #[async_trait::async_trait]
-impl<D: rand::distributions::Distribution<usize> + Debug + Clone + Send + Sync + 'static>
-    NetworkBackend for Mock<D>
+impl
+    NetworkBackend for Mock
 {
-    type Settings = MockConfig<D>;
-    type State = NoState<MockConfig<D>>;
+    type Settings = MockConfig;
+    type State = NoState<MockConfig>;
     type Message = MockBackendMessage;
     type EventKind = EventKind;
     type NetworkEvent = NetworkEvent;
