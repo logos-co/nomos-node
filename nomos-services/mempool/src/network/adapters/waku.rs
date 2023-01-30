@@ -45,10 +45,7 @@ where
         {
             // We panic, but as we could try to reconnect later it should not be
             // a problem. But definitely something to consider.
-            panic!(
-                "Couldn't send subscribe message to the network service: {}",
-                e
-            );
+            panic!("Couldn't send subscribe message to the network service: {e}");
         };
         Self {
             network_relay,

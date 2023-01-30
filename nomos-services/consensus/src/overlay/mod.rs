@@ -1,7 +1,9 @@
 #[allow(unused)]
 mod committees;
+mod flat;
 
 // std
+use std::error::Error;
 // crates
 // internal
 use super::{Approval, NodeId, View};
@@ -21,10 +23,14 @@ pub trait Overlay<'view, Network: NetworkAdapter, Fountain: FountainCode> {
         fountain: &Fountain,
     ) -> Result<Block, FountainError>;
     async fn broadcast_block(&self, block: Block, adapter: &Network, fountain: &Fountain);
-    async fn collect_approvals(
+    /// Different overlays might have different needs or the same overlay might
+    /// require different steps depending on the node role
+    /// For now let's put this responsibility on the overlay
+    async fn approve_and_forward(
         &self,
-        block: Block,
+        block: &Block,
         adapter: &Network,
-    ) -> tokio::sync::mpsc::Receiver<Approval>;
-    async fn forward_approval(&self, approval: Approval, adapter: &Network);
+    ) -> Result<(), Box<dyn Error>>;
+    /// Wait for consensus on a block
+    async fn wait_for_consensus(&self, block: &Block, adapter: &Network);
 }

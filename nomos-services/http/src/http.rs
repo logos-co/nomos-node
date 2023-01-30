@@ -108,8 +108,7 @@ impl Debug for HttpMsg {
                 req_stream: _,
             } => write!(
                 fmt,
-                "HttpMsg::AddHandler {{ sender: {:?}, route: {:?} }}",
-                service_id, route
+                "HttpMsg::AddHandler {{ sender: {service_id:?}, route: {route:?} }}"
             ),
         }
     }

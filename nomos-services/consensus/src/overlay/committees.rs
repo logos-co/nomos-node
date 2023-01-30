@@ -89,8 +89,12 @@ impl<'view, const C: usize> Member<'view, C> {
     }
 
     // Return participants in the children committees this member should interact with
-    pub fn children_committes(&self) -> (Committee, Committee) {
-        self.committee.children()
+    pub fn children_committes(&self) -> (Option<Committee>, Option<Committee>) {
+        let (left, right) = self.committee.children();
+        (
+            self.committees.get_committee_members(left).map(|_| left),
+            self.committees.get_committee_members(right).map(|_| right),
+        )
     }
 }
 
@@ -125,15 +129,22 @@ impl<'view, Network: NetworkAdapter + Sync, Fountain: FountainCode + Sync, const
             .await;
     }
 
-    async fn collect_approvals(
+    async fn approve_and_forward(
         &self,
-        _block: Block,
+        _block: &Block,
         adapter: &Network,
-    ) -> tokio::sync::mpsc::Receiver<Approval> {
+    ) -> Result<(), Box<dyn Error>> {
+        // roughly, we want to do something like this:
+        // 1. wait for left and right children committees to approve
+        // 2. approve the block
+        // 3. forward the approval to the parent committee
+        //
+        // However this will likely change depending on the position
+        // of the committee in the tree
         todo!()
     }
 
-    async fn forward_approval(&self, _approval: Approval, adapter: &Network) {
-        todo!()
+    async fn wait_for_consensus(&self, _approval: &Block, adapter: &Network) {
+        // maybe the leader publishing the QC?
     }
 }
