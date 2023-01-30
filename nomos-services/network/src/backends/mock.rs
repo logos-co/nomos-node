@@ -53,7 +53,7 @@ impl MockPubSubTopic {
     }
 }
 
-#[derive(Clone, Serialize, Debug)]
+#[derive(Clone, PartialEq, Eq, Serialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct MockMessage {
     pub payload: String,
@@ -67,6 +67,20 @@ pub struct MockMessage {
 }
 
 impl MockMessage {
+    pub const fn new(
+        payload: String,
+        content_topic: MockContentTopic,
+        version: MockMessageVersion,
+        timestamp: usize,
+    ) -> Self {
+        Self {
+            payload,
+            content_topic,
+            version,
+            timestamp,
+        }
+    }
+
     pub const fn content_topic(&self) -> MockContentTopic {
         self.content_topic
     }
@@ -78,7 +92,7 @@ impl MockMessage {
 
 #[derive(Clone)]
 pub struct Mock {
-    messages: Arc<Mutex<HashMap<&'static str, Vec<String>>>>,
+    messages: Arc<Mutex<HashMap<&'static str, Vec<MockMessage>>>>,
     message_event: Sender<NetworkEvent>,
     subscribed_topics: Arc<Mutex<HashSet<&'static str>>>,
     config: MockConfig,
@@ -107,7 +121,7 @@ pub enum MockBackendMessage {
     },
     Broadcast {
         topic: &'static str,
-        msg: String,
+        msg: MockMessage,
     },
     RelaySubscribe {
         topic: &'static str,
@@ -117,7 +131,7 @@ pub enum MockBackendMessage {
     },
     Query {
         topic: &'static str,
-        tx: oneshot::Sender<Vec<String>>,
+        tx: oneshot::Sender<Vec<MockMessage>>,
     },
 }
 
@@ -126,7 +140,7 @@ impl core::fmt::Debug for MockBackendMessage {
         match self {
             Self::BootProducer { .. } => write!(f, "BootProducer"),
             Self::Broadcast { topic, msg } => {
-                write!(f, "Broadcast {{ topic: {}, msg: {} }}", topic, msg)
+                write!(f, "Broadcast {{ topic: {}, msg: {:?} }}", topic, msg)
             }
             Self::RelaySubscribe { topic } => write!(f, "RelaySubscribe {{ topic: {} }}", topic),
             Self::RelayUnSubscribe { topic } => {
@@ -251,14 +265,7 @@ impl NetworkBackend for Mock {
                     .entry(topic)
                     .or_insert_with(Vec::new)
                     .push(msg.clone());
-                let _ = self
-                    .message_event
-                    .send(NetworkEvent::RawMessage(MockMessage {
-                        payload: msg,
-                        content_topic: MockContentTopic::new("mock", self.config.version, topic),
-                        version: self.config.version,
-                        timestamp: chrono::Utc::now().timestamp() as usize,
-                    }));
+                let _ = self.message_event.send(NetworkEvent::RawMessage(msg));
             }
             MockBackendMessage::RelaySubscribe { topic } => {
                 tracing::info!("processed relay subscription for topic: {topic}");
@@ -337,7 +344,16 @@ mod tests {
         for val in FOO_BROADCAST_MESSAGES {
             mock.process(MockBackendMessage::Broadcast {
                 topic: "foo",
-                msg: val.to_string(),
+                msg: MockMessage {
+                    payload: val.to_string(),
+                    content_topic: MockContentTopic {
+                        application_name: "mock",
+                        version: 1,
+                        content_topic_name: "foo content",
+                    },
+                    version: 1,
+                    timestamp: chrono::Utc::now().timestamp() as usize,
+                },
             })
             .await;
         }
@@ -345,7 +361,16 @@ mod tests {
         for val in BAR_BROADCAST_MESSAGES {
             mock.process(MockBackendMessage::Broadcast {
                 topic: "bar",
-                msg: val.to_string(),
+                msg: MockMessage {
+                    payload: val.to_string(),
+                    content_topic: MockContentTopic {
+                        application_name: "mock",
+                        version: 1,
+                        content_topic_name: "bar content",
+                    },
+                    version: 1,
+                    timestamp: chrono::Utc::now().timestamp() as usize,
+                },
             })
             .await;
         }
@@ -360,7 +385,7 @@ mod tests {
         let query_result = qrx.await.unwrap();
         assert_eq!(query_result.len(), 2);
         for idx in 0..FOO_BROADCAST_MESSAGES.len() {
-            assert_eq!(&query_result[idx], FOO_BROADCAST_MESSAGES[idx]);
+            assert_eq!(&query_result[idx].payload, FOO_BROADCAST_MESSAGES[idx]);
         }
 
         // subscribe
