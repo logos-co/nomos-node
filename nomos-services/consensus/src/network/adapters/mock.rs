@@ -1,3 +1,6 @@
+// TODO: will remove this lint in another PR
+#![allow(dead_code)]
+
 use bytes::Bytes;
 
 use nomos_network::{
