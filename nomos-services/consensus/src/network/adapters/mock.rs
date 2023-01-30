@@ -59,7 +59,7 @@ impl NetworkAdapter for MockAdapter {
         todo!()
     }
 
-    async fn approvals_stream(&self) -> Box<dyn Stream<Item = Approval>> {
+    async fn approvals_stream(&self) -> Box<dyn Stream<Item = Approval> + Send> {
         todo!()
     }
 

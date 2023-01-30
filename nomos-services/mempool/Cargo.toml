@@ -22,6 +22,8 @@ waku-bindings = { version = "0.1.0-beta3", optional = true}
 
 [dev-dependencies]
 overwatch-derive = { git = "https://github.com/logos-co/Overwatch", branch = "main" }
+tokio = { version = "1", features = ["full"] }
+tracing-subscriber =  { version = "0.3", features = ["json", "env-filter"] }
 
 [features]
 default = []

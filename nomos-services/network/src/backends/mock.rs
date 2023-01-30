@@ -1,6 +1,7 @@
 // internal
 use super::*;
 
+use futures::future::BoxFuture;
 // crates
 use overwatch_rs::services::state::NoState;
 use rand::{
@@ -55,14 +56,14 @@ impl MockPubSubTopic {
 #[derive(Clone, Serialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct MockMessage {
-    payload: String,
+    pub payload: String,
     /// The content topic to be set on the message
-    content_topic: MockContentTopic,
+    pub content_topic: MockContentTopic,
     /// The Mock Message version number
     #[serde(default)]
-    version: MockMessageVersion,
+    pub version: MockMessageVersion,
     /// Unix timestamp in nanoseconds
-    timestamp: usize,
+    pub timestamp: usize,
 }
 
 impl MockMessage {
@@ -75,6 +76,7 @@ impl MockMessage {
     }
 }
 
+#[derive(Clone)]
 pub struct Mock {
     messages: Arc<Mutex<HashMap<&'static str, Vec<String>>>>,
     message_event: Sender<NetworkEvent>,
@@ -91,9 +93,18 @@ pub struct MockConfig {
     pub weights: Option<Vec<usize>>,
 }
 
-/// Interaction with Mock backend
-#[derive(Debug)]
 pub enum MockBackendMessage {
+    BootProducer {
+        #[allow(clippy::type_complexity)]
+        spawner: Box<
+            dyn Fn(
+                    BoxFuture<'static, Result<(), overwatch_rs::DynError>>,
+                ) -> Result<(), overwatch_rs::DynError>
+                + Send
+                + Sync
+                + 'static,
+        >,
+    },
     Broadcast {
         topic: &'static str,
         msg: String,
@@ -108,6 +119,22 @@ pub enum MockBackendMessage {
         topic: &'static str,
         tx: oneshot::Sender<Vec<String>>,
     },
+}
+
+impl core::fmt::Debug for MockBackendMessage {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::BootProducer { .. } => write!(f, "BootProducer"),
+            Self::Broadcast { topic, msg } => {
+                write!(f, "Broadcast {{ topic: {}, msg: {} }}", topic, msg)
+            }
+            Self::RelaySubscribe { topic } => write!(f, "RelaySubscribe {{ topic: {} }}", topic),
+            Self::RelayUnSubscribe { topic } => {
+                write!(f, "RelayUnSubscribe {{ topic: {} }}", topic)
+            }
+            Self::Query { topic, .. } => write!(f, "Query {{ topic: {} }}", topic),
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -137,11 +164,17 @@ impl Mock {
         loop {
             let idx = dist.sample(&mut rng);
             tokio::time::sleep(self.config.duration).await;
-            match self.message_event.send(NetworkEvent::RawMessage(
-                self.config.predefined_messages[idx].clone(),
-            )) {
-                Ok(peers) => {
-                    tracing::debug!("sent message to {} peers", peers);
+            let msg = &self.config.predefined_messages[idx];
+            match self
+                .message_event
+                .send(NetworkEvent::RawMessage(msg.clone()))
+            {
+                Ok(_) => {
+                    tracing::debug!(
+                        "sent message to \"{}\" to topic {}",
+                        msg.payload,
+                        msg.content_topic.content_topic_name
+                    );
                 }
                 Err(e) => {
                     tracing::error!("error sending message: {:?}", e);
@@ -157,8 +190,12 @@ impl Mock {
                 .message_event
                 .send(NetworkEvent::RawMessage(msg.clone()))
             {
-                Ok(peers) => {
-                    tracing::debug!("sent message to {} peers", peers);
+                Ok(_) => {
+                    tracing::debug!(
+                        "sent message \"{}\" to topic {}",
+                        msg.payload,
+                        msg.content_topic.content_topic_name
+                    );
                 }
                 Err(e) => {
                     tracing::error!("error sending message: {:?}", e);
@@ -196,8 +233,18 @@ impl NetworkBackend for Mock {
 
     async fn process(&self, msg: Self::Message) {
         match msg {
+            MockBackendMessage::BootProducer { spawner } => {
+                tracing::info!("booting producer");
+                let this = self.clone();
+                match (spawner)(Box::pin(async move { this.run_producer_handler().await })) {
+                    Ok(_) => {}
+                    Err(e) => {
+                        tracing::error!("error booting producer: {:?}", e);
+                    }
+                }
+            }
             MockBackendMessage::Broadcast { topic, msg } => {
-                debug!("processed normal message");
+                tracing::info!("processed normal message");
                 self.messages
                     .lock()
                     .unwrap()
@@ -214,15 +261,15 @@ impl NetworkBackend for Mock {
                     }));
             }
             MockBackendMessage::RelaySubscribe { topic } => {
-                debug!("processed relay subscription for topic: {topic}");
+                tracing::info!("processed relay subscription for topic: {topic}");
                 self.subscribed_topics.lock().unwrap().insert(topic);
             }
             MockBackendMessage::RelayUnSubscribe { topic } => {
-                debug!("processed relay unsubscription for topic: {topic}");
+                tracing::info!("processed relay unsubscription for topic: {topic}");
                 self.subscribed_topics.lock().unwrap().remove(topic);
             }
             MockBackendMessage::Query { topic, tx } => {
-                debug!("processed query");
+                tracing::info!("processed query");
                 let normal_msgs = self.messages.lock().unwrap();
                 let msgs = normal_msgs.get(&topic).cloned().unwrap_or_default();
                 drop(normal_msgs);
