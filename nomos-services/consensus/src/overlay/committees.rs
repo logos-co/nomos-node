@@ -135,25 +135,17 @@ impl<'view, Network: NetworkAdapter + Sync, Fountain: FountainCode + Sync, const
         encoded_stream
             .for_each_concurrent(None, |chunk| async move {
                 let message = ProposalChunkMsg { chunk };
-                futures::future::join_all(
-                    left_child
-                        .map(|left_child| {
-                            adapter.broadcast_block_chunk(left_child, view, message.clone())
-                        })
-                        .into_iter()
-                        .chain(
-                            right_child
-                                .map(|right_child| {
-                                    adapter.broadcast_block_chunk(
-                                        right_child,
-                                        view,
-                                        message.clone(),
-                                    )
-                                })
-                                .into_iter(),
-                        ),
-                )
-                .await;
+                let r_child = right_child
+                    .map(|right_child| {
+                        adapter.broadcast_block_chunk(right_child, view, message.clone())
+                    })
+                    .into_iter();
+                let l_child = left_child
+                    .map(|left_child| {
+                        adapter.broadcast_block_chunk(left_child, view, message.clone())
+                    })
+                    .into_iter();
+                futures::future::join_all(r_child.chain(l_child)).await;
             })
             .await;
     }
