@@ -69,12 +69,7 @@ impl NetworkAdapter for WakuAdapter {
             .message_subscriber_channel()
             .await
             .unwrap_or_else(|_e| todo!("handle error"));
-        let content_topic = WakuContentTopic {
-            application_name: Cow::Borrowed(APPLICATION_NAME),
-            version: VERSION,
-            content_topic_name: Cow::Owned(format!("proposal-{}-{}", committee.id(), view.id())),
-            encoding: Encoding::Proto,
-        };
+        let content_topic = proposal_topic(committee, view);
         Box::new(
             BroadcastStream::new(stream_channel)
                 .zip(futures::stream::repeat(content_topic))
@@ -104,12 +99,7 @@ impl NetworkAdapter for WakuAdapter {
         view: &View,
         chunk_message: ProposalChunkMsg,
     ) {
-        let content_topic = WakuContentTopic {
-            application_name: Cow::Borrowed(APPLICATION_NAME),
-            version: VERSION,
-            content_topic_name: Cow::Owned(format!("proposal-{}-{}", committee.id(), view.id())),
-            encoding: Encoding::Proto,
-        };
+        let content_topic = proposal_topic(committee, view);
 
         let message = WakuMessage::new(
             chunk_message.as_bytes(),
@@ -134,12 +124,7 @@ impl NetworkAdapter for WakuAdapter {
         committee: Committee,
         view: &View,
     ) -> Box<dyn Stream<Item = Approval> + Send> {
-        let content_topic = WakuContentTopic {
-            application_name: Cow::Borrowed(APPLICATION_NAME),
-            version: VERSION,
-            content_topic_name: Cow::Owned(format!("approval-{}-{}", committee.id(), view.id())),
-            encoding: Encoding::Proto,
-        };
+        let content_topic = approval_topic(committee, view);
         let stream_channel = self
             .message_subscriber_channel()
             .await
@@ -171,12 +156,7 @@ impl NetworkAdapter for WakuAdapter {
         view: &View,
         approval_message: ApprovalMsg,
     ) {
-        let content_topic = WakuContentTopic {
-            application_name: Cow::Borrowed(APPLICATION_NAME),
-            version: VERSION,
-            content_topic_name: Cow::Owned(format!("approval-{}-{}", committee.id(), view.id())),
-            encoding: Encoding::Proto,
-        };
+        let content_topic = approval_topic(committee, view);
 
         let message = WakuMessage::new(
             approval_message.as_bytes(),
@@ -194,5 +174,23 @@ impl NetworkAdapter for WakuAdapter {
         {
             todo!("log error");
         };
+    }
+}
+
+fn approval_topic(committee: Committee, view: &View) -> WakuContentTopic {
+    WakuContentTopic {
+        application_name: Cow::Borrowed(APPLICATION_NAME),
+        version: VERSION,
+        content_topic_name: Cow::Owned(format!("approval-{}-{}", committee.id(), view.id())),
+        encoding: Encoding::Proto,
+    }
+}
+
+fn proposal_topic(committee: Committee, view: &View) -> WakuContentTopic {
+    WakuContentTopic {
+        application_name: Cow::Borrowed(APPLICATION_NAME),
+        version: VERSION,
+        content_topic_name: Cow::Owned(format!("proposal-{}-{}", committee.id(), view.id())),
+        encoding: Encoding::Proto,
     }
 }
