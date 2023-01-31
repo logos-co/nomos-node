@@ -10,7 +10,7 @@ use crate::network::NetworkAdapter;
 use crate::overlay::committees::Committee;
 
 const DEFAULT_THRESHOLD: Threshold = Threshold::new(2, 3);
-const FLAT_COMMITTEE: Committee = Committee::new_flat();
+const FLAT_COMMITTEE: Committee = Committee::root();
 /// The share of nodes that need to approve a block for it to be valid
 /// expressed as a fraction of the total number of nodes
 #[derive(Copy, Clone, Debug)]

@@ -55,12 +55,14 @@ impl<'view, const C: usize> Committees<'view, C> {
 }
 
 impl Committee {
-    pub const fn new_flat() -> Self {
+    pub const fn root() -> Self {
         Self(0)
     }
+
     pub fn id(&self) -> usize {
         self.0
     }
+
     /// Return the left and right children committee, if any
     pub fn children(&self) -> (Committee, Committee) {
         (
