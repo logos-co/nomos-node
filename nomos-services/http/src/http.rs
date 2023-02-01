@@ -5,9 +5,8 @@ use std::{
     fmt::{self, Debug},
     sync::Arc,
 };
-
-use bytes::Bytes;
 // crates
+use bytes::Bytes;
 use overwatch_rs::services::{
     handle::ServiceStateHandle,
     relay::{InboundRelay, OutboundRelay, RelayMessage},
