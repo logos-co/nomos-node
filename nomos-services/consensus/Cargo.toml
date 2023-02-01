@@ -24,3 +24,4 @@ tracing = "0.1"
 [features]
 default = []
 waku = ["nomos-network/waku", "waku-bindings"]
+mock = ["nomos-network/mock"]

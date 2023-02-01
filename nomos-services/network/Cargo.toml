@@ -8,19 +8,27 @@ edition = "2021"
 [dependencies]
 async-trait = "0.1"
 bytes = "1.2"
+chrono = { version = "0.4", optional = true }
 overwatch-rs = { git = "https://github.com/logos-co/Overwatch", branch = "main" }
 multiaddr = "0.15"
 serde = "1.0"
+sscanf = { version = "0.4", optional = true }
 sled = { version = "0.34", optional = true }
 tokio = { version = "1", features = ["sync"] }
 thiserror = "1.0"
 tracing = "0.1"
+rand = { version = "0.8", optional = true }
 waku-bindings = { version = "0.1.0-beta3", optional = true }
 tracing-appender = "0.2"
 tracing-subscriber =  { version = "0.3", features = ["json"] }
 tracing-gelf = "0.7"
 futures = "0.3"
+parking_lot = "0.12"
+
+[dev-dependencies]
+tokio = { version = "1", features = ["full"] }
 
 [features]
 default = []
 waku = ["waku-bindings"]
+mock = ["rand", "chrono"]
