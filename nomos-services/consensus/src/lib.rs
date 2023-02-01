@@ -7,6 +7,8 @@
 mod leadership;
 mod network;
 pub mod overlay;
+#[cfg(test)]
+mod test;
 mod tip;
 
 // std
@@ -111,8 +113,6 @@ where
     }
 
     async fn run(mut self) -> Result<(), overwatch_rs::DynError> {
-        let mut view_generator = self.view_generator().await;
-
         let network_relay: OutboundRelay<_> = self
             .network_relay
             .connect()
@@ -137,13 +137,18 @@ where
         let fountain = F::new(fountain_settings);
 
         let leadership = Leadership::new(private_key, mempool_relay);
+        // FIXME: this should be taken from config
+        let mut cur_view = View {
+            seed: [0; 32],
+            staking_keys: BTreeMap::new(),
+            view_n: 0,
+        };
         loop {
-            let view = view_generator.next().await;
             // if we want to process multiple views at the same time this can
             // be spawned as a separate future
 
             // FIXME: this should probably have a timer to detect failed rounds
-            let res = view
+            let res = cur_view
                 .resolve::<A, Member<'_, COMMITTEE_SIZE>, _, _, _>(
                     private_key,
                     &tip,
@@ -153,45 +158,17 @@ where
                 )
                 .await;
             match res {
-                Ok(_block) => {
+                Ok((_block, view)) => {
                     // resolved block, mark as verified and possibly update the tip
                     // not sure what mark as verified means, e.g. if we want an event subscription
                     // system for this to be used for example by the ledger, storage and mempool
+                    cur_view = view;
                 }
                 Err(e) => {
                     tracing::error!("Error while resolving view: {}", e);
                 }
             }
         }
-    }
-}
-
-impl<A, P, M, F> CarnotConsensus<A, P, M, F>
-where
-    F: FountainCode + Send + Sync + 'static,
-    A: NetworkAdapter + Send + Sync + 'static,
-    P: MemPool + Send + Sync + 'static,
-    P::Settings: Clone + Send + Sync + 'static,
-    P::Tx: Debug + Send + Sync + 'static,
-    P::Id: Debug + Send + Sync + 'static,
-    M: MempoolAdapter<Tx = P::Tx> + Send + Sync + 'static,
-{
-    // Build a service that generates new views as they become available
-    async fn view_generator(&self) -> ViewGenerator {
-        todo!()
-    }
-}
-
-/// Tracks new views and make them available as soon as they are available
-///
-/// A new view is normally generated as soon a a block is approved, but
-/// additional logic is needed in failure cases, like when no new block is
-/// approved for a long enough period of time
-struct ViewGenerator;
-
-impl ViewGenerator {
-    async fn next(&mut self) -> View {
-        todo!()
     }
 }
 
@@ -203,67 +180,136 @@ pub struct Approval;
 pub struct View {
     seed: Seed,
     staking_keys: BTreeMap<NodeId, Stake>,
-    _view_n: u64,
+    pub view_n: u64,
 }
 
 impl View {
     // TODO: might want to encode steps in the type system
-    async fn resolve<'view, A, O, F, Tx, Id>(
+    pub async fn resolve<'view, A, O, F, Tx, Id>(
         &'view self,
         node_id: NodeId,
         tip: &Tip,
         adapter: &A,
         fountain: &F,
         leadership: &Leadership<Tx, Id>,
-    ) -> Result<Block, Box<dyn Error>>
+    ) -> Result<(Block, View), Box<dyn Error>>
+    where
+        A: NetworkAdapter + Send + Sync + 'static,
+        F: FountainCode,
+        O: Overlay<'view, A, F>,
+    {
+        let res = if self.is_leader(node_id) {
+            let block = self
+                .resolve_leader::<A, O, F, _, _>(node_id, tip, adapter, fountain, leadership)
+                .await
+                .unwrap(); // FIXME: handle sad path
+            let next_view = self.generate_next_view(&block);
+            (block, next_view)
+        } else {
+            self.resolve_non_leader::<A, O, F>(node_id, adapter, fountain)
+                .await
+                .unwrap() // FIXME: handle sad path
+        };
+
+        // Commit phase:
+        // Upon verifing a block B, if B.parent = B' and B'.parent = B'' and
+        //    B'.view = B''.view + 1, then the node commits B''.
+        //    This happens implicitly at the chain level and does not require any
+        //    explicit action from the node.
+
+        Ok(res)
+    }
+
+    async fn resolve_leader<'view, A, O, F, Tx, Id>(
+        &'view self,
+        node_id: NodeId,
+        tip: &Tip,
+        adapter: &A,
+        fountain: &F,
+        leadership: &Leadership<Tx, Id>,
+    ) -> Result<Block, ()>
     where
         A: NetworkAdapter + Send + Sync + 'static,
         F: FountainCode,
         O: Overlay<'view, A, F>,
     {
         let overlay = O::new(self, node_id);
-        // FIXME: this is still a working in progress and best-of-my-understanding
-        //       of the consensus protocol, having pseudocode would be very helpful
 
-        // Consensus in Carnot is achieved in 4 steps from the point of view of a node:
-        // 1) The node receives a block proposal from a leader and verifies it
-        // 2, The node signals to the network its approval for the block.
-        //    Depending on the overlay, this may require waiting for a certain number
-        //    of other approvals.
-        // 3) The node waits for consensus to be reached and mark the block as verified
-        // 4) Upon verifing a block B, if B.parent = B' and B'.parent = B'' and
-        //    B'.view = B''.view + 1, then the node commits B''.
-        //    This happens implicitly at the chain level and does not require any
-        //    explicit action from the node.
+        // We need to build the QC for the block we are proposing
+        let qc = overlay.build_qc(&adapter).await;
 
-        // 1) Collect and verify block proposal.
-        //    If this node is the leader this is trivial
-        let block = if let LeadershipResult::Leader { block, .. } =
-            leadership.try_propose_block(self, tip).await
-        {
-            block
-        } else {
-            overlay
-                .reconstruct_proposal_block(adapter, fountain)
-                .await?
-            // TODO: reshare the block?
-            // TODO: verify
-        };
+        let LeadershipResult::Leader { block, _view }  = leadership
+            .try_propose_block(self, tip, qc)
+            .await else { panic!("we are leader")};
 
-        // 2) Signal approval to the network
-        overlay.approve_and_forward(&block, adapter).await?;
-
-        // 3) Wait for consensus
-        overlay.wait_for_consensus(&block, adapter).await;
+        overlay
+            .broadcast_block(block.clone(), adapter, fountain)
+            .await;
 
         Ok(block)
     }
 
+    async fn resolve_non_leader<'view, A, O, F>(
+        &'view self,
+        node_id: NodeId,
+        adapter: &A,
+        fountain: &F,
+    ) -> Result<(Block, View), ()>
+    where
+        A: NetworkAdapter + Send + Sync + 'static,
+        F: FountainCode,
+        O: Overlay<'view, A, F>,
+    {
+        let overlay = O::new(self, node_id);
+        // Consensus in Carnot is achieved in 2 steps from the point of view of a node:
+        // 1) The node receives a block proposal from a leader and verifies it
+        // 2) The node signals to the network its approval for the block.
+        //    Depending on the overlay, this may require waiting for a certain number
+        //    of other approvals.
+
+        // 1) Collect and verify block proposal.
+        let block = overlay
+            .reconstruct_proposal_block(adapter, fountain)
+            .await
+            .unwrap(); // FIXME: handle sad path
+
+        // TODO: reshare the block?
+        // TODO: verify
+        let next_view = self.generate_next_view(&block);
+
+        // 2) Signal approval to the network
+        // We only consider the happy path for now
+        if self.pipelined_safe_block(&block) {
+            overlay
+                .approve_and_forward(&block, adapter, &next_view)
+                .await
+                .unwrap(); // FIXME: handle sad path
+        }
+
+        Ok((block, next_view))
+    }
+
     pub fn is_leader(&self, _node_id: NodeId) -> bool {
-        todo!()
+        false
     }
 
     pub fn id(&self) -> u64 {
-        self._view_n
+        self.view_n
+    }
+
+    // Verifies the block is new and the previous leader did not fail
+    fn pipelined_safe_block(&self, _: &Block) -> bool {
+        // return b.view_n >= self.view_n && b.view_n == b.qc.view_n
+        true
+    }
+
+    fn generate_next_view(&self, _b: &Block) -> View {
+        let mut seed = self.seed;
+        seed[0] += 1;
+        View {
+            seed,
+            staking_keys: self.staking_keys.clone(),
+            view_n: self.view_n + 1,
+        }
     }
 }

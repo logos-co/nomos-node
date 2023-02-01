@@ -87,6 +87,7 @@ impl<'view, Network: NetworkAdapter + Sync, Fountain: FountainCode + Sync>
         &self,
         block: &Block,
         adapter: &Network,
+        _next_view: &View,
     ) -> Result<(), Box<dyn Error>> {
         // in the flat overlay, there's no need to wait for anyone before approving the block
         let approval = self.approve(block);
@@ -103,7 +104,7 @@ impl<'view, Network: NetworkAdapter + Sync, Fountain: FountainCode + Sync>
         Ok(())
     }
 
-    async fn wait_for_consensus(&self, _approval: &Block, adapter: &Network) {
+    async fn build_qc(&self, adapter: &Network) -> Approval {
         // for now, let's pretend that consensus is reached as soon as the
         // block is approved by a share of the nodes
         let mut approvals = HashSet::new();
@@ -121,8 +122,10 @@ impl<'view, Network: NetworkAdapter + Sync, Fountain: FountainCode + Sync>
                     / self.threshold.den;
             if approvals.len() as u64 >= threshold {
                 // consensus reached
-                break;
+                // FIXME: build a real QC
+                return Approval;
             }
         }
+        unimplemented!("consensus not reached")
     }
 }

@@ -154,6 +154,7 @@ impl<'view, Network: NetworkAdapter + Sync, Fountain: FountainCode + Sync, const
         &self,
         _block: &Block,
         _adapter: &Network,
+        _next_view: &View,
     ) -> Result<(), Box<dyn Error>> {
         // roughly, we want to do something like this:
         // 1. wait for left and right children committees to approve
@@ -165,7 +166,8 @@ impl<'view, Network: NetworkAdapter + Sync, Fountain: FountainCode + Sync, const
         todo!()
     }
 
-    async fn wait_for_consensus(&self, _approval: &Block, _adapter: &Network) {
+    async fn build_qc(&self, _adapter: &Network) -> Approval {
         // maybe the leader publishing the QC?
+        todo!()
     }
 }
