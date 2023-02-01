@@ -1,0 +1,9 @@
+.circleci
+.git
+.github
+.gitignore
+.idea
+.vscode
+
+ci
+target

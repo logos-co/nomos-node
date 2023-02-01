@@ -1,0 +1,16 @@
+log:
+  backend: "Stdout"
+  format: "Json"
+  level: "debug"
+network:
+  backend:
+    host: 0.0.0.0
+    port: 3000
+    log_level: "fatal"
+    nodeKey: null
+    discV5BootstrapNodes: []
+    initial_peers: []
+http:
+  backend:
+    address: 0.0.0.0:8080
+    cors_origins: []
