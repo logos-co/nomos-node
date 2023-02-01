@@ -1,5 +1,4 @@
 // std
-use std::pin::Pin;
 // crates
 use futures::StreamExt;
 use rand::{seq::SliceRandom, SeedableRng};
@@ -10,6 +9,8 @@ use crate::network::NetworkAdapter;
 
 /// View of the tree overlay centered around a specific member
 pub struct Member<'view, const C: usize> {
+    // id is not used now, but gonna probably used it for later checking later on
+    #[allow(dead_code)]
     id: NodeId,
     committee: Committee,
     committees: Committees<'view, C>,
@@ -54,6 +55,14 @@ impl<'view, const C: usize> Committees<'view, C> {
 }
 
 impl Committee {
+    pub const fn root() -> Self {
+        Self(0)
+    }
+
+    pub fn id(&self) -> usize {
+        self.0
+    }
+
     /// Return the left and right children committee, if any
     pub fn children(&self) -> (Committee, Committee) {
         (
@@ -112,19 +121,31 @@ impl<'view, Network: NetworkAdapter + Sync, Fountain: FountainCode + Sync, const
         adapter: &Network,
         fountain: &Fountain,
     ) -> Result<Block, FountainError> {
-        let message_stream = adapter.proposal_chunks_stream().await;
+        let committee = self.committee;
+        let view = self.committees.view;
+        let message_stream = adapter.proposal_chunks_stream(committee, view).await;
         fountain.decode(message_stream).await.map(Block::from_bytes)
     }
 
     async fn broadcast_block(&self, block: Block, adapter: &Network, fountain: &Fountain) {
+        let (left_child, right_child) = self.children_committes();
+        let view = self.committees.view;
         let block_bytes = block.as_bytes();
         let encoded_stream = fountain.encode(&block_bytes);
         encoded_stream
             .for_each_concurrent(None, |chunk| async move {
                 let message = ProposalChunkMsg { chunk };
-                adapter
-                    .broadcast_block_chunk(self.committees.view, message)
-                    .await;
+                let r_child = right_child
+                    .map(|right_child| {
+                        adapter.broadcast_block_chunk(right_child, view, message.clone())
+                    })
+                    .into_iter();
+                let l_child = left_child
+                    .map(|left_child| {
+                        adapter.broadcast_block_chunk(left_child, view, message.clone())
+                    })
+                    .into_iter();
+                futures::future::join_all(r_child.chain(l_child)).await;
             })
             .await;
     }
@@ -132,7 +153,7 @@ impl<'view, Network: NetworkAdapter + Sync, Fountain: FountainCode + Sync, const
     async fn approve_and_forward(
         &self,
         _block: &Block,
-        adapter: &Network,
+        _adapter: &Network,
     ) -> Result<(), Box<dyn Error>> {
         // roughly, we want to do something like this:
         // 1. wait for left and right children committees to approve
@@ -144,7 +165,7 @@ impl<'view, Network: NetworkAdapter + Sync, Fountain: FountainCode + Sync, const
         todo!()
     }
 
-    async fn wait_for_consensus(&self, _approval: &Block, adapter: &Network) {
+    async fn wait_for_consensus(&self, _approval: &Block, _adapter: &Network) {
         // maybe the leader publishing the QC?
     }
 }

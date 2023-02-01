@@ -262,4 +262,8 @@ impl View {
     pub fn is_leader(&self, _node_id: NodeId) -> bool {
         todo!()
     }
+
+    pub fn id(&self) -> u64 {
+        self._view_n
+    }
 }
