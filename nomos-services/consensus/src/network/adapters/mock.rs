@@ -14,6 +14,7 @@ use crate::{
         messages::{ApprovalMsg, ProposalChunkMsg},
         NetworkAdapter,
     },
+    overlay::committees::Committee,
     Approval, View,
 };
 
@@ -58,7 +59,11 @@ impl NetworkAdapter for MockAdapter {
         Self { network_relay }
     }
 
-    async fn proposal_chunks_stream(&self) -> Box<dyn Stream<Item = Bytes> + Send + Sync + Unpin> {
+    async fn proposal_chunks_stream(
+        &self,
+        _committee: Committee,
+        _view: &View,
+    ) -> Box<dyn Stream<Item = Bytes> + Send + Sync + Unpin> {
         let stream_channel = self
             .message_subscriber_channel()
             .await
@@ -85,7 +90,12 @@ impl NetworkAdapter for MockAdapter {
         }))
     }
 
-    async fn broadcast_block_chunk(&self, _view: &View, chunk_message: ProposalChunkMsg) {
+    async fn broadcast_block_chunk(
+        &self,
+        _committee: Committee,
+        _view: &View,
+        chunk_message: ProposalChunkMsg,
+    ) {
         let message = MockMessage::new(
             String::from_utf8_lossy(chunk_message.as_bytes()).to_string(),
             MOCK_BLOCK_CONTENT_TOPIC,
@@ -104,7 +114,11 @@ impl NetworkAdapter for MockAdapter {
         };
     }
 
-    async fn approvals_stream(&self) -> Box<dyn Stream<Item = Approval> + Send> {
+    async fn approvals_stream(
+        &self,
+        _committee: Committee,
+        _view: &View,
+    ) -> Box<dyn Stream<Item = Approval> + Send> {
         let stream_channel = self
             .message_subscriber_channel()
             .await
@@ -130,7 +144,12 @@ impl NetworkAdapter for MockAdapter {
         )
     }
 
-    async fn forward_approval(&self, approval_message: ApprovalMsg) {
+    async fn forward_approval(
+        &self,
+        _committee: Committee,
+        _view: &View,
+        approval_message: ApprovalMsg,
+    ) {
         let message = MockMessage::new(
             String::from_utf8_lossy(&approval_message.as_bytes()).to_string(),
             MOCK_APPROVAL_CONTENT_TOPIC,
