@@ -1,4 +1,5 @@
-use blake2::{Blake2s256, Digest};
+use blake2::digest::{Update, VariableOutput};
+use blake2::{Blake2bVar, Digest};
 use serde::{Deserialize, Serialize};
 use std::hash::Hash;
 
@@ -10,10 +11,14 @@ pub struct TxId([u8; 32]);
 
 impl From<&Tx> for TxId {
     fn from(tx: &Tx) -> Self {
-        let mut hasher = Blake2s256::new();
-        hasher.update(bincode::serde::encode_to_vec(tx, bincode::config::standard()).unwrap());
+        let mut hasher = Blake2bVar::new(32).unwrap();
+        hasher.update(
+            bincode::serde::encode_to_vec(tx, bincode::config::standard())
+                .unwrap()
+                .as_slice(),
+        );
         let mut id = [0u8; 32];
-        id.copy_from_slice(hasher.finalize().as_slice());
+        hasher.finalize_variable(&mut id).unwrap();
         Self(id)
     }
 }
@@ -29,8 +34,8 @@ mod test {
         assert_eq!(
             txid.0,
             [
-                26, 113, 217, 35, 178, 18, 65, 215, 30, 117, 195, 9, 189, 146, 124, 78, 66, 91, 97,
-                21, 254, 51, 156, 155, 144, 52, 135, 125, 51, 128, 186, 244
+                39, 227, 252, 176, 211, 134, 68, 39, 134, 158, 47, 7, 82, 40, 169, 232, 168, 118,
+                240, 103, 84, 146, 127, 64, 60, 196, 126, 142, 172, 156, 124, 78
             ]
         );
     }
