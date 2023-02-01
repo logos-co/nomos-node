@@ -16,7 +16,7 @@ RUN apt-get update && apt-get install -yq \
 WORKDIR /nomos
 COPY . . 
 
-RUN cargo build --release -p nomos-node --features metrics
+RUN cargo build --release -p mockpool-node
 
 # NODE IMAGE ----------------------------------------------------------
 
@@ -27,9 +27,9 @@ LABEL source="https://github.com/logos-co/nomos-research"
 LABEL description="Nomos node image"
 
 # nomos default ports
-EXPOSE 8080 9000 60000	
+EXPOSE 3000 8080 9000 60000	
 
-COPY --from=builder /nomos/target/release/nomos-node /usr/bin/nomos-node
+COPY --from=builder /nomos/target/release/mockpool-node /usr/bin/nomos-node
 COPY config.yml.example /etc/nomos/config.yml
 
 ENTRYPOINT ["nomos-node"]
