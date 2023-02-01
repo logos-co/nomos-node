@@ -1,5 +1,5 @@
 use blake2::digest::{Update, VariableOutput};
-use blake2::{Blake2bVar, Digest};
+use blake2::Blake2bVar;
 use serde::{Deserialize, Serialize};
 use std::hash::Hash;
 
