@@ -54,10 +54,7 @@ where
             }))
             .await
         {
-            panic!(
-                "Couldn't send subscribe message to the network service: {}",
-                e
-            );
+            panic!("Couldn't send subscribe message to the network service: {e}",);
         };
         Self {
             network_relay,
