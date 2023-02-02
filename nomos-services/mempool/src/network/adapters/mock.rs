@@ -95,4 +95,8 @@ where
             },
         )))
     }
+
+    async fn send_transaction(&self, _tx: Self::Tx) {
+        todo!()
+    }
 }

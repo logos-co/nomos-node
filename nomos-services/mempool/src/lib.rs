@@ -99,7 +99,7 @@ where
     P: MemPool + Send + 'static,
     P::Settings: Clone + Send + Sync + 'static,
     P::Id: Debug + Send + 'static,
-    P::Tx: Debug + Send + 'static,
+    P::Tx: Clone + Debug + Send + Sync + 'static,
     N: NetworkAdapter<Tx = P::Tx> + Send + Sync + 'static,
 {
     fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, overwatch_rs::DynError> {
@@ -132,9 +132,14 @@ where
                 Some(msg) = service_state.inbound_relay.recv() => {
                     match msg {
                         MempoolMsg::AddTx { tx } => {
-                            pool.add_tx(tx).unwrap_or_else(|e| {
-                                tracing::debug!("could not add tx to the pool due to: {}", e)
-                            });
+                            match pool.add_tx(tx.clone()) {
+                                Ok(_id) => {
+                                    adapter.send_transaction(tx).await;
+                                }
+                                Err(e) => {
+                                   tracing::debug!("could not add tx to the pool due to: {}", e);
+                                }
+                            }
                         }
                         MempoolMsg::View { ancestor_hint, tx } => {
                             tx.send(pool.view(ancestor_hint)).unwrap_or_else(|_| {

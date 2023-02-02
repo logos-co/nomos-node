@@ -12,7 +12,8 @@ use nomos_network::backends::waku::{EventKind, NetworkEvent, Waku, WakuBackendMe
 use nomos_network::{NetworkMsg, NetworkService};
 use overwatch_rs::services::relay::OutboundRelay;
 use overwatch_rs::services::ServiceData;
-use waku_bindings::{Encoding, WakuContentTopic, WakuPubSubTopic};
+use serde::Serialize;
+use waku_bindings::{Encoding, WakuContentTopic, WakuMessage, WakuPubSubTopic};
 
 const WAKU_CARNOT_PUB_SUB_TOPIC: WakuPubSubTopic =
     WakuPubSubTopic::new("CarnotSim", Encoding::Proto);
@@ -28,7 +29,7 @@ pub struct WakuAdapter<Tx> {
 #[async_trait::async_trait]
 impl<Tx> NetworkAdapter for WakuAdapter<Tx>
 where
-    Tx: DeserializeOwned + Send + Sync + 'static,
+    Tx: DeserializeOwned + Serialize + Send + Sync + 'static,
 {
     type Backend = Waku;
     type Tx = Tx;
@@ -69,9 +70,7 @@ where
             |event| async move {
                 match event {
                     Ok(NetworkEvent::RawMessage(message)) => {
-                        if message.content_topic().content_topic_name
-                            == WAKU_CARNOT_TX_CONTENT_TOPIC.content_topic_name
-                        {
+                        if message.content_topic() == &WAKU_CARNOT_TX_CONTENT_TOPIC {
                             let (tx, _): (TransactionMsg<Self::Tx>, _) =
                                 // TODO: This should be temporary, we can probably extract this so we can use/try/test a variety of encodings
                                 bincode::serde::decode_from_slice(
@@ -93,5 +92,27 @@ where
                 }
             },
         )))
+    }
+
+    async fn send_transaction(&self, tx: Self::Tx) {
+        if let Err((_, _e)) = self
+            .network_relay
+            .send(NetworkMsg::Process(WakuBackendMessage::Broadcast {
+                message: WakuMessage::new(
+                    bincode::serde::encode_to_vec(
+                        &TransactionMsg { tx },
+                        bincode::config::standard(),
+                    )
+                    .unwrap(),
+                    WAKU_CARNOT_TX_CONTENT_TOPIC.clone(),
+                    1,
+                    chrono::Utc::now().timestamp() as usize,
+                ),
+                topic: Some(WAKU_CARNOT_PUB_SUB_TOPIC.clone()),
+            }))
+            .await
+        {
+            todo!("log error");
+        };
     }
 }
