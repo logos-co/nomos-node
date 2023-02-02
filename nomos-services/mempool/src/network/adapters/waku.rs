@@ -1,6 +1,5 @@
-use bincode::config::{Fixint, LittleEndian, NoLimit, WriteFixedArrayLength};
-use std::marker::PhantomData;
 // std
+use std::marker::PhantomData;
 // crates
 use futures::{Stream, StreamExt};
 use serde::de::DeserializeOwned;
@@ -75,12 +74,7 @@ where
                                 // TODO: This should be temporary, we can probably extract this so we can use/try/test a variety of encodings
                                 bincode::serde::decode_from_slice(
                                     message.payload(),
-                                    bincode::config::Configuration::<
-                                        LittleEndian,
-                                        Fixint,
-                                        WriteFixedArrayLength,
-                                        NoLimit,
-                                    >::default(),
+                                    bincode::config::standard(),
                                 )
                                 .unwrap();
                             Some(tx.tx)
