@@ -3,7 +3,7 @@ use std::marker::PhantomData;
 
 // crates
 use futures::{Stream, StreamExt};
-use nomos_network::backends::mock::{EventKind, Mock, MockBackendMessage, NetworkEvent};
+use nomos_network::backends::mock::{EventKind, Mock, MockBackendMessage, NetworkEvent, MockMessage, MockContentTopic};
 use nomos_network::{NetworkMsg, NetworkService};
 use overwatch_rs::services::relay::OutboundRelay;
 use overwatch_rs::services::ServiceData;
@@ -15,6 +15,8 @@ use crate::network::NetworkAdapter;
 
 const MOCK_PUB_SUB_TOPIC: &str = "MockPubSubTopic";
 const MOCK_CONTENT_TOPIC: &str = "MockContentTopic";
+const MOCK_TX_CONTENT_TOPIC: MockContentTopic =
+    MockContentTopic::new("Mock", 1, "Tx");
 
 pub struct MockAdapter<Tx> {
     network_relay: OutboundRelay<<NetworkService<Mock> as ServiceData>::Message>,
@@ -24,7 +26,7 @@ pub struct MockAdapter<Tx> {
 #[async_trait::async_trait]
 impl<Tx> NetworkAdapter for MockAdapter<Tx>
 where
-    Tx: From<String> + DeserializeOwned + Send + Sync + 'static,
+    Tx: From<String> + Into<String> + DeserializeOwned + Send + Sync + 'static,
 {
     type Backend = Mock;
     type Tx = Tx;
@@ -93,7 +95,21 @@ where
         )))
     }
 
-    async fn send_transaction(&self, _tx: Self::Tx) {
-        todo!()
+    async fn send_transaction(&self, tx: Self::Tx) {
+        if let Err((e, _e)) = self
+            .network_relay
+            .send(NetworkMsg::Process(MockBackendMessage::Broadcast {
+                msg: MockMessage::new(
+                    tx.into(),
+                    MOCK_TX_CONTENT_TOPIC,
+                    1,
+                    chrono::Utc::now().timestamp() as usize,
+                ),
+                topic: MOCK_PUB_SUB_TOPIC,
+            }))
+            .await
+        {
+            tracing::error!(err = ?e);
+        }; 
     }
 }
