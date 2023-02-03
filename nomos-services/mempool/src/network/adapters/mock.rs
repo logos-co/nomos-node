@@ -3,7 +3,9 @@ use std::marker::PhantomData;
 
 // crates
 use futures::{Stream, StreamExt};
-use nomos_network::backends::mock::{EventKind, Mock, MockBackendMessage, NetworkEvent, MockMessage, MockContentTopic};
+use nomos_network::backends::mock::{
+    EventKind, Mock, MockBackendMessage, MockContentTopic, MockMessage, NetworkEvent,
+};
 use nomos_network::{NetworkMsg, NetworkService};
 use overwatch_rs::services::relay::OutboundRelay;
 use overwatch_rs::services::ServiceData;
@@ -15,8 +17,7 @@ use crate::network::NetworkAdapter;
 
 const MOCK_PUB_SUB_TOPIC: &str = "MockPubSubTopic";
 const MOCK_CONTENT_TOPIC: &str = "MockContentTopic";
-const MOCK_TX_CONTENT_TOPIC: MockContentTopic =
-    MockContentTopic::new("Mock", 1, "Tx");
+const MOCK_TX_CONTENT_TOPIC: MockContentTopic = MockContentTopic::new("Mock", 1, "Tx");
 
 pub struct MockAdapter<Tx> {
     network_relay: OutboundRelay<<NetworkService<Mock> as ServiceData>::Message>,
@@ -110,6 +111,6 @@ where
             .await
         {
             tracing::error!(err = ?e);
-        }; 
+        };
     }
 }
