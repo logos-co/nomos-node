@@ -236,7 +236,7 @@ impl View {
         let overlay = O::new(self, node_id);
 
         // We need to build the QC for the block we are proposing
-        let qc = overlay.build_qc(&adapter).await;
+        let qc = overlay.build_qc(adapter).await;
 
         let LeadershipResult::Leader { block, _view }  = leadership
             .try_propose_block(self, tip, qc)
@@ -273,8 +273,8 @@ impl View {
             .await
             .unwrap(); // FIXME: handle sad path
 
-        // TODO: reshare the block?
         // TODO: verify
+        // TODO: reshare the block?
         let next_view = self.generate_next_view(&block);
 
         // 2) Signal approval to the network
