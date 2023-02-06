@@ -13,8 +13,8 @@ use tokio_stream::wrappers::BroadcastStream;
 // internal
 use crate::network::NetworkAdapter;
 
-const MOCK_PUB_SUB_TOPIC: &str = "MockPubSubTopic";
-const MOCK_CONTENT_TOPIC: &str = "MockContentTopic";
+pub const MOCK_PUB_SUB_TOPIC: &str = "MockPubSubTopic";
+pub const MOCK_CONTENT_TOPIC: &str = "MockContentTopic";
 
 pub struct MockAdapter<Tx> {
     network_relay: OutboundRelay<<NetworkService<Mock> as ServiceData>::Message>,
