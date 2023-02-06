@@ -13,7 +13,6 @@ use nomos_mempool::{
     MempoolMsg, MempoolService,
 };
 
-
 #[derive(Services)]
 struct MockPoolNode {
     logging: ServiceHandle<Logger>,
@@ -66,7 +65,10 @@ fn test_mockmempool() {
                 },
             },
             mockpool: (),
-            logging: serde_json::from_str(r#"{"backend": "Stdout", "format": "Json", "level": "debug"}"#).unwrap(),
+            logging: serde_json::from_str(
+                r#"{"backend": "Stdout", "format": "Json", "level": "debug"}"#,
+            )
+            .unwrap(),
         },
         None,
     )
