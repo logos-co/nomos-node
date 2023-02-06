@@ -140,13 +140,13 @@ impl core::fmt::Debug for MockBackendMessage {
         match self {
             Self::BootProducer { .. } => write!(f, "BootProducer"),
             Self::Broadcast { topic, msg } => {
-                write!(f, "Broadcast {{ topic: {}, msg: {:?} }}", topic, msg)
+                write!(f, "Broadcast {{ topic: {topic}, msg: {msg:?} }}")
             }
-            Self::RelaySubscribe { topic } => write!(f, "RelaySubscribe {{ topic: {} }}", topic),
+            Self::RelaySubscribe { topic } => write!(f, "RelaySubscribe {{ topic: {topic} }}"),
             Self::RelayUnSubscribe { topic } => {
-                write!(f, "RelayUnSubscribe {{ topic: {} }}", topic)
+                write!(f, "RelayUnSubscribe {{ topic: {topic} }}")
             }
-            Self::Query { topic, .. } => write!(f, "Query {{ topic: {} }}", topic),
+            Self::Query { topic, .. } => write!(f, "Query {{ topic: {topic} }}"),
         }
     }
 }
