@@ -71,13 +71,8 @@ where
                 match event {
                     Ok(NetworkEvent::RawMessage(message)) => {
                         if message.content_topic() == &WAKU_CARNOT_TX_CONTENT_TOPIC {
-                            let (tx, _): (TransactionMsg<Self::Tx>, _) =
-                                // TODO: This should be temporary, we can probably extract this so we can use/try/test a variety of encodings
-                                bincode::serde::decode_from_slice(
-                                    message.payload(),
-                                    bincode::config::standard(),
-                                )
-                                .unwrap();
+                            let tx: TransactionMsg<Self::Tx> =
+                                wire::deserializer(message.payload()).deserialize().unwrap();
                             Some(tx.tx)
                         } else {
                             None
@@ -90,7 +85,7 @@ where
     }
 
     async fn send_transaction(&self, tx: Self::Tx) {
-        let payload = wire::serialize(tx).expect("Tx serialization failed");
+        let payload = wire::serialize(&tx).expect("Tx serialization failed");
         if let Err((_, _e)) = self
             .network_relay
             .send(NetworkMsg::Process(WakuBackendMessage::Broadcast {
