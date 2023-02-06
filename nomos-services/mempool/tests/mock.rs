@@ -1,7 +1,7 @@
 use nomos_core::block::BlockId;
 use nomos_network::{
     backends::mock::{
-        EventKind, Mock, MockBackendMessage, MockConfig, MockContentTopic, MockMessage,
+        Mock, MockBackendMessage, MockConfig, MockContentTopic, MockMessage,
     },
     NetworkConfig, NetworkMsg, NetworkService,
 };
