@@ -1,5 +1,5 @@
 use nomos_core::block::BlockId;
-use nomos_log::Logger;
+use nomos_log::{Logger, LoggerSettings};
 use nomos_network::{
     backends::mock::{Mock, MockBackendMessage, MockConfig, MockContentTopic, MockMessage},
     NetworkConfig, NetworkMsg, NetworkService,
@@ -58,17 +58,14 @@ fn test_mockmempool() {
             network: NetworkConfig {
                 backend: MockConfig {
                     predefined_messages,
-                    duration: tokio::time::Duration::from_secs(1),
+                    duration: tokio::time::Duration::from_millis(100),
                     seed: 0,
                     version: 1,
                     weights: None,
                 },
             },
             mockpool: (),
-            logging: serde_json::from_str(
-                r#"{"backend": "Stdout", "format": "Json", "level": "debug"}"#,
-            )
-            .unwrap(),
+            logging: LoggerSettings::default(),
         },
         None,
     )
@@ -119,6 +116,6 @@ fn test_mockmempool() {
     });
 
     while !exist2.load(std::sync::atomic::Ordering::SeqCst) {
-        std::thread::sleep(std::time::Duration::from_secs(1));
+        std::thread::sleep(std::time::Duration::from_millis(200));
     }
 }
