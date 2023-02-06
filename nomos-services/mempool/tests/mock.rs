@@ -53,7 +53,10 @@ fn test_mockmempool() {
         },
     ];
 
-    let t_predefined_messages = predefined_messages.clone();
+    let exp_txns = predefined_messages
+        .iter()
+        .map(|msg| msg.payload.clone())
+        .collect::<std::collections::HashSet<_>>();
 
     let app = OverwatchRunner::<MockPoolNode>::run(
         MockPoolNodeServiceSettings {
@@ -79,22 +82,11 @@ fn test_mockmempool() {
         .relay::<MempoolService<MockAdapter<String>, MockPool<String, String>>>();
 
     app.spawn(async move {
-        let outbound = network.connect().await.unwrap();
+        let network_outbound = network.connect().await.unwrap();
         let mempool_outbound = mempool.connect().await.unwrap();
 
-        let (tx, rx) = tokio::sync::oneshot::channel();
-        // send subscribe message to the network service
-        outbound
-            .send(NetworkMsg::Subscribe {
-                kind: EventKind::Message,
-                sender: tx,
-            })
-            .await
-            .unwrap();
-
-        let _rx = rx.await.unwrap();
         // subscribe to the mock content topic
-        outbound
+        network_outbound
             .send(NetworkMsg::Process(MockBackendMessage::RelaySubscribe {
                 topic: MOCK_CONTENT_TOPIC,
             }))
@@ -112,15 +104,15 @@ fn test_mockmempool() {
                 })
                 .await
                 .unwrap();
+
             let items = mrx
                 .await
                 .unwrap()
                 .into_iter()
                 .collect::<std::collections::HashSet<_>>();
-            if items.len() == t_predefined_messages.len() {
-                for msg in t_predefined_messages {
-                    assert!(items.contains(&msg.payload));
-                }
+
+            if items.len() == exp_txns.len() {
+                assert_eq!(exp_txns, items);
                 exist.store(true, std::sync::atomic::Ordering::SeqCst);
                 break;
             }
