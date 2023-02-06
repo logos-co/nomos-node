@@ -37,6 +37,17 @@ pub struct LoggerSettings {
     level: Level,
 }
 
+impl LoggerSettings {
+    #[inline]
+    pub const fn new(backend: LoggerBackend, format: LoggerFormat, level: Level) -> Self {
+        Self {
+            backend,
+            format,
+            level,
+        }
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum LoggerFormat {
     Json,
