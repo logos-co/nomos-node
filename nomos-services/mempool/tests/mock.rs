@@ -1,8 +1,7 @@
 use nomos_core::block::BlockId;
+use nomos_log::Logger;
 use nomos_network::{
-    backends::mock::{
-        Mock, MockBackendMessage, MockConfig, MockContentTopic, MockMessage,
-    },
+    backends::mock::{Mock, MockBackendMessage, MockConfig, MockContentTopic, MockMessage},
     NetworkConfig, NetworkMsg, NetworkService,
 };
 use overwatch_derive::*;
@@ -14,19 +13,16 @@ use nomos_mempool::{
     MempoolMsg, MempoolService,
 };
 
+
 #[derive(Services)]
 struct MockPoolNode {
+    logging: ServiceHandle<Logger>,
     network: ServiceHandle<NetworkService<Mock>>,
     mockpool: ServiceHandle<MempoolService<MockAdapter<String>, MockPool<String, String>>>,
 }
 
 #[test]
 fn test_mockmempool() {
-    tracing_subscriber::fmt::fmt()
-        .with_env_filter(std::env::var("RUST_LOG").unwrap_or_else(|_| "info".to_owned()))
-        .with_file(false)
-        .init();
-
     let exist = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
     let exist2 = exist.clone();
 
@@ -70,6 +66,7 @@ fn test_mockmempool() {
                 },
             },
             mockpool: (),
+            logging: serde_json::from_str(r#"{"backend": "Stdout", "format": "Json", "level": "debug"}"#).unwrap(),
         },
         None,
     )
