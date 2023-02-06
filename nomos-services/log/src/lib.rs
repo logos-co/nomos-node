@@ -37,6 +37,16 @@ pub struct LoggerSettings {
     level: Level,
 }
 
+impl Default for LoggerSettings {
+    fn default() -> Self {
+        Self {
+            backend: LoggerBackend::Stdout,
+            format: LoggerFormat::Json,
+            level: Level::DEBUG,
+        }
+    }
+}
+
 impl LoggerSettings {
     #[inline]
     pub const fn new(backend: LoggerBackend, format: LoggerFormat, level: Level) -> Self {
