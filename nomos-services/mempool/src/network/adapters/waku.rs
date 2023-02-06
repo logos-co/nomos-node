@@ -7,6 +7,7 @@ use tokio_stream::wrappers::BroadcastStream;
 // internal
 use crate::network::messages::TransactionMsg;
 use crate::network::NetworkAdapter;
+use nomos_core::wire;
 use nomos_network::backends::waku::{EventKind, NetworkEvent, Waku, WakuBackendMessage};
 use nomos_network::{NetworkMsg, NetworkService};
 use overwatch_rs::services::relay::OutboundRelay;
@@ -89,15 +90,12 @@ where
     }
 
     async fn send_transaction(&self, tx: Self::Tx) {
+        let payload = wire::serialize(tx).expect("Tx serialization failed");
         if let Err((_, _e)) = self
             .network_relay
             .send(NetworkMsg::Process(WakuBackendMessage::Broadcast {
                 message: WakuMessage::new(
-                    bincode::serde::encode_to_vec(
-                        &TransactionMsg { tx },
-                        bincode::config::standard(),
-                    )
-                    .unwrap(),
+                    payload,
                     WAKU_CARNOT_TX_CONTENT_TOPIC.clone(),
                     1,
                     chrono::Utc::now().timestamp() as usize,
