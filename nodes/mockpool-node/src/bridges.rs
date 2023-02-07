@@ -142,12 +142,15 @@ pub fn waku_add_conn_bridge(
         {
             if let Some(payload) = payload {
                 if let Ok(addrs) = serde_json::from_slice::<Vec<Multiaddr>>(&payload) {
-                    let mut reqs = vec![];
-                    for addr in addrs {
-                        reqs.push(waku_channel.send(NetworkMsg::Process(
-                            WakuBackendMessage::ConnectPeer { addr },
-                        )));
-                    }
+                    let reqs: Vec<_> = addrs
+                        .into_iter()
+                        .map(|addr| {
+                            waku_channel.send(NetworkMsg::Process(
+                                WakuBackendMessage::ConnectPeer { addr },
+                            ))
+                        })
+                        .collect();
+
                     join_all(reqs).await;
                 }
                 res_tx.send(b"".to_vec().into()).await.unwrap();
