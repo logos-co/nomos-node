@@ -9,9 +9,11 @@ edition = "2021"
 blake2 = "0.10"
 bincode = "2.0.0-rc.2"
 clap = { version = "4", features = ["derive"] }
+futures = "0.3"
 overwatch-rs = { git = "https://github.com/logos-co/Overwatch", branch = "main" }
 overwatch-derive = { git = "https://github.com/logos-co/Overwatch", branch = "main" }
 tracing = "0.1"
+multiaddr = "0.16"
 nomos-core = { path = "../../nomos-core" }
 nomos-network = { path = "../../nomos-services/network", features = ["waku"] }
 nomos-log = { path = "../../nomos-services/log" }
