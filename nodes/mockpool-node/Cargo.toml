@@ -12,6 +12,7 @@ clap = { version = "4", features = ["derive"] }
 overwatch-rs = { git = "https://github.com/logos-co/Overwatch", branch = "main" }
 overwatch-derive = { git = "https://github.com/logos-co/Overwatch", branch = "main" }
 tracing = "0.1"
+multiaddr = "0.16"
 nomos-core = { path = "../../nomos-core" }
 nomos-network = { path = "../../nomos-services/network", features = ["waku"] }
 nomos-log = { path = "../../nomos-services/log" }

@@ -4,6 +4,7 @@ use tokio::sync::oneshot;
 use tracing::debug;
 // internal
 use crate::tx::{Tx, TxId};
+use multiaddr::Multiaddr;
 use nomos_http::backends::axum::AxumBackend;
 use nomos_http::bridge::{build_http_bridge, HttpBridgeRunner};
 use nomos_http::http::{HttpMethod, HttpRequest};
@@ -136,16 +137,15 @@ pub fn waku_add_conn_bridge(
             res_tx, payload, ..
         }) = http_request_channel.recv().await
         {
-            if let Some(addr) = payload
-                .as_ref()
-                .and_then(|b| String::from_utf8(b.to_vec()).ok())
-            {
-                waku_channel
-                    .send(NetworkMsg::Process(WakuBackendMessage::Connect {
-                        addr: addr.try_into().unwrap(),
-                    }))
-                    .await
-                    .unwrap();
+            if let Some(payload) = payload {
+                if let Ok(addrs) = serde_json::from_slice::<Vec<Multiaddr>>(&payload) {
+                    for addr in addrs {
+                        waku_channel
+                            .send(NetworkMsg::Process(WakuBackendMessage::Connect { addr }))
+                            .await
+                            .unwrap();
+                    }
+                }
                 res_tx.send(b"".to_vec().into()).await.unwrap();
             } else {
                 debug!("Invalid payload, {:?}. Should not be empty", payload);
