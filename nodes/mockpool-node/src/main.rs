@@ -69,9 +69,10 @@ fn main() -> Result<()> {
     let Args { config } = Args::parse();
     let config = serde_yaml::from_reader::<_, Config>(std::fs::File::open(config)?)?;
     let bridges: Vec<HttpBridge> = vec![
-        Arc::new(Box::new(bridges::mempool_metrics_bridge)),
-        Arc::new(Box::new(bridges::waku_info_bridge)),
         Arc::new(Box::new(bridges::mempool_add_tx_bridge)),
+        Arc::new(Box::new(bridges::mempool_metrics_bridge)),
+        Arc::new(Box::new(bridges::waku_add_conn_bridge)),
+        Arc::new(Box::new(bridges::waku_info_bridge)),
     ];
     let app = OverwatchRunner::<MockPoolNode>::run(
         MockPoolNodeServiceSettings {

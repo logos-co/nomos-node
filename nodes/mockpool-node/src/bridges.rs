@@ -119,3 +119,38 @@ pub fn waku_info_bridge(
         Ok(())
     }))
 }
+
+pub fn waku_add_conn_bridge(
+    handle: overwatch_rs::overwatch::handle::OverwatchHandle,
+) -> HttpBridgeRunner {
+    Box::new(Box::pin(async move {
+        let (waku_channel, mut http_request_channel) = build_http_bridge::<
+            NetworkService<Waku>,
+            AxumBackend,
+            _,
+        >(handle, HttpMethod::POST, "conn")
+        .await
+        .unwrap();
+
+        while let Some(HttpRequest {
+            res_tx, payload, ..
+        }) = http_request_channel.recv().await
+        {
+            if let Some(addr) = payload
+                .as_ref()
+                .and_then(|b| String::from_utf8(b.to_vec()).ok())
+            {
+                waku_channel
+                    .send(NetworkMsg::Process(WakuBackendMessage::Connect {
+                        addr: addr.try_into().unwrap(),
+                    }))
+                    .await
+                    .unwrap();
+                res_tx.send(b"".to_vec().into()).await.unwrap();
+            } else {
+                debug!("Invalid payload, {:?}. Should not be empty", payload);
+            }
+        }
+        Ok(())
+    }))
+}
