@@ -1,9 +1,7 @@
 // std
+
 // crates
-use tokio::sync::oneshot;
-use tracing::debug;
-// internal
-use crate::tx::{Tx, TxId};
+use futures::future::join_all;
 use multiaddr::Multiaddr;
 use nomos_http::backends::axum::AxumBackend;
 use nomos_http::bridge::{build_http_bridge, HttpBridgeRunner};
@@ -13,6 +11,11 @@ use nomos_mempool::network::adapters::waku::WakuAdapter;
 use nomos_mempool::{MempoolMetrics, MempoolMsg, MempoolService};
 use nomos_network::backends::waku::{Waku, WakuBackendMessage, WakuInfo};
 use nomos_network::{NetworkMsg, NetworkService};
+use tokio::sync::oneshot;
+use tracing::debug;
+
+// internal
+use crate::tx::{Tx, TxId};
 
 pub fn mempool_metrics_bridge(
     handle: overwatch_rs::overwatch::handle::OverwatchHandle,
@@ -139,12 +142,13 @@ pub fn waku_add_conn_bridge(
         {
             if let Some(payload) = payload {
                 if let Ok(addrs) = serde_json::from_slice::<Vec<Multiaddr>>(&payload) {
+                    let mut reqs = vec![];
                     for addr in addrs {
-                        waku_channel
-                            .send(NetworkMsg::Process(WakuBackendMessage::Connect { addr }))
-                            .await
-                            .unwrap();
+                        reqs.push(waku_channel.send(NetworkMsg::Process(
+                            WakuBackendMessage::ConnectPeer { addr },
+                        )));
                     }
+                    join_all(reqs).await;
                 }
                 res_tx.send(b"".to_vec().into()).await.unwrap();
             } else {

@@ -37,7 +37,7 @@ pub enum WakuBackendMessage {
         topic: Option<WakuPubSubTopic>,
     },
     /// Make a connection to peer at provided multiaddress
-    Connect { addr: Multiaddr },
+    ConnectPeer { addr: Multiaddr },
     /// Subscribe to a particular Waku topic
     RelaySubscribe { topic: WakuPubSubTopic },
     /// Unsubscribe from a particular Waku topic
@@ -120,7 +120,7 @@ impl NetworkBackend for Waku {
                     ),
                 }
             }
-            WakuBackendMessage::Connect { addr } => {
+            WakuBackendMessage::ConnectPeer { addr } => {
                 match self.waku.connect_peer_with_address(&addr, None) {
                     Ok(_) => debug!("successfully connected to {addr}"),
                     Err(e) => {
