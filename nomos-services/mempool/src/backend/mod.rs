@@ -3,6 +3,14 @@ pub mod mockpool;
 
 use nomos_core::block::{BlockHeader, BlockId};
 
+#[derive(thiserror::Error, Debug)]
+pub enum MempoolError {
+    #[error("Tx already in mempool")]
+    ExistingTx,
+    #[error(transparent)]
+    DynamicPoolError(#[from] overwatch_rs::DynError),
+}
+
 pub trait MemPool {
     type Settings: Clone;
     type Tx;
@@ -12,7 +20,7 @@ pub trait MemPool {
     fn new(settings: Self::Settings) -> Self;
 
     /// Add a new transaction to the mempool, for example because we received it from the network
-    fn add_tx(&mut self, tx: Self::Tx) -> Result<(), overwatch_rs::DynError>;
+    fn add_tx(&mut self, tx: Self::Tx) -> Result<(), MempoolError>;
 
     /// Return a view over the transactions contained in the mempool.
     /// Implementations should provide *at least* all the transactions which have not been marked as

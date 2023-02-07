@@ -96,7 +96,7 @@ fn test_mockmempool() {
             mempool_outbound
                 .send(MempoolMsg::View {
                     ancestor_hint: BlockId,
-                    tx: mtx,
+                    reply_channel: mtx,
                 })
                 .await
                 .unwrap();

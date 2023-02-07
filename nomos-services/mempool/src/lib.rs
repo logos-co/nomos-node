@@ -7,7 +7,6 @@ use std::fmt::{Debug, Error, Formatter};
 // crates
 use futures::StreamExt;
 use tokio::sync::oneshot::Sender;
-
 // internal
 use crate::network::NetworkAdapter;
 use backend::MemPool;
@@ -40,10 +39,11 @@ pub struct MempoolMetrics {
 pub enum MempoolMsg<Tx, Id> {
     AddTx {
         tx: Tx,
+        reply_channel: Sender<Result<(), ()>>,
     },
     View {
         ancestor_hint: BlockId,
-        tx: Sender<Box<dyn Iterator<Item = Tx> + Send>>,
+        reply_channel: Sender<Box<dyn Iterator<Item = Tx> + Send>>,
     },
     Prune {
         ids: Vec<Id>,
@@ -63,7 +63,7 @@ impl<Tx: Debug, Id: Debug> Debug for MempoolMsg<Tx, Id> {
             Self::View { ancestor_hint, .. } => {
                 write!(f, "MempoolMsg::View {{ ancestor_hint: {ancestor_hint:?}}}")
             }
-            Self::AddTx { tx } => write!(f, "MempoolMsg::AddTx{{tx: {tx:?}}}"),
+            Self::AddTx { tx, .. } => write!(f, "MempoolMsg::AddTx{{tx: {tx:?}}}"),
             Self::Prune { ids } => write!(f, "MempoolMsg::Prune{{ids: {ids:?}}}"),
             Self::MarkInBlock { ids, block } => {
                 write!(
@@ -131,18 +131,20 @@ where
             tokio::select! {
                 Some(msg) = service_state.inbound_relay.recv() => {
                     match msg {
-                        MempoolMsg::AddTx { tx } => {
+                        MempoolMsg::AddTx { tx, reply_channel } => {
                             match pool.add_tx(tx.clone()) {
                                 Ok(_id) => {
-                                    adapter.send_transaction(tx).await;
+                                    if let Err(e) = reply_channel.send(Ok(())) {
+                                        tracing::debug!("Failed to send reply to AddTx: {:?}", e);
+                                    }
                                 }
                                 Err(e) => {
                                    tracing::debug!("could not add tx to the pool due to: {}", e);
                                 }
                             }
                         }
-                        MempoolMsg::View { ancestor_hint, tx } => {
-                            tx.send(pool.view(ancestor_hint)).unwrap_or_else(|_| {
+                        MempoolMsg::View { ancestor_hint, reply_channel } => {
+                            reply_channel.send(pool.view(ancestor_hint)).unwrap_or_else(|_| {
                                 tracing::debug!("could not send back pool view")
                             });
                         }
