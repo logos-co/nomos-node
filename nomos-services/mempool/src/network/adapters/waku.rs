@@ -1,6 +1,5 @@
-use bincode::config::{Fixint, LittleEndian, NoLimit, WriteFixedArrayLength};
-use std::marker::PhantomData;
 // std
+use std::marker::PhantomData;
 // crates
 use futures::{Stream, StreamExt};
 use serde::de::DeserializeOwned;
@@ -8,11 +7,13 @@ use tokio_stream::wrappers::BroadcastStream;
 // internal
 use crate::network::messages::TransactionMsg;
 use crate::network::NetworkAdapter;
+use nomos_core::wire;
 use nomos_network::backends::waku::{EventKind, NetworkEvent, Waku, WakuBackendMessage};
 use nomos_network::{NetworkMsg, NetworkService};
 use overwatch_rs::services::relay::OutboundRelay;
 use overwatch_rs::services::ServiceData;
-use waku_bindings::{Encoding, WakuContentTopic, WakuPubSubTopic};
+use serde::Serialize;
+use waku_bindings::{Encoding, WakuContentTopic, WakuMessage, WakuPubSubTopic};
 
 const WAKU_CARNOT_PUB_SUB_TOPIC: WakuPubSubTopic =
     WakuPubSubTopic::new("CarnotSim", Encoding::Proto);
@@ -28,7 +29,7 @@ pub struct WakuAdapter<Tx> {
 #[async_trait::async_trait]
 impl<Tx> NetworkAdapter for WakuAdapter<Tx>
 where
-    Tx: DeserializeOwned + Send + Sync + 'static,
+    Tx: DeserializeOwned + Serialize + Send + Sync + 'static,
 {
     type Backend = Waku;
     type Tx = Tx;
@@ -69,21 +70,9 @@ where
             |event| async move {
                 match event {
                     Ok(NetworkEvent::RawMessage(message)) => {
-                        if message.content_topic().content_topic_name
-                            == WAKU_CARNOT_TX_CONTENT_TOPIC.content_topic_name
-                        {
-                            let (tx, _): (TransactionMsg<Self::Tx>, _) =
-                                // TODO: This should be temporary, we can probably extract this so we can use/try/test a variety of encodings
-                                bincode::serde::decode_from_slice(
-                                    message.payload(),
-                                    bincode::config::Configuration::<
-                                        LittleEndian,
-                                        Fixint,
-                                        WriteFixedArrayLength,
-                                        NoLimit,
-                                    >::default(),
-                                )
-                                .unwrap();
+                        if message.content_topic() == &WAKU_CARNOT_TX_CONTENT_TOPIC {
+                            let tx: TransactionMsg<Self::Tx> =
+                                wire::deserializer(message.payload()).deserialize().unwrap();
                             Some(tx.tx)
                         } else {
                             None
@@ -93,5 +82,24 @@ where
                 }
             },
         )))
+    }
+
+    async fn send_transaction(&self, tx: Self::Tx) {
+        let payload = wire::serialize(&tx).expect("Tx serialization failed");
+        if let Err((_, _e)) = self
+            .network_relay
+            .send(NetworkMsg::Process(WakuBackendMessage::Broadcast {
+                message: WakuMessage::new(
+                    payload,
+                    WAKU_CARNOT_TX_CONTENT_TOPIC.clone(),
+                    1,
+                    chrono::Utc::now().timestamp() as usize,
+                ),
+                topic: Some(WAKU_CARNOT_PUB_SUB_TOPIC.clone()),
+            }))
+            .await
+        {
+            todo!("log error");
+        };
     }
 }
