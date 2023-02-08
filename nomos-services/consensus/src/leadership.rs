@@ -40,6 +40,7 @@ impl<Tx, Id> Leadership<Tx, Id> {
         &self,
         view: &'view View,
         tip: &Tip,
+        qc: Approval,
     ) -> LeadershipResult<'view> {
         let ancestor_hint = todo!("get the ancestor from the tip");
         if view.is_leader(self.key.key) {

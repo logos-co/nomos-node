@@ -29,7 +29,8 @@ pub trait Overlay<'view, Network: NetworkAdapter, Fountain: FountainCode> {
         &self,
         block: &Block,
         adapter: &Network,
+        next_view: &View,
     ) -> Result<(), Box<dyn Error>>;
     /// Wait for consensus on a block
-    async fn wait_for_consensus(&self, block: &Block, adapter: &Network);
+    async fn build_qc(&self, adapter: &Network) -> Approval;
 }
