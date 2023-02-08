@@ -19,5 +19,4 @@ pub trait NetworkAdapter {
         network_relay: OutboundRelay<<NetworkService<Self::Backend> as ServiceData>::Message>,
     ) -> Self;
     async fn transactions_stream(&self) -> Box<dyn Stream<Item = Self::Tx> + Unpin + Send>;
-    async fn send_transaction(&self, tx: Self::Tx);
 }

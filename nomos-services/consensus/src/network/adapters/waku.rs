@@ -18,7 +18,7 @@ use nomos_network::{
 use overwatch_rs::services::{relay::OutboundRelay, ServiceData};
 use waku_bindings::{Encoding, WakuContentTopic, WakuMessage, WakuPubSubTopic};
 
-const WAKU_CARNOT_PUB_SUB_TOPIC: WakuPubSubTopic =
+pub const WAKU_CARNOT_PUB_SUB_TOPIC: WakuPubSubTopic =
     WakuPubSubTopic::new("CarnotSim", Encoding::Proto);
 
 const APPLICATION_NAME: &str = "CarnotSim";

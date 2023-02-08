@@ -45,7 +45,10 @@ impl<Tx, Id> Leadership<Tx, Id> {
         let ancestor_hint = todo!("get the ancestor from the tip");
         if view.is_leader(self.key.key) {
             let (tx, rx) = tokio::sync::oneshot::channel();
-            self.mempool.send(MempoolMsg::View { ancestor_hint, tx });
+            self.mempool.send(MempoolMsg::View {
+                ancestor_hint,
+                reply_channel: tx,
+            });
             let _iter = rx.await;
 
             LeadershipResult::Leader {

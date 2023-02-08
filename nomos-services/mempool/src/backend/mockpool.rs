@@ -4,7 +4,7 @@ use std::collections::BTreeMap;
 use std::hash::Hash;
 // crates
 // internal
-use crate::backend::MemPool;
+use crate::backend::{MemPool, MempoolError};
 use nomos_core::block::{BlockHeader, BlockId};
 
 /// A mock mempool implementation that stores all transactions in memory in the order received.
@@ -49,10 +49,10 @@ where
         Self::new()
     }
 
-    fn add_tx(&mut self, tx: Self::Tx) -> Result<(), overwatch_rs::DynError> {
+    fn add_tx(&mut self, tx: Self::Tx) -> Result<(), MempoolError> {
         let id = Id::from(&tx);
         if self.pending_txs.contains_key(&id) || self.in_block_txs_by_id.contains_key(&id) {
-            return Ok(());
+            return Err(MempoolError::ExistingTx);
         }
         self.pending_txs.insert(id, tx);
         Ok(())
