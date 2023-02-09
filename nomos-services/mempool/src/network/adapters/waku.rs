@@ -13,12 +13,12 @@ use nomos_network::{NetworkMsg, NetworkService};
 use overwatch_rs::services::relay::OutboundRelay;
 use overwatch_rs::services::ServiceData;
 use serde::Serialize;
-use waku_bindings::{Encoding, WakuContentTopic, WakuMessage, WakuPubSubTopic};
+use waku_bindings::{Encoding, WakuContentTopic, WakuPubSubTopic};
 
-const WAKU_CARNOT_PUB_SUB_TOPIC: WakuPubSubTopic =
+pub const WAKU_CARNOT_PUB_SUB_TOPIC: WakuPubSubTopic =
     WakuPubSubTopic::new("CarnotSim", Encoding::Proto);
 
-const WAKU_CARNOT_TX_CONTENT_TOPIC: WakuContentTopic =
+pub const WAKU_CARNOT_TX_CONTENT_TOPIC: WakuContentTopic =
     WakuContentTopic::new("CarnotSim", 1, "CarnotTx", Encoding::Proto);
 
 pub struct WakuAdapter<Tx> {
@@ -82,24 +82,5 @@ where
                 }
             },
         )))
-    }
-
-    async fn send_transaction(&self, tx: Self::Tx) {
-        let payload = wire::serialize(&tx).expect("Tx serialization failed");
-        if let Err((_, _e)) = self
-            .network_relay
-            .send(NetworkMsg::Process(WakuBackendMessage::Broadcast {
-                message: WakuMessage::new(
-                    payload,
-                    WAKU_CARNOT_TX_CONTENT_TOPIC.clone(),
-                    1,
-                    chrono::Utc::now().timestamp() as usize,
-                ),
-                topic: Some(WAKU_CARNOT_PUB_SUB_TOPIC.clone()),
-            }))
-            .await
-        {
-            todo!("log error");
-        };
     }
 }

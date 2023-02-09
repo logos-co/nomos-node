@@ -4,6 +4,7 @@ use nomos_network::{
     backends::mock::{Mock, MockBackendMessage, MockConfig, MockContentTopic, MockMessage},
     NetworkConfig, NetworkMsg, NetworkService,
 };
+
 use overwatch_derive::*;
 use overwatch_rs::{overwatch::OverwatchRunner, services::handle::ServiceHandle};
 

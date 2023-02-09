@@ -21,6 +21,11 @@ futures = "0.3"
 waku-bindings = { version = "0.1.0-beta2", optional = true}
 tracing = "0.1"
 
+[dev-dependencies]
+nomos-core = { path = "../../nomos-core", features = ["mock"] }
+nomos-log = { path = "../log" }
+overwatch-derive = { git = "https://github.com/logos-co/Overwatch", branch = "main" }
+
 [features]
 default = []
 waku = ["nomos-network/waku", "waku-bindings"]

@@ -12,8 +12,7 @@ pub struct Block;
 pub struct BlockHeader;
 
 /// Identifier of a block
-#[derive(Clone, Debug, Ord, PartialOrd, Eq, PartialEq, Hash)]
-pub struct BlockId;
+pub type BlockId = [u8; 32];
 
 impl Block {
     /// Encode block into bytes
@@ -24,10 +23,14 @@ impl Block {
     pub fn from_bytes(_: Bytes) -> Self {
         Self
     }
+
+    pub fn header(&self) -> BlockHeader {
+        BlockHeader
+    }
 }
 
 impl BlockHeader {
     pub fn id(&self) -> BlockId {
-        BlockId
+        todo!()
     }
 }
