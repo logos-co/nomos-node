@@ -1,6 +1,8 @@
 use super::*;
+use futures::Stream;
 use overwatch_rs::services::state::NoState;
 use serde::{Deserialize, Serialize};
+use std::fmt::Formatter;
 use tokio::sync::{
     broadcast::{self, Receiver, Sender},
     oneshot,
@@ -29,7 +31,6 @@ pub struct WakuConfig {
 }
 
 /// Interaction with Waku node
-#[derive(Debug)]
 pub enum WakuBackendMessage {
     /// Send a message to the network
     Broadcast {
@@ -42,11 +43,15 @@ pub enum WakuBackendMessage {
     RelaySubscribe { topic: WakuPubSubTopic },
     /// Unsubscribe from a particular Waku topic
     RelayUnsubscribe { topic: WakuPubSubTopic },
+    ArchiveSubscribe {
+        topic: WakuContentTopic,
+        reply_channel: oneshot::Sender<Box<dyn Stream<Item = WakuMessage> + Send>>,
+    },
     /// Retrieve old messages from another peer
     StoreQuery {
         query: StoreQuery,
         peer_id: PeerId,
-        response: oneshot::Sender<StoreResponse>,
+        reply_channel: oneshot::Sender<StoreResponse>,
     },
     /// Send a message using Waku Light Push
     LightpushPublish {
@@ -57,6 +62,49 @@ pub enum WakuBackendMessage {
     Info {
         reply_channel: oneshot::Sender<WakuInfo>,
     },
+}
+
+impl Debug for WakuBackendMessage {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            WakuBackendMessage::Broadcast { message, .. } => f
+                .debug_struct("WakuBackendMessage::Broadcast")
+                .field("message", message)
+                .finish(),
+            WakuBackendMessage::ConnectPeer { addr } => f
+                .debug_struct("WakuBackendMessage::ConnectPeer")
+                .field("addr", addr)
+                .finish(),
+            WakuBackendMessage::RelaySubscribe { topic } => f
+                .debug_struct("WakuBackendMessage::RelaySubscribe")
+                .field("topic", topic)
+                .finish(),
+            WakuBackendMessage::RelayUnsubscribe { topic } => f
+                .debug_struct("WakuBackendMessage::RelayUnsubscribe")
+                .field("topic", topic)
+                .finish(),
+            WakuBackendMessage::ArchiveSubscribe { topic, .. } => f
+                .debug_struct("WakuBackendMessage::ArchiveSubscribe")
+                .field("topic", topic)
+                .finish(),
+            WakuBackendMessage::StoreQuery { query, peer_id, .. } => f
+                .debug_struct("WakuBackendMessage::StoreQuery")
+                .field("query", query)
+                .field("peer_id", peer_id)
+                .finish(),
+            WakuBackendMessage::LightpushPublish {
+                message,
+                topic,
+                peer_id,
+            } => f
+                .debug_struct("WakuBackendMessage::LightpushPublish")
+                .field("message", message)
+                .field("topic", topic)
+                .field("peer_id", peer_id)
+                .finish(),
+            WakuBackendMessage::Info { .. } => f.debug_struct("WakuBackendMessage::Info").finish(),
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -161,14 +209,14 @@ impl NetworkBackend for Waku {
             WakuBackendMessage::StoreQuery {
                 query,
                 peer_id,
-                response,
+                reply_channel,
             } => match self.waku.store_query(&query, &peer_id, None) {
                 Ok(res) => {
                     debug!(
                         "successfully retrieved stored messages with options {:?}",
                         query
                     );
-                    response
+                    reply_channel
                         .send(res)
                         .unwrap_or_else(|_| error!("client hung up store query handle"));
                 }
@@ -190,6 +238,15 @@ impl NetworkBackend for Waku {
                     .is_err()
                 {
                     error!("could not send waku info");
+                }
+            }
+            WakuBackendMessage::ArchiveSubscribe { reply_channel, .. } => {
+                // TODO: implement archive subscribe once it is available in waku-bindings
+                if reply_channel
+                    .send(Box::new(futures::stream::empty()))
+                    .is_err()
+                {
+                    error!("could not send archive subscribe stream");
                 }
             }
         };
