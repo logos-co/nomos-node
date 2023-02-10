@@ -8,6 +8,7 @@ use crate::fountain::{FountainCode, FountainError};
 
 /// Fountain code that does no protocol at all.
 /// Just bypasses the raw bytes into a single chunk and reconstruct from it.
+#[derive(Debug)]
 pub struct MockFountain;
 
 #[async_trait]
