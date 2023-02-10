@@ -5,7 +5,7 @@ Nomos blockchain node mvp
 ## Project structure
 
 - `nomos-core`: Nomos core is the collection of essential structures for the Nomos mvp and experimental nodes.
-- `nomos-services`: Nomos services is the collection of services that are used to compound the nomos mvp and experimental nodes.
+- `nomos-services`: Nomos services is the collection of components that are used as building blocks of the Nomos node prototype and the experimental nodes.
   - consensus
   - log
   - http
