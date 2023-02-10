@@ -44,8 +44,8 @@ pub enum WakuBackendMessage {
     /// Unsubscribe from a particular Waku topic
     RelayUnsubscribe { topic: WakuPubSubTopic },
     ArchiveSubscribe {
-        topic: WakuContentTopic,
-        reply_channel: oneshot::Sender<Box<dyn Stream<Item = WakuMessage> + Send>>,
+        content_topic: WakuContentTopic,
+        reply_channel: oneshot::Sender<Box<dyn Stream<Item = WakuMessage> + Send + Sync + Unpin>>,
     },
     /// Retrieve old messages from another peer
     StoreQuery {
@@ -83,7 +83,10 @@ impl Debug for WakuBackendMessage {
                 .debug_struct("WakuBackendMessage::RelayUnsubscribe")
                 .field("topic", topic)
                 .finish(),
-            WakuBackendMessage::ArchiveSubscribe { topic, .. } => f
+            WakuBackendMessage::ArchiveSubscribe {
+                content_topic: topic,
+                ..
+            } => f
                 .debug_struct("WakuBackendMessage::ArchiveSubscribe")
                 .field("topic", topic)
                 .finish(),
