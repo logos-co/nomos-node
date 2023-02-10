@@ -1,4 +1,4 @@
-use nomos_consensus::{CarnotConsensus, network::adapters::MockAdapter as ConsensusMockAdapter};
+use nomos_consensus::{CarnotConsensus, network::adapters::MockAdapter as ConsensusMockAdapter, CarnotSettings};
 use nomos_core::{block::BlockId, fountain::mock::MockFountain};
 use nomos_log::{Logger, LoggerSettings};
 use nomos_network::{
@@ -15,13 +15,15 @@ use nomos_mempool::{
     MempoolMsg, MempoolService,
 };
 
+
 #[derive(Services)]
-struct MockPoolNode {
+struct MockPoolNode { 
     logging: ServiceHandle<Logger>,
     network: ServiceHandle<NetworkService<Mock>>,
     mockpool: ServiceHandle<MempoolService<MockAdapter<String>, MockPool<String, String>>>,
     consensus: ServiceHandle<CarnotConsensus<ConsensusMockAdapter, MockPool<String, String>, MockAdapter<String>, MockFountain>>,
 }
+
 
 #[test]
 fn test_carnot() {
@@ -69,7 +71,7 @@ fn test_carnot() {
             },
             mockpool: (),
             logging: LoggerSettings::default(),
-            consensus: (),
+            consensus: CarnotSettings::new(Default::default(), ()),
         },
         None,
     )

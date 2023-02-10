@@ -42,6 +42,7 @@ pub type Seed = [u8; 32];
 
 const COMMITTEE_SIZE: usize = 1;
 
+#[derive(Debug)]
 pub struct CarnotSettings<Fountain: FountainCode> {
     private_key: [u8; 32],
     fountain_settings: Fountain::Settings,
