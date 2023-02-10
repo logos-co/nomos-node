@@ -1,4 +1,3 @@
-use nomos_core::block::BlockId;
 use nomos_log::{Logger, LoggerSettings};
 use nomos_network::{
     backends::mock::{Mock, MockBackendMessage, MockConfig, MockContentTopic, MockMessage},
@@ -95,7 +94,7 @@ fn test_mockmempool() {
             let (mtx, mrx) = tokio::sync::oneshot::channel();
             mempool_outbound
                 .send(MempoolMsg::View {
-                    ancestor_hint: BlockId,
+                    ancestor_hint: [0; 32],
                     reply_channel: mtx,
                 })
                 .await
