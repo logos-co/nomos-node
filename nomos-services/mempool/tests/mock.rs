@@ -94,7 +94,7 @@ fn test_mockmempool() {
             let (mtx, mrx) = tokio::sync::oneshot::channel();
             mempool_outbound
                 .send(MempoolMsg::View {
-                    ancestor_hint: [0; 32],
+                    ancestor_hint: BlockId::default(),
                     reply_channel: mtx,
                 })
                 .await
