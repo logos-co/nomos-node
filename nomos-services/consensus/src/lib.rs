@@ -56,6 +56,16 @@ impl<Fountain: FountainCode> Clone for CarnotSettings<Fountain> {
     }
 }
 
+impl<Fountain: FountainCode> CarnotSettings<Fountain> {
+    #[inline]
+    pub const fn new(private_key: [u8; 32], fountain_settings: Fountain::Settings) -> Self {
+        Self {
+            private_key,
+            fountain_settings,
+        }
+    }
+}
+
 pub struct CarnotConsensus<A, P, M, F>
 where
     F: FountainCode,
