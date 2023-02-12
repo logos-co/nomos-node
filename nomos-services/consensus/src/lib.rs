@@ -5,7 +5,7 @@
 //! It's obviously extremely important that the information contained in `View` is synchronized across different
 //! nodes, but that has to be achieved through different means.
 mod leadership;
-mod network;
+pub mod network;
 pub mod overlay;
 #[cfg(test)]
 mod test;

@@ -1,4 +1,5 @@
-use nomos_core::block::BlockId;
+use nomos_consensus::{CarnotConsensus, network::adapters::MockAdapter as ConsensusMockAdapter};
+use nomos_core::{block::BlockId, fountain::mock::MockFountain};
 use nomos_log::{Logger, LoggerSettings};
 use nomos_network::{
     backends::mock::{Mock, MockBackendMessage, MockConfig, MockContentTopic, MockMessage},
@@ -19,10 +20,11 @@ struct MockPoolNode {
     logging: ServiceHandle<Logger>,
     network: ServiceHandle<NetworkService<Mock>>,
     mockpool: ServiceHandle<MempoolService<MockAdapter<String>, MockPool<String, String>>>,
+    consensus: ServiceHandle<CarnotConsensus<ConsensusMockAdapter, MockPool<String, String>, MockAdapter<String>, MockFountain>>,
 }
 
 #[test]
-fn test_mockmempool() {
+fn test_carnot() {
     let exist = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
     let exist2 = exist.clone();
 
@@ -67,6 +69,7 @@ fn test_mockmempool() {
             },
             mockpool: (),
             logging: LoggerSettings::default(),
+            consensus: (),
         },
         None,
     )
