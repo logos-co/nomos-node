@@ -113,6 +113,7 @@ impl<'view, Network: NetworkAdapter + Sync, Fountain: FountainCode + Sync, const
 {
     fn new(view: &'view View, node: NodeId) -> Self {
         let committees = Committees::new(view);
+        // TODO: do we need to check here? I meet a panic case when writing tests
         committees.into_member(node).unwrap()
     }
 

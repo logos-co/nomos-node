@@ -1,4 +1,4 @@
-use nomos_consensus::{CarnotConsensus, network::adapters::MockAdapter as ConsensusMockAdapter, CarnotSettings};
+use nomos_consensus::{CarnotConsensus, network::adapters::MockAdapter as ConsensusMockAdapter, CarnotSettings, ViewSettings};
 use nomos_core::{block::BlockId, fountain::mock::MockFountain};
 use nomos_log::{Logger, LoggerSettings};
 use nomos_network::{
@@ -71,7 +71,7 @@ fn test_carnot() {
             },
             mockpool: (),
             logging: LoggerSettings::default(),
-            consensus: CarnotSettings::new(Default::default(), ()),
+            consensus: CarnotSettings::new(Default::default(), (), ViewSettings::new()),
         },
         None,
     )

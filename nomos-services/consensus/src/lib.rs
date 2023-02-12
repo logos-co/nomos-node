@@ -42,10 +42,11 @@ pub type Seed = [u8; 32];
 
 const COMMITTEE_SIZE: usize = 1;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 pub struct CarnotSettings<Fountain: FountainCode> {
-    private_key: [u8; 32],
-    fountain_settings: Fountain::Settings,
+    pub private_key: [u8; 32],
+    pub fountain_settings: Fountain::Settings,
+    pub view_settings: ViewSettings,
 }
 
 impl<Fountain: FountainCode> Clone for CarnotSettings<Fountain> {
@@ -53,16 +54,22 @@ impl<Fountain: FountainCode> Clone for CarnotSettings<Fountain> {
         Self {
             private_key: self.private_key,
             fountain_settings: self.fountain_settings.clone(),
+            view_settings: self.view_settings.clone(),
         }
     }
 }
 
 impl<Fountain: FountainCode> CarnotSettings<Fountain> {
     #[inline]
-    pub const fn new(private_key: [u8; 32], fountain_settings: Fountain::Settings) -> Self {
+    pub const fn new(
+        private_key: [u8; 32],
+        fountain_settings: Fountain::Settings,
+        view_settings: ViewSettings,
+    ) -> Self {
         Self {
             private_key,
             fountain_settings,
+            view_settings,
         }
     }
 }
@@ -139,6 +146,7 @@ where
         let CarnotSettings {
             private_key,
             fountain_settings,
+            view_settings,
         } = self.service_state.settings_reader.get_updated_settings();
 
         let network_adapter = A::new(network_relay).await;
@@ -148,11 +156,10 @@ where
         let fountain = F::new(fountain_settings);
 
         let leadership = Leadership::new(private_key, mempool_relay);
-        // FIXME: this should be taken from config
         let mut cur_view = View {
-            seed: [0; 32],
-            staking_keys: BTreeMap::new(),
-            view_n: 0,
+            seed: view_settings.seed,
+            staking_keys: view_settings.staking_keys,
+            view_n: view_settings.view_n,
         };
         loop {
             // if we want to process multiple views at the same time this can
@@ -185,6 +192,14 @@ where
 
 #[derive(Hash, Eq, PartialEq)]
 pub struct Approval;
+
+/// The settings for the view
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct ViewSettings {
+    pub seed: Seed,
+    pub staking_keys: BTreeMap<NodeId, Stake>,
+    pub view_n: u64,
+}
 
 // Consensus round, also aids in guaranteeing synchronization
 // between various data structures by means of lifetimes

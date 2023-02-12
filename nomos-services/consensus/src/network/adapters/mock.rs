@@ -71,6 +71,7 @@ impl NetworkAdapter for MockAdapter {
             .unwrap();
         Box::new(BroadcastStream::new(stream_channel).filter_map(|msg| {
             Box::pin(async move {
+                tracing::info!("got message: {:?}", msg);
                 match msg {
                     Ok(event) => match event {
                         NetworkEvent::RawMessage(message) => {
