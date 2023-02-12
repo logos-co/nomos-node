@@ -201,14 +201,38 @@ pub struct ViewSettings {
     pub view_n: u64,
 }
 
+impl Default for ViewSettings {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ViewSettings {
     #[inline]
-    pub const fn new(seed: Seed, staking_keys: BTreeMap<NodeId, Stake>, view_n: u64) -> Self {
+    pub const fn new() -> Self {
         Self {
-            seed,
-            staking_keys,
-            view_n,
+            seed: [0; 32],
+            staking_keys: BTreeMap::new(),
+            view_n: 0,
         }
+    }
+
+    #[inline]
+    pub const fn seed(mut self, seed: Seed) -> Self {
+        self.seed = seed;
+        self
+    }
+
+    #[inline]
+    pub fn staking_keys(mut self, staking_keys: BTreeMap<NodeId, Stake>) -> Self {
+        self.staking_keys = staking_keys;
+        self
+    }
+
+    #[inline]
+    pub const fn view_n(mut self, view_n: u64) -> Self {
+        self.view_n = view_n;
+        self
     }
 }
 
