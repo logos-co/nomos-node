@@ -1,4 +1,4 @@
-use nomos_consensus::{CarnotConsensus, network::adapters::MockAdapter as ConsensusMockAdapter, CarnotSettings, ViewSettings};
+use nomos_consensus::{CarnotConsensus, network::adapters::{MockAdapter as ConsensusMockAdapter, MOCK_BLOCK_CONTENT_TOPIC}, CarnotSettings, ViewSettings};
 use nomos_core::{block::BlockId, fountain::mock::MockFountain};
 use nomos_log::{Logger, LoggerSettings};
 use nomos_network::{
@@ -33,21 +33,13 @@ fn test_carnot() {
     let predefined_messages = vec![
         MockMessage {
             payload: "This is foo".to_string(),
-            content_topic: MockContentTopic {
-                application_name: "mock network",
-                version: 0,
-                content_topic_name: MOCK_CONTENT_TOPIC,
-            },
+            content_topic: MOCK_BLOCK_CONTENT_TOPIC,
             version: 0,
             timestamp: 0,
         },
         MockMessage {
             payload: "This is bar".to_string(),
-            content_topic: MockContentTopic {
-                application_name: "mock network",
-                version: 0,
-                content_topic_name: MOCK_CONTENT_TOPIC,
-            },
+            content_topic: MOCK_BLOCK_CONTENT_TOPIC,
             version: 0,
             timestamp: 0,
         },
@@ -71,7 +63,12 @@ fn test_carnot() {
             },
             mockpool: (),
             logging: LoggerSettings::default(),
-            consensus: CarnotSettings::new(Default::default(), (), ViewSettings::new()),
+            consensus: CarnotSettings::new(
+                Default::default(), 
+                (),
+                ViewSettings::new()
+                    .staking_keys([([0u8; 32], 1)].into_iter().collect()),
+            ),
         },
         None,
     )
@@ -121,7 +118,11 @@ fn test_carnot() {
         }
     });
 
-    while !exist2.load(std::sync::atomic::Ordering::SeqCst) {
+    // while !exist2.load(std::sync::atomic::Ordering::SeqCst) {
+    //     std::thread::sleep(std::time::Duration::from_millis(200));
+    // }
+
+    loop {
         std::thread::sleep(std::time::Duration::from_millis(200));
     }
 }
