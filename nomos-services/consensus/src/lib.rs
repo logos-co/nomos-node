@@ -201,6 +201,17 @@ pub struct ViewSettings {
     pub view_n: u64,
 }
 
+impl ViewSettings {
+    #[inline]
+    pub const fn new(seed: Seed, staking_keys: BTreeMap<NodeId, Stake>, view_n: u64) -> Self {
+        Self {
+            seed,
+            staking_keys,
+            view_n,
+        }
+    }
+}
+
 // Consensus round, also aids in guaranteeing synchronization
 // between various data structures by means of lifetimes
 pub struct View {
