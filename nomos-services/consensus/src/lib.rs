@@ -46,7 +46,7 @@ const COMMITTEE_SIZE: usize = 1;
 pub struct CarnotSettings<Fountain: FountainCode> {
     pub private_key: [u8; 32],
     pub fountain_settings: Fountain::Settings,
-    pub view_settings: VeiwSettings,
+    pub view_settings: ViewSettings,
 }
 
 impl<Fountain: FountainCode> Clone for CarnotSettings<Fountain> {
@@ -64,7 +64,7 @@ impl<Fountain: FountainCode> CarnotSettings<Fountain> {
     pub const fn new(
         private_key: [u8; 32],
         fountain_settings: Fountain::Settings,
-        view_settings: VeiwSettings,
+        view_settings: ViewSettings,
     ) -> Self {
         Self {
             private_key,
@@ -195,10 +195,21 @@ pub struct Approval;
 
 /// The settings for the view
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct VeiwSettings {
+pub struct ViewSettings {
     pub seed: Seed,
     pub staking_keys: BTreeMap<NodeId, Stake>,
     pub view_n: u64,
+}
+
+impl ViewSettings {
+    #[inline]
+    pub const fn new(seed: Seed, staking_keys: BTreeMap<NodeId, Stake>, view_n: u64) -> Self {
+        Self {
+            seed,
+            staking_keys,
+            view_n,
+        }
+    }
 }
 
 // Consensus round, also aids in guaranteeing synchronization
