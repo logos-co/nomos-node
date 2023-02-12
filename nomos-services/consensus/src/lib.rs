@@ -60,7 +60,11 @@ impl<Fountain: FountainCode> Clone for CarnotSettings<Fountain> {
 
 impl<Fountain: FountainCode> CarnotSettings<Fountain> {
     #[inline]
-    pub const fn new(private_key: [u8; 32], fountain_settings: Fountain::Settings, view_settings: VeiwSettings) -> Self {
+    pub const fn new(
+        private_key: [u8; 32],
+        fountain_settings: Fountain::Settings,
+        view_settings: VeiwSettings,
+    ) -> Self {
         Self {
             private_key,
             fountain_settings,
@@ -141,7 +145,7 @@ where
         let CarnotSettings {
             private_key,
             fountain_settings,
-            view_settings
+            view_settings,
         } = self.service_state.settings_reader.get_updated_settings();
 
         let network_adapter = A::new(network_relay).await;
