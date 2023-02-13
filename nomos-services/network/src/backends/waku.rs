@@ -128,7 +128,9 @@ impl NetworkBackend for Waku {
     type EventKind = EventKind;
     type NetworkEvent = NetworkEvent;
 
-    fn new(config: Self::Settings) -> Self {
+    fn new(mut config: Self::Settings) -> Self {
+        // set store protocol to active at all times
+        config.inner.store = Some(true);
         let waku = waku_new(Some(config.inner)).unwrap().start().unwrap();
         tracing::info!("waku listening on {}", waku.listen_addresses().unwrap()[0]);
         for peer in &config.initial_peers {
