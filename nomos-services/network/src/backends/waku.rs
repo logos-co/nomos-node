@@ -1,13 +1,18 @@
-use super::*;
-use futures::Stream;
-use overwatch_rs::services::state::NoState;
-use serde::{Deserialize, Serialize};
+// std
 use std::fmt::Formatter;
+use std::future::Future;
+// crates
+use futures::{Stream, StreamExt};
+use serde::{Deserialize, Serialize};
 use tokio::sync::{
     broadcast::{self, Receiver, Sender},
     oneshot,
 };
+use tokio_stream::wrappers::UnboundedReceiverStream;
 use tracing::{debug, error};
+// internal
+use super::*;
+use overwatch_rs::services::state::NoState;
 use waku_bindings::*;
 
 const BROADCAST_CHANNEL_BUF: usize = 16;
@@ -43,8 +48,9 @@ pub enum WakuBackendMessage {
     RelaySubscribe { topic: WakuPubSubTopic },
     /// Unsubscribe from a particular Waku topic
     RelayUnsubscribe { topic: WakuPubSubTopic },
+    /// Get a local cached stream of messages for a particular content topic
     ArchiveSubscribe {
-        content_topic: WakuContentTopic,
+        query: StoreQuery,
         reply_channel: oneshot::Sender<Box<dyn Stream<Item = WakuMessage> + Send + Sync + Unpin>>,
     },
     /// Retrieve old messages from another peer
@@ -83,12 +89,9 @@ impl Debug for WakuBackendMessage {
                 .debug_struct("WakuBackendMessage::RelayUnsubscribe")
                 .field("topic", topic)
                 .finish(),
-            WakuBackendMessage::ArchiveSubscribe {
-                content_topic: topic,
-                ..
-            } => f
+            WakuBackendMessage::ArchiveSubscribe { query, .. } => f
                 .debug_struct("WakuBackendMessage::ArchiveSubscribe")
-                .field("topic", topic)
+                .field("query", query)
                 .finish(),
             WakuBackendMessage::StoreQuery { query, peer_id, .. } => f
                 .debug_struct("WakuBackendMessage::StoreQuery")
@@ -118,6 +121,47 @@ pub enum EventKind {
 #[derive(Debug, Clone)]
 pub enum NetworkEvent {
     RawMessage(WakuMessage),
+}
+
+impl Waku {
+    pub fn waku_store_query_stream(
+        &self,
+        mut query: StoreQuery,
+    ) -> (
+        impl Stream<Item = WakuMessage>,
+        impl Future<Output = ()> + '_,
+    ) {
+        let (sender, receiver) = tokio::sync::mpsc::unbounded_channel();
+        let task = async move {
+            while let Ok(StoreResponse {
+                messages,
+                paging_options,
+            }) = self.waku.local_store_query(&query)
+            {
+                // send messages
+                for message in messages {
+                    // this could fail if the receiver is dropped
+                    // break out of the loop in that case
+                    if sender.send(Some(message)).is_err() {
+                        break;
+                    }
+                }
+                // stop queries if we do not have any more pages
+                if let Some(paging_options) = paging_options {
+                    query.paging_options = Some(paging_options);
+                } else {
+                    break;
+                }
+            }
+            let _ = sender.send(None);
+        };
+        (
+            UnboundedReceiverStream::new(receiver)
+                .fuse()
+                .map(Option::unwrap),
+            task,
+        )
+    }
 }
 
 #[async_trait::async_trait]
@@ -245,14 +289,15 @@ impl NetworkBackend for Waku {
                     error!("could not send waku info");
                 }
             }
-            WakuBackendMessage::ArchiveSubscribe { reply_channel, .. } => {
-                // TODO: implement archive subscribe once it is available in waku-bindings
-                if reply_channel
-                    .send(Box::new(futures::stream::empty()))
-                    .is_err()
-                {
+            WakuBackendMessage::ArchiveSubscribe {
+                reply_channel,
+                query,
+            } => {
+                let (stream, task) = self.waku_store_query_stream(query);
+                if reply_channel.send(Box::new(stream)).is_err() {
                     error!("could not send archive subscribe stream");
                 }
+                task.await;
             }
         };
     }

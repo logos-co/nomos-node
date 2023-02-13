@@ -3,7 +3,7 @@ use std::borrow::Cow;
 // crates
 use bytes::Bytes;
 use futures::{Stream, StreamExt};
-use tokio_stream::wrappers::{BroadcastStream, UnboundedReceiverStream};
+use tokio_stream::wrappers::BroadcastStream;
 // internal
 use crate::network::{
     messages::{ApprovalMsg, ProposalChunkMsg},
@@ -17,7 +17,7 @@ use nomos_network::{
 };
 use overwatch_rs::services::{relay::OutboundRelay, ServiceData};
 use waku_bindings::{
-    Encoding, StoreQuery, StoreResponse, WakuContentTopic, WakuMessage, WakuPubSubTopic,
+    ContentFilter, Encoding, StoreQuery, WakuContentTopic, WakuMessage, WakuPubSubTopic,
 };
 
 pub const WAKU_CARNOT_PUB_SUB_TOPIC: WakuPubSubTopic =
@@ -62,7 +62,14 @@ impl WakuAdapter {
         if let Err((_, _e)) = self
             .network_relay
             .send(NetworkMsg::Process(WakuBackendMessage::ArchiveSubscribe {
-                content_topic,
+                query: StoreQuery {
+                    pubsub_topic: Some(WAKU_CARNOT_PUB_SUB_TOPIC.clone()),
+                    content_filters: vec![ContentFilter::new(content_topic)],
+                    // TODO: maybe handle limits through configuration
+                    start_time: None,
+                    end_time: None,
+                    paging_options: None,
+                },
                 reply_channel: sender,
             }))
             .await
@@ -213,40 +220,4 @@ fn proposal_topic(committee: Committee, view: &View) -> WakuContentTopic {
         content_topic_name: Cow::Owned(format!("proposal-{}-{}", committee.id(), view.id())),
         encoding: Encoding::Proto,
     }
-}
-
-pub async fn waku_store_query_stream<F>(
-    mut query: StoreQuery,
-    mut query_method: F,
-) -> impl Stream<Item = WakuMessage>
-where
-    F: FnMut(&StoreQuery) -> waku_bindings::Result<StoreResponse> + Send + 'static,
-{
-    let (sender, receiver) = tokio::sync::mpsc::unbounded_channel();
-    tokio::spawn(async move {
-        while let Ok(StoreResponse {
-            messages,
-            paging_options,
-        }) = query_method(&query)
-        {
-            // send messages
-            for message in messages {
-                // this could fail if the receiver is dropped
-                // break out of the loop in that case
-                if sender.send(Some(message)).is_err() {
-                    break;
-                }
-            }
-            // stop queries if we do not have any more pages
-            if let Some(paging_options) = paging_options {
-                query.paging_options = Some(paging_options);
-            } else {
-                break;
-            }
-        }
-        let _ = sender.send(None);
-    });
-    UnboundedReceiverStream::new(receiver)
-        .fuse()
-        .map(Option::unwrap)
 }
