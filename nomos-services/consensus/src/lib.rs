@@ -209,7 +209,7 @@ impl Default for ViewSettings {
 
 impl ViewSettings {
     #[inline]
-    pub const fn new() -> Self {
+    pub fn new() -> Self {
         Self {
             seed: [0; 32],
             staking_keys: BTreeMap::new(),
