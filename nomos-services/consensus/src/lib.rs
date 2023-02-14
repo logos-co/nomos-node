@@ -40,8 +40,6 @@ pub type NodeId = PublicKey;
 // Random seed for each round provided by the protocol
 pub type Seed = [u8; 32];
 
-const COMMITTEE_SIZE: usize = 1;
-
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct CarnotSettings<Fountain: FountainCode> {
     pub private_key: [u8; 32],
@@ -198,21 +196,20 @@ where
 #[derive(Hash, Eq, PartialEq)]
 pub struct Approval;
 
-/// The settings for the view
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct ViewSettings {
+pub struct ViewSettingsBuilder {
     pub seed: Seed,
     pub staking_keys: BTreeMap<NodeId, Stake>,
     pub view_n: u64,
 }
 
-impl Default for ViewSettings {
+impl Default for ViewSettingsBuilder {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl ViewSettings {
+impl ViewSettingsBuilder {
     #[inline]
     pub fn new() -> Self {
         Self {
@@ -223,22 +220,39 @@ impl ViewSettings {
     }
 
     #[inline]
-    pub const fn seed(mut self, seed: Seed) -> Self {
+    pub const fn with_seed(mut self, seed: Seed) -> Self {
         self.seed = seed;
         self
     }
 
     #[inline]
-    pub fn staking_keys(mut self, staking_keys: BTreeMap<NodeId, Stake>) -> Self {
+    pub fn with_staking_keys(mut self, staking_keys: BTreeMap<NodeId, Stake>) -> Self {
         self.staking_keys = staking_keys;
         self
     }
 
     #[inline]
-    pub const fn view_n(mut self, view_n: u64) -> Self {
+    pub const fn with_view_n(mut self, view_n: u64) -> Self {
         self.view_n = view_n;
         self
     }
+
+    #[inline]
+    pub fn build(self) -> ViewSettings {
+        ViewSettings {
+            seed: self.seed,
+            staking_keys: self.staking_keys,
+            view_n: self.view_n,
+        }
+    }
+}
+
+/// The settings for the view
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct ViewSettings {
+    pub seed: Seed,
+    pub staking_keys: BTreeMap<NodeId, Stake>,
+    pub view_n: u64,
 }
 
 // Consensus round, also aids in guaranteeing synchronization
