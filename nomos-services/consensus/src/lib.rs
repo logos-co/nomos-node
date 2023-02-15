@@ -25,7 +25,7 @@ use nomos_core::fountain::FountainCode;
 use nomos_core::staking::Stake;
 use nomos_mempool::{backend::MemPool, network::NetworkAdapter as MempoolAdapter, MempoolService};
 use nomos_network::NetworkService;
-use overlay::Overlay;
+use overlay::{Overlay, flat::Flat};
 use overwatch_rs::services::relay::{OutboundRelay, Relay};
 use overwatch_rs::services::{
     handle::ServiceStateHandle,
@@ -72,12 +72,11 @@ impl<Fountain: FountainCode> CarnotSettings<Fountain> {
     }
 }
 
-pub struct CarnotConsensus<A, P, M, F, O>
+pub struct CarnotConsensus<A, P, M, F>
 where
     F: FountainCode,
     A: NetworkAdapter,
     M: MempoolAdapter<Tx = P::Tx>,
-    O: for<'a> Overlay<'a, A, F>,
     P: MemPool,
     P::Tx: Debug + 'static,
     P::Id: Debug + 'static,
@@ -89,15 +88,13 @@ where
     network_relay: Relay<NetworkService<A::Backend>>,
     mempool_relay: Relay<MempoolService<M, P>>,
     _fountain: std::marker::PhantomData<F>,
-    _overlay: std::marker::PhantomData<O>,
 }
 
-impl<A, P, M, F, O> ServiceData for CarnotConsensus<A, P, M, F, O>
+impl<A, P, M, F> ServiceData for CarnotConsensus<A, P, M, F>
 where
     F: FountainCode,
     A: NetworkAdapter,
     P: MemPool,
-    O: for<'a> Overlay<'a, A, F>,
     P::Tx: Debug,
     P::Id: Debug,
     M: MempoolAdapter<Tx = P::Tx>,
@@ -110,12 +107,11 @@ where
 }
 
 #[async_trait::async_trait]
-impl<A, P, M, F, O> ServiceCore for CarnotConsensus<A, P, M, F, O>
+impl<A, P, M, F> ServiceCore for CarnotConsensus<A, P, M, F>
 where
     F: FountainCode + Send + Sync + 'static,
     A: NetworkAdapter + Send + Sync + 'static,
     P: MemPool + Send + Sync + 'static,
-    O: for<'a> Overlay<'a, A, F> + Send + Sync + 'static,
     P::Settings: Send + Sync + 'static,
     P::Tx: Debug + Send + Sync + 'static,
     P::Id: Debug + Send + Sync + 'static,
@@ -128,7 +124,6 @@ where
             service_state,
             network_relay,
             _fountain: Default::default(),
-            _overlay: Default::default(),
             mempool_relay,
         })
     }
@@ -170,7 +165,7 @@ where
 
             // FIXME: this should probably have a timer to detect failed rounds
             let res = cur_view
-                .resolve::<A, O, _, _, _>(
+                .resolve::<A, Flat<'_>, _, _, _>(
                     private_key,
                     &tip,
                     &network_adapter,
