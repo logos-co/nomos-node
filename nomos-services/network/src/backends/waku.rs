@@ -2,7 +2,7 @@
 use std::fmt::Formatter;
 use std::future::Future;
 // crates
-use futures::{Stream, StreamExt};
+use futures::Stream;
 use serde::{Deserialize, Serialize};
 use tokio::sync::{
     broadcast::{self, Receiver, Sender},
