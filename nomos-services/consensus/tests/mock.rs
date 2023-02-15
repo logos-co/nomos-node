@@ -1,4 +1,4 @@
-use nomos_consensus::{CarnotConsensus, network::adapters::{MockAdapter as ConsensusMockAdapter, MOCK_BLOCK_CONTENT_TOPIC}, CarnotSettings, ViewSettings};
+use nomos_consensus::{CarnotConsensus, network::adapters::{MockAdapter as ConsensusMockAdapter, MOCK_BLOCK_CONTENT_TOPIC}, CarnotSettings, ViewSettings, overlay::flat::Flat};
 use nomos_core::{block::BlockId, fountain::mock::MockFountain};
 use nomos_log::{Logger, LoggerSettings};
 use nomos_network::{
@@ -21,7 +21,7 @@ struct MockPoolNode {
     logging: ServiceHandle<Logger>,
     network: ServiceHandle<NetworkService<Mock>>,
     mockpool: ServiceHandle<MempoolService<MockAdapter<String>, MockPool<String, String>>>,
-    consensus: ServiceHandle<CarnotConsensus<ConsensusMockAdapter, MockPool<String, String>, MockAdapter<String>, MockFountain>>,
+    consensus: ServiceHandle<CarnotConsensus<ConsensusMockAdapter, MockPool<String, String>, MockAdapter<String>, MockFountain>, Flat<'a>>,
 }
 
 

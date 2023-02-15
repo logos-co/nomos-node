@@ -47,7 +47,8 @@ impl<'view> Flat<'view> {
 
     fn approve(&self, _block: &Block) -> Approval {
         // we still need to define how votes look like
-        todo!()
+        // TODO: return Approval for now, change it in the future
+        Approval
     }
 }
 
