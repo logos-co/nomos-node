@@ -142,7 +142,7 @@ impl Waku {
                 for message in messages {
                     // this could fail if the receiver is dropped
                     // break out of the loop in that case
-                    if sender.send(Some(message)).is_err() {
+                    if sender.send(message).is_err() {
                         break;
                     }
                 }
@@ -153,14 +153,8 @@ impl Waku {
                     break;
                 }
             }
-            let _ = sender.send(None);
         };
-        (
-            UnboundedReceiverStream::new(receiver)
-                .fuse()
-                .map(Option::unwrap),
-            task,
-        )
+        (UnboundedReceiverStream::new(receiver), task)
     }
 }
 
