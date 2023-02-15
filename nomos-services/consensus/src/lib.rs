@@ -25,7 +25,7 @@ use nomos_core::fountain::FountainCode;
 use nomos_core::staking::Stake;
 use nomos_mempool::{backend::MemPool, network::NetworkAdapter as MempoolAdapter, MempoolService};
 use nomos_network::NetworkService;
-use overlay::{Member, Overlay};
+use overlay::Overlay;
 use overwatch_rs::services::relay::{OutboundRelay, Relay};
 use overwatch_rs::services::{
     handle::ServiceStateHandle,
@@ -39,8 +39,6 @@ use tip::Tip;
 pub type NodeId = PublicKey;
 // Random seed for each round provided by the protocol
 pub type Seed = [u8; 32];
-
-const COMMITTEE_SIZE: usize = 1;
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct CarnotSettings<Fountain: FountainCode> {
@@ -74,11 +72,12 @@ impl<Fountain: FountainCode> CarnotSettings<Fountain> {
     }
 }
 
-pub struct CarnotConsensus<A, P, M, F>
+pub struct CarnotConsensus<A, P, M, F, O>
 where
     F: FountainCode,
     A: NetworkAdapter,
     M: MempoolAdapter<Tx = P::Tx>,
+    O: for<'a> Overlay<'a, A, F>,
     P: MemPool,
     P::Tx: Debug + 'static,
     P::Id: Debug + 'static,
@@ -90,13 +89,15 @@ where
     network_relay: Relay<NetworkService<A::Backend>>,
     mempool_relay: Relay<MempoolService<M, P>>,
     _fountain: std::marker::PhantomData<F>,
+    _overlay: std::marker::PhantomData<O>,
 }
 
-impl<A, P, M, F> ServiceData for CarnotConsensus<A, P, M, F>
+impl<A, P, M, F, O> ServiceData for CarnotConsensus<A, P, M, F, O>
 where
     F: FountainCode,
     A: NetworkAdapter,
     P: MemPool,
+    O: for<'a> Overlay<'a, A, F>,
     P::Tx: Debug,
     P::Id: Debug,
     M: MempoolAdapter<Tx = P::Tx>,
@@ -109,11 +110,12 @@ where
 }
 
 #[async_trait::async_trait]
-impl<A, P, M, F> ServiceCore for CarnotConsensus<A, P, M, F>
+impl<A, P, M, F, O> ServiceCore for CarnotConsensus<A, P, M, F, O>
 where
     F: FountainCode + Send + Sync + 'static,
     A: NetworkAdapter + Send + Sync + 'static,
     P: MemPool + Send + Sync + 'static,
+    O: for<'a> Overlay<'a, A, F> + Send + Sync + 'static,
     P::Settings: Send + Sync + 'static,
     P::Tx: Debug + Send + Sync + 'static,
     P::Id: Debug + Send + Sync + 'static,
@@ -126,6 +128,7 @@ where
             service_state,
             network_relay,
             _fountain: Default::default(),
+            _overlay: Default::default(),
             mempool_relay,
         })
     }
@@ -167,7 +170,7 @@ where
 
             // FIXME: this should probably have a timer to detect failed rounds
             let res = cur_view
-                .resolve::<A, Member<'_, COMMITTEE_SIZE>, _, _, _>(
+                .resolve::<A, O, _, _, _>(
                     private_key,
                     &tip,
                     &network_adapter,
@@ -193,23 +196,22 @@ where
 #[derive(Hash, Eq, PartialEq)]
 pub struct Approval;
 
-/// The settings for the view
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct ViewSettings {
+pub struct ViewSettingsBuilder {
     pub seed: Seed,
     pub staking_keys: BTreeMap<NodeId, Stake>,
     pub view_n: u64,
 }
 
-impl Default for ViewSettings {
+impl Default for ViewSettingsBuilder {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl ViewSettings {
+impl ViewSettingsBuilder {
     #[inline]
-    pub const fn new() -> Self {
+    pub fn new() -> Self {
         Self {
             seed: [0; 32],
             staking_keys: BTreeMap::new(),
@@ -218,22 +220,39 @@ impl ViewSettings {
     }
 
     #[inline]
-    pub const fn seed(mut self, seed: Seed) -> Self {
+    pub const fn with_seed(mut self, seed: Seed) -> Self {
         self.seed = seed;
         self
     }
 
     #[inline]
-    pub fn staking_keys(mut self, staking_keys: BTreeMap<NodeId, Stake>) -> Self {
+    pub fn with_staking_keys(mut self, staking_keys: BTreeMap<NodeId, Stake>) -> Self {
         self.staking_keys = staking_keys;
         self
     }
 
     #[inline]
-    pub const fn view_n(mut self, view_n: u64) -> Self {
+    pub const fn with_view_n(mut self, view_n: u64) -> Self {
         self.view_n = view_n;
         self
     }
+
+    #[inline]
+    pub fn build(self) -> ViewSettings {
+        ViewSettings {
+            seed: self.seed,
+            staking_keys: self.staking_keys,
+            view_n: self.view_n,
+        }
+    }
+}
+
+/// The settings for the view
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct ViewSettings {
+    pub seed: Seed,
+    pub staking_keys: BTreeMap<NodeId, Stake>,
+    pub view_n: u64,
 }
 
 // Consensus round, also aids in guaranteeing synchronization
