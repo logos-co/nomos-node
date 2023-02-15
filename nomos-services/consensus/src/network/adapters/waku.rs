@@ -16,7 +16,9 @@ use nomos_network::{
     NetworkMsg, NetworkService,
 };
 use overwatch_rs::services::{relay::OutboundRelay, ServiceData};
-use waku_bindings::{Encoding, WakuContentTopic, WakuMessage, WakuPubSubTopic};
+use waku_bindings::{
+    ContentFilter, Encoding, StoreQuery, WakuContentTopic, WakuMessage, WakuPubSubTopic,
+};
 
 pub const WAKU_CARNOT_PUB_SUB_TOPIC: WakuPubSubTopic =
     WakuPubSubTopic::new("CarnotSim", Encoding::Proto);
@@ -48,6 +50,63 @@ impl WakuAdapter {
         };
         receiver.await
     }
+
+    async fn archive_subscriber_stream(
+        &self,
+        content_topic: WakuContentTopic,
+    ) -> Result<
+        Box<dyn Stream<Item = WakuMessage> + Send + Sync + Unpin>,
+        tokio::sync::oneshot::error::RecvError,
+    > {
+        let (sender, receiver) = tokio::sync::oneshot::channel();
+        if let Err((_, _e)) = self
+            .network_relay
+            .send(NetworkMsg::Process(WakuBackendMessage::ArchiveSubscribe {
+                query: StoreQuery {
+                    pubsub_topic: Some(WAKU_CARNOT_PUB_SUB_TOPIC.clone()),
+                    content_filters: vec![ContentFilter::new(content_topic)],
+                    // TODO: maybe handle limits through configuration
+                    start_time: None,
+                    end_time: None,
+                    paging_options: None,
+                },
+                reply_channel: sender,
+            }))
+            .await
+        {
+            todo!("log error");
+        };
+        receiver.await
+    }
+
+    async fn cached_stream_with_content_topic(
+        &self,
+        content_topic: WakuContentTopic,
+    ) -> impl Stream<Item = WakuMessage> {
+        // create stream request tasks
+        let live_stream_channel_task = self.message_subscriber_channel();
+        let archive_stream_task = self.archive_subscriber_stream(content_topic.clone());
+        // wait for both tasks to complete
+        let (live_stream_channel_result, archive_stream_result) =
+            futures::join!(live_stream_channel_task, archive_stream_task);
+        // unwrap results
+        let live_stream_channel =
+            live_stream_channel_result.expect("live stream channel from waku network");
+        let archive_stream = archive_stream_result.expect("archive stream from waku network");
+        let live_stream = BroadcastStream::new(live_stream_channel)
+            .zip(futures::stream::repeat(content_topic))
+            .filter_map(|(msg, content_topic)| async move {
+                match msg {
+                    Ok(NetworkEvent::RawMessage(message))
+                        if message.content_topic() == &content_topic =>
+                    {
+                        Some(message)
+                    }
+                    _ => None,
+                }
+            });
+        tokio_stream::StreamExt::merge(archive_stream, live_stream)
+    }
 }
 
 #[async_trait::async_trait]
@@ -65,32 +124,15 @@ impl NetworkAdapter for WakuAdapter {
         committee: Committee,
         view: &View,
     ) -> Box<dyn Stream<Item = Bytes> + Send + Sync + Unpin> {
-        let stream_channel = self
-            .message_subscriber_channel()
-            .await
-            .unwrap_or_else(|_e| todo!("handle error"));
         let content_topic = proposal_topic(committee, view);
-        Box::new(
-            BroadcastStream::new(stream_channel)
-                .zip(futures::stream::repeat(content_topic))
-                .filter_map(|(msg, content_topic)| {
-                    Box::pin(async move {
-                        match msg {
-                            Ok(event) => match event {
-                                NetworkEvent::RawMessage(message) => {
-                                    if &content_topic == message.content_topic() {
-                                        let payload = message.payload();
-                                        Some(ProposalChunkMsg::from_bytes(payload).chunk)
-                                    } else {
-                                        None
-                                    }
-                                }
-                            },
-                            Err(_e) => None,
-                        }
-                    })
+        Box::new(Box::pin(
+            self.cached_stream_with_content_topic(content_topic)
+                .await
+                .map(|message| {
+                    let payload = message.payload();
+                    ProposalChunkMsg::from_bytes(payload).chunk
                 }),
-        )
+        ))
     }
 
     async fn broadcast_block_chunk(
@@ -124,30 +166,15 @@ impl NetworkAdapter for WakuAdapter {
         committee: Committee,
         view: &View,
     ) -> Box<dyn Stream<Item = Approval> + Send> {
-        let content_topic = approval_topic(committee, view);
-        let stream_channel = self
-            .message_subscriber_channel()
-            .await
-            .unwrap_or_else(|_e| todo!("handle error"));
-        Box::new(
-            BroadcastStream::new(stream_channel)
-                .zip(futures::stream::repeat(content_topic))
-                .filter_map(|(msg, content_topic)| async move {
-                    match msg {
-                        Ok(event) => match event {
-                            NetworkEvent::RawMessage(message) => {
-                                if &content_topic == message.content_topic() {
-                                    let payload = message.payload();
-                                    Some(ApprovalMsg::from_bytes(payload).approval)
-                                } else {
-                                    None
-                                }
-                            }
-                        },
-                        Err(_e) => None,
-                    }
+        let content_topic = proposal_topic(committee, view);
+        Box::new(Box::pin(
+            self.cached_stream_with_content_topic(content_topic)
+                .await
+                .map(|message| {
+                    let payload = message.payload();
+                    ApprovalMsg::from_bytes(payload).approval
                 }),
-        )
+        ))
     }
 
     async fn forward_approval(
