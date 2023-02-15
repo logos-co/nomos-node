@@ -9,7 +9,10 @@ use overwatch_rs::{overwatch::OverwatchRunner, services::handle::ServiceHandle};
 
 use nomos_mempool::{
     backend::mockpool::MockPool,
-    network::adapters::mock::{MockAdapter, MOCK_CONTENT_TOPIC},
+    network::{
+        adapters::mock::{MockAdapter, MOCK_CONTENT_TOPIC},
+        MockTransactionMsg,
+    },
     MempoolMsg, MempoolService,
 };
 
@@ -17,7 +20,7 @@ use nomos_mempool::{
 struct MockPoolNode {
     logging: ServiceHandle<Logger>,
     network: ServiceHandle<NetworkService<Mock>>,
-    mockpool: ServiceHandle<MempoolService<MockAdapter<String>, MockPool<String, String>>>,
+    mockpool: ServiceHandle<MempoolService<MockAdapter, MockPool<String, MockTransactionMsg>>>,
 }
 
 #[test]
@@ -75,7 +78,7 @@ fn test_mockmempool() {
     let network = app.handle().relay::<NetworkService<Mock>>();
     let mempool = app
         .handle()
-        .relay::<MempoolService<MockAdapter<String>, MockPool<String, String>>>();
+        .relay::<MempoolService<MockAdapter, MockPool<String, MockTransactionMsg>>>();
 
     app.spawn(async move {
         let network_outbound = network.connect().await.unwrap();
@@ -108,7 +111,10 @@ fn test_mockmempool() {
                 .collect::<std::collections::HashSet<_>>();
 
             if items.len() == exp_txns.len() {
-                assert_eq!(exp_txns, items);
+                assert_eq!(
+                    exp_txns,
+                    items.into_iter().map(|v| v.msg.payload()).collect()
+                );
                 exist.store(true, std::sync::atomic::Ordering::SeqCst);
                 break;
             }

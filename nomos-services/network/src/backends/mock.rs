@@ -21,7 +21,7 @@ const BROADCAST_CHANNEL_BUF: usize = 16;
 
 pub type MockMessageVersion = usize;
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub struct MockContentTopic {
     pub application_name: &'static str,
     pub version: usize,
@@ -53,7 +53,7 @@ impl MockPubSubTopic {
     }
 }
 
-#[derive(Clone, PartialEq, Eq, Serialize, Debug)]
+#[derive(Clone, PartialEq, Eq, Hash, Serialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct MockMessage {
     pub payload: String,

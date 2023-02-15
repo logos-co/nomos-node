@@ -1,8 +1,17 @@
-use nomos_consensus::{CarnotConsensus, network::adapters::{MockAdapter as ConsensusMockAdapter, MOCK_BLOCK_CONTENT_TOPIC}, CarnotSettings, ViewSettings, overlay::flat::Flat};
+use nomos_consensus::{
+    network::{
+        adapters::{
+            MockAdapter as ConsensusMockAdapter, MOCK_APPROVAL_CONTENT_TOPIC,
+            MOCK_BLOCK_CONTENT_TOPIC,
+        },
+        messages::ApprovalMsg,
+    },
+    CarnotConsensus, CarnotSettings, ViewSettingsBuilder,
+};
 use nomos_core::{block::BlockId, fountain::mock::MockFountain};
 use nomos_log::{Logger, LoggerSettings};
 use nomos_network::{
-    backends::mock::{Mock, MockBackendMessage, MockConfig, MockContentTopic, MockMessage},
+    backends::mock::{Mock, MockBackendMessage, MockConfig, MockMessage},
     NetworkConfig, NetworkMsg, NetworkService,
 };
 
@@ -11,22 +20,33 @@ use overwatch_rs::{overwatch::OverwatchRunner, services::handle::ServiceHandle};
 
 use nomos_mempool::{
     backend::mockpool::MockPool,
-    network::adapters::mock::{MockAdapter, MOCK_CONTENT_TOPIC},
+    network::{
+        adapters::mock::{MockAdapter, MOCK_CONTENT_TOPIC},
+        MockTransactionMsg,
+    },
     MempoolMsg, MempoolService,
 };
 
-
 #[derive(Services)]
-struct MockPoolNode { 
+struct MockPoolNode {
     logging: ServiceHandle<Logger>,
     network: ServiceHandle<NetworkService<Mock>>,
-    mockpool: ServiceHandle<MempoolService<MockAdapter<String>, MockPool<String, String>>>,
-    consensus: ServiceHandle<CarnotConsensus<ConsensusMockAdapter, MockPool<String, String>, MockAdapter<String>, MockFountain>, Flat<'a>>,
+    mockpool: ServiceHandle<MempoolService<MockAdapter, MockPool<String, MockTransactionMsg>>>,
+    #[allow(clippy::type_complexity)]
+    consensus: ServiceHandle<
+        CarnotConsensus<
+            ConsensusMockAdapter,
+            MockPool<String, MockTransactionMsg>,
+            MockAdapter,
+            MockFountain,
+        >,
+    >,
 }
-
 
 #[test]
 fn test_carnot() {
+    const KEY: [u8; 32] = [0; 32];
+
     let exist = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
     let exist2 = exist.clone();
 
@@ -47,7 +67,21 @@ fn test_carnot() {
 
     let exp_txns = predefined_messages
         .iter()
-        .map(|msg| msg.payload.clone())
+        .map(|msg| (msg.content_topic, msg.payload()))
+        // We send two messages, so we expect two approval messages back
+        .chain(
+            [
+                (
+                    MOCK_APPROVAL_CONTENT_TOPIC,
+                    String::from_utf8_lossy(&ApprovalMsg::from_bytes(&KEY).as_bytes()).to_string(),
+                ),
+                (
+                    MOCK_APPROVAL_CONTENT_TOPIC,
+                    String::from_utf8_lossy(&ApprovalMsg::from_bytes(&KEY).as_bytes()).to_string(),
+                ),
+            ]
+            .into_iter(),
+        )
         .collect::<std::collections::HashSet<_>>();
 
     let app = OverwatchRunner::<MockPoolNode>::run(
@@ -64,10 +98,11 @@ fn test_carnot() {
             mockpool: (),
             logging: LoggerSettings::default(),
             consensus: CarnotSettings::new(
-                Default::default(), 
+                Default::default(),
                 (),
-                ViewSettings::new()
-                    .staking_keys([([0u8; 32], 1)].into_iter().collect()),
+                ViewSettingsBuilder::new()
+                    .with_staking_keys([(KEY, 1)].into_iter().collect())
+                    .build(),
             ),
         },
         None,
@@ -78,7 +113,7 @@ fn test_carnot() {
     let network = app.handle().relay::<NetworkService<Mock>>();
     let mempool = app
         .handle()
-        .relay::<MempoolService<MockAdapter<String>, MockPool<String, String>>>();
+        .relay::<MempoolService<MockAdapter, MockPool<String, MockTransactionMsg>>>();
 
     app.spawn(async move {
         let network_outbound = network.connect().await.unwrap();
@@ -108,6 +143,7 @@ fn test_carnot() {
                 .await
                 .unwrap()
                 .into_iter()
+                .map(|tx| (tx.msg.content_topic, tx.msg.payload()))
                 .collect::<std::collections::HashSet<_>>();
 
             if items.len() == exp_txns.len() {
@@ -118,11 +154,7 @@ fn test_carnot() {
         }
     });
 
-    // while !exist2.load(std::sync::atomic::Ordering::SeqCst) {
-    //     std::thread::sleep(std::time::Duration::from_millis(200));
-    // }
-
-    loop {
+    while !exist2.load(std::sync::atomic::Ordering::SeqCst) {
         std::thread::sleep(std::time::Duration::from_millis(200));
     }
 }

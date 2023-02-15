@@ -25,7 +25,7 @@ use nomos_core::fountain::FountainCode;
 use nomos_core::staking::Stake;
 use nomos_mempool::{backend::MemPool, network::NetworkAdapter as MempoolAdapter, MempoolService};
 use nomos_network::NetworkService;
-use overlay::{Overlay, flat::Flat};
+use overlay::{flat::Flat, Overlay};
 use overwatch_rs::services::relay::{OutboundRelay, Relay};
 use overwatch_rs::services::{
     handle::ServiceStateHandle,

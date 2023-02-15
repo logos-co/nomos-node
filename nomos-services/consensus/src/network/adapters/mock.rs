@@ -19,7 +19,8 @@ use crate::{
 };
 
 pub const MOCK_PUB_SUB_TOPIC: &str = "MockPubSubTopic";
-pub const MOCK_BLOCK_CONTENT_TOPIC: MockContentTopic = MockContentTopic::new("MockSim", 1, "MockBlock");
+pub const MOCK_BLOCK_CONTENT_TOPIC: MockContentTopic =
+    MockContentTopic::new("MockSim", 1, "MockBlock");
 pub const MOCK_APPROVAL_CONTENT_TOPIC: MockContentTopic =
     MockContentTopic::new("MockSim", 1, "MockApproval");
 

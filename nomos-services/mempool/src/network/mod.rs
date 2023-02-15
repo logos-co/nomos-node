@@ -1,5 +1,7 @@
 pub mod adapters;
 mod messages;
+#[cfg(feature = "mock")]
+pub use messages::MockTransactionMsg;
 
 // std
 

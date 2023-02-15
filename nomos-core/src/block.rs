@@ -34,5 +34,3 @@ impl BlockHeader {
         todo!()
     }
 }
-
-
