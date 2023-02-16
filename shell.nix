@@ -1,12 +1,12 @@
 { pkgs ? import <nixpkgs> {
     builtins = [(import (fetchTarball {
-      url    = "https://github.com/NixOS/nixpkgs/archive/3389f23412877913b9d22a58dfb241684653d7e9.tar.gz";
-      sha256 = "sha256:0wgm7sk9fca38a50hrsqwz6q79z35gqgb9nw80xz7pfdr4jy9pf8";
+      url    = "https://github.com/NixOS/nixpkgs/archive/e06c5e01088672bc460b2bc6b61d88e95190a492.tar.gz";
+      sha256 = "sha256:e7d37547638aeb6b70a9dbf6dcc5970529edef39b46760a1c9689ac7f066ed58";
     }))];
     overlays = [
       (import (fetchGit {
         url = "https://github.com/oxalica/rust-overlay.git";
-	rev = "fe185fac76e009b4bd543704a8c61077cf70155b";
+	rev = "3bab7ae4a80de02377005d611dc4b0a13082aa7c";
       }))
     ];
    }
@@ -17,13 +17,7 @@ pkgs.mkShell {
 
   buildInputs = with pkgs; [
     pkg-config
-    rust-bin.stable."1.65.0".default
-    go_1_19
-  ] ++ lib.optionals stdenv.isDarwin (with darwin.apple_sdk.frameworks; [
-    CoreFoundation
-    CoreServices
-    Security
-  ]);
-
-  __noChroot = pkgs.stdenv.isDarwin;
+    rust-bin.stable."1.67.0".default
+    go_1_19 # 1.19.5
+  ];
 }
