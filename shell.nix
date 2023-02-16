@@ -19,5 +19,7 @@ pkgs.mkShell {
     pkg-config
     rust-bin.stable."1.65.0".default
     go_1_19
-  ];
+  ] ++ lib.optionals stdenv.isDarwin (with darwin.apple_sdk.frameworks; [
+    CoreServices
+  ]);
 }
