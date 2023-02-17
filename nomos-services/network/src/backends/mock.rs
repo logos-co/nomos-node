@@ -11,7 +11,7 @@ use rand::{
 };
 use serde::{Deserialize, Serialize};
 use std::{
-    collections::{HashMap, HashSet},
+    collections::{HashMap, HashSet, VecDeque},
     sync::{Arc, Mutex},
 };
 use tokio::sync::broadcast::{self, Receiver, Sender};
@@ -21,7 +21,7 @@ const BROADCAST_CHANNEL_BUF: usize = 16;
 
 pub type MockMessageVersion = usize;
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub struct MockContentTopic {
     pub application_name: &'static str,
     pub version: usize,
@@ -53,7 +53,7 @@ impl MockPubSubTopic {
     }
 }
 
-#[derive(Clone, PartialEq, Eq, Serialize, Debug)]
+#[derive(Clone, PartialEq, Eq, Hash, Serialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct MockMessage {
     pub payload: String,
@@ -98,9 +98,10 @@ pub struct Mock {
     config: MockConfig,
 }
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug)]
 pub struct MockConfig {
     pub predefined_messages: Vec<MockMessage>,
+    pub expected_response_messages: Arc<Mutex<VecDeque<MockMessage>>>,
     pub duration: std::time::Duration,
     pub seed: u64,
     pub version: usize,
@@ -133,6 +134,10 @@ pub enum MockBackendMessage {
         topic: &'static str,
         tx: oneshot::Sender<Vec<MockMessage>>,
     },
+    Assert {
+        msg: MockMessage,
+        tx: oneshot::Sender<()>,
+    }
 }
 
 impl core::fmt::Debug for MockBackendMessage {
@@ -147,6 +152,7 @@ impl core::fmt::Debug for MockBackendMessage {
                 write!(f, "RelayUnSubscribe {{ topic: {topic} }}")
             }
             Self::Query { topic, .. } => write!(f, "Query {{ topic: {topic} }}"),
+            Self::Assert { msg, .. } => write!(f, "Assert {{ expected: {msg:?} }}"),
         }
     }
 }
@@ -282,6 +288,15 @@ impl NetworkBackend for Mock {
                 drop(normal_msgs);
                 let _ = tx.send(msgs);
             }
+            MockBackendMessage::Assert { msg, tx } => {
+                tracing::info!("processed assert");
+                // we only check message when we run in order producer
+                if self.config.weights.is_none() {
+                    let mut exps = self.config.expected_response_messages.lock().unwrap();
+                    assert_eq!(exps.pop_front().unwrap(), msg);
+                    tx.send(()).unwrap();
+                }
+            }
         };
     }
 
@@ -324,6 +339,7 @@ mod tests {
                     timestamp: 0,
                 },
             ],
+            expected_response_messages: Default::default(),
             duration: tokio::time::Duration::from_secs(1),
             seed: 0,
             version: 1,

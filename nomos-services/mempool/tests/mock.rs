@@ -1,4 +1,4 @@
-use nomos_core::block::BlockId;
+use nomos_core::{block::BlockId, tx::MockTransactionMsg};
 use nomos_log::{Logger, LoggerSettings};
 use nomos_network::{
     backends::mock::{Mock, MockBackendMessage, MockConfig, MockContentTopic, MockMessage},
@@ -17,7 +17,7 @@ use nomos_mempool::{
 struct MockPoolNode {
     logging: ServiceHandle<Logger>,
     network: ServiceHandle<NetworkService<Mock>>,
-    mockpool: ServiceHandle<MempoolService<MockAdapter<String>, MockPool<String, String>>>,
+    mockpool: ServiceHandle<MempoolService<MockAdapter, MockPool<String, MockTransactionMsg>>>,
 }
 
 #[test]
@@ -50,7 +50,7 @@ fn test_mockmempool() {
 
     let exp_txns = predefined_messages
         .iter()
-        .map(|msg| msg.payload.clone())
+        .cloned()
         .collect::<std::collections::HashSet<_>>();
 
     let app = OverwatchRunner::<MockPoolNode>::run(
@@ -58,6 +58,7 @@ fn test_mockmempool() {
             network: NetworkConfig {
                 backend: MockConfig {
                     predefined_messages,
+                    expected_response_messages: Default::default(),
                     duration: tokio::time::Duration::from_millis(100),
                     seed: 0,
                     version: 1,
@@ -75,7 +76,7 @@ fn test_mockmempool() {
     let network = app.handle().relay::<NetworkService<Mock>>();
     let mempool = app
         .handle()
-        .relay::<MempoolService<MockAdapter<String>, MockPool<String, String>>>();
+        .relay::<MempoolService<MockAdapter, MockPool<String, MockTransactionMsg>>>();
 
     app.spawn(async move {
         let network_outbound = network.connect().await.unwrap();
@@ -105,6 +106,7 @@ fn test_mockmempool() {
                 .await
                 .unwrap()
                 .into_iter()
+                .map(|tx| tx.msg)
                 .collect::<std::collections::HashSet<_>>();
 
             if items.len() == exp_txns.len() {

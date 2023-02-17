@@ -1,15 +1,14 @@
 // std
-use std::marker::PhantomData;
 
 // crates
 use futures::{Stream, StreamExt};
+use nomos_core::tx::MockTransactionMsg;
 use nomos_network::backends::mock::{
     EventKind, Mock, MockBackendMessage, MockContentTopic, NetworkEvent,
 };
 use nomos_network::{NetworkMsg, NetworkService};
 use overwatch_rs::services::relay::OutboundRelay;
 use overwatch_rs::services::ServiceData;
-use serde::de::DeserializeOwned;
 use tokio_stream::wrappers::BroadcastStream;
 
 // internal
@@ -19,18 +18,15 @@ pub const MOCK_PUB_SUB_TOPIC: &str = "MockPubSubTopic";
 pub const MOCK_CONTENT_TOPIC: &str = "MockContentTopic";
 pub const MOCK_TX_CONTENT_TOPIC: MockContentTopic = MockContentTopic::new("Mock", 1, "Tx");
 
-pub struct MockAdapter<Tx> {
+pub struct MockAdapter {
     network_relay: OutboundRelay<<NetworkService<Mock> as ServiceData>::Message>,
-    _tx: PhantomData<Tx>,
 }
 
 #[async_trait::async_trait]
-impl<Tx> NetworkAdapter for MockAdapter<Tx>
-where
-    Tx: From<String> + Into<String> + DeserializeOwned + Send + Sync + 'static,
+impl NetworkAdapter for MockAdapter
 {
     type Backend = Mock;
-    type Tx = Tx;
+    type Tx = MockTransactionMsg;
 
     async fn new(
         network_relay: OutboundRelay<<NetworkService<Self::Backend> as ServiceData>::Message>,
@@ -61,7 +57,6 @@ where
         };
         Self {
             network_relay,
-            _tx: Default::default(),
         }
     }
 
@@ -79,18 +74,28 @@ where
         };
 
         let receiver = receiver.await.unwrap();
+        let outbound = self.network_relay.clone();
         Box::new(Box::pin(BroadcastStream::new(receiver).filter_map(
-            |event| async move {
-                match event {
-                    Ok(NetworkEvent::RawMessage(message)) => {
-                        tracing::info!("Received message: {:?}", message.payload());
-                        if message.content_topic().content_topic_name == MOCK_CONTENT_TOPIC {
-                            Some(Tx::from(message.payload()))
-                        } else {
-                            None
+            move |event| {
+                let outbound = outbound.clone();
+                async move {
+                    match event {
+                        Ok(NetworkEvent::RawMessage(message)) => {
+                            tracing::info!("Received message: {:?}", message.payload());
+                            if message.content_topic() == MOCK_TX_CONTENT_TOPIC {
+                                Some(MockTransactionMsg {
+                                    msg: message
+                                })
+                            } else {
+                                // sent assert message to check if we got the expected message
+                                let (tx, rx) = tokio::sync::oneshot::channel();
+                                outbound.send(NetworkMsg::Process(MockBackendMessage::Assert { msg: message, tx, })).await.unwrap();
+                                rx.await.unwrap();
+                                None
+                            }
                         }
+                        Err(_e) => None,
                     }
-                    Err(_e) => None,
                 }
             },
         )))
