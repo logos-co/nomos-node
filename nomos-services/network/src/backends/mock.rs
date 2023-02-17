@@ -288,7 +288,7 @@ impl NetworkBackend for Mock {
                 let _ = tx.send(msgs);
             }
             MockBackendMessage::Assert { msg, tx } => {
-                tracing::info!("processed assert");
+                tracing::info!("processed assert message: {:?}", msg);
                 // we only check message when we run in order producer
                 if self.config.weights.is_none() {
                     let mut exps = self.config.expected_response_messages.lock().unwrap();

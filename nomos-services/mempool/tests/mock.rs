@@ -1,7 +1,7 @@
 use nomos_core::{block::BlockId, tx::mock::MockTransactionMsg};
 use nomos_log::{Logger, LoggerSettings};
 use nomos_network::{
-    backends::mock::{Mock, MockBackendMessage, MockConfig, MockContentTopic, MockMessage},
+    backends::mock::{Mock, MockBackendMessage, MockConfig, MockMessage},
     NetworkConfig, NetworkMsg, NetworkService,
 };
 use overwatch_derive::*;
@@ -9,7 +9,7 @@ use overwatch_rs::{overwatch::OverwatchRunner, services::handle::ServiceHandle};
 
 use nomos_mempool::{
     backend::mockpool::MockPool,
-    network::adapters::mock::{MockAdapter, MOCK_CONTENT_TOPIC},
+    network::adapters::mock::{MockAdapter, MOCK_TX_CONTENT_TOPIC},
     MempoolMsg, MempoolService,
 };
 
@@ -28,21 +28,13 @@ fn test_mockmempool() {
     let predefined_messages = vec![
         MockMessage {
             payload: "This is foo".to_string(),
-            content_topic: MockContentTopic {
-                application_name: "mock network",
-                version: 0,
-                content_topic_name: MOCK_CONTENT_TOPIC,
-            },
+            content_topic: MOCK_TX_CONTENT_TOPIC,
             version: 0,
             timestamp: 0,
         },
         MockMessage {
             payload: "This is bar".to_string(),
-            content_topic: MockContentTopic {
-                application_name: "mock network",
-                version: 0,
-                content_topic_name: MOCK_CONTENT_TOPIC,
-            },
+            content_topic: MOCK_TX_CONTENT_TOPIC,
             version: 0,
             timestamp: 0,
         },
@@ -85,7 +77,7 @@ fn test_mockmempool() {
         // subscribe to the mock content topic
         network_outbound
             .send(NetworkMsg::Process(MockBackendMessage::RelaySubscribe {
-                topic: MOCK_CONTENT_TOPIC,
+                topic: MOCK_TX_CONTENT_TOPIC.content_topic_name,
             }))
             .await
             .unwrap();
