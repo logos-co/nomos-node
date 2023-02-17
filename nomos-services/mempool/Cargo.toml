@@ -20,7 +20,7 @@ thiserror = "1.0"
 tracing = "0.1"
 tokio = { version = "1", features = ["sync", "macros"] }
 tokio-stream = "0.1"
-waku-bindings = { version = "0.1.0-beta3", optional = true}
+waku-bindings = { version = "0.1.0-beta4", optional = true}
 
 [dev-dependencies]
 nomos-log = { path = "../log" }

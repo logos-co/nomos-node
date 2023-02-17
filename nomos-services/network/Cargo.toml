@@ -15,10 +15,11 @@ serde = "1.0"
 sscanf = { version = "0.4", optional = true }
 sled = { version = "0.34", optional = true }
 tokio = { version = "1", features = ["sync"] }
+tokio-stream = "0.1"
 thiserror = "1.0"
 tracing = "0.1"
 rand = { version = "0.8", optional = true }
-waku-bindings = { version = "0.1.0-beta3", optional = true }
+waku-bindings = { version = "0.1.0-beta4", optional = true }
 tracing-appender = "0.2"
 tracing-subscriber =  { version = "0.3", features = ["json"] }
 tracing-gelf = "0.7"

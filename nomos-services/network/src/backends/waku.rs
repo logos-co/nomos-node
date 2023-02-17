@@ -1,11 +1,18 @@
-use super::*;
-use overwatch_rs::services::state::NoState;
+// std
+use std::fmt::Formatter;
+use std::future::Future;
+// crates
+use futures::Stream;
 use serde::{Deserialize, Serialize};
 use tokio::sync::{
     broadcast::{self, Receiver, Sender},
     oneshot,
 };
+use tokio_stream::wrappers::UnboundedReceiverStream;
 use tracing::{debug, error};
+// internal
+use super::*;
+use overwatch_rs::services::state::NoState;
 use waku_bindings::*;
 
 const BROADCAST_CHANNEL_BUF: usize = 16;
@@ -29,7 +36,6 @@ pub struct WakuConfig {
 }
 
 /// Interaction with Waku node
-#[derive(Debug)]
 pub enum WakuBackendMessage {
     /// Send a message to the network
     Broadcast {
@@ -42,11 +48,16 @@ pub enum WakuBackendMessage {
     RelaySubscribe { topic: WakuPubSubTopic },
     /// Unsubscribe from a particular Waku topic
     RelayUnsubscribe { topic: WakuPubSubTopic },
+    /// Get a local cached stream of messages for a particular content topic
+    ArchiveSubscribe {
+        query: StoreQuery,
+        reply_channel: oneshot::Sender<Box<dyn Stream<Item = WakuMessage> + Send + Sync + Unpin>>,
+    },
     /// Retrieve old messages from another peer
     StoreQuery {
         query: StoreQuery,
         peer_id: PeerId,
-        response: oneshot::Sender<StoreResponse>,
+        reply_channel: oneshot::Sender<StoreResponse>,
     },
     /// Send a message using Waku Light Push
     LightpushPublish {
@@ -59,6 +70,49 @@ pub enum WakuBackendMessage {
     },
 }
 
+impl Debug for WakuBackendMessage {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            WakuBackendMessage::Broadcast { message, .. } => f
+                .debug_struct("WakuBackendMessage::Broadcast")
+                .field("message", message)
+                .finish(),
+            WakuBackendMessage::ConnectPeer { addr } => f
+                .debug_struct("WakuBackendMessage::ConnectPeer")
+                .field("addr", addr)
+                .finish(),
+            WakuBackendMessage::RelaySubscribe { topic } => f
+                .debug_struct("WakuBackendMessage::RelaySubscribe")
+                .field("topic", topic)
+                .finish(),
+            WakuBackendMessage::RelayUnsubscribe { topic } => f
+                .debug_struct("WakuBackendMessage::RelayUnsubscribe")
+                .field("topic", topic)
+                .finish(),
+            WakuBackendMessage::ArchiveSubscribe { query, .. } => f
+                .debug_struct("WakuBackendMessage::ArchiveSubscribe")
+                .field("query", query)
+                .finish(),
+            WakuBackendMessage::StoreQuery { query, peer_id, .. } => f
+                .debug_struct("WakuBackendMessage::StoreQuery")
+                .field("query", query)
+                .field("peer_id", peer_id)
+                .finish(),
+            WakuBackendMessage::LightpushPublish {
+                message,
+                topic,
+                peer_id,
+            } => f
+                .debug_struct("WakuBackendMessage::LightpushPublish")
+                .field("message", message)
+                .field("topic", topic)
+                .field("peer_id", peer_id)
+                .finish(),
+            WakuBackendMessage::Info { .. } => f.debug_struct("WakuBackendMessage::Info").finish(),
+        }
+    }
+}
+
 #[derive(Debug)]
 pub enum EventKind {
     Message,
@@ -69,6 +123,41 @@ pub enum NetworkEvent {
     RawMessage(WakuMessage),
 }
 
+impl Waku {
+    pub fn waku_store_query_stream(
+        &self,
+        mut query: StoreQuery,
+    ) -> (
+        impl Stream<Item = WakuMessage>,
+        impl Future<Output = ()> + '_,
+    ) {
+        let (sender, receiver) = tokio::sync::mpsc::unbounded_channel();
+        let task = async move {
+            while let Ok(StoreResponse {
+                messages,
+                paging_options,
+            }) = self.waku.local_store_query(&query)
+            {
+                // send messages
+                for message in messages {
+                    // this could fail if the receiver is dropped
+                    // break out of the loop in that case
+                    if sender.send(message).is_err() {
+                        break;
+                    }
+                }
+                // stop queries if we do not have any more pages
+                if let Some(paging_options) = paging_options {
+                    query.paging_options = Some(paging_options);
+                } else {
+                    break;
+                }
+            }
+        };
+        (UnboundedReceiverStream::new(receiver), task)
+    }
+}
+
 #[async_trait::async_trait]
 impl NetworkBackend for Waku {
     type Settings = WakuConfig;
@@ -77,7 +166,9 @@ impl NetworkBackend for Waku {
     type EventKind = EventKind;
     type NetworkEvent = NetworkEvent;
 
-    fn new(config: Self::Settings) -> Self {
+    fn new(mut config: Self::Settings) -> Self {
+        // set store protocol to active at all times
+        config.inner.store = Some(true);
         let waku = waku_new(Some(config.inner)).unwrap().start().unwrap();
         tracing::info!("waku listening on {}", waku.listen_addresses().unwrap()[0]);
         for peer in &config.initial_peers {
@@ -161,14 +252,14 @@ impl NetworkBackend for Waku {
             WakuBackendMessage::StoreQuery {
                 query,
                 peer_id,
-                response,
+                reply_channel,
             } => match self.waku.store_query(&query, &peer_id, None) {
                 Ok(res) => {
                     debug!(
                         "successfully retrieved stored messages with options {:?}",
                         query
                     );
-                    response
+                    reply_channel
                         .send(res)
                         .unwrap_or_else(|_| error!("client hung up store query handle"));
                 }
@@ -191,6 +282,16 @@ impl NetworkBackend for Waku {
                 {
                     error!("could not send waku info");
                 }
+            }
+            WakuBackendMessage::ArchiveSubscribe {
+                reply_channel,
+                query,
+            } => {
+                let (stream, task) = self.waku_store_query_stream(query);
+                if reply_channel.send(Box::new(stream)).is_err() {
+                    error!("could not send archive subscribe stream");
+                }
+                task.await;
             }
         };
     }
