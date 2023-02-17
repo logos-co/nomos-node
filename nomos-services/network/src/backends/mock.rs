@@ -285,7 +285,6 @@ impl NetworkBackend for Mock {
                 tracing::info!("processed query");
                 let normal_msgs = self.messages.lock().unwrap();
                 let msgs = normal_msgs.get(&topic).cloned().unwrap_or_default();
-                drop(normal_msgs);
                 let _ = tx.send(msgs);
             }
             MockBackendMessage::Assert { msg, tx } => {
@@ -294,7 +293,9 @@ impl NetworkBackend for Mock {
                 if self.config.weights.is_none() {
                     let mut exps = self.config.expected_response_messages.lock().unwrap();
                     assert_eq!(exps.pop_front().unwrap(), msg);
-                    tx.send(()).unwrap();
+                    if tx.send(()).is_err() {
+                        tracing::error!("error when sending assert response");
+                    }
                 }
             }
         };

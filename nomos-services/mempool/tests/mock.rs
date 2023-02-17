@@ -1,4 +1,4 @@
-use nomos_core::{block::BlockId, tx::MockTransactionMsg};
+use nomos_core::{block::BlockId, tx::mock::MockTransactionMsg};
 use nomos_log::{Logger, LoggerSettings};
 use nomos_network::{
     backends::mock::{Mock, MockBackendMessage, MockConfig, MockContentTopic, MockMessage},

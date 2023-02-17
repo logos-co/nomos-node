@@ -2,7 +2,7 @@
 
 // crates
 use futures::{Stream, StreamExt};
-use nomos_core::tx::MockTransactionMsg;
+use nomos_core::tx::mock::MockTransactionMsg;
 use nomos_network::backends::mock::{
     EventKind, Mock, MockBackendMessage, MockContentTopic, NetworkEvent,
 };
@@ -84,14 +84,20 @@ impl NetworkAdapter for MockAdapter {
                             } else {
                                 // sent assert message to check if we got the expected message
                                 let (tx, rx) = tokio::sync::oneshot::channel();
-                                outbound
+
+                                if let Err(e) = outbound
                                     .send(NetworkMsg::Process(MockBackendMessage::Assert {
                                         msg: message,
                                         tx,
                                     }))
                                     .await
-                                    .unwrap();
-                                rx.await.unwrap();
+                                {
+                                    tracing::error!(err = ?e, "fail to send assert message");
+                                }
+
+                                if let Err(e) = rx.await {
+                                    tracing::error!(err = ?e, "fail to receive assert message response");
+                                }
                                 None
                             }
                         }
