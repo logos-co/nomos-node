@@ -137,7 +137,7 @@ pub enum MockBackendMessage {
     Assert {
         msg: MockMessage,
         tx: oneshot::Sender<()>,
-    }
+    },
 }
 
 impl core::fmt::Debug for MockBackendMessage {

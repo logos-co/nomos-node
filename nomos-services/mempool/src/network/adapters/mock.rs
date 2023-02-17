@@ -23,8 +23,7 @@ pub struct MockAdapter {
 }
 
 #[async_trait::async_trait]
-impl NetworkAdapter for MockAdapter
-{
+impl NetworkAdapter for MockAdapter {
     type Backend = Mock;
     type Tx = MockTransactionMsg;
 
@@ -55,9 +54,7 @@ impl NetworkAdapter for MockAdapter
         {
             panic!("Couldn't send subscribe message to the network service: {e}",);
         };
-        Self {
-            network_relay,
-        }
+        Self { network_relay }
     }
 
     async fn transactions_stream(&self) -> Box<dyn Stream<Item = Self::Tx> + Unpin + Send> {
@@ -83,13 +80,17 @@ impl NetworkAdapter for MockAdapter
                         Ok(NetworkEvent::RawMessage(message)) => {
                             tracing::info!("Received message: {:?}", message.payload());
                             if message.content_topic() == MOCK_TX_CONTENT_TOPIC {
-                                Some(MockTransactionMsg {
-                                    msg: message
-                                })
+                                Some(MockTransactionMsg { msg: message })
                             } else {
                                 // sent assert message to check if we got the expected message
                                 let (tx, rx) = tokio::sync::oneshot::channel();
-                                outbound.send(NetworkMsg::Process(MockBackendMessage::Assert { msg: message, tx, })).await.unwrap();
+                                outbound
+                                    .send(NetworkMsg::Process(MockBackendMessage::Assert {
+                                        msg: message,
+                                        tx,
+                                    }))
+                                    .await
+                                    .unwrap();
                                 rx.await.unwrap();
                                 None
                             }
