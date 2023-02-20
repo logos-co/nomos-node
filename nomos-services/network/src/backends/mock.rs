@@ -11,7 +11,7 @@ use rand::{
 };
 use serde::{Deserialize, Serialize};
 use std::{
-    collections::{HashMap, HashSet, VecDeque},
+    collections::{HashMap, HashSet},
     sync::{Arc, Mutex},
 };
 use tokio::sync::broadcast::{self, Receiver, Sender};
@@ -132,7 +132,7 @@ pub enum MockBackendMessage {
     Query {
         topic: &'static str,
         tx: oneshot::Sender<Vec<MockMessage>>,
-    }, 
+    },
 }
 
 impl core::fmt::Debug for MockBackendMessage {

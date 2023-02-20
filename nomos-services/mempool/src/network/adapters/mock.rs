@@ -71,18 +71,20 @@ impl NetworkAdapter for MockAdapter {
         };
 
         let receiver = receiver.await.unwrap();
-        Box::new(Box::pin(BroadcastStream::new(receiver).filter_map(|event| async move {
-            match event {
-                Ok(NetworkEvent::RawMessage(message)) => {
-                    tracing::info!("Received message: {:?}", message.payload());
+        Box::new(Box::pin(BroadcastStream::new(receiver).filter_map(
+            |event| async move {
+                match event {
+                    Ok(NetworkEvent::RawMessage(message)) => {
+                        tracing::info!("Received message: {:?}", message.payload());
                         if message.content_topic() == MOCK_TX_CONTENT_TOPIC {
                             Some(MockTransactionMsg::Request(message))
                         } else {
                             Some(MockTransactionMsg::Response(message))
                         }
+                    }
+                    Err(_e) => None,
                 }
-                Err(_e) => None,
-            }
-        })))
+            },
+        )))
     }
 }
