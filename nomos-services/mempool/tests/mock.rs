@@ -50,7 +50,6 @@ fn test_mockmempool() {
             network: NetworkConfig {
                 backend: MockConfig {
                     predefined_messages,
-                    expected_response_messages: Default::default(),
                     duration: tokio::time::Duration::from_millis(100),
                     seed: 0,
                     version: 1,
@@ -98,7 +97,13 @@ fn test_mockmempool() {
                 .await
                 .unwrap()
                 .into_iter()
-                .map(|tx| tx.msg)
+                .filter_map(|tx| {
+                    if let MockTransactionMsg::Request(msg) = tx {
+                        Some(msg)
+                    } else {
+                        None
+                    }
+                })
                 .collect::<std::collections::HashSet<_>>();
 
             if items.len() == exp_txns.len() {

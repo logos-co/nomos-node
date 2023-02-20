@@ -101,7 +101,6 @@ pub struct Mock {
 #[derive(Clone, Debug)]
 pub struct MockConfig {
     pub predefined_messages: Vec<MockMessage>,
-    pub expected_response_messages: Arc<Mutex<VecDeque<MockMessage>>>,
     pub duration: std::time::Duration,
     pub seed: u64,
     pub version: usize,
@@ -133,11 +132,7 @@ pub enum MockBackendMessage {
     Query {
         topic: &'static str,
         tx: oneshot::Sender<Vec<MockMessage>>,
-    },
-    Assert {
-        msg: MockMessage,
-        tx: oneshot::Sender<()>,
-    },
+    }, 
 }
 
 impl core::fmt::Debug for MockBackendMessage {
@@ -152,7 +147,6 @@ impl core::fmt::Debug for MockBackendMessage {
                 write!(f, "RelayUnSubscribe {{ topic: {topic} }}")
             }
             Self::Query { topic, .. } => write!(f, "Query {{ topic: {topic} }}"),
-            Self::Assert { msg, .. } => write!(f, "Assert {{ expected: {msg:?} }}"),
         }
     }
 }
@@ -287,17 +281,6 @@ impl NetworkBackend for Mock {
                 let msgs = normal_msgs.get(&topic).cloned().unwrap_or_default();
                 let _ = tx.send(msgs);
             }
-            MockBackendMessage::Assert { msg, tx } => {
-                tracing::info!("processed assert message: {:?}", msg);
-                // we only check message when we run in order producer
-                if self.config.weights.is_none() {
-                    let mut exps = self.config.expected_response_messages.lock().unwrap();
-                    assert_eq!(exps.pop_front().unwrap(), msg);
-                    if tx.send(()).is_err() {
-                        tracing::error!("error when sending assert response");
-                    }
-                }
-            }
         };
     }
 
@@ -340,7 +323,6 @@ mod tests {
                     timestamp: 0,
                 },
             ],
-            expected_response_messages: Default::default(),
             duration: tokio::time::Duration::from_secs(1),
             seed: 0,
             version: 1,

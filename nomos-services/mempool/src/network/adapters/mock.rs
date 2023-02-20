@@ -71,40 +71,18 @@ impl NetworkAdapter for MockAdapter {
         };
 
         let receiver = receiver.await.unwrap();
-        let outbound = self.network_relay.clone();
-        Box::new(Box::pin(BroadcastStream::new(receiver).filter_map(
-            move |event| {
-                let outbound = outbound.clone();
-                async move {
-                    match event {
-                        Ok(NetworkEvent::RawMessage(message)) => {
-                            tracing::info!("Received message: {:?}", message.payload());
-                            if message.content_topic() == MOCK_TX_CONTENT_TOPIC {
-                                Some(MockTransactionMsg { msg: message })
-                            } else {
-                                // sent assert message to check if we got the expected message
-                                let (tx, rx) = tokio::sync::oneshot::channel();
-
-                                if let Err(e) = outbound
-                                    .send(NetworkMsg::Process(MockBackendMessage::Assert {
-                                        msg: message,
-                                        tx,
-                                    }))
-                                    .await
-                                {
-                                    tracing::error!(err = ?e, "fail to send assert message");
-                                }
-
-                                if let Err(e) = rx.await {
-                                    tracing::error!(err = ?e, "fail to receive assert message response");
-                                }
-                                None
-                            }
+        Box::new(Box::pin(BroadcastStream::new(receiver).filter_map(|event| async move {
+            match event {
+                Ok(NetworkEvent::RawMessage(message)) => {
+                    tracing::info!("Received message: {:?}", message.payload());
+                        if message.content_topic() == MOCK_TX_CONTENT_TOPIC {
+                            Some(MockTransactionMsg::Request(message))
+                        } else {
+                            Some(MockTransactionMsg::Response(message))
                         }
-                        Err(_e) => None,
-                    }
                 }
-            },
-        )))
+                Err(_e) => None,
+            }
+        })))
     }
 }
