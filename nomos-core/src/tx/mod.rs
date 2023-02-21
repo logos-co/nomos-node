@@ -1,4 +1,7 @@
+#[cfg(feature = "mock")]
+pub mod mock;
 mod transaction;
+
 use serde::{Deserialize, Serialize};
 pub use transaction::Transaction;
 

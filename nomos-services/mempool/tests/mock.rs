@@ -1,7 +1,10 @@
-use nomos_core::block::BlockId;
+use nomos_core::{
+    block::BlockId,
+    tx::mock::{MockTransactionMsg, MockTxId},
+};
 use nomos_log::{Logger, LoggerSettings};
 use nomos_network::{
-    backends::mock::{Mock, MockBackendMessage, MockConfig, MockContentTopic, MockMessage},
+    backends::mock::{Mock, MockBackendMessage, MockConfig, MockMessage},
     NetworkConfig, NetworkMsg, NetworkService,
 };
 use overwatch_derive::*;
@@ -9,7 +12,7 @@ use overwatch_rs::{overwatch::OverwatchRunner, services::handle::ServiceHandle};
 
 use nomos_mempool::{
     backend::mockpool::MockPool,
-    network::adapters::mock::{MockAdapter, MOCK_CONTENT_TOPIC},
+    network::adapters::mock::{MockAdapter, MOCK_TX_CONTENT_TOPIC},
     MempoolMsg, MempoolService,
 };
 
@@ -17,7 +20,7 @@ use nomos_mempool::{
 struct MockPoolNode {
     logging: ServiceHandle<Logger>,
     network: ServiceHandle<NetworkService<Mock>>,
-    mockpool: ServiceHandle<MempoolService<MockAdapter<String>, MockPool<String, String>>>,
+    mockpool: ServiceHandle<MempoolService<MockAdapter, MockPool<MockTxId, MockTransactionMsg>>>,
 }
 
 #[test]
@@ -28,21 +31,13 @@ fn test_mockmempool() {
     let predefined_messages = vec![
         MockMessage {
             payload: "This is foo".to_string(),
-            content_topic: MockContentTopic {
-                application_name: "mock network",
-                version: 0,
-                content_topic_name: MOCK_CONTENT_TOPIC,
-            },
+            content_topic: MOCK_TX_CONTENT_TOPIC,
             version: 0,
             timestamp: 0,
         },
         MockMessage {
             payload: "This is bar".to_string(),
-            content_topic: MockContentTopic {
-                application_name: "mock network",
-                version: 0,
-                content_topic_name: MOCK_CONTENT_TOPIC,
-            },
+            content_topic: MOCK_TX_CONTENT_TOPIC,
             version: 0,
             timestamp: 0,
         },
@@ -50,7 +45,7 @@ fn test_mockmempool() {
 
     let exp_txns = predefined_messages
         .iter()
-        .map(|msg| msg.payload.clone())
+        .cloned()
         .collect::<std::collections::HashSet<_>>();
 
     let app = OverwatchRunner::<MockPoolNode>::run(
@@ -75,7 +70,7 @@ fn test_mockmempool() {
     let network = app.handle().relay::<NetworkService<Mock>>();
     let mempool = app
         .handle()
-        .relay::<MempoolService<MockAdapter<String>, MockPool<String, String>>>();
+        .relay::<MempoolService<MockAdapter, MockPool<MockTxId, MockTransactionMsg>>>();
 
     app.spawn(async move {
         let network_outbound = network.connect().await.unwrap();
@@ -84,7 +79,7 @@ fn test_mockmempool() {
         // subscribe to the mock content topic
         network_outbound
             .send(NetworkMsg::Process(MockBackendMessage::RelaySubscribe {
-                topic: MOCK_CONTENT_TOPIC,
+                topic: MOCK_TX_CONTENT_TOPIC.content_topic_name,
             }))
             .await
             .unwrap();
@@ -105,6 +100,13 @@ fn test_mockmempool() {
                 .await
                 .unwrap()
                 .into_iter()
+                .filter_map(|tx| {
+                    if let MockTransactionMsg::Request(msg) = tx {
+                        Some(msg)
+                    } else {
+                        None
+                    }
+                })
                 .collect::<std::collections::HashSet<_>>();
 
             if items.len() == exp_txns.len() {

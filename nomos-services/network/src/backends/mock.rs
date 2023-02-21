@@ -21,7 +21,7 @@ const BROADCAST_CHANNEL_BUF: usize = 16;
 
 pub type MockMessageVersion = usize;
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub struct MockContentTopic {
     pub application_name: &'static str,
     pub version: usize,
@@ -53,7 +53,7 @@ impl MockPubSubTopic {
     }
 }
 
-#[derive(Clone, PartialEq, Eq, Serialize, Debug)]
+#[derive(Clone, PartialEq, Eq, Hash, Serialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct MockMessage {
     pub payload: String,
@@ -98,7 +98,7 @@ pub struct Mock {
     config: MockConfig,
 }
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug)]
 pub struct MockConfig {
     pub predefined_messages: Vec<MockMessage>,
     pub duration: std::time::Duration,
@@ -279,7 +279,6 @@ impl NetworkBackend for Mock {
                 tracing::info!("processed query");
                 let normal_msgs = self.messages.lock().unwrap();
                 let msgs = normal_msgs.get(&topic).cloned().unwrap_or_default();
-                drop(normal_msgs);
                 let _ = tx.send(msgs);
             }
         };

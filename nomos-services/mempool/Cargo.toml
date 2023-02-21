@@ -26,8 +26,9 @@ waku-bindings = { version = "0.1.0-beta4", optional = true}
 nomos-log = { path = "../log" }
 overwatch-derive = { git = "https://github.com/logos-co/Overwatch", branch = "main" }
 tokio = { version = "1", features = ["full"] }
+blake2 = "0.10"
 
 [features]
 default = []
 waku = ["nomos-network/waku", "waku-bindings"]
-mock = ["linked-hash-map", "nomos-network/mock", "rand"]
+mock = ["linked-hash-map", "nomos-network/mock", "rand", "nomos-core/mock"]

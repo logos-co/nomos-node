@@ -1,15 +1,14 @@
 // std
-use std::marker::PhantomData;
 
 // crates
 use futures::{Stream, StreamExt};
+use nomos_core::tx::mock::MockTransactionMsg;
 use nomos_network::backends::mock::{
     EventKind, Mock, MockBackendMessage, MockContentTopic, NetworkEvent,
 };
 use nomos_network::{NetworkMsg, NetworkService};
 use overwatch_rs::services::relay::OutboundRelay;
 use overwatch_rs::services::ServiceData;
-use serde::de::DeserializeOwned;
 use tokio_stream::wrappers::BroadcastStream;
 
 // internal
@@ -19,18 +18,14 @@ pub const MOCK_PUB_SUB_TOPIC: &str = "MockPubSubTopic";
 pub const MOCK_CONTENT_TOPIC: &str = "MockContentTopic";
 pub const MOCK_TX_CONTENT_TOPIC: MockContentTopic = MockContentTopic::new("Mock", 1, "Tx");
 
-pub struct MockAdapter<Tx> {
+pub struct MockAdapter {
     network_relay: OutboundRelay<<NetworkService<Mock> as ServiceData>::Message>,
-    _tx: PhantomData<Tx>,
 }
 
 #[async_trait::async_trait]
-impl<Tx> NetworkAdapter for MockAdapter<Tx>
-where
-    Tx: From<String> + Into<String> + DeserializeOwned + Send + Sync + 'static,
-{
+impl NetworkAdapter for MockAdapter {
     type Backend = Mock;
-    type Tx = Tx;
+    type Tx = MockTransactionMsg;
 
     async fn new(
         network_relay: OutboundRelay<<NetworkService<Self::Backend> as ServiceData>::Message>,
@@ -59,10 +54,7 @@ where
         {
             panic!("Couldn't send subscribe message to the network service: {e}",);
         };
-        Self {
-            network_relay,
-            _tx: Default::default(),
-        }
+        Self { network_relay }
     }
 
     async fn transactions_stream(&self) -> Box<dyn Stream<Item = Self::Tx> + Unpin + Send> {
@@ -84,10 +76,10 @@ where
                 match event {
                     Ok(NetworkEvent::RawMessage(message)) => {
                         tracing::info!("Received message: {:?}", message.payload());
-                        if message.content_topic().content_topic_name == MOCK_CONTENT_TOPIC {
-                            Some(Tx::from(message.payload()))
+                        if message.content_topic() == MOCK_TX_CONTENT_TOPIC {
+                            Some(MockTransactionMsg::Request(message))
                         } else {
-                            None
+                            Some(MockTransactionMsg::Response(message))
                         }
                     }
                     Err(_e) => None,
