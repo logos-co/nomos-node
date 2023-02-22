@@ -18,7 +18,7 @@ nomos-core = { path = "../../nomos-core" }
 tokio = { version = "1", features = ["sync"] }
 tokio-stream = "0.1"
 futures = "0.3"
-waku-bindings = { version = "0.1.0-beta4", optional = true}
+waku-bindings = { version = "0.1.0-rc.1", optional = true}
 tracing = "0.1"
 
 [features]
