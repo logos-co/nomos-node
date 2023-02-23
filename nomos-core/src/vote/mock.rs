@@ -16,6 +16,7 @@ pub enum QC {
 
 pub struct Error(String);
 
+#[derive(Clone)]
 pub struct MockTallySettings {
     threshold: usize,
 }

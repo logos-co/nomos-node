@@ -23,6 +23,7 @@ use nomos_core::block::Block;
 use nomos_core::crypto::PublicKey;
 use nomos_core::fountain::FountainCode;
 use nomos_core::staking::Stake;
+use nomos_core::vote::Tally;
 use nomos_mempool::{backend::MemPool, network::NetworkAdapter as MempoolAdapter, MempoolService};
 use nomos_network::NetworkService;
 use overlay::Overlay;
@@ -40,37 +41,45 @@ pub type NodeId = PublicKey;
 // Random seed for each round provided by the protocol
 pub type Seed = [u8; 32];
 
-pub struct CarnotSettings<Fountain: FountainCode> {
+pub struct CarnotSettings<Fountain: FountainCode, VoteTally: Tally> {
     private_key: [u8; 32],
     fountain_settings: Fountain::Settings,
+    tally_settings: VoteTally::Settings,
 }
 
-impl<Fountain: FountainCode> Clone for CarnotSettings<Fountain> {
+impl<Fountain: FountainCode, VoteTally: Tally> Clone for CarnotSettings<Fountain, VoteTally> {
     fn clone(&self) -> Self {
         Self {
             private_key: self.private_key,
             fountain_settings: self.fountain_settings.clone(),
+            tally_settings: self.tally_settings.clone(),
         }
     }
 }
 
-impl<Fountain: FountainCode> CarnotSettings<Fountain> {
+impl<Fountain: FountainCode, VoteTally: Tally> CarnotSettings<Fountain, VoteTally> {
     #[inline]
-    pub const fn new(private_key: [u8; 32], fountain_settings: Fountain::Settings) -> Self {
+    pub const fn new(
+        private_key: [u8; 32],
+        fountain_settings: Fountain::Settings,
+        tally_settings: VoteTally::Settings,
+    ) -> Self {
         Self {
             private_key,
             fountain_settings,
+            tally_settings,
         }
     }
 }
 
-pub struct CarnotConsensus<A, P, M, F, O>
+pub struct CarnotConsensus<A, P, M, F, T, O>
 where
     F: FountainCode,
     A: NetworkAdapter,
     M: MempoolAdapter<Tx = P::Tx>,
     P: MemPool,
-    O: Overlay<A, F>,
+    T: Tally,
+    O: Overlay<A, F, T>,
     P::Tx: Debug + 'static,
     P::Id: Debug + 'static,
     A::Backend: 'static,
@@ -81,37 +90,41 @@ where
     network_relay: Relay<NetworkService<A::Backend>>,
     mempool_relay: Relay<MempoolService<M, P>>,
     _fountain: std::marker::PhantomData<F>,
+    _tally: std::marker::PhantomData<T>,
     _overlay: std::marker::PhantomData<O>,
 }
 
-impl<A, P, M, F, O> ServiceData for CarnotConsensus<A, P, M, F, O>
+impl<A, P, M, F, T, O> ServiceData for CarnotConsensus<A, P, M, F, T, O>
 where
     F: FountainCode,
     A: NetworkAdapter,
     P: MemPool,
+    T: Tally,
     P::Tx: Debug,
     P::Id: Debug,
     M: MempoolAdapter<Tx = P::Tx>,
-    O: Overlay<A, F>,
+    O: Overlay<A, F, T>,
 {
     const SERVICE_ID: ServiceId = "Carnot";
-    type Settings = CarnotSettings<F>;
+    type Settings = CarnotSettings<F, T>;
     type State = NoState<Self::Settings>;
     type StateOperator = NoOperator<Self::State>;
     type Message = NoMessage;
 }
 
 #[async_trait::async_trait]
-impl<A, P, M, F, O> ServiceCore for CarnotConsensus<A, P, M, F, O>
+impl<A, P, M, F, T, O> ServiceCore for CarnotConsensus<A, P, M, F, T, O>
 where
     F: FountainCode + Send + Sync + 'static,
     A: NetworkAdapter + Send + Sync + 'static,
     P: MemPool + Send + Sync + 'static,
+    T: Tally + Send + Sync + 'static,
+    T::Settings: Send + Sync + 'static,
     P::Settings: Send + Sync + 'static,
     P::Tx: Debug + Send + Sync + 'static,
     P::Id: Debug + Send + Sync + 'static,
     M: MempoolAdapter<Tx = P::Tx> + Send + Sync + 'static,
-    O: Overlay<A, F> + Send + Sync + 'static,
+    O: Overlay<A, F, T> + Send + Sync + 'static,
 {
     fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, overwatch_rs::DynError> {
         let network_relay = service_state.overwatch_handle.relay();
@@ -120,6 +133,7 @@ where
             service_state,
             network_relay,
             _fountain: Default::default(),
+            _tally: Default::default(),
             _overlay: Default::default(),
             mempool_relay,
         })
@@ -141,6 +155,7 @@ where
         let CarnotSettings {
             private_key,
             fountain_settings,
+            tally_settings,
         } = self.service_state.settings_reader.get_updated_settings();
 
         let network_adapter = A::new(network_relay).await;
@@ -148,6 +163,7 @@ where
         let tip = Tip;
 
         let fountain = F::new(fountain_settings);
+        let tally = T::new(tally_settings);
 
         let leadership = Leadership::new(private_key, mempool_relay);
         // FIXME: this should be taken from config
@@ -162,11 +178,12 @@ where
 
             // FIXME: this should probably have a timer to detect failed rounds
             let res = cur_view
-                .resolve::<A, O, _, _, _>(
+                .resolve::<A, O, _, _, _, _>(
                     private_key,
                     &tip,
                     &network_adapter,
                     &fountain,
+                    &tally,
                     &leadership,
                 )
                 .await;
@@ -198,28 +215,32 @@ pub struct View {
 
 impl View {
     // TODO: might want to encode steps in the type system
-    pub async fn resolve<'view, A, O, F, Tx, Id>(
+    pub async fn resolve<'view, A, O, F, T, Tx, Id>(
         &'view self,
         node_id: NodeId,
         tip: &Tip,
         adapter: &A,
         fountain: &F,
+        tally: &T,
         leadership: &Leadership<Tx, Id>,
     ) -> Result<(Block, View), Box<dyn Error>>
     where
         A: NetworkAdapter + Send + Sync + 'static,
         F: FountainCode,
-        O: Overlay<A, F>,
+        T: Tally + Send + Sync + 'static,
+        O: Overlay<A, F, T>,
     {
         let res = if self.is_leader(node_id) {
             let block = self
-                .resolve_leader::<A, O, F, _, _>(node_id, tip, adapter, fountain, leadership)
+                .resolve_leader::<A, O, F, T, _, _>(
+                    node_id, tip, adapter, fountain, tally, leadership,
+                )
                 .await
                 .unwrap(); // FIXME: handle sad path
             let next_view = self.generate_next_view(&block);
             (block, next_view)
         } else {
-            self.resolve_non_leader::<A, O, F>(node_id, adapter, fountain)
+            self.resolve_non_leader::<A, O, F, T>(node_id, adapter, fountain, tally)
                 .await
                 .unwrap() // FIXME: handle sad path
         };
@@ -233,23 +254,25 @@ impl View {
         Ok(res)
     }
 
-    async fn resolve_leader<'view, A, O, F, Tx, Id>(
+    async fn resolve_leader<'view, A, O, F, T, Tx, Id>(
         &'view self,
         node_id: NodeId,
         tip: &Tip,
         adapter: &A,
         fountain: &F,
+        tally: &T,
         leadership: &Leadership<Tx, Id>,
     ) -> Result<Block, ()>
     where
         A: NetworkAdapter + Send + Sync + 'static,
         F: FountainCode,
-        O: Overlay<A, F>,
+        T: Tally + Send + Sync + 'static,
+        O: Overlay<A, F, T>,
     {
         let overlay = O::new(self, node_id);
 
         // We need to build the QC for the block we are proposing
-        let qc = overlay.build_qc(self, adapter).await;
+        let qc = overlay.build_qc(self, adapter, tally).await;
 
         let LeadershipResult::Leader { block, _view }  = leadership
             .try_propose_block(self, tip, qc)
@@ -262,16 +285,18 @@ impl View {
         Ok(block)
     }
 
-    async fn resolve_non_leader<'view, A, O, F>(
+    async fn resolve_non_leader<'view, A, O, F, T>(
         &'view self,
         node_id: NodeId,
         adapter: &A,
         fountain: &F,
+        tally: &T,
     ) -> Result<(Block, View), ()>
     where
         A: NetworkAdapter + Send + Sync + 'static,
         F: FountainCode,
-        O: Overlay<A, F>,
+        T: Tally + Send + Sync + 'static,
+        O: Overlay<A, F, T>,
     {
         let overlay = O::new(self, node_id);
         // Consensus in Carnot is achieved in 2 steps from the point of view of a node:
@@ -294,7 +319,7 @@ impl View {
         // We only consider the happy path for now
         if self.pipelined_safe_block(&block) {
             overlay
-                .approve_and_forward(self, &block, adapter, &next_view)
+                .approve_and_forward(self, &block, adapter, tally, &next_view)
                 .await
                 .unwrap(); // FIXME: handle sad path
         }

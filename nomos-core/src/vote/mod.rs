@@ -7,7 +7,7 @@ pub trait Tally {
     type Vote;
     type Outcome;
     type TallyError;
-    type Settings;
+    type Settings: Clone;
     fn new(settings: Self::Settings) -> Self;
     async fn tally<S: Stream<Item = Self::Vote> + Unpin + Send>(
         &self,

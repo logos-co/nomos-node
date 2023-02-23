@@ -52,8 +52,8 @@ impl Flat {
 }
 
 #[async_trait::async_trait]
-impl<Network: NetworkAdapter + Sync, Fountain: FountainCode + Sync> Overlay<Network, Fountain>
-    for Flat
+impl<Network: NetworkAdapter + Sync, Fountain: FountainCode + Sync, VoteTally: Tally + Sync>
+    Overlay<Network, Fountain, VoteTally> for Flat
 {
     fn new(view: &View, node: NodeId) -> Self {
         Flat::new(view.view_n, node)
@@ -95,6 +95,7 @@ impl<Network: NetworkAdapter + Sync, Fountain: FountainCode + Sync> Overlay<Netw
         view: &View,
         block: &Block,
         adapter: &Network,
+        tally: &VoteTally,
         _next_view: &View,
     ) -> Result<(), Box<dyn Error>> {
         assert_eq!(view.view_n, self.view_n, "view_n mismatch");
@@ -113,7 +114,7 @@ impl<Network: NetworkAdapter + Sync, Fountain: FountainCode + Sync> Overlay<Netw
         Ok(())
     }
 
-    async fn build_qc(&self, view: &View, adapter: &Network) -> Approval {
+    async fn build_qc(&self, view: &View, adapter: &Network, tally: &VoteTally) -> Approval {
         assert_eq!(view.view_n, self.view_n, "view_n mismatch");
 
         // for now, let's pretend that consensus is reached as soon as the

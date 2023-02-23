@@ -109,8 +109,12 @@ impl<const C: usize> Member<C> {
 }
 
 #[async_trait::async_trait]
-impl<Network: NetworkAdapter + Sync, Fountain: FountainCode + Sync, const C: usize>
-    Overlay<Network, Fountain> for Member<C>
+impl<
+        Network: NetworkAdapter + Sync,
+        Fountain: FountainCode + Sync,
+        VoteTally: Tally + Sync,
+        const C: usize,
+    > Overlay<Network, Fountain, VoteTally> for Member<C>
 {
     // we still need view here to help us initialize
     fn new(view: &View, node: NodeId) -> Self {
@@ -164,6 +168,7 @@ impl<Network: NetworkAdapter + Sync, Fountain: FountainCode + Sync, const C: usi
         view: &View,
         _block: &Block,
         _adapter: &Network,
+        _tally: &VoteTally,
         _next_view: &View,
     ) -> Result<(), Box<dyn Error>> {
         assert_eq!(view.view_n, self.view_n, "view_n mismatch");
@@ -177,7 +182,7 @@ impl<Network: NetworkAdapter + Sync, Fountain: FountainCode + Sync, const C: usi
         todo!()
     }
 
-    async fn build_qc(&self, view: &View, _adapter: &Network) -> Approval {
+    async fn build_qc(&self, view: &View, _adapter: &Network, _tally: &VoteTally) -> Approval {
         assert_eq!(view.view_n, self.view_n, "view_n mismatch");
         // maybe the leader publishing the QC?
         todo!()
