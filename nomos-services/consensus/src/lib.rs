@@ -16,6 +16,7 @@ use std::collections::BTreeMap;
 use std::error::Error;
 use std::fmt::Debug;
 // crates
+use serde::{Deserialize, Serialize};
 // internal
 use crate::network::NetworkAdapter;
 use leadership::{Leadership, LeadershipResult};
@@ -120,6 +121,7 @@ where
     P: MemPool + Send + Sync + 'static,
     T: Tally + Send + Sync + 'static,
     T::Settings: Send + Sync + 'static,
+    T::Outcome: Send + Sync,
     P::Settings: Send + Sync + 'static,
     P::Tx: Debug + Send + Sync + 'static,
     P::Id: Debug + Send + Sync + 'static,
@@ -202,7 +204,7 @@ where
     }
 }
 
-#[derive(Hash, Eq, PartialEq)]
+#[derive(Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub struct Approval;
 
 // Consensus round, also aids in guaranteeing synchronization
@@ -228,6 +230,7 @@ impl View {
         A: NetworkAdapter + Send + Sync + 'static,
         F: FountainCode,
         T: Tally + Send + Sync + 'static,
+        T::Outcome: Send + Sync,
         O: Overlay<A, F, T>,
     {
         let res = if self.is_leader(node_id) {
@@ -267,6 +270,7 @@ impl View {
         A: NetworkAdapter + Send + Sync + 'static,
         F: FountainCode,
         T: Tally + Send + Sync + 'static,
+        T::Outcome: Send + Sync,
         O: Overlay<A, F, T>,
     {
         let overlay = O::new(self, node_id);

@@ -42,5 +42,10 @@ pub trait Overlay<Network: NetworkAdapter, Fountain: FountainCode, VoteTally: Ta
         next_view: &View,
     ) -> Result<(), Box<dyn Error>>;
     /// Wait for consensus on a block
-    async fn build_qc(&self, view: &View, adapter: &Network, vote_tally: &VoteTally) -> Approval;
+    async fn build_qc(
+        &self,
+        view: &View,
+        adapter: &Network,
+        vote_tally: &VoteTally,
+    ) -> VoteTally::Outcome;
 }

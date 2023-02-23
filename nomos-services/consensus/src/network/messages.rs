@@ -1,8 +1,11 @@
 // std
 // crates
 use bytes::Bytes;
+use serde::de::DeserializeOwned;
+use serde::{Deserialize, Serialize};
 // internal
-use crate::{Approval, NodeId};
+use crate::NodeId;
+use nomos_core::wire;
 
 #[derive(Clone)]
 pub struct ProposalChunkMsg {
@@ -21,20 +24,26 @@ impl ProposalChunkMsg {
     }
 }
 
-pub struct ApprovalMsg {
+#[derive(Serialize, Deserialize)]
+pub struct ApprovalMsg<Vote> {
     pub source: NodeId,
-    pub approval: Approval,
+    pub approval: Vote,
 }
 
-impl ApprovalMsg {
+impl<Vote> ApprovalMsg<Vote>
+where
+    Vote: Serialize,
+{
     pub fn as_bytes(&self) -> Box<[u8]> {
-        self.source.into()
+        wire::serialize(self).unwrap().into_boxed_slice()
     }
+}
 
+impl<Vote> ApprovalMsg<Vote>
+where
+    Vote: DeserializeOwned,
+{
     pub fn from_bytes(data: &[u8]) -> Self {
-        Self {
-            source: NodeId::try_from(data).unwrap(),
-            approval: Approval,
-        }
+        wire::deserialize(data).unwrap()
     }
 }

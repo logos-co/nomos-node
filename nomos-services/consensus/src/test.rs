@@ -66,7 +66,7 @@ impl NetworkAdapter for DummyAdapter {
     async fn broadcast_block_chunk(&self, _: Committee, _: &View, _: ProposalChunkMsg) {
         unimplemented!()
     }
-    async fn approvals_stream(
+    async fn votes_stream(
         &self,
         _: Committee,
         _: &View,

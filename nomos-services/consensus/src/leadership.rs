@@ -36,11 +36,11 @@ impl<Tx, Id> Leadership<Tx, Id> {
     }
 
     #[allow(unused, clippy::diverging_sub_expression)]
-    pub async fn try_propose_block<'view>(
+    pub async fn try_propose_block<'view, Qc>(
         &self,
         view: &'view View,
         tip: &Tip,
-        qc: Approval,
+        qc: Qc,
     ) -> LeadershipResult<'view> {
         let ancestor_hint = todo!("get the ancestor from the tip");
         if view.is_leader(self.key.key) {

@@ -182,7 +182,12 @@ impl<
         todo!()
     }
 
-    async fn build_qc(&self, view: &View, _adapter: &Network, _tally: &VoteTally) -> Approval {
+    async fn build_qc(
+        &self,
+        view: &View,
+        _adapter: &Network,
+        _tally: &VoteTally,
+    ) -> VoteTally::Outcome {
         assert_eq!(view.view_n, self.view_n, "view_n mismatch");
         // maybe the leader publishing the QC?
         todo!()
