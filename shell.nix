@@ -19,5 +19,10 @@ pkgs.mkShell {
     pkg-config
     rust-bin.stable."1.67.0".default
     go_1_19 # 1.19.5
+    clang_14
+    llvmPackages_14.libclang
   ];
+  shellHook = ''
+    export LIBCLANG_PATH="${pkgs.llvmPackages_14.libclang.lib}/lib";
+  '';
 }
