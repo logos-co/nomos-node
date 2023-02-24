@@ -34,7 +34,7 @@ impl Flat {
 }
 
 #[async_trait::async_trait]
-impl<'view, Network, Fountain, VoteTally> Overlay<Network, Fountain, VoteTally> for Flat
+impl<Network, Fountain, VoteTally> Overlay<Network, Fountain, VoteTally> for Flat
 where
     Network: NetworkAdapter + Sync,
     Fountain: FountainCode + Sync,
@@ -81,7 +81,7 @@ where
         view: &View,
         block: &Block,
         adapter: &Network,
-        tally: &VoteTally,
+        _tally: &VoteTally,
         _next_view: &View,
     ) -> Result<(), Box<dyn Error>> {
         assert_eq!(view.view_n, self.view_n, "view_n mismatch");
