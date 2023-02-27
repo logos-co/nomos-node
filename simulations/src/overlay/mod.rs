@@ -4,6 +4,8 @@ use crate::node::NodeId;
 use rand::Rng;
 
 pub trait Overlay {
+    type Settings;
+    fn new(settings: Self::Settings) -> Self;
     fn leaders<R: Rng>(
         &self,
         nodes: &[NodeId],

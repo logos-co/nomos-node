@@ -9,6 +9,12 @@ use crate::node::NodeId;
 pub struct FlatOverlay;
 
 impl Overlay for FlatOverlay {
+    type Settings = ();
+
+    fn new(_settings: Self::Settings) -> Self {
+        Self
+    }
+
     fn leaders<R: Rng>(
         &self,
         nodes: &[NodeId],

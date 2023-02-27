@@ -1,3 +1,5 @@
+pub mod carnot;
+
 // std
 use std::time::Duration;
 // crates
