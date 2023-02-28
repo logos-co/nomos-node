@@ -135,9 +135,11 @@ async fn handle_metrics_req(
     let metrics: MempoolMetrics = receiver.await.unwrap();
     res_tx
         // TODO: use serde to serialize metrics
-        .send(Ok(
-            format!("{{\"pending_tx\": {}}}", metrics.pending_txs).into()
-        ))
+        .send(Ok(format!(
+            "{{\"pending_tx\": {}, \"last_tx\": {}}}",
+            metrics.pending_txs, metrics.last_tx_timestamp
+        )
+        .into()))
         .await?;
 
     Ok(())

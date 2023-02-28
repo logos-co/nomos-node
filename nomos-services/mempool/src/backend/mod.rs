@@ -37,4 +37,5 @@ pub trait MemPool {
     fn prune(&mut self, txs: &[Self::Id]);
 
     fn pending_tx_count(&self) -> usize;
+    fn last_tx_timestamp(&self) -> u128;
 }

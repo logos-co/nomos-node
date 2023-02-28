@@ -1,7 +1,8 @@
 // std
 use linked_hash_map::LinkedHashMap;
-use std::collections::BTreeMap;
 use std::hash::Hash;
+use std::time::SystemTime;
+use std::{collections::BTreeMap, time::UNIX_EPOCH};
 // crates
 // internal
 use crate::backend::{MemPool, MempoolError};
@@ -12,6 +13,7 @@ pub struct MockPool<Id, Tx> {
     pending_txs: LinkedHashMap<Id, Tx>,
     in_block_txs: BTreeMap<BlockId, Vec<Tx>>,
     in_block_txs_by_id: BTreeMap<Id, BlockId>,
+    last_tx_timestamp: u128,
 }
 
 impl<Id, Tx> Default for MockPool<Id, Tx>
@@ -23,6 +25,7 @@ where
             pending_txs: LinkedHashMap::new(),
             in_block_txs: BTreeMap::new(),
             in_block_txs_by_id: BTreeMap::new(),
+            last_tx_timestamp: 0,
         }
     }
 }
@@ -55,6 +58,11 @@ where
             return Err(MempoolError::ExistingTx);
         }
         self.pending_txs.insert(id, tx);
+        self.last_tx_timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_millis();
+
         Ok(())
     }
 
@@ -86,5 +94,9 @@ where
 
     fn pending_tx_count(&self) -> usize {
         self.pending_txs.len()
+    }
+
+    fn last_tx_timestamp(&self) -> u128 {
+        self.last_tx_timestamp
     }
 }

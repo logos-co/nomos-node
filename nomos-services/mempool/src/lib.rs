@@ -34,6 +34,7 @@ where
 
 pub struct MempoolMetrics {
     pub pending_txs: usize,
+    pub last_tx_timestamp: u128,
 }
 
 pub enum MempoolMsg<Tx, Id> {
@@ -155,6 +156,7 @@ where
                         MempoolMsg::Metrics { reply_channel } => {
                             let metrics = MempoolMetrics {
                                 pending_txs: pool.pending_tx_count(),
+                                last_tx_timestamp: pool.last_tx_timestamp(),
                             };
                             reply_channel.send(metrics).unwrap_or_else(|_| {
                                 tracing::debug!("could not send back mempool metrics")
