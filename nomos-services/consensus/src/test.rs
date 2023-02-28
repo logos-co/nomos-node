@@ -5,8 +5,8 @@ use crate::*;
 use async_trait::async_trait;
 use bytes::Bytes;
 use futures::Stream;
-use nomos_core::block::*;
-use nomos_core::fountain::{mock::MockFountain, FountainCode, FountainError};
+use nomos_core::fountain::FountainError;
+use nomos_core::fountain::{mock::MockFountain, FountainCode};
 use nomos_network::backends::NetworkBackend;
 use nomos_network::NetworkService;
 use overwatch_rs::services::relay::*;
@@ -17,25 +17,36 @@ struct DummyAdapter;
 struct DummyBackend;
 
 #[async_trait]
-impl<'view, N: NetworkAdapter + Sync, F: FountainCode + Sync> Overlay<'view, N, F>
-    for DummyOverlay
-{
+impl<N: NetworkAdapter + Sync, F: FountainCode + Sync> Overlay<N, F> for DummyOverlay {
     fn new(_: &View, _: NodeId) -> Self {
         DummyOverlay
     }
 
-    async fn build_qc(&self, _: &N) -> Approval {
-        Approval
-    }
-
-    async fn broadcast_block(&self, _: Block, _: &N, _: &F) {}
-
-    async fn reconstruct_proposal_block(&self, _: &N, _: &F) -> Result<Block, FountainError> {
+    async fn reconstruct_proposal_block(
+        &self,
+        _view: &View,
+        _adapter: &N,
+        _fountain: &F,
+    ) -> Result<Block, FountainError> {
         Ok(Block)
     }
 
-    async fn approve_and_forward(&self, _: &Block, _: &N, _: &View) -> Result<(), Box<dyn Error>> {
+    async fn broadcast_block(&self, _view: &View, _block: Block, _adapter: &N, _fountain: &F) {}
+    /// Different overlays might have different needs or the same overlay might
+    /// require different steps depending on the node role
+    /// For now let's put this responsibility on the overlay
+    async fn approve_and_forward(
+        &self,
+        _view: &View,
+        _block: &Block,
+        _adapter: &N,
+        _next_view: &View,
+    ) -> Result<(), Box<dyn Error>> {
         Ok(())
+    }
+
+    async fn build_qc(&self, _view: &View, _: &N) -> Approval {
+        Approval
     }
 }
 
