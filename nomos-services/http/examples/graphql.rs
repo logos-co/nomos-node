@@ -71,7 +71,7 @@ where
                 }
             };
 
-            res_tx.send(res.into()).await.unwrap();
+            res_tx.send(Ok(res.into())).await.unwrap();
         }
         Ok(())
     }))

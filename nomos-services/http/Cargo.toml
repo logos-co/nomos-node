@@ -38,6 +38,7 @@ tower = { version = "0.4", optional = true }
 tower-http = { version = "0.3", features = ["cors", "trace"] }
 tokio = { version = "1", features = ["sync", "macros"] }
 tower-service = "0.3.2"
+http = "0.2.9"
 
 [dev-dependencies]
 metrics = { path = "../metrics", features = ["gql"] }

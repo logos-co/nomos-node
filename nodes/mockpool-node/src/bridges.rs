@@ -45,7 +45,9 @@ pub fn mempool_metrics_bridge(
             let metrics: MempoolMetrics = receiver.await.unwrap();
             res_tx
                 // TODO: use serde to serialize metrics
-                .send(format!("{{\"pending_tx\": {}}}", metrics.pending_txs).into())
+                .send(Ok(
+                    format!("{{\"pending_tx\": {}}}", metrics.pending_txs).into()
+                ))
                 .await
                 .unwrap();
         }
@@ -93,7 +95,7 @@ pub fn mempool_add_tx_bridge(
                         .await
                         .unwrap();
                     send_transaction(network_relay, tx).await;
-                    res_tx.send(b"".to_vec().into()).await.unwrap();
+                    res_tx.send(Ok(b"".to_vec().into())).await.unwrap();
                 }
             } else {
                 debug!(
@@ -129,11 +131,9 @@ pub fn waku_info_bridge(
                 .unwrap();
             let waku_info: WakuInfo = receiver.await.unwrap();
             res_tx
-                .send(
-                    serde_json::to_vec(&waku_info)
-                        .expect("Serializing of waku info message should not fail")
-                        .into(),
-                )
+                .send(Ok(serde_json::to_vec(&waku_info)
+                    .expect("Serializing of waku info message should not fail")
+                    .into()))
                 .await
                 .unwrap();
         }
@@ -170,7 +170,7 @@ pub fn waku_add_conn_bridge(
 
                     join_all(reqs).await;
                 }
-                res_tx.send(b"".to_vec().into()).await.unwrap();
+                res_tx.send(Ok(b"".to_vec().into())).await.unwrap();
             } else {
                 debug!("Invalid payload, {:?}. Should not be empty", payload);
             }

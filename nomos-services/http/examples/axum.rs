@@ -94,7 +94,7 @@ where
                 .unwrap();
             let value = receiver.await.unwrap();
             res_tx
-                .send(format!("Hello, world! {value}").into())
+                .send(Ok(format!("Hello, world! {value}").into()))
                 .await
                 .unwrap();
         }
