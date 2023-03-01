@@ -33,13 +33,15 @@ pub struct Flat {
     // TODO: this should be a const param, but we can't do that yet
     threshold: Threshold,
     node_id: NodeId,
+    view_n: u64,
 }
 
 impl Flat {
-    pub fn new(node_id: NodeId) -> Self {
+    pub fn new(view_n: u64, node_id: NodeId) -> Self {
         Self {
             threshold: DEFAULT_THRESHOLD,
             node_id,
+            view_n,
         }
     }
 
@@ -53,8 +55,8 @@ impl Flat {
 impl<Network: NetworkAdapter + Sync, Fountain: FountainCode + Sync> Overlay<Network, Fountain>
     for Flat
 {
-    fn new(_view: &View, node: NodeId) -> Self {
-        Flat::new(node)
+    fn new(view: &View, node: NodeId) -> Self {
+        Flat::new(view.view_n, node)
     }
 
     async fn reconstruct_proposal_block(
@@ -63,6 +65,7 @@ impl<Network: NetworkAdapter + Sync, Fountain: FountainCode + Sync> Overlay<Netw
         adapter: &Network,
         fountain: &Fountain,
     ) -> Result<Block, FountainError> {
+        assert_eq!(view.view_n, self.view_n, "view_n mismatch");
         let message_stream = adapter.proposal_chunks_stream(FLAT_COMMITTEE, view).await;
         fountain.decode(message_stream).await.map(Block::from_bytes)
     }
@@ -74,6 +77,7 @@ impl<Network: NetworkAdapter + Sync, Fountain: FountainCode + Sync> Overlay<Netw
         adapter: &Network,
         fountain: &Fountain,
     ) {
+        assert_eq!(view.view_n, self.view_n, "view_n mismatch");
         let block_bytes = block.as_bytes();
         let encoded_stream = fountain.encode(&block_bytes);
         encoded_stream
@@ -93,6 +97,7 @@ impl<Network: NetworkAdapter + Sync, Fountain: FountainCode + Sync> Overlay<Netw
         adapter: &Network,
         _next_view: &View,
     ) -> Result<(), Box<dyn Error>> {
+        assert_eq!(view.view_n, self.view_n, "view_n mismatch");
         // in the flat overlay, there's no need to wait for anyone before approving the block
         let approval = self.approve(block);
         adapter
@@ -109,6 +114,8 @@ impl<Network: NetworkAdapter + Sync, Fountain: FountainCode + Sync> Overlay<Netw
     }
 
     async fn build_qc(&self, view: &View, adapter: &Network) -> Approval {
+        assert_eq!(view.view_n, self.view_n, "view_n mismatch");
+
         // for now, let's pretend that consensus is reached as soon as the
         // block is approved by a share of the nodes
         let mut approvals = HashSet::new();

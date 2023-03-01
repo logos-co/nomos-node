@@ -14,6 +14,7 @@ pub struct Member<const C: usize> {
     id: NodeId,
     committee: Committee,
     committees: Committees<C>,
+    view_n: u64,
 }
 
 /// #Just a newtype index to be able to implement parent/children methods
@@ -32,12 +33,13 @@ impl<const C: usize> Committees<C> {
         Self { nodes }
     }
 
-    pub fn into_member(self, id: NodeId) -> Option<Member<C>> {
+    pub fn into_member(self, id: NodeId, view: &View) -> Option<Member<C>> {
         let member_idx = self.nodes.iter().position(|m| m == &id)?;
         Some(Member {
             committee: Committee(member_idx / C),
             committees: self,
             id,
+            view_n: view.view_n,
         })
     }
 
@@ -113,7 +115,7 @@ impl<Network: NetworkAdapter + Sync, Fountain: FountainCode + Sync, const C: usi
     // we still need view here to help us initialize
     fn new(view: &View, node: NodeId) -> Self {
         let committees = Committees::new(view);
-        committees.into_member(node).unwrap()
+        committees.into_member(node, view).unwrap()
     }
 
     async fn reconstruct_proposal_block(
@@ -122,6 +124,7 @@ impl<Network: NetworkAdapter + Sync, Fountain: FountainCode + Sync, const C: usi
         adapter: &Network,
         fountain: &Fountain,
     ) -> Result<Block, FountainError> {
+        assert_eq!(view.view_n, self.view_n, "view_n mismatch");
         let committee = self.committee;
         let message_stream = adapter.proposal_chunks_stream(committee, view).await;
         fountain.decode(message_stream).await.map(Block::from_bytes)
@@ -134,6 +137,7 @@ impl<Network: NetworkAdapter + Sync, Fountain: FountainCode + Sync, const C: usi
         adapter: &Network,
         fountain: &Fountain,
     ) {
+        assert_eq!(view.view_n, self.view_n, "view_n mismatch");
         let (left_child, right_child) = self.children_committes();
         let block_bytes = block.as_bytes();
         let encoded_stream = fountain.encode(&block_bytes);
@@ -157,11 +161,12 @@ impl<Network: NetworkAdapter + Sync, Fountain: FountainCode + Sync, const C: usi
 
     async fn approve_and_forward(
         &self,
-        _view: &View,
+        view: &View,
         _block: &Block,
         _adapter: &Network,
         _next_view: &View,
     ) -> Result<(), Box<dyn Error>> {
+        assert_eq!(view.view_n, self.view_n, "view_n mismatch");
         // roughly, we want to do something like this:
         // 1. wait for left and right children committees to approve
         // 2. approve the block
@@ -172,7 +177,8 @@ impl<Network: NetworkAdapter + Sync, Fountain: FountainCode + Sync, const C: usi
         todo!()
     }
 
-    async fn build_qc(&self, _view: &View, _adapter: &Network) -> Approval {
+    async fn build_qc(&self, view: &View, _adapter: &Network) -> Approval {
+        assert_eq!(view.view_n, self.view_n, "view_n mismatch");
         // maybe the leader publishing the QC?
         todo!()
     }
