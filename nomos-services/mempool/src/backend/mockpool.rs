@@ -13,7 +13,7 @@ pub struct MockPool<Id, Tx> {
     pending_txs: LinkedHashMap<Id, Tx>,
     in_block_txs: BTreeMap<BlockId, Vec<Tx>>,
     in_block_txs_by_id: BTreeMap<Id, BlockId>,
-    last_tx_timestamp: u128,
+    last_tx_timestamp: u64,
 }
 
 impl<Id, Tx> Default for MockPool<Id, Tx>
@@ -61,7 +61,7 @@ where
         self.last_tx_timestamp = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap()
-            .as_millis();
+            .as_millis() as u64;
 
         Ok(())
     }
@@ -96,7 +96,7 @@ where
         self.pending_txs.len()
     }
 
-    fn last_tx_timestamp(&self) -> u128 {
+    fn last_tx_timestamp(&self) -> u64 {
         self.last_tx_timestamp
     }
 }

@@ -183,11 +183,10 @@ async fn handle_add_tx_req(
                 .await?),
         }
     } else {
-        Err(format!(
-            "Invalid payload, {:?}. Empty or couldn't transform into a utf8 String",
-            payload
+        Err(
+            format!("Invalid payload, {payload:?}. Empty or couldn't transform into a utf8 String")
+                .into(),
         )
-        .into())
     }
 }
 
@@ -230,11 +229,10 @@ async fn handle_add_conn_req(
         }
         Ok(res_tx.send(Ok(b"".to_vec().into())).await?)
     } else {
-        Err(format!(
-            "Invalid payload, {:?}. Empty or couldn't transform into a utf8 String",
-            payload
+        Err(
+            format!("Invalid payload, {payload:?}. Empty or couldn't transform into a utf8 String")
+                .into(),
         )
-        .into())
     }
 }
 

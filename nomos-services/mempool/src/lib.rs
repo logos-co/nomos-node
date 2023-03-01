@@ -34,7 +34,7 @@ where
 
 pub struct MempoolMetrics {
     pub pending_txs: usize,
-    pub last_tx_timestamp: u128,
+    pub last_tx_timestamp: u64,
 }
 
 pub enum MempoolMsg<Tx, Id> {
