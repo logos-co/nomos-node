@@ -198,8 +198,8 @@ pub struct View {
 
 impl View {
     // TODO: might want to encode steps in the type system
-    pub async fn resolve<A, O, F, Tx, Id>(
-        &self,
+    pub async fn resolve<'view, A, O, F, Tx, Id>(
+        &'view self,
         node_id: NodeId,
         tip: &Tip,
         adapter: &A,
@@ -233,8 +233,8 @@ impl View {
         Ok(res)
     }
 
-    async fn resolve_leader<A, O, F, Tx, Id>(
-        &self,
+    async fn resolve_leader<'view, A, O, F, Tx, Id>(
+        &'view self,
         node_id: NodeId,
         tip: &Tip,
         adapter: &A,
@@ -262,8 +262,8 @@ impl View {
         Ok(block)
     }
 
-    async fn resolve_non_leader<A, O, F>(
-        &self,
+    async fn resolve_non_leader<'view, A, O, F>(
+        &'view self,
         node_id: NodeId,
         adapter: &A,
         fountain: &F,
