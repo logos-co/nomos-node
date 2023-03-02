@@ -32,9 +32,7 @@ impl<N: NetworkAdapter + Sync, F: FountainCode + Sync> Overlay<N, F> for DummyOv
     }
 
     async fn broadcast_block(&self, _view: &View, _block: Block, _adapter: &N, _fountain: &F) {}
-    /// Different overlays might have different needs or the same overlay might
-    /// require different steps depending on the node role
-    /// For now let's put this responsibility on the overlay
+ 
     async fn approve_and_forward(
         &self,
         _view: &View,
