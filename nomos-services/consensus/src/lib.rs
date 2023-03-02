@@ -25,7 +25,7 @@ use nomos_core::fountain::FountainCode;
 use nomos_core::staking::Stake;
 use nomos_mempool::{backend::MemPool, network::NetworkAdapter as MempoolAdapter, MempoolService};
 use nomos_network::NetworkService;
-use overlay::{Member, Overlay};
+use overlay::Overlay;
 use overwatch_rs::services::relay::{OutboundRelay, Relay};
 use overwatch_rs::services::{
     handle::ServiceStateHandle,
@@ -39,8 +39,6 @@ use tip::Tip;
 pub type NodeId = PublicKey;
 // Random seed for each round provided by the protocol
 pub type Seed = [u8; 32];
-
-const COMMITTEE_SIZE: usize = 1;
 
 pub struct CarnotSettings<Fountain: FountainCode> {
     private_key: [u8; 32],
@@ -66,12 +64,13 @@ impl<Fountain: FountainCode> CarnotSettings<Fountain> {
     }
 }
 
-pub struct CarnotConsensus<A, P, M, F>
+pub struct CarnotConsensus<A, P, M, F, O>
 where
     F: FountainCode,
     A: NetworkAdapter,
     M: MempoolAdapter<Tx = P::Tx>,
     P: MemPool,
+    O: Overlay<A, F>,
     P::Tx: Debug + 'static,
     P::Id: Debug + 'static,
     A::Backend: 'static,
@@ -82,9 +81,10 @@ where
     network_relay: Relay<NetworkService<A::Backend>>,
     mempool_relay: Relay<MempoolService<M, P>>,
     _fountain: std::marker::PhantomData<F>,
+    _overlay: std::marker::PhantomData<O>,
 }
 
-impl<A, P, M, F> ServiceData for CarnotConsensus<A, P, M, F>
+impl<A, P, M, F, O> ServiceData for CarnotConsensus<A, P, M, F, O>
 where
     F: FountainCode,
     A: NetworkAdapter,
@@ -92,6 +92,7 @@ where
     P::Tx: Debug,
     P::Id: Debug,
     M: MempoolAdapter<Tx = P::Tx>,
+    O: Overlay<A, F>,
 {
     const SERVICE_ID: ServiceId = "Carnot";
     type Settings = CarnotSettings<F>;
@@ -101,7 +102,7 @@ where
 }
 
 #[async_trait::async_trait]
-impl<A, P, M, F> ServiceCore for CarnotConsensus<A, P, M, F>
+impl<A, P, M, F, O> ServiceCore for CarnotConsensus<A, P, M, F, O>
 where
     F: FountainCode + Send + Sync + 'static,
     A: NetworkAdapter + Send + Sync + 'static,
@@ -110,6 +111,7 @@ where
     P::Tx: Debug + Send + Sync + 'static,
     P::Id: Debug + Send + Sync + 'static,
     M: MempoolAdapter<Tx = P::Tx> + Send + Sync + 'static,
+    O: Overlay<A, F> + Send + Sync + 'static,
 {
     fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, overwatch_rs::DynError> {
         let network_relay = service_state.overwatch_handle.relay();
@@ -118,6 +120,7 @@ where
             service_state,
             network_relay,
             _fountain: Default::default(),
+            _overlay: Default::default(),
             mempool_relay,
         })
     }
@@ -159,7 +162,7 @@ where
 
             // FIXME: this should probably have a timer to detect failed rounds
             let res = cur_view
-                .resolve::<A, Member<'_, COMMITTEE_SIZE>, _, _, _>(
+                .resolve::<A, O, _, _, _>(
                     private_key,
                     &tip,
                     &network_adapter,
@@ -206,7 +209,7 @@ impl View {
     where
         A: NetworkAdapter + Send + Sync + 'static,
         F: FountainCode,
-        O: Overlay<'view, A, F>,
+        O: Overlay<A, F>,
     {
         let res = if self.is_leader(node_id) {
             let block = self
@@ -241,19 +244,19 @@ impl View {
     where
         A: NetworkAdapter + Send + Sync + 'static,
         F: FountainCode,
-        O: Overlay<'view, A, F>,
+        O: Overlay<A, F>,
     {
         let overlay = O::new(self, node_id);
 
         // We need to build the QC for the block we are proposing
-        let qc = overlay.build_qc(adapter).await;
+        let qc = overlay.build_qc(self, adapter).await;
 
         let LeadershipResult::Leader { block, _view }  = leadership
             .try_propose_block(self, tip, qc)
             .await else { panic!("we are leader")};
 
         overlay
-            .broadcast_block(block.clone(), adapter, fountain)
+            .broadcast_block(self, block.clone(), adapter, fountain)
             .await;
 
         Ok(block)
@@ -268,7 +271,7 @@ impl View {
     where
         A: NetworkAdapter + Send + Sync + 'static,
         F: FountainCode,
-        O: Overlay<'view, A, F>,
+        O: Overlay<A, F>,
     {
         let overlay = O::new(self, node_id);
         // Consensus in Carnot is achieved in 2 steps from the point of view of a node:
@@ -279,7 +282,7 @@ impl View {
 
         // 1) Collect and verify block proposal.
         let block = overlay
-            .reconstruct_proposal_block(adapter, fountain)
+            .reconstruct_proposal_block(self, adapter, fountain)
             .await
             .unwrap(); // FIXME: handle sad path
 
@@ -291,7 +294,7 @@ impl View {
         // We only consider the happy path for now
         if self.pipelined_safe_block(&block) {
             overlay
-                .approve_and_forward(&block, adapter, &next_view)
+                .approve_and_forward(self, &block, adapter, &next_view)
                 .await
                 .unwrap(); // FIXME: handle sad path
         }

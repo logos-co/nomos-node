@@ -13,24 +13,32 @@ use nomos_core::fountain::{FountainCode, FountainError};
 
 /// Dissemination overlay, tied to a specific view
 #[async_trait::async_trait]
-pub trait Overlay<'view, Network: NetworkAdapter, Fountain: FountainCode> {
-    fn new(view: &'view View, node: NodeId) -> Self;
+pub trait Overlay<Network: NetworkAdapter, Fountain: FountainCode> {
+    fn new(view: &View, node: NodeId) -> Self;
 
     async fn reconstruct_proposal_block(
         &self,
+        view: &View,
         adapter: &Network,
         fountain: &Fountain,
     ) -> Result<Block, FountainError>;
-    async fn broadcast_block(&self, block: Block, adapter: &Network, fountain: &Fountain);
+    async fn broadcast_block(
+        &self,
+        view: &View,
+        block: Block,
+        adapter: &Network,
+        fountain: &Fountain,
+    );
     /// Different overlays might have different needs or the same overlay might
     /// require different steps depending on the node role
     /// For now let's put this responsibility on the overlay
     async fn approve_and_forward(
         &self,
+        view: &View,
         block: &Block,
         adapter: &Network,
         next_view: &View,
     ) -> Result<(), Box<dyn Error>>;
     /// Wait for consensus on a block
-    async fn build_qc(&self, adapter: &Network) -> Approval;
+    async fn build_qc(&self, view: &View, adapter: &Network) -> Approval;
 }
