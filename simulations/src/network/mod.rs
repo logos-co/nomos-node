@@ -24,8 +24,7 @@ impl Network {
         node_b: NodeId,
     ) -> Option<Duration> {
         let network_behaviour = self.regions.network_behaviour(node_a, node_b);
-        network_behaviour
-            .should_drop(rng)
+        (!network_behaviour.should_drop(rng))
             // TODO: use a delay range
             .then(|| network_behaviour.delay())
     }

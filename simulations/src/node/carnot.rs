@@ -2,6 +2,7 @@
 use std::collections::HashMap;
 use std::hash::Hash;
 use std::rc::Rc;
+use std::time::Duration;
 // crates
 use rand::prelude::SmallRng;
 use rand::{Rng, SeedableRng};
@@ -49,7 +50,7 @@ fn receive_commit(
         .unwrap()
 }
 
-#[derive(Debug, Eq, PartialEq, Hash)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
 pub enum CarnotStep {
     ReceiveProposal,
     ValidateProposal,
@@ -57,6 +58,7 @@ pub enum CarnotStep {
     ValidateVote,
 }
 
+#[derive(Clone)]
 pub enum CarnotStepSolver {
     Plain(StepTime),
     ParentCommitteeReceiverSolver(ParentCommitteeReceiverSolver),
@@ -64,9 +66,9 @@ pub enum CarnotStepSolver {
 }
 
 pub struct CarnotNodeSettings {
-    steps_costs: HashMap<CarnotStep, CarnotStepSolver>,
-    network: Network,
-    layout: Layout,
+    pub steps_costs: HashMap<CarnotStep, CarnotStepSolver>,
+    pub network: Network,
+    pub layout: Layout,
 }
 
 pub struct CarnotNode {
@@ -74,6 +76,44 @@ pub struct CarnotNode {
     rng: SmallRng,
     settings: Rc<CarnotNodeSettings>,
 }
+
+pub const CARNOT_STEPS_COSTS: &[(CarnotStep, CarnotStepSolver)] = &[
+    (
+        CarnotStep::ReceiveProposal,
+        CarnotStepSolver::ParentCommitteeReceiverSolver(receive_proposal),
+    ),
+    (
+        CarnotStep::ValidateProposal,
+        CarnotStepSolver::Plain(StepTime::from_secs(1)),
+    ),
+    (
+        CarnotStep::ReceiveVote,
+        CarnotStepSolver::ChildCommitteeReceiverSolver(receive_commit),
+    ),
+    (
+        CarnotStep::ValidateVote,
+        CarnotStepSolver::Plain(StepTime::from_secs(1)),
+    ),
+];
+
+pub const CARNOT_LEADER_STEPS: &[CarnotStep] = &[CarnotStep::ReceiveVote, CarnotStep::ValidateVote];
+
+pub const CARNOT_ROOT_STEPS: &[CarnotStep] = &[
+    CarnotStep::ReceiveProposal,
+    CarnotStep::ValidateProposal,
+    CarnotStep::ReceiveVote,
+    CarnotStep::ValidateVote,
+];
+
+pub const CARNOT_INTERMEDIATE_STEPS: &[CarnotStep] = &[
+    CarnotStep::ReceiveProposal,
+    CarnotStep::ValidateProposal,
+    CarnotStep::ReceiveVote,
+    CarnotStep::ValidateVote,
+];
+
+pub const CARNOT_LEAF_STEPS: &[CarnotStep] =
+    &[CarnotStep::ReceiveProposal, CarnotStep::ValidateProposal];
 
 impl Node for CarnotNode {
     type Settings = Rc<CarnotNodeSettings>;
@@ -105,7 +145,7 @@ impl Node for CarnotNode {
                 &self.settings.network,
             ),
             None => {
-                panic!("Unknown step: {:?}", step);
+                panic!("Unknown step: {step:?}");
             }
         }
     }

@@ -30,7 +30,7 @@ impl Overlay for FlatOverlay {
         let committees =
             std::iter::once((0, nodes.iter().copied().collect::<Committee>())).collect();
         let parent = std::iter::once((0, 0)).collect();
-        let children = std::iter::once((0, vec![])).collect();
+        let children = std::iter::once((0, vec![0])).collect();
         Layout::new(committees, parent, children)
     }
 }

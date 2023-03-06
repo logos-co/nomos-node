@@ -5,6 +5,7 @@ use std::collections::{BTreeSet, HashMap};
 // crates
 use rand::Rng;
 // internal
+use crate::node::carnot::CarnotStep;
 use crate::node::{CommitteeId, NodeId};
 
 pub type Committee = BTreeSet<NodeId>;
