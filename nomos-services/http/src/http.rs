@@ -7,6 +7,7 @@ use std::{
 };
 // crates
 use bytes::Bytes;
+use http::StatusCode;
 use overwatch_rs::services::{
     handle::ServiceStateHandle,
     relay::{InboundRelay, OutboundRelay, RelayMessage},
@@ -61,11 +62,13 @@ impl core::fmt::Debug for Route {
     }
 }
 
+pub type HttpResponse = Result<Bytes, (StatusCode, String)>;
+
 #[derive(Debug, Clone)]
 pub struct HttpRequest {
     pub query: HashMap<String, String>,
     pub payload: Option<bytes::Bytes>,
-    pub res_tx: Sender<bytes::Bytes>,
+    pub res_tx: Sender<HttpResponse>,
 }
 
 // HttpMsg is a message that is sent via the relay to communicate with

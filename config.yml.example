@@ -10,6 +10,7 @@ network:
     nodeKey: null
     discV5BootstrapNodes: []
     initial_peers: []
+    relayTopics: []
 http:
   backend:
     address: 0.0.0.0:8080
