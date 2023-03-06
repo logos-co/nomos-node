@@ -2,9 +2,9 @@
 // 2 - Every committee member receives the proposal and validates it
 //
 
-use crate::node::{CommitteeId, Node, NodeId, StepTime};
+use crate::node::{Node, NodeId, StepTime};
 use crate::overlay::Overlay;
-use rand::{Rng, RngCore, SeedableRng};
+use rand::Rng;
 use std::time::Duration;
 
 pub struct ConsensusRunner<N> {
@@ -41,7 +41,7 @@ where
     pub fn run<O: Overlay, R: Rng>(
         &mut self,
         rng: &mut R,
-        mut overlay: O,
+        overlay: O,
         execution: &[(LayoutNodes, N::Step, Box<dyn Fn(&[StepTime]) -> StepTime>)],
     ) -> Report
     where
