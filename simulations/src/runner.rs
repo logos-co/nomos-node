@@ -186,14 +186,14 @@ mod test {
 
         let mut runner: ConsensusRunner<CarnotNode> = setup_runner(&mut rng, &overlay);
 
-        // let leader_steps = CARNOT_LEADER_STEPS.iter().copied().map(|step| {
-        //     (
-        //         LayoutNodes::Leader,
-        //         step,
-        //         Box::new(|times: &[StepTime]| *times.iter().max().unwrap())
-        //             as Box<dyn Fn(&[StepTime]) -> StepTime>,
-        //     )
-        // });
+        let leader_steps = CARNOT_LEADER_STEPS.iter().copied().map(|step| {
+            (
+                LayoutNodes::Leader,
+                step,
+                Box::new(|times: &[StepTime]| *times.iter().max().unwrap())
+                    as Box<dyn Fn(&[StepTime]) -> StepTime>,
+            )
+        });
 
         let committee_steps = CARNOT_LEAF_STEPS.iter().copied().map(|step| {
             (
@@ -204,11 +204,10 @@ mod test {
             )
         });
 
-        // let carnot_steps: Vec<_> = leader_steps.chain(committee_steps).collect();
-        let carnot_steps: Vec<_> = committee_steps.collect();
+        let carnot_steps: Vec<_> = leader_steps.chain(committee_steps).collect();
 
         assert_eq!(
-            Duration::from_millis(1100),
+            Duration::from_millis(2200),
             runner.run(&carnot_steps).round_time
         );
     }
