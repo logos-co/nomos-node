@@ -48,6 +48,7 @@ impl Layout {
     }
 
     pub fn parent(&self, committee_id: CommitteeId) -> CommitteeId {
+        println!("{committee_id}");
         self.parent[&committee_id]
     }
 
@@ -64,6 +65,10 @@ impl Layout {
             .iter()
             .map(|&committee_id| &self.committees[&committee_id])
             .collect()
+    }
+
+    pub fn node_ids(&self) -> impl Iterator<Item = NodeId> + '_ {
+        self.from_committee.keys().copied()
     }
 }
 
