@@ -54,6 +54,7 @@ We assume there is a  `block` function available that returns the block for the 
 undef, will assume a 32-byte opaque string
 
 ### Vote
+A vote for `block` in `view`
 ```      
 block: Id
 view: View 
@@ -62,7 +63,6 @@ voter: Id
 ```
 qc is the optional field containing the QC built by root nodes from 2/3 + 1 votes from their child committees and forwarded the the next view leader.
 Q: building the QC each time for additional votes might be expensive (in terms of network and CPU)
-Q: is vote.block.view the same as vote.view?
 
 ### NewView
 ```
@@ -97,7 +97,6 @@ The following functions are expected to be available to participants during the 
 * `supermajority(votes)`: the behavior changes with the position of a participant in the overlay:
     * Root committee: returns if the number of distinctive signers of votes for a block in the child committee is equal to the threshold or returns if the qourum size has reached.
     Q: What exactly "quorum size has been reached" means?
-    Q: Does this return true for the 2/3 + 2th vote?
 
 * `leader_supermajority(votes)`: returns if the number of distinct voters for a block is 2/3 + 1 for both children committees of root committee and overall 2/3 + 1
 
@@ -235,7 +234,7 @@ Func receive_vote(vote){
         receive(block)
     }
     # Q: What's this condition for?
-    if vote.block.view < current_view - 1 { 
+    if vote.view < current_view - 1 { 
         return
     }
 
@@ -244,12 +243,12 @@ Func receive_vote(vote){
     if member_of_internal_com() AND not member_of_root() {
         if childcommittee (vote.voter) {
             collection[vote.block].append(vote)
+        } else {
+            # Q: not returning here would mean it's extremely easy to
+            # trigger building a new vote in the following branches
+            return;
         }
 
-        # Q: this means that we send a message for every incoming
-        # message after the threshold has been reached, i.e. a vote
-        # from a node in the leaf committee can trigger
-        # at least height(tree) messages.
         if supermajority(collection[vote.block]){
             # Q: should we send it to everyone in the committe?
             let self_vote = build_vote();
@@ -263,8 +262,12 @@ Func receive_vote(vote){
     }
 
     if member_of_root(){
-        if childcommittee(vote.voters) { 
+        if childcommittee(vote.voter) { 
             collection[vote.block].append(vote)
+        } else {
+            # Q: not returning here would mean it's extremely easy to
+            # trigger building a new vote in the following branches
+            return;
         }
 
         # Q: Same consideration as above
@@ -282,16 +285,20 @@ Func receive_vote(vote){
             try_to_commit_grandparent(block)
         }
 
-        if morethanSsupermajority(collection[vote.block]) { 
-            # Q: The vote to send is not the one received but
-            # the one build by this participant, right?
-            let self_vote = build_vote();
-            qc = build_qc(collection[vote.block])
+        # Q: this means that we send a message for every incoming
+        # message after the threshold has been reached, i.e. a vote
+        # from a node in the leaf committee can trigger
+        # at least height(tree) messages.
+        if morethanSsupermajority(collection[vote.block]) {
+            # just forward the vote to the leader
+            # Q: But then childcommitte(vote.voter) would return false
+            # in the leader, as it's a granchild, not a child
             send(vote, leader(current_view + 1))
         }
     }
 
     if self = leader(view) {
+        # Q: No filtering? I can just create a key and  vote?
         collection[vote.block].append(vote)
         if supermajority(collection[vote.block]){
             qc = build_qc(collection[vote.block])
