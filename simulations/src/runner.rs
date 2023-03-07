@@ -13,6 +13,7 @@ pub struct ConsensusRunner<N> {
     leaders: Vec<NodeId>,
 }
 
+#[allow(dead_code)]
 #[derive(Debug)]
 pub struct Report {
     round_time: Duration,
@@ -24,6 +25,8 @@ pub enum LayoutNodes {
     Committee,
     LeafCommittee,
 }
+
+pub type ExecutionSteps<S> = [(LayoutNodes, S, Box<dyn Fn(&[StepTime]) -> StepTime>)];
 
 impl<N: Node> ConsensusRunner<N>
 where
@@ -50,10 +53,7 @@ where
         self.nodes.iter().map(Node::id)
     }
 
-    pub fn run(
-        &mut self,
-        execution: &[(LayoutNodes, N::Step, Box<dyn Fn(&[StepTime]) -> StepTime>)],
-    ) -> Report
+    pub fn run(&mut self, execution: &ExecutionSteps<N::Step>) -> Report
     where
         N::Step: Clone,
     {
