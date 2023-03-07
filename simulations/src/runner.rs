@@ -124,7 +124,7 @@ mod test {
     };
     use crate::node::{NodeId, StepTime};
     use crate::overlay::flat::FlatOverlay;
-    use crate::overlay::{Layout, Overlay};
+    use crate::overlay::Overlay;
     use crate::runner::{ConsensusRunner, LayoutNodes};
     use rand::rngs::SmallRng;
     use rand::{Rng, SeedableRng};

@@ -134,13 +134,18 @@ impl Node for CarnotNode {
             Some(ParentCommitteeReceiverSolver(solver)) => solver(
                 &mut self.rng,
                 self.id,
-                self.settings.layout.parent_nodes(self.id),
+                self.settings
+                    .layout
+                    .parent_nodes(self.settings.layout.committee(self.id)),
                 &self.settings.network,
             ),
             Some(ChildCommitteeReceiverSolver(solver)) => solver(
                 &mut self.rng,
                 self.id,
-                &self.settings.layout.children_nodes(self.id),
+                &self
+                    .settings
+                    .layout
+                    .children_nodes(self.settings.layout.committee(self.id)),
                 &self.settings.network,
             ),
             None => {
