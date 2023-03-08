@@ -62,7 +62,6 @@ voter: Id
 ? qc: Qc
 ```
 qc is the optional field containing the QC built by root nodes from 2/3 + 1 votes from their child committees and forwarded the the next view leader.
-Q: building the QC each time for additional votes might be expensive (in terms of network and CPU)
 
 ### NewView
 ```
@@ -73,7 +72,7 @@ high_qc: Qc
 ## Local Variables
 Participants in the protocol are expected to mainting the following data in addition to the DAG of received proposal:
 * `current_view`
-* `high_qc` 
+* `local_high_qc`
 * `latest_committed_view`
 * `collection`: TODO rename
 
@@ -95,8 +94,7 @@ The following functions are expected to be available to participants during the 
 * `child_committee(participant)`: returns true if the participant passed as argument is member of the child committee of the participant executing the function.
 
 * `supermajority(votes)`: the behavior changes with the position of a participant in the overlay:
-    * Root committee: returns if the number of distinctive signers of votes for a block in the child committee is equal to the threshold or returns if the qourum size has reached.
-    Q: What exactly "quorum size has been reached" means?
+    * Root committee: returns if the number of distinctive signers of votes for a block in the child committee is equal to the threshold.
 
 * `leader_supermajority(votes)`: returns if the number of distinct voters for a block is 2/3 + 1 for both children committees of root committee and overall 2/3 + 1
 
@@ -174,8 +172,8 @@ Func safeBlock(block){
             }
 
             return block.view >= curView
-                AND extends(block, block.aggQC.block())
-            # Q: is block.aggQc.block() the same as block.parent()?
+                AND extends(block, block.aggQC.high_qc.block)
+            # Q: is block.aggQc.high_qc.block the same as block.parent()?
             # This would suggest this check is redundant
         }
     }
@@ -196,15 +194,14 @@ Func try_to_commit_grandparent(block){
 ```
 
 ```Ruby
-# Update the latest certification (qc) and view number 
-# Q: Contrary to the comment above this does not update the view number
+# Update the latest certification (qc)
 Func update_high_qc(qc){
     match qc {
         # Happy case
         Standard => {
             # TODO: revise
-            if qc.view > high_qc.view{
-                high_qc = qc
+            if qc.view > local_high_qc.view{
+                local_high_qc = qc
             }
 
             # Q: The original pseudocde checked for possilbly
@@ -214,9 +211,9 @@ Func update_high_qc(qc){
         # Unhappy case
         Agregate => {
             # Q: TODO revisit when highQc.block is clear
-            if qc.high_qc.block().view != high_qc.view {
+            if qc.high_qc.view != local_high_qc.view {
                 # release the lock and adopt the global lock (?)
-                high_qc = qc.high_qc 
+                local_high_qc = qc.high_qc
                 # Q: same thing about missing views
             }
         }
