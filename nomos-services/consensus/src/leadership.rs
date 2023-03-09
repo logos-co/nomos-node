@@ -17,9 +17,9 @@ pub struct Leadership<Tx, Id> {
     mempool: OutboundRelay<MempoolMsg<Tx, Id>>,
 }
 
-pub enum LeadershipResult<'view> {
+pub enum LeadershipResult<'view, Tx: serde::de::DeserializeOwned> {
     Leader {
-        block: Block,
+        block: Block<Tx>,
         _view: PhantomData<&'view u8>,
     },
     NotLeader {
@@ -27,7 +27,7 @@ pub enum LeadershipResult<'view> {
     },
 }
 
-impl<Tx, Id> Leadership<Tx, Id> {
+impl<Tx: serde::de::DeserializeOwned, Id> Leadership<Tx, Id> {
     pub fn new(key: PrivateKey, mempool: OutboundRelay<MempoolMsg<Tx, Id>>) -> Self {
         Self {
             key: Enclave { key },
@@ -41,7 +41,7 @@ impl<Tx, Id> Leadership<Tx, Id> {
         view: &'view View,
         tip: &Tip,
         qc: Approval,
-    ) -> LeadershipResult<'view> {
+    ) -> LeadershipResult<'view, Tx> {
         let ancestor_hint = todo!("get the ancestor from the tip");
         if view.is_leader(self.key.key) {
             let (tx, rx) = tokio::sync::oneshot::channel();

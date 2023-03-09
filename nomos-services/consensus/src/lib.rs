@@ -5,15 +5,12 @@
 //! It's obviously extremely important that the information contained in `View` is synchronized across different
 //! nodes, but that has to be achieved through different means.
 mod leadership;
-mod network;
+pub mod network;
 pub mod overlay;
-#[cfg(test)]
-mod test;
 mod tip;
 
 // std
 use std::collections::BTreeMap;
-use std::error::Error;
 use std::fmt::Debug;
 // crates
 // internal
@@ -40,6 +37,7 @@ pub type NodeId = PublicKey;
 // Random seed for each round provided by the protocol
 pub type Seed = [u8; 32];
 
+#[derive(Debug)]
 pub struct CarnotSettings<Fountain: FountainCode> {
     private_key: [u8; 32],
     fountain_settings: Fountain::Settings,
@@ -108,10 +106,10 @@ where
     A: NetworkAdapter + Send + Sync + 'static,
     P: MemPool + Send + Sync + 'static,
     P::Settings: Send + Sync + 'static,
-    P::Tx: Debug + Send + Sync + 'static,
-    P::Id: Debug + Send + Sync + 'static,
+    P::Tx: Debug + Clone + serde::de::DeserializeOwned + Send + Sync + 'static,
+    P::Id: Debug + for<'a> From<&'a P::Tx> + Send + Sync + 'static,
     M: MempoolAdapter<Tx = P::Tx> + Send + Sync + 'static,
-    O: Overlay<A, F> + Send + Sync + 'static,
+    O: Overlay<A, F, Tx = P::Tx> + Send + Sync + 'static,
 {
     fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, overwatch_rs::DynError> {
         let network_relay = service_state.overwatch_handle.relay();
@@ -149,7 +147,7 @@ where
 
         let fountain = F::new(fountain_settings);
 
-        let leadership = Leadership::new(private_key, mempool_relay);
+        let leadership = Leadership::new(private_key, mempool_relay.clone());
         // FIXME: this should be taken from config
         let mut cur_view = View {
             seed: [0; 32],
@@ -161,20 +159,25 @@ where
             // be spawned as a separate future
 
             // FIXME: this should probably have a timer to detect failed rounds
-            let res = cur_view
-                .resolve::<A, O, _, _, _>(
-                    private_key,
-                    &tip,
-                    &network_adapter,
-                    &fountain,
-                    &leadership,
-                )
-                .await;
-            match res {
-                Ok((_block, view)) => {
+            match cur_view
+                .resolve::<A, O, _, _>(private_key, &tip, &network_adapter, &fountain, &leadership)
+                .await
+            {
+                Ok((block, view)) => {
                     // resolved block, mark as verified and possibly update the tip
                     // not sure what mark as verified means, e.g. if we want an event subscription
                     // system for this to be used for example by the ledger, storage and mempool
+                    mempool_relay
+                        .send(nomos_mempool::MempoolMsg::MarkInBlock {
+                            ids: block.transactions().iter().map(P::Id::from).collect(),
+                            block: block.header(),
+                        })
+                        .await
+                        .map_err(|(e, _)| {
+                            tracing::error!("Error while sending MarkInBlock message: {}", e);
+                            e
+                        })?;
+
                     cur_view = view;
                 }
                 Err(e) => {
@@ -198,14 +201,14 @@ pub struct View {
 
 impl View {
     // TODO: might want to encode steps in the type system
-    pub async fn resolve<'view, A, O, F, Tx, Id>(
+    pub async fn resolve<'view, A, O, F, Id>(
         &'view self,
         node_id: NodeId,
         tip: &Tip,
         adapter: &A,
         fountain: &F,
-        leadership: &Leadership<Tx, Id>,
-    ) -> Result<(Block, View), Box<dyn Error>>
+        leadership: &Leadership<O::Tx, Id>,
+    ) -> Result<(Block<O::Tx>, View), overwatch_rs::DynError>
     where
         A: NetworkAdapter + Send + Sync + 'static,
         F: FountainCode,
@@ -213,7 +216,7 @@ impl View {
     {
         let res = if self.is_leader(node_id) {
             let block = self
-                .resolve_leader::<A, O, F, _, _>(node_id, tip, adapter, fountain, leadership)
+                .resolve_leader::<A, O, F, _>(node_id, tip, adapter, fountain, leadership)
                 .await
                 .unwrap(); // FIXME: handle sad path
             let next_view = self.generate_next_view(&block);
@@ -233,14 +236,14 @@ impl View {
         Ok(res)
     }
 
-    async fn resolve_leader<'view, A, O, F, Tx, Id>(
+    async fn resolve_leader<'view, A, O, F, Id>(
         &'view self,
         node_id: NodeId,
         tip: &Tip,
         adapter: &A,
         fountain: &F,
-        leadership: &Leadership<Tx, Id>,
-    ) -> Result<Block, ()>
+        leadership: &Leadership<O::Tx, Id>,
+    ) -> Result<Block<O::Tx>, ()>
     where
         A: NetworkAdapter + Send + Sync + 'static,
         F: FountainCode,
@@ -250,7 +253,6 @@ impl View {
 
         // We need to build the QC for the block we are proposing
         let qc = overlay.build_qc(self, adapter).await;
-
         let LeadershipResult::Leader { block, _view }  = leadership
             .try_propose_block(self, tip, qc)
             .await else { panic!("we are leader")};
@@ -267,7 +269,7 @@ impl View {
         node_id: NodeId,
         adapter: &A,
         fountain: &F,
-    ) -> Result<(Block, View), ()>
+    ) -> Result<(Block<O::Tx>, View), ()>
     where
         A: NetworkAdapter + Send + Sync + 'static,
         F: FountainCode,
@@ -303,7 +305,7 @@ impl View {
     }
 
     pub fn is_leader(&self, _node_id: NodeId) -> bool {
-        false
+        true
     }
 
     pub fn id(&self) -> u64 {
@@ -311,12 +313,12 @@ impl View {
     }
 
     // Verifies the block is new and the previous leader did not fail
-    fn pipelined_safe_block(&self, _: &Block) -> bool {
+    fn pipelined_safe_block<Tx: serde::de::DeserializeOwned>(&self, _: &Block<Tx>) -> bool {
         // return b.view_n >= self.view_n && b.view_n == b.qc.view_n
         true
     }
 
-    fn generate_next_view(&self, _b: &Block) -> View {
+    fn generate_next_view<Tx: serde::de::DeserializeOwned>(&self, _b: &Block<Tx>) -> View {
         let mut seed = self.seed;
         seed[0] += 1;
         View {

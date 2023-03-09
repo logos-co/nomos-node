@@ -2,7 +2,7 @@
 
 // crates
 use futures::{Stream, StreamExt};
-use nomos_core::tx::mock::MockTransactionMsg;
+use nomos_core::tx::mock::MockTransaction;
 use nomos_network::backends::mock::{
     EventKind, Mock, MockBackendMessage, MockContentTopic, NetworkEvent,
 };
@@ -25,7 +25,7 @@ pub struct MockAdapter {
 #[async_trait::async_trait]
 impl NetworkAdapter for MockAdapter {
     type Backend = Mock;
-    type Tx = MockTransactionMsg;
+    type Tx = MockTransaction;
 
     async fn new(
         network_relay: OutboundRelay<<NetworkService<Self::Backend> as ServiceData>::Message>,
@@ -48,7 +48,7 @@ impl NetworkAdapter for MockAdapter {
 
         if let Err((e, _)) = network_relay
             .send(NetworkMsg::Process(MockBackendMessage::RelaySubscribe {
-                topic: MOCK_PUB_SUB_TOPIC,
+                topic: MOCK_PUB_SUB_TOPIC.to_string(),
             }))
             .await
         {
@@ -76,10 +76,10 @@ impl NetworkAdapter for MockAdapter {
                 match event {
                     Ok(NetworkEvent::RawMessage(message)) => {
                         tracing::info!("Received message: {:?}", message.payload());
-                        if message.content_topic() == MOCK_TX_CONTENT_TOPIC {
-                            Some(MockTransactionMsg::Request(message))
+                        if message.content_topic().eq(&MOCK_TX_CONTENT_TOPIC) {
+                            Some(MockTransaction::new(message))
                         } else {
-                            Some(MockTransactionMsg::Response(message))
+                            None
                         }
                     }
                     Err(_e) => None,

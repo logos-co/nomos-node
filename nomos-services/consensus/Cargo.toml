@@ -20,6 +20,7 @@ tokio-stream = "0.1"
 futures = "0.3"
 waku-bindings = { version = "0.1.0-rc.2", optional = true}
 tracing = "0.1"
+serde = { version = "1", features = ["derive"] }
 
 [features]
 default = []

@@ -8,6 +8,7 @@ use super::*;
 use crate::network::messages::{ApprovalMsg, ProposalChunkMsg};
 use crate::network::NetworkAdapter;
 use crate::overlay::committees::Committee;
+use nomos_core::wire::deserializer;
 
 const DEFAULT_THRESHOLD: Threshold = Threshold::new(2, 3);
 const FLAT_COMMITTEE: Committee = Committee::root();
@@ -29,32 +30,38 @@ impl Threshold {
 /// As far as the API is concerned, this should be equivalent to any other
 /// overlay and far simpler to implement.
 /// For this reason, this might act as a 'reference' overlay for testing.
-pub struct Flat {
+pub struct Flat<Tx> {
     // TODO: this should be a const param, but we can't do that yet
     threshold: Threshold,
     node_id: NodeId,
     view_n: u64,
+    _tx: std::marker::PhantomData<Tx>,
 }
 
-impl Flat {
+impl<Tx: serde::de::DeserializeOwned> Flat<Tx> {
     pub fn new(view_n: u64, node_id: NodeId) -> Self {
         Self {
             threshold: DEFAULT_THRESHOLD,
             node_id,
             view_n,
+            _tx: std::marker::PhantomData,
         }
     }
 
-    fn approve(&self, _block: &Block) -> Approval {
+    fn approve(&self, _block: &Block<Tx>) -> Approval {
         // we still need to define how votes look like
-        todo!()
+        Approval
     }
 }
 
 #[async_trait::async_trait]
-impl<Network: NetworkAdapter + Sync, Fountain: FountainCode + Sync> Overlay<Network, Fountain>
-    for Flat
+impl<Network: NetworkAdapter + Sync, Fountain: FountainCode + Sync, Tx> Overlay<Network, Fountain>
+    for Flat<Tx>
+where
+    Tx: serde::de::DeserializeOwned + Clone + Send + Sync + 'static,
 {
+    type Tx = Tx;
+
     fn new(view: &View, node: NodeId) -> Self {
         Flat::new(view.view_n, node)
     }
@@ -64,16 +71,20 @@ impl<Network: NetworkAdapter + Sync, Fountain: FountainCode + Sync> Overlay<Netw
         view: &View,
         adapter: &Network,
         fountain: &Fountain,
-    ) -> Result<Block, FountainError> {
+    ) -> Result<Block<Tx>, FountainError> {
         assert_eq!(view.view_n, self.view_n, "view_n mismatch");
         let message_stream = adapter.proposal_chunks_stream(FLAT_COMMITTEE, view).await;
-        fountain.decode(message_stream).await.map(Block::from_bytes)
+        fountain.decode(message_stream).await.and_then(|b| {
+            deserializer(&b)
+                .deserialize::<Block<Tx>>()
+                .map_err(|e| FountainError::from(e.to_string().as_str()))
+        })
     }
 
     async fn broadcast_block(
         &self,
         view: &View,
-        block: Block,
+        block: Block<Tx>,
         adapter: &Network,
         fountain: &Fountain,
     ) {
@@ -93,7 +104,7 @@ impl<Network: NetworkAdapter + Sync, Fountain: FountainCode + Sync> Overlay<Netw
     async fn approve_and_forward(
         &self,
         view: &View,
-        block: &Block,
+        block: &Block<Tx>,
         adapter: &Network,
         _next_view: &View,
     ) -> Result<(), Box<dyn Error>> {
@@ -120,7 +131,6 @@ impl<Network: NetworkAdapter + Sync, Fountain: FountainCode + Sync> Overlay<Netw
         // block is approved by a share of the nodes
         let mut approvals = HashSet::new();
         let mut stream = Box::into_pin(adapter.approvals_stream(FLAT_COMMITTEE, view).await);
-
         // Shadow the original binding so that it can't be directly accessed
         // ever again.
         while let Some(approval) = stream.next().await {
@@ -131,6 +141,7 @@ impl<Network: NetworkAdapter + Sync, Fountain: FountainCode + Sync> Overlay<Netw
             let threshold =
                 (self.threshold.num * view.staking_keys.len() as u64 + self.threshold.den - 1)
                     / self.threshold.den;
+
             if approvals.len() as u64 >= threshold {
                 // consensus reached
                 // FIXME: build a real QC
