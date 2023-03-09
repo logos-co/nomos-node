@@ -1,9 +1,11 @@
 // std
 // crates
 use futures::{Stream, StreamExt};
+use serde::{Deserialize, Serialize};
 // internal
 use crate::vote::Tally;
 
+#[derive(Serialize, Deserialize)]
 pub enum MockVote {
     Yes { view: u64 },
     No { view: u64 },
@@ -25,11 +27,12 @@ pub enum QC {
 
 pub struct Error(String);
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct MockTallySettings {
-    threshold: usize,
+    pub threshold: usize,
 }
 
+#[derive(Debug)]
 pub struct MockTally {
     threshold: usize,
 }
