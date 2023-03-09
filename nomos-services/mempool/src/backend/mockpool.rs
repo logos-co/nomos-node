@@ -86,12 +86,13 @@ where
         block_entry.append(&mut txs_in_block);
     }
 
-    fn block_transactions(&self, block: BlockId) -> Box<dyn Iterator<Item = Self::Tx> + Send> {
-        let empty = Vec::new();
-        match self.in_block_txs.get(&block) {
-            Some(txs) => Box::new(txs.clone().into_iter()),
-            None => Box::new(empty.into_iter()),
-        }
+    fn block_transactions(
+        &self,
+        block: BlockId,
+    ) -> Option<Box<dyn Iterator<Item = Self::Tx> + Send>> {
+        self.in_block_txs.get(&block).map(|txs| {
+            Box::new(txs.clone().into_iter()) as Box<dyn Iterator<Item = Self::Tx> + Send>
+        })
     }
 
     fn prune(&mut self, txs: &[Self::Id]) {

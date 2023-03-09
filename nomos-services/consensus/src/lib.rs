@@ -164,9 +164,10 @@ where
                 .await
             {
                 Ok((block, view)) => {
-                    // resolved block, mark as verified and possibly update the tip
+                    // TODO: resolved block, mark as verified and possibly update the tip
                     // not sure what mark as verified means, e.g. if we want an event subscription
                     // system for this to be used for example by the ledger, storage and mempool
+
                     mempool_relay
                         .send(nomos_mempool::MempoolMsg::MarkInBlock {
                             ids: block.transactions().iter().map(P::Id::from).collect(),
@@ -208,7 +209,7 @@ impl View {
         adapter: &A,
         fountain: &F,
         leadership: &Leadership<O::Tx, Id>,
-    ) -> Result<(Block<O::Tx>, View), overwatch_rs::DynError>
+    ) -> Result<(Block<O::Tx>, View), Box<dyn std::error::Error + Send + Sync + 'static>>
     where
         A: NetworkAdapter + Send + Sync + 'static,
         F: FountainCode,

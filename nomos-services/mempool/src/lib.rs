@@ -51,7 +51,7 @@ pub enum MempoolMsg<Tx, Id> {
     },
     BlockTransaction {
         block: BlockId,
-        reply_channel: Sender<Box<dyn Iterator<Item = Tx> + Send>>,
+        reply_channel: Sender<Option<Box<dyn Iterator<Item = Tx> + Send>>>,
     },
     MarkInBlock {
         ids: Vec<Id>,

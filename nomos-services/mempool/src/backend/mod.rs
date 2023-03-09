@@ -33,7 +33,10 @@ pub trait MemPool {
     fn mark_in_block(&mut self, txs: &[Self::Id], block: BlockHeader);
 
     /// Returns all of the transactions for the block
-    fn block_transactions(&self, block: BlockId) -> Box<dyn Iterator<Item = Self::Tx> + Send>;
+    fn block_transactions(
+        &self,
+        block: BlockId,
+    ) -> Option<Box<dyn Iterator<Item = Self::Tx> + Send>>;
 
     /// Signal that a set of transactions can't be possibly requested anymore and can be
     /// discarded.

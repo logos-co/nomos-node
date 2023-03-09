@@ -2,7 +2,7 @@
 use std::marker::PhantomData;
 // crates
 // internal
-use nomos_core::crypto::PrivateKey;
+use nomos_core::{block::BlockHeader, crypto::PrivateKey};
 use nomos_mempool::MempoolMsg;
 
 use super::*;
@@ -17,7 +17,7 @@ pub struct Leadership<Tx, Id> {
     mempool: OutboundRelay<MempoolMsg<Tx, Id>>,
 }
 
-pub enum LeadershipResult<'view, Tx: serde::de::DeserializeOwned> {
+pub enum LeadershipResult<'view, Tx> {
     Leader {
         block: Block<Tx>,
         _view: PhantomData<&'view u8>,
@@ -42,18 +42,20 @@ impl<Tx: serde::de::DeserializeOwned, Id> Leadership<Tx, Id> {
         tip: &Tip,
         qc: Approval,
     ) -> LeadershipResult<'view, Tx> {
-        let ancestor_hint = todo!("get the ancestor from the tip");
+        // TODO: get the correct ancestor for the tip
+        // let ancestor_hint = todo!("get the ancestor from the tip");
+        let ancestor_hint = [0; 32];
         if view.is_leader(self.key.key) {
             let (tx, rx) = tokio::sync::oneshot::channel();
             self.mempool.send(MempoolMsg::View {
                 ancestor_hint,
                 reply_channel: tx,
             });
-            let _iter = rx.await;
+            let iter = rx.await;
 
             LeadershipResult::Leader {
                 _view: PhantomData,
-                block: todo!("form a block from the returned iterator"),
+                block: Block::<Tx>::new(BlockHeader::default(), iter.unwrap()),
             }
         } else {
             LeadershipResult::NotLeader { _view: PhantomData }
