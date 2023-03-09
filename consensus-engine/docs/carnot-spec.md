@@ -316,13 +316,13 @@ Func receive(newView) {
         receive(block)
     }
 
-    # Q: this was update_high_qc_and_view(new_view.high_qc, Null)
-    update_high_qc(new_view.high_qc)
-
     # It's an old message. Ignore it.
     if newView.view < current_view {
         return 
     }
+
+    # Q: this was update_high_qc_and_view(new_view.high_qc, Null)
+    update_high_qc(new_view.high_qc)
 
     if member_of_internal_com() {
         collection[newView.view].append(newView)
