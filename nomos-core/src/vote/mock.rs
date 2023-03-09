@@ -5,8 +5,17 @@ use futures::{Stream, StreamExt};
 use crate::vote::Tally;
 
 pub enum MockVote {
-    Yes,
-    No,
+    Yes { view: u64 },
+    No { view: u64 },
+}
+
+impl MockVote {
+    pub fn view(&self) -> u64 {
+        match self {
+            MockVote::Yes { view } => *view,
+            MockVote::No { view } => *view,
+        }
+    }
 }
 
 pub enum QC {
@@ -39,15 +48,19 @@ impl Tally for MockTally {
 
     async fn tally<S: Stream<Item = Self::Vote> + Unpin + Send>(
         &self,
+        view: u64,
         mut vote_stream: S,
     ) -> Result<Self::Outcome, Self::TallyError> {
         let mut yes = 0;
         let mut no = 0;
         // TODO: use a timeout
         while let Some(vote) = vote_stream.next().await {
+            if vote.view() != view {
+                return Err(Error("Invalid vote".into()));
+            }
             match vote {
-                MockVote::Yes => yes += 1,
-                MockVote::No => no += 1,
+                MockVote::Yes { .. } => yes += 1,
+                MockVote::No { .. } => no += 1,
             }
         }
         if yes > self.threshold {

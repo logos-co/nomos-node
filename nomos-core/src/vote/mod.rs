@@ -1,3 +1,4 @@
+pub mod carnot;
 pub mod mock;
 
 use futures::Stream;
@@ -11,6 +12,7 @@ pub trait Tally {
     fn new(settings: Self::Settings) -> Self;
     async fn tally<S: Stream<Item = Self::Vote> + Unpin + Send>(
         &self,
+        view: u64,
         vote_stream: S,
     ) -> Result<Self::Outcome, Self::TallyError>;
 }

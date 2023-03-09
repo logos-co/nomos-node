@@ -114,7 +114,7 @@ where
 
         // Shadow the original binding so that it can't be directly accessed
         // ever again.
-        if let Ok(qc) = tally.tally(stream).await {
+        if let Ok(qc) = tally.tally(view.view_n, stream).await {
             qc
         } else {
             unimplemented!("consensus not reached")
