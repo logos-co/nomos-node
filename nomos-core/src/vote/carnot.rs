@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+// TODO: Well, remove this when we actually use the fields from the specification
 // std
 
 // crates
