@@ -23,11 +23,11 @@ pub trait Overlay<Network: NetworkAdapter, Fountain: FountainCode> {
         view: &View,
         adapter: &Network,
         fountain: &Fountain,
-    ) -> Result<Block<Self::Tx>, FountainError>;
+    ) -> Result<Block, FountainError>;
     async fn broadcast_block(
         &self,
         view: &View,
-        block: Block<Self::Tx>,
+        block: Block,
         adapter: &Network,
         fountain: &Fountain,
     );
@@ -37,7 +37,7 @@ pub trait Overlay<Network: NetworkAdapter, Fountain: FountainCode> {
     async fn approve_and_forward(
         &self,
         view: &View,
-        block: &Block<Self::Tx>,
+        block: &Block,
         adapter: &Network,
         next_view: &View,
     ) -> Result<(), Box<dyn Error>>;

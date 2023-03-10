@@ -48,7 +48,7 @@ impl<Tx: serde::de::DeserializeOwned> Flat<Tx> {
         }
     }
 
-    fn approve(&self, _block: &Block<Tx>) -> Approval {
+    fn approve(&self, _block: &Block) -> Approval {
         // we still need to define how votes look like
         Approval
     }
@@ -71,12 +71,12 @@ where
         view: &View,
         adapter: &Network,
         fountain: &Fountain,
-    ) -> Result<Block<Tx>, FountainError> {
+    ) -> Result<Block, FountainError> {
         assert_eq!(view.view_n, self.view_n, "view_n mismatch");
         let message_stream = adapter.proposal_chunks_stream(FLAT_COMMITTEE, view).await;
         fountain.decode(message_stream).await.and_then(|b| {
             deserializer(&b)
-                .deserialize::<Block<Tx>>()
+                .deserialize::<Block>()
                 .map_err(|e| FountainError::from(e.to_string().as_str()))
         })
     }
@@ -84,7 +84,7 @@ where
     async fn broadcast_block(
         &self,
         view: &View,
-        block: Block<Tx>,
+        block: Block,
         adapter: &Network,
         fountain: &Fountain,
     ) {
@@ -104,7 +104,7 @@ where
     async fn approve_and_forward(
         &self,
         view: &View,
-        block: &Block<Tx>,
+        block: &Block,
         adapter: &Network,
         _next_view: &View,
     ) -> Result<(), Box<dyn Error>> {

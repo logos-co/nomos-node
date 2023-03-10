@@ -16,7 +16,7 @@ use std::fmt::Debug;
 // internal
 use crate::network::NetworkAdapter;
 use leadership::{Leadership, LeadershipResult};
-use nomos_core::block::Block;
+use nomos_core::block::{Block, TxHash};
 use nomos_core::crypto::PublicKey;
 use nomos_core::fountain::FountainCode;
 use nomos_core::staking::Stake;
@@ -107,7 +107,8 @@ where
     P: MemPool + Send + Sync + 'static,
     P::Settings: Send + Sync + 'static,
     P::Tx: Debug + Clone + serde::de::DeserializeOwned + Send + Sync + 'static,
-    P::Id: Debug + for<'a> From<&'a P::Tx> + Send + Sync + 'static,
+    for<'t> &'t P::Tx: Into<TxHash>,
+    P::Id: Debug + for<'a> From<&'a TxHash> + Send + Sync + 'static,
     M: MempoolAdapter<Tx = P::Tx> + Send + Sync + 'static,
     O: Overlay<A, F, Tx = P::Tx> + Send + Sync + 'static,
 {
@@ -147,7 +148,7 @@ where
 
         let fountain = F::new(fountain_settings);
 
-        let leadership = Leadership::new(private_key, mempool_relay.clone());
+        let leadership = Leadership::<P::Tx, P::Id>::new(private_key, mempool_relay.clone());
         // FIXME: this should be taken from config
         let mut cur_view = View {
             seed: [0; 32],
@@ -170,7 +171,7 @@ where
 
                     mempool_relay
                         .send(nomos_mempool::MempoolMsg::MarkInBlock {
-                            ids: block.transactions().iter().map(P::Id::from).collect(),
+                            ids: block.transactions().map(P::Id::from).collect(),
                             block: block.header(),
                         })
                         .await
@@ -209,11 +210,12 @@ impl View {
         adapter: &A,
         fountain: &F,
         leadership: &Leadership<O::Tx, Id>,
-    ) -> Result<(Block<O::Tx>, View), Box<dyn std::error::Error + Send + Sync + 'static>>
+    ) -> Result<(Block, View), Box<dyn std::error::Error + Send + Sync + 'static>>
     where
         A: NetworkAdapter + Send + Sync + 'static,
         F: FountainCode,
         O: Overlay<A, F>,
+        for<'t> &'t O::Tx: Into<TxHash>,
     {
         let res = if self.is_leader(node_id) {
             let block = self
@@ -244,11 +246,12 @@ impl View {
         adapter: &A,
         fountain: &F,
         leadership: &Leadership<O::Tx, Id>,
-    ) -> Result<Block<O::Tx>, ()>
+    ) -> Result<Block, ()>
     where
         A: NetworkAdapter + Send + Sync + 'static,
         F: FountainCode,
         O: Overlay<A, F>,
+        for<'t> &'t O::Tx: Into<TxHash>,
     {
         let overlay = O::new(self, node_id);
 
@@ -270,7 +273,7 @@ impl View {
         node_id: NodeId,
         adapter: &A,
         fountain: &F,
-    ) -> Result<(Block<O::Tx>, View), ()>
+    ) -> Result<(Block, View), ()>
     where
         A: NetworkAdapter + Send + Sync + 'static,
         F: FountainCode,
@@ -314,12 +317,12 @@ impl View {
     }
 
     // Verifies the block is new and the previous leader did not fail
-    fn pipelined_safe_block<Tx: serde::de::DeserializeOwned>(&self, _: &Block<Tx>) -> bool {
+    fn pipelined_safe_block(&self, _: &Block) -> bool {
         // return b.view_n >= self.view_n && b.view_n == b.qc.view_n
         true
     }
 
-    fn generate_next_view<Tx: serde::de::DeserializeOwned>(&self, _b: &Block<Tx>) -> View {
+    fn generate_next_view(&self, _b: &Block) -> View {
         let mut seed = self.seed;
         seed[0] += 1;
         View {

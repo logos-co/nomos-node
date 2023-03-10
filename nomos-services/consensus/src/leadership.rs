@@ -2,6 +2,7 @@
 use std::marker::PhantomData;
 // crates
 // internal
+use nomos_core::block::TxHash;
 use nomos_core::{block::BlockHeader, crypto::PrivateKey};
 use nomos_mempool::MempoolMsg;
 
@@ -17,9 +18,9 @@ pub struct Leadership<Tx, Id> {
     mempool: OutboundRelay<MempoolMsg<Tx, Id>>,
 }
 
-pub enum LeadershipResult<'view, Tx> {
+pub enum LeadershipResult<'view> {
     Leader {
-        block: Block<Tx>,
+        block: Block,
         _view: PhantomData<&'view u8>,
     },
     NotLeader {
@@ -27,7 +28,10 @@ pub enum LeadershipResult<'view, Tx> {
     },
 }
 
-impl<Tx: serde::de::DeserializeOwned, Id> Leadership<Tx, Id> {
+impl<Tx, Id> Leadership<Tx, Id>
+where
+    for<'t> &'t Tx: Into<TxHash>, // TODO: we should probably abstract this away but for now the constrain may do
+{
     pub fn new(key: PrivateKey, mempool: OutboundRelay<MempoolMsg<Tx, Id>>) -> Self {
         Self {
             key: Enclave { key },
@@ -41,7 +45,7 @@ impl<Tx: serde::de::DeserializeOwned, Id> Leadership<Tx, Id> {
         view: &'view View,
         tip: &Tip,
         qc: Approval,
-    ) -> LeadershipResult<'view, Tx> {
+    ) -> LeadershipResult<'view> {
         // TODO: get the correct ancestor for the tip
         // let ancestor_hint = todo!("get the ancestor from the tip");
         let ancestor_hint = [0; 32];
@@ -51,11 +55,11 @@ impl<Tx: serde::de::DeserializeOwned, Id> Leadership<Tx, Id> {
                 ancestor_hint,
                 reply_channel: tx,
             });
-            let iter = rx.await;
+            let iter = rx.await.unwrap();
 
             LeadershipResult::Leader {
                 _view: PhantomData,
-                block: Block::<Tx>::new(BlockHeader::default(), iter.unwrap()),
+                block: Block::new(BlockHeader::default(), iter.map(|ref tx| tx.into())),
             }
         } else {
             LeadershipResult::NotLeader { _view: PhantomData }
