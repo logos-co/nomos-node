@@ -14,7 +14,7 @@ pub struct ConsensusRunner<N> {
 }
 
 #[allow(dead_code)]
-#[derive(Debug)]
+#[derive(Debug, serde::Serialize)]
 pub struct Report {
     round_time: Duration,
 }

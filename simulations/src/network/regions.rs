@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 // internal
 use crate::{network::behaviour::NetworkBehaviour, node::NodeId};
 
-#[derive(Copy, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub enum Region {
     NorthAmerica,
     Europe,
@@ -15,7 +15,7 @@ pub enum Region {
     Australia,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct RegionsData {
     pub regions: HashMap<Region, Vec<NodeId>>,
     #[serde(skip)]
