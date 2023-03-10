@@ -1,14 +1,17 @@
+use std::collections::HashSet;
 // std
 // crates
 use bytes::Bytes;
 use serde::{Deserialize, Serialize};
 // internal
 
+pub type TxHash = [u8; 32];
+
 /// A block
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct Block<Tx> {
+pub struct Block {
     header: BlockHeader,
-    transactions: Vec<Tx>,
+    transactions: HashSet<TxHash>,
 }
 
 /// A block header
@@ -20,8 +23,8 @@ pub struct BlockHeader {
 /// Identifier of a block
 pub type BlockId = [u8; 32];
 
-impl<Tx: serde::de::DeserializeOwned> Block<Tx> {
-    pub fn new(header: BlockHeader, txs: impl Iterator<Item = Tx>) -> Self {
+impl Block {
+    pub fn new(header: BlockHeader, txs: impl Iterator<Item = TxHash>) -> Self {
         Self {
             header,
             transactions: txs.collect(),
@@ -37,8 +40,8 @@ impl<Tx: serde::de::DeserializeOwned> Block<Tx> {
         self.header
     }
 
-    pub fn transactions(&self) -> &[Tx] {
-        &self.transactions
+    pub fn transactions(&self) -> impl Iterator<Item = &TxHash> + '_ {
+        self.transactions.iter()
     }
 }
 
