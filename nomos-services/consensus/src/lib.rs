@@ -110,7 +110,7 @@ where
     for<'t> &'t P::Tx: Into<TxHash>,
     P::Id: Debug + for<'a> From<&'a TxHash> + Send + Sync + 'static,
     M: MempoolAdapter<Tx = P::Tx> + Send + Sync + 'static,
-    O: Overlay<A, F, Tx = P::Tx> + Send + Sync + 'static,
+    O: Overlay<A, F> + Send + Sync + 'static,
 {
     fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, overwatch_rs::DynError> {
         let network_relay = service_state.overwatch_handle.relay();
@@ -161,7 +161,13 @@ where
 
             // FIXME: this should probably have a timer to detect failed rounds
             match cur_view
-                .resolve::<A, O, _, _>(private_key, &tip, &network_adapter, &fountain, &leadership)
+                .resolve::<A, O, _, _, _>(
+                    private_key,
+                    &tip,
+                    &network_adapter,
+                    &fountain,
+                    &leadership,
+                )
                 .await
             {
                 Ok((block, view)) => {
@@ -203,23 +209,23 @@ pub struct View {
 
 impl View {
     // TODO: might want to encode steps in the type system
-    pub async fn resolve<'view, A, O, F, Id>(
+    pub async fn resolve<'view, A, O, F, Tx, Id>(
         &'view self,
         node_id: NodeId,
         tip: &Tip,
         adapter: &A,
         fountain: &F,
-        leadership: &Leadership<O::Tx, Id>,
+        leadership: &Leadership<Tx, Id>,
     ) -> Result<(Block, View), Box<dyn std::error::Error + Send + Sync + 'static>>
     where
         A: NetworkAdapter + Send + Sync + 'static,
         F: FountainCode,
         O: Overlay<A, F>,
-        for<'t> &'t O::Tx: Into<TxHash>,
+        for<'t> &'t Tx: Into<TxHash>,
     {
         let res = if self.is_leader(node_id) {
             let block = self
-                .resolve_leader::<A, O, F, _>(node_id, tip, adapter, fountain, leadership)
+                .resolve_leader::<A, O, F, _, _>(node_id, tip, adapter, fountain, leadership)
                 .await
                 .unwrap(); // FIXME: handle sad path
             let next_view = self.generate_next_view(&block);
@@ -239,19 +245,19 @@ impl View {
         Ok(res)
     }
 
-    async fn resolve_leader<'view, A, O, F, Id>(
+    async fn resolve_leader<'view, A, O, F, Tx, Id>(
         &'view self,
         node_id: NodeId,
         tip: &Tip,
         adapter: &A,
         fountain: &F,
-        leadership: &Leadership<O::Tx, Id>,
+        leadership: &Leadership<Tx, Id>,
     ) -> Result<Block, ()>
     where
         A: NetworkAdapter + Send + Sync + 'static,
         F: FountainCode,
         O: Overlay<A, F>,
-        for<'t> &'t O::Tx: Into<TxHash>,
+        for<'t> &'t Tx: Into<TxHash>,
     {
         let overlay = O::new(self, node_id);
 

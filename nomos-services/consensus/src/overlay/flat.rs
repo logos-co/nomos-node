@@ -30,21 +30,19 @@ impl Threshold {
 /// As far as the API is concerned, this should be equivalent to any other
 /// overlay and far simpler to implement.
 /// For this reason, this might act as a 'reference' overlay for testing.
-pub struct Flat<Tx> {
+pub struct Flat {
     // TODO: this should be a const param, but we can't do that yet
     threshold: Threshold,
     node_id: NodeId,
     view_n: u64,
-    _tx: std::marker::PhantomData<Tx>,
 }
 
-impl<Tx: serde::de::DeserializeOwned> Flat<Tx> {
+impl Flat {
     pub fn new(view_n: u64, node_id: NodeId) -> Self {
         Self {
             threshold: DEFAULT_THRESHOLD,
             node_id,
             view_n,
-            _tx: std::marker::PhantomData,
         }
     }
 
@@ -55,13 +53,9 @@ impl<Tx: serde::de::DeserializeOwned> Flat<Tx> {
 }
 
 #[async_trait::async_trait]
-impl<Network: NetworkAdapter + Sync, Fountain: FountainCode + Sync, Tx> Overlay<Network, Fountain>
-    for Flat<Tx>
-where
-    Tx: serde::de::DeserializeOwned + Clone + Send + Sync + 'static,
+impl<Network: NetworkAdapter + Sync, Fountain: FountainCode + Sync> Overlay<Network, Fountain>
+    for Flat
 {
-    type Tx = Tx;
-
     fn new(view: &View, node: NodeId) -> Self {
         Flat::new(view.view_n, node)
     }
