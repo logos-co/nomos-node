@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 
+use rand::seq::IteratorRandom;
+
 use crate::node::NodeId;
 
 use super::{Committee, Layout, Overlay};
@@ -66,11 +68,11 @@ impl Overlay for TreeOverlay {
     fn leaders<R: rand::Rng>(
         &self,
         nodes: &[NodeId],
-        _size: usize,
-        _rng: &mut R,
+        size: usize,
+        rng: &mut R,
     ) -> Box<dyn Iterator<Item = NodeId>> {
-        // Assuming a first node is always a leader.
-        Box::new(nodes.first().copied().into_iter())
+        let leaders = nodes.iter().copied().choose_multiple(rng, size).into_iter();
+        Box::new(leaders)
     }
 
     fn layout<R: rand::Rng>(&self, _nodes: &[NodeId], _rng: &mut R) -> Layout {
@@ -78,8 +80,9 @@ impl Overlay for TreeOverlay {
     }
 }
 
+// Depth including the root node.
 fn committee_count(depth: usize) -> usize {
-    ((2u32.pow(depth as u32 + 1) - 1) / 2) as usize
+    (2u32.pow(depth as u32) - 1) as usize
 }
 
 fn get_parent_id(id: usize) -> usize {
@@ -91,28 +94,63 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_build_full_binary_tree_depth_1() {
-        let settings = TreeSettings {
+    fn build_full_depth_1() {
+        let layout = TreeOverlay::build_full_binary_tree(&TreeSettings {
             tree_type: TreeType::FullBinaryTree,
             depth: 1,
             committee_size: 1,
-        };
-        let layout = TreeOverlay::build_full_binary_tree(&settings);
+        });
         assert_eq!(layout.committees.len(), 1);
-        assert_eq!(layout.children.len(), 1);
+        assert!(layout.children.is_empty());
         assert!(layout.parent.is_empty());
     }
 
     #[test]
-    fn test_build_full_binary_tree_depth_2() {
-        let settings = TreeSettings {
+    fn build_full_depth_3() {
+        let layout = TreeOverlay::build_full_binary_tree(&TreeSettings {
             tree_type: TreeType::FullBinaryTree,
-            depth: 2,
+            depth: 3,
             committee_size: 1,
-        };
-        let layout = TreeOverlay::build_full_binary_tree(&settings);
+        });
         assert_eq!(layout.children[&0], vec![1, 2]);
         assert_eq!(layout.parent[&1], 0);
         assert_eq!(layout.parent[&2], 0);
+
+        assert_eq!(layout.children[&1], vec![3, 4]);
+        assert_eq!(layout.children[&2], vec![5, 6]);
+
+        assert_eq!(layout.parent[&3], 1);
+        assert_eq!(layout.children.get(&3), None);
+
+        assert_eq!(layout.parent[&4], 1);
+        assert_eq!(layout.children.get(&4), None);
+
+        assert_eq!(layout.parent[&5], 2);
+        assert_eq!(layout.children.get(&5), None);
+
+        assert_eq!(layout.parent[&6], 2);
+        assert_eq!(layout.children.get(&6), None);
+    }
+
+    #[test]
+    fn build_full_committee_size() {
+        let layout = TreeOverlay::build_full_binary_tree(&TreeSettings {
+            tree_type: TreeType::FullBinaryTree,
+            depth: 10,
+            committee_size: 10,
+        });
+
+        // 2^(h) - 1
+        assert_eq!(layout.committees.len(), 1023);
+
+        let root_nodes = &layout.committees[&0];
+        assert_eq!(root_nodes.len(), 10);
+        assert_eq!(root_nodes.first(), Some(&0));
+        assert_eq!(root_nodes.last(), Some(&9));
+
+        let last_nodes = &layout.committees[&1022];
+        assert_eq!(last_nodes.len(), 10);
+        assert_eq!(last_nodes.first(), Some(&10220));
+        assert_eq!(last_nodes.last(), Some(&10229));
     }
 }
