@@ -7,9 +7,11 @@ use bytes::Bytes;
 use futures::Stream;
 use nomos_core::fountain::FountainError;
 use nomos_core::fountain::{mock::MockFountain, FountainCode};
+use nomos_core::vote::mock::{MockTally, MockTallySettings, QC};
 use nomos_network::backends::NetworkBackend;
 use nomos_network::NetworkService;
 use overwatch_rs::services::relay::*;
+use serde::de::DeserializeOwned;
 use tokio::sync::broadcast::Receiver;
 
 struct DummyOverlay;
@@ -17,7 +19,7 @@ struct DummyAdapter;
 struct DummyBackend;
 
 #[async_trait]
-impl<N: NetworkAdapter + Sync, F: FountainCode + Sync> Overlay<N, F> for DummyOverlay {
+impl<N: NetworkAdapter + Sync, F: FountainCode + Sync> Overlay<N, F, MockTally> for DummyOverlay {
     fn new(_: &View, _: NodeId) -> Self {
         DummyOverlay
     }
@@ -38,13 +40,14 @@ impl<N: NetworkAdapter + Sync, F: FountainCode + Sync> Overlay<N, F> for DummyOv
         _view: &View,
         _block: &Block,
         _adapter: &N,
+        _vote_tally: &MockTally,
         _next_view: &View,
     ) -> Result<(), Box<dyn Error>> {
         Ok(())
     }
 
-    async fn build_qc(&self, _view: &View, _: &N) -> Approval {
-        Approval
+    async fn build_qc(&self, _view: &View, _adapter: &N, _vote_tally: &MockTally) -> QC {
+        QC::Approved(0, 0)
     }
 }
 
@@ -66,14 +69,21 @@ impl NetworkAdapter for DummyAdapter {
     async fn broadcast_block_chunk(&self, _: Committee, _: &View, _: ProposalChunkMsg) {
         unimplemented!()
     }
-    async fn votes_stream(
+    async fn votes_stream<Vote: DeserializeOwned>(
         &self,
-        _: Committee,
-        _: &View,
-    ) -> Box<dyn Stream<Item = Approval> + Send> {
+        _committee: Committee,
+        _view: &View,
+    ) -> Box<dyn Stream<Item = Vote> + Send> {
         unimplemented!()
     }
-    async fn forward_approval(&self, _: Committee, _: &View, _: ApprovalMsg) {}
+    async fn forward_approval<Vote: Serialize + Send>(
+        &self,
+        _committee: Committee,
+        _view: &View,
+        _approval: ApprovalMsg<Vote>,
+    ) {
+        unimplemented!()
+    }
 }
 
 #[async_trait]
@@ -100,11 +110,13 @@ async fn test_single_round_non_leader() {
         staking_keys: BTreeMap::new(),
         view_n: 0,
     };
+    let mock_tally = MockTally::new(MockTallySettings { threshold: 0 });
     let (_, next_view) = view
-        .resolve_non_leader::<DummyAdapter, DummyOverlay, MockFountain>(
+        .resolve_non_leader::<DummyAdapter, DummyOverlay, MockFountain, MockTally>(
             [0; 32],
             &DummyAdapter,
             &MockFountain,
+            &mock_tally,
         )
         .await
         .unwrap();
