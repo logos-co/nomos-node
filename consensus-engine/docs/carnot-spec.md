@@ -1,6 +1,7 @@
 # Carnot Specification
 This is the pseudocode specification of the Carnot consensus algorithm.
 In this specification we will omit any cryptographic material, block validity and proof checks. A real implementation is expected to check those before hitting this code.
+In addition, all types can be expected to have their invariants checked by the type contract, e.g. in an instance of type `Qc::Aggregate` the `high_qc` field is always the most recent qc among the aggregate qcs and the code can skip this check.
 
 'Q:' is used to indicate unresolved questions.
 Notation is loosely based on CDDL.
@@ -45,9 +46,9 @@ Q: there can only be one block on which consensus in achieved for a view, so may
 view: View
 high_qc: Qc
 ```
-`high_qc` is `Qc` for the most recent view among the aggregated ones. The rest of the qcs are ignored in the rest of this algorithm.
+`high_qc` is `Qc` for the most recent view among the aggregated ones. The rest of the qcs are ignored in the rest of this algorithm. 
 
-We assume there is a  `block` function available that returns the block for the Qc. In case of a standard qc, this is trivially qc.block, while for aggregate it can be obtained by recusively accessing `high_qc` until a standard qc is found.
+We assume there is a  `block` function available that returns the block for the Qc. In case of a standard qc, this is trivially qc.block, while for aggregate it can be obtained by accessing `high_qc`. `high_qc` is guaranteed to be a 'Standard' qc.
 
 
 ##### Id
@@ -125,7 +126,7 @@ Func receive_block(block):
     }
 
     if safe_block(block){
-        # Q: This is not in the original spec, but 
+        # This is not in the original spec, but 
         # let's validate I have this clear.
         assert block.view = current_view
 
@@ -152,7 +153,6 @@ Func safeBlock(block){
     match block.qc {
         Standard => {
             # Previous leader did not fail and its proposal was certified
-            # Q: not a fan of the comment above
             if block.qc.view <= latest_committed_view {
                 return false;
             }
@@ -172,9 +172,8 @@ Func safeBlock(block){
             }
 
             return block.view >= curView
-                AND extends(block, block.aggQC.high_qc.block)
-            # Q: is block.aggQc.high_qc.block the same as block.parent()?
-            # This would suggest this check is redundant
+            # we ensure by construction this extends the block in
+            # high_qc since that is by definition the parent of this block
         }
     }
 
@@ -210,9 +209,7 @@ Func update_high_qc(qc){
         }
         # Unhappy case
         Agregate => {
-            # Q: TODO revisit when highQc.block is clear
             if qc.high_qc.view != local_high_qc.view {
-                # release the lock and adopt the global lock (?)
                 local_high_qc = qc.high_qc
                 # Q: same thing about missing views
             }
@@ -229,10 +226,6 @@ Func receive_vote(vote){
     if vote.block is missing { 
         let block = download(vote.block)
         receive(block)
-    }
-    # Q: What's this condition for?
-    if vote.view < current_view - 1 { 
-        return
     }
 
     # Q: we should probably return if we already received this vote
@@ -295,6 +288,10 @@ Func receive_vote(vote){
     }
 
     if self = leader(view) {
+        if vote.view < current_view - 1 { 
+            return
+        }
+
         # Q: No filtering? I can just create a key and  vote?
         collection[vote.block].append(vote)
         if supermajority(collection[vote.block]){
@@ -344,3 +341,6 @@ Func timeout(){
     unimplemented
 }
 ```     
+
+
+We need to make sure that qcs can't be removed from aggQc when going up the tree
