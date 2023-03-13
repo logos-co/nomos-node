@@ -25,12 +25,12 @@ impl ProposalChunkMsg {
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct ApprovalMsg<Vote> {
+pub struct VoteMsg<Vote> {
     pub source: NodeId,
-    pub approval: Vote,
+    pub vote: Vote,
 }
 
-impl<Vote> ApprovalMsg<Vote>
+impl<Vote> VoteMsg<Vote>
 where
     Vote: Serialize,
 {
@@ -39,7 +39,7 @@ where
     }
 }
 
-impl<Vote> ApprovalMsg<Vote>
+impl<Vote> VoteMsg<Vote>
 where
     Vote: DeserializeOwned,
 {

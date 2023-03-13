@@ -80,7 +80,7 @@ impl NetworkAdapter for DummyAdapter {
         &self,
         _committee: Committee,
         _view: &View,
-        _approval: ApprovalMsg<Vote>,
+        _approval: VoteMsg<Vote>,
     ) {
         unimplemented!()
     }

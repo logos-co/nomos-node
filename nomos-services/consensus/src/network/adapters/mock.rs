@@ -13,7 +13,7 @@ use tokio_stream::{wrappers::BroadcastStream, Stream};
 
 use crate::{
     network::{
-        messages::{ApprovalMsg, ProposalChunkMsg},
+        messages::{ProposalChunkMsg, VoteMsg},
         NetworkAdapter,
     },
     overlay::committees::Committee,
@@ -134,7 +134,7 @@ impl NetworkAdapter for MockAdapter {
                                 == message.content_topic().content_topic_name
                             {
                                 let payload = message.payload();
-                                Some(ApprovalMsg::from_bytes(payload.as_bytes()).approval)
+                                Some(VoteMsg::from_bytes(payload.as_bytes()).vote)
                             } else {
                                 None
                             }
@@ -150,7 +150,7 @@ impl NetworkAdapter for MockAdapter {
         &self,
         _committee: Committee,
         _view: &View,
-        approval_message: ApprovalMsg<Vote>,
+        approval_message: VoteMsg<Vote>,
     ) where
         Vote: Send,
     {

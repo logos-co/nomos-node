@@ -6,7 +6,7 @@ use bytes::Bytes;
 // crates
 use futures::Stream;
 // internal
-use crate::network::messages::{ApprovalMsg, ProposalChunkMsg};
+use crate::network::messages::{ProposalChunkMsg, VoteMsg};
 use crate::overlay::committees::Committee;
 use crate::View;
 use nomos_network::backends::NetworkBackend;
@@ -42,6 +42,6 @@ pub trait NetworkAdapter {
         &self,
         committee: Committee,
         view: &View,
-        approval: ApprovalMsg<Vote>,
+        approval: VoteMsg<Vote>,
     );
 }

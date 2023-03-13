@@ -6,7 +6,7 @@ use serde::de::DeserializeOwned;
 use serde::Serialize;
 // internal
 use super::*;
-use crate::network::messages::{ApprovalMsg, ProposalChunkMsg};
+use crate::network::messages::{ProposalChunkMsg, VoteMsg};
 use crate::network::NetworkAdapter;
 use crate::overlay::committees::Committee;
 
@@ -91,8 +91,8 @@ where
             .forward_approval(
                 FLAT_COMMITTEE,
                 view,
-                ApprovalMsg {
-                    approval,
+                VoteMsg {
+                    vote: approval,
                     source: self.node_id,
                 },
             )

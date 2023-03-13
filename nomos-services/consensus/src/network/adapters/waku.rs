@@ -6,7 +6,7 @@ use futures::{Stream, StreamExt};
 use tokio_stream::wrappers::BroadcastStream;
 // internal
 use crate::network::{
-    messages::{ApprovalMsg, ProposalChunkMsg},
+    messages::{ProposalChunkMsg, VoteMsg},
     NetworkAdapter,
 };
 use crate::overlay::committees::Committee;
@@ -174,7 +174,7 @@ impl NetworkAdapter for WakuAdapter {
                 .await
                 .map(|message| {
                     let payload = message.payload();
-                    ApprovalMsg::from_bytes(payload).approval
+                    VoteMsg::from_bytes(payload).vote
                 }),
         ))
     }
@@ -183,7 +183,7 @@ impl NetworkAdapter for WakuAdapter {
         &self,
         committee: Committee,
         view: &View,
-        approval_message: ApprovalMsg<Vote>,
+        approval_message: VoteMsg<Vote>,
     ) {
         let content_topic = approval_topic(committee, view);
 
