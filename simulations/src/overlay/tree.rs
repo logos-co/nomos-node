@@ -37,17 +37,15 @@ impl TreeOverlay {
             let right_child_id = left_child_id + 1;
 
             // Check for leaf nodes.
-            if left_child_id > committee_count {
-                continue;
+            if right_child_id <= committee_count {
+                children.insert(committee_id, vec![left_child_id, right_child_id]);
             }
-
-            children.insert(committee_id, vec![left_child_id, right_child_id]);
 
             // Root node has no parent.
-            if committee_id < 1 {
-                continue;
+            if committee_id > 0 {
+                let parent_id = get_parent_id(committee_id);
+                parents.insert(committee_id, parent_id);
             }
-            parents.insert(committee_id, get_parent_id(committee_id, committee_count));
         }
 
         Layout::new(committees, parents, children)
@@ -84,8 +82,8 @@ fn committee_count(depth: usize) -> usize {
     ((2u32.pow(depth as u32 + 1) - 1) / 2) as usize
 }
 
-fn get_parent_id(id: usize, node_count: usize) -> usize {
-    node_count - (node_count - id - 1 + id % 2) / 2
+fn get_parent_id(id: usize) -> usize {
+    (id - 1 + id % 2) / 2
 }
 
 #[cfg(test)]
@@ -109,7 +107,7 @@ mod tests {
     fn test_build_full_binary_tree_depth_2() {
         let settings = TreeSettings {
             tree_type: TreeType::FullBinaryTree,
-            depth: 3,
+            depth: 2,
             committee_size: 1,
         };
         let layout = TreeOverlay::build_full_binary_tree(&settings);
