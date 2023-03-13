@@ -1,4 +1,5 @@
 pub mod flat;
+pub mod tree;
 
 // std
 use std::collections::{BTreeSet, HashMap};
@@ -10,7 +11,7 @@ use crate::node::{CommitteeId, NodeId};
 pub type Committee = BTreeSet<NodeId>;
 pub type Leaders = BTreeSet<NodeId>;
 
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
 pub struct Layout {
     pub committees: HashMap<CommitteeId, Committee>,
     pub from_committee: HashMap<NodeId, CommitteeId>,
