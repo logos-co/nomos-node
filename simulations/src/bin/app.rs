@@ -1,3 +1,5 @@
+use std::{path::PathBuf, str::FromStr};
+
 use clap::Parser;
 use rand::thread_rng;
 use serde::{Deserialize, Serialize};
@@ -17,40 +19,65 @@ use simulations::{
 struct Args {
     /// Path for a yaml-encoded network config file
     config: std::path::PathBuf,
-    #[arg(long, default_value_t = String::from("flat"))]
-    overlay_type: String,
-    #[arg(long, default_value_t = String::from("carnot"))]
-    node_type: String,
+    #[arg(long, default_value_t = OverlayType::Flat)]
+    overlay_type: OverlayType,
+    #[arg(long, default_value_t = NodeType::Carnot)]
+    node_type: NodeType,
+    #[arg(short, long, default_value_t = OutputType::StdOut)]
+    output: OutputType,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(clap::ValueEnum, Debug, Copy, Clone, Serialize, Deserialize)]
 enum OverlayType {
     Flat,
 }
 
-impl TryFrom<&str> for OverlayType {
-    type Error = String;
-
-    fn try_from(value: &str) -> Result<Self, Self::Error> {
-        match value {
-            "flat" => Ok(Self::Flat),
-            _ => Err(format!("Unknown overlay type: {}", value)),
+impl core::fmt::Display for OverlayType {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Self::Flat => write!(f, "flat"),
         }
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(clap::ValueEnum, Debug, Copy, Clone, Serialize, Deserialize)]
 enum NodeType {
     Carnot,
 }
 
-impl TryFrom<&str> for NodeType {
-    type Error = String;
+impl core::fmt::Display for NodeType {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Self::Carnot => write!(f, "carnot"),
+        }
+    }
+}
 
-    fn try_from(value: &str) -> Result<Self, Self::Error> {
-        match value {
-            "carnot" => Ok(Self::Carnot),
-            _ => Err(format!("Unknown overlay type: {}", value)),
+#[derive(Debug, Clone, Serialize, Deserialize)]
+enum OutputType {
+    File(PathBuf),
+    StdOut,
+    StdErr,
+}
+
+impl core::fmt::Display for OutputType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            OutputType::File(path) => write!(f, "{}", path.display()),
+            OutputType::StdOut => write!(f, "stdout"),
+            OutputType::StdErr => write!(f, "stderr"),
+        }
+    }
+}
+
+impl FromStr for OutputType {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "stdout" => Ok(Self::StdOut),
+            "stderr" => Ok(Self::StdErr),
+            path => Ok(Self::File(PathBuf::from(path))),
         }
     }
 }
@@ -60,15 +87,15 @@ pub fn main() -> Result<(), Box<dyn std::error::Error>> {
         config,
         overlay_type,
         node_type,
+        output,
     } = Args::parse();
-    let overlay_type = OverlayType::try_from(overlay_type.as_str())?;
-    let node_type = NodeType::try_from(node_type.as_str())?;
 
     let report = match (overlay_type, node_type) {
         (OverlayType::Flat, NodeType::Carnot) => {
             let cfg = serde_json::from_reader::<_, Config<CarnotNode, FlatOverlay>>(
                 std::fs::File::open(config)?,
             )?;
+            #[allow(clippy::unit_arg)]
             let overlay = FlatOverlay::new(cfg.overlay_settings);
             let node_ids = (0..cfg.node_count).collect::<Vec<_>>();
             let mut rng = thread_rng();
@@ -94,6 +121,20 @@ pub fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     };
 
-    println!("{:?}", report);
+    let json = serde_json::to_string_pretty(&report)?;
+    match output {
+        OutputType::File(f) => {
+            use std::{fs::OpenOptions, io::Write};
+
+            let mut file = OpenOptions::new()
+                .write(true)
+                .create(true)
+                .truncate(true)
+                .open(f)?;
+            file.write_all(json.as_bytes())?;
+        }
+        OutputType::StdOut => println!("{}", json),
+        OutputType::StdErr => eprintln!("{}", json),
+    }
     Ok(())
 }
