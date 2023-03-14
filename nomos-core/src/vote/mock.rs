@@ -51,7 +51,6 @@ impl Tally for MockTally {
         mut vote_stream: S,
     ) -> Result<Self::Outcome, Self::TallyError> {
         let mut count_votes = 0;
-        // TODO: use a timeout
         while let Some(vote) = vote_stream.next().await {
             if vote.view() != view {
                 return Err(Error("Invalid vote".into()));
