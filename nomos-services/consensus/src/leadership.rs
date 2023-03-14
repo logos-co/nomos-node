@@ -1,5 +1,4 @@
 // std
-use std::hash::Hash;
 use std::marker::PhantomData;
 // crates
 // internal

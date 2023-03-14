@@ -13,7 +13,7 @@ pub struct MockTransaction {
 
 impl MockTransaction {
     pub fn new(content: MockMessage) -> Self {
-        let id = MockTxId::from(&content);
+        let id = MockTxId::from(content.clone());
         Self { id, content }
     }
 
@@ -22,13 +22,10 @@ impl MockTransaction {
     }
 }
 
-impl From<&nomos_network::backends::mock::MockMessage> for MockTransaction {
-    fn from(msg: &nomos_network::backends::mock::MockMessage) -> Self {
-        let id = MockTxId::from(msg);
-        Self {
-            id,
-            content: msg.clone(),
-        }
+impl From<nomos_network::backends::mock::MockMessage> for MockTransaction {
+    fn from(msg: nomos_network::backends::mock::MockMessage) -> Self {
+        let id = MockTxId::from(msg.clone());
+        Self { id, content: msg }
     }
 }
 
@@ -63,10 +60,10 @@ impl MockTxId {
     }
 }
 
-impl From<&nomos_network::backends::mock::MockMessage> for MockTxId {
-    fn from(msg: &nomos_network::backends::mock::MockMessage) -> Self {
+impl From<nomos_network::backends::mock::MockMessage> for MockTxId {
+    fn from(msg: nomos_network::backends::mock::MockMessage) -> Self {
         let mut hasher = Blake2bVar::new(32).unwrap();
-        hasher.update(&serialize(msg).unwrap());
+        hasher.update(&serialize(&msg).unwrap());
         let mut id = [0u8; 32];
         hasher.finalize_variable(&mut id).unwrap();
         Self(id)
