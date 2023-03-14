@@ -41,11 +41,11 @@ where
     }
 
     #[allow(unused, clippy::diverging_sub_expression)]
-    pub async fn try_propose_block<'view>(
+    pub async fn try_propose_block<'view, Qc>(
         &self,
         view: &'view View,
         tip: &Tip,
-        qc: Approval,
+        qc: Qc,
     ) -> LeadershipResult<'view, Id> {
         // TODO: get the correct ancestor for the tip
         // let ancestor_hint = todo!("get the ancestor from the tip");

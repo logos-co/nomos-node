@@ -10,10 +10,11 @@ use crate::network::NetworkAdapter;
 pub use committees::Member;
 use nomos_core::block::Block;
 use nomos_core::fountain::{FountainCode, FountainError};
+use nomos_core::vote::Tally;
 
 /// Dissemination overlay, tied to a specific view
 #[async_trait::async_trait]
-pub trait Overlay<Network: NetworkAdapter, Fountain: FountainCode> {
+pub trait Overlay<Network: NetworkAdapter, Fountain: FountainCode, VoteTally: Tally> {
     type TxId: serde::de::DeserializeOwned + Clone + Eq + core::hash::Hash + Send + Sync + 'static;
 
     fn new(view: &View, node: NodeId) -> Self;
@@ -39,8 +40,14 @@ pub trait Overlay<Network: NetworkAdapter, Fountain: FountainCode> {
         view: &View,
         block: &Block<Self::TxId>,
         adapter: &Network,
+        vote_tally: &VoteTally,
         next_view: &View,
     ) -> Result<(), Box<dyn Error>>;
     /// Wait for consensus on a block
-    async fn build_qc(&self, view: &View, adapter: &Network) -> Approval;
+    async fn build_qc(
+        &self,
+        view: &View,
+        adapter: &Network,
+        vote_tally: &VoteTally,
+    ) -> VoteTally::Outcome;
 }

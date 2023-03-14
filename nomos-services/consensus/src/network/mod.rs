@@ -6,13 +6,15 @@ use bytes::Bytes;
 // crates
 use futures::Stream;
 // internal
-use crate::network::messages::{ApprovalMsg, ProposalChunkMsg};
+use crate::network::messages::{ProposalChunkMsg, VoteMsg};
 use crate::overlay::committees::Committee;
-use crate::{Approval, View};
+use crate::View;
 use nomos_network::backends::NetworkBackend;
 use nomos_network::NetworkService;
 use overwatch_rs::services::relay::OutboundRelay;
 use overwatch_rs::services::ServiceData;
+use serde::de::DeserializeOwned;
+use serde::Serialize;
 
 #[async_trait::async_trait]
 pub trait NetworkAdapter {
@@ -31,10 +33,15 @@ pub trait NetworkAdapter {
         view: &View,
         chunk_msg: ProposalChunkMsg,
     );
-    async fn approvals_stream(
+    async fn votes_stream<Vote: DeserializeOwned>(
         &self,
         committee: Committee,
         view: &View,
-    ) -> Box<dyn Stream<Item = Approval> + Send>;
-    async fn forward_approval(&self, committee: Committee, view: &View, approval: ApprovalMsg);
+    ) -> Box<dyn Stream<Item = Vote> + Send>;
+    async fn forward_approval<Vote: Serialize + Send>(
+        &self,
+        committee: Committee,
+        view: &View,
+        approval: VoteMsg<Vote>,
+    );
 }

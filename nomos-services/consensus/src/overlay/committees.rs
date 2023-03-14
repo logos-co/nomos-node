@@ -117,10 +117,12 @@ impl<TxId: Eq + Hash, const C: usize> Member<TxId, C> {
 }
 
 #[async_trait::async_trait]
-impl<Network, Fountain, TxId, const C: usize> Overlay<Network, Fountain> for Member<TxId, C>
+impl<Network, Fountain, VoteTally, TxId, const C: usize> Overlay<Network, Fountain, VoteTally>
+    for Member<TxId, C>
 where
     Network: NetworkAdapter + Sync,
     Fountain: FountainCode + Sync,
+    VoteTally: Tally + Sync,
     TxId: serde::de::DeserializeOwned + Eq + Hash + Clone + Send + Sync + 'static,
 {
     type TxId = TxId;
@@ -180,6 +182,7 @@ where
         view: &View,
         _block: &Block<Self::TxId>,
         _adapter: &Network,
+        _tally: &VoteTally,
         _next_view: &View,
     ) -> Result<(), Box<dyn Error>> {
         assert_eq!(view.view_n, self.view_n, "view_n mismatch");
@@ -193,7 +196,12 @@ where
         todo!()
     }
 
-    async fn build_qc(&self, view: &View, _adapter: &Network) -> Approval {
+    async fn build_qc(
+        &self,
+        view: &View,
+        _adapter: &Network,
+        _tally: &VoteTally,
+    ) -> VoteTally::Outcome {
         assert_eq!(view.view_n, self.view_n, "view_n mismatch");
         // maybe the leader publishing the QC?
         todo!()
