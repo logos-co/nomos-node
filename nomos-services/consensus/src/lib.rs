@@ -12,6 +12,7 @@ mod tip;
 // std
 use std::collections::BTreeMap;
 use std::fmt::Debug;
+use std::hash::Hash;
 // crates
 // internal
 use crate::network::NetworkAdapter;
@@ -108,9 +109,17 @@ where
     P::Settings: Send + Sync + 'static,
     P::Tx: Debug + Clone + serde::de::DeserializeOwned + Send + Sync + 'static,
     for<'t> &'t P::Tx: Into<TxHash>,
-    P::Id: Debug + for<'a> From<&'a TxHash> + Send + Sync + 'static,
+    P::Id: Debug
+        + Clone
+        + serde::de::DeserializeOwned
+        + for<'a> From<&'a P::Tx>
+        + Eq
+        + Hash
+        + Send
+        + Sync
+        + 'static,
     M: MempoolAdapter<Tx = P::Tx> + Send + Sync + 'static,
-    O: Overlay<A, F> + Send + Sync + 'static,
+    O: Overlay<A, F, TxId = P::Id> + Send + Sync + 'static,
 {
     fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, overwatch_rs::DynError> {
         let network_relay = service_state.overwatch_handle.relay();
@@ -161,13 +170,7 @@ where
 
             // FIXME: this should probably have a timer to detect failed rounds
             match cur_view
-                .resolve::<A, O, _, _, _>(
-                    private_key,
-                    &tip,
-                    &network_adapter,
-                    &fountain,
-                    &leadership,
-                )
+                .resolve::<A, O, _, _>(private_key, &tip, &network_adapter, &fountain, &leadership)
                 .await
             {
                 Ok((block, view)) => {
@@ -177,7 +180,7 @@ where
 
                     mempool_relay
                         .send(nomos_mempool::MempoolMsg::MarkInBlock {
-                            ids: block.transactions().map(P::Id::from).collect(),
+                            ids: block.transactions().cloned().collect(),
                             block: block.header(),
                         })
                         .await
@@ -209,23 +212,23 @@ pub struct View {
 
 impl View {
     // TODO: might want to encode steps in the type system
-    pub async fn resolve<'view, A, O, F, Tx, Id>(
+    pub async fn resolve<'view, A, O, F, Tx>(
         &'view self,
         node_id: NodeId,
         tip: &Tip,
         adapter: &A,
         fountain: &F,
-        leadership: &Leadership<Tx, Id>,
-    ) -> Result<(Block, View), Box<dyn std::error::Error + Send + Sync + 'static>>
+        leadership: &Leadership<Tx, O::TxId>,
+    ) -> Result<(Block<O::TxId>, View), Box<dyn std::error::Error + Send + Sync + 'static>>
     where
         A: NetworkAdapter + Send + Sync + 'static,
         F: FountainCode,
         O: Overlay<A, F>,
-        for<'t> &'t Tx: Into<TxHash>,
+        for<'t> &'t Tx: Into<O::TxId>,
     {
         let res = if self.is_leader(node_id) {
             let block = self
-                .resolve_leader::<A, O, F, _, _>(node_id, tip, adapter, fountain, leadership)
+                .resolve_leader::<A, O, F, _>(node_id, tip, adapter, fountain, leadership)
                 .await
                 .unwrap(); // FIXME: handle sad path
             let next_view = self.generate_next_view(&block);
@@ -245,19 +248,19 @@ impl View {
         Ok(res)
     }
 
-    async fn resolve_leader<'view, A, O, F, Tx, Id>(
+    async fn resolve_leader<'view, A, O, F, Tx>(
         &'view self,
         node_id: NodeId,
         tip: &Tip,
         adapter: &A,
         fountain: &F,
-        leadership: &Leadership<Tx, Id>,
-    ) -> Result<Block, ()>
+        leadership: &Leadership<Tx, O::TxId>,
+    ) -> Result<Block<O::TxId>, ()>
     where
         A: NetworkAdapter + Send + Sync + 'static,
         F: FountainCode,
         O: Overlay<A, F>,
-        for<'t> &'t Tx: Into<TxHash>,
+        for<'t> &'t Tx: Into<O::TxId>,
     {
         let overlay = O::new(self, node_id);
 
@@ -279,7 +282,7 @@ impl View {
         node_id: NodeId,
         adapter: &A,
         fountain: &F,
-    ) -> Result<(Block, View), ()>
+    ) -> Result<(Block<O::TxId>, View), ()>
     where
         A: NetworkAdapter + Send + Sync + 'static,
         F: FountainCode,
@@ -323,12 +326,12 @@ impl View {
     }
 
     // Verifies the block is new and the previous leader did not fail
-    fn pipelined_safe_block(&self, _: &Block) -> bool {
+    fn pipelined_safe_block<TxId: Eq + Hash>(&self, _: &Block<TxId>) -> bool {
         // return b.view_n >= self.view_n && b.view_n == b.qc.view_n
         true
     }
 
-    fn generate_next_view(&self, _b: &Block) -> View {
+    fn generate_next_view<TxId: Eq + Hash>(&self, _b: &Block<TxId>) -> View {
         let mut seed = self.seed;
         seed[0] += 1;
         View {

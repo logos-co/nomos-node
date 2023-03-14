@@ -1,6 +1,7 @@
 use std::collections::HashSet;
 // std
 use std::error::Error;
+use std::hash::Hash;
 // crates
 use futures::StreamExt;
 // internal
@@ -30,32 +31,39 @@ impl Threshold {
 /// As far as the API is concerned, this should be equivalent to any other
 /// overlay and far simpler to implement.
 /// For this reason, this might act as a 'reference' overlay for testing.
-pub struct Flat {
+pub struct Flat<TxId> {
     // TODO: this should be a const param, but we can't do that yet
     threshold: Threshold,
     node_id: NodeId,
     view_n: u64,
+    _marker: std::marker::PhantomData<TxId>,
 }
 
-impl Flat {
+impl<TxId: Eq + Hash> Flat<TxId> {
     pub fn new(view_n: u64, node_id: NodeId) -> Self {
         Self {
             threshold: DEFAULT_THRESHOLD,
             node_id,
             view_n,
+            _marker: std::marker::PhantomData,
         }
     }
 
-    fn approve(&self, _block: &Block) -> Approval {
+    fn approve(&self, _block: &Block<TxId>) -> Approval {
         // we still need to define how votes look like
         Approval
     }
 }
 
 #[async_trait::async_trait]
-impl<Network: NetworkAdapter + Sync, Fountain: FountainCode + Sync> Overlay<Network, Fountain>
-    for Flat
+impl<Network, Fountain, TxId> Overlay<Network, Fountain> for Flat<TxId>
+where
+    TxId: serde::de::DeserializeOwned + Clone + Eq + Hash + Send + Sync + 'static,
+    Network: NetworkAdapter + Sync,
+    Fountain: FountainCode + Sync,
 {
+    type TxId = TxId;
+
     fn new(view: &View, node: NodeId) -> Self {
         Flat::new(view.view_n, node)
     }
@@ -65,12 +73,12 @@ impl<Network: NetworkAdapter + Sync, Fountain: FountainCode + Sync> Overlay<Netw
         view: &View,
         adapter: &Network,
         fountain: &Fountain,
-    ) -> Result<Block, FountainError> {
+    ) -> Result<Block<Self::TxId>, FountainError> {
         assert_eq!(view.view_n, self.view_n, "view_n mismatch");
         let message_stream = adapter.proposal_chunks_stream(FLAT_COMMITTEE, view).await;
         fountain.decode(message_stream).await.and_then(|b| {
             deserializer(&b)
-                .deserialize::<Block>()
+                .deserialize::<Block<Self::TxId>>()
                 .map_err(|e| FountainError::from(e.to_string().as_str()))
         })
     }
@@ -78,7 +86,7 @@ impl<Network: NetworkAdapter + Sync, Fountain: FountainCode + Sync> Overlay<Netw
     async fn broadcast_block(
         &self,
         view: &View,
-        block: Block,
+        block: Block<Self::TxId>,
         adapter: &Network,
         fountain: &Fountain,
     ) {
@@ -98,7 +106,7 @@ impl<Network: NetworkAdapter + Sync, Fountain: FountainCode + Sync> Overlay<Netw
     async fn approve_and_forward(
         &self,
         view: &View,
-        block: &Block,
+        block: &Block<Self::TxId>,
         adapter: &Network,
         _next_view: &View,
     ) -> Result<(), Box<dyn Error>> {

@@ -1,8 +1,8 @@
 // std
+use std::hash::Hash;
 use std::marker::PhantomData;
 // crates
 // internal
-use nomos_core::block::TxHash;
 use nomos_core::{block::BlockHeader, crypto::PrivateKey};
 use nomos_mempool::MempoolMsg;
 
@@ -18,9 +18,9 @@ pub struct Leadership<Tx, Id> {
     mempool: OutboundRelay<MempoolMsg<Tx, Id>>,
 }
 
-pub enum LeadershipResult<'view> {
+pub enum LeadershipResult<'view, TxId: Eq + core::hash::Hash> {
     Leader {
-        block: Block,
+        block: Block<TxId>,
         _view: PhantomData<&'view u8>,
     },
     NotLeader {
@@ -30,7 +30,8 @@ pub enum LeadershipResult<'view> {
 
 impl<Tx, Id> Leadership<Tx, Id>
 where
-    for<'t> &'t Tx: Into<TxHash>, // TODO: we should probably abstract this away but for now the constrain may do
+    Id: serde::de::DeserializeOwned + Clone + Eq + Hash + Send + Sync + 'static,
+    for<'t> &'t Tx: Into<Id>, // TODO: we should probably abstract this away but for now the constrain may do
 {
     pub fn new(key: PrivateKey, mempool: OutboundRelay<MempoolMsg<Tx, Id>>) -> Self {
         Self {
@@ -45,7 +46,7 @@ where
         view: &'view View,
         tip: &Tip,
         qc: Approval,
-    ) -> LeadershipResult<'view> {
+    ) -> LeadershipResult<'view, Id> {
         // TODO: get the correct ancestor for the tip
         // let ancestor_hint = todo!("get the ancestor from the tip");
         let ancestor_hint = [0; 32];

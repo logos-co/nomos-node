@@ -14,6 +14,8 @@ use nomos_core::fountain::{FountainCode, FountainError};
 /// Dissemination overlay, tied to a specific view
 #[async_trait::async_trait]
 pub trait Overlay<Network: NetworkAdapter, Fountain: FountainCode> {
+    type TxId: serde::de::DeserializeOwned + Clone + Eq + core::hash::Hash + Send + Sync + 'static;
+
     fn new(view: &View, node: NodeId) -> Self;
 
     async fn reconstruct_proposal_block(
@@ -21,11 +23,11 @@ pub trait Overlay<Network: NetworkAdapter, Fountain: FountainCode> {
         view: &View,
         adapter: &Network,
         fountain: &Fountain,
-    ) -> Result<Block, FountainError>;
+    ) -> Result<Block<Self::TxId>, FountainError>;
     async fn broadcast_block(
         &self,
         view: &View,
-        block: Block,
+        block: Block<Self::TxId>,
         adapter: &Network,
         fountain: &Fountain,
     );
@@ -35,7 +37,7 @@ pub trait Overlay<Network: NetworkAdapter, Fountain: FountainCode> {
     async fn approve_and_forward(
         &self,
         view: &View,
-        block: &Block,
+        block: &Block<Self::TxId>,
         adapter: &Network,
         next_view: &View,
     ) -> Result<(), Box<dyn Error>>;

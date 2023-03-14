@@ -1,5 +1,6 @@
-use std::collections::HashSet;
+use indexmap::IndexSet;
 // std
+use core::hash::Hash;
 // crates
 use bytes::Bytes;
 use serde::{Deserialize, Serialize};
@@ -9,9 +10,9 @@ pub type TxHash = [u8; 32];
 
 /// A block
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct Block {
+pub struct Block<TxId: Eq + Hash> {
     header: BlockHeader,
-    transactions: HashSet<TxHash>,
+    transactions: IndexSet<TxId>,
 }
 
 /// A block header
@@ -23,8 +24,8 @@ pub struct BlockHeader {
 /// Identifier of a block
 pub type BlockId = [u8; 32];
 
-impl Block {
-    pub fn new(header: BlockHeader, txs: impl Iterator<Item = TxHash>) -> Self {
+impl<TxId: Eq + Hash> Block<TxId> {
+    pub fn new(header: BlockHeader, txs: impl Iterator<Item = TxId>) -> Self {
         Self {
             header,
             transactions: txs.collect(),
@@ -40,7 +41,7 @@ impl Block {
         self.header
     }
 
-    pub fn transactions(&self) -> impl Iterator<Item = &TxHash> + '_ {
+    pub fn transactions(&self) -> impl Iterator<Item = &TxId> + '_ {
         self.transactions.iter()
     }
 }
