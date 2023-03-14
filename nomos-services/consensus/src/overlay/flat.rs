@@ -1,5 +1,6 @@
 // std
 use std::error::Error;
+use std::hash::Hash;
 // crates
 use futures::StreamExt;
 use serde::de::DeserializeOwned;
@@ -9,6 +10,7 @@ use super::*;
 use crate::network::messages::{ProposalChunkMsg, VoteMsg};
 use crate::network::NetworkAdapter;
 use crate::overlay::committees::Committee;
+use nomos_core::wire::deserializer;
 
 const FLAT_COMMITTEE: Committee = Committee::root();
 
@@ -16,31 +18,39 @@ const FLAT_COMMITTEE: Committee = Committee::root();
 /// As far as the API is concerned, this should be equivalent to any other
 /// overlay and far simpler to implement.
 /// For this reason, this might act as a 'reference' overlay for testing.
-pub struct Flat {
+pub struct Flat<TxId> {
     // TODO: this should be a const param, but we can't do that yet
     node_id: NodeId,
     view_n: u64,
+    _marker: std::marker::PhantomData<TxId>,
 }
 
-impl Flat {
+impl<TxId: Eq + Hash> Flat<TxId> {
     pub fn new(view_n: u64, node_id: NodeId) -> Self {
-        Self { node_id, view_n }
+        Self {
+            node_id,
+            view_n,
+            _marker: Default::default(),
+        }
     }
 
-    fn approve(&self, _block: &Block) -> Approval {
+    fn approve(&self, _block: &Block<TxId>) -> Approval {
         // we still need to define how votes look like
-        todo!()
+        Approval
     }
 }
 
 #[async_trait::async_trait]
-impl<Network, Fountain, VoteTally> Overlay<Network, Fountain, VoteTally> for Flat
+impl<Network, Fountain, VoteTally, TxId> Overlay<Network, Fountain, VoteTally> for Flat<TxId>
 where
+    TxId: serde::de::DeserializeOwned + Clone + Eq + Hash + Send + Sync + 'static,
     Network: NetworkAdapter + Sync,
     Fountain: FountainCode + Sync,
     VoteTally: Tally + Sync,
     VoteTally::Vote: Serialize + DeserializeOwned + Send,
 {
+    type TxId = TxId;
+
     fn new(view: &View, node: NodeId) -> Self {
         Flat::new(view.view_n, node)
     }
@@ -50,16 +60,20 @@ where
         view: &View,
         adapter: &Network,
         fountain: &Fountain,
-    ) -> Result<Block, FountainError> {
+    ) -> Result<Block<Self::TxId>, FountainError> {
         assert_eq!(view.view_n, self.view_n, "view_n mismatch");
         let message_stream = adapter.proposal_chunks_stream(FLAT_COMMITTEE, view).await;
-        fountain.decode(message_stream).await.map(Block::from_bytes)
+        fountain.decode(message_stream).await.and_then(|b| {
+            deserializer(&b)
+                .deserialize::<Block<Self::TxId>>()
+                .map_err(|e| FountainError::from(e.to_string().as_str()))
+        })
     }
 
     async fn broadcast_block(
         &self,
         view: &View,
-        block: Block,
+        block: Block<Self::TxId>,
         adapter: &Network,
         fountain: &Fountain,
     ) {
@@ -79,7 +93,7 @@ where
     async fn approve_and_forward(
         &self,
         view: &View,
-        block: &Block,
+        block: &Block<Self::TxId>,
         adapter: &Network,
         _tally: &VoteTally,
         _next_view: &View,

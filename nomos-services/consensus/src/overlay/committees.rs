@@ -1,6 +1,8 @@
 // std
+use std::hash::Hash;
 // crates
 use futures::StreamExt;
+use nomos_core::wire::deserializer;
 use rand::{seq::SliceRandom, SeedableRng};
 // internal
 use super::*;
@@ -8,38 +10,44 @@ use crate::network::messages::ProposalChunkMsg;
 use crate::network::NetworkAdapter;
 
 /// View of the tree overlay centered around a specific member
-pub struct Member<const C: usize> {
+pub struct Member<TxId: Eq + Hash, const C: usize> {
     // id is not used now, but gonna probably used it for later checking later on
     #[allow(dead_code)]
     id: NodeId,
     committee: Committee,
-    committees: Committees<C>,
+    committees: Committees<TxId, C>,
     view_n: u64,
+    _marker: std::marker::PhantomData<TxId>,
 }
 
 /// #Just a newtype index to be able to implement parent/children methods
 #[derive(Copy, Clone)]
 pub struct Committee(usize);
 
-pub struct Committees<const C: usize> {
+pub struct Committees<TxId: Eq + Hash, const C: usize> {
     nodes: Box<[NodeId]>,
+    _marker: std::marker::PhantomData<TxId>,
 }
 
-impl<const C: usize> Committees<C> {
+impl<TxId: Eq + Hash, const C: usize> Committees<TxId, C> {
     pub fn new(view: &View) -> Self {
         let mut nodes = view.staking_keys.keys().cloned().collect::<Box<[NodeId]>>();
         let mut rng = rand_chacha::ChaCha20Rng::from_seed(view.seed);
         nodes.shuffle(&mut rng);
-        Self { nodes }
+        Self {
+            nodes,
+            _marker: std::marker::PhantomData,
+        }
     }
 
-    pub fn into_member(self, id: NodeId, view: &View) -> Option<Member<C>> {
+    pub fn into_member(self, id: NodeId, view: &View) -> Option<Member<TxId, C>> {
         let member_idx = self.nodes.iter().position(|m| m == &id)?;
         Some(Member {
             committee: Committee(member_idx / C),
             committees: self,
             id,
             view_n: view.view_n,
+            _marker: std::marker::PhantomData,
         })
     }
 
@@ -84,7 +92,7 @@ impl Committee {
     }
 }
 
-impl<const C: usize> Member<C> {
+impl<TxId: Eq + Hash, const C: usize> Member<TxId, C> {
     /// Return other members of this committee
     pub fn peers(&self) -> &[NodeId] {
         self.committees
@@ -109,13 +117,15 @@ impl<const C: usize> Member<C> {
 }
 
 #[async_trait::async_trait]
-impl<
-        Network: NetworkAdapter + Sync,
-        Fountain: FountainCode + Sync,
-        VoteTally: Tally + Sync,
-        const C: usize,
-    > Overlay<Network, Fountain, VoteTally> for Member<C>
+impl<Network, Fountain, VoteTally, TxId, const C: usize> Overlay<Network, Fountain, VoteTally>
+    for Member<TxId, C>
+where
+    Network: NetworkAdapter + Sync,
+    Fountain: FountainCode + Sync,
+    VoteTally: Tally + Sync,
+    TxId: serde::de::DeserializeOwned + Eq + Hash + Clone + Send + Sync + 'static,
 {
+    type TxId = TxId;
     // we still need view here to help us initialize
     fn new(view: &View, node: NodeId) -> Self {
         let committees = Committees::new(view);
@@ -127,17 +137,21 @@ impl<
         view: &View,
         adapter: &Network,
         fountain: &Fountain,
-    ) -> Result<Block, FountainError> {
+    ) -> Result<Block<Self::TxId>, FountainError> {
         assert_eq!(view.view_n, self.view_n, "view_n mismatch");
         let committee = self.committee;
         let message_stream = adapter.proposal_chunks_stream(committee, view).await;
-        fountain.decode(message_stream).await.map(Block::from_bytes)
+        fountain.decode(message_stream).await.and_then(|b| {
+            deserializer(&b)
+                .deserialize::<Block<Self::TxId>>()
+                .map_err(|e| FountainError::from(e.to_string().as_str()))
+        })
     }
 
     async fn broadcast_block(
         &self,
         view: &View,
-        block: Block,
+        block: Block<Self::TxId>,
         adapter: &Network,
         fountain: &Fountain,
     ) {
@@ -166,7 +180,7 @@ impl<
     async fn approve_and_forward(
         &self,
         view: &View,
-        _block: &Block,
+        _block: &Block<Self::TxId>,
         _adapter: &Network,
         _tally: &VoteTally,
         _next_view: &View,

@@ -108,7 +108,7 @@ impl NetworkAdapter for MockAdapter {
             .network_relay
             .send(NetworkMsg::Process(MockBackendMessage::Broadcast {
                 msg: message,
-                topic: MOCK_PUB_SUB_TOPIC,
+                topic: MOCK_PUB_SUB_TOPIC.to_string(),
             }))
             .await
         {
@@ -164,7 +164,7 @@ impl NetworkAdapter for MockAdapter {
             .network_relay
             .send(NetworkMsg::Process(MockBackendMessage::Broadcast {
                 msg: message,
-                topic: MOCK_PUB_SUB_TOPIC,
+                topic: MOCK_PUB_SUB_TOPIC.to_string(),
             }))
             .await
         {

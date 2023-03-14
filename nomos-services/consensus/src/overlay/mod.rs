@@ -15,6 +15,8 @@ use nomos_core::vote::Tally;
 /// Dissemination overlay, tied to a specific view
 #[async_trait::async_trait]
 pub trait Overlay<Network: NetworkAdapter, Fountain: FountainCode, VoteTally: Tally> {
+    type TxId: serde::de::DeserializeOwned + Clone + Eq + core::hash::Hash + Send + Sync + 'static;
+
     fn new(view: &View, node: NodeId) -> Self;
 
     async fn reconstruct_proposal_block(
@@ -22,11 +24,11 @@ pub trait Overlay<Network: NetworkAdapter, Fountain: FountainCode, VoteTally: Ta
         view: &View,
         adapter: &Network,
         fountain: &Fountain,
-    ) -> Result<Block, FountainError>;
+    ) -> Result<Block<Self::TxId>, FountainError>;
     async fn broadcast_block(
         &self,
         view: &View,
-        block: Block,
+        block: Block<Self::TxId>,
         adapter: &Network,
         fountain: &Fountain,
     );
@@ -36,7 +38,7 @@ pub trait Overlay<Network: NetworkAdapter, Fountain: FountainCode, VoteTally: Ta
     async fn approve_and_forward(
         &self,
         view: &View,
-        block: &Block,
+        block: &Block<Self::TxId>,
         adapter: &Network,
         vote_tally: &VoteTally,
         next_view: &View,

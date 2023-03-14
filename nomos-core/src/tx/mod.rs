@@ -1,11 +1,4 @@
+pub mod carnot;
 #[cfg(feature = "mock")]
 pub mod mock;
 mod transaction;
-
-use serde::{Deserialize, Serialize};
-pub use transaction::Transaction;
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub enum Tx {
-    Transfer(Transaction),
-}

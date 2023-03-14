@@ -2,7 +2,7 @@
 use std::marker::PhantomData;
 // crates
 // internal
-use nomos_core::crypto::PrivateKey;
+use nomos_core::{block::BlockHeader, crypto::PrivateKey};
 use nomos_mempool::MempoolMsg;
 
 use super::*;
@@ -17,9 +17,9 @@ pub struct Leadership<Tx, Id> {
     mempool: OutboundRelay<MempoolMsg<Tx, Id>>,
 }
 
-pub enum LeadershipResult<'view> {
+pub enum LeadershipResult<'view, TxId: Eq + core::hash::Hash> {
     Leader {
-        block: Block,
+        block: Block<TxId>,
         _view: PhantomData<&'view u8>,
     },
     NotLeader {
@@ -27,7 +27,11 @@ pub enum LeadershipResult<'view> {
     },
 }
 
-impl<Tx, Id> Leadership<Tx, Id> {
+impl<Tx, Id> Leadership<Tx, Id>
+where
+    Id: Eq + core::hash::Hash,
+    for<'t> &'t Tx: Into<Id>, // TODO: we should probably abstract this away but for now the constrain may do
+{
     pub fn new(key: PrivateKey, mempool: OutboundRelay<MempoolMsg<Tx, Id>>) -> Self {
         Self {
             key: Enclave { key },
@@ -41,19 +45,21 @@ impl<Tx, Id> Leadership<Tx, Id> {
         view: &'view View,
         tip: &Tip,
         qc: Qc,
-    ) -> LeadershipResult<'view> {
-        let ancestor_hint = todo!("get the ancestor from the tip");
+    ) -> LeadershipResult<'view, Id> {
+        // TODO: get the correct ancestor for the tip
+        // let ancestor_hint = todo!("get the ancestor from the tip");
+        let ancestor_hint = [0; 32];
         if view.is_leader(self.key.key) {
             let (tx, rx) = tokio::sync::oneshot::channel();
             self.mempool.send(MempoolMsg::View {
                 ancestor_hint,
                 reply_channel: tx,
             });
-            let _iter = rx.await;
+            let iter = rx.await.unwrap();
 
             LeadershipResult::Leader {
                 _view: PhantomData,
-                block: todo!("form a block from the returned iterator"),
+                block: Block::new(BlockHeader::default(), iter.map(|ref tx| tx.into())),
             }
         } else {
             LeadershipResult::NotLeader { _view: PhantomData }

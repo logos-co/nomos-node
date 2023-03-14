@@ -86,6 +86,16 @@ where
         block_entry.append(&mut txs_in_block);
     }
 
+    #[cfg(test)]
+    fn block_transactions(
+        &self,
+        block: BlockId,
+    ) -> Option<Box<dyn Iterator<Item = Self::Tx> + Send>> {
+        self.in_block_txs.get(&block).map(|txs| {
+            Box::new(txs.clone().into_iter()) as Box<dyn Iterator<Item = Self::Tx> + Send>
+        })
+    }
+
     fn prune(&mut self, txs: &[Self::Id]) {
         for tx_id in txs {
             self.pending_txs.remove(tx_id);

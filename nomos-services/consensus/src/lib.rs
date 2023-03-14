@@ -7,20 +7,18 @@
 mod leadership;
 mod network;
 pub mod overlay;
-#[cfg(test)]
-mod test;
 mod tip;
 
 // std
 use std::collections::BTreeMap;
-use std::error::Error;
 use std::fmt::Debug;
+use std::hash::Hash;
 // crates
 use serde::{Deserialize, Serialize};
 // internal
 use crate::network::NetworkAdapter;
 use leadership::{Leadership, LeadershipResult};
-use nomos_core::block::Block;
+use nomos_core::block::{Block, TxHash};
 use nomos_core::crypto::PublicKey;
 use nomos_core::fountain::FountainCode;
 use nomos_core::staking::Stake;
@@ -42,6 +40,7 @@ pub type NodeId = PublicKey;
 // Random seed for each round provided by the protocol
 pub type Seed = [u8; 32];
 
+#[derive(Debug)]
 pub struct CarnotSettings<Fountain: FountainCode, VoteTally: Tally> {
     private_key: [u8; 32],
     fountain_settings: Fountain::Settings,
@@ -123,10 +122,19 @@ where
     T::Settings: Send + Sync + 'static,
     T::Outcome: Send + Sync,
     P::Settings: Send + Sync + 'static,
-    P::Tx: Debug + Send + Sync + 'static,
-    P::Id: Debug + Send + Sync + 'static,
+    P::Tx: Debug + Clone + serde::de::DeserializeOwned + Send + Sync + 'static,
+    for<'t> &'t P::Tx: Into<TxHash>,
+    P::Id: Debug
+        + Clone
+        + serde::de::DeserializeOwned
+        + for<'a> From<&'a P::Tx>
+        + Eq
+        + Hash
+        + Send
+        + Sync
+        + 'static,
     M: MempoolAdapter<Tx = P::Tx> + Send + Sync + 'static,
-    O: Overlay<A, F, T> + Send + Sync + 'static,
+    O: Overlay<A, F, T, TxId = P::Id> + Send + Sync + 'static,
 {
     fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, overwatch_rs::DynError> {
         let network_relay = service_state.overwatch_handle.relay();
@@ -167,7 +175,7 @@ where
         let fountain = F::new(fountain_settings);
         let tally = T::new(tally_settings);
 
-        let leadership = Leadership::new(private_key, mempool_relay);
+        let leadership = Leadership::<P::Tx, P::Id>::new(private_key, mempool_relay.clone());
         // FIXME: this should be taken from config
         let mut cur_view = View {
             seed: [0; 32],
@@ -180,7 +188,7 @@ where
 
             // FIXME: this should probably have a timer to detect failed rounds
             let res = cur_view
-                .resolve::<A, O, _, _, _, _>(
+                .resolve::<A, O, _, _, _>(
                     private_key,
                     &tip,
                     &network_adapter,
@@ -190,10 +198,22 @@ where
                 )
                 .await;
             match res {
-                Ok((_block, view)) => {
+                Ok((block, view)) => {
                     // resolved block, mark as verified and possibly update the tip
                     // not sure what mark as verified means, e.g. if we want an event subscription
                     // system for this to be used for example by the ledger, storage and mempool
+
+                    mempool_relay
+                        .send(nomos_mempool::MempoolMsg::MarkInBlock {
+                            ids: block.transactions().cloned().collect(),
+                            block: block.header(),
+                        })
+                        .await
+                        .map_err(|(e, _)| {
+                            tracing::error!("Error while sending MarkInBlock message: {}", e);
+                            e
+                        })?;
+
                     cur_view = view;
                 }
                 Err(e) => {
@@ -217,27 +237,26 @@ pub struct View {
 
 impl View {
     // TODO: might want to encode steps in the type system
-    pub async fn resolve<'view, A, O, F, T, Tx, Id>(
+    pub async fn resolve<'view, A, O, F, T, Tx>(
         &'view self,
         node_id: NodeId,
         tip: &Tip,
         adapter: &A,
         fountain: &F,
         tally: &T,
-        leadership: &Leadership<Tx, Id>,
-    ) -> Result<(Block, View), Box<dyn Error>>
+        leadership: &Leadership<Tx, O::TxId>,
+    ) -> Result<(Block<O::TxId>, View), Box<dyn std::error::Error + Send + Sync + 'static>>
     where
         A: NetworkAdapter + Send + Sync + 'static,
         F: FountainCode,
+        for<'t> &'t Tx: Into<O::TxId>,
         T: Tally + Send + Sync + 'static,
         T::Outcome: Send + Sync,
         O: Overlay<A, F, T>,
     {
         let res = if self.is_leader(node_id) {
             let block = self
-                .resolve_leader::<A, O, F, T, _, _>(
-                    node_id, tip, adapter, fountain, tally, leadership,
-                )
+                .resolve_leader::<A, O, F, T, _>(node_id, tip, adapter, fountain, tally, leadership)
                 .await
                 .unwrap(); // FIXME: handle sad path
             let next_view = self.generate_next_view(&block);
@@ -257,20 +276,21 @@ impl View {
         Ok(res)
     }
 
-    async fn resolve_leader<'view, A, O, F, T, Tx, Id>(
+    async fn resolve_leader<'view, A, O, F, T, Tx>(
         &'view self,
         node_id: NodeId,
         tip: &Tip,
         adapter: &A,
         fountain: &F,
         tally: &T,
-        leadership: &Leadership<Tx, Id>,
-    ) -> Result<Block, ()>
+        leadership: &Leadership<Tx, O::TxId>,
+    ) -> Result<Block<O::TxId>, ()>
     where
         A: NetworkAdapter + Send + Sync + 'static,
         F: FountainCode,
         T: Tally + Send + Sync + 'static,
         T::Outcome: Send + Sync,
+        for<'t> &'t Tx: Into<O::TxId>,
         O: Overlay<A, F, T>,
     {
         let overlay = O::new(self, node_id);
@@ -295,7 +315,7 @@ impl View {
         adapter: &A,
         fountain: &F,
         tally: &T,
-    ) -> Result<(Block, View), ()>
+    ) -> Result<(Block<O::TxId>, View), ()>
     where
         A: NetworkAdapter + Send + Sync + 'static,
         F: FountainCode,
@@ -332,7 +352,7 @@ impl View {
     }
 
     pub fn is_leader(&self, _node_id: NodeId) -> bool {
-        false
+        true
     }
 
     pub fn id(&self) -> u64 {
@@ -340,12 +360,12 @@ impl View {
     }
 
     // Verifies the block is new and the previous leader did not fail
-    fn pipelined_safe_block(&self, _: &Block) -> bool {
+    fn pipelined_safe_block<TxId: Eq + Hash>(&self, _: &Block<TxId>) -> bool {
         // return b.view_n >= self.view_n && b.view_n == b.qc.view_n
         true
     }
 
-    fn generate_next_view(&self, _b: &Block) -> View {
+    fn generate_next_view<TxId: Eq + Hash>(&self, _b: &Block<TxId>) -> View {
         let mut seed = self.seed;
         seed[0] += 1;
         View {
