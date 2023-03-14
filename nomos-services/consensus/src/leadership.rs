@@ -30,7 +30,7 @@ pub enum LeadershipResult<'view, TxId: Eq + core::hash::Hash> {
 
 impl<Tx, Id> Leadership<Tx, Id>
 where
-    Id: serde::de::DeserializeOwned + Clone + Eq + Hash + Send + Sync + 'static,
+    Id: Eq + core::hash::Hash,
     for<'t> &'t Tx: Into<Id>, // TODO: we should probably abstract this away but for now the constrain may do
 {
     pub fn new(key: PrivateKey, mempool: OutboundRelay<MempoolMsg<Tx, Id>>) -> Self {
