@@ -86,6 +86,7 @@ where
         block_entry.append(&mut txs_in_block);
     }
 
+    #[cfg(test)]
     fn block_transactions(
         &self,
         block: BlockId,

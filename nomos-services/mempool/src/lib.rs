@@ -49,6 +49,7 @@ pub enum MempoolMsg<Tx, Id> {
     Prune {
         ids: Vec<Id>,
     },
+    #[cfg(test)]
     BlockTransaction {
         block: BlockId,
         reply_channel: Sender<Option<Box<dyn Iterator<Item = Tx> + Send>>>,
@@ -76,6 +77,7 @@ impl<Tx: Debug, Id: Debug> Debug for MempoolMsg<Tx, Id> {
                     "MempoolMsg::MarkInBlock{{ids: {ids:?}, block: {block:?}}}"
                 )
             }
+            #[cfg(test)]
             Self::BlockTransaction { block, .. } => {
                 write!(f, "MempoolMsg::BlockTransaction{{block: {block:?}}}")
             }
@@ -159,6 +161,7 @@ where
                         MempoolMsg::MarkInBlock { ids, block } => {
                             pool.mark_in_block(&ids, block);
                         }
+                        #[cfg(test)]
                         MempoolMsg::BlockTransaction { block, reply_channel } => {
                             reply_channel.send(pool.block_transactions(block)).unwrap_or_else(|_| {
                                 tracing::debug!("could not send back block transactions")
