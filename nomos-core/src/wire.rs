@@ -11,6 +11,7 @@ use bincode::{
     Options,
 };
 use once_cell::sync::Lazy;
+use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 
 pub type Error = bincode::Error;
@@ -103,6 +104,11 @@ pub fn serialize<T: Serialize>(item: &T) -> Result<Vec<u8>, Error> {
     let mut buf = Vec::with_capacity(size as usize);
     serializer(&mut buf).serialize_into(item)?;
     Ok(buf)
+}
+
+/// Deserialize an object directly
+pub fn deserialize<T: DeserializeOwned>(item: &[u8]) -> Result<T, Error> {
+    deserializer(item).deserialize()
 }
 
 #[cfg(test)]
