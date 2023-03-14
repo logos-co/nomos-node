@@ -7,7 +7,7 @@ use bytes::Bytes;
 use futures::Stream;
 use nomos_core::fountain::FountainError;
 use nomos_core::fountain::{mock::MockFountain, FountainCode};
-use nomos_core::vote::mock::{MockTally, MockTallySettings, QC};
+use nomos_core::vote::mock::{MockQc, MockTally, MockTallySettings};
 use nomos_network::backends::NetworkBackend;
 use nomos_network::NetworkService;
 use overwatch_rs::services::relay::*;
@@ -46,8 +46,8 @@ impl<N: NetworkAdapter + Sync, F: FountainCode + Sync> Overlay<N, F, MockTally> 
         Ok(())
     }
 
-    async fn build_qc(&self, _view: &View, _adapter: &N, _vote_tally: &MockTally) -> QC {
-        QC::Approved(0, 0)
+    async fn build_qc(&self, _view: &View, _adapter: &N, _vote_tally: &MockTally) -> MockQc {
+        MockQc::Approved(0, 0)
     }
 }
 
