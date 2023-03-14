@@ -10,7 +10,8 @@ pub type NodeId = usize;
 pub type CommitteeId = usize;
 pub type StepTime = Duration;
 
-pub trait Node {
+pub trait Node: Clone {
+    type Role: std::fmt::Debug;
     type Settings;
     type Step;
     fn new<R: Rng>(rng: &mut R, id: NodeId, settings: Self::Settings) -> Self;

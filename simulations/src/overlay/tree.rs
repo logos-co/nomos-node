@@ -1,10 +1,13 @@
+// std
 use std::collections::HashMap;
-
+// crates
 use rand::seq::IteratorRandom;
-
-use crate::node::NodeId;
-
+// internal
 use super::{Committee, Layout, Overlay};
+use crate::node::{
+    carnot::{CarnotNode, CarnotRole},
+    Node, NodeId,
+};
 
 pub enum TreeType {
     FullBinaryTree,
@@ -16,12 +19,15 @@ pub struct TreeSettings {
     pub depth: usize,
 }
 
-pub struct TreeOverlay {
-    layout: Layout,
+pub struct TreeOverlay<N: Node> {
+    layout: Layout<N>,
 }
 
-impl TreeOverlay {
-    pub fn build_full_binary_tree(settings: &TreeSettings) -> Layout {
+impl<N> TreeOverlay<N>
+where
+    N: Node,
+{
+    pub fn build_full_binary_tree(settings: &TreeSettings) -> Layout<N> {
         let committee_count = committee_count(settings.depth);
         let node_count = committee_count * settings.committee_size;
 
@@ -34,7 +40,13 @@ impl TreeOverlay {
             .chunks(settings.committee_size)
             .enumerate()
         {
-            committees.insert(committee_id, nodes.iter().copied().collect::<Committee>());
+            committees.insert(
+                committee_id,
+                nodes
+                    .iter()
+                    .map(|n| )
+                    .collect::<Committee<N>>(),
+            );
             let left_child_id = 2 * committee_id + 1;
             let right_child_id = left_child_id + 1;
 
@@ -54,7 +66,7 @@ impl TreeOverlay {
     }
 }
 
-impl Overlay for TreeOverlay {
+impl<N: Node> Overlay for TreeOverlay<N> {
     type Settings = TreeSettings;
 
     fn new(settings: Self::Settings) -> Self {
@@ -75,14 +87,15 @@ impl Overlay for TreeOverlay {
         Box::new(leaders)
     }
 
-    fn layout<R: rand::Rng>(&self, _nodes: &[NodeId], _rng: &mut R) -> Layout {
+    fn layout<R: rand::Rng>(&self, _nodes: &[NodeId], _rng: &mut R) -> Layout<CarnotNode> {
         self.layout.clone()
     }
 }
 
-// Depth including the root node.
+/// Returns the number of nodes in the whole tree.
+/// `depth` parameter assumes that roots is included.
 fn committee_count(depth: usize) -> usize {
-    (2u32.pow(depth as u32) - 1) as usize
+    (1 << depth) - 1
 }
 
 fn get_parent_id(id: usize) -> usize {
@@ -140,7 +153,7 @@ mod tests {
             committee_size: 10,
         });
 
-        // 2^(h) - 1
+        // 2^h - 1
         assert_eq!(layout.committees.len(), 1023);
 
         let root_nodes = &layout.committees[&0];

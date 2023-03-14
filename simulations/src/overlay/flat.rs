@@ -4,7 +4,7 @@ use rand::Rng;
 // crates
 // internal
 use super::Overlay;
-use crate::node::NodeId;
+use crate::node::{Node, NodeId};
 use crate::overlay::{Committee, Layout};
 
 pub struct FlatOverlay;
@@ -26,7 +26,7 @@ impl Overlay for FlatOverlay {
         Box::new(leaders)
     }
 
-    fn layout<R: Rng>(&self, nodes: &[NodeId], _rng: &mut R) -> Layout {
+    fn layout<N: Node, R: Rng>(&self, nodes: &[NodeId], _rng: &mut R) -> Layout<N> {
         let committees =
             std::iter::once((0, nodes.iter().copied().collect::<Committee>())).collect();
         let parent = std::iter::once((0, 0)).collect();

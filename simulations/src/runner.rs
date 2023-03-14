@@ -7,9 +7,9 @@ use crate::overlay::Layout;
 use rand::Rng;
 use std::time::Duration;
 
-pub struct ConsensusRunner<N> {
+pub struct ConsensusRunner<N: Node> {
     nodes: Vec<N>,
-    layout: Layout,
+    layout: Layout<N>,
     leaders: Vec<NodeId>,
 }
 
@@ -34,7 +34,7 @@ where
 {
     pub fn new<R: Rng>(
         mut rng: R,
-        layout: Layout,
+        layout: Layout<N>,
         leaders: Vec<NodeId>,
         node_settings: N::Settings,
     ) -> Self {
@@ -81,7 +81,7 @@ where
                                     .get(committee_id)
                                     .unwrap()
                                     .iter()
-                                    .map(|&node| self.nodes[node].run_step(step.clone()))
+                                    .map(|(&node, _)| self.nodes[node].run_step(step.clone()))
                                     .max()
                             })
                             .collect()
@@ -99,7 +99,7 @@ where
                                     .get(committee_id)
                                     .unwrap()
                                     .iter()
-                                    .map(|&node| self.nodes[node].run_step(step.clone()))
+                                    .map(|(&node, _)| self.nodes[node].run_step(step.clone()))
                                     .max()
                             })
                             .collect()
@@ -124,6 +124,7 @@ mod test {
     };
     use crate::node::{NodeId, StepTime};
     use crate::overlay::flat::FlatOverlay;
+    use crate::overlay::tree::{TreeOverlay, TreeSettings, TreeType};
     use crate::overlay::Overlay;
     use crate::runner::{ConsensusRunner, LayoutNodes};
     use rand::rngs::SmallRng;
@@ -208,6 +209,36 @@ mod test {
 
         assert_eq!(
             Duration::from_millis(2200),
+            runner.run(&carnot_steps).round_time
+        );
+    }
+
+    #[test]
+    fn tree_layout_single_step() {
+        let mut rng = SmallRng::seed_from_u64(0);
+        let overlay = TreeOverlay::new(TreeSettings {
+            tree_type: TreeType::FullBinaryTree,
+            committee_size: 10,
+            depth: 10,
+        });
+
+        let mut runner = setup_runner(&mut rng, &overlay);
+
+        let carnot_steps: Vec<_> = CARNOT_LEADER_STEPS
+            .iter()
+            .copied()
+            .map(|step| {
+                (
+                    LayoutNodes::Leader,
+                    step,
+                    Box::new(|times: &[StepTime]| *times.iter().max().unwrap())
+                        as Box<dyn Fn(&[StepTime]) -> StepTime>,
+                )
+            })
+            .collect();
+
+        assert_eq!(
+            Duration::from_millis(1100),
             runner.run(&carnot_steps).round_time
         );
     }
