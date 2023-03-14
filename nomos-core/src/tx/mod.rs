@@ -6,7 +6,6 @@ use bytes::Bytes;
 pub mod carnot;
 #[cfg(feature = "mock")]
 pub mod mock;
-mod transaction;
 
 pub type TransactionHasher<T> = fn(&T) -> <T as Transaction>::Hash;
 
