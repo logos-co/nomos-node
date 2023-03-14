@@ -46,8 +46,9 @@ impl<N: NetworkAdapter + Sync, F: FountainCode + Sync> Overlay<N, F, MockTally> 
         Ok(())
     }
 
-    async fn build_qc(&self, _view: &View, _adapter: &N, _vote_tally: &MockTally) -> MockQc {
-        MockQc::Approved(0, 0)
+    async fn build_qc(&self, view: &View, _adapter: &N, _vote_tally: &MockTally) -> MockQc {
+        // TODO: mock the total votes
+        MockQc::new(0)
     }
 }
 

@@ -33,6 +33,16 @@ pub struct MockTally {
     threshold: usize,
 }
 
+impl MockQc {
+    pub fn new(count_votes: usize) -> Self {
+        Self { count_votes }
+    }
+
+    pub fn votes(&self) -> usize {
+        self.count_votes
+    }
+}
+
 #[async_trait::async_trait]
 impl Tally for MockTally {
     type Vote = MockVote;
