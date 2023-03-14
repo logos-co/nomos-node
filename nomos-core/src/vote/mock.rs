@@ -6,23 +6,19 @@ use serde::{Deserialize, Serialize};
 use crate::vote::Tally;
 
 #[derive(Serialize, Deserialize)]
-pub enum MockVote {
-    Yes { view: u64 },
-    No { view: u64 },
+pub struct MockVote {
+    view: u64,
 }
 
 impl MockVote {
     pub fn view(&self) -> u64 {
-        match self {
-            MockVote::Yes { view } => *view,
-            MockVote::No { view } => *view,
-        }
+        self.view
     }
 }
 
-pub enum QC {
-    Approved(usize, usize),
-    Denied(usize, usize),
+#[allow(dead_code)]
+pub struct MockQc {
+    count_votes: usize,
 }
 
 pub struct Error(String);
@@ -40,7 +36,7 @@ pub struct MockTally {
 #[async_trait::async_trait]
 impl Tally for MockTally {
     type Vote = MockVote;
-    type Outcome = QC;
+    type Outcome = MockQc;
     type TallyError = Error;
     type Settings = MockTallySettings;
 
@@ -54,22 +50,16 @@ impl Tally for MockTally {
         view: u64,
         mut vote_stream: S,
     ) -> Result<Self::Outcome, Self::TallyError> {
-        let mut yes = 0;
-        let mut no = 0;
+        let mut count_votes = 0;
         // TODO: use a timeout
         while let Some(vote) = vote_stream.next().await {
             if vote.view() != view {
                 return Err(Error("Invalid vote".into()));
             }
-            match vote {
-                MockVote::Yes { .. } => yes += 1,
-                MockVote::No { .. } => no += 1,
-            }
+            count_votes += 1;
         }
-        if yes > self.threshold {
-            Ok(QC::Approved(yes, no))
-        } else if no > self.threshold {
-            Ok(QC::Denied(yes, no))
+        if count_votes > self.threshold {
+            Ok(MockQc { count_votes })
         } else {
             Err(Error("Not enough votes".into()))
         }
