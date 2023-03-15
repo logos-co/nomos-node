@@ -66,11 +66,10 @@ impl Tally for MockTally {
                 return Err(Error("Invalid vote".into()));
             }
             count_votes += 1;
+            if count_votes > self.threshold {
+                return Ok(MockQc { count_votes });
+            }
         }
-        if count_votes > self.threshold {
-            Ok(MockQc { count_votes })
-        } else {
-            Err(Error("Not enough votes".into()))
-        }
+        Err(Error("Not enough votes".into()))
     }
 }
