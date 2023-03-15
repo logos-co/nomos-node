@@ -37,19 +37,14 @@ impl TreeOverlay<CarnotNode> {
             .chunks(settings.committee_size)
             .enumerate()
         {
-            committees.insert(
-                committee_id,
-                Committee {
-                    nodes: nodes.iter().copied().collect(),
-                    role: CarnotRole::Root,
-                },
-            );
+            let mut has_children = false;
             let left_child_id = 2 * committee_id + 1;
             let right_child_id = left_child_id + 1;
 
             // Check for leaf nodes.
             if right_child_id <= committee_count {
                 children.insert(committee_id, vec![left_child_id, right_child_id]);
+                has_children = true;
             }
 
             // Root node has no parent.
@@ -57,6 +52,19 @@ impl TreeOverlay<CarnotNode> {
                 let parent_id = get_parent_id(committee_id);
                 parents.insert(committee_id, parent_id);
             }
+
+            let role = match (committee_id, has_children) {
+                (0, _) => CarnotRole::Root,
+                (_, true) => CarnotRole::Intermediate,
+                (_, false) => CarnotRole::Leaf,
+            };
+
+            let committee = Committee {
+                nodes: nodes.iter().copied().collect(),
+                role,
+            };
+
+            committees.insert(committee_id, committee);
         }
 
         Layout::new(committees, parents, children)
@@ -162,5 +170,19 @@ mod tests {
         assert_eq!(last_nodes.len(), 10);
         assert_eq!(last_nodes.first(), Some(&10220));
         assert_eq!(last_nodes.last(), Some(&10229));
+    }
+
+    #[test]
+    fn check_committee_role() {
+        let layout = TreeOverlay::build_full_binary_tree(&TreeSettings {
+            tree_type: TreeType::FullBinaryTree,
+            depth: 10,
+            committee_size: 10,
+        });
+
+        assert_eq!(layout.committees[&0].role, CarnotRole::Root);
+        assert_eq!(layout.committees[&1].role, CarnotRole::Intermediate);
+        assert_eq!(layout.committees[&2].role, CarnotRole::Intermediate);
+        assert_eq!(layout.committees[&1022].role, CarnotRole::Leaf);
     }
 }

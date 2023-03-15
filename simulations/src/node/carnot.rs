@@ -98,6 +98,7 @@ pub struct CarnotNode {
 pub enum CarnotRole {
     Leader,
     Root,
+    // missing role?
     Intermediate,
     Leaf,
 }
