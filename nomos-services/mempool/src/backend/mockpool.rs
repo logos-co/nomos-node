@@ -7,18 +7,22 @@ use std::{collections::BTreeMap, time::UNIX_EPOCH};
 // internal
 use crate::backend::{MemPool, MempoolError};
 use nomos_core::block::{BlockHeader, BlockId};
+use nomos_core::tx::Transaction;
 
 /// A mock mempool implementation that stores all transactions in memory in the order received.
-pub struct MockPool<Id, Tx> {
-    pending_txs: LinkedHashMap<Id, Tx>,
+pub struct MockPool<Tx: Transaction>
+where
+    Tx::Hash: Hash,
+{
+    pending_txs: LinkedHashMap<Tx::Hash, Tx>,
     in_block_txs: BTreeMap<BlockId, Vec<Tx>>,
-    in_block_txs_by_id: BTreeMap<Id, BlockId>,
+    in_block_txs_by_id: BTreeMap<Tx::Hash, BlockId>,
     last_tx_timestamp: u64,
 }
 
-impl<Id, Tx> Default for MockPool<Id, Tx>
+impl<Tx: Transaction> Default for MockPool<Tx>
 where
-    Id: Eq + Hash,
+    Tx::Hash: Hash + Eq,
 {
     fn default() -> Self {
         Self {
@@ -30,30 +34,29 @@ where
     }
 }
 
-impl<Id, Tx> MockPool<Id, Tx>
+impl<Tx: Transaction> MockPool<Tx>
 where
-    Id: Eq + Hash,
+    Tx::Hash: Hash + Eq + Ord,
 {
     pub fn new() -> Self {
         Default::default()
     }
 }
 
-impl<Id, Tx> MemPool for MockPool<Id, Tx>
+impl<Tx> MemPool for MockPool<Tx>
 where
-    Id: for<'t> From<&'t Tx> + PartialOrd + Ord + Eq + Hash + Clone,
-    Tx: Clone + Send + Sync + 'static + Hash,
+    Tx: Transaction + Clone + Send + Sync + 'static + Hash,
+    Tx::Hash: Clone + Hash + Eq + Ord,
 {
     type Settings = ();
     type Tx = Tx;
-    type Id = Id;
 
     fn new(_settings: Self::Settings) -> Self {
         Self::new()
     }
 
     fn add_tx(&mut self, tx: Self::Tx) -> Result<(), MempoolError> {
-        let id = Id::from(&tx);
+        let id = <Self::Tx as Transaction>::hash(&tx);
         if self.pending_txs.contains_key(&id) || self.in_block_txs_by_id.contains_key(&id) {
             return Err(MempoolError::ExistingTx);
         }
@@ -73,7 +76,7 @@ where
         Box::new(pending_txs.into_iter())
     }
 
-    fn mark_in_block(&mut self, txs: &[Self::Id], block: BlockHeader) {
+    fn mark_in_block(&mut self, txs: &[<Self::Tx as Transaction>::Hash], block: BlockHeader) {
         let mut txs_in_block = Vec::with_capacity(txs.len());
         for tx_id in txs.iter() {
             if let Some(tx) = self.pending_txs.remove(tx_id) {
@@ -96,7 +99,7 @@ where
         })
     }
 
-    fn prune(&mut self, txs: &[Self::Id]) {
+    fn prune(&mut self, txs: &[<Self::Tx as Transaction>::Hash]) {
         for tx_id in txs {
             self.pending_txs.remove(tx_id);
         }

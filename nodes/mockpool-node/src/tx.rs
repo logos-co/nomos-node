@@ -1,25 +1,21 @@
-use blake2::digest::{Update, VariableOutput};
-use blake2::Blake2bVar;
+use bytes::Bytes;
+use nomos_core::tx::{Transaction, TransactionHasher};
 use serde::{Deserialize, Serialize};
 use std::hash::Hash;
 
 #[derive(Clone, Debug, Serialize, Deserialize, Hash)]
 pub struct Tx(pub String);
 
-#[derive(Debug, Eq, Hash, PartialEq, Ord, Clone, PartialOrd)]
-pub struct TxId([u8; 32]);
+fn hash_tx(tx: &Tx) -> String {
+    tx.0.clone()
+}
 
-impl From<&Tx> for TxId {
-    fn from(tx: &Tx) -> Self {
-        let mut hasher = Blake2bVar::new(32).unwrap();
-        hasher.update(
-            bincode::serde::encode_to_vec(tx, bincode::config::standard())
-                .unwrap()
-                .as_slice(),
-        );
-        let mut id = [0u8; 32];
-        hasher.finalize_variable(&mut id).unwrap();
-        Self(id)
+impl Transaction for Tx {
+    const HASHER: TransactionHasher<Self> = hash_tx;
+    type Hash = String;
+
+    fn as_bytes(&self) -> Bytes {
+        self.0.as_bytes().to_vec().into()
     }
 }
 

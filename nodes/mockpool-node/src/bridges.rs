@@ -6,7 +6,7 @@ use tokio::sync::mpsc::Sender;
 use tokio::sync::oneshot;
 use tracing::error;
 // internal
-use crate::tx::{Tx, TxId};
+use crate::tx::Tx;
 use futures::future::join_all;
 use multiaddr::Multiaddr;
 use nomos_core::wire;
@@ -27,15 +27,14 @@ pub fn mempool_metrics_bridge(
     handle: overwatch_rs::overwatch::handle::OverwatchHandle,
 ) -> HttpBridgeRunner {
     Box::new(Box::pin(async move {
-        let (mempool_channel, mut http_request_channel) = build_http_bridge::<
-            MempoolService<WakuAdapter<Tx>, MockPool<TxId, Tx>>,
-            AxumBackend,
-            _,
-        >(
-            handle, HttpMethod::GET, "metrics"
-        )
-        .await
-        .unwrap();
+        let (mempool_channel, mut http_request_channel) =
+            build_http_bridge::<MempoolService<WakuAdapter<Tx>, MockPool<Tx>>, AxumBackend, _>(
+                handle,
+                HttpMethod::GET,
+                "metrics",
+            )
+            .await
+            .unwrap();
 
         while let Some(HttpRequest { res_tx, .. }) = http_request_channel.recv().await {
             if let Err(e) = handle_metrics_req(&mempool_channel, res_tx).await {
@@ -50,17 +49,14 @@ pub fn mempool_add_tx_bridge(
     handle: overwatch_rs::overwatch::handle::OverwatchHandle,
 ) -> HttpBridgeRunner {
     Box::new(Box::pin(async move {
-        let (mempool_channel, mut http_request_channel) = build_http_bridge::<
-            MempoolService<WakuAdapter<Tx>, MockPool<TxId, Tx>>,
-            AxumBackend,
-            _,
-        >(
-            handle.clone(),
-            HttpMethod::POST,
-            "addtx",
-        )
-        .await
-        .unwrap();
+        let (mempool_channel, mut http_request_channel) =
+            build_http_bridge::<MempoolService<WakuAdapter<Tx>, MockPool<Tx>>, AxumBackend, _>(
+                handle.clone(),
+                HttpMethod::POST,
+                "addtx",
+            )
+            .await
+            .unwrap();
 
         while let Some(HttpRequest {
             res_tx, payload, ..
@@ -121,7 +117,7 @@ pub fn waku_add_conn_bridge(
 }
 
 async fn handle_metrics_req(
-    mempool_channel: &OutboundRelay<MempoolMsg<Tx, TxId>>,
+    mempool_channel: &OutboundRelay<MempoolMsg<Tx>>,
     res_tx: Sender<HttpResponse>,
 ) -> Result<(), overwatch_rs::DynError> {
     let (sender, receiver) = oneshot::channel();
@@ -147,7 +143,7 @@ async fn handle_metrics_req(
 
 async fn handle_add_tx_req(
     handle: &overwatch_rs::overwatch::handle::OverwatchHandle,
-    mempool_channel: &OutboundRelay<MempoolMsg<Tx, TxId>>,
+    mempool_channel: &OutboundRelay<MempoolMsg<Tx>>,
     res_tx: Sender<HttpResponse>,
     payload: Option<Bytes>,
 ) -> Result<(), overwatch_rs::DynError> {

@@ -10,7 +10,7 @@ pub type TxHash = [u8; 32];
 
 /// A block
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct Block<TxId: Eq + Hash> {
+pub struct Block<TxId: Clone + Eq + Hash> {
     header: BlockHeader,
     transactions: IndexSet<TxId>,
 }
@@ -24,7 +24,7 @@ pub struct BlockHeader {
 /// Identifier of a block
 pub type BlockId = [u8; 32];
 
-impl<TxId: Eq + Hash> Block<TxId> {
+impl<TxId: Clone + Eq + Hash> Block<TxId> {
     pub fn new(header: BlockHeader, txs: impl Iterator<Item = TxId>) -> Self {
         Self {
             header,
