@@ -98,7 +98,6 @@ pub struct CarnotNode {
 pub enum CarnotRole {
     Leader,
     Root,
-    // missing role?
     Intermediate,
     Leaf,
 }
@@ -160,30 +159,43 @@ impl Node for CarnotNode {
         self.id
     }
 
-    fn run_step(&mut self, step: Self::Step) -> StepTime {
-        use CarnotStepSolver::*;
-        match self.settings.steps_costs.get(&step) {
+    fn run_step(&mut self) -> StepTime {
+        match self.role {
+            CarnotRole::Leader => solve_steps(self, CARNOT_LEADER_STEPS),
+            CarnotRole::Root => todo!(),
+            CarnotRole::Intermediate => todo!(),
+            CarnotRole::Leaf => todo!(),
+        }
+    }
+}
+
+fn solve_steps(node: &mut CarnotNode, steps: &[CarnotStep]) -> StepTime {
+    use CarnotStepSolver::*;
+
+    steps
+        .iter()
+        .map(|step| match node.settings.steps_costs.get(step) {
             Some(Plain(t)) => *t,
             Some(ParentCommitteeReceiverSolver(solver)) => solver(
-                &mut self.rng,
-                self.id,
-                self.settings
+                &mut node.rng,
+                node.id,
+                node.settings
                     .layout
-                    .parent_nodes(self.settings.layout.committee(self.id)),
-                &self.settings.network,
+                    .parent_nodes(node.settings.layout.committee(node.id)),
+                &node.settings.network,
             ),
             Some(ChildCommitteeReceiverSolver(solver)) => solver(
-                &mut self.rng,
-                self.id,
-                &self
+                &mut node.rng,
+                node.id,
+                &node
                     .settings
                     .layout
-                    .children_nodes(self.settings.layout.committee(self.id)),
-                &self.settings.network,
+                    .children_nodes(node.settings.layout.committee(node.id)),
+                &node.settings.network,
             ),
             None => {
                 panic!("Unknown step: {step:?}");
             }
-        }
-    }
+        })
+        .sum()
 }

@@ -56,64 +56,19 @@ where
         self.nodes.iter().map(Node::id)
     }
 
-    pub fn run(&mut self, execution: &ExecutionSteps<N::Step>) -> Report
+    pub fn run(&mut self, reducer: Box<dyn Fn(&[StepTime]) -> StepTime>) -> Report
     where
         N::Step: Clone,
     {
         let leaders = &self.leaders;
         let layout = &self.layout;
 
-        let round_time = execution
-            .iter()
-            .map(|(layout_node, step, reducer)| {
-                let times: Vec<StepTime> = match layout_node {
-                    LayoutNodes::Leader => leaders
-                        .iter()
-                        .map(|&leader| self.nodes[leader].run_step(step.clone()))
-                        .collect(),
-                    LayoutNodes::Committee => {
-                        let non_leaf_committees = layout
-                            .children
-                            .iter()
-                            .filter_map(|(id, children)| (!children.is_empty()).then_some(id));
-
-                        non_leaf_committees
-                            .flat_map(|committee_id| {
-                                layout
-                                    .committees
-                                    .get(committee_id)
-                                    .unwrap()
-                                    .nodes
-                                    .iter()
-                                    .map(|&node| self.nodes[node].run_step(step.clone()))
-                                    .max()
-                            })
-                            .collect()
-                    }
-                    LayoutNodes::LeafCommittee => {
-                        let leaf_committees =
-                            layout.children.iter().filter_map(|(id, children)| {
-                                (children.is_empty() || (layout.parent(*id) == *id)).then_some(id)
-                            });
-
-                        leaf_committees
-                            .flat_map(|committee_id| {
-                                layout
-                                    .committees
-                                    .get(committee_id)
-                                    .unwrap()
-                                    .nodes
-                                    .iter()
-                                    .map(|&node| self.nodes[node].run_step(step.clone()))
-                                    .max()
-                            })
-                            .collect()
-                    }
-                };
-
-                reducer(&times)
-            })
-            .sum();
+        //let round_time = layout
+        //    .node_ids()
+        //    .map(|id| {
+        //        // get an actual carnotnode.
+        //        self.nodes[id].run_step();
+        //    }).collect
 
         Report { round_time }
     }
@@ -125,7 +80,8 @@ mod test {
     use crate::network::regions::{Region, RegionsData};
     use crate::network::Network;
     use crate::node::carnot::{
-        CarnotNode, CarnotNodeSettings, CARNOT_LEADER_STEPS, CARNOT_LEAF_STEPS, CARNOT_STEPS_COSTS,
+        CarnotNode, CarnotNodeSettings, CarnotRole, CARNOT_INTERMEDIATE_STEPS, CARNOT_LEADER_STEPS,
+        CARNOT_LEAF_STEPS, CARNOT_ROOT_STEPS, CARNOT_STEPS_COSTS,
     };
     use crate::node::{NodeId, StepTime};
     use crate::overlay::flat::FlatOverlay;
@@ -160,7 +116,7 @@ mod test {
     }
 
     #[test]
-    fn test_run_flat_single_leader_steps() {
+    fn run_flat_single_leader_steps() {
         let mut rng = SmallRng::seed_from_u64(0);
         let overlay = FlatOverlay::new(());
 
@@ -181,12 +137,15 @@ mod test {
 
         assert_eq!(
             Duration::from_millis(1100),
-            runner.run(&carnot_steps).round_time
+            runner
+                .run(Box::new(|times: &[StepTime]| *times.iter().max().unwrap())
+                    as Box<dyn Fn(&[StepTime]) -> StepTime>)
+                .round_time
         );
     }
 
     #[test]
-    fn test_run_flat_single_leader_single_committee() {
+    fn run_flat_single_leader_single_committee() {
         let mut rng = SmallRng::seed_from_u64(0);
         let overlay = FlatOverlay::new(());
 
@@ -214,7 +173,40 @@ mod test {
 
         assert_eq!(
             Duration::from_millis(2200),
-            runner.run(&carnot_steps).round_time
+            runner
+                .run(Box::new(|times: &[StepTime]| *times.iter().max().unwrap())
+                    as Box<dyn Fn(&[StepTime]) -> StepTime>)
+                .round_time
+        );
+    }
+
+    #[test]
+    fn run_tree_committee() {
+        let mut rng = SmallRng::seed_from_u64(0);
+
+        let overlay = TreeOverlay::new(TreeSettings {
+            tree_type: TreeType::FullBinaryTree,
+            depth: 10,
+            committee_size: 10,
+        });
+
+        let mut runner: ConsensusRunner<CarnotNode> = setup_runner(&mut rng, &overlay);
+        let committee_steps = CARNOT_LEAF_STEPS.iter().copied().map(|step| {
+            (
+                LayoutNodes::LeafCommittee,
+                step,
+                Box::new(|times: &[StepTime]| *times.iter().max().unwrap())
+                    as Box<dyn Fn(&[StepTime]) -> StepTime>,
+            )
+        });
+        let carnot_steps: Vec<_> = committee_steps.collect();
+
+        assert_eq!(
+            Duration::from_millis(200),
+            runner
+                .run(Box::new(|times: &[StepTime]| *times.iter().max().unwrap())
+                    as Box<dyn Fn(&[StepTime]) -> StepTime>)
+                .round_time
         );
     }
 }

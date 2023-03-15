@@ -11,10 +11,10 @@ pub type CommitteeId = usize;
 pub type StepTime = Duration;
 
 pub trait Node: Clone {
-    type Role: Debug + Clone;
+    type Role: Debug + Clone + PartialEq + Eq;
     type Settings;
     type Step;
     fn new<R: Rng>(rng: &mut R, id: NodeId, role: Self::Role, settings: Self::Settings) -> Self;
     fn id(&self) -> NodeId;
-    fn run_step(&mut self, steps: Self::Step) -> StepTime;
+    fn run_step(&mut self) -> StepTime;
 }

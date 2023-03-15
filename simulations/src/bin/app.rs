@@ -123,7 +123,8 @@ pub fn main() -> Result<(), Box<dyn std::error::Error>> {
 
             let mut runner: simulations::runner::ConsensusRunner<CarnotNode> =
                 ConsensusRunner::new(&mut rng, layout, leaders, cfg.node_settings);
-            runner.run(&carnot_steps)
+            runner.run(Box::new(|times: &[StepTime]| *times.iter().max().unwrap())
+                as Box<dyn Fn(&[StepTime]) -> StepTime>)
         }
     };
 
