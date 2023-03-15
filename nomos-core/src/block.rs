@@ -47,6 +47,10 @@ impl<TxId: Eq + Hash> Block<TxId> {
 }
 
 impl BlockHeader {
+    pub const fn new() -> Self {
+        Self { id: [0; 32] }
+    }
+
     pub fn id(&self) -> BlockId {
         self.id
     }

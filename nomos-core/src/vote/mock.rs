@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 // internal
 use crate::vote::Tally;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct MockVote {
     view: u64,
 }
@@ -13,6 +13,10 @@ pub struct MockVote {
 impl MockVote {
     pub fn view(&self) -> u64 {
         self.view
+    }
+
+    pub fn new(view: u64) -> Self {
+        Self { view }
     }
 }
 
@@ -65,8 +69,10 @@ impl Tally for MockTally {
             if vote.view() != view {
                 return Err(Error("Invalid vote".into()));
             }
+            eprintln!("Vote received");
             count_votes += 1;
         }
+        eprintln!("never enter here, because while loop never ends");
         if count_votes > self.threshold {
             Ok(MockQc { count_votes })
         } else {

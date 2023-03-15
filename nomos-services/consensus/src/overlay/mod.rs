@@ -1,5 +1,5 @@
 pub mod committees;
-mod flat;
+pub mod flat;
 
 // std
 use std::error::Error;

@@ -1,5 +1,7 @@
 use bytes::Bytes;
 use futures::StreamExt;
+use nomos_core::{tx::mock::MockTransaction, wire};
+use nomos_mempool::network::adapters::mock::MOCK_TX_CONTENT_TOPIC;
 use nomos_network::{
     backends::mock::{
         EventKind, Mock, MockBackendMessage, MockContentTopic, MockMessage, NetworkEvent,
@@ -20,9 +22,10 @@ use crate::{
     View,
 };
 
-const MOCK_PUB_SUB_TOPIC: &str = "MockPubSubTopic";
-const MOCK_BLOCK_CONTENT_TOPIC: MockContentTopic = MockContentTopic::new("MockSim", 1, "MockBlock");
-const MOCK_APPROVAL_CONTENT_TOPIC: MockContentTopic =
+pub const MOCK_PUB_SUB_TOPIC: &str = "MockPubSubTopic";
+pub const MOCK_BLOCK_CONTENT_TOPIC: MockContentTopic =
+    MockContentTopic::new("MockSim", 1, "MockBlock");
+pub const MOCK_APPROVAL_CONTENT_TOPIC: MockContentTopic =
     MockContentTopic::new("MockSim", 1, "MockApproval");
 
 pub struct MockAdapter {
@@ -79,8 +82,12 @@ impl NetworkAdapter for MockAdapter {
                             if MOCK_BLOCK_CONTENT_TOPIC.content_topic_name
                                 == message.content_topic().content_topic_name
                             {
-                                let payload = message.payload();
-                                Some(ProposalChunkMsg::from_bytes(payload.as_bytes()).chunk)
+                                Some(
+                                    ProposalChunkMsg::from_bytes(
+                                        &wire::serialize(&MockTransaction::from(message)).unwrap(),
+                                    )
+                                    .chunk,
+                                )
                             } else {
                                 None
                             }
@@ -130,11 +137,10 @@ impl NetworkAdapter for MockAdapter {
                 match msg {
                     Ok(event) => match event {
                         NetworkEvent::RawMessage(message) => {
-                            if MOCK_APPROVAL_CONTENT_TOPIC.content_topic_name
-                                == message.content_topic().content_topic_name
-                            {
+                            if message.content_topic == MOCK_TX_CONTENT_TOPIC {
                                 let payload = message.payload();
-                                Some(VoteMsg::from_bytes(payload.as_bytes()).vote)
+                                let vmsg = VoteMsg::<Vote>::from_bytes(payload.as_bytes());
+                                Some(vmsg.vote)
                             } else {
                                 None
                             }

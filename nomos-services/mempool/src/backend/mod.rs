@@ -33,7 +33,7 @@ pub trait MemPool {
     fn mark_in_block(&mut self, txs: &[Self::Id], block: BlockHeader);
 
     /// Returns all of the transactions for the block
-    #[cfg(test)]
+    #[cfg(feature = "mock")]
     fn block_transactions(
         &self,
         block: BlockId,

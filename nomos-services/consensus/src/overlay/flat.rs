@@ -121,14 +121,15 @@ where
         tally: &VoteTally,
     ) -> VoteTally::Outcome {
         assert_eq!(view.view_n, self.view_n, "view_n mismatch");
-
+        eprintln!("view {:?}", view);
         // for now, let's pretend that consensus is reached as soon as the
         // block is approved by a share of the nodes
         let stream = Box::into_pin(adapter.votes_stream(FLAT_COMMITTEE, view).await);
-
+        eprintln!("asdasdasd");
         // Shadow the original binding so that it can't be directly accessed
         // ever again.
         if let Ok(qc) = tally.tally(view.view_n, stream).await {
+            println!("tally");
             qc
         } else {
             unimplemented!("consensus not reached")

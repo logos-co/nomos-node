@@ -49,12 +49,15 @@ where
         // TODO: get the correct ancestor for the tip
         // let ancestor_hint = todo!("get the ancestor from the tip");
         let ancestor_hint = [0; 32];
+        eprintln!("here 33333333");
         if view.is_leader(self.key.key) {
             let (tx, rx) = tokio::sync::oneshot::channel();
+            eprintln!("here 444");
             self.mempool.send(MempoolMsg::View {
                 ancestor_hint,
                 reply_channel: tx,
             });
+            eprintln!("here 55");
             let iter = rx.await.unwrap();
 
             LeadershipResult::Leader {

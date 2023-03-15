@@ -1,4 +1,4 @@
-use crate::wire::serialize;
+use crate::{block::TxHash, wire::serialize};
 use blake2::{
     digest::{Update, VariableOutput},
     Blake2bVar,
@@ -33,6 +33,12 @@ impl From<nomos_network::backends::mock::MockMessage> for MockTransaction {
     Debug, Eq, Hash, PartialEq, Ord, Copy, Clone, PartialOrd, serde::Serialize, serde::Deserialize,
 )]
 pub struct MockTxId([u8; 32]);
+
+impl From<MockTxId> for TxHash {
+    fn from(val: MockTxId) -> Self {
+        val.0
+    }
+}
 
 impl From<[u8; 32]> for MockTxId {
     fn from(tx_id: [u8; 32]) -> Self {

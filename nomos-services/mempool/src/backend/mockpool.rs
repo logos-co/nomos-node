@@ -41,8 +41,8 @@ where
 
 impl<Id, Tx> MemPool for MockPool<Id, Tx>
 where
-    Id: for<'t> From<&'t Tx> + PartialOrd + Ord + Eq + Hash + Clone,
-    Tx: Clone + Send + Sync + 'static + Hash,
+    Id: core::fmt::Debug + for<'t> From<&'t Tx> + PartialOrd + Ord + Eq + Hash + Clone,
+    Tx: core::fmt::Debug + Clone + Send + Sync + 'static + Hash,
 {
     type Settings = ();
     type Tx = Tx;
@@ -74,6 +74,7 @@ where
     }
 
     fn mark_in_block(&mut self, txs: &[Self::Id], block: BlockHeader) {
+        eprintln!("mark in block {:?}", txs);
         let mut txs_in_block = Vec::with_capacity(txs.len());
         for tx_id in txs.iter() {
             if let Some(tx) = self.pending_txs.remove(tx_id) {
@@ -86,11 +87,13 @@ where
         block_entry.append(&mut txs_in_block);
     }
 
-    #[cfg(test)]
+    #[cfg(feature = "mock")]
     fn block_transactions(
         &self,
         block: BlockId,
     ) -> Option<Box<dyn Iterator<Item = Self::Tx> + Send>> {
+        // eprintln!("block_transactions({:?})", self.in_block_txs);
+        // eprintln!("block_pending({:#?})", self.pending_txs);
         self.in_block_txs.get(&block).map(|txs| {
             Box::new(txs.clone().into_iter()) as Box<dyn Iterator<Item = Self::Tx> + Send>
         })

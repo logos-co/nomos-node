@@ -6,6 +6,10 @@
 //! nodes, but that has to be achieved through different means.
 mod leadership;
 mod network;
+#[cfg(feature = "mock")]
+pub use network::adapters::mock;
+#[cfg(feature = "mock")]
+pub use network::messages;
 pub mod overlay;
 mod tip;
 
@@ -18,7 +22,7 @@ use serde::{Deserialize, Serialize};
 // internal
 use crate::network::NetworkAdapter;
 use leadership::{Leadership, LeadershipResult};
-use nomos_core::block::{Block, TxHash};
+use nomos_core::block::Block;
 use nomos_core::crypto::PublicKey;
 use nomos_core::fountain::FountainCode;
 use nomos_core::staking::Stake;
@@ -123,7 +127,6 @@ where
     T::Outcome: Send + Sync,
     P::Settings: Send + Sync + 'static,
     P::Tx: Debug + Clone + serde::de::DeserializeOwned + Send + Sync + 'static,
-    for<'t> &'t P::Tx: Into<TxHash>,
     P::Id: Debug
         + Clone
         + serde::de::DeserializeOwned
@@ -182,7 +185,9 @@ where
             staking_keys: BTreeMap::new(),
             view_n: 0,
         };
+        eprintln!("here1");
         loop {
+            eprintln!("here22");
             // if we want to process multiple views at the same time this can
             // be spawned as a separate future
 
@@ -197,6 +202,7 @@ where
                     &leadership,
                 )
                 .await;
+
             match res {
                 Ok((block, view)) => {
                     // resolved block, mark as verified and possibly update the tip
@@ -229,6 +235,7 @@ pub struct Approval;
 
 // Consensus round, also aids in guaranteeing synchronization
 // between various data structures by means of lifetimes
+#[derive(Debug)]
 pub struct View {
     seed: Seed,
     staking_keys: BTreeMap<NodeId, Stake>,
@@ -254,6 +261,7 @@ impl View {
         T::Outcome: Send + Sync,
         O: Overlay<A, F, T>,
     {
+        eprintln!("here33");
         let res = if self.is_leader(node_id) {
             let block = self
                 .resolve_leader::<A, O, F, T, _>(node_id, tip, adapter, fountain, tally, leadership)
@@ -301,7 +309,7 @@ impl View {
         let LeadershipResult::Leader { block, _view }  = leadership
             .try_propose_block(self, tip, qc)
             .await else { panic!("we are leader")};
-
+        eprintln!("here44");
         overlay
             .broadcast_block(self, block.clone(), adapter, fountain)
             .await;

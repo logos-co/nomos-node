@@ -22,7 +22,11 @@ tokio-stream = "0.1"
 waku-bindings = { version = "0.1.0-rc.2", optional = true}
 tracing = "0.1"
 
+[dev-dependencies]
+nomos-log = { path = "../log" }
+overwatch-derive = { git = "https://github.com/logos-co/Overwatch", branch = "main" }
+
 [features]
 default = []
 waku = ["nomos-network/waku", "waku-bindings"]
-mock = ["nomos-network/mock"]
+mock = ["nomos-network/mock", "nomos-mempool/mock", "nomos-core/mock"]
