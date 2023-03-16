@@ -20,10 +20,7 @@ where
     last_tx_timestamp: u64,
 }
 
-impl<Tx: Transaction> Default for MockPool<Tx>
-where
-    Tx::Hash: Hash + Eq,
-{
+impl<Tx: Transaction> Default for MockPool<Tx> {
     fn default() -> Self {
         Self {
             pending_txs: LinkedHashMap::new(),
@@ -36,7 +33,7 @@ where
 
 impl<Tx: Transaction> MockPool<Tx>
 where
-    Tx::Hash: Hash + Eq + Ord,
+    Tx::Hash: Ord,
 {
     pub fn new() -> Self {
         Default::default()
@@ -46,7 +43,7 @@ where
 impl<Tx> MemPool for MockPool<Tx>
 where
     Tx: Transaction + Clone + Send + Sync + 'static + Hash,
-    Tx::Hash: Clone + Hash + Eq + Ord,
+    Tx::Hash: Ord,
 {
     type Settings = ();
     type Tx = Tx;

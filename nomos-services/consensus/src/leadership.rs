@@ -31,7 +31,7 @@ pub enum LeadershipResult<'view, TxId: Clone + Eq + core::hash::Hash> {
 impl<Tx> Leadership<Tx>
 where
     Tx: Transaction,
-    Tx::Hash: Clone + Debug + Hash + Eq,
+    Tx::Hash: Debug,
 {
     pub fn new(key: PrivateKey, mempool: OutboundRelay<MempoolMsg<Tx>>) -> Self {
         Self {

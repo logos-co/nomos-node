@@ -82,7 +82,7 @@ where
     T: Tally,
     O: Overlay<A, F, T, <P::Tx as Transaction>::Hash>,
     P::Tx: Transaction + Debug + 'static,
-    <P::Tx as Transaction>::Hash: Clone + Debug + Eq + Hash,
+    <P::Tx as Transaction>::Hash: Debug,
     A::Backend: 'static,
 {
     service_state: ServiceStateHandle<Self>,
@@ -102,7 +102,7 @@ where
     P: MemPool,
     T: Tally,
     P::Tx: Transaction + Debug,
-    <P::Tx as Transaction>::Hash: Clone + Debug + Eq + Hash,
+    <P::Tx as Transaction>::Hash: Debug,
     M: MempoolAdapter<Tx = P::Tx>,
     O: Overlay<A, F, T, <P::Tx as Transaction>::Hash>,
 {
@@ -124,7 +124,7 @@ where
     T::Outcome: Send + Sync,
     P::Settings: Send + Sync + 'static,
     P::Tx: Debug + Clone + serde::de::DeserializeOwned + Send + Sync + 'static,
-    <P::Tx as Transaction>::Hash: Clone + Debug + Eq + Hash + Send + Sync,
+    <P::Tx as Transaction>::Hash: Debug + Send + Sync,
     M: MempoolAdapter<Tx = P::Tx> + Send + Sync + 'static,
     O: Overlay<A, F, T, <P::Tx as Transaction>::Hash> + Send + Sync + 'static,
 {
@@ -242,7 +242,7 @@ impl View {
         A: NetworkAdapter + Send + Sync + 'static,
         F: FountainCode,
         Tx: Transaction,
-        Tx::Hash: Clone + Debug + Eq + Hash,
+        Tx::Hash: Debug,
         T: Tally + Send + Sync + 'static,
         T::Outcome: Send + Sync,
         O: Overlay<A, F, T, Tx::Hash>,
@@ -284,7 +284,7 @@ impl View {
         T: Tally + Send + Sync + 'static,
         T::Outcome: Send + Sync,
         Tx: Transaction,
-        Tx::Hash: Clone + Debug + Eq + Hash,
+        Tx::Hash: Debug,
         O: Overlay<A, F, T, Tx::Hash>,
     {
         let overlay = O::new(self, node_id);
@@ -315,7 +315,7 @@ impl View {
         F: FountainCode,
         T: Tally + Send + Sync + 'static,
         Tx: Transaction,
-        Tx::Hash: Clone + Debug + Eq + Hash,
+        Tx::Hash: Debug,
         O: Overlay<A, F, T, Tx::Hash>,
     {
         let overlay = O::new(self, node_id);
