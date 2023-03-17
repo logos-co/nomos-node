@@ -10,22 +10,23 @@ pub type TxHash = [u8; 32];
 
 /// A block
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct Block<TxId: Clone + Eq + Hash> {
-    header: BlockHeader,
+pub struct Block<Qc: Clone, TxId: Clone + Eq + Hash> {
+    header: BlockHeader<Qc>,
     transactions: IndexSet<TxId>,
 }
 
 /// A block header
 #[derive(Copy, Clone, Default, Debug, Serialize, Deserialize)]
-pub struct BlockHeader {
+pub struct BlockHeader<Qc: Clone> {
     id: BlockId,
+    qc: Qc,
 }
 
 /// Identifier of a block
 pub type BlockId = [u8; 32];
 
-impl<TxId: Clone + Eq + Hash> Block<TxId> {
-    pub fn new(header: BlockHeader, txs: impl Iterator<Item = TxId>) -> Self {
+impl<Qc: Clone, TxId: Clone + Eq + Hash> Block<Qc, TxId> {
+    pub fn new(header: BlockHeader<Qc>, txs: impl Iterator<Item = TxId>) -> Self {
         Self {
             header,
             transactions: txs.collect(),
@@ -37,8 +38,8 @@ impl<TxId: Clone + Eq + Hash> Block<TxId> {
         Bytes::new()
     }
 
-    pub fn header(&self) -> BlockHeader {
-        self.header
+    pub fn header(&self) -> BlockHeader<Qc> {
+        self.header.clone()
     }
 
     pub fn transactions(&self) -> impl Iterator<Item = &TxId> + '_ {
@@ -46,8 +47,12 @@ impl<TxId: Clone + Eq + Hash> Block<TxId> {
     }
 }
 
-impl BlockHeader {
+impl<Qc: Clone> BlockHeader<Qc> {
     pub fn id(&self) -> BlockId {
         self.id
+    }
+
+    pub fn qc(&self) -> &Qc {
+        &self.qc
     }
 }
