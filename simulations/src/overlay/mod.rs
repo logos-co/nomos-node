@@ -6,15 +6,15 @@ use std::collections::{BTreeSet, HashMap};
 // crates
 use rand::Rng;
 // internal
-use crate::node::{CommitteeId, Node, NodeId};
+use crate::node::{carnot::CarnotRole, CommitteeId, Node, NodeId};
 
 #[derive(Debug, Clone)]
-pub struct Committee<N: Node> {
+pub struct Committee {
     pub nodes: BTreeSet<NodeId>,
-    pub role: N::Role,
+    pub role: CarnotRole,
 }
 
-impl<N: Node> Committee<N> {
+impl Committee {
     #[must_use]
     pub fn is_empty(&self) -> bool {
         self.nodes.len() == 0
@@ -24,17 +24,17 @@ impl<N: Node> Committee<N> {
 pub type Leaders = BTreeSet<NodeId>;
 
 #[derive(Debug, Clone)]
-pub struct Layout<N: Node> {
-    pub committees: HashMap<CommitteeId, Committee<N>>,
+pub struct Layout {
+    pub committees: HashMap<CommitteeId, Committee>,
     pub from_committee: HashMap<NodeId, CommitteeId>,
     pub parent: HashMap<CommitteeId, CommitteeId>,
     pub children: HashMap<CommitteeId, Vec<CommitteeId>>,
     pub layers: HashMap<usize, Vec<CommitteeId>>,
 }
 
-impl<N: Node + Clone> Layout<N> {
+impl Layout {
     pub fn new(
-        committees: HashMap<CommitteeId, Committee<N>>,
+        committees: HashMap<CommitteeId, Committee>,
         parent: HashMap<CommitteeId, CommitteeId>,
         children: HashMap<CommitteeId, Vec<CommitteeId>>,
         layers: HashMap<usize, Vec<usize>>,
@@ -61,7 +61,7 @@ impl<N: Node + Clone> Layout<N> {
         self.from_committee.get(&node_id).copied().unwrap()
     }
 
-    pub fn committee_nodes(&self, committee_id: CommitteeId) -> &Committee<N> {
+    pub fn committee_nodes(&self, committee_id: CommitteeId) -> &Committee {
         &self.committees[&committee_id]
     }
 
@@ -69,7 +69,7 @@ impl<N: Node + Clone> Layout<N> {
         self.parent.get(&committee_id).copied()
     }
 
-    pub fn parent_nodes(&self, committee_id: CommitteeId) -> Option<Committee<N>> {
+    pub fn parent_nodes(&self, committee_id: CommitteeId) -> Option<Committee> {
         self.parent(committee_id)
             .map(|c| self.committees[&c].clone())
     }
@@ -78,7 +78,7 @@ impl<N: Node + Clone> Layout<N> {
         &self.children[&committee_id]
     }
 
-    pub fn children_nodes(&self, committee_id: CommitteeId) -> Vec<&Committee<N>> {
+    pub fn children_nodes(&self, committee_id: CommitteeId) -> Vec<&Committee> {
         self.children(committee_id)
             .iter()
             .map(|&committee_id| &self.committees[&committee_id])
@@ -100,5 +100,5 @@ pub trait Overlay<N: Node> {
         size: usize,
         rng: &mut R,
     ) -> Box<dyn Iterator<Item = NodeId>>;
-    fn layout<R: Rng>(&self, nodes: &[NodeId], rng: &mut R) -> Layout<N>;
+    fn layout<R: Rng>(&self, nodes: &[NodeId], rng: &mut R) -> Layout;
 }

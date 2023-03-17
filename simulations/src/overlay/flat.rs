@@ -27,7 +27,7 @@ impl Overlay<CarnotNode> for FlatOverlay {
         Box::new(leaders)
     }
 
-    fn layout<R: Rng>(&self, nodes: &[NodeId], _rng: &mut R) -> Layout<CarnotNode> {
+    fn layout<R: Rng>(&self, nodes: &[NodeId], _rng: &mut R) -> Layout {
         let committees = std::iter::once((
             0,
             Committee {

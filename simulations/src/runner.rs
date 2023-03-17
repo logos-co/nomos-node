@@ -1,3 +1,4 @@
+use crate::node::carnot::{CarnotRole, CARNOT_LEADER_STEPS};
 use crate::node::{Node, NodeId, StepTime};
 use crate::overlay::Layout;
 use rand::Rng;
@@ -7,7 +8,7 @@ use std::time::Duration;
 
 pub struct ConsensusRunner<N: Node> {
     nodes: HashMap<NodeId, RefCell<N>>,
-    layout: Layout<N>,
+    layout: Layout,
     leaders: Vec<NodeId>,
 }
 
@@ -25,7 +26,7 @@ where
 {
     pub fn new<R: Rng>(
         mut rng: R,
-        layout: Layout<N>,
+        layout: Layout,
         leaders: Vec<NodeId>,
         node_settings: N::Settings,
     ) -> Self {
@@ -33,7 +34,7 @@ where
             .node_ids()
             .map(|id| {
                 let c = &layout.committees[&layout.committee(id)];
-                let node = N::new(&mut rng, id, c.role.clone(), node_settings.clone());
+                let node = N::new(&mut rng, id, node_settings.clone());
                 (id, RefCell::new(node))
             })
             .collect();
@@ -44,10 +45,7 @@ where
         }
     }
 
-    pub fn run(&mut self, reducer: Reducer) -> Report
-    where
-        N::Step: Clone,
-    {
+    pub fn run(&mut self, reducer: Reducer) -> Report {
         let leaders = &self.leaders;
         let layout = &self.layout;
 
@@ -55,12 +53,26 @@ where
         for layer_nodes in layout.layers.values().map(|committees| {
             committees
                 .iter()
-                .flat_map(|id| layout.committees[id].nodes.clone())
-                .collect::<Vec<NodeId>>()
+                .flat_map(|committee_id| {
+                    layout.committees[committee_id]
+                        .nodes
+                        .clone()
+                        .into_iter()
+                        .map(move |node_id| (*committee_id, node_id))
+                })
+                .collect::<Vec<(NodeId, NodeId)>>()
         }) {
             let times: Vec<StepTime> = layer_nodes
                 .iter()
-                .map(|id| self.nodes[id].borrow_mut().run_step())
+                .map(|(committee_id, node_id)| {
+                    let steps = match layout.committees[committee_id].role {
+                        CarnotRole::Leader => CARNOT_LEADER_STEPS,
+                        CarnotRole::Root => CARNOT_LEADER_STEPS,
+                        CarnotRole::Intermediate => CARNOT_LEADER_STEPS,
+                        CarnotRole::Leaf => CARNOT_LEADER_STEPS,
+                    };
+                    self.nodes[node_id].borrow_mut().run_steps(steps)
+                })
                 .collect();
 
             layer_times.push(times)

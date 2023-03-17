@@ -19,12 +19,12 @@ pub struct TreeSettings {
     pub depth: usize,
 }
 
-pub struct TreeOverlay<N: Node> {
-    layout: Layout<N>,
+pub struct TreeOverlay {
+    layout: Layout,
 }
 
-impl TreeOverlay<CarnotNode> {
-    pub fn build_full_binary_tree(settings: &TreeSettings) -> Layout<CarnotNode> {
+impl TreeOverlay {
+    pub fn build_full_binary_tree(settings: &TreeSettings) -> Layout {
         let committee_count = committee_count(settings.depth);
         let node_count = committee_count * settings.committee_size;
 
@@ -77,7 +77,7 @@ impl TreeOverlay<CarnotNode> {
     }
 }
 
-impl Overlay<CarnotNode> for TreeOverlay<CarnotNode> {
+impl Overlay<CarnotNode> for TreeOverlay {
     type Settings = TreeSettings;
 
     fn new(settings: Self::Settings) -> Self {
@@ -98,7 +98,7 @@ impl Overlay<CarnotNode> for TreeOverlay<CarnotNode> {
         Box::new(leaders)
     }
 
-    fn layout<R: rand::Rng>(&self, _nodes: &[NodeId], _rng: &mut R) -> Layout<CarnotNode> {
+    fn layout<R: rand::Rng>(&self, _nodes: &[NodeId], _rng: &mut R) -> Layout {
         self.layout.clone()
     }
 }
