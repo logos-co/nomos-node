@@ -115,7 +115,7 @@ fn get_parent_id(id: usize) -> usize {
 
 /// Get a layer in a tree of a given committee id.
 fn get_layer(id: usize) -> usize {
-    (id as f64).log2().floor() as usize
+    (id as f64 + 1.).log2().floor() as usize
 }
 
 #[cfg(test)]
@@ -187,13 +187,27 @@ mod tests {
     fn check_committee_role() {
         let layout = TreeOverlay::build_full_binary_tree(&TreeSettings {
             tree_type: TreeType::FullBinaryTree,
-            depth: 10,
-            committee_size: 10,
+            depth: 3,
+            committee_size: 1,
         });
 
         assert_eq!(layout.committees[&0].role, CarnotRole::Root);
         assert_eq!(layout.committees[&1].role, CarnotRole::Intermediate);
         assert_eq!(layout.committees[&2].role, CarnotRole::Intermediate);
-        assert_eq!(layout.committees[&1022].role, CarnotRole::Leaf);
+        assert_eq!(layout.committees[&3].role, CarnotRole::Leaf);
+        assert_eq!(layout.committees[&6].role, CarnotRole::Leaf);
+    }
+
+    #[test]
+    fn check_layers() {
+        let layout = TreeOverlay::build_full_binary_tree(&TreeSettings {
+            tree_type: TreeType::FullBinaryTree,
+            depth: 4,
+            committee_size: 1,
+        });
+
+        assert_eq!(layout.layers[&0], vec![0]);
+        assert_eq!(layout.layers[&1], vec![1, 2]);
+        assert_eq!(layout.layers[&2], vec![3, 4, 5, 6]);
     }
 }

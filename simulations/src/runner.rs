@@ -1,10 +1,12 @@
 use crate::node::{Node, NodeId, StepTime};
 use crate::overlay::Layout;
 use rand::Rng;
+use std::cell::RefCell;
+use std::collections::HashMap;
 use std::time::Duration;
 
 pub struct ConsensusRunner<N: Node> {
-    nodes: Vec<N>,
+    nodes: HashMap<NodeId, RefCell<N>>,
     layout: Layout<N>,
     leaders: Vec<NodeId>,
 }
@@ -31,7 +33,8 @@ where
             .node_ids()
             .map(|id| {
                 let c = &layout.committees[&layout.committee(id)];
-                N::new(&mut rng, id, c.role.clone(), node_settings.clone())
+                let node = N::new(&mut rng, id, c.role.clone(), node_settings.clone());
+                (id, RefCell::new(node))
             })
             .collect();
         Self {
@@ -39,10 +42,6 @@ where
             layout,
             leaders,
         }
-    }
-
-    pub fn node_ids(&self) -> impl Iterator<Item = NodeId> + '_ {
-        self.nodes.iter().map(Node::id)
     }
 
     pub fn run(&mut self, reducer: Reducer) -> Report
@@ -61,7 +60,7 @@ where
         }) {
             let times: Vec<StepTime> = layer_nodes
                 .iter()
-                .map(|id| self.nodes[*id].run_step())
+                .map(|id| self.nodes[id].borrow_mut().run_step())
                 .collect();
 
             layer_times.push(times)
@@ -85,6 +84,7 @@ mod test {
     use crate::overlay::tree::{TreeOverlay, TreeSettings, TreeType};
     use crate::overlay::Overlay;
     use crate::runner::{ConsensusRunner, Reducer};
+    use rand::rngs::mock::StepRng;
     use rand::rngs::SmallRng;
     use rand::{Rng, SeedableRng};
     use std::rc::Rc;
@@ -144,18 +144,37 @@ mod test {
 
     #[test]
     fn run_tree_committee() {
-        let mut rng = SmallRng::seed_from_u64(0);
+        let mut rng = StepRng::new(1, 0);
 
         let overlay = TreeOverlay::new(TreeSettings {
             tree_type: TreeType::FullBinaryTree,
-            depth: 10,
-            committee_size: 10,
+            depth: 3,
+            committee_size: 1,
         });
 
         let mut runner: ConsensusRunner<CarnotNode> = setup_runner(&mut rng, &overlay);
 
+        // # Root - 1 node
+        // - 100ms - [IGNORED, no parent] ReceiveProposal,
+        // -   1s  - ValidateProposal,
+        // - 100ms - ReceiveVote,
+        // -   1s  - ValidateVote,
+        // Expected times [2.1s]
+        //
+        // # Intermediary - 2 nodes
+        // - 100ms - ReceiveProposal,
+        // -   1s  - ValidateProposal,
+        // - 100ms - ReceiveVote,
+        // -   1s  - ValidateVote,
+        // Expected times [2.2s, 2.2s]
+        //
+        // # Leaf - 4 nodes
+        // - 100ms - ReceiveProposal
+        // -   1s  - ValidateProposal
+        // Expected times [1.1s, 1.1s, 1.1s, 1.1s]
+
         assert_eq!(
-            Duration::from_millis(200),
+            Duration::from_millis(5400),
             runner
                 .run(Box::new(|times: &[StepTime]| *times.iter().max().unwrap()) as Reducer)
                 .round_time

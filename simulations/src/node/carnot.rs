@@ -2,6 +2,7 @@
 use std::collections::HashMap;
 use std::hash::Hash;
 use std::rc::Rc;
+use std::time::Duration;
 // crates
 use rand::prelude::SmallRng;
 use rand::{Rng, SeedableRng};
@@ -162,9 +163,9 @@ impl Node for CarnotNode {
     fn run_step(&mut self) -> StepTime {
         match self.role {
             CarnotRole::Leader => solve_steps(self, CARNOT_LEADER_STEPS),
-            CarnotRole::Root => todo!(),
-            CarnotRole::Intermediate => todo!(),
-            CarnotRole::Leaf => todo!(),
+            CarnotRole::Root => solve_steps(self, CARNOT_ROOT_STEPS),
+            CarnotRole::Intermediate => solve_steps(self, CARNOT_INTERMEDIATE_STEPS),
+            CarnotRole::Leaf => solve_steps(self, CARNOT_LEAF_STEPS),
         }
     }
 }
@@ -176,14 +177,16 @@ fn solve_steps(node: &mut CarnotNode, steps: &[CarnotStep]) -> StepTime {
         .iter()
         .map(|step| match node.settings.steps_costs.get(step) {
             Some(Plain(t)) => *t,
-            Some(ParentCommitteeReceiverSolver(solver)) => solver(
-                &mut node.rng,
-                node.id,
-                node.settings
+            Some(ParentCommitteeReceiverSolver(solver)) => {
+                match node
+                    .settings
                     .layout
-                    .parent_nodes(node.settings.layout.committee(node.id)),
-                &node.settings.network,
-            ),
+                    .parent_nodes(node.settings.layout.committee(node.id))
+                {
+                    Some(parent) => solver(&mut node.rng, node.id, &parent, &node.settings.network),
+                    None => Duration::ZERO,
+                }
+            }
             Some(ChildCommitteeReceiverSolver(solver)) => solver(
                 &mut node.rng,
                 node.id,

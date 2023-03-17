@@ -65,12 +65,13 @@ impl<N: Node + Clone> Layout<N> {
         &self.committees[&committee_id]
     }
 
-    pub fn parent(&self, committee_id: CommitteeId) -> CommitteeId {
-        self.parent[&committee_id]
+    pub fn parent(&self, committee_id: CommitteeId) -> Option<CommitteeId> {
+        self.parent.get(&committee_id).copied()
     }
 
-    pub fn parent_nodes(&self, committee_id: CommitteeId) -> &Committee<N> {
-        &self.committees[&self.parent(committee_id)]
+    pub fn parent_nodes(&self, committee_id: CommitteeId) -> Option<Committee<N>> {
+        self.parent(committee_id)
+            .map(|c| self.committees[&c].clone())
     }
 
     pub fn children(&self, committee_id: CommitteeId) -> &[CommitteeId] {
