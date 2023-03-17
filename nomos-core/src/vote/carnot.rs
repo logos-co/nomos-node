@@ -71,7 +71,8 @@ pub struct CarnotTally {
 #[async_trait::async_trait]
 impl Tally for CarnotTally {
     type Vote = Vote;
-    type Outcome = QuorumCertificate;
+    type Qc = QuorumCertificate;
+    type Outcome = Self::Qc;
     type TallyError = CarnotTallyError;
     type Settings = CarnotTallySettings;
 

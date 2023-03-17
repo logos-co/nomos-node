@@ -46,7 +46,8 @@ impl MockQc {
 #[async_trait::async_trait]
 impl Tally for MockTally {
     type Vote = MockVote;
-    type Outcome = MockQc;
+    type Qc = MockQc;
+    type Outcome = Self::Qc;
     type TallyError = Error;
     type Settings = MockTallySettings;
 

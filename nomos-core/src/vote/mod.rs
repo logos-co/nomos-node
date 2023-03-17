@@ -6,6 +6,7 @@ use futures::Stream;
 #[async_trait::async_trait]
 pub trait Tally {
     type Vote;
+    type Qc;
     type Outcome;
     type TallyError;
     type Settings: Clone;
