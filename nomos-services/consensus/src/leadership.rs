@@ -52,10 +52,12 @@ where
         let ancestor_hint = [0; 32];
         if view.is_leader(self.key.key) {
             let (tx, rx) = tokio::sync::oneshot::channel();
-            self.mempool.send(MempoolMsg::View {
-                ancestor_hint,
-                reply_channel: tx,
-            }).await;
+            self.mempool
+                .send(MempoolMsg::View {
+                    ancestor_hint,
+                    reply_channel: tx,
+                })
+                .await;
             let iter = rx.await.unwrap();
 
             LeadershipResult::Leader {

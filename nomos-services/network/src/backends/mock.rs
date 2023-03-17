@@ -253,6 +253,7 @@ impl NetworkBackend for Mock {
             MockBackendMessage::BootProducer { spawner } => {
                 tracing::info!("booting producer");
                 let this = self.clone();
+                #[allow(clippy::redundant_async_block)]
                 match (spawner)(Box::pin(async move { this.run_producer_handler().await })) {
                     Ok(_) => {}
                     Err(e) => {

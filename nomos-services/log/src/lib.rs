@@ -97,6 +97,7 @@ impl ServiceCore for Logger {
         let (non_blocking, _guard) = match config.backend {
             LoggerBackend::Gelf { addr } => {
                 let (layer, mut task) = tracing_gelf::Logger::builder().connect_tcp(addr).unwrap();
+                #[allow(clippy::redundant_async_block)]
                 service_state
                     .overwatch_handle
                     .runtime()
