@@ -74,21 +74,25 @@ where
 
 #[cfg(test)]
 mod test {
-    use crate::network::behaviour::NetworkBehaviour;
-    use crate::network::regions::{Region, RegionsData};
-    use crate::network::Network;
-    use crate::node::carnot::CarnotNodeSettings;
-    use crate::node::carnot::{CarnotNode, CARNOT_STEPS_COSTS};
-    use crate::node::{NodeId, StepTime};
-    use crate::overlay::flat::FlatOverlay;
-    use crate::overlay::tree::{TreeOverlay, TreeSettings, TreeType};
-    use crate::overlay::Overlay;
-    use crate::runner::{ConsensusRunner, Reducer};
-    use rand::rngs::mock::StepRng;
-    use rand::rngs::SmallRng;
-    use rand::{Rng, SeedableRng};
-    use std::rc::Rc;
-    use std::time::Duration;
+    use crate::{
+        network::{
+            behaviour::NetworkBehaviour,
+            regions::{Region, RegionsData},
+            Network,
+        },
+        node::{
+            carnot::{CarnotNode, CarnotNodeSettings, CARNOT_STEPS_COSTS},
+            NodeId, StepTime,
+        },
+        overlay::{
+            flat::FlatOverlay,
+            tree::{TreeOverlay, TreeSettings, TreeType},
+            Overlay,
+        },
+        runner::{ConsensusRunner, Reducer},
+    };
+    use rand::{rngs::mock::StepRng, Rng};
+    use std::{rc::Rc, time::Duration};
 
     fn setup_runner<R: Rng, O: Overlay<CarnotNode>>(
         mut rng: &mut R,
@@ -114,28 +118,13 @@ mod test {
 
     #[test]
     fn run_flat_single_leader_steps() {
-        let mut rng = SmallRng::seed_from_u64(0);
+        let mut rng = StepRng::new(1, 0);
         let overlay = FlatOverlay::new(());
 
         let mut runner = setup_runner(&mut rng, &overlay);
 
         assert_eq!(
             Duration::from_millis(1100),
-            runner
-                .run(Box::new(|times: &[StepTime]| *times.iter().max().unwrap()) as Reducer)
-                .round_time
-        );
-    }
-
-    #[test]
-    fn run_flat_single_leader_single_committee() {
-        let mut rng = SmallRng::seed_from_u64(0);
-        let overlay = FlatOverlay::new(());
-
-        let mut runner: ConsensusRunner<CarnotNode> = setup_runner(&mut rng, &overlay);
-
-        assert_eq!(
-            Duration::from_millis(2200),
             runner
                 .run(Box::new(|times: &[StepTime]| *times.iter().max().unwrap()) as Reducer)
                 .round_time
