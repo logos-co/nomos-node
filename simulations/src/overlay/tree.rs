@@ -88,6 +88,10 @@ impl Overlay<CarnotNode> for TreeOverlay {
         Self { layout }
     }
 
+    fn nodes(&self) -> Vec<NodeId> {
+        self.layout.node_ids().collect()
+    }
+
     fn leaders<R: rand::Rng>(
         &self,
         nodes: &[NodeId],

@@ -17,6 +17,10 @@ impl Overlay<CarnotNode> for FlatOverlay {
         Self
     }
 
+    fn nodes(&self) -> Vec<NodeId> {
+        (0..10).collect()
+    }
+
     fn leaders<R: Rng>(
         &self,
         nodes: &[NodeId],

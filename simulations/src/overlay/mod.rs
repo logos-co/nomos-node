@@ -94,6 +94,7 @@ pub trait Overlay<N: Node> {
     type Settings;
 
     fn new(settings: Self::Settings) -> Self;
+    fn nodes(&self) -> Vec<NodeId>;
     fn leaders<R: Rng>(
         &self,
         nodes: &[NodeId],
