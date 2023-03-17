@@ -6,7 +6,7 @@ use rand::seq::IteratorRandom;
 use super::{Committee, Layout, Overlay};
 use crate::node::{
     carnot::{CarnotNode, CarnotRole},
-    Node, NodeId,
+    NodeId,
 };
 
 pub enum TreeType {

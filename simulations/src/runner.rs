@@ -1,4 +1,7 @@
-use crate::node::carnot::{CarnotRole, CARNOT_LEADER_STEPS};
+use crate::node::carnot::{
+    CarnotRole, CARNOT_INTERMEDIATE_STEPS, CARNOT_LEADER_STEPS, CARNOT_LEAF_STEPS,
+    CARNOT_ROOT_STEPS,
+};
 use crate::node::{Node, NodeId, StepTime};
 use crate::overlay::Layout;
 use rand::Rng;
@@ -8,8 +11,8 @@ use std::time::Duration;
 
 pub struct ConsensusRunner<N: Node> {
     nodes: HashMap<NodeId, RefCell<N>>,
-    layout: Layout,
     leaders: Vec<NodeId>,
+    layout: Layout,
 }
 
 #[allow(dead_code)]
@@ -33,7 +36,6 @@ where
         let nodes = layout
             .node_ids()
             .map(|id| {
-                let c = &layout.committees[&layout.committee(id)];
                 let node = N::new(&mut rng, id, node_settings.clone());
                 (id, RefCell::new(node))
             })
@@ -49,6 +51,15 @@ where
         let leaders = &self.leaders;
         let layout = &self.layout;
 
+        let mut leader_times = leaders
+            .iter()
+            .map(|leader_node| {
+                vec![self.nodes[leader_node]
+                    .borrow_mut()
+                    .run_steps(CARNOT_LEADER_STEPS)]
+            })
+            .collect();
+
         let mut layer_times = Vec::new();
         for layer_nodes in layout.layers.values().map(|committees| {
             committees
@@ -58,7 +69,7 @@ where
                         .nodes
                         .clone()
                         .into_iter()
-                        .map(move |node_id| (*committee_id, node_id))
+                        .map(|node_id| (*committee_id, node_id))
                 })
                 .collect::<Vec<(NodeId, NodeId)>>()
         }) {
@@ -66,10 +77,10 @@ where
                 .iter()
                 .map(|(committee_id, node_id)| {
                     let steps = match layout.committees[committee_id].role {
-                        CarnotRole::Leader => CARNOT_LEADER_STEPS,
-                        CarnotRole::Root => CARNOT_LEADER_STEPS,
-                        CarnotRole::Intermediate => CARNOT_LEADER_STEPS,
-                        CarnotRole::Leaf => CARNOT_LEADER_STEPS,
+                        CarnotRole::Root => CARNOT_ROOT_STEPS,
+                        CarnotRole::Intermediate => CARNOT_INTERMEDIATE_STEPS,
+                        CarnotRole::Leaf => CARNOT_LEAF_STEPS,
+                        _ => panic!("invalid committee role"),
                     };
                     self.nodes[node_id].borrow_mut().run_steps(steps)
                 })
@@ -78,6 +89,7 @@ where
             layer_times.push(times)
         }
 
+        layer_times.append(&mut leader_times);
         let round_time = layer_times.iter().map(|d| reducer(d)).sum();
 
         Report { round_time }
@@ -118,11 +130,12 @@ mod test {
         .collect();
         let node_ids: Vec<NodeId> = (0..10).collect();
         let layout = overlay.layout(&node_ids, &mut rng);
-        let leaders = overlay.leaders(&node_ids, 1, &mut rng).collect();
+        let leaders: Vec<NodeId> = overlay.leaders(&node_ids, 1, &mut rng).collect();
         let node_settings: CarnotNodeSettings = CarnotNodeSettings {
             steps_costs: CARNOT_STEPS_COSTS.iter().cloned().collect(),
             network: Network::new(RegionsData::new(regions, network_behaviour)),
             layout: overlay.layout(&node_ids, &mut rng),
+            leaders: leaders.clone(),
         };
 
         ConsensusRunner::new(&mut rng, layout, leaders, Rc::new(node_settings))
