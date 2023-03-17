@@ -10,7 +10,7 @@ use tokio::sync::oneshot::Sender;
 // internal
 use crate::network::NetworkAdapter;
 use backend::MemPool;
-use nomos_core::block::{BlockHeader, BlockId};
+use nomos_core::block::BlockId;
 use nomos_core::tx::Transaction;
 use nomos_network::NetworkService;
 use overwatch_rs::services::{
@@ -57,7 +57,7 @@ pub enum MempoolMsg<Tx: Transaction> {
     },
     MarkInBlock {
         ids: Vec<Tx::Hash>,
-        block: BlockHeader,
+        block: BlockId,
     },
     Metrics {
         reply_channel: Sender<MempoolMetrics>,

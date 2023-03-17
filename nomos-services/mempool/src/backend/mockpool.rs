@@ -6,7 +6,7 @@ use std::{collections::BTreeMap, time::UNIX_EPOCH};
 // crates
 // internal
 use crate::backend::{MemPool, MempoolError};
-use nomos_core::block::{BlockHeader, BlockId};
+use nomos_core::block::BlockId;
 use nomos_core::tx::Transaction;
 
 /// A mock mempool implementation that stores all transactions in memory in the order received.
@@ -73,16 +73,16 @@ where
         Box::new(pending_txs.into_iter())
     }
 
-    fn mark_in_block(&mut self, txs: &[<Self::Tx as Transaction>::Hash], block: BlockHeader) {
+    fn mark_in_block(&mut self, txs: &[<Self::Tx as Transaction>::Hash], block: BlockId) {
         let mut txs_in_block = Vec::with_capacity(txs.len());
         for tx_id in txs.iter() {
             if let Some(tx) = self.pending_txs.remove(tx_id) {
                 txs_in_block.push(tx);
             }
         }
-        let block_entry = self.in_block_txs.entry(block.id()).or_default();
+        let block_entry = self.in_block_txs.entry(block).or_default();
         self.in_block_txs_by_id
-            .extend(txs.iter().cloned().map(|tx| (tx, block.id())));
+            .extend(txs.iter().cloned().map(|tx| (tx, block)));
         block_entry.append(&mut txs_in_block);
     }
 

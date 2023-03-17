@@ -117,6 +117,7 @@ where
     Network: NetworkAdapter + Sync,
     Fountain: FountainCode + Sync,
     VoteTally: Tally + Sync,
+    VoteTally::Qc: serde::de::DeserializeOwned + Clone + Send + Sync + 'static,
     TxId: serde::de::DeserializeOwned + Clone + Hash + Eq + Send + Sync + 'static,
 {
     // we still need view here to help us initialize
@@ -130,13 +131,13 @@ where
         view: &View,
         adapter: &Network,
         fountain: &Fountain,
-    ) -> Result<Block<TxId>, FountainError> {
+    ) -> Result<Block<VoteTally::Qc, TxId>, FountainError> {
         assert_eq!(view.view_n, self.view_n, "view_n mismatch");
         let committee = self.committee;
         let message_stream = adapter.proposal_chunks_stream(committee, view).await;
         fountain.decode(message_stream).await.and_then(|b| {
             deserializer(&b)
-                .deserialize::<Block<TxId>>()
+                .deserialize::<Block<VoteTally::Qc, TxId>>()
                 .map_err(|e| FountainError::from(e.to_string().as_str()))
         })
     }
@@ -144,7 +145,7 @@ where
     async fn broadcast_block(
         &self,
         view: &View,
-        block: Block<TxId>,
+        block: Block<VoteTally::Qc, TxId>,
         adapter: &Network,
         fountain: &Fountain,
     ) {
@@ -173,7 +174,7 @@ where
     async fn approve_and_forward(
         &self,
         view: &View,
-        _block: &Block<TxId>,
+        _block: &Block<VoteTally::Qc, TxId>,
         _adapter: &Network,
         _tally: &VoteTally,
         _next_view: &View,
@@ -189,12 +190,7 @@ where
         todo!()
     }
 
-    async fn build_qc(
-        &self,
-        view: &View,
-        _adapter: &Network,
-        _tally: &VoteTally,
-    ) -> VoteTally::Outcome {
+    async fn build_qc(&self, view: &View, _adapter: &Network, _tally: &VoteTally) -> VoteTally::Qc {
         assert_eq!(view.view_n, self.view_n, "view_n mismatch");
         // maybe the leader publishing the QC?
         todo!()

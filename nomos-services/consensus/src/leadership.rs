@@ -2,8 +2,8 @@
 use std::marker::PhantomData;
 // crates
 // internal
+use nomos_core::crypto::PrivateKey;
 use nomos_core::tx::Transaction;
-use nomos_core::{block::BlockHeader, crypto::PrivateKey};
 use nomos_mempool::MempoolMsg;
 
 use super::*;
@@ -18,9 +18,9 @@ pub struct Leadership<Tx: Transaction> {
     mempool: OutboundRelay<MempoolMsg<Tx>>,
 }
 
-pub enum LeadershipResult<'view, TxId: Clone + Eq + core::hash::Hash> {
+pub enum LeadershipResult<'view, Qc: Clone, TxId: Clone + Eq + core::hash::Hash> {
     Leader {
-        block: Block<TxId>,
+        block: Block<Qc, TxId>,
         _view: PhantomData<&'view u8>,
     },
     NotLeader {
@@ -41,12 +41,12 @@ where
     }
 
     #[allow(unused, clippy::diverging_sub_expression)]
-    pub async fn try_propose_block<'view, Qc>(
+    pub async fn try_propose_block<'view, Qc: Clone>(
         &self,
         view: &'view View,
         tip: &Tip,
         qc: Qc,
-    ) -> LeadershipResult<'view, Tx::Hash> {
+    ) -> LeadershipResult<'view, Qc, Tx::Hash> {
         // TODO: get the correct ancestor for the tip
         // let ancestor_hint = todo!("get the ancestor from the tip");
         let ancestor_hint = [0; 32];
@@ -60,10 +60,7 @@ where
 
             LeadershipResult::Leader {
                 _view: PhantomData,
-                block: Block::new(
-                    BlockHeader::default(),
-                    iter.map(|ref tx| <Tx as Transaction>::hash(tx)),
-                ),
+                block: Block::new(qc, iter.map(|ref tx| <Tx as Transaction>::hash(tx))),
             }
         } else {
             LeadershipResult::NotLeader { _view: PhantomData }

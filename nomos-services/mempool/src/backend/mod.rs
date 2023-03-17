@@ -1,7 +1,7 @@
 #[cfg(feature = "mock")]
 pub mod mockpool;
 
-use nomos_core::block::{BlockHeader, BlockId};
+use nomos_core::block::BlockId;
 use nomos_core::tx::Transaction;
 
 #[derive(thiserror::Error, Debug)]
@@ -30,7 +30,7 @@ pub trait MemPool {
     fn view(&self, ancestor_hint: BlockId) -> Box<dyn Iterator<Item = Self::Tx> + Send>;
 
     /// Record that a set of transactions were included in a block
-    fn mark_in_block(&mut self, txs: &[<Self::Tx as Transaction>::Hash], block: BlockHeader);
+    fn mark_in_block(&mut self, txs: &[<Self::Tx as Transaction>::Hash], block: BlockId);
 
     /// Returns all of the transactions for the block
     #[cfg(test)]

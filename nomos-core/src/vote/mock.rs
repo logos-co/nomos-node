@@ -46,7 +46,8 @@ impl MockQc {
 #[async_trait::async_trait]
 impl Tally for MockTally {
     type Vote = MockVote;
-    type Outcome = MockQc;
+    type Qc = MockQc;
+    type Outcome = ();
     type TallyError = Error;
     type Settings = MockTallySettings;
 
@@ -59,7 +60,7 @@ impl Tally for MockTally {
         &self,
         view: u64,
         mut vote_stream: S,
-    ) -> Result<Self::Outcome, Self::TallyError> {
+    ) -> Result<(Self::Qc, Self::Outcome), Self::TallyError> {
         let mut count_votes = 0;
         while let Some(vote) = vote_stream.next().await {
             if vote.view() != view {
@@ -67,7 +68,7 @@ impl Tally for MockTally {
             }
             count_votes += 1;
             if count_votes > self.threshold {
-                return Ok(MockQc { count_votes });
+                return Ok((MockQc { count_votes }, ()));
             }
         }
         Err(Error("Not enough votes".into()))

@@ -20,7 +20,8 @@ pub trait Overlay<
     Fountain: FountainCode,
     VoteTally: Tally,
     TxId: Clone + Eq + Hash,
->
+> where
+    VoteTally::Qc: Clone,
 {
     fn new(view: &View, node: NodeId) -> Self;
 
@@ -29,11 +30,11 @@ pub trait Overlay<
         view: &View,
         adapter: &Network,
         fountain: &Fountain,
-    ) -> Result<Block<TxId>, FountainError>;
+    ) -> Result<Block<VoteTally::Qc, TxId>, FountainError>;
     async fn broadcast_block(
         &self,
         view: &View,
-        block: Block<TxId>,
+        block: Block<VoteTally::Qc, TxId>,
         adapter: &Network,
         fountain: &Fountain,
     );
@@ -43,7 +44,7 @@ pub trait Overlay<
     async fn approve_and_forward(
         &self,
         view: &View,
-        block: &Block<TxId>,
+        block: &Block<VoteTally::Qc, TxId>,
         adapter: &Network,
         vote_tally: &VoteTally,
         next_view: &View,
@@ -54,5 +55,5 @@ pub trait Overlay<
         view: &View,
         adapter: &Network,
         vote_tally: &VoteTally,
-    ) -> VoteTally::Outcome;
+    ) -> VoteTally::Qc;
 }
