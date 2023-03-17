@@ -133,8 +133,8 @@ pub fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .open(f)?;
             file.write_all(json.as_bytes())?;
         }
-        OutputType::StdOut => println!("{}", json),
-        OutputType::StdErr => eprintln!("{}", json),
+        OutputType::StdOut => println!("{json}"),
+        OutputType::StdErr => eprintln!("{json}"),
     }
     Ok(())
 }
