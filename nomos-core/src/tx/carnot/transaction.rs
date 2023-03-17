@@ -7,7 +7,7 @@ use crate::crypto::Signature;
 /// but does not imply that it can be successfully applied
 /// to the ledger.
 #[derive(Clone, Debug)]
-pub struct Transaction {
+pub struct TransferTransaction {
     pub from: AccountId,
     pub to: AccountId,
     pub value: u64,
@@ -26,26 +26,26 @@ mod serde {
     // This would also allow to control ser/de independently from the Rust
     // representation.
     #[derive(Serialize, Deserialize)]
-    struct WireTransaction {
+    struct WireTransferTransaction {
         from: AccountId,
         to: AccountId,
         value: u64,
         signature: Signature,
     }
 
-    impl<'de> Deserialize<'de> for Transaction {
+    impl<'de> Deserialize<'de> for TransferTransaction {
         fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
         where
             D: Deserializer<'de>,
         {
-            let WireTransaction {
+            let WireTransferTransaction {
                 from,
                 to,
                 value,
                 signature,
-            } = WireTransaction::deserialize(deserializer)?;
+            } = WireTransferTransaction::deserialize(deserializer)?;
             //TODO: check signature
-            Ok(Transaction {
+            Ok(TransferTransaction {
                 from,
                 to,
                 value,
@@ -54,12 +54,12 @@ mod serde {
         }
     }
 
-    impl Serialize for Transaction {
+    impl Serialize for TransferTransaction {
         fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
         where
             S: Serializer,
         {
-            WireTransaction {
+            WireTransferTransaction {
                 from: self.from.clone(),
                 to: self.to.clone(),
                 value: self.value,

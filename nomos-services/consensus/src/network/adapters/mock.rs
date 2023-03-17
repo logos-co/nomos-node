@@ -7,15 +7,17 @@ use nomos_network::{
     NetworkMsg, NetworkService,
 };
 use overwatch_rs::services::{relay::OutboundRelay, ServiceData};
+use serde::de::DeserializeOwned;
+use serde::Serialize;
 use tokio_stream::{wrappers::BroadcastStream, Stream};
 
 use crate::{
     network::{
-        messages::{ApprovalMsg, ProposalChunkMsg},
+        messages::{ProposalChunkMsg, VoteMsg},
         NetworkAdapter,
     },
     overlay::committees::Committee,
-    Approval, View,
+    View,
 };
 
 const MOCK_PUB_SUB_TOPIC: &str = "MockPubSubTopic";
@@ -106,7 +108,7 @@ impl NetworkAdapter for MockAdapter {
             .network_relay
             .send(NetworkMsg::Process(MockBackendMessage::Broadcast {
                 msg: message,
-                topic: MOCK_PUB_SUB_TOPIC,
+                topic: MOCK_PUB_SUB_TOPIC.to_string(),
             }))
             .await
         {
@@ -114,11 +116,11 @@ impl NetworkAdapter for MockAdapter {
         };
     }
 
-    async fn approvals_stream(
+    async fn votes_stream<Vote: DeserializeOwned>(
         &self,
         _committee: Committee,
         _view: &View,
-    ) -> Box<dyn Stream<Item = Approval> + Send> {
+    ) -> Box<dyn Stream<Item = Vote> + Send> {
         let stream_channel = self
             .message_subscriber_channel()
             .await
@@ -132,7 +134,7 @@ impl NetworkAdapter for MockAdapter {
                                 == message.content_topic().content_topic_name
                             {
                                 let payload = message.payload();
-                                Some(ApprovalMsg::from_bytes(payload.as_bytes()).approval)
+                                Some(VoteMsg::from_bytes(payload.as_bytes()).vote)
                             } else {
                                 None
                             }
@@ -144,12 +146,14 @@ impl NetworkAdapter for MockAdapter {
         )
     }
 
-    async fn forward_approval(
+    async fn forward_approval<Vote: Serialize>(
         &self,
         _committee: Committee,
         _view: &View,
-        approval_message: ApprovalMsg,
-    ) {
+        approval_message: VoteMsg<Vote>,
+    ) where
+        Vote: Send,
+    {
         let message = MockMessage::new(
             String::from_utf8_lossy(&approval_message.as_bytes()).to_string(),
             MOCK_APPROVAL_CONTENT_TOPIC,
@@ -160,7 +164,7 @@ impl NetworkAdapter for MockAdapter {
             .network_relay
             .send(NetworkMsg::Process(MockBackendMessage::Broadcast {
                 msg: message,
-                topic: MOCK_PUB_SUB_TOPIC,
+                topic: MOCK_PUB_SUB_TOPIC.to_string(),
             }))
             .await
         {

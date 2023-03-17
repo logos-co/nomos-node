@@ -11,6 +11,7 @@ use rand::{
 };
 use serde::{Deserialize, Serialize};
 use std::{
+    borrow::Cow,
     collections::{HashMap, HashSet},
     sync::{Arc, Mutex},
 };
@@ -21,11 +22,11 @@ const BROADCAST_CHANNEL_BUF: usize = 16;
 
 pub type MockMessageVersion = usize;
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub struct MockContentTopic {
-    pub application_name: &'static str,
+    pub application_name: Cow<'static, str>,
     pub version: usize,
-    pub content_topic_name: &'static str,
+    pub content_topic_name: Cow<'static, str>,
 }
 
 impl MockContentTopic {
@@ -35,25 +36,27 @@ impl MockContentTopic {
         content_topic_name: &'static str,
     ) -> Self {
         Self {
-            application_name,
+            application_name: Cow::Borrowed(application_name),
             version,
-            content_topic_name,
+            content_topic_name: Cow::Borrowed(content_topic_name),
         }
     }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct MockPubSubTopic {
-    pub topic_name: &'static str,
+    pub topic_name: Cow<'static, str>,
 }
 
 impl MockPubSubTopic {
     pub const fn new(topic_name: &'static str) -> Self {
-        Self { topic_name }
+        Self {
+            topic_name: Cow::Borrowed(topic_name),
+        }
     }
 }
 
-#[derive(Clone, PartialEq, Eq, Hash, Serialize, Debug)]
+#[derive(Clone, PartialEq, Eq, Hash, Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct MockMessage {
     pub payload: String,
@@ -81,8 +84,8 @@ impl MockMessage {
         }
     }
 
-    pub const fn content_topic(&self) -> MockContentTopic {
-        self.content_topic
+    pub const fn content_topic(&self) -> &MockContentTopic {
+        &self.content_topic
     }
 
     pub fn payload(&self) -> String {
@@ -92,9 +95,9 @@ impl MockMessage {
 
 #[derive(Clone)]
 pub struct Mock {
-    messages: Arc<Mutex<HashMap<&'static str, Vec<MockMessage>>>>,
+    messages: Arc<Mutex<HashMap<String, Vec<MockMessage>>>>,
     message_event: Sender<NetworkEvent>,
-    subscribed_topics: Arc<Mutex<HashSet<&'static str>>>,
+    subscribed_topics: Arc<Mutex<HashSet<String>>>,
     config: MockConfig,
 }
 
@@ -120,17 +123,17 @@ pub enum MockBackendMessage {
         >,
     },
     Broadcast {
-        topic: &'static str,
+        topic: String,
         msg: MockMessage,
     },
     RelaySubscribe {
-        topic: &'static str,
+        topic: String,
     },
     RelayUnSubscribe {
-        topic: &'static str,
+        topic: String,
     },
     Query {
-        topic: &'static str,
+        topic: String,
         tx: oneshot::Sender<Vec<MockMessage>>,
     },
 }
@@ -237,7 +240,7 @@ impl NetworkBackend for Mock {
                 config
                     .predefined_messages
                     .iter()
-                    .map(|p| (p.content_topic.content_topic_name, Vec::new()))
+                    .map(|p| (p.content_topic.content_topic_name.to_string(), Vec::new()))
                     .collect(),
             )),
             message_event,
@@ -273,7 +276,7 @@ impl NetworkBackend for Mock {
             }
             MockBackendMessage::RelayUnSubscribe { topic } => {
                 tracing::info!("processed relay unsubscription for topic: {topic}");
-                self.subscribed_topics.lock().unwrap().remove(topic);
+                self.subscribed_topics.lock().unwrap().remove(&topic);
             }
             MockBackendMessage::Query { topic, tx } => {
                 tracing::info!("processed query");
@@ -305,9 +308,9 @@ mod tests {
                 MockMessage {
                     payload: "foo".to_string(),
                     content_topic: MockContentTopic {
-                        application_name: "mock network",
+                        application_name: "mock network".into(),
                         version: 0,
-                        content_topic_name: "foo",
+                        content_topic_name: "foo".into(),
                     },
                     version: 0,
                     timestamp: 0,
@@ -315,9 +318,9 @@ mod tests {
                 MockMessage {
                     payload: "bar".to_string(),
                     content_topic: MockContentTopic {
-                        application_name: "mock network",
+                        application_name: "mock network".into(),
                         version: 0,
-                        content_topic_name: "bar",
+                        content_topic_name: "bar".into(),
                     },
                     version: 0,
                     timestamp: 0,
@@ -342,13 +345,13 @@ mod tests {
         // broadcast
         for val in FOO_BROADCAST_MESSAGES {
             mock.process(MockBackendMessage::Broadcast {
-                topic: "foo",
+                topic: "foo".to_string(),
                 msg: MockMessage {
                     payload: val.to_string(),
                     content_topic: MockContentTopic {
-                        application_name: "mock",
+                        application_name: "mock".into(),
                         version: 1,
-                        content_topic_name: "foo content",
+                        content_topic_name: "foo content".into(),
                     },
                     version: 1,
                     timestamp: chrono::Utc::now().timestamp() as usize,
@@ -359,13 +362,13 @@ mod tests {
 
         for val in BAR_BROADCAST_MESSAGES {
             mock.process(MockBackendMessage::Broadcast {
-                topic: "bar",
+                topic: "bar".to_string(),
                 msg: MockMessage {
                     payload: val.to_string(),
                     content_topic: MockContentTopic {
-                        application_name: "mock",
+                        application_name: "mock".into(),
                         version: 1,
-                        content_topic_name: "bar content",
+                        content_topic_name: "bar content".into(),
                     },
                     version: 1,
                     timestamp: chrono::Utc::now().timestamp() as usize,
@@ -377,7 +380,7 @@ mod tests {
         // query
         let (qtx, qrx) = oneshot::channel();
         mock.process(MockBackendMessage::Query {
-            topic: "foo",
+            topic: "foo".to_string(),
             tx: qtx,
         })
         .await;
@@ -388,20 +391,28 @@ mod tests {
         }
 
         // subscribe
-        mock.process(MockBackendMessage::RelaySubscribe { topic: "foo" })
-            .await;
-        mock.process(MockBackendMessage::RelaySubscribe { topic: "bar" })
-            .await;
+        mock.process(MockBackendMessage::RelaySubscribe {
+            topic: "foo".to_string(),
+        })
+        .await;
+        mock.process(MockBackendMessage::RelaySubscribe {
+            topic: "bar".to_string(),
+        })
+        .await;
         assert!(mock.subscribed_topics.lock().unwrap().contains("foo"));
         assert!(mock.subscribed_topics.lock().unwrap().contains("bar"));
 
         // unsubscribe
-        mock.process(MockBackendMessage::RelayUnSubscribe { topic: "foo" })
-            .await;
+        mock.process(MockBackendMessage::RelayUnSubscribe {
+            topic: "foo".to_string(),
+        })
+        .await;
         assert!(!mock.subscribed_topics.lock().unwrap().contains("foo"));
         assert!(mock.subscribed_topics.lock().unwrap().contains("bar"));
-        mock.process(MockBackendMessage::RelayUnSubscribe { topic: "bar" })
-            .await;
+        mock.process(MockBackendMessage::RelayUnSubscribe {
+            topic: "bar".to_string(),
+        })
+        .await;
         assert!(!mock.subscribed_topics.lock().unwrap().contains("foo"));
         assert!(!mock.subscribed_topics.lock().unwrap().contains("bar"));
     }

@@ -11,6 +11,7 @@ use tokio::sync::oneshot::Sender;
 use crate::network::NetworkAdapter;
 use backend::MemPool;
 use nomos_core::block::{BlockHeader, BlockId};
+use nomos_core::tx::Transaction;
 use nomos_network::NetworkService;
 use overwatch_rs::services::{
     handle::ServiceStateHandle,
@@ -25,7 +26,7 @@ where
     P: MemPool,
     P::Settings: Clone,
     P::Tx: Debug + 'static,
-    P::Id: Debug + 'static,
+    <P::Tx as Transaction>::Hash: Debug,
 {
     service_state: ServiceStateHandle<Self>,
     network_relay: Relay<NetworkService<N::Backend>>,
@@ -34,9 +35,10 @@ where
 
 pub struct MempoolMetrics {
     pub pending_txs: usize,
+    pub last_tx_timestamp: u64,
 }
 
-pub enum MempoolMsg<Tx, Id> {
+pub enum MempoolMsg<Tx: Transaction> {
     AddTx {
         tx: Tx,
         reply_channel: Sender<Result<(), ()>>,
@@ -46,10 +48,15 @@ pub enum MempoolMsg<Tx, Id> {
         reply_channel: Sender<Box<dyn Iterator<Item = Tx> + Send>>,
     },
     Prune {
-        ids: Vec<Id>,
+        ids: Vec<Tx::Hash>,
+    },
+    #[cfg(test)]
+    BlockTransaction {
+        block: BlockId,
+        reply_channel: Sender<Option<Box<dyn Iterator<Item = Tx> + Send>>>,
     },
     MarkInBlock {
-        ids: Vec<Id>,
+        ids: Vec<Tx::Hash>,
         block: BlockHeader,
     },
     Metrics {
@@ -57,7 +64,10 @@ pub enum MempoolMsg<Tx, Id> {
     },
 }
 
-impl<Tx: Debug, Id: Debug> Debug for MempoolMsg<Tx, Id> {
+impl<Tx: Transaction + Debug> Debug for MempoolMsg<Tx>
+where
+    Tx::Hash: Debug,
+{
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
         match self {
             Self::View { ancestor_hint, .. } => {
@@ -71,12 +81,16 @@ impl<Tx: Debug, Id: Debug> Debug for MempoolMsg<Tx, Id> {
                     "MempoolMsg::MarkInBlock{{ids: {ids:?}, block: {block:?}}}"
                 )
             }
+            #[cfg(test)]
+            Self::BlockTransaction { block, .. } => {
+                write!(f, "MempoolMsg::BlockTransaction{{block: {block:?}}}")
+            }
             Self::Metrics { .. } => write!(f, "MempoolMsg::Metrics"),
         }
     }
 }
 
-impl<Tx: 'static, Id: 'static> RelayMessage for MempoolMsg<Tx, Id> {}
+impl<Tx: Transaction + 'static> RelayMessage for MempoolMsg<Tx> {}
 
 impl<N, P> ServiceData for MempoolService<N, P>
 where
@@ -84,13 +98,13 @@ where
     P: MemPool,
     P::Settings: Clone,
     P::Tx: Debug + 'static,
-    P::Id: Debug + 'static,
+    <P::Tx as Transaction>::Hash: Debug,
 {
     const SERVICE_ID: ServiceId = "Mempool";
     type Settings = P::Settings;
     type State = NoState<Self::Settings>;
     type StateOperator = NoOperator<Self::State>;
-    type Message = MempoolMsg<<P as MemPool>::Tx, <P as MemPool>::Id>;
+    type Message = MempoolMsg<<P as MemPool>::Tx>;
 }
 
 #[async_trait::async_trait]
@@ -98,8 +112,8 @@ impl<N, P> ServiceCore for MempoolService<N, P>
 where
     P: MemPool + Send + 'static,
     P::Settings: Clone + Send + Sync + 'static,
-    P::Id: Debug + Send + 'static,
-    P::Tx: Clone + Debug + Send + Sync + 'static,
+    P::Tx: Transaction + Clone + Debug + Send + Sync + 'static,
+    <P::Tx as Transaction>::Hash: Debug + Send + Sync + 'static,
     N: NetworkAdapter<Tx = P::Tx> + Send + Sync + 'static,
 {
     fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, overwatch_rs::DynError> {
@@ -151,10 +165,17 @@ where
                         MempoolMsg::MarkInBlock { ids, block } => {
                             pool.mark_in_block(&ids, block);
                         }
+                        #[cfg(test)]
+                        MempoolMsg::BlockTransaction { block, reply_channel } => {
+                            reply_channel.send(pool.block_transactions(block)).unwrap_or_else(|_| {
+                                tracing::debug!("could not send back block transactions")
+                            });
+                        }
                         MempoolMsg::Prune { ids } => { pool.prune(&ids); },
                         MempoolMsg::Metrics { reply_channel } => {
                             let metrics = MempoolMetrics {
                                 pending_txs: pool.pending_tx_count(),
+                                last_tx_timestamp: pool.last_tx_timestamp(),
                             };
                             reply_channel.send(metrics).unwrap_or_else(|_| {
                                 tracing::debug!("could not send back mempool metrics")

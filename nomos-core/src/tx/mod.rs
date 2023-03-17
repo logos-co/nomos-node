@@ -1,11 +1,20 @@
+use std::hash::Hash;
+// std
+// crates
+use bytes::Bytes;
+// internal
+
+pub mod carnot;
 #[cfg(feature = "mock")]
 pub mod mock;
-mod transaction;
 
-use serde::{Deserialize, Serialize};
-pub use transaction::Transaction;
+pub type TransactionHasher<T> = fn(&T) -> <T as Transaction>::Hash;
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub enum Tx {
-    Transfer(Transaction),
+pub trait Transaction {
+    const HASHER: TransactionHasher<Self>;
+    type Hash: Hash + Eq + Clone;
+    fn hash(&self) -> Self::Hash {
+        Self::HASHER(self)
+    }
+    fn as_bytes(&self) -> Bytes;
 }

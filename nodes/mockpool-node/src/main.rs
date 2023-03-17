@@ -18,7 +18,7 @@ use overwatch_rs::{
 };
 use serde::Deserialize;
 use std::sync::Arc;
-use tx::{Tx, TxId};
+use tx::Tx;
 
 /// Simple program to greet a person
 #[derive(Parser, Debug)]
@@ -39,7 +39,7 @@ struct Config {
 struct MockPoolNode {
     logging: ServiceHandle<Logger>,
     network: ServiceHandle<NetworkService<Waku>>,
-    mockpool: ServiceHandle<MempoolService<WakuAdapter<Tx>, MockPool<TxId, Tx>>>,
+    mockpool: ServiceHandle<MempoolService<WakuAdapter<Tx>, MockPool<Tx>>>,
     http: ServiceHandle<HttpService<AxumBackend>>,
     bridges: ServiceHandle<HttpBridgeService>,
 }

@@ -1,6 +1,8 @@
 // std
+use std::hash::Hash;
 // crates
 use futures::StreamExt;
+use nomos_core::wire::deserializer;
 use rand::{seq::SliceRandom, SeedableRng};
 // internal
 use super::*;
@@ -8,37 +10,38 @@ use crate::network::messages::ProposalChunkMsg;
 use crate::network::NetworkAdapter;
 
 /// View of the tree overlay centered around a specific member
-pub struct Member<'view, const C: usize> {
+pub struct Member<const C: usize> {
     // id is not used now, but gonna probably used it for later checking later on
     #[allow(dead_code)]
     id: NodeId,
     committee: Committee,
-    committees: Committees<'view, C>,
+    committees: Committees<C>,
+    view_n: u64,
 }
 
 /// #Just a newtype index to be able to implement parent/children methods
 #[derive(Copy, Clone)]
 pub struct Committee(usize);
 
-pub struct Committees<'view, const C: usize> {
-    view: &'view View,
+pub struct Committees<const C: usize> {
     nodes: Box<[NodeId]>,
 }
 
-impl<'view, const C: usize> Committees<'view, C> {
-    pub fn new(view: &'view View) -> Self {
+impl<const C: usize> Committees<C> {
+    pub fn new(view: &View) -> Self {
         let mut nodes = view.staking_keys.keys().cloned().collect::<Box<[NodeId]>>();
         let mut rng = rand_chacha::ChaCha20Rng::from_seed(view.seed);
         nodes.shuffle(&mut rng);
-        Self { nodes, view }
+        Self { nodes }
     }
 
-    pub fn into_member(self, id: NodeId) -> Option<Member<'view, C>> {
+    pub fn into_member(self, id: NodeId, view: &View) -> Option<Member<C>> {
         let member_idx = self.nodes.iter().position(|m| m == &id)?;
         Some(Member {
             committee: Committee(member_idx / C),
             committees: self,
             id,
+            view_n: view.view_n,
         })
     }
 
@@ -83,7 +86,7 @@ impl Committee {
     }
 }
 
-impl<'view, const C: usize> Member<'view, C> {
+impl<const C: usize> Member<C> {
     /// Return other members of this committee
     pub fn peers(&self) -> &[NodeId] {
         self.committees
@@ -108,28 +111,45 @@ impl<'view, const C: usize> Member<'view, C> {
 }
 
 #[async_trait::async_trait]
-impl<'view, Network: NetworkAdapter + Sync, Fountain: FountainCode + Sync, const C: usize>
-    Overlay<'view, Network, Fountain> for Member<'view, C>
+impl<Network, Fountain, VoteTally, TxId, const C: usize> Overlay<Network, Fountain, VoteTally, TxId>
+    for Member<C>
+where
+    Network: NetworkAdapter + Sync,
+    Fountain: FountainCode + Sync,
+    VoteTally: Tally + Sync,
+    TxId: serde::de::DeserializeOwned + Clone + Hash + Eq + Send + Sync + 'static,
 {
-    fn new(view: &'view View, node: NodeId) -> Self {
+    // we still need view here to help us initialize
+    fn new(view: &View, node: NodeId) -> Self {
         let committees = Committees::new(view);
-        committees.into_member(node).unwrap()
+        committees.into_member(node, view).unwrap()
     }
 
     async fn reconstruct_proposal_block(
         &self,
+        view: &View,
         adapter: &Network,
         fountain: &Fountain,
-    ) -> Result<Block, FountainError> {
+    ) -> Result<Block<TxId>, FountainError> {
+        assert_eq!(view.view_n, self.view_n, "view_n mismatch");
         let committee = self.committee;
-        let view = self.committees.view;
         let message_stream = adapter.proposal_chunks_stream(committee, view).await;
-        fountain.decode(message_stream).await.map(Block::from_bytes)
+        fountain.decode(message_stream).await.and_then(|b| {
+            deserializer(&b)
+                .deserialize::<Block<TxId>>()
+                .map_err(|e| FountainError::from(e.to_string().as_str()))
+        })
     }
 
-    async fn broadcast_block(&self, block: Block, adapter: &Network, fountain: &Fountain) {
+    async fn broadcast_block(
+        &self,
+        view: &View,
+        block: Block<TxId>,
+        adapter: &Network,
+        fountain: &Fountain,
+    ) {
+        assert_eq!(view.view_n, self.view_n, "view_n mismatch");
         let (left_child, right_child) = self.children_committes();
-        let view = self.committees.view;
         let block_bytes = block.as_bytes();
         let encoded_stream = fountain.encode(&block_bytes);
         encoded_stream
@@ -152,10 +172,13 @@ impl<'view, Network: NetworkAdapter + Sync, Fountain: FountainCode + Sync, const
 
     async fn approve_and_forward(
         &self,
-        _block: &Block,
+        view: &View,
+        _block: &Block<TxId>,
         _adapter: &Network,
+        _tally: &VoteTally,
         _next_view: &View,
     ) -> Result<(), Box<dyn Error>> {
+        assert_eq!(view.view_n, self.view_n, "view_n mismatch");
         // roughly, we want to do something like this:
         // 1. wait for left and right children committees to approve
         // 2. approve the block
@@ -166,7 +189,13 @@ impl<'view, Network: NetworkAdapter + Sync, Fountain: FountainCode + Sync, const
         todo!()
     }
 
-    async fn build_qc(&self, _adapter: &Network) -> Approval {
+    async fn build_qc(
+        &self,
+        view: &View,
+        _adapter: &Network,
+        _tally: &VoteTally,
+    ) -> VoteTally::Outcome {
+        assert_eq!(view.view_n, self.view_n, "view_n mismatch");
         // maybe the leader publishing the QC?
         todo!()
     }

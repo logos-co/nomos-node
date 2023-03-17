@@ -6,16 +6,18 @@ use futures::{Stream, StreamExt};
 use tokio_stream::wrappers::BroadcastStream;
 // internal
 use crate::network::{
-    messages::{ApprovalMsg, ProposalChunkMsg},
+    messages::{ProposalChunkMsg, VoteMsg},
     NetworkAdapter,
 };
 use crate::overlay::committees::Committee;
-use crate::{Approval, View};
+use crate::View;
 use nomos_network::{
     backends::waku::{EventKind, NetworkEvent, Waku, WakuBackendMessage},
     NetworkMsg, NetworkService,
 };
 use overwatch_rs::services::{relay::OutboundRelay, ServiceData};
+use serde::de::DeserializeOwned;
+use serde::Serialize;
 use waku_bindings::{
     ContentFilter, Encoding, StoreQuery, WakuContentTopic, WakuMessage, WakuPubSubTopic,
 };
@@ -161,27 +163,27 @@ impl NetworkAdapter for WakuAdapter {
         };
     }
 
-    async fn approvals_stream(
+    async fn votes_stream<Vote: DeserializeOwned>(
         &self,
         committee: Committee,
         view: &View,
-    ) -> Box<dyn Stream<Item = Approval> + Send> {
+    ) -> Box<dyn Stream<Item = Vote> + Send> {
         let content_topic = proposal_topic(committee, view);
         Box::new(Box::pin(
             self.cached_stream_with_content_topic(content_topic)
                 .await
                 .map(|message| {
                     let payload = message.payload();
-                    ApprovalMsg::from_bytes(payload).approval
+                    VoteMsg::from_bytes(payload).vote
                 }),
         ))
     }
 
-    async fn forward_approval(
+    async fn forward_approval<Vote: Serialize + Send>(
         &self,
         committee: Committee,
         view: &View,
-        approval_message: ApprovalMsg,
+        approval_message: VoteMsg<Vote>,
     ) {
         let content_topic = approval_topic(committee, view);
 

@@ -1,36 +1,53 @@
+use indexmap::IndexSet;
 // std
+use core::hash::Hash;
 // crates
 use bytes::Bytes;
+use serde::{Deserialize, Serialize};
 // internal
 
+pub type TxHash = [u8; 32];
+
 /// A block
-#[derive(Clone, Debug)]
-pub struct Block;
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct Block<TxId: Clone + Eq + Hash> {
+    header: BlockHeader,
+    transactions: IndexSet<TxId>,
+}
 
 /// A block header
-#[derive(Clone, Debug)]
-pub struct BlockHeader;
+#[derive(Copy, Clone, Default, Debug, Serialize, Deserialize)]
+pub struct BlockHeader {
+    id: BlockId,
+}
 
 /// Identifier of a block
 pub type BlockId = [u8; 32];
 
-impl Block {
+impl<TxId: Clone + Eq + Hash> Block<TxId> {
+    pub fn new(header: BlockHeader, txs: impl Iterator<Item = TxId>) -> Self {
+        Self {
+            header,
+            transactions: txs.collect(),
+        }
+    }
+
     /// Encode block into bytes
     pub fn as_bytes(&self) -> Bytes {
         Bytes::new()
     }
 
-    pub fn from_bytes(_: Bytes) -> Self {
-        Self
+    pub fn header(&self) -> BlockHeader {
+        self.header
     }
 
-    pub fn header(&self) -> BlockHeader {
-        BlockHeader
+    pub fn transactions(&self) -> impl Iterator<Item = &TxId> + '_ {
+        self.transactions.iter()
     }
 }
 
 impl BlockHeader {
     pub fn id(&self) -> BlockId {
-        todo!()
+        self.id
     }
 }

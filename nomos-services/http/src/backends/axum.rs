@@ -9,6 +9,7 @@ use axum::{
     routing::{get, patch, post, put},
     Router,
 };
+use http::StatusCode;
 use hyper::{
     header::{CONTENT_TYPE, USER_AGENT},
     Body, Request,
@@ -145,7 +146,7 @@ async fn handle_req(
     req_stream: Sender<HttpRequest>,
     query: HashMap<String, String>,
     payload: Option<Bytes>,
-) -> Result<Bytes, String> {
+) -> Result<Bytes, (StatusCode, String)> {
     let (tx, mut rx) = tokio::sync::mpsc::channel(1);
     match req_stream
         .send(HttpRequest {
@@ -155,7 +156,12 @@ async fn handle_req(
         })
         .await
     {
-        Ok(_) => rx.recv().await.ok_or_else(|| "".into()),
-        Err(e) => Err(AxumBackendError::SendError(e).to_string()),
+        Ok(_) => rx.recv().await.ok_or_else(|| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "closed response channel".into(),
+            )
+        })?,
+        Err(e) => Err((StatusCode::INTERNAL_SERVER_ERROR, e.to_string())),
     }
 }

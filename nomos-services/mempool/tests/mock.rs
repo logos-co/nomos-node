@@ -1,7 +1,4 @@
-use nomos_core::{
-    block::BlockId,
-    tx::mock::{MockTransactionMsg, MockTxId},
-};
+use nomos_core::{block::BlockId, tx::mock::MockTransaction};
 use nomos_log::{Logger, LoggerSettings};
 use nomos_network::{
     backends::mock::{Mock, MockBackendMessage, MockConfig, MockMessage},
@@ -20,7 +17,7 @@ use nomos_mempool::{
 struct MockPoolNode {
     logging: ServiceHandle<Logger>,
     network: ServiceHandle<NetworkService<Mock>>,
-    mockpool: ServiceHandle<MempoolService<MockAdapter, MockPool<MockTxId, MockTransactionMsg>>>,
+    mockpool: ServiceHandle<MempoolService<MockAdapter, MockPool<MockTransaction>>>,
 }
 
 #[test]
@@ -70,7 +67,7 @@ fn test_mockmempool() {
     let network = app.handle().relay::<NetworkService<Mock>>();
     let mempool = app
         .handle()
-        .relay::<MempoolService<MockAdapter, MockPool<MockTxId, MockTransactionMsg>>>();
+        .relay::<MempoolService<MockAdapter, MockPool<MockTransaction>>>();
 
     app.spawn(async move {
         let network_outbound = network.connect().await.unwrap();
@@ -79,7 +76,7 @@ fn test_mockmempool() {
         // subscribe to the mock content topic
         network_outbound
             .send(NetworkMsg::Process(MockBackendMessage::RelaySubscribe {
-                topic: MOCK_TX_CONTENT_TOPIC.content_topic_name,
+                topic: MOCK_TX_CONTENT_TOPIC.content_topic_name.to_string(),
             }))
             .await
             .unwrap();
@@ -99,14 +96,7 @@ fn test_mockmempool() {
             let items = mrx
                 .await
                 .unwrap()
-                .into_iter()
-                .filter_map(|tx| {
-                    if let MockTransactionMsg::Request(msg) = tx {
-                        Some(msg)
-                    } else {
-                        None
-                    }
-                })
+                .map(|msg| msg.message().clone())
                 .collect::<std::collections::HashSet<_>>();
 
             if items.len() == exp_txns.len() {
