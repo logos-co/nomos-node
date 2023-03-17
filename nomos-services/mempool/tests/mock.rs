@@ -1,7 +1,4 @@
-use nomos_core::{
-    block::BlockId,
-    tx::mock::{MockTransaction, MockTxId},
-};
+use nomos_core::{block::BlockId, tx::mock::MockTransaction};
 use nomos_log::{Logger, LoggerSettings};
 use nomos_network::{
     backends::mock::{Mock, MockBackendMessage, MockConfig, MockMessage},
@@ -20,7 +17,7 @@ use nomos_mempool::{
 struct MockPoolNode {
     logging: ServiceHandle<Logger>,
     network: ServiceHandle<NetworkService<Mock>>,
-    mockpool: ServiceHandle<MempoolService<MockAdapter, MockPool<MockTxId, MockTransaction>>>,
+    mockpool: ServiceHandle<MempoolService<MockAdapter, MockPool<MockTransaction>>>,
 }
 
 #[test]
@@ -70,7 +67,7 @@ fn test_mockmempool() {
     let network = app.handle().relay::<NetworkService<Mock>>();
     let mempool = app
         .handle()
-        .relay::<MempoolService<MockAdapter, MockPool<MockTxId, MockTransaction>>>();
+        .relay::<MempoolService<MockAdapter, MockPool<MockTransaction>>>();
 
     app.spawn(async move {
         let network_outbound = network.connect().await.unwrap();

@@ -25,7 +25,7 @@ pub struct Flat<TxId> {
     _marker: std::marker::PhantomData<TxId>,
 }
 
-impl<TxId: Eq + Hash> Flat<TxId> {
+impl<TxId: Clone + Eq + Hash> Flat<TxId> {
     pub fn new(view_n: u64, node_id: NodeId) -> Self {
         Self {
             node_id,
@@ -41,7 +41,7 @@ impl<TxId: Eq + Hash> Flat<TxId> {
 }
 
 #[async_trait::async_trait]
-impl<Network, Fountain, VoteTally, TxId> Overlay<Network, Fountain, VoteTally> for Flat<TxId>
+impl<Network, Fountain, VoteTally, TxId> Overlay<Network, Fountain, VoteTally, TxId> for Flat<TxId>
 where
     TxId: serde::de::DeserializeOwned + Clone + Eq + Hash + Send + Sync + 'static,
     Network: NetworkAdapter + Sync,
@@ -49,8 +49,6 @@ where
     VoteTally: Tally + Sync,
     VoteTally::Vote: Serialize + DeserializeOwned + Send,
 {
-    type TxId = TxId;
-
     fn new(view: &View, node: NodeId) -> Self {
         Flat::new(view.view_n, node)
     }
@@ -60,12 +58,12 @@ where
         view: &View,
         adapter: &Network,
         fountain: &Fountain,
-    ) -> Result<Block<Self::TxId>, FountainError> {
+    ) -> Result<Block<TxId>, FountainError> {
         assert_eq!(view.view_n, self.view_n, "view_n mismatch");
         let message_stream = adapter.proposal_chunks_stream(FLAT_COMMITTEE, view).await;
         fountain.decode(message_stream).await.and_then(|b| {
             deserializer(&b)
-                .deserialize::<Block<Self::TxId>>()
+                .deserialize::<Block<TxId>>()
                 .map_err(|e| FountainError::from(e.to_string().as_str()))
         })
     }
@@ -73,7 +71,7 @@ where
     async fn broadcast_block(
         &self,
         view: &View,
-        block: Block<Self::TxId>,
+        block: Block<TxId>,
         adapter: &Network,
         fountain: &Fountain,
     ) {
@@ -93,7 +91,7 @@ where
     async fn approve_and_forward(
         &self,
         view: &View,
-        block: &Block<Self::TxId>,
+        block: &Block<TxId>,
         adapter: &Network,
         _tally: &VoteTally,
         _next_view: &View,

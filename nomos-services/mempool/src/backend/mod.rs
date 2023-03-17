@@ -2,6 +2,7 @@
 pub mod mockpool;
 
 use nomos_core::block::{BlockHeader, BlockId};
+use nomos_core::tx::Transaction;
 
 #[derive(thiserror::Error, Debug)]
 pub enum MempoolError {
@@ -13,8 +14,7 @@ pub enum MempoolError {
 
 pub trait MemPool {
     type Settings: Clone;
-    type Tx;
-    type Id;
+    type Tx: Transaction;
 
     /// Construct a new empty pool
     fn new(settings: Self::Settings) -> Self;
@@ -30,7 +30,7 @@ pub trait MemPool {
     fn view(&self, ancestor_hint: BlockId) -> Box<dyn Iterator<Item = Self::Tx> + Send>;
 
     /// Record that a set of transactions were included in a block
-    fn mark_in_block(&mut self, txs: &[Self::Id], block: BlockHeader);
+    fn mark_in_block(&mut self, txs: &[<Self::Tx as Transaction>::Hash], block: BlockHeader);
 
     /// Returns all of the transactions for the block
     #[cfg(test)]
@@ -41,7 +41,7 @@ pub trait MemPool {
 
     /// Signal that a set of transactions can't be possibly requested anymore and can be
     /// discarded.
-    fn prune(&mut self, txs: &[Self::Id]);
+    fn prune(&mut self, txs: &[<Self::Tx as Transaction>::Hash]);
 
     fn pending_tx_count(&self) -> usize;
     fn last_tx_timestamp(&self) -> u64;
