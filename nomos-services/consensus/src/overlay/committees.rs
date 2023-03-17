@@ -117,7 +117,7 @@ where
     Network: NetworkAdapter + Sync,
     Fountain: FountainCode + Sync,
     VoteTally: Tally + Sync,
-    VoteTally::Qc: serde::de::DeserializeOwned + Clone + Send + Sync,
+    VoteTally::Qc: serde::de::DeserializeOwned + Clone + Send + Sync + 'static,
     TxId: serde::de::DeserializeOwned + Clone + Hash + Eq + Send + Sync + 'static,
 {
     // we still need view here to help us initialize

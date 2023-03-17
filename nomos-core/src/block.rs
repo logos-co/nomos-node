@@ -26,10 +26,13 @@ pub struct BlockHeader<Qc: Clone> {
 pub type BlockId = [u8; 32];
 
 impl<Qc: Clone, TxId: Clone + Eq + Hash> Block<Qc, TxId> {
-    pub fn new(header: BlockHeader<Qc>, txs: impl Iterator<Item = TxId>) -> Self {
+    pub fn new(qc: Qc, txs: impl Iterator<Item = TxId>) -> Self {
+        let transactions = txs.collect();
+        // FIXME: Calculate header Id
+        let header = BlockHeader { id: [0; 32], qc };
         Self {
             header,
-            transactions: txs.collect(),
+            transactions,
         }
     }
 

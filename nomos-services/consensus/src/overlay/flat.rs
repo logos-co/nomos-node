@@ -43,7 +43,7 @@ where
     Fountain: FountainCode + Sync,
     VoteTally: Tally + Sync,
     VoteTally::Vote: Serialize + DeserializeOwned + Send,
-    VoteTally::Qc: Clone + DeserializeOwned + Send + Sync,
+    VoteTally::Qc: Clone + DeserializeOwned + Send + Sync + 'static,
 {
     fn new(view: &View, node: NodeId) -> Self {
         Flat::new(view.view_n, node)

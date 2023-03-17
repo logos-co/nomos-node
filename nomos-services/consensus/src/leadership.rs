@@ -2,8 +2,8 @@
 use std::marker::PhantomData;
 // crates
 // internal
+use nomos_core::crypto::PrivateKey;
 use nomos_core::tx::Transaction;
-use nomos_core::{block::BlockHeader, crypto::PrivateKey};
 use nomos_mempool::MempoolMsg;
 
 use super::*;
@@ -60,10 +60,7 @@ where
 
             LeadershipResult::Leader {
                 _view: PhantomData,
-                block: Block::new(
-                    BlockHeader::default(),
-                    iter.map(|ref tx| <Tx as Transaction>::hash(tx)),
-                ),
+                block: Block::new(qc, iter.map(|ref tx| <Tx as Transaction>::hash(tx))),
             }
         } else {
             LeadershipResult::NotLeader { _view: PhantomData }
