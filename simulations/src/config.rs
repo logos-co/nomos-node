@@ -1,8 +1,8 @@
 use crate::network::regions::Region;
 use crate::node::StepTime;
 use crate::{node::Node, overlay::Overlay};
-use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 pub struct Config<N: Node, O: Overlay> {
     pub network_behaviors: HashMap<(Region, Region), StepTime>,
