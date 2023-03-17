@@ -26,6 +26,7 @@ use nomos_core::block::Block;
 use nomos_core::crypto::PublicKey;
 use nomos_core::fountain::FountainCode;
 use nomos_core::staking::Stake;
+use nomos_core::tx::Transaction;
 use nomos_core::vote::Tally;
 use nomos_mempool::{backend::MemPool, network::NetworkAdapter as MempoolAdapter, MempoolService};
 use nomos_network::NetworkService;
@@ -83,9 +84,9 @@ where
     M: MempoolAdapter<Tx = P::Tx>,
     P: MemPool,
     T: Tally,
-    O: Overlay<A, F, T>,
-    P::Tx: Debug + 'static,
-    P::Id: Debug + 'static,
+    O: Overlay<A, F, T, <P::Tx as Transaction>::Hash>,
+    P::Tx: Transaction + Debug + 'static,
+    <P::Tx as Transaction>::Hash: Debug,
     A::Backend: 'static,
 {
     service_state: ServiceStateHandle<Self>,
@@ -104,10 +105,10 @@ where
     A: NetworkAdapter,
     P: MemPool,
     T: Tally,
-    P::Tx: Debug,
-    P::Id: Debug,
+    P::Tx: Transaction + Debug,
+    <P::Tx as Transaction>::Hash: Debug,
     M: MempoolAdapter<Tx = P::Tx>,
-    O: Overlay<A, F, T>,
+    O: Overlay<A, F, T, <P::Tx as Transaction>::Hash>,
 {
     const SERVICE_ID: ServiceId = "Carnot";
     type Settings = CarnotSettings<F, T>;
@@ -127,17 +128,9 @@ where
     T::Outcome: Send + Sync,
     P::Settings: Send + Sync + 'static,
     P::Tx: Debug + Clone + serde::de::DeserializeOwned + Send + Sync + 'static,
-    P::Id: Debug
-        + Clone
-        + serde::de::DeserializeOwned
-        + for<'a> From<&'a P::Tx>
-        + Eq
-        + Hash
-        + Send
-        + Sync
-        + 'static,
+    <P::Tx as Transaction>::Hash: Debug + Send + Sync,
     M: MempoolAdapter<Tx = P::Tx> + Send + Sync + 'static,
-    O: Overlay<A, F, T, TxId = P::Id> + Send + Sync + 'static,
+    O: Overlay<A, F, T, <P::Tx as Transaction>::Hash> + Send + Sync + 'static,
 {
     fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, overwatch_rs::DynError> {
         let network_relay = service_state.overwatch_handle.relay();
@@ -178,16 +171,14 @@ where
         let fountain = F::new(fountain_settings);
         let tally = T::new(tally_settings);
 
-        let leadership = Leadership::<P::Tx, P::Id>::new(private_key, mempool_relay.clone());
+        let leadership = Leadership::<P::Tx>::new(private_key, mempool_relay.clone());
         // FIXME: this should be taken from config
         let mut cur_view = View {
             seed: [0; 32],
             staking_keys: BTreeMap::new(),
             view_n: 0,
         };
-        eprintln!("here1");
         loop {
-            eprintln!("here22");
             // if we want to process multiple views at the same time this can
             // be spawned as a separate future
 
@@ -251,17 +242,17 @@ impl View {
         adapter: &A,
         fountain: &F,
         tally: &T,
-        leadership: &Leadership<Tx, O::TxId>,
-    ) -> Result<(Block<O::TxId>, View), Box<dyn std::error::Error + Send + Sync + 'static>>
+        leadership: &Leadership<Tx>,
+    ) -> Result<(Block<Tx::Hash>, View), Box<dyn std::error::Error + Send + Sync + 'static>>
     where
         A: NetworkAdapter + Send + Sync + 'static,
         F: FountainCode,
-        for<'t> &'t Tx: Into<O::TxId>,
+        Tx: Transaction,
+        Tx::Hash: Debug,
         T: Tally + Send + Sync + 'static,
         T::Outcome: Send + Sync,
-        O: Overlay<A, F, T>,
+        O: Overlay<A, F, T, Tx::Hash>,
     {
-        eprintln!("here33");
         let res = if self.is_leader(node_id) {
             let block = self
                 .resolve_leader::<A, O, F, T, _>(node_id, tip, adapter, fountain, tally, leadership)
@@ -270,7 +261,7 @@ impl View {
             let next_view = self.generate_next_view(&block);
             (block, next_view)
         } else {
-            self.resolve_non_leader::<A, O, F, T>(node_id, adapter, fountain, tally)
+            self.resolve_non_leader::<A, O, F, T, Tx>(node_id, adapter, fountain, tally)
                 .await
                 .unwrap() // FIXME: handle sad path
         };
@@ -291,15 +282,16 @@ impl View {
         adapter: &A,
         fountain: &F,
         tally: &T,
-        leadership: &Leadership<Tx, O::TxId>,
-    ) -> Result<Block<O::TxId>, ()>
+        leadership: &Leadership<Tx>,
+    ) -> Result<Block<<Tx as Transaction>::Hash>, ()>
     where
         A: NetworkAdapter + Send + Sync + 'static,
         F: FountainCode,
         T: Tally + Send + Sync + 'static,
         T::Outcome: Send + Sync,
-        for<'t> &'t Tx: Into<O::TxId>,
-        O: Overlay<A, F, T>,
+        Tx: Transaction,
+        Tx::Hash: Debug,
+        O: Overlay<A, F, T, Tx::Hash>,
     {
         let overlay = O::new(self, node_id);
 
@@ -309,7 +301,6 @@ impl View {
         let LeadershipResult::Leader { block, _view }  = leadership
             .try_propose_block(self, tip, qc)
             .await else { panic!("we are leader")};
-        eprintln!("here44");
         overlay
             .broadcast_block(self, block.clone(), adapter, fountain)
             .await;
@@ -317,18 +308,20 @@ impl View {
         Ok(block)
     }
 
-    async fn resolve_non_leader<'view, A, O, F, T>(
+    async fn resolve_non_leader<'view, A, O, F, T, Tx>(
         &'view self,
         node_id: NodeId,
         adapter: &A,
         fountain: &F,
         tally: &T,
-    ) -> Result<(Block<O::TxId>, View), ()>
+    ) -> Result<(Block<Tx::Hash>, View), ()>
     where
         A: NetworkAdapter + Send + Sync + 'static,
         F: FountainCode,
         T: Tally + Send + Sync + 'static,
-        O: Overlay<A, F, T>,
+        Tx: Transaction,
+        Tx::Hash: Debug,
+        O: Overlay<A, F, T, Tx::Hash>,
     {
         let overlay = O::new(self, node_id);
         // Consensus in Carnot is achieved in 2 steps from the point of view of a node:
@@ -368,12 +361,12 @@ impl View {
     }
 
     // Verifies the block is new and the previous leader did not fail
-    fn pipelined_safe_block<TxId: Eq + Hash>(&self, _: &Block<TxId>) -> bool {
+    fn pipelined_safe_block<TxId: Clone + Eq + Hash>(&self, _: &Block<TxId>) -> bool {
         // return b.view_n >= self.view_n && b.view_n == b.qc.view_n
         true
     }
 
-    fn generate_next_view<TxId: Eq + Hash>(&self, _b: &Block<TxId>) -> View {
+    fn generate_next_view<TxId: Clone + Eq + Hash>(&self, _b: &Block<TxId>) -> View {
         let mut seed = self.seed;
         seed[0] += 1;
         View {

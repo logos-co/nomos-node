@@ -2,6 +2,7 @@
 use std::marker::PhantomData;
 // crates
 // internal
+use nomos_core::tx::Transaction;
 use nomos_core::{block::BlockHeader, crypto::PrivateKey};
 use nomos_mempool::MempoolMsg;
 
@@ -12,12 +13,12 @@ struct Enclave {
     key: PrivateKey,
 }
 
-pub struct Leadership<Tx, Id> {
+pub struct Leadership<Tx: Transaction> {
     key: Enclave,
-    mempool: OutboundRelay<MempoolMsg<Tx, Id>>,
+    mempool: OutboundRelay<MempoolMsg<Tx>>,
 }
 
-pub enum LeadershipResult<'view, TxId: Eq + core::hash::Hash> {
+pub enum LeadershipResult<'view, TxId: Clone + Eq + core::hash::Hash> {
     Leader {
         block: Block<TxId>,
         _view: PhantomData<&'view u8>,
@@ -27,12 +28,12 @@ pub enum LeadershipResult<'view, TxId: Eq + core::hash::Hash> {
     },
 }
 
-impl<Tx, Id> Leadership<Tx, Id>
+impl<Tx> Leadership<Tx>
 where
-    Id: Eq + core::hash::Hash,
-    for<'t> &'t Tx: Into<Id>, // TODO: we should probably abstract this away but for now the constrain may do
+    Tx: Transaction,
+    Tx::Hash: Debug,
 {
-    pub fn new(key: PrivateKey, mempool: OutboundRelay<MempoolMsg<Tx, Id>>) -> Self {
+    pub fn new(key: PrivateKey, mempool: OutboundRelay<MempoolMsg<Tx>>) -> Self {
         Self {
             key: Enclave { key },
             mempool,
@@ -45,24 +46,24 @@ where
         view: &'view View,
         tip: &Tip,
         qc: Qc,
-    ) -> LeadershipResult<'view, Id> {
+    ) -> LeadershipResult<'view, Tx::Hash> {
         // TODO: get the correct ancestor for the tip
         // let ancestor_hint = todo!("get the ancestor from the tip");
         let ancestor_hint = [0; 32];
-        eprintln!("here 33333333");
         if view.is_leader(self.key.key) {
             let (tx, rx) = tokio::sync::oneshot::channel();
-            eprintln!("here 444");
             self.mempool.send(MempoolMsg::View {
                 ancestor_hint,
                 reply_channel: tx,
-            });
-            eprintln!("here 55");
+            }).await;
             let iter = rx.await.unwrap();
 
             LeadershipResult::Leader {
                 _view: PhantomData,
-                block: Block::new(BlockHeader::default(), iter.map(|ref tx| tx.into())),
+                block: Block::new(
+                    BlockHeader::default(),
+                    iter.map(|ref tx| <Tx as Transaction>::hash(tx)),
+                ),
             }
         } else {
             LeadershipResult::NotLeader { _view: PhantomData }

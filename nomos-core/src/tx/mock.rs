@@ -1,8 +1,11 @@
-use crate::{block::TxHash, wire::serialize};
+use crate::tx::{Transaction, TransactionHasher};
+use crate::wire;
+use crate::wire::serialize;
 use blake2::{
     digest::{Update, VariableOutput},
     Blake2bVar,
 };
+use bytes::{Bytes, BytesMut};
 use nomos_network::backends::mock::MockMessage;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, serde::Serialize, serde::Deserialize)]
@@ -20,6 +23,27 @@ impl MockTransaction {
     pub fn message(&self) -> &MockMessage {
         &self.content
     }
+
+    pub fn id(&self) -> MockTxId {
+        self.id
+    }
+
+    fn as_bytes(&self) -> Bytes {
+        let mut buff = BytesMut::new();
+        wire::serializer_into_buffer(&mut buff)
+            .serialize_into(&self)
+            .expect("MockTransaction serialization to buffer failed");
+        buff.freeze()
+    }
+}
+
+impl Transaction for MockTransaction {
+    const HASHER: TransactionHasher<Self> = MockTransaction::id;
+    type Hash = MockTxId;
+
+    fn as_bytes(&self) -> Bytes {
+        MockTransaction::as_bytes(self)
+    }
 }
 
 impl From<nomos_network::backends::mock::MockMessage> for MockTransaction {
@@ -34,7 +58,7 @@ impl From<nomos_network::backends::mock::MockMessage> for MockTransaction {
 )]
 pub struct MockTxId([u8; 32]);
 
-impl From<MockTxId> for TxHash {
+impl From<MockTxId> for [u8; 32] {
     fn from(val: MockTxId) -> Self {
         val.0
     }

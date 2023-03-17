@@ -69,14 +69,11 @@ impl Tally for MockTally {
             if vote.view() != view {
                 return Err(Error("Invalid vote".into()));
             }
-            eprintln!("Vote received");
             count_votes += 1;
+            if count_votes > self.threshold {
+                return Ok(MockQc { count_votes });
+            }
         }
-        eprintln!("never enter here, because while loop never ends");
-        if count_votes > self.threshold {
-            Ok(MockQc { count_votes })
-        } else {
-            Err(Error("Not enough votes".into()))
-        }
+        Err(Error("Not enough votes".into()))
     }
 }

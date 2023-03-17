@@ -33,12 +33,12 @@ use std::{
 struct MockPoolNode {
     logging: ServiceHandle<Logger>,
     network: ServiceHandle<NetworkService<Mock>>,
-    mockpool: ServiceHandle<MempoolService<MockAdapter, MockPool<MockTxId, MockTransaction>>>,
+    mockpool: ServiceHandle<MempoolService<MockAdapter, MockPool<MockTransaction>>>,
     #[allow(clippy::type_complexity)]
     consensus: ServiceHandle<
         CarnotConsensus<
             ConsensusMockAdapter,
-            MockPool<MockTxId, MockTransaction>,
+            MockPool<MockTransaction>,
             MockAdapter,
             MockFountain,
             MockTally,
@@ -70,7 +70,7 @@ fn test_carnot() {
     ];
 
     let expected = vec![MockTransaction::from(MockMessage {
-        payload: String::from_utf8_lossy(&[0; 32]).to_string(),
+        payload: String::from_utf8_lossy(&mock_vote_msg.as_bytes()).to_string(),
         content_topic: MOCK_TX_CONTENT_TOPIC,
         version: 0,
         timestamp: 0,
@@ -102,11 +102,12 @@ fn test_carnot() {
 
     let mempool = app
         .handle()
-        .relay::<MempoolService<MockAdapter, MockPool<MockTxId, MockTransaction>>>();
+        .relay::<MempoolService<MockAdapter, MockPool<MockTransaction>>>();
 
     let (stop_tx, stop_rx): (Sender<()>, Receiver<()>) = channel();
     app.spawn(async move {
         let mempool_outbound = mempool.connect().await.unwrap();
+        let ttx = stop_tx.clone();
         loop {
             // send block transactions message to mempool, and check if the previous transaction has been in the in_block_txs
             let (mtx, mrx) = tokio::sync::oneshot::channel();
@@ -128,7 +129,9 @@ fn test_carnot() {
                 continue;
             }
             assert_eq!(items, expected);
-            stop_tx.send(()).unwrap();
+            if ttx.send(()).is_ok() {
+                break;
+            }
         }
     });
 
