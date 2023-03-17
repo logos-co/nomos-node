@@ -76,6 +76,7 @@ pub enum CarnotStep {
     LeaderReceiveVote,
     ReceiveVote,
     ValidateVote,
+    Ignore,
 }
 
 impl core::str::FromStr for CarnotStep {
@@ -138,7 +139,7 @@ pub const CARNOT_STEPS_COSTS: &[(CarnotStep, CarnotStepSolver)] = &[
     ),
     (
         CarnotStep::LeaderReceiveVote,
-        CarnotStepSolver::ChildCommitteeReceiverSolver(receive_commit),
+        CarnotStepSolver::LeaderToCommitteeReceiverSolver(receive_commit),
     ),
     (
         CarnotStep::ReceiveVote,
@@ -169,6 +170,8 @@ pub const CARNOT_INTERMEDIATE_STEPS: &[CarnotStep] = &[
 
 pub const CARNOT_LEAF_STEPS: &[CarnotStep] =
     &[CarnotStep::ReceiveProposal, CarnotStep::ValidateProposal];
+
+pub const CARNOT_UNKNOWN_MESSAGE_RECEIVED_STEPS: &[CarnotStep] = &[CarnotStep::Ignore];
 
 impl Node for CarnotNode {
     type Settings = Rc<CarnotNodeSettings>;
@@ -219,6 +222,7 @@ impl Node for CarnotNode {
                 Some(LeaderToCommitteeReceiverSolver(solver)) => {
                     let committees: Vec<&Committee> =
                         self.settings.layout.committees.values().collect();
+                    println!("{committees:?}");
                     solver(
                         &mut self.rng,
                         self.id,
@@ -227,7 +231,8 @@ impl Node for CarnotNode {
                     )
                 }
                 None => {
-                    panic!("Unknown step: {step:?}");
+                    println!("Unknown step: {step:?}");
+                    Duration::ZERO
                 }
             })
             .sum()

@@ -1,6 +1,6 @@
 use crate::node::carnot::{
     CarnotRole, CARNOT_INTERMEDIATE_STEPS, CARNOT_LEADER_STEPS, CARNOT_LEAF_STEPS,
-    CARNOT_ROOT_STEPS,
+    CARNOT_ROOT_STEPS, CARNOT_UNKNOWN_MESSAGE_RECEIVED_STEPS,
 };
 use crate::node::{Node, NodeId, StepTime};
 use crate::overlay::Layout;
@@ -80,7 +80,10 @@ where
                         CarnotRole::Root => CARNOT_ROOT_STEPS,
                         CarnotRole::Intermediate => CARNOT_INTERMEDIATE_STEPS,
                         CarnotRole::Leaf => CARNOT_LEAF_STEPS,
-                        _ => panic!("invalid committee role"),
+                        _ => {
+                            // TODO: Should leader act as a leaf in a flat overlay?
+                            CARNOT_UNKNOWN_MESSAGE_RECEIVED_STEPS
+                        }
                     };
                     self.nodes[node_id].borrow_mut().run_steps(steps)
                 })
