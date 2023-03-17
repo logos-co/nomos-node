@@ -18,36 +18,32 @@ const FLAT_COMMITTEE: Committee = Committee::root();
 /// As far as the API is concerned, this should be equivalent to any other
 /// overlay and far simpler to implement.
 /// For this reason, this might act as a 'reference' overlay for testing.
-pub struct Flat<TxId> {
+pub struct Flat {
     // TODO: this should be a const param, but we can't do that yet
     node_id: NodeId,
     view_n: u64,
-    _marker: std::marker::PhantomData<TxId>,
 }
 
-impl<TxId: Clone + Eq + Hash> Flat<TxId> {
+impl Flat {
     pub fn new(view_n: u64, node_id: NodeId) -> Self {
-        Self {
-            node_id,
-            view_n,
-            _marker: Default::default(),
-        }
+        Self { node_id, view_n }
     }
 
-    fn approve(&self, _block: &Block<TxId>) -> Approval {
+    fn approve<Qc: Clone, TxId: Clone + Eq + Hash>(&self, _block: &Block<Qc, TxId>) -> Approval {
         // we still need to define how votes look like
         Approval
     }
 }
 
 #[async_trait::async_trait]
-impl<Network, Fountain, VoteTally, TxId> Overlay<Network, Fountain, VoteTally, TxId> for Flat<TxId>
+impl<Network, Fountain, VoteTally, TxId> Overlay<Network, Fountain, VoteTally, TxId> for Flat
 where
     TxId: serde::de::DeserializeOwned + Clone + Eq + Hash + Send + Sync + 'static,
     Network: NetworkAdapter + Sync,
     Fountain: FountainCode + Sync,
     VoteTally: Tally + Sync,
     VoteTally::Vote: Serialize + DeserializeOwned + Send,
+    VoteTally::Qc: Clone + DeserializeOwned + Send + Sync,
 {
     fn new(view: &View, node: NodeId) -> Self {
         Flat::new(view.view_n, node)
@@ -58,12 +54,12 @@ where
         view: &View,
         adapter: &Network,
         fountain: &Fountain,
-    ) -> Result<Block<TxId>, FountainError> {
+    ) -> Result<Block<VoteTally::Qc, TxId>, FountainError> {
         assert_eq!(view.view_n, self.view_n, "view_n mismatch");
         let message_stream = adapter.proposal_chunks_stream(FLAT_COMMITTEE, view).await;
         fountain.decode(message_stream).await.and_then(|b| {
             deserializer(&b)
-                .deserialize::<Block<TxId>>()
+                .deserialize::<Block<VoteTally::Qc, TxId>>()
                 .map_err(|e| FountainError::from(e.to_string().as_str()))
         })
     }
@@ -71,7 +67,7 @@ where
     async fn broadcast_block(
         &self,
         view: &View,
-        block: Block<TxId>,
+        block: Block<VoteTally::Qc, TxId>,
         adapter: &Network,
         fountain: &Fountain,
     ) {
@@ -91,7 +87,7 @@ where
     async fn approve_and_forward(
         &self,
         view: &View,
-        block: &Block<TxId>,
+        block: &Block<VoteTally::Qc, TxId>,
         adapter: &Network,
         _tally: &VoteTally,
         _next_view: &View,
@@ -112,12 +108,7 @@ where
         Ok(())
     }
 
-    async fn build_qc(
-        &self,
-        view: &View,
-        adapter: &Network,
-        tally: &VoteTally,
-    ) -> VoteTally::Outcome {
+    async fn build_qc(&self, view: &View, adapter: &Network, tally: &VoteTally) -> VoteTally::Qc {
         assert_eq!(view.view_n, self.view_n, "view_n mismatch");
 
         // for now, let's pretend that consensus is reached as soon as the
@@ -126,7 +117,7 @@ where
 
         // Shadow the original binding so that it can't be directly accessed
         // ever again.
-        if let Ok(qc) = tally.tally(view.view_n, stream).await {
+        if let Ok((qc, _)) = tally.tally(view.view_n, stream).await {
             qc
         } else {
             unimplemented!("consensus not reached")

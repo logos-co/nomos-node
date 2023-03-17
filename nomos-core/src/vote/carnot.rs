@@ -72,7 +72,7 @@ pub struct CarnotTally {
 impl Tally for CarnotTally {
     type Vote = Vote;
     type Qc = QuorumCertificate;
-    type Outcome = Self::Qc;
+    type Outcome = ();
     type TallyError = CarnotTallyError;
     type Settings = CarnotTallySettings;
 
@@ -84,7 +84,7 @@ impl Tally for CarnotTally {
         &self,
         view: u64,
         mut vote_stream: S,
-    ) -> Result<Self::Outcome, Self::TallyError> {
+    ) -> Result<(Self::Qc, Self::Outcome), Self::TallyError> {
         let mut approved = 0usize;
         let mut seen = HashSet::new();
         while let Some(vote) = vote_stream.next().await {
@@ -107,10 +107,13 @@ impl Tally for CarnotTally {
             seen.insert(vote.voter);
             approved += 1;
             if approved >= self.settings.threshold {
-                return Ok(QuorumCertificate::Simple(SimpleQuorumCertificate {
-                    view,
-                    block: vote.block,
-                }));
+                return Ok((
+                    QuorumCertificate::Simple(SimpleQuorumCertificate {
+                        view,
+                        block: vote.block,
+                    }),
+                    (),
+                ));
             }
         }
         Err(CarnotTallyError::InsufficientVotes)

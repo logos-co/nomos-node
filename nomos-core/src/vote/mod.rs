@@ -15,5 +15,5 @@ pub trait Tally {
         &self,
         view: u64,
         vote_stream: S,
-    ) -> Result<Self::Outcome, Self::TallyError>;
+    ) -> Result<(Self::Qc, Self::Outcome), Self::TallyError>;
 }

@@ -80,6 +80,7 @@ where
     M: MempoolAdapter<Tx = P::Tx>,
     P: MemPool,
     T: Tally,
+    T::Qc: Clone,
     O: Overlay<A, F, T, <P::Tx as Transaction>::Hash>,
     P::Tx: Transaction + Debug + 'static,
     <P::Tx as Transaction>::Hash: Debug,
@@ -101,6 +102,7 @@ where
     A: NetworkAdapter,
     P: MemPool,
     T: Tally,
+    T::Qc: Clone,
     P::Tx: Transaction + Debug,
     <P::Tx as Transaction>::Hash: Debug,
     M: MempoolAdapter<Tx = P::Tx>,
@@ -122,6 +124,7 @@ where
     T: Tally + Send + Sync + 'static,
     T::Settings: Send + Sync + 'static,
     T::Outcome: Send + Sync,
+    T::Qc: Clone + Send + Sync,
     P::Settings: Send + Sync + 'static,
     P::Tx: Debug + Clone + serde::de::DeserializeOwned + Send + Sync + 'static,
     <P::Tx as Transaction>::Hash: Debug + Send + Sync,
@@ -198,7 +201,7 @@ where
                     mempool_relay
                         .send(nomos_mempool::MempoolMsg::MarkInBlock {
                             ids: block.transactions().cloned().collect(),
-                            block: block.header(),
+                            block: block.header().id(),
                         })
                         .await
                         .map_err(|(e, _)| {
@@ -237,7 +240,7 @@ impl View {
         fountain: &F,
         tally: &T,
         leadership: &Leadership<Tx>,
-    ) -> Result<(Block<Tx::Hash>, View), Box<dyn std::error::Error + Send + Sync + 'static>>
+    ) -> Result<(Block<T::Qc, Tx::Hash>, View), Box<dyn std::error::Error + Send + Sync + 'static>>
     where
         A: NetworkAdapter + Send + Sync + 'static,
         F: FountainCode,
@@ -245,6 +248,7 @@ impl View {
         Tx::Hash: Debug,
         T: Tally + Send + Sync + 'static,
         T::Outcome: Send + Sync,
+        T::Qc: Clone,
         O: Overlay<A, F, T, Tx::Hash>,
     {
         let res = if self.is_leader(node_id) {
@@ -277,12 +281,13 @@ impl View {
         fountain: &F,
         tally: &T,
         leadership: &Leadership<Tx>,
-    ) -> Result<Block<<Tx as Transaction>::Hash>, ()>
+    ) -> Result<Block<T::Qc, <Tx as Transaction>::Hash>, ()>
     where
         A: NetworkAdapter + Send + Sync + 'static,
         F: FountainCode,
         T: Tally + Send + Sync + 'static,
         T::Outcome: Send + Sync,
+        T::Qc: Clone,
         Tx: Transaction,
         Tx::Hash: Debug,
         O: Overlay<A, F, T, Tx::Hash>,
@@ -309,11 +314,12 @@ impl View {
         adapter: &A,
         fountain: &F,
         tally: &T,
-    ) -> Result<(Block<Tx::Hash>, View), ()>
+    ) -> Result<(Block<T::Qc, Tx::Hash>, View), ()>
     where
         A: NetworkAdapter + Send + Sync + 'static,
         F: FountainCode,
         T: Tally + Send + Sync + 'static,
+        T::Qc: Clone,
         Tx: Transaction,
         Tx::Hash: Debug,
         O: Overlay<A, F, T, Tx::Hash>,
@@ -356,12 +362,15 @@ impl View {
     }
 
     // Verifies the block is new and the previous leader did not fail
-    fn pipelined_safe_block<TxId: Clone + Eq + Hash>(&self, _: &Block<TxId>) -> bool {
+    fn pipelined_safe_block<Qc: Clone, TxId: Clone + Eq + Hash>(
+        &self,
+        _: &Block<Qc, TxId>,
+    ) -> bool {
         // return b.view_n >= self.view_n && b.view_n == b.qc.view_n
         true
     }
 
-    fn generate_next_view<TxId: Clone + Eq + Hash>(&self, _b: &Block<TxId>) -> View {
+    fn generate_next_view<Qc: Clone, TxId: Clone + Eq + Hash>(&self, _b: &Block<Qc, TxId>) -> View {
         let mut seed = self.seed;
         seed[0] += 1;
         View {

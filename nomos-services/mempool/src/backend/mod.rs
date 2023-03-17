@@ -1,7 +1,7 @@
 #[cfg(feature = "mock")]
 pub mod mockpool;
 
-use nomos_core::block::{BlockHeader, BlockId};
+use nomos_core::block::BlockId;
 use nomos_core::tx::Transaction;
 
 #[derive(thiserror::Error, Debug)]
