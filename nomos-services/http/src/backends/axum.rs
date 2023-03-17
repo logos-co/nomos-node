@@ -125,7 +125,9 @@ impl HttpBackend for AxumBackend {
 
 impl AxumBackend {
     fn add_data_route(&self, method: HttpMethod, path: &str, req_stream: Sender<HttpRequest>) {
-        let handle_data = |Query(query): Query<HashMap<String, String>>, payload: Option<Bytes>| handle_req(req_stream, query, payload);
+        let handle_data = |Query(query): Query<HashMap<String, String>>, payload: Option<Bytes>| {
+            handle_req(req_stream, query, payload)
+        };
 
         let handler = match method {
             HttpMethod::GET => get(handle_data),
