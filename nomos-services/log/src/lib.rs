@@ -97,10 +97,12 @@ impl ServiceCore for Logger {
         let (non_blocking, _guard) = match config.backend {
             LoggerBackend::Gelf { addr } => {
                 let (layer, mut task) = tracing_gelf::Logger::builder().connect_tcp(addr).unwrap();
-                #[allow(clippy::redundant_async_block)]
                 service_state
                     .overwatch_handle
                     .runtime()
+                    // #[allow(clippy::redundant_async_block)]
+                    // in 1.68.0, clippy will complain about redundant async block, but we cannot add it
+                    // now because our CI use other version.
                     .spawn(async move { task.connect().await });
                 registry_init!(layer, config.format, config.level);
                 return Ok(Self(None));

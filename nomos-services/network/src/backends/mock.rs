@@ -253,7 +253,9 @@ impl NetworkBackend for Mock {
             MockBackendMessage::BootProducer { spawner } => {
                 tracing::info!("booting producer");
                 let this = self.clone();
-                #[allow(clippy::redundant_async_block)]
+                // #[allow(clippy::redundant_async_block)]
+                // in 1.68.0, clippy will complain about redundant async block, but we cannot add it
+                // now because our CI use other version.
                 match (spawner)(Box::pin(async move { this.run_producer_handler().await })) {
                     Ok(_) => {}
                     Err(e) => {
