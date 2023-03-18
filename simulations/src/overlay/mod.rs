@@ -8,7 +8,7 @@ use rand::Rng;
 // internal
 use crate::node::{carnot::CarnotRole, CommitteeId, Node, NodeId};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Committee {
     pub nodes: BTreeSet<NodeId>,
     pub role: CarnotRole,
@@ -23,7 +23,7 @@ impl Committee {
 
 pub type Leaders = BTreeSet<NodeId>;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Layout {
     pub committees: HashMap<CommitteeId, Committee>,
     pub from_committee: HashMap<NodeId, CommitteeId>,

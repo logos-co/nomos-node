@@ -68,7 +68,7 @@ fn receive_commit(
         .unwrap()
 }
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum CarnotStep {
     RootReceiveProposal,
     ReceiveProposal,
@@ -102,8 +102,38 @@ pub enum CarnotStepSolver {
     RootCommitteeReceiverSolver(RootCommitteeReceiverSolver),
 }
 
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, serde::Serialize, serde::Deserialize)]
+pub enum CarnotStepSolverType {
+    Plain(StepTime),
+    ParentCommitteeReceiverSolver,
+    ChildCommitteeReceiverSolver,
+    LeaderToCommitteeReceiverSolver,
+    RootCommitteeReceiverSolver,
+}
+
+impl CarnotStepSolverType {
+    pub fn to_solver(self) -> CarnotStepSolver {
+        match self {
+            Self::Plain(time) => CarnotStepSolver::Plain(time),
+            Self::ParentCommitteeReceiverSolver => {
+                CarnotStepSolver::ParentCommitteeReceiverSolver(receive_proposal)
+            }
+            Self::ChildCommitteeReceiverSolver => {
+                CarnotStepSolver::ChildCommitteeReceiverSolver(receive_commit)
+            }
+            Self::LeaderToCommitteeReceiverSolver => {
+                CarnotStepSolver::LeaderToCommitteeReceiverSolver(receive_commit)
+            }
+            Self::RootCommitteeReceiverSolver => {
+                CarnotStepSolver::RootCommitteeReceiverSolver(leader_receive_proposal)
+            }
+        }
+    }
+}
+
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct CarnotNodeSettings {
-    pub steps_costs: HashMap<CarnotStep, CarnotStepSolver>,
+    pub steps_costs: HashMap<CarnotStep, CarnotStepSolverType>,
     pub network: Network,
     pub layout: Layout,
     pub leaders: Vec<NodeId>,
@@ -124,30 +154,34 @@ pub enum CarnotRole {
     Leaf,
 }
 
-pub const CARNOT_STEPS_COSTS: &[(CarnotStep, CarnotStepSolver)] = &[
+pub const CARNOT_STEPS_COSTS: &[(CarnotStep, CarnotStepSolverType)] = &[
     (
         CarnotStep::RootReceiveProposal,
-        CarnotStepSolver::RootCommitteeReceiverSolver(leader_receive_proposal),
+        CarnotStepSolverType::RootCommitteeReceiverSolver,
     ),
     (
         CarnotStep::ReceiveProposal,
-        CarnotStepSolver::ParentCommitteeReceiverSolver(receive_proposal),
+        CarnotStepSolverType::ParentCommitteeReceiverSolver,
     ),
     (
         CarnotStep::ValidateProposal,
-        CarnotStepSolver::Plain(StepTime::from_secs(1)),
+        CarnotStepSolverType::Plain(StepTime::from_secs(1)),
     ),
     (
         CarnotStep::LeaderReceiveVote,
-        CarnotStepSolver::LeaderToCommitteeReceiverSolver(receive_commit),
+        CarnotStepSolverType::LeaderToCommitteeReceiverSolver,
     ),
     (
         CarnotStep::ReceiveVote,
-        CarnotStepSolver::ChildCommitteeReceiverSolver(receive_commit),
+        CarnotStepSolverType::ChildCommitteeReceiverSolver,
     ),
     (
         CarnotStep::ValidateVote,
-        CarnotStepSolver::Plain(StepTime::from_secs(1)),
+        CarnotStepSolverType::Plain(StepTime::from_secs(1)),
+    ),
+    (
+        CarnotStep::Ignore,
+        CarnotStepSolverType::Plain(StepTime::from_secs(0)),
     ),
 ];
 
@@ -190,51 +224,49 @@ impl Node for CarnotNode {
 
         steps
             .iter()
-            .map(|step| match self.settings.steps_costs.get(step) {
-                Some(Plain(t)) => *t,
-                Some(ParentCommitteeReceiverSolver(solver)) => {
-                    match self
-                        .settings
-                        .layout
-                        .parent_nodes(self.settings.layout.committee(self.id))
-                    {
-                        Some(parent) => {
-                            solver(&mut self.rng, self.id, &parent, &self.settings.network)
+            .map(
+                |step| match self.settings.steps_costs.get(step).unwrap().to_solver() {
+                    Plain(t) => t,
+                    ParentCommitteeReceiverSolver(solver) => {
+                        match self
+                            .settings
+                            .layout
+                            .parent_nodes(self.settings.layout.committee(self.id))
+                        {
+                            Some(parent) => {
+                                solver(&mut self.rng, self.id, &parent, &self.settings.network)
+                            }
+                            None => Duration::ZERO,
                         }
-                        None => Duration::ZERO,
                     }
-                }
-                Some(ChildCommitteeReceiverSolver(solver)) => solver(
-                    &mut self.rng,
-                    self.id,
-                    &self
-                        .settings
-                        .layout
-                        .children_nodes(self.settings.layout.committee(self.id)),
-                    &self.settings.network,
-                ),
-                Some(RootCommitteeReceiverSolver(solver)) => solver(
-                    &mut self.rng,
-                    self.id,
-                    &self.settings.leaders,
-                    &self.settings.network,
-                ),
-                Some(LeaderToCommitteeReceiverSolver(solver)) => {
-                    let committees: Vec<&Committee> =
-                        self.settings.layout.committees.values().collect();
-                    println!("{committees:?}");
-                    solver(
+                    ChildCommitteeReceiverSolver(solver) => solver(
                         &mut self.rng,
                         self.id,
-                        &committees[..],
+                        &self
+                            .settings
+                            .layout
+                            .children_nodes(self.settings.layout.committee(self.id)),
                         &self.settings.network,
-                    )
-                }
-                None => {
-                    println!("Unknown step: {step:?}");
-                    Duration::ZERO
-                }
-            })
+                    ),
+                    RootCommitteeReceiverSolver(solver) => solver(
+                        &mut self.rng,
+                        self.id,
+                        &self.settings.leaders,
+                        &self.settings.network,
+                    ),
+                    LeaderToCommitteeReceiverSolver(solver) => {
+                        let committees: Vec<&Committee> =
+                            self.settings.layout.committees.values().collect();
+                        println!("{committees:?}");
+                        solver(
+                            &mut self.rng,
+                            self.id,
+                            &committees[..],
+                            &self.settings.network,
+                        )
+                    }
+                },
+            )
             .sum()
     }
 }
