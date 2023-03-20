@@ -66,7 +66,7 @@ impl core::str::FromStr for CarnotStep {
             "validateproposal" => Ok(Self::ValidateProposal),
             "receivevote" => Ok(Self::ReceiveVote),
             "validatevote" => Ok(Self::ValidateVote),
-            _ => Err(format!("Unknown step: {}", s)),
+            _ => Err(format!("Unknown step: {s}")),
         }
     }
 }
