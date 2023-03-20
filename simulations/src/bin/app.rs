@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use simulations::{
     config::Config,
     node::{
-        carnot::{CarnotNode, CARNOT_LEADER_STEPS, CarnotStep},
+        carnot::{CarnotNode, CarnotStep},
         StepTime, Node,
     },
     overlay::{flat::FlatOverlay, Overlay},
@@ -102,7 +102,7 @@ pub fn main() -> Result<(), Box<dyn std::error::Error>> {
             let layout = overlay.layout(&node_ids, &mut rng);
             let leaders = overlay.leaders(&node_ids, 1, &mut rng).collect();
 
-            let carnot_steps: Vec<_> = CARNOT_LEADER_STEPS
+            let carnot_steps: Vec<_> = cfg.steps
                 .iter()
                 .copied()
                 .map(|step| {
