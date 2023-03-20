@@ -1,11 +1,11 @@
-use rand::prelude::IteratorRandom;
-use rand::Rng;
 // std
 // crates
+use rand::prelude::IteratorRandom;
+use rand::Rng;
 // internal
 use super::Overlay;
 use crate::node::carnot::{CarnotNode, CarnotRole};
-use crate::node::{Node, NodeId};
+use crate::node::NodeId;
 use crate::overlay::{Committee, Layout};
 
 pub struct FlatOverlay;
@@ -38,6 +38,7 @@ impl Overlay<CarnotNode> for FlatOverlay {
         .collect();
         let parent = std::iter::once((0, 0)).collect();
         let children = std::iter::once((0, vec![0])).collect();
-        Layout::new(committees, parent, children)
+        let layers = std::iter::once((0, vec![0])).collect();
+        Layout::new(committees, parent, children, layers)
     }
 }

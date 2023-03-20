@@ -31,6 +31,7 @@ impl TreeOverlay<CarnotNode> {
         let mut committees = HashMap::new();
         let mut parents = HashMap::new();
         let mut children = HashMap::new();
+        let mut layers = HashMap::new();
 
         for (committee_id, nodes) in (0..node_count)
             .collect::<Vec<usize>>()
@@ -65,9 +66,14 @@ impl TreeOverlay<CarnotNode> {
             };
 
             committees.insert(committee_id, committee);
+
+            layers
+                .entry(get_layer(committee_id))
+                .or_insert_with(Vec::new)
+                .push(committee_id);
         }
 
-        Layout::new(committees, parents, children)
+        Layout::new(committees, parents, children, layers)
     }
 }
 
@@ -105,6 +111,11 @@ fn committee_count(depth: usize) -> usize {
 
 fn get_parent_id(id: usize) -> usize {
     (id - 1 + id % 2) / 2
+}
+
+/// Get a layer in a tree of a given committee id.
+fn get_layer(id: usize) -> usize {
+    (id as f64).log2().floor() as usize
 }
 
 #[cfg(test)]

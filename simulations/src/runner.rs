@@ -1,7 +1,3 @@
-// 1 - Leader forwards a proposal - Leader builds proposal
-// 2 - Every committee member receives the proposal and validates it
-//
-
 use crate::node::{Node, NodeId, StepTime};
 use crate::overlay::Layout;
 use rand::Rng;
@@ -19,14 +15,7 @@ pub struct Report {
     round_time: Duration,
 }
 
-#[derive(Copy, Clone)]
-pub enum LayoutNodes {
-    Leader,
-    Committee,
-    LeafCommittee,
-}
-
-pub type ExecutionSteps<S> = [(LayoutNodes, S, Box<dyn Fn(&[StepTime]) -> StepTime>)];
+type Reducer = Box<dyn Fn(&[StepTime]) -> StepTime>;
 
 impl<N: Node> ConsensusRunner<N>
 where
@@ -56,19 +45,29 @@ where
         self.nodes.iter().map(Node::id)
     }
 
-    pub fn run(&mut self, reducer: Box<dyn Fn(&[StepTime]) -> StepTime>) -> Report
+    pub fn run(&mut self, reducer: Reducer) -> Report
     where
         N::Step: Clone,
     {
         let leaders = &self.leaders;
         let layout = &self.layout;
 
-        //let round_time = layout
-        //    .node_ids()
-        //    .map(|id| {
-        //        // get an actual carnotnode.
-        //        self.nodes[id].run_step();
-        //    }).collect
+        let mut layer_times = Vec::new();
+        for layer_nodes in layout.layers.values().map(|committees| {
+            committees
+                .iter()
+                .flat_map(|id| layout.committees[id].nodes.clone())
+                .collect::<Vec<NodeId>>()
+        }) {
+            let times: Vec<StepTime> = layer_nodes
+                .iter()
+                .map(|id| self.nodes[*id].run_step())
+                .collect();
+
+            layer_times.push(times)
+        }
+
+        let round_time = layer_times.iter().map(|d| reducer(d)).sum();
 
         Report { round_time }
     }
@@ -79,15 +78,13 @@ mod test {
     use crate::network::behaviour::NetworkBehaviour;
     use crate::network::regions::{Region, RegionsData};
     use crate::network::Network;
-    use crate::node::carnot::{
-        CarnotNode, CarnotNodeSettings, CarnotRole, CARNOT_INTERMEDIATE_STEPS, CARNOT_LEADER_STEPS,
-        CARNOT_LEAF_STEPS, CARNOT_ROOT_STEPS, CARNOT_STEPS_COSTS,
-    };
+    use crate::node::carnot::CarnotNodeSettings;
+    use crate::node::carnot::{CarnotNode, CARNOT_STEPS_COSTS};
     use crate::node::{NodeId, StepTime};
     use crate::overlay::flat::FlatOverlay;
     use crate::overlay::tree::{TreeOverlay, TreeSettings, TreeType};
     use crate::overlay::Overlay;
-    use crate::runner::{ConsensusRunner, LayoutNodes};
+    use crate::runner::{ConsensusRunner, Reducer};
     use rand::rngs::SmallRng;
     use rand::{Rng, SeedableRng};
     use std::rc::Rc;
@@ -122,24 +119,10 @@ mod test {
 
         let mut runner = setup_runner(&mut rng, &overlay);
 
-        let carnot_steps: Vec<_> = CARNOT_LEADER_STEPS
-            .iter()
-            .copied()
-            .map(|step| {
-                (
-                    LayoutNodes::Leader,
-                    step,
-                    Box::new(|times: &[StepTime]| *times.iter().max().unwrap())
-                        as Box<dyn Fn(&[StepTime]) -> StepTime>,
-                )
-            })
-            .collect();
-
         assert_eq!(
             Duration::from_millis(1100),
             runner
-                .run(Box::new(|times: &[StepTime]| *times.iter().max().unwrap())
-                    as Box<dyn Fn(&[StepTime]) -> StepTime>)
+                .run(Box::new(|times: &[StepTime]| *times.iter().max().unwrap()) as Reducer)
                 .round_time
         );
     }
@@ -151,31 +134,10 @@ mod test {
 
         let mut runner: ConsensusRunner<CarnotNode> = setup_runner(&mut rng, &overlay);
 
-        let leader_steps = CARNOT_LEADER_STEPS.iter().copied().map(|step| {
-            (
-                LayoutNodes::Leader,
-                step,
-                Box::new(|times: &[StepTime]| *times.iter().max().unwrap())
-                    as Box<dyn Fn(&[StepTime]) -> StepTime>,
-            )
-        });
-
-        let committee_steps = CARNOT_LEAF_STEPS.iter().copied().map(|step| {
-            (
-                LayoutNodes::LeafCommittee,
-                step,
-                Box::new(|times: &[StepTime]| *times.iter().max().unwrap())
-                    as Box<dyn Fn(&[StepTime]) -> StepTime>,
-            )
-        });
-
-        let carnot_steps: Vec<_> = leader_steps.chain(committee_steps).collect();
-
         assert_eq!(
             Duration::from_millis(2200),
             runner
-                .run(Box::new(|times: &[StepTime]| *times.iter().max().unwrap())
-                    as Box<dyn Fn(&[StepTime]) -> StepTime>)
+                .run(Box::new(|times: &[StepTime]| *times.iter().max().unwrap()) as Reducer)
                 .round_time
         );
     }
@@ -191,21 +153,11 @@ mod test {
         });
 
         let mut runner: ConsensusRunner<CarnotNode> = setup_runner(&mut rng, &overlay);
-        let committee_steps = CARNOT_LEAF_STEPS.iter().copied().map(|step| {
-            (
-                LayoutNodes::LeafCommittee,
-                step,
-                Box::new(|times: &[StepTime]| *times.iter().max().unwrap())
-                    as Box<dyn Fn(&[StepTime]) -> StepTime>,
-            )
-        });
-        let carnot_steps: Vec<_> = committee_steps.collect();
 
         assert_eq!(
             Duration::from_millis(200),
             runner
-                .run(Box::new(|times: &[StepTime]| *times.iter().max().unwrap())
-                    as Box<dyn Fn(&[StepTime]) -> StepTime>)
+                .run(Box::new(|times: &[StepTime]| *times.iter().max().unwrap()) as Reducer)
                 .round_time
         );
     }

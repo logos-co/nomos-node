@@ -29,6 +29,7 @@ pub struct Layout<N: Node> {
     pub from_committee: HashMap<NodeId, CommitteeId>,
     pub parent: HashMap<CommitteeId, CommitteeId>,
     pub children: HashMap<CommitteeId, Vec<CommitteeId>>,
+    pub layers: HashMap<usize, Vec<CommitteeId>>,
 }
 
 impl<N: Node + Clone> Layout<N> {
@@ -36,6 +37,7 @@ impl<N: Node + Clone> Layout<N> {
         committees: HashMap<CommitteeId, Committee<N>>,
         parent: HashMap<CommitteeId, CommitteeId>,
         children: HashMap<CommitteeId, Vec<CommitteeId>>,
+        layers: HashMap<usize, Vec<usize>>,
     ) -> Self {
         let from_committee = committees
             .iter()
@@ -51,6 +53,7 @@ impl<N: Node + Clone> Layout<N> {
             from_committee,
             parent,
             children,
+            layers,
         }
     }
 
