@@ -7,7 +7,7 @@ use simulations::{
     config::Config,
     node::{
         carnot::{CarnotNode, CARNOT_LEADER_STEPS},
-        StepTime,
+        StepTime, Node,
     },
     overlay::{flat::FlatOverlay, Overlay},
     runner::{ConsensusRunner, LayoutNodes},
@@ -74,7 +74,7 @@ impl FromStr for OutputType {
     type Err = String;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
+        match s.to_lowercase().as_str() {
             "stdout" => Ok(Self::StdOut),
             "stderr" => Ok(Self::StdErr),
             path => Ok(Self::File(PathBuf::from(path))),
@@ -92,7 +92,7 @@ pub fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let report = match (overlay_type, node_type) {
         (OverlayType::Flat, NodeType::Carnot) => {
-            let cfg = serde_json::from_reader::<_, Config<CarnotNode, FlatOverlay>>(
+            let cfg = serde_json::from_reader::<_, Config<<CarnotNode as Node>::Settings, <FlatOverlay as Overlay>::Settings>>(
                 std::fs::File::open(config)?,
             )?;
             #[allow(clippy::unit_arg)]
