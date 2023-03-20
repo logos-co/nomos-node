@@ -4,7 +4,10 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 #[derive(Serialize, Deserialize)]
-pub struct Config<N, O, S> {
+pub struct Config<N, O, S>
+where
+    S: core::str::FromStr,
+{
     pub network_behaviors: HashMap<(Region, Region), StepTime>,
     pub regions: Vec<Region>,
     pub overlay_settings: O,

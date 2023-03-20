@@ -71,8 +71,6 @@ impl core::str::FromStr for CarnotStep {
     }
 }
 
-impl super::Step for CarnotStep {}
-
 #[derive(Clone)]
 pub enum CarnotStepSolver {
     Plain(StepTime),

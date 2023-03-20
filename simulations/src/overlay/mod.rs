@@ -73,7 +73,7 @@ impl Layout {
 }
 
 pub trait Overlay {
-    type Settings: serde::Serialize + serde::de::DeserializeOwned;
+    type Settings;
 
     fn new(settings: Self::Settings) -> Self;
     fn leaders<R: Rng>(
