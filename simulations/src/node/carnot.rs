@@ -222,50 +222,52 @@ impl Node for CarnotNode {
     fn run_steps(&mut self, steps: &[CarnotStep]) -> StepTime {
         use CarnotStepSolver::*;
 
-        steps
-            .iter()
-            .map(
-                |step| match self.settings.steps_costs.get(step).unwrap().to_solver() {
-                    Plain(t) => t,
-                    ParentCommitteeReceiverSolver(solver) => {
-                        match self
-                            .settings
-                            .layout
-                            .parent_nodes(self.settings.layout.committee(self.id))
-                        {
-                            Some(parent) => {
-                                solver(&mut self.rng, self.id, &parent, &self.settings.network)
-                            }
-                            None => Duration::ZERO,
+        let mut overall_steps_time = Duration::ZERO;
+        for step in steps.iter() {
+            let step_time = match self.settings.steps_costs.get(step).unwrap().to_solver() {
+                Plain(t) => t,
+                ParentCommitteeReceiverSolver(solver) => {
+                    match self
+                        .settings
+                        .layout
+                        .parent_nodes(self.settings.layout.committee(self.id))
+                    {
+                        Some(parent) => {
+                            solver(&mut self.rng, self.id, &parent, &self.settings.network)
                         }
+                        None => Duration::ZERO,
                     }
-                    ChildCommitteeReceiverSolver(solver) => solver(
+                }
+                ChildCommitteeReceiverSolver(solver) => solver(
+                    &mut self.rng,
+                    self.id,
+                    &self
+                        .settings
+                        .layout
+                        .children_nodes(self.settings.layout.committee(self.id)),
+                    &self.settings.network,
+                ),
+                RootCommitteeReceiverSolver(solver) => solver(
+                    &mut self.rng,
+                    self.id,
+                    &self.settings.leaders,
+                    &self.settings.network,
+                ),
+                LeaderToCommitteeReceiverSolver(solver) => {
+                    let committees: Vec<&Committee> =
+                        self.settings.layout.committees.values().collect();
+                    solver(
                         &mut self.rng,
                         self.id,
-                        &self
-                            .settings
-                            .layout
-                            .children_nodes(self.settings.layout.committee(self.id)),
+                        &committees[..],
                         &self.settings.network,
-                    ),
-                    RootCommitteeReceiverSolver(solver) => solver(
-                        &mut self.rng,
-                        self.id,
-                        &self.settings.leaders,
-                        &self.settings.network,
-                    ),
-                    LeaderToCommitteeReceiverSolver(solver) => {
-                        let committees: Vec<&Committee> =
-                            self.settings.layout.committees.values().collect();
-                        solver(
-                            &mut self.rng,
-                            self.id,
-                            &committees[..],
-                            &self.settings.network,
-                        )
-                    }
-                },
-            )
-            .sum()
+                    )
+                }
+            };
+
+            overall_steps_time += step_time
+        }
+
+        overall_steps_time
     }
 }
