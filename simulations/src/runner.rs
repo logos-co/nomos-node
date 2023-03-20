@@ -50,16 +50,16 @@ where
         let leaders = &self.leaders;
         let layout = &self.layout;
 
-        let mut leader_times = Vec::new();
-        for leader_node in leaders.iter() {
-            let time = self
-                .nodes
-                .get_mut(leader_node)
-                .unwrap()
-                .run_steps(CARNOT_LEADER_STEPS);
-
-            leader_times.push([time].to_vec())
-        }
+        let mut leader_times = leaders
+            .iter()
+            .map(|leader_node| {
+                vec![self
+                    .nodes
+                    .get_mut(leader_node)
+                    .unwrap()
+                    .run_steps(CARNOT_LEADER_STEPS)]
+            })
+            .collect();
 
         let mut layer_times = Vec::new();
         for layer_nodes in layout
