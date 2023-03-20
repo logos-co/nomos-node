@@ -49,6 +49,7 @@ impl Layout {
     }
 
     pub fn parent(&self, committee_id: CommitteeId) -> CommitteeId {
+        println!("{committee_id}");
         self.parent[&committee_id]
     }
 
