@@ -4,12 +4,13 @@ use rand::Rng;
 // crates
 // internal
 use super::Overlay;
+use crate::node::carnot::{CarnotNode, CarnotRole};
 use crate::node::{Node, NodeId};
 use crate::overlay::{Committee, Layout};
 
 pub struct FlatOverlay;
 
-impl Overlay for FlatOverlay {
+impl Overlay<CarnotNode> for FlatOverlay {
     type Settings = ();
 
     fn new(_settings: Self::Settings) -> Self {
@@ -26,9 +27,15 @@ impl Overlay for FlatOverlay {
         Box::new(leaders)
     }
 
-    fn layout<N: Node, R: Rng>(&self, nodes: &[NodeId], _rng: &mut R) -> Layout<N> {
-        let committees =
-            std::iter::once((0, nodes.iter().copied().collect::<Committee>())).collect();
+    fn layout<R: Rng>(&self, nodes: &[NodeId], _rng: &mut R) -> Layout<CarnotNode> {
+        let committees = std::iter::once((
+            0,
+            Committee {
+                nodes: nodes.iter().copied().collect(),
+                role: CarnotRole::Leader,
+            },
+        ))
+        .collect();
         let parent = std::iter::once((0, 0)).collect();
         let children = std::iter::once((0, vec![0])).collect();
         Layout::new(committees, parent, children)

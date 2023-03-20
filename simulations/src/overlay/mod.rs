@@ -8,15 +8,23 @@ use rand::Rng;
 // internal
 use crate::node::{CommitteeId, Node, NodeId};
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct Committee<N: Node> {
-    nodes: BTreeSet<NodeId>,
-    role: N::Role,
+    pub nodes: BTreeSet<NodeId>,
+    pub role: N::Role,
 }
+
+impl<N: Node> Committee<N> {
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.nodes.len() == 0
+    }
+}
+
 pub type Leaders = BTreeSet<NodeId>;
 
-#[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
-pub struct Layout<N: Node + Clone> {
+#[derive(Debug, Clone)]
+pub struct Layout<N: Node> {
     pub committees: HashMap<CommitteeId, Committee<N>>,
     pub from_committee: HashMap<NodeId, CommitteeId>,
     pub parent: HashMap<CommitteeId, CommitteeId>,
@@ -78,7 +86,7 @@ impl<N: Node + Clone> Layout<N> {
     }
 }
 
-pub trait Overlay {
+pub trait Overlay<N: Node> {
     type Settings;
 
     fn new(settings: Self::Settings) -> Self;
@@ -88,5 +96,5 @@ pub trait Overlay {
         size: usize,
         rng: &mut R,
     ) -> Box<dyn Iterator<Item = NodeId>>;
-    fn layout<N: Node + Clone, R: Rng>(&self, nodes: &[NodeId], rng: &mut R) -> Layout<N>;
+    fn layout<R: Rng>(&self, nodes: &[NodeId], rng: &mut R) -> Layout<N>;
 }

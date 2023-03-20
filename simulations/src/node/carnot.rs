@@ -24,6 +24,7 @@ fn receive_proposal(
 ) -> StepTime {
     assert!(!committee.is_empty());
     committee
+        .nodes
         .iter()
         .filter_map(|&sender| network.send_message_cost(rng, sender, node))
         .max()
@@ -41,6 +42,7 @@ fn receive_commit(
         .iter()
         .filter_map(|committee| {
             committee
+                .nodes
                 .iter()
                 .filter_map(|&sender| network.send_message_cost(rng, sender, node))
                 .max()

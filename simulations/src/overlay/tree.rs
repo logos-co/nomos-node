@@ -23,11 +23,8 @@ pub struct TreeOverlay<N: Node> {
     layout: Layout<N>,
 }
 
-impl<N> TreeOverlay<N>
-where
-    N: Node,
-{
-    pub fn build_full_binary_tree(settings: &TreeSettings) -> Layout<N> {
+impl TreeOverlay<CarnotNode> {
+    pub fn build_full_binary_tree(settings: &TreeSettings) -> Layout<CarnotNode> {
         let committee_count = committee_count(settings.depth);
         let node_count = committee_count * settings.committee_size;
 
@@ -42,10 +39,10 @@ where
         {
             committees.insert(
                 committee_id,
-                nodes
-                    .iter()
-                    .map(|n| )
-                    .collect::<Committee<N>>(),
+                Committee {
+                    nodes: nodes.iter().copied().collect(),
+                    role: CarnotRole::Root,
+                },
             );
             let left_child_id = 2 * committee_id + 1;
             let right_child_id = left_child_id + 1;
@@ -66,7 +63,7 @@ where
     }
 }
 
-impl<N: Node> Overlay for TreeOverlay<N> {
+impl Overlay<CarnotNode> for TreeOverlay<CarnotNode> {
     type Settings = TreeSettings;
 
     fn new(settings: Self::Settings) -> Self {
@@ -156,12 +153,12 @@ mod tests {
         // 2^h - 1
         assert_eq!(layout.committees.len(), 1023);
 
-        let root_nodes = &layout.committees[&0];
+        let root_nodes = &layout.committees[&0].nodes;
         assert_eq!(root_nodes.len(), 10);
         assert_eq!(root_nodes.first(), Some(&0));
         assert_eq!(root_nodes.last(), Some(&9));
 
-        let last_nodes = &layout.committees[&1022];
+        let last_nodes = &layout.committees[&1022].nodes;
         assert_eq!(last_nodes.len(), 10);
         assert_eq!(last_nodes.first(), Some(&10220));
         assert_eq!(last_nodes.last(), Some(&10229));
