@@ -57,6 +57,22 @@ pub enum CarnotStep {
     ValidateVote,
 }
 
+impl core::str::FromStr for CarnotStep {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.trim().to_lowercase().as_str() {
+            "receiveproposal" => Ok(Self::ReceiveProposal),
+            "validateproposal" => Ok(Self::ValidateProposal),
+            "receivevote" => Ok(Self::ReceiveVote),
+            "validatevote" => Ok(Self::ValidateVote),
+            _ => Err(format!("Unknown step: {}", s)),
+        }
+    }
+}
+
+impl super::Step for CarnotStep {}
+
 #[derive(Clone)]
 pub enum CarnotStepSolver {
     Plain(StepTime),

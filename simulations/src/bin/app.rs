@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use simulations::{
     config::Config,
     node::{
-        carnot::{CarnotNode, CARNOT_LEADER_STEPS},
+        carnot::{CarnotNode, CARNOT_LEADER_STEPS, CarnotStep},
         StepTime, Node,
     },
     overlay::{flat::FlatOverlay, Overlay},
@@ -92,7 +92,7 @@ pub fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let report = match (overlay_type, node_type) {
         (OverlayType::Flat, NodeType::Carnot) => {
-            let cfg = serde_json::from_reader::<_, Config<<CarnotNode as Node>::Settings, <FlatOverlay as Overlay>::Settings>>(
+            let cfg = serde_json::from_reader::<_, Config<<CarnotNode as Node>::Settings, <FlatOverlay as Overlay>::Settings, CarnotStep>>(
                 std::fs::File::open(config)?,
             )?;
             #[allow(clippy::unit_arg)]
