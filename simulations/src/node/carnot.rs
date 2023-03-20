@@ -257,7 +257,6 @@ impl Node for CarnotNode {
                     LeaderToCommitteeReceiverSolver(solver) => {
                         let committees: Vec<&Committee> =
                             self.settings.layout.committees.values().collect();
-                        println!("{committees:?}");
                         solver(
                             &mut self.rng,
                             self.id,

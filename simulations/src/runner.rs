@@ -50,30 +50,23 @@ where
         let leaders = &self.leaders;
         let layout = &self.layout;
 
-        let mut leader_times = leaders
-            .iter()
-            .map(|leader_node| {
-                vec![self
-                    .nodes
-                    .get_mut(leader_node)
-                    .unwrap()
-                    .run_steps(CARNOT_LEADER_STEPS)]
-            })
-            .collect();
+        let mut leader_times = Vec::new();
+        for leader_node in leaders.iter() {
+            let time = self
+                .nodes
+                .get_mut(leader_node)
+                .unwrap()
+                .run_steps(CARNOT_LEADER_STEPS);
+
+            leader_times.push([time].to_vec())
+        }
 
         let mut layer_times = Vec::new();
-        for layer_nodes in layout.layers.values().map(|committees| {
-            committees
-                .iter()
-                .flat_map(|committee_id| {
-                    layout.committees[committee_id]
-                        .nodes
-                        .clone()
-                        .into_iter()
-                        .map(|node_id| (*committee_id, node_id))
-                })
-                .collect::<Vec<(NodeId, NodeId)>>()
-        }) {
+        for layer_nodes in layout
+            .layers
+            .values()
+            .map(|committees| get_layer_nodes(committees, layout))
+        {
             let times: Vec<StepTime> = layer_nodes
                 .iter()
                 .map(|(committee_id, node_id)| {
@@ -98,6 +91,22 @@ where
 
         Report { round_time }
     }
+}
+
+fn get_layer_nodes(layer_committees: &[NodeId], layout: &Layout) -> Vec<(NodeId, NodeId)> {
+    layer_committees
+        .iter()
+        .flat_map(|committee_id| get_committee_nodes(committee_id, layout))
+        .collect()
+}
+
+fn get_committee_nodes(committee: &NodeId, layout: &Layout) -> Vec<(NodeId, NodeId)> {
+    layout.committees[committee]
+        .nodes
+        .clone()
+        .into_iter()
+        .map(|node_id| (*committee, node_id))
+        .collect()
 }
 
 #[cfg(test)]
