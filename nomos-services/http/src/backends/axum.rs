@@ -113,7 +113,7 @@ impl HttpBackend for AxumBackend {
         let router = self.router.clone();
         let service = tower::service_fn(move |request: Request<Body>| {
             let mut router = router.lock().clone();
-            async move { router.call(request).await }
+            router.call(request)
         });
 
         axum::Server::bind(&self.config.address)
@@ -125,8 +125,8 @@ impl HttpBackend for AxumBackend {
 
 impl AxumBackend {
     fn add_data_route(&self, method: HttpMethod, path: &str, req_stream: Sender<HttpRequest>) {
-        let handle_data = |Query(query): Query<HashMap<String, String>>, payload: Option<Bytes>| async move {
-            handle_req(req_stream, query, payload).await
+        let handle_data = |Query(query): Query<HashMap<String, String>>, payload: Option<Bytes>| {
+            handle_req(req_stream, query, payload)
         };
 
         let handler = match method {

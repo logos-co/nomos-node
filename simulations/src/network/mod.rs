@@ -8,6 +8,7 @@ use crate::node::NodeId;
 pub mod behaviour;
 pub mod regions;
 
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct Network {
     pub regions: regions::RegionsData,
 }

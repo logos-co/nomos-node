@@ -49,12 +49,26 @@ fn receive_commit(
         .unwrap()
 }
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum CarnotStep {
     ReceiveProposal,
     ValidateProposal,
     ReceiveVote,
     ValidateVote,
+}
+
+impl core::str::FromStr for CarnotStep {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.trim().to_lowercase().as_str() {
+            "receiveproposal" => Ok(Self::ReceiveProposal),
+            "validateproposal" => Ok(Self::ValidateProposal),
+            "receivevote" => Ok(Self::ReceiveVote),
+            "validatevote" => Ok(Self::ValidateVote),
+            _ => Err(format!("Unknown step: {s}")),
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -64,8 +78,30 @@ pub enum CarnotStepSolver {
     ChildCommitteeReceiverSolver(ChildCommitteeReceiverSolver),
 }
 
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, serde::Serialize, serde::Deserialize)]
+pub enum CarnotStepSolverType {
+    Plain(StepTime),
+    ParentCommitteeReceiverSolver,
+    ChildCommitteeReceiverSolver,
+}
+
+impl CarnotStepSolverType {
+    pub fn to_solver(self) -> CarnotStepSolver {
+        match self {
+            Self::Plain(time) => CarnotStepSolver::Plain(time),
+            Self::ParentCommitteeReceiverSolver => {
+                CarnotStepSolver::ParentCommitteeReceiverSolver(receive_proposal)
+            }
+            Self::ChildCommitteeReceiverSolver => {
+                CarnotStepSolver::ChildCommitteeReceiverSolver(receive_commit)
+            }
+        }
+    }
+}
+
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct CarnotNodeSettings {
-    pub steps_costs: HashMap<CarnotStep, CarnotStepSolver>,
+    pub steps_costs: HashMap<CarnotStep, CarnotStepSolverType>,
     pub network: Network,
     pub layout: Layout,
 }
@@ -76,22 +112,22 @@ pub struct CarnotNode {
     settings: Rc<CarnotNodeSettings>,
 }
 
-pub const CARNOT_STEPS_COSTS: &[(CarnotStep, CarnotStepSolver)] = &[
+pub const CARNOT_STEPS_COSTS: &[(CarnotStep, CarnotStepSolverType)] = &[
     (
         CarnotStep::ReceiveProposal,
-        CarnotStepSolver::ParentCommitteeReceiverSolver(receive_proposal),
+        CarnotStepSolverType::ParentCommitteeReceiverSolver,
     ),
     (
         CarnotStep::ValidateProposal,
-        CarnotStepSolver::Plain(StepTime::from_secs(1)),
+        CarnotStepSolverType::Plain(StepTime::from_secs(1)),
     ),
     (
         CarnotStep::ReceiveVote,
-        CarnotStepSolver::ChildCommitteeReceiverSolver(receive_commit),
+        CarnotStepSolverType::ChildCommitteeReceiverSolver,
     ),
     (
         CarnotStep::ValidateVote,
-        CarnotStepSolver::Plain(StepTime::from_secs(1)),
+        CarnotStepSolverType::Plain(StepTime::from_secs(1)),
     ),
 ];
 
@@ -130,27 +166,27 @@ impl Node for CarnotNode {
     fn run_step(&mut self, step: Self::Step) -> StepTime {
         use CarnotStepSolver::*;
         match self.settings.steps_costs.get(&step) {
-            Some(Plain(t)) => *t,
-            Some(ParentCommitteeReceiverSolver(solver)) => solver(
-                &mut self.rng,
-                self.id,
-                self.settings
-                    .layout
-                    .parent_nodes(self.settings.layout.committee(self.id)),
-                &self.settings.network,
-            ),
-            Some(ChildCommitteeReceiverSolver(solver)) => solver(
-                &mut self.rng,
-                self.id,
-                &self
-                    .settings
-                    .layout
-                    .children_nodes(self.settings.layout.committee(self.id)),
-                &self.settings.network,
-            ),
-            None => {
-                panic!("Unknown step: {step:?}");
-            }
+            Some(step) => match step.to_solver() {
+                Plain(t) => t,
+                ParentCommitteeReceiverSolver(solver) => solver(
+                    &mut self.rng,
+                    self.id,
+                    self.settings
+                        .layout
+                        .parent_nodes(self.settings.layout.committee(self.id)),
+                    &self.settings.network,
+                ),
+                ChildCommitteeReceiverSolver(solver) => solver(
+                    &mut self.rng,
+                    self.id,
+                    &self
+                        .settings
+                        .layout
+                        .children_nodes(self.settings.layout.committee(self.id)),
+                    &self.settings.network,
+                ),
+            },
+            None => panic!("Unknown step: {step:?}"),
         }
     }
 }

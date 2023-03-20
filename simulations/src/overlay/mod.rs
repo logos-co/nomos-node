@@ -10,6 +10,7 @@ use crate::node::{CommitteeId, NodeId};
 pub type Committee = BTreeSet<NodeId>;
 pub type Leaders = BTreeSet<NodeId>;
 
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct Layout {
     pub committees: HashMap<CommitteeId, Committee>,
     pub from_committee: HashMap<NodeId, CommitteeId>,
@@ -73,6 +74,7 @@ impl Layout {
 
 pub trait Overlay {
     type Settings;
+
     fn new(settings: Self::Settings) -> Self;
     fn leaders<R: Rng>(
         &self,
