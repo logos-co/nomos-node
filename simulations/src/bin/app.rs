@@ -7,7 +7,7 @@ use simulations::{
     config::Config,
     node::{
         carnot::{CarnotNode, CarnotStep},
-        StepTime, Node,
+        Node, StepTime,
     },
     overlay::{flat::FlatOverlay, Overlay},
     runner::{ConsensusRunner, LayoutNodes},
@@ -92,9 +92,14 @@ pub fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let report = match (overlay_type, node_type) {
         (OverlayType::Flat, NodeType::Carnot) => {
-            let cfg = serde_json::from_reader::<_, Config<<CarnotNode as Node>::Settings, <FlatOverlay as Overlay>::Settings, CarnotStep>>(
-                std::fs::File::open(config)?,
-            )?;
+            let cfg = serde_json::from_reader::<
+                _,
+                Config<
+                    <CarnotNode as Node>::Settings,
+                    <FlatOverlay as Overlay>::Settings,
+                    CarnotStep,
+                >,
+            >(std::fs::File::open(config)?)?;
             #[allow(clippy::unit_arg)]
             let overlay = FlatOverlay::new(cfg.overlay_settings);
             let node_ids = (0..cfg.node_count).collect::<Vec<_>>();
@@ -102,7 +107,8 @@ pub fn main() -> Result<(), Box<dyn std::error::Error>> {
             let layout = overlay.layout(&node_ids, &mut rng);
             let leaders = overlay.leaders(&node_ids, 1, &mut rng).collect();
 
-            let carnot_steps: Vec<_> = cfg.steps
+            let carnot_steps: Vec<_> = cfg
+                .steps
                 .iter()
                 .copied()
                 .map(|step| {
