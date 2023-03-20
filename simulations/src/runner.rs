@@ -129,7 +129,7 @@ mod test {
         runner::{ConsensusRunner, Reducer},
     };
     use rand::{rngs::mock::StepRng, Rng};
-    use std::{rc::Rc, time::Duration};
+    use std::{collections::HashMap, rc::Rc, time::Duration};
 
     fn setup_runner<R: Rng, O: Overlay<CarnotNode>>(
         mut rng: &mut R,
@@ -237,6 +237,179 @@ mod test {
 
         assert_eq!(
             Duration::from_millis(6600),
+            runner
+                .run(Box::new(|times: &[StepTime]| *times.iter().max().unwrap()) as Reducer)
+                .round_time
+        );
+    }
+
+    #[test]
+    fn run_tree_network_config_1() {
+        let mut rng = StepRng::new(1, 0);
+
+        let overlay = TreeOverlay::new(TreeSettings {
+            tree_type: TreeType::FullBinaryTree,
+            depth: 3,
+            committee_size: 1,
+        });
+
+        let node_ids = overlay.nodes();
+        let layout = overlay.layout(&node_ids, &mut rng);
+        // Normaly a leaders would be selected randomly, here, we're assuming it's NodeID 1.
+        // let leaders: Vec<NodeId> = overlay.leaders(&node_ids, 1, &mut rng).collect();
+        let leaders = vec![1];
+
+        let first_five = &node_ids[..5];
+        let rest = &node_ids[5..];
+
+        //       0
+        //   1       2
+        // 3   4   5   6
+        //
+        // # Leader - NodeID 1
+        //
+        // Sends vote to all committees.
+        //
+        // LeaderReceiveVote:
+        // - 100ms - Asia - Asia (1 to 0, 1, 2, 3, 4)
+        // - 500ms - Asia - Europe (1 to 5, 6)
+        //
+        // ValidateVote: 1s
+        //
+        // Expected times: [1.5s]
+
+        // # Root - NodeID 0
+        //
+        // Sends vote to child committees.
+        //
+        // RootReceiveProposal:
+        // - 100ms - Asia - Asia (0 to 1)
+        //
+        // ReceiveVote:
+        // - 100ms - Asia - Asia (0 to 1, 2)
+        //
+        // No network:
+        // - 1s - ValidateVote
+        // - 1s - ValidateProposal
+        //
+        // Expected times: [2.2s]
+
+        // # Intermediary - NodeID 1, 2:
+        //
+        // ReceiveVote:
+        // - 100ms - Asia - Asia (1 to 3, 4)
+        // - 500ms - Asia - Europe (2 to 5, 6)
+        //
+        // ReceiveProposal:
+        // - 100ms - Asia - Asia (1 to 0, 2 to 0)
+        //
+        // No network:
+        // - 1s - ValidateVote
+        // - 1s - ValidateProposal
+        //
+        // Expected times [2.2s, 2.6s]
+
+        // # Leaf - NodeID 3, 4, 5, 6
+        //
+        // ReceiveProposal:
+        // - 100ms - Asia - Asia ( 3, 4 to 1)
+        // - 500ms - Asia - Europe ( 5, 6 to 2)
+        //
+        // No network:
+        // - 1s - ValidateProposal
+        //
+        // Expected times [1.1s, 1.1s, 1.5s, 1.5s]
+
+        let regions = HashMap::from([
+            (Region::Asia, first_five.to_vec()),
+            (Region::Europe, rest.to_vec()),
+        ]);
+
+        let network_behaviour = HashMap::from([
+            (
+                (Region::Asia, Region::Asia),
+                NetworkBehaviour::new(Duration::from_millis(100), 0.0),
+            ),
+            (
+                (Region::Asia, Region::Europe),
+                NetworkBehaviour::new(Duration::from_millis(500), 0.0),
+            ),
+            (
+                (Region::Europe, Region::Europe),
+                NetworkBehaviour::new(Duration::from_millis(100), 0.0),
+            ),
+        ]);
+
+        let node_settings: CarnotNodeSettings = CarnotNodeSettings {
+            steps_costs: CARNOT_STEPS_COSTS.iter().cloned().collect(),
+            network: Network::new(RegionsData::new(regions, network_behaviour)),
+            layout: overlay.layout(&node_ids, &mut rng),
+            leaders: leaders.clone(),
+        };
+
+        let mut runner =
+            ConsensusRunner::<CarnotNode>::new(&mut rng, layout, leaders, Rc::new(node_settings));
+
+        assert_eq!(
+            Duration::from_millis(7800),
+            runner
+                .run(Box::new(|times: &[StepTime]| *times.iter().max().unwrap()) as Reducer)
+                .round_time
+        );
+    }
+
+    #[test]
+    fn run_tree_network_config_100() {
+        let mut rng = StepRng::new(1, 0);
+
+        let overlay = TreeOverlay::new(TreeSettings {
+            tree_type: TreeType::FullBinaryTree,
+            depth: 3,
+            committee_size: 100,
+        });
+
+        let node_ids = overlay.nodes();
+        let layout = overlay.layout(&node_ids, &mut rng);
+        // Normaly a leaders would be selected randomly, here, we're assuming it's NodeID 1.
+        // let leaders: Vec<NodeId> = overlay.leaders(&node_ids, 1, &mut rng).collect();
+        let leaders = vec![1];
+
+        let two_thirds = node_ids.len() as f32 * 0.66;
+        let rest = &node_ids[two_thirds as usize..];
+        let two_thirds = &node_ids[..two_thirds as usize];
+
+        let regions = HashMap::from([
+            (Region::Asia, two_thirds.to_vec()),
+            (Region::Europe, rest.to_vec()),
+        ]);
+
+        let network_behaviour = HashMap::from([
+            (
+                (Region::Asia, Region::Asia),
+                NetworkBehaviour::new(Duration::from_millis(100), 0.0),
+            ),
+            (
+                (Region::Asia, Region::Europe),
+                NetworkBehaviour::new(Duration::from_millis(500), 0.0),
+            ),
+            (
+                (Region::Europe, Region::Europe),
+                NetworkBehaviour::new(Duration::from_millis(100), 0.0),
+            ),
+        ]);
+
+        let node_settings: CarnotNodeSettings = CarnotNodeSettings {
+            steps_costs: CARNOT_STEPS_COSTS.iter().cloned().collect(),
+            network: Network::new(RegionsData::new(regions, network_behaviour)),
+            layout: overlay.layout(&node_ids, &mut rng),
+            leaders: leaders.clone(),
+        };
+
+        let mut runner =
+            ConsensusRunner::<CarnotNode>::new(&mut rng, layout, leaders, Rc::new(node_settings));
+
+        assert_eq!(
+            Duration::from_millis(7800),
             runner
                 .run(Box::new(|times: &[StepTime]| *times.iter().max().unwrap()) as Reducer)
                 .round_time
