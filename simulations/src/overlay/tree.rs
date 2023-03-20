@@ -20,21 +20,34 @@ pub struct TreeSettings {
 }
 
 pub struct TreeOverlay {
-    layout: Layout,
+    settings: TreeSettings,
+}
+
+struct TreeProperties {
+    committee_count: usize,
+    node_count: usize,
 }
 
 impl TreeOverlay {
-    pub fn build_full_binary_tree(settings: &TreeSettings) -> Layout {
-        let committee_count = committee_count(settings.depth);
-        let node_count = committee_count * settings.committee_size;
+    fn build_full_binary_tree<R: rand::Rng>(
+        node_ids: &[NodeId],
+        rng: &mut R,
+        settings: &TreeSettings,
+    ) -> Layout {
+        let properties = get_tree_properties(settings);
+
+        // For full binary tree to be formed from existing nodes
+        // a certain unique node count needs to be provided.
+        assert!(properties.node_count <= node_ids.len());
 
         let mut committees = HashMap::new();
         let mut parents = HashMap::new();
         let mut children = HashMap::new();
         let mut layers = HashMap::new();
 
-        for (committee_id, nodes) in (0..node_count)
-            .collect::<Vec<usize>>()
+        for (committee_id, nodes) in node_ids
+            .iter()
+            .choose_multiple(rng, properties.node_count)
             .chunks(settings.committee_size)
             .enumerate()
         {
@@ -43,7 +56,7 @@ impl TreeOverlay {
             let right_child_id = left_child_id + 1;
 
             // Check for leaf nodes.
-            if right_child_id <= committee_count {
+            if right_child_id <= properties.committee_count {
                 children.insert(committee_id, vec![left_child_id, right_child_id]);
                 has_children = true;
             }
@@ -61,7 +74,7 @@ impl TreeOverlay {
             };
 
             let committee = Committee {
-                nodes: nodes.iter().copied().collect(),
+                nodes: nodes.iter().copied().copied().collect(),
                 role,
             };
 
@@ -81,15 +94,12 @@ impl Overlay<CarnotNode> for TreeOverlay {
     type Settings = TreeSettings;
 
     fn new(settings: Self::Settings) -> Self {
-        let layout = match settings.tree_type {
-            TreeType::FullBinaryTree => Self::build_full_binary_tree(&settings),
-        };
-
-        Self { layout }
+        Self { settings }
     }
 
     fn nodes(&self) -> Vec<NodeId> {
-        self.layout.node_ids().collect()
+        let properties = get_tree_properties(&self.settings);
+        (0..properties.node_count).collect()
     }
 
     fn leaders<R: rand::Rng>(
@@ -102,8 +112,19 @@ impl Overlay<CarnotNode> for TreeOverlay {
         Box::new(leaders)
     }
 
-    fn layout<R: rand::Rng>(&self, _nodes: &[NodeId], _rng: &mut R) -> Layout {
-        self.layout.clone()
+    fn layout<R: rand::Rng>(&self, nodes: &[NodeId], rng: &mut R) -> Layout {
+        match self.settings.tree_type {
+            TreeType::FullBinaryTree => Self::build_full_binary_tree(nodes, rng, &self.settings),
+        }
+    }
+}
+
+fn get_tree_properties(settings: &TreeSettings) -> TreeProperties {
+    let committee_count = committee_count(settings.depth);
+    let node_count = committee_count * settings.committee_size;
+    TreeProperties {
+        committee_count,
+        node_count,
     }
 }
 
@@ -125,14 +146,18 @@ fn get_layer(id: usize) -> usize {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rand::rngs::mock::StepRng;
 
     #[test]
     fn build_full_depth_1() {
-        let layout = TreeOverlay::build_full_binary_tree(&TreeSettings {
+        let mut rng = StepRng::new(1, 0);
+        let overlay = TreeOverlay::new(TreeSettings {
             tree_type: TreeType::FullBinaryTree,
             depth: 1,
             committee_size: 1,
         });
+        let nodes = overlay.nodes();
+        let layout = overlay.layout(&nodes, &mut rng);
         assert_eq!(layout.committees.len(), 1);
         assert!(layout.children.is_empty());
         assert!(layout.parent.is_empty());
@@ -140,11 +165,14 @@ mod tests {
 
     #[test]
     fn build_full_depth_3() {
-        let layout = TreeOverlay::build_full_binary_tree(&TreeSettings {
+        let mut rng = StepRng::new(1, 0);
+        let overlay = TreeOverlay::new(TreeSettings {
             tree_type: TreeType::FullBinaryTree,
             depth: 3,
             committee_size: 1,
         });
+        let nodes = overlay.nodes();
+        let layout = overlay.layout(&nodes, &mut rng);
         assert_eq!(layout.children[&0], vec![1, 2]);
         assert_eq!(layout.parent[&1], 0);
         assert_eq!(layout.parent[&2], 0);
@@ -167,11 +195,14 @@ mod tests {
 
     #[test]
     fn build_full_committee_size() {
-        let layout = TreeOverlay::build_full_binary_tree(&TreeSettings {
+        let mut rng = StepRng::new(1, 0);
+        let overlay = TreeOverlay::new(TreeSettings {
             tree_type: TreeType::FullBinaryTree,
             depth: 10,
             committee_size: 10,
         });
+        let nodes = overlay.nodes();
+        let layout = overlay.layout(&nodes, &mut rng);
 
         // 2^h - 1
         assert_eq!(layout.committees.len(), 1023);
@@ -189,11 +220,14 @@ mod tests {
 
     #[test]
     fn check_committee_role() {
-        let layout = TreeOverlay::build_full_binary_tree(&TreeSettings {
+        let mut rng = StepRng::new(1, 0);
+        let overlay = TreeOverlay::new(TreeSettings {
             tree_type: TreeType::FullBinaryTree,
             depth: 3,
             committee_size: 1,
         });
+        let nodes = overlay.nodes();
+        let layout = overlay.layout(&nodes, &mut rng);
 
         assert_eq!(layout.committees[&0].role, CarnotRole::Root);
         assert_eq!(layout.committees[&1].role, CarnotRole::Intermediate);
@@ -204,12 +238,14 @@ mod tests {
 
     #[test]
     fn check_layers() {
-        let layout = TreeOverlay::build_full_binary_tree(&TreeSettings {
+        let mut rng = StepRng::new(1, 0);
+        let overlay = TreeOverlay::new(TreeSettings {
             tree_type: TreeType::FullBinaryTree,
             depth: 4,
             committee_size: 1,
         });
-
+        let nodes = overlay.nodes();
+        let layout = overlay.layout(&nodes, &mut rng);
         assert_eq!(layout.layers[&0], vec![0]);
         assert_eq!(layout.layers[&1], vec![1, 2]);
         assert_eq!(layout.layers[&2], vec![3, 4, 5, 6]);
