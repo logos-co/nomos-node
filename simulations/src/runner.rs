@@ -5,12 +5,11 @@ use crate::node::carnot::{
 use crate::node::{Node, NodeId, StepTime};
 use crate::overlay::Layout;
 use rand::Rng;
-use std::cell::RefCell;
 use std::collections::HashMap;
 use std::time::Duration;
 
 pub struct ConsensusRunner<N: Node> {
-    nodes: HashMap<NodeId, RefCell<N>>,
+    nodes: HashMap<NodeId, N>,
     leaders: Vec<NodeId>,
     layout: Layout,
 }
@@ -37,7 +36,7 @@ where
             .node_ids()
             .map(|id| {
                 let node = N::new(&mut rng, id, node_settings.clone());
-                (id, RefCell::new(node))
+                (id, node)
             })
             .collect();
         Self {
@@ -54,8 +53,10 @@ where
         let mut leader_times = leaders
             .iter()
             .map(|leader_node| {
-                vec![self.nodes[leader_node]
-                    .borrow_mut()
+                vec![self
+                    .nodes
+                    .get_mut(leader_node)
+                    .unwrap()
                     .run_steps(CARNOT_LEADER_STEPS)]
             })
             .collect();
@@ -85,7 +86,7 @@ where
                             CARNOT_UNKNOWN_MESSAGE_RECEIVED_STEPS
                         }
                     };
-                    self.nodes[node_id].borrow_mut().run_steps(steps)
+                    self.nodes.get_mut(node_id).unwrap().run_steps(steps)
                 })
                 .collect();
 
