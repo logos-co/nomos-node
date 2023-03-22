@@ -66,7 +66,7 @@ where
                 let times: Vec<StepTime> = match layout_node {
                     LayoutNodes::Leader => leaders
                         .iter()
-                        .map(|&leader| self.nodes[leader.val()].run_step(step.clone()))
+                        .map(|&leader| self.nodes[leader.inner()].run_step(step.clone()))
                         .collect(),
                     LayoutNodes::Committee => {
                         let non_leaf_committees = layout
@@ -81,7 +81,7 @@ where
                                     .get(committee_id)
                                     .unwrap()
                                     .iter()
-                                    .map(|&node| self.nodes[node.val()].run_step(step.clone()))
+                                    .map(|&node| self.nodes[node.inner()].run_step(step.clone()))
                                     .max()
                             })
                             .collect()
@@ -99,7 +99,7 @@ where
                                     .get(committee_id)
                                     .unwrap()
                                     .iter()
-                                    .map(|&node| self.nodes[node.val()].run_step(step.clone()))
+                                    .map(|&node| self.nodes[node.inner()].run_step(step.clone()))
                                     .max()
                             })
                             .collect()

@@ -21,7 +21,7 @@ impl NodeId {
     }
 
     #[inline]
-    pub const fn val(&self) -> usize {
+    pub const fn inner(&self) -> usize {
         self.0
     }
 }
@@ -60,20 +60,6 @@ impl CommitteeId {
 impl From<usize> for CommitteeId {
     fn from(id: usize) -> Self {
         Self(id)
-    }
-}
-
-impl Deref for CommitteeId {
-    type Target = usize;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl DerefMut for CommitteeId {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
     }
 }
 
