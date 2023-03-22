@@ -28,9 +28,9 @@ impl Overlay for FlatOverlay {
 
     fn layout<R: Rng>(&self, nodes: &[NodeId], _rng: &mut R) -> Layout {
         let committees =
-            std::iter::once((0, nodes.iter().copied().collect::<Committee>())).collect();
-        let parent = std::iter::once((0, 0)).collect();
-        let children = std::iter::once((0, vec![0])).collect();
+            std::iter::once((0.into(), nodes.iter().copied().collect::<Committee>())).collect();
+        let parent = std::iter::once((0.into(), 0.into())).collect();
+        let children = std::iter::once((0.into(), vec![0.into()])).collect();
         Layout::new(committees, parent, children)
     }
 }

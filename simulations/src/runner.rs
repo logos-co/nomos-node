@@ -66,7 +66,7 @@ where
                 let times: Vec<StepTime> = match layout_node {
                     LayoutNodes::Leader => leaders
                         .iter()
-                        .map(|&leader| self.nodes[leader].run_step(step.clone()))
+                        .map(|&leader| self.nodes[leader.val()].run_step(step.clone()))
                         .collect(),
                     LayoutNodes::Committee => {
                         let non_leaf_committees = layout
@@ -81,7 +81,7 @@ where
                                     .get(committee_id)
                                     .unwrap()
                                     .iter()
-                                    .map(|&node| self.nodes[node].run_step(step.clone()))
+                                    .map(|&node| self.nodes[node.val()].run_step(step.clone()))
                                     .max()
                             })
                             .collect()
@@ -99,7 +99,7 @@ where
                                     .get(committee_id)
                                     .unwrap()
                                     .iter()
-                                    .map(|&node| self.nodes[node].run_step(step.clone()))
+                                    .map(|&node| self.nodes[node.val()].run_step(step.clone()))
                                     .max()
                             })
                             .collect()
@@ -135,13 +135,14 @@ mod test {
         mut rng: &mut R,
         overlay: &O,
     ) -> ConsensusRunner<CarnotNode> {
-        let regions = std::iter::once((Region::Europe, (0..10).collect())).collect();
+        let regions =
+            std::iter::once((Region::Europe, (0..10).map(From::from).collect())).collect();
         let network_behaviour = std::iter::once((
             (Region::Europe, Region::Europe),
             NetworkBehaviour::new(Duration::from_millis(100), 0.0),
         ))
         .collect();
-        let node_ids: Vec<NodeId> = (0..10).collect();
+        let node_ids: Vec<NodeId> = (0..10).map(From::from).collect();
         let layout = overlay.layout(&node_ids, &mut rng);
         let leaders = overlay.leaders(&node_ids, 1, &mut rng).collect();
         let node_settings: CarnotNodeSettings = CarnotNodeSettings {

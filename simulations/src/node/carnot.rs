@@ -28,6 +28,7 @@ fn receive_proposal(
         .filter_map(|&sender| network.send_message_cost(rng, sender, node))
         .max()
         .unwrap()
+        .into()
 }
 
 fn receive_commit(
@@ -47,6 +48,7 @@ fn receive_commit(
         })
         .max()
         .unwrap()
+        .into()
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, serde::Serialize, serde::Deserialize)]
@@ -159,7 +161,7 @@ impl Node for CarnotNode {
         Self { id, settings, rng }
     }
 
-    fn id(&self) -> usize {
+    fn id(&self) -> NodeId {
         self.id
     }
 
