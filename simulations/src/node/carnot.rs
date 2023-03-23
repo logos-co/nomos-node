@@ -2,6 +2,7 @@
 use std::collections::HashMap;
 use std::hash::Hash;
 use std::rc::Rc;
+use std::time::Duration;
 // crates
 use rand::prelude::SmallRng;
 use rand::{Rng, SeedableRng};
@@ -10,11 +11,27 @@ use crate::network::Network;
 use crate::node::{Node, NodeId, StepTime};
 use crate::overlay::{Committee, Layout};
 
+pub type RootCommitteeReceiverSolver = fn(&mut SmallRng, NodeId, &[NodeId], &Network) -> StepTime;
+
 pub type ParentCommitteeReceiverSolver =
     fn(&mut SmallRng, NodeId, &Committee, &Network) -> StepTime;
 
 pub type ChildCommitteeReceiverSolver =
     fn(&mut SmallRng, NodeId, &[&Committee], &Network) -> StepTime;
+
+fn leader_receive_proposal(
+    rng: &mut SmallRng,
+    node: NodeId,
+    leader_nodes: &[NodeId],
+    network: &Network,
+) -> StepTime {
+    assert!(!leader_nodes.is_empty());
+    leader_nodes
+        .iter()
+        .filter_map(|&sender| network.send_message_cost(rng, sender, node))
+        .max()
+        .unwrap()
+}
 
 fn receive_proposal(
     rng: &mut SmallRng,
@@ -24,6 +41,7 @@ fn receive_proposal(
 ) -> StepTime {
     assert!(!committee.is_empty());
     committee
+        .nodes
         .iter()
         .filter_map(|&sender| network.send_message_cost(rng, sender, node))
         .max()
@@ -41,6 +59,7 @@ fn receive_commit(
         .iter()
         .filter_map(|committee| {
             committee
+                .nodes
                 .iter()
                 .filter_map(|&sender| network.send_message_cost(rng, sender, node))
                 .max()
@@ -51,10 +70,13 @@ fn receive_commit(
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum CarnotStep {
+    RootReceiveProposal,
     ReceiveProposal,
     ValidateProposal,
+    LeaderReceiveVote,
     ReceiveVote,
     ValidateVote,
+    Ignore,
 }
 
 impl core::str::FromStr for CarnotStep {
@@ -76,6 +98,8 @@ pub enum CarnotStepSolver {
     Plain(StepTime),
     ParentCommitteeReceiverSolver(ParentCommitteeReceiverSolver),
     ChildCommitteeReceiverSolver(ChildCommitteeReceiverSolver),
+    LeaderToCommitteeReceiverSolver(ChildCommitteeReceiverSolver),
+    RootCommitteeReceiverSolver(RootCommitteeReceiverSolver),
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, serde::Serialize, serde::Deserialize)]
@@ -83,6 +107,8 @@ pub enum CarnotStepSolverType {
     Plain(StepTime),
     ParentCommitteeReceiverSolver,
     ChildCommitteeReceiverSolver,
+    LeaderToCommitteeReceiverSolver,
+    RootCommitteeReceiverSolver,
 }
 
 impl CarnotStepSolverType {
@@ -95,6 +121,12 @@ impl CarnotStepSolverType {
             Self::ChildCommitteeReceiverSolver => {
                 CarnotStepSolver::ChildCommitteeReceiverSolver(receive_commit)
             }
+            Self::LeaderToCommitteeReceiverSolver => {
+                CarnotStepSolver::LeaderToCommitteeReceiverSolver(receive_commit)
+            }
+            Self::RootCommitteeReceiverSolver => {
+                CarnotStepSolver::RootCommitteeReceiverSolver(leader_receive_proposal)
+            }
         }
     }
 }
@@ -104,15 +136,29 @@ pub struct CarnotNodeSettings {
     pub steps_costs: HashMap<CarnotStep, CarnotStepSolverType>,
     pub network: Network,
     pub layout: Layout,
+    pub leaders: Vec<NodeId>,
 }
 
+#[derive(Clone)]
 pub struct CarnotNode {
     id: NodeId,
     rng: SmallRng,
     settings: Rc<CarnotNodeSettings>,
 }
 
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, serde::Serialize, serde::Deserialize)]
+pub enum CarnotRole {
+    Leader,
+    Root,
+    Intermediate,
+    Leaf,
+}
+
 pub const CARNOT_STEPS_COSTS: &[(CarnotStep, CarnotStepSolverType)] = &[
+    (
+        CarnotStep::RootReceiveProposal,
+        CarnotStepSolverType::RootCommitteeReceiverSolver,
+    ),
     (
         CarnotStep::ReceiveProposal,
         CarnotStepSolverType::ParentCommitteeReceiverSolver,
@@ -122,6 +168,10 @@ pub const CARNOT_STEPS_COSTS: &[(CarnotStep, CarnotStepSolverType)] = &[
         CarnotStepSolverType::Plain(StepTime::from_secs(1)),
     ),
     (
+        CarnotStep::LeaderReceiveVote,
+        CarnotStepSolverType::LeaderToCommitteeReceiverSolver,
+    ),
+    (
         CarnotStep::ReceiveVote,
         CarnotStepSolverType::ChildCommitteeReceiverSolver,
     ),
@@ -129,12 +179,17 @@ pub const CARNOT_STEPS_COSTS: &[(CarnotStep, CarnotStepSolverType)] = &[
         CarnotStep::ValidateVote,
         CarnotStepSolverType::Plain(StepTime::from_secs(1)),
     ),
+    (
+        CarnotStep::Ignore,
+        CarnotStepSolverType::Plain(StepTime::from_secs(0)),
+    ),
 ];
 
-pub const CARNOT_LEADER_STEPS: &[CarnotStep] = &[CarnotStep::ReceiveVote, CarnotStep::ValidateVote];
+pub const CARNOT_LEADER_STEPS: &[CarnotStep] =
+    &[CarnotStep::LeaderReceiveVote, CarnotStep::ValidateVote];
 
 pub const CARNOT_ROOT_STEPS: &[CarnotStep] = &[
-    CarnotStep::ReceiveProposal,
+    CarnotStep::RootReceiveProposal,
     CarnotStep::ValidateProposal,
     CarnotStep::ReceiveVote,
     CarnotStep::ValidateVote,
@@ -150,32 +205,39 @@ pub const CARNOT_INTERMEDIATE_STEPS: &[CarnotStep] = &[
 pub const CARNOT_LEAF_STEPS: &[CarnotStep] =
     &[CarnotStep::ReceiveProposal, CarnotStep::ValidateProposal];
 
+pub const CARNOT_UNKNOWN_MESSAGE_RECEIVED_STEPS: &[CarnotStep] = &[CarnotStep::Ignore];
+
 impl Node for CarnotNode {
     type Settings = Rc<CarnotNodeSettings>;
-    type Step = CarnotStep;
 
     fn new<R: Rng>(rng: &mut R, id: NodeId, settings: Self::Settings) -> Self {
         let rng = SmallRng::from_rng(rng).unwrap();
-        Self { id, settings, rng }
+        Self { id, rng, settings }
     }
 
     fn id(&self) -> usize {
         self.id
     }
 
-    fn run_step(&mut self, step: Self::Step) -> StepTime {
+    fn run_steps(&mut self, steps: &[CarnotStep]) -> StepTime {
         use CarnotStepSolver::*;
-        match self.settings.steps_costs.get(&step) {
-            Some(step) => match step.to_solver() {
+
+        let mut overall_steps_time = Duration::ZERO;
+        for step in steps.iter() {
+            let step_time = match self.settings.steps_costs.get(step).unwrap().to_solver() {
                 Plain(t) => t,
-                ParentCommitteeReceiverSolver(solver) => solver(
-                    &mut self.rng,
-                    self.id,
-                    self.settings
+                ParentCommitteeReceiverSolver(solver) => {
+                    match self
+                        .settings
                         .layout
-                        .parent_nodes(self.settings.layout.committee(self.id)),
-                    &self.settings.network,
-                ),
+                        .parent_nodes(self.settings.layout.committee(self.id))
+                    {
+                        Some(parent) => {
+                            solver(&mut self.rng, self.id, &parent, &self.settings.network)
+                        }
+                        None => Duration::ZERO,
+                    }
+                }
                 ChildCommitteeReceiverSolver(solver) => solver(
                     &mut self.rng,
                     self.id,
@@ -185,8 +247,27 @@ impl Node for CarnotNode {
                         .children_nodes(self.settings.layout.committee(self.id)),
                     &self.settings.network,
                 ),
-            },
-            None => panic!("Unknown step: {step:?}"),
+                RootCommitteeReceiverSolver(solver) => solver(
+                    &mut self.rng,
+                    self.id,
+                    &self.settings.leaders,
+                    &self.settings.network,
+                ),
+                LeaderToCommitteeReceiverSolver(solver) => {
+                    let committees: Vec<&Committee> =
+                        self.settings.layout.committees.values().collect();
+                    solver(
+                        &mut self.rng,
+                        self.id,
+                        &committees[..],
+                        &self.settings.network,
+                    )
+                }
+            };
+
+            overall_steps_time += step_time
         }
+
+        overall_steps_time
     }
 }

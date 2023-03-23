@@ -1,21 +1,35 @@
 pub mod flat;
+pub mod tree;
 
 // std
 use std::collections::{BTreeSet, HashMap};
 // crates
 use rand::Rng;
 // internal
-use crate::node::{CommitteeId, NodeId};
+use crate::node::{carnot::CarnotRole, CommitteeId, Node, NodeId};
 
-pub type Committee = BTreeSet<NodeId>;
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct Committee {
+    pub nodes: BTreeSet<NodeId>,
+    pub role: CarnotRole,
+}
+
+impl Committee {
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.nodes.len() == 0
+    }
+}
+
 pub type Leaders = BTreeSet<NodeId>;
 
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Layout {
     pub committees: HashMap<CommitteeId, Committee>,
     pub from_committee: HashMap<NodeId, CommitteeId>,
     pub parent: HashMap<CommitteeId, CommitteeId>,
     pub children: HashMap<CommitteeId, Vec<CommitteeId>>,
+    pub layers: HashMap<usize, Vec<CommitteeId>>,
 }
 
 impl Layout {
@@ -23,11 +37,13 @@ impl Layout {
         committees: HashMap<CommitteeId, Committee>,
         parent: HashMap<CommitteeId, CommitteeId>,
         children: HashMap<CommitteeId, Vec<CommitteeId>>,
+        layers: HashMap<usize, Vec<usize>>,
     ) -> Self {
         let from_committee = committees
             .iter()
             .flat_map(|(&committee_id, committee)| {
                 committee
+                    .nodes
                     .iter()
                     .map(move |&node_id| (node_id, committee_id))
             })
@@ -37,6 +53,7 @@ impl Layout {
             from_committee,
             parent,
             children,
+            layers,
         }
     }
 
@@ -48,12 +65,13 @@ impl Layout {
         &self.committees[&committee_id]
     }
 
-    pub fn parent(&self, committee_id: CommitteeId) -> CommitteeId {
-        self.parent[&committee_id]
+    pub fn parent(&self, committee_id: CommitteeId) -> Option<CommitteeId> {
+        self.parent.get(&committee_id).copied()
     }
 
-    pub fn parent_nodes(&self, committee_id: CommitteeId) -> &Committee {
-        &self.committees[&self.parent(committee_id)]
+    pub fn parent_nodes(&self, committee_id: CommitteeId) -> Option<Committee> {
+        self.parent(committee_id)
+            .map(|c| self.committees[&c].clone())
     }
 
     pub fn children(&self, committee_id: CommitteeId) -> &[CommitteeId] {
@@ -72,10 +90,11 @@ impl Layout {
     }
 }
 
-pub trait Overlay {
+pub trait Overlay<N: Node> {
     type Settings;
 
     fn new(settings: Self::Settings) -> Self;
+    fn nodes(&self) -> Vec<NodeId>;
     fn leaders<R: Rng>(
         &self,
         nodes: &[NodeId],

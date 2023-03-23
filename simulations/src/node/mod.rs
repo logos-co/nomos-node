@@ -4,16 +4,17 @@ pub mod carnot;
 use std::time::Duration;
 // crates
 use rand::Rng;
+
+use self::carnot::CarnotStep;
 // internal
 
 pub type NodeId = usize;
 pub type CommitteeId = usize;
 pub type StepTime = Duration;
 
-pub trait Node {
+pub trait Node: Clone {
     type Settings;
-    type Step;
     fn new<R: Rng>(rng: &mut R, id: NodeId, settings: Self::Settings) -> Self;
     fn id(&self) -> NodeId;
-    fn run_step(&mut self, steps: Self::Step) -> StepTime;
+    fn run_steps(&mut self, steps: &[CarnotStep]) -> StepTime;
 }
