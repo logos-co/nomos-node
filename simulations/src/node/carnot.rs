@@ -97,7 +97,9 @@ impl core::str::FromStr for CarnotStepSolverType {
             "parentcommitteereceiversolver" => Ok(Self::ParentCommitteeReceiverSolver),
             "childcommitteereceiversolver" => Ok(Self::ChildCommitteeReceiverSolver),
             x => {
-                let millis = x.parse::<u64>().map_err(|_| format!("Unknown step solver type: {s}"))?;
+                let millis = x
+                    .parse::<u64>()
+                    .map_err(|_| format!("Unknown step solver type: {s}"))?;
                 Ok(Self::Plain(StepTime::from_millis(millis)))
             }
         }
