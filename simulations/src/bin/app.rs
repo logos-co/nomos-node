@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use simulations::{
     config::Config,
     node::{
-        carnot::{CarnotNode, CarnotStep},
+        carnot::{CarnotNode, CarnotStep, CarnotStepSolverType},
         Node, StepTime,
     },
     overlay::{flat::FlatOverlay, Overlay},
@@ -98,6 +98,7 @@ pub fn main() -> Result<(), Box<dyn std::error::Error>> {
                     <CarnotNode as Node>::Settings,
                     <FlatOverlay as Overlay<CarnotNode>>::Settings,
                     CarnotStep,
+                    CarnotStepSolverType,
                 >,
             >(std::fs::File::open(config)?)?;
             #[allow(clippy::unit_arg)]
