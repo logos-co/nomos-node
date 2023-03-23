@@ -8,6 +8,8 @@ use std::{
 // crates
 use rand::Rng;
 use serde::{Deserialize, Serialize};
+
+use self::carnot::CarnotStep;
 // internal
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -114,10 +116,9 @@ impl core::iter::Sum<StepTime> for Duration {
     }
 }
 
-pub trait Node {
+pub trait Node: Clone {
     type Settings;
-    type Step;
     fn new<R: Rng>(rng: &mut R, id: NodeId, settings: Self::Settings) -> Self;
     fn id(&self) -> NodeId;
-    fn run_step(&mut self, steps: Self::Step) -> StepTime;
+    fn run_steps(&mut self, steps: &[CarnotStep]) -> StepTime;
 }

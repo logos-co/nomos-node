@@ -1,19 +1,24 @@
-use rand::prelude::IteratorRandom;
-use rand::Rng;
 // std
 // crates
+use rand::prelude::IteratorRandom;
+use rand::Rng;
 // internal
 use super::Overlay;
+use crate::node::carnot::{CarnotNode, CarnotRole};
 use crate::node::NodeId;
 use crate::overlay::{Committee, Layout};
 
 pub struct FlatOverlay;
 
-impl Overlay for FlatOverlay {
+impl Overlay<CarnotNode> for FlatOverlay {
     type Settings = ();
 
     fn new(_settings: Self::Settings) -> Self {
         Self
+    }
+
+    fn nodes(&self) -> Vec<NodeId> {
+        (0..10).map(NodeId::from).collect()
     }
 
     fn leaders<R: Rng>(
@@ -27,10 +32,17 @@ impl Overlay for FlatOverlay {
     }
 
     fn layout<R: Rng>(&self, nodes: &[NodeId], _rng: &mut R) -> Layout {
-        let committees =
-            std::iter::once((0.into(), nodes.iter().copied().collect::<Committee>())).collect();
+        let committees = std::iter::once((
+            0.into(),
+            Committee {
+                nodes: nodes.iter().copied().collect(),
+                role: CarnotRole::Leader,
+            },
+        ))
+        .collect();
         let parent = std::iter::once((0.into(), 0.into())).collect();
         let children = std::iter::once((0.into(), vec![0.into()])).collect();
-        Layout::new(committees, parent, children)
+        let layers = std::iter::once((0.into(), vec![0.into()])).collect();
+        Layout::new(committees, parent, children, layers)
     }
 }
