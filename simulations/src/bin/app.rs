@@ -10,7 +10,7 @@ use simulations::{
         Node, StepTime,
     },
     overlay::{flat::FlatOverlay, Overlay},
-    runner::{ConsensusRunner, LayoutNodes},
+    runner::ConsensusRunner,
 };
 
 /// Simple program to greet a person
@@ -96,7 +96,7 @@ pub fn main() -> Result<(), Box<dyn std::error::Error>> {
                 _,
                 Config<
                     <CarnotNode as Node>::Settings,
-                    <FlatOverlay as Overlay>::Settings,
+                    <FlatOverlay as Overlay<CarnotNode>>::Settings,
                     CarnotStep,
                     CarnotStepSolverType,
                 >,
@@ -108,23 +108,10 @@ pub fn main() -> Result<(), Box<dyn std::error::Error>> {
             let layout = overlay.layout(&node_ids, &mut rng);
             let leaders = overlay.leaders(&node_ids, 1, &mut rng).collect();
 
-            let carnot_steps: Vec<_> = cfg
-                .step_costs
-                .iter()
-                .copied()
-                .map(|(step, _solver)| {
-                    (
-                        LayoutNodes::Leader,
-                        step,
-                        Box::new(|times: &[StepTime]| *times.iter().max().unwrap())
-                            as Box<dyn Fn(&[StepTime]) -> StepTime>,
-                    )
-                })
-                .collect();
-
             let mut runner: simulations::runner::ConsensusRunner<CarnotNode> =
                 ConsensusRunner::new(&mut rng, layout, leaders, cfg.node_settings);
-            runner.run(&carnot_steps)
+            runner.run(Box::new(|times: &[StepTime]| *times.iter().max().unwrap())
+                as Box<dyn Fn(&[StepTime]) -> StepTime>)
         }
     };
 
