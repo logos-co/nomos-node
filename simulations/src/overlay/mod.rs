@@ -6,12 +6,11 @@ use std::collections::{BTreeSet, HashMap};
 // crates
 use rand::Rng;
 // internal
-use crate::node::{carnot::CarnotRole, CommitteeId, Node, NodeId};
+use crate::node::{CommitteeId, NodeId};
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Committee {
     pub nodes: BTreeSet<NodeId>,
-    pub role: CarnotRole,
 }
 
 impl Committee {
@@ -90,7 +89,7 @@ impl Layout {
     }
 }
 
-pub trait Overlay<N: Node> {
+pub trait Overlay {
     type Settings;
 
     fn new(settings: Self::Settings) -> Self;

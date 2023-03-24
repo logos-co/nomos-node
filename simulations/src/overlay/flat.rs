@@ -4,13 +4,12 @@ use rand::prelude::IteratorRandom;
 use rand::Rng;
 // internal
 use super::Overlay;
-use crate::node::carnot::{CarnotNode, CarnotRole};
 use crate::node::NodeId;
 use crate::overlay::{Committee, Layout};
 
 pub struct FlatOverlay;
 
-impl Overlay<CarnotNode> for FlatOverlay {
+impl Overlay for FlatOverlay {
     type Settings = ();
 
     fn new(_settings: Self::Settings) -> Self {
@@ -36,7 +35,6 @@ impl Overlay<CarnotNode> for FlatOverlay {
             0.into(),
             Committee {
                 nodes: nodes.iter().copied().collect(),
-                role: CarnotRole::Leader,
             },
         ))
         .collect();
