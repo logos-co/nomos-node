@@ -51,7 +51,7 @@ impl Display for OutputFormat {
             OutputFormat::Csv => "csv",
             OutputFormat::Parquet => "parquet",
         };
-        write!(f, "{}", tag)
+        write!(f, "{tag}")
     }
 }
 
@@ -65,10 +65,7 @@ impl FromStr for OutputFormat {
             "parquet" => Ok(Self::Parquet),
             tag => Err(std::io::Error::new(
                 std::io::ErrorKind::InvalidData,
-                format!(
-                    "Invalid {} tag, only [json, csv, polars] are supported",
-                    tag
-                ),
+                format!("Invalid {tag} tag, only [json, csv, polars] are supported",),
             )),
         }
     }

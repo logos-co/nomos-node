@@ -51,7 +51,7 @@ mod test {
                 self.add_assign(1);
             }
         }
-        let mut ttf = MaxViewWard { max_view: 10 };
+        let mut ttf = MaxViewWard { _max_view: 10 };
         let mut cond = false;
 
         let node = 11;

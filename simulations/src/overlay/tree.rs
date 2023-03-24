@@ -233,7 +233,7 @@ mod tests {
             committee_size: 1,
         });
         let nodes = overlay.nodes();
-        let layout = overlay.layout(&nodes, &mut rng);
+        let _layout = overlay.layout(&nodes, &mut rng);
     }
 
     #[test]
