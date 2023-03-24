@@ -72,6 +72,7 @@ fn receive_commit(
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum CarnotStep {
     RootReceiveProposal,
     ReceiveProposal,
@@ -105,13 +106,33 @@ pub enum CarnotStepSolver {
     RootCommitteeReceiverSolver(RootCommitteeReceiverSolver),
 }
 
+#[serde_with::serde_as]
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum CarnotStepSolverType {
-    Plain(StepTime),
+    Plain(#[serde_as(as = "serde_with::DurationMilliSeconds")] StepTime),
     ParentCommitteeReceiverSolver,
     ChildCommitteeReceiverSolver,
     LeaderToCommitteeReceiverSolver,
     RootCommitteeReceiverSolver,
+}
+
+impl core::str::FromStr for CarnotStepSolverType {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.trim().replace(['_', '-'], "").to_lowercase().as_str() {
+            "plain" => Ok(Self::Plain(StepTime::from_millis(1))),
+            "parentcommitteereceiversolver" => Ok(Self::ParentCommitteeReceiverSolver),
+            "childcommitteereceiversolver" => Ok(Self::ChildCommitteeReceiverSolver),
+            x => {
+                let millis = x
+                    .parse::<u64>()
+                    .map_err(|_| format!("Unknown step solver type: {s}"))?;
+                Ok(Self::Plain(StepTime::from_millis(millis)))
+            }
+        }
+    }
 }
 
 impl CarnotStepSolverType {
