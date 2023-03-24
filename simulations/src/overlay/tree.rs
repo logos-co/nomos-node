@@ -2,17 +2,17 @@
 use std::collections::HashMap;
 // crates
 use rand::seq::IteratorRandom;
+use serde::Deserialize;
 // internal
 use super::{Committee, Layout, Overlay};
-use crate::node::{
-    carnot::{CarnotNode, CarnotRole},
-    CommitteeId, NodeId,
-};
+use crate::node::{CommitteeId, NodeId};
 
+#[derive(Clone, Deserialize)]
 pub enum TreeType {
     FullBinaryTree,
 }
 
+#[derive(Clone, Deserialize)]
 pub struct TreeSettings {
     pub tree_type: TreeType,
     pub committee_size: usize,
@@ -51,7 +51,8 @@ impl TreeOverlay {
             .chunks(settings.committee_size)
             .enumerate()
         {
-            let mut has_children = false;
+            // TODO: Why do we have has_children here?
+            let mut _has_children = false;
             let left_child_id = 2 * committee_id + 1;
             let right_child_id = left_child_id + 1;
 
@@ -61,7 +62,7 @@ impl TreeOverlay {
                     committee_id.into(),
                     vec![left_child_id.into(), right_child_id.into()],
                 );
-                has_children = true;
+                _has_children = true;
             }
 
             // Root node has no parent.
@@ -70,15 +71,8 @@ impl TreeOverlay {
                 parents.insert(committee_id.into(), parent_id.into());
             }
 
-            let role = match (committee_id, has_children) {
-                (0, _) => CarnotRole::Root,
-                (_, true) => CarnotRole::Intermediate,
-                (_, false) => CarnotRole::Leaf,
-            };
-
             let committee = Committee {
                 nodes: nodes.iter().copied().copied().collect(),
-                role,
             };
 
             committees.insert(committee_id.into(), committee);
@@ -93,7 +87,7 @@ impl TreeOverlay {
     }
 }
 
-impl Overlay<CarnotNode> for TreeOverlay {
+impl Overlay for TreeOverlay {
     type Settings = TreeSettings;
 
     fn new(settings: Self::Settings) -> Self {
@@ -239,28 +233,7 @@ mod tests {
             committee_size: 1,
         });
         let nodes = overlay.nodes();
-        let layout = overlay.layout(&nodes, &mut rng);
-
-        assert_eq!(
-            layout.committees[&CommitteeId::new(0)].role,
-            CarnotRole::Root
-        );
-        assert_eq!(
-            layout.committees[&CommitteeId::new(1)].role,
-            CarnotRole::Intermediate
-        );
-        assert_eq!(
-            layout.committees[&CommitteeId::new(2)].role,
-            CarnotRole::Intermediate
-        );
-        assert_eq!(
-            layout.committees[&CommitteeId::new(3)].role,
-            CarnotRole::Leaf
-        );
-        assert_eq!(
-            layout.committees[&CommitteeId::new(6)].role,
-            CarnotRole::Leaf
-        );
+        let _layout = overlay.layout(&nodes, &mut rng);
     }
 
     #[test]

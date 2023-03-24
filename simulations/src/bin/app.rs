@@ -1,57 +1,22 @@
-use std::{path::PathBuf, str::FromStr};
-
+// std
+use std::error::Error;
+use std::fmt::{Display, Formatter};
+use std::fs::File;
+use std::io::Cursor;
+use std::path::{Path, PathBuf};
+use std::str::FromStr;
+// crates
 use clap::Parser;
-use rand::thread_rng;
+use polars::io::SerWriter;
+use polars::prelude::{DataFrame, JsonReader, SerReader};
+use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
+use simulations::overlay::tree::TreeOverlay;
+// internal
 use simulations::{
-    config::Config,
-    node::{
-        carnot::{CarnotNode, CarnotStep, CarnotStepSolverType},
-        Node, StepTime,
-    },
-    overlay::{flat::FlatOverlay, Overlay},
-    runner::ConsensusRunner,
+    node::carnot::CarnotNode, output_processors::OutData, runner::SimulationRunner,
+    settings::SimulationSettings,
 };
-
-/// Simple program to greet a person
-#[derive(Parser, Debug)]
-#[command(author, version, about, long_about = None)]
-struct Args {
-    /// Path for a yaml-encoded network config file
-    config: std::path::PathBuf,
-    #[arg(long, default_value_t = OverlayType::Flat)]
-    overlay_type: OverlayType,
-    #[arg(long, default_value_t = NodeType::Carnot)]
-    node_type: NodeType,
-    #[arg(short, long, default_value_t = OutputType::StdOut)]
-    output: OutputType,
-}
-
-#[derive(clap::ValueEnum, Debug, Copy, Clone, Serialize, Deserialize)]
-enum OverlayType {
-    Flat,
-}
-
-impl core::fmt::Display for OverlayType {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        match self {
-            Self::Flat => write!(f, "flat"),
-        }
-    }
-}
-
-#[derive(clap::ValueEnum, Debug, Copy, Clone, Serialize, Deserialize)]
-enum NodeType {
-    Carnot,
-}
-
-impl core::fmt::Display for NodeType {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        match self {
-            Self::Carnot => write!(f, "carnot"),
-        }
-    }
-}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 enum OutputType {
@@ -70,65 +35,137 @@ impl core::fmt::Display for OutputType {
     }
 }
 
-impl FromStr for OutputType {
-    type Err = String;
+/// Output format selector enum
+#[derive(Clone, Debug, Default)]
+enum OutputFormat {
+    Json,
+    Csv,
+    #[default]
+    Parquet,
+}
+
+impl Display for OutputFormat {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let tag = match self {
+            OutputFormat::Json => "json",
+            OutputFormat::Csv => "csv",
+            OutputFormat::Parquet => "parquet",
+        };
+        write!(f, "{tag}")
+    }
+}
+
+impl FromStr for OutputFormat {
+    type Err = std::io::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s.to_lowercase().as_str() {
-            "stdout" => Ok(Self::StdOut),
-            "stderr" => Ok(Self::StdErr),
-            path => Ok(Self::File(PathBuf::from(path))),
+        match s.to_ascii_lowercase().as_str() {
+            "json" => Ok(Self::Json),
+            "csv" => Ok(Self::Csv),
+            "parquet" => Ok(Self::Parquet),
+            tag => Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!("Invalid {tag} tag, only [json, csv, polars] are supported",),
+            )),
         }
     }
 }
 
-pub fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let Args {
-        config,
-        overlay_type,
-        node_type,
-        output,
-    } = Args::parse();
+/// Main simulation wrapper
+/// Pipes together the cli arguments with the execution
+#[derive(Parser)]
+pub struct SimulationApp {
+    /// Json file path, on `SimulationSettings` format
+    #[clap(long, short)]
+    input_settings: PathBuf,
+    /// Output file path
+    #[clap(long, short)]
+    output_file: PathBuf,
+    /// Output format selector
+    #[clap(long, short = 'f', default_value_t)]
+    output_format: OutputFormat,
+}
 
-    let report = match (overlay_type, node_type) {
-        (OverlayType::Flat, NodeType::Carnot) => {
-            let cfg = serde_json::from_reader::<
-                _,
-                Config<
-                    <CarnotNode as Node>::Settings,
-                    <FlatOverlay as Overlay<CarnotNode>>::Settings,
-                    CarnotStep,
-                    CarnotStepSolverType,
-                >,
-            >(std::fs::File::open(config)?)?;
-            #[allow(clippy::unit_arg)]
-            let overlay = FlatOverlay::new(cfg.overlay_settings);
-            let node_ids = (0..cfg.node_count).map(From::from).collect::<Vec<_>>();
-            let mut rng = thread_rng();
-            let layout = overlay.layout(&node_ids, &mut rng);
-            let leaders = overlay.leaders(&node_ids, 1, &mut rng).collect();
+impl SimulationApp {
+    pub fn run(self) -> Result<(), Box<dyn Error>> {
+        let Self {
+            input_settings,
+            output_file,
+            output_format,
+        } = self;
+        let simulation_settings: SimulationSettings<_, _> = load_json_from_file(&input_settings)?;
 
-            let mut runner: simulations::runner::ConsensusRunner<CarnotNode> =
-                ConsensusRunner::new(&mut rng, layout, leaders, cfg.node_settings);
-            runner.run(Box::new(|times: &[StepTime]| *times.iter().max().unwrap())
-                as Box<dyn Fn(&[StepTime]) -> StepTime>)
-        }
-    };
-
-    let json = serde_json::to_string_pretty(&report)?;
-    match output {
-        OutputType::File(f) => {
-            use std::{fs::OpenOptions, io::Write};
-
-            let mut file = OpenOptions::new()
-                .write(true)
-                .create(true)
-                .truncate(true)
-                .open(f)?;
-            file.write_all(json.as_bytes())?;
-        }
-        OutputType::StdOut => println!("{json}"),
-        OutputType::StdErr => eprintln!("{json}"),
+        let mut simulation_runner: SimulationRunner<CarnotNode, TreeOverlay> =
+            SimulationRunner::new(simulation_settings);
+        // build up series vector
+        let mut out_data: Vec<OutData> = Vec::new();
+        simulation_runner.simulate(Some(&mut out_data));
+        let mut dataframe: DataFrame = out_data_to_dataframe(out_data);
+        dump_dataframe_to(output_format, &mut dataframe, &output_file)?;
+        Ok(())
     }
+}
+
+fn out_data_to_dataframe(out_data: Vec<OutData>) -> DataFrame {
+    let mut cursor = Cursor::new(Vec::new());
+    serde_json::to_writer(&mut cursor, &out_data).expect("Dump data to json ");
+    let dataframe = JsonReader::new(cursor)
+        .finish()
+        .expect("Load dataframe from intermediary json");
+
+    dataframe
+        .unnest(["state"])
+        .expect("Node state should be unnest")
+}
+
+/// Generically load a json file
+fn load_json_from_file<T: DeserializeOwned>(path: &Path) -> Result<T, Box<dyn Error>> {
+    let f = File::open(path).map_err(Box::new)?;
+    serde_json::from_reader(f).map_err(|e| Box::new(e) as Box<dyn Error>)
+}
+
+fn dump_dataframe_to_json(data: &mut DataFrame, out_path: &Path) -> Result<(), Box<dyn Error>> {
+    let out_path = out_path.with_extension("json");
+    let f = File::create(out_path)?;
+    let mut writer = polars::prelude::JsonWriter::new(f);
+    writer
+        .finish(data)
+        .map_err(|e| Box::new(e) as Box<dyn Error>)
+}
+
+fn dump_dataframe_to_csv(data: &mut DataFrame, out_path: &Path) -> Result<(), Box<dyn Error>> {
+    let out_path = out_path.with_extension("csv");
+    let f = File::create(out_path)?;
+    let mut writer = polars::prelude::CsvWriter::new(f);
+    writer
+        .finish(data)
+        .map_err(|e| Box::new(e) as Box<dyn Error>)
+}
+
+fn dump_dataframe_to_parquet(data: &mut DataFrame, out_path: &Path) -> Result<(), Box<dyn Error>> {
+    let out_path = out_path.with_extension("parquet");
+    let f = File::create(out_path)?;
+    let writer = polars::prelude::ParquetWriter::new(f);
+    writer
+        .finish(data)
+        .map(|_| ())
+        .map_err(|e| Box::new(e) as Box<dyn Error>)
+}
+
+fn dump_dataframe_to(
+    output_format: OutputFormat,
+    data: &mut DataFrame,
+    out_path: &Path,
+) -> Result<(), Box<dyn Error>> {
+    match output_format {
+        OutputFormat::Json => dump_dataframe_to_json(data, out_path),
+        OutputFormat::Csv => dump_dataframe_to_csv(data, out_path),
+        OutputFormat::Parquet => dump_dataframe_to_parquet(data, out_path),
+    }
+}
+
+fn main() -> Result<(), Box<dyn Error>> {
+    let app: SimulationApp = SimulationApp::parse();
+    app.run()?;
     Ok(())
 }
