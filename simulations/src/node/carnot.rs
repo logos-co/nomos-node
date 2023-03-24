@@ -30,6 +30,7 @@ fn leader_receive_proposal(
         .iter()
         .filter_map(|&sender| network.send_message_cost(rng, sender, node))
         .max()
+        .map(From::from)
         .unwrap()
 }
 
@@ -46,6 +47,7 @@ fn receive_proposal(
         .filter_map(|&sender| network.send_message_cost(rng, sender, node))
         .max()
         .unwrap()
+        .into()
 }
 
 fn receive_commit(
@@ -66,6 +68,7 @@ fn receive_commit(
         })
         .max()
         .unwrap()
+        .into()
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, serde::Serialize, serde::Deserialize)]
@@ -236,7 +239,7 @@ impl Node for CarnotNode {
         Self { id, rng, settings }
     }
 
-    fn id(&self) -> usize {
+    fn id(&self) -> NodeId {
         self.id
     }
 
@@ -256,7 +259,7 @@ impl Node for CarnotNode {
                         Some(parent) => {
                             solver(&mut self.rng, self.id, &parent, &self.settings.network)
                         }
-                        None => Duration::ZERO,
+                        None => Duration::ZERO.into(),
                     }
                 }
                 ChildCommitteeReceiverSolver(solver) => solver(
@@ -286,9 +289,9 @@ impl Node for CarnotNode {
                 }
             };
 
-            overall_steps_time += step_time
+            overall_steps_time += step_time.0
         }
 
-        overall_steps_time
+        overall_steps_time.into()
     }
 }

@@ -2,7 +2,7 @@ use crate::node::carnot::{
     CarnotRole, CARNOT_INTERMEDIATE_STEPS, CARNOT_LEADER_STEPS, CARNOT_LEAF_STEPS,
     CARNOT_ROOT_STEPS, CARNOT_UNKNOWN_MESSAGE_RECEIVED_STEPS,
 };
-use crate::node::{Node, NodeId, StepTime};
+use crate::node::{CommitteeId, Node, NodeId, StepTime};
 use crate::overlay::Layout;
 use rand::Rng;
 use std::collections::HashMap;
@@ -93,14 +93,17 @@ where
     }
 }
 
-fn get_layer_nodes(layer_committees: &[NodeId], layout: &Layout) -> Vec<(NodeId, NodeId)> {
+fn get_layer_nodes(
+    layer_committees: &[CommitteeId],
+    layout: &Layout,
+) -> Vec<(CommitteeId, NodeId)> {
     layer_committees
         .iter()
         .flat_map(|committee_id| get_committee_nodes(committee_id, layout))
         .collect()
 }
 
-fn get_committee_nodes(committee: &NodeId, layout: &Layout) -> Vec<(NodeId, NodeId)> {
+fn get_committee_nodes(committee: &CommitteeId, layout: &Layout) -> Vec<(CommitteeId, NodeId)> {
     layout.committees[committee]
         .nodes
         .clone()
@@ -145,7 +148,6 @@ mod test {
             NetworkBehaviour::new(Duration::from_millis(100), 0.0),
         ))
         .collect();
-
         let node_settings: CarnotNodeSettings = CarnotNodeSettings {
             steps_costs: CARNOT_STEPS_COSTS.iter().cloned().collect(),
             network: Network::new(RegionsData::new(regions, network_behaviour)),
@@ -344,11 +346,15 @@ mod test {
             steps_costs: CARNOT_STEPS_COSTS.iter().cloned().collect(),
             network: Network::new(RegionsData::new(regions, network_behaviour)),
             layout: overlay.layout(&node_ids, &mut rng),
-            leaders: leaders.clone(),
+            leaders: leaders.clone().into_iter().map(From::from).collect(),
         };
 
-        let mut runner =
-            ConsensusRunner::<CarnotNode>::new(&mut rng, layout, leaders, Rc::new(node_settings));
+        let mut runner = ConsensusRunner::<CarnotNode>::new(
+            &mut rng,
+            layout,
+            leaders.into_iter().map(From::from).collect(),
+            Rc::new(node_settings),
+        );
 
         assert_eq!(
             Duration::from_millis(7800),
@@ -402,11 +408,15 @@ mod test {
             steps_costs: CARNOT_STEPS_COSTS.iter().cloned().collect(),
             network: Network::new(RegionsData::new(regions, network_behaviour)),
             layout: overlay.layout(&node_ids, &mut rng),
-            leaders: leaders.clone(),
+            leaders: leaders.clone().into_iter().map(From::from).collect(),
         };
 
-        let mut runner =
-            ConsensusRunner::<CarnotNode>::new(&mut rng, layout, leaders, Rc::new(node_settings));
+        let mut runner = ConsensusRunner::<CarnotNode>::new(
+            &mut rng,
+            layout,
+            leaders.into_iter().map(From::from).collect(),
+            Rc::new(node_settings),
+        );
 
         assert_eq!(
             Duration::from_millis(7800),

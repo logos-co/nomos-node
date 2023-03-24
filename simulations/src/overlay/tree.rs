@@ -6,7 +6,7 @@ use rand::seq::IteratorRandom;
 use super::{Committee, Layout, Overlay};
 use crate::node::{
     carnot::{CarnotNode, CarnotRole},
-    NodeId,
+    CommitteeId, NodeId,
 };
 
 pub enum TreeType {
@@ -57,14 +57,17 @@ impl TreeOverlay {
 
             // Check for leaf nodes.
             if right_child_id <= properties.committee_count {
-                children.insert(committee_id, vec![left_child_id, right_child_id]);
+                children.insert(
+                    committee_id.into(),
+                    vec![left_child_id.into(), right_child_id.into()],
+                );
                 has_children = true;
             }
 
             // Root node has no parent.
             if committee_id > 0 {
                 let parent_id = get_parent_id(committee_id);
-                parents.insert(committee_id, parent_id);
+                parents.insert(committee_id.into(), parent_id.into());
             }
 
             let role = match (committee_id, has_children) {
@@ -78,12 +81,12 @@ impl TreeOverlay {
                 role,
             };
 
-            committees.insert(committee_id, committee);
+            committees.insert(committee_id.into(), committee);
 
             layers
                 .entry(get_layer(committee_id))
                 .or_insert_with(Vec::new)
-                .push(committee_id);
+                .push(committee_id.into());
         }
 
         Layout::new(committees, parents, children, layers)
@@ -99,7 +102,7 @@ impl Overlay<CarnotNode> for TreeOverlay {
 
     fn nodes(&self) -> Vec<NodeId> {
         let properties = get_tree_properties(&self.settings);
-        (0..properties.node_count).collect()
+        (0..properties.node_count).map(From::from).collect()
     }
 
     fn leaders<R: rand::Rng>(
@@ -139,8 +142,8 @@ fn get_parent_id(id: usize) -> usize {
 }
 
 /// Get a layer in a tree of a given committee id.
-fn get_layer(id: usize) -> usize {
-    (id as f64 + 1.).log2().floor() as usize
+fn get_layer(id: usize) -> CommitteeId {
+    CommitteeId::new((id as f64 + 1.).log2().floor() as usize)
 }
 
 #[cfg(test)]
@@ -173,24 +176,33 @@ mod tests {
         });
         let nodes = overlay.nodes();
         let layout = overlay.layout(&nodes, &mut rng);
-        assert_eq!(layout.children[&0], vec![1, 2]);
-        assert_eq!(layout.parent[&1], 0);
-        assert_eq!(layout.parent[&2], 0);
+        assert_eq!(
+            layout.children[&CommitteeId::new(0)],
+            vec![1.into(), 2.into()]
+        );
+        assert_eq!(layout.parent[&CommitteeId::new(1)], 0.into());
+        assert_eq!(layout.parent[&CommitteeId::new(2)], 0.into());
 
-        assert_eq!(layout.children[&1], vec![3, 4]);
-        assert_eq!(layout.children[&2], vec![5, 6]);
+        assert_eq!(
+            layout.children[&CommitteeId::new(1)],
+            vec![3.into(), 4.into()]
+        );
+        assert_eq!(
+            layout.children[&CommitteeId::new(2)],
+            vec![5.into(), 6.into()]
+        );
 
-        assert_eq!(layout.parent[&3], 1);
-        assert_eq!(layout.children.get(&3), None);
+        assert_eq!(layout.parent[&CommitteeId::new(3)], 1.into());
+        assert_eq!(layout.children.get(&CommitteeId::new(3)), None);
 
-        assert_eq!(layout.parent[&4], 1);
-        assert_eq!(layout.children.get(&4), None);
+        assert_eq!(layout.parent[&CommitteeId::new(4)], 1.into());
+        assert_eq!(layout.children.get(&CommitteeId::new(4)), None);
 
-        assert_eq!(layout.parent[&5], 2);
-        assert_eq!(layout.children.get(&5), None);
+        assert_eq!(layout.parent[&CommitteeId::new(5)], 2.into());
+        assert_eq!(layout.children.get(&CommitteeId::new(5)), None);
 
-        assert_eq!(layout.parent[&6], 2);
-        assert_eq!(layout.children.get(&6), None);
+        assert_eq!(layout.parent[&CommitteeId::new(6)], 2.into());
+        assert_eq!(layout.children.get(&CommitteeId::new(6)), None);
     }
 
     #[test]
@@ -207,15 +219,15 @@ mod tests {
         // 2^h - 1
         assert_eq!(layout.committees.len(), 1023);
 
-        let root_nodes = &layout.committees[&0].nodes;
+        let root_nodes = &layout.committees[&CommitteeId::new(0)].nodes;
         assert_eq!(root_nodes.len(), 10);
-        assert_eq!(root_nodes.first(), Some(&0));
-        assert_eq!(root_nodes.last(), Some(&9));
+        assert_eq!(root_nodes.first(), Some(&NodeId::new(0)));
+        assert_eq!(root_nodes.last(), Some(&NodeId::new(9)));
 
-        let last_nodes = &layout.committees[&1022].nodes;
+        let last_nodes = &layout.committees[&CommitteeId::new(1022)].nodes;
         assert_eq!(last_nodes.len(), 10);
-        assert_eq!(last_nodes.first(), Some(&10220));
-        assert_eq!(last_nodes.last(), Some(&10229));
+        assert_eq!(last_nodes.first(), Some(&NodeId::new(10220)));
+        assert_eq!(last_nodes.last(), Some(&NodeId::new(10229)));
     }
 
     #[test]
@@ -229,11 +241,26 @@ mod tests {
         let nodes = overlay.nodes();
         let layout = overlay.layout(&nodes, &mut rng);
 
-        assert_eq!(layout.committees[&0].role, CarnotRole::Root);
-        assert_eq!(layout.committees[&1].role, CarnotRole::Intermediate);
-        assert_eq!(layout.committees[&2].role, CarnotRole::Intermediate);
-        assert_eq!(layout.committees[&3].role, CarnotRole::Leaf);
-        assert_eq!(layout.committees[&6].role, CarnotRole::Leaf);
+        assert_eq!(
+            layout.committees[&CommitteeId::new(0)].role,
+            CarnotRole::Root
+        );
+        assert_eq!(
+            layout.committees[&CommitteeId::new(1)].role,
+            CarnotRole::Intermediate
+        );
+        assert_eq!(
+            layout.committees[&CommitteeId::new(2)].role,
+            CarnotRole::Intermediate
+        );
+        assert_eq!(
+            layout.committees[&CommitteeId::new(3)].role,
+            CarnotRole::Leaf
+        );
+        assert_eq!(
+            layout.committees[&CommitteeId::new(6)].role,
+            CarnotRole::Leaf
+        );
     }
 
     #[test]
@@ -246,8 +273,14 @@ mod tests {
         });
         let nodes = overlay.nodes();
         let layout = overlay.layout(&nodes, &mut rng);
-        assert_eq!(layout.layers[&0], vec![0]);
-        assert_eq!(layout.layers[&1], vec![1, 2]);
-        assert_eq!(layout.layers[&2], vec![3, 4, 5, 6]);
+        assert_eq!(layout.layers[&CommitteeId::new(0)], vec![0.into()]);
+        assert_eq!(
+            layout.layers[&CommitteeId::new(1)],
+            vec![1.into(), 2.into()]
+        );
+        assert_eq!(
+            layout.layers[&CommitteeId::new(2)],
+            vec![3.into(), 4.into(), 5.into(), 6.into()]
+        );
     }
 }

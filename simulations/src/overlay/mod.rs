@@ -29,7 +29,7 @@ pub struct Layout {
     pub from_committee: HashMap<NodeId, CommitteeId>,
     pub parent: HashMap<CommitteeId, CommitteeId>,
     pub children: HashMap<CommitteeId, Vec<CommitteeId>>,
-    pub layers: HashMap<usize, Vec<CommitteeId>>,
+    pub layers: HashMap<CommitteeId, Vec<CommitteeId>>,
 }
 
 impl Layout {
@@ -37,7 +37,7 @@ impl Layout {
         committees: HashMap<CommitteeId, Committee>,
         parent: HashMap<CommitteeId, CommitteeId>,
         children: HashMap<CommitteeId, Vec<CommitteeId>>,
-        layers: HashMap<usize, Vec<usize>>,
+        layers: HashMap<CommitteeId, Vec<CommitteeId>>,
     ) -> Self {
         let from_committee = committees
             .iter()

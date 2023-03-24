@@ -103,7 +103,7 @@ pub fn main() -> Result<(), Box<dyn std::error::Error>> {
             >(std::fs::File::open(config)?)?;
             #[allow(clippy::unit_arg)]
             let overlay = FlatOverlay::new(cfg.overlay_settings);
-            let node_ids = (0..cfg.node_count).collect::<Vec<_>>();
+            let node_ids = (0..cfg.node_count).map(From::from).collect::<Vec<_>>();
             let mut rng = thread_rng();
             let layout = overlay.layout(&node_ids, &mut rng);
             let leaders = overlay.leaders(&node_ids, 1, &mut rng).collect();

@@ -18,7 +18,7 @@ impl Overlay<CarnotNode> for FlatOverlay {
     }
 
     fn nodes(&self) -> Vec<NodeId> {
-        (0..10).collect()
+        (0..10).map(NodeId::from).collect()
     }
 
     fn leaders<R: Rng>(
@@ -33,16 +33,16 @@ impl Overlay<CarnotNode> for FlatOverlay {
 
     fn layout<R: Rng>(&self, nodes: &[NodeId], _rng: &mut R) -> Layout {
         let committees = std::iter::once((
-            0,
+            0.into(),
             Committee {
                 nodes: nodes.iter().copied().collect(),
                 role: CarnotRole::Leader,
             },
         ))
         .collect();
-        let parent = std::iter::once((0, 0)).collect();
-        let children = std::iter::once((0, vec![0])).collect();
-        let layers = std::iter::once((0, vec![0])).collect();
+        let parent = std::iter::once((0.into(), 0.into())).collect();
+        let children = std::iter::once((0.into(), vec![0.into()])).collect();
+        let layers = std::iter::once((0.into(), vec![0.into()])).collect();
         Layout::new(committees, parent, children, layers)
     }
 }
