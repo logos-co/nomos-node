@@ -11,7 +11,7 @@
 //! To solve this we can use a concept of layered *glauber* executions.
 //! The algorithm roughly works as follows:
 //!
-//! ```
+//! ```python
 //! nodes <- [nodes]
 //! layers <- [[nodes_ids], [], ...]
 //! while nodes_to_compute(layers):

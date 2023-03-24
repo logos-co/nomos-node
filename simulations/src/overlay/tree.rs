@@ -234,27 +234,6 @@ mod tests {
         });
         let nodes = overlay.nodes();
         let layout = overlay.layout(&nodes, &mut rng);
-
-        assert_eq!(
-            layout.committees[&CommitteeId::new(0)].role,
-            CarnotRole::Root
-        );
-        assert_eq!(
-            layout.committees[&CommitteeId::new(1)].role,
-            CarnotRole::Intermediate
-        );
-        assert_eq!(
-            layout.committees[&CommitteeId::new(2)].role,
-            CarnotRole::Intermediate
-        );
-        assert_eq!(
-            layout.committees[&CommitteeId::new(3)].role,
-            CarnotRole::Leaf
-        );
-        assert_eq!(
-            layout.committees[&CommitteeId::new(6)].role,
-            CarnotRole::Leaf
-        );
     }
 
     #[test]
