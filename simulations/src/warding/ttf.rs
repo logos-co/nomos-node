@@ -6,7 +6,7 @@ use serde::Deserialize;
 /// the set threshold.
 #[derive(Debug, Deserialize, Copy, Clone)]
 pub struct MaxViewWard {
-    max_view: usize,
+    _max_view: usize,
 }
 
 impl<N: Node> SimulationWard<N> for MaxViewWard {

@@ -41,7 +41,7 @@ where
             .seed
             .unwrap_or_else(|| rand::thread_rng().next_u64());
 
-        println!("Seed: {}", seed);
+        println!("Seed: {seed}");
 
         let mut rng = SmallRng::seed_from_u64(seed);
         let overlay = O::new(settings.overlay_settings.clone());
