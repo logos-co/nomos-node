@@ -73,7 +73,7 @@ pub fn simulate<N: Node, O: Overlay>(
         {
             let mut shared_nodes = runner.nodes.write().expect("Write access to nodes vector");
             let node: &mut N = shared_nodes
-                .get_mut(node_id)
+                .get_mut(node_id.inner())
                 .expect("Node should be present");
             let prev_view = node.current_view();
             node.step();

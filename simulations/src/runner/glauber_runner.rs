@@ -26,6 +26,7 @@ pub fn simulate<N: Node, O: Overlay>(
         .read()
         .expect("Read access to nodes vector")
         .len())
+        .map(From::from)
         .collect();
     let iterations: Vec<_> = (0..maximum_iterations).collect();
     'main: for chunk in iterations.chunks(update_rate) {
@@ -41,7 +42,7 @@ pub fn simulate<N: Node, O: Overlay>(
             {
                 let mut shared_nodes = runner.nodes.write().expect("Write access to nodes vector");
                 let node: &mut N = shared_nodes
-                    .get_mut(node_id)
+                    .get_mut(node_id.inner())
                     .expect("Node should be present");
                 node.step();
             }

@@ -70,7 +70,7 @@ where
         } = settings;
 
         (0..*node_count)
-            .map(|id| N::new(seed, id, node_settings.clone()))
+            .map(|id| N::new(seed, id.into(), node_settings.clone()))
             .collect()
     }
 
