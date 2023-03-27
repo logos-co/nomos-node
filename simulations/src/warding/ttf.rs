@@ -12,7 +12,12 @@ pub struct MaxViewWard {
 impl<N: Node> SimulationWard<N> for MaxViewWard {
     type SimulationState = SimulationState<N>;
     fn analyze(&mut self, state: &Self::SimulationState) -> bool {
-        !state.nodes.read().unwrap().iter().any(|n| n.current_view() >= self.max_view)
+        !state
+            .nodes
+            .read()
+            .expect("simulations: MaxViewWard panic when requiring a read lock")
+            .iter()
+            .any(|n| n.current_view() >= self.max_view)
     }
 }
 
