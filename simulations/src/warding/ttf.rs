@@ -12,12 +12,12 @@ pub struct MaxViewWard {
 impl<N: Node> SimulationWard<N> for MaxViewWard {
     type SimulationState = SimulationState<N>;
     fn analyze(&mut self, state: &Self::SimulationState) -> bool {
-        !state
+        state
             .nodes
             .read()
             .expect("simulations: MaxViewWard panic when requiring a read lock")
             .iter()
-            .any(|n| n.current_view() >= self.max_view)
+            .all(|n| n.current_view() >= self.max_view)
     }
 }
 
@@ -58,13 +58,13 @@ mod test {
         }
         let mut ttf = MaxViewWard { max_view: 10 };
 
-        let node = 9;
+        let node = 11;
         let state = SimulationState {
             nodes: Arc::new(RwLock::new(vec![node])),
         };
         assert!(ttf.analyze(&state));
 
-        state.nodes.write().unwrap().push(11);
+        state.nodes.write().unwrap().push(9);
         assert!(!ttf.analyze(&state));
     }
 }
