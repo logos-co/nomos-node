@@ -2,23 +2,29 @@ use crate::node::Node;
 use crate::warding::{SimulationState, SimulationWard};
 use serde::Deserialize;
 
-/// Time to finality ward. It monitors the amount of rounds of the simulations, triggers when surpassing
-/// the set threshold.
+/// MinMaxView. It monitors the gap between a min view and max view, triggers when surpassing
+/// the max view - min view is larger than a gap.
 #[derive(Debug, Deserialize, Copy, Clone)]
 pub struct MinMaxViewWard {
-    base_view: usize,
     max_gap: usize,
 }
 
 impl<N: Node> SimulationWard<N> for MinMaxViewWard {
     type SimulationState = SimulationState<N>;
     fn analyze(&mut self, state: &Self::SimulationState) -> bool {
-        state
+        let mut min = 0;
+        let mut max = 0;
+        for node in state
             .nodes
             .read()
             .expect("simulations: MinMaxViewWard panic when requiring a read lock")
             .iter()
-            .all(|n| n.current_view() >= self.max_gap + self.base_view)
+        {
+            let view = node.current_view();
+            min = min.min(view);
+            max = max.max(view);
+        }
+        max - min >= self.max_gap
     }
 }
 
@@ -30,27 +36,16 @@ mod test {
 
     #[test]
     fn rebase_threshold() {
-        let mut minmax = MinMaxViewWard {
-            base_view: 10,
-            max_gap: 5,
-        };
+        let mut minmax = MinMaxViewWard { max_gap: 5 };
         let state = SimulationState {
             nodes: Arc::new(RwLock::new(vec![10])),
         };
-        // 10 - 10 = 0 < 5 so false
-        assert!(!minmax.analyze(&state));
-        state.nodes.write().unwrap()[0] = 15;
-        // 15 - 10 = 5 = 5 so true
-        assert!(minmax.analyze(&state));
-
-        // push a new node with 9
-        state.nodes.write().unwrap().push(9);
-        // 15 - 9 = 6 > 5 so not all of nodes meet the condition, false
+        // we only have one node, so always false
         assert!(!minmax.analyze(&state));
 
-        // change the second node to 16
-        state.nodes.write().unwrap()[1] = 16;
-        // 16 - 15 = 1 < 5 so all of the nodes meet the analyze condition, true
+        // push a new node with 10
+        state.nodes.write().unwrap().push(20);
+        // we now have two nodes and the max - min is 10 > max_gap 5, so true
         assert!(minmax.analyze(&state));
     }
 }
