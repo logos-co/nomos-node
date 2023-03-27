@@ -124,3 +124,30 @@ pub trait Node {
     fn state(&self) -> &Self::State;
     fn step(&mut self);
 }
+
+#[cfg(test)]
+impl Node for usize {
+    type Settings = ();
+    type State = Self;
+
+    fn new<R: rand::Rng>(_rng: &mut R, id: NodeId, _settings: Self::Settings) -> Self {
+        id.inner()
+    }
+
+    fn id(&self) -> NodeId {
+        (*self).into()
+    }
+
+    fn current_view(&self) -> usize {
+        *self
+    }
+
+    fn state(&self) -> &Self::State {
+        self
+    }
+
+    fn step(&mut self) {
+        use std::ops::AddAssign;
+        self.add_assign(1);
+    }
+}

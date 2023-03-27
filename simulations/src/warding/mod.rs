@@ -5,6 +5,7 @@ use serde::Deserialize;
 // internal
 use crate::node::Node;
 
+mod minmax;
 mod ttf;
 
 pub struct SimulationState<N> {
@@ -21,9 +22,10 @@ pub trait SimulationWard<N> {
 /// Ward dispatcher
 /// Enum to avoid Boxing (Box<dyn SimulationWard>) wards.
 #[derive(Debug, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum Ward {
-    #[serde(rename = "time_to_finality")]
     MaxView(ttf::MaxViewWard),
+    MinMaxView(minmax::MinMaxViewWard),
 }
 
 impl Ward {
@@ -32,6 +34,7 @@ impl Ward {
     ) -> &mut dyn SimulationWard<N, SimulationState = SimulationState<N>> {
         match self {
             Ward::MaxView(ward) => ward,
+            Ward::MinMaxView(ward) => ward,
         }
     }
 }
