@@ -9,10 +9,10 @@ use super::{NetworkState, SharedState};
 
 #[derive(Debug, Default)]
 pub struct DummyState {
-    current_view: usize,
+    pub current_view: usize,
 }
 
-#[derive(Clone, Deserialize)]
+#[derive(Clone, Default, Deserialize)]
 pub struct DummySettings {}
 
 pub struct DummyNode {

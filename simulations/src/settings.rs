@@ -21,7 +21,7 @@ pub enum RunnerSettings {
     },
 }
 
-#[derive(Deserialize)]
+#[derive(Default, Deserialize)]
 pub struct SimulationSettings<N, O> {
     pub network_behaviors: HashMap<(Region, Region), StepTime>,
     pub regions: Vec<Region>,
