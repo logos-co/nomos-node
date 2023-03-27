@@ -12,13 +12,7 @@ pub struct MaxViewWard {
 impl<N: Node> SimulationWard<N> for MaxViewWard {
     type SimulationState = SimulationState<N>;
     fn analyze(&mut self, state: &Self::SimulationState) -> bool {
-        let x = state.nodes.read().unwrap();
-        for node in x.iter() {
-            if node.current_view() >= self.max_view {
-                return false;
-            }
-        }
-        true
+        !state.nodes.read().unwrap().iter().any(|n| n.current_view() >= self.max_view)
     }
 }
 
@@ -37,7 +31,7 @@ mod test {
             type Settings = ();
             type State = Self;
 
-            fn new<R: Rng>(rng: &mut R, id: NodeId, settings: Self::Settings) -> Self {
+            fn new<R: Rng>(_rng: &mut R, id: NodeId, _settings: Self::Settings) -> Self {
                 id.inner()
             }
 
