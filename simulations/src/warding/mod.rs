@@ -22,10 +22,9 @@ pub trait SimulationWard<N> {
 /// Ward dispatcher
 /// Enum to avoid Boxing (Box<dyn SimulationWard>) wards.
 #[derive(Debug, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum Ward {
-    #[serde(rename = "time_to_finality")]
     MaxView(ttf::MaxViewWard),
-    #[serde(rename = "min_max_view")]
     MinMaxView(minmax::MinMaxViewWard),
 }
 

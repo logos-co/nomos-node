@@ -14,12 +14,11 @@ impl<N: Node> SimulationWard<N> for MinMaxViewWard {
     fn analyze(&mut self, state: &Self::SimulationState) -> bool {
         let mut min = 0;
         let mut max = 0;
-        for node in state
+        let nodes = state
             .nodes
             .read()
-            .expect("simulations: MinMaxViewWard panic when requiring a read lock")
-            .iter()
-        {
+            .expect("simulations: MinMaxViewWard panic when requiring a read lock");
+        for node in nodes.iter() {
             let view = node.current_view();
             min = min.min(view);
             max = max.max(view);
