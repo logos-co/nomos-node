@@ -12,7 +12,7 @@ pub struct MinMaxViewWard {
 impl<N: Node> SimulationWard<N> for MinMaxViewWard {
     type SimulationState = SimulationState<N>;
     fn analyze(&mut self, state: &Self::SimulationState) -> bool {
-        let mut min = 0;
+        let mut min = usize::MAX;
         let mut max = 0;
         let nodes = state
             .nodes
