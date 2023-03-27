@@ -29,3 +29,59 @@ pub fn simulate<N: Node, O: Overlay>(
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::{collections::HashMap, time::Duration};
+
+    use crate::{
+        network::regions::Region,
+        node::dummy::{DummyNode, DummySettings},
+        output_processors::OutData,
+        overlay::tree::{TreeOverlay, TreeSettings, TreeType},
+        runner::SimulationRunner,
+        settings::{RunnerSettings, SimulationSettings},
+    };
+
+    #[test]
+    fn run_dummy_steps() {
+        let network_behaviors = HashMap::from([
+            (
+                (Region::Asia, Region::Asia),
+                Duration::from_millis(100).into(),
+            ),
+            (
+                (Region::Asia, Region::Europe),
+                Duration::from_millis(500).into(),
+            ),
+            (
+                (Region::Europe, Region::Europe),
+                Duration::from_millis(100).into(),
+            ),
+        ]);
+        let regions = vec![Region::Asia, Region::Europe];
+        let wards = vec![];
+        let overlay_settings = TreeSettings {
+            tree_type: TreeType::FullBinaryTree,
+            committee_size: 1,
+            depth: 1,
+        };
+        let node_settings = DummySettings {};
+        let runner_settings = RunnerSettings::Sync;
+        let settings = SimulationSettings {
+            network_behaviors,
+            regions,
+            wards,
+            overlay_settings,
+            node_settings,
+            runner_settings,
+            node_count: 10,
+            committee_size: 1,
+            seed: Some(1),
+        };
+
+        let mut out_data: Vec<OutData> = Vec::new();
+        let mut runner: SimulationRunner<DummyNode, TreeOverlay> = SimulationRunner::new(settings);
+        runner.simulate(Some(&mut out_data));
+    }
+}
