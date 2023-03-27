@@ -3,6 +3,7 @@
 use rand::Rng;
 use serde::Deserialize;
 // internal
+use super::{NetworkState, SharedState};
 use crate::node::{Node, NodeId};
 
 #[derive(Default)]
@@ -22,7 +23,12 @@ impl Node for CarnotNode {
     type Settings = CarnotSettings;
     type State = CarnotState;
 
-    fn new<R: Rng>(_rng: &mut R, id: NodeId, settings: Self::Settings) -> Self {
+    fn new<R: Rng>(
+        _rng: &mut R,
+        id: NodeId,
+        settings: Self::Settings,
+        _network_state: SharedState<NetworkState>,
+    ) -> Self {
         Self {
             id,
             state: Default::default(),

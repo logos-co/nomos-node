@@ -11,7 +11,7 @@ use rand::rngs::SmallRng;
 use rand::{RngCore, SeedableRng};
 use rayon::prelude::*;
 // internal
-use crate::node::Node;
+use crate::node::{NetworkState, Node, NodeId, SharedState};
 use crate::output_processors::OutData;
 use crate::overlay::Overlay;
 use crate::settings::{RunnerSettings, SimulationSettings};
@@ -60,7 +60,7 @@ where
     /// Initialize nodes from settings and calculate initial network state.
     fn nodes_from_initial_settings(
         settings: &SimulationSettings<N::Settings, O::Settings>,
-        _overlay: O, // TODO: attach overlay information to nodes
+        overlay: O,
         seed: &mut SmallRng,
     ) -> Vec<N> {
         let SimulationSettings {
@@ -69,8 +69,14 @@ where
             ..
         } = settings;
 
-        (0..*node_count)
-            .map(|id| N::new(seed, id.into(), node_settings.clone()))
+        let node_ids: Vec<NodeId> = (0..*node_count).map(Into::into).collect();
+        let network_state: SharedState<NetworkState> = Arc::new(RwLock::new(NetworkState {
+            layout: overlay.layout(&node_ids, seed),
+        }));
+
+        node_ids
+            .iter()
+            .map(|id| N::new(seed, *id, node_settings.clone(), network_state.clone()))
             .collect()
     }
 
@@ -100,7 +106,7 @@ where
     fn dump_state_to_out_data(
         &self,
         _simulation_state: &SimulationState<N>,
-        _out_ata: &mut Option<&mut Vec<OutData>>,
+        _out_data: &mut Option<&mut Vec<OutData>>,
     ) {
         todo!("What data do we want to expose?")
     }

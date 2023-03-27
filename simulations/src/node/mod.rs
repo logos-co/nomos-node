@@ -4,11 +4,14 @@ pub mod dummy;
 // std
 use std::{
     ops::{Deref, DerefMut},
+    sync::{Arc, RwLock},
     time::Duration,
 };
 // crates
 use rand::Rng;
 use serde::{Deserialize, Serialize};
+
+use crate::overlay::Layout;
 // internal
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -115,10 +118,22 @@ impl core::iter::Sum<StepTime> for Duration {
     }
 }
 
+/// A state that represents how nodes are interconnected in the network.
+pub struct NetworkState {
+    pub layout: Layout,
+}
+
+pub type SharedState<S> = Arc<RwLock<S>>;
+
 pub trait Node {
     type Settings;
     type State;
-    fn new<R: Rng>(rng: &mut R, id: NodeId, settings: Self::Settings) -> Self;
+    fn new<R: Rng>(
+        rng: &mut R,
+        id: NodeId,
+        settings: Self::Settings,
+        network_state: SharedState<NetworkState>,
+    ) -> Self;
     fn id(&self) -> NodeId;
     // TODO: View must be view whenever we integrate consensus engine
     fn current_view(&self) -> usize;
@@ -131,7 +146,12 @@ impl Node for usize {
     type Settings = ();
     type State = Self;
 
-    fn new<R: rand::Rng>(_rng: &mut R, id: NodeId, _settings: Self::Settings) -> Self {
+    fn new<R: rand::Rng>(
+        _rng: &mut R,
+        id: NodeId,
+        _settings: Self::Settings,
+        _network_state: SharedState<NetworkState>,
+    ) -> Self {
         id.inner()
     }
 

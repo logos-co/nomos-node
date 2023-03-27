@@ -34,18 +34,3 @@ pub struct SimulationSettings<N, O> {
     pub committee_size: usize,
     pub seed: Option<u64>,
 }
-
-#[cfg(test)]
-mod test {
-    use std::{collections::HashMap, time::Duration};
-
-    use crate::{network::regions::Region, node::StepTime};
-
-    #[test]
-    fn serialize_hashmap() {
-        let mut settings: HashMap<(Region, Region), StepTime> = HashMap::new();
-        settings.insert((Region::Europe, Region::Europe), Duration::new(1, 1).into());
-        let a = serde_json::to_string(&settings);
-        println!("{a:?}");
-    }
-}

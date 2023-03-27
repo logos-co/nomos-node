@@ -5,28 +5,38 @@ use serde::Deserialize;
 // internal
 use crate::node::{Node, NodeId};
 
-#[derive(Default)]
-pub struct DummyState {}
+use super::{NetworkState, SharedState};
+
+#[derive(Debug, Default)]
+pub struct DummyState {
+    current_view: usize,
+}
 
 #[derive(Clone, Deserialize)]
 pub struct DummySettings {}
 
-#[allow(dead_code)] // TODO: remove when handling settings
 pub struct DummyNode {
     id: NodeId,
     state: DummyState,
-    settings: DummySettings,
+    _settings: DummySettings,
+    _network_state: SharedState<NetworkState>,
 }
 
 impl Node for DummyNode {
     type Settings = DummySettings;
     type State = DummyState;
 
-    fn new<R: Rng>(_rng: &mut R, id: NodeId, settings: Self::Settings) -> Self {
+    fn new<R: Rng>(
+        _rng: &mut R,
+        id: NodeId,
+        _settings: Self::Settings,
+        _network_state: SharedState<NetworkState>,
+    ) -> Self {
         Self {
             id,
             state: Default::default(),
-            settings,
+            _settings,
+            _network_state,
         }
     }
 
@@ -35,7 +45,7 @@ impl Node for DummyNode {
     }
 
     fn current_view(&self) -> usize {
-        todo!()
+        self.state.current_view
     }
 
     fn state(&self) -> &DummyState {
@@ -43,6 +53,6 @@ impl Node for DummyNode {
     }
 
     fn step(&mut self) {
-        todo!()
+        self.state.current_view += 1;
     }
 }
