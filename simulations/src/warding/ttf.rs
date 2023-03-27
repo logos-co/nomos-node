@@ -6,13 +6,19 @@ use serde::Deserialize;
 /// the set threshold.
 #[derive(Debug, Deserialize, Copy, Clone)]
 pub struct MaxViewWard {
-    _max_view: usize,
+    max_view: usize,
 }
 
 impl<N: Node> SimulationWard<N> for MaxViewWard {
     type SimulationState = SimulationState<N>;
-    fn analyze(&mut self, _state: &Self::SimulationState) -> bool {
-        true // TODO: implement using simulation state
+    fn analyze(&mut self, state: &Self::SimulationState) -> bool {
+        let x = state.nodes.read().unwrap();
+        for node in x.iter() {
+            if node.current_view() >= self.max_view {
+                return false;
+            }
+        }
+        true
     }
 }
 
@@ -51,13 +57,15 @@ mod test {
                 self.add_assign(1);
             }
         }
-        let mut ttf = MaxViewWard { _max_view: 10 };
-        let mut cond = false;
+        let mut ttf = MaxViewWard { max_view: 10 };
 
-        let node = 11;
-        let mut state = SimulationState {
+        let node = 9;
+        let state = SimulationState {
             nodes: Arc::new(RwLock::new(vec![node])),
         };
         assert!(ttf.analyze(&state));
+
+        state.nodes.write().unwrap().push(11);
+        assert!(!ttf.analyze(&state));
     }
 }
