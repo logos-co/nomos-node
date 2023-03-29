@@ -25,11 +25,27 @@ pub enum DummyMessage {
 }
 
 pub struct DummyNode {
-    id: NodeId,
+    node_id: NodeId,
     state: DummyState,
     _settings: DummySettings,
-    _network_state: SharedState<NetworkState>,
-    _network_interface: DummyNetworkInterface,
+    network_state: SharedState<NetworkState>,
+    network_interface: DummyNetworkInterface,
+}
+
+impl DummyNode {
+    pub fn new(
+        node_id: NodeId,
+        network_state: SharedState<NetworkState>,
+        network_interface: DummyNetworkInterface,
+    ) -> Self {
+        Self {
+            node_id,
+            state: DummyState { current_view: 0 },
+            _settings: DummySettings {},
+            network_state,
+            network_interface,
+        }
+    }
 }
 
 impl Node for DummyNode {
@@ -37,7 +53,7 @@ impl Node for DummyNode {
     type State = DummyState;
 
     fn id(&self) -> NodeId {
-        self.id
+        self.node_id
     }
 
     fn current_view(&self) -> usize {
@@ -49,7 +65,7 @@ impl Node for DummyNode {
     }
 
     fn step(&mut self) {
-        let incoming_messages = self._network_interface.receive_messages();
+        let incoming_messages = self.network_interface.receive_messages();
         self.state.current_view += 1;
 
         for message in incoming_messages {
@@ -66,9 +82,13 @@ pub struct DummyNetworkInterface {}
 impl DummyNetworkInterface {
     pub fn new(
         local_addr: NodeId,
-        inbound: Sender<NetworkMessage<DummyMessage>>,
-        outbound: Receiver<NetworkMessage<DummyMessage>>,
+        sender: Sender<NetworkMessage<DummyMessage>>,
+        receiver: Receiver<NetworkMessage<DummyMessage>>,
     ) -> Self {
+        todo!()
+    }
+
+    pub fn get_outgoing_channel() -> Receiver<DummyMessage> {
         todo!()
     }
 }

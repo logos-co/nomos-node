@@ -32,21 +32,64 @@ pub fn simulate<N: Node, O: Overlay>(
 
 #[cfg(test)]
 mod tests {
+    use std::sync::{mpsc, Arc, RwLock};
+
+    use rand::rngs::mock::StepRng;
+
     use crate::{
-        node::{dummy::DummyNode, Node},
-        overlay::tree::TreeOverlay,
+        network::{self, Network},
+        node::{
+            dummy::{DummyMessage, DummyNetworkInterface, DummyNode, DummySettings},
+            NetworkState, Node, NodeId, SharedState,
+        },
+        overlay::{
+            tree::{TreeOverlay, TreeSettings},
+            Overlay,
+        },
         runner::SimulationRunner,
         settings::SimulationSettings,
     };
 
+    fn init_network() -> Network<DummyMessage> {
+        todo!()
+    }
+
+    fn init_dummy_nodes(
+        node_ids: &[NodeId],
+        network: &mut Network<DummyMessage>,
+        network_state: SharedState<NetworkState>,
+    ) -> Vec<DummyNode> {
+        node_ids
+            .iter()
+            .map(|node_id| {
+                let (node_message_sender, node_message_receiver) = mpsc::channel();
+                let network_message_receiver = network.connect(*node_id, node_message_receiver);
+                let network_interface = DummyNetworkInterface::new(
+                    *node_id,
+                    node_message_sender,
+                    network_message_receiver,
+                );
+                DummyNode::new(*node_id, network_state.clone(), network_interface)
+            })
+            .collect()
+    }
+
     #[test]
     fn runner_one_step() {
-        let settings = SimulationSettings {
+        let settings: SimulationSettings<DummySettings, TreeSettings> = SimulationSettings {
             node_count: 10,
             committee_size: 1,
             ..Default::default()
         };
-        let nodes = vec![];
+
+        let mut rng = StepRng::new(1, 0);
+        let node_ids: Vec<NodeId> = (0..settings.node_count).map(Into::into).collect();
+        let overlay = TreeOverlay::new(settings.overlay_settings.clone());
+        let mut network = init_network();
+        let network_state = Arc::new(RwLock::new(NetworkState {
+            layout: overlay.layout(&node_ids, &mut rng),
+        }));
+        let nodes = init_dummy_nodes(&node_ids, &mut network, network_state);
 
         let mut runner: SimulationRunner<DummyNode, TreeOverlay> =
             SimulationRunner::new(nodes, settings);

@@ -1,5 +1,9 @@
 // std
-use std::{collections::HashMap, time::Duration};
+use std::{
+    collections::HashMap,
+    sync::mpsc::{Receiver, Sender},
+    time::Duration,
+};
 // crates
 use rand::Rng;
 // internal
@@ -9,12 +13,12 @@ pub mod behaviour;
 pub mod regions;
 
 #[derive(Clone)]
-pub struct Network {
+pub struct Network<M> {
     pub regions: regions::RegionsData,
-    node_messages: HashMap<NodeId, Vec<NetworkMessage<String>>>,
+    node_messages: HashMap<NodeId, Vec<NetworkMessage<M>>>,
 }
 
-impl Network {
+impl<M> Network<M> {
     pub fn new(regions: regions::RegionsData) -> Self {
         Self {
             regions,
@@ -33,6 +37,14 @@ impl Network {
             // TODO: use a delay range
             .then(|| network_behaviour.delay())
     }
+
+    pub fn connect(
+        &mut self,
+        node_id: NodeId,
+        node_message_receiver: Receiver<NetworkMessage<M>>,
+    ) -> Receiver<NetworkMessage<M>> {
+        todo!()
+    }
 }
 
 #[derive(Clone)]
@@ -40,20 +52,6 @@ pub struct NetworkMessage<M> {
     pub from: usize,
     pub to: usize,
     pub payload: M,
-}
-
-pub struct NodeMessage {}
-
-impl NetworkInterface for Network {
-    type Payload = ();
-
-    fn send_message(&mut self, address: usize, message: Self::Payload) {
-        todo!()
-    }
-
-    fn receive_messages(&mut self) -> Vec<NetworkMessage<Self::Payload>> {
-        todo!()
-    }
 }
 
 pub trait NetworkInterface: Send + Sync {
