@@ -7,6 +7,7 @@ use crate::node::Node;
 
 mod minmax;
 mod ttf;
+mod stalled;
 
 pub struct SimulationState<N> {
     pub nodes: Arc<RwLock<Vec<N>>>,
