@@ -1,21 +1,25 @@
 // std
-use std::time::Duration;
+use std::{collections::HashMap, time::Duration};
 // crates
 use rand::Rng;
 // internal
-use crate::node::NodeId;
+use crate::node::{Node, NodeId};
 
 pub mod behaviour;
 pub mod regions;
 
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Clone)]
 pub struct Network {
     pub regions: regions::RegionsData,
+    node_messages: HashMap<NodeId, Vec<NetworkMessage<String>>>,
 }
 
 impl Network {
     pub fn new(regions: regions::RegionsData) -> Self {
-        Self { regions }
+        Self {
+            regions,
+            node_messages: HashMap::new(),
+        }
     }
 
     pub fn send_message_cost<R: Rng>(
@@ -29,4 +33,32 @@ impl Network {
             // TODO: use a delay range
             .then(|| network_behaviour.delay())
     }
+}
+
+#[derive(Clone)]
+pub struct NetworkMessage<M> {
+    pub from: usize,
+    pub to: usize,
+    pub payload: M,
+}
+
+pub struct NodeMessage {}
+
+impl NetworkInterface for Network {
+    type Payload = ();
+
+    fn send_message(&mut self, address: usize, message: Self::Payload) {
+        todo!()
+    }
+
+    fn receive_messages(&mut self) -> Vec<NetworkMessage<Self::Payload>> {
+        todo!()
+    }
+}
+
+pub trait NetworkInterface: Send + Sync {
+    type Payload;
+
+    fn send_message(&mut self, address: usize, message: Self::Payload);
+    fn receive_messages(&mut self) -> Vec<NetworkMessage<Self::Payload>>;
 }

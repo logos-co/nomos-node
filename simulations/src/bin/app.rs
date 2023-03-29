@@ -94,9 +94,10 @@ impl SimulationApp {
             output_format,
         } = self;
         let simulation_settings: SimulationSettings<_, _> = load_json_from_file(&input_settings)?;
+        let nodes = vec![]; // TODO: Initialize nodes of different types.
 
         let mut simulation_runner: SimulationRunner<CarnotNode, TreeOverlay> =
-            SimulationRunner::new(simulation_settings);
+            SimulationRunner::new(nodes, simulation_settings);
         // build up series vector
         let mut out_data: Vec<OutData> = Vec::new();
         simulation_runner.simulate(Some(&mut out_data));

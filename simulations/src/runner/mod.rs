@@ -3,13 +3,16 @@ mod glauber_runner;
 mod layered_runner;
 mod sync_runner;
 
+use std::collections::HashMap;
 use std::marker::PhantomData;
 // std
+use crate::network::{Network, NetworkInterface};
 use std::sync::{Arc, RwLock};
 // crates
+use crate::network::regions::RegionsData;
 use rand::rngs::SmallRng;
 use rand::{RngCore, SeedableRng};
-use rayon::prelude::*;
+use rayon::{prelude::*, vec};
 // internal
 use crate::node::{NetworkState, Node, NodeId, SharedState};
 use crate::output_processors::OutData;
@@ -36,7 +39,7 @@ where
     N::Settings: Clone,
     O::Settings: Clone,
 {
-    pub fn new(settings: SimulationSettings<N::Settings, O::Settings>) -> Self {
+    pub fn new(nodes: Vec<N>, settings: SimulationSettings<N::Settings, O::Settings>) -> Self {
         let seed = settings
             .seed
             .unwrap_or_else(|| rand::thread_rng().next_u64());
@@ -45,7 +48,7 @@ where
 
         let mut rng = SmallRng::seed_from_u64(seed);
         let overlay = O::new(settings.overlay_settings.clone());
-        let nodes = Self::nodes_from_initial_settings(&settings, overlay, &mut rng);
+        //let nodes = Self::nodes_from_initial_settings(&settings, overlay, &mut rng);
 
         let nodes = Arc::new(RwLock::new(nodes));
 
@@ -58,27 +61,37 @@ where
     }
 
     /// Initialize nodes from settings and calculate initial network state.
-    fn nodes_from_initial_settings(
-        settings: &SimulationSettings<N::Settings, O::Settings>,
-        overlay: O,
-        seed: &mut SmallRng,
-    ) -> Vec<N> {
-        let SimulationSettings {
-            node_settings,
-            node_count,
-            ..
-        } = settings;
+    // fn nodes_from_initial_settings(
+    //     settings: &SimulationSettings<N::Settings, O::Settings>,
+    //     overlay: O,
+    //     seed: &mut SmallRng,
+    // ) -> Vec<N> {
+    //     let SimulationSettings {
+    //         node_settings,
+    //         node_count,
+    //         ..
+    //     } = settings;
 
-        let node_ids: Vec<NodeId> = (0..*node_count).map(Into::into).collect();
-        let network_state: SharedState<NetworkState> = Arc::new(RwLock::new(NetworkState {
-            layout: overlay.layout(&node_ids, seed),
-        }));
+    //     let node_ids: Vec<NodeId> = (0..*node_count).map(Into::into).collect();
+    //     let network_state: SharedState<NetworkState> = Arc::new(RwLock::new(NetworkState {
+    //         layout: overlay.layout(&node_ids, seed),
+    //     }));
+    //     let regions = RegionsData::new(HashMap::new(), HashMap::new());
+    //     let network = Box::new(Network::new(regions));
 
-        node_ids
-            .iter()
-            .map(|id| N::new(seed, *id, node_settings.clone(), network_state.clone()))
-            .collect()
-    }
+    //     node_ids
+    //         .iter()
+    //         .map(|id| {
+    //             N::new(
+    //                 seed,
+    //                 *id,
+    //                 node_settings.clone(),
+    //                 network_state.clone(),
+    //                 network.clone(),
+    //             )
+    //         })
+    //         .collect()
+    // }
 
     pub fn simulate(&mut self, out_data: Option<&mut Vec<OutData>>) {
         match self.settings.runner_settings.clone() {

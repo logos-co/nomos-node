@@ -11,7 +11,7 @@ use std::{
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 
-use crate::overlay::Layout;
+use crate::{network::NetworkInterface, overlay::Layout};
 // internal
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -128,12 +128,7 @@ pub type SharedState<S> = Arc<RwLock<S>>;
 pub trait Node {
     type Settings;
     type State;
-    fn new<R: Rng>(
-        rng: &mut R,
-        id: NodeId,
-        settings: Self::Settings,
-        network_state: SharedState<NetworkState>,
-    ) -> Self;
+
     fn id(&self) -> NodeId;
     // TODO: View must be view whenever we integrate consensus engine
     fn current_view(&self) -> usize;
@@ -145,15 +140,6 @@ pub trait Node {
 impl Node for usize {
     type Settings = ();
     type State = Self;
-
-    fn new<R: rand::Rng>(
-        _rng: &mut R,
-        id: NodeId,
-        _settings: Self::Settings,
-        _network_state: SharedState<NetworkState>,
-    ) -> Self {
-        id.inner()
-    }
 
     fn id(&self) -> NodeId {
         (*self).into()

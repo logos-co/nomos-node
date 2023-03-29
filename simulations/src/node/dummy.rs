@@ -1,9 +1,13 @@
 // std
+use std::sync::mpsc::{Receiver, Sender};
 // crates
 use rand::Rng;
 use serde::Deserialize;
 // internal
-use crate::node::{Node, NodeId};
+use crate::{
+    network::{NetworkInterface, NetworkMessage},
+    node::{Node, NodeId},
+};
 
 use super::{NetworkState, SharedState};
 
@@ -15,30 +19,22 @@ pub struct DummyState {
 #[derive(Clone, Default, Deserialize)]
 pub struct DummySettings {}
 
+pub enum DummyMessage {
+    SendTo(NodeId),
+    MyView(usize),
+}
+
 pub struct DummyNode {
     id: NodeId,
     state: DummyState,
     _settings: DummySettings,
     _network_state: SharedState<NetworkState>,
+    _network_interface: DummyNetworkInterface,
 }
 
 impl Node for DummyNode {
     type Settings = DummySettings;
     type State = DummyState;
-
-    fn new<R: Rng>(
-        _rng: &mut R,
-        id: NodeId,
-        _settings: Self::Settings,
-        _network_state: SharedState<NetworkState>,
-    ) -> Self {
-        Self {
-            id,
-            state: Default::default(),
-            _settings,
-            _network_state,
-        }
-    }
 
     fn id(&self) -> NodeId {
         self.id
@@ -53,6 +49,38 @@ impl Node for DummyNode {
     }
 
     fn step(&mut self) {
+        let incoming_messages = self._network_interface.receive_messages();
         self.state.current_view += 1;
+
+        for message in incoming_messages {
+            match message.payload {
+                DummyMessage::SendTo(_) => todo!(),
+                DummyMessage::MyView(_) => todo!(),
+            }
+        }
+    }
+}
+
+pub struct DummyNetworkInterface {}
+
+impl DummyNetworkInterface {
+    pub fn new(
+        local_addr: NodeId,
+        inbound: Sender<NetworkMessage<DummyMessage>>,
+        outbound: Receiver<NetworkMessage<DummyMessage>>,
+    ) -> Self {
+        todo!()
+    }
+}
+
+impl NetworkInterface for DummyNetworkInterface {
+    type Payload = DummyMessage;
+
+    fn send_message(&mut self, address: usize, message: Self::Payload) {
+        todo!()
+    }
+
+    fn receive_messages(&mut self) -> Vec<crate::network::NetworkMessage<Self::Payload>> {
+        todo!()
     }
 }

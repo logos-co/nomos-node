@@ -46,8 +46,10 @@ mod tests {
             committee_size: 1,
             ..Default::default()
         };
+        let nodes = vec![];
 
-        let mut runner: SimulationRunner<DummyNode, TreeOverlay> = SimulationRunner::new(settings);
+        let mut runner: SimulationRunner<DummyNode, TreeOverlay> =
+            SimulationRunner::new(nodes, settings);
         runner.step();
         let nodes = runner.nodes.read().unwrap();
 
