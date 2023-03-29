@@ -19,6 +19,7 @@ pub struct DummyState {
 #[derive(Clone, Default, Deserialize)]
 pub struct DummySettings {}
 
+#[derive(Clone)]
 pub enum DummyMessage {
     SendTo(NodeId),
     MyView(usize),
@@ -81,9 +82,9 @@ pub struct DummyNetworkInterface {}
 
 impl DummyNetworkInterface {
     pub fn new(
-        local_addr: NodeId,
-        sender: Sender<NetworkMessage<DummyMessage>>,
-        receiver: Receiver<NetworkMessage<DummyMessage>>,
+        _local_addr: NodeId,
+        _sender: Sender<NetworkMessage<DummyMessage>>,
+        _receiver: Receiver<NetworkMessage<DummyMessage>>,
     ) -> Self {
         todo!()
     }
@@ -96,11 +97,11 @@ impl DummyNetworkInterface {
 impl NetworkInterface for DummyNetworkInterface {
     type Payload = DummyMessage;
 
-    fn send_message(&mut self, address: usize, message: Self::Payload) {
+    fn send_message(&self, address: NodeId, message: Self::Payload) {
         todo!()
     }
 
-    fn receive_messages(&mut self) -> Vec<crate::network::NetworkMessage<Self::Payload>> {
+    fn receive_messages(&self) -> Vec<crate::network::NetworkMessage<Self::Payload>> {
         todo!()
     }
 }
