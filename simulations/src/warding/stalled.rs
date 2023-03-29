@@ -44,8 +44,8 @@ impl<N: Node + Clone + Eq + core::hash::Hash> SimulationWard<N> for StalledViewW
 
 #[cfg(test)]
 mod test {
-    use std::sync::{Arc, RwLock};
     use super::*;
+    use std::sync::{Arc, RwLock};
 
     #[test]
     fn rebase_threshold() {

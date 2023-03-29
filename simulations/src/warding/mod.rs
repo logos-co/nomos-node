@@ -6,8 +6,8 @@ use serde::Deserialize;
 use crate::node::Node;
 
 mod minmax;
-mod ttf;
 mod stalled;
+mod ttf;
 
 pub struct SimulationState<N> {
     pub nodes: Arc<RwLock<Vec<N>>>,
