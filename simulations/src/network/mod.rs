@@ -8,7 +8,7 @@ use std::{
 // crates
 use rand::Rng;
 // internal
-use crate::node::{Node, NodeId};
+use crate::node::NodeId;
 
 pub mod behaviour;
 pub mod regions;
@@ -65,25 +65,24 @@ where
         self.network_time += time_passed;
 
         // Receive and store all messages from nodes.
-        for (node_id, from_node) in &self.from_node_receivers {
+        self.from_node_receivers.iter().for_each(|(_, from_node)| {
             while let Ok(message) = from_node.try_recv() {
                 self.messages.push((self.network_time, message));
             }
-        }
+        });
 
         // Reiterate all messages and send to appropriate nodes if simulated
         // delay has passed.
-        for (network_time, message) in self.messages.iter() {
+        if let Some((network_time, message)) = self.messages.pop() {
+            // TODO: Handle message drops (remove unwrap).
             let delay = self
                 .send_message_cost(rng, message.from, message.to)
                 .unwrap();
-            let message_time_with_delay = network_time.add(delay);
-            if message_time_with_delay <= self.network_time {
+            if network_time.add(delay) <= self.network_time {
                 let to_node = self.to_node_senders.get(&message.to).unwrap();
-                let msg = message.clone();
-                to_node
-                    .send(msg.clone())
-                    .expect("Node should have connection");
+                to_node.send(message).expect("Node should have connection");
+            } else {
+                self.messages.push((network_time, message));
             }
         }
     }
@@ -114,7 +113,7 @@ mod tests {
     use rand::rngs::mock::StepRng;
 
     use super::{
-        behaviour::{self, NetworkBehaviour},
+        behaviour::NetworkBehaviour,
         regions::{Region, RegionsData},
         Network, NetworkInterface, NetworkMessage,
     };
@@ -185,11 +184,18 @@ mod tests {
         let b = MockNetworkInterface::new(node_b, from_b_sender, to_b_receiver);
 
         a.send_message(node_b, ());
-        // Messages are received during the network step.
+
+        // Currently messages are received during the network step.
         network.step(&mut rng, Duration::from_millis(0));
+        assert_eq!(a.receive_messages().len(), 0);
         assert_eq!(b.receive_messages().len(), 0);
 
         network.step(&mut rng, Duration::from_millis(100));
+        assert_eq!(a.receive_messages().len(), 0);
         assert_eq!(b.receive_messages().len(), 1);
+
+        network.step(&mut rng, Duration::from_millis(100));
+        assert_eq!(a.receive_messages().len(), 0);
+        assert_eq!(b.receive_messages().len(), 0);
     }
 }

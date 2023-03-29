@@ -1,7 +1,6 @@
 // std
 use std::sync::mpsc::{Receiver, Sender};
 // crates
-use rand::Rng;
 use serde::Deserialize;
 // internal
 use crate::{
@@ -29,21 +28,21 @@ pub struct DummyNode {
     node_id: NodeId,
     state: DummyState,
     _settings: DummySettings,
-    network_state: SharedState<NetworkState>,
+    _network_state: SharedState<NetworkState>,
     network_interface: DummyNetworkInterface,
 }
 
 impl DummyNode {
     pub fn new(
         node_id: NodeId,
-        network_state: SharedState<NetworkState>,
+        _network_state: SharedState<NetworkState>,
         network_interface: DummyNetworkInterface,
     ) -> Self {
         Self {
             node_id,
             state: DummyState { current_view: 0 },
             _settings: DummySettings {},
-            network_state,
+            _network_state,
             network_interface,
         }
     }
@@ -97,7 +96,7 @@ impl DummyNetworkInterface {
 impl NetworkInterface for DummyNetworkInterface {
     type Payload = DummyMessage;
 
-    fn send_message(&self, address: NodeId, message: Self::Payload) {
+    fn send_message(&self, _address: NodeId, _message: Self::Payload) {
         todo!()
     }
 

@@ -37,7 +37,7 @@ mod tests {
     use rand::rngs::mock::StepRng;
 
     use crate::{
-        network::{self, Network},
+        network::Network,
         node::{
             dummy::{DummyMessage, DummyNetworkInterface, DummyNode, DummySettings},
             NetworkState, Node, NodeId, SharedState,
