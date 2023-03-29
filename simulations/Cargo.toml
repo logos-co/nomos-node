@@ -7,6 +7,7 @@ edition = "2021"
 
 [dependencies]
 clap = { version = "4", features = ["derive"] }
+crc32fast = "1.3"
 fixed-slice-deque = "0.1.0-beta2"
 nomos-core = { path = "../nomos-core" }
 polars = { version = "0.27", features = ["serde", "object", "json", "csv-file", "parquet", "dtype-struct"] }

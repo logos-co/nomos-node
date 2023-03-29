@@ -1,44 +1,49 @@
-use std::collections::HashMap;
-
 use crate::node::Node;
 use crate::warding::{SimulationState, SimulationWard};
 use serde::Deserialize;
 
 /// StalledView. Track stalled nodes (e.g incoming queue is empty, the node doesn't write to other queues)
 #[derive(Debug, Deserialize, Clone)]
-pub struct StalledViewWard<N: Eq + core::hash::Hash> {
-    // the key is the node, the first element in the value is the node latest view, the second element
-    // is the node how many times the node is not updated.
-    checkpoints: HashMap<N, (usize, usize)>,
+pub struct StalledViewWard {
+    // the hash checksum
+    checkpoints: Option<u32>,
     // use to check if the node is stalled
     criterion: usize,
+    threshold: usize,
 }
 
-impl<N: Node + Clone + Eq + core::hash::Hash> SimulationWard<N> for StalledViewWard<N> {
+impl<N: Node> SimulationWard<N> for StalledViewWard {
     type SimulationState = SimulationState<N>;
     fn analyze(&mut self, state: &Self::SimulationState) -> bool {
         let nodes = state
             .nodes
             .read()
             .expect("simulations: StalledViewWard panic when requiring a read lock");
+        let mut hash = crc32fast::Hasher::new();
         for node in nodes.iter() {
-            let view = node.current_view();
-            if let Some((last_view, count)) = self.checkpoints.get_mut(node) {
-                if view == *last_view {
-                    *count += 1;
-                    if *count >= self.criterion {
-                        return true;
-                    }
+            hash.update(&node.current_view().to_be_bytes());
+            // TODO: hash messages in the node
+        }
+
+        let cks = hash.finalize();
+        match &mut self.checkpoints {
+            Some(cp) => {
+                if cks == *cp {
+                    self.criterion += 1;
                 } else {
-                    *last_view = view;
-                    *count = 0;
+                    *cp = cks;
+                    // reset the criterion
+                    self.criterion = 0;
+                    return false;
                 }
-            } else {
-                self.checkpoints.insert(node.clone(), (view, 0));
+            }
+            None => {
+                self.checkpoints = Some(cks);
+                return false;
             }
         }
 
-        false
+        self.criterion >= self.threshold
     }
 }
 
@@ -50,8 +55,9 @@ mod test {
     #[test]
     fn rebase_threshold() {
         let mut stalled = StalledViewWard {
-            checkpoints: HashMap::new(),
-            criterion: 2,
+            checkpoints: None,
+            criterion: 0,
+            threshold: 2,
         };
         let state = SimulationState {
             nodes: Arc::new(RwLock::new(vec![10])),
@@ -61,7 +67,16 @@ mod test {
         assert!(!stalled.analyze(&state));
         // increase the criterion, 2
         assert!(!stalled.analyze(&state));
-        // increase the criterion, 3
+        // increase the criterion, 3 > threshold 2, so true
+        assert!(stalled.analyze(&state));
+
+        // push a new one, so the criterion is reset to 0
+        state.nodes.write().unwrap().push(20);
+        assert!(!stalled.analyze(&state));
+
+        // increase the criterion, 2
+        assert!(!stalled.analyze(&state));
+        // increase the criterion, 3 > threshold 2, so true
         assert!(stalled.analyze(&state));
     }
 }
