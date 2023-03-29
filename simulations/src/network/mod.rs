@@ -61,19 +61,27 @@ where
         from_network_receiver
     }
 
+    /// Collects and dispatches messages from connected interfaces.
     pub fn step<R: Rng>(&mut self, rng: &mut R, time_passed: Duration) {
-        self.network_time += time_passed;
+        self.collect_messages();
+        self.dispatch_after(rng, time_passed);
+    }
 
-        // Receive and store all messages from nodes.
+    /// Receive and store all messages from nodes.
+    pub fn collect_messages(&mut self) {
         self.from_node_receivers.iter().for_each(|(_, from_node)| {
             while let Ok(message) = from_node.try_recv() {
                 self.messages.push((self.network_time, message));
             }
         });
+    }
 
-        // Reiterate all messages and send to appropriate nodes if simulated
-        // delay has passed.
-        if let Some((network_time, message)) = self.messages.pop() {
+    /// Reiterate all messages and send to appropriate nodes if simulated
+    /// delay has passed.
+    pub fn dispatch_after<R: Rng>(&mut self, rng: &mut R, time_passed: Duration) {
+        self.network_time += time_passed;
+        let mut delayed = vec![];
+        while let Some((network_time, message)) = self.messages.pop() {
             // TODO: Handle message drops (remove unwrap).
             let delay = self
                 .send_message_cost(rng, message.from, message.to)
@@ -82,9 +90,10 @@ where
                 let to_node = self.to_node_senders.get(&message.to).unwrap();
                 to_node.send(message).expect("Node should have connection");
             } else {
-                self.messages.push((network_time, message));
+                delayed.push((network_time, message));
             }
         }
+        self.messages = delayed;
     }
 }
 
@@ -184,8 +193,11 @@ mod tests {
         let b = MockNetworkInterface::new(node_b, from_b_sender, to_b_receiver);
 
         a.send_message(node_b, ());
+        network.collect_messages();
 
-        // Currently messages are received during the network step.
+        assert_eq!(a.receive_messages().len(), 0);
+        assert_eq!(b.receive_messages().len(), 0);
+
         network.step(&mut rng, Duration::from_millis(0));
         assert_eq!(a.receive_messages().len(), 0);
         assert_eq!(b.receive_messages().len(), 0);
@@ -197,5 +209,86 @@ mod tests {
         network.step(&mut rng, Duration::from_millis(100));
         assert_eq!(a.receive_messages().len(), 0);
         assert_eq!(b.receive_messages().len(), 0);
+
+        b.send_message(node_a, ());
+        b.send_message(node_a, ());
+        b.send_message(node_a, ());
+        network.collect_messages();
+
+        network.dispatch_after(&mut rng, Duration::from_millis(100));
+        assert_eq!(a.receive_messages().len(), 3);
+        assert_eq!(b.receive_messages().len(), 0);
+    }
+
+    #[test]
+    fn regions_send_receive_messages() {
+        let mut rng = StepRng::new(1, 0);
+        let node_a = 0.into();
+        let node_b = 1.into();
+        let node_c = 2.into();
+
+        let regions = HashMap::from([
+            (Region::Asia, vec![node_a, node_b]),
+            (Region::Europe, vec![node_c]),
+        ]);
+        let behaviour = HashMap::from([
+            (
+                (Region::Asia, Region::Asia),
+                NetworkBehaviour::new(Duration::from_millis(100), 0.0),
+            ),
+            (
+                (Region::Asia, Region::Europe),
+                NetworkBehaviour::new(Duration::from_millis(500), 0.0),
+            ),
+            (
+                (Region::Europe, Region::Europe),
+                NetworkBehaviour::new(Duration::from_millis(100), 0.0),
+            ),
+        ]);
+        let regions_data = RegionsData::new(regions, behaviour);
+        let mut network = Network::new(regions_data);
+
+        let (from_a_sender, from_a_receiver) = mpsc::channel();
+        let to_a_receiver = network.connect(node_a, from_a_receiver);
+        let a = MockNetworkInterface::new(node_a, from_a_sender, to_a_receiver);
+
+        let (from_b_sender, from_b_receiver) = mpsc::channel();
+        let to_b_receiver = network.connect(node_b, from_b_receiver);
+        let b = MockNetworkInterface::new(node_b, from_b_sender, to_b_receiver);
+
+        let (from_c_sender, from_c_receiver) = mpsc::channel();
+        let to_c_receiver = network.connect(node_c, from_c_receiver);
+        let c = MockNetworkInterface::new(node_c, from_c_sender, to_c_receiver);
+
+        a.send_message(node_b, ());
+        a.send_message(node_c, ());
+        network.collect_messages();
+
+        b.send_message(node_a, ());
+        b.send_message(node_c, ());
+        network.collect_messages();
+
+        c.send_message(node_a, ());
+        c.send_message(node_b, ());
+        network.collect_messages();
+
+        network.dispatch_after(&mut rng, Duration::from_millis(100));
+        assert_eq!(a.receive_messages().len(), 1);
+        assert_eq!(b.receive_messages().len(), 1);
+        assert_eq!(c.receive_messages().len(), 0);
+
+        a.send_message(node_b, ());
+        b.send_message(node_c, ());
+        network.collect_messages();
+
+        network.dispatch_after(&mut rng, Duration::from_millis(400));
+        assert_eq!(a.receive_messages().len(), 1); // c to a
+        assert_eq!(b.receive_messages().len(), 2); // c to a && a to b
+        assert_eq!(c.receive_messages().len(), 2); // a to c && b to c
+
+        network.dispatch_after(&mut rng, Duration::from_millis(100));
+        assert_eq!(a.receive_messages().len(), 0);
+        assert_eq!(b.receive_messages().len(), 0);
+        assert_eq!(c.receive_messages().len(), 1); // b to c
     }
 }
