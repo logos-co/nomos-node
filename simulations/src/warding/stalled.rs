@@ -6,7 +6,7 @@ use serde::Deserialize;
 #[derive(Debug, Deserialize, Clone)]
 pub struct StalledViewWard {
     // the hash checksum
-    checkpoints: Option<u32>,
+    consecutive_viewed_checkpoint: Option<u32>,
     // use to check if the node is stalled
     criterion: usize,
     threshold: usize,
@@ -19,14 +19,8 @@ impl<N: Node> SimulationWard<N> for StalledViewWard {
             .nodes
             .read()
             .expect("simulations: StalledViewWard panic when requiring a read lock");
-        let mut hash = crc32fast::Hasher::new();
-        for node in nodes.iter() {
-            hash.update(&node.current_view().to_be_bytes());
-            // TODO: hash messages in the node
-        }
-
-        let cks = hash.finalize();
-        match &mut self.checkpoints {
+        let cks = checksum(nodes.as_slice());
+        match &mut self.consecutive_viewed_checkpoint {
             Some(cp) => {
                 if cks == *cp {
                     self.criterion += 1;
@@ -34,17 +28,27 @@ impl<N: Node> SimulationWard<N> for StalledViewWard {
                     *cp = cks;
                     // reset the criterion
                     self.criterion = 0;
-                    return false;
                 }
             }
             None => {
-                self.checkpoints = Some(cks);
+                self.consecutive_viewed_checkpoint = Some(cks);
                 return false;
             }
         }
 
         self.criterion >= self.threshold
     }
+}
+
+#[inline]
+fn checksum<N: Node>(nodes: &[N]) -> u32 {
+    let mut hash = crc32fast::Hasher::new();
+    for node in nodes.iter() {
+        hash.update(&node.current_view().to_be_bytes());
+        // TODO: hash messages in the node
+    }
+
+    hash.finalize()
 }
 
 #[cfg(test)]
