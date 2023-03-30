@@ -59,7 +59,7 @@ mod test {
     #[test]
     fn rebase_threshold() {
         let mut stalled = StalledViewWard {
-            checkpoints: None,
+            consecutive_viewed_checkpoint: None,
             criterion: 0,
             threshold: 2,
         };
