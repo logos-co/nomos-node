@@ -2,10 +2,10 @@
 use std::{
     collections::HashMap,
     ops::Add,
-    sync::mpsc::{self, Receiver, Sender},
     time::{Duration, Instant},
 };
 // crates
+use crossbeam::channel::{self, Receiver, Sender};
 use rand::Rng;
 // internal
 use crate::node::NodeId;
@@ -54,14 +54,14 @@ where
         node_id: NodeId,
         node_message_receiver: Receiver<NetworkMessage<M>>,
     ) -> Receiver<NetworkMessage<M>> {
-        let (to_node_sender, from_network_receiver) = mpsc::channel();
+        let (to_node_sender, from_network_receiver) = channel::unbounded();
         self.from_node_receivers
             .insert(node_id, node_message_receiver);
         self.to_node_senders.insert(node_id, to_node_sender);
         from_network_receiver
     }
 
-    /// Collects and dispatches messages from connected interfaces.
+    /// Collects and dispatches messages to connected interfaces.
     pub fn step<R: Rng>(&mut self, rng: &mut R, time_passed: Duration) {
         self.collect_messages();
         self.dispatch_after(rng, time_passed);
@@ -119,19 +119,15 @@ pub trait NetworkInterface {
 
 #[cfg(test)]
 mod tests {
-    use rand::rngs::mock::StepRng;
-
     use super::{
         behaviour::NetworkBehaviour,
         regions::{Region, RegionsData},
         Network, NetworkInterface, NetworkMessage,
     };
     use crate::node::NodeId;
-    use std::{
-        collections::HashMap,
-        sync::mpsc::{self, Receiver, Sender},
-        time::Duration,
-    };
+    use crossbeam::channel::{self, Receiver, Sender};
+    use rand::rngs::mock::StepRng;
+    use std::{collections::HashMap, time::Duration};
 
     struct MockNetworkInterface {
         id: NodeId,
@@ -184,11 +180,11 @@ mod tests {
         let regions_data = RegionsData::new(regions, behaviour);
         let mut network = Network::new(regions_data);
 
-        let (from_a_sender, from_a_receiver) = mpsc::channel();
+        let (from_a_sender, from_a_receiver) = channel::unbounded();
         let to_a_receiver = network.connect(node_a, from_a_receiver);
         let a = MockNetworkInterface::new(node_a, from_a_sender, to_a_receiver);
 
-        let (from_b_sender, from_b_receiver) = mpsc::channel();
+        let (from_b_sender, from_b_receiver) = channel::unbounded();
         let to_b_receiver = network.connect(node_b, from_b_receiver);
         let b = MockNetworkInterface::new(node_b, from_b_sender, to_b_receiver);
 
@@ -248,15 +244,15 @@ mod tests {
         let regions_data = RegionsData::new(regions, behaviour);
         let mut network = Network::new(regions_data);
 
-        let (from_a_sender, from_a_receiver) = mpsc::channel();
+        let (from_a_sender, from_a_receiver) = channel::unbounded();
         let to_a_receiver = network.connect(node_a, from_a_receiver);
         let a = MockNetworkInterface::new(node_a, from_a_sender, to_a_receiver);
 
-        let (from_b_sender, from_b_receiver) = mpsc::channel();
+        let (from_b_sender, from_b_receiver) = channel::unbounded();
         let to_b_receiver = network.connect(node_b, from_b_receiver);
         let b = MockNetworkInterface::new(node_b, from_b_sender, to_b_receiver);
 
-        let (from_c_sender, from_c_receiver) = mpsc::channel();
+        let (from_c_sender, from_c_receiver) = channel::unbounded();
         let to_c_receiver = network.connect(node_c, from_c_receiver);
         let c = MockNetworkInterface::new(node_c, from_c_sender, to_c_receiver);
 
@@ -283,7 +279,7 @@ mod tests {
 
         network.dispatch_after(&mut rng, Duration::from_millis(400));
         assert_eq!(a.receive_messages().len(), 1); // c to a
-        assert_eq!(b.receive_messages().len(), 2); // c to a && a to b
+        assert_eq!(b.receive_messages().len(), 2); // c to b && a to b
         assert_eq!(c.receive_messages().len(), 2); // a to c && b to c
 
         network.dispatch_after(&mut rng, Duration::from_millis(100));

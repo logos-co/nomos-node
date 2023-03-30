@@ -32,12 +32,12 @@ pub fn simulate<N: Node, O: Overlay>(
 
 #[cfg(test)]
 mod tests {
-    use std::sync::{mpsc, Arc, RwLock};
-
-    use rand::rngs::mock::StepRng;
-
     use crate::{
-        network::Network,
+        network::{
+            behaviour::NetworkBehaviour,
+            regions::{Region, RegionsData},
+            Network,
+        },
         node::{
             dummy::{DummyMessage, DummyNetworkInterface, DummyNode, DummySettings},
             NetworkState, Node, NodeId, SharedState,
@@ -49,9 +49,22 @@ mod tests {
         runner::SimulationRunner,
         settings::SimulationSettings,
     };
+    use crossbeam::channel;
+    use rand::rngs::mock::StepRng;
+    use std::{
+        collections::HashMap,
+        sync::{Arc, RwLock},
+        time::Duration,
+    };
 
-    fn init_network() -> Network<DummyMessage> {
-        todo!()
+    fn init_network(node_ids: &[NodeId]) -> Network<DummyMessage> {
+        let regions = HashMap::from([(Region::Europe, node_ids.to_vec())]);
+        let behaviour = HashMap::from([(
+            (Region::Europe, Region::Europe),
+            NetworkBehaviour::new(Duration::from_millis(100), 0.0),
+        )]);
+        let regions_data = RegionsData::new(regions, behaviour);
+        Network::new(regions_data)
     }
 
     fn init_dummy_nodes(
@@ -62,7 +75,7 @@ mod tests {
         node_ids
             .iter()
             .map(|node_id| {
-                let (node_message_sender, node_message_receiver) = mpsc::channel();
+                let (node_message_sender, node_message_receiver) = channel::unbounded();
                 let network_message_receiver = network.connect(*node_id, node_message_receiver);
                 let network_interface = DummyNetworkInterface::new(
                     *node_id,
@@ -85,7 +98,7 @@ mod tests {
         let mut rng = StepRng::new(1, 0);
         let node_ids: Vec<NodeId> = (0..settings.node_count).map(Into::into).collect();
         let overlay = TreeOverlay::new(settings.overlay_settings.clone());
-        let mut network = init_network();
+        let mut network = init_network(&node_ids);
         let network_state = Arc::new(RwLock::new(NetworkState {
             layout: overlay.layout(&node_ids, &mut rng),
         }));

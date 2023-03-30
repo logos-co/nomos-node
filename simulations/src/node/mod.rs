@@ -8,11 +8,9 @@ use std::{
     time::Duration,
 };
 // crates
-use rand::Rng;
 use serde::{Deserialize, Serialize};
-
-use crate::{network::NetworkInterface, overlay::Layout};
 // internal
+use crate::overlay::Layout;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(transparent)]

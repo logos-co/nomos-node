@@ -1,6 +1,6 @@
 // std
-use std::sync::mpsc::{Receiver, Sender};
 // crates
+use crossbeam::channel::{Receiver, Sender};
 use serde::Deserialize;
 // internal
 use crate::{
@@ -20,8 +20,8 @@ pub struct DummySettings {}
 
 #[derive(Clone)]
 pub enum DummyMessage {
-    SendTo(NodeId),
-    MyView(usize),
+    EventOne(usize),
+    EventTwo(usize),
 }
 
 pub struct DummyNode {
@@ -70,37 +70,46 @@ impl Node for DummyNode {
 
         for message in incoming_messages {
             match message.payload {
-                DummyMessage::SendTo(_) => todo!(),
-                DummyMessage::MyView(_) => todo!(),
+                DummyMessage::EventOne(_) => todo!(),
+                DummyMessage::EventTwo(_) => todo!(),
             }
         }
     }
 }
 
-pub struct DummyNetworkInterface {}
+pub struct DummyNetworkInterface {
+    id: NodeId,
+    sender: Sender<NetworkMessage<DummyMessage>>,
+    receiver: Receiver<NetworkMessage<DummyMessage>>,
+}
 
 impl DummyNetworkInterface {
     pub fn new(
-        _local_addr: NodeId,
-        _sender: Sender<NetworkMessage<DummyMessage>>,
-        _receiver: Receiver<NetworkMessage<DummyMessage>>,
+        id: NodeId,
+        sender: Sender<NetworkMessage<DummyMessage>>,
+        receiver: Receiver<NetworkMessage<DummyMessage>>,
     ) -> Self {
-        todo!()
-    }
-
-    pub fn get_outgoing_channel() -> Receiver<DummyMessage> {
-        todo!()
+        Self {
+            id,
+            sender,
+            receiver,
+        }
     }
 }
 
 impl NetworkInterface for DummyNetworkInterface {
     type Payload = DummyMessage;
 
-    fn send_message(&self, _address: NodeId, _message: Self::Payload) {
-        todo!()
+    fn send_message(&self, address: NodeId, message: Self::Payload) {
+        let message = NetworkMessage::new(self.id, address, message);
+        self.sender.send(message).unwrap();
     }
 
     fn receive_messages(&self) -> Vec<crate::network::NetworkMessage<Self::Payload>> {
-        todo!()
+        let mut messages = vec![];
+        while let Ok(message) = self.receiver.try_recv() {
+            messages.push(message);
+        }
+        messages
     }
 }

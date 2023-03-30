@@ -1,13 +1,8 @@
 // std
 // crates
-use rand::Rng;
 use serde::Deserialize;
 // internal
-use super::{NetworkState, SharedState};
-use crate::{
-    network::NetworkInterface,
-    node::{Node, NodeId},
-};
+use super::{Node, NodeId};
 
 #[derive(Default)]
 pub struct CarnotState {}
