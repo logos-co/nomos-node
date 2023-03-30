@@ -6,6 +6,7 @@ use serde::Deserialize;
 use crate::node::Node;
 
 mod minmax;
+mod stalled;
 mod ttf;
 
 pub struct SimulationState<N> {
