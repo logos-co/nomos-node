@@ -6,10 +6,11 @@ use crate::warding::SimulationState;
 use std::sync::Arc;
 
 /// Simulate with option of dumping the network state as a `::polars::Series`
-pub fn simulate<N: Node, O: Overlay>(
-    runner: &mut SimulationRunner<N, O>,
+pub fn simulate<M, N: Node, O: Overlay>(
+    runner: &mut SimulationRunner<M, N, O>,
     mut out_data: Option<&mut Vec<OutData>>,
 ) where
+    M: Clone,
     N: Send + Sync,
     N::Settings: Clone,
     O::Settings: Clone,
@@ -104,8 +105,8 @@ mod tests {
         }));
         let nodes = init_dummy_nodes(&node_ids, &mut network, network_state);
 
-        let mut runner: SimulationRunner<DummyNode, TreeOverlay> =
-            SimulationRunner::new(nodes, settings);
+        let mut runner: SimulationRunner<DummyMessage, DummyNode, TreeOverlay> =
+            SimulationRunner::new(network, nodes, settings);
         runner.step();
         let nodes = runner.nodes.read().unwrap();
 
