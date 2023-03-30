@@ -158,11 +158,7 @@ mod tests {
         }
 
         fn receive_messages(&self) -> Vec<crate::network::NetworkMessage<Self::Payload>> {
-            let mut messages = vec![];
-            while let Ok(message) = self.receiver.try_recv() {
-                messages.push(message);
-            }
-            messages
+            self.receiver.try_iter().collect()
         }
     }
 
