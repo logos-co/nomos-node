@@ -12,14 +12,8 @@ pub struct StalledViewWard {
     threshold: usize,
 }
 
-impl<N: Node> SimulationWard<N> for StalledViewWard {
-    type SimulationState = SimulationState<N>;
-    fn analyze(&mut self, state: &Self::SimulationState) -> bool {
-        let nodes = state
-            .nodes
-            .read()
-            .expect("simulations: StalledViewWard panic when requiring a read lock");
-        let cks = checksum(nodes.as_slice());
+impl StalledViewWard {
+    fn update_state(&mut self, cks: u32) {
         match &mut self.consecutive_viewed_checkpoint {
             Some(cp) => {
                 if cks == *cp {
@@ -32,10 +26,19 @@ impl<N: Node> SimulationWard<N> for StalledViewWard {
             }
             None => {
                 self.consecutive_viewed_checkpoint = Some(cks);
-                return false;
             }
         }
+    }
+}
 
+impl<N: Node> SimulationWard<N> for StalledViewWard {
+    type SimulationState = SimulationState<N>;
+    fn analyze(&mut self, state: &Self::SimulationState) -> bool {
+        let nodes = state
+            .nodes
+            .read()
+            .expect("simulations: StalledViewWard panic when requiring a read lock");
+        self.update_state(checksum(nodes.as_slice()));
         self.criterion >= self.threshold
     }
 }
