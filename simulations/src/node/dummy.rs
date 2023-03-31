@@ -32,7 +32,7 @@ pub enum DummyMessage {
 pub struct DummyNode {
     node_id: NodeId,
     state: DummyState,
-    settings: DummySettings,
+    _settings: DummySettings,
     overlay_state: SharedState<OverlayState>,
     network_interface: DummyNetworkInterface,
 }
@@ -55,7 +55,7 @@ impl DummyNode {
         Self {
             node_id,
             state: Default::default(),
-            settings: Default::default(),
+            _settings: Default::default(),
             overlay_state,
             network_interface,
         }
@@ -65,12 +65,38 @@ impl DummyNode {
         self.network_interface.send_message(address, message);
     }
 
-    fn on_vote(&mut self, vote: usize) {}
+    fn on_vote(
+        &mut self,
+        vote: usize,
+        roles: &[DummyRole],
+        parents: &Option<BTreeSet<NodeId>>,
+        children: &Option<BTreeSet<NodeId>>,
+    ) {
+        // Leader - increment the view if valid.
+        if roles.contains(&DummyRole::Leader) {}
+        // Root and intermediary - check with peers, send vote to parent.
+        if roles.contains(&DummyRole::Root) || roles.contains(&DummyRole::Internal) {}
+        // Leaf - ignore.
+    }
 
-    fn on_proposal(&mut self, proposal: usize) {}
+    fn on_proposal(
+        &mut self,
+        proposal: usize,
+        roles: &[DummyRole],
+        parents: &Option<BTreeSet<NodeId>>,
+        children: &Option<BTreeSet<NodeId>>,
+    ) {
+        // Leader - ignore.
+        // Root and intermediary - check with peers, send vote to parent.
+        if roles.contains(&DummyRole::Root) || roles.contains(&DummyRole::Internal) {}
+        // Root or intermediary - pass to children.
+        // Leaf - send vote to parents.
+    }
 
-    fn on_new_view(&mut self, view: usize) {
-        self.state.current_view = view;
+    fn on_new_view(&mut self, view: usize, roles: &[DummyRole]) {
+        if roles.len() > 1 || !roles.contains(&DummyRole::Leader) {
+            self.state.current_view = view;
+        }
     }
 }
 
@@ -92,13 +118,22 @@ impl Node for DummyNode {
 
     fn step(&mut self) {
         let incoming_messages = self.network_interface.receive_messages();
+        let current_view = self.current_view();
+        let (leaders, layout) = {
+            let state = self.overlay_state.read().unwrap();
+            let view = &state.views[&current_view];
+            (view.leaders.clone(), view.layout.clone())
+        };
+        let parents = get_parent_nodes(self.node_id, &layout);
+        let children = get_child_nodes(self.node_id, &layout);
+        let roles = get_roles(self.node_id, &leaders, &parents, &children);
 
         for message in incoming_messages {
             self.state.message_count += 1;
             match message.payload {
-                DummyMessage::Vote(v) => self.on_vote(v),
-                DummyMessage::Proposal(p) => self.on_proposal(p),
-                DummyMessage::NewView(v) => self.on_new_view(v),
+                DummyMessage::Vote(v) => self.on_vote(v, &roles, &parents, &children),
+                DummyMessage::Proposal(p) => self.on_proposal(p, &roles, &parents, &children),
+                DummyMessage::NewView(v) => self.on_new_view(v, &roles),
             }
         }
     }
