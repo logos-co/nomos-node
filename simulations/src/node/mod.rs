@@ -3,6 +3,7 @@ pub mod dummy;
 
 // std
 use std::{
+    collections::BTreeMap,
     ops::{Deref, DerefMut},
     sync::{Arc, RwLock},
     time::Duration,
@@ -116,9 +117,15 @@ impl core::iter::Sum<StepTime> for Duration {
     }
 }
 
+#[derive(Clone, Debug)]
+pub struct View {
+    pub leaders: Vec<NodeId>,
+    pub layout: Layout,
+}
+
 /// A state that represents how nodes are interconnected in the network.
 pub struct OverlayState {
-    pub layout: Layout,
+    pub views: BTreeMap<usize, View>,
 }
 
 pub type SharedState<S> = Arc<RwLock<S>>;

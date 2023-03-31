@@ -28,22 +28,22 @@ pub enum DummyMessage {
 pub struct DummyNode {
     node_id: NodeId,
     state: DummyState,
-    _settings: DummySettings,
-    _network_state: SharedState<OverlayState>,
+    settings: DummySettings,
+    overlay_state: SharedState<OverlayState>,
     network_interface: DummyNetworkInterface,
 }
 
 impl DummyNode {
     pub fn new(
         node_id: NodeId,
-        _network_state: SharedState<OverlayState>,
+        overlay_state: SharedState<OverlayState>,
         network_interface: DummyNetworkInterface,
     ) -> Self {
         Self {
             node_id,
             state: Default::default(),
-            _settings: DummySettings {},
-            _network_state,
+            settings: Default::default(),
+            overlay_state,
             network_interface,
         }
     }
@@ -117,8 +117,38 @@ impl NetworkInterface for DummyNetworkInterface {
 
 #[cfg(test)]
 mod tests {
+    use std::{
+        collections::BTreeMap,
+        sync::{Arc, RwLock},
+    };
+
+    use rand::rngs::mock::StepRng;
+
+    use crate::{
+        node::{NodeId, OverlayState, View},
+        overlay::{
+            tree::{TreeOverlay, TreeSettings},
+            Overlay,
+        },
+    };
+
     #[test]
-    fn get_overlay() {
-        //
+    fn get_tree_overlay() {
+        let mut rng = StepRng::new(1, 0);
+        let node_ids: Vec<NodeId> = (0..10).map(Into::into).collect();
+
+        let overlay = TreeOverlay::new(TreeSettings {
+            tree_type: Default::default(),
+            depth: 3,
+            committee_size: 1,
+        });
+        let view = View {
+            //leaders: overlay.leaders(&node_ids, 3, &mut rng).collect(),
+            leaders: vec![0.into(), 1.into(), 2.into()],
+            layout: overlay.layout(&node_ids, &mut rng),
+        };
+        let overlay_state = Arc::new(RwLock::new(OverlayState {
+            views: BTreeMap::from([(1, view.clone())]),
+        }));
     }
 }

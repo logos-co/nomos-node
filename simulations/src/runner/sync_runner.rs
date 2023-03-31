@@ -46,7 +46,7 @@ mod tests {
         },
         node::{
             dummy::{DummyMessage, DummyNetworkInterface, DummyNode, DummySettings},
-            Node, NodeId, OverlayState, SharedState,
+            Node, NodeId, OverlayState, SharedState, View,
         },
         overlay::{
             tree::{TreeOverlay, TreeSettings},
@@ -58,7 +58,7 @@ mod tests {
     use crossbeam::channel;
     use rand::rngs::mock::StepRng;
     use std::{
-        collections::HashMap,
+        collections::{BTreeMap, HashMap},
         sync::{Arc, RwLock},
         time::Duration,
     };
@@ -76,7 +76,7 @@ mod tests {
     fn init_dummy_nodes(
         node_ids: &[NodeId],
         network: &mut Network<DummyMessage>,
-        network_state: SharedState<OverlayState>,
+        overlay_state: SharedState<OverlayState>,
     ) -> Vec<DummyNode> {
         node_ids
             .iter()
@@ -88,7 +88,7 @@ mod tests {
                     node_message_sender,
                     network_message_receiver,
                 );
-                DummyNode::new(*node_id, network_state.clone(), network_interface)
+                DummyNode::new(*node_id, overlay_state.clone(), network_interface)
             })
             .collect()
     }
@@ -105,10 +105,14 @@ mod tests {
         let node_ids: Vec<NodeId> = (0..settings.node_count).map(Into::into).collect();
         let overlay = TreeOverlay::new(settings.overlay_settings.clone());
         let mut network = init_network(&node_ids);
-        let network_state = Arc::new(RwLock::new(OverlayState {
+        let view = View {
+            leaders: overlay.leaders(&node_ids, 1, &mut rng).collect(),
             layout: overlay.layout(&node_ids, &mut rng),
+        };
+        let overlay_state = Arc::new(RwLock::new(OverlayState {
+            views: BTreeMap::from([(1, view)]),
         }));
-        let nodes = init_dummy_nodes(&node_ids, &mut network, network_state);
+        let nodes = init_dummy_nodes(&node_ids, &mut network, overlay_state);
 
         let mut runner: SimulationRunner<DummyMessage, DummyNode, TreeOverlay> =
             SimulationRunner::new(network, nodes, settings);
@@ -132,10 +136,14 @@ mod tests {
         let node_ids: Vec<NodeId> = (0..settings.node_count).map(Into::into).collect();
         let overlay = TreeOverlay::new(settings.overlay_settings.clone());
         let mut network = init_network(&node_ids);
-        let network_state = Arc::new(RwLock::new(OverlayState {
+        let view = View {
+            leaders: overlay.leaders(&node_ids, 1, &mut rng).collect(),
             layout: overlay.layout(&node_ids, &mut rng),
+        };
+        let overlay_state = Arc::new(RwLock::new(OverlayState {
+            views: BTreeMap::from([(1, view)]),
         }));
-        let nodes = init_dummy_nodes(&node_ids, &mut network, network_state);
+        let nodes = init_dummy_nodes(&node_ids, &mut network, overlay_state);
 
         for node in nodes.iter() {
             // All nodes send one message to NodeId(1).
