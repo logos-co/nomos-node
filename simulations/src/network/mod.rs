@@ -80,6 +80,7 @@ where
     /// delay has passed.
     pub fn dispatch_after<R: Rng>(&mut self, rng: &mut R, time_passed: Duration) {
         self.network_time += time_passed;
+
         let mut delayed = vec![];
         while let Some((network_time, message)) = self.messages.pop() {
             // TODO: Handle message drops (remove unwrap).

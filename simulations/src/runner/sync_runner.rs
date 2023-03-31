@@ -113,10 +113,44 @@ mod tests {
         let mut runner: SimulationRunner<DummyMessage, DummyNode, TreeOverlay> =
             SimulationRunner::new(network, nodes, settings);
         runner.step();
-        let nodes = runner.nodes.read().unwrap();
 
+        let nodes = runner.nodes.read().unwrap();
         for node in nodes.iter() {
             assert_eq!(node.current_view(), 1);
         }
+    }
+
+    #[test]
+    fn runner_send_receive() {
+        let settings: SimulationSettings<DummySettings, TreeSettings> = SimulationSettings {
+            node_count: 10,
+            committee_size: 1,
+            ..Default::default()
+        };
+
+        let mut rng = StepRng::new(1, 0);
+        let node_ids: Vec<NodeId> = (0..settings.node_count).map(Into::into).collect();
+        let overlay = TreeOverlay::new(settings.overlay_settings.clone());
+        let mut network = init_network(&node_ids);
+        let network_state = Arc::new(RwLock::new(NetworkState {
+            layout: overlay.layout(&node_ids, &mut rng),
+        }));
+        let nodes = init_dummy_nodes(&node_ids, &mut network, network_state);
+
+        for node in nodes.iter() {
+            // All nodes send one message to NodeId(1).
+            // Nodes can sent messages to themselves.
+            node.send_message(node_ids[1], DummyMessage::EventOne(42));
+        }
+        network.collect_messages();
+
+        let mut runner: SimulationRunner<DummyMessage, DummyNode, TreeOverlay> =
+            SimulationRunner::new(network, nodes, settings);
+
+        runner.step();
+
+        let nodes = runner.nodes.read().unwrap();
+        let state = nodes[1].state();
+        assert_eq!(state.event_one_count, 10);
     }
 }

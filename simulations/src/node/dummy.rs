@@ -13,6 +13,7 @@ use super::{NetworkState, SharedState};
 #[derive(Debug, Default, Serialize)]
 pub struct DummyState {
     pub current_view: usize,
+    pub event_one_count: usize,
 }
 
 #[derive(Clone, Default, Deserialize)]
@@ -40,11 +41,15 @@ impl DummyNode {
     ) -> Self {
         Self {
             node_id,
-            state: DummyState { current_view: 0 },
+            state: Default::default(),
             _settings: DummySettings {},
             _network_state,
             network_interface,
         }
+    }
+
+    pub fn send_message(&self, address: NodeId, message: DummyMessage) {
+        self.network_interface.send_message(address, message);
     }
 }
 
@@ -70,7 +75,7 @@ impl Node for DummyNode {
 
         for message in incoming_messages {
             match message.payload {
-                DummyMessage::EventOne(_) => todo!(),
+                DummyMessage::EventOne(_) => self.state.event_one_count += 1,
                 DummyMessage::EventTwo(_) => todo!(),
             }
         }
