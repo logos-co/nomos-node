@@ -148,7 +148,7 @@ mod tests {
         for node in nodes.iter() {
             // All nodes send one message to NodeId(1).
             // Nodes can send messages to themselves.
-            node.send_message(node_ids[1], DummyMessage::EventOne(42));
+            node.send_message(node_ids[1], DummyMessage::Proposal(42));
         }
         network.collect_messages();
 
@@ -159,6 +159,6 @@ mod tests {
 
         let nodes = runner.nodes.read().unwrap();
         let state = nodes[1].state();
-        assert_eq!(state.event_one_count, 10);
+        assert_eq!(state.message_count, 10);
     }
 }

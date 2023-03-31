@@ -1,6 +1,5 @@
-use std::collections::BTreeSet;
-
 // std
+use std::collections::BTreeSet;
 // crates
 use crossbeam::channel::{Receiver, Sender};
 use serde::{Deserialize, Serialize};
@@ -16,7 +15,7 @@ use super::{OverlayState, SharedState};
 #[derive(Debug, Default, Serialize)]
 pub struct DummyState {
     pub current_view: usize,
-    pub event_one_count: usize,
+    pub message_count: usize,
 }
 
 #[derive(Clone, Default, Deserialize)]
@@ -24,8 +23,10 @@ pub struct DummySettings {}
 
 #[derive(Clone)]
 pub enum DummyMessage {
-    EventOne(usize),
-    EventTwo(usize),
+    // TODO: change to possible carnot messages.
+    Vote(usize),
+    Proposal(usize),
+    NewView(usize),
 }
 
 pub struct DummyNode {
@@ -38,6 +39,7 @@ pub struct DummyNode {
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum DummyRole {
+    Leader,
     Root,
     Internal,
     Leaf,
@@ -62,6 +64,14 @@ impl DummyNode {
     pub fn send_message(&self, address: NodeId, message: DummyMessage) {
         self.network_interface.send_message(address, message);
     }
+
+    fn on_vote(&mut self, vote: usize) {}
+
+    fn on_proposal(&mut self, proposal: usize) {}
+
+    fn on_new_view(&mut self, view: usize) {
+        self.state.current_view = view;
+    }
 }
 
 impl Node for DummyNode {
@@ -82,12 +92,13 @@ impl Node for DummyNode {
 
     fn step(&mut self) {
         let incoming_messages = self.network_interface.receive_messages();
-        self.state.current_view += 1;
 
         for message in incoming_messages {
+            self.state.message_count += 1;
             match message.payload {
-                DummyMessage::EventOne(_) => self.state.event_one_count += 1,
-                DummyMessage::EventTwo(_) => todo!(),
+                DummyMessage::Vote(v) => self.on_vote(v),
+                DummyMessage::Proposal(p) => self.on_proposal(p),
+                DummyMessage::NewView(v) => self.on_new_view(v),
             }
         }
     }
@@ -145,15 +156,26 @@ fn get_child_nodes(node_id: NodeId, layout: &Layout) -> Option<BTreeSet<NodeId>>
 }
 
 fn get_roles(
+    node_id: NodeId,
+    leaders: &[NodeId],
     parents: &Option<BTreeSet<NodeId>>,
     children: &Option<BTreeSet<NodeId>>,
 ) -> Vec<DummyRole> {
-    match (parents, children) {
-        (None, Some(_)) => vec![DummyRole::Root],
-        (Some(_), Some(_)) => vec![DummyRole::Internal],
-        (Some(_), None) => vec![DummyRole::Leaf],
-        (None, None) => vec![DummyRole::Root, DummyRole::Leaf],
+    let mut roles = Vec::new();
+    if leaders.contains(&node_id) {
+        roles.push(DummyRole::Leader);
     }
+
+    match (parents, children) {
+        (None, Some(_)) => roles.push(DummyRole::Root),
+        (Some(_), Some(_)) => roles.push(DummyRole::Internal),
+        (Some(_), None) => roles.push(DummyRole::Leaf),
+        (None, None) => {
+            roles.push(DummyRole::Root);
+            roles.push(DummyRole::Leaf);
+        }
+    };
+    roles
 }
 
 #[cfg(test)]
@@ -216,7 +238,7 @@ mod tests {
     }
 
     #[test]
-    fn get_tree_overlay() {
+    fn send_receive_tree_overlay() {
         let mut rng = StepRng::new(1, 0);
         let overlay = TreeOverlay::new(TreeSettings {
             tree_type: Default::default(),
@@ -294,12 +316,14 @@ mod tests {
             committee_size: 1,
         });
         let node_ids: Vec<NodeId> = overlay.nodes();
+        let leaders = vec![];
         let layout = overlay.layout(&node_ids, &mut rng);
 
         for (node_id, expected_parents, expected_children, expected_roles) in test_cases {
-            let parents = get_parent_nodes(node_id.into(), &layout);
-            let children = get_child_nodes(node_id.into(), &layout);
-            let role = get_roles(&parents, &children);
+            let node_id = node_id.into();
+            let parents = get_parent_nodes(node_id, &layout);
+            let children = get_child_nodes(node_id, &layout);
+            let role = get_roles(node_id, &leaders, &parents, &children);
             assert_eq!(parents, expected_parents);
             assert_eq!(children, expected_children);
             assert_eq!(role, expected_roles);
