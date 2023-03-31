@@ -73,14 +73,19 @@ impl Layout {
             .map(|c| self.committees[&c].clone())
     }
 
-    pub fn children(&self, committee_id: CommitteeId) -> &[CommitteeId] {
-        &self.children[&committee_id]
+    pub fn children(&self, committee_id: CommitteeId) -> Option<&Vec<CommitteeId>> {
+        self.children.get(&committee_id)
     }
 
     pub fn children_nodes(&self, committee_id: CommitteeId) -> Vec<&Committee> {
         self.children(committee_id)
             .iter()
-            .map(|&committee_id| &self.committees[&committee_id])
+            .flat_map(|&committees| {
+                committees
+                    .iter()
+                    .map(|c| &self.committees[c])
+                    .collect::<Vec<&Committee>>()
+            })
             .collect()
     }
 
