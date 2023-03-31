@@ -7,8 +7,9 @@ use serde::Deserialize;
 use super::{Committee, Layout, Overlay};
 use crate::node::{CommitteeId, NodeId};
 
-#[derive(Clone, Deserialize)]
+#[derive(Clone, Default, Deserialize)]
 pub enum TreeType {
+    #[default]
     FullBinaryTree,
 }
 
@@ -17,6 +18,16 @@ pub struct TreeSettings {
     pub tree_type: TreeType,
     pub committee_size: usize,
     pub depth: usize,
+}
+
+impl Default for TreeSettings {
+    fn default() -> Self {
+        Self {
+            tree_type: TreeType::default(),
+            committee_size: 1,
+            depth: 1,
+        }
+    }
 }
 
 pub struct TreeOverlay {

@@ -15,7 +15,7 @@ pub enum Region {
     Australia,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RegionsData {
     pub regions: HashMap<Region, Vec<NodeId>>,
     #[serde(skip)]

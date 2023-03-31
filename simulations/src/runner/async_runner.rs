@@ -8,11 +8,12 @@ use rayon::prelude::*;
 use std::collections::HashSet;
 use std::sync::Arc;
 
-pub fn simulate<N: Node, O: Overlay>(
-    runner: &mut SimulationRunner<N, O>,
+pub fn simulate<M, N: Node, O: Overlay>(
+    runner: &mut SimulationRunner<M, N, O>,
     chunk_size: usize,
     mut out_data: Option<&mut Vec<OutData>>,
 ) where
+    M: Clone,
     N::Settings: Clone,
     N: Send + Sync,
     O::Settings: Clone,

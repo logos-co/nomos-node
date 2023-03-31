@@ -1,9 +1,8 @@
 // std
 // crates
-use rand::Rng;
 use serde::Deserialize;
 // internal
-use crate::node::{Node, NodeId};
+use super::{Node, NodeId};
 
 #[derive(Default)]
 pub struct CarnotState {}
@@ -21,14 +20,6 @@ pub struct CarnotNode {
 impl Node for CarnotNode {
     type Settings = CarnotSettings;
     type State = CarnotState;
-
-    fn new<R: Rng>(_rng: &mut R, id: NodeId, settings: Self::Settings) -> Self {
-        Self {
-            id,
-            state: Default::default(),
-            settings,
-        }
-    }
 
     fn id(&self) -> NodeId {
         self.id
