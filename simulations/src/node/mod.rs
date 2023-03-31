@@ -117,7 +117,7 @@ impl core::iter::Sum<StepTime> for Duration {
 }
 
 /// A state that represents how nodes are interconnected in the network.
-pub struct NetworkState {
+pub struct OverlayState {
     pub layout: Layout,
 }
 

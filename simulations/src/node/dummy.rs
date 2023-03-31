@@ -8,7 +8,7 @@ use crate::{
     node::{Node, NodeId},
 };
 
-use super::{NetworkState, SharedState};
+use super::{OverlayState, SharedState};
 
 #[derive(Debug, Default, Serialize)]
 pub struct DummyState {
@@ -29,14 +29,14 @@ pub struct DummyNode {
     node_id: NodeId,
     state: DummyState,
     _settings: DummySettings,
-    _network_state: SharedState<NetworkState>,
+    _network_state: SharedState<OverlayState>,
     network_interface: DummyNetworkInterface,
 }
 
 impl DummyNode {
     pub fn new(
         node_id: NodeId,
-        _network_state: SharedState<NetworkState>,
+        _network_state: SharedState<OverlayState>,
         network_interface: DummyNetworkInterface,
     ) -> Self {
         Self {
@@ -112,5 +112,13 @@ impl NetworkInterface for DummyNetworkInterface {
 
     fn receive_messages(&self) -> Vec<crate::network::NetworkMessage<Self::Payload>> {
         self.receiver.try_iter().collect()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn get_overlay() {
+        //
     }
 }

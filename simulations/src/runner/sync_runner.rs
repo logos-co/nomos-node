@@ -46,7 +46,7 @@ mod tests {
         },
         node::{
             dummy::{DummyMessage, DummyNetworkInterface, DummyNode, DummySettings},
-            NetworkState, Node, NodeId, SharedState,
+            Node, NodeId, OverlayState, SharedState,
         },
         overlay::{
             tree::{TreeOverlay, TreeSettings},
@@ -76,7 +76,7 @@ mod tests {
     fn init_dummy_nodes(
         node_ids: &[NodeId],
         network: &mut Network<DummyMessage>,
-        network_state: SharedState<NetworkState>,
+        network_state: SharedState<OverlayState>,
     ) -> Vec<DummyNode> {
         node_ids
             .iter()
@@ -105,7 +105,7 @@ mod tests {
         let node_ids: Vec<NodeId> = (0..settings.node_count).map(Into::into).collect();
         let overlay = TreeOverlay::new(settings.overlay_settings.clone());
         let mut network = init_network(&node_ids);
-        let network_state = Arc::new(RwLock::new(NetworkState {
+        let network_state = Arc::new(RwLock::new(OverlayState {
             layout: overlay.layout(&node_ids, &mut rng),
         }));
         let nodes = init_dummy_nodes(&node_ids, &mut network, network_state);
@@ -132,14 +132,14 @@ mod tests {
         let node_ids: Vec<NodeId> = (0..settings.node_count).map(Into::into).collect();
         let overlay = TreeOverlay::new(settings.overlay_settings.clone());
         let mut network = init_network(&node_ids);
-        let network_state = Arc::new(RwLock::new(NetworkState {
+        let network_state = Arc::new(RwLock::new(OverlayState {
             layout: overlay.layout(&node_ids, &mut rng),
         }));
         let nodes = init_dummy_nodes(&node_ids, &mut network, network_state);
 
         for node in nodes.iter() {
             // All nodes send one message to NodeId(1).
-            // Nodes can sent messages to themselves.
+            // Nodes can send messages to themselves.
             node.send_message(node_ids[1], DummyMessage::EventOne(42));
         }
         network.collect_messages();
