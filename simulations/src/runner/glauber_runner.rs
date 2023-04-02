@@ -3,7 +3,9 @@ use crate::output_processors::OutData;
 use crate::overlay::Overlay;
 use crate::runner::SimulationRunner;
 use crate::warding::SimulationState;
+use crate::BoxDynError;
 use rand::prelude::IteratorRandom;
+use serde::Serialize;
 use std::collections::BTreeSet;
 use std::sync::Arc;
 
@@ -13,10 +15,12 @@ pub fn simulate<M, N: Node, O: Overlay>(
     update_rate: usize,
     maximum_iterations: usize,
     mut out_data: Option<&mut Vec<OutData>>,
-) where
+) -> Result<(), BoxDynError>
+where
     M: Clone,
     N: Send + Sync,
     N::Settings: Clone,
+    N::State: Serialize,
     O::Settings: Clone,
 {
     let simulation_state = SimulationState {
@@ -53,6 +57,7 @@ pub fn simulate<M, N: Node, O: Overlay>(
                 break 'main;
             }
         }
-        runner.dump_state_to_out_data(&simulation_state, &mut out_data);
+        runner.dump_state_to_out_data(&simulation_state, &mut out_data)?;
     }
+    Ok(())
 }

@@ -35,6 +35,7 @@ use std::sync::Arc;
 use fixed_slice_deque::FixedSliceDeque;
 use rand::prelude::{IteratorRandom, SliceRandom};
 use rand::rngs::SmallRng;
+use serde::Serialize;
 // internal
 use crate::node::{Node, NodeId};
 use crate::output_processors::OutData;
@@ -47,10 +48,12 @@ pub fn simulate<M, N: Node, O: Overlay>(
     gap: usize,
     distribution: Option<Vec<f32>>,
     mut out_data: Option<&mut Vec<OutData>>,
-) where
+) -> Result<(), Box<dyn std::error::Error + Send + Sync + 'static>>
+where
     M: Clone,
     N: Send + Sync,
     N::Settings: Clone,
+    N::State: Serialize,
     O::Settings: Clone,
 {
     let distribution =
@@ -94,7 +97,7 @@ pub fn simulate<M, N: Node, O: Overlay>(
         // compute the most advanced nodes again
         if deque.first().unwrap().is_empty() {
             let _ = deque.push_back(BTreeSet::default());
-            runner.dump_state_to_out_data(&simulation_state, &mut out_data);
+            runner.dump_state_to_out_data(&simulation_state, &mut out_data)?;
         }
 
         // if no more nodes to compute
@@ -103,7 +106,8 @@ pub fn simulate<M, N: Node, O: Overlay>(
         }
     }
     // write latest state
-    runner.dump_state_to_out_data(&simulation_state, &mut out_data);
+    runner.dump_state_to_out_data(&simulation_state, &mut out_data)?;
+    Ok(())
 }
 
 fn choose_random_layer_and_node_id(

@@ -6,6 +6,7 @@ mod sync_runner;
 // std
 use std::marker::PhantomData;
 
+use crate::BoxDynError;
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
 // crates
@@ -13,6 +14,7 @@ use crate::network::Network;
 use rand::rngs::SmallRng;
 use rand::{RngCore, SeedableRng};
 use rayon::prelude::*;
+use serde::Serialize;
 // internal
 use crate::node::Node;
 use crate::output_processors::OutData;
@@ -39,6 +41,7 @@ where
     M: Clone,
     N: Send + Sync,
     N::Settings: Clone,
+    N::State: Serialize,
     O::Settings: Clone,
 {
     pub fn new(
@@ -64,35 +67,30 @@ where
         }
     }
 
-    pub fn simulate(&mut self, out_data: Option<&mut Vec<OutData>>) {
+    pub fn simulate(&mut self, out_data: Option<&mut Vec<OutData>>) -> Result<(), BoxDynError> {
         match self.settings.runner_settings.clone() {
-            RunnerSettings::Sync => {
-                sync_runner::simulate(self, out_data);
-            }
-            RunnerSettings::Async { chunks } => {
-                async_runner::simulate(self, chunks, out_data);
-            }
+            RunnerSettings::Sync => sync_runner::simulate(self, out_data),
+            RunnerSettings::Async { chunks } => async_runner::simulate(self, chunks, out_data),
             RunnerSettings::Glauber {
                 maximum_iterations,
                 update_rate,
-            } => {
-                glauber_runner::simulate(self, update_rate, maximum_iterations, out_data);
-            }
+            } => glauber_runner::simulate(self, update_rate, maximum_iterations, out_data),
             RunnerSettings::Layered {
                 rounds_gap,
                 distribution,
-            } => {
-                layered_runner::simulate(self, rounds_gap, distribution, out_data);
-            }
+            } => layered_runner::simulate(self, rounds_gap, distribution, out_data),
         }
     }
 
     fn dump_state_to_out_data(
         &self,
-        _simulation_state: &SimulationState<N>,
-        _out_data: &mut Option<&mut Vec<OutData>>,
-    ) {
-        todo!("What data do we want to expose?")
+        simulation_state: &SimulationState<N>,
+        out_data: &mut Option<&mut Vec<OutData>>,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync + 'static>> {
+        if let Some(out_data) = out_data {
+            out_data.push(simulation_state.state()?);
+        }
+        Ok(())
     }
 
     fn check_wards(&mut self, state: &SimulationState<N>) -> bool {
