@@ -88,7 +88,7 @@ where
         out_data: &mut Option<&mut Vec<OutData>>,
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync + 'static>> {
         if let Some(out_data) = out_data {
-            out_data.push(simulation_state.state()?);
+            out_data.push(OutData::try_from(simulation_state)?);
         }
         Ok(())
     }

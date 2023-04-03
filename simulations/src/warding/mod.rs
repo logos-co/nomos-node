@@ -22,23 +22,6 @@ impl<N> SimulationState<N> {
     }
 }
 
-impl<N> SimulationState<N>
-where
-    N: Node,
-    N::State: Serialize,
-{
-    pub fn state(&self) -> Result<OutData, serde_json::Error> {
-        serde_json::to_value(
-            self.nodes
-                .read()
-                .expect("simulations: SimulationState panic when requiring a read lock")
-                .iter()
-                .map(N::state)
-                .collect::<Vec<_>>(),
-        )
-        .map(OutData::new)
-    }
-}
 
 /// A ward is a computation over the `NetworkState`, it must return true if the state satisfies
 /// the warding conditions. It is used to stop the consensus simulation if such condition is reached.
@@ -54,7 +37,6 @@ pub trait SimulationWard<N> {
 pub enum Ward {
     MaxView(ttf::MaxViewWard),
     MinMaxView(minmax::MinMaxViewWard),
-    Stalled(stalled::StalledViewWard),
 }
 
 impl Ward {
@@ -64,7 +46,6 @@ impl Ward {
         match self {
             Ward::MaxView(ward) => ward,
             Ward::MinMaxView(ward) => ward,
-            Ward::Stalled(ward) => ward,
         }
     }
 }
