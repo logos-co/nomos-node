@@ -27,6 +27,7 @@ pub trait SimulationWard<N> {
 pub enum Ward {
     MaxView(ttf::MaxViewWard),
     MinMaxView(minmax::MinMaxViewWard),
+    StalledView(stalled::StalledViewWard),
 }
 
 impl Ward {
@@ -36,6 +37,7 @@ impl Ward {
         match self {
             Ward::MaxView(ward) => ward,
             Ward::MinMaxView(ward) => ward,
+            Ward::StalledView(ward) => ward,
         }
     }
 }
