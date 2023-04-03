@@ -21,7 +21,8 @@ where
 
     fn try_from(state: &crate::warding::SimulationState<N>) -> Result<Self, Self::Error> {
         serde_json::to_value(
-            state.nodes
+            state
+                .nodes
                 .read()
                 .expect("simulations: SimulationState panic when requiring a read lock")
                 .iter()

@@ -22,7 +22,6 @@ impl<N> SimulationState<N> {
     }
 }
 
-
 /// A ward is a computation over the `NetworkState`, it must return true if the state satisfies
 /// the warding conditions. It is used to stop the consensus simulation if such condition is reached.
 pub trait SimulationWard<N> {
