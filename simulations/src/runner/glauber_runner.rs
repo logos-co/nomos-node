@@ -54,9 +54,12 @@ where
 
             // check if any condition makes the simulation stop
             if runner.check_wards(&simulation_state) {
+                // we break the outer main loop, so we need to dump it before the breaking
+                runner.dump_state_to_out_data(&simulation_state, &mut out_data)?;
                 break 'main;
             }
         }
+        // update_rate iterations reached, so dump state
         runner.dump_state_to_out_data(&simulation_state, &mut out_data)?;
     }
     Ok(())

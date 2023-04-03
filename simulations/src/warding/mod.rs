@@ -1,9 +1,9 @@
 // std
 use std::sync::{Arc, RwLock};
 // crates
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 // internal
-use crate::{node::Node, output_processors::OutData};
+use crate::node::Node;
 
 mod minmax;
 mod stalled;
