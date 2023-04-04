@@ -13,6 +13,15 @@ pub struct SimulationState<N> {
     pub nodes: Arc<RwLock<Vec<N>>>,
 }
 
+impl<N> SimulationState<N> {
+    #[inline]
+    pub fn new(nodes: Vec<N>) -> Self {
+        Self {
+            nodes: Arc::new(RwLock::new(nodes)),
+        }
+    }
+}
+
 /// A ward is a computation over the `NetworkState`, it must return true if the state satisfies
 /// the warding conditions. It is used to stop the consensus simulation if such condition is reached.
 pub trait SimulationWard<N> {

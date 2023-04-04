@@ -1,10 +1,10 @@
 // std
 // crates
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 // internal
 use super::{Node, NodeId};
 
-#[derive(Default)]
+#[derive(Default, Serialize)]
 pub struct CarnotState {}
 
 #[derive(Clone, Deserialize)]

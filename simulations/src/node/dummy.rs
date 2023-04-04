@@ -1,7 +1,7 @@
 // std
 // crates
 use crossbeam::channel::{Receiver, Sender};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 // internal
 use crate::{
     network::{NetworkInterface, NetworkMessage},
@@ -10,7 +10,7 @@ use crate::{
 
 use super::{NetworkState, SharedState};
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Serialize)]
 pub struct DummyState {
     pub current_view: usize,
 }

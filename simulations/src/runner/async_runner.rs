@@ -5,6 +5,7 @@ use crate::runner::SimulationRunner;
 use crate::warding::SimulationState;
 use rand::prelude::SliceRandom;
 use rayon::prelude::*;
+use serde::Serialize;
 use std::collections::HashSet;
 use std::sync::Arc;
 
@@ -12,10 +13,12 @@ pub fn simulate<M, N: Node, O: Overlay>(
     runner: &mut SimulationRunner<M, N, O>,
     chunk_size: usize,
     mut out_data: Option<&mut Vec<OutData>>,
-) where
+) -> anyhow::Result<()>
+where
     M: Clone,
     N::Settings: Clone,
     N: Send + Sync,
+    N::State: Serialize,
     O::Settings: Clone,
 {
     let simulation_state = SimulationState::<N> {
@@ -30,7 +33,7 @@ pub fn simulate<M, N: Node, O: Overlay>(
         .map(N::id)
         .collect();
 
-    runner.dump_state_to_out_data(&simulation_state, &mut out_data);
+    runner.dump_state_to_out_data(&simulation_state, &mut out_data)?;
 
     loop {
         node_ids.shuffle(&mut runner.rng);
@@ -44,11 +47,12 @@ pub fn simulate<M, N: Node, O: Overlay>(
                 .filter(|n| ids.contains(&n.id()))
                 .for_each(N::step);
 
-            runner.dump_state_to_out_data(&simulation_state, &mut out_data);
+            runner.dump_state_to_out_data(&simulation_state, &mut out_data)?;
         }
         // check if any condition makes the simulation stop
         if runner.check_wards(&simulation_state) {
             break;
         }
     }
+    Ok(())
 }

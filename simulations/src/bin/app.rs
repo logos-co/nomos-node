@@ -1,6 +1,5 @@
-use std::collections::HashMap;
 // std
-use std::error::Error;
+use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use std::fs::File;
 use std::io::Cursor;
@@ -90,7 +89,7 @@ pub struct SimulationApp {
 }
 
 impl SimulationApp {
-    pub fn run(self) -> Result<(), Box<dyn Error>> {
+    pub fn run(self) -> anyhow::Result<()> {
         let Self {
             input_settings,
             output_file,
@@ -105,7 +104,7 @@ impl SimulationApp {
             SimulationRunner::new(network, nodes, simulation_settings);
         // build up series vector
         let mut out_data: Vec<OutData> = Vec::new();
-        simulation_runner.simulate(Some(&mut out_data));
+        simulation_runner.simulate(Some(&mut out_data))?;
         let mut dataframe: DataFrame = out_data_to_dataframe(out_data);
         dump_dataframe_to(output_format, &mut dataframe, &output_file)?;
         Ok(())
@@ -125,44 +124,37 @@ fn out_data_to_dataframe(out_data: Vec<OutData>) -> DataFrame {
 }
 
 /// Generically load a json file
-fn load_json_from_file<T: DeserializeOwned>(path: &Path) -> Result<T, Box<dyn Error>> {
+fn load_json_from_file<T: DeserializeOwned>(path: &Path) -> anyhow::Result<T> {
     let f = File::open(path).map_err(Box::new)?;
-    serde_json::from_reader(f).map_err(|e| Box::new(e) as Box<dyn Error>)
+    Ok(serde_json::from_reader(f)?)
 }
 
-fn dump_dataframe_to_json(data: &mut DataFrame, out_path: &Path) -> Result<(), Box<dyn Error>> {
+fn dump_dataframe_to_json(data: &mut DataFrame, out_path: &Path) -> anyhow::Result<()> {
     let out_path = out_path.with_extension("json");
     let f = File::create(out_path)?;
     let mut writer = polars::prelude::JsonWriter::new(f);
-    writer
-        .finish(data)
-        .map_err(|e| Box::new(e) as Box<dyn Error>)
+    Ok(writer.finish(data)?)
 }
 
-fn dump_dataframe_to_csv(data: &mut DataFrame, out_path: &Path) -> Result<(), Box<dyn Error>> {
+fn dump_dataframe_to_csv(data: &mut DataFrame, out_path: &Path) -> anyhow::Result<()> {
     let out_path = out_path.with_extension("csv");
     let f = File::create(out_path)?;
     let mut writer = polars::prelude::CsvWriter::new(f);
-    writer
-        .finish(data)
-        .map_err(|e| Box::new(e) as Box<dyn Error>)
+    Ok(writer.finish(data)?)
 }
 
-fn dump_dataframe_to_parquet(data: &mut DataFrame, out_path: &Path) -> Result<(), Box<dyn Error>> {
+fn dump_dataframe_to_parquet(data: &mut DataFrame, out_path: &Path) -> anyhow::Result<()> {
     let out_path = out_path.with_extension("parquet");
     let f = File::create(out_path)?;
     let writer = polars::prelude::ParquetWriter::new(f);
-    writer
-        .finish(data)
-        .map(|_| ())
-        .map_err(|e| Box::new(e) as Box<dyn Error>)
+    Ok(writer.finish(data).map(|_| ())?)
 }
 
 fn dump_dataframe_to(
     output_format: OutputFormat,
     data: &mut DataFrame,
     out_path: &Path,
-) -> Result<(), Box<dyn Error>> {
+) -> anyhow::Result<()> {
     match output_format {
         OutputFormat::Json => dump_dataframe_to_json(data, out_path),
         OutputFormat::Csv => dump_dataframe_to_csv(data, out_path),
@@ -170,7 +162,7 @@ fn dump_dataframe_to(
     }
 }
 
-fn main() -> Result<(), Box<dyn Error>> {
+fn main() -> anyhow::Result<()> {
     let app: SimulationApp = SimulationApp::parse();
     app.run()?;
     Ok(())

@@ -4,6 +4,7 @@ use crate::overlay::Overlay;
 use crate::runner::SimulationRunner;
 use crate::warding::SimulationState;
 use rand::prelude::IteratorRandom;
+use serde::Serialize;
 use std::collections::BTreeSet;
 use std::sync::Arc;
 
@@ -13,10 +14,12 @@ pub fn simulate<M, N: Node, O: Overlay>(
     update_rate: usize,
     maximum_iterations: usize,
     mut out_data: Option<&mut Vec<OutData>>,
-) where
+) -> anyhow::Result<()>
+where
     M: Clone,
     N: Send + Sync,
     N::Settings: Clone,
+    N::State: Serialize,
     O::Settings: Clone,
 {
     let simulation_state = SimulationState {
@@ -50,9 +53,13 @@ pub fn simulate<M, N: Node, O: Overlay>(
 
             // check if any condition makes the simulation stop
             if runner.check_wards(&simulation_state) {
+                // we break the outer main loop, so we need to dump it before the breaking
+                runner.dump_state_to_out_data(&simulation_state, &mut out_data)?;
                 break 'main;
             }
         }
-        runner.dump_state_to_out_data(&simulation_state, &mut out_data);
+        // update_rate iterations reached, so dump state
+        runner.dump_state_to_out_data(&simulation_state, &mut out_data)?;
     }
+    Ok(())
 }
