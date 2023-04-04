@@ -5,5 +5,3 @@ pub mod overlay;
 pub mod runner;
 pub mod settings;
 pub mod warding;
-
-pub type BoxDynError = Box<dyn std::error::Error + Send + Sync + 'static>;

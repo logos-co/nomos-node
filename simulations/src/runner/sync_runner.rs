@@ -5,14 +5,13 @@ use crate::node::Node;
 use crate::output_processors::OutData;
 use crate::overlay::Overlay;
 use crate::warding::SimulationState;
-use crate::BoxDynError;
 use std::sync::Arc;
 
 /// Simulate with option of dumping the network state as a `::polars::Series`
 pub fn simulate<M, N: Node, O: Overlay>(
     runner: &mut SimulationRunner<M, N, O>,
     mut out_data: Option<&mut Vec<OutData>>,
-) -> Result<(), BoxDynError>
+) -> anyhow::Result<()>
 where
     M: Clone,
     N: Send + Sync,

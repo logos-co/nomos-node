@@ -6,7 +6,6 @@ mod sync_runner;
 // std
 use std::marker::PhantomData;
 
-use crate::BoxDynError;
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
 // crates
@@ -67,7 +66,7 @@ where
         }
     }
 
-    pub fn simulate(&mut self, out_data: Option<&mut Vec<OutData>>) -> Result<(), BoxDynError> {
+    pub fn simulate(&mut self, out_data: Option<&mut Vec<OutData>>) -> anyhow::Result<()> {
         match self.settings.runner_settings.clone() {
             RunnerSettings::Sync => sync_runner::simulate(self, out_data),
             RunnerSettings::Async { chunks } => async_runner::simulate(self, chunks, out_data),
@@ -86,7 +85,7 @@ where
         &self,
         simulation_state: &SimulationState<N>,
         out_data: &mut Option<&mut Vec<OutData>>,
-    ) -> Result<(), Box<dyn std::error::Error + Send + Sync + 'static>> {
+    ) -> anyhow::Result<()> {
         if let Some(out_data) = out_data {
             out_data.push(OutData::try_from(simulation_state)?);
         }

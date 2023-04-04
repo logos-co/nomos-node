@@ -3,7 +3,6 @@ use crate::output_processors::OutData;
 use crate::overlay::Overlay;
 use crate::runner::SimulationRunner;
 use crate::warding::SimulationState;
-use crate::BoxDynError;
 use rand::prelude::IteratorRandom;
 use serde::Serialize;
 use std::collections::BTreeSet;
@@ -15,7 +14,7 @@ pub fn simulate<M, N: Node, O: Overlay>(
     update_rate: usize,
     maximum_iterations: usize,
     mut out_data: Option<&mut Vec<OutData>>,
-) -> Result<(), BoxDynError>
+) -> anyhow::Result<()>
 where
     M: Clone,
     N: Send + Sync,

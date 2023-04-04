@@ -48,7 +48,7 @@ pub fn simulate<M, N: Node, O: Overlay>(
     gap: usize,
     distribution: Option<Vec<f32>>,
     mut out_data: Option<&mut Vec<OutData>>,
-) -> Result<(), Box<dyn std::error::Error + Send + Sync + 'static>>
+) -> anyhow::Result<()>
 where
     M: Clone,
     N: Send + Sync,

@@ -3,7 +3,6 @@ use crate::output_processors::OutData;
 use crate::overlay::Overlay;
 use crate::runner::SimulationRunner;
 use crate::warding::SimulationState;
-use crate::BoxDynError;
 use rand::prelude::SliceRandom;
 use rayon::prelude::*;
 use serde::Serialize;
@@ -14,7 +13,7 @@ pub fn simulate<M, N: Node, O: Overlay>(
     runner: &mut SimulationRunner<M, N, O>,
     chunk_size: usize,
     mut out_data: Option<&mut Vec<OutData>>,
-) -> Result<(), BoxDynError>
+) -> anyhow::Result<()>
 where
     M: Clone,
     N::Settings: Clone,
