@@ -10,7 +10,7 @@ use crate::{
 
 use super::{NetworkState, SharedState};
 
-#[derive(Debug, Default, Serialize)]
+#[derive(Debug, Default, Copy, Clone, Serialize)]
 pub struct DummyState {
     pub current_view: usize,
 }

@@ -2,6 +2,7 @@ use crate::node::{Node, NodeId};
 use crate::output_processors::OutData;
 use crate::overlay::Overlay;
 use crate::runner::SimulationRunner;
+use crate::storage::StateCache;
 use crate::warding::SimulationState;
 use rand::prelude::SliceRandom;
 use rayon::prelude::*;
@@ -9,8 +10,8 @@ use serde::Serialize;
 use std::collections::HashSet;
 use std::sync::Arc;
 
-pub fn simulate<M, N: Node, O: Overlay>(
-    runner: &mut SimulationRunner<M, N, O>,
+pub fn simulate<M, N: Node, O: Overlay, S: StateCache<N::State>>(
+    runner: &mut SimulationRunner<M, N, O, S>,
     chunk_size: usize,
     mut out_data: Option<&mut Vec<OutData>>,
 ) -> anyhow::Result<()>
@@ -18,7 +19,7 @@ where
     M: Clone,
     N::Settings: Clone,
     N: Send + Sync,
-    N::State: Serialize,
+    N::State: Clone + Serialize,
     O::Settings: Clone,
 {
     let simulation_state = SimulationState::<N> {

@@ -2,6 +2,7 @@ use crate::node::{Node, NodeId};
 use crate::output_processors::OutData;
 use crate::overlay::Overlay;
 use crate::runner::SimulationRunner;
+use crate::storage::StateCache;
 use crate::warding::SimulationState;
 use rand::prelude::IteratorRandom;
 use serde::Serialize;
@@ -9,8 +10,8 @@ use std::collections::BTreeSet;
 use std::sync::Arc;
 
 /// [Glauber dynamics simulation](https://en.wikipedia.org/wiki/Glauber_dynamics)
-pub fn simulate<M, N: Node, O: Overlay>(
-    runner: &mut SimulationRunner<M, N, O>,
+pub fn simulate<M, N: Node, O: Overlay, S: StateCache<N::State>>(
+    runner: &mut SimulationRunner<M, N, O, S>,
     update_rate: usize,
     maximum_iterations: usize,
     mut out_data: Option<&mut Vec<OutData>>,
@@ -19,7 +20,7 @@ where
     M: Clone,
     N: Send + Sync,
     N::Settings: Clone,
-    N::State: Serialize,
+    N::State: Clone + Serialize,
     O::Settings: Clone,
 {
     let simulation_state = SimulationState {

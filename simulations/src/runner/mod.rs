@@ -10,6 +10,7 @@ use std::sync::{Arc, RwLock};
 use std::time::Duration;
 // crates
 use crate::network::Network;
+use crate::storage::StateCache;
 use rand::rngs::SmallRng;
 use rand::{RngCore, SeedableRng};
 use rayon::prelude::*;
@@ -23,25 +24,28 @@ use crate::warding::{SimulationState, SimulationWard};
 
 /// Encapsulation solution for the simulations runner
 /// Holds the network state, the simulating nodes and the simulation settings.
-pub struct SimulationRunner<M, N, O>
+pub struct SimulationRunner<M, N, O, S>
 where
     N: Node,
     O: Overlay,
+    S: StateCache<N::State>,
 {
     nodes: Arc<RwLock<Vec<N>>>,
+    state_cache: Arc<RwLock<S>>,
     network: Network<M>,
     settings: SimulationSettings<N::Settings, O::Settings>,
     rng: SmallRng,
     _overlay: PhantomData<O>,
 }
 
-impl<M, N: Node, O: Overlay> SimulationRunner<M, N, O>
+impl<M, N: Node, O: Overlay, S> SimulationRunner<M, N, O, S>
 where
     M: Clone,
     N: Send + Sync,
     N::Settings: Clone,
-    N::State: Serialize,
+    N::State: Serialize + Clone,
     O::Settings: Clone,
+    S: StateCache<N::State>,
 {
     pub fn new(
         network: Network<M>,
@@ -55,6 +59,7 @@ where
         println!("Seed: {seed}");
 
         let rng = SmallRng::seed_from_u64(seed);
+        let cache = S::new(&nodes);
         let nodes = Arc::new(RwLock::new(nodes));
 
         Self {
@@ -63,6 +68,7 @@ where
             settings,
             rng,
             _overlay: Default::default(),
+            state_cache: Arc::new(RwLock::new(cache)),
         }
     }
 
@@ -103,13 +109,15 @@ where
     fn step(&mut self) {
         self.network
             .dispatch_after(&mut self.rng, Duration::from_millis(100));
-        self.nodes
+        let mut nodes = self.nodes.write().expect("Single access to nodes vector");
+
+        nodes.par_iter_mut().for_each(|node| {
+            node.step();
+        });
+        self.state_cache
             .write()
-            .expect("Single access to nodes vector")
-            .par_iter_mut()
-            .for_each(|node| {
-                node.step();
-            });
+            .expect("Single access to state cache")
+            .update_many(&nodes);
         self.network.collect_messages();
     }
 }

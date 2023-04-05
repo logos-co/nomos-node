@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 // internal
 use super::{Node, NodeId};
 
-#[derive(Default, Serialize)]
+#[derive(Default, Clone, Serialize)]
 pub struct CarnotState {}
 
 #[derive(Clone, Deserialize)]

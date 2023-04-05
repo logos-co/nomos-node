@@ -13,7 +13,9 @@ use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use simulations::network::regions::RegionsData;
 use simulations::network::Network;
+use simulations::node::carnot::CarnotState;
 use simulations::overlay::tree::TreeOverlay;
+use simulations::storage::FullTrackCache;
 // internal
 use simulations::{
     node::carnot::CarnotNode, output_processors::OutData, runner::SimulationRunner,
@@ -100,8 +102,12 @@ impl SimulationApp {
         let regions_data = RegionsData::new(HashMap::new(), HashMap::new());
         let network = Network::new(regions_data);
 
-        let mut simulation_runner: SimulationRunner<(), CarnotNode, TreeOverlay> =
-            SimulationRunner::new(network, nodes, simulation_settings);
+        let mut simulation_runner: SimulationRunner<
+            (),
+            CarnotNode,
+            TreeOverlay,
+            FullTrackCache<CarnotState>,
+        > = SimulationRunner::new(network, nodes, simulation_settings);
         // build up series vector
         let mut out_data: Vec<OutData> = Vec::new();
         simulation_runner.simulate(Some(&mut out_data))?;

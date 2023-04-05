@@ -41,10 +41,11 @@ use crate::node::{Node, NodeId};
 use crate::output_processors::OutData;
 use crate::overlay::Overlay;
 use crate::runner::SimulationRunner;
+use crate::storage::StateCache;
 use crate::warding::SimulationState;
 
-pub fn simulate<M, N: Node, O: Overlay>(
-    runner: &mut SimulationRunner<M, N, O>,
+pub fn simulate<M, N: Node, O: Overlay, S: StateCache<N::State>>(
+    runner: &mut SimulationRunner<M, N, O, S>,
     gap: usize,
     distribution: Option<Vec<f32>>,
     mut out_data: Option<&mut Vec<OutData>>,
@@ -53,7 +54,7 @@ where
     M: Clone,
     N: Send + Sync,
     N::Settings: Clone,
-    N::State: Serialize,
+    N::State: Clone + Serialize,
     O::Settings: Clone,
 {
     let distribution =
@@ -134,13 +135,14 @@ fn choose_random_layer_and_node_id(
     (i, *node_id)
 }
 
-fn build_node_ids_deque<M, N, O>(
+fn build_node_ids_deque<M, N, O, S>(
     gap: usize,
-    runner: &SimulationRunner<M, N, O>,
+    runner: &SimulationRunner<M, N, O, S>,
 ) -> FixedSliceDeque<BTreeSet<NodeId>>
 where
     N: Node,
     O: Overlay,
+    S: StateCache<N::State>,
 {
     // add a +1 so we always have
     let mut deque = FixedSliceDeque::new(gap + 1);

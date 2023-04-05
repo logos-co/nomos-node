@@ -4,19 +4,20 @@ use super::SimulationRunner;
 use crate::node::Node;
 use crate::output_processors::OutData;
 use crate::overlay::Overlay;
+use crate::storage::StateCache;
 use crate::warding::SimulationState;
 use std::sync::Arc;
 
 /// Simulate with option of dumping the network state as a `::polars::Series`
-pub fn simulate<M, N: Node, O: Overlay>(
-    runner: &mut SimulationRunner<M, N, O>,
+pub fn simulate<M, N: Node, O: Overlay, S: StateCache<N::State>>(
+    runner: &mut SimulationRunner<M, N, O, S>,
     mut out_data: Option<&mut Vec<OutData>>,
 ) -> anyhow::Result<()>
 where
     M: Clone,
     N: Send + Sync,
     N::Settings: Clone,
-    N::State: Serialize,
+    N::State: Clone + Serialize,
     O::Settings: Clone,
 {
     let state = SimulationState {
@@ -45,7 +46,7 @@ mod tests {
             Network,
         },
         node::{
-            dummy::{DummyMessage, DummyNetworkInterface, DummyNode, DummySettings},
+            dummy::{DummyMessage, DummyNetworkInterface, DummyNode, DummySettings, DummyState},
             NetworkState, Node, NodeId, SharedState,
         },
         overlay::{
@@ -54,6 +55,7 @@ mod tests {
         },
         runner::SimulationRunner,
         settings::SimulationSettings,
+        storage::full_track::FullTrackCache,
     };
     use crossbeam::channel;
     use rand::rngs::mock::StepRng;
@@ -110,8 +112,12 @@ mod tests {
         }));
         let nodes = init_dummy_nodes(&node_ids, &mut network, network_state);
 
-        let mut runner: SimulationRunner<DummyMessage, DummyNode, TreeOverlay> =
-            SimulationRunner::new(network, nodes, settings);
+        let mut runner: SimulationRunner<
+            DummyMessage,
+            DummyNode,
+            TreeOverlay,
+            FullTrackCache<DummyState>,
+        > = SimulationRunner::new(network, nodes, settings);
         runner.step();
         let nodes = runner.nodes.read().unwrap();
 
