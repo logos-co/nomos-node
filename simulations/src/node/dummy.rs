@@ -671,8 +671,6 @@ mod tests {
             .duration_since(UNIX_EPOCH)
             .expect("valid unix timestamp")
             .as_secs();
-        // println!("{timestamp}");
-        // WIP: failing timestamp: 1680785967
         let mut rng = SmallRng::seed_from_u64(timestamp);
         let overlay = TreeOverlay::new(TreeSettings {
             tree_type: Default::default(),
@@ -702,7 +700,7 @@ mod tests {
 
         // Using any node as the sender for initial proposal to leader nodes.
         overlays
-            .get(&0)
+            .get(&1)
             .unwrap()
             .leaders
             .iter()
@@ -774,7 +772,7 @@ mod tests {
                 6,
                 Some(BTreeSet::from([2.into()])),
                 None,
-                vec![DummyRole::Leaf],
+                vec![DummyRole::Leader, DummyRole::Leaf],
             ),
         ];
         let mut rng = StepRng::new(1, 0);
@@ -784,7 +782,7 @@ mod tests {
             committee_size: 1,
         });
         let node_ids: Vec<NodeId> = overlay.nodes();
-        let leaders = vec![];
+        let leaders = vec![6.into()];
         let layout = overlay.layout(&node_ids, &mut rng);
         let view = ViewOverlay { leaders, layout };
 

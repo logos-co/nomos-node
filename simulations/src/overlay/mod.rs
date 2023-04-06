@@ -80,12 +80,7 @@ impl Layout {
     pub fn children_nodes(&self, committee_id: CommitteeId) -> Vec<&Committee> {
         self.children(committee_id)
             .iter()
-            .flat_map(|&committees| {
-                committees
-                    .iter()
-                    .map(|c| &self.committees[c])
-                    .collect::<Vec<&Committee>>()
-            })
+            .flat_map(|&committees| committees.iter().map(|c| &self.committees[c]))
             .collect()
     }
 
