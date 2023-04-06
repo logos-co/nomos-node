@@ -88,7 +88,7 @@ mod tests {
                     node_message_sender,
                     network_message_receiver,
                 );
-                DummyNode::new(*node_id, overlay_state.clone(), network_interface)
+                DummyNode::new(*node_id, 0, overlay_state.clone(), network_interface)
             })
             .collect()
     }
@@ -110,6 +110,7 @@ mod tests {
             layout: overlay.layout(&node_ids, &mut rng),
         };
         let overlay_state = Arc::new(RwLock::new(OverlayState {
+            all_nodes: node_ids.clone(),
             overlays: BTreeMap::from([(0, view.clone()), (1, view)]),
         }));
         let nodes = init_dummy_nodes(&node_ids, &mut network, overlay_state);
@@ -141,6 +142,7 @@ mod tests {
             layout: overlay.layout(&node_ids, &mut rng),
         };
         let overlay_state = Arc::new(RwLock::new(OverlayState {
+            all_nodes: node_ids.clone(),
             overlays: BTreeMap::from([(0, view.clone()), (1, view)]),
         }));
         let nodes = init_dummy_nodes(&node_ids, &mut network, overlay_state);

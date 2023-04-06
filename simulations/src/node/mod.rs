@@ -127,17 +127,24 @@ pub type SharedState<S> = Arc<RwLock<S>>;
 
 /// A state that represents how nodes are interconnected in the network.
 pub struct OverlayState {
+    pub all_nodes: Vec<NodeId>,
     pub overlays: BTreeMap<usize, ViewOverlay>,
 }
 
 pub trait OverlayGetter {
     fn get_view(&self, index: usize) -> Option<ViewOverlay>;
+    fn get_all_nodes(&self) -> Vec<NodeId>;
 }
 
 impl OverlayGetter for SharedState<OverlayState> {
     fn get_view(&self, index: usize) -> Option<ViewOverlay> {
         let overlay_state = self.read().unwrap();
         overlay_state.overlays.get(&index).cloned()
+    }
+
+    fn get_all_nodes(&self) -> Vec<NodeId> {
+        let overlay_state = self.read().unwrap();
+        overlay_state.all_nodes.clone()
     }
 }
 
