@@ -96,7 +96,7 @@ pub struct DummyNode {
     overlay_state: SharedState<OverlayState>,
     network_interface: DummyNetworkInterface,
 
-    // Leader in the next view might be any node in current view.
+    // Node in current view might be a leader in the next view.
     // To prevent two states for different roles colliding, temp_leader_state
     // is used only for leaders. It is overridden when current_view is updated.
     temp_leader_state: DummyViewState,
@@ -162,7 +162,7 @@ impl DummyNode {
             .state
             .view_state
             .get_mut(&view)
-            .expect("view state created for current view");
+            .expect("view state created");
         view_state.vote_sent = true;
     }
 
@@ -179,7 +179,7 @@ impl DummyNode {
             .state
             .view_state
             .get_mut(&view)
-            .expect("view state created for current view");
+            .expect("view state created");
         view_state.vote_received_count += 1;
     }
 
@@ -188,10 +188,7 @@ impl DummyNode {
         // TODO: Get percentage from the node settings.
         let enough = children.len() as f32 * 0.66;
 
-        if count > enough as usize {
-            return true;
-        }
-        false
+        count > enough as usize
     }
 
     // Assumptions:
@@ -203,12 +200,12 @@ impl DummyNode {
         messages: &[NetworkMessage<DummyMessage>],
         children: &Option<BTreeSet<NodeId>>,
     ) {
-        messages.iter().for_each(|message| {
+        for message in messages.iter() {
             if let DummyMessage::Vote(vote) = &message.payload {
                 // Internal node can be a leader in the next view, check if the vote traversed the
                 // whole tree.
                 if vote.intent != Intent::FromRootToLeader || vote.view < self.current_view() {
-                    return;
+                    continue;
                 }
 
                 self.temp_leader_state.vote_received_count += 1;
@@ -227,7 +224,7 @@ impl DummyNode {
                     self.temp_leader_state.vote_sent = true;
                 }
             }
-        })
+        }
     }
 
     fn handle_root(
@@ -257,7 +254,6 @@ impl DummyNode {
             }
             DummyMessage::Proposal(block) => {
                 if block.view > self.current_view() {
-                    println!("ROOT node: {:?}, set view {:?}", self.id(), block.view);
                     self.update_view(block.view);
                 }
             }
@@ -272,7 +268,7 @@ impl DummyNode {
     ) {
         messages.iter().for_each(|message| match &message.payload {
             DummyMessage::Vote(vote) => {
-                // Root node can be a leader in the next view, check if the vote traversed the
+                // Internal node can be a leader in the next view, check if the vote traversed the
                 // whole tree.
                 if vote.intent != Intent::FromLeafToInternal || vote.view != self.current_view() {
                     return;
@@ -294,7 +290,6 @@ impl DummyNode {
             }
             DummyMessage::Proposal(block) => {
                 if block.view > self.current_view() {
-                    println!("INTERNAL node: {:?}, set view {:?}", self.id(), block.view);
                     self.update_view(block.view);
                 }
             }
@@ -306,10 +301,9 @@ impl DummyNode {
         messages: &[NetworkMessage<DummyMessage>],
         parents: &Option<BTreeSet<NodeId>>,
     ) {
-        messages.iter().for_each(|message| {
+        for message in messages.iter() {
             if let DummyMessage::Proposal(block) = &message.payload {
                 if block.view > self.current_view() {
-                    println!("LEAF node: {:?}, set view {:?}", self.id(), block.view);
                     self.update_view(block.view);
                 }
                 if !self.is_vote_sent(block.view) {
@@ -320,7 +314,7 @@ impl DummyNode {
                     self.set_vote_sent(block.view);
                 }
             }
-        })
+        }
     }
 }
 
@@ -398,10 +392,6 @@ impl NetworkInterface for DummyNetworkInterface {
 
     fn send_message(&self, address: NodeId, message: Self::Payload) {
         let message = NetworkMessage::new(self.id, address, message);
-        println!(
-            "sending from {:?} to {:?} message {:?}",
-            message.from, message.to, message.payload
-        );
         self.sender.send(message).unwrap();
     }
 
@@ -504,7 +494,7 @@ mod tests {
         node_ids: &[NodeId],
         network: &mut Network<DummyMessage>,
         overlay_state: SharedState<OverlayState>,
-    ) -> Vec<DummyNode> {
+    ) -> HashMap<NodeId, DummyNode> {
         node_ids
             .iter()
             .map(|node_id| {
@@ -515,7 +505,10 @@ mod tests {
                     node_message_sender,
                     network_message_receiver,
                 );
-                DummyNode::new(*node_id, overlay_state.clone(), network_interface)
+                (
+                    *node_id,
+                    DummyNode::new(*node_id, overlay_state.clone(), network_interface),
+                )
             })
             .collect()
     }
@@ -539,32 +532,122 @@ mod tests {
             layout: overlay.layout(&node_ids, &mut rng),
         };
         let overlay_state = Arc::new(RwLock::new(OverlayState {
-            overlays: BTreeMap::from([
-                (0, view.clone()),
-                (1, view.clone()),
-                (2, view.clone()),
-                (3, view.clone()),
-                (4, view.clone()),
-                (5, view),
-            ]),
+            overlays: BTreeMap::from([(0, view.clone()), (1, view.clone()), (2, view)]),
         }));
 
         let mut nodes = init_dummy_nodes(&node_ids, &mut network, overlay_state);
         let initial_vote = Vote::new(1, Intent::FromRootToLeader);
+
         // Using any node as the sender for initial proposal to leader nodes.
-        nodes[0].send_message(0.into(), DummyMessage::Vote(initial_vote.clone()));
-        nodes[0].send_message(1.into(), DummyMessage::Vote(initial_vote.clone()));
-        nodes[0].send_message(2.into(), DummyMessage::Vote(initial_vote));
+        nodes[&0.into()].send_message(0.into(), DummyMessage::Vote(initial_vote.clone()));
+        nodes[&0.into()].send_message(1.into(), DummyMessage::Vote(initial_vote.clone()));
+        nodes[&0.into()].send_message(2.into(), DummyMessage::Vote(initial_vote));
         network.collect_messages();
 
-        for i in 0..9 {
-            println!(">>>>>>>>>>>>>>>>>>>> STEP {i}");
-            network.dispatch_after(&mut rng, Duration::from_millis(100));
-            nodes.iter_mut().for_each(|node| {
-                node.step();
-            });
-            network.collect_messages();
+        for (_, node) in nodes.iter() {
+            assert_eq!(node.current_view(), 0);
         }
+
+        // 1. Leaders receive vote and broadcast new Proposal(Block) to all nodes.
+        network.dispatch_after(&mut rng, Duration::from_millis(100));
+        nodes.iter_mut().for_each(|(_, node)| {
+            node.step();
+        });
+        network.collect_messages();
+
+        // 2. a) All nodes received proposal block.
+        //    b) Leaf nodes send vote to internal nodes.
+        network.dispatch_after(&mut rng, Duration::from_millis(100));
+        nodes.iter_mut().for_each(|(_, node)| {
+            node.step();
+        });
+        network.collect_messages();
+
+        // All nodes should be updated to the proposed blocks view.
+        for (_, node) in nodes.iter() {
+            assert_eq!(node.current_view(), 1);
+        }
+
+        // Root and Internal haven't sent their votes yet.
+        assert!(!nodes[&0.into()].state().view_state[&1].vote_sent); // Root
+        assert!(!nodes[&1.into()].state().view_state[&1].vote_sent); // Internal
+        assert!(!nodes[&2.into()].state().view_state[&1].vote_sent); // Internal
+
+        // Leaves should have thier vote sent.
+        assert!(nodes[&3.into()].state().view_state[&1].vote_sent); // Leaf
+        assert!(nodes[&4.into()].state().view_state[&1].vote_sent); // Leaf
+        assert!(nodes[&5.into()].state().view_state[&1].vote_sent); // Leaf
+        assert!(nodes[&6.into()].state().view_state[&1].vote_sent); // Leaf
+
+        // 3. Internal nodes send vote to root node.
+        network.dispatch_after(&mut rng, Duration::from_millis(100));
+        nodes.iter_mut().for_each(|(_, node)| {
+            node.step();
+        });
+        network.collect_messages();
+
+        // Root hasn't sent its votes yet.
+        assert!(!nodes[&0.into()].state().view_state[&1].vote_sent); // Root
+
+        // Internal and leaves should have thier vote sent.
+        assert!(nodes[&1.into()].state().view_state[&1].vote_sent); // Internal
+        assert!(nodes[&2.into()].state().view_state[&1].vote_sent); // Internal
+        assert!(nodes[&3.into()].state().view_state[&1].vote_sent); // Leaf
+        assert!(nodes[&4.into()].state().view_state[&1].vote_sent); // Leaf
+        assert!(nodes[&5.into()].state().view_state[&1].vote_sent); // Leaf
+        assert!(nodes[&6.into()].state().view_state[&1].vote_sent); // Leaf
+
+        // 4. Root node send vote to next view leader nodes.
+        network.dispatch_after(&mut rng, Duration::from_millis(100));
+        nodes.iter_mut().for_each(|(_, node)| {
+            node.step();
+        });
+        network.collect_messages();
+
+        // Root has sent its votes yet.
+        assert!(nodes[&0.into()].state().view_state[&1].vote_sent); // Root
+        assert!(nodes[&1.into()].state().view_state[&1].vote_sent); // Internal
+        assert!(nodes[&2.into()].state().view_state[&1].vote_sent); // Internal
+        assert!(nodes[&3.into()].state().view_state[&1].vote_sent); // Leaf
+        assert!(nodes[&4.into()].state().view_state[&1].vote_sent); // Leaf
+        assert!(nodes[&5.into()].state().view_state[&1].vote_sent); // Leaf
+        assert!(nodes[&6.into()].state().view_state[&1].vote_sent); // Leaf
+
+        // 5. Leaders receive vote and broadcast new Proposal(Block) to all nodes.
+        network.dispatch_after(&mut rng, Duration::from_millis(100));
+        nodes.iter_mut().for_each(|(_, node)| {
+            node.step();
+        });
+        network.collect_messages();
+
+        // All nodes should still have an old view
+        for (_, node) in nodes.iter() {
+            assert_eq!(node.current_view(), 1); // old
+        }
+
+        // 6. a) All nodes received proposal block.
+        //    b) Leaf nodes send vote to internal nodes.
+        network.dispatch_after(&mut rng, Duration::from_millis(100));
+        nodes.iter_mut().for_each(|(_, node)| {
+            node.step();
+        });
+        network.collect_messages();
+
+        // All nodes should be updated to the proposed blocks view.
+        for (_, node) in nodes.iter() {
+            assert_eq!(node.current_view(), 2); // new
+        }
+
+        // Root and Internal haven't sent their votes yet.
+        assert!(!nodes[&0.into()].state().view_state[&2].vote_sent); // Root
+        assert!(!nodes[&1.into()].state().view_state[&2].vote_sent); // Internal
+        assert!(!nodes[&2.into()].state().view_state[&2].vote_sent); // Internal
+
+        // Leaves should have thier vote sent.
+        assert!(nodes[&3.into()].state().view_state[&2].vote_sent); // Leaf
+        assert!(nodes[&4.into()].state().view_state[&2].vote_sent); // Leaf
+        assert!(nodes[&5.into()].state().view_state[&2].vote_sent); // Leaf
+        assert!(nodes[&6.into()].state().view_state[&2].vote_sent); // Leaf
     }
 
     #[test]
