@@ -46,7 +46,7 @@ mod tests {
         },
         node::{
             dummy::{DummyMessage, DummyNetworkInterface, DummyNode, DummySettings},
-            Node, NodeId, OverlayState, SharedState, View,
+            Node, NodeId, OverlayState, SharedState, ViewOverlay,
         },
         overlay::{
             tree::{TreeOverlay, TreeSettings},
@@ -105,12 +105,12 @@ mod tests {
         let node_ids: Vec<NodeId> = (0..settings.node_count).map(Into::into).collect();
         let overlay = TreeOverlay::new(settings.overlay_settings.clone());
         let mut network = init_network(&node_ids);
-        let view = View {
+        let view = ViewOverlay {
             leaders: overlay.leaders(&node_ids, 1, &mut rng).collect(),
             layout: overlay.layout(&node_ids, &mut rng),
         };
         let overlay_state = Arc::new(RwLock::new(OverlayState {
-            views: BTreeMap::from([(1, view)]),
+            overlays: BTreeMap::from([(1, view)]),
         }));
         let nodes = init_dummy_nodes(&node_ids, &mut network, overlay_state);
 
@@ -136,19 +136,19 @@ mod tests {
         let node_ids: Vec<NodeId> = (0..settings.node_count).map(Into::into).collect();
         let overlay = TreeOverlay::new(settings.overlay_settings.clone());
         let mut network = init_network(&node_ids);
-        let view = View {
+        let view = ViewOverlay {
             leaders: overlay.leaders(&node_ids, 1, &mut rng).collect(),
             layout: overlay.layout(&node_ids, &mut rng),
         };
         let overlay_state = Arc::new(RwLock::new(OverlayState {
-            views: BTreeMap::from([(1, view)]),
+            overlays: BTreeMap::from([(1, view)]),
         }));
         let nodes = init_dummy_nodes(&node_ids, &mut network, overlay_state);
 
         for node in nodes.iter() {
             // All nodes send one message to NodeId(1).
             // Nodes can send messages to themselves.
-            node.send_message(node_ids[1], DummyMessage::Proposal(42));
+            node.send_message(node_ids[1], DummyMessage::Proposal(42.into()));
         }
         network.collect_messages();
 

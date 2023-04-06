@@ -118,17 +118,28 @@ impl core::iter::Sum<StepTime> for Duration {
 }
 
 #[derive(Clone, Debug)]
-pub struct View {
+pub struct ViewOverlay {
     pub leaders: Vec<NodeId>,
     pub layout: Layout,
 }
 
+pub type SharedState<S> = Arc<RwLock<S>>;
+
 /// A state that represents how nodes are interconnected in the network.
 pub struct OverlayState {
-    pub views: BTreeMap<usize, View>,
+    pub overlays: BTreeMap<usize, ViewOverlay>,
 }
 
-pub type SharedState<S> = Arc<RwLock<S>>;
+pub trait OverlayGetter {
+    fn get_view(&self, index: usize) -> Option<ViewOverlay>;
+}
+
+impl OverlayGetter for SharedState<OverlayState> {
+    fn get_view(&self, index: usize) -> Option<ViewOverlay> {
+        let overlay_state = self.read().unwrap();
+        overlay_state.overlays.get(&index).cloned()
+    }
+}
 
 pub trait Node {
     type Settings;
