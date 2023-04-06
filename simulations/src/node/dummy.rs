@@ -356,7 +356,14 @@ impl Node for DummyNode {
         roles.iter().for_each(|role| match role {
             DummyRole::Leader => {
                 // In tree layout CommitteeId(0) is always root committee.
-                let current_roots = Some(view.layout.committees[&0.into()].nodes.clone());
+                let current_roots = Some(
+                    view.layout
+                        .committees
+                        .get(&0.into())
+                        .expect("has CommitteeId(0)")
+                        .nodes
+                        .clone(),
+                );
                 // Leaders are in the next view, passing current root nodes to know how many nodes
                 // there should be votes from.
                 self.handle_leader(&incoming_messages, &current_roots);
@@ -459,11 +466,14 @@ mod tests {
     use std::{
         collections::{BTreeMap, BTreeSet, HashMap},
         sync::{Arc, RwLock},
-        time::Duration,
+        time::{Duration, SystemTime, UNIX_EPOCH},
     };
 
     use crossbeam::channel;
-    use rand::rngs::mock::StepRng;
+    use rand::{
+        rngs::{mock::StepRng, SmallRng},
+        SeedableRng,
+    };
 
     use crate::{
         network::{
@@ -651,6 +661,71 @@ mod tests {
         assert!(nodes[&4.into()].state().view_state[&2].vote_sent); // Leaf
         assert!(nodes[&5.into()].state().view_state[&2].vote_sent); // Leaf
         assert!(nodes[&6.into()].state().view_state[&2].vote_sent); // Leaf
+    }
+
+    #[test]
+    fn send_receive_tree_overlay_smallrng() {
+        // Nodes should progress to second view in 6 steps with random nodes in tree overlay if
+        // network conditions are the same as in `send_receive_tree_overlay` test.
+        let timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("valid unix timestamp")
+            .as_secs();
+        // println!("{timestamp}");
+        // WIP: failing timestamp: 1680785967
+        let mut rng = SmallRng::seed_from_u64(timestamp);
+        let overlay = TreeOverlay::new(TreeSettings {
+            tree_type: Default::default(),
+            depth: 3,
+            committee_size: 1,
+        });
+        let node_ids: Vec<NodeId> = overlay.nodes();
+        let mut network = init_network(&node_ids);
+
+        let overlays: BTreeMap<usize, ViewOverlay> = (0..=3)
+            .map(|view_id| {
+                (
+                    view_id,
+                    ViewOverlay {
+                        leaders: overlay.leaders(&node_ids, 3, &mut rng).collect(),
+                        layout: overlay.layout(&node_ids, &mut rng),
+                    },
+                )
+            })
+            .collect();
+        let overlay_state = Arc::new(RwLock::new(OverlayState {
+            overlays: overlays.clone(),
+        }));
+
+        let mut nodes = init_dummy_nodes(&node_ids, &mut network, overlay_state);
+        let initial_vote = Vote::new(1, Intent::FromRootToLeader);
+
+        // Using any node as the sender for initial proposal to leader nodes.
+        overlays
+            .get(&0)
+            .unwrap()
+            .leaders
+            .iter()
+            .for_each(|leader_id| {
+                nodes[&0.into()].send_message(*leader_id, DummyMessage::Vote(initial_vote.clone()));
+            });
+        network.collect_messages();
+
+        for (_, node) in nodes.iter() {
+            assert_eq!(node.current_view(), 0);
+        }
+
+        for _ in 0..7 {
+            network.dispatch_after(&mut rng, Duration::from_millis(100));
+            nodes.iter_mut().for_each(|(_, node)| {
+                node.step();
+            });
+            network.collect_messages();
+        }
+
+        for (_, node) in nodes.iter() {
+            assert_eq!(node.current_view(), 2);
+        }
     }
 
     #[test]
