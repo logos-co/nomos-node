@@ -1,11 +1,10 @@
 use crate::node::Node;
 
 /// A in-memroy cache stores all of the view number and the vector of nodeids and state
-pub(crate) mod full_track;
-pub use full_track::FullTrackCache;
+pub mod full_track;
 
 /// A in-memory cache stores only the view number and the vector of nodeids and state (no old state)
-pub(crate) mod latest_track;
+pub mod latest_track;
 
 pub trait StateCache<S> {
     fn new<N: Node<State = S>>(nodes: &[N]) -> Self;
