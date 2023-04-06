@@ -336,6 +336,8 @@ impl Node for DummyNode {
 
     fn step(&mut self) {
         let incoming_messages = self.network_interface.receive_messages();
+        self.state.message_count += incoming_messages.len();
+
         let current_view = self.current_view();
         let view = self
             .overlay_state
@@ -362,7 +364,7 @@ impl Node for DummyNode {
             DummyRole::Root => self.handle_root(&incoming_messages, &next_view.leaders, &children),
             DummyRole::Internal => self.handle_internal(&incoming_messages, &parents, &children),
             DummyRole::Leaf => self.handle_leaf(&incoming_messages, &parents),
-            DummyRole::Unknown => todo!(), // not in an overlay?
+            DummyRole::Unknown => (), // not in an overlay?
         });
     }
 }
@@ -410,12 +412,12 @@ impl NetworkInterface for DummyNetworkInterface {
 // }
 
 fn get_parent_nodes(node_id: NodeId, view: &ViewOverlay) -> Option<BTreeSet<NodeId>> {
-    let committee_id = view.layout.committee(node_id);
+    let committee_id = view.layout.committee(node_id)?;
     view.layout.parent_nodes(committee_id).map(|c| c.nodes)
 }
 
 fn get_child_nodes(node_id: NodeId, view: &ViewOverlay) -> Option<BTreeSet<NodeId>> {
-    let committee_id = view.layout.committee(node_id);
+    let committee_id = view.layout.committee(node_id)?;
     let child_nodes: BTreeSet<NodeId> = view
         .layout
         .children_nodes(committee_id)
@@ -444,8 +446,9 @@ fn get_roles(
         (Some(_), Some(_)) => roles.push(DummyRole::Internal),
         (Some(_), None) => roles.push(DummyRole::Leaf),
         (None, None) => {
-            roles.push(DummyRole::Root);
-            roles.push(DummyRole::Leaf);
+            //roles.push(DummyRole::Root);
+            //roles.push(DummyRole::Leaf);
+            roles.push(DummyRole::Unknown);
         }
     };
     roles

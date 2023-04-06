@@ -56,8 +56,8 @@ impl Layout {
         }
     }
 
-    pub fn committee(&self, node_id: NodeId) -> CommitteeId {
-        self.from_committee.get(&node_id).copied().unwrap()
+    pub fn committee(&self, node_id: NodeId) -> Option<CommitteeId> {
+        self.from_committee.get(&node_id).copied()
     }
 
     pub fn committee_nodes(&self, committee_id: CommitteeId) -> &Committee {

@@ -110,7 +110,7 @@ mod tests {
             layout: overlay.layout(&node_ids, &mut rng),
         };
         let overlay_state = Arc::new(RwLock::new(OverlayState {
-            overlays: BTreeMap::from([(1, view)]),
+            overlays: BTreeMap::from([(0, view.clone()), (1, view)]),
         }));
         let nodes = init_dummy_nodes(&node_ids, &mut network, overlay_state);
 
@@ -120,7 +120,7 @@ mod tests {
 
         let nodes = runner.nodes.read().unwrap();
         for node in nodes.iter() {
-            assert_eq!(node.current_view(), 1);
+            assert_eq!(node.current_view(), 0);
         }
     }
 
@@ -141,7 +141,7 @@ mod tests {
             layout: overlay.layout(&node_ids, &mut rng),
         };
         let overlay_state = Arc::new(RwLock::new(OverlayState {
-            overlays: BTreeMap::from([(1, view)]),
+            overlays: BTreeMap::from([(0, view.clone()), (1, view)]),
         }));
         let nodes = init_dummy_nodes(&node_ids, &mut network, overlay_state);
 
