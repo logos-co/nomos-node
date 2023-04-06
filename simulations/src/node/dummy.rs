@@ -95,6 +95,11 @@ pub struct DummyNode {
     _settings: DummySettings,
     overlay_state: SharedState<OverlayState>,
     network_interface: DummyNetworkInterface,
+
+    // Leader in the next view might be any node in current view.
+    // To prevent two states for different roles colliding, temp_leader_state
+    // is used only for leaders. It is overridden when current_view is updated.
+    temp_leader_state: DummyViewState,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -118,6 +123,7 @@ impl DummyNode {
             _settings: Default::default(),
             overlay_state,
             network_interface,
+            temp_leader_state: Default::default(),
         }
     }
 
@@ -139,6 +145,7 @@ impl DummyNode {
                 ..Default::default()
             },
         );
+        self.temp_leader_state = Default::default();
         self.state.current_view = view;
     }
 
@@ -176,51 +183,77 @@ impl DummyNode {
         view_state.vote_received_count += 1;
     }
 
+    fn has_enough_votes(&self, count: usize, children: &Option<BTreeSet<NodeId>>) -> bool {
+        let children = children.as_ref().expect("has children");
+        // TODO: Get percentage from the node settings.
+        let enough = children.len() as f32 * 0.66;
+
+        if count > enough as usize {
+            return true;
+        }
+        false
+    }
+
     // Assumptions:
     // - Leader gets vote from root nodes that are in previous overlay.
     // - Leader sends NewView message to all it's view nodes if it receives votes from all root
     // nodes.
-    fn handle_leader(&mut self, messages: &[NetworkMessage<DummyMessage>]) {
+    fn handle_leader(
+        &mut self,
+        messages: &[NetworkMessage<DummyMessage>],
+        children: &Option<BTreeSet<NodeId>>,
+    ) {
         messages.iter().for_each(|message| {
             if let DummyMessage::Vote(vote) = &message.payload {
                 // Internal node can be a leader in the next view, check if the vote traversed the
                 // whole tree.
-                if vote.intent != Intent::FromRootToLeader {
+                if vote.intent != Intent::FromRootToLeader || vote.view < self.current_view() {
                     return;
                 }
-                // Ignore votes for previous views.
-                if vote.view < self.current_view() {
-                    return;
+
+                self.temp_leader_state.vote_received_count += 1;
+                if !self.temp_leader_state.vote_sent
+                    && self.has_enough_votes(self.temp_leader_state.vote_received_count, children)
+                {
+                    let new_view_id = self.current_view() + 1;
+                    let new_view = self.overlay_state.get_view(new_view_id);
+                    let all_nodes: Vec<NodeId> = new_view
+                        .expect("simulation generated enough views") // generate new overlay on demand?
+                        .layout
+                        .node_ids()
+                        .collect();
+
+                    self.broadcast(&all_nodes, DummyMessage::Proposal(new_view_id.into()));
+                    self.temp_leader_state.vote_sent = true;
                 }
-                // Store vote in local_view_store.
-                //self.local_store(DummyRole::Leader, vote);
-
-                let new_view_id = self.current_view() + 1;
-                let new_view = self.overlay_state.get_view(new_view_id);
-                let all_nodes: Vec<NodeId> = new_view
-                    .expect("simulation generated enough views") // generate new overlay on demand?
-                    .layout
-                    .node_ids()
-                    .collect();
-
-                self.broadcast(&all_nodes, DummyMessage::Proposal(new_view_id.into()));
             }
         })
     }
 
-    fn handle_root(&mut self, messages: &[NetworkMessage<DummyMessage>], leaders: &[NodeId]) {
+    fn handle_root(
+        &mut self,
+        messages: &[NetworkMessage<DummyMessage>],
+        leaders: &[NodeId],
+        children: &Option<BTreeSet<NodeId>>,
+    ) {
         messages.iter().for_each(|message| match &message.payload {
             DummyMessage::Vote(vote) => {
                 // Root node can be a leader in the next view, check if the vote traversed the
                 // whole tree.
-                if vote.intent != Intent::FromInternalToRoot && vote.view != self.current_view() {
+                if vote.intent != Intent::FromInternalToRoot || vote.view != self.current_view() {
                     return;
                 }
 
-                self.broadcast(
-                    leaders,
-                    DummyMessage::Vote(vote.upgrade(Intent::FromRootToLeader)),
-                );
+                self.increment_vote_count(vote.view);
+                if !self.is_vote_sent(vote.view)
+                    && self.has_enough_votes(self.get_vote_count(vote.view), children)
+                {
+                    self.broadcast(
+                        leaders,
+                        DummyMessage::Vote(vote.upgrade(Intent::FromRootToLeader)),
+                    );
+                    self.set_vote_sent(vote.view);
+                }
             }
             DummyMessage::Proposal(block) => {
                 if block.view > self.current_view() {
@@ -235,22 +268,29 @@ impl DummyNode {
         &mut self,
         messages: &[NetworkMessage<DummyMessage>],
         parents: &Option<BTreeSet<NodeId>>,
+        children: &Option<BTreeSet<NodeId>>,
     ) {
         messages.iter().for_each(|message| match &message.payload {
             DummyMessage::Vote(vote) => {
                 // Root node can be a leader in the next view, check if the vote traversed the
                 // whole tree.
-                if vote.intent != Intent::FromLeafToInternal && vote.view != self.current_view() {
+                if vote.intent != Intent::FromLeafToInternal || vote.view != self.current_view() {
                     return;
                 }
 
-                let parents = parents.as_ref().expect("internal has parents");
-                parents.iter().for_each(|node_id| {
-                    self.send_message(
-                        *node_id,
-                        DummyMessage::Vote(vote.upgrade(Intent::FromInternalToRoot)),
-                    )
-                })
+                self.increment_vote_count(vote.view);
+                if !self.is_vote_sent(vote.view)
+                    && self.has_enough_votes(self.get_vote_count(vote.view), children)
+                {
+                    let parents = parents.as_ref().expect("internal has parents");
+                    parents.iter().for_each(|node_id| {
+                        self.send_message(
+                            *node_id,
+                            DummyMessage::Vote(vote.upgrade(Intent::FromInternalToRoot)),
+                        )
+                    });
+                    self.set_vote_sent(vote.view);
+                }
             }
             DummyMessage::Proposal(block) => {
                 if block.view > self.current_view() {
@@ -317,11 +357,16 @@ impl Node for DummyNode {
         let children = get_child_nodes(self.node_id, &view);
         let roles = get_roles(self.node_id, &next_view, &parents, &children);
 
-        println!("node: {:?}, view: {:?}", self.id(), current_view);
         roles.iter().for_each(|role| match role {
-            DummyRole::Leader => self.handle_leader(&incoming_messages),
-            DummyRole::Root => self.handle_root(&incoming_messages, &next_view.leaders),
-            DummyRole::Internal => self.handle_internal(&incoming_messages, &parents),
+            DummyRole::Leader => {
+                // In tree layout CommitteeId(0) is always root committee.
+                let current_roots = Some(view.layout.committees[&0.into()].nodes.clone());
+                // Leaders are in the next view, passing current root nodes to know how many nodes
+                // there should be votes from.
+                self.handle_leader(&incoming_messages, &current_roots);
+            }
+            DummyRole::Root => self.handle_root(&incoming_messages, &next_view.leaders, &children),
+            DummyRole::Internal => self.handle_internal(&incoming_messages, &parents, &children),
             DummyRole::Leaf => self.handle_leaf(&incoming_messages, &parents),
             DummyRole::Unknown => todo!(), // not in an overlay?
         });
@@ -365,14 +410,14 @@ impl NetworkInterface for DummyNetworkInterface {
     }
 }
 
-fn get_peer_nodes(node_id: NodeId, view: &ViewOverlay) -> Option<BTreeSet<NodeId>> {
-    let committee_id = view.layout.committee(node_id);
-    let nodes = &view.layout.committee_nodes(committee_id).nodes;
-    match nodes.len() {
-        0 => None,
-        _ => Some(nodes.clone()),
-    }
-}
+// fn get_peer_nodes(node_id: NodeId, view: &ViewOverlay) -> Option<BTreeSet<NodeId>> {
+//     let committee_id = view.layout.committee(node_id);
+//     let nodes = &view.layout.committee_nodes(committee_id).nodes;
+//     match nodes.len() {
+//         0 => None,
+//         _ => Some(nodes.clone()),
+//     }
+// }
 
 fn get_parent_nodes(node_id: NodeId, view: &ViewOverlay) -> Option<BTreeSet<NodeId>> {
     let committee_id = view.layout.committee(node_id);
@@ -512,7 +557,7 @@ mod tests {
         nodes[0].send_message(2.into(), DummyMessage::Vote(initial_vote));
         network.collect_messages();
 
-        for i in 0..4 {
+        for i in 0..9 {
             println!(">>>>>>>>>>>>>>>>>>>> STEP {i}");
             network.dispatch_after(&mut rng, Duration::from_millis(100));
             nodes.iter_mut().for_each(|node| {
