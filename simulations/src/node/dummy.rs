@@ -33,7 +33,7 @@ pub struct DummySettings {}
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub enum Intent {
     FromRootToLeader,
-    FromInternalToRoot,
+    FromInternalToInternal,
     #[default]
     FromLeafToInternal,
 }
@@ -265,7 +265,7 @@ impl DummyNode {
         if let DummyMessage::Vote(vote) = &message.payload {
             // Root node can be a leader in the next view, check if the vote traversed the
             // whole tree.
-            if vote.intent != Intent::FromInternalToRoot || vote.view != self.current_view() {
+            if vote.intent != Intent::FromInternalToInternal || vote.view != self.current_view() {
                 return;
             }
 
@@ -286,7 +286,10 @@ impl DummyNode {
         if let DummyMessage::Vote(vote) = &message.payload {
             // Internal node can be a leader in the next view, check if the vote traversed the
             // whole tree.
-            if vote.intent != Intent::FromLeafToInternal || vote.view != self.current_view() {
+            if vote.intent != Intent::FromLeafToInternal
+                && vote.intent != Intent::FromInternalToInternal
+                || vote.view != self.current_view()
+            {
                 return;
             }
 
@@ -302,7 +305,7 @@ impl DummyNode {
                 parents.iter().for_each(|node_id| {
                     self.send_message(
                         *node_id,
-                        DummyMessage::Vote(vote.upgrade(Intent::FromInternalToRoot)),
+                        DummyMessage::Vote(vote.upgrade(Intent::FromInternalToInternal)),
                     )
                 });
                 self.set_vote_sent(vote.view);
@@ -831,7 +834,7 @@ mod tests {
         network.collect_messages();
 
         let nodes = Arc::new(RwLock::new(nodes));
-        for _ in 0..7 {
+        for _ in 0..9 {
             network.dispatch_after(&mut rng, Duration::from_millis(100));
             nodes.write().unwrap().par_iter_mut().for_each(|(_, node)| {
                 node.step();
