@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 // internal
 use crate::{network::behaviour::NetworkBehaviour, node::NodeId};
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, Serialize)]
 pub enum Region {
     NorthAmerica,
     Europe,
@@ -13,6 +13,31 @@ pub enum Region {
     Africa,
     SouthAmerica,
     Australia,
+}
+
+impl<'de> serde::Deserialize<'de> for Region {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        match s
+            .trim()
+            .chars()
+            .filter(|c| ['-', '_', ' '].contains(c))
+            .collect::<String>()
+            .to_lowercase()
+            .as_str()
+        {
+            "northamerica" => Ok(Self::NorthAmerica),
+            "europe" => Ok(Self::Europe),
+            "asia" => Ok(Self::Asia),
+            "africa" => Ok(Self::Africa),
+            "southamerica" => Ok(Self::SouthAmerica),
+            "australia" => Ok(Self::Australia),
+            _ => Err(serde::de::Error::custom("Invalid region")),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

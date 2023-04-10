@@ -6,6 +6,7 @@ use serde::Deserialize;
 #[derive(Debug, Deserialize, Clone)]
 pub struct StalledViewWard {
     // the hash checksum
+    #[serde(skip_deserializing)]
     consecutive_viewed_checkpoint: Option<u32>,
     // use to check if the node is stalled
     criterion: usize,

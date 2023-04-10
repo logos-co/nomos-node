@@ -5,6 +5,7 @@ use serde::Deserialize;
 use std::collections::HashMap;
 
 #[derive(Clone, Debug, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
 pub enum RunnerSettings {
     #[default]
     Sync,
