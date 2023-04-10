@@ -97,7 +97,10 @@ where
             .read()
             .expect("lock")
             .par_iter()
-            .filter(|(network_time, message)| self.send_or_drop_message(network_time, message))
+            .filter(|(network_time, message)| {
+                let mut rng = ThreadRng::default();
+                self.send_or_drop_message(&mut rng, network_time, message)
+            })
             .cloned()
             .collect();
 
@@ -106,13 +109,13 @@ where
     }
 
     /// Returns true if message needs to be delayed and be dispatched in future.
-    fn send_or_drop_message(
+    fn send_or_drop_message<R: Rng>(
         &self,
+        rng: &mut R,
         network_time: &NetworkTime,
         message: &NetworkMessage<M>,
     ) -> bool {
-        let mut rng = ThreadRng::default();
-        if let Some(delay) = self.send_message_cost(&mut rng, message.from, message.to) {
+        if let Some(delay) = self.send_message_cost(rng, message.from, message.to) {
             if network_time.add(delay) <= self.network_time {
                 let to_node = self.to_node_senders.get(&message.to).unwrap();
                 to_node
