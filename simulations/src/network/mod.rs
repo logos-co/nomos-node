@@ -2,36 +2,39 @@
 use std::{
     collections::HashMap,
     ops::Add,
+    sync::{Arc, RwLock},
     time::{Duration, Instant},
 };
 // crates
 use crossbeam::channel::{self, Receiver, Sender};
-use rand::Rng;
+use rand::{rngs::ThreadRng, Rng};
+use rayon::prelude::*;
 // internal
 use crate::node::NodeId;
 
 pub mod behaviour;
 pub mod regions;
 
-pub type NetworkTime = Instant;
+type NetworkTime = Instant;
+type NetworkMessages<M> = Arc<RwLock<Vec<(NetworkTime, NetworkMessage<M>)>>>;
 
 pub struct Network<M> {
     pub regions: regions::RegionsData,
     network_time: NetworkTime,
-    messages: Vec<(NetworkTime, NetworkMessage<M>)>,
+    messages: NetworkMessages<M>,
     from_node_receivers: HashMap<NodeId, Receiver<NetworkMessage<M>>>,
     to_node_senders: HashMap<NodeId, Sender<NetworkMessage<M>>>,
 }
 
 impl<M> Network<M>
 where
-    M: Clone,
+    M: Send + Sync + Clone,
 {
     pub fn new(regions: regions::RegionsData) -> Self {
         Self {
             regions,
             network_time: Instant::now(),
-            messages: Vec::new(),
+            messages: Arc::new(RwLock::new(Vec::new())),
             from_node_receivers: HashMap::new(),
             to_node_senders: HashMap::new(),
         }
@@ -62,39 +65,65 @@ where
     }
 
     /// Collects and dispatches messages to connected interfaces.
-    pub fn step<R: Rng>(&mut self, rng: &mut R, time_passed: Duration) {
+    pub fn step(&mut self, time_passed: Duration) {
         self.collect_messages();
-        self.dispatch_after(rng, time_passed);
+        self.dispatch_after(time_passed);
     }
 
     /// Receive and store all messages from nodes.
     pub fn collect_messages(&mut self) {
-        self.from_node_receivers.iter().for_each(|(_, from_node)| {
-            while let Ok(message) = from_node.try_recv() {
-                self.messages.push((self.network_time, message));
-            }
-        });
+        let mut new_messages = self
+            .from_node_receivers
+            .par_iter()
+            .flat_map(|(_, from_node)| {
+                from_node
+                    .try_iter()
+                    .map(|msg| (self.network_time, msg))
+                    .collect::<Vec<_>>()
+            })
+            .collect();
+
+        let mut guard = self.messages.write().unwrap();
+        guard.append(&mut new_messages);
     }
 
     /// Reiterate all messages and send to appropriate nodes if simulated
     /// delay has passed.
-    pub fn dispatch_after<R: Rng>(&mut self, rng: &mut R, time_passed: Duration) {
+    pub fn dispatch_after(&mut self, time_passed: Duration) {
         self.network_time += time_passed;
 
-        let mut delayed = vec![];
-        while let Some((network_time, message)) = self.messages.pop() {
-            // If cost is None, message won't get sent nor it will be
-            // readded to the pending messages list.
-            if let Some(delay) = self.send_message_cost(rng, message.from, message.to) {
-                if network_time.add(delay) <= self.network_time {
-                    let to_node = self.to_node_senders.get(&message.to).unwrap();
-                    to_node.send(message).expect("Node should have connection");
-                } else {
-                    delayed.push((network_time, message));
-                }
+        let delayed: Vec<(NetworkTime, NetworkMessage<M>)> = self
+            .messages
+            .read()
+            .expect("lock")
+            .par_iter()
+            .filter(|(network_time, message)| self.send_or_drop_message(network_time, message))
+            .cloned()
+            .collect();
+
+        let mut guard = self.messages.write().unwrap();
+        *guard = delayed;
+    }
+
+    /// Returns true if message needs to be delayed and be dispatched in future.
+    fn send_or_drop_message(
+        &self,
+        network_time: &NetworkTime,
+        message: &NetworkMessage<M>,
+    ) -> bool {
+        let mut rng = ThreadRng::default();
+        if let Some(delay) = self.send_message_cost(&mut rng, message.from, message.to) {
+            if network_time.add(delay) <= self.network_time {
+                let to_node = self.to_node_senders.get(&message.to).unwrap();
+                to_node
+                    .send(message.clone())
+                    .expect("Node should have connection");
+                return false;
+            } else {
+                return true;
             }
         }
-        self.messages = delayed;
+        false
     }
 }
 
@@ -127,7 +156,6 @@ mod tests {
     };
     use crate::node::NodeId;
     use crossbeam::channel::{self, Receiver, Sender};
-    use rand::rngs::mock::StepRng;
     use std::{collections::HashMap, time::Duration};
 
     struct MockNetworkInterface {
@@ -165,7 +193,6 @@ mod tests {
 
     #[test]
     fn send_receive_messages() {
-        let mut rng = StepRng::new(1, 0);
         let node_a = 0.into();
         let node_b = 1.into();
 
@@ -188,18 +215,19 @@ mod tests {
         a.send_message(node_b, ());
         network.collect_messages();
 
+        println!("something");
         assert_eq!(a.receive_messages().len(), 0);
         assert_eq!(b.receive_messages().len(), 0);
 
-        network.step(&mut rng, Duration::from_millis(0));
+        network.step(Duration::from_millis(0));
         assert_eq!(a.receive_messages().len(), 0);
         assert_eq!(b.receive_messages().len(), 0);
 
-        network.step(&mut rng, Duration::from_millis(100));
+        network.step(Duration::from_millis(100));
         assert_eq!(a.receive_messages().len(), 0);
         assert_eq!(b.receive_messages().len(), 1);
 
-        network.step(&mut rng, Duration::from_millis(100));
+        network.step(Duration::from_millis(100));
         assert_eq!(a.receive_messages().len(), 0);
         assert_eq!(b.receive_messages().len(), 0);
 
@@ -208,14 +236,13 @@ mod tests {
         b.send_message(node_a, ());
         network.collect_messages();
 
-        network.dispatch_after(&mut rng, Duration::from_millis(100));
+        network.dispatch_after(Duration::from_millis(100));
         assert_eq!(a.receive_messages().len(), 3);
         assert_eq!(b.receive_messages().len(), 0);
     }
 
     #[test]
     fn regions_send_receive_messages() {
-        let mut rng = StepRng::new(1, 0);
         let node_a = 0.into();
         let node_b = 1.into();
         let node_c = 2.into();
@@ -265,7 +292,7 @@ mod tests {
         c.send_message(node_b, ());
         network.collect_messages();
 
-        network.dispatch_after(&mut rng, Duration::from_millis(100));
+        network.dispatch_after(Duration::from_millis(100));
         assert_eq!(a.receive_messages().len(), 1);
         assert_eq!(b.receive_messages().len(), 1);
         assert_eq!(c.receive_messages().len(), 0);
@@ -274,12 +301,12 @@ mod tests {
         b.send_message(node_c, ());
         network.collect_messages();
 
-        network.dispatch_after(&mut rng, Duration::from_millis(400));
+        network.dispatch_after(Duration::from_millis(400));
         assert_eq!(a.receive_messages().len(), 1); // c to a
         assert_eq!(b.receive_messages().len(), 2); // c to b && a to b
         assert_eq!(c.receive_messages().len(), 2); // a to c && b to c
 
-        network.dispatch_after(&mut rng, Duration::from_millis(100));
+        network.dispatch_after(Duration::from_millis(100));
         assert_eq!(a.receive_messages().len(), 0);
         assert_eq!(b.receive_messages().len(), 0);
         assert_eq!(c.receive_messages().len(), 1); // b to c
