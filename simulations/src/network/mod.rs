@@ -80,17 +80,18 @@ where
     /// delay has passed.
     pub fn dispatch_after<R: Rng>(&mut self, rng: &mut R, time_passed: Duration) {
         self.network_time += time_passed;
+
         let mut delayed = vec![];
         while let Some((network_time, message)) = self.messages.pop() {
-            // TODO: Handle message drops (remove unwrap).
-            let delay = self
-                .send_message_cost(rng, message.from, message.to)
-                .unwrap();
-            if network_time.add(delay) <= self.network_time {
-                let to_node = self.to_node_senders.get(&message.to).unwrap();
-                to_node.send(message).expect("Node should have connection");
-            } else {
-                delayed.push((network_time, message));
+            // If cost is None, message won't get sent nor it will be
+            // readded to the pending messages list.
+            if let Some(delay) = self.send_message_cost(rng, message.from, message.to) {
+                if network_time.add(delay) <= self.network_time {
+                    let to_node = self.to_node_senders.get(&message.to).unwrap();
+                    to_node.send(message).expect("Node should have connection");
+                } else {
+                    delayed.push((network_time, message));
+                }
             }
         }
         self.messages = delayed;

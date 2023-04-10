@@ -25,7 +25,7 @@ impl Default for TreeSettings {
         Self {
             tree_type: TreeType::default(),
             committee_size: 1,
-            depth: 1,
+            depth: 3, // Root, internal and leaf layers.
         }
     }
 }

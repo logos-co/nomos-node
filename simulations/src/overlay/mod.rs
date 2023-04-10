@@ -56,8 +56,8 @@ impl Layout {
         }
     }
 
-    pub fn committee(&self, node_id: NodeId) -> CommitteeId {
-        self.from_committee.get(&node_id).copied().unwrap()
+    pub fn committee(&self, node_id: NodeId) -> Option<CommitteeId> {
+        self.from_committee.get(&node_id).copied()
     }
 
     pub fn committee_nodes(&self, committee_id: CommitteeId) -> &Committee {
@@ -73,14 +73,14 @@ impl Layout {
             .map(|c| self.committees[&c].clone())
     }
 
-    pub fn children(&self, committee_id: CommitteeId) -> &[CommitteeId] {
-        &self.children[&committee_id]
+    pub fn children(&self, committee_id: CommitteeId) -> Option<&Vec<CommitteeId>> {
+        self.children.get(&committee_id)
     }
 
     pub fn children_nodes(&self, committee_id: CommitteeId) -> Vec<&Committee> {
         self.children(committee_id)
             .iter()
-            .map(|&committee_id| &self.committees[&committee_id])
+            .flat_map(|&committees| committees.iter().map(|c| &self.committees[c]))
             .collect()
     }
 
