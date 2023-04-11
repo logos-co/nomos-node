@@ -41,6 +41,7 @@ use crate::node::{Node, NodeId};
 use crate::output_processors::OutData;
 use crate::overlay::Overlay;
 use crate::runner::SimulationRunner;
+use crate::streaming::{Producer, Subscriber};
 use crate::warding::SimulationState;
 
 pub fn simulate<M, N: Node, O: Overlay>(
@@ -107,6 +108,91 @@ where
     }
     // write latest state
     runner.dump_state_to_out_data(&simulation_state, &mut out_data)?;
+    Ok(())
+}
+
+/// Simulate with sending the network state to any subscriber
+pub fn simulate_with_subscriber<M, N: Node, O: Overlay, P: Producer>(
+    runner: &mut SimulationRunner<M, N, O>,
+    gap: usize,
+    distribution: Option<Vec<f32>>,
+    settings: P::Settings,
+) -> anyhow::Result<()>
+where
+    M: Clone,
+    N: Send + Sync,
+    N::Settings: Clone,
+    N::State: Serialize,
+    O::Settings: Clone,
+    P::Subscriber: Send + Sync + 'static,
+    <P::Subscriber as Subscriber>::Record:
+        for<'a> TryFrom<&'a SimulationState<N>, Error = anyhow::Error>,
+{
+    let distribution =
+        distribution.unwrap_or_else(|| std::iter::repeat(1.0f32).take(gap).collect());
+
+    let layers: Vec<usize> = (0..gap).collect();
+
+    let mut deque = build_node_ids_deque(gap, runner);
+
+    let simulation_state = SimulationState {
+        nodes: Arc::clone(&runner.nodes),
+    };
+    let p = P::new(settings)?;
+    scopeguard::defer!(if let Err(e) = p.stop() {
+        eprintln!("Error stopping producer: {}", e);
+    });
+    let sub = p.subscribe()?;
+    std::thread::spawn(move || {
+        if let Err(e) = sub.run() {
+            eprintln!("Error running subscriber: {}", e);
+        }
+    });
+
+    loop {
+        let (group_index, node_id) =
+            choose_random_layer_and_node_id(&mut runner.rng, &distribution, &layers, &mut deque);
+
+        // remove node_id from group
+        deque.get_mut(group_index).unwrap().remove(&node_id);
+
+        {
+            let mut shared_nodes = runner.nodes.write().expect("Write access to nodes vector");
+            let node: &mut N = shared_nodes
+                .get_mut(node_id.inner())
+                .expect("Node should be present");
+            let prev_view = node.current_view();
+            node.step();
+            let after_view = node.current_view();
+            if after_view > prev_view {
+                // pass node to next step group
+                deque.get_mut(group_index + 1).unwrap().insert(node_id);
+            }
+        }
+
+        // check if any condition makes the simulation stop
+        if runner.check_wards(&simulation_state) {
+            break;
+        }
+
+        // if initial is empty then we finished a full round, append a new set to the end so we can
+        // compute the most advanced nodes again
+        if deque.first().unwrap().is_empty() {
+            let _ = deque.push_back(BTreeSet::default());
+            p.send(<P::Subscriber as Subscriber>::Record::try_from(
+                &simulation_state,
+            )?)?;
+        }
+
+        // if no more nodes to compute
+        if deque.iter().all(BTreeSet::is_empty) {
+            break;
+        }
+    }
+    // write latest state
+    p.send(<P::Subscriber as Subscriber>::Record::try_from(
+        &simulation_state,
+    )?)?;
     Ok(())
 }
 

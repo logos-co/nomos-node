@@ -10,6 +10,7 @@ use std::sync::{Arc, RwLock};
 use std::time::Duration;
 // crates
 use crate::network::Network;
+use crate::streaming::{Producer, Subscriber};
 use rand::rngs::SmallRng;
 use rand::{RngCore, SeedableRng};
 use rayon::prelude::*;
@@ -78,6 +79,43 @@ where
                 rounds_gap,
                 distribution,
             } => layered_runner::simulate(self, rounds_gap, distribution, out_data),
+        }
+    }
+
+    pub fn simulate_with_subscriber<P: Producer>(
+        &mut self,
+        settings: P::Settings,
+    ) -> anyhow::Result<()>
+    where
+        P::Subscriber: Send + Sync + 'static,
+        <P::Subscriber as Subscriber>::Record:
+            Send + Sync + 'static + for<'a> TryFrom<&'a SimulationState<N>, Error = anyhow::Error>,
+    {
+        match self.settings.runner_settings.clone() {
+            RunnerSettings::Sync => {
+                sync_runner::simulate_with_subscriber::<_, _, _, P>(self, settings)
+            }
+            RunnerSettings::Async { chunks } => {
+                async_runner::simulate_with_subscriber::<_, _, _, P>(self, chunks, settings)
+            }
+            RunnerSettings::Glauber {
+                maximum_iterations,
+                update_rate,
+            } => glauber_runner::simulate_with_subscriber::<_, _, _, P>(
+                self,
+                update_rate,
+                maximum_iterations,
+                settings,
+            ),
+            RunnerSettings::Layered {
+                rounds_gap,
+                distribution,
+            } => layered_runner::simulate_with_subscriber::<_, _, _, P>(
+                self,
+                rounds_gap,
+                distribution,
+                settings,
+            ),
         }
     }
 

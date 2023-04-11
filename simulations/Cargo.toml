@@ -15,6 +15,7 @@ nomos-core = { path = "../nomos-core" }
 polars = { version = "0.27", features = ["serde", "object", "json", "csv-file", "parquet", "dtype-struct"] }
 rand = { version = "0.8", features = ["small_rng"] }
 rayon = "1.7"
+scopeguard = "1"
 serde = { version = "1.0", features = ["derive", "rc"] }
 serde_with = "2.3"
 serde_json = "1.0"

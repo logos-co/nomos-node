@@ -4,6 +4,7 @@ use super::SimulationRunner;
 use crate::node::Node;
 use crate::output_processors::OutData;
 use crate::overlay::Overlay;
+use crate::streaming::{Producer, Subscriber};
 use crate::warding::SimulationState;
 use std::sync::Arc;
 
@@ -28,6 +29,47 @@ where
     for _ in 1.. {
         runner.step();
         runner.dump_state_to_out_data(&state, &mut out_data)?;
+        // check if any condition makes the simulation stop
+        if runner.check_wards(&state) {
+            break;
+        }
+    }
+    Ok(())
+}
+
+/// Simulate with sending the network state to any subscriber
+pub fn simulate_with_subscriber<M, N: Node, O: Overlay, P: Producer>(
+    runner: &mut SimulationRunner<M, N, O>,
+    settings: P::Settings,
+) -> anyhow::Result<()>
+where
+    M: Clone,
+    N: Send + Sync,
+    N::Settings: Clone,
+    N::State: Serialize,
+    O::Settings: Clone,
+    P::Subscriber: Send + Sync + 'static,
+    <P::Subscriber as Subscriber>::Record:
+        Send + Sync + 'static + for<'a> TryFrom<&'a SimulationState<N>, Error = anyhow::Error>,
+{
+    let state = SimulationState {
+        nodes: Arc::clone(&runner.nodes),
+    };
+
+    let p = P::new(settings)?;
+    scopeguard::defer!(if let Err(e) = p.stop() {
+        eprintln!("Error stopping producer: {}", e);
+    });
+    let subscriber = p.subscribe()?;
+    std::thread::spawn(move || {
+        if let Err(e) = subscriber.run() {
+            eprintln!("Error in subscriber: {}", e);
+        }
+    });
+    p.send(<P::Subscriber as Subscriber>::Record::try_from(&state)?)?;
+    for _ in 1.. {
+        runner.step();
+        p.send(<P::Subscriber as Subscriber>::Record::try_from(&state)?)?;
         // check if any condition makes the simulation stop
         if runner.check_wards(&state) {
             break;
