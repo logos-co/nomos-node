@@ -140,12 +140,12 @@ where
     };
     let p = P::new(settings)?;
     scopeguard::defer!(if let Err(e) = p.stop() {
-        eprintln!("Error stopping producer: {}", e);
+        eprintln!("Error stopping producer: {e}");
     });
     let sub = p.subscribe()?;
     std::thread::spawn(move || {
         if let Err(e) = sub.run() {
-            eprintln!("Error running subscriber: {}", e);
+            eprintln!("Error running subscriber: {e}");
         }
     });
 

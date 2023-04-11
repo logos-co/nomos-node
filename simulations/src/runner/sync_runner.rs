@@ -58,12 +58,12 @@ where
 
     let p = P::new(settings)?;
     scopeguard::defer!(if let Err(e) = p.stop() {
-        eprintln!("Error stopping producer: {}", e);
+        eprintln!("Error stopping producer: {e}");
     });
     let subscriber = p.subscribe()?;
     std::thread::spawn(move || {
         if let Err(e) = subscriber.run() {
-            eprintln!("Error in subscriber: {}", e);
+            eprintln!("Error in subscriber: {e}");
         }
     });
     p.send(<P::Subscriber as Subscriber>::Record::try_from(&state)?)?;
