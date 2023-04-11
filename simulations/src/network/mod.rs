@@ -2,7 +2,6 @@
 use std::{
     collections::HashMap,
     ops::Add,
-    sync::{Arc, RwLock},
     time::{Duration, Instant},
 };
 // crates
@@ -16,12 +15,11 @@ pub mod behaviour;
 pub mod regions;
 
 type NetworkTime = Instant;
-type NetworkMessages<M> = Arc<RwLock<Vec<(NetworkTime, NetworkMessage<M>)>>>;
 
 pub struct Network<M> {
     pub regions: regions::RegionsData,
     network_time: NetworkTime,
-    messages: NetworkMessages<M>,
+    messages: Vec<(NetworkTime, NetworkMessage<M>)>,
     from_node_receivers: HashMap<NodeId, Receiver<NetworkMessage<M>>>,
     to_node_senders: HashMap<NodeId, Sender<NetworkMessage<M>>>,
 }
@@ -34,7 +32,7 @@ where
         Self {
             regions,
             network_time: Instant::now(),
-            messages: Arc::new(RwLock::new(Vec::new())),
+            messages: Vec::new(),
             from_node_receivers: HashMap::new(),
             to_node_senders: HashMap::new(),
         }
@@ -83,8 +81,7 @@ where
             })
             .collect();
 
-        let mut guard = self.messages.write().unwrap();
-        guard.append(&mut new_messages);
+        self.messages.append(&mut new_messages);
     }
 
     /// Reiterate all messages and send to appropriate nodes if simulated
@@ -92,10 +89,8 @@ where
     pub fn dispatch_after(&mut self, time_passed: Duration) {
         self.network_time += time_passed;
 
-        let delayed: Vec<(NetworkTime, NetworkMessage<M>)> = self
+        let delayed = self
             .messages
-            .read()
-            .expect("lock")
             .par_iter()
             .filter(|(network_time, message)| {
                 let mut rng = ThreadRng::default();
@@ -104,8 +99,7 @@ where
             .cloned()
             .collect();
 
-        let mut guard = self.messages.write().unwrap();
-        *guard = delayed;
+        self.messages = delayed;
     }
 
     /// Returns true if message needs to be delayed and be dispatched in future.
@@ -218,7 +212,6 @@ mod tests {
         a.send_message(node_b, ());
         network.collect_messages();
 
-        println!("something");
         assert_eq!(a.receive_messages().len(), 0);
         assert_eq!(b.receive_messages().len(), 0);
 
