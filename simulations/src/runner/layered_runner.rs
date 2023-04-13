@@ -50,7 +50,7 @@ pub fn simulate<M, N: Node, O: Overlay>(
     mut out_data: Option<&mut Vec<OutData>>,
 ) -> anyhow::Result<()>
 where
-    M: Clone,
+    M: Send + Sync + Clone,
     N: Send + Sync,
     N::Settings: Clone,
     N::State: Serialize,

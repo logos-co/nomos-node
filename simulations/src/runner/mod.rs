@@ -37,7 +37,7 @@ where
 
 impl<M, N: Node, O: Overlay> SimulationRunner<M, N, O>
 where
-    M: Clone,
+    M: Send + Sync + Clone,
     N: Send + Sync,
     N::Settings: Clone,
     N::State: Serialize,
@@ -101,8 +101,7 @@ where
     }
 
     fn step(&mut self) {
-        self.network
-            .dispatch_after(&mut self.rng, Duration::from_millis(100));
+        self.network.dispatch_after(Duration::from_millis(100));
         self.nodes
             .write()
             .expect("Single access to nodes vector")
