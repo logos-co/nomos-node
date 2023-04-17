@@ -8,19 +8,22 @@ use serde::Serialize;
 use std::collections::BTreeSet;
 use std::sync::Arc;
 
+use super::{SimulationRunnerInner, dump_state_to_out_data};
+
 /// [Glauber dynamics simulation](https://en.wikipedia.org/wiki/Glauber_dynamics)
 pub fn simulate<M, N: Node, O: Overlay>(
-    runner: &mut SimulationRunner<M, N, O>,
+    runner: &mut SimulationRunnerInner<M, N, O>,
     update_rate: usize,
     maximum_iterations: usize,
     mut out_data: Option<&mut Vec<OutData>>,
 ) -> anyhow::Result<()>
 where
-    M: Clone,
+    M: Clone + Send,
     N: Send + Sync,
-    N::Settings: Clone,
+    N::Settings: Clone + Send,
     N::State: Serialize,
-    O::Settings: Clone,
+    O: Send,
+    O::Settings: Clone + Send,
 {
     let simulation_state = SimulationState {
         nodes: Arc::clone(&runner.nodes),
@@ -54,12 +57,12 @@ where
             // check if any condition makes the simulation stop
             if runner.check_wards(&simulation_state) {
                 // we break the outer main loop, so we need to dump it before the breaking
-                runner.dump_state_to_out_data(&simulation_state, &mut out_data)?;
+                dump_state_to_out_data(&simulation_state, &mut out_data)?;
                 break 'main;
             }
         }
         // update_rate iterations reached, so dump state
-        runner.dump_state_to_out_data(&simulation_state, &mut out_data)?;
+        dump_state_to_out_data(&simulation_state, &mut out_data)?;
     }
     Ok(())
 }

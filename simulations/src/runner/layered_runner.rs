@@ -43,18 +43,21 @@ use crate::overlay::Overlay;
 use crate::runner::SimulationRunner;
 use crate::warding::SimulationState;
 
+use super::{SimulationRunnerInner, dump_state_to_out_data};
+
 pub fn simulate<M, N: Node, O: Overlay>(
-    runner: &mut SimulationRunner<M, N, O>,
+    runner: &mut SimulationRunnerInner<M, N, O>,
     gap: usize,
     distribution: Option<Vec<f32>>,
     mut out_data: Option<&mut Vec<OutData>>,
 ) -> anyhow::Result<()>
 where
-    M: Clone,
+    M: Clone + Send,
     N: Send + Sync,
-    N::Settings: Clone,
+    N::Settings: Clone + Send,
     N::State: Serialize,
-    O::Settings: Clone,
+    O: Send,
+    O::Settings: Clone + Send,
 {
     let distribution =
         distribution.unwrap_or_else(|| std::iter::repeat(1.0f32).take(gap).collect());
@@ -97,7 +100,7 @@ where
         // compute the most advanced nodes again
         if deque.first().unwrap().is_empty() {
             let _ = deque.push_back(BTreeSet::default());
-            runner.dump_state_to_out_data(&simulation_state, &mut out_data)?;
+            dump_state_to_out_data(&simulation_state, &mut out_data)?;
         }
 
         // if no more nodes to compute
@@ -106,7 +109,7 @@ where
         }
     }
     // write latest state
-    runner.dump_state_to_out_data(&simulation_state, &mut out_data)?;
+    dump_state_to_out_data(&simulation_state, &mut out_data)?;
     Ok(())
 }
 

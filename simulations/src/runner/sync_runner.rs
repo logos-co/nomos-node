@@ -1,6 +1,6 @@
 use serde::Serialize;
 
-use super::SimulationRunner;
+use super::{SimulationRunner, SimulationRunnerInner, dump_state_to_out_data};
 use crate::node::Node;
 use crate::output_processors::OutData;
 use crate::overlay::Overlay;
@@ -9,25 +9,26 @@ use std::sync::Arc;
 
 /// Simulate with option of dumping the network state as a `::polars::Series`
 pub fn simulate<M, N: Node, O: Overlay>(
-    runner: &mut SimulationRunner<M, N, O>,
+    runner: &mut SimulationRunnerInner<M, N, O>,
     mut out_data: Option<&mut Vec<OutData>>,
 ) -> anyhow::Result<()>
 where
-    M: Clone,
+    M: Clone + Send,
     N: Send + Sync,
-    N::Settings: Clone,
+    N::Settings: Clone + Send,
     N::State: Serialize,
-    O::Settings: Clone,
+    O: Send,
+    O::Settings: Clone + Send,
 {
     let state = SimulationState {
         nodes: Arc::clone(&runner.nodes),
     };
 
-    runner.dump_state_to_out_data(&state, &mut out_data)?;
+    dump_state_to_out_data(&state, &mut out_data)?;
 
     for _ in 1.. {
         runner.step();
-        runner.dump_state_to_out_data(&state, &mut out_data)?;
+        dump_state_to_out_data(&state, &mut out_data)?;
         // check if any condition makes the simulation stop
         if runner.check_wards(&state) {
             break;
