@@ -1,29 +1,28 @@
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
-use super::{NodeId, Node};
-
-
+use super::{Node, NodeId};
 
 #[derive(Debug, Default, Copy, Clone, Serialize, Deserialize)]
 pub struct DummyStreamingState {
-  pub current_view: usize,
+    pub current_view: usize,
 }
 
 /// This node implementation only used for testing different streaming implementation purposes.
 pub struct DummyStreamingNode<S> {
-  id: NodeId,
-  state: DummyStreamingState,
-  settings: S,
+    id: NodeId,
+    state: DummyStreamingState,
+    #[allow(dead_code)]
+    settings: S,
 }
 
 impl<S> DummyStreamingNode<S> {
-  pub fn new(id: NodeId, settgins: S) -> Self {
-    Self {
-      id,
-      state: DummyStreamingState::default(),
-      settings: settgins,
+    pub fn new(id: NodeId, settings: S) -> Self {
+        Self {
+            id,
+            state: DummyStreamingState::default(),
+            settings,
+        }
     }
-  }
 }
 
 impl<S> Node for DummyStreamingNode<S> {

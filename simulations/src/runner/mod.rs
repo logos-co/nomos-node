@@ -17,37 +17,40 @@ use rayon::prelude::*;
 use serde::Serialize;
 // internal
 use crate::node::Node;
-use crate::output_processors::OutData;
 use crate::overlay::Overlay;
 use crate::settings::{RunnerSettings, SimulationSettings};
 use crate::warding::{SimulationState, SimulationWard};
 
 /// Encapsulation solution for the simulations runner
 /// Holds the network state, the simulating nodes and the simulation settings.
-pub struct SimulationRunner<M, N, O>
+pub struct SimulationRunner<M, N, O, P>
 where
     N: Node,
     O: Overlay,
+    P: Producer,
 {
     nodes: Arc<RwLock<Vec<N>>>,
     network: Network<M>,
-    settings: SimulationSettings<N::Settings, O::Settings>,
+    settings: SimulationSettings<N::Settings, O::Settings, P::Settings>,
     rng: SmallRng,
     _overlay: PhantomData<O>,
 }
 
-impl<M, N: Node, O: Overlay> SimulationRunner<M, N, O>
+impl<M, N: Node, O: Overlay, P: Producer> SimulationRunner<M, N, O, P>
 where
     M: Clone,
     N: Send + Sync,
     N::Settings: Clone,
     N::State: Serialize,
     O::Settings: Clone,
+    P::Subscriber: Send + Sync + 'static,
+    <P::Subscriber as Subscriber>::Record:
+        Send + Sync + 'static + for<'a> TryFrom<&'a SimulationState<N>, Error = anyhow::Error>,
 {
     pub fn new(
         network: Network<M>,
         nodes: Vec<N>,
-        settings: SimulationSettings<N::Settings, O::Settings>,
+        settings: SimulationSettings<N::Settings, O::Settings, P::Settings>,
     ) -> Self {
         let seed = settings
             .seed
@@ -67,67 +70,36 @@ where
         }
     }
 
-    pub fn simulate(&mut self, out_data: Option<&mut Vec<OutData>>) -> anyhow::Result<()> {
+    pub fn simulate(&mut self) -> anyhow::Result<()> {
         match self.settings.runner_settings.clone() {
-            RunnerSettings::Sync => sync_runner::simulate(self, out_data),
-            RunnerSettings::Async { chunks } => async_runner::simulate(self, chunks, out_data),
+            RunnerSettings::Sync => sync_runner::simulate::<_, _, _, P>(
+                self,
+                self.settings.stream_settings.settings.clone(),
+            ),
+            RunnerSettings::Async { chunks } => async_runner::simulate::<_, _, _, P>(
+                self,
+                chunks,
+                self.settings.stream_settings.settings.clone(),
+            ),
             RunnerSettings::Glauber {
                 maximum_iterations,
                 update_rate,
-            } => glauber_runner::simulate(self, update_rate, maximum_iterations, out_data),
-            RunnerSettings::Layered {
-                rounds_gap,
-                distribution,
-            } => layered_runner::simulate(self, rounds_gap, distribution, out_data),
-        }
-    }
-
-    pub fn simulate_with_subscriber<P: Producer>(
-        &mut self,
-        settings: P::Settings,
-    ) -> anyhow::Result<()>
-    where
-        P::Subscriber: Send + Sync + 'static,
-        <P::Subscriber as Subscriber>::Record:
-            Send + Sync + 'static + for<'a> TryFrom<&'a SimulationState<N>, Error = anyhow::Error>,
-    {
-        match self.settings.runner_settings.clone() {
-            RunnerSettings::Sync => {
-                sync_runner::simulate_with_subscriber::<_, _, _, P>(self, settings)
-            }
-            RunnerSettings::Async { chunks } => {
-                async_runner::simulate_with_subscriber::<_, _, _, P>(self, chunks, settings)
-            }
-            RunnerSettings::Glauber {
-                maximum_iterations,
-                update_rate,
-            } => glauber_runner::simulate_with_subscriber::<_, _, _, P>(
+            } => glauber_runner::simulate::<_, _, _, P>(
                 self,
                 update_rate,
                 maximum_iterations,
-                settings,
+                self.settings.stream_settings.settings.clone(),
             ),
             RunnerSettings::Layered {
                 rounds_gap,
                 distribution,
-            } => layered_runner::simulate_with_subscriber::<_, _, _, P>(
+            } => layered_runner::simulate::<_, _, _, P>(
                 self,
                 rounds_gap,
                 distribution,
-                settings,
+                self.settings.stream_settings.settings.clone(),
             ),
         }
-    }
-
-    fn dump_state_to_out_data(
-        &self,
-        simulation_state: &SimulationState<N>,
-        out_data: &mut Option<&mut Vec<OutData>>,
-    ) -> anyhow::Result<()> {
-        if let Some(out_data) = out_data {
-            out_data.push(OutData::try_from(simulation_state)?);
-        }
-        Ok(())
     }
 
     fn check_wards(&mut self, state: &SimulationState<N>) -> bool {

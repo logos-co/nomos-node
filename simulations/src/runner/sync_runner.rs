@@ -2,44 +2,14 @@ use serde::Serialize;
 
 use super::SimulationRunner;
 use crate::node::Node;
-use crate::output_processors::OutData;
 use crate::overlay::Overlay;
 use crate::streaming::{Producer, Subscriber};
 use crate::warding::SimulationState;
 use std::sync::Arc;
 
-/// Simulate with option of dumping the network state as a `::polars::Series`
-pub fn simulate<M, N: Node, O: Overlay>(
-    runner: &mut SimulationRunner<M, N, O>,
-    mut out_data: Option<&mut Vec<OutData>>,
-) -> anyhow::Result<()>
-where
-    M: Clone,
-    N: Send + Sync,
-    N::Settings: Clone,
-    N::State: Serialize,
-    O::Settings: Clone,
-{
-    let state = SimulationState {
-        nodes: Arc::clone(&runner.nodes),
-    };
-
-    runner.dump_state_to_out_data(&state, &mut out_data)?;
-
-    for _ in 1.. {
-        runner.step();
-        runner.dump_state_to_out_data(&state, &mut out_data)?;
-        // check if any condition makes the simulation stop
-        if runner.check_wards(&state) {
-            break;
-        }
-    }
-    Ok(())
-}
-
 /// Simulate with sending the network state to any subscriber
-pub fn simulate_with_subscriber<M, N: Node, O: Overlay, P: Producer>(
-    runner: &mut SimulationRunner<M, N, O>,
+pub fn simulate<M, N: Node, O: Overlay, P: Producer>(
+    runner: &mut SimulationRunner<M, N, O, P>,
     settings: P::Settings,
 ) -> anyhow::Result<()>
 where
@@ -90,12 +60,14 @@ mod tests {
             dummy::{DummyMessage, DummyNetworkInterface, DummyNode, DummySettings},
             Node, NodeId, OverlayState, SharedState, ViewOverlay,
         },
+        output_processors::OutData,
         overlay::{
             tree::{TreeOverlay, TreeSettings},
             Overlay,
         },
         runner::SimulationRunner,
         settings::SimulationSettings,
+        streaming::naive::{NaiveProducer, NaiveSettings},
     };
     use crossbeam::channel;
     use rand::rngs::mock::StepRng;
@@ -137,11 +109,12 @@ mod tests {
 
     #[test]
     fn runner_one_step() {
-        let settings: SimulationSettings<DummySettings, TreeSettings> = SimulationSettings {
-            node_count: 10,
-            committee_size: 1,
-            ..Default::default()
-        };
+        let settings: SimulationSettings<DummySettings, TreeSettings, NaiveSettings> =
+            SimulationSettings {
+                node_count: 10,
+                committee_size: 1,
+                ..Default::default()
+            };
 
         let mut rng = StepRng::new(1, 0);
         let node_ids: Vec<NodeId> = (0..settings.node_count).map(Into::into).collect();
@@ -157,8 +130,12 @@ mod tests {
         }));
         let nodes = init_dummy_nodes(&node_ids, &mut network, overlay_state);
 
-        let mut runner: SimulationRunner<DummyMessage, DummyNode, TreeOverlay> =
-            SimulationRunner::new(network, nodes, settings);
+        let mut runner: SimulationRunner<
+            DummyMessage,
+            DummyNode,
+            TreeOverlay,
+            NaiveProducer<OutData>,
+        > = SimulationRunner::new(network, nodes, settings);
         runner.step();
 
         let nodes = runner.nodes.read().unwrap();
@@ -169,11 +146,12 @@ mod tests {
 
     #[test]
     fn runner_send_receive() {
-        let settings: SimulationSettings<DummySettings, TreeSettings> = SimulationSettings {
-            node_count: 10,
-            committee_size: 1,
-            ..Default::default()
-        };
+        let settings: SimulationSettings<DummySettings, TreeSettings, NaiveSettings> =
+            SimulationSettings {
+                node_count: 10,
+                committee_size: 1,
+                ..Default::default()
+            };
 
         let mut rng = StepRng::new(1, 0);
         let node_ids: Vec<NodeId> = (0..settings.node_count).map(Into::into).collect();
@@ -201,8 +179,12 @@ mod tests {
         }
         network.collect_messages();
 
-        let mut runner: SimulationRunner<DummyMessage, DummyNode, TreeOverlay> =
-            SimulationRunner::new(network, nodes, settings);
+        let mut runner: SimulationRunner<
+            DummyMessage,
+            DummyNode,
+            TreeOverlay,
+            NaiveProducer<OutData>,
+        > = SimulationRunner::new(network, nodes, settings);
 
         runner.step();
 

@@ -1,16 +1,17 @@
 use std::{
     cell::RefCell,
     fs::{File, OpenOptions},
+    io::Write,
     path::PathBuf,
-    sync::{Arc, Mutex}, io::Write,
+    sync::{Arc, Mutex},
 };
 
 use super::{Producer, Subscriber};
 
 use crossbeam::channel::{bounded, unbounded, Receiver, Sender};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NaiveSettings {
     pub path: PathBuf,
 }
@@ -20,9 +21,7 @@ impl Default for NaiveSettings {
         let mut tmp = std::env::temp_dir();
         tmp.push("simulation");
         tmp.set_extension("data");
-        Self {
-            path: tmp,
-        }
+        Self { path: tmp }
     }
 }
 
@@ -137,12 +136,21 @@ where
     }
 }
 
-
 #[cfg(test)]
 mod tests {
-    use std::{time::Duration, collections::HashMap};
+    use std::{collections::HashMap, time::Duration};
 
-    use crate::{runner::SimulationRunner, node::{dummy_streaming::DummyStreamingNode, NodeId, Node}, overlay::tree::TreeOverlay, network::{Network, regions::{RegionsData, Region}, behaviour::NetworkBehaviour}, warding::SimulationState};
+    use crate::{
+        network::{
+            behaviour::NetworkBehaviour,
+            regions::{Region, RegionsData},
+            Network,
+        },
+        node::{dummy_streaming::DummyStreamingNode, Node, NodeId},
+        overlay::tree::TreeOverlay,
+        runner::SimulationRunner,
+        warding::SimulationState,
+    };
 
     use super::*;
 
@@ -156,13 +164,16 @@ mod tests {
 
         fn try_from(value: &SimulationState<DummyStreamingNode<()>>) -> Result<Self, Self::Error> {
             Ok(Self {
-                states: value.nodes.read().expect("failed to read nodes").iter().map(|node| {
-                    (node.id(), node.current_view())
-                }).collect(),
+                states: value
+                    .nodes
+                    .read()
+                    .expect("failed to read nodes")
+                    .iter()
+                    .map(|node| (node.id(), node.current_view()))
+                    .collect(),
             })
         }
     }
-
 
     #[test]
     fn test_streaming() {
@@ -171,53 +182,66 @@ mod tests {
             ..Default::default()
         };
 
-        let nodes = (0..6).map(|idx| {
-            DummyStreamingNode::new(NodeId::from(idx), ())
-        }).collect::<Vec<_>>();
+        let nodes = (0..6)
+            .map(|idx| DummyStreamingNode::new(NodeId::from(idx), ()))
+            .collect::<Vec<_>>();
         let network = Network::new(RegionsData {
-            regions: (0..6).map(|idx| {
-                let region = match idx % 6 {
-                    0 => Region::Europe,
-                    1 => Region::NorthAmerica,
-                    2 => Region::SouthAmerica,
-                    3 => Region::Asia,
-                    4 => Region::Africa,
-                    5 => Region::Australia,
-                    _ => unreachable!(),
-                };
-                (region, vec![idx.into()])
-            }).collect(),
-            node_region: (0..6).map(|idx| {
-                let region = match idx % 6 {
-                    0 => Region::Europe,
-                    1 => Region::NorthAmerica,
-                    2 => Region::SouthAmerica,
-                    3 => Region::Asia,
-                    4 => Region::Africa,
-                    5 => Region::Australia,
-                    _ => unreachable!(),
-                };
-                (idx.into(), region)
-            }).collect(),
-            region_network_behaviour: (0..6).map(|idx| {
-                let region = match idx % 6 {
-                    0 => Region::Europe,
-                    1 => Region::NorthAmerica,
-                    2 => Region::SouthAmerica,
-                    3 => Region::Asia,
-                    4 => Region::Africa,
-                    5 => Region::Australia,
-                    _ => unreachable!(),
-                };
-                ((region, region), NetworkBehaviour {
-                    delay: Duration::from_millis(100),
-                    drop: 0.0,
+            regions: (0..6)
+                .map(|idx| {
+                    let region = match idx % 6 {
+                        0 => Region::Europe,
+                        1 => Region::NorthAmerica,
+                        2 => Region::SouthAmerica,
+                        3 => Region::Asia,
+                        4 => Region::Africa,
+                        5 => Region::Australia,
+                        _ => unreachable!(),
+                    };
+                    (region, vec![idx.into()])
                 })
-            }).collect()
+                .collect(),
+            node_region: (0..6)
+                .map(|idx| {
+                    let region = match idx % 6 {
+                        0 => Region::Europe,
+                        1 => Region::NorthAmerica,
+                        2 => Region::SouthAmerica,
+                        3 => Region::Asia,
+                        4 => Region::Africa,
+                        5 => Region::Australia,
+                        _ => unreachable!(),
+                    };
+                    (idx.into(), region)
+                })
+                .collect(),
+            region_network_behaviour: (0..6)
+                .map(|idx| {
+                    let region = match idx % 6 {
+                        0 => Region::Europe,
+                        1 => Region::NorthAmerica,
+                        2 => Region::SouthAmerica,
+                        3 => Region::Asia,
+                        4 => Region::Africa,
+                        5 => Region::Australia,
+                        _ => unreachable!(),
+                    };
+                    (
+                        (region, region),
+                        NetworkBehaviour {
+                            delay: Duration::from_millis(100),
+                            drop: 0.0,
+                        },
+                    )
+                })
+                .collect(),
         });
-        let mut simulation_runner: SimulationRunner<(), DummyStreamingNode<()>, TreeOverlay> =
-            SimulationRunner::new(network, nodes, simulation_settings);
+        let mut simulation_runner: SimulationRunner<
+            (),
+            DummyStreamingNode<()>,
+            TreeOverlay,
+            NaiveProducer<NaiveRecord>,
+        > = SimulationRunner::new(network, nodes, simulation_settings);
 
-        simulation_runner.simulate_with_subscriber::<NaiveProducer<NaiveRecord>>(NaiveSettings::default()).unwrap();
+        simulation_runner.simulate().unwrap();
     }
 }
