@@ -43,7 +43,8 @@ impl<'de> serde::Deserialize<'de> for Region {
     where
         D: serde::Deserializer<'de>,
     {
-        String::deserialize(deserializer).and_then(|s| FromStr::from_str(s.as_str()).map_err(serde::de::Error::custom))
+        String::deserialize(deserializer)
+            .and_then(|s| FromStr::from_str(s.as_str()).map_err(serde::de::Error::custom))
     }
 }
 
