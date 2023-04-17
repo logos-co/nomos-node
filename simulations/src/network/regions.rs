@@ -1,5 +1,5 @@
 // std
-use std::collections::HashMap;
+use std::{collections::HashMap, str::FromStr};
 // crates
 use serde::{Deserialize, Serialize};
 // internal
@@ -15,12 +15,10 @@ pub enum Region {
     Australia,
 }
 
-impl<'de> serde::Deserialize<'de> for Region {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        let s = String::deserialize(deserializer)?;
+impl FromStr for Region {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s
             .trim()
             .chars()
@@ -35,8 +33,17 @@ impl<'de> serde::Deserialize<'de> for Region {
             "africa" => Ok(Self::Africa),
             "southamerica" => Ok(Self::SouthAmerica),
             "australia" => Ok(Self::Australia),
-            _ => Err(serde::de::Error::custom("Invalid region")),
+            _ => Err(format!("Invalid region: {s}")),
         }
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for Region {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        String::deserialize(deserializer).and_then(|s| FromStr::from_str(s.as_str()).map_err(serde::de::Error::custom))
     }
 }
 
