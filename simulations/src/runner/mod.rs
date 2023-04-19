@@ -5,18 +5,19 @@ mod sync_runner;
 
 // std
 use std::marker::PhantomData;
-
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
+
 // crates
-use crate::network::Network;
 use crate::streaming::{Producer, Subscriber};
-use crossbeam::channel::{Sender, Receiver};
+use crossbeam::channel::{Receiver, Sender};
 use rand::rngs::SmallRng;
 use rand::{RngCore, SeedableRng};
 use rayon::prelude::*;
 use serde::Serialize;
+
 // internal
+use crate::network::Network;
 use crate::node::Node;
 use crate::overlay::Overlay;
 use crate::settings::{RunnerSettings, SimulationSettings};
@@ -52,9 +53,9 @@ where
     rng: SmallRng,
 }
 
-impl<M, N: Node, O: Overlay, P: Producer> SimulationRunnerInner<M, N, O, P> 
+impl<M, N: Node, O: Overlay, P: Producer> SimulationRunnerInner<M, N, O, P>
 where
-    M: Clone + Send + Sync,
+    M: Send + Sync + Clone,
     N: Send + Sync,
     N::Settings: Clone + Send,
     N::State: Serialize,
@@ -72,12 +73,10 @@ where
     }
 
     fn step(&mut self, nodes: &mut Vec<N>) {
-        self.network.dispatch_after(&mut self.rng, Duration::from_millis(100));
-        nodes
-            .par_iter_mut()
-            .for_each(|node| {
-                node.step();
-            });
+        self.network.dispatch_after(Duration::from_millis(100));
+        nodes.par_iter_mut().for_each(|node| {
+            node.step();
+        });
         self.network.collect_messages();
     }
 }
@@ -120,7 +119,6 @@ where
         let nodes = Arc::new(RwLock::new(nodes));
         Self {
             inner: Arc::new(RwLock::new(SimulationRunnerInner {
-                
                 network,
                 rng,
                 settings,
@@ -161,5 +159,3 @@ where
         }
     }
 }
-
-

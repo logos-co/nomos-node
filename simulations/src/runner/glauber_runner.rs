@@ -18,7 +18,7 @@ pub fn simulate<M, N: Node, O: Overlay, P: Producer>(
     settings: P::Settings,
 ) -> anyhow::Result<()>
 where
-    M: Clone + Send,
+    M: Send + Sync + Clone,
     N: Send + Sync,
     N::Settings: Clone + Send,
     N::State: Serialize,

@@ -1,12 +1,12 @@
 use serde::Serialize;
 
-use super::{SimulationRunner, SimulationRunnerInner, SimulationRunnerHandle};
+use super::{SimulationRunner, SimulationRunnerHandle, SimulationRunnerInner};
 use crate::node::Node;
 use crate::overlay::Overlay;
 use crate::streaming::{Producer, Subscriber};
 use crate::warding::SimulationState;
-use std::sync::Arc;
 use crossbeam::channel::{bounded, select};
+use std::sync::Arc;
 
 /// Simulate with sending the network state to any subscriber
 pub fn simulate<M, N: Node, O: Overlay, P: Producer>(
@@ -14,7 +14,7 @@ pub fn simulate<M, N: Node, O: Overlay, P: Producer>(
     settings: P::Settings,
 ) -> anyhow::Result<SimulationRunnerHandle>
 where
-    M: Clone + Send,
+    M: Send + Sync + Clone,
     N: Send + Sync,
     N::Settings: Clone + Send,
     N::State: Serialize,

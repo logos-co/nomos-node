@@ -315,9 +315,6 @@ impl DummyNode {
 
     fn handle_leaf(&mut self, message: &NetworkMessage<DummyMessage>) {
         if let DummyMessage::Proposal(block) = &message.payload {
-            if block.view > self.current_view() {
-                self.update_view(block.view);
-            }
             if !self.is_vote_sent(block.view) {
                 let parents = &self.local_view.parents.as_ref().expect("leaf has parents");
                 parents.iter().for_each(|node_id| {
@@ -601,7 +598,7 @@ mod tests {
         }
 
         // 1. Leaders receive vote and broadcast new Proposal(Block) to all nodes.
-        network.dispatch_after(&mut rng, Duration::from_millis(100));
+        network.dispatch_after(Duration::from_millis(100));
         nodes.iter_mut().for_each(|(_, node)| {
             node.step();
         });
@@ -609,7 +606,7 @@ mod tests {
 
         // 2. a) All nodes received proposal block.
         //    b) Leaf nodes send vote to internal nodes.
-        network.dispatch_after(&mut rng, Duration::from_millis(100));
+        network.dispatch_after(Duration::from_millis(100));
         nodes.iter_mut().for_each(|(_, node)| {
             node.step();
         });
@@ -632,7 +629,7 @@ mod tests {
         assert!(nodes[&6.into()].state().view_state[&1].vote_sent); // Leaf
 
         // 3. Internal nodes send vote to root node.
-        network.dispatch_after(&mut rng, Duration::from_millis(100));
+        network.dispatch_after(Duration::from_millis(100));
         nodes.iter_mut().for_each(|(_, node)| {
             node.step();
         });
@@ -650,7 +647,7 @@ mod tests {
         assert!(nodes[&6.into()].state().view_state[&1].vote_sent); // Leaf
 
         // 4. Root node send vote to next view leader nodes.
-        network.dispatch_after(&mut rng, Duration::from_millis(100));
+        network.dispatch_after(Duration::from_millis(100));
         nodes.iter_mut().for_each(|(_, node)| {
             node.step();
         });
@@ -666,7 +663,7 @@ mod tests {
         assert!(nodes[&6.into()].state().view_state[&1].vote_sent); // Leaf
 
         // 5. Leaders receive vote and broadcast new Proposal(Block) to all nodes.
-        network.dispatch_after(&mut rng, Duration::from_millis(100));
+        network.dispatch_after(Duration::from_millis(100));
         nodes.iter_mut().for_each(|(_, node)| {
             node.step();
         });
@@ -679,7 +676,7 @@ mod tests {
 
         // 6. a) All nodes received proposal block.
         //    b) Leaf nodes send vote to internal nodes.
-        network.dispatch_after(&mut rng, Duration::from_millis(100));
+        network.dispatch_after(Duration::from_millis(100));
         nodes.iter_mut().for_each(|(_, node)| {
             node.step();
         });
@@ -740,7 +737,7 @@ mod tests {
         }
 
         for _ in 0..7 {
-            network.dispatch_after(&mut rng, Duration::from_millis(100));
+            network.dispatch_after(Duration::from_millis(100));
             nodes.iter_mut().for_each(|(_, node)| {
                 node.step();
             });
@@ -789,7 +786,7 @@ mod tests {
         }
 
         for _ in 0..7 {
-            network.dispatch_after(&mut rng, Duration::from_millis(100));
+            network.dispatch_after(Duration::from_millis(100));
             nodes.iter_mut().for_each(|(_, node)| {
                 node.step();
             });
@@ -835,7 +832,7 @@ mod tests {
 
         let nodes = Arc::new(RwLock::new(nodes));
         for _ in 0..9 {
-            network.dispatch_after(&mut rng, Duration::from_millis(100));
+            network.dispatch_after(Duration::from_millis(100));
             nodes.write().unwrap().par_iter_mut().for_each(|(_, node)| {
                 node.step();
             });
