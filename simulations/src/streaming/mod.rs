@@ -44,7 +44,7 @@ pub struct StreamSettings<S> {
 }
 
 pub trait Producer: Send + Sync + 'static {
-    type Settings: Clone;
+    type Settings: Clone + Send;
     type Subscriber: Subscriber;
 
     fn new(settings: Self::Settings) -> anyhow::Result<Self>

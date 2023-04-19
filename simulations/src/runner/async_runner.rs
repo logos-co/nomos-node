@@ -18,11 +18,11 @@ pub fn simulate<M, N: Node, O: Overlay, P: Producer>(
     settings: P::Settings,
 ) -> anyhow::Result<SimulationRunnerHandle>
 where
-    M: Clone + Send + Sync,
-    N: Send + Sync,
+    M: Clone + Send + Sync + 'static,
+    N: Send + Sync + 'static,
     N::Settings: Clone + Send,
     N::State: Serialize,
-    O::Settings: Clone,
+    O::Settings: Clone + Send,
     P::Subscriber: Send + Sync + 'static,
     <P::Subscriber as Subscriber>::Record:
         Send + Sync + 'static + for<'a> TryFrom<&'a SimulationState<N>, Error = anyhow::Error>,
@@ -39,23 +39,22 @@ where
         .map(N::id)
         .collect();
 
-    let p = P::new(settings)?;
-    scopeguard::defer!(if let Err(e) = p.stop() {
-        eprintln!("Error stopping producer: {e}");
-    });
-    let subscriber = p.subscribe()?;
-    std::thread::spawn(move || {
-        if let Err(e) = subscriber.run() {
-            eprintln!("Error in subscriber: {e}");
-        }
-    });
-
-    let mut inner = runner.inner.clone();
+    let inner = runner.inner.clone();
     let nodes = runner.nodes.clone();
     let (stop_tx, stop_rx) = bounded(1);
     let handle = SimulationRunnerHandle {
         stop_tx,
         handle: std::thread::spawn(move || {
+            let p = P::new(settings)?;
+            scopeguard::defer!(if let Err(e) = p.stop() {
+                eprintln!("Error stopping producer: {e}");
+            });
+            let subscriber = p.subscribe()?;
+            std::thread::spawn(move || {
+                if let Err(e) = subscriber.run() {
+                    eprintln!("Error in subscriber: {e}");
+                }
+            });
             loop {
                 select! {
                     recv(stop_rx) -> _ => {

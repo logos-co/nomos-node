@@ -1,3 +1,7 @@
+use arc_swap::ArcSwapOption;
+use crossbeam::channel::{bounded, unbounded, Receiver, Sender};
+use polars::prelude::*;
+use serde::{Deserialize, Serialize};
 use std::{
     fs::File,
     io::Cursor,
@@ -5,10 +9,6 @@ use std::{
     str::FromStr,
     sync::Mutex,
 };
-use arc_swap::ArcSwapOption;
-use crossbeam::channel::{bounded, unbounded, Receiver, Sender};
-use polars::prelude::*;
-use serde::{Deserialize, Serialize};
 
 use super::{Producer, Subscriber};
 

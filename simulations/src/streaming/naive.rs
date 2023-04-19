@@ -97,7 +97,7 @@ where
 #[derive(Debug)]
 pub struct NaiveSubscriber<R> {
     file: Arc<Mutex<File>>,
-    recvs: Arc<Receivers<R>>
+    recvs: Arc<Receivers<R>>,
 }
 
 impl<R> Subscriber for NaiveSubscriber<R>

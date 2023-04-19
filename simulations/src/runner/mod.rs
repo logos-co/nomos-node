@@ -10,7 +10,7 @@ use std::time::Duration;
 
 // crates
 use crate::streaming::{Producer, Subscriber};
-use crossbeam::channel::{Receiver, Sender};
+use crossbeam::channel::Sender;
 use rand::rngs::SmallRng;
 use rand::{RngCore, SeedableRng};
 use rayon::prelude::*;
@@ -21,7 +21,8 @@ use crate::network::Network;
 use crate::node::Node;
 use crate::overlay::Overlay;
 use crate::settings::{RunnerSettings, SimulationSettings};
-use crate::warding::{SimulationState, SimulationWard};
+use crate::streaming::StreamSettings;
+use crate::warding::{SimulationState, SimulationWard, Ward};
 
 pub struct SimulationRunnerHandle {
     handle: std::thread::JoinHandle<anyhow::Result<()>>,
@@ -42,37 +43,34 @@ impl SimulationRunnerHandle {
     }
 }
 
-pub(crate) struct SimulationRunnerInner<M, N, O, P>
-where
-    N: Node,
-    O: Overlay,
-    P: Producer,
-{
+pub(crate) struct SimulationRunnerInner<M> {
     network: Network<M>,
-    settings: SimulationSettings<N::Settings, O::Settings, P::Settings>,
+    wards: Vec<Ward>,
     rng: SmallRng,
 }
 
-impl<M, N: Node, O: Overlay, P: Producer> SimulationRunnerInner<M, N, O, P>
+impl<M> SimulationRunnerInner<M>
 where
     M: Send + Sync + Clone,
-    N: Send + Sync,
-    N::Settings: Clone + Send,
-    N::State: Serialize,
-    O::Settings: Clone,
-    P::Subscriber: Send + Sync + 'static,
-    <P::Subscriber as Subscriber>::Record:
-        Send + Sync + 'static + for<'a> TryFrom<&'a SimulationState<N>, Error = anyhow::Error>,
 {
-    fn check_wards(&mut self, state: &SimulationState<N>) -> bool {
-        self.settings
-            .wards
+    fn check_wards<N>(&mut self, state: &SimulationState<N>) -> bool
+    where
+        N: Node + Send + Sync,
+        N::Settings: Clone + Send,
+        N::State: Serialize,
+    {
+        self.wards
             .par_iter_mut()
             .map(|ward| ward.analyze(state))
             .any(|x| x)
     }
 
-    fn step(&mut self, nodes: &mut Vec<N>) {
+    fn step<N>(&mut self, nodes: &mut Vec<N>)
+    where
+        N: Node + Send + Sync,
+        N::Settings: Clone + Send,
+        N::State: Serialize,
+    {
         self.network.dispatch_after(Duration::from_millis(100));
         nodes.par_iter_mut().for_each(|node| {
             node.step();
@@ -89,17 +87,20 @@ where
     O: Overlay,
     P: Producer,
 {
-    inner: Arc<RwLock<SimulationRunnerInner<M, N, O, P>>>,
+    inner: Arc<RwLock<SimulationRunnerInner<M>>>,
     nodes: Arc<RwLock<Vec<N>>>,
+    runner_settings: RunnerSettings,
+    stream_settings: StreamSettings<P::Settings>,
+    _overlay: PhantomData<O>,
 }
 
 impl<M, N: Node, O: Overlay, P: Producer> SimulationRunner<M, N, O, P>
 where
-    M: Clone + Send + Sync,
-    N: Send + Sync,
+    M: Clone + Send + Sync + 'static,
+    N: Send + Sync + 'static,
     N::Settings: Clone + Send,
     N::State: Serialize,
-    O::Settings: Clone,
+    O::Settings: Clone + Send,
     P::Subscriber: Send + Sync + 'static,
     <P::Subscriber as Subscriber>::Record:
         Send + Sync + 'static + for<'a> TryFrom<&'a SimulationState<N>, Error = anyhow::Error>,
@@ -117,26 +118,40 @@ where
 
         let rng = SmallRng::seed_from_u64(seed);
         let nodes = Arc::new(RwLock::new(nodes));
+        let SimulationSettings {
+            network_behaviors: _,
+            regions: _,
+            wards,
+            overlay_settings: _,
+            node_settings: _,
+            runner_settings,
+            stream_settings,
+            node_count: _,
+            committee_size: _,
+            seed: _,
+        } = settings;
         Self {
+            stream_settings,
+            runner_settings,
             inner: Arc::new(RwLock::new(SimulationRunnerInner {
                 network,
                 rng,
-                settings,
+                wards,
             })),
             nodes,
+            _overlay: PhantomData,
         }
     }
 
-    pub fn simulate(&mut self) -> anyhow::Result<()> {
-        match self.settings.runner_settings.clone() {
-            RunnerSettings::Sync => sync_runner::simulate::<_, _, _, P>(
-                self,
-                self.settings.stream_settings.settings.clone(),
-            ),
+    pub fn simulate(&mut self) -> anyhow::Result<SimulationRunnerHandle> {
+        match self.runner_settings.clone() {
+            RunnerSettings::Sync => {
+                sync_runner::simulate::<_, _, _, P>(self, self.stream_settings.settings.clone())
+            }
             RunnerSettings::Async { chunks } => async_runner::simulate::<_, _, _, P>(
                 self,
                 chunks,
-                self.settings.stream_settings.settings.clone(),
+                self.stream_settings.settings.clone(),
             ),
             RunnerSettings::Glauber {
                 maximum_iterations,
@@ -145,7 +160,7 @@ where
                 self,
                 update_rate,
                 maximum_iterations,
-                self.settings.stream_settings.settings.clone(),
+                self.stream_settings.settings.clone(),
             ),
             RunnerSettings::Layered {
                 rounds_gap,
@@ -154,7 +169,7 @@ where
                 self,
                 rounds_gap,
                 distribution,
-                self.settings.stream_settings.settings.clone(),
+                self.stream_settings.settings.clone(),
             ),
         }
     }

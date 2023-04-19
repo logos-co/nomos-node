@@ -1,6 +1,6 @@
 use serde::Serialize;
 
-use super::{SimulationRunner, SimulationRunnerHandle, SimulationRunnerInner};
+use super::{SimulationRunner, SimulationRunnerHandle};
 use crate::node::Node;
 use crate::overlay::Overlay;
 use crate::streaming::{Producer, Subscriber};
@@ -14,8 +14,8 @@ pub fn simulate<M, N: Node, O: Overlay, P: Producer>(
     settings: P::Settings,
 ) -> anyhow::Result<SimulationRunnerHandle>
 where
-    M: Send + Sync + Clone,
-    N: Send + Sync,
+    M: Send + Sync + Clone + 'static,
+    N: Send + Sync + 'static,
     N::Settings: Clone + Send,
     N::State: Serialize,
     O::Settings: Clone,
@@ -27,30 +27,32 @@ where
         nodes: Arc::clone(&runner.nodes),
     };
 
-    let p = P::new(settings)?;
-    scopeguard::defer!(if let Err(e) = p.stop() {
-        eprintln!("Error stopping producer: {e}");
-    });
-    let subscriber = p.subscribe()?;
-    std::thread::spawn(move || {
-        if let Err(e) = subscriber.run() {
-            eprintln!("Error in subscriber: {e}");
-        }
-    });
-    let mut inner = runner.inner.clone();
+    let inner = runner.inner.clone();
     let nodes = runner.nodes.clone();
-    p.send(<P::Subscriber as Subscriber>::Record::try_from(&state)?)?;
+
     let (stop_tx, stop_rx) = bounded(1);
     let handle = SimulationRunnerHandle {
         stop_tx,
         handle: std::thread::spawn(move || {
+            let p = P::new(settings)?;
+            scopeguard::defer!(if let Err(e) = p.stop() {
+                eprintln!("Error stopping producer: {e}");
+            });
+            let subscriber = p.subscribe()?;
+            std::thread::spawn(move || {
+                if let Err(e) = subscriber.run() {
+                    eprintln!("Error in subscriber: {e}");
+                }
+            });
+            p.send(<P::Subscriber as Subscriber>::Record::try_from(&state)?)?;
             loop {
                 select! {
                     recv(stop_rx) -> _ => {
                         return Ok(());
                     }
                     default => {
-                        let nodes = nodes.write().expect("Write access to nodes vector");
+                        let mut inner = inner.write().expect("Write access to inner simulation state");
+                        let mut nodes = nodes.write().expect("Write access to nodes vector");
                         inner.step(&mut nodes);
                         p.send(<P::Subscriber as Subscriber>::Record::try_from(&state).unwrap()).unwrap();
                         // check if any condition makes the simulation stop
