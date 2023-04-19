@@ -1,5 +1,4 @@
 use std::{
-    cell::RefCell,
     fs::{File, OpenOptions},
     io::Write,
     path::PathBuf,
@@ -7,7 +6,7 @@ use std::{
 };
 
 use super::{Producer, Subscriber};
-
+use arc_swap::ArcSwapOption;
 use crossbeam::channel::{bounded, unbounded, Receiver, Sender};
 use serde::{Deserialize, Serialize};
 
@@ -35,7 +34,7 @@ struct Receivers<R> {
 pub struct NaiveProducer<R> {
     sender: Sender<R>,
     stop_tx: Sender<()>,
-    recvs: RefCell<Option<Receivers<R>>>,
+    recvs: ArcSwapOption<Receivers<R>>,
     settings: NaiveSettings,
 }
 
@@ -55,7 +54,7 @@ where
         let (stop_tx, stop_rx) = bounded(1);
         Ok(Self {
             sender,
-            recvs: RefCell::new(Some(Receivers { stop_rx, recv })),
+            recvs: ArcSwapOption::from(Some(Arc::new(Receivers { stop_rx, recv }))),
             stop_tx,
             settings,
         })
@@ -69,13 +68,13 @@ where
     where
         Self::Subscriber: Sized,
     {
-        let mut recvs = self.recvs.borrow_mut();
+        let recvs = self.recvs.load();
         if recvs.is_none() {
             return Err(anyhow::anyhow!("Producer has been subscribed"));
         }
 
         let mut opts = OpenOptions::new();
-        let Receivers { stop_rx, recv } = recvs.take().unwrap();
+        let recvs = self.recvs.swap(None).unwrap();
         let this = NaiveSubscriber {
             file: Arc::new(Mutex::new(
                 opts.truncate(true)
@@ -84,8 +83,7 @@ where
                     .write(true)
                     .open(&self.settings.path)?,
             )),
-            stop_rx,
-            recv,
+            recvs,
         };
         eprintln!("Subscribed to {}", self.settings.path.display());
         Ok(this)
@@ -99,8 +97,7 @@ where
 #[derive(Debug)]
 pub struct NaiveSubscriber<R> {
     file: Arc<Mutex<File>>,
-    stop_rx: Receiver<()>,
-    recv: Receiver<R>,
+    recvs: Arc<Receivers<R>>
 }
 
 impl<R> Subscriber for NaiveSubscriber<R>
@@ -110,16 +107,16 @@ where
     type Record = R;
 
     fn next(&self) -> Option<anyhow::Result<Self::Record>> {
-        Some(self.recv.recv().map_err(From::from))
+        Some(self.recvs.recv.recv().map_err(From::from))
     }
 
     fn run(self) -> anyhow::Result<()> {
         loop {
             crossbeam::select! {
-                recv(self.stop_rx) -> _ => {
+                recv(self.recvs.stop_rx) -> _ => {
                     break;
                 }
-                recv(self.recv) -> msg => {
+                recv(self.recvs.recv) -> msg => {
                     self.sink(msg?)?;
                 }
             }
@@ -153,7 +150,6 @@ mod tests {
     };
 
     use super::*;
-
     #[derive(Debug, Clone, Serialize)]
     struct NaiveRecord {
         states: HashMap<NodeId, usize>,

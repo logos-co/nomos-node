@@ -43,7 +43,7 @@ pub struct StreamSettings<S> {
     pub settings: S,
 }
 
-pub trait Producer {
+pub trait Producer: Send + Sync + 'static {
     type Settings: Clone;
     type Subscriber: Subscriber;
 
