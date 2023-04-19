@@ -5,16 +5,17 @@ mod sync_runner;
 
 // std
 use std::marker::PhantomData;
-
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
+
 // crates
-use crate::network::Network;
 use rand::rngs::SmallRng;
 use rand::{RngCore, SeedableRng};
 use rayon::prelude::*;
 use serde::Serialize;
+
 // internal
+use crate::network::Network;
 use crate::node::Node;
 use crate::output_processors::OutData;
 use crate::overlay::Overlay;
