@@ -15,9 +15,13 @@ nomos-core = { path = "../nomos-core" }
 polars = { version = "0.27", features = ["serde", "object", "json", "csv-file", "parquet", "dtype-struct"] }
 rand = { version = "0.8", features = ["small_rng"] }
 rayon = "1.7"
+scopeguard = "1"
 serde = { version = "1.0", features = ["derive", "rc"] }
 serde_with = "2.3"
 serde_json = "1.0"
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 getrandom = { version = "0.2", features = ["js"] }
+
+[dev-dependencies]
+tempfile = "3.4"

@@ -38,26 +38,27 @@ use rand::rngs::SmallRng;
 use serde::Serialize;
 // internal
 use crate::node::{Node, NodeId};
-use crate::output_processors::OutData;
 use crate::overlay::Overlay;
 use crate::runner::SimulationRunner;
+use crate::streaming::{Producer, Subscriber};
 use crate::warding::SimulationState;
 
-use super::{SimulationRunnerInner, dump_state_to_out_data};
-
-pub fn simulate<M, N: Node, O: Overlay>(
-    runner: &mut SimulationRunnerInner<M, N, O>,
+/// Simulate with sending the network state to any subscriber
+pub fn simulate<M, N: Node, O: Overlay, P: Producer>(
+    runner: &mut SimulationRunner<M, N, O, P>,
     gap: usize,
     distribution: Option<Vec<f32>>,
-    mut out_data: Option<&mut Vec<OutData>>,
+    settings: P::Settings,
 ) -> anyhow::Result<()>
 where
     M: Clone + Send,
     N: Send + Sync,
     N::Settings: Clone + Send,
     N::State: Serialize,
-    O: Send,
-    O::Settings: Clone + Send,
+    O::Settings: Clone,
+    P::Subscriber: Send + Sync + 'static,
+    <P::Subscriber as Subscriber>::Record:
+        for<'a> TryFrom<&'a SimulationState<N>, Error = anyhow::Error>,
 {
     let distribution =
         distribution.unwrap_or_else(|| std::iter::repeat(1.0f32).take(gap).collect());
@@ -69,6 +70,16 @@ where
     let simulation_state = SimulationState {
         nodes: Arc::clone(&runner.nodes),
     };
+    let p = P::new(settings)?;
+    scopeguard::defer!(if let Err(e) = p.stop() {
+        eprintln!("Error stopping producer: {e}");
+    });
+    let sub = p.subscribe()?;
+    std::thread::spawn(move || {
+        if let Err(e) = sub.run() {
+            eprintln!("Error running subscriber: {e}");
+        }
+    });
 
     loop {
         let (group_index, node_id) =
@@ -100,7 +111,9 @@ where
         // compute the most advanced nodes again
         if deque.first().unwrap().is_empty() {
             let _ = deque.push_back(BTreeSet::default());
-            dump_state_to_out_data(&simulation_state, &mut out_data)?;
+            p.send(<P::Subscriber as Subscriber>::Record::try_from(
+                &simulation_state,
+            )?)?;
         }
 
         // if no more nodes to compute
@@ -109,7 +122,9 @@ where
         }
     }
     // write latest state
-    dump_state_to_out_data(&simulation_state, &mut out_data)?;
+    p.send(<P::Subscriber as Subscriber>::Record::try_from(
+        &simulation_state,
+    )?)?;
     Ok(())
 }
 
@@ -137,13 +152,14 @@ fn choose_random_layer_and_node_id(
     (i, *node_id)
 }
 
-fn build_node_ids_deque<M, N, O>(
+fn build_node_ids_deque<M, N, O, P>(
     gap: usize,
-    runner: &SimulationRunner<M, N, O>,
+    runner: &SimulationRunner<M, N, O, P>,
 ) -> FixedSliceDeque<BTreeSet<NodeId>>
 where
     N: Node,
     O: Overlay,
+    P: Producer,
 {
     // add a +1 so we always have
     let mut deque = FixedSliceDeque::new(gap + 1);

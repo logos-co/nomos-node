@@ -1,40 +1,68 @@
 use serde::Serialize;
 
-use super::{SimulationRunner, SimulationRunnerInner, dump_state_to_out_data};
+use super::{SimulationRunner, SimulationRunnerInner, SimulationRunnerHandle};
 use crate::node::Node;
-use crate::output_processors::OutData;
 use crate::overlay::Overlay;
+use crate::streaming::{Producer, Subscriber};
 use crate::warding::SimulationState;
 use std::sync::Arc;
+use crossbeam::channel::{bounded, select};
 
-/// Simulate with option of dumping the network state as a `::polars::Series`
-pub fn simulate<M, N: Node, O: Overlay>(
-    runner: &mut SimulationRunnerInner<M, N, O>,
-    mut out_data: Option<&mut Vec<OutData>>,
-) -> anyhow::Result<()>
+/// Simulate with sending the network state to any subscriber
+pub fn simulate<M, N: Node, O: Overlay, P: Producer>(
+    runner: &mut SimulationRunner<M, N, O, P>,
+    settings: P::Settings,
+) -> anyhow::Result<SimulationRunnerHandle>
 where
     M: Clone + Send,
     N: Send + Sync,
     N::Settings: Clone + Send,
     N::State: Serialize,
-    O: Send,
-    O::Settings: Clone + Send,
+    O::Settings: Clone,
+    P::Subscriber: Send + Sync + 'static,
+    <P::Subscriber as Subscriber>::Record:
+        Send + Sync + 'static + for<'a> TryFrom<&'a SimulationState<N>, Error = anyhow::Error>,
 {
     let state = SimulationState {
         nodes: Arc::clone(&runner.nodes),
     };
 
-    dump_state_to_out_data(&state, &mut out_data)?;
-
-    for _ in 1.. {
-        runner.step();
-        dump_state_to_out_data(&state, &mut out_data)?;
-        // check if any condition makes the simulation stop
-        if runner.check_wards(&state) {
-            break;
+    let p = P::new(settings)?;
+    scopeguard::defer!(if let Err(e) = p.stop() {
+        eprintln!("Error stopping producer: {e}");
+    });
+    let subscriber = p.subscribe()?;
+    std::thread::spawn(move || {
+        if let Err(e) = subscriber.run() {
+            eprintln!("Error in subscriber: {e}");
         }
-    }
-    Ok(())
+    });
+    let mut inner = runner.inner.clone();
+    let nodes = runner.nodes.clone();
+    p.send(<P::Subscriber as Subscriber>::Record::try_from(&state)?)?;
+    let (stop_tx, stop_rx) = bounded(1);
+    let handle = SimulationRunnerHandle {
+        stop_tx,
+        handle: std::thread::spawn(move || {
+            loop {
+                select! {
+                    recv(stop_rx) -> _ => {
+                        return Ok(());
+                    }
+                    default => {
+                        let nodes = nodes.write().expect("Write access to nodes vector");
+                        inner.step(&mut nodes);
+                        p.send(<P::Subscriber as Subscriber>::Record::try_from(&state).unwrap()).unwrap();
+                        // check if any condition makes the simulation stop
+                        if inner.check_wards(&state) {
+                            return Ok(());
+                        }
+                    }
+                }
+            }
+        }),
+    };
+    Ok(handle)
 }
 
 #[cfg(test)]
@@ -49,12 +77,14 @@ mod tests {
             dummy::{DummyMessage, DummyNetworkInterface, DummyNode, DummySettings},
             Node, NodeId, OverlayState, SharedState, ViewOverlay,
         },
+        output_processors::OutData,
         overlay::{
             tree::{TreeOverlay, TreeSettings},
             Overlay,
         },
         runner::SimulationRunner,
         settings::SimulationSettings,
+        streaming::naive::{NaiveProducer, NaiveSettings},
     };
     use crossbeam::channel;
     use rand::rngs::mock::StepRng;
@@ -96,11 +126,12 @@ mod tests {
 
     #[test]
     fn runner_one_step() {
-        let settings: SimulationSettings<DummySettings, TreeSettings> = SimulationSettings {
-            node_count: 10,
-            committee_size: 1,
-            ..Default::default()
-        };
+        let settings: SimulationSettings<DummySettings, TreeSettings, NaiveSettings> =
+            SimulationSettings {
+                node_count: 10,
+                committee_size: 1,
+                ..Default::default()
+            };
 
         let mut rng = StepRng::new(1, 0);
         let node_ids: Vec<NodeId> = (0..settings.node_count).map(Into::into).collect();
@@ -116,8 +147,12 @@ mod tests {
         }));
         let nodes = init_dummy_nodes(&node_ids, &mut network, overlay_state);
 
-        let mut runner: SimulationRunner<DummyMessage, DummyNode, TreeOverlay> =
-            SimulationRunner::new(network, nodes, settings);
+        let mut runner: SimulationRunner<
+            DummyMessage,
+            DummyNode,
+            TreeOverlay,
+            NaiveProducer<OutData>,
+        > = SimulationRunner::new(network, nodes, settings);
         runner.step();
 
         let nodes = runner.nodes.read().unwrap();
@@ -128,11 +163,12 @@ mod tests {
 
     #[test]
     fn runner_send_receive() {
-        let settings: SimulationSettings<DummySettings, TreeSettings> = SimulationSettings {
-            node_count: 10,
-            committee_size: 1,
-            ..Default::default()
-        };
+        let settings: SimulationSettings<DummySettings, TreeSettings, NaiveSettings> =
+            SimulationSettings {
+                node_count: 10,
+                committee_size: 1,
+                ..Default::default()
+            };
 
         let mut rng = StepRng::new(1, 0);
         let node_ids: Vec<NodeId> = (0..settings.node_count).map(Into::into).collect();
@@ -160,8 +196,12 @@ mod tests {
         }
         network.collect_messages();
 
-        let mut runner: SimulationRunner<DummyMessage, DummyNode, TreeOverlay> =
-            SimulationRunner::new(network, nodes, settings);
+        let mut runner: SimulationRunner<
+            DummyMessage,
+            DummyNode,
+            TreeOverlay,
+            NaiveProducer<OutData>,
+        > = SimulationRunner::new(network, nodes, settings);
 
         runner.step();
 

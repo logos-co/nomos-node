@@ -1,33 +1,45 @@
 use crate::node::{Node, NodeId};
-use crate::output_processors::OutData;
 use crate::overlay::Overlay;
 use crate::runner::SimulationRunner;
+use crate::streaming::{Producer, Subscriber};
 use crate::warding::SimulationState;
 use rand::prelude::IteratorRandom;
 use serde::Serialize;
 use std::collections::BTreeSet;
 use std::sync::Arc;
 
-use super::{SimulationRunnerInner, dump_state_to_out_data};
-
+/// Simulate with sending the network state to any subscriber.
+///
 /// [Glauber dynamics simulation](https://en.wikipedia.org/wiki/Glauber_dynamics)
-pub fn simulate<M, N: Node, O: Overlay>(
-    runner: &mut SimulationRunnerInner<M, N, O>,
+pub fn simulate<M, N: Node, O: Overlay, P: Producer>(
+    runner: &mut SimulationRunner<M, N, O, P>,
     update_rate: usize,
     maximum_iterations: usize,
-    mut out_data: Option<&mut Vec<OutData>>,
+    settings: P::Settings,
 ) -> anyhow::Result<()>
 where
     M: Clone + Send,
     N: Send + Sync,
     N::Settings: Clone + Send,
     N::State: Serialize,
-    O: Send,
-    O::Settings: Clone + Send,
+    O::Settings: Clone,
+    P::Subscriber: Send + Sync + 'static,
+    <P::Subscriber as Subscriber>::Record:
+        for<'a> TryFrom<&'a SimulationState<N>, Error = anyhow::Error>,
 {
     let simulation_state = SimulationState {
         nodes: Arc::clone(&runner.nodes),
     };
+    let p = P::new(settings)?;
+    scopeguard::defer!(if let Err(e) = p.stop() {
+        eprintln!("Error stopping producer: {e}");
+    });
+    let subscriber = p.subscribe()?;
+    std::thread::spawn(move || {
+        if let Err(e) = subscriber.run() {
+            eprintln!("Error in subscriber: {e}");
+        }
+    });
     let nodes_remaining: BTreeSet<NodeId> = (0..runner
         .nodes
         .read()
@@ -57,12 +69,16 @@ where
             // check if any condition makes the simulation stop
             if runner.check_wards(&simulation_state) {
                 // we break the outer main loop, so we need to dump it before the breaking
-                dump_state_to_out_data(&simulation_state, &mut out_data)?;
+                p.send(<P::Subscriber as Subscriber>::Record::try_from(
+                    &simulation_state,
+                )?)?;
                 break 'main;
             }
         }
         // update_rate iterations reached, so dump state
-        dump_state_to_out_data(&simulation_state, &mut out_data)?;
+        p.send(<P::Subscriber as Subscriber>::Record::try_from(
+            &simulation_state,
+        )?)?;
     }
     Ok(())
 }
