@@ -1,12 +1,11 @@
 use std::{
-    cell::RefCell,
     fs::File,
     io::Cursor,
     path::{Path, PathBuf},
     str::FromStr,
     sync::Mutex,
 };
-
+use arc_swap::ArcSwapOption;
 use crossbeam::channel::{bounded, unbounded, Receiver, Sender};
 use polars::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -61,7 +60,7 @@ struct Receivers<R> {
 pub struct PolarsProducer<R> {
     sender: Sender<R>,
     stop_tx: Sender<()>,
-    recvs: RefCell<Option<Receivers<R>>>,
+    recvs: ArcSwapOption<Receivers<R>>,
     settings: PolarsSettings,
 }
 
@@ -81,7 +80,7 @@ where
         let (stop_tx, stop_rx) = bounded(1);
         Ok(Self {
             sender,
-            recvs: RefCell::new(Some(Receivers { stop_rx, recv })),
+            recvs: ArcSwapOption::from(Some(Arc::new(Receivers { stop_rx, recv }))),
             stop_tx,
             settings,
         })
@@ -95,16 +94,15 @@ where
     where
         Self::Subscriber: Sized,
     {
-        let mut recvs = self.recvs.borrow_mut();
+        let recvs = self.recvs.load();
         if recvs.is_none() {
             return Err(anyhow::anyhow!("Producer has been subscribed"));
         }
 
-        let Receivers { stop_rx, recv } = recvs.take().unwrap();
+        let recvs = self.recvs.swap(None).unwrap();
         let this = PolarsSubscriber {
             data: Arc::new(Mutex::new(Vec::new())),
-            stop_rx,
-            recv,
+            recvs,
             path: self.settings.path.clone(),
             format: self.settings.format,
         };
@@ -121,8 +119,7 @@ pub struct PolarsSubscriber<R> {
     data: Arc<Mutex<Vec<R>>>,
     path: PathBuf,
     format: PolarsFormat,
-    recv: Receiver<R>,
-    stop_rx: Receiver<()>,
+    recvs: Arc<Receivers<R>>,
 }
 
 impl<R> PolarsSubscriber<R>
@@ -156,16 +153,16 @@ where
     type Record = R;
 
     fn next(&self) -> Option<anyhow::Result<Self::Record>> {
-        Some(self.recv.recv().map_err(From::from))
+        Some(self.recvs.recv.recv().map_err(From::from))
     }
 
     fn run(self) -> anyhow::Result<()> {
         loop {
             crossbeam::select! {
-                recv(self.stop_rx) -> _ => {
+                recv(self.recvs.stop_rx) -> _ => {
                     return self.persist();
                 }
-                recv(self.recv) -> msg => {
+                recv(self.recvs.recv) -> msg => {
                     self.sink(msg?)?;
                 }
             }
