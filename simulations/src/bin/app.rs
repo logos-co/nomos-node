@@ -7,7 +7,6 @@ use clap::Parser;
 use serde::de::DeserializeOwned;
 use simulations::network::regions::RegionsData;
 use simulations::network::Network;
-use simulations::overlay::tree::TreeOverlay;
 use simulations::streaming::StreamType;
 // internal
 use simulations::{
@@ -33,7 +32,7 @@ impl SimulationApp {
             input_settings,
             stream_type,
         } = self;
-
+        let simulation_settings: SimulationSettings = load_json_from_file(&input_settings)?;
         let nodes = vec![]; // TODO: Initialize nodes of different types.
         let regions_data = RegionsData::new(HashMap::new(), HashMap::new());
         let network = Network::new(regions_data);
@@ -41,37 +40,22 @@ impl SimulationApp {
         // build up series vector
         match stream_type {
             simulations::streaming::StreamType::Naive => {
-                let simulation_settings: SimulationSettings<_, _, _> =
-                    load_json_from_file(&input_settings)?;
-                let simulation_runner: SimulationRunner<
-                    (),
-                    CarnotNode,
-                    TreeOverlay,
-                    NaiveProducer<OutData>,
-                > = SimulationRunner::new(network, nodes, simulation_settings);
-                simulation_runner.simulate()?
+                let simulation_settings: SimulationSettings = load_json_from_file(&input_settings)?;
+                let simulation_runner: SimulationRunner<(), CarnotNode> =
+                    SimulationRunner::new(network, nodes, simulation_settings);
+                simulation_runner.simulate::<NaiveProducer<OutData>>()?
             }
             simulations::streaming::StreamType::Polars => {
-                let simulation_settings: SimulationSettings<_, _, _> =
-                    load_json_from_file(&input_settings)?;
-                let simulation_runner: SimulationRunner<
-                    (),
-                    CarnotNode,
-                    TreeOverlay,
-                    PolarsProducer<OutData>,
-                > = SimulationRunner::new(network, nodes, simulation_settings);
-                simulation_runner.simulate()?
+                let simulation_settings: SimulationSettings = load_json_from_file(&input_settings)?;
+                let simulation_runner: SimulationRunner<(), CarnotNode> =
+                    SimulationRunner::new(network, nodes, simulation_settings);
+                simulation_runner.simulate::<PolarsProducer<OutData>>()?
             }
             simulations::streaming::StreamType::IO => {
-                let simulation_settings: SimulationSettings<_, _, _> =
-                    load_json_from_file(&input_settings)?;
-                let simulation_runner: SimulationRunner<
-                    (),
-                    CarnotNode,
-                    TreeOverlay,
-                    IOProducer<std::io::Stdout, OutData>,
-                > = SimulationRunner::new(network, nodes, simulation_settings);
-                simulation_runner.simulate()?
+                let simulation_settings: SimulationSettings = load_json_from_file(&input_settings)?;
+                let simulation_runner: SimulationRunner<(), CarnotNode> =
+                    SimulationRunner::new(network, nodes, simulation_settings);
+                simulation_runner.simulate::<IOProducer<std::io::Stdout, OutData>>()?
             }
         };
         Ok(())

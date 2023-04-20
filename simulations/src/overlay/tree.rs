@@ -7,13 +7,13 @@ use serde::Deserialize;
 use super::{Committee, Layout, Overlay};
 use crate::node::{CommitteeId, NodeId};
 
-#[derive(Clone, Default, Deserialize)]
+#[derive(Clone, Debug, Default, Deserialize)]
 pub enum TreeType {
     #[default]
     FullBinaryTree,
 }
 
-#[derive(Clone, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct TreeSettings {
     pub tree_type: TreeType,
     pub committee_size: usize,

@@ -1,6 +1,6 @@
 use std::sync::{Arc, Mutex};
 
-use super::{Producer, Receivers, Subscriber};
+use super::{Producer, Receivers, StreamSettings, Subscriber};
 use arc_swap::ArcSwapOption;
 use crossbeam::channel::{bounded, unbounded, Sender};
 use serde::{Deserialize, Serialize};
@@ -17,6 +17,19 @@ impl Default for IOStreamSettings {
         }
     }
 }
+
+// impl<W> TryFrom<StreamSettings> for IOStreamSettings<W> {
+//     type Error = String;
+//
+//     fn try_from(settings: StreamSettings) -> Result<Self, Self::Error> {
+//         match settings {
+//             StreamSettings::IO(settings) => Ok(IOStreamSettings {
+//                 writer: settings.writer,
+//             }),
+//             _ => Err("io settings can't be created".into()),
+//         }
+//     }
+// }
 
 impl<'de> Deserialize<'de> for IOStreamSettings {
     fn deserialize<D>(_deserializer: D) -> Result<Self, D::Error>
@@ -46,10 +59,11 @@ where
 
     type Subscriber = IOSubscriber<W, R>;
 
-    fn new(settings: Self::Settings) -> anyhow::Result<Self>
+    fn new(settings: StreamSettings) -> anyhow::Result<Self>
     where
         Self: Sized,
     {
+        let settings: IOStreamSettings<W> = settings.try_into().expect("io settings");
         let (sender, recv) = unbounded();
         let (stop_tx, stop_rx) = bounded(1);
         Ok(Self {
@@ -139,9 +153,8 @@ mod tests {
             Network,
         },
         node::{dummy_streaming::DummyStreamingNode, Node, NodeId},
-        overlay::tree::TreeOverlay,
         runner::SimulationRunner,
-        streaming::{StreamSettings, StreamType},
+        streaming::StreamSettings,
         warding::SimulationState,
     };
 
@@ -169,12 +182,9 @@ mod tests {
     fn test_streaming() {
         let simulation_settings = crate::settings::SimulationSettings {
             seed: Some(1),
-            stream_settings: StreamSettings {
-                ty: StreamType::IO,
-                settings: IOStreamSettings {
-                    writer: std::io::stdout(),
-                },
-            },
+            stream_settings: StreamSettings::IO(IOStreamSettings {
+                writer: std::io::stdout(),
+            }),
             ..Default::default()
         };
 
@@ -231,14 +241,10 @@ mod tests {
                 })
                 .collect(),
         });
-        let simulation_runner: SimulationRunner<
-            (),
-            DummyStreamingNode<()>,
-            TreeOverlay,
-            IOProducer<std::io::Stdout, IORecord>,
-        > = SimulationRunner::new(network, nodes, simulation_settings);
+        let simulation_runner: SimulationRunner<(), DummyStreamingNode<()>> =
+            SimulationRunner::new(network, nodes, simulation_settings);
         simulation_runner
-            .simulate()
+            .simulate::<IOProducer<std::io::Stdout, IORecord>>()
             .unwrap()
             .stop_after(Duration::from_millis(100))
             .unwrap();

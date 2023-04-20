@@ -1,7 +1,7 @@
 use std::str::FromStr;
 
 use crossbeam::channel::Receiver;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 pub mod io;
 pub mod naive;
@@ -45,18 +45,24 @@ impl<'de> serde::Deserialize<'de> for StreamType {
     }
 }
 
-#[derive(Debug, Default, Clone, Serialize, serde::Deserialize)]
-pub struct StreamSettings<S> {
-    #[serde(rename = "type")]
-    pub ty: StreamType,
-    pub settings: S,
+#[derive(Debug, Deserialize)]
+pub enum StreamSettings {
+    Naive(naive::NaiveSettings),
+    IO(io::IOStreamSettings),
+    Polars(polars::PolarsSettings),
+}
+
+impl Default for StreamSettings {
+    fn default() -> Self {
+        Self::IO(Default::default())
+    }
 }
 
 pub trait Producer: Send + Sync + 'static {
     type Settings: Send;
     type Subscriber: Subscriber;
 
-    fn new(settings: Self::Settings) -> anyhow::Result<Self>
+    fn new(settings: StreamSettings) -> anyhow::Result<Self>
     where
         Self: Sized;
 
