@@ -1,4 +1,4 @@
-# nomos-research
+# nomos-node
 Nomos blockchain node mvp
 
 
