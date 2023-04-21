@@ -84,8 +84,9 @@ where
 {
     inner: Arc<RwLock<SimulationRunnerInner<M>>>,
     nodes: Arc<RwLock<Vec<N>>>,
-    runner_settings: RunnerSettings,
-    stream_settings: StreamSettings,
+    network: Network<M>,
+    settings: SimulationSettings,
+    rng: SmallRng,
 }
 
 impl<M, N: Node> SimulationRunner<M, N>
@@ -117,14 +118,15 @@ where
             seed: _,
         } = settings;
         Self {
-            stream_settings,
-            runner_settings,
             inner: Arc::new(RwLock::new(SimulationRunnerInner {
                 network,
                 rng,
                 wards,
             })),
             nodes,
+            network,
+            settings,
+            rng,
         }
     }
 

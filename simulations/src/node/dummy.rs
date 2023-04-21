@@ -492,7 +492,7 @@ mod tests {
         Network::new(regions_data)
     }
 
-    fn init_dummy_nodes(
+    fn init_dummy_nodes<S>(
         node_ids: &[NodeId],
         network: &mut Network<DummyMessage>,
         overlay_state: SharedState<OverlayState>,

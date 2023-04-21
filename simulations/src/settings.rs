@@ -84,7 +84,9 @@ impl<W> TryInto<IOStreamSettings<W>> for StreamSettings {
 #[derive(Default, Deserialize)]
 pub struct SimulationSettings {
     pub network_behaviors: HashMap<(Region, Region), StepTime>,
-    pub regions: Vec<Region>,
+    /// Represents node distribution in the simulated regions.
+    /// The sum of distributions should be 1.
+    pub regions: HashMap<Region, f32>,
     #[serde(default)]
     pub wards: Vec<Ward>,
     pub overlay_settings: OverlaySettings,

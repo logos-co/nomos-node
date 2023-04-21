@@ -14,7 +14,10 @@ use std::{
 // crates
 use serde::{Deserialize, Serialize};
 // internal
-use crate::overlay::Layout;
+use crate::{
+    overlay::{flat::FlatOverlay, tree::TreeOverlay, Layout, Overlay},
+    settings::OverlaySettings,
+};
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(transparent)]
@@ -126,11 +129,30 @@ pub struct ViewOverlay {
     pub layout: Layout,
 }
 
+impl From<OverlaySettings> for ViewOverlay {
+    fn from(value: OverlaySettings) -> Self {
+        match value {
+            OverlaySettings::Flat => {
+                todo!()
+            }
+            OverlaySettings::Tree(_) => {
+                todo!()
+            }
+        }
+    }
+}
+
 pub type SharedState<S> = Arc<RwLock<S>>;
+
+pub enum OverlaySomething {
+    Flat(FlatOverlay),
+    Tree(TreeOverlay),
+}
 
 /// A state that represents how nodes are interconnected in the network.
 pub struct OverlayState {
     pub all_nodes: Vec<NodeId>,
+    pub overlay: OverlaySomething,
     pub overlays: BTreeMap<usize, ViewOverlay>,
 }
 
