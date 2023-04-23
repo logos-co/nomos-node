@@ -143,34 +143,18 @@ where
         }
     }
 
-    pub fn simulate(&mut self) -> anyhow::Result<SimulationRunnerHandle> {
+    pub fn simulate(self) -> anyhow::Result<SimulationRunnerHandle> {
         match self.runner_settings.clone() {
-            RunnerSettings::Sync => {
-                sync_runner::simulate::<_, _, _, P>(self, self.stream_settings.settings.clone())
-            }
-            RunnerSettings::Async { chunks } => async_runner::simulate::<_, _, _, P>(
-                self,
-                chunks,
-                self.stream_settings.settings.clone(),
-            ),
+            RunnerSettings::Sync => sync_runner::simulate::<_, _, _, P>(self),
+            RunnerSettings::Async { chunks } => async_runner::simulate::<_, _, _, P>(self, chunks),
             RunnerSettings::Glauber {
                 maximum_iterations,
                 update_rate,
-            } => glauber_runner::simulate::<_, _, _, P>(
-                self,
-                update_rate,
-                maximum_iterations,
-                self.stream_settings.settings.clone(),
-            ),
+            } => glauber_runner::simulate::<_, _, _, P>(self, update_rate, maximum_iterations),
             RunnerSettings::Layered {
                 rounds_gap,
                 distribution,
-            } => layered_runner::simulate::<_, _, _, P>(
-                self,
-                rounds_gap,
-                distribution,
-                self.stream_settings.settings.clone(),
-            ),
+            } => layered_runner::simulate::<_, _, _, P>(self, rounds_gap, distribution),
         }
     }
 }

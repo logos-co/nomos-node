@@ -1,44 +1,38 @@
-use std::{
-    fs::{File, OpenOptions},
-    io::Write,
-    path::PathBuf,
-    sync::{Arc, Mutex},
-};
+use std::sync::{Arc, Mutex};
 
 use super::{Producer, Receivers, Subscriber};
 use arc_swap::ArcSwapOption;
 use crossbeam::channel::{bounded, unbounded, Sender};
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct NaiveSettings {
-    pub path: PathBuf,
+pub struct IOStreamSettings<W = std::io::Stdout> {
+    pub writer: W,
 }
 
-impl Default for NaiveSettings {
+impl Default for IOStreamSettings {
     fn default() -> Self {
-        let mut tmp = std::env::temp_dir();
-        tmp.push("simulation");
-        tmp.set_extension("data");
-        Self { path: tmp }
+        Self {
+            writer: std::io::stdout(),
+        }
     }
 }
 
 #[derive(Debug)]
-pub struct NaiveProducer<R> {
+pub struct IOProducer<W, R> {
     sender: Sender<R>,
     stop_tx: Sender<()>,
     recvs: ArcSwapOption<Receivers<R>>,
-    settings: NaiveSettings,
+    writer: ArcSwapOption<Mutex<W>>,
 }
 
-impl<R> Producer for NaiveProducer<R>
+impl<W, R> Producer for IOProducer<W, R>
 where
+    W: std::io::Write + Send + Sync + 'static,
     R: Serialize + Send + Sync + 'static,
 {
-    type Settings = NaiveSettings;
+    type Settings = IOStreamSettings<W>;
 
-    type Subscriber = NaiveSubscriber<R>;
+    type Subscriber = IOSubscriber<W, R>;
 
     fn new(settings: Self::Settings) -> anyhow::Result<Self>
     where
@@ -50,7 +44,7 @@ where
             sender,
             recvs: ArcSwapOption::from(Some(Arc::new(Receivers { stop_rx, recv }))),
             stop_tx,
-            settings,
+            writer: ArcSwapOption::from(Some(Arc::new(Mutex::new(settings.writer)))),
         })
     }
 
@@ -67,19 +61,9 @@ where
             return Err(anyhow::anyhow!("Producer has been subscribed"));
         }
 
-        let mut opts = OpenOptions::new();
         let recvs = self.recvs.swap(None).unwrap();
-        let this = NaiveSubscriber {
-            file: Arc::new(Mutex::new(
-                opts.truncate(true)
-                    .create(true)
-                    .read(true)
-                    .write(true)
-                    .open(&self.settings.path)?,
-            )),
-            recvs,
-        };
-        eprintln!("Subscribed to {}", self.settings.path.display());
+        let writer = self.writer.swap(None).unwrap();
+        let this = IOSubscriber { recvs, writer };
         Ok(this)
     }
 
@@ -89,13 +73,14 @@ where
 }
 
 #[derive(Debug)]
-pub struct NaiveSubscriber<R> {
-    file: Arc<Mutex<File>>,
+pub struct IOSubscriber<W, R> {
     recvs: Arc<Receivers<R>>,
+    writer: Arc<Mutex<W>>,
 }
 
-impl<R> Subscriber for NaiveSubscriber<R>
+impl<W, R> Subscriber for IOSubscriber<W, R>
 where
+    W: std::io::Write + Send + Sync + 'static,
     R: Serialize + Send + Sync + 'static,
 {
     type Record = R;
@@ -120,9 +105,13 @@ where
     }
 
     fn sink(&self, state: Self::Record) -> anyhow::Result<()> {
-        let mut file = self.file.lock().expect("failed to lock file");
-        serde_json::to_writer(&mut *file, &state)?;
-        file.write_all(b",\n")?;
+        serde_json::to_writer(
+            &mut *self
+                .writer
+                .lock()
+                .expect("fail to lock writer in io subscriber"),
+            &state,
+        )?;
         Ok(())
     }
 }
@@ -140,24 +129,23 @@ mod tests {
         node::{dummy_streaming::DummyStreamingNode, Node, NodeId},
         overlay::tree::TreeOverlay,
         runner::SimulationRunner,
+        streaming::{StreamSettings, StreamType},
         warding::SimulationState,
     };
 
     use super::*;
     #[derive(Debug, Clone, Serialize)]
-    struct NaiveRecord {
+    struct IORecord {
         states: HashMap<NodeId, usize>,
     }
 
-    impl TryFrom<&SimulationState<DummyStreamingNode<()>>> for NaiveRecord {
+    impl TryFrom<&SimulationState<DummyStreamingNode<()>>> for IORecord {
         type Error = anyhow::Error;
 
         fn try_from(value: &SimulationState<DummyStreamingNode<()>>) -> Result<Self, Self::Error> {
+            let nodes = value.nodes.read().expect("failed to read nodes");
             Ok(Self {
-                states: value
-                    .nodes
-                    .read()
-                    .expect("failed to read nodes")
+                states: nodes
                     .iter()
                     .map(|node| (node.id(), node.current_view()))
                     .collect(),
@@ -169,6 +157,12 @@ mod tests {
     fn test_streaming() {
         let simulation_settings = crate::settings::SimulationSettings {
             seed: Some(1),
+            stream_settings: StreamSettings {
+                ty: StreamType::IO,
+                settings: IOStreamSettings {
+                    writer: std::io::stdout(),
+                },
+            },
             ..Default::default()
         };
 
@@ -229,9 +223,12 @@ mod tests {
             (),
             DummyStreamingNode<()>,
             TreeOverlay,
-            NaiveProducer<NaiveRecord>,
+            IOProducer<std::io::Stdout, IORecord>,
         > = SimulationRunner::new(network, nodes, simulation_settings);
-
-        simulation_runner.simulate().unwrap();
+        simulation_runner
+            .simulate()
+            .unwrap()
+            .stop_after(Duration::from_millis(100))
+            .unwrap();
     }
 }

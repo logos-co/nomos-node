@@ -10,8 +10,7 @@ use std::sync::Arc;
 
 /// Simulate with sending the network state to any subscriber
 pub fn simulate<M, N: Node, O: Overlay, P: Producer>(
-    runner: &mut SimulationRunner<M, N, O, P>,
-    settings: P::Settings,
+    runner: SimulationRunner<M, N, O, P>,
 ) -> anyhow::Result<SimulationRunnerHandle>
 where
     M: Send + Sync + Clone + 'static,
@@ -34,7 +33,7 @@ where
     let handle = SimulationRunnerHandle {
         stop_tx,
         handle: std::thread::spawn(move || {
-            let p = P::new(settings)?;
+            let p = P::new(runner.stream_settings.settings)?;
             scopeguard::defer!(if let Err(e) = p.stop() {
                 eprintln!("Error stopping producer: {e}");
             });
@@ -52,8 +51,15 @@ where
                     }
                     default => {
                         let mut inner = inner.write().expect("Write access to inner simulation state");
-                        let mut nodes = nodes.write().expect("Write access to nodes vector");
-                        inner.step(&mut nodes);
+
+                        // we must use a code block to make sure once the step call is finished then the write lock will be released, because in Record::try_from(&state),
+                        // we need to call the read lock, if we do not release the write lock,
+                        // then dead lock will occur
+                        {
+                            let mut nodes = nodes.write().expect("Write access to nodes vector");
+                            inner.step(&mut nodes);
+                        }
+
                         p.send(<P::Subscriber as Subscriber>::Record::try_from(&state).unwrap()).unwrap();
                         // check if any condition makes the simulation stop
                         if inner.check_wards(&state) {
@@ -149,13 +155,11 @@ mod tests {
         }));
         let nodes = init_dummy_nodes(&node_ids, &mut network, overlay_state);
 
-        let mut runner: SimulationRunner<
-            DummyMessage,
-            DummyNode,
-            TreeOverlay,
-            NaiveProducer<OutData>,
-        > = SimulationRunner::new(network, nodes, settings);
-        runner.step();
+        let runner: SimulationRunner<DummyMessage, DummyNode, TreeOverlay, NaiveProducer<OutData>> =
+            SimulationRunner::new(network, nodes, settings);
+        let mut nodes = runner.nodes.write().unwrap();
+        runner.inner.write().unwrap().step(&mut nodes);
+        drop(nodes);
 
         let nodes = runner.nodes.read().unwrap();
         for node in nodes.iter() {
@@ -198,14 +202,12 @@ mod tests {
         }
         network.collect_messages();
 
-        let mut runner: SimulationRunner<
-            DummyMessage,
-            DummyNode,
-            TreeOverlay,
-            NaiveProducer<OutData>,
-        > = SimulationRunner::new(network, nodes, settings);
+        let runner: SimulationRunner<DummyMessage, DummyNode, TreeOverlay, NaiveProducer<OutData>> =
+            SimulationRunner::new(network, nodes, settings);
 
-        runner.step();
+        let mut nodes = runner.nodes.write().unwrap();
+        runner.inner.write().unwrap().step(&mut nodes);
+        drop(nodes);
 
         let nodes = runner.nodes.read().unwrap();
         let state = nodes[1].state();

@@ -1,13 +1,22 @@
 use std::str::FromStr;
 
+use crossbeam::channel::Receiver;
 use serde::Serialize;
 
+pub mod io;
 pub mod naive;
 pub mod polars;
+
+#[derive(Debug)]
+struct Receivers<R> {
+    stop_rx: Receiver<()>,
+    recv: Receiver<R>,
+}
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Serialize)]
 pub enum StreamType {
     #[default]
+    IO,
     Naive,
     Polars,
 }
@@ -44,7 +53,7 @@ pub struct StreamSettings<S> {
 }
 
 pub trait Producer: Send + Sync + 'static {
-    type Settings: Clone + Send;
+    type Settings: Send;
     type Subscriber: Subscriber;
 
     fn new(settings: Self::Settings) -> anyhow::Result<Self>

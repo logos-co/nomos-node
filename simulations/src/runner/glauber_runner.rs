@@ -14,10 +14,9 @@ use std::sync::Arc;
 ///
 /// [Glauber dynamics simulation](https://en.wikipedia.org/wiki/Glauber_dynamics)
 pub fn simulate<M, N: Node, O: Overlay, P: Producer>(
-    runner: &mut SimulationRunner<M, N, O, P>,
+    runner: SimulationRunner<M, N, O, P>,
     update_rate: usize,
     maximum_iterations: usize,
-    settings: P::Settings,
 ) -> anyhow::Result<SimulationRunnerHandle>
 where
     M: Send + Sync + Clone + 'static,
@@ -43,7 +42,7 @@ where
     let (stop_tx, stop_rx) = bounded(1);
     let handle = SimulationRunnerHandle {
         handle: std::thread::spawn(move || {
-            let p = P::new(settings)?;
+            let p = P::new(runner.stream_settings.settings)?;
             scopeguard::defer!(if let Err(e) = p.stop() {
                 eprintln!("Error stopping producer: {e}");
             });

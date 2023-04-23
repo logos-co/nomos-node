@@ -13,9 +13,8 @@ use std::sync::Arc;
 
 /// Simulate with sending the network state to any subscriber
 pub fn simulate<M, N: Node, O: Overlay, P: Producer>(
-    runner: &mut SimulationRunner<M, N, O, P>,
+    runner: SimulationRunner<M, N, O, P>,
     chunk_size: usize,
-    settings: P::Settings,
 ) -> anyhow::Result<SimulationRunnerHandle>
 where
     M: Clone + Send + Sync + 'static,
@@ -45,7 +44,7 @@ where
     let handle = SimulationRunnerHandle {
         stop_tx,
         handle: std::thread::spawn(move || {
-            let p = P::new(settings)?;
+            let p = P::new(runner.stream_settings.settings)?;
             scopeguard::defer!(if let Err(e) = p.stop() {
                 eprintln!("Error stopping producer: {e}");
             });

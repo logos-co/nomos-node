@@ -49,10 +49,9 @@ use super::SimulationRunnerHandle;
 
 /// Simulate with sending the network state to any subscriber
 pub fn simulate<M, N: Node, O: Overlay, P: Producer>(
-    runner: &mut SimulationRunner<M, N, O, P>,
+    runner: SimulationRunner<M, N, O, P>,
     gap: usize,
     distribution: Option<Vec<f32>>,
-    settings: P::Settings,
 ) -> anyhow::Result<SimulationRunnerHandle>
 where
     M: Send + Sync + Clone + 'static,
@@ -69,7 +68,7 @@ where
 
     let layers: Vec<usize> = (0..gap).collect();
 
-    let mut deque = build_node_ids_deque(gap, runner);
+    let mut deque = build_node_ids_deque(gap, &runner);
 
     let simulation_state = SimulationState {
         nodes: Arc::clone(&runner.nodes),
@@ -81,7 +80,7 @@ where
     let handle = SimulationRunnerHandle {
         stop_tx,
         handle: std::thread::spawn(move || {
-            let p = P::new(settings)?;
+            let p = P::new(runner.stream_settings.settings)?;
             scopeguard::defer!(if let Err(e) = p.stop() {
                 eprintln!("Error stopping producer: {e}");
             });

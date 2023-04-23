@@ -1,5 +1,5 @@
 use arc_swap::ArcSwapOption;
-use crossbeam::channel::{bounded, unbounded, Receiver, Sender};
+use crossbeam::channel::{bounded, unbounded, Sender};
 use polars::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -10,7 +10,7 @@ use std::{
     sync::Mutex,
 };
 
-use super::{Producer, Subscriber};
+use super::{Producer, Receivers, Subscriber};
 
 #[derive(Debug, Clone, Copy, Serialize)]
 pub enum PolarsFormat {
@@ -48,12 +48,6 @@ impl<'de> Deserialize<'de> for PolarsFormat {
 pub struct PolarsSettings {
     pub format: PolarsFormat,
     pub path: PathBuf,
-}
-
-#[derive(Debug)]
-struct Receivers<R> {
-    stop_rx: Receiver<()>,
-    recv: Receiver<R>,
 }
 
 #[derive(Debug)]
