@@ -1,11 +1,11 @@
 use crate::network::regions::Region;
-use crate::node::StepTime;
 use crate::overlay::tree::TreeSettings;
 use crate::streaming::io::IOStreamSettings;
 use crate::streaming::StreamSettings;
 use crate::warding::Ward;
 use serde::Deserialize;
 use std::collections::HashMap;
+use std::time::Duration;
 
 #[derive(Clone, Debug, Deserialize, Default)]
 pub enum RunnerSettings {
@@ -83,7 +83,7 @@ impl<W> TryInto<IOStreamSettings<W>> for StreamSettings {
 
 #[derive(Default, Deserialize)]
 pub struct SimulationSettings {
-    pub network_behaviors: HashMap<(Region, Region), StepTime>,
+    pub network_behaviors: HashMap<(Region, Region), Duration>,
     /// Represents node distribution in the simulated regions.
     /// The sum of distributions should be 1.
     pub regions: HashMap<Region, f32>,

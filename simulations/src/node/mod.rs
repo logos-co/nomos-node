@@ -181,8 +181,8 @@ impl Overlay for SimulationOverlay {
 /// A state that represents how nodes are interconnected in the network.
 pub struct OverlayState {
     pub all_nodes: Vec<NodeId>,
-    pub overlay: SimulationOverlay,             // gen_new_view
-    pub overlays: BTreeMap<usize, ViewOverlay>, // <- new view here
+    pub overlay: SimulationOverlay,
+    pub overlays: BTreeMap<usize, ViewOverlay>,
 }
 
 pub trait OverlayGetter {

@@ -73,7 +73,7 @@ impl SimulationApp {
         let behaviours = simulation_settings
             .network_behaviors
             .iter()
-            .map(|((a, b), d)| ((*a, *b), NetworkBehaviour::new(d.into_inner(), 0.0)))
+            .map(|((a, b), d)| ((*a, *b), NetworkBehaviour::new(*d, 0.0)))
             .collect();
         let regions_data = RegionsData::new(regions, behaviours);
 
