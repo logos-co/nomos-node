@@ -1,4 +1,5 @@
 // std
+use anyhow::Ok;
 use std::collections::BTreeMap;
 use std::fmt::{Display, Formatter};
 use std::fs::File;
@@ -19,10 +20,10 @@ use simulations::network::behaviour::NetworkBehaviour;
 use simulations::network::regions::RegionsData;
 use simulations::network::{InMemoryNetworkInterface, Network};
 use simulations::node::dummy::DummyNode;
-use simulations::node::{Node, NodeId, OverlayState, SimulationOverlay, ViewOverlay};
+use simulations::node::{NodeId, OverlayState, ViewOverlay};
 use simulations::overlay::flat::FlatOverlay;
 use simulations::overlay::tree::TreeOverlay;
-use simulations::overlay::Overlay;
+use simulations::overlay::{Overlay, SimulationOverlay};
 use simulations::streaming::StreamType;
 // internal
 use simulations::{
@@ -95,13 +96,40 @@ impl SimulationApp {
             &mut rng,
         );
 
+        let overlay_state = Arc::new(RwLock::new(OverlayState {
+            all_nodes: node_ids.clone(),
+            overlay,
+            overlays,
+        }));
+
         let mut network = Network::new(regions_data);
-        let nodes = node_ids
-            .iter()
-            .map(|node_id| {
-                let node = match &simulation_settings.node_settings {
-                    simulations::settings::NodeSettings::Carnot => CarnotNode::new(*node_id),
-                    simulations::settings::NodeSettings::Dummy => {
+
+        // build up series vector
+        let mut out_data: Vec<OutData> = Vec::new();
+
+        let mut runner = match &simulation_settings.node_settings {
+            simulations::settings::NodeSettings::Carnot => {
+                let nodes = node_ids
+                    .iter()
+                    .map(|node_id| CarnotNode::new(*node_id))
+                    .collect();
+                let mut runner = SimulationRunner::new(network, nodes, simulation_settings);
+                match stream_type {
+                    simulations::streaming::StreamType::Naive => {
+                        runner.simulate::<NaiveProducer<OutData>>()?
+                    }
+                    simulations::streaming::StreamType::Polars => {
+                        runner.simulate::<PolarsProducer<OutData>>()?
+                    }
+                    simulations::streaming::StreamType::IO => {
+                        runner.simulate::<IOProducer<std::io::Stdout, OutData>>()?
+                    }
+                }
+            }
+            simulations::settings::NodeSettings::Dummy => {
+                let nodes = node_ids
+                    .iter()
+                    .map(|node_id| {
                         let (node_message_sender, node_message_receiver) = channel::unbounded();
                         let network_message_receiver =
                             network.connect(*node_id, node_message_receiver);
@@ -110,25 +138,23 @@ impl SimulationApp {
                             node_message_sender,
                             network_message_receiver,
                         );
-                        DummyNode::new(*node_id, 0, overlay_state, network_interface)
-                    }
-                };
-                node
-            })
-            .collect();
+                        DummyNode::new(*node_id, 0, overlay_state.clone(), network_interface)
+                    })
+                    .collect();
 
-        let mut simulation_runner: SimulationRunner<_, _> =
-            SimulationRunner::new(network, nodes, simulation_settings);
-        // build up series vector
-        match stream_type {
-            simulations::streaming::StreamType::Naive => {
-                simulation_runner.simulate::<NaiveProducer<OutData>>()?
-            }
-            simulations::streaming::StreamType::Polars => {
-                simulation_runner.simulate::<PolarsProducer<OutData>>()?
-            }
-            simulations::streaming::StreamType::IO => {
-                simulation_runner.simulate::<IOProducer<std::io::Stdout, OutData>>()?
+                let mut runner = SimulationRunner::new(network, nodes, simulation_settings);
+                // build up series vector
+                match stream_type {
+                    simulations::streaming::StreamType::Naive => {
+                        runner.simulate::<NaiveProducer<OutData>>()?
+                    }
+                    simulations::streaming::StreamType::Polars => {
+                        runner.simulate::<PolarsProducer<OutData>>()?
+                    }
+                    simulations::streaming::StreamType::IO => {
+                        runner.simulate::<IOProducer<std::io::Stdout, OutData>>()?
+                    }
+                }
             }
         };
         Ok(())

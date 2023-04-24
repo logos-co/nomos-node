@@ -14,6 +14,12 @@ impl FlatOverlay {
     }
 }
 
+impl Default for FlatOverlay {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Overlay for FlatOverlay {
     fn nodes(&self) -> Vec<NodeId> {
         (0..10).map(NodeId::from).collect()

@@ -81,11 +81,11 @@ mod tests {
         },
         node::{
             dummy::{DummyMessage, DummyNode},
-            Node, NodeId, OverlayState, SharedState, SimulationOverlay, ViewOverlay,
+            Node, NodeId, OverlayState, SharedState, ViewOverlay,
         },
         overlay::{
             tree::{TreeOverlay, TreeSettings},
-            Overlay,
+            Overlay, SimulationOverlay,
         },
         runner::SimulationRunner,
         settings::SimulationSettings,

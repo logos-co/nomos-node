@@ -5,7 +5,6 @@ pub mod dummy;
 pub mod dummy_streaming;
 
 // std
-use rand::Rng;
 use std::{
     collections::BTreeMap,
     ops::{Deref, DerefMut},
@@ -16,7 +15,7 @@ use std::{
 use serde::{Deserialize, Serialize};
 // internal
 use crate::{
-    overlay::{flat::FlatOverlay, tree::TreeOverlay, Layout, Overlay, SimulationOverlay},
+    overlay::{Layout, SimulationOverlay},
     settings::OverlaySettings,
 };
 
@@ -166,54 +165,6 @@ impl OverlayGetter for SharedState<OverlayState> {
     fn get_all_nodes(&self) -> Vec<NodeId> {
         let overlay_state = self.read().unwrap();
         overlay_state.all_nodes.clone()
-    }
-}
-
-pub enum SimulationNodeSettings {
-    Carnot(carnot::CarnotSettings),
-    Dummy(dummy::DummySettings),
-}
-
-pub enum SimulationNodeState {
-    Carnot(carnot::CarnotState),
-    Dummy(dummy::DummyState),
-}
-
-pub enum SimulationNode {
-    Carnot(carnot::CarnotNode),
-    Dummy(dummy::DummyNode),
-}
-
-impl Node for SimulationNode {
-    type Settings = SimulationNodeSettings;
-    type State = SimulationNodeState;
-
-    fn id(&self) -> NodeId {
-        match self {
-            SimulationNode::Carnot(node) => node.id(),
-            SimulationNode::Dummy(node) => node.id(),
-        }
-    }
-
-    fn current_view(&self) -> usize {
-        match self {
-            SimulationNode::Carnot(node) => node.current_view(),
-            SimulationNode::Dummy(node) => node.current_view(),
-        }
-    }
-
-    fn state(&self) -> &Self::State {
-        match self {
-            SimulationNode::Carnot(node) => &SimulationNodeState::Carnot(*node.state()),
-            SimulationNode::Dummy(node) => &SimulationNodeState::Dummy(*node.state()),
-        }
-    }
-
-    fn step(&mut self) {
-        match self {
-            SimulationNode::Carnot(node) => node.step(),
-            SimulationNode::Dummy(node) => node.step(),
-        }
     }
 }
 

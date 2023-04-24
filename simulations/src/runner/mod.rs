@@ -113,8 +113,9 @@ where
             runner_settings,
             stream_settings,
             node_count: _,
-            committee_size: _,
             seed: _,
+            views_count: _,
+            leaders_count: _,
         } = settings;
         Self {
             inner: Arc::new(RwLock::new(SimulationRunnerInner {
