@@ -146,7 +146,7 @@ impl NetworkAdapter for MockAdapter {
         )
     }
 
-    async fn forward_approval<Vote: Serialize>(
+    async fn send_vote<Vote: Serialize>(
         &self,
         _committee: Committee,
         _view: &View,

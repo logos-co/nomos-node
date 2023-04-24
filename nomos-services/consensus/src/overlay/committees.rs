@@ -133,8 +133,7 @@ where
         fountain: &Fountain,
     ) -> Result<Block<VoteTally::Qc, TxId>, FountainError> {
         assert_eq!(view.view_n, self.view_n, "view_n mismatch");
-        let committee = self.committee;
-        let message_stream = adapter.proposal_chunks_stream(committee, view).await;
+        let message_stream = adapter.proposal_chunks_stream(view).await;
         fountain.decode(message_stream).await.and_then(|b| {
             deserializer(&b)
                 .deserialize::<Block<VoteTally::Qc, TxId>>()
@@ -150,23 +149,12 @@ where
         fountain: &Fountain,
     ) {
         assert_eq!(view.view_n, self.view_n, "view_n mismatch");
-        let (left_child, right_child) = self.children_committes();
         let block_bytes = block.as_bytes();
         let encoded_stream = fountain.encode(&block_bytes);
         encoded_stream
             .for_each_concurrent(None, |chunk| async move {
                 let message = ProposalChunkMsg { chunk };
-                let r_child = right_child
-                    .map(|right_child| {
-                        adapter.broadcast_block_chunk(right_child, view, message.clone())
-                    })
-                    .into_iter();
-                let l_child = left_child
-                    .map(|left_child| {
-                        adapter.broadcast_block_chunk(left_child, view, message.clone())
-                    })
-                    .into_iter();
-                futures::future::join_all(r_child.chain(l_child)).await;
+                adapter.broadcast_block_chunk(view, message.clone()).await;
             })
             .await;
     }

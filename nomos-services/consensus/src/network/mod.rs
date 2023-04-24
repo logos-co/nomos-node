@@ -24,24 +24,22 @@ pub trait NetworkAdapter {
     ) -> Self;
     async fn proposal_chunks_stream(
         &self,
-        committee: Committee,
         view: &View,
     ) -> Box<dyn Stream<Item = Bytes> + Send + Sync + Unpin>;
-    async fn broadcast_block_chunk(
+    async fn broadcast_block_chunk(&self, view: &View, chunk_msg: ProposalChunkMsg);
+    async fn timeout_qc_stream(
         &self,
-        committee: Committee,
         view: &View,
-        chunk_msg: ProposalChunkMsg,
-    );
+    ) -> Box<dyn Stream<Item = ()> + Send + Sync + Unpin>;
     async fn votes_stream<Vote: DeserializeOwned>(
         &self,
         committee: Committee,
         view: &View,
     ) -> Box<dyn Stream<Item = Vote> + Send>;
-    async fn forward_approval<Vote: Serialize + Send>(
+    async fn send_vote<Vote: Serialize + Send>(
         &self,
         committee: Committee,
         view: &View,
-        approval: VoteMsg<Vote>,
+        vote: VoteMsg<Vote>,
     );
 }

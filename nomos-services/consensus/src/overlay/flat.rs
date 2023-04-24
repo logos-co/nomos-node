@@ -56,7 +56,7 @@ where
         fountain: &Fountain,
     ) -> Result<Block<VoteTally::Qc, TxId>, FountainError> {
         assert_eq!(view.view_n, self.view_n, "view_n mismatch");
-        let message_stream = adapter.proposal_chunks_stream(FLAT_COMMITTEE, view).await;
+        let message_stream = adapter.proposal_chunks_stream(view).await;
         fountain.decode(message_stream).await.and_then(|b| {
             deserializer(&b)
                 .deserialize::<Block<VoteTally::Qc, TxId>>()
@@ -78,7 +78,7 @@ where
             .for_each_concurrent(None, |chunk| async move {
                 let message = ProposalChunkMsg { chunk };
                 adapter
-                    .broadcast_block_chunk(FLAT_COMMITTEE, view, message)
+                    .broadcast_block_chunk(view, message)
                     .await;
             })
             .await;
@@ -96,7 +96,7 @@ where
         // in the flat overlay, there's no need to wait for anyone before approving the block
         let approval = self.approve(block);
         adapter
-            .forward_approval(
+            .send_vote(
                 FLAT_COMMITTEE,
                 view,
                 VoteMsg {
