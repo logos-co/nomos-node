@@ -89,6 +89,39 @@ impl Layout {
     }
 }
 
+pub enum SimulationOverlay {
+    Flat(flat::FlatOverlay),
+    Tree(tree::TreeOverlay),
+}
+
+impl Overlay for SimulationOverlay {
+    fn nodes(&self) -> Vec<NodeId> {
+        match self {
+            SimulationOverlay::Flat(overlay) => overlay.nodes(),
+            SimulationOverlay::Tree(overlay) => overlay.nodes(),
+        }
+    }
+
+    fn leaders<R: Rng>(
+        &self,
+        nodes: &[NodeId],
+        size: usize,
+        rng: &mut R,
+    ) -> Box<dyn Iterator<Item = NodeId>> {
+        match self {
+            SimulationOverlay::Flat(overlay) => overlay.leaders(nodes, size, rng),
+            SimulationOverlay::Tree(overlay) => overlay.leaders(nodes, size, rng),
+        }
+    }
+
+    fn layout<R: Rng>(&self, nodes: &[NodeId], rng: &mut R) -> Layout {
+        match self {
+            SimulationOverlay::Flat(overlay) => overlay.layout(nodes, rng),
+            SimulationOverlay::Tree(overlay) => overlay.layout(nodes, rng),
+        }
+    }
+}
+
 pub trait Overlay {
     fn nodes(&self) -> Vec<NodeId>;
     fn leaders<R: Rng>(

@@ -18,7 +18,8 @@ use serde::{Deserialize, Serialize};
 use simulations::network::behaviour::NetworkBehaviour;
 use simulations::network::regions::RegionsData;
 use simulations::network::{InMemoryNetworkInterface, Network};
-use simulations::node::{NodeId, OverlayState, SimulationOverlay, ViewOverlay};
+use simulations::node::dummy::DummyNode;
+use simulations::node::{Node, NodeId, OverlayState, SimulationOverlay, ViewOverlay};
 use simulations::overlay::flat::FlatOverlay;
 use simulations::overlay::tree::TreeOverlay;
 use simulations::overlay::Overlay;
@@ -89,8 +90,8 @@ impl SimulationApp {
         let overlays = generate_overlays(
             &node_ids,
             &overlay,
-            simulation_settings.committee_size,
-            simulation_settings.committee_size,
+            simulation_settings.views_count,
+            simulation_settings.leaders_count,
             &mut rng,
         );
 
@@ -98,18 +99,25 @@ impl SimulationApp {
         let nodes = node_ids
             .iter()
             .map(|node_id| {
-                let (node_message_sender, node_message_receiver) = channel::unbounded();
-                let network_message_receiver = network.connect(*node_id, node_message_receiver);
-                let network_interface = InMemoryNetworkInterface::new(
-                    *node_id,
-                    node_message_sender,
-                    network_message_receiver,
-                );
-                CarnotNode::new(*node_id)
+                let node = match &simulation_settings.node_settings {
+                    simulations::settings::NodeSettings::Carnot => CarnotNode::new(*node_id),
+                    simulations::settings::NodeSettings::Dummy => {
+                        let (node_message_sender, node_message_receiver) = channel::unbounded();
+                        let network_message_receiver =
+                            network.connect(*node_id, node_message_receiver);
+                        let network_interface = InMemoryNetworkInterface::new(
+                            *node_id,
+                            node_message_sender,
+                            network_message_receiver,
+                        );
+                        DummyNode::new(*node_id, 0, overlay_state, network_interface)
+                    }
+                };
+                node
             })
             .collect();
 
-        let mut simulation_runner: SimulationRunner<(), CarnotNode> =
+        let mut simulation_runner: SimulationRunner<_, _> =
             SimulationRunner::new(network, nodes, simulation_settings);
         // build up series vector
         match stream_type {

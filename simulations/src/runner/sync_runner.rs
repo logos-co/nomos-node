@@ -132,7 +132,6 @@ mod tests {
     fn runner_one_step() {
         let settings: SimulationSettings = SimulationSettings {
             node_count: 10,
-            committee_size: 1,
             overlay_settings: TreeSettings::default().into(),
             ..Default::default()
         };
@@ -168,7 +167,6 @@ mod tests {
     fn runner_send_receive() {
         let settings: SimulationSettings = SimulationSettings {
             node_count: 10,
-            committee_size: 1,
             ..Default::default()
         };
 

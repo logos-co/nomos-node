@@ -94,6 +94,7 @@ pub struct SimulationSettings {
     pub runner_settings: RunnerSettings,
     pub stream_settings: StreamSettings,
     pub node_count: usize,
-    pub committee_size: usize,
+    pub views_count: usize,
+    pub leaders_count: usize,
     pub seed: Option<u64>,
 }
