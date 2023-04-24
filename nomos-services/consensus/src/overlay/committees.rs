@@ -16,7 +16,7 @@ pub struct Member<const C: usize> {
     id: NodeId,
     committee: Committee,
     committees: Committees<C>,
-    view_n: consensus_engine::View,
+    view_n: u64,
 }
 
 /// #Just a newtype index to be able to implement parent/children methods
@@ -133,7 +133,7 @@ where
         fountain: &Fountain,
     ) -> Result<Block<VoteTally::Qc, TxId>, FountainError> {
         assert_eq!(view.view_n, self.view_n, "view_n mismatch");
-        let message_stream = adapter.proposal_chunks_stream(view.view_n).await;
+        let message_stream = adapter.proposal_chunks_stream(view).await;
         fountain.decode(message_stream).await.and_then(|b| {
             deserializer(&b)
                 .deserialize::<Block<VoteTally::Qc, TxId>>()
@@ -153,11 +153,8 @@ where
         let encoded_stream = fountain.encode(&block_bytes);
         encoded_stream
             .for_each_concurrent(None, |chunk| async move {
-                let message = ProposalChunkMsg {
-                    chunk: chunk.to_vec().into_boxed_slice(),
-                    view: view.view_n,
-                };
-                adapter.broadcast_block_chunk(message.clone()).await;
+                let message = ProposalChunkMsg { chunk };
+                adapter.broadcast_block_chunk(view, message.clone()).await;
             })
             .await;
     }
