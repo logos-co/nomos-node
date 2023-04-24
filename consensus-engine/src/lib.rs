@@ -1,49 +1,117 @@
 use std::collections::{HashMap, HashSet};
 
-mod types;
-pub use types::*;
+mod io;
+use io::*;
+use io::Output::Send;
+
+pub type View = i64;
+pub type Id = [u8; 32];
 
 #[derive(Clone, Debug)]
-pub struct Carnot<O: Overlay> {
-    id: NodeId,
+pub struct CarnotState<O: Overlay> {
+    id: Id,
     current_view: View,
     highest_voted_view: View,
-    local_high_qc: StandardQc,
-    safe_blocks: HashMap<BlockId, Block>,
-    last_view_timeout_qc: Option<TimeoutQc>,
+    local_high_qc: Qc,
+    safe_blocks: HashMap<Id, Block>,
+    last_view_timeout_qc: Qc,
     overlay: O,
 }
 
-impl<O: Overlay> Carnot<O> {
-    pub fn from_genesis(id: NodeId, genesis_block: Block, overlay: O) -> Self {
+pub trait Overlay: Clone {
+    fn root_committee(&self) -> Id;
+    fn rebuild(&mut self, timeout_qc: Qc);
+    fn is_member_of_child_committee(&self, id: Id) -> bool;
+    fn is_member_of_root_committee(&self, id: Id) -> bool;
+    fn is_child_of_root_committee(&self, id: Id) -> bool;
+    fn supermajority_threshold(&self, id: Id) -> usize;
+    fn parent_committee(&self, id: Id) -> Id;
+    fn leader(&self, view: View) -> Id;
+}
+
+pub struct ConsensusEngine<O: Overlay> {
+    state: CarnotState<O>,
+}
+
+struct Vote {
+    block: Id,
+    voter: Id,
+}
+
+struct Timeout {
+    view: View,
+    sender: Id,
+    high_qc: Qc,
+}
+
+struct NewView {
+    view: View,
+    sender: Id,
+    timeout_qc: Qc,
+    high_qc: Qc,
+}
+
+impl<O: Overlay> ConsensusEngine<O> {
+    pub fn from_genesis(id: Id, genesis_block: Block, overlay: O) -> Self {
         Self {
-            current_view: 0,
-            local_high_qc: StandardQc::genesis(),
-            id,
-            highest_voted_view: -1,
-            last_view_timeout_qc: None,
-            overlay,
-            safe_blocks: [(id, genesis_block)].into(),
+            state: CarnotState {
+                current_view: 0,
+                // TODO: fix
+                local_high_qc: Qc::Standard {
+                    view: -1,
+                    id: genesis_block.id,
+                },
+                id,
+                highest_voted_view: -1,
+                // TODO: fix
+                last_view_timeout_qc: Qc::Standard {
+                    view: -1,
+                    id: genesis_block.id,
+                },
+                overlay,
+                safe_blocks: [(id, genesis_block)].into(),
+            },
         }
     }
-    /// Upon reception of a block
-    ///
-    /// Preconditions:
-    ///  *  The parent-children relation between blocks must be preserved when calling
-    ///     this function. In other words, you must call `receive_block(b.parent())` with
-    ///     success before `receive_block(b)`.
-    ///  *  Overlay changes for views < block.view should be made available before trying to process
-    ///     a block by calling `receive_timeout_qc`.
-    #[allow(clippy::result_unit_err)]
-    pub fn receive_block(&self, block: Block) -> Result<Self, ()> {
+
+    fn update_state_on_success(
+        &mut self,
+        next: Result<(CarnotState<O>, Vec<Output>), ()>,
+    ) -> Vec<Output> {
+        match next {
+            Ok((next_state, out)) => {
+                self.state = next_state;
+                out
+            }
+            Err(()) => vec![],
+        }
+    }
+
+    pub fn step(&mut self, input: Input) -> Vec<Output> {
+        let maybe_next_state = match input {
+            Input::Block { block } => self.state.receive_block(block),
+            Input::Timeout => self.state.local_timeout(),
+            _ => unimplemented!(),
+        };
+        self.update_state_on_success(maybe_next_state)
+    }
+
+    pub fn committed_blocks(&self) -> Vec<Id> {
+        todo!()
+    }
+}
+
+impl<O: Overlay> CarnotState<O> {
+    fn receive_block(&self, block: Block) -> Result<(Self, Vec<Output>), ()> {
         assert!(
             self.safe_blocks.contains_key(&block.parent()),
-            "out of order view not supported, missing parent block for {block:?}",
+            "out of order view not supported, missing parent block for {:?}",
+            block
         );
 
         // if the block has already been processed, return early
         if self.safe_blocks.contains_key(&block.id) {
-            return Ok(self.clone());
+            return Err(());
         }
 
         if self.blocks_in_view(block.view).contains(&block)
@@ -59,206 +127,146 @@ impl<O: Overlay> Carnot<O> {
 
         let mut new_state = self.clone();
 
-        if new_state.block_is_safe(block.clone()) {
-            new_state.safe_blocks.insert(block.id, block.clone());
+        if new_state.block_is_safe(block) {
+            new_state.safe_blocks.insert(block.id, block);
             new_state.update_high_qc(block.parent_qc);
-        } else {
-            // Non safe block, not necessarily an error
-            return Err(());
         }
 
-        Ok(new_state)
+        Ok((new_state, vec![]))
     }
 
-    /// Upon reception of a global timeout event
-    ///
-    /// Preconditions:
-    pub fn receive_timeout_qc(&self, timeout_qc: TimeoutQc) -> Self {
-        let mut new_state = self.clone();
+    fn receive_timeout_qc(&self, timeout_qc: Qc) {
+        assert!(timeout_qc.view() > self.current_view);
+        // self.update_high_qc(timeout_qc.high_qc);
+        self.update_timeout_qc(timeout_qc);
 
-        if timeout_qc.view < new_state.current_view {
-            return new_state;
-        }
-        new_state.update_high_qc(timeout_qc.high_qc.clone());
-        new_state.update_timeout_qc(timeout_qc.clone());
-
-        new_state.current_view = timeout_qc.view + 1;
-        new_state.overlay.rebuild(timeout_qc);
-
-        new_state
+        self.current_view += 1;
+        self.overlay.rebuild(timeout_qc);
     }
 
-    /// Upon reception of a supermajority of votes for a safe block from children
-    /// of the current node. It signals approval of the block to the network.
-    ///
-    /// Preconditions:
-    /// *  `receive_block(b)` must have been called successfully before trying to approve a block b.
-    /// *   A node should not attempt to vote for a block in a view earlier than the latest one it actively participated in.
-    pub fn approve_block(&self, block: Block) -> (Self, Output) {
+    // TODO: list preconditions
+    fn approve_block(&self, block: Block) -> Output {
         assert!(self.safe_blocks.contains_key(&block.id));
         assert!(
             self.highest_voted_view < block.view,
             "can't vote for a block in the past"
         );
 
-        let mut new_state = self.clone();
-
-        new_state.highest_voted_view = block.view;
-
-        let to = if new_state.overlay.is_member_of_root_committee(new_state.id) {
-            [new_state.overlay.leader(block.view + 1)]
-                .into_iter()
-                .collect()
-        } else {
-            new_state.overlay.parent_committee(self.id)
+        self.highest_voted_view = block.view;
+        if self.overlay.is_member_of_root_committee(self.id) {
+            return Send {
+                to: self.overlay.leader(block.view + 1),
+                payload: Box::new(Vote {
+                    block: block.id,
+                    voter: self.id,
+                }),
+            };
+        }
+        return Send {
+            to: self.overlay.parent_committee(self.id),
+            payload: Box::new(Vote {
+                block: block.id,
+                voter: self.id,
+            }),
         };
-        (
-            new_state,
-            Output::Send {
-                to,
-                payload: Payload::Vote(Vote { block: block.id }),
-            },
-        )
     }
 
-    /// Upon reception of a supermajority of votes for a new view from children of the current node.
-    /// It signals approval of the new view to the network.
-    ///
-    /// Preconditions:
-    /// *  `receive_timeout_qc(timeout_qc)` must have been called successfully before trying to approve a new view with that
-    ///     timeout qc.
-    /// *   A node should not attempt to approve a view earlier than the latest one it actively participated in.
-    pub fn approve_new_view(
-        &self,
-        timeout_qc: TimeoutQc,
-        new_views: HashSet<NewView>,
-    ) -> (Self, Output) {
-        let new_view = timeout_qc.view + 1;
-        assert!(
-            new_view
-                >= self
-                    .last_view_timeout_qc
-                    .as_ref()
-                    .map(|qc| qc.view)
-                    .unwrap_or(0)
-        );
+    // TODO: list preconditions
+    fn approve_new_view(&self, timeout_qc: Qc, new_views: HashSet<NewView>) -> Send<NewView> {
+        let new_view = timeout_qc.view() + 1;
+        assert!(new_view >= self.last_view_timeout_qc.view());
         assert_eq!(
             new_views.len(),
-            self.overlay.super_majority_threshold(self.id)
+            self.overlay.supermajority_threshold(self.id)
         );
-        assert!(new_views.iter().all(|nv| self
-            .overlay
-            .is_member_of_child_committee(self.id, nv.sender)));
+        assert!(new_views
+            .iter()
+            .all(|nv| self.overlay.is_member_of_child_committee(nv.sender)));
         assert!(self.highest_voted_view < new_view);
         assert!(new_views.iter().all(|nv| nv.view == new_view));
-        assert!(new_views.iter().all(|nv| nv.timeout_qc == timeout_qc));
-
-        let mut new_state = self.clone();
 
         let high_qc = new_views
             .iter()
-            .map(|nv| &nv.high_qc)
-            .chain(std::iter::once(&timeout_qc.high_qc))
+            .map(|nv| nv.high_qc)
+            .chain(std::iter::once(timeout_qc))
             .max_by_key(|qc| qc.view())
             .unwrap();
-        new_state.update_high_qc(high_qc.clone());
+        self.update_high_qc(high_qc);
 
         let new_view_msg = NewView {
             view: new_view,
-            high_qc: high_qc.clone(),
-            sender: new_state.id,
+            high_qc,
+            sender: self.id,
             timeout_qc,
         };
+        self.highest_voted_view = new_view;
 
-        new_state.highest_voted_view = new_view;
-        let to = if new_state.overlay.is_member_of_root_committee(new_state.id) {
-            [new_state.overlay.leader(new_view + 1)]
-                .into_iter()
-                .collect()
-        } else {
-            new_state.overlay.parent_committee(new_state.id)
-        };
-        (
-            new_state,
-            Output::Send {
-                to,
-                payload: Payload::NewView(new_view_msg),
+        return Send {
+            to: if self.overlay.is_member_of_root_committee(self.id) {
+                self.overlay.leader(new_view + 1)
+            } else {
+                self.overlay.parent_committee(self.id)
             },
-        )
+            payload: Box::new(new_view_msg),
+        };
     }
 
-    /// Upon a configurable amout of time has elapsed since the last view change
-    ///
-    /// Preconditions: none!
-    /// Just notice that the timer only reset after a view change, i.e. a node can't timeout
-    /// more than once for the same view
-    pub fn local_timeout(&self) -> (Self, Option<Output>) {
-        let mut new_state = self.clone();
-
-        new_state.highest_voted_view = new_state.current_view;
-        if new_state.overlay.is_member_of_root_committee(new_state.id)
-            || new_state.overlay.is_child_of_root_committee(new_state.id)
+    fn local_timeout(&self) -> Result<(Self, Vec<Output>), ()> {
+        self.highest_voted_view = self.current_view;
+        if self.overlay.is_member_of_root_committee(self.id)
+            || self.overlay.is_child_of_root_committee(self.id)
         {
             let timeout_msg = Timeout {
-                view: new_state.current_view,
-                high_qc: Qc::Standard(new_state.local_high_qc.clone()),
-                sender: new_state.id,
-                timeout_qc: new_state.last_view_timeout_qc.clone(),
+                view: self.current_view,
+                high_qc: self.local_high_qc,
+                sender: self.id,
             };
-            let to = new_state.overlay.root_committee();
-            return (
-                new_state,
-                Some(Output::Send {
-                    to,
-                    payload: Payload::Timeout(timeout_msg),
-                }),
-            );
+            return Ok((
+                self.clone(),
+                vec![Send {
+                    to: self.overlay.root_committee(),
+                    payload: Box::new(timeout_msg),
+                }],
+            ));
         }
-        (new_state, None)
+        Ok((self.clone(), vec![]))
     }
 
     fn block_is_safe(&self, block: Block) -> bool {
-        block.view >= self.current_view && block.view == block.parent_qc.view() + 1
+        return block.view >= self.current_view && block.view == block.parent_qc.view() + 1;
     }
 
     fn update_high_qc(&mut self, qc: Qc) {
-        let qc_view = qc.view();
         match qc {
-            Qc::Standard(new_qc) if new_qc.view > self.local_high_qc.view => {
-                self.local_high_qc = new_qc;
+            Qc::Standard { view, id: _ } if view > self.local_high_qc.view() => {
+                self.local_high_qc = qc;
             }
-            Qc::Aggregated(new_qc) if new_qc.high_qc.view != self.local_high_qc.view => {
-                self.local_high_qc = new_qc.high_qc;
+            Qc::Aggregated { high_qc_view, .. } if high_qc_view != self.local_high_qc.view() => {
+                self.local_high_qc = qc;
             }
             _ => {}
         }
-        if qc_view == self.current_view {
+        if qc.view() == self.current_view {
             self.current_view += 1;
         }
     }
 
-    fn update_timeout_qc(&mut self, timeout_qc: TimeoutQc) {
-        match (&self.last_view_timeout_qc, timeout_qc) {
-            (None, timeout_qc) => {
-                self.last_view_timeout_qc = Some(timeout_qc);
-            }
-            (Some(current_qc), timeout_qc) if timeout_qc.view > current_qc.view => {
-                self.last_view_timeout_qc = Some(timeout_qc);
-            }
-            _ => {}
+    fn update_timeout_qc(&mut self, timeout_qc: Qc) {
+        if self.last_view_timeout_qc.view() < timeout_qc.view() {
+            self.last_view_timeout_qc = timeout_qc;
         }
     }
 
-    pub fn blocks_in_view(&self, view: View) -> Vec<Block> {
+    fn blocks_in_view(&self, view: View) -> Vec<Block> {
         self.safe_blocks
             .iter()
             .filter(|(_, b)| b.view == view)
-            .map(|(_, block)| block.clone())
+            .map(|(_, block)| *block)
             .collect()
     }
 
-    pub fn genesis_block(&self) -> Block {
-        self.blocks_in_view(0)[0].clone()
+    fn genesis_block(&self) -> Block {
+        self.blocks_in_view(0)[0]
     }
 
     // Returns the id of the grandparent block if it can be committed or None otherwise
@@ -270,12 +278,12 @@ impl<O: Overlay> Carnot<O> {
             && matches!(parent.parent_qc, Qc::Standard { .. })
             && matches!(grandparent.parent_qc, Qc::Standard { .. })
         {
-            return Some(grandparent.clone());
+            return Some(*grandparent);
         }
         None
     }
 
-    pub fn latest_committed_block(&self) -> Block {
+    fn latest_committed_block(&self) -> Block {
         for view in (0..self.current_view).rev() {
             for block in self.blocks_in_view(view) {
                 if let Some(block) = self.can_commit_grandparent(block) {
@@ -286,16 +294,16 @@ impl<O: Overlay> Carnot<O> {
         self.genesis_block()
     }
 
-    pub fn latest_committed_view(&self) -> View {
+    fn latest_committed_view(&self) -> View {
         self.latest_committed_block().view
     }
 
-    pub fn committed_blocks(&self) -> Vec<BlockId> {
+    fn committed_blocks(&self) -> Vec<Id> {
         let mut res = vec![];
         let mut current = self.latest_committed_block();
         while current != self.genesis_block() {
             res.push(current.id);
-            current = self.safe_blocks.get(&current.parent()).unwrap().clone();
+            current = *self.safe_blocks.get(&current.parent()).unwrap();
         }
         // If the length is 1, it means that the genesis block is the only committed block
         // and was added to the list already at the beginning of the function.
@@ -311,85 +319,74 @@ impl<O: Overlay> Carnot<O> {
 mod test {
     use super::*;
 
-    #[derive(Clone)]
-    struct NoOverlay;
-
-    impl Overlay for NoOverlay {
-        fn root_committee(&self) -> Committee {
-            todo!()
-        }
-
-        fn rebuild(&mut self, _timeout_qc: TimeoutQc) {
-            todo!()
-        }
-
-        fn is_member_of_child_committee(&self, _parent: NodeId, _child: NodeId) -> bool {
-            todo!()
-        }
-
-        fn is_member_of_root_committee(&self, _id: NodeId) -> bool {
-            todo!()
-        }
-
-        fn is_member_of_leaf_committee(&self, _id: NodeId) -> bool {
-            todo!()
-        }
-
-        fn is_child_of_root_committee(&self, _id: NodeId) -> bool {
-            todo!()
-        }
-
-        fn parent_committee(&self, _id: NodeId) -> Committee {
-            todo!()
-        }
-
-        fn leaf_committees(&self, _id: NodeId) -> HashSet<Committee> {
-            todo!()
-        }
-
-        fn leader(&self, _view: View) -> NodeId {
-            todo!()
-        }
-
-        fn super_majority_threshold(&self, _id: NodeId) -> usize {
-            todo!()
-        }
-
-        fn leader_super_majority_threshold(&self, _view: View) -> usize {
-            todo!()
-        }
+    #[test]
+    fn block_is_safe() {
+        let mut engine = ConsensusEngine::from_genesis(
+            [0; 32],
+            Qc::Standard {
+                view: 0,
+                id: [0; 32],
+            },
+        );
+        let block = Input::Block {
+            view: 1,
+            id: [1; 32],
+            parent_qc: Qc::Standard {
+                view: 0,
+                id: [0; 32],
+            },
+        };
+        let out = engine.step(block);
+        assert_eq!(
+            out,
+            vec![Output::Safeblock {
+                view: 1,
+                id: [1; 32]
+            }]
+        );
     }
 
     #[test]
     fn block_is_committed() {
-        let genesis = Block {
-            view: 0,
-            id: [0; 32],
-            parent_qc: Qc::Standard(StandardQc {
+        let mut engine = ConsensusEngine::from_genesis(
+            [0; 32],
+            Qc::Standard {
                 view: 0,
                 id: [0; 32],
-            }),
-        };
-        let mut engine = Carnot::from_genesis([0; 32], genesis.clone(), NoOverlay);
-        let p1 = Block {
+            },
+        );
+        let p1 = Input::block {
             view: 1,
             id: [1; 32],
-            parent_qc: Qc::Standard(StandardQc {
+            parent_qc: Qc::Standard {
                 view: 0,
                 id: [0; 32],
-            }),
+            },
         };
-        let p2 = Block {
+        let p2 = Input::block {
             view: 2,
             id: [2; 32],
-            parent_qc: Qc::Standard(StandardQc {
+            parent_qc: Qc::Standard {
                 view: 1,
                 id: [1; 32],
-            }),
+            },
         };
-        assert_eq!(engine.latest_committed_block(), genesis);
-        engine = engine.receive_block(p1).unwrap();
-        engine = engine.receive_block(p2).unwrap();
-        assert_eq!(engine.latest_committed_block(), genesis);
+        let _ = engine.step(p1);
+        println!("step 1");
+        let out = engine.step(p2);
+        println!("step 1");
+        assert_eq!(
+            out,
+            vec![
+                Output::Safeblock {
+                    view: 2,
+                    id: [2; 32]
+                },
+                Output::Committed {
+                    view: 0,
+                    id: [0; 32]
+                }
+            ]
+        );
     }
 }
