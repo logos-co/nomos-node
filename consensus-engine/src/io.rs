@@ -1,33 +1,46 @@
 use crate::{Id, View};
+use std::any::Any;
 
 /// Possible events to which the consensus engine can react.
 /// Timeout is here so that the engine can abstract over time
 /// and remain a pure function.
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub enum Input {
-    Proposal { view: View, id: Id, parent_qc: Qc },
+    Block { block: Block },
     NewView { view: View },
     Timeout,
 }
 
-/// Possible output events.
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Copy)]
+pub struct Block {
+    pub id: Id,
+    pub view: View,
+    pub parent_qc: Qc,
+}
 
+impl Block {
+    pub fn parent(&self) -> Id {
+        self.parent_qc.block()
+    }
+}
+
+/// Possible output events.
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub enum Output {
-    /// Proposal is "safe", meaning it's not for an old
+    /// block is "safe", meaning it's not for an old
     /// view and the qc is from the view previous to the
-    /// one in which the proposal was issued.
+    /// one in which the block was issued.
     ///
-    /// This can be used to filter out proposals for which
+    /// This can be used to filter out blocks for which
     /// a participant should actively vote for.
-    SafeProposal {
+    SafeBlock {
         view: View,
         id: Id,
     },
-    Committed {
-        view: View,
-        id: Id,
-    },
+    Send {
+        to: Id,
+        payload: Box<dyn Any + Eq + PartialEq + Hash>,
+    }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Copy)]
@@ -46,6 +59,8 @@ pub enum Qc {
         high_qc_view: View,
         high_qc_id: Id,
     },
+    
+    
 }
 
 impl Qc {
