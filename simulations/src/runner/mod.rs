@@ -84,9 +84,8 @@ where
 {
     inner: Arc<RwLock<SimulationRunnerInner<M>>>,
     nodes: Arc<RwLock<Vec<N>>>,
-    network: Network<M>,
-    settings: SimulationSettings,
-    rng: SmallRng,
+    runner_settings: RunnerSettings,
+    stream_settings: StreamSettings,
 }
 
 impl<M, N: Node> SimulationRunner<M, N>
@@ -124,9 +123,8 @@ where
                 wards,
             })),
             nodes,
-            network,
-            settings,
-            rng,
+            runner_settings,
+            stream_settings,
         }
     }
 

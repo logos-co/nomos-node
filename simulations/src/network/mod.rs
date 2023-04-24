@@ -144,6 +144,39 @@ pub trait NetworkInterface {
     fn receive_messages(&self) -> Vec<NetworkMessage<Self::Payload>>;
 }
 
+pub struct InMemoryNetworkInterface<M> {
+    id: NodeId,
+    sender: Sender<NetworkMessage<M>>,
+    receiver: Receiver<NetworkMessage<M>>,
+}
+
+impl<M> InMemoryNetworkInterface<M> {
+    pub fn new(
+        id: NodeId,
+        sender: Sender<NetworkMessage<M>>,
+        receiver: Receiver<NetworkMessage<M>>,
+    ) -> Self {
+        Self {
+            id,
+            sender,
+            receiver,
+        }
+    }
+}
+
+impl<M> NetworkInterface for InMemoryNetworkInterface<M> {
+    type Payload = M;
+
+    fn send_message(&self, address: NodeId, message: Self::Payload) {
+        let message = NetworkMessage::new(self.id, address, message);
+        self.sender.send(message).unwrap();
+    }
+
+    fn receive_messages(&self) -> Vec<crate::network::NetworkMessage<Self::Payload>> {
+        self.receiver.try_iter().collect()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::{

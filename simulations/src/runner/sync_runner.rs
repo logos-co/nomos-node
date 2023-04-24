@@ -31,7 +31,7 @@ where
     let handle = SimulationRunnerHandle {
         stop_tx,
         handle: std::thread::spawn(move || {
-            let p = P::new(runner.settings.stream_settings)?;
+            let p = P::new(runner.stream_settings)?;
             scopeguard::defer!(if let Err(e) = p.stop() {
                 eprintln!("Error stopping producer: {e}");
             });
@@ -77,11 +77,11 @@ mod tests {
         network::{
             behaviour::NetworkBehaviour,
             regions::{Region, RegionsData},
-            Network,
+            InMemoryNetworkInterface, Network,
         },
         node::{
-            dummy::{DummyMessage, DummyNetworkInterface, DummyNode},
-            Node, NodeId, OverlayState, SharedState, ViewOverlay,
+            dummy::{DummyMessage, DummyNode},
+            Node, NodeId, OverlayState, SharedState, SimulationOverlay, ViewOverlay,
         },
         overlay::{
             tree::{TreeOverlay, TreeSettings},
@@ -118,7 +118,7 @@ mod tests {
             .map(|node_id| {
                 let (node_message_sender, node_message_receiver) = channel::unbounded();
                 let network_message_receiver = network.connect(*node_id, node_message_receiver);
-                let network_interface = DummyNetworkInterface::new(
+                let network_interface = InMemoryNetworkInterface::new(
                     *node_id,
                     node_message_sender,
                     network_message_receiver,
@@ -147,6 +147,7 @@ mod tests {
         };
         let overlay_state = Arc::new(RwLock::new(OverlayState {
             all_nodes: node_ids.clone(),
+            overlay: SimulationOverlay::Tree(overlay),
             overlays: BTreeMap::from([(0, view.clone()), (1, view)]),
         }));
         let nodes = init_dummy_nodes(&node_ids, &mut network, overlay_state);
@@ -181,6 +182,7 @@ mod tests {
         };
         let overlay_state = Arc::new(RwLock::new(OverlayState {
             all_nodes: node_ids.clone(),
+            overlay: SimulationOverlay::Tree(overlay),
             overlays: BTreeMap::from([
                 (0, view.clone()),
                 (1, view.clone()),

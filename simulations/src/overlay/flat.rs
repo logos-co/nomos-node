@@ -9,7 +9,7 @@ use crate::overlay::{Committee, Layout};
 
 pub struct FlatOverlay;
 impl FlatOverlay {
-    fn new() -> Self {
+    pub fn new() -> Self {
         Self
     }
 }

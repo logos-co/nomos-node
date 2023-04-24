@@ -40,7 +40,7 @@ struct TreeProperties {
 }
 
 impl TreeOverlay {
-    pub fn new(settings: &TreeSettings) -> Self {
+    pub fn new(settings: TreeSettings) -> Self {
         Self { settings }
     }
 
