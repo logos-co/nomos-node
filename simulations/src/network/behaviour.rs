@@ -1,8 +1,10 @@
 // std
-use std::time::Duration;
+use std::{collections::HashMap, time::Duration};
 // crates
 use rand::Rng;
 use serde::{Deserialize, Serialize};
+
+use super::{regions::Region, NetworkSettings};
 // internal
 
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
@@ -23,4 +25,16 @@ impl NetworkBehaviour {
     pub fn should_drop<R: Rng>(&self, rng: &mut R) -> bool {
         rng.gen_bool(self.drop)
     }
+}
+
+// Takes a reference to the simulation_settings and returns a HashMap representing the
+// network behaviors for pairs of NodeIds.
+pub fn create_behaviours(
+    network_settings: &NetworkSettings,
+) -> HashMap<(Region, Region), NetworkBehaviour> {
+    network_settings
+        .network_behaviors
+        .iter()
+        .map(|((a, b), d)| ((*a, *b), NetworkBehaviour::new(*d, 0.0)))
+        .collect()
 }

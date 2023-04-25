@@ -18,18 +18,16 @@ impl Default for IOStreamSettings {
     }
 }
 
-// impl<W> TryFrom<StreamSettings> for IOStreamSettings<W> {
-//     type Error = String;
-//
-//     fn try_from(settings: StreamSettings) -> Result<Self, Self::Error> {
-//         match settings {
-//             StreamSettings::IO(settings) => Ok(IOStreamSettings {
-//                 writer: settings.writer,
-//             }),
-//             _ => Err("io settings can't be created".into()),
-//         }
-//     }
-// }
+impl<W> TryFrom<StreamSettings> for IOStreamSettings<W> {
+    type Error = String;
+
+    fn try_from(settings: StreamSettings) -> Result<Self, Self::Error> {
+        match settings {
+            StreamSettings::IO(settings) => Ok(IOStreamSettings { writer: todo!() }),
+            _ => Err("io settings can't be created".into()),
+        }
+    }
+}
 
 impl<'de> Deserialize<'de> for IOStreamSettings {
     fn deserialize<D>(_deserializer: D) -> Result<Self, D::Error>

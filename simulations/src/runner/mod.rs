@@ -105,8 +105,6 @@ where
         let rng = SmallRng::seed_from_u64(seed);
         let nodes = Arc::new(RwLock::new(nodes));
         let SimulationSettings {
-            network_behaviors: _,
-            regions: _,
             wards,
             overlay_settings: _,
             node_settings: _,
@@ -116,6 +114,7 @@ where
             seed: _,
             views_count: _,
             leaders_count: _,
+            network_settings: _,
         } = settings;
         Self {
             inner: Arc::new(RwLock::new(SimulationRunnerInner {

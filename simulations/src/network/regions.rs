@@ -1,9 +1,12 @@
 // std
+use rand::{seq::SliceRandom, Rng};
 use std::collections::HashMap;
 // crates
 use serde::{Deserialize, Serialize};
 // internal
 use crate::{network::behaviour::NetworkBehaviour, node::NodeId};
+
+use super::NetworkSettings;
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub enum Region {
@@ -55,4 +58,25 @@ impl RegionsData {
     pub fn region_nodes(&self, region: Region) -> &[NodeId] {
         &self.regions[&region]
     }
+}
+
+// Takes a reference to the node_ids and simulation_settings and returns a HashMap
+// representing the regions and their associated node IDs.
+pub fn create_regions<R: Rng>(
+    node_ids: &[NodeId],
+    rng: &mut R,
+    network_settings: &NetworkSettings,
+) -> HashMap<Region, Vec<NodeId>> {
+    let mut region_nodes = node_ids.to_vec();
+    region_nodes.shuffle(rng);
+
+    network_settings
+        .regions
+        .iter()
+        .map(|(region, distribution)| {
+            let node_count = (node_ids.len() as f32 * distribution).round() as usize;
+            let nodes = region_nodes.drain(..node_count).collect::<Vec<_>>();
+            (*region, nodes)
+        })
+        .collect()
 }

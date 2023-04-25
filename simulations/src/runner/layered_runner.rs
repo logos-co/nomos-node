@@ -66,7 +66,7 @@ where
 
     let layers: Vec<usize> = (0..gap).collect();
 
-    let mut deque = build_node_ids_deque::<M, N, P>(gap, &runner);
+    let mut deque = build_node_ids_deque::<M, N>(gap, &runner);
 
     let simulation_state = SimulationState {
         nodes: Arc::clone(&runner.nodes),
@@ -170,13 +170,12 @@ fn choose_random_layer_and_node_id(
     (i, *node_id)
 }
 
-fn build_node_ids_deque<M, N, P>(
+fn build_node_ids_deque<M, N>(
     gap: usize,
     runner: &SimulationRunner<M, N>,
 ) -> FixedSliceDeque<BTreeSet<NodeId>>
 where
     N: Node,
-    P: Producer,
 {
     // add a +1 so we always have
     let mut deque = FixedSliceDeque::new(gap + 1);

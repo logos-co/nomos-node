@@ -1,29 +1,24 @@
 // std
 use anyhow::Ok;
 use std::collections::BTreeMap;
-use std::fmt::{Display, Formatter};
 use std::fs::File;
 use std::path::{Path, PathBuf};
-use std::str::FromStr;
 use std::sync::{Arc, RwLock};
 // crates
 use clap::Parser;
 use crossbeam::channel;
-use polars::io::SerWriter;
-use polars::prelude::{DataFrame, JsonReader, SerReader};
 use rand::rngs::SmallRng;
 use rand::seq::SliceRandom;
 use rand::{Rng, SeedableRng};
 use serde::de::DeserializeOwned;
-use serde::{Deserialize, Serialize};
-use simulations::network::behaviour::NetworkBehaviour;
-use simulations::network::regions::RegionsData;
+use simulations::network::behaviour::create_behaviours;
+use simulations::network::regions::{create_regions, RegionsData};
 use simulations::network::{InMemoryNetworkInterface, Network};
 use simulations::node::dummy::DummyNode;
 use simulations::node::{NodeId, OverlayState, ViewOverlay};
 use simulations::overlay::flat::FlatOverlay;
 use simulations::overlay::tree::TreeOverlay;
-use simulations::overlay::{Overlay, SimulationOverlay};
+use simulations::overlay::{create_overlay, Overlay, SimulationOverlay};
 use simulations::streaming::StreamType;
 // internal
 use simulations::{
@@ -54,40 +49,17 @@ impl SimulationApp {
             input_settings,
             stream_type,
         } = self;
-        let mut rng = SmallRng::seed_from_u64(123);
         let simulation_settings: SimulationSettings = load_json_from_file(&input_settings)?;
+        let mut rng = SmallRng::seed_from_u64(simulation_settings.seed.unwrap_or(0));
         let mut node_ids: Vec<NodeId> = (0..simulation_settings.node_count)
             .map(Into::into)
             .collect();
         node_ids.shuffle(&mut rng);
 
-        let mut region_nodes = node_ids.clone();
-        let regions = simulation_settings
-            .regions
-            .iter()
-            .map(|(region, distribution)| {
-                // Node ids should be already shuffled.
-                let node_count = (node_ids.len() as f32 * distribution).round() as usize;
-                let nodes = region_nodes.drain(..node_count).collect::<Vec<_>>();
-                (*region, nodes)
-            })
-            .collect();
-        let behaviours = simulation_settings
-            .network_behaviors
-            .iter()
-            .map(|((a, b), d)| ((*a, *b), NetworkBehaviour::new(*d, 0.0)))
-            .collect();
+        let regions = create_regions(&node_ids, &mut rng, &simulation_settings.network_settings);
+        let behaviours = create_behaviours(&simulation_settings.network_settings);
         let regions_data = RegionsData::new(regions, behaviours);
-
-        let overlay: SimulationOverlay = match &simulation_settings.overlay_settings {
-            simulations::settings::OverlaySettings::Flat => {
-                SimulationOverlay::Flat(FlatOverlay::new())
-            }
-            simulations::settings::OverlaySettings::Tree(settings) => {
-                SimulationOverlay::Tree(TreeOverlay::new(settings.clone()))
-            }
-        };
-
+        let overlay = create_overlay(&simulation_settings.overlay_settings);
         let overlays = generate_overlays(
             &node_ids,
             &overlay,
@@ -104,16 +76,13 @@ impl SimulationApp {
 
         let mut network = Network::new(regions_data);
 
-        // build up series vector
-        let mut out_data: Vec<OutData> = Vec::new();
-
-        let mut runner = match &simulation_settings.node_settings {
+        match &simulation_settings.node_settings {
             simulations::settings::NodeSettings::Carnot => {
                 let nodes = node_ids
                     .iter()
                     .map(|node_id| CarnotNode::new(*node_id))
                     .collect();
-                let mut runner = SimulationRunner::new(network, nodes, simulation_settings);
+                let runner = SimulationRunner::new(network, nodes, simulation_settings);
                 match stream_type {
                     simulations::streaming::StreamType::Naive => {
                         runner.simulate::<NaiveProducer<OutData>>()?
@@ -141,9 +110,7 @@ impl SimulationApp {
                         DummyNode::new(*node_id, 0, overlay_state.clone(), network_interface)
                     })
                     .collect();
-
-                let mut runner = SimulationRunner::new(network, nodes, simulation_settings);
-                // build up series vector
+                let runner = SimulationRunner::new(network, nodes, simulation_settings);
                 match stream_type {
                     simulations::streaming::StreamType::Naive => {
                         runner.simulate::<NaiveProducer<OutData>>()?
@@ -167,6 +134,8 @@ fn load_json_from_file<T: DeserializeOwned>(path: &Path) -> anyhow::Result<T> {
     Ok(serde_json::from_reader(f)?)
 }
 
+// Helper method to pregenerate views.
+// TODO: Remove once shared overlay can generate new views on demand.
 fn generate_overlays<R: Rng>(
     node_ids: &[NodeId],
     overlay: &SimulationOverlay,

@@ -14,10 +14,7 @@ use std::{
 // crates
 use serde::{Deserialize, Serialize};
 // internal
-use crate::{
-    overlay::{Layout, SimulationOverlay},
-    settings::OverlaySettings,
-};
+use crate::overlay::{Layout, OverlaySettings, SimulationOverlay};
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(transparent)]
