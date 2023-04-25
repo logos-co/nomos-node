@@ -1,6 +1,9 @@
 pub mod carnot;
 pub mod dummy;
 
+#[cfg(test)]
+pub mod dummy_streaming;
+
 // std
 use std::{
     collections::BTreeMap,

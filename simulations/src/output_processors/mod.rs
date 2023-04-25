@@ -1,5 +1,7 @@
 use serde::Serialize;
 
+use crate::warding::SimulationState;
+
 pub type SerializedNodeState = serde_json::Value;
 
 #[derive(Serialize)]
@@ -12,12 +14,12 @@ impl OutData {
     }
 }
 
-impl<N> TryFrom<&crate::warding::SimulationState<N>> for OutData
+impl<N> TryFrom<&SimulationState<N>> for OutData
 where
     N: crate::node::Node,
     N::State: Serialize,
 {
-    type Error = serde_json::Error;
+    type Error = anyhow::Error;
 
     fn try_from(state: &crate::warding::SimulationState<N>) -> Result<Self, Self::Error> {
         serde_json::to_value(
@@ -30,6 +32,7 @@ where
                 .collect::<Vec<_>>(),
         )
         .map(OutData::new)
+        .map_err(From::from)
     }
 }
 
