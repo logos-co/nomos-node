@@ -54,7 +54,7 @@ impl SimulationApp {
             input_settings,
             stream_type,
         } = self;
-        let mut rng = SmallRng::seed_from_u64(1234);
+        let mut rng = SmallRng::seed_from_u64(123);
         let simulation_settings: SimulationSettings = load_json_from_file(&input_settings)?;
         let mut node_ids: Vec<NodeId> = (0..simulation_settings.node_count)
             .map(Into::into)
