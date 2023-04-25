@@ -3,8 +3,9 @@ use std::sync::{Arc, Mutex};
 use super::{Producer, Receivers, Subscriber};
 use arc_swap::ArcSwapOption;
 use crossbeam::channel::{bounded, unbounded, Sender};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
+#[derive(Debug)]
 pub struct IOStreamSettings<W = std::io::Stdout> {
     pub writer: W,
 }
@@ -14,6 +15,17 @@ impl Default for IOStreamSettings {
         Self {
             writer: std::io::stdout(),
         }
+    }
+}
+
+impl<'de> Deserialize<'de> for IOStreamSettings {
+    fn deserialize<D>(_deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        Ok(Self {
+            writer: std::io::stdout(),
+        })
     }
 }
 

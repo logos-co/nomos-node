@@ -12,7 +12,7 @@ use simulations::streaming::StreamType;
 // internal
 use simulations::{
     node::carnot::CarnotNode, output_processors::OutData, runner::SimulationRunner,
-    settings::SimulationSettings, streaming::naive::NaiveProducer,
+    settings::SimulationSettings, streaming::io::IOProducer, streaming::naive::NaiveProducer,
     streaming::polars::PolarsProducer,
 };
 
@@ -43,7 +43,7 @@ impl SimulationApp {
             simulations::streaming::StreamType::Naive => {
                 let simulation_settings: SimulationSettings<_, _, _> =
                     load_json_from_file(&input_settings)?;
-                let mut simulation_runner: SimulationRunner<
+                let simulation_runner: SimulationRunner<
                     (),
                     CarnotNode,
                     TreeOverlay,
@@ -54,11 +54,22 @@ impl SimulationApp {
             simulations::streaming::StreamType::Polars => {
                 let simulation_settings: SimulationSettings<_, _, _> =
                     load_json_from_file(&input_settings)?;
-                let mut simulation_runner: SimulationRunner<
+                let simulation_runner: SimulationRunner<
                     (),
                     CarnotNode,
                     TreeOverlay,
                     PolarsProducer<OutData>,
+                > = SimulationRunner::new(network, nodes, simulation_settings);
+                simulation_runner.simulate()?
+            }
+            simulations::streaming::StreamType::IO => {
+                let simulation_settings: SimulationSettings<_, _, _> =
+                    load_json_from_file(&input_settings)?;
+                let simulation_runner: SimulationRunner<
+                    (),
+                    CarnotNode,
+                    TreeOverlay,
+                    IOProducer<std::io::Stdout, OutData>,
                 > = SimulationRunner::new(network, nodes, simulation_settings);
                 simulation_runner.simulate()?
             }
