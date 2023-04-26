@@ -1,42 +1,52 @@
-use std::sync::{Arc, Mutex};
+use std::{
+    any::Any,
+    io::stdout,
+    sync::{Arc, Mutex},
+};
 
 use super::{Producer, Receivers, StreamSettings, Subscriber};
 use arc_swap::ArcSwapOption;
 use crossbeam::channel::{bounded, unbounded, Sender};
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug)]
-pub struct IOStreamSettings<W = std::io::Stdout> {
-    pub writer: W,
+#[derive(Debug, Default, Deserialize)]
+pub struct IOStreamSettings {
+    pub writer_type: WriteType,
 }
 
-impl Default for IOStreamSettings {
-    fn default() -> Self {
-        Self {
-            writer: std::io::stdout(),
+#[derive(Debug, Default, Deserialize)]
+pub enum WriteType {
+    #[default]
+    Stdout,
+}
+
+pub trait ToWriter<W: std::io::Write + Send + Sync + 'static> {
+    fn to_writer(&self) -> Result<W, String>;
+}
+
+impl<W: std::io::Write + Send + Sync + 'static> ToWriter<W> for WriteType {
+    fn to_writer(&self) -> Result<W, String> {
+        match self {
+            WriteType::Stdout => {
+                let stdout = Box::new(stdout());
+                let boxed_any = Box::new(stdout) as Box<dyn Any + Send + Sync>;
+                boxed_any
+                    .downcast::<W>()
+                    .map(|boxed| *boxed)
+                    .map_err(|_| "Writer type mismatch".to_string())
+            }
         }
     }
 }
 
-impl<W> TryFrom<StreamSettings> for IOStreamSettings<W> {
+impl TryFrom<StreamSettings> for IOStreamSettings {
     type Error = String;
 
     fn try_from(settings: StreamSettings) -> Result<Self, Self::Error> {
         match settings {
-            StreamSettings::IO(settings) => Ok(IOStreamSettings { writer: todo!() }),
+            StreamSettings::IO(settings) => Ok(settings),
             _ => Err("io settings can't be created".into()),
         }
-    }
-}
-
-impl<'de> Deserialize<'de> for IOStreamSettings {
-    fn deserialize<D>(_deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        Ok(Self {
-            writer: std::io::stdout(),
-        })
     }
 }
 
@@ -53,7 +63,7 @@ where
     W: std::io::Write + Send + Sync + 'static,
     R: Serialize + Send + Sync + 'static,
 {
-    type Settings = IOStreamSettings<W>;
+    type Settings = IOStreamSettings;
 
     type Subscriber = IOSubscriber<W, R>;
 
@@ -61,14 +71,20 @@ where
     where
         Self: Sized,
     {
-        let settings: IOStreamSettings<W> = settings.try_into().expect("io settings");
+        let settings: IOStreamSettings = settings
+            .try_into()
+            .expect("io settings from stream settings");
+        let writer = settings
+            .writer_type
+            .to_writer()
+            .expect("writer from writer type");
         let (sender, recv) = unbounded();
         let (stop_tx, stop_rx) = bounded(1);
         Ok(Self {
             sender,
             recvs: ArcSwapOption::from(Some(Arc::new(Receivers { stop_rx, recv }))),
             stop_tx,
-            writer: ArcSwapOption::from(Some(Arc::new(Mutex::new(settings.writer)))),
+            writer: ArcSwapOption::from(Some(Arc::new(Mutex::new(writer)))),
         })
     }
 
@@ -152,7 +168,6 @@ mod tests {
         },
         node::{dummy_streaming::DummyStreamingNode, Node, NodeId},
         runner::SimulationRunner,
-        streaming::StreamSettings,
         warding::SimulationState,
     };
 
@@ -180,9 +195,6 @@ mod tests {
     fn test_streaming() {
         let simulation_settings = crate::settings::SimulationSettings {
             seed: Some(1),
-            stream_settings: StreamSettings::IO(IOStreamSettings {
-                writer: std::io::stdout(),
-            }),
             ..Default::default()
         };
 
