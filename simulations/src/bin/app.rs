@@ -1,5 +1,6 @@
 // std
 use anyhow::Ok;
+use serde::Serialize;
 use std::collections::BTreeMap;
 use std::fs::File;
 use std::path::{Path, PathBuf};
@@ -15,7 +16,7 @@ use simulations::network::behaviour::create_behaviours;
 use simulations::network::regions::{create_regions, RegionsData};
 use simulations::network::{InMemoryNetworkInterface, Network};
 use simulations::node::dummy::DummyNode;
-use simulations::node::{NodeId, OverlayState, ViewOverlay};
+use simulations::node::{Node, NodeId, OverlayState, ViewOverlay};
 use simulations::overlay::flat::FlatOverlay;
 use simulations::overlay::tree::TreeOverlay;
 use simulations::overlay::{create_overlay, Overlay, SimulationOverlay};
@@ -82,18 +83,7 @@ impl SimulationApp {
                     .iter()
                     .map(|node_id| CarnotNode::new(*node_id))
                     .collect();
-                let runner = SimulationRunner::new(network, nodes, simulation_settings);
-                match stream_type {
-                    simulations::streaming::StreamType::Naive => {
-                        runner.simulate::<NaiveProducer<OutData>>()?
-                    }
-                    simulations::streaming::StreamType::Polars => {
-                        runner.simulate::<PolarsProducer<OutData>>()?
-                    }
-                    simulations::streaming::StreamType::IO => {
-                        runner.simulate::<IOProducer<std::io::Stdout, OutData>>()?
-                    }
-                }
+                run(network, nodes, simulation_settings, stream_type)?;
             }
             simulations::settings::NodeSettings::Dummy => {
                 let nodes = node_ids
@@ -110,22 +100,36 @@ impl SimulationApp {
                         DummyNode::new(*node_id, 0, overlay_state.clone(), network_interface)
                     })
                     .collect();
-                let runner = SimulationRunner::new(network, nodes, simulation_settings);
-                match stream_type {
-                    simulations::streaming::StreamType::Naive => {
-                        runner.simulate::<NaiveProducer<OutData>>()?
-                    }
-                    simulations::streaming::StreamType::Polars => {
-                        runner.simulate::<PolarsProducer<OutData>>()?
-                    }
-                    simulations::streaming::StreamType::IO => {
-                        runner.simulate::<IOProducer<std::io::Stdout, OutData>>()?
-                    }
-                }
+                run(network, nodes, simulation_settings, stream_type)?;
             }
         };
         Ok(())
     }
+}
+
+fn run<M, N: Node>(
+    network: Network<M>,
+    nodes: Vec<N>,
+    settings: SimulationSettings,
+    stream_type: StreamType,
+) -> anyhow::Result<()>
+where
+    M: Clone + Send + Sync + 'static,
+    N: Send + Sync + 'static,
+    N::Settings: Clone + Send,
+    N::State: Serialize,
+{
+    let runner = SimulationRunner::new(network, nodes, settings);
+    match stream_type {
+        simulations::streaming::StreamType::Naive => runner.simulate::<NaiveProducer<OutData>>()?,
+        simulations::streaming::StreamType::Polars => {
+            runner.simulate::<PolarsProducer<OutData>>()?
+        }
+        simulations::streaming::StreamType::IO => {
+            runner.simulate::<IOProducer<std::io::Stdout, OutData>>()?
+        }
+    };
+    Ok(())
 }
 
 /// Generically load a json file
