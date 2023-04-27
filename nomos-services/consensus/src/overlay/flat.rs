@@ -77,10 +77,10 @@ where
         encoded_stream
             .for_each_concurrent(None, |chunk| async move {
                 let message = ProposalChunkMsg {
-                    chunk,
+                    chunk: chunk.to_vec().into_boxed_slice(),
                     view: view.view_n,
                 };
-                adapter.broadcast_block_chunk(view.view_n, message).await;
+                adapter.broadcast_block_chunk(message).await;
             })
             .await;
     }
