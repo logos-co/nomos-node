@@ -17,8 +17,6 @@ use simulations::network::regions::{create_regions, RegionsData};
 use simulations::network::{InMemoryNetworkInterface, Network};
 use simulations::node::dummy::DummyNode;
 use simulations::node::{Node, NodeId, OverlayState, ViewOverlay};
-use simulations::overlay::flat::FlatOverlay;
-use simulations::overlay::tree::TreeOverlay;
 use simulations::overlay::{create_overlay, Overlay, SimulationOverlay};
 use simulations::streaming::StreamType;
 // internal
@@ -37,11 +35,6 @@ pub struct SimulationApp {
     input_settings: PathBuf,
     #[clap(long)]
     stream_type: StreamType,
-}
-
-pub enum OverlayVariants {
-    Flat(FlatOverlay),
-    Tree(TreeOverlay),
 }
 
 impl SimulationApp {
