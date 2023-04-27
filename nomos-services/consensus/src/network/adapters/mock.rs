@@ -64,7 +64,7 @@ impl NetworkAdapter for MockAdapter {
 
     async fn proposal_chunks_stream(
         &self,
-        _view: View,
+        _view: &View,
     ) -> Box<dyn Stream<Item = Bytes> + Send + Sync + Unpin> {
         let stream_channel = self
             .message_subscriber_channel()
@@ -94,7 +94,7 @@ impl NetworkAdapter for MockAdapter {
         }))
     }
 
-    async fn broadcast_block_chunk(&self, chunk_message: ProposalChunkMsg) {
+    async fn broadcast_block_chunk(&self, _view: &View, chunk_message: ProposalChunkMsg) {
         let message = MockMessage::new(
             String::from_utf8_lossy(&chunk_message.as_bytes()).to_string(),
             MOCK_BLOCK_CONTENT_TOPIC,
@@ -111,6 +111,13 @@ impl NetworkAdapter for MockAdapter {
         {
             tracing::error!("Failed to broadcast block chunk: {:?}", e);
         };
+    }
+
+    async fn timeout_qc_stream(
+        &self,
+        view: &View,
+    ) -> Box<dyn Stream<Item = ()> + Send + Sync + Unpin> {
+        todo!()
     }
 
     async fn broadcast_timeout_qc(&self, _timeout_qc_msg: TimeoutQcMsg) {
