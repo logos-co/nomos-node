@@ -1,5 +1,6 @@
 // std
 // crates
+use bytes::Bytes;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 // internal
@@ -9,7 +10,7 @@ use nomos_core::wire;
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct ProposalChunkMsg {
-    pub chunk: Box<[u8]>,
+    pub chunk: Bytes,
     pub view: View,
 }
 
