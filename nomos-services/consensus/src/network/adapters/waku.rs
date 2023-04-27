@@ -136,11 +136,9 @@ impl NetworkAdapter for WakuAdapter {
     }
 
     async fn broadcast_block_chunk(&self, view: &View, chunk_message: ProposalChunkMsg) {
-        let content_topic = proposal_topic(view);
-
         let message = WakuMessage::new(
             chunk_message.as_bytes(),
-            content_topic,
+            PROPOSAL_CONTENT_TOPIC.clone(),
             1,
             chrono::Utc::now().timestamp() as usize,
         );
@@ -160,7 +158,6 @@ impl NetworkAdapter for WakuAdapter {
         &self,
         view: &View,
     ) -> Box<dyn Stream<Item = ()> + Send + Sync + Unpin> {
-        let content_topic = timeout_qc_topic(view);
         Box::new(Box::pin(
             self.cached_stream_with_content_topic(TIMEOUT_QC_CONTENT_TOPIC.clone())
                 .await
