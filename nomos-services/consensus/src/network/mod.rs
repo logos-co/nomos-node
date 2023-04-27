@@ -6,7 +6,7 @@ use bytes::Bytes;
 // crates
 use futures::Stream;
 // internal
-use crate::network::messages::{ProposalChunkMsg, VoteMsg};
+use crate::network::messages::{ProposalChunkMsg, TimeoutQcMsg, VoteMsg};
 use crate::overlay::committees::Committee;
 use consensus_engine::{TimeoutQc, View};
 use nomos_network::backends::NetworkBackend;
@@ -26,7 +26,8 @@ pub trait NetworkAdapter {
         &self,
         view: View,
     ) -> Box<dyn Stream<Item = Bytes> + Send + Sync + Unpin>;
-    async fn broadcast_block_chunk(&self, view: View, chunk_msg: ProposalChunkMsg);
+    async fn broadcast_block_chunk(&self, chunk_msg: ProposalChunkMsg);
+    async fn broadcast_timeout_qc(&self, timeout_qc_msg: TimeoutQcMsg);
     async fn timeout_qc_stream(
         &self,
         view: View,
