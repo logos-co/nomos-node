@@ -34,11 +34,11 @@ impl<O: Overlay> Carnot<O> {
     ///     success before `receive_block(b)`.
     ///  *  Overlay changes for views < block.view should be made available before trying to process
     ///     a block by calling `receive_timeout_qc`.
+    #[allow(clippy::result_unit_err)]
     pub fn receive_block(&self, block: Block) -> Result<Self, ()> {
         assert!(
             self.safe_blocks.contains_key(&block.parent()),
-            "out of order view not supported, missing parent block for {:?}",
-            block
+            "out of order view not supported, missing parent block for {block:?}",
         );
 
         // if the block has already been processed, return early
