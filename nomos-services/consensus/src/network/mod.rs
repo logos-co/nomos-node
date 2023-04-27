@@ -8,7 +8,7 @@ use futures::Stream;
 // internal
 use crate::network::messages::{ProposalChunkMsg, VoteMsg};
 use crate::overlay::committees::Committee;
-use crate::View;
+use consensus_engine::{TimeoutQc, View};
 use nomos_network::backends::NetworkBackend;
 use nomos_network::NetworkService;
 use overwatch_rs::services::relay::OutboundRelay;
@@ -24,22 +24,22 @@ pub trait NetworkAdapter {
     ) -> Self;
     async fn proposal_chunks_stream(
         &self,
-        view: &View,
+        view: View,
     ) -> Box<dyn Stream<Item = Bytes> + Send + Sync + Unpin>;
-    async fn broadcast_block_chunk(&self, view: &View, chunk_msg: ProposalChunkMsg);
+    async fn broadcast_block_chunk(&self, view: View, chunk_msg: ProposalChunkMsg);
     async fn timeout_qc_stream(
         &self,
-        view: &View,
-    ) -> Box<dyn Stream<Item = ()> + Send + Sync + Unpin>;
+        view: View,
+    ) -> Box<dyn Stream<Item = TimeoutQc> + Send + Sync + Unpin>;
     async fn votes_stream<Vote: DeserializeOwned>(
         &self,
         committee: Committee,
-        view: &View,
+        view: View,
     ) -> Box<dyn Stream<Item = Vote> + Send>;
     async fn send_vote<Vote: Serialize + Send>(
         &self,
         committee: Committee,
-        view: &View,
+        view: View,
         vote: VoteMsg<Vote>,
     );
 }
