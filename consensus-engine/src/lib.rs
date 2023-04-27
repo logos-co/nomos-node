@@ -319,123 +319,77 @@ mod test {
             todo!()
         }
 
-        fn rebuild(&mut self, timeout_qc: Qc) {
+        fn rebuild(&mut self, _timeout_qc: TimeoutQc) {
             todo!()
         }
 
-        fn is_member_of_child_committee(&self, parent: NodeId, child: NodeId) -> bool {
+        fn is_member_of_child_committee(&self, _parent: NodeId, _child: NodeId) -> bool {
             todo!()
         }
 
-        fn is_member_of_root_committee(&self, id: NodeId) -> bool {
+        fn is_member_of_root_committee(&self, _id: NodeId) -> bool {
             todo!()
         }
 
-        fn is_member_of_leaf_committee(&self, id: NodeId) -> bool {
+        fn is_member_of_leaf_committee(&self, _id: NodeId) -> bool {
             todo!()
         }
 
-        fn is_child_of_root_committee(&self, id: NodeId) -> bool {
+        fn is_child_of_root_committee(&self, _id: NodeId) -> bool {
             todo!()
         }
 
-        fn parent_committee(&self, id: NodeId) -> Committee {
+        fn parent_committee(&self, _id: NodeId) -> Committee {
             todo!()
         }
 
-        fn leaf_committees(&self, id: NodeId) -> HashSet<Committee> {
+        fn leaf_committees(&self, _id: NodeId) -> HashSet<Committee> {
             todo!()
         }
 
-        fn leader(&self, view: View) -> NodeId {
+        fn leader(&self, _view: View) -> NodeId {
             todo!()
         }
 
-        fn super_majority_threshold(&self, id: NodeId) -> usize {
+        fn super_majority_threshold(&self, _id: NodeId) -> usize {
             todo!()
         }
 
-        fn leader_super_majority_threshold(&self, view: View) -> usize {
+        fn leader_super_majority_threshold(&self, _view: View) -> usize {
             todo!()
         }
     }
 
-    // #[test]
-    // fn block_is_safe() {
-    //     let mut engine = ConsensusEngine::from_genesis(
-    //         [0; 32],
-    //         Block {
-    //             id: [0; 32],
-    //             view: -1,
-    //             parent_qc: Qc::Standard(StandardQc {
-    //                 view: 0,
-    //                 id: [0; 32],
-    //             }),
-    //         },
-    //         NoOverlay,
-    //     );
-    //
-    //     let block = Input::Block {
-    //         block: Block {
-    //             id: [1; 32],
-    //             view: 1,
-    //             parent_qc: Qc::Standard(StandardQc {
-    //                 view: 0,
-    //                 id: [0; 32],
-    //             }),
-    //         },
-    //     };
-    //     let out = engine.step(block);
-    //     assert_eq!(
-    //         out,
-    //         vec![Output::SafeBlock {
-    //             view: 1,
-    //             id: [1; 32]
-    //         }]
-    //     );
-    // }
-    //
-    // #[test]
-    // fn block_is_committed() {
-    //     let mut engine = ConsensusEngine::from_genesis(
-    //         [0; 32],
-    //         Qc::Standard {
-    //             view: 0,
-    //             id: [0; 32],
-    //         },
-    //     );
-    //     let p1 = Input::block {
-    //         view: 1,
-    //         id: [1; 32],
-    //         parent_qc: Qc::Standard {
-    //             view: 0,
-    //             id: [0; 32],
-    //         },
-    //     };
-    //     let p2 = Input::block {
-    //         view: 2,
-    //         id: [2; 32],
-    //         parent_qc: Qc::Standard {
-    //             view: 1,
-    //             id: [1; 32],
-    //         },
-    //     };
-    //     let _ = engine.step(p1);
-    //     println!("step 1");
-    //     let out = engine.step(p2);
-    //     println!("step 1");
-    //     assert_eq!(
-    //         out,
-    //         vec![
-    //             Output::Safeblock {
-    //                 view: 2,
-    //                 id: [2; 32]
-    //             },
-    //             Output::Committed {
-    //                 view: 0,
-    //                 id: [0; 32]
-    //             }
-    //         ]
-    //     );
-    // }
+    #[test]
+    fn block_is_committed() {
+        let genesis = Block {
+            view: 0,
+            id: [0; 32],
+            parent_qc: Qc::Standard(StandardQc {
+                view: 0,
+                id: [0; 32],
+            }),
+        };
+        let mut engine = Carnot::from_genesis([0; 32], genesis.clone(), NoOverlay);
+        let p1 = Block {
+            view: 1,
+            id: [1; 32],
+            parent_qc: Qc::Standard(StandardQc {
+                view: 0,
+                id: [0; 32],
+            }),
+        };
+        let p2 = Block {
+            view: 2,
+            id: [2; 32],
+            parent_qc: Qc::Standard(StandardQc {
+                view: 1,
+                id: [1; 32],
+            }),
+        };
+        assert_eq!(engine.latest_committed_block(), genesis);
+        engine = engine.receive_block(p1).unwrap();
+        engine = engine.receive_block(p2).unwrap();
+        assert_eq!(engine.latest_committed_block(), genesis);
+    }
 }
