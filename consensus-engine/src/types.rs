@@ -12,6 +12,7 @@ pub type Committee = HashSet<NodeId>;
 /// This enum represents the different types of messages that can be sent from the perspective of consensus and
 /// can't be directly used in the network as they lack things like cryptographic signatures.
 #[derive(Debug, Clone, Eq, PartialEq)]
+#[cfg_attr(feature = "serde1", derive(serde::Serialize, serde::Deserialize))]
 pub enum Payload {
     /// Vote for a block in a view
     Vote(Vote),
@@ -23,11 +24,13 @@ pub enum Payload {
 
 /// Returned
 #[derive(Debug, Clone, Eq, PartialEq)]
+#[cfg_attr(feature = "serde1", derive(serde::Serialize, serde::Deserialize))]
 pub struct Vote {
     pub block: BlockId,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
+#[cfg_attr(feature = "serde1", derive(serde::Serialize, serde::Deserialize))]
 pub struct Timeout {
     pub view: View,
     pub sender: NodeId,
@@ -36,6 +39,7 @@ pub struct Timeout {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
+#[cfg_attr(feature = "serde1", derive(serde::Serialize, serde::Deserialize))]
 pub struct NewView {
     pub view: View,
     pub sender: NodeId,
@@ -44,6 +48,7 @@ pub struct NewView {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
+#[cfg_attr(feature = "serde1", derive(serde::Serialize, serde::Deserialize))]
 pub struct TimeoutQc {
     pub view: View,
     pub high_qc: Qc,
@@ -51,6 +56,7 @@ pub struct TimeoutQc {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
+#[cfg_attr(feature = "serde1", derive(serde::Serialize, serde::Deserialize))]
 pub struct Block {
     pub id: BlockId,
     pub view: View,
@@ -76,6 +82,7 @@ pub enum Output {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
+#[cfg_attr(feature = "serde1", derive(serde::Serialize, serde::Deserialize))]
 pub struct StandardQc {
     pub view: View,
     pub id: BlockId,
@@ -91,12 +98,14 @@ impl StandardQc {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
+#[cfg_attr(feature = "serde1", derive(serde::Serialize, serde::Deserialize))]
 pub struct AggregateQc {
     pub high_qc: StandardQc,
     pub view: View,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
+#[cfg_attr(feature = "serde1", derive(serde::Serialize, serde::Deserialize))]
 pub enum Qc {
     Standard(StandardQc),
     Aggregated(AggregateQc),

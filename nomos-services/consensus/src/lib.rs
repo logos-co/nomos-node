@@ -227,7 +227,7 @@ pub struct Approval;
 pub struct View {
     seed: Seed,
     staking_keys: BTreeMap<NodeId, Stake>,
-    pub view_n: u64,
+    pub view_n: consensus_engine::View,
 }
 
 impl View {
@@ -357,8 +357,9 @@ impl View {
         true
     }
 
+    // TODO: use consensus_engine::View instead
     pub fn id(&self) -> u64 {
-        self.view_n
+        self.view_n.try_into().unwrap()
     }
 
     // Verifies the block is new and the previous leader did not fail
