@@ -150,19 +150,24 @@ impl NetworkAdapter for WakuAdapter {
         Box::new(Box::pin(
             self.cached_stream_with_content_topic(PROPOSAL_CONTENT_TOPIC.clone())
                 .await
-                .filter_map(|message| {
+                .filter_map(move |message| {
                     let payload = message.payload();
-                    let ProposalChunkMsg {view: msg_view, chunk} = ProposalChunkMsg::from_bytes(payload)l;
-                    if view == &msg_view {
-                        Some(chunk)
-                    } else {
-                        None
+                    let ProposalChunkMsg {
+                        view: msg_view,
+                        chunk,
+                    } = ProposalChunkMsg::from_bytes(payload);
+                    async move {
+                        if view == msg_view {
+                            Some(Bytes::from(chunk))
+                        } else {
+                            None
+                        }
                     }
                 }),
         ))
     }
 
-    async fn broadcast_block_chunk(&self, view: View, chunk_message: ProposalChunkMsg) {
+    async fn broadcast_block_chunk(&self, chunk_message: ProposalChunkMsg) {
         let message = WakuMessage::new(
             chunk_message.as_bytes(),
             PROPOSAL_CONTENT_TOPIC.clone(),
@@ -183,6 +188,11 @@ impl NetworkAdapter for WakuAdapter {
         };
     }
 
+    async fn broadcast_timeout_qc(&self, timeout_qc_msg: TimeoutQcMsg) {
+        self.broadcast(timeout_qc_msg.as_bytes(), TIMEOUT_QC_CONTENT_TOPIC)
+            .await
+    }
+
     async fn timeout_qc_stream(
         &self,
         view: View,
@@ -190,13 +200,15 @@ impl NetworkAdapter for WakuAdapter {
         Box::new(Box::pin(
             self.cached_stream_with_content_topic(TIMEOUT_QC_CONTENT_TOPIC.clone())
                 .await
-                .filter_map(|message| {
+                .filter_map(move |message| {
                     let payload = message.payload();
                     let qc = TimeoutQcMsg::from_bytes(payload).qc;
-                    if qc.view > *view {
-                        Some(qc)
-                    } else {
-                        None
+                    async move {
+                        if qc.view > view {
+                            Some(qc)
+                        } else {
+                            None
+                        }
                     }
                 }),
         ))
