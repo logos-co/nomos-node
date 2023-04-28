@@ -4,20 +4,20 @@
 //! are always synchronized (i.e. it cannot happen that we accidentally use committees from different views).
 //! It's obviously extremely important that the information contained in `View` is synchronized across different
 //! nodes, but that has to be achieved through different means.
-mod leadership;
 mod network;
-pub mod overlay;
 mod tip;
 
 // std
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
 use std::fmt::Debug;
 use std::hash::Hash;
+use std::time::Duration;
 // crates
+use futures::StreamExt;
 use serde::{Deserialize, Serialize};
 // internal
 use crate::network::NetworkAdapter;
-use leadership::{Leadership, LeadershipResult};
+use consensus_engine::{Carnot, NewView, Overlay, Qc, StandardQc, Timeout, TimeoutQc, Vote};
 use nomos_core::block::Block;
 use nomos_core::crypto::PublicKey;
 use nomos_core::fountain::FountainCode;
@@ -26,7 +26,6 @@ use nomos_core::tx::Transaction;
 use nomos_core::vote::Tally;
 use nomos_mempool::{backend::MemPool, network::NetworkAdapter as MempoolAdapter, MempoolService};
 use nomos_network::NetworkService;
-use overlay::Overlay;
 use overwatch_rs::services::relay::{OutboundRelay, Relay};
 use overwatch_rs::services::{
     handle::ServiceStateHandle,
@@ -34,7 +33,9 @@ use overwatch_rs::services::{
     state::{NoOperator, NoState},
     ServiceCore, ServiceData, ServiceId,
 };
+use serde::de::DeserializeOwned;
 use tip::Tip;
+use tokio::select;
 
 // Raw bytes for now, could be a ed25519 public key
 pub type NodeId = PublicKey;
@@ -81,7 +82,7 @@ where
     P: MemPool,
     T: Tally,
     T::Qc: Clone,
-    O: Overlay<A, F, T, <P::Tx as Transaction>::Hash>,
+    O: Overlay,
     P::Tx: Transaction + Debug + 'static,
     <P::Tx as Transaction>::Hash: Debug,
     A::Backend: 'static,
@@ -106,7 +107,7 @@ where
     P::Tx: Transaction + Debug,
     <P::Tx as Transaction>::Hash: Debug,
     M: MempoolAdapter<Tx = P::Tx>,
-    O: Overlay<A, F, T, <P::Tx as Transaction>::Hash>,
+    O: Overlay,
 {
     const SERVICE_ID: ServiceId = "Carnot";
     type Settings = CarnotSettings<F, T>;
@@ -129,7 +130,7 @@ where
     P::Tx: Debug + Clone + serde::de::DeserializeOwned + Send + Sync + 'static,
     <P::Tx as Transaction>::Hash: Debug + Send + Sync,
     M: MempoolAdapter<Tx = P::Tx> + Send + Sync + 'static,
-    O: Overlay<A, F, T, <P::Tx as Transaction>::Hash> + Send + Sync + 'static,
+    O: Overlay + Send + Sync + 'static,
 {
     fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, overwatch_rs::DynError> {
         let network_relay = service_state.overwatch_handle.relay();
@@ -169,52 +170,37 @@ where
 
         let fountain = F::new(fountain_settings);
         let tally = T::new(tally_settings);
-
-        let leadership = Leadership::<P::Tx>::new(private_key, mempool_relay.clone());
+        let overlay = O::new();
+        // let leadership = Leadership::<P::Tx>::new(private_key, mempool_relay.clone());
         // FIXME: this should be taken from config
         let mut cur_view = View {
             seed: [0; 32],
             staking_keys: BTreeMap::new(),
             view_n: 0,
         };
+
+        let genesis = consensus_engine::Block {
+            id: [0; 32],
+            view: 0,
+            parent_qc: Qc::Standard(StandardQc::genesis()),
+        };
+        let mut carnot = Carnot::from_genesis(private_key, genesis, overlay);
+
         loop {
             // if we want to process multiple views at the same time this can
             // be spawned as a separate future
 
             // FIXME: this should probably have a timer to detect failed rounds
             let res = cur_view
-                .resolve::<A, O, _, _, _>(
+                .resolve::<A, O, _, _, P::Tx>(
                     private_key,
                     &tip,
                     &network_adapter,
                     &fountain,
                     &tally,
-                    &leadership,
+                    &mut carnot,
                 )
                 .await;
-            match res {
-                Ok((block, view)) => {
-                    // resolved block, mark as verified and possibly update the tip
-                    // not sure what mark as verified means, e.g. if we want an event subscription
-                    // system for this to be used for example by the ledger, storage and mempool
-
-                    mempool_relay
-                        .send(nomos_mempool::MempoolMsg::MarkInBlock {
-                            ids: block.transactions().cloned().collect(),
-                            block: block.header().id(),
-                        })
-                        .await
-                        .map_err(|(e, _)| {
-                            tracing::error!("Error while sending MarkInBlock message: {}", e);
-                            e
-                        })?;
-
-                    cur_view = view;
-                }
-                Err(e) => {
-                    tracing::error!("Error while resolving view: {}", e);
-                }
-            }
         }
     }
 }
@@ -239,8 +225,8 @@ impl View {
         adapter: &A,
         fountain: &F,
         tally: &T,
-        leadership: &Leadership<Tx>,
-    ) -> Result<(Block<T::Qc, Tx::Hash>, View), Box<dyn std::error::Error + Send + Sync + 'static>>
+        carnot: &mut Carnot<O>,
+    ) -> Result<(Block<Tx::Hash>, View), Box<dyn std::error::Error + Send + Sync + 'static>>
     where
         A: NetworkAdapter + Send + Sync + 'static,
         F: FountainCode,
@@ -249,135 +235,68 @@ impl View {
         T: Tally + Send + Sync + 'static,
         T::Outcome: Send + Sync,
         T::Qc: Clone,
-        O: Overlay<A, F, T, Tx::Hash>,
+        O: Overlay,
     {
-        let res = if self.is_leader(node_id) {
-            let block = self
-                .resolve_leader::<A, O, F, T, _>(node_id, tip, adapter, fountain, tally, leadership)
-                .await
-                .unwrap(); // FIXME: handle sad path
-            let next_view = self.generate_next_view(&block);
-            (block, next_view)
-        } else {
-            self.resolve_non_leader::<A, O, F, T, Tx>(node_id, adapter, fountain, tally)
-                .await
-                .unwrap() // FIXME: handle sad path
-        };
-
-        // Commit phase:
-        // Upon verifing a block B, if B.parent = B' and B'.parent = B'' and
-        //    B'.view = B''.view + 1, then the node commits B''.
-        //    This happens implicitly at the chain level and does not require any
-        //    explicit action from the node.
-
-        Ok(res)
+        unimplemented!()
     }
+}
 
-    async fn resolve_leader<'view, A, O, F, T, Tx>(
-        &'view self,
-        node_id: NodeId,
-        tip: &Tip,
-        adapter: &A,
-        fountain: &F,
-        tally: &T,
-        leadership: &Leadership<Tx>,
-    ) -> Result<Block<T::Qc, <Tx as Transaction>::Hash>, ()>
-    where
-        A: NetworkAdapter + Send + Sync + 'static,
-        F: FountainCode,
-        T: Tally + Send + Sync + 'static,
-        T::Outcome: Send + Sync,
-        T::Qc: Clone,
-        Tx: Transaction,
-        Tx::Hash: Debug,
-        O: Overlay<A, F, T, Tx::Hash>,
-    {
-        let overlay = O::new(self, node_id);
+pub enum CarnotEvent<Tx: Clone + Eq + Hash> {
+    Timeout,
+    TimeoutDetected(HashSet<Timeout>),
+    Proposal(Block<Tx>),
+    TimeoutQc(TimeoutQc),
+    NewView(HashSet<NewView>),
+    Votes(HashSet<Vote>),
+}
 
-        // We need to build the QC for the block we are proposing
-        let qc = overlay.build_qc(self, adapter, tally).await;
+pub struct CarnotEventBuilder<A, F> {
+    timeout: Duration,
+    threshold: usize,
+    view: consensus_engine::View,
+    adapter: A,
+    fountain: F,
+}
 
-        let LeadershipResult::Leader { block, _view }  = leadership
-            .try_propose_block(self, tip, qc)
-            .await else { panic!("we are leader")};
-
-        overlay
-            .broadcast_block(self, block.clone(), adapter, fountain)
-            .await;
-
-        Ok(block)
-    }
-
-    async fn resolve_non_leader<'view, A, O, F, T, Tx>(
-        &'view self,
-        node_id: NodeId,
-        adapter: &A,
-        fountain: &F,
-        tally: &T,
-    ) -> Result<(Block<T::Qc, Tx::Hash>, View), ()>
-    where
-        A: NetworkAdapter + Send + Sync + 'static,
-        F: FountainCode,
-        T: Tally + Send + Sync + 'static,
-        T::Qc: Clone,
-        Tx: Transaction,
-        Tx::Hash: Debug,
-        O: Overlay<A, F, T, Tx::Hash>,
-    {
-        let overlay = O::new(self, node_id);
-        // Consensus in Carnot is achieved in 2 steps from the point of view of a node:
-        // 1) The node receives a block proposal from a leader and verifies it
-        // 2) The node signals to the network its approval for the block.
-        //    Depending on the overlay, this may require waiting for a certain number
-        //    of other approvals.
-
-        // 1) Collect and verify block proposal.
-        let block = overlay
-            .reconstruct_proposal_block(self, adapter, fountain)
-            .await
-            .unwrap(); // FIXME: handle sad path
-
-        // TODO: verify
-        // TODO: reshare the block?
-        let next_view = self.generate_next_view(&block);
-
-        // 2) Signal approval to the network
-        // We only consider the happy path for now
-        if self.pipelined_safe_block(&block) {
-            overlay
-                .approve_and_forward(self, &block, adapter, tally, &next_view)
-                .await
-                .unwrap(); // FIXME: handle sad path
+impl<A, F> CarnotEventBuilder<A, F>
+where
+    A: NetworkAdapter,
+    F: FountainCode,
+{
+    pub fn new(
+        view: consensus_engine::View,
+        timeout: Duration,
+        threshold: usize,
+        adapter: A,
+        fountain: F,
+    ) -> Self {
+        Self {
+            view,
+            timeout,
+            threshold,
+            adapter,
+            fountain,
         }
-
-        Ok((block, next_view))
     }
 
-    pub fn is_leader(&self, _node_id: NodeId) -> bool {
-        true
-    }
-
-    // TODO: use consensus_engine::View instead
-    pub fn id(&self) -> u64 {
-        self.view_n.try_into().unwrap()
-    }
-
-    // Verifies the block is new and the previous leader did not fail
-    fn pipelined_safe_block<Qc: Clone, TxId: Clone + Eq + Hash>(
+    pub async fn next_proposal<Tx: Clone + Eq + Hash + Serialize + DeserializeOwned>(
         &self,
-        _: &Block<Qc, TxId>,
-    ) -> bool {
-        // return b.view_n >= self.view_n && b.view_n == b.qc.view_n
-        true
-    }
-
-    fn generate_next_view<Qc: Clone, TxId: Clone + Eq + Hash>(&self, _b: &Block<Qc, TxId>) -> View {
-        let mut seed = self.seed;
-        seed[0] += 1;
-        View {
-            seed,
-            staking_keys: self.staking_keys.clone(),
-            view_n: self.view_n + 1,
-        }
+    ) -> CarnotEvent<Tx> {
+        let proposal_stream = self
+            .fountain
+            .decode(self.adapter.proposal_chunks_stream(self.view).await);
+        let mut timeout_qc_stream = self.adapter.timeout_qc_stream(self.view).await;
+        select! {
+            Ok(proposal) = proposal_stream => {
+                let block = Block::from_bytes(&proposal);
+                return CarnotEvent::Proposal(block);
+            }
+            Some(timeout_qc) = timeout_qc_stream.next() => {
+                return CarnotEvent::TimeoutQc(timeout_qc);
+            }
+            _ = tokio::time::sleep(self.timeout) => {
+                return CarnotEvent::Timeout;
+            }
+        };
     }
 }

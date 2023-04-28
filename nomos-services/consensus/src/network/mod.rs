@@ -7,8 +7,7 @@ use bytes::Bytes;
 use futures::Stream;
 // internal
 use crate::network::messages::{ProposalChunkMsg, TimeoutQcMsg, VoteMsg};
-use crate::overlay::committees::Committee;
-use consensus_engine::{TimeoutQc, View};
+use consensus_engine::{Committee, TimeoutQc, View};
 use nomos_network::backends::NetworkBackend;
 use nomos_network::NetworkService;
 use overwatch_rs::services::relay::OutboundRelay;
