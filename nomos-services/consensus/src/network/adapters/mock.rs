@@ -12,14 +12,11 @@ use serde::Serialize;
 use tokio_stream::{wrappers::BroadcastStream, Stream};
 
 use crate::network::messages::TimeoutQcMsg;
-use crate::{
-    network::{
-        messages::{ProposalChunkMsg, VoteMsg},
-        NetworkAdapter,
-    },
-    overlay::committees::Committee,
+use crate::network::{
+    messages::{ProposalChunkMsg, VoteMsg},
+    NetworkAdapter,
 };
-use consensus_engine::{TimeoutQc, View};
+use consensus_engine::{Committee, TimeoutQc, View};
 
 const MOCK_PUB_SUB_TOPIC: &str = "MockPubSubTopic";
 const MOCK_BLOCK_CONTENT_TOPIC: MockContentTopic = MockContentTopic::new("MockSim", 1, "MockBlock");

@@ -1,5 +1,7 @@
 // std
 use std::borrow::Cow;
+use std::collections::hash_map::DefaultHasher;
+use std::hash::{Hash, Hasher};
 // crates
 use bytes::Bytes;
 use futures::{Stream, StreamExt};
@@ -10,8 +12,7 @@ use crate::network::{
     messages::{ProposalChunkMsg, VoteMsg},
     NetworkAdapter,
 };
-use crate::overlay::committees::Committee;
-use consensus_engine::{TimeoutQc, View};
+use consensus_engine::{Committee, TimeoutQc, View};
 use nomos_network::{
     backends::waku::{EventKind, NetworkEvent, Waku, WakuBackendMessage},
     NetworkMsg, NetworkService,
@@ -263,7 +264,7 @@ fn votes_topic(committee: Committee, view: View) -> WakuContentTopic {
     WakuContentTopic {
         application_name: Cow::Borrowed(APPLICATION_NAME),
         version: VERSION,
-        content_topic_name: Cow::Owned(format!("votes-{}-{}", committee.id(), view)),
+        content_topic_name: Cow::Owned(format!("votes-{}-{}", hash_set(&committee), view)),
         encoding: Encoding::Proto,
     }
 }
@@ -272,3 +273,12 @@ const PROPOSAL_CONTENT_TOPIC: WakuContentTopic =
     WakuContentTopic::new(APPLICATION_NAME, VERSION, "proposal", Encoding::Proto);
 const TIMEOUT_QC_CONTENT_TOPIC: WakuContentTopic =
     WakuContentTopic::new(APPLICATION_NAME, VERSION, "timeout-qc", Encoding::Proto);
+
+// TODO: Maybe use a secure hasher instead
+fn hash_set(c: &Committee) -> u64 {
+    let mut s = DefaultHasher::new();
+    for e in c.iter() {
+        e.hash(&mut s);
+    }
+    s.finish()
+}
