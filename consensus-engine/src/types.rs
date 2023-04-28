@@ -89,7 +89,7 @@ pub struct StandardQc {
 }
 
 impl StandardQc {
-    pub(crate) fn genesis() -> Self {
+    pub fn genesis() -> Self {
         Self {
             view: -1,
             id: [0; 32],
@@ -139,6 +139,7 @@ impl Qc {
 }
 
 pub trait Overlay: Clone {
+    fn new() -> Self;
     fn root_committee(&self) -> Committee;
     fn rebuild(&mut self, timeout_qc: TimeoutQc);
     fn is_member_of_child_committee(&self, parent: NodeId, child: NodeId) -> bool;
