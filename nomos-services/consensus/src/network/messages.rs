@@ -4,7 +4,7 @@ use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 // internal
 use crate::NodeId;
-use consensus_engine::{TimeoutQc, View};
+use consensus_engine::{NewView, Qc, TimeoutQc, View, Vote};
 use nomos_core::wire;
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -24,24 +24,31 @@ impl ProposalChunkMsg {
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct VoteMsg<Vote> {
-    pub source: NodeId,
+pub struct VoteMsg {
+    pub voter: NodeId,
     pub vote: Vote,
+    pub qc: Option<Qc>,
 }
 
-impl<Vote> VoteMsg<Vote>
-where
-    Vote: Serialize,
-{
+impl VoteMsg {
     pub fn as_bytes(&self) -> Box<[u8]> {
         wire::serialize(self).unwrap().into_boxed_slice()
     }
+    pub fn from_bytes(data: &[u8]) -> Self {
+        wire::deserialize(data).unwrap()
+    }
 }
 
-impl<Vote> VoteMsg<Vote>
-where
-    Vote: DeserializeOwned,
-{
+#[derive(Serialize, Deserialize)]
+pub struct NewViewMsg {
+    pub voter: NodeId,
+    pub vote: NewView,
+}
+
+impl NewViewMsg {
+    pub fn as_bytes(&self) -> Box<[u8]> {
+        wire::serialize(self).unwrap().into_boxed_slice()
+    }
     pub fn from_bytes(data: &[u8]) -> Self {
         wire::deserialize(data).unwrap()
     }
@@ -57,7 +64,6 @@ impl TimeoutQcMsg {
     pub fn as_bytes(&self) -> Box<[u8]> {
         wire::serialize(self).unwrap().into_boxed_slice()
     }
-
     pub fn from_bytes(data: &[u8]) -> Self {
         wire::deserialize(data).unwrap()
     }
