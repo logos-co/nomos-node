@@ -1,5 +1,6 @@
 // std
 // crates
+use consensus_engine::View;
 use futures::{Stream, StreamExt};
 use serde::{Deserialize, Serialize};
 // internal
@@ -7,11 +8,11 @@ use crate::vote::Tally;
 
 #[derive(Serialize, Deserialize)]
 pub struct MockVote {
-    view: u64,
+    view: View,
 }
 
 impl MockVote {
-    pub fn view(&self) -> u64 {
+    pub fn view(&self) -> View {
         self.view
     }
 }
@@ -58,7 +59,7 @@ impl Tally for MockTally {
 
     async fn tally<S: Stream<Item = Self::Vote> + Unpin + Send>(
         &self,
-        view: u64,
+        view: View,
         mut vote_stream: S,
     ) -> Result<(Self::Qc, Self::Outcome), Self::TallyError> {
         let mut count_votes = 0;
