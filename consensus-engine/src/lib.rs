@@ -116,7 +116,10 @@ impl<O: Overlay> Carnot<O> {
             new_state,
             Output::Send {
                 to,
-                payload: Payload::Vote(Vote { block: block.id }),
+                payload: Payload::Vote(Vote {
+                    block: block.id,
+                    view: block.view,
+                }),
             },
         )
     }
