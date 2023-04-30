@@ -7,7 +7,7 @@ use bytes::Bytes;
 use futures::{Stream, StreamExt};
 use tokio_stream::wrappers::BroadcastStream;
 // internal
-use crate::network::messages::TimeoutQcMsg;
+use crate::network::messages::{TimeoutMsg, TimeoutQcMsg};
 use crate::network::{
     messages::{ProposalChunkMsg, VoteMsg},
     NetworkAdapter,
@@ -171,6 +171,29 @@ impl NetworkAdapter for WakuAdapter {
             .await
     }
 
+    async fn timeout_stream(
+        &self,
+        committee: &Committee,
+        view: View,
+    ) -> Box<dyn Stream<Item = TimeoutMsg> + Send + Sync + Unpin> {
+        let content_topic = create_topic("timeout", committee, view);
+        Box::new(Box::pin(
+            self.cached_stream_with_content_topic(content_topic)
+                .await
+                .filter_map(move |message| {
+                    let payload = message.payload();
+                    let timeout = TimeoutMsg::from_bytes(payload);
+                    async move {
+                        if timeout.vote.view == view {
+                            Some(timeout)
+                        } else {
+                            None
+                        }
+                    }
+                }),
+        ))
+    }
+
     async fn timeout_qc_stream(
         &self,
         view: View,
@@ -196,14 +219,14 @@ impl NetworkAdapter for WakuAdapter {
         &self,
         committee: &Committee,
         view: View,
-    ) -> Box<dyn Stream<Item = Vote> + Send> {
-        let content_topic = votes_topic(committee, view);
+    ) -> Box<dyn Stream<Item = VoteMsg> + Send> {
+        let content_topic = create_topic("votes", committee, view);
         Box::new(Box::pin(
             self.cached_stream_with_content_topic(content_topic)
                 .await
                 .map(|message| {
                     let payload = message.payload();
-                    VoteMsg::from_bytes(payload).vote
+                    VoteMsg::from_bytes(payload)
                 }),
         ))
     }
@@ -214,7 +237,7 @@ impl NetworkAdapter for WakuAdapter {
         view: View,
         approval_message: VoteMsg,
     ) {
-        let content_topic = votes_topic(committee, view);
+        let content_topic = create_topic("votes", committee, view);
 
         let message = WakuMessage::new(
             approval_message.as_bytes(),
@@ -235,11 +258,11 @@ impl NetworkAdapter for WakuAdapter {
     }
 }
 
-fn votes_topic(committee: &Committee, view: View) -> WakuContentTopic {
+fn create_topic(tag: &str, committee: &Committee, view: View) -> WakuContentTopic {
     WakuContentTopic {
         application_name: Cow::Borrowed(APPLICATION_NAME),
         version: VERSION,
-        content_topic_name: Cow::Owned(format!("votes-{}-{}", hash_set(committee), view)),
+        content_topic_name: Cow::Owned(format!("{}-{}-{}", tag, hash_set(committee), view)),
         encoding: Encoding::Proto,
     }
 }
