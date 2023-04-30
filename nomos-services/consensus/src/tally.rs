@@ -6,48 +6,13 @@ use std::collections::HashSet;
 // crates
 use futures::{Stream, StreamExt};
 // internal
-use crate::block::BlockId;
-use crate::crypto::PublicKey;
-use crate::vote::Tally;
+use crate::network::messages::VoteMsg;
+use consensus_engine::{Qc, StandardQc, View, Vote};
+use nomos_core::block::BlockId;
+use nomos_core::crypto::PublicKey;
+use nomos_core::vote::Tally;
 
 pub type NodeId = PublicKey;
-
-pub enum QuorumCertificate {
-    Simple(SimpleQuorumCertificate),
-    Aggregated(AggregatedQuorumCertificate),
-}
-
-impl QuorumCertificate {
-    pub fn view(&self) -> u64 {
-        match self {
-            QuorumCertificate::Simple(qc) => qc.view,
-            QuorumCertificate::Aggregated(qc) => qc.view,
-        }
-    }
-}
-
-pub struct SimpleQuorumCertificate {
-    view: u64,
-    block: BlockId,
-}
-
-pub struct AggregatedQuorumCertificate {
-    view: u64,
-    high_qh: Box<QuorumCertificate>,
-}
-
-pub struct Vote {
-    block: BlockId,
-    view: u64,
-    voter: NodeId, // TODO: this should be some id, probably the node pk
-    qc: Option<QuorumCertificate>,
-}
-
-impl Vote {
-    pub fn valid_view(&self, view: u64) -> bool {
-        self.view == view && self.qc.as_ref().map_or(true, |qc| qc.view() == view - 1)
-    }
-}
 
 #[derive(thiserror::Error, Debug)]
 pub enum CarnotTallyError {
@@ -70,9 +35,9 @@ pub struct CarnotTally {
 
 #[async_trait::async_trait]
 impl Tally for CarnotTally {
-    type Vote = Vote;
-    type Qc = QuorumCertificate;
-    type Outcome = ();
+    type Vote = VoteMsg<Vote>;
+    type Qc = Qc;
+    type Outcome = HashSet<Vote>;
     type TallyError = CarnotTallyError;
     type Settings = CarnotTallySettings;
 
@@ -82,11 +47,12 @@ impl Tally for CarnotTally {
 
     async fn tally<S: Stream<Item = Self::Vote> + Unpin + Send>(
         &self,
-        view: u64,
+        view: View,
         mut vote_stream: S,
     ) -> Result<(Self::Qc, Self::Outcome), Self::TallyError> {
         let mut approved = 0usize;
         let mut seen = HashSet::new();
+        let mut outcome = HashSet::new();
         while let Some(vote) = vote_stream.next().await {
             // check vote view is valid
             if !vote.valid_view(view) {
@@ -105,14 +71,15 @@ impl Tally for CarnotTally {
                 ));
             }
             seen.insert(vote.voter);
+            outcome.insert(vote.vote);
             approved += 1;
             if approved >= self.settings.threshold {
                 return Ok((
-                    QuorumCertificate::Simple(SimpleQuorumCertificate {
-                        view,
-                        block: vote.block,
+                    Qc::Standard(StandardQc {
+                        view: vote.view,
+                        id: vote.block,
                     }),
-                    (),
+                    outcome,
                 ));
             }
         }
