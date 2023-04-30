@@ -18,10 +18,11 @@ overwatch-rs = { git = "https://github.com/logos-co/Overwatch", branch = "main" 
 rand_chacha = "0.3"
 rand = "0.8"
 serde = { version = "1", features = ["derive"] }
+thiserror = "1.0"
 tokio = { version = "1", features = ["sync"] }
 tokio-stream = "0.1"
-waku-bindings = { version = "0.1.0-rc.2", optional = true}
 tracing = "0.1"
+waku-bindings = { version = "0.1.0-rc.2", optional = true}
 
 [features]
 default = []

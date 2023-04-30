@@ -114,6 +114,13 @@ impl NetworkAdapter for MockAdapter {
         todo!()
     }
 
+    async fn timeout_stream(
+        &self,
+        view: View,
+    ) -> Box<dyn Stream<Item = TimeoutQc> + Send + Sync + Unpin> {
+        todo!()
+    }
+
     async fn timeout_qc_stream(
         &self,
         _view: View,

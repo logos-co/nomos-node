@@ -8,7 +8,6 @@ use futures::{Stream, StreamExt};
 // internal
 use crate::network::messages::VoteMsg;
 use consensus_engine::{Qc, StandardQc, View, Vote};
-use nomos_core::block::BlockId;
 use nomos_core::crypto::PublicKey;
 use nomos_core::vote::Tally;
 
@@ -35,7 +34,7 @@ pub struct CarnotTally {
 
 #[async_trait::async_trait]
 impl Tally for CarnotTally {
-    type Vote = VoteMsg<Vote>;
+    type Vote = VoteMsg;
     type Qc = Qc;
     type Outcome = HashSet<Vote>;
     type TallyError = CarnotTallyError;
@@ -55,7 +54,7 @@ impl Tally for CarnotTally {
         let mut outcome = HashSet::new();
         while let Some(vote) = vote_stream.next().await {
             // check vote view is valid
-            if !vote.valid_view(view) {
+            if !vote.vote.view != view {
                 return Err(CarnotTallyError::InvalidVote("Invalid view".to_string()));
             }
             // check for duplicated votes
@@ -71,13 +70,13 @@ impl Tally for CarnotTally {
                 ));
             }
             seen.insert(vote.voter);
-            outcome.insert(vote.vote);
+            outcome.insert(vote.vote.clone());
             approved += 1;
             if approved >= self.settings.threshold {
                 return Ok((
                     Qc::Standard(StandardQc {
-                        view: vote.view,
-                        id: vote.block,
+                        view: vote.vote.view,
+                        id: vote.vote.block,
                     }),
                     outcome,
                 ));
