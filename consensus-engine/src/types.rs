@@ -27,14 +27,14 @@ pub enum Payload {
 }
 
 /// Returned
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Vote {
     pub view: View,
     pub block: BlockId,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Timeout {
     pub view: View,
@@ -43,7 +43,7 @@ pub struct Timeout {
     pub timeout_qc: Option<TimeoutQc>,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct NewView {
     pub view: View,
@@ -52,7 +52,7 @@ pub struct NewView {
     pub high_qc: Qc,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct TimeoutQc {
     pub view: View,

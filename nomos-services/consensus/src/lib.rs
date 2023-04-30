@@ -15,10 +15,15 @@ use std::hash::Hash;
 use std::time::Duration;
 // crates
 use futures::StreamExt;
-use serde::{Deserialize, Serialize};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use tokio::select;
 // internal
+use crate::network::messages::{NewViewMsg, VoteMsg};
 use crate::network::NetworkAdapter;
-use consensus_engine::{Carnot, NewView, Overlay, Qc, StandardQc, Timeout, TimeoutQc, Vote};
+use crate::tally::CarnotTally;
+use consensus_engine::{
+    Carnot, Committee, NewView, Overlay, Qc, StandardQc, Timeout, TimeoutQc, Vote,
+};
 use nomos_core::block::Block;
 use nomos_core::crypto::PublicKey;
 use nomos_core::fountain::FountainCode;
@@ -34,9 +39,7 @@ use overwatch_rs::services::{
     state::{NoOperator, NoState},
     ServiceCore, ServiceData, ServiceId,
 };
-use serde::de::DeserializeOwned;
 use tip::Tip;
-use tokio::select;
 
 // Raw bytes for now, could be a ed25519 public key
 pub type NodeId = PublicKey;
@@ -248,28 +251,32 @@ pub enum CarnotEvent<Tx: Clone + Eq + Hash> {
     Proposal(Block<Tx>),
     TimeoutQc(TimeoutQc),
     NewView(HashSet<NewView>),
-    Votes(HashSet<Vote>),
+    Votes((Qc, HashSet<Vote>)),
 }
 
-pub struct CarnotEventBuilder<A, F> {
+pub struct CarnotEventBuilder<'view, A, F> {
     timeout: Duration,
     threshold: usize,
     view: consensus_engine::View,
-    adapter: A,
-    fountain: F,
+    committee: Committee,
+    adapter: &'view A,
+    fountain: &'view F,
+    tally: &'view CarnotTally,
 }
 
-impl<A, F> CarnotEventBuilder<A, F>
+impl<'view, A, F> CarnotEventBuilder<'view, A, F>
 where
     A: NetworkAdapter,
     F: FountainCode,
 {
     pub fn new(
         view: consensus_engine::View,
+        committee: Committee,
         timeout: Duration,
         threshold: usize,
-        adapter: A,
-        fountain: F,
+        adapter: &'view A,
+        fountain: &'view F,
+        tally: &'view CarnotTally,
     ) -> Self {
         Self {
             view,
@@ -277,6 +284,8 @@ where
             threshold,
             adapter,
             fountain,
+            tally,
+            committee,
         }
     }
 
@@ -286,18 +295,79 @@ where
         let proposal_stream = self
             .fountain
             .decode(self.adapter.proposal_chunks_stream(self.view).await);
-        let mut timeout_qc_stream = self.adapter.timeout_qc_stream(self.view).await;
         select! {
             Ok(proposal) = proposal_stream => {
                 let block = Block::from_bytes(&proposal);
-                return CarnotEvent::Proposal(block);
-            }
-            Some(timeout_qc) = timeout_qc_stream.next() => {
-                return CarnotEvent::TimeoutQc(timeout_qc);
+                CarnotEvent::Proposal(block)
             }
             _ = tokio::time::sleep(self.timeout) => {
-                return CarnotEvent::Timeout;
+                CarnotEvent::Timeout
             }
-        };
+        }
+    }
+
+    pub async fn next_timeout_qc<Tx: Clone + Eq + Hash + Serialize + DeserializeOwned>(
+        &self,
+    ) -> Option<CarnotEvent<Tx>> {
+        self.adapter
+            .timeout_qc_stream(self.view)
+            .await
+            .next()
+            .await
+            .map(|qc| CarnotEvent::TimeoutQc(qc.qc))
+    }
+
+    pub async fn gather_votes<Tx: Clone + Eq + Hash + Serialize + DeserializeOwned>(
+        &self,
+    ) -> Option<CarnotEvent<Tx>> {
+        let votes_stream = self
+            .adapter
+            .votes_stream::<VoteMsg>(&self.committee, self.view)
+            .await;
+        match self.tally.tally(self.view, votes_stream).await {
+            Ok((qc, outcome)) => Some(CarnotEvent::Votes((qc, outcome))),
+            Err(e) => {
+                todo!("Handle tally error");
+            }
+        }
+    }
+
+    pub async fn gather_new_view<Tx: Clone + Eq + Hash + Serialize + DeserializeOwned>(
+        &self,
+    ) -> CarnotEvent<Tx> {
+        // TODO: Maybe implement tally for unhappy path?
+        let mut seen = HashSet::new();
+        let mut votes = HashSet::new();
+        let mut stream = self
+            .adapter
+            .votes_stream::<NewViewMsg>(&self.committee, self.view)
+            .await;
+        while let Some(msg) = StreamExt::next(&mut stream).await {
+            if seen.contains(&msg.voter) {
+                continue;
+            }
+            seen.insert(msg.voter);
+            votes.insert(msg.vote);
+            if votes.len() >= self.threshold {
+                break;
+            }
+        }
+        CarnotEvent::NewView(votes)
+    }
+
+    pub async fn gather_timeout<Tx: Clone + Eq + Hash + Serialize + DeserializeOwned>(
+        &self,
+    ) -> CarnotEvent<Tx> {
+        let mut stream = self
+            .adapter
+            .timeout_stream(&self.committee, self.view)
+            .await;
+        CarnotEvent::TimeoutDetected(
+            stream
+                .take(self.threshold)
+                .map(|msg| msg.vote)
+                .collect()
+                .await,
+        )
     }
 }
