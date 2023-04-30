@@ -194,7 +194,7 @@ impl NetworkAdapter for WakuAdapter {
 
     async fn votes_stream<Vote: DeserializeOwned>(
         &self,
-        committee: Committee,
+        committee: &Committee,
         view: View,
     ) -> Box<dyn Stream<Item = Vote> + Send> {
         let content_topic = votes_topic(committee, view);
@@ -210,9 +210,9 @@ impl NetworkAdapter for WakuAdapter {
 
     async fn send_vote<Vote: Serialize + Send>(
         &self,
-        committee: Committee,
+        committee: &Committee,
         view: View,
-        approval_message: VoteMsg<Vote>,
+        approval_message: VoteMsg,
     ) {
         let content_topic = votes_topic(committee, view);
 
@@ -235,11 +235,11 @@ impl NetworkAdapter for WakuAdapter {
     }
 }
 
-fn votes_topic(committee: Committee, view: View) -> WakuContentTopic {
+fn votes_topic(committee: &Committee, view: View) -> WakuContentTopic {
     WakuContentTopic {
         application_name: Cow::Borrowed(APPLICATION_NAME),
         version: VERSION,
-        content_topic_name: Cow::Owned(format!("votes-{}-{}", hash_set(&committee), view)),
+        content_topic_name: Cow::Owned(format!("votes-{}-{}", hash_set(committee), view)),
         encoding: Encoding::Proto,
     }
 }

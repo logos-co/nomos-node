@@ -33,13 +33,13 @@ pub trait NetworkAdapter {
     ) -> Box<dyn Stream<Item = TimeoutQc> + Send + Sync + Unpin>;
     async fn votes_stream<Vote: DeserializeOwned>(
         &self,
-        committee: Committee,
+        committee: &Committee,
         view: View,
     ) -> Box<dyn Stream<Item = Vote> + Send>;
     async fn send_vote<Vote: Serialize + Send>(
         &self,
-        committee: Committee,
+        committee: &Committee,
         view: View,
-        vote: VoteMsg<Vote>,
+        vote: VoteMsg,
     );
 }
