@@ -78,14 +78,9 @@ impl Block {
 
 /// Possible output events.
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub enum Output {
-    Send {
-        to: HashSet<NodeId>,
-        payload: Payload,
-    },
-    Broadcast {
-        payload: Payload,
-    },
+pub struct Send {
+    pub to: HashSet<NodeId>,
+    pub payload: Payload,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]

@@ -171,12 +171,8 @@ impl NetworkAdapter for MockAdapter {
         )
     }
 
-    async fn send_vote<Vote: Serialize>(
-        &self,
-        _committee: Committee,
-        _view: View,
-        approval_message: VoteMsg<Vote>,
-    ) where
+    async fn send(&self, _committee: Committee, _view: View, approval_message: VoteMsg<Vote>)
+    where
         Vote: Send,
     {
         let message = MockMessage::new(

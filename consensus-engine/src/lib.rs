@@ -26,6 +26,10 @@ impl<O: Overlay> Carnot<O> {
             safe_blocks: [(id, genesis_block)].into(),
         }
     }
+
+    pub fn current_view(&self) -> View {
+        self.current_view
+    }
     /// Upon reception of a block
     ///
     /// Preconditions:
@@ -94,7 +98,7 @@ impl<O: Overlay> Carnot<O> {
     /// Preconditions:
     /// *  `receive_block(b)` must have been called successfully before trying to approve a block b.
     /// *   A node should not attempt to vote for a block in a view earlier than the latest one it actively participated in.
-    pub fn approve_block(&self, block: Block) -> (Self, Output) {
+    pub fn approve_block(&self, block: Block) -> (Self, Send) {
         assert!(self.safe_blocks.contains_key(&block.id));
         assert!(
             self.highest_voted_view < block.view,
@@ -114,7 +118,7 @@ impl<O: Overlay> Carnot<O> {
         };
         (
             new_state,
-            Output::Send {
+            Send {
                 to,
                 payload: Payload::Vote(Vote {
                     block: block.id,
@@ -135,7 +139,7 @@ impl<O: Overlay> Carnot<O> {
         &self,
         timeout_qc: TimeoutQc,
         new_views: HashSet<NewView>,
-    ) -> (Self, Output) {
+    ) -> (Self, Send) {
         let new_view = timeout_qc.view + 1;
         assert!(
             new_view
@@ -183,7 +187,7 @@ impl<O: Overlay> Carnot<O> {
         };
         (
             new_state,
-            Output::Send {
+            Send {
                 to,
                 payload: Payload::NewView(new_view_msg),
             },
@@ -195,7 +199,7 @@ impl<O: Overlay> Carnot<O> {
     /// Preconditions: none!
     /// Just notice that the timer only reset after a view change, i.e. a node can't timeout
     /// more than once for the same view
-    pub fn local_timeout(&self) -> (Self, Option<Output>) {
+    pub fn local_timeout(&self) -> (Self, Option<Send>) {
         let mut new_state = self.clone();
 
         new_state.highest_voted_view = new_state.current_view;
@@ -211,7 +215,7 @@ impl<O: Overlay> Carnot<O> {
             let to = new_state.overlay.root_committee();
             return (
                 new_state,
-                Some(Output::Send {
+                Some(Send {
                     to,
                     payload: Payload::Timeout(timeout_msg),
                 }),
