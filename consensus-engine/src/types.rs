@@ -43,6 +43,8 @@ pub struct Timeout {
     pub timeout_qc: Option<TimeoutQc>,
 }
 
+// TODO: We are making "mandatory" to have received the timeout_qc before the new_view votes.
+// We should consider to remove the TimoutQc from the NewView message and use a hash or id instead.
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct NewView {

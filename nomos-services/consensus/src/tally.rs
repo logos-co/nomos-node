@@ -28,6 +28,7 @@ pub struct CarnotTallySettings {
     participating_nodes: HashSet<NodeId>,
 }
 
+#[derive(Clone)]
 pub struct CarnotTally {
     settings: CarnotTallySettings,
 }
