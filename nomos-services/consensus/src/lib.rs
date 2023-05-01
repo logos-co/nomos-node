@@ -20,11 +20,11 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use tokio::select;
 use tokio_stream::wrappers::ReceiverStream;
 // internal
-use crate::network::messages::{NewViewMsg, VoteMsg};
+use crate::network::messages::{NewViewMsg, ProposalChunkMsg, TimeoutMsg, TimeoutQcMsg, VoteMsg};
 use crate::network::NetworkAdapter;
 use crate::tally::CarnotTally;
 use consensus_engine::{
-    Carnot, Committee, NewView, Overlay, Qc, StandardQc, Timeout, TimeoutQc, Vote,
+    Carnot, Committee, NewView, Overlay, Payload, Qc, StandardQc, Timeout, TimeoutQc, Vote,
 };
 use nomos_core::block::{Block, BlockId};
 use nomos_core::crypto::PublicKey;
@@ -124,7 +124,8 @@ where
     A: NetworkAdapter + Clone + Send + Sync + 'static,
     P: MemPool + Send + Sync + 'static,
     P::Settings: Send + Sync + 'static,
-    P::Tx: Debug + Clone + serde::de::DeserializeOwned + Send + Sync + 'static,
+    P::Tx:
+        Debug + Clone + Eq + Hash + Serialize + serde::de::DeserializeOwned + Send + Sync + 'static,
     <P::Tx as Transaction>::Hash: Debug + Send + Sync,
     M: MempoolAdapter<Tx = P::Tx> + Send + Sync + 'static,
     O: Overlay + Send + Sync + 'static,
@@ -196,7 +197,7 @@ where
                 fountain.clone(),
                 tally.clone(),
             );
-            let res = cur_view
+            if let Ok((next_view, next_carnot_state)) = cur_view
                 .resolve::<A, O, _, _, P::Tx>(
                     private_key,
                     &tip,
@@ -204,15 +205,24 @@ where
                     &fountain,
                     &tally,
                     event_builder,
-                    &mut carnot,
+                    carnot.clone(),
                 )
-                .await;
+                .await
+            {
+                carnot = next_carnot_state;
+                cur_view = next_view;
+            } else {
+                // TODO: handle error
+            }
         }
     }
 }
 
-#[derive(Hash, Eq, PartialEq, Serialize, Deserialize)]
-pub struct Approval;
+enum Output<Tx: Clone + Eq + Hash> {
+    Send(consensus_engine::Send),
+    BroadcastTimeoutQc { timeout_qc: TimeoutQc },
+    BroadcastProposal { proposal: Block<Tx> },
+}
 
 // Consensus round, also aids in guaranteeing synchronization
 // between various data structures by means of lifetimes
@@ -232,30 +242,146 @@ impl View {
         fountain: &F,
         tally: &T,
         event_builder: CarnotEventBuilder<A, F>,
-        carnot: &mut Carnot<O>,
-    ) -> Result<(Block<Tx::Hash>, View), Box<dyn std::error::Error + Send + Sync + 'static>>
+        mut carnot: Carnot<O>,
+    ) -> Result<(View, Carnot<O>), Box<dyn std::error::Error + Send + Sync + 'static>>
     where
-        A: NetworkAdapter + Send + Sync + 'static,
-        F: FountainCode,
-        Tx: Transaction,
+        A: NetworkAdapter + Clone + Send + Sync + 'static,
+        F: FountainCode + Clone + Send + Sync + 'static,
+        Tx: Transaction
+            + Clone
+            + Eq
+            + Hash
+            + Debug
+            + Send
+            + Sync
+            + Serialize
+            + DeserializeOwned
+            + 'static,
         Tx::Hash: Debug,
-        T: Tally + Send + Sync + 'static,
+        T: Tally + Clone + Send + Sync + 'static,
         T::Outcome: Send + Sync,
         T::Qc: Clone,
         O: Overlay,
     {
-        unimplemented!()
+        let mut event_stream = event_builder.run::<Tx>().await;
+        while let Some(event) = event_stream.next().await {
+            let (carnot, engine_event): (_, Option<Output<Tx>>) = match event {
+                CarnotEvent::Timeout => {
+                    let (carnot, event) = carnot.local_timeout();
+                    (carnot, event.map(Output::Send))
+                }
+                CarnotEvent::Proposal(proposal) => {
+                    // TODO: Validate block
+                    let carnot = carnot
+                        .receive_block(proposal.header().clone())
+                        .expect("Block should be nice :)");
+                    (carnot, None)
+                }
+                CarnotEvent::TimeoutQc(qc) => (carnot.receive_timeout_qc(qc), None),
+                CarnotEvent::BlockApproved((qc, votes, block)) => {
+                    // TODO: Validate votes
+                    let (carnot, output) = carnot.approve_block(block.header().clone());
+                    // TODO: Handle approved block (notify mempool ?)
+                    (carnot, Some(Output::Send(output)))
+                }
+                CarnotEvent::TimeoutDetected(timeouts) => {
+                    // TODO: build qc and send it
+                    (carnot.clone(), None)
+                }
+                CarnotEvent::NewView((new_views, timeout_qc)) => {
+                    let (carnot, event) = carnot.approve_new_view(timeout_qc, new_views);
+                    (carnot, Some(Output::Send(event)))
+                }
+            };
+            if let Some(engine_event) = engine_event {
+                match engine_event {
+                    Output::Send(consensus_engine::Send { to, payload }) => match payload {
+                        Payload::Vote(vote) => {
+                            adapter
+                                .send(
+                                    &to,
+                                    self.view_n,
+                                    VoteMsg {
+                                        voter: node_id,
+                                        vote,
+                                        qc: None, // TODO: handle root commmittee members
+                                    }
+                                    .as_bytes(),
+                                    "votes",
+                                )
+                                .await;
+                        }
+                        Payload::Timeout(timeout) => {
+                            adapter
+                                .send(
+                                    &to,
+                                    self.view_n,
+                                    TimeoutMsg {
+                                        voter: node_id,
+                                        vote: timeout,
+                                    }
+                                    .as_bytes(),
+                                    "timeout",
+                                )
+                                .await;
+                        }
+                        Payload::NewView(new_view) => {
+                            adapter
+                                .send(
+                                    &to,
+                                    self.view_n,
+                                    NewViewMsg {
+                                        voter: node_id,
+                                        vote: new_view,
+                                    }
+                                    .as_bytes(),
+                                    "new-view",
+                                )
+                                .await;
+                        }
+                    },
+                    Output::BroadcastProposal { proposal } => {
+                        fountain
+                            .encode(&proposal.as_bytes())
+                            .for_each(|chunk| {
+                                adapter.broadcast_block_chunk(ProposalChunkMsg {
+                                    chunk: chunk.to_vec().into_boxed_slice(),
+                                    // TODO: handle multiple proposals
+                                    view: self.view_n,
+                                })
+                            })
+                            .await;
+                    }
+                    Output::BroadcastTimeoutQc { timeout_qc } => {
+                        adapter
+                            .broadcast_timeout_qc(TimeoutQcMsg {
+                                source: node_id,
+                                qc: timeout_qc,
+                            })
+                            .await;
+                    }
+                }
+            }
+        }
+
+        let next_view = View {
+            seed: [0; 32], // TODO: generate seed from future beacon
+            staking_keys: BTreeMap::new(),
+            view_n: carnot.current_view(),
+        };
+
+        Ok((next_view, carnot))
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum CarnotEvent<Tx: Clone + Eq + Hash + Debug + Send + Sync> {
     Timeout,
     TimeoutDetected(HashSet<Timeout>),
     Proposal(Block<Tx>),
     TimeoutQc(TimeoutQc),
-    NewView(HashSet<NewView>),
-    Votes((Qc, HashSet<Vote>)),
+    NewView((HashSet<NewView>, TimeoutQc)),
+    BlockApproved((Qc, HashSet<Vote>, Block<Tx>)),
 }
 
 #[derive(Clone)]
@@ -335,14 +461,14 @@ where
         Tx: Clone + Eq + Hash + Serialize + DeserializeOwned + Debug + Send + Sync,
     >(
         &self,
-        proposal_id: BlockId,
+        block: Block<Tx>,
     ) -> Option<CarnotEvent<Tx>> {
         let votes_stream = self
             .adapter
-            .votes_stream(&self.committee, self.view, proposal_id)
+            .votes_stream(&self.committee, self.view, block.header().id)
             .await;
         match self.tally.tally(self.view, votes_stream).await {
-            Ok((qc, outcome)) => Some(CarnotEvent::Votes((qc, outcome))),
+            Ok((qc, outcome)) => Some(CarnotEvent::BlockApproved((qc, outcome, block))),
             Err(e) => {
                 todo!("Handle tally error");
             }
@@ -353,6 +479,7 @@ where
         Tx: Clone + Eq + Hash + Serialize + DeserializeOwned + Debug + Send + Sync,
     >(
         &self,
+        timeout_qc: TimeoutQc,
     ) -> CarnotEvent<Tx> {
         // TODO: Maybe implement tally for unhappy path?
         let mut seen = HashSet::new();
@@ -371,7 +498,7 @@ where
                 break;
             }
         }
-        CarnotEvent::NewView(votes)
+        CarnotEvent::NewView((votes, timeout_qc))
     }
 
     pub async fn gather_timeout<
@@ -411,7 +538,7 @@ where
                     .await
                     .expect("Send should not fail");
                 tokio::task::spawn(async move {
-                    if let Some(event) = inner_builder.gather_votes(proposal.header().id).await {
+                    if let Some(event) = inner_builder.gather_votes(proposal).await {
                         votes_event_sender.send(event).await.unwrap();
                     }
                 });
@@ -432,14 +559,14 @@ where
         let new_view_sender = event_sender.clone();
         let builder = self.clone();
         tokio::task::spawn(async move {
-            let timout_qc = builder.next_timeout_qc().await;
-            if let Some(qc) = timout_qc {
+            let timout_qc = builder.next_timeout_qc::<Tx>().await;
+            if let Some(CarnotEvent::TimeoutQc(qc)) = timout_qc {
                 timout_qc_sender
-                    .send(qc)
+                    .send(CarnotEvent::TimeoutQc(qc.clone()))
                     .await
                     .expect("Send should not fail");
                 tokio::task::spawn(async move {
-                    let new_view = builder.gather_new_view().await;
+                    let new_view = builder.gather_new_view(qc).await;
                     new_view_sender
                         .send(new_view)
                         .await

@@ -276,13 +276,8 @@ impl NetworkAdapter for WakuAdapter {
         ))
     }
 
-    async fn send_vote<Vote: Serialize + Send>(
-        &self,
-        committee: &Committee,
-        view: View,
-        approval_message: VoteMsg,
-    ) {
-        let content_topic = create_topic("votes", committee, view);
+    async fn send(&self, committee: &Committee, view: View, payload: Bytes, channel: &str) {
+        let content_topic = create_topic(channel, committee, view);
 
         let message = WakuMessage::new(
             approval_message.as_bytes(),

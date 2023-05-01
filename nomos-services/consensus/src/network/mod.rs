@@ -12,7 +12,6 @@ use nomos_network::backends::NetworkBackend;
 use nomos_network::NetworkService;
 use overwatch_rs::services::relay::OutboundRelay;
 use overwatch_rs::services::ServiceData;
-use serde::Serialize;
 
 #[async_trait::async_trait]
 pub trait NetworkAdapter {
@@ -46,10 +45,5 @@ pub trait NetworkAdapter {
         committee: &Committee,
         view: View,
     ) -> Box<dyn Stream<Item = NewViewMsg> + Send + Unpin>;
-    async fn send_vote<Vote: Serialize + Send>(
-        &self,
-        committee: &Committee,
-        view: View,
-        vote: VoteMsg,
-    );
+    async fn send(&self, committee: &Committee, view: View, payload: Box<[u8]>, channel: &str);
 }
