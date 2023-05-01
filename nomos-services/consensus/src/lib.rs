@@ -9,14 +9,16 @@ mod tally;
 mod tip;
 
 // std
+use bytes::Bytes;
 use std::collections::{BTreeMap, HashSet};
 use std::fmt::Debug;
 use std::hash::Hash;
 use std::time::Duration;
 // crates
-use futures::StreamExt;
+use futures::{Stream, StreamExt};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use tokio::select;
+use tokio_stream::wrappers::ReceiverStream;
 // internal
 use crate::network::messages::{NewViewMsg, VoteMsg};
 use crate::network::NetworkAdapter;
@@ -24,9 +26,9 @@ use crate::tally::CarnotTally;
 use consensus_engine::{
     Carnot, Committee, NewView, Overlay, Qc, StandardQc, Timeout, TimeoutQc, Vote,
 };
-use nomos_core::block::Block;
+use nomos_core::block::{Block, BlockId};
 use nomos_core::crypto::PublicKey;
-use nomos_core::fountain::FountainCode;
+use nomos_core::fountain::{FountainCode, FountainError};
 use nomos_core::staking::Stake;
 use nomos_core::tx::Transaction;
 use nomos_core::vote::Tally;
@@ -78,14 +80,12 @@ impl<Fountain: FountainCode, VoteTally: Tally> CarnotSettings<Fountain, VoteTall
     }
 }
 
-pub struct CarnotConsensus<A, P, M, F, T, O>
+pub struct CarnotConsensus<A, P, M, F, O>
 where
     F: FountainCode,
     A: NetworkAdapter,
     M: MempoolAdapter<Tx = P::Tx>,
     P: MemPool,
-    T: Tally,
-    T::Qc: Clone,
     O: Overlay,
     P::Tx: Transaction + Debug + 'static,
     <P::Tx as Transaction>::Hash: Debug,
@@ -97,39 +97,32 @@ where
     network_relay: Relay<NetworkService<A::Backend>>,
     mempool_relay: Relay<MempoolService<M, P>>,
     _fountain: std::marker::PhantomData<F>,
-    _tally: std::marker::PhantomData<T>,
     _overlay: std::marker::PhantomData<O>,
 }
 
-impl<A, P, M, F, T, O> ServiceData for CarnotConsensus<A, P, M, F, T, O>
+impl<A, P, M, F, O> ServiceData for CarnotConsensus<A, P, M, F, O>
 where
     F: FountainCode,
     A: NetworkAdapter,
     P: MemPool,
-    T: Tally,
-    T::Qc: Clone,
     P::Tx: Transaction + Debug,
     <P::Tx as Transaction>::Hash: Debug,
     M: MempoolAdapter<Tx = P::Tx>,
     O: Overlay,
 {
     const SERVICE_ID: ServiceId = "Carnot";
-    type Settings = CarnotSettings<F, T>;
+    type Settings = CarnotSettings<F, CarnotTally>;
     type State = NoState<Self::Settings>;
     type StateOperator = NoOperator<Self::State>;
     type Message = NoMessage;
 }
 
 #[async_trait::async_trait]
-impl<A, P, M, F, T, O> ServiceCore for CarnotConsensus<A, P, M, F, T, O>
+impl<A, P, M, F, O> ServiceCore for CarnotConsensus<A, P, M, F, O>
 where
-    F: FountainCode + Send + Sync + 'static,
-    A: NetworkAdapter + Send + Sync + 'static,
+    F: FountainCode + Clone + Send + Sync + 'static,
+    A: NetworkAdapter + Clone + Send + Sync + 'static,
     P: MemPool + Send + Sync + 'static,
-    T: Tally + Send + Sync + 'static,
-    T::Settings: Send + Sync + 'static,
-    T::Outcome: Send + Sync,
-    T::Qc: Clone + Send + Sync,
     P::Settings: Send + Sync + 'static,
     P::Tx: Debug + Clone + serde::de::DeserializeOwned + Send + Sync + 'static,
     <P::Tx as Transaction>::Hash: Debug + Send + Sync,
@@ -143,7 +136,6 @@ where
             service_state,
             network_relay,
             _fountain: Default::default(),
-            _tally: Default::default(),
             _overlay: Default::default(),
             mempool_relay,
         })
@@ -173,7 +165,7 @@ where
         let tip = Tip;
 
         let fountain = F::new(fountain_settings);
-        let tally = T::new(tally_settings);
+        let tally = CarnotTally::new(tally_settings);
         let overlay = O::new();
         // let leadership = Leadership::<P::Tx>::new(private_key, mempool_relay.clone());
         // FIXME: this should be taken from config
@@ -195,6 +187,15 @@ where
             // be spawned as a separate future
 
             // FIXME: this should probably have a timer to detect failed rounds
+            let event_builder = CarnotEventBuilder::new(
+                cur_view.view_n,
+                HashSet::new(),
+                Duration::from_secs(2),
+                10,
+                network_adapter.clone(),
+                fountain.clone(),
+                tally.clone(),
+            );
             let res = cur_view
                 .resolve::<A, O, _, _, P::Tx>(
                     private_key,
@@ -202,6 +203,7 @@ where
                     &network_adapter,
                     &fountain,
                     &tally,
+                    event_builder,
                     &mut carnot,
                 )
                 .await;
@@ -229,6 +231,7 @@ impl View {
         adapter: &A,
         fountain: &F,
         tally: &T,
+        event_builder: CarnotEventBuilder<A, F>,
         carnot: &mut Carnot<O>,
     ) -> Result<(Block<Tx::Hash>, View), Box<dyn std::error::Error + Send + Sync + 'static>>
     where
@@ -245,7 +248,8 @@ impl View {
     }
 }
 
-pub enum CarnotEvent<Tx: Clone + Eq + Hash> {
+#[derive(Debug)]
+pub enum CarnotEvent<Tx: Clone + Eq + Hash + Debug + Send + Sync> {
     Timeout,
     TimeoutDetected(HashSet<Timeout>),
     Proposal(Block<Tx>),
@@ -254,29 +258,30 @@ pub enum CarnotEvent<Tx: Clone + Eq + Hash> {
     Votes((Qc, HashSet<Vote>)),
 }
 
-pub struct CarnotEventBuilder<'view, A, F> {
+#[derive(Clone)]
+pub struct CarnotEventBuilder<A, F> {
     timeout: Duration,
     threshold: usize,
     view: consensus_engine::View,
     committee: Committee,
-    adapter: &'view A,
-    fountain: &'view F,
-    tally: &'view CarnotTally,
+    adapter: A,
+    fountain: F,
+    tally: CarnotTally,
 }
 
-impl<'view, A, F> CarnotEventBuilder<'view, A, F>
+impl<A, F> CarnotEventBuilder<A, F>
 where
-    A: NetworkAdapter,
-    F: FountainCode,
+    A: NetworkAdapter + Clone + Send + Sync + 'static,
+    F: FountainCode + Clone + Send + Sync + 'static,
 {
     pub fn new(
         view: consensus_engine::View,
         committee: Committee,
         timeout: Duration,
         threshold: usize,
-        adapter: &'view A,
-        fountain: &'view F,
-        tally: &'view CarnotTally,
+        adapter: A,
+        fountain: F,
+        tally: CarnotTally,
     ) -> Self {
         Self {
             view,
@@ -289,24 +294,33 @@ where
         }
     }
 
-    pub async fn next_proposal<Tx: Clone + Eq + Hash + Serialize + DeserializeOwned>(
+    pub async fn timeout<
+        Tx: Clone + Eq + Hash + Serialize + DeserializeOwned + Debug + Send + Sync,
+    >(
         &self,
     ) -> CarnotEvent<Tx> {
-        let proposal_stream = self
-            .fountain
-            .decode(self.adapter.proposal_chunks_stream(self.view).await);
-        select! {
-            Ok(proposal) = proposal_stream => {
-                let block = Block::from_bytes(&proposal);
-                CarnotEvent::Proposal(block)
-            }
-            _ = tokio::time::sleep(self.timeout) => {
-                CarnotEvent::Timeout
-            }
-        }
+        // TODO: add cancelable token handling for happy path
+        tokio::time::sleep(self.timeout).await;
+        CarnotEvent::Timeout
     }
 
-    pub async fn next_timeout_qc<Tx: Clone + Eq + Hash + Serialize + DeserializeOwned>(
+    pub async fn proposal_stream<
+        Tx: Clone + Eq + Hash + Serialize + DeserializeOwned + Debug + Send + Sync,
+    >(
+        &self,
+    ) -> impl Stream<Item = CarnotEvent<Tx>> {
+        self.adapter
+            .proposal_chunks_stream(self.view)
+            .await
+            .map(|proposal| {
+                let block = Block::from_bytes(&proposal);
+                CarnotEvent::Proposal(block)
+            })
+    }
+
+    pub async fn next_timeout_qc<
+        Tx: Clone + Eq + Hash + Serialize + DeserializeOwned + Debug + Send + Sync,
+    >(
         &self,
     ) -> Option<CarnotEvent<Tx>> {
         self.adapter
@@ -317,12 +331,15 @@ where
             .map(|qc| CarnotEvent::TimeoutQc(qc.qc))
     }
 
-    pub async fn gather_votes<Tx: Clone + Eq + Hash + Serialize + DeserializeOwned>(
+    pub async fn gather_votes<
+        Tx: Clone + Eq + Hash + Serialize + DeserializeOwned + Debug + Send + Sync,
+    >(
         &self,
+        proposal_id: BlockId,
     ) -> Option<CarnotEvent<Tx>> {
         let votes_stream = self
             .adapter
-            .votes_stream::<VoteMsg>(&self.committee, self.view)
+            .votes_stream(&self.committee, self.view, proposal_id)
             .await;
         match self.tally.tally(self.view, votes_stream).await {
             Ok((qc, outcome)) => Some(CarnotEvent::Votes((qc, outcome))),
@@ -332,7 +349,9 @@ where
         }
     }
 
-    pub async fn gather_new_view<Tx: Clone + Eq + Hash + Serialize + DeserializeOwned>(
+    pub async fn gather_new_view<
+        Tx: Clone + Eq + Hash + Serialize + DeserializeOwned + Debug + Send + Sync,
+    >(
         &self,
     ) -> CarnotEvent<Tx> {
         // TODO: Maybe implement tally for unhappy path?
@@ -340,7 +359,7 @@ where
         let mut votes = HashSet::new();
         let mut stream = self
             .adapter
-            .votes_stream::<NewViewMsg>(&self.committee, self.view)
+            .new_view_stream(&self.committee, self.view)
             .await;
         while let Some(msg) = StreamExt::next(&mut stream).await {
             if seen.contains(&msg.voter) {
@@ -355,7 +374,9 @@ where
         CarnotEvent::NewView(votes)
     }
 
-    pub async fn gather_timeout<Tx: Clone + Eq + Hash + Serialize + DeserializeOwned>(
+    pub async fn gather_timeout<
+        Tx: Clone + Eq + Hash + Serialize + DeserializeOwned + Debug + Send + Sync,
+    >(
         &self,
     ) -> CarnotEvent<Tx> {
         let mut stream = self
@@ -369,5 +390,74 @@ where
                 .collect()
                 .await,
         )
+    }
+
+    pub async fn run<
+        Tx: Clone + Eq + Hash + Serialize + DeserializeOwned + Debug + Send + Sync + 'static,
+    >(
+        self,
+    ) -> impl Stream<Item = CarnotEvent<Tx>> {
+        let (event_sender, event_receiver) = tokio::sync::mpsc::channel(1);
+
+        let proposal_event_sender = event_sender.clone();
+        let builder = self.clone();
+        tokio::task::spawn(async move {
+            let mut proposal_stream = builder.proposal_stream().await;
+            while let Some(CarnotEvent::Proposal(proposal)) = proposal_stream.next().await {
+                let inner_builder = builder.clone();
+                let votes_event_sender = proposal_event_sender.clone();
+                proposal_event_sender
+                    .send(CarnotEvent::Proposal(proposal.clone()))
+                    .await
+                    .expect("Send should not fail");
+                tokio::task::spawn(async move {
+                    if let Some(event) = inner_builder.gather_votes(proposal.header().id).await {
+                        votes_event_sender.send(event).await.unwrap();
+                    }
+                });
+            }
+        });
+
+        let timeout_event_sender = event_sender.clone();
+        let builder = self.clone();
+        tokio::task::spawn(async move {
+            let event = builder.timeout().await;
+            timeout_event_sender
+                .send(event)
+                .await
+                .expect("Send should not fail");
+        });
+
+        let timout_qc_sender = event_sender.clone();
+        let new_view_sender = event_sender.clone();
+        let builder = self.clone();
+        tokio::task::spawn(async move {
+            let timout_qc = builder.next_timeout_qc().await;
+            if let Some(qc) = timout_qc {
+                timout_qc_sender
+                    .send(qc)
+                    .await
+                    .expect("Send should not fail");
+                tokio::task::spawn(async move {
+                    let new_view = builder.gather_new_view().await;
+                    new_view_sender
+                        .send(new_view)
+                        .await
+                        .expect("Send should not fail");
+                });
+            }
+        });
+
+        let timout_sender = event_sender.clone();
+        let builder = self.clone();
+        tokio::task::spawn(async move {
+            let timeout = builder.gather_timeout().await;
+            timout_sender
+                .send(timeout)
+                .await
+                .expect("Send should not fail");
+        });
+
+        ReceiverStream::new(event_receiver)
     }
 }

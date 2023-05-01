@@ -6,6 +6,7 @@ use crate::NodeId;
 use consensus_engine::{NewView, Qc, Timeout, TimeoutQc, View, Vote};
 use nomos_core::wire;
 
+// TODO: Discriminate between different proposals
 #[derive(Clone, Serialize, Deserialize)]
 pub struct ProposalChunkMsg {
     pub chunk: Box<[u8]>,

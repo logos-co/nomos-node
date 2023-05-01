@@ -16,7 +16,7 @@ use crate::network::{
     messages::{ProposalChunkMsg, VoteMsg},
     NetworkAdapter,
 };
-use consensus_engine::{Committee, TimeoutQc, View};
+use consensus_engine::{BlockId, Committee, TimeoutQc, View};
 
 const MOCK_PUB_SUB_TOPIC: &str = "MockPubSubTopic";
 const MOCK_BLOCK_CONTENT_TOPIC: MockContentTopic = MockContentTopic::new("MockSim", 1, "MockBlock");
@@ -116,7 +116,8 @@ impl NetworkAdapter for MockAdapter {
 
     async fn timeout_stream(
         &self,
-        view: View,
+        _committee: Committee,
+        _view: View,
     ) -> Box<dyn Stream<Item = TimeoutQc> + Send + Sync + Unpin> {
         todo!()
     }
@@ -143,6 +144,7 @@ impl NetworkAdapter for MockAdapter {
         &self,
         _committee: Committee,
         _view: View,
+        _proposal_id: BlockId,
     ) -> Box<dyn Stream<Item = Vote> + Send> {
         let stream_channel = self
             .message_subscriber_channel()

@@ -7,12 +7,12 @@ use bytes::Bytes;
 use futures::{Stream, StreamExt};
 use tokio_stream::wrappers::BroadcastStream;
 // internal
-use crate::network::messages::{TimeoutMsg, TimeoutQcMsg};
+use crate::network::messages::{NewViewMsg, TimeoutMsg, TimeoutQcMsg};
 use crate::network::{
     messages::{ProposalChunkMsg, VoteMsg},
     NetworkAdapter,
 };
-use consensus_engine::{Committee, TimeoutQc, View};
+use consensus_engine::{BlockId, Committee, TimeoutQc, View};
 use nomos_network::{
     backends::waku::{EventKind, NetworkEvent, Waku, WakuBackendMessage},
     NetworkMsg, NetworkService,
@@ -215,18 +215,40 @@ impl NetworkAdapter for WakuAdapter {
         ))
     }
 
-    async fn votes_stream<Vote: DeserializeOwned>(
+    async fn votes_stream(
         &self,
         committee: &Committee,
         view: View,
+        proposal_id: BlockId,
     ) -> Box<dyn Stream<Item = VoteMsg> + Send> {
+        let content_topic = create_topic("votes", committee, view);
+        Box::new(Box::pin(
+            self.cached_stream_with_content_topic(content_topic)
+                .await
+                .filter_map(|message| {
+                    let payload = message.payload();
+                    let vote = VoteMsg::from_bytes(payload);
+                    if vote.vote.block == proposal_id {
+                        Some(vote)
+                    } else {
+                        None
+                    }
+                }),
+        ))
+    }
+
+    async fn new_view_stream(
+        &self,
+        committee: &Committee,
+        view: View,
+    ) -> Box<dyn Stream<Item = NewViewMsg> + Send> {
         let content_topic = create_topic("votes", committee, view);
         Box::new(Box::pin(
             self.cached_stream_with_content_topic(content_topic)
                 .await
                 .map(|message| {
                     let payload = message.payload();
-                    VoteMsg::from_bytes(payload)
+                    NewViewMsg::from_bytes(payload)
                 }),
         ))
     }
