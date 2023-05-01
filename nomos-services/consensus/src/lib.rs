@@ -259,103 +259,10 @@ impl View {
     {
         let mut event_stream = event_builder.run::<Tx>().await;
         while let Some(event) = event_stream.next().await {
-            let (new_carnot, engine_event): (_, Option<Output<Tx>>) = match event {
-                CarnotEvent::Timeout => {
-                    let (carnot, event) = carnot.local_timeout();
-                    (carnot, event.map(Output::Send))
-                }
-                CarnotEvent::Proposal(proposal) => {
-                    // TODO: Validate block
-                    let carnot = carnot
-                        .receive_block(proposal.header().clone())
-                        .expect("Block should be nice :)");
-                    (carnot, None)
-                }
-                CarnotEvent::TimeoutQc(qc) => (carnot.receive_timeout_qc(qc), None),
-                CarnotEvent::BlockApproved((_qc, _votes, block)) => {
-                    // TODO: Validate votes
-                    let (carnot, output) = carnot.approve_block(block.header().clone());
-                    // TODO: Handle approved block (notify mempool ?)
-                    (carnot, Some(Output::Send(output)))
-                }
-                CarnotEvent::TimeoutDetected(_timeouts) => {
-                    // TODO: build qc and send it
-                    (carnot.clone(), None)
-                }
-                CarnotEvent::NewView((new_views, timeout_qc)) => {
-                    let (carnot, event) = carnot.approve_new_view(timeout_qc, new_views);
-                    (carnot, Some(Output::Send(event)))
-                }
-            };
-            if let Some(engine_event) = engine_event {
-                match engine_event {
-                    Output::Send(consensus_engine::Send { to, payload }) => match payload {
-                        Payload::Vote(vote) => {
-                            adapter
-                                .send(
-                                    &to,
-                                    self.view_n,
-                                    VoteMsg {
-                                        voter: node_id,
-                                        vote,
-                                        qc: None, // TODO: handle root commmittee members
-                                    }
-                                    .as_bytes(),
-                                    "votes",
-                                )
-                                .await;
-                        }
-                        Payload::Timeout(timeout) => {
-                            adapter
-                                .send(
-                                    &to,
-                                    self.view_n,
-                                    TimeoutMsg {
-                                        voter: node_id,
-                                        vote: timeout,
-                                    }
-                                    .as_bytes(),
-                                    "timeout",
-                                )
-                                .await;
-                        }
-                        Payload::NewView(new_view) => {
-                            adapter
-                                .send(
-                                    &to,
-                                    self.view_n,
-                                    NewViewMsg {
-                                        voter: node_id,
-                                        vote: new_view,
-                                    }
-                                    .as_bytes(),
-                                    "new-view",
-                                )
-                                .await;
-                        }
-                    },
-                    Output::BroadcastProposal { proposal } => {
-                        fountain
-                            .encode(&proposal.as_bytes())
-                            .for_each(|chunk| {
-                                adapter.broadcast_block_chunk(ProposalChunkMsg {
-                                    chunk: chunk.to_vec().into_boxed_slice(),
-                                    // TODO: handle multiple proposals
-                                    view: self.view_n,
-                                })
-                            })
-                            .await;
-                    }
-                    Output::BroadcastTimeoutQc { timeout_qc } => {
-                        adapter
-                            .broadcast_timeout_qc(TimeoutQcMsg {
-                                source: node_id,
-                                qc: timeout_qc,
-                            })
-                            .await;
-                    }
-                }
-            }
+            let (new_carnot, carnot_event): (_, Option<Output<Tx>>) =
+                self.handle_io_event(carnot, event).await;
+            self.handle_carnot_event(node_id, carnot_event, adapter, fountain)
+                .await;
             carnot = new_carnot;
         }
 
@@ -366,6 +273,145 @@ impl View {
         };
 
         Ok((next_view, carnot))
+    }
+
+    async fn handle_io_event<Tx, O>(
+        &self,
+        carnot: Carnot<O>,
+        event: CarnotEvent<Tx>,
+    ) -> (Carnot<O>, Option<Output<Tx>>)
+    where
+        Tx: Transaction
+            + Clone
+            + Eq
+            + Hash
+            + Debug
+            + Send
+            + Sync
+            + Serialize
+            + DeserializeOwned
+            + 'static,
+        O: Overlay,
+    {
+        match event {
+            CarnotEvent::Timeout => {
+                let (carnot, event) = carnot.local_timeout();
+                (carnot, event.map(Output::Send))
+            }
+            CarnotEvent::Proposal(proposal) => {
+                // TODO: Validate block
+                let carnot = carnot
+                    .receive_block(proposal.header().clone())
+                    .expect("Block should be nice :)");
+                (carnot, None)
+            }
+            CarnotEvent::TimeoutQc(qc) => (carnot.receive_timeout_qc(qc), None),
+            CarnotEvent::BlockApproved((_qc, _votes, block)) => {
+                // TODO: Validate votes
+                let (carnot, output) = carnot.approve_block(block.header().clone());
+                // TODO: Handle approved block (notify mempool ?)
+                (carnot, Some(Output::Send(output)))
+            }
+            CarnotEvent::TimeoutDetected(_timeouts) => {
+                // TODO: build qc and send it
+                (carnot, None)
+            }
+            CarnotEvent::NewView((new_views, timeout_qc)) => {
+                let (carnot, event) = carnot.approve_new_view(timeout_qc, new_views);
+                (carnot, Some(Output::Send(event)))
+            }
+        }
+    }
+
+    async fn handle_carnot_event<A, F, Tx>(
+        &self,
+        node_id: NodeId,
+        carnot_event: Option<Output<Tx>>,
+        adapter: &A,
+        fountain: &F,
+    ) where
+        A: NetworkAdapter + Clone + Send + Sync + 'static,
+        F: FountainCode + Clone + Send + Sync + 'static,
+        Tx: Transaction
+            + Clone
+            + Eq
+            + Hash
+            + Debug
+            + Send
+            + Sync
+            + Serialize
+            + DeserializeOwned
+            + 'static,
+    {
+        if let Some(engine_event) = carnot_event {
+            match engine_event {
+                Output::Send(consensus_engine::Send { to, payload }) => match payload {
+                    Payload::Vote(vote) => {
+                        adapter
+                            .send(
+                                &to,
+                                self.view_n,
+                                VoteMsg {
+                                    voter: node_id,
+                                    vote,
+                                    qc: None, // TODO: handle root commmittee members
+                                }
+                                .as_bytes(),
+                                "votes",
+                            )
+                            .await;
+                    }
+                    Payload::Timeout(timeout) => {
+                        adapter
+                            .send(
+                                &to,
+                                self.view_n,
+                                TimeoutMsg {
+                                    voter: node_id,
+                                    vote: timeout,
+                                }
+                                .as_bytes(),
+                                "timeout",
+                            )
+                            .await;
+                    }
+                    Payload::NewView(new_view) => {
+                        adapter
+                            .send(
+                                &to,
+                                self.view_n,
+                                NewViewMsg {
+                                    voter: node_id,
+                                    vote: new_view,
+                                }
+                                .as_bytes(),
+                                "new-view",
+                            )
+                            .await;
+                    }
+                },
+                Output::BroadcastProposal { proposal } => {
+                    fountain
+                        .encode(&proposal.as_bytes())
+                        .for_each(|chunk| {
+                            adapter.broadcast_block_chunk(ProposalChunkMsg {
+                                chunk: chunk.to_vec().into_boxed_slice(),
+                                // TODO: handle multiple proposals
+                                view: self.view_n,
+                            })
+                        })
+                        .await;
+                }
+                Output::BroadcastTimeoutQc { timeout_qc } => {
+                    adapter
+                        .broadcast_timeout_qc(TimeoutQcMsg {
+                            source: node_id,
+                            qc: timeout_qc,
+                        })
+                        .await;
+                }
+            }
+        }
     }
 }
 
