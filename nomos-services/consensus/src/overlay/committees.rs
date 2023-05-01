@@ -16,7 +16,7 @@ pub struct Member<const C: usize> {
     id: NodeId,
     committee: Committee,
     committees: Committees<C>,
-    view_n: u64,
+    view_n: consensus_engine::View,
 }
 
 /// #Just a newtype index to be able to implement parent/children methods
@@ -133,8 +133,7 @@ where
         fountain: &Fountain,
     ) -> Result<Block<VoteTally::Qc, TxId>, FountainError> {
         assert_eq!(view.view_n, self.view_n, "view_n mismatch");
-        let committee = self.committee;
-        let message_stream = adapter.proposal_chunks_stream(committee, view).await;
+        let message_stream = adapter.proposal_chunks_stream(view.view_n).await;
         fountain.decode(message_stream).await.and_then(|b| {
             deserializer(&b)
                 .deserialize::<Block<VoteTally::Qc, TxId>>()
@@ -150,23 +149,15 @@ where
         fountain: &Fountain,
     ) {
         assert_eq!(view.view_n, self.view_n, "view_n mismatch");
-        let (left_child, right_child) = self.children_committes();
         let block_bytes = block.as_bytes();
         let encoded_stream = fountain.encode(&block_bytes);
         encoded_stream
             .for_each_concurrent(None, |chunk| async move {
-                let message = ProposalChunkMsg { chunk };
-                let r_child = right_child
-                    .map(|right_child| {
-                        adapter.broadcast_block_chunk(right_child, view, message.clone())
-                    })
-                    .into_iter();
-                let l_child = left_child
-                    .map(|left_child| {
-                        adapter.broadcast_block_chunk(left_child, view, message.clone())
-                    })
-                    .into_iter();
-                futures::future::join_all(r_child.chain(l_child)).await;
+                let message = ProposalChunkMsg {
+                    chunk: chunk.to_vec().into_boxed_slice(),
+                    view: view.view_n,
+                };
+                adapter.broadcast_block_chunk(message.clone()).await;
             })
             .await;
     }

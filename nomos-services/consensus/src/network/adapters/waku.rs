@@ -5,12 +5,13 @@ use bytes::Bytes;
 use futures::{Stream, StreamExt};
 use tokio_stream::wrappers::BroadcastStream;
 // internal
+use crate::network::messages::TimeoutQcMsg;
 use crate::network::{
     messages::{ProposalChunkMsg, VoteMsg},
     NetworkAdapter,
 };
 use crate::overlay::committees::Committee;
-use crate::View;
+use consensus_engine::{TimeoutQc, View};
 use nomos_network::{
     backends::waku::{EventKind, NetworkEvent, Waku, WakuBackendMessage},
     NetworkMsg, NetworkService,
@@ -109,6 +110,20 @@ impl WakuAdapter {
             });
         tokio_stream::StreamExt::merge(archive_stream, live_stream)
     }
+
+    async fn broadcast(&self, bytes: Box<[u8]>, topic: WakuContentTopic) {
+        let message = WakuMessage::new(bytes, topic, 1, chrono::Utc::now().timestamp() as usize);
+        if let Err((_, _e)) = self
+            .network_relay
+            .send(NetworkMsg::Process(WakuBackendMessage::Broadcast {
+                message,
+                topic: Some(WAKU_CARNOT_PUB_SUB_TOPIC.clone()),
+            }))
+            .await
+        {
+            todo!("log error");
+        };
+    }
 }
 
 #[async_trait::async_trait]
@@ -123,52 +138,65 @@ impl NetworkAdapter for WakuAdapter {
 
     async fn proposal_chunks_stream(
         &self,
-        committee: Committee,
-        view: &View,
+        view: View,
     ) -> Box<dyn Stream<Item = Bytes> + Send + Sync + Unpin> {
-        let content_topic = proposal_topic(committee, view);
         Box::new(Box::pin(
-            self.cached_stream_with_content_topic(content_topic)
+            self.cached_stream_with_content_topic(PROPOSAL_CONTENT_TOPIC.clone())
                 .await
-                .map(|message| {
+                .filter_map(move |message| {
                     let payload = message.payload();
-                    ProposalChunkMsg::from_bytes(payload).chunk
+                    let ProposalChunkMsg {
+                        view: msg_view,
+                        chunk,
+                    } = ProposalChunkMsg::from_bytes(payload);
+                    async move {
+                        if view == msg_view {
+                            Some(Bytes::from(chunk))
+                        } else {
+                            None
+                        }
+                    }
                 }),
         ))
     }
 
-    async fn broadcast_block_chunk(
-        &self,
-        committee: Committee,
-        view: &View,
-        chunk_message: ProposalChunkMsg,
-    ) {
-        let content_topic = proposal_topic(committee, view);
-
-        let message = WakuMessage::new(
-            chunk_message.as_bytes(),
-            content_topic,
-            1,
-            chrono::Utc::now().timestamp() as usize,
-        );
-        if let Err((_, _e)) = self
-            .network_relay
-            .send(NetworkMsg::Process(WakuBackendMessage::Broadcast {
-                message,
-                topic: Some(WAKU_CARNOT_PUB_SUB_TOPIC.clone()),
-            }))
+    async fn broadcast_block_chunk(&self, chunk_message: ProposalChunkMsg) {
+        self.broadcast(chunk_message.as_bytes(), PROPOSAL_CONTENT_TOPIC)
             .await
-        {
-            todo!("log error");
-        };
+    }
+
+    async fn broadcast_timeout_qc(&self, timeout_qc_msg: TimeoutQcMsg) {
+        self.broadcast(timeout_qc_msg.as_bytes(), TIMEOUT_QC_CONTENT_TOPIC)
+            .await
+    }
+
+    async fn timeout_qc_stream(
+        &self,
+        view: View,
+    ) -> Box<dyn Stream<Item = TimeoutQc> + Send + Sync + Unpin> {
+        Box::new(Box::pin(
+            self.cached_stream_with_content_topic(TIMEOUT_QC_CONTENT_TOPIC.clone())
+                .await
+                .filter_map(move |message| {
+                    let payload = message.payload();
+                    let qc = TimeoutQcMsg::from_bytes(payload).qc;
+                    async move {
+                        if qc.view > view {
+                            Some(qc)
+                        } else {
+                            None
+                        }
+                    }
+                }),
+        ))
     }
 
     async fn votes_stream<Vote: DeserializeOwned>(
         &self,
         committee: Committee,
-        view: &View,
+        view: View,
     ) -> Box<dyn Stream<Item = Vote> + Send> {
-        let content_topic = proposal_topic(committee, view);
+        let content_topic = votes_topic(committee, view);
         Box::new(Box::pin(
             self.cached_stream_with_content_topic(content_topic)
                 .await
@@ -179,13 +207,13 @@ impl NetworkAdapter for WakuAdapter {
         ))
     }
 
-    async fn forward_approval<Vote: Serialize + Send>(
+    async fn send_vote<Vote: Serialize + Send>(
         &self,
         committee: Committee,
-        view: &View,
+        view: View,
         approval_message: VoteMsg<Vote>,
     ) {
-        let content_topic = approval_topic(committee, view);
+        let content_topic = votes_topic(committee, view);
 
         let message = WakuMessage::new(
             approval_message.as_bytes(),
@@ -206,20 +234,16 @@ impl NetworkAdapter for WakuAdapter {
     }
 }
 
-fn approval_topic(committee: Committee, view: &View) -> WakuContentTopic {
+fn votes_topic(committee: Committee, view: View) -> WakuContentTopic {
     WakuContentTopic {
         application_name: Cow::Borrowed(APPLICATION_NAME),
         version: VERSION,
-        content_topic_name: Cow::Owned(format!("approval-{}-{}", committee.id(), view.id())),
+        content_topic_name: Cow::Owned(format!("votes-{}-{}", committee.id(), view)),
         encoding: Encoding::Proto,
     }
 }
 
-fn proposal_topic(committee: Committee, view: &View) -> WakuContentTopic {
-    WakuContentTopic {
-        application_name: Cow::Borrowed(APPLICATION_NAME),
-        version: VERSION,
-        content_topic_name: Cow::Owned(format!("proposal-{}-{}", committee.id(), view.id())),
-        encoding: Encoding::Proto,
-    }
-}
+const PROPOSAL_CONTENT_TOPIC: WakuContentTopic =
+    WakuContentTopic::new(APPLICATION_NAME, VERSION, "proposal", Encoding::Proto);
+const TIMEOUT_QC_CONTENT_TOPIC: WakuContentTopic =
+    WakuContentTopic::new(APPLICATION_NAME, VERSION, "timeout-qc", Encoding::Proto);

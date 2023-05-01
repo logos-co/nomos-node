@@ -9,6 +9,7 @@ edition = "2021"
 async-trait = "0.1"
 bytes = "1.3"
 chrono = "0.4"
+consensus-engine = { path = "../../consensus-engine", features = ["serde1"] }
 futures = "0.3"
 nomos-network = { path = "../network" }
 nomos-mempool = { path = "../mempool" }

@@ -12,6 +12,7 @@ authors = [
 async-trait = { version = "0.1" }
 blake2 = { version = "0.10" }
 bytes = "1.3"
+consensus-engine = { path = "../consensus-engine"}
 futures = "0.3"
 nomos-network = { path = "../nomos-services/network", optional = true }
 raptorq = { version = "1.7", optional = true }

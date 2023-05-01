@@ -21,11 +21,11 @@ const FLAT_COMMITTEE: Committee = Committee::root();
 pub struct Flat {
     // TODO: this should be a const param, but we can't do that yet
     node_id: NodeId,
-    view_n: u64,
+    view_n: consensus_engine::View,
 }
 
 impl Flat {
-    pub fn new(view_n: u64, node_id: NodeId) -> Self {
+    pub fn new(view_n: consensus_engine::View, node_id: NodeId) -> Self {
         Self { node_id, view_n }
     }
 
@@ -56,7 +56,7 @@ where
         fountain: &Fountain,
     ) -> Result<Block<VoteTally::Qc, TxId>, FountainError> {
         assert_eq!(view.view_n, self.view_n, "view_n mismatch");
-        let message_stream = adapter.proposal_chunks_stream(FLAT_COMMITTEE, view).await;
+        let message_stream = adapter.proposal_chunks_stream(view.view_n).await;
         fountain.decode(message_stream).await.and_then(|b| {
             deserializer(&b)
                 .deserialize::<Block<VoteTally::Qc, TxId>>()
@@ -76,10 +76,11 @@ where
         let encoded_stream = fountain.encode(&block_bytes);
         encoded_stream
             .for_each_concurrent(None, |chunk| async move {
-                let message = ProposalChunkMsg { chunk };
-                adapter
-                    .broadcast_block_chunk(FLAT_COMMITTEE, view, message)
-                    .await;
+                let message = ProposalChunkMsg {
+                    chunk: chunk.to_vec().into_boxed_slice(),
+                    view: view.view_n,
+                };
+                adapter.broadcast_block_chunk(message).await;
             })
             .await;
     }
@@ -96,9 +97,9 @@ where
         // in the flat overlay, there's no need to wait for anyone before approving the block
         let approval = self.approve(block);
         adapter
-            .forward_approval(
+            .send_vote(
                 FLAT_COMMITTEE,
-                view,
+                view.view_n,
                 VoteMsg {
                     vote: approval,
                     source: self.node_id,
@@ -113,11 +114,12 @@ where
 
         // for now, let's pretend that consensus is reached as soon as the
         // block is approved by a share of the nodes
-        let stream = Box::into_pin(adapter.votes_stream(FLAT_COMMITTEE, view).await);
+        let stream = Box::into_pin(adapter.votes_stream(FLAT_COMMITTEE, view.view_n).await);
 
         // Shadow the original binding so that it can't be directly accessed
         // ever again.
-        if let Ok((qc, _)) = tally.tally(view.view_n, stream).await {
+        // TODO: Remove the `try_into` call when tally is refactored to use with latest consensus engine types
+        if let Ok((qc, _)) = tally.tally(view.view_n.try_into().unwrap(), stream).await {
             qc
         } else {
             unimplemented!("consensus not reached")

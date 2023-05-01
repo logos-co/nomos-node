@@ -11,14 +11,15 @@ use serde::de::DeserializeOwned;
 use serde::Serialize;
 use tokio_stream::{wrappers::BroadcastStream, Stream};
 
+use crate::network::messages::TimeoutQcMsg;
 use crate::{
     network::{
         messages::{ProposalChunkMsg, VoteMsg},
         NetworkAdapter,
     },
     overlay::committees::Committee,
-    View,
 };
+use consensus_engine::{TimeoutQc, View};
 
 const MOCK_PUB_SUB_TOPIC: &str = "MockPubSubTopic";
 const MOCK_BLOCK_CONTENT_TOPIC: MockContentTopic = MockContentTopic::new("MockSim", 1, "MockBlock");
@@ -63,8 +64,7 @@ impl NetworkAdapter for MockAdapter {
 
     async fn proposal_chunks_stream(
         &self,
-        _committee: Committee,
-        _view: &View,
+        _view: View,
     ) -> Box<dyn Stream<Item = Bytes> + Send + Sync + Unpin> {
         let stream_channel = self
             .message_subscriber_channel()
@@ -80,7 +80,9 @@ impl NetworkAdapter for MockAdapter {
                                 == message.content_topic().content_topic_name
                             {
                                 let payload = message.payload();
-                                Some(ProposalChunkMsg::from_bytes(payload.as_bytes()).chunk)
+                                Some(Bytes::from(
+                                    ProposalChunkMsg::from_bytes(payload.as_bytes()).chunk,
+                                ))
                             } else {
                                 None
                             }
@@ -92,14 +94,9 @@ impl NetworkAdapter for MockAdapter {
         }))
     }
 
-    async fn broadcast_block_chunk(
-        &self,
-        _committee: Committee,
-        _view: &View,
-        chunk_message: ProposalChunkMsg,
-    ) {
+    async fn broadcast_block_chunk(&self, chunk_message: ProposalChunkMsg) {
         let message = MockMessage::new(
-            String::from_utf8_lossy(chunk_message.as_bytes()).to_string(),
+            String::from_utf8_lossy(&chunk_message.as_bytes()).to_string(),
             MOCK_BLOCK_CONTENT_TOPIC,
             1,
             chrono::Utc::now().timestamp() as usize,
@@ -116,10 +113,21 @@ impl NetworkAdapter for MockAdapter {
         };
     }
 
+    async fn broadcast_timeout_qc(&self, _timeout_qc_msg: TimeoutQcMsg) {
+        todo!()
+    }
+
+    async fn timeout_qc_stream(
+        &self,
+        _view: View,
+    ) -> Box<dyn Stream<Item = TimeoutQc> + Send + Sync + Unpin> {
+        todo!()
+    }
+
     async fn votes_stream<Vote: DeserializeOwned>(
         &self,
         _committee: Committee,
-        _view: &View,
+        _view: View,
     ) -> Box<dyn Stream<Item = Vote> + Send> {
         let stream_channel = self
             .message_subscriber_channel()
@@ -146,10 +154,10 @@ impl NetworkAdapter for MockAdapter {
         )
     }
 
-    async fn forward_approval<Vote: Serialize>(
+    async fn send_vote<Vote: Serialize>(
         &self,
         _committee: Committee,
-        _view: &View,
+        _view: View,
         approval_message: VoteMsg<Vote>,
     ) where
         Vote: Send,

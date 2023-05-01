@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
 mod types;
-use types::*;
+pub use types::*;
 
 #[derive(Clone, Debug)]
 pub struct Carnot<O: Overlay> {
