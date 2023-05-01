@@ -9,15 +9,13 @@ mod tally;
 mod tip;
 
 // std
-use bytes::Bytes;
 use std::collections::{BTreeMap, HashSet};
 use std::fmt::Debug;
 use std::hash::Hash;
 use std::time::Duration;
 // crates
 use futures::{Stream, StreamExt};
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use tokio::select;
+use serde::{de::DeserializeOwned, Serialize};
 use tokio_stream::wrappers::ReceiverStream;
 // internal
 use crate::network::messages::{NewViewMsg, ProposalChunkMsg, TimeoutMsg, TimeoutQcMsg, VoteMsg};
@@ -26,9 +24,9 @@ use crate::tally::CarnotTally;
 use consensus_engine::{
     Carnot, Committee, NewView, Overlay, Payload, Qc, StandardQc, Timeout, TimeoutQc, Vote,
 };
-use nomos_core::block::{Block, BlockId};
+use nomos_core::block::Block;
 use nomos_core::crypto::PublicKey;
-use nomos_core::fountain::{FountainCode, FountainError};
+use nomos_core::fountain::FountainCode;
 use nomos_core::staking::Stake;
 use nomos_core::tx::Transaction;
 use nomos_core::vote::Tally;
@@ -149,7 +147,7 @@ where
             .await
             .expect("Relay connection with NetworkService should succeed");
 
-        let mempool_relay: OutboundRelay<_> = self
+        let _mempool_relay: OutboundRelay<_> = self
             .mempool_relay
             .connect()
             .await
@@ -194,16 +192,14 @@ where
                 Duration::from_secs(2),
                 10,
                 network_adapter.clone(),
-                fountain.clone(),
                 tally.clone(),
             );
             if let Ok((next_view, next_carnot_state)) = cur_view
-                .resolve::<A, O, _, _, P::Tx>(
+                .resolve::<A, O, _, P::Tx>(
                     private_key,
                     &tip,
                     &network_adapter,
                     &fountain,
-                    &tally,
                     event_builder,
                     carnot.clone(),
                 )
@@ -218,14 +214,16 @@ where
     }
 }
 
+#[allow(dead_code)] // TODO: remove this when using broadcasting events
 enum Output<Tx: Clone + Eq + Hash> {
     Send(consensus_engine::Send),
     BroadcastTimeoutQc { timeout_qc: TimeoutQc },
     BroadcastProposal { proposal: Block<Tx> },
 }
 
-// Consensus round, also aids in guaranteeing synchronization
-// between various data structures by means of lifetimes
+#[allow(dead_code)] // TODO: remove this when using the seed and staking keys
+/// Consensus round, also aids in guaranteeing synchronization
+/// between various data structures by means of lifetimes
 pub struct View {
     seed: Seed,
     staking_keys: BTreeMap<NodeId, Stake>,
@@ -234,14 +232,13 @@ pub struct View {
 
 impl View {
     // TODO: might want to encode steps in the type system
-    pub async fn resolve<'view, A, O, F, T, Tx>(
+    pub async fn resolve<'view, A, O, F, Tx>(
         &'view self,
         node_id: NodeId,
-        tip: &Tip,
+        _tip: &Tip,
         adapter: &A,
         fountain: &F,
-        tally: &T,
-        event_builder: CarnotEventBuilder<A, F>,
+        event_builder: CarnotEventBuilder<A>,
         mut carnot: Carnot<O>,
     ) -> Result<(View, Carnot<O>), Box<dyn std::error::Error + Send + Sync + 'static>>
     where
@@ -258,14 +255,11 @@ impl View {
             + DeserializeOwned
             + 'static,
         Tx::Hash: Debug,
-        T: Tally + Clone + Send + Sync + 'static,
-        T::Outcome: Send + Sync,
-        T::Qc: Clone,
         O: Overlay,
     {
         let mut event_stream = event_builder.run::<Tx>().await;
         while let Some(event) = event_stream.next().await {
-            let (carnot, engine_event): (_, Option<Output<Tx>>) = match event {
+            let (new_carnot, engine_event): (_, Option<Output<Tx>>) = match event {
                 CarnotEvent::Timeout => {
                     let (carnot, event) = carnot.local_timeout();
                     (carnot, event.map(Output::Send))
@@ -278,13 +272,13 @@ impl View {
                     (carnot, None)
                 }
                 CarnotEvent::TimeoutQc(qc) => (carnot.receive_timeout_qc(qc), None),
-                CarnotEvent::BlockApproved((qc, votes, block)) => {
+                CarnotEvent::BlockApproved((_qc, _votes, block)) => {
                     // TODO: Validate votes
                     let (carnot, output) = carnot.approve_block(block.header().clone());
                     // TODO: Handle approved block (notify mempool ?)
                     (carnot, Some(Output::Send(output)))
                 }
-                CarnotEvent::TimeoutDetected(timeouts) => {
+                CarnotEvent::TimeoutDetected(_timeouts) => {
                     // TODO: build qc and send it
                     (carnot.clone(), None)
                 }
@@ -362,6 +356,7 @@ impl View {
                     }
                 }
             }
+            carnot = new_carnot;
         }
 
         let next_view = View {
@@ -385,20 +380,18 @@ pub enum CarnotEvent<Tx: Clone + Eq + Hash + Debug + Send + Sync> {
 }
 
 #[derive(Clone)]
-pub struct CarnotEventBuilder<A, F> {
+pub struct CarnotEventBuilder<A> {
     timeout: Duration,
     threshold: usize,
     view: consensus_engine::View,
     committee: Committee,
     adapter: A,
-    fountain: F,
     tally: CarnotTally,
 }
 
-impl<A, F> CarnotEventBuilder<A, F>
+impl<A> CarnotEventBuilder<A>
 where
     A: NetworkAdapter + Clone + Send + Sync + 'static,
-    F: FountainCode + Clone + Send + Sync + 'static,
 {
     pub fn new(
         view: consensus_engine::View,
@@ -406,7 +399,6 @@ where
         timeout: Duration,
         threshold: usize,
         adapter: A,
-        fountain: F,
         tally: CarnotTally,
     ) -> Self {
         Self {
@@ -414,7 +406,6 @@ where
             timeout,
             threshold,
             adapter,
-            fountain,
             tally,
             committee,
         }
@@ -469,7 +460,7 @@ where
             .await;
         match self.tally.tally(self.view, votes_stream).await {
             Ok((qc, outcome)) => Some(CarnotEvent::BlockApproved((qc, outcome, block))),
-            Err(e) => {
+            Err(_e) => {
                 todo!("Handle tally error");
             }
         }
@@ -506,7 +497,7 @@ where
     >(
         &self,
     ) -> CarnotEvent<Tx> {
-        let mut stream = self
+        let stream = self
             .adapter
             .timeout_stream(&self.committee, self.view)
             .await;
@@ -575,8 +566,8 @@ where
             }
         });
 
-        let timout_sender = event_sender.clone();
-        let builder = self.clone();
+        let timout_sender = event_sender;
+        let builder = self;
         tokio::task::spawn(async move {
             let timeout = builder.gather_timeout().await;
             timout_sender
