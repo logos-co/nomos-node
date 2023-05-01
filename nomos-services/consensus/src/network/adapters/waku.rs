@@ -220,15 +220,15 @@ impl NetworkAdapter for WakuAdapter {
     async fn timeout_qc_stream(
         &self,
         view: View,
-    ) -> Box<dyn Stream<Item = TimeoutQc> + Send + Sync + Unpin> {
+    ) -> Box<dyn Stream<Item = TimeoutQcMsg> + Send + Sync + Unpin> {
         Box::new(Box::pin(
             self.cached_stream_with_content_topic(TIMEOUT_QC_CONTENT_TOPIC.clone())
                 .await
                 .filter_map(move |message| {
                     let payload = message.payload();
-                    let qc = TimeoutQcMsg::from_bytes(payload).qc;
+                    let qc = TimeoutQcMsg::from_bytes(payload);
                     async move {
-                        if qc.view > view {
+                        if qc.qc.view > view {
                             Some(qc)
                         } else {
                             None
@@ -243,18 +243,20 @@ impl NetworkAdapter for WakuAdapter {
         committee: &Committee,
         view: View,
         proposal_id: BlockId,
-    ) -> Box<dyn Stream<Item = VoteMsg> + Send> {
+    ) -> Box<dyn Stream<Item = VoteMsg> + Send + Unpin> {
         let content_topic = create_topic("votes", committee, view);
         Box::new(Box::pin(
             self.cached_stream_with_content_topic(content_topic)
                 .await
-                .filter_map(|message| {
+                .filter_map(move |message| {
                     let payload = message.payload();
                     let vote = VoteMsg::from_bytes(payload);
-                    if vote.vote.block == proposal_id {
-                        Some(vote)
-                    } else {
-                        None
+                    async move {
+                        if vote.vote.block == proposal_id {
+                            Some(vote)
+                        } else {
+                            None
+                        }
                     }
                 }),
         ))
@@ -264,7 +266,7 @@ impl NetworkAdapter for WakuAdapter {
         &self,
         committee: &Committee,
         view: View,
-    ) -> Box<dyn Stream<Item = NewViewMsg> + Send> {
+    ) -> Box<dyn Stream<Item = NewViewMsg> + Send + Unpin> {
         let content_topic = create_topic("votes", committee, view);
         Box::new(Box::pin(
             self.cached_stream_with_content_topic(content_topic)
@@ -276,11 +278,11 @@ impl NetworkAdapter for WakuAdapter {
         ))
     }
 
-    async fn send(&self, committee: &Committee, view: View, payload: Bytes, channel: &str) {
+    async fn send(&self, committee: &Committee, view: View, payload: Box<[u8]>, channel: &str) {
         let content_topic = create_topic(channel, committee, view);
 
         let message = WakuMessage::new(
-            approval_message.as_bytes(),
+            payload,
             content_topic,
             1,
             chrono::Utc::now().timestamp_nanos() as usize,
