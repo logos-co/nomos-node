@@ -12,14 +12,12 @@ use crate::network::{
     messages::{ProposalChunkMsg, VoteMsg},
     NetworkAdapter,
 };
-use consensus_engine::{BlockId, Committee, TimeoutQc, View};
+use consensus_engine::{BlockId, Committee, View};
 use nomos_network::{
     backends::waku::{EventKind, NetworkEvent, Waku, WakuBackendMessage},
     NetworkMsg, NetworkService,
 };
 use overwatch_rs::services::{relay::OutboundRelay, ServiceData};
-use serde::de::DeserializeOwned;
-use serde::Serialize;
 use waku_bindings::{
     ContentFilter, Encoding, StoreQuery, WakuContentTopic, WakuMessage, WakuPubSubTopic,
 };

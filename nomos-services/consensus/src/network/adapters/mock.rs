@@ -7,7 +7,6 @@ use nomos_network::{
     NetworkMsg, NetworkService,
 };
 use overwatch_rs::services::{relay::OutboundRelay, ServiceData};
-use serde::de::DeserializeOwned;
 use tokio_stream::{wrappers::BroadcastStream, Stream};
 
 use crate::network::messages::{NewViewMsg, TimeoutMsg, TimeoutQcMsg};
@@ -15,7 +14,7 @@ use crate::network::{
     messages::{ProposalChunkMsg, VoteMsg},
     NetworkAdapter,
 };
-use consensus_engine::{BlockId, Committee, TimeoutQc, View, Vote};
+use consensus_engine::{BlockId, Committee, View};
 
 const MOCK_PUB_SUB_TOPIC: &str = "MockPubSubTopic";
 const MOCK_BLOCK_CONTENT_TOPIC: MockContentTopic = MockContentTopic::new("MockSim", 1, "MockBlock");
@@ -161,13 +160,13 @@ impl NetworkAdapter for MockAdapter {
 
     async fn new_view_stream(
         &self,
-        committee: &Committee,
-        view: View,
+        _committee: &Committee,
+        _view: View,
     ) -> Box<dyn Stream<Item = NewViewMsg> + Send + Unpin> {
         todo!()
     }
 
-    async fn send(&self, _committee: &Committee, _view: View, payload: Box<[u8]>, channel: &str) {
+    async fn send(&self, _committee: &Committee, _view: View, payload: Box<[u8]>, _channel: &str) {
         let message = MockMessage::new(
             String::from_utf8_lossy(&payload).to_string(),
             MOCK_APPROVAL_CONTENT_TOPIC,
