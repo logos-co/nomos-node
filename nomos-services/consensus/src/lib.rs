@@ -14,7 +14,7 @@ use std::fmt::Debug;
 use std::hash::Hash;
 use std::time::Duration;
 // crates
-use futures::{stream::FuturesUnordered, Stream, StreamExt, FutureExt, future::FusedFuture};
+use futures::{future::FusedFuture, stream::FuturesUnordered, FutureExt, Stream, StreamExt};
 use serde::{de::DeserializeOwned, Serialize};
 // internal
 use crate::network::messages::{NewViewMsg, ProposalChunkMsg, TimeoutMsg, TimeoutQcMsg, VoteMsg};
@@ -231,7 +231,10 @@ where
     }
 
     async fn timeout_qc_stream(&self) -> impl Stream<Item = TimeoutQc> {
-        self.adapter.timeout_qc_stream(self.view()).await.map(|msg| msg.qc)
+        self.adapter
+            .timeout_qc_stream(self.view())
+            .await
+            .map(|msg| msg.qc)
     }
 
     async fn gather_votes<
