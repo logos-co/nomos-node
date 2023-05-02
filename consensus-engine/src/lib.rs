@@ -322,6 +322,10 @@ mod test {
     struct NoOverlay;
 
     impl Overlay for NoOverlay {
+        fn new() -> Self {
+            Self
+        }
+
         fn root_committee(&self) -> Committee {
             todo!()
         }
