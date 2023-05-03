@@ -3,7 +3,6 @@ use std::borrow::Cow;
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 // crates
-use bytes::Bytes;
 use futures::{Stream, StreamExt};
 use tokio_stream::wrappers::BroadcastStream;
 // internal
@@ -145,19 +144,16 @@ impl NetworkAdapter for WakuAdapter {
     async fn proposal_chunks_stream(
         &self,
         view: View,
-    ) -> Box<dyn Stream<Item = Bytes> + Send + Sync + Unpin> {
+    ) -> Box<dyn Stream<Item = ProposalChunkMsg> + Send + Sync + Unpin> {
         Box::new(Box::pin(
             self.cached_stream_with_content_topic(PROPOSAL_CONTENT_TOPIC.clone())
                 .await
                 .filter_map(move |message| {
                     let payload = message.payload();
-                    let ProposalChunkMsg {
-                        view: msg_view,
-                        chunk,
-                    } = ProposalChunkMsg::from_bytes(payload);
+                    let proposal = ProposalChunkMsg::from_bytes(payload);
                     async move {
-                        if view == msg_view {
-                            Some(Bytes::from(chunk))
+                        if view == proposal.view {
+                            Some(proposal)
                         } else {
                             None
                         }

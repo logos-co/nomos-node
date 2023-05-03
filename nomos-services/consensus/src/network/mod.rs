@@ -2,7 +2,6 @@ pub mod adapters;
 pub mod messages;
 
 // std
-use bytes::Bytes;
 // crates
 use futures::Stream;
 // internal
@@ -22,7 +21,7 @@ pub trait NetworkAdapter {
     async fn proposal_chunks_stream(
         &self,
         view: View,
-    ) -> Box<dyn Stream<Item = Bytes> + Send + Sync + Unpin>;
+    ) -> Box<dyn Stream<Item = ProposalChunkMsg> + Send + Sync + Unpin>;
     async fn broadcast_block_chunk(&self, chunk_msg: ProposalChunkMsg);
     async fn broadcast_timeout_qc(&self, timeout_qc_msg: TimeoutQcMsg);
     async fn timeout_stream(
