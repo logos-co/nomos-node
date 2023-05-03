@@ -284,7 +284,7 @@ where
         }
     }
 
-    async fn gather_new_view(
+    async fn gather_new_views(
         &self,
         committee: &Committee,
         view: consensus_engine::View,
@@ -339,7 +339,7 @@ where
             Some((qc, _, _)) = happy_path.next() => {
                 qc
             }
-            _votes = self.gather_new_view(&leader_committee, previous_view) => {
+            _votes = self.gather_new_views(&leader_committee, previous_view) => {
                 Qc::Aggregated(AggregateQc {
                     high_qc: self.carnot.high_qc(),
                     view: self.carnot.current_view(),
@@ -361,7 +361,7 @@ where
         let local_timeout = tokio::time::sleep(self.timeout);
         let root_timeout = self.gather_timeout().fuse();
         let get_previous_block_qc = self.get_previous_block_qc().fuse();
-        let gather_new_view_votes = self.gather_new_view(&self.committee, self.view()).fuse();
+        let gather_new_view_votes = self.gather_new_views(&self.committee, self.view()).fuse();
 
         tokio::pin!(proposal_stream);
         tokio::pin!(local_timeout);
