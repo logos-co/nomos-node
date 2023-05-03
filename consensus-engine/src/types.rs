@@ -139,6 +139,13 @@ impl Qc {
             Qc::Aggregated(AggregateQc { high_qc, .. }) => high_qc.id,
         }
     }
+
+    pub fn high_qc(&self) -> StandardQc {
+        match self {
+            Qc::Standard(qc) => qc.clone(),
+            Qc::Aggregated(AggregateQc { high_qc, .. }) => high_qc.clone(),
+        }
+    }
 }
 
 pub trait Overlay: Clone {
