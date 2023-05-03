@@ -312,6 +312,10 @@ impl<O: Overlay> Carnot<O> {
         }
         res
     }
+
+    pub fn last_view_timeout_qc(&self) -> Option<TimeoutQc> {
+        self.last_view_timeout_qc.clone()
+    }
 }
 
 #[cfg(test)]

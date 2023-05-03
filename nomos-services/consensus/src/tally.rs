@@ -23,9 +23,9 @@ pub enum CarnotTallyError {
 
 #[derive(Clone)]
 pub struct CarnotTallySettings {
-    threshold: usize,
+    pub threshold: usize,
     // TODO: this probably should be dynamic and should change with the view (?)
-    participating_nodes: HashSet<NodeId>,
+    pub participating_nodes: HashSet<NodeId>,
 }
 
 #[derive(Clone)]

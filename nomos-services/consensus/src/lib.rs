@@ -28,7 +28,9 @@ use nomos_core::crypto::PublicKey;
 use nomos_core::fountain::FountainCode;
 use nomos_core::tx::Transaction;
 use nomos_core::vote::Tally;
-use nomos_mempool::{backend::MemPool, network::NetworkAdapter as MempoolAdapter, MempoolService};
+use nomos_mempool::{
+    backend::MemPool, network::NetworkAdapter as MempoolAdapter, MempoolMsg, MempoolService,
+};
 use nomos_network::NetworkService;
 use overwatch_rs::services::relay::{OutboundRelay, Relay};
 use overwatch_rs::services::{
@@ -145,7 +147,7 @@ where
             .await
             .expect("Relay connection with NetworkService should succeed");
 
-        let _mempool_relay: OutboundRelay<_> = self
+        let mempool_relay: OutboundRelay<_> = self
             .mempool_relay
             .connect()
             .await
@@ -159,12 +161,11 @@ where
 
         let network_adapter = A::new(network_relay).await;
 
-        let _tip = Tip;
+        let tip = Tip;
 
         let fountain = F::new(fountain_settings);
         let tally = CarnotTally::new(tally_settings);
         let overlay = O::new();
-        // let leadership = Leadership::<P::Tx>::new(private_key, mempool_relay.clone());
 
         let genesis = consensus_engine::Block {
             id: [0; 32],
@@ -184,8 +185,10 @@ where
                 carnot,
                 node_id: private_key,
                 fountain: fountain.clone(),
+                tip: tip.clone(),
+                mempool: mempool_relay.clone(),
             }
-            .run::<P::Tx>()
+            .run()
             .await;
         }
     }
@@ -198,7 +201,7 @@ enum Output<Tx: Clone + Eq + Hash> {
     BroadcastProposal { proposal: Block<Tx> },
 }
 
-pub struct View<A, F, O: Overlay> {
+pub struct View<A, F, O: Overlay, Tx: Transaction> {
     timeout: Duration,
     threshold: usize,
     committee: Committee,
@@ -207,23 +210,22 @@ pub struct View<A, F, O: Overlay> {
     tally: CarnotTally,
     carnot: Carnot<O>,
     node_id: NodeId,
+    tip: Tip,
+    mempool: OutboundRelay<MempoolMsg<Tx>>,
 }
 
-impl<A, O, F> View<A, F, O>
+impl<A, O, F, Tx> View<A, F, O, Tx>
 where
     A: NetworkAdapter,
     F: FountainCode,
     O: Overlay + Clone,
+    Tx: Transaction + Clone + Eq + Hash + Serialize + DeserializeOwned + Debug + Send + Sync,
 {
     fn view(&self) -> consensus_engine::View {
         self.carnot.current_view()
     }
 
-    pub async fn proposal_stream<
-        Tx: Clone + Eq + Hash + Serialize + DeserializeOwned + Debug + Send + Sync,
-    >(
-        &self,
-    ) -> impl Stream<Item = Block<Tx>> {
+    pub async fn proposal_stream(&self) -> impl Stream<Item = Block<Tx>> {
         self.adapter
             .proposal_chunks_stream(self.view())
             .await
@@ -247,12 +249,7 @@ where
             .map(|msg| msg.qc)
     }
 
-    async fn gather_votes<
-        Tx: Clone + Eq + Hash + Serialize + DeserializeOwned + Debug + Send + Sync,
-    >(
-        &self,
-        block: Block<Tx>,
-    ) -> (Qc, HashSet<Vote>, Block<Tx>) {
+    async fn gather_votes(&self, block: Block<Tx>) -> (Qc, HashSet<Vote>, Block<Tx>) {
         let votes_stream = self
             .adapter
             .votes_stream(&self.committee, self.view(), block.header().id)
@@ -296,9 +293,78 @@ where
             .await
     }
 
-    pub async fn run<Tx: Clone + Eq + Hash + Serialize + DeserializeOwned + Debug + Send + Sync>(
-        self,
-    ) -> Carnot<O> {
+    async fn get_previous_block_qc(&self) -> Qc {
+        let previous_view = self.carnot.current_view() - 1;
+        let leader_committee = [self.node_id].into_iter().collect();
+        // happy path
+        let mut happy_path = self
+            .carnot
+            .blocks_in_view(previous_view)
+            .into_iter()
+            .map(|block| async {
+                let votes_stream = self
+                    .adapter
+                    .votes_stream(&leader_committee, previous_view, block.id)
+                    .await;
+                // FIX
+                let settings = crate::tally::CarnotTallySettings {
+                    threshold: 10,
+                    participating_nodes: HashSet::new(),
+                };
+                let tally = CarnotTally::new(settings);
+                match tally.tally(previous_view, votes_stream).await {
+                    Ok((qc, outcome)) => (qc, outcome, block),
+                    Err(_e) => {
+                        todo!("Handle tally error");
+                    }
+                }
+            })
+            .collect::<FuturesUnordered<_>>();
+
+        // sad path
+        let sad_path = async {
+            if self
+                .carnot
+                .last_view_timeout_qc()
+                .map(|qc| qc.view == previous_view - 1)
+                .unwrap_or(false)
+            {
+                let mut seen = HashSet::new();
+                let mut votes = HashSet::new();
+                let mut stream = self
+                    .adapter
+                    .new_view_stream(&leader_committee, self.view())
+                    .await;
+                while let Some(msg) = StreamExt::next(&mut stream).await {
+                    if seen.contains(&msg.voter) {
+                        continue;
+                    }
+                    seen.insert(msg.voter);
+                    votes.insert(msg.vote);
+                    if votes.len() >= self.threshold {
+                        break;
+                    }
+                }
+                // build qc from votes
+                todo!()
+            } else {
+                futures::pending!();
+                unreachable!()
+            }
+        };
+
+        tokio::select! {
+            Some((qc, _, _)) = happy_path.next() => {
+                qc
+            }
+
+            aggregate_qc = sad_path => {
+                Qc::Aggregated(aggregate_qc)
+            }
+        }
+    }
+
+    pub async fn run(self) -> Carnot<O> {
         let mut carnot = self.carnot.clone();
         // Some tasks are only activated after another event has been triggered,
         // We thus push them to this stream and wait for them on demand
@@ -307,14 +373,16 @@ where
 
         // we create futures here and just poll them through a mut reference in the loop
         // to avoid creating a new future for each iteration
-        let proposal_stream = self.proposal_stream::<Tx>().await;
+        let proposal_stream = self.proposal_stream().await;
         let mut timeout_qc_stream = self.timeout_qc_stream().await;
         let local_timeout = tokio::time::sleep(self.timeout);
         let root_timeout = self.gather_timeout().fuse();
+        let get_previous_block_qc = self.get_previous_block_qc().fuse();
 
         tokio::pin!(proposal_stream);
         tokio::pin!(local_timeout);
         tokio::pin!(root_timeout);
+        tokio::pin!(get_previous_block_qc);
 
         loop {
             let mut output = None;
@@ -322,7 +390,7 @@ where
                 Some(block) = proposal_stream.next() => {
                     if let Ok(new_state) = carnot.receive_block(block.header().clone()) {
                         carnot = new_state;
-                        gather_block_votes.push(self.gather_votes::<Tx>(block));
+                        gather_block_votes.push(self.gather_votes(block));
                     }
                 }
 
@@ -353,6 +421,18 @@ where
 
                 _ = &mut root_timeout, if !root_timeout.is_terminated() => {
                     // timeout detected
+                }
+
+                qc = &mut get_previous_block_qc, if !get_previous_block_qc.is_terminated() => {
+                    // propose block
+                    let (reply_channel, rx) = tokio::sync::oneshot::channel();
+                    self.mempool.send(MempoolMsg::View { ancestor_hint: self.tip.id(), reply_channel })
+                        .await
+                        .unwrap_or_else(|(e, _)| eprintln!("Could not get transactions from mempool {e}"));
+                    if let Ok(txs) = rx.await {
+                        let proposal = Block::new(self.view(), qc, txs);
+                        output = Some(Output::BroadcastProposal { proposal });
+                    }
                 }
             }
             if let Some(output) = output {
