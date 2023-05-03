@@ -249,12 +249,17 @@ where
             .map(|msg| msg.qc)
     }
 
-    async fn gather_votes(&self, block: Block<Tx>) -> (Qc, HashSet<Vote>, Block<Tx>) {
+    async fn gather_votes(
+        &self,
+        committee: &Committee,
+        block: consensus_engine::Block,
+        tally: &CarnotTally,
+    ) -> (Qc, HashSet<Vote>, consensus_engine::Block) {
         let votes_stream = self
             .adapter
-            .votes_stream(&self.committee, self.view(), block.header().id)
+            .votes_stream(committee, block.view, block.id)
             .await;
-        match self.tally.tally(self.view(), votes_stream).await {
+        match tally.tally(block.view, votes_stream).await {
             Ok((qc, outcome)) => (qc, outcome, block),
             Err(_e) => {
                 todo!("Handle tally error");
@@ -262,25 +267,35 @@ where
         }
     }
 
-    async fn gather_new_view(&self, timeout_qc: TimeoutQc) -> (HashSet<NewView>, TimeoutQc) {
-        // TODO: Maybe implement tally for unhappy path?
-        let mut seen = HashSet::new();
-        let mut votes = HashSet::new();
-        let mut stream = self
-            .adapter
-            .new_view_stream(&self.committee, self.view())
-            .await;
-        while let Some(msg) = StreamExt::next(&mut stream).await {
-            if seen.contains(&msg.voter) {
-                continue;
+    async fn gather_new_views(
+        &self,
+        committee: &Committee,
+        view: consensus_engine::View,
+    ) -> (HashSet<NewView>, TimeoutQc) {
+        match self.carnot.last_view_timeout_qc() {
+            // only try to collect new views if we have a timeout qc from the previous view
+            Some(timeout_qc) if timeout_qc.view == view - 1 => {
+                // TODO: Maybe implement tally for unhappy path?
+                let mut seen = HashSet::new();
+                let mut votes = HashSet::new();
+                let mut stream = self
+                    .adapter
+                    .new_view_stream(committee, timeout_qc.view + 1)
+                    .await;
+                while let Some(msg) = StreamExt::next(&mut stream).await {
+                    if seen.contains(&msg.voter) {
+                        continue;
+                    }
+                    seen.insert(msg.voter);
+                    votes.insert(msg.vote);
+                    if votes.len() >= self.threshold {
+                        break;
+                    }
+                }
+                (votes, timeout_qc)
             }
-            seen.insert(msg.voter);
-            votes.insert(msg.vote);
-            if votes.len() >= self.threshold {
-                break;
-            }
+            _ =>  { futures::pending!(); unreachable!() },
         }
-        (votes, timeout_qc)
     }
 
     async fn gather_timeout(&self) -> HashSet<Timeout> {
@@ -296,70 +311,23 @@ where
     async fn get_previous_block_qc(&self) -> Qc {
         let previous_view = self.carnot.current_view() - 1;
         let leader_committee = [self.node_id].into_iter().collect();
-        // happy path
         let mut happy_path = self
             .carnot
             .blocks_in_view(previous_view)
             .into_iter()
             .map(|block| async {
-                let votes_stream = self
-                    .adapter
-                    .votes_stream(&leader_committee, previous_view, block.id)
-                    .await;
-                // FIX
-                let settings = crate::tally::CarnotTallySettings {
-                    threshold: 10,
-                    participating_nodes: HashSet::new(),
-                };
-                let tally = CarnotTally::new(settings);
-                match tally.tally(previous_view, votes_stream).await {
-                    Ok((qc, outcome)) => (qc, outcome, block),
-                    Err(_e) => {
-                        todo!("Handle tally error");
-                    }
-                }
+                self.gather_votes(&leader_committee, block, &self.tally)
+                    .await
             })
             .collect::<FuturesUnordered<_>>();
-
-        // sad path
-        let sad_path = async {
-            if self
-                .carnot
-                .last_view_timeout_qc()
-                .map(|qc| qc.view == previous_view - 1)
-                .unwrap_or(false)
-            {
-                let mut seen = HashSet::new();
-                let mut votes = HashSet::new();
-                let mut stream = self
-                    .adapter
-                    .new_view_stream(&leader_committee, self.view())
-                    .await;
-                while let Some(msg) = StreamExt::next(&mut stream).await {
-                    if seen.contains(&msg.voter) {
-                        continue;
-                    }
-                    seen.insert(msg.voter);
-                    votes.insert(msg.vote);
-                    if votes.len() >= self.threshold {
-                        break;
-                    }
-                }
-                // build qc from votes
-                todo!()
-            } else {
-                futures::pending!();
-                unreachable!()
-            }
-        };
 
         tokio::select! {
             Some((qc, _, _)) = happy_path.next() => {
                 qc
             }
-
-            aggregate_qc = sad_path => {
-                Qc::Aggregated(aggregate_qc)
+            _votes = self.gather_new_views(&leader_committee, previous_view) => {
+                #[allow(unreachable_code)]
+                Qc::Aggregated(todo!())
             }
         }
     }
@@ -369,7 +337,6 @@ where
         // Some tasks are only activated after another event has been triggered,
         // We thus push them to this stream and wait for them on demand
         let mut gather_block_votes = FuturesUnordered::new();
-        let mut gather_new_view_votes = FuturesUnordered::new();
 
         // we create futures here and just poll them through a mut reference in the loop
         // to avoid creating a new future for each iteration
@@ -378,11 +345,13 @@ where
         let local_timeout = tokio::time::sleep(self.timeout);
         let root_timeout = self.gather_timeout().fuse();
         let get_previous_block_qc = self.get_previous_block_qc().fuse();
+        let gather_new_view_votes = self.gather_new_views(&self.committee, self.view()).fuse();
 
         tokio::pin!(proposal_stream);
         tokio::pin!(local_timeout);
         tokio::pin!(root_timeout);
         tokio::pin!(get_previous_block_qc);
+        tokio::pin!(gather_new_view_votes);
 
         loop {
             let mut output = None;
@@ -390,22 +359,21 @@ where
                 Some(block) = proposal_stream.next() => {
                     if let Ok(new_state) = carnot.receive_block(block.header().clone()) {
                         carnot = new_state;
-                        gather_block_votes.push(self.gather_votes(block));
+                        gather_block_votes.push(self.gather_votes(&self.committee, block.header().clone(), &self.tally));
                     }
                 }
 
                 Some((_qc, _votes, block)) = gather_block_votes.next() => {
-                    let (new_carnot, out) = carnot.approve_block(block.header().clone());
+                    let (new_carnot, out) = carnot.approve_block(block);
                     carnot = new_carnot;
                     output = Some(Output::Send::<Tx>(out));
                 }
 
                 Some(timeout_qc) = timeout_qc_stream.next()  => {
                     carnot = carnot.receive_timeout_qc(timeout_qc.clone());
-                    gather_new_view_votes.push(self.gather_new_view(timeout_qc));
                 }
 
-                Some((new_views, timeout_qc)) = gather_new_view_votes.next() => {
+                (new_views, timeout_qc) = &mut gather_new_view_votes, if !gather_new_view_votes.is_terminated() => {
                     let (new_carnot, out) =
                     carnot.approve_new_view(timeout_qc, new_views);
                     carnot = new_carnot;
