@@ -56,19 +56,15 @@ impl Tally for CarnotTally {
         while let Some(vote) = vote_stream.next().await {
             // check vote view is valid
             if !vote.vote.view != view {
-                return Err(CarnotTallyError::InvalidVote("Invalid view".to_string()));
+                todo!("report invalid vote view");
             }
             // check for duplicated votes
             if seen.contains(&vote.voter) {
-                return Err(CarnotTallyError::InvalidVote(
-                    "Double voted node".to_string(),
-                ));
+                todo!("report double voted node");
             }
             // check for individual nodes votes
             if !self.settings.participating_nodes.contains(&vote.voter) {
-                return Err(CarnotTallyError::InvalidVote(
-                    "Non-participating node".to_string(),
-                ));
+                todo!("report non-participating voted node");
             }
             seen.insert(vote.voter);
             outcome.insert(vote.vote.clone());

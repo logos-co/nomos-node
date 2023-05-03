@@ -20,7 +20,7 @@ use serde::{de::DeserializeOwned, Serialize};
 // internal
 use crate::network::messages::{NewViewMsg, ProposalChunkMsg, TimeoutMsg, TimeoutQcMsg, VoteMsg};
 use crate::network::NetworkAdapter;
-use crate::tally::CarnotTally;
+use crate::tally::happy::CarnotTally;
 use consensus_engine::{
     AggregateQc, Carnot, Committee, NewView, Overlay, Payload, Qc, StandardQc, Timeout, TimeoutQc,
     Vote,
