@@ -1,4 +1,3 @@
-use bytes::Bytes;
 use futures::StreamExt;
 use nomos_network::{
     backends::mock::{
@@ -60,7 +59,7 @@ impl NetworkAdapter for MockAdapter {
     async fn proposal_chunks_stream(
         &self,
         _view: View,
-    ) -> Box<dyn Stream<Item = Bytes> + Send + Sync + Unpin> {
+    ) -> Box<dyn Stream<Item = ProposalChunkMsg> + Send + Sync + Unpin> {
         let stream_channel = self
             .message_subscriber_channel()
             .await
@@ -75,9 +74,7 @@ impl NetworkAdapter for MockAdapter {
                                 == message.content_topic().content_topic_name
                             {
                                 let payload = message.payload();
-                                Some(Bytes::from(
-                                    ProposalChunkMsg::from_bytes(payload.as_bytes()).chunk,
-                                ))
+                                Some(ProposalChunkMsg::from_bytes(payload.as_bytes()))
                             } else {
                                 None
                             }

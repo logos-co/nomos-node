@@ -227,7 +227,17 @@ where
         self.adapter
             .proposal_chunks_stream(self.view())
             .await
-            .map(|proposal| Block::from_bytes(&proposal))
+            .filter_map(move |msg| {
+                async move {
+                    let proposal = Block::from_bytes(&msg.chunk);
+                    if proposal.header().id == msg.proposal {
+                        // TODO: Leader is faulty? what should we do?
+                        Some(proposal)
+                    } else {
+                        None
+                    }
+                }
+            })
     }
 
     async fn timeout_qc_stream(&self) -> impl Stream<Item = TimeoutQc> {
@@ -297,11 +307,12 @@ where
 
         // we create futures here and just poll them through a mut reference in the loop
         // to avoid creating a new future for each iteration
-        let mut proposal_stream = self.proposal_stream::<Tx>().await;
+        let proposal_stream = self.proposal_stream::<Tx>().await;
         let mut timeout_qc_stream = self.timeout_qc_stream().await;
         let local_timeout = tokio::time::sleep(self.timeout);
         let root_timeout = self.gather_timeout().fuse();
 
+        tokio::pin!(proposal_stream);
         tokio::pin!(local_timeout);
         tokio::pin!(root_timeout);
 
@@ -425,8 +436,8 @@ async fn handle_output<A, F, Tx>(
                 .encode(&proposal.as_bytes())
                 .for_each(|chunk| {
                     adapter.broadcast_block_chunk(ProposalChunkMsg {
+                        proposal: proposal.header().id,
                         chunk: chunk.to_vec().into_boxed_slice(),
-                        // TODO: handle multiple proposals
                         view,
                     })
                 })
