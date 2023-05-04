@@ -44,6 +44,16 @@ impl<TxId: Clone + Eq + Hash> Block<TxId> {
     }
 }
 
+fn id_from_wire_content(bytes: &[u8]) -> consensus_engine::BlockId {
+    use blake2::digest::{Update, VariableOutput};
+
+    let mut hasher = blake2::Blake2bVar::new(32).unwrap();
+    hasher.update(bytes);
+    let mut buff = BlockId::default();
+    hasher.finalize_variable(&mut buff).unwrap();
+    buff
+}
+
 impl<TxId: Clone + Eq + Hash + Serialize + DeserializeOwned> Block<TxId> {
     /// Encode block into bytes
     pub fn as_bytes(&self) -> Bytes {
@@ -51,6 +61,8 @@ impl<TxId: Clone + Eq + Hash + Serialize + DeserializeOwned> Block<TxId> {
     }
 
     pub fn from_bytes(bytes: &[u8]) -> Self {
-        wire::deserialize(bytes).unwrap()
+        let mut result: Self = wire::deserialize(bytes).unwrap();
+        result.header.id = id_from_wire_content(bytes);
+        result
     }
 }
