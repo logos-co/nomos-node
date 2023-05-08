@@ -1,8 +1,9 @@
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use super::{Producer, Receivers, Subscriber};
 use arc_swap::ArcSwapOption;
 use crossbeam::channel::{bounded, unbounded, Sender};
+use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug)]
@@ -117,13 +118,7 @@ where
     }
 
     fn sink(&self, state: Self::Record) -> anyhow::Result<()> {
-        serde_json::to_writer(
-            &mut *self
-                .writer
-                .lock()
-                .expect("fail to lock writer in io subscriber"),
-            &state,
-        )?;
+        serde_json::to_writer(&mut *self.writer.lock(), &state)?;
         Ok(())
     }
 }
@@ -155,7 +150,7 @@ mod tests {
         type Error = anyhow::Error;
 
         fn try_from(value: &SimulationState<DummyStreamingNode<()>>) -> Result<Self, Self::Error> {
-            let nodes = value.nodes.read().expect("failed to read nodes");
+            let nodes = value.nodes.read();
             Ok(Self {
                 states: nodes
                     .iter()

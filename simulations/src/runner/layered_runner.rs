@@ -96,7 +96,7 @@ where
                         break;
                     }
                     default => {
-                        let mut inner = inner.write().expect("Lock inner");
+                        let mut inner = inner.write();
                         let (group_index, node_id) =
                             choose_random_layer_and_node_id(&mut inner.rng, &distribution, &layers, &mut deque);
 
@@ -104,7 +104,7 @@ where
                         deque.get_mut(group_index).unwrap().remove(&node_id);
 
                         {
-                            let mut shared_nodes = nodes.write().expect("Write access to nodes vector");
+                            let mut shared_nodes = nodes.write();
                             let node: &mut N = shared_nodes
                                 .get_mut(node_id.inner())
                                 .expect("Node should be present");
@@ -184,13 +184,7 @@ where
     // add a +1 so we always have
     let mut deque = FixedSliceDeque::new(gap + 1);
     // push first layer
-    let node_ids: BTreeSet<NodeId> = runner
-        .nodes
-        .write()
-        .expect("Single access to runner nodes")
-        .iter()
-        .map(|node| node.id())
-        .collect();
+    let node_ids: BTreeSet<NodeId> = runner.nodes.write().iter().map(|node| node.id()).collect();
 
     deque.push_back(node_ids);
     // allocate default sets

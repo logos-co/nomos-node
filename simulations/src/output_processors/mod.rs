@@ -22,17 +22,9 @@ where
     type Error = anyhow::Error;
 
     fn try_from(state: &crate::warding::SimulationState<N>) -> Result<Self, Self::Error> {
-        serde_json::to_value(
-            state
-                .nodes
-                .read()
-                .expect("simulations: SimulationState panic when requiring a read lock")
-                .iter()
-                .map(N::state)
-                .collect::<Vec<_>>(),
-        )
-        .map(OutData::new)
-        .map_err(From::from)
+        serde_json::to_value(state.nodes.read().iter().map(N::state).collect::<Vec<_>>())
+            .map(OutData::new)
+            .map_err(From::from)
     }
 }
 

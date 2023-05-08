@@ -30,13 +30,7 @@ where
         nodes: Arc::clone(&runner.nodes),
     };
 
-    let mut node_ids: Vec<NodeId> = runner
-        .nodes
-        .read()
-        .expect("Read access to nodes vector")
-        .iter()
-        .map(N::id)
-        .collect();
+    let mut node_ids: Vec<NodeId> = runner.nodes.read().iter().map(N::id).collect();
 
     let inner = runner.inner.clone();
     let nodes = runner.nodes.clone();
@@ -60,13 +54,12 @@ where
                         return Ok(());
                     }
                     default => {
-                        let mut inner = inner.write().expect("Write access to inner in async runner");
+                        let mut inner = inner.write();
                         node_ids.shuffle(&mut inner.rng);
                         for ids_chunk in node_ids.chunks(chunk_size) {
                             let ids: HashSet<NodeId> = ids_chunk.iter().copied().collect();
                             nodes
                                 .write()
-                                .expect("Write access to nodes vector")
                                 .par_iter_mut()
                                 .filter(|n| ids.contains(&n.id()))
                                 .for_each(N::step);

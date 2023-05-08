@@ -5,12 +5,13 @@ mod sync_runner;
 
 // std
 use std::marker::PhantomData;
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 use std::time::Duration;
 
 // crates
 use crate::streaming::{Producer, Subscriber};
 use crossbeam::channel::Sender;
+use parking_lot::RwLock;
 use rand::rngs::SmallRng;
 use rand::{RngCore, SeedableRng};
 use rayon::prelude::*;

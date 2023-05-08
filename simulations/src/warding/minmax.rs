@@ -14,10 +14,7 @@ impl<N: Node> SimulationWard<N> for MinMaxViewWard {
     fn analyze(&mut self, state: &Self::SimulationState) -> bool {
         let mut min = usize::MAX;
         let mut max = 0;
-        let nodes = state
-            .nodes
-            .read()
-            .expect("simulations: MinMaxViewWard panic when requiring a read lock");
+        let nodes = state.nodes.read();
         for node in nodes.iter() {
             let view = node.current_view();
             min = min.min(view);
@@ -31,7 +28,8 @@ impl<N: Node> SimulationWard<N> for MinMaxViewWard {
 mod test {
     use crate::warding::minmax::MinMaxViewWard;
     use crate::warding::{SimulationState, SimulationWard};
-    use std::sync::{Arc, RwLock};
+    use parking_lot::RwLock;
+    use std::sync::Arc;
 
     #[test]
     fn rebase_threshold() {
@@ -43,7 +41,7 @@ mod test {
         assert!(!minmax.analyze(&state));
 
         // push a new node with 10
-        state.nodes.write().unwrap().push(20);
+        state.nodes.write().push(20);
         // we now have two nodes and the max - min is 10 > max_gap 5, so true
         assert!(minmax.analyze(&state));
     }
