@@ -7,6 +7,7 @@
 mod network;
 mod tally;
 mod tip;
+mod overlay;
 
 // std
 use std::collections::HashSet;
@@ -52,6 +53,7 @@ pub struct CarnotSettings<Fountain: FountainCode, VoteTally: Tally> {
     private_key: [u8; 32],
     fountain_settings: Fountain::Settings,
     tally_settings: VoteTally::Settings,
+    nodes: Vec<NodeId>,
 }
 
 impl<Fountain: FountainCode, VoteTally: Tally> Clone for CarnotSettings<Fountain, VoteTally> {
@@ -60,6 +62,7 @@ impl<Fountain: FountainCode, VoteTally: Tally> Clone for CarnotSettings<Fountain
             private_key: self.private_key,
             fountain_settings: self.fountain_settings.clone(),
             tally_settings: self.tally_settings.clone(),
+            nodes: self.nodes.clone(),
         }
     }
 }
@@ -70,11 +73,13 @@ impl<Fountain: FountainCode, VoteTally: Tally> CarnotSettings<Fountain, VoteTall
         private_key: [u8; 32],
         fountain_settings: Fountain::Settings,
         tally_settings: VoteTally::Settings,
+        nodes: Vec<NodeId>
     ) -> Self {
         Self {
             private_key,
             fountain_settings,
             tally_settings,
+            nodes
         }
     }
 }
@@ -158,6 +163,7 @@ where
             private_key,
             fountain_settings,
             tally_settings,
+            nodes,
         } = self.service_state.settings_reader.get_updated_settings();
 
         let network_adapter = A::new(network_relay).await;
@@ -166,7 +172,7 @@ where
 
         let fountain = F::new(fountain_settings);
         let tally = CarnotTally::new(tally_settings);
-        let overlay = O::new();
+        let overlay = O::new(nodes);
 
         let genesis = consensus_engine::Block {
             id: [0; 32],
