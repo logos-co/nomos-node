@@ -65,6 +65,7 @@ pub struct TimeoutQc {
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Block {
+    #[cfg_attr(feature = "serde", serde(skip))]
     pub id: BlockId,
     pub view: View,
     pub parent_qc: Qc,
