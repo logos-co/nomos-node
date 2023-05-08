@@ -152,5 +152,5 @@ pub trait Overlay: Clone {
     fn leaf_committees(&self, id: NodeId) -> HashSet<Committee>;
     fn leader(&self, view: View) -> NodeId;
     fn super_majority_threshold(&self, id: NodeId) -> usize;
-    fn leader_super_majority_threshold(&self, view: View) -> usize;
+    fn leader_super_majority_threshold(&self, id: NodeId) -> usize;
 }

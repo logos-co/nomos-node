@@ -179,12 +179,10 @@ where
             // we iterate view per view because it's easier to keep an ordering for events
             carnot = View {
                 timeout: Duration::from_secs(2),
-                threshold: 10,
                 committee: Committee::new(),
                 adapter: network_adapter.clone(),
                 tally: tally.clone(),
                 carnot,
-                node_id: private_key,
                 fountain: fountain.clone(),
                 tip: tip.clone(),
                 mempool: mempool_relay.clone(),
@@ -204,13 +202,11 @@ enum Output<Tx: Clone + Eq + Hash> {
 
 pub struct View<A, F, O: Overlay, Tx: Transaction> {
     timeout: Duration,
-    threshold: usize,
     committee: Committee,
     adapter: A,
     fountain: F,
     tally: CarnotTally,
     carnot: Carnot<O>,
-    node_id: NodeId,
     tip: Tip,
     mempool: OutboundRelay<MempoolMsg<Tx>>,
 }
@@ -289,7 +285,8 @@ where
                     }
                     seen.insert(msg.voter);
                     votes.insert(msg.vote);
-                    if votes.len() >= self.threshold {
+                    // TODO: when building this for the leader we should use overlay.leader_supermajority_threshold
+                    if votes.len() >= self.carnot.super_majority_threshold() {
                         break;
                     }
                 }
@@ -306,20 +303,26 @@ where
         self.adapter
             .timeout_stream(&self.committee, self.view())
             .await
-            .take(self.threshold)
+            .take(self.carnot.leader_super_majority_threshold())
             .map(|msg| msg.vote)
             .collect()
             .await
     }
 
     async fn get_previous_block_qc(&self) -> Qc {
+        // if we're not the leader we don't have to do anything
+        if !self.carnot.is_leader_for_current_view() {
+            futures::pending!();
+        }
+
         let previous_view = self.carnot.current_view() - 1;
-        let leader_committee = [self.node_id].into_iter().collect();
+        let leader_committee = [self.carnot.id()].into_iter().collect();
         let mut happy_path = self
             .carnot
             .blocks_in_view(previous_view)
             .into_iter()
             .map(|block| async {
+                // TODO: this should use overlay.leader_super_majority_threshold
                 self.gather_votes(&leader_committee, block, &self.tally)
                     .await
             })
@@ -414,7 +417,7 @@ where
                     &self.adapter,
                     &self.fountain,
                     carnot.current_view(),
-                    self.node_id,
+                    carnot.id(),
                     output,
                 )
                 .await;

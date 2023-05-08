@@ -320,6 +320,22 @@ impl<O: Overlay> Carnot<O> {
     pub fn high_qc(&self) -> StandardQc {
         self.local_high_qc.clone()
     }
+
+    pub fn is_leader_for_current_view(&self) -> bool {
+        self.overlay.leader(self.current_view) == self.id
+    }
+
+    pub fn super_majority_threshold(&self) -> usize {
+        self.overlay.super_majority_threshold(self.id)
+    }
+
+    pub fn leader_super_majority_threshold(&self) -> usize {
+        self.overlay.super_majority_threshold(self.id)
+    }
+
+    pub fn id(&self) -> NodeId {
+        self.id
+    }
 }
 
 #[cfg(test)]
@@ -374,7 +390,7 @@ mod test {
             todo!()
         }
 
-        fn leader_super_majority_threshold(&self, _view: View) -> usize {
+        fn leader_super_majority_threshold(&self, _id: NodeId) -> usize {
             todo!()
         }
     }
