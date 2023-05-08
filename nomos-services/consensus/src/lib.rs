@@ -73,13 +73,13 @@ impl<Fountain: FountainCode, VoteTally: Tally> CarnotSettings<Fountain, VoteTall
         private_key: [u8; 32],
         fountain_settings: Fountain::Settings,
         tally_settings: VoteTally::Settings,
-        nodes: Vec<NodeId>
+        nodes: Vec<NodeId>,
     ) -> Self {
         Self {
             private_key,
             fountain_settings,
             tally_settings,
-            nodes
+            nodes,
         }
     }
 }

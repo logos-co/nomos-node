@@ -40,7 +40,7 @@ impl Overlay for FlatRoundRobin {
     }
 
     fn leaf_committees(&self, _id: NodeId) -> Vec<consensus_engine::Committee> {
-        [self.root_committee()].into_iter().collect()
+        vec![self.root_committee()]
     }
 
     fn leader(&self, view: View) -> NodeId {
