@@ -21,7 +21,8 @@ use crate::network::messages::{NewViewMsg, ProposalChunkMsg, TimeoutMsg, Timeout
 use crate::network::NetworkAdapter;
 use crate::tally::CarnotTally;
 use consensus_engine::{
-    Carnot, Committee, NewView, Overlay, Payload, Qc, StandardQc, Timeout, TimeoutQc, Vote,
+    AggregateQc, Carnot, Committee, NewView, Overlay, Payload, Qc, StandardQc, Timeout, TimeoutQc,
+    Vote,
 };
 use nomos_core::block::Block;
 use nomos_core::crypto::PublicKey;
@@ -329,8 +330,10 @@ where
                 qc
             }
             _votes = self.gather_new_views(&leader_committee, previous_view) => {
-                #[allow(unreachable_code)]
-                Qc::Aggregated(todo!())
+                Qc::Aggregated(AggregateQc {
+                    high_qc: self.carnot.high_qc(),
+                    view: self.carnot.current_view(),
+                })
             }
         }
     }
