@@ -294,7 +294,10 @@ where
                 }
                 (votes, timeout_qc)
             }
-            _ =>  { futures::pending!(); unreachable!() },
+            _ => {
+                futures::pending!();
+                unreachable!()
+            }
         }
     }
 
