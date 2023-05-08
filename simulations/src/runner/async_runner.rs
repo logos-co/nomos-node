@@ -1,7 +1,7 @@
 use crate::node::{Node, NodeId};
 use crate::overlay::Overlay;
-use crate::runner::{SimulationRunner, SimulationRunnerHandle};
-use crate::streaming::{Producer, Subscriber};
+use crate::runner::SimulationRunner;
+use crate::streaming::StreamProducer;
 use crate::warding::SimulationState;
 use crossbeam::channel::bounded;
 use crossbeam::select;
@@ -11,20 +11,20 @@ use serde::Serialize;
 use std::collections::HashSet;
 use std::sync::Arc;
 
+use super::SimulationRunnerHandle;
+
 /// Simulate with sending the network state to any subscriber
-pub fn simulate<M, N: Node, O: Overlay, P: Producer>(
-    runner: SimulationRunner<M, N, O, P>,
+pub fn simulate<M, N: Node, O: Overlay, R>(
+    runner: SimulationRunner<M, N, O, R>,
     chunk_size: usize,
-) -> anyhow::Result<SimulationRunnerHandle>
+) -> anyhow::Result<SimulationRunnerHandle<R>>
 where
     M: Clone + Send + Sync + 'static,
     N: Send + Sync + 'static,
     N::Settings: Clone + Send,
     N::State: Serialize,
     O::Settings: Clone + Send,
-    P::Subscriber: Send + Sync + 'static,
-    <P::Subscriber as Subscriber>::Record:
-        Send + Sync + 'static + for<'a> TryFrom<&'a SimulationState<N>, Error = anyhow::Error>,
+    R: for<'a> TryFrom<&'a SimulationState<N>, Error = anyhow::Error> + Send + Sync + 'static,
 {
     let simulation_state = SimulationState::<N> {
         nodes: Arc::clone(&runner.nodes),
@@ -39,50 +39,43 @@ where
         .collect();
 
     let inner = runner.inner.clone();
-    let nodes = runner.nodes.clone();
+    let nodes = runner.nodes;
     let (stop_tx, stop_rx) = bounded(1);
-    let handle = SimulationRunnerHandle {
-        stop_tx,
-        handle: std::thread::spawn(move || {
-            let p = P::new(runner.stream_settings.settings)?;
-            scopeguard::defer!(if let Err(e) = p.stop() {
-                eprintln!("Error stopping producer: {e}");
-            });
-            let subscriber = p.subscribe()?;
-            std::thread::spawn(move || {
-                if let Err(e) = subscriber.run() {
-                    eprintln!("Error in subscriber: {e}");
+    let p = StreamProducer::<R>::new();
+    let p1 = p.clone();
+    let handle = std::thread::spawn(move || {
+        loop {
+            select! {
+                recv(stop_rx) -> _ => {
+                    return Ok(());
                 }
-            });
-            loop {
-                select! {
-                    recv(stop_rx) -> _ => {
-                        return Ok(());
-                    }
-                    default => {
-                        let mut inner = inner.write().expect("Write access to inner in async runner");
-                        node_ids.shuffle(&mut inner.rng);
-                        for ids_chunk in node_ids.chunks(chunk_size) {
-                            let ids: HashSet<NodeId> = ids_chunk.iter().copied().collect();
-                            nodes
-                                .write()
-                                .expect("Write access to nodes vector")
-                                .par_iter_mut()
-                                .filter(|n| ids.contains(&n.id()))
-                                .for_each(N::step);
+                default => {
+                    let mut inner = inner.write().expect("Write access to inner in async runner");
+                    node_ids.shuffle(&mut inner.rng);
+                    for ids_chunk in node_ids.chunks(chunk_size) {
+                        let ids: HashSet<NodeId> = ids_chunk.iter().copied().collect();
+                        nodes
+                            .write()
+                            .expect("Write access to nodes vector")
+                            .par_iter_mut()
+                            .filter(|n| ids.contains(&n.id()))
+                            .for_each(N::step);
 
-                            p.send(<P::Subscriber as Subscriber>::Record::try_from(
-                                &simulation_state,
-                            )?)?;
-                        }
-                        // check if any condition makes the simulation stop
-                        if inner.check_wards(&simulation_state) {
-                            return Ok(());
-                        }
+                        p.send(R::try_from(
+                            &simulation_state,
+                        )?)?;
+                    }
+                    // check if any condition makes the simulation stop
+                    if inner.check_wards(&simulation_state) {
+                        return Ok(());
                     }
                 }
             }
-        }),
-    };
-    Ok(handle)
+        }
+    });
+    Ok(SimulationRunnerHandle {
+        producer: p1,
+        stop_tx,
+        handle,
+    })
 }

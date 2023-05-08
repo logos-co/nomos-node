@@ -1,6 +1,5 @@
 use crate::network::regions::Region;
 use crate::node::StepTime;
-use crate::streaming::StreamSettings;
 use crate::warding::Ward;
 use serde::Deserialize;
 use std::collections::HashMap;
@@ -23,7 +22,7 @@ pub enum RunnerSettings {
 }
 
 #[derive(Default, Deserialize)]
-pub struct SimulationSettings<N, O, P> {
+pub struct SimulationSettings<N, O> {
     pub network_behaviors: HashMap<(Region, Region), StepTime>,
     pub regions: Vec<Region>,
     #[serde(default)]
@@ -31,7 +30,6 @@ pub struct SimulationSettings<N, O, P> {
     pub overlay_settings: O,
     pub node_settings: N,
     pub runner_settings: RunnerSettings,
-    pub stream_settings: StreamSettings<P>,
     pub node_count: usize,
     pub committee_size: usize,
     pub seed: Option<u64>,
