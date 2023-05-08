@@ -157,6 +157,7 @@ pub trait Overlay: Clone {
     fn is_member_of_leaf_committee(&self, id: NodeId) -> bool;
     fn is_child_of_root_committee(&self, id: NodeId) -> bool;
     fn parent_committee(&self, id: NodeId) -> Committee;
+    fn child_committee(&self, id: NodeId) -> Committee;
     fn leaf_committees(&self, id: NodeId) -> Vec<Committee>;
     fn leader(&self, view: View) -> NodeId;
     fn super_majority_threshold(&self, id: NodeId) -> usize;

@@ -6,7 +6,7 @@ use crate::crypto::Signature;
 /// Can only be constructed if the signature is valid,
 /// but does not imply that it can be successfully applied
 /// to the ledger.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct TransferTransaction {
     pub from: AccountId,
     pub to: AccountId,

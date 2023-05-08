@@ -181,7 +181,7 @@ impl NetworkBackend for Waku {
         let tx = message_event.clone();
         waku_set_event_callback(move |sig| match sig.event() {
             Event::WakuMessage(ref msg_event) => {
-                debug!("received message event");
+                debug!("received message event {:?}", msg_event.waku_message());
                 if tx
                     .send(NetworkEvent::RawMessage(msg_event.waku_message().clone()))
                     .is_err()

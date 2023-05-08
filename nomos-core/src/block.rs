@@ -29,6 +29,7 @@ impl<TxId: Clone + Eq + Hash + Serialize + DeserializeOwned> Block<TxId> {
             view,
             parent_qc,
         };
+
         let mut s = Self {
             header,
             transactions,

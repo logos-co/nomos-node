@@ -20,6 +20,7 @@ const MOCK_BLOCK_CONTENT_TOPIC: MockContentTopic = MockContentTopic::new("MockSi
 const MOCK_APPROVAL_CONTENT_TOPIC: MockContentTopic =
     MockContentTopic::new("MockSim", 1, "MockApproval");
 
+#[derive(Clone, Debug)]
 pub struct MockAdapter {
     network_relay: OutboundRelay<<NetworkService<Mock> as ServiceData>::Message>,
 }

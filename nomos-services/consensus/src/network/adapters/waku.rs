@@ -27,6 +27,7 @@ pub const WAKU_CARNOT_PUB_SUB_TOPIC: WakuPubSubTopic =
 const APPLICATION_NAME: &str = "CarnotSim";
 const VERSION: usize = 1;
 
+#[derive(Clone)]
 pub struct WakuAdapter {
     network_relay: OutboundRelay<<NetworkService<Waku> as ServiceData>::Message>,
 }

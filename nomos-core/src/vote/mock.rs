@@ -1,6 +1,6 @@
 // std
 // crates
-use consensus_engine::View;
+use consensus_engine::{Block, View};
 use futures::{Stream, StreamExt};
 use serde::{Deserialize, Serialize};
 // internal
@@ -49,6 +49,7 @@ impl Tally for MockTally {
     type Vote = MockVote;
     type Qc = MockQc;
     type Outcome = ();
+    type Subject = Block;
     type TallyError = Error;
     type Settings = MockTallySettings;
 
@@ -59,12 +60,12 @@ impl Tally for MockTally {
 
     async fn tally<S: Stream<Item = Self::Vote> + Unpin + Send>(
         &self,
-        view: View,
+        block: Block,
         mut vote_stream: S,
     ) -> Result<(Self::Qc, Self::Outcome), Self::TallyError> {
         let mut count_votes = 0;
         while let Some(vote) = vote_stream.next().await {
-            if vote.view() != view {
+            if vote.view() != block.view {
                 return Err(Error("Invalid vote".into()));
             }
             count_votes += 1;
