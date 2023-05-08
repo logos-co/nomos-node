@@ -40,7 +40,6 @@ use rand::rngs::SmallRng;
 use serde::Serialize;
 // internal
 use crate::node::{Node, NodeId};
-use crate::overlay::Overlay;
 use crate::runner::SimulationRunner;
 use crate::streaming::StreamProducer;
 use crate::warding::SimulationState;
@@ -48,8 +47,8 @@ use crate::warding::SimulationState;
 use super::SimulationRunnerHandle;
 
 /// Simulate with sending the network state to any subscriber
-pub fn simulate<M, N: Node, O: Overlay, R>(
-    runner: SimulationRunner<M, N, O, R>,
+pub fn simulate<M, N: Node, R>(
+    runner: SimulationRunner<M, N, R>,
     gap: usize,
     distribution: Option<Vec<f32>>,
 ) -> anyhow::Result<SimulationRunnerHandle<R>>
@@ -58,7 +57,6 @@ where
     N: Send + Sync + 'static,
     N::Settings: Clone + Send,
     N::State: Serialize,
-    O::Settings: Clone + Send,
     R: for<'a> TryFrom<&'a SimulationState<N>, Error = anyhow::Error> + Send + Sync + 'static,
 {
     let distribution =
@@ -66,7 +64,7 @@ where
 
     let layers: Vec<usize> = (0..gap).collect();
 
-    let mut deque = build_node_ids_deque(gap, &runner);
+    let mut deque = build_node_ids_deque::<M, N, R>(gap, &runner);
 
     let simulation_state = SimulationState {
         nodes: Arc::clone(&runner.nodes),
@@ -161,13 +159,12 @@ fn choose_random_layer_and_node_id(
     (i, *node_id)
 }
 
-fn build_node_ids_deque<M, N, O, R>(
+fn build_node_ids_deque<M, N, R>(
     gap: usize,
-    runner: &SimulationRunner<M, N, O, R>,
+    runner: &SimulationRunner<M, N, R>,
 ) -> FixedSliceDeque<BTreeSet<NodeId>>
 where
     N: Node,
-    O: Overlay,
 {
     // add a +1 so we always have
     let mut deque = FixedSliceDeque::new(gap + 1);

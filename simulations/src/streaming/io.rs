@@ -1,45 +1,65 @@
-use std::sync::{Arc, Mutex};
+use std::{
+    any::Any,
+    io::stdout,
+    sync::{Arc, Mutex},
+};
 
-use super::{Receivers, Subscriber};
+use super::{Receivers, StreamSettings, Subscriber};
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug)]
-pub struct IOStreamSettings<W = std::io::Stdout> {
-    pub writer: W,
+#[derive(Debug, Clone, Default, Deserialize)]
+pub struct IOStreamSettings {
+    pub writer_type: WriteType,
 }
 
-impl Default for IOStreamSettings {
-    fn default() -> Self {
-        Self {
-            writer: std::io::stdout(),
+#[derive(Debug, Clone, Default, Deserialize)]
+pub enum WriteType {
+    #[default]
+    Stdout,
+}
+
+pub trait ToWriter<W: std::io::Write + Send + Sync + 'static> {
+    fn to_writer(&self) -> anyhow::Result<W>;
+}
+
+impl<W: std::io::Write + Send + Sync + 'static> ToWriter<W> for WriteType {
+    fn to_writer(&self) -> anyhow::Result<W> {
+        match self {
+            WriteType::Stdout => {
+                let stdout = Box::new(stdout());
+                let boxed_any = Box::new(stdout) as Box<dyn Any + Send + Sync>;
+                Ok(boxed_any.downcast::<W>().map(|boxed| *boxed).map_err(|_| {
+                    std::io::Error::new(std::io::ErrorKind::Other, "Writer type mismatch")
+                })?)
+            }
         }
     }
 }
 
-impl<'de> Deserialize<'de> for IOStreamSettings {
-    fn deserialize<D>(_deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        Ok(Self {
-            writer: std::io::stdout(),
-        })
+impl TryFrom<StreamSettings> for IOStreamSettings {
+    type Error = String;
+
+    fn try_from(settings: StreamSettings) -> Result<Self, Self::Error> {
+        match settings {
+            StreamSettings::IO(settings) => Ok(settings),
+            _ => Err("io settings can't be created".into()),
+        }
     }
 }
 
 #[derive(Debug)]
-pub struct IOSubscriber<W, R> {
+pub struct IOSubscriber<R, W = std::io::Stdout> {
     recvs: Arc<Receivers<R>>,
     writer: Arc<Mutex<W>>,
 }
 
-impl<W, R> Subscriber for IOSubscriber<W, R>
+impl<W, R> Subscriber for IOSubscriber<R, W>
 where
     W: std::io::Write + Send + Sync + 'static,
     R: Serialize + Send + Sync + 'static,
 {
     type Record = R;
-    type Settings = IOStreamSettings<W>;
+    type Settings = IOStreamSettings;
 
     fn new(
         record_recv: crossbeam::channel::Receiver<Arc<Self::Record>>,
@@ -54,7 +74,7 @@ where
                 stop_rx: stop_recv,
                 recv: record_recv,
             }),
-            writer: Arc::new(Mutex::new(settings.writer)),
+            writer: Arc::new(Mutex::new(settings.writer_type.to_writer()?)),
         })
     }
 
@@ -101,7 +121,6 @@ mod tests {
         },
         node::{dummy_streaming::DummyStreamingNode, Node, NodeId},
         output_processors::OutData,
-        overlay::tree::TreeOverlay,
         runner::SimulationRunner,
         warding::SimulationState,
     };
@@ -186,7 +205,7 @@ mod tests {
                 })
                 .collect(),
         });
-        let simulation_runner: SimulationRunner<(), DummyStreamingNode<()>, TreeOverlay, OutData> =
+        let simulation_runner: SimulationRunner<(), DummyStreamingNode<()>, OutData> =
             SimulationRunner::new(network, nodes, simulation_settings);
         simulation_runner
             .simulate()

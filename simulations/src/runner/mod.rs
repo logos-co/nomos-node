@@ -3,8 +3,8 @@ mod glauber_runner;
 mod layered_runner;
 mod sync_runner;
 
-// std
 use std::marker::PhantomData;
+// std
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
 
@@ -19,7 +19,6 @@ use serde::Serialize;
 // internal
 use crate::network::Network;
 use crate::node::Node;
-use crate::overlay::Overlay;
 use crate::settings::{RunnerSettings, SimulationSettings};
 use crate::warding::{SimulationState, SimulationWard, Ward};
 
@@ -48,6 +47,10 @@ impl<R: Send + Sync + 'static> SimulationRunnerHandle<R> {
         settings: S::Settings,
     ) -> anyhow::Result<SubscriberHandle<S>> {
         self.producer.subscribe(settings)
+    }
+
+    pub fn join(self) -> anyhow::Result<()> {
+        self.handle.join().expect("Join simulation thread")
     }
 }
 
@@ -89,32 +92,25 @@ where
 
 /// Encapsulation solution for the simulations runner
 /// Holds the network state, the simulating nodes and the simulation settings.
-pub struct SimulationRunner<M, N, O, R>
+pub struct SimulationRunner<M, N, R>
 where
     N: Node,
-    O: Overlay,
 {
     inner: Arc<RwLock<SimulationRunnerInner<M>>>,
     nodes: Arc<RwLock<Vec<N>>>,
     runner_settings: RunnerSettings,
-    _overlay: PhantomData<O>,
     _record: PhantomData<R>,
 }
 
-impl<M, N: Node, O: Overlay, R> SimulationRunner<M, N, O, R>
+impl<M, N: Node, R> SimulationRunner<M, N, R>
 where
     M: Clone + Send + Sync + 'static,
     N: Send + Sync + 'static,
     N::Settings: Clone + Send,
     N::State: Serialize,
-    O::Settings: Clone + Send,
     R: for<'a> TryFrom<&'a SimulationState<N>, Error = anyhow::Error> + Send + Sync + 'static,
 {
-    pub fn new(
-        network: Network<M>,
-        nodes: Vec<N>,
-        settings: SimulationSettings<N::Settings, O::Settings>,
-    ) -> Self {
+    pub fn new(network: Network<M>, nodes: Vec<N>, settings: SimulationSettings) -> Self {
         let seed = settings
             .seed
             .unwrap_or_else(|| rand::thread_rng().next_u64());
@@ -124,15 +120,16 @@ where
         let rng = SmallRng::seed_from_u64(seed);
         let nodes = Arc::new(RwLock::new(nodes));
         let SimulationSettings {
-            network_behaviors: _,
-            regions: _,
             wards,
             overlay_settings: _,
             node_settings: _,
             runner_settings,
+            stream_settings: _,
             node_count: _,
-            committee_size: _,
             seed: _,
+            views_count: _,
+            leaders_count: _,
+            network_settings: _,
         } = settings;
         Self {
             runner_settings,
@@ -142,7 +139,6 @@ where
                 wards,
             })),
             nodes,
-            _overlay: PhantomData,
             _record: PhantomData,
         }
     }

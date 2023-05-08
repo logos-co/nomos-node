@@ -1,5 +1,4 @@
 use crate::node::{Node, NodeId};
-use crate::overlay::Overlay;
 use crate::runner::SimulationRunner;
 use crate::streaming::StreamProducer;
 use crate::warding::SimulationState;
@@ -14,8 +13,8 @@ use std::sync::Arc;
 use super::SimulationRunnerHandle;
 
 /// Simulate with sending the network state to any subscriber
-pub fn simulate<M, N: Node, O: Overlay, R>(
-    runner: SimulationRunner<M, N, O, R>,
+pub fn simulate<M, N: Node, R>(
+    runner: SimulationRunner<M, N, R>,
     chunk_size: usize,
 ) -> anyhow::Result<SimulationRunnerHandle<R>>
 where
@@ -23,7 +22,6 @@ where
     N: Send + Sync + 'static,
     N::Settings: Clone + Send,
     N::State: Serialize,
-    O::Settings: Clone + Send,
     R: for<'a> TryFrom<&'a SimulationState<N>, Error = anyhow::Error> + Send + Sync + 'static,
 {
     let simulation_state = SimulationState::<N> {

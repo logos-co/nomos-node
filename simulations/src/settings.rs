@@ -1,8 +1,8 @@
-use crate::network::regions::Region;
-use crate::node::StepTime;
+use crate::network::NetworkSettings;
+use crate::overlay::OverlaySettings;
+use crate::streaming::StreamSettings;
 use crate::warding::Ward;
 use serde::Deserialize;
-use std::collections::HashMap;
 
 #[derive(Clone, Debug, Deserialize, Default)]
 pub enum RunnerSettings {
@@ -21,16 +21,24 @@ pub enum RunnerSettings {
     },
 }
 
+#[derive(Clone, Debug, Deserialize, Default)]
+pub enum NodeSettings {
+    Carnot,
+    #[default]
+    Dummy,
+}
+
 #[derive(Default, Deserialize)]
-pub struct SimulationSettings<N, O> {
-    pub network_behaviors: HashMap<(Region, Region), StepTime>,
-    pub regions: Vec<Region>,
+pub struct SimulationSettings {
     #[serde(default)]
     pub wards: Vec<Ward>,
-    pub overlay_settings: O,
-    pub node_settings: N,
+    pub network_settings: NetworkSettings,
+    pub overlay_settings: OverlaySettings,
+    pub node_settings: NodeSettings,
     pub runner_settings: RunnerSettings,
+    pub stream_settings: StreamSettings,
     pub node_count: usize,
-    pub committee_size: usize,
+    pub views_count: usize,
+    pub leaders_count: usize,
     pub seed: Option<u64>,
 }

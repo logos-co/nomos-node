@@ -7,7 +7,7 @@ use super::{Node, NodeId};
 #[derive(Default, Serialize)]
 pub struct CarnotState {}
 
-#[derive(Clone, Deserialize)]
+#[derive(Clone, Default, Deserialize)]
 pub struct CarnotSettings {}
 
 #[allow(dead_code)] // TODO: remove when handling settings
@@ -15,6 +15,16 @@ pub struct CarnotNode {
     id: NodeId,
     state: CarnotState,
     settings: CarnotSettings,
+}
+
+impl CarnotNode {
+    pub fn new(id: NodeId) -> Self {
+        Self {
+            id,
+            state: Default::default(),
+            settings: Default::default(),
+        }
+    }
 }
 
 impl Node for CarnotNode {

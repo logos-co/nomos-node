@@ -5,12 +5,23 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use super::{Receivers, Subscriber};
+use super::{Receivers, StreamSettings, Subscriber};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NaiveSettings {
     pub path: PathBuf,
+}
+
+impl TryFrom<StreamSettings> for NaiveSettings {
+    type Error = String;
+
+    fn try_from(settings: StreamSettings) -> Result<Self, Self::Error> {
+        match settings {
+            StreamSettings::Naive(settings) => Ok(settings),
+            _ => Err("naive settings can't be created".into()),
+        }
+    }
 }
 
 impl Default for NaiveSettings {
@@ -102,7 +113,6 @@ mod tests {
         },
         node::{dummy_streaming::DummyStreamingNode, Node, NodeId},
         output_processors::OutData,
-        overlay::tree::TreeOverlay,
         runner::SimulationRunner,
         warding::SimulationState,
     };
@@ -189,7 +199,7 @@ mod tests {
                 })
                 .collect(),
         });
-        let simulation_runner: SimulationRunner<(), DummyStreamingNode<()>, TreeOverlay, OutData> =
+        let simulation_runner: SimulationRunner<(), DummyStreamingNode<()>, OutData> =
             SimulationRunner::new(network, nodes, simulation_settings);
 
         simulation_runner.simulate().unwrap();

@@ -8,7 +8,7 @@ use std::{
     sync::Mutex,
 };
 
-use super::Receivers;
+use super::{Receivers, StreamSettings};
 
 #[derive(Debug, Clone, Copy, Serialize)]
 pub enum PolarsFormat {
@@ -46,6 +46,17 @@ impl<'de> Deserialize<'de> for PolarsFormat {
 pub struct PolarsSettings {
     pub format: PolarsFormat,
     pub path: PathBuf,
+}
+
+impl TryFrom<StreamSettings> for PolarsSettings {
+    type Error = String;
+
+    fn try_from(settings: StreamSettings) -> Result<Self, Self::Error> {
+        match settings {
+            StreamSettings::Polars(settings) => Ok(settings),
+            _ => Err("polars settings can't be created".into()),
+        }
+    }
 }
 
 #[derive(Debug)]

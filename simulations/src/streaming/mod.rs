@@ -5,7 +5,7 @@ use std::{
 };
 
 use crossbeam::channel::{bounded, unbounded, Receiver, Sender};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 pub mod io;
 pub mod naive;
@@ -49,11 +49,40 @@ impl<'de> serde::Deserialize<'de> for StreamType {
     }
 }
 
-#[derive(Debug, Default, Clone, Serialize, serde::Deserialize)]
-pub struct StreamSettings<S> {
-    #[serde(rename = "type")]
-    pub ty: StreamType,
-    pub settings: S,
+#[derive(Debug, Deserialize, Clone)]
+pub enum StreamSettings {
+    Naive(naive::NaiveSettings),
+    IO(io::IOStreamSettings),
+    Polars(polars::PolarsSettings),
+}
+
+impl Default for StreamSettings {
+    fn default() -> Self {
+        Self::IO(Default::default())
+    }
+}
+
+impl StreamSettings {
+    pub fn unwrap_naive(self) -> naive::NaiveSettings {
+        match self {
+            StreamSettings::Naive(settings) => settings,
+            _ => panic!("unwrap naive failed"),
+        }
+    }
+
+    pub fn unwrap_io(self) -> io::IOStreamSettings {
+        match self {
+            StreamSettings::IO(settings) => settings,
+            _ => panic!("unwrap io failed"),
+        }
+    }
+
+    pub fn unwrap_polars(self) -> polars::PolarsSettings {
+        match self {
+            StreamSettings::Polars(settings) => settings,
+            _ => panic!("unwrap polars failed"),
+        }
+    }
 }
 
 pub struct SubscriberHandle<S> {
