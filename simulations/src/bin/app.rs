@@ -5,6 +5,7 @@ use std::collections::BTreeMap;
 use std::fs::File;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
+use std::time::{SystemTime, UNIX_EPOCH};
 // crates
 use clap::Parser;
 use crossbeam::channel;
@@ -44,7 +45,14 @@ impl SimulationApp {
             stream_type,
         } = self;
         let simulation_settings: SimulationSettings = load_json_from_file(&input_settings)?;
-        let mut rng = SmallRng::seed_from_u64(simulation_settings.seed.unwrap_or(0));
+
+        let seed = simulation_settings.seed.unwrap_or_else(|| {
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .expect("Time went backwards")
+                .as_secs()
+        });
+        let mut rng = SmallRng::seed_from_u64(seed);
         let mut node_ids: Vec<NodeId> = (0..simulation_settings.node_count)
             .map(Into::into)
             .collect();
