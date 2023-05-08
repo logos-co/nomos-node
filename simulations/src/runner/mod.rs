@@ -9,7 +9,7 @@ use std::sync::{Arc, RwLock};
 use std::time::Duration;
 
 // crates
-use crate::streaming::StreamProducer;
+use crate::streaming::{StreamProducer, Subscriber, SubscriberHandle};
 use crossbeam::channel::Sender;
 use rand::rngs::SmallRng;
 use rand::{RngCore, SeedableRng};
@@ -43,8 +43,11 @@ impl<R: Send + Sync + 'static> SimulationRunnerHandle<R> {
         Ok(())
     }
 
-    pub fn producer(&self) -> &StreamProducer<R> {
-        &self.producer
+    pub fn subscribe<S: Subscriber<Record = R>>(
+        &self,
+        settings: S::Settings,
+    ) -> anyhow::Result<SubscriberHandle<S>> {
+        self.producer.subscribe(settings)
     }
 }
 
