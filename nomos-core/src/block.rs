@@ -21,7 +21,7 @@ pub struct Block<TxId: Clone + Eq + Hash> {
 /// Identifier of a block
 pub type BlockId = [u8; 32];
 
-impl<TxId: Clone + Eq + Hash> Block<TxId> {
+impl<TxId: Clone + Eq + Hash + Serialize + DeserializeOwned> Block<TxId> {
     pub fn new(view: View, parent_qc: Qc, txs: impl Iterator<Item = TxId>) -> Self {
         let transactions = txs.collect();
         let header = consensus_engine::Block {
@@ -29,10 +29,13 @@ impl<TxId: Clone + Eq + Hash> Block<TxId> {
             view,
             parent_qc,
         };
-        Self {
+        let mut s = Self {
             header,
             transactions,
-        }
+        };
+        let id = id_from_wire_content(&s.as_bytes());
+        s.header.id = id;
+        s
     }
 
     pub fn header(&self) -> &consensus_engine::Block {
@@ -44,6 +47,14 @@ impl<TxId: Clone + Eq + Hash> Block<TxId> {
     }
 }
 
+fn id_from_wire_content(bytes: &[u8]) -> consensus_engine::BlockId {
+    use blake2::digest::{consts::U32, Digest};
+    use blake2::Blake2b;
+    let mut hasher = Blake2b::<U32>::new();
+    hasher.update(bytes);
+    hasher.finalize().into()
+}
+
 impl<TxId: Clone + Eq + Hash + Serialize + DeserializeOwned> Block<TxId> {
     /// Encode block into bytes
     pub fn as_bytes(&self) -> Bytes {
@@ -51,6 +62,8 @@ impl<TxId: Clone + Eq + Hash + Serialize + DeserializeOwned> Block<TxId> {
     }
 
     pub fn from_bytes(bytes: &[u8]) -> Self {
-        wire::deserialize(bytes).unwrap()
+        let mut result: Self = wire::deserialize(bytes).unwrap();
+        result.header.id = id_from_wire_content(bytes);
+        result
     }
 }
