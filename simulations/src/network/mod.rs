@@ -8,6 +8,7 @@ use std::{
 use crossbeam::channel::{self, Receiver, Sender};
 use rand::{rngs::ThreadRng, Rng};
 use rayon::prelude::*;
+use serde::Deserialize;
 // internal
 use crate::node::NodeId;
 
@@ -15,6 +16,14 @@ pub mod behaviour;
 pub mod regions;
 
 type NetworkTime = Instant;
+
+#[derive(Clone, Debug, Deserialize, Default)]
+pub struct NetworkSettings {
+    pub network_behaviors: HashMap<(regions::Region, regions::Region), Duration>,
+    /// Represents node distribution in the simulated regions.
+    /// The sum of distributions should be 1.
+    pub regions: HashMap<regions::Region, f32>,
+}
 
 pub struct Network<M> {
     pub regions: regions::RegionsData,
@@ -142,6 +151,39 @@ pub trait NetworkInterface {
 
     fn send_message(&self, address: NodeId, message: Self::Payload);
     fn receive_messages(&self) -> Vec<NetworkMessage<Self::Payload>>;
+}
+
+pub struct InMemoryNetworkInterface<M> {
+    id: NodeId,
+    sender: Sender<NetworkMessage<M>>,
+    receiver: Receiver<NetworkMessage<M>>,
+}
+
+impl<M> InMemoryNetworkInterface<M> {
+    pub fn new(
+        id: NodeId,
+        sender: Sender<NetworkMessage<M>>,
+        receiver: Receiver<NetworkMessage<M>>,
+    ) -> Self {
+        Self {
+            id,
+            sender,
+            receiver,
+        }
+    }
+}
+
+impl<M> NetworkInterface for InMemoryNetworkInterface<M> {
+    type Payload = M;
+
+    fn send_message(&self, address: NodeId, message: Self::Payload) {
+        let message = NetworkMessage::new(self.id, address, message);
+        self.sender.send(message).unwrap();
+    }
+
+    fn receive_messages(&self) -> Vec<crate::network::NetworkMessage<Self::Payload>> {
+        self.receiver.try_iter().collect()
+    }
 }
 
 #[cfg(test)]

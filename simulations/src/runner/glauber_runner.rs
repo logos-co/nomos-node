@@ -1,5 +1,4 @@
 use crate::node::{Node, NodeId};
-use crate::overlay::Overlay;
 use crate::runner::{SimulationRunner, SimulationRunnerHandle};
 use crate::streaming::{Producer, Subscriber};
 use crate::warding::SimulationState;
@@ -13,8 +12,8 @@ use std::sync::Arc;
 /// Simulate with sending the network state to any subscriber.
 ///
 /// [Glauber dynamics simulation](https://en.wikipedia.org/wiki/Glauber_dynamics)
-pub fn simulate<M, N: Node, O: Overlay, P: Producer>(
-    runner: SimulationRunner<M, N, O, P>,
+pub fn simulate<M, N: Node, P: Producer>(
+    runner: SimulationRunner<M, N>,
     update_rate: usize,
     maximum_iterations: usize,
 ) -> anyhow::Result<SimulationRunnerHandle>
@@ -23,7 +22,6 @@ where
     N: Send + Sync + 'static,
     N::Settings: Clone + Send,
     N::State: Serialize,
-    O::Settings: Clone + Send,
     P::Subscriber: Send + Sync + 'static,
     <P::Subscriber as Subscriber>::Record:
         for<'a> TryFrom<&'a SimulationState<N>, Error = anyhow::Error>,
@@ -42,7 +40,7 @@ where
     let (stop_tx, stop_rx) = bounded(1);
     let handle = SimulationRunnerHandle {
         handle: std::thread::spawn(move || {
-            let p = P::new(runner.stream_settings.settings)?;
+            let p = P::new(runner.stream_settings)?;
             scopeguard::defer!(if let Err(e) = p.stop() {
                 eprintln!("Error stopping producer: {e}");
             });

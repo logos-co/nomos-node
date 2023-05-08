@@ -5,8 +5,11 @@ pub mod tree;
 use std::collections::{BTreeSet, HashMap};
 // crates
 use rand::Rng;
+use serde::Deserialize;
 // internal
 use crate::node::{CommitteeId, NodeId};
+
+use self::tree::TreeSettings;
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Committee {
@@ -89,10 +92,70 @@ impl Layout {
     }
 }
 
-pub trait Overlay {
-    type Settings;
+pub enum SimulationOverlay {
+    Flat(flat::FlatOverlay),
+    Tree(tree::TreeOverlay),
+}
 
-    fn new(settings: Self::Settings) -> Self;
+#[derive(Clone, Debug, Deserialize)]
+pub enum OverlaySettings {
+    Flat,
+    Tree(TreeSettings),
+}
+
+impl Default for OverlaySettings {
+    fn default() -> Self {
+        Self::Tree(Default::default())
+    }
+}
+
+impl From<TreeSettings> for OverlaySettings {
+    fn from(settings: TreeSettings) -> OverlaySettings {
+        OverlaySettings::Tree(settings)
+    }
+}
+
+impl TryInto<TreeSettings> for OverlaySettings {
+    type Error = String;
+
+    fn try_into(self) -> Result<TreeSettings, Self::Error> {
+        if let Self::Tree(settings) = self {
+            Ok(settings)
+        } else {
+            Err("unable to convert to tree settings".into())
+        }
+    }
+}
+
+impl Overlay for SimulationOverlay {
+    fn nodes(&self) -> Vec<NodeId> {
+        match self {
+            SimulationOverlay::Flat(overlay) => overlay.nodes(),
+            SimulationOverlay::Tree(overlay) => overlay.nodes(),
+        }
+    }
+
+    fn leaders<R: Rng>(
+        &self,
+        nodes: &[NodeId],
+        size: usize,
+        rng: &mut R,
+    ) -> Box<dyn Iterator<Item = NodeId>> {
+        match self {
+            SimulationOverlay::Flat(overlay) => overlay.leaders(nodes, size, rng),
+            SimulationOverlay::Tree(overlay) => overlay.leaders(nodes, size, rng),
+        }
+    }
+
+    fn layout<R: Rng>(&self, nodes: &[NodeId], rng: &mut R) -> Layout {
+        match self {
+            SimulationOverlay::Flat(overlay) => overlay.layout(nodes, rng),
+            SimulationOverlay::Tree(overlay) => overlay.layout(nodes, rng),
+        }
+    }
+}
+
+pub trait Overlay {
     fn nodes(&self) -> Vec<NodeId>;
     fn leaders<R: Rng>(
         &self,
@@ -101,4 +164,15 @@ pub trait Overlay {
         rng: &mut R,
     ) -> Box<dyn Iterator<Item = NodeId>>;
     fn layout<R: Rng>(&self, nodes: &[NodeId], rng: &mut R) -> Layout;
+}
+
+// Takes a reference to the simulation_settings and returns a SimulationOverlay instance based
+// on the overlay settings specified in simulation_settings.
+pub fn create_overlay(overlay_settings: &OverlaySettings) -> SimulationOverlay {
+    match &overlay_settings {
+        OverlaySettings::Flat => SimulationOverlay::Flat(flat::FlatOverlay::new()),
+        OverlaySettings::Tree(settings) => {
+            SimulationOverlay::Tree(tree::TreeOverlay::new(settings.clone()))
+        }
+    }
 }

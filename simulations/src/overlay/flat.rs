@@ -8,14 +8,19 @@ use crate::node::NodeId;
 use crate::overlay::{Committee, Layout};
 
 pub struct FlatOverlay;
-
-impl Overlay for FlatOverlay {
-    type Settings = ();
-
-    fn new(_settings: Self::Settings) -> Self {
+impl FlatOverlay {
+    pub fn new() -> Self {
         Self
     }
+}
 
+impl Default for FlatOverlay {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Overlay for FlatOverlay {
     fn nodes(&self) -> Vec<NodeId> {
         (0..10).map(NodeId::from).collect()
     }

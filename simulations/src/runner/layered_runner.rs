@@ -40,7 +40,6 @@ use rand::rngs::SmallRng;
 use serde::Serialize;
 // internal
 use crate::node::{Node, NodeId};
-use crate::overlay::Overlay;
 use crate::runner::SimulationRunner;
 use crate::streaming::{Producer, Subscriber};
 use crate::warding::SimulationState;
@@ -48,8 +47,8 @@ use crate::warding::SimulationState;
 use super::SimulationRunnerHandle;
 
 /// Simulate with sending the network state to any subscriber
-pub fn simulate<M, N: Node, O: Overlay, P: Producer>(
-    runner: SimulationRunner<M, N, O, P>,
+pub fn simulate<M, N: Node, P: Producer>(
+    runner: SimulationRunner<M, N>,
     gap: usize,
     distribution: Option<Vec<f32>>,
 ) -> anyhow::Result<SimulationRunnerHandle>
@@ -58,7 +57,6 @@ where
     N: Send + Sync + 'static,
     N::Settings: Clone + Send,
     N::State: Serialize,
-    O::Settings: Clone + Send,
     P::Subscriber: Send + Sync + 'static,
     <P::Subscriber as Subscriber>::Record:
         for<'a> TryFrom<&'a SimulationState<N>, Error = anyhow::Error>,
@@ -68,7 +66,7 @@ where
 
     let layers: Vec<usize> = (0..gap).collect();
 
-    let mut deque = build_node_ids_deque(gap, &runner);
+    let mut deque = build_node_ids_deque::<M, N>(gap, &runner);
 
     let simulation_state = SimulationState {
         nodes: Arc::clone(&runner.nodes),
@@ -80,7 +78,7 @@ where
     let handle = SimulationRunnerHandle {
         stop_tx,
         handle: std::thread::spawn(move || {
-            let p = P::new(runner.stream_settings.settings)?;
+            let p = P::new(runner.stream_settings)?;
             scopeguard::defer!(if let Err(e) = p.stop() {
                 eprintln!("Error stopping producer: {e}");
             });
@@ -172,14 +170,12 @@ fn choose_random_layer_and_node_id(
     (i, *node_id)
 }
 
-fn build_node_ids_deque<M, N, O, P>(
+fn build_node_ids_deque<M, N>(
     gap: usize,
-    runner: &SimulationRunner<M, N, O, P>,
+    runner: &SimulationRunner<M, N>,
 ) -> FixedSliceDeque<BTreeSet<NodeId>>
 where
     N: Node,
-    O: Overlay,
-    P: Producer,
 {
     // add a +1 so we always have
     let mut deque = FixedSliceDeque::new(gap + 1);

@@ -5,7 +5,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use super::{Producer, Receivers, Subscriber};
+use super::{Producer, Receivers, StreamSettings, Subscriber};
 use arc_swap::ArcSwapOption;
 use crossbeam::channel::{bounded, unbounded, Sender};
 use serde::{Deserialize, Serialize};
@@ -13,6 +13,17 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NaiveSettings {
     pub path: PathBuf,
+}
+
+impl TryFrom<StreamSettings> for NaiveSettings {
+    type Error = String;
+
+    fn try_from(settings: StreamSettings) -> Result<Self, Self::Error> {
+        match settings {
+            StreamSettings::Naive(settings) => Ok(settings),
+            _ => Err("naive settings can't be created".into()),
+        }
+    }
 }
 
 impl Default for NaiveSettings {
@@ -40,10 +51,11 @@ where
 
     type Subscriber = NaiveSubscriber<R>;
 
-    fn new(settings: Self::Settings) -> anyhow::Result<Self>
+    fn new(settings: StreamSettings) -> anyhow::Result<Self>
     where
         Self: Sized,
     {
+        let settings = settings.try_into().expect("naive settings");
         let (sender, recv) = unbounded();
         let (stop_tx, stop_rx) = bounded(1);
         Ok(Self {
@@ -138,7 +150,6 @@ mod tests {
             Network,
         },
         node::{dummy_streaming::DummyStreamingNode, Node, NodeId},
-        overlay::tree::TreeOverlay,
         runner::SimulationRunner,
         warding::SimulationState,
     };
@@ -225,13 +236,11 @@ mod tests {
                 })
                 .collect(),
         });
-        let simulation_runner: SimulationRunner<
-            (),
-            DummyStreamingNode<()>,
-            TreeOverlay,
-            NaiveProducer<NaiveRecord>,
-        > = SimulationRunner::new(network, nodes, simulation_settings);
+        let simulation_runner: SimulationRunner<(), DummyStreamingNode<()>> =
+            SimulationRunner::new(network, nodes, simulation_settings);
 
-        simulation_runner.simulate().unwrap();
+        simulation_runner
+            .simulate::<NaiveProducer<NaiveRecord>>()
+            .unwrap();
     }
 }

@@ -10,7 +10,7 @@ use std::{
     sync::Mutex,
 };
 
-use super::{Producer, Receivers, Subscriber};
+use super::{Producer, Receivers, StreamSettings, Subscriber};
 
 #[derive(Debug, Clone, Copy, Serialize)]
 pub enum PolarsFormat {
@@ -50,6 +50,17 @@ pub struct PolarsSettings {
     pub path: PathBuf,
 }
 
+impl TryFrom<StreamSettings> for PolarsSettings {
+    type Error = String;
+
+    fn try_from(settings: StreamSettings) -> Result<Self, Self::Error> {
+        match settings {
+            StreamSettings::Polars(settings) => Ok(settings),
+            _ => Err("polars settings can't be created".into()),
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct PolarsProducer<R> {
     sender: Sender<R>,
@@ -66,10 +77,11 @@ where
 
     type Subscriber = PolarsSubscriber<R>;
 
-    fn new(settings: Self::Settings) -> anyhow::Result<Self>
+    fn new(settings: StreamSettings) -> anyhow::Result<Self>
     where
         Self: Sized,
     {
+        let settings = settings.try_into().expect("polars settings");
         let (sender, recv) = unbounded();
         let (stop_tx, stop_rx) = bounded(1);
         Ok(Self {
