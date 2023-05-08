@@ -23,7 +23,7 @@ where
         nodes: Arc::clone(&runner.nodes),
     };
 
-    let inner = runner.inner.clone();
+    let inner_runner = runner.inner.clone();
     let nodes = runner.nodes;
 
     let (stop_tx, stop_rx) = bounded(1);
@@ -37,19 +37,19 @@ where
                     return Ok(());
                 }
                 default => {
-                    let mut inner = inner.write().expect("Write access to inner simulation state");
+                    let mut inner_runner = inner_runner.write().expect("Write access to inner simulation state");
 
                     // we must use a code block to make sure once the step call is finished then the write lock will be released, because in Record::try_from(&state),
                     // we need to call the read lock, if we do not release the write lock,
                     // then dead lock will occur
                     {
                         let mut nodes = nodes.write().expect("Write access to nodes vector");
-                        inner.step(&mut nodes);
+                        inner_runner.step(&mut nodes);
                     }
 
                     p.send(R::try_from(&state)?)?;
                     // check if any condition makes the simulation stop
-                    if inner.check_wards(&state) {
+                    if inner_runner.check_wards(&state) {
                         return Ok(());
                     }
                 }

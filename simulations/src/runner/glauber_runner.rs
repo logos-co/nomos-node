@@ -32,7 +32,7 @@ where
         nodes: Arc::clone(&runner.nodes),
     };
 
-    let inner = runner.inner.clone();
+    let inner_runner = runner.inner.clone();
     let nodes = runner.nodes;
     let nodes_remaining: BTreeSet<NodeId> =
         (0..nodes.read().expect("Read access to nodes vector").len())
@@ -43,7 +43,8 @@ where
     let p = StreamProducer::<R>::new();
     let p1 = p.clone();
     let handle = std::thread::spawn(move || {
-        let mut inner = inner.write().expect("Locking inner");
+        let mut inner_runner: std::sync::RwLockWriteGuard<super::SimulationRunnerInner<M>> =
+            inner_runner.write().expect("Locking runner");
 
         'main: for chunk in iterations.chunks(update_rate) {
             select! {
@@ -54,7 +55,7 @@ where
                             break 'main;
                         }
 
-                        let node_id = *nodes_remaining.iter().choose(&mut inner.rng).expect(
+                        let node_id = *nodes_remaining.iter().choose(&mut inner_runner.rng).expect(
                             "Some id to be selected as it should be impossible for the set to be empty here",
                         );
 
@@ -67,7 +68,7 @@ where
                         }
 
                         // check if any condition makes the simulation stop
-                        if inner.check_wards(&simulation_state) {
+                        if inner_runner.check_wards(&simulation_state) {
                             // we break the outer main loop, so we need to dump it before the breaking
                             p.send(R::try_from(
                                 &simulation_state,

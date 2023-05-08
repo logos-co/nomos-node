@@ -38,7 +38,7 @@ where
         .map(N::id)
         .collect();
 
-    let inner = runner.inner.clone();
+    let inner_runner = runner.inner.clone();
     let nodes = runner.nodes;
     let (stop_tx, stop_rx) = bounded(1);
     let p = StreamProducer::<R>::new();
@@ -50,8 +50,8 @@ where
                     return Ok(());
                 }
                 default => {
-                    let mut inner = inner.write().expect("Write access to inner in async runner");
-                    node_ids.shuffle(&mut inner.rng);
+                    let mut inner_runner = inner_runner.write().expect("Write access to inner in async runner");
+                    node_ids.shuffle(&mut inner_runner.rng);
                     for ids_chunk in node_ids.chunks(chunk_size) {
                         let ids: HashSet<NodeId> = ids_chunk.iter().copied().collect();
                         nodes
@@ -66,7 +66,7 @@ where
                         )?)?;
                     }
                     // check if any condition makes the simulation stop
-                    if inner.check_wards(&simulation_state) {
+                    if inner_runner.check_wards(&simulation_state) {
                         return Ok(());
                     }
                 }

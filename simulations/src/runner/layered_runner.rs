@@ -72,7 +72,7 @@ where
         nodes: Arc::clone(&runner.nodes),
     };
 
-    let inner = runner.inner.clone();
+    let inner_runner = runner.inner.clone();
     let nodes = runner.nodes;
     let (stop_tx, stop_rx) = bounded(1);
     let p = StreamProducer::<R>::new();
@@ -84,9 +84,9 @@ where
                     break;
                 }
                 default => {
-                    let mut inner = inner.write().expect("Lock inner");
+                    let mut inner_runner = inner_runner.write().expect("Lock runner");
                     let (group_index, node_id) =
-                        choose_random_layer_and_node_id(&mut inner.rng, &distribution, &layers, &mut deque);
+                        choose_random_layer_and_node_id(&mut inner_runner.rng, &distribution, &layers, &mut deque);
 
                     // remove node_id from group
                     deque.get_mut(group_index).unwrap().remove(&node_id);
@@ -106,7 +106,7 @@ where
                     }
 
                     // check if any condition makes the simulation stop
-                    if inner.check_wards(&simulation_state) {
+                    if inner_runner.check_wards(&simulation_state) {
                         break;
                     }
 
