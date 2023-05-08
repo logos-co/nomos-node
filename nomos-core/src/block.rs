@@ -21,7 +21,7 @@ pub struct Block<TxId: Clone + Eq + Hash> {
 /// Identifier of a block
 pub type BlockId = [u8; 32];
 
-impl<TxId: Clone + Eq + Hash> Block<TxId> {
+impl<TxId: Clone + Eq + Hash + Serialize + DeserializeOwned> Block<TxId> {
     pub fn new(view: View, parent_qc: Qc, txs: impl Iterator<Item = TxId>) -> Self {
         let transactions = txs.collect();
         let header = consensus_engine::Block {
@@ -29,10 +29,13 @@ impl<TxId: Clone + Eq + Hash> Block<TxId> {
             view,
             parent_qc,
         };
-        Self {
+        let mut s = Self {
             header,
             transactions,
-        }
+        };
+        let id = id_from_wire_content(&s.as_bytes());
+        s.header.id = id;
+        s
     }
 
     pub fn header(&self) -> &consensus_engine::Block {
