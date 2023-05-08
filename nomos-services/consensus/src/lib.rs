@@ -4,10 +4,10 @@
 //! are always synchronized (i.e. it cannot happen that we accidentally use committees from different views).
 //! It's obviously extremely important that the information contained in `View` is synchronized across different
 //! nodes, but that has to be achieved through different means.
-mod network;
+pub mod network;
+pub mod overlay;
 mod tally;
 mod tip;
-mod overlay;
 
 // std
 use std::collections::HashSet;
