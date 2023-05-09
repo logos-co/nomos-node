@@ -7,13 +7,13 @@ use serde::Deserialize;
 use super::{Committee, Layout, Overlay};
 use crate::node::{CommitteeId, NodeId};
 
-#[derive(Clone, Default, Deserialize)]
+#[derive(Clone, Debug, Default, Deserialize)]
 pub enum TreeType {
     #[default]
     FullBinaryTree,
 }
 
-#[derive(Clone, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct TreeSettings {
     pub tree_type: TreeType,
     pub committee_size: usize,
@@ -40,6 +40,10 @@ struct TreeProperties {
 }
 
 impl TreeOverlay {
+    pub fn new(settings: TreeSettings) -> Self {
+        Self { settings }
+    }
+
     fn build_full_binary_tree<R: rand::Rng>(
         node_ids: &[NodeId],
         rng: &mut R,
@@ -99,12 +103,6 @@ impl TreeOverlay {
 }
 
 impl Overlay for TreeOverlay {
-    type Settings = TreeSettings;
-
-    fn new(settings: Self::Settings) -> Self {
-        Self { settings }
-    }
-
     fn nodes(&self) -> Vec<NodeId> {
         let properties = get_tree_properties(&self.settings);
         (0..properties.node_count).map(From::from).collect()

@@ -1,5 +1,4 @@
 use crate::node::{Node, NodeId};
-use crate::overlay::Overlay;
 use crate::runner::{SimulationRunner, SimulationRunnerHandle};
 use crate::streaming::{Producer, Subscriber};
 use crate::warding::SimulationState;
@@ -12,8 +11,8 @@ use std::collections::HashSet;
 use std::sync::Arc;
 
 /// Simulate with sending the network state to any subscriber
-pub fn simulate<M, N: Node, O: Overlay, P: Producer>(
-    runner: SimulationRunner<M, N, O, P>,
+pub fn simulate<M, N: Node, P: Producer>(
+    runner: SimulationRunner<M, N>,
     chunk_size: usize,
 ) -> anyhow::Result<SimulationRunnerHandle>
 where
@@ -21,7 +20,6 @@ where
     N: Send + Sync + 'static,
     N::Settings: Clone + Send,
     N::State: Serialize,
-    O::Settings: Clone + Send,
     P::Subscriber: Send + Sync + 'static,
     <P::Subscriber as Subscriber>::Record:
         Send + Sync + 'static + for<'a> TryFrom<&'a SimulationState<N>, Error = anyhow::Error>,
@@ -38,7 +36,7 @@ where
     let handle = SimulationRunnerHandle {
         stop_tx,
         handle: std::thread::spawn(move || {
-            let p = P::new(runner.stream_settings.settings)?;
+            let p = P::new(runner.stream_settings)?;
             scopeguard::defer!(if let Err(e) = p.stop() {
                 eprintln!("Error stopping producer: {e}");
             });

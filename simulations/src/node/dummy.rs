@@ -1,11 +1,10 @@
 // std
 use std::collections::{BTreeMap, BTreeSet};
 // crates
-use crossbeam::channel::{Receiver, Sender};
 use serde::{Deserialize, Serialize};
 // internal
 use crate::{
-    network::{NetworkInterface, NetworkMessage},
+    network::{InMemoryNetworkInterface, NetworkInterface, NetworkMessage},
     node::{Node, NodeId},
 };
 
@@ -131,7 +130,7 @@ pub struct DummyNode {
     state: DummyState,
     _settings: DummySettings,
     overlay_state: SharedState<OverlayState>,
-    network_interface: DummyNetworkInterface,
+    network_interface: InMemoryNetworkInterface<DummyMessage>,
     local_view: LocalView,
 
     // Node in current view might be a leader in the next view.
@@ -154,7 +153,7 @@ impl DummyNode {
         node_id: NodeId,
         view_id: usize,
         overlay_state: SharedState<OverlayState>,
-        network_interface: DummyNetworkInterface,
+        network_interface: InMemoryNetworkInterface<DummyMessage>,
     ) -> Self {
         Self {
             node_id,
@@ -373,39 +372,6 @@ impl Node for DummyNode {
     }
 }
 
-pub struct DummyNetworkInterface {
-    id: NodeId,
-    sender: Sender<NetworkMessage<DummyMessage>>,
-    receiver: Receiver<NetworkMessage<DummyMessage>>,
-}
-
-impl DummyNetworkInterface {
-    pub fn new(
-        id: NodeId,
-        sender: Sender<NetworkMessage<DummyMessage>>,
-        receiver: Receiver<NetworkMessage<DummyMessage>>,
-    ) -> Self {
-        Self {
-            id,
-            sender,
-            receiver,
-        }
-    }
-}
-
-impl NetworkInterface for DummyNetworkInterface {
-    type Payload = DummyMessage;
-
-    fn send_message(&self, address: NodeId, message: Self::Payload) {
-        let message = NetworkMessage::new(self.id, address, message);
-        self.sender.send(message).unwrap();
-    }
-
-    fn receive_messages(&self) -> Vec<crate::network::NetworkMessage<Self::Payload>> {
-        self.receiver.try_iter().collect()
-    }
-}
-
 fn get_parent_nodes(node_id: NodeId, view: &ViewOverlay) -> Option<BTreeSet<NodeId>> {
     let committee_id = view.layout.committee(node_id)?;
     view.layout.parent_nodes(committee_id).map(|c| c.nodes)
@@ -469,11 +435,11 @@ mod tests {
         network::{
             behaviour::NetworkBehaviour,
             regions::{Region, RegionsData},
-            Network,
+            InMemoryNetworkInterface, Network,
         },
         node::{
             dummy::{get_child_nodes, get_parent_nodes, get_roles, DummyRole},
-            Node, NodeId, OverlayState, SharedState, ViewOverlay,
+            Node, NodeId, OverlayState, SharedState, SimulationOverlay, ViewOverlay,
         },
         overlay::{
             tree::{TreeOverlay, TreeSettings},
@@ -481,7 +447,7 @@ mod tests {
         },
     };
 
-    use super::{DummyMessage, DummyNetworkInterface, DummyNode, Intent, Vote};
+    use super::{DummyMessage, DummyNode, Intent, Vote};
 
     fn init_network(node_ids: &[NodeId]) -> Network<DummyMessage> {
         let regions = HashMap::from([(Region::Europe, node_ids.to_vec())]);
@@ -503,7 +469,7 @@ mod tests {
             .map(|node_id| {
                 let (node_message_sender, node_message_receiver) = channel::unbounded();
                 let network_message_receiver = network.connect(*node_id, node_message_receiver);
-                let network_interface = DummyNetworkInterface::new(
+                let network_interface = InMemoryNetworkInterface::new(
                     *node_id,
                     node_message_sender,
                     network_message_receiver,
@@ -516,9 +482,9 @@ mod tests {
             .collect()
     }
 
-    fn generate_overlays<O: Overlay, R: Rng>(
+    fn generate_overlays<R: Rng>(
         node_ids: &[NodeId],
-        overlay: O,
+        overlay: &SimulationOverlay,
         overlay_count: usize,
         leader_count: usize,
         rng: &mut R,
@@ -577,6 +543,7 @@ mod tests {
         };
         let overlay_state = Arc::new(RwLock::new(OverlayState {
             all_nodes: node_ids.clone(),
+            overlay: SimulationOverlay::Tree(overlay),
             overlays: BTreeMap::from([
                 (0, view.clone()),
                 (1, view.clone()),
@@ -711,19 +678,20 @@ mod tests {
         let mut rng = SmallRng::seed_from_u64(timestamp);
 
         let committee_size = 1;
-        let overlay = TreeOverlay::new(TreeSettings {
+        let overlay = SimulationOverlay::Tree(TreeOverlay::new(TreeSettings {
             tree_type: Default::default(),
             depth: 3,
             committee_size,
-        });
+        }));
 
         // There are more nodes in the network than in a tree overlay.
         let node_ids: Vec<NodeId> = (0..100).map(Into::into).collect();
         let mut network = init_network(&node_ids);
 
-        let overlays = generate_overlays(&node_ids, overlay, 4, 3, &mut rng);
+        let overlays = generate_overlays(&node_ids, &overlay, 4, 3, &mut rng);
         let overlay_state = Arc::new(RwLock::new(OverlayState {
             all_nodes: node_ids.clone(),
+            overlay,
             overlays: overlays.clone(),
         }));
 
@@ -760,19 +728,20 @@ mod tests {
         let mut rng = SmallRng::seed_from_u64(timestamp);
 
         let committee_size = 100;
-        let overlay = TreeOverlay::new(TreeSettings {
+        let overlay = SimulationOverlay::Tree(TreeOverlay::new(TreeSettings {
             tree_type: Default::default(),
             depth: 3,
             committee_size,
-        });
+        }));
 
         // There are more nodes in the network than in a tree overlay.
         let node_ids: Vec<NodeId> = (0..10000).map(Into::into).collect();
         let mut network = init_network(&node_ids);
 
-        let overlays = generate_overlays(&node_ids, overlay, 4, 100, &mut rng);
+        let overlays = generate_overlays(&node_ids, &overlay, 4, 100, &mut rng);
         let overlay_state = Arc::new(RwLock::new(OverlayState {
             all_nodes: node_ids.clone(),
+            overlay,
             overlays: overlays.clone(),
         }));
 
@@ -809,19 +778,20 @@ mod tests {
         let mut rng = SmallRng::seed_from_u64(timestamp);
 
         let committee_size = 500;
-        let overlay = TreeOverlay::new(TreeSettings {
+        let overlay = SimulationOverlay::Tree(TreeOverlay::new(TreeSettings {
             tree_type: Default::default(),
             depth: 5,
             committee_size,
-        });
+        }));
 
         // There are more nodes in the network than in a tree overlay.
         let node_ids: Vec<NodeId> = (0..100000).map(Into::into).collect();
         let mut network = init_network(&node_ids);
 
-        let overlays = generate_overlays(&node_ids, overlay, 4, 1000, &mut rng);
+        let overlays = generate_overlays(&node_ids, &overlay, 4, 1000, &mut rng);
         let overlay_state = Arc::new(RwLock::new(OverlayState {
             all_nodes: node_ids.clone(),
+            overlay,
             overlays: overlays.clone(),
         }));
 

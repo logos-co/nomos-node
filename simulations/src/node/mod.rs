@@ -15,7 +15,7 @@ use std::{
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 // internal
-use crate::overlay::Layout;
+use crate::overlay::{Layout, OverlaySettings, SimulationOverlay};
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(transparent)]
@@ -127,11 +127,25 @@ pub struct ViewOverlay {
     pub layout: Layout,
 }
 
+impl From<OverlaySettings> for ViewOverlay {
+    fn from(value: OverlaySettings) -> Self {
+        match value {
+            OverlaySettings::Flat => {
+                todo!()
+            }
+            OverlaySettings::Tree(_) => {
+                todo!()
+            }
+        }
+    }
+}
+
 pub type SharedState<S> = Arc<RwLock<S>>;
 
 /// A state that represents how nodes are interconnected in the network.
 pub struct OverlayState {
     pub all_nodes: Vec<NodeId>,
+    pub overlay: SimulationOverlay,
     pub overlays: BTreeMap<usize, ViewOverlay>,
 }
 

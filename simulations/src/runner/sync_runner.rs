@@ -2,22 +2,20 @@ use serde::Serialize;
 
 use super::{SimulationRunner, SimulationRunnerHandle};
 use crate::node::Node;
-use crate::overlay::Overlay;
 use crate::streaming::{Producer, Subscriber};
 use crate::warding::SimulationState;
 use crossbeam::channel::{bounded, select};
 use std::sync::Arc;
 
 /// Simulate with sending the network state to any subscriber
-pub fn simulate<M, N: Node, O: Overlay, P: Producer>(
-    runner: SimulationRunner<M, N, O, P>,
+pub fn simulate<M, N: Node, P: Producer>(
+    runner: SimulationRunner<M, N>,
 ) -> anyhow::Result<SimulationRunnerHandle>
 where
     M: Send + Sync + Clone + 'static,
     N: Send + Sync + 'static,
     N::Settings: Clone + Send,
     N::State: Serialize,
-    O::Settings: Clone,
     P::Subscriber: Send + Sync + 'static,
     <P::Subscriber as Subscriber>::Record:
         Send + Sync + 'static + for<'a> TryFrom<&'a SimulationState<N>, Error = anyhow::Error>,
@@ -33,7 +31,7 @@ where
     let handle = SimulationRunnerHandle {
         stop_tx,
         handle: std::thread::spawn(move || {
-            let p = P::new(runner.stream_settings.settings)?;
+            let p = P::new(runner.stream_settings)?;
             scopeguard::defer!(if let Err(e) = p.stop() {
                 eprintln!("Error stopping producer: {e}");
             });
@@ -79,20 +77,18 @@ mod tests {
         network::{
             behaviour::NetworkBehaviour,
             regions::{Region, RegionsData},
-            Network,
+            InMemoryNetworkInterface, Network,
         },
         node::{
-            dummy::{DummyMessage, DummyNetworkInterface, DummyNode, DummySettings},
+            dummy::{DummyMessage, DummyNode},
             Node, NodeId, OverlayState, SharedState, ViewOverlay,
         },
-        output_processors::OutData,
         overlay::{
             tree::{TreeOverlay, TreeSettings},
-            Overlay,
+            Overlay, SimulationOverlay,
         },
         runner::SimulationRunner,
         settings::SimulationSettings,
-        streaming::naive::{NaiveProducer, NaiveSettings},
     };
     use crossbeam::channel;
     use parking_lot::RwLock;
@@ -123,7 +119,7 @@ mod tests {
             .map(|node_id| {
                 let (node_message_sender, node_message_receiver) = channel::unbounded();
                 let network_message_receiver = network.connect(*node_id, node_message_receiver);
-                let network_interface = DummyNetworkInterface::new(
+                let network_interface = InMemoryNetworkInterface::new(
                     *node_id,
                     node_message_sender,
                     network_message_receiver,
@@ -135,16 +131,15 @@ mod tests {
 
     #[test]
     fn runner_one_step() {
-        let settings: SimulationSettings<DummySettings, TreeSettings, NaiveSettings> =
-            SimulationSettings {
-                node_count: 10,
-                committee_size: 1,
-                ..Default::default()
-            };
+        let settings: SimulationSettings = SimulationSettings {
+            node_count: 10,
+            overlay_settings: TreeSettings::default().into(),
+            ..Default::default()
+        };
 
         let mut rng = StepRng::new(1, 0);
         let node_ids: Vec<NodeId> = (0..settings.node_count).map(Into::into).collect();
-        let overlay = TreeOverlay::new(settings.overlay_settings.clone());
+        let overlay = TreeOverlay::new(settings.overlay_settings.clone().try_into().unwrap());
         let mut network = init_network(&node_ids);
         let view = ViewOverlay {
             leaders: overlay.leaders(&node_ids, 1, &mut rng).collect(),
@@ -152,11 +147,12 @@ mod tests {
         };
         let overlay_state = Arc::new(RwLock::new(OverlayState {
             all_nodes: node_ids.clone(),
+            overlay: SimulationOverlay::Tree(overlay),
             overlays: BTreeMap::from([(0, view.clone()), (1, view)]),
         }));
         let nodes = init_dummy_nodes(&node_ids, &mut network, overlay_state);
 
-        let runner: SimulationRunner<DummyMessage, DummyNode, TreeOverlay, NaiveProducer<OutData>> =
+        let runner: SimulationRunner<DummyMessage, DummyNode> =
             SimulationRunner::new(network, nodes, settings);
         let mut nodes = runner.nodes.write();
         runner.inner.write().step(&mut nodes);
@@ -170,16 +166,14 @@ mod tests {
 
     #[test]
     fn runner_send_receive() {
-        let settings: SimulationSettings<DummySettings, TreeSettings, NaiveSettings> =
-            SimulationSettings {
-                node_count: 10,
-                committee_size: 1,
-                ..Default::default()
-            };
+        let settings: SimulationSettings = SimulationSettings {
+            node_count: 10,
+            ..Default::default()
+        };
 
         let mut rng = StepRng::new(1, 0);
         let node_ids: Vec<NodeId> = (0..settings.node_count).map(Into::into).collect();
-        let overlay = TreeOverlay::new(settings.overlay_settings.clone());
+        let overlay = TreeOverlay::new(settings.overlay_settings.clone().try_into().unwrap());
         let mut network = init_network(&node_ids);
         let view = ViewOverlay {
             leaders: overlay.leaders(&node_ids, 1, &mut rng).collect(),
@@ -187,6 +181,7 @@ mod tests {
         };
         let overlay_state = Arc::new(RwLock::new(OverlayState {
             all_nodes: node_ids.clone(),
+            overlay: SimulationOverlay::Tree(overlay),
             overlays: BTreeMap::from([
                 (0, view.clone()),
                 (1, view.clone()),
@@ -203,7 +198,7 @@ mod tests {
         }
         network.collect_messages();
 
-        let runner: SimulationRunner<DummyMessage, DummyNode, TreeOverlay, NaiveProducer<OutData>> =
+        let runner: SimulationRunner<DummyMessage, DummyNode> =
             SimulationRunner::new(network, nodes, settings);
 
         let mut nodes = runner.nodes.write();
