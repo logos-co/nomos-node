@@ -15,6 +15,7 @@ use super::SimulationRunnerHandle;
 /// Simulate with sending the network state to any subscriber
 pub fn simulate<M, N: Node, R>(
     runner: SimulationRunner<M, N, R>,
+    p: StreamProducer<R>,
     chunk_size: usize,
 ) -> anyhow::Result<SimulationRunnerHandle<R>>
 where
@@ -39,7 +40,6 @@ where
     let inner_runner = runner.inner.clone();
     let nodes = runner.nodes;
     let (stop_tx, stop_rx) = bounded(1);
-    let p = StreamProducer::<R>::new();
     let p1 = p.clone();
     let handle = std::thread::spawn(move || {
         loop {

@@ -16,6 +16,7 @@ use super::SimulationRunnerHandle;
 /// [Glauber dynamics simulation](https://en.wikipedia.org/wiki/Glauber_dynamics)
 pub fn simulate<M, N: Node, R>(
     runner: SimulationRunner<M, N, R>,
+    p: StreamProducer<R>,
     update_rate: usize,
     maximum_iterations: usize,
 ) -> anyhow::Result<SimulationRunnerHandle<R>>
@@ -38,7 +39,6 @@ where
             .collect();
     let iterations: Vec<_> = (0..maximum_iterations).collect();
     let (stop_tx, stop_rx) = bounded(1);
-    let p = StreamProducer::<R>::new();
     let p1 = p.clone();
     let handle = std::thread::spawn(move || {
         let mut inner_runner: std::sync::RwLockWriteGuard<super::SimulationRunnerInner<M>> =

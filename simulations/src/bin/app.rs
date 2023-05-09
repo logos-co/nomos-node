@@ -124,10 +124,10 @@ where
 {
     let stream_settings = settings.stream_settings.clone();
     let runner = SimulationRunner::<_, _, OutData>::new(network, nodes, settings);
-
+    let p = Default::default();
     macro_rules! bail {
-        ($settings: ident, $sub: ident) => {
-            let handle = runner.simulate()?;
+        ($producer: ident, $settings: ident, $sub: ident) => {
+            let handle = runner.simulate($producer)?;
             let mut sub_handle = handle.subscribe::<$sub<OutData>>($settings)?;
             std::thread::spawn(move || {
                 sub_handle.run();
@@ -138,15 +138,15 @@ where
     match stream_type {
         StreamType::Naive => {
             let settings = stream_settings.unwrap_naive();
-            bail!(settings, NaiveSubscriber);
+            bail!(p, settings, NaiveSubscriber);
         }
         StreamType::IO => {
             let settings = stream_settings.unwrap_io();
-            bail!(settings, IOSubscriber);
+            bail!(p, settings, IOSubscriber);
         }
         StreamType::Polars => {
             let settings = stream_settings.unwrap_polars();
-            bail!(settings, PolarsSubscriber);
+            bail!(p, settings, PolarsSubscriber);
         }
     };
     Ok(())

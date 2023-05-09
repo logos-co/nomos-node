@@ -114,7 +114,7 @@ mod tests {
         node::{dummy_streaming::DummyStreamingNode, Node, NodeId},
         output_processors::OutData,
         runner::SimulationRunner,
-        warding::SimulationState,
+        warding::SimulationState, streaming::StreamProducer,
     };
 
     use super::*;
@@ -201,7 +201,7 @@ mod tests {
         });
         let simulation_runner: SimulationRunner<(), DummyStreamingNode<()>, OutData> =
             SimulationRunner::new(network, nodes, simulation_settings);
-
-        simulation_runner.simulate().unwrap();
+        let p = StreamProducer::default();
+        simulation_runner.simulate(p).unwrap();
     }
 }

@@ -143,18 +143,18 @@ where
         }
     }
 
-    pub fn simulate(self) -> anyhow::Result<SimulationRunnerHandle<R>> {
+    pub fn simulate(self, producer: StreamProducer<R>) -> anyhow::Result<SimulationRunnerHandle<R>> {
         match self.runner_settings.clone() {
-            RunnerSettings::Sync => sync_runner::simulate(self),
-            RunnerSettings::Async { chunks } => async_runner::simulate(self, chunks),
+            RunnerSettings::Sync => sync_runner::simulate(self, producer),
+            RunnerSettings::Async { chunks } => async_runner::simulate(self, producer, chunks),
             RunnerSettings::Glauber {
                 maximum_iterations,
                 update_rate,
-            } => glauber_runner::simulate(self, update_rate, maximum_iterations),
+            } => glauber_runner::simulate(self, producer, update_rate, maximum_iterations),
             RunnerSettings::Layered {
                 rounds_gap,
                 distribution,
-            } => layered_runner::simulate(self, rounds_gap, distribution),
+            } => layered_runner::simulate(self, producer, rounds_gap, distribution),
         }
     }
 }

@@ -9,6 +9,7 @@ use std::sync::Arc;
 /// Simulate with sending the network state to any subscriber
 pub fn simulate<M, N: Node, R>(
     runner: SimulationRunner<M, N, R>,
+    p: StreamProducer<R>,
 ) -> anyhow::Result<SimulationRunnerHandle<R>>
 where
     M: Send + Sync + Clone + 'static,
@@ -25,7 +26,6 @@ where
     let nodes = runner.nodes;
 
     let (stop_tx, stop_rx) = bounded(1);
-    let p = StreamProducer::<R>::new();
     let p1 = p.clone();
     let handle = std::thread::spawn(move || {
         p.send(R::try_from(&state)?)?;
