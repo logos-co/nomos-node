@@ -141,7 +141,7 @@ impl Qc {
 }
 
 pub trait Overlay: Clone {
-    fn new() -> Self;
+    fn new(nodes: Vec<NodeId>) -> Self;
     fn root_committee(&self) -> Committee;
     fn rebuild(&mut self, timeout_qc: TimeoutQc);
     fn is_member_of_child_committee(&self, parent: NodeId, child: NodeId) -> bool;
@@ -149,7 +149,7 @@ pub trait Overlay: Clone {
     fn is_member_of_leaf_committee(&self, id: NodeId) -> bool;
     fn is_child_of_root_committee(&self, id: NodeId) -> bool;
     fn parent_committee(&self, id: NodeId) -> Committee;
-    fn leaf_committees(&self, id: NodeId) -> HashSet<Committee>;
+    fn leaf_committees(&self, id: NodeId) -> Vec<Committee>;
     fn leader(&self, view: View) -> NodeId;
     fn super_majority_threshold(&self, id: NodeId) -> usize;
     fn leader_super_majority_threshold(&self, id: NodeId) -> usize;

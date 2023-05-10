@@ -346,7 +346,7 @@ mod test {
     struct NoOverlay;
 
     impl Overlay for NoOverlay {
-        fn new() -> Self {
+        fn new(_nodes: Vec<NodeId>) -> Self {
             Self
         }
 
@@ -378,7 +378,7 @@ mod test {
             todo!()
         }
 
-        fn leaf_committees(&self, _id: NodeId) -> HashSet<Committee> {
+        fn leaf_committees(&self, _id: NodeId) -> Vec<Committee> {
             todo!()
         }
 
