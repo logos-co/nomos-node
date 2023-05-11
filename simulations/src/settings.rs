@@ -28,7 +28,7 @@ pub enum NodeSettings {
     Dummy,
 }
 
-#[derive(Default, Deserialize)]
+#[derive(Clone, Default, Debug, Deserialize)]
 pub struct SimulationSettings {
     #[serde(default)]
     pub wards: Vec<Ward>,

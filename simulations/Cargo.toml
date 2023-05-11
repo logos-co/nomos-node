@@ -13,6 +13,7 @@ crc32fast = "1.3"
 crossbeam = { version = "0.8.2", features = ["crossbeam-channel"] }
 fixed-slice-deque = "0.1.0-beta2"
 nomos-core = { path = "../nomos-core" }
+once_cell = "1.17"
 polars = { version = "0.27", features = ["serde", "object", "json", "csv-file", "parquet", "dtype-struct"] }
 rand = { version = "0.8", features = ["small_rng"] }
 rayon = "1.7"

@@ -110,12 +110,15 @@ where
     N::State: Serialize,
     R: for<'a> TryFrom<&'a SimulationState<N>, Error = anyhow::Error> + Send + Sync + 'static,
 {
-    pub fn new(network: Network<M>, nodes: Vec<N>, settings: SimulationSettings) -> Self {
+    pub fn new(network: Network<M>, nodes: Vec<N>, mut settings: SimulationSettings) -> Self {
         let seed = settings
             .seed
             .unwrap_or_else(|| rand::thread_rng().next_u64());
 
-        println!("Seed: {seed}");
+        settings.seed.get_or_insert_with(|| rand::thread_rng().next_u64());
+
+        // Store the 
+        crate::CONFIGURATION.set(settings.clone()).unwrap();
 
         let rng = SmallRng::seed_from_u64(seed);
         let nodes = Arc::new(RwLock::new(nodes));
