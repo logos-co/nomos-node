@@ -8,7 +8,7 @@ use std::sync::{Arc, RwLock};
 use std::time::Duration;
 
 // crates
-use crate::streaming::{Producer, StreamSettings, Subscriber};
+use crate::streaming::{StreamProducer, Subscriber, SubscriberHandle};
 use crossbeam::channel::Sender;
 use rand::rngs::SmallRng;
 use rand::{RngCore, SeedableRng};
@@ -21,12 +21,13 @@ use crate::node::Node;
 use crate::settings::{RunnerSettings, SimulationSettings};
 use crate::warding::{SimulationState, SimulationWard, Ward};
 
-pub struct SimulationRunnerHandle {
-    handle: std::thread::JoinHandle<anyhow::Result<()>>,
+pub struct SimulationRunnerHandle<R> {
+    producer: StreamProducer<R>,
     stop_tx: Sender<()>,
+    handle: std::thread::JoinHandle<anyhow::Result<()>>,
 }
 
-impl SimulationRunnerHandle {
+impl<R: Send + Sync + 'static> SimulationRunnerHandle<R> {
     pub fn stop_after(self, duration: Duration) -> anyhow::Result<()> {
         std::thread::sleep(duration);
         self.stop()
@@ -35,8 +36,20 @@ impl SimulationRunnerHandle {
     pub fn stop(self) -> anyhow::Result<()> {
         if !self.handle.is_finished() {
             self.stop_tx.send(())?;
+            self.producer.stop()?;
         }
         Ok(())
+    }
+
+    pub fn subscribe<S: Subscriber<Record = R>>(
+        &self,
+        settings: S::Settings,
+    ) -> anyhow::Result<SubscriberHandle<S>> {
+        self.producer.subscribe(settings)
+    }
+
+    pub fn join(self) -> anyhow::Result<()> {
+        self.handle.join().expect("Join simulation thread")
     }
 }
 
@@ -78,24 +91,30 @@ where
 
 /// Encapsulation solution for the simulations runner
 /// Holds the network state, the simulating nodes and the simulation settings.
-pub struct SimulationRunner<M, N>
+pub struct SimulationRunner<M, N, R>
 where
     N: Node,
 {
     inner: Arc<RwLock<SimulationRunnerInner<M>>>,
     nodes: Arc<RwLock<Vec<N>>>,
     runner_settings: RunnerSettings,
-    stream_settings: StreamSettings,
+    producer: StreamProducer<R>,
 }
 
-impl<M, N: Node> SimulationRunner<M, N>
+impl<M, N: Node, R> SimulationRunner<M, N, R>
 where
     M: Clone + Send + Sync + 'static,
     N: Send + Sync + 'static,
     N::Settings: Clone + Send,
     N::State: Serialize,
+    R: for<'a> TryFrom<&'a SimulationState<N>, Error = anyhow::Error> + Send + Sync + 'static,
 {
-    pub fn new(network: Network<M>, nodes: Vec<N>, settings: SimulationSettings) -> Self {
+    pub fn new(
+        network: Network<M>,
+        nodes: Vec<N>,
+        producer: StreamProducer<R>,
+        settings: SimulationSettings,
+    ) -> Self {
         let seed = settings
             .seed
             .unwrap_or_else(|| rand::thread_rng().next_u64());
@@ -109,7 +128,7 @@ where
             overlay_settings: _,
             node_settings: _,
             runner_settings,
-            stream_settings,
+            stream_settings: _,
             node_count: _,
             seed: _,
             views_count: _,
@@ -117,34 +136,29 @@ where
             network_settings: _,
         } = settings;
         Self {
+            runner_settings,
             inner: Arc::new(RwLock::new(SimulationRunnerInner {
                 network,
                 rng,
                 wards,
             })),
             nodes,
-            runner_settings,
-            stream_settings,
+            producer,
         }
     }
 
-    pub fn simulate<P: Producer>(self) -> anyhow::Result<SimulationRunnerHandle>
-    where
-        P::Subscriber: Send + Sync + 'static,
-        <P::Subscriber as Subscriber>::Record:
-            Send + Sync + 'static + for<'a> TryFrom<&'a SimulationState<N>, Error = anyhow::Error>,
-    {
+    pub fn simulate(self) -> anyhow::Result<SimulationRunnerHandle<R>> {
         match self.runner_settings.clone() {
-            RunnerSettings::Sync => sync_runner::simulate::<_, _, P>(self),
-            RunnerSettings::Async { chunks } => async_runner::simulate::<_, _, P>(self, chunks),
+            RunnerSettings::Sync => sync_runner::simulate(self),
+            RunnerSettings::Async { chunks } => async_runner::simulate(self, chunks),
             RunnerSettings::Glauber {
                 maximum_iterations,
                 update_rate,
-            } => glauber_runner::simulate::<_, _, P>(self, update_rate, maximum_iterations),
+            } => glauber_runner::simulate(self, update_rate, maximum_iterations),
             RunnerSettings::Layered {
                 rounds_gap,
                 distribution,
-            } => layered_runner::simulate::<_, _, P>(self, rounds_gap, distribution),
+            } => layered_runner::simulate(self, rounds_gap, distribution),
         }
     }
 }
