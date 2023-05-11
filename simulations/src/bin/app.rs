@@ -7,11 +7,12 @@ use simulations::streaming::polars::PolarsSubscriber;
 use std::collections::BTreeMap;
 use std::fs::File;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 // crates
 use clap::Parser;
 use crossbeam::channel;
+use parking_lot::RwLock;
 use rand::rngs::SmallRng;
 use rand::seq::SliceRandom;
 use rand::{Rng, SeedableRng};
