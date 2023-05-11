@@ -3,7 +3,6 @@ mod glauber_runner;
 mod layered_runner;
 mod sync_runner;
 
-use std::marker::PhantomData;
 // std
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
@@ -99,7 +98,7 @@ where
     inner: Arc<RwLock<SimulationRunnerInner<M>>>,
     nodes: Arc<RwLock<Vec<N>>>,
     runner_settings: RunnerSettings,
-    _record: PhantomData<R>,
+    producer: StreamProducer<R>,
 }
 
 impl<M, N: Node, R> SimulationRunner<M, N, R>
@@ -110,7 +109,12 @@ where
     N::State: Serialize,
     R: for<'a> TryFrom<&'a SimulationState<N>, Error = anyhow::Error> + Send + Sync + 'static,
 {
-    pub fn new(network: Network<M>, nodes: Vec<N>, settings: SimulationSettings) -> Self {
+    pub fn new(
+        network: Network<M>,
+        nodes: Vec<N>,
+        producer: StreamProducer<R>,
+        settings: SimulationSettings,
+    ) -> Self {
         let seed = settings
             .seed
             .unwrap_or_else(|| rand::thread_rng().next_u64());
@@ -139,22 +143,22 @@ where
                 wards,
             })),
             nodes,
-            _record: PhantomData,
+            producer,
         }
     }
 
-    pub fn simulate(self, producer: StreamProducer<R>) -> anyhow::Result<SimulationRunnerHandle<R>> {
+    pub fn simulate(self) -> anyhow::Result<SimulationRunnerHandle<R>> {
         match self.runner_settings.clone() {
-            RunnerSettings::Sync => sync_runner::simulate(self, producer),
-            RunnerSettings::Async { chunks } => async_runner::simulate(self, producer, chunks),
+            RunnerSettings::Sync => sync_runner::simulate(self),
+            RunnerSettings::Async { chunks } => async_runner::simulate(self, chunks),
             RunnerSettings::Glauber {
                 maximum_iterations,
                 update_rate,
-            } => glauber_runner::simulate(self, producer, update_rate, maximum_iterations),
+            } => glauber_runner::simulate(self, update_rate, maximum_iterations),
             RunnerSettings::Layered {
                 rounds_gap,
                 distribution,
-            } => layered_runner::simulate(self, producer, rounds_gap, distribution),
+            } => layered_runner::simulate(self, rounds_gap, distribution),
         }
     }
 }

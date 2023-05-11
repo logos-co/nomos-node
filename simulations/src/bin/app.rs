@@ -123,11 +123,11 @@ where
     N::State: Serialize,
 {
     let stream_settings = settings.stream_settings.clone();
-    let runner = SimulationRunner::<_, _, OutData>::new(network, nodes, settings);
-    let p = Default::default();
+    let runner =
+        SimulationRunner::<_, _, OutData>::new(network, nodes, Default::default(), settings);
     macro_rules! bail {
-        ($producer: ident, $settings: ident, $sub: ident) => {
-            let handle = runner.simulate($producer)?;
+        ($settings: ident, $sub: ident) => {
+            let handle = runner.simulate()?;
             let mut sub_handle = handle.subscribe::<$sub<OutData>>($settings)?;
             std::thread::spawn(move || {
                 sub_handle.run();
@@ -138,15 +138,15 @@ where
     match stream_type {
         StreamType::Naive => {
             let settings = stream_settings.unwrap_naive();
-            bail!(p, settings, NaiveSubscriber);
+            bail!(settings, NaiveSubscriber);
         }
         StreamType::IO => {
             let settings = stream_settings.unwrap_io();
-            bail!(p, settings, IOSubscriber);
+            bail!(settings, IOSubscriber);
         }
         StreamType::Polars => {
             let settings = stream_settings.unwrap_polars();
-            bail!(p, settings, PolarsSubscriber);
+            bail!(settings, PolarsSubscriber);
         }
     };
     Ok(())

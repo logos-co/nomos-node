@@ -41,7 +41,6 @@ use serde::Serialize;
 // internal
 use crate::node::{Node, NodeId};
 use crate::runner::SimulationRunner;
-use crate::streaming::StreamProducer;
 use crate::warding::SimulationState;
 
 use super::SimulationRunnerHandle;
@@ -49,7 +48,6 @@ use super::SimulationRunnerHandle;
 /// Simulate with sending the network state to any subscriber
 pub fn simulate<M, N: Node, R>(
     runner: SimulationRunner<M, N, R>,
-    p: StreamProducer<R>,
     gap: usize,
     distribution: Option<Vec<f32>>,
 ) -> anyhow::Result<SimulationRunnerHandle<R>>
@@ -74,7 +72,8 @@ where
     let inner_runner = runner.inner.clone();
     let nodes = runner.nodes;
     let (stop_tx, stop_rx) = bounded(1);
-    let p1 = p.clone();
+    let p = runner.producer.clone();
+    let p1 = runner.producer;
     let handle = std::thread::spawn(move || {
         loop {
             select! {
