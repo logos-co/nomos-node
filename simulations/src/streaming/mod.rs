@@ -198,7 +198,9 @@ where
 {
     pub fn send(&self, record: R) -> anyhow::Result<()> {
         let mut inner = self.inner.lock().unwrap();
-        if record.is_settings() {
+        // The settings record only be sent when we call SimulationRunner::new
+        // so we can only set the settings record once.
+        if record.is_settings() && inner.settings.is_none() {
             inner.settings = Some(Arc::new(record));
             return Ok(());
         }
