@@ -1,6 +1,9 @@
 // std
 use anyhow::Ok;
 use serde::Serialize;
+use simulations::streaming::io::IOSubscriber;
+use simulations::streaming::naive::NaiveSubscriber;
+use simulations::streaming::polars::PolarsSubscriber;
 use std::collections::BTreeMap;
 use std::fs::File;
 use std::path::{Path, PathBuf};
@@ -23,8 +26,7 @@ use simulations::streaming::StreamType;
 // internal
 use simulations::{
     node::carnot::CarnotNode, output_processors::OutData, runner::SimulationRunner,
-    settings::SimulationSettings, streaming::io::IOProducer, streaming::naive::NaiveProducer,
-    streaming::polars::PolarsProducer,
+    settings::SimulationSettings,
 };
 
 /// Main simulation wrapper
@@ -120,14 +122,31 @@ where
     N::Settings: Clone + Send,
     N::State: Serialize,
 {
-    let runner = SimulationRunner::new(network, nodes, settings);
+    let stream_settings = settings.stream_settings.clone();
+    let runner = SimulationRunner::<_, _, OutData>::new(network, nodes, settings);
+    let p = Default::default();
+    macro_rules! bail {
+        ($producer: ident, $settings: ident, $sub: ident) => {
+            let handle = runner.simulate($producer)?;
+            let mut sub_handle = handle.subscribe::<$sub<OutData>>($settings)?;
+            std::thread::spawn(move || {
+                sub_handle.run();
+            });
+            handle.join()?;
+        };
+    }
     match stream_type {
-        simulations::streaming::StreamType::Naive => runner.simulate::<NaiveProducer<OutData>>()?,
-        simulations::streaming::StreamType::Polars => {
-            runner.simulate::<PolarsProducer<OutData>>()?
+        StreamType::Naive => {
+            let settings = stream_settings.unwrap_naive();
+            bail!(p, settings, NaiveSubscriber);
         }
-        simulations::streaming::StreamType::IO => {
-            runner.simulate::<IOProducer<std::io::Stdout, OutData>>()?
+        StreamType::IO => {
+            let settings = stream_settings.unwrap_io();
+            bail!(p, settings, IOSubscriber);
+        }
+        StreamType::Polars => {
+            let settings = stream_settings.unwrap_polars();
+            bail!(p, settings, PolarsSubscriber);
         }
     };
     Ok(())

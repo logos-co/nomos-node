@@ -5,9 +5,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use super::{Producer, Receivers, StreamSettings, Subscriber};
-use arc_swap::ArcSwapOption;
-use crossbeam::channel::{bounded, unbounded, Sender};
+use super::{Receivers, StreamSettings, Subscriber};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -36,71 +34,6 @@ impl Default for NaiveSettings {
 }
 
 #[derive(Debug)]
-pub struct NaiveProducer<R> {
-    sender: Sender<R>,
-    stop_tx: Sender<()>,
-    recvs: ArcSwapOption<Receivers<R>>,
-    settings: NaiveSettings,
-}
-
-impl<R> Producer for NaiveProducer<R>
-where
-    R: Serialize + Send + Sync + 'static,
-{
-    type Settings = NaiveSettings;
-
-    type Subscriber = NaiveSubscriber<R>;
-
-    fn new(settings: StreamSettings) -> anyhow::Result<Self>
-    where
-        Self: Sized,
-    {
-        let settings = settings.try_into().expect("naive settings");
-        let (sender, recv) = unbounded();
-        let (stop_tx, stop_rx) = bounded(1);
-        Ok(Self {
-            sender,
-            recvs: ArcSwapOption::from(Some(Arc::new(Receivers { stop_rx, recv }))),
-            stop_tx,
-            settings,
-        })
-    }
-
-    fn send(&self, state: <Self::Subscriber as Subscriber>::Record) -> anyhow::Result<()> {
-        self.sender.send(state).map_err(From::from)
-    }
-
-    fn subscribe(&self) -> anyhow::Result<Self::Subscriber>
-    where
-        Self::Subscriber: Sized,
-    {
-        let recvs = self.recvs.load();
-        if recvs.is_none() {
-            return Err(anyhow::anyhow!("Producer has been subscribed"));
-        }
-
-        let mut opts = OpenOptions::new();
-        let recvs = self.recvs.swap(None).unwrap();
-        let this = NaiveSubscriber {
-            file: Arc::new(Mutex::new(
-                opts.truncate(true)
-                    .create(true)
-                    .read(true)
-                    .write(true)
-                    .open(&self.settings.path)?,
-            )),
-            recvs,
-        };
-        eprintln!("Subscribed to {}", self.settings.path.display());
-        Ok(this)
-    }
-
-    fn stop(&self) -> anyhow::Result<()> {
-        Ok(self.stop_tx.send(())?)
-    }
-}
-
-#[derive(Debug)]
 pub struct NaiveSubscriber<R> {
     file: Arc<Mutex<File>>,
     recvs: Arc<Receivers<R>>,
@@ -112,7 +45,36 @@ where
 {
     type Record = R;
 
-    fn next(&self) -> Option<anyhow::Result<Self::Record>> {
+    type Settings = NaiveSettings;
+
+    fn new(
+        record_recv: crossbeam::channel::Receiver<Arc<Self::Record>>,
+        stop_recv: crossbeam::channel::Receiver<()>,
+        settings: Self::Settings,
+    ) -> anyhow::Result<Self>
+    where
+        Self: Sized,
+    {
+        let mut opts = OpenOptions::new();
+        let recvs = Receivers {
+            stop_rx: stop_recv,
+            recv: record_recv,
+        };
+        let this = NaiveSubscriber {
+            file: Arc::new(Mutex::new(
+                opts.truncate(true)
+                    .create(true)
+                    .read(true)
+                    .write(true)
+                    .open(&settings.path)?,
+            )),
+            recvs: Arc::new(recvs),
+        };
+        eprintln!("Subscribed to {}", settings.path.display());
+        Ok(this)
+    }
+
+    fn next(&self) -> Option<anyhow::Result<Arc<Self::Record>>> {
         Some(self.recvs.recv.recv().map_err(From::from))
     }
 
@@ -131,7 +93,7 @@ where
         Ok(())
     }
 
-    fn sink(&self, state: Self::Record) -> anyhow::Result<()> {
+    fn sink(&self, state: Arc<Self::Record>) -> anyhow::Result<()> {
         let mut file = self.file.lock().expect("failed to lock file");
         serde_json::to_writer(&mut *file, &state)?;
         file.write_all(b",\n")?;
@@ -150,8 +112,9 @@ mod tests {
             Network,
         },
         node::{dummy_streaming::DummyStreamingNode, Node, NodeId},
+        output_processors::OutData,
         runner::SimulationRunner,
-        warding::SimulationState,
+        warding::SimulationState, streaming::StreamProducer,
     };
 
     use super::*;
@@ -236,11 +199,9 @@ mod tests {
                 })
                 .collect(),
         });
-        let simulation_runner: SimulationRunner<(), DummyStreamingNode<()>> =
+        let simulation_runner: SimulationRunner<(), DummyStreamingNode<()>, OutData> =
             SimulationRunner::new(network, nodes, simulation_settings);
-
-        simulation_runner
-            .simulate::<NaiveProducer<NaiveRecord>>()
-            .unwrap();
+        let p = StreamProducer::default();
+        simulation_runner.simulate(p).unwrap();
     }
 }

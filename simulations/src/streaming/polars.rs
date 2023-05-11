@@ -1,5 +1,3 @@
-use arc_swap::ArcSwapOption;
-use crossbeam::channel::{bounded, unbounded, Sender};
 use polars::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -10,7 +8,7 @@ use std::{
     sync::Mutex,
 };
 
-use super::{Producer, Receivers, StreamSettings, Subscriber};
+use super::{Receivers, StreamSettings};
 
 #[derive(Debug, Clone, Copy, Serialize)]
 pub enum PolarsFormat {
@@ -62,67 +60,8 @@ impl TryFrom<StreamSettings> for PolarsSettings {
 }
 
 #[derive(Debug)]
-pub struct PolarsProducer<R> {
-    sender: Sender<R>,
-    stop_tx: Sender<()>,
-    recvs: ArcSwapOption<Receivers<R>>,
-    settings: PolarsSettings,
-}
-
-impl<R> Producer for PolarsProducer<R>
-where
-    R: Serialize + Send + Sync + 'static,
-{
-    type Settings = PolarsSettings;
-
-    type Subscriber = PolarsSubscriber<R>;
-
-    fn new(settings: StreamSettings) -> anyhow::Result<Self>
-    where
-        Self: Sized,
-    {
-        let settings = settings.try_into().expect("polars settings");
-        let (sender, recv) = unbounded();
-        let (stop_tx, stop_rx) = bounded(1);
-        Ok(Self {
-            sender,
-            recvs: ArcSwapOption::from(Some(Arc::new(Receivers { stop_rx, recv }))),
-            stop_tx,
-            settings,
-        })
-    }
-
-    fn send(&self, state: <Self::Subscriber as Subscriber>::Record) -> anyhow::Result<()> {
-        self.sender.send(state).map_err(From::from)
-    }
-
-    fn subscribe(&self) -> anyhow::Result<Self::Subscriber>
-    where
-        Self::Subscriber: Sized,
-    {
-        let recvs = self.recvs.load();
-        if recvs.is_none() {
-            return Err(anyhow::anyhow!("Producer has been subscribed"));
-        }
-
-        let recvs = self.recvs.swap(None).unwrap();
-        let this = PolarsSubscriber {
-            data: Arc::new(Mutex::new(Vec::new())),
-            recvs,
-            path: self.settings.path.clone(),
-            format: self.settings.format,
-        };
-        Ok(this)
-    }
-
-    fn stop(&self) -> anyhow::Result<()> {
-        Ok(self.stop_tx.send(())?)
-    }
-}
-
-#[derive(Debug)]
 pub struct PolarsSubscriber<R> {
-    data: Arc<Mutex<Vec<R>>>,
+    data: Arc<Mutex<Vec<Arc<R>>>>,
     path: PathBuf,
     format: PolarsFormat,
     recvs: Arc<Receivers<R>>,
@@ -157,8 +96,30 @@ where
     R: Serialize + Send + Sync + 'static,
 {
     type Record = R;
+    type Settings = PolarsSettings;
 
-    fn next(&self) -> Option<anyhow::Result<Self::Record>> {
+    fn new(
+        record_recv: crossbeam::channel::Receiver<Arc<Self::Record>>,
+        stop_recv: crossbeam::channel::Receiver<()>,
+        settings: Self::Settings,
+    ) -> anyhow::Result<Self>
+    where
+        Self: Sized,
+    {
+        let recvs = Receivers {
+            stop_rx: stop_recv,
+            recv: record_recv,
+        };
+        let this = PolarsSubscriber {
+            data: Arc::new(Mutex::new(Vec::new())),
+            recvs: Arc::new(recvs),
+            path: settings.path.clone(),
+            format: settings.format,
+        };
+        Ok(this)
+    }
+
+    fn next(&self) -> Option<anyhow::Result<Arc<Self::Record>>> {
         Some(self.recvs.recv.recv().map_err(From::from))
     }
 
@@ -175,7 +136,7 @@ where
         }
     }
 
-    fn sink(&self, state: Self::Record) -> anyhow::Result<()> {
+    fn sink(&self, state: Arc<Self::Record>) -> anyhow::Result<()> {
         self.data
             .lock()
             .expect("failed to lock data in PolarsSubscriber")

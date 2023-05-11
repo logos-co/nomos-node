@@ -4,36 +4,33 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use super::{Producer, Receivers, StreamSettings, Subscriber};
-use arc_swap::ArcSwapOption;
-use crossbeam::channel::{bounded, unbounded, Sender};
+use super::{Receivers, StreamSettings, Subscriber};
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Default, Deserialize)]
+#[derive(Debug, Clone, Default, Deserialize)]
 pub struct IOStreamSettings {
     pub writer_type: WriteType,
 }
 
-#[derive(Debug, Default, Deserialize)]
+#[derive(Debug, Clone, Default, Deserialize)]
 pub enum WriteType {
     #[default]
     Stdout,
 }
 
 pub trait ToWriter<W: std::io::Write + Send + Sync + 'static> {
-    fn to_writer(&self) -> Result<W, String>;
+    fn to_writer(&self) -> anyhow::Result<W>;
 }
 
 impl<W: std::io::Write + Send + Sync + 'static> ToWriter<W> for WriteType {
-    fn to_writer(&self) -> Result<W, String> {
+    fn to_writer(&self) -> anyhow::Result<W> {
         match self {
             WriteType::Stdout => {
                 let stdout = Box::new(stdout());
                 let boxed_any = Box::new(stdout) as Box<dyn Any + Send + Sync>;
-                boxed_any
-                    .downcast::<W>()
-                    .map(|boxed| *boxed)
-                    .map_err(|_| "Writer type mismatch".to_string())
+                Ok(boxed_any.downcast::<W>().map(|boxed| *boxed).map_err(|_| {
+                    std::io::Error::new(std::io::ErrorKind::Other, "Writer type mismatch")
+                })?)
             }
         }
     }
@@ -51,81 +48,37 @@ impl TryFrom<StreamSettings> for IOStreamSettings {
 }
 
 #[derive(Debug)]
-pub struct IOProducer<W, R> {
-    sender: Sender<R>,
-    stop_tx: Sender<()>,
-    recvs: ArcSwapOption<Receivers<R>>,
-    writer: ArcSwapOption<Mutex<W>>,
-}
-
-impl<W, R> Producer for IOProducer<W, R>
-where
-    W: std::io::Write + Send + Sync + 'static,
-    R: Serialize + Send + Sync + 'static,
-{
-    type Settings = IOStreamSettings;
-
-    type Subscriber = IOSubscriber<W, R>;
-
-    fn new(settings: StreamSettings) -> anyhow::Result<Self>
-    where
-        Self: Sized,
-    {
-        let settings: IOStreamSettings = settings
-            .try_into()
-            .expect("io settings from stream settings");
-        let writer = settings
-            .writer_type
-            .to_writer()
-            .expect("writer from writer type");
-        let (sender, recv) = unbounded();
-        let (stop_tx, stop_rx) = bounded(1);
-        Ok(Self {
-            sender,
-            recvs: ArcSwapOption::from(Some(Arc::new(Receivers { stop_rx, recv }))),
-            stop_tx,
-            writer: ArcSwapOption::from(Some(Arc::new(Mutex::new(writer)))),
-        })
-    }
-
-    fn send(&self, state: <Self::Subscriber as Subscriber>::Record) -> anyhow::Result<()> {
-        self.sender.send(state).map_err(From::from)
-    }
-
-    fn subscribe(&self) -> anyhow::Result<Self::Subscriber>
-    where
-        Self::Subscriber: Sized,
-    {
-        let recvs = self.recvs.load();
-        if recvs.is_none() {
-            return Err(anyhow::anyhow!("Producer has been subscribed"));
-        }
-
-        let recvs = self.recvs.swap(None).unwrap();
-        let writer = self.writer.swap(None).unwrap();
-        let this = IOSubscriber { recvs, writer };
-        Ok(this)
-    }
-
-    fn stop(&self) -> anyhow::Result<()> {
-        Ok(self.stop_tx.send(())?)
-    }
-}
-
-#[derive(Debug)]
-pub struct IOSubscriber<W, R> {
+pub struct IOSubscriber<R, W = std::io::Stdout> {
     recvs: Arc<Receivers<R>>,
     writer: Arc<Mutex<W>>,
 }
 
-impl<W, R> Subscriber for IOSubscriber<W, R>
+impl<W, R> Subscriber for IOSubscriber<R, W>
 where
     W: std::io::Write + Send + Sync + 'static,
     R: Serialize + Send + Sync + 'static,
 {
     type Record = R;
+    type Settings = IOStreamSettings;
 
-    fn next(&self) -> Option<anyhow::Result<Self::Record>> {
+    fn new(
+        record_recv: crossbeam::channel::Receiver<Arc<Self::Record>>,
+        stop_recv: crossbeam::channel::Receiver<()>,
+        settings: Self::Settings,
+    ) -> anyhow::Result<Self>
+    where
+        Self: Sized,
+    {
+        Ok(Self {
+            recvs: Arc::new(Receivers {
+                stop_rx: stop_recv,
+                recv: record_recv,
+            }),
+            writer: Arc::new(Mutex::new(settings.writer_type.to_writer()?)),
+        })
+    }
+
+    fn next(&self) -> Option<anyhow::Result<Arc<Self::Record>>> {
         Some(self.recvs.recv.recv().map_err(From::from))
     }
 
@@ -144,7 +97,7 @@ where
         Ok(())
     }
 
-    fn sink(&self, state: Self::Record) -> anyhow::Result<()> {
+    fn sink(&self, state: Arc<Self::Record>) -> anyhow::Result<()> {
         serde_json::to_writer(
             &mut *self
                 .writer
@@ -167,8 +120,9 @@ mod tests {
             Network,
         },
         node::{dummy_streaming::DummyStreamingNode, Node, NodeId},
+        output_processors::OutData,
         runner::SimulationRunner,
-        warding::SimulationState,
+        warding::SimulationState, streaming::StreamProducer,
     };
 
     use super::*;
@@ -251,10 +205,11 @@ mod tests {
                 })
                 .collect(),
         });
-        let simulation_runner: SimulationRunner<(), DummyStreamingNode<()>> =
+        let simulation_runner: SimulationRunner<(), DummyStreamingNode<()>, OutData> =
             SimulationRunner::new(network, nodes, simulation_settings);
+        let p = StreamProducer::default();
         simulation_runner
-            .simulate::<IOProducer<std::io::Stdout, IORecord>>()
+            .simulate(p)
             .unwrap()
             .stop_after(Duration::from_millis(100))
             .unwrap();
