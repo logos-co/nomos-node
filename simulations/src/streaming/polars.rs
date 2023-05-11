@@ -1,3 +1,5 @@
+use super::{Receivers, StreamSettings};
+use crate::output_processors::Runtime;
 use polars::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -7,8 +9,6 @@ use std::{
     str::FromStr,
     sync::Mutex,
 };
-
-use super::{Receivers, StreamSettings};
 
 #[derive(Debug, Clone, Copy, Serialize)]
 pub enum PolarsFormat {
@@ -93,7 +93,7 @@ where
 
 impl<R> super::Subscriber for PolarsSubscriber<R>
 where
-    R: Serialize + Send + Sync + 'static,
+    R: crate::output_processors::Record + Serialize,
 {
     type Record = R;
     type Settings = PolarsSettings;
@@ -127,6 +127,8 @@ where
         loop {
             crossbeam::select! {
                 recv(self.recvs.stop_rx) -> _ => {
+                    // collect the run time meta
+                    self.sink(Arc::new(R::from(Runtime::load()?)))?;
                     return self.persist();
                 }
                 recv(self.recvs.recv) -> msg => {

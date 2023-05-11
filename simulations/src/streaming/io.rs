@@ -5,6 +5,7 @@ use std::{
 };
 
 use super::{Receivers, StreamSettings, Subscriber};
+use crate::output_processors::Runtime;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -56,7 +57,7 @@ pub struct IOSubscriber<R, W = std::io::Stdout> {
 impl<W, R> Subscriber for IOSubscriber<R, W>
 where
     W: std::io::Write + Send + Sync + 'static,
-    R: Serialize + Send + Sync + 'static,
+    R: crate::output_processors::Record + Serialize,
 {
     type Record = R;
     type Settings = IOStreamSettings;
@@ -86,6 +87,8 @@ where
         loop {
             crossbeam::select! {
                 recv(self.recvs.stop_rx) -> _ => {
+                    // collect the run time meta
+                    self.sink(Arc::new(R::from(Runtime::load()?)))?;
                     break;
                 }
                 recv(self.recvs.recv) -> msg => {

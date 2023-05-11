@@ -1,18 +1,51 @@
+use std::time::Duration;
+
+use chrono::{DateTime, Utc};
 use serde::Serialize;
 
 use crate::settings::SimulationSettings;
 use crate::warding::SimulationState;
 
-pub trait Record: From<SimulationSettings> + Send + Sync + 'static {
+pub trait Record: From<Runtime> + From<SimulationSettings> + Send + Sync + 'static {
     fn is_settings(&self) -> bool;
+
+    fn is_meta(&self) -> bool;
 }
 
 pub type SerializedNodeState = serde_json::Value;
 
 #[derive(Serialize)]
+pub struct Runtime {
+    start: DateTime<Utc>,
+    end: DateTime<Utc>,
+    elapsed: Duration,
+}
+
+impl Runtime {
+    pub(crate) fn load() -> anyhow::Result<Self> {
+        let elapsed = crate::START_TIME.elapsed();
+        let end = Utc::now();
+        Ok(Self {
+            start: end
+                .checked_sub_signed(chrono::Duration::from_std(elapsed)?)
+                .unwrap(),
+            end,
+            elapsed,
+        })
+    }
+}
+
+#[derive(Serialize)]
 pub enum OutData {
+    Runtime(Runtime),
     Settings(Box<SimulationSettings>),
     Data(SerializedNodeState),
+}
+
+impl From<Runtime> for OutData {
+    fn from(runtime: Runtime) -> Self {
+        Self::Runtime(runtime)
+    }
 }
 
 impl From<SimulationSettings> for OutData {
@@ -30,6 +63,10 @@ impl From<SerializedNodeState> for OutData {
 impl Record for OutData {
     fn is_settings(&self) -> bool {
         matches!(self, Self::Settings(_))
+    }
+
+    fn is_meta(&self) -> bool {
+        matches!(self, Self::Runtime(_))
     }
 }
 

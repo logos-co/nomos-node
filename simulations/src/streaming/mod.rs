@@ -253,7 +253,7 @@ where
 
 pub trait Subscriber {
     type Settings;
-    type Record: Serialize + Send + Sync + 'static;
+    type Record: crate::output_processors::Record + Serialize;
 
     fn new(
         record_recv: Receiver<Arc<Self::Record>>,

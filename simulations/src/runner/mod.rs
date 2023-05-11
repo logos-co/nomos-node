@@ -158,6 +158,9 @@ where
     }
 
     pub fn simulate(self) -> anyhow::Result<SimulationRunnerHandle<R>> {
+        // init the start time
+        let _ = *crate::START_TIME;
+
         match self.runner_settings.clone() {
             RunnerSettings::Sync => sync_runner::simulate(self),
             RunnerSettings::Async { chunks } => async_runner::simulate(self, chunks),
