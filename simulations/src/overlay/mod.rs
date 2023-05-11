@@ -5,7 +5,7 @@ pub mod tree;
 use std::collections::{BTreeSet, HashMap};
 // crates
 use rand::Rng;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 // internal
 use crate::node::{CommitteeId, NodeId};
 
@@ -97,7 +97,7 @@ pub enum SimulationOverlay {
     Tree(tree::TreeOverlay),
 }
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum OverlaySettings {
     Flat,
     Tree(TreeSettings),

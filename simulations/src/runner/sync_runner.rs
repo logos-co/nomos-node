@@ -2,21 +2,24 @@ use serde::Serialize;
 
 use super::{SimulationRunner, SimulationRunnerHandle};
 use crate::warding::SimulationState;
-use crate::{node::Node, streaming::StreamProducer};
+use crate::{node::Node, output_processors::Record};
 use crossbeam::channel::{bounded, select};
 use std::sync::Arc;
 
 /// Simulate with sending the network state to any subscriber
 pub fn simulate<M, N: Node, R>(
     runner: SimulationRunner<M, N, R>,
-    p: StreamProducer<R>,
 ) -> anyhow::Result<SimulationRunnerHandle<R>>
 where
     M: Send + Sync + Clone + 'static,
     N: Send + Sync + 'static,
     N::Settings: Clone + Send,
     N::State: Serialize,
-    R: for<'a> TryFrom<&'a SimulationState<N>, Error = anyhow::Error> + Send + Sync + 'static,
+    R: Record
+        + for<'a> TryFrom<&'a SimulationState<N>, Error = anyhow::Error>
+        + Send
+        + Sync
+        + 'static,
 {
     let state = SimulationState {
         nodes: Arc::clone(&runner.nodes),
@@ -26,7 +29,8 @@ where
     let nodes = runner.nodes;
 
     let (stop_tx, stop_rx) = bounded(1);
-    let p1 = p.clone();
+    let p = runner.producer.clone();
+    let p1 = runner.producer;
     let handle = std::thread::spawn(move || {
         p.send(R::try_from(&state)?)?;
         loop {
@@ -77,6 +81,7 @@ mod tests {
         overlay::{tree::TreeOverlay, Overlay, SimulationOverlay},
         runner::SimulationRunner,
         settings::SimulationSettings,
+        streaming::StreamProducer,
     };
     use crossbeam::channel;
     use rand::rngs::mock::StepRng;
@@ -138,8 +143,9 @@ mod tests {
         }));
         let nodes = init_dummy_nodes(&node_ids, &mut network, overlay_state);
 
+        let producer = StreamProducer::default();
         let runner: SimulationRunner<DummyMessage, DummyNode, OutData> =
-            SimulationRunner::new(network, nodes, settings);
+            SimulationRunner::new(network, nodes, producer, settings).unwrap();
         let mut nodes = runner.nodes.write().unwrap();
         runner.inner.write().unwrap().step(&mut nodes);
         drop(nodes);
@@ -185,7 +191,7 @@ mod tests {
         network.collect_messages();
 
         let runner: SimulationRunner<DummyMessage, DummyNode, OutData> =
-            SimulationRunner::new(network, nodes, settings);
+            SimulationRunner::new(network, nodes, Default::default(), settings).unwrap();
 
         let mut nodes = runner.nodes.write().unwrap();
         runner.inner.write().unwrap().step(&mut nodes);

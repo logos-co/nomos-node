@@ -1,6 +1,6 @@
 use crate::node::{Node, NodeId};
+use crate::output_processors::Record;
 use crate::runner::SimulationRunner;
-use crate::streaming::StreamProducer;
 use crate::warding::SimulationState;
 use crossbeam::channel::bounded;
 use crossbeam::select;
@@ -15,7 +15,6 @@ use super::SimulationRunnerHandle;
 /// Simulate with sending the network state to any subscriber
 pub fn simulate<M, N: Node, R>(
     runner: SimulationRunner<M, N, R>,
-    p: StreamProducer<R>,
     chunk_size: usize,
 ) -> anyhow::Result<SimulationRunnerHandle<R>>
 where
@@ -23,7 +22,11 @@ where
     N: Send + Sync + 'static,
     N::Settings: Clone + Send,
     N::State: Serialize,
-    R: for<'a> TryFrom<&'a SimulationState<N>, Error = anyhow::Error> + Send + Sync + 'static,
+    R: Record
+        + for<'a> TryFrom<&'a SimulationState<N>, Error = anyhow::Error>
+        + Send
+        + Sync
+        + 'static,
 {
     let simulation_state = SimulationState::<N> {
         nodes: Arc::clone(&runner.nodes),
@@ -40,7 +43,8 @@ where
     let inner_runner = runner.inner.clone();
     let nodes = runner.nodes;
     let (stop_tx, stop_rx) = bounded(1);
-    let p1 = p.clone();
+    let p = runner.producer.clone();
+    let p1 = runner.producer;
     let handle = std::thread::spawn(move || {
         loop {
             select! {

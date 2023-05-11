@@ -1,9 +1,9 @@
 use crate::node::Node;
 use crate::warding::{SimulationState, SimulationWard};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 /// StalledView. Track stalled nodes (e.g incoming queue is empty, the node doesn't write to other queues)
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct StalledViewWard {
     // the hash checksum
     consecutive_viewed_checkpoint: Option<u32>,

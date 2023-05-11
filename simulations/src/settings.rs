@@ -2,9 +2,9 @@ use crate::network::NetworkSettings;
 use crate::overlay::OverlaySettings;
 use crate::streaming::StreamSettings;
 use crate::warding::Ward;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Debug, Deserialize, Default)]
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
 pub enum RunnerSettings {
     #[default]
     Sync,
@@ -21,14 +21,14 @@ pub enum RunnerSettings {
     },
 }
 
-#[derive(Clone, Debug, Deserialize, Default)]
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
 pub enum NodeSettings {
     Carnot,
     #[default]
     Dummy,
 }
 
-#[derive(Clone, Default, Debug, Deserialize)]
+#[derive(Clone, Default, Debug, Serialize, Deserialize)]
 pub struct SimulationSettings {
     #[serde(default)]
     pub wards: Vec<Ward>,

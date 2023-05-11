@@ -1,16 +1,42 @@
 use serde::Serialize;
 
+use crate::settings::SimulationSettings;
 use crate::warding::SimulationState;
+
+pub trait Record: From<SimulationSettings> + Send + Sync + 'static {
+    fn is_settings(&self) -> bool;
+}
 
 pub type SerializedNodeState = serde_json::Value;
 
 #[derive(Serialize)]
-pub struct OutData(SerializedNodeState);
+pub enum OutData {
+    Settings(Box<SimulationSettings>),
+    Data(SerializedNodeState),
+}
+
+impl From<SimulationSettings> for OutData {
+    fn from(settings: SimulationSettings) -> Self {
+        Self::Settings(Box::new(settings))
+    }
+}
+
+impl From<SerializedNodeState> for OutData {
+    fn from(state: SerializedNodeState) -> Self {
+        Self::Data(state)
+    }
+}
+
+impl Record for OutData {
+    fn is_settings(&self) -> bool {
+        matches!(self, Self::Settings(_))
+    }
+}
 
 impl OutData {
     #[inline]
     pub const fn new(state: SerializedNodeState) -> Self {
-        Self(state)
+        Self::Data(state)
     }
 }
 

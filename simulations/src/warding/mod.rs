@@ -1,7 +1,7 @@
 // std
 use std::sync::{Arc, RwLock};
 // crates
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 // internal
 use crate::node::Node;
 
@@ -31,7 +31,7 @@ pub trait SimulationWard<N> {
 
 /// Ward dispatcher
 /// Enum to avoid Boxing (Box<dyn SimulationWard>) wards.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Ward {
     MaxView(ttf::MaxViewWard),

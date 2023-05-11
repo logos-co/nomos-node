@@ -7,6 +7,8 @@ use std::{
 use crossbeam::channel::{bounded, unbounded, Receiver, Sender};
 use serde::{Deserialize, Serialize};
 
+use crate::output_processors::Record;
+
 pub mod io;
 pub mod naive;
 pub mod polars;
@@ -49,7 +51,7 @@ impl<'de> serde::Deserialize<'de> for StreamType {
     }
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum StreamSettings {
     Naive(naive::NaiveSettings),
     IO(io::IOStreamSettings),
@@ -148,6 +150,9 @@ struct StreamProducerInner<R> {
 
     /// record_cache is used to cache messsages when there are no subscribers.
     record_cache: Vec<Arc<R>>,
+
+    /// A settings record, this record once set, will be sent to all subscribers as the first record.
+    settings: Option<Arc<R>>,
 }
 
 impl<R> Default for StreamProducerInner<R> {
@@ -155,6 +160,7 @@ impl<R> Default for StreamProducerInner<R> {
         Self {
             senders: Vec::new(),
             record_cache: Vec::new(),
+            settings: None,
         }
     }
 }
@@ -188,10 +194,14 @@ impl<R> StreamProducer<R> {
 
 impl<R> StreamProducer<R>
 where
-    R: Send + Sync + 'static,
+    R: Record + Send + Sync + 'static,
 {
     pub fn send(&self, record: R) -> anyhow::Result<()> {
         let mut inner = self.inner.lock().unwrap();
+        if record.is_settings() {
+            inner.settings = Some(Arc::new(record));
+            return Ok(());
+        }
         if inner.senders.is_empty() {
             inner.record_cache.push(Arc::new(record));
             Ok(())
@@ -213,6 +223,10 @@ where
         let (tx, rx) = unbounded();
         let (stop_tx, stop_rx) = bounded(1);
         let mut inner = self.inner.lock().unwrap();
+        // send the settings record to the subscriber as the first record
+        if let Some(settings) = &inner.settings {
+            tx.send(Arc::clone(settings))?;
+        }
         inner.senders.push(Senders {
             record_sender: tx,
             stop_sender: stop_tx.clone(),

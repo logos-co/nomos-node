@@ -1,6 +1,6 @@
 use crate::node::{Node, NodeId};
+use crate::output_processors::Record;
 use crate::runner::SimulationRunner;
-use crate::streaming::StreamProducer;
 use crate::warding::SimulationState;
 use crossbeam::channel::bounded;
 use crossbeam::select;
@@ -16,7 +16,6 @@ use super::SimulationRunnerHandle;
 /// [Glauber dynamics simulation](https://en.wikipedia.org/wiki/Glauber_dynamics)
 pub fn simulate<M, N: Node, R>(
     runner: SimulationRunner<M, N, R>,
-    p: StreamProducer<R>,
     update_rate: usize,
     maximum_iterations: usize,
 ) -> anyhow::Result<SimulationRunnerHandle<R>>
@@ -25,7 +24,11 @@ where
     N: Send + Sync + 'static,
     N::Settings: Clone + Send,
     N::State: Serialize,
-    R: for<'a> TryFrom<&'a SimulationState<N>, Error = anyhow::Error> + Send + Sync + 'static,
+    R: Record
+        + for<'a> TryFrom<&'a SimulationState<N>, Error = anyhow::Error>
+        + Send
+        + Sync
+        + 'static,
 {
     let simulation_state = SimulationState {
         nodes: Arc::clone(&runner.nodes),
@@ -39,7 +42,8 @@ where
             .collect();
     let iterations: Vec<_> = (0..maximum_iterations).collect();
     let (stop_tx, stop_rx) = bounded(1);
-    let p1 = p.clone();
+    let p = runner.producer.clone();
+    let p1 = runner.producer;
     let handle = std::thread::spawn(move || {
         let mut inner_runner: std::sync::RwLockWriteGuard<super::SimulationRunnerInner<M>> =
             inner_runner.write().expect("Locking runner");

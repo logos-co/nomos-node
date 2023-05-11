@@ -3,11 +3,11 @@ mod glauber_runner;
 mod layered_runner;
 mod sync_runner;
 
-use std::marker::PhantomData;
 // std
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
 
+use crate::output_processors::Record;
 // crates
 use crate::streaming::{StreamProducer, Subscriber, SubscriberHandle};
 use crossbeam::channel::Sender;
@@ -28,7 +28,7 @@ pub struct SimulationRunnerHandle<R> {
     handle: std::thread::JoinHandle<anyhow::Result<()>>,
 }
 
-impl<R: Send + Sync + 'static> SimulationRunnerHandle<R> {
+impl<R: Record> SimulationRunnerHandle<R> {
     pub fn stop_after(self, duration: Duration) -> anyhow::Result<()> {
         std::thread::sleep(duration);
         self.stop()
@@ -99,7 +99,7 @@ where
     inner: Arc<RwLock<SimulationRunnerInner<M>>>,
     nodes: Arc<RwLock<Vec<N>>>,
     runner_settings: RunnerSettings,
-    _record: PhantomData<R>,
+    producer: StreamProducer<R>,
 }
 
 impl<M, N: Node, R> SimulationRunner<M, N, R>
@@ -108,17 +108,28 @@ where
     N: Send + Sync + 'static,
     N::Settings: Clone + Send,
     N::State: Serialize,
-    R: for<'a> TryFrom<&'a SimulationState<N>, Error = anyhow::Error> + Send + Sync + 'static,
+    R: Record
+        + for<'a> TryFrom<&'a SimulationState<N>, Error = anyhow::Error>
+        + Send
+        + Sync
+        + 'static,
 {
-    pub fn new(network: Network<M>, nodes: Vec<N>, mut settings: SimulationSettings) -> Self {
+    pub fn new(
+        network: Network<M>,
+        nodes: Vec<N>,
+        producer: StreamProducer<R>,
+        mut settings: SimulationSettings,
+    ) -> anyhow::Result<Self> {
         let seed = settings
             .seed
             .unwrap_or_else(|| rand::thread_rng().next_u64());
 
-        settings.seed.get_or_insert_with(|| rand::thread_rng().next_u64());
+        settings
+            .seed
+            .get_or_insert_with(|| rand::thread_rng().next_u64());
 
-        // Store the 
-        crate::CONFIGURATION.set(settings.clone()).unwrap();
+        // Store the settings to the producer so that we can collect them later
+        producer.send(R::from(settings.clone()))?;
 
         let rng = SmallRng::seed_from_u64(seed);
         let nodes = Arc::new(RwLock::new(nodes));
@@ -134,7 +145,7 @@ where
             leaders_count: _,
             network_settings: _,
         } = settings;
-        Self {
+        Ok(Self {
             runner_settings,
             inner: Arc::new(RwLock::new(SimulationRunnerInner {
                 network,
@@ -142,22 +153,22 @@ where
                 wards,
             })),
             nodes,
-            _record: PhantomData,
-        }
+            producer,
+        })
     }
 
-    pub fn simulate(self, producer: StreamProducer<R>) -> anyhow::Result<SimulationRunnerHandle<R>> {
+    pub fn simulate(self) -> anyhow::Result<SimulationRunnerHandle<R>> {
         match self.runner_settings.clone() {
-            RunnerSettings::Sync => sync_runner::simulate(self, producer),
-            RunnerSettings::Async { chunks } => async_runner::simulate(self, producer, chunks),
+            RunnerSettings::Sync => sync_runner::simulate(self),
+            RunnerSettings::Async { chunks } => async_runner::simulate(self, chunks),
             RunnerSettings::Glauber {
                 maximum_iterations,
                 update_rate,
-            } => glauber_runner::simulate(self, producer, update_rate, maximum_iterations),
+            } => glauber_runner::simulate(self, update_rate, maximum_iterations),
             RunnerSettings::Layered {
                 rounds_gap,
                 distribution,
-            } => layered_runner::simulate(self, producer, rounds_gap, distribution),
+            } => layered_runner::simulate(self, rounds_gap, distribution),
         }
     }
 }
