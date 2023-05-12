@@ -284,15 +284,24 @@ where
         }
     }
 
-    async fn gather_new_view(&self, timeout_qc: TimeoutQc) -> (HashSet<NewView>, TimeoutQc) {
-        let votes_stream = self
-            .adapter
-            .new_view_stream(&self.committee, self.view())
-            .await;
-        match self.new_view_tally.tally(self.view(), votes_stream).await {
-            Ok((_, outcome)) => (outcome, timeout_qc),
-            Err(_e) => {
-                todo!("Handle tally error");
+    async fn gather_new_view(
+        &self,
+        committee: &Committee,
+        view: consensus_engine::View,
+    ) -> (HashSet<NewView>, TimeoutQc) {
+        match self.carnot.last_view_timeout_qc() {
+            Some(timeout_qc) if timeout_qc.view == view - 1 => {
+                let votes_stream = self.adapter.new_view_stream(committee, view).await;
+                match self.new_view_tally.tally(self.view(), votes_stream).await {
+                    Ok((_, outcome)) => (outcome, timeout_qc),
+                    Err(_e) => {
+                        todo!("Handle tally error");
+                    }
+                }
+            }
+            _ => {
+                futures::pending!();
+                unreachable!()
             }
         }
     }
@@ -330,7 +339,7 @@ where
             Some((qc, _, _)) = happy_path.next() => {
                 qc
             }
-            _votes = self.gather_new_views(&leader_committee, previous_view) => {
+            _votes = self.gather_new_view(&leader_committee, previous_view) => {
                 Qc::Aggregated(AggregateQc {
                     high_qc: self.carnot.high_qc(),
                     view: self.carnot.current_view(),
@@ -352,7 +361,7 @@ where
         let local_timeout = tokio::time::sleep(self.timeout);
         let root_timeout = self.gather_timeout().fuse();
         let get_previous_block_qc = self.get_previous_block_qc().fuse();
-        let gather_new_view_votes = self.gather_new_views(&self.committee, self.view()).fuse();
+        let gather_new_view_votes = self.gather_new_view(&self.committee, self.view()).fuse();
 
         tokio::pin!(proposal_stream);
         tokio::pin!(local_timeout);
