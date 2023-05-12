@@ -112,7 +112,14 @@ impl WakuAdapter {
     }
 
     async fn broadcast(&self, bytes: Box<[u8]>, topic: WakuContentTopic) {
-        let message = WakuMessage::new(bytes, topic, 1, chrono::Utc::now().timestamp() as usize);
+        let message = WakuMessage::new(
+            bytes,
+            topic,
+            1,
+            chrono::Utc::now().timestamp() as usize,
+            [],
+            false,
+        );
         if let Err((_, _e)) = self
             .network_relay
             .send(NetworkMsg::Process(WakuBackendMessage::Broadcast {
@@ -220,6 +227,8 @@ impl NetworkAdapter for WakuAdapter {
             content_topic,
             1,
             chrono::Utc::now().timestamp() as usize,
+            [],
+            false,
         );
         if let Err((_, _e)) = self
             .network_relay
