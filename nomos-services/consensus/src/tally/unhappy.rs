@@ -50,26 +50,24 @@ impl Tally for NewViewTally {
         view: View,
         mut vote_stream: S,
     ) -> Result<(Self::Qc, Self::Outcome), Self::TallyError> {
-        let mut approved = 0usize;
         let mut seen = HashSet::new();
         let mut outcome = HashSet::new();
         while let Some(vote) = vote_stream.next().await {
             // check vote view is valid
             if !vote.vote.view != view {
-                todo!("report invalid vote view");
+                continue;
             }
             // check for duplicated votes
             if seen.contains(&vote.voter) {
-                todo!("report double voted node");
+                continue;
             }
             // check for individual nodes votes
             if !self.settings.participating_nodes.contains(&vote.voter) {
-                todo!("report non-participating voted node");
+                continue;
             }
             seen.insert(vote.voter);
             outcome.insert(vote.vote.clone());
-            approved += 1;
-            if approved >= self.settings.threshold {
+            if seen.len() >= self.settings.threshold {
                 return Ok(((), outcome));
             }
         }
