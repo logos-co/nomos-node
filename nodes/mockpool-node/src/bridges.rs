@@ -244,6 +244,8 @@ async fn send_transaction(
                 WAKU_CARNOT_TX_CONTENT_TOPIC.clone(),
                 1,
                 chrono::Utc::now().timestamp() as usize,
+                [],
+                false,
             ),
             topic: Some(WAKU_CARNOT_PUB_SUB_TOPIC.clone()),
         }))
