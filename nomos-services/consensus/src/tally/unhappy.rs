@@ -57,10 +57,7 @@ impl Tally for NewViewTally {
             if !vote.vote.view != view {
                 continue;
             }
-            // check for duplicated votes
-            if seen.contains(&vote.voter) {
-                continue;
-            }
+
             // check for individual nodes votes
             if !self.settings.participating_nodes.contains(&vote.voter) {
                 continue;
