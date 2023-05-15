@@ -95,12 +95,7 @@ where
     }
 
     fn sink(&self, state: Arc<Self::Record>) -> anyhow::Result<()> {
-        serde_json::to_writer(
-            &mut *self
-                .writer
-                .lock(),
-            &state,
-        )?;
+        serde_json::to_writer(&mut *self.writer.lock(), &state)?;
         Ok(())
     }
 }

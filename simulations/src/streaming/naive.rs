@@ -1,12 +1,12 @@
+use super::{Receivers, StreamSettings, Subscriber};
+use parking_lot::Mutex;
+use serde::{Deserialize, Serialize};
 use std::{
     fs::{File, OpenOptions},
     io::Write,
     path::PathBuf,
     sync::Arc,
 };
-use parking_lot::Mutex;
-use super::{Receivers, StreamSettings, Subscriber};
-use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NaiveSettings {

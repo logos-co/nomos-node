@@ -1,5 +1,5 @@
-use polars::prelude::*;
 use parking_lot::Mutex;
+use polars::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::{
     fs::File,
@@ -134,9 +134,7 @@ where
     }
 
     fn sink(&self, state: Arc<Self::Record>) -> anyhow::Result<()> {
-        self.data
-            .lock()
-            .push(state);
+        self.data.lock().push(state);
         Ok(())
     }
 }
