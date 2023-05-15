@@ -1,9 +1,6 @@
 // std
 use anyhow::Ok;
 use serde::Serialize;
-use simulations::streaming::io::IOSubscriber;
-use simulations::streaming::naive::NaiveSubscriber;
-use simulations::streaming::polars::PolarsSubscriber;
 use std::collections::BTreeMap;
 use std::fs::File;
 use std::path::{Path, PathBuf};
@@ -22,7 +19,10 @@ use simulations::network::{InMemoryNetworkInterface, Network};
 use simulations::node::dummy::DummyNode;
 use simulations::node::{Node, NodeId, OverlayState, ViewOverlay};
 use simulations::overlay::{create_overlay, Overlay, SimulationOverlay};
-use simulations::streaming::StreamType;
+use simulations::streaming::{
+    io::IOSubscriber, naive::NaiveSubscriber, polars::PolarsSubscriber,
+    runtime_subscriber::RuntimeSubscriber, settings_subscriber::SettingsSubscriber, StreamType,
+};
 // internal
 use simulations::{
     node::carnot::CarnotNode, output_processors::OutData, runner::SimulationRunner,
@@ -128,13 +128,28 @@ where
     macro_rules! bail {
         ($settings: ident, $sub: ident) => {
             let handle = runner.simulate()?;
-            let mut sub_handle = handle.subscribe::<$sub<OutData>>($settings)?;
-            std::thread::spawn(move || {
-                sub_handle.run();
+            let mut data_subscriber_handle = handle.subscribe::<$sub<OutData>>($settings)?;
+            let mut runtime_subscriber_handle =
+                handle.subscribe::<RuntimeSubscriber<OutData>>(Default::default())?;
+            let mut settings_subscriber_handle =
+                handle.subscribe::<SettingsSubscriber<OutData>>(Default::default())?;
+            std::thread::scope(|s| {
+                s.spawn(move || {
+                    data_subscriber_handle.run();
+                });
+
+                s.spawn(move || {
+                    runtime_subscriber_handle.run();
+                });
+
+                s.spawn(move || {
+                    settings_subscriber_handle.run();
+                });
             });
             handle.join()?;
         };
     }
+
     match stream_type {
         StreamType::Naive => {
             let settings = stream_settings.unwrap_naive();

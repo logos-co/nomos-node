@@ -1,5 +1,5 @@
 use super::{Receivers, StreamSettings};
-use crate::output_processors::Runtime;
+use crate::output_processors::{RecordType, Runtime};
 use polars::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -144,6 +144,10 @@ where
             .expect("failed to lock data in PolarsSubscriber")
             .push(state);
         Ok(())
+    }
+
+    fn subscribe_data_type() -> RecordType {
+        RecordType::Data
     }
 }
 

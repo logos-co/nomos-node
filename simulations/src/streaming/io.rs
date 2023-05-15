@@ -5,7 +5,7 @@ use std::{
 };
 
 use super::{Receivers, StreamSettings, Subscriber};
-use crate::output_processors::Runtime;
+use crate::output_processors::{RecordType, Runtime};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -109,6 +109,10 @@ where
             &state,
         )?;
         Ok(())
+    }
+
+    fn subscribe_data_type() -> RecordType {
+        RecordType::Data
     }
 }
 

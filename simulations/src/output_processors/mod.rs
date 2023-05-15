@@ -6,10 +6,27 @@ use serde::Serialize;
 use crate::settings::SimulationSettings;
 use crate::warding::SimulationState;
 
-pub trait Record: From<Runtime> + From<SimulationSettings> + Send + Sync + 'static {
-    fn is_settings(&self) -> bool;
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum RecordType {
+    Meta,
+    Settings,
+    Data,
+}
 
-    fn is_meta(&self) -> bool;
+pub trait Record: From<Runtime> + From<SimulationSettings> + Send + Sync + 'static {
+    fn record_type(&self) -> RecordType;
+
+    fn is_settings(&self) -> bool {
+        self.record_type() == RecordType::Settings
+    }
+
+    fn is_meta(&self) -> bool {
+        self.record_type() == RecordType::Meta
+    }
+
+    fn is_data(&self) -> bool {
+        self.record_type() == RecordType::Data
+    }
 }
 
 pub type SerializedNodeState = serde_json::Value;
@@ -36,6 +53,7 @@ impl Runtime {
 }
 
 #[derive(Serialize)]
+#[serde(untagged)]
 pub enum OutData {
     Runtime(Runtime),
     Settings(Box<SimulationSettings>),
@@ -61,12 +79,12 @@ impl From<SerializedNodeState> for OutData {
 }
 
 impl Record for OutData {
-    fn is_settings(&self) -> bool {
-        matches!(self, Self::Settings(_))
-    }
-
-    fn is_meta(&self) -> bool {
-        matches!(self, Self::Runtime(_))
+    fn record_type(&self) -> RecordType {
+        match self {
+            Self::Runtime(_) => RecordType::Meta,
+            Self::Settings(_) => RecordType::Settings,
+            Self::Data(_) => RecordType::Data,
+        }
     }
 }
 

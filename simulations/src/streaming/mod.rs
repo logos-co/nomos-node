@@ -7,11 +7,19 @@ use std::{
 use crossbeam::channel::{bounded, unbounded, Receiver, Sender};
 use serde::{Deserialize, Serialize};
 
-use crate::output_processors::Record;
+use crate::output_processors::{Record, RecordType, Runtime};
 
 pub mod io;
 pub mod naive;
 pub mod polars;
+pub mod runtime_subscriber;
+pub mod settings_subscriber;
+
+pub enum SubscriberType {
+    Meta,
+    Settings,
+    Data,
+}
 
 #[derive(Debug)]
 struct Receivers<R> {
@@ -139,6 +147,7 @@ where
 
 #[derive(Debug)]
 struct Senders<R> {
+    record_ty: RecordType,
     record_sender: Sender<Arc<R>>,
     stop_sender: Sender<()>,
 }
@@ -150,9 +159,6 @@ struct StreamProducerInner<R> {
 
     /// record_cache is used to cache messsages when there are no subscribers.
     record_cache: Vec<Arc<R>>,
-
-    /// A settings record, this record once set, will be sent to all subscribers as the first record.
-    settings: Option<Arc<R>>,
 }
 
 impl<R> Default for StreamProducerInner<R> {
@@ -160,7 +166,6 @@ impl<R> Default for StreamProducerInner<R> {
         Self {
             senders: Vec::new(),
             record_cache: Vec::new(),
-            settings: None,
         }
     }
 }
@@ -198,22 +203,23 @@ where
 {
     pub fn send(&self, record: R) -> anyhow::Result<()> {
         let mut inner = self.inner.lock().unwrap();
-        // The settings record only be sent when we call SimulationRunner::new
-        // so we can only set the settings record once.
-        if record.is_settings() && inner.settings.is_none() {
-            inner.settings = Some(Arc::new(record));
-            return Ok(());
-        }
         if inner.senders.is_empty() {
             inner.record_cache.push(Arc::new(record));
             Ok(())
         } else {
             let record = Arc::new(record);
+            // cache record for new subscriber
+            inner.record_cache.push(record.clone());
+
             // if a send fails, then it means the corresponding subscriber is dropped,
             // we just remove the sender from the list of senders.
-            inner
-                .senders
-                .retain(|tx| tx.record_sender.send(record.clone()).is_ok());
+            inner.senders.retain(|tx| {
+                if tx.record_ty != record.record_type() {
+                    true
+                } else {
+                    tx.record_sender.send(Arc::clone(&record)).is_ok()
+                }
+            });
             Ok(())
         }
     }
@@ -225,13 +231,18 @@ where
         let (tx, rx) = unbounded();
         let (stop_tx, stop_rx) = bounded(1);
         let mut inner = self.inner.lock().unwrap();
-        // send the settings record to the subscriber as the first record
-        if let Some(settings) = &inner.settings {
-            tx.send(Arc::clone(settings))?;
+
+        // send all previous records to the new subscriber
+        for record in inner.record_cache.iter() {
+            if S::subscribe_data_type() == record.record_type() {
+                tx.send(Arc::clone(record))?;
+            }
         }
+
         inner.senders.push(Senders {
             record_sender: tx,
             stop_sender: stop_tx.clone(),
+            record_ty: S::subscribe_data_type(),
         });
         Ok(SubscriberHandle {
             handle: None,
@@ -241,7 +252,19 @@ where
     }
 
     pub fn stop(self) -> anyhow::Result<()> {
+        let meta_record = Arc::new(R::from(Runtime::load()?));
         let inner = self.inner.lock().unwrap();
+
+        // send runtime record to runtime subscribers
+        inner.senders.iter().for_each(|tx| {
+            if tx.record_ty == meta_record.record_type() {
+                if let Err(e) = tx.record_sender.send(Arc::clone(&meta_record)) {
+                    eprintln!("Error sending meta record: {e}");
+                }
+            }
+        });
+
+        // send stop signal to all subscribers
         inner.senders.iter().for_each(|tx| {
             if let Err(e) = tx.stop_sender.send(()) {
                 eprintln!("Error stopping subscriber: {e}");
@@ -276,4 +299,6 @@ pub trait Subscriber {
     }
 
     fn sink(&self, state: Arc<Self::Record>) -> anyhow::Result<()>;
+
+    fn subscribe_data_type() -> RecordType;
 }

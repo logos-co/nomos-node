@@ -1,4 +1,4 @@
-use super::{Receivers, StreamSettings, Subscriber};
+use super::{Receivers, Subscriber};
 use crate::output_processors::{RecordType, Runtime};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -9,43 +9,32 @@ use std::{
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct NaiveSettings {
+pub struct SettingsSubscriberSettings {
     pub path: PathBuf,
 }
 
-impl TryFrom<StreamSettings> for NaiveSettings {
-    type Error = String;
-
-    fn try_from(settings: StreamSettings) -> Result<Self, Self::Error> {
-        match settings {
-            StreamSettings::Naive(settings) => Ok(settings),
-            _ => Err("naive settings can't be created".into()),
-        }
-    }
-}
-
-impl Default for NaiveSettings {
+impl Default for SettingsSubscriberSettings {
     fn default() -> Self {
         let mut tmp = std::env::temp_dir();
         tmp.push("simulation");
-        tmp.set_extension("data");
+        tmp.set_extension("conf");
         Self { path: tmp }
     }
 }
 
 #[derive(Debug)]
-pub struct NaiveSubscriber<R> {
+pub struct SettingsSubscriber<R> {
     file: Arc<Mutex<File>>,
     recvs: Arc<Receivers<R>>,
 }
 
-impl<R> Subscriber for NaiveSubscriber<R>
+impl<R> Subscriber for SettingsSubscriber<R>
 where
     R: crate::output_processors::Record + Serialize,
 {
     type Record = R;
 
-    type Settings = NaiveSettings;
+    type Settings = SettingsSubscriberSettings;
 
     fn new(
         record_recv: crossbeam::channel::Receiver<Arc<Self::Record>>,
@@ -60,7 +49,7 @@ where
             stop_rx: stop_recv,
             recv: record_recv,
         };
-        let this = NaiveSubscriber {
+        let this = SettingsSubscriber {
             file: Arc::new(Mutex::new(
                 opts.truncate(true)
                     .create(true)
@@ -125,11 +114,11 @@ mod tests {
 
     use super::*;
     #[derive(Debug, Clone, Serialize)]
-    struct NaiveRecord {
+    struct SettingsRecord {
         states: HashMap<NodeId, usize>,
     }
 
-    impl TryFrom<&SimulationState<DummyStreamingNode<()>>> for NaiveRecord {
+    impl TryFrom<&SimulationState<DummyStreamingNode<()>>> for SettingsRecord {
         type Error = anyhow::Error;
 
         fn try_from(value: &SimulationState<DummyStreamingNode<()>>) -> Result<Self, Self::Error> {
