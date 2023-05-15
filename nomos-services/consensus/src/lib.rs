@@ -7,6 +7,7 @@
 pub mod network;
 pub mod overlay;
 mod tally;
+mod view_cancel;
 
 // std
 use std::collections::HashSet;
