@@ -50,30 +50,22 @@ impl Tally for CarnotTally {
         view: View,
         mut vote_stream: S,
     ) -> Result<(Self::Qc, Self::Outcome), Self::TallyError> {
-        let mut approved = 0usize;
         let mut seen = HashSet::new();
         let mut outcome = HashSet::new();
         while let Some(vote) = vote_stream.next().await {
             // check vote view is valid
             if !vote.vote.view != view {
-                return Err(CarnotTallyError::InvalidVote("Invalid view".to_string()));
+                continue;
             }
-            // check for duplicated votes
-            if seen.contains(&vote.voter) {
-                return Err(CarnotTallyError::InvalidVote(
-                    "Double voted node".to_string(),
-                ));
-            }
+
             // check for individual nodes votes
             if !self.settings.participating_nodes.contains(&vote.voter) {
-                return Err(CarnotTallyError::InvalidVote(
-                    "Non-participating node".to_string(),
-                ));
+                continue;
             }
+
             seen.insert(vote.voter);
             outcome.insert(vote.vote.clone());
-            approved += 1;
-            if approved >= self.settings.threshold {
+            if seen.len() >= self.settings.threshold {
                 return Ok((
                     Qc::Standard(StandardQc {
                         view: vote.vote.view,

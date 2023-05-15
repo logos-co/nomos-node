@@ -20,7 +20,8 @@ use serde::{de::DeserializeOwned, Serialize};
 // internal
 use crate::network::messages::{NewViewMsg, ProposalChunkMsg, TimeoutMsg, TimeoutQcMsg, VoteMsg};
 use crate::network::NetworkAdapter;
-use crate::tally::CarnotTally;
+use crate::tally::happy::CarnotTally;
+use crate::tally::unhappy::NewViewTally;
 use consensus_engine::{
     AggregateQc, Carnot, Committee, NewView, Overlay, Payload, Qc, StandardQc, Timeout, TimeoutQc,
     Vote,
@@ -49,36 +50,44 @@ pub type NodeId = PublicKey;
 pub type Seed = [u8; 32];
 
 #[derive(Debug)]
-pub struct CarnotSettings<Fountain: FountainCode, VoteTally: Tally> {
+pub struct CarnotSettings<Fountain: FountainCode, VoteTally: Tally, NewViewTally: Tally> {
     private_key: [u8; 32],
     fountain_settings: Fountain::Settings,
     tally_settings: VoteTally::Settings,
+    new_view_tally_settings: NewViewTally::Settings,
     nodes: Vec<NodeId>,
 }
 
-impl<Fountain: FountainCode, VoteTally: Tally> Clone for CarnotSettings<Fountain, VoteTally> {
+impl<Fountain: FountainCode, VoteTally: Tally, NewViewTally: Tally> Clone
+    for CarnotSettings<Fountain, VoteTally, NewViewTally>
+{
     fn clone(&self) -> Self {
         Self {
             private_key: self.private_key,
             fountain_settings: self.fountain_settings.clone(),
             tally_settings: self.tally_settings.clone(),
+            new_view_tally_settings: self.new_view_tally_settings.clone(),
             nodes: self.nodes.clone(),
         }
     }
 }
 
-impl<Fountain: FountainCode, VoteTally: Tally> CarnotSettings<Fountain, VoteTally> {
+impl<Fountain: FountainCode, VoteTally: Tally, NewViewTally: Tally>
+    CarnotSettings<Fountain, VoteTally, NewViewTally>
+{
     #[inline]
     pub const fn new(
         private_key: [u8; 32],
         fountain_settings: Fountain::Settings,
         tally_settings: VoteTally::Settings,
+        new_view_tally_settings: NewViewTally::Settings,
         nodes: Vec<NodeId>,
     ) -> Self {
         Self {
             private_key,
             fountain_settings,
             tally_settings,
+            new_view_tally_settings,
             nodes,
         }
     }
@@ -115,7 +124,7 @@ where
     O: Overlay,
 {
     const SERVICE_ID: ServiceId = "Carnot";
-    type Settings = CarnotSettings<F, CarnotTally>;
+    type Settings = CarnotSettings<F, CarnotTally, NewViewTally>;
     type State = NoState<Self::Settings>;
     type StateOperator = NoOperator<Self::State>;
     type Message = NoMessage;
@@ -164,6 +173,7 @@ where
             fountain_settings,
             tally_settings,
             nodes,
+            new_view_tally_settings,
         } = self.service_state.settings_reader.get_updated_settings();
 
         let network_adapter = A::new(network_relay).await;
@@ -172,6 +182,8 @@ where
 
         let fountain = F::new(fountain_settings);
         let tally = CarnotTally::new(tally_settings);
+        let new_view_tally = NewViewTally::new(new_view_tally_settings);
+        // let leadership = Leadership::<P::Tx>::new(private_key, mempool_relay.clone());
         let overlay = O::new(nodes);
 
         let genesis = consensus_engine::Block {
@@ -188,6 +200,7 @@ where
                 committee: Committee::new(),
                 adapter: network_adapter.clone(),
                 tally: tally.clone(),
+                new_view_tally: new_view_tally.clone(),
                 carnot,
                 fountain: fountain.clone(),
                 tip: tip.clone(),
@@ -212,6 +225,7 @@ pub struct View<A, F, O: Overlay, Tx: Transaction> {
     adapter: A,
     fountain: F,
     tally: CarnotTally,
+    new_view_tally: NewViewTally,
     carnot: Carnot<O>,
     tip: Tip,
     mempool: OutboundRelay<MempoolMsg<Tx>>,
@@ -270,33 +284,20 @@ where
         }
     }
 
-    async fn gather_new_views(
+    async fn gather_new_view(
         &self,
         committee: &Committee,
         view: consensus_engine::View,
     ) -> (HashSet<NewView>, TimeoutQc) {
         match self.carnot.last_view_timeout_qc() {
-            // only try to collect new views if we have a timeout qc from the previous view
             Some(timeout_qc) if timeout_qc.view == view - 1 => {
-                // TODO: Maybe implement tally for unhappy path?
-                let mut seen = HashSet::new();
-                let mut votes = HashSet::new();
-                let mut stream = self
-                    .adapter
-                    .new_view_stream(committee, timeout_qc.view + 1)
-                    .await;
-                while let Some(msg) = StreamExt::next(&mut stream).await {
-                    if seen.contains(&msg.voter) {
-                        continue;
-                    }
-                    seen.insert(msg.voter);
-                    votes.insert(msg.vote);
-                    // TODO: when building this for the leader we should use overlay.leader_supermajority_threshold
-                    if votes.len() >= self.carnot.super_majority_threshold() {
-                        break;
+                let votes_stream = self.adapter.new_view_stream(committee, view).await;
+                match self.new_view_tally.tally(self.view(), votes_stream).await {
+                    Ok((_, outcome)) => (outcome, timeout_qc),
+                    Err(_e) => {
+                        todo!("Handle tally error");
                     }
                 }
-                (votes, timeout_qc)
             }
             _ => {
                 futures::pending!();
@@ -338,7 +339,7 @@ where
             Some((qc, _, _)) = happy_path.next() => {
                 qc
             }
-            _votes = self.gather_new_views(&leader_committee, previous_view) => {
+            _votes = self.gather_new_view(&leader_committee, previous_view) => {
                 Qc::Aggregated(AggregateQc {
                     high_qc: self.carnot.high_qc(),
                     view: self.carnot.current_view(),
@@ -360,7 +361,7 @@ where
         let local_timeout = tokio::time::sleep(self.timeout);
         let root_timeout = self.gather_timeout().fuse();
         let get_previous_block_qc = self.get_previous_block_qc().fuse();
-        let gather_new_view_votes = self.gather_new_views(&self.committee, self.view()).fuse();
+        let gather_new_view_votes = self.gather_new_view(&self.committee, self.view()).fuse();
 
         tokio::pin!(proposal_stream);
         tokio::pin!(local_timeout);
