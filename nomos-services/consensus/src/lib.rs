@@ -23,6 +23,7 @@ use serde::{de::DeserializeOwned, Serialize};
 use crate::network::messages::{NewViewMsg, ProposalChunkMsg, TimeoutMsg, TimeoutQcMsg, VoteMsg};
 use crate::network::NetworkAdapter;
 use crate::tally::{happy::CarnotTally, unhappy::NewViewTally, CarnotTallySettings};
+use crate::view_cancel::ViewCancelCache;
 use consensus_engine::{
     AggregateQc, Carnot, Committee, NewView, Overlay, Payload, Qc, StandardQc, Timeout, TimeoutQc,
     Vote,
@@ -190,30 +191,39 @@ where
             participating_nodes: carnot.root_committee(),
         };
         let leader_tally_settings = &_leader_tally_settings;
+
+        let mut view_cancel_cache = ViewCancelCache::new();
+
         let events: FuturesUnordered<Pin<Box<dyn Future<Output = Event<P::Tx>> + Send>>> =
             FuturesUnordered::new();
         let genesis_block = carnot.genesis_block();
-        events.push(Box::pin(Self::gather_block(
-            adapter,
+        events.push(Box::pin(view_cancel_cache.cancelable_event_future(
             genesis_block.view + 1,
+            Self::gather_block(adapter, genesis_block.view + 1),
         )));
-        events.push(Box::pin(Self::gather_votes(
-            adapter,
-            self_committee,
-            genesis_block.clone(),
-            tally_settings.clone(),
+        events.push(Box::pin(view_cancel_cache.cancelable_event_future(
+            genesis_block.view,
+            Self::gather_votes(
+                adapter,
+                self_committee,
+                genesis_block.clone(),
+                tally_settings.clone(),
+            ),
         )));
         if carnot.is_leader_for_view(genesis_block.view + 1) {
-            events.push(Box::pin(async move {
-                let Event::Approve { qc, .. } = Self::gather_votes(
+            events.push(Box::pin(view_cancel_cache.cancelable_event_future(
+                genesis_block.view + 1,
+                async move {
+                    let Event::Approve { qc, .. } = Self::gather_votes(
                     adapter,
                     leader_committee,
                     genesis_block,
                     leader_tally_settings.clone(),
                 )
                 .await else { unreachable!() };
-                Event::ProposeBlock { qc }
-            }));
+                    Event::ProposeBlock { qc }
+                },
+            )));
         }
 
         tokio::pin!(events);
@@ -229,36 +239,45 @@ where
                         Ok(new_state) => {
                             let new_view = new_state.current_view();
                             if new_view != carnot.current_view() {
-                                events.push(Box::pin(Self::gather_votes(
-                                    adapter,
-                                    self_committee,
-                                    block.clone(),
-                                    tally_settings.clone(),
+                                events.push(Box::pin(view_cancel_cache.cancelable_event_future(
+                                    new_view,
+                                    Self::gather_votes(
+                                        adapter,
+                                        self_committee,
+                                        block.clone(),
+                                        tally_settings.clone(),
+                                    ),
                                 )));
                             } else {
-                                events.push(Box::pin(async move {
-                                    if let Some(block) = stream.next().await {
-                                        Event::Proposal { block, stream }
-                                    } else {
-                                        Event::None
-                                    }
-                                }));
+                                events.push(Box::pin(view_cancel_cache.cancelable_event_future(
+                                    carnot.current_view(),
+                                    async move {
+                                        if let Some(block) = stream.next().await {
+                                            Event::Proposal { block, stream }
+                                        } else {
+                                            Event::None
+                                        }
+                                    },
+                                )));
                             }
                             carnot = new_state;
                         }
                         Err(_) => tracing::debug!("invalid block {:?}", block),
                     }
                     if carnot.is_leader_for_view(block.view + 1) {
-                        events.push(Box::pin(async move {
-                            let Event::Approve { qc, .. } = Self::gather_votes(
+                        events.push(Box::pin(view_cancel_cache.cancelable_event_future(
+                            block.view + 1,
+                            async move {
+                                let Event::Approve { qc, .. } = Self::gather_votes(
                                 adapter,
                                 leader_committee,
                                 block,
                                 leader_tally_settings.clone(),
                             )
                             .await else { unreachable!() };
-                            Event::ProposeBlock { qc }
-                        }));
+                                Event::ProposeBlock { qc }
+                            },
+                        )));
                     }
                 }
                 Event::Approve { block, .. } => {
@@ -284,31 +303,37 @@ where
                     let next_view = timeout_qc.view + 2;
                     if carnot.is_leader_for_view(next_view) {
                         let high_qc = carnot.high_qc();
-                        events.push(Box::pin(async move {
-                            let _votes = Self::gather_new_views(
-                                adapter,
-                                leader_committee,
-                                timeout_qc,
-                                leader_tally_settings.clone(),
-                            )
-                            .await;
-                            Event::ProposeBlock {
-                                qc: Qc::Aggregated(AggregateQc {
-                                    high_qc,
-                                    view: next_view,
-                                }),
-                            }
-                        }));
+                        events.push(Box::pin(view_cancel_cache.cancelable_event_future(
+                            next_view,
+                            async move {
+                                let _votes = Self::gather_new_views(
+                                    adapter,
+                                    leader_committee,
+                                    timeout_qc,
+                                    leader_tally_settings.clone(),
+                                )
+                                .await;
+                                Event::ProposeBlock {
+                                    qc: Qc::Aggregated(AggregateQc {
+                                        high_qc,
+                                        view: next_view,
+                                    }),
+                                }
+                            },
+                        )));
                     }
                 }
                 Event::TimeoutQc { timeout_qc } => {
                     tracing::debug!("timeout received {:?}", timeout_qc);
                     carnot = carnot.receive_timeout_qc(timeout_qc.clone());
-                    events.push(Box::pin(Self::gather_new_views(
-                        adapter,
-                        self_committee,
-                        timeout_qc,
-                        tally_settings.clone(),
+                    events.push(Box::pin(view_cancel_cache.cancelable_event_future(
+                        timeout_qc.view,
+                        Self::gather_new_views(
+                            adapter,
+                            self_committee,
+                            timeout_qc,
+                            tally_settings.clone(),
+                        ),
                     )));
                 }
                 Event::RootTimeout { timeouts } => {
@@ -340,22 +365,31 @@ where
 
             let current_view = carnot.current_view();
             if current_view != prev_view {
+                // First we cancel previous processing view tasks
+                view_cancel_cache.cancel(prev_view);
                 tracing::debug!("Advanced view from {prev_view} to {current_view}");
                 // View change!
-                events.push(Box::pin(async {
-                    tokio::time::sleep(TIMEOUT).await;
-                    Event::LocalTimeout
-                }));
-                events.push(Box::pin(Self::gather_block(adapter, current_view + 1)));
-                events.push(Box::pin(Self::gather_timeout_qc(adapter, current_view)));
+                events.push(Box::pin(view_cancel_cache.cancelable_event_future(
+                    current_view,
+                    async {
+                        tokio::time::sleep(TIMEOUT).await;
+                        Event::LocalTimeout
+                    },
+                )));
+                events.push(Box::pin(view_cancel_cache.cancelable_event_future(
+                    current_view + 1,
+                    Self::gather_block(adapter, current_view + 1),
+                )));
+                events.push(Box::pin(view_cancel_cache.cancelable_event_future(
+                    current_view,
+                    Self::gather_timeout_qc(adapter, current_view),
+                )));
                 if carnot.is_member_of_root_committee() {
                     let threshold = carnot.leader_super_majority_threshold();
-                    events.push(Box::pin(Self::gather_timeout(
-                        adapter,
-                        self_committee,
+                    events.push(Box::pin(view_cancel_cache.cancelable_event_future(
                         current_view,
-                        threshold,
-                    )))
+                        Self::gather_timeout(adapter, self_committee, current_view, threshold),
+                    )));
                 }
             }
 
@@ -554,7 +588,7 @@ where
     }
 }
 
-enum Event<Tx: Clone + Hash + Eq> {
+pub(crate) enum Event<Tx: Clone + Hash + Eq> {
     Proposal {
         block: Block<Tx>,
         stream: Pin<Box<dyn Stream<Item = Block<Tx>> + Send>>,

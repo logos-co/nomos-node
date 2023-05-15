@@ -1,5 +1,9 @@
+use crate::Event;
 use consensus_engine::View;
 use std::collections::HashMap;
+use std::future::Future;
+use std::hash::Hash;
+use tokio::select;
 use tokio_util::sync::CancellationToken;
 
 pub struct ViewCancel(CancellationToken);
@@ -48,5 +52,19 @@ impl ViewCancelCache {
             .entry(view)
             .or_insert_with(ViewCancel::new)
             .cancel_token()
+    }
+
+    pub(crate) fn cancelable_event_future<Tx: Clone + Hash + Eq, F: Future<Output = Event<Tx>>>(
+        &mut self,
+        view: View,
+        f: F,
+    ) -> impl Future<Output = Event<Tx>> {
+        let token = self.cancel_token(view);
+        async move {
+            select! {
+                event = f => event,
+                _ = token.cancelled() => Event::None,
+            }
+        }
     }
 }
