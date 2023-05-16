@@ -173,14 +173,14 @@ where
         let mut carnot = Carnot::from_genesis(private_key, genesis, overlay);
         let network_adapter = A::new(network_relay).await;
         let adapter = &network_adapter;
-        let _child_committee = carnot.child_committee();
-        let child_committee = &_child_committee;
+        let _self_committee = carnot.self_committee();
+        let self_committee = &_self_committee;
         let _leader_committee = [carnot.id()].into_iter().collect();
         let leader_committee = &_leader_committee;
         let fountain = F::new(fountain_settings);
         let _tally_settings = CarnotTallySettings {
             threshold: carnot.super_majority_threshold(),
-            participating_nodes: carnot.child_committee(),
+            participating_nodes: carnot.child_committees().into_iter().flatten().collect(),
         };
         let tally_settings = &_tally_settings;
         let _leader_tally_settings = CarnotTallySettings {
@@ -199,7 +199,7 @@ where
         )));
         events.push(Box::pin(Self::gather_votes(
             adapter,
-            child_committee,
+            self_committee,
             genesis_block,
             tally_settings.clone(),
         )));
@@ -219,7 +219,7 @@ where
                             if new_view != carnot.current_view() {
                                 events.push(Box::pin(Self::gather_votes(
                                     adapter,
-                                    child_committee,
+                                    self_committee,
                                     block,
                                     tally_settings.clone(),
                                 )));
@@ -294,7 +294,7 @@ where
                     carnot = carnot.receive_timeout_qc(timeout_qc.clone());
                     events.push(Box::pin(Self::gather_new_views(
                         adapter,
-                        child_committee,
+                        self_committee,
                         timeout_qc,
                         tally_settings.clone(),
                     )));
@@ -340,7 +340,7 @@ where
                     let threshold = carnot.leader_super_majority_threshold();
                     events.push(Box::pin(Self::gather_timeout(
                         adapter,
-                        child_committee,
+                        self_committee,
                         current_view,
                         threshold,
                     )))

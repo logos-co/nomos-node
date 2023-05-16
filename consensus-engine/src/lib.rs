@@ -338,8 +338,12 @@ impl<O: Overlay> Carnot<O> {
         self.id
     }
 
-    pub fn child_committee(&self) -> Committee {
-        self.overlay.child_committee(self.id)
+    pub fn self_committee(&self) -> Committee {
+        self.overlay.node_committee(self.id)
+    }
+
+    pub fn child_committees(&self) -> Vec<Committee> {
+        self.overlay.child_committees(self.id)
     }
 
     pub fn parent_committee(&self) -> Committee {
@@ -391,11 +395,15 @@ mod test {
             todo!()
         }
 
+        fn node_committee(&self, _id: NodeId) -> Committee {
+            todo!()
+        }
+
         fn parent_committee(&self, _id: NodeId) -> Committee {
             todo!()
         }
 
-        fn child_committee(&self, _id: NodeId) -> Committee {
+        fn child_committees(&self, _id: NodeId) -> Vec<Committee> {
             todo!()
         }
 

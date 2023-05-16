@@ -39,8 +39,12 @@ impl Overlay for FlatRoundRobin {
         Committee::new()
     }
 
-    fn child_committee(&self, _id: NodeId) -> consensus_engine::Committee {
-        Committee::new()
+    fn node_committee(&self, _id: NodeId) -> consensus_engine::Committee {
+        self.nodes.clone().into_iter().collect()
+    }
+
+    fn child_committees(&self, _id: NodeId) -> Vec<consensus_engine::Committee> {
+        vec![]
     }
 
     fn leaf_committees(&self, _id: NodeId) -> Vec<consensus_engine::Committee> {
