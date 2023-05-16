@@ -3,7 +3,9 @@ mod messages;
 
 // std
 // crates
+use self::event_builder::EventBuilderSettings;
 use serde::{Deserialize, Serialize};
+
 // internal
 use super::{Node, NodeId};
 
@@ -11,7 +13,9 @@ use super::{Node, NodeId};
 pub struct CarnotState {}
 
 #[derive(Clone, Default, Deserialize)]
-pub struct CarnotSettings {}
+pub struct CarnotSettings {
+    pub event_builder_settings: EventBuilderSettings,
+}
 
 #[allow(dead_code)] // TODO: remove when handling settings
 pub struct CarnotNode {
