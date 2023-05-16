@@ -240,7 +240,7 @@ where
                             let new_view = new_state.current_view();
                             if new_view != carnot.current_view() {
                                 events.push(Box::pin(view_cancel_cache.cancelable_event_future(
-                                    new_view,
+                                    block.view,
                                     Self::gather_votes(
                                         adapter,
                                         self_committee,
@@ -250,7 +250,7 @@ where
                                 )));
                             } else {
                                 events.push(Box::pin(view_cancel_cache.cancelable_event_future(
-                                    carnot.current_view(),
+                                    block.view,
                                     async move {
                                         if let Some(block) = stream.next().await {
                                             Event::Proposal { block, stream }
@@ -266,7 +266,7 @@ where
                     }
                     if carnot.is_leader_for_view(block.view + 1) {
                         events.push(Box::pin(view_cancel_cache.cancelable_event_future(
-                            block.view + 1,
+                            block.view,
                             async move {
                                 let Event::Approve { qc, .. } = Self::gather_votes(
                                 adapter,
@@ -304,7 +304,7 @@ where
                     if carnot.is_leader_for_view(next_view) {
                         let high_qc = carnot.high_qc();
                         events.push(Box::pin(view_cancel_cache.cancelable_event_future(
-                            next_view,
+                            timeout_qc.view + 1,
                             async move {
                                 let _votes = Self::gather_new_views(
                                     adapter,
@@ -327,7 +327,7 @@ where
                     tracing::debug!("timeout received {:?}", timeout_qc);
                     carnot = carnot.receive_timeout_qc(timeout_qc.clone());
                     events.push(Box::pin(view_cancel_cache.cancelable_event_future(
-                        timeout_qc.view,
+                        timeout_qc.view + 1,
                         Self::gather_new_views(
                             adapter,
                             self_committee,
