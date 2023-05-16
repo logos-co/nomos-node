@@ -9,14 +9,6 @@ use std::collections::HashMap;
 
 pub type CarnotTx = [u8; 32];
 
-#[derive(thiserror::Error, Debug)]
-pub enum EventBuilderError {
-    #[error("block cannot be found: {0:?}")]
-    BlockNotFound(BlockId),
-    #[error("voter {voter:?} on view {view} has empty qc")]
-    EmptyQc { voter: NodeId, view: i64 },
-}
-
 #[derive(Default, Copy, Clone, Serialize, Deserialize)]
 pub struct EventBuilderSettings {
     pub votes_threshold: usize,
@@ -42,7 +34,7 @@ impl EventBuilder {
         }
     }
 
-    pub fn step(&mut self, messages: Vec<CarnotMessage>) -> Result<Vec<Event<CarnotTx>>> {
+    pub fn step(&mut self, messages: Vec<CarnotMessage>) -> Vec<Event<CarnotTx>> {
         let mut events = Vec::new();
         for message in messages {
             match message {
@@ -60,10 +52,7 @@ impl EventBuilder {
                 CarnotMessage::Vote(msg) => {
                     let msg_view = msg.vote.view;
                     let block_id = msg.vote.block;
-                    let qc = msg.qc.clone().ok_or(EventBuilderError::EmptyQc {
-                        voter: msg.voter,
-                        view: msg_view,
-                    })?;
+                    let qc = msg.qc.clone().expect("empty QC from vote message")?;
                     let entries = self
                         .vote_message
                         .entry(msg_view)
@@ -78,7 +67,7 @@ impl EventBuilder {
                             block: self
                                 .blocks
                                 .get(&block_id)
-                                .ok_or(EventBuilderError::BlockNotFound(block_id))?,
+                                .expect(format!("cannot find block id {:?}", block_id).as_str())?,
                             votes: entry.into_iter().collect(),
                         })
                     }
@@ -120,6 +109,6 @@ impl EventBuilder {
             }
         }
 
-        Ok(events)
+        events
     }
 }

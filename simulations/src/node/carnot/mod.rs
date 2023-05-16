@@ -13,9 +13,7 @@ use super::{Node, NodeId};
 pub struct CarnotState {}
 
 #[derive(Clone, Default, Deserialize)]
-pub struct CarnotSettings {
-    pub event_builder_settings: EventBuilderSettings,
-}
+pub struct CarnotSettings {}
 
 #[allow(dead_code)] // TODO: remove when handling settings
 pub struct CarnotNode {
