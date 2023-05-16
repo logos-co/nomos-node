@@ -1,3 +1,6 @@
+mod event_builder;
+mod messages;
+
 // std
 // crates
 use serde::{Deserialize, Serialize};
