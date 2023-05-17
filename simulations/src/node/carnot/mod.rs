@@ -8,7 +8,9 @@ use crate::network::{InMemoryNetworkInterface, NetworkInterface, NetworkMessage}
 // std
 // crates
 use self::{event_builder::EventBuilderSettings, messages::CarnotMessage, overlay::CarnotOverlay};
-use consensus_engine::{View, StandardQc, BlockId, Block, TimeoutQc, Payload, Vote, Carnot, Overlay};
+use consensus_engine::{
+    Block, BlockId, Carnot, Overlay, Payload, StandardQc, TimeoutQc, View, Vote,
+};
 use nomos_consensus::Event;
 use serde::{Deserialize, Serialize};
 
@@ -78,9 +80,7 @@ impl<O: Overlay> CarnotNode<O> {
         self.state.highest_voted_view = block.view;
 
         let to = if self.overlay.is_member_of_root_committee(self.id) {
-            [self.overlay.leader(block.view + 1)]
-                .into_iter()
-                .collect()
+            [self.overlay.leader(block.view + 1)].into_iter().collect()
         } else {
             self.overlay.parent_committee(self.id)
         };
@@ -127,25 +127,35 @@ impl<O: Overlay> Node for CarnotNode<O> {
             match event {
                 Event::Proposal { block, stream } => {
                     println!("receive proposal {:?}", block.header().id);
-                    self.engine.receive_block(block);
-                },
+                    match self.engine.receive_block(block) {
+                        Ok(new) => self.engine = new,
+                        Err(_) => println!("invalid block {:?}", block),
+                    }
+                }
                 // This branch means we already get enough votes for this block
                 // So we can just call approve_block
                 Event::Approve { qc, block, votes } => {
-                    self.engine.approve_block(block);
-                },
+                    let (new, _) = self.engine.approve_block(block);
+                    self.engine = new;
+                }
                 // This branch means we already get enough new view msgs for this qc
-                // So we can just call approve_new_view 
-                Event::NewView { timeout_qc, new_views } => {
-                    self.engine.approve_new_view(timeout_qc, new_views);
-                },
+                // So we can just call approve_new_view
+                Event::NewView {
+                    timeout_qc,
+                    new_views,
+                } => {
+                    let (new, _) = self.engine.approve_new_view(timeout_qc, new_views);
+                    self.engine = new;
+                }
                 Event::TimeoutQc { timeout_qc } => {
-                    self.engine.receive_timeout_qc(timeout_qc);
-                },
+                    self.engine = self.engine.receive_timeout_qc(timeout_qc);
+                }
                 Event::RootTimeout { timeouts } => {
                     println!("root timeouts: {:?}", timeouts);
-                },
-                Event::ProposeBlock { .. } => unreachable!("propose block will never be constructed"),
+                }
+                Event::ProposeBlock { .. } => {
+                    unreachable!("propose block will never be constructed")
+                }
                 Event::LocalTimeout => unreachable!("local timeout will never be constructed"),
                 Event::None => unreachable!("none event will never be constructed"),
             }
