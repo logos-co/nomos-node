@@ -1,13 +1,14 @@
 #![allow(dead_code)]
 // TODO: Well, remove this when we actually use the fields from the specification
 // std
-
 use std::collections::HashSet;
 // crates
 use futures::{Stream, StreamExt};
+
 // internal
+use super::CarnotTallySettings;
 use crate::network::messages::VoteMsg;
-use consensus_engine::{Qc, StandardQc, View, Vote};
+use consensus_engine::{Block, Qc, StandardQc, Vote};
 use nomos_core::crypto::PublicKey;
 use nomos_core::vote::Tally;
 
@@ -21,14 +22,7 @@ pub enum CarnotTallyError {
     InsufficientVotes,
 }
 
-#[derive(Clone)]
-pub struct CarnotTallySettings {
-    pub threshold: usize,
-    // TODO: this probably should be dynamic and should change with the view (?)
-    pub participating_nodes: HashSet<NodeId>,
-}
-
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct CarnotTally {
     settings: CarnotTallySettings,
 }
@@ -37,6 +31,7 @@ pub struct CarnotTally {
 impl Tally for CarnotTally {
     type Vote = VoteMsg;
     type Qc = Qc;
+    type Subject = Block;
     type Outcome = HashSet<Vote>;
     type TallyError = CarnotTallyError;
     type Settings = CarnotTallySettings;
@@ -47,14 +42,24 @@ impl Tally for CarnotTally {
 
     async fn tally<S: Stream<Item = Self::Vote> + Unpin + Send>(
         &self,
-        view: View,
+        block: Block,
         mut vote_stream: S,
     ) -> Result<(Self::Qc, Self::Outcome), Self::TallyError> {
         let mut seen = HashSet::new();
         let mut outcome = HashSet::new();
+        // return early for leaf nodes
+        if self.settings.threshold == 0 {
+            return Ok((
+                Qc::Standard(StandardQc {
+                    view: block.view,
+                    id: block.id,
+                }),
+                outcome,
+            ));
+        }
         while let Some(vote) = vote_stream.next().await {
             // check vote view is valid
-            if !vote.vote.view != view {
+            if vote.vote.view != block.view || vote.vote.block != block.id {
                 continue;
             }
 
@@ -75,6 +80,6 @@ impl Tally for CarnotTally {
                 ));
             }
         }
-        Err(CarnotTallyError::InsufficientVotes)
+        unreachable!()
     }
 }

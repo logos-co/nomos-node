@@ -25,10 +25,11 @@ impl<TxId: Clone + Eq + Hash + Serialize + DeserializeOwned> Block<TxId> {
     pub fn new(view: View, parent_qc: Qc, txs: impl Iterator<Item = TxId>) -> Self {
         let transactions = txs.collect();
         let header = consensus_engine::Block {
-            id: [0; 32],
+            id: [view as u8; 32],
             view,
             parent_qc,
         };
+
         let mut s = Self {
             header,
             transactions,

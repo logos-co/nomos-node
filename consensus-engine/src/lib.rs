@@ -23,7 +23,7 @@ impl<O: Overlay> Carnot<O> {
             highest_voted_view: -1,
             last_view_timeout_qc: None,
             overlay,
-            safe_blocks: [(id, genesis_block)].into(),
+            safe_blocks: [(genesis_block.id, genesis_block)].into(),
         }
     }
 
@@ -44,12 +44,10 @@ impl<O: Overlay> Carnot<O> {
             self.safe_blocks.contains_key(&block.parent()),
             "out of order view not supported, missing parent block for {block:?}",
         );
-
         // if the block has already been processed, return early
         if self.safe_blocks.contains_key(&block.id) {
             return Ok(self.clone());
         }
-
         if self.blocks_in_view(block.view).contains(&block)
             || block.view <= self.latest_committed_view()
         {
@@ -60,7 +58,6 @@ impl<O: Overlay> Carnot<O> {
             //  By rejecting any other blocks except the first one received for a view this code does NOT do that.
             return Err(());
         }
-
         let mut new_state = self.clone();
 
         if new_state.block_is_safe(block.clone()) {
@@ -70,7 +67,6 @@ impl<O: Overlay> Carnot<O> {
             // Non safe block, not necessarily an error
             return Err(());
         }
-
         Ok(new_state)
     }
 
@@ -99,7 +95,12 @@ impl<O: Overlay> Carnot<O> {
     /// *  `receive_block(b)` must have been called successfully before trying to approve a block b.
     /// *   A node should not attempt to vote for a block in a view earlier than the latest one it actively participated in.
     pub fn approve_block(&self, block: Block) -> (Self, Send) {
-        assert!(self.safe_blocks.contains_key(&block.id));
+        assert!(
+            self.safe_blocks.contains_key(&block.id),
+            "{:?} not in {:?}",
+            block,
+            self.safe_blocks
+        );
         assert!(
             self.highest_voted_view < block.view,
             "can't vote for a block in the past"
@@ -321,8 +322,8 @@ impl<O: Overlay> Carnot<O> {
         self.local_high_qc.clone()
     }
 
-    pub fn is_leader_for_current_view(&self) -> bool {
-        self.overlay.leader(self.current_view) == self.id
+    pub fn is_leader_for_view(&self, view: View) -> bool {
+        self.overlay.leader(view) == self.id
     }
 
     pub fn super_majority_threshold(&self) -> usize {
@@ -330,11 +331,31 @@ impl<O: Overlay> Carnot<O> {
     }
 
     pub fn leader_super_majority_threshold(&self) -> usize {
-        self.overlay.super_majority_threshold(self.id)
+        self.overlay.leader_super_majority_threshold(self.id)
     }
 
     pub fn id(&self) -> NodeId {
         self.id
+    }
+
+    pub fn self_committee(&self) -> Committee {
+        self.overlay.node_committee(self.id)
+    }
+
+    pub fn child_committees(&self) -> Vec<Committee> {
+        self.overlay.child_committees(self.id)
+    }
+
+    pub fn parent_committee(&self) -> Committee {
+        self.overlay.parent_committee(self.id)
+    }
+
+    pub fn root_committee(&self) -> Committee {
+        self.overlay.root_committee()
+    }
+
+    pub fn is_member_of_root_committee(&self) -> bool {
+        self.overlay.is_member_of_root_committee(self.id)
     }
 }
 
@@ -374,7 +395,15 @@ mod test {
             todo!()
         }
 
+        fn node_committee(&self, _id: NodeId) -> Committee {
+            todo!()
+        }
+
         fn parent_committee(&self, _id: NodeId) -> Committee {
+            todo!()
+        }
+
+        fn child_committees(&self, _id: NodeId) -> Vec<Committee> {
             todo!()
         }
 

@@ -8,7 +8,7 @@ use crate::tx::{Transaction, TransactionHasher};
 
 mod transaction;
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub enum Tx {
     Transfer(TransferTransaction),
 }

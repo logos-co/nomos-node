@@ -1,6 +1,6 @@
-use consensus_engine::{NodeId, Overlay, View};
+use consensus_engine::{Committee, NodeId, Overlay, View};
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 /// Flat overlay with a single committee and round robin leader selection.
 pub struct FlatRoundRobin {
     nodes: Vec<NodeId>,
@@ -36,7 +36,15 @@ impl Overlay for FlatRoundRobin {
     }
 
     fn parent_committee(&self, _id: NodeId) -> consensus_engine::Committee {
-        panic!("root committee does not have a parent committee")
+        Committee::new()
+    }
+
+    fn node_committee(&self, _id: NodeId) -> consensus_engine::Committee {
+        self.nodes.clone().into_iter().collect()
+    }
+
+    fn child_committees(&self, _id: NodeId) -> Vec<consensus_engine::Committee> {
+        vec![]
     }
 
     fn leaf_committees(&self, _id: NodeId) -> Vec<consensus_engine::Committee> {
@@ -48,10 +56,10 @@ impl Overlay for FlatRoundRobin {
     }
 
     fn super_majority_threshold(&self, _id: NodeId) -> usize {
-        self.nodes.len() * 3 / 2 + 1
+        0
     }
 
-    fn leader_super_majority_threshold(&self, id: NodeId) -> usize {
-        self.super_majority_threshold(id)
+    fn leader_super_majority_threshold(&self, _id: NodeId) -> usize {
+        self.nodes.len() * 2 / 3 + 1
     }
 }
