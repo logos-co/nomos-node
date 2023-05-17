@@ -189,7 +189,6 @@ where
             participating_nodes: carnot.root_committee(),
         };
         let leader_tally_settings = &_leader_tally_settings;
-
         let events: FuturesUnordered<Pin<Box<dyn Future<Output = Event<P::Tx>> + Send>>> =
             FuturesUnordered::new();
         let genesis_block = carnot.genesis_block();
@@ -200,9 +199,21 @@ where
         events.push(Box::pin(Self::gather_votes(
             adapter,
             self_committee,
-            genesis_block,
+            genesis_block.clone(),
             tally_settings.clone(),
         )));
+        if carnot.is_leader_for_view(genesis_block.view + 1) {
+            events.push(Box::pin(async move {
+                let Event::Approve { qc, .. } = Self::gather_votes(
+                    adapter,
+                    leader_committee,
+                    genesis_block,
+                    leader_tally_settings.clone(),
+                )
+                .await else { unreachable!() };
+                Event::ProposeBlock { qc }
+            }));
+        }
 
         tokio::pin!(events);
 
@@ -220,7 +231,7 @@ where
                                 events.push(Box::pin(Self::gather_votes(
                                     adapter,
                                     self_committee,
-                                    block,
+                                    block.clone(),
                                     tally_settings.clone(),
                                 )));
                             } else {
@@ -236,12 +247,6 @@ where
                         }
                         Err(_) => tracing::debug!("invalid block {:?}", block),
                     }
-                }
-                Event::Approve { block, .. } => {
-                    tracing::debug!("approving proposal {:?}", block);
-                    let (new_carnot, out) = carnot.approve_block(block.clone());
-                    carnot = new_carnot;
-                    output = Some(Output::Send::<P::Tx>(out));
                     if carnot.is_leader_for_view(block.view + 1) {
                         events.push(Box::pin(async move {
                             let Event::Approve { qc, .. } = Self::gather_votes(
@@ -254,6 +259,12 @@ where
                             Event::ProposeBlock { qc }
                         }));
                     }
+                }
+                Event::Approve { block, .. } => {
+                    tracing::debug!("approving proposal {:?}", block);
+                    let (new_carnot, out) = carnot.approve_block(block.clone());
+                    carnot = new_carnot;
+                    output = Some(Output::Send::<P::Tx>(out));
                 }
                 Event::LocalTimeout => {
                     tracing::debug!("local timeout");
