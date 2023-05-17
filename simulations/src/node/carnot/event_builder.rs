@@ -1,5 +1,5 @@
 use crate::node::carnot::messages::CarnotMessage;
-use consensus_engine::View;
+use consensus_engine::{View, Qc, AggregateQc};
 use nomos_consensus::network::messages::{NewViewMsg, TimeoutMsg, VoteMsg};
 use nomos_consensus::Event::TimeoutQc;
 use nomos_consensus::{Event, NodeId};
@@ -75,10 +75,10 @@ impl EventBuilder {
                     let msg_view = msg.vote.view;
                     let timeout_qc = msg.vote.timeout_qc.clone();
                     if let Some(new_views) = self.new_view_message.tally(msg_view, msg) {
-                        events.push(Event::NewView {
-                            new_views,
-                            timeout_qc,
-                        })
+                        events.push(Event::ProposeBlock { qc: Qc::Aggregated(AggregateQc {
+                            high_qc: timeout_qc.high_qc,
+                            view: timeout_qc.view + 2,
+                        }) })
                     }
                 }
             }
