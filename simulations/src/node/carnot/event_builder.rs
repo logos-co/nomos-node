@@ -22,6 +22,7 @@ pub struct EventBuilder {
     timeout_message: Tally<TimeoutMsg>,
     new_view_message: Tally<NewViewMsg>,
     config: EventBuilderSettings,
+    pub(crate) current_view: View,
 }
 
 impl EventBuilder {
@@ -32,6 +33,7 @@ impl EventBuilder {
             config: Default::default(),
             blocks: Default::default(),
             new_view_message: Default::default(),
+            current_view: View::default(),
         }
     }
 
@@ -74,6 +76,7 @@ impl EventBuilder {
                 CarnotMessage::NewView(msg) => {
                     let msg_view = msg.vote.view;
                     let timeout_qc = msg.vote.timeout_qc.clone();
+                    self.current_view = core::cmp::max(self.current_view, msg_view);
                     if let Some(new_views) = self.new_view_message.tally(msg_view, msg) {
                         events.push(Event::NewView {
                             new_views,
