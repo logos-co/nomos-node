@@ -1,7 +1,7 @@
 mod event_builder;
 mod messages;
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use crate::network::{InMemoryNetworkInterface, NetworkInterface, NetworkMessage};
 
@@ -9,7 +9,7 @@ use crate::network::{InMemoryNetworkInterface, NetworkInterface, NetworkMessage}
 // crates
 use self::{event_builder::EventBuilderSettings, messages::CarnotMessage, overlay::CarnotOverlay};
 use consensus_engine::{
-    Block, BlockId, Carnot, Overlay, Payload, StandardQc, TimeoutQc, View, Vote,
+    Block, BlockId, Carnot, Overlay, Payload, StandardQc, TimeoutQc, View, Vote, Committee,
 };
 use nomos_consensus::Event;
 use serde::{Deserialize, Serialize};
@@ -20,10 +20,33 @@ use super::{Node, NodeId};
 #[derive(Default, Serialize)]
 pub struct CarnotState {
     current_view: View,
-    highest_voted_view: View,
     local_high_qc: StandardQc,
     safe_blocks: HashMap<BlockId, Block>,
     last_view_timeout_qc: Option<TimeoutQc>,
+    latest_committed_block: Block,
+    latest_committed_view: View,
+    root_committe: Committee,
+    parent_committe: Committee,
+    child_committee: Committee,
+    committed_blocks: Vec<BlockId>,
+}
+
+impl<O: Overlay> From<&Carnot<O>> for CarnotState {
+    fn from(value: &Carnot<O>) -> Self {
+        let current_view = value.current_view();
+        Self {
+            current_view,
+            local_high_qc: value.high_qc(),
+            parent_committe: value.parent_committee(),
+            root_committe: value.root_committee(),
+            child_committee: value.child_committee(),
+            latest_committed_block: value.latest_committed_block(),
+            latest_committed_view: value.latest_committed_view(),
+            safe_blocks: value.blocks_in_view(current_view),
+            last_view_timeout_qc: value.last_view_timeout_qc(),
+            committed_blocks: value.committed_blocks(),
+        }
+    }
 }
 
 #[derive(Clone, Default, Deserialize)]
@@ -160,5 +183,8 @@ impl<O: Overlay> Node for CarnotNode<O> {
                 Event::None => unreachable!("none event will never be constructed"),
             }
         }
+
+        // update state
+        self.state = CarnotState::from(&self.engine);
     }
 }
