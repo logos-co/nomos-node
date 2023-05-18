@@ -116,7 +116,7 @@ impl WakuAdapter {
             bytes,
             topic,
             1,
-            chrono::Utc::now().timestamp() as usize,
+            chrono::Utc::now().timestamp_nanos() as usize,
             [],
             false,
         );
@@ -226,7 +226,7 @@ impl NetworkAdapter for WakuAdapter {
             approval_message.as_bytes(),
             content_topic,
             1,
-            chrono::Utc::now().timestamp() as usize,
+            chrono::Utc::now().timestamp_nanos() as usize,
             [],
             false,
         );
