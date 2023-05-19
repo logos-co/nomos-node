@@ -14,6 +14,7 @@ pub type CarnotTx = [u8; 32];
 pub struct EventBuilderSettings {
     pub votes_threshold: usize,
     pub timeout_threshold: usize,
+    pub new_view_threadhold: usize,
 }
 
 pub struct EventBuilder {
