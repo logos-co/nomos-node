@@ -21,7 +21,7 @@ pub struct EventBuilder {
     vote_message: Tally<VoteMsg>,
     timeout_message: Tally<TimeoutMsg>,
     new_view_message: Tally<NewViewMsg>,
-    config: EventBuilderSettings,
+    pub(crate) config: EventBuilderSettings,
     pub(crate) current_view: View,
 }
 
