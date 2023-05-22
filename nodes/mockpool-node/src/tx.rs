@@ -3,7 +3,7 @@ use nomos_core::tx::{Transaction, TransactionHasher};
 use serde::{Deserialize, Serialize};
 use std::hash::Hash;
 
-#[derive(Clone, Debug, Serialize, Deserialize, Hash)]
+#[derive(Clone, Debug, Serialize, Deserialize, Hash, PartialEq, Eq)]
 pub struct Tx(pub String);
 
 fn hash_tx(tx: &Tx) -> String {

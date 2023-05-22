@@ -1,4 +1,3 @@
-use bytes::Bytes;
 use futures::StreamExt;
 use nomos_network::{
     backends::mock::{
@@ -7,25 +6,21 @@ use nomos_network::{
     NetworkMsg, NetworkService,
 };
 use overwatch_rs::services::{relay::OutboundRelay, ServiceData};
-use serde::de::DeserializeOwned;
-use serde::Serialize;
 use tokio_stream::{wrappers::BroadcastStream, Stream};
 
-use crate::network::messages::TimeoutQcMsg;
-use crate::{
-    network::{
-        messages::{ProposalChunkMsg, VoteMsg},
-        NetworkAdapter,
-    },
-    overlay::committees::Committee,
+use crate::network::messages::{NewViewMsg, TimeoutMsg, TimeoutQcMsg};
+use crate::network::{
+    messages::{ProposalChunkMsg, VoteMsg},
+    NetworkAdapter,
 };
-use consensus_engine::{TimeoutQc, View};
+use consensus_engine::{BlockId, Committee, View};
 
 const MOCK_PUB_SUB_TOPIC: &str = "MockPubSubTopic";
 const MOCK_BLOCK_CONTENT_TOPIC: MockContentTopic = MockContentTopic::new("MockSim", 1, "MockBlock");
 const MOCK_APPROVAL_CONTENT_TOPIC: MockContentTopic =
     MockContentTopic::new("MockSim", 1, "MockApproval");
 
+#[derive(Clone)]
 pub struct MockAdapter {
     network_relay: OutboundRelay<<NetworkService<Mock> as ServiceData>::Message>,
 }
@@ -65,7 +60,7 @@ impl NetworkAdapter for MockAdapter {
     async fn proposal_chunks_stream(
         &self,
         _view: View,
-    ) -> Box<dyn Stream<Item = Bytes> + Send + Sync + Unpin> {
+    ) -> Box<dyn Stream<Item = ProposalChunkMsg> + Send + Sync + Unpin> {
         let stream_channel = self
             .message_subscriber_channel()
             .await
@@ -80,9 +75,7 @@ impl NetworkAdapter for MockAdapter {
                                 == message.content_topic().content_topic_name
                             {
                                 let payload = message.payload();
-                                Some(Bytes::from(
-                                    ProposalChunkMsg::from_bytes(payload.as_bytes()).chunk,
-                                ))
+                                Some(ProposalChunkMsg::from_bytes(payload.as_bytes()))
                             } else {
                                 None
                             }
@@ -117,24 +110,33 @@ impl NetworkAdapter for MockAdapter {
         todo!()
     }
 
-    async fn timeout_qc_stream(
+    async fn timeout_stream(
         &self,
+        _committee: &Committee,
         _view: View,
-    ) -> Box<dyn Stream<Item = TimeoutQc> + Send + Sync + Unpin> {
+    ) -> Box<dyn Stream<Item = TimeoutMsg> + Send + Sync + Unpin> {
         todo!()
     }
 
-    async fn votes_stream<Vote: DeserializeOwned>(
+    async fn timeout_qc_stream(
         &self,
-        _committee: Committee,
         _view: View,
-    ) -> Box<dyn Stream<Item = Vote> + Send> {
+    ) -> Box<dyn Stream<Item = TimeoutQcMsg> + Send + Sync + Unpin> {
+        todo!()
+    }
+
+    async fn votes_stream(
+        &self,
+        _committee: &Committee,
+        _view: View,
+        _proposal_id: BlockId,
+    ) -> Box<dyn Stream<Item = VoteMsg> + Send + Unpin> {
         let stream_channel = self
             .message_subscriber_channel()
             .await
             .unwrap_or_else(|_e| todo!("handle error"));
-        Box::new(
-            BroadcastStream::new(stream_channel).filter_map(|msg| async move {
+        Box::new(Box::pin(BroadcastStream::new(stream_channel).filter_map(
+            |msg| async move {
                 match msg {
                     Ok(event) => match event {
                         NetworkEvent::RawMessage(message) => {
@@ -142,7 +144,7 @@ impl NetworkAdapter for MockAdapter {
                                 == message.content_topic().content_topic_name
                             {
                                 let payload = message.payload();
-                                Some(VoteMsg::from_bytes(payload.as_bytes()).vote)
+                                Some(VoteMsg::from_bytes(payload.as_bytes()))
                             } else {
                                 None
                             }
@@ -150,20 +152,21 @@ impl NetworkAdapter for MockAdapter {
                     },
                     Err(_e) => None,
                 }
-            }),
-        )
+            },
+        )))
     }
 
-    async fn send_vote<Vote: Serialize>(
+    async fn new_view_stream(
         &self,
-        _committee: Committee,
+        _committee: &Committee,
         _view: View,
-        approval_message: VoteMsg<Vote>,
-    ) where
-        Vote: Send,
-    {
+    ) -> Box<dyn Stream<Item = NewViewMsg> + Send + Unpin> {
+        todo!()
+    }
+
+    async fn send(&self, _committee: &Committee, _view: View, payload: Box<[u8]>, _channel: &str) {
         let message = MockMessage::new(
-            String::from_utf8_lossy(&approval_message.as_bytes()).to_string(),
+            String::from_utf8_lossy(&payload).to_string(),
             MOCK_APPROVAL_CONTENT_TOPIC,
             1,
             chrono::Utc::now().timestamp_nanos() as usize,
