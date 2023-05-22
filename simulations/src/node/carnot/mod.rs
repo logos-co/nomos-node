@@ -1,13 +1,13 @@
 mod event_builder;
 mod messages;
 
-use std::collections::{HashMap, HashSet};
+use std::{collections::{HashMap, HashSet}, time::Duration};
 
 use crate::network::{InMemoryNetworkInterface, NetworkInterface, NetworkMessage};
 
 // std
 // crates
-use self::{event_builder::EventBuilderSettings, messages::CarnotMessage, overlay::CarnotOverlay};
+use self::{event_builder::EventBuilderSettings, messages::CarnotMessage};
 use consensus_engine::{
     Block, BlockId, Carnot, Committee, Overlay, Payload, Qc, StandardQc, TimeoutQc, View, Vote,
 };
@@ -20,9 +20,10 @@ use serde::{Deserialize, Serialize};
 // internal
 use super::{Node, NodeId};
 
-#[derive(Default, Serialize)]
+#[derive(Serialize)]
 pub struct CarnotState {
     current_view: View,
+    highest_voted_view: View,
     local_high_qc: StandardQc,
     safe_blocks: HashMap<BlockId, Block>,
     last_view_timeout_qc: Option<TimeoutQc>,
@@ -45,22 +46,24 @@ impl<O: Overlay> From<&Carnot<O>> for CarnotState {
             child_committee: value.child_committee(),
             latest_committed_block: value.latest_committed_block(),
             latest_committed_view: value.latest_committed_view(),
-            safe_blocks: value.blocks_in_view(current_view),
+            safe_blocks: value.blocks_in_view(current_view).into_iter().map(|b| (b.id, b)).collect(),
             last_view_timeout_qc: value.last_view_timeout_qc(),
             committed_blocks: value.committed_blocks(),
+            highest_voted_view: Default::default(),
         }
     }
 }
 
 #[derive(Clone, Default, Deserialize)]
 pub struct CarnotSettings {
-    nodes: Vec<NodeId>,
+    nodes: Vec<consensus_engine::NodeId>,
     seed: u64,
+    timeout: Duration,
 }
 
 #[allow(dead_code)] // TODO: remove when handling settings
 pub struct CarnotNode<O: Overlay> {
-    id: NodeId,
+    id: consensus_engine::NodeId,
     state: CarnotState,
     settings: CarnotSettings,
     network_interface: InMemoryNetworkInterface<CarnotMessage>,
@@ -69,7 +72,7 @@ pub struct CarnotNode<O: Overlay> {
 }
 
 impl<O: Overlay> CarnotNode<O> {
-    pub fn new(id: NodeId, settings: CarnotSettings) -> Self {
+    pub fn new(id: consensus_engine::NodeId, settings: CarnotSettings) -> Self {
         let (sender, receiver) = crossbeam::channel::unbounded();
         let genesis = consensus_engine::Block {
             id: [0; 32],
@@ -77,18 +80,21 @@ impl<O: Overlay> CarnotNode<O> {
             parent_qc: Qc::Standard(StandardQc::genesis()),
         };
         let overlay = O::new(settings.nodes.clone());
+        let engine = Carnot::from_genesis(id, genesis, overlay);
+        let state = CarnotState::from(&engine);
+
         Self {
             id,
-            state: Default::default(),
+            state,
             settings,
             network_interface: InMemoryNetworkInterface::new(id, sender, receiver),
-            event_builder: Default::default(),
-            engine: Carnot::from_genesis(id, genesis, overlay),
+            event_builder: event_builder::EventBuilder::new(id),
+            engine,
         }
     }
 
     pub fn send_message(&self, message: NetworkMessage<CarnotMessage>) {
-        self.network_interface.send_message(self.id, message);
+        self.network_interface.send_message(self.id, message.payload);
     }
 
     pub fn approve_block(&self, block: Block) -> consensus_engine::Send {
@@ -106,10 +112,10 @@ impl<O: Overlay> CarnotNode<O> {
         // update state
         self.state.highest_voted_view = block.view;
 
-        let to = if self.overlay.is_member_of_root_committee(self.id) {
-            [self.overlay.leader(block.view + 1)].into_iter().collect()
+        let to = if self.engine.is_member_of_root_committee() {
+            [self.engine.leader(block.view + 1)].into_iter().collect()
         } else {
-            self.overlay.parent_committee(self.id)
+            self.engine.parent_committee()
         };
 
         consensus_engine::Send {
@@ -119,10 +125,6 @@ impl<O: Overlay> CarnotNode<O> {
                 view: block.view,
             }),
         }
-    }
-
-    fn is_leader_for_view(&self, view: View) -> bool {
-        self.overlay.leader(view) == self.id
     }
 
     fn gather_votes(&self, committee: &Committee, block: consensus_engine::Block) {
@@ -142,28 +144,6 @@ impl<O: Overlay> CarnotNode<O> {
                         view: block.view,
                     },
                     qc: Some(block.parent_qc),
-                }),
-            );
-        }
-    }
-
-    fn gather_new_views(&self, committee: &Committee, timeout_qc: TimeoutQc) {
-        use rand::seq::IteratorRandom;
-        use rand::Rng;
-
-        // random choose some commitees to new view
-        for node in committee.iter().choose_multiple(
-            &mut rand::thread_rng(),
-            self.event_builder.config.new_view_threadhold,
-        ) {
-            self.network_interface.send_message(
-                *node,
-                CarnotMessage::Vote(NewViewMsg {
-                    voter: *node,
-                    vote: Vote {
-                        block: block.id,
-                        view: block.view,
-                    },
                 }),
             );
         }
@@ -227,7 +207,7 @@ impl<O: Overlay> Node for CarnotNode<O> {
     }
 
     fn current_view(&self) -> usize {
-        self.event_builder.current_view
+        self.event_builder.current_view as usize
     }
 
     fn state(&self) -> &CarnotState {
@@ -239,22 +219,20 @@ impl<O: Overlay> Node for CarnotNode<O> {
             self.network_interface
                 .receive_messages()
                 .into_iter()
-                .map(|m| m.payload),
+                .map(|m| m.payload)
+                .collect(),
+            self.settings.timeout,
+            &self.engine,
         );
 
         for event in events {
+            let prev_view = self.engine.current_view();
             let mut output = None;
             match event {
                 Event::Proposal { block, stream } => {
                     println!("receive proposal {:?}", block.header().id);
                     match self.engine.receive_block(block) {
-                        Ok(new) => {
-                            let new_view = new.current_view();
-                            if new_view != self.engine.current_view() {
-                                self.gather_votes(&self.engine.child_committee(), block);
-                            }
-                            self.engine = new;
-                        }
+                        Ok(new) => self.engine = new,
                         Err(_) => println!("invalid block {:?}", block),
                     }
                 }
@@ -271,18 +249,18 @@ impl<O: Overlay> Node for CarnotNode<O> {
                     timeout_qc,
                     new_views,
                 } => {
-                    let (new, out) = self.engine.approve_new_view(timeout_qc, new_views);
-                    output = Some(out);
-                    self.engine = new;
-                    let next_view = timeout_qc.view + 2;
-                    if self.engine.is_leader_for_view(next_view) {
-                        self.gather_new_views(&[self.id].into_iter().collect(), timeout_qc);
-                    }
+                    // let (new, out) = self.engine.approve_new_view(timeout_qc, new_views);
+                    // output = Some(out);
+                    // self.engine = new;
+                    // let next_view = timeout_qc.view + 2;
+                    // if self.engine.is_leader_for_view(next_view) {
+                    //     self.gather_new_views(&[self.id].into_iter().collect(), timeout_qc);
+                    // }
+                    unimplemented!()
                 }
                 Event::TimeoutQc { timeout_qc } => {
                     let child = self.engine.child_committee();
                     self.engine = self.engine.receive_timeout_qc(timeout_qc);
-                    self.gather_new_views(&child, timeout_qc);
                 }
                 Event::RootTimeout { timeouts } => {
                     println!("root timeouts: {:?}", timeouts);
@@ -293,7 +271,7 @@ impl<O: Overlay> Node for CarnotNode<O> {
                 Event::LocalTimeout => unreachable!("local timeout will never be constructed"),
                 Event::None => unreachable!("none event will never be constructed"),
             }
-
+ 
             if let Some(output) = output {
                 self.handle_output(output);
             }
@@ -302,4 +280,8 @@ impl<O: Overlay> Node for CarnotNode<O> {
         // update state
         self.state = CarnotState::from(&self.engine);
     }
+}
+
+#[test]
+fn test_() {
 }

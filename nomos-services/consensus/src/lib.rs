@@ -26,7 +26,7 @@ use consensus_engine::{
     AggregateQc, Carnot, Committee, NewView, Overlay, Payload, Qc, StandardQc, Timeout, TimeoutQc,
     Vote,
 };
-use nomos_core::block::Block;
+pub use nomos_core::block::Block;
 use nomos_core::crypto::PublicKey;
 use nomos_core::fountain::FountainCode;
 use nomos_core::tx::Transaction;

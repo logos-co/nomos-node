@@ -353,6 +353,10 @@ impl<O: Overlay> Carnot<O> {
     pub fn is_member_of_root_committee(&self) -> bool {
         self.overlay.is_member_of_root_committee(self.id)
     }
+
+    pub fn leader(&self, view: View) -> NodeId {
+        self.overlay.leader(view)
+    }
 }
 
 #[cfg(test)]
