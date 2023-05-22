@@ -39,7 +39,7 @@ pub struct Vote {
 pub struct Timeout {
     pub view: View,
     pub sender: NodeId,
-    pub high_qc: Qc,
+    pub high_qc: StandardQc,
     pub timeout_qc: Option<TimeoutQc>,
 }
 
@@ -51,14 +51,14 @@ pub struct NewView {
     pub view: View,
     pub sender: NodeId,
     pub timeout_qc: TimeoutQc,
-    pub high_qc: Qc,
+    pub high_qc: StandardQc,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct TimeoutQc {
     pub view: View,
-    pub high_qc: Qc,
+    pub high_qc: StandardQc,
     pub sender: NodeId,
 }
 
