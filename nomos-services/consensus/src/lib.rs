@@ -338,7 +338,23 @@ where
                 }
                 Event::RootTimeout { timeouts } => {
                     tracing::debug!("root timeout {:?}", timeouts);
-                    // timeout detected
+                    // TODO: filter timeouts upon reception
+                    assert!(timeouts.iter().all(|t| t.view == carnot.current_view()));
+                    let high_qc = timeouts
+                        .iter()
+                        .map(|t| &t.high_qc)
+                        .chain(std::iter::once(&carnot.high_qc()))
+                        .max_by_key(|qc| qc.view)
+                        .expect("empty root committee")
+                        .clone();
+                    if carnot.is_member_of_root_committee() {
+                        let timeout_qc = TimeoutQc {
+                            view: carnot.current_view(),
+                            high_qc,
+                            sender: carnot.id(),
+                        };
+                        output = Some(Output::BroadcastTimeoutQc { timeout_qc });
+                    }
                 }
                 Event::ProposeBlock { qc } => {
                     tracing::debug!("proposing block");
