@@ -1,12 +1,10 @@
 use crate::node::carnot::messages::CarnotMessage;
-use consensus_engine::{View, Overlay, Carnot};
+use consensus_engine::{Carnot, Overlay, View};
 use nomos_consensus::network::messages::{NewViewMsg, TimeoutMsg, VoteMsg};
-use nomos_consensus::Event::TimeoutQc;
 use nomos_consensus::{Event, NodeId};
 use nomos_core::block::{Block, BlockId};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
-use std::time::{Duration, Instant};
 
 pub type CarnotTx = [u8; 32];
 
@@ -17,7 +15,7 @@ pub struct EventBuilderSettings {
     pub new_view_threshold: usize,
 }
 
-pub struct EventBuilder {
+pub(crate) struct EventBuilder {
     id: NodeId,
     blocks: HashMap<BlockId, Block<CarnotTx>>,
     vote_message: Tally<VoteMsg>,
@@ -43,7 +41,6 @@ impl EventBuilder {
     pub fn step<O: Overlay>(
         &mut self,
         messages: Vec<CarnotMessage>,
-        timeout: Duration,
         engine: &Carnot<O>,
     ) -> Vec<Event<CarnotTx>> {
         let mut events = Vec::new();
@@ -67,7 +64,7 @@ impl EventBuilder {
 
                     // if we are the leader, then use the leader threshold, otherwise use the leaf threshold
                     let threshold = if engine.is_leader_for_view(msg_view) {
-                        engine.leader_super_majority_threshold()    
+                        engine.leader_super_majority_threshold()
                     } else {
                         engine.super_majority_threshold()
                     };
@@ -79,12 +76,10 @@ impl EventBuilder {
                                 .blocks
                                 .get(&block_id)
                                 .cloned()
-                                .map(|b| {
-                                    consensus_engine::Block {
-                                        id: b.header().id,
-                                        view: b.header().view,
-                                        parent_qc: b.header().parent_qc,
-                                    }
+                                .map(|b| consensus_engine::Block {
+                                    id: b.header().id,
+                                    view: b.header().view,
+                                    parent_qc: b.header().parent_qc.clone(),
                                 })
                                 .expect(format!("cannot find block id {:?}", block_id).as_str()),
                             votes: votes.into_iter().map(|v| v.vote).collect(),
@@ -94,7 +89,9 @@ impl EventBuilder {
                 CarnotMessage::Timeout(msg) => {
                     let msg_view = msg.vote.view;
                     if let Some(timeouts) = self.timeout_message.tally(msg_view, msg) {
-                        events.push(Event::RootTimeout { timeouts: timeouts.into_iter().map(|v| v.vote).collect() })
+                        events.push(Event::RootTimeout {
+                            timeouts: timeouts.into_iter().map(|v| v.vote).collect(),
+                        })
                     }
                 }
                 CarnotMessage::NewView(msg) => {
@@ -103,12 +100,14 @@ impl EventBuilder {
                     self.current_view = core::cmp::max(self.current_view, msg_view);
                     // if we are the leader, then use the leader threshold, otherwise use the leaf threshold
                     let threshold = if engine.is_leader_for_view(msg_view) {
-                        engine.leader_super_majority_threshold()    
+                        engine.leader_super_majority_threshold()
                     } else {
                         engine.super_majority_threshold()
                     };
 
-                    if let Some(new_views) = self.new_view_message.tally_by(msg_view, msg, threshold) {
+                    if let Some(new_views) =
+                        self.new_view_message.tally_by(msg_view, msg, threshold)
+                    {
                         events.push(Event::NewView {
                             new_views: new_views.into_iter().map(|v| v.vote).collect(),
                             timeout_qc,
@@ -145,8 +144,7 @@ impl<T: core::hash::Hash + Eq> Tally<T> {
         self.tally_by(view, message, self.threshold)
     }
 
-    fn tally_by(&mut self, view: View, message: T, threshold: usize) -> Option<HashSet<T>> 
-    {
+    fn tally_by(&mut self, view: View, message: T, threshold: usize) -> Option<HashSet<T>> {
         let entries = self
             .cache
             .entry(view)

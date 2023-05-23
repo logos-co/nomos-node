@@ -8,7 +8,7 @@ use crate::{
     node::{Node, NodeId},
 };
 
-use super::{OverlayGetter, OverlayState, SharedState, ViewOverlay};
+use super::{CommitteeId, OverlayGetter, OverlayState, SharedState, ViewOverlay};
 
 #[derive(Debug, Default, Serialize)]
 pub struct DummyState {
@@ -112,7 +112,7 @@ impl LocalView {
         let current_roots = view
             .layout
             .committees
-            .get(&0.into())
+            .get(&CommitteeId(0))
             .map(|c| c.nodes.clone());
 
         Self {
@@ -444,6 +444,7 @@ mod tests {
             tree::{TreeOverlay, TreeSettings},
             Overlay,
         },
+        util::node_id,
     };
 
     use super::{DummyMessage, DummyNode, Intent, Vote};
@@ -515,7 +516,7 @@ mod tests {
             .for_each(|leader_id| {
                 for _ in 0..committee_size {
                     nodes
-                        .get(&0.into())
+                        .get(&node_id(0))
                         .unwrap()
                         .send_message(*leader_id, DummyMessage::Vote(initial_vote.clone()));
                 }
@@ -537,7 +538,7 @@ mod tests {
         let mut network = init_network(&node_ids);
 
         let view = ViewOverlay {
-            leaders: vec![0.into(), 1.into(), 2.into()],
+            leaders: vec![node_id(0), node_id(1), node_id(2)],
             layout: overlay.layout(&node_ids, &mut rng),
         };
         let overlay_state = Arc::new(RwLock::new(OverlayState {
@@ -555,9 +556,9 @@ mod tests {
         let initial_vote = Vote::new(1, Intent::FromRootToLeader);
 
         // Using any node as the sender for initial proposal to leader nodes.
-        nodes[&0.into()].send_message(0.into(), DummyMessage::Vote(initial_vote.clone()));
-        nodes[&0.into()].send_message(1.into(), DummyMessage::Vote(initial_vote.clone()));
-        nodes[&0.into()].send_message(2.into(), DummyMessage::Vote(initial_vote));
+        nodes[&node_id(0)].send_message(node_id(0), DummyMessage::Vote(initial_vote.clone()));
+        nodes[&node_id(0)].send_message(node_id(1), DummyMessage::Vote(initial_vote.clone()));
+        nodes[&node_id(0)].send_message(node_id(2), DummyMessage::Vote(initial_vote));
         network.collect_messages();
 
         for (_, node) in nodes.iter() {
@@ -585,15 +586,15 @@ mod tests {
         }
 
         // Root and Internal haven't sent their votes yet.
-        assert!(!nodes[&0.into()].state().view_state[&1].vote_sent); // Root
-        assert!(!nodes[&1.into()].state().view_state[&1].vote_sent); // Internal
-        assert!(!nodes[&2.into()].state().view_state[&1].vote_sent); // Internal
+        assert!(!nodes[&node_id(0)].state().view_state[&1].vote_sent); // Root
+        assert!(!nodes[&node_id(1)].state().view_state[&1].vote_sent); // Internal
+        assert!(!nodes[&node_id(2)].state().view_state[&1].vote_sent); // Internal
 
         // Leaves should have thier vote sent.
-        assert!(nodes[&3.into()].state().view_state[&1].vote_sent); // Leaf
-        assert!(nodes[&4.into()].state().view_state[&1].vote_sent); // Leaf
-        assert!(nodes[&5.into()].state().view_state[&1].vote_sent); // Leaf
-        assert!(nodes[&6.into()].state().view_state[&1].vote_sent); // Leaf
+        assert!(nodes[&node_id(3)].state().view_state[&1].vote_sent); // Leaf
+        assert!(nodes[&node_id(4)].state().view_state[&1].vote_sent); // Leaf
+        assert!(nodes[&node_id(5)].state().view_state[&1].vote_sent); // Leaf
+        assert!(nodes[&node_id(6)].state().view_state[&1].vote_sent); // Leaf
 
         // 3. Internal nodes send vote to root node.
         network.dispatch_after(Duration::from_millis(100));
@@ -603,15 +604,15 @@ mod tests {
         network.collect_messages();
 
         // Root hasn't sent its votes yet.
-        assert!(!nodes[&0.into()].state().view_state[&1].vote_sent); // Root
+        assert!(!nodes[&node_id(0)].state().view_state[&1].vote_sent); // Root
 
         // Internal and leaves should have thier vote sent.
-        assert!(nodes[&1.into()].state().view_state[&1].vote_sent); // Internal
-        assert!(nodes[&2.into()].state().view_state[&1].vote_sent); // Internal
-        assert!(nodes[&3.into()].state().view_state[&1].vote_sent); // Leaf
-        assert!(nodes[&4.into()].state().view_state[&1].vote_sent); // Leaf
-        assert!(nodes[&5.into()].state().view_state[&1].vote_sent); // Leaf
-        assert!(nodes[&6.into()].state().view_state[&1].vote_sent); // Leaf
+        assert!(nodes[&node_id(1)].state().view_state[&1].vote_sent); // Internal
+        assert!(nodes[&node_id(2)].state().view_state[&1].vote_sent); // Internal
+        assert!(nodes[&node_id(3)].state().view_state[&1].vote_sent); // Leaf
+        assert!(nodes[&node_id(4)].state().view_state[&1].vote_sent); // Leaf
+        assert!(nodes[&node_id(5)].state().view_state[&1].vote_sent); // Leaf
+        assert!(nodes[&node_id(6)].state().view_state[&1].vote_sent); // Leaf
 
         // 4. Root node send vote to next view leader nodes.
         network.dispatch_after(Duration::from_millis(100));
@@ -621,13 +622,13 @@ mod tests {
         network.collect_messages();
 
         // Root has sent its votes.
-        assert!(nodes[&0.into()].state().view_state[&1].vote_sent); // Root
-        assert!(nodes[&1.into()].state().view_state[&1].vote_sent); // Internal
-        assert!(nodes[&2.into()].state().view_state[&1].vote_sent); // Internal
-        assert!(nodes[&3.into()].state().view_state[&1].vote_sent); // Leaf
-        assert!(nodes[&4.into()].state().view_state[&1].vote_sent); // Leaf
-        assert!(nodes[&5.into()].state().view_state[&1].vote_sent); // Leaf
-        assert!(nodes[&6.into()].state().view_state[&1].vote_sent); // Leaf
+        assert!(nodes[&node_id(0)].state().view_state[&1].vote_sent); // Root
+        assert!(nodes[&node_id(1)].state().view_state[&1].vote_sent); // Internal
+        assert!(nodes[&node_id(2)].state().view_state[&1].vote_sent); // Internal
+        assert!(nodes[&node_id(3)].state().view_state[&1].vote_sent); // Leaf
+        assert!(nodes[&node_id(4)].state().view_state[&1].vote_sent); // Leaf
+        assert!(nodes[&node_id(5)].state().view_state[&1].vote_sent); // Leaf
+        assert!(nodes[&node_id(6)].state().view_state[&1].vote_sent); // Leaf
 
         // 5. Leaders receive vote and broadcast new Proposal(Block) to all nodes.
         network.dispatch_after(Duration::from_millis(100));
@@ -655,15 +656,15 @@ mod tests {
         }
 
         // Root and Internal haven't sent their votes yet.
-        assert!(!nodes[&0.into()].state().view_state[&2].vote_sent); // Root
-        assert!(!nodes[&1.into()].state().view_state[&2].vote_sent); // Internal
-        assert!(!nodes[&2.into()].state().view_state[&2].vote_sent); // Internal
+        assert!(!nodes[&node_id(0)].state().view_state[&2].vote_sent); // Root
+        assert!(!nodes[&node_id(1)].state().view_state[&2].vote_sent); // Internal
+        assert!(!nodes[&node_id(2)].state().view_state[&2].vote_sent); // Internal
 
         // Leaves should have thier vote sent.
-        assert!(nodes[&3.into()].state().view_state[&2].vote_sent); // Leaf
-        assert!(nodes[&4.into()].state().view_state[&2].vote_sent); // Leaf
-        assert!(nodes[&5.into()].state().view_state[&2].vote_sent); // Leaf
-        assert!(nodes[&6.into()].state().view_state[&2].vote_sent); // Leaf
+        assert!(nodes[&node_id(3)].state().view_state[&2].vote_sent); // Leaf
+        assert!(nodes[&node_id(4)].state().view_state[&2].vote_sent); // Leaf
+        assert!(nodes[&node_id(5)].state().view_state[&2].vote_sent); // Leaf
+        assert!(nodes[&node_id(6)].state().view_state[&2].vote_sent); // Leaf
     }
 
     #[test]
@@ -684,7 +685,7 @@ mod tests {
         }));
 
         // There are more nodes in the network than in a tree overlay.
-        let node_ids: Vec<NodeId> = (0..100).map(Into::into).collect();
+        let node_ids: Vec<NodeId> = (0..100).map(node_id).collect();
         let mut network = init_network(&node_ids);
 
         let overlays = generate_overlays(&node_ids, &overlay, 4, 3, &mut rng);
@@ -734,7 +735,7 @@ mod tests {
         }));
 
         // There are more nodes in the network than in a tree overlay.
-        let node_ids: Vec<NodeId> = (0..10000).map(Into::into).collect();
+        let node_ids: Vec<NodeId> = (0..10000).map(node_id).collect();
         let mut network = init_network(&node_ids);
 
         let overlays = generate_overlays(&node_ids, &overlay, 4, 100, &mut rng);
@@ -784,7 +785,7 @@ mod tests {
         }));
 
         // There are more nodes in the network than in a tree overlay.
-        let node_ids: Vec<NodeId> = (0..100000).map(Into::into).collect();
+        let node_ids: Vec<NodeId> = (0..100000).map(node_id).collect();
         let mut network = init_network(&node_ids);
 
         let overlays = generate_overlays(&node_ids, &overlay, 4, 1000, &mut rng);
@@ -823,42 +824,42 @@ mod tests {
             (
                 0,
                 None,
-                Some(BTreeSet::from([1.into(), 2.into()])),
+                Some(BTreeSet::from([node_id(1), node_id(2)])),
                 vec![DummyRole::Root],
             ),
             (
                 1,
-                Some(BTreeSet::from([0.into()])),
-                Some(BTreeSet::from([3.into(), 4.into()])),
+                Some(BTreeSet::from([node_id(0)])),
+                Some(BTreeSet::from([node_id(3), node_id(4)])),
                 vec![DummyRole::Internal],
             ),
             (
                 2,
-                Some(BTreeSet::from([0.into()])),
-                Some(BTreeSet::from([5.into(), 6.into()])),
+                Some(BTreeSet::from([node_id(0)])),
+                Some(BTreeSet::from([node_id(5), node_id(6)])),
                 vec![DummyRole::Internal],
             ),
             (
                 3,
-                Some(BTreeSet::from([1.into()])),
+                Some(BTreeSet::from([node_id(1)])),
                 None,
                 vec![DummyRole::Leaf],
             ),
             (
                 4,
-                Some(BTreeSet::from([1.into()])),
+                Some(BTreeSet::from([node_id(1)])),
                 None,
                 vec![DummyRole::Leaf],
             ),
             (
                 5,
-                Some(BTreeSet::from([2.into()])),
+                Some(BTreeSet::from([node_id(2)])),
                 None,
                 vec![DummyRole::Leaf],
             ),
             (
                 6,
-                Some(BTreeSet::from([2.into()])),
+                Some(BTreeSet::from([node_id(2)])),
                 None,
                 vec![DummyRole::Leader, DummyRole::Leaf],
             ),
@@ -870,12 +871,12 @@ mod tests {
             committee_size: 1,
         });
         let node_ids: Vec<NodeId> = overlay.nodes();
-        let leaders = vec![6.into()];
+        let leaders = vec![node_id(6)];
         let layout = overlay.layout(&node_ids, &mut rng);
         let view = ViewOverlay { leaders, layout };
 
-        for (node_id, expected_parents, expected_children, expected_roles) in test_cases {
-            let node_id = node_id.into();
+        for (nid, expected_parents, expected_children, expected_roles) in test_cases {
+            let node_id = node_id(nid);
             let parents = get_parent_nodes(node_id, &view);
             let children = get_child_nodes(node_id, &view);
             let role = get_roles(node_id, &view, &parents, &children);

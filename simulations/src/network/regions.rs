@@ -106,6 +106,7 @@ mod tests {
             NetworkSettings,
         },
         node::NodeId,
+        util::node_id,
     };
 
     #[test]
@@ -144,9 +145,7 @@ mod tests {
         let mut rng = StepRng::new(1, 0);
 
         for tcase in test_cases.iter() {
-            let nodes = (0..tcase.node_count)
-                .map(Into::into)
-                .collect::<Vec<NodeId>>();
+            let nodes = (0..tcase.node_count).map(node_id).collect::<Vec<NodeId>>();
 
             let available_regions = vec![
                 Region::NorthAmerica,
