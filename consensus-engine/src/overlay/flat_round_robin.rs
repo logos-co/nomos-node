@@ -1,4 +1,4 @@
-use consensus_engine::{Committee, NodeId, Overlay, View};
+use crate::{Committee, NodeId, Overlay, View};
 
 #[derive(Clone, Debug)]
 /// Flat overlay with a single committee and round robin leader selection.
@@ -11,11 +11,11 @@ impl Overlay for FlatRoundRobin {
         Self { nodes }
     }
 
-    fn root_committee(&self) -> consensus_engine::Committee {
+    fn root_committee(&self) -> crate::Committee {
         self.nodes.clone().into_iter().collect()
     }
 
-    fn rebuild(&mut self, _timeout_qc: consensus_engine::TimeoutQc) {
+    fn rebuild(&mut self, _timeout_qc: crate::TimeoutQc) {
         todo!()
     }
 
@@ -35,19 +35,19 @@ impl Overlay for FlatRoundRobin {
         false
     }
 
-    fn parent_committee(&self, _id: NodeId) -> consensus_engine::Committee {
+    fn parent_committee(&self, _id: NodeId) -> crate::Committee {
         Committee::new()
     }
 
-    fn node_committee(&self, _id: NodeId) -> consensus_engine::Committee {
+    fn node_committee(&self, _id: NodeId) -> crate::Committee {
         self.nodes.clone().into_iter().collect()
     }
 
-    fn child_committees(&self, _id: NodeId) -> Vec<consensus_engine::Committee> {
+    fn child_committees(&self, _id: NodeId) -> Vec<crate::Committee> {
         vec![]
     }
 
-    fn leaf_committees(&self, _id: NodeId) -> Vec<consensus_engine::Committee> {
+    fn leaf_committees(&self, _id: NodeId) -> Vec<crate::Committee> {
         vec![self.root_committee()]
     }
 

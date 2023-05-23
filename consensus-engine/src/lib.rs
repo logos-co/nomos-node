@@ -1,6 +1,8 @@
 use std::collections::{HashMap, HashSet};
 
+pub mod overlay;
 mod types;
+pub use overlay::Overlay;
 pub use types::*;
 
 #[derive(Clone, Debug)]

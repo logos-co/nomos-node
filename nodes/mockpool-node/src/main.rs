@@ -3,9 +3,9 @@ mod tx;
 
 use clap::Parser;
 use color_eyre::eyre::{eyre, Result};
+use consensus_engine::overlay::FlatRoundRobin;
 use nomos_consensus::{
-    network::adapters::waku::WakuAdapter as ConsensusWakuAdapter, overlay::FlatRoundRobin,
-    CarnotConsensus,
+    network::adapters::waku::WakuAdapter as ConsensusWakuAdapter, CarnotConsensus,
 };
 use nomos_core::fountain::mock::MockFountain;
 use nomos_http::backends::axum::AxumBackend;
