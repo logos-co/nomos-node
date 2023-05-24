@@ -354,7 +354,7 @@ mod tests {
                         content_topic_name: "foo content".into(),
                     },
                     version: 1,
-                    timestamp: chrono::Utc::now().timestamp() as usize,
+                    timestamp: chrono::Utc::now().timestamp_nanos() as usize,
                 },
             })
             .await;
@@ -371,7 +371,7 @@ mod tests {
                         content_topic_name: "bar content".into(),
                     },
                     version: 1,
-                    timestamp: chrono::Utc::now().timestamp() as usize,
+                    timestamp: chrono::Utc::now().timestamp_nanos() as usize,
                 },
             })
             .await;

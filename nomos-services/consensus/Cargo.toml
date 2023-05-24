@@ -7,9 +7,10 @@ edition = "2021"
 
 [dependencies]
 async-trait = "0.1"
+async-stream = "0.3"
 bytes = "1.3"
 chrono = "0.4"
-consensus-engine = { path = "../../consensus-engine", features = ["serde1"] }
+consensus-engine = { path = "../../consensus-engine", features = ["serde"] }
 futures = "0.3"
 nomos-network = { path = "../network" }
 nomos-mempool = { path = "../mempool" }
@@ -18,10 +19,12 @@ overwatch-rs = { git = "https://github.com/logos-co/Overwatch", branch = "main" 
 rand_chacha = "0.3"
 rand = "0.8"
 serde = { version = "1", features = ["derive"] }
+thiserror = "1.0"
 tokio = { version = "1", features = ["sync"] }
 tokio-stream = "0.1"
-waku-bindings = { version = "0.1.0-rc.2", optional = true}
+tokio-util = "0.7"
 tracing = "0.1"
+waku-bindings = { version = "0.1.0-rc.2", optional = true}
 
 [features]
 default = []
