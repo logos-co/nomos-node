@@ -1,5 +1,9 @@
+// std
 use std::collections::HashSet;
 use std::hash::Hash;
+// crates
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
 
 pub type View = i64;
 pub type NodeId = [u8; 32];
@@ -12,7 +16,7 @@ pub type Committee = HashSet<NodeId>;
 /// This enum represents the different types of messages that can be sent from the perspective of consensus and
 /// can't be directly used in the network as they lack things like cryptographic signatures.
 #[derive(Debug, Clone, Eq, PartialEq)]
-#[cfg_attr(feature = "serde1", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum Payload {
     /// Vote for a block in a view
     Vote(Vote),
@@ -23,41 +27,45 @@ pub enum Payload {
 }
 
 /// Returned
-#[derive(Debug, Clone, Eq, PartialEq)]
-#[cfg_attr(feature = "serde1", derive(serde::Serialize, serde::Deserialize))]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Vote {
+    pub view: View,
     pub block: BlockId,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
-#[cfg_attr(feature = "serde1", derive(serde::Serialize, serde::Deserialize))]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Timeout {
     pub view: View,
     pub sender: NodeId,
-    pub high_qc: Qc,
+    pub high_qc: StandardQc,
     pub timeout_qc: Option<TimeoutQc>,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
-#[cfg_attr(feature = "serde1", derive(serde::Serialize, serde::Deserialize))]
+// TODO: We are making "mandatory" to have received the timeout_qc before the new_view votes.
+// We should consider to remove the TimoutQc from the NewView message and use a hash or id instead.
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct NewView {
     pub view: View,
     pub sender: NodeId,
     pub timeout_qc: TimeoutQc,
-    pub high_qc: Qc,
+    pub high_qc: StandardQc,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
-#[cfg_attr(feature = "serde1", derive(serde::Serialize, serde::Deserialize))]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct TimeoutQc {
     pub view: View,
-    pub high_qc: Qc,
+    pub high_qc: StandardQc,
     pub sender: NodeId,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
-#[cfg_attr(feature = "serde1", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Block {
+    #[cfg_attr(feature = "serde", serde(skip))]
     pub id: BlockId,
     pub view: View,
     pub parent_qc: Qc,
@@ -71,25 +79,20 @@ impl Block {
 
 /// Possible output events.
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub enum Output {
-    Send {
-        to: HashSet<NodeId>,
-        payload: Payload,
-    },
-    Broadcast {
-        payload: Payload,
-    },
+pub struct Send {
+    pub to: HashSet<NodeId>,
+    pub payload: Payload,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
-#[cfg_attr(feature = "serde1", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct StandardQc {
     pub view: View,
     pub id: BlockId,
 }
 
 impl StandardQc {
-    pub(crate) fn genesis() -> Self {
+    pub fn genesis() -> Self {
         Self {
             view: -1,
             id: [0; 32],
@@ -98,14 +101,14 @@ impl StandardQc {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
-#[cfg_attr(feature = "serde1", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct AggregateQc {
     pub high_qc: StandardQc,
     pub view: View,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
-#[cfg_attr(feature = "serde1", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum Qc {
     Standard(StandardQc),
     Aggregated(AggregateQc),
@@ -136,9 +139,17 @@ impl Qc {
             Qc::Aggregated(AggregateQc { high_qc, .. }) => high_qc.id,
         }
     }
+
+    pub fn high_qc(&self) -> StandardQc {
+        match self {
+            Qc::Standard(qc) => qc.clone(),
+            Qc::Aggregated(AggregateQc { high_qc, .. }) => high_qc.clone(),
+        }
+    }
 }
 
 pub trait Overlay: Clone {
+    fn new(nodes: Vec<NodeId>) -> Self;
     fn root_committee(&self) -> Committee;
     fn rebuild(&mut self, timeout_qc: TimeoutQc);
     fn is_member_of_child_committee(&self, parent: NodeId, child: NodeId) -> bool;
@@ -146,8 +157,10 @@ pub trait Overlay: Clone {
     fn is_member_of_leaf_committee(&self, id: NodeId) -> bool;
     fn is_child_of_root_committee(&self, id: NodeId) -> bool;
     fn parent_committee(&self, id: NodeId) -> Committee;
-    fn leaf_committees(&self, id: NodeId) -> HashSet<Committee>;
+    fn child_committees(&self, id: NodeId) -> Vec<Committee>;
+    fn leaf_committees(&self, id: NodeId) -> Vec<Committee>;
+    fn node_committee(&self, id: NodeId) -> Committee;
     fn leader(&self, view: View) -> NodeId;
     fn super_majority_threshold(&self, id: NodeId) -> usize;
-    fn leader_super_majority_threshold(&self, view: View) -> usize;
+    fn leader_super_majority_threshold(&self, id: NodeId) -> usize;
 }

@@ -23,8 +23,12 @@ impl<O: Overlay> Carnot<O> {
             highest_voted_view: -1,
             last_view_timeout_qc: None,
             overlay,
-            safe_blocks: [(id, genesis_block)].into(),
+            safe_blocks: [(genesis_block.id, genesis_block)].into(),
         }
+    }
+
+    pub fn current_view(&self) -> View {
+        self.current_view
     }
     /// Upon reception of a block
     ///
@@ -40,12 +44,10 @@ impl<O: Overlay> Carnot<O> {
             self.safe_blocks.contains_key(&block.parent()),
             "out of order view not supported, missing parent block for {block:?}",
         );
-
         // if the block has already been processed, return early
         if self.safe_blocks.contains_key(&block.id) {
             return Ok(self.clone());
         }
-
         if self.blocks_in_view(block.view).contains(&block)
             || block.view <= self.latest_committed_view()
         {
@@ -56,7 +58,6 @@ impl<O: Overlay> Carnot<O> {
             //  By rejecting any other blocks except the first one received for a view this code does NOT do that.
             return Err(());
         }
-
         let mut new_state = self.clone();
 
         if new_state.block_is_safe(block.clone()) {
@@ -66,7 +67,6 @@ impl<O: Overlay> Carnot<O> {
             // Non safe block, not necessarily an error
             return Err(());
         }
-
         Ok(new_state)
     }
 
@@ -79,7 +79,7 @@ impl<O: Overlay> Carnot<O> {
         if timeout_qc.view < new_state.current_view {
             return new_state;
         }
-        new_state.update_high_qc(timeout_qc.high_qc.clone());
+        new_state.update_high_qc(Qc::Standard(timeout_qc.high_qc.clone()));
         new_state.update_timeout_qc(timeout_qc.clone());
 
         new_state.current_view = timeout_qc.view + 1;
@@ -94,8 +94,13 @@ impl<O: Overlay> Carnot<O> {
     /// Preconditions:
     /// *  `receive_block(b)` must have been called successfully before trying to approve a block b.
     /// *   A node should not attempt to vote for a block in a view earlier than the latest one it actively participated in.
-    pub fn approve_block(&self, block: Block) -> (Self, Output) {
-        assert!(self.safe_blocks.contains_key(&block.id));
+    pub fn approve_block(&self, block: Block) -> (Self, Send) {
+        assert!(
+            self.safe_blocks.contains_key(&block.id),
+            "{:?} not in {:?}",
+            block,
+            self.safe_blocks
+        );
         assert!(
             self.highest_voted_view < block.view,
             "can't vote for a block in the past"
@@ -114,9 +119,12 @@ impl<O: Overlay> Carnot<O> {
         };
         (
             new_state,
-            Output::Send {
+            Send {
                 to,
-                payload: Payload::Vote(Vote { block: block.id }),
+                payload: Payload::Vote(Vote {
+                    block: block.id,
+                    view: block.view,
+                }),
             },
         )
     }
@@ -132,7 +140,7 @@ impl<O: Overlay> Carnot<O> {
         &self,
         timeout_qc: TimeoutQc,
         new_views: HashSet<NewView>,
-    ) -> (Self, Output) {
+    ) -> (Self, Send) {
         let new_view = timeout_qc.view + 1;
         assert!(
             new_view
@@ -159,9 +167,9 @@ impl<O: Overlay> Carnot<O> {
             .iter()
             .map(|nv| &nv.high_qc)
             .chain(std::iter::once(&timeout_qc.high_qc))
-            .max_by_key(|qc| qc.view())
+            .max_by_key(|qc| qc.view)
             .unwrap();
-        new_state.update_high_qc(high_qc.clone());
+        new_state.update_high_qc(Qc::Standard(high_qc.clone()));
 
         let new_view_msg = NewView {
             view: new_view,
@@ -180,7 +188,7 @@ impl<O: Overlay> Carnot<O> {
         };
         (
             new_state,
-            Output::Send {
+            Send {
                 to,
                 payload: Payload::NewView(new_view_msg),
             },
@@ -192,7 +200,7 @@ impl<O: Overlay> Carnot<O> {
     /// Preconditions: none!
     /// Just notice that the timer only reset after a view change, i.e. a node can't timeout
     /// more than once for the same view
-    pub fn local_timeout(&self) -> (Self, Option<Output>) {
+    pub fn local_timeout(&self) -> (Self, Option<Send>) {
         let mut new_state = self.clone();
 
         new_state.highest_voted_view = new_state.current_view;
@@ -201,14 +209,14 @@ impl<O: Overlay> Carnot<O> {
         {
             let timeout_msg = Timeout {
                 view: new_state.current_view,
-                high_qc: Qc::Standard(new_state.local_high_qc.clone()),
+                high_qc: new_state.local_high_qc.clone(),
                 sender: new_state.id,
                 timeout_qc: new_state.last_view_timeout_qc.clone(),
             };
             let to = new_state.overlay.root_committee();
             return (
                 new_state,
-                Some(Output::Send {
+                Some(Send {
                     to,
                     payload: Payload::Timeout(timeout_msg),
                 }),
@@ -305,6 +313,50 @@ impl<O: Overlay> Carnot<O> {
         }
         res
     }
+
+    pub fn last_view_timeout_qc(&self) -> Option<TimeoutQc> {
+        self.last_view_timeout_qc.clone()
+    }
+
+    pub fn high_qc(&self) -> StandardQc {
+        self.local_high_qc.clone()
+    }
+
+    pub fn is_leader_for_view(&self, view: View) -> bool {
+        self.overlay.leader(view) == self.id
+    }
+
+    pub fn super_majority_threshold(&self) -> usize {
+        self.overlay.super_majority_threshold(self.id)
+    }
+
+    pub fn leader_super_majority_threshold(&self) -> usize {
+        self.overlay.leader_super_majority_threshold(self.id)
+    }
+
+    pub fn id(&self) -> NodeId {
+        self.id
+    }
+
+    pub fn self_committee(&self) -> Committee {
+        self.overlay.node_committee(self.id)
+    }
+
+    pub fn child_committees(&self) -> Vec<Committee> {
+        self.overlay.child_committees(self.id)
+    }
+
+    pub fn parent_committee(&self) -> Committee {
+        self.overlay.parent_committee(self.id)
+    }
+
+    pub fn root_committee(&self) -> Committee {
+        self.overlay.root_committee()
+    }
+
+    pub fn is_member_of_root_committee(&self) -> bool {
+        self.overlay.is_member_of_root_committee(self.id)
+    }
 }
 
 #[cfg(test)]
@@ -315,6 +367,10 @@ mod test {
     struct NoOverlay;
 
     impl Overlay for NoOverlay {
+        fn new(_nodes: Vec<NodeId>) -> Self {
+            Self
+        }
+
         fn root_committee(&self) -> Committee {
             todo!()
         }
@@ -339,11 +395,19 @@ mod test {
             todo!()
         }
 
+        fn node_committee(&self, _id: NodeId) -> Committee {
+            todo!()
+        }
+
         fn parent_committee(&self, _id: NodeId) -> Committee {
             todo!()
         }
 
-        fn leaf_committees(&self, _id: NodeId) -> HashSet<Committee> {
+        fn child_committees(&self, _id: NodeId) -> Vec<Committee> {
+            todo!()
+        }
+
+        fn leaf_committees(&self, _id: NodeId) -> Vec<Committee> {
             todo!()
         }
 
@@ -355,7 +419,7 @@ mod test {
             todo!()
         }
 
-        fn leader_super_majority_threshold(&self, _view: View) -> usize {
+        fn leader_super_majority_threshold(&self, _id: NodeId) -> usize {
             todo!()
         }
     }
