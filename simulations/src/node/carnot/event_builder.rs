@@ -1,5 +1,5 @@
 use crate::node::carnot::messages::CarnotMessage;
-use consensus_engine::{Carnot, Overlay, View};
+use consensus_engine::{Carnot, Overlay, Qc, View};
 use nomos_consensus::network::messages::{NewViewMsg, TimeoutMsg, VoteMsg};
 use nomos_consensus::{Event, NodeId};
 use nomos_core::block::{Block, BlockId};
@@ -21,6 +21,7 @@ pub(crate) struct EventBuilder {
     vote_message: Tally<VoteMsg>,
     timeout_message: Tally<TimeoutMsg>,
     new_view_message: Tally<NewViewMsg>,
+    proposal_seen: HashSet<View>,
     pub(crate) config: EventBuilderSettings,
     pub(crate) current_view: View,
 }
@@ -33,6 +34,7 @@ impl EventBuilder {
             config: Default::default(),
             blocks: Default::default(),
             new_view_message: Default::default(),
+            proposal_seen: Default::default(),
             current_view: View::default(),
             id,
         }
@@ -44,6 +46,20 @@ impl EventBuilder {
         engine: &Carnot<O>,
     ) -> Vec<Event<CarnotTx>> {
         let mut events = Vec::new();
+        if !self.proposal_seen.contains(&engine.current_view())
+            && engine.is_leader_for_view(engine.current_view())
+        {
+            events.push(Event::Proposal {
+                // TODO: do actually propose something debuggable inside txs
+                block: Block::new(
+                    engine.current_view(),
+                    Qc::Standard(engine.high_qc()),
+                    [].into_iter(),
+                ),
+                stream: Box::pin(futures::stream::empty()),
+            });
+            self.proposal_seen.insert(engine.current_view());
+        }
         for message in messages {
             match message {
                 CarnotMessage::Proposal(msg) => {

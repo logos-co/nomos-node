@@ -10,12 +10,14 @@ use crate::network::{InMemoryNetworkInterface, NetworkInterface, NetworkMessage}
 // std
 // crates
 use self::messages::CarnotMessage;
+use crate::node::carnot::event_builder::CarnotTx;
 use consensus_engine::{
     Block, BlockId, Carnot, Committee, Overlay, Payload, Qc, StandardQc, TimeoutQc, View, Vote,
 };
+use nomos_consensus::network::messages::ProposalChunkMsg;
 use nomos_consensus::{
     network::messages::{NewViewMsg, TimeoutMsg, VoteMsg},
-    Event,
+    Event, Output,
 };
 use serde::{Deserialize, Serialize};
 
@@ -155,12 +157,12 @@ impl<O: Overlay> CarnotNode<O> {
         }
     }
 
-    fn handle_output(&self, output: consensus_engine::Send) {
+    fn handle_output(&self, output: Output<CarnotTx>) {
         match output {
-            consensus_engine::Send {
+            Output::Send(consensus_engine::Send {
                 to,
                 payload: Payload::Vote(vote),
-            } => {
+            }) => {
                 for node in to {
                     self.network_interface.send_message(
                         node,
@@ -172,10 +174,10 @@ impl<O: Overlay> CarnotNode<O> {
                     );
                 }
             }
-            consensus_engine::Send {
+            Output::Send(consensus_engine::Send {
                 to,
                 payload: Payload::NewView(new_view),
-            } => {
+            }) => {
                 for node in to {
                     self.network_interface.send_message(
                         node,
@@ -186,10 +188,10 @@ impl<O: Overlay> CarnotNode<O> {
                     );
                 }
             }
-            consensus_engine::Send {
+            Output::Send(consensus_engine::Send {
                 to,
                 payload: Payload::Timeout(timeout),
-            } => {
+            }) => {
                 for node in to {
                     self.network_interface.send_message(
                         node,
@@ -198,6 +200,21 @@ impl<O: Overlay> CarnotNode<O> {
                             vote: timeout.clone(),
                         }),
                     );
+                }
+            }
+            Output::BroadcastTimeoutQc { .. } => {
+                unimplemented!()
+            }
+            Output::BroadcastProposal { proposal } => {
+                for node in &self.settings.nodes {
+                    self.network_interface.send_message(
+                        *node,
+                        CarnotMessage::Proposal(ProposalChunkMsg {
+                            chunk: proposal.as_bytes().to_vec().into(),
+                            proposal: proposal.header().id,
+                            view: proposal.header().view,
+                        }),
+                    )
                 }
             }
         }
@@ -234,6 +251,11 @@ impl<O: Overlay> Node for CarnotNode<O> {
             let mut output = None;
             match event {
                 Event::Proposal { block, stream: _ } => {
+                    if self.engine.is_leader_for_view(self.engine.current_view()) {
+                        output = Some(nomos_consensus::Output::BroadcastProposal {
+                            proposal: block.clone(),
+                        });
+                    }
                     println!("receive proposal {:?}", block.header().id);
                     match self.engine.receive_block(consensus_engine::Block {
                         id: block.header().id,
@@ -252,7 +274,7 @@ impl<O: Overlay> Node for CarnotNode<O> {
                     votes: _,
                 } => {
                     let (new, out) = self.engine.approve_block(block);
-                    output = Some(out);
+                    output = Some(Output::Send(out));
                     self.engine = new;
                 }
                 // This branch means we already get enough new view msgs for this qc

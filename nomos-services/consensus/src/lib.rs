@@ -419,8 +419,7 @@ where
     }
 }
 
-#[allow(dead_code)] // TODO: remove this when using broadcasting events
-enum Output<Tx: Clone + Eq + Hash> {
+pub enum Output<Tx: Clone + Eq + Hash> {
     Send(consensus_engine::Send),
     BroadcastTimeoutQc { timeout_qc: TimeoutQc },
     BroadcastProposal { proposal: Block<Tx> },
