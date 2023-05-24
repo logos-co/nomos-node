@@ -20,7 +20,7 @@ const MOCK_BLOCK_CONTENT_TOPIC: MockContentTopic = MockContentTopic::new("MockSi
 const MOCK_APPROVAL_CONTENT_TOPIC: MockContentTopic =
     MockContentTopic::new("MockSim", 1, "MockApproval");
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct MockAdapter {
     network_relay: OutboundRelay<<NetworkService<Mock> as ServiceData>::Message>,
 }
@@ -92,7 +92,7 @@ impl NetworkAdapter for MockAdapter {
             String::from_utf8_lossy(&chunk_message.as_bytes()).to_string(),
             MOCK_BLOCK_CONTENT_TOPIC,
             1,
-            chrono::Utc::now().timestamp() as usize,
+            chrono::Utc::now().timestamp_nanos() as usize,
         );
         if let Err((e, _)) = self
             .network_relay
@@ -169,7 +169,7 @@ impl NetworkAdapter for MockAdapter {
             String::from_utf8_lossy(&payload).to_string(),
             MOCK_APPROVAL_CONTENT_TOPIC,
             1,
-            chrono::Utc::now().timestamp() as usize,
+            chrono::Utc::now().timestamp_nanos() as usize,
         );
         if let Err((e, _e)) = self
             .network_relay

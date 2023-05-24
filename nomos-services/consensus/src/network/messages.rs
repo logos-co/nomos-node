@@ -6,7 +6,7 @@ use crate::NodeId;
 use consensus_engine::{BlockId, NewView, Qc, Timeout, TimeoutQc, View, Vote};
 use nomos_core::wire;
 
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash)]
 pub struct ProposalChunkMsg {
     pub chunk: Box<[u8]>,
     pub proposal: BlockId,
@@ -38,6 +38,7 @@ impl VoteMsg {
         wire::deserialize(data).unwrap()
     }
 }
+
 
 #[derive(Serialize, Deserialize, Hash, PartialEq, Eq)]
 pub struct NewViewMsg {

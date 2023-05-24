@@ -115,7 +115,7 @@ impl WakuAdapter {
             bytes,
             topic,
             1,
-            chrono::Utc::now().timestamp() as usize,
+            chrono::Utc::now().timestamp_nanos() as usize,
             [],
             false,
         );
@@ -147,7 +147,7 @@ impl NetworkAdapter for WakuAdapter {
         view: View,
     ) -> Box<dyn Stream<Item = ProposalChunkMsg> + Send + Sync + Unpin> {
         Box::new(Box::pin(
-            self.cached_stream_with_content_topic(PROPOSAL_CONTENT_TOPIC.clone())
+            self.cached_stream_with_content_topic(PROPOSAL_CONTENT_TOPIC)
                 .await
                 .filter_map(move |message| {
                     let payload = message.payload();
@@ -164,8 +164,24 @@ impl NetworkAdapter for WakuAdapter {
     }
 
     async fn broadcast_block_chunk(&self, chunk_message: ProposalChunkMsg) {
-        self.broadcast(chunk_message.as_bytes(), PROPOSAL_CONTENT_TOPIC)
+        let message = WakuMessage::new(
+            chunk_message.as_bytes(),
+            PROPOSAL_CONTENT_TOPIC,
+            1,
+            chrono::Utc::now().timestamp_nanos() as usize,
+            [],
+            false,
+        );
+        if let Err((_, _e)) = self
+            .network_relay
+            .send(NetworkMsg::Process(WakuBackendMessage::Broadcast {
+                message,
+                topic: Some(WAKU_CARNOT_PUB_SUB_TOPIC),
+            }))
             .await
+        {
+            todo!("log error");
+        };
     }
 
     async fn broadcast_timeout_qc(&self, timeout_qc_msg: TimeoutQcMsg) {
@@ -201,7 +217,7 @@ impl NetworkAdapter for WakuAdapter {
         view: View,
     ) -> Box<dyn Stream<Item = TimeoutQcMsg> + Send + Sync + Unpin> {
         Box::new(Box::pin(
-            self.cached_stream_with_content_topic(TIMEOUT_QC_CONTENT_TOPIC.clone())
+            self.cached_stream_with_content_topic(TIMEOUT_QC_CONTENT_TOPIC)
                 .await
                 .filter_map(move |message| {
                     let payload = message.payload();
@@ -264,7 +280,7 @@ impl NetworkAdapter for WakuAdapter {
             payload,
             content_topic,
             1,
-            chrono::Utc::now().timestamp() as usize,
+            chrono::Utc::now().timestamp_nanos() as usize,
             [],
             false,
         );
@@ -272,7 +288,7 @@ impl NetworkAdapter for WakuAdapter {
             .network_relay
             .send(NetworkMsg::Process(WakuBackendMessage::Broadcast {
                 message,
-                topic: Some(WAKU_CARNOT_PUB_SUB_TOPIC.clone()),
+                topic: Some(WAKU_CARNOT_PUB_SUB_TOPIC),
             }))
             .await
         {

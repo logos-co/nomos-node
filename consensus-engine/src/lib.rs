@@ -79,7 +79,7 @@ impl<O: Overlay> Carnot<O> {
         if timeout_qc.view < new_state.current_view {
             return new_state;
         }
-        new_state.update_high_qc(timeout_qc.high_qc.clone());
+        new_state.update_high_qc(Qc::Standard(timeout_qc.high_qc.clone()));
         new_state.update_timeout_qc(timeout_qc.clone());
 
         new_state.current_view = timeout_qc.view + 1;
@@ -167,9 +167,9 @@ impl<O: Overlay> Carnot<O> {
             .iter()
             .map(|nv| &nv.high_qc)
             .chain(std::iter::once(&timeout_qc.high_qc))
-            .max_by_key(|qc| qc.view())
+            .max_by_key(|qc| qc.view)
             .unwrap();
-        new_state.update_high_qc(high_qc.clone());
+        new_state.update_high_qc(Qc::Standard(high_qc.clone()));
 
         let new_view_msg = NewView {
             view: new_view,
@@ -209,7 +209,7 @@ impl<O: Overlay> Carnot<O> {
         {
             let timeout_msg = Timeout {
                 view: new_state.current_view,
-                high_qc: Qc::Standard(new_state.local_high_qc.clone()),
+                high_qc: new_state.local_high_qc.clone(),
                 sender: new_state.id,
                 timeout_qc: new_state.last_view_timeout_qc.clone(),
             };
@@ -314,6 +314,10 @@ impl<O: Overlay> Carnot<O> {
         res
     }
 
+    pub fn leader(&self, view: View) -> NodeId {
+        self.overlay.leader(view)
+    }
+
     pub fn last_view_timeout_qc(&self) -> Option<TimeoutQc> {
         self.last_view_timeout_qc.clone()
     }
@@ -338,8 +342,12 @@ impl<O: Overlay> Carnot<O> {
         self.id
     }
 
-    pub fn child_committee(&self) -> Committee {
-        self.overlay.child_committee(self.id)
+    pub fn self_committee(&self) -> Committee {
+        self.overlay.node_committee(self.id)
+    }
+
+    pub fn child_committees(&self) -> Vec<Committee> {
+        self.overlay.child_committees(self.id)
     }
 
     pub fn parent_committee(&self) -> Committee {
@@ -352,10 +360,6 @@ impl<O: Overlay> Carnot<O> {
 
     pub fn is_member_of_root_committee(&self) -> bool {
         self.overlay.is_member_of_root_committee(self.id)
-    }
-
-    pub fn leader(&self, view: View) -> NodeId {
-        self.overlay.leader(view)
     }
 }
 
@@ -395,11 +399,15 @@ mod test {
             todo!()
         }
 
+        fn node_committee(&self, _id: NodeId) -> Committee {
+            todo!()
+        }
+
         fn parent_committee(&self, _id: NodeId) -> Committee {
             todo!()
         }
 
-        fn child_committee(&self, _id: NodeId) -> Committee {
+        fn child_committees(&self, _id: NodeId) -> Vec<Committee> {
             todo!()
         }
 

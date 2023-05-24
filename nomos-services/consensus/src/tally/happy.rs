@@ -59,7 +59,7 @@ impl Tally for CarnotTally {
         }
         while let Some(vote) = vote_stream.next().await {
             // check vote view is valid
-            if !vote.vote.view != block.view || vote.vote.block != block.id {
+            if vote.vote.view != block.view || vote.vote.block != block.id {
                 continue;
             }
 

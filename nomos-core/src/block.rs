@@ -12,18 +12,10 @@ use serde::{Deserialize, Serialize};
 pub type TxHash = [u8; 32];
 
 /// A block
-#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Block<TxId: Clone + Eq + Hash> {
     header: consensus_engine::Block,
     transactions: IndexSet<TxId>,
-}
-
-impl<TxId: Clone + Eq + Hash> core::hash::Hash for Block<TxId> {
-    fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
-        self.header.hash(state);
-        self.transactions.len().hash(state);
-        self.transactions.iter().for_each(|tx| tx.hash(state));
-    }
 }
 
 /// Identifier of a block
@@ -33,7 +25,7 @@ impl<TxId: Clone + Eq + Hash + Serialize + DeserializeOwned> Block<TxId> {
     pub fn new(view: View, parent_qc: Qc, txs: impl Iterator<Item = TxId>) -> Self {
         let transactions = txs.collect();
         let header = consensus_engine::Block {
-            id: [0; 32],
+            id: [view as u8; 32],
             view,
             parent_qc,
         };

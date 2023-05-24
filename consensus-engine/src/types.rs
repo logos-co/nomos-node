@@ -39,7 +39,7 @@ pub struct Vote {
 pub struct Timeout {
     pub view: View,
     pub sender: NodeId,
-    pub high_qc: Qc,
+    pub high_qc: StandardQc,
     pub timeout_qc: Option<TimeoutQc>,
 }
 
@@ -51,14 +51,14 @@ pub struct NewView {
     pub view: View,
     pub sender: NodeId,
     pub timeout_qc: TimeoutQc,
-    pub high_qc: Qc,
+    pub high_qc: StandardQc,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct TimeoutQc {
     pub view: View,
-    pub high_qc: Qc,
+    pub high_qc: StandardQc,
     pub sender: NodeId,
 }
 
@@ -157,8 +157,9 @@ pub trait Overlay: Clone {
     fn is_member_of_leaf_committee(&self, id: NodeId) -> bool;
     fn is_child_of_root_committee(&self, id: NodeId) -> bool;
     fn parent_committee(&self, id: NodeId) -> Committee;
-    fn child_committee(&self, id: NodeId) -> Committee;
+    fn child_committees(&self, id: NodeId) -> Vec<Committee>;
     fn leaf_committees(&self, id: NodeId) -> Vec<Committee>;
+    fn node_committee(&self, id: NodeId) -> Committee;
     fn leader(&self, view: View) -> NodeId;
     fn super_majority_threshold(&self, id: NodeId) -> usize;
     fn leader_super_majority_threshold(&self, id: NodeId) -> usize;

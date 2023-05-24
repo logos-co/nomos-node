@@ -33,7 +33,7 @@ pub struct CarnotState {
     latest_committed_view: View,
     root_committe: Committee,
     parent_committe: Committee,
-    child_committee: Committee,
+    child_committees: Vec<Committee>,
     committed_blocks: Vec<BlockId>,
 }
 
@@ -45,7 +45,7 @@ impl<O: Overlay> From<&Carnot<O>> for CarnotState {
             local_high_qc: value.high_qc(),
             parent_committe: value.parent_committee(),
             root_committe: value.root_committee(),
-            child_committee: value.child_committee(),
+            child_committees: value.child_committees(),
             latest_committed_block: value.latest_committed_block(),
             latest_committed_view: value.latest_committed_view(),
             safe_blocks: value
@@ -292,6 +292,3 @@ impl<O: Overlay> Node for CarnotNode<O> {
         self.state = CarnotState::from(&self.engine);
     }
 }
-
-#[test]
-fn test_() {}
