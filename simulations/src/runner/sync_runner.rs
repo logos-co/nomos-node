@@ -1,8 +1,8 @@
 use serde::Serialize;
 
 use super::{SimulationRunner, SimulationRunnerHandle};
-use crate::node::Node;
 use crate::warding::SimulationState;
+use crate::{node::Node, output_processors::Record};
 use crossbeam::channel::{bounded, select};
 use std::sync::Arc;
 
@@ -15,7 +15,11 @@ where
     N: Send + Sync + 'static,
     N::Settings: Clone + Send,
     N::State: Serialize,
-    R: for<'a> TryFrom<&'a SimulationState<N>, Error = anyhow::Error> + Send + Sync + 'static,
+    R: Record
+        + for<'a> TryFrom<&'a SimulationState<N>, Error = anyhow::Error>
+        + Send
+        + Sync
+        + 'static,
 {
     let state = SimulationState {
         nodes: Arc::clone(&runner.nodes),
@@ -142,7 +146,7 @@ mod tests {
 
         let producer = StreamProducer::default();
         let runner: SimulationRunner<DummyMessage, DummyNode, OutData> =
-            SimulationRunner::new(network, nodes, producer, settings);
+            SimulationRunner::new(network, nodes, producer, settings).unwrap();
         let mut nodes = runner.nodes.write().unwrap();
         runner.inner.write().unwrap().step(&mut nodes);
         drop(nodes);
@@ -188,7 +192,7 @@ mod tests {
         network.collect_messages();
 
         let runner: SimulationRunner<DummyMessage, DummyNode, OutData> =
-            SimulationRunner::new(network, nodes, Default::default(), settings);
+            SimulationRunner::new(network, nodes, Default::default(), settings).unwrap();
 
         let mut nodes = runner.nodes.write().unwrap();
         runner.inner.write().unwrap().step(&mut nodes);

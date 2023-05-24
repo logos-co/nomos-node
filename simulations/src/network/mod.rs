@@ -8,7 +8,7 @@ use std::{
 use crossbeam::channel::{self, Receiver, Sender};
 use rand::{rngs::ThreadRng, Rng};
 use rayon::prelude::*;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 // internal
 use crate::node::NodeId;
 
@@ -17,7 +17,7 @@ pub mod regions;
 
 type NetworkTime = Instant;
 
-#[derive(Clone, Debug, Deserialize, Default)]
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
 pub struct NetworkSettings {
     pub network_behaviors: HashMap<(regions::Region, regions::Region), Duration>,
     /// Represents node distribution in the simulated regions.

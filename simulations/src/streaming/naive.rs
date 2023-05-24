@@ -1,12 +1,12 @@
+use super::{Receivers, StreamSettings, Subscriber};
+use crate::output_processors::{RecordType, Runtime};
+use serde::{Deserialize, Serialize};
 use std::{
     fs::{File, OpenOptions},
     io::Write,
     path::PathBuf,
     sync::{Arc, Mutex},
 };
-
-use super::{Receivers, StreamSettings, Subscriber};
-use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NaiveSettings {
@@ -41,7 +41,7 @@ pub struct NaiveSubscriber<R> {
 
 impl<R> Subscriber for NaiveSubscriber<R>
 where
-    R: Serialize + Send + Sync + 'static,
+    R: crate::output_processors::Record + Serialize,
 {
     type Record = R;
 
@@ -82,6 +82,8 @@ where
         loop {
             crossbeam::select! {
                 recv(self.recvs.stop_rx) -> _ => {
+                    // collect the run time meta
+                    self.sink(Arc::new(R::from(Runtime::load()?)))?;
                     break;
                 }
                 recv(self.recvs.recv) -> msg => {
@@ -98,6 +100,10 @@ where
         serde_json::to_writer(&mut *file, &state)?;
         file.write_all(b",\n")?;
         Ok(())
+    }
+
+    fn subscribe_data_type() -> RecordType {
+        RecordType::Data
     }
 }
 
@@ -201,7 +207,7 @@ mod tests {
                 .collect(),
         });
         let simulation_runner: SimulationRunner<(), DummyStreamingNode<()>, OutData> =
-            SimulationRunner::new(network, nodes, Default::default(), simulation_settings);
+            SimulationRunner::new(network, nodes, Default::default(), simulation_settings).unwrap();
         simulation_runner.simulate().unwrap();
     }
 }

@@ -1,4 +1,5 @@
 use crate::node::{Node, NodeId};
+use crate::output_processors::Record;
 use crate::runner::SimulationRunner;
 use crate::warding::SimulationState;
 use crossbeam::channel::bounded;
@@ -21,7 +22,11 @@ where
     N: Send + Sync + 'static,
     N::Settings: Clone + Send,
     N::State: Serialize,
-    R: for<'a> TryFrom<&'a SimulationState<N>, Error = anyhow::Error> + Send + Sync + 'static,
+    R: Record
+        + for<'a> TryFrom<&'a SimulationState<N>, Error = anyhow::Error>
+        + Send
+        + Sync
+        + 'static,
 {
     let simulation_state = SimulationState::<N> {
         nodes: Arc::clone(&runner.nodes),

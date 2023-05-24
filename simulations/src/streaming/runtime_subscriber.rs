@@ -1,66 +1,40 @@
+use super::{Receivers, Subscriber};
+use crate::output_processors::{RecordType, Runtime};
+use serde::{Deserialize, Serialize};
 use std::{
-    any::Any,
-    io::stdout,
+    fs::{File, OpenOptions},
+    io::Write,
+    path::PathBuf,
     sync::{Arc, Mutex},
 };
 
-use super::{Receivers, StreamSettings, Subscriber};
-use crate::output_processors::{RecordType, Runtime};
-use serde::{Deserialize, Serialize};
-
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct IOStreamSettings {
-    pub writer_type: WriteType,
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RuntimeSettings {
+    pub path: PathBuf,
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub enum WriteType {
-    #[default]
-    Stdout,
-}
-
-pub trait ToWriter<W: std::io::Write + Send + Sync + 'static> {
-    fn to_writer(&self) -> anyhow::Result<W>;
-}
-
-impl<W: std::io::Write + Send + Sync + 'static> ToWriter<W> for WriteType {
-    fn to_writer(&self) -> anyhow::Result<W> {
-        match self {
-            WriteType::Stdout => {
-                let stdout = Box::new(stdout());
-                let boxed_any = Box::new(stdout) as Box<dyn Any + Send + Sync>;
-                Ok(boxed_any.downcast::<W>().map(|boxed| *boxed).map_err(|_| {
-                    std::io::Error::new(std::io::ErrorKind::Other, "Writer type mismatch")
-                })?)
-            }
-        }
-    }
-}
-
-impl TryFrom<StreamSettings> for IOStreamSettings {
-    type Error = String;
-
-    fn try_from(settings: StreamSettings) -> Result<Self, Self::Error> {
-        match settings {
-            StreamSettings::IO(settings) => Ok(settings),
-            _ => Err("io settings can't be created".into()),
-        }
+impl Default for RuntimeSettings {
+    fn default() -> Self {
+        let mut tmp = std::env::temp_dir();
+        tmp.push("simulation");
+        tmp.set_extension("runtime");
+        Self { path: tmp }
     }
 }
 
 #[derive(Debug)]
-pub struct IOSubscriber<R, W = std::io::Stdout> {
+pub struct RuntimeSubscriber<R> {
+    file: Arc<Mutex<File>>,
     recvs: Arc<Receivers<R>>,
-    writer: Arc<Mutex<W>>,
 }
 
-impl<W, R> Subscriber for IOSubscriber<R, W>
+impl<R> Subscriber for RuntimeSubscriber<R>
 where
-    W: std::io::Write + Send + Sync + 'static,
     R: crate::output_processors::Record + Serialize,
 {
     type Record = R;
-    type Settings = IOStreamSettings;
+
+    type Settings = RuntimeSettings;
 
     fn new(
         record_recv: crossbeam::channel::Receiver<Arc<Self::Record>>,
@@ -70,13 +44,23 @@ where
     where
         Self: Sized,
     {
-        Ok(Self {
-            recvs: Arc::new(Receivers {
-                stop_rx: stop_recv,
-                recv: record_recv,
-            }),
-            writer: Arc::new(Mutex::new(settings.writer_type.to_writer()?)),
-        })
+        let mut opts = OpenOptions::new();
+        let recvs = Receivers {
+            stop_rx: stop_recv,
+            recv: record_recv,
+        };
+        let this = RuntimeSubscriber {
+            file: Arc::new(Mutex::new(
+                opts.truncate(true)
+                    .create(true)
+                    .read(true)
+                    .write(true)
+                    .open(&settings.path)?,
+            )),
+            recvs: Arc::new(recvs),
+        };
+        eprintln!("Subscribed to {}", settings.path.display());
+        Ok(this)
     }
 
     fn next(&self) -> Option<anyhow::Result<Arc<Self::Record>>> {
@@ -101,13 +85,9 @@ where
     }
 
     fn sink(&self, state: Arc<Self::Record>) -> anyhow::Result<()> {
-        serde_json::to_writer(
-            &mut *self
-                .writer
-                .lock()
-                .expect("fail to lock writer in io subscriber"),
-            &state,
-        )?;
+        let mut file = self.file.lock().expect("failed to lock file");
+        serde_json::to_writer(&mut *file, &state)?;
+        file.write_all(b",\n")?;
         Ok(())
     }
 
@@ -129,23 +109,24 @@ mod tests {
         node::{dummy_streaming::DummyStreamingNode, Node, NodeId},
         output_processors::OutData,
         runner::SimulationRunner,
-        util::node_id,
         warding::SimulationState,
     };
 
     use super::*;
     #[derive(Debug, Clone, Serialize)]
-    struct IORecord {
+    struct RuntimeRecord {
         states: HashMap<NodeId, usize>,
     }
 
-    impl TryFrom<&SimulationState<DummyStreamingNode<()>>> for IORecord {
+    impl TryFrom<&SimulationState<DummyStreamingNode<()>>> for RuntimeRecord {
         type Error = anyhow::Error;
 
         fn try_from(value: &SimulationState<DummyStreamingNode<()>>) -> Result<Self, Self::Error> {
-            let nodes = value.nodes.read().expect("failed to read nodes");
             Ok(Self {
-                states: nodes
+                states: value
+                    .nodes
+                    .read()
+                    .expect("failed to read nodes")
                     .iter()
                     .map(|node| (node.id(), node.current_view()))
                     .collect(),
@@ -161,7 +142,7 @@ mod tests {
         };
 
         let nodes = (0..6)
-            .map(|idx| DummyStreamingNode::new(node_id(idx), ()))
+            .map(|idx| DummyStreamingNode::new(NodeId::from(idx), ()))
             .collect::<Vec<_>>();
         let network = Network::new(RegionsData {
             regions: (0..6)
@@ -175,7 +156,7 @@ mod tests {
                         5 => Region::Australia,
                         _ => unreachable!(),
                     };
-                    (region, vec![node_id(idx)])
+                    (region, vec![idx.into()])
                 })
                 .collect(),
             node_region: (0..6)
@@ -189,7 +170,7 @@ mod tests {
                         5 => Region::Australia,
                         _ => unreachable!(),
                     };
-                    (node_id(idx), region)
+                    (idx.into(), region)
                 })
                 .collect(),
             region_network_behaviour: (0..6)
@@ -215,10 +196,6 @@ mod tests {
         });
         let simulation_runner: SimulationRunner<(), DummyStreamingNode<()>, OutData> =
             SimulationRunner::new(network, nodes, Default::default(), simulation_settings).unwrap();
-        simulation_runner
-            .simulate()
-            .unwrap()
-            .stop_after(Duration::from_millis(100))
-            .unwrap();
+        simulation_runner.simulate().unwrap();
     }
 }

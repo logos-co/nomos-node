@@ -7,6 +7,7 @@ mod sync_runner;
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
 
+use crate::output_processors::Record;
 // crates
 use crate::streaming::{StreamProducer, Subscriber, SubscriberHandle};
 use crossbeam::channel::Sender;
@@ -27,7 +28,7 @@ pub struct SimulationRunnerHandle<R> {
     handle: std::thread::JoinHandle<anyhow::Result<()>>,
 }
 
-impl<R: Send + Sync + 'static> SimulationRunnerHandle<R> {
+impl<R: Record> SimulationRunnerHandle<R> {
     pub fn stop_after(self, duration: Duration) -> anyhow::Result<()> {
         std::thread::sleep(duration);
         self.stop()
@@ -107,19 +108,28 @@ where
     N: Send + Sync + 'static,
     N::Settings: Clone + Send,
     N::State: Serialize,
-    R: for<'a> TryFrom<&'a SimulationState<N>, Error = anyhow::Error> + Send + Sync + 'static,
+    R: Record
+        + for<'a> TryFrom<&'a SimulationState<N>, Error = anyhow::Error>
+        + Send
+        + Sync
+        + 'static,
 {
     pub fn new(
         network: Network<M>,
         nodes: Vec<N>,
         producer: StreamProducer<R>,
-        settings: SimulationSettings,
-    ) -> Self {
+        mut settings: SimulationSettings,
+    ) -> anyhow::Result<Self> {
         let seed = settings
             .seed
             .unwrap_or_else(|| rand::thread_rng().next_u64());
 
-        println!("Seed: {seed}");
+        settings
+            .seed
+            .get_or_insert_with(|| rand::thread_rng().next_u64());
+
+        // Store the settings to the producer so that we can collect them later
+        producer.send(R::from(settings.clone()))?;
 
         let rng = SmallRng::seed_from_u64(seed);
         let nodes = Arc::new(RwLock::new(nodes));
@@ -135,7 +145,7 @@ where
             leaders_count: _,
             network_settings: _,
         } = settings;
-        Self {
+        Ok(Self {
             runner_settings,
             inner: Arc::new(RwLock::new(SimulationRunnerInner {
                 network,
@@ -144,10 +154,13 @@ where
             })),
             nodes,
             producer,
-        }
+        })
     }
 
     pub fn simulate(self) -> anyhow::Result<SimulationRunnerHandle<R>> {
+        // init the start time
+        let _ = *crate::START_TIME;
+
         match self.runner_settings.clone() {
             RunnerSettings::Sync => sync_runner::simulate(self),
             RunnerSettings::Async { chunks } => async_runner::simulate(self, chunks),
