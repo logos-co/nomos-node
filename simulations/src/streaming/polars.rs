@@ -122,6 +122,7 @@ where
             }),
             format: settings.format,
         };
+        eprintln!("Subscribed to {}", this.path.display());
         Ok(this)
     }
 

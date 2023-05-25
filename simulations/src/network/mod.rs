@@ -2,7 +2,8 @@
 use std::{
     collections::HashMap,
     ops::Add,
-    time::{Duration, Instant}, str::FromStr,
+    str::FromStr,
+    time::{Duration, Instant},
 };
 // crates
 use crossbeam::channel::{self, Receiver, Sender};
@@ -16,7 +17,6 @@ pub mod behaviour;
 pub mod regions;
 
 type NetworkTime = Instant;
-
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct NetworkBehaviourKey {
@@ -230,7 +230,7 @@ mod tests {
         regions::{Region, RegionsData},
         Network, NetworkInterface, NetworkMessage,
     };
-    use crate::{node::NodeId, util::node_id, network::NetworkBehaviourKey};
+    use crate::{network::NetworkBehaviourKey, node::NodeId, util::node_id};
     use crossbeam::channel::{self, Receiver, Sender};
     use std::{collections::HashMap, time::Duration};
 

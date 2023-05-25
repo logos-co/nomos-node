@@ -19,7 +19,7 @@ use nomos_consensus::{
     network::messages::{NewViewMsg, TimeoutMsg, VoteMsg},
     Event, Output,
 };
-use serde::{Deserialize, Serialize, ser::SerializeStruct};
+use serde::{ser::SerializeStruct, Deserialize, Serialize};
 
 // internal
 use super::{Node, NodeId};
@@ -41,12 +41,20 @@ pub struct CarnotState {
 impl Serialize for CarnotState {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
-        S: serde::Serializer {
+        S: serde::Serializer,
+    {
         let mut state = serializer.serialize_struct("CarnotState", 11)?;
         state.serialize_field("current_view", &self.current_view)?;
         state.serialize_field("highest_voted_view", &self.highest_voted_view)?;
         state.serialize_field("local_high_qc", &self.local_high_qc)?;
-        state.serialize_field("safe_blocks", &self.safe_blocks.iter().map(|(k, v)| (format!("{k:?}"), v.clone())).collect::<HashMap<_, _>>())?;
+        state.serialize_field(
+            "safe_blocks",
+            &self
+                .safe_blocks
+                .iter()
+                .map(|(k, v)| (format!("{k:?}"), v.clone()))
+                .collect::<HashMap<_, _>>(),
+        )?;
         state.serialize_field("last_view_timeout_qc", &self.last_view_timeout_qc)?;
         state.serialize_field("latest_committed_block", &self.latest_committed_block)?;
         state.serialize_field("latest_committed_view", &self.latest_committed_view)?;

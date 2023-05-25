@@ -17,7 +17,4 @@ pub(crate) fn parse_idx(id: &consensus_engine::NodeId) -> usize {
     u32::from_be_bytes(bytes) as usize
 }
 
-
-pub(crate) mod millis_duration {
-    
-}
+pub(crate) mod millis_duration {}

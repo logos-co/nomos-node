@@ -4,7 +4,7 @@ use std::{collections::HashMap, time::Duration};
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 
-use super::{NetworkSettings, NetworkBehaviourKey};
+use super::{NetworkBehaviourKey, NetworkSettings};
 // internal
 
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]

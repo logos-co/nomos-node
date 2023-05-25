@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 // internal
 use crate::{network::behaviour::NetworkBehaviour, node::NodeId};
 
-use super::{NetworkSettings, NetworkBehaviourKey};
+use super::{NetworkBehaviourKey, NetworkSettings};
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
 pub enum Region {
@@ -36,7 +36,12 @@ impl FromStr for Region {
     type Err = String;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s.trim().to_lowercase().replace(['-', '_', ' '], "").as_str() {
+        match s
+            .trim()
+            .to_lowercase()
+            .replace(['-', '_', ' '], "")
+            .as_str()
+        {
             "northamerica" | "na" => Ok(Self::NorthAmerica),
             "europe" | "eu" => Ok(Self::Europe),
             "asia" | "as" => Ok(Self::Asia),

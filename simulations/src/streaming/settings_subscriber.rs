@@ -68,16 +68,13 @@ where
     }
 
     fn run(self) -> anyhow::Result<()> {
-        loop {
-            crossbeam::select! {
-                recv(self.recvs.stop_rx) -> _ => {
-                    // collect the run time meta
-                    self.sink(Arc::new(R::from(Runtime::load()?)))?;
-                    break;
-                }
-                recv(self.recvs.recv) -> msg => {
-                    self.sink(msg?)?;
-                }
+        crossbeam::select! {
+            recv(self.recvs.stop_rx) -> _ => {
+                // collect the run time meta
+                self.sink(Arc::new(R::from(Runtime::load()?)))?;
+            }
+            recv(self.recvs.recv) -> msg => {
+                self.sink(msg?)?;
             }
         }
 
