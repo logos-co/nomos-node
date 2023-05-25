@@ -97,7 +97,7 @@ impl EventBuilder {
                                     view: b.header().view,
                                     parent_qc: b.header().parent_qc.clone(),
                                 })
-                                .unwrap_or_else(|| panic!("cannot find block id {:?}", block_id)),
+                                .unwrap_or_else(|| panic!("cannot find block id {block_id:?}")),
                             votes: votes.into_iter().map(|v| v.vote).collect(),
                         })
                     }
