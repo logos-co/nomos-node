@@ -121,7 +121,7 @@ impl<O: Overlay> CarnotNode<O> {
         let (sender, receiver) = crossbeam::channel::unbounded();
         let genesis = consensus_engine::Block {
             id: [0; 32],
-            view: 0,
+            view: -1,
             parent_qc: Qc::Standard(StandardQc::genesis()),
         };
         let overlay = O::new(settings.nodes.clone());
