@@ -49,25 +49,15 @@ impl EventBuilder {
         if !self.proposal_seen.contains(&engine.current_view())
             && engine.is_leader_for_view(engine.current_view())
         {
-            if !self.proposal_seen.contains(&engine.current_view())
-                && engine.is_leader_for_view(engine.current_view())
-            {
-                let block = if engine.current_view() == 0 {
-                    let header = engine.genesis_block();
-                    Block::new(header.view, header.parent_qc, [].into_iter())
-                } else {
-                    Block::new(
-                        engine.current_view(),
-                        Qc::Standard(engine.high_qc()),
-                        [].into_iter(),
-                    )
-                };
-                events.push(Event::Proposal {
-                    block,
-                    stream: Box::pin(futures::stream::empty()),
-                });
-                self.proposal_seen.insert(engine.current_view());
-            }
+            events.push(Event::Proposal {
+                block: Block::new(
+                    engine.current_view(),
+                    Qc::Standard(engine.high_qc()),
+                    [].into_iter(),
+                ),
+                stream: Box::pin(futures::stream::empty()),
+            });
+            self.proposal_seen.insert(engine.current_view());
         }
         for message in messages {
             match message {
