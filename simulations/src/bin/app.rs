@@ -29,8 +29,7 @@ use simulations::streaming::{
 // internal
 use simulations::{
     node::carnot::CarnotNode, output_processors::OutData, runner::SimulationRunner,
-    settings::SimulationSettings,
-    util::node_id
+    settings::SimulationSettings, util::node_id,
 };
 
 /// Main simulation wrapper
@@ -59,9 +58,7 @@ impl SimulationApp {
                 .as_secs()
         });
         let mut rng = SmallRng::seed_from_u64(seed);
-        let mut node_ids: Vec<NodeId> = (0..simulation_settings.node_count)
-            .map(node_id)
-            .collect();
+        let mut node_ids: Vec<NodeId> = (0..simulation_settings.node_count).map(node_id).collect();
         node_ids.shuffle(&mut rng);
 
         let regions = create_regions(&node_ids, &mut rng, &simulation_settings.network_settings);
@@ -85,15 +82,21 @@ impl SimulationApp {
         let mut network = Network::new(regions_data);
 
         match &simulation_settings.node_settings {
-            simulations::settings::NodeSettings::Carnot {
-                seed,
-                timeout,
-            } => {
+            simulations::settings::NodeSettings::Carnot { seed, timeout } => {
                 let ids = node_ids.clone();
                 let nodes = node_ids
                     .iter()
                     .copied()
-                    .map(|node_id| CarnotNode::<FlatRoundRobin>::new(node_id, CarnotSettings::new(ids.clone().into_iter().map(Into::into).collect(), *seed, *timeout)))
+                    .map(|node_id| {
+                        CarnotNode::<FlatRoundRobin>::new(
+                            node_id,
+                            CarnotSettings::new(
+                                ids.clone().into_iter().map(Into::into).collect(),
+                                *seed,
+                                *timeout,
+                            ),
+                        )
+                    })
                     .collect();
                 run(network, nodes, simulation_settings, stream_type)?;
             }

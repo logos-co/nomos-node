@@ -109,7 +109,8 @@ mod tests {
         node::{dummy_streaming::DummyStreamingNode, Node, NodeId},
         output_processors::OutData,
         runner::SimulationRunner,
-        warding::SimulationState, util::node_id,
+        util::node_id,
+        warding::SimulationState,
     };
 
     use super::*;

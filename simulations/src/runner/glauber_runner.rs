@@ -37,10 +37,7 @@ where
 
     let inner_runner = runner.inner.clone();
     let nodes = runner.nodes;
-    let nodes_remaining: BTreeSet<NodeId> =
-        (0..nodes.read().len())
-            .map(node_id)
-            .collect();
+    let nodes_remaining: BTreeSet<NodeId> = (0..nodes.read().len()).map(node_id).collect();
     let iterations: Vec<_> = (0..maximum_iterations).collect();
     let (stop_tx, stop_rx) = bounded(1);
     let p = runner.producer.clone();
