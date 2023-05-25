@@ -1,6 +1,6 @@
 // std
 use rand::{seq::SliceRandom, Rng};
-use std::collections::HashMap;
+use std::{collections::HashMap, str::FromStr};
 // crates
 use serde::{Deserialize, Serialize};
 // internal
@@ -8,7 +8,7 @@ use crate::{network::behaviour::NetworkBehaviour, node::NodeId};
 
 use super::NetworkSettings;
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, Serialize)]
 pub enum Region {
     NorthAmerica,
     Europe,
@@ -16,6 +16,29 @@ pub enum Region {
     Africa,
     SouthAmerica,
     Australia,
+}
+
+impl FromStr for Region {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.trim().to_lowercase().replace(['-', '_', ' '], "").as_str() {
+            "northamerica" | "na" => Ok(Self::NorthAmerica),
+            "europe" | "eu" => Ok(Self::Europe),
+            "asia" | "as" => Ok(Self::Asia),
+            "africa" | "af" => Ok(Self::Africa),
+            "southamerica" | "sa" => Ok(Self::SouthAmerica),
+            "australia" | "au" => Ok(Self::Australia),
+            _ => Err(format!("Unknown region: {}", s)),
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for Region {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let s = String::deserialize(deserializer)?;
+        Self::from_str(&s).map_err(serde::de::Error::custom)
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -39,6 +39,7 @@ pub struct SimulationSettings {
     pub network_settings: NetworkSettings,
     pub overlay_settings: OverlaySettings,
     pub node_settings: NodeSettings,
+    #[serde(default)]
     pub runner_settings: RunnerSettings,
     pub stream_settings: StreamSettings,
     pub node_count: usize,

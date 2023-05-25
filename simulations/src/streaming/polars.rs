@@ -45,7 +45,8 @@ impl<'de> Deserialize<'de> for PolarsFormat {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PolarsSettings {
     pub format: PolarsFormat,
-    pub path: PathBuf,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub path: Option<PathBuf>,
 }
 
 impl TryFrom<StreamSettings> for PolarsSettings {
@@ -110,7 +111,15 @@ where
         let this = PolarsSubscriber {
             data: Arc::new(Mutex::new(Vec::new())),
             recvs: Arc::new(recvs),
-            path: settings.path.clone(),
+            path: settings.path.clone().unwrap_or_else(|| {
+                let mut p = std::env::temp_dir().join("polars");
+                match settings.format {
+                    PolarsFormat::Json => p.set_extension("json"),
+                    PolarsFormat::Csv => p.set_extension("csv"),
+                    PolarsFormat::Parquet => p.set_extension("parquet"),
+                };
+                p
+            }),
             format: settings.format,
         };
         Ok(this)

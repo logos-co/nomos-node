@@ -1,0 +1,28 @@
+{
+  "network_settings": {
+    "network_behaviors": {
+    
+    },
+    "regions": {
+      "north america": 0.1,
+      "europe": 0.1,
+      "asia": 0.2,
+      "australia": 0.2,
+      "south america": 0.2,
+      "africa": 0.2
+    }
+  },
+  "overlay_settings": "Flat",
+  "node_settings": {
+    "seed": 0,
+    "timeout": 1000
+  },
+  "runner_settings": "Sync",
+  "stream_settings": {
+    "format": "json"
+  },
+  "node_count": 3,
+  "views_count": 3,
+  "leaders_count": 1,
+  "seed": 0
+}

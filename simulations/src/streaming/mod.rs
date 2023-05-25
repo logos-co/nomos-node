@@ -60,6 +60,7 @@ impl<'de> serde::Deserialize<'de> for StreamType {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase", untagged)]
 pub enum StreamSettings {
     Naive(naive::NaiveSettings),
     IO(io::IOStreamSettings),
