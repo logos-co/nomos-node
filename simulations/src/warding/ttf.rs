@@ -16,7 +16,6 @@ impl<N: Node> SimulationWard<N> for MaxViewWard {
         state
             .nodes
             .read()
-            .expect("simulations: MaxViewWard panic when requiring a read lock")
             .iter()
             .all(|n| n.current_view() >= self.max_view)
     }
@@ -26,7 +25,8 @@ impl<N: Node> SimulationWard<N> for MaxViewWard {
 mod test {
     use crate::warding::ttf::MaxViewWard;
     use crate::warding::{SimulationState, SimulationWard};
-    use std::sync::{Arc, RwLock};
+    use parking_lot::RwLock;
+    use std::sync::Arc;
 
     #[test]
     fn rebase_threshold() {
@@ -38,7 +38,7 @@ mod test {
         };
         assert!(ttf.analyze(&state));
 
-        state.nodes.write().unwrap().push(9);
+        state.nodes.write().push(9);
         assert!(!ttf.analyze(&state));
     }
 }

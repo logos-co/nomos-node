@@ -4,13 +4,14 @@ mod layered_runner;
 mod sync_runner;
 
 // std
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 use std::time::Duration;
 
 use crate::output_processors::Record;
 // crates
 use crate::streaming::{StreamProducer, Subscriber, SubscriberHandle};
 use crossbeam::channel::Sender;
+use parking_lot::RwLock;
 use rand::rngs::SmallRng;
 use rand::{RngCore, SeedableRng};
 use rayon::prelude::*;

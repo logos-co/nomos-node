@@ -34,10 +34,7 @@ impl StalledViewWard {
 impl<N: Node> SimulationWard<N> for StalledViewWard {
     type SimulationState = SimulationState<N>;
     fn analyze(&mut self, state: &Self::SimulationState) -> bool {
-        let nodes = state
-            .nodes
-            .read()
-            .expect("simulations: StalledViewWard panic when requiring a read lock");
+        let nodes = state.nodes.read();
         self.update_state(checksum(nodes.as_slice()));
         self.criterion >= self.threshold
     }
@@ -57,7 +54,8 @@ fn checksum<N: Node>(nodes: &[N]) -> u32 {
 #[cfg(test)]
 mod test {
     use super::*;
-    use std::sync::{Arc, RwLock};
+    use parking_lot::RwLock;
+    use std::sync::Arc;
 
     #[test]
     fn rebase_threshold() {
@@ -78,7 +76,7 @@ mod test {
         assert!(stalled.analyze(&state));
 
         // push a new one, so the criterion is reset to 0
-        state.nodes.write().unwrap().push(20);
+        state.nodes.write().push(20);
         assert!(!stalled.analyze(&state));
 
         // increase the criterion, 2
