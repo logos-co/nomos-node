@@ -282,7 +282,6 @@ impl<O: Overlay> Node for CarnotNode<O> {
                 .collect(),
             &self.engine,
         );
-        println!("vote:{:?} events:{}", self.id, events.len());
         for event in events {
             let mut output: Vec<Output<CarnotTx>> = vec![];
             match event {
@@ -303,6 +302,7 @@ impl<O: Overlay> Node for CarnotNode<O> {
                     }
 
                     if self.engine.overlay().is_member_of_leaf_committee(self.id) {
+                        println!("send vote from {:?} to {:?}", self.id, block.header().id);
                         output.push(nomos_consensus::Output::Send(consensus_engine::Send {
                             to: self.engine.parent_committee(),
                             payload: Payload::Vote(Vote {
@@ -319,6 +319,7 @@ impl<O: Overlay> Node for CarnotNode<O> {
                     block,
                     votes: _,
                 } => {
+                    println!("receive approve {:?}", block.id);
                     let (new, out) = self.engine.approve_block(block);
                     output = vec![Output::Send(out)];
                     self.engine = new;
