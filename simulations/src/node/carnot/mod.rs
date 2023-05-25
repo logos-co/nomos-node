@@ -285,11 +285,11 @@ impl<O: Overlay> Node for CarnotNode<O> {
         );
 
         for event in events {
-            let mut output = None;
+            let mut output: Vec<Output<CarnotTx>> = vec![];
             match event {
                 Event::Proposal { block, stream: _ } => {
                     if self.engine.is_leader_for_view(self.engine.current_view()) {
-                        output = Some(nomos_consensus::Output::BroadcastProposal {
+                        output.push(nomos_consensus::Output::BroadcastProposal {
                             proposal: block.clone(),
                         });
                     }
@@ -302,6 +302,15 @@ impl<O: Overlay> Node for CarnotNode<O> {
                         Ok(new) => self.engine = new,
                         Err(_) => println!("invalid block {block:?}"),
                     }
+                    if self.engine.overlay().is_member_of_leaf_committee(self.id) {
+                        output.push(nomos_consensus::Output::Send(consensus_engine::Send {
+                            to: self.engine.parent_committee(),
+                            payload: Payload::Vote(Vote {
+                                view: self.engine.current_view(),
+                                block: block.header().id,
+                            }),
+                        }))
+                    }
                 }
                 // This branch means we already get enough votes for this block
                 // So we can just call approve_block
@@ -311,7 +320,7 @@ impl<O: Overlay> Node for CarnotNode<O> {
                     votes: _,
                 } => {
                     let (new, out) = self.engine.approve_block(block);
-                    output = Some(Output::Send(out));
+                    output = vec![Output::Send(out)];
                     self.engine = new;
                 }
                 // This branch means we already get enough new view msgs for this qc
@@ -342,8 +351,8 @@ impl<O: Overlay> Node for CarnotNode<O> {
                 Event::None => unreachable!("none event will never be constructed"),
             }
 
-            if let Some(output) = output {
-                self.handle_output(output);
+            for output_event in output.drain(..) {
+                self.handle_output(output_event);
             }
         }
 

@@ -46,19 +46,8 @@ impl EventBuilder {
         engine: &Carnot<O>,
     ) -> Vec<Event<CarnotTx>> {
         let mut events = Vec::new();
-        if !self.proposal_seen.contains(&engine.current_view())
-            && engine.is_leader_for_view(engine.current_view())
-        {
-            events.push(Event::Proposal {
-                block: Block::new(
-                    engine.current_view(),
-                    Qc::Standard(engine.high_qc()),
-                    [].into_iter(),
-                ),
-                stream: Box::pin(futures::stream::empty()),
-            });
-            self.proposal_seen.insert(engine.current_view());
-        }
+        self.try_handle_leader(engine, &mut events);
+
         for message in messages {
             match message {
                 CarnotMessage::Proposal(msg) => {
@@ -133,6 +122,26 @@ impl EventBuilder {
         }
 
         events
+    }
+
+    fn try_handle_leader<O: Overlay>(
+        &mut self,
+        engine: &Carnot<O>,
+        events: &mut Vec<Event<CarnotTx>>,
+    ) {
+        if !self.proposal_seen.contains(&engine.current_view())
+            && engine.is_leader_for_view(engine.current_view())
+        {
+            events.push(Event::Proposal {
+                block: Block::new(
+                    engine.current_view(),
+                    Qc::Standard(engine.high_qc()),
+                    [].into_iter(),
+                ),
+                stream: Box::pin(futures::stream::empty()),
+            });
+            self.proposal_seen.insert(engine.current_view());
+        }
     }
 }
 
