@@ -117,8 +117,7 @@ pub struct CarnotNode<O: Overlay> {
 }
 
 impl<O: Overlay> CarnotNode<O> {
-    pub fn new(id: consensus_engine::NodeId, settings: CarnotSettings) -> Self {
-        let (sender, receiver) = crossbeam::channel::unbounded();
+    pub fn new(id: consensus_engine::NodeId, settings: CarnotSettings, network_interface: InMemoryNetworkInterface<CarnotMessage>) -> Self {
         let genesis = consensus_engine::Block {
             id: [0; 32],
             view: -1,
@@ -132,7 +131,7 @@ impl<O: Overlay> CarnotNode<O> {
             id,
             state,
             settings,
-            network_interface: InMemoryNetworkInterface::new(id, sender, receiver),
+            network_interface,
             event_builder: event_builder::EventBuilder::new(id),
             engine,
         }
@@ -283,7 +282,7 @@ impl<O: Overlay> Node for CarnotNode<O> {
                 .collect(),
             &self.engine,
         );
-
+        println!("vote:{:?} events:{}", self.id, events.len());
         for event in events {
             let mut output: Vec<Output<CarnotTx>> = vec![];
             match event {
@@ -302,6 +301,7 @@ impl<O: Overlay> Node for CarnotNode<O> {
                         Ok(new) => self.engine = new,
                         Err(_) => println!("invalid block {block:?}"),
                     }
+
                     if self.engine.overlay().is_member_of_leaf_committee(self.id) {
                         output.push(nomos_consensus::Output::Send(consensus_engine::Send {
                             to: self.engine.parent_committee(),

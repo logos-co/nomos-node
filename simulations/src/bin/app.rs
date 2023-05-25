@@ -79,15 +79,23 @@ impl SimulationApp {
             overlays,
         }));
 
-        let mut network = Network::new(regions_data);
+       
 
         match &simulation_settings.node_settings {
             simulations::settings::NodeSettings::Carnot { seed, timeout } => {
                 let ids = node_ids.clone();
+                let mut network = Network::new(regions_data);
                 let nodes = node_ids
                     .iter()
                     .copied()
                     .map(|node_id| {
+                        let (node_message_sender, node_message_receiver) = channel::unbounded();
+                        let network_message_receiver = network.connect(node_id, node_message_receiver);
+                        let network_interface = InMemoryNetworkInterface::new(
+                            node_id,
+                            node_message_sender,
+                            network_message_receiver,
+                        );
                         CarnotNode::<FlatRoundRobin>::new(
                             node_id,
                             CarnotSettings::new(
@@ -95,12 +103,14 @@ impl SimulationApp {
                                 *seed,
                                 *timeout,
                             ),
+                            network_interface
                         )
                     })
                     .collect();
                 run(network, nodes, simulation_settings, stream_type)?;
             }
             simulations::settings::NodeSettings::Dummy => {
+                let mut network = Network::new(regions_data);
                 let nodes = node_ids
                     .iter()
                     .map(|node_id| {

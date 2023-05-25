@@ -39,7 +39,7 @@ impl VoteMsg {
     }
 }
 
-#[derive(Serialize, Deserialize, Hash, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Hash, PartialEq, Eq, Clone)]
 pub struct NewViewMsg {
     pub voter: NodeId,
     pub vote: NewView,
@@ -54,7 +54,7 @@ impl NewViewMsg {
     }
 }
 
-#[derive(Serialize, Deserialize, Hash, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Hash, PartialEq, Eq, Clone)]
 pub struct TimeoutMsg {
     pub voter: NodeId,
     pub vote: Timeout,
@@ -69,7 +69,7 @@ impl TimeoutMsg {
     }
 }
 
-#[derive(Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[derive(Serialize, Deserialize, PartialEq, Eq, Hash, Clone)]
 pub struct TimeoutQcMsg {
     pub source: NodeId,
     pub qc: TimeoutQc,
