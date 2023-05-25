@@ -22,8 +22,12 @@ pub enum RunnerSettings {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
+#[serde(untagged)]
 pub enum NodeSettings {
-    Carnot,
+    Carnot {
+        seed: u64,
+        timeout: std::time::Duration,
+    },
     #[default]
     Dummy,
 }

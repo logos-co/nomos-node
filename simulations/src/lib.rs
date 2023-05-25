@@ -7,6 +7,6 @@ pub mod settings;
 pub mod streaming;
 pub mod warding;
 
-pub(crate) mod util;
+pub mod util;
 static START_TIME: once_cell::sync::Lazy<std::time::Instant> =
     once_cell::sync::Lazy::new(std::time::Instant::now);

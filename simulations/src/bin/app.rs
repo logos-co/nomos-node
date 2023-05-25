@@ -1,6 +1,7 @@
 // std
 use anyhow::Ok;
 use serde::Serialize;
+use simulations::node::carnot::CarnotSettings;
 use std::collections::BTreeMap;
 use std::fs::File;
 use std::path::{Path, PathBuf};
@@ -9,6 +10,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 // crates
 use clap::Parser;
 use crossbeam::channel;
+use nomos_consensus::overlay::FlatRoundRobin;
 use parking_lot::RwLock;
 use rand::rngs::SmallRng;
 use rand::seq::SliceRandom;
@@ -28,6 +30,7 @@ use simulations::streaming::{
 use simulations::{
     node::carnot::CarnotNode, output_processors::OutData, runner::SimulationRunner,
     settings::SimulationSettings,
+    util::node_id
 };
 
 /// Main simulation wrapper
@@ -57,7 +60,7 @@ impl SimulationApp {
         });
         let mut rng = SmallRng::seed_from_u64(seed);
         let mut node_ids: Vec<NodeId> = (0..simulation_settings.node_count)
-            .map(Into::into)
+            .map(node_id)
             .collect();
         node_ids.shuffle(&mut rng);
 
@@ -82,10 +85,15 @@ impl SimulationApp {
         let mut network = Network::new(regions_data);
 
         match &simulation_settings.node_settings {
-            simulations::settings::NodeSettings::Carnot => {
+            simulations::settings::NodeSettings::Carnot {
+                seed,
+                timeout,
+            } => {
+                let ids = node_ids.clone();
                 let nodes = node_ids
                     .iter()
-                    .map(|node_id| CarnotNode::new(*node_id))
+                    .copied()
+                    .map(|node_id| CarnotNode::<FlatRoundRobin>::new(node_id, CarnotSettings::new(ids.clone().into_iter().map(Into::into).collect(), *seed, *timeout)))
                     .collect();
                 run(network, nodes, simulation_settings, stream_type)?;
             }

@@ -67,6 +67,16 @@ pub struct CarnotSettings {
     timeout: Duration,
 }
 
+impl CarnotSettings {
+    pub fn new(nodes: Vec<consensus_engine::NodeId>, seed: u64, timeout: Duration) -> Self {
+        Self {
+            nodes,
+            seed,
+            timeout,
+        }
+    }
+}
+
 #[allow(dead_code)] // TODO: remove when handling settings
 pub struct CarnotNode<O: Overlay> {
     id: consensus_engine::NodeId,
