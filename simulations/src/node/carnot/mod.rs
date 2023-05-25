@@ -251,7 +251,7 @@ impl<O: Overlay> Node for CarnotNode<O> {
                         parent_qc: block.header().parent_qc.clone(),
                     }) {
                         Ok(new) => self.engine = new,
-                        Err(_) => println!("invalid block {:?}", block),
+                        Err(_) => println!("invalid block {block:?}"),
                     }
                 }
                 // This branch means we already get enough votes for this block
@@ -284,7 +284,7 @@ impl<O: Overlay> Node for CarnotNode<O> {
                     self.engine = self.engine.receive_timeout_qc(timeout_qc);
                 }
                 Event::RootTimeout { timeouts } => {
-                    println!("root timeouts: {:?}", timeouts);
+                    println!("root timeouts: {timeouts:?}");
                 }
                 Event::ProposeBlock { .. } => {
                     unreachable!("propose block will never be constructed")

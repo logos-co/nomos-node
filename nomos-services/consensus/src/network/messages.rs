@@ -39,7 +39,6 @@ impl VoteMsg {
     }
 }
 
-
 #[derive(Serialize, Deserialize, Hash, PartialEq, Eq)]
 pub struct NewViewMsg {
     pub voter: NodeId,

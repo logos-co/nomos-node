@@ -1,8 +1,8 @@
 // std
 use std::sync::Arc;
 // crates
-use serde::{Deserialize, Serialize};
 use parking_lot::RwLock;
+use serde::{Deserialize, Serialize};
 // internal
 use crate::node::Node;
 

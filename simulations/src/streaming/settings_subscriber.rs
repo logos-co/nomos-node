@@ -109,7 +109,8 @@ mod tests {
         node::{dummy_streaming::DummyStreamingNode, Node, NodeId},
         output_processors::OutData,
         runner::SimulationRunner,
-        warding::SimulationState, util::node_id,
+        util::node_id,
+        warding::SimulationState,
     };
 
     use super::*;
@@ -125,7 +126,7 @@ mod tests {
             Ok(Self {
                 states: value
                     .nodes
-                    .read() 
+                    .read()
                     .iter()
                     .map(|node| (node.id(), node.current_view()))
                     .collect(),
