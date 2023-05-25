@@ -1,11 +1,12 @@
 use super::{Receivers, StreamSettings, Subscriber};
 use crate::output_processors::{RecordType, Runtime};
+use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 use std::{
     fs::{File, OpenOptions},
     io::Write,
     path::PathBuf,
-    sync::{Arc, Mutex},
+    sync::Arc,
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -96,7 +97,7 @@ where
     }
 
     fn sink(&self, state: Arc<Self::Record>) -> anyhow::Result<()> {
-        let mut file = self.file.lock().expect("failed to lock file");
+        let mut file = self.file.lock();
         serde_json::to_writer(&mut *file, &state)?;
         file.write_all(b",\n")?;
         Ok(())
@@ -138,7 +139,6 @@ mod tests {
                 states: value
                     .nodes
                     .read()
-                    .expect("failed to read nodes")
                     .iter()
                     .map(|node| (node.id(), node.current_view()))
                     .collect(),
