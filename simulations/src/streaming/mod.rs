@@ -40,6 +40,7 @@ impl FromStr for StreamType {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.trim().to_ascii_lowercase().as_str() {
+            "io" => Ok(Self::IO),
             "naive" => Ok(Self::Naive),
             "polars" => Ok(Self::Polars),
             tag => Err(format!(

@@ -3,6 +3,10 @@ name = "simulations"
 version = "0.1.0"
 edition = "2021"
 
+[[bin]]
+name = "simulation"
+path = "src/bin/app.rs"
+
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
