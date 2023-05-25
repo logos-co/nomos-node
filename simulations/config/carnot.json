@@ -15,7 +15,7 @@
   "overlay_settings": "Flat",
   "node_settings": {
     "seed": 0,
-    "timeout": 1000
+    "timeout": "1000ms"
   },
   "runner_settings": "Sync",
   "stream_settings": {

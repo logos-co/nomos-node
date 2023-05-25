@@ -6,9 +6,9 @@ use serde::{Deserialize, Serialize};
 // internal
 use crate::{network::behaviour::NetworkBehaviour, node::NodeId};
 
-use super::NetworkSettings;
+use super::{NetworkSettings, NetworkBehaviourKey};
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, Serialize)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
 pub enum Region {
     NorthAmerica,
     Europe,
@@ -16,6 +16,20 @@ pub enum Region {
     Africa,
     SouthAmerica,
     Australia,
+}
+
+impl core::fmt::Display for Region {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let s = match self {
+            Self::NorthAmerica => "NorthAmerica",
+            Self::Europe => "Europe",
+            Self::Asia => "Asia",
+            Self::Africa => "Africa",
+            Self::SouthAmerica => "SouthAmerica",
+            Self::Australia => "Australia",
+        };
+        write!(f, "{}", s)
+    }
 }
 
 impl FromStr for Region {
@@ -34,6 +48,20 @@ impl FromStr for Region {
     }
 }
 
+impl Serialize for Region {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        let s = match self {
+            Self::NorthAmerica => "North America",
+            Self::Europe => "Europe",
+            Self::Asia => "Asia",
+            Self::Africa => "Africa",
+            Self::SouthAmerica => "South America",
+            Self::Australia => "Australia",
+        };
+        serializer.serialize_str(s)
+    }
+}
+
 impl<'de> Deserialize<'de> for Region {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         let s = String::deserialize(deserializer)?;
@@ -46,13 +74,13 @@ pub struct RegionsData {
     pub regions: HashMap<Region, Vec<NodeId>>,
     #[serde(skip)]
     pub node_region: HashMap<NodeId, Region>,
-    pub region_network_behaviour: HashMap<(Region, Region), NetworkBehaviour>,
+    pub region_network_behaviour: HashMap<NetworkBehaviourKey, NetworkBehaviour>,
 }
 
 impl RegionsData {
     pub fn new(
         regions: HashMap<Region, Vec<NodeId>>,
-        region_network_behaviour: HashMap<(Region, Region), NetworkBehaviour>,
+        region_network_behaviour: HashMap<NetworkBehaviourKey, NetworkBehaviour>,
     ) -> Self {
         let node_region = regions
             .iter()
@@ -72,9 +100,11 @@ impl RegionsData {
     pub fn network_behaviour(&self, node_a: NodeId, node_b: NodeId) -> &NetworkBehaviour {
         let region_a = self.node_region[&node_a];
         let region_b = self.node_region[&node_b];
+        let k = NetworkBehaviourKey::new(region_a, region_b);
+        let k_rev = NetworkBehaviourKey::new(region_b, region_a);
         self.region_network_behaviour
-            .get(&(region_a, region_b))
-            .or(self.region_network_behaviour.get(&(region_b, region_a)))
+            .get(&k)
+            .or(self.region_network_behaviour.get(&k_rev))
             .expect("Network behaviour not found for the given regions")
     }
 

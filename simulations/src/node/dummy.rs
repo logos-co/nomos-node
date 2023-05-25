@@ -435,7 +435,7 @@ mod tests {
         network::{
             behaviour::NetworkBehaviour,
             regions::{Region, RegionsData},
-            InMemoryNetworkInterface, Network,
+            InMemoryNetworkInterface, Network, NetworkBehaviourKey,
         },
         node::{
             dummy::{get_child_nodes, get_parent_nodes, get_roles, DummyRole},
@@ -453,7 +453,7 @@ mod tests {
     fn init_network(node_ids: &[NodeId]) -> Network<DummyMessage> {
         let regions = HashMap::from([(Region::Europe, node_ids.to_vec())]);
         let behaviour = HashMap::from([(
-            (Region::Europe, Region::Europe),
+            NetworkBehaviourKey::new(Region::Europe, Region::Europe),
             NetworkBehaviour::new(Duration::from_millis(100), 0.0),
         )]);
         let regions_data = RegionsData::new(regions, behaviour);

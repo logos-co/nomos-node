@@ -17,12 +17,11 @@ use nomos_consensus::{
     network::messages::{NewViewMsg, TimeoutMsg, VoteMsg},
     Event,
 };
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize, ser::SerializeStruct};
 
 // internal
 use super::{Node, NodeId};
 
-#[derive(Serialize)]
 pub struct CarnotState {
     current_view: View,
     highest_voted_view: View,
@@ -35,6 +34,26 @@ pub struct CarnotState {
     parent_committe: Committee,
     child_committees: Vec<Committee>,
     committed_blocks: Vec<BlockId>,
+}
+
+impl Serialize for CarnotState {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer {
+        let mut state = serializer.serialize_struct("CarnotState", 11)?;
+        state.serialize_field("current_view", &self.current_view)?;
+        state.serialize_field("highest_voted_view", &self.highest_voted_view)?;
+        state.serialize_field("local_high_qc", &self.local_high_qc)?;
+        state.serialize_field("safe_blocks", &self.safe_blocks.iter().map(|(k, v)| (format!("{k:?}"), v.clone())).collect::<HashMap<_, _>>())?;
+        state.serialize_field("last_view_timeout_qc", &self.last_view_timeout_qc)?;
+        state.serialize_field("latest_committed_block", &self.latest_committed_block)?;
+        state.serialize_field("latest_committed_view", &self.latest_committed_view)?;
+        state.serialize_field("root_committe", &self.root_committe)?;
+        state.serialize_field("parent_committe", &self.parent_committe)?;
+        state.serialize_field("child_committees", &self.child_committees)?;
+        state.serialize_field("committed_blocks", &self.committed_blocks)?;
+        state.end()
+    }
 }
 
 impl<O: Overlay> From<&Carnot<O>> for CarnotState {

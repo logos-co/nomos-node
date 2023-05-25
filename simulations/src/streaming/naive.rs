@@ -116,7 +116,7 @@ mod tests {
         network::{
             behaviour::NetworkBehaviour,
             regions::{Region, RegionsData},
-            Network,
+            Network, NetworkBehaviourKey,
         },
         node::{dummy_streaming::DummyStreamingNode, Node, NodeId},
         output_processors::OutData,
@@ -197,7 +197,7 @@ mod tests {
                         _ => unreachable!(),
                     };
                     (
-                        (region, region),
+                        NetworkBehaviourKey::new(region, region),
                         NetworkBehaviour {
                             delay: Duration::from_millis(100),
                             drop: 0.0,

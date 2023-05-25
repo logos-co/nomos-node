@@ -26,6 +26,7 @@ pub enum RunnerSettings {
 pub enum NodeSettings {
     Carnot {
         seed: u64,
+        #[serde(with = "humantime_serde")]
         timeout: std::time::Duration,
     },
     #[default]
