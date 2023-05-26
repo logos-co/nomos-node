@@ -37,7 +37,6 @@ struct Nomos {
 }
 
 fn main() -> Result<()> {
-    tracing_subscriber::fmt::init();
     let Args { config } = Args::parse();
     let config = serde_yaml::from_reader::<_, Config>(std::fs::File::open(config)?)?;
     let app = OverwatchRunner::<Nomos>::run(
