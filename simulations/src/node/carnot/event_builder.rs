@@ -1,4 +1,5 @@
 use crate::node::carnot::messages::CarnotMessage;
+use crate::util::parse_idx;
 use consensus_engine::{Carnot, Overlay, Qc, View};
 use nomos_consensus::network::messages::{NewViewMsg, TimeoutMsg, VoteMsg};
 use nomos_consensus::{Event, NodeId};
@@ -47,7 +48,6 @@ impl EventBuilder {
     ) -> Vec<Event<CarnotTx>> {
         let mut events = Vec::new();
         self.try_handle_leader(engine, &mut events);
-
         for message in messages {
             match message {
                 CarnotMessage::Proposal(msg) => {
@@ -74,18 +74,21 @@ impl EventBuilder {
                     };
 
                     if let Some(votes) = self.vote_message.tally_by(msg_view, msg, threshold) {
+                        let block = self
+                        .blocks
+                        .get(&block_id)
+                        .cloned()
+                        .map(|b| consensus_engine::Block {
+                            id: b.header().id,
+                            view: b.header().view,
+                            parent_qc: b.header().parent_qc.clone(),
+                        })
+                        .unwrap_or_else(|| panic!("cannot find block id {block_id:?}"));
+                        println!("Node({}) approve: votes: {}, view: {}, block {:?}", parse_idx(&self.id), votes.len(), block.view, block.id);
+
                         events.push(Event::Approve {
                             qc,
-                            block: self
-                                .blocks
-                                .get(&block_id)
-                                .cloned()
-                                .map(|b| consensus_engine::Block {
-                                    id: b.header().id,
-                                    view: b.header().view,
-                                    parent_qc: b.header().parent_qc.clone(),
-                                })
-                                .unwrap_or_else(|| panic!("cannot find block id {block_id:?}")),
+                            block,
                             votes: votes.into_iter().map(|v| v.vote).collect(),
                         })
                     }

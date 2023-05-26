@@ -419,6 +419,7 @@ where
     }
 }
 
+#[derive(Debug)]
 pub enum Output<Tx: Clone + Eq + Hash> {
     Send(consensus_engine::Send),
     BroadcastTimeoutQc { timeout_qc: TimeoutQc },
