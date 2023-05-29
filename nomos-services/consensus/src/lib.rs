@@ -494,7 +494,6 @@ where
         view: consensus_engine::View,
         threshold: usize,
     ) -> Event<P::Tx> {
-        futures::pending!();
         let timeouts = adapter
             .timeout_stream(committee, view)
             .await
