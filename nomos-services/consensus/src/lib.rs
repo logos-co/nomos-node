@@ -29,7 +29,7 @@ use consensus_engine::{
     Vote,
 };
 
-use nomos_core::block::Block;
+pub use nomos_core::block::Block;
 use nomos_core::crypto::PublicKey;
 use nomos_core::fountain::FountainCode;
 use nomos_core::tx::Transaction;
@@ -270,12 +270,12 @@ where
                             block.view,
                             async move {
                                 let Event::Approve { qc, .. } = Self::gather_votes(
-                                adapter,
-                                leader_committee,
-                                block,
-                                leader_tally_settings.clone(),
-                            )
-                            .await else { unreachable!() };
+                                    adapter,
+                                    leader_committee,
+                                    block,
+                                    leader_tally_settings.clone(),
+                                )
+                                .await else { unreachable!() };
                                 Event::ProposeBlock { qc }
                             },
                         )));

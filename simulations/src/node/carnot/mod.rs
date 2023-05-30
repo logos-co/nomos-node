@@ -300,7 +300,13 @@ impl<O: Overlay> Node for CarnotNode<O> {
                             proposal: block.clone(),
                         });
                     }
-                    tracing::info!(node = parse_idx(&self.id), current_view = self.engine.current_view(), block_view = block.header().view, block = ?block.header().id, "receive block proposal");
+
+                    if self.engine.blocks_in_view(block.header().view).contains(block.header()) {
+                        continue;
+                    }
+
+                    let current_view = self.engine.current_view();
+                    tracing::info!(node = parse_idx(&self.id), current_view = current_view, block_view = block.header().view, block = ?block.header().id, "receive block proposal");
                     match self.engine.receive_block(consensus_engine::Block {
                         id: block.header().id,
                         view: block.header().view,
@@ -325,7 +331,7 @@ impl<O: Overlay> Node for CarnotNode<O> {
                 // This branch means we already get enough votes for this block
                 // So we can just call approve_block
                 Event::Approve {
-                    qc: _,
+                    qc,
                     block,
                     votes: _,
                 } => {
@@ -334,6 +340,13 @@ impl<O: Overlay> Node for CarnotNode<O> {
                         let (new, out) = self.engine.approve_block(block);
                         output = vec![Output::Send(out)];
                         self.engine = new;
+                    }
+
+                    let current_view = self.engine.current_view();
+                    if self.engine.is_leader_for_view(current_view + 1) {
+                        output.push(nomos_consensus::Output::BroadcastProposal {
+                            proposal: nomos_consensus::Block::new(current_view + 1, qc, core::iter::empty()),
+                        });
                     }
                 }
                 // This branch means we already get enough new view msgs for this qc

@@ -76,7 +76,11 @@ impl EventBuilder {
                     };
 
                     if let Some(votes) = self.vote_message.tally_by(msg_view, msg, threshold) {
-                        let block = self
+                        if is_leader {
+                            self.propose_new_block(engine, &mut events);
+                            continue;
+                        }
+                        if let Some(block) = self
                             .blocks
                             .get(&block_id)
                             .cloned()
@@ -85,15 +89,15 @@ impl EventBuilder {
                                 view: b.header().view,
                                 parent_qc: b.header().parent_qc.clone(),
                             })
-                            .unwrap_or_else(|| panic!("cannot find block id {block_id:?}"));
+                        {
+                            tracing::info!(node=?parse_idx(&self.id), votes=votes.len(), current_view = engine.current_view(), block_view=block.view, block=?block.id, "approve block");
 
-                        tracing::info!(node=?parse_idx(&self.id), votes=votes.len(), current_view = engine.current_view(), block_view=block.view, block=?block.id, "approve block");
-
-                        events.push(Event::Approve {
-                            qc,
-                            block,
-                            votes: votes.into_iter().map(|v| v.vote).collect(),
-                        })
+                            events.push(Event::Approve {
+                                qc,
+                                block,
+                                votes: votes.into_iter().map(|v| v.vote).collect(),
+                            });
+                        }
                     }
                 }
                 CarnotMessage::Timeout(msg) => {
