@@ -5,7 +5,6 @@ use crate::warding::SimulationState;
 use crossbeam::channel::bounded;
 use crossbeam::select;
 use rand::prelude::SliceRandom;
-use rayon::prelude::*;
 use serde::Serialize;
 use std::collections::HashSet;
 use std::sync::Arc;

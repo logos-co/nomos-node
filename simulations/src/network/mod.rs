@@ -8,7 +8,6 @@ use std::{
 // crates
 use crossbeam::channel::{self, Receiver, Sender};
 use rand::{rngs::ThreadRng, Rng};
-use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 // internal
 use crate::node::NodeId;

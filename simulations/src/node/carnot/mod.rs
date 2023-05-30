@@ -300,7 +300,7 @@ impl<O: Overlay> Node for CarnotNode<O> {
                             proposal: block.clone(),
                         });
                     }
-                    tracing::info!(node = parse_idx(&self.id), view = block.header().view, block = ?block.header().id, "receive block proposal");
+                    tracing::info!(node = parse_idx(&self.id), current_view = self.engine.current_view(), block_view = block.header().view, block = ?block.header().id, "receive block proposal");
                     match self.engine.receive_block(consensus_engine::Block {
                         id: block.header().id,
                         view: block.header().view,
@@ -308,7 +308,7 @@ impl<O: Overlay> Node for CarnotNode<O> {
                     }) {
                         Ok(new) => self.engine = new,
                         Err(_) => {
-                            tracing::error!(node = parse_idx(&self.id), block = ?block.header().id, "receive block proposal, but is invalid");
+                            tracing::error!(node = parse_idx(&self.id), current_view = self.engine.current_view(), block_view = block.header().view, block = ?block.header().id, "receive block proposal, but is invalid");
                         }
                     }
 
@@ -329,7 +329,7 @@ impl<O: Overlay> Node for CarnotNode<O> {
                     block,
                     votes: _,
                 } => {
-                    tracing::info!(node = parse_idx(&self.id), block = ?block.id, "receive approve message");
+                    tracing::info!(node = parse_idx(&self.id), current_view = self.engine.current_view(), block_view = block.view, block = ?block.id, "receive approve message");
                     if !self.engine.blocks_in_view(block.view).contains(&block) {
                         let (new, out) = self.engine.approve_block(block);
                         output = vec![Output::Send(out)];

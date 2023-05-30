@@ -14,7 +14,6 @@ use crossbeam::channel::Sender;
 use parking_lot::RwLock;
 use rand::rngs::SmallRng;
 use rand::{RngCore, SeedableRng};
-use rayon::prelude::*;
 use serde::Serialize;
 
 // internal
@@ -77,7 +76,7 @@ where
             .any(|x| x)
     }
 
-    fn step<N>(&mut self, nodes: &mut Vec<N>)
+    fn step<N>(&mut self, nodes: &mut [N])
     where
         N: Node + Send + Sync,
         N::Settings: Clone + Send,

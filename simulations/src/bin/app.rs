@@ -54,7 +54,8 @@ impl SimulationApp {
             .with_target(true)
             .with_ansi(true)
             .finish();
-        tracing::subscriber::set_global_default(subscriber).expect("config_tracing is only called once");
+        tracing::subscriber::set_global_default(subscriber)
+            .expect("config_tracing is only called once");
 
         let Self {
             input_settings,
@@ -90,8 +91,6 @@ impl SimulationApp {
             overlays,
         }));
 
-       
-
         match &simulation_settings.node_settings {
             simulations::settings::NodeSettings::Carnot { seed, timeout } => {
                 let ids = node_ids.clone();
@@ -101,7 +100,8 @@ impl SimulationApp {
                     .copied()
                     .map(|node_id| {
                         let (node_message_sender, node_message_receiver) = channel::unbounded();
-                        let network_message_receiver = network.connect(node_id, node_message_receiver);
+                        let network_message_receiver =
+                            network.connect(node_id, node_message_receiver);
                         let network_interface = InMemoryNetworkInterface::new(
                             node_id,
                             node_message_sender,
@@ -114,7 +114,7 @@ impl SimulationApp {
                                 *seed,
                                 *timeout,
                             ),
-                            network_interface
+                            network_interface,
                         )
                     })
                     .collect();

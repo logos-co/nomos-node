@@ -76,12 +76,6 @@ impl EventBuilder {
                     };
 
                     if let Some(votes) = self.vote_message.tally_by(msg_view, msg, threshold) {
-                        // // if we are the leader, then we should change to the next view
-                        // if is_leader {
-                        //     self.propose_new_block(engine, &mut events);
-                        //     continue;
-                        // }
-
                         let block = self
                             .blocks
                             .get(&block_id)
@@ -93,7 +87,7 @@ impl EventBuilder {
                             })
                             .unwrap_or_else(|| panic!("cannot find block id {block_id:?}"));
 
-                        tracing::info!(node=?parse_idx(&self.id), votes=votes.len(), view=block.view, block=?block.id, "approve block");
+                        tracing::info!(node=?parse_idx(&self.id), votes=votes.len(), current_view = engine.current_view(), block_view=block.view, block=?block.id, "approve block");
 
                         events.push(Event::Approve {
                             qc,
@@ -148,7 +142,8 @@ impl EventBuilder {
         );
         tracing::info!(
             node = parse_idx(&self.id),
-            view = block.header().view,
+            current_view = engine.current_view(),
+            block_view = block.header().view,
             block = ?block.header().id,
             "propose block"
         );
@@ -156,7 +151,7 @@ impl EventBuilder {
             block,
             stream: Box::pin(futures::stream::empty()),
         });
-        self.proposal_seen.insert(engine.current_view() + 1); 
+        self.proposal_seen.insert(engine.current_view() + 1);
     }
 
     fn try_handle_leader<O: Overlay>(
@@ -174,7 +169,8 @@ impl EventBuilder {
             );
             tracing::info!(
                 node = parse_idx(&self.id),
-                view = block.header().view,
+                current_view = engine.current_view(),
+                block_view = block.header().view,
                 block = ?block.header().id,
                 "propose block"
             );
