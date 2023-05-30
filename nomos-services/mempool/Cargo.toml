@@ -20,7 +20,7 @@ thiserror = "1.0"
 tracing = "0.1"
 tokio = { version = "1", features = ["sync", "macros"] }
 tokio-stream = "0.1"
-waku-bindings = { version = "0.1.0-rc.2", optional = true}
+waku-bindings = { git = "https://github.com/waku-org/waku-rust-bindings.git", rev = "803fc37e041a54daabc90e3201271964f5e6bdfa", optional = true }
 
 [dev-dependencies]
 nomos-log = { path = "../log" }
