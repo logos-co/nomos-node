@@ -6,6 +6,7 @@ mod messages;
 use std::{collections::HashMap, time::Duration};
 
 use crate::network::{InMemoryNetworkInterface, NetworkInterface, NetworkMessage};
+use crate::util::parse_idx;
 
 // std
 // crates
@@ -117,7 +118,11 @@ pub struct CarnotNode<O: Overlay> {
 }
 
 impl<O: Overlay> CarnotNode<O> {
-    pub fn new(id: consensus_engine::NodeId, settings: CarnotSettings, network_interface: InMemoryNetworkInterface<CarnotMessage>) -> Self {
+    pub fn new(
+        id: consensus_engine::NodeId,
+        settings: CarnotSettings,
+        network_interface: InMemoryNetworkInterface<CarnotMessage>,
+    ) -> Self {
         let genesis = consensus_engine::Block {
             id: [0; 32],
             view: -1,
@@ -205,7 +210,10 @@ impl<O: Overlay> CarnotNode<O> {
                         CarnotMessage::Vote(VoteMsg {
                             voter: self.id,
                             vote: vote.clone(),
-                            qc: Some(Qc::Standard(StandardQc { view: vote.view, id: vote.block })),
+                            qc: Some(Qc::Standard(StandardQc {
+                                view: vote.view,
+                                id: vote.block,
+                            })),
                         }),
                     );
                 }
@@ -292,14 +300,16 @@ impl<O: Overlay> Node for CarnotNode<O> {
                             proposal: block.clone(),
                         });
                     }
-                    println!("receive proposal {:?}", block.header().id);
+                    tracing::info!(node = parse_idx(&self.id), view = block.header().view, block = ?block.header().id, "receive block proposal");
                     match self.engine.receive_block(consensus_engine::Block {
                         id: block.header().id,
                         view: block.header().view,
                         parent_qc: block.header().parent_qc.clone(),
                     }) {
                         Ok(new) => self.engine = new,
-                        Err(_) => println!("invalid block {block:?}"),
+                        Err(_) => {
+                            tracing::error!(node = parse_idx(&self.id), block = ?block.header().id, "receive block proposal, but is invalid");
+                        }
                     }
 
                     if self.engine.overlay().is_member_of_leaf_committee(self.id) {
@@ -319,10 +329,12 @@ impl<O: Overlay> Node for CarnotNode<O> {
                     block,
                     votes: _,
                 } => {
-                    println!("receive approve {:?}", block.id);
-                    let (new, out) = self.engine.approve_block(block);
-                    output = vec![Output::Send(out)];
-                    self.engine = new;
+                    tracing::info!(node = parse_idx(&self.id), block = ?block.id, "receive approve message");
+                    if !self.engine.blocks_in_view(block.view).contains(&block) {
+                        let (new, out) = self.engine.approve_block(block);
+                        output = vec![Output::Send(out)];
+                        self.engine = new;
+                    }
                 }
                 // This branch means we already get enough new view msgs for this qc
                 // So we can just call approve_new_view

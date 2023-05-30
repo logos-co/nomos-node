@@ -45,6 +45,17 @@ pub struct SimulationApp {
 
 impl SimulationApp {
     pub fn run(self) -> anyhow::Result<()> {
+        let filter = std::env::var("SIMULATION_LOG").unwrap_or_else(|_| "info".to_owned());
+        let subscriber = tracing_subscriber::fmt::fmt()
+            .without_time()
+            .with_line_number(true)
+            .with_env_filter(filter)
+            .with_file(false)
+            .with_target(true)
+            .with_ansi(true)
+            .finish();
+        tracing::subscriber::set_global_default(subscriber).expect("config_tracing is only called once");
+
         let Self {
             input_settings,
             stream_type,

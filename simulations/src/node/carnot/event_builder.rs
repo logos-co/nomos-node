@@ -66,26 +66,34 @@ impl EventBuilder {
                     let block_id = msg.vote.block;
                     let qc = msg.qc.clone().expect("empty QC from vote message");
 
+                    let is_leader = engine.is_leader_for_view(msg_view);
+
                     // if we are the leader, then use the leader threshold, otherwise use the leaf threshold
-                    let threshold = if engine.is_leader_for_view(msg_view) {
+                    let threshold = if is_leader {
                         engine.leader_super_majority_threshold()
                     } else {
                         engine.super_majority_threshold()
                     };
 
                     if let Some(votes) = self.vote_message.tally_by(msg_view, msg, threshold) {
-                        
+                        // // if we are the leader, then we should change to the next view
+                        // if is_leader {
+                        //     self.propose_new_block(engine, &mut events);
+                        //     continue;
+                        // }
+
                         let block = self
-                        .blocks
-                        .get(&block_id)
-                        .cloned()
-                        .map(|b| consensus_engine::Block {
-                            id: b.header().id,
-                            view: b.header().view,
-                            parent_qc: b.header().parent_qc.clone(),
-                        })
-                        .unwrap_or_else(|| panic!("cannot find block id {block_id:?}"));
-                        println!("Node({}) approve: votes: {}, view: {}, block {:?}", parse_idx(&self.id), votes.len(), block.view, block.id);
+                            .blocks
+                            .get(&block_id)
+                            .cloned()
+                            .map(|b| consensus_engine::Block {
+                                id: b.header().id,
+                                view: b.header().view,
+                                parent_qc: b.header().parent_qc.clone(),
+                            })
+                            .unwrap_or_else(|| panic!("cannot find block id {block_id:?}"));
+
+                        tracing::info!(node=?parse_idx(&self.id), votes=votes.len(), view=block.view, block=?block.id, "approve block");
 
                         events.push(Event::Approve {
                             qc,
@@ -128,6 +136,29 @@ impl EventBuilder {
         events
     }
 
+    fn propose_new_block<O: Overlay>(
+        &mut self,
+        engine: &Carnot<O>,
+        events: &mut Vec<Event<CarnotTx>>,
+    ) {
+        let block = Block::new(
+            engine.current_view() + 1,
+            Qc::Standard(engine.high_qc()),
+            [].into_iter(),
+        );
+        tracing::info!(
+            node = parse_idx(&self.id),
+            view = block.header().view,
+            block = ?block.header().id,
+            "propose block"
+        );
+        events.push(Event::Proposal {
+            block,
+            stream: Box::pin(futures::stream::empty()),
+        });
+        self.proposal_seen.insert(engine.current_view() + 1); 
+    }
+
     fn try_handle_leader<O: Overlay>(
         &mut self,
         engine: &Carnot<O>,
@@ -136,12 +167,19 @@ impl EventBuilder {
         if !self.proposal_seen.contains(&engine.current_view())
             && engine.is_leader_for_view(engine.current_view())
         {
+            let block = Block::new(
+                engine.current_view(),
+                Qc::Standard(engine.high_qc()),
+                [].into_iter(),
+            );
+            tracing::info!(
+                node = parse_idx(&self.id),
+                view = block.header().view,
+                block = ?block.header().id,
+                "propose block"
+            );
             events.push(Event::Proposal {
-                block: Block::new(
-                    engine.current_view(),
-                    Qc::Standard(engine.high_qc()),
-                    [].into_iter(),
-                ),
+                block,
                 stream: Box::pin(futures::stream::empty()),
             });
             self.proposal_seen.insert(engine.current_view());
