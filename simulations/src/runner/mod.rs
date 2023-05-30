@@ -72,7 +72,7 @@ where
         N::State: Serialize,
     {
         self.wards
-            .par_iter_mut()
+            .iter_mut()
             .map(|ward| ward.analyze(state))
             .any(|x| x)
     }
@@ -84,7 +84,7 @@ where
         N::State: Serialize,
     {
         self.network.dispatch_after(Duration::from_millis(100));
-        nodes.par_iter_mut().for_each(|node| {
+        nodes.iter_mut().for_each(|node| {
             node.step();
         });
         self.network.collect_messages();

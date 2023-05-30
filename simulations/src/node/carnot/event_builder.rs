@@ -74,6 +74,7 @@ impl EventBuilder {
                     };
 
                     if let Some(votes) = self.vote_message.tally_by(msg_view, msg, threshold) {
+                        
                         let block = self
                         .blocks
                         .get(&block_id)

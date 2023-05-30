@@ -52,7 +52,7 @@ where
                         let ids: HashSet<NodeId> = ids_chunk.iter().copied().collect();
                         nodes
                             .write()
-                            .par_iter_mut()
+                            .iter_mut()
                             .filter(|n| ids.contains(&n.id()))
                             .for_each(N::step);
 

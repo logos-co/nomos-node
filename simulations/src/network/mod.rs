@@ -118,7 +118,7 @@ where
     pub fn collect_messages(&mut self) {
         let mut new_messages = self
             .from_node_receivers
-            .par_iter()
+            .iter()
             .flat_map(|(_, from_node)| {
                 from_node
                     .try_iter()
@@ -137,7 +137,7 @@ where
 
         let delayed = self
             .messages
-            .par_iter()
+            .iter()
             .filter(|(network_time, message)| {
                 let mut rng = ThreadRng::default();
                 self.send_or_drop_message(&mut rng, network_time, message)
