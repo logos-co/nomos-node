@@ -419,11 +419,12 @@ fn get_roles(
 mod tests {
     use std::{
         collections::{BTreeMap, BTreeSet, HashMap},
-        sync::{Arc, RwLock},
+        sync::Arc,
         time::{Duration, SystemTime, UNIX_EPOCH},
     };
 
     use crossbeam::channel;
+    use parking_lot::RwLock;
     use rand::{
         rngs::{mock::StepRng, SmallRng},
         Rng, SeedableRng,
@@ -803,13 +804,13 @@ mod tests {
         let nodes = Arc::new(RwLock::new(nodes));
         for _ in 0..9 {
             network.dispatch_after(Duration::from_millis(100));
-            nodes.write().unwrap().par_iter_mut().for_each(|(_, node)| {
+            nodes.write().par_iter_mut().for_each(|(_, node)| {
                 node.step();
             });
             network.collect_messages();
         }
 
-        for (_, node) in nodes.read().unwrap().iter() {
+        for (_, node) in nodes.read().iter() {
             assert_eq!(node.current_view(), 2);
         }
     }

@@ -35,13 +35,13 @@ where
                     return Ok(());
                 }
                 default => {
-                    let mut inner_runner = inner_runner.write().expect("Write access to inner simulation state");
+                    let mut inner_runner = inner_runner.write();
 
                     // we must use a code block to make sure once the step call is finished then the write lock will be released, because in Record::try_from(&state),
                     // we need to call the read lock, if we do not release the write lock,
                     // then dead lock will occur
                     {
-                        let mut nodes = nodes.write().expect("Write access to nodes vector");
+                        let mut nodes = nodes.write();
                         inner_runner.step(&mut nodes);
                     }
 
@@ -80,10 +80,11 @@ mod tests {
         streaming::StreamProducer,
     };
     use crossbeam::channel;
+    use parking_lot::RwLock;
     use rand::rngs::mock::StepRng;
     use std::{
         collections::{BTreeMap, HashMap},
-        sync::{Arc, RwLock},
+        sync::Arc,
         time::Duration,
     };
 
@@ -142,11 +143,11 @@ mod tests {
         let producer = StreamProducer::default();
         let runner: SimulationRunner<DummyMessage, DummyNode, OutData> =
             SimulationRunner::new(network, nodes, producer, settings);
-        let mut nodes = runner.nodes.write().unwrap();
-        runner.inner.write().unwrap().step(&mut nodes);
+        let mut nodes = runner.nodes.write();
+        runner.inner.write().step(&mut nodes);
         drop(nodes);
 
-        let nodes = runner.nodes.read().unwrap();
+        let nodes = runner.nodes.read();
         for node in nodes.iter() {
             assert_eq!(node.current_view(), 0);
         }
@@ -189,11 +190,11 @@ mod tests {
         let runner: SimulationRunner<DummyMessage, DummyNode, OutData> =
             SimulationRunner::new(network, nodes, Default::default(), settings);
 
-        let mut nodes = runner.nodes.write().unwrap();
-        runner.inner.write().unwrap().step(&mut nodes);
+        let mut nodes = runner.nodes.write();
+        runner.inner.write().step(&mut nodes);
         drop(nodes);
 
-        let nodes = runner.nodes.read().unwrap();
+        let nodes = runner.nodes.read();
         let state = nodes[1].state();
         assert_eq!(state.message_count, 10);
     }

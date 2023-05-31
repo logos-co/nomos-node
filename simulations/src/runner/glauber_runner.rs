@@ -31,17 +31,14 @@ where
 
     let inner_runner = runner.inner.clone();
     let nodes = runner.nodes;
-    let nodes_remaining: BTreeSet<NodeId> =
-        (0..nodes.read().expect("Read access to nodes vector").len())
-            .map(From::from)
-            .collect();
+    let nodes_remaining: BTreeSet<NodeId> = (0..nodes.read().len()).map(From::from).collect();
     let iterations: Vec<_> = (0..maximum_iterations).collect();
     let (stop_tx, stop_rx) = bounded(1);
     let p = runner.producer.clone();
     let p1 = runner.producer;
     let handle = std::thread::spawn(move || {
-        let mut inner_runner: std::sync::RwLockWriteGuard<super::SimulationRunnerInner<M>> =
-            inner_runner.write().expect("Locking runner");
+        let mut inner_runner: parking_lot::RwLockWriteGuard<super::SimulationRunnerInner<M>> =
+            inner_runner.write();
 
         'main: for chunk in iterations.chunks(update_rate) {
             select! {
@@ -57,7 +54,7 @@ where
                         );
 
                         {
-                            let mut shared_nodes = nodes.write().expect("Write access to nodes vector");
+                            let mut shared_nodes = nodes.write();
                             let node: &mut N = shared_nodes
                                 .get_mut(node_id.inner())
                                 .expect("Node should be present");

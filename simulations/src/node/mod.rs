@@ -8,10 +8,11 @@ pub mod dummy_streaming;
 use std::{
     collections::BTreeMap,
     ops::{Deref, DerefMut},
-    sync::{Arc, RwLock},
+    sync::Arc,
     time::Duration,
 };
 // crates
+use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 // internal
 use crate::overlay::{Layout, OverlaySettings, SimulationOverlay};
@@ -155,12 +156,12 @@ pub trait OverlayGetter {
 
 impl OverlayGetter for SharedState<OverlayState> {
     fn get_view(&self, index: usize) -> Option<ViewOverlay> {
-        let overlay_state = self.read().unwrap();
+        let overlay_state = self.read();
         overlay_state.overlays.get(&index).cloned()
     }
 
     fn get_all_nodes(&self) -> Vec<NodeId> {
-        let overlay_state = self.read().unwrap();
+        let overlay_state = self.read();
         overlay_state.all_nodes.clone()
     }
 }

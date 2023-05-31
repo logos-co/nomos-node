@@ -1,3 +1,4 @@
+use parking_lot::Mutex;
 use polars::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -5,7 +6,6 @@ use std::{
     io::Cursor,
     path::{Path, PathBuf},
     str::FromStr,
-    sync::Mutex,
 };
 
 use super::{Receivers, StreamSettings};
@@ -72,10 +72,7 @@ where
     R: Serialize,
 {
     fn persist(&self) -> anyhow::Result<()> {
-        let data = self
-            .data
-            .lock()
-            .expect("failed to lock data in PolarsSubscriber pesist");
+        let data = self.data.lock();
         let mut cursor = Cursor::new(Vec::new());
         serde_json::to_writer(&mut cursor, &*data).expect("Dump data to json ");
         let mut data = JsonReader::new(cursor)
@@ -137,10 +134,7 @@ where
     }
 
     fn sink(&self, state: Arc<Self::Record>) -> anyhow::Result<()> {
-        self.data
-            .lock()
-            .expect("failed to lock data in PolarsSubscriber")
-            .push(state);
+        self.data.lock().push(state);
         Ok(())
     }
 }
