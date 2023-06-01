@@ -284,7 +284,7 @@ impl<O: Overlay> Carnot<O> {
     }
 
     pub fn latest_committed_block(&self) -> Block {
-        for view in (0..self.current_view + 1).rev() {
+        for view in (0..=self.current_view).rev() {
             for block in self.blocks_in_view(view) {
                 if let Some(block) = self.can_commit_grandparent(block) {
                     return block;
