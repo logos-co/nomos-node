@@ -122,7 +122,7 @@ where
             }),
             format: settings.format,
         };
-        eprintln!("Subscribed to {}", this.path.display());
+        tracing::info!(target = "simulation", "subscribed to {}", this.path.display());
         Ok(this)
     }
 
