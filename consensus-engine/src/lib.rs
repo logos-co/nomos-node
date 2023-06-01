@@ -284,7 +284,7 @@ impl<O: Overlay> Carnot<O> {
     }
 
     pub fn latest_committed_block(&self) -> Block {
-        for view in (0..self.current_view).rev() {
+        for view in (0..self.current_view + 1).rev() {
             for block in self.blocks_in_view(view) {
                 if let Some(block) = self.can_commit_grandparent(block) {
                     return block;
@@ -305,12 +305,7 @@ impl<O: Overlay> Carnot<O> {
             res.push(current.id);
             current = self.safe_blocks.get(&current.parent()).unwrap().clone();
         }
-        // If the length is 1, it means that the genesis block is the only committed block
-        // and was added to the list already at the beginning of the function.
-        // Otherwise, we need to add the genesis block to the list.
-        if res.len() > 1 {
-            res.push(self.genesis_block().id);
-        }
+        res.push(self.genesis_block().id);
         res
     }
 
@@ -424,36 +419,162 @@ mod test {
         }
     }
 
-    #[test]
-    fn block_is_committed() {
-        let genesis = Block {
-            view: 0,
-            id: [0; 32],
-            parent_qc: Qc::Standard(StandardQc {
+    fn init_from_genesis() -> Carnot<NoOverlay> {
+        Carnot::from_genesis(
+            [0; 32],
+            Block {
                 view: 0,
                 id: [0; 32],
+                parent_qc: Qc::Standard(StandardQc::genesis()),
+            },
+            NoOverlay,
+        )
+    }
+
+    fn next_block(block: &Block) -> Block {
+        let mut next_id = block.id;
+        next_id[0] += 1;
+
+        return Block {
+            view: block.view + 1,
+            id: next_id,
+            parent_qc: Qc::Standard(StandardQc {
+                view: block.view,
+                id: block.id,
             }),
         };
-        let mut engine = Carnot::from_genesis([0; 32], genesis.clone(), NoOverlay);
-        let p1 = Block {
-            view: 1,
+    }
+
+    #[test]
+    // Ensure that all states are initialized correctly with the genesis block.
+    fn from_genesis() {
+        let engine = init_from_genesis();
+        assert_eq!(engine.current_view(), 0);
+        assert_eq!(engine.highest_voted_view, -1);
+
+        let genesis = engine.genesis_block();
+        assert_eq!(engine.high_qc(), genesis.parent_qc.high_qc());
+        assert_eq!(engine.blocks_in_view(0), vec![genesis]);
+        assert_eq!(engine.last_view_timeout_qc(), None);
+    }
+
+    #[test]
+    // Ensure that all states are updated correctly after a block is received.
+    fn receive_block() {
+        let mut engine = init_from_genesis();
+        let block = next_block(&engine.genesis_block());
+
+        engine = engine.receive_block(block.clone()).unwrap();
+        assert_eq!(engine.blocks_in_view(block.view), vec![block.clone()]);
+        assert_eq!(engine.high_qc(), block.parent_qc.high_qc());
+        assert_eq!(engine.latest_committed_block(), engine.genesis_block());
+    }
+
+    #[test]
+    // Ensure that receive_block() returns early if the same block ID has already been received.
+    fn receive_duplicate_block_id() {
+        let mut engine = init_from_genesis();
+
+        let block1 = next_block(&engine.genesis_block());
+        engine = engine.receive_block(block1.clone()).unwrap();
+
+        let mut block2 = next_block(&block1);
+        block2.id = block1.id;
+        engine = engine.receive_block(block2.clone()).unwrap();
+        assert_eq!(engine.blocks_in_view(1), vec![block1.clone()]);
+    }
+
+    #[test]
+    #[should_panic(expected = "out of order view not supported, missing parent block")]
+    // Ensure that receive_block() fails if the parent block has never been received.
+    fn receive_block_with_unknown_parent() {
+        let engine = init_from_genesis();
+        let mut parent_block_id = engine.genesis_block().id;
+        parent_block_id[0] += 1; // generate an unknown parent block ID
+        let block = Block {
+            view: engine.current_view() + 1,
             id: [1; 32],
             parent_qc: Qc::Standard(StandardQc {
-                view: 0,
-                id: [0; 32],
+                view: engine.current_view(),
+                id: parent_block_id,
             }),
         };
-        let p2 = Block {
-            view: 2,
-            id: [2; 32],
-            parent_qc: Qc::Standard(StandardQc {
-                view: 1,
-                id: [1; 32],
-            }),
-        };
-        assert_eq!(engine.latest_committed_block(), genesis);
-        engine = engine.receive_block(p1).unwrap();
-        engine = engine.receive_block(p2).unwrap();
-        assert_eq!(engine.latest_committed_block(), genesis);
+
+        let _ = engine.receive_block(block.clone());
+    }
+
+    #[test]
+    // Ensure that receive_block() returns Err for unsafe blocks.
+    fn receive_unsafe_blocks() {
+        let mut engine = init_from_genesis();
+
+        let block = next_block(&engine.genesis_block());
+        engine = engine.receive_block(block.clone()).unwrap();
+
+        let block = next_block(&block);
+        engine = engine.receive_block(block.clone()).unwrap();
+
+        let mut unsafe_block = next_block(&block);
+        unsafe_block.view = engine.current_view() - 1; // UNSAFE: view < engine.current_view
+        assert!(engine.receive_block(unsafe_block).is_err());
+
+        let mut unsafe_block = next_block(&block);
+        unsafe_block.view = unsafe_block.parent_qc.view() + 2; // UNSAFE: view != parent_qc.view + 1
+        assert!(engine.receive_block(unsafe_block).is_err());
+    }
+
+    #[test]
+    // Ensure that multiple blocks (forks) can be received at the current view.
+    fn receive_multiple_blocks_at_the_current_view() {
+        let mut engine = init_from_genesis();
+
+        let block1 = next_block(&engine.genesis_block());
+        engine = engine.receive_block(block1.clone()).unwrap();
+
+        let block2 = next_block(&block1);
+        engine = engine.receive_block(block2.clone()).unwrap();
+
+        let mut block3 = block2.clone();
+        block3.id = [3; 32]; // use a new ID, so that this block isn't ignored
+        engine = engine.receive_block(block3.clone()).unwrap();
+
+        assert_eq!(engine.current_view(), block3.view);
+        assert!(engine
+            .blocks_in_view(engine.current_view())
+            .contains(&block2));
+        assert!(engine
+            .blocks_in_view(engine.current_view())
+            .contains(&block3));
+    }
+
+    #[test]
+    // Ensure that the grandparent of the current view can be committed
+    fn receive_block_and_commit() {
+        let mut engine = init_from_genesis();
+        assert_eq!(engine.latest_committed_block(), engine.genesis_block());
+
+        let block1 = next_block(&engine.genesis_block());
+        engine = engine.receive_block(block1.clone()).unwrap();
+        assert_eq!(engine.latest_committed_block(), engine.genesis_block());
+
+        let block2 = next_block(&block1);
+        engine = engine.receive_block(block2.clone()).unwrap();
+        assert_eq!(engine.latest_committed_block(), engine.genesis_block());
+
+        let block3 = next_block(&block2);
+        engine = engine.receive_block(block3.clone()).unwrap();
+        assert_eq!(engine.latest_committed_block(), block1);
+        assert_eq!(
+            engine.committed_blocks(),
+            vec![block1.id, engine.genesis_block().id]
+        );
+
+        let block4 = next_block(&block3);
+        engine = engine.receive_block(block4.clone()).unwrap();
+        assert_eq!(engine.latest_committed_block(), block2);
+        assert_eq!(
+            engine.committed_blocks(),
+            vec![block2.id, block1.id, engine.genesis_block().id]
+        );
     }
 }
