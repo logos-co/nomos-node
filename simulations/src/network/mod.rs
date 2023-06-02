@@ -8,6 +8,7 @@ use std::{
 // crates
 use crossbeam::channel::{self, Receiver, Sender};
 use rand::{rngs::ThreadRng, Rng};
+use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 // internal
 use crate::node::NodeId;
@@ -117,7 +118,7 @@ where
     pub fn collect_messages(&mut self) {
         let mut new_messages = self
             .from_node_receivers
-            .iter()
+            .par_iter()
             .flat_map(|(_, from_node)| {
                 from_node
                     .try_iter()
@@ -136,7 +137,7 @@ where
 
         let delayed = self
             .messages
-            .iter()
+            .par_iter()
             .filter(|(network_time, message)| {
                 let mut rng = ThreadRng::default();
                 self.send_or_drop_message(&mut rng, network_time, message)

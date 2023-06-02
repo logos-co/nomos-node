@@ -14,6 +14,7 @@ use crossbeam::channel::Sender;
 use parking_lot::RwLock;
 use rand::rngs::SmallRng;
 use rand::{RngCore, SeedableRng};
+use rayon::prelude::*;
 use serde::Serialize;
 
 // internal
@@ -71,7 +72,7 @@ where
         N::State: Serialize,
     {
         self.wards
-            .iter_mut()
+            .par_iter_mut()
             .map(|ward| ward.analyze(state))
             .any(|x| x)
     }
@@ -83,7 +84,7 @@ where
         N::State: Serialize,
     {
         self.network.dispatch_after(Duration::from_millis(100));
-        nodes.iter_mut().for_each(|node| {
+        nodes.par_iter_mut().for_each(|node| {
             node.step();
         });
         self.network.collect_messages();

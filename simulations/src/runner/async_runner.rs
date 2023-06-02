@@ -5,6 +5,7 @@ use crate::warding::SimulationState;
 use crossbeam::channel::bounded;
 use crossbeam::select;
 use rand::prelude::SliceRandom;
+use rayon::prelude::*;
 use serde::Serialize;
 use std::collections::HashSet;
 use std::sync::Arc;
@@ -51,7 +52,7 @@ where
                         let ids: HashSet<NodeId> = ids_chunk.iter().copied().collect();
                         nodes
                             .write()
-                            .iter_mut()
+                            .par_iter_mut()
                             .filter(|n| ids.contains(&n.id()))
                             .for_each(N::step);
 
