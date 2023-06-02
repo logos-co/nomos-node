@@ -182,7 +182,6 @@ where
             handle.join()?;
         };
     }
-
     match stream_type {
         StreamType::Naive => {
             let settings = stream_settings.unwrap_naive();
@@ -230,6 +229,9 @@ fn generate_overlays<R: Rng>(
 
 fn main() -> anyhow::Result<()> {
     let app: SimulationApp = SimulationApp::parse();
-    app.run()?;
+    if let Err(e) = app.run() {
+        println!("Error: {}", e);
+        std::process::exit(1);
+    }
     Ok(())
 }

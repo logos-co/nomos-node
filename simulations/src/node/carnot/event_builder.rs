@@ -19,6 +19,7 @@ pub struct EventBuilderSettings {
 pub(crate) struct EventBuilder {
     id: NodeId,
     blocks: HashMap<BlockId, Block<CarnotTx>>,
+    approved_blocks: HashSet<BlockId>,
     vote_message: Tally<VoteMsg>,
     timeout_message: Tally<TimeoutMsg>,
     new_view_message: Tally<NewViewMsg>,
@@ -38,6 +39,7 @@ impl EventBuilder {
             proposal_seen: Default::default(),
             current_view: View::default(),
             id,
+            approved_blocks: Default::default(),
         }
     }
 
@@ -52,7 +54,18 @@ impl EventBuilder {
             match message {
                 CarnotMessage::Proposal(msg) => {
                     let block = Block::from_bytes(&msg.chunk);
+                    if self.blocks.contains_key(&block.header().id) {
+                        continue;
+                    }
                     self.blocks.insert(block.header().id, block.clone());
+                    tracing::info!(
+                        node=parse_idx(&self.id),
+                        leader=parse_idx(&engine.leader(block.header().view)),
+                        current_view = engine.current_view(),
+                        block_view=block.header().view,
+                        block=?block.header().id,
+                        "receive proposal message",
+                    );
                     events.push(Event::Proposal {
                         block,
                         stream: Box::pin(futures::stream::empty()),
@@ -64,7 +77,10 @@ impl EventBuilder {
                 CarnotMessage::Vote(msg) => {
                     let msg_view = msg.vote.view;
                     let block_id = msg.vote.block;
-                    let qc = msg.qc.clone().expect("empty QC from vote message");
+                    let Some(qc) = msg.qc.clone() else {
+                        tracing::warn!(node=?parse_idx(&self.id), current_view = engine.current_view(), "received vote without QC");
+                        continue;
+                    };
 
                     let is_leader = engine.is_leader_for_view(msg_view);
 
@@ -80,6 +96,9 @@ impl EventBuilder {
                             self.propose_new_block(engine, &mut events);
                             continue;
                         }
+                        if self.approved_blocks.contains(&block_id) {
+                            continue;
+                        }
                         if let Some(block) = self
                             .blocks
                             .get(&block_id)
@@ -90,7 +109,17 @@ impl EventBuilder {
                                 parent_qc: b.header().parent_qc.clone(),
                             })
                         {
-                            tracing::info!(node=?parse_idx(&self.id), votes=votes.len(), current_view = engine.current_view(), block_view=block.view, block=?block.id, "approve block");
+                            self.approved_blocks.insert(block_id);
+                            tracing::info!(
+                                node=parse_idx(&self.id),
+                                leader=parse_idx(&engine.leader(msg_view)),
+                                votes=votes.len(),
+                                current_view = engine.current_view(),
+                                block_view=block.view,
+                                block=?block.id,
+                                "approve block",
+                            );
+
 
                             events.push(Event::Approve {
                                 qc,
@@ -146,6 +175,7 @@ impl EventBuilder {
         );
         tracing::info!(
             node = parse_idx(&self.id),
+            leader = parse_idx(&engine.leader(engine.current_view())),
             current_view = engine.current_view(),
             block_view = block.header().view,
             block = ?block.header().id,
@@ -173,6 +203,7 @@ impl EventBuilder {
             );
             tracing::info!(
                 node = parse_idx(&self.id),
+                leader = parse_idx(&engine.leader(engine.current_view())),
                 current_view = engine.current_view(),
                 block_view = block.header().view,
                 block = ?block.header().id,

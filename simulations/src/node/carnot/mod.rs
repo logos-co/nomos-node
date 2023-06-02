@@ -306,7 +306,7 @@ impl<O: Overlay> Node for CarnotNode<O> {
                     }
 
                     let current_view = self.engine.current_view();
-                    tracing::info!(node = parse_idx(&self.id), current_view = current_view, block_view = block.header().view, block = ?block.header().id, "receive block proposal");
+                    tracing::info!(node=parse_idx(&self.id), leader=parse_idx(&self.engine.leader(current_view)), current_view = current_view, block_view = block.header().view, block = ?block.header().id, "receive block proposal");
                     match self.engine.receive_block(consensus_engine::Block {
                         id: block.header().id,
                         view: block.header().view,
@@ -335,8 +335,8 @@ impl<O: Overlay> Node for CarnotNode<O> {
                     block,
                     votes: _,
                 } => {
-                    tracing::info!(node = parse_idx(&self.id), current_view = self.engine.current_view(), block_view = block.view, block = ?block.id, "receive approve message");
-                    if !self.engine.blocks_in_view(block.view).contains(&block) {
+                    tracing::info!(node = parse_idx(&self.id), leader=parse_idx(&self.engine.leader(block.view)), current_view = self.engine.current_view(), block_view = block.view, block = ?block.id, "receive approve message");
+                    if !self.engine.blocks_in_view(block.view).contains(&block) && self.state.safe_blocks.contains_key(&block.id) {
                         let (new, out) = self.engine.approve_block(block);
                         output = vec![Output::Send(out)];
                         self.engine = new;
@@ -362,6 +362,7 @@ impl<O: Overlay> Node for CarnotNode<O> {
                     // if self.engine.is_leader_for_view(next_view) {
                     //     self.gather_new_views(&[self.id].into_iter().collect(), timeout_qc);
                     // }
+                    tracing::error!("unimplemented new view branch");
                     unimplemented!()
                 }
                 Event::TimeoutQc { timeout_qc } => {
@@ -371,10 +372,17 @@ impl<O: Overlay> Node for CarnotNode<O> {
                     println!("root timeouts: {timeouts:?}");
                 }
                 Event::ProposeBlock { .. } => {
+                    tracing::error!("unimplemented propose block branch");
                     unreachable!("propose block will never be constructed")
                 }
-                Event::LocalTimeout => unreachable!("local timeout will never be constructed"),
-                Event::None => unreachable!("none event will never be constructed"),
+                Event::LocalTimeout => {
+                    tracing::error!("unimplemented local timeout branch");
+                    unreachable!("local timeout will never be constructed")
+                },
+                Event::None => {
+                    tracing::error!("unimplemented none branch");
+                    unreachable!("none event will never be constructed")
+                },
             }
 
             for output_event in output.drain(..) {
