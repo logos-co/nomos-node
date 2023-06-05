@@ -1,10 +1,11 @@
+use consensus_engine::overlay::RandomBeaconState;
 use indexmap::IndexSet;
 // std
 use core::hash::Hash;
 // crates
 use crate::wire;
 use bytes::Bytes;
-use consensus_engine::{Qc, View};
+use consensus_engine::{LeaderProof, NodeId, Qc, View};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 // internal
@@ -16,23 +17,34 @@ pub type TxHash = [u8; 32];
 pub struct Block<TxId: Clone + Eq + Hash> {
     header: consensus_engine::Block,
     transactions: IndexSet<TxId>,
+    beacon: RandomBeaconState,
 }
 
 /// Identifier of a block
 pub type BlockId = [u8; 32];
 
 impl<TxId: Clone + Eq + Hash + Serialize + DeserializeOwned> Block<TxId> {
-    pub fn new(view: View, parent_qc: Qc, txs: impl Iterator<Item = TxId>) -> Self {
+    pub fn new(
+        view: View,
+        parent_qc: Qc,
+        txs: impl Iterator<Item = TxId>,
+        proposer: NodeId,
+        beacon: RandomBeaconState,
+    ) -> Self {
         let transactions = txs.collect();
         let header = consensus_engine::Block {
             id: [view as u8; 32],
             view,
             parent_qc,
+            leader_proof: LeaderProof::LeaderId {
+                leader_id: proposer,
+            },
         };
 
         let mut s = Self {
             header,
             transactions,
+            beacon,
         };
         let id = id_from_wire_content(&s.as_bytes());
         s.header.id = id;

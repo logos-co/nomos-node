@@ -15,6 +15,8 @@ use std::hash::Hash;
 use std::pin::Pin;
 use std::time::Duration;
 // crates
+use bls_signatures::PrivateKey;
+use consensus_engine::overlay::RoundRobin;
 use futures::{stream::FuturesUnordered, Future, Stream, StreamExt};
 use serde::Deserialize;
 use serde::{de::DeserializeOwned, Serialize};
@@ -24,9 +26,11 @@ use crate::network::NetworkAdapter;
 use crate::tally::{happy::CarnotTally, unhappy::NewViewTally, CarnotTallySettings};
 use crate::view_cancel::ViewCancelCache;
 use consensus_engine::{
-    AggregateQc, Carnot, Committee, NewView, Overlay, Payload, Qc, StandardQc, Timeout, TimeoutQc,
-    Vote,
+    overlay::{LeaderSelection, RandomBeaconState},
+    AggregateQc, Carnot, Committee, LeaderProof, NewView, Overlay, Payload, Qc, StandardQc,
+    Timeout, TimeoutQc, Vote,
 };
+
 use nomos_core::block::Block;
 use nomos_core::crypto::PublicKey;
 use nomos_core::fountain::FountainCode;
@@ -53,33 +57,33 @@ pub type NodeId = PublicKey;
 pub type Seed = [u8; 32];
 
 #[derive(Debug, Deserialize, Serialize)]
-pub struct CarnotSettings<Fountain: FountainCode> {
+pub struct CarnotSettings<Fountain: FountainCode, O: Overlay> {
     private_key: [u8; 32],
     fountain_settings: Fountain::Settings,
-    nodes: Vec<NodeId>,
+    overlay_settings: O::Settings,
 }
 
-impl<Fountain: FountainCode> Clone for CarnotSettings<Fountain> {
+impl<Fountain: FountainCode, O: Overlay> Clone for CarnotSettings<Fountain, O> {
     fn clone(&self) -> Self {
         Self {
             private_key: self.private_key,
             fountain_settings: self.fountain_settings.clone(),
-            nodes: self.nodes.clone(),
+            overlay_settings: self.overlay_settings.clone(),
         }
     }
 }
 
-impl<Fountain: FountainCode> CarnotSettings<Fountain> {
+impl<Fountain: FountainCode, O: Overlay> CarnotSettings<Fountain, O> {
     #[inline]
     pub const fn new(
         private_key: [u8; 32],
         fountain_settings: Fountain::Settings,
-        nodes: Vec<NodeId>,
+        overlay_settings: O::Settings,
     ) -> Self {
         Self {
             private_key,
             fountain_settings,
-            nodes,
+            overlay_settings,
         }
     }
 }
@@ -115,7 +119,7 @@ where
     O: Overlay + Debug,
 {
     const SERVICE_ID: ServiceId = "Carnot";
-    type Settings = CarnotSettings<F>;
+    type Settings = CarnotSettings<F, O>;
     type State = NoState<Self::Settings>;
     type StateOperator = NoOperator<Self::State>;
     type Message = NoMessage;
@@ -132,7 +136,7 @@ where
         Debug + Clone + Eq + Hash + Serialize + serde::de::DeserializeOwned + Send + Sync + 'static,
     <P::Tx as Transaction>::Hash: Debug + Send + Sync,
     M: MempoolAdapter<Tx = P::Tx> + Send + Sync + 'static,
-    O: Overlay + Debug + Send + Sync + 'static,
+    O: Overlay<LeaderSelection = RoundRobin> + Debug + Send + Sync + 'static,
 {
     fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, overwatch_rs::DynError> {
         let network_relay = service_state.overwatch_handle.relay();
@@ -162,14 +166,15 @@ where
         let CarnotSettings {
             private_key,
             fountain_settings,
-            nodes,
+            overlay_settings,
         } = self.service_state.settings_reader.get_updated_settings();
 
-        let overlay = O::new(nodes);
+        let overlay = O::new(overlay_settings);
         let genesis = consensus_engine::Block {
             id: [0; 32],
             view: 0,
             parent_qc: Qc::Standard(StandardQc::genesis()),
+            leader_proof: LeaderProof::LeaderId { leader_id: [0; 32] },
         };
         let mut carnot = Carnot::from_genesis(private_key, genesis, overlay);
         let network_adapter = A::new(network_relay).await;
@@ -209,7 +214,7 @@ where
                 tally_settings.clone(),
             ),
         )));
-        if carnot.is_leader_for_view(genesis_block.view + 1) {
+        if carnot.is_next_leader() {
             events.push(Box::pin(view_cancel_cache.cancelable_event_future(
                 genesis_block.view + 1,
                 async move {
@@ -235,7 +240,7 @@ where
                     tracing::debug!("received proposal {:?}", block);
                     let block = block.header().clone();
                     match carnot.receive_block(block.clone()) {
-                        Ok(new_state) => {
+                        Ok(mut new_state) => {
                             let new_view = new_state.current_view();
                             if new_view != carnot.current_view() {
                                 events.push(Box::pin(view_cancel_cache.cancelable_event_future(
@@ -247,6 +252,13 @@ where
                                         tally_settings.clone(),
                                     ),
                                 )));
+                                new_state = new_state
+                                    .update_overlay(|overlay| {
+                                        overlay.update_leader_selection(|rr| {
+                                            Ok::<_, ()>(rr.advance(()))
+                                        })
+                                    })
+                                    .unwrap();
                             } else {
                                 events.push(Box::pin(view_cancel_cache.cancelable_event_future(
                                     block.view,
@@ -263,7 +275,7 @@ where
                         }
                         Err(_) => tracing::debug!("invalid block {:?}", block),
                     }
-                    if carnot.is_leader_for_view(block.view + 1) {
+                    if carnot.is_next_leader() {
                         events.push(Box::pin(view_cancel_cache.cancelable_event_future(
                             block.view,
                             async move {
@@ -301,7 +313,7 @@ where
                     output = Some(Output::Send(out));
                     let new_view = timeout_qc.view + 1;
                     let next_view = new_view + 1;
-                    if carnot.is_leader_for_view(next_view) {
+                    if carnot.is_next_leader() {
                         let high_qc = carnot.high_qc();
                         events.push(Box::pin(view_cancel_cache.cancelable_event_future(
                             new_view,
@@ -370,7 +382,11 @@ where
                         });
                     match rx.await {
                         Ok(txs) => {
-                            let proposal = Block::new(qc.view() + 1, qc, txs);
+                            let beacon = RandomBeaconState::generate(
+                                qc.view(),
+                                &PrivateKey::new(private_key),
+                            );
+                            let proposal = Block::new(qc.view() + 1, qc, txs, carnot.id(), beacon);
                             output = Some(Output::BroadcastProposal { proposal });
                         }
                         Err(e) => tracing::error!("Could not fetch txs {e}"),

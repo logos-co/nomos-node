@@ -69,6 +69,13 @@ pub struct Block {
     pub id: BlockId,
     pub view: View,
     pub parent_qc: Qc,
+    pub leader_proof: LeaderProof,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub enum LeaderProof {
+    LeaderId { leader_id: NodeId },
 }
 
 impl Block {
