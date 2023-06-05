@@ -358,16 +358,16 @@ impl<O: Overlay> Carnot<O> {
 mod test {
     use super::*;
 
-    #[derive(Clone)]
-    struct NoOverlay;
+    #[derive(Clone, Debug, PartialEq)]
+    struct MockOverlay;
 
-    impl Overlay for NoOverlay {
+    impl Overlay for MockOverlay {
         fn new(_nodes: Vec<NodeId>) -> Self {
             Self
         }
 
         fn root_committee(&self) -> Committee {
-            todo!()
+            vec![[0; 32]].into_iter().collect()
         }
 
         fn rebuild(&mut self, _timeout_qc: TimeoutQc) {
@@ -375,39 +375,39 @@ mod test {
         }
 
         fn is_member_of_child_committee(&self, _parent: NodeId, _child: NodeId) -> bool {
-            todo!()
+            false
         }
 
         fn is_member_of_root_committee(&self, _id: NodeId) -> bool {
-            todo!()
+            true
         }
 
         fn is_member_of_leaf_committee(&self, _id: NodeId) -> bool {
-            todo!()
+            true
         }
 
         fn is_child_of_root_committee(&self, _id: NodeId) -> bool {
-            todo!()
+            false
         }
 
         fn node_committee(&self, _id: NodeId) -> Committee {
-            todo!()
+            self.root_committee()
         }
 
         fn parent_committee(&self, _id: NodeId) -> Committee {
-            todo!()
+            self.root_committee()
         }
 
         fn child_committees(&self, _id: NodeId) -> Vec<Committee> {
-            todo!()
+            vec![]
         }
 
         fn leaf_committees(&self, _id: NodeId) -> Vec<Committee> {
-            todo!()
+            vec![self.root_committee()]
         }
 
         fn leader(&self, _view: View) -> NodeId {
-            todo!()
+            [0; 32]
         }
 
         fn super_majority_threshold(&self, _id: NodeId) -> usize {
@@ -415,11 +415,11 @@ mod test {
         }
 
         fn leader_super_majority_threshold(&self, _id: NodeId) -> usize {
-            todo!()
+            self.root_committee().len() * 2 / 3 + 1
         }
     }
 
-    fn init_from_genesis() -> Carnot<NoOverlay> {
+    fn init_from_genesis() -> Carnot<MockOverlay> {
         Carnot::from_genesis(
             [0; 32],
             Block {
@@ -427,7 +427,7 @@ mod test {
                 id: [0; 32],
                 parent_qc: Qc::Standard(StandardQc::genesis()),
             },
-            NoOverlay,
+            MockOverlay,
         )
     }
 
@@ -576,5 +576,49 @@ mod test {
             engine.committed_blocks(),
             vec![block2.id, block1.id, engine.genesis_block().id]
         );
+    }
+
+    #[test]
+    // Ensure that approve_block updates highest_voted_view and returns a correct Send.
+    fn approve_block() {
+        let mut engine = init_from_genesis();
+
+        let block = next_block(&engine.genesis_block());
+        engine = engine.receive_block(block.clone()).unwrap();
+
+        let (engine, send) = engine.approve_block(block.clone());
+        assert_eq!(engine.highest_voted_view, block.view);
+        assert_eq!(send.to, vec![[0; 32]].into_iter().collect()); // next leader
+        assert_eq!(
+            send.payload,
+            Payload::Vote(Vote {
+                block: block.id,
+                view: block.view
+            })
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "not in")]
+    // Ensure that approve_block cannot accept not-received blocks.
+    fn approve_block_not_received() {
+        let engine = init_from_genesis();
+
+        let block = next_block(&engine.genesis_block());
+        let _ = engine.approve_block(block.clone());
+    }
+
+    #[test]
+    #[should_panic(expected = "can't vote for a block in the past")]
+    // Ensure that approve_block cannot vote blocks in the past.
+    fn approve_block_in_the_past() {
+        let mut engine = init_from_genesis();
+
+        let block = next_block(&engine.genesis_block());
+        engine = engine.receive_block(block.clone()).unwrap();
+        let (engine, _) = engine.approve_block(block.clone());
+
+        // trying to approve the block again that was already voted.
+        let _ = engine.approve_block(block);
     }
 }
