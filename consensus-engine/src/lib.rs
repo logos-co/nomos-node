@@ -567,7 +567,7 @@ mod test {
         assert_eq!(engine.latest_committed_block(), block1);
         assert_eq!(
             engine.committed_blocks(),
-            vec![block1.id, engine.genesis_block().id]
+            vec![block1.id, engine.genesis_block().id] // without block2 and block3
         );
 
         let block4 = next_block(&block3);
@@ -575,7 +575,7 @@ mod test {
         assert_eq!(engine.latest_committed_block(), block2);
         assert_eq!(
             engine.committed_blocks(),
-            vec![block2.id, block1.id, engine.genesis_block().id]
+            vec![block2.id, block1.id, engine.genesis_block().id] // without block3, block4
         );
     }
 
