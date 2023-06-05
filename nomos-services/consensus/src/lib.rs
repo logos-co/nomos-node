@@ -4,6 +4,7 @@
 //! are always synchronized (i.e. it cannot happen that we accidentally use committees from different views).
 //! It's obviously extremely important that the information contained in `View` is synchronized across different
 //! nodes, but that has to be achieved through different means.
+mod leader_selection;
 pub mod network;
 mod tally;
 mod view_cancel;
@@ -16,8 +17,8 @@ use std::pin::Pin;
 use std::time::Duration;
 // crates
 use bls_signatures::PrivateKey;
-use consensus_engine::overlay::RoundRobin;
 use futures::{stream::FuturesUnordered, Future, Stream, StreamExt};
+use leader_selection::UpdateableLeaderSelection;
 use serde::Deserialize;
 use serde::{de::DeserializeOwned, Serialize};
 // internal
@@ -26,9 +27,8 @@ use crate::network::NetworkAdapter;
 use crate::tally::{happy::CarnotTally, unhappy::NewViewTally, CarnotTallySettings};
 use crate::view_cancel::ViewCancelCache;
 use consensus_engine::{
-    overlay::{LeaderSelection, RandomBeaconState},
-    AggregateQc, Carnot, Committee, LeaderProof, NewView, Overlay, Payload, Qc, StandardQc,
-    Timeout, TimeoutQc, Vote,
+    overlay::RandomBeaconState, AggregateQc, Carnot, Committee, LeaderProof, NewView, Overlay,
+    Payload, Qc, StandardQc, Timeout, TimeoutQc, Vote,
 };
 
 use nomos_core::block::Block;
@@ -136,7 +136,8 @@ where
         Debug + Clone + Eq + Hash + Serialize + serde::de::DeserializeOwned + Send + Sync + 'static,
     <P::Tx as Transaction>::Hash: Debug + Send + Sync,
     M: MempoolAdapter<Tx = P::Tx> + Send + Sync + 'static,
-    O: Overlay<LeaderSelection = RoundRobin> + Debug + Send + Sync + 'static,
+    O: Overlay + Debug + Send + Sync + 'static,
+    O::LeaderSelection: UpdateableLeaderSelection,
 {
     fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, overwatch_rs::DynError> {
         let network_relay = service_state.overwatch_handle.relay();
@@ -238,7 +239,8 @@ where
             match event {
                 Event::Proposal { block, mut stream } => {
                     tracing::debug!("received proposal {:?}", block);
-                    let block = block.header().clone();
+                    let original_block = block;
+                    let block = original_block.header().clone();
                     match carnot.receive_block(block.clone()) {
                         Ok(mut new_state) => {
                             let new_view = new_state.current_view();
@@ -252,7 +254,10 @@ where
                                         tally_settings.clone(),
                                     ),
                                 )));
-                                new_state = update_round_robin_leader_selection(new_state);
+                                new_state =
+                                    Self::update_leader_selection(new_state, |leader_selection| {
+                                        leader_selection.on_new_block_received(original_block)
+                                    });
                             } else {
                                 events.push(Box::pin(view_cancel_cache.cancelable_event_future(
                                     block.view,
@@ -330,16 +335,22 @@ where
                 }
                 Event::TimeoutQc { timeout_qc } => {
                     tracing::debug!("timeout received {:?}", timeout_qc);
-                    carnot = carnot.receive_timeout_qc(timeout_qc.clone());
+                    let mut new_state = carnot.receive_timeout_qc(timeout_qc.clone());
                     events.push(Box::pin(view_cancel_cache.cancelable_event_future(
                         timeout_qc.view + 1,
                         Self::gather_new_views(
                             adapter,
                             self_committee,
-                            timeout_qc,
+                            timeout_qc.clone(),
                             tally_settings.clone(),
                         ),
                     )));
+                    if carnot.current_view() != new_state.current_view() {
+                        new_state = Self::update_leader_selection(new_state, |leader_selection| {
+                            leader_selection.on_timeout_qc_received(timeout_qc)
+                        });
+                    }
+                    carnot = new_state;
                 }
                 Event::RootTimeout { timeouts } => {
                     tracing::debug!("root timeout {:?}", timeouts);
@@ -375,7 +386,7 @@ where
                         });
                     match rx.await {
                         Ok(txs) => {
-                            let beacon = RandomBeaconState::generate(
+                            let beacon = RandomBeaconState::generate_happy(
                                 qc.view(),
                                 &PrivateKey::new(private_key),
                             );
@@ -445,6 +456,7 @@ where
     <P::Tx as Transaction>::Hash: Debug + Send + Sync,
     M: MempoolAdapter<Tx = P::Tx> + Send + Sync + 'static,
     O: Overlay + Debug + Send + Sync + 'static,
+    O::LeaderSelection: UpdateableLeaderSelection,
 {
     async fn gather_timeout_qc(adapter: &A, view: consensus_engine::View) -> Event<P::Tx> {
         if let Some(timeout_qc) = adapter
@@ -535,14 +547,19 @@ where
             Event::None
         }
     }
-}
 
-fn update_round_robin_leader_selection<O: Overlay<LeaderSelection = RoundRobin>>(
-    carnot: Carnot<O>,
-) -> Carnot<O> {
-    carnot
-        .update_overlay(|overlay| overlay.update_leader_selection(|rr| Ok::<_, ()>(rr.advance(()))))
-        .unwrap()
+    fn update_leader_selection<
+        E: std::error::Error,
+        U: FnOnce(O::LeaderSelection) -> Result<O::LeaderSelection, E>,
+    >(
+        carnot: Carnot<O>,
+        f: U,
+    ) -> Carnot<O> {
+        carnot
+            .update_overlay(|overlay| overlay.update_leader_selection(f))
+            // TODO: remove unwrap
+            .unwrap()
+    }
 }
 
 async fn handle_output<A, F, Tx>(adapter: &A, fountain: &F, node_id: NodeId, output: Output<Tx>)

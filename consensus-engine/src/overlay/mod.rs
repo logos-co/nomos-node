@@ -31,8 +31,5 @@ pub trait Overlay: Clone {
 }
 
 pub trait LeaderSelection: Clone {
-    type Advance: Clone;
-
     fn next_leader(&self, nodes: &[NodeId]) -> NodeId;
-    fn advance(&self, adv: Self::Advance) -> Self;
 }

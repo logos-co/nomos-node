@@ -50,13 +50,19 @@ impl<TxId: Clone + Eq + Hash + Serialize + DeserializeOwned> Block<TxId> {
         s.header.id = id;
         s
     }
+}
 
+impl<TxId: Clone + Eq + Hash> Block<TxId> {
     pub fn header(&self) -> &consensus_engine::Block {
         &self.header
     }
 
     pub fn transactions(&self) -> impl Iterator<Item = &TxId> + '_ {
         self.transactions.iter()
+    }
+
+    pub fn beacon(&self) -> &RandomBeaconState {
+        &self.beacon
     }
 }
 
