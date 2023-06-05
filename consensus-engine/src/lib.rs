@@ -591,12 +591,7 @@ mod test {
 
         let (engine, send) = engine.approve_block(block.clone());
         assert_eq!(engine.highest_voted_view, block.view);
-        assert_eq!(
-            send.to,
-            vec![engine.overlay.leader(block.view + 1)] // next leader
-                .into_iter()
-                .collect()
-        );
+        assert_eq!(send.to, vec![[0; 32]].into_iter().collect()); // next leader
         assert_eq!(
             send.payload,
             Payload::Vote(Vote {
