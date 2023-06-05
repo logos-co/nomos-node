@@ -454,8 +454,9 @@ mod test {
 
         let genesis = engine.genesis_block();
         assert_eq!(engine.high_qc(), genesis.parent_qc.high_qc());
-        assert_eq!(engine.blocks_in_view(0), vec![genesis]);
+        assert_eq!(engine.blocks_in_view(0), vec![genesis.clone()]);
         assert_eq!(engine.last_view_timeout_qc(), None);
+        assert_eq!(engine.committed_blocks(), vec![genesis.id]);
     }
 
     #[test]
