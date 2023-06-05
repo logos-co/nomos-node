@@ -59,7 +59,11 @@ where
             )),
             recvs: Arc::new(recvs),
         };
-        tracing::info!(taget = "simulation", "subscribed to {}", settings.path.display());
+        tracing::info!(
+            taget = "simulation",
+            "subscribed to {}",
+            settings.path.display()
+        );
         Ok(this)
     }
 

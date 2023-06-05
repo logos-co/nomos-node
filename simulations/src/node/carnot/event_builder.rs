@@ -99,15 +99,15 @@ impl EventBuilder {
                         if self.approved_blocks.contains(&block_id) {
                             continue;
                         }
-                        if let Some(block) = self
-                            .blocks
-                            .get(&block_id)
-                            .cloned()
-                            .map(|b| consensus_engine::Block {
-                                id: b.header().id,
-                                view: b.header().view,
-                                parent_qc: b.header().parent_qc.clone(),
-                            })
+                        if let Some(block) =
+                            self.blocks
+                                .get(&block_id)
+                                .cloned()
+                                .map(|b| consensus_engine::Block {
+                                    id: b.header().id,
+                                    view: b.header().view,
+                                    parent_qc: b.header().parent_qc.clone(),
+                                })
                         {
                             self.approved_blocks.insert(block_id);
                             tracing::info!(
@@ -119,7 +119,6 @@ impl EventBuilder {
                                 block=?block.id,
                                 "approve block",
                             );
-
 
                             events.push(Event::Approve {
                                 qc,

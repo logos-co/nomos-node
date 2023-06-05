@@ -301,7 +301,11 @@ impl<O: Overlay> Node for CarnotNode<O> {
                         });
                     }
 
-                    if self.engine.blocks_in_view(block.header().view).contains(block.header()) {
+                    if self
+                        .engine
+                        .blocks_in_view(block.header().view)
+                        .contains(block.header())
+                    {
                         continue;
                     }
 
@@ -336,7 +340,9 @@ impl<O: Overlay> Node for CarnotNode<O> {
                     votes: _,
                 } => {
                     tracing::info!(node = parse_idx(&self.id), leader=parse_idx(&self.engine.leader(block.view)), current_view = self.engine.current_view(), block_view = block.view, block = ?block.id, "receive approve message");
-                    if !self.engine.blocks_in_view(block.view).contains(&block) && self.state.safe_blocks.contains_key(&block.id) {
+                    if !self.engine.blocks_in_view(block.view).contains(&block)
+                        && self.state.safe_blocks.contains_key(&block.id)
+                    {
                         let (new, out) = self.engine.approve_block(block);
                         output = vec![Output::Send(out)];
                         self.engine = new;
@@ -345,7 +351,11 @@ impl<O: Overlay> Node for CarnotNode<O> {
                     let current_view = self.engine.current_view();
                     if self.engine.is_leader_for_view(current_view + 1) {
                         output.push(nomos_consensus::Output::BroadcastProposal {
-                            proposal: nomos_consensus::Block::new(current_view + 1, qc, core::iter::empty()),
+                            proposal: nomos_consensus::Block::new(
+                                current_view + 1,
+                                qc,
+                                core::iter::empty(),
+                            ),
                         });
                     }
                 }
@@ -378,11 +388,11 @@ impl<O: Overlay> Node for CarnotNode<O> {
                 Event::LocalTimeout => {
                     tracing::error!("unimplemented local timeout branch");
                     unreachable!("local timeout will never be constructed")
-                },
+                }
                 Event::None => {
                     tracing::error!("unimplemented none branch");
                     unreachable!("none event will never be constructed")
-                },
+                }
             }
 
             for output_event in output.drain(..) {
