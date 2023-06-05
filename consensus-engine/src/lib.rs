@@ -3,7 +3,7 @@ use std::collections::{HashMap, HashSet};
 mod types;
 pub use types::*;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Carnot<O: Overlay> {
     id: NodeId,
     current_view: View,
@@ -358,16 +358,19 @@ impl<O: Overlay> Carnot<O> {
 mod test {
     use super::*;
 
-    #[derive(Clone)]
-    struct NoOverlay;
+    #[derive(Clone, Debug, PartialEq)]
+    /// Flat overlay with a single committee and round robin leader selection.
+    pub struct FlatRoundRobin {
+        nodes: Vec<NodeId>,
+    }
 
-    impl Overlay for NoOverlay {
-        fn new(_nodes: Vec<NodeId>) -> Self {
-            Self
+    impl Overlay for FlatRoundRobin {
+        fn new(nodes: Vec<NodeId>) -> Self {
+            Self { nodes }
         }
 
         fn root_committee(&self) -> Committee {
-            todo!()
+            self.nodes.clone().into_iter().collect()
         }
 
         fn rebuild(&mut self, _timeout_qc: TimeoutQc) {
@@ -375,51 +378,51 @@ mod test {
         }
 
         fn is_member_of_child_committee(&self, _parent: NodeId, _child: NodeId) -> bool {
-            todo!()
+            false
         }
 
         fn is_member_of_root_committee(&self, _id: NodeId) -> bool {
-            todo!()
+            true
         }
 
         fn is_member_of_leaf_committee(&self, _id: NodeId) -> bool {
-            todo!()
+            true
         }
 
         fn is_child_of_root_committee(&self, _id: NodeId) -> bool {
-            todo!()
-        }
-
-        fn node_committee(&self, _id: NodeId) -> Committee {
-            todo!()
+            false
         }
 
         fn parent_committee(&self, _id: NodeId) -> Committee {
-            todo!()
+            Committee::new()
+        }
+
+        fn node_committee(&self, _id: NodeId) -> Committee {
+            self.nodes.clone().into_iter().collect()
         }
 
         fn child_committees(&self, _id: NodeId) -> Vec<Committee> {
-            todo!()
+            vec![]
         }
 
         fn leaf_committees(&self, _id: NodeId) -> Vec<Committee> {
-            todo!()
+            vec![self.root_committee()]
         }
 
-        fn leader(&self, _view: View) -> NodeId {
-            todo!()
+        fn leader(&self, view: View) -> NodeId {
+            self.nodes[view as usize % self.nodes.len()]
         }
 
         fn super_majority_threshold(&self, _id: NodeId) -> usize {
-            todo!()
+            0
         }
 
         fn leader_super_majority_threshold(&self, _id: NodeId) -> usize {
-            todo!()
+            self.nodes.len() * 2 / 3 + 1
         }
     }
 
-    fn init_from_genesis() -> Carnot<NoOverlay> {
+    fn init_from_genesis() -> Carnot<FlatRoundRobin> {
         Carnot::from_genesis(
             [0; 32],
             Block {
@@ -427,7 +430,7 @@ mod test {
                 id: [0; 32],
                 parent_qc: Qc::Standard(StandardQc::genesis()),
             },
-            NoOverlay,
+            FlatRoundRobin::new(vec![[0; 32]]),
         )
     }
 
@@ -480,8 +483,8 @@ mod test {
 
         let mut block2 = next_block(&block1);
         block2.id = block1.id;
-        engine = engine.receive_block(block2.clone()).unwrap();
-        assert_eq!(engine.blocks_in_view(1), vec![block1.clone()]);
+        let engine2 = engine.receive_block(block2.clone()).unwrap();
+        assert_eq!(engine2, engine); // no state changed
     }
 
     #[test]
@@ -575,6 +578,82 @@ mod test {
         assert_eq!(
             engine.committed_blocks(),
             vec![block2.id, block1.id, engine.genesis_block().id]
+        );
+    }
+
+    #[test]
+    // Ensure that approve_block updates highest_voted_view and returns a correct Send.
+    fn approve_block() {
+        let mut engine = init_from_genesis();
+
+        let block = next_block(&engine.genesis_block());
+        engine = engine.receive_block(block.clone()).unwrap();
+
+        let (engine, send) = engine.approve_block(block.clone());
+        assert_eq!(engine.highest_voted_view, block.view);
+        assert_eq!(
+            send.to,
+            vec![engine.overlay.leader(block.view + 1)] // next leader
+                .into_iter()
+                .collect()
+        );
+        assert_eq!(
+            send.payload,
+            Payload::Vote(Vote {
+                block: block.id,
+                view: block.view
+            })
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "not in")]
+    // Ensure that approve_block cannot accept not-received blocks.
+    fn approve_block_not_received() {
+        let engine = init_from_genesis();
+
+        let block = next_block(&engine.genesis_block());
+        let _ = engine.approve_block(block.clone());
+    }
+
+    #[test]
+    #[should_panic(expected = "can't vote for a block in the past")]
+    // Ensure that approve_block cannot vote blocks in the past.
+    fn approve_block_in_the_past() {
+        let mut engine = init_from_genesis();
+
+        let block = next_block(&engine.genesis_block());
+        engine = engine.receive_block(block.clone()).unwrap();
+        let (engine, _) = engine.approve_block(block.clone());
+
+        // trying to approve the block again that was already voted.
+        let _ = engine.approve_block(block);
+    }
+
+    #[test]
+    // Test local_timeout from the perspective of three types of nodes (root, internal, leaf).
+    fn local_timeout() {
+        let mut engine = init_from_genesis();
+        let block = next_block(&engine.genesis_block());
+        engine = engine.receive_block(block.clone()).unwrap(); // received but not approved yet
+
+        let (engine, send) = engine.local_timeout();
+        assert_eq!(engine.highest_voted_view, 1); // updated from 0 (genesis) to 1 (current_view)
+        assert_eq!(
+            send.clone().unwrap().to,
+            vec![[0; 32]].into_iter().collect() // root_committee
+        );
+        assert_eq!(
+            send.clone().unwrap().payload,
+            Payload::Timeout(Timeout {
+                view: 1,
+                sender: [0; 32],
+                high_qc: StandardQc {
+                    view: engine.genesis_block().view,
+                    id: engine.genesis_block().id
+                },
+                timeout_qc: None
+            })
         );
     }
 }
