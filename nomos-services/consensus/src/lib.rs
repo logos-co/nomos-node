@@ -562,6 +562,14 @@ where
     }
 }
 
+fn update_round_robin_leader_selection<O: Overlay<LeaderSelection = RoundRobin>>(
+    carnot: Carnot<O>,
+) -> Carnot<O> {
+    carnot
+        .update_overlay(|overlay| overlay.update_leader_selection(|rr| Ok::<_, ()>(rr.advance(()))))
+        .unwrap()
+}
+
 async fn handle_output<A, F, Tx>(adapter: &A, fountain: &F, node_id: NodeId, output: Output<Tx>)
 where
     A: NetworkAdapter,
