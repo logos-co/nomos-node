@@ -50,6 +50,16 @@ impl<O: Overlay> Carnot<O> {
         if self.safe_blocks.contains_key(&block.id) {
             return Ok(self.clone());
         }
+
+        match block.leader_proof {
+            LeaderProof::LeaderId { leader_id } => {
+                // This only accepts blocks from the leader of current_view + 1
+                if leader_id != self.overlay.next_leader() {
+                    return Err(());
+                }
+            }
+        }
+
         if self.blocks_in_view(block.view).contains(&block)
             || block.view <= self.latest_committed_view()
         {
@@ -113,9 +123,7 @@ impl<O: Overlay> Carnot<O> {
         new_state.highest_voted_view = block.view;
 
         let to = if new_state.overlay.is_member_of_root_committee(new_state.id) {
-            [new_state.overlay.leader(block.view + 1)]
-                .into_iter()
-                .collect()
+            [new_state.overlay.next_leader()].into_iter().collect()
         } else {
             new_state.overlay.parent_committee(self.id)
         };
@@ -182,9 +190,7 @@ impl<O: Overlay> Carnot<O> {
 
         new_state.highest_voted_view = new_view;
         let to = if new_state.overlay.is_member_of_root_committee(new_state.id) {
-            [new_state.overlay.leader(new_view + 1)]
-                .into_iter()
-                .collect()
+            [new_state.overlay.next_leader()].into_iter().collect()
         } else {
             new_state.overlay.parent_committee(new_state.id)
         };
@@ -324,8 +330,8 @@ impl<O: Overlay> Carnot<O> {
         self.local_high_qc.clone()
     }
 
-    pub fn is_leader_for_view(&self, view: View) -> bool {
-        self.overlay.leader(view) == self.id
+    pub fn is_next_leader(&self) -> bool {
+        self.overlay.next_leader() == self.id
     }
 
     pub fn super_majority_threshold(&self) -> usize {
@@ -359,72 +365,27 @@ impl<O: Overlay> Carnot<O> {
     pub fn is_member_of_root_committee(&self) -> bool {
         self.overlay.is_member_of_root_committee(self.id)
     }
+
+    /// A way to allow for overlay extendability without compromising the engine
+    /// generality.
+    pub fn update_overlay<F, E>(&self, f: F) -> Result<Self, E>
+    where
+        F: FnOnce(O) -> Result<O, E>,
+    {
+        match f(self.overlay.clone()) {
+            Ok(overlay) => Ok(Self {
+                overlay,
+                ..self.clone()
+            }),
+            Err(e) => Err(e),
+        }
+    }
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
-
-    #[derive(Clone)]
-    struct NoOverlay;
-
-    impl Overlay for NoOverlay {
-        fn new(_nodes: Vec<NodeId>) -> Self {
-            Self
-        }
-
-        fn root_committee(&self) -> Committee {
-            todo!()
-        }
-
-        fn rebuild(&mut self, _timeout_qc: TimeoutQc) {
-            todo!()
-        }
-
-        fn is_member_of_child_committee(&self, _parent: NodeId, _child: NodeId) -> bool {
-            todo!()
-        }
-
-        fn is_member_of_root_committee(&self, _id: NodeId) -> bool {
-            todo!()
-        }
-
-        fn is_member_of_leaf_committee(&self, _id: NodeId) -> bool {
-            todo!()
-        }
-
-        fn is_child_of_root_committee(&self, _id: NodeId) -> bool {
-            todo!()
-        }
-
-        fn node_committee(&self, _id: NodeId) -> Committee {
-            todo!()
-        }
-
-        fn parent_committee(&self, _id: NodeId) -> Committee {
-            todo!()
-        }
-
-        fn child_committees(&self, _id: NodeId) -> Vec<Committee> {
-            todo!()
-        }
-
-        fn leaf_committees(&self, _id: NodeId) -> Vec<Committee> {
-            todo!()
-        }
-
-        fn leader(&self, _view: View) -> NodeId {
-            todo!()
-        }
-
-        fn super_majority_threshold(&self, _id: NodeId) -> usize {
-            todo!()
-        }
-
-        fn leader_super_majority_threshold(&self, _id: NodeId) -> usize {
-            todo!()
-        }
-    }
+    use crate::overlay::{FlatOverlay, RoundRobin};
 
     #[test]
     fn block_is_committed() {
@@ -435,8 +396,13 @@ mod test {
                 view: 0,
                 id: [0; 32],
             }),
+            leader_proof: LeaderProof::LeaderId { leader_id: [0; 32] },
         };
-        let mut engine = Carnot::from_genesis([0; 32], genesis.clone(), NoOverlay);
+        let mut engine = Carnot::from_genesis(
+            [0; 32],
+            genesis.clone(),
+            FlatOverlay::new((vec![[0; 32]], RoundRobin::new())),
+        );
         let p1 = Block {
             view: 1,
             id: [1; 32],
@@ -444,6 +410,7 @@ mod test {
                 view: 0,
                 id: [0; 32],
             }),
+            leader_proof: LeaderProof::LeaderId { leader_id: [0; 32] },
         };
         let p2 = Block {
             view: 2,
@@ -452,6 +419,7 @@ mod test {
                 view: 1,
                 id: [1; 32],
             }),
+            leader_proof: LeaderProof::LeaderId { leader_id: [0; 32] },
         };
         assert_eq!(engine.latest_committed_block(), genesis);
         engine = engine.receive_block(p1).unwrap();

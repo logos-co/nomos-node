@@ -3,7 +3,7 @@ mod tx;
 
 use clap::Parser;
 use color_eyre::eyre::{eyre, Result};
-use consensus_engine::overlay::FlatRoundRobin;
+use consensus_engine::overlay::{FlatOverlay, RoundRobin};
 use nomos_consensus::{
     network::adapters::waku::WakuAdapter as ConsensusWakuAdapter, CarnotConsensus,
 };
@@ -39,7 +39,7 @@ type Carnot = CarnotConsensus<
     MockPool<Tx>,
     MempoolWakuAdapter<Tx>,
     MockFountain,
-    FlatRoundRobin,
+    FlatOverlay<RoundRobin>,
 >;
 
 #[derive(Deserialize)]

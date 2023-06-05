@@ -1,10 +1,17 @@
 use super::types::*;
 
-mod flat_round_robin;
-pub use flat_round_robin::FlatRoundRobin;
+mod flat_overlay;
+mod random_beacon;
+pub use flat_overlay::*;
+pub use random_beacon::*;
+
+use std::marker::Send;
 
 pub trait Overlay: Clone {
-    fn new(nodes: Vec<NodeId>) -> Self;
+    type Settings: Clone + Send + Sync + 'static;
+    type LeaderSelection: LeaderSelection + Clone + Send + Sync + 'static;
+
+    fn new(settings: Self::Settings) -> Self;
     fn root_committee(&self) -> Committee;
     fn rebuild(&mut self, timeout_qc: TimeoutQc);
     fn is_member_of_child_committee(&self, parent: NodeId, child: NodeId) -> bool;
@@ -15,7 +22,17 @@ pub trait Overlay: Clone {
     fn child_committees(&self, id: NodeId) -> Vec<Committee>;
     fn leaf_committees(&self, id: NodeId) -> Vec<Committee>;
     fn node_committee(&self, id: NodeId) -> Committee;
-    fn leader(&self, view: View) -> NodeId;
+    fn next_leader(&self) -> NodeId;
     fn super_majority_threshold(&self, id: NodeId) -> usize;
     fn leader_super_majority_threshold(&self, id: NodeId) -> usize;
+    fn update_leader_selection<F, E>(&self, f: F) -> Result<Self, E>
+    where
+        F: FnOnce(Self::LeaderSelection) -> Result<Self::LeaderSelection, E>;
+}
+
+pub trait LeaderSelection: Clone {
+    type Advance: Clone;
+
+    fn next_leader(&self, nodes: &[NodeId]) -> NodeId;
+    fn advance(&self, adv: Self::Advance) -> Self;
 }
