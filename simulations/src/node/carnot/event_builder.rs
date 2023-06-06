@@ -1,11 +1,12 @@
 use crate::node::carnot::messages::CarnotMessage;
 use crate::util::parse_idx;
-use consensus_engine::{Carnot, Overlay, Qc, View};
+use consensus_engine::{Carnot, NewView, Overlay, Qc, Timeout, TimeoutQc, View, Vote};
 use nomos_consensus::network::messages::{NewViewMsg, TimeoutMsg, VoteMsg};
-use nomos_consensus::{Event, NodeId};
+use nomos_consensus::NodeId;
 use nomos_core::block::{Block, BlockId};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
+use std::hash::Hash;
 
 pub type CarnotTx = [u8; 32];
 
@@ -29,14 +30,14 @@ pub(crate) struct EventBuilder {
 }
 
 impl EventBuilder {
-    pub fn new(id: NodeId) -> Self {
+    pub fn new<O: Overlay>(id: NodeId) -> Self {
         Self {
             vote_message: Default::default(),
             timeout_message: Default::default(),
             config: Default::default(),
             blocks: Default::default(),
             new_view_message: Default::default(),
-            proposal_seen: Default::default(),
+            proposal_seen: [0].into_iter().collect(),
             current_view: View::default(),
             id,
             approved_blocks: Default::default(),
@@ -50,6 +51,7 @@ impl EventBuilder {
     ) -> Vec<Event<CarnotTx>> {
         let mut events = Vec::new();
         self.try_handle_leader(engine, &mut events);
+        self.try_handle_leaf(engine, &mut events);
         for message in messages {
             match message {
                 CarnotMessage::Proposal(msg) => {
@@ -66,10 +68,7 @@ impl EventBuilder {
                         block=?block.header().id,
                         "receive proposal message",
                     );
-                    events.push(Event::Proposal {
-                        block,
-                        stream: Box::pin(futures::stream::empty()),
-                    });
+                    events.push(Event::Proposal { block });
                 }
                 CarnotMessage::TimeoutQc(msg) => {
                     events.push(Event::TimeoutQc { timeout_qc: msg.qc });
@@ -180,10 +179,7 @@ impl EventBuilder {
             block = ?block.header().id,
             "propose block"
         );
-        events.push(Event::Proposal {
-            block,
-            stream: Box::pin(futures::stream::empty()),
-        });
+        events.push(Event::Proposal { block });
         self.proposal_seen.insert(engine.current_view() + 1);
     }
 
@@ -208,11 +204,24 @@ impl EventBuilder {
                 block = ?block.header().id,
                 "propose block"
             );
-            events.push(Event::Proposal {
-                block,
-                stream: Box::pin(futures::stream::empty()),
-            });
+            events.push(Event::Proposal { block });
             self.proposal_seen.insert(engine.current_view());
+        }
+    }
+
+    fn try_handle_leaf<O: Overlay>(
+        &mut self,
+        engine: &Carnot<O>,
+        events: &mut Vec<Event<CarnotTx>>,
+    ) {
+        // vote for genesis
+        if engine.current_view() == 0 && engine.overlay().is_member_of_leaf_committee(self.id) {
+            let genesis = engine.genesis_block();
+            events.push(Event::Approve {
+                qc: genesis.parent_qc.clone(),
+                block: genesis,
+                votes: HashSet::new(),
+            })
         }
     }
 }
@@ -256,4 +265,31 @@ impl<T: core::hash::Hash + Eq> Tally<T> {
             None
         }
     }
+}
+
+pub enum Event<Tx: Clone + Hash + Eq> {
+    Proposal {
+        block: Block<Tx>,
+    },
+    #[allow(dead_code)]
+    Approve {
+        qc: Qc,
+        block: consensus_engine::Block,
+        votes: HashSet<Vote>,
+    },
+    LocalTimeout,
+    NewView {
+        timeout_qc: TimeoutQc,
+        new_views: HashSet<NewView>,
+    },
+    TimeoutQc {
+        timeout_qc: TimeoutQc,
+    },
+    RootTimeout {
+        timeouts: HashSet<Timeout>,
+    },
+    ProposeBlock {
+        qc: Qc,
+    },
+    None,
 }

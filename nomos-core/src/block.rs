@@ -39,6 +39,16 @@ impl<TxId: Clone + Eq + Hash + Serialize + DeserializeOwned> Block<TxId> {
         s
     }
 
+    pub fn from_header_and_txs(
+        header: consensus_engine::Block,
+        txs: impl Iterator<Item = TxId>,
+    ) -> Self {
+        Self {
+            header,
+            transactions: txs.collect(),
+        }
+    }
+
     pub fn header(&self) -> &consensus_engine::Block {
         &self.header
     }

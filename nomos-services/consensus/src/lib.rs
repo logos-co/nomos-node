@@ -604,7 +604,7 @@ where
     }
 }
 
-pub enum Event<Tx: Clone + Hash + Eq> {
+enum Event<Tx: Clone + Hash + Eq> {
     Proposal {
         block: Block<Tx>,
         stream: Pin<Box<dyn Stream<Item = Block<Tx>> + Send>>,

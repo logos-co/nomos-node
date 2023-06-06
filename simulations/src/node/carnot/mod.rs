@@ -11,16 +11,16 @@ use crate::util::parse_idx;
 // std
 // crates
 use self::messages::CarnotMessage;
-use crate::node::carnot::event_builder::CarnotTx;
+use crate::node::carnot::event_builder::{CarnotTx, Event};
 use consensus_engine::{
     Block, BlockId, Carnot, Committee, Overlay, Payload, Qc, StandardQc, TimeoutQc, View, Vote,
 };
 use nomos_consensus::network::messages::ProposalChunkMsg;
 use nomos_consensus::{
     network::messages::{NewViewMsg, TimeoutMsg, VoteMsg},
-    Event, Output,
+    Output,
 };
-use serde::{ser::SerializeStruct, Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 
 // internal
 use super::{Node, NodeId};
@@ -44,7 +44,9 @@ pub struct CarnotState {
 /// Have to implement this manually because of the `serde_json` will panic if the key of map
 /// is not a string.
 fn serialize_blocks<S>(blocks: &HashMap<BlockId, Block>, serializer: S) -> Result<S::Ok, S::Error>
-where S: serde::Serializer {
+where
+    S: serde::Serializer,
+{
     use serde::ser::SerializeMap;
     let mut ser = serializer.serialize_map(Some(blocks.len()))?;
     for (k, v) in blocks {
@@ -111,9 +113,10 @@ impl<O: Overlay> CarnotNode<O> {
     ) -> Self {
         let genesis = consensus_engine::Block {
             id: [0; 32],
-            view: -1,
+            view: 0,
             parent_qc: Qc::Standard(StandardQc::genesis()),
         };
+
         let overlay = O::new(settings.nodes.clone());
         let engine = Carnot::from_genesis(id, genesis, overlay);
         let state = CarnotState::from(&engine);
@@ -123,7 +126,7 @@ impl<O: Overlay> CarnotNode<O> {
             state,
             settings,
             network_interface,
-            event_builder: event_builder::EventBuilder::new(id),
+            event_builder: event_builder::EventBuilder::new::<O>(id),
             engine,
         }
     }
@@ -229,7 +232,7 @@ impl<O: Overlay> Node for CarnotNode<O> {
         for event in events {
             let mut output: Vec<Output<CarnotTx>> = vec![];
             match event {
-                Event::Proposal { block, stream: _ } => {
+                Event::Proposal { block } => {
                     if self.engine.is_leader_for_view(self.engine.current_view()) {
                         output.push(nomos_consensus::Output::BroadcastProposal {
                             proposal: block.clone(),

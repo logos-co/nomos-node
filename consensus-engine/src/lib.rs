@@ -30,6 +30,7 @@ impl<O: Overlay> Carnot<O> {
     pub fn current_view(&self) -> View {
         self.current_view
     }
+
     /// Upon reception of a block
     ///
     /// Preconditions:

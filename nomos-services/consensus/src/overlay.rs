@@ -1,4 +1,4 @@
-use consensus_engine::{Committee, NodeId, Overlay, View};
+use consensus_engine::{NodeId, Overlay, View};
 
 #[derive(Clone, Debug)]
 /// Flat overlay with a single committee and round robin leader selection.
