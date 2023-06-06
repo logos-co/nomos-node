@@ -31,10 +31,8 @@ pub enum RandomBeaconState {
 
 #[derive(Debug, Error)]
 pub enum Error {
-    #[error("Invalid random beacon trasition")]
+    #[error("Invalid random beacon transition")]
     InvalidRandomBeacon,
-    #[error("Invalid signature format")]
-    InvalidSignature(#[from] bls_signatures::Error),
 }
 
 impl RandomBeaconState {
