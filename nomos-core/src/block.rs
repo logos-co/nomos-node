@@ -25,7 +25,7 @@ impl<TxId: Clone + Eq + Hash + Serialize + DeserializeOwned> Block<TxId> {
     pub fn new(view: View, parent_qc: Qc, txs: impl Iterator<Item = TxId>) -> Self {
         let transactions = txs.collect();
         let header = consensus_engine::Block {
-            id: [view as u8; 32],
+            id: [0; 32],
             view,
             parent_qc,
         };
@@ -34,7 +34,7 @@ impl<TxId: Clone + Eq + Hash + Serialize + DeserializeOwned> Block<TxId> {
             header,
             transactions,
         };
-        let id = id_from_wire_content(&s.as_bytes());
+        let id = block_id_from_wire_content(&s);
         s.header.id = id;
         s
     }
@@ -43,10 +43,13 @@ impl<TxId: Clone + Eq + Hash + Serialize + DeserializeOwned> Block<TxId> {
         header: consensus_engine::Block,
         txs: impl Iterator<Item = TxId>,
     ) -> Self {
-        Self {
+        let mut s = Self {
             header,
             transactions: txs.collect(),
-        }
+        };
+        let id = block_id_from_wire_content(&s);
+        s.header.id = id;
+        s
     }
 
     pub fn header(&self) -> &consensus_engine::Block {
@@ -58,9 +61,12 @@ impl<TxId: Clone + Eq + Hash + Serialize + DeserializeOwned> Block<TxId> {
     }
 }
 
-fn id_from_wire_content(bytes: &[u8]) -> consensus_engine::BlockId {
+pub fn block_id_from_wire_content<Tx: Clone + Eq + Hash + Serialize + DeserializeOwned>(
+    block: &Block<Tx>,
+) -> consensus_engine::BlockId {
     use blake2::digest::{consts::U32, Digest};
     use blake2::Blake2b;
+    let bytes = block.as_bytes();
     let mut hasher = Blake2b::<U32>::new();
     hasher.update(bytes);
     hasher.finalize().into()
@@ -74,7 +80,7 @@ impl<TxId: Clone + Eq + Hash + Serialize + DeserializeOwned> Block<TxId> {
 
     pub fn from_bytes(bytes: &[u8]) -> Self {
         let mut result: Self = wire::deserialize(bytes).unwrap();
-        result.header.id = id_from_wire_content(bytes);
+        result.header.id = block_id_from_wire_content(&result);
         result
     }
 }

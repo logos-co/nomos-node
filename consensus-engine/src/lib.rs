@@ -31,6 +31,10 @@ impl<O: Overlay> Carnot<O> {
         self.current_view
     }
 
+    pub fn highest_voted_view(&self) -> View {
+        self.highest_voted_view
+    }
+
     /// Upon reception of a block
     ///
     /// Preconditions:

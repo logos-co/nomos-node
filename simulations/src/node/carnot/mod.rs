@@ -111,14 +111,8 @@ impl<O: Overlay> CarnotNode<O> {
         settings: CarnotSettings,
         network_interface: InMemoryNetworkInterface<CarnotMessage>,
     ) -> Self {
-        let genesis = consensus_engine::Block {
-            id: [0; 32],
-            view: 0,
-            parent_qc: Qc::Standard(StandardQc::genesis()),
-        };
-
         let overlay = O::new(settings.nodes.clone());
-        let engine = Carnot::from_genesis(id, genesis, overlay);
+        let engine = Carnot::from_genesis(id, Block::genesis(), overlay);
         let state = CarnotState::from(&engine);
 
         Self {

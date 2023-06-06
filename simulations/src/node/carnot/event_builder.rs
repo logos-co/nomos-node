@@ -68,7 +68,7 @@ impl EventBuilder {
                         block=?block.header().id,
                         "receive proposal message",
                     );
-                    events.push(Event::Proposal { block });
+                    events.push(Event::Proposal { block })
                 }
                 CarnotMessage::TimeoutQc(msg) => {
                     events.push(Event::TimeoutQc { timeout_qc: msg.qc });
@@ -188,6 +188,9 @@ impl EventBuilder {
         engine: &Carnot<O>,
         events: &mut Vec<Event<CarnotTx>>,
     ) {
+        if engine.current_view() == 0 {
+            return;
+        }
         if !self.proposal_seen.contains(&engine.current_view())
             && engine.is_leader_for_view(engine.current_view())
         {
@@ -215,7 +218,9 @@ impl EventBuilder {
         events: &mut Vec<Event<CarnotTx>>,
     ) {
         // vote for genesis
-        if engine.current_view() == 0 && engine.overlay().is_member_of_leaf_committee(self.id) {
+        if engine.highest_voted_view() == -1
+            && engine.overlay().is_member_of_leaf_committee(self.id)
+        {
             let genesis = engine.genesis_block();
             events.push(Event::Approve {
                 qc: genesis.parent_qc.clone(),
