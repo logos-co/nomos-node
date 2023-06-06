@@ -147,57 +147,6 @@ impl<O: Overlay> CarnotNode<O> {
             .send_message(self.id, message.payload);
     }
 
-    pub fn approve_block(&mut self, block: Block) -> consensus_engine::Send {
-        assert!(
-            self.state.safe_blocks.contains_key(&block.id),
-            "{:?} not in {:?}",
-            block,
-            self.state.safe_blocks
-        );
-        assert!(
-            self.state.highest_voted_view < block.view,
-            "can't vote for a block in the past"
-        );
-
-        // update state
-        self.state.highest_voted_view = block.view;
-
-        let to = if self.engine.is_member_of_root_committee() {
-            [self.engine.leader(block.view + 1)].into_iter().collect()
-        } else {
-            self.engine.parent_committee()
-        };
-
-        consensus_engine::Send {
-            to,
-            payload: Payload::Vote(Vote {
-                block: block.id,
-                view: block.view,
-            }),
-        }
-    }
-
-    fn gather_votes(&self, committee: &Committee, block: consensus_engine::Block) {
-        use rand::seq::IteratorRandom;
-        // random choose some commitees to vote
-        for node in committee.iter().choose_multiple(
-            &mut rand::thread_rng(),
-            self.event_builder.config.votes_threshold,
-        ) {
-            self.network_interface.send_message(
-                *node,
-                CarnotMessage::Vote(VoteMsg {
-                    voter: *node,
-                    vote: Vote {
-                        block: block.id,
-                        view: block.view,
-                    },
-                    qc: Some(block.parent_qc.clone()),
-                }),
-            );
-        }
-    }
-
     fn handle_output(&self, output: Output<CarnotTx>) {
         match output {
             Output::Send(consensus_engine::Send {
@@ -395,7 +344,7 @@ impl<O: Overlay> Node for CarnotNode<O> {
                 }
             }
 
-            for output_event in output.drain(..) {
+            for output_event in output {
                 self.handle_output(output_event);
             }
         }
