@@ -266,7 +266,7 @@ impl<O: Overlay> Carnot<O> {
     }
 
     pub fn genesis_block(&self) -> Block {
-        self.blocks_in_view(-1)[0].clone()
+        self.blocks_in_view(0)[0].clone()
     }
 
     // Returns the id of the grandparent block if it can be committed or None otherwise
