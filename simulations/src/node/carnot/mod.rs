@@ -16,7 +16,7 @@ use consensus_engine::{
     Block, BlockId, Carnot, Committee, NewView, Overlay, Payload, Qc, StandardQc, TimeoutQc, View,
     Vote,
 };
-use nomos_consensus::network::messages::ProposalChunkMsg;
+use nomos_consensus::network::messages::{ProposalChunkMsg, TimeoutQcMsg};
 use nomos_consensus::{
     network::messages::{NewViewMsg, TimeoutMsg, VoteMsg},
     Event, Output,
@@ -247,8 +247,14 @@ impl<O: Overlay> CarnotNode<O> {
                     );
                 }
             }
-            Output::BroadcastTimeoutQc { .. } => {
-                unimplemented!()
+            Output::BroadcastTimeoutQc { timeout_qc } => {
+                self.network_interface.send_message(
+                    self.id,
+                    CarnotMessage::TimeoutQc(TimeoutQcMsg {
+                        source: self.id,
+                        qc: timeout_qc,
+                    }),
+                );
             }
             Output::BroadcastProposal { proposal } => {
                 for node in &self.settings.nodes {
@@ -294,6 +300,7 @@ impl<O: Overlay> Node for CarnotNode<O> {
 
         for event in events {
             let mut output: Vec<Output<CarnotTx>> = vec![];
+            let prev_view = self.engine.current_view();
             match event {
                 Event::Proposal { block, stream: _ } => {
                     if self.engine.is_leader_for_view(self.engine.current_view()) {
@@ -385,6 +392,13 @@ impl<O: Overlay> Node for CarnotNode<O> {
                     }
                 }
                 Event::TimeoutQc { timeout_qc } => {
+                    tracing::warn!(
+                        node = parse_idx(&self.id),
+                        leader = parse_idx(&self.engine.leader(timeout_qc.view)),
+                        current_view = self.engine.current_view(),
+                        timeout_view = timeout_qc.view,
+                        "receive timeout qc message"
+                    );
                     self.engine = self.engine.receive_timeout_qc(timeout_qc.clone());
                     output.push(nomos_consensus::Output::Send(consensus_engine::Send {
                         to: self.engine.self_committee(),
@@ -397,7 +411,23 @@ impl<O: Overlay> Node for CarnotNode<O> {
                     }));
                 }
                 Event::RootTimeout { timeouts } => {
-                    println!("root timeouts: {timeouts:?}");
+                    tracing::debug!("root timeout {:?}", timeouts);
+                    assert!(timeouts.iter().all(|t| t.view == self.engine.current_view()));
+                    let high_qc = timeouts
+                        .iter()
+                        .map(|t| &t.high_qc)
+                        .chain(std::iter::once(&self.engine.high_qc()))
+                        .max_by_key(|qc| qc.view)
+                        .expect("empty root committee")
+                        .clone();
+                    if self.engine.is_member_of_root_committee() {
+                        let timeout_qc = TimeoutQc {
+                            view: self.engine.current_view(),
+                            high_qc,
+                            sender: self.id(),
+                        };
+                        output.push(nomos_consensus::Output::BroadcastTimeoutQc { timeout_qc });
+                    }
                 }
                 Event::ProposeBlock { qc } => {
                     if self.engine.is_leader_for_view(qc.view()) {
@@ -411,13 +441,34 @@ impl<O: Overlay> Node for CarnotNode<O> {
                     }
                 }
                 Event::LocalTimeout => {
-                    tracing::error!("unimplemented local timeout branch");
-                    unreachable!("local timeout will never be constructed")
+                    tracing::warn!(
+                        node = parse_idx(&self.id),
+                        leader = parse_idx(&self.engine.leader(self.engine.current_view())),
+                        current_view = self.engine.current_view(),
+                        "receive local timeout message"
+                    );
+                    let (new, out) = self.engine.local_timeout();
+                    self.engine = new;
+                    if let Some(out) = out {
+                        output.push(Output::Send(out));
+                    }
                 }
                 Event::None => {
                     tracing::error!("unimplemented none branch");
                     unreachable!("none event will never be constructed")
                 }
+            }
+
+            let current_view = self.engine.current_view();
+
+            if current_view != prev_view {
+                self.network_interface.send_message(self.id, CarnotMessage::LocalTimeout);
+
+                // TODO: If we meet a timeout, we should gather the block,
+                // but how to do it in sim app? Add a method in NetworkInterface?
+
+                // TODO: If we meet a timeout, we should gather the timeout qc,
+                // but how to do it in sim app? Add a method in NetworkInterface? 
             }
 
             for output_event in output.drain(..) {

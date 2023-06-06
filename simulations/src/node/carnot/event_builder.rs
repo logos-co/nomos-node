@@ -128,12 +128,22 @@ impl EventBuilder {
                         }
                     }
                 }
+                CarnotMessage::LocalTimeout => {
+                    events.push(Event::LocalTimeout);
+                }
                 CarnotMessage::Timeout(msg) => {
                     let msg_view = msg.vote.view;
+
                     if let Some(timeouts) = self.timeout_message.tally(msg_view, msg) {
-                        events.push(Event::RootTimeout {
-                            timeouts: timeouts.into_iter().map(|v| v.vote).collect(),
-                        })
+                        if engine.is_member_of_root_committee() {
+                            let threshold = engine.leader_super_majority_threshold();
+                            if timeouts.len() >= threshold {
+                                events.push(Event::RootTimeout {
+                                    timeouts: timeouts.into_iter().map(|v| v.vote).collect(),
+                                })
+                            }
+                        }
+                        
                     }
                 }
                 CarnotMessage::NewView(msg) => {
