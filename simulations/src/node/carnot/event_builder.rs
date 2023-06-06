@@ -1,6 +1,6 @@
 use crate::node::carnot::messages::CarnotMessage;
 use crate::util::parse_idx;
-use consensus_engine::{Carnot, Overlay, Qc, View, AggregateQc};
+use consensus_engine::{AggregateQc, Carnot, Overlay, Qc, View};
 use nomos_consensus::network::messages::{NewViewMsg, TimeoutMsg, VoteMsg};
 use nomos_consensus::{Event, NodeId};
 use nomos_core::block::{Block, BlockId};

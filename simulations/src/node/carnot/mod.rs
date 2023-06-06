@@ -13,7 +13,8 @@ use crate::util::parse_idx;
 use self::messages::CarnotMessage;
 use crate::node::carnot::event_builder::CarnotTx;
 use consensus_engine::{
-    Block, BlockId, Carnot, Committee, Overlay, Payload, Qc, StandardQc, TimeoutQc, View, Vote,
+    Block, BlockId, Carnot, Committee, NewView, Overlay, Payload, Qc, StandardQc, TimeoutQc, View,
+    Vote,
 };
 use nomos_consensus::network::messages::ProposalChunkMsg;
 use nomos_consensus::{
@@ -369,15 +370,31 @@ impl<O: Overlay> Node for CarnotNode<O> {
                     let prev_view = self.engine.current_view();
                     self.engine = new;
                     let next_view = timeout_qc.view + 2;
-                    tracing::info!(node = parse_idx(&self.id), leader=parse_idx(&self.engine.leader(timeout_qc.view)), prev_view=prev_view, current_view = self.engine.current_view(), next_view = next_view, timeout_view = timeout_qc.view, "receive new view message");
+                    tracing::info!(
+                        node = parse_idx(&self.id),
+                        leader = parse_idx(&self.engine.leader(timeout_qc.view)),
+                        prev_view = prev_view,
+                        current_view = self.engine.current_view(),
+                        next_view = next_view,
+                        timeout_view = timeout_qc.view,
+                        "receive new view message"
+                    );
                     // if we are the leader, then send to self a new view message
-                    // if we are not the leader, then we will receive the new view message from the leader by event_builder
                     if self.engine.is_leader_for_view(next_view) {
                         output.push(nomos_consensus::Output::Send(out));
                     }
                 }
                 Event::TimeoutQc { timeout_qc } => {
-                    self.engine = self.engine.receive_timeout_qc(timeout_qc);
+                    self.engine = self.engine.receive_timeout_qc(timeout_qc.clone());
+                    output.push(nomos_consensus::Output::Send(consensus_engine::Send {
+                        to: self.engine.self_committee(),
+                        payload: Payload::NewView(NewView {
+                            view: timeout_qc.view + 1,
+                            sender: self.id,
+                            timeout_qc,
+                            high_qc: self.engine.high_qc(),
+                        }),
+                    }));
                 }
                 Event::RootTimeout { timeouts } => {
                     println!("root timeouts: {timeouts:?}");
@@ -385,7 +402,11 @@ impl<O: Overlay> Node for CarnotNode<O> {
                 Event::ProposeBlock { qc } => {
                     if self.engine.is_leader_for_view(qc.view()) {
                         output.push(nomos_consensus::Output::BroadcastProposal {
-                            proposal: nomos_consensus::Block::new(qc.view() + 1, qc, core::iter::empty()),
+                            proposal: nomos_consensus::Block::new(
+                                qc.view() + 1,
+                                qc,
+                                core::iter::empty(),
+                            ),
                         });
                     }
                 }
