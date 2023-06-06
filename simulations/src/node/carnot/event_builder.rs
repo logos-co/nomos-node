@@ -1,6 +1,6 @@
 use crate::node::carnot::messages::CarnotMessage;
 use crate::util::parse_idx;
-use consensus_engine::{Carnot, Overlay, Qc, View};
+use consensus_engine::{Carnot, Overlay, Qc, View, AggregateQc};
 use nomos_consensus::network::messages::{NewViewMsg, TimeoutMsg, VoteMsg};
 use nomos_consensus::{Event, NodeId};
 use nomos_core::block::{Block, BlockId};
@@ -139,9 +139,10 @@ impl EventBuilder {
                 CarnotMessage::NewView(msg) => {
                     let msg_view = msg.vote.view;
                     let timeout_qc = msg.vote.timeout_qc.clone();
+                    let is_leader = engine.is_leader_for_view(msg_view);
                     self.current_view = core::cmp::max(self.current_view, msg_view);
                     // if we are the leader, then use the leader threshold, otherwise use the leaf threshold
-                    let threshold = if engine.is_leader_for_view(msg_view) {
+                    let threshold = if is_leader {
                         engine.leader_super_majority_threshold()
                     } else {
                         engine.super_majority_threshold()
@@ -150,6 +151,17 @@ impl EventBuilder {
                     if let Some(new_views) =
                         self.new_view_message.tally_by(msg_view, msg, threshold)
                     {
+                        if is_leader {
+                            let high_qc = engine.high_qc();
+                            events.push(Event::ProposeBlock {
+                                qc: Qc::Aggregated(AggregateQc {
+                                    high_qc,
+                                    view: msg_view + 1,
+                                }),
+                            });
+                            continue;
+                        }
+
                         events.push(Event::NewView {
                             new_views: new_views.into_iter().map(|v| v.vote).collect(),
                             timeout_qc,

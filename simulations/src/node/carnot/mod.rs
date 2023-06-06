@@ -362,18 +362,19 @@ impl<O: Overlay> Node for CarnotNode<O> {
                 // This branch means we already get enough new view msgs for this qc
                 // So we can just call approve_new_view
                 Event::NewView {
-                    timeout_qc: _,
-                    new_views: _,
+                    timeout_qc,
+                    new_views,
                 } => {
-                    // let (new, out) = self.engine.approve_new_view(timeout_qc, new_views);
-                    // output = Some(out);
-                    // self.engine = new;
-                    // let next_view = timeout_qc.view + 2;
-                    // if self.engine.is_leader_for_view(next_view) {
-                    //     self.gather_new_views(&[self.id].into_iter().collect(), timeout_qc);
-                    // }
-                    tracing::error!("unimplemented new view branch");
-                    unimplemented!()
+                    let (new, out) = self.engine.approve_new_view(timeout_qc.clone(), new_views);
+                    let prev_view = self.engine.current_view();
+                    self.engine = new;
+                    let next_view = timeout_qc.view + 2;
+                    tracing::info!(node = parse_idx(&self.id), leader=parse_idx(&self.engine.leader(timeout_qc.view)), prev_view=prev_view, current_view = self.engine.current_view(), next_view = next_view, timeout_view = timeout_qc.view, "receive new view message");
+                    // if we are the leader, then send to self a new view message
+                    // if we are not the leader, then we will receive the new view message from the leader by event_builder
+                    if self.engine.is_leader_for_view(next_view) {
+                        output.push(nomos_consensus::Output::Send(out));
+                    }
                 }
                 Event::TimeoutQc { timeout_qc } => {
                     self.engine = self.engine.receive_timeout_qc(timeout_qc);
@@ -381,9 +382,12 @@ impl<O: Overlay> Node for CarnotNode<O> {
                 Event::RootTimeout { timeouts } => {
                     println!("root timeouts: {timeouts:?}");
                 }
-                Event::ProposeBlock { .. } => {
-                    tracing::error!("unimplemented propose block branch");
-                    unreachable!("propose block will never be constructed")
+                Event::ProposeBlock { qc } => {
+                    if self.engine.is_leader_for_view(qc.view()) {
+                        output.push(nomos_consensus::Output::BroadcastProposal {
+                            proposal: nomos_consensus::Block::new(qc.view() + 1, qc, core::iter::empty()),
+                        });
+                    }
                 }
                 Event::LocalTimeout => {
                     tracing::error!("unimplemented local timeout branch");
