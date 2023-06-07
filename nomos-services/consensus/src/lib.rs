@@ -234,21 +234,7 @@ where
                         .await
                     }
                     Some(msg) = self.service_state.inbound_relay.next() => {
-                        match msg {
-                            ConsensusMsg::Info { tx } => {
-                                let info = CarnotInfo {
-                                    id: carnot.id(),
-                                    current_view: carnot.current_view(),
-                                    highest_voted_view: carnot.highest_voted_view(),
-                                    local_high_qc: carnot.high_qc(),
-                                    safe_blocks: carnot.safe_blocks().clone(),
-                                    last_view_timeout_qc: carnot.last_view_timeout_qc(),
-                                    committed_blocks: carnot.committed_blocks(),
-                                };
-                                tx.send(info)
-                                  .unwrap_or_else(|e| tracing::error!("Could not send consensus info through channel: {:?}", e));
-                            }
-                        }
+                        Self::process_message(&carnot, msg);
                     }
             }
         }
@@ -275,6 +261,25 @@ where
     O: Overlay + Debug + Send + Sync + 'static,
     O::LeaderSelection: UpdateableLeaderSelection,
 {
+    fn process_message(carnot: &Carnot<O>, msg: ConsensusMsg) {
+        match msg {
+            ConsensusMsg::Info { tx } => {
+                let info = CarnotInfo {
+                    id: carnot.id(),
+                    current_view: carnot.current_view(),
+                    highest_voted_view: carnot.highest_voted_view(),
+                    local_high_qc: carnot.high_qc(),
+                    safe_blocks: carnot.safe_blocks().clone(),
+                    last_view_timeout_qc: carnot.last_view_timeout_qc(),
+                    committed_blocks: carnot.committed_blocks(),
+                };
+                tx.send(info).unwrap_or_else(|e| {
+                    tracing::error!("Could not send consensus info through channel: {:?}", e)
+                });
+            }
+        }
+    }
+
     async fn process_carnot_event(
         mut carnot: Carnot<O>,
         event: Event<P::Tx>,
