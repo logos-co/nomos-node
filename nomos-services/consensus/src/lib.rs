@@ -4,7 +4,7 @@ mod tally;
 mod task_manager;
 
 // std
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::fmt::Debug;
 use std::hash::Hash;
 use std::pin::Pin;
@@ -15,14 +15,15 @@ use futures::{Stream, StreamExt};
 use leader_selection::UpdateableLeaderSelection;
 use serde::Deserialize;
 use serde::{de::DeserializeOwned, Serialize};
+use tokio::sync::oneshot::Sender;
 use tracing::instrument;
 // internal
 use crate::network::messages::{NewViewMsg, ProposalChunkMsg, TimeoutMsg, TimeoutQcMsg, VoteMsg};
 use crate::network::NetworkAdapter;
 use crate::tally::{happy::CarnotTally, unhappy::NewViewTally, CarnotTallySettings};
 use consensus_engine::{
-    overlay::RandomBeaconState, AggregateQc, Carnot, Committee, LeaderProof, NewView, Overlay,
-    Payload, Qc, StandardQc, Timeout, TimeoutQc, View, Vote,
+    overlay::RandomBeaconState, AggregateQc, BlockId, Carnot, Committee, LeaderProof, NewView,
+    Overlay, Payload, Qc, StandardQc, Timeout, TimeoutQc, View, Vote,
 };
 use task_manager::TaskManager;
 
@@ -35,10 +36,9 @@ use nomos_mempool::{
     backend::MemPool, network::NetworkAdapter as MempoolAdapter, MempoolMsg, MempoolService,
 };
 use nomos_network::NetworkService;
-use overwatch_rs::services::relay::{OutboundRelay, Relay};
+use overwatch_rs::services::relay::{OutboundRelay, Relay, RelayMessage};
 use overwatch_rs::services::{
     handle::ServiceStateHandle,
-    relay::NoMessage,
     state::{NoOperator, NoState},
     ServiceCore, ServiceData, ServiceId,
 };
@@ -117,7 +117,7 @@ where
     type Settings = CarnotSettings<F, O>;
     type State = NoState<Self::Settings>;
     type StateOperator = NoOperator<Self::State>;
-    type Message = NoMessage;
+    type Message = ConsensusMsg;
 }
 
 #[async_trait::async_trait]
@@ -219,82 +219,39 @@ where
             });
         }
 
-        while let Some(event) = task_manager.next().await {
-            let mut output = None;
-            let prev_view = carnot.current_view();
-            match event {
-                Event::Proposal { block, stream } => {
-                    (carnot, output) = Self::process_block(
-                        carnot,
-                        block,
-                        stream,
-                        &mut task_manager,
-                        adapter.clone(),
-                    )
-                    .await;
-                }
-                Event::Approve { block, .. } => {
-                    tracing::debug!("approving proposal {:?}", block);
-                    let (new_carnot, out) = carnot.approve_block(block.clone());
-                    carnot = new_carnot;
-                    output = Some(Output::Send::<P::Tx>(out));
-                }
-                Event::LocalTimeout => {
-                    tracing::debug!("local timeout");
-                    let (new_carnot, out) = carnot.local_timeout();
-                    carnot = new_carnot;
-                    output = out.map(Output::Send);
-                }
-                Event::NewView {
-                    timeout_qc,
-                    new_views,
-                } => {
-                    (carnot, output) = Self::approve_new_view(
-                        carnot,
-                        timeout_qc,
-                        new_views,
-                        &mut task_manager,
-                        adapter.clone(),
-                    )
-                    .await;
-                }
-                Event::TimeoutQc { timeout_qc } => {
-                    (carnot, output) = Self::receive_timeout_qc(
-                        carnot,
-                        timeout_qc,
-                        &mut task_manager,
-                        adapter.clone(),
-                    )
-                    .await;
-                }
-                Event::RootTimeout { timeouts } => {
-                    (carnot, output) = Self::process_root_timeout(carnot, timeouts).await;
-                }
-                Event::ProposeBlock { qc } => {
-                    output =
-                        Self::propose_block(carnot.id(), private_key, qc, mempool_relay.clone())
-                            .await;
-                }
-                _ => {}
-            }
-
-            let current_view = carnot.current_view();
-            if current_view != prev_view {
-                Self::process_view_change(
-                    carnot.clone(),
-                    prev_view,
-                    &mut task_manager,
-                    adapter.clone(),
-                )
-                .await;
-            }
-
-            if let Some(output) = output {
-                handle_output(&adapter, &fountain, carnot.id(), output).await;
+        loop {
+            tokio::select! {
+                    Some(event) = task_manager.next() => {
+                        carnot = Self::process_carnot_event(
+                            carnot,
+                            event,
+                            &mut task_manager,
+                            adapter.clone(),
+                            private_key,
+                            mempool_relay.clone(),
+                            &fountain,
+                        )
+                        .await
+                    }
+                    Some(msg) = self.service_state.inbound_relay.next() => {
+                        match msg {
+                            ConsensusMsg::Info { tx } => {
+                                let info = CarnotInfo {
+                                    id: carnot.id(),
+                                    current_view: carnot.current_view(),
+                                    highest_voted_view: carnot.highest_voted_view(),
+                                    local_high_qc: carnot.high_qc(),
+                                    safe_blocks: carnot.safe_blocks().clone(),
+                                    last_view_timeout_qc: carnot.last_view_timeout_qc(),
+                                    committed_blocks: carnot.committed_blocks(),
+                                };
+                                tx.send(info)
+                                  .unwrap_or_else(|e| tracing::error!("Could not send consensus info through channel: {:?}", e));
+                            }
+                        }
+                    }
             }
         }
-
-        unreachable!("carnot exited");
     }
 }
 
@@ -318,6 +275,74 @@ where
     O: Overlay + Debug + Send + Sync + 'static,
     O::LeaderSelection: UpdateableLeaderSelection,
 {
+    async fn process_carnot_event(
+        mut carnot: Carnot<O>,
+        event: Event<P::Tx>,
+        task_manager: &mut TaskManager<View, Event<P::Tx>>,
+        adapter: A,
+        private_key: PrivateKey,
+        mempool_relay: OutboundRelay<MempoolMsg<P::Tx>>,
+        fountain: &F,
+    ) -> Carnot<O> {
+        let mut output = None;
+        let prev_view = carnot.current_view();
+        match event {
+            Event::Proposal { block, stream } => {
+                (carnot, output) =
+                    Self::process_block(carnot, block, stream, task_manager, adapter.clone()).await;
+            }
+            Event::Approve { block, .. } => {
+                tracing::debug!("approving proposal {:?}", block);
+                let (new_carnot, out) = carnot.approve_block(block);
+                carnot = new_carnot;
+                output = Some(Output::Send::<P::Tx>(out));
+            }
+            Event::LocalTimeout => {
+                tracing::debug!("local timeout");
+                let (new_carnot, out) = carnot.local_timeout();
+                carnot = new_carnot;
+                output = out.map(Output::Send);
+            }
+            Event::NewView {
+                timeout_qc,
+                new_views,
+            } => {
+                (carnot, output) = Self::approve_new_view(
+                    carnot,
+                    timeout_qc,
+                    new_views,
+                    task_manager,
+                    adapter.clone(),
+                )
+                .await;
+            }
+            Event::TimeoutQc { timeout_qc } => {
+                (carnot, output) =
+                    Self::receive_timeout_qc(carnot, timeout_qc, task_manager, adapter.clone())
+                        .await;
+            }
+            Event::RootTimeout { timeouts } => {
+                (carnot, output) = Self::process_root_timeout(carnot, timeouts).await;
+            }
+            Event::ProposeBlock { qc } => {
+                output = Self::propose_block(carnot.id(), private_key, qc, mempool_relay).await;
+            }
+            _ => {}
+        }
+
+        let current_view = carnot.current_view();
+        if current_view != prev_view {
+            Self::process_view_change(carnot.clone(), prev_view, task_manager, adapter.clone())
+                .await;
+        }
+
+        if let Some(output) = output {
+            handle_output(&adapter, fountain, carnot.id(), output).await;
+        }
+
+        carnot
+    }
+
     #[instrument(level = "debug", skip(adapter, task_manager, stream))]
     async fn process_block(
         mut carnot: Carnot<O>,
@@ -742,4 +767,22 @@ pub(crate) enum Event<Tx: Clone + Hash + Eq> {
         qc: Qc,
     },
     None,
+}
+
+#[derive(Debug)]
+pub enum ConsensusMsg {
+    Info { tx: Sender<CarnotInfo> },
+}
+
+impl RelayMessage for ConsensusMsg {}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CarnotInfo {
+    id: NodeId,
+    current_view: View,
+    highest_voted_view: View,
+    local_high_qc: StandardQc,
+    safe_blocks: HashMap<BlockId, consensus_engine::Block>,
+    last_view_timeout_qc: Option<TimeoutQc>,
+    committed_blocks: Vec<BlockId>,
 }
