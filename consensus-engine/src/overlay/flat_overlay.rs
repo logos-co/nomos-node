@@ -114,6 +114,6 @@ impl LeaderSelection for RoundRobin {
 #[derive(Clone, Debug, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Settings<L> {
-    nodes: Vec<NodeId>,
-    leader: L,
+    pub nodes: Vec<NodeId>,
+    pub leader: L,
 }

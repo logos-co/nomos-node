@@ -379,78 +379,23 @@ impl<O: Overlay> Carnot<O> {
 
 #[cfg(test)]
 mod test {
+    use crate::overlay::{FlatOverlay, RoundRobin, Settings};
+
     use super::*;
 
-    #[derive(Clone, Debug, PartialEq)]
-    struct MockOverlay;
-
-    impl Overlay for MockOverlay {
-        fn new(_nodes: Vec<NodeId>) -> Self {
-            Self
-        }
-
-        fn root_committee(&self) -> Committee {
-            vec![[0; 32]].into_iter().collect()
-        }
-
-        fn rebuild(&mut self, _timeout_qc: TimeoutQc) {
-            todo!()
-        }
-
-        fn is_member_of_child_committee(&self, _parent: NodeId, _child: NodeId) -> bool {
-            false
-        }
-
-        fn is_member_of_root_committee(&self, _id: NodeId) -> bool {
-            true
-        }
-
-        fn is_member_of_leaf_committee(&self, _id: NodeId) -> bool {
-            true
-        }
-
-        fn is_child_of_root_committee(&self, _id: NodeId) -> bool {
-            false
-        }
-
-        fn node_committee(&self, _id: NodeId) -> Committee {
-            self.root_committee()
-        }
-
-        fn parent_committee(&self, _id: NodeId) -> Committee {
-            self.root_committee()
-        }
-
-        fn child_committees(&self, _id: NodeId) -> Vec<Committee> {
-            vec![]
-        }
-
-        fn leaf_committees(&self, _id: NodeId) -> Vec<Committee> {
-            vec![self.root_committee()]
-        }
-
-        fn leader(&self, _view: View) -> NodeId {
-            [0; 32]
-        }
-
-        fn super_majority_threshold(&self, _id: NodeId) -> usize {
-            todo!()
-        }
-
-        fn leader_super_majority_threshold(&self, _id: NodeId) -> usize {
-            self.root_committee().len() * 2 / 3 + 1
-        }
-    }
-
-    fn init_from_genesis() -> Carnot<MockOverlay> {
+    fn init_from_genesis() -> Carnot<FlatOverlay<RoundRobin>> {
         Carnot::from_genesis(
             [0; 32],
             Block {
                 view: 0,
                 id: [0; 32],
                 parent_qc: Qc::Standard(StandardQc::genesis()),
+                leader_proof: LeaderProof::LeaderId { leader_id: [0; 32] },
             },
-            MockOverlay,
+            FlatOverlay::new(Settings {
+                nodes: vec![[0; 32]],
+                leader: RoundRobin::default(),
+            }),
         )
     }
 
