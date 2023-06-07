@@ -97,18 +97,16 @@ impl RoundRobin {
     pub fn new() -> Self {
         Self { cur: 0 }
     }
-}
 
-impl LeaderSelection for RoundRobin {
-    type Advance = ();
-
-    fn next_leader(&self, nodes: &[NodeId]) -> NodeId {
-        nodes[self.cur % nodes.len()]
-    }
-
-    fn advance(&self, _: Self::Advance) -> Self {
+    pub fn advance(&self) -> Self {
         Self {
             cur: (self.cur + 1),
         }
+    }
+}
+
+impl LeaderSelection for RoundRobin {
+    fn next_leader(&self, nodes: &[NodeId]) -> NodeId {
+        nodes[self.cur % nodes.len()]
     }
 }
