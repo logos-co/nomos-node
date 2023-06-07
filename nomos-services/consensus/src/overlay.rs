@@ -1,4 +1,4 @@
-use consensus_engine::{NodeId, Overlay, View};
+use consensus_engine::{NodeId, Overlay, View, Committee};
 
 #[derive(Clone, Debug)]
 /// Flat overlay with a single committee and round robin leader selection.
@@ -36,7 +36,7 @@ impl Overlay for FlatRoundRobin {
     }
 
     fn parent_committee(&self, _id: NodeId) -> consensus_engine::Committee {
-        self.root_committee()
+        Committee::new()
     }
 
     fn node_committee(&self, _id: NodeId) -> consensus_engine::Committee {
