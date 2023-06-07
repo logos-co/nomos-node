@@ -75,6 +75,14 @@ impl Block {
     pub fn parent(&self) -> BlockId {
         self.parent_qc.block()
     }
+
+    pub fn genesis() -> Self {
+        Self {
+            id: [0; 32],
+            view: 0,
+            parent_qc: Qc::Standard(StandardQc::genesis()),
+        }
+    }
 }
 
 /// Possible output events.

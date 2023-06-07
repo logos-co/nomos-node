@@ -36,7 +36,7 @@ impl Overlay for FlatRoundRobin {
     }
 
     fn parent_committee(&self, _id: NodeId) -> consensus_engine::Committee {
-        self.root_committee()
+        Committee::new()
     }
 
     fn node_committee(&self, _id: NodeId) -> consensus_engine::Committee {

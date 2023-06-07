@@ -30,6 +30,11 @@ impl<O: Overlay> Carnot<O> {
     pub fn current_view(&self) -> View {
         self.current_view
     }
+
+    pub fn highest_voted_view(&self) -> View {
+        self.highest_voted_view
+    }
+
     /// Upon reception of a block
     ///
     /// Preconditions:
@@ -59,7 +64,6 @@ impl<O: Overlay> Carnot<O> {
             return Err(());
         }
         let mut new_state = self.clone();
-
         if new_state.block_is_safe(block.clone()) {
             new_state.safe_blocks.insert(block.id, block.clone());
             new_state.update_high_qc(block.parent_qc);
@@ -266,7 +270,7 @@ impl<O: Overlay> Carnot<O> {
     }
 
     pub fn genesis_block(&self) -> Block {
-        self.blocks_in_view(-1)[0].clone()
+        self.blocks_in_view(0)[0].clone()
     }
 
     // Returns the id of the grandparent block if it can be committed or None otherwise

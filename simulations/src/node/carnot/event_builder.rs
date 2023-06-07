@@ -1,11 +1,14 @@
 use crate::node::carnot::messages::CarnotMessage;
 use crate::util::parse_idx;
-use consensus_engine::{AggregateQc, Carnot, Overlay, Qc, View};
+use consensus_engine::{
+    AggregateQc, Carnot, NewView, Overlay, Qc, StandardQc, Timeout, TimeoutQc, View, Vote,
+};
 use nomos_consensus::network::messages::{NewViewMsg, TimeoutMsg, VoteMsg};
-use nomos_consensus::{Event, NodeId};
+use nomos_consensus::NodeId;
 use nomos_core::block::{Block, BlockId};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
+use std::hash::Hash;
 
 pub type CarnotTx = [u8; 32];
 
@@ -19,11 +22,9 @@ pub struct EventBuilderSettings {
 pub(crate) struct EventBuilder {
     id: NodeId,
     blocks: HashMap<BlockId, Block<CarnotTx>>,
-    approved_blocks: HashSet<BlockId>,
     vote_message: Tally<VoteMsg>,
     timeout_message: Tally<TimeoutMsg>,
     new_view_message: Tally<NewViewMsg>,
-    proposal_seen: HashSet<View>,
     pub(crate) config: EventBuilderSettings,
     pub(crate) current_view: View,
 }
@@ -36,10 +37,8 @@ impl EventBuilder {
             config: Default::default(),
             blocks: Default::default(),
             new_view_message: Default::default(),
-            proposal_seen: Default::default(),
             current_view: View::default(),
             id,
-            approved_blocks: Default::default(),
         }
     }
 
@@ -49,7 +48,21 @@ impl EventBuilder {
         engine: &Carnot<O>,
     ) -> Vec<Event<CarnotTx>> {
         let mut events = Vec::new();
-        self.try_handle_leader(engine, &mut events);
+        // only run when the engine is in the genesis view
+        if engine.highest_voted_view() == -1
+            && engine.overlay().is_member_of_leaf_committee(self.id)
+        {
+            let genesis = engine.genesis_block();
+            events.push(Event::Approve {
+                qc: Qc::Standard(StandardQc {
+                    view: genesis.view,
+                    id: genesis.id,
+                }),
+                block: genesis,
+                votes: HashSet::new(),
+            })
+        }
+
         for message in messages {
             match message {
                 CarnotMessage::Proposal(msg) => {
@@ -64,12 +77,10 @@ impl EventBuilder {
                         current_view = engine.current_view(),
                         block_view=block.header().view,
                         block=?block.header().id,
+                        parent_block=?block.header().parent(),
                         "receive proposal message",
                     );
-                    events.push(Event::Proposal {
-                        block,
-                        stream: Box::pin(futures::stream::empty()),
-                    });
+                    events.push(Event::Proposal { block })
                 }
                 CarnotMessage::TimeoutQc(msg) => {
                     events.push(Event::TimeoutQc { timeout_qc: msg.qc });
@@ -92,13 +103,6 @@ impl EventBuilder {
                     };
 
                     if let Some(votes) = self.vote_message.tally_by(msg_view, msg, threshold) {
-                        if is_leader {
-                            self.propose_new_block(engine, &mut events);
-                            continue;
-                        }
-                        if self.approved_blocks.contains(&block_id) {
-                            continue;
-                        }
                         if let Some(block) =
                             self.blocks
                                 .get(&block_id)
@@ -109,7 +113,6 @@ impl EventBuilder {
                                     parent_qc: b.header().parent_qc.clone(),
                                 })
                         {
-                            self.approved_blocks.insert(block_id);
                             tracing::info!(
                                 node=parse_idx(&self.id),
                                 leader=parse_idx(&engine.leader(msg_view)),
@@ -125,6 +128,10 @@ impl EventBuilder {
                                 block,
                                 votes: votes.into_iter().map(|v| v.vote).collect(),
                             });
+                        }
+
+                        if is_leader {
+                            self.propose_new_block(engine, &mut events);
                         }
                     }
                 }
@@ -143,7 +150,6 @@ impl EventBuilder {
                                 })
                             }
                         }
-                        
                     }
                 }
                 CarnotMessage::NewView(msg) => {
@@ -194,48 +200,17 @@ impl EventBuilder {
             Qc::Standard(engine.high_qc()),
             [].into_iter(),
         );
+
         tracing::info!(
             node = parse_idx(&self.id),
             leader = parse_idx(&engine.leader(engine.current_view())),
             current_view = engine.current_view(),
             block_view = block.header().view,
             block = ?block.header().id,
+            parent_block = ?block.header().parent(),
             "propose block"
         );
-        events.push(Event::Proposal {
-            block,
-            stream: Box::pin(futures::stream::empty()),
-        });
-        self.proposal_seen.insert(engine.current_view() + 1);
-    }
-
-    fn try_handle_leader<O: Overlay>(
-        &mut self,
-        engine: &Carnot<O>,
-        events: &mut Vec<Event<CarnotTx>>,
-    ) {
-        if !self.proposal_seen.contains(&engine.current_view())
-            && engine.is_leader_for_view(engine.current_view())
-        {
-            let block = Block::new(
-                engine.current_view(),
-                Qc::Standard(engine.high_qc()),
-                [].into_iter(),
-            );
-            tracing::info!(
-                node = parse_idx(&self.id),
-                leader = parse_idx(&engine.leader(engine.current_view())),
-                current_view = engine.current_view(),
-                block_view = block.header().view,
-                block = ?block.header().id,
-                "propose block"
-            );
-            events.push(Event::Proposal {
-                block,
-                stream: Box::pin(futures::stream::empty()),
-            });
-            self.proposal_seen.insert(engine.current_view());
-        }
+        events.push(Event::Proposal { block });
     }
 }
 
@@ -278,4 +253,31 @@ impl<T: core::hash::Hash + Eq> Tally<T> {
             None
         }
     }
+}
+
+pub enum Event<Tx: Clone + Hash + Eq> {
+    Proposal {
+        block: Block<Tx>,
+    },
+    #[allow(dead_code)]
+    Approve {
+        qc: Qc,
+        block: consensus_engine::Block,
+        votes: HashSet<Vote>,
+    },
+    LocalTimeout,
+    NewView {
+        timeout_qc: TimeoutQc,
+        new_views: HashSet<NewView>,
+    },
+    TimeoutQc {
+        timeout_qc: TimeoutQc,
+    },
+    RootTimeout {
+        timeouts: HashSet<Timeout>,
+    },
+    ProposeBlock {
+        qc: Qc,
+    },
+    None,
 }

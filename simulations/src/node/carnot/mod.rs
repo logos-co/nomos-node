@@ -11,7 +11,7 @@ use crate::util::parse_idx;
 // std
 // crates
 use self::messages::CarnotMessage;
-use crate::node::carnot::event_builder::CarnotTx;
+use crate::node::carnot::event_builder::{CarnotTx, Event};
 use consensus_engine::{
     Block, BlockId, Carnot, Committee, NewView, Overlay, Payload, Qc, StandardQc, TimeoutQc, View,
     Vote,
@@ -19,17 +19,19 @@ use consensus_engine::{
 use nomos_consensus::network::messages::{ProposalChunkMsg, TimeoutQcMsg};
 use nomos_consensus::{
     network::messages::{NewViewMsg, TimeoutMsg, VoteMsg},
-    Event, Output,
+    Output,
 };
-use serde::{ser::SerializeStruct, Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 
 // internal
 use super::{Node, NodeId};
 
+#[derive(Serialize)]
 pub struct CarnotState {
     current_view: View,
     highest_voted_view: View,
     local_high_qc: StandardQc,
+    #[serde(serialize_with = "serialize_blocks")]
     safe_blocks: HashMap<BlockId, Block>,
     last_view_timeout_qc: Option<TimeoutQc>,
     latest_committed_block: Block,
@@ -40,32 +42,18 @@ pub struct CarnotState {
     committed_blocks: Vec<BlockId>,
 }
 
-impl Serialize for CarnotState {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        let mut state = serializer.serialize_struct("CarnotState", 11)?;
-        state.serialize_field("current_view", &self.current_view)?;
-        state.serialize_field("highest_voted_view", &self.highest_voted_view)?;
-        state.serialize_field("local_high_qc", &self.local_high_qc)?;
-        state.serialize_field(
-            "safe_blocks",
-            &self
-                .safe_blocks
-                .iter()
-                .map(|(k, v)| (format!("{k:?}"), v.clone()))
-                .collect::<HashMap<_, _>>(),
-        )?;
-        state.serialize_field("last_view_timeout_qc", &self.last_view_timeout_qc)?;
-        state.serialize_field("latest_committed_block", &self.latest_committed_block)?;
-        state.serialize_field("latest_committed_view", &self.latest_committed_view)?;
-        state.serialize_field("root_committe", &self.root_committe)?;
-        state.serialize_field("parent_committe", &self.parent_committe)?;
-        state.serialize_field("child_committees", &self.child_committees)?;
-        state.serialize_field("committed_blocks", &self.committed_blocks)?;
-        state.end()
+/// Have to implement this manually because of the `serde_json` will panic if the key of map
+/// is not a string.
+fn serialize_blocks<S>(blocks: &HashMap<BlockId, Block>, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    use serde::ser::SerializeMap;
+    let mut ser = serializer.serialize_map(Some(blocks.len()))?;
+    for (k, v) in blocks {
+        ser.serialize_entry(&format!("{k:?}"), v)?;
     }
+    ser.end()
 }
 
 impl<O: Overlay> From<&Carnot<O>> for CarnotState {
@@ -124,13 +112,8 @@ impl<O: Overlay> CarnotNode<O> {
         settings: CarnotSettings,
         network_interface: InMemoryNetworkInterface<CarnotMessage>,
     ) -> Self {
-        let genesis = consensus_engine::Block {
-            id: [0; 32],
-            view: -1,
-            parent_qc: Qc::Standard(StandardQc::genesis()),
-        };
         let overlay = O::new(settings.nodes.clone());
-        let engine = Carnot::from_genesis(id, genesis, overlay);
+        let engine = Carnot::from_genesis(id, Block::genesis(), overlay);
         let state = CarnotState::from(&engine);
 
         Self {
@@ -146,57 +129,6 @@ impl<O: Overlay> CarnotNode<O> {
     pub(crate) fn send_message(&self, message: NetworkMessage<CarnotMessage>) {
         self.network_interface
             .send_message(self.id, message.payload);
-    }
-
-    pub fn approve_block(&mut self, block: Block) -> consensus_engine::Send {
-        assert!(
-            self.state.safe_blocks.contains_key(&block.id),
-            "{:?} not in {:?}",
-            block,
-            self.state.safe_blocks
-        );
-        assert!(
-            self.state.highest_voted_view < block.view,
-            "can't vote for a block in the past"
-        );
-
-        // update state
-        self.state.highest_voted_view = block.view;
-
-        let to = if self.engine.is_member_of_root_committee() {
-            [self.engine.leader(block.view + 1)].into_iter().collect()
-        } else {
-            self.engine.parent_committee()
-        };
-
-        consensus_engine::Send {
-            to,
-            payload: Payload::Vote(Vote {
-                block: block.id,
-                view: block.view,
-            }),
-        }
-    }
-
-    fn gather_votes(&self, committee: &Committee, block: consensus_engine::Block) {
-        use rand::seq::IteratorRandom;
-        // random choose some commitees to vote
-        for node in committee.iter().choose_multiple(
-            &mut rand::thread_rng(),
-            self.event_builder.config.votes_threshold,
-        ) {
-            self.network_interface.send_message(
-                *node,
-                CarnotMessage::Vote(VoteMsg {
-                    voter: *node,
-                    vote: Vote {
-                        block: block.id,
-                        view: block.view,
-                    },
-                    qc: Some(block.parent_qc.clone()),
-                }),
-            );
-        }
     }
 
     fn handle_output(&self, output: Output<CarnotTx>) {
@@ -302,23 +234,18 @@ impl<O: Overlay> Node for CarnotNode<O> {
             let mut output: Vec<Output<CarnotTx>> = vec![];
             let prev_view = self.engine.current_view();
             match event {
-                Event::Proposal { block, stream: _ } => {
-                    if self.engine.is_leader_for_view(self.engine.current_view()) {
-                        output.push(nomos_consensus::Output::BroadcastProposal {
-                            proposal: block.clone(),
-                        });
-                    }
-
-                    if self
-                        .engine
-                        .blocks_in_view(block.header().view)
-                        .contains(block.header())
-                    {
-                        continue;
-                    }
-
+                Event::Proposal { block } => {
                     let current_view = self.engine.current_view();
-                    tracing::info!(node=parse_idx(&self.id), leader=parse_idx(&self.engine.leader(current_view)), current_view = current_view, block_view = block.header().view, block = ?block.header().id, "receive block proposal");
+                    tracing::info!(
+                        node=parse_idx(&self.id),
+                        leader=parse_idx(&self.engine.leader(current_view)),
+                        last_committed_view=self.engine.latest_committed_view(),
+                        current_view = current_view,
+                        block_view = block.header().view,
+                        block = ?block.header().id,
+                        parent_block=?block.header().parent(),
+                        "receive block proposal",
+                    );
                     match self.engine.receive_block(consensus_engine::Block {
                         id: block.header().id,
                         view: block.header().view,
@@ -347,10 +274,12 @@ impl<O: Overlay> Node for CarnotNode<O> {
                     block,
                     votes: _,
                 } => {
-                    tracing::info!(node = parse_idx(&self.id), leader=parse_idx(&self.engine.leader(block.view)), current_view = self.engine.current_view(), block_view = block.view, block = ?block.id, "receive approve message");
-                    if !self.engine.blocks_in_view(block.view).contains(&block)
-                        && self.state.safe_blocks.contains_key(&block.id)
+                    tracing::info!(node = parse_idx(&self.id), leader=parse_idx(&self.engine.leader(block.view)), current_view = self.engine.current_view(), block_view = block.view, block = ?block.id, parent_block=?block.parent(), "receive approve message");
+                    if block.view == 0
+                        || !self.engine.blocks_in_view(block.view).contains(&block)
+                            && self.state.safe_blocks.contains_key(&block.id)
                     {
+                        tracing::info!(node = parse_idx(&self.id), leader=parse_idx(&self.engine.leader(block.view)), current_view = self.engine.current_view(), block_view = block.view, block = ?block.id, parent_block=?block.parent(), "approve block");
                         let (new, out) = self.engine.approve_block(block);
                         output = vec![Output::Send(out)];
                         self.engine = new;
@@ -412,7 +341,9 @@ impl<O: Overlay> Node for CarnotNode<O> {
                 }
                 Event::RootTimeout { timeouts } => {
                     tracing::debug!("root timeout {:?}", timeouts);
-                    assert!(timeouts.iter().all(|t| t.view == self.engine.current_view()));
+                    assert!(timeouts
+                        .iter()
+                        .all(|t| t.view == self.engine.current_view()));
                     let high_qc = timeouts
                         .iter()
                         .map(|t| &t.high_qc)
@@ -462,16 +393,17 @@ impl<O: Overlay> Node for CarnotNode<O> {
             let current_view = self.engine.current_view();
 
             if current_view != prev_view {
-                self.network_interface.send_message(self.id, CarnotMessage::LocalTimeout);
+                self.network_interface
+                    .send_message(self.id, CarnotMessage::LocalTimeout);
 
                 // TODO: If we meet a timeout, we should gather the block,
                 // but how to do it in sim app? Add a method in NetworkInterface?
 
                 // TODO: If we meet a timeout, we should gather the timeout qc,
-                // but how to do it in sim app? Add a method in NetworkInterface? 
+                // but how to do it in sim app? Add a method in NetworkInterface?
             }
 
-            for output_event in output.drain(..) {
+            for output_event in output {
                 self.handle_output(output_event);
             }
         }
