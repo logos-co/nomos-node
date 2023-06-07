@@ -172,7 +172,7 @@ impl EventBuilder {
             Qc::Standard(engine.high_qc()),
             [].into_iter(),
         );
-        
+
         tracing::info!(
             node = parse_idx(&self.id),
             leader = parse_idx(&engine.leader(engine.current_view())),

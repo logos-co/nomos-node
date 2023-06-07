@@ -227,24 +227,7 @@ impl<O: Overlay> Node for CarnotNode<O> {
             let mut output: Vec<Output<CarnotTx>> = vec![];
             match event {
                 Event::Proposal { block } => {
-                    if self.engine.is_leader_for_view(self.engine.current_view()) {
-                        output.push(nomos_consensus::Output::BroadcastProposal {
-                            proposal: block.clone(),
-                        });
-                    }
-
-                    if self
-                        .engine
-                        .blocks_in_view(block.header().view)
-                        .contains(block.header())
-                    {
-                        continue;
-                    }
-
                     let current_view = self.engine.current_view();
-                    for blk in self.engine.blocks_in_view(block.header().view) {
-                        tracing::warn!(block = ?blk.id, view = blk.view, "block");
-                    }
                     tracing::info!(
                         node=parse_idx(&self.id),
                         leader=parse_idx(&self.engine.leader(current_view)),
