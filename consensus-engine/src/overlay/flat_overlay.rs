@@ -14,10 +14,10 @@ impl<L> Overlay for FlatOverlay<L>
 where
     L: LeaderSelection + Send + Sync + 'static,
 {
-    type Settings = (Vec<NodeId>, L);
+    type Settings = Settings<L>;
     type LeaderSelection = L;
 
-    fn new((nodes, leader): Self::Settings) -> Self {
+    fn new(Settings { leader, nodes }: Self::Settings) -> Self {
         Self { nodes, leader }
     }
 
@@ -109,4 +109,11 @@ impl LeaderSelection for RoundRobin {
     fn next_leader(&self, nodes: &[NodeId]) -> NodeId {
         nodes[self.cur % nodes.len()]
     }
+}
+
+#[derive(Clone, Debug, Default)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub struct Settings<L> {
+    nodes: Vec<NodeId>,
+    leader: L,
 }
