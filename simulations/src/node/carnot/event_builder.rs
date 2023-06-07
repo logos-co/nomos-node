@@ -87,11 +87,6 @@ impl EventBuilder {
                     events.push(Event::TimeoutQc { timeout_qc: msg.qc });
                 }
                 CarnotMessage::Vote(msg) => {
-                    tracing::info!(
-                        node=parse_idx(&self.id),
-                        vote=?msg,
-                        "received vote msg",
-                    );
                     let msg_view = msg.vote.view;
                     let block_id = msg.vote.block;
                     let voter = msg.voter;
