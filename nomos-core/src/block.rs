@@ -14,8 +14,8 @@ pub type TxHash = [u8; 32];
 /// A block
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Block<TxId: Clone + Eq + Hash> {
-    header: consensus_engine::Block,
-    transactions: IndexSet<TxId>,
+    pub header: consensus_engine::Block,
+    pub transactions: IndexSet<TxId>,
 }
 
 /// Identifier of a block

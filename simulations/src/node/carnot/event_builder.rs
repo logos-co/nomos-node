@@ -1,6 +1,6 @@
 use crate::node::carnot::messages::CarnotMessage;
 use crate::util::parse_idx;
-use consensus_engine::{Carnot, NewView, Overlay, Qc, Timeout, TimeoutQc, View, Vote, StandardQc};
+use consensus_engine::{Carnot, NewView, Overlay, Qc, StandardQc, Timeout, TimeoutQc, View, Vote};
 use nomos_consensus::network::messages::{NewViewMsg, TimeoutMsg, VoteMsg};
 use nomos_consensus::NodeId;
 use nomos_core::block::{Block, BlockId};
@@ -21,6 +21,7 @@ pub(crate) struct EventBuilder {
     id: NodeId,
     blocks: HashMap<BlockId, Block<CarnotTx>>,
     vote_message: Tally<VoteMsg>,
+    leader_vote_message: Tally<VoteMsg>,
     timeout_message: Tally<TimeoutMsg>,
     new_view_message: Tally<NewViewMsg>,
     pub(crate) config: EventBuilderSettings,
@@ -28,12 +29,13 @@ pub(crate) struct EventBuilder {
 }
 
 impl EventBuilder {
-    pub fn new(id: NodeId) -> Self {
+    pub fn new(id: NodeId, genesis: Block<CarnotTx>) -> Self {
         Self {
             vote_message: Default::default(),
+            leader_vote_message: Default::default(),
             timeout_message: Default::default(),
             config: Default::default(),
-            blocks: Default::default(),
+            blocks: [(genesis.header().id, genesis)].into_iter().collect(),
             new_view_message: Default::default(),
             current_view: View::default(),
             id,
@@ -50,6 +52,7 @@ impl EventBuilder {
         if engine.highest_voted_view() == -1
             && engine.overlay().is_member_of_leaf_committee(self.id)
         {
+            tracing::info!(node = parse_idx(&self.id), "voting genesis",);
             let genesis = engine.genesis_block();
             events.push(Event::Approve {
                 qc: Qc::Standard(StandardQc {
@@ -84,14 +87,26 @@ impl EventBuilder {
                     events.push(Event::TimeoutQc { timeout_qc: msg.qc });
                 }
                 CarnotMessage::Vote(msg) => {
+                    tracing::info!(
+                        node=parse_idx(&self.id),
+                        vote=?msg,
+                        "received vote msg",
+                    );
                     let msg_view = msg.vote.view;
                     let block_id = msg.vote.block;
+                    let voter = msg.voter;
+                    let is_leader = engine.is_leader_for_view(msg_view + 1);
+                    let tally = if engine.overlay().is_member_of_root_committee(voter) && is_leader
+                    {
+                        &mut self.leader_vote_message
+                    } else {
+                        &mut self.vote_message
+                    };
+
                     let Some(qc) = msg.qc.clone() else {
                         tracing::warn!(node=?parse_idx(&self.id), current_view = engine.current_view(), "received vote without QC");
                         continue;
                     };
-
-                    let is_leader = engine.is_leader_for_view(msg_view);
 
                     // if we are the leader, then use the leader threshold, otherwise use the leaf threshold
                     let threshold = if is_leader {
@@ -99,8 +114,7 @@ impl EventBuilder {
                     } else {
                         engine.super_majority_threshold()
                     };
-
-                    if let Some(votes) = self.vote_message.tally_by(msg_view, msg, threshold) {
+                    if let Some(votes) = tally.tally_by(msg_view, msg, threshold) {
                         if let Some(block) =
                             self.blocks
                                 .get(&block_id)
@@ -120,17 +134,19 @@ impl EventBuilder {
                                 block=?block.id,
                                 "approve block",
                             );
-
-                            let parent_qc = block.parent_qc.clone();
-                            let block_view = block.view;
-                            events.push(Event::Approve {
-                                qc,
-                                block,
-                                votes: votes.into_iter().map(|v| v.vote).collect(),
-                            });
-
                             if is_leader {
-                                self.propose_new_block(engine, block_view + 1, parent_qc, &mut events);
+                                events.push(Event::ProposeBlock {
+                                    qc: Qc::Standard(StandardQc {
+                                        view: block.view,
+                                        id: block.id,
+                                    }),
+                                });
+                            } else {
+                                events.push(Event::Approve {
+                                    qc,
+                                    block,
+                                    votes: votes.into_iter().map(|v| v.vote).collect(),
+                                });
                             }
                         }
                     }
@@ -168,31 +184,6 @@ impl EventBuilder {
 
         events
     }
-
-    fn propose_new_block<O: Overlay>(
-        &mut self,
-        engine: &Carnot<O>,
-        view: View,
-        parent_qc: Qc,
-        events: &mut Vec<Event<CarnotTx>>,
-    ) {
-        let block = Block::new(
-            view,
-            parent_qc,
-            [].into_iter(),
-        );
-
-        tracing::info!(
-            node = parse_idx(&self.id),
-            leader = parse_idx(&engine.leader(engine.current_view())),
-            current_view = engine.current_view(),
-            block_view = block.header().view,
-            block = ?block.header().id,
-            parent_block = ?block.header().parent(),
-            "propose block"
-        );
-        events.push(Event::Proposal { block });
-    }
 }
 
 struct Tally<T: core::hash::Hash + Eq> {
@@ -219,15 +210,9 @@ impl<T: core::hash::Hash + Eq> Tally<T> {
     }
 
     fn tally_by(&mut self, view: View, message: T, threshold: usize) -> Option<HashSet<T>> {
-        let entries = self
-            .cache
-            .entry(view)
-            .and_modify(|entry| {
-                entry.insert(message);
-            })
-            .or_default()
-            .len();
-
+        let entries = self.cache.entry(view).or_default();
+        entries.insert(message);
+        let entries = entries.len();
         if entries >= threshold {
             Some(self.cache.remove(&view).unwrap())
         } else {
@@ -246,6 +231,9 @@ pub enum Event<Tx: Clone + Hash + Eq> {
         block: consensus_engine::Block,
         votes: HashSet<Vote>,
     },
+    ProposeBlock {
+        qc: Qc,
+    },
     LocalTimeout,
     NewView {
         timeout_qc: TimeoutQc,
@@ -256,9 +244,6 @@ pub enum Event<Tx: Clone + Hash + Eq> {
     },
     RootTimeout {
         timeouts: HashSet<Timeout>,
-    },
-    ProposeBlock {
-        qc: Qc,
     },
     None,
 }
