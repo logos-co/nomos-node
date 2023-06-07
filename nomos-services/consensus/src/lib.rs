@@ -300,23 +300,24 @@ where
                     let (new_carnot, out) = carnot.approve_new_view(timeout_qc.clone(), new_views);
                     carnot = new_carnot;
                     output = Some(Output::Send(out));
-                    let next_view = timeout_qc.view + 2;
+                    let new_view = timeout_qc.view + 1;
+                    let next_view = new_view + 1;
                     if carnot.is_leader_for_view(next_view) {
                         let high_qc = carnot.high_qc();
                         events.push(Box::pin(view_cancel_cache.cancelable_event_future(
-                            timeout_qc.view + 1,
+                            new_view,
                             async move {
                                 let _votes = Self::gather_new_views(
                                     adapter,
                                     leader_committee,
-                                    timeout_qc,
+                                    timeout_qc.clone(),
                                     leader_tally_settings.clone(),
                                 )
                                 .await;
                                 Event::ProposeBlock {
                                     qc: Qc::Aggregated(AggregateQc {
                                         high_qc,
-                                        view: next_view,
+                                        view: new_view,
                                     }),
                                 }
                             },
