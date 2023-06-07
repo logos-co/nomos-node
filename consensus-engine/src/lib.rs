@@ -64,7 +64,6 @@ impl<O: Overlay> Carnot<O> {
             return Err(());
         }
         let mut new_state = self.clone();
-
         if new_state.block_is_safe(block.clone()) {
             new_state.safe_blocks.insert(block.id, block.clone());
             new_state.update_high_qc(block.parent_qc);

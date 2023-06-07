@@ -30,7 +30,7 @@ pub(crate) struct EventBuilder {
 }
 
 impl EventBuilder {
-    pub fn new<O: Overlay>(id: NodeId) -> Self {
+    pub fn new(id: NodeId) -> Self {
         Self {
             vote_message: Default::default(),
             timeout_message: Default::default(),
@@ -66,6 +66,7 @@ impl EventBuilder {
                         current_view = engine.current_view(),
                         block_view=block.header().view,
                         block=?block.header().id,
+                        parent_block=?block.header().parent(),
                         "receive proposal message",
                     );
                     events.push(Event::Proposal { block })
@@ -171,12 +172,14 @@ impl EventBuilder {
             Qc::Standard(engine.high_qc()),
             [].into_iter(),
         );
+        
         tracing::info!(
             node = parse_idx(&self.id),
             leader = parse_idx(&engine.leader(engine.current_view())),
             current_view = engine.current_view(),
             block_view = block.header().view,
             block = ?block.header().id,
+            parent_block = ?block.header().parent(),
             "propose block"
         );
         events.push(Event::Proposal { block });
@@ -205,6 +208,7 @@ impl EventBuilder {
                 current_view = engine.current_view(),
                 block_view = block.header().view,
                 block = ?block.header().id,
+                parent_block = ?block.header().parent(),
                 "propose block"
             );
             events.push(Event::Proposal { block });

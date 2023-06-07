@@ -120,7 +120,7 @@ impl<O: Overlay> CarnotNode<O> {
             state,
             settings,
             network_interface,
-            event_builder: event_builder::EventBuilder::new::<O>(id),
+            event_builder: event_builder::EventBuilder::new(id),
             engine,
         }
     }
@@ -242,7 +242,19 @@ impl<O: Overlay> Node for CarnotNode<O> {
                     }
 
                     let current_view = self.engine.current_view();
-                    tracing::info!(node=parse_idx(&self.id), leader=parse_idx(&self.engine.leader(current_view)), current_view = current_view, block_view = block.header().view, block = ?block.header().id, "receive block proposal");
+                    for blk in self.engine.blocks_in_view(block.header().view) {
+                        tracing::warn!(block = ?blk.id, view = blk.view, "block");
+                    }
+                    tracing::info!(
+                        node=parse_idx(&self.id),
+                        leader=parse_idx(&self.engine.leader(current_view)),
+                        last_committed_view=self.engine.latest_committed_view(),
+                        current_view = current_view,
+                        block_view = block.header().view,
+                        block = ?block.header().id,
+                        parent_block=?block.header().parent(),
+                        "receive block proposal",
+                    );
                     match self.engine.receive_block(consensus_engine::Block {
                         id: block.header().id,
                         view: block.header().view,
@@ -271,10 +283,11 @@ impl<O: Overlay> Node for CarnotNode<O> {
                     block,
                     votes: _,
                 } => {
-                    tracing::info!(node = parse_idx(&self.id), leader=parse_idx(&self.engine.leader(block.view)), current_view = self.engine.current_view(), block_view = block.view, block = ?block.id, "receive approve message");
-                    if !self.engine.blocks_in_view(block.view).contains(&block)
+                    tracing::info!(node = parse_idx(&self.id), leader=parse_idx(&self.engine.leader(block.view)), current_view = self.engine.current_view(), block_view = block.view, block = ?block.id, parent_block=?block.parent(), "receive approve message");
+                    if block.view == 0 || !self.engine.blocks_in_view(block.view).contains(&block)
                         && self.state.safe_blocks.contains_key(&block.id)
                     {
+                        tracing::info!(node = parse_idx(&self.id), leader=parse_idx(&self.engine.leader(block.view)), current_view = self.engine.current_view(), block_view = block.view, block = ?block.id, parent_block=?block.parent(), "approve block");
                         let (new, out) = self.engine.approve_block(block);
                         output = vec![Output::Send(out)];
                         self.engine = new;
