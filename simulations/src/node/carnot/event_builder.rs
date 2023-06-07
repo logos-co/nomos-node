@@ -1,6 +1,6 @@
 use crate::node::carnot::messages::CarnotMessage;
 use crate::util::parse_idx;
-use consensus_engine::{Carnot, NewView, Overlay, Qc, Timeout, TimeoutQc, View, Vote};
+use consensus_engine::{Carnot, NewView, Overlay, Qc, Timeout, TimeoutQc, View, Vote, StandardQc};
 use nomos_consensus::network::messages::{NewViewMsg, TimeoutMsg, VoteMsg};
 use nomos_consensus::NodeId;
 use nomos_core::block::{Block, BlockId};
@@ -227,7 +227,10 @@ impl EventBuilder {
         {
             let genesis = engine.genesis_block();
             events.push(Event::Approve {
-                qc: genesis.parent_qc.clone(),
+                qc: Qc::Standard(StandardQc {
+                    view: genesis.view,
+                    id: genesis.id,
+                }),
                 block: genesis,
                 votes: HashSet::new(),
             })

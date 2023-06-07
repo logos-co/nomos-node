@@ -102,7 +102,7 @@ pub struct StandardQc {
 impl StandardQc {
     pub fn genesis() -> Self {
         Self {
-            view: 0,
+            view: -1,
             id: [0; 32],
         }
     }
