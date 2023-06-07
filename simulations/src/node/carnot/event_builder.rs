@@ -121,15 +121,16 @@ impl EventBuilder {
                                 "approve block",
                             );
 
+                            let parent_qc = block.parent_qc.clone();
                             events.push(Event::Approve {
                                 qc,
                                 block,
                                 votes: votes.into_iter().map(|v| v.vote).collect(),
                             });
-                        }
 
-                        if is_leader {
-                            self.propose_new_block(engine, &mut events);
+                            if is_leader {
+                                self.propose_new_block(engine, parent_qc, &mut events);
+                            }
                         }
                     }
                 }
@@ -170,11 +171,12 @@ impl EventBuilder {
     fn propose_new_block<O: Overlay>(
         &mut self,
         engine: &Carnot<O>,
+        parent_qc: Qc,
         events: &mut Vec<Event<CarnotTx>>,
     ) {
         let block = Block::new(
             engine.current_view() + 1,
-            Qc::Standard(engine.high_qc()),
+            parent_qc,
             [].into_iter(),
         );
 
