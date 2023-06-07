@@ -305,7 +305,7 @@ impl<O: Overlay> Node for CarnotNode<O> {
                     let (new, out) = self.engine.approve_new_view(timeout_qc.clone(), new_views);
                     let prev_view = self.engine.current_view();
                     self.engine = new;
-                    let next_view = timeout_qc.view + 2;
+                    let next_view = timeout_qc.view + 1;
                     tracing::info!(
                         node = parse_idx(&self.id),
                         leader = parse_idx(&self.engine.leader(timeout_qc.view)),
@@ -315,10 +315,6 @@ impl<O: Overlay> Node for CarnotNode<O> {
                         timeout_view = timeout_qc.view,
                         "receive new view message"
                     );
-                    // if we are the leader, then send to self a new view message
-                    if self.engine.is_leader_for_view(next_view) {
-                        output.push(nomos_consensus::Output::Send(out));
-                    }
                 }
                 Event::TimeoutQc { timeout_qc } => {
                     tracing::warn!(
