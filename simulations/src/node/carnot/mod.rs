@@ -274,7 +274,8 @@ impl<O: Overlay> Node for CarnotNode<O> {
                     );
 
                     if block.view <= self.engine.highest_voted_view() {
-                        panic!("receive duplicated proposals");
+                        tracing::error!("receive duplicated proposals");
+                        continue;
                     }
                     let (new, out) = self.engine.approve_block(block);
                     tracing::info!(vote=?out, node=parse_idx(&self.id));
