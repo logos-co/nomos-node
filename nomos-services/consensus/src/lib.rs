@@ -4,7 +4,7 @@ mod tally;
 mod task_manager;
 
 // std
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::fmt::Debug;
 use std::hash::Hash;
 use std::pin::Pin;
@@ -269,7 +269,7 @@ where
                     current_view: carnot.current_view(),
                     highest_voted_view: carnot.highest_voted_view(),
                     local_high_qc: carnot.high_qc(),
-                    safe_blocks: carnot.safe_blocks().clone(),
+                    safe_blocks: carnot.safe_blocks().clone().into_values().collect(),
                     last_view_timeout_qc: carnot.last_view_timeout_qc(),
                     committed_blocks: carnot.committed_blocks(),
                 };
@@ -787,7 +787,7 @@ pub struct CarnotInfo {
     current_view: View,
     highest_voted_view: View,
     local_high_qc: StandardQc,
-    safe_blocks: HashMap<BlockId, consensus_engine::Block>,
+    safe_blocks: Vec<consensus_engine::Block>,
     last_view_timeout_qc: Option<TimeoutQc>,
     committed_blocks: Vec<BlockId>,
 }
