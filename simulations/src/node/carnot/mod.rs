@@ -112,7 +112,7 @@ impl<O: Overlay> CarnotNode<O> {
         network_interface: InMemoryNetworkInterface<CarnotMessage>,
     ) -> Self {
         let overlay = O::new(settings.nodes.clone());
-        let genesis = nomos_consensus::Block::from_header_and_txs(Block::genesis(), [].into_iter());
+        let genesis = nomos_consensus::Block::new(0, Block::genesis().parent_qc, [].into_iter());
         let engine = Carnot::from_genesis(id, genesis.header().clone(), overlay);
         let state = CarnotState::from(&engine);
 

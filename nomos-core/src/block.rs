@@ -39,19 +39,6 @@ impl<TxId: Clone + Eq + Hash + Serialize + DeserializeOwned> Block<TxId> {
         s
     }
 
-    pub fn from_header_and_txs(
-        header: consensus_engine::Block,
-        txs: impl Iterator<Item = TxId>,
-    ) -> Self {
-        let mut s = Self {
-            header,
-            transactions: txs.collect(),
-        };
-        let id = block_id_from_wire_content(&s);
-        s.header.id = id;
-        s
-    }
-
     pub fn header(&self) -> &consensus_engine::Block {
         &self.header
     }
