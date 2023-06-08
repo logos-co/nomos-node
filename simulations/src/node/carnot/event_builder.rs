@@ -213,7 +213,7 @@ impl<T: core::hash::Hash + Eq> Tally<T> {
         let entries = self.cache.entry(view).or_default();
         entries.insert(message);
         let entries = entries.len();
-        if entries >= threshold {
+        if entries == threshold {
             Some(self.cache.remove(&view).unwrap())
         } else {
             None
