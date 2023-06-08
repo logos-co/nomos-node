@@ -134,7 +134,7 @@ where
                 match handle.join() {
                     Ok(rst) => rst?,
                     Err(_) => {
-                        eprintln!("Error joining subscriber thread");
+                        tracing::error!("Error joining subscriber thread");
                     }
                 }
             }
@@ -261,7 +261,7 @@ where
         inner.senders.iter().for_each(|tx| {
             if tx.record_ty == meta_record.record_type() {
                 if let Err(e) = tx.record_sender.send(Arc::clone(&meta_record)) {
-                    eprintln!("Error sending meta record: {e}");
+                    tracing::error!("Error sending meta record: {e}");
                 }
             }
         });
@@ -269,7 +269,7 @@ where
         // send stop signal to all subscribers
         inner.senders.iter().for_each(|tx| {
             if let Err(e) = tx.stop_sender.send(()) {
-                eprintln!("Error stopping subscriber: {e}");
+                tracing::error!("Error stopping subscriber: {e}");
             }
         });
         Ok(())
