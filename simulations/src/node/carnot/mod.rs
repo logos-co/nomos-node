@@ -273,6 +273,9 @@ impl<O: Overlay> Node for CarnotNode<O> {
                         "receive approve message"
                     );
 
+                    if block.view <= self.engine.highest_voted_view() {
+                        panic!("receive duplicated proposals");
+                    }
                     let (new, out) = self.engine.approve_block(block);
                     tracing::info!(vote=?out, node=parse_idx(&self.id));
                     output = vec![Output::Send(out)];
