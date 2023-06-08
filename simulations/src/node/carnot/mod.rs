@@ -273,6 +273,7 @@ impl<O: Overlay> Node for CarnotNode<O> {
                         "receive approve message"
                     );
 
+                    // TODO: Remove
                     if block.view <= self.engine.highest_voted_view() {
                         tracing::error!("receive duplicated proposals");
                         continue;
