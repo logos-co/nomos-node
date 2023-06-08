@@ -118,7 +118,6 @@ impl SimulationApp {
                         )
                     })
                     .collect();
-                eprintln!("here {:?}", stream_type);
                 run(network, nodes, simulation_settings, stream_type)?;
             }
             simulations::settings::NodeSettings::Dummy => {
@@ -189,7 +188,6 @@ where
             bail!(settings, NaiveSubscriber);
         }
         Some(StreamType::IO) => {
-            eprintln!("aaa {:?}", stream_type);
             let settings = stream_settings.unwrap_io();
             bail!(settings, IOSubscriber);
         }
@@ -198,7 +196,7 @@ where
             bail!(settings, PolarsSubscriber);
         }
         None => {
-            runner.simulate()?.join()?; 
+            runner.simulate()?.join()?;
         }
     };
     Ok(())
