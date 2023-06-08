@@ -272,8 +272,10 @@ impl<O: Overlay> Node for CarnotNode<O> {
                         parent_block=?block.parent(),
                         "receive approve message"
                     );
-                    // FIXME: dirty hack for double proposals, check why this happens and fix
+
+                    // TODO: Remove
                     if block.view <= self.engine.highest_voted_view() {
+                        tracing::error!("receive duplicated proposals");
                         continue;
                     }
                     let (new, out) = self.engine.approve_block(block);

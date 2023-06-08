@@ -90,8 +90,10 @@ impl EventBuilder {
                     let msg_view = msg.vote.view;
                     let block_id = msg.vote.block;
                     let voter = msg.voter;
-                    let is_leader = engine.is_leader_for_view(msg_view + 1);
-                    let tally = if engine.overlay().is_member_of_root_committee(voter) && is_leader
+                    let is_next_view_leader = engine.is_leader_for_view(msg_view + 1);
+                    let is_current_view_leader = engine.is_leader_for_view(msg_view);
+                    let tally = if engine.overlay().is_member_of_root_committee(voter)
+                        && is_current_view_leader
                     {
                         &mut self.leader_vote_message
                     } else {
@@ -104,7 +106,7 @@ impl EventBuilder {
                     };
 
                     // if we are the leader, then use the leader threshold, otherwise use the leaf threshold
-                    let threshold = if is_leader {
+                    let threshold = if is_current_view_leader {
                         engine.leader_super_majority_threshold()
                     } else {
                         engine.super_majority_threshold()
@@ -129,14 +131,17 @@ impl EventBuilder {
                                 block=?block.id,
                                 "approve block",
                             );
-                            if is_leader {
+
+                            if is_next_view_leader {
                                 events.push(Event::ProposeBlock {
                                     qc: Qc::Standard(StandardQc {
                                         view: block.view,
                                         id: block.id,
                                     }),
                                 });
-                            } else {
+                            }
+
+                            if is_current_view_leader {
                                 events.push(Event::Approve {
                                     qc,
                                     block,
