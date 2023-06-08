@@ -272,10 +272,7 @@ impl<O: Overlay> Node for CarnotNode<O> {
                         parent_block=?block.parent(),
                         "receive approve message"
                     );
-                    // FIXME: dirty hack for double proposals, check why this happens and fix
-                    if block.view <= self.engine.highest_voted_view() {
-                        continue;
-                    }
+
                     let (new, out) = self.engine.approve_block(block);
                     tracing::info!(vote=?out, node=parse_idx(&self.id));
                     output = vec![Output::Send(out)];
