@@ -113,7 +113,8 @@ impl<O: Overlay> CarnotNode<O> {
         network_interface: InMemoryNetworkInterface<CarnotMessage>,
     ) -> Self {
         let overlay = O::new(settings.nodes.clone());
-        let engine = Carnot::from_genesis(id, Block::genesis(), overlay);
+        let genesis = nomos_consensus::Block::from_header_and_txs(Block::genesis(), [].into_iter());
+        let engine = Carnot::from_genesis(id, genesis.header().clone(), overlay);
         let state = CarnotState::from(&engine);
 
         Self {
@@ -121,7 +122,7 @@ impl<O: Overlay> CarnotNode<O> {
             state,
             settings,
             network_interface,
-            event_builder: event_builder::EventBuilder::new(id),
+            event_builder: event_builder::EventBuilder::new(id, genesis),
             engine,
         }
     }
@@ -269,32 +270,29 @@ impl<O: Overlay> Node for CarnotNode<O> {
                 }
                 // This branch means we already get enough votes for this block
                 // So we can just call approve_block
-                Event::Approve {
-                    qc,
-                    block,
-                    votes: _,
-                } => {
-                    tracing::info!(node = parse_idx(&self.id), leader=parse_idx(&self.engine.leader(block.view)), current_view = self.engine.current_view(), block_view = block.view, block = ?block.id, parent_block=?block.parent(), "receive approve message");
-                    if block.view == 0
-                        || !self.engine.blocks_in_view(block.view).contains(&block)
-                            && self.state.safe_blocks.contains_key(&block.id)
-                    {
-                        tracing::info!(node = parse_idx(&self.id), leader=parse_idx(&self.engine.leader(block.view)), current_view = self.engine.current_view(), block_view = block.view, block = ?block.id, parent_block=?block.parent(), "approve block");
-                        let (new, out) = self.engine.approve_block(block);
-                        output = vec![Output::Send(out)];
-                        self.engine = new;
+                Event::Approve { block, .. } => {
+                    tracing::info!(
+                        node = parse_idx(&self.id),
+                        leader=parse_idx(&self.engine.leader(block.view)),
+                        current_view = self.engine.current_view(),
+                        block_view = block.view,
+                        block = ?block.id,
+                        parent_block=?block.parent(),
+                        "receive approve message"
+                    );
+                    // FIXME: dirty hack for double proposals, check why this happens and fix
+                    if block.view <= self.engine.highest_voted_view() {
+                        continue;
                     }
-
-                    let current_view = self.engine.current_view();
-                    if self.engine.is_leader_for_view(current_view + 1) {
-                        output.push(nomos_consensus::Output::BroadcastProposal {
-                            proposal: nomos_consensus::Block::new(
-                                current_view + 1,
-                                qc,
-                                core::iter::empty(),
-                            ),
-                        });
-                    }
+                    let (new, out) = self.engine.approve_block(block);
+                    tracing::info!(vote=?out, node=parse_idx(&self.id));
+                    output = vec![Output::Send(out)];
+                    self.engine = new;
+                }
+                Event::ProposeBlock { qc } => {
+                    output = vec![Output::BroadcastProposal {
+                        proposal: nomos_consensus::Block::new(qc.view() + 1, qc, [].into_iter()),
+                    }]
                 }
                 // This branch means we already get enough new view msgs for this qc
                 // So we can just call approve_new_view
@@ -302,7 +300,7 @@ impl<O: Overlay> Node for CarnotNode<O> {
                     timeout_qc,
                     new_views,
                 } => {
-                    let (new, out) = self.engine.approve_new_view(timeout_qc.clone(), new_views);
+                    let (new, _out) = self.engine.approve_new_view(timeout_qc.clone(), new_views);
                     let prev_view = self.engine.current_view();
                     self.engine = new;
                     let next_view = timeout_qc.view + 1;
@@ -354,17 +352,6 @@ impl<O: Overlay> Node for CarnotNode<O> {
                             sender: self.id(),
                         };
                         output.push(nomos_consensus::Output::BroadcastTimeoutQc { timeout_qc });
-                    }
-                }
-                Event::ProposeBlock { qc } => {
-                    if self.engine.is_leader_for_view(qc.view()) {
-                        output.push(nomos_consensus::Output::BroadcastProposal {
-                            proposal: nomos_consensus::Block::new(
-                                qc.view() + 1,
-                                qc,
-                                core::iter::empty(),
-                            ),
-                        });
                     }
                 }
                 Event::LocalTimeout => {

@@ -40,7 +40,7 @@ pub struct SimulationApp {
     #[clap(long, short)]
     input_settings: PathBuf,
     #[clap(long)]
-    stream_type: StreamType,
+    stream_type: Option<StreamType>,
 }
 
 impl SimulationApp {
@@ -118,6 +118,7 @@ impl SimulationApp {
                         )
                     })
                     .collect();
+                eprintln!("here {:?}", stream_type);
                 run(network, nodes, simulation_settings, stream_type)?;
             }
             simulations::settings::NodeSettings::Dummy => {
@@ -147,7 +148,7 @@ fn run<M, N: Node>(
     network: Network<M>,
     nodes: Vec<N>,
     settings: SimulationSettings,
-    stream_type: StreamType,
+    stream_type: Option<StreamType>,
 ) -> anyhow::Result<()>
 where
     M: Clone + Send + Sync + 'static,
@@ -183,17 +184,21 @@ where
         };
     }
     match stream_type {
-        StreamType::Naive => {
+        Some(StreamType::Naive) => {
             let settings = stream_settings.unwrap_naive();
             bail!(settings, NaiveSubscriber);
         }
-        StreamType::IO => {
+        Some(StreamType::IO) => {
+            eprintln!("aaa {:?}", stream_type);
             let settings = stream_settings.unwrap_io();
             bail!(settings, IOSubscriber);
         }
-        StreamType::Polars => {
+        Some(StreamType::Polars) => {
             let settings = stream_settings.unwrap_polars();
             bail!(settings, PolarsSubscriber);
+        }
+        None => {
+            runner.simulate()?.join()?; 
         }
     };
     Ok(())

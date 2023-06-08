@@ -28,7 +28,7 @@ impl core::fmt::Display for Region {
             Self::SouthAmerica => "SouthAmerica",
             Self::Australia => "Australia",
         };
-        write!(f, "{}", s)
+        write!(f, "{s}")
     }
 }
 
@@ -48,7 +48,7 @@ impl FromStr for Region {
             "africa" | "af" => Ok(Self::Africa),
             "southamerica" | "sa" => Ok(Self::SouthAmerica),
             "australia" | "au" => Ok(Self::Australia),
-            _ => Err(format!("Unknown region: {}", s)),
+            _ => Err(format!("Unknown region: {s}")),
         }
     }
 }

@@ -7,10 +7,12 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct IOStreamSettings {
+    #[serde(rename = "type")]
     pub writer_type: WriteType,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum WriteType {
     #[default]
     Stdout,
@@ -24,8 +26,7 @@ impl<W: std::io::Write + Send + Sync + 'static> ToWriter<W> for WriteType {
     fn to_writer(&self) -> anyhow::Result<W> {
         match self {
             WriteType::Stdout => {
-                let stdout = Box::new(stdout());
-                let boxed_any = Box::new(stdout) as Box<dyn Any + Send + Sync>;
+                let boxed_any = Box::new(stdout()) as Box<dyn Any + Send + Sync>;
                 Ok(boxed_any.downcast::<W>().map(|boxed| *boxed).map_err(|_| {
                     std::io::Error::new(std::io::ErrorKind::Other, "Writer type mismatch")
                 })?)
