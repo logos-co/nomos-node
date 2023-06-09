@@ -15,8 +15,7 @@ use crate::util::parse_idx;
 use self::messages::CarnotMessage;
 use crate::node::carnot::event_builder::{CarnotTx, Event};
 use consensus_engine::{
-    Block, BlockId, Carnot, Committee, NewView, Overlay, Payload, Qc, StandardQc, TimeoutQc, View,
-    Vote,
+    Block, BlockId, Carnot, Committee, Overlay, Payload, Qc, StandardQc, TimeoutQc, View, Vote,
 };
 use nomos_consensus::network::messages::{ProposalChunkMsg, TimeoutQcMsg};
 use nomos_consensus::{
@@ -304,8 +303,9 @@ impl<O: Overlay> Node for CarnotNode<O> {
                     timeout_qc,
                     new_views,
                 } => {
-                    let (new, _out) = self.engine.approve_new_view(timeout_qc.clone(), new_views);
+                    let (new, out) = self.engine.approve_new_view(timeout_qc.clone(), new_views);
                     let prev_view = self.engine.current_view();
+                    output.push(Output::Send(out));
                     self.engine = new;
                     let next_view = timeout_qc.view + 1;
                     tracing::info!(
@@ -327,31 +327,22 @@ impl<O: Overlay> Node for CarnotNode<O> {
                         "receive timeout qc message"
                     );
                     self.engine = self.engine.receive_timeout_qc(timeout_qc.clone());
-                    output.push(nomos_consensus::Output::Send(consensus_engine::Send {
-                        to: self.engine.self_committee(),
-                        payload: Payload::NewView(NewView {
-                            view: timeout_qc.view + 1,
-                            sender: self.id,
-                            timeout_qc,
-                            high_qc: self.engine.high_qc(),
-                        }),
-                    }));
                 }
                 Event::RootTimeout { timeouts } => {
                     tracing::debug!("root timeout {:?}", timeouts);
-                    assert!(timeouts
-                        .iter()
-                        .all(|t| t.view == self.engine.current_view()));
-                    let high_qc = timeouts
-                        .iter()
-                        .map(|t| &t.high_qc)
-                        .chain(std::iter::once(&self.engine.high_qc()))
-                        .max_by_key(|qc| qc.view)
-                        .expect("empty root committee")
-                        .clone();
                     if self.engine.is_member_of_root_committee() {
+                        assert!(timeouts
+                            .iter()
+                            .all(|t| t.view == self.engine.current_view()));
+                        let high_qc = timeouts
+                            .iter()
+                            .map(|t| &t.high_qc)
+                            .chain(std::iter::once(&self.engine.high_qc()))
+                            .max_by_key(|qc| qc.view)
+                            .expect("empty root committee")
+                            .clone();
                         let timeout_qc = TimeoutQc {
-                            view: self.engine.current_view(),
+                            view: timeouts.iter().next().unwrap().view,
                             high_qc,
                             sender: self.id(),
                         };

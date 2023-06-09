@@ -120,7 +120,14 @@ impl EventBuilder {
                     events.push(Event::Proposal { block })
                 }
                 CarnotMessage::TimeoutQc(msg) => {
+                    let timeout_qc = msg.qc.clone();
                     events.push(Event::TimeoutQc { timeout_qc: msg.qc });
+                    if engine.overlay().is_member_of_leaf_committee(self.id) {
+                        events.push(Event::NewView {
+                            timeout_qc,
+                            new_views: Default::default(),
+                        });
+                    }
                 }
                 CarnotMessage::Vote(msg) => {
                     let msg_view = msg.vote.view;
