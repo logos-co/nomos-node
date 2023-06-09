@@ -113,7 +113,7 @@ impl<O: Overlay> CarnotNode<O> {
         network_interface: InMemoryNetworkInterface<CarnotMessage>,
     ) -> Self {
         let overlay = O::new(settings.nodes.clone());
-        let genesis = nomos_consensus::Block::from_header_and_txs(Block::genesis(), [].into_iter());
+        let genesis = nomos_consensus::Block::new(0, Block::genesis().parent_qc, [].into_iter());
         let engine = Carnot::from_genesis(id, genesis.header().clone(), overlay);
         let state = CarnotState::from(&engine);
 
@@ -280,8 +280,10 @@ impl<O: Overlay> Node for CarnotNode<O> {
                         parent_block=?block.parent(),
                         "receive approve message"
                     );
-                    // FIXME: dirty hack for double proposals, check why this happens and fix
+
+                    // TODO: Remove
                     if block.view <= self.engine.highest_voted_view() {
+                        tracing::error!("receive duplicated proposals");
                         continue;
                     }
                     let (new, out) = self.engine.approve_block(block);
