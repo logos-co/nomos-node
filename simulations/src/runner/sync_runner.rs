@@ -151,7 +151,10 @@ mod tests {
         let runner: SimulationRunner<DummyMessage, DummyNode, OutData> =
             SimulationRunner::new(network, nodes, producer, settings).unwrap();
         let mut nodes = runner.nodes.write();
-        runner.inner.write().step(&mut nodes);
+        runner
+            .inner
+            .write()
+            .step(&mut nodes, Duration::from_millis(100));
         drop(nodes);
 
         let nodes = runner.nodes.read();
@@ -198,7 +201,10 @@ mod tests {
             SimulationRunner::new(network, nodes, Default::default(), settings).unwrap();
 
         let mut nodes = runner.nodes.write();
-        runner.inner.write().step(&mut nodes);
+        runner
+            .inner
+            .write()
+            .step(&mut nodes, Duration::from_millis(100));
         drop(nodes);
 
         let nodes = runner.nodes.read();
