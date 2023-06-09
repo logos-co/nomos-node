@@ -2,6 +2,8 @@
 
 mod event_builder;
 mod messages;
+mod tally;
+mod timeout;
 
 use std::{collections::HashMap, time::Duration};
 
@@ -116,13 +118,13 @@ impl<O: Overlay> CarnotNode<O> {
         let genesis = nomos_consensus::Block::new(0, Block::genesis().parent_qc, [].into_iter());
         let engine = Carnot::from_genesis(id, genesis.header().clone(), overlay);
         let state = CarnotState::from(&engine);
-
+        let timeout = settings.timeout;
         Self {
             id,
             state,
             settings,
             network_interface,
-            event_builder: event_builder::EventBuilder::new(id, genesis),
+            event_builder: event_builder::EventBuilder::new(id, genesis, timeout),
             engine,
         }
     }
@@ -221,7 +223,7 @@ impl<O: Overlay> Node for CarnotNode<O> {
         &self.state
     }
 
-    fn step(&mut self) {
+    fn step(&mut self, elapsed: Duration) {
         let events = self.event_builder.step(
             self.network_interface
                 .receive_messages()
@@ -229,11 +231,11 @@ impl<O: Overlay> Node for CarnotNode<O> {
                 .map(|m| m.payload)
                 .collect(),
             &self.engine,
+            elapsed,
         );
 
         for event in events {
             let mut output: Vec<Output<CarnotTx>> = vec![];
-            let prev_view = self.engine.current_view();
             match event {
                 Event::Proposal { block } => {
                     let current_view = self.engine.current_view();
@@ -373,19 +375,6 @@ impl<O: Overlay> Node for CarnotNode<O> {
                     tracing::error!("unimplemented none branch");
                     unreachable!("none event will never be constructed")
                 }
-            }
-
-            let current_view = self.engine.current_view();
-
-            if current_view != prev_view {
-                self.network_interface
-                    .send_message(self.id, CarnotMessage::LocalTimeout);
-
-                // TODO: If we meet a timeout, we should gather the block,
-                // but how to do it in sim app? Add a method in NetworkInterface?
-
-                // TODO: If we meet a timeout, we should gather the timeout qc,
-                // but how to do it in sim app? Add a method in NetworkInterface?
             }
 
             for output_event in output {

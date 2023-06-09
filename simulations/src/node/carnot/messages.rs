@@ -8,6 +8,5 @@ pub enum CarnotMessage {
     Vote(VoteMsg),
     TimeoutQc(TimeoutQcMsg),
     Timeout(TimeoutMsg),
-    LocalTimeout,
     NewView(NewViewMsg),
 }

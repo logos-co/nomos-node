@@ -1,5 +1,6 @@
 // std
 use std::collections::{BTreeMap, BTreeSet};
+use std::time::Duration;
 // crates
 use serde::{Deserialize, Serialize};
 // internal
@@ -362,7 +363,7 @@ impl Node for DummyNode {
         &self.state
     }
 
-    fn step(&mut self) {
+    fn step(&mut self, _: Duration) {
         let incoming_messages = self.network_interface.receive_messages();
         self.state.message_count += incoming_messages.len();
 

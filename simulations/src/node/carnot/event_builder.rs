@@ -1,12 +1,17 @@
 use crate::node::carnot::messages::CarnotMessage;
+use crate::node::carnot::tally::Tally;
+use crate::node::carnot::timeout::TimeoutHandler;
 use crate::util::parse_idx;
-use consensus_engine::{Carnot, NewView, Overlay, Qc, StandardQc, Timeout, TimeoutQc, View, Vote, AggregateQc};
+use consensus_engine::{
+    AggregateQc, Carnot, NewView, Overlay, Qc, StandardQc, Timeout, TimeoutQc, View, Vote,
+};
 use nomos_consensus::network::messages::{NewViewMsg, TimeoutMsg, VoteMsg};
 use nomos_consensus::NodeId;
 use nomos_core::block::{Block, BlockId};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::hash::Hash;
+use std::time::Duration;
 
 pub type CarnotTx = [u8; 32];
 
@@ -24,12 +29,13 @@ pub(crate) struct EventBuilder {
     leader_vote_message: Tally<VoteMsg>,
     timeout_message: Tally<TimeoutMsg>,
     new_view_message: Tally<NewViewMsg>,
+    timeout_handler: TimeoutHandler,
     pub(crate) config: EventBuilderSettings,
     pub(crate) current_view: View,
 }
 
 impl EventBuilder {
-    pub fn new(id: NodeId, genesis: Block<CarnotTx>) -> Self {
+    pub fn new(id: NodeId, genesis: Block<CarnotTx>, timeout: Duration) -> Self {
         Self {
             vote_message: Default::default(),
             leader_vote_message: Default::default(),
@@ -39,6 +45,25 @@ impl EventBuilder {
             new_view_message: Default::default(),
             current_view: View::default(),
             id,
+            timeout_handler: TimeoutHandler::new(timeout),
+        }
+    }
+
+    fn local_timeout(
+        &mut self,
+        view: View,
+        member_of_root_committee: bool,
+        elapsed: Duration,
+    ) -> bool {
+        if member_of_root_committee {
+            if self.timeout_handler.step(view, elapsed) {
+                self.timeout_handler.prune_by_view(view);
+                true
+            } else {
+                false
+            }
+        } else {
+            false
         }
     }
 
@@ -46,7 +71,18 @@ impl EventBuilder {
         &mut self,
         messages: Vec<CarnotMessage>,
         engine: &Carnot<O>,
+        elapsed: Duration,
     ) -> Vec<Event<CarnotTx>> {
+        // check timeout and exit
+        // TODO: probably a good place to prune old view messages
+        if self.local_timeout(
+            engine.current_view(),
+            engine.is_member_of_root_committee(),
+            elapsed,
+        ) {
+            return vec![Event::LocalTimeout];
+        }
+
         let mut events = Vec::new();
         // only run when the engine is in the genesis view
         if engine.highest_voted_view() == -1
@@ -151,9 +187,6 @@ impl EventBuilder {
                         }
                     }
                 }
-                CarnotMessage::LocalTimeout => {
-                    events.push(Event::LocalTimeout);
-                }
                 CarnotMessage::Timeout(msg) => {
                     let msg_view = msg.vote.view;
                     let is_current_view_leader = engine.is_leader_for_view(msg_view);
@@ -162,7 +195,8 @@ impl EventBuilder {
                     } else {
                         engine.super_majority_threshold()
                     };
-                    if let Some(timeouts) = self.timeout_message.tally_by(msg_view, msg, threshold) {
+                    if let Some(timeouts) = self.timeout_message.tally_by(msg_view, msg, threshold)
+                    {
                         if engine.is_member_of_root_committee() {
                             events.push(Event::RootTimeout {
                                 timeouts: timeouts.into_iter().map(|v| v.vote).collect(),
@@ -205,42 +239,13 @@ impl EventBuilder {
             }
         }
 
+        // check timeout
+        if self.timeout_handler.is_timeout(engine.current_view())
+            && engine.is_member_of_root_committee()
+        {
+            events.push(Event::LocalTimeout);
+        }
         events
-    }
-}
-
-struct Tally<T: core::hash::Hash + Eq> {
-    cache: HashMap<View, HashSet<T>>,
-    threshold: usize,
-}
-
-impl<T: core::hash::Hash + Eq> Default for Tally<T> {
-    fn default() -> Self {
-        Self::new(0)
-    }
-}
-
-impl<T: core::hash::Hash + Eq> Tally<T> {
-    fn new(threshold: usize) -> Self {
-        Self {
-            cache: Default::default(),
-            threshold,
-        }
-    }
-
-    fn tally(&mut self, view: View, message: T) -> Option<HashSet<T>> {
-        self.tally_by(view, message, self.threshold)
-    }
-
-    fn tally_by(&mut self, view: View, message: T, threshold: usize) -> Option<HashSet<T>> {
-        let entries = self.cache.entry(view).or_default();
-        entries.insert(message);
-        let entries = entries.len();
-        if entries == threshold {
-            Some(self.cache.remove(&view).unwrap())
-        } else {
-            None
-        }
     }
 }
 

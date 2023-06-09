@@ -9,6 +9,7 @@ use rayon::prelude::*;
 use serde::Serialize;
 use std::collections::HashSet;
 use std::sync::Arc;
+use std::time::Duration;
 
 use super::SimulationRunnerHandle;
 
@@ -39,6 +40,7 @@ where
     let (stop_tx, stop_rx) = bounded(1);
     let p = runner.producer.clone();
     let p1 = runner.producer;
+    let elapsed = Duration::from_millis(100);
     let handle = std::thread::spawn(move || {
         loop {
             select! {
@@ -54,7 +56,7 @@ where
                             .write()
                             .par_iter_mut()
                             .filter(|n| ids.contains(&n.id()))
-                            .for_each(N::step);
+                            .for_each(|node|node.step(elapsed));
 
                         p.send(R::try_from(
                             &simulation_state,
