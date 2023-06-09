@@ -156,15 +156,17 @@ impl EventBuilder {
                 }
                 CarnotMessage::Timeout(msg) => {
                     let msg_view = msg.vote.view;
-
-                    if let Some(timeouts) = self.timeout_message.tally(msg_view, msg) {
+                    let is_current_view_leader = engine.is_leader_for_view(msg_view);
+                    let threshold = if is_current_view_leader {
+                        engine.leader_super_majority_threshold()
+                    } else {
+                        engine.super_majority_threshold()
+                    };
+                    if let Some(timeouts) = self.timeout_message.tally_by(msg_view, msg, threshold) {
                         if engine.is_member_of_root_committee() {
-                            let threshold = engine.leader_super_majority_threshold();
-                            if timeouts.len() >= threshold {
-                                events.push(Event::RootTimeout {
-                                    timeouts: timeouts.into_iter().map(|v| v.vote).collect(),
-                                })
-                            }
+                            events.push(Event::RootTimeout {
+                                timeouts: timeouts.into_iter().map(|v| v.vote).collect(),
+                            });
                         }
                     }
                 }
