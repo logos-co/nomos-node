@@ -69,6 +69,13 @@ pub struct Block {
     pub id: BlockId,
     pub view: View,
     pub parent_qc: Qc,
+    pub leader_proof: LeaderProof,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub enum LeaderProof {
+    LeaderId { leader_id: NodeId },
 }
 
 impl Block {
@@ -146,21 +153,4 @@ impl Qc {
             Qc::Aggregated(AggregateQc { high_qc, .. }) => high_qc.clone(),
         }
     }
-}
-
-pub trait Overlay: Clone {
-    fn new(nodes: Vec<NodeId>) -> Self;
-    fn root_committee(&self) -> Committee;
-    fn rebuild(&mut self, timeout_qc: TimeoutQc);
-    fn is_member_of_child_committee(&self, parent: NodeId, child: NodeId) -> bool;
-    fn is_member_of_root_committee(&self, id: NodeId) -> bool;
-    fn is_member_of_leaf_committee(&self, id: NodeId) -> bool;
-    fn is_child_of_root_committee(&self, id: NodeId) -> bool;
-    fn parent_committee(&self, id: NodeId) -> Committee;
-    fn child_committees(&self, id: NodeId) -> Vec<Committee>;
-    fn leaf_committees(&self, id: NodeId) -> Vec<Committee>;
-    fn node_committee(&self, id: NodeId) -> Committee;
-    fn leader(&self, view: View) -> NodeId;
-    fn super_majority_threshold(&self, id: NodeId) -> usize;
-    fn leader_super_majority_threshold(&self, id: NodeId) -> usize;
 }
