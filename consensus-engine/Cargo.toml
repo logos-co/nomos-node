@@ -16,3 +16,7 @@ thiserror = "1"
 
 [features]
 default = []
+
+[dev-dependencies]
+proptest = "1.2.0"
+proptest-state-machine = "0.1.0"
