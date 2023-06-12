@@ -1,6 +1,8 @@
 use std::collections::{HashMap, HashSet};
 
+pub mod overlay;
 mod types;
+pub use overlay::Overlay;
 pub use types::*;
 
 #[derive(Clone, Debug)]
@@ -53,6 +55,16 @@ impl<O: Overlay> Carnot<O> {
         if self.safe_blocks.contains_key(&block.id) {
             return Ok(self.clone());
         }
+
+        match block.leader_proof {
+            LeaderProof::LeaderId { leader_id } => {
+                // This only accepts blocks from the leader of current_view + 1
+                if leader_id != self.overlay.next_leader() {
+                    return Err(());
+                }
+            }
+        }
+
         if self.blocks_in_view(block.view).contains(&block)
             || block.view <= self.latest_committed_view()
         {
@@ -115,9 +127,7 @@ impl<O: Overlay> Carnot<O> {
         new_state.highest_voted_view = block.view;
 
         let to = if new_state.overlay.is_member_of_root_committee(new_state.id) {
-            [new_state.overlay.leader(block.view + 1)]
-                .into_iter()
-                .collect()
+            [new_state.overlay.next_leader()].into_iter().collect()
         } else {
             new_state.overlay.parent_committee(self.id)
         };
@@ -184,9 +194,7 @@ impl<O: Overlay> Carnot<O> {
 
         new_state.highest_voted_view = new_view;
         let to = if new_state.overlay.is_member_of_root_committee(new_state.id) {
-            [new_state.overlay.leader(new_view + 1)]
-                .into_iter()
-                .collect()
+            [new_state.overlay.next_leader()].into_iter().collect()
         } else {
             new_state.overlay.parent_committee(new_state.id)
         };
@@ -288,7 +296,7 @@ impl<O: Overlay> Carnot<O> {
     }
 
     pub fn latest_committed_block(&self) -> Block {
-        for view in (0..self.current_view).rev() {
+        for view in (0..=self.current_view).rev() {
             for block in self.blocks_in_view(view) {
                 if let Some(block) = self.can_commit_grandparent(block) {
                     return block;
@@ -309,12 +317,7 @@ impl<O: Overlay> Carnot<O> {
             res.push(current.id);
             current = self.safe_blocks.get(&current.parent()).unwrap().clone();
         }
-        // If the length is 1, it means that the genesis block is the only committed block
-        // and was added to the list already at the beginning of the function.
-        // Otherwise, we need to add the genesis block to the list.
-        if res.len() > 1 {
-            res.push(self.genesis_block().id);
-        }
+        res.push(self.genesis_block().id);
         res
     }
 
@@ -330,8 +333,8 @@ impl<O: Overlay> Carnot<O> {
         self.local_high_qc.clone()
     }
 
-    pub fn is_leader_for_view(&self, view: View) -> bool {
-        self.overlay.leader(view) == self.id
+    pub fn is_next_leader(&self) -> bool {
+        self.overlay.next_leader() == self.id
     }
 
     pub fn super_majority_threshold(&self) -> usize {
@@ -368,104 +371,236 @@ impl<O: Overlay> Carnot<O> {
 
     pub fn overlay(&self) -> &O {
         &self.overlay
+
+    /// A way to allow for overlay extendability without compromising the engine
+    /// generality.
+    pub fn update_overlay<F, E>(&self, f: F) -> Result<Self, E>
+    where
+        F: FnOnce(O) -> Result<O, E>,
+    {
+        match f(self.overlay.clone()) {
+            Ok(overlay) => Ok(Self {
+                overlay,
+                ..self.clone()
+            }),
+            Err(e) => Err(e),
+        }
     }
 }
 
 #[cfg(test)]
 mod test {
+    use crate::overlay::{FlatOverlay, RoundRobin, Settings};
+
     use super::*;
 
-    #[derive(Clone)]
-    struct NoOverlay;
+    fn init_from_genesis() -> Carnot<FlatOverlay<RoundRobin>> {
+        Carnot::from_genesis(
+            [0; 32],
+            Block {
+                view: 0,
+                id: [0; 32],
+                parent_qc: Qc::Standard(StandardQc::genesis()),
+                leader_proof: LeaderProof::LeaderId { leader_id: [0; 32] },
+            },
+            FlatOverlay::new(Settings {
+                nodes: vec![[0; 32]],
+                leader: RoundRobin::default(),
+            }),
+        )
+    }
 
-    impl Overlay for NoOverlay {
-        fn new(_nodes: Vec<NodeId>) -> Self {
-            Self
-        }
+    fn next_block(block: &Block) -> Block {
+        let mut next_id = block.id;
+        next_id[0] += 1;
 
-        fn root_committee(&self) -> Committee {
-            todo!()
-        }
-
-        fn rebuild(&mut self, _timeout_qc: TimeoutQc) {
-            todo!()
-        }
-
-        fn is_member_of_child_committee(&self, _parent: NodeId, _child: NodeId) -> bool {
-            todo!()
-        }
-
-        fn is_member_of_root_committee(&self, _id: NodeId) -> bool {
-            todo!()
-        }
-
-        fn is_member_of_leaf_committee(&self, _id: NodeId) -> bool {
-            todo!()
-        }
-
-        fn is_child_of_root_committee(&self, _id: NodeId) -> bool {
-            todo!()
-        }
-
-        fn node_committee(&self, _id: NodeId) -> Committee {
-            todo!()
-        }
-
-        fn parent_committee(&self, _id: NodeId) -> Committee {
-            todo!()
-        }
-
-        fn child_committees(&self, _id: NodeId) -> Vec<Committee> {
-            todo!()
-        }
-
-        fn leaf_committees(&self, _id: NodeId) -> Vec<Committee> {
-            todo!()
-        }
-
-        fn leader(&self, _view: View) -> NodeId {
-            todo!()
-        }
-
-        fn super_majority_threshold(&self, _id: NodeId) -> usize {
-            todo!()
-        }
-
-        fn leader_super_majority_threshold(&self, _id: NodeId) -> usize {
-            todo!()
-        }
+        return Block {
+            view: block.view + 1,
+            id: next_id,
+            parent_qc: Qc::Standard(StandardQc {
+                view: block.view,
+                id: block.id,
+            }),
+            leader_proof: LeaderProof::LeaderId { leader_id: [0; 32] },
+        };
     }
 
     #[test]
-    fn block_is_committed() {
-        let genesis = Block {
-            view: 0,
-            id: [0; 32],
-            parent_qc: Qc::Standard(StandardQc {
-                view: 0,
-                id: [0; 32],
-            }),
-        };
-        let mut engine = Carnot::from_genesis([0; 32], genesis.clone(), NoOverlay);
-        let p1 = Block {
-            view: 1,
+    // Ensure that all states are initialized correctly with the genesis block.
+    fn from_genesis() {
+        let engine = init_from_genesis();
+        assert_eq!(engine.current_view(), 0);
+        assert_eq!(engine.highest_voted_view, -1);
+
+        let genesis = engine.genesis_block();
+        assert_eq!(engine.high_qc(), genesis.parent_qc.high_qc());
+        assert_eq!(engine.blocks_in_view(0), vec![genesis.clone()]);
+        assert_eq!(engine.last_view_timeout_qc(), None);
+        assert_eq!(engine.committed_blocks(), vec![genesis.id]);
+    }
+
+    #[test]
+    // Ensure that all states are updated correctly after a block is received.
+    fn receive_block() {
+        let mut engine = init_from_genesis();
+        let block = next_block(&engine.genesis_block());
+
+        engine = engine.receive_block(block.clone()).unwrap();
+        assert_eq!(engine.blocks_in_view(block.view), vec![block.clone()]);
+        assert_eq!(engine.high_qc(), block.parent_qc.high_qc());
+        assert_eq!(engine.latest_committed_block(), engine.genesis_block());
+    }
+
+    #[test]
+    // Ensure that receive_block() returns early if the same block ID has already been received.
+    fn receive_duplicate_block_id() {
+        let mut engine = init_from_genesis();
+
+        let block1 = next_block(&engine.genesis_block());
+        engine = engine.receive_block(block1.clone()).unwrap();
+
+        let mut block2 = next_block(&block1);
+        block2.id = block1.id;
+        engine = engine.receive_block(block2.clone()).unwrap();
+        assert_eq!(engine.blocks_in_view(1), vec![block1.clone()]);
+    }
+
+    #[test]
+    #[should_panic(expected = "out of order view not supported, missing parent block")]
+    // Ensure that receive_block() fails if the parent block has never been received.
+    fn receive_block_with_unknown_parent() {
+        let engine = init_from_genesis();
+        let mut parent_block_id = engine.genesis_block().id;
+        parent_block_id[0] += 1; // generate an unknown parent block ID
+        let block = Block {
+            view: engine.current_view() + 1,
             id: [1; 32],
             parent_qc: Qc::Standard(StandardQc {
-                view: 0,
-                id: [0; 32],
+                view: engine.current_view(),
+                id: parent_block_id,
             }),
+            leader_proof: LeaderProof::LeaderId { leader_id: [0; 32] },
         };
-        let p2 = Block {
-            view: 2,
-            id: [2; 32],
-            parent_qc: Qc::Standard(StandardQc {
-                view: 1,
-                id: [1; 32],
-            }),
-        };
-        assert_eq!(engine.latest_committed_block(), genesis);
-        engine = engine.receive_block(p1).unwrap();
-        engine = engine.receive_block(p2).unwrap();
-        assert_eq!(engine.latest_committed_block(), genesis);
+
+        let _ = engine.receive_block(block.clone());
+    }
+
+    #[test]
+    // Ensure that receive_block() returns Err for unsafe blocks.
+    fn receive_unsafe_blocks() {
+        let mut engine = init_from_genesis();
+
+        let block = next_block(&engine.genesis_block());
+        engine = engine.receive_block(block.clone()).unwrap();
+
+        let block = next_block(&block);
+        engine = engine.receive_block(block.clone()).unwrap();
+
+        let mut unsafe_block = next_block(&block);
+        unsafe_block.view = engine.current_view() - 1; // UNSAFE: view < engine.current_view
+        assert!(engine.receive_block(unsafe_block).is_err());
+
+        let mut unsafe_block = next_block(&block);
+        unsafe_block.view = unsafe_block.parent_qc.view() + 2; // UNSAFE: view != parent_qc.view + 1
+        assert!(engine.receive_block(unsafe_block).is_err());
+    }
+
+    #[test]
+    // Ensure that multiple blocks (forks) can be received at the current view.
+    fn receive_multiple_blocks_at_the_current_view() {
+        let mut engine = init_from_genesis();
+
+        let block1 = next_block(&engine.genesis_block());
+        engine = engine.receive_block(block1.clone()).unwrap();
+
+        let block2 = next_block(&block1);
+        engine = engine.receive_block(block2.clone()).unwrap();
+
+        let mut block3 = block2.clone();
+        block3.id = [3; 32]; // use a new ID, so that this block isn't ignored
+        engine = engine.receive_block(block3.clone()).unwrap();
+
+        assert_eq!(engine.current_view(), block3.view);
+        assert!(engine
+            .blocks_in_view(engine.current_view())
+            .contains(&block2));
+        assert!(engine
+            .blocks_in_view(engine.current_view())
+            .contains(&block3));
+    }
+
+    #[test]
+    // Ensure that the grandparent of the current view can be committed
+    fn receive_block_and_commit() {
+        let mut engine = init_from_genesis();
+        assert_eq!(engine.latest_committed_block(), engine.genesis_block());
+
+        let block1 = next_block(&engine.genesis_block());
+        engine = engine.receive_block(block1.clone()).unwrap();
+        assert_eq!(engine.latest_committed_block(), engine.genesis_block());
+
+        let block2 = next_block(&block1);
+        engine = engine.receive_block(block2.clone()).unwrap();
+        assert_eq!(engine.latest_committed_block(), engine.genesis_block());
+
+        let block3 = next_block(&block2);
+        engine = engine.receive_block(block3.clone()).unwrap();
+        assert_eq!(engine.latest_committed_block(), block1);
+        assert_eq!(
+            engine.committed_blocks(),
+            vec![block1.id, engine.genesis_block().id] // without block2 and block3
+        );
+
+        let block4 = next_block(&block3);
+        engine = engine.receive_block(block4.clone()).unwrap();
+        assert_eq!(engine.latest_committed_block(), block2);
+        assert_eq!(
+            engine.committed_blocks(),
+            vec![block2.id, block1.id, engine.genesis_block().id] // without block3, block4
+        );
+    }
+
+    #[test]
+    // Ensure that approve_block updates highest_voted_view and returns a correct Send.
+    fn approve_block() {
+        let mut engine = init_from_genesis();
+
+        let block = next_block(&engine.genesis_block());
+        engine = engine.receive_block(block.clone()).unwrap();
+
+        let (engine, send) = engine.approve_block(block.clone());
+        assert_eq!(engine.highest_voted_view, block.view);
+        assert_eq!(send.to, vec![[0; 32]].into_iter().collect()); // next leader
+        assert_eq!(
+            send.payload,
+            Payload::Vote(Vote {
+                block: block.id,
+                view: block.view
+            })
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "not in")]
+    // Ensure that approve_block cannot accept not-received blocks.
+    fn approve_block_not_received() {
+        let engine = init_from_genesis();
+
+        let block = next_block(&engine.genesis_block());
+        let _ = engine.approve_block(block.clone());
+    }
+
+    #[test]
+    #[should_panic(expected = "can't vote for a block in the past")]
+    // Ensure that approve_block cannot vote blocks in the past.
+    fn approve_block_in_the_past() {
+        let mut engine = init_from_genesis();
+
+        let block = next_block(&engine.genesis_block());
+        engine = engine.receive_block(block.clone()).unwrap();
+        let (engine, _) = engine.approve_block(block.clone());
+
+        // trying to approve the block again that was already voted.
+        let _ = engine.approve_block(block);
     }
 }

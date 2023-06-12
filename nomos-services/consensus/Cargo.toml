@@ -25,6 +25,7 @@ tokio-stream = "0.1"
 tokio-util = "0.7"
 tracing = "0.1"
 waku-bindings = { version = "0.1.0-rc.2", optional = true}
+bls-signatures = "0.14"
 
 [features]
 default = []
