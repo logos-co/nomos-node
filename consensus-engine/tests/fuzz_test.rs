@@ -49,7 +49,10 @@ impl ReferenceStateMachine for RefState {
 
     // Initialize the reference state machine
     fn init_state() -> BoxedStrategy<Self::State> {
-        let mut state = Self::default();
+        let mut state = RefState {
+            highest_voted_view: -1,
+            ..Self::default()
+        };
         let genesis_block = Block {
             view: 0,
             id: [0; 32],
@@ -212,6 +215,11 @@ impl StateMachineTest for ConsensusEngineTest {
             latest_committed_view = *view;
         }
         assert_eq!(state.engine.latest_committed_view(), latest_committed_view);
+
+        assert_eq!(
+            state.engine.highest_voted_view(),
+            ref_state.highest_voted_view
+        );
 
         //TODO:: assert other fields in the state
     }
