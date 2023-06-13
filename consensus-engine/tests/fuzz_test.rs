@@ -14,14 +14,15 @@ prop_state_machine! {
         // Enable verbose mode to make the state machine test print the
         // transitions for each case.
         verbose: 1,
-        // Only run 10 cases by default to avoid running out of system resources
+        // Only run 100 cases by default to avoid running out of system resources
         // and taking too long to finish.
-        cases: 10000,
+        cases: 100,
         .. Config::default()
     })]
 
     #[test]
-    fn happy_path(sequential 1..100 => ConsensusEngineTest);
+    // run 50 state transitions per test case
+    fn happy_path(sequential 1..50 => ConsensusEngineTest);
 }
 
 #[derive(Clone, Debug, Default)]
