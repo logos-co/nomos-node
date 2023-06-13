@@ -8,12 +8,6 @@ use system_under_test::ConsensusEngineTest;
 
 prop_state_machine! {
     #![proptest_config(Config {
-        // Turn failure persistence off for demonstration. This means that no
-        // regression file will be captured.
-        failure_persistence: None,
-        // Enable verbose mode to make the state machine test print the
-        // transitions for each case.
-        verbose: 1,
         // Only run 100 cases by default to avoid running out of system resources
         // and taking too long to finish.
         cases: 100,
@@ -188,7 +182,8 @@ impl StateMachineTest for ConsensusEngineTest {
         transition: <Self::Reference as proptest_state_machine::ReferenceStateMachine>::Transition,
     ) -> Self::SystemUnderTest {
         match transition {
-            Transition::ReceiveBlock(id, _qc_id) => {
+            Transition::ReceiveBlock(id, qc_id) => {
+                println!("ReceiveBlock({id:?}, {qc_id:?})");
                 let engine = state
                     .engine
                     .receive_block(ref_state.blocks.get(&id).unwrap().clone())
@@ -197,6 +192,7 @@ impl StateMachineTest for ConsensusEngineTest {
                 ConsensusEngineTest { engine }
             }
             Transition::ApproveBlock(id) => {
+                println!("ApproveBlock({id:?})");
                 let (engine, _send) = state
                     .engine
                     .approve_block(ref_state.blocks.get(&id).unwrap().clone());
