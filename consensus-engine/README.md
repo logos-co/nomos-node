@@ -2,7 +2,7 @@
 
 ## Fuzz testing
 
-For testing consensus-engine with randomized state transitions,
+To test consensus-engine with randomized state transitions,
 ```bash
 cargo test --tests fuzz_test
 ```
@@ -20,3 +20,16 @@ cc c2157c559fe10276985a8f2284b0c294c2d6a5a293cce45f2e4ad2a3b4a23233 # shrinks to
 If the test starts with the regression files existing, the files are automatically captured and used as test cases to check if the issue is not reproduced anymore.
 Thus, these regression files should be added to the Git repository.
 For more details, please see the [proptest guide](https://proptest-rs.github.io/proptest/proptest/state-machine.html).
+
+### Test cases
+
+Currently, the fuzz testing generates the following transitions considered as valid.
+- `ReceiveBlock`
+- `ApproveBlock`
+
+In other words, it doesn't run transitions that are expected to be explicitly rejected by consensus-engine, such as approving blocks that are not received yet.
+This means that we test whether the consensus-engine works well if only valid inputs are received.
+
+TODO:
+- Test whether the consensus isn't broken if invalid transitions are received.
+- Test more transitions for unhappy path.
