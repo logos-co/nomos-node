@@ -23,6 +23,7 @@ use consensus_engine::{
 };
 use nomos_consensus::network::messages::ProposalChunkMsg;
 use nomos_consensus::{
+    leader_selection::UpdateableLeaderSelection,
     network::messages::{NewViewMsg, TimeoutMsg, VoteMsg},
     Output,
 };
@@ -209,7 +210,7 @@ impl<O: Overlay> CarnotNode<O> {
     }
 }
 
-impl<O: Overlay> Node for CarnotNode<O> {
+impl<L: UpdateableLeaderSelection, O: Overlay<LeaderSelection = L>> Node for CarnotNode<O> {
     type Settings = CarnotSettings;
     type State = CarnotState;
 
@@ -232,7 +233,10 @@ impl<O: Overlay> Node for CarnotNode<O> {
             .receive_messages()
             .into_iter()
             .map(|m| m.payload)
-            .partition(|m| m.view() == self.engine.current_view());
+            .partition(|m| {
+                m.view() == self.engine.current_view()
+                    || matches!(m, CarnotMessage::Proposal(_) | CarnotMessage::TimeoutQc(_))
+            });
 
         self.message_cache.update(other_view_messages);
         current_view_messages.append(&mut self.message_cache.retrieve(self.engine.current_view()));
@@ -254,7 +258,18 @@ impl<O: Overlay> Node for CarnotNode<O> {
                         "receive block proposal",
                     );
                     match self.engine.receive_block(block.header().clone()) {
-                        Ok(new) => self.engine = new,
+                        Ok(mut new) => {
+                            if self.engine.current_view() != new.current_view() {
+                                new = new
+                                    .update_overlay(|overlay| {
+                                        overlay.update_leader_selection(|leader_selection| {
+                                            leader_selection.on_new_block_received(block.clone())
+                                        })
+                                    })
+                                    .unwrap_or(new);
+                                self.engine = new;
+                            }
+                        }
                         Err(_) => {
                             tracing::error!(node = parse_idx(&self.id), current_view = self.engine.current_view(), block_view = block.header().view, block = ?block.header().id, "receive block proposal, but is invalid");
                         }
