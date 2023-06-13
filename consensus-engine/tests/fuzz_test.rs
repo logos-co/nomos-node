@@ -40,6 +40,8 @@ pub struct RefState {
 pub enum Transition {
     ReceiveBlock(BlockId, BlockId),
     ApproveBlock(BlockId),
+    //TODO: add more transitions
+    //TODO: consider invalid transitions that must be rejected by consensus-engine
 }
 
 impl ReferenceStateMachine for RefState {
@@ -107,8 +109,11 @@ impl ReferenceStateMachine for RefState {
                         Transition::ReceiveBlock(id, parent.id)
                     )
                 ),
-                1 => arb_block_not_voted.clone().prop_map(move |block| Transition::ApproveBlock(block.id)),
-            ].boxed()
+                1 => arb_block_not_voted.clone().prop_map(move |block|
+                    Transition::ApproveBlock(block.id)
+                ),
+            ]
+            .boxed()
         }
     }
 
@@ -216,6 +221,7 @@ impl StateMachineTest for ConsensusEngineTest {
         }
         assert_eq!(state.engine.latest_committed_view(), latest_committed_view);
 
+        // check if highest_voted_view has been updated correctly
         assert_eq!(
             state.engine.highest_voted_view(),
             ref_state.highest_voted_view
