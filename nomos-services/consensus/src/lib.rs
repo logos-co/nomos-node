@@ -15,6 +15,7 @@ use futures::{Stream, StreamExt};
 use leader_selection::UpdateableLeaderSelection;
 use serde::Deserialize;
 use serde::{de::DeserializeOwned, Serialize};
+use serde_with::serde_as;
 use tokio::sync::oneshot::Sender;
 use tracing::instrument;
 // internal
@@ -781,13 +782,58 @@ pub enum ConsensusMsg {
 
 impl RelayMessage for ConsensusMsg {}
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde_as]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct CarnotInfo {
     id: NodeId,
     current_view: View,
     highest_voted_view: View,
     local_high_qc: StandardQc,
+    #[serde_as(as = "Vec<(_, _)>")]
     safe_blocks: HashMap<BlockId, consensus_engine::Block>,
     last_view_timeout_qc: Option<TimeoutQc>,
     committed_blocks: Vec<BlockId>,
+}
+
+#[cfg(test)]
+mod tests {
+    use consensus_engine::Block;
+
+    use super::*;
+
+    #[test]
+    fn serde_carnot_info() {
+        let info = CarnotInfo {
+            id: [0; 32],
+            current_view: 1,
+            highest_voted_view: -1,
+            local_high_qc: StandardQc {
+                view: 0,
+                id: [0; 32],
+            },
+            safe_blocks: HashMap::from([(
+                [0; 32],
+                Block {
+                    id: [0; 32],
+                    view: 0,
+                    parent_qc: Qc::Standard(StandardQc {
+                        view: 0,
+                        id: [0; 32],
+                    }),
+                    leader_proof: LeaderProof::LeaderId { leader_id: [0; 32] },
+                },
+            )]),
+            last_view_timeout_qc: None,
+            committed_blocks: vec![[0; 32]],
+        };
+
+        let serialized = serde_json::to_string(&info).unwrap();
+        assert_eq!(
+            serialized,
+            r#"{"id":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"current_view":1,"highest_voted_view":-1,"local_high_qc":{"view":0,"id":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]},"safe_blocks":[[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],{"view":0,"parent_qc":{"Standard":{"view":0,"id":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]}},"leader_proof":{"LeaderId":{"leader_id":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]}}}]],"last_view_timeout_qc":null,"committed_blocks":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]]}"#
+        );
+
+        let deserialized: CarnotInfo = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(deserialized, info);
+    }
 }

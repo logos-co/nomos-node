@@ -26,8 +26,12 @@ tokio-util = "0.7"
 tracing = "0.1"
 waku-bindings = { version = "0.1.0-rc.2", optional = true}
 bls-signatures = "0.14"
+serde_with = "3.0.0"
 
 [features]
 default = []
 waku = ["nomos-network/waku", "waku-bindings"]
 mock = ["nomos-network/mock"]
+
+[dev-dependencies]
+serde_json = "1.0.96"
