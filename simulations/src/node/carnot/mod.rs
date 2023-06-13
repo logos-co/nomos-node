@@ -1,17 +1,23 @@
 #![allow(dead_code)]
 
 mod event_builder;
+mod message_cache;
 mod messages;
 
-use std::{collections::HashMap, time::Duration};
-
-use crate::network::{InMemoryNetworkInterface, NetworkInterface, NetworkMessage};
-use crate::util::parse_idx;
-
 // std
+use std::{collections::HashMap, time::Duration};
 // crates
+use bls_signatures::PrivateKey;
+use rand::Rng;
+use serde::{Deserialize, Serialize};
+// internal
 use self::messages::CarnotMessage;
+use super::{Node, NodeId};
+use crate::network::{InMemoryNetworkInterface, NetworkInterface, NetworkMessage};
 use crate::node::carnot::event_builder::{CarnotTx, Event};
+use crate::node::carnot::message_cache::MessageCache;
+use crate::util::parse_idx;
+use consensus_engine::overlay::RandomBeaconState;
 use consensus_engine::{
     Block, BlockId, Carnot, Committee, Overlay, Payload, Qc, StandardQc, TimeoutQc, View, Vote,
 };
@@ -20,10 +26,6 @@ use nomos_consensus::{
     network::messages::{NewViewMsg, TimeoutMsg, VoteMsg},
     Output,
 };
-use serde::{Deserialize, Serialize};
-
-// internal
-use super::{Node, NodeId};
 
 #[derive(Serialize)]
 pub struct CarnotState {
@@ -101,28 +103,37 @@ pub struct CarnotNode<O: Overlay> {
     state: CarnotState,
     settings: CarnotSettings,
     network_interface: InMemoryNetworkInterface<CarnotMessage>,
+    message_cache: MessageCache,
     event_builder: event_builder::EventBuilder,
     engine: Carnot<O>,
+    random_beacon_pk: PrivateKey,
 }
 
 impl<O: Overlay> CarnotNode<O> {
-    pub fn new(
+    pub fn new<R: Rng>(
         id: consensus_engine::NodeId,
         settings: CarnotSettings,
+        overlay_settings: O::Settings,
+        genesis: nomos_consensus::Block<CarnotTx>,
         network_interface: InMemoryNetworkInterface<CarnotMessage>,
+        rng: &mut R,
     ) -> Self {
-        let overlay = O::new(settings.nodes.clone());
-        let genesis = nomos_consensus::Block::new(0, Block::genesis().parent_qc, [].into_iter());
+        let overlay = O::new(overlay_settings);
         let engine = Carnot::from_genesis(id, genesis.header().clone(), overlay);
         let state = CarnotState::from(&engine);
-
+        // pk is generated in an insecure way, but for simulation purpouses using a rng like smallrng is more useful
+        let mut pk_buff = [0; 32];
+        rng.fill_bytes(&mut pk_buff);
+        let random_beacon_pk = PrivateKey::new(pk_buff);
         Self {
             id,
             state,
             settings,
             network_interface,
+            message_cache: MessageCache::new(),
             event_builder: event_builder::EventBuilder::new(id, genesis),
             engine,
+            random_beacon_pk,
         }
     }
 
@@ -215,14 +226,18 @@ impl<O: Overlay> Node for CarnotNode<O> {
     }
 
     fn step(&mut self) {
-        let events = self.event_builder.step(
-            self.network_interface
-                .receive_messages()
-                .into_iter()
-                .map(|m| m.payload)
-                .collect(),
-            &self.engine,
-        );
+        // split messages per view, we just one to process the current engine processing view or proposals or timeoutqcs
+        let (mut current_view_messages, other_view_messages): (Vec<_>, Vec<_>) = self
+            .network_interface
+            .receive_messages()
+            .into_iter()
+            .map(|m| m.payload)
+            .partition(|m| m.view() == self.engine.current_view());
+
+        self.message_cache.update(other_view_messages);
+        current_view_messages.append(&mut self.message_cache.retrieve(self.engine.current_view()));
+
+        let events = self.event_builder.step(current_view_messages, &self.engine);
 
         for event in events {
             let mut output: Vec<Output<CarnotTx>> = vec![];
@@ -231,7 +246,6 @@ impl<O: Overlay> Node for CarnotNode<O> {
                     let current_view = self.engine.current_view();
                     tracing::info!(
                         node=parse_idx(&self.id),
-                        leader=parse_idx(&self.engine.leader(current_view)),
                         last_committed_view=self.engine.latest_committed_view(),
                         current_view = current_view,
                         block_view = block.header().view,
@@ -239,11 +253,7 @@ impl<O: Overlay> Node for CarnotNode<O> {
                         parent_block=?block.header().parent(),
                         "receive block proposal",
                     );
-                    match self.engine.receive_block(consensus_engine::Block {
-                        id: block.header().id,
-                        view: block.header().view,
-                        parent_qc: block.header().parent_qc.clone(),
-                    }) {
+                    match self.engine.receive_block(block.header().clone()) {
                         Ok(new) => self.engine = new,
                         Err(_) => {
                             tracing::error!(node = parse_idx(&self.id), current_view = self.engine.current_view(), block_view = block.header().view, block = ?block.header().id, "receive block proposal, but is invalid");
@@ -265,7 +275,6 @@ impl<O: Overlay> Node for CarnotNode<O> {
                 Event::Approve { block, .. } => {
                     tracing::info!(
                         node = parse_idx(&self.id),
-                        leader=parse_idx(&self.engine.leader(block.view)),
                         current_view = self.engine.current_view(),
                         block_view = block.view,
                         block = ?block.id,
@@ -285,7 +294,16 @@ impl<O: Overlay> Node for CarnotNode<O> {
                 }
                 Event::ProposeBlock { qc } => {
                     output = vec![Output::BroadcastProposal {
-                        proposal: nomos_consensus::Block::new(qc.view() + 1, qc, [].into_iter()),
+                        proposal: nomos_consensus::Block::new(
+                            qc.view() + 1,
+                            qc.clone(),
+                            [].into_iter(),
+                            self.id,
+                            RandomBeaconState::generate_happy(
+                                qc.view() + 1,
+                                &self.random_beacon_pk,
+                            ),
+                        ),
                     }]
                 }
                 // This branch means we already get enough new view msgs for this qc

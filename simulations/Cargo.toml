@@ -12,6 +12,7 @@ path = "src/bin/app.rs"
 [dependencies]
 anyhow = "1"
 arc-swap = "1.6"
+bls-signatures = "0.14"
 clap = { version = "4", features = ["derive"] }
 chrono = { version = "0.4", features = ["serde"] }
 crc32fast = "1.3"

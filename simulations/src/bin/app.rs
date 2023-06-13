@@ -9,8 +9,9 @@ use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 // crates
 use clap::Parser;
+use consensus_engine::overlay::{FlatOverlay, RandomBeaconState, RoundRobin};
+use consensus_engine::Block;
 use crossbeam::channel;
-use nomos_consensus::overlay::FlatRoundRobin;
 use parking_lot::RwLock;
 use rand::rngs::SmallRng;
 use rand::seq::SliceRandom;
@@ -21,7 +22,7 @@ use simulations::network::regions::{create_regions, RegionsData};
 use simulations::network::{InMemoryNetworkInterface, Network};
 use simulations::node::dummy::DummyNode;
 use simulations::node::{Node, NodeId, OverlayState, ViewOverlay};
-use simulations::overlay::{create_overlay, Overlay, SimulationOverlay};
+use simulations::overlay::{create_overlay, SimulationOverlay};
 use simulations::streaming::{
     io::IOSubscriber, naive::NaiveSubscriber, polars::PolarsSubscriber,
     runtime_subscriber::RuntimeSubscriber, settings_subscriber::SettingsSubscriber, StreamType,
@@ -95,14 +96,29 @@ impl SimulationApp {
                             node_message_sender,
                             network_message_receiver,
                         );
-                        CarnotNode::<FlatRoundRobin>::new(
+                        let nodes: Vec<NodeId> = ids.clone().into_iter().map(Into::into).collect();
+                        let leader = nodes.first().copied().unwrap();
+                        let overlay_settings = consensus_engine::overlay::Settings {
+                            nodes: nodes.to_vec(),
+                            leader: RoundRobin::new(),
+                        };
+                        // FIXME: Actually use a proposer and a key to generate random beacon state
+                        let genesis = nomos_consensus::Block::new(
+                            0,
+                            Block::genesis().parent_qc,
+                            [].into_iter(),
+                            leader,
+                            RandomBeaconState::Sad {
+                                entropy: Box::new([0; 32]),
+                            },
+                        );
+                        CarnotNode::<FlatOverlay<RoundRobin>>::new(
                             node_id,
-                            CarnotSettings::new(
-                                ids.clone().into_iter().map(Into::into).collect(),
-                                *seed,
-                                *timeout,
-                            ),
+                            CarnotSettings::new(nodes, *seed, *timeout),
+                            overlay_settings,
+                            genesis,
                             network_interface,
+                            &mut rng,
                         )
                     })
                     .collect();
@@ -199,23 +215,14 @@ fn load_json_from_file<T: DeserializeOwned>(path: &Path) -> anyhow::Result<T> {
 // Helper method to pregenerate views.
 // TODO: Remove once shared overlay can generate new views on demand.
 fn generate_overlays<R: Rng>(
-    node_ids: &[NodeId],
-    overlay: &SimulationOverlay,
-    overlay_count: usize,
-    leader_count: usize,
-    rng: &mut R,
+    _node_ids: &[NodeId],
+    _overlay: &SimulationOverlay,
+    _overlay_count: usize,
+    _leader_count: usize,
+    _rng: &mut R,
 ) -> BTreeMap<usize, ViewOverlay> {
-    (0..overlay_count)
-        .map(|view_id| {
-            (
-                view_id,
-                ViewOverlay {
-                    leaders: overlay.leaders(node_ids, leader_count, rng).collect(),
-                    layout: overlay.layout(node_ids, rng),
-                },
-            )
-        })
-        .collect()
+    // TODO: This call needs to be removed
+    Default::default()
 }
 
 fn main() -> anyhow::Result<()> {

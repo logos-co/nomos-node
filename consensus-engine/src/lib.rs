@@ -321,10 +321,6 @@ impl<O: Overlay> Carnot<O> {
         res
     }
 
-    pub fn leader(&self, view: View) -> NodeId {
-        self.overlay.leader(view)
-    }
-
     pub fn last_view_timeout_qc(&self) -> Option<TimeoutQc> {
         self.last_view_timeout_qc.clone()
     }
@@ -371,6 +367,7 @@ impl<O: Overlay> Carnot<O> {
 
     pub fn overlay(&self) -> &O {
         &self.overlay
+    }
 
     /// A way to allow for overlay extendability without compromising the engine
     /// generality.

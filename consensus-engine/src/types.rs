@@ -88,6 +88,7 @@ impl Block {
             id: [0; 32],
             view: 0,
             parent_qc: Qc::Standard(StandardQc::genesis()),
+            leader_proof: LeaderProof::LeaderId { leader_id: [0; 32] },
         }
     }
 }

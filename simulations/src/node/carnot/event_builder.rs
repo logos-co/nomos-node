@@ -20,8 +20,8 @@ pub struct EventBuilderSettings {
 pub(crate) struct EventBuilder {
     id: NodeId,
     blocks: HashMap<BlockId, Block<CarnotTx>>,
-    vote_message: Tally<VoteMsg>,
     leader_vote_message: Tally<VoteMsg>,
+    vote_message: Tally<VoteMsg>,
     timeout_message: Tally<TimeoutMsg>,
     new_view_message: Tally<NewViewMsg>,
     pub(crate) config: EventBuilderSettings,
@@ -74,7 +74,6 @@ impl EventBuilder {
                     self.blocks.insert(block.header().id, block.clone());
                     tracing::info!(
                         node=parse_idx(&self.id),
-                        leader=parse_idx(&engine.leader(block.header().view)),
                         current_view = engine.current_view(),
                         block_view=block.header().view,
                         block=?block.header().id,
@@ -90,11 +89,11 @@ impl EventBuilder {
                     let msg_view = msg.vote.view;
                     let block_id = msg.vote.block;
                     let voter = msg.voter;
-                    let is_next_view_leader = engine.is_leader_for_view(msg_view + 1);
-                    let is_current_view_leader = engine.is_leader_for_view(msg_view);
-                    let tally = if engine.overlay().is_member_of_root_committee(voter)
-                        && is_current_view_leader
-                    {
+                    let is_next_view_leader = engine.is_next_leader();
+                    let is_message_from_root_committee =
+                        engine.overlay().is_member_of_root_committee(voter);
+
+                    let tally = if is_message_from_root_committee {
                         &mut self.leader_vote_message
                     } else {
                         &mut self.vote_message
@@ -105,26 +104,22 @@ impl EventBuilder {
                         continue;
                     };
 
-                    // if we are the leader, then use the leader threshold, otherwise use the leaf threshold
-                    let threshold = if is_current_view_leader {
+                    // if the message comes from the root committee, then use the leader threshold, otherwise use the leaf threshold
+                    let threshold = if is_message_from_root_committee {
                         engine.leader_super_majority_threshold()
                     } else {
                         engine.super_majority_threshold()
                     };
+
                     if let Some(votes) = tally.tally_by(msg_view, msg, threshold) {
-                        if let Some(block) =
-                            self.blocks
-                                .get(&block_id)
-                                .cloned()
-                                .map(|b| consensus_engine::Block {
-                                    id: b.header().id,
-                                    view: b.header().view,
-                                    parent_qc: b.header().parent_qc.clone(),
-                                })
+                        if let Some(block) = self
+                            .blocks
+                            .get(&block_id)
+                            .cloned()
+                            .map(|b| b.header().clone())
                         {
                             tracing::info!(
                                 node=parse_idx(&self.id),
-                                leader=parse_idx(&engine.leader(msg_view)),
                                 votes=votes.len(),
                                 current_view = engine.current_view(),
                                 block_view=block.view,
@@ -132,16 +127,14 @@ impl EventBuilder {
                                 "approve block",
                             );
 
-                            if is_next_view_leader {
+                            if is_next_view_leader && is_message_from_root_committee {
                                 events.push(Event::ProposeBlock {
                                     qc: Qc::Standard(StandardQc {
                                         view: block.view,
                                         id: block.id,
                                     }),
                                 });
-                            }
-
-                            if is_current_view_leader {
+                            } else {
                                 events.push(Event::Approve {
                                     qc,
                                     block,
@@ -164,7 +157,7 @@ impl EventBuilder {
                     let timeout_qc = msg.vote.timeout_qc.clone();
                     self.current_view = core::cmp::max(self.current_view, msg_view);
                     // if we are the leader, then use the leader threshold, otherwise use the leaf threshold
-                    let threshold = if engine.is_leader_for_view(msg_view) {
+                    let threshold = if engine.is_next_leader() {
                         engine.leader_super_majority_threshold()
                     } else {
                         engine.super_majority_threshold()
