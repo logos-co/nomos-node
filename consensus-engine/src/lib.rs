@@ -354,7 +354,7 @@ impl<O: Overlay> Carnot<O> {
     }
 
     pub fn parent_committee(&self) -> Committee {
-        self.overlay.root_committee()
+        self.overlay.parent_committee(self.id)
     }
 
     pub fn root_committee(&self) -> Committee {
