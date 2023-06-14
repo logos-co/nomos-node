@@ -291,12 +291,6 @@ impl<L: UpdateableLeaderSelection, O: Overlay<LeaderSelection = L>> Node for Car
                         parent_block=?block.parent(),
                         "receive approve message"
                     );
-
-                    // TODO: Remove
-                    if block.view <= self.engine.highest_voted_view() {
-                        tracing::error!("receive duplicated proposals");
-                        continue;
-                    }
                     let (new, out) = self.engine.approve_block(block);
                     tracing::info!(vote=?out, node=parse_idx(&self.id));
                     output = vec![Output::Send(out)];
