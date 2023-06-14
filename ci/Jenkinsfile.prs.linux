@@ -7,8 +7,9 @@ pipeline {
   }
 
   environment {
-    GOPATH  = '/tmp/go'
-    GOCACHE = '/tmp/'
+    /* Avoid cache poisoning by other jobs. */
+    GOCACHE = "${env.WORKSPACE_TMP}/go-build"
+    GOPATH  = "${env.WORKSPACE_TMP}/go"
   }
 
   options {
@@ -22,9 +23,9 @@ pipeline {
   stages {
     stage('Check') {
       steps {
-      	sh 'cargo check --all --all-features'
-      	sh 'cargo fmt -- --check'
-	sh 'cargo clippy --all --all-features -- --deny warnings'
+        sh 'cargo check --all --all-features'
+        sh 'cargo fmt -- --check'
+        sh 'cargo clippy --all --all-features -- --deny warnings'
       }
     }
 
