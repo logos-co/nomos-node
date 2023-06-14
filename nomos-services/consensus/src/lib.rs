@@ -1,9 +1,3 @@
-//! In this module, and children ones, the 'view lifetime is tied to a logical consensus view,
-//! represented by the `View` struct.
-//! This is done to ensure that all the different data structs used to represent various actors
-//! are always synchronized (i.e. it cannot happen that we accidentally use committees from different views).
-//! It's obviously extremely important that the information contained in `View` is synchronized across different
-//! nodes, but that has to be achieved through different means.
 pub mod leader_selection;
 pub mod network;
 mod tally;
