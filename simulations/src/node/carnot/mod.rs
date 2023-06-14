@@ -115,7 +115,7 @@ impl<O: Overlay> CarnotNode<O> {
         id: consensus_engine::NodeId,
         settings: CarnotSettings,
         overlay_settings: O::Settings,
-        genesis: nomos_consensus::Block<CarnotTx>,
+        genesis: nomos_core::block::Block<CarnotTx>,
         network_interface: InMemoryNetworkInterface<CarnotMessage>,
         rng: &mut R,
     ) -> Self {
@@ -309,7 +309,7 @@ impl<L: UpdateableLeaderSelection, O: Overlay<LeaderSelection = L>> Node for Car
                 }
                 Event::ProposeBlock { qc } => {
                     output = vec![Output::BroadcastProposal {
-                        proposal: nomos_consensus::Block::new(
+                        proposal: nomos_core::block::Block::new(
                             qc.view() + 1,
                             qc.clone(),
                             [].into_iter(),
@@ -370,6 +370,6 @@ enum Output<Tx: Clone + Eq + Hash> {
         timeout_qc: TimeoutQc,
     },
     BroadcastProposal {
-        proposal: nomos_consensus::Block<Tx>,
+        proposal: nomos_core::block::Block<Tx>,
     },
 }

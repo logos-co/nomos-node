@@ -103,7 +103,7 @@ impl SimulationApp {
                             leader: RoundRobin::new(),
                         };
                         // FIXME: Actually use a proposer and a key to generate random beacon state
-                        let genesis = nomos_consensus::Block::new(
+                        let genesis = nomos_core::block::Block::new(
                             0,
                             Block::genesis().parent_qc,
                             [].into_iter(),
