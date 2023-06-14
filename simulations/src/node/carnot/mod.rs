@@ -132,7 +132,7 @@ impl<O: Overlay> CarnotNode<O> {
             settings,
             network_interface,
             message_cache: MessageCache::new(),
-            event_builder: event_builder::EventBuilder::new(id, genesis),
+            event_builder: event_builder::EventBuilder::new(id),
             engine,
             random_beacon_pk,
         }

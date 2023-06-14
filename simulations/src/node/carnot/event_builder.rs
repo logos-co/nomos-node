@@ -3,7 +3,7 @@ use crate::util::parse_idx;
 use consensus_engine::{Carnot, NewView, Overlay, Qc, StandardQc, Timeout, TimeoutQc, View, Vote};
 use nomos_consensus::network::messages::{NewViewMsg, TimeoutMsg, VoteMsg};
 use nomos_consensus::NodeId;
-use nomos_core::block::{Block, BlockId};
+use nomos_core::block::Block;
 use std::collections::{HashMap, HashSet};
 use std::hash::Hash;
 
@@ -11,7 +11,6 @@ pub type CarnotTx = [u8; 32];
 
 pub(crate) struct EventBuilder {
     id: NodeId,
-    blocks: HashMap<BlockId, Block<CarnotTx>>,
     leader_vote_message: Tally<VoteMsg>,
     vote_message: Tally<VoteMsg>,
     timeout_message: Tally<TimeoutMsg>,
@@ -20,12 +19,11 @@ pub(crate) struct EventBuilder {
 }
 
 impl EventBuilder {
-    pub fn new(id: NodeId, genesis: Block<CarnotTx>) -> Self {
+    pub fn new(id: NodeId) -> Self {
         Self {
             vote_message: Default::default(),
             leader_vote_message: Default::default(),
             timeout_message: Default::default(),
-            blocks: [(genesis.header().id, genesis)].into_iter().collect(),
             new_view_message: Default::default(),
             current_view: View::default(),
             id,
@@ -58,10 +56,6 @@ impl EventBuilder {
             match message {
                 CarnotMessage::Proposal(msg) => {
                     let block = Block::from_bytes(&msg.chunk);
-                    if self.blocks.contains_key(&block.header().id) {
-                        continue;
-                    }
-                    self.blocks.insert(block.header().id, block.clone());
                     tracing::info!(
                         node=parse_idx(&self.id),
                         current_view = engine.current_view(),
@@ -102,11 +96,11 @@ impl EventBuilder {
                     };
 
                     if let Some(votes) = tally.tally_by(msg_view, msg, threshold) {
-                        if let Some(block) = self
-                            .blocks
-                            .get(&block_id)
+                        if let Some(block) = engine
+                            .blocks_in_view(msg_view)
+                            .iter()
+                            .find(|block| block.id == block_id)
                             .cloned()
-                            .map(|b| b.header().clone())
                         {
                             tracing::info!(
                                 node=parse_idx(&self.id),
