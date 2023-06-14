@@ -5,6 +5,7 @@ mod message_cache;
 mod messages;
 
 // std
+use std::hash::Hash;
 use std::{collections::HashMap, time::Duration};
 // crates
 use bls_signatures::PrivateKey;
@@ -25,7 +26,6 @@ use nomos_consensus::network::messages::ProposalChunkMsg;
 use nomos_consensus::{
     leader_selection::UpdateableLeaderSelection,
     network::messages::{NewViewMsg, TimeoutMsg, VoteMsg},
-    Output,
 };
 
 #[derive(Serialize)]
@@ -276,7 +276,7 @@ impl<L: UpdateableLeaderSelection, O: Overlay<LeaderSelection = L>> Node for Car
                     }
 
                     if self.engine.overlay().is_member_of_leaf_committee(self.id) {
-                        output.push(nomos_consensus::Output::Send(consensus_engine::Send {
+                        output.push(Output::Send(consensus_engine::Send {
                             to: self.engine.parent_committee(),
                             payload: Payload::Vote(Vote {
                                 view: self.engine.current_view(),
@@ -361,4 +361,15 @@ impl<L: UpdateableLeaderSelection, O: Overlay<LeaderSelection = L>> Node for Car
         // update state
         self.state = CarnotState::from(&self.engine);
     }
+}
+
+#[derive(Debug)]
+enum Output<Tx: Clone + Eq + Hash> {
+    Send(consensus_engine::Send),
+    BroadcastTimeoutQc {
+        timeout_qc: TimeoutQc,
+    },
+    BroadcastProposal {
+        proposal: nomos_consensus::Block<Tx>,
+    },
 }
