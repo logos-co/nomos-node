@@ -25,7 +25,7 @@ where
     }
 
     fn rebuild(&mut self, _timeout_qc: crate::TimeoutQc) {
-        todo!()
+        // do nothing for now
     }
 
     fn is_member_of_child_committee(&self, _parent: NodeId, _child: NodeId) -> bool {
