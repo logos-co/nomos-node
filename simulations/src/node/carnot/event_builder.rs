@@ -4,18 +4,10 @@ use consensus_engine::{Carnot, NewView, Overlay, Qc, StandardQc, Timeout, Timeou
 use nomos_consensus::network::messages::{NewViewMsg, TimeoutMsg, VoteMsg};
 use nomos_consensus::NodeId;
 use nomos_core::block::{Block, BlockId};
-use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::hash::Hash;
 
 pub type CarnotTx = [u8; 32];
-
-#[derive(Default, Copy, Clone, Serialize, Deserialize)]
-pub struct EventBuilderSettings {
-    pub votes_threshold: usize,
-    pub timeout_threshold: usize,
-    pub new_view_threshold: usize,
-}
 
 pub(crate) struct EventBuilder {
     id: NodeId,
@@ -24,7 +16,6 @@ pub(crate) struct EventBuilder {
     vote_message: Tally<VoteMsg>,
     timeout_message: Tally<TimeoutMsg>,
     new_view_message: Tally<NewViewMsg>,
-    pub(crate) config: EventBuilderSettings,
     pub(crate) current_view: View,
 }
 
@@ -34,7 +25,6 @@ impl EventBuilder {
             vote_message: Default::default(),
             leader_vote_message: Default::default(),
             timeout_message: Default::default(),
-            config: Default::default(),
             blocks: [(genesis.header().id, genesis)].into_iter().collect(),
             new_view_message: Default::default(),
             current_view: View::default(),
