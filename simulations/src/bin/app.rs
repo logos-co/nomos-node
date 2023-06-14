@@ -81,7 +81,7 @@ impl SimulationApp {
         }));
 
         match &simulation_settings.node_settings {
-            simulations::settings::NodeSettings::Carnot { seed, timeout } => {
+            simulations::settings::NodeSettings::Carnot { timeout } => {
                 let ids = node_ids.clone();
                 let mut network = Network::new(regions_data);
                 let nodes = node_ids
@@ -114,7 +114,7 @@ impl SimulationApp {
                         );
                         CarnotNode::<FlatOverlay<RoundRobin>>::new(
                             node_id,
-                            CarnotSettings::new(nodes, *seed, *timeout),
+                            CarnotSettings::new(nodes, *timeout),
                             overlay_settings,
                             genesis,
                             network_interface,

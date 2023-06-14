@@ -84,17 +84,12 @@ impl<O: Overlay> From<&Carnot<O>> for CarnotState {
 #[derive(Clone, Default, Deserialize)]
 pub struct CarnotSettings {
     nodes: Vec<consensus_engine::NodeId>,
-    seed: u64,
     timeout: Duration,
 }
 
 impl CarnotSettings {
-    pub fn new(nodes: Vec<consensus_engine::NodeId>, seed: u64, timeout: Duration) -> Self {
-        Self {
-            nodes,
-            seed,
-            timeout,
-        }
+    pub fn new(nodes: Vec<consensus_engine::NodeId>, timeout: Duration) -> Self {
+        Self { nodes, timeout }
     }
 }
 
