@@ -396,7 +396,79 @@ mod test {
 
     use super::*;
 
-    fn init_from_genesis() -> Carnot<FlatOverlay<RoundRobin>> {
+    // MockOverlay inherits FlatOverlay<RoundRobin> to override `rebuild`.
+    #[derive(Clone, Debug)]
+    struct MockOverlay(FlatOverlay<RoundRobin>);
+
+    impl Overlay for MockOverlay {
+        type Settings = Settings<RoundRobin>;
+        type LeaderSelection = RoundRobin;
+
+        fn new(settings: Self::Settings) -> Self {
+            MockOverlay(FlatOverlay::new(settings))
+        }
+
+        fn root_committee(&self) -> Committee {
+            self.0.root_committee()
+        }
+
+        fn rebuild(&mut self, _: TimeoutQc) {
+            // do nothing, instead of panicking by todo!()
+        }
+
+        fn is_member_of_child_committee(&self, parent: NodeId, child: NodeId) -> bool {
+            self.0.is_member_of_child_committee(parent, child)
+        }
+
+        fn is_member_of_root_committee(&self, id: NodeId) -> bool {
+            self.0.is_member_of_root_committee(id)
+        }
+
+        fn is_member_of_leaf_committee(&self, id: NodeId) -> bool {
+            self.0.is_member_of_leaf_committee(id)
+        }
+
+        fn is_child_of_root_committee(&self, id: NodeId) -> bool {
+            self.0.is_child_of_root_committee(id)
+        }
+
+        fn parent_committee(&self, id: NodeId) -> Committee {
+            self.0.parent_committee(id)
+        }
+
+        fn child_committees(&self, id: NodeId) -> Vec<Committee> {
+            self.0.child_committees(id)
+        }
+
+        fn leaf_committees(&self, id: NodeId) -> Vec<Committee> {
+            self.0.leaf_committees(id)
+        }
+
+        fn node_committee(&self, id: NodeId) -> Committee {
+            self.0.node_committee(id)
+        }
+
+        fn next_leader(&self) -> NodeId {
+            self.0.next_leader()
+        }
+
+        fn super_majority_threshold(&self, id: NodeId) -> usize {
+            self.0.super_majority_threshold(id)
+        }
+
+        fn leader_super_majority_threshold(&self, id: NodeId) -> usize {
+            self.0.leader_super_majority_threshold(id)
+        }
+
+        fn update_leader_selection<F, E>(&self, f: F) -> Result<Self, E>
+        where
+            F: FnOnce(Self::LeaderSelection) -> Result<Self::LeaderSelection, E>,
+        {
+            Ok(MockOverlay(self.0.update_leader_selection(f)?))
+        }
+    }
+
+    fn init_from_genesis() -> Carnot<MockOverlay> {
         Carnot::from_genesis(
             [0; 32],
             Block {
@@ -405,7 +477,7 @@ mod test {
                 parent_qc: Qc::Standard(StandardQc::genesis()),
                 leader_proof: LeaderProof::LeaderId { leader_id: [0; 32] },
             },
-            FlatOverlay::new(Settings {
+            MockOverlay::new(Settings {
                 nodes: vec![[0; 32]],
                 leader: RoundRobin::default(),
             }),
