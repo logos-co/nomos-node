@@ -32,6 +32,11 @@ impl<O: Overlay> Carnot<O> {
     pub fn current_view(&self) -> View {
         self.current_view
     }
+
+    pub fn highest_voted_view(&self) -> View {
+        self.highest_voted_view
+    }
+
     /// Upon reception of a block
     ///
     /// Preconditions:
@@ -71,7 +76,6 @@ impl<O: Overlay> Carnot<O> {
             return Err(());
         }
         let mut new_state = self.clone();
-
         if new_state.block_is_safe(block.clone()) {
             new_state.safe_blocks.insert(block.id, block.clone());
             new_state.update_high_qc(block.parent_qc);
@@ -359,6 +363,10 @@ impl<O: Overlay> Carnot<O> {
 
     pub fn is_member_of_root_committee(&self) -> bool {
         self.overlay.is_member_of_root_committee(self.id)
+    }
+
+    pub fn overlay(&self) -> &O {
+        &self.overlay
     }
 
     /// A way to allow for overlay extendability without compromising the engine

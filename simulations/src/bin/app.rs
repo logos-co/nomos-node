@@ -1,9 +1,7 @@
 // std
 use anyhow::Ok;
 use serde::Serialize;
-use simulations::streaming::io::IOSubscriber;
-use simulations::streaming::naive::NaiveSubscriber;
-use simulations::streaming::polars::PolarsSubscriber;
+use simulations::node::carnot::CarnotSettings;
 use std::collections::BTreeMap;
 use std::fs::File;
 use std::path::{Path, PathBuf};
@@ -11,6 +9,8 @@ use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 // crates
 use clap::Parser;
+use consensus_engine::overlay::{FlatOverlay, RandomBeaconState, RoundRobin};
+use consensus_engine::Block;
 use crossbeam::channel;
 use parking_lot::RwLock;
 use rand::rngs::SmallRng;
@@ -22,12 +22,15 @@ use simulations::network::regions::{create_regions, RegionsData};
 use simulations::network::{InMemoryNetworkInterface, Network};
 use simulations::node::dummy::DummyNode;
 use simulations::node::{Node, NodeId, OverlayState, ViewOverlay};
-use simulations::overlay::{create_overlay, Overlay, SimulationOverlay};
-use simulations::streaming::StreamType;
+use simulations::overlay::{create_overlay, SimulationOverlay};
+use simulations::streaming::{
+    io::IOSubscriber, naive::NaiveSubscriber, polars::PolarsSubscriber,
+    runtime_subscriber::RuntimeSubscriber, settings_subscriber::SettingsSubscriber, StreamType,
+};
 // internal
 use simulations::{
     node::carnot::CarnotNode, output_processors::OutData, runner::SimulationRunner,
-    settings::SimulationSettings,
+    settings::SimulationSettings, util::node_id,
 };
 
 /// Main simulation wrapper
@@ -38,7 +41,7 @@ pub struct SimulationApp {
     #[clap(long, short)]
     input_settings: PathBuf,
     #[clap(long)]
-    stream_type: StreamType,
+    stream_type: Option<StreamType>,
 }
 
 impl SimulationApp {
@@ -56,9 +59,7 @@ impl SimulationApp {
                 .as_secs()
         });
         let mut rng = SmallRng::seed_from_u64(seed);
-        let mut node_ids: Vec<NodeId> = (0..simulation_settings.node_count)
-            .map(Into::into)
-            .collect();
+        let mut node_ids: Vec<NodeId> = (0..simulation_settings.node_count).map(node_id).collect();
         node_ids.shuffle(&mut rng);
 
         let regions = create_regions(&node_ids, &mut rng, &simulation_settings.network_settings);
@@ -79,17 +80,52 @@ impl SimulationApp {
             overlays,
         }));
 
-        let mut network = Network::new(regions_data);
-
         match &simulation_settings.node_settings {
-            simulations::settings::NodeSettings::Carnot => {
+            simulations::settings::NodeSettings::Carnot { timeout } => {
+                let ids = node_ids.clone();
+                let mut network = Network::new(regions_data);
                 let nodes = node_ids
                     .iter()
-                    .map(|node_id| CarnotNode::new(*node_id))
+                    .copied()
+                    .map(|node_id| {
+                        let (node_message_sender, node_message_receiver) = channel::unbounded();
+                        let network_message_receiver =
+                            network.connect(node_id, node_message_receiver);
+                        let network_interface = InMemoryNetworkInterface::new(
+                            node_id,
+                            node_message_sender,
+                            network_message_receiver,
+                        );
+                        let nodes: Vec<NodeId> = ids.clone().into_iter().map(Into::into).collect();
+                        let leader = nodes.first().copied().unwrap();
+                        let overlay_settings = consensus_engine::overlay::Settings {
+                            nodes: nodes.to_vec(),
+                            leader: RoundRobin::new(),
+                        };
+                        // FIXME: Actually use a proposer and a key to generate random beacon state
+                        let genesis = nomos_core::block::Block::new(
+                            0,
+                            Block::genesis().parent_qc,
+                            [].into_iter(),
+                            leader,
+                            RandomBeaconState::Sad {
+                                entropy: Box::new([0; 32]),
+                            },
+                        );
+                        CarnotNode::<FlatOverlay<RoundRobin>>::new(
+                            node_id,
+                            CarnotSettings::new(nodes, *timeout),
+                            overlay_settings,
+                            genesis,
+                            network_interface,
+                            &mut rng,
+                        )
+                    })
                     .collect();
                 run(network, nodes, simulation_settings, stream_type)?;
             }
             simulations::settings::NodeSettings::Dummy => {
+                let mut network = Network::new(regions_data);
                 let nodes = node_ids
                     .iter()
                     .map(|node_id| {
@@ -115,7 +151,7 @@ fn run<M, N: Node>(
     network: Network<M>,
     nodes: Vec<N>,
     settings: SimulationSettings,
-    stream_type: StreamType,
+    stream_type: Option<StreamType>,
 ) -> anyhow::Result<()>
 where
     M: Clone + Send + Sync + 'static,
@@ -125,29 +161,46 @@ where
 {
     let stream_settings = settings.stream_settings.clone();
     let runner =
-        SimulationRunner::<_, _, OutData>::new(network, nodes, Default::default(), settings);
+        SimulationRunner::<_, _, OutData>::new(network, nodes, Default::default(), settings)?;
     macro_rules! bail {
         ($settings: ident, $sub: ident) => {
             let handle = runner.simulate()?;
-            let mut sub_handle = handle.subscribe::<$sub<OutData>>($settings)?;
-            std::thread::spawn(move || {
-                sub_handle.run();
+            let mut data_subscriber_handle = handle.subscribe::<$sub<OutData>>($settings)?;
+            let mut runtime_subscriber_handle =
+                handle.subscribe::<RuntimeSubscriber<OutData>>(Default::default())?;
+            let mut settings_subscriber_handle =
+                handle.subscribe::<SettingsSubscriber<OutData>>(Default::default())?;
+            std::thread::scope(|s| {
+                s.spawn(move || {
+                    data_subscriber_handle.run();
+                });
+
+                s.spawn(move || {
+                    runtime_subscriber_handle.run();
+                });
+
+                s.spawn(move || {
+                    settings_subscriber_handle.run();
+                });
             });
             handle.join()?;
         };
     }
     match stream_type {
-        StreamType::Naive => {
+        Some(StreamType::Naive) => {
             let settings = stream_settings.unwrap_naive();
             bail!(settings, NaiveSubscriber);
         }
-        StreamType::IO => {
+        Some(StreamType::IO) => {
             let settings = stream_settings.unwrap_io();
             bail!(settings, IOSubscriber);
         }
-        StreamType::Polars => {
+        Some(StreamType::Polars) => {
             let settings = stream_settings.unwrap_polars();
             bail!(settings, PolarsSubscriber);
+        }
+        None => {
+            runner.simulate()?.join()?;
         }
     };
     Ok(())
@@ -162,27 +215,34 @@ fn load_json_from_file<T: DeserializeOwned>(path: &Path) -> anyhow::Result<T> {
 // Helper method to pregenerate views.
 // TODO: Remove once shared overlay can generate new views on demand.
 fn generate_overlays<R: Rng>(
-    node_ids: &[NodeId],
-    overlay: &SimulationOverlay,
-    overlay_count: usize,
-    leader_count: usize,
-    rng: &mut R,
+    _node_ids: &[NodeId],
+    _overlay: &SimulationOverlay,
+    _overlay_count: usize,
+    _leader_count: usize,
+    _rng: &mut R,
 ) -> BTreeMap<usize, ViewOverlay> {
-    (0..overlay_count)
-        .map(|view_id| {
-            (
-                view_id,
-                ViewOverlay {
-                    leaders: overlay.leaders(node_ids, leader_count, rng).collect(),
-                    layout: overlay.layout(node_ids, rng),
-                },
-            )
-        })
-        .collect()
+    // TODO: This call needs to be removed
+    Default::default()
 }
 
 fn main() -> anyhow::Result<()> {
+    let filter = std::env::var("SIMULATION_LOG").unwrap_or_else(|_| "info".to_owned());
+    let subscriber = tracing_subscriber::fmt::fmt()
+        .without_time()
+        .with_line_number(true)
+        .with_env_filter(filter)
+        .with_file(false)
+        .with_target(true)
+        .with_ansi(true)
+        .finish();
+    tracing::subscriber::set_global_default(subscriber)
+        .expect("config_tracing is only called once");
+
     let app: SimulationApp = SimulationApp::parse();
-    app.run()?;
+
+    if let Err(e) = app.run() {
+        tracing::error!("Error: {}", e);
+        std::process::exit(1);
+    }
     Ok(())
 }

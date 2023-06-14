@@ -1,10 +1,11 @@
 use crate::node::Node;
 use crate::warding::{SimulationState, SimulationWard};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 /// MinMaxView. It monitors the gap between a min view and max view, triggers when surpassing
 /// the max view - min view is larger than a gap.
-#[derive(Debug, Deserialize, Copy, Clone)]
+#[derive(Debug, Serialize, Deserialize, Copy, Clone)]
+#[serde(transparent)]
 pub struct MinMaxViewWard {
     max_gap: usize,
 }

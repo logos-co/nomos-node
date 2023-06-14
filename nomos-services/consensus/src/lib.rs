@@ -1,4 +1,4 @@
-mod leader_selection;
+pub mod leader_selection;
 pub mod network;
 mod tally;
 mod task_manager;
@@ -298,7 +298,7 @@ where
     }
 }
 
-#[allow(dead_code)] // TODO: remove this when using broadcasting events
+#[derive(Debug)]
 enum Output<Tx: Clone + Eq + Hash> {
     Send(consensus_engine::Send),
     BroadcastTimeoutQc { timeout_qc: TimeoutQc },
@@ -716,7 +716,7 @@ where
     }
 }
 
-pub(crate) enum Event<Tx: Clone + Hash + Eq> {
+enum Event<Tx: Clone + Hash + Eq> {
     Proposal {
         block: Block<Tx>,
         stream: Pin<Box<dyn Stream<Item = Block<Tx>> + Send>>,

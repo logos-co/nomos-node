@@ -1,15 +1,18 @@
 use std::{any::Any, io::stdout, sync::Arc};
 
 use super::{Receivers, StreamSettings, Subscriber};
+use crate::output_processors::{RecordType, Runtime};
 use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Default, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct IOStreamSettings {
+    #[serde(rename = "type")]
     pub writer_type: WriteType,
 }
 
-#[derive(Debug, Clone, Default, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum WriteType {
     #[default]
     Stdout,
@@ -23,8 +26,7 @@ impl<W: std::io::Write + Send + Sync + 'static> ToWriter<W> for WriteType {
     fn to_writer(&self) -> anyhow::Result<W> {
         match self {
             WriteType::Stdout => {
-                let stdout = Box::new(stdout());
-                let boxed_any = Box::new(stdout) as Box<dyn Any + Send + Sync>;
+                let boxed_any = Box::new(stdout()) as Box<dyn Any + Send + Sync>;
                 Ok(boxed_any.downcast::<W>().map(|boxed| *boxed).map_err(|_| {
                     std::io::Error::new(std::io::ErrorKind::Other, "Writer type mismatch")
                 })?)
@@ -53,7 +55,7 @@ pub struct IOSubscriber<R, W = std::io::Stdout> {
 impl<W, R> Subscriber for IOSubscriber<R, W>
 where
     W: std::io::Write + Send + Sync + 'static,
-    R: Serialize + Send + Sync + 'static,
+    R: crate::output_processors::Record + Serialize,
 {
     type Record = R;
     type Settings = IOStreamSettings;
@@ -83,6 +85,8 @@ where
         loop {
             crossbeam::select! {
                 recv(self.recvs.stop_rx) -> _ => {
+                    // collect the run time meta
+                    self.sink(Arc::new(R::from(Runtime::load()?)))?;
                     break;
                 }
                 recv(self.recvs.recv) -> msg => {
@@ -98,6 +102,10 @@ where
         serde_json::to_writer(&mut *self.writer.lock(), &state)?;
         Ok(())
     }
+
+    fn subscribe_data_type() -> RecordType {
+        RecordType::Data
+    }
 }
 
 #[cfg(test)]
@@ -108,11 +116,12 @@ mod tests {
         network::{
             behaviour::NetworkBehaviour,
             regions::{Region, RegionsData},
-            Network,
+            Network, NetworkBehaviourKey,
         },
         node::{dummy_streaming::DummyStreamingNode, Node, NodeId},
         output_processors::OutData,
         runner::SimulationRunner,
+        util::node_id,
         warding::SimulationState,
     };
 
@@ -144,7 +153,7 @@ mod tests {
         };
 
         let nodes = (0..6)
-            .map(|idx| DummyStreamingNode::new(NodeId::from(idx), ()))
+            .map(|idx| DummyStreamingNode::new(node_id(idx), ()))
             .collect::<Vec<_>>();
         let network = Network::new(RegionsData {
             regions: (0..6)
@@ -158,7 +167,7 @@ mod tests {
                         5 => Region::Australia,
                         _ => unreachable!(),
                     };
-                    (region, vec![idx.into()])
+                    (region, vec![node_id(idx)])
                 })
                 .collect(),
             node_region: (0..6)
@@ -172,7 +181,7 @@ mod tests {
                         5 => Region::Australia,
                         _ => unreachable!(),
                     };
-                    (idx.into(), region)
+                    (node_id(idx), region)
                 })
                 .collect(),
             region_network_behaviour: (0..6)
@@ -187,7 +196,7 @@ mod tests {
                         _ => unreachable!(),
                     };
                     (
-                        (region, region),
+                        NetworkBehaviourKey::new(region, region),
                         NetworkBehaviour {
                             delay: Duration::from_millis(100),
                             drop: 0.0,
@@ -197,7 +206,7 @@ mod tests {
                 .collect(),
         });
         let simulation_runner: SimulationRunner<(), DummyStreamingNode<()>, OutData> =
-            SimulationRunner::new(network, nodes, Default::default(), simulation_settings);
+            SimulationRunner::new(network, nodes, Default::default(), simulation_settings).unwrap();
         simulation_runner
             .simulate()
             .unwrap()

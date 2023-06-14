@@ -2,13 +2,14 @@
 use std::{
     collections::HashMap,
     ops::Add,
+    str::FromStr,
     time::{Duration, Instant},
 };
 // crates
 use crossbeam::channel::{self, Receiver, Sender};
 use rand::{rngs::ThreadRng, Rng};
 use rayon::prelude::*;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 // internal
 use crate::node::NodeId;
 
@@ -17,9 +18,45 @@ pub mod regions;
 
 type NetworkTime = Instant;
 
-#[derive(Clone, Debug, Deserialize, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct NetworkBehaviourKey {
+    pub from: regions::Region,
+    pub to: regions::Region,
+}
+
+impl NetworkBehaviourKey {
+    pub fn new(from: regions::Region, to: regions::Region) -> Self {
+        Self { from, to }
+    }
+}
+
+impl Serialize for NetworkBehaviourKey {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        let s = format!("{}:{}", self.from, self.to);
+        serializer.serialize_str(&s)
+    }
+}
+
+impl<'de> Deserialize<'de> for NetworkBehaviourKey {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let s = String::deserialize(deserializer)?;
+        let mut split = s.split(':');
+        let from = split.next().ok_or(serde::de::Error::custom(
+            "NetworkBehaviourKey should be in the form of `from_region:to_region`",
+        ))?;
+        let to = split.next().ok_or(serde::de::Error::custom(
+            "NetworkBehaviourKey should be in the form of `from_region:to_region`",
+        ))?;
+        Ok(Self::new(
+            regions::Region::from_str(from).map_err(serde::de::Error::custom)?,
+            regions::Region::from_str(to).map_err(serde::de::Error::custom)?,
+        ))
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
 pub struct NetworkSettings {
-    pub network_behaviors: HashMap<(regions::Region, regions::Region), Duration>,
+    pub network_behaviors: HashMap<NetworkBehaviourKey, Duration>,
     /// Represents node distribution in the simulated regions.
     /// The sum of distributions should be 1.
     pub regions: HashMap<regions::Region, f32>,
@@ -193,7 +230,7 @@ mod tests {
         regions::{Region, RegionsData},
         Network, NetworkInterface, NetworkMessage,
     };
-    use crate::node::NodeId;
+    use crate::{network::NetworkBehaviourKey, node::NodeId, util::node_id};
     use crossbeam::channel::{self, Receiver, Sender};
     use std::{collections::HashMap, time::Duration};
 
@@ -232,12 +269,12 @@ mod tests {
 
     #[test]
     fn send_receive_messages() {
-        let node_a = 0.into();
-        let node_b = 1.into();
+        let node_a = node_id(0);
+        let node_b = node_id(1);
 
         let regions = HashMap::from([(Region::Europe, vec![node_a, node_b])]);
         let behaviour = HashMap::from([(
-            (Region::Europe, Region::Europe),
+            NetworkBehaviourKey::new(Region::Europe, Region::Europe),
             NetworkBehaviour::new(Duration::from_millis(100), 0.0),
         )]);
         let regions_data = RegionsData::new(regions, behaviour);
@@ -281,9 +318,9 @@ mod tests {
 
     #[test]
     fn regions_send_receive_messages() {
-        let node_a = 0.into();
-        let node_b = 1.into();
-        let node_c = 2.into();
+        let node_a = node_id(0);
+        let node_b = node_id(1);
+        let node_c = node_id(2);
 
         let regions = HashMap::from([
             (Region::Asia, vec![node_a, node_b]),
@@ -291,15 +328,15 @@ mod tests {
         ]);
         let behaviour = HashMap::from([
             (
-                (Region::Asia, Region::Asia),
+                NetworkBehaviourKey::new(Region::Asia, Region::Asia),
                 NetworkBehaviour::new(Duration::from_millis(100), 0.0),
             ),
             (
-                (Region::Asia, Region::Europe),
+                NetworkBehaviourKey::new(Region::Asia, Region::Europe),
                 NetworkBehaviour::new(Duration::from_millis(500), 0.0),
             ),
             (
-                (Region::Europe, Region::Europe),
+                NetworkBehaviourKey::new(Region::Europe, Region::Europe),
                 NetworkBehaviour::new(Duration::from_millis(100), 0.0),
             ),
         ]);

@@ -40,7 +40,9 @@ use rand::rngs::SmallRng;
 use serde::Serialize;
 // internal
 use crate::node::{Node, NodeId};
+use crate::output_processors::Record;
 use crate::runner::SimulationRunner;
+use crate::util::parse_idx;
 use crate::warding::SimulationState;
 
 use super::SimulationRunnerHandle;
@@ -56,7 +58,11 @@ where
     N: Send + Sync + 'static,
     N::Settings: Clone + Send,
     N::State: Serialize,
-    R: for<'a> TryFrom<&'a SimulationState<N>, Error = anyhow::Error> + Send + Sync + 'static,
+    R: Record
+        + for<'a> TryFrom<&'a SimulationState<N>, Error = anyhow::Error>
+        + Send
+        + Sync
+        + 'static,
 {
     let distribution =
         distribution.unwrap_or_else(|| std::iter::repeat(1.0f32).take(gap).collect());
@@ -91,7 +97,7 @@ where
                     {
                         let mut shared_nodes = nodes.write();
                         let node: &mut N = shared_nodes
-                            .get_mut(node_id.inner())
+                            .get_mut(parse_idx(&node_id))
                             .expect("Node should be present");
                         let prev_view = node.current_view();
                         node.step();

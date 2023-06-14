@@ -1,0 +1,60 @@
+{
+  "network_settings": {
+    "network_behaviors": {
+      "north america:north america": {
+        "secs": 1,
+        "nanos": 0
+      },
+      "north america:europe": {
+        "secs": 1,
+        "nanos": 0
+      },
+      "north america:asia": {
+        "secs": 1,
+        "nanos": 0
+      },
+      "europe:europe": {
+        "secs": 1,
+        "nanos": 0
+      },
+      "europe:asia": {
+        "secs": 1,
+        "nanos": 0
+      },
+      "europe:north america": {
+        "secs": 1,
+        "nanos": 0
+      },
+      "asia:north america": {
+        "secs": 1,
+        "nanos": 0
+      },
+      "asia:europe": {
+        "secs": 1,
+        "nanos": 0
+      },
+      "asia:asia": {
+        "secs": 1,
+        "nanos": 0
+      }
+    },
+    "regions": {
+      "north america": 0.4,
+      "europe": 0.4,
+      "asia": 0.3
+    }
+  },
+  "overlay_settings": "Flat",
+  "node_settings": {
+    "seed": 0,
+    "timeout": "1000ms"
+  },
+  "runner_settings": "Sync",
+  "stream_settings": {
+    "format": "json"
+  },
+  "node_count": 3,
+  "views_count": 3,
+  "leaders_count": 1,
+  "seed": 0
+}

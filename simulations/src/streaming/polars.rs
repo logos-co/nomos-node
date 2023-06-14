@@ -1,3 +1,5 @@
+use super::{Receivers, StreamSettings};
+use crate::output_processors::{RecordType, Runtime};
 use parking_lot::Mutex;
 use polars::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -7,8 +9,6 @@ use std::{
     path::{Path, PathBuf},
     str::FromStr,
 };
-
-use super::{Receivers, StreamSettings};
 
 #[derive(Debug, Clone, Copy, Serialize)]
 pub enum PolarsFormat {
@@ -45,7 +45,8 @@ impl<'de> Deserialize<'de> for PolarsFormat {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PolarsSettings {
     pub format: PolarsFormat,
-    pub path: PathBuf,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub path: Option<PathBuf>,
 }
 
 impl TryFrom<StreamSettings> for PolarsSettings {
@@ -90,7 +91,7 @@ where
 
 impl<R> super::Subscriber for PolarsSubscriber<R>
 where
-    R: Serialize + Send + Sync + 'static,
+    R: crate::output_processors::Record + Serialize,
 {
     type Record = R;
     type Settings = PolarsSettings;
@@ -110,9 +111,22 @@ where
         let this = PolarsSubscriber {
             data: Arc::new(Mutex::new(Vec::new())),
             recvs: Arc::new(recvs),
-            path: settings.path.clone(),
+            path: settings.path.clone().unwrap_or_else(|| {
+                let mut p = std::env::temp_dir().join("polars");
+                match settings.format {
+                    PolarsFormat::Json => p.set_extension("json"),
+                    PolarsFormat::Csv => p.set_extension("csv"),
+                    PolarsFormat::Parquet => p.set_extension("parquet"),
+                };
+                p
+            }),
             format: settings.format,
         };
+        tracing::info!(
+            target = "simulation",
+            "subscribed to {}",
+            this.path.display()
+        );
         Ok(this)
     }
 
@@ -124,6 +138,8 @@ where
         loop {
             crossbeam::select! {
                 recv(self.recvs.stop_rx) -> _ => {
+                    // collect the run time meta
+                    self.sink(Arc::new(R::from(Runtime::load()?)))?;
                     return self.persist();
                 }
                 recv(self.recvs.recv) -> msg => {
@@ -136,6 +152,10 @@ where
     fn sink(&self, state: Arc<Self::Record>) -> anyhow::Result<()> {
         self.data.lock().push(state);
         Ok(())
+    }
+
+    fn subscribe_data_type() -> RecordType {
+        RecordType::Data
     }
 }
 

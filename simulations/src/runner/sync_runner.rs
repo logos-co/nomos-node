@@ -1,8 +1,8 @@
 use serde::Serialize;
 
 use super::{SimulationRunner, SimulationRunnerHandle};
-use crate::node::Node;
 use crate::warding::SimulationState;
+use crate::{node::Node, output_processors::Record};
 use crossbeam::channel::{bounded, select};
 use std::sync::Arc;
 
@@ -15,7 +15,11 @@ where
     N: Send + Sync + 'static,
     N::Settings: Clone + Send,
     N::State: Serialize,
-    R: for<'a> TryFrom<&'a SimulationState<N>, Error = anyhow::Error> + Send + Sync + 'static,
+    R: Record
+        + for<'a> TryFrom<&'a SimulationState<N>, Error = anyhow::Error>
+        + Send
+        + Sync
+        + 'static,
 {
     let state = SimulationState {
         nodes: Arc::clone(&runner.nodes),
@@ -67,7 +71,7 @@ mod tests {
         network::{
             behaviour::NetworkBehaviour,
             regions::{Region, RegionsData},
-            InMemoryNetworkInterface, Network,
+            InMemoryNetworkInterface, Network, NetworkBehaviourKey,
         },
         node::{
             dummy::{DummyMessage, DummyNode},
@@ -78,6 +82,7 @@ mod tests {
         runner::SimulationRunner,
         settings::SimulationSettings,
         streaming::StreamProducer,
+        util::node_id,
     };
     use crossbeam::channel;
     use parking_lot::RwLock;
@@ -91,7 +96,7 @@ mod tests {
     fn init_network(node_ids: &[NodeId]) -> Network<DummyMessage> {
         let regions = HashMap::from([(Region::Europe, node_ids.to_vec())]);
         let behaviour = HashMap::from([(
-            (Region::Europe, Region::Europe),
+            NetworkBehaviourKey::new(Region::Europe, Region::Europe),
             NetworkBehaviour::new(Duration::from_millis(100), 0.0),
         )]);
         let regions_data = RegionsData::new(regions, behaviour);
@@ -126,7 +131,7 @@ mod tests {
         };
 
         let mut rng = StepRng::new(1, 0);
-        let node_ids: Vec<NodeId> = (0..settings.node_count).map(Into::into).collect();
+        let node_ids: Vec<NodeId> = (0..settings.node_count).map(node_id).collect();
         let overlay = TreeOverlay::new(settings.overlay_settings.clone().try_into().unwrap());
         let mut network = init_network(&node_ids);
         let view = ViewOverlay {
@@ -142,7 +147,7 @@ mod tests {
 
         let producer = StreamProducer::default();
         let runner: SimulationRunner<DummyMessage, DummyNode, OutData> =
-            SimulationRunner::new(network, nodes, producer, settings);
+            SimulationRunner::new(network, nodes, producer, settings).unwrap();
         let mut nodes = runner.nodes.write();
         runner.inner.write().step(&mut nodes);
         drop(nodes);
@@ -161,7 +166,7 @@ mod tests {
         };
 
         let mut rng = StepRng::new(1, 0);
-        let node_ids: Vec<NodeId> = (0..settings.node_count).map(Into::into).collect();
+        let node_ids: Vec<NodeId> = (0..settings.node_count).map(node_id).collect();
         let overlay = TreeOverlay::new(settings.overlay_settings.clone().try_into().unwrap());
         let mut network = init_network(&node_ids);
         let view = ViewOverlay {
@@ -188,7 +193,7 @@ mod tests {
         network.collect_messages();
 
         let runner: SimulationRunner<DummyMessage, DummyNode, OutData> =
-            SimulationRunner::new(network, nodes, Default::default(), settings);
+            SimulationRunner::new(network, nodes, Default::default(), settings).unwrap();
 
         let mut nodes = runner.nodes.write();
         runner.inner.write().step(&mut nodes);

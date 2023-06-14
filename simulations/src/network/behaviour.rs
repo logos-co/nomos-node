@@ -4,7 +4,7 @@ use std::{collections::HashMap, time::Duration};
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 
-use super::{regions::Region, NetworkSettings};
+use super::{NetworkBehaviourKey, NetworkSettings};
 // internal
 
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
@@ -31,10 +31,10 @@ impl NetworkBehaviour {
 // network behaviors for pairs of NodeIds.
 pub fn create_behaviours(
     network_settings: &NetworkSettings,
-) -> HashMap<(Region, Region), NetworkBehaviour> {
+) -> HashMap<NetworkBehaviourKey, NetworkBehaviour> {
     network_settings
         .network_behaviors
         .iter()
-        .map(|((a, b), d)| ((*a, *b), NetworkBehaviour::new(*d, 0.0)))
+        .map(|(k, d)| (*k, NetworkBehaviour::new(*d, 0.0)))
         .collect()
 }

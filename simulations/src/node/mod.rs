@@ -17,27 +17,7 @@ use serde::{Deserialize, Serialize};
 // internal
 use crate::overlay::{Layout, OverlaySettings, SimulationOverlay};
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
-#[serde(transparent)]
-pub struct NodeId(usize);
-
-impl NodeId {
-    #[inline]
-    pub const fn new(id: usize) -> Self {
-        Self(id)
-    }
-
-    #[inline]
-    pub const fn inner(&self) -> usize {
-        self.0
-    }
-}
-
-impl From<usize> for NodeId {
-    fn from(id: usize) -> Self {
-        Self(id)
-    }
-}
+pub use consensus_engine::NodeId;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(transparent)]
@@ -183,7 +163,7 @@ impl Node for usize {
     type State = Self;
 
     fn id(&self) -> NodeId {
-        (*self).into()
+        crate::util::node_id(*self)
     }
 
     fn current_view(&self) -> usize {

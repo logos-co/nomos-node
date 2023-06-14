@@ -1,5 +1,7 @@
 use crate::node::{Node, NodeId};
+use crate::output_processors::Record;
 use crate::runner::SimulationRunner;
+use crate::util::{node_id, parse_idx};
 use crate::warding::SimulationState;
 use crossbeam::channel::bounded;
 use crossbeam::select;
@@ -23,7 +25,11 @@ where
     N: Send + Sync + 'static,
     N::Settings: Clone + Send,
     N::State: Serialize,
-    R: for<'a> TryFrom<&'a SimulationState<N>, Error = anyhow::Error> + Send + Sync + 'static,
+    R: Record
+        + for<'a> TryFrom<&'a SimulationState<N>, Error = anyhow::Error>
+        + Send
+        + Sync
+        + 'static,
 {
     let simulation_state = SimulationState {
         nodes: Arc::clone(&runner.nodes),
@@ -31,7 +37,7 @@ where
 
     let inner_runner = runner.inner.clone();
     let nodes = runner.nodes;
-    let nodes_remaining: BTreeSet<NodeId> = (0..nodes.read().len()).map(From::from).collect();
+    let nodes_remaining: BTreeSet<NodeId> = (0..nodes.read().len()).map(node_id).collect();
     let iterations: Vec<_> = (0..maximum_iterations).collect();
     let (stop_tx, stop_rx) = bounded(1);
     let p = runner.producer.clone();
@@ -56,7 +62,7 @@ where
                         {
                             let mut shared_nodes = nodes.write();
                             let node: &mut N = shared_nodes
-                                .get_mut(node_id.inner())
+                                .get_mut(parse_idx(&node_id))
                                 .expect("Node should be present");
                             node.step();
                         }

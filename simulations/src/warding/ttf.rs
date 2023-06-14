@@ -1,10 +1,11 @@
 use crate::node::Node;
 use crate::warding::{SimulationState, SimulationWard};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 /// Time to finality ward. It monitors the amount of rounds of the simulations, triggers when surpassing
 /// the set threshold.
-#[derive(Debug, Deserialize, Copy, Clone)]
+#[derive(Debug, Serialize, Deserialize, Copy, Clone)]
+#[serde(transparent)]
 pub struct MaxViewWard {
     max_view: usize,
 }

@@ -1,52 +1,40 @@
-use super::{Receivers, StreamSettings, Subscriber};
+use super::{Receivers, Subscriber};
 use crate::output_processors::{RecordType, Runtime};
-use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 use std::{
     fs::{File, OpenOptions},
     io::Write,
     path::PathBuf,
-    sync::Arc,
+    sync::{Arc, Mutex},
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct NaiveSettings {
+pub struct RuntimeSettings {
     pub path: PathBuf,
 }
 
-impl TryFrom<StreamSettings> for NaiveSettings {
-    type Error = String;
-
-    fn try_from(settings: StreamSettings) -> Result<Self, Self::Error> {
-        match settings {
-            StreamSettings::Naive(settings) => Ok(settings),
-            _ => Err("naive settings can't be created".into()),
-        }
-    }
-}
-
-impl Default for NaiveSettings {
+impl Default for RuntimeSettings {
     fn default() -> Self {
         let mut tmp = std::env::temp_dir();
         tmp.push("simulation");
-        tmp.set_extension("data");
+        tmp.set_extension("runtime");
         Self { path: tmp }
     }
 }
 
 #[derive(Debug)]
-pub struct NaiveSubscriber<R> {
+pub struct RuntimeSubscriber<R> {
     file: Arc<Mutex<File>>,
     recvs: Arc<Receivers<R>>,
 }
 
-impl<R> Subscriber for NaiveSubscriber<R>
+impl<R> Subscriber for RuntimeSubscriber<R>
 where
     R: crate::output_processors::Record + Serialize,
 {
     type Record = R;
 
-    type Settings = NaiveSettings;
+    type Settings = RuntimeSettings;
 
     fn new(
         record_recv: crossbeam::channel::Receiver<Arc<Self::Record>>,
@@ -61,7 +49,7 @@ where
             stop_rx: stop_recv,
             recv: record_recv,
         };
-        let this = NaiveSubscriber {
+        let this = RuntimeSubscriber {
             file: Arc::new(Mutex::new(
                 opts.truncate(true)
                     .create(true)
@@ -72,7 +60,7 @@ where
             recvs: Arc::new(recvs),
         };
         tracing::info!(
-            target = "simulation",
+            taget = "simulation",
             "subscribed to {}",
             settings.path.display()
         );
@@ -84,16 +72,13 @@ where
     }
 
     fn run(self) -> anyhow::Result<()> {
-        loop {
-            crossbeam::select! {
-                recv(self.recvs.stop_rx) -> _ => {
-                    // collect the run time meta
-                    self.sink(Arc::new(R::from(Runtime::load()?)))?;
-                    break;
-                }
-                recv(self.recvs.recv) -> msg => {
-                    self.sink(msg?)?;
-                }
+        crossbeam::select! {
+            recv(self.recvs.stop_rx) -> _ => {
+                // collect the run time meta
+                self.sink(Arc::new(R::from(Runtime::load()?)))?;
+            }
+            recv(self.recvs.recv) -> msg => {
+                self.sink(msg?)?;
             }
         }
 
@@ -101,7 +86,7 @@ where
     }
 
     fn sink(&self, state: Arc<Self::Record>) -> anyhow::Result<()> {
-        let mut file = self.file.lock();
+        let mut file = self.file.lock().expect("failed to lock file");
         serde_json::to_writer(&mut *file, &state)?;
         file.write_all(b",\n")?;
         Ok(())
@@ -131,11 +116,11 @@ mod tests {
 
     use super::*;
     #[derive(Debug, Clone, Serialize)]
-    struct NaiveRecord {
+    struct RuntimeRecord {
         states: HashMap<NodeId, usize>,
     }
 
-    impl TryFrom<&SimulationState<DummyStreamingNode<()>>> for NaiveRecord {
+    impl TryFrom<&SimulationState<DummyStreamingNode<()>>> for RuntimeRecord {
         type Error = anyhow::Error;
 
         fn try_from(value: &SimulationState<DummyStreamingNode<()>>) -> Result<Self, Self::Error> {

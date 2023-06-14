@@ -6,7 +6,6 @@ use serde::{Deserialize, Serialize};
 /// Flat overlay with a single committee and round robin leader selection.
 pub struct FlatOverlay<L: LeaderSelection> {
     nodes: Vec<NodeId>,
-
     leader: L,
 }
 
