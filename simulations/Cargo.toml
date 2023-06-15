@@ -21,6 +21,7 @@ crossbeam = { version = "0.8.2", features = ["crossbeam-channel"] }
 consensus-engine = { path = "../consensus-engine" }
 fixed-slice-deque = "0.1.0-beta2"
 futures = "0.3"
+humantime = "2.1"
 humantime-serde = "1"
 nomos-core = { path = "../nomos-core" }
 nomos-consensus = { path = "../nomos-services/consensus" }
