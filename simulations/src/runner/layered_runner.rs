@@ -33,6 +33,7 @@ use crossbeam::select;
 use std::collections::BTreeSet;
 use std::ops::Not;
 use std::sync::Arc;
+use std::time::Duration;
 // crates
 use fixed_slice_deque::FixedSliceDeque;
 use rand::prelude::{IteratorRandom, SliceRandom};
@@ -80,6 +81,7 @@ where
     let (stop_tx, stop_rx) = bounded(1);
     let p = runner.producer.clone();
     let p1 = runner.producer;
+    let elapsed = Duration::from_millis(100);
     let handle = std::thread::spawn(move || {
         loop {
             select! {
@@ -99,7 +101,7 @@ where
                             .get_mut(parse_idx(&node_id))
                             .expect("Node should be present");
                         let prev_view = node.current_view();
-                        node.step();
+                        node.step(elapsed);
                         let after_view = node.current_view();
                         if after_view > prev_view {
                             // pass node to next step group
