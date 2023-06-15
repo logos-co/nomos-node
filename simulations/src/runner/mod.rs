@@ -77,15 +77,15 @@ where
             .any(|x| x)
     }
 
-    fn step<N>(&mut self, nodes: &mut [N])
+    fn step<N>(&mut self, nodes: &mut [N], elapsed: Duration)
     where
         N: Node + Send + Sync,
         N::Settings: Clone + Send,
         N::State: Serialize,
     {
-        self.network.dispatch_after(Duration::from_millis(100));
+        self.network.dispatch_after(elapsed);
         nodes.par_iter_mut().for_each(|node| {
-            node.step();
+            node.step(elapsed);
         });
         self.network.collect_messages();
     }
