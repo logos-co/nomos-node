@@ -145,6 +145,7 @@ where
             views_count: _,
             leaders_count: _,
             network_settings: _,
+            step_time: _,
         } = settings;
         Ok(Self {
             runner_settings,

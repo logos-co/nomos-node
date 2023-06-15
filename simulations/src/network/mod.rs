@@ -56,10 +56,49 @@ impl<'de> Deserialize<'de> for NetworkBehaviourKey {
 
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
 pub struct NetworkSettings {
+    #[serde(with = "network_behaviors_serde")]
     pub network_behaviors: HashMap<NetworkBehaviourKey, Duration>,
     /// Represents node distribution in the simulated regions.
     /// The sum of distributions should be 1.
     pub regions: HashMap<regions::Region, f32>,
+}
+
+/// Ser/Deser `HashMap<NetworkBehaviourKey, Duration>` to humantime format.
+mod network_behaviors_serde {
+    use super::{Deserialize, Duration, HashMap, NetworkBehaviourKey};
+
+    /// Have to implement this manually because of the `serde_json` will panic if the key of map
+    /// is not a string.
+    pub fn serialize<S>(
+        vals: &HashMap<NetworkBehaviourKey, Duration>,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeMap;
+        let mut ser = serializer.serialize_map(Some(vals.len()))?;
+        for (k, v) in vals {
+            ser.serialize_key(&k)?;
+            ser.serialize_value(&humantime::format_duration(*v).to_string())?;
+        }
+        ser.end()
+    }
+
+    pub fn deserialize<'de, D>(
+        deserializer: D,
+    ) -> Result<HashMap<NetworkBehaviourKey, Duration>, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let map = HashMap::<NetworkBehaviourKey, String>::deserialize(deserializer)?;
+        map.into_iter()
+            .map(|(k, v)| {
+                let v = humantime::parse_duration(&v).map_err(serde::de::Error::custom)?;
+                Ok((k, v))
+            })
+            .collect::<Result<HashMap<_, _>, _>>()
+    }
 }
 
 pub struct Network<M> {
