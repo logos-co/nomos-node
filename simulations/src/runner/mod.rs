@@ -9,7 +9,10 @@ use std::time::Duration;
 
 use crate::output_processors::Record;
 // crates
-use crate::streaming::{StreamProducer, Subscriber, SubscriberHandle};
+use crate::streaming::{
+    runtime_subscriber::RuntimeSubscriber, settings_subscriber::SettingsSubscriber, StreamProducer,
+    Subscriber, SubscriberHandle,
+};
 use crossbeam::channel::Sender;
 use parking_lot::RwLock;
 use rand::rngs::SmallRng;
@@ -97,7 +100,7 @@ pub struct SimulationRunner<M, N, R>
 where
     N: Node,
 {
-    inner: Arc<RwLock<SimulationRunnerInner<M>>>,
+    inner: SimulationRunnerInner<M>,
     nodes: Arc<RwLock<Vec<N>>>,
     runner_settings: RunnerSettings,
     producer: StreamProducer<R>,
@@ -145,14 +148,15 @@ where
             views_count: _,
             leaders_count: _,
             network_settings: _,
+            step_time: _,
         } = settings;
         Ok(Self {
             runner_settings,
-            inner: Arc::new(RwLock::new(SimulationRunnerInner {
+            inner: SimulationRunnerInner {
                 network,
                 rng,
                 wards,
-            })),
+            },
             nodes,
             producer,
         })
@@ -174,5 +178,49 @@ where
                 distribution,
             } => layered_runner::simulate(self, rounds_gap, distribution),
         }
+    }
+}
+
+impl<M, N: Node, R> SimulationRunner<M, N, R>
+where
+    M: Clone + Send + Sync + 'static,
+    N: Send + Sync + 'static,
+    N::Settings: Clone + Send,
+    N::State: Serialize,
+    R: Record
+        + serde::Serialize
+        + for<'a> TryFrom<&'a SimulationState<N>, Error = anyhow::Error>
+        + Send
+        + Sync
+        + 'static,
+{
+    pub fn simulate_and_subscribe<S>(
+        self,
+        settings: S::Settings,
+    ) -> anyhow::Result<SimulationRunnerHandle<R>>
+    where
+        S: Subscriber<Record = R> + Send + Sync + 'static,
+    {
+        let handle = self.simulate()?;
+        let mut data_subscriber_handle = handle.subscribe::<S>(settings)?;
+        let mut runtime_subscriber_handle =
+            handle.subscribe::<RuntimeSubscriber<R>>(Default::default())?;
+        let mut settings_subscriber_handle =
+            handle.subscribe::<SettingsSubscriber<R>>(Default::default())?;
+        std::thread::scope(|s| {
+            s.spawn(move || {
+                data_subscriber_handle.run();
+            });
+
+            s.spawn(move || {
+                runtime_subscriber_handle.run();
+            });
+
+            s.spawn(move || {
+                settings_subscriber_handle.run();
+            });
+        });
+
+        Ok(handle)
     }
 }

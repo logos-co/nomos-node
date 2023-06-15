@@ -3,9 +3,9 @@
 # The steps are identical to those that run on PRs, but this script includes macos environment.
 on:
   push:
-    branches: [main]
+    branches: [master]
 
-name: Main branch updates check
+name: Master branch updates check
 
 jobs:
   check:
