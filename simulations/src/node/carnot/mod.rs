@@ -331,18 +331,15 @@ impl<L: UpdateableLeaderSelection, O: Overlay<LeaderSelection = L>> Node for Car
                     let prev_view = self.engine.current_view();
                     output.push(Output::Send(out));
                     self.engine = new;
-                    let next_view = timeout_qc.view + 1;
                     tracing::info!(
                         node = parse_idx(&self.id),
-                        prev_view = prev_view,
                         current_view = self.engine.current_view(),
-                        next_view = next_view,
                         timeout_view = timeout_qc.view,
                         "receive new view message"
                     );
                 }
                 Event::TimeoutQc { timeout_qc } => {
-                    tracing::warn!(
+                    tracing::info!(
                         node = parse_idx(&self.id),
                         current_view = self.engine.current_view(),
                         timeout_view = timeout_qc.view,
@@ -372,7 +369,7 @@ impl<L: UpdateableLeaderSelection, O: Overlay<LeaderSelection = L>> Node for Car
                     }
                 }
                 Event::LocalTimeout => {
-                    tracing::warn!(
+                    tracing::info!(
                         node = parse_idx(&self.id),
                         current_view = self.engine.current_view(),
                         "receive local timeout message"
