@@ -1,7 +1,9 @@
 // std
 // crates
+use crate::Carnot;
 use bytes::Bytes;
 use http::StatusCode;
+use nomos_consensus::{CarnotInfo, ConsensusMsg};
 use tokio::sync::mpsc::Sender;
 use tokio::sync::oneshot;
 use tracing::error;
@@ -23,6 +25,25 @@ use nomos_network::{NetworkMsg, NetworkService};
 use overwatch_rs::services::relay::OutboundRelay;
 use waku_bindings::WakuMessage;
 
+pub fn carnot_info_bridge(
+    handle: overwatch_rs::overwatch::handle::OverwatchHandle,
+) -> HttpBridgeRunner {
+    Box::new(Box::pin(async move {
+        let (carnot_channel, mut http_request_channel) =
+            build_http_bridge::<Carnot, AxumBackend, _>(handle, HttpMethod::GET, "info")
+                .await
+                .unwrap();
+
+        while let Some(HttpRequest { res_tx, .. }) = http_request_channel.recv().await {
+            if let Err(e) = handle_carnot_info_req(&carnot_channel, &res_tx).await {
+                error!(e);
+            }
+        }
+
+        Ok(())
+    }))
+}
+
 pub fn mempool_metrics_bridge(
     handle: overwatch_rs::overwatch::handle::OverwatchHandle,
 ) -> HttpBridgeRunner {
@@ -37,7 +58,7 @@ pub fn mempool_metrics_bridge(
             .unwrap();
 
         while let Some(HttpRequest { res_tx, .. }) = http_request_channel.recv().await {
-            if let Err(e) = handle_metrics_req(&mempool_channel, res_tx).await {
+            if let Err(e) = handle_mempool_metrics_req(&mempool_channel, res_tx).await {
                 error!(e);
             }
         }
@@ -62,7 +83,9 @@ pub fn mempool_add_tx_bridge(
             res_tx, payload, ..
         }) = http_request_channel.recv().await
         {
-            if let Err(e) = handle_add_tx_req(&handle, &mempool_channel, res_tx, payload).await {
+            if let Err(e) =
+                handle_mempool_add_tx_req(&handle, &mempool_channel, res_tx, payload).await
+            {
                 error!(e);
             }
         }
@@ -84,7 +107,7 @@ pub fn waku_info_bridge(
         .unwrap();
 
         while let Some(HttpRequest { res_tx, .. }) = http_request_channel.recv().await {
-            if let Err(e) = handle_info_req(&waku_channel, &res_tx).await {
+            if let Err(e) = handle_waku_info_req(&waku_channel, &res_tx).await {
                 error!(e);
             }
         }
@@ -116,7 +139,24 @@ pub fn waku_add_conn_bridge(
     }))
 }
 
-async fn handle_metrics_req(
+async fn handle_carnot_info_req(
+    carnot_channel: &OutboundRelay<ConsensusMsg>,
+    res_tx: &Sender<HttpResponse>,
+) -> Result<(), overwatch_rs::DynError> {
+    let (sender, receiver) = oneshot::channel();
+    carnot_channel
+        .send(ConsensusMsg::Info { tx: sender })
+        .await
+        .map_err(|(e, _)| e)?;
+    let carnot_info: CarnotInfo = receiver.await.unwrap();
+    res_tx
+        .send(Ok(serde_json::to_vec(&carnot_info)?.into()))
+        .await?;
+
+    Ok(())
+}
+
+async fn handle_mempool_metrics_req(
     mempool_channel: &OutboundRelay<MempoolMsg<Tx>>,
     res_tx: Sender<HttpResponse>,
 ) -> Result<(), overwatch_rs::DynError> {
@@ -141,7 +181,7 @@ async fn handle_metrics_req(
     Ok(())
 }
 
-async fn handle_add_tx_req(
+async fn handle_mempool_add_tx_req(
     handle: &overwatch_rs::overwatch::handle::OverwatchHandle,
     mempool_channel: &OutboundRelay<MempoolMsg<Tx>>,
     res_tx: Sender<HttpResponse>,
@@ -186,7 +226,7 @@ async fn handle_add_tx_req(
     }
 }
 
-async fn handle_info_req(
+async fn handle_waku_info_req(
     waku_channel: &OutboundRelay<NetworkMsg<Waku>>,
     res_tx: &Sender<HttpResponse>,
 ) -> Result<(), overwatch_rs::DynError> {

@@ -37,6 +37,10 @@ impl<O: Overlay> Carnot<O> {
         self.highest_voted_view
     }
 
+    pub fn safe_blocks(&self) -> &HashMap<BlockId, Block> {
+        &self.safe_blocks
+    }
+
     /// Upon reception of a block
     ///
     /// Preconditions:
