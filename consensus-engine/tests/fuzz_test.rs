@@ -70,20 +70,14 @@ impl ReferenceStateMachine for RefState {
             .iter()
             .rev()
             .take(2)
-            .map(|(_k, v)| v)
-            .into_iter()
-            .map(|m| m.values().cloned().collect::<Vec<Block>>())
-            .flatten()
+            .flat_map(|(_k, v)| v.values().cloned())
             .collect();
         let arb_parent = proptest::sample::select(blocks_in_last_two_views);
 
         let blocks_not_voted: Vec<Block> = state
             .chain
             .range(state.highest_voted_view + 1..)
-            .map(|(_k, v)| v)
-            .into_iter()
-            .map(|m| m.values().cloned().collect::<Vec<Block>>())
-            .flatten()
+            .flat_map(|(_k, v)| v.values().cloned())
             .collect();
 
         if blocks_not_voted.len() == 0 {
