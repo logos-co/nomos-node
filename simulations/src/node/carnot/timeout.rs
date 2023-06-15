@@ -17,8 +17,8 @@ impl TimeoutHandler {
 
     pub fn step(&mut self, view: View, elapsed: Duration) -> bool {
         let timeout = self.per_view.entry(view).or_insert(self.timeout);
-        *timeout = (*timeout - elapsed).min(Duration::default());
-        *timeout <= Duration::default()
+        *timeout = (*timeout - elapsed).saturating_sub(Duration::default());
+        *timeout == Duration::ZERO
     }
 
     pub fn is_timeout(&self, view: View) -> bool {
