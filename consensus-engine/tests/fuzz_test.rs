@@ -121,17 +121,11 @@ impl ReferenceStateMachine for RefState {
                     leader_proof: LeaderProof::LeaderId { leader_id: [0; 32] },
                 };
 
-                match state.chain.get_mut(&new_block.view) {
-                    Some(blocks) => {
-                        blocks.insert(new_block.id, new_block.clone());
-                    }
-                    None => {
-                        state.chain.insert(
-                            new_block.view,
-                            HashMap::from([(new_block.id, new_block.clone())]),
-                        );
-                    }
-                }
+                state
+                    .chain
+                    .entry(new_block.view)
+                    .or_default()
+                    .insert(new_block.id, new_block.clone());
                 state.blocks.insert(new_block.id, new_block);
             }
             Transition::ApproveBlock(id) => {
