@@ -17,17 +17,16 @@ use rand::rngs::SmallRng;
 use rand::seq::SliceRandom;
 use rand::{Rng, SeedableRng};
 use serde::de::DeserializeOwned;
-use simulations::output_processors::Record;
-use simulations::runner::SimulationRunnerHandle;
 use simulations::network::behaviour::create_behaviours;
 use simulations::network::regions::{create_regions, RegionsData};
 use simulations::network::{InMemoryNetworkInterface, Network};
 use simulations::node::dummy::DummyNode;
 use simulations::node::{Node, NodeId, OverlayState, ViewOverlay};
+use simulations::output_processors::Record;
 use simulations::overlay::{create_overlay, SimulationOverlay};
+use simulations::runner::SimulationRunnerHandle;
 use simulations::streaming::{
-    io::IOSubscriber, naive::NaiveSubscriber, polars::PolarsSubscriber,
-    StreamType,
+    io::IOSubscriber, naive::NaiveSubscriber, polars::PolarsSubscriber, StreamType,
 };
 // internal
 use simulations::{

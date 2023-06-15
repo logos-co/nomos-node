@@ -9,7 +9,10 @@ use std::time::Duration;
 
 use crate::output_processors::Record;
 // crates
-use crate::streaming::{StreamProducer, Subscriber, SubscriberHandle, runtime_subscriber::RuntimeSubscriber, settings_subscriber::SettingsSubscriber};
+use crate::streaming::{
+    runtime_subscriber::RuntimeSubscriber, settings_subscriber::SettingsSubscriber, StreamProducer,
+    Subscriber, SubscriberHandle,
+};
 use crossbeam::channel::Sender;
 use parking_lot::RwLock;
 use rand::rngs::SmallRng;
