@@ -25,7 +25,7 @@ where
         nodes: Arc::clone(&runner.nodes),
     };
 
-    let inner_runner = runner.inner.clone();
+    let mut inner_runner = runner.inner;
     let nodes = runner.nodes;
 
     let (stop_tx, stop_rx) = bounded(1);
@@ -39,8 +39,6 @@ where
                     return Ok(());
                 }
                 default => {
-                    let mut inner_runner = inner_runner.write();
-
                     // we must use a code block to make sure once the step call is finished then the write lock will be released, because in Record::try_from(&state),
                     // we need to call the read lock, if we do not release the write lock,
                     // then dead lock will occur
@@ -146,10 +144,10 @@ mod tests {
         let nodes = init_dummy_nodes(&node_ids, &mut network, overlay_state);
 
         let producer = StreamProducer::default();
-        let runner: SimulationRunner<DummyMessage, DummyNode, OutData> =
+        let mut runner: SimulationRunner<DummyMessage, DummyNode, OutData> =
             SimulationRunner::new(network, nodes, producer, settings).unwrap();
         let mut nodes = runner.nodes.write();
-        runner.inner.write().step(&mut nodes);
+        runner.inner.step(&mut nodes);
         drop(nodes);
 
         let nodes = runner.nodes.read();
@@ -192,11 +190,11 @@ mod tests {
         }
         network.collect_messages();
 
-        let runner: SimulationRunner<DummyMessage, DummyNode, OutData> =
+        let mut runner: SimulationRunner<DummyMessage, DummyNode, OutData> =
             SimulationRunner::new(network, nodes, Default::default(), settings).unwrap();
 
         let mut nodes = runner.nodes.write();
-        runner.inner.write().step(&mut nodes);
+        runner.inner.step(&mut nodes);
         drop(nodes);
 
         let nodes = runner.nodes.read();

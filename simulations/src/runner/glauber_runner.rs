@@ -35,7 +35,7 @@ where
         nodes: Arc::clone(&runner.nodes),
     };
 
-    let inner_runner = runner.inner.clone();
+    let mut inner_runner = runner.inner;
     let nodes = runner.nodes;
     let nodes_remaining: BTreeSet<NodeId> = (0..nodes.read().len()).map(node_id).collect();
     let iterations: Vec<_> = (0..maximum_iterations).collect();
@@ -43,9 +43,6 @@ where
     let p = runner.producer.clone();
     let p1 = runner.producer;
     let handle = std::thread::spawn(move || {
-        let mut inner_runner: parking_lot::RwLockWriteGuard<super::SimulationRunnerInner<M>> =
-            inner_runner.write();
-
         'main: for chunk in iterations.chunks(update_rate) {
             select! {
                 recv(stop_rx) -> _ => break 'main,

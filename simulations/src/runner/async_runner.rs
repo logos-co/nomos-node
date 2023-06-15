@@ -34,7 +34,7 @@ where
 
     let mut node_ids: Vec<NodeId> = runner.nodes.read().iter().map(N::id).collect();
 
-    let inner_runner = runner.inner.clone();
+    let mut inner_runner = runner.inner;
     let nodes = runner.nodes;
     let (stop_tx, stop_rx) = bounded(1);
     let p = runner.producer.clone();
@@ -46,7 +46,6 @@ where
                     return Ok(());
                 }
                 default => {
-                    let mut inner_runner = inner_runner.write();
                     node_ids.shuffle(&mut inner_runner.rng);
                     for ids_chunk in node_ids.chunks(chunk_size) {
                         let ids: HashSet<NodeId> = ids_chunk.iter().copied().collect();
