@@ -32,7 +32,6 @@ use simulations::{
     node::carnot::CarnotNode, output_processors::OutData, runner::SimulationRunner,
     settings::SimulationSettings, util::node_id,
 };
-#[path = "log.rs"]
 mod log;
 
 /// Main simulation wrapper

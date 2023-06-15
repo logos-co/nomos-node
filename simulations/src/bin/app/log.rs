@@ -1,7 +1,7 @@
 use std::str::FromStr;
 
 #[derive(Copy, Clone)]
-pub(super) enum LogFormat {
+pub enum LogFormat {
     Plain,
     Json,
 }
@@ -18,7 +18,7 @@ impl FromStr for LogFormat {
     }
 }
 
-pub(super) fn config_tracing(fmt: Option<LogFormat>) {
+pub fn config_tracing(fmt: Option<LogFormat>) {
     let filter = std::env::var("SIMULATION_LOG").unwrap_or_else(|_| "info".to_owned());
     if let Some(LogFormat::Json) = fmt {
         let subscriber = tracing_subscriber::fmt::fmt()
