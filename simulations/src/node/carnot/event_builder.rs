@@ -37,12 +37,7 @@ impl EventBuilder {
         }
     }
 
-    fn local_timeout(
-        &mut self,
-        view: View,
-        member_of_root_committee: bool,
-        elapsed: Duration,
-    ) -> bool {
+    fn local_timeout(&mut self, view: View, elapsed: Duration) -> bool {
         if self.timeout_handler.step(view, elapsed) {
             self.timeout_handler.prune_by_view(view);
             true
@@ -59,11 +54,7 @@ impl EventBuilder {
     ) -> Vec<Event<CarnotTx>> {
         let mut events = Vec::new();
         // check timeout and exit
-        if self.local_timeout(
-            engine.current_view(),
-            engine.is_member_of_root_committee(),
-            elapsed,
-        ) {
+        if self.local_timeout(engine.current_view(), elapsed) {
             events.push(Event::LocalTimeout);
             // if we timeout discard incoming view messages
             messages.retain(|msg| {

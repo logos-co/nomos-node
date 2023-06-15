@@ -328,7 +328,6 @@ impl<L: UpdateableLeaderSelection, O: Overlay<LeaderSelection = L>> Node for Car
                     new_views,
                 } => {
                     let (new, out) = self.engine.approve_new_view(timeout_qc.clone(), new_views);
-                    let prev_view = self.engine.current_view();
                     output.push(Output::Send(out));
                     self.engine = new;
                     tracing::info!(
