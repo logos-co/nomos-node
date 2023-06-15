@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, HashMap};
 
-use consensus_engine::{Block, BlockId, Qc, StandardQc, View};
+use consensus_engine::{Block, BlockId, LeaderProof, Qc, StandardQc, View};
 use proptest::prelude::*;
 use proptest::test_runner::Config;
 use proptest_state_machine::{prop_state_machine, ReferenceStateMachine, StateMachineTest};
@@ -53,6 +53,7 @@ impl ReferenceStateMachine for RefState {
             view: 0,
             id: [0; 32],
             parent_qc: Qc::Standard(StandardQc::genesis()),
+            leader_proof: LeaderProof::LeaderId { leader_id: [0; 32] },
         };
         state.chain.insert(
             genesis_block.view,
@@ -117,6 +118,7 @@ impl ReferenceStateMachine for RefState {
                         view: qc_block.view,
                         id: qc_block.id,
                     }),
+                    leader_proof: LeaderProof::LeaderId { leader_id: [0; 32] },
                 };
 
                 match state.chain.get_mut(&new_block.view) {
@@ -223,11 +225,14 @@ impl StateMachineTest for ConsensusEngineTest {
 
 // SUT is a system (state) that we want to test.
 mod system_under_test {
-    use consensus_engine::*;
+    use consensus_engine::{
+        overlay::{FlatOverlay, RoundRobin, Settings},
+        *,
+    };
 
     #[derive(Clone, Debug)]
     pub struct ConsensusEngineTest {
-        pub engine: Carnot<MockOverlay>,
+        pub engine: Carnot<FlatOverlay<RoundRobin>>,
     }
 
     impl ConsensusEngineTest {
@@ -238,72 +243,15 @@ mod system_under_test {
                     view: 0,
                     id: [0; 32],
                     parent_qc: Qc::Standard(StandardQc::genesis()),
+                    leader_proof: LeaderProof::LeaderId { leader_id: [0; 32] },
                 },
-                MockOverlay,
+                FlatOverlay::new(Settings {
+                    nodes: vec![[0; 32]],
+                    leader: RoundRobin::default(),
+                }),
             );
 
             ConsensusEngineTest { engine }
-        }
-    }
-
-    #[derive(Clone, Debug, PartialEq)]
-    pub struct MockOverlay;
-
-    impl Overlay for MockOverlay {
-        fn new(_nodes: Vec<NodeId>) -> Self {
-            Self
-        }
-
-        fn root_committee(&self) -> Committee {
-            vec![[0; 32]].into_iter().collect()
-        }
-
-        fn rebuild(&mut self, _timeout_qc: TimeoutQc) {
-            todo!()
-        }
-
-        fn is_member_of_child_committee(&self, _parent: NodeId, _child: NodeId) -> bool {
-            false
-        }
-
-        fn is_member_of_root_committee(&self, _id: NodeId) -> bool {
-            true
-        }
-
-        fn is_member_of_leaf_committee(&self, _id: NodeId) -> bool {
-            true
-        }
-
-        fn is_child_of_root_committee(&self, _id: NodeId) -> bool {
-            false
-        }
-
-        fn node_committee(&self, _id: NodeId) -> Committee {
-            self.root_committee()
-        }
-
-        fn parent_committee(&self, _id: NodeId) -> Committee {
-            self.root_committee()
-        }
-
-        fn child_committees(&self, _id: NodeId) -> Vec<Committee> {
-            vec![]
-        }
-
-        fn leaf_committees(&self, _id: NodeId) -> Vec<Committee> {
-            vec![self.root_committee()]
-        }
-
-        fn leader(&self, _view: View) -> NodeId {
-            [0; 32]
-        }
-
-        fn super_majority_threshold(&self, _id: NodeId) -> usize {
-            todo!()
-        }
-
-        fn leader_super_majority_threshold(&self, _id: NodeId) -> usize {
-            self.root_committee().len() * 2 / 3 + 1
         }
     }
 }
