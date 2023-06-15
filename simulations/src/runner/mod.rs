@@ -97,7 +97,7 @@ pub struct SimulationRunner<M, N, R>
 where
     N: Node,
 {
-    inner: Arc<RwLock<SimulationRunnerInner<M>>>,
+    inner: SimulationRunnerInner<M>,
     nodes: Arc<RwLock<Vec<N>>>,
     runner_settings: RunnerSettings,
     producer: StreamProducer<R>,
@@ -148,11 +148,11 @@ where
         } = settings;
         Ok(Self {
             runner_settings,
-            inner: Arc::new(RwLock::new(SimulationRunnerInner {
+            inner: SimulationRunnerInner {
                 network,
                 rng,
                 wards,
-            })),
+            },
             nodes,
             producer,
         })

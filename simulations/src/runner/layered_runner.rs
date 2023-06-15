@@ -75,7 +75,7 @@ where
         nodes: Arc::clone(&runner.nodes),
     };
 
-    let inner_runner = runner.inner.clone();
+    let mut inner_runner = runner.inner;
     let nodes = runner.nodes;
     let (stop_tx, stop_rx) = bounded(1);
     let p = runner.producer.clone();
@@ -87,7 +87,6 @@ where
                     break;
                 }
                 default => {
-                    let mut inner_runner = inner_runner.write();
                     let (group_index, node_id) =
                         choose_random_layer_and_node_id(&mut inner_runner.rng, &distribution, &layers, &mut deque);
 
