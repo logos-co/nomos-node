@@ -43,13 +43,9 @@ impl EventBuilder {
         member_of_root_committee: bool,
         elapsed: Duration,
     ) -> bool {
-        if member_of_root_committee {
-            if self.timeout_handler.step(view, elapsed) {
-                self.timeout_handler.prune_by_view(view);
-                true
-            } else {
-                false
-            }
+        if self.timeout_handler.step(view, elapsed) {
+            self.timeout_handler.prune_by_view(view);
+            true
         } else {
             false
         }
@@ -57,21 +53,27 @@ impl EventBuilder {
 
     pub fn step<O: Overlay>(
         &mut self,
-        messages: Vec<CarnotMessage>,
+        mut messages: Vec<CarnotMessage>,
         engine: &Carnot<O>,
         elapsed: Duration,
     ) -> Vec<Event<CarnotTx>> {
+        let mut events = Vec::new();
         // check timeout and exit
-        // TODO: probably a good place to prune old view messages
         if self.local_timeout(
             engine.current_view(),
             engine.is_member_of_root_committee(),
             elapsed,
         ) {
-            return vec![Event::LocalTimeout];
+            events.push(Event::LocalTimeout);
+            // if we timeout discard incoming view messages
+            messages.retain(|msg| {
+                matches!(
+                    msg,
+                    CarnotMessage::Proposal(_) | CarnotMessage::TimeoutQc(_)
+                )
+            });
         }
 
-        let mut events = Vec::new();
         // only run when the engine is in the genesis view
         if engine.highest_voted_view() == -1
             && engine.overlay().is_member_of_leaf_committee(self.id)
@@ -218,13 +220,6 @@ impl EventBuilder {
                     }
                 }
             }
-        }
-
-        // check timeout
-        if self.timeout_handler.is_timeout(engine.current_view())
-            && engine.is_member_of_root_committee()
-        {
-            events.push(Event::LocalTimeout);
         }
         events
     }
