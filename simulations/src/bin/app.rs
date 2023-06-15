@@ -22,10 +22,11 @@ use simulations::network::regions::{create_regions, RegionsData};
 use simulations::network::{InMemoryNetworkInterface, Network};
 use simulations::node::dummy::DummyNode;
 use simulations::node::{Node, NodeId, OverlayState, ViewOverlay};
+use simulations::output_processors::Record;
 use simulations::overlay::{create_overlay, SimulationOverlay};
+use simulations::runner::SimulationRunnerHandle;
 use simulations::streaming::{
-    io::IOSubscriber, naive::NaiveSubscriber, polars::PolarsSubscriber,
-    runtime_subscriber::RuntimeSubscriber, settings_subscriber::SettingsSubscriber, StreamType,
+    io::IOSubscriber, naive::NaiveSubscriber, polars::PolarsSubscriber, StreamType,
 };
 // internal
 use simulations::{
@@ -162,47 +163,41 @@ where
     let stream_settings = settings.stream_settings.clone();
     let runner =
         SimulationRunner::<_, _, OutData>::new(network, nodes, Default::default(), settings)?;
-    macro_rules! bail {
-        ($settings: ident, $sub: ident) => {
-            let handle = runner.simulate()?;
-            let mut data_subscriber_handle = handle.subscribe::<$sub<OutData>>($settings)?;
-            let mut runtime_subscriber_handle =
-                handle.subscribe::<RuntimeSubscriber<OutData>>(Default::default())?;
-            let mut settings_subscriber_handle =
-                handle.subscribe::<SettingsSubscriber<OutData>>(Default::default())?;
-            std::thread::scope(|s| {
-                s.spawn(move || {
-                    data_subscriber_handle.run();
-                });
 
-                s.spawn(move || {
-                    runtime_subscriber_handle.run();
-                });
-
-                s.spawn(move || {
-                    settings_subscriber_handle.run();
-                });
-            });
-            handle.join()?;
-        };
-    }
-    match stream_type {
+    let handle = match stream_type {
         Some(StreamType::Naive) => {
             let settings = stream_settings.unwrap_naive();
-            bail!(settings, NaiveSubscriber);
+            runner.simulate_and_subscribe::<NaiveSubscriber<OutData>>(settings)?
         }
         Some(StreamType::IO) => {
             let settings = stream_settings.unwrap_io();
-            bail!(settings, IOSubscriber);
+            runner.simulate_and_subscribe::<IOSubscriber<OutData>>(settings)?
         }
         Some(StreamType::Polars) => {
             let settings = stream_settings.unwrap_polars();
-            bail!(settings, PolarsSubscriber);
+            runner.simulate_and_subscribe::<PolarsSubscriber<OutData>>(settings)?
         }
-        None => {
-            runner.simulate()?.join()?;
-        }
+        None => runner.simulate()?,
     };
+
+    signal(handle)
+}
+
+fn signal<R: Record>(handle: SimulationRunnerHandle<R>) -> anyhow::Result<()> {
+    let (tx, rx) = crossbeam::channel::bounded(1);
+    ctrlc::set_handler(move || {
+        tx.send(()).unwrap();
+    })?;
+    loop {
+        crossbeam::select! {
+            recv(rx) -> _ => {
+                handle.stop()?;
+                tracing::info!("gracefully shutwon the simulation app");
+                break;
+            },
+            default => {}
+        }
+    }
     Ok(())
 }
 
@@ -241,7 +236,7 @@ fn main() -> anyhow::Result<()> {
     let app: SimulationApp = SimulationApp::parse();
 
     if let Err(e) = app.run() {
-        tracing::error!("Error: {}", e);
+        tracing::error!("error: {}", e);
         std::process::exit(1);
     }
     Ok(())
