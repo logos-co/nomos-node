@@ -5,6 +5,7 @@ use simulations::node::carnot::CarnotSettings;
 use std::collections::BTreeMap;
 use std::fs::File;
 use std::path::{Path, PathBuf};
+use std::str::FromStr;
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 // crates
@@ -33,6 +34,24 @@ use simulations::{
     settings::SimulationSettings, util::node_id,
 };
 
+#[derive(Copy, Clone)]
+enum LogFormat {
+    Plain,
+    Json,
+}
+
+impl FromStr for LogFormat {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.trim().to_ascii_lowercase().as_str() {
+            "json" => Ok(LogFormat::Json),
+            "plain" => Ok(LogFormat::Plain),
+            _ => Err(anyhow::anyhow!("Unknown log format")),
+        }
+    }
+}
+
 /// Main simulation wrapper
 /// Pipes together the cli arguments with the execution
 #[derive(Parser)]
@@ -42,6 +61,8 @@ pub struct SimulationApp {
     input_settings: PathBuf,
     #[clap(long)]
     stream_type: Option<StreamType>,
+    #[clap(long)]
+    log_format: Option<LogFormat>,
 }
 
 impl SimulationApp {
@@ -49,6 +70,7 @@ impl SimulationApp {
         let Self {
             input_settings,
             stream_type,
+            log_format: _,
         } = self;
         let simulation_settings: SimulationSettings = load_json_from_file(&input_settings)?;
 
@@ -226,22 +248,35 @@ fn generate_overlays<R: Rng>(
 }
 
 fn main() -> anyhow::Result<()> {
-    let filter = std::env::var("SIMULATION_LOG").unwrap_or_else(|_| "info".to_owned());
-    let subscriber = tracing_subscriber::fmt::fmt()
-        .without_time()
-        .with_line_number(true)
-        .with_env_filter(filter)
-        .with_file(false)
-        .with_target(true)
-        .with_ansi(true)
-        .finish();
-    tracing::subscriber::set_global_default(subscriber)
-        .expect("config_tracing is only called once");
-
     let app: SimulationApp = SimulationApp::parse();
+    let filter = std::env::var("SIMULATION_LOG").unwrap_or_else(|_| "info".to_owned());
+    if let Some(LogFormat::Json) = app.log_format {
+        let subscriber = tracing_subscriber::fmt::fmt()
+            .without_time()
+            .with_line_number(true)
+            .with_env_filter(filter)
+            .with_file(false)
+            .with_target(true)
+            .with_ansi(true)
+            .json()
+            .finish();
+        tracing::subscriber::set_global_default(subscriber)
+            .expect("config_tracing is only called once");
+    } else {
+        let subscriber = tracing_subscriber::fmt::fmt()
+            .without_time()
+            .with_line_number(true)
+            .with_env_filter(filter)
+            .with_file(false)
+            .with_target(true)
+            .with_ansi(true)
+            .finish();
+        tracing::subscriber::set_global_default(subscriber)
+            .expect("config_tracing is only called once");
+    }
 
     if let Err(e) = app.run() {
-        tracing::error!("Error: {}", e);
+        tracing::error!("error: {}", e);
         std::process::exit(1);
     }
     Ok(())
