@@ -33,6 +33,7 @@ use simulations::{
     node::carnot::CarnotNode, output_processors::OutData, runner::SimulationRunner,
     settings::SimulationSettings, util::node_id,
 };
+mod log;
 
 /// Main simulation wrapper
 /// Pipes together the cli arguments with the execution
@@ -43,6 +44,8 @@ pub struct SimulationApp {
     input_settings: PathBuf,
     #[clap(long)]
     stream_type: Option<StreamType>,
+    #[clap(long)]
+    log_format: Option<log::LogFormat>,
 }
 
 impl SimulationApp {
@@ -50,6 +53,7 @@ impl SimulationApp {
         let Self {
             input_settings,
             stream_type,
+            log_format: _,
         } = self;
         let simulation_settings: SimulationSettings = load_json_from_file(&input_settings)?;
 
@@ -221,19 +225,8 @@ fn generate_overlays<R: Rng>(
 }
 
 fn main() -> anyhow::Result<()> {
-    let filter = std::env::var("SIMULATION_LOG").unwrap_or_else(|_| "info".to_owned());
-    let subscriber = tracing_subscriber::fmt::fmt()
-        .without_time()
-        .with_line_number(true)
-        .with_env_filter(filter)
-        .with_file(false)
-        .with_target(true)
-        .with_ansi(true)
-        .finish();
-    tracing::subscriber::set_global_default(subscriber)
-        .expect("config_tracing is only called once");
-
     let app: SimulationApp = SimulationApp::parse();
+    log::config_tracing(app.log_format);
 
     if let Err(e) = app.run() {
         tracing::error!("error: {}", e);
