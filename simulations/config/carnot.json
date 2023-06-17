@@ -19,9 +19,9 @@
   },
   "overlay_settings": "Flat",
   "node_settings": {
-    "seed": 0,
     "timeout": "1000ms"
   },
+  "step_time": "100ms",
   "runner_settings": "Sync",
   "stream_settings": {
     "format": "json"

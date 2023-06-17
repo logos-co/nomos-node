@@ -22,14 +22,9 @@ pub enum RunnerSettings {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
-#[serde(untagged)]
-pub enum NodeSettings {
-    Carnot {
-        #[serde(with = "humantime_serde")]
-        timeout: std::time::Duration,
-    },
-    #[default]
-    Dummy,
+pub struct NodeSettings {
+    #[serde(with = "humantime_serde")]
+    pub timeout: std::time::Duration,
 }
 
 #[derive(Clone, Default, Debug, Serialize, Deserialize)]
