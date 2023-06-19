@@ -5,6 +5,7 @@ use crate::warding::SimulationState;
 use crate::{node::Node, output_processors::Record};
 use crossbeam::channel::{bounded, select};
 use std::sync::Arc;
+use std::time::Duration;
 
 /// Simulate with sending the network state to any subscriber
 pub fn simulate<M, N: Node, R>(
@@ -31,6 +32,7 @@ where
     let (stop_tx, stop_rx) = bounded(1);
     let p = runner.producer.clone();
     let p1 = runner.producer;
+    let elapsed = Duration::from_millis(100);
     let handle = std::thread::spawn(move || {
         p.send(R::try_from(&state)?)?;
         loop {
@@ -44,7 +46,7 @@ where
                     // then dead lock will occur
                     {
                         let mut nodes = nodes.write();
-                        inner_runner.step(&mut nodes);
+                        inner_runner.step(&mut nodes, elapsed);
                     }
 
                     p.send(R::try_from(&state)?)?;
@@ -147,7 +149,7 @@ mod tests {
         let mut runner: SimulationRunner<DummyMessage, DummyNode, OutData> =
             SimulationRunner::new(network, nodes, producer, settings).unwrap();
         let mut nodes = runner.nodes.write();
-        runner.inner.step(&mut nodes);
+        runner.inner.step(&mut nodes, Duration::from_millis(100));
         drop(nodes);
 
         let nodes = runner.nodes.read();
@@ -194,7 +196,7 @@ mod tests {
             SimulationRunner::new(network, nodes, Default::default(), settings).unwrap();
 
         let mut nodes = runner.nodes.write();
-        runner.inner.step(&mut nodes);
+        runner.inner.step(&mut nodes, Duration::from_millis(100));
         drop(nodes);
 
         let nodes = runner.nodes.read();

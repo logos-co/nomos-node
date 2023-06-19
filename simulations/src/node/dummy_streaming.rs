@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use std::time::Duration;
 
 use super::{Node, NodeId};
 
@@ -42,7 +43,7 @@ impl<S> Node for DummyStreamingNode<S> {
         &self.state
     }
 
-    fn step(&mut self) {
+    fn step(&mut self, _: Duration) {
         self.state.current_view += 1;
     }
 }

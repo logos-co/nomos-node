@@ -1,5 +1,6 @@
 // std
 use std::collections::{BTreeMap, BTreeSet};
+use std::time::Duration;
 // crates
 use serde::{Deserialize, Serialize};
 // internal
@@ -362,7 +363,7 @@ impl Node for DummyNode {
         &self.state
     }
 
-    fn step(&mut self) {
+    fn step(&mut self, _: Duration) {
         let incoming_messages = self.network_interface.receive_messages();
         self.state.message_count += incoming_messages.len();
 
@@ -565,19 +566,19 @@ mod tests {
         for (_, node) in nodes.iter() {
             assert_eq!(node.current_view(), 0);
         }
-
+        let elapsed = Duration::from_millis(100);
         // 1. Leaders receive vote and broadcast new Proposal(Block) to all nodes.
-        network.dispatch_after(Duration::from_millis(100));
+        network.dispatch_after(elapsed);
         nodes.iter_mut().for_each(|(_, node)| {
-            node.step();
+            node.step(elapsed);
         });
         network.collect_messages();
 
         // 2. a) All nodes received proposal block.
         //    b) Leaf nodes send vote to internal nodes.
-        network.dispatch_after(Duration::from_millis(100));
+        network.dispatch_after(elapsed);
         nodes.iter_mut().for_each(|(_, node)| {
-            node.step();
+            node.step(elapsed);
         });
         network.collect_messages();
 
@@ -598,9 +599,9 @@ mod tests {
         assert!(nodes[&node_id(6)].state().view_state[&1].vote_sent); // Leaf
 
         // 3. Internal nodes send vote to root node.
-        network.dispatch_after(Duration::from_millis(100));
+        network.dispatch_after(elapsed);
         nodes.iter_mut().for_each(|(_, node)| {
-            node.step();
+            node.step(elapsed);
         });
         network.collect_messages();
 
@@ -616,9 +617,9 @@ mod tests {
         assert!(nodes[&node_id(6)].state().view_state[&1].vote_sent); // Leaf
 
         // 4. Root node send vote to next view leader nodes.
-        network.dispatch_after(Duration::from_millis(100));
+        network.dispatch_after(elapsed);
         nodes.iter_mut().for_each(|(_, node)| {
-            node.step();
+            node.step(elapsed);
         });
         network.collect_messages();
 
@@ -632,9 +633,9 @@ mod tests {
         assert!(nodes[&node_id(6)].state().view_state[&1].vote_sent); // Leaf
 
         // 5. Leaders receive vote and broadcast new Proposal(Block) to all nodes.
-        network.dispatch_after(Duration::from_millis(100));
+        network.dispatch_after(elapsed);
         nodes.iter_mut().for_each(|(_, node)| {
-            node.step();
+            node.step(elapsed);
         });
         network.collect_messages();
 
@@ -645,9 +646,9 @@ mod tests {
 
         // 6. a) All nodes received proposal block.
         //    b) Leaf nodes send vote to internal nodes.
-        network.dispatch_after(Duration::from_millis(100));
+        network.dispatch_after(elapsed);
         nodes.iter_mut().for_each(|(_, node)| {
-            node.step();
+            node.step(elapsed);
         });
         network.collect_messages();
 
@@ -705,11 +706,11 @@ mod tests {
         for (_, node) in nodes.iter() {
             assert_eq!(node.current_view(), 0);
         }
-
+        let elapsed = Duration::from_millis(100);
         for _ in 0..7 {
-            network.dispatch_after(Duration::from_millis(100));
+            network.dispatch_after(elapsed);
             nodes.iter_mut().for_each(|(_, node)| {
-                node.step();
+                node.step(elapsed);
             });
             network.collect_messages();
         }
@@ -755,11 +756,11 @@ mod tests {
         for (_, node) in nodes.iter() {
             assert_eq!(node.current_view(), 0);
         }
-
+        let elapsed = Duration::from_millis(100);
         for _ in 0..7 {
-            network.dispatch_after(Duration::from_millis(100));
+            network.dispatch_after(elapsed);
             nodes.iter_mut().for_each(|(_, node)| {
-                node.step();
+                node.step(elapsed);
             });
             network.collect_messages();
         }
@@ -803,10 +804,11 @@ mod tests {
         network.collect_messages();
 
         let nodes = Arc::new(RwLock::new(nodes));
+        let elapsed = Duration::from_millis(100);
         for _ in 0..9 {
-            network.dispatch_after(Duration::from_millis(100));
+            network.dispatch_after(elapsed);
             nodes.write().par_iter_mut().for_each(|(_, node)| {
-                node.step();
+                node.step(elapsed);
             });
             network.collect_messages();
         }

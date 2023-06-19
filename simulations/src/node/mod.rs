@@ -154,7 +154,7 @@ pub trait Node {
     // TODO: View must be view whenever we integrate consensus engine
     fn current_view(&self) -> usize;
     fn state(&self) -> &Self::State;
-    fn step(&mut self);
+    fn step(&mut self, elapsed: Duration);
 }
 
 #[cfg(test)]
@@ -174,7 +174,7 @@ impl Node for usize {
         self
     }
 
-    fn step(&mut self) {
+    fn step(&mut self, _: Duration) {
         use std::ops::AddAssign;
         self.add_assign(1);
     }
