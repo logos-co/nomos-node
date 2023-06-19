@@ -28,6 +28,32 @@ use nomos_consensus::{
     network::messages::{NewViewMsg, TimeoutMsg, VoteMsg},
 };
 
+const CURRENT_VIEW: &str = "current_view";
+const HIGHEST_VOTED_VIEW: &str = "highest_voted_view";
+const LOCAL_HIGH_QC: &str = "local_high_qc";
+const SAFE_BLOCKS: &str = "safe_blocks";
+const LAST_VIEW_TIMEOUT_QC: &str = "last_view_timeout_qc";
+const LATEST_COMMITTED_BLOCK: &str = "latest_committed_block";
+const LATEST_COMMITTED_VIEW: &str = "latest_committed_view";
+const ROOT_COMMITTEE: &str = "root_committee";
+const PARENT_COMMITTEE: &str = "parent_committee";
+const CHILD_COMMITTEES: &str = "child_committees";
+const COMMITTED_BLOCKS: &str = "committed_blocks";
+
+pub const CARNOT_RECORD_KEYS: &[&str] = &[
+    CURRENT_VIEW,
+    HIGHEST_VOTED_VIEW,
+    LOCAL_HIGH_QC,
+    SAFE_BLOCKS,
+    LAST_VIEW_TIMEOUT_QC,
+    LATEST_COMMITTED_BLOCK,
+    LATEST_COMMITTED_VIEW,
+    ROOT_COMMITTEE,
+    PARENT_COMMITTEE,
+    CHILD_COMMITTEES,
+    COMMITTED_BLOCKS,
+];
+
 #[derive(Default, Serialize)]
 pub struct CarnotState {
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -58,20 +84,8 @@ pub struct CarnotState {
 }
 
 impl CarnotState {
-    fn keys() -> &'static [&'static str] {
-        &[
-            "current_view",
-            "highest_voted_view",
-            "local_high_qc",
-            "safe_blocks",
-            "last_view_timeout_qc",
-            "latest_committed_block",
-            "latest_committed_view",
-            "root_committe",
-            "parent_committe",
-            "child_committees",
-            "committed_blocks",
-        ]
+    const fn keys() -> &'static [&'static str] {
+        CARNOT_RECORD_KEYS
     }
 }
 
@@ -196,30 +210,32 @@ impl<O: Overlay> CarnotNode<O> {
                 if !persist {
                     continue;
                 }
-                match *k {
-                    "current_view" => state.current_view = Some(self.engine.current_view()),
-                    "highest_voted_view" => {
+                match k.trim() {
+                    CURRENT_VIEW => state.current_view = Some(self.engine.current_view()),
+                    HIGHEST_VOTED_VIEW => {
                         state.highest_voted_view = Some(self.engine.highest_voted_view())
                     }
-                    "local_high_qc" => state.local_high_qc = Some(self.engine.high_qc()),
-                    "safe_blocks" => state.safe_blocks = Some(self.engine.safe_blocks().clone()),
-                    "last_view_timeout_qc" => {
+                    LOCAL_HIGH_QC => state.local_high_qc = Some(self.engine.high_qc()),
+                    SAFE_BLOCKS => state.safe_blocks = Some(self.engine.safe_blocks().clone()),
+                    LAST_VIEW_TIMEOUT_QC => {
                         state.last_view_timeout_qc = self.engine.last_view_timeout_qc()
                     }
-                    "latest_committed_block" => {
+                    LATEST_COMMITTED_BLOCK => {
                         state.latest_committed_block = Some(self.engine.latest_committed_block())
                     }
-                    "latest_committed_view" => {
+                    LATEST_COMMITTED_VIEW => {
                         state.latest_committed_view = Some(self.engine.latest_committed_view())
                     }
-                    "root_committe" => state.root_committe = Some(self.engine.root_committee()),
-                    "parent_committe" => {
+                    ROOT_COMMITTEE => state.root_committe = Some(self.engine.root_committee()),
+                    PARENT_COMMITTEE => {
                         state.parent_committe = Some(self.engine.parent_committee())
                     }
-                    "child_committees" => {
+                    CHILD_COMMITTEES => {
                         state.child_committees = Some(self.engine.child_committees())
                     }
-                    "committed_blocks" => state.committed_blocks = None,
+                    COMMITTED_BLOCKS => {
+                        state.committed_blocks = Some(self.engine.committed_blocks())
+                    }
                     _ => {}
                 }
             }
