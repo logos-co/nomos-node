@@ -6,7 +6,7 @@
     overlays = [
       (import (fetchGit {
         url = "https://github.com/oxalica/rust-overlay.git";
-	rev = "3bab7ae4a80de02377005d611dc4b0a13082aa7c";
+        rev = "86302751ef371597d48951983e1a2f04fe78d4ff";
       }))
     ];
    }
