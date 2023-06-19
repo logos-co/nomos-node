@@ -56,7 +56,7 @@ impl EventBuilder {
         // check timeout and exit
         if self.local_timeout(engine.current_view(), elapsed) {
             events.push(Event::LocalTimeout);
-            // if we timeout discard incoming view messages
+            // if we timeout discard incoming current view messages
             messages.retain(|msg| {
                 matches!(
                     msg,
