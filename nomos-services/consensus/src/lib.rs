@@ -434,10 +434,10 @@ where
             participating_nodes: carnot.root_committee(),
         };
         let (new_carnot, out) = carnot.approve_new_view(timeout_qc.clone(), new_views);
-        let next_view = timeout_qc.view + 2;
+        let new_view = timeout_qc.view + 1;
         if carnot.is_next_leader() {
             let high_qc = carnot.high_qc();
-            task_manager.push(timeout_qc.view + 1, async move {
+            task_manager.push(new_view, async move {
                 let _votes = Self::gather_new_views(
                     adapter,
                     leader_committee,
@@ -448,7 +448,7 @@ where
                 Event::ProposeBlock {
                     qc: Qc::Aggregated(AggregateQc {
                         high_qc,
-                        view: next_view,
+                        view: new_view,
                     }),
                 }
             });
