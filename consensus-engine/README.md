@@ -31,5 +31,5 @@ In other words, it doesn't run transitions that are expected to be explicitly re
 This means that we test whether the consensus-engine works well if only valid inputs are received.
 
 TODO:
-- Test whether the consensus isn't broken if invalid transitions are received.
+- Test whether the consensus isn't broken if unacceptable transitions are received.
 - Test more transitions for unhappy path.
