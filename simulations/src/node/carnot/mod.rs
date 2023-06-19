@@ -28,55 +28,95 @@ use nomos_consensus::{
     network::messages::{NewViewMsg, TimeoutMsg, VoteMsg},
 };
 
-#[derive(Serialize)]
+#[derive(Default, Serialize)]
 pub struct CarnotState {
-    current_view: View,
-    highest_voted_view: View,
-    local_high_qc: StandardQc,
-    #[serde(serialize_with = "serialize_blocks")]
-    safe_blocks: HashMap<BlockId, Block>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    current_view: Option<View>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    highest_voted_view: Option<View>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    local_high_qc: Option<StandardQc>,
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        serialize_with = "serialize_blocks"
+    )]
+    safe_blocks: Option<HashMap<BlockId, Block>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     last_view_timeout_qc: Option<TimeoutQc>,
-    latest_committed_block: Block,
-    latest_committed_view: View,
-    root_committe: Committee,
-    parent_committe: Committee,
-    child_committees: Vec<Committee>,
-    committed_blocks: Vec<BlockId>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    latest_committed_block: Option<Block>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    latest_committed_view: Option<View>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    root_committe: Option<Committee>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    parent_committe: Option<Committee>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    child_committees: Option<Vec<Committee>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    committed_blocks: Option<Vec<BlockId>>,
+}
+
+impl CarnotState {
+    fn keys() -> &'static [&'static str] {
+        &[
+            "current_view",
+            "highest_voted_view",
+            "local_high_qc",
+            "safe_blocks",
+            "last_view_timeout_qc",
+            "latest_committed_block",
+            "latest_committed_view",
+            "root_committe",
+            "parent_committe",
+            "child_committees",
+            "committed_blocks",
+        ]
+    }
 }
 
 /// Have to implement this manually because of the `serde_json` will panic if the key of map
 /// is not a string.
-fn serialize_blocks<S>(blocks: &HashMap<BlockId, Block>, serializer: S) -> Result<S::Ok, S::Error>
+fn serialize_blocks<S>(
+    blocks: &Option<HashMap<BlockId, Block>>,
+    serializer: S,
+) -> Result<S::Ok, S::Error>
 where
     S: serde::Serializer,
 {
     use serde::ser::SerializeMap;
-    let mut ser = serializer.serialize_map(Some(blocks.len()))?;
-    for (k, v) in blocks {
-        ser.serialize_entry(&format!("{k:?}"), v)?;
+    if let Some(blocks) = blocks {
+        let mut ser = serializer.serialize_map(Some(blocks.len()))?;
+        for (k, v) in blocks {
+            ser.serialize_entry(&format!("{k:?}"), v)?;
+        }
+        ser.end()
+    } else {
+        serializer.serialize_none()
     }
-    ser.end()
 }
 
 impl<O: Overlay> From<&Carnot<O>> for CarnotState {
     fn from(value: &Carnot<O>) -> Self {
         let current_view = value.current_view();
         Self {
-            current_view,
-            local_high_qc: value.high_qc(),
-            parent_committe: value.parent_committee(),
-            root_committe: value.root_committee(),
-            child_committees: value.child_committees(),
-            latest_committed_block: value.latest_committed_block(),
-            latest_committed_view: value.latest_committed_view(),
-            safe_blocks: value
-                .blocks_in_view(current_view)
-                .into_iter()
-                .map(|b| (b.id, b))
-                .collect(),
+            current_view: Some(current_view),
+            local_high_qc: Some(value.high_qc()),
+            parent_committe: Some(value.parent_committee()),
+            root_committe: Some(value.root_committee()),
+            child_committees: Some(value.child_committees()),
+            latest_committed_block: Some(value.latest_committed_block()),
+            latest_committed_view: Some(value.latest_committed_view()),
+            safe_blocks: Some(
+                value
+                    .blocks_in_view(current_view)
+                    .into_iter()
+                    .map(|b| (b.id, b))
+                    .collect(),
+            ),
             last_view_timeout_qc: value.last_view_timeout_qc(),
-            committed_blocks: value.committed_blocks(),
-            highest_voted_view: Default::default(),
+            committed_blocks: Some(value.committed_blocks()),
+            highest_voted_view: Some(Default::default()),
         }
     }
 }
@@ -85,11 +125,20 @@ impl<O: Overlay> From<&Carnot<O>> for CarnotState {
 pub struct CarnotSettings {
     nodes: Vec<consensus_engine::NodeId>,
     timeout: Duration,
+    record_settings: HashMap<String, bool>,
 }
 
 impl CarnotSettings {
-    pub fn new(nodes: Vec<consensus_engine::NodeId>, timeout: Duration) -> Self {
-        Self { nodes, timeout }
+    pub fn new(
+        nodes: Vec<consensus_engine::NodeId>,
+        timeout: Duration,
+        record_settings: HashMap<String, bool>,
+    ) -> Self {
+        Self {
+            nodes,
+            timeout,
+            record_settings,
+        }
     }
 }
 
@@ -116,12 +165,12 @@ impl<O: Overlay> CarnotNode<O> {
     ) -> Self {
         let overlay = O::new(overlay_settings);
         let engine = Carnot::from_genesis(id, genesis.header().clone(), overlay);
-        let state = CarnotState::from(&engine);
+        let state = Default::default();
         // pk is generated in an insecure way, but for simulation purpouses using a rng like smallrng is more useful
         let mut pk_buff = [0; 32];
         rng.fill_bytes(&mut pk_buff);
         let random_beacon_pk = PrivateKey::new(pk_buff);
-        Self {
+        let mut this = Self {
             id,
             state,
             settings,
@@ -130,12 +179,53 @@ impl<O: Overlay> CarnotNode<O> {
             event_builder: event_builder::EventBuilder::new(id),
             engine,
             random_beacon_pk,
-        }
+        };
+        this.state = this.build_state();
+        this
     }
 
     pub(crate) fn send_message(&self, message: NetworkMessage<CarnotMessage>) {
         self.network_interface
             .send_message(self.id, message.payload);
+    }
+
+    fn build_state(&self) -> CarnotState {
+        let mut state = CarnotState::default();
+        for k in CarnotState::keys() {
+            if let Some(persist) = self.settings.record_settings.get(*k) {
+                if !persist {
+                    continue;
+                }
+                match *k {
+                    "current_view" => state.current_view = Some(self.engine.current_view()),
+                    "highest_voted_view" => {
+                        state.highest_voted_view = Some(self.engine.highest_voted_view())
+                    }
+                    "local_high_qc" => state.local_high_qc = Some(self.engine.high_qc()),
+                    "safe_blocks" => state.safe_blocks = Some(self.engine.safe_blocks().clone()),
+                    "last_view_timeout_qc" => {
+                        state.last_view_timeout_qc = self.engine.last_view_timeout_qc()
+                    }
+                    "latest_committed_block" => {
+                        state.latest_committed_block = Some(self.engine.latest_committed_block())
+                    }
+                    "latest_committed_view" => {
+                        state.latest_committed_view = Some(self.engine.latest_committed_view())
+                    }
+                    "root_committe" => state.root_committe = Some(self.engine.root_committee()),
+                    "parent_committe" => {
+                        state.parent_committe = Some(self.engine.parent_committee())
+                    }
+                    "child_committees" => {
+                        state.child_committees = Some(self.engine.child_committees())
+                    }
+                    "committed_blocks" => state.committed_blocks = None,
+                    _ => {}
+                }
+            }
+        }
+
+        state
     }
 
     fn handle_output(&self, output: Output<CarnotTx>) {
@@ -348,7 +438,7 @@ impl<L: UpdateableLeaderSelection, O: Overlay<LeaderSelection = L>> Node for Car
         }
 
         // update state
-        self.state = CarnotState::from(&self.engine);
+        self.state = self.build_state();
     }
 }
 

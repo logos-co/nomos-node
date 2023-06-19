@@ -149,6 +149,7 @@ where
             leaders_count: _,
             network_settings: _,
             step_time: _,
+            record_settings: _,
         } = settings;
         Ok(Self {
             runner_settings,
