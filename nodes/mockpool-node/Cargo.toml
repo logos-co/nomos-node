@@ -30,4 +30,4 @@ serde_json = "1.0"
 serde_yaml = "0.9"
 color-eyre = "0.6.0"
 serde = "1"
-waku-bindings = { git = "https://github.com/waku-org/waku-rust-bindings.git", rev = "803fc37e041a54daabc90e3201271964f5e6bdfa" }
+waku-bindings = "0.1.1"
