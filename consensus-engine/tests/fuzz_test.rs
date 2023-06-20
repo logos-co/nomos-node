@@ -210,9 +210,9 @@ impl RefState {
     }
 
     fn current_view(&self) -> View {
-        let (last_view, _) = self.chain.last_key_value().unwrap();
+        let (&last_view, _) = self.chain.last_key_value().unwrap();
         // TODO: this logic must cover other cases for unhappy path
-        last_view.clone()
+        last_view
     }
 
     fn consecutive_block(parent: &Block) -> Block {
