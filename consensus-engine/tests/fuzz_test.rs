@@ -3,7 +3,9 @@ use std::{
     panic,
 };
 
-use consensus_engine::{Block, LeaderProof, NodeId, Qc, StandardQc, TimeoutQc, View};
+use consensus_engine::{
+    AggregateQc, Block, LeaderProof, NewView, NodeId, Qc, StandardQc, TimeoutQc, View,
+};
 use proptest::prelude::*;
 use proptest::test_runner::Config;
 use proptest_state_machine::{prop_state_machine, ReferenceStateMachine, StateMachineTest};
@@ -41,6 +43,10 @@ struct ViewEntry {
 }
 
 impl ViewEntry {
+    fn new() -> ViewEntry {
+        Default::default()
+    }
+
     fn is_empty(&self) -> bool {
         self.blocks.is_empty() && self.timeout_qcs.is_empty()
     }
@@ -66,6 +72,7 @@ pub enum Transition {
     LocalTimeout,
     ReceiveTimeoutQcForCurrentView(TimeoutQc),
     ReceiveTimeoutQcForOldView(TimeoutQc),
+    ApproveNewViewWithLatestTimeoutQc(TimeoutQc, HashSet<NewView>),
     //TODO: add more invalid transitions that must be rejected by consensus-engine
     //TODO: add more transitions
 }
@@ -116,6 +123,8 @@ impl ReferenceStateMachine for RefState {
             state.transition_local_timeout(),
             state.transition_receive_timeout_qc_for_current_view(),
             state.transition_receive_timeout_qc_for_old_view(),
+            state.transition_approve_new_view_with_latest_timeout_qc(),
+            state.transition_receive_block_with_aggregated_qc(),
         ]
         .boxed()
     }
@@ -143,6 +152,10 @@ impl ReferenceStateMachine for RefState {
             }
             Transition::ReceiveTimeoutQcForOldView(timeout_qc) => {
                 timeout_qc.view < state.current_view()
+            }
+            Transition::ApproveNewViewWithLatestTimeoutQc(timeout_qc, _) => {
+                state.latest_timeout_qcs().contains(timeout_qc)
+                    && state.highest_voted_view < RefState::new_view_from(timeout_qc)
             }
         }
     }
@@ -182,6 +195,11 @@ impl ReferenceStateMachine for RefState {
             }
             Transition::ReceiveTimeoutQcForOldView(_) => {
                 // Nothing to do because we expect the state doesn't change.
+            }
+            Transition::ApproveNewViewWithLatestTimeoutQc(timeout_qc, _) => {
+                let new_view = RefState::new_view_from(timeout_qc);
+                state.chain.entry(new_view).or_insert(ViewEntry::new());
+                state.highest_voted_view = new_view;
             }
         }
 
@@ -273,16 +291,9 @@ impl RefState {
 
     // Generate a Transition::ReceiveTimeoutQcForCurrentView
     fn transition_receive_timeout_qc_for_current_view(&self) -> BoxedStrategy<Transition> {
-        let view = self.current_view();
-        let high_qc = self
-            .chain
-            .iter()
-            .rev()
-            .find_map(|(_, entry)| entry.high_qc());
-
-        if let Some(high_qc) = high_qc {
+        if let Some(high_qc) = self.high_qc() {
             Just(Transition::ReceiveTimeoutQcForCurrentView(TimeoutQc {
-                view: view.clone(),
+                view: self.current_view(),
                 high_qc,
                 sender: SENDER,
             }))
@@ -316,6 +327,48 @@ impl RefState {
         }
     }
 
+    // Generate a Transition::ApproveNewViewWithLatestTimeoutQc.
+    fn transition_approve_new_view_with_latest_timeout_qc(&self) -> BoxedStrategy<Transition> {
+        let latest_timeout_qcs: Vec<TimeoutQc> = self
+            .latest_timeout_qcs()
+            .iter()
+            .filter(|timeout_qc| self.highest_voted_view < RefState::new_view_from(timeout_qc))
+            .cloned()
+            .collect();
+
+        if latest_timeout_qcs.is_empty() {
+            Just(Transition::Nop).boxed()
+        } else {
+            proptest::sample::select(latest_timeout_qcs)
+                .prop_map(move |timeout_qc| {
+                    //TODO: set new_views
+                    Transition::ApproveNewViewWithLatestTimeoutQc(timeout_qc, HashSet::new())
+                })
+                .boxed()
+        }
+    }
+
+    // Generate a Transition::ReceiveBlock, but with AggregatedQc.
+    fn transition_receive_block_with_aggregated_qc(&self) -> BoxedStrategy<Transition> {
+        //TODO: more randomness
+        let current_view = self.current_view();
+
+        if let Some(high_qc) = self.high_qc() {
+            Just(Transition::ReceiveBlock(Block {
+                id: rand::thread_rng().gen(),
+                view: current_view + 1,
+                parent_qc: Qc::Aggregated(AggregateQc {
+                    high_qc: high_qc.clone(),
+                    view: current_view,
+                }),
+                leader_proof: LEADER_PROOF.clone(),
+            }))
+            .boxed()
+        } else {
+            Just(Transition::Nop).boxed()
+        }
+    }
+
     fn current_view(&self) -> View {
         let (&last_view, last_entry) = self.chain.last_key_value().unwrap();
         if last_entry.timeout_qcs.is_empty() {
@@ -323,6 +376,30 @@ impl RefState {
         } else {
             let timeout_qc = last_entry.timeout_qcs.iter().next().unwrap();
             RefState::new_view_from(&timeout_qc)
+        }
+    }
+
+    fn high_qc(&self) -> Option<StandardQc> {
+        self.chain
+            .iter()
+            .rev()
+            .find_map(|(_, entry)| entry.high_qc())
+    }
+
+    fn latest_timeout_qcs(&self) -> Vec<TimeoutQc> {
+        let latest_timeout_qc_view_entry = self
+            .chain
+            .iter()
+            .rev()
+            .find(|(_, entry)| !entry.timeout_qcs.is_empty());
+
+        match latest_timeout_qc_view_entry {
+            Some((_, entry)) => entry
+                .timeout_qcs
+                .iter()
+                .cloned()
+                .collect::<Vec<TimeoutQc>>(),
+            None => vec![],
         }
     }
 
@@ -415,6 +492,15 @@ impl StateMachineTest for ConsensusEngineTest {
 
                 // Check that the engine state didn't change.
                 assert_eq!(engine, prev_engine);
+
+                ConsensusEngineTest { engine }
+            }
+            Transition::ApproveNewViewWithLatestTimeoutQc(timeout_qc, new_views) => {
+                let (engine, _) = state.engine.approve_new_view(timeout_qc.clone(), new_views);
+                assert_eq!(
+                    engine.highest_voted_view(),
+                    RefState::new_view_from(&timeout_qc)
+                );
 
                 ConsensusEngineTest { engine }
             }
