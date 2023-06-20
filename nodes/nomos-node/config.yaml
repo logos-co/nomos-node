@@ -1,0 +1,23 @@
+log:
+  backend: "Stdout"
+  format: "Json"
+  level: "debug"
+consensus:
+  private_key: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+  fountain_settings: null
+  overlay_settings:
+    nodes: [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]]
+    leader:
+      cur: 0
+network:
+  backend:
+    host: 0.0.0.0
+    port: 3000
+    log_level: "fatal"
+    nodeKey: null
+    discV5BootstrapNodes: []
+  initial_peers: []
+http:
+  backend:
+    address: 0.0.0.0:8080
+    cors_origins: []
