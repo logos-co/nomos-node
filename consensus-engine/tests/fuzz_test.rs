@@ -36,13 +36,16 @@ pub struct RefState {
 // State transtitions that will be picked randomly
 #[derive(Clone, Debug)]
 pub enum Transition {
-    ReceiveBlock(Block, bool),
-    ApproveBlock(Block, bool),
+    Nop,
+    ReceiveBlock(Block),
+    ReceiveUnsafeBlock(Block),
+    ApproveBlock(Block),
+    ApprovePastBlock(Block),
     //TODO: add more transitions
-    //TODO: consider invalid transitions that must be rejected by consensus-engine
 }
 
 const LEADER_PROOF: LeaderProof = LeaderProof::LeaderId { leader_id: [0; 32] };
+const INITIAL_HIGHEST_VOTED_VIEW: View = -1;
 
 impl ReferenceStateMachine for RefState {
     type State = Self;
@@ -60,46 +63,57 @@ impl ReferenceStateMachine for RefState {
 
         Just(RefState {
             chain: BTreeMap::from([(genesis_block.view, HashSet::from([genesis_block.clone()]))]),
-            highest_voted_view: -1,
+            highest_voted_view: INITIAL_HIGHEST_VOTED_VIEW,
         })
         .boxed()
     }
 
     // Generate transitions based on the current reference state machine
     fn transitions(state: &Self::State) -> BoxedStrategy<Self::Transition> {
+        // Instead of using verbose `if` statements here to filter out the types of transitions
+        // which cannot be created based on the current reference state,
+        // each `state.transition_*` function returns a Nop transition
+        // if it cannot generate the promised transition for the current reference state.
+        // Both reference and real state machine do nothing for Nop transitions.
         prop_oneof![
             3 => state.transition_receive_block(),
+            2 => state.transition_receive_unsafe_block(),
             2 => state.transition_approve_block(),
+            1 => state.transition_approve_past_block(),
         ]
         .boxed()
     }
 
     // Check if the transition is valid for a given reference state, before applying the transition
     // If invalid, the transition will be ignored and a new transition will be generated.
-    fn preconditions(_state: &Self::State, transition: &Self::Transition) -> bool {
-        match transition {
-            Transition::ReceiveBlock(_, _) => true,
-            Transition::ApproveBlock(_, _) => true,
-        }
+    fn preconditions(_state: &Self::State, _transition: &Self::Transition) -> bool {
+        // Return true for any transition,
+        // as we use Nop if a certain transition is invalid for a given reference state.
+        // This way is simpler because we don't need to duplicate the checks
+        // which are already performed for generating transitions.
+        true
     }
 
     // Apply the given transition on the reference state machine,
     // so that it can be used to generate next transitions and be compared against the real state.
     fn apply(mut state: Self::State, transition: &Self::Transition) -> Self::State {
         match transition {
-            Transition::ReceiveBlock(block, is_safe) => {
-                if *is_safe {
-                    state
-                        .chain
-                        .entry(block.view)
-                        .or_default()
-                        .insert(block.clone());
-                }
+            Transition::Nop => {}
+            Transition::ReceiveBlock(block) => {
+                state
+                    .chain
+                    .entry(block.view)
+                    .or_default()
+                    .insert(block.clone());
             }
-            Transition::ApproveBlock(block, is_approvable) => {
-                if *is_approvable {
-                    state.highest_voted_view = block.view;
-                }
+            Transition::ReceiveUnsafeBlock(_) => {
+                // Nothing to do because we expect the state doesn't change.
+            }
+            Transition::ApproveBlock(block) => {
+                state.highest_voted_view = block.view;
+            }
+            Transition::ApprovePastBlock(_) => {
+                // Nothing to do because we expect the state doesn't change.
             }
         }
 
@@ -109,45 +123,83 @@ impl ReferenceStateMachine for RefState {
 
 impl RefState {
     // Generate a Transition::ReceiveBlock.
-    fn transition_receive_block(
-        &self,
-    ) -> proptest::strategy::Map<proptest::sample::Select<Block>, impl Fn(Block) -> Transition>
-    {
-        let blocks = self
+    fn transition_receive_block(&self) -> BoxedStrategy<Transition> {
+        let blocks_in_last_two_views = self
             .chain
             .iter()
             .rev()
-            .take(5)
+            .take(2)
             .flat_map(|(_view, blocks)| blocks.iter().cloned())
             .collect::<Vec<Block>>();
-        let (last_view, _) = self.chain.last_key_value().unwrap();
-        let last_view = last_view.clone();
 
-        proptest::sample::select(blocks).prop_map(move |parent| -> Transition {
-            let block = Self::consecutive_block(&parent);
-            let is_safe = block.view >= last_view;
-            Transition::ReceiveBlock(block, is_safe)
-        })
+        if blocks_in_last_two_views.is_empty() {
+            Just(Transition::Nop).boxed()
+        } else {
+            // proptest::sample::select panics if the input is empty
+            proptest::sample::select(blocks_in_last_two_views)
+                .prop_map(move |parent| -> Transition {
+                    Transition::ReceiveBlock(Self::consecutive_block(&parent))
+                })
+                .boxed()
+        }
+    }
+
+    // Generate a Transition::ReceiveUnsafeBlock.
+    fn transition_receive_unsafe_block(&self) -> BoxedStrategy<Transition> {
+        let blocks_not_in_last_two_views = self
+            .chain
+            .iter()
+            .rev()
+            .skip(2)
+            .flat_map(|(_view, blocks)| blocks.iter().cloned())
+            .collect::<Vec<Block>>();
+
+        if blocks_not_in_last_two_views.is_empty() {
+            Just(Transition::Nop).boxed()
+        } else {
+            // proptest::sample::select panics if the input is empty
+            proptest::sample::select(blocks_not_in_last_two_views)
+                .prop_map(move |parent| -> Transition {
+                    Transition::ReceiveUnsafeBlock(Self::consecutive_block(&parent))
+                })
+                .boxed()
+        }
     }
 
     // Generate a Transition::ApproveBlock.
-    fn transition_approve_block(
-        &self,
-    ) -> proptest::strategy::Map<proptest::sample::Select<Block>, impl Fn(Block) -> Transition>
-    {
-        let blocks = self
+    fn transition_approve_block(&self) -> BoxedStrategy<Transition> {
+        let blocks_not_voted = self
             .chain
-            .iter()
-            .rev()
-            .take(5)
+            .range(self.highest_voted_view + 1..)
             .flat_map(|(_view, blocks)| blocks.iter().cloned())
             .collect::<Vec<Block>>();
-        let highest_voted_view = self.highest_voted_view.clone();
 
-        proptest::sample::select(blocks).prop_map(move |block| {
-            let is_approvable = block.view > highest_voted_view;
-            Transition::ApproveBlock(block, is_approvable)
-        })
+        if blocks_not_voted.is_empty() {
+            Just(Transition::Nop).boxed()
+        } else {
+            // proptest::sample::select panics if the input is empty
+            proptest::sample::select(blocks_not_voted)
+                .prop_map(move |block| Transition::ApproveBlock(block))
+                .boxed()
+        }
+    }
+
+    // Generate a Transition::ApprovePastBlock.
+    fn transition_approve_past_block(&self) -> BoxedStrategy<Transition> {
+        let past_blocks = self
+            .chain
+            .range(INITIAL_HIGHEST_VOTED_VIEW..self.highest_voted_view)
+            .flat_map(|(_view, blocks)| blocks.iter().cloned())
+            .collect::<Vec<Block>>();
+
+        if past_blocks.is_empty() {
+            Just(Transition::Nop).boxed()
+        } else {
+            // proptest::sample::select panics if the input is empty
+            proptest::sample::select(past_blocks)
+                .prop_map(move |block| Transition::ApprovePastBlock(block))
+                .boxed()
+        }
     }
 
     fn consecutive_block(parent: &Block) -> Block {
@@ -189,36 +241,30 @@ impl StateMachineTest for ConsensusEngineTest {
         println!("{transition:?}");
 
         match transition {
-            Transition::ReceiveBlock(block, is_safe) => {
-                let result = panic::catch_unwind(|| state.engine.receive_block(block.clone()));
-                if is_safe {
-                    assert!(result.is_ok());
-                    let result = result.unwrap();
-                    assert!(result.is_ok());
-                    let engine = result.unwrap();
-                    assert!(engine.blocks_in_view(block.view).contains(&block));
+            Transition::Nop => state,
+            Transition::ReceiveBlock(block) => {
+                let engine = state.engine.receive_block(block.clone()).unwrap();
+                assert!(engine.blocks_in_view(block.view).contains(&block));
 
-                    ConsensusEngineTest { engine }
-                } else {
-                    assert!(result.is_err() || result.unwrap().is_err());
-
-                    state
-                }
+                ConsensusEngineTest { engine }
             }
-            Transition::ApproveBlock(block, is_approvable) => {
-                let result = panic::catch_unwind(|| state.engine.approve_block(block.clone()));
-                if is_approvable {
-                    assert!(result.is_ok());
-                    let (engine, _send) = result.unwrap();
-                    //TODO: assert 'send'
-                    assert_eq!(engine.highest_voted_view(), block.view);
+            Transition::ReceiveUnsafeBlock(block) => {
+                let result = panic::catch_unwind(|| state.engine.receive_block(block));
+                assert!(result.is_err() || result.unwrap().is_err());
 
-                    ConsensusEngineTest { engine }
-                } else {
-                    assert!(result.is_err());
+                state
+            }
+            Transition::ApproveBlock(block) => {
+                let (engine, _) = state.engine.approve_block(block.clone());
+                assert_eq!(engine.highest_voted_view(), block.view);
 
-                    state
-                }
+                ConsensusEngineTest { engine }
+            }
+            Transition::ApprovePastBlock(block) => {
+                let result = panic::catch_unwind(|| state.engine.approve_block(block));
+                assert!(result.is_err());
+
+                state
             }
         }
     }
