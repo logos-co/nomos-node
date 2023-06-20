@@ -98,12 +98,8 @@ impl ReferenceStateMachine for RefState {
         // because some transitions may no longer be valid after some shrinking is applied.
         match transition {
             Transition::Nop => true,
-            Transition::ReceiveBlock(block) => {
-                state.last_n_views(2).contains(&block.parent_qc.view())
-            }
-            Transition::ReceiveUnsafeBlock(block) => {
-                !state.last_n_views(2).contains(&block.parent_qc.view())
-            }
+            Transition::ReceiveBlock(block) => block.view >= state.current_view(),
+            Transition::ReceiveUnsafeBlock(block) => block.view < state.current_view(),
             Transition::ApproveBlock(block) => state.highest_voted_view < block.view,
             Transition::ApprovePastBlock(block) => state.highest_voted_view >= block.view,
         }
@@ -139,19 +135,17 @@ impl ReferenceStateMachine for RefState {
 impl RefState {
     // Generate a Transition::ReceiveBlock.
     fn transition_receive_block(&self) -> BoxedStrategy<Transition> {
-        let blocks_in_last_two_views = self
+        let recent_parents = self
             .chain
-            .iter()
-            .rev()
-            .take(2)
+            .range(self.current_view() - 1..)
             .flat_map(|(_view, blocks)| blocks.iter().cloned())
             .collect::<Vec<Block>>();
 
-        if blocks_in_last_two_views.is_empty() {
+        if recent_parents.is_empty() {
             Just(Transition::Nop).boxed()
         } else {
             // proptest::sample::select panics if the input is empty
-            proptest::sample::select(blocks_in_last_two_views)
+            proptest::sample::select(recent_parents)
                 .prop_map(move |parent| -> Transition {
                     Transition::ReceiveBlock(Self::consecutive_block(&parent))
                 })
@@ -161,19 +155,17 @@ impl RefState {
 
     // Generate a Transition::ReceiveUnsafeBlock.
     fn transition_receive_unsafe_block(&self) -> BoxedStrategy<Transition> {
-        let blocks_not_in_last_two_views = self
+        let old_parents = self
             .chain
-            .iter()
-            .rev()
-            .skip(2)
+            .range(..self.current_view() - 1)
             .flat_map(|(_view, blocks)| blocks.iter().cloned())
             .collect::<Vec<Block>>();
 
-        if blocks_not_in_last_two_views.is_empty() {
+        if old_parents.is_empty() {
             Just(Transition::Nop).boxed()
         } else {
             // proptest::sample::select panics if the input is empty
-            proptest::sample::select(blocks_not_in_last_two_views)
+            proptest::sample::select(old_parents)
                 .prop_map(move |parent| -> Transition {
                     Transition::ReceiveUnsafeBlock(Self::consecutive_block(&parent))
                 })
@@ -217,13 +209,10 @@ impl RefState {
         }
     }
 
-    fn last_n_views(&self, n: usize) -> Vec<View> {
-        self.chain
-            .iter()
-            .rev()
-            .take(n)
-            .map(|(view, _)| view.clone())
-            .collect::<Vec<View>>()
+    fn current_view(&self) -> View {
+        let (last_view, _) = self.chain.last_key_value().unwrap();
+        // TODO: this logic must cover other cases for unhappy path
+        last_view.clone()
     }
 
     fn consecutive_block(parent: &Block) -> Block {
@@ -299,9 +288,8 @@ impl StateMachineTest for ConsensusEngineTest {
         state: &Self::SystemUnderTest,
         ref_state: &<Self::Reference as ReferenceStateMachine>::State,
     ) {
-        let (last_view, _) = ref_state.chain.last_key_value().unwrap();
         //TODO: this may be false in unhappy path
-        assert_eq!(state.engine.current_view(), last_view.clone());
+        assert_eq!(state.engine.current_view(), ref_state.current_view());
 
         assert_eq!(
             state.engine.highest_voted_view(),
