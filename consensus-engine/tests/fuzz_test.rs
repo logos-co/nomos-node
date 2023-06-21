@@ -87,12 +87,26 @@ impl ReferenceStateMachine for RefState {
 
     // Check if the transition is valid for a given reference state, before applying the transition
     // If invalid, the transition will be ignored and a new transition will be generated.
-    fn preconditions(_state: &Self::State, _transition: &Self::Transition) -> bool {
-        // Return true for any transition,
-        // as we use Nop if a certain transition is invalid for a given reference state.
-        // This way is simpler because we don't need to duplicate the checks
-        // which are already performed for generating transitions.
-        true
+    //
+    // Also, preconditions are used for shrinking in failure cases.
+    // Preconditions check if the transition is still valid after some shrinking is applied.
+    // If the transition became invalid for the shrinked state, the shrinking is stopped or
+    // is continued to other directions.
+    fn preconditions(state: &Self::State, transition: &Self::Transition) -> bool {
+        // In most cases, we need to check the same conditions again used to create transitions.
+        // This is redundant for success cases, but is necessary for shrinking in failure cases,
+        // because some transitions may no longer be valid after some shrinking is applied.
+        match transition {
+            Transition::Nop => true,
+            Transition::ReceiveBlock(block) => {
+                state.last_n_views(2).contains(&block.parent_qc.view())
+            }
+            Transition::ReceiveUnsafeBlock(block) => {
+                !state.last_n_views(2).contains(&block.parent_qc.view())
+            }
+            Transition::ApproveBlock(block) => state.highest_voted_view < block.view,
+            Transition::ApprovePastBlock(block) => state.highest_voted_view >= block.view,
+        }
     }
 
     // Apply the given transition on the reference state machine,
@@ -201,6 +215,15 @@ impl RefState {
                 .prop_map(move |block| Transition::ApprovePastBlock(block))
                 .boxed()
         }
+    }
+
+    fn last_n_views(&self, n: usize) -> Vec<View> {
+        self.chain
+            .iter()
+            .rev()
+            .take(n)
+            .map(|(view, _)| view.clone())
+            .collect::<Vec<View>>()
     }
 
     fn consecutive_block(parent: &Block) -> Block {
