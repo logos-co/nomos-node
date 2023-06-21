@@ -41,6 +41,10 @@ struct ViewEntry {
 }
 
 impl ViewEntry {
+    fn is_empty(&self) -> bool {
+        self.blocks.is_empty() && self.timeout_qcs.is_empty()
+    }
+
     fn high_qc(&self) -> Option<StandardQc> {
         let iter1 = self.blocks.iter().map(|block| block.parent_qc.high_qc());
         let iter2 = self
@@ -292,23 +296,23 @@ impl RefState {
         let old_view_entries: Vec<(View, ViewEntry)> = self
             .chain
             .range(..self.current_view())
-            .filter(|(_, entry)| !entry.blocks.is_empty())
+            .filter(|(_, entry)| !entry.is_empty())
             .map(|(view, entry)| (view.clone(), entry.clone()))
             .collect();
 
         if old_view_entries.is_empty() {
-            return Just(Transition::Nop).boxed();
-        }
-
-        proptest::sample::select(old_view_entries)
-            .prop_map(move |(view, entry)| {
-                Transition::ReceiveTimeoutQcForOldView(TimeoutQc {
-                    view: view.clone(),
-                    high_qc: entry.high_qc().unwrap(),
-                    sender: SENDER.clone(),
+            Just(Transition::Nop).boxed()
+        } else {
+            proptest::sample::select(old_view_entries)
+                .prop_map(move |(view, entry)| {
+                    Transition::ReceiveTimeoutQcForOldView(TimeoutQc {
+                        view: view.clone(),
+                        high_qc: entry.high_qc().unwrap(),
+                        sender: SENDER.clone(),
+                    })
                 })
-            })
-            .boxed()
+                .boxed()
+        }
     }
 
     fn current_view(&self) -> View {
