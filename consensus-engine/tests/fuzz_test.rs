@@ -73,8 +73,7 @@ pub enum Transition {
     ReceiveTimeoutQcForCurrentView(TimeoutQc),
     ReceiveTimeoutQcForOldView(TimeoutQc),
     ApproveNewViewWithLatestTimeoutQc(TimeoutQc, HashSet<NewView>),
-    //TODO: add more invalid transitions that must be rejected by consensus-engine
-    //TODO: add more transitions
+    //TODO: add more corner transitions
 }
 
 const LEADER_PROOF: LeaderProof = LeaderProof::LeaderId { leader_id: [0; 32] };
@@ -124,7 +123,7 @@ impl ReferenceStateMachine for RefState {
             state.transition_receive_timeout_qc_for_current_view(),
             state.transition_receive_timeout_qc_for_old_view(),
             state.transition_approve_new_view_with_latest_timeout_qc(),
-            state.transition_receive_block_with_aggregated_qc(),
+            state.transition_receive_safe_block_with_aggregated_qc(),
         ]
         .boxed()
     }
@@ -348,17 +347,17 @@ impl RefState {
         }
     }
 
-    // Generate a Transition::ReceiveBlock, but with AggregatedQc.
-    fn transition_receive_block_with_aggregated_qc(&self) -> BoxedStrategy<Transition> {
+    // Generate a Transition::ReceiveSafeBlock, but with AggregatedQc.
+    fn transition_receive_safe_block_with_aggregated_qc(&self) -> BoxedStrategy<Transition> {
         //TODO: more randomness
         let current_view = self.current_view();
 
         if let Some(high_qc) = self.high_qc() {
-            Just(Transition::ReceiveBlock(Block {
+            Just(Transition::ReceiveSafeBlock(Block {
                 id: rand::thread_rng().gen(),
                 view: current_view + 1,
                 parent_qc: Qc::Aggregated(AggregateQc {
-                    high_qc: high_qc.clone(),
+                    high_qc,
                     view: current_view,
                 }),
                 leader_proof: LEADER_PROOF.clone(),
