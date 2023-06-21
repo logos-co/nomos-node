@@ -16,7 +16,8 @@ network:
     log_level: "fatal"
     nodeKey: null
     discV5BootstrapNodes: []
-  initial_peers: []
+    initial_peers: []
+    relayTopics: []
 http:
   backend:
     address: 0.0.0.0:8080
