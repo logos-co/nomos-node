@@ -30,6 +30,6 @@ LABEL description="Nomos node image"
 EXPOSE 3000 8080 9000 60000	
 
 COPY --from=builder /nomos/target/release/nomos-node /usr/bin/nomos-node
-COPY config.yml.example /etc/nomos/config.yml
+COPY nodes/nomos-node/config.yaml /etc/nomos/config.yaml
 
 ENTRYPOINT ["nomos-node"]
