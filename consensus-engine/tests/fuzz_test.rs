@@ -284,7 +284,7 @@ impl RefState {
             Just(Transition::ReceiveTimeoutQcForCurrentView(TimeoutQc {
                 view: view.clone(),
                 high_qc,
-                sender: SENDER.clone(),
+                sender: SENDER,
             }))
             .boxed()
         } else {
@@ -298,7 +298,7 @@ impl RefState {
             .chain
             .range(..self.current_view())
             .filter(|(_, entry)| !entry.is_empty())
-            .map(|(view, entry)| (view.clone(), entry.clone()))
+            .map(|(&view, entry)| (view, entry.clone()))
             .collect();
 
         if old_view_entries.is_empty() {
@@ -309,7 +309,7 @@ impl RefState {
                     Transition::ReceiveTimeoutQcForOldView(TimeoutQc {
                         view: view.clone(),
                         high_qc: entry.high_qc().unwrap(),
-                        sender: SENDER.clone(),
+                        sender: SENDER,
                     })
                 })
                 .boxed()
@@ -411,7 +411,7 @@ impl StateMachineTest for ConsensusEngineTest {
             }
             Transition::ReceiveTimeoutQcForOldView(timeout_qc) => {
                 let prev_engine = state.engine.clone();
-                let engine = state.engine.receive_timeout_qc(timeout_qc.clone());
+                let engine = state.engine.receive_timeout_qc(timeout_qc);
 
                 // Check that the engine state didn't change.
                 assert_eq!(
