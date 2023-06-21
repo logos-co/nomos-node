@@ -38,7 +38,7 @@ pub struct RefState {
 #[derive(Clone, Debug)]
 pub enum Transition {
     Nop,
-    ReceiveBlock(Block),
+    ReceiveSafeBlock(Block),
     ReceiveUnsafeBlock(Block),
     ApproveBlock(Block),
     ApprovePastBlock(Block),
@@ -77,7 +77,7 @@ impl ReferenceStateMachine for RefState {
         // if it cannot generate the promised transition for the current reference state.
         // Both reference and real state machine do nothing for Nop transitions.
         prop_oneof![
-            3 => state.transition_receive_block(),
+            3 => state.transition_receive_safe_block(),
             2 => state.transition_receive_unsafe_block(),
             2 => state.transition_approve_block(),
             1 => state.transition_approve_past_block(),
@@ -114,7 +114,7 @@ impl ReferenceStateMachine for RefState {
     fn apply(mut state: Self::State, transition: &Self::Transition) -> Self::State {
         match transition {
             Transition::Nop => {}
-            Transition::ReceiveBlock(block) => {
+            Transition::ReceiveSafeBlock(block) => {
                 state
                     .chain
                     .entry(block.view)
@@ -137,8 +137,8 @@ impl ReferenceStateMachine for RefState {
 }
 
 impl RefState {
-    // Generate a Transition::ReceiveBlock.
-    fn transition_receive_block(&self) -> BoxedStrategy<Transition> {
+    // Generate a Transition::ReceiveSafeBlock.
+    fn transition_receive_safe_block(&self) -> BoxedStrategy<Transition> {
         let blocks_in_last_two_views = self
             .chain
             .iter()
@@ -153,7 +153,7 @@ impl RefState {
             // proptest::sample::select panics if the input is empty
             proptest::sample::select(blocks_in_last_two_views)
                 .prop_map(move |parent| -> Transition {
-                    Transition::ReceiveBlock(Self::consecutive_block(&parent))
+                    Transition::ReceiveSafeBlock(Self::consecutive_block(&parent))
                 })
                 .boxed()
         }
@@ -266,7 +266,10 @@ impl StateMachineTest for ConsensusEngineTest {
 
         match transition {
             Transition::Nop => state,
-            Transition::ReceiveBlock(block) => {
+            Transition::ReceiveSafeBlock(block) => {
+                // Because we generate/apply transitions sequentially,
+                // this transition will always be applied to the same state that it was generated against.
+                // In other words, we can assume that the `block` is always safe for the current state.
                 let engine = state.engine.receive_block(block.clone()).unwrap();
                 assert!(engine.blocks_in_view(block.view).contains(&block));
 
