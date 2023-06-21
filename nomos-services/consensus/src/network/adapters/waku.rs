@@ -284,7 +284,7 @@ impl NetworkAdapter for WakuAdapter {
             [],
             false,
         );
-        if let Err((_, _e)) = self
+        if let Err((_, e)) = self
             .network_relay
             .send(NetworkMsg::Process(WakuBackendMessage::Broadcast {
                 message,
@@ -292,7 +292,7 @@ impl NetworkAdapter for WakuAdapter {
             }))
             .await
         {
-            todo!("log error");
+            tracing::error!("waku message send error: {e:?}");
         };
     }
 }
