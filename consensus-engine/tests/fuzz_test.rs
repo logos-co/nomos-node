@@ -186,7 +186,7 @@ impl RefState {
         } else {
             // proptest::sample::select panics if the input is empty
             proptest::sample::select(blocks_not_voted)
-                .prop_map(move |block| Transition::ApproveBlock(block))
+                .prop_map(Transition::ApproveBlock)
                 .boxed()
         }
     }
@@ -204,7 +204,7 @@ impl RefState {
         } else {
             // proptest::sample::select panics if the input is empty
             proptest::sample::select(past_blocks)
-                .prop_map(move |block| Transition::ApprovePastBlock(block))
+                .prop_map(Transition::ApprovePastBlock)
                 .boxed()
         }
     }
