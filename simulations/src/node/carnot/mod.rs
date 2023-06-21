@@ -3,6 +3,8 @@
 mod event_builder;
 mod message_cache;
 mod messages;
+mod tally;
+mod timeout;
 
 // std
 use std::hash::Hash;
@@ -22,7 +24,7 @@ use consensus_engine::overlay::RandomBeaconState;
 use consensus_engine::{
     Block, BlockId, Carnot, Committee, Overlay, Payload, Qc, StandardQc, TimeoutQc, View, Vote,
 };
-use nomos_consensus::network::messages::ProposalChunkMsg;
+use nomos_consensus::network::messages::{ProposalChunkMsg, TimeoutQcMsg};
 use nomos_consensus::{
     leader_selection::UpdateableLeaderSelection,
     network::messages::{NewViewMsg, TimeoutMsg, VoteMsg},
@@ -54,32 +56,25 @@ pub const CARNOT_RECORD_KEYS: &[&str] = &[
     COMMITTED_BLOCKS,
 ];
 
+static RECORD_SETTINGS: std::sync::OnceLock<HashMap<String, bool>> = std::sync::OnceLock::new();
+
+#[serde_with::skip_serializing_none]
+#[serde_with::serde_as]
 #[derive(Default, Serialize)]
 pub struct CarnotState {
-    #[serde(skip_serializing_if = "Option::is_none")]
     current_view: Option<View>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     highest_voted_view: Option<View>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     local_high_qc: Option<StandardQc>,
     #[serde(
-        skip_serializing_if = "Option::is_none",
         serialize_with = "serialize_blocks"
     )]
     safe_blocks: Option<HashMap<BlockId, Block>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     last_view_timeout_qc: Option<TimeoutQc>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     latest_committed_block: Option<Block>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     latest_committed_view: Option<View>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     root_committe: Option<Committee>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     parent_committe: Option<Committee>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     child_committees: Option<Vec<Committee>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     committed_blocks: Option<Vec<BlockId>>,
 }
 
@@ -179,7 +174,8 @@ impl<O: Overlay> CarnotNode<O> {
     ) -> Self {
         let overlay = O::new(overlay_settings);
         let engine = Carnot::from_genesis(id, genesis.header().clone(), overlay);
-        let state = Default::default();
+        let state = Default::default(); 
+        let timeout = settings.timeout;
         // pk is generated in an insecure way, but for simulation purpouses using a rng like smallrng is more useful
         let mut pk_buff = [0; 32];
         rng.fill_bytes(&mut pk_buff);
@@ -190,7 +186,7 @@ impl<O: Overlay> CarnotNode<O> {
             settings,
             network_interface,
             message_cache: MessageCache::new(),
-            event_builder: event_builder::EventBuilder::new(id),
+            event_builder: event_builder::EventBuilder::new(id, timeout),
             engine,
             random_beacon_pk,
         };
@@ -292,8 +288,14 @@ impl<O: Overlay> CarnotNode<O> {
                     );
                 }
             }
-            Output::BroadcastTimeoutQc { .. } => {
-                unimplemented!()
+            Output::BroadcastTimeoutQc { timeout_qc } => {
+                self.network_interface.send_message(
+                    self.id,
+                    CarnotMessage::TimeoutQc(TimeoutQcMsg {
+                        source: self.id,
+                        qc: timeout_qc,
+                    }),
+                );
             }
             Output::BroadcastProposal { proposal } => {
                 for node in &self.settings.nodes {
@@ -327,7 +329,7 @@ impl<L: UpdateableLeaderSelection, O: Overlay<LeaderSelection = L>> Node for Car
         &self.state
     }
 
-    fn step(&mut self) {
+    fn step(&mut self, elapsed: Duration) {
         // split messages per view, we just one to process the current engine processing view or proposals or timeoutqcs
         let (mut current_view_messages, other_view_messages): (Vec<_>, Vec<_>) = self
             .network_interface
@@ -342,7 +344,9 @@ impl<L: UpdateableLeaderSelection, O: Overlay<LeaderSelection = L>> Node for Car
         self.message_cache.update(other_view_messages);
         current_view_messages.append(&mut self.message_cache.retrieve(self.engine.current_view()));
 
-        let events = self.event_builder.step(current_view_messages, &self.engine);
+        let events = self
+            .event_builder
+            .step(current_view_messages, &self.engine, elapsed);
 
         for event in events {
             let mut output: Vec<Output<CarnotTx>> = vec![];
@@ -419,28 +423,60 @@ impl<L: UpdateableLeaderSelection, O: Overlay<LeaderSelection = L>> Node for Car
                 // This branch means we already get enough new view msgs for this qc
                 // So we can just call approve_new_view
                 Event::NewView {
-                    timeout_qc: _,
-                    new_views: _,
+                    timeout_qc,
+                    new_views,
                 } => {
-                    // let (new, out) = self.engine.approve_new_view(timeout_qc, new_views);
-                    // output = Some(out);
-                    // self.engine = new;
-                    // let next_view = timeout_qc.view + 2;
-                    // if self.engine.is_leader_for_view(next_view) {
-                    //     self.gather_new_views(&[self.id].into_iter().collect(), timeout_qc);
-                    // }
-                    tracing::error!("unimplemented new view branch");
-                    unimplemented!()
+                    let (new, out) = self.engine.approve_new_view(timeout_qc.clone(), new_views);
+                    output.push(Output::Send(out));
+                    self.engine = new;
+                    tracing::info!(
+                        node = parse_idx(&self.id),
+                        current_view = self.engine.current_view(),
+                        timeout_view = timeout_qc.view,
+                        "receive new view message"
+                    );
                 }
                 Event::TimeoutQc { timeout_qc } => {
-                    self.engine = self.engine.receive_timeout_qc(timeout_qc);
+                    tracing::info!(
+                        node = parse_idx(&self.id),
+                        current_view = self.engine.current_view(),
+                        timeout_view = timeout_qc.view,
+                        "receive timeout qc message"
+                    );
+                    self.engine = self.engine.receive_timeout_qc(timeout_qc.clone());
                 }
                 Event::RootTimeout { timeouts } => {
-                    println!("root timeouts: {timeouts:?}");
+                    tracing::debug!("root timeout {:?}", timeouts);
+                    if self.engine.is_member_of_root_committee() {
+                        assert!(timeouts
+                            .iter()
+                            .all(|t| t.view == self.engine.current_view()));
+                        let high_qc = timeouts
+                            .iter()
+                            .map(|t| &t.high_qc)
+                            .chain(std::iter::once(&self.engine.high_qc()))
+                            .max_by_key(|qc| qc.view)
+                            .expect("empty root committee")
+                            .clone();
+                        let timeout_qc = TimeoutQc {
+                            view: timeouts.iter().next().unwrap().view,
+                            high_qc,
+                            sender: self.id(),
+                        };
+                        output.push(Output::BroadcastTimeoutQc { timeout_qc });
+                    }
                 }
                 Event::LocalTimeout => {
-                    tracing::error!("unimplemented local timeout branch");
-                    unreachable!("local timeout will never be constructed")
+                    tracing::info!(
+                        node = parse_idx(&self.id),
+                        current_view = self.engine.current_view(),
+                        "receive local timeout message"
+                    );
+                    let (new, out) = self.engine.local_timeout();
+                    self.engine = new;
+                    if let Some(out) = out {
+                        output.push(Output::Send(out));
+                    }
                 }
                 Event::None => {
                     tracing::error!("unimplemented none branch");

@@ -9,6 +9,7 @@ use rand::prelude::IteratorRandom;
 use serde::Serialize;
 use std::collections::BTreeSet;
 use std::sync::Arc;
+use std::time::Duration;
 
 use super::SimulationRunnerHandle;
 
@@ -42,6 +43,7 @@ where
     let (stop_tx, stop_rx) = bounded(1);
     let p = runner.producer.clone();
     let p1 = runner.producer;
+    let elapsed = Duration::from_millis(100);
     let handle = std::thread::spawn(move || {
         'main: for chunk in iterations.chunks(update_rate) {
             select! {
@@ -61,7 +63,7 @@ where
                             let node: &mut N = shared_nodes
                                 .get_mut(parse_idx(&node_id))
                                 .expect("Node should be present");
-                            node.step();
+                            node.step(elapsed);
                         }
 
                         // check if any condition makes the simulation stop
