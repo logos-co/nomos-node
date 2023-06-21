@@ -58,24 +58,87 @@ pub const CARNOT_RECORD_KEYS: &[&str] = &[
 
 static RECORD_SETTINGS: std::sync::OnceLock<HashMap<String, bool>> = std::sync::OnceLock::new();
 
-#[serde_with::skip_serializing_none]
-#[serde_with::serde_as]
-#[derive(Default, Serialize)]
 pub struct CarnotState {
-    current_view: Option<View>,
-    highest_voted_view: Option<View>,
-    local_high_qc: Option<StandardQc>,
-    #[serde(
-        serialize_with = "serialize_blocks"
-    )]
-    safe_blocks: Option<HashMap<BlockId, Block>>,
+    current_view: View,
+    highest_voted_view: View,
+    local_high_qc: StandardQc,
+    safe_blocks: HashMap<BlockId, Block>,
     last_view_timeout_qc: Option<TimeoutQc>,
-    latest_committed_block: Option<Block>,
-    latest_committed_view: Option<View>,
-    root_committe: Option<Committee>,
-    parent_committe: Option<Committee>,
-    child_committees: Option<Vec<Committee>>,
-    committed_blocks: Option<Vec<BlockId>>,
+    latest_committed_block: Block,
+    latest_committed_view: View,
+    root_committe: Committee,
+    parent_committe: Committee,
+    child_committees: Vec<Committee>,
+    committed_blocks: Vec<BlockId>,
+}
+
+impl serde::Serialize for CarnotState {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeStruct;
+        if let Some(rs) = RECORD_SETTINGS.get() {
+            let keys = rs
+                .iter()
+                .filter_map(|(k, v)| {
+                    if CARNOT_RECORD_KEYS.contains(&k.trim()) && *v {
+                        Some(k)
+                    } else {
+                        None
+                    }
+                })
+                .collect::<Vec<_>>();
+
+            let mut ser = serializer.serialize_struct("CarnotState", keys.len())?;
+            for k in keys {
+                match k.trim() {
+                    CURRENT_VIEW => ser.serialize_field(CURRENT_VIEW, &self.current_view)?,
+                    HIGHEST_VOTED_VIEW => {
+                        ser.serialize_field(HIGHEST_VOTED_VIEW, &self.highest_voted_view)?
+                    }
+                    LOCAL_HIGH_QC => ser.serialize_field(LOCAL_HIGH_QC, &self.local_high_qc)?,
+                    SAFE_BLOCKS => {
+                        #[derive(Serialize)]
+                        #[serde(transparent)]
+                        struct SafeBlockHelper<'a> {
+                            #[serde(serialize_with = "serialize_blocks")]
+                            safe_blocks: &'a HashMap<BlockId, Block>,
+                        }
+                        ser.serialize_field(
+                            SAFE_BLOCKS,
+                            &SafeBlockHelper {
+                                safe_blocks: &self.safe_blocks,
+                            },
+                        )?;
+                    }
+                    LAST_VIEW_TIMEOUT_QC => {
+                        ser.serialize_field(LAST_VIEW_TIMEOUT_QC, &self.last_view_timeout_qc)?
+                    }
+                    LATEST_COMMITTED_BLOCK => {
+                        ser.serialize_field(LATEST_COMMITTED_BLOCK, &self.latest_committed_block)?
+                    }
+                    LATEST_COMMITTED_VIEW => {
+                        ser.serialize_field(LATEST_COMMITTED_VIEW, &self.latest_committed_view)?
+                    }
+                    ROOT_COMMITTEE => ser.serialize_field(ROOT_COMMITTEE, &self.root_committe)?,
+                    PARENT_COMMITTEE => {
+                        ser.serialize_field(PARENT_COMMITTEE, &self.parent_committe)?
+                    }
+                    CHILD_COMMITTEES => {
+                        ser.serialize_field(CHILD_COMMITTEES, &self.child_committees)?
+                    }
+                    COMMITTED_BLOCKS => {
+                        ser.serialize_field(COMMITTED_BLOCKS, &self.committed_blocks)?
+                    }
+                    _ => {}
+                }
+            }
+            ser.end()
+        } else {
+            serializer.serialize_none()
+        }
+    }
 }
 
 impl CarnotState {
@@ -86,46 +149,37 @@ impl CarnotState {
 
 /// Have to implement this manually because of the `serde_json` will panic if the key of map
 /// is not a string.
-fn serialize_blocks<S>(
-    blocks: &Option<HashMap<BlockId, Block>>,
-    serializer: S,
-) -> Result<S::Ok, S::Error>
+fn serialize_blocks<S>(blocks: &HashMap<BlockId, Block>, serializer: S) -> Result<S::Ok, S::Error>
 where
     S: serde::Serializer,
 {
     use serde::ser::SerializeMap;
-    if let Some(blocks) = blocks {
-        let mut ser = serializer.serialize_map(Some(blocks.len()))?;
-        for (k, v) in blocks {
-            ser.serialize_entry(&format!("{k:?}"), v)?;
-        }
-        ser.end()
-    } else {
-        serializer.serialize_none()
+    let mut ser = serializer.serialize_map(Some(blocks.len()))?;
+    for (k, v) in blocks {
+        ser.serialize_entry(&format!("{k:?}"), v)?;
     }
+    ser.end()
 }
 
 impl<O: Overlay> From<&Carnot<O>> for CarnotState {
     fn from(value: &Carnot<O>) -> Self {
         let current_view = value.current_view();
         Self {
-            current_view: Some(current_view),
-            local_high_qc: Some(value.high_qc()),
-            parent_committe: Some(value.parent_committee()),
-            root_committe: Some(value.root_committee()),
-            child_committees: Some(value.child_committees()),
-            latest_committed_block: Some(value.latest_committed_block()),
-            latest_committed_view: Some(value.latest_committed_view()),
-            safe_blocks: Some(
-                value
-                    .blocks_in_view(current_view)
-                    .into_iter()
-                    .map(|b| (b.id, b))
-                    .collect(),
-            ),
+            current_view,
+            local_high_qc: value.high_qc(),
+            parent_committe: value.parent_committee(),
+            root_committe: value.root_committee(),
+            child_committees: value.child_committees(),
+            latest_committed_block: value.latest_committed_block(),
+            latest_committed_view: value.latest_committed_view(),
+            safe_blocks: value
+                .blocks_in_view(current_view)
+                .into_iter()
+                .map(|b| (b.id, b))
+                .collect(),
             last_view_timeout_qc: value.last_view_timeout_qc(),
-            committed_blocks: Some(value.committed_blocks()),
-            highest_voted_view: Some(Default::default()),
+            committed_blocks: value.committed_blocks(),
+            highest_voted_view: Default::default(),
         }
     }
 }
@@ -174,8 +228,9 @@ impl<O: Overlay> CarnotNode<O> {
     ) -> Self {
         let overlay = O::new(overlay_settings);
         let engine = Carnot::from_genesis(id, genesis.header().clone(), overlay);
-        let state = Default::default(); 
+        let state = CarnotState::from(&engine);
         let timeout = settings.timeout;
+        RECORD_SETTINGS.get_or_init(|| settings.record_settings.clone());
         // pk is generated in an insecure way, but for simulation purpouses using a rng like smallrng is more useful
         let mut pk_buff = [0; 32];
         rng.fill_bytes(&mut pk_buff);
@@ -190,54 +245,13 @@ impl<O: Overlay> CarnotNode<O> {
             engine,
             random_beacon_pk,
         };
-        this.state = this.build_state();
+        this.state = CarnotState::from(&this.engine);
         this
     }
 
     pub(crate) fn send_message(&self, message: NetworkMessage<CarnotMessage>) {
         self.network_interface
             .send_message(self.id, message.payload);
-    }
-
-    fn build_state(&self) -> CarnotState {
-        let mut state = CarnotState::default();
-        for k in CarnotState::keys() {
-            if let Some(persist) = self.settings.record_settings.get(*k) {
-                if !persist {
-                    continue;
-                }
-                match k.trim() {
-                    CURRENT_VIEW => state.current_view = Some(self.engine.current_view()),
-                    HIGHEST_VOTED_VIEW => {
-                        state.highest_voted_view = Some(self.engine.highest_voted_view())
-                    }
-                    LOCAL_HIGH_QC => state.local_high_qc = Some(self.engine.high_qc()),
-                    SAFE_BLOCKS => state.safe_blocks = Some(self.engine.safe_blocks().clone()),
-                    LAST_VIEW_TIMEOUT_QC => {
-                        state.last_view_timeout_qc = self.engine.last_view_timeout_qc()
-                    }
-                    LATEST_COMMITTED_BLOCK => {
-                        state.latest_committed_block = Some(self.engine.latest_committed_block())
-                    }
-                    LATEST_COMMITTED_VIEW => {
-                        state.latest_committed_view = Some(self.engine.latest_committed_view())
-                    }
-                    ROOT_COMMITTEE => state.root_committe = Some(self.engine.root_committee()),
-                    PARENT_COMMITTEE => {
-                        state.parent_committe = Some(self.engine.parent_committee())
-                    }
-                    CHILD_COMMITTEES => {
-                        state.child_committees = Some(self.engine.child_committees())
-                    }
-                    COMMITTED_BLOCKS => {
-                        state.committed_blocks = Some(self.engine.committed_blocks())
-                    }
-                    _ => {}
-                }
-            }
-        }
-
-        state
     }
 
     fn handle_output(&self, output: Output<CarnotTx>) {
@@ -490,7 +504,7 @@ impl<L: UpdateableLeaderSelection, O: Overlay<LeaderSelection = L>> Node for Car
         }
 
         // update state
-        self.state = self.build_state();
+        self.state = CarnotState::from(&self.engine);
     }
 }
 
