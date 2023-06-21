@@ -5,7 +5,7 @@ mod types;
 pub use overlay::Overlay;
 pub use types::*;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Carnot<O: Overlay> {
     id: NodeId,
     current_view: View,

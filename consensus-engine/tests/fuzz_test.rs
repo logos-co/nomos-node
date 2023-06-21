@@ -414,11 +414,7 @@ impl StateMachineTest for ConsensusEngineTest {
                 let engine = state.engine.receive_timeout_qc(timeout_qc);
 
                 // Check that the engine state didn't change.
-                assert_eq!(
-                    engine.last_view_timeout_qc(),
-                    prev_engine.last_view_timeout_qc()
-                );
-                assert_eq!(engine.current_view(), prev_engine.current_view());
+                assert_eq!(engine, prev_engine);
 
                 ConsensusEngineTest { engine }
             }

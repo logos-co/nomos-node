@@ -2,7 +2,7 @@ use super::LeaderSelection;
 use crate::{Committee, NodeId, Overlay};
 use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 /// Flat overlay with a single committee and round robin leader selection.
 pub struct FlatOverlay<L: LeaderSelection> {
     nodes: Vec<NodeId>,
@@ -86,7 +86,7 @@ where
     }
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, PartialEq)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct RoundRobin {
     cur: usize,
