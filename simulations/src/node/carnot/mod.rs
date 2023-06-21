@@ -30,12 +30,38 @@ use nomos_consensus::{
     network::messages::{NewViewMsg, TimeoutMsg, VoteMsg},
 };
 
-#[derive(Serialize)]
+const CURRENT_VIEW: &str = "current_view";
+const HIGHEST_VOTED_VIEW: &str = "highest_voted_view";
+const LOCAL_HIGH_QC: &str = "local_high_qc";
+const SAFE_BLOCKS: &str = "safe_blocks";
+const LAST_VIEW_TIMEOUT_QC: &str = "last_view_timeout_qc";
+const LATEST_COMMITTED_BLOCK: &str = "latest_committed_block";
+const LATEST_COMMITTED_VIEW: &str = "latest_committed_view";
+const ROOT_COMMITTEE: &str = "root_committee";
+const PARENT_COMMITTEE: &str = "parent_committee";
+const CHILD_COMMITTEES: &str = "child_committees";
+const COMMITTED_BLOCKS: &str = "committed_blocks";
+
+pub const CARNOT_RECORD_KEYS: &[&str] = &[
+    CURRENT_VIEW,
+    HIGHEST_VOTED_VIEW,
+    LOCAL_HIGH_QC,
+    SAFE_BLOCKS,
+    LAST_VIEW_TIMEOUT_QC,
+    LATEST_COMMITTED_BLOCK,
+    LATEST_COMMITTED_VIEW,
+    ROOT_COMMITTEE,
+    PARENT_COMMITTEE,
+    CHILD_COMMITTEES,
+    COMMITTED_BLOCKS,
+];
+
+static RECORD_SETTINGS: std::sync::OnceLock<HashMap<String, bool>> = std::sync::OnceLock::new();
+
 pub struct CarnotState {
     current_view: View,
     highest_voted_view: View,
     local_high_qc: StandardQc,
-    #[serde(serialize_with = "serialize_blocks")]
     safe_blocks: HashMap<BlockId, Block>,
     last_view_timeout_qc: Option<TimeoutQc>,
     latest_committed_block: Block,
@@ -44,6 +70,81 @@ pub struct CarnotState {
     parent_committe: Committee,
     child_committees: Vec<Committee>,
     committed_blocks: Vec<BlockId>,
+}
+
+impl serde::Serialize for CarnotState {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeStruct;
+        if let Some(rs) = RECORD_SETTINGS.get() {
+            let keys = rs
+                .iter()
+                .filter_map(|(k, v)| {
+                    if CARNOT_RECORD_KEYS.contains(&k.trim()) && *v {
+                        Some(k)
+                    } else {
+                        None
+                    }
+                })
+                .collect::<Vec<_>>();
+
+            let mut ser = serializer.serialize_struct("CarnotState", keys.len())?;
+            for k in keys {
+                match k.trim() {
+                    CURRENT_VIEW => ser.serialize_field(CURRENT_VIEW, &self.current_view)?,
+                    HIGHEST_VOTED_VIEW => {
+                        ser.serialize_field(HIGHEST_VOTED_VIEW, &self.highest_voted_view)?
+                    }
+                    LOCAL_HIGH_QC => ser.serialize_field(LOCAL_HIGH_QC, &self.local_high_qc)?,
+                    SAFE_BLOCKS => {
+                        #[derive(Serialize)]
+                        #[serde(transparent)]
+                        struct SafeBlockHelper<'a> {
+                            #[serde(serialize_with = "serialize_blocks")]
+                            safe_blocks: &'a HashMap<BlockId, Block>,
+                        }
+                        ser.serialize_field(
+                            SAFE_BLOCKS,
+                            &SafeBlockHelper {
+                                safe_blocks: &self.safe_blocks,
+                            },
+                        )?;
+                    }
+                    LAST_VIEW_TIMEOUT_QC => {
+                        ser.serialize_field(LAST_VIEW_TIMEOUT_QC, &self.last_view_timeout_qc)?
+                    }
+                    LATEST_COMMITTED_BLOCK => {
+                        ser.serialize_field(LATEST_COMMITTED_BLOCK, &self.latest_committed_block)?
+                    }
+                    LATEST_COMMITTED_VIEW => {
+                        ser.serialize_field(LATEST_COMMITTED_VIEW, &self.latest_committed_view)?
+                    }
+                    ROOT_COMMITTEE => ser.serialize_field(ROOT_COMMITTEE, &self.root_committe)?,
+                    PARENT_COMMITTEE => {
+                        ser.serialize_field(PARENT_COMMITTEE, &self.parent_committe)?
+                    }
+                    CHILD_COMMITTEES => {
+                        ser.serialize_field(CHILD_COMMITTEES, &self.child_committees)?
+                    }
+                    COMMITTED_BLOCKS => {
+                        ser.serialize_field(COMMITTED_BLOCKS, &self.committed_blocks)?
+                    }
+                    _ => {}
+                }
+            }
+            ser.end()
+        } else {
+            serializer.serialize_none()
+        }
+    }
+}
+
+impl CarnotState {
+    const fn keys() -> &'static [&'static str] {
+        CARNOT_RECORD_KEYS
+    }
 }
 
 /// Have to implement this manually because of the `serde_json` will panic if the key of map
@@ -87,11 +188,20 @@ impl<O: Overlay> From<&Carnot<O>> for CarnotState {
 pub struct CarnotSettings {
     nodes: Vec<consensus_engine::NodeId>,
     timeout: Duration,
+    record_settings: HashMap<String, bool>,
 }
 
 impl CarnotSettings {
-    pub fn new(nodes: Vec<consensus_engine::NodeId>, timeout: Duration) -> Self {
-        Self { nodes, timeout }
+    pub fn new(
+        nodes: Vec<consensus_engine::NodeId>,
+        timeout: Duration,
+        record_settings: HashMap<String, bool>,
+    ) -> Self {
+        Self {
+            nodes,
+            timeout,
+            record_settings,
+        }
     }
 }
 
@@ -120,11 +230,12 @@ impl<O: Overlay> CarnotNode<O> {
         let engine = Carnot::from_genesis(id, genesis.header().clone(), overlay);
         let state = CarnotState::from(&engine);
         let timeout = settings.timeout;
+        RECORD_SETTINGS.get_or_init(|| settings.record_settings.clone());
         // pk is generated in an insecure way, but for simulation purpouses using a rng like smallrng is more useful
         let mut pk_buff = [0; 32];
         rng.fill_bytes(&mut pk_buff);
         let random_beacon_pk = PrivateKey::new(pk_buff);
-        Self {
+        let mut this = Self {
             id,
             state,
             settings,
@@ -133,7 +244,9 @@ impl<O: Overlay> CarnotNode<O> {
             event_builder: event_builder::EventBuilder::new(id, timeout),
             engine,
             random_beacon_pk,
-        }
+        };
+        this.state = CarnotState::from(&this.engine);
+        this
     }
 
     pub(crate) fn send_message(&self, message: NetworkMessage<CarnotMessage>) {

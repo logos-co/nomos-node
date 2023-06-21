@@ -59,7 +59,7 @@ impl ViewEntry {
 #[derive(Clone, Debug)]
 pub enum Transition {
     Nop,
-    ReceiveBlock(Block),
+    ReceiveSafeBlock(Block),
     ReceiveUnsafeBlock(Block),
     ApproveBlock(Block),
     ApprovePastBlock(Block),
@@ -67,6 +67,7 @@ pub enum Transition {
     ReceiveTimeoutQcForCurrentView(TimeoutQc),
     ReceiveTimeoutQcForOldView(TimeoutQc),
     //TODO: add more invalid transitions that must be rejected by consensus-engine
+    //TODO: add more transitions
 }
 
 const LEADER_PROOF: LeaderProof = LeaderProof::LeaderId { leader_id: [0; 32] };
@@ -108,7 +109,7 @@ impl ReferenceStateMachine for RefState {
         // if it cannot generate the promised transition for the current reference state.
         // Both reference and real state machine do nothing for Nop transitions.
         prop_oneof![
-            state.transition_receive_block(),
+            state.transition_receive_safe_block(),
             state.transition_receive_unsafe_block(),
             state.transition_approve_block(),
             state.transition_approve_past_block(),
@@ -132,7 +133,7 @@ impl ReferenceStateMachine for RefState {
         // because some transitions may no longer be valid after some shrinking is applied.
         match transition {
             Transition::Nop => true,
-            Transition::ReceiveBlock(block) => block.view >= state.current_view(),
+            Transition::ReceiveSafeBlock(block) => block.view >= state.current_view(),
             Transition::ReceiveUnsafeBlock(block) => block.view < state.current_view(),
             Transition::ApproveBlock(block) => state.highest_voted_view < block.view,
             Transition::ApprovePastBlock(block) => state.highest_voted_view >= block.view,
@@ -151,7 +152,7 @@ impl ReferenceStateMachine for RefState {
     fn apply(mut state: Self::State, transition: &Self::Transition) -> Self::State {
         match transition {
             Transition::Nop => {}
-            Transition::ReceiveBlock(block) => {
+            Transition::ReceiveSafeBlock(block) => {
                 state
                     .chain
                     .entry(block.view)
@@ -189,8 +190,8 @@ impl ReferenceStateMachine for RefState {
 }
 
 impl RefState {
-    // Generate a Transition::ReceiveBlock.
-    fn transition_receive_block(&self) -> BoxedStrategy<Transition> {
+    // Generate a Transition::ReceiveSafeBlock.
+    fn transition_receive_safe_block(&self) -> BoxedStrategy<Transition> {
         let recent_parents = self
             .chain
             .range(self.current_view() - 1..)
@@ -203,7 +204,7 @@ impl RefState {
             // proptest::sample::select panics if the input is empty
             proptest::sample::select(recent_parents)
                 .prop_map(move |parent| -> Transition {
-                    Transition::ReceiveBlock(Self::consecutive_block(&parent))
+                    Transition::ReceiveSafeBlock(Self::consecutive_block(&parent))
                 })
                 .boxed()
         }
@@ -242,7 +243,7 @@ impl RefState {
         } else {
             // proptest::sample::select panics if the input is empty
             proptest::sample::select(blocks_not_voted)
-                .prop_map(move |block| Transition::ApproveBlock(block))
+                .prop_map(Transition::ApproveBlock)
                 .boxed()
         }
     }
@@ -260,7 +261,7 @@ impl RefState {
         } else {
             // proptest::sample::select panics if the input is empty
             proptest::sample::select(past_blocks)
-                .prop_map(move |block| Transition::ApprovePastBlock(block))
+                .prop_map(Transition::ApprovePastBlock)
                 .boxed()
         }
     }
@@ -316,9 +317,9 @@ impl RefState {
     }
 
     fn current_view(&self) -> View {
-        let (last_view, last_entry) = self.chain.last_key_value().unwrap();
+        let (&last_view, last_entry) = self.chain.last_key_value().unwrap();
         if last_entry.timeout_qcs.is_empty() {
-            last_view.clone()
+            last_view
         } else {
             let timeout_qc = last_entry.timeout_qcs.iter().next().unwrap();
             RefState::new_view_from(&timeout_qc)
@@ -369,7 +370,10 @@ impl StateMachineTest for ConsensusEngineTest {
 
         match transition {
             Transition::Nop => state,
-            Transition::ReceiveBlock(block) => {
+            Transition::ReceiveSafeBlock(block) => {
+                // Because we generate/apply transitions sequentially,
+                // this transition will always be applied to the same state that it was generated against.
+                // In other words, we can assume that the `block` is always safe for the current state.
                 let engine = state.engine.receive_block(block.clone()).unwrap();
                 assert!(engine.blocks_in_view(block.view).contains(&block));
 
