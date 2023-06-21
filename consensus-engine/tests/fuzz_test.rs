@@ -98,7 +98,7 @@ impl ReferenceStateMachine for RefState {
         // because some transitions may no longer be valid after some shrinking is applied.
         match transition {
             Transition::Nop => true,
-            Transition::ReceiveBlock(block) => {
+            Transition::ReceiveSafeBlock(block) => {
                 state.last_n_views(2).contains(&block.parent_qc.view())
             }
             Transition::ReceiveUnsafeBlock(block) => {
