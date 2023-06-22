@@ -3,7 +3,7 @@ use std::{
     panic,
 };
 
-use consensus_engine::{Block, LeaderProof, Qc, StandardQc, View};
+use consensus_engine::{Block, LeaderProof, NodeId, Qc, StandardQc, TimeoutQc, View};
 use proptest::prelude::*;
 use proptest::test_runner::Config;
 use proptest_state_machine::{prop_state_machine, ReferenceStateMachine, StateMachineTest};
@@ -30,8 +30,29 @@ prop_state_machine! {
 // so that we don't need to replicate the logic implemented in consensus-engine.
 #[derive(Clone, Debug)]
 pub struct RefState {
-    chain: BTreeMap<View, HashSet<Block>>,
+    chain: BTreeMap<View, ViewEntry>,
     highest_voted_view: View,
+}
+
+#[derive(Clone, Debug, Default, PartialEq)]
+struct ViewEntry {
+    blocks: HashSet<Block>,
+    timeout_qcs: HashSet<TimeoutQc>,
+}
+
+impl ViewEntry {
+    fn is_empty(&self) -> bool {
+        self.blocks.is_empty() && self.timeout_qcs.is_empty()
+    }
+
+    fn high_qc(&self) -> Option<StandardQc> {
+        let iter1 = self.blocks.iter().map(|block| block.parent_qc.high_qc());
+        let iter2 = self
+            .timeout_qcs
+            .iter()
+            .map(|timeout_qc| timeout_qc.high_qc.clone());
+        iter1.chain(iter2).max_by_key(|qc| qc.view)
+    }
 }
 
 // State transtitions that will be picked randomly
@@ -42,11 +63,16 @@ pub enum Transition {
     ReceiveUnsafeBlock(Block),
     ApproveBlock(Block),
     ApprovePastBlock(Block),
+    LocalTimeout,
+    ReceiveTimeoutQcForCurrentView(TimeoutQc),
+    ReceiveTimeoutQcForOldView(TimeoutQc),
+    //TODO: add more invalid transitions that must be rejected by consensus-engine
     //TODO: add more transitions
 }
 
 const LEADER_PROOF: LeaderProof = LeaderProof::LeaderId { leader_id: [0; 32] };
 const INITIAL_HIGHEST_VOTED_VIEW: View = -1;
+const SENDER: NodeId = [0; 32];
 
 impl ReferenceStateMachine for RefState {
     type State = Self;
@@ -63,7 +89,13 @@ impl ReferenceStateMachine for RefState {
         };
 
         Just(RefState {
-            chain: BTreeMap::from([(genesis_block.view, HashSet::from([genesis_block.clone()]))]),
+            chain: BTreeMap::from([(
+                genesis_block.view,
+                ViewEntry {
+                    blocks: HashSet::from([genesis_block]),
+                    timeout_qcs: Default::default(),
+                },
+            )]),
             highest_voted_view: INITIAL_HIGHEST_VOTED_VIEW,
         })
         .boxed()
@@ -77,10 +109,13 @@ impl ReferenceStateMachine for RefState {
         // if it cannot generate the promised transition for the current reference state.
         // Both reference and real state machine do nothing for Nop transitions.
         prop_oneof![
-            3 => state.transition_receive_safe_block(),
-            2 => state.transition_receive_unsafe_block(),
-            2 => state.transition_approve_block(),
-            1 => state.transition_approve_past_block(),
+            state.transition_receive_safe_block(),
+            state.transition_receive_unsafe_block(),
+            state.transition_approve_block(),
+            state.transition_approve_past_block(),
+            state.transition_local_timeout(),
+            state.transition_receive_timeout_qc_for_current_view(),
+            state.transition_receive_timeout_qc_for_old_view(),
         ]
         .boxed()
     }
@@ -102,6 +137,13 @@ impl ReferenceStateMachine for RefState {
             Transition::ReceiveUnsafeBlock(block) => block.view < state.current_view(),
             Transition::ApproveBlock(block) => state.highest_voted_view < block.view,
             Transition::ApprovePastBlock(block) => state.highest_voted_view >= block.view,
+            Transition::LocalTimeout => true,
+            Transition::ReceiveTimeoutQcForCurrentView(timeout_qc) => {
+                timeout_qc.view == state.current_view()
+            }
+            Transition::ReceiveTimeoutQcForOldView(timeout_qc) => {
+                timeout_qc.view < state.current_view()
+            }
         }
     }
 
@@ -115,6 +157,7 @@ impl ReferenceStateMachine for RefState {
                     .chain
                     .entry(block.view)
                     .or_default()
+                    .blocks
                     .insert(block.clone());
             }
             Transition::ReceiveUnsafeBlock(_) => {
@@ -124,6 +167,20 @@ impl ReferenceStateMachine for RefState {
                 state.highest_voted_view = block.view;
             }
             Transition::ApprovePastBlock(_) => {
+                // Nothing to do because we expect the state doesn't change.
+            }
+            Transition::LocalTimeout => {
+                state.highest_voted_view = state.current_view();
+            }
+            Transition::ReceiveTimeoutQcForCurrentView(timeout_qc) => {
+                state
+                    .chain
+                    .entry(timeout_qc.view)
+                    .or_default()
+                    .timeout_qcs
+                    .insert(timeout_qc.clone());
+            }
+            Transition::ReceiveTimeoutQcForOldView(_) => {
                 // Nothing to do because we expect the state doesn't change.
             }
         }
@@ -138,7 +195,7 @@ impl RefState {
         let recent_parents = self
             .chain
             .range(self.current_view() - 1..)
-            .flat_map(|(_view, blocks)| blocks.iter().cloned())
+            .flat_map(|(_view, entry)| entry.blocks.iter().cloned())
             .collect::<Vec<Block>>();
 
         if recent_parents.is_empty() {
@@ -158,7 +215,7 @@ impl RefState {
         let old_parents = self
             .chain
             .range(..self.current_view() - 1)
-            .flat_map(|(_view, blocks)| blocks.iter().cloned())
+            .flat_map(|(_view, entry)| entry.blocks.iter().cloned())
             .collect::<Vec<Block>>();
 
         if old_parents.is_empty() {
@@ -178,7 +235,7 @@ impl RefState {
         let blocks_not_voted = self
             .chain
             .range(self.highest_voted_view + 1..)
-            .flat_map(|(_view, blocks)| blocks.iter().cloned())
+            .flat_map(|(_view, entry)| entry.blocks.iter().cloned())
             .collect::<Vec<Block>>();
 
         if blocks_not_voted.is_empty() {
@@ -196,7 +253,7 @@ impl RefState {
         let past_blocks = self
             .chain
             .range(INITIAL_HIGHEST_VOTED_VIEW..self.highest_voted_view)
-            .flat_map(|(_view, blocks)| blocks.iter().cloned())
+            .flat_map(|(_view, entry)| entry.blocks.iter().cloned())
             .collect::<Vec<Block>>();
 
         if past_blocks.is_empty() {
@@ -209,10 +266,68 @@ impl RefState {
         }
     }
 
+    // Generate a Transition::LocalTimeout.
+    fn transition_local_timeout(&self) -> BoxedStrategy<Transition> {
+        Just(Transition::LocalTimeout).boxed()
+    }
+
+    // Generate a Transition::ReceiveTimeoutQcForCurrentView
+    fn transition_receive_timeout_qc_for_current_view(&self) -> BoxedStrategy<Transition> {
+        let view = self.current_view();
+        let high_qc = self
+            .chain
+            .iter()
+            .rev()
+            .find_map(|(_, entry)| entry.high_qc());
+
+        if let Some(high_qc) = high_qc {
+            Just(Transition::ReceiveTimeoutQcForCurrentView(TimeoutQc {
+                view: view.clone(),
+                high_qc,
+                sender: SENDER,
+            }))
+            .boxed()
+        } else {
+            Just(Transition::Nop).boxed()
+        }
+    }
+
+    // Generate a Transition::ReceiveTimeoutQcForOldView
+    fn transition_receive_timeout_qc_for_old_view(&self) -> BoxedStrategy<Transition> {
+        let old_view_entries: Vec<(View, ViewEntry)> = self
+            .chain
+            .range(..self.current_view())
+            .filter(|(_, entry)| !entry.is_empty())
+            .map(|(&view, entry)| (view, entry.clone()))
+            .collect();
+
+        if old_view_entries.is_empty() {
+            Just(Transition::Nop).boxed()
+        } else {
+            proptest::sample::select(old_view_entries)
+                .prop_map(move |(view, entry)| {
+                    Transition::ReceiveTimeoutQcForOldView(TimeoutQc {
+                        view: view.clone(),
+                        high_qc: entry.high_qc().unwrap(),
+                        sender: SENDER,
+                    })
+                })
+                .boxed()
+        }
+    }
+
     fn current_view(&self) -> View {
-        let (&last_view, _) = self.chain.last_key_value().unwrap();
-        // TODO: this logic must cover other cases for unhappy path
-        last_view
+        let (&last_view, last_entry) = self.chain.last_key_value().unwrap();
+        if last_entry.timeout_qcs.is_empty() {
+            last_view
+        } else {
+            let timeout_qc = last_entry.timeout_qcs.iter().next().unwrap();
+            RefState::new_view_from(&timeout_qc)
+        }
+    }
+
+    fn new_view_from(timeout_qc: &TimeoutQc) -> View {
+        timeout_qc.view + 1
     }
 
     fn consecutive_block(parent: &Block) -> Block {
@@ -282,6 +397,27 @@ impl StateMachineTest for ConsensusEngineTest {
 
                 state
             }
+            Transition::LocalTimeout => {
+                let (engine, _) = state.engine.local_timeout();
+                assert_eq!(engine.highest_voted_view(), engine.current_view());
+
+                ConsensusEngineTest { engine }
+            }
+            Transition::ReceiveTimeoutQcForCurrentView(timeout_qc) => {
+                let engine = state.engine.receive_timeout_qc(timeout_qc.clone());
+                assert_eq!(engine.current_view(), RefState::new_view_from(&timeout_qc));
+
+                ConsensusEngineTest { engine }
+            }
+            Transition::ReceiveTimeoutQcForOldView(timeout_qc) => {
+                let prev_engine = state.engine.clone();
+                let engine = state.engine.receive_timeout_qc(timeout_qc);
+
+                // Check that the engine state didn't change.
+                assert_eq!(engine, prev_engine);
+
+                ConsensusEngineTest { engine }
+            }
         }
     }
 
@@ -291,7 +427,6 @@ impl StateMachineTest for ConsensusEngineTest {
         state: &Self::SystemUnderTest,
         ref_state: &<Self::Reference as ReferenceStateMachine>::State,
     ) {
-        //TODO: this may be false in unhappy path
         assert_eq!(state.engine.current_view(), ref_state.current_view());
 
         assert_eq!(
