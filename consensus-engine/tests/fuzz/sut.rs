@@ -102,6 +102,7 @@ impl StateMachineTest for ConsensusEngineTest {
                 ConsensusEngineTest { engine }
             }
             Transition::ReceiveTimeoutQcForOldView(timeout_qc) => {
+                #[allow(clippy::redundant_clone)]
                 let prev_engine = state.engine.clone();
                 let engine = state.engine.receive_timeout_qc(timeout_qc);
 

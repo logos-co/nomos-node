@@ -266,7 +266,7 @@ impl RefState {
             proptest::sample::select(old_view_entries)
                 .prop_map(move |(view, entry)| {
                     Transition::ReceiveTimeoutQcForOldView(TimeoutQc {
-                        view: view.clone(),
+                        view,
                         high_qc: entry.high_qc().unwrap(),
                         sender: SENDER,
                     })
@@ -327,7 +327,7 @@ impl RefState {
             last_view
         } else {
             let timeout_qc = last_entry.timeout_qcs.iter().next().unwrap();
-            RefState::new_view_from(&timeout_qc)
+            RefState::new_view_from(timeout_qc)
         }
     }
 
