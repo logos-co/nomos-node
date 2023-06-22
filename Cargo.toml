@@ -10,5 +10,6 @@ members = [
     "nomos-services/http",
     "nodes/nomos-node",
     "simulations",
-    "consensus-engine"
+    "consensus-engine",
+    "tests",
 ]
