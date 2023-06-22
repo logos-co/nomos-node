@@ -186,19 +186,13 @@ impl<O: Overlay> From<&Carnot<O>> for CarnotState {
 
 #[derive(Clone, Default, Deserialize)]
 pub struct CarnotSettings {
-    nodes: Vec<consensus_engine::NodeId>,
     timeout: Duration,
     record_settings: HashMap<String, bool>,
 }
 
 impl CarnotSettings {
-    pub fn new(
-        nodes: Vec<consensus_engine::NodeId>,
-        timeout: Duration,
-        record_settings: HashMap<String, bool>,
-    ) -> Self {
+    pub fn new(timeout: Duration, record_settings: HashMap<String, bool>) -> Self {
         Self {
-            nodes,
             timeout,
             record_settings,
         }
@@ -311,16 +305,12 @@ impl<O: Overlay> CarnotNode<O> {
                 );
             }
             Output::BroadcastProposal { proposal } => {
-                for node in &self.settings.nodes {
-                    self.network_interface.send_message(
-                        *node,
-                        CarnotMessage::Proposal(ProposalChunkMsg {
-                            chunk: proposal.as_bytes().to_vec().into(),
-                            proposal: proposal.header().id,
-                            view: proposal.header().view,
-                        }),
-                    )
-                }
+                self.network_interface
+                    .broadcast(CarnotMessage::Proposal(ProposalChunkMsg {
+                        chunk: proposal.as_bytes().to_vec().into(),
+                        proposal: proposal.header().id,
+                        view: proposal.header().view,
+                    }))
             }
         }
     }
