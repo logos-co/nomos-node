@@ -1,5 +1,7 @@
 mod fuzz;
 
+use std::panic;
+
 use proptest::prelude::*;
 use proptest::test_runner::Config;
 use proptest_state_machine::{prop_state_machine, ReferenceStateMachine, StateMachineTest};
