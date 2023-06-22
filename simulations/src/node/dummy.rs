@@ -236,8 +236,8 @@ impl DummyNode {
     // - Leader gets vote from root nodes that are in previous overlay.
     // - Leader sends NewView message to all it's view nodes if it receives votes from all root
     // nodes.
-    fn handle_leader(&mut self, message: &NetworkMessage<DummyMessage>) {
-        if let DummyMessage::Vote(vote) = &message.payload {
+    fn handle_leader(&mut self, payload: &DummyMessage) {
+        if let DummyMessage::Vote(vote) = payload {
             // Internal node can be a leader in the next view, check if the vote traversed the
             // whole tree.
             if vote.intent != Intent::FromRootToLeader || vote.view < self.current_view() {
@@ -261,8 +261,8 @@ impl DummyNode {
         }
     }
 
-    fn handle_root(&mut self, message: &NetworkMessage<DummyMessage>) {
-        if let DummyMessage::Vote(vote) = &message.payload {
+    fn handle_root(&mut self, payload: &DummyMessage) {
+        if let DummyMessage::Vote(vote) = payload {
             // Root node can be a leader in the next view, check if the vote traversed the
             // whole tree.
             if vote.intent != Intent::FromInternalToInternal || vote.view != self.current_view() {
@@ -282,8 +282,8 @@ impl DummyNode {
         }
     }
 
-    fn handle_internal(&mut self, message: &NetworkMessage<DummyMessage>) {
-        if let DummyMessage::Vote(vote) = &message.payload {
+    fn handle_internal(&mut self, message: &DummyMessage) {
+        if let DummyMessage::Vote(vote) = &message {
             // Internal node can be a leader in the next view, check if the vote traversed the
             // whole tree.
             if vote.intent != Intent::FromLeafToInternal
@@ -313,8 +313,8 @@ impl DummyNode {
         }
     }
 
-    fn handle_leaf(&mut self, message: &NetworkMessage<DummyMessage>) {
-        if let DummyMessage::Proposal(block) = &message.payload {
+    fn handle_leaf(&mut self, payload: &DummyMessage) {
+        if let DummyMessage::Proposal(block) = &payload {
             if !self.is_vote_sent(block.view) {
                 let parents = &self.local_view.parents.as_ref().expect("leaf has parents");
                 parents.iter().for_each(|node_id| {
@@ -326,9 +326,13 @@ impl DummyNode {
     }
 
     fn handle_message(&mut self, message: &NetworkMessage<DummyMessage>) {
+        let payload = match message {
+            NetworkMessage::Adhoc(m) => m.payload.clone(),
+            NetworkMessage::Broadcast(m) => m.payload.clone(),
+        };
         // The view can change on any message, node needs to change its position
         // and roles if the view changes during the message processing.
-        if let DummyMessage::Proposal(block) = &message.payload {
+        if let DummyMessage::Proposal(block) = &payload {
             if block.view > self.current_view() {
                 self.update_view(block.view);
             }
@@ -337,10 +341,10 @@ impl DummyNode {
 
         for role in roles.iter() {
             match role {
-                DummyRole::Leader => self.handle_leader(message),
-                DummyRole::Root => self.handle_root(message),
-                DummyRole::Internal => self.handle_internal(message),
-                DummyRole::Leaf => self.handle_leaf(message),
+                DummyRole::Leader => self.handle_leader(&payload),
+                DummyRole::Root => self.handle_root(&payload),
+                DummyRole::Internal => self.handle_internal(&payload),
+                DummyRole::Leaf => self.handle_leaf(&payload),
                 DummyRole::Unknown => (),
             }
         }
