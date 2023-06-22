@@ -1,69 +1,19 @@
+use nomos_node::{Config, Nomos, NomosServiceSettings};
+
 mod bridges;
-mod tx;
 
 use clap::Parser;
 use color_eyre::eyre::{eyre, Result};
-use consensus_engine::overlay::{FlatOverlay, RoundRobin};
-#[cfg(feature = "metrics")]
-use metrics::{backend::map::MapMetricsBackend, types::MetricsData, MetricsService};
-use nomos_consensus::{
-    network::adapters::waku::WakuAdapter as ConsensusWakuAdapter, CarnotConsensus,
-};
-use nomos_core::fountain::mock::MockFountain;
-use nomos_http::backends::axum::AxumBackend;
-use nomos_http::bridge::{HttpBridge, HttpBridgeService, HttpBridgeSettings};
-use nomos_http::http::HttpService;
-use nomos_log::Logger;
-use nomos_mempool::{
-    backend::mockpool::MockPool, network::adapters::waku::WakuAdapter as MempoolWakuAdapter,
-    MempoolService,
-};
-use nomos_network::{backends::waku::Waku, NetworkService};
-use overwatch_derive::*;
-use overwatch_rs::{
-    overwatch::*,
-    services::{handle::ServiceHandle, ServiceData},
-};
-use serde::Deserialize;
-use std::sync::Arc;
-use tx::Tx;
+use nomos_http::bridge::{HttpBridge, HttpBridgeSettings};
 
-/// Simple program to greet a person
+use overwatch_rs::overwatch::*;
+use std::sync::Arc;
+
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 struct Args {
     /// Path for a yaml-encoded network config file
     config: std::path::PathBuf,
-}
-
-type Carnot = CarnotConsensus<
-    ConsensusWakuAdapter,
-    MockPool<Tx>,
-    MempoolWakuAdapter<Tx>,
-    MockFountain,
-    FlatOverlay<RoundRobin>,
->;
-
-#[derive(Deserialize)]
-struct Config {
-    log: <Logger as ServiceData>::Settings,
-    network: <NetworkService<Waku> as ServiceData>::Settings,
-    http: <HttpService<AxumBackend> as ServiceData>::Settings,
-    consensus: <Carnot as ServiceData>::Settings,
-    #[cfg(feature = "metrics")]
-    metrics: <MetricsService<MapMetricsBackend<MetricsData>> as ServiceData>::Settings,
-}
-
-#[derive(Services)]
-struct Nomos {
-    logging: ServiceHandle<Logger>,
-    network: ServiceHandle<NetworkService<Waku>>,
-    mockpool: ServiceHandle<MempoolService<MempoolWakuAdapter<Tx>, MockPool<Tx>>>,
-    consensus: ServiceHandle<Carnot>,
-    http: ServiceHandle<HttpService<AxumBackend>>,
-    bridges: ServiceHandle<HttpBridgeService>,
-    #[cfg(feature = "metrics")]
-    metrics: ServiceHandle<MetricsService<MapMetricsBackend<MetricsData>>>,
 }
 
 fn main() -> Result<()> {

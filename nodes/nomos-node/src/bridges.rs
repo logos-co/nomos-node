@@ -1,14 +1,13 @@
 // std
 // crates
-use crate::Carnot;
 use bytes::Bytes;
 use http::StatusCode;
 use nomos_consensus::{CarnotInfo, ConsensusMsg};
+
 use tokio::sync::mpsc::Sender;
 use tokio::sync::oneshot;
 use tracing::error;
 // internal
-use crate::tx::Tx;
 use futures::future::join_all;
 use multiaddr::Multiaddr;
 use nomos_core::wire;
@@ -22,6 +21,7 @@ use nomos_mempool::network::adapters::waku::{
 use nomos_mempool::{MempoolMetrics, MempoolMsg, MempoolService};
 use nomos_network::backends::waku::{Waku, WakuBackendMessage, WakuInfo};
 use nomos_network::{NetworkMsg, NetworkService};
+use nomos_node::{Carnot, Tx};
 use overwatch_rs::services::relay::OutboundRelay;
 use waku_bindings::WakuMessage;
 
