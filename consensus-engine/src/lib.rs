@@ -416,7 +416,7 @@ mod test {
         let mut next_id = block.id;
         next_id[0] += 1;
 
-        return Block {
+        Block {
             view: block.view + 1,
             id: next_id,
             parent_qc: Qc::Standard(StandardQc {
@@ -424,7 +424,7 @@ mod test {
                 id: block.id,
             }),
             leader_proof: LeaderProof::LeaderId { leader_id: [0; 32] },
-        };
+        }
     }
 
     #[test]
@@ -463,8 +463,8 @@ mod test {
 
         let mut block2 = next_block(&block1);
         block2.id = block1.id;
-        engine = engine.receive_block(block2.clone()).unwrap();
-        assert_eq!(engine.blocks_in_view(1), vec![block1.clone()]);
+        engine = engine.receive_block(block2).unwrap();
+        assert_eq!(engine.blocks_in_view(1), vec![block1]);
     }
 
     #[test]
@@ -484,7 +484,7 @@ mod test {
             leader_proof: LeaderProof::LeaderId { leader_id: [0; 32] },
         };
 
-        let _ = engine.receive_block(block.clone());
+        let _ = engine.receive_block(block);
     }
 
     #[test]
@@ -518,6 +518,7 @@ mod test {
         let block2 = next_block(&block1);
         engine = engine.receive_block(block2.clone()).unwrap();
 
+        #[allow(clippy::redundant_clone)]
         let mut block3 = block2.clone();
         block3.id = [3; 32]; // use a new ID, so that this block isn't ignored
         engine = engine.receive_block(block3.clone()).unwrap();
@@ -554,7 +555,7 @@ mod test {
         );
 
         let block4 = next_block(&block3);
-        engine = engine.receive_block(block4.clone()).unwrap();
+        engine = engine.receive_block(block4).unwrap();
         assert_eq!(engine.latest_committed_block(), block2);
         assert_eq!(
             engine.committed_blocks(),
@@ -589,7 +590,7 @@ mod test {
         let engine = init_from_genesis();
 
         let block = next_block(&engine.genesis_block());
-        let _ = engine.approve_block(block.clone());
+        let _ = engine.approve_block(block);
     }
 
     #[test]
@@ -611,7 +612,7 @@ mod test {
     fn local_timeout() {
         let mut engine = init_from_genesis();
         let block = next_block(&engine.genesis_block());
-        engine = engine.receive_block(block.clone()).unwrap(); // received but not approved yet
+        engine = engine.receive_block(block).unwrap(); // received but not approved yet
 
         let (engine, send) = engine.local_timeout();
         assert_eq!(engine.highest_voted_view, 1); // updated from 0 (genesis) to 1 (current_view)
@@ -637,7 +638,7 @@ mod test {
     fn receive_timeout_qc_after_local_timeout() {
         let mut engine = init_from_genesis();
         let block = next_block(&engine.genesis_block());
-        engine = engine.receive_block(block.clone()).unwrap(); // received but not approved yet
+        engine = engine.receive_block(block).unwrap(); // received but not approved yet
 
         let (mut engine, _) = engine.local_timeout();
 
@@ -652,7 +653,7 @@ mod test {
         };
         engine = engine.receive_timeout_qc(timeout_qc.clone());
         assert_eq!(engine.local_high_qc, timeout_qc.high_qc);
-        assert_eq!(engine.last_view_timeout_qc, Some(timeout_qc.clone()));
+        assert_eq!(engine.last_view_timeout_qc, Some(timeout_qc));
         assert_eq!(engine.current_view(), 2);
     }
 
@@ -661,7 +662,7 @@ mod test {
     fn receive_timeout_qc_before_local_timeout() {
         let mut engine = init_from_genesis();
         let block = next_block(&engine.genesis_block());
-        engine = engine.receive_block(block.clone()).unwrap(); // received but not approved yet
+        engine = engine.receive_block(block).unwrap(); // received but not approved yet
 
         // before local_timeout occurs
 
@@ -676,7 +677,7 @@ mod test {
         };
         engine = engine.receive_timeout_qc(timeout_qc.clone());
         assert_eq!(engine.local_high_qc, timeout_qc.high_qc);
-        assert_eq!(engine.last_view_timeout_qc, Some(timeout_qc.clone()));
+        assert_eq!(engine.last_view_timeout_qc, Some(timeout_qc));
         assert_eq!(engine.current_view(), 2);
     }
 
@@ -685,7 +686,7 @@ mod test {
     fn approve_new_view() {
         let mut engine = init_from_genesis();
         let block = next_block(&engine.genesis_block());
-        engine = engine.receive_block(block.clone()).unwrap(); // received but not approved yet
+        engine = engine.receive_block(block).unwrap(); // received but not approved yet
 
         assert_eq!(engine.current_view(), 1); // still waiting for a QC(view=1)
         let timeout_qc = TimeoutQc {
@@ -707,12 +708,12 @@ mod test {
         assert_eq!(engine.current_view(), 2); // not changed
         assert_eq!(engine.highest_voted_view, 2);
         assert_eq!(
-            send.clone().payload,
+            send.payload,
             Payload::NewView(NewView {
                 view: 2,
                 sender: [0; 32],
                 timeout_qc: timeout_qc.clone(),
-                high_qc: timeout_qc.clone().high_qc,
+                high_qc: timeout_qc.high_qc,
             })
         );
     }
@@ -722,7 +723,7 @@ mod test {
     fn approve_new_view_not_bigger_than_timeout_qc() {
         let mut engine = init_from_genesis();
         let block = next_block(&engine.genesis_block());
-        engine = engine.receive_block(block.clone()).unwrap(); // received but not approved yet
+        engine = engine.receive_block(block).unwrap(); // received but not approved yet
 
         assert_eq!(engine.current_view(), 1);
         let timeout_qc1 = TimeoutQc {
@@ -746,9 +747,9 @@ mod test {
             sender: [0; 32],
         };
         engine = engine.receive_timeout_qc(timeout_qc2.clone());
-        assert_eq!(engine.last_view_timeout_qc, Some(timeout_qc2.clone()));
+        assert_eq!(engine.last_view_timeout_qc, Some(timeout_qc2));
 
         // we expect new_view(timeout_qc2), but...
-        let _ = engine.approve_new_view(timeout_qc1.clone(), HashSet::new());
+        let _ = engine.approve_new_view(timeout_qc1, HashSet::new());
     }
 }
