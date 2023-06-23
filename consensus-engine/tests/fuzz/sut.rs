@@ -130,12 +130,25 @@ impl StateMachineTest for ConsensusEngineTest {
         ref_state: &<Self::Reference as ReferenceStateMachine>::State,
     ) {
         assert_eq!(state.engine.current_view(), ref_state.current_view());
-
         assert_eq!(
             state.engine.highest_voted_view(),
-            ref_state.highest_voted_view()
+            ref_state.highest_voted_view
         );
+        assert_eq!(state.engine.high_qc().view, ref_state.high_qc().view);
 
-        //TODO: add more invariants with more public functions of Carnot
+        match state.engine.last_view_timeout_qc() {
+            Some(timeout_qc) => assert!(ref_state.latest_timeout_qcs().contains(&timeout_qc)),
+            None => assert!(ref_state.latest_timeout_qcs().is_empty()),
+        }
+
+        // Check if state and ref_state have the same blocks
+        let mut num_blocks = 0;
+        for (_, entry) in ref_state.chain.iter() {
+            for block in entry.blocks.iter() {
+                assert_eq!(state.engine.safe_blocks().get(&block.id), Some(block));
+                num_blocks += 1;
+            }
+        }
+        assert_eq!(state.engine.safe_blocks().len(), num_blocks);
     }
 }
