@@ -89,12 +89,10 @@ impl ReferenceStateMachine for RefState {
         match transition {
             Transition::Nop => true,
             Transition::ReceiveSafeBlock(block) => {
-                state.contains_block(block.parent_qc.view(), block.parent_qc.block())
-                    && block.view >= state.current_view()
+                state.contains_parent_of(block) && block.view >= state.current_view()
             }
             Transition::ReceiveUnsafeBlock(block) => {
-                state.contains_block(block.parent_qc.view(), block.parent_qc.block())
-                    && block.view < state.current_view()
+                state.contains_parent_of(block) && block.view < state.current_view()
             }
             Transition::ApproveBlock(block) => state.highest_voted_view < block.view,
             Transition::ApprovePastBlock(block) => state.highest_voted_view >= block.view,
@@ -293,6 +291,10 @@ impl RefState {
 
     pub fn new_view_from(timeout_qc: &TimeoutQc) -> View {
         timeout_qc.view + 1
+    }
+
+    fn contains_parent_of(&self, block: &Block) -> bool {
+        self.contains_block(block.parent_qc.parent_view(), block.parent_qc.block())
     }
 
     fn contains_block(&self, view: View, block_id: BlockId) -> bool {
