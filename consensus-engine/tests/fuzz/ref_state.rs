@@ -239,16 +239,12 @@ impl RefState {
 
     // Generate a Transition::ReceiveTimeoutQcForCurrentView
     fn transition_receive_timeout_qc_for_current_view(&self) -> BoxedStrategy<Transition> {
-        if let Some(high_qc) = self.high_qc() {
-            Just(Transition::ReceiveTimeoutQcForCurrentView(TimeoutQc {
-                view: self.current_view(),
-                high_qc,
-                sender: SENDER,
-            }))
-            .boxed()
-        } else {
-            Just(Transition::Nop).boxed()
-        }
+        Just(Transition::ReceiveTimeoutQcForCurrentView(TimeoutQc {
+            view: self.current_view(),
+            high_qc: self.high_qc(),
+            sender: SENDER,
+        }))
+        .boxed()
     }
 
     // Generate a Transition::ReceiveTimeoutQcForOldView
@@ -301,20 +297,16 @@ impl RefState {
         //TODO: more randomness
         let current_view = self.current_view();
 
-        if let Some(high_qc) = self.high_qc() {
-            Just(Transition::ReceiveSafeBlock(Block {
-                id: rand::thread_rng().gen(),
-                view: current_view + 1,
-                parent_qc: Qc::Aggregated(AggregateQc {
-                    high_qc,
-                    view: current_view,
-                }),
-                leader_proof: LEADER_PROOF.clone(),
-            }))
-            .boxed()
-        } else {
-            Just(Transition::Nop).boxed()
-        }
+        Just(Transition::ReceiveSafeBlock(Block {
+            id: rand::thread_rng().gen(),
+            view: current_view + 1,
+            parent_qc: Qc::Aggregated(AggregateQc {
+                high_qc: self.high_qc(),
+                view: current_view,
+            }),
+            leader_proof: LEADER_PROOF.clone(),
+        }))
+        .boxed()
     }
 
     pub fn highest_voted_view(&self) -> View {
@@ -335,11 +327,12 @@ impl RefState {
         timeout_qc.view + 1
     }
 
-    fn high_qc(&self) -> Option<StandardQc> {
+    fn high_qc(&self) -> StandardQc {
         self.chain
             .iter()
             .rev()
             .find_map(|(_, entry)| entry.high_qc())
+            .unwrap() // doesn't fail because self.chain always contains at least a genesis block
     }
 
     fn latest_timeout_qcs(&self) -> Vec<TimeoutQc> {
