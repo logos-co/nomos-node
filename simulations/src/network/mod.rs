@@ -197,37 +197,39 @@ where
         match message {
             NetworkMessage::Adhoc(msg) => {
                 let recipient = msg.to.expect("Adhoc message has recipient");
-                if let Some(delay) = self.send_message_cost(rng, msg.from, recipient) {
-                    if network_time.add(delay) <= self.network_time {
-                        let to_node = self.to_node_senders.get(&recipient).unwrap();
-                        to_node
-                            .send(message.clone())
-                            .expect("Node should have connection");
-                        return false;
-                    } else {
-                        return true;
-                    }
-                }
-                false
+                let to_node = self.to_node_senders.get(&recipient).unwrap();
+                self.send_delayed(rng, recipient, to_node, network_time, msg)
             }
             NetworkMessage::Broadcast(msg) => {
+                let mut adhoc = msg.clone();
                 for (recipient, to_node) in self.to_node_senders.iter() {
-                    if let Some(delay) = self.send_message_cost(rng, msg.from, *recipient) {
-                        if network_time.add(delay) <= self.network_time {
-                            let adhoc_msg =
-                                NetworkMessage::adhoc(msg.from, *recipient, msg.payload.clone());
-                            to_node
-                                .send(adhoc_msg)
-                                .expect("Node should have connection");
-                            return false;
-                        } else {
-                            return true;
-                        }
-                    }
+                    adhoc.to = Some(*recipient);
+                    self.send_delayed(rng, *recipient, to_node, network_time, &adhoc);
                 }
                 false
             }
         }
+    }
+
+    fn send_delayed<R: Rng>(
+        &self,
+        rng: &mut R,
+        to: NodeId,
+        to_node: &Sender<NetworkMessage<M>>,
+        network_time: &NetworkTime,
+        msg: &AdhocMessage<M>,
+    ) -> bool {
+        if let Some(delay) = self.send_message_cost(rng, msg.from, to) {
+            if network_time.add(delay) <= self.network_time {
+                to_node
+                    .send(NetworkMessage::Adhoc(msg.clone()))
+                    .expect("Node should have connection");
+                return false;
+            } else {
+                return true;
+            }
+        }
+        false
     }
 }
 
