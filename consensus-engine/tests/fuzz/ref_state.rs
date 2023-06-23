@@ -298,12 +298,9 @@ impl RefState {
     }
 
     fn contains_block(&self, view: View, block_id: BlockId) -> bool {
-        self.chain
-            .get(&view)
-            .unwrap_or(&Default::default())
-            .blocks
-            .iter()
-            .any(|block| block.id == block_id)
+        self.chain.get(&view).map_or(false, |entry| {
+            entry.blocks.iter().any(|block| block.id == block_id)
+        })
     }
 
     fn consecutive_block(parent: &Block) -> Block {
