@@ -95,7 +95,7 @@ impl StateMachineTest for ConsensusEngineTest {
 
                 ConsensusEngineTest { engine }
             }
-            Transition::ReceiveTimeoutQcForCurrentView(timeout_qc) => {
+            Transition::ReceiveTimeoutQcForRecentView(timeout_qc) => {
                 let engine = state.engine.receive_timeout_qc(timeout_qc.clone());
                 assert_eq!(engine.current_view(), RefState::new_view_from(&timeout_qc));
 
