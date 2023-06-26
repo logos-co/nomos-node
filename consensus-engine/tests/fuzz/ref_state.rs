@@ -257,7 +257,7 @@ impl RefState {
                     (current_view..=current_view + delta) // including future views
                         .prop_map(move |view| {
                             Transition::ReceiveTimeoutQcForRecentView(TimeoutQc {
-                                view: current_view + view,
+                                view,
                                 high_qc: StandardQc {
                                     view: block.view,
                                     id: block.id,
