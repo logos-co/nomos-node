@@ -2,6 +2,8 @@
 
 ## Fuzz testing
 
+### Running fuzz tests
+
 To test consensus-engine with randomized state transitions,
 ```bash
 cargo test --test fuzz_test
@@ -13,10 +15,12 @@ To trigger a long-running fuzz test, please use the following environment variab
 PROPTEST_CASES=500000 \  // # of successful test cases that must execute
 cargo test --test fuzz_test
 ```
-The [hard-coded number](fuzz_test.rs#L20) of state transitions will be executed for each test case.
+The [hard-coded number](tests/fuzz_test.rs#L20) of state transitions will be executed for each test case.
 This number needs to be configurable soon.
 
 For more details about `PROPTEST_*` environment variables, please see the [proptest guide](https://github.com/proptest-rs/proptest/blob/7d840ca5071bed1a986dd7e0db080847a07c9818/proptest/src/test_runner/config.rs#L186).
+
+### Regression files
 
 If the fuzz testing finds any failure case, it will generate a regression file: `tests/fuzz_test.proptest-regressions` that contains the initial state and transitions that cause the failure. The file looks like below.
 ```
