@@ -23,7 +23,7 @@ If you want to print transitions,
 # 0: No extra output
 # 1: Log test failure messages
 # 2: Trace low-level details
-PROPTEST_CASES=2 \
+PROPTEST_VERBOSE=2 \
 cargo test --test fuzz_test -- --nocapture
 ```
 
