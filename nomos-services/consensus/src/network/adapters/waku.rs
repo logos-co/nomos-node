@@ -86,15 +86,15 @@ impl WakuAdapter {
         content_topic: WakuContentTopic,
     ) -> impl Stream<Item = WakuMessage> {
         // create stream request tasks
-        let live_stream_channel_task = self.message_subscriber_channel();
-        let archive_stream_task = self.archive_subscriber_stream(content_topic.clone());
-        // wait for both tasks to complete
-        let (live_stream_channel_result, archive_stream_result) =
-            futures::join!(live_stream_channel_task, archive_stream_task);
-        // unwrap results
-        let live_stream_channel =
-            live_stream_channel_result.expect("live stream channel from waku network");
-        let archive_stream = archive_stream_result.expect("archive stream from waku network");
+        let live_stream_channel = self
+            .message_subscriber_channel()
+            .await
+            .expect("live stream channel from waku network");
+        let archive_stream = self
+            .archive_subscriber_stream(content_topic.clone())
+            .await
+            .expect("archive stream from waku network");
+
         let live_stream = BroadcastStream::new(live_stream_channel)
             .zip(futures::stream::repeat(content_topic))
             .filter_map(|(msg, content_topic)| async move {
