@@ -29,3 +29,7 @@ async-trait = "0.1"
 [[test]]
 name = "test_consensus_happy_path"
 path = "src/tests/happy.rs"
+
+
+[features]
+metrics = ["nomos-node/metrics"]

@@ -4,6 +4,7 @@ pub use nodes::NomosNode;
 use once_cell::sync::Lazy;
 use rand::SeedableRng;
 use rand_xoshiro::Xoshiro256PlusPlus;
+use std::fmt::Debug;
 use std::net::TcpListener;
 use std::sync::Mutex;
 
@@ -20,8 +21,6 @@ pub fn get_available_port() -> u16 {
     }
     *port
 }
-
-use std::fmt::Debug;
 
 #[async_trait::async_trait]
 pub trait Node: Sized {

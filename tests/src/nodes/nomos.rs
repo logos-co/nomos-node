@@ -172,6 +172,8 @@ fn create_node_config(nodes: Vec<[u8; 32]>, private_key: [u8; 32]) -> Config {
                 cors_origins: vec![],
             },
         },
+        #[cfg(feature = "metrics")]
+        metrics: Default::default(),
     };
     config.network.backend.inner.port = Some(get_available_port() as usize);
     config
