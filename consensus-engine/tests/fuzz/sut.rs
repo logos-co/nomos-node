@@ -1,4 +1,4 @@
-use std::panic;
+use std::{collections::HashSet, panic};
 
 use consensus_engine::{
     overlay::{FlatOverlay, RoundRobin, Settings},
@@ -130,12 +130,24 @@ impl StateMachineTest for ConsensusEngineTest {
         ref_state: &<Self::Reference as ReferenceStateMachine>::State,
     ) {
         assert_eq!(state.engine.current_view(), ref_state.current_view());
-
         assert_eq!(
             state.engine.highest_voted_view(),
-            ref_state.highest_voted_view()
+            ref_state.highest_voted_view
         );
+        assert_eq!(state.engine.high_qc().view, ref_state.high_qc().view);
 
-        //TODO: add more invariants with more public functions of Carnot
+        match state.engine.last_view_timeout_qc() {
+            Some(timeout_qc) => assert!(ref_state.latest_timeout_qcs().contains(&timeout_qc)),
+            None => assert!(ref_state.latest_timeout_qcs().is_empty()),
+        }
+
+        // Check if state and ref_state have the same blocks
+        let ref_blocks: HashSet<&Block> = ref_state
+            .chain
+            .values()
+            .flat_map(|entry| entry.blocks.iter())
+            .collect();
+        let blocks: HashSet<&Block> = state.engine.safe_blocks().values().collect();
+        assert_eq!(blocks, ref_blocks);
     }
 }

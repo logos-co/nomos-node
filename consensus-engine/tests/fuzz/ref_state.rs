@@ -17,14 +17,14 @@ use crate::fuzz::transition::Transition;
 // so that we don't need to replicate the logic implemented in consensus-engine.
 #[derive(Clone, Debug)]
 pub struct RefState {
-    chain: BTreeMap<View, ViewEntry>,
-    highest_voted_view: View,
+    pub chain: BTreeMap<View, ViewEntry>,
+    pub highest_voted_view: View,
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]
-struct ViewEntry {
-    blocks: HashSet<Block>,
-    timeout_qcs: HashSet<TimeoutQc>,
+pub struct ViewEntry {
+    pub blocks: HashSet<Block>,
+    pub timeout_qcs: HashSet<TimeoutQc>,
 }
 
 const LEADER_PROOF: LeaderProof = LeaderProof::LeaderId { leader_id: [0; 32] };
@@ -315,10 +315,6 @@ impl RefState {
         .boxed()
     }
 
-    pub fn highest_voted_view(&self) -> View {
-        self.highest_voted_view
-    }
-
     pub fn current_view(&self) -> View {
         let (&last_view, last_entry) = self.chain.last_key_value().unwrap();
         if last_entry.timeout_qcs.is_empty() {
@@ -333,7 +329,7 @@ impl RefState {
         timeout_qc.view + 1
     }
 
-    fn high_qc(&self) -> StandardQc {
+    pub fn high_qc(&self) -> StandardQc {
         self.chain
             .iter()
             .rev()
@@ -341,7 +337,7 @@ impl RefState {
             .unwrap() // doesn't fail because self.chain always contains at least a genesis block
     }
 
-    fn latest_timeout_qcs(&self) -> Vec<TimeoutQc> {
+    pub fn latest_timeout_qcs(&self) -> Vec<TimeoutQc> {
         let latest_timeout_qc_view_entry = self
             .chain
             .iter()
