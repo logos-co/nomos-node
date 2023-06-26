@@ -294,13 +294,13 @@ impl RefState {
     }
 
     fn contains_parent_of(&self, block: &Block) -> bool {
-        self.contains_block(block.parent_qc.parent_view(), block.parent_qc.block())
+        self.contains_block(block.parent_qc.block())
     }
 
-    fn contains_block(&self, view: View, block_id: BlockId) -> bool {
-        self.chain.get(&view).map_or(false, |entry| {
-            entry.blocks.iter().any(|block| block.id == block_id)
-        })
+    fn contains_block(&self, block_id: BlockId) -> bool {
+        self.chain
+            .iter()
+            .any(|(_, entry)| entry.blocks.iter().any(|block| block.id == block_id))
     }
 
     fn consecutive_block(parent: &Block) -> Block {
