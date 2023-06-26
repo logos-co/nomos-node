@@ -11,7 +11,7 @@ pub enum Transition {
     ApproveBlock(Block),
     ApprovePastBlock(Block),
     LocalTimeout,
-    ReceiveTimeoutQcForCurrentView(TimeoutQc),
+    ReceiveTimeoutQcForRecentView(TimeoutQc),
     ReceiveTimeoutQcForOldView(TimeoutQc),
     ApproveNewViewWithLatestTimeoutQc(TimeoutQc, HashSet<NewView>),
     //TODO: add more corner transitions

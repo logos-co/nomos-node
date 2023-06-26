@@ -71,7 +71,7 @@ impl ReferenceStateMachine for RefState {
             state.transition_approve_block(),
             state.transition_approve_past_block(),
             state.transition_local_timeout(),
-            state.transition_receive_timeout_qc_for_current_view(),
+            state.transition_receive_timeout_qc_for_recent_view(),
             state.transition_receive_timeout_qc_for_old_view(),
             state.transition_approve_new_view_with_latest_timeout_qc(),
             state.transition_receive_safe_block_with_aggregated_qc(),
@@ -101,7 +101,7 @@ impl ReferenceStateMachine for RefState {
             Transition::ApproveBlock(block) => state.highest_voted_view < block.view,
             Transition::ApprovePastBlock(block) => state.highest_voted_view >= block.view,
             Transition::LocalTimeout => true,
-            Transition::ReceiveTimeoutQcForCurrentView(timeout_qc) => {
+            Transition::ReceiveTimeoutQcForRecentView(timeout_qc) => {
                 timeout_qc.view == state.current_view()
             }
             Transition::ReceiveTimeoutQcForOldView(timeout_qc) => {
@@ -139,7 +139,7 @@ impl ReferenceStateMachine for RefState {
             Transition::LocalTimeout => {
                 state.highest_voted_view = state.current_view();
             }
-            Transition::ReceiveTimeoutQcForCurrentView(timeout_qc) => {
+            Transition::ReceiveTimeoutQcForRecentView(timeout_qc) => {
                 state
                     .chain
                     .entry(timeout_qc.view)
@@ -243,14 +243,37 @@ impl RefState {
         Just(Transition::LocalTimeout).boxed()
     }
 
-    // Generate a Transition::ReceiveTimeoutQcForCurrentView
-    fn transition_receive_timeout_qc_for_current_view(&self) -> BoxedStrategy<Transition> {
-        Just(Transition::ReceiveTimeoutQcForCurrentView(TimeoutQc {
-            view: self.current_view(),
-            high_qc: self.high_qc(),
-            sender: SENDER,
-        }))
-        .boxed()
+    // Generate a Transition::ReceiveTimeoutQcForRecentView
+    fn transition_receive_timeout_qc_for_recent_view(&self) -> BoxedStrategy<Transition> {
+        let current_view = self.current_view();
+        let local_high_qc = self.high_qc();
+        let delta = 3;
+
+        let blocks_around_local_high_qc = self
+            .chain
+            .range(local_high_qc.view - delta..=local_high_qc.view + delta) // including past/future QCs
+            .flat_map(|(_, entry)| entry.blocks.iter().cloned())
+            .collect::<Vec<Block>>();
+
+        if blocks_around_local_high_qc.is_empty() {
+            Just(Transition::Nop).boxed()
+        } else {
+            proptest::sample::select(blocks_around_local_high_qc)
+                .prop_flat_map(move |block| {
+                    (current_view..=current_view + delta) // including future views
+                        .prop_map(move |view| {
+                            Transition::ReceiveTimeoutQcForRecentView(TimeoutQc {
+                                view,
+                                high_qc: StandardQc {
+                                    view: block.view,
+                                    id: block.id,
+                                },
+                                sender: SENDER,
+                            })
+                        })
+                })
+                .boxed()
+        }
     }
 
     // Generate a Transition::ReceiveTimeoutQcForOldView
@@ -331,10 +354,10 @@ impl RefState {
 
     pub fn high_qc(&self) -> StandardQc {
         self.chain
-            .iter()
-            .rev()
-            .find_map(|(_, entry)| entry.high_qc())
-            .unwrap() // doesn't fail because self.chain always contains at least a genesis block
+            .values()
+            .map(|entry| entry.high_qc().unwrap_or_else(StandardQc::genesis))
+            .max_by_key(|qc| qc.view)
+            .unwrap_or_else(StandardQc::genesis)
     }
 
     pub fn latest_timeout_qcs(&self) -> Vec<TimeoutQc> {
