@@ -12,11 +12,20 @@ cargo test --test fuzz_test
 By default, the fuzz test runs only [few test cases and transisions](tests/fuzz_test.rs#L15).
 To trigger a long-running fuzz test, please use the following environment variables:
 ```bash
-PROPTEST_CASES=500000 \  // # of successful test cases that must execute
+PROPTEST_CASES=500000 \  # Num of successful test cases that must execute
 cargo test --test fuzz_test
 ```
-The [hard-coded number](tests/fuzz_test.rs#L20) of state transitions will be executed for each test case.
+The [hardcoded number](tests/fuzz_test.rs#L20) of state transitions will be executed for each test case.
 This number needs to be configurable soon.
+
+If you want to print transitions,
+```bash
+# 0: No extra output
+# 1: Log test failure messages
+# 2: Trace low-level details
+PROPTEST_CASES=2 \
+cargo test --test fuzz_test -- --nocapture
+```
 
 For more details about `PROPTEST_*` environment variables, please see the [proptest guide](https://github.com/proptest-rs/proptest/blob/7d840ca5071bed1a986dd7e0db080847a07c9818/proptest/src/test_runner/config.rs#L186).
 
@@ -42,15 +51,4 @@ In this case, we don't need to (or shouldn't) push the regression file to Git.
 
 For more details, please see the [proptest guide](https://proptest-rs.github.io/proptest/proptest/state-machine.html).
 
-### State transitions
-
-Currently, the fuzz testing generates the following transitions considered as valid.
-- `ReceiveBlock`
-- `ApproveBlock`
-
-In other words, it doesn't run transitions that are expected to be explicitly rejected by consensus-engine, such as approving blocks that are not received yet.
-This means that we test whether the consensus-engine works well if only valid inputs are received.
-
-TODO:
-- Test whether the consensus isn't broken if unacceptable transitions are received.
-- Test more transitions for unhappy path.
+NOTE: It seems that the regression file isn't loaded by [proptest-state-machine-testing](https://proptest-rs.github.io/proptest/proptest/state-machine.html). @youngjoon-lee should find the right way.
