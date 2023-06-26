@@ -142,13 +142,12 @@ impl StateMachineTest for ConsensusEngineTest {
         }
 
         // Check if state and ref_state have the same blocks
-        let ref_blocks: HashSet<Block> = ref_state
+        let ref_blocks: HashSet<&Block> = ref_state
             .chain
             .values()
             .flat_map(|entry| entry.blocks.iter())
-            .cloned()
             .collect();
-        let blocks: HashSet<Block> = state.engine.safe_blocks().values().cloned().collect();
+        let blocks: HashSet<&Block> = state.engine.safe_blocks().values().collect();
         assert_eq!(blocks, ref_blocks);
     }
 }
