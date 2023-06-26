@@ -1,4 +1,4 @@
-use std::panic;
+use std::{collections::HashSet, panic};
 
 use consensus_engine::{
     overlay::{FlatOverlay, RoundRobin, Settings},
@@ -142,13 +142,12 @@ impl StateMachineTest for ConsensusEngineTest {
         }
 
         // Check if state and ref_state have the same blocks
-        let mut num_blocks = 0;
-        for (_, entry) in ref_state.chain.iter() {
-            for block in entry.blocks.iter() {
-                assert_eq!(state.engine.safe_blocks().get(&block.id), Some(block));
-                num_blocks += 1;
-            }
-        }
-        assert_eq!(state.engine.safe_blocks().len(), num_blocks);
+        let ref_blocks: HashSet<&Block> = ref_state
+            .chain
+            .values()
+            .flat_map(|entry| entry.blocks.iter())
+            .collect();
+        let blocks: HashSet<&Block> = state.engine.safe_blocks().values().collect();
+        assert_eq!(blocks, ref_blocks);
     }
 }

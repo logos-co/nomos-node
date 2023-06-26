@@ -1,15 +1,15 @@
 {
   "network_settings": {
     "network_behaviors": {
-      "north america:north america": "1s",
-      "north america:europe": "1s",
-      "north america:asia": "1s",
-      "europe:europe": "1s",
-      "europe:asia": "1s",
-      "europe:north america": "1s",
-      "asia:north america": "1s",
-      "asia:europe": "1s",
-      "asia:asia": "1s"
+      "north america:north america": "10ms",
+      "north america:europe": "50ms",
+      "north america:asia": "500ms",
+      "europe:europe": "5ms",
+      "europe:asia": "300ms",
+      "europe:north america": "80ms",
+      "asia:north america": "480ms",
+      "asia:europe": "300ms",
+      "asia:asia": "40ms"
     },
     "regions": {
       "north america": 0.4,

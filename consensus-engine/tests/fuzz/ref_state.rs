@@ -1,6 +1,8 @@
 use std::collections::{BTreeMap, HashSet};
 
-use consensus_engine::{AggregateQc, Block, LeaderProof, NodeId, Qc, StandardQc, TimeoutQc, View};
+use consensus_engine::{
+    AggregateQc, Block, BlockId, LeaderProof, NodeId, Qc, StandardQc, TimeoutQc, View,
+};
 use proptest::prelude::*;
 use proptest::strategy::BoxedStrategy;
 use proptest_state_machine::ReferenceStateMachine;
@@ -90,8 +92,12 @@ impl ReferenceStateMachine for RefState {
         // because some transitions may no longer be valid after some shrinking is applied.
         match transition {
             Transition::Nop => true,
-            Transition::ReceiveSafeBlock(block) => block.view >= state.current_view(),
-            Transition::ReceiveUnsafeBlock(block) => block.view < state.current_view(),
+            Transition::ReceiveSafeBlock(block) => {
+                state.contains_parent_of(block) && block.view >= state.current_view()
+            }
+            Transition::ReceiveUnsafeBlock(block) => {
+                state.contains_parent_of(block) && block.view < state.current_view()
+            }
             Transition::ApproveBlock(block) => state.highest_voted_view < block.view,
             Transition::ApprovePastBlock(block) => state.highest_voted_view >= block.view,
             Transition::LocalTimeout => true,
@@ -369,6 +375,16 @@ impl RefState {
                 .collect::<Vec<TimeoutQc>>(),
             None => vec![],
         }
+    }
+
+    fn contains_parent_of(&self, block: &Block) -> bool {
+        self.contains_block(block.parent_qc.block())
+    }
+
+    fn contains_block(&self, block_id: BlockId) -> bool {
+        self.chain
+            .iter()
+            .any(|(_, entry)| entry.blocks.iter().any(|block| block.id == block_id))
     }
 
     fn consecutive_block(parent: &Block) -> Block {

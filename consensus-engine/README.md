@@ -2,10 +2,34 @@
 
 ## Fuzz testing
 
+### Running fuzz tests
+
 To test consensus-engine with randomized state transitions,
 ```bash
-cargo test --tests fuzz_test
+cargo test --test fuzz_test
 ```
+
+By default, the fuzz test runs only [few test cases and transisions](tests/fuzz_test.rs#L15).
+To trigger a long-running fuzz test, please use the following environment variables:
+```bash
+PROPTEST_CASES=500000 \  # Num of successful test cases that must execute
+cargo test --test fuzz_test
+```
+The [hardcoded number](tests/fuzz_test.rs#L20) of state transitions will be executed for each test case.
+This number needs to be configurable soon.
+
+If you want to print transitions,
+```bash
+# 0: No extra output
+# 1: Log test failure messages
+# 2: Trace low-level details
+PROPTEST_VERBOSE=2 \
+cargo test --test fuzz_test -- --nocapture
+```
+
+For more details about `PROPTEST_*` environment variables, please see the [proptest guide](https://github.com/proptest-rs/proptest/blob/7d840ca5071bed1a986dd7e0db080847a07c9818/proptest/src/test_runner/config.rs#L186).
+
+### Regression files
 
 If the fuzz testing finds any failure case, it will generate a regression file: `tests/fuzz_test.proptest-regressions` that contains the initial state and transitions that cause the failure. The file looks like below.
 ```
@@ -17,19 +41,14 @@ If the fuzz testing finds any failure case, it will generate a regression file: 
 # everyone who runs the test benefits from these saved cases.
 cc c2157c559fe10276985a8f2284b0c294c2d6a5a293cce45f2e4ad2a3b4a23233 # shrinks to (initial_state, transitions) = (RefState { chain: {0: {[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]: Block { id: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], view: 0, parent_qc: Standard(StandardQc { view: -1, id: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] }) }}}, blocks: {[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]: Block { id: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], view: 0, parent_qc: Standard(StandardQc { view: -1, id: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] }) }}, highest_voted_view: 0 }, [ReceiveBlock([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])])
 ```
-If the test starts with the regression files existing, the files are automatically captured and used as test cases to check if the issue is not reproduced anymore.
-Thus, these regression files should be added to the Git repository.
+We should manually check if the error is caused by consensus-engine, or by something wrong in the fuzz test.
+
+If the error is came from consensus-engine, we should fix the consensus-engine and commit the fix to Git along with the regression file.
+If the fuzz test starts with the regression files existing, the files are automatically captured and used as test cases to check if the issue is not reproduced anymore.
+
+If the error is caused by something wrong in the fuzz test, we should fix the test.
+In this case, we don't need to (or shouldn't) push the regression file to Git.
+
 For more details, please see the [proptest guide](https://proptest-rs.github.io/proptest/proptest/state-machine.html).
 
-### Test cases
-
-Currently, the fuzz testing generates the following transitions considered as valid.
-- `ReceiveBlock`
-- `ApproveBlock`
-
-In other words, it doesn't run transitions that are expected to be explicitly rejected by consensus-engine, such as approving blocks that are not received yet.
-This means that we test whether the consensus-engine works well if only valid inputs are received.
-
-TODO:
-- Test whether the consensus isn't broken if unacceptable transitions are received.
-- Test more transitions for unhappy path.
+_NOTE: It seems that the regression file is generated well but isn't loaded by [proptest-state-machine-testing](https://proptest-rs.github.io/proptest/proptest/state-machine.html). @youngjoon-lee should find the right way._
