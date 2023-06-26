@@ -1,6 +1,8 @@
 use std::collections::{BTreeMap, HashSet};
 
-use consensus_engine::{AggregateQc, Block, BlockId, LeaderProof, NodeId, Qc, StandardQc, TimeoutQc, View};
+use consensus_engine::{
+    AggregateQc, Block, BlockId, LeaderProof, NodeId, Qc, StandardQc, TimeoutQc, View,
+};
 use proptest::prelude::*;
 use proptest::strategy::BoxedStrategy;
 use proptest_state_machine::ReferenceStateMachine;
@@ -355,7 +357,7 @@ impl RefState {
             None => vec![],
         }
     }
-  
+
     fn contains_parent_of(&self, block: &Block) -> bool {
         self.contains_block(block.parent_qc.block())
     }
