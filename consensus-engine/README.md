@@ -51,4 +51,4 @@ In this case, we don't need to (or shouldn't) push the regression file to Git.
 
 For more details, please see the [proptest guide](https://proptest-rs.github.io/proptest/proptest/state-machine.html).
 
-_NOTE: It seems that the regression file isn't loaded by [proptest-state-machine-testing](https://proptest-rs.github.io/proptest/proptest/state-machine.html). @youngjoon-lee should find the right way._
+_NOTE: It seems that the regression file is generated well but isn't loaded by [proptest-state-machine-testing](https://proptest-rs.github.io/proptest/proptest/state-machine.html). @youngjoon-lee should find the right way._
