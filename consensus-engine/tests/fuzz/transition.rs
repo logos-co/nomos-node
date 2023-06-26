@@ -1,4 +1,6 @@
-use consensus_engine::{Block, TimeoutQc};
+use std::collections::HashSet;
+
+use consensus_engine::{Block, NewView, TimeoutQc};
 
 // State transtitions that will be picked randomly
 #[derive(Clone, Debug)]
@@ -11,6 +13,6 @@ pub enum Transition {
     LocalTimeout,
     ReceiveTimeoutQcForCurrentView(TimeoutQc),
     ReceiveTimeoutQcForOldView(TimeoutQc),
-    //TODO: add more invalid transitions that must be rejected by consensus-engine
-    //TODO: add more transitions
+    ApproveNewViewWithLatestTimeoutQc(TimeoutQc, HashSet<NewView>),
+    //TODO: add more corner transitions
 }
