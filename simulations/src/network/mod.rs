@@ -262,6 +262,13 @@ impl<M> NetworkMessage<M> {
             payload,
         })
     }
+
+    pub fn get_payload(self) -> M {
+        match self {
+            NetworkMessage::Adhoc(AdhocMessage { payload, .. }) => payload,
+            NetworkMessage::Broadcast(AdhocMessage { payload, .. }) => payload,
+        }
+    }
 }
 
 pub trait NetworkInterface {

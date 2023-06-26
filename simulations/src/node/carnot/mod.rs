@@ -16,7 +16,7 @@ use serde::{Deserialize, Serialize};
 // internal
 use self::messages::CarnotMessage;
 use super::{Node, NodeId};
-use crate::network::{AdhocMessage, InMemoryNetworkInterface, NetworkInterface, NetworkMessage};
+use crate::network::{InMemoryNetworkInterface, NetworkInterface, NetworkMessage};
 use crate::node::carnot::event_builder::{CarnotTx, Event};
 use crate::node::carnot::message_cache::MessageCache;
 use crate::util::parse_idx;
@@ -243,10 +243,6 @@ impl<O: Overlay> CarnotNode<O> {
         this
     }
 
-    pub(crate) fn send_message(&self, message: CarnotMessage) {
-        self.network_interface.send_message(self.id, message);
-    }
-
     fn handle_output(&self, output: Output<CarnotTx>) {
         match output {
             Output::Send(consensus_engine::Send {
@@ -338,10 +334,7 @@ impl<L: UpdateableLeaderSelection, O: Overlay<LeaderSelection = L>> Node for Car
             .network_interface
             .receive_messages()
             .into_iter()
-            .map(|m| match m {
-                NetworkMessage::Adhoc(AdhocMessage { payload, .. }) => payload,
-                NetworkMessage::Broadcast(AdhocMessage { payload, .. }) => payload,
-            })
+            .map(NetworkMessage::get_payload)
             .partition(|m| {
                 m.view() == self.engine.current_view()
                     || matches!(m, CarnotMessage::Proposal(_) | CarnotMessage::TimeoutQc(_))
