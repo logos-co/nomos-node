@@ -111,6 +111,15 @@ impl StateMachineTest for ConsensusEngineTest {
 
                 ConsensusEngineTest { engine }
             }
+            Transition::ApproveNewViewWithLatestTimeoutQc(timeout_qc, new_views) => {
+                let (engine, _) = state.engine.approve_new_view(timeout_qc.clone(), new_views);
+                assert_eq!(
+                    engine.highest_voted_view(),
+                    RefState::new_view_from(&timeout_qc)
+                );
+
+                ConsensusEngineTest { engine }
+            }
         }
     }
 

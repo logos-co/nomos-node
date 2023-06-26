@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, HashSet};
 
-use consensus_engine::{Block, BlockId, LeaderProof, NodeId, Qc, StandardQc, TimeoutQc, View};
+use consensus_engine::{AggregateQc, Block, BlockId, LeaderProof, NodeId, Qc, StandardQc, TimeoutQc, View};
 use proptest::prelude::*;
 use proptest::strategy::BoxedStrategy;
 use proptest_state_machine::ReferenceStateMachine;
@@ -71,6 +71,8 @@ impl ReferenceStateMachine for RefState {
             state.transition_local_timeout(),
             state.transition_receive_timeout_qc_for_current_view(),
             state.transition_receive_timeout_qc_for_old_view(),
+            state.transition_approve_new_view_with_latest_timeout_qc(),
+            state.transition_receive_safe_block_with_aggregated_qc(),
         ]
         .boxed()
     }
@@ -102,6 +104,10 @@ impl ReferenceStateMachine for RefState {
             }
             Transition::ReceiveTimeoutQcForOldView(timeout_qc) => {
                 timeout_qc.view < state.current_view()
+            }
+            Transition::ApproveNewViewWithLatestTimeoutQc(timeout_qc, _) => {
+                state.latest_timeout_qcs().contains(timeout_qc)
+                    && state.highest_voted_view < RefState::new_view_from(timeout_qc)
             }
         }
     }
@@ -141,6 +147,11 @@ impl ReferenceStateMachine for RefState {
             }
             Transition::ReceiveTimeoutQcForOldView(_) => {
                 // Nothing to do because we expect the state doesn't change.
+            }
+            Transition::ApproveNewViewWithLatestTimeoutQc(timeout_qc, _) => {
+                let new_view = RefState::new_view_from(timeout_qc);
+                state.chain.entry(new_view).or_insert(ViewEntry::new());
+                state.highest_voted_view = new_view;
             }
         }
 
@@ -232,23 +243,12 @@ impl RefState {
 
     // Generate a Transition::ReceiveTimeoutQcForCurrentView
     fn transition_receive_timeout_qc_for_current_view(&self) -> BoxedStrategy<Transition> {
-        let view = self.current_view();
-        let high_qc = self
-            .chain
-            .iter()
-            .rev()
-            .find_map(|(_, entry)| entry.high_qc());
-
-        if let Some(high_qc) = high_qc {
-            Just(Transition::ReceiveTimeoutQcForCurrentView(TimeoutQc {
-                view,
-                high_qc,
-                sender: SENDER,
-            }))
-            .boxed()
-        } else {
-            Just(Transition::Nop).boxed()
-        }
+        Just(Transition::ReceiveTimeoutQcForCurrentView(TimeoutQc {
+            view: self.current_view(),
+            high_qc: self.high_qc(),
+            sender: SENDER,
+        }))
+        .boxed()
     }
 
     // Generate a Transition::ReceiveTimeoutQcForOldView
@@ -275,6 +275,44 @@ impl RefState {
         }
     }
 
+    // Generate a Transition::ApproveNewViewWithLatestTimeoutQc.
+    fn transition_approve_new_view_with_latest_timeout_qc(&self) -> BoxedStrategy<Transition> {
+        let latest_timeout_qcs: Vec<TimeoutQc> = self
+            .latest_timeout_qcs()
+            .iter()
+            .filter(|timeout_qc| self.highest_voted_view < RefState::new_view_from(timeout_qc))
+            .cloned()
+            .collect();
+
+        if latest_timeout_qcs.is_empty() {
+            Just(Transition::Nop).boxed()
+        } else {
+            proptest::sample::select(latest_timeout_qcs)
+                .prop_map(move |timeout_qc| {
+                    //TODO: set new_views
+                    Transition::ApproveNewViewWithLatestTimeoutQc(timeout_qc, HashSet::new())
+                })
+                .boxed()
+        }
+    }
+
+    // Generate a Transition::ReceiveSafeBlock, but with AggregatedQc.
+    fn transition_receive_safe_block_with_aggregated_qc(&self) -> BoxedStrategy<Transition> {
+        //TODO: more randomness
+        let current_view = self.current_view();
+
+        Just(Transition::ReceiveSafeBlock(Block {
+            id: rand::thread_rng().gen(),
+            view: current_view + 1,
+            parent_qc: Qc::Aggregated(AggregateQc {
+                high_qc: self.high_qc(),
+                view: current_view,
+            }),
+            leader_proof: LEADER_PROOF.clone(),
+        }))
+        .boxed()
+    }
+
     pub fn highest_voted_view(&self) -> View {
         self.highest_voted_view
     }
@@ -293,6 +331,31 @@ impl RefState {
         timeout_qc.view + 1
     }
 
+    fn high_qc(&self) -> StandardQc {
+        self.chain
+            .iter()
+            .rev()
+            .find_map(|(_, entry)| entry.high_qc())
+            .unwrap() // doesn't fail because self.chain always contains at least a genesis block
+    }
+
+    fn latest_timeout_qcs(&self) -> Vec<TimeoutQc> {
+        let latest_timeout_qc_view_entry = self
+            .chain
+            .iter()
+            .rev()
+            .find(|(_, entry)| !entry.timeout_qcs.is_empty());
+
+        match latest_timeout_qc_view_entry {
+            Some((_, entry)) => entry
+                .timeout_qcs
+                .iter()
+                .cloned()
+                .collect::<Vec<TimeoutQc>>(),
+            None => vec![],
+        }
+    }
+  
     fn contains_parent_of(&self, block: &Block) -> bool {
         self.contains_block(block.parent_qc.block())
     }
@@ -318,6 +381,10 @@ impl RefState {
 }
 
 impl ViewEntry {
+    fn new() -> ViewEntry {
+        Default::default()
+    }
+
     fn is_empty(&self) -> bool {
         self.blocks.is_empty() && self.timeout_qcs.is_empty()
     }
