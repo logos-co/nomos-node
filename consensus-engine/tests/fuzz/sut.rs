@@ -129,6 +129,10 @@ impl StateMachineTest for ConsensusEngineTest {
         state: &Self::SystemUnderTest,
         ref_state: &<Self::Reference as ReferenceStateMachine>::State,
     ) {
+        // Check invariants that the engine state must guarantee by itself.
+        assert!(state.engine.current_view() > state.engine.high_qc().view,);
+
+        // Compare state with ref_state to ensure that ref_state reflects the state correctly.
         assert_eq!(state.engine.current_view(), ref_state.current_view());
         assert_eq!(
             state.engine.highest_voted_view(),
