@@ -57,9 +57,32 @@ pub struct NewView {
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct TimeoutQc {
-    pub view: View,
-    pub high_qc: StandardQc,
-    pub sender: NodeId,
+    view: View,
+    high_qc: StandardQc,
+    sender: NodeId,
+}
+
+impl TimeoutQc {
+    pub fn new(view: View, high_qc: StandardQc, sender: NodeId) -> Self {
+        assert!(view >= high_qc.view);
+        Self {
+            view,
+            high_qc,
+            sender,
+        }
+    }
+
+    pub fn view(&self) -> i64 {
+        self.view
+    }
+
+    pub fn high_qc(&self) -> &StandardQc {
+        &self.high_qc
+    }
+
+    pub fn sender(&self) -> [u8; 32] {
+        self.sender
+    }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
@@ -161,5 +184,52 @@ impl Qc {
             Qc::Standard(qc) => qc.clone(),
             Qc::Aggregated(AggregateQc { high_qc, .. }) => high_qc.clone(),
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn new_timeout_qc() {
+        let timeout_qc = TimeoutQc::new(
+            2,
+            StandardQc {
+                view: 1,
+                id: [0; 32],
+            },
+            [0; 32],
+        );
+        assert_eq!(timeout_qc.view(), 2);
+        assert_eq!(timeout_qc.high_qc().view, 1);
+        assert_eq!(timeout_qc.high_qc().id, [0; 32]);
+        assert_eq!(timeout_qc.sender(), [0; 32]);
+
+        let timeout_qc = TimeoutQc::new(
+            2,
+            StandardQc {
+                view: 2,
+                id: [0; 32],
+            },
+            [0; 32],
+        );
+        assert_eq!(timeout_qc.view(), 2);
+        assert_eq!(timeout_qc.high_qc().view, 2);
+        assert_eq!(timeout_qc.high_qc().id, [0; 32]);
+        assert_eq!(timeout_qc.sender(), [0; 32]);
+    }
+
+    #[test]
+    #[should_panic(expected = "view >= high_qc.view")]
+    fn new_timeout_qc_panic() {
+        let _ = TimeoutQc::new(
+            1,
+            StandardQc {
+                view: 2,
+                id: [0; 32],
+            },
+            [0; 32],
+        );
     }
 }

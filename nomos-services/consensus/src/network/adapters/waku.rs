@@ -223,7 +223,7 @@ impl NetworkAdapter for WakuAdapter {
                     let payload = message.payload();
                     let qc = TimeoutQcMsg::from_bytes(payload);
                     async move {
-                        if qc.qc.view > view {
+                        if qc.qc.view() > view {
                             Some(qc)
                         } else {
                             None
