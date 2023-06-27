@@ -1,7 +1,14 @@
-use std::{fs::File, str::FromStr};
+use std::{
+    fs::File,
+    io::{stderr, stdout},
+    path::PathBuf,
+    str::FromStr,
+};
+use tracing_subscriber::fmt::{format::Format, FormatEvent, FormatFields, SubscriberBuilder};
 
-#[derive(Copy, Clone)]
+#[derive(Default, Copy, Clone)]
 pub enum LogFormat {
+    #[default]
     Plain,
     Json,
 }
@@ -18,46 +25,66 @@ impl FromStr for LogFormat {
     }
 }
 
-pub fn config_tracing<P: AsRef<std::path::Path>>(fmt: Option<LogFormat>, file: Option<&P>) {
-    let filter = std::env::var("SIMULATION_LOG").unwrap_or_else(|_| "info".to_owned());
-    if let Some(LogFormat::Json) = fmt {
-        let subscriber = tracing_subscriber::fmt::fmt()
-            .without_time()
-            .with_line_number(true)
-            .with_env_filter(filter)
-            .with_file(false)
-            .with_target(true)
-            .json();
+#[derive(Default, Clone)]
+pub enum LogOutput {
+    #[default]
+    StdOut,
+    StdErr,
+    File(PathBuf),
+}
 
-        if let Some(p) = file {
-            let file = File::create(p).expect("Unable to create log file");
-            tracing::subscriber::set_global_default(
-                subscriber.with_ansi(false).with_writer(file).finish(),
-            )
-            .expect("config_tracing is only called once");
-            return;
+impl FromStr for LogOutput {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.trim().to_ascii_lowercase().as_str() {
+            "stdout" => Ok(Self::StdOut),
+            "stderr" => Ok(Self::StdErr),
+            path => Ok(Self::File(PathBuf::from(path))),
         }
-
-        tracing::subscriber::set_global_default(subscriber.finish())
-            .expect("config_tracing is only called once");
-    } else {
-        let subscriber = tracing_subscriber::fmt::fmt()
-            .without_time()
-            .with_line_number(true)
-            .with_env_filter(filter)
-            .with_file(false)
-            .with_target(true);
-
-        if let Some(p) = file {
-            let file = File::create(p).expect("Unable to create log file");
-            tracing::subscriber::set_global_default(
-                subscriber.with_ansi(false).with_writer(file).finish(),
-            )
-            .expect("config_tracing is only called once");
-            return;
-        }
-
-        tracing::subscriber::set_global_default(subscriber.finish())
-            .expect("config_tracing is only called once");
     }
+}
+
+pub fn config_tracing(fmt: LogFormat, file: &LogOutput) {
+    let filter = std::env::var("SIMULATION_LOG").unwrap_or_else(|_| "info".to_owned());
+
+    let subscriber: tracing_subscriber::fmt::SubscriberBuilder<
+        tracing_subscriber::fmt::format::DefaultFields,
+        tracing_subscriber::fmt::format::Format<tracing_subscriber::fmt::format::Full, ()>,
+        tracing_subscriber::EnvFilter,
+    > = tracing_subscriber::fmt::fmt()
+        .without_time()
+        .with_line_number(true)
+        .with_env_filter(filter)
+        .with_file(false)
+        .with_target(true);
+
+    if let LogFormat::Json = fmt {
+        set_global(subscriber.json(), file);
+    } else {
+        set_global(subscriber, file);
+    }
+}
+
+fn set_global<N, L, T>(
+    subscriber: SubscriberBuilder<N, Format<L, T>, tracing_subscriber::EnvFilter>,
+    output: &LogOutput,
+) where
+    N: for<'writer> FormatFields<'writer> + 'static + Send + Sync,
+    Format<L, T>: FormatEvent<tracing_subscriber::Registry, N>,
+    L: Send + Sync + 'static,
+    T: Send + Sync + 'static,
+{
+    use tracing::subscriber::set_global_default;
+    match output {
+        LogOutput::StdOut => set_global_default(subscriber.with_writer(stdout).finish()),
+        LogOutput::StdErr => set_global_default(subscriber.with_writer(stderr).finish()),
+        LogOutput::File(path) => set_global_default(
+            subscriber
+                .with_ansi(false)
+                .with_writer(File::create(path).expect("Unable to create log file"))
+                .finish(),
+        ),
+    }
+    .expect("Unable to set global default subscriber")
 }
