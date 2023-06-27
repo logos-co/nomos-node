@@ -2,11 +2,15 @@ use super::LeaderSelection;
 use crate::{Committee, NodeId, Overlay};
 use serde::{Deserialize, Serialize};
 
+const LEADER_SUPER_MAJORITY_THRESHOLD_NUM: usize = 2;
+const LEADER_SUPER_MAJORITY_THRESHOLD_DEN: usize = 3;
+
 #[derive(Clone, Debug, PartialEq)]
 /// Flat overlay with a single committee and round robin leader selection.
 pub struct FlatOverlay<L: LeaderSelection> {
     nodes: Vec<NodeId>,
     leader: L,
+    leader_threshold: (usize, usize),
 }
 
 impl<L> Overlay for FlatOverlay<L>
@@ -16,8 +20,21 @@ where
     type Settings = Settings<L>;
     type LeaderSelection = L;
 
-    fn new(Settings { leader, nodes }: Self::Settings) -> Self {
-        Self { nodes, leader }
+    fn new(
+        Settings {
+            leader,
+            nodes,
+            leader_super_majority_threshold,
+        }: Self::Settings,
+    ) -> Self {
+        Self {
+            nodes,
+            leader,
+            leader_threshold: leader_super_majority_threshold.unwrap_or((
+                LEADER_SUPER_MAJORITY_THRESHOLD_NUM,
+                LEADER_SUPER_MAJORITY_THRESHOLD_DEN,
+            )),
+        }
     }
 
     fn root_committee(&self) -> crate::Committee {
@@ -69,7 +86,8 @@ where
     }
 
     fn leader_super_majority_threshold(&self, _id: NodeId) -> usize {
-        self.nodes.len() * 2 / 3 + 1
+        // self.leader_threshold is a tuple of (num, den) where num/den is the super majority threshold
+        self.nodes.len() * self.leader_threshold.0 / self.leader_threshold.1
     }
 
     fn update_leader_selection<F, E>(&self, f: F) -> Result<Self, E>
@@ -114,5 +132,7 @@ impl LeaderSelection for RoundRobin {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Settings<L> {
     pub nodes: Vec<NodeId>,
+    // a tuple of (num, den) where num/den is the super majority threshold
+    pub leader_super_majority_threshold: Option<(usize, usize)>,
     pub leader: L,
 }
