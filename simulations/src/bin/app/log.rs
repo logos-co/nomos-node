@@ -48,11 +48,7 @@ impl FromStr for LogOutput {
 pub fn config_tracing(fmt: LogFormat, file: &LogOutput) {
     let filter = std::env::var("SIMULATION_LOG").unwrap_or_else(|_| "info".to_owned());
 
-    let subscriber: tracing_subscriber::fmt::SubscriberBuilder<
-        tracing_subscriber::fmt::format::DefaultFields,
-        tracing_subscriber::fmt::format::Format<tracing_subscriber::fmt::format::Full, ()>,
-        tracing_subscriber::EnvFilter,
-    > = tracing_subscriber::fmt::fmt()
+    let subscriber = tracing_subscriber::fmt::fmt()
         .without_time()
         .with_line_number(true)
         .with_env_filter(filter)
