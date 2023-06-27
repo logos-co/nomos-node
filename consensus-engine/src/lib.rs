@@ -63,7 +63,8 @@ impl<O: Overlay> Carnot<O> {
         match block.leader_proof {
             LeaderProof::LeaderId { leader_id } => {
                 // This only accepts blocks from the leader of current_view + 1
-                if leader_id != self.overlay.next_leader() {
+                if leader_id != self.overlay.next_leader() || block.view != self.current_view() + 1
+                {
                     return Err(());
                 }
             }
@@ -508,31 +509,6 @@ mod test {
     }
 
     #[test]
-    // Ensure that multiple blocks (forks) can be received at the current view.
-    fn receive_multiple_blocks_at_the_current_view() {
-        let mut engine = init_from_genesis();
-
-        let block1 = next_block(&engine.genesis_block());
-        engine = engine.receive_block(block1.clone()).unwrap();
-
-        let block2 = next_block(&block1);
-        engine = engine.receive_block(block2.clone()).unwrap();
-
-        #[allow(clippy::redundant_clone)]
-        let mut block3 = block2.clone();
-        block3.id = [3; 32]; // use a new ID, so that this block isn't ignored
-        engine = engine.receive_block(block3.clone()).unwrap();
-
-        assert_eq!(engine.current_view(), block3.view);
-        assert!(engine
-            .blocks_in_view(engine.current_view())
-            .contains(&block2));
-        assert!(engine
-            .blocks_in_view(engine.current_view())
-            .contains(&block3));
-    }
-
-    #[test]
     // Ensure that the grandparent of the current view can be committed
     fn receive_block_and_commit() {
         let mut engine = init_from_genesis();
@@ -561,6 +537,39 @@ mod test {
             engine.committed_blocks(),
             vec![block2.id, block1.id, engine.genesis_block().id] // without block3, block4
         );
+    }
+
+    #[test]
+    // Ensure that the leader check in receive_block fails
+    // if block.view is not the expected view.
+    fn receive_block_with_future_view() {
+        let mut engine = init_from_genesis();
+
+        let block1 = next_block(&engine.genesis_block());
+        engine = engine.receive_block(block1.clone()).unwrap();
+        assert_eq!(engine.current_view(), 1);
+
+        // a future block should be rejected
+        let future_block = Block {
+            id: [10; 32],
+            view: 11, // a future view
+            parent_qc: Qc::Aggregated(AggregateQc {
+                view: 10,
+                high_qc: StandardQc {
+                    // a known parent block
+                    id: block1.id,
+                    view: block1.view,
+                },
+            }),
+            // In a single node env, the leader is always the same.
+            leader_proof: LeaderProof::LeaderId { leader_id: [0; 32] },
+        };
+        assert!(engine.receive_block(future_block).is_err());
+
+        // a past block should be also rejected
+        let mut past_block = block1; // with the same view as block1
+        past_block.id = [10; 32];
+        assert!(engine.receive_block(past_block).is_err());
     }
 
     #[test]
