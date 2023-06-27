@@ -1,4 +1,4 @@
-use std::str::FromStr;
+use std::{fs::File, str::FromStr};
 
 #[derive(Copy, Clone)]
 pub enum LogFormat {
@@ -18,7 +18,7 @@ impl FromStr for LogFormat {
     }
 }
 
-pub fn config_tracing(fmt: Option<LogFormat>) {
+pub fn config_tracing<P: AsRef<std::path::Path>>(fmt: Option<LogFormat>, file: Option<&P>) {
     let filter = std::env::var("SIMULATION_LOG").unwrap_or_else(|_| "info".to_owned());
     if let Some(LogFormat::Json) = fmt {
         let subscriber = tracing_subscriber::fmt::fmt()
@@ -27,10 +27,18 @@ pub fn config_tracing(fmt: Option<LogFormat>) {
             .with_env_filter(filter)
             .with_file(false)
             .with_target(true)
-            .with_ansi(true)
-            .json()
-            .finish();
-        tracing::subscriber::set_global_default(subscriber)
+            .json();
+
+        if let Some(p) = file {
+            let file = File::create(p).expect("Unable to create log file");
+            tracing::subscriber::set_global_default(
+                subscriber.with_ansi(false).with_writer(file).finish(),
+            )
+            .expect("config_tracing is only called once");
+            return;
+        }
+
+        tracing::subscriber::set_global_default(subscriber.finish())
             .expect("config_tracing is only called once");
     } else {
         let subscriber = tracing_subscriber::fmt::fmt()
@@ -38,10 +46,18 @@ pub fn config_tracing(fmt: Option<LogFormat>) {
             .with_line_number(true)
             .with_env_filter(filter)
             .with_file(false)
-            .with_target(true)
-            .with_ansi(true)
-            .finish();
-        tracing::subscriber::set_global_default(subscriber)
+            .with_target(true);
+
+        if let Some(p) = file {
+            let file = File::create(p).expect("Unable to create log file");
+            tracing::subscriber::set_global_default(
+                subscriber.with_ansi(false).with_writer(file).finish(),
+            )
+            .expect("config_tracing is only called once");
+            return;
+        }
+
+        tracing::subscriber::set_global_default(subscriber.finish())
             .expect("config_tracing is only called once");
     }
 }

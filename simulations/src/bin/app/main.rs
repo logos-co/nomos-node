@@ -41,6 +41,8 @@ pub struct SimulationApp {
     stream_type: Option<StreamType>,
     #[clap(long)]
     log_format: Option<log::LogFormat>,
+    #[clap(long)]
+    log_file: Option<PathBuf>,
 }
 
 impl SimulationApp {
@@ -49,6 +51,7 @@ impl SimulationApp {
             input_settings,
             stream_type,
             log_format: _,
+            log_file: _,
         } = self;
         let simulation_settings: SimulationSettings = load_json_from_file(&input_settings)?;
 
@@ -175,7 +178,7 @@ fn load_json_from_file<T: DeserializeOwned>(path: &Path) -> anyhow::Result<T> {
 
 fn main() -> anyhow::Result<()> {
     let app: SimulationApp = SimulationApp::parse();
-    log::config_tracing(app.log_format);
+    log::config_tracing(app.log_format, app.log_file.as_ref());
 
     if let Err(e) = app.run() {
         tracing::error!("error: {}", e);
