@@ -88,7 +88,6 @@ where
         // to them
         tokio::time::sleep(std::time::Duration::from_secs(1)).await;
 
-
         let Self {
             service_state: ServiceStateHandle {
                 mut inbound_relay, ..
