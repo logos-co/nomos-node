@@ -10,13 +10,13 @@ use fuzz::sut::ConsensusEngineTest;
 
 prop_state_machine! {
     #![proptest_config(Config {
-        // Only run 100 cases by default to avoid running out of system resources
+        // Only run 10 cases by default to avoid running out of system resources
         // and taking too long to finish.
-        cases: 100,
+        cases: 10,
         .. Config::default()
     })]
 
     #[test]
-    // run 50 state transitions per test case
-    fn consensus_engine_test(sequential 1..50 => ConsensusEngineTest);
+    // run 100 state transitions per test case
+    fn consensus_engine_test(sequential 1..100 => ConsensusEngineTest);
 }

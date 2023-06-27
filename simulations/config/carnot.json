@@ -24,7 +24,7 @@
   "step_time": "100ms",
   "runner_settings": "Sync",
   "stream_settings": {
-    "format": "json"
+    "type": "stdout"
   },
   "node_count": 3,
   "views_count": 3,
