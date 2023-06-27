@@ -10,7 +10,7 @@ RUN echo 'deb http://deb.debian.org/debian bullseye-backports main' \
 
 # Dependecies for publishing documentation and building waku-bindings.
 RUN apt-get update && apt-get install -yq \
-    openssh-client git python3-pip clang \
+    libssl-dev openssh-client git python3-pip clang \
     golang-src/bullseye-backports \
     golang-doc/bullseye-backports \
     golang/bullseye-backports

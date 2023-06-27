@@ -31,8 +31,8 @@ pub struct WakuInfo {
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct WakuConfig {
     #[serde(flatten)]
-    inner: WakuNodeConfig,
-    initial_peers: Vec<Multiaddr>,
+    pub inner: WakuNodeConfig,
+    pub initial_peers: Vec<Multiaddr>,
 }
 
 /// Interaction with Waku node
