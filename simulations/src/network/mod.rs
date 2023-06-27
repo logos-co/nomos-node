@@ -194,11 +194,35 @@ where
         network_time: &NetworkTime,
         message: &NetworkMessage<M>,
     ) -> bool {
-        if let Some(delay) = self.send_message_cost(rng, message.from, message.to) {
+        match message {
+            NetworkMessage::Adhoc(msg) => {
+                let recipient = msg.to.expect("Adhoc message has recipient");
+                let to_node = self.to_node_senders.get(&recipient).unwrap();
+                self.send_delayed(rng, recipient, to_node, network_time, msg)
+            }
+            NetworkMessage::Broadcast(msg) => {
+                let mut adhoc = msg.clone();
+                for (recipient, to_node) in self.to_node_senders.iter() {
+                    adhoc.to = Some(*recipient);
+                    self.send_delayed(rng, *recipient, to_node, network_time, &adhoc);
+                }
+                false
+            }
+        }
+    }
+
+    fn send_delayed<R: Rng>(
+        &self,
+        rng: &mut R,
+        to: NodeId,
+        to_node: &Sender<NetworkMessage<M>>,
+        network_time: &NetworkTime,
+        msg: &AdhocMessage<M>,
+    ) -> bool {
+        if let Some(delay) = self.send_message_cost(rng, msg.from, to) {
             if network_time.add(delay) <= self.network_time {
-                let to_node = self.to_node_senders.get(&message.to).unwrap();
                 to_node
-                    .send(message.clone())
+                    .send(NetworkMessage::Adhoc(msg.clone()))
                     .expect("Node should have connection");
                 return false;
             } else {
@@ -210,21 +234,47 @@ where
 }
 
 #[derive(Clone, Debug)]
-pub struct NetworkMessage<M> {
+pub struct AdhocMessage<M> {
     pub from: NodeId,
-    pub to: NodeId,
+    pub to: Option<NodeId>,
     pub payload: M,
 }
 
+#[derive(Clone, Debug)]
+pub enum NetworkMessage<M> {
+    Adhoc(AdhocMessage<M>),
+    Broadcast(AdhocMessage<M>),
+}
+
 impl<M> NetworkMessage<M> {
-    pub fn new(from: NodeId, to: NodeId, payload: M) -> Self {
-        Self { from, to, payload }
+    pub fn adhoc(from: NodeId, to: NodeId, payload: M) -> Self {
+        Self::Adhoc(AdhocMessage {
+            from,
+            to: Some(to),
+            payload,
+        })
+    }
+
+    pub fn broadcast(from: NodeId, payload: M) -> Self {
+        Self::Broadcast(AdhocMessage {
+            from,
+            to: None,
+            payload,
+        })
+    }
+
+    pub fn get_payload(self) -> M {
+        match self {
+            NetworkMessage::Adhoc(AdhocMessage { payload, .. }) => payload,
+            NetworkMessage::Broadcast(AdhocMessage { payload, .. }) => payload,
+        }
     }
 }
 
 pub trait NetworkInterface {
     type Payload;
 
+    fn broadcast(&self, message: Self::Payload);
     fn send_message(&self, address: NodeId, message: Self::Payload);
     fn receive_messages(&self) -> Vec<NetworkMessage<Self::Payload>>;
 }
@@ -252,8 +302,13 @@ impl<M> InMemoryNetworkInterface<M> {
 impl<M> NetworkInterface for InMemoryNetworkInterface<M> {
     type Payload = M;
 
+    fn broadcast(&self, message: Self::Payload) {
+        let message = NetworkMessage::broadcast(self.id, message);
+        self.sender.send(message).unwrap();
+    }
+
     fn send_message(&self, address: NodeId, message: Self::Payload) {
-        let message = NetworkMessage::new(self.id, address, message);
+        let message = NetworkMessage::adhoc(self.id, address, message);
         self.sender.send(message).unwrap();
     }
 
@@ -296,8 +351,13 @@ mod tests {
     impl NetworkInterface for MockNetworkInterface {
         type Payload = ();
 
+        fn broadcast(&self, message: Self::Payload) {
+            let message = NetworkMessage::broadcast(self.id, message);
+            self.sender.send(message).unwrap();
+        }
+
         fn send_message(&self, address: NodeId, message: Self::Payload) {
-            let message = NetworkMessage::new(self.id, address, message);
+            let message = NetworkMessage::adhoc(self.id, address, message);
             self.sender.send(message).unwrap();
         }
 

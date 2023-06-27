@@ -98,7 +98,6 @@ impl SimulationApp {
                 CarnotNode::<FlatOverlay<RoundRobin>>::new(
                     node_id,
                     CarnotSettings::new(
-                        nodes,
                         simulation_settings.node_settings.timeout,
                         simulation_settings.record_settings.clone(),
                     ),
