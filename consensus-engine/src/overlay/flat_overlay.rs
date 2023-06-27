@@ -1,16 +1,16 @@
 use super::LeaderSelection;
 use crate::{Committee, NodeId, Overlay};
+use fraction::{Fraction, ToPrimitive};
 use serde::{Deserialize, Serialize};
-
-const LEADER_SUPER_MAJORITY_THRESHOLD_NUM: usize = 2;
-const LEADER_SUPER_MAJORITY_THRESHOLD_DEN: usize = 3;
+const LEADER_SUPER_MAJORITY_THRESHOLD_NUM: u64 = 2;
+const LEADER_SUPER_MAJORITY_THRESHOLD_DEN: u64 = 3;
 
 #[derive(Clone, Debug, PartialEq)]
 /// Flat overlay with a single committee and round robin leader selection.
 pub struct FlatOverlay<L: LeaderSelection> {
     nodes: Vec<NodeId>,
     leader: L,
-    leader_threshold: (usize, usize),
+    leader_threshold: Fraction,
 }
 
 impl<L> Overlay for FlatOverlay<L>
@@ -30,10 +30,12 @@ where
         Self {
             nodes,
             leader,
-            leader_threshold: leader_super_majority_threshold.unwrap_or((
-                LEADER_SUPER_MAJORITY_THRESHOLD_NUM,
-                LEADER_SUPER_MAJORITY_THRESHOLD_DEN,
-            )),
+            leader_threshold: leader_super_majority_threshold.unwrap_or_else(|| {
+                Fraction::new(
+                    LEADER_SUPER_MAJORITY_THRESHOLD_NUM,
+                    LEADER_SUPER_MAJORITY_THRESHOLD_DEN,
+                )
+            }),
         }
     }
 
@@ -87,7 +89,10 @@ where
 
     fn leader_super_majority_threshold(&self, _id: NodeId) -> usize {
         // self.leader_threshold is a tuple of (num, den) where num/den is the super majority threshold
-        self.nodes.len() * self.leader_threshold.0 / self.leader_threshold.1
+        (Fraction::from(self.nodes.len()) * self.leader_threshold)
+            .floor()
+            .to_usize()
+            .unwrap()
     }
 
     fn update_leader_selection<F, E>(&self, f: F) -> Result<Self, E>
@@ -132,7 +137,26 @@ impl LeaderSelection for RoundRobin {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Settings<L> {
     pub nodes: Vec<NodeId>,
-    // a tuple of (num, den) where num/den is the super majority threshold
-    pub leader_super_majority_threshold: Option<(usize, usize)>,
+    /// A fraction representing the threshold in the form `<num>/<den>'
+    /// Defaults to 2/3
+    #[serde(with = "deser")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub leader_super_majority_threshold: Option<Fraction>,
     pub leader: L,
+}
+
+mod deser {
+    use serde::{Serializer, Deserializer, de, Deserialize, Serialize};
+    use fraction::Fraction;
+    use std::str::FromStr;
+
+   pub fn deserialize<'de, D>(deserializer: D) -> Result<Option<Fraction>, D::Error> where D: Deserializer<'de> {
+        <Option<String>>::deserialize(deserializer)?.map(|s| {
+            FromStr::from_str(&s).map_err(de::Error::custom)
+        }).transpose()
+   }
+
+   pub fn serialize<S>(value: &Option<Fraction>, serializer: S) -> Result<S::Ok, S::Error> where S: Serializer {
+        value.map(|v| v.to_string()).serialize(serializer)
+   }
 }
