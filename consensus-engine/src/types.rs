@@ -139,14 +139,6 @@ impl Qc {
         }
     }
 
-    /// The view of the block this qc is for.
-    pub fn parent_view(&self) -> View {
-        match self {
-            Qc::Standard(StandardQc { view, .. }) => *view,
-            Qc::Aggregated(AggregateQc { view, .. }) => *view,
-        }
-    }
-
     /// The id of the block this qc is for.
     /// This will be the parent of the block which will include this qc
     pub fn block(&self) -> BlockId {
@@ -161,5 +153,37 @@ impl Qc {
             Qc::Standard(qc) => qc.clone(),
             Qc::Aggregated(AggregateQc { high_qc, .. }) => high_qc.clone(),
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn standard_qc() {
+        let standard_qc = StandardQc {
+            view: 10,
+            id: [0; 32],
+        };
+        let qc = Qc::Standard(standard_qc.clone());
+        assert_eq!(qc.view(), 10);
+        assert_eq!(qc.block(), [0; 32]);
+        assert_eq!(qc.high_qc(), standard_qc);
+    }
+
+    #[test]
+    fn aggregated_qc() {
+        let aggregated_qc = AggregateQc {
+            view: 20,
+            high_qc: StandardQc {
+                view: 10,
+                id: [0; 32],
+            },
+        };
+        let qc = Qc::Aggregated(aggregated_qc.clone());
+        assert_eq!(qc.view(), 20);
+        assert_eq!(qc.block(), [0; 32]);
+        assert_eq!(qc.high_qc(), aggregated_qc.high_qc);
     }
 }
