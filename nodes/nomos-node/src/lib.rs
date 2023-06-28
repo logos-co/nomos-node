@@ -19,11 +19,11 @@ use nomos_mempool::{
 use nomos_network::{backends::waku::Waku, NetworkService};
 use overwatch_derive::*;
 use overwatch_rs::services::{handle::ServiceHandle, ServiceData};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 pub use tx::Tx;
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug, Clone, Serialize)]
 pub struct Config {
     pub log: <Logger as ServiceData>::Settings,
     pub network: <NetworkService<Waku> as ServiceData>::Settings,

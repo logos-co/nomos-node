@@ -54,9 +54,9 @@ pub type Seed = [u8; 32];
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct CarnotSettings<Fountain: FountainCode, O: Overlay> {
-    private_key: [u8; 32],
-    fountain_settings: Fountain::Settings,
-    overlay_settings: O::Settings,
+    pub private_key: [u8; 32],
+    pub fountain_settings: Fountain::Settings,
+    pub overlay_settings: O::Settings,
 }
 
 impl<Fountain: FountainCode, O: Overlay> Clone for CarnotSettings<Fountain, O> {
@@ -781,14 +781,14 @@ impl RelayMessage for ConsensusMsg {}
 #[serde_as]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct CarnotInfo {
-    id: NodeId,
-    current_view: View,
-    highest_voted_view: View,
-    local_high_qc: StandardQc,
+    pub id: NodeId,
+    pub current_view: View,
+    pub highest_voted_view: View,
+    pub local_high_qc: StandardQc,
     #[serde_as(as = "Vec<(_, _)>")]
-    safe_blocks: HashMap<BlockId, consensus_engine::Block>,
-    last_view_timeout_qc: Option<TimeoutQc>,
-    committed_blocks: Vec<BlockId>,
+    pub safe_blocks: HashMap<BlockId, consensus_engine::Block>,
+    pub last_view_timeout_qc: Option<TimeoutQc>,
+    pub committed_blocks: Vec<BlockId>,
 }
 
 #[cfg(test)]

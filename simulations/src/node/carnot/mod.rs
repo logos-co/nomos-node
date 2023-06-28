@@ -186,19 +186,13 @@ impl<O: Overlay> From<&Carnot<O>> for CarnotState {
 
 #[derive(Clone, Default, Deserialize)]
 pub struct CarnotSettings {
-    nodes: Vec<consensus_engine::NodeId>,
     timeout: Duration,
     record_settings: HashMap<String, bool>,
 }
 
 impl CarnotSettings {
-    pub fn new(
-        nodes: Vec<consensus_engine::NodeId>,
-        timeout: Duration,
-        record_settings: HashMap<String, bool>,
-    ) -> Self {
+    pub fn new(timeout: Duration, record_settings: HashMap<String, bool>) -> Self {
         Self {
-            nodes,
             timeout,
             record_settings,
         }
@@ -247,11 +241,6 @@ impl<O: Overlay> CarnotNode<O> {
         };
         this.state = CarnotState::from(&this.engine);
         this
-    }
-
-    pub(crate) fn send_message(&self, message: NetworkMessage<CarnotMessage>) {
-        self.network_interface
-            .send_message(self.id, message.payload);
     }
 
     fn handle_output(&self, output: Output<CarnotTx>) {
@@ -312,16 +301,12 @@ impl<O: Overlay> CarnotNode<O> {
                 );
             }
             Output::BroadcastProposal { proposal } => {
-                for node in &self.settings.nodes {
-                    self.network_interface.send_message(
-                        *node,
-                        CarnotMessage::Proposal(ProposalChunkMsg {
-                            chunk: proposal.as_bytes().to_vec().into(),
-                            proposal: proposal.header().id,
-                            view: proposal.header().view,
-                        }),
-                    )
-                }
+                self.network_interface
+                    .broadcast(CarnotMessage::Proposal(ProposalChunkMsg {
+                        chunk: proposal.as_bytes().to_vec().into(),
+                        proposal: proposal.header().id,
+                        view: proposal.header().view,
+                    }))
             }
         }
     }
@@ -349,7 +334,7 @@ impl<L: UpdateableLeaderSelection, O: Overlay<LeaderSelection = L>> Node for Car
             .network_interface
             .receive_messages()
             .into_iter()
-            .map(|m| m.payload)
+            .map(NetworkMessage::get_payload)
             .partition(|m| {
                 m.view() == self.engine.current_view()
                     || matches!(m, CarnotMessage::Proposal(_) | CarnotMessage::TimeoutQc(_))
@@ -440,15 +425,15 @@ impl<L: UpdateableLeaderSelection, O: Overlay<LeaderSelection = L>> Node for Car
                     timeout_qc,
                     new_views,
                 } => {
-                    let (new, out) = self.engine.approve_new_view(timeout_qc.clone(), new_views);
-                    output.push(Output::Send(out));
-                    self.engine = new;
                     tracing::info!(
                         node = parse_idx(&self.id),
                         current_view = self.engine.current_view(),
                         timeout_view = timeout_qc.view(),
                         "receive new view message"
                     );
+                    let (new, out) = self.engine.approve_new_view(timeout_qc.clone(), new_views);
+                    output.push(Output::Send(out));
+                    self.engine = new;
                 }
                 Event::TimeoutQc { timeout_qc } => {
                     tracing::info!(
