@@ -146,17 +146,23 @@ pub struct Settings<L> {
 }
 
 mod deser {
-    use serde::{Serializer, Deserializer, de, Deserialize, Serialize};
     use fraction::Fraction;
+    use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
     use std::str::FromStr;
 
-   pub fn deserialize<'de, D>(deserializer: D) -> Result<Option<Fraction>, D::Error> where D: Deserializer<'de> {
-        <Option<String>>::deserialize(deserializer)?.map(|s| {
-            FromStr::from_str(&s).map_err(de::Error::custom)
-        }).transpose()
-   }
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Option<Fraction>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        <Option<String>>::deserialize(deserializer)?
+            .map(|s| FromStr::from_str(&s).map_err(de::Error::custom))
+            .transpose()
+    }
 
-   pub fn serialize<S>(value: &Option<Fraction>, serializer: S) -> Result<S::Ok, S::Error> where S: Serializer {
+    pub fn serialize<S>(value: &Option<Fraction>, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
         value.map(|v| v.to_string()).serialize(serializer)
-   }
+    }
 }
