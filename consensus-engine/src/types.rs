@@ -64,7 +64,13 @@ pub struct TimeoutQc {
 
 impl TimeoutQc {
     pub fn new(view: View, high_qc: StandardQc, sender: NodeId) -> Self {
-        assert!(view >= high_qc.view);
+        assert!(
+            view >= high_qc.view,
+            "timeout_qc.view:{} shouldn't be lower than timeout_qc.high_qc.view:{}",
+            view,
+            high_qc.view,
+        );
+
         Self {
             view,
             high_qc,
@@ -72,7 +78,7 @@ impl TimeoutQc {
         }
     }
 
-    pub fn view(&self) -> i64 {
+    pub fn view(&self) -> View {
         self.view
     }
 
@@ -80,7 +86,7 @@ impl TimeoutQc {
         &self.high_qc
     }
 
-    pub fn sender(&self) -> [u8; 32] {
+    pub fn sender(&self) -> NodeId {
         self.sender
     }
 }
@@ -221,7 +227,9 @@ mod test {
     }
 
     #[test]
-    #[should_panic(expected = "view >= high_qc.view")]
+    #[should_panic(
+        expected = "timeout_qc.view:1 shouldn't be lower than timeout_qc.high_qc.view:2"
+    )]
     fn new_timeout_qc_panic() {
         let _ = TimeoutQc::new(
             1,
