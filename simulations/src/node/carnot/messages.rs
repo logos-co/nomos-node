@@ -17,7 +17,7 @@ impl CarnotMessage {
         match self {
             CarnotMessage::Proposal(msg) => msg.view,
             CarnotMessage::Vote(msg) => msg.vote.view,
-            CarnotMessage::TimeoutQc(msg) => msg.qc.view,
+            CarnotMessage::TimeoutQc(msg) => msg.qc.view(),
             CarnotMessage::Timeout(msg) => msg.vote.view,
             CarnotMessage::NewView(msg) => msg.vote.view,
         }

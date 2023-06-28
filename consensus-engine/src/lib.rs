@@ -96,13 +96,13 @@ impl<O: Overlay> Carnot<O> {
     pub fn receive_timeout_qc(&self, timeout_qc: TimeoutQc) -> Self {
         let mut new_state = self.clone();
 
-        if timeout_qc.view < new_state.current_view {
+        if timeout_qc.view() < new_state.current_view {
             return new_state;
         }
-        new_state.update_high_qc(Qc::Standard(timeout_qc.high_qc.clone()));
+        new_state.update_high_qc(Qc::Standard(timeout_qc.high_qc().clone()));
         new_state.update_timeout_qc(timeout_qc.clone());
 
-        new_state.current_view = timeout_qc.view + 1;
+        new_state.current_view = timeout_qc.view() + 1;
         new_state.overlay.rebuild(timeout_qc);
 
         new_state
@@ -159,13 +159,13 @@ impl<O: Overlay> Carnot<O> {
         timeout_qc: TimeoutQc,
         new_views: HashSet<NewView>,
     ) -> (Self, Send) {
-        let new_view = timeout_qc.view + 1;
+        let new_view = timeout_qc.view() + 1;
         assert!(
             new_view
                 > self
                     .last_view_timeout_qc
                     .as_ref()
-                    .map(|qc| qc.view)
+                    .map(|qc| qc.view())
                     .unwrap_or(0),
             "can't vote for a new view not bigger than the last timeout_qc"
         );
@@ -185,7 +185,7 @@ impl<O: Overlay> Carnot<O> {
         let high_qc = new_views
             .iter()
             .map(|nv| &nv.high_qc)
-            .chain(std::iter::once(&timeout_qc.high_qc))
+            .chain(std::iter::once(timeout_qc.high_qc()))
             .max_by_key(|qc| qc.view)
             .unwrap();
         new_state.update_high_qc(Qc::Standard(high_qc.clone()));
@@ -267,7 +267,7 @@ impl<O: Overlay> Carnot<O> {
             (None, timeout_qc) => {
                 self.last_view_timeout_qc = Some(timeout_qc);
             }
-            (Some(current_qc), timeout_qc) if timeout_qc.view > current_qc.view => {
+            (Some(current_qc), timeout_qc) if timeout_qc.view() > current_qc.view() => {
                 self.last_view_timeout_qc = Some(timeout_qc);
             }
             _ => {}
@@ -643,16 +643,16 @@ mod test {
         let (mut engine, _) = engine.local_timeout();
 
         assert_eq!(engine.current_view(), 1);
-        let timeout_qc = TimeoutQc {
-            view: 1,
-            high_qc: StandardQc {
+        let timeout_qc = TimeoutQc::new(
+            1,
+            StandardQc {
                 view: 0, // genesis
                 id: [0; 32],
             },
-            sender: [0; 32],
-        };
+            [0; 32],
+        );
         engine = engine.receive_timeout_qc(timeout_qc.clone());
-        assert_eq!(engine.local_high_qc, timeout_qc.high_qc);
+        assert_eq!(&engine.local_high_qc, timeout_qc.high_qc());
         assert_eq!(engine.last_view_timeout_qc, Some(timeout_qc));
         assert_eq!(engine.current_view(), 2);
     }
@@ -667,16 +667,16 @@ mod test {
         // before local_timeout occurs
 
         assert_eq!(engine.current_view(), 1);
-        let timeout_qc = TimeoutQc {
-            view: 1,
-            high_qc: StandardQc {
+        let timeout_qc = TimeoutQc::new(
+            1,
+            StandardQc {
                 view: 0, // genesis
                 id: [0; 32],
             },
-            sender: [0; 32],
-        };
+            [0; 32],
+        );
         engine = engine.receive_timeout_qc(timeout_qc.clone());
-        assert_eq!(engine.local_high_qc, timeout_qc.high_qc);
+        assert_eq!(&engine.local_high_qc, timeout_qc.high_qc());
         assert_eq!(engine.last_view_timeout_qc, Some(timeout_qc));
         assert_eq!(engine.current_view(), 2);
     }
@@ -689,22 +689,22 @@ mod test {
         engine = engine.receive_block(block).unwrap(); // received but not approved yet
 
         assert_eq!(engine.current_view(), 1); // still waiting for a QC(view=1)
-        let timeout_qc = TimeoutQc {
-            view: 1,
-            high_qc: StandardQc {
+        let timeout_qc = TimeoutQc::new(
+            1,
+            StandardQc {
                 view: 0, // genesis
                 id: [0; 32],
             },
-            sender: [0; 32],
-        };
+            [0; 32],
+        );
         engine = engine.receive_timeout_qc(timeout_qc.clone());
-        assert_eq!(engine.local_high_qc, timeout_qc.high_qc);
+        assert_eq!(&engine.local_high_qc, timeout_qc.high_qc());
         assert_eq!(engine.last_view_timeout_qc, Some(timeout_qc.clone()));
         assert_eq!(engine.current_view(), 2);
         assert_eq!(engine.highest_voted_view, -1); // didn't vote on anything yet
 
         let (engine, send) = engine.approve_new_view(timeout_qc.clone(), HashSet::new());
-        assert_eq!(engine.high_qc(), timeout_qc.high_qc);
+        assert_eq!(&engine.high_qc(), timeout_qc.high_qc());
         assert_eq!(engine.current_view(), 2); // not changed
         assert_eq!(engine.highest_voted_view, 2);
         assert_eq!(
@@ -713,7 +713,7 @@ mod test {
                 view: 2,
                 sender: [0; 32],
                 timeout_qc: timeout_qc.clone(),
-                high_qc: timeout_qc.high_qc,
+                high_qc: timeout_qc.high_qc().clone(),
             })
         );
     }
@@ -726,26 +726,26 @@ mod test {
         engine = engine.receive_block(block).unwrap(); // received but not approved yet
 
         assert_eq!(engine.current_view(), 1);
-        let timeout_qc1 = TimeoutQc {
-            view: 1,
-            high_qc: StandardQc {
+        let timeout_qc1 = TimeoutQc::new(
+            1,
+            StandardQc {
                 view: 0, // genesis
                 id: [0; 32],
             },
-            sender: [0; 32],
-        };
+            [0; 32],
+        );
         engine = engine.receive_timeout_qc(timeout_qc1.clone());
         assert_eq!(engine.last_view_timeout_qc, Some(timeout_qc1.clone()));
 
         // receiving a timeout_qc2 before approving new_view(timeout_qc1)
-        let timeout_qc2 = TimeoutQc {
-            view: 2,
-            high_qc: StandardQc {
+        let timeout_qc2 = TimeoutQc::new(
+            2,
+            StandardQc {
                 view: 0, // genesis
                 id: [0; 32],
             },
-            sender: [0; 32],
-        };
+            [0; 32],
+        );
         engine = engine.receive_timeout_qc(timeout_qc2.clone());
         assert_eq!(engine.last_view_timeout_qc, Some(timeout_qc2));
 

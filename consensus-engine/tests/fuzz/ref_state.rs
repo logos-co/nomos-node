@@ -102,10 +102,10 @@ impl ReferenceStateMachine for RefState {
             Transition::ApprovePastBlock(block) => state.highest_voted_view >= block.view,
             Transition::LocalTimeout => true,
             Transition::ReceiveTimeoutQcForRecentView(timeout_qc) => {
-                timeout_qc.view == state.current_view()
+                timeout_qc.view() == state.current_view()
             }
             Transition::ReceiveTimeoutQcForOldView(timeout_qc) => {
-                timeout_qc.view < state.current_view()
+                timeout_qc.view() < state.current_view()
             }
             Transition::ApproveNewViewWithLatestTimeoutQc(timeout_qc, _) => {
                 state.latest_timeout_qcs().contains(timeout_qc)
@@ -142,7 +142,7 @@ impl ReferenceStateMachine for RefState {
             Transition::ReceiveTimeoutQcForRecentView(timeout_qc) => {
                 state
                     .chain
-                    .entry(timeout_qc.view)
+                    .entry(timeout_qc.view())
                     .or_default()
                     .timeout_qcs
                     .insert(timeout_qc.clone());
@@ -262,14 +262,14 @@ impl RefState {
                 .prop_flat_map(move |block| {
                     (current_view..=current_view + delta) // including future views
                         .prop_map(move |view| {
-                            Transition::ReceiveTimeoutQcForRecentView(TimeoutQc {
+                            Transition::ReceiveTimeoutQcForRecentView(TimeoutQc::new(
                                 view,
-                                high_qc: StandardQc {
+                                StandardQc {
                                     view: block.view,
                                     id: block.id,
                                 },
-                                sender: SENDER,
-                            })
+                                SENDER,
+                            ))
                         })
                 })
                 .boxed()
@@ -290,11 +290,11 @@ impl RefState {
         } else {
             proptest::sample::select(old_view_entries)
                 .prop_map(move |(view, entry)| {
-                    Transition::ReceiveTimeoutQcForOldView(TimeoutQc {
+                    Transition::ReceiveTimeoutQcForOldView(TimeoutQc::new(
                         view,
-                        high_qc: entry.high_qc().unwrap(),
-                        sender: SENDER,
-                    })
+                        entry.high_qc().unwrap(),
+                        SENDER,
+                    ))
                 })
                 .boxed()
         }
@@ -349,7 +349,7 @@ impl RefState {
     }
 
     pub fn new_view_from(timeout_qc: &TimeoutQc) -> View {
-        timeout_qc.view + 1
+        timeout_qc.view() + 1
     }
 
     pub fn high_qc(&self) -> StandardQc {
@@ -415,7 +415,7 @@ impl ViewEntry {
         let iter2 = self
             .timeout_qcs
             .iter()
-            .map(|timeout_qc| timeout_qc.high_qc.clone());
+            .map(|timeout_qc| timeout_qc.high_qc().clone());
         iter1.chain(iter2).max_by_key(|qc| qc.view)
     }
 }
