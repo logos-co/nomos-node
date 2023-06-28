@@ -425,15 +425,15 @@ impl<L: UpdateableLeaderSelection, O: Overlay<LeaderSelection = L>> Node for Car
                     timeout_qc,
                     new_views,
                 } => {
-                    let (new, out) = self.engine.approve_new_view(timeout_qc.clone(), new_views);
-                    output.push(Output::Send(out));
-                    self.engine = new;
                     tracing::info!(
                         node = parse_idx(&self.id),
                         current_view = self.engine.current_view(),
                         timeout_view = timeout_qc.view,
                         "receive new view message"
                     );
+                    let (new, out) = self.engine.approve_new_view(timeout_qc.clone(), new_views);
+                    output.push(Output::Send(out));
+                    self.engine = new;
                 }
                 Event::TimeoutQc { timeout_qc } => {
                     tracing::info!(
