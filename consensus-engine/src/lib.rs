@@ -244,7 +244,7 @@ impl<O: Overlay> Carnot<O> {
     }
 
     fn block_is_safe(&self, block: Block) -> bool {
-        block.view >= self.current_view && block.view == block.parent_qc.view() + 1
+        block.view > self.current_view && block.view == block.parent_qc.view() + 1
     }
 
     fn update_high_qc(&mut self, qc: Qc) {
