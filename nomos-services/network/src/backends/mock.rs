@@ -231,7 +231,7 @@ impl NetworkBackend for Mock {
     type EventKind = EventKind;
     type NetworkEvent = NetworkEvent;
 
-    fn new(config: Self::Settings) -> Self {
+    fn new(config: Self::Settings, _: tokio::runtime::Handle) -> Self {
         let message_event = broadcast::channel(BROADCAST_CHANNEL_BUF).0;
 
         Self {
@@ -332,7 +332,10 @@ mod tests {
             weights: None,
         };
 
-        let mock = Arc::new(Mock::new(config));
+        let mock = Arc::new(Mock::new(
+            config,
+            tokio::runtime::Runtime::new().unwrap().handle().clone(),
+        ));
         // run producer
         let task = mock.clone();
         tokio::spawn(async move {

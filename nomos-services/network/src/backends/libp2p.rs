@@ -61,7 +61,7 @@ impl NetworkBackend for Libp2p {
     type EventKind = EventKind;
     type NetworkEvent = NetworkEvent;
 
-    fn new(config: Self::Settings) -> Self {
+    fn new(config: Self::Settings, runtime_handle: tokio::runtime::Handle) -> Self {
         let id_keys = identity::Keypair::generate_ed25519();
         let local_peer_id = PeerId::from(id_keys.public());
         tracing::info!("libp2p peer_id:{}", local_peer_id);
@@ -112,7 +112,7 @@ impl NetworkBackend for Libp2p {
             network_event_tx: network_event_tx.clone(),
             backend_message_rx,
         };
-        tokio::spawn(async move { swarm_handle.run().await });
+        runtime_handle.spawn(async move { swarm_handle.run().await });
 
         Self {
             network_event_tx,

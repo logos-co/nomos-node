@@ -19,7 +19,7 @@ pub trait NetworkBackend {
     type EventKind: Debug + Send + Sync + 'static;
     type NetworkEvent: Debug + Send + Sync + 'static;
 
-    fn new(config: Self::Settings) -> Self;
+    fn new(config: Self::Settings, runtime_handle: tokio::runtime::Handle) -> Self;
     async fn process(&self, msg: Self::Message);
     async fn subscribe(&mut self, event: Self::EventKind) -> Receiver<Self::NetworkEvent>;
 }
