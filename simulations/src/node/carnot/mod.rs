@@ -425,21 +425,21 @@ impl<L: UpdateableLeaderSelection, O: Overlay<LeaderSelection = L>> Node for Car
                     timeout_qc,
                     new_views,
                 } => {
-                    let (new, out) = self.engine.approve_new_view(timeout_qc.clone(), new_views);
-                    output.push(Output::Send(out));
-                    self.engine = new;
                     tracing::info!(
                         node = parse_idx(&self.id),
                         current_view = self.engine.current_view(),
-                        timeout_view = timeout_qc.view,
+                        timeout_view = timeout_qc.view(),
                         "receive new view message"
                     );
+                    let (new, out) = self.engine.approve_new_view(timeout_qc.clone(), new_views);
+                    output.push(Output::Send(out));
+                    self.engine = new;
                 }
                 Event::TimeoutQc { timeout_qc } => {
                     tracing::info!(
                         node = parse_idx(&self.id),
                         current_view = self.engine.current_view(),
-                        timeout_view = timeout_qc.view,
+                        timeout_view = timeout_qc.view(),
                         "receive timeout qc message"
                     );
                     self.engine = self.engine.receive_timeout_qc(timeout_qc.clone());
@@ -457,11 +457,11 @@ impl<L: UpdateableLeaderSelection, O: Overlay<LeaderSelection = L>> Node for Car
                             .max_by_key(|qc| qc.view)
                             .expect("empty root committee")
                             .clone();
-                        let timeout_qc = TimeoutQc {
-                            view: timeouts.iter().next().unwrap().view,
+                        let timeout_qc = TimeoutQc::new(
+                            timeouts.iter().next().unwrap().view,
                             high_qc,
-                            sender: self.id(),
-                        };
+                            self.id(),
+                        );
                         output.push(Output::BroadcastTimeoutQc { timeout_qc });
                     }
                 }

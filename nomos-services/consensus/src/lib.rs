@@ -434,7 +434,7 @@ where
             participating_nodes: carnot.root_committee(),
         };
         let (new_carnot, out) = carnot.approve_new_view(timeout_qc.clone(), new_views);
-        let new_view = timeout_qc.view + 1;
+        let new_view = timeout_qc.view() + 1;
         if carnot.is_next_leader() {
             let high_qc = carnot.high_qc();
             task_manager.push(new_view, async move {
@@ -471,7 +471,7 @@ where
             participating_nodes: carnot.child_committees().into_iter().flatten().collect(),
         };
         task_manager.push(
-            timeout_qc.view + 1,
+            timeout_qc.view() + 1,
             Self::gather_new_views(adapter, self_committee, timeout_qc.clone(), tally_settings),
         );
         if carnot.current_view() != new_state.current_view() {
@@ -498,11 +498,7 @@ where
             .clone();
         let mut output = None;
         if carnot.is_member_of_root_committee() {
-            let timeout_qc = TimeoutQc {
-                view: carnot.current_view(),
-                high_qc,
-                sender: carnot.id(),
-            };
+            let timeout_qc = TimeoutQc::new(carnot.current_view(), high_qc, carnot.id());
             output = Some(Output::BroadcastTimeoutQc { timeout_qc });
         }
         (carnot, output)
@@ -606,7 +602,7 @@ where
     ) -> Event<P::Tx> {
         let tally = NewViewTally::new(tally);
         let stream = adapter
-            .new_view_stream(&committee, timeout_qc.view + 1)
+            .new_view_stream(&committee, timeout_qc.view() + 1)
             .await;
         match tally.tally(timeout_qc.clone(), stream).await {
             Ok((_qc, new_views)) => Event::NewView {

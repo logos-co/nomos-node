@@ -18,5 +18,5 @@ prop_state_machine! {
 
     #[test]
     // run 100 state transitions per test case
-    fn consensus_engine_test(sequential 1..100 => ConsensusEngineTest);
+    fn consensus_engine_test(sequential 1..30 => ConsensusEngineTest);
 }

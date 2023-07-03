@@ -57,9 +57,38 @@ pub struct NewView {
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct TimeoutQc {
-    pub view: View,
-    pub high_qc: StandardQc,
-    pub sender: NodeId,
+    view: View,
+    high_qc: StandardQc,
+    sender: NodeId,
+}
+
+impl TimeoutQc {
+    pub fn new(view: View, high_qc: StandardQc, sender: NodeId) -> Self {
+        assert!(
+            view >= high_qc.view,
+            "timeout_qc.view:{} shouldn't be lower than timeout_qc.high_qc.view:{}",
+            view,
+            high_qc.view,
+        );
+
+        Self {
+            view,
+            high_qc,
+            sender,
+        }
+    }
+
+    pub fn view(&self) -> View {
+        self.view
+    }
+
+    pub fn high_qc(&self) -> &StandardQc {
+        &self.high_qc
+    }
+
+    pub fn sender(&self) -> NodeId {
+        self.sender
+    }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
@@ -185,5 +214,49 @@ mod test {
         assert_eq!(qc.view(), 20);
         assert_eq!(qc.block(), [0; 32]);
         assert_eq!(qc.high_qc(), aggregated_qc.high_qc);
+    }
+
+    #[test]
+    fn new_timeout_qc() {
+        let timeout_qc = TimeoutQc::new(
+            2,
+            StandardQc {
+                view: 1,
+                id: [0; 32],
+            },
+            [0; 32],
+        );
+        assert_eq!(timeout_qc.view(), 2);
+        assert_eq!(timeout_qc.high_qc().view, 1);
+        assert_eq!(timeout_qc.high_qc().id, [0; 32]);
+        assert_eq!(timeout_qc.sender(), [0; 32]);
+
+        let timeout_qc = TimeoutQc::new(
+            2,
+            StandardQc {
+                view: 2,
+                id: [0; 32],
+            },
+            [0; 32],
+        );
+        assert_eq!(timeout_qc.view(), 2);
+        assert_eq!(timeout_qc.high_qc().view, 2);
+        assert_eq!(timeout_qc.high_qc().id, [0; 32]);
+        assert_eq!(timeout_qc.sender(), [0; 32]);
+    }
+
+    #[test]
+    #[should_panic(
+        expected = "timeout_qc.view:1 shouldn't be lower than timeout_qc.high_qc.view:2"
+    )]
+    fn new_timeout_qc_panic() {
+        let _ = TimeoutQc::new(
+            1,
+            StandardQc {
+                view: 2,
+                id: [0; 32],
+            },
+            [0; 32],
+        );
     }
 }

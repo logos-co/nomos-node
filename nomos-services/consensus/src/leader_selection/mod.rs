@@ -42,6 +42,6 @@ impl UpdateableLeaderSelection for RandomBeaconState {
     }
 
     fn on_timeout_qc_received(&self, qc: TimeoutQc) -> Result<Self, Self::Error> {
-        Ok(Self::generate_sad(qc.view, self))
+        Ok(Self::generate_sad(qc.view(), self))
     }
 }

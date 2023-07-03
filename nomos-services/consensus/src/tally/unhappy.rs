@@ -48,7 +48,7 @@ impl Tally for NewViewTally {
 
         while let Some(vote) = vote_stream.next().await {
             // check vote view is valid
-            if !vote.vote.view != timeout_qc.view {
+            if !vote.vote.view != timeout_qc.view() {
                 continue;
             }
 
