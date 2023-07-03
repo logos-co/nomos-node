@@ -55,19 +55,21 @@ impl Tree {
         let committee_size = nodes.len() / number_of_committees;
         let remainder = nodes.len() % number_of_committees;
 
-        let mut committees: Vec<Committee> = Vec::new();
+        let mut committees: Vec<HashSet<NodeId>> = (0..number_of_committees)
+            .map(|n| {
+                nodes[n * committee_size..(n + 1) * committee_size]
+                    .iter()
+                    .cloned()
+                    .collect()
+            })
+            .collect();
 
-        for n in 0..number_of_committees {
-            let mut committee = HashSet::new();
-            for node in &nodes[n * committee_size..(n + 1) * committee_size] {
-                committee.insert(*node);
-            }
-            committees.push(committee);
-        }
-
-        if remainder > 0 {
-            for node in &nodes[nodes.len() - remainder..] {
-                committees.last_mut().unwrap().insert(*node);
+        // Refill committees with extra nodes
+        if remainder != 0 {
+            for i in 0..remainder {
+                let node = nodes[nodes.len() - remainder + i];
+                let committee_index = i % number_of_committees;
+                committees[committee_index].insert(node);
             }
         }
 
@@ -397,16 +399,16 @@ mod tests {
     fn test_root_committee() {
         let nodes: Vec<[u8; 32]> = (0..10).map(|i| [i as u8; 32]).collect();
         let overlay = TreeOverlay::new(TreeOverlaySettings {
-            nodes: nodes.clone(),
             current_leader: nodes[0],
+            nodes,
             entropy: [0; 32],
             number_of_committees: 3,
             leader: RoundRobin::new(),
         });
 
         let mut expected_root = HashSet::new();
-        expected_root.insert(nodes[9]);
-        expected_root.extend(nodes[0..3].iter());
+        expected_root.insert(overlay.nodes[9]);
+        expected_root.extend(overlay.nodes[0..3].iter());
 
         assert_eq!(overlay.root_committee(), expected_root);
     }
@@ -415,48 +417,58 @@ mod tests {
     fn test_leaf_committees() {
         let nodes: Vec<[u8; 32]> = (0..10).map(|i| [i as u8; 32]).collect();
         let overlay = TreeOverlay::new(TreeOverlaySettings {
-            nodes: nodes.clone(),
             current_leader: nodes[0],
+            nodes,
             entropy: [0; 32],
             number_of_committees: 3,
             leader: RoundRobin::new(),
         });
 
-        assert_eq!(
-            overlay.leaf_committees([0; 32]),
-            vec![
-                nodes[3..6].iter().cloned().collect(),
-                nodes[6..9].iter().cloned().collect()
-            ]
-        );
+        let mut leaf_committees = overlay
+            .leaf_committees([0; 32])
+            .into_iter()
+            .map(|s| {
+                let mut vec = s.into_iter().collect::<Vec<_>>();
+                vec.sort();
+                vec
+            })
+            .collect::<Vec<_>>();
+        leaf_committees.sort();
+        let mut c1 = overlay.nodes[3..6].to_vec();
+        c1.sort();
+        let mut c2 = overlay.nodes[6..9].to_vec();
+        c2.sort();
+        let mut expected = vec![c1, c2];
+        expected.sort();
+        assert_eq!(leaf_committees, expected);
     }
 
     #[test]
     fn test_super_majority_threshold_for_leaf() {
         let nodes: Vec<[u8; 32]> = (0..10).map(|i| [i as u8; 32]).collect();
         let overlay = TreeOverlay::new(TreeOverlaySettings {
-            nodes: nodes.clone(),
             current_leader: nodes[0],
+            nodes,
             entropy: [0; 32],
             number_of_committees: 3,
             leader: RoundRobin::new(),
         });
 
-        assert_eq!(overlay.super_majority_threshold(nodes[8]), 0);
+        assert_eq!(overlay.super_majority_threshold(overlay.nodes[8]), 0);
     }
 
     #[test]
     fn test_super_majority_threshold_for_root_member() {
         let nodes: Vec<[u8; 32]> = (0..10).map(|i| [i as u8; 32]).collect();
         let overlay = TreeOverlay::new(TreeOverlaySettings {
-            nodes: nodes.clone(),
             current_leader: nodes[0],
+            nodes,
             entropy: [0; 32],
             number_of_committees: 3,
             leader: RoundRobin::new(),
         });
 
-        assert_eq!(overlay.super_majority_threshold(nodes[0]), 3);
+        assert_eq!(overlay.super_majority_threshold(overlay.nodes[0]), 3);
     }
 
     #[test]
