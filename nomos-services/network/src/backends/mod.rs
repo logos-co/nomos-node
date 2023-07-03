@@ -5,6 +5,9 @@ use tokio::sync::broadcast::Receiver;
 #[cfg(feature = "waku")]
 pub mod waku;
 
+#[cfg(feature = "libp2p-backend")]
+pub mod libp2p;
+
 #[cfg(feature = "mock")]
 pub mod mock;
 
