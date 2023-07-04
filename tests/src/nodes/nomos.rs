@@ -1,5 +1,4 @@
 // std
-use std::io::Read;
 use std::net::SocketAddr;
 use std::process::{Child, Command, Stdio};
 use std::time::Duration;
@@ -8,6 +7,7 @@ use crate::{get_available_port, Node, SpawnConfig, RNG};
 use consensus_engine::overlay::{RoundRobin, Settings};
 use nomos_consensus::{CarnotInfo, CarnotSettings};
 use nomos_http::backends::axum::AxumBackendSettings;
+use nomos_log::{LoggerBackend, LoggerFormat};
 use nomos_network::{
     backends::waku::{WakuConfig, WakuInfo},
     NetworkConfig,
@@ -15,6 +15,7 @@ use nomos_network::{
 use nomos_node::Config;
 use waku_bindings::{Multiaddr, PeerId};
 // crates
+use fraction::{Fraction, One};
 use once_cell::sync::Lazy;
 use rand::Rng;
 use reqwest::Client;
@@ -24,6 +25,7 @@ static CLIENT: Lazy<Client> = Lazy::new(Client::new);
 const NOMOS_BIN: &str = "../target/debug/nomos-node";
 const CARNOT_INFO_API: &str = "carnot/info";
 const NETWORK_INFO_API: &str = "network/info";
+const LOGS_PREFIX: &str = "__logs";
 
 pub struct NomosNode {
     addr: SocketAddr,
@@ -33,24 +35,34 @@ pub struct NomosNode {
 
 impl Drop for NomosNode {
     fn drop(&mut self) {
-        let mut output = String::new();
-        if let Some(stdout) = &mut self.child.stdout {
-            stdout.read_to_string(&mut output).unwrap();
+        if std::thread::panicking() {
+            println!("persisting directory at {}", self._tempdir.path().display());
+            // we need ownership of the dir to persist it
+            let dir = std::mem::replace(&mut self._tempdir, tempfile::tempdir().unwrap());
+            // a bit confusing but `into_path` persists the directory
+            let _ = dir.into_path();
         }
-        // self.child.stdout.as_mut().unwrap().read_to_string(&mut output).unwrap();
-        println!("{} stdout: {}", self.addr, output);
+
         self.child.kill().unwrap();
     }
 }
 
 impl NomosNode {
-    pub async fn spawn(config: &Config) -> Self {
+    pub async fn spawn(mut config: Config) -> Self {
         // Waku stores the messages in a db file in the current dir, we need a different
         // directory for each node to avoid conflicts
         let dir = tempfile::tempdir().unwrap();
         let mut file = NamedTempFile::new().unwrap();
         let config_path = file.path().to_owned();
-        serde_json::to_writer(&mut file, config).unwrap();
+
+        // setup logging so that we can intercept it later in testing
+        config.log.backend = LoggerBackend::File {
+            directory: dir.path().to_owned(),
+            prefix: Some(LOGS_PREFIX.into()),
+        };
+        config.log.format = LoggerFormat::Json;
+
+        serde_yaml::to_writer(&mut file, &config).unwrap();
         let child = Command::new(std::env::current_dir().unwrap().join(NOMOS_BIN))
             .arg(&config_path)
             .current_dir(dir.path())
@@ -101,6 +113,28 @@ impl NomosNode {
             .unwrap()
             .swap_remove(0)
     }
+
+    // not async so that we can use this in `Drop`
+    pub fn get_logs_from_file(&self) -> String {
+        println!(
+            "fetching logs from dir {}...",
+            self._tempdir.path().display()
+        );
+        // std::thread::sleep(std::time::Duration::from_secs(50));
+        std::fs::read_dir(self._tempdir.path())
+            .unwrap()
+            .filter_map(|entry| {
+                let entry = entry.unwrap();
+                let path = entry.path();
+                if path.is_file() && path.to_str().unwrap().contains(LOGS_PREFIX) {
+                    Some(path)
+                } else {
+                    None
+                }
+            })
+            .map(|f| std::fs::read_to_string(f).unwrap())
+            .collect::<String>()
+    }
 }
 
 #[async_trait::async_trait]
@@ -118,10 +152,9 @@ impl Node for NomosNode {
                     .iter()
                     .map(|id| create_node_config(ids.clone(), *id))
                     .collect::<Vec<_>>();
-                let mut nodes = vec![Self::spawn(&configs[0]).await];
+                let mut nodes = vec![Self::spawn(configs.swap_remove(0)).await];
                 let listening_addr = nodes[0].get_listening_address().await;
-                configs.drain(0..1);
-                for conf in &mut configs {
+                for mut conf in configs {
                     conf.network
                         .backend
                         .initial_peers
@@ -161,6 +194,10 @@ fn create_node_config(nodes: Vec<[u8; 32]>, private_key: [u8; 32]) -> Config {
             overlay_settings: Settings {
                 nodes,
                 leader: RoundRobin::new(),
+                // By setting the leader_threshold to 1 we ensure that all nodes come
+                // online before progressing. This is only necessary until we add a way
+                // to recover poast blocks from other nodes.
+                leader_super_majority_threshold: Some(Fraction::one()),
             },
         },
         log: Default::default(),

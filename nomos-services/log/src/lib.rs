@@ -31,10 +31,10 @@ pub enum LoggerBackend {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct LoggerSettings {
-    backend: LoggerBackend,
-    format: LoggerFormat,
+    pub backend: LoggerBackend,
+    pub format: LoggerFormat,
     #[serde(with = "serde_level")]
-    level: Level,
+    pub level: Level,
 }
 
 impl Default for LoggerSettings {

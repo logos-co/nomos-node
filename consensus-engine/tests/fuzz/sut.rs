@@ -29,6 +29,7 @@ impl ConsensusEngineTest {
             FlatOverlay::new(Settings {
                 nodes: vec![[0; 32]],
                 leader: RoundRobin::default(),
+                leader_super_majority_threshold: None,
             }),
         );
 

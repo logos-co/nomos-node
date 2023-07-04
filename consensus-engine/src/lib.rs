@@ -415,6 +415,7 @@ mod test {
             FlatOverlay::new(Settings {
                 nodes,
                 leader: RoundRobin::default(),
+                leader_super_majority_threshold: None,
             }),
         )
     }
