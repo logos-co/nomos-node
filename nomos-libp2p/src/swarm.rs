@@ -99,7 +99,7 @@ impl Swarm {
         runtime_handle.spawn(async move {
             loop {
                 tokio::select! {
-                    event = swarm.swarm.select_next_some() => {
+                    Some(event) = swarm.swarm.next() => {
                         swarm.handle_swarm_event(event).await;
                     }
                     Some(command) = command_rx.recv() => {
