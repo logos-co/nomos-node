@@ -1,11 +1,11 @@
 use super::*;
-use overwatch_rs::services::state::ServiceState;
+use overwatch_rs::{overwatch::handle::OverwatchHandle, services::state::ServiceState};
 use tokio::sync::broadcast::Receiver;
 
 #[cfg(feature = "waku")]
 pub mod waku;
 
-#[cfg(feature = "libp2p-backend")]
+#[cfg(feature = "libp2p")]
 pub mod libp2p;
 
 #[cfg(feature = "mock")]
@@ -19,7 +19,7 @@ pub trait NetworkBackend {
     type EventKind: Debug + Send + Sync + 'static;
     type NetworkEvent: Debug + Send + Sync + 'static;
 
-    fn new(config: Self::Settings, runtime_handle: tokio::runtime::Handle) -> Self;
+    fn new(config: Self::Settings, overwatch_handle: OverwatchHandle) -> Self;
     async fn process(&self, msg: Self::Message);
     async fn subscribe(&mut self, event: Self::EventKind) -> Receiver<Self::NetworkEvent>;
 }

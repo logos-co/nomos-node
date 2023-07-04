@@ -1,0 +1,28 @@
+[package]
+name = "nomos-libp2p"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+multiaddr = "0.18"
+tokio = { version = "1", features = ["sync", "macros"] }
+futures = "0.3"
+libp2p = { version = "0.52.1", features = [
+  "yamux",
+  "noise",
+  "macros",
+  "gossipsub",
+  "identify",
+  "tcp",
+  "tokio",
+  "secp256k1",
+] }
+serde = { version = "1.0.166", features = ["derive"] }
+hex = "0.4.3"
+log = "0.4.19"
+thiserror = "1.0.40"
+
+[dev-dependencies]
+env_logger = "0.10.0"
+serde_json = "1.0.99"
+tokio = { version = "1", features = ["time"] }

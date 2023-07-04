@@ -25,15 +25,7 @@ tracing-subscriber = { version = "0.3", features = ["json"] }
 tracing-gelf = "0.7"
 futures = "0.3"
 parking_lot = "0.12"
-libp2p = { version = "0.52.1", optional = true, features = [
-  "yamux",
-  "noise",
-  "macros",
-  "gossipsub",
-  "identify",
-  "tcp",
-  "tokio",
-] }
+nomos-libp2p = { path = "../../nomos-libp2p", optional = true }
 
 [dev-dependencies]
 tokio = { version = "1", features = ["full"] }
@@ -41,5 +33,5 @@ tokio = { version = "1", features = ["full"] }
 [features]
 default = []
 waku = ["waku-bindings"]
-libp2p-backend = ["libp2p"]
+libp2p = ["nomos-libp2p"]
 mock = ["rand", "chrono"]

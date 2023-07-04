@@ -20,7 +20,7 @@ multiaddr = "0.17"
 nomos-core = { path = "../../nomos-core" }
 nomos-network = { path = "../../nomos-services/network", features = [
   "waku",
-  "libp2p-backend",
+  "libp2p",
 ] }
 nomos-log = { path = "../../nomos-services/log" }
 nomos-mempool = { path = "../../nomos-services/mempool", features = [

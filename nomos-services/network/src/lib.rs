@@ -76,7 +76,7 @@ where
         Ok(Self {
             backend: <B as NetworkBackend>::new(
                 service_state.settings_reader.get_updated_settings().backend,
-                service_state.overwatch_handle.runtime().clone(),
+                service_state.overwatch_handle.clone(),
             ),
             service_state,
         })

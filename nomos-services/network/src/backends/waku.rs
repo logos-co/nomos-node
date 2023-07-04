@@ -166,7 +166,7 @@ impl NetworkBackend for Waku {
     type EventKind = EventKind;
     type NetworkEvent = NetworkEvent;
 
-    fn new(mut config: Self::Settings, _: tokio::runtime::Handle) -> Self {
+    fn new(mut config: Self::Settings, _: OverwatchHandle) -> Self {
         // set store protocol to active at all times
         config.inner.store = Some(true);
         let waku = waku_new(Some(config.inner)).unwrap().start().unwrap();
