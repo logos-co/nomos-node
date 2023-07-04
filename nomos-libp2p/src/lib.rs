@@ -62,7 +62,8 @@ impl NomosLibp2p {
         self.event_tx.subscribe()
     }
 
-    pub async fn send_command(
+    // Schedule a command to be executed by libp2p swarm and wait until the result is received.
+    pub async fn execute_command(
         &self,
         message: command::CommandMessage,
     ) -> Result<(), Box<dyn Error>> {
@@ -107,7 +108,7 @@ mod tests {
         let node2 = NomosLibp2p::new(config2, tokio::runtime::Handle::current()).unwrap();
 
         assert!(node2
-            .send_command(CommandMessage::Connect(
+            .execute_command(CommandMessage::Connect(
                 node1.peer_id,
                 "/ip4/127.0.0.1/tcp/60000".parse().unwrap()
             ))
@@ -116,7 +117,7 @@ mod tests {
 
         let topic = "topic1".to_string();
         assert!(node2
-            .send_command(CommandMessage::Subscribe(topic.clone()))
+            .execute_command(CommandMessage::Subscribe(topic.clone()))
             .await
             .is_ok());
 
@@ -125,7 +126,7 @@ mod tests {
 
         let message = "hello".as_bytes().to_vec();
         assert!(node1
-            .send_command(CommandMessage::Broadcast {
+            .execute_command(CommandMessage::Broadcast {
                 topic: topic.clone(),
                 message: message.clone()
             })

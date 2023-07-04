@@ -27,7 +27,7 @@ impl NetworkBackend for Libp2p {
     }
 
     async fn process(&self, msg: Self::Message) {
-        if let Err(e) = self.libp2p.send_command(msg).await {
+        if let Err(e) = self.libp2p.execute_command(msg).await {
             tracing::error!("failed to send command to nomos-libp2p: {e:?}");
         }
     }
