@@ -1,0 +1,85 @@
+pipeline {
+	agent {
+		dockerfile {
+			label 'linux'
+			dir 'ci'
+		}
+	}
+
+	environment {
+		/* Avoid cache poisoning by other jobs. */
+		GOCACHE = "${env.WORKSPACE_TMP}/go-build"
+		GOPATH  = "${env.WORKSPACE_TMP}/go"
+	}
+
+	options {
+		disableConcurrentBuilds()
+		buildDiscarder(logRotator(
+			numToKeepStr: '20',
+			daysToKeepStr: '30',
+		))
+	}
+
+	stages {
+		stage('Build') {
+			steps {
+				/* Node binary is required for integration tests */
+				sh 'cargo build'
+			}
+		}
+
+		stage('Integration tests') {
+			steps {
+				sh 'cargo test two_nodes_happy'
+				sh 'cargo test three_nodes_happy'
+			}
+		}
+	}
+	post {
+		failure {
+			script {
+				discordNotify(
+					header: 'Nightly Integration Tests Failed',
+					cred: 'nomos-node-discord-commits-webhook',
+				)
+			}
+		}
+		success {
+			script {
+				discordNotify(cred: 'nomos-node-discord-commits-webhook')
+			}
+        }
+		cleanup { cleanWs() }
+	}
+}
+
+def discordNotify(Map args=[:]) {
+	def opts = [
+		header: args.header ?: 'Nightly Integration Tests Passed',
+		title:  args.title  ?: "${env.JOB_NAME}#${env.BUILD_NUMBER}",
+		cred:   args.cred   ?: null,
+	]
+	def repo = [
+		url: GIT_URL.minus('.git'),
+		branch: GIT_BRANCH.minus('origin/'),
+		commit: GIT_COMMIT.take(8),
+	]
+	withCredentials([
+		string(
+			credentialsId: opts.cred,
+			variable: 'DISCORD_WEBHOOK',
+		),
+	]) {
+		discordSend(
+			link: env.BUILD_URL,
+			result: currentBuild.currentResult,
+			webhookURL: env.DISCORD_WEBHOOK,
+			title: opts.title,
+			description: """
+			${opts.header}
+			Branch: [`${repo.branch}`](${repo.url}/commits/${repo.branch})
+			Commit: [`${repo.commit}`](${repo.url}/commit/${repo.commit})
+			""",
+		)
+	}
+}
