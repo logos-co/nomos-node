@@ -1,8 +1,4 @@
-use std::{
-    collections::{hash_map::DefaultHasher, HashMap},
-    error::Error,
-    hash::{Hash, Hasher},
-};
+use std::{collections::HashMap, error::Error};
 
 use futures::StreamExt;
 use libp2p::{
