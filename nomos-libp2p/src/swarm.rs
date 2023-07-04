@@ -1,4 +1,4 @@
-use std::{collections::HashMap, error::Error};
+use std::{collections::HashMap, error::Error, time::Duration};
 
 use futures::StreamExt;
 use libp2p::{
@@ -35,7 +35,7 @@ pub struct SwarmConfig {
     pub host: std::net::Ipv4Addr,
     // TCP listening port. Use 0 for random
     pub port: u16,
-    /// Secp256k1 private key in Hex format (`0x123...abc`). Default random
+    // Secp256k1 private key in Hex format (`0x123...abc`). Default random
     #[serde(with = "secret_key_serde")]
     pub node_key: secp256k1::SecretKey,
 }
@@ -56,6 +56,9 @@ pub enum SwarmError {
     DuplicateDialing,
 }
 
+// A timeout for the setup and protocol upgrade process for all in/outbound connections
+const TRANSPORT_TIMEOUT: Duration = Duration::from_secs(20);
+
 impl Swarm {
     // TODO: define error types
     pub fn run(
@@ -72,7 +75,7 @@ impl Swarm {
             .upgrade(upgrade::Version::V1Lazy)
             .authenticate(noise::Config::new(&id_keys)?)
             .multiplex(yamux::Config::default())
-            .timeout(std::time::Duration::from_secs(20))
+            .timeout(TRANSPORT_TIMEOUT)
             .boxed();
 
         let gossipsub = gossipsub::Behaviour::new(
