@@ -79,17 +79,10 @@ impl Swarm {
             .timeout(std::time::Duration::from_secs(20))
             .boxed();
 
-        let gossipsub_message_id_fn = |message: &gossipsub::Message| {
-            let mut s = DefaultHasher::new();
-            message.data.hash(&mut s);
-            gossipsub::MessageId::from(s.finish().to_string())
-        };
-
         let gossipsub = gossipsub::Behaviour::new(
             gossipsub::MessageAuthenticity::Signed(id_keys),
             gossipsub::ConfigBuilder::default()
                 .validation_mode(gossipsub::ValidationMode::Strict)
-                .message_id_fn(gossipsub_message_id_fn)
                 .build()?,
         )?;
 
