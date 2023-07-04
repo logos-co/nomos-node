@@ -164,17 +164,20 @@ impl ReferenceStateMachine for RefState {
 impl RefState {
     // Generate a Transition::ReceiveSafeBlock.
     fn transition_receive_safe_block(&self) -> BoxedStrategy<Transition> {
-        let recent_parents = self
+        let parents: Vec<Block> = self
             .chain
-            .range(self.current_view() - 1..)
-            .flat_map(|(_view, entry)| entry.blocks.iter().cloned())
-            .collect::<Vec<Block>>();
+            .get(&self.current_view())
+            .cloned()
+            .unwrap_or_default()
+            .blocks
+            .into_iter()
+            .collect();
 
-        if recent_parents.is_empty() {
+        if parents.is_empty() {
             Just(Transition::Nop).boxed()
         } else {
             // proptest::sample::select panics if the input is empty
-            proptest::sample::select(recent_parents)
+            proptest::sample::select(parents)
                 .prop_map(move |parent| -> Transition {
                     Transition::ReceiveSafeBlock(Self::consecutive_block(&parent))
                 })
