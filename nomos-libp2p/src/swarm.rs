@@ -5,7 +5,7 @@ use libp2p::{
     core::upgrade,
     gossipsub,
     identity::{self, secp256k1},
-    noise,
+    plaintext::PlainText2Config,
     swarm::{NetworkBehaviour, SwarmBuilder, SwarmEvent},
     tcp, yamux, PeerId, Transport,
 };
@@ -71,17 +71,23 @@ impl Swarm {
         let local_peer_id = PeerId::from(id_keys.public());
         log::info!("libp2p peer_id:{}", local_peer_id);
 
+        // TODO: consider using noise authentication
         let tcp_transport = tcp::tokio::Transport::new(tcp::Config::default().nodelay(true))
             .upgrade(upgrade::Version::V1Lazy)
-            .authenticate(noise::Config::new(&id_keys)?)
+            .authenticate(PlainText2Config {
+                local_public_key: id_keys.public(),
+            })
             .multiplex(yamux::Config::default())
             .timeout(TRANSPORT_TIMEOUT)
             .boxed();
 
+        // TODO: consider using Signed or Anonymous.
+        //       For Anonymous, a custom `message_id` function need to be set
+        //       to prevent all messages from a peer being filtered as duplicates.
         let gossipsub = gossipsub::Behaviour::new(
-            gossipsub::MessageAuthenticity::Signed(id_keys),
+            gossipsub::MessageAuthenticity::Author(local_peer_id),
             gossipsub::ConfigBuilder::default()
-                .validation_mode(gossipsub::ValidationMode::Strict)
+                .validation_mode(gossipsub::ValidationMode::None)
                 .build()?,
         )?;
 
