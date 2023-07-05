@@ -4,7 +4,9 @@ use std::collections::{HashMap, HashSet};
 
 fn blake2b_hash(committee: &Committee) -> [u8; 32] {
     let mut hasher = Blake2b::<U32>::new();
-    for member in committee {
+    let mut tmp = committee.iter().collect::<Vec<_>>();
+    tmp.sort();
+    for member in tmp {
         hasher.update(member);
     }
     hasher.finalize().into()
