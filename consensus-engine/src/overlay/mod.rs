@@ -2,8 +2,11 @@ use super::types::*;
 
 mod flat_overlay;
 mod random_beacon;
+mod tree_overlay;
+
 pub use flat_overlay::*;
 pub use random_beacon::*;
+pub use tree_overlay::*;
 
 use std::marker::Send;
 
