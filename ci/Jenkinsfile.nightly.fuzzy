@@ -1,82 +1,82 @@
 pipeline {
-	agent {
-		dockerfile {
-			label 'linux'
-			dir 'ci'
-		}
-	}
+  agent {
+    dockerfile {
+      label 'linux'
+      dir 'ci'
+    }
+  }
 
-	environment {
-		/* Avoid cache poisoning by other jobs. */
-		GOCACHE = "${env.WORKSPACE_TMP}/go-build"
-		GOPATH  = "${env.WORKSPACE_TMP}/go"
-		GIT_COMMITTER_NAME = 'status-im-auto'
-		GIT_COMMITTER_EMAIL = 'auto@status.im'
-		PROPTEST_CASES=50 
-	}
+  environment {
+    /* Avoid cache poisoning by other jobs. */
+    GOCACHE = "${env.WORKSPACE_TMP}/go-build"
+    GOPATH  = "${env.WORKSPACE_TMP}/go"
+    GIT_COMMITTER_NAME = 'status-im-auto'
+    GIT_COMMITTER_EMAIL = 'auto@status.im'
+    PROPTEST_CASES=500000
+  }
 
-	options {
-		disableConcurrentBuilds()
-		buildDiscarder(logRotator(
-			numToKeepStr: '20',
-			daysToKeepStr: '30',
-		))
-	}
+  options {
+    disableConcurrentBuilds()
+    buildDiscarder(logRotator(
+      numToKeepStr: '20',
+      daysToKeepStr: '30',
+    ))
+  }
 
-	stages {
-		stage('Fuzztest') {
-			steps {
-				sh 'cargo test --test fuzz_test'
-			}
-		}
-	}
+  stages {
+    stage('Fuzztest') {
+      steps {
+        sh 'cargo test --test fuzz_test'
+      }
+    }
+  }
 
-	post {
-		failure {
-			script {
-				archiveArtifacts artifacts: '**/*.proptest-regressions'
-				discordNotify(
-					header: 'Nightly Fuzztest Failed. Regression files archived as job artifacts',
-					cred: 'nomos-node-discord-commits-webhook',
-				)
-			}
-		}
-		success {
-			script {
-				discordNotify(cred: 'nomos-node-discord-commits-webhook')
-			}
-		}
-		cleanup { cleanWs() }
-	}
+  post {
+    failure {
+      script {
+        archiveArtifacts artifacts: '**/*.proptest-regressions'
+        discordNotify(
+          header: 'Nightly Fuzztest Failed. Regression files archived as job artifacts',
+          cred: 'nomos-node-discord-commits-webhook',
+        )
+      }
+    }
+    success {
+      script {
+        discordNotify(cred: 'nomos-node-discord-commits-webhook')
+      }
+    }
+    cleanup { cleanWs() }
+  }
 }
 
 def discordNotify(Map args=[:]) {
-	def opts = [
-		header: args.header ?: 'Nightly Fuzztest Passed',
-		title:  args.title  ?: "${env.JOB_NAME}#${env.BUILD_NUMBER}",
-		cred:   args.cred   ?: null,
-	]
-	def repo = [
-		url: GIT_URL.minus('.git'),
-		branch: GIT_BRANCH.minus('origin/'),
-		commit: GIT_COMMIT.take(8),
-	]
-	withCredentials([
-		string(
-			credentialsId: opts.cred,
-			variable: 'DISCORD_WEBHOOK',
-		),
-	]) {
-		discordSend(
-			link: env.BUILD_URL,
-			result: currentBuild.currentResult,
-			webhookURL: env.DISCORD_WEBHOOK,
-			title: opts.title,
-			description: """
-			${opts.header}
-			Branch: [`${repo.branch}`](${repo.url}/commits/${repo.branch})
-			Commit: [`${repo.commit}`](${repo.url}/commit/${repo.commit})
-			""",
-		)
-	}
+  def opts = [
+    header: args.header ?: 'Nightly Fuzztest Passed',
+    title:  args.title  ?: "${env.JOB_NAME}#${env.BUILD_NUMBER}",
+    cred:   args.cred   ?: null,
+  ]
+  def repo = [
+    url: GIT_URL.minus('.git'),
+    branch: GIT_BRANCH.minus('origin/'),
+    commit: GIT_COMMIT.take(8),
+  ]
+  withCredentials([
+    string(
+      credentialsId: opts.cred,
+      variable: 'DISCORD_WEBHOOK',
+    ),
+  ]) {
+    discordSend(
+      link: env.BUILD_URL,
+      result: currentBuild.currentResult,
+      webhookURL: env.DISCORD_WEBHOOK,
+      title: opts.title,
+      description: """
+      ${opts.header}
+      Branch: [`${repo.branch}`](${repo.url}/commits/${repo.branch})
+      Commit: [`${repo.commit}`](${repo.url}/commit/${repo.commit})
+      """,
+    )
+  }
 }
