@@ -50,7 +50,7 @@ impl Tree {
     pub(super) fn build_committee_from_nodes_with_size(
         nodes: &[NodeId],
         number_of_committees: usize,
-    ) -> (Vec<NodeId>, HashMap<usize, Committee>) {
+    ) -> (Vec<[u8; 32]>, HashMap<usize, Committee>) {
         let committee_size = nodes.len() / number_of_committees;
         let remainder = nodes.len() % number_of_committees;
 
