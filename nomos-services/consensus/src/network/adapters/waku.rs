@@ -287,7 +287,7 @@ impl NetworkAdapter for WakuAdapter {
         committee: &Committee,
         view: View,
     ) -> Box<dyn Stream<Item = NewViewMsg> + Send + Unpin> {
-        let content_topic = create_topic("votes", committee, view);
+        let content_topic = create_topic("new-view", committee, view);
         Box::new(Box::pin(
             self.cached_stream_with_content_topic(content_topic)
                 .await
