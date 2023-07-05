@@ -40,7 +40,6 @@ impl Tally for NewViewTally {
     ) -> Result<(Self::Qc, Self::Outcome), Self::TallyError> {
         let mut seen = HashSet::new();
         let mut outcome = HashSet::new();
-
         // return early for leaf nodes
         if self.settings.threshold == 0 {
             return Ok(((), outcome));
@@ -48,7 +47,7 @@ impl Tally for NewViewTally {
 
         while let Some(vote) = vote_stream.next().await {
             // check vote view is valid
-            if !vote.vote.view != timeout_qc.view() {
+            if vote.vote.view != timeout_qc.view() + 1 {
                 continue;
             }
 
