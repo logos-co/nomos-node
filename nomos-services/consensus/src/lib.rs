@@ -567,7 +567,15 @@ where
             let threshold = carnot.leader_super_majority_threshold();
             task_manager.push(
                 current_view,
-                Self::gather_timeout(adapter, carnot.self_committee(), current_view, threshold),
+                Self::gather_timeout(
+                    adapter,
+                    carnot.self_committee(),
+                    current_view,
+                    CarnotTallySettings {
+                        threshold: carnot.leader_super_majority_threshold(),
+                        participating_nodes: carnot.root_committee(),
+                    },
+                ),
             );
         }
     }
@@ -627,16 +635,16 @@ where
         adapter: A,
         committee: Committee,
         view: consensus_engine::View,
-        threshold: usize,
+        tally: CarnotTallySettings,
     ) -> Event<P::Tx> {
-        let timeouts = adapter
-            .timeout_stream(&committee, view)
-            .await
-            .take(threshold)
-            .map(|msg| msg.vote)
-            .collect()
-            .await;
-        Event::RootTimeout { timeouts }
+        let tally = TimeoutTally::new(tally);
+        let stream = adapter.timeout_stream(&committee, view).await;
+        match tally.tally(view, stream).await {
+            Ok((_, timeouts)) => Event::RootTimeout { timeouts },
+            Err(_e) => {
+                todo!("Handle tally error {_e}");
+            }
+        }
     }
 
     async fn gather_block(adapter: A, view: consensus_engine::View) -> Event<P::Tx> {

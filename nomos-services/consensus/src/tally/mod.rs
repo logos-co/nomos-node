@@ -1,4 +1,5 @@
 pub mod happy;
+pub mod timeout;
 pub mod unhappy;
 
 // std
