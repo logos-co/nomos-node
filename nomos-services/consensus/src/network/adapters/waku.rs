@@ -1,6 +1,7 @@
 // std
 use std::borrow::Cow;
 use std::collections::hash_map::DefaultHasher;
+use std::collections::BTreeSet;
 use std::hash::{Hash, Hasher};
 // crates
 use futures::{Stream, StreamExt};
@@ -247,7 +248,7 @@ impl NetworkAdapter for WakuAdapter {
                     let payload = message.payload();
                     let qc = TimeoutQcMsg::from_bytes(payload);
                     async move {
-                        if qc.qc.view() > view {
+                        if qc.qc.view() == view {
                             Some(qc)
                         } else {
                             None
@@ -286,7 +287,7 @@ impl NetworkAdapter for WakuAdapter {
         committee: &Committee,
         view: View,
     ) -> Box<dyn Stream<Item = NewViewMsg> + Send + Unpin> {
-        let content_topic = create_topic("votes", committee, view);
+        let content_topic = create_topic("new-view", committee, view);
         Box::new(Box::pin(
             self.cached_stream_with_content_topic(content_topic)
                 .await
@@ -338,6 +339,8 @@ const TIMEOUT_QC_CONTENT_TOPIC: WakuContentTopic =
 // TODO: Maybe use a secure hasher instead
 fn hash_set(c: &Committee) -> u64 {
     let mut s = DefaultHasher::new();
+    // ensure consistent iteration across nodes
+    let c = c.iter().collect::<BTreeSet<_>>();
     for e in c.iter() {
         e.hash(&mut s);
     }

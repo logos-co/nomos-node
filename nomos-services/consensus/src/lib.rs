@@ -21,7 +21,9 @@ use tracing::instrument;
 // internal
 use crate::network::messages::{NewViewMsg, ProposalChunkMsg, TimeoutMsg, TimeoutQcMsg, VoteMsg};
 use crate::network::NetworkAdapter;
-use crate::tally::{happy::CarnotTally, unhappy::NewViewTally, CarnotTallySettings};
+use crate::tally::{
+    happy::CarnotTally, timeout::TimeoutTally, unhappy::NewViewTally, CarnotTallySettings,
+};
 use consensus_engine::{
     overlay::RandomBeaconState, AggregateQc, BlockId, Carnot, Committee, LeaderProof, NewView,
     Overlay, Payload, Qc, StandardQc, Timeout, TimeoutQc, View, Vote,
@@ -191,11 +193,14 @@ where
         let mut task_manager = TaskManager::new();
 
         let genesis_block = carnot.genesis_block();
-        task_manager.push(
-            genesis_block.view + 1,
-            Self::gather_block(adapter.clone(), genesis_block.view + 1),
-        );
-
+        Self::process_view_change(
+            carnot.clone(),
+            genesis_block.view - 1,
+            &mut task_manager,
+            adapter.clone(),
+        )
+        .await;
+        // we already have the genesis block, no need to wait for it
         task_manager.push(
             genesis_block.view,
             Self::gather_votes(
@@ -303,11 +308,16 @@ where
                 carnot = new_carnot;
                 output = Some(Output::Send::<P::Tx>(out));
             }
-            Event::LocalTimeout => {
+            Event::LocalTimeout { view } => {
                 tracing::debug!("local timeout");
                 let (new_carnot, out) = carnot.local_timeout();
                 carnot = new_carnot;
                 output = out.map(Output::Send);
+                // keep timeout until the situation is resolved
+                task_manager.push(view, async move {
+                    tokio::time::sleep(TIMEOUT).await;
+                    Event::LocalTimeout { view }
+                });
             }
             Event::NewView {
                 timeout_qc,
@@ -543,9 +553,9 @@ where
         task_manager.cancel(prev_view);
         tracing::debug!("Advanced view from {prev_view} to {current_view}");
         // View change!
-        task_manager.push(current_view, async {
+        task_manager.push(current_view, async move {
             tokio::time::sleep(TIMEOUT).await;
-            Event::LocalTimeout
+            Event::LocalTimeout { view: current_view }
         });
         task_manager.push(
             current_view + 1,
@@ -556,10 +566,17 @@ where
             Self::gather_timeout_qc(adapter.clone(), current_view),
         );
         if carnot.is_member_of_root_committee() {
-            let threshold = carnot.leader_super_majority_threshold();
             task_manager.push(
                 current_view,
-                Self::gather_timeout(adapter, carnot.self_committee(), current_view, threshold),
+                Self::gather_timeout(
+                    adapter,
+                    carnot.self_committee(),
+                    current_view,
+                    CarnotTallySettings {
+                        threshold: carnot.leader_super_majority_threshold(),
+                        participating_nodes: carnot.root_committee(),
+                    },
+                ),
             );
         }
     }
@@ -578,6 +595,7 @@ where
         }
     }
 
+    #[instrument(level = "debug", skip(adapter, tally))]
     async fn gather_votes(
         adapter: A,
         committee: Committee,
@@ -594,6 +612,7 @@ where
         }
     }
 
+    #[instrument(level = "debug", skip(adapter, tally))]
     async fn gather_new_views(
         adapter: A,
         committee: Committee,
@@ -615,22 +634,24 @@ where
         }
     }
 
+    #[instrument(level = "debug", skip(adapter, tally))]
     async fn gather_timeout(
         adapter: A,
         committee: Committee,
         view: consensus_engine::View,
-        threshold: usize,
+        tally: CarnotTallySettings,
     ) -> Event<P::Tx> {
-        let timeouts = adapter
-            .timeout_stream(&committee, view)
-            .await
-            .take(threshold)
-            .map(|msg| msg.vote)
-            .collect()
-            .await;
-        Event::RootTimeout { timeouts }
+        let tally = TimeoutTally::new(tally);
+        let stream = adapter.timeout_stream(&committee, view).await;
+        match tally.tally(view, stream).await {
+            Ok((_, timeouts)) => Event::RootTimeout { timeouts },
+            Err(_e) => {
+                todo!("Handle tally error {_e}");
+            }
+        }
     }
 
+    #[instrument(level = "debug", skip(adapter))]
     async fn gather_block(adapter: A, view: consensus_engine::View) -> Event<P::Tx> {
         let stream = adapter
             .proposal_chunks_stream(view)
@@ -754,7 +775,9 @@ enum Event<Tx: Clone + Hash + Eq> {
         block: consensus_engine::Block,
         votes: HashSet<Vote>,
     },
-    LocalTimeout,
+    LocalTimeout {
+        view: View,
+    },
     NewView {
         timeout_qc: TimeoutQc,
         new_views: HashSet<NewView>,

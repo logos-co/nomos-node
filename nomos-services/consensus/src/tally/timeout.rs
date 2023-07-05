@@ -1,32 +1,25 @@
 // std
-use std::collections::HashSet;
+use std::{collections::HashSet, convert::Infallible};
 // crates
 use futures::{Stream, StreamExt};
-use serde::{Deserialize, Serialize};
 // internal
 use super::CarnotTallySettings;
-use crate::network::messages::NewViewMsg;
-use consensus_engine::{NewView, TimeoutQc};
+use crate::network::messages::TimeoutMsg;
+use consensus_engine::{Timeout, View};
 use nomos_core::vote::Tally;
 
-#[derive(thiserror::Error, Debug)]
-pub enum NewViewTallyError {
-    #[error("Did not receive enough votes")]
-    InsufficientVotes,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct NewViewTally {
+#[derive(Clone, Debug)]
+pub struct TimeoutTally {
     settings: CarnotTallySettings,
 }
 
 #[async_trait::async_trait]
-impl Tally for NewViewTally {
-    type Vote = NewViewMsg;
+impl Tally for TimeoutTally {
+    type Vote = TimeoutMsg;
     type Qc = ();
-    type Subject = TimeoutQc;
-    type Outcome = HashSet<NewView>;
-    type TallyError = NewViewTallyError;
+    type Subject = View;
+    type Outcome = HashSet<Timeout>;
+    type TallyError = Infallible;
     type Settings = CarnotTallySettings;
 
     fn new(settings: Self::Settings) -> Self {
@@ -35,19 +28,14 @@ impl Tally for NewViewTally {
 
     async fn tally<S: Stream<Item = Self::Vote> + Unpin + Send>(
         &self,
-        timeout_qc: TimeoutQc,
+        view: View,
         mut vote_stream: S,
     ) -> Result<(Self::Qc, Self::Outcome), Self::TallyError> {
         let mut seen = HashSet::new();
         let mut outcome = HashSet::new();
-        // return early for leaf nodes
-        if self.settings.threshold == 0 {
-            return Ok(((), outcome));
-        }
-
         while let Some(vote) = vote_stream.next().await {
-            // check vote view is valid
-            if vote.vote.view != timeout_qc.view() + 1 {
+            // check timeout view is valid
+            if vote.vote.view != view {
                 continue;
             }
 
@@ -55,12 +43,13 @@ impl Tally for NewViewTally {
             if !self.settings.participating_nodes.contains(&vote.voter) {
                 continue;
             }
+
             seen.insert(vote.voter);
             outcome.insert(vote.vote.clone());
             if seen.len() >= self.settings.threshold {
                 return Ok(((), outcome));
             }
         }
-        Err(NewViewTallyError::InsufficientVotes)
+        unreachable!()
     }
 }
