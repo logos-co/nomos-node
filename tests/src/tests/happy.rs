@@ -5,20 +5,27 @@ use tests::{Node, NomosNode, SpawnConfig};
 const TARGET_VIEW: i64 = 20;
 
 async fn happy_test(nodes: Vec<NomosNode>) {
-    while stream::iter(&nodes)
-        .any(|n| async move { n.consensus_info().await.current_view < TARGET_VIEW })
-        .await
-    {
-        println!(
-            "waiting... {}",
-            stream::iter(&nodes)
-                .then(|n| async move { format!("{}", n.consensus_info().await.current_view) })
-                .collect::<Vec<_>>()
-                .await
-                .join(" | ")
-        );
-        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
-    }
+    let timeout = std::time::Duration::from_secs(20);
+    let timeout = tokio::time::sleep(timeout);
+    tokio::select! {
+        _ = timeout => panic!("timed out waiting for nodes to reach view {}", TARGET_VIEW),
+        _ = async { while stream::iter(&nodes)
+            .any(|n| async move { n.consensus_info().await.current_view < TARGET_VIEW })
+            .await
+        {
+            println!(
+                "waiting... {}",
+                stream::iter(&nodes)
+                    .then(|n| async move { format!("{}", n.consensus_info().await.current_view) })
+                    .collect::<Vec<_>>()
+                    .await
+                    .join(" | ")
+            );
+            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+        }
+        } => {}
+    };
+
     let infos = stream::iter(nodes)
         .then(|n| async move { n.consensus_info().await })
         .collect::<Vec<_>>()
@@ -43,7 +50,7 @@ async fn two_nodes_happy() {
 }
 
 #[tokio::test]
-async fn three_nodes_happy() {
-    let nodes = NomosNode::spawn_nodes(SpawnConfig::Star { n_participants: 3 }).await;
+async fn ten_nodes_happy() {
+    let nodes = NomosNode::spawn_nodes(SpawnConfig::Star { n_participants: 10 }).await;
     happy_test(nodes).await;
 }

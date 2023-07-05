@@ -87,6 +87,7 @@ impl SimulationApp {
                 let overlay_settings = consensus_engine::overlay::Settings {
                     nodes: nodes.to_vec(),
                     leader: RoundRobin::new(),
+                    leader_super_majority_threshold: None,
                 };
                 // FIXME: Actually use a proposer and a key to generate random beacon state
                 let genesis = nomos_core::block::Block::new(

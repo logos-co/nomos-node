@@ -63,7 +63,8 @@ impl<O: Overlay> Carnot<O> {
         match block.leader_proof {
             LeaderProof::LeaderId { leader_id } => {
                 // This only accepts blocks from the leader of current_view + 1
-                if leader_id != self.overlay.next_leader() {
+                if leader_id != self.overlay.next_leader() || block.view != self.current_view() + 1
+                {
                     return Err(());
                 }
             }
@@ -392,27 +393,34 @@ impl<O: Overlay> Carnot<O> {
 
 #[cfg(test)]
 mod test {
+    use std::convert::Infallible;
+
     use crate::overlay::{FlatOverlay, RoundRobin, Settings};
 
     use super::*;
 
-    fn init_from_genesis() -> Carnot<FlatOverlay<RoundRobin>> {
+    fn init(nodes: Vec<NodeId>) -> Carnot<FlatOverlay<RoundRobin>> {
+        assert!(!nodes.is_empty());
+
         Carnot::from_genesis(
-            [0; 32],
+            *nodes.first().unwrap(),
             Block {
                 view: 0,
                 id: [0; 32],
                 parent_qc: Qc::Standard(StandardQc::genesis()),
-                leader_proof: LeaderProof::LeaderId { leader_id: [0; 32] },
+                leader_proof: LeaderProof::LeaderId {
+                    leader_id: *nodes.first().unwrap(),
+                },
             },
             FlatOverlay::new(Settings {
-                nodes: vec![[0; 32]],
+                nodes,
                 leader: RoundRobin::default(),
+                leader_super_majority_threshold: None,
             }),
         )
     }
 
-    fn next_block(block: &Block) -> Block {
+    fn next_block(engine: &Carnot<FlatOverlay<RoundRobin>>, block: &Block) -> Block {
         let mut next_id = block.id;
         next_id[0] += 1;
 
@@ -423,14 +431,30 @@ mod test {
                 view: block.view,
                 id: block.id,
             }),
-            leader_proof: LeaderProof::LeaderId { leader_id: [0; 32] },
+            leader_proof: LeaderProof::LeaderId {
+                leader_id: engine.overlay().next_leader(),
+            },
         }
+    }
+
+    fn update_leader_selection(
+        engine: &Carnot<FlatOverlay<RoundRobin>>,
+    ) -> Carnot<FlatOverlay<RoundRobin>> {
+        engine
+            .update_overlay(|overlay| {
+                overlay.update_leader_selection(
+                    |leader_selection| -> Result<RoundRobin, Infallible> {
+                        Ok(leader_selection.advance())
+                    },
+                )
+            })
+            .unwrap()
     }
 
     #[test]
     // Ensure that all states are initialized correctly with the genesis block.
     fn from_genesis() {
-        let engine = init_from_genesis();
+        let engine = init(vec![[0; 32]]);
         assert_eq!(engine.current_view(), 0);
         assert_eq!(engine.highest_voted_view, -1);
 
@@ -444,8 +468,8 @@ mod test {
     #[test]
     // Ensure that all states are updated correctly after a block is received.
     fn receive_block() {
-        let mut engine = init_from_genesis();
-        let block = next_block(&engine.genesis_block());
+        let mut engine = init(vec![[0; 32]]);
+        let block = next_block(&engine, &engine.genesis_block());
 
         engine = engine.receive_block(block.clone()).unwrap();
         assert_eq!(engine.blocks_in_view(block.view), vec![block.clone()]);
@@ -456,12 +480,13 @@ mod test {
     #[test]
     // Ensure that receive_block() returns early if the same block ID has already been received.
     fn receive_duplicate_block_id() {
-        let mut engine = init_from_genesis();
+        let mut engine = init(vec![[0; 32]]);
 
-        let block1 = next_block(&engine.genesis_block());
+        let block1 = next_block(&engine, &engine.genesis_block());
         engine = engine.receive_block(block1.clone()).unwrap();
+        engine = update_leader_selection(&engine);
 
-        let mut block2 = next_block(&block1);
+        let mut block2 = next_block(&engine, &block1);
         block2.id = block1.id;
         engine = engine.receive_block(block2).unwrap();
         assert_eq!(engine.blocks_in_view(1), vec![block1]);
@@ -471,7 +496,7 @@ mod test {
     #[should_panic(expected = "out of order view not supported, missing parent block")]
     // Ensure that receive_block() fails if the parent block has never been received.
     fn receive_block_with_unknown_parent() {
-        let engine = init_from_genesis();
+        let engine = init(vec![[0; 32]]);
         let mut parent_block_id = engine.genesis_block().id;
         parent_block_id[0] += 1; // generate an unknown parent block ID
         let block = Block {
@@ -490,71 +515,51 @@ mod test {
     #[test]
     // Ensure that receive_block() returns Err for unsafe blocks.
     fn receive_unsafe_blocks() {
-        let mut engine = init_from_genesis();
+        let mut engine = init(vec![[0; 32]]);
 
-        let block = next_block(&engine.genesis_block());
+        let block = next_block(&engine, &engine.genesis_block());
         engine = engine.receive_block(block.clone()).unwrap();
+        engine = update_leader_selection(&engine);
 
-        let block = next_block(&block);
+        let block = next_block(&engine, &block);
         engine = engine.receive_block(block.clone()).unwrap();
+        engine = update_leader_selection(&engine);
 
-        let mut unsafe_block = next_block(&block);
+        let mut unsafe_block = next_block(&engine, &block);
         unsafe_block.view = engine.current_view() - 1; // UNSAFE: view < engine.current_view
         assert!(engine.receive_block(unsafe_block).is_err());
 
-        let mut unsafe_block = next_block(&block);
+        let mut unsafe_block = next_block(&engine, &block);
         unsafe_block.view = unsafe_block.parent_qc.view() + 2; // UNSAFE: view != parent_qc.view + 1
         assert!(engine.receive_block(unsafe_block).is_err());
     }
 
     #[test]
-    // Ensure that multiple blocks (forks) can be received at the current view.
-    fn receive_multiple_blocks_at_the_current_view() {
-        let mut engine = init_from_genesis();
-
-        let block1 = next_block(&engine.genesis_block());
-        engine = engine.receive_block(block1.clone()).unwrap();
-
-        let block2 = next_block(&block1);
-        engine = engine.receive_block(block2.clone()).unwrap();
-
-        #[allow(clippy::redundant_clone)]
-        let mut block3 = block2.clone();
-        block3.id = [3; 32]; // use a new ID, so that this block isn't ignored
-        engine = engine.receive_block(block3.clone()).unwrap();
-
-        assert_eq!(engine.current_view(), block3.view);
-        assert!(engine
-            .blocks_in_view(engine.current_view())
-            .contains(&block2));
-        assert!(engine
-            .blocks_in_view(engine.current_view())
-            .contains(&block3));
-    }
-
-    #[test]
     // Ensure that the grandparent of the current view can be committed
     fn receive_block_and_commit() {
-        let mut engine = init_from_genesis();
+        let mut engine = init(vec![[0; 32]]);
         assert_eq!(engine.latest_committed_block(), engine.genesis_block());
 
-        let block1 = next_block(&engine.genesis_block());
+        let block1 = next_block(&engine, &engine.genesis_block());
         engine = engine.receive_block(block1.clone()).unwrap();
         assert_eq!(engine.latest_committed_block(), engine.genesis_block());
+        engine = update_leader_selection(&engine);
 
-        let block2 = next_block(&block1);
+        let block2 = next_block(&engine, &block1);
         engine = engine.receive_block(block2.clone()).unwrap();
         assert_eq!(engine.latest_committed_block(), engine.genesis_block());
+        engine = update_leader_selection(&engine);
 
-        let block3 = next_block(&block2);
+        let block3 = next_block(&engine, &block2);
         engine = engine.receive_block(block3.clone()).unwrap();
         assert_eq!(engine.latest_committed_block(), block1);
         assert_eq!(
             engine.committed_blocks(),
             vec![block1.id, engine.genesis_block().id] // without block2 and block3
         );
+        engine = update_leader_selection(&engine);
 
-        let block4 = next_block(&block3);
+        let block4 = next_block(&engine, &block3);
         engine = engine.receive_block(block4).unwrap();
         assert_eq!(engine.latest_committed_block(), block2);
         assert_eq!(
@@ -564,16 +569,73 @@ mod test {
     }
 
     #[test]
+    // Ensure that the leader check in receive_block fails
+    // if the block is proposed by an unexpected leader.
+    fn receive_block_with_unexpected_leader() {
+        let mut engine = init(vec![[0; 32], [1; 32]]);
+
+        let block = next_block(&engine, &engine.genesis_block());
+        engine = engine.receive_block(block.clone()).unwrap();
+        engine = update_leader_selection(&engine);
+        // now next_leader is [1; 32]
+
+        let mut block = next_block(&engine, &block);
+        block.leader_proof = LeaderProof::LeaderId {
+            leader_id: [0; 32], // unexpected leader
+        };
+        assert!(engine.receive_block(block).is_err());
+    }
+
+    #[test]
+    // Ensure that the leader check in receive_block fails
+    // if block.view is not the expected view.
+    fn receive_block_with_unexpected_view() {
+        let mut engine = init(vec![[0; 32], [1; 32]]);
+
+        let block1 = next_block(&engine, &engine.genesis_block());
+        engine = engine.receive_block(block1.clone()).unwrap();
+        assert_eq!(engine.current_view(), 1);
+        engine = update_leader_selection(&engine);
+
+        // a future block should be rejected
+        let future_block = Block {
+            id: [10; 32],
+            view: 11, // a future view
+            parent_qc: Qc::Aggregated(AggregateQc {
+                view: 10,
+                high_qc: StandardQc {
+                    // a known parent block
+                    id: block1.id,
+                    view: block1.view,
+                },
+            }),
+            leader_proof: LeaderProof::LeaderId {
+                leader_id: engine.overlay().next_leader(),
+            },
+        };
+        assert!(engine.receive_block(future_block).is_err());
+
+        // a past block should be also rejected
+        let mut past_block = block1; // with the same view as block1
+        past_block.id = [10; 32];
+        assert!(engine.receive_block(past_block).is_err());
+    }
+
+    #[test]
     // Ensure that approve_block updates highest_voted_view and returns a correct Send.
     fn approve_block() {
-        let mut engine = init_from_genesis();
+        let mut engine = init(vec![[0; 32], [1; 32], [3; 32]]);
 
-        let block = next_block(&engine.genesis_block());
+        let block = next_block(&engine, &engine.genesis_block());
         engine = engine.receive_block(block.clone()).unwrap();
+        engine = update_leader_selection(&engine);
 
         let (engine, send) = engine.approve_block(block.clone());
         assert_eq!(engine.highest_voted_view, block.view);
-        assert_eq!(send.to, vec![[0; 32]].into_iter().collect()); // next leader
+        assert_eq!(
+            send.to,
+            vec![engine.overlay().next_leader()].into_iter().collect()
+        );
         assert_eq!(
             send.payload,
             Payload::Vote(Vote {
@@ -587,9 +649,9 @@ mod test {
     #[should_panic(expected = "not in")]
     // Ensure that approve_block cannot accept not-received blocks.
     fn approve_block_not_received() {
-        let engine = init_from_genesis();
+        let engine = init(vec![[0; 32]]);
 
-        let block = next_block(&engine.genesis_block());
+        let block = next_block(&engine, &engine.genesis_block());
         let _ = engine.approve_block(block);
     }
 
@@ -597,10 +659,12 @@ mod test {
     #[should_panic(expected = "can't vote for a block in the past")]
     // Ensure that approve_block cannot vote blocks in the past.
     fn approve_block_in_the_past() {
-        let mut engine = init_from_genesis();
+        let mut engine = init(vec![[0; 32]]);
 
-        let block = next_block(&engine.genesis_block());
+        let block = next_block(&engine, &engine.genesis_block());
         engine = engine.receive_block(block.clone()).unwrap();
+        engine = update_leader_selection(&engine);
+
         let (engine, _) = engine.approve_block(block.clone());
 
         // trying to approve the block again that was already voted.
@@ -610,16 +674,17 @@ mod test {
     #[test]
     // Ensure that local_timeout() votes on the current view.
     fn local_timeout() {
-        let mut engine = init_from_genesis();
-        let block = next_block(&engine.genesis_block());
+        let mut engine = init(vec![[0; 32], [1; 32]]);
+        let block = next_block(&engine, &engine.genesis_block());
         engine = engine.receive_block(block).unwrap(); // received but not approved yet
+        engine = update_leader_selection(&engine);
 
         let (engine, send) = engine.local_timeout();
         assert_eq!(engine.highest_voted_view, 1); // updated from 0 (genesis) to 1 (current_view)
         assert_eq!(
             send,
             Some(Send {
-                to: vec![[0; 32]].into_iter().collect(), // root_committee
+                to: engine.overlay().root_committee(),
                 payload: Payload::Timeout(Timeout {
                     view: 1,
                     sender: [0; 32],
@@ -636,9 +701,10 @@ mod test {
     #[test]
     // Ensure that receive_timeout_qc updates current_view, last_view_timeout_qc and local_high_qc.
     fn receive_timeout_qc_after_local_timeout() {
-        let mut engine = init_from_genesis();
-        let block = next_block(&engine.genesis_block());
+        let mut engine = init(vec![[0; 32]]);
+        let block = next_block(&engine, &engine.genesis_block());
         engine = engine.receive_block(block).unwrap(); // received but not approved yet
+        engine = update_leader_selection(&engine);
 
         let (mut engine, _) = engine.local_timeout();
 
@@ -660,9 +726,10 @@ mod test {
     #[test]
     // Ensure that receive_timeout_qc works even before local_timeout occurs.
     fn receive_timeout_qc_before_local_timeout() {
-        let mut engine = init_from_genesis();
-        let block = next_block(&engine.genesis_block());
+        let mut engine = init(vec![[0; 32]]);
+        let block = next_block(&engine, &engine.genesis_block());
         engine = engine.receive_block(block).unwrap(); // received but not approved yet
+        engine = update_leader_selection(&engine);
 
         // before local_timeout occurs
 
@@ -684,9 +751,10 @@ mod test {
     #[test]
     // Ensure that approve_new_view votes on the new view correctly.
     fn approve_new_view() {
-        let mut engine = init_from_genesis();
-        let block = next_block(&engine.genesis_block());
+        let mut engine = init(vec![[0; 32], [1; 32], [2; 32]]);
+        let block = next_block(&engine, &engine.genesis_block());
         engine = engine.receive_block(block).unwrap(); // received but not approved yet
+        engine = update_leader_selection(&engine);
 
         assert_eq!(engine.current_view(), 1); // still waiting for a QC(view=1)
         let timeout_qc = TimeoutQc::new(
@@ -702,28 +770,33 @@ mod test {
         assert_eq!(engine.last_view_timeout_qc, Some(timeout_qc.clone()));
         assert_eq!(engine.current_view(), 2);
         assert_eq!(engine.highest_voted_view, -1); // didn't vote on anything yet
+        engine = update_leader_selection(&engine);
 
         let (engine, send) = engine.approve_new_view(timeout_qc.clone(), HashSet::new());
         assert_eq!(&engine.high_qc(), timeout_qc.high_qc());
         assert_eq!(engine.current_view(), 2); // not changed
         assert_eq!(engine.highest_voted_view, 2);
         assert_eq!(
-            send.payload,
-            Payload::NewView(NewView {
-                view: 2,
-                sender: [0; 32],
-                timeout_qc: timeout_qc.clone(),
-                high_qc: timeout_qc.high_qc().clone(),
-            })
+            send,
+            Send {
+                to: vec![engine.overlay().next_leader()].into_iter().collect(),
+                payload: Payload::NewView(NewView {
+                    view: 2,
+                    sender: [0; 32],
+                    timeout_qc: timeout_qc.clone(),
+                    high_qc: timeout_qc.high_qc().clone(),
+                })
+            }
         );
     }
 
     #[test]
     #[should_panic(expected = "can't vote for a new view not bigger than the last timeout_qc")]
     fn approve_new_view_not_bigger_than_timeout_qc() {
-        let mut engine = init_from_genesis();
-        let block = next_block(&engine.genesis_block());
+        let mut engine = init(vec![[0; 32]]);
+        let block = next_block(&engine, &engine.genesis_block());
         engine = engine.receive_block(block).unwrap(); // received but not approved yet
+        engine = update_leader_selection(&engine);
 
         assert_eq!(engine.current_view(), 1);
         let timeout_qc1 = TimeoutQc::new(
@@ -736,6 +809,7 @@ mod test {
         );
         engine = engine.receive_timeout_qc(timeout_qc1.clone());
         assert_eq!(engine.last_view_timeout_qc, Some(timeout_qc1.clone()));
+        engine = update_leader_selection(&engine);
 
         // receiving a timeout_qc2 before approving new_view(timeout_qc1)
         let timeout_qc2 = TimeoutQc::new(
@@ -748,6 +822,7 @@ mod test {
         );
         engine = engine.receive_timeout_qc(timeout_qc2.clone());
         assert_eq!(engine.last_view_timeout_qc, Some(timeout_qc2));
+        engine = update_leader_selection(&engine);
 
         // we expect new_view(timeout_qc2), but...
         let _ = engine.approve_new_view(timeout_qc1, HashSet::new());
