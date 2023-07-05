@@ -594,6 +594,7 @@ where
         }
     }
 
+    #[instrument(level = "debug", skip(adapter, tally))]
     async fn gather_votes(
         adapter: A,
         committee: Committee,
@@ -610,6 +611,7 @@ where
         }
     }
 
+    #[instrument(level = "debug", skip(adapter, tally))]
     async fn gather_new_views(
         adapter: A,
         committee: Committee,
@@ -631,6 +633,7 @@ where
         }
     }
 
+    #[instrument(level = "debug", skip(adapter, tally))]
     async fn gather_timeout(
         adapter: A,
         committee: Committee,
@@ -647,6 +650,7 @@ where
         }
     }
 
+    #[instrument(level = "debug", skip(adapter))]
     async fn gather_block(adapter: A, view: consensus_engine::View) -> Event<P::Tx> {
         let stream = adapter
             .proposal_chunks_stream(view)
