@@ -191,11 +191,14 @@ where
         let mut task_manager = TaskManager::new();
 
         let genesis_block = carnot.genesis_block();
-        task_manager.push(
-            genesis_block.view + 1,
-            Self::gather_block(adapter.clone(), genesis_block.view + 1),
-        );
-
+        Self::process_view_change(
+            carnot.clone(),
+            genesis_block.view - 1,
+            &mut task_manager,
+            adapter.clone(),
+        )
+        .await;
+        // we already have the genesis block, no need to wait for it
         task_manager.push(
             genesis_block.view,
             Self::gather_votes(
