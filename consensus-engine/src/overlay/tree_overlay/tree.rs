@@ -76,7 +76,7 @@ impl Tree {
         (hashes, committees.into_iter().enumerate().collect())
     }
 
-    pub(super) fn parent_committee(&self, committee_id: &NodeId) -> Option<&NodeId> {
+    pub(super) fn parent_committee(&self, committee_id: &NodeId) -> Option<&[u8; 32]> {
         if committee_id == &self.inner_committees[0] {
             None
         } else {
@@ -97,7 +97,7 @@ impl Tree {
     pub(super) fn child_committees(
         &self,
         committee_id: &NodeId,
-    ) -> (Option<&NodeId>, Option<&NodeId>) {
+    ) -> (Option<&[u8; 32]>, Option<&[u8; 32]>) {
         let Some(base) = self
             .committee_id_to_index
             .get(committee_id)
@@ -110,7 +110,7 @@ impl Tree {
         )
     }
 
-    pub(super) fn leaf_committees(&self) -> HashMap<&NodeId, &Committee> {
+    pub(super) fn leaf_committees(&self) -> HashMap<&[u8; 32], &Committee> {
         let total_leafs = (self.inner_committees.len() + 1) / 2;
         let mut leaf_committees = HashMap::new();
         for i in (self.inner_committees.len() - total_leafs)..self.inner_committees.len() {
@@ -131,7 +131,7 @@ impl Tree {
         self.committees_by_member.get(member_id).copied()
     }
 
-    pub(super) fn committee_id_by_member_id(&self, member_id: &NodeId) -> Option<&NodeId> {
+    pub(super) fn committee_id_by_member_id(&self, member_id: &NodeId) -> Option<&[u8; 32]> {
         self.committees_by_member
             .get(member_id)
             .map(|&idx| &self.inner_committees[idx])
