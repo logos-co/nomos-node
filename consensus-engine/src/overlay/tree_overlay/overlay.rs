@@ -40,6 +40,7 @@ where
             leader,
         } = settings;
         let mut rng = StdRng::from_seed(entropy);
+        // TODO: support custom shuffling algorithm
         nodes.shuffle(&mut rng);
 
         let carnot_tree = Tree::new(&nodes, number_of_committees);
@@ -121,7 +122,8 @@ where
         }
         self.carnot_tree
             .committee_by_member_id(&id)
-            .map_or(0, |c| (c.len() * 2 / 3) + 1)
+            .map(|c| (c.len() * 2 / 3) + 1)
+            .expect("node is not part of any committee")
     }
 
     fn leader_super_majority_threshold(&self, _id: NodeId) -> usize {
