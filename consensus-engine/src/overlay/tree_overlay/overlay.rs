@@ -107,8 +107,13 @@ where
             .collect()
     }
 
-    fn node_committee(&self, _id: NodeId) -> Committee {
-        self.nodes.clone().into_iter().collect()
+    fn node_committee(&self, id: NodeId) -> Committee {
+        self.carnot_tree
+            .committees_by_member
+            .get(&id)
+            .and_then(|committee_index| self.carnot_tree.membership_committees.get(committee_index))
+            .cloned()
+            .unwrap_or_default()
     }
 
     fn next_leader(&self) -> NodeId {
