@@ -148,3 +148,43 @@ impl Tree {
             .and_then(|&idx| self.committee_by_committee_idx(idx))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_carnot_tree_parenting() {
+        let nodes: Vec<[u8; 32]> = (0..10).map(|i| [i as u8; 32]).collect();
+        let tree = Tree::new(&nodes, 3);
+
+        let root = &tree.inner_committees[0];
+        let one = &tree.inner_committees[1];
+        let two = &tree.inner_committees[2];
+
+        assert_eq!(tree.parent_committee(one), Some(root));
+        assert_eq!(tree.parent_committee(two), Some(root));
+    }
+
+    #[test]
+    fn test_carnot_tree_root_parenting() {
+        let nodes: Vec<[u8; 32]> = (0..10).map(|i| [i as u8; 32]).collect();
+        let tree = Tree::new(&nodes, 3);
+
+        let root = &tree.inner_committees[0];
+
+        assert!(tree.parent_committee(root).is_none());
+    }
+
+    #[test]
+    fn test_carnot_tree_childs() {
+        let nodes: Vec<[u8; 32]> = (0..10).map(|i| [i as u8; 32]).collect();
+        let tree = Tree::new(&nodes, 3);
+
+        let root = &tree.inner_committees[0];
+        let one = &tree.inner_committees[1];
+        let two = &tree.inner_committees[2];
+
+        assert_eq!(tree.child_committees(root), (Some(one), Some(two)));
+    }
+}
