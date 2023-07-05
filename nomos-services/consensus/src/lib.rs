@@ -21,7 +21,9 @@ use tracing::instrument;
 // internal
 use crate::network::messages::{NewViewMsg, ProposalChunkMsg, TimeoutMsg, TimeoutQcMsg, VoteMsg};
 use crate::network::NetworkAdapter;
-use crate::tally::{happy::CarnotTally, unhappy::NewViewTally, CarnotTallySettings};
+use crate::tally::{
+    happy::CarnotTally, timeout::TimeoutTally, unhappy::NewViewTally, CarnotTallySettings,
+};
 use consensus_engine::{
     overlay::RandomBeaconState, AggregateQc, BlockId, Carnot, Committee, LeaderProof, NewView,
     Overlay, Payload, Qc, StandardQc, Timeout, TimeoutQc, View, Vote,
@@ -564,7 +566,6 @@ where
             Self::gather_timeout_qc(adapter.clone(), current_view),
         );
         if carnot.is_member_of_root_committee() {
-            let threshold = carnot.leader_super_majority_threshold();
             task_manager.push(
                 current_view,
                 Self::gather_timeout(

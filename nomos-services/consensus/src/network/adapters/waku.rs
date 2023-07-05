@@ -340,7 +340,7 @@ const TIMEOUT_QC_CONTENT_TOPIC: WakuContentTopic =
 fn hash_set(c: &Committee) -> u64 {
     let mut s = DefaultHasher::new();
     // ensure consistent iteration across nodes
-    let c = c.into_iter().collect::<BTreeSet<_>>();
+    let c = c.iter().collect::<BTreeSet<_>>();
     for e in c.iter() {
         e.hash(&mut s);
     }
