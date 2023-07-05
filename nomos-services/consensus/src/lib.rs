@@ -306,11 +306,16 @@ where
                 carnot = new_carnot;
                 output = Some(Output::Send::<P::Tx>(out));
             }
-            Event::LocalTimeout => {
+            Event::LocalTimeout { view } => {
                 tracing::debug!("local timeout");
                 let (new_carnot, out) = carnot.local_timeout();
                 carnot = new_carnot;
                 output = out.map(Output::Send);
+                // keep timeout until the situation is resolved
+                task_manager.push(view, async move {
+                    tokio::time::sleep(TIMEOUT).await;
+                    Event::LocalTimeout { view }
+                });
             }
             Event::NewView {
                 timeout_qc,
@@ -546,9 +551,9 @@ where
         task_manager.cancel(prev_view);
         tracing::debug!("Advanced view from {prev_view} to {current_view}");
         // View change!
-        task_manager.push(current_view, async {
+        task_manager.push(current_view, async move {
             tokio::time::sleep(TIMEOUT).await;
-            Event::LocalTimeout
+            Event::LocalTimeout { view: current_view }
         });
         task_manager.push(
             current_view + 1,
@@ -757,7 +762,9 @@ enum Event<Tx: Clone + Hash + Eq> {
         block: consensus_engine::Block,
         votes: HashSet<Vote>,
     },
-    LocalTimeout,
+    LocalTimeout {
+        view: View,
+    },
     NewView {
         timeout_qc: TimeoutQc,
         new_views: HashSet<NewView>,
