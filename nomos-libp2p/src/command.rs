@@ -4,6 +4,8 @@ use libp2p::PeerId;
 use multiaddr::Multiaddr;
 use tokio::sync::oneshot;
 
+/// Commands that users can execute to [`NomosLibp2p`].
+/// The result can be received from the [`result_tx`].
 pub struct Command {
     pub message: CommandMessage,
     pub result_tx: CommandResultSender,

@@ -35,6 +35,8 @@ impl Default for NomosLibp2pConfig {
 }
 
 impl NomosLibp2p {
+    /// Builds a [`NomosLibp2p`], and spawns a libp2p swarm internally as an async task.
+    //
     // TODO: define error types
     pub fn new(
         config: NomosLibp2pConfig,
@@ -57,12 +59,12 @@ impl NomosLibp2p {
         })
     }
 
-    // Create a receiver that will receive events emitted from libp2p swarm
+    /// Create a receiver for [`Event`] emitted from libp2p swarm
     pub fn event_receiver(&self) -> broadcast::Receiver<Event> {
         self.event_tx.subscribe()
     }
 
-    // Schedule a command to be executed by libp2p swarm and wait until the result is received.
+    /// Schedule a [`Command`] to be executed by libp2p swarm and wait until the result is received.
     pub async fn execute_command(
         &self,
         message: command::CommandMessage,

@@ -18,9 +18,13 @@ use crate::{
     event::Event,
 };
 
+/// Wraps [`libp2p::Swarm`], and contains data structures to provide convenient APIs with users.
 pub struct Swarm {
+    // A core libp2p swarm
     swarm: libp2p::Swarm<Behaviour>,
+    // A channel to emit events to users
     event_tx: Sender<Event>,
+    // Holds pending dialings not established or failed yet
     pending_dial: HashMap<PeerId, CommandResultSender>,
 }
 
@@ -56,10 +60,12 @@ pub enum SwarmError {
     DuplicateDialing,
 }
 
-// A timeout for the setup and protocol upgrade process for all in/outbound connections
+/// A timeout for the setup and protocol upgrade process for all in/outbound connections
 const TRANSPORT_TIMEOUT: Duration = Duration::from_secs(20);
 
 impl Swarm {
+    /// Builds a [`Swarm`], and spawns a [`libp2p::Swarm`] as an async task.
+    //
     // TODO: define error types
     pub fn run(
         config: &SwarmConfig,
@@ -121,6 +127,7 @@ impl Swarm {
         Ok(local_peer_id)
     }
 
+    /// Handle a event returned from [`libp2p::Swarm`], such as gossipsub messages or libp2p system events
     async fn handle_swarm_event<T>(&mut self, swarm_event: SwarmEvent<BehaviourEvent, T>) {
         match swarm_event {
             SwarmEvent::NewListenAddr { address, .. } => {
@@ -158,12 +165,15 @@ impl Swarm {
         }
     }
 
+    /// Emit a [`Event`] to users who subscribe the event channel.
     fn emit_event(&mut self, event: Event) {
         if let Err(e) = self.event_tx.send(event) {
             log::error!("failed to emit event from libp2p swarm: {e}");
         }
     }
 
+    /// Handle a [`Command`] received from a user,
+    /// and return its result via the result channel created by the user.
     async fn handle_command(&mut self, command: Command) {
         let Command { message, result_tx } = command;
 
@@ -174,6 +184,9 @@ impl Swarm {
                 {
                     match self.swarm.dial(peer_addr.with(Protocol::P2p(peer_id))) {
                         Ok(_) => {
+                            // Since dialing isn't completed synchronously, store the context,
+                            // so that the result can be returned to the user later
+                            // when the dialing is succeeded or failed.
                             e.insert(result_tx);
                         }
                         Err(e) => {
