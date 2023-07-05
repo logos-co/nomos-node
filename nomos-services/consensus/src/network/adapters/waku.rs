@@ -1,6 +1,7 @@
 // std
 use std::borrow::Cow;
 use std::collections::hash_map::DefaultHasher;
+use std::collections::BTreeSet;
 use std::hash::{Hash, Hasher};
 // crates
 use futures::{Stream, StreamExt};
@@ -338,6 +339,8 @@ const TIMEOUT_QC_CONTENT_TOPIC: WakuContentTopic =
 // TODO: Maybe use a secure hasher instead
 fn hash_set(c: &Committee) -> u64 {
     let mut s = DefaultHasher::new();
+    // ensure consistent iteration across nodes
+    let c = c.into_iter().collect::<BTreeSet<_>>();
     for e in c.iter() {
         e.hash(&mut s);
     }
