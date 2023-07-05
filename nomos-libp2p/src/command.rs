@@ -6,7 +6,7 @@ use tokio::sync::oneshot;
 
 pub struct Command {
     pub message: CommandMessage,
-    pub sender: CommandSender,
+    pub result_tx: CommandResultSender,
 }
 
 #[derive(Debug)]
@@ -18,4 +18,4 @@ pub enum CommandMessage {
 }
 
 pub type Topic = String;
-pub type CommandSender = oneshot::Sender<Result<(), Box<dyn Error + Send>>>;
+pub type CommandResultSender = oneshot::Sender<Result<(), Box<dyn Error + Send>>>;

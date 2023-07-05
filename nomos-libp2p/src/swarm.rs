@@ -14,14 +14,14 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::{broadcast::Sender, mpsc::Receiver};
 
 use crate::{
-    command::{Command, CommandMessage, CommandSender},
+    command::{Command, CommandMessage, CommandResultSender},
     event::Event,
 };
 
 pub struct Swarm {
     swarm: libp2p::Swarm<Behaviour>,
     event_tx: Sender<Event>,
-    pending_dial: HashMap<PeerId, CommandSender>,
+    pending_dial: HashMap<PeerId, CommandResultSender>,
 }
 
 #[derive(NetworkBehaviour)]
@@ -165,7 +165,7 @@ impl Swarm {
     }
 
     async fn handle_command(&mut self, command: Command) {
-        let Command { message, sender } = command;
+        let Command { message, result_tx } = command;
 
         match message {
             CommandMessage::Connect(peer_id, peer_addr) => {
@@ -174,14 +174,14 @@ impl Swarm {
                 {
                     match self.swarm.dial(peer_addr.with(Protocol::P2p(peer_id))) {
                         Ok(_) => {
-                            e.insert(sender);
+                            e.insert(result_tx);
                         }
                         Err(e) => {
-                            let _ = sender.send(Err(Box::new(e)));
+                            let _ = result_tx.send(Err(Box::new(e)));
                         }
                     }
                 } else {
-                    let _ = sender.send(Err(Box::new(SwarmError::DuplicateDialing)));
+                    let _ = result_tx.send(Err(Box::new(SwarmError::DuplicateDialing)));
                 }
             }
             CommandMessage::Broadcast { topic, message } => {
@@ -194,10 +194,10 @@ impl Swarm {
                 match result {
                     Ok(message_id) => {
                         log::debug!("message broadcasted: {message_id}");
-                        let _ = sender.send(Ok(()));
+                        let _ = result_tx.send(Ok(()));
                     }
                     Err(e) => {
-                        let _ = sender.send(Err(Box::new(e)));
+                        let _ = result_tx.send(Err(Box::new(e)));
                     }
                 }
             }
@@ -210,10 +210,10 @@ impl Swarm {
 
                 match result {
                     Ok(_) => {
-                        let _ = sender.send(Ok(()));
+                        let _ = result_tx.send(Ok(()));
                     }
                     Err(e) => {
-                        let _ = sender.send(Err(Box::new(e)));
+                        let _ = result_tx.send(Err(Box::new(e)));
                     }
                 }
             }
@@ -226,10 +226,10 @@ impl Swarm {
 
                 match result {
                     Ok(_) => {
-                        let _ = sender.send(Ok(()));
+                        let _ = result_tx.send(Ok(()));
                     }
                     Err(e) => {
-                        let _ = sender.send(Err(Box::new(e)));
+                        let _ = result_tx.send(Err(Box::new(e)));
                     }
                 }
             }

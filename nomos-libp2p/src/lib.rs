@@ -67,13 +67,13 @@ impl NomosLibp2p {
         &self,
         message: command::CommandMessage,
     ) -> Result<(), Box<dyn Error>> {
-        let (sender, receiver) = oneshot::channel();
+        let (result_tx, result_rx) = oneshot::channel();
         self.command_tx
             .clone()
-            .send(Command { message, sender })
+            .send(Command { message, result_tx })
             .await?;
 
-        receiver.await?.map_err(|e| -> Box<dyn Error> { e })
+        result_rx.await?.map_err(|e| -> Box<dyn Error> { e })
     }
 }
 
