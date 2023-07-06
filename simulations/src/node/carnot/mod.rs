@@ -251,7 +251,7 @@ impl<O: Overlay> CarnotNode<O> {
             }) => {
                 for node in to {
                     self.network_interface.send_message(
-                        node,
+                        node.into(),
                         CarnotMessage::Vote(VoteMsg {
                             voter: self.id,
                             vote: vote.clone(),
@@ -269,9 +269,9 @@ impl<O: Overlay> CarnotNode<O> {
             }) => {
                 for node in to {
                     self.network_interface.send_message(
-                        node,
+                        node.into(),
                         CarnotMessage::NewView(NewViewMsg {
-                            voter: node,
+                            voter: node.into(),
                             vote: new_view.clone(),
                         }),
                     );
@@ -283,9 +283,9 @@ impl<O: Overlay> CarnotNode<O> {
             }) => {
                 for node in to {
                     self.network_interface.send_message(
-                        node,
+                        node.into(),
                         CarnotMessage::Timeout(TimeoutMsg {
-                            voter: node,
+                            voter: node.into(),
                             vote: timeout.clone(),
                         }),
                     );

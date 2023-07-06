@@ -180,7 +180,7 @@ where
         let fountain = F::new(fountain_settings);
         let private_key = PrivateKey::new(private_key);
         let self_committee = carnot.self_committee();
-        let leader_committee = [carnot.id()].into_iter().collect::<HashSet<_>>();
+        let leader_committee = [carnot.id().into()].into_iter().collect::<HashSet<_>>();
         let tally_settings = CarnotTallySettings {
             threshold: carnot.super_majority_threshold(),
             participating_nodes: carnot.child_committees().into_iter().flatten().collect(),
@@ -371,7 +371,7 @@ where
         let original_block = block;
         let block = original_block.header().clone();
         let self_committee = carnot.self_committee();
-        let leader_committee = [carnot.id()].into_iter().collect();
+        let leader_committee = [carnot.id().into()].into_iter().collect();
 
         let tally_settings = CarnotTallySettings {
             threshold: carnot.super_majority_threshold(),
@@ -437,7 +437,7 @@ where
         task_manager: &mut TaskManager<View, Event<P::Tx>>,
         adapter: A,
     ) -> (Carnot<O>, Option<Output<P::Tx>>) {
-        let leader_committee = [carnot.id()].into_iter().collect();
+        let leader_committee = [carnot.id().into()].into_iter().collect();
         let leader_tally_settings = CarnotTallySettings {
             threshold: carnot.leader_super_majority_threshold(),
             // TODO: add children of root committee
