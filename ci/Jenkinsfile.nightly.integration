@@ -1,0 +1,75 @@
+pipeline {
+  agent {
+    dockerfile {
+      label 'linux'
+      dir 'ci'
+    }
+  }
+
+  parameters {
+    string(
+      name: 'ITERATIONS',
+      description: 'Number of repeated integration test runs',
+      defaultValue: params.ITERATIONS ?: '1000'
+    )
+  }
+
+  environment {
+    /* Avoid cache poisoning by other jobs. */
+    GOCACHE = "${env.WORKSPACE_TMP}/go-build"
+    GOPATH  = "${env.WORKSPACE_TMP}/go"
+    RUST_BACKTRACE = 1
+  }
+
+  options {
+    disableConcurrentBuilds()
+    buildDiscarder(logRotator(
+      numToKeepStr: '20',
+      daysToKeepStr: '30',
+    ))
+  }
+
+  stages {
+    stage('Build') {
+      steps {
+        /* Node binary is required for integration tests */
+        sh 'cargo build'
+      }
+    }
+
+    stage('Integration tests') {
+      steps {
+        script {
+          int iterations = params.ITERATIONS.toInteger()
+
+          for (int i = 0; i < iterations; i++) {
+            echo "Running iteration ${i + 1} of ${iterations}"
+
+            def result = sh(script: 'cargo test ten_nodes_happy', returnStatus: true)
+
+            if (result != 0) {
+              error("Test failed on iteration ${i + 1}")
+              break
+            }
+          }
+        }
+      }
+    }
+  }
+  post {
+    failure {
+      script {
+        def discord = load "${WORKSPACE}/ci/discord.groovy"
+        discord.sendMessage(header: 'Nightly Integration Tests Failed')
+      }
+    }
+    success {
+      script {
+        def discord = load "${WORKSPACE}/ci/discord.groovy"
+        discord.sendMessage(header: 'Nightly Integration Tests Passed')
+      }
+    }
+    cleanup { cleanWs() }
+  }
+}
+
