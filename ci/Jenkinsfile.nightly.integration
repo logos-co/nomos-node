@@ -18,7 +18,6 @@ pipeline {
     /* Avoid cache poisoning by other jobs. */
     GOCACHE = "${env.WORKSPACE_TMP}/go-build"
     GOPATH  = "${env.WORKSPACE_TMP}/go"
-    ITERATIONS = 1000
   }
 
   options {
