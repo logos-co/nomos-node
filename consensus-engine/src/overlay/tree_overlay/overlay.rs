@@ -89,7 +89,9 @@ where
     }
 
     fn child_committees(&self, id: NodeId) -> Vec<Committee> {
-        match self.carnot_tree.child_committees(&id.into()) {
+        let Some(committee_idx) = self.carnot_tree.committees_by_member.get(&id) else { return Vec::new(); };
+        let Some(committee_id) = self.carnot_tree.inner_committees.get(*committee_idx) else { return Vec::new(); };
+        match self.carnot_tree.child_committees(committee_id) {
             (None, None) => vec![],
             (None, Some(c)) | (Some(c), None) => {
                 let committee_idx = self
