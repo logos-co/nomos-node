@@ -89,46 +89,58 @@ where
     }
 
     fn child_committees(&self, id: NodeId) -> Vec<Committee> {
-        let Some(committee_idx) = self.carnot_tree.committees_by_member.get(&id) else { return Vec::new(); };
-        let Some(committee_id) = self.carnot_tree.inner_committees.get(*committee_idx) else { return Vec::new(); };
-        match self.carnot_tree.child_committees(committee_id) {
-            (None, None) => vec![],
-            (None, Some(c)) | (Some(c), None) => {
-                let committee_idx = self
-                    .carnot_tree
-                    .committee_id_to_index
-                    .get(c)
-                    .expect("Cannot find committee index");
-                let committee = self
-                    .carnot_tree
-                    .membership_committees
-                    .get(committee_idx)
-                    .expect("Cannot find committee");
-                vec![committee.clone()]
+        // Lookup committee index by member id, then committee id by index.
+        let committee_id = self
+            .carnot_tree
+            .committees_by_member
+            .get(&id)
+            .and_then(|committee_idx| self.carnot_tree.inner_committees.get(*committee_idx));
+
+        if let Some(committee_id) = committee_id {
+            // Lookup child committees by committee id.
+            match self.carnot_tree.child_committees(committee_id) {
+                (None, None) => vec![],
+                (Some(c), None) | (None, Some(c)) => {
+                    // Single child committee found.
+                    self.carnot_tree
+                        .committee_id_to_index
+                        .get(c)
+                        .and_then(|committee_idx| {
+                            self.carnot_tree.membership_committees.get(committee_idx)
+                        })
+                        .map_or(vec![], |committee| vec![committee.clone()])
+                }
+                (Some(c1), Some(c2)) => {
+                    // Two child committees found.
+                    let committee1 =
+                        self.carnot_tree
+                            .committee_id_to_index
+                            .get(c1)
+                            .and_then(|committee_idx| {
+                                self.carnot_tree.membership_committees.get(committee_idx)
+                            });
+                    let committee2 =
+                        self.carnot_tree
+                            .committee_id_to_index
+                            .get(c2)
+                            .and_then(|committee_idx| {
+                                self.carnot_tree.membership_committees.get(committee_idx)
+                            });
+
+                    match (committee1, committee2) {
+                        (Some(committee1), Some(committee2)) => {
+                            vec![committee1.clone(), committee2.clone()]
+                        }
+                        (Some(committee), None) | (None, Some(committee)) => {
+                            vec![committee.clone()]
+                        }
+                        _ => vec![], // One or both committees not found
+                    }
+                }
             }
-            (Some(c1), Some(c2)) => {
-                let committee_idx1 = self
-                    .carnot_tree
-                    .committee_id_to_index
-                    .get(c1)
-                    .expect("Cannot find committee index");
-                let committee_idx2 = self
-                    .carnot_tree
-                    .committee_id_to_index
-                    .get(c2)
-                    .expect("Cannot find committee index");
-                let committee1 = self
-                    .carnot_tree
-                    .membership_committees
-                    .get(committee_idx1)
-                    .expect("Cannot find committee");
-                let committee2 = self
-                    .carnot_tree
-                    .membership_committees
-                    .get(committee_idx2)
-                    .expect("Cannot find committee");
-                vec![committee1.clone(), committee2.clone()]
-            }
+        } else {
+            // Return early if no committee index or id found.
+            vec![]
         }
     }
 
