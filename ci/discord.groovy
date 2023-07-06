@@ -1,8 +1,8 @@
 def sendMessage(Map args=[:]) {
   def opts = [
-    header: args.header ?: 'Nightly Fuzztest Passed',
+    header: args.header ?: 'Build succeeded',
     title:  args.title  ?: "${env.JOB_NAME}#${env.BUILD_NUMBER}",
-    cred:   args.cred   ?: null,
+    cred:   args.cred   ?: 'nomos-node-discord-commits-webhook',
   ]
   def repo = [
     url: GIT_URL.minus('.git'),

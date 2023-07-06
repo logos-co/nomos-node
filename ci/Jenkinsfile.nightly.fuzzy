@@ -8,8 +8,8 @@ pipeline {
 
   parameters {
     string(
-      name: 'ITERATIONS',
-      description: 'Name of component to build.',
+      name: 'PROPTEST_CASES',
+      description: 'Test cases to be executed',
       defaultValue: params.PROPTEST_CASES ?: '500000'
     )
   }
@@ -45,17 +45,14 @@ pipeline {
   post {
     failure {
       script {
-        def discord = load "${WORKSPACE}/ci/discordNotify.groovy"
-        discord.sendMessage(
-          header: 'Nightly Fuzztest Failed. Regression files archived as job artifacts',
-          cred: 'nomos-node-discord-commits-webhook',
-        )
+        def discord = load "${WORKSPACE}/ci/discord.groovy"
+        discord.sendMessage(header: 'Nightly Fuzztest Failed. Regression files archived as job artifacts')
       }
     }
     success {
       script {
-        def discord = load "${WORKSPACE}/ci/discordNotify.groovy"
-        discord.sendMessage(cred: 'nomos-node-discord-commits-webhook')
+        def discord = load "${WORKSPACE}/ci/discord.groovy"
+        discord.sendMessage(header: 'Nightly Fuzztest Passed')
       }
     }
     cleanup { cleanWs() }
