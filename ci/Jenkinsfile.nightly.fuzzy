@@ -45,7 +45,8 @@ pipeline {
   post {
     failure {
       script {
-        discordNotify(
+        def discord = load "${WORKSPACE}/ci/discordNotify.groovy"
+        discord.sendMessage(
           header: 'Nightly Fuzztest Failed. Regression files archived as job artifacts',
           cred: 'nomos-node-discord-commits-webhook',
         )
@@ -53,11 +54,11 @@ pipeline {
     }
     success {
       script {
-        discordNotify(cred: 'nomos-node-discord-commits-webhook')
+        def discord = load "${WORKSPACE}/ci/discordNotify.groovy"
+        discord.sendMessage(cred: 'nomos-node-discord-commits-webhook')
       }
     }
     cleanup { cleanWs() }
   }
 }
 
-def discordNotify = load "${WORKSPACE}ci/discordNotify.groovy"

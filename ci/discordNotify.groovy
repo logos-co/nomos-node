@@ -1,4 +1,4 @@
-def discordNotify(Map args=[:]) {
+def sendMessage(Map args=[:]) {
   def opts = [
     header: args.header ?: 'Nightly Fuzztest Passed',
     title:  args.title  ?: "${env.JOB_NAME}#${env.BUILD_NUMBER}",
@@ -29,4 +29,4 @@ def discordNotify(Map args=[:]) {
   }
 }
 
-return this.discordNotify
+return this
