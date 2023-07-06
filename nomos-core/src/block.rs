@@ -5,6 +5,7 @@ use core::hash::Hash;
 // crates
 use crate::wire;
 use bytes::Bytes;
+pub use consensus_engine::BlockId;
 use consensus_engine::{LeaderProof, NodeId, Qc, View};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
@@ -20,9 +21,6 @@ pub struct Block<TxId: Clone + Eq + Hash> {
     beacon: RandomBeaconState,
 }
 
-/// Identifier of a block
-pub type BlockId = [u8; 32];
-
 impl<TxId: Clone + Eq + Hash + Serialize + DeserializeOwned> Block<TxId> {
     pub fn new(
         view: View,
@@ -33,7 +31,7 @@ impl<TxId: Clone + Eq + Hash + Serialize + DeserializeOwned> Block<TxId> {
     ) -> Self {
         let transactions = txs.collect();
         let header = consensus_engine::Block {
-            id: [0; 32],
+            id: BlockId::genesis(),
             view,
             parent_qc,
             leader_proof: LeaderProof::LeaderId {
@@ -74,7 +72,7 @@ pub fn block_id_from_wire_content<Tx: Clone + Eq + Hash + Serialize + Deserializ
     let bytes = block.as_bytes();
     let mut hasher = Blake2b::<U32>::new();
     hasher.update(bytes);
-    hasher.finalize().into()
+    BlockId::new(hasher.finalize().into())
 }
 
 impl<TxId: Clone + Eq + Hash + Serialize + DeserializeOwned> Block<TxId> {

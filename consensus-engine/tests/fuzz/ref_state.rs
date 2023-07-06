@@ -42,7 +42,7 @@ impl ReferenceStateMachine for RefState {
     fn init_state() -> BoxedStrategy<Self::State> {
         let genesis_block = Block {
             view: 0,
-            id: [0; 32],
+            id: BlockId::genesis(),
             parent_qc: Qc::Standard(StandardQc::genesis()),
             leader_proof: LEADER_PROOF.clone(),
         };
@@ -332,7 +332,7 @@ impl RefState {
         let current_view = self.current_view();
 
         Just(Transition::ReceiveSafeBlock(Block {
-            id: rand::thread_rng().gen(),
+            id: BlockId::random(),
             view: current_view + 1,
             parent_qc: Qc::Aggregated(AggregateQc {
                 high_qc: self.high_qc(),
@@ -395,7 +395,7 @@ impl RefState {
     fn consecutive_block(parent: &Block) -> Block {
         Block {
             // use rand because we don't want this to be shrinked by proptest
-            id: rand::thread_rng().gen(),
+            id: BlockId::random(),
             view: parent.view + 1,
             parent_qc: Qc::Standard(StandardQc {
                 view: parent.view,
