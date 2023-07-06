@@ -40,11 +40,7 @@ impl Tally for TimeoutTally {
             }
 
             // check for individual nodes votes
-            if !self
-                .settings
-                .participating_nodes
-                .contains(&vote.voter.into())
-            {
+            if !self.settings.participating_nodes.contains(&vote.voter) {
                 continue;
             }
 

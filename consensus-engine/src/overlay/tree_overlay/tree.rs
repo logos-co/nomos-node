@@ -6,7 +6,7 @@ pub(super) struct Tree {
     pub(super) inner_committees: Vec<CommitteeId>,
     pub(super) membership_committees: HashMap<usize, Committee>,
     pub(super) committee_id_to_index: HashMap<CommitteeId, usize>,
-    pub(super) committees_by_member: HashMap<CommitteeId, usize>,
+    pub(super) committees_by_member: HashMap<NodeId, usize>,
 }
 
 impl Tree {
@@ -55,7 +55,7 @@ impl Tree {
         // Refill committees with extra nodes
         if remainder != 0 {
             for i in 0..remainder {
-                let node = nodes[nodes.len() - remainder + i].into();
+                let node = nodes[nodes.len() - remainder + i];
                 let committee_index = i % number_of_committees;
                 committees[committee_index].insert(node);
             }
@@ -120,12 +120,12 @@ impl Tree {
     }
 
     pub(super) fn committee_idx_by_member_id(&self, member_id: &NodeId) -> Option<usize> {
-        self.committees_by_member.get(&member_id.into()).copied()
+        self.committees_by_member.get(member_id).copied()
     }
 
     pub(super) fn committee_id_by_member_id(&self, member_id: &NodeId) -> Option<&CommitteeId> {
         self.committees_by_member
-            .get(&member_id.into())
+            .get(member_id)
             .map(|&idx| &self.inner_committees[idx])
     }
 

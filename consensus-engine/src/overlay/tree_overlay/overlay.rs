@@ -70,14 +70,14 @@ where
     }
 
     fn is_member_of_root_committee(&self, id: NodeId) -> bool {
-        self.carnot_tree.root_committee().contains(&id.into())
+        self.carnot_tree.root_committee().contains(&id)
     }
 
     fn is_member_of_leaf_committee(&self, id: NodeId) -> bool {
         self.carnot_tree
             .leaf_committees()
             .values()
-            .any(|committee| committee.contains(&id.into()))
+            .any(|committee| committee.contains(&id))
     }
 
     fn is_child_of_root_committee(&self, id: NodeId) -> bool {
@@ -89,13 +89,58 @@ where
     }
 
     fn child_committees(&self, id: NodeId) -> Vec<Committee> {
-        match self.carnot_tree.child_committees(&id.into()) {
-            (None, None) => vec![],
-            (None, Some(c)) | (Some(c), None) => vec![std::iter::once(*c).collect()],
-            (Some(c1), Some(c2)) => vec![
-                std::iter::once(*c1).collect(),
-                std::iter::once(*c2).collect(),
-            ],
+        // Lookup committee index by member id, then committee id by index.
+        let committee_id = self
+            .carnot_tree
+            .committees_by_member
+            .get(&id)
+            .and_then(|committee_idx| self.carnot_tree.inner_committees.get(*committee_idx));
+
+        if let Some(committee_id) = committee_id {
+            // Lookup child committees by committee id.
+            match self.carnot_tree.child_committees(committee_id) {
+                (None, None) => vec![],
+                (Some(c), None) | (None, Some(c)) => {
+                    // Single child committee found.
+                    self.carnot_tree
+                        .committee_id_to_index
+                        .get(c)
+                        .and_then(|committee_idx| {
+                            self.carnot_tree.membership_committees.get(committee_idx)
+                        })
+                        .map_or(vec![], |committee| vec![committee.clone()])
+                }
+                (Some(c1), Some(c2)) => {
+                    // Two child committees found.
+                    let committee1 =
+                        self.carnot_tree
+                            .committee_id_to_index
+                            .get(c1)
+                            .and_then(|committee_idx| {
+                                self.carnot_tree.membership_committees.get(committee_idx)
+                            });
+                    let committee2 =
+                        self.carnot_tree
+                            .committee_id_to_index
+                            .get(c2)
+                            .and_then(|committee_idx| {
+                                self.carnot_tree.membership_committees.get(committee_idx)
+                            });
+
+                    match (committee1, committee2) {
+                        (Some(committee1), Some(committee2)) => {
+                            vec![committee1.clone(), committee2.clone()]
+                        }
+                        (Some(committee), None) | (None, Some(committee)) => {
+                            vec![committee.clone()]
+                        }
+                        _ => vec![], // One or both committees not found
+                    }
+                }
+            }
+        } else {
+            // Return early if no committee index or id found.
+            vec![]
         }
     }
 
@@ -110,7 +155,7 @@ where
     fn node_committee(&self, id: NodeId) -> Committee {
         self.carnot_tree
             .committees_by_member
-            .get(&id.into())
+            .get(&id)
             .and_then(|committee_index| self.carnot_tree.membership_committees.get(committee_index))
             .cloned()
             .unwrap_or_default()
@@ -188,7 +233,7 @@ where
 #[cfg(test)]
 mod tests {
     use crate::overlay::RoundRobin;
-    use crate::{CommitteeId, Overlay};
+    use crate::Overlay;
 
     use super::*;
 
@@ -235,8 +280,8 @@ mod tests {
         });
 
         let mut expected_root = Committee::new();
-        expected_root.insert(overlay.nodes[9].into());
-        expected_root.extend(overlay.nodes[0..3].iter().map(|n| CommitteeId::from(*n)));
+        expected_root.insert(overlay.nodes[9]);
+        expected_root.extend(overlay.nodes[0..3].iter());
 
         assert_eq!(overlay.root_committee(), expected_root);
     }
@@ -262,15 +307,9 @@ mod tests {
             })
             .collect::<Vec<_>>();
         leaf_committees.sort();
-        let mut c1 = overlay.nodes[3..6]
-            .iter()
-            .map(From::from)
-            .collect::<Vec<_>>();
+        let mut c1 = overlay.nodes[3..6].to_vec();
         c1.sort();
-        let mut c2 = overlay.nodes[6..9]
-            .iter()
-            .map(From::from)
-            .collect::<Vec<_>>();
+        let mut c2 = overlay.nodes[6..9].to_vec();
         c2.sort();
         let mut expected = vec![c1, c2];
         expected.sort();
