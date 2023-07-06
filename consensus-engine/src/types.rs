@@ -1,14 +1,17 @@
 // std
-use std::collections::HashSet;
 use std::hash::Hash;
 // crates
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
-pub type View = i64;
-pub type NodeId = [u8; 32];
-pub type BlockId = [u8; 32];
-pub type Committee = HashSet<NodeId>;
+mod commitee;
+pub use commitee::{Committee, CommitteeId};
+mod node_id;
+pub use node_id::NodeId;
+mod block_id;
+pub use block_id::BlockId;
+mod view;
+pub use view::View;
 
 /// The way the consensus engine communicates with the rest of the system is by returning
 /// actions to be performed.
@@ -114,10 +117,12 @@ impl Block {
 
     pub fn genesis() -> Self {
         Self {
-            id: [0; 32],
-            view: 0,
+            id: BlockId::genesis(),
+            view: 0.into(),
             parent_qc: Qc::Standard(StandardQc::genesis()),
-            leader_proof: LeaderProof::LeaderId { leader_id: [0; 32] },
+            leader_proof: LeaderProof::LeaderId {
+                leader_id: [0; 32].into(),
+            },
         }
     }
 }
@@ -125,7 +130,7 @@ impl Block {
 /// Possible output events.
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Send {
-    pub to: HashSet<NodeId>,
+    pub to: Committee,
     pub payload: Payload,
 }
 
@@ -137,10 +142,10 @@ pub struct StandardQc {
 }
 
 impl StandardQc {
-    pub fn genesis() -> Self {
+    pub const fn genesis() -> Self {
         Self {
-            view: -1,
-            id: [0; 32],
+            view: View::genesis(),
+            id: BlockId::genesis(),
         }
     }
 }
@@ -192,57 +197,57 @@ mod test {
     #[test]
     fn standard_qc() {
         let standard_qc = StandardQc {
-            view: 10,
-            id: [0; 32],
+            view: 10.into(),
+            id: [0; 32].into(),
         };
         let qc = Qc::Standard(standard_qc.clone());
-        assert_eq!(qc.view(), 10);
-        assert_eq!(qc.block(), [0; 32]);
+        assert_eq!(qc.view(), 10.into());
+        assert_eq!(qc.block(), [0; 32].into());
         assert_eq!(qc.high_qc(), standard_qc);
     }
 
     #[test]
     fn aggregated_qc() {
         let aggregated_qc = AggregateQc {
-            view: 20,
+            view: 20.into(),
             high_qc: StandardQc {
-                view: 10,
-                id: [0; 32],
+                view: 10.into(),
+                id: [0; 32].into(),
             },
         };
         let qc = Qc::Aggregated(aggregated_qc.clone());
-        assert_eq!(qc.view(), 20);
-        assert_eq!(qc.block(), [0; 32]);
+        assert_eq!(qc.view(), 20.into());
+        assert_eq!(qc.block(), [0; 32].into());
         assert_eq!(qc.high_qc(), aggregated_qc.high_qc);
     }
 
     #[test]
     fn new_timeout_qc() {
         let timeout_qc = TimeoutQc::new(
-            2,
+            2.into(),
             StandardQc {
-                view: 1,
-                id: [0; 32],
+                view: 1.into(),
+                id: [0; 32].into(),
             },
-            [0; 32],
+            [0; 32].into(),
         );
-        assert_eq!(timeout_qc.view(), 2);
-        assert_eq!(timeout_qc.high_qc().view, 1);
-        assert_eq!(timeout_qc.high_qc().id, [0; 32]);
-        assert_eq!(timeout_qc.sender(), [0; 32]);
+        assert_eq!(timeout_qc.view(), 2.into());
+        assert_eq!(timeout_qc.high_qc().view, 1.into());
+        assert_eq!(timeout_qc.high_qc().id, [0; 32].into());
+        assert_eq!(timeout_qc.sender(), [0; 32].into());
 
         let timeout_qc = TimeoutQc::new(
-            2,
+            2.into(),
             StandardQc {
-                view: 2,
-                id: [0; 32],
+                view: 2.into(),
+                id: [0; 32].into(),
             },
-            [0; 32],
+            [0; 32].into(),
         );
-        assert_eq!(timeout_qc.view(), 2);
-        assert_eq!(timeout_qc.high_qc().view, 2);
-        assert_eq!(timeout_qc.high_qc().id, [0; 32]);
-        assert_eq!(timeout_qc.sender(), [0; 32]);
+        assert_eq!(timeout_qc.view(), 2.into());
+        assert_eq!(timeout_qc.high_qc().view, 2.into());
+        assert_eq!(timeout_qc.high_qc().id, [0; 32].into());
+        assert_eq!(timeout_qc.sender(), [0; 32].into());
     }
 
     #[test]
@@ -251,12 +256,12 @@ mod test {
     )]
     fn new_timeout_qc_panic() {
         let _ = TimeoutQc::new(
-            1,
+            1.into(),
             StandardQc {
-                view: 2,
-                id: [0; 32],
+                view: 2.into(),
+                id: [0; 32].into(),
             },
-            [0; 32],
+            [0; 32].into(),
         );
     }
 }

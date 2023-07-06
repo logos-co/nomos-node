@@ -1,5 +1,5 @@
 use super::LeaderSelection;
-use crate::{Committee, NodeId, Overlay};
+use crate::{Committee, CommitteeId, NodeId, Overlay};
 use fraction::{Fraction, ToPrimitive};
 use serde::{Deserialize, Serialize};
 const LEADER_SUPER_MAJORITY_THRESHOLD_NUM: u64 = 2;
@@ -40,7 +40,11 @@ where
     }
 
     fn root_committee(&self) -> crate::Committee {
-        self.nodes.clone().into_iter().collect()
+        self.nodes
+            .clone()
+            .into_iter()
+            .map::<CommitteeId, _>(From::from)
+            .collect()
     }
 
     fn rebuild(&mut self, _timeout_qc: crate::TimeoutQc) {
@@ -68,7 +72,11 @@ where
     }
 
     fn node_committee(&self, _id: NodeId) -> crate::Committee {
-        self.nodes.clone().into_iter().collect()
+        self.nodes
+            .clone()
+            .into_iter()
+            .map::<CommitteeId, _>(From::from)
+            .collect()
     }
 
     fn child_committees(&self, _id: NodeId) -> Vec<crate::Committee> {

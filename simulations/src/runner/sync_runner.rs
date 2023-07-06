@@ -82,7 +82,6 @@ mod tests {
         runner::SimulationRunner,
         settings::SimulationSettings,
         streaming::StreamProducer,
-        util::node_id,
     };
     use crossbeam::channel;
     use parking_lot::RwLock;
@@ -131,7 +130,7 @@ mod tests {
         };
 
         let mut rng = StepRng::new(1, 0);
-        let node_ids: Vec<NodeId> = (0..settings.node_count).map(node_id).collect();
+        let node_ids: Vec<NodeId> = (0..settings.node_count).map(Into::into).collect();
         let overlay = TreeOverlay::new(settings.overlay_settings.clone().try_into().unwrap());
         let mut network = init_network(&node_ids);
         let view = ViewOverlay {
@@ -166,7 +165,7 @@ mod tests {
         };
 
         let mut rng = StepRng::new(1, 0);
-        let node_ids: Vec<NodeId> = (0..settings.node_count).map(node_id).collect();
+        let node_ids: Vec<NodeId> = (0..settings.node_count).map(Into::into).collect();
         let overlay = TreeOverlay::new(settings.overlay_settings.clone().try_into().unwrap());
         let mut network = init_network(&node_ids);
         let view = ViewOverlay {

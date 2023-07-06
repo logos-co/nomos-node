@@ -70,14 +70,14 @@ where
     }
 
     fn is_member_of_root_committee(&self, id: NodeId) -> bool {
-        self.carnot_tree.root_committee().contains(&id)
+        self.carnot_tree.root_committee().contains(&id.into())
     }
 
     fn is_member_of_leaf_committee(&self, id: NodeId) -> bool {
         self.carnot_tree
             .leaf_committees()
             .values()
-            .any(|committee| committee.contains(&id))
+            .any(|committee| committee.contains(&id.into()))
     }
 
     fn is_child_of_root_committee(&self, id: NodeId) -> bool {
@@ -89,7 +89,7 @@ where
     }
 
     fn child_committees(&self, id: NodeId) -> Vec<Committee> {
-        match self.carnot_tree.child_committees(&id) {
+        match self.carnot_tree.child_committees(&id.into()) {
             (None, None) => vec![],
             (None, Some(c)) | (Some(c), None) => vec![std::iter::once(*c).collect()],
             (Some(c1), Some(c2)) => vec![
@@ -110,7 +110,7 @@ where
     fn node_committee(&self, id: NodeId) -> Committee {
         self.carnot_tree
             .committees_by_member
-            .get(&id)
+            .get(&id.into())
             .and_then(|committee_index| self.carnot_tree.membership_committees.get(committee_index))
             .cloned()
             .unwrap_or_default()
@@ -188,14 +188,13 @@ where
 #[cfg(test)]
 mod tests {
     use crate::overlay::RoundRobin;
-    use crate::Overlay;
+    use crate::{CommitteeId, Overlay};
 
     use super::*;
-    use std::collections::HashSet;
 
     #[test]
     fn test_carnot_overlay_leader() {
-        let nodes: Vec<[u8; 32]> = (0..10).map(|i| [i as u8; 32]).collect();
+        let nodes: Vec<_> = (0..10).map(|i| [i as u8; 32].into()).collect();
         let overlay = TreeOverlay::new(TreeOverlaySettings {
             nodes: nodes.clone(),
             current_leader: nodes[0],
@@ -209,7 +208,7 @@ mod tests {
 
     #[test]
     fn test_next_leader_is_advance_current_leader() {
-        let nodes: Vec<[u8; 32]> = (0..10).map(|i| [i as u8; 32]).collect();
+        let nodes: Vec<_> = (0..10).map(|i| [i as u8; 32].into()).collect();
         let mut overlay = TreeOverlay::new(TreeOverlaySettings {
             nodes: nodes.clone(),
             current_leader: nodes[0],
@@ -226,7 +225,7 @@ mod tests {
 
     #[test]
     fn test_root_committee() {
-        let nodes: Vec<[u8; 32]> = (0..10).map(|i| [i as u8; 32]).collect();
+        let nodes: Vec<_> = (0..10).map(|i| [i as u8; 32].into()).collect();
         let overlay = TreeOverlay::new(TreeOverlaySettings {
             current_leader: nodes[0],
             nodes,
@@ -235,16 +234,16 @@ mod tests {
             leader: RoundRobin::new(),
         });
 
-        let mut expected_root = HashSet::new();
-        expected_root.insert(overlay.nodes[9]);
-        expected_root.extend(overlay.nodes[0..3].iter());
+        let mut expected_root = Committee::new();
+        expected_root.insert(overlay.nodes[9].into());
+        expected_root.extend(overlay.nodes[0..3].iter().map(|n| CommitteeId::from(*n)));
 
         assert_eq!(overlay.root_committee(), expected_root);
     }
 
     #[test]
     fn test_leaf_committees() {
-        let nodes: Vec<[u8; 32]> = (0..10).map(|i| [i as u8; 32]).collect();
+        let nodes: Vec<_> = (0..10).map(|i| [i as u8; 32].into()).collect();
         let overlay = TreeOverlay::new(TreeOverlaySettings {
             current_leader: nodes[0],
             nodes,
@@ -254,7 +253,7 @@ mod tests {
         });
 
         let mut leaf_committees = overlay
-            .leaf_committees([0; 32])
+            .leaf_committees([0; 32].into())
             .into_iter()
             .map(|s| {
                 let mut vec = s.into_iter().collect::<Vec<_>>();
@@ -263,9 +262,15 @@ mod tests {
             })
             .collect::<Vec<_>>();
         leaf_committees.sort();
-        let mut c1 = overlay.nodes[3..6].to_vec();
+        let mut c1 = overlay.nodes[3..6]
+            .iter()
+            .map(From::from)
+            .collect::<Vec<_>>();
         c1.sort();
-        let mut c2 = overlay.nodes[6..9].to_vec();
+        let mut c2 = overlay.nodes[6..9]
+            .iter()
+            .map(From::from)
+            .collect::<Vec<_>>();
         c2.sort();
         let mut expected = vec![c1, c2];
         expected.sort();
@@ -274,7 +279,7 @@ mod tests {
 
     #[test]
     fn test_super_majority_threshold_for_leaf() {
-        let nodes: Vec<[u8; 32]> = (0..10).map(|i| [i as u8; 32]).collect();
+        let nodes: Vec<_> = (0..10).map(|i| [i as u8; 32].into()).collect();
         let overlay = TreeOverlay::new(TreeOverlaySettings {
             current_leader: nodes[0],
             nodes,
@@ -288,7 +293,7 @@ mod tests {
 
     #[test]
     fn test_super_majority_threshold_for_root_member() {
-        let nodes: Vec<[u8; 32]> = (0..10).map(|i| [i as u8; 32]).collect();
+        let nodes: Vec<_> = (0..10).map(|i| [i as u8; 32].into()).collect();
         let overlay = TreeOverlay::new(TreeOverlaySettings {
             current_leader: nodes[0],
             nodes,
@@ -302,7 +307,7 @@ mod tests {
 
     #[test]
     fn test_leader_super_majority_threshold() {
-        let nodes: Vec<[u8; 32]> = (0..10).map(|i| [i as u8; 32]).collect();
+        let nodes: Vec<_> = (0..10).map(|i| [i as u8; 32].into()).collect();
         let overlay = TreeOverlay::new(TreeOverlaySettings {
             nodes: nodes.clone(),
             current_leader: nodes[0],
@@ -311,6 +316,6 @@ mod tests {
             leader: RoundRobin::new(),
         });
 
-        assert_eq!(overlay.leader_super_majority_threshold([0; 32]), 7);
+        assert_eq!(overlay.leader_super_majority_threshold([0; 32].into()), 7);
     }
 }

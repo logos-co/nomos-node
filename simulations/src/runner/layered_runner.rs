@@ -43,7 +43,6 @@ use serde::Serialize;
 use crate::node::{Node, NodeId};
 use crate::output_processors::Record;
 use crate::runner::SimulationRunner;
-use crate::util::parse_idx;
 use crate::warding::SimulationState;
 
 use super::SimulationRunnerHandle;
@@ -98,7 +97,7 @@ where
                     {
                         let mut shared_nodes = nodes.write();
                         let node: &mut N = shared_nodes
-                            .get_mut(parse_idx(&node_id))
+                            .get_mut(node_id.index())
                             .expect("Node should be present");
                         let prev_view = node.current_view();
                         node.step(elapsed);

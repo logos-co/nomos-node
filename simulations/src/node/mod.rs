@@ -163,7 +163,7 @@ impl Node for usize {
     type State = Self;
 
     fn id(&self) -> NodeId {
-        crate::util::node_id(*self)
+        (*self).into()
     }
 
     fn current_view(&self) -> usize {

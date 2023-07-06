@@ -47,12 +47,16 @@ impl Tally for NewViewTally {
 
         while let Some(vote) = vote_stream.next().await {
             // check vote view is valid
-            if vote.vote.view != timeout_qc.view() + 1 {
+            if vote.vote.view != timeout_qc.view().incr() {
                 continue;
             }
 
             // check for individual nodes votes
-            if !self.settings.participating_nodes.contains(&vote.voter) {
+            if !self
+                .settings
+                .participating_nodes
+                .contains(&(vote.voter.into()))
+            {
                 continue;
             }
             seen.insert(vote.voter);

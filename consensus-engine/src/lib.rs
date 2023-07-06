@@ -19,10 +19,10 @@ pub struct Carnot<O: Overlay> {
 impl<O: Overlay> Carnot<O> {
     pub fn from_genesis(id: NodeId, genesis_block: Block, overlay: O) -> Self {
         Self {
-            current_view: 0,
+            current_view: 0.into(),
             local_high_qc: StandardQc::genesis(),
             id,
-            highest_voted_view: -1,
+            highest_voted_view: (-1).into(),
             last_view_timeout_qc: None,
             overlay,
             safe_blocks: [(genesis_block.id, genesis_block)].into(),
@@ -63,7 +63,8 @@ impl<O: Overlay> Carnot<O> {
         match block.leader_proof {
             LeaderProof::LeaderId { leader_id } => {
                 // This only accepts blocks from the leader of current_view + 1
-                if leader_id != self.overlay.next_leader() || block.view != self.current_view() + 1
+                if leader_id != self.overlay.next_leader()
+                    || block.view != self.current_view().incr()
                 {
                     return Err(());
                 }
@@ -103,7 +104,7 @@ impl<O: Overlay> Carnot<O> {
         new_state.update_high_qc(Qc::Standard(timeout_qc.high_qc().clone()));
         new_state.update_timeout_qc(timeout_qc.clone());
 
-        new_state.current_view = timeout_qc.view() + 1;
+        new_state.current_view = timeout_qc.view().incr();
         new_state.overlay.rebuild(timeout_qc);
 
         new_state
@@ -132,7 +133,10 @@ impl<O: Overlay> Carnot<O> {
         new_state.highest_voted_view = block.view;
 
         let to = if new_state.overlay.is_member_of_root_committee(new_state.id) {
-            [new_state.overlay.next_leader()].into_iter().collect()
+            [new_state.overlay.next_leader()]
+                .into_iter()
+                .map::<CommitteeId, _>(From::from)
+                .collect()
         } else {
             new_state.overlay.parent_committee(self.id)
         };
@@ -160,14 +164,14 @@ impl<O: Overlay> Carnot<O> {
         timeout_qc: TimeoutQc,
         new_views: HashSet<NewView>,
     ) -> (Self, Send) {
-        let new_view = timeout_qc.view() + 1;
+        let new_view = timeout_qc.view().incr();
         assert!(
             new_view
                 > self
                     .last_view_timeout_qc
                     .as_ref()
                     .map(|qc| qc.view())
-                    .unwrap_or(0),
+                    .unwrap_or(View::ZERO),
             "can't vote for a new view not bigger than the last timeout_qc"
         );
         assert_eq!(
@@ -200,7 +204,10 @@ impl<O: Overlay> Carnot<O> {
 
         new_state.highest_voted_view = new_view;
         let to = if new_state.overlay.is_member_of_root_committee(new_state.id) {
-            [new_state.overlay.next_leader()].into_iter().collect()
+            [new_state.overlay.next_leader()]
+                .into_iter()
+                .map::<CommitteeId, _>(From::from)
+                .collect()
         } else {
             new_state.overlay.parent_committee(new_state.id)
         };
@@ -244,7 +251,7 @@ impl<O: Overlay> Carnot<O> {
     }
 
     fn block_is_safe(&self, block: Block) -> bool {
-        block.view >= self.current_view && block.view == block.parent_qc.view() + 1
+        block.view >= self.current_view && block.view == block.parent_qc.view() + 1.into()
     }
 
     fn update_high_qc(&mut self, qc: Qc) {
@@ -259,7 +266,7 @@ impl<O: Overlay> Carnot<O> {
             _ => {}
         }
         if qc_view == self.current_view {
-            self.current_view += 1;
+            self.current_view += 1.into();
         }
     }
 
@@ -284,7 +291,7 @@ impl<O: Overlay> Carnot<O> {
     }
 
     pub fn genesis_block(&self) -> Block {
-        self.blocks_in_view(0)[0].clone()
+        self.blocks_in_view(0.into())[0].clone()
     }
 
     // Returns the id of the grandparent block if it can be committed or None otherwise
@@ -292,7 +299,7 @@ impl<O: Overlay> Carnot<O> {
         let parent = self.safe_blocks.get(&block.parent())?;
         let grandparent = self.safe_blocks.get(&parent.parent())?;
 
-        if parent.view == grandparent.view + 1
+        if parent.view == grandparent.view.incr()
             && matches!(parent.parent_qc, Qc::Standard { .. })
             && matches!(grandparent.parent_qc, Qc::Standard { .. })
         {
@@ -302,8 +309,8 @@ impl<O: Overlay> Carnot<O> {
     }
 
     pub fn latest_committed_block(&self) -> Block {
-        for view in (0..=self.current_view).rev() {
-            for block in self.blocks_in_view(view) {
+        for view in (0..=self.current_view.0).rev() {
+            for block in self.blocks_in_view(view.into()) {
                 if let Some(block) = self.can_commit_grandparent(block) {
                     return block;
                 }
@@ -404,14 +411,7 @@ mod test {
 
         Carnot::from_genesis(
             *nodes.first().unwrap(),
-            Block {
-                view: 0,
-                id: [0; 32],
-                parent_qc: Qc::Standard(StandardQc::genesis()),
-                leader_proof: LeaderProof::LeaderId {
-                    leader_id: *nodes.first().unwrap(),
-                },
-            },
+            Block::genesis(),
             FlatOverlay::new(Settings {
                 nodes,
                 leader: RoundRobin::default(),
@@ -422,10 +422,10 @@ mod test {
 
     fn next_block(engine: &Carnot<FlatOverlay<RoundRobin>>, block: &Block) -> Block {
         let mut next_id = block.id;
-        next_id[0] += 1;
+        next_id.0[0] += 1;
 
         Block {
-            view: block.view + 1,
+            view: block.view.incr(),
             id: next_id,
             parent_qc: Qc::Standard(StandardQc {
                 view: block.view,
@@ -454,13 +454,13 @@ mod test {
     #[test]
     // Ensure that all states are initialized correctly with the genesis block.
     fn from_genesis() {
-        let engine = init(vec![[0; 32]]);
-        assert_eq!(engine.current_view(), 0);
-        assert_eq!(engine.highest_voted_view, -1);
+        let engine = init(vec![[0; 32].into()]);
+        assert_eq!(engine.current_view(), 0.into());
+        assert_eq!(engine.highest_voted_view, (-1).into());
 
         let genesis = engine.genesis_block();
         assert_eq!(engine.high_qc(), genesis.parent_qc.high_qc());
-        assert_eq!(engine.blocks_in_view(0), vec![genesis.clone()]);
+        assert_eq!(engine.blocks_in_view(0.into()), vec![genesis.clone()]);
         assert_eq!(engine.last_view_timeout_qc(), None);
         assert_eq!(engine.committed_blocks(), vec![genesis.id]);
     }
@@ -468,7 +468,7 @@ mod test {
     #[test]
     // Ensure that all states are updated correctly after a block is received.
     fn receive_block() {
-        let mut engine = init(vec![[0; 32]]);
+        let mut engine = init(vec![[0; 32].into()]);
         let block = next_block(&engine, &engine.genesis_block());
 
         engine = engine.receive_block(block.clone()).unwrap();
@@ -480,7 +480,7 @@ mod test {
     #[test]
     // Ensure that receive_block() returns early if the same block ID has already been received.
     fn receive_duplicate_block_id() {
-        let mut engine = init(vec![[0; 32]]);
+        let mut engine = init(vec![[0; 32].into()]);
 
         let block1 = next_block(&engine, &engine.genesis_block());
         engine = engine.receive_block(block1.clone()).unwrap();
@@ -489,24 +489,26 @@ mod test {
         let mut block2 = next_block(&engine, &block1);
         block2.id = block1.id;
         engine = engine.receive_block(block2).unwrap();
-        assert_eq!(engine.blocks_in_view(1), vec![block1]);
+        assert_eq!(engine.blocks_in_view(1.into()), vec![block1]);
     }
 
     #[test]
     #[should_panic(expected = "out of order view not supported, missing parent block")]
     // Ensure that receive_block() fails if the parent block has never been received.
     fn receive_block_with_unknown_parent() {
-        let engine = init(vec![[0; 32]]);
+        let engine = init(vec![[0; 32].into()]);
         let mut parent_block_id = engine.genesis_block().id;
-        parent_block_id[0] += 1; // generate an unknown parent block ID
+        parent_block_id.0[0] += 1; // generate an unknown parent block ID
         let block = Block {
-            view: engine.current_view() + 1,
-            id: [1; 32],
+            view: engine.current_view().incr(),
+            id: [1; 32].into(),
             parent_qc: Qc::Standard(StandardQc {
                 view: engine.current_view(),
                 id: parent_block_id,
             }),
-            leader_proof: LeaderProof::LeaderId { leader_id: [0; 32] },
+            leader_proof: LeaderProof::LeaderId {
+                leader_id: [0; 32].into(),
+            },
         };
 
         let _ = engine.receive_block(block);
@@ -515,7 +517,7 @@ mod test {
     #[test]
     // Ensure that receive_block() returns Err for unsafe blocks.
     fn receive_unsafe_blocks() {
-        let mut engine = init(vec![[0; 32]]);
+        let mut engine = init(vec![[0; 32].into()]);
 
         let block = next_block(&engine, &engine.genesis_block());
         engine = engine.receive_block(block.clone()).unwrap();
@@ -526,18 +528,18 @@ mod test {
         engine = update_leader_selection(&engine);
 
         let mut unsafe_block = next_block(&engine, &block);
-        unsafe_block.view = engine.current_view() - 1; // UNSAFE: view < engine.current_view
+        unsafe_block.view = engine.current_view().decr(); // UNSAFE: view < engine.current_view
         assert!(engine.receive_block(unsafe_block).is_err());
 
         let mut unsafe_block = next_block(&engine, &block);
-        unsafe_block.view = unsafe_block.parent_qc.view() + 2; // UNSAFE: view != parent_qc.view + 1
+        unsafe_block.view = unsafe_block.parent_qc.view() + 2.into(); // UNSAFE: view != parent_qc.view + 1
         assert!(engine.receive_block(unsafe_block).is_err());
     }
 
     #[test]
     // Ensure that the grandparent of the current view can be committed
     fn receive_block_and_commit() {
-        let mut engine = init(vec![[0; 32]]);
+        let mut engine = init(vec![[0; 32].into()]);
         assert_eq!(engine.latest_committed_block(), engine.genesis_block());
 
         let block1 = next_block(&engine, &engine.genesis_block());
@@ -572,7 +574,7 @@ mod test {
     // Ensure that the leader check in receive_block fails
     // if the block is proposed by an unexpected leader.
     fn receive_block_with_unexpected_leader() {
-        let mut engine = init(vec![[0; 32], [1; 32]]);
+        let mut engine = init(vec![[0; 32].into(), [1; 32].into()]);
 
         let block = next_block(&engine, &engine.genesis_block());
         engine = engine.receive_block(block.clone()).unwrap();
@@ -581,7 +583,7 @@ mod test {
 
         let mut block = next_block(&engine, &block);
         block.leader_proof = LeaderProof::LeaderId {
-            leader_id: [0; 32], // unexpected leader
+            leader_id: [0; 32].into(), // unexpected leader
         };
         assert!(engine.receive_block(block).is_err());
     }
@@ -590,19 +592,19 @@ mod test {
     // Ensure that the leader check in receive_block fails
     // if block.view is not the expected view.
     fn receive_block_with_unexpected_view() {
-        let mut engine = init(vec![[0; 32], [1; 32]]);
+        let mut engine = init(vec![[0; 32].into(), [1; 32].into()]);
 
         let block1 = next_block(&engine, &engine.genesis_block());
         engine = engine.receive_block(block1.clone()).unwrap();
-        assert_eq!(engine.current_view(), 1);
+        assert_eq!(engine.current_view(), 1.into());
         engine = update_leader_selection(&engine);
 
         // a future block should be rejected
         let future_block = Block {
-            id: [10; 32],
-            view: 11, // a future view
+            id: [10; 32].into(),
+            view: 11.into(), // a future view
             parent_qc: Qc::Aggregated(AggregateQc {
-                view: 10,
+                view: 10.into(),
                 high_qc: StandardQc {
                     // a known parent block
                     id: block1.id,
@@ -617,14 +619,14 @@ mod test {
 
         // a past block should be also rejected
         let mut past_block = block1; // with the same view as block1
-        past_block.id = [10; 32];
+        past_block.id = [10; 32].into();
         assert!(engine.receive_block(past_block).is_err());
     }
 
     #[test]
     // Ensure that approve_block updates highest_voted_view and returns a correct Send.
     fn approve_block() {
-        let mut engine = init(vec![[0; 32], [1; 32], [3; 32]]);
+        let mut engine = init(vec![[0; 32].into(), [1; 32].into(), [3; 32].into()]);
 
         let block = next_block(&engine, &engine.genesis_block());
         engine = engine.receive_block(block.clone()).unwrap();
@@ -634,7 +636,10 @@ mod test {
         assert_eq!(engine.highest_voted_view, block.view);
         assert_eq!(
             send.to,
-            vec![engine.overlay().next_leader()].into_iter().collect()
+            vec![engine.overlay().next_leader()]
+                .into_iter()
+                .map::<CommitteeId, _>(From::from)
+                .collect()
         );
         assert_eq!(
             send.payload,
@@ -649,7 +654,7 @@ mod test {
     #[should_panic(expected = "not in")]
     // Ensure that approve_block cannot accept not-received blocks.
     fn approve_block_not_received() {
-        let engine = init(vec![[0; 32]]);
+        let engine = init(vec![[0; 32].into()]);
 
         let block = next_block(&engine, &engine.genesis_block());
         let _ = engine.approve_block(block);
@@ -659,7 +664,7 @@ mod test {
     #[should_panic(expected = "can't vote for a block in the past")]
     // Ensure that approve_block cannot vote blocks in the past.
     fn approve_block_in_the_past() {
-        let mut engine = init(vec![[0; 32]]);
+        let mut engine = init(vec![[0; 32].into()]);
 
         let block = next_block(&engine, &engine.genesis_block());
         engine = engine.receive_block(block.clone()).unwrap();
@@ -674,23 +679,23 @@ mod test {
     #[test]
     // Ensure that local_timeout() votes on the current view.
     fn local_timeout() {
-        let mut engine = init(vec![[0; 32], [1; 32]]);
+        let mut engine = init(vec![[0; 32].into(), [1; 32].into()]);
         let block = next_block(&engine, &engine.genesis_block());
         engine = engine.receive_block(block).unwrap(); // received but not approved yet
         engine = update_leader_selection(&engine);
 
         let (engine, send) = engine.local_timeout();
-        assert_eq!(engine.highest_voted_view, 1); // updated from 0 (genesis) to 1 (current_view)
+        assert_eq!(engine.highest_voted_view, 1.into()); // updated from 0 (genesis) to 1 (current_view)
         assert_eq!(
             send,
             Some(Send {
                 to: engine.overlay().root_committee(),
                 payload: Payload::Timeout(Timeout {
-                    view: 1,
-                    sender: [0; 32],
+                    view: 1.into(),
+                    sender: [0; 32].into(),
                     high_qc: StandardQc {
-                        view: 0, // genesis
-                        id: [0; 32],
+                        view: 0.into(), // genesis
+                        id: BlockId::genesis(),
                     },
                     timeout_qc: None
                 }),
@@ -701,88 +706,91 @@ mod test {
     #[test]
     // Ensure that receive_timeout_qc updates current_view, last_view_timeout_qc and local_high_qc.
     fn receive_timeout_qc_after_local_timeout() {
-        let mut engine = init(vec![[0; 32]]);
+        let mut engine = init(vec![[0; 32].into()]);
         let block = next_block(&engine, &engine.genesis_block());
         engine = engine.receive_block(block).unwrap(); // received but not approved yet
         engine = update_leader_selection(&engine);
 
         let (mut engine, _) = engine.local_timeout();
 
-        assert_eq!(engine.current_view(), 1);
+        assert_eq!(engine.current_view(), 1.into());
         let timeout_qc = TimeoutQc::new(
-            1,
+            1.into(),
             StandardQc {
-                view: 0, // genesis
-                id: [0; 32],
+                view: 0.into(), // genesis
+                id: BlockId::genesis(),
             },
-            [0; 32],
+            [0; 32].into(),
         );
         engine = engine.receive_timeout_qc(timeout_qc.clone());
         assert_eq!(&engine.local_high_qc, timeout_qc.high_qc());
         assert_eq!(engine.last_view_timeout_qc, Some(timeout_qc));
-        assert_eq!(engine.current_view(), 2);
+        assert_eq!(engine.current_view(), 2.into());
     }
 
     #[test]
     // Ensure that receive_timeout_qc works even before local_timeout occurs.
     fn receive_timeout_qc_before_local_timeout() {
-        let mut engine = init(vec![[0; 32]]);
+        let mut engine = init(vec![[0; 32].into()]);
         let block = next_block(&engine, &engine.genesis_block());
         engine = engine.receive_block(block).unwrap(); // received but not approved yet
         engine = update_leader_selection(&engine);
 
         // before local_timeout occurs
 
-        assert_eq!(engine.current_view(), 1);
+        assert_eq!(engine.current_view(), 1.into());
         let timeout_qc = TimeoutQc::new(
-            1,
+            1.into(),
             StandardQc {
-                view: 0, // genesis
-                id: [0; 32],
+                view: 0.into(), // genesis
+                id: BlockId::genesis(),
             },
-            [0; 32],
+            [0; 32].into(),
         );
         engine = engine.receive_timeout_qc(timeout_qc.clone());
         assert_eq!(&engine.local_high_qc, timeout_qc.high_qc());
         assert_eq!(engine.last_view_timeout_qc, Some(timeout_qc));
-        assert_eq!(engine.current_view(), 2);
+        assert_eq!(engine.current_view(), 2.into());
     }
 
     #[test]
     // Ensure that approve_new_view votes on the new view correctly.
     fn approve_new_view() {
-        let mut engine = init(vec![[0; 32], [1; 32], [2; 32]]);
+        let mut engine = init(vec![[0; 32].into(), [1; 32].into(), [2; 32].into()]);
         let block = next_block(&engine, &engine.genesis_block());
         engine = engine.receive_block(block).unwrap(); // received but not approved yet
         engine = update_leader_selection(&engine);
 
-        assert_eq!(engine.current_view(), 1); // still waiting for a QC(view=1)
+        assert_eq!(engine.current_view(), 1.into()); // still waiting for a QC(view=1)
         let timeout_qc = TimeoutQc::new(
-            1,
+            1.into(),
             StandardQc {
-                view: 0, // genesis
-                id: [0; 32],
+                view: 0.into(), // genesis
+                id: BlockId::genesis(),
             },
-            [0; 32],
+            [0; 32].into(),
         );
         engine = engine.receive_timeout_qc(timeout_qc.clone());
         assert_eq!(&engine.local_high_qc, timeout_qc.high_qc());
         assert_eq!(engine.last_view_timeout_qc, Some(timeout_qc.clone()));
-        assert_eq!(engine.current_view(), 2);
-        assert_eq!(engine.highest_voted_view, -1); // didn't vote on anything yet
+        assert_eq!(engine.current_view(), 2.into());
+        assert_eq!(engine.highest_voted_view, (-1).into()); // didn't vote on anything yet
         engine = update_leader_selection(&engine);
 
         let (engine, send) = engine.approve_new_view(timeout_qc.clone(), HashSet::new());
         assert_eq!(&engine.high_qc(), timeout_qc.high_qc());
-        assert_eq!(engine.current_view(), 2); // not changed
-        assert_eq!(engine.highest_voted_view, 2);
+        assert_eq!(engine.current_view(), 2.into()); // not changed
+        assert_eq!(engine.highest_voted_view, 2.into());
         assert_eq!(
             send,
             Send {
-                to: vec![engine.overlay().next_leader()].into_iter().collect(),
+                to: vec![engine.overlay().next_leader()]
+                    .into_iter()
+                    .map::<CommitteeId, _>(From::from)
+                    .collect(),
                 payload: Payload::NewView(NewView {
-                    view: 2,
-                    sender: [0; 32],
+                    view: 2.into(),
+                    sender: [0; 32].into(),
                     timeout_qc: timeout_qc.clone(),
                     high_qc: timeout_qc.high_qc().clone(),
                 })
@@ -793,19 +801,19 @@ mod test {
     #[test]
     #[should_panic(expected = "can't vote for a new view not bigger than the last timeout_qc")]
     fn approve_new_view_not_bigger_than_timeout_qc() {
-        let mut engine = init(vec![[0; 32]]);
+        let mut engine = init(vec![[0; 32].into()]);
         let block = next_block(&engine, &engine.genesis_block());
         engine = engine.receive_block(block).unwrap(); // received but not approved yet
         engine = update_leader_selection(&engine);
 
-        assert_eq!(engine.current_view(), 1);
+        assert_eq!(engine.current_view(), 1.into());
         let timeout_qc1 = TimeoutQc::new(
-            1,
+            1.into(),
             StandardQc {
-                view: 0, // genesis
-                id: [0; 32],
+                view: 0.into(), // genesis
+                id: BlockId::genesis(),
             },
-            [0; 32],
+            [0; 32].into(),
         );
         engine = engine.receive_timeout_qc(timeout_qc1.clone());
         assert_eq!(engine.last_view_timeout_qc, Some(timeout_qc1.clone()));
@@ -813,12 +821,12 @@ mod test {
 
         // receiving a timeout_qc2 before approving new_view(timeout_qc1)
         let timeout_qc2 = TimeoutQc::new(
-            2,
+            2.into(),
             StandardQc {
-                view: 0, // genesis
-                id: [0; 32],
+                view: 0.into(), // genesis
+                id: BlockId::genesis(),
             },
-            [0; 32],
+            [0; 32].into(),
         );
         engine = engine.receive_timeout_qc(timeout_qc2.clone());
         assert_eq!(engine.last_view_timeout_qc, Some(timeout_qc2));

@@ -11,6 +11,7 @@ use std::pin::Pin;
 use std::time::Duration;
 // crates
 use bls_signatures::PrivateKey;
+use consensus_engine::{CommitteeId, NodeId};
 use futures::{Stream, StreamExt};
 use leader_selection::UpdateableLeaderSelection;
 use serde::Deserialize;
@@ -25,13 +26,12 @@ use crate::tally::{
     happy::CarnotTally, timeout::TimeoutTally, unhappy::NewViewTally, CarnotTallySettings,
 };
 use consensus_engine::{
-    overlay::RandomBeaconState, AggregateQc, BlockId, Carnot, Committee, LeaderProof, NewView,
-    Overlay, Payload, Qc, StandardQc, Timeout, TimeoutQc, View, Vote,
+    overlay::RandomBeaconState, AggregateQc, BlockId, Carnot, Committee, NewView, Overlay, Payload,
+    Qc, StandardQc, Timeout, TimeoutQc, View, Vote,
 };
 use task_manager::TaskManager;
 
 use nomos_core::block::Block;
-use nomos_core::crypto::PublicKey;
 use nomos_core::fountain::FountainCode;
 use nomos_core::tx::Transaction;
 use nomos_core::vote::Tally;
@@ -49,8 +49,6 @@ use overwatch_rs::services::{
 // TODO: tale this from config
 const TIMEOUT: Duration = Duration::from_secs(60);
 
-// Raw bytes for now, could be a ed25519 public key
-pub type NodeId = PublicKey;
 // Random seed for each round provided by the protocol
 pub type Seed = [u8; 32];
 
@@ -169,18 +167,16 @@ where
         } = self.service_state.settings_reader.get_updated_settings();
 
         let overlay = O::new(overlay_settings);
-        let genesis = consensus_engine::Block {
-            id: [0; 32],
-            view: 0,
-            parent_qc: Qc::Standard(StandardQc::genesis()),
-            leader_proof: LeaderProof::LeaderId { leader_id: [0; 32] },
-        };
-        let mut carnot = Carnot::from_genesis(private_key, genesis, overlay);
+        let genesis = consensus_engine::Block::genesis();
+        let mut carnot = Carnot::from_genesis(private_key.into(), genesis, overlay);
         let adapter = A::new(network_relay).await;
         let fountain = F::new(fountain_settings);
         let private_key = PrivateKey::new(private_key);
         let self_committee = carnot.self_committee();
-        let leader_committee = [carnot.id()].into_iter().collect::<HashSet<_>>();
+        let leader_committee = [carnot.id()]
+            .into_iter()
+            .map::<CommitteeId, _>(From::from)
+            .collect::<Committee>();
         let tally_settings = CarnotTallySettings {
             threshold: carnot.super_majority_threshold(),
             participating_nodes: carnot.child_committees().into_iter().flatten().collect(),
@@ -195,7 +191,7 @@ where
         let genesis_block = carnot.genesis_block();
         Self::process_view_change(
             carnot.clone(),
-            genesis_block.view - 1,
+            genesis_block.view.decr(),
             &mut task_manager,
             adapter.clone(),
         )
@@ -213,7 +209,7 @@ where
 
         if carnot.is_next_leader() {
             let network_adapter = adapter.clone();
-            task_manager.push(genesis_block.view + 1, async move {
+            task_manager.push(genesis_block.view.incr(), async move {
                 let Event::Approve { qc, .. } = Self::gather_votes(
                         network_adapter,
                         leader_committee.clone(),
@@ -248,6 +244,7 @@ where
 }
 
 #[derive(Debug)]
+#[allow(clippy::large_enum_variant)]
 enum Output<Tx: Clone + Eq + Hash> {
     Send(consensus_engine::Send),
     BroadcastTimeoutQc { timeout_qc: TimeoutQc },
@@ -371,7 +368,10 @@ where
         let original_block = block;
         let block = original_block.header().clone();
         let self_committee = carnot.self_committee();
-        let leader_committee = [carnot.id()].into_iter().collect();
+        let leader_committee = [carnot.id()]
+            .into_iter()
+            .map::<CommitteeId, _>(From::from)
+            .collect();
 
         let tally_settings = CarnotTallySettings {
             threshold: carnot.super_majority_threshold(),
@@ -437,14 +437,17 @@ where
         task_manager: &mut TaskManager<View, Event<P::Tx>>,
         adapter: A,
     ) -> (Carnot<O>, Option<Output<P::Tx>>) {
-        let leader_committee = [carnot.id()].into_iter().collect();
+        let leader_committee = [carnot.id()]
+            .into_iter()
+            .map::<CommitteeId, _>(From::from)
+            .collect();
         let leader_tally_settings = CarnotTallySettings {
             threshold: carnot.leader_super_majority_threshold(),
             // TODO: add children of root committee
             participating_nodes: carnot.root_committee(),
         };
         let (new_carnot, out) = carnot.approve_new_view(timeout_qc.clone(), new_views);
-        let new_view = timeout_qc.view() + 1;
+        let new_view = timeout_qc.view().incr();
         if carnot.is_next_leader() {
             let high_qc = carnot.high_qc();
             task_manager.push(new_view, async move {
@@ -481,7 +484,7 @@ where
             participating_nodes: carnot.child_committees().into_iter().flatten().collect(),
         };
         task_manager.push(
-            timeout_qc.view() + 1,
+            timeout_qc.view().incr(),
             Self::gather_new_views(adapter, self_committee, timeout_qc.clone(), tally_settings),
         );
         if carnot.current_view() != new_state.current_view() {
@@ -525,7 +528,7 @@ where
         let mut output = None;
         mempool_relay
             .send(MempoolMsg::View {
-                ancestor_hint: [0; 32],
+                ancestor_hint: [0; 32].into(),
                 reply_channel,
             })
             .await
@@ -534,7 +537,7 @@ where
         match rx.await {
             Ok(txs) => {
                 let beacon = RandomBeaconState::generate_happy(qc.view(), &private_key);
-                let proposal = Block::new(qc.view() + 1, qc, txs, id, beacon);
+                let proposal = Block::new(qc.view().incr(), qc, txs, id, beacon);
                 output = Some(Output::BroadcastProposal { proposal });
             }
             Err(e) => tracing::error!("Could not fetch txs {e}"),
@@ -558,8 +561,8 @@ where
             Event::LocalTimeout { view: current_view }
         });
         task_manager.push(
-            current_view + 1,
-            Self::gather_block(adapter.clone(), current_view + 1),
+            current_view.incr(),
+            Self::gather_block(adapter.clone(), current_view.incr()),
         );
         task_manager.push(
             current_view,
@@ -621,7 +624,7 @@ where
     ) -> Event<P::Tx> {
         let tally = NewViewTally::new(tally);
         let stream = adapter
-            .new_view_stream(&committee, timeout_qc.view() + 1)
+            .new_view_stream(&committee, timeout_qc.view().incr())
             .await;
         match tally.tally(timeout_qc.clone(), stream).await {
             Ok((_qc, new_views)) => Event::NewView {
@@ -816,34 +819,36 @@ pub struct CarnotInfo {
 
 #[cfg(test)]
 mod tests {
-    use consensus_engine::Block;
+    use consensus_engine::{Block, LeaderProof};
 
     use super::*;
 
     #[test]
     fn serde_carnot_info() {
         let info = CarnotInfo {
-            id: [0; 32],
-            current_view: 1,
-            highest_voted_view: -1,
+            id: [0; 32].into(),
+            current_view: 1.into(),
+            highest_voted_view: (-1).into(),
             local_high_qc: StandardQc {
-                view: 0,
-                id: [0; 32],
+                view: 0.into(),
+                id: [0; 32].into(),
             },
             safe_blocks: HashMap::from([(
-                [0; 32],
+                [0; 32].into(),
                 Block {
-                    id: [0; 32],
-                    view: 0,
+                    id: [0; 32].into(),
+                    view: 0.into(),
                     parent_qc: Qc::Standard(StandardQc {
-                        view: 0,
-                        id: [0; 32],
+                        view: 0.into(),
+                        id: [0; 32].into(),
                     }),
-                    leader_proof: LeaderProof::LeaderId { leader_id: [0; 32] },
+                    leader_proof: LeaderProof::LeaderId {
+                        leader_id: [0; 32].into(),
+                    },
                 },
             )]),
             last_view_timeout_qc: None,
-            committed_blocks: vec![[0; 32]],
+            committed_blocks: vec![[0; 32].into()],
         };
 
         let serialized = serde_json::to_string(&info).unwrap();
