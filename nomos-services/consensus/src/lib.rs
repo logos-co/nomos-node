@@ -11,6 +11,7 @@ use std::pin::Pin;
 use std::time::Duration;
 // crates
 use bls_signatures::PrivateKey;
+pub use consensus_engine::NodeId;
 use futures::{Stream, StreamExt};
 use leader_selection::UpdateableLeaderSelection;
 use serde::Deserialize;
@@ -31,7 +32,6 @@ use consensus_engine::{
 use task_manager::TaskManager;
 
 use nomos_core::block::Block;
-use nomos_core::crypto::PublicKey;
 use nomos_core::fountain::FountainCode;
 use nomos_core::tx::Transaction;
 use nomos_core::vote::Tally;
@@ -49,8 +49,6 @@ use overwatch_rs::services::{
 // TODO: tale this from config
 const TIMEOUT: Duration = Duration::from_secs(60);
 
-// Raw bytes for now, could be a ed25519 public key
-pub type NodeId = PublicKey;
 // Random seed for each round provided by the protocol
 pub type Seed = [u8; 32];
 
@@ -173,9 +171,11 @@ where
             id: [0; 32],
             view: 0,
             parent_qc: Qc::Standard(StandardQc::genesis()),
-            leader_proof: LeaderProof::LeaderId { leader_id: [0; 32] },
+            leader_proof: LeaderProof::LeaderId {
+                leader_id: NodeId::new([0; 32]),
+            },
         };
-        let mut carnot = Carnot::from_genesis(private_key, genesis, overlay);
+        let mut carnot = Carnot::from_genesis(NodeId::new(private_key), genesis, overlay);
         let adapter = A::new(network_relay).await;
         let fountain = F::new(fountain_settings);
         let private_key = PrivateKey::new(private_key);
@@ -824,7 +824,7 @@ mod tests {
     #[test]
     fn serde_carnot_info() {
         let info = CarnotInfo {
-            id: [0; 32],
+            id: NodeId::new([0; 32]),
             current_view: 1,
             highest_voted_view: -1,
             local_high_qc: StandardQc {
@@ -840,7 +840,9 @@ mod tests {
                         view: 0,
                         id: [0; 32],
                     }),
-                    leader_proof: LeaderProof::LeaderId { leader_id: [0; 32] },
+                    leader_proof: LeaderProof::LeaderId {
+                        leader_id: NodeId::new([0; 32]),
+                    },
                 },
             )]),
             last_view_timeout_qc: None,

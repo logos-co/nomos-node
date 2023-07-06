@@ -19,15 +19,17 @@ pub struct ConsensusEngineTest {
 impl ConsensusEngineTest {
     pub fn new() -> Self {
         let engine = Carnot::from_genesis(
-            [0; 32],
+            NodeId::new([0; 32]),
             Block {
                 view: 0,
                 id: [0; 32],
                 parent_qc: Qc::Standard(StandardQc::genesis()),
-                leader_proof: LeaderProof::LeaderId { leader_id: [0; 32] },
+                leader_proof: LeaderProof::LeaderId {
+                    leader_id: NodeId::new([0; 32]),
+                },
             },
             FlatOverlay::new(Settings {
-                nodes: vec![[0; 32]],
+                nodes: vec![NodeId::new([0; 32])],
                 leader: RoundRobin::default(),
                 leader_super_majority_threshold: None,
             }),
