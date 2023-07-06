@@ -102,7 +102,7 @@ impl ReferenceStateMachine for RefState {
             Transition::ApprovePastBlock(block) => state.highest_voted_view >= block.view,
             Transition::LocalTimeout => true,
             Transition::ReceiveTimeoutQcForRecentView(timeout_qc) => {
-                timeout_qc.view() == state.current_view()
+                timeout_qc.view() >= state.current_view()
             }
             Transition::ReceiveTimeoutQcForOldView(timeout_qc) => {
                 timeout_qc.view() < state.current_view()
