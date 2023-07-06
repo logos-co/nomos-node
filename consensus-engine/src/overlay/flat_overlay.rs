@@ -40,7 +40,7 @@ where
     }
 
     fn root_committee(&self) -> crate::Committee {
-        self.nodes.clone().into_iter().map(From::from).collect()
+        self.nodes.clone().into_iter().collect()
     }
 
     fn rebuild(&mut self, _timeout_qc: crate::TimeoutQc) {
@@ -68,7 +68,7 @@ where
     }
 
     fn node_committee(&self, _id: NodeId) -> crate::Committee {
-        self.nodes.clone().into_iter().map(From::from).collect()
+        self.nodes.clone().into_iter().collect()
     }
 
     fn child_committees(&self, _id: NodeId) -> Vec<crate::Committee> {
