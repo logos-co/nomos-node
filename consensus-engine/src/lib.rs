@@ -132,10 +132,7 @@ impl<O: Overlay> Carnot<O> {
         new_state.highest_voted_view = block.view;
 
         let to = if new_state.overlay.is_member_of_root_committee(new_state.id) {
-            [new_state.overlay.next_leader()]
-                .into_iter()
-                .map::<CommitteeId, _>(From::from)
-                .collect()
+            [new_state.overlay.next_leader()].into_iter().collect()
         } else {
             new_state.overlay.parent_committee(self.id)
         };
@@ -203,10 +200,7 @@ impl<O: Overlay> Carnot<O> {
 
         new_state.highest_voted_view = new_view;
         let to = if new_state.overlay.is_member_of_root_committee(new_state.id) {
-            [new_state.overlay.next_leader()]
-                .into_iter()
-                .map::<CommitteeId, _>(From::from)
-                .collect()
+            [new_state.overlay.next_leader()].into_iter().collect()
         } else {
             new_state.overlay.parent_committee(new_state.id)
         };
@@ -640,10 +634,7 @@ mod test {
         assert_eq!(engine.highest_voted_view, block.view);
         assert_eq!(
             send.to,
-            vec![engine.overlay().next_leader()]
-                .into_iter()
-                .map::<CommitteeId, _>(From::from)
-                .collect()
+            vec![engine.overlay().next_leader()].into_iter().collect()
         );
         assert_eq!(
             send.payload,
@@ -788,10 +779,7 @@ mod test {
         assert_eq!(
             send,
             Send {
-                to: vec![engine.overlay().next_leader()]
-                    .into_iter()
-                    .map::<CommitteeId, _>(From::from)
-                    .collect(),
+                to: vec![engine.overlay().next_leader()].into_iter().collect(),
                 payload: Payload::NewView(NewView {
                     view: 2,
                     sender: [0; 32],
