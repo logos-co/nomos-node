@@ -66,6 +66,46 @@ impl Committee {
         }
         hasher.finalize()
     }
+
+    #[inline]
+    pub fn contains(&self, node_id: &NodeId) -> bool {
+        self.members.contains(node_id)
+    }
+
+    #[inline]
+    pub fn insert(&mut self, node_id: NodeId) {
+        self.members.insert(node_id);
+    }
+
+    #[inline]
+    pub fn remove(&mut self, node_id: &NodeId) {
+        self.members.remove(node_id);
+    }
+
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.members.is_empty()
+    }
+
+    #[inline]
+    pub fn len(&self) -> usize {
+        self.members.len()
+    }
+
+    #[inline]
+    pub fn extend<'a>(&mut self, other: impl IntoIterator<Item = &'a NodeId>) {
+        self.members.extend(other);
+    }
+
+    #[inline]
+    pub fn id<D: digest::Digest<OutputSize = digest::typenum::U32>>(&self) -> CommitteeId {
+        CommitteeId::new(self.hash::<D>().into())
+    }
+
+    #[inline]
+    pub fn iter(&self) -> impl Iterator<Item = &NodeId> {
+        self.members.iter()
+    }
 }
 
 impl<'a, T> From<T> for Committee
@@ -128,19 +168,5 @@ impl<'a> core::iter::IntoIterator for &'a Committee {
 
     fn into_iter(self) -> Self::IntoIter {
         self.members.iter()
-    }
-}
-
-impl core::ops::Deref for Committee {
-    type Target = BTreeSet<NodeId>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.members
-    }
-}
-
-impl core::ops::DerefMut for Committee {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.members
     }
 }
