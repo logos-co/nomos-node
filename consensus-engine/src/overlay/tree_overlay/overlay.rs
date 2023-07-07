@@ -89,14 +89,26 @@ where
     }
 
     fn child_committees(&self, id: NodeId) -> Vec<Committee> {
-        match self.carnot_tree.child_committees(&id) {
-            (None, None) => vec![],
-            (None, Some(c)) | (Some(c), None) => vec![std::iter::once(*c).collect()],
-            (Some(c1), Some(c2)) => vec![
-                std::iter::once(*c1).collect(),
-                std::iter::once(*c2).collect(),
-            ],
-        }
+        // Lookup committee index by member id, then committee id by index.
+        self.carnot_tree
+            .committees_by_member
+            .get(&id)
+            .and_then(|committee_idx| self.carnot_tree.inner_committees.get(*committee_idx))
+            .map(|committee_id| {
+                let (l, r) = self.carnot_tree.child_committees(committee_id);
+                let extract_committee = |committee_id| {
+                    self.carnot_tree
+                        .committee_id_to_index
+                        .get(committee_id)
+                        .and_then(|committee_idx| {
+                            self.carnot_tree.membership_committees.get(committee_idx)
+                        })
+                };
+                let l = l.and_then(extract_committee).into_iter().cloned();
+                let r = r.and_then(extract_committee).into_iter().cloned();
+                l.chain(r).collect()
+            })
+            .expect("NodeId not found in overlay")
     }
 
     fn leaf_committees(&self, _id: NodeId) -> Vec<Committee> {
@@ -191,7 +203,6 @@ mod tests {
     use crate::Overlay;
 
     use super::*;
-    use std::collections::HashSet;
 
     #[test]
     fn test_carnot_overlay_leader() {
@@ -235,7 +246,7 @@ mod tests {
             leader: RoundRobin::new(),
         });
 
-        let mut expected_root = HashSet::new();
+        let mut expected_root = Committee::new();
         expected_root.insert(overlay.nodes[9]);
         expected_root.extend(overlay.nodes[0..3].iter());
 
