@@ -21,7 +21,7 @@ impl ConsensusEngineTest {
         let engine = Carnot::from_genesis(
             NodeId::new([0; 32]),
             Block {
-                view: 0,
+                view: View::new(0),
                 id: BlockId::genesis(),
                 parent_qc: Qc::Standard(StandardQc::genesis()),
                 leader_proof: LeaderProof::LeaderId {

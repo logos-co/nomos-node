@@ -10,8 +10,8 @@ mod node_id;
 pub use node_id::NodeId;
 mod block_id;
 pub use block_id::BlockId;
-
-pub type View = i64;
+mod view;
+pub use view::View;
 
 /// The way the consensus engine communicates with the rest of the system is by returning
 /// actions to be performed.
@@ -118,7 +118,7 @@ impl Block {
     pub fn genesis() -> Self {
         Self {
             id: BlockId::genesis(),
-            view: 0,
+            view: View(0),
             parent_qc: Qc::Standard(StandardQc::genesis()),
             leader_proof: LeaderProof::LeaderId {
                 leader_id: NodeId::new([0; 32]),
@@ -144,7 +144,7 @@ pub struct StandardQc {
 impl StandardQc {
     pub fn genesis() -> Self {
         Self {
-            view: -1,
+            view: View(-1),
             id: BlockId::genesis(),
         }
     }
@@ -197,11 +197,11 @@ mod test {
     #[test]
     fn standard_qc() {
         let standard_qc = StandardQc {
-            view: 10,
+            view: View(10),
             id: BlockId::genesis(),
         };
         let qc = Qc::Standard(standard_qc.clone());
-        assert_eq!(qc.view(), 10);
+        assert_eq!(qc.view(), View(10));
         assert_eq!(qc.block(), BlockId::new([0; 32]));
         assert_eq!(qc.high_qc(), standard_qc);
     }
@@ -209,14 +209,14 @@ mod test {
     #[test]
     fn aggregated_qc() {
         let aggregated_qc = AggregateQc {
-            view: 20,
+            view: View(20),
             high_qc: StandardQc {
-                view: 10,
+                view: View(10),
                 id: BlockId::genesis(),
             },
         };
         let qc = Qc::Aggregated(aggregated_qc.clone());
-        assert_eq!(qc.view(), 20);
+        assert_eq!(qc.view(), View(20));
         assert_eq!(qc.block(), BlockId::new([0; 32]));
         assert_eq!(qc.high_qc(), aggregated_qc.high_qc);
     }
@@ -224,28 +224,28 @@ mod test {
     #[test]
     fn new_timeout_qc() {
         let timeout_qc = TimeoutQc::new(
-            2,
+            View(2),
             StandardQc {
-                view: 1,
+                view: View(1),
                 id: BlockId::genesis(),
             },
             NodeId::new([0; 32]),
         );
-        assert_eq!(timeout_qc.view(), 2);
-        assert_eq!(timeout_qc.high_qc().view, 1);
+        assert_eq!(timeout_qc.view(), View(2));
+        assert_eq!(timeout_qc.high_qc().view, View(1));
         assert_eq!(timeout_qc.high_qc().id, BlockId::new([0; 32]));
         assert_eq!(timeout_qc.sender(), NodeId::new([0; 32]));
 
         let timeout_qc = TimeoutQc::new(
-            2,
+            View(2),
             StandardQc {
-                view: 2,
+                view: View(2),
                 id: BlockId::genesis(),
             },
             NodeId::new([0; 32]),
         );
-        assert_eq!(timeout_qc.view(), 2);
-        assert_eq!(timeout_qc.high_qc().view, 2);
+        assert_eq!(timeout_qc.view(), View(2));
+        assert_eq!(timeout_qc.high_qc().view, View(2));
         assert_eq!(timeout_qc.high_qc().id, BlockId::new([0; 32]));
         assert_eq!(timeout_qc.sender(), NodeId::new([0; 32]));
     }
@@ -256,9 +256,9 @@ mod test {
     )]
     fn new_timeout_qc_panic() {
         let _ = TimeoutQc::new(
-            1,
+            View(1),
             StandardQc {
-                view: 2,
+                view: View(2),
                 id: BlockId::genesis(),
             },
             NodeId::new([0; 32]),

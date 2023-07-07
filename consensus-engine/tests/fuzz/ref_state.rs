@@ -30,7 +30,7 @@ pub struct ViewEntry {
 const LEADER_PROOF: LeaderProof = LeaderProof::LeaderId {
     leader_id: NodeId::new([0; 32]),
 };
-const INITIAL_HIGHEST_VOTED_VIEW: View = -1;
+const INITIAL_HIGHEST_VOTED_VIEW: View = View::new(-1);
 const SENDER: NodeId = NodeId::new([0; 32]);
 
 impl ReferenceStateMachine for RefState {
@@ -41,7 +41,7 @@ impl ReferenceStateMachine for RefState {
     // Initialize the reference state machine
     fn init_state() -> BoxedStrategy<Self::State> {
         let genesis_block = Block {
-            view: 0,
+            view: View::new(0),
             id: BlockId::genesis(),
             parent_qc: Qc::Standard(StandardQc::genesis()),
             leader_proof: LEADER_PROOF.clone(),
@@ -191,7 +191,7 @@ impl RefState {
     fn transition_receive_unsafe_block(&self) -> BoxedStrategy<Transition> {
         let old_parents = self
             .chain
-            .range(..self.current_view() - 1)
+            .range(..self.current_view().decr())
             .flat_map(|(_view, entry)| entry.blocks.iter().cloned())
             .collect::<Vec<Block>>();
 
@@ -211,7 +211,7 @@ impl RefState {
     fn transition_approve_block(&self) -> BoxedStrategy<Transition> {
         let blocks_not_voted = self
             .chain
-            .range(self.highest_voted_view + 1..)
+            .range(self.highest_voted_view.incr()..)
             .flat_map(|(_view, entry)| entry.blocks.iter().cloned())
             .collect::<Vec<Block>>();
 
@@ -250,13 +250,13 @@ impl RefState {
 
     // Generate a Transition::ReceiveTimeoutQcForRecentView
     fn transition_receive_timeout_qc_for_recent_view(&self) -> BoxedStrategy<Transition> {
-        let current_view = self.current_view();
+        let current_view: i64 = self.current_view().into();
         let local_high_qc = self.high_qc();
         let delta = 3;
 
         let blocks_around_local_high_qc = self
             .chain
-            .range(local_high_qc.view - delta..=local_high_qc.view + delta) // including past/future QCs
+            .range(local_high_qc.view - View::new(delta)..=local_high_qc.view + View::new(delta)) // including past/future QCs
             .flat_map(|(_, entry)| entry.blocks.iter().cloned())
             .collect::<Vec<Block>>();
 
@@ -268,7 +268,7 @@ impl RefState {
                     (current_view..=current_view + delta) // including future views
                         .prop_map(move |view| {
                             Transition::ReceiveTimeoutQcForRecentView(TimeoutQc::new(
-                                view,
+                                View::new(view),
                                 StandardQc {
                                     view: block.view,
                                     id: block.id,
@@ -333,7 +333,7 @@ impl RefState {
 
         Just(Transition::ReceiveSafeBlock(Block {
             id: BlockId::random(),
-            view: current_view + 1,
+            view: current_view.incr(),
             parent_qc: Qc::Aggregated(AggregateQc {
                 high_qc: self.high_qc(),
                 view: current_view,
@@ -354,7 +354,7 @@ impl RefState {
     }
 
     pub fn new_view_from(timeout_qc: &TimeoutQc) -> View {
-        timeout_qc.view() + 1
+        timeout_qc.view().incr()
     }
 
     pub fn high_qc(&self) -> StandardQc {
@@ -396,7 +396,7 @@ impl RefState {
         Block {
             // use rand because we don't want this to be shrinked by proptest
             id: BlockId::random(),
-            view: parent.view + 1,
+            view: parent.view.incr(),
             parent_qc: Qc::Standard(StandardQc {
                 view: parent.view,
                 id: parent.id,

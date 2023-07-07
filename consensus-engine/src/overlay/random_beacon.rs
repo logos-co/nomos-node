@@ -1,6 +1,5 @@
 use crate::types::*;
 use bls_signatures::{PrivateKey, PublicKey, Serialize, Signature};
-use integer_encoding::VarInt;
 use rand::{seq::SliceRandom, SeedableRng};
 use serde::{Deserialize, Serialize as SerdeSerialize};
 use sha2::{Digest, Sha256};
@@ -80,7 +79,7 @@ impl RandomBeaconState {
 }
 
 fn view_to_bytes(view: View) -> Box<[u8]> {
-    View::encode_var_vec(view).into_boxed_slice()
+    view.encode_var_vec().into_boxed_slice()
 }
 
 // FIXME: the spec should be clearer on what is the expected behavior,
