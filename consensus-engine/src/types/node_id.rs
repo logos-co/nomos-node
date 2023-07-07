@@ -10,6 +10,7 @@ impl NodeId {
     }
 
     /// Returns a random node id
+    #[cfg(any(test, feature = "simulation"))]
     #[inline]
     pub fn random() -> Self {
         use rand::RngCore;
@@ -20,7 +21,7 @@ impl NodeId {
     }
 
     /// Returns the index of the node, the index is the first [0..size of usize] bytes of the node id
-    #[cfg(test)]
+    #[cfg(any(test, feature = "simulation"))]
     #[inline]
     pub fn index(&self) -> usize {
         const SIZE: usize = core::mem::size_of::<usize>();
@@ -68,7 +69,7 @@ impl From<&super::CommitteeId> for NodeId {
 //
 // [0..size of usize]: node index in big endian
 // [size of usize..32]: zeros
-#[cfg(test)]
+#[cfg(any(test, feature = "simulation"))]
 impl From<usize> for NodeId {
     fn from(id: usize) -> Self {
         let mut bytes = [0u8; 32];

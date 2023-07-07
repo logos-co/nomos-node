@@ -15,6 +15,7 @@ impl BlockId {
     }
 
     /// Returns a random block id
+    #[cfg(any(test, feature = "simulation"))]
     #[inline]
     pub fn random() -> Self {
         use rand::RngCore;
