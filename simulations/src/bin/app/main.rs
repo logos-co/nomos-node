@@ -8,7 +8,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 // crates
 use clap::Parser;
 use consensus_engine::overlay::{FlatOverlay, RandomBeaconState, RoundRobin};
-use consensus_engine::Block;
+use consensus_engine::{Block, View};
 use crossbeam::channel;
 use rand::rngs::SmallRng;
 use rand::seq::SliceRandom;
