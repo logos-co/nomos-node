@@ -93,7 +93,7 @@ impl SimulationApp {
                 };
                 // FIXME: Actually use a proposer and a key to generate random beacon state
                 let genesis = nomos_core::block::Block::new(
-                    0,
+                    View::new(0),
                     Block::genesis().parent_qc,
                     [].into_iter(),
                     leader,
