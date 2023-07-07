@@ -180,7 +180,7 @@ where
         let fountain = F::new(fountain_settings);
         let private_key = PrivateKey::new(private_key);
         let self_committee = carnot.self_committee();
-        let leader_committee = [carnot.id()].into_iter().collect::<HashSet<_>>();
+        let leader_committee = [carnot.id()].into_iter().collect::<Committee>();
         let tally_settings = CarnotTallySettings {
             threshold: carnot.super_majority_threshold(),
             participating_nodes: carnot.child_committees().into_iter().flatten().collect(),
@@ -248,6 +248,7 @@ where
 }
 
 #[derive(Debug)]
+#[allow(clippy::large_enum_variant)]
 enum Output<Tx: Clone + Eq + Hash> {
     Send(consensus_engine::Send),
     BroadcastTimeoutQc { timeout_qc: TimeoutQc },

@@ -494,6 +494,7 @@ impl<L: UpdateableLeaderSelection, O: Overlay<LeaderSelection = L>> Node for Car
 }
 
 #[derive(Debug)]
+#[allow(clippy::large_enum_variant)]
 enum Output<Tx: Clone + Eq + Hash> {
     Send(consensus_engine::Send),
     BroadcastTimeoutQc {

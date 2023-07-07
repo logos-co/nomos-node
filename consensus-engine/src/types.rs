@@ -1,17 +1,15 @@
 // std
-use std::collections::HashSet;
 use std::hash::Hash;
 // crates
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
 mod committee;
-pub use committee::CommitteeId;
+pub use committee::{Committee, CommitteeId};
 
 pub type View = i64;
 pub type NodeId = [u8; 32];
 pub type BlockId = [u8; 32];
-pub type Committee = HashSet<NodeId>;
 
 /// The way the consensus engine communicates with the rest of the system is by returning
 /// actions to be performed.

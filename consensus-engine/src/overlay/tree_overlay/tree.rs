@@ -1,16 +1,5 @@
 use crate::{Committee, CommitteeId, NodeId};
-use blake2::{digest::typenum::U32, Blake2b, Digest};
-use std::collections::{HashMap, HashSet};
-
-fn blake2b_hash(committee: &Committee) -> CommitteeId {
-    let mut hasher = Blake2b::<U32>::new();
-    let mut tmp = committee.iter().collect::<Vec<_>>();
-    tmp.sort();
-    for member in tmp {
-        hasher.update(member);
-    }
-    CommitteeId::new(hasher.finalize().into())
-}
+use std::collections::HashMap;
 
 #[derive(Debug, Clone)]
 pub(super) struct Tree {
@@ -59,7 +48,6 @@ impl Tree {
                 nodes[n * committee_size..(n + 1) * committee_size]
                     .iter()
                     .cloned()
-                    .map(From::from)
                     .collect()
             })
             .collect();
@@ -73,7 +61,10 @@ impl Tree {
             }
         }
 
-        let hashes = committees.iter().map(blake2b_hash).collect::<Vec<_>>();
+        let hashes = committees
+            .iter()
+            .map(Committee::id::<blake2::Blake2b<digest::typenum::U32>>)
+            .collect::<Vec<_>>();
         (hashes, committees.into_iter().enumerate().collect())
     }
 
@@ -88,8 +79,8 @@ impl Tree {
     }
 
     pub(super) fn parent_committee_from_member_id(&self, id: &NodeId) -> Committee {
-        let Some(committee_id) = self.committee_id_by_member_id(id) else { return HashSet::new(); };
-        let Some(parent_id) = self.parent_committee(committee_id) else { return HashSet::new(); };
+        let Some(committee_id) = self.committee_id_by_member_id(id) else { return Committee::new(); };
+        let Some(parent_id) = self.parent_committee(committee_id) else { return Committee::new(); };
         self.committee_by_committee_idx(self.committee_id_to_index[parent_id])
             .cloned()
             .unwrap_or_default()
