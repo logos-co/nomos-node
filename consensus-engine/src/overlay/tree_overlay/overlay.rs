@@ -90,58 +90,25 @@ where
 
     fn child_committees(&self, id: NodeId) -> Vec<Committee> {
         // Lookup committee index by member id, then committee id by index.
-        let committee_id = self
-            .carnot_tree
+        self.carnot_tree
             .committees_by_member
             .get(&id)
-            .and_then(|committee_idx| self.carnot_tree.inner_committees.get(*committee_idx));
-
-        if let Some(committee_id) = committee_id {
-            // Lookup child committees by committee id.
-            match self.carnot_tree.child_committees(committee_id) {
-                (None, None) => vec![],
-                (Some(c), None) | (None, Some(c)) => {
-                    // Single child committee found.
+            .and_then(|committee_idx| self.carnot_tree.inner_committees.get(*committee_idx))
+            .map(|committee_id| {
+                let (l, r) = self.carnot_tree.child_committees(committee_id);
+                let extract_committee = |committee_id| {
                     self.carnot_tree
                         .committee_id_to_index
-                        .get(c)
+                        .get(committee_id)
                         .and_then(|committee_idx| {
                             self.carnot_tree.membership_committees.get(committee_idx)
                         })
-                        .map_or(vec![], |committee| vec![committee.clone()])
-                }
-                (Some(c1), Some(c2)) => {
-                    // Two child committees found.
-                    let committee1 =
-                        self.carnot_tree
-                            .committee_id_to_index
-                            .get(c1)
-                            .and_then(|committee_idx| {
-                                self.carnot_tree.membership_committees.get(committee_idx)
-                            });
-                    let committee2 =
-                        self.carnot_tree
-                            .committee_id_to_index
-                            .get(c2)
-                            .and_then(|committee_idx| {
-                                self.carnot_tree.membership_committees.get(committee_idx)
-                            });
-
-                    match (committee1, committee2) {
-                        (Some(committee1), Some(committee2)) => {
-                            vec![committee1.clone(), committee2.clone()]
-                        }
-                        (Some(committee), None) | (None, Some(committee)) => {
-                            vec![committee.clone()]
-                        }
-                        _ => vec![], // One or both committees not found
-                    }
-                }
-            }
-        } else {
-            // Return early if no committee index or id found.
-            vec![]
-        }
+                };
+                let l = l.and_then(extract_committee).into_iter().cloned();
+                let r = r.and_then(extract_committee).into_iter().cloned();
+                l.chain(r).collect()
+            })
+            .expect("NodeId not found in overlay")
     }
 
     fn leaf_committees(&self, _id: NodeId) -> Vec<Committee> {
