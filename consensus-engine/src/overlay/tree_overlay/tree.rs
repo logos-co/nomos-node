@@ -63,7 +63,7 @@ impl Tree {
 
         let hashes = committees
             .iter()
-            .map(|c| CommitteeId::new(c.hash::<blake2::Blake2b<digest::typenum::U32>>().into()))
+            .map(Committee::id::<blake2::Blake2b<digest::typenum::U32>>)
             .collect::<Vec<_>>();
         (hashes, committees.into_iter().enumerate().collect())
     }
