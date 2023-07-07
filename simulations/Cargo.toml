@@ -18,7 +18,7 @@ ctrlc = "3.4"
 chrono = { version = "0.4", features = ["serde"] }
 crc32fast = "1.3"
 crossbeam = { version = "0.8.2", features = ["crossbeam-channel"] }
-consensus-engine = { path = "../consensus-engine" }
+consensus-engine = { path = "../consensus-engine", features = ["simulation"] }
 fixed-slice-deque = "0.1.0-beta2"
 futures = "0.3"
 humantime = "2.1"
