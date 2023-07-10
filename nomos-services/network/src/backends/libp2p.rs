@@ -79,6 +79,29 @@ impl NetworkBackend for Libp2p {
                                 tracing::debug!("Got message with id: {id} from peer: {peer_id}");
                                 log_error!(events_tx.send(Event::Message(message)));
                             }
+                            SwarmEvent::ConnectionEstablished {
+                                peer_id,
+                                connection_id,
+                               ..
+                            } => {
+                                tracing::debug!("connected to peer: {peer_id} {connection_id:?}");
+                            }
+                            SwarmEvent::ConnectionClosed {
+                                peer_id,
+                                connection_id,
+                                cause,
+                                ..
+                            } => {
+                                tracing::debug!("connection closed from peer: {peer_id} {connection_id:?} due to {cause:?}");
+                            }
+                            SwarmEvent::OutgoingConnectionError {
+                                peer_id,
+                                connection_id,
+                                error,
+                                ..
+                            } => {
+                                tracing::debug!("failed to connect to peer: {peer_id:?} {connection_id:?} due to: {error}");
+                            }
                             _ => {}
                         }
                     }
