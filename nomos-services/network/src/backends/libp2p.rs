@@ -81,7 +81,6 @@ impl NetworkBackend for Libp2p {
                             }
                             _ => {}
                         }
-                        
                     }
                     Some(command) = commands_rx.recv() => {
                         match command {
@@ -97,7 +96,7 @@ impl NetworkBackend for Libp2p {
                                     Err(e) => {
                                         tracing::error!("failed to broadcast message to topic: {topic} {e:?}");
                                     }
-                                } 
+                                }
                             }
                             Command::Subscribe(topic) => {
                                 tracing::debug!("subscribing to topic: {topic}");
