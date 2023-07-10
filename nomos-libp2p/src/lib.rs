@@ -1,145 +1,186 @@
-pub mod command;
-pub mod event;
-mod swarm;
-
 use std::error::Error;
+use std::pin::Pin;
+use std::task::{Context, Poll};
 
-use command::Command;
-use event::Event;
-use libp2p::PeerId;
+use std::time::Duration;
+
+pub use libp2p;
+
+use libp2p::gossipsub::MessageId;
+pub use libp2p::{
+    core::upgrade,
+    gossipsub::{self, PublishError, SubscriptionError},
+    identity::{self, secp256k1},
+    plaintext::PlainText2Config,
+    swarm::{DialError, NetworkBehaviour, SwarmBuilder, SwarmEvent, THandlerErr},
+    tcp, yamux, PeerId, Transport,
+};
+pub use multiaddr::{multiaddr, Multiaddr, Protocol};
 use serde::{Deserialize, Serialize};
-use swarm::{Swarm, SwarmConfig};
-use tokio::sync::{broadcast, mpsc, oneshot};
 
-pub struct NomosLibp2p {
-    pub peer_id: PeerId,
-    command_tx: mpsc::Sender<Command>,
-    event_tx: broadcast::Sender<Event>,
+/// Wraps [`libp2p::Swarm`], and config it for use within Nomos.
+pub struct Swarm {
+    // A core libp2p swarm
+    swarm: libp2p::Swarm<Behaviour>,
+}
+
+#[derive(NetworkBehaviour)]
+pub struct Behaviour {
+    gossipsub: gossipsub::Behaviour,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct NomosLibp2pConfig {
-    pub swarm_config: SwarmConfig,
-    pub command_channel_size: usize,
-    pub event_channel_size: usize,
+pub struct SwarmConfig {
+    // Listening IPv4 address
+    pub host: std::net::Ipv4Addr,
+    // TCP listening port. Use 0 for random
+    pub port: u16,
+    // Secp256k1 private key in Hex format (`0x123...abc`). Default random
+    #[serde(with = "secret_key_serde")]
+    pub node_key: secp256k1::SecretKey,
 }
 
-impl Default for NomosLibp2pConfig {
+impl Default for SwarmConfig {
     fn default() -> Self {
         Self {
-            swarm_config: Default::default(),
-            command_channel_size: 16,
-            event_channel_size: 16,
+            host: std::net::Ipv4Addr::new(0, 0, 0, 0),
+            port: 60000,
+            node_key: secp256k1::SecretKey::generate(),
         }
     }
 }
 
-impl NomosLibp2p {
-    /// Builds a [`NomosLibp2p`], and spawns a libp2p swarm internally as an async task.
+#[derive(thiserror::Error, Debug)]
+pub enum SwarmError {
+    #[error("duplicate dialing")]
+    DuplicateDialing,
+}
+
+/// A timeout for the setup and protocol upgrade process for all in/outbound connections
+const TRANSPORT_TIMEOUT: Duration = Duration::from_secs(20);
+
+impl Swarm {
+    /// Builds a [`Swarm`] configured for use with Nomos on top of a tokio executor.
     //
     // TODO: define error types
-    pub fn new(
-        config: NomosLibp2pConfig,
-        runtime_handle: tokio::runtime::Handle,
-    ) -> Result<Self, Box<dyn Error>> {
-        let (command_tx, command_rx) = mpsc::channel::<Command>(config.command_channel_size);
-        let (event_tx, _) = broadcast::channel::<Event>(config.event_channel_size);
+    pub fn build(config: &SwarmConfig) -> Result<Self, Box<dyn Error>> {
+        let id_keys = identity::Keypair::from(secp256k1::Keypair::from(config.node_key.clone()));
+        let local_peer_id = PeerId::from(id_keys.public());
+        log::info!("libp2p peer_id:{}", local_peer_id);
 
-        let peer_id = Swarm::run(
-            &config.swarm_config,
-            runtime_handle,
-            command_rx,
-            event_tx.clone(),
+        // TODO: consider using noise authentication
+        let tcp_transport = tcp::tokio::Transport::new(tcp::Config::default().nodelay(true))
+            .upgrade(upgrade::Version::V1Lazy)
+            .authenticate(PlainText2Config {
+                local_public_key: id_keys.public(),
+            })
+            .multiplex(yamux::Config::default())
+            .timeout(TRANSPORT_TIMEOUT)
+            .boxed();
+
+        // TODO: consider using Signed or Anonymous.
+        //       For Anonymous, a custom `message_id` function need to be set
+        //       to prevent all messages from a peer being filtered as duplicates.
+        let gossipsub = gossipsub::Behaviour::new(
+            gossipsub::MessageAuthenticity::Author(local_peer_id),
+            gossipsub::ConfigBuilder::default()
+                .validation_mode(gossipsub::ValidationMode::None)
+                .build()?,
         )?;
 
-        Ok(Self {
-            peer_id,
-            command_tx,
-            event_tx,
-        })
+        let mut swarm = SwarmBuilder::with_tokio_executor(
+            tcp_transport,
+            Behaviour { gossipsub },
+            local_peer_id,
+        )
+        .build();
+
+        swarm.listen_on(multiaddr!(Ip4(config.host), Tcp(config.port)))?;
+
+        Ok(Swarm { swarm })
     }
 
-    /// Create a receiver for [`Event`] emitted from libp2p swarm
-    pub fn event_receiver(&self) -> broadcast::Receiver<Event> {
-        self.event_tx.subscribe()
+    /// Initiates a connection attempt to a peer
+    pub fn connect(&mut self, peer_id: PeerId, peer_addr: Multiaddr) -> Result<(), DialError> {
+        tracing::debug!("attempting to dial {peer_id}");
+        self.swarm.dial(peer_addr.with(Protocol::P2p(peer_id)))?;
+        Ok(())
     }
 
-    /// Schedule a [`Command`] to be executed by libp2p swarm and wait until the result is received.
-    pub async fn execute_command(
-        &self,
-        message: command::CommandMessage,
-    ) -> Result<(), Box<dyn Error>> {
-        let (result_tx, result_rx) = oneshot::channel();
-        self.command_tx
-            .clone()
-            .send(Command { message, result_tx })
-            .await?;
+    /// Subscribes to a topic
+    ///
+    /// Returns true if the topic is newly subscribed or false if already subscribed.
+    pub fn subscribe(&mut self, topic: &str) -> Result<bool, SubscriptionError> {
+        self.swarm
+            .behaviour_mut()
+            .gossipsub
+            .subscribe(&gossipsub::IdentTopic::new(topic))
+    }
 
-        result_rx.await?.map_err(|e| -> Box<dyn Error> { e })
+    pub fn broadcast(&mut self, topic: &str, message: Vec<u8>) -> Result<MessageId, PublishError> {
+        self.swarm
+            .behaviour_mut()
+            .gossipsub
+            .publish(gossipsub::IdentTopic::new(topic), message)
+    }
+
+    /// Unsubscribes from a topic
+    ///
+    /// Returns true if previously subscribed
+    pub fn unsubscribe(&mut self, topic: &str) -> Result<bool, PublishError> {
+        self.swarm
+            .behaviour_mut()
+            .gossipsub
+            .unsubscribe(&gossipsub::IdentTopic::new(topic))
+    }
+}
+
+impl futures::Stream for Swarm {
+    type Item = SwarmEvent<BehaviourEvent, THandlerErr<Behaviour>>;
+
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        Pin::new(&mut self.swarm).poll_next(cx)
+    }
+}
+
+mod secret_key_serde {
+    use libp2p::identity::secp256k1;
+    use serde::de::Error;
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
+    pub fn serialize<S>(key: &secp256k1::SecretKey, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let hex_str = hex::encode(key.to_bytes());
+        hex_str.serialize(serializer)
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<secp256k1::SecretKey, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let hex_str = String::deserialize(deserializer)?;
+        let mut key_bytes = hex::decode(hex_str).map_err(|e| D::Error::custom(format!("{e}")))?;
+        secp256k1::SecretKey::try_from_bytes(key_bytes.as_mut_slice())
+            .map_err(|e| D::Error::custom(format!("{e}")))
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::time::Duration;
-
-    use crate::command::CommandMessage;
-
     use super::*;
 
-    #[tokio::test]
-    async fn subscribe() {
-        env_logger::init();
+    #[test]
+    fn config_serde() {
+        let config: SwarmConfig = Default::default();
 
-        let config1 = NomosLibp2pConfig {
-            swarm_config: SwarmConfig {
-                port: 60000,
-                ..Default::default()
-            },
-            ..Default::default()
-        };
-        let node1 = NomosLibp2p::new(config1, tokio::runtime::Handle::current()).unwrap();
+        let serialized = serde_json::to_string(&config).unwrap();
+        println!("{serialized}");
 
-        let config2 = NomosLibp2pConfig {
-            swarm_config: SwarmConfig {
-                port: 60001,
-                ..Default::default()
-            },
-            ..Default::default()
-        };
-        let node2 = NomosLibp2p::new(config2, tokio::runtime::Handle::current()).unwrap();
-
-        assert!(node2
-            .execute_command(CommandMessage::Connect(
-                node1.peer_id,
-                "/ip4/127.0.0.1/tcp/60000".parse().unwrap()
-            ))
-            .await
-            .is_ok());
-
-        let topic = "topic1".to_string();
-        assert!(node2
-            .execute_command(CommandMessage::Subscribe(topic.clone()))
-            .await
-            .is_ok());
-
-        // Wait until the node2's subscription is propagated to the node1.
-        tokio::time::sleep(Duration::from_secs(3)).await;
-
-        let message = "hello".as_bytes().to_vec();
-        assert!(node1
-            .execute_command(CommandMessage::Broadcast {
-                topic: topic.clone(),
-                message: message.clone()
-            })
-            .await
-            .is_ok());
-
-        match node2.event_receiver().recv().await.unwrap() {
-            Event::Message(msg) => {
-                assert_eq!(msg.topic, libp2p::gossipsub::IdentTopic::new(topic).hash());
-                assert_eq!(msg.data, message);
-            }
-        }
+        let deserialized: SwarmConfig = serde_json::from_str(serialized.as_str()).unwrap();
+        assert_eq!(deserialized.host, config.host);
+        assert_eq!(deserialized.port, config.port);
+        assert_eq!(deserialized.node_key.to_bytes(), config.node_key.to_bytes());
     }
 }

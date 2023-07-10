@@ -21,6 +21,7 @@ serde = { version = "1.0.166", features = ["derive"] }
 hex = "0.4.3"
 log = "0.4.19"
 thiserror = "1.0.40"
+tracing = "0.1"
 
 [dev-dependencies]
 env_logger = "0.10.0"
