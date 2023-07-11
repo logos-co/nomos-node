@@ -180,7 +180,7 @@ impl Node for usize {
     }
 }
 
-pub trait NodeIdExt: From<usize> {
+pub trait NodeIdExt {
     fn index(&self) -> usize;
 
     fn from_index(idx: usize) -> Self;
