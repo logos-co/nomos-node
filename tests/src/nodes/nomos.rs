@@ -16,7 +16,7 @@ use nomos_network::{
 use nomos_node::Config;
 use waku_bindings::{Multiaddr, PeerId};
 // crates
-use fraction::{Fraction, One};
+use fraction::Fraction;
 use once_cell::sync::Lazy;
 use rand::Rng;
 use reqwest::Client;
@@ -144,7 +144,11 @@ impl Node for NomosNode {
 
     async fn spawn_nodes(config: SpawnConfig) -> Vec<Self> {
         match config {
-            SpawnConfig::Star { n_participants } => {
+            SpawnConfig::Star {
+                n_participants,
+                threshold,
+                timeout,
+            } => {
                 let mut ids = vec![[0; 32]; n_participants];
                 for id in &mut ids {
                     RNG.lock().unwrap().fill(id);
@@ -181,7 +185,12 @@ impl Node for NomosNode {
     }
 }
 
-fn create_node_config(nodes: Vec<NodeId>, private_key: [u8; 32]) -> Config {
+fn create_node_config(
+    nodes: Vec<NodeId>,
+    private_key: [u8; 32],
+    threshold: Fraction,
+    timeout: Duration,
+) -> Config {
     let mut config = Config {
         network: NetworkConfig {
             backend: WakuConfig {
@@ -198,8 +207,9 @@ fn create_node_config(nodes: Vec<NodeId>, private_key: [u8; 32]) -> Config {
                 // By setting the leader_threshold to 1 we ensure that all nodes come
                 // online before progressing. This is only necessary until we add a way
                 // to recover poast blocks from other nodes.
-                leader_super_majority_threshold: Some(Fraction::one()),
+                leader_super_majority_threshold: Some(threshold),
             },
+            timeout,
         },
         log: Default::default(),
         http: nomos_http::http::HttpServiceSettings {

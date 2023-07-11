@@ -231,7 +231,7 @@ impl NetworkBackend for Mock {
     type EventKind = EventKind;
     type NetworkEvent = NetworkEvent;
 
-    fn new(config: Self::Settings) -> Self {
+    fn new(config: Self::Settings, _: OverwatchHandle) -> Self {
         let message_event = broadcast::channel(BROADCAST_CHANNEL_BUF).0;
 
         Self {
@@ -299,6 +299,8 @@ impl NetworkBackend for Mock {
 
 #[cfg(test)]
 mod tests {
+    use tokio::sync::mpsc;
+
     use super::*;
 
     #[tokio::test]
@@ -332,7 +334,10 @@ mod tests {
             weights: None,
         };
 
-        let mock = Arc::new(Mock::new(config));
+        let mock = Arc::new(Mock::new(
+            config,
+            OverwatchHandle::new(tokio::runtime::Handle::current(), mpsc::channel(1).0),
+        ));
         // run producer
         let task = mock.clone();
         tokio::spawn(async move {
