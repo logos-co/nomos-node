@@ -202,7 +202,7 @@ mod tests {
 
         for tcase in test_cases.iter() {
             let nodes = (0..tcase.node_count)
-                .map(NodeId::from)
+                .map(NodeId::from_index)
                 .collect::<Vec<NodeId>>();
 
             let available_regions = vec![

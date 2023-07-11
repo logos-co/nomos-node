@@ -22,7 +22,7 @@ impl Default for FlatOverlay {
 
 impl Overlay for FlatOverlay {
     fn nodes(&self) -> Vec<NodeId> {
-        (0..10).map(NodeId::from).collect()
+        (0..10).map(NodeId::from_index).collect()
     }
 
     fn leaders<R: Rng>(

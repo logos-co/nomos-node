@@ -17,7 +17,7 @@ use serde::de::DeserializeOwned;
 use simulations::network::behaviour::create_behaviours;
 use simulations::network::regions::{create_regions, RegionsData};
 use simulations::network::{InMemoryNetworkInterface, Network};
-use simulations::node::{Node, NodeId};
+use simulations::node::{Node, NodeId, NodeIdExt};
 use simulations::output_processors::Record;
 use simulations::runner::SimulationRunnerHandle;
 use simulations::streaming::{
@@ -63,7 +63,7 @@ impl SimulationApp {
         });
         let mut rng = SmallRng::seed_from_u64(seed);
         let mut node_ids: Vec<NodeId> = (0..simulation_settings.node_count)
-            .map(NodeId::from)
+            .map(NodeId::from_index_index)
             .collect();
         node_ids.shuffle(&mut rng);
 

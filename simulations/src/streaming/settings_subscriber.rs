@@ -142,7 +142,7 @@ mod tests {
         };
 
         let nodes = (0..6)
-            .map(|idx| DummyStreamingNode::new(NodeId::from(idx), ()))
+            .map(|idx| DummyStreamingNode::new(NodeId::from_index(idx), ()))
             .collect::<Vec<_>>();
         let network = Network::new(RegionsData {
             regions: (0..6)
@@ -156,7 +156,7 @@ mod tests {
                         5 => Region::Australia,
                         _ => unreachable!(),
                     };
-                    (region, vec![NodeId::from(idx)])
+                    (region, vec![NodeId::from_index(idx)])
                 })
                 .collect(),
             node_region: (0..6)
@@ -170,7 +170,7 @@ mod tests {
                         5 => Region::Australia,
                         _ => unreachable!(),
                     };
-                    (NodeId::from(idx), region)
+                    (NodeId::from_index(idx), region)
                 })
                 .collect(),
             region_network_behaviour: (0..6)
