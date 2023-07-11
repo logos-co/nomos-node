@@ -298,6 +298,7 @@ where
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     async fn process_carnot_event(
         mut carnot: Carnot<O>,
         event: Event<P::Tx>,
