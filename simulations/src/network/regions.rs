@@ -160,9 +160,12 @@ mod tests {
     use consensus_engine::NodeId;
     use rand::rngs::mock::StepRng;
 
-    use crate::network::{
-        regions::{create_regions, Region},
-        NetworkSettings,
+    use crate::{
+        network::{
+            regions::{create_regions, Region},
+            NetworkSettings,
+        },
+        node::NodeIdExt,
     };
 
     #[test]

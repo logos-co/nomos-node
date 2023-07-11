@@ -118,7 +118,7 @@ mod tests {
             regions::{Region, RegionsData},
             Network, NetworkBehaviourKey,
         },
-        node::{dummy_streaming::DummyStreamingNode, Node, NodeId},
+        node::{dummy_streaming::DummyStreamingNode, Node, NodeId, NodeIdExt},
         output_processors::OutData,
         runner::SimulationRunner,
         warding::SimulationState,

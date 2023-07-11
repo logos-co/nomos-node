@@ -444,7 +444,7 @@ mod tests {
         },
         node::{
             dummy::{get_child_nodes, get_parent_nodes, get_roles, DummyRole},
-            Node, NodeId, OverlayState, SharedState, SimulationOverlay, ViewOverlay,
+            Node, NodeId, NodeIdExt, OverlayState, SharedState, SimulationOverlay, ViewOverlay,
         },
         overlay::{
             tree::{TreeOverlay, TreeSettings},

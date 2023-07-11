@@ -75,7 +75,7 @@ mod tests {
         },
         node::{
             dummy::{DummyMessage, DummyNode},
-            Node, NodeId, OverlayState, SharedState, ViewOverlay,
+            Node, NodeId, NodeIdExt, OverlayState, SharedState, ViewOverlay,
         },
         output_processors::OutData,
         overlay::{tree::TreeOverlay, Overlay, SimulationOverlay},

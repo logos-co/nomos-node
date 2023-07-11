@@ -324,7 +324,10 @@ mod tests {
         regions::{Region, RegionsData},
         Network, NetworkInterface, NetworkMessage,
     };
-    use crate::{network::NetworkBehaviourKey, node::NodeId};
+    use crate::{
+        network::NetworkBehaviourKey,
+        node::{NodeId, NodeIdExt},
+    };
     use crossbeam::channel::{self, Receiver, Sender};
     use std::{collections::HashMap, time::Duration};
 
