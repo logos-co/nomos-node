@@ -197,7 +197,7 @@ impl NodeIdExt for NodeId {
 
     fn from_index(idx: usize) -> Self {
         let mut bytes = [0u8; 32];
-        bytes[..core::mem::size_of::<usize>()].copy_from_slice(&id.to_be_bytes());
+        bytes[..core::mem::size_of::<usize>()].copy_from_slice(&idx.to_be_bytes());
         NodeId::new(bytes)
     }
 }
