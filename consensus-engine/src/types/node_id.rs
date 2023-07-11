@@ -10,16 +10,7 @@ impl NodeId {
 
     /// Returns a random node id
     #[cfg(any(test, feature = "simulation"))]
-    pub fn random() -> Self {
-        use rand::RngCore;
-        let mut rng = rand::thread_rng();
-        let mut bytes = [0u8; 32];
-        rng.fill_bytes(&mut bytes);
-        Self(bytes)
-    }
-
-    #[cfg(any(test, feature = "simulation"))]
-    pub fn random_with(rng: &mut impl rand::Rng) -> Self {
+    pub fn random(rng: &mut impl rand::Rng) -> Self {
         let mut bytes = [0u8; 32];
         rng.fill_bytes(&mut bytes);
         Self(bytes)
