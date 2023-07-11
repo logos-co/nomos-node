@@ -46,8 +46,11 @@ use overwatch_rs::services::{
     ServiceCore, ServiceData, ServiceId,
 };
 
-// TODO: tale this from config
-const TIMEOUT: Duration = Duration::from_secs(60);
+const DEFAULT_TIMEOUT: Duration = Duration::from_secs(30);
+
+fn default_timeout() -> Duration {
+    DEFAULT_TIMEOUT
+}
 
 // Raw bytes for now, could be a ed25519 public key
 pub type NodeId = PublicKey;
@@ -59,6 +62,8 @@ pub struct CarnotSettings<Fountain: FountainCode, O: Overlay> {
     pub private_key: [u8; 32],
     pub fountain_settings: Fountain::Settings,
     pub overlay_settings: O::Settings,
+    #[serde(default = "default_timeout")]
+    pub timeout: Duration,
 }
 
 impl<Fountain: FountainCode, O: Overlay> Clone for CarnotSettings<Fountain, O> {
@@ -67,6 +72,7 @@ impl<Fountain: FountainCode, O: Overlay> Clone for CarnotSettings<Fountain, O> {
             private_key: self.private_key,
             fountain_settings: self.fountain_settings.clone(),
             overlay_settings: self.overlay_settings.clone(),
+            timeout: self.timeout,
         }
     }
 }
@@ -77,11 +83,13 @@ impl<Fountain: FountainCode, O: Overlay> CarnotSettings<Fountain, O> {
         private_key: [u8; 32],
         fountain_settings: Fountain::Settings,
         overlay_settings: O::Settings,
+        timeout: Duration,
     ) -> Self {
         Self {
             private_key,
             fountain_settings,
             overlay_settings,
+            timeout,
         }
     }
 }
@@ -166,6 +174,7 @@ where
             private_key,
             fountain_settings,
             overlay_settings,
+            timeout,
         } = self.service_state.settings_reader.get_updated_settings();
 
         let overlay = O::new(overlay_settings);
@@ -198,6 +207,7 @@ where
             genesis_block.view - 1,
             &mut task_manager,
             adapter.clone(),
+            timeout,
         )
         .await;
         // we already have the genesis block, no need to wait for it
@@ -236,6 +246,7 @@ where
                             private_key,
                             mempool_relay.clone(),
                             &fountain,
+                            timeout,
                         )
                         .await
                     }
@@ -287,6 +298,7 @@ where
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     async fn process_carnot_event(
         mut carnot: Carnot<O>,
         event: Event<P::Tx>,
@@ -295,6 +307,7 @@ where
         private_key: PrivateKey,
         mempool_relay: OutboundRelay<MempoolMsg<P::Tx>>,
         fountain: &F,
+        timeout: Duration,
     ) -> Carnot<O> {
         let mut output = None;
         let prev_view = carnot.current_view();
@@ -316,7 +329,7 @@ where
                 output = out.map(Output::Send);
                 // keep timeout until the situation is resolved
                 task_manager.push(view, async move {
-                    tokio::time::sleep(TIMEOUT).await;
+                    tokio::time::sleep(timeout).await;
                     Event::LocalTimeout { view }
                 });
             }
@@ -349,8 +362,14 @@ where
 
         let current_view = carnot.current_view();
         if current_view != prev_view {
-            Self::process_view_change(carnot.clone(), prev_view, task_manager, adapter.clone())
-                .await;
+            Self::process_view_change(
+                carnot.clone(),
+                prev_view,
+                task_manager,
+                adapter.clone(),
+                timeout,
+            )
+            .await;
         }
 
         if let Some(output) = output {
@@ -369,6 +388,11 @@ where
         adapter: A,
     ) -> (Carnot<O>, Option<Output<P::Tx>>) {
         tracing::debug!("received proposal {:?}", block);
+        if carnot.highest_voted_view() >= block.header().view {
+            tracing::debug!("already voted for view {}", block.header().view);
+            return (carnot, None);
+        }
+
         let original_block = block;
         let block = original_block.header().clone();
         let self_committee = carnot.self_committee();
@@ -498,8 +522,18 @@ where
         carnot: Carnot<O>,
         timeouts: HashSet<Timeout>,
     ) -> (Carnot<O>, Option<Output<P::Tx>>) {
-        // TODO: filter timeouts upon reception
-        assert!(timeouts.iter().all(|t| t.view == carnot.current_view()));
+        // we might have received a timeout_qc sent by some other node and advanced the view
+        // already, in which case we should ignore the timeout
+        if carnot.current_view() != timeouts.iter().map(|t| t.view).max().unwrap_or(0) {
+            return (carnot, None);
+        }
+
+        assert!(
+            timeouts.iter().all(|t| t.view == carnot.current_view()),
+            "{:?} {}",
+            timeouts.iter().collect::<Vec<_>>(),
+            carnot.current_view(),
+        );
         let high_qc = timeouts
             .iter()
             .map(|t| &t.high_qc)
@@ -548,6 +582,7 @@ where
         prev_view: View,
         task_manager: &mut TaskManager<View, Event<P::Tx>>,
         adapter: A,
+        timeout: Duration,
     ) {
         let current_view = carnot.current_view();
         // First we cancel previous processing view tasks
@@ -555,7 +590,7 @@ where
         tracing::debug!("Advanced view from {prev_view} to {current_view}");
         // View change!
         task_manager.push(current_view, async move {
-            tokio::time::sleep(TIMEOUT).await;
+            tokio::time::sleep(timeout).await;
             Event::LocalTimeout { view: current_view }
         });
         task_manager.push(
