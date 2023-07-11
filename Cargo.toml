@@ -1,6 +1,7 @@
 [workspace]
 members = [
     "nomos-core",
+    "nomos-libp2p",
     "nomos-services/log",
     "nomos-services/metrics",
     "nomos-services/network",
