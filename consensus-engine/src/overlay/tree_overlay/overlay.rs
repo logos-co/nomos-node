@@ -206,7 +206,7 @@ mod tests {
 
     #[test]
     fn test_carnot_overlay_leader() {
-        let nodes: Vec<_> = (0..10).map(|i| [i as u8; 32].into()).collect();
+        let nodes: Vec<_> = (0..10).map(|i| NodeId::new([i as u8; 32])).collect();
         let overlay = TreeOverlay::new(TreeOverlaySettings {
             nodes: nodes.clone(),
             current_leader: nodes[0],
@@ -220,7 +220,7 @@ mod tests {
 
     #[test]
     fn test_next_leader_is_advance_current_leader() {
-        let nodes: Vec<_> = (0..10).map(|i| [i as u8; 32].into()).collect();
+        let nodes: Vec<_> = (0..10).map(|i| NodeId::new([i as u8; 32])).collect();
         let mut overlay = TreeOverlay::new(TreeOverlaySettings {
             nodes: nodes.clone(),
             current_leader: nodes[0],
@@ -237,7 +237,7 @@ mod tests {
 
     #[test]
     fn test_root_committee() {
-        let nodes: Vec<_> = (0..10).map(|i| [i as u8; 32].into()).collect();
+        let nodes: Vec<_> = (0..10).map(|i| NodeId::new([i as u8; 32])).collect();
         let overlay = TreeOverlay::new(TreeOverlaySettings {
             current_leader: nodes[0],
             nodes,
@@ -255,7 +255,7 @@ mod tests {
 
     #[test]
     fn test_leaf_committees() {
-        let nodes: Vec<_> = (0..10).map(|i| [i as u8; 32].into()).collect();
+        let nodes: Vec<_> = (0..10).map(|i| NodeId::new([i as u8; 32])).collect();
         let overlay = TreeOverlay::new(TreeOverlaySettings {
             current_leader: nodes[0],
             nodes,
@@ -285,7 +285,7 @@ mod tests {
 
     #[test]
     fn test_super_majority_threshold_for_leaf() {
-        let nodes: Vec<_> = (0..10).map(|i| [i as u8; 32].into()).collect();
+        let nodes: Vec<_> = (0..10).map(|i| NodeId::new([i as u8; 32])).collect();
         let overlay = TreeOverlay::new(TreeOverlaySettings {
             current_leader: nodes[0],
             nodes,
@@ -299,7 +299,7 @@ mod tests {
 
     #[test]
     fn test_super_majority_threshold_for_root_member() {
-        let nodes: Vec<_> = (0..10).map(|i| [i as u8; 32].into()).collect();
+        let nodes: Vec<_> = (0..10).map(|i| NodeId::new([i as u8; 32])).collect();
         let overlay = TreeOverlay::new(TreeOverlaySettings {
             current_leader: nodes[0],
             nodes,
@@ -313,7 +313,7 @@ mod tests {
 
     #[test]
     fn test_leader_super_majority_threshold() {
-        let nodes: Vec<_> = (0..10).map(|i| [i as u8; 32].into()).collect();
+        let nodes: Vec<_> = (0..10).map(|i| NodeId::new([i as u8; 32])).collect();
         let overlay = TreeOverlay::new(TreeOverlaySettings {
             nodes: nodes.clone(),
             current_leader: nodes[0],

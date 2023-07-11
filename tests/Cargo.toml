@@ -31,6 +31,10 @@ fraction = "0.13"
 name = "test_consensus_happy_path"
 path = "src/tests/happy.rs"
 
+[[test]]
+name = "test_consensus_unhappy_path"
+path = "src/tests/unhappy.rs"
+
 
 [features]
 metrics = ["nomos-node/metrics"]

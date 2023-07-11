@@ -324,7 +324,10 @@ mod tests {
         regions::{Region, RegionsData},
         Network, NetworkInterface, NetworkMessage,
     };
-    use crate::{network::NetworkBehaviourKey, node::NodeId};
+    use crate::{
+        network::NetworkBehaviourKey,
+        node::{NodeId, NodeIdExt},
+    };
     use crossbeam::channel::{self, Receiver, Sender};
     use std::{collections::HashMap, time::Duration};
 
@@ -368,8 +371,8 @@ mod tests {
 
     #[test]
     fn send_receive_messages() {
-        let node_a = NodeId::from(0);
-        let node_b = NodeId::from(1);
+        let node_a = NodeId::from_index(0);
+        let node_b = NodeId::from_index(1);
 
         let regions = HashMap::from([(Region::Europe, vec![node_a, node_b])]);
         let behaviour = HashMap::from([(
@@ -417,9 +420,9 @@ mod tests {
 
     #[test]
     fn regions_send_receive_messages() {
-        let node_a = NodeId::from(0);
-        let node_b = NodeId::from(1);
-        let node_c = NodeId::from(2);
+        let node_a = NodeId::from_index(0);
+        let node_b = NodeId::from_index(1);
+        let node_c = NodeId::from_index(2);
 
         let regions = HashMap::from([
             (Region::Asia, vec![node_a, node_b]),

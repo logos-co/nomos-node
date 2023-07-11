@@ -150,7 +150,7 @@ mod tests {
 
     #[test]
     fn test_carnot_tree_parenting() {
-        let nodes: Vec<_> = (0..10).map(|i| [i as u8; 32].into()).collect();
+        let nodes: Vec<_> = (0..10).map(|i| NodeId::new([i as u8; 32])).collect();
         let tree = Tree::new(&nodes, 3);
 
         let root = &tree.inner_committees[0];
@@ -163,7 +163,7 @@ mod tests {
 
     #[test]
     fn test_carnot_tree_root_parenting() {
-        let nodes: Vec<_> = (0..10).map(|i| [i as u8; 32].into()).collect();
+        let nodes: Vec<_> = (0..10).map(|i| NodeId::new([i as u8; 32])).collect();
         let tree = Tree::new(&nodes, 3);
 
         let root = &tree.inner_committees[0];
@@ -173,7 +173,7 @@ mod tests {
 
     #[test]
     fn test_carnot_tree_childs() {
-        let nodes: Vec<_> = (0..10).map(|i| [i as u8; 32].into()).collect();
+        let nodes: Vec<_> = (0..10).map(|i| NodeId::new([i as u8; 32])).collect();
         let tree = Tree::new(&nodes, 3);
 
         let root = &tree.inner_committees[0];

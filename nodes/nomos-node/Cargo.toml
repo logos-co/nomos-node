@@ -18,15 +18,23 @@ overwatch-derive = { git = "https://github.com/logos-co/Overwatch", branch = "ma
 tracing = "0.1"
 multiaddr = "0.17"
 nomos-core = { path = "../../nomos-core" }
-nomos-network = { path = "../../nomos-services/network", features = ["waku"] }
+nomos-network = { path = "../../nomos-services/network", features = [
+  "waku",
+  "libp2p",
+] }
 nomos-log = { path = "../../nomos-services/log" }
-nomos-mempool = { path = "../../nomos-services/mempool", features = ["waku", "mock"] }
+nomos-mempool = { path = "../../nomos-services/mempool", features = [
+  "waku",
+  "mock",
+] }
 nomos-http = { path = "../../nomos-services/http", features = ["http"] }
-nomos-consensus = { path = "../../nomos-services/consensus", features = ["waku"] }
+nomos-consensus = { path = "../../nomos-services/consensus", features = [
+  "waku",
+] }
 metrics = { path = "../../nomos-services/metrics", optional = true }
 tracing-subscriber = "0.3"
 consensus-engine = { path = "../../consensus-engine" }
-tokio = {version = "1.24", features = ["sync"] }
+tokio = { version = "1.24", features = ["sync"] }
 serde_json = "1.0"
 serde_yaml = "0.9"
 color-eyre = "0.6.0"

@@ -160,9 +160,12 @@ mod tests {
     use consensus_engine::NodeId;
     use rand::rngs::mock::StepRng;
 
-    use crate::network::{
-        regions::{create_regions, Region},
-        NetworkSettings,
+    use crate::{
+        network::{
+            regions::{create_regions, Region},
+            NetworkSettings,
+        },
+        node::NodeIdExt,
     };
 
     #[test]
@@ -202,7 +205,7 @@ mod tests {
 
         for tcase in test_cases.iter() {
             let nodes = (0..tcase.node_count)
-                .map(NodeId::from)
+                .map(NodeId::from_index)
                 .collect::<Vec<NodeId>>();
 
             let available_regions = vec![

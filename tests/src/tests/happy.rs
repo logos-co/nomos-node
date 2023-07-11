@@ -1,6 +1,8 @@
 use consensus_engine::View;
+use fraction::{Fraction, One};
 use futures::stream::{self, StreamExt};
 use std::collections::HashSet;
+use std::time::Duration;
 use tests::{Node, NomosNode, SpawnConfig};
 
 const TARGET_VIEW: View = View::new(20);
@@ -46,12 +48,22 @@ async fn happy_test(nodes: Vec<NomosNode>) {
 
 #[tokio::test]
 async fn two_nodes_happy() {
-    let nodes = NomosNode::spawn_nodes(SpawnConfig::Star { n_participants: 2 }).await;
+    let nodes = NomosNode::spawn_nodes(SpawnConfig::Star {
+        n_participants: 2,
+        threshold: Fraction::one(),
+        timeout: Duration::from_secs(10),
+    })
+    .await;
     happy_test(nodes).await;
 }
 
 #[tokio::test]
 async fn ten_nodes_happy() {
-    let nodes = NomosNode::spawn_nodes(SpawnConfig::Star { n_participants: 10 }).await;
+    let nodes = NomosNode::spawn_nodes(SpawnConfig::Star {
+        n_participants: 10,
+        threshold: Fraction::one(),
+        timeout: Duration::from_secs(10),
+    })
+    .await;
     happy_test(nodes).await;
 }
