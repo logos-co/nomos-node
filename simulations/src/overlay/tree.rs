@@ -1,6 +1,6 @@
 // std
-use std::collections::HashMap;
 use consensus_engine::NodeId;
+use std::collections::HashMap;
 // crates
 use rand::seq::IteratorRandom;
 use serde::{Deserialize, Serialize};

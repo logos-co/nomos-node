@@ -17,37 +17,12 @@ impl NodeId {
         rng.fill_bytes(&mut bytes);
         Self(bytes)
     }
-}
 
-impl From<[u8; 32]> for NodeId {
-    fn from(id: [u8; 32]) -> Self {
-        Self(id)
-    }
-}
-
-impl From<&[u8; 32]> for NodeId {
-    fn from(id: &[u8; 32]) -> Self {
-        Self(*id)
-    }
-}
-
-impl From<NodeId> for [u8; 32] {
-    fn from(id: NodeId) -> Self {
-        id.0
-    }
-}
-
-impl From<super::CommitteeId> for NodeId {
-    /// A node id should be able to built from committee id
-    fn from(id: super::CommitteeId) -> Self {
-        Self(id.into())
-    }
-}
-
-impl From<&super::CommitteeId> for NodeId {
-    /// A node id should be able to built from committee id
-    fn from(id: &super::CommitteeId) -> Self {
-        Self((*id).into())
+    #[cfg(any(test, feature = "simulation"))]
+    pub fn random_with(rng: &mut impl rand::Rng) -> Self {
+        let mut bytes = [0u8; 32];
+        rng.fill_bytes(&mut bytes);
+        Self(bytes)
     }
 }
 

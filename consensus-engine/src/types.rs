@@ -233,7 +233,7 @@ mod test {
         assert_eq!(timeout_qc.view(), 2);
         assert_eq!(timeout_qc.high_qc().view, 1);
         assert_eq!(timeout_qc.high_qc().id, [0; 32]);
-        assert_eq!(timeout_qc.sender(), [0; 32].into());
+        assert_eq!(timeout_qc.sender(), NodeId::new([0; 32]));
 
         let timeout_qc = TimeoutQc::new(
             2,
