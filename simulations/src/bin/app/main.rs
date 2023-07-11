@@ -63,7 +63,7 @@ impl SimulationApp {
         });
         let mut rng = SmallRng::seed_from_u64(seed);
         let mut node_ids: Vec<NodeId> = (0..simulation_settings.node_count)
-            .map(NodeId::from_index_index)
+            .map(NodeId::from_index)
             .collect();
         node_ids.shuffle(&mut rng);
 
