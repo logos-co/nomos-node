@@ -60,7 +60,6 @@ impl From<&super::CommitteeId> for NodeId {
     }
 }
 
-
 #[cfg(any(test, feature = "simulation"))]
 impl From<usize> for NodeId {
     /// A convienient way to build a node id from an index
@@ -68,7 +67,7 @@ impl From<usize> for NodeId {
     /// The format is:
     ///
     /// `[0..size of usize]`: node index in big endian
-    /// 
+    ///
     /// `[size of usize..32]`: zeros
     fn from(id: usize) -> Self {
         let mut bytes = [0u8; 32];
