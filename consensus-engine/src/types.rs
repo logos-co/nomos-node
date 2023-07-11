@@ -117,7 +117,7 @@ impl Block {
 
     pub fn genesis() -> Self {
         Self {
-            id: BlockId::genesis(),
+            id: BlockId::zeros(),
             view: 0,
             parent_qc: Qc::Standard(StandardQc::genesis()),
             leader_proof: LeaderProof::LeaderId {
@@ -145,7 +145,7 @@ impl StandardQc {
     pub fn genesis() -> Self {
         Self {
             view: -1,
-            id: BlockId::genesis(),
+            id: BlockId::zeros(),
         }
     }
 }
@@ -198,7 +198,7 @@ mod test {
     fn standard_qc() {
         let standard_qc = StandardQc {
             view: 10,
-            id: BlockId::genesis(),
+            id: BlockId::zeros(),
         };
         let qc = Qc::Standard(standard_qc.clone());
         assert_eq!(qc.view(), 10);
@@ -212,7 +212,7 @@ mod test {
             view: 20,
             high_qc: StandardQc {
                 view: 10,
-                id: BlockId::genesis(),
+                id: BlockId::zeros(),
             },
         };
         let qc = Qc::Aggregated(aggregated_qc.clone());
@@ -227,7 +227,7 @@ mod test {
             2,
             StandardQc {
                 view: 1,
-                id: BlockId::genesis(),
+                id: BlockId::zeros(),
             },
             NodeId::new([0; 32]),
         );
@@ -240,7 +240,7 @@ mod test {
             2,
             StandardQc {
                 view: 2,
-                id: BlockId::genesis(),
+                id: BlockId::zeros(),
             },
             NodeId::new([0; 32]),
         );
@@ -259,7 +259,7 @@ mod test {
             1,
             StandardQc {
                 view: 2,
-                id: BlockId::genesis(),
+                id: BlockId::zeros(),
             },
             NodeId::new([0; 32]),
         );

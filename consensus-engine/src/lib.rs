@@ -406,7 +406,7 @@ mod test {
             *nodes.first().unwrap(),
             Block {
                 view: 0,
-                id: BlockId::genesis(),
+                id: BlockId::zeros(),
                 parent_qc: Qc::Standard(StandardQc::genesis()),
                 leader_proof: LeaderProof::LeaderId {
                     leader_id: *nodes.first().unwrap(),
@@ -696,7 +696,7 @@ mod test {
                     sender: NodeId::new([0; 32]),
                     high_qc: StandardQc {
                         view: 0, // genesis
-                        id: BlockId::genesis(),
+                        id: BlockId::zeros(),
                     },
                     timeout_qc: None
                 }),
@@ -719,7 +719,7 @@ mod test {
             1,
             StandardQc {
                 view: 0, // genesis
-                id: BlockId::genesis(),
+                id: BlockId::zeros(),
             },
             NodeId::new([0; 32]),
         );
@@ -744,7 +744,7 @@ mod test {
             1,
             StandardQc {
                 view: 0, // genesis
-                id: BlockId::genesis(),
+                id: BlockId::zeros(),
             },
             NodeId::new([0; 32]),
         );
@@ -771,7 +771,7 @@ mod test {
             1,
             StandardQc {
                 view: 0, // genesis
-                id: BlockId::genesis(),
+                id: BlockId::zeros(),
             },
             NodeId::new([0; 32]),
         );
@@ -813,7 +813,7 @@ mod test {
             1,
             StandardQc {
                 view: 0, // genesis
-                id: BlockId::genesis(),
+                id: BlockId::zeros(),
             },
             NodeId::new([0; 32]),
         );
@@ -826,7 +826,7 @@ mod test {
             2,
             StandardQc {
                 view: 0, // genesis
-                id: BlockId::genesis(),
+                id: BlockId::zeros(),
             },
             NodeId::new([0; 32]),
         );

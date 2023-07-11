@@ -4,19 +4,16 @@
 pub struct BlockId(pub(crate) [u8; 32]);
 
 impl BlockId {
-    #[inline]
     pub const fn new(val: [u8; 32]) -> Self {
         Self(val)
     }
 
-    #[inline]
-    pub const fn genesis() -> Self {
+    pub const fn zeros() -> Self {
         Self([0; 32])
     }
 
     /// Returns a random block id
     #[cfg(any(test, feature = "simulation"))]
-    #[inline]
     pub fn random() -> Self {
         use rand::RngCore;
         let mut rng = rand::thread_rng();
