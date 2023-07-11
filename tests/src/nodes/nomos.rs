@@ -155,7 +155,7 @@ impl Node for NomosNode {
                 }
                 let mut configs = ids
                     .iter()
-                    .map(|id| create_node_config(ids.iter().map(From::from).collect(), *id))
+                    .map(|id| create_node_config(ids.iter().map(From::from).collect(), *id, threshold, timeout))
                     .collect::<Vec<_>>();
                 let mut nodes = vec![Self::spawn(configs.swap_remove(0)).await];
                 let listening_addr = nodes[0].get_listening_address().await;
