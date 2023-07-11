@@ -12,7 +12,7 @@ impl BlockId {
         Self([0; 32])
     }
 
-    /// Returns a random block id
+    /// Returns a random block id, only avaliable with feature `simulation` or test
     #[cfg(any(test, feature = "simulation"))]
     pub fn random() -> Self {
         use rand::RngCore;
