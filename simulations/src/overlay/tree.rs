@@ -1,11 +1,12 @@
 // std
+use consensus_engine::NodeId;
 use std::collections::HashMap;
 // crates
 use rand::seq::IteratorRandom;
 use serde::{Deserialize, Serialize};
 // internal
 use super::{Committee, Layout, Overlay};
-use crate::node::{CommitteeId, NodeId};
+use crate::node::{CommitteeId, NodeIdExt};
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub enum TreeType {
@@ -105,7 +106,7 @@ impl TreeOverlay {
 impl Overlay for TreeOverlay {
     fn nodes(&self) -> Vec<NodeId> {
         let properties = get_tree_properties(&self.settings);
-        (0..properties.node_count).map(NodeId::from).collect()
+        (0..properties.node_count).map(NodeId::from_index).collect()
     }
 
     fn leaders<R: rand::Rng>(
@@ -225,13 +226,13 @@ mod tests {
 
         let root_nodes = &layout.committees[&CommitteeId::new(0)].nodes;
         assert_eq!(root_nodes.len(), 10);
-        assert_eq!(root_nodes.first(), Some(&NodeId::from(0)));
-        assert_eq!(root_nodes.last(), Some(&NodeId::from(9)));
+        assert_eq!(root_nodes.first(), Some(&NodeId::from_index(0)));
+        assert_eq!(root_nodes.last(), Some(&NodeId::from_index(9)));
 
         let last_nodes = &layout.committees[&CommitteeId::new(1022)].nodes;
         assert_eq!(last_nodes.len(), 10);
-        assert_eq!(last_nodes.first(), Some(&NodeId::from(10220)));
-        assert_eq!(last_nodes.last(), Some(&NodeId::from(10229)));
+        assert_eq!(last_nodes.first(), Some(&NodeId::from_index(10220)));
+        assert_eq!(last_nodes.last(), Some(&NodeId::from_index(10229)));
     }
 
     #[test]

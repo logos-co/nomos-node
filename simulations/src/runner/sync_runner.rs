@@ -75,7 +75,7 @@ mod tests {
         },
         node::{
             dummy::{DummyMessage, DummyNode},
-            Node, NodeId, OverlayState, SharedState, ViewOverlay,
+            Node, NodeId, NodeIdExt, OverlayState, SharedState, ViewOverlay,
         },
         output_processors::OutData,
         overlay::{tree::TreeOverlay, Overlay, SimulationOverlay},
@@ -130,7 +130,7 @@ mod tests {
         };
 
         let mut rng = StepRng::new(1, 0);
-        let node_ids: Vec<NodeId> = (0..settings.node_count).map(NodeId::from).collect();
+        let node_ids: Vec<NodeId> = (0..settings.node_count).map(NodeId::from_index).collect();
         let overlay = TreeOverlay::new(settings.overlay_settings.clone().try_into().unwrap());
         let mut network = init_network(&node_ids);
         let view = ViewOverlay {
@@ -165,7 +165,7 @@ mod tests {
         };
 
         let mut rng = StepRng::new(1, 0);
-        let node_ids: Vec<NodeId> = (0..settings.node_count).map(NodeId::from).collect();
+        let node_ids: Vec<NodeId> = (0..settings.node_count).map(NodeId::from_index).collect();
         let overlay = TreeOverlay::new(settings.overlay_settings.clone().try_into().unwrap());
         let mut network = init_network(&node_ids);
         let view = ViewOverlay {

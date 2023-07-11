@@ -1,4 +1,4 @@
-use crate::node::{Node, NodeId};
+use crate::node::{Node, NodeId, NodeIdExt};
 use crate::output_processors::Record;
 use crate::runner::SimulationRunner;
 use crate::warding::SimulationState;
@@ -37,7 +37,8 @@ where
 
     let mut inner_runner = runner.inner;
     let nodes = runner.nodes;
-    let nodes_remaining: BTreeSet<NodeId> = (0..nodes.read().len()).map(NodeId::from).collect();
+    let nodes_remaining: BTreeSet<NodeId> =
+        (0..nodes.read().len()).map(NodeId::from_index).collect();
     let iterations: Vec<_> = (0..maximum_iterations).collect();
     let (stop_tx, stop_rx) = bounded(1);
     let p = runner.producer.clone();

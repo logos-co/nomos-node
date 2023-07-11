@@ -1,12 +1,17 @@
 mod nodes;
-
 pub use nodes::NomosNode;
-use once_cell::sync::Lazy;
-use rand::SeedableRng;
-use rand_xoshiro::Xoshiro256PlusPlus;
+
+// std
 use std::fmt::Debug;
 use std::net::TcpListener;
 use std::sync::Mutex;
+use std::time::Duration;
+
+//crates
+use fraction::Fraction;
+use once_cell::sync::Lazy;
+use rand::SeedableRng;
+use rand_xoshiro::Xoshiro256PlusPlus;
 
 static RNG: Lazy<Mutex<Xoshiro256PlusPlus>> =
     Lazy::new(|| Mutex::new(Xoshiro256PlusPlus::seed_from_u64(42)));
@@ -32,5 +37,9 @@ pub trait Node: Sized {
 
 #[derive(Clone, Copy)]
 pub enum SpawnConfig {
-    Star { n_participants: usize },
+    Star {
+        n_participants: usize,
+        threshold: Fraction,
+        timeout: Duration,
+    },
 }
