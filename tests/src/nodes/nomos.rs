@@ -157,7 +157,7 @@ impl Node for NomosNode {
                     .iter()
                     .map(|id| {
                         create_node_config(
-                            ids.iter().map(From::from).collect(),
+                            ids.iter().copied().map(NodeId::new).collect(),
                             *id,
                             threshold,
                             timeout,
