@@ -42,7 +42,7 @@ impl ReferenceStateMachine for RefState {
     fn init_state() -> BoxedStrategy<Self::State> {
         let genesis_block = Block {
             view: View::new(0),
-            id: BlockId::genesis(),
+            id: BlockId::zeros(),
             parent_qc: Qc::Standard(StandardQc::genesis()),
             leader_proof: LEADER_PROOF.clone(),
         };

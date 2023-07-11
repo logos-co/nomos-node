@@ -22,7 +22,7 @@ impl ConsensusEngineTest {
             NodeId::new([0; 32]),
             Block {
                 view: View::new(0),
-                id: BlockId::genesis(),
+                id: BlockId::zeros(),
                 parent_qc: Qc::Standard(StandardQc::genesis()),
                 leader_proof: LeaderProof::LeaderId {
                     leader_id: NodeId::new([0; 32]),

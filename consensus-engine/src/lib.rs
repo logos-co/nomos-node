@@ -407,7 +407,7 @@ mod test {
             *nodes.first().unwrap(),
             Block {
                 view: View(0),
-                id: BlockId::genesis(),
+                id: BlockId::zeros(),
                 parent_qc: Qc::Standard(StandardQc::genesis()),
                 leader_proof: LeaderProof::LeaderId {
                     leader_id: *nodes.first().unwrap(),
@@ -697,7 +697,7 @@ mod test {
                     sender: NodeId::new([0; 32]),
                     high_qc: StandardQc {
                         view: View(0), // genesis
-                        id: BlockId::genesis(),
+                        id: BlockId::zeros(),
                     },
                     timeout_qc: None
                 }),
@@ -719,8 +719,8 @@ mod test {
         let timeout_qc = TimeoutQc::new(
             View(1),
             StandardQc {
-                view: View(0), // genesis
-                id: BlockId::genesis(),
+                view: View::new(0), // genesis
+                id: BlockId::zeros(),
             },
             NodeId::new([0; 32]),
         );
@@ -745,7 +745,7 @@ mod test {
             View(1),
             StandardQc {
                 view: View(0), // genesis
-                id: BlockId::genesis(),
+                id: BlockId::zeros(),
             },
             NodeId::new([0; 32]),
         );
@@ -772,7 +772,7 @@ mod test {
             View(1),
             StandardQc {
                 view: View(0), // genesis
-                id: BlockId::genesis(),
+                id: BlockId::zeros(),
             },
             NodeId::new([0; 32]),
         );
@@ -814,7 +814,7 @@ mod test {
             View(1),
             StandardQc {
                 view: View(0), // genesis
-                id: BlockId::genesis(),
+                id: BlockId::zeros(),
             },
             NodeId::new([0; 32]),
         );
@@ -827,7 +827,7 @@ mod test {
             View(2),
             StandardQc {
                 view: View(0), // genesis
-                id: BlockId::genesis(),
+                id: BlockId::zeros(),
             },
             NodeId::new([0; 32]),
         );

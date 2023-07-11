@@ -168,8 +168,8 @@ where
 
         let overlay = O::new(overlay_settings);
         let genesis = consensus_engine::Block {
-            id: BlockId::genesis(),
-            view: View::new(0),
+            id: BlockId::zeros(),
+            view: 0,
             parent_qc: Qc::Standard(StandardQc::genesis()),
             leader_proof: LeaderProof::LeaderId {
                 leader_id: NodeId::new([0; 32]),
@@ -526,7 +526,7 @@ where
         let mut output = None;
         mempool_relay
             .send(MempoolMsg::View {
-                ancestor_hint: BlockId::genesis(),
+                ancestor_hint: BlockId::zeros(),
                 reply_channel,
             })
             .await
@@ -828,17 +828,17 @@ mod tests {
             current_view: View::new(1),
             highest_voted_view: View::new(-1),
             local_high_qc: StandardQc {
-                view: View::new(0),
-                id: BlockId::genesis(),
+                view: 0,
+                id: BlockId::zeros(),
             },
             safe_blocks: HashMap::from([(
-                BlockId::genesis(),
+                BlockId::zeros(),
                 Block {
-                    id: BlockId::genesis(),
-                    view: View::new(0),
+                    id: BlockId::zeros(),
+                    view: 0,
                     parent_qc: Qc::Standard(StandardQc {
-                        view: View::new(0),
-                        id: BlockId::genesis(),
+                        view: 0,
+                        id: BlockId::zeros(),
                     }),
                     leader_proof: LeaderProof::LeaderId {
                         leader_id: NodeId::new([0; 32]),
@@ -846,7 +846,7 @@ mod tests {
                 },
             )]),
             last_view_timeout_qc: None,
-            committed_blocks: vec![BlockId::genesis()],
+            committed_blocks: vec![BlockId::zeros()],
         };
 
         let serialized = serde_json::to_string(&info).unwrap();

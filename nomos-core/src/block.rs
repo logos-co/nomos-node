@@ -31,7 +31,7 @@ impl<TxId: Clone + Eq + Hash + Serialize + DeserializeOwned> Block<TxId> {
     ) -> Self {
         let transactions = txs.collect();
         let header = consensus_engine::Block {
-            id: BlockId::genesis(),
+            id: BlockId::zeros(),
             view,
             parent_qc,
             leader_proof: LeaderProof::LeaderId {
