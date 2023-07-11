@@ -1,10 +1,11 @@
+use consensus_engine::NodeId;
 // std
 // crates
 use rand::prelude::IteratorRandom;
 use rand::Rng;
 // internal
 use super::Overlay;
-use crate::node::NodeId;
+use crate::node::NodeIdExt;
 use crate::overlay::{Committee, Layout};
 
 pub struct FlatOverlay;

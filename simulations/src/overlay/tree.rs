@@ -1,11 +1,12 @@
 // std
 use std::collections::HashMap;
+use consensus_engine::NodeId;
 // crates
 use rand::seq::IteratorRandom;
 use serde::{Deserialize, Serialize};
 // internal
 use super::{Committee, Layout, Overlay};
-use crate::node::{CommitteeId, NodeId};
+use crate::node::{CommitteeId, NodeIdExt};
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub enum TreeType {

@@ -1,4 +1,4 @@
-use crate::node::{Node, NodeId};
+use crate::node::{Node, NodeId, NodeIdExt};
 use crate::output_processors::Record;
 use crate::runner::SimulationRunner;
 use crate::warding::SimulationState;
