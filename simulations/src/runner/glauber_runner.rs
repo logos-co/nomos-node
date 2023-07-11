@@ -1,7 +1,6 @@
-use crate::node::{Node, NodeId};
+use crate::node::{Node, NodeId, NodeIdExt};
 use crate::output_processors::Record;
 use crate::runner::SimulationRunner;
-use crate::util::{node_id, parse_idx};
 use crate::warding::SimulationState;
 use crossbeam::channel::bounded;
 use crossbeam::select;
@@ -38,7 +37,8 @@ where
 
     let mut inner_runner = runner.inner;
     let nodes = runner.nodes;
-    let nodes_remaining: BTreeSet<NodeId> = (0..nodes.read().len()).map(node_id).collect();
+    let nodes_remaining: BTreeSet<NodeId> =
+        (0..nodes.read().len()).map(NodeId::from_index).collect();
     let iterations: Vec<_> = (0..maximum_iterations).collect();
     let (stop_tx, stop_rx) = bounded(1);
     let p = runner.producer.clone();
@@ -61,7 +61,7 @@ where
                         {
                             let mut shared_nodes = nodes.write();
                             let node: &mut N = shared_nodes
-                                .get_mut(parse_idx(&node_id))
+                                .get_mut(node_id.index())
                                 .expect("Node should be present");
                             node.step(elapsed);
                         }

@@ -19,7 +19,6 @@ use super::{Node, NodeId};
 use crate::network::{InMemoryNetworkInterface, NetworkInterface, NetworkMessage};
 use crate::node::carnot::event_builder::{CarnotTx, Event};
 use crate::node::carnot::message_cache::MessageCache;
-use crate::util::parse_idx;
 use consensus_engine::overlay::RandomBeaconState;
 use consensus_engine::{
     Block, BlockId, Carnot, Committee, Overlay, Payload, Qc, StandardQc, TimeoutQc, View, Vote,
@@ -353,7 +352,7 @@ impl<L: UpdateableLeaderSelection, O: Overlay<LeaderSelection = L>> Node for Car
                 Event::Proposal { block } => {
                     let current_view = self.engine.current_view();
                     tracing::info!(
-                        node=parse_idx(&self.id),
+                        node=%self.id,
                         last_committed_view=self.engine.latest_committed_view(),
                         current_view = current_view,
                         block_view = block.header().view,
@@ -375,7 +374,7 @@ impl<L: UpdateableLeaderSelection, O: Overlay<LeaderSelection = L>> Node for Car
                             }
                         }
                         Err(_) => {
-                            tracing::error!(node = parse_idx(&self.id), current_view = self.engine.current_view(), block_view = block.header().view, block = ?block.header().id, "receive block proposal, but is invalid");
+                            tracing::error!(node = %self.id, current_view = self.engine.current_view(), block_view = block.header().view, block = ?block.header().id, "receive block proposal, but is invalid");
                         }
                     }
 
@@ -393,7 +392,7 @@ impl<L: UpdateableLeaderSelection, O: Overlay<LeaderSelection = L>> Node for Car
                 // So we can just call approve_block
                 Event::Approve { block, .. } => {
                     tracing::info!(
-                        node = parse_idx(&self.id),
+                        node = %self.id,
                         current_view = self.engine.current_view(),
                         block_view = block.view,
                         block = ?block.id,
@@ -401,7 +400,7 @@ impl<L: UpdateableLeaderSelection, O: Overlay<LeaderSelection = L>> Node for Car
                         "receive approve message"
                     );
                     let (new, out) = self.engine.approve_block(block);
-                    tracing::info!(vote=?out, node=parse_idx(&self.id));
+                    tracing::info!(vote=?out, node=%self.id);
                     output = vec![Output::Send(out)];
                     self.engine = new;
                 }
@@ -426,7 +425,7 @@ impl<L: UpdateableLeaderSelection, O: Overlay<LeaderSelection = L>> Node for Car
                     new_views,
                 } => {
                     tracing::info!(
-                        node = parse_idx(&self.id),
+                        node = %self.id,
                         current_view = self.engine.current_view(),
                         timeout_view = timeout_qc.view(),
                         "receive new view message"
@@ -437,7 +436,7 @@ impl<L: UpdateableLeaderSelection, O: Overlay<LeaderSelection = L>> Node for Car
                 }
                 Event::TimeoutQc { timeout_qc } => {
                     tracing::info!(
-                        node = parse_idx(&self.id),
+                        node = %self.id,
                         current_view = self.engine.current_view(),
                         timeout_view = timeout_qc.view(),
                         "receive timeout qc message"
@@ -467,7 +466,7 @@ impl<L: UpdateableLeaderSelection, O: Overlay<LeaderSelection = L>> Node for Car
                 }
                 Event::LocalTimeout => {
                     tracing::info!(
-                        node = parse_idx(&self.id),
+                        node = %self.id,
                         current_view = self.engine.current_view(),
                         "receive local timeout message"
                     );

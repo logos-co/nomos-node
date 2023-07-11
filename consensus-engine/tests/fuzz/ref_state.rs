@@ -27,9 +27,11 @@ pub struct ViewEntry {
     pub timeout_qcs: HashSet<TimeoutQc>,
 }
 
-const LEADER_PROOF: LeaderProof = LeaderProof::LeaderId { leader_id: [0; 32] };
+const LEADER_PROOF: LeaderProof = LeaderProof::LeaderId {
+    leader_id: NodeId::new([0; 32]),
+};
 const INITIAL_HIGHEST_VOTED_VIEW: View = -1;
-const SENDER: NodeId = [0; 32];
+const SENDER: NodeId = NodeId::new([0; 32]);
 
 impl ReferenceStateMachine for RefState {
     type State = Self;

@@ -17,7 +17,7 @@ use serde::de::DeserializeOwned;
 use simulations::network::behaviour::create_behaviours;
 use simulations::network::regions::{create_regions, RegionsData};
 use simulations::network::{InMemoryNetworkInterface, Network};
-use simulations::node::{Node, NodeId};
+use simulations::node::{Node, NodeId, NodeIdExt};
 use simulations::output_processors::Record;
 use simulations::runner::SimulationRunnerHandle;
 use simulations::streaming::{
@@ -26,7 +26,7 @@ use simulations::streaming::{
 // internal
 use simulations::{
     node::carnot::CarnotNode, output_processors::OutData, runner::SimulationRunner,
-    settings::SimulationSettings, util::node_id,
+    settings::SimulationSettings,
 };
 mod log;
 
@@ -62,7 +62,9 @@ impl SimulationApp {
                 .as_secs()
         });
         let mut rng = SmallRng::seed_from_u64(seed);
-        let mut node_ids: Vec<NodeId> = (0..simulation_settings.node_count).map(node_id).collect();
+        let mut node_ids: Vec<NodeId> = (0..simulation_settings.node_count)
+            .map(NodeId::from_index)
+            .collect();
         node_ids.shuffle(&mut rng);
 
         let regions = create_regions(&node_ids, &mut rng, &simulation_settings.network_settings);

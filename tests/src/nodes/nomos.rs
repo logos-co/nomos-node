@@ -5,6 +5,7 @@ use std::time::Duration;
 // internal
 use crate::{get_available_port, Node, SpawnConfig, RNG};
 use consensus_engine::overlay::{RoundRobin, Settings};
+use consensus_engine::NodeId;
 use nomos_consensus::{CarnotInfo, CarnotSettings};
 use nomos_http::backends::axum::AxumBackendSettings;
 use nomos_log::{LoggerBackend, LoggerFormat};
@@ -154,7 +155,14 @@ impl Node for NomosNode {
                 }
                 let mut configs = ids
                     .iter()
-                    .map(|id| create_node_config(ids.clone(), *id, threshold, timeout))
+                    .map(|id| {
+                        create_node_config(
+                            ids.iter().copied().map(NodeId::new).collect(),
+                            *id,
+                            threshold,
+                            timeout,
+                        )
+                    })
                     .collect::<Vec<_>>();
                 let mut nodes = vec![Self::spawn(configs.swap_remove(0)).await];
                 let listening_addr = nodes[0].get_listening_address().await;
@@ -185,7 +193,7 @@ impl Node for NomosNode {
 }
 
 fn create_node_config(
-    nodes: Vec<[u8; 32]>,
+    nodes: Vec<NodeId>,
     private_key: [u8; 32],
     threshold: Fraction,
     timeout: Duration,

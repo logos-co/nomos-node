@@ -1,12 +1,12 @@
+use consensus_engine::NodeId;
 // std
 // crates
 use rand::prelude::IteratorRandom;
 use rand::Rng;
 // internal
 use super::Overlay;
-use crate::node::NodeId;
+use crate::node::NodeIdExt;
 use crate::overlay::{Committee, Layout};
-use crate::util::node_id;
 
 pub struct FlatOverlay;
 impl FlatOverlay {
@@ -23,7 +23,7 @@ impl Default for FlatOverlay {
 
 impl Overlay for FlatOverlay {
     fn nodes(&self) -> Vec<NodeId> {
-        (0..10).map(node_id).collect()
+        (0..10).map(NodeId::from_index).collect()
     }
 
     fn leaders<R: Rng>(

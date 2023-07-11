@@ -1,5 +1,4 @@
 use crate::node::carnot::{messages::CarnotMessage, tally::Tally, timeout::TimeoutHandler};
-use crate::util::parse_idx;
 use consensus_engine::{
     AggregateQc, Carnot, NewView, Overlay, Qc, StandardQc, Timeout, TimeoutQc, View, Vote,
 };
@@ -69,7 +68,7 @@ impl EventBuilder {
         if engine.highest_voted_view() == -1
             && engine.overlay().is_member_of_leaf_committee(self.id)
         {
-            tracing::info!(node = parse_idx(&self.id), "voting genesis",);
+            tracing::info!(node = %self.id, "voting genesis",);
             let genesis = engine.genesis_block();
             events.push(Event::Approve {
                 qc: Qc::Standard(StandardQc {
@@ -86,7 +85,7 @@ impl EventBuilder {
                 CarnotMessage::Proposal(msg) => {
                     let block = Block::from_bytes(&msg.chunk);
                     tracing::info!(
-                        node=parse_idx(&self.id),
+                        node=%self.id,
                         current_view = engine.current_view(),
                         block_view=block.header().view,
                         block=?block.header().id,
@@ -120,7 +119,7 @@ impl EventBuilder {
                     };
 
                     let Some(qc) = msg.qc.clone() else {
-                        tracing::warn!(node=?parse_idx(&self.id), current_view = engine.current_view(), "received vote without QC");
+                        tracing::warn!(node=%self.id, current_view = engine.current_view(), "received vote without QC");
                         continue;
                     };
 
@@ -139,7 +138,7 @@ impl EventBuilder {
                             .cloned()
                         {
                             tracing::info!(
-                                node=parse_idx(&self.id),
+                                node=%self.id,
                                 votes=votes.len(),
                                 current_view = engine.current_view(),
                                 block_view=block.view,

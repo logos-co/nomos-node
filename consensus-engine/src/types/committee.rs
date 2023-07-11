@@ -62,7 +62,7 @@ impl Committee {
     ) -> digest::generic_array::GenericArray<u8, <D as digest::OutputSizeUser>::OutputSize> {
         let mut hasher = D::new();
         for member in &self.members {
-            hasher.update(member);
+            hasher.update(member.0);
         }
         hasher.finalize()
     }
@@ -119,16 +119,16 @@ where
     }
 }
 
-impl core::iter::FromIterator<[u8; 32]> for Committee {
-    fn from_iter<T: IntoIterator<Item = [u8; 32]>>(iter: T) -> Self {
+impl core::iter::FromIterator<NodeId> for Committee {
+    fn from_iter<T: IntoIterator<Item = NodeId>>(iter: T) -> Self {
         Self {
             members: iter.into_iter().collect(),
         }
     }
 }
 
-impl<'a> core::iter::FromIterator<&'a [u8; 32]> for Committee {
-    fn from_iter<T: IntoIterator<Item = &'a [u8; 32]>>(iter: T) -> Self {
+impl<'a> core::iter::FromIterator<&'a NodeId> for Committee {
+    fn from_iter<T: IntoIterator<Item = &'a NodeId>>(iter: T) -> Self {
         Self {
             members: iter.into_iter().copied().collect(),
         }

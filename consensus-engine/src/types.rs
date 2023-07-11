@@ -6,9 +6,10 @@ use serde::{Deserialize, Serialize};
 
 mod committee;
 pub use committee::{Committee, CommitteeId};
+mod node_id;
+pub use node_id::NodeId;
 
 pub type View = i64;
-pub type NodeId = [u8; 32];
 pub type BlockId = [u8; 32];
 
 /// The way the consensus engine communicates with the rest of the system is by returning
@@ -118,7 +119,9 @@ impl Block {
             id: [0; 32],
             view: 0,
             parent_qc: Qc::Standard(StandardQc::genesis()),
-            leader_proof: LeaderProof::LeaderId { leader_id: [0; 32] },
+            leader_proof: LeaderProof::LeaderId {
+                leader_id: NodeId::new([0; 32]),
+            },
         }
     }
 }
@@ -225,12 +228,12 @@ mod test {
                 view: 1,
                 id: [0; 32],
             },
-            [0; 32],
+            NodeId::new([0; 32]),
         );
         assert_eq!(timeout_qc.view(), 2);
         assert_eq!(timeout_qc.high_qc().view, 1);
         assert_eq!(timeout_qc.high_qc().id, [0; 32]);
-        assert_eq!(timeout_qc.sender(), [0; 32]);
+        assert_eq!(timeout_qc.sender(), NodeId::new([0; 32]));
 
         let timeout_qc = TimeoutQc::new(
             2,
@@ -238,12 +241,12 @@ mod test {
                 view: 2,
                 id: [0; 32],
             },
-            [0; 32],
+            NodeId::new([0; 32]),
         );
         assert_eq!(timeout_qc.view(), 2);
         assert_eq!(timeout_qc.high_qc().view, 2);
         assert_eq!(timeout_qc.high_qc().id, [0; 32]);
-        assert_eq!(timeout_qc.sender(), [0; 32]);
+        assert_eq!(timeout_qc.sender(), NodeId::new([0; 32]));
     }
 
     #[test]
@@ -257,7 +260,7 @@ mod test {
                 view: 2,
                 id: [0; 32],
             },
-            [0; 32],
+            NodeId::new([0; 32]),
         );
     }
 }

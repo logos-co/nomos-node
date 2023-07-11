@@ -163,7 +163,7 @@ impl Node for usize {
     type State = Self;
 
     fn id(&self) -> NodeId {
-        crate::util::node_id(*self)
+        NodeId::from_index(*self)
     }
 
     fn current_view(&self) -> usize {
@@ -177,5 +177,27 @@ impl Node for usize {
     fn step(&mut self, _: Duration) {
         use std::ops::AddAssign;
         self.add_assign(1);
+    }
+}
+
+pub trait NodeIdExt {
+    fn index(&self) -> usize;
+
+    fn from_index(idx: usize) -> Self;
+}
+
+impl NodeIdExt for NodeId {
+    fn index(&self) -> usize {
+        const SIZE: usize = core::mem::size_of::<usize>();
+        let mut bytes = [0u8; SIZE];
+        let src: [u8; 32] = (*self).into();
+        bytes.copy_from_slice(&src[..SIZE]);
+        usize::from_be_bytes(bytes)
+    }
+
+    fn from_index(idx: usize) -> Self {
+        let mut bytes = [0u8; 32];
+        bytes[..core::mem::size_of::<usize>()].copy_from_slice(&idx.to_be_bytes());
+        NodeId::new(bytes)
     }
 }

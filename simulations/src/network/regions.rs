@@ -1,10 +1,11 @@
+use consensus_engine::NodeId;
 // std
 use rand::{seq::SliceRandom, Rng};
 use std::{collections::HashMap, str::FromStr};
 // crates
 use serde::{Deserialize, Serialize};
 // internal
-use crate::{network::behaviour::NetworkBehaviour, node::NodeId};
+use crate::network::behaviour::NetworkBehaviour;
 
 use super::{NetworkBehaviourKey, NetworkSettings};
 
@@ -156,6 +157,7 @@ pub fn create_regions<R: Rng>(
 mod tests {
     use std::collections::HashMap;
 
+    use consensus_engine::NodeId;
     use rand::rngs::mock::StepRng;
 
     use crate::{
@@ -163,8 +165,7 @@ mod tests {
             regions::{create_regions, Region},
             NetworkSettings,
         },
-        node::NodeId,
-        util::node_id,
+        node::NodeIdExt,
     };
 
     #[test]
@@ -203,7 +204,9 @@ mod tests {
         let mut rng = StepRng::new(1, 0);
 
         for tcase in test_cases.iter() {
-            let nodes = (0..tcase.node_count).map(node_id).collect::<Vec<NodeId>>();
+            let nodes = (0..tcase.node_count)
+                .map(NodeId::from_index)
+                .collect::<Vec<NodeId>>();
 
             let available_regions = vec![
                 Region::NorthAmerica,
