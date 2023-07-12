@@ -406,7 +406,7 @@ mod test {
             *nodes.first().unwrap(),
             Block {
                 view: 0,
-                id: [0; 32],
+                id: BlockId::zeros(),
                 parent_qc: Qc::Standard(StandardQc::genesis()),
                 leader_proof: LeaderProof::LeaderId {
                     leader_id: *nodes.first().unwrap(),
@@ -422,7 +422,7 @@ mod test {
 
     fn next_block(engine: &Carnot<FlatOverlay<RoundRobin>>, block: &Block) -> Block {
         let mut next_id = block.id;
-        next_id[0] += 1;
+        next_id.0[0] += 1;
 
         Block {
             view: block.view + 1,
@@ -498,10 +498,10 @@ mod test {
     fn receive_block_with_unknown_parent() {
         let engine = init(vec![NodeId::new([0; 32])]);
         let mut parent_block_id = engine.genesis_block().id;
-        parent_block_id[0] += 1; // generate an unknown parent block ID
+        parent_block_id.0[0] += 1; // generate an unknown parent block ID
         let block = Block {
             view: engine.current_view() + 1,
-            id: [1; 32],
+            id: BlockId::new([1; 32]),
             parent_qc: Qc::Standard(StandardQc {
                 view: engine.current_view(),
                 id: parent_block_id,
@@ -601,7 +601,7 @@ mod test {
 
         // a future block should be rejected
         let future_block = Block {
-            id: [10; 32],
+            id: BlockId::new([10; 32]),
             view: 11, // a future view
             parent_qc: Qc::Aggregated(AggregateQc {
                 view: 10,
@@ -619,7 +619,7 @@ mod test {
 
         // a past block should be also rejected
         let mut past_block = block1; // with the same view as block1
-        past_block.id = [10; 32];
+        past_block.id = BlockId::new([10; 32]);
         assert!(engine.receive_block(past_block).is_err());
     }
 
@@ -696,7 +696,7 @@ mod test {
                     sender: NodeId::new([0; 32]),
                     high_qc: StandardQc {
                         view: 0, // genesis
-                        id: [0; 32],
+                        id: BlockId::zeros(),
                     },
                     timeout_qc: None
                 }),
@@ -719,7 +719,7 @@ mod test {
             1,
             StandardQc {
                 view: 0, // genesis
-                id: [0; 32],
+                id: BlockId::zeros(),
             },
             NodeId::new([0; 32]),
         );
@@ -744,7 +744,7 @@ mod test {
             1,
             StandardQc {
                 view: 0, // genesis
-                id: [0; 32],
+                id: BlockId::zeros(),
             },
             NodeId::new([0; 32]),
         );
@@ -771,7 +771,7 @@ mod test {
             1,
             StandardQc {
                 view: 0, // genesis
-                id: [0; 32],
+                id: BlockId::zeros(),
             },
             NodeId::new([0; 32]),
         );
@@ -813,7 +813,7 @@ mod test {
             1,
             StandardQc {
                 view: 0, // genesis
-                id: [0; 32],
+                id: BlockId::zeros(),
             },
             NodeId::new([0; 32]),
         );
@@ -826,7 +826,7 @@ mod test {
             2,
             StandardQc {
                 view: 0, // genesis
-                id: [0; 32],
+                id: BlockId::zeros(),
             },
             NodeId::new([0; 32]),
         );
