@@ -524,7 +524,13 @@ where
     ) -> (Carnot<O>, Option<Output<P::Tx>>) {
         // we might have received a timeout_qc sent by some other node and advanced the view
         // already, in which case we should ignore the timeout
-        if carnot.current_view() != timeouts.iter().map(|t| t.view).max().unwrap_or(View::new(0)) {
+        if carnot.current_view()
+            != timeouts
+                .iter()
+                .map(|t| t.view)
+                .max()
+                .unwrap_or(View::new(0))
+        {
             return (carnot, None);
         }
 
