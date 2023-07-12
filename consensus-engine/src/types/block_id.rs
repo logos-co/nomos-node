@@ -14,9 +14,7 @@ impl BlockId {
 
     /// Returns a random block id, only avaliable with feature `simulation` or test
     #[cfg(any(test, feature = "simulation"))]
-    pub fn random() -> Self {
-        use rand::RngCore;
-        let mut rng = rand::thread_rng();
+    pub fn random<R: rand::Rng>(rng: &mut R) -> Self {
         let mut bytes = [0u8; 32];
         rng.fill_bytes(&mut bytes);
         Self(bytes)
