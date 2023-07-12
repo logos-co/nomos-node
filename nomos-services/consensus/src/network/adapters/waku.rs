@@ -1,8 +1,5 @@
 // std
 use std::borrow::Cow;
-use std::collections::hash_map::DefaultHasher;
-use std::collections::BTreeSet;
-use std::hash::{Hash, Hasher};
 // crates
 use futures::{Stream, StreamExt};
 use tokio_stream::wrappers::BroadcastStream;
