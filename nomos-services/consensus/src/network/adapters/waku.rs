@@ -10,7 +10,7 @@ use tokio_stream::wrappers::BroadcastStream;
 use crate::network::messages::{NewViewMsg, TimeoutMsg, TimeoutQcMsg};
 use crate::network::{
     messages::{ProposalChunkMsg, VoteMsg},
-    NetworkAdapter,
+    BoxedStream, NetworkAdapter,
 };
 use consensus_engine::{BlockId, Committee, View};
 use nomos_network::{
@@ -57,10 +57,7 @@ impl WakuAdapter {
     async fn archive_subscriber_stream(
         network_relay: OutboundRelay<<NetworkService<Waku> as ServiceData>::Message>,
         content_topic: WakuContentTopic,
-    ) -> Result<
-        Box<dyn Stream<Item = WakuMessage> + Send + Sync + Unpin>,
-        tokio::sync::oneshot::error::RecvError,
-    > {
+    ) -> Result<BoxedStream<WakuMessage>, tokio::sync::oneshot::error::RecvError> {
         let (sender, receiver) = tokio::sync::oneshot::channel();
         if let Err((_, _e)) = network_relay
             .send(NetworkMsg::Process(WakuBackendMessage::ArchiveSubscribe {
@@ -167,10 +164,7 @@ impl NetworkAdapter for WakuAdapter {
         Self { network_relay }
     }
 
-    async fn proposal_chunks_stream(
-        &self,
-        view: View,
-    ) -> Box<dyn Stream<Item = ProposalChunkMsg> + Send + Sync + Unpin> {
+    async fn proposal_chunks_stream(&self, view: View) -> BoxedStream<ProposalChunkMsg> {
         Box::new(Box::pin(
             self.cached_stream_with_content_topic(PROPOSAL_CONTENT_TOPIC)
                 .await
@@ -214,11 +208,7 @@ impl NetworkAdapter for WakuAdapter {
             .await
     }
 
-    async fn timeout_stream(
-        &self,
-        committee: &Committee,
-        view: View,
-    ) -> Box<dyn Stream<Item = TimeoutMsg> + Send + Sync + Unpin> {
+    async fn timeout_stream(&self, committee: &Committee, view: View) -> BoxedStream<TimeoutMsg> {
         let content_topic = create_topic("timeout", committee, view);
         Box::new(Box::pin(
             self.cached_stream_with_content_topic(content_topic)
@@ -237,10 +227,7 @@ impl NetworkAdapter for WakuAdapter {
         ))
     }
 
-    async fn timeout_qc_stream(
-        &self,
-        view: View,
-    ) -> Box<dyn Stream<Item = TimeoutQcMsg> + Send + Sync + Unpin> {
+    async fn timeout_qc_stream(&self, view: View) -> BoxedStream<TimeoutQcMsg> {
         Box::new(Box::pin(
             self.cached_stream_with_content_topic(TIMEOUT_QC_CONTENT_TOPIC)
                 .await
@@ -263,7 +250,7 @@ impl NetworkAdapter for WakuAdapter {
         committee: &Committee,
         view: View,
         proposal_id: BlockId,
-    ) -> Box<dyn Stream<Item = VoteMsg> + Send + Unpin> {
+    ) -> BoxedStream<VoteMsg> {
         let content_topic = create_topic("votes", committee, view);
         Box::new(Box::pin(
             self.cached_stream_with_content_topic(content_topic)
@@ -282,11 +269,7 @@ impl NetworkAdapter for WakuAdapter {
         ))
     }
 
-    async fn new_view_stream(
-        &self,
-        committee: &Committee,
-        view: View,
-    ) -> Box<dyn Stream<Item = NewViewMsg> + Send + Unpin> {
+    async fn new_view_stream(&self, committee: &Committee, view: View) -> BoxedStream<NewViewMsg> {
         let content_topic = create_topic("new-view", committee, view);
         Box::new(Box::pin(
             self.cached_stream_with_content_topic(content_topic)

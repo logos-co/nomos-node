@@ -6,12 +6,12 @@ use nomos_network::{
     NetworkMsg, NetworkService,
 };
 use overwatch_rs::services::{relay::OutboundRelay, ServiceData};
-use tokio_stream::{wrappers::BroadcastStream, Stream};
+use tokio_stream::wrappers::BroadcastStream;
 
 use crate::network::messages::{NewViewMsg, TimeoutMsg, TimeoutQcMsg};
 use crate::network::{
     messages::{ProposalChunkMsg, VoteMsg},
-    NetworkAdapter,
+    BoxedStream, NetworkAdapter,
 };
 use consensus_engine::{BlockId, Committee, View};
 
@@ -57,10 +57,7 @@ impl NetworkAdapter for MockAdapter {
         Self { network_relay }
     }
 
-    async fn proposal_chunks_stream(
-        &self,
-        _view: View,
-    ) -> Box<dyn Stream<Item = ProposalChunkMsg> + Send + Sync + Unpin> {
+    async fn proposal_chunks_stream(&self, _view: View) -> BoxedStream<ProposalChunkMsg> {
         let stream_channel = self
             .message_subscriber_channel()
             .await
@@ -110,27 +107,15 @@ impl NetworkAdapter for MockAdapter {
         todo!()
     }
 
-    async fn timeout_stream(
-        &self,
-        _committee: &Committee,
-        _view: View,
-    ) -> Box<dyn Stream<Item = TimeoutMsg> + Send + Sync + Unpin> {
+    async fn timeout_stream(&self, _committee: &Committee, _view: View) -> BoxedStream<TimeoutMsg> {
         todo!()
     }
 
-    async fn timeout_qc_stream(
-        &self,
-        _view: View,
-    ) -> Box<dyn Stream<Item = TimeoutQcMsg> + Send + Sync + Unpin> {
+    async fn timeout_qc_stream(&self, _view: View) -> BoxedStream<TimeoutQcMsg> {
         todo!()
     }
 
-    async fn votes_stream(
-        &self,
-        _committee: &Committee,
-        _view: View,
-        _proposal_id: BlockId,
-    ) -> Box<dyn Stream<Item = VoteMsg> + Send + Unpin> {
+    async fn votes_stream(&self, _: &Committee, _: View, _: BlockId) -> BoxedStream<VoteMsg> {
         let stream_channel = self
             .message_subscriber_channel()
             .await
@@ -156,11 +141,7 @@ impl NetworkAdapter for MockAdapter {
         )))
     }
 
-    async fn new_view_stream(
-        &self,
-        _committee: &Committee,
-        _view: View,
-    ) -> Box<dyn Stream<Item = NewViewMsg> + Send + Unpin> {
+    async fn new_view_stream(&self, _: &Committee, _view: View) -> BoxedStream<NewViewMsg> {
         todo!()
     }
 
