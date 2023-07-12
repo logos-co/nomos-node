@@ -65,7 +65,7 @@ impl EventBuilder {
         }
 
         // only run when the engine is in the genesis view
-        if engine.highest_voted_view() == -1
+        if engine.highest_voted_view() == View::new(-1)
             && engine.overlay().is_member_of_leaf_committee(self.id)
         {
             tracing::info!(node = %self.id, "voting genesis",);
@@ -86,8 +86,8 @@ impl EventBuilder {
                     let block = Block::from_bytes(&msg.chunk);
                     tracing::info!(
                         node=%self.id,
-                        current_view = engine.current_view(),
-                        block_view=block.header().view,
+                        current_view = %engine.current_view(),
+                        block_view=%block.header().view,
                         block=?block.header().id,
                         parent_block=?block.header().parent(),
                         "receive proposal message",
@@ -119,7 +119,7 @@ impl EventBuilder {
                     };
 
                     let Some(qc) = msg.qc.clone() else {
-                        tracing::warn!(node=%self.id, current_view = engine.current_view(), "received vote without QC");
+                        tracing::warn!(node=%self.id, current_view = %engine.current_view(), "received vote without QC");
                         continue;
                     };
 
@@ -140,9 +140,9 @@ impl EventBuilder {
                             tracing::info!(
                                 node=%self.id,
                                 votes=votes.len(),
-                                current_view = engine.current_view(),
-                                block_view=block.view,
-                                block=?block.id,
+                                current_view = %engine.current_view(),
+                                block_view=%block.view,
+                                block=%block.id,
                                 "approve block",
                             );
 
@@ -198,7 +198,7 @@ impl EventBuilder {
                             events.push(Event::ProposeBlock {
                                 qc: Qc::Aggregated(AggregateQc {
                                     high_qc,
-                                    view: msg_view + 1,
+                                    view: msg_view.next(),
                                 }),
                             });
                         } else {

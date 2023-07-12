@@ -1,10 +1,11 @@
+use consensus_engine::View;
 use fraction::{Fraction, One};
 use futures::stream::{self, StreamExt};
 use std::collections::HashSet;
 use std::time::Duration;
 use tests::{Node, NomosNode, SpawnConfig};
 
-const TARGET_VIEW: i64 = 20;
+const TARGET_VIEW: View = View::new(20);
 
 async fn happy_test(nodes: Vec<NomosNode>) {
     let timeout = std::time::Duration::from_secs(20);

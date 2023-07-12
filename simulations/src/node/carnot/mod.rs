@@ -320,7 +320,8 @@ impl<L: UpdateableLeaderSelection, O: Overlay<LeaderSelection = L>> Node for Car
     }
 
     fn current_view(&self) -> usize {
-        self.event_builder.current_view as usize
+        let view: i64 = self.event_builder.current_view.into();
+        view as usize
     }
 
     fn state(&self) -> &CarnotState {
@@ -338,7 +339,7 @@ impl<L: UpdateableLeaderSelection, O: Overlay<LeaderSelection = L>> Node for Car
                 m.view() == self.engine.current_view()
                     || matches!(m, CarnotMessage::Proposal(_) | CarnotMessage::TimeoutQc(_))
             });
-        self.message_cache.prune(self.engine.current_view() - 1);
+        self.message_cache.prune(self.engine.current_view().prev());
         self.message_cache.update(other_view_messages);
         current_view_messages.append(&mut self.message_cache.retrieve(self.engine.current_view()));
 
@@ -353,11 +354,11 @@ impl<L: UpdateableLeaderSelection, O: Overlay<LeaderSelection = L>> Node for Car
                     let current_view = self.engine.current_view();
                     tracing::info!(
                         node=%self.id,
-                        last_committed_view=self.engine.latest_committed_view(),
-                        current_view = current_view,
-                        block_view = block.header().view,
-                        block = ?block.header().id,
-                        parent_block=?block.header().parent(),
+                        last_committed_view=%self.engine.latest_committed_view(),
+                        current_view = %current_view,
+                        block_view = %block.header().view,
+                        block = %block.header().id,
+                        parent_block=%block.header().parent(),
                         "receive block proposal",
                     );
                     match self.engine.receive_block(block.header().clone()) {
@@ -374,7 +375,7 @@ impl<L: UpdateableLeaderSelection, O: Overlay<LeaderSelection = L>> Node for Car
                             }
                         }
                         Err(_) => {
-                            tracing::error!(node = %self.id, current_view = self.engine.current_view(), block_view = block.header().view, block = ?block.header().id, "receive block proposal, but is invalid");
+                            tracing::error!(node = %self.id, current_view = %self.engine.current_view(), block_view = %block.header().view, block = %block.header().id, "receive block proposal, but is invalid");
                         }
                     }
 
@@ -393,10 +394,10 @@ impl<L: UpdateableLeaderSelection, O: Overlay<LeaderSelection = L>> Node for Car
                 Event::Approve { block, .. } => {
                     tracing::info!(
                         node = %self.id,
-                        current_view = self.engine.current_view(),
-                        block_view = block.view,
-                        block = ?block.id,
-                        parent_block=?block.parent(),
+                        current_view = %self.engine.current_view(),
+                        block_view = %block.view,
+                        block = %block.id,
+                        parent_block=%block.parent(),
                         "receive approve message"
                     );
                     let (new, out) = self.engine.approve_block(block);
@@ -407,12 +408,12 @@ impl<L: UpdateableLeaderSelection, O: Overlay<LeaderSelection = L>> Node for Car
                 Event::ProposeBlock { qc } => {
                     output = vec![Output::BroadcastProposal {
                         proposal: nomos_core::block::Block::new(
-                            qc.view() + 1,
+                            qc.view().next(),
                             qc.clone(),
                             [].into_iter(),
                             self.id,
                             RandomBeaconState::generate_happy(
-                                qc.view() + 1,
+                                qc.view().next(),
                                 &self.random_beacon_pk,
                             ),
                         ),
@@ -426,8 +427,8 @@ impl<L: UpdateableLeaderSelection, O: Overlay<LeaderSelection = L>> Node for Car
                 } => {
                     tracing::info!(
                         node = %self.id,
-                        current_view = self.engine.current_view(),
-                        timeout_view = timeout_qc.view(),
+                        current_view = %self.engine.current_view(),
+                        timeout_view = %timeout_qc.view(),
                         "receive new view message"
                     );
                     let (new, out) = self.engine.approve_new_view(timeout_qc.clone(), new_views);
@@ -437,8 +438,8 @@ impl<L: UpdateableLeaderSelection, O: Overlay<LeaderSelection = L>> Node for Car
                 Event::TimeoutQc { timeout_qc } => {
                     tracing::info!(
                         node = %self.id,
-                        current_view = self.engine.current_view(),
-                        timeout_view = timeout_qc.view(),
+                        current_view = %self.engine.current_view(),
+                        timeout_view = %timeout_qc.view(),
                         "receive timeout qc message"
                     );
                     self.engine = self.engine.receive_timeout_qc(timeout_qc.clone());
@@ -467,7 +468,7 @@ impl<L: UpdateableLeaderSelection, O: Overlay<LeaderSelection = L>> Node for Car
                 Event::LocalTimeout => {
                     tracing::info!(
                         node = %self.id,
-                        current_view = self.engine.current_view(),
+                        current_view = %self.engine.current_view(),
                         "receive local timeout message"
                     );
                     let (new, out) = self.engine.local_timeout();

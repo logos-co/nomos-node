@@ -19,10 +19,10 @@ pub struct Carnot<O: Overlay> {
 impl<O: Overlay> Carnot<O> {
     pub fn from_genesis(id: NodeId, genesis_block: Block, overlay: O) -> Self {
         Self {
-            current_view: 0,
+            current_view: View(0),
             local_high_qc: StandardQc::genesis(),
             id,
-            highest_voted_view: -1,
+            highest_voted_view: View(-1),
             last_view_timeout_qc: None,
             overlay,
             safe_blocks: [(genesis_block.id, genesis_block)].into(),
@@ -63,7 +63,8 @@ impl<O: Overlay> Carnot<O> {
         match block.leader_proof {
             LeaderProof::LeaderId { leader_id } => {
                 // This only accepts blocks from the leader of current_view + 1
-                if leader_id != self.overlay.next_leader() || block.view != self.current_view() + 1
+                if leader_id != self.overlay.next_leader()
+                    || block.view != self.current_view().next()
                 {
                     return Err(());
                 }
@@ -103,7 +104,7 @@ impl<O: Overlay> Carnot<O> {
         new_state.update_high_qc(Qc::Standard(timeout_qc.high_qc().clone()));
         new_state.update_timeout_qc(timeout_qc.clone());
 
-        new_state.current_view = timeout_qc.view() + 1;
+        new_state.current_view = timeout_qc.view().next();
         new_state.overlay.rebuild(timeout_qc);
 
         new_state
@@ -160,14 +161,14 @@ impl<O: Overlay> Carnot<O> {
         timeout_qc: TimeoutQc,
         new_views: HashSet<NewView>,
     ) -> (Self, Send) {
-        let new_view = timeout_qc.view() + 1;
+        let new_view = timeout_qc.view().next();
         assert!(
             new_view
                 > self
                     .last_view_timeout_qc
                     .as_ref()
                     .map(|qc| qc.view())
-                    .unwrap_or(0),
+                    .unwrap_or(View(0)),
             "can't vote for a new view not bigger than the last timeout_qc"
         );
         assert_eq!(
@@ -244,7 +245,7 @@ impl<O: Overlay> Carnot<O> {
     }
 
     fn block_is_safe(&self, block: Block) -> bool {
-        block.view >= self.current_view && block.view == block.parent_qc.view() + 1
+        block.view >= self.current_view && block.view == block.parent_qc.view().next()
     }
 
     fn update_high_qc(&mut self, qc: Qc) {
@@ -259,7 +260,7 @@ impl<O: Overlay> Carnot<O> {
             _ => {}
         }
         if qc_view == self.current_view {
-            self.current_view += 1;
+            self.current_view += View(1);
         }
     }
 
@@ -284,7 +285,7 @@ impl<O: Overlay> Carnot<O> {
     }
 
     pub fn genesis_block(&self) -> Block {
-        self.blocks_in_view(0)[0].clone()
+        self.blocks_in_view(View(0))[0].clone()
     }
 
     // Returns the id of the grandparent block if it can be committed or None otherwise
@@ -292,7 +293,7 @@ impl<O: Overlay> Carnot<O> {
         let parent = self.safe_blocks.get(&block.parent())?;
         let grandparent = self.safe_blocks.get(&parent.parent())?;
 
-        if parent.view == grandparent.view + 1
+        if parent.view == grandparent.view.next()
             && matches!(parent.parent_qc, Qc::Standard { .. })
             && matches!(grandparent.parent_qc, Qc::Standard { .. })
         {
@@ -302,8 +303,8 @@ impl<O: Overlay> Carnot<O> {
     }
 
     pub fn latest_committed_block(&self) -> Block {
-        for view in (0..=self.current_view).rev() {
-            for block in self.blocks_in_view(view) {
+        for view in (0..=self.current_view.0).rev() {
+            for block in self.blocks_in_view(View(view)) {
                 if let Some(block) = self.can_commit_grandparent(block) {
                     return block;
                 }
@@ -405,7 +406,7 @@ mod test {
         Carnot::from_genesis(
             *nodes.first().unwrap(),
             Block {
-                view: 0,
+                view: View(0),
                 id: BlockId::zeros(),
                 parent_qc: Qc::Standard(StandardQc::genesis()),
                 leader_proof: LeaderProof::LeaderId {
@@ -425,7 +426,7 @@ mod test {
         next_id.0[0] += 1;
 
         Block {
-            view: block.view + 1,
+            view: block.view.next(),
             id: next_id,
             parent_qc: Qc::Standard(StandardQc {
                 view: block.view,
@@ -455,12 +456,12 @@ mod test {
     // Ensure that all states are initialized correctly with the genesis block.
     fn from_genesis() {
         let engine = init(vec![NodeId::new([0; 32])]);
-        assert_eq!(engine.current_view(), 0);
-        assert_eq!(engine.highest_voted_view, -1);
+        assert_eq!(engine.current_view(), View(0));
+        assert_eq!(engine.highest_voted_view, View(-1));
 
         let genesis = engine.genesis_block();
         assert_eq!(engine.high_qc(), genesis.parent_qc.high_qc());
-        assert_eq!(engine.blocks_in_view(0), vec![genesis.clone()]);
+        assert_eq!(engine.blocks_in_view(View(0)), vec![genesis.clone()]);
         assert_eq!(engine.last_view_timeout_qc(), None);
         assert_eq!(engine.committed_blocks(), vec![genesis.id]);
     }
@@ -489,7 +490,7 @@ mod test {
         let mut block2 = next_block(&engine, &block1);
         block2.id = block1.id;
         engine = engine.receive_block(block2).unwrap();
-        assert_eq!(engine.blocks_in_view(1), vec![block1]);
+        assert_eq!(engine.blocks_in_view(View(1)), vec![block1]);
     }
 
     #[test]
@@ -500,7 +501,7 @@ mod test {
         let mut parent_block_id = engine.genesis_block().id;
         parent_block_id.0[0] += 1; // generate an unknown parent block ID
         let block = Block {
-            view: engine.current_view() + 1,
+            view: engine.current_view().next(),
             id: BlockId::new([1; 32]),
             parent_qc: Qc::Standard(StandardQc {
                 view: engine.current_view(),
@@ -528,11 +529,11 @@ mod test {
         engine = update_leader_selection(&engine);
 
         let mut unsafe_block = next_block(&engine, &block);
-        unsafe_block.view = engine.current_view() - 1; // UNSAFE: view < engine.current_view
+        unsafe_block.view = engine.current_view().prev(); // UNSAFE: view < engine.current_view
         assert!(engine.receive_block(unsafe_block).is_err());
 
         let mut unsafe_block = next_block(&engine, &block);
-        unsafe_block.view = unsafe_block.parent_qc.view() + 2; // UNSAFE: view != parent_qc.view + 1
+        unsafe_block.view = unsafe_block.parent_qc.view() + View(2); // UNSAFE: view != parent_qc.view + 1
         assert!(engine.receive_block(unsafe_block).is_err());
     }
 
@@ -596,15 +597,15 @@ mod test {
 
         let block1 = next_block(&engine, &engine.genesis_block());
         engine = engine.receive_block(block1.clone()).unwrap();
-        assert_eq!(engine.current_view(), 1);
+        assert_eq!(engine.current_view(), View(1));
         engine = update_leader_selection(&engine);
 
         // a future block should be rejected
         let future_block = Block {
             id: BlockId::new([10; 32]),
-            view: 11, // a future view
+            view: View(11), // a future view
             parent_qc: Qc::Aggregated(AggregateQc {
-                view: 10,
+                view: View(10),
                 high_qc: StandardQc {
                     // a known parent block
                     id: block1.id,
@@ -686,16 +687,16 @@ mod test {
         engine = update_leader_selection(&engine);
 
         let (engine, send) = engine.local_timeout();
-        assert_eq!(engine.highest_voted_view, 1); // updated from 0 (genesis) to 1 (current_view)
+        assert_eq!(engine.highest_voted_view, View(1)); // updated from 0 (genesis) to 1 (current_view)
         assert_eq!(
             send,
             Some(Send {
                 to: engine.overlay().root_committee(),
                 payload: Payload::Timeout(Timeout {
-                    view: 1,
+                    view: View(1),
                     sender: NodeId::new([0; 32]),
                     high_qc: StandardQc {
-                        view: 0, // genesis
+                        view: View(0), // genesis
                         id: BlockId::zeros(),
                     },
                     timeout_qc: None
@@ -714,11 +715,11 @@ mod test {
 
         let (mut engine, _) = engine.local_timeout();
 
-        assert_eq!(engine.current_view(), 1);
+        assert_eq!(engine.current_view(), View(1));
         let timeout_qc = TimeoutQc::new(
-            1,
+            View(1),
             StandardQc {
-                view: 0, // genesis
+                view: View::new(0), // genesis
                 id: BlockId::zeros(),
             },
             NodeId::new([0; 32]),
@@ -726,7 +727,7 @@ mod test {
         engine = engine.receive_timeout_qc(timeout_qc.clone());
         assert_eq!(&engine.local_high_qc, timeout_qc.high_qc());
         assert_eq!(engine.last_view_timeout_qc, Some(timeout_qc));
-        assert_eq!(engine.current_view(), 2);
+        assert_eq!(engine.current_view(), View(2));
     }
 
     #[test]
@@ -739,11 +740,11 @@ mod test {
 
         // before local_timeout occurs
 
-        assert_eq!(engine.current_view(), 1);
+        assert_eq!(engine.current_view(), View(1));
         let timeout_qc = TimeoutQc::new(
-            1,
+            View(1),
             StandardQc {
-                view: 0, // genesis
+                view: View(0), // genesis
                 id: BlockId::zeros(),
             },
             NodeId::new([0; 32]),
@@ -751,7 +752,7 @@ mod test {
         engine = engine.receive_timeout_qc(timeout_qc.clone());
         assert_eq!(&engine.local_high_qc, timeout_qc.high_qc());
         assert_eq!(engine.last_view_timeout_qc, Some(timeout_qc));
-        assert_eq!(engine.current_view(), 2);
+        assert_eq!(engine.current_view(), View(2));
     }
 
     #[test]
@@ -766,11 +767,11 @@ mod test {
         engine = engine.receive_block(block).unwrap(); // received but not approved yet
         engine = update_leader_selection(&engine);
 
-        assert_eq!(engine.current_view(), 1); // still waiting for a QC(view=1)
+        assert_eq!(engine.current_view(), View(1)); // still waiting for a QC(view=1)
         let timeout_qc = TimeoutQc::new(
-            1,
+            View(1),
             StandardQc {
-                view: 0, // genesis
+                view: View(0), // genesis
                 id: BlockId::zeros(),
             },
             NodeId::new([0; 32]),
@@ -778,20 +779,20 @@ mod test {
         engine = engine.receive_timeout_qc(timeout_qc.clone());
         assert_eq!(&engine.local_high_qc, timeout_qc.high_qc());
         assert_eq!(engine.last_view_timeout_qc, Some(timeout_qc.clone()));
-        assert_eq!(engine.current_view(), 2);
-        assert_eq!(engine.highest_voted_view, -1); // didn't vote on anything yet
+        assert_eq!(engine.current_view(), View(2));
+        assert_eq!(engine.highest_voted_view, View(-1)); // didn't vote on anything yet
         engine = update_leader_selection(&engine);
 
         let (engine, send) = engine.approve_new_view(timeout_qc.clone(), HashSet::new());
         assert_eq!(&engine.high_qc(), timeout_qc.high_qc());
-        assert_eq!(engine.current_view(), 2); // not changed
-        assert_eq!(engine.highest_voted_view, 2);
+        assert_eq!(engine.current_view(), View(2)); // not changed
+        assert_eq!(engine.highest_voted_view, View(2));
         assert_eq!(
             send,
             Send {
                 to: vec![engine.overlay().next_leader()].into_iter().collect(),
                 payload: Payload::NewView(NewView {
-                    view: 2,
+                    view: View(2),
                     sender: NodeId::new([0; 32]),
                     timeout_qc: timeout_qc.clone(),
                     high_qc: timeout_qc.high_qc().clone(),
@@ -808,11 +809,11 @@ mod test {
         engine = engine.receive_block(block).unwrap(); // received but not approved yet
         engine = update_leader_selection(&engine);
 
-        assert_eq!(engine.current_view(), 1);
+        assert_eq!(engine.current_view(), View(1));
         let timeout_qc1 = TimeoutQc::new(
-            1,
+            View(1),
             StandardQc {
-                view: 0, // genesis
+                view: View(0), // genesis
                 id: BlockId::zeros(),
             },
             NodeId::new([0; 32]),
@@ -823,9 +824,9 @@ mod test {
 
         // receiving a timeout_qc2 before approving new_view(timeout_qc1)
         let timeout_qc2 = TimeoutQc::new(
-            2,
+            View(2),
             StandardQc {
-                view: 0, // genesis
+                view: View(0), // genesis
                 id: BlockId::zeros(),
             },
             NodeId::new([0; 32]),

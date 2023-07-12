@@ -8,7 +8,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 // crates
 use clap::Parser;
 use consensus_engine::overlay::{FlatOverlay, RandomBeaconState, RoundRobin};
-use consensus_engine::Block;
+use consensus_engine::{Block, View};
 use crossbeam::channel;
 use rand::rngs::SmallRng;
 use rand::seq::SliceRandom;
@@ -93,7 +93,7 @@ impl SimulationApp {
                 };
                 // FIXME: Actually use a proposer and a key to generate random beacon state
                 let genesis = nomos_core::block::Block::new(
-                    0,
+                    View::new(0),
                     Block::genesis().parent_qc,
                     [].into_iter(),
                     leader,

@@ -178,7 +178,7 @@ where
         let overlay = O::new(overlay_settings);
         let genesis = consensus_engine::Block {
             id: BlockId::zeros(),
-            view: 0,
+            view: View::new(0),
             parent_qc: Qc::Standard(StandardQc::genesis()),
             leader_proof: LeaderProof::LeaderId {
                 leader_id: NodeId::new([0; 32]),
@@ -204,7 +204,7 @@ where
         let genesis_block = carnot.genesis_block();
         Self::process_view_change(
             carnot.clone(),
-            genesis_block.view - 1,
+            genesis_block.view.prev(),
             &mut task_manager,
             adapter.clone(),
             timeout,
@@ -223,7 +223,7 @@ where
 
         if carnot.is_next_leader() {
             let network_adapter = adapter.clone();
-            task_manager.push(genesis_block.view + 1, async move {
+            task_manager.push(genesis_block.view.next(), async move {
                 let Event::Approve { qc, .. } = Self::gather_votes(
                         network_adapter,
                         leader_committee.clone(),
@@ -469,7 +469,7 @@ where
             participating_nodes: carnot.root_committee(),
         };
         let (new_carnot, out) = carnot.approve_new_view(timeout_qc.clone(), new_views);
-        let new_view = timeout_qc.view() + 1;
+        let new_view = timeout_qc.view().next();
         if carnot.is_next_leader() {
             let high_qc = carnot.high_qc();
             task_manager.push(new_view, async move {
@@ -506,7 +506,7 @@ where
             participating_nodes: carnot.child_committees().into_iter().flatten().collect(),
         };
         task_manager.push(
-            timeout_qc.view() + 1,
+            timeout_qc.view().next(),
             Self::gather_new_views(adapter, self_committee, timeout_qc.clone(), tally_settings),
         );
         if carnot.current_view() != new_state.current_view() {
@@ -524,7 +524,13 @@ where
     ) -> (Carnot<O>, Option<Output<P::Tx>>) {
         // we might have received a timeout_qc sent by some other node and advanced the view
         // already, in which case we should ignore the timeout
-        if carnot.current_view() != timeouts.iter().map(|t| t.view).max().unwrap_or(0) {
+        if carnot.current_view()
+            != timeouts
+                .iter()
+                .map(|t| t.view)
+                .max()
+                .unwrap_or(View::new(0))
+        {
             return (carnot, None);
         }
 
@@ -569,7 +575,7 @@ where
         match rx.await {
             Ok(txs) => {
                 let beacon = RandomBeaconState::generate_happy(qc.view(), &private_key);
-                let proposal = Block::new(qc.view() + 1, qc, txs, id, beacon);
+                let proposal = Block::new(qc.view().next(), qc, txs, id, beacon);
                 output = Some(Output::BroadcastProposal { proposal });
             }
             Err(e) => tracing::error!("Could not fetch txs {e}"),
@@ -594,8 +600,8 @@ where
             Event::LocalTimeout { view: current_view }
         });
         task_manager.push(
-            current_view + 1,
-            Self::gather_block(adapter.clone(), current_view + 1),
+            current_view.next(),
+            Self::gather_block(adapter.clone(), current_view.next()),
         );
         task_manager.push(
             current_view,
@@ -657,7 +663,7 @@ where
     ) -> Event<P::Tx> {
         let tally = NewViewTally::new(tally);
         let stream = adapter
-            .new_view_stream(&committee, timeout_qc.view() + 1)
+            .new_view_stream(&committee, timeout_qc.view().next())
             .await;
         match tally.tally(timeout_qc.clone(), stream).await {
             Ok((_qc, new_views)) => Event::NewView {
@@ -860,19 +866,19 @@ mod tests {
     fn serde_carnot_info() {
         let info = CarnotInfo {
             id: NodeId::new([0; 32]),
-            current_view: 1,
-            highest_voted_view: -1,
+            current_view: View::new(1),
+            highest_voted_view: View::new(-1),
             local_high_qc: StandardQc {
-                view: 0,
+                view: View::new(0),
                 id: BlockId::zeros(),
             },
             safe_blocks: HashMap::from([(
                 BlockId::zeros(),
                 Block {
                     id: BlockId::zeros(),
-                    view: 0,
+                    view: View::new(0),
                     parent_qc: Qc::Standard(StandardQc {
-                        view: 0,
+                        view: View::new(0),
                         id: BlockId::zeros(),
                     }),
                     leader_proof: LeaderProof::LeaderId {
