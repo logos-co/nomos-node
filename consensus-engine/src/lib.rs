@@ -64,7 +64,7 @@ impl<O: Overlay> Carnot<O> {
             LeaderProof::LeaderId { leader_id } => {
                 // This only accepts blocks from the leader of current_view + 1
                 if leader_id != self.overlay.next_leader()
-                    || block.view != self.current_view().incr()
+                    || block.view != self.current_view().next()
                 {
                     return Err(());
                 }
@@ -104,7 +104,7 @@ impl<O: Overlay> Carnot<O> {
         new_state.update_high_qc(Qc::Standard(timeout_qc.high_qc().clone()));
         new_state.update_timeout_qc(timeout_qc.clone());
 
-        new_state.current_view = timeout_qc.view().incr();
+        new_state.current_view = timeout_qc.view().next();
         new_state.overlay.rebuild(timeout_qc);
 
         new_state
@@ -161,7 +161,7 @@ impl<O: Overlay> Carnot<O> {
         timeout_qc: TimeoutQc,
         new_views: HashSet<NewView>,
     ) -> (Self, Send) {
-        let new_view = timeout_qc.view().incr();
+        let new_view = timeout_qc.view().next();
         assert!(
             new_view
                 > self
@@ -245,7 +245,7 @@ impl<O: Overlay> Carnot<O> {
     }
 
     fn block_is_safe(&self, block: Block) -> bool {
-        block.view >= self.current_view && block.view == block.parent_qc.view().incr()
+        block.view >= self.current_view && block.view == block.parent_qc.view().next()
     }
 
     fn update_high_qc(&mut self, qc: Qc) {
@@ -293,7 +293,7 @@ impl<O: Overlay> Carnot<O> {
         let parent = self.safe_blocks.get(&block.parent())?;
         let grandparent = self.safe_blocks.get(&parent.parent())?;
 
-        if parent.view == grandparent.view.incr()
+        if parent.view == grandparent.view.next()
             && matches!(parent.parent_qc, Qc::Standard { .. })
             && matches!(grandparent.parent_qc, Qc::Standard { .. })
         {
@@ -426,7 +426,7 @@ mod test {
         next_id.0[0] += 1;
 
         Block {
-            view: block.view.incr(),
+            view: block.view.next(),
             id: next_id,
             parent_qc: Qc::Standard(StandardQc {
                 view: block.view,
@@ -501,7 +501,7 @@ mod test {
         let mut parent_block_id = engine.genesis_block().id;
         parent_block_id.0[0] += 1; // generate an unknown parent block ID
         let block = Block {
-            view: engine.current_view().incr(),
+            view: engine.current_view().next(),
             id: BlockId::new([1; 32]),
             parent_qc: Qc::Standard(StandardQc {
                 view: engine.current_view(),
@@ -529,7 +529,7 @@ mod test {
         engine = update_leader_selection(&engine);
 
         let mut unsafe_block = next_block(&engine, &block);
-        unsafe_block.view = engine.current_view().decr(); // UNSAFE: view < engine.current_view
+        unsafe_block.view = engine.current_view().prev(); // UNSAFE: view < engine.current_view
         assert!(engine.receive_block(unsafe_block).is_err());
 
         let mut unsafe_block = next_block(&engine, &block);

@@ -198,7 +198,7 @@ impl EventBuilder {
                             events.push(Event::ProposeBlock {
                                 qc: Qc::Aggregated(AggregateQc {
                                     high_qc,
-                                    view: msg_view.incr(),
+                                    view: msg_view.next(),
                                 }),
                             });
                         } else {

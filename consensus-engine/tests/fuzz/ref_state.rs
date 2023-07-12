@@ -191,7 +191,7 @@ impl RefState {
     fn transition_receive_unsafe_block(&self) -> BoxedStrategy<Transition> {
         let old_parents = self
             .chain
-            .range(..self.current_view().decr())
+            .range(..self.current_view().prev())
             .flat_map(|(_view, entry)| entry.blocks.iter().cloned())
             .collect::<Vec<Block>>();
 
@@ -211,7 +211,7 @@ impl RefState {
     fn transition_approve_block(&self) -> BoxedStrategy<Transition> {
         let blocks_not_voted = self
             .chain
-            .range(self.highest_voted_view.incr()..)
+            .range(self.highest_voted_view.next()..)
             .flat_map(|(_view, entry)| entry.blocks.iter().cloned())
             .collect::<Vec<Block>>();
 
@@ -332,7 +332,7 @@ impl RefState {
         let current_view = self.current_view();
 
         Just(Transition::ReceiveSafeBlock(Block {
-            view: current_view.incr(),
+            view: current_view.next(),
             id: BlockId::random(&mut rand::thread_rng()),
             parent_qc: Qc::Aggregated(AggregateQc {
                 high_qc: self.high_qc(),
@@ -354,7 +354,7 @@ impl RefState {
     }
 
     pub fn new_view_from(timeout_qc: &TimeoutQc) -> View {
-        timeout_qc.view().incr()
+        timeout_qc.view().next()
     }
 
     pub fn high_qc(&self) -> StandardQc {
@@ -395,7 +395,7 @@ impl RefState {
     fn consecutive_block(parent: &Block) -> Block {
         Block {
             // use rand because we don't want this to be shrinked by proptest
-            view: parent.view.incr(),
+            view: parent.view.next(),
             id: BlockId::random(&mut rand::thread_rng()),
             parent_qc: Qc::Standard(StandardQc {
                 view: parent.view,

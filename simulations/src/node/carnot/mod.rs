@@ -339,7 +339,7 @@ impl<L: UpdateableLeaderSelection, O: Overlay<LeaderSelection = L>> Node for Car
                 m.view() == self.engine.current_view()
                     || matches!(m, CarnotMessage::Proposal(_) | CarnotMessage::TimeoutQc(_))
             });
-        self.message_cache.prune(self.engine.current_view().decr());
+        self.message_cache.prune(self.engine.current_view().prev());
         self.message_cache.update(other_view_messages);
         current_view_messages.append(&mut self.message_cache.retrieve(self.engine.current_view()));
 
@@ -408,12 +408,12 @@ impl<L: UpdateableLeaderSelection, O: Overlay<LeaderSelection = L>> Node for Car
                 Event::ProposeBlock { qc } => {
                     output = vec![Output::BroadcastProposal {
                         proposal: nomos_core::block::Block::new(
-                            qc.view().incr(),
+                            qc.view().next(),
                             qc.clone(),
                             [].into_iter(),
                             self.id,
                             RandomBeaconState::generate_happy(
-                                qc.view().incr(),
+                                qc.view().next(),
                                 &self.random_beacon_pk,
                             ),
                         ),

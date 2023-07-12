@@ -35,11 +35,11 @@ impl View {
         self.0.encode_var_vec()
     }
 
-    pub const fn incr(&self) -> Self {
+    pub const fn next(&self) -> Self {
         Self(self.0 + 1)
     }
 
-    pub const fn decr(&self) -> Self {
+    pub const fn prev(&self) -> Self {
         Self(self.0 - 1)
     }
 }
