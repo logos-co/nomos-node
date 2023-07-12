@@ -283,7 +283,7 @@ fn create_topic(tag: &str, committee: Option<&Committee>) -> WakuContentTopic {
             "{}{}",
             tag,
             committee
-                .map(|c| format!("-{}", hash_set(c)))
+                .map(|c| format!("-{}", c.id::<blake2::Blake2s256>()))
                 .unwrap_or_default()
         )),
         encoding: Encoding::Proto,
@@ -316,14 +316,3 @@ const PROPOSAL_TAG: &str = "proposal";
 const VOTE_TAG: &str = "vote";
 const TIMEOUT_TAG: &str = "timeout";
 const TIMEOUT_QC_TAG: &str = "timeout-qc";
-
-// TODO: Maybe use a secure hasher instead
-fn hash_set(c: &Committee) -> u64 {
-    let mut s = DefaultHasher::new();
-    // ensure consistent iteration across nodes
-    let c = c.iter().collect::<BTreeSet<_>>();
-    for e in c.iter() {
-        e.hash(&mut s);
-    }
-    s.finish()
-}
