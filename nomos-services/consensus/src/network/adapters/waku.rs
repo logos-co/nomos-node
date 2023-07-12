@@ -7,7 +7,7 @@ use std::hash::{Hash, Hasher};
 use futures::{Stream, StreamExt};
 use tokio_stream::wrappers::BroadcastStream;
 // internal
-use crate::network::messages::{NewViewMsg, TimeoutMsg, TimeoutQcMsg};
+use crate::network::messages::{NetworkMessage, NewViewMsg, TimeoutMsg, TimeoutQcMsg};
 use crate::network::{
     messages::{ProposalChunkMsg, VoteMsg},
     BoxedStream, NetworkAdapter,
@@ -132,158 +132,7 @@ impl WakuAdapter {
         tokio_stream::StreamExt::merge(live_stream, archive_stream)
     }
 
-    async fn broadcast(&self, bytes: Box<[u8]>, topic: WakuContentTopic) {
-        let message = WakuMessage::new(
-            bytes,
-            topic,
-            1,
-            chrono::Utc::now().timestamp_nanos() as usize,
-            [],
-            false,
-        );
-        if let Err((_, _e)) = self
-            .network_relay
-            .send(NetworkMsg::Process(WakuBackendMessage::Broadcast {
-                message,
-                topic: Some(WAKU_CARNOT_PUB_SUB_TOPIC.clone()),
-            }))
-            .await
-        {
-            todo!("log error");
-        };
-    }
-}
-
-#[async_trait::async_trait]
-impl NetworkAdapter for WakuAdapter {
-    type Backend = Waku;
-
-    async fn new(
-        network_relay: OutboundRelay<<NetworkService<Self::Backend> as ServiceData>::Message>,
-    ) -> Self {
-        Self { network_relay }
-    }
-
-    async fn proposal_chunks_stream(&self, view: View) -> BoxedStream<ProposalChunkMsg> {
-        Box::new(Box::pin(
-            self.cached_stream_with_content_topic(PROPOSAL_CONTENT_TOPIC)
-                .await
-                .filter_map(move |message| {
-                    let payload = message.payload();
-                    let proposal = ProposalChunkMsg::from_bytes(payload);
-                    async move {
-                        if view == proposal.view {
-                            Some(proposal)
-                        } else {
-                            None
-                        }
-                    }
-                }),
-        ))
-    }
-
-    async fn broadcast_block_chunk(&self, chunk_message: ProposalChunkMsg) {
-        let message = WakuMessage::new(
-            chunk_message.as_bytes(),
-            PROPOSAL_CONTENT_TOPIC,
-            1,
-            chrono::Utc::now().timestamp_nanos() as usize,
-            [],
-            false,
-        );
-        if let Err((_, _e)) = self
-            .network_relay
-            .send(NetworkMsg::Process(WakuBackendMessage::Broadcast {
-                message,
-                topic: Some(WAKU_CARNOT_PUB_SUB_TOPIC),
-            }))
-            .await
-        {
-            todo!("log error");
-        };
-    }
-
-    async fn broadcast_timeout_qc(&self, timeout_qc_msg: TimeoutQcMsg) {
-        self.broadcast(timeout_qc_msg.as_bytes(), TIMEOUT_QC_CONTENT_TOPIC)
-            .await
-    }
-
-    async fn timeout_stream(&self, committee: &Committee, view: View) -> BoxedStream<TimeoutMsg> {
-        let content_topic = create_topic("timeout", committee, view);
-        Box::new(Box::pin(
-            self.cached_stream_with_content_topic(content_topic)
-                .await
-                .filter_map(move |message| {
-                    let payload = message.payload();
-                    let timeout = TimeoutMsg::from_bytes(payload);
-                    async move {
-                        if timeout.vote.view == view {
-                            Some(timeout)
-                        } else {
-                            None
-                        }
-                    }
-                }),
-        ))
-    }
-
-    async fn timeout_qc_stream(&self, view: View) -> BoxedStream<TimeoutQcMsg> {
-        Box::new(Box::pin(
-            self.cached_stream_with_content_topic(TIMEOUT_QC_CONTENT_TOPIC)
-                .await
-                .filter_map(move |message| {
-                    let payload = message.payload();
-                    let qc = TimeoutQcMsg::from_bytes(payload);
-                    async move {
-                        if qc.qc.view() == view {
-                            Some(qc)
-                        } else {
-                            None
-                        }
-                    }
-                }),
-        ))
-    }
-
-    async fn votes_stream(
-        &self,
-        committee: &Committee,
-        view: View,
-        proposal_id: BlockId,
-    ) -> BoxedStream<VoteMsg> {
-        let content_topic = create_topic("votes", committee, view);
-        Box::new(Box::pin(
-            self.cached_stream_with_content_topic(content_topic)
-                .await
-                .filter_map(move |message| {
-                    let payload = message.payload();
-                    let vote = VoteMsg::from_bytes(payload);
-                    async move {
-                        if vote.vote.block == proposal_id {
-                            Some(vote)
-                        } else {
-                            None
-                        }
-                    }
-                }),
-        ))
-    }
-
-    async fn new_view_stream(&self, committee: &Committee, view: View) -> BoxedStream<NewViewMsg> {
-        let content_topic = create_topic("new-view", committee, view);
-        Box::new(Box::pin(
-            self.cached_stream_with_content_topic(content_topic)
-                .await
-                .map(|message| {
-                    let payload = message.payload();
-                    NewViewMsg::from_bytes(payload)
-                }),
-        ))
-    }
-
-    async fn send(&self, committee: &Committee, view: View, payload: Box<[u8]>, channel: &str) {
-        let content_topic = create_topic(channel, committee, view);
-
+    async fn inner_broadcast(&self, payload: Box<[u8]>, content_topic: WakuContentTopic) {
         let message = WakuMessage::new(
             payload,
             content_topic,
@@ -305,19 +154,168 @@ impl NetworkAdapter for WakuAdapter {
     }
 }
 
-fn create_topic(tag: &str, committee: &Committee, view: View) -> WakuContentTopic {
+#[async_trait::async_trait]
+impl NetworkAdapter for WakuAdapter {
+    type Backend = Waku;
+
+    async fn new(
+        network_relay: OutboundRelay<<NetworkService<Self::Backend> as ServiceData>::Message>,
+    ) -> Self {
+        Self { network_relay }
+    }
+
+    async fn proposal_chunks_stream(&self, view: View) -> BoxedStream<ProposalChunkMsg> {
+        Box::new(Box::pin(
+            self.cached_stream_with_content_topic(create_topic(PROPOSAL_TAG, None))
+                .await
+                .filter_map(move |message| {
+                    let payload = message.payload();
+                    let proposal = ProposalChunkMsg::from_bytes(payload);
+                    async move {
+                        if view == proposal.view {
+                            Some(proposal)
+                        } else {
+                            None
+                        }
+                    }
+                }),
+        ))
+    }
+
+    async fn broadcast(&self, message: NetworkMessage) {
+        let topic = create_topic(message_tag(&message), None);
+        self.inner_broadcast(unwrap_message_to_bytes(&message), topic)
+            .await
+    }
+
+    async fn timeout_stream(&self, committee: &Committee, view: View) -> BoxedStream<TimeoutMsg> {
+        let content_topic = create_topic(TIMEOUT_TAG, Some(committee));
+        Box::new(Box::pin(
+            self.cached_stream_with_content_topic(content_topic)
+                .await
+                .filter_map(move |message| {
+                    let payload = message.payload();
+                    let timeout = TimeoutMsg::from_bytes(payload);
+                    async move {
+                        if timeout.vote.view == view {
+                            Some(timeout)
+                        } else {
+                            None
+                        }
+                    }
+                }),
+        ))
+    }
+
+    async fn timeout_qc_stream(&self, view: View) -> BoxedStream<TimeoutQcMsg> {
+        Box::new(Box::pin(
+            self.cached_stream_with_content_topic(create_topic(TIMEOUT_QC_TAG, None))
+                .await
+                .filter_map(move |message| {
+                    let payload = message.payload();
+                    let qc = TimeoutQcMsg::from_bytes(payload);
+                    async move {
+                        if qc.qc.view() == view {
+                            Some(qc)
+                        } else {
+                            None
+                        }
+                    }
+                }),
+        ))
+    }
+
+    async fn votes_stream(
+        &self,
+        committee: &Committee,
+        view: View,
+        proposal_id: BlockId,
+    ) -> BoxedStream<VoteMsg> {
+        let content_topic = create_topic(VOTE_TAG, Some(committee));
+        Box::new(Box::pin(
+            self.cached_stream_with_content_topic(content_topic)
+                .await
+                .filter_map(move |message| {
+                    let payload = message.payload();
+                    let vote = VoteMsg::from_bytes(payload);
+                    async move {
+                        if vote.vote.block == proposal_id && vote.vote.view == view {
+                            Some(vote)
+                        } else {
+                            None
+                        }
+                    }
+                }),
+        ))
+    }
+
+    async fn new_view_stream(&self, committee: &Committee, view: View) -> BoxedStream<NewViewMsg> {
+        let content_topic = create_topic(NEW_VIEW_TAG, Some(committee));
+        Box::new(Box::pin(
+            self.cached_stream_with_content_topic(content_topic)
+                .await
+                .filter_map(move |message| {
+                    let payload = message.payload();
+                    let new_view = NewViewMsg::from_bytes(payload);
+                    async move {
+                        if new_view.vote.view == view {
+                            Some(new_view)
+                        } else {
+                            None
+                        }
+                    }
+                }),
+        ))
+    }
+
+    async fn send(&self, message: NetworkMessage, committee: &Committee) {
+        let topic = create_topic(message_tag(&message), Some(committee));
+        self.inner_broadcast(unwrap_message_to_bytes(&message), topic)
+            .await
+    }
+}
+
+fn create_topic(tag: &str, committee: Option<&Committee>) -> WakuContentTopic {
     WakuContentTopic {
         application_name: Cow::Borrowed(APPLICATION_NAME),
         version: VERSION,
-        content_topic_name: Cow::Owned(format!("{}-{}-{}", tag, hash_set(committee), view)),
+        content_topic_name: Cow::Owned(format!(
+            "{}{}",
+            tag,
+            committee
+                .map(|c| format!("-{}", hash_set(c)))
+                .unwrap_or_default()
+        )),
         encoding: Encoding::Proto,
     }
 }
 
-const PROPOSAL_CONTENT_TOPIC: WakuContentTopic =
-    WakuContentTopic::new(APPLICATION_NAME, VERSION, "proposal", Encoding::Proto);
-const TIMEOUT_QC_CONTENT_TOPIC: WakuContentTopic =
-    WakuContentTopic::new(APPLICATION_NAME, VERSION, "timeout-qc", Encoding::Proto);
+// since we use content topic to filter messages, we can remove the tag from the message
+fn unwrap_message_to_bytes(message: &NetworkMessage) -> Box<[u8]> {
+    match message {
+        NetworkMessage::NewView(msg) => msg.as_bytes(),
+        NetworkMessage::ProposalChunk(msg) => msg.as_bytes(),
+        NetworkMessage::Vote(msg) => msg.as_bytes(),
+        NetworkMessage::Timeout(msg) => msg.as_bytes(),
+        NetworkMessage::TimeoutQc(msg) => msg.as_bytes(),
+    }
+}
+
+fn message_tag(message: &NetworkMessage) -> &str {
+    match message {
+        NetworkMessage::NewView(_) => NEW_VIEW_TAG,
+        NetworkMessage::ProposalChunk(_) => PROPOSAL_TAG,
+        NetworkMessage::Vote(_) => VOTE_TAG,
+        NetworkMessage::Timeout(_) => TIMEOUT_TAG,
+        NetworkMessage::TimeoutQc(_) => TIMEOUT_QC_TAG,
+    }
+}
+
+const NEW_VIEW_TAG: &str = "new-view";
+const PROPOSAL_TAG: &str = "proposal";
+const VOTE_TAG: &str = "vote";
+const TIMEOUT_TAG: &str = "timeout";
+const TIMEOUT_QC_TAG: &str = "timeout-qc";
 
 // TODO: Maybe use a secure hasher instead
 fn hash_set(c: &Committee) -> u64 {

@@ -83,3 +83,21 @@ impl TimeoutQcMsg {
         wire::deserialize(data).unwrap()
     }
 }
+
+#[derive(Serialize, Deserialize)]
+pub enum NetworkMessage {
+    Timeout(TimeoutMsg),
+    TimeoutQc(TimeoutQcMsg),
+    Vote(VoteMsg),
+    NewView(NewViewMsg),
+    ProposalChunk(ProposalChunkMsg),
+}
+
+impl NetworkMessage {
+    pub fn as_bytes(&self) -> Box<[u8]> {
+        wire::serialize(self).unwrap().into_boxed_slice()
+    }
+    pub fn from_bytes(data: &[u8]) -> Self {
+        wire::deserialize(data).unwrap()
+    }
+}

@@ -20,7 +20,9 @@ use serde_with::serde_as;
 use tokio::sync::oneshot::Sender;
 use tracing::instrument;
 // internal
-use crate::network::messages::{NewViewMsg, ProposalChunkMsg, TimeoutMsg, TimeoutQcMsg, VoteMsg};
+use crate::network::messages::{
+    NetworkMessage, NewViewMsg, ProposalChunkMsg, TimeoutMsg, TimeoutQcMsg, VoteMsg,
+};
 use crate::network::NetworkAdapter;
 use crate::tally::{
     happy::CarnotTally, timeout::TimeoutTally, unhappy::NewViewTally, CarnotTallySettings,
@@ -736,43 +738,34 @@ where
             Payload::Vote(vote) => {
                 adapter
                     .send(
-                        &to,
-                        vote.view,
-                        VoteMsg {
+                        NetworkMessage::Vote(VoteMsg {
                             voter: node_id,
                             vote,
                             qc: None, // TODO: handle root commmittee members
-                        }
-                        .as_bytes(),
-                        "votes",
+                        }),
+                        &to,
                     )
                     .await;
             }
             Payload::Timeout(timeout) => {
                 adapter
                     .send(
-                        &to,
-                        timeout.view,
-                        TimeoutMsg {
+                        NetworkMessage::Timeout(TimeoutMsg {
                             voter: node_id,
                             vote: timeout,
-                        }
-                        .as_bytes(),
-                        "timeout",
+                        }),
+                        &to,
                     )
                     .await;
             }
             Payload::NewView(new_view) => {
                 adapter
                     .send(
-                        &to,
-                        new_view.view,
-                        NewViewMsg {
+                        NetworkMessage::NewView(NewViewMsg {
                             voter: node_id,
                             vote: new_view,
-                        }
-                        .as_bytes(),
-                        "new-view",
+                        }),
+                        &to,
                     )
                     .await;
             }
@@ -781,20 +774,20 @@ where
             fountain
                 .encode(&proposal.as_bytes())
                 .for_each(|chunk| {
-                    adapter.broadcast_block_chunk(ProposalChunkMsg {
+                    adapter.broadcast(NetworkMessage::ProposalChunk(ProposalChunkMsg {
                         proposal: proposal.header().id,
                         chunk: chunk.to_vec().into_boxed_slice(),
                         view: proposal.header().view,
-                    })
+                    }))
                 })
                 .await;
         }
         Output::BroadcastTimeoutQc { timeout_qc } => {
             adapter
-                .broadcast_timeout_qc(TimeoutQcMsg {
+                .broadcast(NetworkMessage::TimeoutQc(TimeoutQcMsg {
                     source: node_id,
                     qc: timeout_qc,
-                })
+                }))
                 .await;
         }
     }
