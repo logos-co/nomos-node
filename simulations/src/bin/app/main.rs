@@ -1,13 +1,13 @@
 // std
 use anyhow::Ok;
+use overlay_node::OverlayNode;
 use serde::Serialize;
-use simulations::node::carnot::CarnotSettings;
 use std::fs::File;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 // crates
 use clap::Parser;
-use consensus_engine::overlay::{FlatOverlay, RandomBeaconState, RoundRobin};
+use consensus_engine::overlay::RandomBeaconState;
 use consensus_engine::{Block, View};
 use crossbeam::channel;
 use rand::rngs::SmallRng;
@@ -25,10 +25,10 @@ use simulations::streaming::{
 };
 // internal
 use simulations::{
-    node::carnot::CarnotNode, output_processors::OutData, runner::SimulationRunner,
-    settings::SimulationSettings,
+    output_processors::OutData, runner::SimulationRunner, settings::SimulationSettings,
 };
 mod log;
+mod overlay_node;
 
 /// Main simulation wrapper
 /// Pipes together the cli arguments with the execution
@@ -86,11 +86,7 @@ impl SimulationApp {
                 );
                 let nodes: Vec<NodeId> = ids.clone().into_iter().map(Into::into).collect();
                 let leader = nodes.first().copied().unwrap();
-                let overlay_settings = consensus_engine::overlay::Settings {
-                    nodes: nodes.to_vec(),
-                    leader: RoundRobin::new(),
-                    leader_super_majority_threshold: None,
-                };
+
                 // FIXME: Actually use a proposer and a key to generate random beacon state
                 let genesis = nomos_core::block::Block::new(
                     View::new(0),
@@ -101,30 +97,50 @@ impl SimulationApp {
                         entropy: Box::new([0; 32]),
                     },
                 );
-                CarnotNode::<FlatOverlay<RoundRobin>>::new(
+                OverlayNode::to_overlay_node(
                     node_id,
-                    CarnotSettings::new(
-                        simulation_settings.node_settings.timeout,
-                        simulation_settings.record_settings.clone(),
-                    ),
-                    overlay_settings,
-                    genesis,
+                    nodes,
+                    leader,
                     network_interface,
+                    genesis,
                     &mut rng,
+                    &simulation_settings,
                 )
             })
             .collect();
-        run(network, nodes, simulation_settings, stream_type)?;
+        run_with_overlay(network, nodes, simulation_settings, stream_type)?;
         Ok(())
     }
 }
 
-fn run<M, N: Node>(
+fn run_with_overlay<M>(
+    network: Network<M>,
+    nodes: Vec<OverlayNode>,
+    settings: SimulationSettings,
+    stream_type: Option<StreamType>,
+) -> anyhow::Result<()>
+where
+    M: Clone + Send + Sync + 'static,
+{
+    match settings.overlay_settings {
+        simulations::settings::OverlaySettings::Flat => {
+            let nodes = nodes.into_iter().map(OverlayNode::unwrap_flat).collect();
+            signal(run_with_stream(network, nodes, settings, stream_type)?)
+        }
+        simulations::settings::OverlaySettings::Tree(_) => {
+            let nodes = nodes.into_iter().map(OverlayNode::unwrap_tree).collect();
+            let handle = run_with_stream(network, nodes, settings, stream_type)?;
+            signal(handle)
+        }
+    }
+}
+
+fn run_with_stream<M, N: Node>(
     network: Network<M>,
     nodes: Vec<N>,
     settings: SimulationSettings,
     stream_type: Option<StreamType>,
-) -> anyhow::Result<()>
+) -> anyhow::Result<SimulationRunnerHandle<OutData>>
 where
     M: Clone + Send + Sync + 'static,
     N: Send + Sync + 'static,
@@ -135,23 +151,21 @@ where
     let runner =
         SimulationRunner::<_, _, OutData>::new(network, nodes, Default::default(), settings)?;
 
-    let handle = match stream_type {
+    match stream_type {
         Some(StreamType::Naive) => {
             let settings = stream_settings.unwrap_naive();
-            runner.simulate_and_subscribe::<NaiveSubscriber<OutData>>(settings)?
+            Ok(runner.simulate_and_subscribe::<NaiveSubscriber<OutData>>(settings)?)
         }
         Some(StreamType::IO) => {
             let settings = stream_settings.unwrap_io();
-            runner.simulate_and_subscribe::<IOSubscriber<OutData>>(settings)?
+            Ok(runner.simulate_and_subscribe::<IOSubscriber<OutData>>(settings)?)
         }
         Some(StreamType::Polars) => {
             let settings = stream_settings.unwrap_polars();
-            runner.simulate_and_subscribe::<PolarsSubscriber<OutData>>(settings)?
+            Ok(runner.simulate_and_subscribe::<PolarsSubscriber<OutData>>(settings)?)
         }
-        None => runner.simulate()?,
-    };
-
-    signal(handle)
+        None => Ok(runner.simulate()?),
+    }
 }
 
 fn signal<R: Record>(handle: SimulationRunnerHandle<R>) -> anyhow::Result<()> {

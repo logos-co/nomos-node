@@ -396,7 +396,7 @@ impl<O: Overlay> Carnot<O> {
 mod test {
     use std::convert::Infallible;
 
-    use crate::overlay::{FlatOverlay, RoundRobin, Settings};
+    use crate::overlay::{FlatOverlay, FlatOverlaySettings, RoundRobin};
 
     use super::*;
 
@@ -413,7 +413,7 @@ mod test {
                     leader_id: *nodes.first().unwrap(),
                 },
             },
-            FlatOverlay::new(Settings {
+            FlatOverlay::new(FlatOverlaySettings {
                 nodes,
                 leader: RoundRobin::default(),
                 leader_super_majority_threshold: None,

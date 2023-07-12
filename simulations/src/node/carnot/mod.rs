@@ -2,7 +2,7 @@
 
 mod event_builder;
 mod message_cache;
-mod messages;
+pub mod messages;
 mod tally;
 mod timeout;
 

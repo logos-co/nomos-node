@@ -78,7 +78,10 @@ mod tests {
             Node, NodeId, NodeIdExt, OverlayState, SharedState, ViewOverlay,
         },
         output_processors::OutData,
-        overlay::{tree::TreeOverlay, Overlay, SimulationOverlay},
+        overlay::{
+            tree::{TreeOverlay, TreeSettings},
+            Overlay, SimulationOverlay,
+        },
         runner::SimulationRunner,
         settings::SimulationSettings,
         streaming::StreamProducer,
@@ -131,7 +134,7 @@ mod tests {
 
         let mut rng = StepRng::new(1, 0);
         let node_ids: Vec<NodeId> = (0..settings.node_count).map(NodeId::from_index).collect();
-        let overlay = TreeOverlay::new(settings.overlay_settings.clone().try_into().unwrap());
+        let overlay = TreeOverlay::new(TreeSettings::default());
         let mut network = init_network(&node_ids);
         let view = ViewOverlay {
             leaders: overlay.leaders(&node_ids, 1, &mut rng).collect(),
@@ -166,7 +169,7 @@ mod tests {
 
         let mut rng = StepRng::new(1, 0);
         let node_ids: Vec<NodeId> = (0..settings.node_count).map(NodeId::from_index).collect();
-        let overlay = TreeOverlay::new(settings.overlay_settings.clone().try_into().unwrap());
+        let overlay = TreeOverlay::new(TreeSettings::default());
         let mut network = init_network(&node_ids);
         let view = ViewOverlay {
             leaders: overlay.leaders(&node_ids, 1, &mut rng).collect(),

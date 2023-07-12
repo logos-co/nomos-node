@@ -17,7 +17,9 @@
       "asia": 0.3
     }
   },
-  "overlay_settings": "Flat",
+  "overlay_settings": {
+	  "number_of_committees": 3
+  },
   "node_settings": {
     "timeout": "1000ms"
   },

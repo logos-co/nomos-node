@@ -1,7 +1,7 @@
 use std::{collections::HashSet, panic};
 
 use consensus_engine::{
-    overlay::{FlatOverlay, RoundRobin, Settings},
+    overlay::{FlatOverlay, FlatOverlaySettings, RoundRobin},
     *,
 };
 use proptest_state_machine::{ReferenceStateMachine, StateMachineTest};
@@ -28,7 +28,7 @@ impl ConsensusEngineTest {
                     leader_id: NodeId::new([0; 32]),
                 },
             },
-            FlatOverlay::new(Settings {
+            FlatOverlay::new(FlatOverlaySettings {
                 nodes: vec![NodeId::new([0; 32])],
                 leader: RoundRobin::default(),
                 leader_super_majority_threshold: None,
