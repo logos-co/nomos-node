@@ -869,16 +869,16 @@ mod tests {
             current_view: View::new(1),
             highest_voted_view: View::new(-1),
             local_high_qc: StandardQc {
-                view: 0,
+                view: View::new(0),
                 id: BlockId::zeros(),
             },
             safe_blocks: HashMap::from([(
                 BlockId::zeros(),
                 Block {
                     id: BlockId::zeros(),
-                    view: 0,
+                    view: View::new(0),
                     parent_qc: Qc::Standard(StandardQc {
-                        view: 0,
+                        view: View::new(0),
                         id: BlockId::zeros(),
                     }),
                     leader_proof: LeaderProof::LeaderId {

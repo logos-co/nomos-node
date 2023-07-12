@@ -1,9 +1,10 @@
+use consensus_engine::View;
 use fraction::Fraction;
 use futures::stream::{self, StreamExt};
 use std::collections::HashSet;
 use tests::{Node, NomosNode, SpawnConfig};
 
-const TARGET_VIEW: i64 = 20;
+const TARGET_VIEW: View = View::new(20);
 
 #[tokio::test]
 async fn ten_nodes_one_down() {
