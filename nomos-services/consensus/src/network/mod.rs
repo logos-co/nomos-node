@@ -5,7 +5,9 @@ pub mod messages;
 // crates
 use futures::Stream;
 // internal
-use crate::network::messages::{NewViewMsg, ProposalChunkMsg, TimeoutMsg, TimeoutQcMsg, VoteMsg};
+use crate::network::messages::{
+    NetworkMessage, NewViewMsg, ProposalChunkMsg, TimeoutMsg, TimeoutQcMsg, VoteMsg,
+};
 use consensus_engine::{BlockId, Committee, View};
 use nomos_network::backends::NetworkBackend;
 use nomos_network::NetworkService;
@@ -24,8 +26,7 @@ pub trait NetworkAdapter {
         &self,
         view: View,
     ) -> Box<dyn Stream<Item = ProposalChunkMsg> + Send + Sync + Unpin>;
-    async fn broadcast_block_chunk(&self, chunk_msg: ProposalChunkMsg);
-    async fn broadcast_timeout_qc(&self, timeout_qc_msg: TimeoutQcMsg);
+    async fn broadcast(&self, message: NetworkMessage);
     async fn timeout_stream(&self, committee: &Committee, view: View) -> BoxedStream<TimeoutMsg>;
     async fn timeout_qc_stream(&self, view: View) -> BoxedStream<TimeoutQcMsg>;
     async fn votes_stream(
@@ -35,5 +36,5 @@ pub trait NetworkAdapter {
         proposal_id: BlockId,
     ) -> BoxedStream<VoteMsg>;
     async fn new_view_stream(&self, committee: &Committee, view: View) -> BoxedStream<NewViewMsg>;
-    async fn send(&self, committee: &Committee, view: View, payload: Box<[u8]>, channel: &str);
+    async fn send(&self, message: NetworkMessage, committee: &Committee);
 }

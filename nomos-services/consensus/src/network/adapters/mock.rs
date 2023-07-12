@@ -8,7 +8,7 @@ use nomos_network::{
 use overwatch_rs::services::{relay::OutboundRelay, ServiceData};
 use tokio_stream::wrappers::BroadcastStream;
 
-use crate::network::messages::{NewViewMsg, TimeoutMsg, TimeoutQcMsg};
+use crate::network::messages::{NetworkMessage, NewViewMsg, TimeoutMsg, TimeoutQcMsg};
 use crate::network::{
     messages::{ProposalChunkMsg, VoteMsg},
     BoxedStream, NetworkAdapter,
@@ -84,27 +84,8 @@ impl NetworkAdapter for MockAdapter {
         }))
     }
 
-    async fn broadcast_block_chunk(&self, chunk_message: ProposalChunkMsg) {
-        let message = MockMessage::new(
-            String::from_utf8_lossy(&chunk_message.as_bytes()).to_string(),
-            MOCK_BLOCK_CONTENT_TOPIC,
-            1,
-            chrono::Utc::now().timestamp_nanos() as usize,
-        );
-        if let Err((e, _)) = self
-            .network_relay
-            .send(NetworkMsg::Process(MockBackendMessage::Broadcast {
-                msg: message,
-                topic: MOCK_PUB_SUB_TOPIC.to_string(),
-            }))
-            .await
-        {
-            tracing::error!("Failed to broadcast block chunk: {:?}", e);
-        };
-    }
-
-    async fn broadcast_timeout_qc(&self, _timeout_qc_msg: TimeoutQcMsg) {
-        todo!()
+    async fn broadcast(&self, message: NetworkMessage) {
+        self.send(message, &Committee::default()).await
     }
 
     async fn timeout_stream(&self, _committee: &Committee, _view: View) -> BoxedStream<TimeoutMsg> {
@@ -145,9 +126,9 @@ impl NetworkAdapter for MockAdapter {
         todo!()
     }
 
-    async fn send(&self, _committee: &Committee, _view: View, payload: Box<[u8]>, _channel: &str) {
+    async fn send(&self, message: NetworkMessage, _committee: &Committee) {
         let message = MockMessage::new(
-            String::from_utf8_lossy(&payload).to_string(),
+            String::from_utf8_lossy(&message.as_bytes()).to_string(),
             MOCK_APPROVAL_CONTENT_TOPIC,
             1,
             chrono::Utc::now().timestamp_nanos() as usize,
