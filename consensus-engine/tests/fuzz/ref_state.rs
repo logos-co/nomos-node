@@ -332,7 +332,7 @@ impl RefState {
         let current_view = self.current_view();
 
         Just(Transition::ReceiveSafeBlock(Block {
-            id: BlockId::random(),
+            id: BlockId::random(&mut rand::thread_rng()),
             view: current_view + 1,
             parent_qc: Qc::Aggregated(AggregateQc {
                 high_qc: self.high_qc(),
@@ -395,7 +395,7 @@ impl RefState {
     fn consecutive_block(parent: &Block) -> Block {
         Block {
             // use rand because we don't want this to be shrinked by proptest
-            id: BlockId::random(),
+            id: BlockId::random(&mut rand::thread_rng()),
             view: parent.view + 1,
             parent_qc: Qc::Standard(StandardQc {
                 view: parent.view,
