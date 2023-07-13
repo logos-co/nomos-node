@@ -1,4 +1,5 @@
 // std
+use consensus_engine::View;
 use std::collections::{BTreeMap, BTreeSet};
 use std::time::Duration;
 // crates
@@ -40,12 +41,12 @@ pub enum Intent {
 
 #[derive(Debug, Clone)]
 pub struct Vote {
-    pub view: usize,
+    pub view: View,
     pub intent: Intent,
 }
 
 impl Vote {
-    pub fn new(id: usize, intent: Intent) -> Self {
+    pub fn new(id: View, intent: Intent) -> Self {
         Self { view: id, intent }
     }
 
@@ -57,8 +58,8 @@ impl Vote {
     }
 }
 
-impl From<usize> for Vote {
-    fn from(id: usize) -> Self {
+impl From<View> for Vote {
+    fn from(id: View) -> Self {
         Self {
             view: id,
             intent: Default::default(),
@@ -68,17 +69,17 @@ impl From<usize> for Vote {
 
 #[derive(Debug, Clone)]
 pub struct Block {
-    pub view: usize,
+    pub view: View,
 }
 
 impl Block {
-    pub fn new(id: usize) -> Self {
+    pub fn new(id: View) -> Self {
         Self { view: id }
     }
 }
 
-impl From<usize> for Block {
-    fn from(id: usize) -> Self {
+impl From<View> for Block {
+    fn from(id: View) -> Self {
         Self { view: id }
     }
 }
@@ -98,7 +99,7 @@ struct LocalView {
 }
 
 impl LocalView {
-    pub fn new<O: OverlayGetter>(node_id: NodeId, view_id: usize, overlays: O) -> Self {
+    pub fn new<O: OverlayGetter>(node_id: NodeId, view_id: View, overlays: O) -> Self {
         let view = overlays
             .get_view(view_id)
             .expect("simulation generated enough views");
@@ -152,7 +153,7 @@ pub enum DummyRole {
 impl DummyNode {
     pub fn new(
         node_id: NodeId,
-        view_id: usize,
+        view_id: View,
         overlay_state: SharedState<OverlayState>,
         network_interface: InMemoryNetworkInterface<DummyMessage>,
     ) -> Self {
@@ -177,7 +178,7 @@ impl DummyNode {
             .for_each(|address| self.send_message(*address, message.clone()))
     }
 
-    fn update_view(&mut self, view: usize) {
+    fn update_view(&mut self, view: View) {
         self.state.view_state.insert(
             view,
             DummyViewState {
@@ -190,7 +191,7 @@ impl DummyNode {
         self.local_view = LocalView::new(self.id(), view, self.overlay_state.clone());
     }
 
-    fn is_vote_sent(&self, view: usize) -> bool {
+    fn is_vote_sent(&self, view: View) -> bool {
         self.state
             .view_state
             .get(&view)
@@ -198,7 +199,7 @@ impl DummyNode {
             .vote_sent
     }
 
-    fn set_vote_sent(&mut self, view: usize) {
+    fn set_vote_sent(&mut self, view: View) {
         let view_state = self
             .state
             .view_state
@@ -207,7 +208,7 @@ impl DummyNode {
         view_state.vote_sent = true;
     }
 
-    fn get_vote_count(&self, view: usize) -> usize {
+    fn get_vote_count(&self, view: View) -> usize {
         self.state
             .view_state
             .get(&view)
@@ -215,7 +216,7 @@ impl DummyNode {
             .vote_received_count
     }
 
-    fn increment_vote_count(&mut self, view: usize) {
+    fn increment_vote_count(&mut self, view: View) {
         let view_state = self
             .state
             .view_state
@@ -251,7 +252,7 @@ impl DummyNode {
                     &self.local_view.current_roots,
                 )
             {
-                let new_view_id = self.current_view() + 1;
+                let new_view_id = self.current_view().next();
                 self.broadcast(
                     &self.overlay_state.get_all_nodes(),
                     DummyMessage::Proposal(new_view_id.into()),
@@ -359,8 +360,8 @@ impl Node for DummyNode {
         self.node_id
     }
 
-    fn current_view(&self) -> usize {
-        self.state.current_view
+    fn current_view(&self) -> View {
+        View::new(self.state.current_view as i64)
     }
 
     fn state(&self) -> &DummyState {
@@ -428,6 +429,7 @@ mod tests {
         time::{Duration, SystemTime, UNIX_EPOCH},
     };
 
+    use consensus_engine::View;
     use crossbeam::channel;
     use parking_lot::RwLock;
     use rand::{
@@ -578,7 +580,7 @@ mod tests {
         network.collect_messages();
 
         for (_, node) in nodes.iter() {
-            assert_eq!(node.current_view(), 0);
+            assert_eq!(node.current_view(), View::new(0));
         }
         let elapsed = Duration::from_millis(100);
         // 1. Leaders receive vote and broadcast new Proposal(Block) to all nodes.
@@ -598,7 +600,7 @@ mod tests {
 
         // All nodes should be updated to the proposed blocks view.
         for (_, node) in nodes.iter() {
-            assert_eq!(node.current_view(), 1);
+            assert_eq!(node.current_view(), View::new(1));
         }
 
         // Root and Internal haven't sent their votes yet.
@@ -655,7 +657,7 @@ mod tests {
 
         // All nodes should be in an old view
         for (_, node) in nodes.iter() {
-            assert_eq!(node.current_view(), 1); // old
+            assert_eq!(node.current_view(), View::new(1)); // old
         }
 
         // 6. a) All nodes received proposal block.
@@ -668,7 +670,7 @@ mod tests {
 
         // All nodes should be updated to the proposed blocks view.
         for (_, node) in nodes.iter() {
-            assert_eq!(node.current_view(), 2); // new
+            assert_eq!(node.current_view(), View::new(2)); // new
         }
 
         // Root and Internal haven't sent their votes yet.
@@ -719,7 +721,7 @@ mod tests {
         network.collect_messages();
 
         for (_, node) in nodes.iter() {
-            assert_eq!(node.current_view(), 0);
+            assert_eq!(node.current_view(), View::new(0));
         }
         let elapsed = Duration::from_millis(100);
         for _ in 0..7 {
@@ -731,7 +733,7 @@ mod tests {
         }
 
         for (_, node) in nodes.iter() {
-            assert_eq!(node.current_view(), 2);
+            assert_eq!(node.current_view(), View::new(2));
         }
     }
 
@@ -769,7 +771,7 @@ mod tests {
         network.collect_messages();
 
         for (_, node) in nodes.iter() {
-            assert_eq!(node.current_view(), 0);
+            assert_eq!(node.current_view(), View::new(0));
         }
         let elapsed = Duration::from_millis(100);
         for _ in 0..7 {
@@ -781,7 +783,7 @@ mod tests {
         }
 
         for (_, node) in nodes.iter() {
-            assert_eq!(node.current_view(), 2);
+            assert_eq!(node.current_view(), View::new(2));
         }
     }
 
@@ -829,7 +831,7 @@ mod tests {
         }
 
         for (_, node) in nodes.read().iter() {
-            assert_eq!(node.current_view(), 2);
+            assert_eq!(node.current_view(), View::new(2));
         }
     }
 

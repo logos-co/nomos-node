@@ -1,5 +1,6 @@
 use crate::node::Node;
 use crate::warding::{SimulationState, SimulationWard};
+use consensus_engine::View;
 use serde::{Deserialize, Serialize};
 
 /// Time to finality ward. It monitors the amount of rounds of the simulations, triggers when surpassing
@@ -7,7 +8,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Serialize, Deserialize, Copy, Clone)]
 #[serde(transparent)]
 pub struct MaxViewWard {
-    max_view: usize,
+    max_view: View,
 }
 
 impl<N: Node> SimulationWard<N> for MaxViewWard {

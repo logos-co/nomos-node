@@ -5,6 +5,7 @@ pub mod dummy;
 pub mod dummy_streaming;
 
 // std
+use consensus_engine::View;
 use std::{
     collections::BTreeMap,
     ops::{Deref, DerefMut},
@@ -126,16 +127,16 @@ pub type SharedState<S> = Arc<RwLock<S>>;
 pub struct OverlayState {
     pub all_nodes: Vec<NodeId>,
     pub overlay: SimulationOverlay,
-    pub overlays: BTreeMap<usize, ViewOverlay>,
+    pub overlays: BTreeMap<View, ViewOverlay>,
 }
 
 pub trait OverlayGetter {
-    fn get_view(&self, index: usize) -> Option<ViewOverlay>;
+    fn get_view(&self, index: View) -> Option<ViewOverlay>;
     fn get_all_nodes(&self) -> Vec<NodeId>;
 }
 
 impl OverlayGetter for SharedState<OverlayState> {
-    fn get_view(&self, index: usize) -> Option<ViewOverlay> {
+    fn get_view(&self, index: View) -> Option<ViewOverlay> {
         let overlay_state = self.read();
         overlay_state.overlays.get(&index).cloned()
     }
@@ -151,8 +152,7 @@ pub trait Node {
     type State;
 
     fn id(&self) -> NodeId;
-    // TODO: View must be view whenever we integrate consensus engine
-    fn current_view(&self) -> usize;
+    fn current_view(&self) -> View;
     fn state(&self) -> &Self::State;
     fn step(&mut self, elapsed: Duration);
 }
@@ -166,8 +166,8 @@ impl Node for usize {
         NodeId::from_index(*self)
     }
 
-    fn current_view(&self) -> usize {
-        *self
+    fn current_view(&self) -> View {
+        View::new(*self as i64)
     }
 
     fn state(&self) -> &Self::State {

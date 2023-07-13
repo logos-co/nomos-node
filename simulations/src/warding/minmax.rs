@@ -1,5 +1,6 @@
 use crate::node::Node;
 use crate::warding::{SimulationState, SimulationWard};
+use consensus_engine::View;
 use serde::{Deserialize, Serialize};
 
 /// MinMaxView. It monitors the gap between a min view and max view, triggers when surpassing
@@ -7,14 +8,14 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Serialize, Deserialize, Copy, Clone)]
 #[serde(transparent)]
 pub struct MinMaxViewWard {
-    max_gap: usize,
+    max_gap: View,
 }
 
 impl<N: Node> SimulationWard<N> for MinMaxViewWard {
     type SimulationState = SimulationState<N>;
     fn analyze(&mut self, state: &Self::SimulationState) -> bool {
-        let mut min = usize::MAX;
-        let mut max = 0;
+        let mut min = View::new(usize::MAX as i64);
+        let mut max = View::new(0);
         let nodes = state.nodes.read();
         for node in nodes.iter() {
             let view = node.current_view();
@@ -29,12 +30,15 @@ impl<N: Node> SimulationWard<N> for MinMaxViewWard {
 mod test {
     use crate::warding::minmax::MinMaxViewWard;
     use crate::warding::{SimulationState, SimulationWard};
+    use consensus_engine::View;
     use parking_lot::RwLock;
     use std::sync::Arc;
 
     #[test]
     fn rebase_threshold() {
-        let mut minmax = MinMaxViewWard { max_gap: 5 };
+        let mut minmax = MinMaxViewWard {
+            max_gap: View::new(5),
+        };
         let state = SimulationState {
             nodes: Arc::new(RwLock::new(vec![10])),
         };
