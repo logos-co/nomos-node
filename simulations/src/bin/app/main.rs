@@ -1,7 +1,6 @@
 // std
 use anyhow::Ok;
-use overlay_node::OverlayNode;
-use serde::Serialize;
+use simulations::node::carnot::{CarnotSettings, CarnotState};
 use std::fs::File;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -73,7 +72,9 @@ impl SimulationApp {
 
         let ids = node_ids.clone();
         let mut network = Network::new(regions_data);
-        let nodes = node_ids
+        let nodes: Vec<
+            Box<dyn Node<Settings = CarnotSettings, State = CarnotState> + Send + Sync>,
+        > = node_ids
             .iter()
             .copied()
             .map(|node_id| {
@@ -97,7 +98,7 @@ impl SimulationApp {
                         entropy: Box::new([0; 32]),
                     },
                 );
-                OverlayNode::to_overlay_node(
+                overlay_node::to_overlay_node(
                     node_id,
                     nodes,
                     leader,
@@ -108,64 +109,40 @@ impl SimulationApp {
                 )
             })
             .collect();
-        run_with_overlay(network, nodes, simulation_settings, stream_type)?;
+        run(network, nodes, simulation_settings, stream_type)?;
         Ok(())
     }
 }
 
-fn run_with_overlay<M>(
+fn run<M>(
     network: Network<M>,
-    nodes: Vec<OverlayNode>,
+    nodes: Vec<Box<dyn Node<Settings = CarnotSettings, State = CarnotState> + Send + Sync>>,
     settings: SimulationSettings,
     stream_type: Option<StreamType>,
 ) -> anyhow::Result<()>
 where
     M: Clone + Send + Sync + 'static,
 {
-    match settings.overlay_settings {
-        simulations::settings::OverlaySettings::Flat => {
-            let nodes = nodes.into_iter().map(OverlayNode::unwrap_flat).collect();
-            signal(run_with_stream(network, nodes, settings, stream_type)?)
-        }
-        simulations::settings::OverlaySettings::Tree(_) => {
-            let nodes = nodes.into_iter().map(OverlayNode::unwrap_tree).collect();
-            let handle = run_with_stream(network, nodes, settings, stream_type)?;
-            signal(handle)
-        }
-    }
-}
-
-fn run_with_stream<M, N: Node>(
-    network: Network<M>,
-    nodes: Vec<N>,
-    settings: SimulationSettings,
-    stream_type: Option<StreamType>,
-) -> anyhow::Result<SimulationRunnerHandle<OutData>>
-where
-    M: Clone + Send + Sync + 'static,
-    N: Send + Sync + 'static,
-    N::Settings: Clone + Send,
-    N::State: Serialize,
-{
     let stream_settings = settings.stream_settings.clone();
-    let runner =
-        SimulationRunner::<_, _, OutData>::new(network, nodes, Default::default(), settings)?;
+    let runner = SimulationRunner::<_, OutData>::new(network, nodes, Default::default(), settings)?;
 
-    match stream_type {
+    let handle = match stream_type {
         Some(StreamType::Naive) => {
             let settings = stream_settings.unwrap_naive();
-            Ok(runner.simulate_and_subscribe::<NaiveSubscriber<OutData>>(settings)?)
+            runner.simulate_and_subscribe::<NaiveSubscriber<OutData>>(settings)?
         }
         Some(StreamType::IO) => {
             let settings = stream_settings.unwrap_io();
-            Ok(runner.simulate_and_subscribe::<IOSubscriber<OutData>>(settings)?)
+            runner.simulate_and_subscribe::<IOSubscriber<OutData>>(settings)?
         }
         Some(StreamType::Polars) => {
             let settings = stream_settings.unwrap_polars();
-            Ok(runner.simulate_and_subscribe::<PolarsSubscriber<OutData>>(settings)?)
+            runner.simulate_and_subscribe::<PolarsSubscriber<OutData>>(settings)?
         }
-        None => Ok(runner.simulate()?),
-    }
+        None => runner.simulate()?,
+    };
+
+    signal(handle)
 }
 
 fn signal<R: Record>(handle: SimulationRunnerHandle<R>) -> anyhow::Result<()> {

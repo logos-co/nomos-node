@@ -130,10 +130,10 @@ mod tests {
         states: HashMap<NodeId, usize>,
     }
 
-    impl TryFrom<&SimulationState<DummyStreamingNode<()>>> for IORecord {
+    impl TryFrom<&SimulationState> for IORecord {
         type Error = anyhow::Error;
 
-        fn try_from(value: &SimulationState<DummyStreamingNode<()>>) -> Result<Self, Self::Error> {
+        fn try_from(value: &SimulationState) -> Result<Self, Self::Error> {
             let nodes = value.nodes.read();
             Ok(Self {
                 states: nodes

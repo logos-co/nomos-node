@@ -1,4 +1,3 @@
-use crate::node::Node;
 use crate::warding::{SimulationState, SimulationWard};
 use serde::{Deserialize, Serialize};
 
@@ -10,8 +9,8 @@ pub struct MinMaxViewWard {
     max_gap: usize,
 }
 
-impl<N: Node> SimulationWard<N> for MinMaxViewWard {
-    type SimulationState = SimulationState<N>;
+impl SimulationWard for MinMaxViewWard {
+    type SimulationState = SimulationState;
     fn analyze(&mut self, state: &Self::SimulationState) -> bool {
         let mut min = usize::MAX;
         let mut max = 0;

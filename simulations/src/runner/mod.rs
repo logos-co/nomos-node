@@ -7,6 +7,7 @@ mod sync_runner;
 use std::sync::Arc;
 use std::time::Duration;
 
+use crate::node::carnot::{CarnotSettings, CarnotState};
 use crate::output_processors::Record;
 // crates
 use crate::streaming::{
@@ -18,7 +19,7 @@ use parking_lot::RwLock;
 use rand::rngs::SmallRng;
 use rand::{RngCore, SeedableRng};
 use rayon::prelude::*;
-use serde::Serialize;
+
 
 // internal
 use crate::network::Network;
@@ -68,24 +69,18 @@ impl<M> SimulationRunnerInner<M>
 where
     M: Send + Sync + Clone,
 {
-    fn check_wards<N>(&mut self, state: &SimulationState<N>) -> bool
-    where
-        N: Node + Send + Sync,
-        N::Settings: Clone + Send,
-        N::State: Serialize,
-    {
+    fn check_wards(&mut self, state: &SimulationState) -> bool {
         self.wards
             .par_iter_mut()
             .map(|ward| ward.analyze(state))
             .any(|x| x)
     }
 
-    fn step<N>(&mut self, nodes: &mut [N], elapsed: Duration)
-    where
-        N: Node + Send + Sync,
-        N::Settings: Clone + Send,
-        N::State: Serialize,
-    {
+    fn step(
+        &mut self,
+        nodes: &mut [Box<dyn Node<Settings = CarnotSettings, State = CarnotState> + Send + Sync>],
+        elapsed: Duration,
+    ) {
         self.network.dispatch_after(elapsed);
         nodes.par_iter_mut().for_each(|node| {
             node.step(elapsed);
@@ -96,31 +91,23 @@ where
 
 /// Encapsulation solution for the simulations runner
 /// Holds the network state, the simulating nodes and the simulation settings.
-pub struct SimulationRunner<M, N, R>
-where
-    N: Node,
-{
+pub struct SimulationRunner<M, R> {
     inner: SimulationRunnerInner<M>,
-    nodes: Arc<RwLock<Vec<N>>>,
+    nodes: Arc<
+        RwLock<Vec<Box<dyn Node<Settings = CarnotSettings, State = CarnotState> + Send + Sync>>>,
+    >,
     runner_settings: RunnerSettings,
     producer: StreamProducer<R>,
 }
 
-impl<M, N: Node, R> SimulationRunner<M, N, R>
+impl<M, R> SimulationRunner<M, R>
 where
     M: Clone + Send + Sync + 'static,
-    N: Send + Sync + 'static,
-    N::Settings: Clone + Send,
-    N::State: Serialize,
-    R: Record
-        + for<'a> TryFrom<&'a SimulationState<N>, Error = anyhow::Error>
-        + Send
-        + Sync
-        + 'static,
+    R: Record + for<'a> TryFrom<&'a SimulationState, Error = anyhow::Error> + Send + Sync + 'static,
 {
     pub fn new(
         network: Network<M>,
-        nodes: Vec<N>,
+        nodes: Vec<Box<dyn Node<Settings = CarnotSettings, State = CarnotState> + Send + Sync>>,
         producer: StreamProducer<R>,
         mut settings: SimulationSettings,
     ) -> anyhow::Result<Self> {
@@ -182,15 +169,12 @@ where
     }
 }
 
-impl<M, N: Node, R> SimulationRunner<M, N, R>
+impl<M, R> SimulationRunner<M, R>
 where
     M: Clone + Send + Sync + 'static,
-    N: Send + Sync + 'static,
-    N::Settings: Clone + Send,
-    N::State: Serialize,
     R: Record
         + serde::Serialize
-        + for<'a> TryFrom<&'a SimulationState<N>, Error = anyhow::Error>
+        + for<'a> TryFrom<&'a SimulationState, Error = anyhow::Error>
         + Send
         + Sync
         + 'static,

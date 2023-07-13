@@ -95,17 +95,20 @@ impl OutData {
     }
 }
 
-impl<N> TryFrom<&SimulationState<N>> for OutData
-where
-    N: crate::node::Node,
-    N::State: Serialize,
-{
+impl TryFrom<&SimulationState> for OutData {
     type Error = anyhow::Error;
 
-    fn try_from(state: &crate::warding::SimulationState<N>) -> Result<Self, Self::Error> {
-        serde_json::to_value(state.nodes.read().iter().map(N::state).collect::<Vec<_>>())
-            .map(OutData::new)
-            .map_err(From::from)
+    fn try_from(state: &crate::warding::SimulationState) -> Result<Self, Self::Error> {
+        serde_json::to_value(
+            state
+                .nodes
+                .read()
+                .iter()
+                .map(|n| n.state())
+                .collect::<Vec<_>>(),
+        )
+        .map(OutData::new)
+        .map_err(From::from)
     }
 }
 

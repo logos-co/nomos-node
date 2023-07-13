@@ -1,26 +1,15 @@
-use serde::Serialize;
-
 use super::{SimulationRunner, SimulationRunnerHandle};
+use crate::output_processors::Record;
 use crate::warding::SimulationState;
-use crate::{node::Node, output_processors::Record};
 use crossbeam::channel::{bounded, select};
 use std::sync::Arc;
 use std::time::Duration;
 
 /// Simulate with sending the network state to any subscriber
-pub fn simulate<M, N: Node, R>(
-    runner: SimulationRunner<M, N, R>,
-) -> anyhow::Result<SimulationRunnerHandle<R>>
+pub fn simulate<M, R>(runner: SimulationRunner<M, R>) -> anyhow::Result<SimulationRunnerHandle<R>>
 where
     M: Send + Sync + Clone + 'static,
-    N: Send + Sync + 'static,
-    N::Settings: Clone + Send,
-    N::State: Serialize,
-    R: Record
-        + for<'a> TryFrom<&'a SimulationState<N>, Error = anyhow::Error>
-        + Send
-        + Sync
-        + 'static,
+    R: Record + for<'a> TryFrom<&'a SimulationState, Error = anyhow::Error> + Send + Sync + 'static,
 {
     let state = SimulationState {
         nodes: Arc::clone(&runner.nodes),

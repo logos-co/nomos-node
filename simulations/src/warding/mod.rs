@@ -4,19 +4,26 @@ use std::sync::Arc;
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 // internal
-use crate::node::Node;
+use crate::node::{
+    carnot::{CarnotSettings, CarnotState},
+    Node,
+};
 
 mod minmax;
 mod stalled;
 mod ttf;
 
-pub struct SimulationState<N> {
-    pub nodes: Arc<RwLock<Vec<N>>>,
+pub struct SimulationState {
+    pub nodes: Arc<
+        RwLock<Vec<Box<dyn Node<Settings = CarnotSettings, State = CarnotState> + Send + Sync>>>,
+    >,
 }
 
-impl<N> SimulationState<N> {
+impl SimulationState {
     #[inline]
-    pub fn new(nodes: Vec<N>) -> Self {
+    pub fn new(
+        nodes: Vec<Box<dyn Node<Settings = CarnotSettings, State = CarnotState> + Send + Sync>>,
+    ) -> Self {
         Self {
             nodes: Arc::new(RwLock::new(nodes)),
         }
@@ -25,7 +32,7 @@ impl<N> SimulationState<N> {
 
 /// A ward is a computation over the `NetworkState`, it must return true if the state satisfies
 /// the warding conditions. It is used to stop the consensus simulation if such condition is reached.
-pub trait SimulationWard<N> {
+pub trait SimulationWard {
     type SimulationState;
     fn analyze(&mut self, state: &Self::SimulationState) -> bool;
 }
@@ -41,9 +48,9 @@ pub enum Ward {
 }
 
 impl Ward {
-    pub fn simulation_ward_mut<N: Node>(
+    pub fn simulation_ward_mut(
         &mut self,
-    ) -> &mut dyn SimulationWard<N, SimulationState = SimulationState<N>> {
+    ) -> &mut dyn SimulationWard<SimulationState = SimulationState> {
         match self {
             Ward::MaxView(ward) => ward,
             Ward::MinMaxView(ward) => ward,
@@ -52,8 +59,8 @@ impl Ward {
     }
 }
 
-impl<N: Node> SimulationWard<N> for Ward {
-    type SimulationState = SimulationState<N>;
+impl SimulationWard for Ward {
+    type SimulationState = SimulationState;
     fn analyze(&mut self, state: &Self::SimulationState) -> bool {
         self.simulation_ward_mut().analyze(state)
     }

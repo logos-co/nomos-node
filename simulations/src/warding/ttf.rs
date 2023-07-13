@@ -1,4 +1,3 @@
-use crate::node::Node;
 use crate::warding::{SimulationState, SimulationWard};
 use serde::{Deserialize, Serialize};
 
@@ -10,8 +9,8 @@ pub struct MaxViewWard {
     max_view: usize,
 }
 
-impl<N: Node> SimulationWard<N> for MaxViewWard {
-    type SimulationState = SimulationState<N>;
+impl SimulationWard for MaxViewWard {
+    type SimulationState = SimulationState;
     fn analyze(&mut self, state: &Self::SimulationState) -> bool {
         state
             .nodes
