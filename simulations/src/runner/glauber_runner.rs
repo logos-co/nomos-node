@@ -1,4 +1,3 @@
-
 use crate::node::{Node, NodeId, NodeIdExt};
 use crate::output_processors::Record;
 use crate::runner::SimulationRunner;

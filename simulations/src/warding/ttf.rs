@@ -33,11 +33,11 @@ mod test {
 
         let node = 11;
         let state = SimulationState {
-            nodes: Arc::new(RwLock::new(vec![node])),
+            nodes: Arc::new(RwLock::new(vec![Box::new(node)])),
         };
         assert!(ttf.analyze(&state));
 
-        state.nodes.write().push(9);
+        state.nodes.write().push(Box::new(9));
         assert!(!ttf.analyze(&state));
     }
 }

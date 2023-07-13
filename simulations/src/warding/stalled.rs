@@ -65,7 +65,7 @@ mod test {
             threshold: 2,
         };
         let state = SimulationState {
-            nodes: Arc::new(RwLock::new(vec![10])),
+            nodes: Arc::new(RwLock::new(vec![Box::new(10)])),
         };
 
         // increase the criterion, 1
@@ -76,7 +76,7 @@ mod test {
         assert!(stalled.analyze(&state));
 
         // push a new one, so the criterion is reset to 0
-        state.nodes.write().push(20);
+        state.nodes.write().push(Box::new(20));
         assert!(!stalled.analyze(&state));
 
         // increase the criterion, 2

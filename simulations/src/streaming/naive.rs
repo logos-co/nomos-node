@@ -122,7 +122,10 @@ mod tests {
             regions::{Region, RegionsData},
             Network, NetworkBehaviourKey,
         },
-        node::{dummy_streaming::DummyStreamingNode, Node, NodeId, NodeIdExt},
+        node::{
+            dummy_streaming::{DummyStreamingNode, DummyStreamingState},
+            Node, NodeId, NodeIdExt,
+        },
         output_processors::OutData,
         runner::SimulationRunner,
         warding::SimulationState,
@@ -157,7 +160,14 @@ mod tests {
         };
 
         let nodes = (0..6)
-            .map(|idx| DummyStreamingNode::new(NodeId::from_index(idx), ()))
+            .map(|idx| {
+                Box::new(DummyStreamingNode::new(NodeId::from_index(idx), ()))
+                    as Box<
+                        dyn Node<State = DummyStreamingState, Settings = ()>
+                            + std::marker::Send
+                            + Sync,
+                    >
+            })
             .collect::<Vec<_>>();
         let network = Network::new(RegionsData {
             regions: (0..6)
@@ -209,7 +219,7 @@ mod tests {
                 })
                 .collect(),
         });
-        let simulation_runner: SimulationRunner<(), DummyStreamingNode<()>, OutData> =
+        let simulation_runner: SimulationRunner<(), OutData, (), DummyStreamingState> =
             SimulationRunner::new(network, nodes, Default::default(), simulation_settings).unwrap();
         simulation_runner.simulate().unwrap();
     }

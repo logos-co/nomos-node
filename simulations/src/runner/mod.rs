@@ -7,7 +7,6 @@ mod sync_runner;
 use std::sync::Arc;
 use std::time::Duration;
 
-
 use crate::output_processors::Record;
 // crates
 use crate::streaming::{
