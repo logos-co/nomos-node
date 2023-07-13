@@ -6,10 +6,18 @@ use std::sync::Arc;
 use std::time::Duration;
 
 /// Simulate with sending the network state to any subscriber
-pub fn simulate<M, R>(runner: SimulationRunner<M, R>) -> anyhow::Result<SimulationRunnerHandle<R>>
+pub fn simulate<M, R, S, T>(
+    runner: SimulationRunner<M, R, S, T>,
+) -> anyhow::Result<SimulationRunnerHandle<R>>
 where
     M: Send + Sync + Clone + 'static,
-    R: Record + for<'a> TryFrom<&'a SimulationState, Error = anyhow::Error> + Send + Sync + 'static,
+    R: Record
+        + for<'a> TryFrom<&'a SimulationState<S, T>, Error = anyhow::Error>
+        + Send
+        + Sync
+        + 'static,
+    S: 'static,
+    T: 'static,
 {
     let state = SimulationState {
         nodes: Arc::clone(&runner.nodes),
@@ -63,7 +71,7 @@ mod tests {
             InMemoryNetworkInterface, Network, NetworkBehaviourKey,
         },
         node::{
-            dummy::{DummyMessage, DummyNode},
+            dummy::{DummyMessage, DummyNode, DummySettings, DummyState},
             Node, NodeId, NodeIdExt, OverlayState, SharedState, ViewOverlay,
         },
         output_processors::OutData,
@@ -71,7 +79,7 @@ mod tests {
             tree::{TreeOverlay, TreeSettings},
             Overlay, SimulationOverlay,
         },
-        runner::SimulationRunner,
+        runner::{BoxedNode, SimulationRunner},
         settings::SimulationSettings,
         streaming::StreamProducer,
     };
@@ -98,7 +106,7 @@ mod tests {
         node_ids: &[NodeId],
         network: &mut Network<DummyMessage>,
         overlay_state: SharedState<OverlayState>,
-    ) -> Vec<DummyNode> {
+    ) -> Vec<BoxedNode<DummySettings, DummyState>> {
         node_ids
             .iter()
             .map(|node_id| {
@@ -109,7 +117,12 @@ mod tests {
                     node_message_sender,
                     network_message_receiver,
                 );
-                DummyNode::new(*node_id, 0, overlay_state.clone(), network_interface)
+                Box::new(DummyNode::new(
+                    *node_id,
+                    0,
+                    overlay_state.clone(),
+                    network_interface,
+                ))
             })
             .collect()
     }
@@ -137,7 +150,7 @@ mod tests {
         let nodes = init_dummy_nodes(&node_ids, &mut network, overlay_state);
 
         let producer = StreamProducer::default();
-        let mut runner: SimulationRunner<DummyMessage, DummyNode, OutData> =
+        let mut runner: SimulationRunner<DummyMessage, OutData, DummySettings, DummyState> =
             SimulationRunner::new(network, nodes, producer, settings).unwrap();
         let mut nodes = runner.nodes.write();
         runner.inner.step(&mut nodes, Duration::from_millis(100));

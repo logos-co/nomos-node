@@ -35,7 +35,7 @@ use std::ops::Not;
 use std::sync::Arc;
 use std::time::Duration;
 // crates
-use crate::node::carnot::{CarnotSettings, CarnotState};
+
 use fixed_slice_deque::FixedSliceDeque;
 use rand::prelude::{IteratorRandom, SliceRandom};
 use rand::rngs::SmallRng;
@@ -48,21 +48,27 @@ use crate::warding::SimulationState;
 use super::SimulationRunnerHandle;
 
 /// Simulate with sending the network state to any subscriber
-pub fn simulate<M, R>(
-    runner: SimulationRunner<M, R>,
+pub fn simulate<M, R, S, T>(
+    runner: SimulationRunner<M, R, S, T>,
     gap: usize,
     distribution: Option<Vec<f32>>,
 ) -> anyhow::Result<SimulationRunnerHandle<R>>
 where
     M: Send + Sync + Clone + 'static,
-    R: Record + for<'a> TryFrom<&'a SimulationState, Error = anyhow::Error> + Send + Sync + 'static,
+    R: Record
+        + for<'a> TryFrom<&'a SimulationState<S, T>, Error = anyhow::Error>
+        + Send
+        + Sync
+        + 'static,
+    S: 'static,
+    T: 'static,
 {
     let distribution =
         distribution.unwrap_or_else(|| std::iter::repeat(1.0f32).take(gap).collect());
 
     let layers: Vec<usize> = (0..gap).collect();
 
-    let mut deque = build_node_ids_deque::<M, R>(gap, &runner);
+    let mut deque = build_node_ids_deque::<M, R, S, T>(gap, &runner);
 
     let simulation_state = SimulationState {
         nodes: Arc::clone(&runner.nodes),
@@ -89,7 +95,7 @@ where
 
                     {
                         let mut shared_nodes = nodes.write();
-                        let node: &mut dyn Node<Settings = CarnotSettings, State = CarnotState> = &mut **shared_nodes
+                        let node: &mut dyn Node<Settings = S, State = T> = &mut **shared_nodes
                             .get_mut(node_id.index())
                             .expect("Node should be present");
                         let prev_view = node.current_view();
@@ -157,9 +163,9 @@ fn choose_random_layer_and_node_id(
     (i, *node_id)
 }
 
-fn build_node_ids_deque<M, R>(
+fn build_node_ids_deque<M, R, S, T>(
     gap: usize,
-    runner: &SimulationRunner<M, R>,
+    runner: &SimulationRunner<M, R, S, T>,
 ) -> FixedSliceDeque<BTreeSet<NodeId>> {
     // add a +1 so we always have
     let mut deque = FixedSliceDeque::new(gap + 1);

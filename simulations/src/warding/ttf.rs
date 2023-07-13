@@ -9,8 +9,8 @@ pub struct MaxViewWard {
     max_view: usize,
 }
 
-impl SimulationWard for MaxViewWard {
-    type SimulationState = SimulationState;
+impl<S, T> SimulationWard<S, T> for MaxViewWard {
+    type SimulationState = SimulationState<S, T>;
     fn analyze(&mut self, state: &Self::SimulationState) -> bool {
         state
             .nodes

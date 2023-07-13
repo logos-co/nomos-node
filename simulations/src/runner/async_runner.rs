@@ -13,13 +13,19 @@ use std::time::Duration;
 use super::SimulationRunnerHandle;
 
 /// Simulate with sending the network state to any subscriber
-pub fn simulate<M, R>(
-    runner: SimulationRunner<M, R>,
+pub fn simulate<M, R, S, T>(
+    runner: SimulationRunner<M, R, S, T>,
     chunk_size: usize,
 ) -> anyhow::Result<SimulationRunnerHandle<R>>
 where
     M: Clone + Send + Sync + 'static,
-    R: Record + for<'a> TryFrom<&'a SimulationState, Error = anyhow::Error> + Send + Sync + 'static,
+    R: Record
+        + for<'a> TryFrom<&'a SimulationState<S, T>, Error = anyhow::Error>
+        + Send
+        + Sync
+        + 'static,
+    S: 'static,
+    T: 'static,
 {
     let simulation_state = SimulationState {
         nodes: Arc::clone(&runner.nodes),

@@ -134,10 +134,10 @@ mod tests {
         states: HashMap<NodeId, usize>,
     }
 
-    impl TryFrom<&SimulationState> for NaiveRecord {
+    impl<S, T: Serialize> TryFrom<&SimulationState<S, T>> for NaiveRecord {
         type Error = anyhow::Error;
 
-        fn try_from(value: &SimulationState) -> Result<Self, Self::Error> {
+        fn try_from(value: &SimulationState<S, T>) -> Result<Self, Self::Error> {
             Ok(Self {
                 states: value
                     .nodes

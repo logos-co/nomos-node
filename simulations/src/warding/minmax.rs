@@ -9,8 +9,8 @@ pub struct MinMaxViewWard {
     max_gap: usize,
 }
 
-impl SimulationWard for MinMaxViewWard {
-    type SimulationState = SimulationState;
+impl<S, T> SimulationWard<S, T> for MinMaxViewWard {
+    type SimulationState = SimulationState<S, T>;
     fn analyze(&mut self, state: &Self::SimulationState) -> bool {
         let mut min = usize::MAX;
         let mut max = 0;

@@ -5,10 +5,8 @@ use consensus_engine::{
 use rand::Rng;
 use simulations::{
     network::InMemoryNetworkInterface,
-    node::{
-        carnot::{messages::CarnotMessage, CarnotNode, CarnotSettings, CarnotState},
-        Node,
-    },
+    node::carnot::{messages::CarnotMessage, CarnotNode, CarnotSettings, CarnotState},
+    runner::BoxedNode,
     settings::SimulationSettings,
 };
 
@@ -20,7 +18,7 @@ pub fn to_overlay_node<R: Rng>(
     genesis: nomos_core::block::Block<[u8; 32]>,
     mut rng: R,
     settings: &SimulationSettings,
-) -> Box<dyn Node<Settings = CarnotSettings, State = CarnotState> + Send + Sync> {
+) -> BoxedNode<CarnotSettings, CarnotState> {
     match &settings.overlay_settings {
         simulations::settings::OverlaySettings::Flat => {
             let overlay_settings = consensus_engine::overlay::FlatOverlaySettings {

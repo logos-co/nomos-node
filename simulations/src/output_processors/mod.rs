@@ -95,10 +95,10 @@ impl OutData {
     }
 }
 
-impl TryFrom<&SimulationState> for OutData {
+impl<S, T: Serialize> TryFrom<&SimulationState<S, T>> for OutData {
     type Error = anyhow::Error;
 
-    fn try_from(state: &crate::warding::SimulationState) -> Result<Self, Self::Error> {
+    fn try_from(state: &SimulationState<S, T>) -> Result<Self, Self::Error> {
         serde_json::to_value(
             state
                 .nodes

@@ -1,5 +1,6 @@
 // std
 use anyhow::Ok;
+use serde::Serialize;
 use simulations::node::carnot::{CarnotSettings, CarnotState};
 use std::fs::File;
 use std::path::{Path, PathBuf};
@@ -16,9 +17,9 @@ use serde::de::DeserializeOwned;
 use simulations::network::behaviour::create_behaviours;
 use simulations::network::regions::{create_regions, RegionsData};
 use simulations::network::{InMemoryNetworkInterface, Network};
-use simulations::node::{Node, NodeId, NodeIdExt};
+use simulations::node::{NodeId, NodeIdExt};
 use simulations::output_processors::Record;
-use simulations::runner::SimulationRunnerHandle;
+use simulations::runner::{BoxedNode, SimulationRunnerHandle};
 use simulations::streaming::{
     io::IOSubscriber, naive::NaiveSubscriber, polars::PolarsSubscriber, StreamType,
 };
@@ -72,9 +73,7 @@ impl SimulationApp {
 
         let ids = node_ids.clone();
         let mut network = Network::new(regions_data);
-        let nodes: Vec<
-            Box<dyn Node<Settings = CarnotSettings, State = CarnotState> + Send + Sync>,
-        > = node_ids
+        let nodes: Vec<BoxedNode<CarnotSettings, CarnotState>> = node_ids
             .iter()
             .copied()
             .map(|node_id| {
@@ -109,22 +108,25 @@ impl SimulationApp {
                 )
             })
             .collect();
-        run(network, nodes, simulation_settings, stream_type)?;
+        run::<_, _, _>(network, nodes, simulation_settings, stream_type)?;
         Ok(())
     }
 }
 
-fn run<M>(
+fn run<M, S, T>(
     network: Network<M>,
-    nodes: Vec<Box<dyn Node<Settings = CarnotSettings, State = CarnotState> + Send + Sync>>,
+    nodes: Vec<BoxedNode<S, T>>,
     settings: SimulationSettings,
     stream_type: Option<StreamType>,
 ) -> anyhow::Result<()>
 where
     M: Clone + Send + Sync + 'static,
+    S: 'static,
+    T: Serialize + 'static,
 {
     let stream_settings = settings.stream_settings.clone();
-    let runner = SimulationRunner::<_, OutData>::new(network, nodes, Default::default(), settings)?;
+    let runner =
+        SimulationRunner::<_, OutData, S, T>::new(network, nodes, Default::default(), settings)?;
 
     let handle = match stream_type {
         Some(StreamType::Naive) => {
