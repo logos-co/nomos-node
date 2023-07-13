@@ -146,7 +146,7 @@ mod tests {
         let overlay_state = Arc::new(RwLock::new(OverlayState {
             all_nodes: node_ids.clone(),
             overlay: SimulationOverlay::Tree(overlay),
-            overlays: BTreeMap::from([(0, view.clone()), (1, view)]),
+            overlays: BTreeMap::from([(View::new(0), view.clone()), (View::new(1), view)]),
         }));
         let nodes = init_dummy_nodes(&node_ids, &mut network, overlay_state);
 
@@ -182,10 +182,10 @@ mod tests {
             all_nodes: node_ids.clone(),
             overlay: SimulationOverlay::Tree(overlay),
             overlays: BTreeMap::from([
-                (0, view.clone()),
-                (1, view.clone()),
-                (42, view.clone()),
-                (43, view),
+                (View::new(0), view.clone()),
+                (View::new(1), view.clone()),
+                (View::new(42), view.clone()),
+                (View::new(43), view),
             ]),
         }));
         let nodes = init_dummy_nodes(&node_ids, &mut network, overlay_state);

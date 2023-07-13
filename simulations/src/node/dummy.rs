@@ -500,11 +500,11 @@ mod tests {
         overlay_count: usize,
         leader_count: usize,
         rng: &mut R,
-    ) -> BTreeMap<usize, ViewOverlay> {
+    ) -> BTreeMap<View, ViewOverlay> {
         (0..overlay_count)
             .map(|view_id| {
                 (
-                    view_id,
+                    View::new(view_id as i64),
                     ViewOverlay {
                         leaders: overlay.leaders(node_ids, leader_count, rng).collect(),
                         layout: overlay.layout(node_ids, rng),
@@ -515,13 +515,13 @@ mod tests {
     }
 
     fn send_initial_votes(
-        overlays: &BTreeMap<usize, ViewOverlay>,
+        overlays: &BTreeMap<View, ViewOverlay>,
         committee_size: usize,
         nodes: &HashMap<NodeId, DummyNode>,
     ) {
         let initial_vote = Vote::new(View::new(1), Intent::FromRootToLeader);
         overlays
-            .get(&1)
+            .get(&View::new(1))
             .unwrap()
             .leaders
             .iter()
