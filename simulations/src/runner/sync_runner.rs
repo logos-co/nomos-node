@@ -83,6 +83,7 @@ mod tests {
         settings::SimulationSettings,
         streaming::StreamProducer,
     };
+    use consensus_engine::View;
     use crossbeam::channel;
     use parking_lot::RwLock;
     use rand::rngs::mock::StepRng;
@@ -117,7 +118,12 @@ mod tests {
                     node_message_sender,
                     network_message_receiver,
                 );
-                DummyNode::new(*node_id, 0, overlay_state.clone(), network_interface)
+                DummyNode::new(
+                    *node_id,
+                    View::new(0),
+                    overlay_state.clone(),
+                    network_interface,
+                )
             })
             .collect()
     }
@@ -153,7 +159,7 @@ mod tests {
 
         let nodes = runner.nodes.read();
         for node in nodes.iter() {
-            assert_eq!(node.current_view(), 0);
+            assert_eq!(node.current_view(), View::new(0));
         }
     }
 
@@ -187,7 +193,7 @@ mod tests {
         for node in nodes.iter() {
             // All nodes send one message to NodeId(1).
             // Nodes can send messages to themselves.
-            node.send_message(node_ids[1], DummyMessage::Proposal(42.into()));
+            node.send_message(node_ids[1], DummyMessage::Proposal(View::new(42).into()));
         }
         network.collect_messages();
 

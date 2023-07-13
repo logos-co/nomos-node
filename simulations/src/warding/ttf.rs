@@ -26,12 +26,15 @@ impl<N: Node> SimulationWard<N> for MaxViewWard {
 mod test {
     use crate::warding::ttf::MaxViewWard;
     use crate::warding::{SimulationState, SimulationWard};
+    use consensus_engine::View;
     use parking_lot::RwLock;
     use std::sync::Arc;
 
     #[test]
     fn rebase_threshold() {
-        let mut ttf = MaxViewWard { max_view: 10 };
+        let mut ttf = MaxViewWard {
+            max_view: View::new(10),
+        };
 
         let node = 11;
         let state = SimulationState {

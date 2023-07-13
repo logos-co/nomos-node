@@ -14,9 +14,9 @@ use super::{CommitteeId, OverlayGetter, OverlayState, SharedState, ViewOverlay};
 
 #[derive(Debug, Default, Serialize)]
 pub struct DummyState {
-    pub current_view: usize,
+    pub current_view: View,
     pub message_count: usize,
-    pub view_state: BTreeMap<usize, DummyViewState>,
+    pub view_state: BTreeMap<View, DummyViewState>,
 }
 
 #[derive(Debug, Default, Serialize)]
@@ -104,7 +104,7 @@ impl LocalView {
             .get_view(view_id)
             .expect("simulation generated enough views");
         let next_view = overlays
-            .get_view(view_id + 1)
+            .get_view(view_id.next())
             .expect("simulation generated enough views");
 
         let parents = get_parent_nodes(node_id, &view);
@@ -361,7 +361,7 @@ impl Node for DummyNode {
     }
 
     fn current_view(&self) -> View {
-        View::new(self.state.current_view as i64)
+        self.state.current_view
     }
 
     fn state(&self) -> &DummyState {
@@ -483,7 +483,12 @@ mod tests {
                 );
                 (
                     *node_id,
-                    DummyNode::new(*node_id, 0, overlay_state.clone(), network_interface),
+                    DummyNode::new(
+                        *node_id,
+                        View::new(0),
+                        overlay_state.clone(),
+                        network_interface,
+                    ),
                 )
             })
             .collect()
@@ -514,7 +519,7 @@ mod tests {
         committee_size: usize,
         nodes: &HashMap<NodeId, DummyNode>,
     ) {
-        let initial_vote = Vote::new(1, Intent::FromRootToLeader);
+        let initial_vote = Vote::new(View::new(1), Intent::FromRootToLeader);
         overlays
             .get(&1)
             .unwrap()
@@ -556,15 +561,15 @@ mod tests {
             all_nodes: node_ids.clone(),
             overlay: SimulationOverlay::Tree(overlay),
             overlays: BTreeMap::from([
-                (0, view.clone()),
-                (1, view.clone()),
-                (2, view.clone()),
-                (3, view),
+                (View::new(0), view.clone()),
+                (View::new(1), view.clone()),
+                (View::new(2), view.clone()),
+                (View::new(3), view),
             ]),
         }));
 
         let mut nodes = init_dummy_nodes(&node_ids, &mut network, overlay_state);
-        let initial_vote = Vote::new(1, Intent::FromRootToLeader);
+        let initial_vote = Vote::new(View::new(1), Intent::FromRootToLeader);
 
         // Using any node as the sender for initial proposal to leader nodes.
         nodes[&NodeId::from_index(0)].send_message(
@@ -604,15 +609,15 @@ mod tests {
         }
 
         // Root and Internal haven't sent their votes yet.
-        assert!(!nodes[&NodeId::from_index(0)].state().view_state[&1].vote_sent); // Root
-        assert!(!nodes[&NodeId::from_index(1)].state().view_state[&1].vote_sent); // Internal
-        assert!(!nodes[&NodeId::from_index(2)].state().view_state[&1].vote_sent); // Internal
+        assert!(!nodes[&NodeId::from_index(0)].state().view_state[&View::new(1)].vote_sent); // Root
+        assert!(!nodes[&NodeId::from_index(1)].state().view_state[&View::new(1)].vote_sent); // Internal
+        assert!(!nodes[&NodeId::from_index(2)].state().view_state[&View::new(1)].vote_sent); // Internal
 
         // Leaves should have thier vote sent.
-        assert!(nodes[&NodeId::from_index(3)].state().view_state[&1].vote_sent); // Leaf
-        assert!(nodes[&NodeId::from_index(4)].state().view_state[&1].vote_sent); // Leaf
-        assert!(nodes[&NodeId::from_index(5)].state().view_state[&1].vote_sent); // Leaf
-        assert!(nodes[&NodeId::from_index(6)].state().view_state[&1].vote_sent); // Leaf
+        assert!(nodes[&NodeId::from_index(3)].state().view_state[&View::new(1)].vote_sent); // Leaf
+        assert!(nodes[&NodeId::from_index(4)].state().view_state[&View::new(1)].vote_sent); // Leaf
+        assert!(nodes[&NodeId::from_index(5)].state().view_state[&View::new(1)].vote_sent); // Leaf
+        assert!(nodes[&NodeId::from_index(6)].state().view_state[&View::new(1)].vote_sent); // Leaf
 
         // 3. Internal nodes send vote to root node.
         network.dispatch_after(elapsed);
@@ -622,15 +627,15 @@ mod tests {
         network.collect_messages();
 
         // Root hasn't sent its votes yet.
-        assert!(!nodes[&NodeId::from_index(0)].state().view_state[&1].vote_sent); // Root
+        assert!(!nodes[&NodeId::from_index(0)].state().view_state[&View::new(1)].vote_sent); // Root
 
         // Internal and leaves should have thier vote sent.
-        assert!(nodes[&NodeId::from_index(1)].state().view_state[&1].vote_sent); // Internal
-        assert!(nodes[&NodeId::from_index(2)].state().view_state[&1].vote_sent); // Internal
-        assert!(nodes[&NodeId::from_index(3)].state().view_state[&1].vote_sent); // Leaf
-        assert!(nodes[&NodeId::from_index(4)].state().view_state[&1].vote_sent); // Leaf
-        assert!(nodes[&NodeId::from_index(5)].state().view_state[&1].vote_sent); // Leaf
-        assert!(nodes[&NodeId::from_index(6)].state().view_state[&1].vote_sent); // Leaf
+        assert!(nodes[&NodeId::from_index(1)].state().view_state[&View::new(1)].vote_sent); // Internal
+        assert!(nodes[&NodeId::from_index(2)].state().view_state[&View::new(1)].vote_sent); // Internal
+        assert!(nodes[&NodeId::from_index(3)].state().view_state[&View::new(1)].vote_sent); // Leaf
+        assert!(nodes[&NodeId::from_index(4)].state().view_state[&View::new(1)].vote_sent); // Leaf
+        assert!(nodes[&NodeId::from_index(5)].state().view_state[&View::new(1)].vote_sent); // Leaf
+        assert!(nodes[&NodeId::from_index(6)].state().view_state[&View::new(1)].vote_sent); // Leaf
 
         // 4. Root node send vote to next view leader nodes.
         network.dispatch_after(elapsed);
@@ -640,13 +645,13 @@ mod tests {
         network.collect_messages();
 
         // Root has sent its votes.
-        assert!(nodes[&NodeId::from_index(0)].state().view_state[&1].vote_sent); // Root
-        assert!(nodes[&NodeId::from_index(1)].state().view_state[&1].vote_sent); // Internal
-        assert!(nodes[&NodeId::from_index(2)].state().view_state[&1].vote_sent); // Internal
-        assert!(nodes[&NodeId::from_index(3)].state().view_state[&1].vote_sent); // Leaf
-        assert!(nodes[&NodeId::from_index(4)].state().view_state[&1].vote_sent); // Leaf
-        assert!(nodes[&NodeId::from_index(5)].state().view_state[&1].vote_sent); // Leaf
-        assert!(nodes[&NodeId::from_index(6)].state().view_state[&1].vote_sent); // Leaf
+        assert!(nodes[&NodeId::from_index(0)].state().view_state[&View::new(1)].vote_sent); // Root
+        assert!(nodes[&NodeId::from_index(1)].state().view_state[&View::new(1)].vote_sent); // Internal
+        assert!(nodes[&NodeId::from_index(2)].state().view_state[&View::new(1)].vote_sent); // Internal
+        assert!(nodes[&NodeId::from_index(3)].state().view_state[&View::new(1)].vote_sent); // Leaf
+        assert!(nodes[&NodeId::from_index(4)].state().view_state[&View::new(1)].vote_sent); // Leaf
+        assert!(nodes[&NodeId::from_index(5)].state().view_state[&View::new(1)].vote_sent); // Leaf
+        assert!(nodes[&NodeId::from_index(6)].state().view_state[&View::new(1)].vote_sent); // Leaf
 
         // 5. Leaders receive vote and broadcast new Proposal(Block) to all nodes.
         network.dispatch_after(elapsed);
@@ -674,15 +679,15 @@ mod tests {
         }
 
         // Root and Internal haven't sent their votes yet.
-        assert!(!nodes[&NodeId::from_index(0)].state().view_state[&2].vote_sent); // Root
-        assert!(!nodes[&NodeId::from_index(1)].state().view_state[&2].vote_sent); // Internal
-        assert!(!nodes[&NodeId::from_index(2)].state().view_state[&2].vote_sent); // Internal
+        assert!(!nodes[&NodeId::from_index(0)].state().view_state[&View::new(2)].vote_sent); // Root
+        assert!(!nodes[&NodeId::from_index(1)].state().view_state[&View::new(2)].vote_sent); // Internal
+        assert!(!nodes[&NodeId::from_index(2)].state().view_state[&View::new(2)].vote_sent); // Internal
 
         // Leaves should have thier vote sent.
-        assert!(nodes[&NodeId::from_index(3)].state().view_state[&2].vote_sent); // Leaf
-        assert!(nodes[&NodeId::from_index(4)].state().view_state[&2].vote_sent); // Leaf
-        assert!(nodes[&NodeId::from_index(5)].state().view_state[&2].vote_sent); // Leaf
-        assert!(nodes[&NodeId::from_index(6)].state().view_state[&2].vote_sent);
+        assert!(nodes[&NodeId::from_index(3)].state().view_state[&View::new(2)].vote_sent); // Leaf
+        assert!(nodes[&NodeId::from_index(4)].state().view_state[&View::new(2)].vote_sent); // Leaf
+        assert!(nodes[&NodeId::from_index(5)].state().view_state[&View::new(2)].vote_sent); // Leaf
+        assert!(nodes[&NodeId::from_index(6)].state().view_state[&View::new(2)].vote_sent);
         // Leaf
     }
 
