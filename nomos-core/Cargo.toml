@@ -32,3 +32,4 @@ tokio = { version = "1.23", features = ["macros", "rt"] }
 default = []
 raptor = ["raptorq"]
 mock = ["nomos-network/mock", "serde_json"]
+waku = ["nomos-network/waku", "serde_json"]
