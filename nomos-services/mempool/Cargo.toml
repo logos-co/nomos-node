@@ -11,7 +11,7 @@ bincode = { version = "2.0.0-rc.2", features = ["serde"] }
 chrono = "0.4"
 futures = "0.3"
 linked-hash-map = { version = "0.5.6", optional = true }
-nomos-network = { path = "../network", features = ["waku"] }
+nomos-network = { path = "../network" }
 nomos-core = { path = "../../nomos-core" }
 overwatch-rs = { git = "https://github.com/logos-co/Overwatch", branch = "main" }
 rand = { version = "0.8", optional = true }
@@ -30,5 +30,5 @@ blake2 = "0.10"
 
 [features]
 default = []
-waku = ["nomos-network/waku", "waku-bindings"]
+waku = ["nomos-network/waku", "nomos-core/waku", "waku-bindings"]
 mock = ["linked-hash-map", "nomos-network/mock", "rand", "nomos-core/mock"]
