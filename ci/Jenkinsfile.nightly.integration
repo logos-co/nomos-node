@@ -45,9 +45,17 @@ pipeline {
           for (int i = 0; i < iterations; i++) {
             echo "Running iteration ${i + 1} of ${iterations}"
 
-            def result = sh(script: 'cargo test ten_nodes_happy', returnStatus: true)
+            if (sh(script: 'cargo test ten_nodes_happy', returnStatus: true) != 0) {
+              error("Test failed on iteration ${i + 1}")
+              break
+			}
 
-            if (result != 0) {
+            if (sh(script: 'cargo test two_nodes_happy', returnStatus: true) != 0) {
+              error("Test failed on iteration ${i + 1}")
+              break
+			}
+
+            if (sh(script: 'cargo test ten_nodes_one_down', returnStatus: true) != 0) {
               error("Test failed on iteration ${i + 1}")
               break
             }
@@ -56,6 +64,7 @@ pipeline {
       }
     }
   }
+
   post {
     failure {
       script {
