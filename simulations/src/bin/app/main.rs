@@ -77,10 +77,17 @@ impl SimulationApp {
             .iter()
             .copied()
             .map(|node_id| {
+                let (node_message_broadcast_sender, node_message_broadcast_receiver) =
+                    channel::unbounded();
                 let (node_message_sender, node_message_receiver) = channel::unbounded();
-                let network_message_receiver = network.connect(node_id, node_message_receiver);
+                let network_message_receiver = network.connect(
+                    node_id,
+                    node_message_receiver,
+                    node_message_broadcast_receiver,
+                );
                 let network_interface = InMemoryNetworkInterface::new(
                     node_id,
+                    node_message_broadcast_sender,
                     node_message_sender,
                     network_message_receiver,
                 );
