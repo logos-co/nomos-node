@@ -10,7 +10,7 @@ pipeline {
     string(
       name: 'PROPTEST_CASES',
       description: 'Test cases to be executed',
-      defaultValue: params.PROPTEST_CASES ?: '500000'
+      defaultValue: params.PROPTEST_CASES ?: '1000000'
     )
   }
 
@@ -18,7 +18,7 @@ pipeline {
     /* Avoid cache poisoning by other jobs. */
     GOCACHE = "${env.WORKSPACE_TMP}/go-build"
     GOPATH  = "${env.WORKSPACE_TMP}/go"
-    PROPTEST_CASES = "${params.PROTEST_CASES}"
+    PROPTEST_CASES = "${params.PROPTEST_CASES}"
   }
 
   options {
