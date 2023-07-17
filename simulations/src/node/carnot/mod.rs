@@ -291,13 +291,11 @@ impl<O: Overlay> CarnotNode<O> {
                 }
             }
             Output::BroadcastTimeoutQc { timeout_qc } => {
-                self.network_interface.send_message(
-                    self.id,
-                    CarnotMessage::TimeoutQc(TimeoutQcMsg {
+                self.network_interface
+                    .broadcast(CarnotMessage::TimeoutQc(TimeoutQcMsg {
                         source: self.id,
                         qc: timeout_qc,
-                    }),
-                );
+                    }));
             }
             Output::BroadcastProposal { proposal } => {
                 self.network_interface

@@ -373,12 +373,24 @@ mod tests {
         let mut network = Network::new(regions_data);
 
         let (from_a_sender, from_a_receiver) = channel::unbounded();
-        let to_a_receiver = network.connect(node_a, from_a_receiver);
-        let a = MockNetworkInterface::new(node_a, from_a_sender, to_a_receiver);
+        let (from_a_broadcast_sender, from_a_broadcast_receiver) = channel::unbounded();
+        let to_a_receiver = network.connect(node_a, from_a_receiver, from_a_broadcast_receiver);
+        let a = MockNetworkInterface::new(
+            node_a,
+            from_a_broadcast_sender,
+            from_a_sender,
+            to_a_receiver,
+        );
 
         let (from_b_sender, from_b_receiver) = channel::unbounded();
-        let to_b_receiver = network.connect(node_b, from_b_receiver);
-        let b = MockNetworkInterface::new(node_b, from_b_sender, to_b_receiver);
+        let (from_b_broadcast_sender, from_b_broadcast_receiver) = channel::unbounded();
+        let to_b_receiver = network.connect(node_b, from_b_receiver, from_b_broadcast_receiver);
+        let b = MockNetworkInterface::new(
+            node_b,
+            from_b_broadcast_sender,
+            from_b_sender,
+            to_b_receiver,
+        );
 
         a.send_message(node_b, ());
         network.collect_messages();
@@ -436,16 +448,34 @@ mod tests {
         let mut network = Network::new(regions_data);
 
         let (from_a_sender, from_a_receiver) = channel::unbounded();
-        let to_a_receiver = network.connect(node_a, from_a_receiver);
-        let a = MockNetworkInterface::new(node_a, from_a_sender, to_a_receiver);
+        let (from_a_broadcast_sender, from_a_broadcast_receiver) = channel::unbounded();
+        let to_a_receiver = network.connect(node_a, from_a_receiver, from_a_broadcast_receiver);
+        let a = MockNetworkInterface::new(
+            node_a,
+            from_a_broadcast_sender,
+            from_a_sender,
+            to_a_receiver,
+        );
 
         let (from_b_sender, from_b_receiver) = channel::unbounded();
-        let to_b_receiver = network.connect(node_b, from_b_receiver);
-        let b = MockNetworkInterface::new(node_b, from_b_sender, to_b_receiver);
+        let (from_b_broadcast_sender, from_b_broadcast_receiver) = channel::unbounded();
+        let to_b_receiver = network.connect(node_b, from_b_receiver, from_b_broadcast_receiver);
+        let b = MockNetworkInterface::new(
+            node_b,
+            from_b_broadcast_sender,
+            from_b_sender,
+            to_b_receiver,
+        );
 
         let (from_c_sender, from_c_receiver) = channel::unbounded();
-        let to_c_receiver = network.connect(node_c, from_c_receiver);
-        let c = MockNetworkInterface::new(node_c, from_c_sender, to_c_receiver);
+        let (from_c_broadcast_sender, from_c_broadcast_receiver) = channel::unbounded();
+        let to_c_receiver = network.connect(node_c, from_c_receiver, from_c_broadcast_receiver);
+        let c = MockNetworkInterface::new(
+            node_c,
+            from_c_broadcast_sender,
+            from_c_sender,
+            to_c_receiver,
+        );
 
         a.send_message(node_b, ());
         a.send_message(node_c, ());
