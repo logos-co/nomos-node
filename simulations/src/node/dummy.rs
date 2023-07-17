@@ -457,7 +457,7 @@ mod tests {
             NetworkBehaviour::new(Duration::from_millis(100), 0.0),
         )]);
         let regions_data = RegionsData::new(regions, behaviour);
-        Network::new(regions_data)
+        Network::new(regions_data, 0)
     }
 
     fn init_dummy_nodes(

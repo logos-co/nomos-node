@@ -72,7 +72,7 @@ impl SimulationApp {
         let regions_data = RegionsData::new(regions, behaviours);
 
         let ids = node_ids.clone();
-        let mut network = Network::new(regions_data);
+        let mut network = Network::new(regions_data, seed);
         let nodes: Vec<BoxedNode<CarnotSettings, CarnotState>> = node_ids
             .iter()
             .copied()

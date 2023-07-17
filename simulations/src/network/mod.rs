@@ -7,7 +7,7 @@ use std::{
 };
 // crates
 use crossbeam::channel::{self, Receiver, Sender};
-use rand::{rngs::ThreadRng, Rng};
+use rand::{rngs::SmallRng, Rng, SeedableRng};
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 // internal
@@ -108,13 +108,14 @@ pub struct Network<M> {
     from_node_receivers: HashMap<NodeId, Receiver<NetworkMessage<M>>>,
     from_node_broadcast_receivers: HashMap<NodeId, Receiver<NetworkMessage<M>>>,
     to_node_senders: HashMap<NodeId, Sender<NetworkMessage<M>>>,
+    seed: u64,
 }
 
 impl<M> Network<M>
 where
     M: Send + Sync + Clone,
 {
-    pub fn new(regions: regions::RegionsData) -> Self {
+    pub fn new(regions: regions::RegionsData, seed: u64) -> Self {
         Self {
             regions,
             network_time: Instant::now(),
@@ -122,6 +123,7 @@ where
             from_node_receivers: HashMap::new(),
             from_node_broadcast_receivers: HashMap::new(),
             to_node_senders: HashMap::new(),
+            seed,
         }
     }
 
@@ -206,7 +208,7 @@ where
             .messages
             .par_iter()
             .filter(|(network_time, message)| {
-                let mut rng = ThreadRng::default();
+                let mut rng = SmallRng::seed_from_u64(self.seed);
                 self.send_or_drop_message(&mut rng, network_time, message)
             })
             .cloned()
@@ -370,7 +372,7 @@ mod tests {
             NetworkBehaviour::new(Duration::from_millis(100), 0.0),
         )]);
         let regions_data = RegionsData::new(regions, behaviour);
-        let mut network = Network::new(regions_data);
+        let mut network = Network::new(regions_data, 0);
 
         let (from_a_sender, from_a_receiver) = channel::unbounded();
         let (from_a_broadcast_sender, from_a_broadcast_receiver) = channel::unbounded();
@@ -445,7 +447,7 @@ mod tests {
             ),
         ]);
         let regions_data = RegionsData::new(regions, behaviour);
-        let mut network = Network::new(regions_data);
+        let mut network = Network::new(regions_data, 0);
 
         let (from_a_sender, from_a_receiver) = channel::unbounded();
         let (from_a_broadcast_sender, from_a_broadcast_receiver) = channel::unbounded();
