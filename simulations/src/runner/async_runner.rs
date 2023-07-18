@@ -1,4 +1,4 @@
-use crate::node::{Node, NodeId};
+use crate::node::NodeId;
 use crate::output_processors::Record;
 use crate::runner::SimulationRunner;
 use crate::warding::SimulationState;
@@ -6,7 +6,6 @@ use crossbeam::channel::bounded;
 use crossbeam::select;
 use rand::prelude::SliceRandom;
 use rayon::prelude::*;
-use serde::Serialize;
 use std::collections::HashSet;
 use std::sync::Arc;
 use std::time::Duration;
@@ -14,26 +13,25 @@ use std::time::Duration;
 use super::SimulationRunnerHandle;
 
 /// Simulate with sending the network state to any subscriber
-pub fn simulate<M, N: Node, R>(
-    runner: SimulationRunner<M, N, R>,
+pub fn simulate<M, R, S, T>(
+    runner: SimulationRunner<M, R, S, T>,
     chunk_size: usize,
 ) -> anyhow::Result<SimulationRunnerHandle<R>>
 where
     M: Clone + Send + Sync + 'static,
-    N: Send + Sync + 'static,
-    N::Settings: Clone + Send,
-    N::State: Serialize,
     R: Record
-        + for<'a> TryFrom<&'a SimulationState<N>, Error = anyhow::Error>
+        + for<'a> TryFrom<&'a SimulationState<S, T>, Error = anyhow::Error>
         + Send
         + Sync
         + 'static,
+    S: 'static,
+    T: 'static,
 {
-    let simulation_state = SimulationState::<N> {
+    let simulation_state = SimulationState {
         nodes: Arc::clone(&runner.nodes),
     };
 
-    let mut node_ids: Vec<NodeId> = runner.nodes.read().iter().map(N::id).collect();
+    let mut node_ids: Vec<NodeId> = runner.nodes.read().iter().map(|n| n.id()).collect();
 
     let mut inner_runner = runner.inner;
     let nodes = runner.nodes;

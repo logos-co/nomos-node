@@ -1,4 +1,3 @@
-use crate::node::Node;
 use crate::warding::{SimulationState, SimulationWard};
 use serde::{Deserialize, Serialize};
 
@@ -10,8 +9,8 @@ pub struct MinMaxViewWard {
     max_gap: usize,
 }
 
-impl<N: Node> SimulationWard<N> for MinMaxViewWard {
-    type SimulationState = SimulationState<N>;
+impl<S, T> SimulationWard<S, T> for MinMaxViewWard {
+    type SimulationState = SimulationState<S, T>;
     fn analyze(&mut self, state: &Self::SimulationState) -> bool {
         let mut min = usize::MAX;
         let mut max = 0;
@@ -36,13 +35,13 @@ mod test {
     fn rebase_threshold() {
         let mut minmax = MinMaxViewWard { max_gap: 5 };
         let state = SimulationState {
-            nodes: Arc::new(RwLock::new(vec![10])),
+            nodes: Arc::new(RwLock::new(vec![Box::new(10)])),
         };
         // we only have one node, so always false
         assert!(!minmax.analyze(&state));
 
         // push a new node with 10
-        state.nodes.write().push(20);
+        state.nodes.write().push(Box::new(20));
         // we now have two nodes and the max - min is 10 > max_gap 5, so true
         assert!(minmax.analyze(&state));
     }

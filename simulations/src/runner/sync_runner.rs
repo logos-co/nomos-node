@@ -1,26 +1,23 @@
-use serde::Serialize;
-
 use super::{SimulationRunner, SimulationRunnerHandle};
+use crate::output_processors::Record;
 use crate::warding::SimulationState;
-use crate::{node::Node, output_processors::Record};
 use crossbeam::channel::{bounded, select};
 use std::sync::Arc;
 use std::time::Duration;
 
 /// Simulate with sending the network state to any subscriber
-pub fn simulate<M, N: Node, R>(
-    runner: SimulationRunner<M, N, R>,
+pub fn simulate<M, R, S, T>(
+    runner: SimulationRunner<M, R, S, T>,
 ) -> anyhow::Result<SimulationRunnerHandle<R>>
 where
     M: Send + Sync + Clone + 'static,
-    N: Send + Sync + 'static,
-    N::Settings: Clone + Send,
-    N::State: Serialize,
     R: Record
-        + for<'a> TryFrom<&'a SimulationState<N>, Error = anyhow::Error>
+        + for<'a> TryFrom<&'a SimulationState<S, T>, Error = anyhow::Error>
         + Send
         + Sync
         + 'static,
+    S: 'static,
+    T: 'static,
 {
     let state = SimulationState {
         nodes: Arc::clone(&runner.nodes),
@@ -74,11 +71,14 @@ mod tests {
             InMemoryNetworkInterface, Network, NetworkBehaviourKey,
         },
         node::{
-            dummy::{DummyMessage, DummyNode},
+            dummy::{DummyMessage, DummyNode, DummySettings, DummyState},
             Node, NodeId, NodeIdExt, OverlayState, SharedState, ViewOverlay,
         },
         output_processors::OutData,
-        overlay::{tree::TreeOverlay, Overlay, SimulationOverlay},
+        overlay::{
+            tree::{TreeOverlay, TreeSettings},
+            Overlay, SimulationOverlay,
+        },
         runner::SimulationRunner,
         settings::SimulationSettings,
         streaming::StreamProducer,
@@ -131,7 +131,7 @@ mod tests {
 
         let mut rng = StepRng::new(1, 0);
         let node_ids: Vec<NodeId> = (0..settings.node_count).map(NodeId::from_index).collect();
-        let overlay = TreeOverlay::new(settings.overlay_settings.clone().try_into().unwrap());
+        let overlay = TreeOverlay::new(TreeSettings::default());
         let mut network = init_network(&node_ids);
         let view = ViewOverlay {
             leaders: overlay.leaders(&node_ids, 1, &mut rng).collect(),
@@ -142,11 +142,24 @@ mod tests {
             overlay: SimulationOverlay::Tree(overlay),
             overlays: BTreeMap::from([(0, view.clone()), (1, view)]),
         }));
-        let nodes = init_dummy_nodes(&node_ids, &mut network, overlay_state);
+        let nodes = init_dummy_nodes(&node_ids, &mut network, overlay_state)
+            .into_iter()
+            .map(|n| {
+                Box::new(n)
+                    as Box<
+                        dyn Node<State = DummyState, Settings = DummySettings>
+                            + std::marker::Send
+                            + Sync,
+                    >
+            })
+            .collect();
 
         let producer = StreamProducer::default();
-        let mut runner: SimulationRunner<DummyMessage, DummyNode, OutData> =
-            SimulationRunner::new(network, nodes, producer, settings).unwrap();
+        let mut runner: SimulationRunner<DummyMessage, OutData, DummySettings, DummyState> =
+            SimulationRunner::<_, OutData, DummySettings, DummyState>::new(
+                network, nodes, producer, settings,
+            )
+            .unwrap();
         let mut nodes = runner.nodes.write();
         runner.inner.step(&mut nodes, Duration::from_millis(100));
         drop(nodes);
@@ -166,7 +179,7 @@ mod tests {
 
         let mut rng = StepRng::new(1, 0);
         let node_ids: Vec<NodeId> = (0..settings.node_count).map(NodeId::from_index).collect();
-        let overlay = TreeOverlay::new(settings.overlay_settings.clone().try_into().unwrap());
+        let overlay = TreeOverlay::new(TreeSettings::default());
         let mut network = init_network(&node_ids);
         let view = ViewOverlay {
             leaders: overlay.leaders(&node_ids, 1, &mut rng).collect(),
@@ -182,7 +195,7 @@ mod tests {
                 (43, view),
             ]),
         }));
-        let nodes = init_dummy_nodes(&node_ids, &mut network, overlay_state);
+        let nodes = init_dummy_nodes(&node_ids, &mut network, overlay_state.clone());
 
         for node in nodes.iter() {
             // All nodes send one message to NodeId(1).
@@ -191,7 +204,19 @@ mod tests {
         }
         network.collect_messages();
 
-        let mut runner: SimulationRunner<DummyMessage, DummyNode, OutData> =
+        let nodes = init_dummy_nodes(&node_ids, &mut network, overlay_state)
+            .into_iter()
+            .map(|n| {
+                Box::new(n)
+                    as Box<
+                        dyn Node<State = DummyState, Settings = DummySettings>
+                            + std::marker::Send
+                            + Sync,
+                    >
+            })
+            .collect();
+
+        let mut runner: SimulationRunner<DummyMessage, OutData, DummySettings, DummyState> =
             SimulationRunner::new(network, nodes, Default::default(), settings).unwrap();
 
         let mut nodes = runner.nodes.write();

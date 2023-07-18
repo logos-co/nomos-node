@@ -1,4 +1,3 @@
-use crate::node::Node;
 use crate::warding::{SimulationState, SimulationWard};
 use serde::{Deserialize, Serialize};
 
@@ -10,8 +9,8 @@ pub struct MaxViewWard {
     max_view: usize,
 }
 
-impl<N: Node> SimulationWard<N> for MaxViewWard {
-    type SimulationState = SimulationState<N>;
+impl<S, T> SimulationWard<S, T> for MaxViewWard {
+    type SimulationState = SimulationState<S, T>;
     fn analyze(&mut self, state: &Self::SimulationState) -> bool {
         state
             .nodes
@@ -34,11 +33,11 @@ mod test {
 
         let node = 11;
         let state = SimulationState {
-            nodes: Arc::new(RwLock::new(vec![node])),
+            nodes: Arc::new(RwLock::new(vec![Box::new(node)])),
         };
         assert!(ttf.analyze(&state));
 
-        state.nodes.write().push(9);
+        state.nodes.write().push(Box::new(9));
         assert!(!ttf.analyze(&state));
     }
 }

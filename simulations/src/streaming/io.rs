@@ -118,7 +118,10 @@ mod tests {
             regions::{Region, RegionsData},
             Network, NetworkBehaviourKey,
         },
-        node::{dummy_streaming::DummyStreamingNode, Node, NodeId, NodeIdExt},
+        node::{
+            dummy_streaming::{DummyStreamingNode, DummyStreamingState},
+            Node, NodeId, NodeIdExt,
+        },
         output_processors::OutData,
         runner::SimulationRunner,
         warding::SimulationState,
@@ -130,10 +133,10 @@ mod tests {
         states: HashMap<NodeId, usize>,
     }
 
-    impl TryFrom<&SimulationState<DummyStreamingNode<()>>> for IORecord {
+    impl<S, T: Serialize> TryFrom<&SimulationState<S, T>> for IORecord {
         type Error = anyhow::Error;
 
-        fn try_from(value: &SimulationState<DummyStreamingNode<()>>) -> Result<Self, Self::Error> {
+        fn try_from(value: &SimulationState<S, T>) -> Result<Self, Self::Error> {
             let nodes = value.nodes.read();
             Ok(Self {
                 states: nodes
@@ -152,7 +155,14 @@ mod tests {
         };
 
         let nodes = (0..6)
-            .map(|idx| DummyStreamingNode::new(NodeId::from_index(idx), ()))
+            .map(|idx| {
+                Box::new(DummyStreamingNode::new(NodeId::from_index(idx), ()))
+                    as Box<
+                        dyn Node<State = DummyStreamingState, Settings = ()>
+                            + std::marker::Send
+                            + Sync,
+                    >
+            })
             .collect::<Vec<_>>();
         let network = Network::new(RegionsData {
             regions: (0..6)
@@ -204,7 +214,7 @@ mod tests {
                 })
                 .collect(),
         });
-        let simulation_runner: SimulationRunner<(), DummyStreamingNode<()>, OutData> =
+        let simulation_runner: SimulationRunner<(), OutData, (), DummyStreamingState> =
             SimulationRunner::new(network, nodes, Default::default(), simulation_settings).unwrap();
         simulation_runner
             .simulate()

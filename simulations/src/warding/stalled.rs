@@ -1,4 +1,4 @@
-use crate::node::Node;
+use crate::runner::BoxedNode;
 use crate::warding::{SimulationState, SimulationWard};
 use serde::{Deserialize, Serialize};
 
@@ -31,8 +31,8 @@ impl StalledViewWard {
     }
 }
 
-impl<N: Node> SimulationWard<N> for StalledViewWard {
-    type SimulationState = SimulationState<N>;
+impl<S, T> SimulationWard<S, T> for StalledViewWard {
+    type SimulationState = SimulationState<S, T>;
     fn analyze(&mut self, state: &Self::SimulationState) -> bool {
         let nodes = state.nodes.read();
         self.update_state(checksum(nodes.as_slice()));
@@ -41,7 +41,7 @@ impl<N: Node> SimulationWard<N> for StalledViewWard {
 }
 
 #[inline]
-fn checksum<N: Node>(nodes: &[N]) -> u32 {
+fn checksum<S, T>(nodes: &[BoxedNode<S, T>]) -> u32 {
     let mut hash = crc32fast::Hasher::new();
     for node in nodes.iter() {
         hash.update(&node.current_view().to_be_bytes());
@@ -65,7 +65,7 @@ mod test {
             threshold: 2,
         };
         let state = SimulationState {
-            nodes: Arc::new(RwLock::new(vec![10])),
+            nodes: Arc::new(RwLock::new(vec![Box::new(10)])),
         };
 
         // increase the criterion, 1
@@ -76,7 +76,7 @@ mod test {
         assert!(stalled.analyze(&state));
 
         // push a new one, so the criterion is reset to 0
-        state.nodes.write().push(20);
+        state.nodes.write().push(Box::new(20));
         assert!(!stalled.analyze(&state));
 
         // increase the criterion, 2

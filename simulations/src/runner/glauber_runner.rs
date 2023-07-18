@@ -5,7 +5,7 @@ use crate::warding::SimulationState;
 use crossbeam::channel::bounded;
 use crossbeam::select;
 use rand::prelude::IteratorRandom;
-use serde::Serialize;
+
 use std::collections::BTreeSet;
 use std::sync::Arc;
 use std::time::Duration;
@@ -15,21 +15,20 @@ use super::SimulationRunnerHandle;
 /// Simulate with sending the network state to any subscriber.
 ///
 /// [Glauber dynamics simulation](https://en.wikipedia.org/wiki/Glauber_dynamics)
-pub fn simulate<M, N: Node, R>(
-    runner: SimulationRunner<M, N, R>,
+pub fn simulate<M, R, S, T>(
+    runner: SimulationRunner<M, R, S, T>,
     update_rate: usize,
     maximum_iterations: usize,
 ) -> anyhow::Result<SimulationRunnerHandle<R>>
 where
     M: Send + Sync + Clone + 'static,
-    N: Send + Sync + 'static,
-    N::Settings: Clone + Send,
-    N::State: Serialize,
     R: Record
-        + for<'a> TryFrom<&'a SimulationState<N>, Error = anyhow::Error>
+        + for<'a> TryFrom<&'a SimulationState<S, T>, Error = anyhow::Error>
         + Send
         + Sync
         + 'static,
+    S: 'static,
+    T: 'static,
 {
     let simulation_state = SimulationState {
         nodes: Arc::clone(&runner.nodes),
@@ -60,7 +59,7 @@ where
 
                         {
                             let mut shared_nodes = nodes.write();
-                            let node: &mut N = shared_nodes
+                            let node: &mut dyn Node<Settings = S, State = T> = &mut **shared_nodes
                                 .get_mut(node_id.index())
                                 .expect("Node should be present");
                             node.step(elapsed);

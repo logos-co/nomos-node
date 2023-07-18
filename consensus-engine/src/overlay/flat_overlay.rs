@@ -17,11 +17,11 @@ impl<L> Overlay for FlatOverlay<L>
 where
     L: LeaderSelection + Send + Sync + 'static,
 {
-    type Settings = Settings<L>;
+    type Settings = FlatOverlaySettings<L>;
     type LeaderSelection = L;
 
     fn new(
-        Settings {
+        FlatOverlaySettings {
             leader,
             nodes,
             leader_super_majority_threshold,
@@ -135,7 +135,7 @@ impl LeaderSelection for RoundRobin {
 
 #[derive(Clone, Debug, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-pub struct Settings<L> {
+pub struct FlatOverlaySettings<L> {
     pub nodes: Vec<NodeId>,
     /// A fraction representing the threshold in the form `<num>/<den>'
     /// Defaults to 2/3

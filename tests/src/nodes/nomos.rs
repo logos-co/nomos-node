@@ -4,7 +4,7 @@ use std::process::{Child, Command, Stdio};
 use std::time::Duration;
 // internal
 use crate::{get_available_port, Node, SpawnConfig, RNG};
-use consensus_engine::overlay::{RoundRobin, Settings};
+use consensus_engine::overlay::{FlatOverlaySettings, RoundRobin};
 use consensus_engine::NodeId;
 use nomos_consensus::{CarnotInfo, CarnotSettings};
 use nomos_http::backends::axum::AxumBackendSettings;
@@ -208,7 +208,7 @@ fn create_node_config(
         consensus: CarnotSettings {
             private_key,
             fountain_settings: (),
-            overlay_settings: Settings {
+            overlay_settings: FlatOverlaySettings {
                 nodes,
                 leader: RoundRobin::new(),
                 // By setting the leader_threshold to 1 we ensure that all nodes come

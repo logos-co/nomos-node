@@ -1,13 +1,13 @@
 // std
 use anyhow::Ok;
 use serde::Serialize;
-use simulations::node::carnot::CarnotSettings;
+use simulations::node::carnot::{CarnotSettings, CarnotState};
 use std::fs::File;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 // crates
 use clap::Parser;
-use consensus_engine::overlay::{FlatOverlay, RandomBeaconState, RoundRobin};
+use consensus_engine::overlay::RandomBeaconState;
 use consensus_engine::{Block, View};
 use crossbeam::channel;
 use rand::rngs::SmallRng;
@@ -17,18 +17,18 @@ use serde::de::DeserializeOwned;
 use simulations::network::behaviour::create_behaviours;
 use simulations::network::regions::{create_regions, RegionsData};
 use simulations::network::{InMemoryNetworkInterface, Network};
-use simulations::node::{Node, NodeId, NodeIdExt};
+use simulations::node::{NodeId, NodeIdExt};
 use simulations::output_processors::Record;
-use simulations::runner::SimulationRunnerHandle;
+use simulations::runner::{BoxedNode, SimulationRunnerHandle};
 use simulations::streaming::{
     io::IOSubscriber, naive::NaiveSubscriber, polars::PolarsSubscriber, StreamType,
 };
 // internal
 use simulations::{
-    node::carnot::CarnotNode, output_processors::OutData, runner::SimulationRunner,
-    settings::SimulationSettings,
+    output_processors::OutData, runner::SimulationRunner, settings::SimulationSettings,
 };
 mod log;
+mod overlay_node;
 
 /// Main simulation wrapper
 /// Pipes together the cli arguments with the execution
@@ -73,7 +73,7 @@ impl SimulationApp {
 
         let ids = node_ids.clone();
         let mut network = Network::new(regions_data);
-        let nodes = node_ids
+        let nodes: Vec<BoxedNode<CarnotSettings, CarnotState>> = node_ids
             .iter()
             .copied()
             .map(|node_id| {
@@ -86,11 +86,7 @@ impl SimulationApp {
                 );
                 let nodes: Vec<NodeId> = ids.clone().into_iter().map(Into::into).collect();
                 let leader = nodes.first().copied().unwrap();
-                let overlay_settings = consensus_engine::overlay::Settings {
-                    nodes: nodes.to_vec(),
-                    leader: RoundRobin::new(),
-                    leader_super_majority_threshold: None,
-                };
+
                 // FIXME: Actually use a proposer and a key to generate random beacon state
                 let genesis = nomos_core::block::Block::new(
                     View::new(0),
@@ -101,39 +97,36 @@ impl SimulationApp {
                         entropy: Box::new([0; 32]),
                     },
                 );
-                CarnotNode::<FlatOverlay<RoundRobin>>::new(
+                overlay_node::to_overlay_node(
                     node_id,
-                    CarnotSettings::new(
-                        simulation_settings.node_settings.timeout,
-                        simulation_settings.record_settings.clone(),
-                    ),
-                    overlay_settings,
-                    genesis,
+                    nodes,
+                    leader,
                     network_interface,
+                    genesis,
                     &mut rng,
+                    &simulation_settings,
                 )
             })
             .collect();
-        run(network, nodes, simulation_settings, stream_type)?;
+        run::<_, _, _>(network, nodes, simulation_settings, stream_type)?;
         Ok(())
     }
 }
 
-fn run<M, N: Node>(
+fn run<M, S, T>(
     network: Network<M>,
-    nodes: Vec<N>,
+    nodes: Vec<BoxedNode<S, T>>,
     settings: SimulationSettings,
     stream_type: Option<StreamType>,
 ) -> anyhow::Result<()>
 where
     M: Clone + Send + Sync + 'static,
-    N: Send + Sync + 'static,
-    N::Settings: Clone + Send,
-    N::State: Serialize,
+    S: 'static,
+    T: Serialize + 'static,
 {
     let stream_settings = settings.stream_settings.clone();
     let runner =
-        SimulationRunner::<_, _, OutData>::new(network, nodes, Default::default(), settings)?;
+        SimulationRunner::<_, OutData, S, T>::new(network, nodes, Default::default(), settings)?;
 
     let handle = match stream_type {
         Some(StreamType::Naive) => {

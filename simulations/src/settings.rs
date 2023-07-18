@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 
 use crate::network::NetworkSettings;
-use crate::overlay::OverlaySettings;
 use crate::streaming::StreamSettings;
 use crate::warding::Ward;
 use serde::{Deserialize, Serialize};
@@ -21,6 +20,19 @@ pub enum RunnerSettings {
         rounds_gap: usize,
         distribution: Option<Vec<f32>>,
     },
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum OverlaySettings {
+    #[default]
+    Flat,
+    Tree(TreeSettings),
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct TreeSettings {
+    pub number_of_committees: usize,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
