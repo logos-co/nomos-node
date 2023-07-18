@@ -23,13 +23,13 @@ pub(crate) struct EventBuilder {
 }
 
 impl EventBuilder {
-    pub fn new(id: NodeId, timeout: Duration) -> Self {
+    pub fn new(id: NodeId, timeout: Duration, threshold: usize) -> Self {
         Self {
-            vote_message: Default::default(),
-            leader_vote_message: Default::default(),
-            timeout_message: Default::default(),
-            leader_new_view_message: Default::default(),
-            new_view_message: Default::default(),
+            vote_message: Tally::new(threshold),
+            leader_vote_message: Tally::new(threshold),
+            timeout_message: Tally::new(threshold),
+            leader_new_view_message: Tally::new(threshold),
+            new_view_message: Tally::new(threshold),
             current_view: View::default(),
             id,
             timeout_handler: TimeoutHandler::new(timeout),

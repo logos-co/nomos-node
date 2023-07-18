@@ -187,13 +187,19 @@ impl<O: Overlay> From<&Carnot<O>> for CarnotState {
 pub struct CarnotSettings {
     timeout: Duration,
     record_settings: HashMap<String, bool>,
+    threshold: usize,
 }
 
 impl CarnotSettings {
-    pub fn new(timeout: Duration, record_settings: HashMap<String, bool>) -> Self {
+    pub fn new(
+        timeout: Duration,
+        record_settings: HashMap<String, bool>,
+        threshold: usize,
+    ) -> Self {
         Self {
             timeout,
             record_settings,
+            threshold,
         }
     }
 }
@@ -231,10 +237,10 @@ impl<O: Overlay> CarnotNode<O> {
         let mut this = Self {
             id,
             state,
-            settings,
             network_interface,
             message_cache: MessageCache::new(),
-            event_builder: event_builder::EventBuilder::new(id, timeout),
+            event_builder: event_builder::EventBuilder::new(id, timeout, settings.threshold),
+            settings,
             engine,
             random_beacon_pk,
         };

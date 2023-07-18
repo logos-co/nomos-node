@@ -31,6 +31,7 @@ pub fn to_overlay_node<R: Rng>(
                 CarnotSettings::new(
                     settings.node_settings.timeout,
                     settings.record_settings.clone(),
+                    0,
                 ),
                 overlay_settings,
                 genesis,
@@ -51,6 +52,7 @@ pub fn to_overlay_node<R: Rng>(
                 CarnotSettings::new(
                     settings.node_settings.timeout,
                     settings.record_settings.clone(),
+                    overlay_settings.number_of_committees,
                 ),
                 overlay_settings,
                 genesis,

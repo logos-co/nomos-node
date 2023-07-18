@@ -79,8 +79,12 @@ impl Tree {
     }
 
     pub(super) fn parent_committee_from_member_id(&self, id: &NodeId) -> Committee {
-        let Some(committee_id) = self.committee_id_by_member_id(id) else { return Committee::new(); };
-        let Some(parent_id) = self.parent_committee(committee_id) else { return Committee::new(); };
+        let Some(committee_id) = self.committee_id_by_member_id(id) else {
+            return Committee::new();
+        };
+        let Some(parent_id) = self.parent_committee(committee_id) else {
+            return Committee::new();
+        };
         self.committee_by_committee_idx(self.committee_id_to_index[parent_id])
             .cloned()
             .unwrap_or_default()
@@ -93,7 +97,10 @@ impl Tree {
         let Some(base) = self
             .committee_id_to_index
             .get(committee_id)
-            .map(|&idx| idx * 2) else { return (None, None); };
+            .map(|&idx| idx * 2)
+        else {
+            return (None, None);
+        };
         let first_child = base + 1;
         let second_child = base + 2;
         (
