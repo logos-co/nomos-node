@@ -176,24 +176,16 @@ where
 
         let mut broadcast_messages = self
             .from_node_broadcast_receivers
-            .par_iter()
+            .iter()
             .flat_map(|(_, from_node)| {
-                from_node
-                    .try_iter()
-                    .flat_map(|msg| {
-                        self.to_node_senders
-                            .keys()
-                            .map(|recipient| {
-                                let mut msg = msg.clone();
-                                msg.to = Some(*recipient);
-                                msg
-                            })
-                            .collect::<Vec<_>>()
+                from_node.try_iter().flat_map(|msg| {
+                    self.to_node_senders.keys().map(move |recipient| {
+                        let mut m = msg.clone();
+                        m.to = Some(*recipient);
+                        m
                     })
-                    .collect::<Vec<_>>()
+                })
             })
-            .collect::<Vec<_>>()
-            .into_iter()
             .map(|m| (self.network_time, m))
             .collect::<Vec<_>>();
         self.messages.append(&mut broadcast_messages);
