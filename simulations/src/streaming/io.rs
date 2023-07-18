@@ -164,56 +164,59 @@ mod tests {
                     >
             })
             .collect::<Vec<_>>();
-        let network = Network::new(RegionsData {
-            regions: (0..6)
-                .map(|idx| {
-                    let region = match idx % 6 {
-                        0 => Region::Europe,
-                        1 => Region::NorthAmerica,
-                        2 => Region::SouthAmerica,
-                        3 => Region::Asia,
-                        4 => Region::Africa,
-                        5 => Region::Australia,
-                        _ => unreachable!(),
-                    };
-                    (region, vec![NodeId::from_index(idx)])
-                })
-                .collect(),
-            node_region: (0..6)
-                .map(|idx| {
-                    let region = match idx % 6 {
-                        0 => Region::Europe,
-                        1 => Region::NorthAmerica,
-                        2 => Region::SouthAmerica,
-                        3 => Region::Asia,
-                        4 => Region::Africa,
-                        5 => Region::Australia,
-                        _ => unreachable!(),
-                    };
-                    (NodeId::from_index(idx), region)
-                })
-                .collect(),
-            region_network_behaviour: (0..6)
-                .map(|idx| {
-                    let region = match idx % 6 {
-                        0 => Region::Europe,
-                        1 => Region::NorthAmerica,
-                        2 => Region::SouthAmerica,
-                        3 => Region::Asia,
-                        4 => Region::Africa,
-                        5 => Region::Australia,
-                        _ => unreachable!(),
-                    };
-                    (
-                        NetworkBehaviourKey::new(region, region),
-                        NetworkBehaviour {
-                            delay: Duration::from_millis(100),
-                            drop: 0.0,
-                        },
-                    )
-                })
-                .collect(),
-        });
+        let network = Network::new(
+            RegionsData {
+                regions: (0..6)
+                    .map(|idx| {
+                        let region = match idx % 6 {
+                            0 => Region::Europe,
+                            1 => Region::NorthAmerica,
+                            2 => Region::SouthAmerica,
+                            3 => Region::Asia,
+                            4 => Region::Africa,
+                            5 => Region::Australia,
+                            _ => unreachable!(),
+                        };
+                        (region, vec![NodeId::from_index(idx)])
+                    })
+                    .collect(),
+                node_region: (0..6)
+                    .map(|idx| {
+                        let region = match idx % 6 {
+                            0 => Region::Europe,
+                            1 => Region::NorthAmerica,
+                            2 => Region::SouthAmerica,
+                            3 => Region::Asia,
+                            4 => Region::Africa,
+                            5 => Region::Australia,
+                            _ => unreachable!(),
+                        };
+                        (NodeId::from_index(idx), region)
+                    })
+                    .collect(),
+                region_network_behaviour: (0..6)
+                    .map(|idx| {
+                        let region = match idx % 6 {
+                            0 => Region::Europe,
+                            1 => Region::NorthAmerica,
+                            2 => Region::SouthAmerica,
+                            3 => Region::Asia,
+                            4 => Region::Africa,
+                            5 => Region::Australia,
+                            _ => unreachable!(),
+                        };
+                        (
+                            NetworkBehaviourKey::new(region, region),
+                            NetworkBehaviour {
+                                delay: Duration::from_millis(100),
+                                drop: 0.0,
+                            },
+                        )
+                    })
+                    .collect(),
+            },
+            0,
+        );
         let simulation_runner: SimulationRunner<(), OutData, (), DummyStreamingState> =
             SimulationRunner::new(network, nodes, Default::default(), simulation_settings).unwrap();
         simulation_runner

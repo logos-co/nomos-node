@@ -8,7 +8,7 @@ pub(crate) struct Tally<T: core::hash::Hash + Eq> {
 
 impl<T: core::hash::Hash + Eq> Default for Tally<T> {
     fn default() -> Self {
-        Self::new(0)
+        Self::new(2)
     }
 }
 

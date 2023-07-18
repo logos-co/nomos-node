@@ -326,13 +326,9 @@ impl DummyNode {
     }
 
     fn handle_message(&mut self, message: &NetworkMessage<DummyMessage>) {
-        let payload = match message {
-            NetworkMessage::Adhoc(m) => m.payload.clone(),
-            NetworkMessage::Broadcast(m) => m.payload.clone(),
-        };
         // The view can change on any message, node needs to change its position
         // and roles if the view changes during the message processing.
-        if let DummyMessage::Proposal(block) = &payload {
+        if let DummyMessage::Proposal(block) = &message.payload {
             if block.view > self.current_view() {
                 self.update_view(block.view);
             }
@@ -341,10 +337,10 @@ impl DummyNode {
 
         for role in roles.iter() {
             match role {
-                DummyRole::Leader => self.handle_leader(&payload),
-                DummyRole::Root => self.handle_root(&payload),
-                DummyRole::Internal => self.handle_internal(&payload),
-                DummyRole::Leaf => self.handle_leaf(&payload),
+                DummyRole::Leader => self.handle_leader(&message.payload),
+                DummyRole::Root => self.handle_root(&message.payload),
+                DummyRole::Internal => self.handle_internal(&message.payload),
+                DummyRole::Leaf => self.handle_leaf(&message.payload),
                 DummyRole::Unknown => (),
             }
         }
@@ -461,7 +457,7 @@ mod tests {
             NetworkBehaviour::new(Duration::from_millis(100), 0.0),
         )]);
         let regions_data = RegionsData::new(regions, behaviour);
-        Network::new(regions_data)
+        Network::new(regions_data, 0)
     }
 
     fn init_dummy_nodes(
@@ -473,9 +469,16 @@ mod tests {
             .iter()
             .map(|node_id| {
                 let (node_message_sender, node_message_receiver) = channel::unbounded();
-                let network_message_receiver = network.connect(*node_id, node_message_receiver);
+                let (node_message_broadcast_sender, node_message_broadcast_receiver) =
+                    channel::unbounded();
+                let network_message_receiver = network.connect(
+                    *node_id,
+                    node_message_receiver,
+                    node_message_broadcast_receiver,
+                );
                 let network_interface = InMemoryNetworkInterface::new(
                     *node_id,
+                    node_message_broadcast_sender,
                     node_message_sender,
                     network_message_receiver,
                 );
