@@ -4,30 +4,52 @@ use rand::rngs::StdRng;
 use rand::seq::SliceRandom;
 use rand::SeedableRng;
 
+pub trait Shuffler {
+    fn shuffle<R>(&self, nodes: &mut [NodeId], rng: &mut R)
+    where
+        R: rand::Rng + ?Sized;
+}
+
+#[derive(Debug, Default, Copy, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct DefaultShuffler;
+
+impl Shuffler for DefaultShuffler {
+    fn shuffle<R>(&self, nodes: &mut [NodeId], rng: &mut R)
+    where
+        R: rand::Rng + ?Sized,
+    {
+        <[NodeId] as rand::seq::SliceRandom>::shuffle(nodes, rng)
+    }
+}
+
 #[derive(Debug, Clone)]
-pub struct TreeOverlaySettings<L: LeaderSelection> {
+pub struct TreeOverlaySettings<L: LeaderSelection, S = DefaultShuffler> {
     pub nodes: Vec<NodeId>,
     pub current_leader: NodeId,
     pub entropy: [u8; 32],
     pub number_of_committees: usize,
     pub leader: L,
+    pub shuffer: S,
 }
 
 #[derive(Debug, Clone)]
-pub struct TreeOverlay<L> {
+pub struct TreeOverlay<L, S = DefaultShuffler> {
     pub(super) entropy: [u8; 32],
     pub(super) number_of_committees: usize,
     pub(super) nodes: Vec<NodeId>,
     pub(super) current_leader: NodeId,
     pub(super) carnot_tree: Tree,
     pub(super) leader: L,
+    pub(super) shuffer: S,
 }
 
-impl<L> Overlay for TreeOverlay<L>
+impl<L, S> Overlay for TreeOverlay<L, S>
 where
     L: LeaderSelection + Send + Sync + 'static,
+    S: Shuffler + Clone + Send + Sync + 'static,
 {
-    type Settings = TreeOverlaySettings<L>;
+    type Settings = TreeOverlaySettings<L, S>;
 
     type LeaderSelection = L;
 
@@ -38,10 +60,10 @@ where
             entropy,
             number_of_committees,
             leader,
+            shuffer,
         } = settings;
         let mut rng = StdRng::from_seed(entropy);
-        // TODO: support custom shuffling algorithm
-        nodes.shuffle(&mut rng);
+        shuffer.shuffle(&mut nodes, &mut rng);
 
         let carnot_tree = Tree::new(&nodes, number_of_committees);
 
@@ -52,6 +74,7 @@ where
             current_leader,
             carnot_tree,
             leader,
+            shuffer,
         }
     }
 
@@ -174,9 +197,10 @@ where
     }
 }
 
-impl<L> TreeOverlay<L>
+impl<L, S> TreeOverlay<L, S>
 where
     L: LeaderSelection + Send + Sync + 'static,
+    S: Shuffler + Clone + Send + Sync + 'static,
 {
     pub fn advance(&self, entropy: [u8; 32], leader: L) -> Self {
         Self::new(TreeOverlaySettings {
@@ -185,6 +209,7 @@ where
             entropy,
             number_of_committees: self.number_of_committees,
             leader,
+            shuffer: self.shuffer.clone(),
         })
     }
 
@@ -213,6 +238,7 @@ mod tests {
             entropy: [0; 32],
             number_of_committees: 3,
             leader: RoundRobin::new(),
+            shuffer: DefaultShuffler,
         });
 
         assert_eq!(*overlay.leader(), nodes[0]);
@@ -227,6 +253,7 @@ mod tests {
             entropy: [0; 32],
             number_of_committees: 3,
             leader: RoundRobin::new(),
+            shuffer: DefaultShuffler,
         });
 
         let leader = overlay.next_leader();
@@ -238,12 +265,13 @@ mod tests {
     #[test]
     fn test_root_committee() {
         let nodes: Vec<_> = (0..10).map(|i| NodeId::new([i as u8; 32])).collect();
-        let overlay = TreeOverlay::new(TreeOverlaySettings {
+        let overlay = TreeOverlay::<_, DefaultShuffler>::new(TreeOverlaySettings {
             current_leader: nodes[0],
             nodes,
             entropy: [0; 32],
             number_of_committees: 3,
             leader: RoundRobin::new(),
+            shuffer: DefaultShuffler,
         });
 
         let mut expected_root = Committee::new();
@@ -256,12 +284,13 @@ mod tests {
     #[test]
     fn test_leaf_committees() {
         let nodes: Vec<_> = (0..10).map(|i| NodeId::new([i as u8; 32])).collect();
-        let overlay = TreeOverlay::new(TreeOverlaySettings {
+        let overlay = TreeOverlay::<_, DefaultShuffler>::new(TreeOverlaySettings {
             current_leader: nodes[0],
             nodes,
             entropy: [0; 32],
             number_of_committees: 3,
             leader: RoundRobin::new(),
+            shuffer: DefaultShuffler,
         });
 
         let mut leaf_committees = overlay
@@ -286,12 +315,13 @@ mod tests {
     #[test]
     fn test_super_majority_threshold_for_leaf() {
         let nodes: Vec<_> = (0..10).map(|i| NodeId::new([i as u8; 32])).collect();
-        let overlay = TreeOverlay::new(TreeOverlaySettings {
+        let overlay = TreeOverlay::<_, DefaultShuffler>::new(TreeOverlaySettings {
             current_leader: nodes[0],
             nodes,
             entropy: [0; 32],
             number_of_committees: 3,
             leader: RoundRobin::new(),
+            shuffer: DefaultShuffler,
         });
 
         assert_eq!(overlay.super_majority_threshold(overlay.nodes[8]), 0);
@@ -300,12 +330,13 @@ mod tests {
     #[test]
     fn test_super_majority_threshold_for_root_member() {
         let nodes: Vec<_> = (0..10).map(|i| NodeId::new([i as u8; 32])).collect();
-        let overlay = TreeOverlay::new(TreeOverlaySettings {
+        let overlay = TreeOverlay::<_, DefaultShuffler>::new(TreeOverlaySettings {
             current_leader: nodes[0],
             nodes,
             entropy: [0; 32],
             number_of_committees: 3,
             leader: RoundRobin::new(),
+            shuffer: DefaultShuffler,
         });
 
         assert_eq!(overlay.super_majority_threshold(overlay.nodes[0]), 3);
@@ -314,12 +345,13 @@ mod tests {
     #[test]
     fn test_leader_super_majority_threshold() {
         let nodes: Vec<_> = (0..10).map(|i| NodeId::new([i as u8; 32])).collect();
-        let overlay = TreeOverlay::new(TreeOverlaySettings {
+        let overlay = TreeOverlay::<_, DefaultShuffler>::new(TreeOverlaySettings {
             nodes: nodes.clone(),
             current_leader: nodes[0],
             entropy: [0; 32],
             number_of_committees: 3,
             leader: RoundRobin::new(),
+            shuffer: DefaultShuffler,
         });
 
         assert_eq!(

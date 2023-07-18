@@ -45,6 +45,7 @@ pub fn to_overlay_node<R: Rng>(
                 entropy: [0; 32],
                 number_of_committees: tree_settings.number_of_committees,
                 leader: RoundRobin::new(),
+                shuffer: DefaultShuffler,
             };
             Box::new(CarnotNode::<TreeOverlay<RoundRobin>>::new(
                 node_id,
