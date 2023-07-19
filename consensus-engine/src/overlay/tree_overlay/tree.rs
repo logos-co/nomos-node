@@ -134,6 +134,7 @@ impl Tree {
             .and_then(|idx| self.committee_by_committee_idx(idx))
     }
 
+    #[allow(dead_code)]
     pub(super) fn committee_by_committee_id(
         &self,
         committee_id: &CommitteeId,

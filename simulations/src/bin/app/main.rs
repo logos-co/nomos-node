@@ -120,7 +120,7 @@ impl SimulationApp {
     }
 }
 
-fn run<M, S, T>(
+fn run<M: std::fmt::Debug, S, T>(
     network: Network<M>,
     nodes: Vec<BoxedNode<S, T>>,
     settings: SimulationSettings,

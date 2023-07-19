@@ -1,5 +1,5 @@
 use super::LeaderSelection;
-use crate::{Committee, NodeId, Overlay};
+use crate::{NodeId, Overlay};
 use fraction::{Fraction, ToPrimitive};
 use serde::{Deserialize, Serialize};
 const LEADER_SUPER_MAJORITY_THRESHOLD_NUM: u64 = 2;
@@ -64,7 +64,7 @@ where
     }
 
     fn parent_committee(&self, _id: NodeId) -> crate::Committee {
-        Committee::new()
+        std::iter::once(self.next_leader()).collect()
     }
 
     fn node_committee(&self, _id: NodeId) -> crate::Committee {

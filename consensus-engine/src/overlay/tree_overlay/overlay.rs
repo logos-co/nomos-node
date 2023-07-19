@@ -85,7 +85,12 @@ where
     }
 
     fn parent_committee(&self, id: NodeId) -> Committee {
-        self.carnot_tree.parent_committee_from_member_id(&id)
+        let c = self.carnot_tree.parent_committee_from_member_id(&id);
+        if !c.is_empty() {
+            c
+        } else {
+            std::iter::once(self.next_leader()).collect()
+        }
     }
 
     fn child_committees(&self, id: NodeId) -> Vec<Committee> {
@@ -143,20 +148,25 @@ where
             .expect("node is not part of any committee")
     }
 
+    // TODO: Carnot node in sim does not send votes to the next leader from the child committee of
+    // root committee yet. *For now* leader super majority threshold should be calculated only from
+    // the number of root committee nodes. The code will be reverted once vote sending from
+    // child committee of root committee is added to Carnot node.
     fn leader_super_majority_threshold(&self, _id: NodeId) -> usize {
-        let root_committee = &self.carnot_tree.inner_committees[0];
-        let children = self.carnot_tree.child_committees(root_committee);
-        let children_size = children.0.map_or(0, |c| {
-            self.carnot_tree
-                .committee_by_committee_id(c)
-                .map_or(0, |c| c.len())
-        }) + children.1.map_or(0, |c| {
-            self.carnot_tree
-                .committee_by_committee_id(c)
-                .map_or(0, |c| c.len())
-        });
-        let root_size = self.root_committee().len();
-        let committee_size = root_size + children_size;
+        // let root_committee = &self.carnot_tree.inner_committees[0];
+        // let children = self.carnot_tree.child_committees(root_committee);
+        // let children_size = children.0.map_or(0, |c| {
+        //     self.carnot_tree
+        //         .committee_by_committee_id(c)
+        //         .map_or(0, |c| c.len())
+        // }) + children.1.map_or(0, |c| {
+        //     self.carnot_tree
+        //         .committee_by_committee_id(c)
+        //         .map_or(0, |c| c.len())
+        // });
+        // let root_size = self.root_committee().len();
+        // let committee_size = root_size + children_size;
+        let committee_size = self.root_committee().len();
         (committee_size * 2 / 3) + 1
     }
 
