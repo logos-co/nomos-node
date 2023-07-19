@@ -346,7 +346,7 @@ impl<L: UpdateableLeaderSelection, O: Overlay<LeaderSelection = L>> Node for Car
             .step(current_view_messages, &self.engine, elapsed);
 
         for event in events {
-            let mut output: Vec<Output<CarnotTx>> = vec![];
+            let mut output = None;
             match event {
                 Event::Proposal { block } => {
                     let current_view = self.engine.current_view();
@@ -378,7 +378,7 @@ impl<L: UpdateableLeaderSelection, O: Overlay<LeaderSelection = L>> Node for Car
                     }
 
                     if self.engine.overlay().is_member_of_leaf_committee(self.id) {
-                        output.push(Output::Send(consensus_engine::Send {
+                        output = Some(Output::Send(consensus_engine::Send {
                             to: self.engine.parent_committee(),
                             payload: Payload::Vote(Vote {
                                 view: self.engine.current_view(),
@@ -400,11 +400,11 @@ impl<L: UpdateableLeaderSelection, O: Overlay<LeaderSelection = L>> Node for Car
                     );
                     let (new, out) = self.engine.approve_block(block);
                     tracing::info!(vote=?out, node=%self.id);
-                    output = vec![Output::Send(out)];
+                    output = Some(Output::Send(out));
                     self.engine = new;
                 }
                 Event::ProposeBlock { qc } => {
-                    output = vec![Output::BroadcastProposal {
+                    output = Some(Output::BroadcastProposal {
                         proposal: nomos_core::block::Block::new(
                             qc.view().next(),
                             qc.clone(),
@@ -415,7 +415,7 @@ impl<L: UpdateableLeaderSelection, O: Overlay<LeaderSelection = L>> Node for Car
                                 &self.random_beacon_pk,
                             ),
                         ),
-                    }]
+                    });
                 }
                 // This branch means we already get enough new view msgs for this qc
                 // So we can just call approve_new_view
@@ -430,7 +430,7 @@ impl<L: UpdateableLeaderSelection, O: Overlay<LeaderSelection = L>> Node for Car
                         "receive new view message"
                     );
                     let (new, out) = self.engine.approve_new_view(timeout_qc.clone(), new_views);
-                    output.push(Output::Send(out));
+                    output = Some(Output::Send(out));
                     self.engine = new;
                 }
                 Event::TimeoutQc { timeout_qc } => {
@@ -460,7 +460,7 @@ impl<L: UpdateableLeaderSelection, O: Overlay<LeaderSelection = L>> Node for Car
                             high_qc,
                             self.id(),
                         );
-                        output.push(Output::BroadcastTimeoutQc { timeout_qc });
+                        output = Some(Output::BroadcastTimeoutQc { timeout_qc });
                     }
                 }
                 Event::LocalTimeout => {
@@ -471,18 +471,15 @@ impl<L: UpdateableLeaderSelection, O: Overlay<LeaderSelection = L>> Node for Car
                     );
                     let (new, out) = self.engine.local_timeout();
                     self.engine = new;
-                    if let Some(out) = out {
-                        output.push(Output::Send(out));
-                    }
+                    output = out.map(Output::Send);
                 }
                 Event::None => {
                     tracing::error!("unimplemented none branch");
                     unreachable!("none event will never be constructed")
                 }
             }
-
-            for output_event in output {
-                self.handle_output(output_event);
+            if let Some(event) = output {
+                self.handle_output(event);
             }
         }
 
