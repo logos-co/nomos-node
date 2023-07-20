@@ -318,7 +318,7 @@ impl<L: UpdateableLeaderSelection, O: Overlay<LeaderSelection = L>> Node for Car
     }
 
     fn current_view(&self) -> View {
-        self.event_builder.current_view
+        self.engine.current_view()
     }
 
     fn state(&self) -> &CarnotState {
