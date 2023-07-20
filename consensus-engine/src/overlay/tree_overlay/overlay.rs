@@ -334,7 +334,7 @@ mod tests {
 
         assert_eq!(
             overlay.leader_super_majority_threshold(NodeId::new([0; 32])),
-            7
+            3
         );
     }
 }
