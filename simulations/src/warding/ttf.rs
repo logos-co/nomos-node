@@ -1,4 +1,5 @@
 use crate::warding::{SimulationState, SimulationWard};
+use consensus_engine::View;
 use serde::{Deserialize, Serialize};
 
 /// Time to finality ward. It monitors the amount of rounds of the simulations, triggers when surpassing
@@ -6,7 +7,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Serialize, Deserialize, Copy, Clone)]
 #[serde(transparent)]
 pub struct MaxViewWard {
-    max_view: usize,
+    max_view: View,
 }
 
 impl<S, T> SimulationWard<S, T> for MaxViewWard {
@@ -24,12 +25,15 @@ impl<S, T> SimulationWard<S, T> for MaxViewWard {
 mod test {
     use crate::warding::ttf::MaxViewWard;
     use crate::warding::{SimulationState, SimulationWard};
+    use consensus_engine::View;
     use parking_lot::RwLock;
     use std::sync::Arc;
 
     #[test]
     fn rebase_threshold() {
-        let mut ttf = MaxViewWard { max_view: 10 };
+        let mut ttf = MaxViewWard {
+            max_view: View::new(10),
+        };
 
         let node = 11;
         let state = SimulationState {

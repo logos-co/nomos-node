@@ -1,3 +1,4 @@
+use consensus_engine::View;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
@@ -5,7 +6,7 @@ use super::{Node, NodeId};
 
 #[derive(Debug, Default, Copy, Clone, Serialize, Deserialize)]
 pub struct DummyStreamingState {
-    pub current_view: usize,
+    pub current_view: View,
 }
 
 /// This node implementation only used for testing different streaming implementation purposes.
@@ -35,7 +36,7 @@ impl<S> Node for DummyStreamingNode<S> {
         self.id
     }
 
-    fn current_view(&self) -> usize {
+    fn current_view(&self) -> View {
         self.state.current_view
     }
 
@@ -44,6 +45,6 @@ impl<S> Node for DummyStreamingNode<S> {
     }
 
     fn step(&mut self, _: Duration) {
-        self.state.current_view += 1;
+        self.state.current_view = self.state.current_view.next();
     }
 }

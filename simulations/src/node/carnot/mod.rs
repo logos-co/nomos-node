@@ -317,9 +317,8 @@ impl<L: UpdateableLeaderSelection, O: Overlay<LeaderSelection = L>> Node for Car
         self.id
     }
 
-    fn current_view(&self) -> usize {
-        let view: i64 = self.event_builder.current_view.into();
-        view as usize
+    fn current_view(&self) -> View {
+        self.event_builder.current_view
     }
 
     fn state(&self) -> &CarnotState {

@@ -44,7 +44,8 @@ impl<S, T> SimulationWard<S, T> for StalledViewWard {
 fn checksum<S, T>(nodes: &[BoxedNode<S, T>]) -> u32 {
     let mut hash = crc32fast::Hasher::new();
     for node in nodes.iter() {
-        hash.update(&node.current_view().to_be_bytes());
+        let view: i64 = node.current_view().into();
+        hash.update(&(view as usize).to_be_bytes());
         // TODO: hash messages in the node
     }
 

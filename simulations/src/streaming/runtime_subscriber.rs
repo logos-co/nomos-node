@@ -101,6 +101,8 @@ where
 mod tests {
     use std::{collections::HashMap, time::Duration};
 
+    use consensus_engine::View;
+
     use crate::{
         network::{
             behaviour::NetworkBehaviour,
@@ -119,7 +121,7 @@ mod tests {
     use super::*;
     #[derive(Debug, Clone, Serialize)]
     struct RuntimeRecord {
-        states: HashMap<NodeId, usize>,
+        states: HashMap<NodeId, View>,
     }
 
     impl<S, T: Serialize> TryFrom<&SimulationState<S, T>> for RuntimeRecord {
