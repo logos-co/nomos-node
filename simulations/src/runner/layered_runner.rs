@@ -54,7 +54,7 @@ pub fn simulate<M, R, S, T>(
     distribution: Option<Vec<f32>>,
 ) -> anyhow::Result<SimulationRunnerHandle<R>>
 where
-    M: Send + Sync + Clone + 'static,
+    M: std::fmt::Debug + Send + Sync + Clone + 'static,
     R: Record
         + for<'a> TryFrom<&'a SimulationState<S, T>, Error = anyhow::Error>
         + Send
@@ -163,7 +163,7 @@ fn choose_random_layer_and_node_id(
     (i, *node_id)
 }
 
-fn build_node_ids_deque<M, R, S, T>(
+fn build_node_ids_deque<M: std::fmt::Debug, R, S, T>(
     gap: usize,
     runner: &SimulationRunner<M, R, S, T>,
 ) -> FixedSliceDeque<BTreeSet<NodeId>> {

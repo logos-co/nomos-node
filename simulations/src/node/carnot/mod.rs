@@ -57,6 +57,7 @@ pub const CARNOT_RECORD_KEYS: &[&str] = &[
 
 static RECORD_SETTINGS: std::sync::OnceLock<HashMap<String, bool>> = std::sync::OnceLock::new();
 
+#[derive(Debug)]
 pub struct CarnotState {
     current_view: View,
     highest_voted_view: View,

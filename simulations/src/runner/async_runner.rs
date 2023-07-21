@@ -18,7 +18,7 @@ pub fn simulate<M, R, S, T>(
     chunk_size: usize,
 ) -> anyhow::Result<SimulationRunnerHandle<R>>
 where
-    M: Clone + Send + Sync + 'static,
+    M: std::fmt::Debug + Clone + Send + Sync + 'static,
     R: Record
         + for<'a> TryFrom<&'a SimulationState<S, T>, Error = anyhow::Error>
         + Send

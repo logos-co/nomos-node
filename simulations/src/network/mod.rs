@@ -101,7 +101,7 @@ mod network_behaviors_serde {
     }
 }
 
-pub struct Network<M> {
+pub struct Network<M: std::fmt::Debug> {
     pub regions: regions::RegionsData,
     network_time: NetworkTime,
     messages: Vec<(NetworkTime, NetworkMessage<M>)>,
@@ -113,7 +113,7 @@ pub struct Network<M> {
 
 impl<M> Network<M>
 where
-    M: Send + Sync + Clone,
+    M: std::fmt::Debug + Send + Sync + Clone,
 {
     pub fn new(regions: regions::RegionsData, seed: u64) -> Self {
         Self {

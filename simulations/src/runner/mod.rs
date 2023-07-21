@@ -60,7 +60,7 @@ impl<R: Record> SimulationRunnerHandle<R> {
     }
 }
 
-pub(crate) struct SimulationRunnerInner<M> {
+pub(crate) struct SimulationRunnerInner<M: std::fmt::Debug> {
     network: Network<M>,
     wards: Vec<Ward>,
     rng: SmallRng,
@@ -68,7 +68,7 @@ pub(crate) struct SimulationRunnerInner<M> {
 
 impl<M> SimulationRunnerInner<M>
 where
-    M: Send + Sync + Clone,
+    M: std::fmt::Debug + Send + Sync + Clone,
 {
     fn check_wards<S, T>(&mut self, state: &SimulationState<S, T>) -> bool {
         self.wards
@@ -88,7 +88,7 @@ where
 
 /// Encapsulation solution for the simulations runner
 /// Holds the network state, the simulating nodes and the simulation settings.
-pub struct SimulationRunner<M, R, S, T> {
+pub struct SimulationRunner<M: std::fmt::Debug, R, S, T> {
     inner: SimulationRunnerInner<M>,
     nodes: Arc<RwLock<Vec<BoxedNode<S, T>>>>,
     runner_settings: RunnerSettings,
@@ -97,7 +97,7 @@ pub struct SimulationRunner<M, R, S, T> {
 
 impl<M, R, S, T> SimulationRunner<M, R, S, T>
 where
-    M: Clone + Send + Sync + 'static,
+    M: std::fmt::Debug + Clone + Send + Sync + 'static,
     R: Record
         + for<'a> TryFrom<&'a SimulationState<S, T>, Error = anyhow::Error>
         + Send
@@ -172,7 +172,7 @@ where
 
 impl<M, R, S, T> SimulationRunner<M, R, S, T>
 where
-    M: Clone + Send + Sync + 'static,
+    M: std::fmt::Debug + Clone + Send + Sync + 'static,
     R: Record
         + serde::Serialize
         + for<'a> TryFrom<&'a SimulationState<S, T>, Error = anyhow::Error>
