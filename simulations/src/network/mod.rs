@@ -237,16 +237,26 @@ pub struct NetworkMessage<M> {
     pub from: NodeId,
     pub to: Option<NodeId>,
     pub payload: M,
+    pub size_bytes: u32,
 }
 
 impl<M> NetworkMessage<M> {
-    pub fn new(from: NodeId, to: Option<NodeId>, payload: M) -> Self {
-        Self { from, to, payload }
+    pub fn new(from: NodeId, to: Option<NodeId>, payload: M, size_bytes: u32) -> Self {
+        Self {
+            from,
+            to,
+            payload,
+            size_bytes,
+        }
     }
 
     pub fn get_payload(self) -> M {
         self.payload
     }
+}
+
+pub trait PayloadSize {
+    fn size_bytes(&self) -> u32;
 }
 
 pub trait NetworkInterface {
@@ -280,16 +290,18 @@ impl<M> InMemoryNetworkInterface<M> {
     }
 }
 
-impl<M> NetworkInterface for InMemoryNetworkInterface<M> {
+impl<M: PayloadSize> NetworkInterface for InMemoryNetworkInterface<M> {
     type Payload = M;
 
     fn broadcast(&self, message: Self::Payload) {
-        let message = NetworkMessage::new(self.id, None, message);
+        let size = message.size_bytes();
+        let message = NetworkMessage::new(self.id, None, message, size);
         self.broadcast.send(message).unwrap();
     }
 
     fn send_message(&self, address: NodeId, message: Self::Payload) {
-        let message = NetworkMessage::new(self.id, Some(address), message);
+        let size = message.size_bytes();
+        let message = NetworkMessage::new(self.id, Some(address), message, size);
         self.sender.send(message).unwrap();
     }
 
@@ -339,12 +351,12 @@ mod tests {
         type Payload = ();
 
         fn broadcast(&self, message: Self::Payload) {
-            let message = NetworkMessage::new(self.id, None, message);
+            let message = NetworkMessage::new(self.id, None, message, 0);
             self.broadcast.send(message).unwrap();
         }
 
         fn send_message(&self, address: NodeId, message: Self::Payload) {
-            let message = NetworkMessage::new(self.id, Some(address), message);
+            let message = NetworkMessage::new(self.id, Some(address), message, 0);
             self.sender.send(message).unwrap();
         }
 

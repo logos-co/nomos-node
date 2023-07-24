@@ -3,6 +3,8 @@ use nomos_consensus::network::messages::{
     NewViewMsg, ProposalChunkMsg, TimeoutMsg, TimeoutQcMsg, VoteMsg,
 };
 
+use crate::network::PayloadSize;
+
 #[derive(Debug, Eq, PartialEq, Hash, Clone)]
 pub enum CarnotMessage {
     Proposal(ProposalChunkMsg),
@@ -21,5 +23,11 @@ impl CarnotMessage {
             CarnotMessage::Timeout(msg) => msg.vote.view,
             CarnotMessage::NewView(msg) => msg.vote.view,
         }
+    }
+}
+
+impl PayloadSize for CarnotMessage {
+    fn size_bytes(&self) -> u32 {
+        0
     }
 }
