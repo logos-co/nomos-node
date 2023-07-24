@@ -29,6 +29,7 @@ use nomos_consensus::{
     network::messages::{NewViewMsg, TimeoutMsg, VoteMsg},
 };
 
+const NODE_ID: &str = "node_id";
 const CURRENT_VIEW: &str = "current_view";
 const HIGHEST_VOTED_VIEW: &str = "highest_voted_view";
 const LOCAL_HIGH_QC: &str = "local_high_qc";
@@ -42,6 +43,7 @@ const CHILD_COMMITTEES: &str = "child_committees";
 const COMMITTED_BLOCKS: &str = "committed_blocks";
 
 pub const CARNOT_RECORD_KEYS: &[&str] = &[
+    NODE_ID,
     CURRENT_VIEW,
     HIGHEST_VOTED_VIEW,
     LOCAL_HIGH_QC,
@@ -59,6 +61,7 @@ static RECORD_SETTINGS: std::sync::OnceLock<HashMap<String, bool>> = std::sync::
 
 #[derive(Debug)]
 pub struct CarnotState {
+    node_id: NodeId,
     current_view: View,
     highest_voted_view: View,
     local_high_qc: StandardQc,
@@ -93,6 +96,7 @@ impl serde::Serialize for CarnotState {
             let mut ser = serializer.serialize_struct("CarnotState", keys.len())?;
             for k in keys {
                 match k.trim() {
+                    NODE_ID => ser.serialize_field(NODE_ID, &self.node_id)?,
                     CURRENT_VIEW => ser.serialize_field(CURRENT_VIEW, &self.current_view)?,
                     HIGHEST_VOTED_VIEW => {
                         ser.serialize_field(HIGHEST_VOTED_VIEW, &self.highest_voted_view)?
@@ -163,8 +167,10 @@ where
 
 impl<O: Overlay> From<&Carnot<O>> for CarnotState {
     fn from(value: &Carnot<O>) -> Self {
+        let node_id = value.id();
         let current_view = value.current_view();
         Self {
+            node_id,
             current_view,
             local_high_qc: value.high_qc(),
             parent_committe: value.parent_committee(),
