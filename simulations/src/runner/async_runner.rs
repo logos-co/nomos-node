@@ -16,6 +16,7 @@ use super::SimulationRunnerHandle;
 pub fn simulate<M, R, S, T>(
     runner: SimulationRunner<M, R, S, T>,
     chunk_size: usize,
+    step_time: Duration,
 ) -> anyhow::Result<SimulationRunnerHandle<R>>
 where
     M: std::fmt::Debug + Clone + Send + Sync + 'static,
@@ -38,7 +39,6 @@ where
     let (stop_tx, stop_rx) = bounded(1);
     let p = runner.producer.clone();
     let p1 = runner.producer;
-    let elapsed = Duration::from_millis(100);
     let handle = std::thread::spawn(move || {
         loop {
             select! {
@@ -53,7 +53,7 @@ where
                             .write()
                             .par_iter_mut()
                             .filter(|n| ids.contains(&n.id()))
-                            .for_each(|node|node.step(elapsed));
+                            .for_each(|node|node.step(step_time));
 
                         p.send(R::try_from(
                             &simulation_state,
