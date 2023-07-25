@@ -28,6 +28,12 @@ impl CarnotMessage {
 
 impl PayloadSize for CarnotMessage {
     fn size_bytes(&self) -> u32 {
-        0
+        match self {
+            CarnotMessage::Proposal(p) => 56 + p.chunk.len() as u32,
+            CarnotMessage::Vote(_) => 128,
+            CarnotMessage::TimeoutQc(_) => 112,
+            CarnotMessage::Timeout(_) => 200,
+            CarnotMessage::NewView(_) => 192,
+        }
     }
 }
