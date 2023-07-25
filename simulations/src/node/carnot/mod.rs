@@ -41,6 +41,7 @@ const ROOT_COMMITTEE: &str = "root_committee";
 const PARENT_COMMITTEE: &str = "parent_committee";
 const CHILD_COMMITTEES: &str = "child_committees";
 const COMMITTED_BLOCKS: &str = "committed_blocks";
+const STEP_DURATION: &str = "step_duration";
 
 pub const CARNOT_RECORD_KEYS: &[&str] = &[
     CURRENT_VIEW,
@@ -54,6 +55,7 @@ pub const CARNOT_RECORD_KEYS: &[&str] = &[
     PARENT_COMMITTEE,
     CHILD_COMMITTEES,
     COMMITTED_BLOCKS,
+    STEP_DURATION,
 ];
 
 static RECORD_SETTINGS: std::sync::OnceLock<HashMap<String, bool>> = std::sync::OnceLock::new();
@@ -71,6 +73,7 @@ pub struct CarnotState {
     parent_committe: Committee,
     child_committees: Vec<Committee>,
     committed_blocks: Vec<BlockId>,
+    step_duration: Duration,
 }
 
 impl serde::Serialize for CarnotState {
@@ -132,6 +135,7 @@ impl serde::Serialize for CarnotState {
                     COMMITTED_BLOCKS => {
                         ser.serialize_field(COMMITTED_BLOCKS, &self.committed_blocks)?
                     }
+                    STEP_DURATION => ser.serialize_field(STEP_DURATION, &self.step_duration)?,
                     _ => {}
                 }
             }
@@ -181,6 +185,7 @@ impl<O: Overlay> From<&Carnot<O>> for CarnotState {
             last_view_timeout_qc: value.last_view_timeout_qc(),
             committed_blocks: value.committed_blocks(),
             highest_voted_view: Default::default(),
+            step_duration: Default::default(),
         }
     }
 }
@@ -210,7 +215,7 @@ pub struct CarnotNode<O: Overlay> {
     event_builder: event_builder::EventBuilder,
     engine: Carnot<O>,
     random_beacon_pk: PrivateKey,
-    last_step_duration: Duration,
+    step_duration: Duration,
 }
 
 impl<L: UpdateableLeaderSelection, O: Overlay<LeaderSelection = L>> CarnotNode<O> {
@@ -240,7 +245,7 @@ impl<L: UpdateableLeaderSelection, O: Overlay<LeaderSelection = L>> CarnotNode<O
             event_builder: event_builder::EventBuilder::new(id, timeout),
             engine,
             random_beacon_pk,
-            last_step_duration: Duration::ZERO,
+            step_duration: Duration::ZERO,
         };
         this.state = CarnotState::from(&this.engine);
         this
@@ -467,16 +472,7 @@ impl<L: UpdateableLeaderSelection, O: Overlay<LeaderSelection = L>> Node for Car
     }
 
     fn step(&mut self, elapsed: Duration) {
-        // If the last node step took longer than the runner step time, then skip this step and
-        // try during the next one.
-        self.last_step_duration = self
-            .last_step_duration
-            .checked_sub(elapsed)
-            .unwrap_or_default();
-        if self.last_step_duration > elapsed {
-            return;
-        }
-        let step_time = Instant::now();
+        let step_duration = Instant::now();
 
         // split messages per view, we just want to process the current engine processing view or proposals or timeoutqcs
         let (mut current_view_messages, other_view_messages): (Vec<_>, Vec<_>) = self
@@ -502,7 +498,7 @@ impl<L: UpdateableLeaderSelection, O: Overlay<LeaderSelection = L>> Node for Car
 
         // update state
         self.state = CarnotState::from(&self.engine);
-        self.last_step_duration = step_time.elapsed();
+        self.state.step_duration = step_duration.elapsed();
     }
 }
 
