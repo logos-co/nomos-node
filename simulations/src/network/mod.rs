@@ -105,15 +105,15 @@ mod network_behaviors_serde {
 
 /// Represents node network capacity and current load in bytes.
 struct NodeNetworkCapacity {
-    capacity: u32,
+    capacity_bps: u32,
     current_load: Mutex<u32>,
     load_to_flush: AtomicU32,
 }
 
 impl NodeNetworkCapacity {
-    fn new(capacity: u32) -> Self {
+    fn new(capacity_bps: u32) -> Self {
         Self {
-            capacity,
+            capacity_bps,
             current_load: Mutex::new(0),
             load_to_flush: AtomicU32::new(0),
         }
@@ -121,7 +121,7 @@ impl NodeNetworkCapacity {
 
     fn increase_load(&self, load: u32) -> bool {
         let mut current_load = self.current_load.lock();
-        if *current_load + load <= self.capacity {
+        if *current_load + load <= self.capacity_bps {
             *current_load += load;
             true
         } else {
@@ -183,12 +183,12 @@ where
     pub fn connect(
         &mut self,
         node_id: NodeId,
-        capacity_bytes: u32,
+        capacity_bps: u32,
         node_message_receiver: Receiver<NetworkMessage<M>>,
         node_message_broadcast_receiver: Receiver<NetworkMessage<M>>,
     ) -> Receiver<NetworkMessage<M>> {
         self.node_network_capacity
-            .insert(node_id, NodeNetworkCapacity::new(capacity_bytes));
+            .insert(node_id, NodeNetworkCapacity::new(capacity_bps));
         let (to_node_sender, from_network_receiver) = channel::unbounded();
         self.from_node_receivers
             .insert(node_id, node_message_receiver);
