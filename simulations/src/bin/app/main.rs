@@ -82,6 +82,7 @@ impl SimulationApp {
                 let (node_message_sender, node_message_receiver) = channel::unbounded();
                 let network_message_receiver = network.connect(
                     node_id,
+                    1000,
                     node_message_receiver,
                     node_message_broadcast_receiver,
                 );

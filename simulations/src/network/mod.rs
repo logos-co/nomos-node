@@ -3,10 +3,12 @@ use std::{
     collections::HashMap,
     ops::Add,
     str::FromStr,
+    sync::atomic::{AtomicU32, Ordering},
     time::{Duration, Instant},
 };
 // crates
 use crossbeam::channel::{self, Receiver, Sender};
+use parking_lot::Mutex;
 use rand::{rngs::SmallRng, Rng, SeedableRng};
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -101,10 +103,48 @@ mod network_behaviors_serde {
     }
 }
 
+/// Represents node network capacity and current load in bytes.
+struct NodeNetworkCapacity {
+    capacity: u32,
+    current_load: Mutex<u32>,
+    load_to_flush: AtomicU32,
+}
+
+impl NodeNetworkCapacity {
+    fn new(capacity: u32) -> Self {
+        Self {
+            capacity,
+            current_load: Mutex::new(0),
+            load_to_flush: AtomicU32::new(0),
+        }
+    }
+
+    fn increase_load(&self, load: u32) -> bool {
+        let mut current_load = self.current_load.lock();
+        if *current_load + load <= self.capacity {
+            *current_load += load;
+            true
+        } else {
+            false
+        }
+    }
+
+    fn decrease_load(&self, load: u32) {
+        self.load_to_flush.fetch_add(load, Ordering::Relaxed);
+    }
+
+    fn flush_load(&self) {
+        let mut s = self.current_load.lock();
+        *s -= self.load_to_flush.load(Ordering::Relaxed);
+        self.load_to_flush.store(0, Ordering::Relaxed);
+    }
+}
+
 pub struct Network<M: std::fmt::Debug> {
     pub regions: regions::RegionsData,
     network_time: NetworkTime,
     messages: Vec<(NetworkTime, NetworkMessage<M>)>,
+    node_network_capacity: HashMap<NodeId, NodeNetworkCapacity>,
     from_node_receivers: HashMap<NodeId, Receiver<NetworkMessage<M>>>,
     from_node_broadcast_receivers: HashMap<NodeId, Receiver<NetworkMessage<M>>>,
     to_node_senders: HashMap<NodeId, Sender<NetworkMessage<M>>>,
@@ -120,6 +160,7 @@ where
             regions,
             network_time: Instant::now(),
             messages: Vec::new(),
+            node_network_capacity: HashMap::new(),
             from_node_receivers: HashMap::new(),
             from_node_broadcast_receivers: HashMap::new(),
             to_node_senders: HashMap::new(),
@@ -142,9 +183,12 @@ where
     pub fn connect(
         &mut self,
         node_id: NodeId,
+        capacity_bytes: u32,
         node_message_receiver: Receiver<NetworkMessage<M>>,
         node_message_broadcast_receiver: Receiver<NetworkMessage<M>>,
     ) -> Receiver<NetworkMessage<M>> {
+        self.node_network_capacity
+            .insert(node_id, NodeNetworkCapacity::new(capacity_bytes));
         let (to_node_sender, from_network_receiver) = channel::unbounded();
         self.from_node_receivers
             .insert(node_id, node_message_receiver);
@@ -206,6 +250,10 @@ where
             .cloned()
             .collect();
 
+        for (_, c) in self.node_network_capacity.iter() {
+            c.flush_load();
+        }
+
         self.messages = delayed;
     }
 
@@ -218,11 +266,15 @@ where
     ) -> bool {
         let to = message.to.expect("adhoc message has recipient");
         if let Some(delay) = self.send_message_cost(rng, message.from, to) {
-            if network_time.add(delay) <= self.network_time {
+            let node_capacity = self.node_network_capacity.get(&to).unwrap();
+            if network_time.add(delay) <= self.network_time
+                && node_capacity.increase_load(message.size_bytes)
+            {
                 let to_node = self.to_node_senders.get(&to).unwrap();
                 to_node
                     .send(message.clone())
-                    .expect("Node should have connection");
+                    .expect("node should have connection");
+                node_capacity.decrease_load(message.size_bytes);
                 return false;
             } else {
                 return true;
@@ -351,12 +403,12 @@ mod tests {
         type Payload = ();
 
         fn broadcast(&self, message: Self::Payload) {
-            let message = NetworkMessage::new(self.id, None, message, 0);
+            let message = NetworkMessage::new(self.id, None, message, 1);
             self.broadcast.send(message).unwrap();
         }
 
         fn send_message(&self, address: NodeId, message: Self::Payload) {
-            let message = NetworkMessage::new(self.id, Some(address), message, 0);
+            let message = NetworkMessage::new(self.id, Some(address), message, 1);
             self.sender.send(message).unwrap();
         }
 
@@ -380,7 +432,7 @@ mod tests {
 
         let (from_a_sender, from_a_receiver) = channel::unbounded();
         let (from_a_broadcast_sender, from_a_broadcast_receiver) = channel::unbounded();
-        let to_a_receiver = network.connect(node_a, from_a_receiver, from_a_broadcast_receiver);
+        let to_a_receiver = network.connect(node_a, 3, from_a_receiver, from_a_broadcast_receiver);
         let a = MockNetworkInterface::new(
             node_a,
             from_a_broadcast_sender,
@@ -390,7 +442,7 @@ mod tests {
 
         let (from_b_sender, from_b_receiver) = channel::unbounded();
         let (from_b_broadcast_sender, from_b_broadcast_receiver) = channel::unbounded();
-        let to_b_receiver = network.connect(node_b, from_b_receiver, from_b_broadcast_receiver);
+        let to_b_receiver = network.connect(node_b, 3, from_b_receiver, from_b_broadcast_receiver);
         let b = MockNetworkInterface::new(
             node_b,
             from_b_broadcast_sender,
@@ -455,7 +507,7 @@ mod tests {
 
         let (from_a_sender, from_a_receiver) = channel::unbounded();
         let (from_a_broadcast_sender, from_a_broadcast_receiver) = channel::unbounded();
-        let to_a_receiver = network.connect(node_a, from_a_receiver, from_a_broadcast_receiver);
+        let to_a_receiver = network.connect(node_a, 2, from_a_receiver, from_a_broadcast_receiver);
         let a = MockNetworkInterface::new(
             node_a,
             from_a_broadcast_sender,
@@ -465,7 +517,7 @@ mod tests {
 
         let (from_b_sender, from_b_receiver) = channel::unbounded();
         let (from_b_broadcast_sender, from_b_broadcast_receiver) = channel::unbounded();
-        let to_b_receiver = network.connect(node_b, from_b_receiver, from_b_broadcast_receiver);
+        let to_b_receiver = network.connect(node_b, 2, from_b_receiver, from_b_broadcast_receiver);
         let b = MockNetworkInterface::new(
             node_b,
             from_b_broadcast_sender,
@@ -475,7 +527,7 @@ mod tests {
 
         let (from_c_sender, from_c_receiver) = channel::unbounded();
         let (from_c_broadcast_sender, from_c_broadcast_receiver) = channel::unbounded();
-        let to_c_receiver = network.connect(node_c, from_c_receiver, from_c_broadcast_receiver);
+        let to_c_receiver = network.connect(node_c, 2, from_c_receiver, from_c_broadcast_receiver);
         let c = MockNetworkInterface::new(
             node_c,
             from_c_broadcast_sender,
@@ -513,5 +565,56 @@ mod tests {
         assert_eq!(a.receive_messages().len(), 0);
         assert_eq!(b.receive_messages().len(), 0);
         assert_eq!(c.receive_messages().len(), 1); // b to c
+    }
+
+    #[test]
+    fn node_network_capacity_limit() {
+        let node_a = NodeId::from_index(0);
+        let node_b = NodeId::from_index(1);
+
+        let regions = HashMap::from([(Region::Europe, vec![node_a, node_b])]);
+        let behaviour = HashMap::from([(
+            NetworkBehaviourKey::new(Region::Europe, Region::Europe),
+            NetworkBehaviour::new(Duration::from_millis(100), 0.0),
+        )]);
+        let regions_data = RegionsData::new(regions, behaviour);
+        let mut network = Network::new(regions_data, 0);
+
+        let (from_a_sender, from_a_receiver) = channel::unbounded();
+        let (from_a_broadcast_sender, from_a_broadcast_receiver) = channel::unbounded();
+        let to_a_receiver = network.connect(node_a, 3, from_a_receiver, from_a_broadcast_receiver);
+        let a = MockNetworkInterface::new(
+            node_a,
+            from_a_broadcast_sender,
+            from_a_sender,
+            to_a_receiver,
+        );
+
+        let (from_b_sender, from_b_receiver) = channel::unbounded();
+        let (from_b_broadcast_sender, from_b_broadcast_receiver) = channel::unbounded();
+        let to_b_receiver = network.connect(node_b, 2, from_b_receiver, from_b_broadcast_receiver);
+        let b = MockNetworkInterface::new(
+            node_b,
+            from_b_broadcast_sender,
+            from_b_sender,
+            to_b_receiver,
+        );
+
+        for _ in 0..6 {
+            a.send_message(node_b, ());
+            b.send_message(node_a, ());
+        }
+
+        network.step(Duration::from_millis(100));
+        assert_eq!(a.receive_messages().len(), 3);
+        assert_eq!(b.receive_messages().len(), 2);
+
+        network.step(Duration::from_millis(100));
+        assert_eq!(a.receive_messages().len(), 3);
+        assert_eq!(b.receive_messages().len(), 2);
+
+        network.step(Duration::from_millis(100));
+        assert_eq!(a.receive_messages().len(), 0);
+        assert_eq!(b.receive_messages().len(), 2);
     }
 }
