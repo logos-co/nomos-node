@@ -8,6 +8,7 @@ mod timeout;
 
 // std
 use std::hash::Hash;
+use std::time::Instant;
 use std::{collections::HashMap, time::Duration};
 // crates
 use bls_signatures::PrivateKey;
@@ -209,9 +210,10 @@ pub struct CarnotNode<O: Overlay> {
     event_builder: event_builder::EventBuilder,
     engine: Carnot<O>,
     random_beacon_pk: PrivateKey,
+    last_step_duration: Duration,
 }
 
-impl<O: Overlay> CarnotNode<O> {
+impl<L: UpdateableLeaderSelection, O: Overlay<LeaderSelection = L>> CarnotNode<O> {
     pub fn new<R: Rng>(
         id: consensus_engine::NodeId,
         settings: CarnotSettings,
@@ -238,6 +240,7 @@ impl<O: Overlay> CarnotNode<O> {
             event_builder: event_builder::EventBuilder::new(id, timeout),
             engine,
             random_beacon_pk,
+            last_step_duration: Duration::ZERO,
         };
         this.state = CarnotState::from(&this.engine);
         this
@@ -308,6 +311,143 @@ impl<O: Overlay> CarnotNode<O> {
             }
         }
     }
+
+    fn process_event(&mut self, event: Event<[u8; 32]>) {
+        let mut output = None;
+        match event {
+            Event::Proposal { block } => {
+                let current_view = self.engine.current_view();
+                tracing::info!(
+                    node=%self.id,
+                    last_committed_view=%self.engine.latest_committed_view(),
+                    current_view = %current_view,
+                    block_view = %block.header().view,
+                    block = %block.header().id,
+                    parent_block=%block.header().parent(),
+                    "receive block proposal",
+                );
+                match self.engine.receive_block(block.header().clone()) {
+                    Ok(mut new) => {
+                        if self.engine.current_view() != new.current_view() {
+                            new = new
+                                .update_overlay(|overlay| {
+                                    overlay.update_leader_selection(|leader_selection| {
+                                        leader_selection.on_new_block_received(block.clone())
+                                    })
+                                })
+                                .unwrap_or(new);
+                            self.engine = new;
+                        }
+                    }
+                    Err(_) => {
+                        tracing::error!(
+                            node = %self.id,
+                            current_view = %self.engine.current_view(),
+                            block_view = %block.header().view, block = %block.header().id,
+                            "receive block proposal, but is invalid",
+                        );
+                    }
+                }
+
+                if self.engine.overlay().is_member_of_leaf_committee(self.id) {
+                    output = Some(Output::Send(consensus_engine::Send {
+                        to: self.engine.parent_committee(),
+                        payload: Payload::Vote(Vote {
+                            view: self.engine.current_view(),
+                            block: block.header().id,
+                        }),
+                    }))
+                }
+            }
+            // This branch means we already get enough votes for this block
+            // So we can just call approve_block
+            Event::Approve { block, .. } => {
+                tracing::info!(
+                    node = %self.id,
+                    current_view = %self.engine.current_view(),
+                    block_view = %block.view,
+                    block = %block.id,
+                    parent_block=%block.parent(),
+                    "receive approve message"
+                );
+                let (new, out) = self.engine.approve_block(block);
+                tracing::info!(vote=?out, node=%self.id);
+                output = Some(Output::Send(out));
+                self.engine = new;
+            }
+            Event::ProposeBlock { qc } => {
+                output = Some(Output::BroadcastProposal {
+                    proposal: nomos_core::block::Block::new(
+                        qc.view().next(),
+                        qc.clone(),
+                        [].into_iter(),
+                        self.id,
+                        RandomBeaconState::generate_happy(qc.view().next(), &self.random_beacon_pk),
+                    ),
+                });
+            }
+            // This branch means we already get enough new view msgs for this qc
+            // So we can just call approve_new_view
+            Event::NewView {
+                timeout_qc,
+                new_views,
+            } => {
+                tracing::info!(
+                    node = %self.id,
+                    current_view = %self.engine.current_view(),
+                    timeout_view = %timeout_qc.view(),
+                    "receive new view message"
+                );
+                let (new, out) = self.engine.approve_new_view(timeout_qc.clone(), new_views);
+                output = Some(Output::Send(out));
+                self.engine = new;
+            }
+            Event::TimeoutQc { timeout_qc } => {
+                tracing::info!(
+                    node = %self.id,
+                    current_view = %self.engine.current_view(),
+                    timeout_view = %timeout_qc.view(),
+                    "receive timeout qc message"
+                );
+                self.engine = self.engine.receive_timeout_qc(timeout_qc.clone());
+            }
+            Event::RootTimeout { timeouts } => {
+                tracing::debug!("root timeout {:?}", timeouts);
+                if self.engine.is_member_of_root_committee() {
+                    assert!(timeouts
+                        .iter()
+                        .all(|t| t.view == self.engine.current_view()));
+                    let high_qc = timeouts
+                        .iter()
+                        .map(|t| &t.high_qc)
+                        .chain(std::iter::once(&self.engine.high_qc()))
+                        .max_by_key(|qc| qc.view)
+                        .expect("empty root committee")
+                        .clone();
+                    let timeout_qc =
+                        TimeoutQc::new(timeouts.iter().next().unwrap().view, high_qc, self.id);
+                    output = Some(Output::BroadcastTimeoutQc { timeout_qc });
+                }
+            }
+            Event::LocalTimeout => {
+                tracing::info!(
+                    node = %self.id,
+                    current_view = %self.engine.current_view(),
+                    "receive local timeout message"
+                );
+                let (new, out) = self.engine.local_timeout();
+                self.engine = new;
+                output = out.map(Output::Send);
+            }
+            Event::None => {
+                tracing::error!("unimplemented none branch");
+                unreachable!("none event will never be constructed")
+            }
+        }
+        if let Some(event) = output {
+            self.handle_output(event);
+        }
+    }
 }
 
 impl<L: UpdateableLeaderSelection, O: Overlay<LeaderSelection = L>> Node for CarnotNode<O> {
@@ -327,7 +467,18 @@ impl<L: UpdateableLeaderSelection, O: Overlay<LeaderSelection = L>> Node for Car
     }
 
     fn step(&mut self, elapsed: Duration) {
-        // split messages per view, we just one to process the current engine processing view or proposals or timeoutqcs
+        // If the last node step took longer than the runner step time, then skip this step and
+        // try during the next one.
+        self.last_step_duration = self
+            .last_step_duration
+            .checked_sub(elapsed)
+            .unwrap_or_default();
+        if self.last_step_duration > elapsed {
+            return;
+        }
+        let step_time = Instant::now();
+
+        // split messages per view, we just want to process the current engine processing view or proposals or timeoutqcs
         let (mut current_view_messages, other_view_messages): (Vec<_>, Vec<_>) = self
             .network_interface
             .receive_messages()
@@ -346,145 +497,12 @@ impl<L: UpdateableLeaderSelection, O: Overlay<LeaderSelection = L>> Node for Car
             .step(current_view_messages, &self.engine, elapsed);
 
         for event in events {
-            let mut output = None;
-            match event {
-                Event::Proposal { block } => {
-                    let current_view = self.engine.current_view();
-                    tracing::info!(
-                        node=%self.id,
-                        last_committed_view=%self.engine.latest_committed_view(),
-                        current_view = %current_view,
-                        block_view = %block.header().view,
-                        block = %block.header().id,
-                        parent_block=%block.header().parent(),
-                        "receive block proposal",
-                    );
-                    match self.engine.receive_block(block.header().clone()) {
-                        Ok(mut new) => {
-                            if self.engine.current_view() != new.current_view() {
-                                new = new
-                                    .update_overlay(|overlay| {
-                                        overlay.update_leader_selection(|leader_selection| {
-                                            leader_selection.on_new_block_received(block.clone())
-                                        })
-                                    })
-                                    .unwrap_or(new);
-                                self.engine = new;
-                            }
-                        }
-                        Err(_) => {
-                            tracing::error!(node = %self.id, current_view = %self.engine.current_view(), block_view = %block.header().view, block = %block.header().id, "receive block proposal, but is invalid");
-                        }
-                    }
-
-                    if self.engine.overlay().is_member_of_leaf_committee(self.id) {
-                        output = Some(Output::Send(consensus_engine::Send {
-                            to: self.engine.parent_committee(),
-                            payload: Payload::Vote(Vote {
-                                view: self.engine.current_view(),
-                                block: block.header().id,
-                            }),
-                        }))
-                    }
-                }
-                // This branch means we already get enough votes for this block
-                // So we can just call approve_block
-                Event::Approve { block, .. } => {
-                    tracing::info!(
-                        node = %self.id,
-                        current_view = %self.engine.current_view(),
-                        block_view = %block.view,
-                        block = %block.id,
-                        parent_block=%block.parent(),
-                        "receive approve message"
-                    );
-                    let (new, out) = self.engine.approve_block(block);
-                    tracing::info!(vote=?out, node=%self.id);
-                    output = Some(Output::Send(out));
-                    self.engine = new;
-                }
-                Event::ProposeBlock { qc } => {
-                    output = Some(Output::BroadcastProposal {
-                        proposal: nomos_core::block::Block::new(
-                            qc.view().next(),
-                            qc.clone(),
-                            [].into_iter(),
-                            self.id,
-                            RandomBeaconState::generate_happy(
-                                qc.view().next(),
-                                &self.random_beacon_pk,
-                            ),
-                        ),
-                    });
-                }
-                // This branch means we already get enough new view msgs for this qc
-                // So we can just call approve_new_view
-                Event::NewView {
-                    timeout_qc,
-                    new_views,
-                } => {
-                    tracing::info!(
-                        node = %self.id,
-                        current_view = %self.engine.current_view(),
-                        timeout_view = %timeout_qc.view(),
-                        "receive new view message"
-                    );
-                    let (new, out) = self.engine.approve_new_view(timeout_qc.clone(), new_views);
-                    output = Some(Output::Send(out));
-                    self.engine = new;
-                }
-                Event::TimeoutQc { timeout_qc } => {
-                    tracing::info!(
-                        node = %self.id,
-                        current_view = %self.engine.current_view(),
-                        timeout_view = %timeout_qc.view(),
-                        "receive timeout qc message"
-                    );
-                    self.engine = self.engine.receive_timeout_qc(timeout_qc.clone());
-                }
-                Event::RootTimeout { timeouts } => {
-                    tracing::debug!("root timeout {:?}", timeouts);
-                    if self.engine.is_member_of_root_committee() {
-                        assert!(timeouts
-                            .iter()
-                            .all(|t| t.view == self.engine.current_view()));
-                        let high_qc = timeouts
-                            .iter()
-                            .map(|t| &t.high_qc)
-                            .chain(std::iter::once(&self.engine.high_qc()))
-                            .max_by_key(|qc| qc.view)
-                            .expect("empty root committee")
-                            .clone();
-                        let timeout_qc = TimeoutQc::new(
-                            timeouts.iter().next().unwrap().view,
-                            high_qc,
-                            self.id(),
-                        );
-                        output = Some(Output::BroadcastTimeoutQc { timeout_qc });
-                    }
-                }
-                Event::LocalTimeout => {
-                    tracing::info!(
-                        node = %self.id,
-                        current_view = %self.engine.current_view(),
-                        "receive local timeout message"
-                    );
-                    let (new, out) = self.engine.local_timeout();
-                    self.engine = new;
-                    output = out.map(Output::Send);
-                }
-                Event::None => {
-                    tracing::error!("unimplemented none branch");
-                    unreachable!("none event will never be constructed")
-                }
-            }
-            if let Some(event) = output {
-                self.handle_output(event);
-            }
+            self.process_event(event);
         }
 
         // update state
         self.state = CarnotState::from(&self.engine);
+        self.last_step_duration = step_time.elapsed();
     }
 }
 
