@@ -1,14 +1,14 @@
 {
   "network_settings": {
     "network_behaviors": {
-      "north america:north america": "10ms",
-      "north america:europe": "50ms",
-      "north america:asia": "500ms",
-      "europe:europe": "5ms",
-      "europe:asia": "300ms",
-      "europe:north america": "80ms",
-      "asia:north america": "480ms",
-      "asia:europe": "300ms",
+      "north america:north america": "50ms",
+      "north america:europe": "100ms",
+      "north america:asia": "120ms",
+      "europe:europe": "50ms",
+      "europe:asia": "100ms",
+      "europe:north america": "120ms",
+      "asia:north america": "100ms",
+      "asia:europe": "120ms",
       "asia:asia": "40ms"
     },
     "regions": {
@@ -23,13 +23,30 @@
   "node_settings": {
     "timeout": "1000ms"
   },
-  "step_time": "100ms",
+  "step_time": "10ms",
   "runner_settings": "Sync",
   "stream_settings": {
-    "type": "stdout"
+    "path": "test.json"
   },
-  "node_count": 3,
+  "node_count": 3000,
   "views_count": 3,
   "leaders_count": 1,
-  "seed": 0
+  "seed": 0,
+  "wards": [
+	  {"max_view": 1}
+  ],
+  "record_settings": { 
+	"node_id": true,
+	"current_view": true,
+	"highest_voted_view": true,
+	"local_high_qc": true,
+	"safe_blocks": true,
+	"last_view_timeout_qc": true,
+	"latest_committed_block": true,
+	"latest_committed_view": true,
+	"root_committee": true,
+	"parent_committee": true,
+	"child_committees": true,
+	"committed_blocks": true
+  }
 }
