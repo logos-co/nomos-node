@@ -29,11 +29,13 @@ impl CarnotMessage {
 impl PayloadSize for CarnotMessage {
     fn size_bytes(&self) -> u32 {
         match self {
-            CarnotMessage::Proposal(p) => 56 + p.chunk.len() as u32,
-            CarnotMessage::Vote(_) => 128,
-            CarnotMessage::TimeoutQc(_) => 112,
-            CarnotMessage::Timeout(_) => 200,
-            CarnotMessage::NewView(_) => 192,
+            CarnotMessage::Proposal(p) => {
+                (std::mem::size_of::<ProposalChunkMsg>() + p.chunk.len()) as u32
+            }
+            CarnotMessage::Vote(_) => std::mem::size_of::<VoteMsg>() as u32,
+            CarnotMessage::TimeoutQc(_) => std::mem::size_of::<TimeoutQcMsg>() as u32,
+            CarnotMessage::Timeout(_) => std::mem::size_of::<TimeoutMsg>() as u32,
+            CarnotMessage::NewView(_) => std::mem::size_of::<NewViewMsg>() as u32,
         }
     }
 }
