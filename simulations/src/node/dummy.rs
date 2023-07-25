@@ -3,6 +3,7 @@ use consensus_engine::View;
 use std::collections::{BTreeMap, BTreeSet};
 use std::time::Duration;
 // crates
+use crate::network::PayloadSize;
 use serde::{Deserialize, Serialize};
 // internal
 use crate::{
@@ -88,6 +89,12 @@ impl From<View> for Block {
 pub enum DummyMessage {
     Vote(Vote),
     Proposal(Block),
+}
+
+impl PayloadSize for DummyMessage {
+    fn size_bytes(&self) -> u32 {
+        0
+    }
 }
 
 struct LocalView {
@@ -475,6 +482,7 @@ mod tests {
                     channel::unbounded();
                 let network_message_receiver = network.connect(
                     *node_id,
+                    0,
                     node_message_receiver,
                     node_message_broadcast_receiver,
                 );

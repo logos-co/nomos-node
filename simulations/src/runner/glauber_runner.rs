@@ -19,6 +19,7 @@ pub fn simulate<M, R, S, T>(
     runner: SimulationRunner<M, R, S, T>,
     update_rate: usize,
     maximum_iterations: usize,
+    step_time: Duration,
 ) -> anyhow::Result<SimulationRunnerHandle<R>>
 where
     M: std::fmt::Debug + Send + Sync + Clone + 'static,
@@ -42,7 +43,6 @@ where
     let (stop_tx, stop_rx) = bounded(1);
     let p = runner.producer.clone();
     let p1 = runner.producer;
-    let elapsed = Duration::from_millis(100);
     let handle = std::thread::spawn(move || {
         'main: for chunk in iterations.chunks(update_rate) {
             select! {
@@ -62,7 +62,7 @@ where
                             let node: &mut dyn Node<Settings = S, State = T> = &mut **shared_nodes
                                 .get_mut(node_id.index())
                                 .expect("Node should be present");
-                            node.step(elapsed);
+                            node.step(step_time);
                         }
 
                         // check if any condition makes the simulation stop

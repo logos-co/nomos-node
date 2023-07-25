@@ -93,6 +93,7 @@ pub struct SimulationRunner<M: std::fmt::Debug, R, S, T> {
     nodes: Arc<RwLock<Vec<BoxedNode<S, T>>>>,
     runner_settings: RunnerSettings,
     producer: StreamProducer<R>,
+    step_time: Duration,
 }
 
 impl<M, R, S, T> SimulationRunner<M, R, S, T>
@@ -136,7 +137,7 @@ where
             views_count: _,
             leaders_count: _,
             network_settings: _,
-            step_time: _,
+            step_time,
             record_settings: _,
         } = settings;
         Ok(Self {
@@ -148,24 +149,26 @@ where
             },
             nodes,
             producer,
+            step_time,
         })
     }
 
     pub fn simulate(self) -> anyhow::Result<SimulationRunnerHandle<R>> {
         // init the start time
         let _ = *crate::START_TIME;
+        let step_time = self.step_time;
 
         match self.runner_settings.clone() {
-            RunnerSettings::Sync => sync_runner::simulate(self),
-            RunnerSettings::Async { chunks } => async_runner::simulate(self, chunks),
+            RunnerSettings::Sync => sync_runner::simulate(self, step_time),
+            RunnerSettings::Async { chunks } => async_runner::simulate(self, chunks, step_time),
             RunnerSettings::Glauber {
                 maximum_iterations,
                 update_rate,
-            } => glauber_runner::simulate(self, update_rate, maximum_iterations),
+            } => glauber_runner::simulate(self, update_rate, maximum_iterations, step_time),
             RunnerSettings::Layered {
                 rounds_gap,
                 distribution,
-            } => layered_runner::simulate(self, rounds_gap, distribution),
+            } => layered_runner::simulate(self, rounds_gap, distribution, step_time),
         }
     }
 }

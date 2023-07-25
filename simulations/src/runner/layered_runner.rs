@@ -52,6 +52,7 @@ pub fn simulate<M, R, S, T>(
     runner: SimulationRunner<M, R, S, T>,
     gap: usize,
     distribution: Option<Vec<f32>>,
+    step_time: Duration,
 ) -> anyhow::Result<SimulationRunnerHandle<R>>
 where
     M: std::fmt::Debug + Send + Sync + Clone + 'static,
@@ -79,7 +80,6 @@ where
     let (stop_tx, stop_rx) = bounded(1);
     let p = runner.producer.clone();
     let p1 = runner.producer;
-    let elapsed = Duration::from_millis(100);
     let handle = std::thread::spawn(move || {
         loop {
             select! {
@@ -99,7 +99,7 @@ where
                             .get_mut(node_id.index())
                             .expect("Node should be present");
                         let prev_view = node.current_view();
-                        node.step(elapsed);
+                        node.step(step_time);
                         let after_view = node.current_view();
                         if after_view > prev_view {
                             // pass node to next step group
