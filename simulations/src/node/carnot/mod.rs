@@ -398,7 +398,7 @@ impl<L: UpdateableLeaderSelection, O: Overlay<LeaderSelection = L>> CarnotNode<O
                     timeout_view = %timeout_qc.view(),
                     "receive new view message"
                 );
-                let (new, out) = self.engine.approve_new_view(timeout_qc.clone(), new_views);
+                let (new, out) = self.engine.approve_new_view(timeout_qc, new_views);
                 output = Some(Output::Send(out));
                 self.engine = new;
             }
@@ -409,7 +409,7 @@ impl<L: UpdateableLeaderSelection, O: Overlay<LeaderSelection = L>> CarnotNode<O
                     timeout_view = %timeout_qc.view(),
                     "receive timeout qc message"
                 );
-                self.engine = self.engine.receive_timeout_qc(timeout_qc.clone());
+                self.engine = self.engine.receive_timeout_qc(timeout_qc);
             }
             Event::RootTimeout { timeouts } => {
                 tracing::debug!("root timeout {:?}", timeouts);
