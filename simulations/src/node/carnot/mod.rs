@@ -505,7 +505,7 @@ impl<L: UpdateableLeaderSelection, O: Overlay<LeaderSelection = L>> Node for Car
             .network_interface
             .receive_messages()
             .into_iter()
-            .map(NetworkMessage::get_payload)
+            .map(NetworkMessage::into_payload)
             .partition(|m| {
                 m.view() == self.engine.current_view()
                     || matches!(m, CarnotMessage::Proposal(_) | CarnotMessage::TimeoutQc(_))

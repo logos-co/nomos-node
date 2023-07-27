@@ -92,7 +92,10 @@ impl Tree {
         let Some(base) = self
             .committee_id_to_index
             .get(committee_id)
-            .map(|&idx| idx * 2) else { return (None, None); };
+            .map(|&idx| idx * 2)
+        else {
+            return (None, None);
+        };
         let first_child = base + 1;
         let second_child = base + 2;
         (

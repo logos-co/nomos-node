@@ -3,7 +3,10 @@ use std::{
     collections::HashMap,
     ops::Add,
     str::FromStr,
-    sync::atomic::{AtomicU32, Ordering},
+    sync::{
+        atomic::{AtomicU32, Ordering},
+        Arc,
+    },
     time::{Duration, Instant},
 };
 // crates
@@ -267,16 +270,31 @@ where
         let to = message.to.expect("adhoc message has recipient");
         if let Some(delay) = self.send_message_cost(rng, message.from, to) {
             let node_capacity = self.node_network_capacity.get(&to).unwrap();
-            if network_time.add(delay) <= self.network_time
-                && node_capacity.increase_load(message.size_bytes)
-            {
+            let should_delay = network_time.add(delay) <= self.network_time;
+            let remaining_size = message.remaining_size();
+            if should_delay && node_capacity.increase_load(remaining_size) {
                 let to_node = self.to_node_senders.get(&to).unwrap();
                 to_node
                     .send(message.clone())
                     .expect("node should have connection");
-                node_capacity.decrease_load(message.size_bytes);
+                node_capacity.decrease_load(remaining_size);
                 return false;
             } else {
+                // if we do not need to delay, then we should check if the msg is too large
+                // if so, we mock the partial sending message behavior
+                if should_delay {
+                    let mut cap = node_capacity.current_load.lock();
+                    let sent = node_capacity.capacity_bps - *cap;
+                    *cap = node_capacity.capacity_bps;
+                    if message.partial_send(sent) == 0 {
+                        let to_node = self.to_node_senders.get(&to).unwrap();
+                        to_node
+                            .send(message.clone())
+                            .expect("node should have connection");
+                        node_capacity.decrease_load(sent);
+                        return false;
+                    }
+                }
                 return true;
             }
         }
@@ -289,7 +307,7 @@ pub struct NetworkMessage<M> {
     pub from: NodeId,
     pub to: Option<NodeId>,
     pub payload: M,
-    pub size_bytes: u32,
+    pub remaining: Arc<AtomicU32>,
 }
 
 impl<M> NetworkMessage<M> {
@@ -298,12 +316,27 @@ impl<M> NetworkMessage<M> {
             from,
             to,
             payload,
-            size_bytes,
+            remaining: Arc::new(AtomicU32::new(size_bytes)),
         }
     }
 
-    pub fn get_payload(self) -> M {
+    pub fn payload(&self) -> &M {
+        &self.payload
+    }
+
+    pub fn into_payload(self) -> M {
         self.payload
+    }
+
+    fn remaining_size(&self) -> u32 {
+        self.remaining.load(Ordering::SeqCst)
+    }
+
+    /// Mock the partial sending of a message behavior, returning the remaining message size.
+    fn partial_send(&self, size: u32) -> u32 {
+        self.remaining
+            .fetch_sub(size, Ordering::SeqCst)
+            .saturating_sub(size)
     }
 }
 

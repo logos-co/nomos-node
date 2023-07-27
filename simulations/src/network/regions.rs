@@ -208,7 +208,7 @@ mod tests {
                 .map(NodeId::from_index)
                 .collect::<Vec<NodeId>>();
 
-            let available_regions = vec![
+            let available_regions = [
                 Region::NorthAmerica,
                 Region::Europe,
                 Region::Asia,

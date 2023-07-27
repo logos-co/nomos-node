@@ -82,12 +82,13 @@ impl SimulationApp {
                 let (node_message_sender, node_message_receiver) = channel::unbounded();
                 // Dividing milliseconds in second by milliseconds in the step.
                 let step_time_as_second_fraction =
-                    1_000_000 / simulation_settings.step_time.subsec_millis();
-                let capacity_bps = simulation_settings.node_settings.network_capacity_kbps * 1024
-                    / step_time_as_second_fraction;
+                    simulation_settings.step_time.subsec_millis() as f32 / 1_000_000_f32;
+                let capacity_bps = simulation_settings.node_settings.network_capacity_kbps as f32
+                    * 1024.0
+                    * step_time_as_second_fraction;
                 let network_message_receiver = network.connect(
                     node_id,
-                    capacity_bps,
+                    capacity_bps as u32,
                     node_message_receiver,
                     node_message_broadcast_receiver,
                 );
