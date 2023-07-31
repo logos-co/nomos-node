@@ -381,8 +381,11 @@ impl<L: UpdateableLeaderSelection, O: Overlay<LeaderSelection = L>> CarnotNode<O
                     parent_block=%block.parent(),
                     "receive approve message"
                 );
-                let (new, out) = self.engine.approve_block(block);
+                let block_grandparent_view = block.view - View::new(3);
+                let (mut new, out) = self.engine.approve_block(block);
                 tracing::info!(vote=?out, node=%self.id);
+                // pruning old blocks older than the grandparent block needed to check validity
+                new.prune_older_blocks_by_view(block_grandparent_view);
                 output = Some(Output::Send(out));
                 self.engine = new;
             }
