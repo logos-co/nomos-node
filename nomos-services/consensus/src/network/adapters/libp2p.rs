@@ -203,7 +203,7 @@ impl Libp2pAdapter {
         if let Err((e, message)) = self
             .network_relay
             .send(NetworkMsg::Process(Command::Broadcast {
-                message: message.as_bytes().to_vec(),
+                message: message.as_bytes(),
                 topic: topic.into(),
             }))
             .await
