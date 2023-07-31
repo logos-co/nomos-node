@@ -66,7 +66,7 @@ where
     fn is_member_of_child_committee(&self, parent: NodeId, child: NodeId) -> bool {
         let child_parent = self.parent_committee(child);
         let parent = self.carnot_tree.committee_by_member_id(&parent);
-        parent.map_or(false, |p| child_parent.eq(p))
+        child_parent.as_ref() == parent
     }
 
     fn is_member_of_root_committee(&self, id: NodeId) -> bool {
@@ -81,16 +81,13 @@ where
     }
 
     fn is_child_of_root_committee(&self, id: NodeId) -> bool {
-        self.parent_committee(id) == self.root_committee()
+        self.parent_committee(id)
+            .map(|c| c == self.root_committee())
+            .unwrap_or(false)
     }
 
-    fn parent_committee(&self, id: NodeId) -> Committee {
-        let c = self.carnot_tree.parent_committee_from_member_id(&id);
-        if !c.is_empty() {
-            c
-        } else {
-            std::iter::once(self.next_leader()).collect()
-        }
+    fn parent_committee(&self, id: NodeId) -> Option<Committee> {
+        self.carnot_tree.parent_committee_from_member_id(&id)
     }
 
     fn child_committees(&self, id: NodeId) -> Vec<Committee> {

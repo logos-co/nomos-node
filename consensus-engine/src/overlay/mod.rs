@@ -21,7 +21,7 @@ pub trait Overlay: Clone {
     fn is_member_of_root_committee(&self, id: NodeId) -> bool;
     fn is_member_of_leaf_committee(&self, id: NodeId) -> bool;
     fn is_child_of_root_committee(&self, id: NodeId) -> bool;
-    fn parent_committee(&self, id: NodeId) -> Committee;
+    fn parent_committee(&self, id: NodeId) -> Option<Committee>;
     fn child_committees(&self, id: NodeId) -> Vec<Committee>;
     fn leaf_committees(&self, id: NodeId) -> Vec<Committee>;
     fn node_committee(&self, id: NodeId) -> Committee;
