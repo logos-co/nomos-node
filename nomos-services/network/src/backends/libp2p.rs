@@ -1,14 +1,19 @@
+// std
+use std::error::Error;
+// internal
+use super::NetworkBackend;
 use nomos_libp2p::{
     libp2p::{
-        gossipsub::{self, Message},
+        gossipsub::{self, Message, TopicHash},
         Multiaddr, PeerId,
     },
     BehaviourEvent, Swarm, SwarmConfig, SwarmEvent,
 };
-use overwatch_rs::{overwatch::handle::OverwatchHandle, services::state::NoState};
-use tokio::sync::{broadcast, mpsc};
 
-use super::NetworkBackend;
+// crates
+use overwatch_rs::{overwatch::handle::OverwatchHandle, services::state::NoState};
+use serde::{Deserialize, Serialize};
+use tokio::sync::{broadcast, mpsc, oneshot};
 
 macro_rules! log_error {
     ($e:expr) => {
@@ -27,15 +32,13 @@ pub struct Libp2p {
 pub enum EventKind {
     Message,
 }
-use std::error::Error;
-use tokio::sync::oneshot;
 
-const BUFFER_SIZE: usize = 16;
+const BUFFER_SIZE: usize = 64;
 
 #[derive(Debug)]
 pub enum Command {
     Connect(PeerId, Multiaddr),
-    Broadcast { topic: Topic, message: Vec<u8> },
+    Broadcast { topic: Topic, message: Box<[u8]> },
     Subscribe(Topic),
     Unsubscribe(Topic),
 }
