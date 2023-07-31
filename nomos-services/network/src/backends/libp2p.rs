@@ -112,7 +112,7 @@ impl NetworkBackend for Libp2p {
                                 log_error!(swarm.connect(peer_id, peer_addr));
                             }
                             Command::Broadcast { topic, message } => {
-                                match swarm.broadcast(&topic, message) {
+                                match swarm.broadcast(&topic, message.clone()) {
                                     Ok(id) => {
                                         tracing::debug!("broadcasted message with id: {id} tp topic: {topic}");
                                     }
@@ -120,6 +120,12 @@ impl NetworkBackend for Libp2p {
                                         tracing::error!("failed to broadcast message to topic: {topic} {e:?}");
                                     }
                                 }
+                                log_error!(events_tx.send(Event::Message(Message {
+                                    source: None,
+                                    data: message.into(),
+                                    sequence_number: None,
+                                    topic: TopicHash::from_raw(topic)
+                                })));
                             }
                             Command::Subscribe(topic) => {
                                 tracing::debug!("subscribing to topic: {topic}");
