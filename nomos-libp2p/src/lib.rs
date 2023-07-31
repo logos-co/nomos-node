@@ -88,6 +88,13 @@ impl Swarm {
             gossipsub::MessageAuthenticity::Author(local_peer_id),
             gossipsub::ConfigBuilder::default()
                 .validation_mode(gossipsub::ValidationMode::None)
+                .message_id_fn(|message| {
+                    use blake2::digest::{consts::U32, Digest};
+                    use blake2::Blake2b;
+                    let mut hasher = Blake2b::<U32>::new();
+                    hasher.update(&message.data);
+                    gossipsub::MessageId::from(hasher.finalize().to_vec())
+                })
                 .build()?,
         )?;
 
