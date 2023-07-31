@@ -38,6 +38,8 @@ pub struct SwarmConfig {
     // Secp256k1 private key in Hex format (`0x123...abc`). Default random
     #[serde(with = "secret_key_serde")]
     pub node_key: secp256k1::SecretKey,
+    // Initial peers to connect to
+    pub initial_peers: Vec<Multiaddr>,
 }
 
 impl Default for SwarmConfig {
@@ -46,6 +48,7 @@ impl Default for SwarmConfig {
             host: std::net::Ipv4Addr::new(0, 0, 0, 0),
             port: 60000,
             node_key: secp256k1::SecretKey::generate(),
+            initial_peers: Vec::new(),
         }
     }
 }
@@ -96,6 +99,10 @@ impl Swarm {
         .build();
 
         swarm.listen_on(multiaddr!(Ip4(config.host), Tcp(config.port)))?;
+
+        for peer in &config.initial_peers {
+            swarm.dial(peer.clone())?;
+        }
 
         Ok(Swarm { swarm })
     }
