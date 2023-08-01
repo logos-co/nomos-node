@@ -220,7 +220,7 @@ impl<O: Overlay> Carnot<O> {
         )
     }
 
-    /// Upon a configurable amout of time has elapsed since the last view change
+    /// Upon a configurable amount of time has elapsed since the last view change
     ///
     /// Preconditions: none!
     /// Just notice that the timer only reset after a view change, i.e. a node can't timeout
@@ -395,6 +395,12 @@ impl<O: Overlay> Carnot<O> {
             }),
             Err(e) => Err(e),
         }
+    }
+
+    /// Blocks newer than the last committed block are not safe to be pruned
+    pub fn prune_older_blocks_by_view(&mut self, threshold_view: View) {
+        assert!(threshold_view < self.latest_committed_block().view);
+        self.safe_blocks.retain(|_, b| b.view < threshold_view);
     }
 }
 
