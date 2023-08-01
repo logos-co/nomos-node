@@ -63,12 +63,8 @@ where
         false
     }
 
-    fn parent_committee(&self, _id: NodeId) -> crate::Committee {
-        std::iter::once(self.next_leader()).collect()
-    }
-
-    fn node_committee(&self, _id: NodeId) -> crate::Committee {
-        self.nodes.clone().into_iter().collect()
+    fn parent_committee(&self, _id: NodeId) -> Option<crate::Committee> {
+        Some(std::iter::once(self.next_leader()).collect())
     }
 
     fn child_committees(&self, _id: NodeId) -> Vec<crate::Committee> {
@@ -77,6 +73,10 @@ where
 
     fn leaf_committees(&self, _id: NodeId) -> Vec<crate::Committee> {
         vec![self.root_committee()]
+    }
+
+    fn node_committee(&self, _id: NodeId) -> crate::Committee {
+        self.nodes.clone().into_iter().collect()
     }
 
     fn next_leader(&self) -> NodeId {

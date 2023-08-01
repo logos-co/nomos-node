@@ -78,12 +78,11 @@ impl Tree {
         }
     }
 
-    pub(super) fn parent_committee_from_member_id(&self, id: &NodeId) -> Committee {
-        let Some(committee_id) = self.committee_id_by_member_id(id) else { return Committee::new(); };
-        let Some(parent_id) = self.parent_committee(committee_id) else { return Committee::new(); };
+    pub(super) fn parent_committee_from_member_id(&self, id: &NodeId) -> Option<Committee> {
+        let committee_id = self.committee_id_by_member_id(id)?;
+        let parent_id = self.parent_committee(committee_id)?;
         self.committee_by_committee_idx(self.committee_id_to_index[parent_id])
             .cloned()
-            .unwrap_or_default()
     }
 
     pub(super) fn child_committees(

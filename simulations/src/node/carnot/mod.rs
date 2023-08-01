@@ -72,8 +72,8 @@ pub struct CarnotState {
     last_view_timeout_qc: Option<TimeoutQc>,
     latest_committed_block: Block,
     latest_committed_view: View,
-    root_committe: Committee,
-    parent_committe: Committee,
+    root_committee: Committee,
+    parent_committee: Option<Committee>,
     child_committees: Vec<Committee>,
     committed_blocks: Vec<BlockId>,
     step_duration: Duration,
@@ -129,9 +129,9 @@ impl serde::Serialize for CarnotState {
                     LATEST_COMMITTED_VIEW => {
                         ser.serialize_field(LATEST_COMMITTED_VIEW, &self.latest_committed_view)?
                     }
-                    ROOT_COMMITTEE => ser.serialize_field(ROOT_COMMITTEE, &self.root_committe)?,
+                    ROOT_COMMITTEE => ser.serialize_field(ROOT_COMMITTEE, &self.root_committee)?,
                     PARENT_COMMITTEE => {
-                        ser.serialize_field(PARENT_COMMITTEE, &self.parent_committe)?
+                        ser.serialize_field(PARENT_COMMITTEE, &self.parent_committee)?
                     }
                     CHILD_COMMITTEES => {
                         ser.serialize_field(CHILD_COMMITTEES, &self.child_committees)?
@@ -178,8 +178,8 @@ impl<O: Overlay> From<&Carnot<O>> for CarnotState {
             node_id,
             current_view,
             local_high_qc: value.high_qc(),
-            parent_committe: value.parent_committee(),
-            root_committe: value.root_committee(),
+            parent_committee: value.parent_committee(),
+            root_committee: value.root_committee(),
             child_committees: value.child_committees(),
             latest_committed_block: value.latest_committed_block(),
             latest_committed_view: value.latest_committed_view(),
@@ -361,8 +361,16 @@ impl<L: UpdateableLeaderSelection, O: Overlay<LeaderSelection = L>> CarnotNode<O
                 }
 
                 if self.engine.overlay().is_member_of_leaf_committee(self.id) {
+                    // Check if we are also a member of the parent committee, this is a special case for the flat committee
+                    let to = if self.engine.overlay().is_child_of_root_committee(self.id) {
+                        [self.engine.overlay().next_leader()].into_iter().collect()
+                    } else {
+                        self.engine.parent_committee().expect(
+                            "Parent committee of non root committee members should be present",
+                        )
+                    };
                     output = Some(Output::Send(consensus_engine::Send {
-                        to: self.engine.parent_committee(),
+                        to,
                         payload: Payload::Vote(Vote {
                             view: self.engine.current_view(),
                             block: block.header().id,

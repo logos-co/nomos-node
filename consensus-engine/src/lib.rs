@@ -135,7 +135,10 @@ impl<O: Overlay> Carnot<O> {
         let to = if new_state.overlay.is_member_of_root_committee(new_state.id) {
             [new_state.overlay.next_leader()].into_iter().collect()
         } else {
-            new_state.overlay.parent_committee(self.id)
+            new_state
+                .overlay
+                .parent_committee(self.id)
+                .expect("Non root committee members parent should be present")
         };
         (
             new_state,
@@ -203,7 +206,10 @@ impl<O: Overlay> Carnot<O> {
         let to = if new_state.overlay.is_member_of_root_committee(new_state.id) {
             [new_state.overlay.next_leader()].into_iter().collect()
         } else {
-            new_state.overlay.parent_committee(new_state.id)
+            new_state
+                .overlay
+                .parent_committee(new_state.id)
+                .expect("Non root committee members parent should be present")
         };
         (
             new_state,
@@ -360,7 +366,7 @@ impl<O: Overlay> Carnot<O> {
         self.overlay.child_committees(self.id)
     }
 
-    pub fn parent_committee(&self) -> Committee {
+    pub fn parent_committee(&self) -> Option<Committee> {
         self.overlay.parent_committee(self.id)
     }
 
