@@ -273,7 +273,38 @@ impl NetworkAdapter for Libp2pAdapter {
                                             .try_send(msg);
                                     }
                                 }
-                                _ => tracing::debug!("unrecognized message"),
+                                NetworkMessage::Timeout(msg) => {
+                                    tracing::debug!("received timeout");
+                                    let mut cache = cache.cache.lock().unwrap();
+                                    let view = msg.vote.view;
+                                    if let Some(messages) = cache.get_mut(&view) {
+                                        messages
+                                            .timeouts
+                                            .entry(to.unwrap())
+                                            .or_default()
+                                            .try_send(msg);
+                                    }
+                                }
+                                NetworkMessage::TimeoutQc(msg) => {
+                                    tracing::debug!("received timeout_qc");
+                                    let mut cache = cache.cache.lock().unwrap();
+                                    let view = msg.qc.view();
+                                    if let Some(messages) = cache.get_mut(&view) {
+                                        messages.timeout_qcs.try_send(msg);
+                                    }
+                                }
+                                NetworkMessage::NewView(msg) => {
+                                    tracing::debug!("received new_view");
+                                    let mut cache = cache.cache.lock().unwrap();
+                                    let view = msg.vote.view;
+                                    if let Some(messages) = cache.get_mut(&view) {
+                                        messages
+                                            .new_views
+                                            .entry(to.unwrap())
+                                            .or_default()
+                                            .try_send(msg);
+                                    }
+                                }
                             },
                             _ => tracing::debug!("unrecognized gossipsub message"),
                         }
