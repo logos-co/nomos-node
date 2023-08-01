@@ -6,7 +6,9 @@ use std::time::Duration;
 
 pub use libp2p;
 
-use libp2p::gossipsub::MessageId;
+use blake2::digest::{consts::U32, Digest};
+use blake2::Blake2b;
+use libp2p::gossipsub::{Message, MessageId};
 pub use libp2p::{
     core::upgrade,
     gossipsub::{self, PublishError, SubscriptionError},
@@ -38,6 +40,8 @@ pub struct SwarmConfig {
     // Secp256k1 private key in Hex format (`0x123...abc`). Default random
     #[serde(with = "secret_key_serde")]
     pub node_key: secp256k1::SecretKey,
+    // Initial peers to connect to
+    pub initial_peers: Vec<Multiaddr>,
 }
 
 impl Default for SwarmConfig {
@@ -46,6 +50,7 @@ impl Default for SwarmConfig {
             host: std::net::Ipv4Addr::new(0, 0, 0, 0),
             port: 60000,
             node_key: secp256k1::SecretKey::generate(),
+            initial_peers: Vec::new(),
         }
     }
 }
@@ -85,6 +90,7 @@ impl Swarm {
             gossipsub::MessageAuthenticity::Author(local_peer_id),
             gossipsub::ConfigBuilder::default()
                 .validation_mode(gossipsub::ValidationMode::None)
+                .message_id_fn(compute_message_id)
                 .build()?,
         )?;
 
@@ -96,6 +102,10 @@ impl Swarm {
         .build();
 
         swarm.listen_on(multiaddr!(Ip4(config.host), Tcp(config.port)))?;
+
+        for peer in &config.initial_peers {
+            swarm.dial(peer.clone())?;
+        }
 
         Ok(Swarm { swarm })
     }
@@ -117,7 +127,11 @@ impl Swarm {
             .subscribe(&gossipsub::IdentTopic::new(topic))
     }
 
-    pub fn broadcast(&mut self, topic: &str, message: Vec<u8>) -> Result<MessageId, PublishError> {
+    pub fn broadcast(
+        &mut self,
+        topic: &str,
+        message: impl Into<Vec<u8>>,
+    ) -> Result<MessageId, PublishError> {
         self.swarm
             .behaviour_mut()
             .gossipsub
@@ -133,6 +147,11 @@ impl Swarm {
             .gossipsub
             .unsubscribe(&gossipsub::IdentTopic::new(topic))
     }
+
+    /// Returns a reference to the underlying [`libp2p::Swarm`]
+    pub fn swarm(&self) -> &libp2p::Swarm<Behaviour> {
+        &self.swarm
+    }
 }
 
 impl futures::Stream for Swarm {
@@ -141,6 +160,12 @@ impl futures::Stream for Swarm {
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         Pin::new(&mut self.swarm).poll_next(cx)
     }
+}
+
+fn compute_message_id(message: &Message) -> MessageId {
+    let mut hasher = Blake2b::<U32>::new();
+    hasher.update(&message.data);
+    MessageId::from(hasher.finalize().to_vec())
 }
 
 mod secret_key_serde {
