@@ -383,14 +383,13 @@ impl<L: UpdateableLeaderSelection, O: Overlay<LeaderSelection = L>> CarnotNode<O
                 );
                 let block_grandparent_view = match &block.parent_qc {
                     Qc::Standard(qc) => qc.view,
-                    Qc::Aggregated(_qc) => self
-                        .engine
-                        .safe_blocks()
-                        .iter()
-                        .filter(|(_, b)| matches!(b.parent_qc, Qc::Standard(_)))
-                        .max_by_key(|(_, b)| b.view)
-                        .map(|(_, b)| b.view)
-                        .unwrap_or_else(|| View::new(0)),
+                    Qc::Aggregated(qc) => {
+                        self.engine
+                            .safe_blocks()
+                            .get(&qc.high_qc.id)
+                            .expect("Parent block must be present")
+                            .view
+                    }
                 } - View::new(3);
                 let (mut new, out) = self.engine.approve_block(block);
                 tracing::info!(vote=?out, node=%self.id);
