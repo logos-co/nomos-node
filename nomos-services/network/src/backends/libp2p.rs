@@ -1,3 +1,4 @@
+use super::NetworkBackend;
 use nomos_libp2p::{
     libp2p::{
         gossipsub::{self, Message},
@@ -6,9 +7,8 @@ use nomos_libp2p::{
     BehaviourEvent, Swarm, SwarmConfig, SwarmEvent,
 };
 use overwatch_rs::{overwatch::handle::OverwatchHandle, services::state::NoState};
+use serde::{Deserialize, Serialize};
 use tokio::sync::{broadcast, mpsc};
-
-use super::NetworkBackend;
 
 macro_rules! log_error {
     ($e:expr) => {
@@ -146,7 +146,7 @@ impl NetworkBackend for Libp2p {
                                     listen_addresses: swarm.listeners().cloned().collect(),
                                     n_peers: network_info.num_peers(),
                                     n_connections: counters.num_connections(),
-                                    n_pending: counters.num_pending(),
+                                    n_pending_connections: counters.num_pending(),
                                 };
                                 log_error!(reply.send(info));
                             }
