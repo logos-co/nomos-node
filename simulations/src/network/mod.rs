@@ -283,22 +283,34 @@ where
                 // if we do not need to delay, then we should check if the msg is too large
                 // if so, we mock the partial sending message behavior
                 if should_delay {
-                    let mut cap = node_capacity.current_load.lock();
-                    let sent = node_capacity.capacity_bps - *cap;
-                    *cap = node_capacity.capacity_bps;
-                    if message.partial_send(sent) == 0 {
-                        let to_node = self.to_node_senders.get(&to).unwrap();
-                        to_node
-                            .send(message.clone())
-                            .expect("node should have connection");
-                        node_capacity.decrease_load(sent);
-                        return false;
-                    }
+                    // if remaining is 0, we should send without delay
+                    return self.try_partial_send(node_capacity, message, &to) != 0;
                 }
                 return true;
             }
         }
         false
+    }
+
+    /// Try to apply partial send logic, returns the remaining size of the message
+    fn try_partial_send(
+        &self,
+        node_capacity: &NodeNetworkCapacity,
+        message: &NetworkMessage<M>,
+        to: &NodeId,
+    ) -> u32 {
+        let mut cap = node_capacity.current_load.lock();
+        let sent = node_capacity.capacity_bps - *cap;
+        *cap = node_capacity.capacity_bps;
+        let remaining = message.partial_send(sent);
+        if remaining == 0 {
+            let to_node = self.to_node_senders.get(to).unwrap();
+            to_node
+                .send(message.clone())
+                .expect("node should have connection");
+            node_capacity.decrease_load(sent);
+        }
+        remaining
     }
 }
 
