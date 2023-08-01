@@ -112,11 +112,11 @@ pub struct Libp2pAdapter {
 impl MessageCache {
     /// The number of views a node will cache messages for, from current_view to current_view + VIEW_SIZE_LIMIT.
     /// Messages for views outside [current_view, current_view + VIEW_SIZE_LIMIT] will be discarded.
-    const VIEW_SIZE_LIMIT: View = 5;
+    const VIEW_SIZE_LIMIT: View = View::new(5);
 
     fn new() -> Self {
-        let cache = (0..Self::VIEW_SIZE_LIMIT)
-            .map(|v| (v, Default::default()))
+        let cache = (0..Self::VIEW_SIZE_LIMIT.into())
+            .map(|v| (v.into(), Default::default()))
             .collect::<BTreeMap<View, Messages>>();
         Self {
             cache: Arc::new(Mutex::new(cache)),
@@ -125,8 +125,8 @@ impl MessageCache {
 
     // treat view as the current view
     fn advance(mut cache: impl DerefMut<Target = BTreeMap<View, Messages>>, view: View) {
-        if cache.remove(&(view - 1)).is_some() {
-            cache.insert(view + Self::VIEW_SIZE_LIMIT - 1, Messages::default());
+        if cache.remove(&(view - 1.into())).is_some() {
+            cache.insert(view + Self::VIEW_SIZE_LIMIT - 1.into(), Messages::default());
         }
     }
 
@@ -136,7 +136,7 @@ impl MessageCache {
         let res = cache
             .get_mut(&view)
             .map(|m| m.proposal_chunks.recv_or_restore());
-        Self::advance(cache, view - 1);
+        Self::advance(cache, view - 1.into());
         res
     }
 
@@ -204,7 +204,7 @@ impl Libp2pAdapter {
         if let Err((e, message)) = self
             .network_relay
             .send(NetworkMsg::Process(Command::Broadcast {
-                message: message.as_bytes(),
+                message: message.as_bytes().to_vec(),
                 topic: topic.into(),
             }))
             .await
@@ -323,8 +323,6 @@ impl NetworkAdapter for Libp2pAdapter {
         view: View,
         proposal_id: BlockId,
     ) -> BoxedStream<VoteMsg> {
-        let cache = self.message_cache.cache.lock().unwrap();
-        drop(cache);
         self.message_cache
             .get_votes(view, committee.id::<blake2::Blake2s256>(), proposal_id)
             .map::<BoxedStream<VoteMsg>, _>(|stream| Box::new(ReceiverStream::new(stream)))
