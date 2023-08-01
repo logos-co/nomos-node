@@ -6,7 +6,9 @@ use std::time::Duration;
 
 pub use libp2p;
 
-use libp2p::gossipsub::MessageId;
+use blake2::digest::{consts::U32, Digest};
+use blake2::Blake2b;
+use libp2p::gossipsub::{Message, MessageId};
 pub use libp2p::{
     core::upgrade,
     gossipsub::{self, PublishError, SubscriptionError},
@@ -88,13 +90,7 @@ impl Swarm {
             gossipsub::MessageAuthenticity::Author(local_peer_id),
             gossipsub::ConfigBuilder::default()
                 .validation_mode(gossipsub::ValidationMode::None)
-                .message_id_fn(|message| {
-                    use blake2::digest::{consts::U32, Digest};
-                    use blake2::Blake2b;
-                    let mut hasher = Blake2b::<U32>::new();
-                    hasher.update(&message.data);
-                    gossipsub::MessageId::from(hasher.finalize().to_vec())
-                })
+                .message_id_fn(compute_message_id)
                 .build()?,
         )?;
 
@@ -164,6 +160,12 @@ impl futures::Stream for Swarm {
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         Pin::new(&mut self.swarm).poll_next(cx)
     }
+}
+
+fn compute_message_id(message: &Message) -> MessageId {
+    let mut hasher = Blake2b::<U32>::new();
+    hasher.update(&message.data);
+    MessageId::from(hasher.finalize().to_vec())
 }
 
 mod secret_key_serde {
