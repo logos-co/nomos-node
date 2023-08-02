@@ -306,7 +306,7 @@ impl NetworkAdapter for Libp2pAdapter {
                                     }
                                 }
                             },
-                            _ => tracing::error!("unrecognized gossipsub message"),
+                            _ => tracing::debug!("unrecognized gossipsub message"),
                         }
                     }
                     Err(RecvError::Lagged(n)) => {
