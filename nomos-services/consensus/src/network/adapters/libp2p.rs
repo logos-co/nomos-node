@@ -47,7 +47,6 @@ struct MessageCache {
 // buffer messages even if no consumer showed up yet.
 // Lock-free thread safe ring buffer exists but haven't found a good implementation for rust yet so let's just use
 // channels for now.
-// TODO: replace with vec + notify / wait mechanism
 struct Spsc<T> {
     sender: Sender<T>,
     receiver: Option<Receiver<T>>,
