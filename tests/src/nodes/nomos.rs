@@ -8,12 +8,17 @@ use consensus_engine::overlay::{FlatOverlaySettings, RoundRobin};
 use consensus_engine::NodeId;
 use nomos_consensus::{CarnotInfo, CarnotSettings};
 use nomos_http::backends::axum::AxumBackendSettings;
+#[cfg(feature = "libp2p")]
+use nomos_libp2p::Multiaddr;
+use nomos_libp2p::SwarmConfig;
 use nomos_log::{LoggerBackend, LoggerFormat};
-use nomos_network::{
-    backends::waku::{WakuConfig, WakuInfo},
-    NetworkConfig,
-};
+#[cfg(feature = "libp2p")]
+use nomos_network::backends::libp2p::Libp2pInfo;
+#[cfg(feature = "waku")]
+use nomos_network::backends::waku::{WakuConfig, WakuInfo};
+use nomos_network::NetworkConfig;
 use nomos_node::Config;
+#[cfg(feature = "waku")]
 use waku_bindings::{Multiaddr, PeerId};
 // crates
 use fraction::Fraction;
@@ -75,7 +80,12 @@ impl NomosNode {
             child,
             _tempdir: dir,
         };
-        node.wait_online().await;
+        tokio::time::timeout(std::time::Duration::from_secs(10), async {
+            node.wait_online().await
+        })
+        .await
+        .unwrap();
+
         node
     }
 
@@ -92,6 +102,7 @@ impl NomosNode {
         }
     }
 
+    #[cfg(feature = "waku")]
     pub async fn peer_id(&self) -> PeerId {
         self.get(NETWORK_INFO_API)
             .await
@@ -103,6 +114,7 @@ impl NomosNode {
             .unwrap()
     }
 
+    #[cfg(feature = "waku")]
     pub async fn get_listening_address(&self) -> Multiaddr {
         self.get(NETWORK_INFO_API)
             .await
@@ -112,6 +124,18 @@ impl NomosNode {
             .unwrap()
             .listen_addresses
             .unwrap()
+            .swap_remove(0)
+    }
+
+    #[cfg(feature = "libp2p")]
+    pub async fn get_listening_address(&self) -> Multiaddr {
+        self.get(NETWORK_INFO_API)
+            .await
+            .unwrap()
+            .json::<Libp2pInfo>()
+            .await
+            .unwrap()
+            .listen_addresses
             .swap_remove(0)
     }
 
@@ -200,9 +224,15 @@ fn create_node_config(
 ) -> Config {
     let mut config = Config {
         network: NetworkConfig {
+            #[cfg(feature = "waku")]
             backend: WakuConfig {
                 initial_peers: vec![],
                 inner: Default::default(),
+            },
+            #[cfg(feature = "libp2p")]
+            backend: SwarmConfig {
+                initial_peers: vec![],
+                ..Default::default()
             },
         },
         consensus: CarnotSettings {
@@ -230,6 +260,14 @@ fn create_node_config(
         #[cfg(feature = "metrics")]
         metrics: Default::default(),
     };
-    config.network.backend.inner.port = Some(get_available_port() as usize);
+    #[cfg(feature = "waku")]
+    {
+        config.network.backend.inner.port = Some(get_available_port() as usize);
+    }
+    #[cfg(feature = "libp2p")]
+    {
+        config.network.backend.port = get_available_port();
+    }
+
     config
 }
