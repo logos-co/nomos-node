@@ -35,6 +35,6 @@ waku-bindings = { version = "0.1.1", optional = true }
 
 
 [features]
-default = ["libp2p"]
+default = ["waku"]
 waku = ["waku-bindings", "nomos-network/waku", "nomos-mempool/waku", "nomos-consensus/waku"]
 libp2p = ["nomos-network/libp2p", "nomos-mempool/libp2p", "nomos-consensus/libp2p"]
