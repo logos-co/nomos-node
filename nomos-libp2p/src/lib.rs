@@ -56,12 +56,6 @@ pub enum SwarmError {
     DuplicateDialing,
 }
 
-macro_rules! gossipsub_topic {
-    ($str:expr) => {
-        gossipsub::IdentTopic::new($str)
-    };
-}
-
 /// A timeout for the setup and protocol upgrade process for all in/outbound connections
 const TRANSPORT_TIMEOUT: Duration = Duration::from_secs(20);
 
@@ -120,14 +114,14 @@ impl Swarm {
         self.swarm
             .behaviour_mut()
             .gossipsub
-            .subscribe(&gossipsub_topic!(topic))
+            .subscribe(&gossipsub::IdentTopic::new(topic))
     }
 
     pub fn broadcast(&mut self, topic: &str, message: Vec<u8>) -> Result<MessageId, PublishError> {
         self.swarm
             .behaviour_mut()
             .gossipsub
-            .publish(gossipsub_topic!(topic), message)
+            .publish(gossipsub::IdentTopic::new(topic), message)
     }
 
     /// Unsubscribes from a topic
@@ -137,7 +131,7 @@ impl Swarm {
         self.swarm
             .behaviour_mut()
             .gossipsub
-            .unsubscribe(&gossipsub_topic!(topic))
+            .unsubscribe(&gossipsub::IdentTopic::new(topic))
     }
 
     pub fn is_subscribed(&mut self, topic: &str) -> bool {
@@ -152,7 +146,7 @@ impl Swarm {
     }
 
     pub fn topic_hash(topic: &str) -> TopicHash {
-        gossipsub_topic!(topic).hash()
+        gossipsub::IdentTopic::new(topic).hash()
     }
 }
 
