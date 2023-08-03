@@ -227,12 +227,15 @@ where
             let network_adapter = adapter.clone();
             task_manager.push(genesis_block.view.next(), async move {
                 let Event::Approve { qc, .. } = Self::gather_votes(
-                        network_adapter,
-                        leader_committee.clone(),
-                        genesis_block,
-                        leader_tally_settings.clone(),
-                    )
-                    .await else { unreachable!() };
+                    network_adapter,
+                    leader_committee.clone(),
+                    genesis_block,
+                    leader_tally_settings.clone(),
+                )
+                .await
+                else {
+                    unreachable!()
+                };
                 Event::ProposeBlock { qc }
             });
         }
@@ -442,13 +445,12 @@ where
 
         if carnot.is_next_leader() {
             task_manager.push(block.view, async move {
-                let Event::Approve { qc, .. } = Self::gather_votes(
-                    adapter,
-                    leader_committee,
-                    block,
-                    leader_tally_settings,
-                )
-                .await else { unreachable!() };
+                let Event::Approve { qc, .. } =
+                    Self::gather_votes(adapter, leader_committee, block, leader_tally_settings)
+                        .await
+                else {
+                    unreachable!()
+                };
                 Event::ProposeBlock { qc }
             });
         }

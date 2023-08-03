@@ -1,6 +1,6 @@
 use crate::node::carnot::messages::CarnotMessage;
 use consensus_engine::View;
-use polars::export::ahash::HashMap;
+use std::collections::HashMap;
 
 pub(crate) struct MessageCache {
     cache: HashMap<View, Vec<CarnotMessage>>,
