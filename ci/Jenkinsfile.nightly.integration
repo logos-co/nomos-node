@@ -30,36 +30,44 @@ pipeline {
   }
 
   stages {
-    stage('Build') {
+    stage('Build waku') {
       steps {
         /* Node binary is required for integration tests */
-        sh 'cargo build'
+        sh 'cargo build -p nomos-node --feature waku'
       }
     }
 
-    stage('Integration tests') {
+    stage('Integration tests waku') {
       steps {
         script {
           int iterations = params.ITERATIONS.toInteger()
 
-          for (int i = 0; i < iterations; i++) {
-            echo "Running iteration ${i + 1} of ${iterations}"
+          def tests = ['cargo test -p tests -F waku ten_nodes_happy',
+                       'cargo test -p tests -F waku two_nodes_happy',
+                       'cargo test -p tests -F waku ten_nodes_one_down']
 
-            if (sh(script: 'cargo test ten_nodes_happy', returnStatus: true) != 0) {
-              error("Test failed on iteration ${i + 1}")
-              break
-			}
+          runTests(tests, iterations)
+        }
+      }
+    }
 
-            if (sh(script: 'cargo test two_nodes_happy', returnStatus: true) != 0) {
-              error("Test failed on iteration ${i + 1}")
-              break
-			}
+    stage('Build libp2p') {
+      steps {
+        /* Node binary is required for integration tests */
+        sh 'cargo build -p nomos-node --feature libp2p'
+      }
+    }
 
-            if (sh(script: 'cargo test ten_nodes_one_down', returnStatus: true) != 0) {
-              error("Test failed on iteration ${i + 1}")
-              break
-            }
-          }
+    stage('Integration tests libp2p') {
+      steps {
+        script {
+          int iterations = params.ITERATIONS.toInteger()
+
+          def tests = ['cargo test -p tests -F libp2p ten_nodes_happy',
+                       'cargo test -p tests -F libp2p two_nodes_happy',
+                       'cargo test -p tests -F libp2p ten_nodes_one_down']
+
+          runTests(tests, iterations)
         }
       }
     }
@@ -79,6 +87,19 @@ pipeline {
       }
     }
     cleanup { cleanWs() }
+  }
+}
+
+def runTestCases(test_cases, iterations) {
+  for (int i = 0; i < iterations; i++) {
+    echo "Running iteration ${i + 1} of ${iterations}"
+
+    for (test_case in test_cases) {
+      if (sh(script: test_case, returnStatus: true) != 0) {
+        error("Test '${test_case}' failed on iteration ${i + 1}")
+        return
+      }
+    }
   }
 }
 
