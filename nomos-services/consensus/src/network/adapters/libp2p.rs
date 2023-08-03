@@ -14,7 +14,6 @@ use crate::network::{
     BoxedStream, NetworkAdapter,
 };
 use consensus_engine::{BlockId, Committee, CommitteeId, View};
-use nomos_core::wire;
 use nomos_network::{
     backends::libp2p::{Command, Event, EventKind, Libp2p},
     NetworkMsg, NetworkService,
@@ -247,67 +246,65 @@ impl NetworkAdapter for Libp2pAdapter {
             let mut incoming_messages = receiver.await.unwrap();
             loop {
                 match incoming_messages.recv().await {
-                    Ok(Event::Message(message)) => {
-                        match nomos_core::wire::deserialize(&message.data) {
-                            Ok(GossipsubMessage { to, message }) => match message {
-                                NetworkMessage::ProposalChunk(msg) => {
-                                    tracing::debug!("received proposal chunk");
-                                    let mut cache = cache.cache.lock().unwrap();
-                                    let view = msg.view;
-                                    if let Some(messages) = cache.get_mut(&view) {
-                                        messages.proposal_chunks.try_send(msg);
-                                    }
+                    Ok(Event::Message(message)) => match wire::deserialize(&message.data) {
+                        Ok(GossipsubMessage { to, message }) => match message {
+                            NetworkMessage::ProposalChunk(msg) => {
+                                tracing::debug!("received proposal chunk");
+                                let mut cache = cache.cache.lock().unwrap();
+                                let view = msg.view;
+                                if let Some(messages) = cache.get_mut(&view) {
+                                    messages.proposal_chunks.try_send(msg);
                                 }
-                                NetworkMessage::Vote(msg) => {
-                                    tracing::debug!("received vote");
-                                    let mut cache = cache.cache.lock().unwrap();
-                                    let view = msg.vote.view;
-                                    if let Some(messages) = cache.get_mut(&view) {
-                                        messages
-                                            .votes
-                                            .entry(to.unwrap())
-                                            .or_default()
-                                            .entry(msg.vote.block)
-                                            .or_default()
-                                            .try_send(msg);
-                                    }
+                            }
+                            NetworkMessage::Vote(msg) => {
+                                tracing::debug!("received vote");
+                                let mut cache = cache.cache.lock().unwrap();
+                                let view = msg.vote.view;
+                                if let Some(messages) = cache.get_mut(&view) {
+                                    messages
+                                        .votes
+                                        .entry(to.unwrap())
+                                        .or_default()
+                                        .entry(msg.vote.block)
+                                        .or_default()
+                                        .try_send(msg);
                                 }
-                                NetworkMessage::Timeout(msg) => {
-                                    tracing::debug!("received timeout");
-                                    let mut cache = cache.cache.lock().unwrap();
-                                    let view = msg.vote.view;
-                                    if let Some(messages) = cache.get_mut(&view) {
-                                        messages
-                                            .timeouts
-                                            .entry(to.unwrap())
-                                            .or_default()
-                                            .try_send(msg);
-                                    }
+                            }
+                            NetworkMessage::Timeout(msg) => {
+                                tracing::debug!("received timeout");
+                                let mut cache = cache.cache.lock().unwrap();
+                                let view = msg.vote.view;
+                                if let Some(messages) = cache.get_mut(&view) {
+                                    messages
+                                        .timeouts
+                                        .entry(to.unwrap())
+                                        .or_default()
+                                        .try_send(msg);
                                 }
-                                NetworkMessage::TimeoutQc(msg) => {
-                                    tracing::debug!("received timeout_qc");
-                                    let mut cache = cache.cache.lock().unwrap();
-                                    let view = msg.qc.view();
-                                    if let Some(messages) = cache.get_mut(&view) {
-                                        messages.timeout_qcs.try_send(msg);
-                                    }
+                            }
+                            NetworkMessage::TimeoutQc(msg) => {
+                                tracing::debug!("received timeout_qc");
+                                let mut cache = cache.cache.lock().unwrap();
+                                let view = msg.qc.view();
+                                if let Some(messages) = cache.get_mut(&view) {
+                                    messages.timeout_qcs.try_send(msg);
                                 }
-                                NetworkMessage::NewView(msg) => {
-                                    tracing::debug!("received new_view");
-                                    let mut cache = cache.cache.lock().unwrap();
-                                    let view = msg.vote.view;
-                                    if let Some(messages) = cache.get_mut(&view) {
-                                        messages
-                                            .new_views
-                                            .entry(to.unwrap())
-                                            .or_default()
-                                            .try_send(msg);
-                                    }
+                            }
+                            NetworkMessage::NewView(msg) => {
+                                tracing::debug!("received new_view");
+                                let mut cache = cache.cache.lock().unwrap();
+                                let view = msg.vote.view;
+                                if let Some(messages) = cache.get_mut(&view) {
+                                    messages
+                                        .new_views
+                                        .entry(to.unwrap())
+                                        .or_default()
+                                        .try_send(msg);
                                 }
-                            },
-                            _ => tracing::debug!("unrecognized gossipsub message"),
-                        }
-                    }
+                            }
+                        },
+                        _ => tracing::debug!("unrecognized gossipsub message"),
+                    },
                     Err(RecvError::Lagged(n)) => {
                         tracing::error!("lagged messages: {n}")
                     }

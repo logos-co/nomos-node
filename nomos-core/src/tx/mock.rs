@@ -1,6 +1,4 @@
 use crate::tx::{Transaction, TransactionHasher};
-use crate::wire;
-use crate::wire::serialize;
 use blake2::{
     digest::{Update, VariableOutput},
     Blake2bVar,
@@ -87,7 +85,7 @@ impl MockTxId {
 impl From<nomos_network::backends::mock::MockMessage> for MockTxId {
     fn from(msg: nomos_network::backends::mock::MockMessage) -> Self {
         let mut hasher = Blake2bVar::new(32).unwrap();
-        hasher.update(&serialize(&msg).unwrap());
+        hasher.update(&wire::serialize(&msg).unwrap());
         let mut id = [0u8; 32];
         hasher.finalize_variable(&mut id).unwrap();
         Self(id)

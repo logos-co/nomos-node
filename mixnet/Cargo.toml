@@ -1,0 +1,16 @@
+[package]
+name = "mixnet"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+tokio = { version = "1.29.1", features = ["net"] }
+rand = "0.8"
+tracing = "0.1.37"
+sphinx-packet = "0.1.0"
+thiserror = "1.0.44"
+wire = { path = "../wire" }
+nym-sphinx-addressing = { package = "nym-sphinx-addressing", git = "https://github.com/nymtech/nym", tag = "v1.1.22" }

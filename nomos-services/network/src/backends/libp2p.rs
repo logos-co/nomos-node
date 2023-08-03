@@ -2,6 +2,7 @@
 use std::error::Error;
 // internal
 use super::NetworkBackend;
+use mixnet::{config::MixNode, Mixnet};
 use nomos_libp2p::{
     libp2p::{
         gossipsub::{self, Message},
@@ -51,6 +52,21 @@ pub enum Command {
     Info { reply: oneshot::Sender<Libp2pInfo> },
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+struct MixnetMessage {
+    topic: Topic,
+    message: Vec<u8>,
+}
+
+impl MixnetMessage {
+    pub fn as_bytes(&self) -> Box<[u8]> {
+        wire::serialize(self).unwrap().into_boxed_slice()
+    }
+    pub fn from_bytes(data: &[u8]) -> Self {
+        wire::deserialize(data).unwrap()
+    }
+}
+
 pub type Topic = String;
 pub type CommandResultSender = oneshot::Sender<Result<(), Box<dyn Error + Send>>>;
 
@@ -59,6 +75,10 @@ pub type CommandResultSender = oneshot::Sender<Result<(), Box<dyn Error + Send>>
 pub enum Event {
     Message(Message),
 }
+
+const MIXNET_CHANNEL_SIZE: usize = 100;
+const MIXNET_TOPOLOGY_CHANNEL_SIZE: usize = 3;
+const MIXNET_TOPOLOGY_TOPIC: &str = "MixnetTopology";
 
 #[async_trait::async_trait]
 impl NetworkBackend for Libp2p {
@@ -75,9 +95,40 @@ impl NetworkBackend for Libp2p {
             events_tx: events_tx.clone(),
             commands_tx,
         };
+
+        let (mixnet_outbound_msg_tx, mixnet_outbound_msg_rx) =
+            mpsc::channel::<mixnet::Message>(MIXNET_CHANNEL_SIZE);
+        let (mixnet_inbound_msg_tx, mut mixnet_inbound_msg_rx) =
+            broadcast::channel::<mixnet::Message>(MIXNET_CHANNEL_SIZE);
+        let (mixnet_mixnode_tx, mixnet_mixnode_rx) =
+            mpsc::channel::<MixNode>(MIXNET_TOPOLOGY_CHANNEL_SIZE);
+        let mixnet = Mixnet::new(
+            Default::default(), //TODO: use a proper config
+            mixnet_outbound_msg_rx,
+            mixnet_inbound_msg_tx,
+            mixnet_mixnode_rx,
+        );
+        let mixnet_topology_topic_hash = gossipsub::IdentTopic::new(MIXNET_TOPOLOGY_TOPIC).hash();
+
+        let mixnode = MixNode {
+            public_key: mixnet.public_key(),
+            addr: mixnet.external_address(),
+        };
+
+        overwatch_handle.runtime().spawn(async move {
+            if let Err(e) = mixnet.run().await {
+                tracing::error!("error from mixnet: {e}");
+            }
+        });
+
         overwatch_handle.runtime().spawn(async move {
             use tokio_stream::StreamExt;
             let mut swarm = Swarm::build(&config).unwrap();
+
+            if let Err(e) = swarm.subscribe(MIXNET_TOPOLOGY_TOPIC) {
+                tracing::error!("failed to start subscribing {MIXNET_TOPOLOGY_TOPIC}: {e}");
+            }
+
             loop {
                 tokio::select! {
                     Some(event) = swarm.next() => {
@@ -87,8 +138,13 @@ impl NetworkBackend for Libp2p {
                                 message_id: id,
                                 message,
                             })) => {
-                                tracing::debug!("Got message with id: {id} from peer: {peer_id}");
-                                log_error!(events_tx.send(Event::Message(message)));
+                                tracing::debug!("Got message with id: {id} forwared from peer: {peer_id}");
+                                if message.topic == mixnet_topology_topic_hash {
+                                    let mixnode = MixNode::from_bytes(&message.data);
+                                    log_error!(mixnet_mixnode_tx.send(mixnode).await);
+                                } else {
+                                    log_error!(events_tx.send(Event::Message(message)));
+                                }
                             }
                             SwarmEvent::ConnectionEstablished {
                                 peer_id,
@@ -123,23 +179,8 @@ impl NetworkBackend for Libp2p {
                                 log_error!(swarm.connect(peer_id, peer_addr));
                             }
                             Command::Broadcast { topic, message } => {
-                                match swarm.broadcast(&topic, message.to_vec()) {
-                                    Ok(id) => {
-                                        tracing::debug!("broadcasted message with id: {id} tp topic: {topic}");
-                                    }
-                                    Err(e) => {
-                                        tracing::error!("failed to broadcast message to topic: {topic} {e:?}");
-                                    }
-                                }
-
-                                if swarm.is_subscribed(&topic) {
-                                    log_error!(events_tx.send(Event::Message(Message {
-                                        source: None,
-                                        data: message.into(),
-                                        sequence_number: None,
-                                        topic: Swarm::topic_hash(&topic),
-                                    })));
-                                }
+                                let msg = MixnetMessage { topic, message: message.to_vec() };
+                                log_error!(mixnet_outbound_msg_tx.send(msg.as_bytes()).await);
                             }
                             Command::Subscribe(topic) => {
                                 tracing::debug!("subscribing to topic: {topic}");
@@ -163,9 +204,40 @@ impl NetworkBackend for Libp2p {
                             }
                         };
                     }
+                    Ok(msg) = mixnet_inbound_msg_rx.recv() => {
+                        let MixnetMessage { topic, message } = MixnetMessage::from_bytes(&msg);
+                        match swarm.broadcast(&topic, message.clone()) {
+                            Ok(id) => {
+                                tracing::debug!("broadcasted message with id: {id} tp topic: {topic}");
+                            }
+                            Err(e) => {
+                                tracing::error!("failed to broadcast message to topic: {topic} {e:?}");
+                            }
+                        }
+
+                        if swarm.is_subscribed(&topic) {
+                            log_error!(events_tx.send(Event::Message(Message {
+                                source: None,
+                                data: message,
+                                sequence_number: None,
+                                topic: Swarm::topic_hash(&topic),
+                            })));
+                        }
+                    }
+                    _ = tokio::time::sleep(tokio::time::Duration::from_secs(60)) => {
+                        tracing::debug!("broadcasting my mixnode information");
+
+                        // TODO: we might need to broadcast this anonymously so that subscribers
+                        // cannot aware the PeerId of the publisher.
+                        // rust-libp2p provides this feature: https://docs.rs/libp2p-gossipsub/latest/libp2p_gossipsub/enum.MessageAuthenticity.html#variant.Anonymous.
+                        if let Err(e) = swarm.broadcast(MIXNET_TOPOLOGY_TOPIC, mixnode.as_bytes().to_vec()) {
+                            tracing::error!("failed to broadcast topology message: {e:?}");
+                        }
+                    }
                 }
             }
         });
+
         libp2p
     }
 

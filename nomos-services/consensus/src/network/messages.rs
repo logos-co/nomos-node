@@ -4,7 +4,6 @@ use serde::{Deserialize, Serialize};
 // internal
 use crate::NodeId;
 use consensus_engine::{BlockId, NewView, Qc, Timeout, TimeoutQc, View, Vote};
-use nomos_core::wire;
 
 #[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash)]
 pub struct ProposalChunkMsg {

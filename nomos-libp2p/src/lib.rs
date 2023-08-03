@@ -111,6 +111,10 @@ impl Swarm {
         Ok(Swarm { swarm })
     }
 
+    pub fn peer_id(&self) -> &PeerId {
+        self.swarm.local_peer_id()
+    }
+
     /// Initiates a connection attempt to a peer
     pub fn connect(&mut self, peer_id: PeerId, peer_addr: Multiaddr) -> Result<(), DialError> {
         tracing::debug!("attempting to dial {peer_id}");

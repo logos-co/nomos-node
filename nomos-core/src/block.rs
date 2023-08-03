@@ -3,7 +3,6 @@ use indexmap::IndexSet;
 // std
 use core::hash::Hash;
 // crates
-use crate::wire;
 use bytes::Bytes;
 pub use consensus_engine::BlockId;
 use consensus_engine::{LeaderProof, NodeId, Qc, View};

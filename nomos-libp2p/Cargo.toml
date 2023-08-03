@@ -16,6 +16,7 @@ libp2p = { version = "0.52.1", features = [
   "tcp",
   "tokio",
   "secp256k1",
+  "serde",
 ] }
 blake2 = { version = "0.10" }
 serde = { version = "1.0.166", features = ["derive"] }

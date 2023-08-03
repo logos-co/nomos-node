@@ -7,7 +7,6 @@ use tokio_stream::wrappers::BroadcastStream;
 // internal
 use crate::network::messages::TransactionMsg;
 use crate::network::NetworkAdapter;
-use nomos_core::wire;
 use nomos_network::backends::waku::{EventKind, NetworkEvent, Waku, WakuBackendMessage};
 use nomos_network::{NetworkMsg, NetworkService};
 use overwatch_rs::services::relay::OutboundRelay;
