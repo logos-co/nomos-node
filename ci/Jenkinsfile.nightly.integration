@@ -33,7 +33,7 @@ pipeline {
     stage('Build waku') {
       steps {
         /* Node binary is required for integration tests */
-        sh 'cargo build -p nomos-node --feature waku'
+        sh 'cargo build -p nomos-node --features waku'
       }
     }
 
