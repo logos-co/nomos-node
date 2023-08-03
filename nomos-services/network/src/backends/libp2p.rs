@@ -11,8 +11,8 @@ use nomos_libp2p::{
 };
 // crates
 use overwatch_rs::{overwatch::handle::OverwatchHandle, services::state::NoState};
-use tokio::sync::{broadcast, mpsc, oneshot};
 use serde::{Deserialize, Serialize};
+use tokio::sync::{broadcast, mpsc, oneshot};
 
 macro_rules! log_error {
     ($e:expr) => {
