@@ -6,7 +6,7 @@ use std::time::Duration;
 
 pub use libp2p;
 
-use libp2p::gossipsub::MessageId;
+use libp2p::gossipsub::{MessageId, TopicHash};
 pub use libp2p::{
     core::upgrade,
     gossipsub::{self, PublishError, SubscriptionError},
@@ -54,6 +54,12 @@ impl Default for SwarmConfig {
 pub enum SwarmError {
     #[error("duplicate dialing")]
     DuplicateDialing,
+}
+
+macro_rules! gossipsub_topic {
+    ($str:expr) => {
+        gossipsub::IdentTopic::new($str)
+    };
 }
 
 /// A timeout for the setup and protocol upgrade process for all in/outbound connections
@@ -114,14 +120,14 @@ impl Swarm {
         self.swarm
             .behaviour_mut()
             .gossipsub
-            .subscribe(&gossipsub::IdentTopic::new(topic))
+            .subscribe(&gossipsub_topic!(topic))
     }
 
     pub fn broadcast(&mut self, topic: &str, message: Vec<u8>) -> Result<MessageId, PublishError> {
         self.swarm
             .behaviour_mut()
             .gossipsub
-            .publish(gossipsub::IdentTopic::new(topic), message)
+            .publish(gossipsub_topic!(topic), message)
     }
 
     /// Unsubscribes from a topic
@@ -131,7 +137,22 @@ impl Swarm {
         self.swarm
             .behaviour_mut()
             .gossipsub
-            .unsubscribe(&gossipsub::IdentTopic::new(topic))
+            .unsubscribe(&gossipsub_topic!(topic))
+    }
+
+    pub fn is_subscribed(&mut self, topic: &str) -> bool {
+        let topic_hash = Self::topic_hash(topic);
+
+        //TODO: consider O(1) searching by having our own data structure
+        self.swarm
+            .behaviour_mut()
+            .gossipsub
+            .topics()
+            .any(|h| h == &topic_hash)
+    }
+
+    pub fn topic_hash(topic: &str) -> TopicHash {
+        gossipsub_topic!(topic).hash()
     }
 }
 
