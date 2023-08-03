@@ -8,7 +8,8 @@ pub use libp2p;
 
 use blake2::digest::{consts::U32, Digest};
 use blake2::Blake2b;
-use libp2p::gossipsub::{Message, MessageId};
+use libp2p::gossipsub::{Message, MessageId, TopicHash};
+
 pub use libp2p::{
     core::upgrade,
     gossipsub::{self, PublishError, SubscriptionError},
@@ -151,6 +152,21 @@ impl Swarm {
     /// Returns a reference to the underlying [`libp2p::Swarm`]
     pub fn swarm(&self) -> &libp2p::Swarm<Behaviour> {
         &self.swarm
+    }
+
+    pub fn is_subscribed(&mut self, topic: &str) -> bool {
+        let topic_hash = Self::topic_hash(topic);
+
+        //TODO: consider O(1) searching by having our own data structure
+        self.swarm
+            .behaviour_mut()
+            .gossipsub
+            .topics()
+            .any(|h| h == &topic_hash)
+    }
+
+    pub fn topic_hash(topic: &str) -> TopicHash {
+        gossipsub::IdentTopic::new(topic).hash()
     }
 }
 

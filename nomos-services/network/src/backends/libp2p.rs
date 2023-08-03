@@ -4,15 +4,15 @@ use std::error::Error;
 use super::NetworkBackend;
 use nomos_libp2p::{
     libp2p::{
-        gossipsub::{self, Message, TopicHash},
+        gossipsub::{self, Message},
         Multiaddr, PeerId,
     },
     BehaviourEvent, Swarm, SwarmConfig, SwarmEvent,
 };
 // crates
 use overwatch_rs::{overwatch::handle::OverwatchHandle, services::state::NoState};
-use serde::{Deserialize, Serialize};
 use tokio::sync::{broadcast, mpsc, oneshot};
+use serde::{Deserialize, Serialize};
 
 macro_rules! log_error {
     ($e:expr) => {
@@ -123,7 +123,7 @@ impl NetworkBackend for Libp2p {
                                 log_error!(swarm.connect(peer_id, peer_addr));
                             }
                             Command::Broadcast { topic, message } => {
-                                match swarm.broadcast(&topic, message.clone()) {
+                                match swarm.broadcast(&topic, message.to_vec()) {
                                     Ok(id) => {
                                         tracing::debug!("broadcasted message with id: {id} tp topic: {topic}");
                                     }
@@ -131,12 +131,15 @@ impl NetworkBackend for Libp2p {
                                         tracing::error!("failed to broadcast message to topic: {topic} {e:?}");
                                     }
                                 }
-                                log_error!(events_tx.send(Event::Message(Message {
-                                    source: None,
-                                    data: message.into(),
-                                    sequence_number: None,
-                                    topic: TopicHash::from_raw(topic)
-                                })));
+
+                                if swarm.is_subscribed(&topic) {
+                                    log_error!(events_tx.send(Event::Message(Message {
+                                        source: None,
+                                        data: message.into(),
+                                        sequence_number: None,
+                                        topic: Swarm::topic_hash(&topic),
+                                    })));
+                                }
                             }
                             Command::Subscribe(topic) => {
                                 tracing::debug!("subscribing to topic: {topic}");
