@@ -403,7 +403,7 @@ impl<O: Overlay> Carnot<O> {
         // do not remove genesis
         let view_zero = View::new(0);
         self.safe_blocks
-            .retain(|_, b| b.view < threshold_view && view_zero != b.view);
+            .retain(|_, b| b.view > threshold_view && view_zero == b.view);
     }
 }
 
