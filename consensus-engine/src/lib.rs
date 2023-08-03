@@ -400,7 +400,10 @@ impl<O: Overlay> Carnot<O> {
     /// Blocks newer than the last committed block are not safe to be pruned
     pub fn prune_older_blocks_by_view(&mut self, threshold_view: View) {
         assert!(threshold_view < self.latest_committed_block().view);
-        self.safe_blocks.retain(|_, b| b.view < threshold_view);
+        // do not remove genesis
+        let view_zero = View::new(0);
+        self.safe_blocks
+            .retain(|_, b| b.view > threshold_view && view_zero == b.view);
     }
 }
 
