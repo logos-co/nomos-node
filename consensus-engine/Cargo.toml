@@ -19,7 +19,8 @@ fraction = { version = "0.13" }
 [features]
 default = []
 serde = ["dep:serde"]
-simulation = []
+simulation = ["research"]
+research = []
 
 [dev-dependencies]
 proptest = "1.2.0"
