@@ -46,7 +46,7 @@ pipeline {
                        'cargo test -p tests -F waku two_nodes_happy',
                        'cargo test -p tests -F waku ten_nodes_one_down']
 
-          runTests(tests, iterations)
+          runTestCases(tests, iterations)
         }
       }
     }
@@ -54,7 +54,7 @@ pipeline {
     stage('Build libp2p') {
       steps {
         /* Node binary is required for integration tests */
-        sh 'cargo build -p nomos-node --feature libp2p'
+        sh 'cargo build -p nomos-node --features libp2p'
       }
     }
 
@@ -67,7 +67,7 @@ pipeline {
                        'cargo test -p tests -F libp2p two_nodes_happy',
                        'cargo test -p tests -F libp2p ten_nodes_one_down']
 
-          runTests(tests, iterations)
+          runTestCases(tests, iterations)
         }
       }
     }
