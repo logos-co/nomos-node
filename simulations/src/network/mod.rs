@@ -270,9 +270,9 @@ where
         let to = message.to.expect("adhoc message has recipient");
         if let Some(delay) = self.send_message_cost(rng, message.from, to) {
             let node_capacity = self.node_network_capacity.get(&to).unwrap();
-            let should_delay = network_time.add(delay) <= self.network_time;
+            let should_send = network_time.add(delay) <= self.network_time;
             let remaining_size = message.remaining_size();
-            if should_delay && node_capacity.increase_load(remaining_size) {
+            if should_send && node_capacity.increase_load(remaining_size) {
                 let to_node = self.to_node_senders.get(&to).unwrap();
                 to_node
                     .send(message.clone())
@@ -282,7 +282,7 @@ where
             } else {
                 // if we do not need to delay, then we should check if the msg is too large
                 // if so, we mock the partial sending message behavior
-                if should_delay {
+                if should_send {
                     // if remaining is 0, we should send without delay
                     return self.try_partial_send(node_capacity, message, &to) != 0;
                 }
@@ -303,12 +303,14 @@ where
         let sent = node_capacity.capacity_bps - *cap;
         *cap = node_capacity.capacity_bps;
         let remaining = message.partial_send(sent);
+        // Message is partially sent, the node capacity needs to be flushed at the end of step even
+        // if the whole message is not sent.
+        node_capacity.decrease_load(sent);
         if remaining == 0 {
             let to_node = self.to_node_senders.get(to).unwrap();
             to_node
                 .send(message.clone())
                 .expect("node should have connection");
-            node_capacity.decrease_load(sent);
         }
         remaining
     }
@@ -730,13 +732,13 @@ mod tests {
         // Node B should receive a message during the second step, because it's throughput during the
         // step is 1, but the message size it receives is 2.
         network.step(Duration::from_millis(100));
-        assert_eq!(a.receive_messages().len(), 1);
-        assert_eq!(b.receive_messages().len(), 0);
+        assert_eq!(a.receive_messages().len(), 0);
+        assert_eq!(b.receive_messages().len(), 1);
 
         // Node A should receive a message during the third step, because it's throughput during the
         // step is 5, but the message it recieves is of size 15.
         network.step(Duration::from_millis(100));
-        assert_eq!(a.receive_messages().len(), 0);
-        assert_eq!(b.receive_messages().len(), 1);
+        assert_eq!(a.receive_messages().len(), 1);
+        assert_eq!(b.receive_messages().len(), 0);
     }
 }
