@@ -426,6 +426,7 @@ mod tests {
         broadcast: Sender<NetworkMessage<()>>,
         sender: Sender<NetworkMessage<()>>,
         receiver: Receiver<NetworkMessage<()>>,
+        message_size: u32,
     }
 
     impl MockNetworkInterface {
@@ -434,12 +435,14 @@ mod tests {
             broadcast: Sender<NetworkMessage<()>>,
             sender: Sender<NetworkMessage<()>>,
             receiver: Receiver<NetworkMessage<()>>,
+            message_size: u32,
         ) -> Self {
             Self {
                 id,
                 broadcast,
                 sender,
                 receiver,
+                message_size,
             }
         }
     }
@@ -448,12 +451,12 @@ mod tests {
         type Payload = ();
 
         fn broadcast(&self, message: Self::Payload) {
-            let message = NetworkMessage::new(self.id, None, message, 1);
+            let message = NetworkMessage::new(self.id, None, message, self.message_size);
             self.broadcast.send(message).unwrap();
         }
 
         fn send_message(&self, address: NodeId, message: Self::Payload) {
-            let message = NetworkMessage::new(self.id, Some(address), message, 1);
+            let message = NetworkMessage::new(self.id, Some(address), message, self.message_size);
             self.sender.send(message).unwrap();
         }
 
@@ -483,6 +486,7 @@ mod tests {
             from_a_broadcast_sender,
             from_a_sender,
             to_a_receiver,
+            1,
         );
 
         let (from_b_sender, from_b_receiver) = channel::unbounded();
@@ -493,6 +497,7 @@ mod tests {
             from_b_broadcast_sender,
             from_b_sender,
             to_b_receiver,
+            1,
         );
 
         a.send_message(node_b, ());
@@ -558,6 +563,7 @@ mod tests {
             from_a_broadcast_sender,
             from_a_sender,
             to_a_receiver,
+            1,
         );
 
         let (from_b_sender, from_b_receiver) = channel::unbounded();
@@ -568,6 +574,7 @@ mod tests {
             from_b_broadcast_sender,
             from_b_sender,
             to_b_receiver,
+            1,
         );
 
         let (from_c_sender, from_c_receiver) = channel::unbounded();
@@ -578,6 +585,7 @@ mod tests {
             from_c_broadcast_sender,
             from_c_sender,
             to_c_receiver,
+            1,
         );
 
         a.send_message(node_b, ());
@@ -633,6 +641,7 @@ mod tests {
             from_a_broadcast_sender,
             from_a_sender,
             to_a_receiver,
+            1,
         );
 
         let (from_b_sender, from_b_receiver) = channel::unbounded();
@@ -643,6 +652,7 @@ mod tests {
             from_b_broadcast_sender,
             from_b_sender,
             to_b_receiver,
+            1,
         );
 
         for _ in 0..6 {
@@ -661,5 +671,73 @@ mod tests {
         network.step(Duration::from_millis(100));
         assert_eq!(a.receive_messages().len(), 0);
         assert_eq!(b.receive_messages().len(), 2);
+    }
+
+    #[test]
+    fn node_network_message_partial_send() {
+        let node_a = NodeId::from_index(0);
+        let node_b = NodeId::from_index(1);
+
+        let regions = HashMap::from([(Region::Europe, vec![node_a, node_b])]);
+        let behaviour = HashMap::from([(
+            NetworkBehaviourKey::new(Region::Europe, Region::Europe),
+            NetworkBehaviour::new(Duration::from_millis(100), 0.0),
+        )]);
+        let regions_data = RegionsData::new(regions, behaviour);
+        let mut network = Network::new(regions_data, 0);
+
+        let (from_a_sender, from_a_receiver) = channel::unbounded();
+        let (from_a_broadcast_sender, from_a_broadcast_receiver) = channel::unbounded();
+
+        // Node A is connected to the network with throuput of 5.
+        let to_a_receiver = network.connect(node_a, 5, from_a_receiver, from_a_broadcast_receiver);
+
+        // Every message sent to Node A with be of size 15.
+        let a = MockNetworkInterface::new(
+            node_a,
+            from_a_broadcast_sender,
+            from_a_sender,
+            to_a_receiver,
+            15,
+        );
+
+        let (from_b_sender, from_b_receiver) = channel::unbounded();
+        let (from_b_broadcast_sender, from_b_broadcast_receiver) = channel::unbounded();
+
+        // Node B is connected to the network with throuput of 1.
+        let to_b_receiver = network.connect(node_b, 1, from_b_receiver, from_b_broadcast_receiver);
+
+        // Every message sent to Node B with be of size 2.
+        let b = MockNetworkInterface::new(
+            node_b,
+            from_b_broadcast_sender,
+            from_b_sender,
+            to_b_receiver,
+            2,
+        );
+
+        // Each node receives one message.
+        // It should take 3 steps for Node A to receive a message.
+        // It should take 2 steps for Node B to receive a message.
+        a.send_message(node_b, ());
+        b.send_message(node_a, ());
+
+        // Step duration matches the latency between nodes, thus Node A can receive 5 units of a
+        // message, Node B - 1 unit of a message during the step.
+        network.step(Duration::from_millis(100));
+        assert_eq!(a.receive_messages().len(), 0);
+        assert_eq!(b.receive_messages().len(), 0);
+
+        // Node B should receive a message during the second step, because it's throuput during the
+        // step is 1, but the message size it receives is 2.
+        network.step(Duration::from_millis(100));
+        assert_eq!(a.receive_messages().len(), 0);
+        assert_eq!(b.receive_messages().len(), 1);
+
+        // Node A should receive a message during the third step, because it's throuput during the
+        // step is 5, but the message it recieves is of size 15.
+        network.step(Duration::from_millis(100));
+        assert_eq!(a.receive_messages().len(), 1);
+        assert_eq!(b.receive_messages().len(), 0);
     }
 }
