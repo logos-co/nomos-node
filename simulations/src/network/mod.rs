@@ -692,13 +692,13 @@ mod tests {
         // Node A is connected to the network with throuput of 5.
         let to_a_receiver = network.connect(node_a, 5, from_a_receiver, from_a_broadcast_receiver);
 
-        // Every message sent to Node A with be of size 15.
+        // Every message sent **from** Node A will be of size 15.
         let a = MockNetworkInterface::new(
             node_a,
             from_a_broadcast_sender,
             from_a_sender,
             to_a_receiver,
-            15,
+            2,
         );
 
         let (from_b_sender, from_b_receiver) = channel::unbounded();
@@ -707,19 +707,18 @@ mod tests {
         // Node B is connected to the network with throuput of 1.
         let to_b_receiver = network.connect(node_b, 1, from_b_receiver, from_b_broadcast_receiver);
 
-        // Every message sent to Node B with be of size 2.
+        // Every message sent **from** Node B will be of size 2.
         let b = MockNetworkInterface::new(
             node_b,
             from_b_broadcast_sender,
             from_b_sender,
             to_b_receiver,
-            2,
+            15,
         );
 
-        // Each node receives one message.
-        // It should take 3 steps for Node A to receive a message.
-        // It should take 2 steps for Node B to receive a message.
+        // Node A sends message of size 2 to Node B.
         a.send_message(node_b, ());
+        // Node B sends message of size 15 to Node A.
         b.send_message(node_a, ());
 
         // Step duration matches the latency between nodes, thus Node A can receive 5 units of a
@@ -728,16 +727,16 @@ mod tests {
         assert_eq!(a.receive_messages().len(), 0);
         assert_eq!(b.receive_messages().len(), 0);
 
-        // Node B should receive a message during the second step, because it's throuput during the
+        // Node B should receive a message during the second step, because it's throughput during the
         // step is 1, but the message size it receives is 2.
-        network.step(Duration::from_millis(100));
-        assert_eq!(a.receive_messages().len(), 0);
-        assert_eq!(b.receive_messages().len(), 1);
-
-        // Node A should receive a message during the third step, because it's throuput during the
-        // step is 5, but the message it recieves is of size 15.
         network.step(Duration::from_millis(100));
         assert_eq!(a.receive_messages().len(), 1);
         assert_eq!(b.receive_messages().len(), 0);
+
+        // Node A should receive a message during the third step, because it's throughput during the
+        // step is 5, but the message it recieves is of size 15.
+        network.step(Duration::from_millis(100));
+        assert_eq!(a.receive_messages().len(), 0);
+        assert_eq!(b.receive_messages().len(), 1);
     }
 }
