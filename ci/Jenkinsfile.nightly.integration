@@ -30,16 +30,24 @@ pipeline {
   }
 
   stages {
-    stage('Integration tests') {
-      steps {
-        script {
-          def testMatrix = [
-            ['feature': 'waku', 'tests': ['ten_nodes_happy', 'two_nodes_happy', 'ten_nodes_one_down']],
-            ['feature': 'libp2p', 'tests': ['ten_nodes_happy', 'two_nodes_happy', 'ten_nodes_one_down']]
-          ]
+    stage('Integration Tests') {
+      matrix {
+        axes {
+          axis {
+            name 'FEATURE'
+            values 'waku', 'libp2p'
+          }
+        }
+        stages {
+          stage('BuildAndTest') {
+            steps {
+              script {
+                /* To prevent rebuilding node for each test, tests are defined here */
+                def tests = ['ten_nodes_happy', 'two_nodes_happy', 'ten_nodes_one_down']
 
-          testMatrix.each { item ->
-            runBuildAndTestsForFeature(item.feature, item.tests)
+                runBuildAndTestsForFeature(FEATURE, tests)
+              }
+            }
           }
         }
       }

@@ -21,28 +21,36 @@ pipeline {
   }
 
   stages {
-    stage('Check') {
-      steps {
-        sh 'cargo check --all --features waku'
-        sh 'cargo check --all --features libp2p'
-        sh 'cargo fmt -- --check'
-        sh 'cargo clippy --all --features waku -- --deny warnings'
-        sh 'cargo clippy --all --features libp2p -- --deny warnings'
-      }
-    }
+    stage('BuildAndTest') {
+      matrix {
+        axes {
+          axis {
+            name 'FEATURES'
+            values 'waku', 'libp2p'
+          }
+        }
+        stages {
+          stage('Check') {
+            steps {
+              sh "cargo check --all --features ${FEATURES}"
+              sh "cargo fmt -- --check"
+              sh "cargo clippy --all --features ${FEATURES} -- --deny warnings"
+            }
+          }
 
-    stage('Build') {
-      steps {
-        sh 'cargo build'
-        sh 'cargo build --all --features waku'
-        sh 'cargo build --all --features libp2p'
-      }
-    }
+          stage('Build') {
+            steps {
+              sh "cargo build"
+              sh "cargo build --all --features ${FEATURES}"
+            }
+          }
 
-    stage('Test') {
-      steps {
-        sh 'cargo test --all --features waku'
-        sh 'cargo test --all --features libp2p'
+          stage('Test') {
+            steps {
+              sh "cargo test --all --features ${FEATURES}"
+            }
+          }
+        }
       }
     }
   }
