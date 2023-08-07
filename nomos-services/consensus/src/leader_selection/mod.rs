@@ -1,5 +1,6 @@
+use consensus_engine::overlay::RoundRobin;
 use consensus_engine::{
-    overlay::{Error as RandomBeaconError, LeaderSelection, RandomBeaconState, RoundRobin},
+    overlay::{Error as RandomBeaconError, LeaderSelection, RandomBeaconState},
     TimeoutQc,
 };
 use nomos_core::block::Block;
@@ -10,9 +11,9 @@ pub trait UpdateableLeaderSelection: LeaderSelection {
 
     fn on_new_block_received<Tx: Hash + Clone + Eq>(
         &self,
-        block: Block<Tx>,
+        block: &Block<Tx>,
     ) -> Result<Self, Self::Error>;
-    fn on_timeout_qc_received(&self, qc: TimeoutQc) -> Result<Self, Self::Error>;
+    fn on_timeout_qc_received(&self, qc: &TimeoutQc) -> Result<Self, Self::Error>;
 }
 
 impl UpdateableLeaderSelection for RoundRobin {
@@ -20,12 +21,12 @@ impl UpdateableLeaderSelection for RoundRobin {
 
     fn on_new_block_received<Tx: Hash + Clone + Eq>(
         &self,
-        _block: Block<Tx>,
+        _block: &Block<Tx>,
     ) -> Result<Self, Self::Error> {
         Ok(self.advance())
     }
 
-    fn on_timeout_qc_received(&self, _qc: TimeoutQc) -> Result<Self, Self::Error> {
+    fn on_timeout_qc_received(&self, _qc: &TimeoutQc) -> Result<Self, Self::Error> {
         Ok(self.advance())
     }
 }
@@ -35,13 +36,13 @@ impl UpdateableLeaderSelection for RandomBeaconState {
 
     fn on_new_block_received<Tx: Hash + Clone + Eq>(
         &self,
-        block: Block<Tx>,
+        block: &Block<Tx>,
     ) -> Result<Self, Self::Error> {
         self.check_advance_happy(block.beacon().clone(), block.header().parent_qc.view())
         // TODO: check random beacon public keys is leader id
     }
 
-    fn on_timeout_qc_received(&self, qc: TimeoutQc) -> Result<Self, Self::Error> {
+    fn on_timeout_qc_received(&self, qc: &TimeoutQc) -> Result<Self, Self::Error> {
         Ok(Self::generate_sad(qc.view(), self))
     }
 }
