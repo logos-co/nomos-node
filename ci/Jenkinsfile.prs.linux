@@ -23,22 +23,26 @@ pipeline {
   stages {
     stage('Check') {
       steps {
-        sh 'cargo check --all --all-features'
+        sh 'cargo check --all --features waku'
+        sh 'cargo check --all --features libp2p'
         sh 'cargo fmt -- --check'
-        sh 'cargo clippy --all --all-features -- --deny warnings'
+        sh 'cargo clippy --all --features waku -- --deny warnings'
+        sh 'cargo clippy --all --features libp2p -- --deny warnings'
       }
     }
 
     stage('Build') {
       steps {
         sh 'cargo build'
-        sh 'cargo build --all --all-features'
+        sh 'cargo build --all --features waku'
+        sh 'cargo build --all --features libp2p'
       }
     }
 
     stage('Test') {
       steps {
-        sh 'cargo test --all --all-features'
+        sh 'cargo test --all --features waku'
+        sh 'cargo test --all --features libp2p'
       }
     }
   }
