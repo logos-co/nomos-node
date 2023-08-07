@@ -1,3 +1,6 @@
+// std
+use std::error::Error;
+// internal
 use super::NetworkBackend;
 use nomos_libp2p::{
     libp2p::{
@@ -6,9 +9,10 @@ use nomos_libp2p::{
     },
     BehaviourEvent, Swarm, SwarmConfig, SwarmEvent,
 };
+// crates
 use overwatch_rs::{overwatch::handle::OverwatchHandle, services::state::NoState};
 use serde::{Deserialize, Serialize};
-use tokio::sync::{broadcast, mpsc};
+use tokio::sync::{broadcast, mpsc, oneshot};
 
 macro_rules! log_error {
     ($e:expr) => {
@@ -35,15 +39,13 @@ pub struct Libp2pInfo {
 pub enum EventKind {
     Message,
 }
-use std::error::Error;
-use tokio::sync::oneshot;
 
-const BUFFER_SIZE: usize = 16;
+const BUFFER_SIZE: usize = 64;
 
 #[derive(Debug)]
 pub enum Command {
     Connect(PeerId, Multiaddr),
-    Broadcast { topic: Topic, message: Vec<u8> },
+    Broadcast { topic: Topic, message: Box<[u8]> },
     Subscribe(Topic),
     Unsubscribe(Topic),
     Info { reply: oneshot::Sender<Libp2pInfo> },
@@ -121,13 +123,22 @@ impl NetworkBackend for Libp2p {
                                 log_error!(swarm.connect(peer_id, peer_addr));
                             }
                             Command::Broadcast { topic, message } => {
-                                match swarm.broadcast(&topic, message) {
+                                match swarm.broadcast(&topic, message.to_vec()) {
                                     Ok(id) => {
                                         tracing::debug!("broadcasted message with id: {id} tp topic: {topic}");
                                     }
                                     Err(e) => {
                                         tracing::error!("failed to broadcast message to topic: {topic} {e:?}");
                                     }
+                                }
+
+                                if swarm.is_subscribed(&topic) {
+                                    log_error!(events_tx.send(Event::Message(Message {
+                                        source: None,
+                                        data: message.into(),
+                                        sequence_number: None,
+                                        topic: Swarm::topic_hash(&topic),
+                                    })));
                                 }
                             }
                             Command::Subscribe(topic) => {
