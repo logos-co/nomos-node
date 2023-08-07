@@ -1,3 +1,4 @@
+use crate::overlay::{CommitteeMembership, FisherYatesShuffle};
 use crate::types::*;
 use bls_signatures::{PrivateKey, PublicKey, Serialize, Signature};
 use rand::{seq::SliceRandom, SeedableRng};
@@ -60,6 +61,15 @@ impl RandomBeaconState {
         Self::Sad { entropy }
     }
 
+    pub fn initial_sad_from_entropy(entropy: [u8; 32]) -> Self {
+        Self::generate_sad(
+            View::new(-1),
+            &Self::Sad {
+                entropy: Box::new(entropy),
+            },
+        )
+    }
+
     pub fn check_advance_happy(&self, rb: RandomBeaconState, view: View) -> Result<Self, Error> {
         let context = view_to_bytes(view);
         match rb {
@@ -94,6 +104,14 @@ fn choice(state: &RandomBeaconState, nodes: &[NodeId]) -> NodeId {
 impl LeaderSelection for RandomBeaconState {
     fn next_leader(&self, nodes: &[NodeId]) -> NodeId {
         choice(self, nodes)
+    }
+}
+
+impl CommitteeMembership for RandomBeaconState {
+    fn reshape_committees(&self, nodes: &[NodeId]) -> Vec<NodeId> {
+        let mut seed = [0; 32];
+        seed.copy_from_slice(&self.entropy().deref()[..32]);
+        FisherYatesShuffle::shuffle(nodes, seed)
     }
 }
 
