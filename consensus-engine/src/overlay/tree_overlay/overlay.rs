@@ -1,57 +1,55 @@
 use super::tree::Tree;
+use crate::overlay::CommitteeMembership;
 use crate::{overlay::LeaderSelection, Committee, NodeId, Overlay};
-use rand::rngs::StdRng;
-use rand::seq::SliceRandom;
-use rand::SeedableRng;
 
 #[derive(Debug, Clone)]
-pub struct TreeOverlaySettings<L: LeaderSelection> {
+pub struct TreeOverlaySettings<L: LeaderSelection, M: CommitteeMembership> {
     pub nodes: Vec<NodeId>,
     pub current_leader: NodeId,
-    pub entropy: [u8; 32],
     pub number_of_committees: usize,
     pub leader: L,
+    pub committee_membership: M,
 }
 
 #[derive(Debug, Clone)]
-pub struct TreeOverlay<L> {
-    pub(super) entropy: [u8; 32],
+pub struct TreeOverlay<L, M> {
     pub(super) number_of_committees: usize,
     pub(super) nodes: Vec<NodeId>,
     pub(super) current_leader: NodeId,
     pub(super) carnot_tree: Tree,
     pub(super) leader: L,
+    pub(super) committee_membership: M,
 }
 
-impl<L> Overlay for TreeOverlay<L>
+impl<L, M> Overlay for TreeOverlay<L, M>
 where
     L: LeaderSelection + Send + Sync + 'static,
+    M: CommitteeMembership + Send + Sync + 'static,
 {
-    type Settings = TreeOverlaySettings<L>;
+    type Settings = TreeOverlaySettings<L, M>;
 
     type LeaderSelection = L;
+    type CommitteeMembership = M;
 
     fn new(settings: Self::Settings) -> Self {
         let TreeOverlaySettings {
-            mut nodes,
+            nodes,
             current_leader,
-            entropy,
             number_of_committees,
             leader,
+            committee_membership,
         } = settings;
-        let mut rng = StdRng::from_seed(entropy);
-        // TODO: support custom shuffling algorithm
-        nodes.shuffle(&mut rng);
 
+        let nodes = committee_membership.reshape_committees(&nodes);
         let carnot_tree = Tree::new(&nodes, number_of_committees);
 
         Self {
-            entropy,
             number_of_committees,
             nodes,
             current_leader,
             carnot_tree,
             leader,
+            committee_membership,
         }
     }
 
@@ -131,8 +129,7 @@ where
     }
 
     fn next_leader(&self) -> NodeId {
-        let mut rng = StdRng::from_seed(self.entropy);
-        *self.nodes.choose(&mut rng).unwrap()
+        self.leader.next_leader(&self.nodes)
     }
 
     fn super_majority_threshold(&self, id: NodeId) -> usize {
@@ -179,19 +176,36 @@ where
             Err(e) => Err(e),
         }
     }
+
+    fn update_committees<F, E>(&self, f: F) -> Result<Self, E>
+    where
+        F: FnOnce(Self::CommitteeMembership) -> Result<Self::CommitteeMembership, E>,
+    {
+        f(self.committee_membership.clone()).map(|committee_membership| {
+            let settings = TreeOverlaySettings {
+                nodes: self.nodes.clone(),
+                current_leader: self.current_leader,
+                number_of_committees: self.number_of_committees,
+                leader: self.leader.clone(),
+                committee_membership,
+            };
+            Self::new(settings)
+        })
+    }
 }
 
-impl<L> TreeOverlay<L>
+impl<L, M> TreeOverlay<L, M>
 where
     L: LeaderSelection + Send + Sync + 'static,
+    M: CommitteeMembership + Send + Sync + 'static,
 {
-    pub fn advance(&self, entropy: [u8; 32], leader: L) -> Self {
+    pub fn advance(&self, leader: L, committee_membership: M) -> Self {
         Self::new(TreeOverlaySettings {
             nodes: self.nodes.clone(),
             current_leader: self.next_leader(),
-            entropy,
             number_of_committees: self.number_of_committees,
             leader,
+            committee_membership,
         })
     }
 
@@ -206,10 +220,12 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::overlay::RoundRobin;
+    use crate::overlay::leadership::RoundRobin;
+    use crate::overlay::membership::FisherYatesShuffle;
     use crate::Overlay;
 
     use super::*;
+    const ENTROPY: [u8; 32] = [0; 32];
 
     #[test]
     fn test_carnot_overlay_leader() {
@@ -217,9 +233,9 @@ mod tests {
         let overlay = TreeOverlay::new(TreeOverlaySettings {
             nodes: nodes.clone(),
             current_leader: nodes[0],
-            entropy: [0; 32],
             number_of_committees: 3,
             leader: RoundRobin::new(),
+            committee_membership: FisherYatesShuffle::new(ENTROPY),
         });
 
         assert_eq!(*overlay.leader(), nodes[0]);
@@ -231,13 +247,13 @@ mod tests {
         let mut overlay = TreeOverlay::new(TreeOverlaySettings {
             nodes: nodes.clone(),
             current_leader: nodes[0],
-            entropy: [0; 32],
             number_of_committees: 3,
             leader: RoundRobin::new(),
+            committee_membership: FisherYatesShuffle::new(ENTROPY),
         });
 
         let leader = overlay.next_leader();
-        overlay = overlay.advance([1; 32], RoundRobin::new());
+        overlay = overlay.advance(RoundRobin::new(), FisherYatesShuffle::new(ENTROPY));
 
         assert_eq!(leader, *overlay.leader());
     }
@@ -248,9 +264,9 @@ mod tests {
         let overlay = TreeOverlay::new(TreeOverlaySettings {
             current_leader: nodes[0],
             nodes,
-            entropy: [0; 32],
             number_of_committees: 3,
             leader: RoundRobin::new(),
+            committee_membership: FisherYatesShuffle::new(ENTROPY),
         });
 
         let mut expected_root = Committee::new();
@@ -266,9 +282,9 @@ mod tests {
         let overlay = TreeOverlay::new(TreeOverlaySettings {
             current_leader: nodes[0],
             nodes,
-            entropy: [0; 32],
             number_of_committees: 3,
             leader: RoundRobin::new(),
+            committee_membership: FisherYatesShuffle::new(ENTROPY),
         });
 
         let mut leaf_committees = overlay
@@ -296,9 +312,9 @@ mod tests {
         let overlay = TreeOverlay::new(TreeOverlaySettings {
             current_leader: nodes[0],
             nodes,
-            entropy: [0; 32],
             number_of_committees: 3,
             leader: RoundRobin::new(),
+            committee_membership: FisherYatesShuffle::new(ENTROPY),
         });
 
         assert_eq!(overlay.super_majority_threshold(overlay.nodes[8]), 0);
@@ -310,9 +326,9 @@ mod tests {
         let overlay = TreeOverlay::new(TreeOverlaySettings {
             current_leader: nodes[0],
             nodes,
-            entropy: [0; 32],
             number_of_committees: 3,
             leader: RoundRobin::new(),
+            committee_membership: FisherYatesShuffle::new(ENTROPY),
         });
 
         assert_eq!(overlay.super_majority_threshold(overlay.nodes[0]), 3);
@@ -324,9 +340,9 @@ mod tests {
         let overlay = TreeOverlay::new(TreeOverlaySettings {
             nodes: nodes.clone(),
             current_leader: nodes[0],
-            entropy: [0; 32],
             number_of_committees: 3,
             leader: RoundRobin::new(),
+            committee_membership: FisherYatesShuffle::new(ENTROPY),
         });
 
         assert_eq!(
