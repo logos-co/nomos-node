@@ -45,7 +45,7 @@ pipeline {
 
           stage('Test') {
             steps { script {
-              nix.shell("cargo test --all--no-default-features --features ${FEATURES}")
+              nix.shell("cargo test --all --no-default-features --features ${FEATURES}")
             } }
           }
         }
