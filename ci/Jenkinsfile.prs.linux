@@ -40,7 +40,6 @@ pipeline {
 
           stage('Build') {
             steps {
-              sh "cargo build"
               sh "cargo build --all --no-default-features --features ${FEATURES}"
             }
           }

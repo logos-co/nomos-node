@@ -39,7 +39,6 @@ pipeline {
 
           stage('Build') {
             steps { script {
-              nix.shell("cargo build")
               nix.shell("cargo build --all --no-default-features --features ${FEATURES}")
             } }
           }
