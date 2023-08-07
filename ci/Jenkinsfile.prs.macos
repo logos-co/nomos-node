@@ -31,22 +31,22 @@ pipeline {
         stages {
           stage('Check') {
             steps { script {
-              nix.shell("cargo check --all --features ${FEATURES}")
+              nix.shell("cargo check --all --no-default-features --features ${FEATURES}")
               nix.shell("cargo fmt -- --check")
-              nix.shell("cargo clippy --all --features ${FEATURES} -- --deny warnings")
+              nix.shell("cargo clippy --all --no-default-features --features ${FEATURES} -- --deny warnings")
             } }
           }
 
           stage('Build') {
             steps { script {
               nix.shell("cargo build")
-              nix.shell("cargo build --all --features ${FEATURES}")
+              nix.shell("cargo build --all --no-default-features --features ${FEATURES}")
             } }
           }
 
           stage('Test') {
             steps { script {
-              nix.shell("cargo test --all --features ${FEATURES}")
+              nix.shell("cargo test --all--no-default-features --features ${FEATURES}")
             } }
           }
         }

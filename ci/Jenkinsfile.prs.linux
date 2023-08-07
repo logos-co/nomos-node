@@ -32,22 +32,22 @@ pipeline {
         stages {
           stage('Check') {
             steps {
-              sh "cargo check --all --features ${FEATURES}"
+              sh "cargo check --all --no-default-features --features ${FEATURES}"
               sh "cargo fmt -- --check"
-              sh "cargo clippy --all --features ${FEATURES} -- --deny warnings"
+              sh "cargo clippy --all --no-default-features --features ${FEATURES} -- --deny warnings"
             }
           }
 
           stage('Build') {
             steps {
               sh "cargo build"
-              sh "cargo build --all --features ${FEATURES}"
+              sh "cargo build --all --no-default-features --features ${FEATURES}"
             }
           }
 
           stage('Test') {
             steps {
-              sh "cargo test --all --features ${FEATURES}"
+              sh "cargo test --all --no-default-features --features ${FEATURES}"
             }
           }
         }
