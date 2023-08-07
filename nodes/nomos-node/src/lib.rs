@@ -30,6 +30,9 @@ use serde::{Deserialize, Serialize};
 
 pub use tx::Tx;
 
+#[cfg(all(feature = "waku", feature = "libp2p"))]
+compile_error!("feature \"waku\" and feature \"libp2p\" cannot be enabled at the same time");
+
 #[derive(Deserialize, Debug, Clone, Serialize)]
 pub struct Config {
     pub log: <Logger as ServiceData>::Settings,
