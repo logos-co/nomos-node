@@ -24,6 +24,7 @@ use consensus_engine::overlay::RandomBeaconState;
 use consensus_engine::{
     Block, BlockId, Carnot, Committee, Overlay, Payload, Qc, StandardQc, TimeoutQc, View, Vote,
 };
+use nomos_consensus::committee_membership::UpdateableCommitteeMembership;
 use nomos_consensus::network::messages::{ProposalChunkMsg, TimeoutQcMsg};
 use nomos_consensus::{
     leader_selection::UpdateableLeaderSelection,
@@ -224,7 +225,12 @@ pub struct CarnotNode<O: Overlay> {
     step_duration: Duration,
 }
 
-impl<L: UpdateableLeaderSelection, O: Overlay<LeaderSelection = L>> CarnotNode<O> {
+impl<
+        L: UpdateableLeaderSelection,
+        M: UpdateableCommitteeMembership,
+        O: Overlay<LeaderSelection = L, CommitteeMembership = M>,
+    > CarnotNode<O>
+{
     pub fn new<R: Rng>(
         id: consensus_engine::NodeId,
         settings: CarnotSettings,
@@ -342,8 +348,13 @@ impl<L: UpdateableLeaderSelection, O: Overlay<LeaderSelection = L>> CarnotNode<O
                         if self.engine.current_view() != new.current_view() {
                             new = new
                                 .update_overlay(|overlay| {
-                                    overlay.update_leader_selection(|leader_selection| {
-                                        leader_selection.on_new_block_received(block.clone())
+                                    let overlay = overlay
+                                        .update_leader_selection(|leader_selection| {
+                                            leader_selection.on_new_block_received(&block)
+                                        })
+                                        .expect("Leader selection update should succeed");
+                                    overlay.update_committees(|committee_membership| {
+                                        committee_membership.on_new_block_received(&block)
                                     })
                                 })
                                 .unwrap_or(new);
@@ -481,7 +492,12 @@ impl<L: UpdateableLeaderSelection, O: Overlay<LeaderSelection = L>> CarnotNode<O
     }
 }
 
-impl<L: UpdateableLeaderSelection, O: Overlay<LeaderSelection = L>> Node for CarnotNode<O> {
+impl<
+        L: UpdateableLeaderSelection,
+        M: UpdateableCommitteeMembership,
+        O: Overlay<LeaderSelection = L, CommitteeMembership = M>,
+    > Node for CarnotNode<O>
+{
     type Settings = CarnotSettings;
     type State = CarnotState;
 
