@@ -1,24 +1,30 @@
 use super::LeaderSelection;
+use crate::overlay::CommitteeMembership;
 use crate::{NodeId, Overlay};
 use fraction::{Fraction, ToPrimitive};
 use serde::{Deserialize, Serialize};
+use std::marker::PhantomData;
+
 const LEADER_SUPER_MAJORITY_THRESHOLD_NUM: u64 = 2;
 const LEADER_SUPER_MAJORITY_THRESHOLD_DEN: u64 = 3;
 
 #[derive(Clone, Debug, PartialEq)]
 /// Flat overlay with a single committee and round robin leader selection.
-pub struct FlatOverlay<L: LeaderSelection> {
+pub struct FlatOverlay<L: LeaderSelection, M: CommitteeMembership> {
     nodes: Vec<NodeId>,
     leader: L,
     leader_threshold: Fraction,
+    _committee_membership: PhantomData<M>,
 }
 
-impl<L> Overlay for FlatOverlay<L>
+impl<L, M> Overlay for FlatOverlay<L, M>
 where
     L: LeaderSelection + Send + Sync + 'static,
+    M: CommitteeMembership + Send + Sync + 'static,
 {
     type Settings = FlatOverlaySettings<L>;
     type LeaderSelection = L;
+    type CommitteeMembership = M;
 
     fn new(
         FlatOverlaySettings {
@@ -36,6 +42,7 @@ where
                     LEADER_SUPER_MAJORITY_THRESHOLD_DEN,
                 )
             }),
+            _committee_membership: Default::default(),
         }
     }
 
@@ -107,29 +114,12 @@ where
             Err(e) => Err(e),
         }
     }
-}
 
-#[derive(Clone, Debug, Default, PartialEq)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-pub struct RoundRobin {
-    cur: usize,
-}
-
-impl RoundRobin {
-    pub fn new() -> Self {
-        Self { cur: 0 }
-    }
-
-    pub fn advance(&self) -> Self {
-        Self {
-            cur: (self.cur + 1),
-        }
-    }
-}
-
-impl LeaderSelection for RoundRobin {
-    fn next_leader(&self, nodes: &[NodeId]) -> NodeId {
-        nodes[self.cur % nodes.len()]
+    fn update_committees<F, E>(&self, _f: F) -> Result<Self, E>
+    where
+        F: FnOnce(Self::CommitteeMembership) -> Result<Self::CommitteeMembership, E>,
+    {
+        Ok(self.clone())
     }
 }
 
