@@ -9,8 +9,7 @@ use consensus_engine::NodeId;
 use nomos_consensus::{CarnotInfo, CarnotSettings};
 use nomos_http::backends::axum::AxumBackendSettings;
 #[cfg(feature = "libp2p")]
-use nomos_libp2p::Multiaddr;
-use nomos_libp2p::SwarmConfig;
+use nomos_libp2p::{Multiaddr, SwarmConfig};
 use nomos_log::{LoggerBackend, LoggerFormat};
 #[cfg(feature = "libp2p")]
 use nomos_network::backends::libp2p::Libp2pInfo;
