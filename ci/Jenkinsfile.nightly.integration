@@ -30,44 +30,17 @@ pipeline {
   }
 
   stages {
-    stage('Build waku') {
-      steps {
-        /* Node binary is required for integration tests */
-        sh 'cargo build -p nomos-node --features waku'
-      }
-    }
-
-    stage('Integration tests waku') {
+    stage('Integration tests') {
       steps {
         script {
-          int iterations = params.ITERATIONS.toInteger()
+          def testMatrix = [
+            ['feature': 'waku', 'tests': ['ten_nodes_happy', 'two_nodes_happy', 'ten_nodes_one_down']],
+            ['feature': 'libp2p', 'tests': ['ten_nodes_happy', 'two_nodes_happy', 'ten_nodes_one_down']]
+          ]
 
-          def tests = ['cargo test -p tests -F waku ten_nodes_happy',
-                       'cargo test -p tests -F waku two_nodes_happy',
-                       'cargo test -p tests -F waku ten_nodes_one_down']
-
-          runTestCases(tests, iterations)
-        }
-      }
-    }
-
-    stage('Build libp2p') {
-      steps {
-        /* Node binary is required for integration tests */
-        sh 'cargo build -p nomos-node --features libp2p'
-      }
-    }
-
-    stage('Integration tests libp2p') {
-      steps {
-        script {
-          int iterations = params.ITERATIONS.toInteger()
-
-          def tests = ['cargo test -p tests -F libp2p ten_nodes_happy',
-                       'cargo test -p tests -F libp2p two_nodes_happy',
-                       'cargo test -p tests -F libp2p ten_nodes_one_down']
-
-          runTestCases(tests, iterations)
+          testMatrix.each { item ->
+            runBuildAndTestsForFeature(item.feature, item.tests)
+          }
         }
       }
     }
@@ -90,12 +63,26 @@ pipeline {
   }
 }
 
+def runBuildAndTestsForFeature(feature, tests) {
+  echo "Building node for feature: ${feature}"
+  def build_cmd = "cargo build -p nomos-node --features ${feature}"
+
+  if (sh(script: build_cmd, returnStatus: true) != 0) {
+    error("Build '${feature}' node failed")
+    return
+  }
+  
+  int iterations = params.ITERATIONS.toInteger()
+  runTestCases(tests, iterations)
+}
+
 def runTestCases(test_cases, iterations) {
   for (int i = 0; i < iterations; i++) {
     echo "Running iteration ${i + 1} of ${iterations}"
 
     for (test_case in test_cases) {
-      if (sh(script: test_case, returnStatus: true) != 0) {
+      def test_cmd = "cargo test -p tests --features ${feature} ${test_case}"
+      if (sh(script: test_cmd, returnStatus: true) != 0) {
         error("Test '${test_case}' failed on iteration ${i + 1}")
         return
       }
