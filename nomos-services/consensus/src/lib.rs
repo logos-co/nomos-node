@@ -1,3 +1,4 @@
+pub mod committee_membership;
 pub mod leader_selection;
 pub mod network;
 mod tally;
@@ -33,6 +34,7 @@ use consensus_engine::{
 };
 use task_manager::TaskManager;
 
+use crate::committee_membership::UpdateableCommitteeMembership;
 use nomos_core::block::Block;
 use nomos_core::fountain::FountainCode;
 use nomos_core::tx::Transaction;
@@ -144,6 +146,7 @@ where
     M: MempoolAdapter<Tx = P::Tx> + Send + Sync + 'static,
     O: Overlay + Debug + Send + Sync + 'static,
     O::LeaderSelection: UpdateableLeaderSelection,
+    O::CommitteeMembership: UpdateableCommitteeMembership,
 {
     fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, overwatch_rs::DynError> {
         let network_relay = service_state.overwatch_handle.relay();
@@ -283,6 +286,7 @@ where
     M: MempoolAdapter<Tx = P::Tx> + Send + Sync + 'static,
     O: Overlay + Debug + Send + Sync + 'static,
     O::LeaderSelection: UpdateableLeaderSelection,
+    O::CommitteeMembership: UpdateableCommitteeMembership,
 {
     fn process_message(carnot: &Carnot<O>, msg: ConsensusMsg) {
         match msg {
@@ -426,9 +430,13 @@ where
                             tally_settings,
                         ),
                     );
-                    new_state = Self::update_leader_selection(new_state, |leader_selection| {
-                        leader_selection.on_new_block_received(original_block)
-                    });
+                    new_state = Self::update_overlay(
+                        new_state,
+                        |leader_selection| leader_selection.on_new_block_received(&original_block),
+                        |committee_membership| {
+                            committee_membership.on_new_block_received(&original_block)
+                        },
+                    );
                 } else {
                     task_manager.push(block.view, async move {
                         if let Some(block) = stream.next().await {
@@ -514,9 +522,11 @@ where
             Self::gather_new_views(adapter, self_committee, timeout_qc.clone(), tally_settings),
         );
         if carnot.current_view() != new_state.current_view() {
-            new_state = Self::update_leader_selection(new_state, |leader_selection| {
-                leader_selection.on_timeout_qc_received(timeout_qc)
-            });
+            new_state = Self::update_overlay(
+                new_state,
+                |leader_selection| leader_selection.on_timeout_qc_received(&timeout_qc),
+                |committee_membership| committee_membership.on_timeout_qc_received(&timeout_qc),
+            );
         }
         (new_state, None)
     }
@@ -723,15 +733,40 @@ where
 
     fn update_leader_selection<
         E: std::error::Error,
-        U: FnOnce(O::LeaderSelection) -> Result<O::LeaderSelection, E>,
+        Fl: FnOnce(O::LeaderSelection) -> Result<O::LeaderSelection, E>,
     >(
         carnot: Carnot<O>,
-        f: U,
+        leader_selection_f: Fl,
     ) -> Carnot<O> {
         carnot
-            .update_overlay(|overlay| overlay.update_leader_selection(f))
-            // TODO: remove unwrap
+            .update_overlay(|overlay| overlay.update_leader_selection(leader_selection_f))
             .unwrap()
+    }
+
+    fn update_committee_membership<
+        E: std::error::Error,
+        Fm: FnOnce(O::CommitteeMembership) -> Result<O::CommitteeMembership, E>,
+    >(
+        carnot: Carnot<O>,
+        committee_membership_f: Fm,
+    ) -> Carnot<O> {
+        carnot
+            .update_overlay(|overlay| overlay.update_committees(committee_membership_f))
+            .unwrap()
+    }
+
+    fn update_overlay<
+        El: std::error::Error,
+        Em: std::error::Error,
+        Fl: FnOnce(O::LeaderSelection) -> Result<O::LeaderSelection, El>,
+        Fm: FnOnce(O::CommitteeMembership) -> Result<O::CommitteeMembership, Em>,
+    >(
+        carnot: Carnot<O>,
+        leader_selection_f: Fl,
+        committee_membership_f: Fm,
+    ) -> Carnot<O> {
+        let carnot = Self::update_leader_selection(carnot, leader_selection_f);
+        Self::update_committee_membership(carnot, committee_membership_f)
     }
 }
 
