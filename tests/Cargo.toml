@@ -5,7 +5,7 @@ edition = "2021"
 publish = false
 
 [dependencies]
-nomos-node = { path = "../nodes/nomos-node" }
+nomos-node = { path = "../nodes/nomos-node", default-features = false }
 nomos-consensus = { path = "../nomos-services/consensus" }
 nomos-network = { path = "../nomos-services/network" }
 nomos-log = { path = "../nomos-services/log" }
