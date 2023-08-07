@@ -20,25 +20,37 @@ pipeline {
   }
 
   stages {
-    stage('Check') {
-      steps { script {
-        nix.shell('cargo check --all --all-features')
-        nix.shell('cargo fmt -- --check')
-        nix.shell('cargo clippy --all --all-features -- --deny warnings')
-      } }
-    }
+    stage('BuildAndTest') {
+      matrix {
+        axes {
+          axis {
+            name 'FEATURES'
+            values 'waku', 'libp2p'
+          }
+        }
+        stages {
+          stage('Check') {
+            steps { script {
+              nix.shell("cargo check --all --features ${FEATURES}")
+              nix.shell("cargo fmt -- --check")
+              nix.shell("cargo clippy --all --features ${FEATURES} -- --deny warnings")
+            } }
+          }
 
-    stage('Build') {
-      steps { script {
-        nix.shell('cargo build')
-        nix.shell('cargo build --all --all-features')
-      } }
-    }
+          stage('Build') {
+            steps { script {
+              nix.shell("cargo build")
+              nix.shell("cargo build --all --features ${FEATURES}")
+            } }
+          }
 
-    stage('Test') {
-      steps { script {
-        nix.shell('cargo test --all --all-features')
-      } }
+          stage('Test') {
+            steps { script {
+              nix.shell("cargo test --all --features ${FEATURES}")
+            } }
+          }
+        }
+      }
     }
   }
   post {
