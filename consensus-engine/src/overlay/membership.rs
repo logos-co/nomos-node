@@ -2,8 +2,9 @@
 
 // crates
 use rand::prelude::SliceRandom;
-use rand::SeedableRng;
+use rand::{Rng, SeedableRng};
 use rand_chacha::ChaCha20Rng;
+use shuffle::shuffler::Shuffler;
 
 // internal
 use crate::overlay::CommitteeMembership;
@@ -21,7 +22,12 @@ impl FisherYatesShuffle {
 
     pub fn shuffle<T: Clone>(elements: &mut [T], entropy: [u8; 32]) {
         let mut rng = ChaCha20Rng::from_seed(entropy);
-        elements.shuffle(&mut rng);
+        // Implementation of fisher yates shuffling
+        // https://en.wikipedia.org/wiki/Fisher%E2%80%93Yates_shuffle
+        for i in (1..elements.len()).rev() {
+            let j = rng.gen_range(0..(i + 1));
+            elements.swap(i, j);
+        }
     }
 }
 
