@@ -344,7 +344,7 @@ impl<
                     "receive block proposal",
                 );
                 match self.engine.receive_block(block.header().clone()) {
-                    Ok(mut new) => {
+                    Ok(new) => {
                         if self.engine.current_view() != new.current_view() {
                             // TODO: Refactor this into a method, use for timeout qc as well
                             // new = new
