@@ -440,9 +440,12 @@ impl<
                     timeout_view = %timeout_qc.view(),
                     "receive new view message"
                 );
-                let (new, out) = self.engine.approve_new_view(timeout_qc, new_views);
-                output = Some(Output::Send(out));
-                self.engine = new;
+                // just process timeout if node have not already process it
+                if timeout_qc.view() == self.engine.current_view() {
+                    let (new, out) = self.engine.approve_new_view(timeout_qc, new_views);
+                    output = Some(Output::Send(out));
+                    self.engine = new;
+                }
             }
             Event::TimeoutQc { timeout_qc } => {
                 tracing::info!(
