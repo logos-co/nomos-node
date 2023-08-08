@@ -38,15 +38,22 @@ pipeline {
             }
           }
 
-          stage('Build') {
-            steps {
-              sh "cargo build --all --no-default-features --features ${FEATURES}"
+          stage('BuildAndTest') {
+            options {
+              lock("sync-features")
             }
-          }
+            stages {
+              stage('Build') {
+                steps {
+                  sh "cargo build --all --no-default-features --features ${FEATURES}"
+                }
+              }
 
-          stage('Test') {
-            steps {
-              sh "cargo test --all --no-default-features --features ${FEATURES}"
+              stage('Test') {
+                steps {
+                  sh "cargo test --all --no-default-features --features ${FEATURES}"
+                }
+              }
             }
           }
         }

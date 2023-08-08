@@ -37,16 +37,23 @@ pipeline {
             } }
           }
 
-          stage('Build') {
-            steps { script {
-              nix.shell("cargo build --all --no-default-features --features ${FEATURES}")
-            } }
-          }
+          stage('BuildAndTest') {
+            options {
+              lock('sync-features')
+            }
+            stages {
+              stage('Build') {
+                steps { script {
+                  nix.shell("cargo build --all --no-default-features --features ${FEATURES}")
+                } }
+              }
 
-          stage('Test') {
-            steps { script {
-              nix.shell("cargo test --all --no-default-features --features ${FEATURES}")
-            } }
+              stage('Test') {
+                steps { script {
+                  nix.shell("cargo test --all --no-default-features --features ${FEATURES}")
+                } }
+              }
+            }
           }
         }
       }
