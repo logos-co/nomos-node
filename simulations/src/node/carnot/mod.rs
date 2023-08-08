@@ -525,6 +525,8 @@ impl<
             .receive_messages()
             .into_iter()
             .map(NetworkMessage::into_payload)
+            // do not care for older view messages
+            .filter(|m| m.view() >= self.engine.current_view())
             .partition(|m| {
                 m.view() == self.engine.current_view()
                     || matches!(m, CarnotMessage::Proposal(_) | CarnotMessage::TimeoutQc(_))
