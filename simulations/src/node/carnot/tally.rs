@@ -3,25 +3,13 @@ use std::collections::{HashMap, HashSet};
 
 pub(crate) struct Tally<T: core::hash::Hash + Eq + Clone> {
     cache: HashMap<View, HashSet<T>>,
-    threshold: usize,
-}
-
-impl<T: core::hash::Hash + Eq + Clone> Default for Tally<T> {
-    fn default() -> Self {
-        Self::new(2)
-    }
 }
 
 impl<T: core::hash::Hash + Eq + Clone> Tally<T> {
-    pub fn new(threshold: usize) -> Self {
+    pub fn new() -> Self {
         Self {
             cache: Default::default(),
-            threshold,
         }
-    }
-
-    pub fn tally(&mut self, view: View, message: T) -> Option<HashSet<T>> {
-        self.tally_by(view, message, self.threshold)
     }
 
     pub fn tally_by(&mut self, view: View, message: T, threshold: usize) -> Option<HashSet<T>> {
