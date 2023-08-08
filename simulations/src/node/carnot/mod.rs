@@ -190,7 +190,7 @@ impl<O: Overlay> From<&Carnot<O>> for CarnotState {
                 .map(|b| (b.id, b))
                 .collect(),
             last_view_timeout_qc: value.last_view_timeout_qc(),
-            committed_blocks: value.committed_blocks(),
+            committed_blocks: value.latest_committed_blocks(),
             highest_voted_view: Default::default(),
             step_duration: Default::default(),
         }
