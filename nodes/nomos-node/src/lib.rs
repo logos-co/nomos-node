@@ -61,7 +61,7 @@ pub type Carnot = CarnotConsensus<
     MockPool<Tx>,
     MempoolLibp2pAdapter<Tx>,
     MockFountain,
-    FlatOverlay<RoundRobin>,
+    FlatOverlay<RoundRobin, RandomBeaconState>,
 >;
 
 #[derive(Services)]
