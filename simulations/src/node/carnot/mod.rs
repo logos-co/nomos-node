@@ -190,7 +190,7 @@ impl<O: Overlay> From<&Carnot<O>> for CarnotState {
                 .map(|b| (b.id, b))
                 .collect(),
             last_view_timeout_qc: value.last_view_timeout_qc(),
-            committed_blocks: value.committed_blocks(),
+            committed_blocks: value.latest_committed_blocks(),
             highest_voted_view: Default::default(),
             step_duration: Default::default(),
         }
@@ -344,20 +344,21 @@ impl<
                     "receive block proposal",
                 );
                 match self.engine.receive_block(block.header().clone()) {
-                    Ok(mut new) => {
+                    Ok(new) => {
                         if self.engine.current_view() != new.current_view() {
-                            new = new
-                                .update_overlay(|overlay| {
-                                    let overlay = overlay
-                                        .update_leader_selection(|leader_selection| {
-                                            leader_selection.on_new_block_received(&block)
-                                        })
-                                        .expect("Leader selection update should succeed");
-                                    overlay.update_committees(|committee_membership| {
-                                        committee_membership.on_new_block_received(&block)
-                                    })
-                                })
-                                .unwrap_or(new);
+                            // TODO: Refactor this into a method, use for timeout qc as well
+                            // new = new
+                            //     .update_overlay(|overlay| {
+                            //         let overlay = overlay
+                            //             .update_leader_selection(|leader_selection| {
+                            //                 leader_selection.on_new_block_received(&block)
+                            //             })
+                            //             .expect("Leader selection update should succeed");
+                            //         overlay.update_committees(|committee_membership| {
+                            //             committee_membership.on_new_block_received(&block)
+                            //         })
+                            //     })
+                            //     .unwrap_or(new);
                             self.engine = new;
                         }
                     }
@@ -373,7 +374,7 @@ impl<
 
                 if self.engine.overlay().is_member_of_leaf_committee(self.id) {
                     // Check if we are also a member of the parent committee, this is a special case for the flat committee
-                    let to = if self.engine.overlay().is_child_of_root_committee(self.id) {
+                    let to = if self.engine.overlay().is_member_of_root_committee(self.id) {
                         [self.engine.overlay().next_leader()].into_iter().collect()
                     } else {
                         self.engine.parent_committee().expect(
@@ -440,9 +441,12 @@ impl<
                     timeout_view = %timeout_qc.view(),
                     "receive new view message"
                 );
-                let (new, out) = self.engine.approve_new_view(timeout_qc, new_views);
-                output = Some(Output::Send(out));
-                self.engine = new;
+                // just process timeout if node have not already process it
+                if timeout_qc.view() == self.engine.current_view() {
+                    let (new, out) = self.engine.approve_new_view(timeout_qc, new_views);
+                    output = Some(Output::Send(out));
+                    self.engine = new;
+                }
             }
             Event::TimeoutQc { timeout_qc } => {
                 tracing::info!(
@@ -522,6 +526,8 @@ impl<
             .receive_messages()
             .into_iter()
             .map(NetworkMessage::into_payload)
+            // do not care for older view messages
+            .filter(|m| m.view() >= self.engine.current_view())
             .partition(|m| {
                 m.view() == self.engine.current_view()
                     || matches!(m, CarnotMessage::Proposal(_) | CarnotMessage::TimeoutQc(_))

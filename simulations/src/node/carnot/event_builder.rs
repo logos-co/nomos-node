@@ -25,11 +25,11 @@ pub(crate) struct EventBuilder {
 impl EventBuilder {
     pub fn new(id: NodeId, timeout: Duration) -> Self {
         Self {
-            vote_message: Default::default(),
-            leader_vote_message: Default::default(),
-            timeout_message: Default::default(),
-            leader_new_view_message: Default::default(),
-            new_view_message: Default::default(),
+            vote_message: Tally::new(),
+            leader_vote_message: Tally::new(),
+            timeout_message: Tally::new(),
+            leader_new_view_message: Tally::new(),
+            new_view_message: Tally::new(),
             current_view: View::default(),
             id,
             timeout_handler: TimeoutHandler::new(timeout),
@@ -165,7 +165,11 @@ impl EventBuilder {
                 }
                 CarnotMessage::Timeout(msg) => {
                     let msg_view = msg.vote.view;
-                    if let Some(timeouts) = self.timeout_message.tally(msg_view, msg) {
+                    if let Some(timeouts) = self.timeout_message.tally_by(
+                        msg_view,
+                        msg,
+                        engine.overlay().super_majority_threshold(self.id),
+                    ) {
                         events.push(Event::RootTimeout {
                             timeouts: timeouts.into_iter().map(|v| v.vote).collect(),
                         })
