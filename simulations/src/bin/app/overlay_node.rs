@@ -1,5 +1,6 @@
+use consensus_engine::overlay::RandomBeaconState;
 use consensus_engine::{
-    overlay::{FlatOverlay, RoundRobin, TreeOverlay},
+    overlay::{FlatOverlay, FreezeMembership, RoundRobin, TreeOverlay},
     NodeId,
 };
 use rand::Rng;
@@ -26,37 +27,41 @@ pub fn to_overlay_node<R: Rng>(
                 leader: RoundRobin::new(),
                 leader_super_majority_threshold: None,
             };
-            Box::new(CarnotNode::<FlatOverlay<RoundRobin>>::new(
-                node_id,
-                CarnotSettings::new(
-                    settings.node_settings.timeout,
-                    settings.record_settings.clone(),
+            Box::new(
+                CarnotNode::<FlatOverlay<RoundRobin, FreezeMembership>>::new(
+                    node_id,
+                    CarnotSettings::new(
+                        settings.node_settings.timeout,
+                        settings.record_settings.clone(),
+                    ),
+                    overlay_settings,
+                    genesis,
+                    network_interface,
+                    &mut rng,
                 ),
-                overlay_settings,
-                genesis,
-                network_interface,
-                &mut rng,
-            ))
+            )
         }
         simulations::settings::OverlaySettings::Tree(tree_settings) => {
             let overlay_settings = consensus_engine::overlay::TreeOverlaySettings {
                 nodes,
                 current_leader: leader,
-                entropy: [0; 32],
                 number_of_committees: tree_settings.number_of_committees,
                 leader: RoundRobin::new(),
+                committee_membership: RandomBeaconState::initial_sad_from_entropy([0; 32]),
             };
-            Box::new(CarnotNode::<TreeOverlay<RoundRobin>>::new(
-                node_id,
-                CarnotSettings::new(
-                    settings.node_settings.timeout,
-                    settings.record_settings.clone(),
+            Box::new(
+                CarnotNode::<TreeOverlay<RoundRobin, RandomBeaconState>>::new(
+                    node_id,
+                    CarnotSettings::new(
+                        settings.node_settings.timeout,
+                        settings.record_settings.clone(),
+                    ),
+                    overlay_settings,
+                    genesis,
+                    network_interface,
+                    &mut rng,
                 ),
-                overlay_settings,
-                genesis,
-                network_interface,
-                &mut rng,
-            ))
+            )
         }
     }
 }

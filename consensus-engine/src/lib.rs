@@ -411,11 +411,11 @@ impl<O: Overlay> Carnot<O> {
 mod test {
     use std::convert::Infallible;
 
-    use crate::overlay::{FlatOverlay, FlatOverlaySettings, RoundRobin};
+    use crate::overlay::{FlatOverlay, FlatOverlaySettings, FreezeMembership, RoundRobin};
 
     use super::*;
 
-    fn init(nodes: Vec<NodeId>) -> Carnot<FlatOverlay<RoundRobin>> {
+    fn init(nodes: Vec<NodeId>) -> Carnot<FlatOverlay<RoundRobin, FreezeMembership>> {
         assert!(!nodes.is_empty());
 
         Carnot::from_genesis(
@@ -436,7 +436,10 @@ mod test {
         )
     }
 
-    fn next_block(engine: &Carnot<FlatOverlay<RoundRobin>>, block: &Block) -> Block {
+    fn next_block(
+        engine: &Carnot<FlatOverlay<RoundRobin, FreezeMembership>>,
+        block: &Block,
+    ) -> Block {
         let mut next_id = block.id;
         next_id.0[0] += 1;
 
@@ -454,8 +457,8 @@ mod test {
     }
 
     fn update_leader_selection(
-        engine: &Carnot<FlatOverlay<RoundRobin>>,
-    ) -> Carnot<FlatOverlay<RoundRobin>> {
+        engine: &Carnot<FlatOverlay<RoundRobin, FreezeMembership>>,
+    ) -> Carnot<FlatOverlay<RoundRobin, FreezeMembership>> {
         engine
             .update_overlay(|overlay| {
                 overlay.update_leader_selection(

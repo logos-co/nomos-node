@@ -1,7 +1,7 @@
 mod tx;
 
 use color_eyre::eyre::Result;
-use consensus_engine::overlay::{FlatOverlay, RoundRobin};
+use consensus_engine::overlay::{FlatOverlay, RandomBeaconState, RoundRobin};
 #[cfg(feature = "metrics")]
 use metrics::{backend::map::MapMetricsBackend, types::MetricsData, MetricsService};
 use nomos_consensus::{
@@ -38,7 +38,7 @@ pub type Carnot = CarnotConsensus<
     MockPool<Tx>,
     MempoolWakuAdapter<Tx>,
     MockFountain,
-    FlatOverlay<RoundRobin>,
+    FlatOverlay<RoundRobin, RandomBeaconState>,
 >;
 
 #[derive(Services)]

@@ -1,10 +1,14 @@
 use super::types::*;
 
 mod flat_overlay;
+mod leadership;
+mod membership;
 mod random_beacon;
 mod tree_overlay;
 
 pub use flat_overlay::*;
+pub use leadership::*;
+pub use membership::*;
 pub use random_beacon::*;
 pub use tree_overlay::*;
 
@@ -13,6 +17,7 @@ use std::marker::Send;
 pub trait Overlay: Clone {
     type Settings: Clone + Send + Sync + 'static;
     type LeaderSelection: LeaderSelection + Clone + Send + Sync + 'static;
+    type CommitteeMembership: CommitteeMembership + Clone + Send + Sync + 'static;
 
     fn new(settings: Self::Settings) -> Self;
     fn root_committee(&self) -> Committee;
@@ -31,8 +36,15 @@ pub trait Overlay: Clone {
     fn update_leader_selection<F, E>(&self, f: F) -> Result<Self, E>
     where
         F: FnOnce(Self::LeaderSelection) -> Result<Self::LeaderSelection, E>;
+    fn update_committees<F, E>(&self, f: F) -> Result<Self, E>
+    where
+        F: FnOnce(Self::CommitteeMembership) -> Result<Self::CommitteeMembership, E>;
 }
 
 pub trait LeaderSelection: Clone {
     fn next_leader(&self, nodes: &[NodeId]) -> NodeId;
+}
+
+pub trait CommitteeMembership: Clone {
+    fn reshape_committees(&self, nodes: &mut [NodeId]);
 }

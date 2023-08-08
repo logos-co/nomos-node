@@ -1,5 +1,6 @@
 use std::{collections::HashSet, panic};
 
+use consensus_engine::overlay::FreezeMembership;
 use consensus_engine::{
     overlay::{FlatOverlay, FlatOverlaySettings, RoundRobin},
     *,
@@ -13,7 +14,7 @@ use crate::fuzz::transition::Transition;
 // This is called as SUT (System Under Test).
 #[derive(Clone, Debug)]
 pub struct ConsensusEngineTest {
-    pub engine: Carnot<FlatOverlay<RoundRobin>>,
+    pub engine: Carnot<FlatOverlay<RoundRobin, FreezeMembership>>,
 }
 
 impl ConsensusEngineTest {
