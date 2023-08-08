@@ -1,7 +1,7 @@
 // std
 
 // crates
-use rand::prelude::{SliceRandom, StdRng};
+use rand::prelude::SliceRandom;
 use rand::SeedableRng;
 use rand_chacha::ChaCha20Rng;
 
@@ -19,17 +19,15 @@ impl FisherYatesShuffle {
         Self { entropy }
     }
 
-    pub fn shuffle<T: Clone>(elements: &[T], entropy: [u8; 32]) -> Vec<T> {
-        let mut elements = elements.to_vec();
+    pub fn shuffle<T: Clone>(elements: &mut [T], entropy: [u8; 32]) {
         let mut rng = ChaCha20Rng::from_seed(entropy);
         elements.shuffle(&mut rng);
-        elements
     }
 }
 
 impl CommitteeMembership for FisherYatesShuffle {
-    fn reshape_committees(&self, nodes: &[NodeId]) -> Vec<NodeId> {
-        FisherYatesShuffle::shuffle(nodes, self.entropy)
+    fn reshape_committees(&self, nodes: &mut [NodeId]) {
+        FisherYatesShuffle::shuffle(nodes, self.entropy);
     }
 }
 
@@ -37,7 +35,5 @@ impl CommitteeMembership for FisherYatesShuffle {
 pub struct FreezeMembership;
 
 impl CommitteeMembership for FreezeMembership {
-    fn reshape_committees(&self, nodes: &[NodeId]) -> Vec<NodeId> {
-        nodes.to_vec()
-    }
+    fn reshape_committees(&self, _nodes: &mut [NodeId]) {}
 }

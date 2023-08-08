@@ -108,10 +108,10 @@ impl LeaderSelection for RandomBeaconState {
 }
 
 impl CommitteeMembership for RandomBeaconState {
-    fn reshape_committees(&self, nodes: &[NodeId]) -> Vec<NodeId> {
+    fn reshape_committees(&self, nodes: &mut [NodeId]) {
         let mut seed = [0; 32];
         seed.copy_from_slice(&self.entropy().deref()[..32]);
-        FisherYatesShuffle::shuffle(nodes, seed)
+        FisherYatesShuffle::shuffle(nodes, seed);
     }
 }
 

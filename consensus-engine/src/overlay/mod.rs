@@ -46,5 +46,5 @@ pub trait LeaderSelection: Clone {
 }
 
 pub trait CommitteeMembership: Clone {
-    fn reshape_committees(&self, nodes: &[NodeId]) -> Vec<NodeId>;
+    fn reshape_committees(&self, nodes: &mut [NodeId]);
 }

@@ -33,14 +33,14 @@ where
 
     fn new(settings: Self::Settings) -> Self {
         let TreeOverlaySettings {
-            nodes,
+            mut nodes,
             current_leader,
             number_of_committees,
             leader,
             committee_membership,
         } = settings;
 
-        let nodes = committee_membership.reshape_committees(&nodes);
+        committee_membership.reshape_committees(&mut nodes);
         let carnot_tree = Tree::new(&nodes, number_of_committees);
 
         Self {
