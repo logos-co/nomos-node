@@ -14,6 +14,7 @@ overwatch-rs = { git = "https://github.com/logos-co/Overwatch", branch = "main" 
 nomos-core = { path = "../nomos-core" }
 consensus-engine = { path = "../consensus-engine", features = ["serde"] }
 nomos-mempool = { path = "../nomos-services/mempool", features = ["mock"] }
+mixnet = { path = "../mixnet" }
 rand = "0.8"
 once_cell = "1"
 rand_xoshiro = "0.6"
@@ -39,5 +40,6 @@ path = "src/tests/unhappy.rs"
 
 [features]
 metrics = ["nomos-node/metrics"]
-waku  = ["nomos-network/waku", "nomos-mempool/waku", "waku-bindings"]
+waku = ["nomos-network/waku", "nomos-mempool/waku", "waku-bindings"]
 libp2p = ["nomos-network/libp2p", "nomos-mempool/libp2p", "nomos-libp2p"]
+

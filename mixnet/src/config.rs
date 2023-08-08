@@ -6,11 +6,11 @@ use std::{
 use nym_sphinx_addressing::nodes::NymNodeRoutingAddress;
 use serde::{Deserialize, Serialize};
 use sphinx_packet::{
-    crypto::{PrivateKey, PRIVATE_KEY_SIZE, PUBLIC_KEY_SIZE},
+    crypto::{PrivateKey, PublicKey, PRIVATE_KEY_SIZE, PUBLIC_KEY_SIZE},
     route::{self},
 };
 
-#[derive(Clone)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Config {
     pub listen_address: SocketAddr,
     // An external address known to be (likely) reachable for other nodes
@@ -27,15 +27,28 @@ impl Default for Config {
             listen_address: SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 7777),
             external_address: SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 7777),
             private_key: PrivateKey::new().to_bytes(),
-            topology: HashMap::new(),
+            topology: Default::default(),
             num_hops: 3,
         }
     }
 }
 
-pub type Topology = HashMap<[u8; PUBLIC_KEY_SIZE], MixNode>;
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
+pub struct Topology {
+    pub nodes: HashMap<[u8; PUBLIC_KEY_SIZE], MixNode>,
+}
 
-#[derive(Clone, Serialize, Deserialize)]
+impl From<Vec<MixNode>> for Topology {
+    fn from(nodes: Vec<MixNode>) -> Self {
+        let mut map: HashMap<[u8; PUBLIC_KEY_SIZE], MixNode> = HashMap::new();
+        for node in nodes {
+            map.insert(node.public_key, node);
+        }
+        Self { nodes: map }
+    }
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct MixNode {
     pub public_key: [u8; PUBLIC_KEY_SIZE],
     pub addr: SocketAddr,
@@ -54,6 +67,13 @@ impl TryInto<route::Node> for MixNode {
 }
 
 impl MixNode {
+    pub fn new(private_key: [u8; PRIVATE_KEY_SIZE], addr: SocketAddr) -> Self {
+        Self {
+            public_key: *PublicKey::from(&PrivateKey::from(private_key)).as_bytes(),
+            addr,
+        }
+    }
+
     pub fn as_bytes(&self) -> Box<[u8]> {
         wire::serialize(self).unwrap().into_boxed_slice()
     }

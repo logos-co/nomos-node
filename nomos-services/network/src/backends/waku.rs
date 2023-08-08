@@ -3,10 +3,11 @@ use std::fmt::Formatter;
 use std::future::Future;
 // crates
 use futures::Stream;
+use mixnet::{config::MixNode, Mixnet};
 use serde::{Deserialize, Serialize};
 use tokio::sync::{
     broadcast::{self, Receiver, Sender},
-    oneshot,
+    mpsc, oneshot,
 };
 use tokio_stream::wrappers::UnboundedReceiverStream;
 use tracing::{debug, error};
@@ -18,8 +19,8 @@ use waku_bindings::*;
 const BROADCAST_CHANNEL_BUF: usize = 16;
 
 pub struct Waku {
-    waku: WakuNodeHandle<Running>,
     message_event: Sender<NetworkEvent>,
+    backend_message_tx: mpsc::Sender<WakuBackendMessage>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -33,6 +34,7 @@ pub struct WakuConfig {
     #[serde(flatten)]
     pub inner: WakuNodeConfig,
     pub initial_peers: Vec<Multiaddr>,
+    pub mixnet: mixnet::config::Config, //TODO: make this optional
 }
 
 /// Interaction with Waku node
@@ -123,39 +125,18 @@ pub enum NetworkEvent {
     RawMessage(WakuMessage),
 }
 
-impl Waku {
-    pub fn waku_store_query_stream(
-        &self,
-        mut query: StoreQuery,
-    ) -> (
-        impl Stream<Item = WakuMessage>,
-        impl Future<Output = ()> + '_,
-    ) {
-        let (sender, receiver) = tokio::sync::mpsc::unbounded_channel();
-        let task = async move {
-            while let Ok(StoreResponse {
-                messages,
-                paging_options,
-            }) = self.waku.local_store_query(&query)
-            {
-                // send messages
-                for message in messages {
-                    // this could fail if the receiver is dropped
-                    // break out of the loop in that case
-                    if sender.send(message).is_err() {
-                        break;
-                    }
-                }
-                // stop queries if we do not have any more pages
-                if let Some(paging_options) = paging_options {
-                    query.paging_options = Some(paging_options);
-                } else {
-                    break;
-                }
-            }
-        };
-        (UnboundedReceiverStream::new(receiver), task)
-    }
+const BACKEND_MSG_CHANNEL_SIZE: usize = 100;
+
+const MIXNET_CHANNEL_SIZE: usize = 100;
+const MIXNET_TOPOLOGY_CHANNEL_SIZE: usize = 3;
+
+// NOTE: MixnetMessage is to be serialized as JSON
+// because 'wire' serialization fails with an error(SequenceMustHaveLength)
+// due to #[serde(flatten)] in WakuMessage.
+#[derive(Debug, Serialize, Deserialize, Clone)]
+struct MixnetMessage {
+    message: WakuMessage,
+    topic: Option<WakuPubSubTopic>,
 }
 
 #[async_trait::async_trait]
@@ -166,7 +147,7 @@ impl NetworkBackend for Waku {
     type EventKind = EventKind;
     type NetworkEvent = NetworkEvent;
 
-    fn new(mut config: Self::Settings, _: OverwatchHandle) -> Self {
+    fn new(mut config: Self::Settings, overwatch_handle: OverwatchHandle) -> Self {
         // set store protocol to active at all times
         config.inner.store = Some(true);
         let waku = waku_new(Some(config.inner)).unwrap().start().unwrap();
@@ -191,109 +172,64 @@ impl NetworkBackend for Waku {
             }
             _ => tracing::warn!("unsupported event"),
         });
+
+        let (mixnet_outbound_msg_tx, mixnet_outbound_msg_rx) =
+            mpsc::channel::<mixnet::Message>(MIXNET_CHANNEL_SIZE);
+        let (mixnet_inbound_msg_tx, mut mixnet_inbound_msg_rx) =
+            broadcast::channel::<mixnet::Message>(MIXNET_CHANNEL_SIZE);
+        let (_mixnet_mixnode_tx, mixnet_mixnode_rx) =
+            mpsc::channel::<MixNode>(MIXNET_TOPOLOGY_CHANNEL_SIZE);
+        let mixnet = Mixnet::new(
+            config.mixnet,
+            mixnet_outbound_msg_rx,
+            mixnet_inbound_msg_tx,
+            mixnet_mixnode_rx,
+        );
+
+        overwatch_handle.runtime().spawn(async move {
+            if let Err(e) = mixnet.run().await {
+                tracing::error!("error from mixnet: {e}");
+            }
+        });
+
+        let (backend_message_tx, mut backend_message_rx) = mpsc::channel(BACKEND_MSG_CHANNEL_SIZE);
+
+        overwatch_handle.runtime().spawn(async move {
+            loop {
+                tokio::select! {
+                    Some(msg) = backend_message_rx.recv() => {
+                        handle_backend_message(&waku, msg, mixnet_outbound_msg_tx.clone()).await;
+                    }
+                    Ok(msg) = mixnet_inbound_msg_rx.recv() => {
+                        let MixnetMessage { message, topic } = serde_json::from_slice(&msg).unwrap();
+                        tracing::debug!("received MixnetMessage from mixnet: {message:?} {topic:?}");
+
+                        match waku.relay_publish_message(&message, topic, None) {
+                            Ok(id) => debug!(
+                                "successfully broadcast message with id: {id}, raw contents: {:?}",
+                                message.payload()
+                            ),
+                            Err(e) => tracing::error!(
+                                "could not broadcast message due to {e}, raw contents {:?}",
+                                message.payload()
+                            ),
+                        }
+                    }
+                    //TODO: periodically broadcast mixnode information
+                }
+            }
+        });
+
         Self {
-            waku,
             message_event,
+            backend_message_tx,
         }
     }
 
     async fn process(&self, msg: Self::Message) {
-        match msg {
-            WakuBackendMessage::Broadcast { message, topic } => {
-                match self.waku.relay_publish_message(&message, topic, None) {
-                    Ok(id) => debug!(
-                        "successfully broadcast message with id: {id}, raw contents: {:?}",
-                        message.payload()
-                    ),
-                    Err(e) => tracing::error!(
-                        "could not broadcast message due to {e}, raw contents {:?}",
-                        message.payload()
-                    ),
-                }
-            }
-            WakuBackendMessage::ConnectPeer { addr } => {
-                match self.waku.connect_peer_with_address(&addr, None) {
-                    Ok(_) => debug!("successfully connected to {addr}"),
-                    Err(e) => {
-                        tracing::warn!("Could not connect to {addr}: {e}");
-                    }
-                }
-            }
-            WakuBackendMessage::LightpushPublish {
-                message,
-                topic,
-                peer_id,
-            } => match self.waku.lightpush_publish(&message, topic, peer_id, None) {
-                Ok(id) => debug!(
-                    "successfully published lighpush message with id: {id}, raw contents: {:?}",
-                    message.payload()
-                ),
-                Err(e) => tracing::error!(
-                    "could not publish lightpush message due to {e}, raw contents {:?}",
-                    message.payload()
-                ),
-            },
-            WakuBackendMessage::RelaySubscribe { topic } => {
-                match self.waku.relay_subscribe(Some(topic.clone())) {
-                    Ok(_) => debug!("successfully subscribed to topic {:?}", topic),
-                    Err(e) => {
-                        tracing::error!("could not subscribe to topic {:?} due to {e}", topic)
-                    }
-                }
-            }
-            WakuBackendMessage::RelayUnsubscribe { topic } => {
-                match self.waku.relay_unsubscribe(Some(topic.clone())) {
-                    Ok(_) => debug!("successfully unsubscribed to topic {:?}", topic),
-                    Err(e) => {
-                        tracing::error!("could not unsubscribe to topic {:?} due to {e}", topic)
-                    }
-                }
-            }
-            WakuBackendMessage::StoreQuery {
-                query,
-                peer_id,
-                reply_channel,
-            } => match self.waku.store_query(&query, &peer_id, None) {
-                Ok(res) => {
-                    debug!(
-                        "successfully retrieved stored messages with options {:?}",
-                        query
-                    );
-                    reply_channel
-                        .send(res)
-                        .unwrap_or_else(|_| error!("client hung up store query handle"));
-                }
-                Err(e) => {
-                    error!(
-                        "could not retrieve store messages due to {e}, options: {:?}",
-                        query
-                    )
-                }
-            },
-            WakuBackendMessage::Info { reply_channel } => {
-                let listen_addresses = self.waku.listen_addresses().ok();
-                let peer_id = self.waku.peer_id().ok();
-                if reply_channel
-                    .send(WakuInfo {
-                        listen_addresses,
-                        peer_id,
-                    })
-                    .is_err()
-                {
-                    error!("could not send waku info");
-                }
-            }
-            WakuBackendMessage::ArchiveSubscribe {
-                reply_channel,
-                query,
-            } => {
-                let (stream, task) = self.waku_store_query_stream(query);
-                if reply_channel.send(Box::new(stream)).is_err() {
-                    error!("could not send archive subscribe stream");
-                }
-                task.await;
-            }
-        };
+        if let Err(e) = self.backend_message_tx.send(msg).await {
+            tracing::error!("failed to send backend_message to waku: {e:?}");
+        }
     }
 
     async fn subscribe(&mut self, kind: Self::EventKind) -> Receiver<Self::NetworkEvent> {
@@ -304,4 +240,137 @@ impl NetworkBackend for Waku {
             }
         }
     }
+}
+
+async fn handle_backend_message(
+    waku: &WakuNodeHandle<Running>,
+    msg: WakuBackendMessage,
+    mixnet_outbound_msg_tx: mpsc::Sender<mixnet::Message>,
+) {
+    match msg {
+        WakuBackendMessage::Broadcast { message, topic } => {
+            tracing::debug!("sending MixnetMessage to mixnet");
+            let msg = MixnetMessage { message, topic };
+            let json_msg = serde_json::to_vec(&msg).unwrap();
+
+            if let Err(e) = mixnet_outbound_msg_tx.send(json_msg.into()).await {
+                tracing::error!("failed to send msg to mixnet: {e}");
+            }
+        }
+        WakuBackendMessage::ConnectPeer { addr } => {
+            match waku.connect_peer_with_address(&addr, None) {
+                Ok(_) => debug!("successfully connected to {addr}"),
+                Err(e) => {
+                    tracing::warn!("Could not connect to {addr}: {e}");
+                }
+            }
+        }
+        WakuBackendMessage::LightpushPublish {
+            message,
+            topic,
+            peer_id,
+        } => match waku.lightpush_publish(&message, topic, peer_id, None) {
+            Ok(id) => debug!(
+                "successfully published lighpush message with id: {id}, raw contents: {:?}",
+                message.payload()
+            ),
+            Err(e) => tracing::error!(
+                "could not publish lightpush message due to {e}, raw contents {:?}",
+                message.payload()
+            ),
+        },
+        WakuBackendMessage::RelaySubscribe { topic } => {
+            match waku.relay_subscribe(Some(topic.clone())) {
+                Ok(_) => debug!("successfully subscribed to topic {:?}", topic),
+                Err(e) => {
+                    tracing::error!("could not subscribe to topic {:?} due to {e}", topic)
+                }
+            }
+        }
+        WakuBackendMessage::RelayUnsubscribe { topic } => {
+            match waku.relay_unsubscribe(Some(topic.clone())) {
+                Ok(_) => debug!("successfully unsubscribed to topic {:?}", topic),
+                Err(e) => {
+                    tracing::error!("could not unsubscribe to topic {:?} due to {e}", topic)
+                }
+            }
+        }
+        WakuBackendMessage::StoreQuery {
+            query,
+            peer_id,
+            reply_channel,
+        } => match waku.store_query(&query, &peer_id, None) {
+            Ok(res) => {
+                debug!(
+                    "successfully retrieved stored messages with options {:?}",
+                    query
+                );
+                reply_channel
+                    .send(res)
+                    .unwrap_or_else(|_| error!("client hung up store query handle"));
+            }
+            Err(e) => {
+                error!(
+                    "could not retrieve store messages due to {e}, options: {:?}",
+                    query
+                )
+            }
+        },
+        WakuBackendMessage::Info { reply_channel } => {
+            let listen_addresses = waku.listen_addresses().ok();
+            let peer_id = waku.peer_id().ok();
+            if reply_channel
+                .send(WakuInfo {
+                    listen_addresses,
+                    peer_id,
+                })
+                .is_err()
+            {
+                error!("could not send waku info");
+            }
+        }
+        WakuBackendMessage::ArchiveSubscribe {
+            reply_channel,
+            query,
+        } => {
+            let (stream, task) = waku_store_query_stream(waku, query);
+            if reply_channel.send(Box::new(stream)).is_err() {
+                error!("could not send archive subscribe stream");
+            }
+            task.await;
+        }
+    };
+}
+
+fn waku_store_query_stream(
+    waku: &WakuNodeHandle<Running>,
+    mut query: StoreQuery,
+) -> (
+    impl Stream<Item = WakuMessage>,
+    impl Future<Output = ()> + '_,
+) {
+    let (sender, receiver) = tokio::sync::mpsc::unbounded_channel();
+    let task = async move {
+        while let Ok(StoreResponse {
+            messages,
+            paging_options,
+        }) = waku.local_store_query(&query)
+        {
+            // send messages
+            for message in messages {
+                // this could fail if the receiver is dropped
+                // break out of the loop in that case
+                if sender.send(message).is_err() {
+                    break;
+                }
+            }
+            // stop queries if we do not have any more pages
+            if let Some(paging_options) = paging_options {
+                query.paging_options = Some(paging_options);
+            } else {
+                break;
+            }
+        }
+    };
+    (UnboundedReceiverStream::new(receiver), task)
 }

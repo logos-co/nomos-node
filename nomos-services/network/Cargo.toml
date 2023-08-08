@@ -28,6 +28,7 @@ parking_lot = "0.12"
 wire = { path = "../../wire" }
 nomos-libp2p = { path = "../../nomos-libp2p", optional = true }
 mixnet = { path = "../../mixnet" }
+serde_json = "1.0.104"
 
 [dev-dependencies]
 tokio = { version = "1", features = ["full"] }

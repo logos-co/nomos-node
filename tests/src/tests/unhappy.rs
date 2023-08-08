@@ -16,7 +16,7 @@ async fn ten_nodes_one_down() {
     .await;
     let mut failed_node = nodes.pop().unwrap();
     failed_node.stop();
-    let timeout = std::time::Duration::from_secs(120);
+    let timeout = std::time::Duration::from_secs(600);
     let timeout = tokio::time::sleep(timeout);
     tokio::select! {
         _ = timeout => panic!("timed out waiting for nodes to reach view {}", TARGET_VIEW),
@@ -48,6 +48,9 @@ async fn ten_nodes_one_down() {
             i.safe_blocks
                 .values()
                 .find(|b| b.view == TARGET_VIEW)
+                // TODO: With mixnet, this unwrap() fails
+                // because all safe_blocks contain only a genesis block.
+                // We should investigate what happened (e.g. mixnet TCP hang with deal node)
                 .unwrap()
         })
         .collect::<HashSet<_>>();

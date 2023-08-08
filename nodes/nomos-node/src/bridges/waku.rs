@@ -4,7 +4,6 @@ use tokio::sync::mpsc::Sender;
 use tokio::sync::oneshot;
 // internal
 use futures::future::join_all;
-use nomos_core::wire;
 use nomos_http::http::HttpResponse;
 use nomos_mempool::network::adapters::waku::{
     WAKU_CARNOT_PUB_SUB_TOPIC, WAKU_CARNOT_TX_CONTENT_TOPIC,

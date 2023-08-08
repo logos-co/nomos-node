@@ -1,11 +1,12 @@
 // std
-use std::net::SocketAddr;
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::process::{Child, Command, Stdio};
 use std::time::Duration;
 // internal
 use crate::{get_available_port, Node, SpawnConfig, RNG};
 use consensus_engine::overlay::{FlatOverlaySettings, RoundRobin};
 use consensus_engine::NodeId;
+use mixnet::config::MixNode;
 use nomos_consensus::{CarnotInfo, CarnotSettings};
 use nomos_http::backends::axum::AxumBackendSettings;
 #[cfg(feature = "libp2p")]
@@ -187,7 +188,27 @@ impl Node for NomosNode {
                         )
                     })
                     .collect::<Vec<_>>();
+
+                // Populate mixnet topology into configs
+                let mixnodes: Vec<MixNode> = configs
+                    .iter()
+                    .map(|c| {
+                        MixNode::new(
+                            c.network.backend.mixnet.private_key,
+                            c.network.backend.mixnet.external_address,
+                        )
+                    })
+                    .collect();
+                for conf in configs.iter_mut() {
+                    let mut mixnodes = mixnodes.clone();
+                    mixnodes.retain(|mixnode| {
+                        mixnode.addr != conf.network.backend.mixnet.external_address
+                    });
+                    conf.network.backend.mixnet.topology = mixnodes.into();
+                }
+
                 let mut nodes = vec![Self::spawn(configs.swap_remove(0)).await];
+
                 let listening_addr = nodes[0].get_listening_address().await;
                 for mut conf in configs {
                     conf.network
@@ -196,6 +217,7 @@ impl Node for NomosNode {
                         .push(listening_addr.clone());
                     nodes.push(Self::spawn(conf).await);
                 }
+
                 nodes
             }
         }
@@ -221,12 +243,28 @@ fn create_node_config(
     threshold: Fraction,
     timeout: Duration,
 ) -> Config {
+    let mixnet_port = get_available_port();
+
     let mut config = Config {
         network: NetworkConfig {
             #[cfg(feature = "waku")]
             backend: WakuConfig {
                 initial_peers: vec![],
                 inner: Default::default(),
+                mixnet: mixnet::config::Config {
+                    listen_address: SocketAddr::new(
+                        IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)),
+                        mixnet_port,
+                    ),
+                    external_address: SocketAddr::new(
+                        IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
+                        mixnet_port,
+                    ),
+                    // TODO: use a different private key for NodeId <> MixNode unlinkability
+                    private_key,
+                    topology: Default::default(),
+                    num_hops: 3,
+                },
             },
             #[cfg(feature = "libp2p")]
             backend: SwarmConfig {

@@ -92,7 +92,7 @@ impl Mixnet {
                 }
                 Some(mixnode) = self.mixnode_rx.recv() => {
                     tracing::debug!("mixnode received");
-                    self.topology.insert(mixnode.public_key, mixnode);
+                    self.topology.nodes.insert(mixnode.public_key, mixnode);
                 }
             }
         }
@@ -103,10 +103,12 @@ impl Mixnet {
         private_key: PrivateKey,
         inbound_msg_tx: broadcast::Sender<Message>,
     ) -> Result<(), Box<dyn Error>> {
+        tracing::debug!("handling connection");
         let packet_size = socket.read_u64().await?;
         let mut buf = vec![0; packet_size as usize]; // TODO: handle u64 -> usize failure
         socket.read_exact(&mut buf).await?;
         let packet = SphinxPacket::from_bytes(&buf)?;
+        tracing::debug!("received a Sphinx packet from the TCP conn");
 
         match packet.process(&private_key)? {
             ProcessedPacket::ForwardHop(packet, next_node_addr, delay) => {
@@ -123,6 +125,7 @@ impl Mixnet {
         next_node_addr: NodeAddressBytes,
         delay: Delay,
     ) -> Result<(), Box<dyn Error>> {
+        tracing::debug!("Delaying the packet for {delay:?}");
         tokio::time::sleep(delay.to_duration()).await;
         Self::send_packet(packet, next_node_addr).await
     }
@@ -131,6 +134,7 @@ impl Mixnet {
         payload: Payload,
         inbound_msg_tx: broadcast::Sender<Message>,
     ) -> Result<(), Box<dyn Error>> {
+        tracing::debug!("Sending the packet to the local");
         let message: Message = payload.recover_plaintext()?.into_boxed_slice();
         inbound_msg_tx.send(message)?;
         Ok(())
@@ -141,6 +145,7 @@ impl Mixnet {
         topology: Topology,
         num_hops: usize,
     ) -> Result<(), Box<dyn Error>> {
+        tracing::debug!("Building a Sphinx packet: {num_hops}");
         let (packet, first_node) = Self::build_sphinx_packet(msg, topology, num_hops)?;
         Self::send_packet(Box::new(packet), first_node.address).await
     }
@@ -151,6 +156,7 @@ impl Mixnet {
         num_hops: usize,
     ) -> Result<(sphinx_packet::SphinxPacket, route::Node), Box<dyn Error>> {
         let route: Vec<route::Node> = topology
+            .nodes
             .values()
             .choose_multiple(&mut OsRng, num_hops)
             .iter()
@@ -181,11 +187,13 @@ impl Mixnet {
         addr: NodeAddressBytes,
     ) -> Result<(), Box<dyn Error>> {
         let addr = SocketAddr::try_from(NymNodeRoutingAddress::try_from(addr)?)?;
+        tracing::debug!("Sending a Sphinx packet to the node: {addr:?}");
 
         let mut socket = TcpStream::connect(addr).await?;
 
         socket.write_u64(packet.len() as u64).await?;
         socket.write_all(&packet.to_bytes()).await?;
+        tracing::debug!("Sent a Sphinx packet successuflly to the node: {addr:?}");
 
         Ok(())
     }
