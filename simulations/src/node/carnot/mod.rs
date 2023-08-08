@@ -346,18 +346,19 @@ impl<
                 match self.engine.receive_block(block.header().clone()) {
                     Ok(mut new) => {
                         if self.engine.current_view() != new.current_view() {
-                            new = new
-                                .update_overlay(|overlay| {
-                                    let overlay = overlay
-                                        .update_leader_selection(|leader_selection| {
-                                            leader_selection.on_new_block_received(&block)
-                                        })
-                                        .expect("Leader selection update should succeed");
-                                    overlay.update_committees(|committee_membership| {
-                                        committee_membership.on_new_block_received(&block)
-                                    })
-                                })
-                                .unwrap_or(new);
+                            // TODO: Refactor this into a method, use for timeout qc as well
+                            // new = new
+                            //     .update_overlay(|overlay| {
+                            //         let overlay = overlay
+                            //             .update_leader_selection(|leader_selection| {
+                            //                 leader_selection.on_new_block_received(&block)
+                            //             })
+                            //             .expect("Leader selection update should succeed");
+                            //         overlay.update_committees(|committee_membership| {
+                            //             committee_membership.on_new_block_received(&block)
+                            //         })
+                            //     })
+                            //     .unwrap_or(new);
                             self.engine = new;
                         }
                     }
@@ -373,7 +374,7 @@ impl<
 
                 if self.engine.overlay().is_member_of_leaf_committee(self.id) {
                     // Check if we are also a member of the parent committee, this is a special case for the flat committee
-                    let to = if self.engine.overlay().is_child_of_root_committee(self.id) {
+                    let to = if self.engine.overlay().is_member_of_root_committee(self.id) {
                         [self.engine.overlay().next_leader()].into_iter().collect()
                     } else {
                         self.engine.parent_committee().expect(
