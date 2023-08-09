@@ -230,9 +230,9 @@ impl NetworkAdapter for Libp2pAdapter {
         let message_cache = MessageCache::new();
         let cache = message_cache.clone();
         let relay = network_relay.clone();
+        Self::subscribe(&relay, TOPIC).await;
         // TODO: maybe we need the runtime handle here?
         tokio::spawn(async move {
-            Self::subscribe(&relay, TOPIC).await;
             let (sender, receiver) = tokio::sync::oneshot::channel();
             if let Err((e, _)) = relay
                 .send(NetworkMsg::Subscribe {

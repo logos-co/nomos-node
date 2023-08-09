@@ -16,21 +16,13 @@ http = "0.2.9"
 overwatch-rs = { git = "https://github.com/logos-co/Overwatch", branch = "main" }
 overwatch-derive = { git = "https://github.com/logos-co/Overwatch", branch = "main" }
 tracing = "0.1"
-multiaddr = "0.17"
+multiaddr = "0.18"
 nomos-core = { path = "../../nomos-core" }
-nomos-network = { path = "../../nomos-services/network", features = [
-  "waku",
-  "libp2p",
-] }
+nomos-network = { path = "../../nomos-services/network" }
 nomos-log = { path = "../../nomos-services/log" }
-nomos-mempool = { path = "../../nomos-services/mempool", features = [
-  "waku",
-  "mock",
-] }
+nomos-mempool = { path = "../../nomos-services/mempool", features = ["mock"] }
 nomos-http = { path = "../../nomos-services/http", features = ["http"] }
-nomos-consensus = { path = "../../nomos-services/consensus", features = [
-  "waku",
-] }
+nomos-consensus = { path = "../../nomos-services/consensus" }
 metrics = { path = "../../nomos-services/metrics", optional = true }
 tracing-subscriber = "0.3"
 consensus-engine = { path = "../../consensus-engine" }
@@ -39,4 +31,10 @@ serde_json = "1.0"
 serde_yaml = "0.9"
 color-eyre = "0.6.0"
 serde = "1"
-waku-bindings = "0.1.1"
+waku-bindings = { version = "0.1.1", optional = true }
+
+
+[features]
+default = ["waku"]
+waku = ["waku-bindings", "nomos-network/waku", "nomos-mempool/waku", "nomos-consensus/waku"]
+libp2p = ["nomos-network/libp2p", "nomos-mempool/libp2p", "nomos-consensus/libp2p"]

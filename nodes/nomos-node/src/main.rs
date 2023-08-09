@@ -21,10 +21,12 @@ fn main() -> Result<()> {
     let config = serde_yaml::from_reader::<_, Config>(std::fs::File::open(config)?)?;
     let bridges: Vec<HttpBridge> = vec![
         Arc::new(Box::new(bridges::carnot_info_bridge)),
-        Arc::new(Box::new(bridges::mempool_add_tx_bridge)),
         Arc::new(Box::new(bridges::mempool_metrics_bridge)),
+        Arc::new(Box::new(bridges::network_info_bridge)),
+        #[cfg(feature = "waku")]
+        Arc::new(Box::new(bridges::mempool_add_tx_bridge)),
+        #[cfg(feature = "waku")]
         Arc::new(Box::new(bridges::waku_add_conn_bridge)),
-        Arc::new(Box::new(bridges::waku_info_bridge)),
     ];
     let app = OverwatchRunner::<Nomos>::run(
         NomosServiceSettings {
