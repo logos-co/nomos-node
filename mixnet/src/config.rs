@@ -3,7 +3,7 @@ use std::{
     net::{IpAddr, Ipv4Addr, SocketAddr},
 };
 
-use nym_sphinx_addressing::nodes::NymNodeRoutingAddress;
+use nym_sphinx::addressing::nodes::NymNodeRoutingAddress;
 use serde::{Deserialize, Serialize};
 use sphinx_packet::{
     crypto::{PrivateKey, PublicKey, PRIVATE_KEY_SIZE, PUBLIC_KEY_SIZE},
