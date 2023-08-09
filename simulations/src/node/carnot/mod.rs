@@ -533,6 +533,8 @@ impl<
                     || matches!(m, CarnotMessage::Proposal(_) | CarnotMessage::TimeoutQc(_))
             });
         self.message_cache.prune(self.engine.current_view().prev());
+        self.event_builder
+            .prune_by_view(self.engine.current_view().prev());
         self.message_cache.update(other_view_messages);
         current_view_messages.append(&mut self.message_cache.retrieve(self.engine.current_view()));
 
