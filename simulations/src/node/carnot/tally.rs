@@ -24,6 +24,6 @@ impl<T: core::hash::Hash + Eq + Clone> Tally<T> {
     }
 
     pub fn prune(&mut self, view: View) {
-        self.cache.retain(|v| v > &view);
+        self.cache.retain(|v, _| v > &view);
     }
 }
