@@ -57,10 +57,6 @@ where
         self.carnot_tree.root_committee().clone()
     }
 
-    fn rebuild(&mut self, _timeout_qc: crate::TimeoutQc) {
-        // do nothing for now
-    }
-
     fn is_member_of_child_committee(&self, parent: NodeId, child: NodeId) -> bool {
         let child_parent = self.parent_committee(child);
         let parent = self.carnot_tree.committee_by_member_id(&parent);
