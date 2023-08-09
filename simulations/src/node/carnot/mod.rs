@@ -344,21 +344,9 @@ impl<
                     "receive block proposal",
                 );
                 match self.engine.receive_block(block.header().clone()) {
-                    Ok(new) => {
+                    Ok(mut new) => {
                         if self.engine.current_view() != new.current_view() {
-                            // TODO: Refactor this into a method, use for timeout qc as well
-                            // new = new
-                            //     .update_overlay(|overlay| {
-                            //         let overlay = overlay
-                            //             .update_leader_selection(|leader_selection| {
-                            //                 leader_selection.on_new_block_received(&block)
-                            //             })
-                            //             .expect("Leader selection update should succeed");
-                            //         overlay.update_committees(|committee_membership| {
-                            //             committee_membership.on_new_block_received(&block)
-                            //         })
-                            //     })
-                            //     .unwrap_or(new);
+                            new = Self::update_overlay_with_block(new, &block);
                             self.engine = new;
                         }
                     }
@@ -455,7 +443,8 @@ impl<
                     timeout_view = %timeout_qc.view(),
                     "receive timeout qc message"
                 );
-                self.engine = self.engine.receive_timeout_qc(timeout_qc);
+                let new = self.engine.receive_timeout_qc(timeout_qc.clone());
+                self.engine = Self::update_overlay_with_timeout_qc(new, &timeout_qc);
             }
             Event::RootTimeout { timeouts } => {
                 tracing::debug!("root timeout {:?}", timeouts);
@@ -493,6 +482,39 @@ impl<
         if let Some(event) = output {
             self.handle_output(event);
         }
+    }
+
+    fn update_overlay_with_block<Tx: Clone + Eq + Hash>(
+        state: Carnot<O>,
+        block: &nomos_core::block::Block<Tx>,
+    ) -> Carnot<O> {
+        state
+            .update_overlay(|overlay| {
+                overlay
+                    .update_leader_selection(|leader_selection| {
+                        leader_selection.on_new_block_received(block)
+                    })
+                    .expect("Leader selection update should succeed")
+                    .update_committees(|committee_membership| {
+                        committee_membership.on_new_block_received(block)
+                    })
+            })
+            .unwrap_or(state)
+    }
+
+    fn update_overlay_with_timeout_qc(state: Carnot<O>, qc: &TimeoutQc) -> Carnot<O> {
+        state
+            .update_overlay(|overlay| {
+                overlay
+                    .update_leader_selection(|leader_selection| {
+                        leader_selection.on_timeout_qc_received(qc)
+                    })
+                    .expect("Leader selection update should succeed")
+                    .update_committees(|committee_membership| {
+                        committee_membership.on_timeout_qc_received(qc)
+                    })
+            })
+            .unwrap_or(state)
     }
 }
 
