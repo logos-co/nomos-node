@@ -38,7 +38,7 @@ pub struct TreeSettings {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct BranchSettings {
-    pub number_of_levels: usize,
+    pub branch_depth: usize,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]

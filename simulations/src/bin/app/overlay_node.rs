@@ -67,7 +67,7 @@ pub fn to_overlay_node<R: Rng>(
             let overlay_settings = consensus_engine::overlay::BranchOverlaySettings {
                 nodes,
                 current_leader: leader,
-                number_of_levels: branch_settings.number_of_levels,
+                branch_depth: branch_settings.branch_depth,
                 leader: RoundRobin::new(),
                 committee_membership: RandomBeaconState::initial_sad_from_entropy([0; 32]),
             };

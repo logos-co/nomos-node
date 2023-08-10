@@ -7,7 +7,7 @@ use std::collections::HashMap;
 pub struct BranchOverlaySettings<L: LeaderSelection, M: CommitteeMembership> {
     pub nodes: Vec<NodeId>,
     pub current_leader: NodeId,
-    pub number_of_levels: usize,
+    pub branch_depth: usize,
     pub leader: L,
     pub committee_membership: M,
 }
@@ -37,21 +37,21 @@ where
         let BranchOverlaySettings {
             nodes,
             current_leader,
-            number_of_levels,
+            branch_depth,
             leader,
             committee_membership,
         } = settings;
         let (inner_committees, membership_committees) =
-            build_committee_from_nodes_with_size(&nodes, number_of_levels);
+            build_committee_from_nodes_with_size(&nodes, branch_depth);
 
-        assert!(number_of_levels == inner_committees.len());
+        assert!(branch_depth == inner_committees.len());
 
         let committees_by_member = membership_committees
             .iter()
             .flat_map(|(committee, members)| members.iter().map(|member| (*member, *committee)))
             .collect();
         Self {
-            number_of_committees: number_of_levels,
+            number_of_committees: branch_depth,
             nodes,
             current_leader,
             leader,
@@ -63,10 +63,6 @@ where
 
     fn root_committee(&self) -> Committee {
         self.membership_committees[&0].clone()
-    }
-
-    fn rebuild(&mut self, _timeout_qc: crate::TimeoutQc) {
-        // do nothing for now
     }
 
     fn is_member_of_child_committee(&self, parent: NodeId, child: NodeId) -> bool {
@@ -152,7 +148,7 @@ where
             let settings = BranchOverlaySettings {
                 nodes: self.nodes.clone(),
                 current_leader: self.current_leader,
-                number_of_levels: self.number_of_committees,
+                branch_depth: self.number_of_committees,
                 leader: self.leader.clone(),
                 committee_membership,
             };
@@ -168,13 +164,9 @@ fn build_committee_from_nodes_with_size(
     let committee_size = nodes.len() / number_of_committees;
     let remainder = nodes.len() % number_of_committees;
 
-    let mut committees: Vec<Committee> = (0..number_of_committees)
-        .map(|n| {
-            nodes[n * committee_size..(n + 1) * committee_size]
-                .iter()
-                .cloned()
-                .collect()
-        })
+    let mut committees: Vec<Committee> = nodes
+        .chunks_exact(committee_size)
+        .map(|chunk| chunk.iter().cloned().collect())
         .collect();
 
     // Refill committees with extra nodes
@@ -206,7 +198,7 @@ mod tests {
         let overlay = BranchOverlay::new(BranchOverlaySettings {
             current_leader: nodes[0],
             nodes,
-            number_of_levels: 3,
+            branch_depth: 3,
             leader: RoundRobin::new(),
             committee_membership: FisherYatesShuffle::new(ENTROPY),
         });
@@ -224,7 +216,7 @@ mod tests {
         let overlay = BranchOverlay::new(BranchOverlaySettings {
             current_leader: nodes[0],
             nodes,
-            number_of_levels: 3,
+            branch_depth: 3,
             leader: RoundRobin::new(),
             committee_membership: FisherYatesShuffle::new(ENTROPY),
         });
@@ -252,7 +244,7 @@ mod tests {
         let overlay = BranchOverlay::new(BranchOverlaySettings {
             current_leader: nodes[0],
             nodes,
-            number_of_levels: 4,
+            branch_depth: 4,
             leader: RoundRobin::new(),
             committee_membership: FisherYatesShuffle::new(ENTROPY),
         });
