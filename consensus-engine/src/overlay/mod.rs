@@ -21,7 +21,6 @@ pub trait Overlay: Clone {
 
     fn new(settings: Self::Settings) -> Self;
     fn root_committee(&self) -> Committee;
-    fn rebuild(&mut self, timeout_qc: TimeoutQc);
     fn is_member_of_child_committee(&self, parent: NodeId, child: NodeId) -> bool;
     fn is_member_of_root_committee(&self, id: NodeId) -> bool;
     fn is_member_of_leaf_committee(&self, id: NodeId) -> bool;
