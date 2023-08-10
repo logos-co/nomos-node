@@ -1,11 +1,13 @@
 use super::types::*;
 
+mod branch_overlay;
 mod flat_overlay;
 mod leadership;
 mod membership;
 mod random_beacon;
 mod tree_overlay;
 
+pub use branch_overlay::*;
 pub use flat_overlay::*;
 pub use leadership::*;
 pub use membership::*;

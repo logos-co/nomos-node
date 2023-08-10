@@ -3,7 +3,6 @@
 mod event_builder;
 mod message_cache;
 pub mod messages;
-mod researsh_overlay;
 mod tally;
 mod timeout;
 
