@@ -73,7 +73,7 @@ pipeline {
 
 def runBuildAndTestsForFeature(feature, tests) {
   echo "Building node for feature: ${feature}"
-  def build_cmd = "cargo build -p nomos-node --features ${feature}"
+  def build_cmd = "cargo build -p nomos-node --no-default-features --features ${feature}"
 
   if (sh(script: build_cmd, returnStatus: true) != 0) {
     error("Build '${feature}' node failed")
@@ -89,7 +89,7 @@ def runTestCases(test_cases, iterations) {
     echo "Running iteration ${i + 1} of ${iterations}"
 
     for (test_case in test_cases) {
-      def test_cmd = "cargo test -p tests --no-default-features --features ${feature} ${test_case}"
+      def test_cmd = "cargo test -p tests --all --no-default-features --features ${feature} ${test_case}"
       if (sh(script: test_cmd, returnStatus: true) != 0) {
         error("Test '${test_case}' failed on iteration ${i + 1}")
         return
