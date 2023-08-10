@@ -1,4 +1,4 @@
-use consensus_engine::overlay::RandomBeaconState;
+use consensus_engine::overlay::{BranchOverlay, RandomBeaconState};
 use consensus_engine::{
     overlay::{FlatOverlay, FreezeMembership, RoundRobin, TreeOverlay},
     NodeId,
@@ -51,6 +51,28 @@ pub fn to_overlay_node<R: Rng>(
             };
             Box::new(
                 CarnotNode::<TreeOverlay<RoundRobin, RandomBeaconState>>::new(
+                    node_id,
+                    CarnotSettings::new(
+                        settings.node_settings.timeout,
+                        settings.record_settings.clone(),
+                    ),
+                    overlay_settings,
+                    genesis,
+                    network_interface,
+                    &mut rng,
+                ),
+            )
+        }
+        simulations::settings::OverlaySettings::Branch(branch_settings) => {
+            let overlay_settings = consensus_engine::overlay::BranchOverlaySettings {
+                nodes,
+                current_leader: leader,
+                number_of_levels: branch_settings.number_of_levels,
+                leader: RoundRobin::new(),
+                committee_membership: RandomBeaconState::initial_sad_from_entropy([0; 32]),
+            };
+            Box::new(
+                CarnotNode::<BranchOverlay<RoundRobin, RandomBeaconState>>::new(
                     node_id,
                     CarnotSettings::new(
                         settings.node_settings.timeout,

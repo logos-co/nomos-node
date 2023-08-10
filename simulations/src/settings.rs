@@ -28,11 +28,17 @@ pub enum OverlaySettings {
     #[default]
     Flat,
     Tree(TreeSettings),
+    Branch(BranchSettings),
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct TreeSettings {
     pub number_of_committees: usize,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct BranchSettings {
+    pub number_of_levels: usize,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
