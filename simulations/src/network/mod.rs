@@ -107,6 +107,7 @@ mod network_behaviors_serde {
 }
 
 /// Represents node network capacity and current load in bytes.
+#[derive(Debug)]
 struct NodeNetworkCapacity {
     capacity_bps: u32,
     current_load: Mutex<u32>,
@@ -143,6 +144,7 @@ impl NodeNetworkCapacity {
     }
 }
 
+#[derive(Debug)]
 pub struct Network<M: std::fmt::Debug> {
     pub regions: regions::RegionsData,
     network_time: NetworkTime,
