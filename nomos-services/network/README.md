@@ -37,9 +37,10 @@ Please note that we will keep using broadcasting for some message types, such as
   - As we mentioned [above](#mixnet-integration), we're thinking about better ways than broadcasting.
 
 
-### Technical considerations
+### TODOs
 
 - Better mixnet topology management
     - Currently, the mixnet topology is configured in the config file, and is updated via advertisements from other mixnodes through libp2p gossipsub.
 - "Layered" mixnet topology, for mixnodes to not establish connections with all other mixnodes
 - Better mixnet transport between mixnodes (e.g. TCP conn pooling, multiplexing, or any other transport rather than TCP)
+- Cover traffic (dummy traffic) for unobservability
