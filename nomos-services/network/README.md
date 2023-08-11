@@ -21,6 +21,15 @@ Also, this topic is outside the scope of mixnet integration.
 Please note that we will keep using broadcasting for some message types, such as proposing blocks to the entire network.
 
 
+### Purposes
+
+Protection of the message sender identities from the network (from global adversaries, who can also be a part of the network)
+
+This can be achieved by the following techniques[^1].
+> 1. make all traffic look the same (so adversaries can’t follow individual traffic)
+> 2. re-order traffic (so that adversaries can’t simply count what goes in and what comes out to statistically de-anonymise users)
+> 3. generate fake cover traffic (so adversaries can’t know when anonymity was important)
+ 
 ### Design
 
 - Mixnet integration strategy
@@ -44,3 +53,6 @@ Please note that we will keep using broadcasting for some message types, such as
 - "Layered" mixnet topology, for mixnodes to not establish connections with all other mixnodes
 - Better mixnet transport between mixnodes (e.g. TCP conn pooling, multiplexing, or any other transport rather than TCP)
 - Cover traffic (dummy traffic) for unobservability
+
+
+[^1]: A simple introduction to mixnets: https://constructiveproof.com/posts/2020-02-17-a-simple-introduction-to-mixnets/
