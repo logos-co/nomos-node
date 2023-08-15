@@ -86,13 +86,13 @@ where
         loop {
             crossbeam::select! {
                 recv(self.recvs.stop_rx) -> finish_tx => {
-                    // collect the run time meta
-                    self.sink(Arc::new(R::from(Runtime::load()?)))?;
-
                     // Flush remaining messages after stop signal.
                     while let Ok(msg) = self.recvs.recv.try_recv() {
                         self.sink(msg)?;
                     }
+
+                    // collect the run time meta
+                    self.sink(Arc::new(R::from(Runtime::load()?)))?;
 
                     finish_tx?.send(())?
                 }
