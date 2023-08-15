@@ -15,6 +15,52 @@ pub mod polars;
 pub mod runtime_subscriber;
 pub mod settings_subscriber;
 
+#[derive(Debug, Clone, Copy, Serialize)]
+pub enum SubscriberFormat {
+    Json,
+    Csv,
+    Parquet,
+}
+
+impl SubscriberFormat {
+    pub const fn csv() -> Self {
+        Self::Csv
+    }
+
+    pub const fn json() -> Self {
+        Self::Json
+    }
+
+    pub const fn parquet() -> Self {
+        Self::Parquet
+    }
+}
+
+impl FromStr for SubscriberFormat {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.trim().to_ascii_lowercase().as_str() {
+            "json" => Ok(Self::Json),
+            "csv" => Ok(Self::Csv),
+            "parquet" => Ok(Self::Parquet),
+            tag => Err(format!(
+                "Invalid {tag} format, only [json, csv, parquet] are supported",
+            )),
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for SubscriberFormat {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        SubscriberFormat::from_str(&s).map_err(serde::de::Error::custom)
+    }
+}
+
 pub enum SubscriberType {
     Meta,
     Settings,

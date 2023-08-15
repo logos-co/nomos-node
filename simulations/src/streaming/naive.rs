@@ -1,10 +1,9 @@
-use super::{Receivers, StreamSettings, Subscriber};
+use super::{Receivers, StreamSettings, Subscriber, SubscriberFormat};
 use crate::output_processors::{RecordType, Runtime};
-use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 use std::{
+    cell::{Cell, RefCell},
     fs::{File, OpenOptions},
-    io::Write,
     path::PathBuf,
     sync::Arc,
 };
@@ -12,6 +11,8 @@ use std::{
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NaiveSettings {
     pub path: PathBuf,
+    #[serde(default = "SubscriberFormat::csv")]
+    pub format: SubscriberFormat,
 }
 
 impl TryFrom<StreamSettings> for NaiveSettings {
@@ -30,14 +31,19 @@ impl Default for NaiveSettings {
         let mut tmp = std::env::temp_dir();
         tmp.push("simulation");
         tmp.set_extension("data");
-        Self { path: tmp }
+        Self {
+            path: tmp,
+            format: SubscriberFormat::Csv,
+        }
     }
 }
 
 #[derive(Debug)]
 pub struct NaiveSubscriber<R> {
-    file: Arc<Mutex<File>>,
-    recvs: Arc<Receivers<R>>,
+    file: RefCell<File>,
+    recvs: Receivers<R>,
+    with_header: Cell<bool>,
+    format: SubscriberFormat,
 }
 
 impl<R> Subscriber for NaiveSubscriber<R>
@@ -62,14 +68,16 @@ where
             recv: record_recv,
         };
         let this = NaiveSubscriber {
-            file: Arc::new(Mutex::new(
+            file: RefCell::new(
                 opts.truncate(true)
                     .create(true)
                     .read(true)
                     .write(true)
                     .open(&settings.path)?,
-            )),
-            recvs: Arc::new(recvs),
+            ),
+            recvs,
+            with_header: Cell::new(false),
+            format: settings.format,
         };
         tracing::info!(
             target = "simulation",
@@ -101,9 +109,26 @@ where
     }
 
     fn sink(&self, state: Arc<Self::Record>) -> anyhow::Result<()> {
-        let mut file = self.file.lock();
-        serde_json::to_writer(&mut *file, &state)?;
-        file.write_all(b",\n")?;
+        let mut file = self.file.borrow_mut();
+        match self.format {
+            SubscriberFormat::Json => {
+                serde_json::to_writer(&mut *file, &state)?;
+            }
+            SubscriberFormat::Csv => {
+                let mut w = csv::Writer::from_writer(&mut *file);
+                // If have not write csv header, then write it
+                if !self.with_header.get() {
+                    w.write_record(state.fields())?;
+                    self.with_header.set(true);
+                }
+                w.serialize(&state)?;
+                w.flush()?;
+            }
+            SubscriberFormat::Parquet => {
+                panic!("native subscriber does not support parquet format")
+            }
+        }
+
         Ok(())
     }
 

@@ -1,50 +1,17 @@
-use super::{Receivers, StreamSettings};
+use super::{Receivers, StreamSettings, SubscriberFormat};
 use crate::output_processors::{RecordType, Runtime};
-use parking_lot::Mutex;
 use polars::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::{
+    cell::RefCell,
     fs::File,
     io::Cursor,
     path::{Path, PathBuf},
-    str::FromStr,
 };
-
-#[derive(Debug, Clone, Copy, Serialize)]
-pub enum PolarsFormat {
-    Json,
-    Csv,
-    Parquet,
-}
-
-impl FromStr for PolarsFormat {
-    type Err = String;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s.trim().to_ascii_lowercase().as_str() {
-            "json" => Ok(Self::Json),
-            "csv" => Ok(Self::Csv),
-            "parquet" => Ok(Self::Parquet),
-            tag => Err(format!(
-                "Invalid {tag} format, only [json, csv, parquet] are supported",
-            )),
-        }
-    }
-}
-
-impl<'de> Deserialize<'de> for PolarsFormat {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        let s = String::deserialize(deserializer)?;
-        PolarsFormat::from_str(&s).map_err(serde::de::Error::custom)
-    }
-}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PolarsSettings {
-    pub format: PolarsFormat,
+    pub format: SubscriberFormat,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub path: Option<PathBuf>,
 }
@@ -62,10 +29,10 @@ impl TryFrom<StreamSettings> for PolarsSettings {
 
 #[derive(Debug)]
 pub struct PolarsSubscriber<R> {
-    data: Arc<Mutex<Vec<Arc<R>>>>,
+    data: RefCell<Vec<Arc<R>>>,
     path: PathBuf,
-    format: PolarsFormat,
-    recvs: Arc<Receivers<R>>,
+    format: SubscriberFormat,
+    recvs: Receivers<R>,
 }
 
 impl<R> PolarsSubscriber<R>
@@ -73,7 +40,7 @@ where
     R: Serialize,
 {
     fn persist(&self) -> anyhow::Result<()> {
-        let data = self.data.lock();
+        let data = self.data.borrow_mut();
         let mut cursor = Cursor::new(Vec::new());
         serde_json::to_writer(&mut cursor, &*data).expect("Dump data to json ");
         let mut data = JsonReader::new(cursor)
@@ -82,9 +49,9 @@ where
 
         data.unnest(["state"])?;
         match self.format {
-            PolarsFormat::Json => dump_dataframe_to_json(&mut data, self.path.as_path()),
-            PolarsFormat::Csv => dump_dataframe_to_csv(&mut data, self.path.as_path()),
-            PolarsFormat::Parquet => dump_dataframe_to_parquet(&mut data, self.path.as_path()),
+            SubscriberFormat::Json => dump_dataframe_to_json(&mut data, self.path.as_path()),
+            SubscriberFormat::Csv => dump_dataframe_to_csv(&mut data, self.path.as_path()),
+            SubscriberFormat::Parquet => dump_dataframe_to_parquet(&mut data, self.path.as_path()),
         }
     }
 }
@@ -109,14 +76,14 @@ where
             recv: record_recv,
         };
         let this = PolarsSubscriber {
-            data: Arc::new(Mutex::new(Vec::new())),
-            recvs: Arc::new(recvs),
+            data: RefCell::new(Vec::new()),
+            recvs,
             path: settings.path.clone().unwrap_or_else(|| {
                 let mut p = std::env::temp_dir().join("polars");
                 match settings.format {
-                    PolarsFormat::Json => p.set_extension("json"),
-                    PolarsFormat::Csv => p.set_extension("csv"),
-                    PolarsFormat::Parquet => p.set_extension("parquet"),
+                    SubscriberFormat::Json => p.set_extension("json"),
+                    SubscriberFormat::Csv => p.set_extension("csv"),
+                    SubscriberFormat::Parquet => p.set_extension("parquet"),
                 };
                 p
             }),
@@ -150,7 +117,7 @@ where
     }
 
     fn sink(&self, state: Arc<Self::Record>) -> anyhow::Result<()> {
-        self.data.lock().push(state);
+        self.data.borrow_mut().push(state);
         Ok(())
     }
 

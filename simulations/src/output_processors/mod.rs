@@ -27,6 +27,9 @@ pub trait Record: From<Runtime> + From<SimulationSettings> + Send + Sync + 'stat
     fn is_data(&self) -> bool {
         self.record_type() == RecordType::Data
     }
+
+    /// Returns the record fields' names
+    fn fields(&self) -> Vec<&str>;
 }
 
 pub type SerializedNodeState = serde_json::Value;
@@ -84,6 +87,17 @@ impl Record for OutData {
             Self::Runtime(_) => RecordType::Meta,
             Self::Settings(_) => RecordType::Settings,
             Self::Data(_) => RecordType::Data,
+        }
+    }
+
+    fn fields(&self) -> Vec<&str> {
+        match self {
+            Self::Runtime(_) => vec![],
+            Self::Settings(_) => vec![],
+            Self::Data(d) => match d {
+                serde_json::Value::Object(obj) => obj.iter().map(|(k, _)| k.as_str()).collect(),
+                _ => vec![],
+            },
         }
     }
 }
