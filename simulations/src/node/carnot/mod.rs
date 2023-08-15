@@ -251,7 +251,8 @@ impl serde::Serialize for CarnotState {
                     }
                     LATEST_COMMITTED_BLOCK => ser.serialize_field(
                         LATEST_COMMITTED_BLOCK,
-                        &block_to_csv_field(&self.latest_committed_block),
+                        &block_to_csv_field(&self.latest_committed_block)
+                            .map_err(<S::Error as serde::ser::Error>::custom)?,
                     )?,
                     LATEST_COMMITTED_VIEW => {
                         ser.serialize_field(LATEST_COMMITTED_VIEW, &self.latest_committed_view)?
@@ -358,7 +359,7 @@ where
     use serde::ser::SerializeMap;
     let mut ser = serializer.serialize_map(Some(blocks.len()))?;
     for (k, v) in blocks {
-        ser.serialize_entry(&format!("{k:?}"), v)?;
+        ser.serialize_entry(&format!("{k}"), v)?;
     }
     ser.end()
 }
@@ -370,21 +371,33 @@ fn serialize_blocks_to_csv<S>(
 where
     S: serde::Serializer,
 {
-    let mut vec = Vec::with_capacity(blocks.len());
-    for v in blocks.values() {
-        vec.push(block_to_csv_field(v));
-    }
-    serializer.serialize_str(&format!("[{}]", vec.join(",")))
+    let v = blocks
+        .values()
+        .map(block_to_csv_field)
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(<S::Error as serde::ser::Error>::custom)?
+        .join(",");
+    serializer.serialize_str(&format!("[{v}]"))
 }
 
-fn block_to_csv_field(v: &Block) -> String {
-    let lp = match &v.leader_proof {
-        consensus_engine::LeaderProof::LeaderId { leader_id } => leader_id.index(),
-    };
-    let high_qc = v.parent_qc.high_qc();
-    let high_block = &high_qc.id;
-    let high_view = &high_qc.view;
-    format!("{{block: {}, view: {}, parent_block: {}, parent_view: {}, high_qc: {{view: {high_view}, block: {high_block}}}, leader_proof: {}}}", v.id, v.view, v.parent_qc.block(), v.parent_qc.view(), lp)
+fn block_to_csv_field(v: &Block) -> serde_json::Result<String> {
+    struct Helper<'a>(&'a Block);
+
+    impl<'a> serde::Serialize for Helper<'a> {
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: serde::Serializer,
+        {
+            use serde::ser::SerializeStruct;
+            let mut s = serializer.serialize_struct("Block", 4)?;
+            s.serialize_field("id", &self.0.id.to_string())?;
+            s.serialize_field("view", &self.0.view)?;
+            s.serialize_field("parent_qc", &self.0.parent_qc)?;
+            s.serialize_field("leader_proof", &self.0.leader_proof)?;
+            s.end()
+        }
+    }
+    serde_json::to_string(&Helper(v))
 }
 
 impl<O: Overlay> From<&Carnot<O>> for CarnotState {
