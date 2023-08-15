@@ -186,6 +186,7 @@ fn signal<R: Record>(handle: SimulationRunnerHandle<R>) -> anyhow::Result<()> {
             },
             default => {
                 if handle.is_finished() {
+                    handle.shutdown()?;
                     break;
                 }
                 std::thread::sleep(Duration::from_millis(50));

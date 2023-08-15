@@ -43,7 +43,7 @@ impl<R: Record> SimulationRunnerHandle<R> {
     pub fn stop(&self) -> anyhow::Result<()> {
         if !self.handle.is_finished() {
             self.stop_tx.send(())?;
-            self.producer.stop()?;
+            self.shutdown()?;
         }
         Ok(())
     }
@@ -57,6 +57,10 @@ impl<R: Record> SimulationRunnerHandle<R> {
 
     pub fn is_finished(&self) -> bool {
         self.handle.is_finished()
+    }
+
+    pub fn shutdown(&self) -> anyhow::Result<()> {
+        self.producer.stop()
     }
 
     pub fn join(self) -> anyhow::Result<()> {

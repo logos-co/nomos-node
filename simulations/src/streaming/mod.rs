@@ -23,7 +23,7 @@ pub enum SubscriberType {
 
 #[derive(Debug)]
 struct Receivers<R> {
-    stop_rx: Receiver<()>,
+    stop_rx: Receiver<Sender<()>>,
     recv: Receiver<Arc<R>>,
 }
 
@@ -99,7 +99,7 @@ impl StreamSettings {
 
 pub struct SubscriberHandle<S> {
     handle: Option<std::thread::JoinHandle<anyhow::Result<()>>>,
-    stop_tx: Sender<()>,
+    stop_tx: Sender<Sender<()>>,
     subscriber: Option<S>,
 }
 
@@ -127,7 +127,9 @@ where
         if let Some(handle) = self.handle {
             // if we have a handle, and the handle is not finished
             if !handle.is_finished() {
-                self.stop_tx.send(())?;
+                let (finish_tx, finish_rx) = bounded(1);
+                self.stop_tx.send(finish_tx)?;
+                finish_rx.recv()?;
             } else {
                 // we are sure the handle is finished, so we can join it and try to get the result.
                 // if we have any error on subscriber side, return the error.
@@ -151,7 +153,7 @@ where
 struct Senders<R> {
     record_ty: RecordType,
     record_sender: Sender<Arc<R>>,
-    stop_sender: Sender<()>,
+    stop_sender: Sender<Sender<()>>,
 }
 
 #[derive(Debug)]
@@ -268,8 +270,11 @@ where
 
         // send stop signal to all subscribers
         inner.senders.iter().for_each(|tx| {
-            if let Err(e) = tx.stop_sender.send(()) {
+            let (finish_tx, finish_rx) = bounded(1);
+            if let Err(e) = tx.stop_sender.send(finish_tx) {
                 tracing::error!("Error stopping subscriber: {e}");
+            } else if let Err(e) = finish_rx.recv() {
+                tracing::error!("Error finilizing subscriber: {e}");
             }
         });
         Ok(())
@@ -282,7 +287,7 @@ pub trait Subscriber {
 
     fn new(
         record_recv: Receiver<Arc<Self::Record>>,
-        stop_recv: Receiver<()>,
+        stop_recv: Receiver<Sender<()>>,
         settings: Self::Settings,
     ) -> anyhow::Result<Self>
     where
