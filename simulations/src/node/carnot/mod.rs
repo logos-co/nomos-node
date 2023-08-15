@@ -123,12 +123,15 @@ impl Record for CarnotRecord {
     }
 
     fn fields(&self) -> Vec<&str> {
-        RECORD_SETTINGS
+        let mut fields = RECORD_SETTINGS
             .get()
             .unwrap()
             .keys()
             .map(String::as_str)
-            .collect()
+            .collect::<Vec<_>>();
+        // sort fields to make sure the we are matching header field and record field when using csv format
+        fields.sort();
+        fields
     }
 
     fn data(&self) -> Vec<&CarnotState> {
@@ -163,7 +166,7 @@ impl serde::Serialize for CarnotState {
     {
         use serde::ser::SerializeStruct;
         if let Some(rs) = RECORD_SETTINGS.get() {
-            let keys = rs
+            let mut keys = rs
                 .iter()
                 .filter_map(|(k, v)| {
                     if CARNOT_RECORD_KEYS.contains(&k.trim()) && *v {
@@ -173,6 +176,9 @@ impl serde::Serialize for CarnotState {
                     }
                 })
                 .collect::<Vec<_>>();
+
+            // sort keys to make sure the we are matching header field and record field when using csv format
+            keys.sort();
 
             let mut ser = serializer.serialize_struct("CarnotState", keys.len())?;
             for k in keys {
