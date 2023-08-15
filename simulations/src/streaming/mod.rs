@@ -253,7 +253,7 @@ where
         })
     }
 
-    pub fn stop(self) -> anyhow::Result<()> {
+    pub fn stop(&self) -> anyhow::Result<()> {
         let meta_record = Arc::new(R::from(Runtime::load()?));
         let inner = self.inner.lock().unwrap();
 
