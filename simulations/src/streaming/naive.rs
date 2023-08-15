@@ -1,11 +1,14 @@
 use super::{Receivers, StreamSettings, Subscriber, SubscriberFormat};
 use crate::output_processors::{RecordType, Runtime};
+use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 use std::{
-    cell::{Cell, RefCell},
     fs::{File, OpenOptions},
     path::PathBuf,
-    sync::Arc,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -40,9 +43,9 @@ impl Default for NaiveSettings {
 
 #[derive(Debug)]
 pub struct NaiveSubscriber<R> {
-    file: RefCell<File>,
+    file: Mutex<File>,
     recvs: Receivers<R>,
-    with_header: Cell<bool>,
+    with_header: AtomicBool,
     format: SubscriberFormat,
 }
 
@@ -68,7 +71,7 @@ where
             recv: record_recv,
         };
         let this = NaiveSubscriber {
-            file: RefCell::new(
+            file: Mutex::new(
                 opts.truncate(true)
                     .create(true)
                     .read(true)
@@ -76,7 +79,7 @@ where
                     .open(&settings.path)?,
             ),
             recvs,
-            with_header: Cell::new(false),
+            with_header: AtomicBool::new(false),
             format: settings.format,
         };
         tracing::info!(
@@ -109,7 +112,7 @@ where
     }
 
     fn sink(&self, state: Arc<Self::Record>) -> anyhow::Result<()> {
-        let mut file = self.file.borrow_mut();
+        let mut file = self.file.lock();
         match self.format {
             SubscriberFormat::Json => {
                 serde_json::to_writer(&mut *file, &state)?;
@@ -117,11 +120,20 @@ where
             SubscriberFormat::Csv => {
                 let mut w = csv::Writer::from_writer(&mut *file);
                 // If have not write csv header, then write it
-                if !self.with_header.get() {
-                    w.write_record(state.fields())?;
-                    self.with_header.set(true);
+                if !self.with_header.load(Ordering::Acquire) {
+                    w.write_record(state.fields()).map_err(|e| {
+                        tracing::error!(target = "simulations", err = %e, "fail to write CSV header");
+                        e
+                    })?;
+
+                    self.with_header.store(true, Ordering::Release);
                 }
-                w.serialize(&state)?;
+                for data in state.data() {
+                    w.serialize(data).map_err(|e| {
+                        tracing::error!(target = "simulations", err = %e, "fail to write CSV record");
+                        e
+                    })?
+                }
                 w.flush()?;
             }
             SubscriberFormat::Parquet => {

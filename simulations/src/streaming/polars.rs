@@ -1,9 +1,9 @@
 use super::{Receivers, StreamSettings, SubscriberFormat};
 use crate::output_processors::{RecordType, Runtime};
+use parking_lot::Mutex;
 use polars::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::{
-    cell::RefCell,
     fs::File,
     io::Cursor,
     path::{Path, PathBuf},
@@ -29,7 +29,7 @@ impl TryFrom<StreamSettings> for PolarsSettings {
 
 #[derive(Debug)]
 pub struct PolarsSubscriber<R> {
-    data: RefCell<Vec<Arc<R>>>,
+    data: Mutex<Vec<Arc<R>>>,
     path: PathBuf,
     format: SubscriberFormat,
     recvs: Receivers<R>,
@@ -40,7 +40,7 @@ where
     R: Serialize,
 {
     fn persist(&self) -> anyhow::Result<()> {
-        let data = self.data.borrow_mut();
+        let data = self.data.lock();
         let mut cursor = Cursor::new(Vec::new());
         serde_json::to_writer(&mut cursor, &*data).expect("Dump data to json ");
         let mut data = JsonReader::new(cursor)
@@ -76,7 +76,7 @@ where
             recv: record_recv,
         };
         let this = PolarsSubscriber {
-            data: RefCell::new(Vec::new()),
+            data: Mutex::new(Vec::new()),
             recvs,
             path: settings.path.clone().unwrap_or_else(|| {
                 let mut p = std::env::temp_dir().join("polars");
@@ -117,7 +117,7 @@ where
     }
 
     fn sink(&self, state: Arc<Self::Record>) -> anyhow::Result<()> {
-        self.data.borrow_mut().push(state);
+        self.data.lock().push(state);
         Ok(())
     }
 

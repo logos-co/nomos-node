@@ -13,14 +13,14 @@ use crate::{
 
 use super::{CommitteeId, OverlayGetter, OverlayState, SharedState, ViewOverlay};
 
-#[derive(Debug, Default, Serialize)]
+#[derive(Debug, Default, Clone, Serialize)]
 pub struct DummyState {
     pub current_view: View,
     pub message_count: usize,
     pub view_state: BTreeMap<View, DummyViewState>,
 }
 
-#[derive(Debug, Default, Serialize)]
+#[derive(Debug, Default, Copy, Clone, Serialize)]
 pub struct DummyViewState {
     proposal_received: bool,
     vote_received_count: usize,

@@ -6,6 +6,7 @@ pub mod messages;
 mod tally;
 mod timeout;
 
+use std::any::Any;
 // std
 use std::hash::Hash;
 use std::time::Instant;
@@ -20,6 +21,11 @@ use super::{Node, NodeId};
 use crate::network::{InMemoryNetworkInterface, NetworkInterface, NetworkMessage};
 use crate::node::carnot::event_builder::{CarnotTx, Event};
 use crate::node::carnot::message_cache::MessageCache;
+use crate::node::NodeIdExt;
+use crate::output_processors::{Record, RecordType, Runtime};
+use crate::settings::SimulationSettings;
+use crate::streaming::SubscriberFormat;
+use crate::warding::SimulationState;
 use consensus_engine::overlay::RandomBeaconState;
 use consensus_engine::{
     Block, BlockId, Carnot, Committee, Overlay, Payload, Qc, StandardQc, TimeoutQc, View, Vote,
@@ -63,7 +69,7 @@ pub const CARNOT_RECORD_KEYS: &[&str] = &[
 
 static RECORD_SETTINGS: std::sync::OnceLock<HashMap<String, bool>> = std::sync::OnceLock::new();
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct CarnotState {
     node_id: NodeId,
     current_view: View,
@@ -78,6 +84,76 @@ pub struct CarnotState {
     child_committees: Vec<Committee>,
     committed_blocks: Vec<BlockId>,
     step_duration: Duration,
+
+    /// does not serialize this field, this field is used to check
+    /// how to serialize other fields because csv format does not support
+    /// nested map or struct, we have to do some customize.
+    format: SubscriberFormat,
+}
+
+#[derive(Serialize)]
+#[serde(untagged)]
+pub enum CarnotRecord {
+    Runtime(Runtime),
+    Settings(Box<SimulationSettings>),
+    Data(Vec<Box<CarnotState>>),
+}
+
+impl From<Runtime> for CarnotRecord {
+    fn from(value: Runtime) -> Self {
+        Self::Runtime(value)
+    }
+}
+
+impl From<SimulationSettings> for CarnotRecord {
+    fn from(value: SimulationSettings) -> Self {
+        Self::Settings(Box::new(value))
+    }
+}
+
+impl Record for CarnotRecord {
+    type Data = CarnotState;
+
+    fn record_type(&self) -> RecordType {
+        match self {
+            CarnotRecord::Runtime(_) => RecordType::Meta,
+            CarnotRecord::Settings(_) => RecordType::Settings,
+            CarnotRecord::Data(_) => RecordType::Data,
+        }
+    }
+
+    fn fields(&self) -> Vec<&str> {
+        RECORD_SETTINGS
+            .get()
+            .unwrap()
+            .keys()
+            .map(String::as_str)
+            .collect()
+    }
+
+    fn data(&self) -> Vec<&CarnotState> {
+        match self {
+            CarnotRecord::Data(d) => d.iter().map(AsRef::as_ref).collect(),
+            _ => unreachable!(),
+        }
+    }
+}
+
+impl<S, T: Clone + Serialize + 'static> TryFrom<&SimulationState<S, T>> for CarnotRecord {
+    type Error = anyhow::Error;
+
+    fn try_from(state: &SimulationState<S, T>) -> Result<Self, Self::Error> {
+        let Ok(states) = state
+            .nodes
+            .read()
+            .iter()
+            .map(|n| Box::<dyn Any + 'static>::downcast(Box::new(n.state().clone())))
+            .collect::<Result<Vec<_>, _>>()
+        else {
+            return Err(anyhow::anyhow!("use carnot record on other node"));
+        };
+        Ok(Self::Data(states))
+    }
 }
 
 impl serde::Serialize for CarnotState {
@@ -101,46 +177,153 @@ impl serde::Serialize for CarnotState {
             let mut ser = serializer.serialize_struct("CarnotState", keys.len())?;
             for k in keys {
                 match k.trim() {
-                    NODE_ID => ser.serialize_field(NODE_ID, &self.node_id)?,
+                    NODE_ID => ser.serialize_field(NODE_ID, &self.node_id.index())?,
                     CURRENT_VIEW => ser.serialize_field(CURRENT_VIEW, &self.current_view)?,
                     HIGHEST_VOTED_VIEW => {
                         ser.serialize_field(HIGHEST_VOTED_VIEW, &self.highest_voted_view)?
                     }
-                    LOCAL_HIGH_QC => ser.serialize_field(LOCAL_HIGH_QC, &self.local_high_qc)?,
-                    SAFE_BLOCKS => {
-                        #[derive(Serialize)]
-                        #[serde(transparent)]
-                        struct SafeBlockHelper<'a> {
-                            #[serde(serialize_with = "serialize_blocks")]
-                            safe_blocks: &'a HashMap<BlockId, Block>,
+                    LOCAL_HIGH_QC => {
+                        if self.format.is_csv() {
+                            ser.serialize_field(
+                                LOCAL_HIGH_QC,
+                                &format!(
+                                    "{{view: {}, block: {}}}",
+                                    self.local_high_qc.view, self.local_high_qc.id
+                                ),
+                            )?
+                        } else {
+                            ser.serialize_field(LOCAL_HIGH_QC, &self.local_high_qc)?
                         }
-                        ser.serialize_field(
-                            SAFE_BLOCKS,
-                            &SafeBlockHelper {
-                                safe_blocks: &self.safe_blocks,
-                            },
-                        )?;
+                    }
+                    SAFE_BLOCKS => {
+                        if self.format == SubscriberFormat::Csv {
+                            #[derive(Serialize)]
+                            #[serde(transparent)]
+                            struct SafeBlockHelper<'a> {
+                                #[serde(serialize_with = "serialize_blocks_to_csv")]
+                                safe_blocks: &'a HashMap<BlockId, Block>,
+                            }
+                            ser.serialize_field(
+                                SAFE_BLOCKS,
+                                &SafeBlockHelper {
+                                    safe_blocks: &self.safe_blocks,
+                                },
+                            )?;
+                        } else {
+                            #[derive(Serialize)]
+                            #[serde(transparent)]
+                            struct SafeBlockHelper<'a> {
+                                #[serde(serialize_with = "serialize_blocks_to_json")]
+                                safe_blocks: &'a HashMap<BlockId, Block>,
+                            }
+                            ser.serialize_field(
+                                SAFE_BLOCKS,
+                                &SafeBlockHelper {
+                                    safe_blocks: &self.safe_blocks,
+                                },
+                            )?;
+                        }
                     }
                     LAST_VIEW_TIMEOUT_QC => {
-                        ser.serialize_field(LAST_VIEW_TIMEOUT_QC, &self.last_view_timeout_qc)?
+                        if self.format.is_csv() {
+                            ser.serialize_field(
+                                LAST_VIEW_TIMEOUT_QC,
+                                &self.last_view_timeout_qc.as_ref().map(|tc| {
+                                    let qc = tc.high_qc();
+                                    format!(
+                                        "{{view: {}, standard_view: {}, block: {}, node: {}}}",
+                                        tc.view(),
+                                        qc.view,
+                                        qc.id,
+                                        tc.sender().index()
+                                    )
+                                }),
+                            )?
+                        } else {
+                            ser.serialize_field(LAST_VIEW_TIMEOUT_QC, &self.last_view_timeout_qc)?
+                        }
                     }
-                    LATEST_COMMITTED_BLOCK => {
-                        ser.serialize_field(LATEST_COMMITTED_BLOCK, &self.latest_committed_block)?
-                    }
+                    LATEST_COMMITTED_BLOCK => ser.serialize_field(
+                        LATEST_COMMITTED_BLOCK,
+                        &block_to_csv_field(&self.latest_committed_block),
+                    )?,
                     LATEST_COMMITTED_VIEW => {
                         ser.serialize_field(LATEST_COMMITTED_VIEW, &self.latest_committed_view)?
                     }
-                    ROOT_COMMITTEE => ser.serialize_field(ROOT_COMMITTEE, &self.root_committee)?,
+                    ROOT_COMMITTEE => {
+                        if self.format.is_csv() {
+                            let val = self
+                                .root_committee
+                                .iter()
+                                .map(|n| n.index().to_string())
+                                .collect::<Vec<_>>();
+                            ser.serialize_field(ROOT_COMMITTEE, &format!("[{}]", val.join(",")))?
+                        } else {
+                            ser.serialize_field(
+                                ROOT_COMMITTEE,
+                                &self
+                                    .root_committee
+                                    .iter()
+                                    .map(|n| n.index())
+                                    .collect::<Vec<_>>(),
+                            )?
+                        }
+                    }
                     PARENT_COMMITTEE => {
-                        ser.serialize_field(PARENT_COMMITTEE, &self.parent_committee)?
+                        if self.format.is_csv() {
+                            let committees = self.parent_committee.as_ref().map(|c| {
+                                c.iter().map(|n| n.index().to_string()).collect::<Vec<_>>()
+                            });
+                            let committees = committees.map(|c| {
+                                let c = c.join(",");
+                                format!("[{c}]")
+                            });
+                            ser.serialize_field(CHILD_COMMITTEES, &committees)?
+                        } else {
+                            let committees = self
+                                .parent_committee
+                                .as_ref()
+                                .map(|c| c.iter().map(|n| n.index()).collect::<Vec<_>>());
+                            ser.serialize_field(PARENT_COMMITTEE, &committees)?
+                        }
                     }
                     CHILD_COMMITTEES => {
-                        ser.serialize_field(CHILD_COMMITTEES, &self.child_committees)?
+                        let committees = self
+                            .child_committees
+                            .iter()
+                            .map(|c| {
+                                let s = c
+                                    .iter()
+                                    .map(|n| n.index().to_string())
+                                    .collect::<Vec<_>>()
+                                    .join(",");
+                                format!("[{s}]")
+                            })
+                            .collect::<Vec<_>>();
+                        if self.format.is_csv() {
+                            let committees = committees.join(",");
+                            ser.serialize_field(CHILD_COMMITTEES, &format!("[{committees}]"))?
+                        } else {
+                            ser.serialize_field(CHILD_COMMITTEES, &committees)?
+                        }
                     }
                     COMMITTED_BLOCKS => {
-                        ser.serialize_field(COMMITTED_BLOCKS, &self.committed_blocks)?
+                        let blocks = self
+                            .committed_blocks
+                            .iter()
+                            .map(|b| b.to_string())
+                            .collect::<Vec<_>>();
+                        if self.format.is_csv() {
+                            let blocks = blocks.join(",");
+                            ser.serialize_field(COMMITTED_BLOCKS, &format!("[{blocks}]"))?
+                        } else {
+                            ser.serialize_field(COMMITTED_BLOCKS, &blocks)?
+                        }
                     }
-                    STEP_DURATION => ser.serialize_field(STEP_DURATION, &self.step_duration)?,
+                    STEP_DURATION => ser.serialize_field(
+                        STEP_DURATION,
+                        &humantime::format_duration(self.step_duration).to_string(),
+                    )?,
                     _ => {}
                 }
             }
@@ -159,7 +342,10 @@ impl CarnotState {
 
 /// Have to implement this manually because of the `serde_json` will panic if the key of map
 /// is not a string.
-fn serialize_blocks<S>(blocks: &HashMap<BlockId, Block>, serializer: S) -> Result<S::Ok, S::Error>
+fn serialize_blocks_to_json<S>(
+    blocks: &HashMap<BlockId, Block>,
+    serializer: S,
+) -> Result<S::Ok, S::Error>
 where
     S: serde::Serializer,
 {
@@ -169,6 +355,30 @@ where
         ser.serialize_entry(&format!("{k:?}"), v)?;
     }
     ser.end()
+}
+
+fn serialize_blocks_to_csv<S>(
+    blocks: &HashMap<BlockId, Block>,
+    serializer: S,
+) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    let mut vec = Vec::with_capacity(blocks.len());
+    for v in blocks.values() {
+        vec.push(block_to_csv_field(v));
+    }
+    serializer.serialize_str(&format!("[{}]", vec.join(",")))
+}
+
+fn block_to_csv_field(v: &Block) -> String {
+    let lp = match &v.leader_proof {
+        consensus_engine::LeaderProof::LeaderId { leader_id } => leader_id.index(),
+    };
+    let high_qc = v.parent_qc.high_qc();
+    let high_block = &high_qc.id;
+    let high_view = &high_qc.view;
+    format!("{{block: {}, view: {}, parent_block: {}, parent_view: {}, high_qc: {{view: {high_view}, block: {high_block}}}, leader_proof: {}}}", v.id, v.view, v.parent_qc.block(), v.parent_qc.view(), lp)
 }
 
 impl<O: Overlay> From<&Carnot<O>> for CarnotState {
@@ -193,6 +403,7 @@ impl<O: Overlay> From<&Carnot<O>> for CarnotState {
             committed_blocks: value.latest_committed_blocks(),
             highest_voted_view: Default::default(),
             step_duration: Default::default(),
+            format: SubscriberFormat::Csv,
         }
     }
 }
@@ -201,13 +412,21 @@ impl<O: Overlay> From<&Carnot<O>> for CarnotState {
 pub struct CarnotSettings {
     timeout: Duration,
     record_settings: HashMap<String, bool>,
+
+    #[serde(default)]
+    format: SubscriberFormat,
 }
 
 impl CarnotSettings {
-    pub fn new(timeout: Duration, record_settings: HashMap<String, bool>) -> Self {
+    pub fn new(
+        timeout: Duration,
+        record_settings: HashMap<String, bool>,
+        format: SubscriberFormat,
+    ) -> Self {
         Self {
             timeout,
             record_settings,
+            format,
         }
     }
 }
@@ -570,6 +789,7 @@ impl<
 
         // update state
         self.state = CarnotState::from(&self.engine);
+        self.state.format = self.settings.format;
         self.state.step_duration = step_duration.elapsed();
     }
 }

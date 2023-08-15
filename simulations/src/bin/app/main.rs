@@ -19,7 +19,7 @@ use serde::Serialize;
 use simulations::network::behaviour::create_behaviours;
 use simulations::network::regions::{create_regions, RegionsData};
 use simulations::network::{InMemoryNetworkInterface, Network};
-use simulations::node::carnot::{CarnotSettings, CarnotState};
+use simulations::node::carnot::{CarnotRecord, CarnotSettings, CarnotState};
 use simulations::node::{NodeId, NodeIdExt};
 use simulations::output_processors::Record;
 use simulations::runner::{BoxedNode, SimulationRunnerHandle};
@@ -27,9 +27,7 @@ use simulations::streaming::{
     io::IOSubscriber, naive::NaiveSubscriber, polars::PolarsSubscriber, StreamType,
 };
 // internal
-use simulations::{
-    output_processors::OutData, runner::SimulationRunner, settings::SimulationSettings,
-};
+use simulations::{runner::SimulationRunner, settings::SimulationSettings};
 mod log;
 mod overlay_node;
 
@@ -146,24 +144,28 @@ fn run<M: std::fmt::Debug, S, T>(
 where
     M: Clone + Send + Sync + 'static,
     S: 'static,
-    T: Serialize + 'static,
+    T: Serialize + Clone + 'static,
 {
     let stream_settings = settings.stream_settings.clone();
-    let runner =
-        SimulationRunner::<_, OutData, S, T>::new(network, nodes, Default::default(), settings)?;
+    let runner = SimulationRunner::<_, CarnotRecord, S, T>::new(
+        network,
+        nodes,
+        Default::default(),
+        settings,
+    )?;
 
     let handle = match stream_type {
         Some(StreamType::Naive) => {
             let settings = stream_settings.unwrap_naive();
-            runner.simulate_and_subscribe::<NaiveSubscriber<OutData>>(settings)?
+            runner.simulate_and_subscribe::<NaiveSubscriber<CarnotRecord>>(settings)?
         }
         Some(StreamType::IO) => {
             let settings = stream_settings.unwrap_io();
-            runner.simulate_and_subscribe::<IOSubscriber<OutData>>(settings)?
+            runner.simulate_and_subscribe::<IOSubscriber<CarnotRecord>>(settings)?
         }
         Some(StreamType::Polars) => {
             let settings = stream_settings.unwrap_polars();
-            runner.simulate_and_subscribe::<PolarsSubscriber<OutData>>(settings)?
+            runner.simulate_and_subscribe::<PolarsSubscriber<CarnotRecord>>(settings)?
         }
         None => runner.simulate()?,
     };

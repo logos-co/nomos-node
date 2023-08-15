@@ -15,9 +15,10 @@ pub mod polars;
 pub mod runtime_subscriber;
 pub mod settings_subscriber;
 
-#[derive(Debug, Clone, Copy, Serialize)]
+#[derive(Debug, Default, Clone, Copy, Serialize, PartialEq, Eq)]
 pub enum SubscriberFormat {
     Json,
+    #[default]
     Csv,
     Parquet,
 }
@@ -33,6 +34,10 @@ impl SubscriberFormat {
 
     pub const fn parquet() -> Self {
         Self::Parquet
+    }
+
+    pub fn is_csv(&self) -> bool {
+        matches!(self, Self::Csv)
     }
 }
 

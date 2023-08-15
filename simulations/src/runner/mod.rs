@@ -105,7 +105,7 @@ where
         + Sync
         + 'static,
     S: 'static,
-    T: Serialize + 'static,
+    T: Serialize + Clone + 'static,
 {
     pub fn new(
         network: Network<M>,
@@ -183,7 +183,7 @@ where
         + Sync
         + 'static,
     S: 'static,
-    T: Serialize + 'static,
+    T: Serialize + Clone + 'static,
 {
     pub fn simulate_and_subscribe<B>(
         self,
