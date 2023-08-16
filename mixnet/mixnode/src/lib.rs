@@ -82,13 +82,11 @@ impl Mixnode {
         tracing::debug!("Delaying the packet for {delay:?}");
         tokio::time::sleep(delay.to_duration()).await;
 
-        let addr = SocketAddr::try_from(NymNodeRoutingAddress::try_from(next_node_addr)?)?;
-        tracing::debug!("Forwarding a Sphinx packet to the mixnode: {addr:?}");
-
-        let mut socket = TcpStream::connect(addr).await?;
-        socket.write_all(&packet.to_bytes()).await?;
-
-        Ok(())
+        Self::forward(
+            &packet.to_bytes(),
+            NymNodeRoutingAddress::try_from(next_node_addr)?,
+        )
+        .await
     }
 
     async fn forward_payload_to_destination(
@@ -97,13 +95,18 @@ impl Mixnode {
     ) -> Result<(), Box<dyn Error>> {
         tracing::debug!("Forwarding payload to destination");
 
-        let addr = SocketAddr::try_from(NymNodeRoutingAddress::try_from_bytes(
-            &destination_addr.as_bytes(),
-        )?)?;
-        tracing::debug!("Forwarding a Sphinx packet to the destination: {addr:?}");
+        Self::forward(
+            payload.as_bytes(),
+            NymNodeRoutingAddress::try_from_bytes(&destination_addr.as_bytes())?,
+        )
+        .await
+    }
+
+    async fn forward(data: &[u8], to: NymNodeRoutingAddress) -> Result<(), Box<dyn Error>> {
+        let addr = SocketAddr::try_from(to)?;
 
         let mut socket = TcpStream::connect(addr).await?;
-        socket.write_all(payload.as_bytes()).await?;
+        socket.write_all(data).await?;
 
         Ok(())
     }
