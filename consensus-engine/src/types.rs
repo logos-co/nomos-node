@@ -106,6 +106,7 @@ pub struct Block {
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", serde(untagged))]
 pub enum LeaderProof {
     LeaderId { leader_id: NodeId },
 }

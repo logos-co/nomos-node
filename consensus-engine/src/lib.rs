@@ -2,6 +2,7 @@ use std::collections::{HashMap, HashSet};
 
 pub mod overlay;
 mod types;
+mod util;
 pub use overlay::Overlay;
 pub use types::*;
 

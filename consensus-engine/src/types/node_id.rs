@@ -1,7 +1,9 @@
 #[derive(Clone, Copy, Default, Debug, Eq, PartialEq, Hash, Ord, PartialOrd)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(transparent))]
-pub struct NodeId(pub(crate) [u8; 32]);
+pub struct NodeId(
+    #[cfg_attr(feature = "serde", serde(with = "crate::util::serde_array32"))] pub(crate) [u8; 32],
+);
 
 impl NodeId {
     pub const fn new(val: [u8; 32]) -> Self {
