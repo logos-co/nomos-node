@@ -10,11 +10,9 @@ pub(crate) mod serde_array32 {
 
     pub fn serialize<S: serde::Serializer>(t: &[u8; 32], serializer: S) -> Result<S::Ok, S::Error> {
         if serializer.is_human_readable() {
-            let size = MAX_SERIALIZATION_LENGTH;
             STRING_BUFFER.with(|s| {
                 let mut s = s.borrow_mut();
                 s.clear();
-                s.reserve(size);
                 s.push_str("0x");
                 for v in t {
                     std::fmt::write(&mut *s, format_args!("{:02x}", v)).unwrap();
