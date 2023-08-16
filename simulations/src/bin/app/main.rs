@@ -2,7 +2,7 @@
 use std::fs::File;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 // crates
 use anyhow::Ok;
 use clap::Parser;
@@ -174,6 +174,7 @@ where
 }
 
 fn signal<R: Record>(handle: SimulationRunnerHandle<R>) -> anyhow::Result<()> {
+    let handle = Arc::new(handle);
     let (tx, rx) = crossbeam::channel::bounded(1);
     ctrlc::set_handler(move || {
         tx.send(()).unwrap();
@@ -182,10 +183,16 @@ fn signal<R: Record>(handle: SimulationRunnerHandle<R>) -> anyhow::Result<()> {
         crossbeam::select! {
             recv(rx) -> _ => {
                 handle.stop()?;
-                tracing::info!("gracefully shutwon the simulation app");
+                tracing::info!("gracefully shutdown the simulation app");
                 break;
             },
-            default => {}
+            default => {
+                if handle.is_finished() {
+                    handle.shutdown()?;
+                    break;
+                }
+                std::thread::sleep(Duration::from_millis(50));
+            }
         }
     }
     Ok(())

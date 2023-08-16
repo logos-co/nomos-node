@@ -1,5 +1,6 @@
 use super::{Receivers, StreamSettings, Subscriber, SubscriberFormat};
 use crate::output_processors::{Record, RecordType, Runtime};
+use crossbeam::channel::{Receiver, Sender};
 use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -59,8 +60,8 @@ where
     type Settings = NaiveSettings;
 
     fn new(
-        record_recv: crossbeam::channel::Receiver<Arc<Self::Record>>,
-        stop_recv: crossbeam::channel::Receiver<()>,
+        record_recv: Receiver<Arc<Self::Record>>,
+        stop_recv: Receiver<Sender<()>>,
         settings: Self::Settings,
     ) -> anyhow::Result<Self>
     where
@@ -98,18 +99,22 @@ where
     fn run(self) -> anyhow::Result<()> {
         loop {
             crossbeam::select! {
-                recv(self.recvs.stop_rx) -> _ => {
+                recv(self.recvs.stop_rx) -> finish_tx => {
+                    // Flush remaining messages after stop signal.
+                    while let Ok(msg) = self.recvs.recv.try_recv() {
+                        self.sink(msg)?;
+                    }
+
                     // collect the run time meta
                     self.sink(Arc::new(R::from(Runtime::load()?)))?;
-                    break;
+
+                    finish_tx?.send(())?
                 }
                 recv(self.recvs.recv) -> msg => {
                     self.sink(msg?)?;
                 }
             }
         }
-
-        Ok(())
     }
 
     fn sink(&self, state: Arc<Self::Record>) -> anyhow::Result<()> {
