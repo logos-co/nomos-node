@@ -46,6 +46,5 @@ path = "src/tests/mixnet.rs"
 
 [features]
 metrics = ["nomos-node/metrics"]
-waku = ["nomos-network/waku", "nomos-mempool/waku", "waku-bindings"]
+waku  = ["nomos-network/waku", "nomos-mempool/waku", "waku-bindings"]
 libp2p = ["nomos-network/libp2p", "nomos-mempool/libp2p", "nomos-libp2p"]
-
