@@ -2,13 +2,15 @@ pub(crate) mod serde_array32 {
     use serde::{Deserialize, Serialize};
     use std::cell::RefCell;
 
+    const MAX_SERIALIZATION_LENGTH: usize = 32 * 2 + 2;
+
     thread_local! {
-        static STRING_BUFFER: RefCell<String> = RefCell::new(String::new());
+        static STRING_BUFFER: RefCell<String> = RefCell::new(String::with_capacity(MAX_SERIALIZATION_LENGTH));
     }
 
     pub fn serialize<S: serde::Serializer>(t: &[u8; 32], serializer: S) -> Result<S::Ok, S::Error> {
         if serializer.is_human_readable() {
-            let size = 32 * 2 + 2;
+            let size = MAX_SERIALIZATION_LENGTH;
             STRING_BUFFER.with(|s| {
                 let mut s = s.borrow_mut();
                 s.clear();
