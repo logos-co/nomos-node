@@ -1,7 +1,7 @@
 use std::{collections::HashMap, error::Error, net::SocketAddr};
 
 use nym_sphinx::addressing::nodes::NymNodeRoutingAddress;
-use rand::{rngs::OsRng, seq::IteratorRandom};
+use rand::{seq::IteratorRandom, Rng};
 use serde::{Deserialize, Serialize};
 use sphinx_packet::{crypto::PUBLIC_KEY_SIZE, route};
 
@@ -35,7 +35,11 @@ impl Topology {
         None
     }
 
-    pub fn random_route(&self, num_hops: usize) -> Result<Vec<route::Node>, Box<dyn Error>> {
+    pub fn random_route<R: Rng>(
+        &self,
+        rng: &mut R,
+        num_hops: usize,
+    ) -> Result<Vec<route::Node>, Box<dyn Error>> {
         if self.layers.len() < num_hops {
             todo!("return error");
         }
@@ -46,7 +50,7 @@ impl Topology {
             let layer = self.layers.get(layer_id).unwrap();
             route.push(
                 layer
-                    .random_node()
+                    .random_node(rng)
                     .expect("layer is not empty")
                     .clone()
                     .try_into()
@@ -59,8 +63,8 @@ impl Topology {
 }
 
 impl Layer {
-    pub fn random_node(&self) -> Option<&Mixnode> {
-        self.nodes.values().choose(&mut OsRng)
+    pub fn random_node<R: Rng>(&self, rng: &mut R) -> Option<&Mixnode> {
+        self.nodes.values().choose(rng)
     }
 }
 

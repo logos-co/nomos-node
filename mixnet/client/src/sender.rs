@@ -6,7 +6,7 @@ use nym_sphinx::{
     params::PacketSize, Delay, Destination, DestinationAddressBytes, NodeAddressBytes,
     IDENTIFIER_LENGTH, PAYLOAD_OVERHEAD_SIZE,
 };
-use rand::rngs::OsRng;
+use rand::Rng;
 use sphinx_packet::{route, SphinxPacket, SphinxPacketBuilder};
 use tokio::{io::AsyncWriteExt, net::TcpStream};
 
@@ -21,10 +21,11 @@ impl Sender {
         Self { topology }
     }
 
-    pub fn send(
+    pub fn send<R: Rng>(
         &self,
         msg: Vec<u8>,
         destination: SocketAddr,
+        rng: &mut R,
         num_hops: usize,
     ) -> Result<(), Box<dyn Error>> {
         let dest_addr: NodeAddressBytes =
@@ -34,9 +35,9 @@ impl Sender {
             [0; IDENTIFIER_LENGTH], // TODO: use a proper SURBIdentifier if we need SURB
         );
 
-        Sender::pad_and_split_message(msg)
+        Sender::pad_and_split_message(rng, msg)
             .into_iter()
-            .map(|fragment| self.build_sphinx_packet(fragment, &destination, num_hops))
+            .map(|fragment| self.build_sphinx_packet(fragment, &destination, rng, num_hops))
             .collect::<Result<Vec<_>, _>>()?
             .into_iter()
             .for_each(|(packet, first_node)| {
@@ -51,7 +52,7 @@ impl Sender {
         Ok(())
     }
 
-    fn pad_and_split_message(msg: Vec<u8>) -> Vec<Fragment> {
+    fn pad_and_split_message<R: Rng>(rng: &mut R, msg: Vec<u8>) -> Vec<Fragment> {
         let nym_message = NymMessage::new_plain(msg);
 
         // TODO: add PUBLIC_KEY_SIZE for encryption for the destination
@@ -61,16 +62,17 @@ impl Sender {
 
         nym_message
             .pad_to_full_packet_lengths(plaintext_size_per_packet)
-            .split_into_fragments(&mut OsRng, plaintext_size_per_packet)
+            .split_into_fragments(rng, plaintext_size_per_packet)
     }
 
-    fn build_sphinx_packet(
+    fn build_sphinx_packet<R: Rng>(
         &self,
         fragment: Fragment,
         destination: &Destination,
+        rng: &mut R,
         num_hops: usize,
     ) -> Result<(sphinx_packet::SphinxPacket, route::Node), Box<dyn Error>> {
-        let route = self.topology.random_route(num_hops)?;
+        let route = self.topology.random_route(rng, num_hops)?;
 
         // TODO: use proper delays
         let delays: Vec<Delay> = route.iter().map(|_| Delay::new_from_nanos(0)).collect();

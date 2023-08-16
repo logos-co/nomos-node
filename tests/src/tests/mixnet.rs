@@ -5,7 +5,7 @@ use std::{
 
 use mixnet_client::MixnetClient;
 use mixnet_topology::{Layer, Mixnode, Topology};
-use rand::RngCore;
+use rand::{rngs::OsRng, RngCore};
 
 #[tokio::test]
 async fn mixnet() {
@@ -15,7 +15,7 @@ async fn mixnet() {
     let mut msg = [0u8; 100 * 1024];
     rand::thread_rng().fill_bytes(&mut msg);
 
-    let res = client1.send(msg.to_vec(), destination, topology.layers.len());
+    let res = client1.send(msg.to_vec(), destination, &mut OsRng, topology.layers.len());
     assert!(res.is_ok());
 
     let received = client2.subscribe().recv().await.unwrap();

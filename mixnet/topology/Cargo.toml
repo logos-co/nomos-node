@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+# Using an older version, since `nym-sphinx` depends on `rand` v0.7.3.
 rand = "0.7.3"
 serde = { version = "1.0", features = ["derive"] }
 sphinx-packet = "0.1.0"

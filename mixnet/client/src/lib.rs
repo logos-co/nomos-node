@@ -5,6 +5,7 @@ mod sender;
 use std::{error::Error, net::SocketAddr};
 
 use config::Config;
+use rand::Rng;
 use receiver::Receiver;
 use sender::Sender;
 use tokio::sync::broadcast;
@@ -29,13 +30,14 @@ impl MixnetClient {
         })
     }
 
-    pub fn send(
+    pub fn send<R: Rng>(
         &self,
         msg: Vec<u8>,
         destination: SocketAddr,
+        rng: &mut R,
         num_hops: usize,
     ) -> Result<(), Box<dyn Error>> {
-        self.sender.send(msg, destination, num_hops)
+        self.sender.send(msg, destination, rng, num_hops)
     }
 
     pub fn subscribe(&self) -> broadcast::Receiver<Vec<u8>> {
