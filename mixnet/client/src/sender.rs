@@ -34,20 +34,19 @@ impl Sender {
             [0; IDENTIFIER_LENGTH], // TODO: use a proper SURBIdentifier if we need SURB
         );
 
-        let mut packets: Vec<(sphinx_packet::SphinxPacket, route::Node)> = Vec::new();
-
-        for fragment in Sender::pad_and_split_message(msg) {
-            let packet = self.build_sphinx_packet(fragment, &destination, num_hops)?;
-            packets.push(packet);
-        }
-
-        for (packet, first_node) in packets {
-            tokio::spawn(async move {
-                if let Err(e) = Sender::send_packet(Box::new(packet), first_node.address).await {
-                    tracing::error!("failed to send packet to the first node: {e}");
-                }
+        Sender::pad_and_split_message(msg)
+            .into_iter()
+            .map(|fragment| self.build_sphinx_packet(fragment, &destination, num_hops))
+            .collect::<Result<Vec<_>, _>>()?
+            .into_iter()
+            .for_each(|(packet, first_node)| {
+                tokio::spawn(async move {
+                    if let Err(e) = Sender::send_packet(Box::new(packet), first_node.address).await
+                    {
+                        tracing::error!("failed to send packet to the first node: {e}");
+                    }
+                });
             });
-        }
 
         Ok(())
     }
