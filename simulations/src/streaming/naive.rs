@@ -119,7 +119,9 @@ where
                 write_json_record(&mut *file, &self.initialized, &*state)?;
             }
             SubscriberFormat::Csv => {
-                let mut w = csv::Writer::from_writer(&mut *file);
+                let mut w = csv::WriterBuilder::new()
+                    .has_headers(false)
+                    .from_writer(&mut *file);
                 write_csv_record(&mut w, &self.initialized, &*state)?;
             }
             SubscriberFormat::Parquet => {
