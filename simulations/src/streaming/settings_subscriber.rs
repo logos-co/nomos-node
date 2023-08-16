@@ -1,5 +1,6 @@
 use super::{Receivers, Subscriber};
 use crate::output_processors::{RecordType, Runtime};
+use crossbeam::channel::{Receiver, Sender};
 use serde::{Deserialize, Serialize};
 use std::{
     fs::{File, OpenOptions},
@@ -37,8 +38,8 @@ where
     type Settings = SettingsSubscriberSettings;
 
     fn new(
-        record_recv: crossbeam::channel::Receiver<Arc<Self::Record>>,
-        stop_recv: crossbeam::channel::Receiver<()>,
+        record_recv: Receiver<Arc<Self::Record>>,
+        stop_recv: Receiver<Sender<()>>,
         settings: Self::Settings,
     ) -> anyhow::Result<Self>
     where
@@ -73,9 +74,10 @@ where
 
     fn run(self) -> anyhow::Result<()> {
         crossbeam::select! {
-            recv(self.recvs.stop_rx) -> _ => {
+            recv(self.recvs.stop_rx) -> finish_tx => {
                 // collect the run time meta
                 self.sink(Arc::new(R::from(Runtime::load()?)))?;
+                finish_tx?.send(())?;
             }
             recv(self.recvs.recv) -> msg => {
                 self.sink(msg?)?;
