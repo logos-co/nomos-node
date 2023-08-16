@@ -1,9 +1,10 @@
 use super::{Receivers, StreamSettings, Subscriber, SubscriberFormat};
-use crate::output_processors::{RecordType, Runtime};
+use crate::output_processors::{Record, RecordType, Runtime};
 use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 use std::{
     fs::{File, OpenOptions},
+    io::{Seek, Write},
     path::PathBuf,
     sync::{
         atomic::{AtomicBool, Ordering},
@@ -45,7 +46,7 @@ impl Default for NaiveSettings {
 pub struct NaiveSubscriber<R> {
     file: Mutex<File>,
     recvs: Receivers<R>,
-    with_header: AtomicBool,
+    initialized: AtomicBool,
     format: SubscriberFormat,
 }
 
@@ -79,7 +80,7 @@ where
                     .open(&settings.path)?,
             ),
             recvs,
-            with_header: AtomicBool::new(false),
+            initialized: AtomicBool::new(false),
             format: settings.format,
         };
         tracing::info!(
@@ -115,26 +116,11 @@ where
         let mut file = self.file.lock();
         match self.format {
             SubscriberFormat::Json => {
-                serde_json::to_writer(&mut *file, &state)?;
+                write_json_record(&mut *file, &self.initialized, &*state)?;
             }
             SubscriberFormat::Csv => {
                 let mut w = csv::Writer::from_writer(&mut *file);
-                // If have not write csv header, then write it
-                if !self.with_header.load(Ordering::Acquire) {
-                    w.write_record(state.fields()).map_err(|e| {
-                        tracing::error!(target = "simulations", err = %e, "fail to write CSV header");
-                        e
-                    })?;
-
-                    self.with_header.store(true, Ordering::Release);
-                }
-                for data in state.data() {
-                    w.serialize(data).map_err(|e| {
-                        tracing::error!(target = "simulations", err = %e, "fail to write CSV record");
-                        e
-                    })?
-                }
-                w.flush()?;
+                write_csv_record(&mut w, &self.initialized, &*state)?;
             }
             SubscriberFormat::Parquet => {
                 panic!("native subscriber does not support parquet format")
@@ -147,6 +133,64 @@ where
     fn subscribe_data_type() -> RecordType {
         RecordType::Data
     }
+}
+
+impl<R> Drop for NaiveSubscriber<R> {
+    fn drop(&mut self) {
+        if SubscriberFormat::Json == self.format {
+            let mut file = self.file.lock();
+            // To construct a valid json format, we need to overwrite the last comma
+            if let Err(e) = file
+                .seek(std::io::SeekFrom::End(-1))
+                .and_then(|_| file.write_all(b"]}"))
+            {
+                tracing::error!(target="simulations", err=%e, "fail to close json format");
+            }
+        }
+    }
+}
+
+fn write_json_record<W: std::io::Write, R: Record>(
+    mut w: W,
+    initialized: &AtomicBool,
+    record: &R,
+) -> std::io::Result<()> {
+    if !initialized.load(Ordering::Acquire) {
+        w.write_all(b"{\"records\": [")?;
+    }
+    let records = record.data();
+    let num_records = records.len();
+    for (idx, data) in records.into_iter().enumerate() {
+        serde_json::to_writer(&mut w, data)?;
+        if idx != num_records - 1 {
+            w.write_all(b",")?;
+        }
+    }
+    Ok(())
+}
+
+fn write_csv_record<W: std::io::Write, R: Record>(
+    w: &mut csv::Writer<W>,
+    initialized: &AtomicBool,
+    record: &R,
+) -> csv::Result<()> {
+    // If have not write csv header, then write it
+    if !initialized.load(Ordering::Acquire) {
+        w.write_record(record.fields()).map_err(|e| {
+            tracing::error!(target = "simulations", err = %e, "fail to write CSV header");
+            e
+        })?;
+
+        initialized.store(true, Ordering::Release);
+    }
+    for data in record.data() {
+        w.serialize(data).map_err(|e| {
+            tracing::error!(target = "simulations", err = %e, "fail to write CSV record");
+            e
+        })?
+    }
+    w.flush()?;
+    Ok(())
 }
 
 #[cfg(test)]

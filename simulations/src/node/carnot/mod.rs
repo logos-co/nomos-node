@@ -137,7 +137,7 @@ impl Record for CarnotRecord {
     fn data(&self) -> Vec<&CarnotState> {
         match self {
             CarnotRecord::Data(d) => d.iter().map(AsRef::as_ref).collect(),
-            _ => unreachable!(),
+            _ => vec![],
         }
     }
 }
