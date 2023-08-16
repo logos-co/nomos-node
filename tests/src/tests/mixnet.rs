@@ -43,7 +43,6 @@ fn run_mixnodes() -> Topology {
     let topology = Topology {
         layers: vec![
             Layer {
-                id: 0,
                 nodes: HashMap::from([(
                     mixnode1.id(),
                     Mixnode {
@@ -53,7 +52,6 @@ fn run_mixnodes() -> Topology {
                 )]),
             },
             Layer {
-                id: 1,
                 nodes: HashMap::from([(
                     mixnode2.id(),
                     Mixnode {
@@ -63,7 +61,6 @@ fn run_mixnodes() -> Topology {
                 )]),
             },
             Layer {
-                id: 2,
                 nodes: HashMap::from([(
                     mixnode3.id(),
                     Mixnode {

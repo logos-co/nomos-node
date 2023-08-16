@@ -1,11 +1,10 @@
 use std::{collections::HashMap, error::Error, net::SocketAddr};
 
-use nym_sphinx::addressing::nodes::NymNodeRoutingAddress;
+use nym_sphinx::addressing::nodes::{NymNodeRoutingAddress, NymNodeRoutingAddressError};
 use rand::{seq::IteratorRandom, Rng};
 use serde::{Deserialize, Serialize};
 use sphinx_packet::{crypto::PUBLIC_KEY_SIZE, route};
 
-pub type LayerId = u8;
 pub type MixnodeId = [u8; PUBLIC_KEY_SIZE];
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
@@ -15,7 +14,6 @@ pub struct Topology {
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Layer {
-    pub id: LayerId,
     pub nodes: HashMap<MixnodeId, Mixnode>,
 }
 
@@ -26,15 +24,6 @@ pub struct Mixnode {
 }
 
 impl Topology {
-    pub fn layer_id(&self, node_id: MixnodeId) -> Option<LayerId> {
-        for layer in self.layers.iter() {
-            if layer.nodes.contains_key(&node_id) {
-                return Some(layer.id);
-            }
-        }
-        None
-    }
-
     pub fn random_route<R: Rng>(
         &self,
         rng: &mut R,
@@ -44,19 +33,19 @@ impl Topology {
             todo!("return error");
         }
 
-        let mut route: Vec<route::Node> = Vec::new();
-
-        for layer_id in 0..num_hops {
-            let layer = self.layers.get(layer_id).unwrap();
-            route.push(
+        let route: Vec<route::Node> = self
+            .layers
+            .iter()
+            .take(num_hops)
+            .map(|layer| {
                 layer
                     .random_node(rng)
                     .expect("layer is not empty")
                     .clone()
                     .try_into()
-                    .unwrap(),
-            );
-        }
+                    .unwrap()
+            })
+            .collect();
 
         Ok(route)
     }
@@ -69,13 +58,11 @@ impl Layer {
 }
 
 impl TryInto<route::Node> for Mixnode {
-    type Error = ();
+    type Error = NymNodeRoutingAddressError;
 
     fn try_into(self) -> Result<route::Node, Self::Error> {
         Ok(route::Node {
-            address: NymNodeRoutingAddress::from(self.address)
-                .try_into()
-                .unwrap(),
+            address: NymNodeRoutingAddress::from(self.address).try_into()?,
             pub_key: self.public_key.into(),
         })
     }
