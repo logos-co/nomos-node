@@ -1,10 +1,10 @@
 use std::net::SocketAddr;
 
-use mixnet_topology::Topology;
+use mixnet_topology::MixnetTopology;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct Config {
+pub struct MixnetClientConfig {
     pub listen_addr: SocketAddr,
-    pub topology: Topology,
+    pub topology: MixnetTopology,
 }

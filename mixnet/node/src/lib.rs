@@ -1,7 +1,9 @@
+pub mod config;
+
 use std::{error::Error, net::SocketAddr};
 
-use config::Config;
-use mixnet_topology::MixnodeId;
+pub use config::MixnetNodeConfig;
+use mixnet_topology::MixnetNodeId;
 use nym_sphinx::{
     addressing::nodes::NymNodeRoutingAddress, Delay, DestinationAddressBytes, NodeAddressBytes,
     Payload, PrivateKey, PublicKey,
@@ -12,19 +14,17 @@ use tokio::{
     net::{TcpListener, TcpStream},
 };
 
-pub mod config;
-
 // A mix node that routes packets in the Mixnet.
-pub struct Mixnode {
-    config: Config,
+pub struct MixnetNode {
+    config: MixnetNodeConfig,
 }
 
-impl Mixnode {
-    pub fn new(config: Config) -> Self {
+impl MixnetNode {
+    pub fn new(config: MixnetNodeConfig) -> Self {
         Self { config }
     }
 
-    pub fn id(&self) -> MixnodeId {
+    pub fn id(&self) -> MixnetNodeId {
         self.public_key()
     }
 

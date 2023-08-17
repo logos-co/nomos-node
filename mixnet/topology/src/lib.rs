@@ -5,25 +5,25 @@ use rand::{seq::IteratorRandom, Rng};
 use serde::{Deserialize, Serialize};
 use sphinx_packet::{crypto::PUBLIC_KEY_SIZE, route};
 
-pub type MixnodeId = [u8; PUBLIC_KEY_SIZE];
+pub type MixnetNodeId = [u8; PUBLIC_KEY_SIZE];
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
-pub struct Topology {
+pub struct MixnetTopology {
     pub layers: Vec<Layer>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Layer {
-    pub nodes: HashMap<MixnodeId, Mixnode>,
+    pub nodes: HashMap<MixnetNodeId, Node>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct Mixnode {
+pub struct Node {
     pub address: SocketAddr,
     pub public_key: [u8; PUBLIC_KEY_SIZE],
 }
 
-impl Topology {
+impl MixnetTopology {
     pub fn random_route<R: Rng>(
         &self,
         rng: &mut R,
@@ -52,12 +52,12 @@ impl Topology {
 }
 
 impl Layer {
-    pub fn random_node<R: Rng>(&self, rng: &mut R) -> Option<&Mixnode> {
+    pub fn random_node<R: Rng>(&self, rng: &mut R) -> Option<&Node> {
         self.nodes.values().choose(rng)
     }
 }
 
-impl TryInto<route::Node> for Mixnode {
+impl TryInto<route::Node> for Node {
     type Error = NymNodeRoutingAddressError;
 
     fn try_into(self) -> Result<route::Node, Self::Error> {

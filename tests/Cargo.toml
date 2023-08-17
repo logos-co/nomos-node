@@ -14,7 +14,7 @@ overwatch-rs = { git = "https://github.com/logos-co/Overwatch", branch = "main" 
 nomos-core = { path = "../nomos-core" }
 consensus-engine = { path = "../consensus-engine", features = ["serde"] }
 nomos-mempool = { path = "../nomos-services/mempool", features = ["mock"] }
-mixnode = { path = "../mixnet/mixnode" }
+mixnet-node = { path = "../mixnet/node" }
 mixnet-client = { path = "../mixnet/client" }
 mixnet-topology = { path = "../mixnet/topology" }
 # Using older versions, since `mixnet-*` crates depend on `rand` v0.7.3.
@@ -47,5 +47,6 @@ path = "src/tests/mixnet.rs"
 
 [features]
 metrics = ["nomos-node/metrics"]
-waku  = ["nomos-network/waku", "nomos-mempool/waku", "waku-bindings"]
+waku = ["nomos-network/waku", "nomos-mempool/waku", "waku-bindings"]
 libp2p = ["nomos-network/libp2p", "nomos-mempool/libp2p", "nomos-libp2p"]
+

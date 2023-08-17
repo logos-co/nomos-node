@@ -1,6 +1,6 @@
 use std::{error::Error, net::SocketAddr};
 
-use mixnet_topology::Topology;
+use mixnet_topology::MixnetTopology;
 use nym_sphinx::{
     addressing::nodes::NymNodeRoutingAddress, chunking::fragment::Fragment, message::NymMessage,
     params::PacketSize, Delay, Destination, DestinationAddressBytes, NodeAddressBytes,
@@ -13,11 +13,11 @@ use tokio::{io::AsyncWriteExt, net::TcpStream};
 // Sender splits messages into Sphinx packets and sends them to the Mixnet.
 pub struct Sender {
     //TODO: handle topology update
-    topology: Topology,
+    topology: MixnetTopology,
 }
 
 impl Sender {
-    pub fn new(topology: Topology) -> Self {
+    pub fn new(topology: MixnetTopology) -> Self {
         Self { topology }
     }
 

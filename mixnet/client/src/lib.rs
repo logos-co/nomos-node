@@ -4,7 +4,7 @@ mod sender;
 
 use std::{error::Error, net::SocketAddr};
 
-use config::Config;
+pub use config::MixnetClientConfig;
 use rand::Rng;
 use receiver::Receiver;
 use sender::Sender;
@@ -19,7 +19,7 @@ pub struct MixnetClient {
 const CHANNEL_SIZE: usize = 100;
 
 impl MixnetClient {
-    pub async fn run(config: Config) -> Result<Self, Box<dyn Error>> {
+    pub async fn run(config: MixnetClientConfig) -> Result<Self, Box<dyn Error>> {
         let (message_tx, _) = broadcast::channel(CHANNEL_SIZE);
 
         Receiver::run(config.listen_addr, message_tx.clone()).await?;
