@@ -13,12 +13,6 @@ use self::{
 };
 use consensus_engine::{AggregateQc, Block, BlockId, Committee, Qc, StandardQc, TimeoutQc, View};
 
-mod csv;
-mod json;
-
-pub(super) use csv::CarnotStateCsvSerializer;
-pub(super) use json::CarnotStateJsonSerializer;
-
 const NODE_ID: &str = "node_id";
 const CURRENT_VIEW: &str = "current_view";
 const HIGHEST_VOTED_VIEW: &str = "highest_voted_view";
@@ -48,6 +42,94 @@ pub const CARNOT_RECORD_KEYS: &[&str] = &[
     COMMITTED_BLOCKS,
     STEP_DURATION,
 ];
+
+macro_rules! serializer {
+    ($name: ident) => {
+        #[serde_with::skip_serializing_none]
+        #[serde_with::serde_as]
+        #[derive(Serialize, Default)]
+        pub(crate) struct $name<'a> {
+            node_id: Option<NodeIdHelper>,
+            current_view: Option<View>,
+            highest_voted_view: Option<View>,
+            local_high_qc: Option<StandardQcHelper>,
+            safe_blocks: Option<SafeBlocksHelper<'a>>,
+            last_view_timeout_qc: Option<Option<TimeoutQcHelper<'a>>>,
+            latest_committed_block: Option<BlockHelper<'a>>,
+            latest_committed_view: Option<View>,
+            root_committee: Option<CommitteeHelper<'a>>,
+            parent_committee: Option<Option<CommitteeHelper<'a>>>,
+            child_committees: Option<CommitteesHelper<'a>>,
+            committed_blocks: Option<CommittedBlockHelper<'a>>,
+            #[serde_as(as = "Option<serde_with::DurationMilliSeconds>")]
+            step_duration: Option<Duration>,
+        }
+
+        impl<'a> $name<'a> {
+            pub(crate) fn serialize_state<S: serde::ser::Serializer>(
+                &mut self,
+                keys: Vec<&String>,
+                state: &'a super::super::CarnotState,
+                serializer: S,
+            ) -> Result<S::Ok, S::Error> {
+                for k in keys {
+                    match k.trim() {
+                        NODE_ID => {
+                            self.node_id = Some(state.node_id.into());
+                        }
+                        CURRENT_VIEW => {
+                            self.current_view = Some(state.current_view);
+                        }
+                        HIGHEST_VOTED_VIEW => {
+                            self.highest_voted_view = Some(state.highest_voted_view);
+                        }
+                        LOCAL_HIGH_QC => {
+                            self.local_high_qc = Some((&state.local_high_qc).into());
+                        }
+                        SAFE_BLOCKS => {
+                            self.safe_blocks = Some((&state.safe_blocks).into());
+                        }
+                        LAST_VIEW_TIMEOUT_QC => {
+                            self.last_view_timeout_qc =
+                                Some(state.last_view_timeout_qc.as_ref().map(From::from));
+                        }
+                        LATEST_COMMITTED_BLOCK => {
+                            self.latest_committed_block =
+                                Some((&state.latest_committed_block).into());
+                        }
+                        LATEST_COMMITTED_VIEW => {
+                            self.latest_committed_view = Some(state.latest_committed_view);
+                        }
+                        ROOT_COMMITTEE => {
+                            self.root_committee = Some((&state.root_committee).into());
+                        }
+                        PARENT_COMMITTEE => {
+                            self.parent_committee =
+                                Some(state.parent_committee.as_ref().map(From::from));
+                        }
+                        CHILD_COMMITTEES => {
+                            self.child_committees = Some(state.child_committees.as_slice().into());
+                        }
+                        COMMITTED_BLOCKS => {
+                            self.committed_blocks = Some(state.committed_blocks.as_slice().into());
+                        }
+                        STEP_DURATION => {
+                            self.step_duration = Some(state.step_duration);
+                        }
+                        _ => {}
+                    }
+                }
+                state.serialize(serializer)
+            }
+        }
+    };
+}
+
+mod csv;
+mod json;
+
+pub(super) use csv::CarnotStateCsvSerializer;
+pub(super) use json::CarnotStateJsonSerializer;
 
 pub(crate) mod standard_qc {
     use super::*;
