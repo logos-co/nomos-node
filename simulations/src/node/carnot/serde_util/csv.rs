@@ -4,20 +4,20 @@ use super::*;
 #[serde_with::serde_as]
 #[derive(Serialize, Default)]
 pub(crate) struct CarnotStateCsvSerializer<'a> {
-    pub(crate) node_id: Option<NodeIdHelper>,
-    pub(crate) current_view: Option<View>,
-    pub(crate) highest_voted_view: Option<View>,
-    pub(crate) local_high_qc: Option<StandardQcHelper>,
-    pub(crate) safe_blocks: Option<SafeBlocksHelper<'a>>,
-    pub(crate) last_view_timeout_qc: Option<Option<TimeoutQcHelper<'a>>>,
-    pub(crate) latest_committed_block: Option<BlockHelper<'a>>,
-    pub(crate) latest_committed_view: Option<View>,
-    pub(crate) root_committee: Option<CommitteeHelper<'a>>,
-    pub(crate) parent_committee: Option<Option<CommitteeHelper<'a>>>,
-    pub(crate) child_committees: Option<CommitteesHelper<'a>>,
-    pub(crate) committed_blocks: Option<CommittedBlockHelper<'a>>,
+    node_id: Option<NodeIdHelper>,
+    current_view: Option<View>,
+    highest_voted_view: Option<View>,
+    local_high_qc: Option<StandardQcHelper>,
+    safe_blocks: Option<SafeBlocksHelper<'a>>,
+    last_view_timeout_qc: Option<Option<TimeoutQcHelper<'a>>>,
+    latest_committed_block: Option<BlockHelper<'a>>,
+    latest_committed_view: Option<View>,
+    root_committee: Option<CommitteeHelper<'a>>,
+    parent_committee: Option<Option<CommitteeHelper<'a>>>,
+    child_committees: Option<CommitteesHelper<'a>>,
+    committed_blocks: Option<CommittedBlockHelper<'a>>,
     #[serde_as(as = "Option<serde_with::DurationMilliSeconds>")]
-    pub(crate) step_duration: Option<Duration>,
+    step_duration: Option<Duration>,
 }
 
 impl<'a> CarnotStateCsvSerializer<'a> {
@@ -76,29 +76,7 @@ impl<'a> CarnotStateCsvSerializer<'a> {
     }
 }
 
-impl<'a> From<&'a super::super::CarnotState> for CarnotStateCsvSerializer<'a> {
-    fn from(value: &'a super::super::CarnotState) -> Self {
-        Self {
-            node_id: Some(value.node_id.into()),
-            current_view: Some(value.current_view),
-            highest_voted_view: Some(value.highest_voted_view),
-            local_high_qc: Some(StandardQcHelper::from(&value.local_high_qc)),
-            safe_blocks: Some(SafeBlocksHelper::from(&value.safe_blocks)),
-            last_view_timeout_qc: Some(value.last_view_timeout_qc.as_ref().map(From::from)),
-            latest_committed_block: Some(BlockHelper::from(&value.latest_committed_block)),
-            latest_committed_view: Some(value.latest_committed_view),
-            root_committee: Some(CommitteeHelper::from(&value.root_committee)),
-            parent_committee: Some(value.parent_committee.as_ref().map(From::from)),
-            child_committees: Some(CommitteesHelper::from(value.child_committees.as_slice())),
-            committed_blocks: Some(CommittedBlockHelper::from(
-                value.committed_blocks.as_slice(),
-            )),
-            step_duration: Some(value.step_duration),
-        }
-    }
-}
-
-pub(crate) struct SafeBlocksHelper<'a>(&'a HashMap<BlockId, Block>);
+struct SafeBlocksHelper<'a>(&'a HashMap<BlockId, Block>);
 
 impl<'a> From<&'a HashMap<BlockId, Block>> for SafeBlocksHelper<'a> {
     fn from(val: &'a HashMap<BlockId, Block>) -> Self {
@@ -120,7 +98,7 @@ impl<'a> Serialize for SafeBlocksHelper<'a> {
     }
 }
 
-pub(crate) struct CommitteeHelper<'a>(&'a Committee);
+struct CommitteeHelper<'a>(&'a Committee);
 
 impl<'a> From<&'a Committee> for CommitteeHelper<'a> {
     fn from(val: &'a Committee) -> Self {
@@ -142,7 +120,7 @@ impl<'a> Serialize for CommitteeHelper<'a> {
     }
 }
 
-pub(crate) struct CommitteesHelper<'a>(&'a [Committee]);
+struct CommitteesHelper<'a>(&'a [Committee]);
 
 impl<'a> From<&'a [Committee]> for CommitteesHelper<'a> {
     fn from(val: &'a [Committee]) -> Self {
@@ -164,7 +142,7 @@ impl<'a> Serialize for CommitteesHelper<'a> {
     }
 }
 
-pub(crate) struct CommittedBlockHelper<'a>(&'a [BlockId]);
+struct CommittedBlockHelper<'a>(&'a [BlockId]);
 
 impl<'a> From<&'a [BlockId]> for CommittedBlockHelper<'a> {
     fn from(val: &'a [BlockId]) -> Self {
