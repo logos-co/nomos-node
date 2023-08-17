@@ -5,6 +5,7 @@ mod message_cache;
 pub mod messages;
 mod state;
 pub use state::*;
+mod serde_util;
 mod tally;
 mod timeout;
 
@@ -16,14 +17,13 @@ use std::{collections::HashMap, time::Duration};
 // crates
 use bls_signatures::PrivateKey;
 use rand::Rng;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 // internal
 use self::messages::CarnotMessage;
 use super::{Node, NodeId};
 use crate::network::{InMemoryNetworkInterface, NetworkInterface, NetworkMessage};
 use crate::node::carnot::event_builder::{CarnotTx, Event};
 use crate::node::carnot::message_cache::MessageCache;
-use crate::node::NodeIdExt;
 use crate::output_processors::{Record, RecordType, Runtime};
 use crate::settings::SimulationSettings;
 use crate::streaming::SubscriberFormat;
