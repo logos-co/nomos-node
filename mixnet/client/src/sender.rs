@@ -1,6 +1,6 @@
 use std::{error::Error, net::SocketAddr};
 
-use mixnet_protocol::{write_body, BodyType};
+use mixnet_protocol::Body;
 use mixnet_topology::MixnetTopology;
 use nym_sphinx::{
     addressing::nodes::NymNodeRoutingAddress, chunking::fragment::Fragment, message::NymMessage,
@@ -22,11 +22,7 @@ impl Sender {
         Self { topology }
     }
 
-    pub fn send<R: Rng>(
-        &self,
-        msg: Vec<u8>,
-        rng: &mut R,
-    ) -> Result<(), Box<dyn Error>> {
+    pub fn send<R: Rng>(&self, msg: Vec<u8>, rng: &mut R) -> Result<(), Box<dyn Error>> {
         let destination = self.topology.random_destination(rng)?;
         let destination = Destination::new(
             DestinationAddressBytes::from_bytes(destination.address.as_bytes()),
@@ -95,7 +91,8 @@ impl Sender {
         tracing::debug!("Sending a Sphinx packet to the node: {addr:?}");
 
         let mut socket = TcpStream::connect(addr).await?;
-        write_body(&mut socket, BodyType::SphinxPacket, &packet.to_bytes()).await?;
+        let body = Body::new_sphinx(packet);
+        body.write_body(&mut socket).await?;
         tracing::debug!("Sent a Sphinx packet successuflly to the node: {addr:?}");
 
         Ok(())
