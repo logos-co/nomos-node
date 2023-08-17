@@ -2,7 +2,7 @@ pub mod config;
 mod receiver;
 mod sender;
 
-use std::{error::Error, net::SocketAddr};
+use std::error::Error;
 
 pub use config::MixnetClientConfig;
 use rand::Rng;
@@ -22,7 +22,10 @@ impl MixnetClient {
     pub async fn run(config: MixnetClientConfig) -> Result<Self, Box<dyn Error>> {
         let (message_tx, _) = broadcast::channel(CHANNEL_SIZE);
 
-        Receiver::run(config.listen_addr, message_tx.clone()).await?;
+        // Run a receiver only if listen_address is specified
+        if let Some(listen_address) = config.listen_address {
+            Receiver::run(listen_address, message_tx.clone()).await?;
+        }
 
         Ok(Self {
             sender: Sender::new(config.topology),
@@ -30,13 +33,8 @@ impl MixnetClient {
         })
     }
 
-    pub fn send<R: Rng>(
-        &self,
-        msg: Vec<u8>,
-        destination: SocketAddr,
-        rng: &mut R,
-    ) -> Result<(), Box<dyn Error>> {
-        self.sender.send(msg, destination, rng)
+    pub fn send<R: Rng>(&self, msg: Vec<u8>, rng: &mut R) -> Result<(), Box<dyn Error>> {
+        self.sender.send(msg, rng)
     }
 
     pub fn subscribe(&self) -> broadcast::Receiver<Vec<u8>> {

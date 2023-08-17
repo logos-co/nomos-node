@@ -15,7 +15,7 @@ use tokio::{
     sync::broadcast,
 };
 
-// Receiver accepts TCP connections to receive incoming messages from the exit layer of Mixnet.
+// Receiver accepts TCP connections to receive incoming payloads from the Mixnet.
 pub struct Receiver;
 
 impl Receiver {

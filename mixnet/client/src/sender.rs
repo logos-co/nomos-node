@@ -1,5 +1,6 @@
 use std::{error::Error, net::SocketAddr};
 
+use mixnet_protocol::{write_body, BodyType};
 use mixnet_topology::MixnetTopology;
 use nym_sphinx::{
     addressing::nodes::NymNodeRoutingAddress, chunking::fragment::Fragment, message::NymMessage,
@@ -8,7 +9,7 @@ use nym_sphinx::{
 };
 use rand::Rng;
 use sphinx_packet::{route, SphinxPacket, SphinxPacketBuilder};
-use tokio::{io::AsyncWriteExt, net::TcpStream};
+use tokio::net::TcpStream;
 
 // Sender splits messages into Sphinx packets and sends them to the Mixnet.
 pub struct Sender {
@@ -24,13 +25,11 @@ impl Sender {
     pub fn send<R: Rng>(
         &self,
         msg: Vec<u8>,
-        destination: SocketAddr,
         rng: &mut R,
     ) -> Result<(), Box<dyn Error>> {
-        let dest_addr: NodeAddressBytes =
-            NymNodeRoutingAddress::from(destination).try_into().unwrap();
+        let destination = self.topology.random_destination(rng)?;
         let destination = Destination::new(
-            DestinationAddressBytes::from_bytes(dest_addr.as_bytes()),
+            DestinationAddressBytes::from_bytes(destination.address.as_bytes()),
             [0; IDENTIFIER_LENGTH], // TODO: use a proper SURBIdentifier if we need SURB
         );
 
@@ -96,8 +95,7 @@ impl Sender {
         tracing::debug!("Sending a Sphinx packet to the node: {addr:?}");
 
         let mut socket = TcpStream::connect(addr).await?;
-
-        socket.write_all(&packet.to_bytes()).await?;
+        write_body(&mut socket, BodyType::SphinxPacket, &packet.to_bytes()).await?;
         tracing::debug!("Sent a Sphinx packet successuflly to the node: {addr:?}");
 
         Ok(())
