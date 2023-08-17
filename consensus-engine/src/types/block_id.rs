@@ -1,9 +1,7 @@
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq, Ord, PartialOrd)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(transparent))]
-pub struct BlockId(
-    #[cfg_attr(feature = "serde", serde(with = "crate::util::serde_array32"))] pub(crate) [u8; 32],
-);
+pub struct BlockId(pub(crate) [u8; 32]);
 
 impl BlockId {
     pub const fn new(val: [u8; 32]) -> Self {
