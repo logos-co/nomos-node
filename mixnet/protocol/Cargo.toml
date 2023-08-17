@@ -8,3 +8,5 @@ edition = "2021"
 [dependencies]
 tokio = "1.29.1"
 sphinx-packet = "0.1.0"
+futures = "0.3"
+tokio-util = {version  = "0.7", features = ["io", "io-util"] }

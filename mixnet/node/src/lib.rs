@@ -10,7 +10,6 @@ use nym_sphinx::{
     Payload, PrivateKey, PublicKey,
 };
 use sphinx_packet::{crypto::PUBLIC_KEY_SIZE, ProcessedPacket, SphinxPacket};
-use tokio::io::AsyncWriteExt;
 use tokio::net::{TcpListener, TcpStream};
 
 // A mix node that routes packets in the Mixnet.
@@ -61,16 +60,11 @@ impl MixnetNode {
         private_key: PrivateKey,
         client_address: SocketAddr,
     ) -> Result<(), Box<dyn Error>> {
-        let body = Body::read_body(&mut socket).await?;
+        let body = Body::read(&mut socket).await?;
         match body {
             Body::SphinxPacket(packet) => Self::handle_sphinx_packet(private_key, packet).await,
-            Body::FinalPayload(payload) => {
-                Self::handle_final_payload(
-                    private_key,
-                    client_address,
-                    Payload::from_bytes(&payload)?,
-                )
-                .await
+            _body @ Body::FinalPayload(_) => {
+                Self::handle_final_payload(private_key, client_address, _body).await
             }
         }
     }
@@ -92,12 +86,11 @@ impl MixnetNode {
     async fn handle_final_payload(
         _private_key: PrivateKey,
         client_address: SocketAddr,
-        payload: Payload,
+        body: Body<'_>,
     ) -> Result<(), Box<dyn Error>> {
         // TODO: Reuse a conn instead of establishing ad-hoc conns
         let mut client_stream = TcpStream::connect(client_address).await?;
-        // TODO: Decrypt the final payload using the private key
-        client_stream.write_all(payload.as_bytes()).await?;
+        body.write(&mut client_stream).await?;
         Ok(())
     }
 
@@ -123,7 +116,7 @@ impl MixnetNode {
         tracing::debug!("Forwarding final payload to destination mixnode");
 
         Self::forward(
-            Body::new_final_borrowed(payload.as_bytes()),
+            Body::new_final_owned(payload.into_bytes()),
             NymNodeRoutingAddress::try_from_bytes(&destination_addr.as_bytes())?,
         )
         .await
@@ -133,7 +126,7 @@ impl MixnetNode {
         let addr = SocketAddr::try_from(to)?;
 
         let mut socket = TcpStream::connect(addr).await?;
-        body.write_body(&mut socket).await?;
+        body.write(&mut socket).await?;
 
         Ok(())
     }

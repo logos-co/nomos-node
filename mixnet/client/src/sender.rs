@@ -92,7 +92,7 @@ impl Sender {
 
         let mut socket = TcpStream::connect(addr).await?;
         let body = Body::new_sphinx(packet);
-        body.write_body(&mut socket).await?;
+        body.write(&mut socket).await?;
         tracing::debug!("Sent a Sphinx packet successuflly to the node: {addr:?}");
 
         Ok(())
