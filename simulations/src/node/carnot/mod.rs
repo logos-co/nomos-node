@@ -3,6 +3,7 @@
 mod event_builder;
 mod message_cache;
 pub mod messages;
+mod serde_util;
 mod tally;
 mod timeout;
 
@@ -13,7 +14,7 @@ use std::{collections::HashMap, time::Duration};
 // crates
 use bls_signatures::PrivateKey;
 use rand::Rng;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 // internal
 use self::messages::CarnotMessage;
 use super::{Node, NodeId};
@@ -85,7 +86,6 @@ impl serde::Serialize for CarnotState {
     where
         S: serde::Serializer,
     {
-        use serde::ser::SerializeStruct;
         if let Some(rs) = RECORD_SETTINGS.get() {
             let keys = rs
                 .iter()
@@ -98,53 +98,54 @@ impl serde::Serialize for CarnotState {
                 })
                 .collect::<Vec<_>>();
 
-            let mut ser = serializer.serialize_struct("CarnotState", keys.len())?;
+            let mut state = serde_util::CarnotState::default();
             for k in keys {
                 match k.trim() {
-                    NODE_ID => ser.serialize_field(NODE_ID, &self.node_id)?,
-                    CURRENT_VIEW => ser.serialize_field(CURRENT_VIEW, &self.current_view)?,
-                    HIGHEST_VOTED_VIEW => {
-                        ser.serialize_field(HIGHEST_VOTED_VIEW, &self.highest_voted_view)?
+                    NODE_ID => {
+                        state.node_id = Some(self.node_id.into());
                     }
-                    LOCAL_HIGH_QC => ser.serialize_field(LOCAL_HIGH_QC, &self.local_high_qc)?,
+                    CURRENT_VIEW => {
+                        state.current_view = Some(self.current_view);
+                    }
+                    HIGHEST_VOTED_VIEW => {
+                        state.highest_voted_view = Some(self.highest_voted_view);
+                    }
+                    LOCAL_HIGH_QC => {
+                        state.local_high_qc = Some((&self.local_high_qc).into());
+                    }
                     SAFE_BLOCKS => {
-                        #[derive(Serialize)]
-                        #[serde(transparent)]
-                        struct SafeBlockHelper<'a> {
-                            #[serde(serialize_with = "serialize_blocks")]
-                            safe_blocks: &'a HashMap<BlockId, Block>,
-                        }
-                        ser.serialize_field(
-                            SAFE_BLOCKS,
-                            &SafeBlockHelper {
-                                safe_blocks: &self.safe_blocks,
-                            },
-                        )?;
+                        state.safe_blocks = Some((&self.safe_blocks).into());
                     }
                     LAST_VIEW_TIMEOUT_QC => {
-                        ser.serialize_field(LAST_VIEW_TIMEOUT_QC, &self.last_view_timeout_qc)?
+                        state.last_view_timeout_qc =
+                            Some(self.last_view_timeout_qc.as_ref().map(From::from));
                     }
                     LATEST_COMMITTED_BLOCK => {
-                        ser.serialize_field(LATEST_COMMITTED_BLOCK, &self.latest_committed_block)?
+                        state.latest_committed_block = Some((&self.latest_committed_block).into());
                     }
                     LATEST_COMMITTED_VIEW => {
-                        ser.serialize_field(LATEST_COMMITTED_VIEW, &self.latest_committed_view)?
+                        state.latest_committed_view = Some(self.latest_committed_view);
                     }
-                    ROOT_COMMITTEE => ser.serialize_field(ROOT_COMMITTEE, &self.root_committee)?,
+                    ROOT_COMMITTEE => {
+                        state.root_committee = Some((&self.root_committee).into());
+                    }
                     PARENT_COMMITTEE => {
-                        ser.serialize_field(PARENT_COMMITTEE, &self.parent_committee)?
+                        state.parent_committee =
+                            Some(self.parent_committee.as_ref().map(From::from));
                     }
                     CHILD_COMMITTEES => {
-                        ser.serialize_field(CHILD_COMMITTEES, &self.child_committees)?
+                        state.child_committees = Some(self.child_committees.as_slice().into());
                     }
                     COMMITTED_BLOCKS => {
-                        ser.serialize_field(COMMITTED_BLOCKS, &self.committed_blocks)?
+                        state.committed_blocks = Some(self.committed_blocks.as_slice().into());
                     }
-                    STEP_DURATION => ser.serialize_field(STEP_DURATION, &self.step_duration)?,
+                    STEP_DURATION => {
+                        state.step_duration = Some(self.step_duration);
+                    }
                     _ => {}
                 }
             }
-            ser.end()
+            state.serialize(serializer)
         } else {
             serializer.serialize_none()
         }

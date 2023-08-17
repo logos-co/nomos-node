@@ -39,5 +39,5 @@ path = "src/tests/unhappy.rs"
 
 [features]
 metrics = ["nomos-node/metrics"]
-waku  = ["nomos-network/waku", "nomos-mempool/waku", "waku-bindings"]
-libp2p = ["nomos-network/libp2p", "nomos-mempool/libp2p", "nomos-libp2p"]
+waku  = ["nomos-network/waku", "nomos-mempool/waku", "nomos-node/waku", "waku-bindings"]
+libp2p = ["nomos-network/libp2p", "nomos-mempool/libp2p", "nomos-libp2p", "nomos-node/libp2p"]
