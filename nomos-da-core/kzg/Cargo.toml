@@ -1,0 +1,10 @@
+[package]
+name = "kzg"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+kzg = { git = "https://github.com/sifraitech/rust-kzg.git", package = "rust-kzg-blst" }
+kzg_traits = { git = "https://github.com/sifraitech/rust-kzg.git", package = "kzg" }
