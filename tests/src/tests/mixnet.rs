@@ -16,7 +16,7 @@ async fn mixnet() {
     let mut msg = [0u8; 100 * 1024];
     rand::thread_rng().fill_bytes(&mut msg);
 
-    let res = client1.send(msg.to_vec(), destination, &mut OsRng, topology.layers.len());
+    let res = client1.send(msg.to_vec(), destination, &mut OsRng);
     assert!(res.is_ok());
 
     let received = client2.subscribe().recv().await.unwrap();

@@ -24,14 +24,8 @@ pub struct Node {
 }
 
 impl MixnetTopology {
-    pub fn random_route<R: Rng>(
-        &self,
-        rng: &mut R,
-        num_hops: usize,
-    ) -> Result<Vec<route::Node>, Box<dyn Error>> {
-        if self.layers.len() < num_hops {
-            todo!("return error");
-        }
+    pub fn random_route<R: Rng>(&self, rng: &mut R) -> Result<Vec<route::Node>, Box<dyn Error>> {
+        let num_hops = self.layers.len();
 
         let route: Vec<route::Node> = self
             .layers

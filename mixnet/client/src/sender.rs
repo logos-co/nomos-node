@@ -26,7 +26,6 @@ impl Sender {
         msg: Vec<u8>,
         destination: SocketAddr,
         rng: &mut R,
-        num_hops: usize,
     ) -> Result<(), Box<dyn Error>> {
         let dest_addr: NodeAddressBytes =
             NymNodeRoutingAddress::from(destination).try_into().unwrap();
@@ -37,7 +36,7 @@ impl Sender {
 
         Sender::pad_and_split_message(rng, msg)
             .into_iter()
-            .map(|fragment| self.build_sphinx_packet(fragment, &destination, rng, num_hops))
+            .map(|fragment| self.build_sphinx_packet(fragment, &destination, rng))
             .collect::<Result<Vec<_>, _>>()?
             .into_iter()
             .for_each(|(packet, first_node)| {
@@ -70,9 +69,8 @@ impl Sender {
         fragment: Fragment,
         destination: &Destination,
         rng: &mut R,
-        num_hops: usize,
     ) -> Result<(sphinx_packet::SphinxPacket, route::Node), Box<dyn Error>> {
-        let route = self.topology.random_route(rng, num_hops)?;
+        let route = self.topology.random_route(rng)?;
 
         // TODO: use proper delays
         let delays: Vec<Delay> = route.iter().map(|_| Delay::new_from_nanos(0)).collect();

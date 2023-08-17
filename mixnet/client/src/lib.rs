@@ -35,9 +35,8 @@ impl MixnetClient {
         msg: Vec<u8>,
         destination: SocketAddr,
         rng: &mut R,
-        num_hops: usize,
     ) -> Result<(), Box<dyn Error>> {
-        self.sender.send(msg, destination, rng, num_hops)
+        self.sender.send(msg, destination, rng)
     }
 
     pub fn subscribe(&self) -> broadcast::Receiver<Vec<u8>> {
