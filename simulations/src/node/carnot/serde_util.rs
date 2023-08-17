@@ -128,7 +128,7 @@ macro_rules! serializer {
 mod csv;
 mod json;
 
-pub(super) use csv::CarnotStateCsvSerializer;
+pub(super) use self::csv::CarnotStateCsvSerializer;
 pub(super) use json::CarnotStateJsonSerializer;
 
 pub(crate) mod standard_qc {
