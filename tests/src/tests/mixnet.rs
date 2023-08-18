@@ -7,15 +7,16 @@ use mixnet_client::{MixnetClient, MixnetClientConfig, MixnetClientMode};
 use mixnet_node::{MixnetNode, MixnetNodeConfig};
 use mixnet_topology::{Layer, MixnetTopology, Node};
 use rand::{rngs::OsRng, RngCore};
+use tokio::sync::broadcast;
 
 #[tokio::test]
 async fn mixnet() {
-    let (topology, destination_client) = run_nodes_and_clients().await;
+    let (topology, mut destination_rx) = run_nodes_and_clients().await;
 
     let mut msg = [0u8; 100 * 1024];
     rand::thread_rng().fill_bytes(&mut msg);
 
-    let mut sender_client = mixnet_client::new(
+    let mut sender_client = MixnetClient::new(
         MixnetClientConfig {
             mode: MixnetClientMode::Sender,
             topology: topology.clone(),
@@ -26,16 +27,11 @@ async fn mixnet() {
     let res = sender_client.send(msg.to_vec());
     assert!(res.is_ok());
 
-    let received = destination_client
-        .subscribe()
-        .unwrap()
-        .recv()
-        .await
-        .unwrap();
+    let received = destination_rx.recv().await.unwrap();
     assert_eq!(msg, received.as_slice());
 }
 
-async fn run_nodes_and_clients() -> (MixnetTopology, Box<dyn MixnetClient>) {
+async fn run_nodes_and_clients() -> (MixnetTopology, broadcast::Receiver<Vec<u8>>) {
     let config1 = MixnetNodeConfig {
         listen_address: SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(127, 0, 0, 1), 7777)),
         client_address: SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(127, 0, 0, 1), 7778)),
@@ -89,27 +85,41 @@ async fn run_nodes_and_clients() -> (MixnetTopology, Box<dyn MixnetClient>) {
     };
 
     // Run MixnetClient for each MixnetNode
-    let _ = mixnet_client::new(
+    let client1 = MixnetClient::new(
         MixnetClientConfig {
-            mode: MixnetClientMode::SenderReceiver(config1.client_address),
+            mode: MixnetClientMode::SenderReceiver {
+                listen_address: config1.client_address,
+                channel_capacity: 10,
+            },
             topology: topology.clone(),
         },
         OsRng,
     );
-    let _ = mixnet_client::new(
+    let _ = client1.run();
+
+    let client2 = MixnetClient::new(
         MixnetClientConfig {
-            mode: MixnetClientMode::SenderReceiver(config2.client_address),
+            mode: MixnetClientMode::SenderReceiver {
+                listen_address: config2.client_address,
+                channel_capacity: 10,
+            },
             topology: topology.clone(),
         },
         OsRng,
     );
-    let client3 = mixnet_client::new(
+    let _ = client2.run();
+
+    let client3 = MixnetClient::new(
         MixnetClientConfig {
-            mode: MixnetClientMode::SenderReceiver(config3.client_address),
+            mode: MixnetClientMode::SenderReceiver {
+                listen_address: config3.client_address,
+                channel_capacity: 10,
+            },
             topology: topology.clone(),
         },
         OsRng,
     );
+    let client3_rx = client3.run().unwrap();
 
     // Run all MixnetNodes
     tokio::spawn(async move {
@@ -128,5 +138,5 @@ async fn run_nodes_and_clients() -> (MixnetTopology, Box<dyn MixnetClient>) {
     // According to the current implementation,
     // the client3 (connected with the mixnode3 in the exit layer) always will be selected
     // as a destination.
-    (topology, client3)
+    (topology, client3_rx)
 }
