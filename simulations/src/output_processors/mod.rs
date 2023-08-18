@@ -1,4 +1,3 @@
-use std::collections::BTreeSet;
 use std::time::Duration;
 
 use chrono::{DateTime, Utc};
@@ -30,9 +29,6 @@ pub trait Record: From<Runtime> + From<SimulationSettings> + Send + Sync + 'stat
     fn is_data(&self) -> bool {
         self.record_type() == RecordType::Data
     }
-
-    /// Returns the record fields' names
-    fn fields(&self) -> Vec<&str>;
 
     fn data(&self) -> Vec<&Self::Data>;
 }
@@ -97,33 +93,11 @@ impl Record for OutData {
         }
     }
 
-    fn fields(&self) -> Vec<&str> {
-        match self {
-            Self::Runtime(_) => vec![],
-            Self::Settings(_) => vec![],
-            Self::Data(d) => get_keys(d),
-        }
-    }
-
     fn data(&self) -> Vec<&SerializedNodeState> {
         match self {
             Self::Data(d) => vec![d],
             _ => unreachable!(),
         }
-    }
-}
-
-fn get_keys(val: &serde_json::Value) -> Vec<&str> {
-    let mut keys = BTreeSet::new();
-    match val {
-        serde_json::Value::Object(obj) => return obj.iter().map(|(k, _)| k.as_str()).collect(),
-        serde_json::Value::Array(arr) => {
-            for el in arr.iter() {
-                keys.extend(get_keys(el));
-            }
-            keys.into_iter().collect()
-        }
-        _ => keys.into_iter().collect(),
     }
 }
 

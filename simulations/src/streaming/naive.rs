@@ -124,10 +124,7 @@ where
                 write_json_record(&mut *file, &self.initialized, &*state)?;
             }
             SubscriberFormat::Csv => {
-                let mut w = csv::WriterBuilder::new()
-                    .has_headers(false)
-                    .from_writer(&mut *file);
-                write_csv_record(&mut w, &self.initialized, &*state)?;
+                write_csv_record(&mut *file, &self.initialized, &*state)?;
             }
             SubscriberFormat::Parquet => {
                 panic!("native subscriber does not support parquet format")
@@ -174,19 +171,17 @@ fn write_json_record<W: std::io::Write, R: Record>(
 }
 
 fn write_csv_record<W: std::io::Write, R: Record>(
-    w: &mut csv::Writer<W>,
+    w: &mut W,
     initialized: &AtomicBool,
     record: &R,
 ) -> csv::Result<()> {
     // If have not write csv header, then write it
-    if !initialized.load(Ordering::Acquire) {
-        w.write_record(record.fields()).map_err(|e| {
-            tracing::error!(target = "simulations", err = %e, "fail to write CSV header");
-            e
-        })?;
-
+    let mut w = if !initialized.load(Ordering::Acquire) {
         initialized.store(true, Ordering::Release);
-    }
+        csv::WriterBuilder::new().has_headers(true).from_writer(w)
+    } else {
+        csv::WriterBuilder::new().has_headers(false).from_writer(w)
+    };
     for data in record.data() {
         w.serialize(data).map_err(|e| {
             tracing::error!(target = "simulations", err = %e, "fail to write CSV record");

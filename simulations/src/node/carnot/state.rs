@@ -72,22 +72,6 @@ impl Record for CarnotRecord {
         }
     }
 
-    fn fields(&self) -> Vec<&str> {
-        if let Some(rs) = RECORD_SETTINGS.get() {
-            std::iter::once("step_id")
-                .chain(rs.iter().filter_map(|(k, v)| {
-                    if serde_util::CARNOT_RECORD_KEYS.contains(&k.trim()) && *v {
-                        Some(k.as_str())
-                    } else {
-                        None
-                    }
-                }))
-                .collect::<Vec<_>>()
-        } else {
-            vec![]
-        }
-    }
-
     fn data(&self) -> Vec<&CarnotState> {
         match self {
             CarnotRecord::Data(d) => d.iter().map(AsRef::as_ref).collect(),
