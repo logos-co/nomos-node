@@ -18,10 +18,27 @@ pub struct CarnotState {
     pub(crate) committed_blocks: Vec<BlockId>,
     pub(super) step_duration: Duration,
 
+    /// Step id for this state
+    pub(super) step_id: usize,
     /// does not serialize this field, this field is used to check
     /// how to serialize other fields because csv format does not support
     /// nested map or struct, we have to do some customize.
     pub(super) format: SubscriberFormat,
+}
+
+impl CarnotState {
+    pub(super) fn new<O: Overlay>(
+        step_id: usize,
+        step_duration: Duration,
+        fmt: SubscriberFormat,
+        engine: &Carnot<O>,
+    ) -> Self {
+        let mut this = Self::from(engine);
+        this.step_id = step_id;
+        this.step_duration = step_duration;
+        this.format = fmt;
+        this
+    }
 }
 
 #[derive(Serialize)]
@@ -56,23 +73,19 @@ impl Record for CarnotRecord {
     }
 
     fn fields(&self) -> Vec<&str> {
-        let mut fields = if let Some(rs) = RECORD_SETTINGS.get() {
-            rs.iter()
-                .filter_map(|(k, v)| {
+        if let Some(rs) = RECORD_SETTINGS.get() {
+            std::iter::once("step_id")
+                .chain(rs.iter().filter_map(|(k, v)| {
                     if serde_util::CARNOT_RECORD_KEYS.contains(&k.trim()) && *v {
                         Some(k.as_str())
                     } else {
                         None
                     }
-                })
+                }))
                 .collect::<Vec<_>>()
         } else {
             vec![]
-        };
-
-        // sort fields to make sure the we are matching header field and record field when using csv format
-        fields.sort();
-        fields
+        }
     }
 
     fn data(&self) -> Vec<&CarnotState> {
@@ -159,6 +172,7 @@ impl<O: Overlay> From<&Carnot<O>> for CarnotState {
             highest_voted_view: Default::default(),
             step_duration: Default::default(),
             format: SubscriberFormat::Csv,
+            step_id: 0,
         }
     }
 }

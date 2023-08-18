@@ -164,14 +164,11 @@ fn write_json_record<W: std::io::Write, R: Record>(
 ) -> std::io::Result<()> {
     if !initialized.load(Ordering::Acquire) {
         w.write_all(b"{\"records\": [")?;
+        initialized.store(true, Ordering::Release);
     }
-    let records = record.data();
-    let num_records = records.len();
-    for (idx, data) in records.into_iter().enumerate() {
+    for data in record.data() {
         serde_json::to_writer(&mut w, data)?;
-        if idx != num_records - 1 {
-            w.write_all(b",")?;
-        }
+        w.write_all(b",")?;
     }
     Ok(())
 }

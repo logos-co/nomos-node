@@ -10,6 +10,7 @@ mod tally;
 mod timeout;
 
 use std::any::Any;
+use std::collections::BTreeMap;
 // std
 use std::hash::Hash;
 use std::time::Instant;
@@ -39,12 +40,12 @@ use nomos_consensus::{
     network::messages::{NewViewMsg, TimeoutMsg, VoteMsg},
 };
 
-static RECORD_SETTINGS: std::sync::OnceLock<HashMap<String, bool>> = std::sync::OnceLock::new();
+static RECORD_SETTINGS: std::sync::OnceLock<BTreeMap<String, bool>> = std::sync::OnceLock::new();
 
 #[derive(Clone, Default, Deserialize)]
 pub struct CarnotSettings {
     timeout: Duration,
-    record_settings: HashMap<String, bool>,
+    record_settings: BTreeMap<String, bool>,
 
     #[serde(default)]
     format: SubscriberFormat,
@@ -53,7 +54,7 @@ pub struct CarnotSettings {
 impl CarnotSettings {
     pub fn new(
         timeout: Duration,
-        record_settings: HashMap<String, bool>,
+        record_settings: BTreeMap<String, bool>,
         format: SubscriberFormat,
     ) -> Self {
         Self {
@@ -68,6 +69,8 @@ impl CarnotSettings {
 pub struct CarnotNode<O: Overlay> {
     id: consensus_engine::NodeId,
     state: CarnotState,
+    /// A step counter
+    current_step: usize,
     settings: CarnotSettings,
     network_interface: InMemoryNetworkInterface<CarnotMessage>,
     message_cache: MessageCache,
@@ -110,8 +113,10 @@ impl<
             engine,
             random_beacon_pk,
             step_duration: Duration::ZERO,
+            current_step: 0,
         };
         this.state = CarnotState::from(&this.engine);
+        this.state.format = this.settings.format;
         this
     }
 
@@ -421,9 +426,13 @@ impl<
         }
 
         // update state
-        self.state = CarnotState::from(&self.engine);
-        self.state.format = self.settings.format;
-        self.state.step_duration = step_duration.elapsed();
+        self.state = CarnotState::new(
+            self.current_step,
+            step_duration.elapsed(),
+            self.settings.format,
+            &self.engine,
+        );
+        self.current_step += 1;
     }
 }
 

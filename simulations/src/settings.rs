@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 use crate::network::NetworkSettings;
 use crate::streaming::StreamSettings;
@@ -53,7 +53,7 @@ pub struct SimulationSettings {
     #[serde(default)]
     pub wards: Vec<Ward>,
     #[serde(default)]
-    pub record_settings: HashMap<String, bool>,
+    pub record_settings: BTreeMap<String, bool>,
     pub network_settings: NetworkSettings,
     pub overlay_settings: OverlaySettings,
     pub node_settings: NodeSettings,

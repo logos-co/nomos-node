@@ -27,40 +27,43 @@ const CHILD_COMMITTEES: &str = "child_committees";
 const COMMITTED_BLOCKS: &str = "committed_blocks";
 const STEP_DURATION: &str = "step_duration";
 
+/// Order is important when serialize to CSV.
 pub const CARNOT_RECORD_KEYS: &[&str] = &[
-    NODE_ID,
+    CHILD_COMMITTEES,
+    COMMITTED_BLOCKS,
     CURRENT_VIEW,
     HIGHEST_VOTED_VIEW,
-    LOCAL_HIGH_QC,
-    SAFE_BLOCKS,
     LAST_VIEW_TIMEOUT_QC,
     LATEST_COMMITTED_BLOCK,
     LATEST_COMMITTED_VIEW,
-    ROOT_COMMITTEE,
+    LOCAL_HIGH_QC,
+    NODE_ID,
     PARENT_COMMITTEE,
-    CHILD_COMMITTEES,
-    COMMITTED_BLOCKS,
+    ROOT_COMMITTEE,
+    SAFE_BLOCKS,
     STEP_DURATION,
 ];
 
 macro_rules! serializer {
     ($name: ident) => {
+        // Fields order is in alphabetic, order is important when sink to CSV file.
         #[serde_with::skip_serializing_none]
         #[serde_with::serde_as]
         #[derive(Serialize, Default)]
         pub(crate) struct $name<'a> {
-            node_id: Option<NodeIdHelper<'a>>,
+            step_id: usize,
+            child_committees: Option<CommitteesHelper<'a>>,
+            committed_blocks: Option<CommittedBlockHelper<'a>>,
             current_view: Option<View>,
             highest_voted_view: Option<View>,
-            local_high_qc: Option<StandardQcHelper<'a>>,
-            safe_blocks: Option<SafeBlocksHelper<'a>>,
             last_view_timeout_qc: Option<Option<TimeoutQcHelper<'a>>>,
             latest_committed_block: Option<BlockHelper<'a>>,
             latest_committed_view: Option<View>,
-            root_committee: Option<CommitteeHelper<'a>>,
+            local_high_qc: Option<StandardQcHelper<'a>>,
+            node_id: Option<NodeIdHelper<'a>>,
             parent_committee: Option<Option<CommitteeHelper<'a>>>,
-            child_committees: Option<CommitteesHelper<'a>>,
-            committed_blocks: Option<CommittedBlockHelper<'a>>,
+            root_committee: Option<CommitteeHelper<'a>>,
+            safe_blocks: Option<SafeBlocksHelper<'a>>,
             #[serde_as(as = "Option<serde_with::DurationMilliSeconds>")]
             step_duration: Option<Duration>,
         }
@@ -72,6 +75,7 @@ macro_rules! serializer {
                 state: &'a super::super::CarnotState,
                 serializer: S,
             ) -> Result<S::Ok, S::Error> {
+                self.step_id = state.step_id;
                 for k in keys {
                     match k.trim() {
                         NODE_ID => {
@@ -191,12 +195,17 @@ pub(crate) mod qc {
         Aggregate(aggregate_qc::AggregateQcHelper<'a>),
     }
 
+    impl<'a> From<&'a Qc> for QcHelper<'a> {
+        fn from(value: &'a Qc) -> Self {
+            match value {
+                Qc::Standard(s) => Self::Standard(s),
+                Qc::Aggregated(a) => Self::Aggregate(a.into()),
+            }
+        }
+    }
+
     pub fn serialize<S: serde::Serializer>(t: &Qc, serializer: S) -> Result<S::Ok, S::Error> {
-        let qc = match t {
-            Qc::Standard(s) => QcHelper::Standard(s),
-            Qc::Aggregated(a) => QcHelper::Aggregate(aggregate_qc::AggregateQcHelper::from(a)),
-        };
-        qc.serialize(serializer)
+        QcHelper::from(t).serialize(serializer)
     }
 }
 
@@ -234,7 +243,7 @@ pub(crate) mod timeout_qc {
 pub(crate) mod serde_block {
     use consensus_engine::LeaderProof;
 
-    use super::*;
+    use super::{qc::QcHelper, *};
 
     #[derive(Serialize)]
     #[serde(untagged)]
@@ -256,7 +265,7 @@ pub(crate) mod serde_block {
     pub(crate) struct BlockHelper<'a> {
         view: View,
         id: BlockIdHelper<'a>,
-        parent_qc: &'a Qc,
+        parent_qc: QcHelper<'a>,
         leader_proof: LeaderProofHelper<'a>,
     }
 
@@ -265,7 +274,7 @@ pub(crate) mod serde_block {
             Self {
                 view: val.view,
                 id: (&val.id).into(),
-                parent_qc: &val.parent_qc,
+                parent_qc: (&val.parent_qc).into(),
                 leader_proof: (&val.leader_proof).into(),
             }
         }
