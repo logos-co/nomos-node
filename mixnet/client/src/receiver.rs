@@ -27,30 +27,25 @@ impl Receiver {
         let listener = TcpListener::bind(listen_addr).await?;
         let message_reconstructor: Arc<Mutex<MessageReconstructor>> = Default::default();
 
-        tokio::spawn(async move {
-            loop {
-                match listener.accept().await {
-                    Ok((socket, remote_addr)) => {
-                        tracing::debug!("Accepted incoming connection from {remote_addr:?}");
+        loop {
+            match listener.accept().await {
+                Ok((socket, remote_addr)) => {
+                    tracing::debug!("Accepted incoming connection from {remote_addr:?}");
 
-                        let message_tx = message_tx.clone();
-                        let message_reconstructor = message_reconstructor.clone();
+                    let message_tx = message_tx.clone();
+                    let message_reconstructor = message_reconstructor.clone();
 
-                        tokio::spawn(async {
-                            if let Err(e) =
-                                Self::handle_connection(socket, message_tx, message_reconstructor)
-                                    .await
-                            {
-                                tracing::error!("failed to handle conn: {e}");
-                            }
-                        });
-                    }
-                    Err(e) => tracing::warn!("Failed to accept incoming connection: {e}"),
+                    tokio::spawn(async {
+                        if let Err(e) =
+                            Self::handle_connection(socket, message_tx, message_reconstructor).await
+                        {
+                            tracing::error!("failed to handle conn: {e}");
+                        }
+                    });
                 }
+                Err(e) => tracing::warn!("Failed to accept incoming connection: {e}"),
             }
-        });
-
-        Ok(())
+        }
     }
 
     async fn handle_connection(

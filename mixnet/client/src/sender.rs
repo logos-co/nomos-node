@@ -12,32 +12,32 @@ use sphinx_packet::{route, SphinxPacket, SphinxPacketBuilder};
 use tokio::net::TcpStream;
 
 // Sender splits messages into Sphinx packets and sends them to the Mixnet.
-pub struct Sender {
+pub struct Sender<R: Rng> {
     //TODO: handle topology update
     topology: MixnetTopology,
+    rng: R,
 }
 
-impl Sender {
-    pub fn new(topology: MixnetTopology) -> Self {
-        Self { topology }
+impl<R: Rng> Sender<R> {
+    pub fn new(topology: MixnetTopology, rng: R) -> Self {
+        Self { topology, rng }
     }
 
-    pub fn send<R: Rng>(&self, msg: Vec<u8>, rng: &mut R) -> Result<(), Box<dyn Error>> {
-        let destination = self.topology.random_destination(rng)?;
+    pub fn send(&mut self, msg: Vec<u8>) -> Result<(), Box<dyn Error>> {
+        let destination = self.topology.random_destination(&mut self.rng)?;
         let destination = Destination::new(
             DestinationAddressBytes::from_bytes(destination.address.as_bytes()),
             [0; IDENTIFIER_LENGTH], // TODO: use a proper SURBIdentifier if we need SURB
         );
 
-        Sender::pad_and_split_message(rng, msg)
+        self.pad_and_split_message(msg)
             .into_iter()
-            .map(|fragment| self.build_sphinx_packet(fragment, &destination, rng))
+            .map(|fragment| self.build_sphinx_packet(fragment, &destination))
             .collect::<Result<Vec<_>, _>>()?
             .into_iter()
             .for_each(|(packet, first_node)| {
                 tokio::spawn(async move {
-                    if let Err(e) = Sender::send_packet(Box::new(packet), first_node.address).await
-                    {
+                    if let Err(e) = Self::send_packet(Box::new(packet), first_node.address).await {
                         tracing::error!("failed to send packet to the first node: {e}");
                     }
                 });
@@ -46,7 +46,7 @@ impl Sender {
         Ok(())
     }
 
-    fn pad_and_split_message<R: Rng>(rng: &mut R, msg: Vec<u8>) -> Vec<Fragment> {
+    fn pad_and_split_message(&mut self, msg: Vec<u8>) -> Vec<Fragment> {
         let nym_message = NymMessage::new_plain(msg);
 
         // TODO: add PUBLIC_KEY_SIZE for encryption for the destination
@@ -56,16 +56,15 @@ impl Sender {
 
         nym_message
             .pad_to_full_packet_lengths(plaintext_size_per_packet)
-            .split_into_fragments(rng, plaintext_size_per_packet)
+            .split_into_fragments(&mut self.rng, plaintext_size_per_packet)
     }
 
-    fn build_sphinx_packet<R: Rng>(
-        &self,
+    fn build_sphinx_packet(
+        &mut self,
         fragment: Fragment,
         destination: &Destination,
-        rng: &mut R,
     ) -> Result<(sphinx_packet::SphinxPacket, route::Node), Box<dyn Error>> {
-        let route = self.topology.random_route(rng)?;
+        let route = self.topology.random_route(&mut self.rng)?;
 
         // TODO: use proper delays
         let delays: Vec<Delay> = route.iter().map(|_| Delay::new_from_nanos(0)).collect();
