@@ -3,17 +3,14 @@ pub mod config;
 use std::{error::Error, net::SocketAddr};
 
 pub use config::MixnetNodeConfig;
-use mixnet_protocol::{write_body, BodyType};
+use mixnet_protocol::Body;
 use mixnet_topology::MixnetNodeId;
 use nym_sphinx::{
     addressing::nodes::NymNodeRoutingAddress, Delay, DestinationAddressBytes, NodeAddressBytes,
     Payload, PrivateKey, PublicKey,
 };
 use sphinx_packet::{crypto::PUBLIC_KEY_SIZE, ProcessedPacket, SphinxPacket};
-use tokio::{
-    io::AsyncReadExt,
-    net::{TcpListener, TcpStream},
-};
+use tokio::net::{TcpListener, TcpStream};
 
 // A mix node that routes packets in the Mixnet.
 pub struct MixnetNode {
@@ -63,24 +60,19 @@ impl MixnetNode {
         private_key: PrivateKey,
         client_address: SocketAddr,
     ) -> Result<(), Box<dyn Error>> {
-        match BodyType::from_u8(socket.read_u8().await?) {
-            BodyType::SphinxPacket => Self::handle_sphinx_packet(socket, private_key).await,
-            BodyType::FinalPayload => {
-                Self::handle_final_payload(socket, private_key, client_address).await
+        let body = Body::read(&mut socket).await?;
+        match body {
+            Body::SphinxPacket(packet) => Self::handle_sphinx_packet(private_key, packet).await,
+            _body @ Body::FinalPayload(_) => {
+                Self::handle_final_payload(private_key, client_address, _body).await
             }
         }
     }
 
     async fn handle_sphinx_packet(
-        mut socket: TcpStream,
         private_key: PrivateKey,
+        packet: Box<SphinxPacket>,
     ) -> Result<(), Box<dyn Error>> {
-        let mut buf = Vec::new();
-        socket.read_to_end(&mut buf).await?;
-
-        let packet = SphinxPacket::from_bytes(&buf)?;
-        tracing::debug!("received a Sphinx packet from the TCP conn");
-
         match packet.process(&private_key)? {
             ProcessedPacket::ForwardHop(packet, next_node_addr, delay) => {
                 Self::forward_packet_to_next_hop(packet, next_node_addr, delay).await
@@ -92,16 +84,14 @@ impl MixnetNode {
     }
 
     async fn handle_final_payload(
-        mut socket: TcpStream,
         _private_key: PrivateKey,
         client_address: SocketAddr,
+        body: Body<'_>,
     ) -> Result<(), Box<dyn Error>> {
         // TODO: Reuse a conn instead of establishing ad-hoc conns
         let mut client_stream = TcpStream::connect(client_address).await?;
-
         // TODO: Decrypt the final payload using the private key
-        let _ = tokio::io::copy(&mut socket, &mut client_stream).await?;
-
+        body.write(&mut client_stream).await?;
         Ok(())
     }
 
@@ -114,8 +104,7 @@ impl MixnetNode {
         tokio::time::sleep(delay.to_duration()).await;
 
         Self::forward(
-            BodyType::SphinxPacket,
-            &packet.to_bytes(),
+            Body::new_sphinx(packet),
             NymNodeRoutingAddress::try_from(next_node_addr)?,
         )
         .await
@@ -128,22 +117,17 @@ impl MixnetNode {
         tracing::debug!("Forwarding final payload to destination mixnode");
 
         Self::forward(
-            BodyType::FinalPayload,
-            payload.as_bytes(),
+            Body::new_final_owned(payload.into_bytes()),
             NymNodeRoutingAddress::try_from_bytes(&destination_addr.as_bytes())?,
         )
         .await
     }
 
-    async fn forward(
-        body_type: BodyType,
-        body: &[u8],
-        to: NymNodeRoutingAddress,
-    ) -> Result<(), Box<dyn Error>> {
+    async fn forward(body: Body<'_>, to: NymNodeRoutingAddress) -> Result<(), Box<dyn Error>> {
         let addr = SocketAddr::try_from(to)?;
 
         let mut socket = TcpStream::connect(addr).await?;
-        write_body(&mut socket, body_type, body).await?;
+        body.write(&mut socket).await?;
 
         Ok(())
     }

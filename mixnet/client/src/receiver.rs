@@ -4,6 +4,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 
+use mixnet_protocol::Body;
 use nym_sphinx::{
     chunking::{fragment::Fragment, reconstruction::MessageReconstructor},
     message::{NymMessage, PaddedMessage},
@@ -52,11 +53,24 @@ impl Receiver {
         message_tx: broadcast::Sender<Vec<u8>>,
         message_reconstructor: Arc<Mutex<MessageReconstructor>>,
     ) -> Result<(), Box<dyn Error>> {
-        let mut buf = Vec::new();
-        socket.read_to_end(&mut buf).await?;
+        let body = Body::read(&mut socket).await?;
+        match body {
+            Body::SphinxPacket(_) => Err("received sphinx packet not expected".into()),
+            Body::FinalPayload(mut reader) => {
+                let mut buf = Vec::new();
+                reader.read_to_end(&mut buf).await?;
+                let payload = Payload::from_bytes(&buf)?;
 
-        let payload = Payload::from_bytes(&buf)?.recover_plaintext()?;
-        let fragment = Fragment::try_from_bytes(&payload)?;
+                Self::handle_payload(payload, message_tx, message_reconstructor).await
+            }
+        }
+    }
+    async fn handle_payload(
+        payload: Payload,
+        message_tx: broadcast::Sender<Vec<u8>>,
+        message_reconstructor: Arc<Mutex<MessageReconstructor>>,
+    ) -> Result<(), Box<dyn Error>> {
+        let fragment = Fragment::try_from_bytes(&payload.recover_plaintext()?)?;
 
         if let Some((padded_message, _)) = {
             let mut reconstructor = message_reconstructor.lock().unwrap();
