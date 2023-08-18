@@ -5,7 +5,7 @@ use serde::{
     Deserialize, Serialize,
 };
 
-use self::{ 
+use self::{
     serde_id::{BlockIdHelper, NodeIdHelper},
     standard_qc::StandardQcHelper,
     timeout_qc::TimeoutQcHelper,
@@ -238,8 +238,6 @@ pub(crate) mod timeout_qc {
         TimeoutQcHelper::from(t).serialize(serializer)
     }
 }
-
-
 
 pub(crate) mod serde_id {
     use consensus_engine::{BlockId, NodeId};
