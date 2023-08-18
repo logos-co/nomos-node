@@ -51,7 +51,7 @@ impl Receiver {
 
     async fn handle_connection(
         mut socket: TcpStream,
-        message_tx: impl Sink<Vec<u8>> + Clone + Unpin,
+        message_tx: impl Sink<Vec<u8>> + Unpin,
         message_reconstructor: Arc<Mutex<MessageReconstructor>>,
     ) -> Result<(), Box<dyn Error>> {
         let body = Body::read(&mut socket).await?;
@@ -69,7 +69,7 @@ impl Receiver {
 
     async fn handle_payload(
         payload: Payload,
-        mut message_tx: impl Sink<Vec<u8>> + Clone + Unpin,
+        mut message_tx: impl Sink<Vec<u8>> + Unpin,
         message_reconstructor: Arc<Mutex<MessageReconstructor>>,
     ) -> Result<(), Box<dyn Error>> {
         let fragment = Fragment::try_from_bytes(&payload.recover_plaintext()?)?;
