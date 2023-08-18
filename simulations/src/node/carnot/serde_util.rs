@@ -26,7 +26,6 @@ const CHILD_COMMITTEES: &str = "child_committees";
 const COMMITTED_BLOCKS: &str = "committed_blocks";
 const STEP_DURATION: &str = "step_duration";
 
-/// Order is important when serialize to CSV.
 pub const CARNOT_RECORD_KEYS: &[&str] = &[
     CHILD_COMMITTEES,
     COMMITTED_BLOCKS,
@@ -45,7 +44,6 @@ pub const CARNOT_RECORD_KEYS: &[&str] = &[
 
 macro_rules! serializer {
     ($name: ident) => {
-        // Fields order is in alphabetic, order is important when sink to CSV file.
         #[serde_with::skip_serializing_none]
         #[serde_with::serde_as]
         #[derive(Serialize, Default)]
