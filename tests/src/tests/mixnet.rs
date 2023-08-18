@@ -3,7 +3,7 @@ use std::{
     net::{Ipv4Addr, SocketAddr, SocketAddrV4},
 };
 
-use mixnet_client::{MixnetClient, MixnetClientConfig};
+use mixnet_client::{MixnetClient, MixnetClientConfig, MixnetClientMode};
 use mixnet_node::{MixnetNode, MixnetNodeConfig};
 use mixnet_topology::{Layer, MixnetTopology, Node};
 use rand::{rngs::OsRng, RngCore};
@@ -15,21 +15,27 @@ async fn mixnet() {
     let mut msg = [0u8; 100 * 1024];
     rand::thread_rng().fill_bytes(&mut msg);
 
-    let sender_client = MixnetClient::run(MixnetClientConfig {
-        listen_address: None, // It's not mandatory for senders to listen conns from MixnetNode
-        topology: topology.clone(),
-    })
-    .await
-    .unwrap();
+    let mut sender_client = mixnet_client::new(
+        MixnetClientConfig {
+            mode: MixnetClientMode::Sender,
+            topology: topology.clone(),
+        },
+        OsRng,
+    );
 
-    let res = sender_client.send(msg.to_vec(), &mut OsRng);
+    let res = sender_client.send(msg.to_vec());
     assert!(res.is_ok());
 
-    let received = destination_client.subscribe().recv().await.unwrap();
+    let received = destination_client
+        .subscribe()
+        .unwrap()
+        .recv()
+        .await
+        .unwrap();
     assert_eq!(msg, received.as_slice());
 }
 
-async fn run_nodes_and_clients() -> (MixnetTopology, MixnetClient) {
+async fn run_nodes_and_clients() -> (MixnetTopology, Box<dyn MixnetClient>) {
     let config1 = MixnetNodeConfig {
         listen_address: SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(127, 0, 0, 1), 7777)),
         client_address: SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(127, 0, 0, 1), 7778)),
@@ -83,24 +89,27 @@ async fn run_nodes_and_clients() -> (MixnetTopology, MixnetClient) {
     };
 
     // Run MixnetClient for each MixnetNode
-    let _ = MixnetClient::run(MixnetClientConfig {
-        topology: topology.clone(),
-        listen_address: Some(config1.client_address),
-    })
-    .await
-    .unwrap();
-    let _ = MixnetClient::run(MixnetClientConfig {
-        topology: topology.clone(),
-        listen_address: Some(config2.client_address),
-    })
-    .await
-    .unwrap();
-    let client3 = MixnetClient::run(MixnetClientConfig {
-        topology: topology.clone(),
-        listen_address: Some(config3.client_address),
-    })
-    .await
-    .unwrap();
+    let _ = mixnet_client::new(
+        MixnetClientConfig {
+            mode: MixnetClientMode::SenderReceiver(config1.client_address),
+            topology: topology.clone(),
+        },
+        OsRng,
+    );
+    let _ = mixnet_client::new(
+        MixnetClientConfig {
+            mode: MixnetClientMode::SenderReceiver(config2.client_address),
+            topology: topology.clone(),
+        },
+        OsRng,
+    );
+    let client3 = mixnet_client::new(
+        MixnetClientConfig {
+            mode: MixnetClientMode::SenderReceiver(config3.client_address),
+            topology: topology.clone(),
+        },
+        OsRng,
+    );
 
     // Run all MixnetNodes
     tokio::spawn(async move {
