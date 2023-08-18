@@ -56,12 +56,21 @@ impl Record for CarnotRecord {
     }
 
     fn fields(&self) -> Vec<&str> {
-        let mut fields = RECORD_SETTINGS
-            .get()
-            .unwrap()
-            .keys()
-            .map(String::as_str)
-            .collect::<Vec<_>>();
+        let mut fields = if let Some(rs) = RECORD_SETTINGS.get() {
+            rs
+                .iter()
+                .filter_map(|(k, v)| {
+                    if serde_util::CARNOT_RECORD_KEYS.contains(&k.trim()) && *v {
+                        Some(k.as_str())
+                    } else {
+                        None
+                    }
+                })
+                .collect::<Vec<_>>()
+        } else {
+            vec![]
+        };
+
         // sort fields to make sure the we are matching header field and record field when using csv format
         fields.sort();
         fields
@@ -116,6 +125,7 @@ impl serde::Serialize for CarnotState {
                     .serialize_state(keys, self, serializer),
                 SubscriberFormat::Parquet => unreachable!(),
             }
+            // serializer.serialize_none()
         } else {
             serializer.serialize_none()
         }

@@ -37,18 +37,17 @@
   "wards": [
 	  {"max_view": 1}
   ],
-  "record_settings": { 
-	"node_id": true,
-	"current_view": true,
-	"highest_voted_view": true,
-	"local_high_qc": true,
-	"safe_blocks": true,
-	"last_view_timeout_qc": true,
-	"latest_committed_block": true,
-	"latest_committed_view": true,
-	"root_committee": true,
-	"parent_committee": true,
-	"child_committees": true,
-	"committed_blocks": true
+  "record_settings": {
+    "current_view": true,
+    "highest_voted_view": true,
+    "local_high_qc": true,
+    "safe_blocks": false,
+    "last_view_timeout_qc": true,
+    "latest_committed_block": true,
+    "latest_committed_view": true,
+    "root_committee": false,
+    "parent_committee": false,
+    "child_committees": false,
+    "committed_blocks": false
   }
 }
