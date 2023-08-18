@@ -31,6 +31,7 @@ tokio = "1"
 futures = "0.3"
 async-trait = "0.1"
 fraction = "0.13"
+tokio-util = "0.7.8"
 
 [[test]]
 name = "test_consensus_happy_path"
@@ -49,4 +50,3 @@ path = "src/tests/mixnet.rs"
 metrics = ["nomos-node/metrics"]
 waku = ["nomos-network/waku", "nomos-mempool/waku", "waku-bindings"]
 libp2p = ["nomos-network/libp2p", "nomos-mempool/libp2p", "nomos-libp2p"]
-

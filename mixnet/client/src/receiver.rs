@@ -1,9 +1,11 @@
 use std::{
     error::Error,
+    marker::Unpin,
     net::SocketAddr,
     sync::{Arc, Mutex},
 };
 
+use futures::{Sink, SinkExt};
 use mixnet_protocol::Body;
 use nym_sphinx::{
     chunking::{fragment::Fragment, reconstruction::MessageReconstructor},
@@ -13,7 +15,6 @@ use nym_sphinx::{
 use tokio::{
     io::AsyncReadExt,
     net::{TcpListener, TcpStream},
-    sync::broadcast,
 };
 
 // Receiver accepts TCP connections to receive incoming payloads from the Mixnet.
@@ -22,7 +23,7 @@ pub struct Receiver;
 impl Receiver {
     pub async fn run(
         listen_addr: SocketAddr,
-        message_tx: broadcast::Sender<Vec<u8>>,
+        message_tx: impl Sink<Vec<u8>> + Clone + Unpin + Send + 'static,
     ) -> Result<(), Box<dyn Error>> {
         let listener = TcpListener::bind(listen_addr).await?;
         let message_reconstructor: Arc<Mutex<MessageReconstructor>> = Default::default();
@@ -50,7 +51,7 @@ impl Receiver {
 
     async fn handle_connection(
         mut socket: TcpStream,
-        message_tx: broadcast::Sender<Vec<u8>>,
+        message_tx: impl Sink<Vec<u8>> + Clone + Unpin,
         message_reconstructor: Arc<Mutex<MessageReconstructor>>,
     ) -> Result<(), Box<dyn Error>> {
         let body = Body::read(&mut socket).await?;
@@ -65,20 +66,25 @@ impl Receiver {
             }
         }
     }
+
     async fn handle_payload(
         payload: Payload,
-        message_tx: broadcast::Sender<Vec<u8>>,
+        mut message_tx: impl Sink<Vec<u8>> + Clone + Unpin,
         message_reconstructor: Arc<Mutex<MessageReconstructor>>,
     ) -> Result<(), Box<dyn Error>> {
         let fragment = Fragment::try_from_bytes(&payload.recover_plaintext()?)?;
 
-        if let Some((padded_message, _)) = {
+        let reconstruction_result = {
             let mut reconstructor = message_reconstructor.lock().unwrap();
             reconstructor.insert_new_fragment(fragment)
-        } {
+        };
+
+        if let Some((padded_message, _)) = reconstruction_result {
             tracing::debug!("sending a reconstructed message to the local");
             let message = Self::remove_padding(padded_message)?;
-            message_tx.send(message)?;
+            if (message_tx.send(message).await).is_err() {
+                return Err("failed to send message to the sink".into());
+            }
         }
 
         Ok(())

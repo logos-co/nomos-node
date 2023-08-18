@@ -7,7 +7,8 @@ use mixnet_client::{MixnetClient, MixnetClientConfig, MixnetClientMode};
 use mixnet_node::{MixnetNode, MixnetNodeConfig};
 use mixnet_topology::{Layer, MixnetTopology, Node};
 use rand::{rngs::OsRng, RngCore};
-use tokio::sync::broadcast;
+use tokio::sync::mpsc;
+use tokio_util::sync::PollSender;
 
 #[tokio::test]
 async fn mixnet() {
@@ -31,7 +32,7 @@ async fn mixnet() {
     assert_eq!(msg, received.as_slice());
 }
 
-async fn run_nodes_and_clients() -> (MixnetTopology, broadcast::Receiver<Vec<u8>>) {
+async fn run_nodes_and_clients() -> (MixnetTopology, mpsc::Receiver<Vec<u8>>) {
     let config1 = MixnetNodeConfig {
         listen_address: SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(127, 0, 0, 1), 7777)),
         client_address: SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(127, 0, 0, 1), 7778)),
@@ -87,39 +88,39 @@ async fn run_nodes_and_clients() -> (MixnetTopology, broadcast::Receiver<Vec<u8>
     // Run MixnetClient for each MixnetNode
     let client1 = MixnetClient::new(
         MixnetClientConfig {
-            mode: MixnetClientMode::SenderReceiver {
-                listen_address: config1.client_address,
-                channel_capacity: 10,
-            },
+            mode: MixnetClientMode::SenderReceiver(config1.client_address),
             topology: topology.clone(),
         },
         OsRng,
     );
-    let _ = client1.run();
+    let (client1_tx, _) = mpsc::channel::<Vec<u8>>(1);
+    tokio::spawn(async move {
+        client1.run(PollSender::new(client1_tx)).await;
+    });
 
     let client2 = MixnetClient::new(
         MixnetClientConfig {
-            mode: MixnetClientMode::SenderReceiver {
-                listen_address: config2.client_address,
-                channel_capacity: 10,
-            },
+            mode: MixnetClientMode::SenderReceiver(config2.client_address),
             topology: topology.clone(),
         },
         OsRng,
     );
-    let _ = client2.run();
+    let (client2_tx, _) = mpsc::channel::<Vec<u8>>(1);
+    tokio::spawn(async move {
+        client2.run(PollSender::new(client2_tx)).await;
+    });
 
     let client3 = MixnetClient::new(
         MixnetClientConfig {
-            mode: MixnetClientMode::SenderReceiver {
-                listen_address: config3.client_address,
-                channel_capacity: 10,
-            },
+            mode: MixnetClientMode::SenderReceiver(config3.client_address),
             topology: topology.clone(),
         },
         OsRng,
     );
-    let client3_rx = client3.run().unwrap();
+    let (client3_tx, client3_rx) = mpsc::channel::<Vec<u8>>(1);
+    tokio::spawn(async move {
+        client3.run(PollSender::new(client3_tx)).await;
+    });
 
     // Run all MixnetNodes
     tokio::spawn(async move {

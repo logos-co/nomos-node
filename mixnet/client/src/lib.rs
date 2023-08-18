@@ -6,9 +6,9 @@ use std::error::Error;
 
 pub use config::MixnetClientConfig;
 pub use config::MixnetClientMode;
+use futures::Sink;
 use rand::Rng;
 use sender::Sender;
-use tokio::sync::broadcast;
 
 // A client for sending packets to Mixnet and receiving packets from Mixnet.
 pub struct MixnetClient<R: Rng> {
@@ -24,8 +24,8 @@ impl<R: Rng> MixnetClient<R> {
         }
     }
 
-    pub fn run(&self) -> Option<broadcast::Receiver<Vec<u8>>> {
-        self.mode.run()
+    pub async fn run(&self, message_tx: impl Sink<Vec<u8>> + Clone + Unpin + Send + 'static) {
+        self.mode.run(message_tx).await
     }
 
     pub fn send(&mut self, msg: Vec<u8>) -> Result<(), Box<dyn Error>> {

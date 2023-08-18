@@ -13,3 +13,4 @@ nym-sphinx = { package = "nym-sphinx", git = "https://github.com/nymtech/nym", t
 rand = "0.7.3"
 mixnet-protocol = { path = "../protocol" }
 mixnet-topology = { path = "../topology" }
+futures = "0.3.28"

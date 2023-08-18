@@ -1,8 +1,8 @@
 use std::net::SocketAddr;
 
+use futures::Sink;
 use mixnet_topology::MixnetTopology;
 use serde::{Deserialize, Serialize};
-use tokio::sync::broadcast;
 
 use crate::receiver::Receiver;
 
@@ -15,26 +15,18 @@ pub struct MixnetClientConfig {
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub enum MixnetClientMode {
     Sender,
-    SenderReceiver {
-        listen_address: SocketAddr,
-        channel_capacity: usize,
-    },
+    SenderReceiver(SocketAddr),
 }
 
 impl MixnetClientMode {
-    pub(crate) fn run(&self) -> Option<broadcast::Receiver<Vec<u8>>> {
+    pub(crate) async fn run(
+        &self,
+        message_tx: impl Sink<Vec<u8>> + Clone + Unpin + Send + 'static,
+    ) {
         match self {
-            Self::Sender => None,
-            Self::SenderReceiver {
-                listen_address,
-                channel_capacity,
-            } => {
-                let (tx, rx) = broadcast::channel(*channel_capacity);
-                let listen_address = *listen_address;
-
-                tokio::spawn(async move { Receiver::run(listen_address, tx).await.unwrap() });
-
-                Some(rx)
+            Self::Sender => (),
+            Self::SenderReceiver(listen_address) => {
+                Receiver::run(*listen_address, message_tx).await.unwrap()
             }
         }
     }
