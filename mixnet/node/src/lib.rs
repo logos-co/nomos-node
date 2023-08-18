@@ -90,6 +90,7 @@ impl MixnetNode {
     ) -> Result<(), Box<dyn Error>> {
         // TODO: Reuse a conn instead of establishing ad-hoc conns
         let mut client_stream = TcpStream::connect(client_address).await?;
+        // TODO: Decrypt the final payload using the private key
         body.write(&mut client_stream).await?;
         Ok(())
     }
