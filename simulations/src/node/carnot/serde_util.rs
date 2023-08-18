@@ -119,7 +119,7 @@ macro_rules! serializer {
                         _ => {}
                     }
                 }
-                state.serialize(serializer)
+                self.serialize(serializer)
             }
         }
     };

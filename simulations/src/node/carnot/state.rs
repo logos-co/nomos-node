@@ -57,8 +57,7 @@ impl Record for CarnotRecord {
 
     fn fields(&self) -> Vec<&str> {
         let mut fields = if let Some(rs) = RECORD_SETTINGS.get() {
-            rs
-                .iter()
+            rs.iter()
                 .filter_map(|(k, v)| {
                     if serde_util::CARNOT_RECORD_KEYS.contains(&k.trim()) && *v {
                         Some(k.as_str())
@@ -125,7 +124,6 @@ impl serde::Serialize for CarnotState {
                     .serialize_state(keys, self, serializer),
                 SubscriberFormat::Parquet => unreachable!(),
             }
-            // serializer.serialize_none()
         } else {
             serializer.serialize_none()
         }
