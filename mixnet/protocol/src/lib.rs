@@ -66,7 +66,7 @@ impl<'a> Body<'a> {
         writer.write_u8(variant).await?;
         match self {
             Body::SphinxPacket(packet) => {
-                writer.write_all(packet.payload.as_bytes()).await?;
+                writer.write_all(&packet.to_bytes()).await?;
             }
             Body::FinalPayload(mut reader) => {
                 tokio::io::copy(&mut reader, writer).await?;
