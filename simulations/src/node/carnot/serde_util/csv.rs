@@ -39,7 +39,7 @@ impl<'a> Serialize for CommitteeHelper<'a> {
     {
         self.0
             .iter()
-            .map(|&b| serde_json::to_string(&NodeIdHelper::from(b)))
+            .map(|b| serde_json::to_string(&NodeIdHelper::from(b)))
             .collect::<Result<Vec<_>, _>>()
             .map_err(<S::Error as serde::ser::Error>::custom)
             .and_then(|val| serializer.serialize_str(&format!("[{}]", val.join(","))))
@@ -83,7 +83,7 @@ impl<'a> Serialize for CommittedBlockHelper<'a> {
     {
         self.0
             .iter()
-            .map(|&b| serde_json::to_string(&BlockIdHelper::from(b)))
+            .map(|b| serde_json::to_string(&BlockIdHelper::from(b)))
             .collect::<Result<Vec<_>, _>>()
             .map_err(<S::Error as serde::ser::Error>::custom)
             .and_then(|val| serializer.serialize_str(&format!("[{}]", val.join(","))))

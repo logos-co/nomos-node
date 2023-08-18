@@ -49,10 +49,10 @@ macro_rules! serializer {
         #[serde_with::serde_as]
         #[derive(Serialize, Default)]
         pub(crate) struct $name<'a> {
-            node_id: Option<NodeIdHelper>,
+            node_id: Option<NodeIdHelper<'a>>,
             current_view: Option<View>,
             highest_voted_view: Option<View>,
-            local_high_qc: Option<StandardQcHelper>,
+            local_high_qc: Option<StandardQcHelper<'a>>,
             safe_blocks: Option<SafeBlocksHelper<'a>>,
             last_view_timeout_qc: Option<Option<TimeoutQcHelper<'a>>>,
             latest_committed_block: Option<BlockHelper<'a>>,
@@ -75,7 +75,7 @@ macro_rules! serializer {
                 for k in keys {
                     match k.trim() {
                         NODE_ID => {
-                            self.node_id = Some(state.node_id.into());
+                            self.node_id = Some((&state.node_id).into());
                         }
                         CURRENT_VIEW => {
                             self.current_view = Some(state.current_view);
@@ -135,16 +135,16 @@ pub(crate) mod standard_qc {
     use super::*;
 
     #[derive(Serialize)]
-    pub(crate) struct StandardQcHelper {
+    pub(crate) struct StandardQcHelper<'a> {
         view: View,
-        id: serde_id::BlockIdHelper,
+        id: serde_id::BlockIdHelper<'a>,
     }
 
-    impl From<&StandardQc> for StandardQcHelper {
-        fn from(val: &StandardQc) -> Self {
+    impl<'a> From<&'a StandardQc> for StandardQcHelper<'a> {
+        fn from(val: &'a StandardQc) -> Self {
             Self {
                 view: val.view,
-                id: val.id.into(),
+                id: (&val.id).into(),
             }
         }
     }
@@ -238,15 +238,15 @@ pub(crate) mod serde_block {
 
     #[derive(Serialize)]
     #[serde(untagged)]
-    enum LeaderProofHelper {
-        LeaderId { leader_id: NodeIdHelper },
+    enum LeaderProofHelper<'a> {
+        LeaderId { leader_id: NodeIdHelper<'a> },
     }
 
-    impl From<&LeaderProof> for LeaderProofHelper {
-        fn from(value: &LeaderProof) -> Self {
+    impl<'a> From<&'a LeaderProof> for LeaderProofHelper<'a> {
+        fn from(value: &'a LeaderProof) -> Self {
             match value {
                 LeaderProof::LeaderId { leader_id } => Self::LeaderId {
-                    leader_id: (*leader_id).into(),
+                    leader_id: leader_id.into(),
                 },
             }
         }
@@ -255,16 +255,16 @@ pub(crate) mod serde_block {
     #[derive(Serialize)]
     pub(crate) struct BlockHelper<'a> {
         view: View,
-        id: BlockIdHelper,
+        id: BlockIdHelper<'a>,
         parent_qc: &'a Qc,
-        leader_proof: LeaderProofHelper,
+        leader_proof: LeaderProofHelper<'a>,
     }
 
     impl<'a> From<&'a Block> for BlockHelper<'a> {
         fn from(val: &'a Block) -> Self {
             Self {
                 view: val.view,
-                id: val.id.into(),
+                id: (&val.id).into(),
                 parent_qc: &val.parent_qc,
                 leader_proof: (&val.leader_proof).into(),
             }
@@ -281,20 +281,20 @@ pub(crate) mod serde_id {
 
     use super::*;
 
-    #[derive(Serialize, Deserialize)]
-    pub(crate) struct BlockIdHelper(#[serde(with = "serde_array32")] [u8; 32]);
+    #[derive(Serialize)]
+    pub(crate) struct BlockIdHelper<'a>(#[serde(with = "serde_array32")] &'a [u8; 32]);
 
-    impl From<BlockId> for BlockIdHelper {
-        fn from(val: BlockId) -> Self {
+    impl<'a> From<&'a BlockId> for BlockIdHelper<'a> {
+        fn from(val: &'a BlockId) -> Self {
             Self(val.into())
         }
     }
 
-    #[derive(Serialize, Deserialize)]
-    pub(crate) struct NodeIdHelper(#[serde(with = "serde_array32")] [u8; 32]);
+    #[derive(Serialize)]
+    pub(crate) struct NodeIdHelper<'a>(#[serde(with = "serde_array32")] &'a [u8; 32]);
 
-    impl From<NodeId> for NodeIdHelper {
-        fn from(val: NodeId) -> Self {
+    impl<'a> From<&'a NodeId> for NodeIdHelper<'a> {
+        fn from(val: &'a NodeId) -> Self {
             Self(val.into())
         }
     }
@@ -303,7 +303,7 @@ pub(crate) mod serde_id {
         t: &NodeId,
         serializer: S,
     ) -> Result<S::Ok, S::Error> {
-        NodeIdHelper::from(*t).serialize(serializer)
+        NodeIdHelper::from(t).serialize(serializer)
     }
 
     pub(crate) mod serde_array32 {

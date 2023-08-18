@@ -40,7 +40,7 @@ impl<'a> Serialize for CommitteeHelper<'a> {
         let iter = self.0.iter();
         let mut s = serializer.serialize_seq(Some(iter.size_hint().0))?;
         for id in iter {
-            s.serialize_element(&NodeIdHelper::from(*id))?;
+            s.serialize_element(&NodeIdHelper::from(id))?;
         }
         s.end()
     }
@@ -82,7 +82,7 @@ impl<'a> Serialize for CommittedBlockHelper<'a> {
     {
         let mut s = serializer.serialize_seq(Some(self.0.len()))?;
         for c in self.0 {
-            s.serialize_element(&BlockIdHelper::from(*c))?;
+            s.serialize_element(&BlockIdHelper::from(c))?;
         }
         s.end()
     }

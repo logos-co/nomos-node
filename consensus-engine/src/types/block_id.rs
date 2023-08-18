@@ -39,6 +39,12 @@ impl From<BlockId> for [u8; 32] {
     }
 }
 
+impl<'a> From<&'a BlockId> for &'a [u8; 32] {
+    fn from(id: &'a BlockId) -> Self {
+        &id.0
+    }
+}
+
 impl core::fmt::Display for BlockId {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         write!(f, "0x")?;
