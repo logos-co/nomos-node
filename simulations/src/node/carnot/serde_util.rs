@@ -5,8 +5,7 @@ use serde::{
     Deserialize, Serialize,
 };
 
-use self::{
-    serde_block::BlockHelper,
+use self::{ 
     serde_id::{BlockIdHelper, NodeIdHelper},
     standard_qc::StandardQcHelper,
     timeout_qc::TimeoutQcHelper,
@@ -240,50 +239,7 @@ pub(crate) mod timeout_qc {
     }
 }
 
-pub(crate) mod serde_block {
-    use consensus_engine::LeaderProof;
 
-    use super::{qc::QcHelper, *};
-
-    #[derive(Serialize)]
-    #[serde(untagged)]
-    enum LeaderProofHelper<'a> {
-        LeaderId { leader_id: NodeIdHelper<'a> },
-    }
-
-    impl<'a> From<&'a LeaderProof> for LeaderProofHelper<'a> {
-        fn from(value: &'a LeaderProof) -> Self {
-            match value {
-                LeaderProof::LeaderId { leader_id } => Self::LeaderId {
-                    leader_id: leader_id.into(),
-                },
-            }
-        }
-    }
-
-    #[derive(Serialize)]
-    pub(crate) struct BlockHelper<'a> {
-        view: View,
-        id: BlockIdHelper<'a>,
-        parent_qc: QcHelper<'a>,
-        leader_proof: LeaderProofHelper<'a>,
-    }
-
-    impl<'a> From<&'a Block> for BlockHelper<'a> {
-        fn from(val: &'a Block) -> Self {
-            Self {
-                view: val.view,
-                id: (&val.id).into(),
-                parent_qc: (&val.parent_qc).into(),
-                leader_proof: (&val.leader_proof).into(),
-            }
-        }
-    }
-
-    pub fn serialize<S: serde::Serializer>(t: &Block, serializer: S) -> Result<S::Ok, S::Error> {
-        BlockHelper::from(t).serialize(serializer)
-    }
-}
 
 pub(crate) mod serde_id {
     use consensus_engine::{BlockId, NodeId};

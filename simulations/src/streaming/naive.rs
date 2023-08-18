@@ -191,9 +191,9 @@ fn write_csv_record<W: std::io::Write, R: Record>(
         w.serialize(data).map_err(|e| {
             tracing::error!(target = "simulations", err = %e, "fail to write CSV record");
             e
-        })?
+        })?;
+        w.flush()?;
     }
-    w.flush()?;
     Ok(())
 }
 

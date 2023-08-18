@@ -1,6 +1,61 @@
 use super::*;
+use serde_block::BlockHelper;
 
 serializer!(CarnotStateCsvSerializer);
+
+pub(crate) mod serde_block {
+  use consensus_engine::LeaderProof;
+
+  use super::{qc::QcHelper, *};
+
+  #[derive(Serialize)]
+  #[serde(untagged)]
+  enum LeaderProofHelper<'a> {
+      LeaderId { leader_id: NodeIdHelper<'a> },
+  }
+
+  impl<'a> From<&'a LeaderProof> for LeaderProofHelper<'a> {
+      fn from(value: &'a LeaderProof) -> Self {
+          match value {
+              LeaderProof::LeaderId { leader_id } => Self::LeaderId {
+                  leader_id: leader_id.into(),
+              },
+          }
+      }
+  }
+
+  pub(super) struct BlockHelper<'a>(BlockHelperInner<'a>);
+
+  #[derive(Serialize)]
+  struct BlockHelperInner<'a> {
+      view: View,
+      id: BlockIdHelper<'a>,
+      parent_qc: QcHelper<'a>,
+      leader_proof: LeaderProofHelper<'a>,
+  }
+
+  impl<'a> From<&'a Block> for BlockHelper<'a> {
+      fn from(val: &'a Block) -> Self {
+          Self(BlockHelperInner {
+              view: val.view,
+              id: (&val.id).into(),
+              parent_qc: (&val.parent_qc).into(),
+              leader_proof: (&val.leader_proof).into(),
+          })
+      }
+  }
+
+  impl<'a> serde::Serialize for BlockHelper<'a> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+      serde_json::to_string(&self.0)
+        .map_err(<S::Error as serde::ser::Error>::custom)
+        .and_then(|s| serializer.serialize_str(s.as_str()))
+    } 
+  }
+}
 
 struct SafeBlocksHelper<'a>(&'a HashMap<BlockId, Block>);
 

@@ -27,8 +27,8 @@
   "step_time": "100ms",
   "runner_settings": "Sync",
   "stream_settings": {
-      "path": "tree_500_7_view_1_default.json",
-      "format": "json"
+      "path": "tree_500_7_view_1_default.csv",
+      "format": "csv"
   },
   "node_count": 500,
   "views_count": 10,
