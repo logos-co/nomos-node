@@ -3,6 +3,8 @@ use serde_block::BlockHelper;
 
 serializer!(CarnotStateJsonSerializer);
 
+pub(super) type LocalHighQcHelper<'a> = super::standard_qc::StandardQcHelper<'a>;
+
 pub(crate) mod serde_block {
     use consensus_engine::LeaderProof;
 

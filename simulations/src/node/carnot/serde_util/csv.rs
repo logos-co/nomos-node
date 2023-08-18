@@ -57,6 +57,25 @@ pub(crate) mod serde_block {
     }
 }
 
+pub(super) struct LocalHighQcHelper<'a>(StandardQcHelper<'a>);
+
+impl<'a> Serialize for LocalHighQcHelper<'a> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serde_json::to_string(&self.0)
+            .map_err(<S::Error as serde::ser::Error>::custom)
+            .and_then(|s| serializer.serialize_str(s.as_str()))
+    }
+}
+
+impl<'a> From<&'a StandardQc> for LocalHighQcHelper<'a> {
+    fn from(value: &'a StandardQc) -> Self {
+        Self(From::from(value))
+    }
+}
+
 struct SafeBlocksHelper<'a>(&'a HashMap<BlockId, Block>);
 
 impl<'a> From<&'a HashMap<BlockId, Block>> for SafeBlocksHelper<'a> {

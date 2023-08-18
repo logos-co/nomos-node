@@ -56,7 +56,7 @@ macro_rules! serializer {
             last_view_timeout_qc: Option<Option<TimeoutQcHelper<'a>>>,
             latest_committed_block: Option<BlockHelper<'a>>,
             latest_committed_view: Option<View>,
-            local_high_qc: Option<StandardQcHelper<'a>>,
+            local_high_qc: Option<LocalHighQcHelper<'a>>,
             node_id: Option<NodeIdHelper<'a>>,
             parent_committee: Option<Option<CommitteeHelper<'a>>>,
             root_committee: Option<CommitteeHelper<'a>>,
