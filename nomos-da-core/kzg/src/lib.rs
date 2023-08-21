@@ -1,9 +1,8 @@
-use kzg::eip_4844::{
-    blob_to_kzg_commitment_rust, bytes_to_blob, compute_blob_kzg_proof_rust,
-    verify_blob_kzg_proof_rust,
-};
-use kzg::types::fr::FsFr;
-use kzg::types::g1::FsG1;
+mod dynamic_kzg;
+mod types;
+
+use crate::types::{Blob, Commitment, Proof};
+use dynamic_kzg::{blob_to_kzg_commitment, compute_blob_kzg_proof, verify_blob_kzg_proof};
 use kzg::types::kzg_settings::FsKZGSettings;
 use kzg_traits::G1;
 use std::error::Error;
