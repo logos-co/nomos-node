@@ -1,7 +1,9 @@
+mod client_notifier;
 pub mod config;
 
 use std::{error::Error, net::SocketAddr};
 
+use client_notifier::ClientNotifier;
 pub use config::MixnetNodeConfig;
 use mixnet_protocol::Body;
 use mixnet_topology::MixnetNodeId;
@@ -10,7 +12,10 @@ use nym_sphinx::{
     Payload, PrivateKey, PublicKey,
 };
 use sphinx_packet::{crypto::PUBLIC_KEY_SIZE, ProcessedPacket, SphinxPacket};
-use tokio::net::{TcpListener, TcpStream};
+use tokio::{
+    net::{TcpListener, TcpStream},
+    sync::mpsc,
+};
 
 // A mix node that routes packets in the Mixnet.
 pub struct MixnetNode {
@@ -30,21 +35,36 @@ impl MixnetNode {
         *PublicKey::from(&PrivateKey::from(self.config.private_key)).as_bytes()
     }
 
+    const CLIENT_NOTI_CHANNEL_SIZE: usize = 100;
+
     pub async fn run(self) -> Result<(), Box<dyn Error>> {
+        // Spawn a ClientNotifier
+        let (client_tx, client_rx) = mpsc::channel(Self::CLIENT_NOTI_CHANNEL_SIZE);
+        tokio::spawn(async move {
+            if let Err(e) = ClientNotifier::run(self.config.client_listen_address, client_rx).await
+            {
+                tracing::error!("failed to run client notifier: {e}");
+            }
+        });
+
         //TODO: Accepting ad-hoc TCP conns for now. Improve conn handling.
         //TODO: Add graceful shutdown
         let listener = TcpListener::bind(self.config.listen_address).await?;
+        tracing::info!(
+            "Listening mixnet node connections: {}",
+            self.config.listen_address
+        );
 
         loop {
             match listener.accept().await {
                 Ok((socket, remote_addr)) => {
                     tracing::debug!("Accepted incoming connection from {remote_addr:?}");
 
+                    let client_tx = client_tx.clone();
                     let private_key = PrivateKey::from(self.config.private_key);
-                    let client_address = self.config.client_address;
                     tokio::spawn(async move {
                         if let Err(e) =
-                            Self::handle_connection(socket, private_key, client_address).await
+                            Self::handle_connection(socket, private_key, client_tx).await
                         {
                             tracing::error!("failed to handle conn: {e}");
                         }
@@ -58,13 +78,13 @@ impl MixnetNode {
     async fn handle_connection(
         mut socket: TcpStream,
         private_key: PrivateKey,
-        client_address: SocketAddr,
+        client_tx: mpsc::Sender<Body>,
     ) -> Result<(), Box<dyn Error>> {
         let body = Body::read(&mut socket).await?;
         match body {
             Body::SphinxPacket(packet) => Self::handle_sphinx_packet(private_key, packet).await,
             _body @ Body::FinalPayload(_) => {
-                Self::handle_final_payload(private_key, client_address, _body).await
+                Self::forward_body_to_client_notifier(private_key, client_tx, _body).await
             }
         }
     }
@@ -83,15 +103,15 @@ impl MixnetNode {
         }
     }
 
-    async fn handle_final_payload(
+    async fn forward_body_to_client_notifier(
         _private_key: PrivateKey,
-        client_address: SocketAddr,
-        body: Body<'_>,
+        client_tx: mpsc::Sender<Body>,
+        body: Body,
     ) -> Result<(), Box<dyn Error>> {
-        // TODO: Reuse a conn instead of establishing ad-hoc conns
-        let mut client_stream = TcpStream::connect(client_address).await?;
         // TODO: Decrypt the final payload using the private key
-        body.write(&mut client_stream).await?;
+
+        // Do not wait when the channel is full or no receiver exists
+        client_tx.try_send(body)?;
         Ok(())
     }
 
@@ -117,13 +137,13 @@ impl MixnetNode {
         tracing::debug!("Forwarding final payload to destination mixnode");
 
         Self::forward(
-            Body::new_final_owned(payload.into_bytes()),
+            Body::new_final_payload(payload),
             NymNodeRoutingAddress::try_from_bytes(&destination_addr.as_bytes())?,
         )
         .await
     }
 
-    async fn forward(body: Body<'_>, to: NymNodeRoutingAddress) -> Result<(), Box<dyn Error>> {
+    async fn forward(body: Body, to: NymNodeRoutingAddress) -> Result<(), Box<dyn Error>> {
         let addr = SocketAddr::try_from(to)?;
 
         let mut socket = TcpStream::connect(addr).await?;

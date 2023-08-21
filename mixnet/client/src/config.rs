@@ -25,8 +25,8 @@ impl MixnetClientMode {
     ) {
         match self {
             Self::Sender => (),
-            Self::SenderReceiver(listen_address) => {
-                Receiver::run(*listen_address, message_tx).await.unwrap()
+            Self::SenderReceiver(node_address) => {
+                Receiver::run(*node_address, message_tx).await.unwrap()
             }
         }
     }
