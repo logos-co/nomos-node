@@ -115,9 +115,7 @@ async fn run_nodes_and_destination_client() -> (MixnetTopology, mpsc::Receiver<V
         OsRng,
     );
     let (client_tx, client_rx) = mpsc::channel::<Vec<u8>>(1);
-    tokio::spawn(async move {
-        client.run(PollSender::new(client_tx)).await;
-    });
+    client.run(PollSender::new(client_tx));
 
     (topology, client_rx)
 }
