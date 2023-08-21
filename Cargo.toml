@@ -11,6 +11,7 @@ members = [
     "nomos-services/http",
     "nomos-da-core/reed-solomon",
     "nodes/nomos-node",
+    "nodes/mixnode",
     "simulations",
     "consensus-engine",
     "tests",
