@@ -3,10 +3,14 @@
 mod event_builder;
 mod message_cache;
 pub mod messages;
+mod state;
+pub use state::*;
 mod serde_util;
 mod tally;
 mod timeout;
 
+use std::any::Any;
+use std::collections::BTreeMap;
 // std
 use std::hash::Hash;
 use std::time::Instant;
@@ -21,6 +25,10 @@ use super::{Node, NodeId};
 use crate::network::{InMemoryNetworkInterface, NetworkInterface, NetworkMessage};
 use crate::node::carnot::event_builder::{CarnotTx, Event};
 use crate::node::carnot::message_cache::MessageCache;
+use crate::output_processors::{Record, RecordType, Runtime};
+use crate::settings::SimulationSettings;
+use crate::streaming::SubscriberFormat;
+use crate::warding::SimulationState;
 use consensus_engine::overlay::RandomBeaconState;
 use consensus_engine::{
     Block, BlockId, Carnot, Committee, Overlay, Payload, Qc, StandardQc, TimeoutQc, View, Vote,
@@ -32,183 +40,27 @@ use nomos_consensus::{
     network::messages::{NewViewMsg, TimeoutMsg, VoteMsg},
 };
 
-const NODE_ID: &str = "node_id";
-const CURRENT_VIEW: &str = "current_view";
-const HIGHEST_VOTED_VIEW: &str = "highest_voted_view";
-const LOCAL_HIGH_QC: &str = "local_high_qc";
-const SAFE_BLOCKS: &str = "safe_blocks";
-const LAST_VIEW_TIMEOUT_QC: &str = "last_view_timeout_qc";
-const LATEST_COMMITTED_BLOCK: &str = "latest_committed_block";
-const LATEST_COMMITTED_VIEW: &str = "latest_committed_view";
-const ROOT_COMMITTEE: &str = "root_committee";
-const PARENT_COMMITTEE: &str = "parent_committee";
-const CHILD_COMMITTEES: &str = "child_committees";
-const COMMITTED_BLOCKS: &str = "committed_blocks";
-const STEP_DURATION: &str = "step_duration";
-
-pub const CARNOT_RECORD_KEYS: &[&str] = &[
-    NODE_ID,
-    CURRENT_VIEW,
-    HIGHEST_VOTED_VIEW,
-    LOCAL_HIGH_QC,
-    SAFE_BLOCKS,
-    LAST_VIEW_TIMEOUT_QC,
-    LATEST_COMMITTED_BLOCK,
-    LATEST_COMMITTED_VIEW,
-    ROOT_COMMITTEE,
-    PARENT_COMMITTEE,
-    CHILD_COMMITTEES,
-    COMMITTED_BLOCKS,
-    STEP_DURATION,
-];
-
-static RECORD_SETTINGS: std::sync::OnceLock<HashMap<String, bool>> = std::sync::OnceLock::new();
-
-#[derive(Debug)]
-pub struct CarnotState {
-    node_id: NodeId,
-    current_view: View,
-    highest_voted_view: View,
-    local_high_qc: StandardQc,
-    safe_blocks: HashMap<BlockId, Block>,
-    last_view_timeout_qc: Option<TimeoutQc>,
-    latest_committed_block: Block,
-    latest_committed_view: View,
-    root_committee: Committee,
-    parent_committee: Option<Committee>,
-    child_committees: Vec<Committee>,
-    committed_blocks: Vec<BlockId>,
-    step_duration: Duration,
-}
-
-impl serde::Serialize for CarnotState {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        if let Some(rs) = RECORD_SETTINGS.get() {
-            let keys = rs
-                .iter()
-                .filter_map(|(k, v)| {
-                    if CARNOT_RECORD_KEYS.contains(&k.trim()) && *v {
-                        Some(k)
-                    } else {
-                        None
-                    }
-                })
-                .collect::<Vec<_>>();
-
-            let mut state = serde_util::CarnotState::default();
-            for k in keys {
-                match k.trim() {
-                    NODE_ID => {
-                        state.node_id = Some(self.node_id.into());
-                    }
-                    CURRENT_VIEW => {
-                        state.current_view = Some(self.current_view);
-                    }
-                    HIGHEST_VOTED_VIEW => {
-                        state.highest_voted_view = Some(self.highest_voted_view);
-                    }
-                    LOCAL_HIGH_QC => {
-                        state.local_high_qc = Some((&self.local_high_qc).into());
-                    }
-                    SAFE_BLOCKS => {
-                        state.safe_blocks = Some((&self.safe_blocks).into());
-                    }
-                    LAST_VIEW_TIMEOUT_QC => {
-                        state.last_view_timeout_qc =
-                            Some(self.last_view_timeout_qc.as_ref().map(From::from));
-                    }
-                    LATEST_COMMITTED_BLOCK => {
-                        state.latest_committed_block = Some((&self.latest_committed_block).into());
-                    }
-                    LATEST_COMMITTED_VIEW => {
-                        state.latest_committed_view = Some(self.latest_committed_view);
-                    }
-                    ROOT_COMMITTEE => {
-                        state.root_committee = Some((&self.root_committee).into());
-                    }
-                    PARENT_COMMITTEE => {
-                        state.parent_committee =
-                            Some(self.parent_committee.as_ref().map(From::from));
-                    }
-                    CHILD_COMMITTEES => {
-                        state.child_committees = Some(self.child_committees.as_slice().into());
-                    }
-                    COMMITTED_BLOCKS => {
-                        state.committed_blocks = Some(self.committed_blocks.as_slice().into());
-                    }
-                    STEP_DURATION => {
-                        state.step_duration = Some(self.step_duration);
-                    }
-                    _ => {}
-                }
-            }
-            state.serialize(serializer)
-        } else {
-            serializer.serialize_none()
-        }
-    }
-}
-
-impl CarnotState {
-    const fn keys() -> &'static [&'static str] {
-        CARNOT_RECORD_KEYS
-    }
-}
-
-/// Have to implement this manually because of the `serde_json` will panic if the key of map
-/// is not a string.
-fn serialize_blocks<S>(blocks: &HashMap<BlockId, Block>, serializer: S) -> Result<S::Ok, S::Error>
-where
-    S: serde::Serializer,
-{
-    use serde::ser::SerializeMap;
-    let mut ser = serializer.serialize_map(Some(blocks.len()))?;
-    for (k, v) in blocks {
-        ser.serialize_entry(&format!("{k:?}"), v)?;
-    }
-    ser.end()
-}
-
-impl<O: Overlay> From<&Carnot<O>> for CarnotState {
-    fn from(value: &Carnot<O>) -> Self {
-        let node_id = value.id();
-        let current_view = value.current_view();
-        Self {
-            node_id,
-            current_view,
-            local_high_qc: value.high_qc(),
-            parent_committee: value.parent_committee(),
-            root_committee: value.root_committee(),
-            child_committees: value.child_committees(),
-            latest_committed_block: value.latest_committed_block(),
-            latest_committed_view: value.latest_committed_view(),
-            safe_blocks: value
-                .blocks_in_view(current_view)
-                .into_iter()
-                .map(|b| (b.id, b))
-                .collect(),
-            last_view_timeout_qc: value.last_view_timeout_qc(),
-            committed_blocks: value.latest_committed_blocks(),
-            highest_voted_view: Default::default(),
-            step_duration: Default::default(),
-        }
-    }
-}
+static RECORD_SETTINGS: std::sync::OnceLock<BTreeMap<String, bool>> = std::sync::OnceLock::new();
 
 #[derive(Clone, Default, Deserialize)]
 pub struct CarnotSettings {
     timeout: Duration,
-    record_settings: HashMap<String, bool>,
+    record_settings: BTreeMap<String, bool>,
+
+    #[serde(default)]
+    format: SubscriberFormat,
 }
 
 impl CarnotSettings {
-    pub fn new(timeout: Duration, record_settings: HashMap<String, bool>) -> Self {
+    pub fn new(
+        timeout: Duration,
+        record_settings: BTreeMap<String, bool>,
+        format: SubscriberFormat,
+    ) -> Self {
         Self {
             timeout,
             record_settings,
+            format,
         }
     }
 }
@@ -217,6 +69,8 @@ impl CarnotSettings {
 pub struct CarnotNode<O: Overlay> {
     id: consensus_engine::NodeId,
     state: CarnotState,
+    /// A step counter
+    current_step: usize,
     settings: CarnotSettings,
     network_interface: InMemoryNetworkInterface<CarnotMessage>,
     message_cache: MessageCache,
@@ -259,8 +113,10 @@ impl<
             engine,
             random_beacon_pk,
             step_duration: Duration::ZERO,
+            current_step: 0,
         };
         this.state = CarnotState::from(&this.engine);
+        this.state.format = this.settings.format;
         this
     }
 
@@ -570,8 +426,13 @@ impl<
         }
 
         // update state
-        self.state = CarnotState::from(&self.engine);
-        self.state.step_duration = step_duration.elapsed();
+        self.state = CarnotState::new(
+            self.current_step,
+            step_duration.elapsed(),
+            self.settings.format,
+            &self.engine,
+        );
+        self.current_step += 1;
     }
 }
 

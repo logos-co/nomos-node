@@ -6,155 +6,146 @@ use serde::{
 };
 
 use self::{
-    serde_block::BlockHelper,
     serde_id::{BlockIdHelper, NodeIdHelper},
     standard_qc::StandardQcHelper,
     timeout_qc::TimeoutQcHelper,
 };
 use consensus_engine::{AggregateQc, Block, BlockId, Committee, Qc, StandardQc, TimeoutQc, View};
 
-#[serde_with::skip_serializing_none]
-#[serde_with::serde_as]
-#[derive(Serialize, Default)]
-pub(crate) struct CarnotState<'a> {
-    pub(crate) node_id: Option<NodeIdHelper>,
-    pub(crate) current_view: Option<View>,
-    pub(crate) highest_voted_view: Option<View>,
-    pub(crate) local_high_qc: Option<StandardQcHelper>,
-    pub(crate) safe_blocks: Option<SafeBlocksHelper<'a>>,
-    pub(crate) last_view_timeout_qc: Option<Option<TimeoutQcHelper<'a>>>,
-    pub(crate) latest_committed_block: Option<BlockHelper>,
-    pub(crate) latest_committed_view: Option<View>,
-    pub(crate) root_committee: Option<CommitteeHelper<'a>>,
-    pub(crate) parent_committee: Option<Option<CommitteeHelper<'a>>>,
-    pub(crate) child_committees: Option<CommitteesHelper<'a>>,
-    pub(crate) committed_blocks: Option<CommittedBlockHelper<'a>>,
-    #[serde_as(as = "Option<serde_with::DurationMilliSeconds>")]
-    pub(crate) step_duration: Option<Duration>,
-}
+const NODE_ID: &str = "node_id";
+const CURRENT_VIEW: &str = "current_view";
+const HIGHEST_VOTED_VIEW: &str = "highest_voted_view";
+const LOCAL_HIGH_QC: &str = "local_high_qc";
+const SAFE_BLOCKS: &str = "safe_blocks";
+const LAST_VIEW_TIMEOUT_QC: &str = "last_view_timeout_qc";
+const LATEST_COMMITTED_BLOCK: &str = "latest_committed_block";
+const LATEST_COMMITTED_VIEW: &str = "latest_committed_view";
+const ROOT_COMMITTEE: &str = "root_committee";
+const PARENT_COMMITTEE: &str = "parent_committee";
+const CHILD_COMMITTEES: &str = "child_committees";
+const COMMITTED_BLOCKS: &str = "committed_blocks";
+const STEP_DURATION: &str = "step_duration";
 
-impl<'a> From<&'a super::CarnotState> for CarnotState<'a> {
-    fn from(value: &'a super::CarnotState) -> Self {
-        Self {
-            node_id: Some(value.node_id.into()),
-            current_view: Some(value.current_view),
-            highest_voted_view: Some(value.highest_voted_view),
-            local_high_qc: Some(StandardQcHelper::from(&value.local_high_qc)),
-            safe_blocks: Some(SafeBlocksHelper::from(&value.safe_blocks)),
-            last_view_timeout_qc: Some(value.last_view_timeout_qc.as_ref().map(From::from)),
-            latest_committed_block: Some(BlockHelper::from(&value.latest_committed_block)),
-            latest_committed_view: Some(value.latest_committed_view),
-            root_committee: Some(CommitteeHelper::from(&value.root_committee)),
-            parent_committee: Some(value.parent_committee.as_ref().map(From::from)),
-            child_committees: Some(CommitteesHelper::from(value.child_committees.as_slice())),
-            committed_blocks: Some(CommittedBlockHelper::from(
-                value.committed_blocks.as_slice(),
-            )),
-            step_duration: Some(value.step_duration),
+pub const CARNOT_RECORD_KEYS: &[&str] = &[
+    CHILD_COMMITTEES,
+    COMMITTED_BLOCKS,
+    CURRENT_VIEW,
+    HIGHEST_VOTED_VIEW,
+    LAST_VIEW_TIMEOUT_QC,
+    LATEST_COMMITTED_BLOCK,
+    LATEST_COMMITTED_VIEW,
+    LOCAL_HIGH_QC,
+    NODE_ID,
+    PARENT_COMMITTEE,
+    ROOT_COMMITTEE,
+    SAFE_BLOCKS,
+    STEP_DURATION,
+];
+
+macro_rules! serializer {
+    ($name: ident) => {
+        #[serde_with::skip_serializing_none]
+        #[serde_with::serde_as]
+        #[derive(Serialize, Default)]
+        pub(crate) struct $name<'a> {
+            step_id: usize,
+            child_committees: Option<CommitteesHelper<'a>>,
+            committed_blocks: Option<CommittedBlockHelper<'a>>,
+            current_view: Option<View>,
+            highest_voted_view: Option<View>,
+            last_view_timeout_qc: Option<Option<TimeoutQcHelper<'a>>>,
+            latest_committed_block: Option<BlockHelper<'a>>,
+            latest_committed_view: Option<View>,
+            local_high_qc: Option<LocalHighQcHelper<'a>>,
+            node_id: Option<NodeIdHelper<'a>>,
+            parent_committee: Option<Option<CommitteeHelper<'a>>>,
+            root_committee: Option<CommitteeHelper<'a>>,
+            safe_blocks: Option<SafeBlocksHelper<'a>>,
+            #[serde_as(as = "Option<serde_with::DurationMilliSeconds>")]
+            step_duration: Option<Duration>,
         }
-    }
-}
 
-pub(crate) struct SafeBlocksHelper<'a>(&'a HashMap<BlockId, Block>);
-
-impl<'a> From<&'a HashMap<BlockId, Block>> for SafeBlocksHelper<'a> {
-    fn from(val: &'a HashMap<BlockId, Block>) -> Self {
-        Self(val)
-    }
-}
-
-impl<'a> Serialize for SafeBlocksHelper<'a> {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        let iter = self.0.values();
-        let mut s = serializer.serialize_seq(Some(iter.size_hint().0))?;
-        for b in iter {
-            s.serialize_element(&BlockHelper::from(b))?;
+        impl<'a> $name<'a> {
+            pub(crate) fn serialize_state<S: serde::ser::Serializer>(
+                &mut self,
+                keys: Vec<&String>,
+                state: &'a super::super::CarnotState,
+                serializer: S,
+            ) -> Result<S::Ok, S::Error> {
+                self.step_id = state.step_id;
+                for k in keys {
+                    match k.trim() {
+                        NODE_ID => {
+                            self.node_id = Some((&state.node_id).into());
+                        }
+                        CURRENT_VIEW => {
+                            self.current_view = Some(state.current_view);
+                        }
+                        HIGHEST_VOTED_VIEW => {
+                            self.highest_voted_view = Some(state.highest_voted_view);
+                        }
+                        LOCAL_HIGH_QC => {
+                            self.local_high_qc = Some((&state.local_high_qc).into());
+                        }
+                        SAFE_BLOCKS => {
+                            self.safe_blocks = Some((&state.safe_blocks).into());
+                        }
+                        LAST_VIEW_TIMEOUT_QC => {
+                            self.last_view_timeout_qc =
+                                Some(state.last_view_timeout_qc.as_ref().map(From::from));
+                        }
+                        LATEST_COMMITTED_BLOCK => {
+                            self.latest_committed_block =
+                                Some((&state.latest_committed_block).into());
+                        }
+                        LATEST_COMMITTED_VIEW => {
+                            self.latest_committed_view = Some(state.latest_committed_view);
+                        }
+                        ROOT_COMMITTEE => {
+                            self.root_committee = Some((&state.root_committee).into());
+                        }
+                        PARENT_COMMITTEE => {
+                            self.parent_committee =
+                                Some(state.parent_committee.as_ref().map(From::from));
+                        }
+                        CHILD_COMMITTEES => {
+                            self.child_committees = Some(state.child_committees.as_slice().into());
+                        }
+                        COMMITTED_BLOCKS => {
+                            self.committed_blocks = Some(state.committed_blocks.as_slice().into());
+                        }
+                        STEP_DURATION => {
+                            self.step_duration = Some(state.step_duration);
+                        }
+                        _ => {}
+                    }
+                }
+                self.serialize(serializer)
+            }
         }
-        s.end()
-    }
+    };
 }
 
-pub(crate) struct CommitteeHelper<'a>(&'a Committee);
+mod csv;
+mod json;
 
-impl<'a> From<&'a Committee> for CommitteeHelper<'a> {
-    fn from(val: &'a Committee) -> Self {
-        Self(val)
-    }
-}
-
-impl<'a> Serialize for CommitteeHelper<'a> {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        let iter = self.0.iter();
-        let mut s = serializer.serialize_seq(Some(iter.size_hint().0))?;
-        for id in iter {
-            s.serialize_element(&NodeIdHelper::from(*id))?;
-        }
-        s.end()
-    }
-}
-
-pub(crate) struct CommitteesHelper<'a>(&'a [Committee]);
-
-impl<'a> From<&'a [Committee]> for CommitteesHelper<'a> {
-    fn from(val: &'a [Committee]) -> Self {
-        Self(val)
-    }
-}
-
-impl<'a> Serialize for CommitteesHelper<'a> {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        let mut s = serializer.serialize_seq(Some(self.0.len()))?;
-        for c in self.0 {
-            s.serialize_element(&CommitteeHelper::from(c))?;
-        }
-        s.end()
-    }
-}
-
-pub(crate) struct CommittedBlockHelper<'a>(&'a [BlockId]);
-
-impl<'a> From<&'a [BlockId]> for CommittedBlockHelper<'a> {
-    fn from(val: &'a [BlockId]) -> Self {
-        Self(val)
-    }
-}
-
-impl<'a> Serialize for CommittedBlockHelper<'a> {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        let mut s = serializer.serialize_seq(Some(self.0.len()))?;
-        for c in self.0 {
-            s.serialize_element(&BlockIdHelper::from(*c))?;
-        }
-        s.end()
-    }
-}
+pub(super) use self::csv::CarnotStateCsvSerializer;
+pub(super) use json::CarnotStateJsonSerializer;
 
 pub(crate) mod standard_qc {
     use super::*;
 
     #[derive(Serialize)]
-    pub(crate) struct StandardQcHelper {
+    pub(crate) struct StandardQcHelper<'a> {
         view: View,
-        id: serde_id::BlockIdHelper,
+        id: serde_id::BlockIdHelper<'a>,
     }
 
-    impl From<&StandardQc> for StandardQcHelper {
-        fn from(val: &StandardQc) -> Self {
+    impl<'a> From<&'a StandardQc> for StandardQcHelper<'a> {
+        fn from(val: &'a StandardQc) -> Self {
             Self {
                 view: val.view,
-                id: val.id.into(),
+                id: (&val.id).into(),
             }
         }
     }
@@ -201,12 +192,17 @@ pub(crate) mod qc {
         Aggregate(aggregate_qc::AggregateQcHelper<'a>),
     }
 
+    impl<'a> From<&'a Qc> for QcHelper<'a> {
+        fn from(value: &'a Qc) -> Self {
+            match value {
+                Qc::Standard(s) => Self::Standard(s),
+                Qc::Aggregated(a) => Self::Aggregate(a.into()),
+            }
+        }
+    }
+
     pub fn serialize<S: serde::Serializer>(t: &Qc, serializer: S) -> Result<S::Ok, S::Error> {
-        let qc = match t {
-            Qc::Standard(s) => QcHelper::Standard(s),
-            Qc::Aggregated(a) => QcHelper::Aggregate(aggregate_qc::AggregateQcHelper::from(a)),
-        };
-        qc.serialize(serializer)
+        QcHelper::from(t).serialize(serializer)
     }
 }
 
@@ -241,48 +237,25 @@ pub(crate) mod timeout_qc {
     }
 }
 
-pub(crate) mod serde_block {
-    use super::*;
-
-    #[derive(Serialize)]
-    pub(crate) struct BlockHelper {
-        view: View,
-        id: BlockIdHelper,
-    }
-
-    impl From<&Block> for BlockHelper {
-        fn from(val: &Block) -> Self {
-            Self {
-                view: val.view,
-                id: val.id.into(),
-            }
-        }
-    }
-
-    pub fn serialize<S: serde::Serializer>(t: &Block, serializer: S) -> Result<S::Ok, S::Error> {
-        BlockHelper::from(t).serialize(serializer)
-    }
-}
-
 pub(crate) mod serde_id {
     use consensus_engine::{BlockId, NodeId};
 
     use super::*;
 
-    #[derive(Serialize, Deserialize)]
-    pub(crate) struct BlockIdHelper(#[serde(with = "serde_array32")] [u8; 32]);
+    #[derive(Serialize)]
+    pub(crate) struct BlockIdHelper<'a>(#[serde(with = "serde_array32")] &'a [u8; 32]);
 
-    impl From<BlockId> for BlockIdHelper {
-        fn from(val: BlockId) -> Self {
+    impl<'a> From<&'a BlockId> for BlockIdHelper<'a> {
+        fn from(val: &'a BlockId) -> Self {
             Self(val.into())
         }
     }
 
-    #[derive(Serialize, Deserialize)]
-    pub(crate) struct NodeIdHelper(#[serde(with = "serde_array32")] [u8; 32]);
+    #[derive(Serialize)]
+    pub(crate) struct NodeIdHelper<'a>(#[serde(with = "serde_array32")] &'a [u8; 32]);
 
-    impl From<NodeId> for NodeIdHelper {
-        fn from(val: NodeId) -> Self {
+    impl<'a> From<&'a NodeId> for NodeIdHelper<'a> {
+        fn from(val: &'a NodeId) -> Self {
             Self(val.into())
         }
     }
@@ -291,7 +264,7 @@ pub(crate) mod serde_id {
         t: &NodeId,
         serializer: S,
     ) -> Result<S::Ok, S::Error> {
-        NodeIdHelper::from(*t).serialize(serializer)
+        NodeIdHelper::from(t).serialize(serializer)
     }
 
     pub(crate) mod serde_array32 {

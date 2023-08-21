@@ -53,7 +53,7 @@ where
                             .write()
                             .par_iter_mut()
                             .filter(|n| ids.contains(&n.id()))
-                            .for_each(|node|node.step(step_time));
+                            .for_each(|node| node.step(step_time));
 
                         p.send(R::try_from(
                             &simulation_state,

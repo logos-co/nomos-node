@@ -35,6 +35,12 @@ impl From<NodeId> for [u8; 32] {
     }
 }
 
+impl<'a> From<&'a NodeId> for &'a [u8; 32] {
+    fn from(id: &'a NodeId) -> Self {
+        &id.0
+    }
+}
+
 impl core::fmt::Display for NodeId {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         write!(f, "0x")?;
