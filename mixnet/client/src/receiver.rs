@@ -1,75 +1,51 @@
-use std::{
-    error::Error,
-    net::SocketAddr,
-    sync::{Arc, Mutex},
-};
+use std::{error::Error, marker::Unpin, net::SocketAddr};
 
+use futures::{Sink, SinkExt};
+use mixnet_protocol::Body;
 use nym_sphinx::{
     chunking::{fragment::Fragment, reconstruction::MessageReconstructor},
     message::{NymMessage, PaddedMessage},
     Payload,
 };
-use tokio::{
-    io::AsyncReadExt,
-    net::{TcpListener, TcpStream},
-    sync::broadcast,
-};
+use tokio::net::TcpStream;
 
-// Receiver accepts TCP connections to receive incoming messages from the exit layer of Mixnet.
+// Receiver accepts TCP connections to receive incoming payloads from the Mixnet.
 pub struct Receiver;
 
 impl Receiver {
     pub async fn run(
-        listen_addr: SocketAddr,
-        message_tx: broadcast::Sender<Vec<u8>>,
+        node_address: SocketAddr,
+        message_tx: impl Sink<Vec<u8>> + Unpin + Clone,
     ) -> Result<(), Box<dyn Error>> {
-        let listener = TcpListener::bind(listen_addr).await?;
-        let message_reconstructor: Arc<Mutex<MessageReconstructor>> = Default::default();
+        let mut socket = TcpStream::connect(node_address).await?;
+        let mut message_reconstructor: MessageReconstructor = Default::default();
 
-        tokio::spawn(async move {
-            loop {
-                match listener.accept().await {
-                    Ok((socket, remote_addr)) => {
-                        tracing::debug!("Accepted incoming connection from {remote_addr:?}");
-
-                        let message_tx = message_tx.clone();
-                        let message_reconstructor = message_reconstructor.clone();
-
-                        tokio::spawn(async {
-                            if let Err(e) =
-                                Self::handle_connection(socket, message_tx, message_reconstructor)
-                                    .await
-                            {
-                                tracing::error!("failed to handle conn: {e}");
-                            }
-                        });
-                    }
-                    Err(e) => tracing::warn!("Failed to accept incoming connection: {e}"),
+        loop {
+            let body = Body::read(&mut socket).await?;
+            match body {
+                Body::SphinxPacket(_) => return Err("received sphinx packet not expected".into()),
+                Body::FinalPayload(payload) => {
+                    Self::handle_payload(payload, message_tx.clone(), &mut message_reconstructor)
+                        .await?
                 }
             }
-        });
-
-        Ok(())
+        }
     }
 
-    async fn handle_connection(
-        mut socket: TcpStream,
-        message_tx: broadcast::Sender<Vec<u8>>,
-        message_reconstructor: Arc<Mutex<MessageReconstructor>>,
+    async fn handle_payload(
+        payload: Payload,
+        mut message_tx: impl Sink<Vec<u8>> + Unpin,
+        message_reconstructor: &mut MessageReconstructor,
     ) -> Result<(), Box<dyn Error>> {
-        let mut buf = Vec::new();
-        socket.read_to_end(&mut buf).await?;
+        let fragment = Fragment::try_from_bytes(&payload.recover_plaintext()?)?;
 
-        let payload = Payload::from_bytes(&buf)?.recover_plaintext()?;
-        let fragment = Fragment::try_from_bytes(&payload)?;
-
-        if let Some((padded_message, _)) = {
-            let mut reconstructor = message_reconstructor.lock().unwrap();
-            reconstructor.insert_new_fragment(fragment)
-        } {
+        let reconstruction_result = message_reconstructor.insert_new_fragment(fragment);
+        if let Some((padded_message, _)) = reconstruction_result {
             tracing::debug!("sending a reconstructed message to the local");
             let message = Self::remove_padding(padded_message)?;
-            message_tx.send(message)?;
+            if (message_tx.send(message).await).is_err() {
+                return Err("failed to send message to the sink".into());
+            }
         }
 
         Ok(())

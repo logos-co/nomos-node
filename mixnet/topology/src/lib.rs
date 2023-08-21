@@ -43,6 +43,19 @@ impl MixnetTopology {
 
         Ok(route)
     }
+
+    // Choose a destination mixnet node randomly from the last layer.
+    pub fn random_destination<R: Rng>(&self, rng: &mut R) -> Result<route::Node, Box<dyn Error>> {
+        Ok(self
+            .layers
+            .last()
+            .expect("topology is not empty")
+            .random_node(rng)
+            .expect("layer is not empty")
+            .clone()
+            .try_into()
+            .unwrap())
+    }
 }
 
 impl Layer {
