@@ -219,7 +219,7 @@ mod test {
     fn test_blob_to_kzg_commitment() {
         let (g1s, g2s) = generate_trusted_setup(4096, [0; 32]);
         let fft_settings = kzg::types::fft_settings::FsFFTSettings::new(8).unwrap();
-        let mut settings = FsKZGSettings::new(&g1s, &g2s, 4096, &fft_settings).unwrap();
+        let settings = FsKZGSettings::new(&g1s, &g2s, 4096, &fft_settings).unwrap();
         let blob = Blob::from_bytes(&[5; 4096 * 32]).unwrap();
         let commitment = blob_to_kzg_commitment(&blob, &settings, 4096);
         let commitment2 = blob_to_kzg_commitment_rust(&blob.inner, &settings);
