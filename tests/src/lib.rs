@@ -17,15 +17,11 @@ static RNG: Lazy<Mutex<Xoshiro256PlusPlus>> =
     Lazy::new(|| Mutex::new(Xoshiro256PlusPlus::seed_from_u64(42)));
 
 pub fn get_available_port() -> u16 {
-    let mut port = random_port();
+    let mut port: u16 = RNG.lock().unwrap().gen_range(8000..10000);
     while TcpListener::bind(("127.0.0.1", port)).is_err() {
-        port = random_port();
+        port += 1;
     }
     port
-}
-
-fn random_port() -> u16 {
-    RNG.lock().unwrap().gen_range(8000..10000)
 }
 
 #[async_trait::async_trait]
