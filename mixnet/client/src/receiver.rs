@@ -7,7 +7,7 @@ use nym_sphinx::{
     message::{NymMessage, PaddedMessage},
     Payload,
 };
-use tokio::net::{TcpSocket, TcpStream};
+use tokio::net::TcpStream;
 
 // Receiver accepts TCP connections to receive incoming payloads from the Mixnet.
 pub struct Receiver;
