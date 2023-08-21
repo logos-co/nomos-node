@@ -50,6 +50,10 @@ impl MixnetNode {
         //TODO: Accepting ad-hoc TCP conns for now. Improve conn handling.
         //TODO: Add graceful shutdown
         let listener = TcpListener::bind(self.config.listen_address).await?;
+        tracing::info!(
+            "Listening mixnet node connections: {}",
+            self.config.listen_address
+        );
 
         loop {
             match listener.accept().await {

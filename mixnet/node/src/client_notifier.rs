@@ -14,6 +14,7 @@ impl ClientNotifier {
         mut rx: mpsc::Receiver<Body>,
     ) -> Result<(), Box<dyn Error>> {
         let listener = TcpListener::bind(listen_address).await?;
+        tracing::info!("Listening mixnet client connections: {listen_address}");
 
         // Currently, handling only a single incoming connection
         // TODO: consider handling multiple clients
