@@ -105,7 +105,6 @@ impl<O: Overlay> Carnot<O> {
         new_state.update_timeout_qc(timeout_qc.clone());
 
         new_state.current_view = timeout_qc.view().next();
-        new_state.overlay.rebuild(timeout_qc);
 
         new_state
     }

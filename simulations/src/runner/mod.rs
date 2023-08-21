@@ -40,10 +40,10 @@ impl<R: Record> SimulationRunnerHandle<R> {
         self.stop()
     }
 
-    pub fn stop(self) -> anyhow::Result<()> {
+    pub fn stop(&self) -> anyhow::Result<()> {
         if !self.handle.is_finished() {
             self.stop_tx.send(())?;
-            self.producer.stop()?;
+            self.shutdown()?;
         }
         Ok(())
     }
@@ -53,6 +53,14 @@ impl<R: Record> SimulationRunnerHandle<R> {
         settings: S::Settings,
     ) -> anyhow::Result<SubscriberHandle<S>> {
         self.producer.subscribe(settings)
+    }
+
+    pub fn is_finished(&self) -> bool {
+        self.handle.is_finished()
+    }
+
+    pub fn shutdown(&self) -> anyhow::Result<()> {
+        self.producer.stop()
     }
 
     pub fn join(self) -> anyhow::Result<()> {
@@ -105,7 +113,7 @@ where
         + Sync
         + 'static,
     S: 'static,
-    T: Serialize + 'static,
+    T: Serialize + Clone + 'static,
 {
     pub fn new(
         network: Network<M>,
@@ -183,7 +191,7 @@ where
         + Sync
         + 'static,
     S: 'static,
-    T: Serialize + 'static,
+    T: Serialize + Clone + 'static,
 {
     pub fn simulate_and_subscribe<B>(
         self,

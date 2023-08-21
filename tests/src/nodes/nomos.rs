@@ -3,7 +3,7 @@ use std::net::SocketAddr;
 use std::process::{Child, Command, Stdio};
 use std::time::Duration;
 // internal
-use crate::{get_available_port, Node, SpawnConfig, RNG};
+use crate::{get_available_port, Node, SpawnConfig};
 use consensus_engine::overlay::{FlatOverlaySettings, RoundRobin};
 use consensus_engine::NodeId;
 use nomos_consensus::{CarnotInfo, CarnotSettings};
@@ -22,7 +22,7 @@ use waku_bindings::{Multiaddr, PeerId};
 // crates
 use fraction::Fraction;
 use once_cell::sync::Lazy;
-use rand::Rng;
+use rand::{thread_rng, Rng};
 use reqwest::Client;
 use tempfile::NamedTempFile;
 
@@ -174,7 +174,7 @@ impl Node for NomosNode {
             } => {
                 let mut ids = vec![[0; 32]; n_participants];
                 for id in &mut ids {
-                    RNG.lock().unwrap().fill(id);
+                    thread_rng().fill(id);
                 }
                 let mut configs = ids
                     .iter()

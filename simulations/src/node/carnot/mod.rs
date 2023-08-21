@@ -3,9 +3,14 @@
 mod event_builder;
 mod message_cache;
 pub mod messages;
+mod state;
+pub use state::*;
+mod serde_util;
 mod tally;
 mod timeout;
 
+use std::any::Any;
+use std::collections::BTreeMap;
 // std
 use std::hash::Hash;
 use std::time::Instant;
@@ -13,13 +18,17 @@ use std::{collections::HashMap, time::Duration};
 // crates
 use bls_signatures::PrivateKey;
 use rand::Rng;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 // internal
 use self::messages::CarnotMessage;
 use super::{Node, NodeId};
 use crate::network::{InMemoryNetworkInterface, NetworkInterface, NetworkMessage};
 use crate::node::carnot::event_builder::{CarnotTx, Event};
 use crate::node::carnot::message_cache::MessageCache;
+use crate::output_processors::{Record, RecordType, Runtime};
+use crate::settings::SimulationSettings;
+use crate::streaming::SubscriberFormat;
+use crate::warding::SimulationState;
 use consensus_engine::overlay::RandomBeaconState;
 use consensus_engine::{
     Block, BlockId, Carnot, Committee, Overlay, Payload, Qc, StandardQc, TimeoutQc, View, Vote,
@@ -31,183 +40,27 @@ use nomos_consensus::{
     network::messages::{NewViewMsg, TimeoutMsg, VoteMsg},
 };
 
-const NODE_ID: &str = "node_id";
-const CURRENT_VIEW: &str = "current_view";
-const HIGHEST_VOTED_VIEW: &str = "highest_voted_view";
-const LOCAL_HIGH_QC: &str = "local_high_qc";
-const SAFE_BLOCKS: &str = "safe_blocks";
-const LAST_VIEW_TIMEOUT_QC: &str = "last_view_timeout_qc";
-const LATEST_COMMITTED_BLOCK: &str = "latest_committed_block";
-const LATEST_COMMITTED_VIEW: &str = "latest_committed_view";
-const ROOT_COMMITTEE: &str = "root_committee";
-const PARENT_COMMITTEE: &str = "parent_committee";
-const CHILD_COMMITTEES: &str = "child_committees";
-const COMMITTED_BLOCKS: &str = "committed_blocks";
-const STEP_DURATION: &str = "step_duration";
-
-pub const CARNOT_RECORD_KEYS: &[&str] = &[
-    NODE_ID,
-    CURRENT_VIEW,
-    HIGHEST_VOTED_VIEW,
-    LOCAL_HIGH_QC,
-    SAFE_BLOCKS,
-    LAST_VIEW_TIMEOUT_QC,
-    LATEST_COMMITTED_BLOCK,
-    LATEST_COMMITTED_VIEW,
-    ROOT_COMMITTEE,
-    PARENT_COMMITTEE,
-    CHILD_COMMITTEES,
-    COMMITTED_BLOCKS,
-    STEP_DURATION,
-];
-
-static RECORD_SETTINGS: std::sync::OnceLock<HashMap<String, bool>> = std::sync::OnceLock::new();
-
-#[derive(Debug)]
-pub struct CarnotState {
-    node_id: NodeId,
-    current_view: View,
-    highest_voted_view: View,
-    local_high_qc: StandardQc,
-    safe_blocks: HashMap<BlockId, Block>,
-    last_view_timeout_qc: Option<TimeoutQc>,
-    latest_committed_block: Block,
-    latest_committed_view: View,
-    root_committee: Committee,
-    parent_committee: Option<Committee>,
-    child_committees: Vec<Committee>,
-    committed_blocks: Vec<BlockId>,
-    step_duration: Duration,
-}
-
-impl serde::Serialize for CarnotState {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        use serde::ser::SerializeStruct;
-        if let Some(rs) = RECORD_SETTINGS.get() {
-            let keys = rs
-                .iter()
-                .filter_map(|(k, v)| {
-                    if CARNOT_RECORD_KEYS.contains(&k.trim()) && *v {
-                        Some(k)
-                    } else {
-                        None
-                    }
-                })
-                .collect::<Vec<_>>();
-
-            let mut ser = serializer.serialize_struct("CarnotState", keys.len())?;
-            for k in keys {
-                match k.trim() {
-                    NODE_ID => ser.serialize_field(NODE_ID, &self.node_id)?,
-                    CURRENT_VIEW => ser.serialize_field(CURRENT_VIEW, &self.current_view)?,
-                    HIGHEST_VOTED_VIEW => {
-                        ser.serialize_field(HIGHEST_VOTED_VIEW, &self.highest_voted_view)?
-                    }
-                    LOCAL_HIGH_QC => ser.serialize_field(LOCAL_HIGH_QC, &self.local_high_qc)?,
-                    SAFE_BLOCKS => {
-                        #[derive(Serialize)]
-                        #[serde(transparent)]
-                        struct SafeBlockHelper<'a> {
-                            #[serde(serialize_with = "serialize_blocks")]
-                            safe_blocks: &'a HashMap<BlockId, Block>,
-                        }
-                        ser.serialize_field(
-                            SAFE_BLOCKS,
-                            &SafeBlockHelper {
-                                safe_blocks: &self.safe_blocks,
-                            },
-                        )?;
-                    }
-                    LAST_VIEW_TIMEOUT_QC => {
-                        ser.serialize_field(LAST_VIEW_TIMEOUT_QC, &self.last_view_timeout_qc)?
-                    }
-                    LATEST_COMMITTED_BLOCK => {
-                        ser.serialize_field(LATEST_COMMITTED_BLOCK, &self.latest_committed_block)?
-                    }
-                    LATEST_COMMITTED_VIEW => {
-                        ser.serialize_field(LATEST_COMMITTED_VIEW, &self.latest_committed_view)?
-                    }
-                    ROOT_COMMITTEE => ser.serialize_field(ROOT_COMMITTEE, &self.root_committee)?,
-                    PARENT_COMMITTEE => {
-                        ser.serialize_field(PARENT_COMMITTEE, &self.parent_committee)?
-                    }
-                    CHILD_COMMITTEES => {
-                        ser.serialize_field(CHILD_COMMITTEES, &self.child_committees)?
-                    }
-                    COMMITTED_BLOCKS => {
-                        ser.serialize_field(COMMITTED_BLOCKS, &self.committed_blocks)?
-                    }
-                    STEP_DURATION => ser.serialize_field(STEP_DURATION, &self.step_duration)?,
-                    _ => {}
-                }
-            }
-            ser.end()
-        } else {
-            serializer.serialize_none()
-        }
-    }
-}
-
-impl CarnotState {
-    const fn keys() -> &'static [&'static str] {
-        CARNOT_RECORD_KEYS
-    }
-}
-
-/// Have to implement this manually because of the `serde_json` will panic if the key of map
-/// is not a string.
-fn serialize_blocks<S>(blocks: &HashMap<BlockId, Block>, serializer: S) -> Result<S::Ok, S::Error>
-where
-    S: serde::Serializer,
-{
-    use serde::ser::SerializeMap;
-    let mut ser = serializer.serialize_map(Some(blocks.len()))?;
-    for (k, v) in blocks {
-        ser.serialize_entry(&format!("{k:?}"), v)?;
-    }
-    ser.end()
-}
-
-impl<O: Overlay> From<&Carnot<O>> for CarnotState {
-    fn from(value: &Carnot<O>) -> Self {
-        let node_id = value.id();
-        let current_view = value.current_view();
-        Self {
-            node_id,
-            current_view,
-            local_high_qc: value.high_qc(),
-            parent_committee: value.parent_committee(),
-            root_committee: value.root_committee(),
-            child_committees: value.child_committees(),
-            latest_committed_block: value.latest_committed_block(),
-            latest_committed_view: value.latest_committed_view(),
-            safe_blocks: value
-                .blocks_in_view(current_view)
-                .into_iter()
-                .map(|b| (b.id, b))
-                .collect(),
-            last_view_timeout_qc: value.last_view_timeout_qc(),
-            committed_blocks: value.latest_committed_blocks(),
-            highest_voted_view: Default::default(),
-            step_duration: Default::default(),
-        }
-    }
-}
+static RECORD_SETTINGS: std::sync::OnceLock<BTreeMap<String, bool>> = std::sync::OnceLock::new();
 
 #[derive(Clone, Default, Deserialize)]
 pub struct CarnotSettings {
     timeout: Duration,
-    record_settings: HashMap<String, bool>,
+    record_settings: BTreeMap<String, bool>,
+
+    #[serde(default)]
+    format: SubscriberFormat,
 }
 
 impl CarnotSettings {
-    pub fn new(timeout: Duration, record_settings: HashMap<String, bool>) -> Self {
+    pub fn new(
+        timeout: Duration,
+        record_settings: BTreeMap<String, bool>,
+        format: SubscriberFormat,
+    ) -> Self {
         Self {
             timeout,
             record_settings,
+            format,
         }
     }
 }
@@ -216,6 +69,8 @@ impl CarnotSettings {
 pub struct CarnotNode<O: Overlay> {
     id: consensus_engine::NodeId,
     state: CarnotState,
+    /// A step counter
+    current_step: usize,
     settings: CarnotSettings,
     network_interface: InMemoryNetworkInterface<CarnotMessage>,
     message_cache: MessageCache,
@@ -258,8 +113,10 @@ impl<
             engine,
             random_beacon_pk,
             step_duration: Duration::ZERO,
+            current_step: 0,
         };
         this.state = CarnotState::from(&this.engine);
+        this.state.format = this.settings.format;
         this
     }
 
@@ -344,21 +201,9 @@ impl<
                     "receive block proposal",
                 );
                 match self.engine.receive_block(block.header().clone()) {
-                    Ok(new) => {
+                    Ok(mut new) => {
                         if self.engine.current_view() != new.current_view() {
-                            // TODO: Refactor this into a method, use for timeout qc as well
-                            // new = new
-                            //     .update_overlay(|overlay| {
-                            //         let overlay = overlay
-                            //             .update_leader_selection(|leader_selection| {
-                            //                 leader_selection.on_new_block_received(&block)
-                            //             })
-                            //             .expect("Leader selection update should succeed");
-                            //         overlay.update_committees(|committee_membership| {
-                            //             committee_membership.on_new_block_received(&block)
-                            //         })
-                            //     })
-                            //     .unwrap_or(new);
+                            new = Self::update_overlay_with_block(new, &block);
                             self.engine = new;
                         }
                     }
@@ -455,7 +300,8 @@ impl<
                     timeout_view = %timeout_qc.view(),
                     "receive timeout qc message"
                 );
-                self.engine = self.engine.receive_timeout_qc(timeout_qc);
+                let new = self.engine.receive_timeout_qc(timeout_qc.clone());
+                self.engine = Self::update_overlay_with_timeout_qc(new, &timeout_qc);
             }
             Event::RootTimeout { timeouts } => {
                 tracing::debug!("root timeout {:?}", timeouts);
@@ -493,6 +339,39 @@ impl<
         if let Some(event) = output {
             self.handle_output(event);
         }
+    }
+
+    fn update_overlay_with_block<Tx: Clone + Eq + Hash>(
+        state: Carnot<O>,
+        block: &nomos_core::block::Block<Tx>,
+    ) -> Carnot<O> {
+        state
+            .update_overlay(|overlay| {
+                overlay
+                    .update_leader_selection(|leader_selection| {
+                        leader_selection.on_new_block_received(block)
+                    })
+                    .expect("Leader selection update should succeed")
+                    .update_committees(|committee_membership| {
+                        committee_membership.on_new_block_received(block)
+                    })
+            })
+            .unwrap_or(state)
+    }
+
+    fn update_overlay_with_timeout_qc(state: Carnot<O>, qc: &TimeoutQc) -> Carnot<O> {
+        state
+            .update_overlay(|overlay| {
+                overlay
+                    .update_leader_selection(|leader_selection| {
+                        leader_selection.on_timeout_qc_received(qc)
+                    })
+                    .expect("Leader selection update should succeed")
+                    .update_committees(|committee_membership| {
+                        committee_membership.on_timeout_qc_received(qc)
+                    })
+            })
+            .unwrap_or(state)
     }
 }
 
@@ -533,6 +412,8 @@ impl<
                     || matches!(m, CarnotMessage::Proposal(_) | CarnotMessage::TimeoutQc(_))
             });
         self.message_cache.prune(self.engine.current_view().prev());
+        self.event_builder
+            .prune_by_view(self.engine.current_view().prev());
         self.message_cache.update(other_view_messages);
         current_view_messages.append(&mut self.message_cache.retrieve(self.engine.current_view()));
 
@@ -545,8 +426,13 @@ impl<
         }
 
         // update state
-        self.state = CarnotState::from(&self.engine);
-        self.state.step_duration = step_duration.elapsed();
+        self.state = CarnotState::new(
+            self.current_step,
+            step_duration.elapsed(),
+            self.settings.format,
+            &self.engine,
+        );
+        self.current_step += 1;
     }
 }
 

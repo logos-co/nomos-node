@@ -15,6 +15,57 @@ pub mod polars;
 pub mod runtime_subscriber;
 pub mod settings_subscriber;
 
+#[derive(Debug, Default, Clone, Copy, Serialize, PartialEq, Eq)]
+pub enum SubscriberFormat {
+    Json,
+    #[default]
+    Csv,
+    Parquet,
+}
+
+impl SubscriberFormat {
+    pub const fn csv() -> Self {
+        Self::Csv
+    }
+
+    pub const fn json() -> Self {
+        Self::Json
+    }
+
+    pub const fn parquet() -> Self {
+        Self::Parquet
+    }
+
+    pub fn is_csv(&self) -> bool {
+        matches!(self, Self::Csv)
+    }
+}
+
+impl FromStr for SubscriberFormat {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.trim().to_ascii_lowercase().as_str() {
+            "json" => Ok(Self::Json),
+            "csv" => Ok(Self::Csv),
+            "parquet" => Ok(Self::Parquet),
+            tag => Err(format!(
+                "Invalid {tag} format, only [json, csv, parquet] are supported",
+            )),
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for SubscriberFormat {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        SubscriberFormat::from_str(&s).map_err(serde::de::Error::custom)
+    }
+}
+
 pub enum SubscriberType {
     Meta,
     Settings,
@@ -23,7 +74,7 @@ pub enum SubscriberType {
 
 #[derive(Debug)]
 struct Receivers<R> {
-    stop_rx: Receiver<()>,
+    stop_rx: Receiver<Sender<()>>,
     recv: Receiver<Arc<R>>,
 }
 
@@ -99,7 +150,7 @@ impl StreamSettings {
 
 pub struct SubscriberHandle<S> {
     handle: Option<std::thread::JoinHandle<anyhow::Result<()>>>,
-    stop_tx: Sender<()>,
+    stop_tx: Sender<Sender<()>>,
     subscriber: Option<S>,
 }
 
@@ -127,7 +178,9 @@ where
         if let Some(handle) = self.handle {
             // if we have a handle, and the handle is not finished
             if !handle.is_finished() {
-                self.stop_tx.send(())?;
+                let (finish_tx, finish_rx) = bounded(1);
+                self.stop_tx.send(finish_tx)?;
+                finish_rx.recv()?;
             } else {
                 // we are sure the handle is finished, so we can join it and try to get the result.
                 // if we have any error on subscriber side, return the error.
@@ -151,7 +204,7 @@ where
 struct Senders<R> {
     record_ty: RecordType,
     record_sender: Sender<Arc<R>>,
-    stop_sender: Sender<()>,
+    stop_sender: Sender<Sender<()>>,
 }
 
 #[derive(Debug)]
@@ -253,7 +306,7 @@ where
         })
     }
 
-    pub fn stop(self) -> anyhow::Result<()> {
+    pub fn stop(&self) -> anyhow::Result<()> {
         let meta_record = Arc::new(R::from(Runtime::load()?));
         let inner = self.inner.lock().unwrap();
 
@@ -268,8 +321,11 @@ where
 
         // send stop signal to all subscribers
         inner.senders.iter().for_each(|tx| {
-            if let Err(e) = tx.stop_sender.send(()) {
+            let (finish_tx, finish_rx) = bounded(1);
+            if let Err(e) = tx.stop_sender.send(finish_tx) {
                 tracing::error!("Error stopping subscriber: {e}");
+            } else if let Err(e) = finish_rx.recv() {
+                tracing::error!("Error finilizing subscriber: {e}");
             }
         });
         Ok(())
@@ -282,7 +338,7 @@ pub trait Subscriber {
 
     fn new(
         record_recv: Receiver<Arc<Self::Record>>,
-        stop_recv: Receiver<()>,
+        stop_recv: Receiver<Sender<()>>,
         settings: Self::Settings,
     ) -> anyhow::Result<Self>
     where

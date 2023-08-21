@@ -1,4 +1,4 @@
-use consensus_engine::overlay::RandomBeaconState;
+use consensus_engine::overlay::{BranchOverlay, RandomBeaconState};
 use consensus_engine::{
     overlay::{FlatOverlay, FreezeMembership, RoundRobin, TreeOverlay},
     NodeId,
@@ -20,6 +20,13 @@ pub fn to_overlay_node<R: Rng>(
     mut rng: R,
     settings: &SimulationSettings,
 ) -> BoxedNode<CarnotSettings, CarnotState> {
+    let fmt = match &settings.stream_settings {
+        simulations::streaming::StreamSettings::Naive(n) => n.format,
+        simulations::streaming::StreamSettings::IO(_) => {
+            simulations::streaming::SubscriberFormat::Csv
+        }
+        simulations::streaming::StreamSettings::Polars(p) => p.format,
+    };
     match &settings.overlay_settings {
         simulations::settings::OverlaySettings::Flat => {
             let overlay_settings = consensus_engine::overlay::FlatOverlaySettings {
@@ -33,6 +40,7 @@ pub fn to_overlay_node<R: Rng>(
                     CarnotSettings::new(
                         settings.node_settings.timeout,
                         settings.record_settings.clone(),
+                        fmt,
                     ),
                     overlay_settings,
                     genesis,
@@ -55,6 +63,30 @@ pub fn to_overlay_node<R: Rng>(
                     CarnotSettings::new(
                         settings.node_settings.timeout,
                         settings.record_settings.clone(),
+                        fmt,
+                    ),
+                    overlay_settings,
+                    genesis,
+                    network_interface,
+                    &mut rng,
+                ),
+            )
+        }
+        simulations::settings::OverlaySettings::Branch(branch_settings) => {
+            let overlay_settings = consensus_engine::overlay::BranchOverlaySettings {
+                nodes,
+                current_leader: leader,
+                branch_depth: branch_settings.branch_depth,
+                leader: RoundRobin::new(),
+                committee_membership: RandomBeaconState::initial_sad_from_entropy([0; 32]),
+            };
+            Box::new(
+                CarnotNode::<BranchOverlay<RoundRobin, RandomBeaconState>>::new(
+                    node_id,
+                    CarnotSettings::new(
+                        settings.node_settings.timeout,
+                        settings.record_settings.clone(),
+                        fmt,
                     ),
                     overlay_settings,
                     genesis,

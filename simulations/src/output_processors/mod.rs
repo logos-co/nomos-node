@@ -14,6 +14,8 @@ pub enum RecordType {
 }
 
 pub trait Record: From<Runtime> + From<SimulationSettings> + Send + Sync + 'static {
+    type Data: serde::Serialize;
+
     fn record_type(&self) -> RecordType;
 
     fn is_settings(&self) -> bool {
@@ -27,6 +29,8 @@ pub trait Record: From<Runtime> + From<SimulationSettings> + Send + Sync + 'stat
     fn is_data(&self) -> bool {
         self.record_type() == RecordType::Data
     }
+
+    fn data(&self) -> Vec<&Self::Data>;
 }
 
 pub type SerializedNodeState = serde_json::Value;
@@ -79,11 +83,20 @@ impl From<SerializedNodeState> for OutData {
 }
 
 impl Record for OutData {
+    type Data = SerializedNodeState;
+
     fn record_type(&self) -> RecordType {
         match self {
             Self::Runtime(_) => RecordType::Meta,
             Self::Settings(_) => RecordType::Settings,
             Self::Data(_) => RecordType::Data,
+        }
+    }
+
+    fn data(&self) -> Vec<&SerializedNodeState> {
+        match self {
+            Self::Data(d) => vec![d],
+            _ => unreachable!(),
         }
     }
 }
@@ -95,7 +108,7 @@ impl OutData {
     }
 }
 
-impl<S, T: Serialize> TryFrom<&SimulationState<S, T>> for OutData {
+impl<S, T: Serialize + Clone> TryFrom<&SimulationState<S, T>> for OutData {
     type Error = anyhow::Error;
 
     fn try_from(state: &SimulationState<S, T>) -> Result<Self, Self::Error> {

@@ -36,6 +36,15 @@ impl EventBuilder {
         }
     }
 
+    /// At some point we need to clear old votes or RAM just goes brrrrrr
+    pub fn prune_by_view(&mut self, view: View) {
+        self.vote_message.prune(view);
+        self.leader_vote_message.prune(view);
+        self.timeout_message.prune(view);
+        self.leader_new_view_message.prune(view);
+        self.new_view_message.prune(view);
+    }
+
     fn local_timeout(&mut self, view: View, elapsed: Duration) -> bool {
         if self.timeout_handler.step(view, elapsed) {
             self.timeout_handler.prune_by_view(view);

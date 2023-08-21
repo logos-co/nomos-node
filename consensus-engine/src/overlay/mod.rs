@@ -1,11 +1,13 @@
 use super::types::*;
 
+mod branch_overlay;
 mod flat_overlay;
 mod leadership;
 mod membership;
 mod random_beacon;
 mod tree_overlay;
 
+pub use branch_overlay::*;
 pub use flat_overlay::*;
 pub use leadership::*;
 pub use membership::*;
@@ -21,7 +23,6 @@ pub trait Overlay: Clone {
 
     fn new(settings: Self::Settings) -> Self;
     fn root_committee(&self) -> Committee;
-    fn rebuild(&mut self, timeout_qc: TimeoutQc);
     fn is_member_of_child_committee(&self, parent: NodeId, child: NodeId) -> bool;
     fn is_member_of_root_committee(&self, id: NodeId) -> bool;
     fn is_member_of_leaf_committee(&self, id: NodeId) -> bool;
