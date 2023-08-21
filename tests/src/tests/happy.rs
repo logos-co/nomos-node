@@ -3,7 +3,7 @@ use fraction::{Fraction, One};
 use futures::stream::{self, StreamExt};
 use std::collections::HashSet;
 use std::time::Duration;
-use tests::{Node, NomosNode, SpawnConfig};
+use tests::{MixNode, Node, NomosNode, SpawnConfig};
 
 const TARGET_VIEW: View = View::new(20);
 
@@ -48,6 +48,9 @@ async fn happy_test(nodes: Vec<NomosNode>) {
 
 #[tokio::test]
 async fn two_nodes_happy() {
+    let (_mixnodes, _mixnet_node_configs, _mixnet_topology) = MixNode::spawn_nodes(2).await;
+    //TODO: use these when spawning nomos-nodes with mixclient
+
     let nodes = NomosNode::spawn_nodes(SpawnConfig::Star {
         n_participants: 2,
         threshold: Fraction::one(),
@@ -59,6 +62,9 @@ async fn two_nodes_happy() {
 
 #[tokio::test]
 async fn ten_nodes_happy() {
+    let (_mixnodes, _mixnet_node_configs, _mixnet_topology) = MixNode::spawn_nodes(3).await;
+    //TODO: use these when spawning nomos-nodes with mixclient
+
     let nodes = NomosNode::spawn_nodes(SpawnConfig::Star {
         n_participants: 10,
         threshold: Fraction::one(),

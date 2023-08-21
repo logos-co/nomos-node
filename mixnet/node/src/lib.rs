@@ -9,8 +9,9 @@ use mixnet_protocol::Body;
 use mixnet_topology::MixnetNodeId;
 use nym_sphinx::{
     addressing::nodes::NymNodeRoutingAddress, Delay, DestinationAddressBytes, NodeAddressBytes,
-    Payload, PrivateKey, PublicKey,
+    Payload, PrivateKey,
 };
+pub use sphinx_packet::crypto::PRIVATE_KEY_SIZE;
 use sphinx_packet::{crypto::PUBLIC_KEY_SIZE, ProcessedPacket, SphinxPacket};
 use tokio::{
     net::{TcpListener, TcpStream},
@@ -32,7 +33,7 @@ impl MixnetNode {
     }
 
     pub fn public_key(&self) -> [u8; PUBLIC_KEY_SIZE] {
-        *PublicKey::from(&PrivateKey::from(self.config.private_key)).as_bytes()
+        self.config.public_key()
     }
 
     const CLIENT_NOTI_CHANNEL_SIZE: usize = 100;

@@ -1,4 +1,5 @@
 mod nodes;
+pub use nodes::MixNode;
 pub use nodes::NomosNode;
 
 // std

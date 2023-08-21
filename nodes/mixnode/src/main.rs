@@ -11,9 +11,10 @@ struct Args {
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    // construct a subscriber that prints formatted traces to stdout
+    // Construct a subscriber that prints formatted traces to stdout
+    // and use that subscriber to process traces emitted after this point
+    // TODO: use the log service that nomos-node uses, if necessary
     let subscriber = tracing_subscriber::FmtSubscriber::new();
-    // use that subscriber to process traces emitted after this point
     tracing::subscriber::set_global_default(subscriber)?;
 
     let Args { config } = Args::parse();

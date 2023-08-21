@@ -1,8 +1,8 @@
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
 
-use nym_sphinx::PrivateKey;
+use nym_sphinx::{PrivateKey, PublicKey};
 use serde::{Deserialize, Serialize};
-use sphinx_packet::crypto::PRIVATE_KEY_SIZE;
+use sphinx_packet::crypto::{PRIVATE_KEY_SIZE, PUBLIC_KEY_SIZE};
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct MixnetNodeConfig {
@@ -24,5 +24,11 @@ impl Default for MixnetNodeConfig {
             )),
             private_key: PrivateKey::new().to_bytes(),
         }
+    }
+}
+
+impl MixnetNodeConfig {
+    pub fn public_key(&self) -> [u8; PUBLIC_KEY_SIZE] {
+        *PublicKey::from(&PrivateKey::from(self.private_key)).as_bytes()
     }
 }
