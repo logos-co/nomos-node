@@ -101,7 +101,7 @@ async fn run_nodes_and_destination_client() -> (MixnetTopology, mpsc::Receiver<V
     });
 
     // Wait until mixnodes are ready
-    // TODO: use a more sophiscated way
+    // TODO: use a more sophisticated way
     tokio::time::sleep(Duration::from_secs(1)).await;
 
     // Run a MixnetClient only for the MixnetNode in the exit layer.
