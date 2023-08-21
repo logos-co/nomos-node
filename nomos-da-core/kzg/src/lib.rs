@@ -21,7 +21,7 @@ pub fn compute_commitment(
     Ok(Commitment(blob_to_kzg_commitment(
         &blob,
         settings,
-        data.len() / BYTES_PER_BLOB,
+        data.len() / BYTES_PER_FIELD_ELEMENT,
     )))
 }
 
