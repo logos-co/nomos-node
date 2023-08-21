@@ -6,5 +6,8 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-kzg = { git = "https://github.com/sifraitech/rust-kzg.git", package = "rust-kzg-blst" }
+kzg = { git = "https://github.com/sifraitech/rust-kzg.git", package = "rust-kzg-blst", features = ["parallel"] }
 kzg_traits = { git = "https://github.com/sifraitech/rust-kzg.git", package = "kzg" }
+
+[dev-dependencies]
+kzg-bench = { git = "https://github.com/sifraitech/rust-kzg.git", package = "kzg-bench" }
