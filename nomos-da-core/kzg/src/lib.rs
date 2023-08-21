@@ -1,4 +1,7 @@
-use kzg::eip_4844::{blob_to_kzg_commitment_rust, bytes_to_blob, compute_blob_kzg_proof_rust};
+use kzg::eip_4844::{
+    blob_to_kzg_commitment_rust, bytes_to_blob, compute_blob_kzg_proof_rust,
+    verify_blob_kzg_proof_rust,
+};
 use kzg::types::fr::FsFr;
 use kzg::types::g1::FsG1;
 use kzg::types::kzg_settings::FsKZGSettings;
@@ -72,4 +75,15 @@ pub fn compute_proofs(
         )?))
     }
     Ok(res)
+}
+
+pub fn verify_blob(
+    blob: &[u8],
+    proof: &Proof,
+    commitment: &Commitment,
+    settings: &FsKZGSettings,
+) -> Result<bool, Box<dyn Error>> {
+    assert_eq!(blob.len(), BYTES_PER_BLOB);
+    let blob = bytes_to_blob(blob)?;
+    verify_blob_kzg_proof_rust(&blob, &proof.0, &commitment.0, settings).map_err(|e| e.into())
 }
