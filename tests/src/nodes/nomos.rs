@@ -6,6 +6,9 @@ use std::time::Duration;
 use crate::{get_available_port, Node, SpawnConfig};
 use consensus_engine::overlay::{FlatOverlaySettings, RoundRobin};
 use consensus_engine::NodeId;
+use mixnet_client::{MixnetClientConfig, MixnetClientMode};
+use mixnet_node::MixnetNodeConfig;
+use mixnet_topology::MixnetTopology;
 use nomos_consensus::{CarnotInfo, CarnotSettings};
 use nomos_http::backends::axum::AxumBackendSettings;
 #[cfg(feature = "libp2p")]
@@ -172,6 +175,8 @@ impl Node for NomosNode {
                 n_participants,
                 threshold,
                 timeout,
+                mut mixnet_node_configs,
+                mixnet_topology,
             } => {
                 let mut ids = vec![[0; 32]; n_participants];
                 for id in &mut ids {
@@ -185,6 +190,8 @@ impl Node for NomosNode {
                             *id,
                             threshold,
                             timeout,
+                            mixnet_node_configs.pop(),
+                            mixnet_topology.clone(),
                         )
                     })
                     .collect::<Vec<_>>();
@@ -230,7 +237,14 @@ fn create_node_config(
     private_key: [u8; 32],
     threshold: Fraction,
     timeout: Duration,
+    mixnet_node_config: Option<MixnetNodeConfig>,
+    mixnet_topology: MixnetTopology,
 ) -> Config {
+    let mixnet_client_mode = match mixnet_node_config {
+        Some(node_config) => MixnetClientMode::SenderReceiver(node_config.client_listen_address),
+        None => MixnetClientMode::Sender,
+    };
+
     let mut config = Config {
         network: NetworkConfig {
             #[cfg(feature = "waku")]
@@ -244,7 +258,10 @@ fn create_node_config(
                     initial_peers: vec![],
                     ..Default::default()
                 },
-                mixnet_client: todo!(),
+                mixnet_client: MixnetClientConfig {
+                    mode: mixnet_client_mode,
+                    topology: mixnet_topology,
+                },
             },
         },
         consensus: CarnotSettings {
