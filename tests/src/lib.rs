@@ -10,21 +10,22 @@ use std::time::Duration;
 //crates
 use fraction::Fraction;
 use once_cell::sync::Lazy;
-use rand::SeedableRng;
+use rand::{Rng, SeedableRng};
 use rand_xoshiro::Xoshiro256PlusPlus;
 
 static RNG: Lazy<Mutex<Xoshiro256PlusPlus>> =
     Lazy::new(|| Mutex::new(Xoshiro256PlusPlus::seed_from_u64(42)));
 
-static NET_PORT: Mutex<u16> = Mutex::new(8000);
-
 pub fn get_available_port() -> u16 {
-    let mut port = NET_PORT.lock().unwrap();
-    *port += 1;
-    while TcpListener::bind(("127.0.0.1", *port)).is_err() {
-        *port += 1;
+    let mut port = random_port();
+    while TcpListener::bind(("127.0.0.1", port)).is_err() {
+        port = random_port();
     }
-    *port
+    port
+}
+
+fn random_port() -> u16 {
+    RNG.lock().unwrap().gen_range(8000..10000)
 }
 
 #[async_trait::async_trait]
