@@ -14,4 +14,8 @@ members = [
     "simulations",
     "consensus-engine",
     "tests",
+    "mixnet/node",
+    "mixnet/client",
+    "mixnet/protocol",
+    "mixnet/topology",
 ]
