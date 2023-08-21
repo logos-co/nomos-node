@@ -1,25 +1,20 @@
-use sphinx_packet::SphinxPacket;
+use sphinx_packet::{payload::Payload, SphinxPacket};
 use std::error::Error;
-use std::io::Cursor;
 
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 
-pub enum Body<'a> {
+pub enum Body {
     SphinxPacket(Box<SphinxPacket>),
-    FinalPayload(Box<dyn AsyncRead + Unpin + Send + 'a>),
+    FinalPayload(Payload),
 }
 
-impl<'a> Body<'a> {
+impl Body {
     pub fn new_sphinx(packet: Box<SphinxPacket>) -> Self {
         Self::SphinxPacket(packet)
     }
 
-    pub fn new_final_owned(data: Vec<u8>) -> Self {
-        Self::FinalPayload(Box::new(Cursor::new(data)))
-    }
-
-    pub fn new_final_stream(data: impl AsyncRead + Unpin + Send + 'a) -> Self {
-        Self::FinalPayload(Box::new(data))
+    pub fn new_final_payload(payload: Payload) -> Self {
+        Self::FinalPayload(payload)
     }
 
     fn variant_as_u8(&self) -> u8 {
@@ -29,9 +24,9 @@ impl<'a> Body<'a> {
         }
     }
 
-    pub async fn read<R>(reader: &'a mut R) -> Result<Body<'a>, Box<dyn Error>>
+    pub async fn read<R>(reader: &mut R) -> Result<Body, Box<dyn Error>>
     where
-        R: AsyncRead + Unpin + Send,
+        R: AsyncRead + Unpin,
     {
         let id = reader.read_u8().await?;
         match id {
@@ -41,21 +36,28 @@ impl<'a> Body<'a> {
         }
     }
 
-    async fn read_sphinx_packet<R>(reader: &mut R) -> Result<Body<'a>, Box<dyn Error>>
+    async fn read_sphinx_packet<R>(reader: &mut R) -> Result<Body, Box<dyn Error>>
     where
         R: AsyncRead + Unpin,
     {
-        let mut buf = Vec::new();
-        reader.read_to_end(&mut buf).await?;
+        let size = reader.read_u64().await?;
+        let mut buf = vec![0; size as usize];
+        reader.read_exact(&mut buf).await?;
+
         let packet = SphinxPacket::from_bytes(&buf)?;
         Ok(Self::new_sphinx(Box::new(packet)))
     }
 
-    async fn read_final_payload<R>(reader: &'a mut R) -> Result<Body<'a>, Box<dyn Error>>
+    async fn read_final_payload<R>(reader: &mut R) -> Result<Body, Box<dyn Error>>
     where
-        R: AsyncRead + Unpin + Send,
+        R: AsyncRead + Unpin,
     {
-        Ok(Self::new_final_stream(reader))
+        let size = reader.read_u64().await?;
+        let mut buf = vec![0; size as usize];
+        reader.read_exact(&mut buf).await?;
+
+        let payload = Payload::from_bytes(&buf)?;
+        Ok(Self::new_final_payload(payload))
     }
 
     pub async fn write<W>(self, writer: &mut W) -> Result<(), Box<dyn Error>>
@@ -66,10 +68,14 @@ impl<'a> Body<'a> {
         writer.write_u8(variant).await?;
         match self {
             Body::SphinxPacket(packet) => {
-                writer.write_all(&packet.to_bytes()).await?;
+                let data = packet.to_bytes();
+                writer.write_u64(data.len() as u64).await?;
+                writer.write_all(&data).await?;
             }
-            Body::FinalPayload(mut reader) => {
-                tokio::io::copy(&mut reader, writer).await?;
+            Body::FinalPayload(payload) => {
+                let data = payload.as_bytes();
+                writer.write_u64(data.len() as u64).await?;
+                writer.write_all(data).await?;
             }
         }
         Ok(())
