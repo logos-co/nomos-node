@@ -1,5 +1,5 @@
 [package]
-name = "kzg"
+name = "nomos-kzg"
 version = "0.1.0"
 edition = "2021"
 
@@ -10,4 +10,8 @@ kzg = { git = "https://github.com/sifraitech/rust-kzg.git", package = "rust-kzg-
 kzg_traits = { git = "https://github.com/sifraitech/rust-kzg.git", package = "kzg" }
 
 [dev-dependencies]
-kzg-bench = { git = "https://github.com/sifraitech/rust-kzg.git", package = "kzg-bench" }
+criterion = "0.5.1"
+
+[[bench]]
+name = "nomos_kzg"
+harness = false

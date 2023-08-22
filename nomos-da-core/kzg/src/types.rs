@@ -37,4 +37,8 @@ impl Blob {
     pub fn len(&self) -> usize {
         self.inner.len()
     }
+
+    pub fn inner(&self) -> Vec<FsFr> {
+        self.inner.clone()
+    }
 }

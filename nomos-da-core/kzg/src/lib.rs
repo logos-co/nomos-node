@@ -1,8 +1,8 @@
 mod dynamic_kzg;
 mod types;
 
-use crate::types::{Blob, Commitment, Proof};
-use dynamic_kzg::{blob_to_kzg_commitment, compute_blob_kzg_proof, verify_blob_kzg_proof};
+pub use crate::types::{Blob, Commitment, Proof};
+pub use dynamic_kzg::{blob_to_kzg_commitment, compute_blob_kzg_proof, verify_blob_kzg_proof};
 use kzg::types::kzg_settings::FsKZGSettings;
 use std::error::Error;
 
