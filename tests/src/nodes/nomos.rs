@@ -6,6 +6,7 @@ use std::time::Duration;
 use crate::{get_available_port, Node, SpawnConfig};
 use consensus_engine::overlay::{FlatOverlaySettings, RoundRobin};
 use consensus_engine::NodeId;
+#[cfg(feature = "libp2p")]
 use mixnet_client::{MixnetClientConfig, MixnetClientMode};
 use mixnet_node::MixnetNodeConfig;
 use mixnet_topology::MixnetTopology;
@@ -14,9 +15,8 @@ use nomos_http::backends::axum::AxumBackendSettings;
 #[cfg(feature = "libp2p")]
 use nomos_libp2p::{Multiaddr, SwarmConfig};
 use nomos_log::{LoggerBackend, LoggerFormat};
-use nomos_network::backends::libp2p::Libp2pConfig;
 #[cfg(feature = "libp2p")]
-use nomos_network::backends::libp2p::Libp2pInfo;
+use nomos_network::backends::libp2p::{Libp2pConfig, Libp2pInfo};
 #[cfg(feature = "waku")]
 use nomos_network::backends::waku::{WakuConfig, WakuInfo};
 use nomos_network::NetworkConfig;
@@ -240,6 +240,7 @@ fn create_node_config(
     mixnet_node_config: Option<MixnetNodeConfig>,
     mixnet_topology: MixnetTopology,
 ) -> Config {
+    #[cfg(feature = "libp2p")]
     let mixnet_client_mode = match mixnet_node_config {
         Some(node_config) => MixnetClientMode::SenderReceiver(node_config.client_listen_address),
         None => MixnetClientMode::Sender,
