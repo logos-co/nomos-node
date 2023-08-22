@@ -237,8 +237,10 @@ fn create_node_config(
     private_key: [u8; 32],
     threshold: Fraction,
     timeout: Duration,
-    mixnet_node_config: Option<MixnetNodeConfig>,
-    mixnet_topology: MixnetTopology,
+    #[cfg(feature = "libp2p")] mixnet_node_config: Option<MixnetNodeConfig>,
+    #[cfg(feature = "waku")] _mixnet_node_config: Option<MixnetNodeConfig>,
+    #[cfg(feature = "libp2p")] mixnet_topology: MixnetTopology,
+    #[cfg(feature = "waku")] _mixnet_topology: MixnetTopology,
 ) -> Config {
     #[cfg(feature = "libp2p")]
     let mixnet_client_mode = match mixnet_node_config {
