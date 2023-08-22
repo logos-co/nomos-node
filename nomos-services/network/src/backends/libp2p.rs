@@ -17,7 +17,6 @@ use overwatch_rs::{overwatch::handle::OverwatchHandle, services::state::NoState}
 use rand::rngs::OsRng;
 use serde::{Deserialize, Serialize};
 use tokio::sync::{broadcast, mpsc, oneshot};
-use tracing::log;
 
 macro_rules! log_error {
     ($e:expr) => {
@@ -105,7 +104,7 @@ impl NetworkBackend for Libp2p {
                     }
                 })) as Pin<Box<dyn Stream<Item=Vec<u8>> + Send>>
             } else {
-                log::error!("Could not quickstart mixnet stream");
+                tracing::error!("Could not quickstart mixnet stream");
                 Box::pin(stream::empty())
             };
             let mut swarm = Swarm::build(&config.inner).unwrap();
