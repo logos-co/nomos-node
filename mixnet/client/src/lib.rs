@@ -30,8 +30,7 @@ impl<R: Rng> MixnetClient<R> {
         Option<impl Stream<Item = Result<Vec<u8>, Box<dyn Error>>> + Send + 'static>,
         Box<dyn Error>,
     > {
-        let mode = self.mode.clone();
-        mode.run().await
+        self.mode.run().await
     }
 
     pub fn send(&mut self, msg: Vec<u8>) -> Result<(), Box<dyn Error>> {

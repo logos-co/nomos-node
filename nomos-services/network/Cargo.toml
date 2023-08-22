@@ -17,7 +17,6 @@ sscanf = { version = "0.4", optional = true }
 sled = { version = "0.34", optional = true }
 tokio = { version = "1", features = ["sync"] }
 tokio-stream = "0.1"
-tokio-util = "0.7.8"
 thiserror = "1.0"
 tracing = "0.1"
 rand = { version = "0.7.3", optional = true }
