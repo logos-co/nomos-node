@@ -24,7 +24,7 @@ impl<R: Rng> MixnetClient<R> {
         }
     }
 
-    // Instead of providing this sync function that spawns a task internally,
+    // TODO: Instead of providing this sync function that spawns a task internally,
     // it would be better to provide the `Stream` trait implementation
     // for better composability from the user's point of view.
     // https://github.com/logos-co/nomos-node/issues/314
