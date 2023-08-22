@@ -3,6 +3,7 @@ mod receiver;
 mod sender;
 
 use std::error::Error;
+use std::time::Duration;
 
 pub use config::MixnetClientConfig;
 pub use config::MixnetClientMode;
@@ -28,7 +29,7 @@ impl<R: Rng> MixnetClient<R> {
         self.mode.run(message_tx).await
     }
 
-    pub fn send(&mut self, msg: Vec<u8>) -> Result<(), Box<dyn Error>> {
-        self.sender.send(msg)
+    pub fn send(&mut self, msg: Vec<u8>, total_delay: Duration) -> Result<(), Box<dyn Error>> {
+        self.sender.send(msg, total_delay)
     }
 }

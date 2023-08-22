@@ -1,4 +1,4 @@
-use std::{error::Error, net::SocketAddr};
+use std::{error::Error, net::SocketAddr, time::Duration};
 
 use mixnet_protocol::Body;
 use mixnet_topology::MixnetTopology;
@@ -23,7 +23,7 @@ impl<R: Rng> Sender<R> {
         Self { topology, rng }
     }
 
-    pub fn send(&mut self, msg: Vec<u8>) -> Result<(), Box<dyn Error>> {
+    pub fn send(&mut self, msg: Vec<u8>, total_delay: Duration) -> Result<(), Box<dyn Error>> {
         let destination = self.topology.random_destination(&mut self.rng)?;
         let destination = Destination::new(
             DestinationAddressBytes::from_bytes(destination.address.as_bytes()),
@@ -32,7 +32,7 @@ impl<R: Rng> Sender<R> {
 
         self.pad_and_split_message(msg)
             .into_iter()
-            .map(|fragment| self.build_sphinx_packet(fragment, &destination))
+            .map(|fragment| self.build_sphinx_packet(fragment, &destination, total_delay))
             .collect::<Result<Vec<_>, _>>()?
             .into_iter()
             .for_each(|(packet, first_node)| {
@@ -63,11 +63,17 @@ impl<R: Rng> Sender<R> {
         &mut self,
         fragment: Fragment,
         destination: &Destination,
+        total_delay: Duration,
     ) -> Result<(sphinx_packet::SphinxPacket, route::Node), Box<dyn Error>> {
         let route = self.topology.random_route(&mut self.rng)?;
 
-        // TODO: use proper delays
-        let delays: Vec<Delay> = route.iter().map(|_| Delay::new_from_nanos(0)).collect();
+        let delays: Vec<Delay> = RandomDelayIterator::new(
+            rand::thread_rng(),
+            route.len() as u64,
+            total_delay.as_millis() as u64,
+        )
+        .map(Delay::new_from_millis)
+        .collect();
 
         // TODO: encryption for the destination
         // https://github.com/nymtech/nym/blob/3748ab77a132143d5fd1cd75dd06334d33294815/common/nymsphinx/src/preparer/payload.rs#L70
@@ -95,5 +101,53 @@ impl<R: Rng> Sender<R> {
         tracing::debug!("Sent a Sphinx packet successuflly to the node: {addr:?}");
 
         Ok(())
+    }
+}
+
+struct RandomDelayIterator<R> {
+    rng: R,
+    remaining_delays: u64,
+    remaining_time: u64,
+    avg_delay: u64,
+}
+
+impl<R> RandomDelayIterator<R> {
+    fn new(rng: R, total_delays: u64, total_time: u64) -> Self {
+        RandomDelayIterator {
+            rng,
+            remaining_delays: total_delays,
+            remaining_time: total_time,
+            avg_delay: total_time / total_delays,
+        }
+    }
+}
+
+impl<R> Iterator for RandomDelayIterator<R>
+where
+    R: Rng,
+{
+    type Item = u64;
+
+    fn next(&mut self) -> Option<u64> {
+        if self.remaining_delays == 0 {
+            return None;
+        }
+
+        if self.remaining_delays == 1 {
+            self.remaining_delays -= 1;
+            return Some(self.remaining_time);
+        }
+
+        // Calculate bounds to avoid extreme values
+        let lower_bound = (self.avg_delay as f64 * 0.5) as u64;
+        let upper_bound = (self.avg_delay as f64 * 1.5)
+            .min((self.remaining_time - self.remaining_delays + 1) as f64)
+            as u64;
+
+        let delay = self.rng.gen_range(lower_bound, upper_bound);
+        self.remaining_time -= delay;
+        self.remaining_delays -= 1;
+
+        Some(delay)
     }
 }
