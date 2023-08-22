@@ -1,6 +1,6 @@
-use std::{error::Error, marker::Unpin, net::SocketAddr};
+use std::{error::Error, net::SocketAddr};
 
-use futures::{Sink, SinkExt};
+use futures::{stream, Stream, TryStreamExt};
 use mixnet_protocol::Body;
 use nym_sphinx::{
     chunking::{fragment::Fragment, reconstruction::MessageReconstructor},
@@ -15,40 +15,44 @@ pub struct Receiver;
 impl Receiver {
     pub async fn run(
         node_address: SocketAddr,
-        message_tx: impl Sink<Vec<u8>> + Unpin + Clone,
-    ) -> Result<(), Box<dyn Error>> {
-        let mut socket = TcpStream::connect(node_address).await?;
-        let mut message_reconstructor: MessageReconstructor = Default::default();
-
-        loop {
-            let body = Body::read(&mut socket).await?;
+    ) -> Result<impl Stream<Item = Result<Vec<u8>, Box<dyn Error>>> + Send + 'static, Box<dyn Error>>
+    {
+        let socket = TcpStream::connect(node_address).await?;
+        Ok(stream::unfold(socket, |mut socket| async move {
+            let Ok(body) = Body::read(&mut socket).await else {
+                    // TODO: Maybe this is a hard error and the stream is corrupted? In that case stop the stream
+                    return Some((Err("Could not read body from socket".into()), socket));
+                };
+            let mut message_reconstructor: MessageReconstructor = Default::default();
             match body {
-                Body::SphinxPacket(_) => return Err("received sphinx packet not expected".into()),
-                Body::FinalPayload(payload) => {
-                    Self::handle_payload(payload, message_tx.clone(), &mut message_reconstructor)
-                        .await?
+                Body::SphinxPacket(_) => {
+                    Some((Err("received sphinx packet not expected".into()), socket))
                 }
+                Body::FinalPayload(payload) => Some((
+                    Self::handle_payload(payload, &mut message_reconstructor).await,
+                    socket,
+                )),
             }
-        }
+        })
+        .into_stream())
     }
 
     async fn handle_payload(
         payload: Payload,
-        mut message_tx: impl Sink<Vec<u8>> + Unpin,
         message_reconstructor: &mut MessageReconstructor,
-    ) -> Result<(), Box<dyn Error>> {
+    ) -> Result<Vec<u8>, Box<dyn Error>> {
         let fragment = Fragment::try_from_bytes(&payload.recover_plaintext()?)?;
 
         let reconstruction_result = message_reconstructor.insert_new_fragment(fragment);
-        if let Some((padded_message, _)) = reconstruction_result {
+        let message = if let Some((padded_message, _)) = reconstruction_result {
             tracing::debug!("sending a reconstructed message to the local");
-            let message = Self::remove_padding(padded_message)?;
-            if (message_tx.send(message).await).is_err() {
-                return Err("failed to send message to the sink".into());
-            }
-        }
+            Self::remove_padding(padded_message)?
+        } else {
+            // TODO: polish error message
+            return Err("received a fragment that did not complete a message".into());
+        };
 
-        Ok(())
+        Ok(message)
     }
 
     fn remove_padding(msg: Vec<u8>) -> Result<Vec<u8>, Box<dyn Error>> {

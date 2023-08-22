@@ -36,6 +36,11 @@ impl Body {
         }
     }
 
+    fn sphinx_packet_from_bytes(data: &[u8]) -> Result<Self, Box<dyn Error>> {
+        let packet = SphinxPacket::from_bytes(data)?;
+        Ok(Self::new_sphinx(Box::new(packet)))
+    }
+
     async fn read_sphinx_packet<R>(reader: &mut R) -> Result<Body, Box<dyn Error>>
     where
         R: AsyncRead + Unpin,
@@ -43,9 +48,12 @@ impl Body {
         let size = reader.read_u64().await?;
         let mut buf = vec![0; size as usize];
         reader.read_exact(&mut buf).await?;
+        Self::sphinx_packet_from_bytes(&buf)
+    }
 
-        let packet = SphinxPacket::from_bytes(&buf)?;
-        Ok(Self::new_sphinx(Box::new(packet)))
+    pub fn final_payload_from_bytes(data: &[u8]) -> Result<Self, Box<dyn Error>> {
+        let payload = Payload::from_bytes(data)?;
+        Ok(Self::new_final_payload(payload))
     }
 
     async fn read_final_payload<R>(reader: &mut R) -> Result<Body, Box<dyn Error>>
@@ -56,8 +64,7 @@ impl Body {
         let mut buf = vec![0; size as usize];
         reader.read_exact(&mut buf).await?;
 
-        let payload = Payload::from_bytes(&buf)?;
-        Ok(Self::new_final_payload(payload))
+        Self::final_payload_from_bytes(&buf)
     }
 
     pub async fn write<W>(self, writer: &mut W) -> Result<(), Box<dyn Error>>

@@ -7,6 +7,7 @@ edition = "2021"
 serde = { version = "1.0", features = ["derive"] }
 tracing = "0.1.37"
 tokio = { version = "1.29.1", features = ["net"] }
+tokio-util = { version = "0.7", features = ["io"] }
 sphinx-packet = "0.1.0"
 nym-sphinx = { package = "nym-sphinx", git = "https://github.com/nymtech/nym", tag = "v1.1.22" }
 # Using an older version, since `nym-sphinx` depends on `rand` v0.7.3.

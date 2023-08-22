@@ -3,11 +3,10 @@ mod receiver;
 mod sender;
 
 use std::error::Error;
-use std::future::Future;
 
 pub use config::MixnetClientConfig;
 pub use config::MixnetClientMode;
-use futures::Sink;
+use futures::Stream;
 use rand::Rng;
 use sender::Sender;
 
@@ -25,16 +24,14 @@ impl<R: Rng> MixnetClient<R> {
         }
     }
 
-    pub fn run(
+    pub async fn run(
         &self,
-        message_tx: impl Sink<Vec<u8>> + Clone + Unpin + Send + Sync + 'static,
-    ) -> impl Future<Output = ()> + Send + 'static {
+    ) -> Result<impl Stream<Item = Result<Vec<u8>, Box<dyn Error>>> + Send + 'static, Box<dyn Error>>
+    {
         let mode = self.mode.clone();
-        async move {
-            if let Err(e) = mode.run(message_tx).await {
-                tracing::error!("error from mixnet client receiver: {e}");
-            }
-        }
+        mode.run()
+            .await
+            .map(|stream| stream.expect("Expected client mode"))
     }
 
     pub fn send(&mut self, msg: Vec<u8>) -> Result<(), Box<dyn Error>> {

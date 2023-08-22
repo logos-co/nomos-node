@@ -1,6 +1,6 @@
 use std::{error::Error, net::SocketAddr};
 
-use futures::Sink;
+use futures::Stream;
 use mixnet_topology::MixnetTopology;
 use serde::{Deserialize, Serialize};
 
@@ -21,11 +21,13 @@ pub enum MixnetClientMode {
 impl MixnetClientMode {
     pub(crate) async fn run(
         &self,
-        message_tx: impl Sink<Vec<u8>> + Clone + Unpin + Send + 'static,
-    ) -> Result<(), Box<dyn Error>> {
+    ) -> Result<
+        Option<impl Stream<Item = Result<Vec<u8>, Box<dyn Error>>> + Send + 'static>,
+        Box<dyn Error>,
+    > {
         match self {
-            Self::Sender => Ok(()),
-            Self::SenderReceiver(node_address) => Receiver::run(*node_address, message_tx).await,
+            Self::Sender => Ok(None),
+            Self::SenderReceiver(node_address) => Receiver::run(*node_address).await.map(Some),
         }
     }
 }
