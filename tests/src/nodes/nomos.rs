@@ -11,6 +11,7 @@ use nomos_http::backends::axum::AxumBackendSettings;
 #[cfg(feature = "libp2p")]
 use nomos_libp2p::{Multiaddr, SwarmConfig};
 use nomos_log::{LoggerBackend, LoggerFormat};
+use nomos_network::backends::libp2p::Libp2pConfig;
 #[cfg(feature = "libp2p")]
 use nomos_network::backends::libp2p::Libp2pInfo;
 #[cfg(feature = "waku")]
@@ -190,10 +191,19 @@ impl Node for NomosNode {
                 let mut nodes = vec![Self::spawn(configs.swap_remove(0)).await];
                 let listening_addr = nodes[0].get_listening_address().await;
                 for mut conf in configs {
+                    #[cfg(feature = "waku")]
                     conf.network
                         .backend
                         .initial_peers
                         .push(listening_addr.clone());
+                    #[cfg(feature = "libp2p")]
+                    // TODO: Consider having `initial_peers` outside of `inner`, as WakuConfig does
+                    conf.network
+                        .backend
+                        .inner
+                        .initial_peers
+                        .push(listening_addr.clone());
+
                     nodes.push(Self::spawn(conf).await);
                 }
                 nodes
@@ -229,9 +239,12 @@ fn create_node_config(
                 inner: Default::default(),
             },
             #[cfg(feature = "libp2p")]
-            backend: SwarmConfig {
-                initial_peers: vec![],
-                ..Default::default()
+            backend: Libp2pConfig {
+                inner: SwarmConfig {
+                    initial_peers: vec![],
+                    ..Default::default()
+                },
+                mixnet_client: todo!(),
             },
         },
         consensus: CarnotSettings {
@@ -265,7 +278,7 @@ fn create_node_config(
     }
     #[cfg(feature = "libp2p")]
     {
-        config.network.backend.port = get_available_port();
+        config.network.backend.inner.port = get_available_port();
     }
 
     config

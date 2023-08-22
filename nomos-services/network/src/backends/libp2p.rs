@@ -2,6 +2,7 @@
 use std::error::Error;
 // internal
 use super::NetworkBackend;
+use mixnet_client::{MixnetClient, MixnetClientConfig};
 use nomos_libp2p::{
     libp2p::{
         gossipsub::{self, Message},
@@ -11,8 +12,10 @@ use nomos_libp2p::{
 };
 // crates
 use overwatch_rs::{overwatch::handle::OverwatchHandle, services::state::NoState};
+use rand::rngs::OsRng;
 use serde::{Deserialize, Serialize};
 use tokio::sync::{broadcast, mpsc, oneshot};
+use tokio_util::sync::PollSender;
 
 macro_rules! log_error {
     ($e:expr) => {
@@ -25,6 +28,13 @@ macro_rules! log_error {
 pub struct Libp2p {
     events_tx: broadcast::Sender<Event>,
     commands_tx: mpsc::Sender<Command>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct Libp2pConfig {
+    #[serde(flatten)]
+    pub inner: SwarmConfig,
+    pub mixnet_client: MixnetClientConfig,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -60,15 +70,25 @@ pub enum Event {
     Message(Message),
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct MixnetMessage {
+    topic: Topic,
+    message: Box<[u8]>,
+}
+
 #[async_trait::async_trait]
 impl NetworkBackend for Libp2p {
-    type Settings = SwarmConfig;
-    type State = NoState<SwarmConfig>;
+    type Settings = Libp2pConfig;
+    type State = NoState<Libp2pConfig>;
     type Message = Command;
     type EventKind = EventKind;
     type NetworkEvent = Event;
 
     fn new(config: Self::Settings, overwatch_handle: OverwatchHandle) -> Self {
+        let mut mixnet_client = MixnetClient::new(config.mixnet_client, OsRng);
+        let (mixnet_inbound_tx, mut mixnet_inbound_rx) = mpsc::channel(BUFFER_SIZE);
+        mixnet_client.run(PollSender::new(mixnet_inbound_tx));
+
         let (commands_tx, mut commands_rx) = tokio::sync::mpsc::channel(BUFFER_SIZE);
         let (events_tx, _) = tokio::sync::broadcast::channel(BUFFER_SIZE);
         let libp2p = Self {
@@ -77,7 +97,7 @@ impl NetworkBackend for Libp2p {
         };
         overwatch_handle.runtime().spawn(async move {
             use tokio_stream::StreamExt;
-            let mut swarm = Swarm::build(&config).unwrap();
+            let mut swarm = Swarm::build(&config.inner).unwrap();
             loop {
                 tokio::select! {
                     Some(event) = swarm.next() => {
@@ -123,23 +143,11 @@ impl NetworkBackend for Libp2p {
                                 log_error!(swarm.connect(peer_id, peer_addr));
                             }
                             Command::Broadcast { topic, message } => {
-                                match swarm.broadcast(&topic, message.to_vec()) {
-                                    Ok(id) => {
-                                        tracing::debug!("broadcasted message with id: {id} tp topic: {topic}");
-                                    }
-                                    Err(e) => {
-                                        tracing::error!("failed to broadcast message to topic: {topic} {e:?}");
-                                    }
-                                }
-
-                                if swarm.is_subscribed(&topic) {
-                                    log_error!(events_tx.send(Event::Message(Message {
-                                        source: None,
-                                        data: message.into(),
-                                        sequence_number: None,
-                                        topic: Swarm::topic_hash(&topic),
-                                    })));
-                                }
+                                tracing::debug!("sending message to mixnet client");
+                                let msg = MixnetMessage { topic, message };
+                                // TODO: use `wire` instead of json, by resolving import cycles
+                                let msg = serde_json::to_vec(&msg).unwrap();
+                                log_error!(mixnet_client.send(msg));
                             }
                             Command::Subscribe(topic) => {
                                 tracing::debug!("subscribing to topic: {topic}");
@@ -162,6 +170,32 @@ impl NetworkBackend for Libp2p {
                                 log_error!(reply.send(info));
                             }
                         };
+                    }
+                    Some(msg) = mixnet_inbound_rx.recv() => {
+                        tracing::debug!("receiving message from mixnet client");
+                        let Ok(MixnetMessage { topic, message }) = serde_json::from_slice(&msg) else {
+                            tracing::error!("failed to deserialize json received from mixnet client");
+                            continue;
+                        };
+
+                        match swarm.broadcast(&topic, message.to_vec()) {
+                            Ok(id) => {
+                                tracing::debug!("broadcasted message with id: {id} tp topic: {topic}");
+                            }
+                            Err(e) => {
+                                tracing::error!("failed to broadcast message to topic: {topic} {e:?}");
+                            }
+                        }
+
+                        // self-notification because libp2p doesn't do it
+                        if swarm.is_subscribed(&topic) {
+                            log_error!(events_tx.send(Event::Message(Message {
+                                source: None,
+                                data: message.into(),
+                                sequence_number: None,
+                                topic: Swarm::topic_hash(&topic),
+                            })));
+                        }
                     }
                 }
             }
