@@ -1,19 +1,19 @@
 use std::{
     collections::HashMap,
+    error::Error,
     net::{Ipv4Addr, SocketAddr, SocketAddrV4},
     time::Duration,
 };
 
+use futures::{Stream, StreamExt};
 use mixnet_client::{MixnetClient, MixnetClientConfig, MixnetClientMode};
 use mixnet_node::{MixnetNode, MixnetNodeConfig};
 use mixnet_topology::{Layer, MixnetTopology, Node};
 use rand::{rngs::OsRng, RngCore};
-use tokio::sync::mpsc;
-use tokio_util::sync::PollSender;
 
 #[tokio::test]
 async fn mixnet() {
-    let (topology, mut destination_rx) = run_nodes_and_destination_client().await;
+    let (topology, destination_stream) = run_nodes_and_destination_client().await;
 
     let mut msg = [0u8; 100 * 1024];
     rand::thread_rng().fill_bytes(&mut msg);
@@ -29,11 +29,15 @@ async fn mixnet() {
     let res = sender_client.send(msg.to_vec());
     assert!(res.is_ok());
 
-    let received = destination_rx.recv().await.unwrap();
+    tokio::pin!(destination_stream);
+    let received = destination_stream.next().await.unwrap().unwrap();
     assert_eq!(msg, received.as_slice());
 }
 
-async fn run_nodes_and_destination_client() -> (MixnetTopology, mpsc::Receiver<Vec<u8>>) {
+async fn run_nodes_and_destination_client() -> (
+    MixnetTopology,
+    impl Stream<Item = Result<Vec<u8>, Box<dyn Error>>> + Send,
+) {
     let config1 = MixnetNodeConfig {
         listen_address: SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(127, 0, 0, 1), 7777)),
         client_listen_address: SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(127, 0, 0, 1), 7778)),
@@ -114,8 +118,7 @@ async fn run_nodes_and_destination_client() -> (MixnetTopology, mpsc::Receiver<V
         },
         OsRng,
     );
-    let (client_tx, client_rx) = mpsc::channel::<Vec<u8>>(1);
-    client.run(PollSender::new(client_tx));
+    let client_stream = client.run().await.unwrap().unwrap();
 
-    (topology, client_rx)
+    (topology, client_stream)
 }

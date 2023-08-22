@@ -18,41 +18,59 @@ impl Receiver {
     ) -> Result<impl Stream<Item = Result<Vec<u8>, Box<dyn Error>>> + Send + 'static, Box<dyn Error>>
     {
         let socket = TcpStream::connect(node_address).await?;
-        Ok(stream::unfold(socket, |mut socket| async move {
-            let Ok(body) = Body::read(&mut socket).await else {
-                    // TODO: Maybe this is a hard error and the stream is corrupted? In that case stop the stream
-                    return Some((Err("Could not read body from socket".into()), socket));
-                };
-            let mut message_reconstructor: MessageReconstructor = Default::default();
-            match body {
-                Body::SphinxPacket(_) => {
-                    Some((Err("received sphinx packet not expected".into()), socket))
+
+        // MessageReconstructor buffers all received fragments (payloads)
+        // and eventually returns reconstructed messages.
+        let message_reconstructor: MessageReconstructor = Default::default();
+
+        Ok(stream::unfold(
+            (socket, message_reconstructor),
+            |(mut socket, mut message_reconstructor)| async move {
+                loop {
+                    let Ok(body) = Body::read(&mut socket).await else {
+                        // TODO: Maybe this is a hard error and the stream is corrupted? In that case stop the stream
+                        return Some((Err("Could not read body from socket".into()), (socket, message_reconstructor)));
+                    };
+                    match body {
+                        Body::SphinxPacket(_) => {
+                            return Some((Err("received sphinx packet not expected".into()), (socket, message_reconstructor)));
+                        }
+                        Body::FinalPayload(payload) => {
+                            match Self::handle_payload(payload, &mut message_reconstructor).await {
+                                Ok(Some(reconstructed_message)) => {
+                                    return Some((Ok(reconstructed_message), (socket, message_reconstructor)));
+                                },
+                                Ok(None) => {
+                                    // A payload has been received but the message isn't yet reconstructed completely.
+                                    // Read more payloads.
+                                    continue;
+                                }
+                                Err(e) => {
+                                    return Some((Err(format!("Could not handle payload: {e}").into()), (socket, message_reconstructor)));
+                                },
+                            }
+                        }
+                    }
                 }
-                Body::FinalPayload(payload) => Some((
-                    Self::handle_payload(payload, &mut message_reconstructor).await,
-                    socket,
-                )),
-            }
-        })
+            },
+        )
         .into_stream())
     }
 
     async fn handle_payload(
         payload: Payload,
         message_reconstructor: &mut MessageReconstructor,
-    ) -> Result<Vec<u8>, Box<dyn Error>> {
+    ) -> Result<Option<Vec<u8>>, Box<dyn Error>> {
         let fragment = Fragment::try_from_bytes(&payload.recover_plaintext()?)?;
 
         let reconstruction_result = message_reconstructor.insert_new_fragment(fragment);
-        let message = if let Some((padded_message, _)) = reconstruction_result {
-            tracing::debug!("sending a reconstructed message to the local");
-            Self::remove_padding(padded_message)?
-        } else {
-            // TODO: polish error message
-            return Err("received a fragment that did not complete a message".into());
-        };
-
-        Ok(message)
+        match reconstruction_result {
+            Some((padded_message, _)) => {
+                tracing::debug!("a reconstructed message reconstructed");
+                Ok(Some(Self::remove_padding(padded_message)?))
+            }
+            None => Ok(None),
+        }
     }
 
     fn remove_padding(msg: Vec<u8>) -> Result<Vec<u8>, Box<dyn Error>> {
