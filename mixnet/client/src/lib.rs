@@ -3,6 +3,7 @@ mod receiver;
 mod sender;
 
 use std::error::Error;
+use std::future::Future;
 
 pub use config::MixnetClientConfig;
 pub use config::MixnetClientMode;
@@ -24,17 +25,16 @@ impl<R: Rng> MixnetClient<R> {
         }
     }
 
-    // TODO: Instead of providing this sync function that spawns a task internally,
-    // it would be better to provide the `Stream` trait implementation
-    // for better composability from the user's point of view.
-    // https://github.com/logos-co/nomos-node/issues/314
-    pub fn run(&self, message_tx: impl Sink<Vec<u8>> + Clone + Unpin + Send + Sync + 'static) {
+    pub fn run(
+        &self,
+        message_tx: impl Sink<Vec<u8>> + Clone + Unpin + Send + Sync + 'static,
+    ) -> impl Future<Output = ()> + Send + 'static {
         let mode = self.mode.clone();
-        tokio::spawn(async move {
+        async move {
             if let Err(e) = mode.run(message_tx).await {
                 tracing::error!("error from mixnet client receiver: {e}");
             }
-        });
+        }
     }
 
     pub fn send(&mut self, msg: Vec<u8>) -> Result<(), Box<dyn Error>> {
