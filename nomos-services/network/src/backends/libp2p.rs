@@ -1,5 +1,7 @@
 // std
+use futures::{stream, Stream};
 use std::error::Error;
+use std::pin::Pin;
 // internal
 use super::NetworkBackend;
 use mixnet_client::{MixnetClient, MixnetClientConfig};
@@ -15,7 +17,7 @@ use overwatch_rs::{overwatch::handle::OverwatchHandle, services::state::NoState}
 use rand::rngs::OsRng;
 use serde::{Deserialize, Serialize};
 use tokio::sync::{broadcast, mpsc, oneshot};
-use tokio_util::sync::PollSender;
+use tracing::log;
 
 macro_rules! log_error {
     ($e:expr) => {
@@ -86,11 +88,6 @@ impl NetworkBackend for Libp2p {
 
     fn new(config: Self::Settings, overwatch_handle: OverwatchHandle) -> Self {
         let mut mixnet_client = MixnetClient::new(config.mixnet_client, OsRng);
-        let (mixnet_inbound_tx, mut mixnet_inbound_rx) = mpsc::channel(BUFFER_SIZE);
-        overwatch_handle
-            .runtime()
-            .spawn(mixnet_client.run(PollSender::new(mixnet_inbound_tx)));
-
         let (commands_tx, mut commands_rx) = tokio::sync::mpsc::channel(BUFFER_SIZE);
         let (events_tx, _) = tokio::sync::broadcast::channel(BUFFER_SIZE);
         let libp2p = Self {
@@ -99,6 +96,18 @@ impl NetworkBackend for Libp2p {
         };
         overwatch_handle.runtime().spawn(async move {
             use tokio_stream::StreamExt;
+            let mut stream = if let Ok(Some(stream)) = mixnet_client.run().await {
+                Box::pin(stream.filter_map(|r| match r {
+                    Ok(msg) => Some(msg),
+                    Err(e) => {
+                        tracing::error!("error while receiving from mixnet: {e:?}");
+                        None
+                    }
+                })) as Pin<Box<dyn Stream<Item=Vec<u8>> + Send>>
+            } else {
+                log::error!("Could not quickstart mixnet stream");
+                Box::pin(stream::empty())
+            };
             let mut swarm = Swarm::build(&config.inner).unwrap();
             loop {
                 tokio::select! {
@@ -173,7 +182,7 @@ impl NetworkBackend for Libp2p {
                             }
                         };
                     }
-                    Some(msg) = mixnet_inbound_rx.recv() => {
+                    Some(msg) = stream.next() => {
                         tracing::debug!("receiving message from mixnet client");
                         let Ok(MixnetMessage { topic, message }) = serde_json::from_slice(&msg) else {
                             tracing::error!("failed to deserialize json received from mixnet client");

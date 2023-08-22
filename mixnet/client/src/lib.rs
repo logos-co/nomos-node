@@ -26,12 +26,12 @@ impl<R: Rng> MixnetClient<R> {
 
     pub async fn run(
         &self,
-    ) -> Result<impl Stream<Item = Result<Vec<u8>, Box<dyn Error>>> + Send + 'static, Box<dyn Error>>
-    {
+    ) -> Result<
+        Option<impl Stream<Item = Result<Vec<u8>, Box<dyn Error>>> + Send + 'static>,
+        Box<dyn Error>,
+    > {
         let mode = self.mode.clone();
-        mode.run()
-            .await
-            .map(|stream| stream.expect("Expected client mode"))
+        mode.run().await
     }
 
     pub fn send(&mut self, msg: Vec<u8>) -> Result<(), Box<dyn Error>> {
