@@ -1,5 +1,4 @@
-use crate::types::{Blob, Commitment, Proof};
-use crate::BYTES_PER_FIELD_ELEMENT;
+use crate::types::{Blob, Commitment, KzgSettings, Proof};
 use kzg::eip_4844::{hash_to_bls_field, verify_kzg_proof_rust};
 use kzg::kzg_proofs::g1_linear_combination;
 use kzg::types::fr::FsFr;
@@ -24,14 +23,14 @@ pub fn blob_to_kzg_commitment(
 pub fn compute_blob_kzg_proof(
     blob: &Blob,
     commitment: &Commitment,
-    ts: &FsKZGSettings,
+    settings: &KzgSettings,
 ) -> Result<FsG1, String> {
     if !commitment.0.is_valid() {
         return Err("Invalid commitment".to_string());
     }
 
-    let evaluation_challenge_fr = compute_challenge(blob, &commitment.0);
-    let (proof, _) = compute_kzg_proof(blob, &evaluation_challenge_fr, ts);
+    let evaluation_challenge_fr = compute_challenge(blob, &commitment.0, settings);
+    let (proof, _) = compute_kzg_proof(blob, &evaluation_challenge_fr, settings);
     Ok(proof)
 }
 
@@ -39,7 +38,7 @@ pub fn verify_blob_kzg_proof(
     blob: &Blob,
     commitment: &Commitment,
     proof: &Proof,
-    ts: &FsKZGSettings,
+    settings: &KzgSettings,
 ) -> Result<bool, String> {
     if !commitment.0.is_valid() {
         return Err("Invalid commitment".to_string());
@@ -49,13 +48,22 @@ pub fn verify_blob_kzg_proof(
     }
 
     let polynomial = blob_to_polynomial(&blob.inner);
-    let evaluation_challenge_fr = compute_challenge(blob, &commitment.0);
-    let y_fr =
-        evaluate_polynomial_in_evaluation_form_rust(&polynomial, &evaluation_challenge_fr, ts);
-    verify_kzg_proof_rust(&commitment.0, &evaluation_challenge_fr, &y_fr, &proof.0, ts)
+    let evaluation_challenge_fr = compute_challenge(blob, &commitment.0, settings);
+    let y_fr = evaluate_polynomial_in_evaluation_form_rust(
+        &polynomial,
+        &evaluation_challenge_fr,
+        &settings.settings,
+    );
+    verify_kzg_proof_rust(
+        &commitment.0,
+        &evaluation_challenge_fr,
+        &y_fr,
+        &proof.0,
+        &settings.settings,
+    )
 }
 
-fn compute_challenge(blob: &Blob, commitment: &FsG1) -> FsFr {
+fn compute_challenge(blob: &Blob, commitment: &FsG1, settings: &KzgSettings) -> FsFr {
     let mut bytes: Vec<u8> = vec![0; CHALLENGE_INPUT_SIZE];
 
     // Copy domain separator
@@ -67,14 +75,15 @@ fn compute_challenge(blob: &Blob, commitment: &FsG1) -> FsFr {
     // Copy blob
     for i in 0..blob.len() {
         let v = blob.inner[i].to_bytes();
-        bytes[(32 + i * BYTES_PER_FIELD_ELEMENT)..(32 + (i + 1) * BYTES_PER_FIELD_ELEMENT)]
+        bytes[(32 + i * settings.bytes_per_field_element)
+            ..(32 + (i + 1) * settings.bytes_per_field_element)]
             .copy_from_slice(&v);
     }
 
     // Copy commitment
     let v = commitment.to_bytes();
     for i in 0..v.len() {
-        bytes[32 + BYTES_PER_FIELD_ELEMENT * blob.len() + i] = v[i];
+        bytes[32 + settings.bytes_per_field_element * blob.len() + i] = v[i];
     }
 
     // Now let's create the challenge!
@@ -82,13 +91,13 @@ fn compute_challenge(blob: &Blob, commitment: &FsG1) -> FsFr {
     hash_to_bls_field(&eval_challenge)
 }
 
-fn compute_kzg_proof(blob: &Blob, z: &FsFr, s: &FsKZGSettings) -> (FsG1, FsFr) {
+fn compute_kzg_proof(blob: &Blob, z: &FsFr, s: &KzgSettings) -> (FsG1, FsFr) {
     let polynomial = blob_to_polynomial(blob.inner.as_slice());
     let poly_len = polynomial.coeffs.len();
-    let y = evaluate_polynomial_in_evaluation_form_rust(&polynomial, z, s);
+    let y = evaluate_polynomial_in_evaluation_form_rust(&polynomial, z, &s.settings);
 
     let mut tmp: FsFr;
-    let roots_of_unity: &Vec<FsFr> = &s.fs.roots_of_unity;
+    let roots_of_unity: &Vec<FsFr> = &s.settings.fs.roots_of_unity;
 
     let mut m: usize = 0;
     let mut q: FsPoly = FsPoly::new(poly_len).unwrap();
@@ -142,7 +151,7 @@ fn compute_kzg_proof(blob: &Blob, z: &FsFr, s: &FsKZGSettings) -> (FsG1, FsFr) {
         }
     }
 
-    let proof = g1_lincomb(&s.secret_g1, &q.coeffs, poly_len);
+    let proof = g1_lincomb(&s.settings.secret_g1, &q.coeffs, poly_len);
     (proof, y)
 }
 
@@ -220,9 +229,13 @@ mod test {
         let (g1s, g2s) = generate_trusted_setup(4096, [0; 32]);
         let fft_settings = kzg::types::fft_settings::FsFFTSettings::new(8).unwrap();
         let settings = FsKZGSettings::new(&g1s, &g2s, 4096, &fft_settings).unwrap();
-        let blob = Blob::from_bytes(&[5; 4096 * 32]).unwrap();
-        let commitment = blob_to_kzg_commitment(&blob, &settings, 4096);
-        let commitment2 = blob_to_kzg_commitment_rust(&blob.inner, &settings);
+        let kzg_settings = KzgSettings {
+            settings,
+            bytes_per_field_element: 32,
+        };
+        let blob = Blob::from_bytes(&[5; 4096 * 32], &kzg_settings).unwrap();
+        let commitment = blob_to_kzg_commitment(&blob, &kzg_settings.settings, 4096);
+        let commitment2 = blob_to_kzg_commitment_rust(&blob.inner, &kzg_settings.settings);
         assert_eq!(commitment, commitment2);
     }
 }
