@@ -205,7 +205,6 @@ impl NetworkBackend for Libp2p {
                                 todo!("Handle mixclient error: {e}");
                             }
                         }
-                        
                     }
                 }
             }
