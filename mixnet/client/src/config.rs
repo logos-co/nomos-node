@@ -1,10 +1,10 @@
-use std::{error::Error, net::SocketAddr};
+use std::net::SocketAddr;
 
-use futures::Stream;
+use futures::{stream, StreamExt};
 use mixnet_topology::MixnetTopology;
 use serde::{Deserialize, Serialize};
 
-use crate::receiver::Receiver;
+use crate::{receiver::Receiver, MessageStream, MixnetClientError};
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct MixnetClientConfig {
@@ -19,15 +19,10 @@ pub enum MixnetClientMode {
 }
 
 impl MixnetClientMode {
-    pub(crate) async fn run(
-        &self,
-    ) -> Result<
-        Option<impl Stream<Item = Result<Vec<u8>, Box<dyn Error>>> + Send + 'static>,
-        Box<dyn Error>,
-    > {
+    pub(crate) async fn run(&self) -> Result<MessageStream, MixnetClientError> {
         match self {
-            Self::Sender => Ok(None),
-            Self::SenderReceiver(node_address) => Receiver::run(*node_address).await.map(Some),
+            Self::Sender => Ok(stream::empty().boxed()),
+            Self::SenderReceiver(node_address) => Ok(Receiver::run(*node_address).await?.boxed()),
         }
     }
 }

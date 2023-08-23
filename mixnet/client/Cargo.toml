@@ -14,3 +14,4 @@ rand = "0.7.3"
 mixnet-protocol = { path = "../protocol" }
 mixnet-topology = { path = "../topology" }
 futures = "0.3.28"
+thiserror = "1"

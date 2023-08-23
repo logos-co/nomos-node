@@ -1,7 +1,5 @@
 // std
-use futures::{stream, Stream};
 use std::error::Error;
-use std::pin::Pin;
 // internal
 use super::NetworkBackend;
 use mixnet_client::{MixnetClient, MixnetClientConfig};
@@ -95,18 +93,12 @@ impl NetworkBackend for Libp2p {
         };
         overwatch_handle.runtime().spawn(async move {
             use tokio_stream::StreamExt;
-            let mut stream = if let Ok(Some(stream)) = mixnet_client.run().await {
-                Box::pin(stream.filter_map(|r| match r {
-                    Ok(msg) => Some(msg),
-                    Err(e) => {
-                        tracing::error!("error while receiving from mixnet: {e:?}");
-                        None
-                    }
-                })) as Pin<Box<dyn Stream<Item=Vec<u8>> + Send>>
-            } else {
+
+            let Ok(mut stream) = mixnet_client.run().await else {
                 tracing::error!("Could not quickstart mixnet stream");
-                Box::pin(stream::empty())
+                return;
             };
+
             let mut swarm = Swarm::build(&config.inner).unwrap();
             loop {
                 tokio::select! {
@@ -181,31 +173,39 @@ impl NetworkBackend for Libp2p {
                             }
                         };
                     }
-                    Some(msg) = stream.next() => {
-                        tracing::debug!("receiving message from mixnet client");
-                        let Ok(MixnetMessage { topic, message }) = serde_json::from_slice(&msg) else {
-                            tracing::error!("failed to deserialize json received from mixnet client");
-                            continue;
-                        };
+                    Some(result) = stream.next() => {
+                        match result {
+                            Ok(msg) => {
+                                tracing::debug!("receiving message from mixnet client");
+                                let Ok(MixnetMessage { topic, message }) = serde_json::from_slice(&msg) else {
+                                    tracing::error!("failed to deserialize json received from mixnet client");
+                                    continue;
+                                };
 
-                        match swarm.broadcast(&topic, message.to_vec()) {
-                            Ok(id) => {
-                                tracing::debug!("broadcasted message with id: {id} tp topic: {topic}");
-                            }
+                                match swarm.broadcast(&topic, message.to_vec()) {
+                                    Ok(id) => {
+                                        tracing::debug!("broadcasted message with id: {id} tp topic: {topic}");
+                                    }
+                                    Err(e) => {
+                                        tracing::error!("failed to broadcast message to topic: {topic} {e:?}");
+                                    }
+                                }
+
+                                // self-notification because libp2p doesn't do it
+                                if swarm.is_subscribed(&topic) {
+                                    log_error!(events_tx.send(Event::Message(Message {
+                                        source: None,
+                                        data: message.into(),
+                                        sequence_number: None,
+                                        topic: Swarm::topic_hash(&topic),
+                                    })));
+                                }
+                            },
                             Err(e) => {
-                                tracing::error!("failed to broadcast message to topic: {topic} {e:?}");
+                                todo!("Handle mixclient error: {e}");
                             }
                         }
-
-                        // self-notification because libp2p doesn't do it
-                        if swarm.is_subscribed(&topic) {
-                            log_error!(events_tx.send(Event::Message(Message {
-                                source: None,
-                                data: message.into(),
-                                sequence_number: None,
-                                topic: Swarm::topic_hash(&topic),
-                            })));
-                        }
+                        
                     }
                 }
             }
