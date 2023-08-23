@@ -1,3 +1,8 @@
+//! Custom variant of rust-kzg that supports dynamic sized blobs.
+//! https://github.com/sifraitech/rust-kzg
+//! Some types were changed to fit our API for comfort.
+//! Blob related constants were removed and we use a config based approach.
+
 use crate::types::{Blob, Commitment, KzgSettings, Proof};
 use kzg::eip_4844::{hash_to_bls_field, verify_kzg_proof_rust};
 use kzg::kzg_proofs::g1_linear_combination;

@@ -9,6 +9,9 @@ use std::error::Error;
 pub const BYTES_PER_PROOF: usize = 48;
 pub const BYTES_PER_COMMITMENT: usize = 48;
 
+/// Compute a kzg commitment for the given data.
+/// It works for arbitrary data, but the data must be a multiple of **32 bytes**.
+/// The data is interpreted as a sequence of field elements. Each consisting of **32 bytes**.
 pub fn compute_commitment(
     data: &[u8],
     settings: &KzgSettings,
@@ -21,6 +24,9 @@ pub fn compute_commitment(
     )))
 }
 
+/// Compute a kzg proof for each field element in the given data.
+/// It works for arbitrary data, but the data must be a multiple of **32 bytes**.
+/// The data is interpreted as a sequence of field elements. Each consisting of **32 bytes**.
 pub fn compute_proofs(
     data: &[u8],
     commitment: &Commitment,
@@ -37,6 +43,9 @@ pub fn compute_proofs(
     Ok(res)
 }
 
+/// Verify a kzg proof for the given blob.
+/// It works for arbitrary data, but the data must be a multiple of **32 bytes**.
+/// The data is interpreted as a sequence of field elements. Each consisting of **32 bytes**.
 pub fn verify_blob(
     blob: &[u8],
     proof: &Proof,

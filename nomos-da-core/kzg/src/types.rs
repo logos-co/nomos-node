@@ -5,15 +5,19 @@ use kzg::types::kzg_settings::FsKZGSettings;
 use kzg_traits::{Fr, G1};
 use std::error::Error;
 
+/// A wrapper around the KZG settings that also stores the number of bytes per field element.
 pub struct KzgSettings {
     pub settings: FsKZGSettings,
     pub bytes_per_field_element: usize,
 }
 
+/// A KZG commitment.
 pub struct Commitment(pub(crate) FsG1);
 
+/// A KZG proof.
 pub struct Proof(pub(crate) FsG1);
 
+/// A blob of data.
 pub struct Blob {
     pub(crate) inner: Vec<FsFr>,
 }
