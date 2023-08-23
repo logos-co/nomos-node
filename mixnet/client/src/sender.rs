@@ -68,7 +68,7 @@ impl<R: Rng> Sender<R> {
         let route = self.topology.random_route(&mut self.rng)?;
 
         let delays: Vec<Delay> = RandomDelayIterator::new(
-            rand::thread_rng(),
+            &mut self.rng,
             route.len() as u64,
             total_delay.as_millis() as u64,
         )
