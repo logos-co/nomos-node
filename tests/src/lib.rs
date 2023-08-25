@@ -9,14 +9,15 @@ use std::time::Duration;
 
 //crates
 use fraction::Fraction;
-use rand::{thread_rng, Rng};
 
 pub fn get_available_port() -> u16 {
-    let mut port: u16 = thread_rng().gen_range(8000, 10000);
-    while TcpListener::bind(("127.0.0.1", port)).is_err() {
-        port += 1;
+    match TcpListener::bind(("127.0.0.1", 0)) {
+        Ok(conn) => conn
+            .local_addr()
+            .expect("could not get local address")
+            .port(),
+        Err(e) => panic!("no available ports: {e}"),
     }
-    port
 }
 
 #[async_trait::async_trait]
