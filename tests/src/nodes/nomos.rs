@@ -3,7 +3,7 @@ use std::net::SocketAddr;
 use std::process::{Child, Command, Stdio};
 use std::time::Duration;
 // internal
-use crate::{get_available_port, Node, SpawnConfig};
+use crate::{Node, SpawnConfig};
 use consensus_engine::overlay::{FlatOverlaySettings, RoundRobin};
 use consensus_engine::NodeId;
 use nomos_consensus::{CarnotInfo, CarnotSettings};
@@ -250,9 +250,7 @@ fn create_node_config(
         log: Default::default(),
         http: nomos_http::http::HttpServiceSettings {
             backend: AxumBackendSettings {
-                address: format!("127.0.0.1:{}", get_available_port())
-                    .parse()
-                    .unwrap(),
+                address: "127.0.0.1:0".parse().unwrap(),
                 cors_origins: vec![],
             },
         },
@@ -261,11 +259,11 @@ fn create_node_config(
     };
     #[cfg(feature = "waku")]
     {
-        config.network.backend.inner.port = Some(get_available_port() as usize);
+        config.network.backend.inner.port = Some(0);
     }
     #[cfg(feature = "libp2p")]
     {
-        config.network.backend.port = get_available_port();
+        config.network.backend.port = 0;
     }
 
     config
