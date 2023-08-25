@@ -38,7 +38,13 @@ impl Blob {
     pub fn from_bytes(data: &[u8], settings: &KzgSettings) -> Result<Self, Box<dyn Error>> {
         let mut inner = Vec::with_capacity(data.len() / settings.bytes_per_field_element);
         for chunk in data.chunks(settings.bytes_per_field_element) {
-            inner.push(FsFr::from_bytes(chunk)?);
+            if chunk.len() < settings.bytes_per_field_element {
+                let mut padded_chunk = vec![0; settings.bytes_per_field_element];
+                padded_chunk[..chunk.len()].copy_from_slice(chunk);
+                inner.push(FsFr::from_bytes(&padded_chunk)?);
+            } else {
+                inner.push(FsFr::from_bytes(chunk)?);
+            }
         }
         Ok(Self { inner })
     }
