@@ -1,15 +1,16 @@
-use criterion::BenchmarkId;
-use criterion::Criterion;
-use criterion::{criterion_group, criterion_main};
-use futures::StreamExt;
-use mixnet_client::MixnetClientMode;
-use mixnet_client::{MixnetClient, MixnetClientConfig};
-use rand::rngs::OsRng;
-use rand::RngCore;
+use std::time::{Duration, Instant};
 
-async fn test_one_message(msg: &[u8]) {
-    let (topology, mut destination_stream) = tests::run_nodes_and_destination_client().await;
+use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use futures::{Stream, StreamExt};
+use mixnet_client::{MixnetClient, MixnetClientConfig, MixnetClientError, MixnetClientMode};
+use mixnet_topology::MixnetTopology;
+use rand::{rngs::OsRng, RngCore};
 
+async fn test_one_message(
+    msg: &[u8],
+    topology: MixnetTopology,
+    mut destination_stream: impl Stream<Item = Result<Vec<u8>, MixnetClientError>> + Send + Unpin,
+) {
     let mut sender_client = MixnetClient::new(
         MixnetClientConfig {
             mode: MixnetClientMode::Sender,
@@ -28,16 +29,22 @@ async fn test_one_message(msg: &[u8]) {
 fn bench_one_message(c: &mut Criterion) {
     const MESSAGE_SIZE: &[usize] = &[250, 500, 1000];
     for size in MESSAGE_SIZE {
-        let mut msg = vec![0u8; msg_size];
-        rand::thread_rng().fill_bytes(&mut msg);
-        c.bench_with_input(
-            BenchmarkId::new(format!("one message {size}"), size),
-            &msg,
-            |b, s| {
-                b.to_async(tokio::runtime::Runtime::new().unwrap())
-                    .iter(|| async { test_one_message(s).await });
-            },
-        );
+        c.bench_function(&format!("one message {size}"), |b| {
+            b.to_async(tokio::runtime::Runtime::new().unwrap())
+                .iter_custom(|iters| async move {
+                    let mut msg = vec![0u8; *size];
+                    rand::thread_rng().fill_bytes(&mut msg);
+                    let mut total_duration = Duration::ZERO;
+                    for _ in 0..iters {
+                        let (topology, destination_stream) =
+                            tests::run_nodes_and_destination_client().await;
+                        let start = Instant::now();
+                        black_box(test_one_message(&msg, topology, destination_stream).await);
+                        total_duration += start.elapsed();
+                    }
+                    total_duration
+                });
+        });
     }
 }
 

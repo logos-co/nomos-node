@@ -34,6 +34,7 @@ fraction = "0.13"
 
 [dev-dependencies]
 criterion = { version = "0.5", features = ["async_tokio"] }
+pollster = "0.3"
 
 [[test]]
 name = "test_consensus_happy_path"
