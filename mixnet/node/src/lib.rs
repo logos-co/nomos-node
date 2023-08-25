@@ -109,9 +109,10 @@ impl MixnetNode {
         client_tx: mpsc::Sender<Body>,
         body: Body,
     ) -> Result<(), Box<dyn Error>> {
-        // TODO: Decrypt the final payload using the private key
+        // TODO: Decrypt the final payload using the private key, if it's encrypted
 
         // Do not wait when the channel is full or no receiver exists
+        // TODO: Consider any better way
         client_tx.try_send(body)?;
         Ok(())
     }

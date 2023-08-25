@@ -4,10 +4,13 @@ use futures::stream::{self, StreamExt};
 use std::collections::HashSet;
 use std::time::Duration;
 use tests::{MixNode, Node, NomosNode, SpawnConfig};
+use tokio::time::Instant;
 
 const TARGET_VIEW: View = View::new(20);
 
 async fn happy_test(nodes: Vec<NomosNode>) {
+    let start_time = Instant::now();
+
     let timeout = std::time::Duration::from_secs(20);
     let timeout = tokio::time::sleep(timeout);
     tokio::select! {
@@ -28,6 +31,9 @@ async fn happy_test(nodes: Vec<NomosNode>) {
         }
         } => {}
     };
+
+    let elapsed = Instant::now().checked_duration_since(start_time).unwrap();
+    println!("ELAPSED: {elapsed:?}");
 
     let infos = stream::iter(nodes)
         .then(|n| async move { n.consensus_info().await })

@@ -9,9 +9,10 @@ use mixnet_client::{MixnetClient, MixnetClientConfig, MixnetClientError, MixnetC
 use mixnet_node::{MixnetNode, MixnetNodeConfig};
 use mixnet_topology::{Layer, MixnetTopology, Node};
 use rand::{rngs::OsRng, RngCore};
+use tokio::time::Instant;
 
 #[tokio::test]
-async fn mixnet() {
+async fn mixnet_one_message() {
     let (topology, mut destination_stream) = run_nodes_and_destination_client().await;
 
     let mut msg = [0u8; 100 * 1024];
@@ -25,11 +26,57 @@ async fn mixnet() {
         OsRng,
     );
 
+    let start_time = Instant::now();
+
     let res = sender_client.send(msg.to_vec());
     assert!(res.is_ok());
 
     let received = destination_stream.next().await.unwrap().unwrap();
     assert_eq!(msg, received.as_slice());
+
+    let elapsed = Instant::now().checked_duration_since(start_time).unwrap();
+    println!("ELAPSED: {elapsed:?}");
+}
+
+// TODO: This test should be enabled after the connection reuse is implemented:
+//       https://github.com/logos-co/nomos-node/issues/313
+//       Currently, this test fails with `Too many open files (os error 24)`.
+#[ignore]
+#[tokio::test(flavor = "multi_thread")]
+async fn mixnet_ten_messages() {
+    let (topology, mut destination_stream) = run_nodes_and_destination_client().await;
+
+    let mut msg = [0u8; 100 * 1024];
+    rand::thread_rng().fill_bytes(&mut msg);
+
+    let start_time = Instant::now();
+
+    const NUM_MESSAGES: usize = 10;
+
+    for _ in 0..NUM_MESSAGES {
+        let msg = msg.clone();
+        let topology = topology.clone();
+
+        tokio::spawn(async move {
+            let mut sender_client = MixnetClient::new(
+                MixnetClientConfig {
+                    mode: MixnetClientMode::Sender,
+                    topology,
+                },
+                OsRng,
+            );
+            let res = sender_client.send(msg.to_vec());
+            assert!(res.is_ok());
+        });
+    }
+
+    for _ in 0..NUM_MESSAGES {
+        let received = destination_stream.next().await.unwrap().unwrap();
+        assert_eq!(msg, received.as_slice());
+    }
+
+    let elapsed = Instant::now().checked_duration_since(start_time).unwrap();
+    println!("ELAPSED: {elapsed:?}");
 }
 
 async fn run_nodes_and_destination_client() -> (
