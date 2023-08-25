@@ -38,7 +38,7 @@ impl MixnetNode {
 
     const CLIENT_NOTI_CHANNEL_SIZE: usize = 100;
 
-    pub async fn run(self) -> Result<(), Box<dyn Error>> {
+    pub async fn run(mut self) -> Result<(), Box<dyn Error>> {
         // Spawn a ClientNotifier
         let (client_tx, client_rx) = mpsc::channel(Self::CLIENT_NOTI_CHANNEL_SIZE);
         tokio::spawn(async move {
@@ -51,6 +51,13 @@ impl MixnetNode {
         //TODO: Accepting ad-hoc TCP conns for now. Improve conn handling.
         //TODO: Add graceful shutdown
         let listener = TcpListener::bind(self.config.listen_address).await?;
+        // update the port if the port is assigned automatically by the system
+        if self.config.listen_address.port() == 0 {
+            self.config
+                .listen_address
+                .set_port(listener.local_addr().unwrap().port());
+        }
+
         tracing::info!(
             "Listening mixnet node connections: {}",
             self.config.listen_address

@@ -10,10 +10,16 @@ pub struct ClientNotifier {}
 
 impl ClientNotifier {
     pub async fn run(
-        listen_address: SocketAddr,
+        mut listen_address: SocketAddr,
         mut rx: mpsc::Receiver<Body>,
     ) -> Result<(), Box<dyn Error>> {
         let listener = TcpListener::bind(listen_address).await?;
+
+        // update the port if the port is assigned automatically by the system
+        if listen_address.port() == 0 {
+            listen_address.set_port(listener.local_addr().unwrap().port());
+        }
+
         tracing::info!("Listening mixnet client connections: {listen_address}");
 
         // Currently, handling only a single incoming connection

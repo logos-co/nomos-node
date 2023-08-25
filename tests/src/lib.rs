@@ -10,16 +10,6 @@ use std::time::Duration;
 //crates
 use fraction::Fraction;
 
-pub fn get_available_port() -> u16 {
-    match TcpListener::bind(("127.0.0.1", 0)) {
-        Ok(conn) => conn
-            .local_addr()
-            .expect("could not get local address")
-            .port(),
-        Err(e) => panic!("no available ports: {e}"),
-    }
-}
-
 #[async_trait::async_trait]
 pub trait Node: Sized {
     type ConsensusInfo: Debug + Clone + PartialEq;
