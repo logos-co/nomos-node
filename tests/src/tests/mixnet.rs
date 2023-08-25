@@ -47,7 +47,7 @@ async fn test_one_message(msg_size: usize) {
     let received = destination_stream.next().await.unwrap().unwrap();
     assert_eq!(msg, received.as_slice());
 
-    let elapsed = Instant::now().checked_duration_since(start_time).unwrap();
+    let elapsed = start_time.elapsed();
     println!("ELAPSED: {elapsed:?}");
 }
 
@@ -88,7 +88,7 @@ async fn mixnet_ten_messages() {
         assert_eq!(msg, received.as_slice());
     }
 
-    let elapsed = Instant::now().checked_duration_since(start_time).unwrap();
+    let elapsed = start_time.elapsed();
     println!("ELAPSED: {elapsed:?}");
 }
 

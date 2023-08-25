@@ -32,7 +32,7 @@ async fn happy_test(nodes: Vec<NomosNode>) {
         } => {}
     };
 
-    let elapsed = Instant::now().checked_duration_since(start_time).unwrap();
+    let elapsed = start_time.elapsed();
     println!("ELAPSED: {elapsed:?}");
 
     let infos = stream::iter(nodes)
