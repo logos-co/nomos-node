@@ -32,6 +32,9 @@ futures = "0.3"
 async-trait = "0.1"
 fraction = "0.13"
 
+[dev-dependencies]
+criterion = { version = "0.5", features = ["async_tokio"] }
+
 [[test]]
 name = "test_consensus_happy_path"
 path = "src/tests/happy.rs"
@@ -44,8 +47,12 @@ path = "src/tests/unhappy.rs"
 name = "test_mixnet"
 path = "src/tests/mixnet.rs"
 
+[[bench]]
+name = "mixnet"
+harness = false
 
 [features]
 metrics = ["nomos-node/metrics"]
 waku  = ["nomos-network/waku", "nomos-mempool/waku", "nomos-node/waku", "waku-bindings"]
 libp2p = ["nomos-network/libp2p", "nomos-mempool/libp2p", "nomos-libp2p", "nomos-node/libp2p"]
+
