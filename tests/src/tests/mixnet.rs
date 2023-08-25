@@ -12,10 +12,23 @@ use rand::{rngs::OsRng, RngCore};
 use tokio::time::Instant;
 
 #[tokio::test]
+async fn mixnet_one_small_message() {
+    // Similar size as Nomos messages.
+    // But, this msg won't be splitted into multiple packets,
+    // since min packet size is 2KB (hardcoded in nymsphinx).
+    // https://github.com/nymtech/nym/blob/3748ab77a132143d5fd1cd75dd06334d33294815/common/nymsphinx/params/src/packet_sizes.rs#L28C10-L28C10
+    test_one_message(500).await
+}
+
+#[tokio::test]
 async fn mixnet_one_message() {
+    test_one_message(100 * 1024).await
+}
+
+async fn test_one_message(msg_size: usize) {
     let (topology, mut destination_stream) = run_nodes_and_destination_client().await;
 
-    let mut msg = [0u8; 100 * 1024];
+    let mut msg = vec![0u8; msg_size];
     rand::thread_rng().fill_bytes(&mut msg);
 
     let mut sender_client = MixnetClient::new(
