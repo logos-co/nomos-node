@@ -7,11 +7,8 @@ use mixnet_client::{MixnetClient, MixnetClientConfig};
 use rand::rngs::OsRng;
 use rand::RngCore;
 
-async fn test_one_message(msg_size: usize) {
+async fn test_one_message(msg: &[u8]) {
     let (topology, mut destination_stream) = tests::run_nodes_and_destination_client().await;
-
-    let mut msg = vec![0u8; msg_size];
-    rand::thread_rng().fill_bytes(&mut msg);
 
     let mut sender_client = MixnetClient::new(
         MixnetClientConfig {
@@ -31,10 +28,12 @@ async fn test_one_message(msg_size: usize) {
 fn bench_one_message(c: &mut Criterion) {
     const MESSAGE_SIZE: &[usize] = &[250, 500, 1000];
     for size in MESSAGE_SIZE {
+        let mut msg = vec![0u8; msg_size];
+        rand::thread_rng().fill_bytes(&mut msg);
         c.bench_with_input(
             BenchmarkId::new(format!("one message {size}"), size),
-            size,
-            |b, &s| {
+            &msg,
+            |b, s| {
                 b.to_async(tokio::runtime::Runtime::new().unwrap())
                     .iter(|| async { test_one_message(s).await });
             },
