@@ -42,5 +42,10 @@ fn bench_one_message(c: &mut Criterion) {
     }
 }
 
-criterion_group!(benches, bench_one_message);
+criterion_group!(
+  name = benches;
+  config = Criterion::default().sample_size(10);
+  targets = bench_one_message
+);
+
 criterion_main!(benches);

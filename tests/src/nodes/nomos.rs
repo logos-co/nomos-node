@@ -296,7 +296,7 @@ fn create_node_config(
     }
     #[cfg(feature = "libp2p")]
     {
-        config.network.backend.port = 0;
+        config.network.backend.inner.port = 0;
     }
 
     config
