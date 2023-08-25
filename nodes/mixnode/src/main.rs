@@ -11,11 +11,9 @@ struct Args {
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    // Construct a subscriber that prints formatted traces to stdout
-    // and use that subscriber to process traces emitted after this point
+    // Install global collector configured based on RUST_LOG env var.
     // TODO: use the log service that nomos-node uses, if necessary
-    let subscriber = tracing_subscriber::FmtSubscriber::new();
-    tracing::subscriber::set_global_default(subscriber)?;
+    tracing_subscriber::fmt::init();
 
     let Args { config } = Args::parse();
     let config = serde_yaml::from_reader::<_, MixnetNodeConfig>(std::fs::File::open(config)?)?;
