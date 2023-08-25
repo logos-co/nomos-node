@@ -4,7 +4,6 @@ pub use nodes::NomosNode;
 
 // std
 use std::fmt::Debug;
-use std::net::TcpListener;
 use std::time::Duration;
 
 //crates
