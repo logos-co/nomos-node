@@ -1,13 +1,5 @@
-use std::{
-    collections::HashMap,
-    net::{Ipv4Addr, SocketAddr, SocketAddrV4},
-    time::Duration,
-};
-
-use futures::{Stream, StreamExt};
-use mixnet_client::{MixnetClient, MixnetClientConfig, MixnetClientError, MixnetClientMode};
-use mixnet_node::{MixnetNode, MixnetNodeConfig};
-use mixnet_topology::{Layer, MixnetTopology, Node};
+use futures::StreamExt;
+use mixnet_client::{MixnetClient, MixnetClientConfig, MixnetClientMode};
 use rand::{rngs::OsRng, RngCore};
 use tokio::time::Instant;
 
@@ -26,7 +18,7 @@ async fn mixnet_one_message() {
 }
 
 async fn test_one_message(msg_size: usize) {
-    let (topology, mut destination_stream) = run_nodes_and_destination_client().await;
+    let (topology, mut destination_stream) = tests::run_nodes_and_destination_client().await;
 
     let mut msg = vec![0u8; msg_size];
     rand::thread_rng().fill_bytes(&mut msg);
