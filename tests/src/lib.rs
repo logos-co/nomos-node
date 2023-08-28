@@ -1,4 +1,6 @@
 mod nodes;
+use mixnet_node::MixnetNodeConfig;
+use mixnet_topology::MixnetTopology;
 pub use nodes::MixNode;
 pub use nodes::NomosNode;
 
@@ -27,11 +29,13 @@ pub trait Node: Sized {
     fn stop(&mut self);
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub enum SpawnConfig {
     Star {
         n_participants: usize,
         threshold: Fraction,
         timeout: Duration,
+        mixnet_node_configs: Vec<MixnetNodeConfig>,
+        mixnet_topology: MixnetTopology,
     },
 }

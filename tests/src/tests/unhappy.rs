@@ -8,13 +8,13 @@ const TARGET_VIEW: View = View::new(20);
 
 #[tokio::test]
 async fn ten_nodes_one_down() {
-    let (_mixnodes, _mixnet_node_configs, _mixnet_topology) = MixNode::spawn_nodes(3).await;
-    //TODO: use these when spawning nomos-nodes with mixclient
-
+    let (_mixnodes, mixnet_node_configs, mixnet_topology) = MixNode::spawn_nodes(3).await;
     let mut nodes = NomosNode::spawn_nodes(SpawnConfig::Star {
         n_participants: 10,
         threshold: Fraction::new(9u32, 10u32),
         timeout: std::time::Duration::from_secs(5),
+        mixnet_node_configs,
+        mixnet_topology,
     })
     .await;
     let mut failed_node = nodes.pop().unwrap();
