@@ -107,9 +107,8 @@ impl MixnetNode {
         );
 
         tokio::spawn(async move {
-            if let Err(e) = ClientNotifier::new(client_listener, client_rx, notifier_shutdown_rx)
-                .run()
-                .await
+            if let Err(e) =
+                ClientNotifier::run(client_listener, client_rx, notifier_shutdown_rx).await
             {
                 tracing::error!("failed to run client notifier: {e}");
             }

@@ -5,32 +5,14 @@ use tokio::{
     sync::mpsc,
 };
 
-pub struct ClientNotifier {
-    ln: TcpListener,
-    rx: mpsc::Receiver<Body>,
-    shutdown_rx: async_channel::Receiver<()>,
-}
+pub struct ClientNotifier {}
 
 impl ClientNotifier {
-    pub(crate) fn new(
+    pub async fn run(
         ln: TcpListener,
-        rx: mpsc::Receiver<Body>,
+        mut rx: mpsc::Receiver<Body>,
         shutdown_rx: async_channel::Receiver<()>,
-    ) -> Self {
-        Self {
-            ln,
-            rx,
-            shutdown_rx,
-        }
-    }
-
-    pub async fn run(self) -> Result<(), Box<dyn Error>> {
-        let Self {
-            ln,
-            mut rx,
-            shutdown_rx,
-        } = self;
-
+    ) -> Result<(), Box<dyn Error>> {
         // Currently, handling only a single incoming connection
         // TODO: consider handling multiple clients
         loop {
