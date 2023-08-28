@@ -4,16 +4,15 @@ use std::{
     time::Duration,
 };
 
-use mixnet_client::{MixnetClient, MixnetClientConfig, MixnetClientMode};
+use futures::{Stream, StreamExt};
+use mixnet_client::{MixnetClient, MixnetClientConfig, MixnetClientError, MixnetClientMode};
 use mixnet_node::{MixnetNode, MixnetNodeConfig};
 use mixnet_topology::{Layer, MixnetTopology, Node};
 use rand::{rngs::OsRng, RngCore};
-use tokio::sync::mpsc;
-use tokio_util::sync::PollSender;
 
 #[tokio::test]
 async fn mixnet() {
-    let (topology, mut destination_rx) = run_nodes_and_destination_client().await;
+    let (topology, mut destination_stream) = run_nodes_and_destination_client().await;
 
     let mut msg = [0u8; 100 * 1024];
     rand::thread_rng().fill_bytes(&mut msg);
@@ -29,11 +28,14 @@ async fn mixnet() {
     let res = sender_client.send(msg.to_vec());
     assert!(res.is_ok());
 
-    let received = destination_rx.recv().await.unwrap();
+    let received = destination_stream.next().await.unwrap().unwrap();
     assert_eq!(msg, received.as_slice());
 }
 
-async fn run_nodes_and_destination_client() -> (MixnetTopology, mpsc::Receiver<Vec<u8>>) {
+async fn run_nodes_and_destination_client() -> (
+    MixnetTopology,
+    impl Stream<Item = Result<Vec<u8>, MixnetClientError>> + Send,
+) {
     let config1 = MixnetNodeConfig {
         listen_address: SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(127, 0, 0, 1), 7777)),
         client_listen_address: SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(127, 0, 0, 1), 7778)),
@@ -87,18 +89,17 @@ async fn run_nodes_and_destination_client() -> (MixnetTopology, mpsc::Receiver<V
     };
 
     // Run all MixnetNodes
-    let mixnode1_handle = mixnode1.run().await.unwrap();
     tokio::spawn(async move {
-        assert!(mixnode1_handle.await.is_ok());
+        let res = mixnode1.run().await.unwrap().await;
+        assert!(res.is_ok());
     });
-    let mixnode2_handle = mixnode2.run().await.unwrap();
     tokio::spawn(async move {
-        assert!(mixnode2_handle.await.is_ok());
+        let res = mixnode2.run().await.unwrap().await;
+        assert!(res.is_ok());
     });
-    let mixnode3_handle = mixnode3.run().await.unwrap();
-    let mixnode3_client_listen_address = mixnode3_handle.client_listen_address();
     tokio::spawn(async move {
-        assert!(mixnode3_handle.await.is_ok());
+        let res = mixnode3.run().await.unwrap().await;
+        assert!(res.is_ok());
     });
 
     // Wait until mixnodes are ready
@@ -110,15 +111,12 @@ async fn run_nodes_and_destination_client() -> (MixnetTopology, mpsc::Receiver<V
     // one of mixnodes the exit layer always will be selected as a destination.
     let client = MixnetClient::new(
         MixnetClientConfig {
-            mode: MixnetClientMode::SenderReceiver(mixnode3_client_listen_address),
+            mode: MixnetClientMode::SenderReceiver(config3.client_listen_address),
             topology: topology.clone(),
         },
         OsRng,
     );
-    let (client_tx, client_rx) = mpsc::channel::<Vec<u8>>(1);
-    tokio::spawn(async move {
-        client.run(PollSender::new(client_tx)).await;
-    });
+    let client_stream = client.run().await.unwrap();
 
-    (topology, client_rx)
+    (topology, client_stream)
 }

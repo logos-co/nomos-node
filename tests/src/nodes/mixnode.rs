@@ -10,6 +10,8 @@ use mixnet_topology::{Layer, MixnetTopology, Node};
 use rand::{thread_rng, RngCore};
 use tempfile::NamedTempFile;
 
+use crate::get_available_port;
+
 const MIXNODE_BIN: &str = "../target/debug/mixnode";
 
 pub struct MixNode {
@@ -49,10 +51,13 @@ impl MixNode {
             thread_rng().fill_bytes(&mut private_key);
 
             let config = MixnetNodeConfig {
-                listen_address: SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(127, 0, 0, 1), 0)),
+                listen_address: SocketAddr::V4(SocketAddrV4::new(
+                    Ipv4Addr::new(127, 0, 0, 1),
+                    get_available_port(),
+                )),
                 client_listen_address: SocketAddr::V4(SocketAddrV4::new(
                     Ipv4Addr::new(127, 0, 0, 1),
-                    0,
+                    get_available_port(),
                 )),
                 private_key,
             };
