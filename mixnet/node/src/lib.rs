@@ -89,29 +89,17 @@ impl MixnetNode {
 
     const CLIENT_NOTI_CHANNEL_SIZE: usize = 100;
 
-    pub async fn run(mut self) -> Result<MixnetNodeHandle, Box<dyn Error>> {
+    pub async fn run(self) -> Result<MixnetNodeHandle, Box<dyn Error>> {
         let (shutdown_tx, shutdown_rx) = async_channel::bounded(1);
         // Spawn a ClientNotifier
         let (client_tx, client_rx) = mpsc::channel(Self::CLIENT_NOTI_CHANNEL_SIZE);
         let notifier_shutdown_rx = shutdown_rx.clone();
 
         let listener = TcpListener::bind(self.config.listen_address).await?;
-        // update the port if the port is assigned automatically by the system
-        if self.config.listen_address.port() == 0 {
-            self.config
-                .listen_address
-                .set_port(listener.local_addr()?.port());
-        }
 
         tracing::error!("mixnode is listening on {}", self.config.listen_address);
 
         let client_listener = TcpListener::bind(self.config.client_listen_address).await?;
-        // update the port if the port is assigned automatically by the system
-        if self.config.client_listen_address.port() == 0 {
-            self.config
-                .client_listen_address
-                .set_port(client_listener.local_addr()?.port());
-        }
 
         tracing::error!(
             "client notifier is listening on {}",
