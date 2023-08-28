@@ -6,13 +6,17 @@ use std::time::Duration;
 use crate::{Node, SpawnConfig};
 use consensus_engine::overlay::{FlatOverlaySettings, RoundRobin};
 use consensus_engine::NodeId;
+#[cfg(feature = "libp2p")]
+use mixnet_client::{MixnetClientConfig, MixnetClientMode};
+use mixnet_node::MixnetNodeConfig;
+use mixnet_topology::MixnetTopology;
 use nomos_consensus::{CarnotInfo, CarnotSettings};
 use nomos_http::backends::axum::AxumBackendSettings;
 #[cfg(feature = "libp2p")]
 use nomos_libp2p::{Multiaddr, SwarmConfig};
 use nomos_log::{LoggerBackend, LoggerFormat};
 #[cfg(feature = "libp2p")]
-use nomos_network::backends::libp2p::Libp2pInfo;
+use nomos_network::backends::libp2p::{Libp2pConfig, Libp2pInfo};
 #[cfg(feature = "waku")]
 use nomos_network::backends::waku::{WakuConfig, WakuInfo};
 use nomos_network::NetworkConfig;
@@ -171,6 +175,8 @@ impl Node for NomosNode {
                 n_participants,
                 threshold,
                 timeout,
+                mut mixnet_node_configs,
+                mixnet_topology,
             } => {
                 let mut ids = vec![[0; 32]; n_participants];
                 for id in &mut ids {
@@ -184,16 +190,27 @@ impl Node for NomosNode {
                             *id,
                             threshold,
                             timeout,
+                            mixnet_node_configs.pop(),
+                            mixnet_topology.clone(),
                         )
                     })
                     .collect::<Vec<_>>();
                 let mut nodes = vec![Self::spawn(configs.swap_remove(0)).await];
                 let listening_addr = nodes[0].get_listening_address().await;
                 for mut conf in configs {
+                    #[cfg(feature = "waku")]
                     conf.network
                         .backend
                         .initial_peers
                         .push(listening_addr.clone());
+                    #[cfg(feature = "libp2p")]
+                    // TODO: Consider having `initial_peers` outside of `inner`, as WakuConfig does
+                    conf.network
+                        .backend
+                        .inner
+                        .initial_peers
+                        .push(listening_addr.clone());
+
                     nodes.push(Self::spawn(conf).await);
                 }
                 nodes
@@ -220,7 +237,17 @@ fn create_node_config(
     private_key: [u8; 32],
     threshold: Fraction,
     timeout: Duration,
+    #[cfg(feature = "libp2p")] mixnet_node_config: Option<MixnetNodeConfig>,
+    #[cfg(feature = "waku")] _mixnet_node_config: Option<MixnetNodeConfig>,
+    #[cfg(feature = "libp2p")] mixnet_topology: MixnetTopology,
+    #[cfg(feature = "waku")] _mixnet_topology: MixnetTopology,
 ) -> Config {
+    #[cfg(feature = "libp2p")]
+    let mixnet_client_mode = match mixnet_node_config {
+        Some(node_config) => MixnetClientMode::SenderReceiver(node_config.client_listen_address),
+        None => MixnetClientMode::Sender,
+    };
+
     let mut config = Config {
         network: NetworkConfig {
             #[cfg(feature = "waku")]
@@ -229,9 +256,15 @@ fn create_node_config(
                 inner: Default::default(),
             },
             #[cfg(feature = "libp2p")]
-            backend: SwarmConfig {
-                initial_peers: vec![],
-                ..Default::default()
+            backend: Libp2pConfig {
+                inner: SwarmConfig {
+                    initial_peers: vec![],
+                    ..Default::default()
+                },
+                mixnet_client: MixnetClientConfig {
+                    mode: mixnet_client_mode,
+                    topology: mixnet_topology,
+                },
             },
         },
         consensus: CarnotSettings {
@@ -263,7 +296,7 @@ fn create_node_config(
     }
     #[cfg(feature = "libp2p")]
     {
-        config.network.backend.port = 0;
+        config.network.backend.inner.port = 0;
     }
 
     config

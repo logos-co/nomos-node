@@ -31,7 +31,6 @@ tokio = "1"
 futures = "0.3"
 async-trait = "0.1"
 fraction = "0.13"
-tokio-util = "0.7.8"
 
 [[test]]
 name = "test_consensus_happy_path"
