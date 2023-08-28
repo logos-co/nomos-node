@@ -262,6 +262,53 @@ fn random_delay(range: &Range<Duration>) -> Duration {
     thread_rng().gen_range(range.start, range.end)
 }
 
+async fn broadcast_and_retry(
+    topic: Topic,
+    message: Box<[u8]>,
+    retry: usize,
+    commands_tx: mpsc::Sender<Command>,
+    swarm: &mut Swarm,
+    events_tx: broadcast::Sender<Event>,
+) {
+    tracing::debug!("broadcasting message to topic: {topic}");
+
+    let wait = BACKOFF.pow(retry as u32);
+
+    match swarm.broadcast(&topic, message.to_vec()) {
+        Ok(id) => {
+            tracing::debug!("broadcasted message with id: {id} tp topic: {topic}");
+            // self-notification because libp2p doesn't do it
+            if swarm.is_subscribed(&topic) {
+                log_error!(events_tx.send(Event::Message(Message {
+                    source: None,
+                    data: message.into(),
+                    sequence_number: None,
+                    topic: Swarm::topic_hash(&topic),
+                })));
+            }
+        }
+        Err(gossipsub::PublishError::InsufficientPeers) => {
+            tracing::error!("failed to broadcast message to topic due to insufficient peers, trying again in {wait:?}");
+            if retry < MAX_RETRY {
+                tokio::spawn(async move {
+                    tokio::time::sleep(std::time::Duration::from_secs(wait)).await;
+                    commands_tx
+                        .send(Command::DirectBroadcastAndRetry {
+                            topic,
+                            message,
+                            retry: retry + 1,
+                        })
+                        .await
+                        .unwrap_or_else(|_| tracing::error!("could not schedule retry"));
+                });
+            }
+        }
+        Err(e) => {
+            tracing::error!("failed to broadcast message to topic: {topic} {e:?}");
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::time::Duration;
