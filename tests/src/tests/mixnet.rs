@@ -87,17 +87,18 @@ async fn run_nodes_and_destination_client() -> (MixnetTopology, mpsc::Receiver<V
     };
 
     // Run all MixnetNodes
+    let mixnode1_handle = mixnode1.run().await.unwrap();
     tokio::spawn(async move {
-        let res = mixnode1.run().await;
-        assert!(res.is_ok());
+        assert!(mixnode1_handle.await.is_ok());
     });
+    let mixnode2_handle = mixnode1.run().await.unwrap();
     tokio::spawn(async move {
-        let res = mixnode2.run().await;
-        assert!(res.is_ok());
+        assert!(mixnode2_handle.await.is_ok());
     });
+    let mixnode3_handle = mixnode1.run().await.unwrap();
+    let mixnode3_client_listen_address = mixnode3_handle.client_listen_address();
     tokio::spawn(async move {
-        let res = mixnode3.run().await;
-        assert!(res.is_ok());
+        assert!(mixnode3_handle.await.is_ok());
     });
 
     // Wait until mixnodes are ready
@@ -109,7 +110,7 @@ async fn run_nodes_and_destination_client() -> (MixnetTopology, mpsc::Receiver<V
     // one of mixnodes the exit layer always will be selected as a destination.
     let client = MixnetClient::new(
         MixnetClientConfig {
-            mode: MixnetClientMode::SenderReceiver(config3.client_listen_address),
+            mode: MixnetClientMode::SenderReceiver(mixnode3_client_listen_address),
             topology: topology.clone(),
         },
         OsRng,

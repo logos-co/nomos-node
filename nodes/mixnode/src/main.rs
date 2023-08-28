@@ -22,9 +22,25 @@ async fn main() -> Result<()> {
 
     let node = MixnetNode::new(config);
 
-    //TODO: graceful shutdown
-    if let Err(e) = node.run().await {
-        tracing::error!("error from mixnet-node: {e}");
+    match node.run().await {
+        Ok(handle) => {
+            tokio::pin!(handle);
+            loop {
+                tokio::select! {
+                    _ = tokio::signal::ctrl_c() => {
+                        tracing::info!("received shutdown signal, gracefully shutdown");
+                        handle.shutdown();
+                        return Ok(());
+                    }
+                    _ = &mut handle => {
+                        return Ok(());
+                    }
+                }
+            }
+        }
+        Err(e) => {
+            tracing::error!("error from mixnet-node: {e}");
+        }
     }
 
     Ok(())

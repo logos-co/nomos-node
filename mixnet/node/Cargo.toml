@@ -4,10 +4,13 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+atomic = "0.5" # keep on 0.5 for now, because on 0.6, we need to write unsafe code to implement a trait
+async-channel = "1.9"
 serde = { version = "1.0", features = ["derive"] }
 tracing = "0.1.37"
-tokio = { version = "1.29.1", features = ["net"] }
+tokio = { version = "1.32", features = ["net", "macros", "time"] }
 sphinx-packet = "0.1.0"
 nym-sphinx = { package = "nym-sphinx", git = "https://github.com/nymtech/nym", tag = "v1.1.22" }
 mixnet-protocol = { path = "../protocol" }
 mixnet-topology = { path = "../topology" }
+pin-project-lite = "0.2"
