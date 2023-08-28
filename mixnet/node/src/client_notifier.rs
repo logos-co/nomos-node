@@ -1,36 +1,41 @@
-use std::{error::Error, net::SocketAddr, sync::Arc};
-
-use atomic::{Atomic, Ordering};
 use mixnet_protocol::Body;
+use std::error::Error;
 use tokio::{
     net::{TcpListener, TcpStream},
     sync::mpsc,
 };
 
-pub struct ClientNotifier {}
+pub struct ClientNotifier {
+    ln: TcpListener,
+    rx: mpsc::Receiver<Body>,
+    shutdown_rx: async_channel::Receiver<()>,
+}
 
 impl ClientNotifier {
-    pub async fn run(
-        listen_address: Arc<Atomic<SocketAddr>>,
-        mut rx: mpsc::Receiver<Body>,
+    pub(crate) fn new(
+        ln: TcpListener,
+        rx: mpsc::Receiver<Body>,
         shutdown_rx: async_channel::Receiver<()>,
-    ) -> Result<(), Box<dyn Error>> {
-        let mut addr = listen_address.load(Ordering::Acquire);
-        let listener = TcpListener::bind(addr).await?;
-
-        // update the port if the port is assigned automatically by the system
-        if addr.port() == 0 {
-            addr.set_port(listener.local_addr().unwrap().port());
-            listen_address.store(addr, Ordering::Release);
+    ) -> Self {
+        Self {
+            ln,
+            rx,
+            shutdown_rx,
         }
+    }
 
-        tracing::info!("Listening mixnet client connections: {addr}");
+    pub async fn run(self) -> Result<(), Box<dyn Error>> {
+        let Self {
+            ln,
+            mut rx,
+            shutdown_rx,
+        } = self;
 
         // Currently, handling only a single incoming connection
         // TODO: consider handling multiple clients
         loop {
             tokio::select! {
-                socket = listener.accept() => {
+                socket = ln.accept() => {
                     match socket {
                         Ok((socket, remote_addr)) => {
                             tracing::debug!("Accepted incoming client connection from {remote_addr:?}");

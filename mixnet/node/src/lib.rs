@@ -1,9 +1,6 @@
 mod client_notifier;
 pub mod config;
 
-use std::{error::Error, net::SocketAddr, sync::Arc};
-
-use atomic::Atomic;
 use client_notifier::ClientNotifier;
 pub use config::MixnetNodeConfig;
 use mixnet_protocol::Body;
@@ -14,6 +11,7 @@ use nym_sphinx::{
 };
 pub use sphinx_packet::crypto::PRIVATE_KEY_SIZE;
 use sphinx_packet::{crypto::PUBLIC_KEY_SIZE, ProcessedPacket, SphinxPacket};
+use std::{error::Error, net::SocketAddr};
 use tokio::{
     net::{TcpListener, TcpStream},
     sync::mpsc,
@@ -22,7 +20,7 @@ use tokio::{
 pin_project_lite::pin_project! {
     pub struct MixnetNodeHandle {
         listen_address: SocketAddr,
-        client_listen_address: Arc<Atomic<SocketAddr>>,
+        client_listen_address: SocketAddr,
         private_key: [u8; PRIVATE_KEY_SIZE],
         shutdown_tx: async_channel::Sender<()>,
         #[pin]
@@ -38,7 +36,7 @@ impl MixnetNodeHandle {
 
     /// Returns the actual client listening address.
     pub fn client_listen_address(&self) -> SocketAddr {
-        self.client_listen_address.load(atomic::Ordering::Acquire)
+        self.client_listen_address
     }
 
     /// Returns the private key of the mix node.
@@ -95,27 +93,41 @@ impl MixnetNode {
         let (shutdown_tx, shutdown_rx) = async_channel::bounded(1);
         // Spawn a ClientNotifier
         let (client_tx, client_rx) = mpsc::channel(Self::CLIENT_NOTI_CHANNEL_SIZE);
-        let client_listen_address = Arc::new(Atomic::new(self.config.client_listen_address));
-        let notifier_listen_address = client_listen_address.clone();
         let notifier_shutdown_rx = shutdown_rx.clone();
+
+        let listener = TcpListener::bind(self.config.listen_address).await?;
+        // update the port if the port is assigned automatically by the system
+        if self.config.listen_address.port() == 0 {
+            self.config
+                .listen_address
+                .set_port(listener.local_addr()?.port());
+        }
+
+        tracing::error!("mixnode is listening on {}", self.config.listen_address);
+
+        let client_listener = TcpListener::bind(self.config.client_listen_address).await?;
+        // update the port if the port is assigned automatically by the system
+        if self.config.client_listen_address.port() == 0 {
+            self.config
+                .client_listen_address
+                .set_port(client_listener.local_addr()?.port());
+        }
+
+        tracing::error!(
+            "client notifier is listening on {}",
+            self.config.client_listen_address
+        );
+
         tokio::spawn(async move {
-            if let Err(e) =
-                ClientNotifier::run(notifier_listen_address, client_rx, notifier_shutdown_rx).await
+            if let Err(e) = ClientNotifier::new(client_listener, client_rx, notifier_shutdown_rx)
+                .run()
+                .await
             {
                 tracing::error!("failed to run client notifier: {e}");
             }
         });
 
         //TODO: Accepting ad-hoc TCP conns for now. Improve conn handling.
-        //TODO: Add graceful shutdown
-        let listener = TcpListener::bind(self.config.listen_address).await?;
-        // update the port if the port is assigned automatically by the system
-        if self.config.listen_address.port() == 0 {
-            self.config
-                .listen_address
-                .set_port(listener.local_addr().unwrap().port());
-        }
-
         tracing::info!(
             "Listening mixnet node connections: {}",
             self.config.listen_address
@@ -152,7 +164,7 @@ impl MixnetNode {
 
         Ok(MixnetNodeHandle {
             listen_address: self.config.listen_address,
-            client_listen_address,
+            client_listen_address: self.config.client_listen_address,
             private_key: self.config.private_key,
             shutdown_tx,
             handle,

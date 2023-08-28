@@ -4,7 +4,6 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-atomic = "0.5" # keep on 0.5 for now, because on 0.6, we need to write unsafe code to implement a trait
 async-channel = "1.9"
 serde = { version = "1.0", features = ["derive"] }
 tracing = "0.1.37"
