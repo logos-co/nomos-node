@@ -91,11 +91,11 @@ async fn run_nodes_and_destination_client() -> (MixnetTopology, mpsc::Receiver<V
     tokio::spawn(async move {
         assert!(mixnode1_handle.await.is_ok());
     });
-    let mixnode2_handle = mixnode1.run().await.unwrap();
+    let mixnode2_handle = mixnode2.run().await.unwrap();
     tokio::spawn(async move {
         assert!(mixnode2_handle.await.is_ok());
     });
-    let mixnode3_handle = mixnode1.run().await.unwrap();
+    let mixnode3_handle = mixnode3.run().await.unwrap();
     let mixnode3_client_listen_address = mixnode3_handle.client_listen_address();
     tokio::spawn(async move {
         assert!(mixnode3_handle.await.is_ok());
