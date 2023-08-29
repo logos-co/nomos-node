@@ -143,7 +143,7 @@ where
         let upper_bound = (self.avg_delay as f64 * 1.5)
             // guarantee that we don't exceed the remaining time and promise the delay we return is
             // at least 1ms.
-            .min((self.remaining_time as f64 - self.remaining_delays as f64) + 1.0);
+            .min(self.remaining_time.saturating_sub(self.remaining_delays) as f64 + 1.0);
         let lower_bound = (self.avg_delay as f64 * 0.5).min(upper_bound);
 
         let delay = Uniform::new_inclusive(lower_bound, upper_bound).sample(&mut self.rng) as u64;
