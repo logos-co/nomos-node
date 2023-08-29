@@ -16,3 +16,4 @@ members = [
     "consensus-engine",
     "tests",
 ]
+resolver = "2"
