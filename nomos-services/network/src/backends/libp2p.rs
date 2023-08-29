@@ -287,21 +287,20 @@ async fn broadcast_and_retry(
                 })));
             }
         }
-        Err(gossipsub::PublishError::InsufficientPeers) => {
+        Err(gossipsub::PublishError::InsufficientPeers) if retry < MAX_RETRY => {
             tracing::error!("failed to broadcast message to topic due to insufficient peers, trying again in {wait:?}");
-            if retry < MAX_RETRY {
-                tokio::spawn(async move {
-                    tokio::time::sleep(std::time::Duration::from_secs(wait)).await;
-                    commands_tx
-                        .send(Command::DirectBroadcastAndRetry {
-                            topic,
-                            message,
-                            retry: retry + 1,
-                        })
-                        .await
-                        .unwrap_or_else(|_| tracing::error!("could not schedule retry"));
-                });
-            }
+
+            tokio::spawn(async move {
+                tokio::time::sleep(std::time::Duration::from_secs(wait)).await;
+                commands_tx
+                    .send(Command::DirectBroadcastAndRetry {
+                        topic,
+                        message,
+                        retry: retry + 1,
+                    })
+                    .await
+                    .unwrap_or_else(|_| tracing::error!("could not schedule retry"));
+            });
         }
         Err(e) => {
             tracing::error!("failed to broadcast message to topic: {topic} {e:?}");
