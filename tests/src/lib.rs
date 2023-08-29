@@ -1,21 +1,25 @@
 mod nodes;
 pub use nodes::NomosNode;
+use once_cell::sync::Lazy;
 
 // std
-use std::fmt::Debug;
 use std::net::TcpListener;
 use std::time::Duration;
+use std::{fmt::Debug, sync::Mutex};
 
 //crates
 use fraction::Fraction;
 use rand::{thread_rng, Rng};
 
+static NET_PORT: Lazy<Mutex<u16>> = Lazy::new(|| Mutex::new(thread_rng().gen_range(8000..10000)));
+
 pub fn get_available_port() -> u16 {
-    let mut port: u16 = thread_rng().gen_range(8000..10000);
-    while TcpListener::bind(("127.0.0.1", port)).is_err() {
-        port += 1;
+    let mut port = NET_PORT.lock().unwrap();
+    *port += 1;
+    while TcpListener::bind(("127.0.0.1", *port)).is_err() {
+        *port += 1;
     }
-    port
+    *port
 }
 
 #[async_trait::async_trait]
