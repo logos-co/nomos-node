@@ -7,7 +7,7 @@ use nym_sphinx::{
     params::PacketSize, Delay, Destination, DestinationAddressBytes, NodeAddressBytes,
     IDENTIFIER_LENGTH, PAYLOAD_OVERHEAD_SIZE,
 };
-use rand::Rng;
+use rand::{distributions::Uniform, prelude::Distribution, Rng};
 use sphinx_packet::{route, SphinxPacket, SphinxPacketBuilder};
 use tokio::net::TcpStream;
 
@@ -156,7 +156,7 @@ where
             .min((self.remaining_time as f64 - self.remaining_delays as f64) + 1.0);
         let lower_bound = (self.avg_delay as f64 * 0.5).min(upper_bound);
 
-        let delay = self.rng.gen_range(lower_bound, upper_bound + 1.0).floor() as u64;
+        let delay = Uniform::new_inclusive(lower_bound, upper_bound).sample(&mut self.rng) as u64;
         self.remaining_time = self.remaining_time.saturating_sub(delay);
 
         Some(delay)
