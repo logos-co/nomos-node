@@ -25,7 +25,7 @@ async fn mixnet() {
         OsRng,
     );
 
-    let res = sender_client.send(msg.to_vec());
+    let res = sender_client.send(msg.to_vec(), Duration::from_millis(500));
     assert!(res.is_ok());
 
     let received = destination_stream.next().await.unwrap().unwrap();
