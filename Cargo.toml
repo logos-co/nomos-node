@@ -10,6 +10,7 @@ members = [
     "nomos-services/mempool",
     "nomos-services/http",
     "nomos-da-core/reed-solomon",
+    "nomos-da-core/kzg",
     "nodes/nomos-node",
     "nodes/mixnode",
     "simulations",
