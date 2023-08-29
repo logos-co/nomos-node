@@ -21,3 +21,4 @@ members = [
     "mixnet/protocol",
     "mixnet/topology",
 ]
+resolver = "2"
