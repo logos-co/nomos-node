@@ -157,7 +157,7 @@ where
             as u64;
 
         // corner case: when lower bound is greater than upper bound
-        if lower_bound > upper_bound {
+        if lower_bound >= upper_bound {
             self.remaining_delays -= 1;
             self.remaining_time = 0;
             return Some(self.remaining_time);
