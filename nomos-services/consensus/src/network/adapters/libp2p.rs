@@ -231,6 +231,11 @@ impl NetworkAdapter for Libp2pAdapter {
         let cache = message_cache.clone();
         let relay = network_relay.clone();
         Self::subscribe(&relay, TOPIC).await;
+        tracing::debug!("Starting up...");
+        // this wait seems to be helpful in some cases since we give the time
+        // to the network to establish connections before we start sending messages
+        tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+
         // TODO: maybe we need the runtime handle here?
         tokio::spawn(async move {
             let (sender, receiver) = tokio::sync::oneshot::channel();

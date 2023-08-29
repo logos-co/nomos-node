@@ -83,12 +83,6 @@ where
     }
 
     async fn run(mut self) -> Result<(), overwatch_rs::DynError> {
-        tracing::debug!("Starting up...");
-        // this wait seems to be helpful in some cases for waku, where it reports
-        // to be connected to peers but does not seem to be able to send messages
-        // to them
-        tokio::time::sleep(std::time::Duration::from_secs(1)).await;
-
         let Self {
             service_state: ServiceStateHandle {
                 mut inbound_relay, ..
