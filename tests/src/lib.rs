@@ -14,7 +14,7 @@ use std::{fmt::Debug, sync::Mutex};
 use fraction::Fraction;
 use rand::{thread_rng, Rng};
 
-static NET_PORT: Lazy<Mutex<u16>> = Lazy::new(|| Mutex::new(thread_rng().gen_range(8000..10000)));
+static NET_PORT: Lazy<Mutex<u16>> = Lazy::new(|| Mutex::new(thread_rng().gen_range(8000, 10000)));
 
 pub fn get_available_port() -> u16 {
     let mut port = NET_PORT.lock().unwrap();
