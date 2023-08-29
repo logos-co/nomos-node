@@ -133,60 +133,58 @@ where
             return None;
         }
 
+        self.remaining_delays -= 1;
+
         // corner case: 0 average delay
         if self.avg_delay == 0 {
-            self.remaining_delays -= 1;
             return Some(0);
         }
 
         if self.remaining_delays == 1 {
-            self.remaining_delays -= 1;
             return Some(self.remaining_time);
         }
 
         // if we have no remaining time, then just return 0
         if self.remaining_time == 0 {
-            self.remaining_delays -= 1;
             return Some(0);
         }
 
         // Calculate bounds to avoid extreme values
-        let lower_bound = (self.avg_delay as f64 * 0.5) as u64;
         let upper_bound = (self.avg_delay as f64 * 1.5)
-            .min((self.remaining_time as f64 - self.remaining_delays as f64) + 1.0)
-            as u64;
+            // guarantee that we don't exceed the remaining time and promise the delay we return is
+            // at least 1ms.
+            .min((self.remaining_time as f64 - self.remaining_delays as f64) + 1.0);
+        let lower_bound = (self.avg_delay as f64 * 0.5).min(upper_bound);
 
-        // corner case: when lower bound is greater than upper bound
-        if lower_bound >= upper_bound {
-            self.remaining_delays -= 1;
-            self.remaining_time = 0;
-            return Some(self.remaining_time);
-        }
-
-        let delay = self.rng.gen_range(lower_bound, upper_bound);
+        let delay = self.rng.gen_range(lower_bound, upper_bound).floor() as u64;
         self.remaining_time = self.remaining_time.saturating_sub(delay);
-        self.remaining_delays -= 1;
 
         Some(delay)
     }
 }
 
-#[test]
-fn test_random_delay_iter_zero_total_time() {
-    const TOTAL_DELAYS: u64 = 3;
-    let mut delays = RandomDelayIterator::new(rand::thread_rng(), TOTAL_DELAYS, 0);
-    for _ in 0..TOTAL_DELAYS {
-        assert_eq!(delays.next(), Some(0));
-    }
-    assert!(delays.next().is_none());
-}
+#[cfg(test)]
+mod tests {
+    use super::RandomDelayIterator;
 
-#[test]
-fn test_random_delay_iter_small_total_time() {
     const TOTAL_DELAYS: u64 = 3;
-    let mut delays = RandomDelayIterator::new(rand::thread_rng(), TOTAL_DELAYS, 1);
-    for _ in 0..TOTAL_DELAYS {
-        assert!(delays.next().is_some());
+
+    #[test]
+    fn test_random_delay_iter_zero_total_time() {
+        let mut delays = RandomDelayIterator::new(rand::thread_rng(), TOTAL_DELAYS, 0);
+        for _ in 0..TOTAL_DELAYS {
+            assert_eq!(delays.next(), Some(0));
+        }
+        assert!(delays.next().is_none());
     }
-    assert!(delays.next().is_none());
+
+    #[test]
+    fn test_random_delay_iter_small_total_time() {
+        const TOTAL_DELAYS: u64 = 3;
+        let mut delays = RandomDelayIterator::new(rand::thread_rng(), TOTAL_DELAYS, 1);
+        for _ in 0..TOTAL_DELAYS {
+            assert!(delays.next().is_some());
+        }
+        assert!(delays.next().is_none());
+    }
 }
