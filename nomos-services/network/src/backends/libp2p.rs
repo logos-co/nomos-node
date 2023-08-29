@@ -149,7 +149,7 @@ impl NetworkBackend for Libp2p {
                                 let msg = MixnetMessage { topic, message };
                                 // TODO: use `wire` instead of json, by resolving import cycles
                                 let msg = serde_json::to_vec(&msg).unwrap();
-                                log_error!(mixnet_client.send(msg));
+                                log_error!(mixnet_client.send(msg, std::time::Duration::ZERO));
                             }
                             Command::Subscribe(topic) => {
                                 tracing::debug!("subscribing to topic: {topic}");

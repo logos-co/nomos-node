@@ -9,6 +9,7 @@ use mixnet_client::{MixnetClient, MixnetClientConfig, MixnetClientError, MixnetC
 use mixnet_node::{MixnetNode, MixnetNodeConfig};
 use mixnet_topology::{Layer, MixnetTopology, Node};
 use rand::{rngs::OsRng, RngCore};
+use tests::get_available_port;
 
 #[tokio::test]
 async fn mixnet() {
@@ -25,7 +26,7 @@ async fn mixnet() {
         OsRng,
     );
 
-    let res = sender_client.send(msg.to_vec());
+    let res = sender_client.send(msg.to_vec(), Duration::from_millis(500));
     assert!(res.is_ok());
 
     let received = destination_stream.next().await.unwrap().unwrap();
@@ -37,18 +38,36 @@ async fn run_nodes_and_destination_client() -> (
     impl Stream<Item = Result<Vec<u8>, MixnetClientError>> + Send,
 ) {
     let config1 = MixnetNodeConfig {
-        listen_address: SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(127, 0, 0, 1), 7777)),
-        client_listen_address: SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(127, 0, 0, 1), 7778)),
+        listen_address: SocketAddr::V4(SocketAddrV4::new(
+            Ipv4Addr::new(127, 0, 0, 1),
+            get_available_port(),
+        )),
+        client_listen_address: SocketAddr::V4(SocketAddrV4::new(
+            Ipv4Addr::new(127, 0, 0, 1),
+            get_available_port(),
+        )),
         ..Default::default()
     };
     let config2 = MixnetNodeConfig {
-        listen_address: SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(127, 0, 0, 1), 8777)),
-        client_listen_address: SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(127, 0, 0, 1), 8778)),
+        listen_address: SocketAddr::V4(SocketAddrV4::new(
+            Ipv4Addr::new(127, 0, 0, 1),
+            get_available_port(),
+        )),
+        client_listen_address: SocketAddr::V4(SocketAddrV4::new(
+            Ipv4Addr::new(127, 0, 0, 1),
+            get_available_port(),
+        )),
         ..Default::default()
     };
     let config3 = MixnetNodeConfig {
-        listen_address: SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(127, 0, 0, 1), 9777)),
-        client_listen_address: SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(127, 0, 0, 1), 9778)),
+        listen_address: SocketAddr::V4(SocketAddrV4::new(
+            Ipv4Addr::new(127, 0, 0, 1),
+            get_available_port(),
+        )),
+        client_listen_address: SocketAddr::V4(SocketAddrV4::new(
+            Ipv4Addr::new(127, 0, 0, 1),
+            get_available_port(),
+        )),
         ..Default::default()
     };
 
