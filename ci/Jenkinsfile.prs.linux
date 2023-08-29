@@ -40,7 +40,7 @@ pipeline {
 
           stage('BuildAndTest') {
             options {
-              lock("sync-features")
+              lock('sync-linux-${env.GIT_COMMIT}')
             }
             stages {
               stage('Build') {
