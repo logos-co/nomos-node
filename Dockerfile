@@ -1,6 +1,6 @@
 # BUILD IMAGE ---------------------------------------------------------
 
-FROM rust:1.70.0-slim-bullseye AS builder
+FROM rust:1.72.0-slim-bullseye AS builder
 
 # Using backports for go 1.19
 RUN echo 'deb http://deb.debian.org/debian bullseye-backports main' \
@@ -16,14 +16,14 @@ RUN apt-get update && apt-get install -yq \
 WORKDIR /nomos
 COPY . . 
 
-RUN cargo build --release -p nomos-node
+RUN cargo build --release -p nomos-node --no-default-features --features libp2p
 
 # NODE IMAGE ----------------------------------------------------------
 
 FROM bitnami/minideb:latest
 
 LABEL maintainer="augustinas@status.im"
-LABEL source="https://github.com/logos-co/nomos-research"
+LABEL source="https://github.com/logos-co/nomos-node"
 LABEL description="Nomos node image"
 
 # nomos default ports
