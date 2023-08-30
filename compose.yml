@@ -1,0 +1,16 @@
+services:
+  nomos-node:
+    build: .
+    ports:
+      - "3000-3010:3000"
+      - "8080-8090:8080"
+    hostname: "nomos{{.Task.Slot}}"
+    volumes:
+      - ./testnet/configs:/etc/nomos
+    environment:
+      - TASK_SLOT={{.Task.Slot}}
+    deploy:
+      replicas: 10
+      restart_policy:
+        condition: on-failure
+    entrypoint: "/usr/bin/nomos-node /etc/nomos/config${TASK_SLOT}.yaml"
