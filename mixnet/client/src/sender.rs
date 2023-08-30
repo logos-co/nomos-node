@@ -72,7 +72,7 @@ impl<R: Rng> Sender<R> {
             route.len() as u64,
             total_delay.as_millis() as u64,
         )
-        .map(Delay::new_from_millis)
+        .map(|d| Delay::new_from_millis(d.as_millis() as u64))
         .collect();
 
         // TODO: encryption for the destination
@@ -126,9 +126,9 @@ impl<R> Iterator for RandomDelayIterator<R>
 where
     R: Rng,
 {
-    type Item = u64;
+    type Item = Duration;
 
-    fn next(&mut self) -> Option<u64> {
+    fn next(&mut self) -> Option<Duration> {
         if self.remaining_delays == 0 {
             return None;
         }
@@ -136,7 +136,7 @@ where
         self.remaining_delays -= 1;
 
         if self.remaining_delays == 1 {
-            return Some(self.remaining_time);
+            return Some(Duration::from_millis(self.remaining_time));
         }
 
         // Calculate bounds to avoid extreme values
@@ -149,12 +149,14 @@ where
         let delay = Uniform::new_inclusive(lower_bound, upper_bound).sample(&mut self.rng) as u64;
         self.remaining_time = self.remaining_time.saturating_sub(delay);
 
-        Some(delay)
+        Some(Duration::from_millis(delay))
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use std::time::Duration;
+
     use super::RandomDelayIterator;
 
     const TOTAL_DELAYS: u64 = 3;
@@ -171,9 +173,11 @@ mod tests {
     #[test]
     fn test_random_delay_iter_small_total_time() {
         let mut delays = RandomDelayIterator::new(rand::thread_rng(), TOTAL_DELAYS, 1);
+        let mut d = Duration::ZERO;
         for _ in 0..TOTAL_DELAYS {
-            assert!(delays.next().is_some());
+            d += delays.next().unwrap();
         }
         assert!(delays.next().is_none());
+        assert_eq!(d, Duration::from_millis(1));
     }
 }
