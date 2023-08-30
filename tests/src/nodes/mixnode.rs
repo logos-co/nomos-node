@@ -26,7 +26,10 @@ impl Drop for MixNode {
 
 impl MixNode {
     pub async fn spawn(config: MixnetNodeConfig) -> Self {
-        let config = mixnode::Config { mixnode: config };
+        let config = mixnode::Config {
+            mixnode: config,
+            log: Default::default(),
+        };
 
         let mut file = NamedTempFile::new().unwrap();
         let config_path = file.path().to_owned();
