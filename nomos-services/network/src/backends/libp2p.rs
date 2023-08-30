@@ -2,11 +2,9 @@
 use std::error::Error;
 // internal
 use super::NetworkBackend;
+pub use nomos_libp2p::libp2p::gossipsub::{Message, TopicHash};
 use nomos_libp2p::{
-    libp2p::{
-        gossipsub::{self, Message},
-        Multiaddr, PeerId,
-    },
+    libp2p::{gossipsub, Multiaddr, PeerId},
     BehaviourEvent, Swarm, SwarmConfig, SwarmEvent,
 };
 // crates
