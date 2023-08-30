@@ -67,13 +67,10 @@ impl<R: Rng> Sender<R> {
     ) -> Result<(sphinx_packet::SphinxPacket, route::Node), Box<dyn Error>> {
         let route = self.topology.random_route(&mut self.rng)?;
 
-        let delays: Vec<Delay> = RandomDelayIterator::new(
-            &mut self.rng,
-            route.len() as u64,
-            total_delay.as_millis() as u64,
-        )
-        .map(|d| Delay::new_from_millis(d.as_millis() as u64))
-        .collect();
+        let delays: Vec<Delay> =
+            RandomDelayIterator::new(&mut self.rng, route.len() as u64, total_delay)
+                .map(|d| Delay::new_from_millis(d.as_millis() as u64))
+                .collect();
 
         // TODO: encryption for the destination
         // https://github.com/nymtech/nym/blob/3748ab77a132143d5fd1cd75dd06334d33294815/common/nymsphinx/src/preparer/payload.rs#L70
@@ -112,7 +109,8 @@ struct RandomDelayIterator<R> {
 }
 
 impl<R> RandomDelayIterator<R> {
-    fn new(rng: R, total_delays: u64, total_time: u64) -> Self {
+    fn new(rng: R, total_delays: u64, total_time: Duration) -> Self {
+        let total_time = total_time.as_millis() as u64;
         RandomDelayIterator {
             rng,
             remaining_delays: total_delays,
@@ -163,7 +161,7 @@ mod tests {
 
     #[test]
     fn test_random_delay_iter_zero_total_time() {
-        let mut delays = RandomDelayIterator::new(rand::thread_rng(), TOTAL_DELAYS, 0);
+        let mut delays = RandomDelayIterator::new(rand::thread_rng(), TOTAL_DELAYS, Duration::ZERO);
         for _ in 0..TOTAL_DELAYS {
             assert!(delays.next().is_some());
         }
@@ -172,7 +170,8 @@ mod tests {
 
     #[test]
     fn test_random_delay_iter_small_total_time() {
-        let mut delays = RandomDelayIterator::new(rand::thread_rng(), TOTAL_DELAYS, 1);
+        let mut delays =
+            RandomDelayIterator::new(rand::thread_rng(), TOTAL_DELAYS, Duration::from_millis(1));
         let mut d = Duration::ZERO;
         for _ in 0..TOTAL_DELAYS {
             d += delays.next().unwrap();
