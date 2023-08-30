@@ -1,5 +1,4 @@
 use bytes::Bytes;
-use http::StatusCode;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::oneshot;
 // internal
@@ -9,11 +8,8 @@ use nomos_http::http::HttpResponse;
 use nomos_mempool::network::adapters::waku::{
     WAKU_CARNOT_PUB_SUB_TOPIC, WAKU_CARNOT_TX_CONTENT_TOPIC,
 };
-use nomos_mempool::MempoolMsg;
-use nomos_network::backends::libp2p;
-use nomos_network::backends::libp2p::Libp2p;
 use nomos_network::backends::waku::{Waku, WakuBackendMessage};
-use nomos_network::{NetworkMsg, NetworkService};
+use nomos_network::NetworkMsg;
 use nomos_node::Tx;
 use overwatch_rs::services::relay::OutboundRelay;
 use waku_bindings::{Multiaddr, WakuMessage};
