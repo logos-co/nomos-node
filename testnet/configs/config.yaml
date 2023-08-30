@@ -1,0 +1,25 @@
+log:
+  backend: "Stdout"
+  format: "Json"
+  level: "debug"
+consensus:
+  private_key: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+  fountain_settings: null
+  overlay_settings:
+    leader_super_majority_threshold: 1
+    nodes: [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]]
+    leader:
+      cur: 0
+network:
+  backend:
+    host: 0.0.0.0
+    port: 3000
+    log_level: "fatal"
+    node_key: "0000000000000000000000000000000000000000000000000000000000000001"
+    discV5BootstrapNodes: []
+    initial_peers: ["/dns/nomos1/tcp/3000","/dns/nomos2/tcp/3000","/dns/nomos3/tcp/3000","/dns/nomos4/tcp/3000","/dns/nomos5/tcp/3000","/dns/nomos6/tcp/3000","/dns/nomos7/tcp/3000","/dns/nomos8/tcp/3000","/dns/nomos9/tcp/3000","/dns/nomos10/tcp/3000"]
+    relayTopics: []
+http:
+  backend:
+    address: 0.0.0.0:8080
+    cors_origins: []
