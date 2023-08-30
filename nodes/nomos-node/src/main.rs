@@ -1,4 +1,4 @@
-use nomos_node::{Config, Nomos, NomosServiceSettings};
+use nomos_node::{Config, Nomos, NomosServiceSettings, Tx};
 
 mod bridges;
 
@@ -6,6 +6,14 @@ use clap::Parser;
 use color_eyre::eyre::{eyre, Result};
 use nomos_http::bridge::{HttpBridge, HttpBridgeSettings};
 
+#[cfg(feature = "libp2p")]
+use nomos_mempool::network::adapters::libp2p::Libp2pAdapter;
+#[cfg(feature = "waku")]
+use nomos_mempool::network::adapters::waku::WakuAdapter;
+#[cfg(feature = "libp2p")]
+use nomos_network::backends::libp2p::Libp2p;
+#[cfg(feature = "waku")]
+use nomos_network::backends::waku::Waku;
 use overwatch_rs::overwatch::*;
 use std::sync::Arc;
 
@@ -24,7 +32,13 @@ fn main() -> Result<()> {
         Arc::new(Box::new(bridges::mempool_metrics_bridge)),
         Arc::new(Box::new(bridges::network_info_bridge)),
         #[cfg(feature = "waku")]
-        Arc::new(Box::new(bridges::mempool_add_tx_bridge)),
+        Arc::new(Box::new(
+            bridges::mempool_add_tx_bridge::<Waku, WakuAdapter<Tx>>,
+        )),
+        #[cfg(feature = "libp2p")]
+        Arc::new(Box::new(
+            bridges::mempool_add_tx_bridge::<Libp2p, Libp2pAdapter<Tx>>,
+        )),
         #[cfg(feature = "waku")]
         Arc::new(Box::new(bridges::waku_add_conn_bridge)),
     ];
