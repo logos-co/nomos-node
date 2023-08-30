@@ -28,8 +28,7 @@ struct Mixnetnode {
     node: ServiceHandle<MixnetNodeService>,
 }
 
-#[tokio::main]
-async fn main() -> Result<(), DynError> {
+fn main() -> Result<(), DynError> {
     // Construct a subscriber that prints formatted traces to stdout
     // and use that subscriber to process traces emitted after this point
     // TODO: use the log service that nomos-node uses, if necessary
