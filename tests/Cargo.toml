@@ -14,6 +14,7 @@ overwatch-rs = { git = "https://github.com/logos-co/Overwatch", branch = "main" 
 nomos-core = { path = "../nomos-core" }
 consensus-engine = { path = "../consensus-engine", features = ["serde"] }
 nomos-mempool = { path = "../nomos-services/mempool", features = ["mock"] }
+mixnode = { path = "../nodes/mixnode" }
 mixnet-node = { path = "../mixnet/node" }
 mixnet-client = { path = "../mixnet/client" }
 mixnet-topology = { path = "../mixnet/topology" }

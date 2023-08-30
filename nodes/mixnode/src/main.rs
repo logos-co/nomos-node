@@ -2,30 +2,15 @@ mod services;
 
 use clap::Parser;
 use color_eyre::eyre::Result;
-use overwatch_derive::Services;
+use mixnode::{Config, MixNode, MixNodeServiceSettings};
 use overwatch_rs::overwatch::OverwatchRunner;
-use overwatch_rs::services::handle::ServiceHandle;
-use overwatch_rs::services::ServiceData;
 use overwatch_rs::DynError;
-use serde::{Deserialize, Serialize};
-use services::mixnet::MixnetNodeService;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 struct Args {
     /// Path for a yaml-encoded mixnet-node config file
     config: std::path::PathBuf,
-}
-
-#[derive(Deserialize, Debug, Clone, Serialize)]
-pub struct Config {
-    // pub log: <Logger as ServiceData>::Settings,
-    pub mixnode: <MixnetNodeService as ServiceData>::Settings,
-}
-
-#[derive(Services)]
-struct Mixnetnode {
-    node: ServiceHandle<MixnetNodeService>,
 }
 
 fn main() -> Result<(), DynError> {
@@ -38,8 +23,8 @@ fn main() -> Result<(), DynError> {
     let Args { config } = Args::parse();
     let config = serde_yaml::from_reader::<_, Config>(std::fs::File::open(config)?)?;
 
-    let app = OverwatchRunner::<Mixnetnode>::run(
-        MixnetnodeServiceSettings {
+    let app = OverwatchRunner::<MixNode>::run(
+        MixNodeServiceSettings {
             node: config.mixnode,
         },
         None,
