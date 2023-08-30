@@ -49,7 +49,8 @@ impl<R: Rng> Sender<R> {
     fn pad_and_split_message(&mut self, msg: Vec<u8>) -> Vec<Fragment> {
         let nym_message = NymMessage::new_plain(msg);
 
-        // TODO: add PUBLIC_KEY_SIZE for encryption for the destination
+        // TODO: add PUBLIC_KEY_SIZE for encryption for the destination,
+        //       if we're going to encrypt final payloads for the destination.
         // TODO: add ACK_OVERHEAD if we need SURB-ACKs.
         // https://github.com/nymtech/nym/blob/3748ab77a132143d5fd1cd75dd06334d33294815/common/nymsphinx/src/message.rs#L181-L181
         let plaintext_size_per_packet = PacketSize::RegularPacket.plaintext_size();
@@ -75,7 +76,7 @@ impl<R: Rng> Sender<R> {
         .map(Delay::new_from_millis)
         .collect();
 
-        // TODO: encryption for the destination
+        // TODO: encrypt the payload for the destination, if we want
         // https://github.com/nymtech/nym/blob/3748ab77a132143d5fd1cd75dd06334d33294815/common/nymsphinx/src/preparer/payload.rs#L70
         let payload = fragment.into_bytes();
 
