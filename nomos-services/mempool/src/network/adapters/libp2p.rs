@@ -5,6 +5,8 @@ use futures::Stream;
 use serde::{de::DeserializeOwned, Serialize};
 use tokio_stream::wrappers::BroadcastStream;
 use tokio_stream::StreamExt;
+use tracing::log::error;
+
 // internal
 use crate::network::messages::TransactionMsg;
 use crate::network::NetworkAdapter;
@@ -57,9 +59,13 @@ where
         Box::new(Box::pin(BroadcastStream::new(receiver).filter_map(
             move |message| match message {
                 Ok(Event::Message(Message { data, topic, .. })) if topic == topic_hash => {
-                    let tx = wire::deserialize::<TransactionMsg<Tx>>(&data)
-                        .expect("Failed to deserialize tx");
-                    Some(tx.tx)
+                    match wire::deserialize::<TransactionMsg<Tx>>(&data) {
+                        Ok(msg) => Some(msg.tx),
+                        Err(e) => {
+                            error!("Unrecognized Tx message: {e}");
+                            None
+                        }
+                    }
                 }
                 _ => None,
             },
