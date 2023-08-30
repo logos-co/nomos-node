@@ -1,7 +1,8 @@
-use std::{error::Error, net::SocketAddr, time::Duration};
+use std::{error::Error, net::SocketAddr, sync::Arc, time::Duration};
 
 use mixnet_protocol::Body;
 use mixnet_topology::MixnetTopology;
+use mixnet_util::ConnectionCache;
 use nym_sphinx::{
     addressing::nodes::NymNodeRoutingAddress, chunking::fragment::Fragment, message::NymMessage,
     params::PacketSize, Delay, Destination, DestinationAddressBytes, NodeAddressBytes,
@@ -9,18 +10,23 @@ use nym_sphinx::{
 };
 use rand::Rng;
 use sphinx_packet::{route, SphinxPacket, SphinxPacketBuilder};
-use tokio::net::TcpStream;
+use tokio::{net::TcpStream, sync::Mutex};
 
 // Sender splits messages into Sphinx packets and sends them to the Mixnet.
 pub struct Sender<R: Rng> {
     //TODO: handle topology update
     topology: MixnetTopology,
+    cache: ConnectionCache,
     rng: R,
 }
 
 impl<R: Rng> Sender<R> {
-    pub fn new(topology: MixnetTopology, rng: R) -> Self {
-        Self { topology, rng }
+    pub fn new(topology: MixnetTopology, cache: ConnectionCache, rng: R) -> Self {
+        Self {
+            topology,
+            rng,
+            cache,
+        }
     }
 
     pub fn send(&mut self, msg: Vec<u8>, total_delay: Duration) -> Result<(), Box<dyn Error>> {
@@ -36,8 +42,11 @@ impl<R: Rng> Sender<R> {
             .collect::<Result<Vec<_>, _>>()?
             .into_iter()
             .for_each(|(packet, first_node)| {
+                let cache = self.cache.clone();
                 tokio::spawn(async move {
-                    if let Err(e) = Self::send_packet(Box::new(packet), first_node.address).await {
+                    if let Err(e) =
+                        Self::send_packet(&cache, Box::new(packet), first_node.address).await
+                    {
                         tracing::error!("failed to send packet to the first node: {e}");
                     }
                 });
@@ -89,15 +98,24 @@ impl<R: Rng> Sender<R> {
     }
 
     async fn send_packet(
+        cache: &ConnectionCache,
         packet: Box<SphinxPacket>,
         addr: NodeAddressBytes,
     ) -> Result<(), Box<dyn Error>> {
         let addr = SocketAddr::try_from(NymNodeRoutingAddress::try_from(addr)?)?;
         tracing::debug!("Sending a Sphinx packet to the node: {addr:?}");
 
-        let mut socket = TcpStream::connect(addr).await?;
-        let body = Body::new_sphinx(packet);
-        body.write(&mut socket).await?;
+        if let Some(stream) = cache.get(&addr) {
+            let mut stream = stream.lock().await;
+            let body = Body::new_sphinx(packet);
+            body.write(&mut *stream).await?;
+        } else {
+            let mut socket = TcpStream::connect(addr).await?;
+            let body = Body::new_sphinx(packet);
+            body.write(&mut socket).await?;
+            cache.insert(addr, Arc::new(Mutex::new(socket)));
+        }
+
         tracing::debug!("Sent a Sphinx packet successuflly to the node: {addr:?}");
 
         Ok(())

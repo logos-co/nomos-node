@@ -1,29 +1,51 @@
-use std::{error::Error, net::SocketAddr};
+use std::{error::Error, net::SocketAddr, sync::Arc};
 
 use futures::{stream, Stream, StreamExt};
 use mixnet_protocol::Body;
+use mixnet_util::ConnectionCache;
 use nym_sphinx::{
     chunking::{fragment::Fragment, reconstruction::MessageReconstructor},
     message::{NymMessage, PaddedMessage},
     Payload,
 };
-use tokio::net::TcpStream;
+use tokio::{net::TcpStream, sync::Mutex};
 
 use crate::MixnetClientError;
 
 // Receiver accepts TCP connections to receive incoming payloads from the Mixnet.
-pub struct Receiver;
+pub struct Receiver {
+    cache: ConnectionCache,
+    node_address: SocketAddr,
+}
 
 impl Receiver {
+    pub fn new(node_address: SocketAddr, cache: ConnectionCache) -> Self {
+        Self {
+            cache,
+            node_address,
+        }
+    }
+
     pub async fn run(
-        node_address: SocketAddr,
+        &self,
     ) -> Result<
         impl Stream<Item = Result<Vec<u8>, MixnetClientError>> + Send + 'static,
         MixnetClientError,
     > {
-        let Ok(socket) = TcpStream::connect(node_address).await else {
+        if let Some(stream) = self.cache.get(&self.node_address) {
+            return Ok(Self::message_stream(Box::pin(Self::fragment_stream(
+                stream,
+            ))));
+        }
+
+        let Ok(socket) = TcpStream::connect(self.node_address)
+            .await
+            .map(|s| Arc::new(Mutex::new(s)))
+        else {
             return Err(MixnetClientError::MixnetNodeConnectError);
         };
+
+        self.cache.insert(self.node_address, socket.clone());
 
         Ok(Self::message_stream(Box::pin(Self::fragment_stream(
             socket,
@@ -31,12 +53,17 @@ impl Receiver {
     }
 
     fn fragment_stream(
-        socket: TcpStream,
+        socket: Arc<Mutex<TcpStream>>,
     ) -> impl Stream<Item = Result<Fragment, MixnetClientError>> + Send + 'static {
-        stream::unfold(socket, |mut socket| async move {
-            let Ok(body) = Body::read(&mut socket).await else {
-                // TODO: Maybe this is a hard error and the stream is corrupted? In that case stop the stream
-                return Some((Err(MixnetClientError::MixnetNodeStreamClosed), socket));
+        stream::unfold(socket, |socket| async move {
+            let body = {
+                let mut mu = socket.lock().await;
+                let Ok(body) = Body::read(&mut *mu).await else {
+                    // TODO: Maybe this is a hard error and the stream is corrupted? In that case stop the stream
+                    drop(mu);
+                    return Some((Err(MixnetClientError::MixnetNodeStreamClosed), socket));
+                };
+                body
             };
 
             match body {
