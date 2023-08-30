@@ -60,6 +60,7 @@ impl MixNode {
                     get_available_port(),
                 )),
                 private_key,
+                connection_cache_size: None,
             };
             configs.push(config);
         }

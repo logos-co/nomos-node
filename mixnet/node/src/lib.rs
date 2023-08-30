@@ -93,7 +93,10 @@ impl MixnetNode {
         let body = Body::read(&mut socket).await?;
         match body {
             Body::SphinxPacket(packet) => {
-                cache.insert(socket.peer_addr().unwrap(), Arc::new(tokio::sync::Mutex::new(socket)));
+                cache.insert(
+                    socket.peer_addr().unwrap(),
+                    Arc::new(tokio::sync::Mutex::new(socket)),
+                );
                 Self::handle_sphinx_packet(cache, private_key, packet).await
             }
             _body @ Body::FinalPayload(_) => {
