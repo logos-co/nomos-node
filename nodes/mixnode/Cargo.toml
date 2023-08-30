@@ -6,6 +6,7 @@ edition = "2021"
 [dependencies]
 async-trait = "0.1"
 mixnet-node = { path = "../../mixnet/node" }
+nomos-log = { path = "../../nomos-services/log" }
 clap = { version = "4", features = ["derive"] }
 color-eyre = "0.6.0"
 overwatch-rs = { git = "https://github.com/logos-co/Overwatch", branch = "main" }
