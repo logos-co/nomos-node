@@ -1,16 +1,30 @@
 services:
-  nomos-node:
-    build: .
+
+  bootstrap:
+    build:
+      context: .
+      dockerfile: Dockerfile.libp2p
     ports:
-      - "3000-3010:3000"
-      - "8080-8090:8080"
-    hostname: "nomos{{.Task.Slot}}"
+      - "3000:3000"
+      - "8080:8080"
     volumes:
-      - ./testnet/configs:/etc/nomos
-    environment:
-      - TASK_SLOT={{.Task.Slot}}
+      - ./testnet:/etc/nomos
+    entrypoint: sh
+    command: "/etc/nomos/run_bootstrap.sh"
+
+  libp2p-node:
+    build:
+      context: .
+      dockerfile: Dockerfile.libp2p
+    ports:
+      - "3001-3010:3000"
+      - "8081-8190:8080"
+    volumes:
+      - ./testnet:/etc/nomos
     deploy:
-      replicas: 10
-      restart_policy:
-        condition: on-failure
-    entrypoint: "/usr/bin/nomos-node /etc/nomos/config${TASK_SLOT}.yaml"
+      replicas: 10 
+    depends_on:
+      - bootstrap
+    entrypoint: sh
+    command: "/etc/nomos/run_libp2p.sh"
+

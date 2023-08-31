@@ -17,7 +17,7 @@ network:
     log_level: "fatal"
     node_key: "0000000000000000000000000000000000000000000000000000000000000001"
     discV5BootstrapNodes: []
-    initial_peers: ["/dns/nomos1/tcp/3000","/dns/nomos2/tcp/3000","/dns/nomos3/tcp/3000","/dns/nomos4/tcp/3000","/dns/nomos5/tcp/3000","/dns/nomos6/tcp/3000","/dns/nomos7/tcp/3000","/dns/nomos8/tcp/3000","/dns/nomos9/tcp/3000","/dns/nomos10/tcp/3000"]
+    initial_peers: ["/dns/nomos-node-bootstrap-1/tcp/3000"]
     relayTopics: []
 http:
   backend:
