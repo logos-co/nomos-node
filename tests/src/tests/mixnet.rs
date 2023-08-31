@@ -22,6 +22,7 @@ async fn mixnet() {
         MixnetClientConfig {
             mode: MixnetClientMode::Sender,
             topology: topology.clone(),
+            connection_cache_size: 255,
         },
         OsRng,
     );
@@ -132,6 +133,7 @@ async fn run_nodes_and_destination_client() -> (
         MixnetClientConfig {
             mode: MixnetClientMode::SenderReceiver(config3.client_listen_address),
             topology: topology.clone(),
+            connection_cache_size: 255,
         },
         OsRng,
     );
