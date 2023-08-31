@@ -30,6 +30,6 @@ blake2 = "0.10"
 
 [features]
 default = []
-waku = ["nomos-network/waku", "nomos-core/waku", "waku-bindings"]
+waku = ["nomos-network/waku", "waku-bindings"]
 mock = ["linked-hash-map", "nomos-network/mock", "rand", "nomos-core/mock"]
 libp2p = ["nomos-network/libp2p"]

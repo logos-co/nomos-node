@@ -3,6 +3,7 @@ use std::error::Error;
 // internal
 use super::NetworkBackend;
 use mixnet_client::{MixnetClient, MixnetClientConfig};
+use nomos_core::wire;
 pub use nomos_libp2p::libp2p::gossipsub::{Message, TopicHash};
 use nomos_libp2p::{
     libp2p::{gossipsub, Multiaddr, PeerId},
@@ -71,6 +72,15 @@ pub enum Event {
 struct MixnetMessage {
     topic: Topic,
     message: Box<[u8]>,
+}
+
+impl MixnetMessage {
+    pub fn as_bytes(&self) -> Vec<u8> {
+        wire::serialize(self).expect("Couldn't serialize MixnetMessage")
+    }
+    pub fn from_bytes(data: &[u8]) -> Result<Self, wire::Error> {
+        wire::deserialize(data)
+    }
 }
 
 #[async_trait::async_trait]
@@ -145,9 +155,7 @@ impl NetworkBackend for Libp2p {
                             Command::Broadcast { topic, message } => {
                                 tracing::debug!("sending message to mixnet client");
                                 let msg = MixnetMessage { topic, message };
-                                // TODO: use `wire` instead of json, by resolving import cycles
-                                let msg = serde_json::to_vec(&msg).unwrap();
-                                log_error!(mixnet_client.send(msg, std::time::Duration::ZERO));
+                                log_error!(mixnet_client.send(msg.as_bytes(), std::time::Duration::ZERO));
                             }
                             Command::Subscribe(topic) => {
                                 tracing::debug!("subscribing to topic: {topic}");
@@ -175,8 +183,8 @@ impl NetworkBackend for Libp2p {
                         match result {
                             Ok(msg) => {
                                 tracing::debug!("receiving message from mixnet client");
-                                let Ok(MixnetMessage { topic, message }) = serde_json::from_slice(&msg) else {
-                                    tracing::error!("failed to deserialize json received from mixnet client");
+                                let Ok(MixnetMessage { topic, message }) = MixnetMessage::from_bytes(&msg) else {
+                                    tracing::error!("failed to deserialize msg received from mixnet client");
                                     continue;
                                 };
 
