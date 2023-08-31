@@ -8,7 +8,7 @@ use std::time::Duration;
 pub use config::MixnetClientConfig;
 pub use config::MixnetClientMode;
 use futures::stream::BoxStream;
-use mixnet_util::ConnectionCache;
+use mixnet_util::ConnectionPool;
 use rand::Rng;
 use sender::Sender;
 use thiserror::Error;
@@ -23,7 +23,7 @@ pub type MessageStream = BoxStream<'static, Result<Vec<u8>, MixnetClientError>>;
 
 impl<R: Rng> MixnetClient<R> {
     pub fn new(config: MixnetClientConfig, rng: R) -> Self {
-        let cache = ConnectionCache::new(config.connection_cache_size);
+        let cache = ConnectionPool::new(config.connection_cache_size);
         Self {
             mode: config.mode,
             sender: Sender::new(config.topology, cache, rng),

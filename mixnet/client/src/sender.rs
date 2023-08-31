@@ -1,8 +1,8 @@
-use std::{error::Error, net::SocketAddr, sync::Arc, time::Duration};
+use std::{error::Error, net::SocketAddr, time::Duration};
 
 use mixnet_protocol::Body;
 use mixnet_topology::MixnetTopology;
-use mixnet_util::ConnectionCache;
+use mixnet_util::ConnectionPool;
 use nym_sphinx::{
     addressing::nodes::NymNodeRoutingAddress, chunking::fragment::Fragment, message::NymMessage,
     params::PacketSize, Delay, Destination, DestinationAddressBytes, NodeAddressBytes,
@@ -10,18 +10,17 @@ use nym_sphinx::{
 };
 use rand::Rng;
 use sphinx_packet::{route, SphinxPacket, SphinxPacketBuilder};
-use tokio::{net::TcpStream, sync::Mutex};
 
 // Sender splits messages into Sphinx packets and sends them to the Mixnet.
 pub struct Sender<R: Rng> {
     //TODO: handle topology update
     topology: MixnetTopology,
-    cache: ConnectionCache,
+    cache: ConnectionPool,
     rng: R,
 }
 
 impl<R: Rng> Sender<R> {
-    pub fn new(topology: MixnetTopology, cache: ConnectionCache, rng: R) -> Self {
+    pub fn new(topology: MixnetTopology, cache: ConnectionPool, rng: R) -> Self {
         Self {
             topology,
             rng,
@@ -98,23 +97,17 @@ impl<R: Rng> Sender<R> {
     }
 
     async fn send_packet(
-        cache: &ConnectionCache,
+        cache: &ConnectionPool,
         packet: Box<SphinxPacket>,
         addr: NodeAddressBytes,
     ) -> Result<(), Box<dyn Error>> {
         let addr = SocketAddr::try_from(NymNodeRoutingAddress::try_from(addr)?)?;
         tracing::debug!("Sending a Sphinx packet to the node: {addr:?}");
 
-        if let Some(stream) = cache.get(&addr) {
-            let mut stream = stream.lock().await;
-            let body = Body::new_sphinx(packet);
-            body.write(&mut *stream).await?;
-        } else {
-            let mut socket = TcpStream::connect(addr).await?;
-            let body = Body::new_sphinx(packet);
-            body.write(&mut socket).await?;
-            cache.insert(addr, Arc::new(Mutex::new(socket)));
-        }
+        let mu = cache.get_or_init(&addr).await?;
+        let mut socket = mu.lock().await;
+        let body = Body::new_sphinx(packet);
+        body.write(&mut *socket).await?;
 
         tracing::debug!("Sent a Sphinx packet successuflly to the node: {addr:?}");
 

@@ -7,7 +7,7 @@ use client_notifier::ClientNotifier;
 pub use config::MixnetNodeConfig;
 use mixnet_protocol::Body;
 use mixnet_topology::MixnetNodeId;
-use mixnet_util::ConnectionCache;
+use mixnet_util::ConnectionPool;
 use nym_sphinx::{
     addressing::nodes::NymNodeRoutingAddress, Delay, DestinationAddressBytes, NodeAddressBytes,
     Payload, PrivateKey,
@@ -22,12 +22,12 @@ use tokio::{
 // A mix node that routes packets in the Mixnet.
 pub struct MixnetNode {
     config: MixnetNodeConfig,
-    cache: ConnectionCache,
+    cache: ConnectionPool,
 }
 
 impl MixnetNode {
     pub fn new(config: MixnetNodeConfig) -> Self {
-        let cache = ConnectionCache::new(config.connection_cache_size);
+        let cache = ConnectionPool::new(config.connection_cache_size);
         Self { config, cache }
     }
 
@@ -82,7 +82,7 @@ impl MixnetNode {
 
     async fn handle_connection(
         mut socket: TcpStream,
-        cache: ConnectionCache,
+        cache: ConnectionPool,
         private_key: PrivateKey,
         client_tx: mpsc::Sender<Body>,
     ) -> Result<(), Box<dyn Error>> {
@@ -102,7 +102,7 @@ impl MixnetNode {
     }
 
     async fn handle_sphinx_packet(
-        cache: ConnectionCache,
+        cache: ConnectionPool,
         private_key: PrivateKey,
         packet: Box<SphinxPacket>,
     ) -> Result<(), Box<dyn Error>> {
@@ -129,7 +129,7 @@ impl MixnetNode {
     }
 
     async fn forward_packet_to_next_hop(
-        cache: ConnectionCache,
+        cache: ConnectionPool,
         packet: Box<SphinxPacket>,
         next_node_addr: NodeAddressBytes,
         delay: Delay,
@@ -146,7 +146,7 @@ impl MixnetNode {
     }
 
     async fn forward_payload_to_destination(
-        cache: ConnectionCache,
+        cache: ConnectionPool,
         payload: Payload,
         destination_addr: DestinationAddressBytes,
     ) -> Result<(), Box<dyn Error>> {
@@ -161,7 +161,7 @@ impl MixnetNode {
     }
 
     async fn forward(
-        cache: ConnectionCache,
+        cache: ConnectionPool,
         body: Body,
         to: NymNodeRoutingAddress,
     ) -> Result<(), Box<dyn Error>> {
