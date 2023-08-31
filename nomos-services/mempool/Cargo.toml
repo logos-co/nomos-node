@@ -20,7 +20,7 @@ thiserror = "1.0"
 tracing = "0.1"
 tokio = { version = "1", features = ["sync", "macros"] }
 tokio-stream = "0.1"
-waku-bindings = { version = "0.1.1", optional = true}
+waku-bindings = { version = "0.1.1", optional = true }
 
 [dev-dependencies]
 nomos-log = { path = "../log" }
@@ -30,6 +30,6 @@ blake2 = "0.10"
 
 [features]
 default = []
-waku = ["nomos-network/waku", "nomos-core/waku", "waku-bindings"]
+waku = ["nomos-network/waku", "waku-bindings"]
 mock = ["linked-hash-map", "nomos-network/mock", "rand", "nomos-core/mock"]
 libp2p = ["nomos-network/libp2p"]

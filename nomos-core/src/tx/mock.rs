@@ -6,21 +6,21 @@ use blake2::{
     Blake2bVar,
 };
 use bytes::{Bytes, BytesMut};
-use nomos_network::backends::mock::MockMessage;
+use serde::Serialize;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, serde::Serialize, serde::Deserialize)]
-pub struct MockTransaction {
+pub struct MockTransaction<M> {
     id: MockTxId,
-    content: MockMessage,
+    content: M,
 }
 
-impl MockTransaction {
-    pub fn new(content: MockMessage) -> Self {
-        let id = MockTxId::from(content.clone());
+impl<M: Serialize> MockTransaction<M> {
+    pub fn new(content: M) -> Self {
+        let id = MockTxId::from(serialize(&content).unwrap().as_slice());
         Self { id, content }
     }
 
-    pub fn message(&self) -> &MockMessage {
+    pub fn message(&self) -> &M {
         &self.content
     }
 
@@ -37,7 +37,7 @@ impl MockTransaction {
     }
 }
 
-impl Transaction for MockTransaction {
+impl<M: Serialize> Transaction for MockTransaction<M> {
     const HASHER: TransactionHasher<Self> = MockTransaction::id;
     type Hash = MockTxId;
 
@@ -46,9 +46,9 @@ impl Transaction for MockTransaction {
     }
 }
 
-impl From<nomos_network::backends::mock::MockMessage> for MockTransaction {
-    fn from(msg: nomos_network::backends::mock::MockMessage) -> Self {
-        let id = MockTxId::from(msg.clone());
+impl<M: Serialize> From<M> for MockTransaction<M> {
+    fn from(msg: M) -> Self {
+        let id = MockTxId::from(serialize(&msg).unwrap().as_slice());
         Self { id, content: msg }
     }
 }
@@ -84,18 +84,18 @@ impl MockTxId {
     }
 }
 
-impl From<nomos_network::backends::mock::MockMessage> for MockTxId {
-    fn from(msg: nomos_network::backends::mock::MockMessage) -> Self {
+impl From<&[u8]> for MockTxId {
+    fn from(msg: &[u8]) -> Self {
         let mut hasher = Blake2bVar::new(32).unwrap();
-        hasher.update(&serialize(&msg).unwrap());
+        hasher.update(msg);
         let mut id = [0u8; 32];
         hasher.finalize_variable(&mut id).unwrap();
         Self(id)
     }
 }
 
-impl From<&MockTransaction> for MockTxId {
-    fn from(msg: &MockTransaction) -> Self {
+impl<M> From<&MockTransaction<M>> for MockTxId {
+    fn from(msg: &MockTransaction<M>) -> Self {
         msg.id
     }
 }
