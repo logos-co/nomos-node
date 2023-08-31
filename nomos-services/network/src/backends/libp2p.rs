@@ -75,8 +75,8 @@ struct MixnetMessage {
 }
 
 impl MixnetMessage {
-    pub fn as_bytes(&self) -> Box<[u8]> {
-        wire::serialize(self).unwrap().into_boxed_slice()
+    pub fn as_bytes(&self) -> Vec<u8> {
+        wire::serialize(self).expect("Couldn't serialize MixnetMessage")
     }
     pub fn from_bytes(data: &[u8]) -> Result<Self, wire::Error> {
         wire::deserialize(data)
@@ -155,7 +155,7 @@ impl NetworkBackend for Libp2p {
                             Command::Broadcast { topic, message } => {
                                 tracing::debug!("sending message to mixnet client");
                                 let msg = MixnetMessage { topic, message };
-                                log_error!(mixnet_client.send(msg.as_bytes().to_vec(), std::time::Duration::ZERO));
+                                log_error!(mixnet_client.send(msg.as_bytes(), std::time::Duration::ZERO));
                             }
                             Command::Subscribe(topic) => {
                                 tracing::debug!("subscribing to topic: {topic}");
