@@ -4,8 +4,5 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-lru = "0.11"
-once_cell = "1.18" # remove this dep when rust's OnceLock is stable
-rustix = { version = "0.38", features = ["process"] }
 tokio = { version = "1.32", default-features = false, features = ["sync", "net"] }
 parking_lot = { version = "0.12", features = ["send_guard"] }  

@@ -7,7 +7,7 @@ use client_notifier::ClientNotifier;
 pub use config::MixnetNodeConfig;
 use mixnet_protocol::Body;
 use mixnet_topology::MixnetNodeId;
-use mixnet_util::{ConnectionCache, MAX_OPEN_FILES_LIMIT};
+use mixnet_util::ConnectionCache;
 use nym_sphinx::{
     addressing::nodes::NymNodeRoutingAddress, Delay, DestinationAddressBytes, NodeAddressBytes,
     Payload, PrivateKey,
@@ -27,11 +27,7 @@ pub struct MixnetNode {
 
 impl MixnetNode {
     pub fn new(config: MixnetNodeConfig) -> Self {
-        let cache = ConnectionCache::new(
-            config
-                .connection_cache_size
-                .unwrap_or(MAX_OPEN_FILES_LIMIT.unwrap_or(u8::MAX as usize)),
-        );
+        let cache = ConnectionCache::new(config.connection_cache_size);
         Self { config, cache }
     }
 
