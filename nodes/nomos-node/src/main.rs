@@ -22,11 +22,16 @@ use std::sync::Arc;
 struct Args {
     /// Path for a yaml-encoded network config file
     config: std::path::PathBuf,
+    /// Overrides node key in config file
+    #[clap(long = "node-key")]
+    node_key: Option<String>,
 }
 
 fn main() -> Result<()> {
-    let Args { config } = Args::parse();
-    let config = serde_yaml::from_reader::<_, Config>(std::fs::File::open(config)?)?;
+    let Args { config, node_key } = Args::parse();
+    let mut config = serde_yaml::from_reader::<_, Config>(std::fs::File::open(config)?)?;
+    config.set_node_key(node_key)?;
+
     let bridges: Vec<HttpBridge> = vec![
         Arc::new(Box::new(bridges::carnot_info_bridge)),
         Arc::new(Box::new(bridges::mempool_metrics_bridge)),
