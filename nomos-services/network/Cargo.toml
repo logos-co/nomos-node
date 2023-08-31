@@ -33,7 +33,7 @@ mixnet-client = { path = "../../mixnet/client" }
 tokio = { version = "1", features = ["full"] }
 
 [features]
-default = ["libp2p"]
+default = []
 waku = ["waku-bindings"]
 libp2p = ["nomos-libp2p", "rand"]
 mock = ["rand", "chrono"]
