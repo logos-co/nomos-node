@@ -89,7 +89,7 @@ impl MixnetNode {
 
     const CLIENT_NOTI_CHANNEL_SIZE: usize = 100;
 
-    pub async fn run(self) -> Result<MixnetNodeHandle, Box<dyn Error>> {
+    pub async fn run(self) -> Result<MixnetNodeHandle, Box<dyn Error + Send + Sync>> {
         let (shutdown_tx, shutdown_rx) = async_channel::bounded(1);
         // Spawn a ClientNotifier
         let (client_tx, client_rx) = mpsc::channel(Self::CLIENT_NOTI_CHANNEL_SIZE);
@@ -191,7 +191,7 @@ impl MixnetNode {
         client_tx: mpsc::Sender<Body>,
         body: Body,
     ) -> Result<(), Box<dyn Error>> {
-        // TODO: Decrypt the final payload using the private key
+        // TODO: Decrypt the final payload using the private key, if it's encrypted
 
         // Do not wait when the channel is full or no receiver exists
         client_tx.try_send(body)?;

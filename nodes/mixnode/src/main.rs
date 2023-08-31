@@ -1,6 +1,10 @@
+mod services;
+
 use clap::Parser;
 use color_eyre::eyre::Result;
-use mixnet_node::{MixnetNode, MixnetNodeConfig};
+use mixnode::{Config, MixNode, MixNodeServiceSettings};
+use overwatch_rs::overwatch::OverwatchRunner;
+use overwatch_rs::DynError;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -9,39 +13,17 @@ struct Args {
     config: std::path::PathBuf,
 }
 
-#[tokio::main]
-async fn main() -> Result<()> {
-    // Construct a subscriber that prints formatted traces to stdout
-    // and use that subscriber to process traces emitted after this point
-    // TODO: use the log service that nomos-node uses, if necessary
-    let subscriber = tracing_subscriber::FmtSubscriber::new();
-    tracing::subscriber::set_global_default(subscriber)?;
-
+fn main() -> Result<(), DynError> {
     let Args { config } = Args::parse();
-    let config = serde_yaml::from_reader::<_, MixnetNodeConfig>(std::fs::File::open(config)?)?;
+    let config = serde_yaml::from_reader::<_, Config>(std::fs::File::open(config)?)?;
 
-    let node = MixnetNode::new(config);
-
-    match node.run().await {
-        Ok(handle) => {
-            tokio::pin!(handle);
-            loop {
-                tokio::select! {
-                    _ = tokio::signal::ctrl_c() => {
-                        tracing::info!("received shutdown signal, gracefully shutdown");
-                        handle.shutdown();
-                        return Ok(());
-                    }
-                    _ = &mut handle => {
-                        return Ok(());
-                    }
-                }
-            }
-        }
-        Err(e) => {
-            tracing::error!("error from mixnet-node: {e}");
-        }
-    }
-
+    let app = OverwatchRunner::<MixNode>::run(
+        MixNodeServiceSettings {
+            node: config.mixnode,
+            logging: config.log,
+        },
+        None,
+    )?;
+    app.wait_finished();
     Ok(())
 }

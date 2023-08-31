@@ -25,10 +25,15 @@ impl Drop for MixNode {
 }
 
 impl MixNode {
-    pub async fn spawn(config: &MixnetNodeConfig) -> Self {
+    pub async fn spawn(config: MixnetNodeConfig) -> Self {
+        let config = mixnode::Config {
+            mixnode: config,
+            log: Default::default(),
+        };
+
         let mut file = NamedTempFile::new().unwrap();
         let config_path = file.path().to_owned();
-        serde_yaml::to_writer(&mut file, config).unwrap();
+        serde_yaml::to_writer(&mut file, &config).unwrap();
 
         let child = Command::new(std::env::current_dir().unwrap().join(MIXNODE_BIN))
             .arg(&config_path)
@@ -66,7 +71,7 @@ impl MixNode {
 
         let mut nodes = Vec::<MixNode>::new();
         for config in &configs {
-            nodes.push(Self::spawn(config).await);
+            nodes.push(Self::spawn(config.clone()).await);
         }
 
         // We need to return configs as well, to configure mixclients accordingly
