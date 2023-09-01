@@ -29,6 +29,8 @@ jobs:
           command: check
           args: --all --no-default-features --features ${{ matrix.feature }}
 
+  test:
+    name: Test Suite
     strategy:
       fail-fast: false # all OSes should be tested even if one fails (default: true)
       matrix:
@@ -48,8 +50,7 @@ jobs:
         uses: actions-rs/toolchain@v1
         with:
           profile: minimal
-          toolchain: stable
-          target: x86_64-pc-windows-gnu
+          toolchain: stable-gnu
           override: true
       # Setup Rust toolchain for other OSes
       - name: Setup Rust toolchain (Other OSes)
@@ -63,6 +64,12 @@ jobs:
         with:
           command: build
           args: --all --no-default-features --features ${{ matrix.feature }}
+      # Freeup some space for Windows tests
+      - name: Clean target dir (Windows)
+        if: matrix.os == 'windows-latest'
+        uses: actions-rs/cargo@v1
+        with:
+          command: clean
       - uses: actions-rs/cargo@v1
         with:
           command: test
