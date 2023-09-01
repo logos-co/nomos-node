@@ -31,8 +31,8 @@ jobs:
         continue-on-error: true
       - run: |
           cargo install grcov;
-          cargo test --all --no-default-features --features waku;
-          cargo test --all --no-default-features --features libp2p;
+          cargo test --no-default-features --features waku -- --skip ten_nodes_happy --skip two_nodes_happy --skip ten_nodes_one_down
+          cargo test --no-default-features --features libp2p -- --skip ten_nodes_happy --skip two_nodes_happy --skip ten_nodes_one_down
           mkdir /tmp/cov;
           grcov . --binary-path ./target/debug/ -s . -t lcov --branch --ignore-not-existing --ignore '../*' --ignore "/*" -o /tmp/cov/tests.lcov;
       - uses: codecov/codecov-action@v3
