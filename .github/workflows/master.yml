@@ -42,7 +42,19 @@ jobs:
       - uses: actions/setup-go@v3 # we need go to build go-waku
         with:
           go-version: '1.19'
-      - uses: actions-rs/toolchain@v1
+      # Setup Rust toolchain with GNU for Windows
+      - name: Setup Rust with GNU toolchain (Windows)
+        if: matrix.os == 'windows-latest'
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          target: x86_64-pc-windows-gnu
+          override: true
+      # Setup Rust toolchain for other OSes
+      - name: Setup Rust toolchain (Other OSes)
+        if: matrix.os != 'windows-latest'
+        uses: actions-rs/toolchain@v1
         with:
           profile: minimal
           toolchain: stable
