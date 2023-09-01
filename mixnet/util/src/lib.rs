@@ -26,8 +26,8 @@ impl ConnectionPool {
         addr: &SocketAddr,
     ) -> std::io::Result<Arc<tokio::sync::Mutex<TcpStream>>> {
         let mut pool = self.pool.lock();
-        match pool.get(addr) {
-            Some(tcp) => Ok(tcp.clone()),
+        match pool.get(addr).cloned() {
+            Some(tcp) => Ok(tcp),
             None => {
                 let tcp = Arc::new(tokio::sync::Mutex::new(TcpStream::connect(addr).await?));
                 pool.insert(*addr, tcp.clone());

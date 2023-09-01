@@ -81,26 +81,15 @@ impl MixnetNode {
     }
 
     async fn handle_connection(
-        socket: TcpStream,
+        mut socket: TcpStream,
         cache: ConnectionPool,
         private_key: PrivateKey,
         client_tx: mpsc::Sender<Body>,
     ) -> Result<(), Box<dyn Error + Send + Sync + 'static>> {
-        tokio::pin!(socket);
         loop {
-            tokio::select! {
-                // TODO: add a random delay?
-                _ = tokio::time::sleep(std::time::Duration::from_millis(100)) => {}
-                body = Body::read(&mut socket) => {
-                    match body {
-                        Ok(body) => if let Err(e) = Self::handle_body(body, &cache, &private_key, &client_tx).await {
-                            tracing::error!("failed to handle body: {e}");
-                        },
-                        Err(e) => {
-                            tracing::error!("failed to read body: {e}");
-                        }
-                    }
-                }
+            let body = Body::read(&mut socket).await?;
+            if let Err(e) = Self::handle_body(body, &cache, &private_key, &client_tx).await {
+                tracing::error!("failed to handle body: {e}");
             }
         }
     }
