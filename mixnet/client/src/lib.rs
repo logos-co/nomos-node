@@ -23,7 +23,7 @@ pub type MessageStream = BoxStream<'static, Result<Vec<u8>, MixnetClientError>>;
 
 impl<R: Rng> MixnetClient<R> {
     pub fn new(config: MixnetClientConfig, rng: R) -> Self {
-        let cache = ConnectionPool::new(config.connection_cache_size);
+        let cache = ConnectionPool::new(config.connection_pool_size);
         Self {
             mode: config.mode,
             sender: Sender::new(config.topology, cache, rng),

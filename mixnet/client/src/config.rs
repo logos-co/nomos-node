@@ -10,7 +10,7 @@ use crate::{receiver::Receiver, MessageStream, MixnetClientError};
 pub struct MixnetClientConfig {
     pub mode: MixnetClientMode,
     pub topology: MixnetTopology,
-    pub connection_cache_size: usize,
+    pub connection_pool_size: usize,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]

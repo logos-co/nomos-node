@@ -12,8 +12,8 @@ pub struct MixnetNodeConfig {
     pub client_listen_address: SocketAddr,
     /// A key for decrypting Sphinx packets
     pub private_key: [u8; PRIVATE_KEY_SIZE],
-    /// The size of the connection cache.
-    pub connection_cache_size: usize,
+    /// The size of the connection pool.
+    pub connection_pool_size: usize,
 }
 
 impl Default for MixnetNodeConfig {
@@ -25,7 +25,7 @@ impl Default for MixnetNodeConfig {
                 7778,
             )),
             private_key: PrivateKey::new().to_bytes(),
-            connection_cache_size: 255,
+            connection_pool_size: 255,
         }
     }
 }

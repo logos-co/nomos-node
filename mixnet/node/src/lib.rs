@@ -22,13 +22,13 @@ use tokio::{
 // A mix node that routes packets in the Mixnet.
 pub struct MixnetNode {
     config: MixnetNodeConfig,
-    cache: ConnectionPool,
+    pool: ConnectionPool,
 }
 
 impl MixnetNode {
     pub fn new(config: MixnetNodeConfig) -> Self {
-        let cache = ConnectionPool::new(config.connection_cache_size);
-        Self { config, cache }
+        let pool = ConnectionPool::new(config.connection_pool_size);
+        Self { config, pool }
     }
 
     pub fn id(&self) -> MixnetNodeId {
@@ -66,10 +66,10 @@ impl MixnetNode {
 
                     let client_tx = client_tx.clone();
                     let private_key = PrivateKey::from(self.config.private_key);
-                    let cache = self.cache.clone();
+                    let pool = self.pool.clone();
                     tokio::spawn(async move {
                         if let Err(e) =
-                            Self::handle_connection(socket, cache, private_key, client_tx).await
+                            Self::handle_connection(socket, pool, private_key, client_tx).await
                         {
                             tracing::error!("failed to handle conn: {e}");
                         }
@@ -82,13 +82,13 @@ impl MixnetNode {
 
     async fn handle_connection(
         mut socket: TcpStream,
-        cache: ConnectionPool,
+        pool: ConnectionPool,
         private_key: PrivateKey,
         client_tx: mpsc::Sender<Body>,
     ) -> Result<(), Box<dyn Error + Send + Sync + 'static>> {
         loop {
             let body = Body::read(&mut socket).await?;
-            if let Err(e) = Self::handle_body(body, &cache, &private_key, &client_tx).await {
+            if let Err(e) = Self::handle_body(body, &pool, &private_key, &client_tx).await {
                 tracing::error!("failed to handle body: {e}");
             }
         }
@@ -96,13 +96,13 @@ impl MixnetNode {
 
     async fn handle_body(
         body: Body,
-        cache: &ConnectionPool,
+        pool: &ConnectionPool,
         private_key: &PrivateKey,
         client_tx: &mpsc::Sender<Body>,
     ) -> Result<(), Box<dyn Error + Send + Sync + 'static>> {
         match body {
             Body::SphinxPacket(packet) => {
-                Self::handle_sphinx_packet(cache, private_key, packet).await
+                Self::handle_sphinx_packet(pool, private_key, packet).await
             }
             _body @ Body::FinalPayload(_) => {
                 Self::forward_body_to_client_notifier(private_key, client_tx, _body).await
@@ -111,16 +111,16 @@ impl MixnetNode {
     }
 
     async fn handle_sphinx_packet(
-        cache: &ConnectionPool,
+        pool: &ConnectionPool,
         private_key: &PrivateKey,
         packet: Box<SphinxPacket>,
     ) -> Result<(), Box<dyn Error + Send + Sync + 'static>> {
         match packet.process(private_key)? {
             ProcessedPacket::ForwardHop(packet, next_node_addr, delay) => {
-                Self::forward_packet_to_next_hop(cache, packet, next_node_addr, delay).await
+                Self::forward_packet_to_next_hop(pool, packet, next_node_addr, delay).await
             }
             ProcessedPacket::FinalHop(destination_addr, _, payload) => {
-                Self::forward_payload_to_destination(cache, payload, destination_addr).await
+                Self::forward_payload_to_destination(pool, payload, destination_addr).await
             }
         }
     }
@@ -138,7 +138,7 @@ impl MixnetNode {
     }
 
     async fn forward_packet_to_next_hop(
-        cache: &ConnectionPool,
+        pool: &ConnectionPool,
         packet: Box<SphinxPacket>,
         next_node_addr: NodeAddressBytes,
         delay: Delay,
@@ -147,7 +147,7 @@ impl MixnetNode {
         tokio::time::sleep(delay.to_duration()).await;
 
         Self::forward(
-            cache,
+            pool,
             Body::new_sphinx(packet),
             NymNodeRoutingAddress::try_from(next_node_addr)?,
         )
@@ -155,14 +155,14 @@ impl MixnetNode {
     }
 
     async fn forward_payload_to_destination(
-        cache: &ConnectionPool,
+        pool: &ConnectionPool,
         payload: Payload,
         destination_addr: DestinationAddressBytes,
     ) -> Result<(), Box<dyn Error + Send + Sync + 'static>> {
         tracing::debug!("Forwarding final payload to destination mixnode");
 
         Self::forward(
-            cache,
+            pool,
             Body::new_final_payload(payload),
             NymNodeRoutingAddress::try_from_bytes(&destination_addr.as_bytes())?,
         )
@@ -170,18 +170,18 @@ impl MixnetNode {
     }
 
     async fn forward(
-        cache: &ConnectionPool,
+        pool: &ConnectionPool,
         body: Body,
         to: NymNodeRoutingAddress,
     ) -> Result<(), Box<dyn Error + Send + Sync + 'static>> {
         let addr = SocketAddr::try_from(to)?;
-        if let Some(addr) = cache.get(&addr) {
+        if let Some(addr) = pool.get(&addr) {
             let mut stream = addr.lock().await;
             body.write(&mut *stream).await?;
             return Ok(());
         }
 
-        body.write(&mut *cache.get_or_init(&addr).await?.lock().await)
+        body.write(&mut *pool.get_or_init(&addr).await?.lock().await)
             .await?;
         Ok(())
     }

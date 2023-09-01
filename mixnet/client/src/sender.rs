@@ -15,16 +15,16 @@ use sphinx_packet::{route, SphinxPacket, SphinxPacketBuilder};
 pub struct Sender<R: Rng> {
     //TODO: handle topology update
     topology: MixnetTopology,
-    cache: ConnectionPool,
+    pool: ConnectionPool,
     rng: R,
 }
 
 impl<R: Rng> Sender<R> {
-    pub fn new(topology: MixnetTopology, cache: ConnectionPool, rng: R) -> Self {
+    pub fn new(topology: MixnetTopology, pool: ConnectionPool, rng: R) -> Self {
         Self {
             topology,
             rng,
-            cache,
+            pool,
         }
     }
 
@@ -45,10 +45,10 @@ impl<R: Rng> Sender<R> {
             .collect::<Result<Vec<_>, _>>()?
             .into_iter()
             .for_each(|(packet, first_node)| {
-                let cache = self.cache.clone();
+                let pool = self.pool.clone();
                 tokio::spawn(async move {
                     if let Err(e) =
-                        Self::send_packet(&cache, Box::new(packet), first_node.address).await
+                        Self::send_packet(&pool, Box::new(packet), first_node.address).await
                     {
                         tracing::error!("failed to send packet to the first node: {e}");
                     }
@@ -100,14 +100,15 @@ impl<R: Rng> Sender<R> {
     }
 
     async fn send_packet(
-        cache: &ConnectionPool,
+        pool: &ConnectionPool,
         packet: Box<SphinxPacket>,
         addr: NodeAddressBytes,
     ) -> Result<(), Box<dyn Error + Send + Sync + 'static>> {
         let addr = SocketAddr::try_from(NymNodeRoutingAddress::try_from(addr)?)?;
         tracing::debug!("Sending a Sphinx packet to the node: {addr:?}");
 
-        let mu = cache.get_or_init(&addr).await?;
+        let mu: std::sync::Arc<tokio::sync::Mutex<tokio::net::TcpStream>> =
+            pool.get_or_init(&addr).await?;
         let mut socket = mu.lock().await;
         let body = Body::new_sphinx(packet);
         body.write(&mut *socket).await?;
