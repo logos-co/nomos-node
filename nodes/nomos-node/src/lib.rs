@@ -61,7 +61,7 @@ impl Config {
             #[cfg(feature = "libp2p")]
             {
                 let mut key_bytes = hex::decode(node_key)?;
-                self.network.backend.node_key =
+                self.network.backend.inner.node_key =
                     SecretKey::try_from_bytes(key_bytes.as_mut_slice())?;
             }
         }
