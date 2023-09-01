@@ -12,6 +12,8 @@ use rand::{rngs::OsRng, RngCore};
 use tests::get_available_port;
 
 #[tokio::test]
+// Set timeout since the test won't stop even if mixnodes (spawned asynchronously) panic.
+#[ntest::timeout(5000)]
 async fn mixnet() {
     let (topology, mut destination_stream) = run_nodes_and_destination_client().await;
 

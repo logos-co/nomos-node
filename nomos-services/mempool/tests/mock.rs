@@ -17,7 +17,7 @@ use nomos_mempool::{
 struct MockPoolNode {
     logging: ServiceHandle<Logger>,
     network: ServiceHandle<NetworkService<Mock>>,
-    mockpool: ServiceHandle<MempoolService<MockAdapter, MockPool<MockTransaction>>>,
+    mockpool: ServiceHandle<MempoolService<MockAdapter, MockPool<MockTransaction<MockMessage>>>>,
 }
 
 #[test]
@@ -67,7 +67,7 @@ fn test_mockmempool() {
     let network = app.handle().relay::<NetworkService<Mock>>();
     let mempool = app
         .handle()
-        .relay::<MempoolService<MockAdapter, MockPool<MockTransaction>>>();
+        .relay::<MempoolService<MockAdapter, MockPool<MockTransaction<MockMessage>>>>();
 
     app.spawn(async move {
         let network_outbound = network.connect().await.unwrap();

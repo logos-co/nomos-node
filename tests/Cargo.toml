@@ -14,6 +14,7 @@ overwatch-rs = { git = "https://github.com/logos-co/Overwatch", branch = "main" 
 nomos-core = { path = "../nomos-core" }
 consensus-engine = { path = "../consensus-engine", features = ["serde"] }
 nomos-mempool = { path = "../nomos-services/mempool", features = ["mock"] }
+mixnode = { path = "../nodes/mixnode" }
 mixnet-node = { path = "../mixnet/node" }
 mixnet-client = { path = "../mixnet/client" }
 mixnet-topology = { path = "../mixnet/topology" }
@@ -31,6 +32,7 @@ tokio = "1"
 futures = "0.3"
 async-trait = "0.1"
 fraction = "0.13"
+ntest = "0.9.0"
 
 [[test]]
 name = "test_consensus_happy_path"
