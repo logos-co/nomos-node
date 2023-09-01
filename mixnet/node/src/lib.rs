@@ -172,9 +172,8 @@ impl MixnetNode {
             return Ok(());
         }
 
-        let mut socket = TcpStream::connect(addr).await?;
-        body.write(&mut socket).await?;
-        cache.insert(addr, Arc::new(tokio::sync::Mutex::new(socket)));
+        body.write(&mut *cache.get_or_init(&addr).await?.lock().await)
+            .await?;
         Ok(())
     }
 }
