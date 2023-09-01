@@ -1,4 +1,4 @@
-use std::{error::Error, net::SocketAddr, sync::Arc};
+use std::{error::Error, net::SocketAddr};
 
 use futures::{stream, Stream, StreamExt};
 use mixnet_protocol::Body;
@@ -7,7 +7,7 @@ use nym_sphinx::{
     message::{NymMessage, PaddedMessage},
     Payload,
 };
-use tokio::{net::TcpStream, sync::Mutex};
+use tokio::net::TcpStream;
 
 use crate::MixnetClientError;
 
@@ -27,10 +27,7 @@ impl Receiver {
         impl Stream<Item = Result<Vec<u8>, MixnetClientError>> + Send + 'static,
         MixnetClientError,
     > {
-        let Ok(socket) = TcpStream::connect(self.node_address)
-            .await
-            .map(|s| Arc::new(Mutex::new(s)))
-        else {
+        let Ok(socket) = TcpStream::connect(self.node_address).await else {
             return Err(MixnetClientError::MixnetNodeConnectError);
         };
 
@@ -40,17 +37,12 @@ impl Receiver {
     }
 
     fn fragment_stream(
-        socket: Arc<Mutex<TcpStream>>,
+        socket: TcpStream,
     ) -> impl Stream<Item = Result<Fragment, MixnetClientError>> + Send + 'static {
-        stream::unfold(socket, |socket| async move {
-            let body = {
-                let mut mu = socket.lock().await;
-                let Ok(body) = Body::read(&mut *mu).await else {
-                    // TODO: Maybe this is a hard error and the stream is corrupted? In that case stop the stream
-                    drop(mu);
-                    return Some((Err(MixnetClientError::MixnetNodeStreamClosed), socket));
-                };
-                body
+        stream::unfold(socket, |mut socket| async move {
+            let Ok(body) = Body::read(&mut socket).await else {
+                // TODO: Maybe this is a hard error and the stream is corrupted? In that case stop the stream
+                return Some((Err(MixnetClientError::MixnetNodeStreamClosed), socket));
             };
 
             match body {
