@@ -28,7 +28,11 @@ impl<R: Rng> Sender<R> {
         }
     }
 
-    pub fn send(&mut self, msg: Vec<u8>, total_delay: Duration) -> Result<(), Box<dyn Error>> {
+    pub fn send(
+        &mut self,
+        msg: Vec<u8>,
+        total_delay: Duration,
+    ) -> Result<(), Box<dyn Error + Send + Sync + 'static>> {
         let destination = self.topology.random_destination(&mut self.rng)?;
         let destination = Destination::new(
             DestinationAddressBytes::from_bytes(destination.address.as_bytes()),
@@ -72,7 +76,8 @@ impl<R: Rng> Sender<R> {
         fragment: Fragment,
         destination: &Destination,
         total_delay: Duration,
-    ) -> Result<(sphinx_packet::SphinxPacket, route::Node), Box<dyn Error>> {
+    ) -> Result<(sphinx_packet::SphinxPacket, route::Node), Box<dyn Error + Send + Sync + 'static>>
+    {
         let route = self.topology.random_route(&mut self.rng)?;
 
         let delays: Vec<Delay> = RandomDelayIterator::new(
@@ -100,7 +105,7 @@ impl<R: Rng> Sender<R> {
         cache: &ConnectionPool,
         packet: Box<SphinxPacket>,
         addr: NodeAddressBytes,
-    ) -> Result<(), Box<dyn Error>> {
+    ) -> Result<(), Box<dyn Error + Send + Sync + 'static>> {
         let addr = SocketAddr::try_from(NymNodeRoutingAddress::try_from(addr)?)?;
         tracing::debug!("Sending a Sphinx packet to the node: {addr:?}");
 

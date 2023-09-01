@@ -34,7 +34,11 @@ impl<R: Rng> MixnetClient<R> {
         self.mode.run().await
     }
 
-    pub fn send(&mut self, msg: Vec<u8>, total_delay: Duration) -> Result<(), Box<dyn Error>> {
+    pub fn send(
+        &mut self,
+        msg: Vec<u8>,
+        total_delay: Duration,
+    ) -> Result<(), Box<dyn Error + Send + Sync + 'static>> {
         self.sender.send(msg, total_delay)
     }
 }
