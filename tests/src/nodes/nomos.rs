@@ -265,6 +265,7 @@ fn create_node_config(
                     mode: mixnet_client_mode,
                     topology: mixnet_topology,
                 },
+                mixnet_delay: Duration::ZERO..Duration::from_millis(10),
             },
         },
         consensus: CarnotSettings {
