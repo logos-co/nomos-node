@@ -15,21 +15,27 @@ pub type TxHash = [u8; 32];
 
 /// A block
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct Block<TxId: Clone + Eq + Hash> {
+pub struct Block<Tx: Clone + Eq + Hash, Blob: Clone + Eq + Hash> {
     header: consensus_engine::Block,
-    transactions: IndexSet<TxId>,
     beacon: RandomBeaconState,
+    transactions: IndexSet<Tx>,
+    blobs: IndexSet<Blob>,
 }
 
-impl<TxId: Clone + Eq + Hash + Serialize + DeserializeOwned> Block<TxId> {
+impl<
+        Tx: Clone + Eq + Hash + Serialize + DeserializeOwned,
+        Blob: Clone + Eq + Hash + Serialize + DeserializeOwned,
+    > Block<Tx, Blob>
+{
     pub fn new(
         view: View,
         parent_qc: Qc,
-        txs: impl Iterator<Item = TxId>,
+        txs: impl Iterator<Item = Tx>,
         proposer: NodeId,
         beacon: RandomBeaconState,
     ) -> Self {
         let transactions = txs.collect();
+        let blobs = IndexSet::new();
         let header = consensus_engine::Block {
             id: BlockId::zeros(),
             view,
@@ -38,11 +44,11 @@ impl<TxId: Clone + Eq + Hash + Serialize + DeserializeOwned> Block<TxId> {
                 leader_id: proposer,
             },
         };
-
         let mut s = Self {
             header,
-            transactions,
             beacon,
+            transactions,
+            blobs,
         };
         let id = block_id_from_wire_content(&s);
         s.header.id = id;
@@ -50,13 +56,17 @@ impl<TxId: Clone + Eq + Hash + Serialize + DeserializeOwned> Block<TxId> {
     }
 }
 
-impl<TxId: Clone + Eq + Hash> Block<TxId> {
+impl<Tx: Clone + Eq + Hash, Blob: Clone + Eq + Hash> Block<Tx, Blob> {
     pub fn header(&self) -> &consensus_engine::Block {
         &self.header
     }
 
-    pub fn transactions(&self) -> impl Iterator<Item = &TxId> + '_ {
+    pub fn transactions(&self) -> impl Iterator<Item = &Tx> + '_ {
         self.transactions.iter()
+    }
+
+    pub fn blobs(&self) -> impl Iterator<Item = &Blob> + '_ {
+        self.blobs.iter()
     }
 
     pub fn beacon(&self) -> &RandomBeaconState {
@@ -64,8 +74,11 @@ impl<TxId: Clone + Eq + Hash> Block<TxId> {
     }
 }
 
-pub fn block_id_from_wire_content<Tx: Clone + Eq + Hash + Serialize + DeserializeOwned>(
-    block: &Block<Tx>,
+pub fn block_id_from_wire_content<
+    Tx: Clone + Eq + Hash + Serialize + DeserializeOwned,
+    Blob: Clone + Eq + Hash + Serialize + DeserializeOwned,
+>(
+    block: &Block<Tx, Blob>,
 ) -> consensus_engine::BlockId {
     use blake2::digest::{consts::U32, Digest};
     use blake2::Blake2b;
@@ -75,7 +88,11 @@ pub fn block_id_from_wire_content<Tx: Clone + Eq + Hash + Serialize + Deserializ
     BlockId::new(hasher.finalize().into())
 }
 
-impl<TxId: Clone + Eq + Hash + Serialize + DeserializeOwned> Block<TxId> {
+impl<
+        Tx: Clone + Eq + Hash + Serialize + DeserializeOwned,
+        Blob: Clone + Eq + Hash + Serialize + DeserializeOwned,
+    > Block<Tx, Blob>
+{
     /// Encode block into bytes
     pub fn as_bytes(&self) -> Bytes {
         wire::serialize(self).unwrap().into()
