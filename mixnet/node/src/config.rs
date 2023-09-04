@@ -6,12 +6,14 @@ use sphinx_packet::crypto::{PRIVATE_KEY_SIZE, PUBLIC_KEY_SIZE};
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct MixnetNodeConfig {
-    // A listen address for receiving Sphinx packets
+    /// A listen address for receiving Sphinx packets
     pub listen_address: SocketAddr,
-    // An listen address fro communicating with mixnet clients
+    /// An listen address fro communicating with mixnet clients
     pub client_listen_address: SocketAddr,
-    // A key for decrypting Sphinx packets
+    /// A key for decrypting Sphinx packets
     pub private_key: [u8; PRIVATE_KEY_SIZE],
+    /// The size of the connection pool.
+    pub connection_pool_size: usize,
 }
 
 impl Default for MixnetNodeConfig {
@@ -23,6 +25,7 @@ impl Default for MixnetNodeConfig {
                 7778,
             )),
             private_key: PrivateKey::new().to_bytes(),
+            connection_pool_size: 255,
         }
     }
 }

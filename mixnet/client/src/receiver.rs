@@ -12,16 +12,22 @@ use tokio::net::TcpStream;
 use crate::MixnetClientError;
 
 // Receiver accepts TCP connections to receive incoming payloads from the Mixnet.
-pub struct Receiver;
+pub struct Receiver {
+    node_address: SocketAddr,
+}
 
 impl Receiver {
+    pub fn new(node_address: SocketAddr) -> Self {
+        Self { node_address }
+    }
+
     pub async fn run(
-        node_address: SocketAddr,
+        &self,
     ) -> Result<
         impl Stream<Item = Result<Vec<u8>, MixnetClientError>> + Send + 'static,
         MixnetClientError,
     > {
-        let Ok(socket) = TcpStream::connect(node_address).await else {
+        let Ok(socket) = TcpStream::connect(self.node_address).await else {
             return Err(MixnetClientError::MixnetNodeConnectError);
         };
 
