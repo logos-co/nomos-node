@@ -90,6 +90,7 @@ impl MixnetNode {
             let body = Body::read(&mut socket).await?;
             if let Err(e) = Self::handle_body(body, &pool, &private_key, &client_tx).await {
                 tracing::error!("failed to handle body: {e}");
+                return Err(e);
             }
         }
     }
@@ -175,12 +176,6 @@ impl MixnetNode {
         to: NymNodeRoutingAddress,
     ) -> Result<(), Box<dyn Error + Send + Sync + 'static>> {
         let addr = SocketAddr::try_from(to)?;
-        if let Some(addr) = pool.get(&addr) {
-            let mut stream = addr.lock().await;
-            body.write(&mut *stream).await?;
-            return Ok(());
-        }
-
         body.write(&mut *pool.get_or_init(&addr).await?.lock().await)
             .await?;
         Ok(())
