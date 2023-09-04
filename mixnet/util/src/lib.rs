@@ -4,7 +4,6 @@ use parking_lot::Mutex;
 use tokio::net::TcpStream;
 
 #[derive(Clone)]
-#[repr(transparent)]
 pub struct ConnectionPool {
     pool: Arc<Mutex<HashMap<SocketAddr, Arc<tokio::sync::Mutex<TcpStream>>>>>,
 }
