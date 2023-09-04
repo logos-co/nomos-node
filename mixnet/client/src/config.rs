@@ -10,6 +10,7 @@ use crate::{receiver::Receiver, MessageStream, MixnetClientError};
 pub struct MixnetClientConfig {
     pub mode: MixnetClientMode,
     pub topology: MixnetTopology,
+    pub connection_pool_size: usize,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -22,7 +23,9 @@ impl MixnetClientMode {
     pub(crate) async fn run(&self) -> Result<MessageStream, MixnetClientError> {
         match self {
             Self::Sender => Ok(stream::empty().boxed()),
-            Self::SenderReceiver(node_address) => Ok(Receiver::run(*node_address).await?.boxed()),
+            Self::SenderReceiver(node_address) => {
+                Ok(Receiver::new(*node_address).run().await?.boxed())
+            }
         }
     }
 }

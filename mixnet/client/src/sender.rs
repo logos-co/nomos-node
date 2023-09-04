@@ -2,6 +2,7 @@ use std::{error::Error, net::SocketAddr, time::Duration};
 
 use mixnet_protocol::Body;
 use mixnet_topology::MixnetTopology;
+use mixnet_util::ConnectionPool;
 use nym_sphinx::{
     addressing::nodes::NymNodeRoutingAddress, chunking::fragment::Fragment, message::NymMessage,
     params::PacketSize, Delay, Destination, DestinationAddressBytes, NodeAddressBytes,
@@ -9,21 +10,29 @@ use nym_sphinx::{
 };
 use rand::{distributions::Uniform, prelude::Distribution, Rng};
 use sphinx_packet::{route, SphinxPacket, SphinxPacketBuilder};
-use tokio::net::TcpStream;
 
 // Sender splits messages into Sphinx packets and sends them to the Mixnet.
 pub struct Sender<R: Rng> {
     //TODO: handle topology update
     topology: MixnetTopology,
+    pool: ConnectionPool,
     rng: R,
 }
 
 impl<R: Rng> Sender<R> {
-    pub fn new(topology: MixnetTopology, rng: R) -> Self {
-        Self { topology, rng }
+    pub fn new(topology: MixnetTopology, pool: ConnectionPool, rng: R) -> Self {
+        Self {
+            topology,
+            rng,
+            pool,
+        }
     }
 
-    pub fn send(&mut self, msg: Vec<u8>, total_delay: Duration) -> Result<(), Box<dyn Error>> {
+    pub fn send(
+        &mut self,
+        msg: Vec<u8>,
+        total_delay: Duration,
+    ) -> Result<(), Box<dyn Error + Send + Sync + 'static>> {
         let destination = self.topology.random_destination(&mut self.rng)?;
         let destination = Destination::new(
             DestinationAddressBytes::from_bytes(destination.address.as_bytes()),
@@ -36,8 +45,11 @@ impl<R: Rng> Sender<R> {
             .collect::<Result<Vec<_>, _>>()?
             .into_iter()
             .for_each(|(packet, first_node)| {
+                let pool = self.pool.clone();
                 tokio::spawn(async move {
-                    if let Err(e) = Self::send_packet(Box::new(packet), first_node.address).await {
+                    if let Err(e) =
+                        Self::send_packet(&pool, Box::new(packet), first_node.address).await
+                    {
                         tracing::error!("failed to send packet to the first node: {e}");
                     }
                 });
@@ -65,7 +77,8 @@ impl<R: Rng> Sender<R> {
         fragment: Fragment,
         destination: &Destination,
         total_delay: Duration,
-    ) -> Result<(sphinx_packet::SphinxPacket, route::Node), Box<dyn Error>> {
+    ) -> Result<(sphinx_packet::SphinxPacket, route::Node), Box<dyn Error + Send + Sync + 'static>>
+    {
         let route = self.topology.random_route(&mut self.rng)?;
 
         let delays: Vec<Delay> =
@@ -87,15 +100,19 @@ impl<R: Rng> Sender<R> {
     }
 
     async fn send_packet(
+        pool: &ConnectionPool,
         packet: Box<SphinxPacket>,
         addr: NodeAddressBytes,
-    ) -> Result<(), Box<dyn Error>> {
+    ) -> Result<(), Box<dyn Error + Send + Sync + 'static>> {
         let addr = SocketAddr::try_from(NymNodeRoutingAddress::try_from(addr)?)?;
         tracing::debug!("Sending a Sphinx packet to the node: {addr:?}");
 
-        let mut socket = TcpStream::connect(addr).await?;
+        let mu: std::sync::Arc<tokio::sync::Mutex<tokio::net::TcpStream>> =
+            pool.get_or_init(&addr).await?;
+        let mut socket = mu.lock().await;
         let body = Body::new_sphinx(packet);
-        body.write(&mut socket).await?;
+        body.write(&mut *socket).await?;
+
         tracing::debug!("Sent a Sphinx packet successuflly to the node: {addr:?}");
 
         Ok(())

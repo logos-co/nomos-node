@@ -24,7 +24,10 @@ pub struct Node {
 }
 
 impl MixnetTopology {
-    pub fn random_route<R: Rng>(&self, rng: &mut R) -> Result<Vec<route::Node>, Box<dyn Error>> {
+    pub fn random_route<R: Rng>(
+        &self,
+        rng: &mut R,
+    ) -> Result<Vec<route::Node>, Box<dyn Error + Send + Sync + 'static>> {
         let num_hops = self.layers.len();
 
         let route: Vec<route::Node> = self
@@ -45,7 +48,10 @@ impl MixnetTopology {
     }
 
     // Choose a destination mixnet node randomly from the last layer.
-    pub fn random_destination<R: Rng>(&self, rng: &mut R) -> Result<route::Node, Box<dyn Error>> {
+    pub fn random_destination<R: Rng>(
+        &self,
+        rng: &mut R,
+    ) -> Result<route::Node, Box<dyn Error + Send + Sync + 'static>> {
         Ok(self
             .layers
             .last()

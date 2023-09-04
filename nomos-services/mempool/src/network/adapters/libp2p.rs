@@ -16,7 +16,7 @@ use nomos_network::{NetworkMsg, NetworkService};
 use overwatch_rs::services::relay::OutboundRelay;
 use overwatch_rs::services::ServiceData;
 
-const CARNOT_TX_TOPIC: &str = "CarnotTx";
+pub const CARNOT_TX_TOPIC: &str = "CarnotTx";
 
 pub struct Libp2pAdapter<Tx> {
     network_relay: OutboundRelay<<NetworkService<Libp2p> as ServiceData>::Message>,

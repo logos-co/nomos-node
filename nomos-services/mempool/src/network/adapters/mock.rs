@@ -4,7 +4,7 @@
 use futures::{Stream, StreamExt};
 use nomos_core::tx::mock::MockTransaction;
 use nomos_network::backends::mock::{
-    EventKind, Mock, MockBackendMessage, MockContentTopic, NetworkEvent,
+    EventKind, Mock, MockBackendMessage, MockContentTopic, MockMessage, NetworkEvent,
 };
 use nomos_network::{NetworkMsg, NetworkService};
 use overwatch_rs::services::relay::OutboundRelay;
@@ -25,7 +25,7 @@ pub struct MockAdapter {
 #[async_trait::async_trait]
 impl NetworkAdapter for MockAdapter {
     type Backend = Mock;
-    type Tx = MockTransaction;
+    type Tx = MockTransaction<MockMessage>;
 
     async fn new(
         network_relay: OutboundRelay<<NetworkService<Self::Backend> as ServiceData>::Message>,

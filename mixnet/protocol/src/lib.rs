@@ -24,7 +24,7 @@ impl Body {
         }
     }
 
-    pub async fn read<R>(reader: &mut R) -> Result<Body, Box<dyn Error>>
+    pub async fn read<R>(reader: &mut R) -> Result<Body, Box<dyn Error + Send + Sync + 'static>>
     where
         R: AsyncRead + Unpin,
     {
@@ -36,12 +36,16 @@ impl Body {
         }
     }
 
-    fn sphinx_packet_from_bytes(data: &[u8]) -> Result<Self, Box<dyn Error>> {
+    fn sphinx_packet_from_bytes(
+        data: &[u8],
+    ) -> Result<Self, Box<dyn Error + Send + Sync + 'static>> {
         let packet = SphinxPacket::from_bytes(data)?;
         Ok(Self::new_sphinx(Box::new(packet)))
     }
 
-    async fn read_sphinx_packet<R>(reader: &mut R) -> Result<Body, Box<dyn Error>>
+    async fn read_sphinx_packet<R>(
+        reader: &mut R,
+    ) -> Result<Body, Box<dyn Error + Send + Sync + 'static>>
     where
         R: AsyncRead + Unpin,
     {
@@ -51,12 +55,16 @@ impl Body {
         Self::sphinx_packet_from_bytes(&buf)
     }
 
-    pub fn final_payload_from_bytes(data: &[u8]) -> Result<Self, Box<dyn Error>> {
+    pub fn final_payload_from_bytes(
+        data: &[u8],
+    ) -> Result<Self, Box<dyn Error + Send + Sync + 'static>> {
         let payload = Payload::from_bytes(data)?;
         Ok(Self::new_final_payload(payload))
     }
 
-    async fn read_final_payload<R>(reader: &mut R) -> Result<Body, Box<dyn Error>>
+    async fn read_final_payload<R>(
+        reader: &mut R,
+    ) -> Result<Body, Box<dyn Error + Send + Sync + 'static>>
     where
         R: AsyncRead + Unpin,
     {
@@ -67,7 +75,10 @@ impl Body {
         Self::final_payload_from_bytes(&buf)
     }
 
-    pub async fn write<W>(self, writer: &mut W) -> Result<(), Box<dyn Error>>
+    pub async fn write<W>(
+        self,
+        writer: &mut W,
+    ) -> Result<(), Box<dyn Error + Send + Sync + 'static>>
     where
         W: AsyncWrite + Unpin + ?Sized,
     {
