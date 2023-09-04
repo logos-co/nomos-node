@@ -8,9 +8,11 @@ use std::{
 // crates
 use bytes::Bytes;
 use http::StatusCode;
+#[cfg(feature = "gql")]
+use overwatch_rs::services::relay::OutboundRelay;
 use overwatch_rs::services::{
     handle::ServiceStateHandle,
-    relay::{InboundRelay, OutboundRelay, RelayMessage},
+    relay::{InboundRelay, RelayMessage},
     state::{NoOperator, NoState},
     ServiceCore, ServiceData, ServiceId,
 };

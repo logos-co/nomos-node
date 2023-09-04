@@ -7,7 +7,7 @@ use nym_sphinx::{
     params::PacketSize, Delay, Destination, DestinationAddressBytes, NodeAddressBytes,
     IDENTIFIER_LENGTH, PAYLOAD_OVERHEAD_SIZE,
 };
-use rand::Rng;
+use rand::{distributions::Uniform, prelude::Distribution, Rng};
 use sphinx_packet::{route, SphinxPacket, SphinxPacketBuilder};
 use tokio::net::TcpStream;
 
@@ -49,7 +49,8 @@ impl<R: Rng> Sender<R> {
     fn pad_and_split_message(&mut self, msg: Vec<u8>) -> Vec<Fragment> {
         let nym_message = NymMessage::new_plain(msg);
 
-        // TODO: add PUBLIC_KEY_SIZE for encryption for the destination
+        // TODO: add PUBLIC_KEY_SIZE for encryption for the destination,
+        //       if we're going to encrypt final payloads for the destination.
         // TODO: add ACK_OVERHEAD if we need SURB-ACKs.
         // https://github.com/nymtech/nym/blob/3748ab77a132143d5fd1cd75dd06334d33294815/common/nymsphinx/src/message.rs#L181-L181
         let plaintext_size_per_packet = PacketSize::RegularPacket.plaintext_size();
@@ -67,15 +68,12 @@ impl<R: Rng> Sender<R> {
     ) -> Result<(sphinx_packet::SphinxPacket, route::Node), Box<dyn Error>> {
         let route = self.topology.random_route(&mut self.rng)?;
 
-        let delays: Vec<Delay> = RandomDelayIterator::new(
-            &mut self.rng,
-            route.len() as u64,
-            total_delay.as_millis() as u64,
-        )
-        .map(Delay::new_from_millis)
-        .collect();
+        let delays: Vec<Delay> =
+            RandomDelayIterator::new(&mut self.rng, route.len() as u64, total_delay)
+                .map(|d| Delay::new_from_millis(d.as_millis() as u64))
+                .collect();
 
-        // TODO: encryption for the destination
+        // TODO: encrypt the payload for the destination, if we want
         // https://github.com/nymtech/nym/blob/3748ab77a132143d5fd1cd75dd06334d33294815/common/nymsphinx/src/preparer/payload.rs#L70
         let payload = fragment.into_bytes();
 
@@ -112,7 +110,8 @@ struct RandomDelayIterator<R> {
 }
 
 impl<R> RandomDelayIterator<R> {
-    fn new(rng: R, total_delays: u64, total_time: u64) -> Self {
+    fn new(rng: R, total_delays: u64, total_time: Duration) -> Self {
+        let total_time = total_time.as_millis() as u64;
         RandomDelayIterator {
             rng,
             remaining_delays: total_delays,
@@ -126,28 +125,59 @@ impl<R> Iterator for RandomDelayIterator<R>
 where
     R: Rng,
 {
-    type Item = u64;
+    type Item = Duration;
 
-    fn next(&mut self) -> Option<u64> {
+    fn next(&mut self) -> Option<Duration> {
         if self.remaining_delays == 0 {
             return None;
         }
 
+        self.remaining_delays -= 1;
+
         if self.remaining_delays == 1 {
-            self.remaining_delays -= 1;
-            return Some(self.remaining_time);
+            return Some(Duration::from_millis(self.remaining_time));
         }
 
         // Calculate bounds to avoid extreme values
-        let lower_bound = (self.avg_delay as f64 * 0.5) as u64;
         let upper_bound = (self.avg_delay as f64 * 1.5)
-            .min((self.remaining_time - self.remaining_delays + 1) as f64)
-            as u64;
+            // guarantee that we don't exceed the remaining time and promise the delay we return is
+            // at least 1ms.
+            .min(self.remaining_time.saturating_sub(self.remaining_delays) as f64);
+        let lower_bound = (self.avg_delay as f64 * 0.5).min(upper_bound);
 
-        let delay = self.rng.gen_range(lower_bound, upper_bound);
-        self.remaining_time -= delay;
-        self.remaining_delays -= 1;
+        let delay = Uniform::new_inclusive(lower_bound, upper_bound).sample(&mut self.rng) as u64;
+        self.remaining_time = self.remaining_time.saturating_sub(delay);
 
-        Some(delay)
+        Some(Duration::from_millis(delay))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::time::Duration;
+
+    use super::RandomDelayIterator;
+
+    const TOTAL_DELAYS: u64 = 3;
+
+    #[test]
+    fn test_random_delay_iter_zero_total_time() {
+        let mut delays = RandomDelayIterator::new(rand::thread_rng(), TOTAL_DELAYS, Duration::ZERO);
+        for _ in 0..TOTAL_DELAYS {
+            assert!(delays.next().is_some());
+        }
+        assert!(delays.next().is_none());
+    }
+
+    #[test]
+    fn test_random_delay_iter_small_total_time() {
+        let mut delays =
+            RandomDelayIterator::new(rand::thread_rng(), TOTAL_DELAYS, Duration::from_millis(1));
+        let mut d = Duration::ZERO;
+        for _ in 0..TOTAL_DELAYS {
+            d += delays.next().unwrap();
+        }
+        assert!(delays.next().is_none());
+        assert_eq!(d, Duration::from_millis(1));
     }
 }
