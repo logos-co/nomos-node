@@ -1,3 +1,5 @@
+use bytes::Bytes;
+use http::StatusCode;
 // std
 // crates
 use nomos_consensus::{CarnotInfo, ConsensusMsg};
@@ -33,6 +35,8 @@ use waku::*;
 mod libp2p;
 #[cfg(feature = "libp2p")]
 use libp2p::*;
+use nomos_mempool::network::NetworkAdapter;
+use nomos_network::backends::NetworkBackend;
 
 macro_rules! get_handler {
     ($handle:expr, $service:ty, $path:expr => $handler:tt) => {{
@@ -83,13 +87,15 @@ pub fn network_info_bridge(
     }))
 }
 
-#[cfg(feature = "waku")]
-pub fn mempool_add_tx_bridge(
+pub fn mempool_add_tx_bridge<
+    N: NetworkBackend,
+    A: NetworkAdapter<Backend = N, Tx = Tx> + Send + Sync + 'static,
+>(
     handle: overwatch_rs::overwatch::handle::OverwatchHandle,
 ) -> HttpBridgeRunner {
     Box::new(Box::pin(async move {
         let (mempool_channel, mut http_request_channel) =
-            build_http_bridge::<MempoolService<WakuAdapter<Tx>, MockPool<Tx>>, AxumBackend, _>(
+            build_http_bridge::<MempoolService<A, MockPool<Tx>>, AxumBackend, _>(
                 handle.clone(),
                 HttpMethod::POST,
                 "addtx",
@@ -176,4 +182,57 @@ async fn handle_mempool_metrics_req(
         .await?;
 
     Ok(())
+}
+
+pub(super) async fn handle_mempool_add_tx_req(
+    handle: &overwatch_rs::overwatch::handle::OverwatchHandle,
+    mempool_channel: &OutboundRelay<MempoolMsg<Tx>>,
+    res_tx: Sender<HttpResponse>,
+    payload: Option<Bytes>,
+) -> Result<(), overwatch_rs::DynError> {
+    if let Some(data) = payload
+        .as_ref()
+        .and_then(|b| String::from_utf8(b.to_vec()).ok())
+    {
+        let tx = Tx(data);
+        let (sender, receiver) = oneshot::channel();
+        mempool_channel
+            .send(MempoolMsg::AddTx {
+                tx: tx.clone(),
+                reply_channel: sender,
+            })
+            .await
+            .map_err(|(e, _)| e)?;
+
+        match receiver.await {
+            Ok(Ok(())) => {
+                // broadcast transaction to peers
+                #[cfg(feature = "waku")]
+                {
+                    let network_relay = handle.relay::<NetworkService<Waku>>().connect().await?;
+                    waku_send_transaction(network_relay, tx).await?;
+                }
+                #[cfg(feature = "libp2p")]
+                {
+                    let network_relay = handle.relay::<NetworkService<Libp2p>>().connect().await?;
+                    libp2p_send_transaction(network_relay, tx).await?;
+                }
+                Ok(res_tx.send(Ok(b"".to_vec().into())).await?)
+            }
+            Ok(Err(())) => Ok(res_tx
+                .send(Err((
+                    StatusCode::CONFLICT,
+                    "error: unable to add tx".into(),
+                )))
+                .await?),
+            Err(err) => Ok(res_tx
+                .send(Err((StatusCode::INTERNAL_SERVER_ERROR, err.to_string())))
+                .await?),
+        }
+    } else {
+        Err(
+            format!("Invalid payload, {payload:?}. Empty or couldn't transform into a utf8 String")
+                .into(),
+        )
+    }
 }
