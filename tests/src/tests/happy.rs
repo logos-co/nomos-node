@@ -32,7 +32,7 @@ async fn happy_test(nodes: Vec<NomosNode>) {
         } => {}
     };
 
-    let elapsed = Instant::now().checked_duration_since(start_time).unwrap();
+    let elapsed = start_time.elapsed();
     println!("ELAPSED: {elapsed:?}");
 
     let infos = stream::iter(nodes)
@@ -68,6 +68,7 @@ async fn two_nodes_happy() {
 
 #[tokio::test]
 async fn ten_nodes_happy() {
+    //TODO: use at least 6 mixnodes after fixing https://github.com/logos-co/nomos-node/issues/329
     let (_mixnodes, mixnet_node_configs, mixnet_topology) = MixNode::spawn_nodes(3).await;
     let nodes = NomosNode::spawn_nodes(SpawnConfig::Star {
         n_participants: 10,
