@@ -176,7 +176,7 @@ impl MixnetNode {
         to: NymNodeRoutingAddress,
     ) -> Result<(), Box<dyn Error + Send + Sync + 'static>> {
         let addr = SocketAddr::try_from(to)?;
-        body.write(&mut *pool.get_or_init(&addr).await?.lock().await)
+        body.write(&mut *pool.get_or_init(&addr).await?.write())
             .await?;
         Ok(())
     }
