@@ -18,8 +18,8 @@ pub type TxHash = [u8; 32];
 pub struct Block<Tx: Clone + Eq + Hash, Blob: Clone + Eq + Hash> {
     header: consensus_engine::Block,
     beacon: RandomBeaconState,
-    transactions: IndexSet<Tx>,
-    blobs: IndexSet<Blob>,
+    cl_transactions: IndexSet<Tx>,
+    bl_blobs: IndexSet<Blob>,
 }
 
 impl<
@@ -47,8 +47,8 @@ impl<
         let mut s = Self {
             header,
             beacon,
-            transactions,
-            blobs,
+            cl_transactions: transactions,
+            bl_blobs: blobs,
         };
         let id = block_id_from_wire_content(&s);
         s.header.id = id;
@@ -62,11 +62,11 @@ impl<Tx: Clone + Eq + Hash, Blob: Clone + Eq + Hash> Block<Tx, Blob> {
     }
 
     pub fn transactions(&self) -> impl Iterator<Item = &Tx> + '_ {
-        self.transactions.iter()
+        self.cl_transactions.iter()
     }
 
     pub fn blobs(&self) -> impl Iterator<Item = &Blob> + '_ {
-        self.blobs.iter()
+        self.bl_blobs.iter()
     }
 
     pub fn beacon(&self) -> &RandomBeaconState {
