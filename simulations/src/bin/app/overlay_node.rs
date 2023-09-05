@@ -16,7 +16,7 @@ pub fn to_overlay_node<R: Rng>(
     nodes: Vec<NodeId>,
     leader: NodeId,
     network_interface: InMemoryNetworkInterface<CarnotMessage>,
-    genesis: nomos_core::block::Block<[u8; 32]>,
+    genesis: nomos_core::block::Block<[u8; 32], Box<[u8]>>,
     mut rng: R,
     settings: &SimulationSettings,
 ) -> BoxedNode<CarnotSettings, CarnotState> {

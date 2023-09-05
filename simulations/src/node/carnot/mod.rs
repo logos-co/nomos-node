@@ -23,7 +23,7 @@ use serde::Deserialize;
 use self::messages::CarnotMessage;
 use super::{Node, NodeId};
 use crate::network::{InMemoryNetworkInterface, NetworkInterface, NetworkMessage};
-use crate::node::carnot::event_builder::{CarnotTx, Event};
+use crate::node::carnot::event_builder::{CarnotBlob, CarnotTx, Event};
 use crate::node::carnot::message_cache::MessageCache;
 use crate::output_processors::{Record, RecordType, Runtime};
 use crate::settings::SimulationSettings;
@@ -90,7 +90,7 @@ impl<
         id: consensus_engine::NodeId,
         settings: CarnotSettings,
         overlay_settings: O::Settings,
-        genesis: nomos_core::block::Block<CarnotTx>,
+        genesis: nomos_core::block::Block<CarnotTx, CarnotBlob>,
         network_interface: InMemoryNetworkInterface<CarnotMessage>,
         rng: &mut R,
     ) -> Self {
@@ -120,7 +120,7 @@ impl<
         this
     }
 
-    fn handle_output(&self, output: Output<CarnotTx>) {
+    fn handle_output(&self, output: Output<CarnotTx, CarnotBlob>) {
         match output {
             Output::Send(consensus_engine::Send {
                 to,
@@ -343,7 +343,7 @@ impl<
 
     fn update_overlay_with_block<Tx: Clone + Eq + Hash>(
         state: Carnot<O>,
-        block: &nomos_core::block::Block<Tx>,
+        block: &nomos_core::block::Block<Tx, CarnotBlob>,
     ) -> Carnot<O> {
         state
             .update_overlay(|overlay| {
@@ -438,12 +438,12 @@ impl<
 
 #[derive(Debug)]
 #[allow(clippy::large_enum_variant)]
-enum Output<Tx: Clone + Eq + Hash> {
+enum Output<Tx: Clone + Eq + Hash, Blob: Clone + Eq + Hash> {
     Send(consensus_engine::Send),
     BroadcastTimeoutQc {
         timeout_qc: TimeoutQc,
     },
     BroadcastProposal {
-        proposal: nomos_core::block::Block<Tx>,
+        proposal: nomos_core::block::Block<Tx, Blob>,
     },
 }

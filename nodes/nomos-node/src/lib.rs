@@ -1,3 +1,4 @@
+mod blob;
 mod tx;
 
 use color_eyre::eyre::Result;
@@ -32,6 +33,7 @@ use serde::{Deserialize, Serialize};
 #[cfg(feature = "waku")]
 use waku_bindings::SecretKey;
 
+use crate::blob::Blob;
 pub use tx::Tx;
 
 #[cfg(all(feature = "waku", feature = "libp2p"))]
@@ -76,6 +78,7 @@ pub type Carnot = CarnotConsensus<
     MempoolWakuAdapter<Tx>,
     MockFountain,
     FlatOverlay<RoundRobin, RandomBeaconState>,
+    Blob,
 >;
 
 #[cfg(feature = "libp2p")]
@@ -85,6 +88,7 @@ pub type Carnot = CarnotConsensus<
     MempoolLibp2pAdapter<Tx>,
     MockFountain,
     FlatOverlay<RoundRobin, RandomBeaconState>,
+    Blob,
 >;
 
 #[derive(Services)]
