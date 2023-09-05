@@ -65,7 +65,7 @@ impl MixnetNode {
                     tracing::debug!("Accepted incoming connection from {remote_addr:?}");
 
                     let client_tx = client_tx.clone();
-                    let private_key = PrivateKey::from(self.config.private_key);
+                    let private_key = self.config.private_key;
                     let pool = self.pool.clone();
                     tokio::spawn(async move {
                         if let Err(e) =
@@ -83,15 +83,21 @@ impl MixnetNode {
     async fn handle_connection(
         mut socket: TcpStream,
         pool: ConnectionPool,
-        private_key: PrivateKey,
+        private_key: [u8; PRIVATE_KEY_SIZE],
         client_tx: mpsc::Sender<Body>,
     ) -> Result<(), Box<dyn Error + Send + Sync + 'static>> {
         loop {
             let body = Body::read(&mut socket).await?;
-            if let Err(e) = Self::handle_body(body, &pool, &private_key, &client_tx).await {
-                tracing::error!("failed to handle body: {e}");
-                return Err(e);
-            }
+
+            let pool = pool.clone();
+            let private_key = PrivateKey::from(private_key);
+            let client_tx = client_tx.clone();
+
+            tokio::spawn(async move {
+                if let Err(e) = Self::handle_body(body, &pool, &private_key, &client_tx).await {
+                    tracing::error!("failed to handle body: {e}");
+                }
+            });
         }
     }
 
