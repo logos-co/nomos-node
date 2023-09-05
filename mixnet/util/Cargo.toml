@@ -4,7 +4,6 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-tokio = { version = "1.32", default-features = false, features = ["sync", "net"] }
-parking_lot = { version = "0.12", features = ["send_guard"] }
+tokio = { version = "1.32", default-features = false, features = ["net"] }
 spin = "0.9"
 crossbeam-skiplist = "0.1"

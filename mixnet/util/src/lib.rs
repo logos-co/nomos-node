@@ -1,8 +1,6 @@
 use std::{net::SocketAddr, sync::Arc};
 
 use crossbeam_skiplist::SkipMap;
-
-// use parking_lot::Mutex;
 use spin::RwLock;
 use tokio::net::TcpStream;
 
@@ -22,7 +20,6 @@ impl ConnectionPool {
         self.pool.get(addr).map(|s| s.value().clone())
     }
 
-    #[allow(clippy::await_holding_lock)]
     pub async fn get_or_init(&self, addr: &SocketAddr) -> std::io::Result<Arc<RwLock<TcpStream>>> {
         match self.pool.get(addr) {
             Some(ent) => Ok(ent.value().clone()),
