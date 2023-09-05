@@ -46,24 +46,28 @@ async fn happy_test(nodes: Vec<NomosNode>) {
     assert_eq!(blocks.len(), 1);
 }
 
-#[tokio::test]
-async fn two_nodes_happy() {
-    let nodes = NomosNode::spawn_nodes(SpawnConfig::Star {
-        n_participants: 2,
-        threshold: Fraction::one(),
-        timeout: Duration::from_secs(10),
-    })
-    .await;
-    happy_test(nodes).await;
+#[test]
+fn two_nodes_happy() {
+    tests::run_test(async {
+        let nodes = NomosNode::spawn_nodes(SpawnConfig::Star {
+            n_participants: 2,
+            threshold: Fraction::one(),
+            timeout: Duration::from_secs(10),
+        })
+        .await;
+        happy_test(nodes).await;
+    });
 }
 
-#[tokio::test]
-async fn ten_nodes_happy() {
-    let nodes = NomosNode::spawn_nodes(SpawnConfig::Star {
-        n_participants: 10,
-        threshold: Fraction::one(),
-        timeout: Duration::from_secs(10),
-    })
-    .await;
-    happy_test(nodes).await;
+#[test]
+fn ten_nodes_happy() {
+    tests::run_test(async {
+        let nodes = NomosNode::spawn_nodes(SpawnConfig::Star {
+            n_participants: 10,
+            threshold: Fraction::one(),
+            timeout: Duration::from_secs(10),
+        })
+        .await;
+        happy_test(nodes).await;
+    });
 }

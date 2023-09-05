@@ -11,6 +11,40 @@ use std::{fmt::Debug, sync::Mutex};
 use fraction::Fraction;
 use rand::{thread_rng, Rng};
 
+pub fn initialize_tracing() {
+    use std::sync::Once;
+    static TRACE: Once = Once::new();
+    TRACE.call_once(|| {
+        let filter = std::env::var("SHOWBIZ_TESTING_LOG").unwrap_or_else(|_| "debug".to_owned());
+        tracing::subscriber::set_global_default(
+            tracing_subscriber::fmt::fmt()
+                .without_time()
+                .with_line_number(true)
+                .with_env_filter(filter)
+                .with_file(false)
+                .with_target(true)
+                .with_ansi(true)
+                .finish(),
+        )
+        .unwrap();
+    });
+}
+
+pub fn run_test(fut: impl std::future::Future<Output = ()>) {
+    initialize_tracing();
+    ::tokio::runtime::Runtime::new().unwrap().block_on(fut);
+}
+
+pub fn run_test_multiple_threads(num_threads: usize, fut: impl std::future::Future<Output = ()>) {
+    initialize_tracing();
+    tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(num_threads)
+        .enable_all()
+        .build()
+        .unwrap()
+        .block_on(fut);
+}
+
 static NET_PORT: Lazy<Mutex<u16>> = Lazy::new(|| Mutex::new(thread_rng().gen_range(8000..10000)));
 
 pub fn get_available_port() -> u16 {
