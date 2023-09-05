@@ -64,8 +64,7 @@ where
     B: DaBackend + Send,
     B::Settings: Clone + Send + Sync + 'static,
     B::Blob: Send,
-    // TODO: Reply type must be piped together, for now empty array.
-    N: NetworkAdapter<Blob = B::Blob, Reply = [u8; 32]> + Send + Sync,
+    N: NetworkAdapter<Blob = B::Blob> + Send,
 {
     fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, DynError> {
         let network_relay = service_state.overwatch_handle.relay();

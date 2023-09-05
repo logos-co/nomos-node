@@ -1,12 +1,12 @@
 // std
 // crates
 use futures::Stream;
-use overwatch_rs::DynError;
 // internal
 use nomos_network::backends::NetworkBackend;
 use nomos_network::NetworkService;
 use overwatch_rs::services::relay::OutboundRelay;
 use overwatch_rs::services::ServiceData;
+use overwatch_rs::DynError;
 
 #[async_trait::async_trait]
 pub trait NetworkAdapter {
