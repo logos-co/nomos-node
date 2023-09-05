@@ -108,7 +108,7 @@ impl<R: Rng> Sender<R> {
         tracing::debug!("Sending a Sphinx packet to the node: {addr:?}");
 
         let body = Body::new_sphinx(packet);
-        body.write(&mut *pool.get_or_init(&addr).await?.write())
+        body.write(pool.get_or_init(&addr).await?.get_mut())
             .await?;
 
         tracing::debug!("Sent a Sphinx packet successuflly to the node: {addr:?}");
