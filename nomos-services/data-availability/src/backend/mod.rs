@@ -1,5 +1,6 @@
 mod memory_cache;
 
+use nomos_core::blob::Blob;
 use overwatch_rs::DynError;
 
 #[derive(Debug)]
@@ -11,7 +12,7 @@ pub enum DaError {
 pub trait DaBackend {
     type Settings: Clone;
 
-    type Blob;
+    type Blob: Blob;
 
     fn new(settings: Self::Settings) -> Self;
 
