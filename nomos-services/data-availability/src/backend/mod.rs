@@ -1,3 +1,5 @@
+mod memory_cache;
+
 use overwatch_rs::DynError;
 
 #[derive(Debug)]
@@ -5,6 +7,7 @@ pub enum DaError {
     Dyn(DynError),
 }
 
+#[async_trait::async_trait]
 pub trait DaBackend {
     type Settings: Clone;
 
@@ -12,7 +15,7 @@ pub trait DaBackend {
 
     fn new(settings: Self::Settings) -> Self;
 
-    fn add_blob(&mut self, blob: Self::Blob) -> Result<(), DaError>;
+    async fn add_blob(&mut self, blob: Self::Blob) -> Result<(), DaError>;
 
-    fn pending_blobs(&self) -> Box<dyn Iterator<Item = Self::Blob> + Send>;
+    async fn pending_blobs(&self) -> Box<dyn Iterator<Item = Self::Blob> + Send>;
 }

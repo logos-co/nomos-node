@@ -61,7 +61,7 @@ where
 #[async_trait::async_trait]
 impl<B, N> ServiceCore for DataAvailabilityService<B, N>
 where
-    B: DaBackend + Send,
+    B: DaBackend + Send + Sync,
     B::Settings: Clone + Send + Sync + 'static,
     B::Blob: Send,
     // TODO: Reply type must be piped together, for now empty array.
@@ -115,7 +115,7 @@ async fn handle_new_blob<B: DaBackend, A: NetworkAdapter<Blob = B::Blob, Reply =
     blob: B::Blob,
 ) -> Result<(), DaError> {
     // we need to handle the reply (verification + signature)
-    backend.add_blob(blob)?;
+    backend.add_blob(blob).await?;
     adapter
         .send_attestation([0u8; 32])
         .await
@@ -125,7 +125,7 @@ async fn handle_new_blob<B: DaBackend, A: NetworkAdapter<Blob = B::Blob, Reply =
 async fn handle_da_msg<B: DaBackend>(backend: &mut B, msg: DaMsg<B::Blob>) -> Result<(), DaError> {
     match msg {
         DaMsg::PendingBlobs { reply_channel } => {
-            let pending_blobs = backend.pending_blobs();
+            let pending_blobs = backend.pending_blobs().await;
             if reply_channel.send(pending_blobs).is_err() {
                 tracing::debug!("Could not send pending blobs");
             }
