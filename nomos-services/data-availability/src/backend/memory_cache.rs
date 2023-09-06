@@ -1,7 +1,9 @@
+use crate::backend::{DaBackend, DaError};
 use moka::future::{Cache, CacheBuilder};
 use nomos_core::blob::Blob;
 use std::time::Duration;
 
+#[derive(Clone, Copy)]
 pub struct BlobCacheSettings {
     max_capacity: usize,
     evicting_period: Duration,
@@ -35,7 +37,37 @@ where
         self.0.remove(hash).await;
     }
 
-    pub async fn pending_blobs(&self) -> Box<dyn Iterator<Item = B> + Send + '_> {
-        Box::new(self.0.iter().map(|t| t.1))
+    pub fn pending_blobs(&self) -> Box<dyn Iterator<Item = B> + Send> {
+        // bypass lifetime
+        let blobs: Vec<_> = self.0.iter().map(|t| t.1).collect();
+        Box::new(blobs.into_iter())
+    }
+}
+
+#[async_trait::async_trait]
+impl<B> DaBackend for BlobCache<B::Hash, B>
+where
+    B: Clone + Blob + Send + Sync + 'static,
+    B::Hash: Send + Sync + 'static,
+{
+    type Settings = BlobCacheSettings;
+    type Blob = B;
+
+    fn new(settings: Self::Settings) -> Self {
+        BlobCache::new(settings)
+    }
+
+    async fn add_blob(&self, blob: Self::Blob) -> Result<(), DaError> {
+        self.add(blob).await;
+        Ok(())
+    }
+
+    async fn remove_blob(&self, blob: &<Self::Blob as Blob>::Hash) -> Result<(), DaError> {
+        self.remove(blob).await;
+        Ok(())
+    }
+
+    fn pending_blobs(&self) -> Box<dyn Iterator<Item = Self::Blob> + Send> {
+        BlobCache::pending_blobs(self)
     }
 }

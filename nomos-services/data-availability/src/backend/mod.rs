@@ -16,7 +16,9 @@ pub trait DaBackend {
 
     fn new(settings: Self::Settings) -> Self;
 
-    async fn add_blob(&mut self, blob: Self::Blob) -> Result<(), DaError>;
+    async fn add_blob(&self, blob: Self::Blob) -> Result<(), DaError>;
 
-    async fn pending_blobs(&self) -> Box<dyn Iterator<Item = Self::Blob> + Send>;
+    async fn remove_blob(&self, blob: &<Self::Blob as Blob>::Hash) -> Result<(), DaError>;
+
+    fn pending_blobs(&self) -> Box<dyn Iterator<Item = Self::Blob> + Send>;
 }
