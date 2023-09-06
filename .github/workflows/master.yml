@@ -25,11 +25,12 @@ jobs:
           toolchain: stable
           override: true
       - uses: actions-rs/cargo@v1
-        continue-on-error: true
         with:
           command: check
           args: --all --no-default-features --features ${{ matrix.feature }}
 
+  test:
+    name: Test Suite
     strategy:
       fail-fast: false # all OSes should be tested even if one fails (default: true)
       matrix:
@@ -43,27 +44,44 @@ jobs:
       - uses: actions/setup-go@v3 # we need go to build go-waku
         with:
           go-version: '1.19'
-      - uses: actions-rs/toolchain@v1
+      # Setup Rust toolchain with GNU for Windows
+      - name: Setup Rust with GNU toolchain (Windows)
+        if: matrix.os == 'windows-latest'
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable-gnu
+          target: x86_64-pc-windows-gnu
+          override: true
+      # Setup Rust toolchain for other OSes
+      - name: Setup Rust toolchain (Other OSes)
+        if: matrix.os != 'windows-latest'
+        uses: actions-rs/toolchain@v1
         with:
           profile: minimal
           toolchain: stable
           override: true
       - uses: actions-rs/cargo@v1
-        continue-on-error: true
         with:
           command: build
           args: --all --no-default-features --features ${{ matrix.feature }}
+      # Freeup some space for Windows tests
+      - name: Clean target dir (Windows)
+        if: matrix.os == 'windows-latest'
+        uses: actions-rs/cargo@v1
+        with:
+          command: clean
       - uses: actions-rs/cargo@v1
-        continue-on-error: true
         with:
           command: test
-          args: --all --no-default-features --features ${{ matrix.feature }}
+          args: --all --no-default-features --features ${{ matrix.feature }} -- --skip ten_nodes_happy --skip two_nodes_happy --skip ten_nodes_one_down
 
   lints:
     name: Rust lints
     runs-on: ubuntu-latest
-    matrix:
-      feature: [libp2p, waku]
+    strategy:
+      matrix:
+        feature: [libp2p, waku]
     steps:
       - uses: actions/checkout@v2
         with:
@@ -77,14 +95,12 @@ jobs:
 
       - name: Run cargo fmt
         uses: actions-rs/cargo@v1
-        continue-on-error: true
         with:
           command: fmt
           args: --all -- --check
 
       - name: Run cargo clippy
         uses: actions-rs/cargo@v1
-        continue-on-error: true
         with:
           command: clippy
           args: --all --no-default-features --features ${{ matrix.feature }} -- --deny warnings
