@@ -1,5 +1,9 @@
+use overwatch_rs::DynError;
+
 #[derive(Debug)]
-pub enum DaError {}
+pub enum DaError {
+    Dyn(DynError),
+}
 
 pub trait DaBackend {
     type Settings: Clone;

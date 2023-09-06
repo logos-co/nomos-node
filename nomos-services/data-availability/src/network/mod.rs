@@ -1,7 +1,7 @@
 // std
 // crates
 use futures::Stream;
-use tokio::sync::oneshot;
+use overwatch_rs::DynError;
 // internal
 use nomos_network::backends::NetworkBackend;
 use nomos_network::NetworkService;
@@ -19,7 +19,7 @@ pub trait NetworkAdapter {
         network_relay: OutboundRelay<<NetworkService<Self::Backend> as ServiceData>::Message>,
     ) -> Self;
 
-    async fn blob_stream(
-        &self,
-    ) -> Box<dyn Stream<Item = (Self::Blob, oneshot::Sender<Self::Reply>)> + Unpin + Send>;
+    async fn blob_stream(&self) -> Box<dyn Stream<Item = Self::Blob> + Unpin + Send>;
+
+    async fn send_attestation(&self, attestation: Self::Reply) -> Result<(), DynError>;
 }

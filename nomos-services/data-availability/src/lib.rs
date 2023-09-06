@@ -15,7 +15,6 @@ use overwatch_rs::services::handle::ServiceStateHandle;
 use overwatch_rs::services::relay::{Relay, RelayMessage};
 use overwatch_rs::services::state::{NoOperator, NoState};
 use overwatch_rs::services::{ServiceCore, ServiceData, ServiceId};
-use tokio::sync::oneshot;
 
 pub struct DataAvailabilityService<B, N>
 where
@@ -65,7 +64,8 @@ where
     B: DaBackend + Send,
     B::Settings: Clone + Send + Sync + 'static,
     B::Blob: Send,
-    N: NetworkAdapter<Blob = B::Blob> + Send + Sync,
+    // TODO: Reply type must be piped together, for now empty array.
+    N: NetworkAdapter<Blob = B::Blob, Reply = [u8; 32]> + Send + Sync,
 {
     fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, DynError> {
         let network_relay = service_state.overwatch_handle.relay();
@@ -94,8 +94,8 @@ where
         let mut network_blobs = adapter.blob_stream().await;
         loop {
             tokio::select! {
-                Some((blob, reply_channel)) = network_blobs.next() => {
-                    if let Err(e) = handle_new_blob(&mut backend, blob, reply_channel).await {
+                Some(blob) = network_blobs.next() => {
+                    if let Err(e) = handle_new_blob(&mut backend, &adapter, blob).await {
                         tracing::debug!("Failed to add a new received blob: {e:?}");
                     }
                 }
@@ -109,13 +109,17 @@ where
     }
 }
 
-async fn handle_new_blob<B: DaBackend, Reply>(
+async fn handle_new_blob<B: DaBackend, A: NetworkAdapter<Blob = B::Blob, Reply = [u8; 32]>>(
     backend: &mut B,
+    adapter: &A,
     blob: B::Blob,
-    _reply_channel: oneshot::Sender<Reply>,
 ) -> Result<(), DaError> {
     // we need to handle the reply (verification + signature)
-    backend.add_blob(blob)
+    backend.add_blob(blob)?;
+    adapter
+        .send_attestation([0u8; 32])
+        .await
+        .map_err(DaError::Dyn)
 }
 
 async fn handle_da_msg<B: DaBackend>(backend: &mut B, msg: DaMsg<B::Blob>) -> Result<(), DaError> {
