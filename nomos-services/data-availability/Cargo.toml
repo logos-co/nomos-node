@@ -10,4 +10,5 @@ async-trait = "0.1"
 futures = "0.3"
 nomos-network = { path = "../network" }
 overwatch-rs = { git = "https://github.com/logos-co/Overwatch", branch = "main" }
+tracing = "0.1"
 tokio = { version = "1", features = ["sync", "macros"] }

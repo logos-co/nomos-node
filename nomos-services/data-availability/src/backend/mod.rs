@@ -1,4 +1,6 @@
+#[derive(Debug)]
 pub enum DaError {}
+
 pub trait DaBackend {
     type Settings: Clone;
 
@@ -6,7 +8,7 @@ pub trait DaBackend {
 
     fn new(settings: Self::Settings) -> Self;
 
-    fn add_blob(blob: Self::Blob) -> Result<(), DaError>;
+    fn add_blob(&mut self, blob: Self::Blob) -> Result<(), DaError>;
 
-    fn pending_blobs() -> Box<dyn Iterator<Item = Self::Blob> + Send>;
+    fn pending_blobs(&self) -> Box<dyn Iterator<Item = Self::Blob> + Send>;
 }

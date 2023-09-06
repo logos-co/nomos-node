@@ -21,5 +21,5 @@ pub trait NetworkAdapter {
 
     async fn blob_stream(
         &self,
-    ) -> Box<dyn Stream<Item = (Self::Blob, oneshot::Sender<Self::Reply>)>>;
+    ) -> Box<dyn Stream<Item = (Self::Blob, oneshot::Sender<Self::Reply>)> + Unpin + Send>;
 }
