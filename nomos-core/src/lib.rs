@@ -1,4 +1,5 @@
 pub mod account;
+pub mod blob;
 pub mod block;
 pub mod crypto;
 pub mod fountain;
