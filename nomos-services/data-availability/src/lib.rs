@@ -139,7 +139,7 @@ where
 {
     match msg {
         DaMsg::PendingBlobs { reply_channel } => {
-            let pending_blobs = backend.pending_blobs();
+            let pending_blobs = backend.pending_blobs().await;
             if reply_channel.send(pending_blobs).is_err() {
                 tracing::debug!("Could not send pending blobs");
             }
