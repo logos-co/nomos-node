@@ -64,7 +64,7 @@ where
     B: DaBackend + Send,
     B::Settings: Clone + Send + Sync + 'static,
     B::Blob: Send,
-    N: NetworkAdapter<Blob = B::Blob> + Send,
+    N: NetworkAdapter<Blob = B::Blob> + Send + Sync,
 {
     fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, DynError> {
         let network_relay = service_state.overwatch_handle.relay();
