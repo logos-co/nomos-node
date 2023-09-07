@@ -17,12 +17,45 @@ use tokio_stream::wrappers::BroadcastStream;
 use tokio_stream::StreamExt;
 use tracing::log::error;
 
-pub const NOMOS_DA_BLOBS_TOPIC: &str = "DaBlobs";
+pub const NOMOS_DA_TOPIC: &str = "NomosDa";
 
 pub struct Libp2pAdapter<B, A> {
     network_relay: OutboundRelay<<NetworkService<Libp2p> as ServiceData>::Message>,
     _blob: PhantomData<B>,
     _attestation: PhantomData<A>,
+}
+
+impl<B, A> Libp2pAdapter<B, A>
+where
+    B: Serialize + DeserializeOwned + Send + Sync + 'static,
+    A: Serialize + DeserializeOwned + Send + Sync + 'static,
+{
+    async fn stream_for<E: DeserializeOwned>(&self) -> Box<dyn Stream<Item = E> + Unpin + Send> {
+        let topic_hash = TopicHash::from_raw(NOMOS_DA_TOPIC);
+        let (sender, receiver) = tokio::sync::oneshot::channel();
+        self.network_relay
+            .send(NetworkMsg::Subscribe {
+                kind: EventKind::Message,
+                sender,
+            })
+            .await
+            .expect("Network backend should be ready");
+        let receiver = receiver.await.unwrap();
+        Box::new(Box::pin(BroadcastStream::new(receiver).filter_map(
+            move |msg| match msg {
+                Ok(Event::Message(Message { topic, data, .. })) if topic == topic_hash => {
+                    match wire::deserialize::<E>(&data) {
+                        Ok(msg) => Some(msg),
+                        Err(e) => {
+                            error!("Unrecognized Blob message: {e}");
+                            None
+                        }
+                    }
+                }
+                _ => None,
+            },
+        )))
+    }
 }
 
 #[async_trait::async_trait]
@@ -40,7 +73,7 @@ where
     ) -> Self {
         network_relay
             .send(NetworkMsg::Process(Command::Subscribe(
-                NOMOS_DA_BLOBS_TOPIC.to_string(),
+                NOMOS_DA_TOPIC.to_string(),
             )))
             .await
             .expect("Network backend should be ready");
@@ -52,30 +85,11 @@ where
     }
 
     async fn blob_stream(&self) -> Box<dyn Stream<Item = Self::Blob> + Unpin + Send> {
-        let topic_hash = TopicHash::from_raw(NOMOS_DA_BLOBS_TOPIC);
-        let (sender, receiver) = tokio::sync::oneshot::channel();
-        self.network_relay
-            .send(NetworkMsg::Subscribe {
-                kind: EventKind::Message,
-                sender,
-            })
-            .await
-            .expect("Network backend should be ready");
-        let receiver = receiver.await.unwrap();
-        Box::new(Box::pin(BroadcastStream::new(receiver).filter_map(
-            move |msg| match msg {
-                Ok(Event::Message(Message { topic, data, .. })) if topic == topic_hash => {
-                    match wire::deserialize::<Self::Blob>(&data) {
-                        Ok(msg) => Some(msg),
-                        Err(e) => {
-                            error!("Unrecognized Blob message: {e}");
-                            None
-                        }
-                    }
-                }
-                _ => None,
-            },
-        )))
+        self.stream_for::<Self::Blob>().await
+    }
+
+    async fn attestation_stream(&self) -> Box<dyn Stream<Item = Self::Attestation> + Unpin + Send> {
+        self.stream_for::<Self::Attestation>().await
     }
 
     async fn send_attestation(&self, attestation: Self::Attestation) -> Result<(), DynError> {
