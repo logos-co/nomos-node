@@ -56,6 +56,17 @@ where
             },
         )))
     }
+
+    async fn send<E: Serialize>(&self, data: E) -> Result<(), DynError> {
+        let message = wire::serialize(&data)?.into_boxed_slice();
+        self.network_relay
+            .send(NetworkMsg::Process(Command::Broadcast {
+                topic: NOMOS_DA_TOPIC.to_string(),
+                message,
+            }))
+            .await
+            .map_err(|(e, _)| Box::new(e) as DynError)
+    }
 }
 
 #[async_trait::async_trait]
@@ -93,10 +104,10 @@ where
     }
 
     async fn send_attestation(&self, attestation: Self::Attestation) -> Result<(), DynError> {
-        todo!()
+        self.send(attestation).await
     }
 
     async fn send_blob(&self, blob: Self::Blob) -> Result<(), DynError> {
-        todo!()
+        self.send(blob).await
     }
 }
