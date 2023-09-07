@@ -1,4 +1,7 @@
-use std::{net::SocketAddr, path::PathBuf};
+use std::{
+    net::{IpAddr, SocketAddr},
+    path::PathBuf,
+};
 
 use crate::Carnot;
 use clap::{Parser, ValueEnum};
@@ -7,7 +10,7 @@ use color_eyre::eyre::{eyre, Result};
 use metrics::{backend::map::MapMetricsBackend, types::MetricsData, MetricsService};
 use nomos_http::{backends::axum::AxumBackend, http::HttpService};
 #[cfg(feature = "libp2p")]
-use nomos_libp2p::secp256k1::SecretKey;
+use nomos_libp2p::{secp256k1::SecretKey, Multiaddr};
 use nomos_log::{Logger, LoggerBackend, LoggerFormat};
 #[cfg(feature = "libp2p")]
 use nomos_network::backends::libp2p::Libp2p;
@@ -18,7 +21,56 @@ use overwatch_rs::services::ServiceData;
 use serde::{Deserialize, Serialize};
 use tracing::Level;
 #[cfg(feature = "waku")]
-use waku_bindings::SecretKey;
+use waku_bindings::{Multiaddr, SecretKey};
+
+#[derive(ValueEnum, Clone, Debug, Default)]
+pub enum LoggerBackendType {
+    Gelf,
+    File,
+    #[default]
+    Stdout,
+    Stderr,
+}
+
+#[derive(Parser, Debug, Clone)]
+pub struct LogArgs {
+    /// Address for the Gelf backend
+    #[clap(long = "log-addr", env = "LOG_ADDR", required_if_eq("backend", "Gelf"))]
+    addr: Option<SocketAddr>,
+
+    /// Directory for the File backend
+    #[clap(long = "log-dir", env = "LOG_DIR", required_if_eq("backend", "File"))]
+    directory: Option<PathBuf>,
+
+    /// Prefix for the File backend
+    #[clap(long = "log-path", env = "LOG_PATH", required_if_eq("backend", "File"))]
+    prefix: Option<PathBuf>,
+
+    /// Backend type
+    #[clap(long = "log-backend", env = "LOG_BACKEND", value_enum)]
+    backend: Option<LoggerBackendType>,
+
+    #[clap(long = "log-format", env = "LOG_FORMAT")]
+    format: Option<String>,
+
+    #[clap(long = "log-level", env = "LOG_LEVEL")]
+    level: Option<String>,
+}
+
+#[derive(Parser, Debug, Clone)]
+pub struct NetworkArgs {
+    #[clap(long = "net-host", env = "NET_HOST")]
+    host: Option<IpAddr>,
+
+    #[clap(long = "net-port", env = "NET_PORT")]
+    port: Option<usize>,
+
+    #[clap(long = "net-node-key", env = "NET_NODE_KEY")]
+    node_key: Option<String>,
+
+    #[clap(long = "net-initial-peers", env = "NET_INITIAL_PEERS")]
+    pub initial_peers: Option<Vec<Multiaddr>>,
+}
 
 #[derive(Deserialize, Debug, Clone, Serialize)]
 pub struct Config {
@@ -34,23 +86,6 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn set_node_key(&mut self, node_key: Option<String>) -> Result<()> {
-        if let Some(node_key) = node_key {
-            #[cfg(feature = "waku")]
-            {
-                use std::str::FromStr;
-                self.network.backend.inner.node_key = Some(SecretKey::from_str(&node_key)?)
-            }
-            #[cfg(feature = "libp2p")]
-            {
-                let mut key_bytes = hex::decode(node_key)?;
-                self.network.backend.node_key =
-                    SecretKey::try_from_bytes(key_bytes.as_mut_slice())?;
-            }
-        }
-        Ok(())
-    }
-
     pub fn update_log(mut self, log_args: LogArgs) -> Result<Self> {
         let LogArgs {
             backend,
@@ -93,38 +128,64 @@ impl Config {
         }
         Ok(self)
     }
-}
 
-#[derive(ValueEnum, Clone, Debug, Default)]
-pub enum LoggerBackendType {
-    Gelf,
-    File,
-    #[default]
-    Stdout,
-    Stderr,
-}
+    #[cfg(feature = "waku")]
+    pub fn update_network(mut self, network_args: NetworkArgs) -> Result<Self> {
+        let NetworkArgs {
+            host,
+            port,
+            node_key,
+            initial_peers,
+        } = network_args;
 
-#[derive(Parser, Debug, Clone)]
-pub struct LogArgs {
-    /// Address for the Gelf backend
-    #[clap(long = "log-addr", env = "LOG_ADDR", required_if_eq("backend", "Gelf"))]
-    addr: Option<SocketAddr>,
+        if let Some(host) = host {
+            self.network.backend.inner.host = Some(host);
+        }
 
-    /// Directory for the File backend
-    #[clap(long = "log-dir", env = "LOG_DIR", required_if_eq("backend", "File"))]
-    directory: Option<PathBuf>,
+        if let Some(port) = port {
+            self.network.backend.inner.port = Some(port);
+        }
 
-    /// Prefix for the File backend
-    #[clap(long = "log-path", env = "LOG_PATH", required_if_eq("backend", "File"))]
-    prefix: Option<PathBuf>,
+        if let Some(node_key) = node_key {
+            use std::str::FromStr;
+            self.network.backend.inner.node_key = Some(SecretKey::from_str(&node_key)?);
+        }
 
-    /// Backend type
-    #[clap(long = "log-backend", env = "LOG_BACKEND", value_enum)]
-    backend: Option<LoggerBackendType>,
+        if let Some(peers) = initial_peers {
+            self.network.backend.initial_peers = peers;
+        }
 
-    #[clap(long = "log-format", env = "LOG_FORMAT")]
-    format: Option<String>,
+        Ok(self)
+    }
 
-    #[clap(long = "log-level", env = "LOG_LEVEL")]
-    level: Option<String>,
+    #[cfg(feature = "libp2p")]
+    pub fn update_network(mut self, network_args: NetworkArgs) -> Result<Self> {
+        let NetworkArgs {
+            host,
+            port,
+            node_key,
+            initial_peers,
+        } = network_args;
+
+        if let Some(IpAddr::V4(h)) = host {
+            self.network.backend.host = h;
+        } else if host.is_some() {
+            return Err(eyre!("Unsupported ip version"));
+        }
+
+        if let Some(port) = port {
+            self.network.backend.port = port as u16;
+        }
+
+        if let Some(node_key) = node_key {
+            let mut key_bytes = hex::decode(node_key)?;
+            self.network.backend.node_key = SecretKey::try_from_bytes(key_bytes.as_mut_slice())?;
+        }
+
+        if let Some(peers) = initial_peers {
+            self.network.backend.initial_peers = peers;
+        }
+
+        Ok(self)
+    }
 }

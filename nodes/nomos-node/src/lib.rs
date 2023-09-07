@@ -30,7 +30,7 @@ use overwatch_derive::*;
 use overwatch_rs::services::handle::ServiceHandle;
 
 use crate::blob::Blob;
-pub use config::{Config, LogArgs};
+pub use config::{Config, LogArgs, NetworkArgs};
 pub use tx::Tx;
 
 #[cfg(all(feature = "waku", feature = "libp2p"))]
