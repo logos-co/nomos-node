@@ -15,10 +15,6 @@ impl ConnectionPool {
         }
     }
 
-    pub async fn get(&self, addr: &SocketAddr) -> Option<Arc<Mutex<TcpStream>>> {
-        self.pool.lock().await.get(addr).cloned()
-    }
-
     pub async fn get_or_init(&self, addr: &SocketAddr) -> std::io::Result<Arc<Mutex<TcpStream>>> {
         let mut pool = self.pool.lock().await;
         match pool.get(addr).cloned() {
@@ -29,9 +25,5 @@ impl ConnectionPool {
                 Ok(tcp)
             }
         }
-    }
-
-    pub async fn insert(&self, addr: SocketAddr, stream: Arc<Mutex<TcpStream>>) {
-        self.pool.lock().await.insert(addr, stream);
     }
 }
