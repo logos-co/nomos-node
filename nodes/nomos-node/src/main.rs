@@ -1,4 +1,7 @@
-use nomos_node::{Config, HttpArgs, LogArgs, NetworkArgs, Nomos, NomosServiceSettings, Tx};
+use nomos_node::{
+    Config, ConsensusArgs, HttpArgs, LogArgs, NetworkArgs, Nomos, NomosServiceSettings,
+    OverlayArgs, Tx,
+};
 
 mod bridges;
 
@@ -31,6 +34,12 @@ struct Args {
     /// Overrides http config.
     #[clap(flatten)]
     http_args: HttpArgs,
+    /// Overrides consensus config.
+    #[clap(flatten)]
+    consensus_args: ConsensusArgs,
+    /// Overrides overlay config.
+    #[clap(flatten)]
+    overlay_args: OverlayArgs,
 }
 
 fn main() -> Result<()> {
@@ -39,10 +48,14 @@ fn main() -> Result<()> {
         log_args,
         http_args,
         network_args,
+        consensus_args,
+        overlay_args,
     } = Args::parse();
     let config = serde_yaml::from_reader::<_, Config>(std::fs::File::open(config)?)?
         .update_log(log_args)?
         .update_http(http_args)?
+        .update_consensus(consensus_args)?
+        .update_overlay(overlay_args)?
         .update_network(network_args)?;
 
     let bridges: Vec<HttpBridge> = vec![

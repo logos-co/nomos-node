@@ -1,11 +1,13 @@
 use std::{
     net::{IpAddr, SocketAddr},
     path::PathBuf,
+    time::Duration,
 };
 
 use crate::Carnot;
 use clap::{Parser, ValueEnum};
-use color_eyre::eyre::{eyre, Result};
+use color_eyre::eyre::{self, eyre, Result};
+use hex::FromHex;
 #[cfg(feature = "metrics")]
 use metrics::{backend::map::MapMetricsBackend, types::MetricsData, MetricsService};
 use nomos_http::{backends::axum::AxumBackend, http::HttpService};
@@ -79,6 +81,41 @@ pub struct HttpArgs {
 
     #[clap(long = "http-cors-origin", env = "HTTP_CORS_ORIGIN")]
     pub cors_origins: Option<Vec<String>>,
+}
+
+#[derive(Parser, Debug, Clone)]
+pub struct ConsensusArgs {
+    #[clap(long = "consensus-priv-key", env = "CONSENSUS_PRIV_KEY")]
+    consensus_priv_key: Option<String>,
+
+    #[clap(long = "consensus-timeout-secs", env = "CONSENSUS_TIMEOUT_SECS")]
+    consensus_timeout_secs: Option<String>,
+}
+
+#[derive(ValueEnum, Clone, Debug, Default)]
+pub enum OverlayType {
+    #[default]
+    Flat,
+    Tree,
+}
+
+#[derive(Parser, Debug, Clone)]
+pub struct OverlayArgs {
+    // TODO: Act on type and support other overlays.
+    #[clap(long = "overlay-type", env = "OVERLAY_TYPE")]
+    pub overlay_type: Option<OverlayType>,
+
+    #[clap(long = "overlay-nodes", env = "OVERLAY_NODES")]
+    pub overlay_nodes: Option<Vec<String>>,
+
+    #[clap(long = "overlay-leader", env = "OVERLAY_LEADER")]
+    pub overlay_leader: Option<usize>,
+
+    #[clap(
+        long = "overlay-leader-super-majority-threshold",
+        env = "OVERLAY_LEADER_SUPER_MAJORITY_THRESHOLD"
+    )]
+    pub overlay_leader_super_majority_threshold: Option<usize>,
 }
 
 #[derive(Deserialize, Debug, Clone, Serialize)]
@@ -200,16 +237,62 @@ impl Config {
 
     pub fn update_http(mut self, http_args: HttpArgs) -> Result<Self> {
         let HttpArgs {
-            http_addr: addr,
+            http_addr,
             cors_origins,
         } = http_args;
 
-        if let Some(addr) = addr {
+        if let Some(addr) = http_addr {
             self.http.backend.address = addr;
         }
 
         if let Some(cors) = cors_origins {
             self.http.backend.cors_origins = cors;
+        }
+
+        Ok(self)
+    }
+
+    pub fn update_consensus(mut self, consensus_args: ConsensusArgs) -> Result<Self> {
+        let ConsensusArgs {
+            consensus_priv_key,
+            consensus_timeout_secs,
+        } = consensus_args;
+
+        if let Some(private_key) = consensus_priv_key {
+            let bytes = <[u8; 32]>::from_hex(private_key)?;
+            self.consensus.private_key = bytes;
+        }
+
+        if let Some(timeout) = consensus_timeout_secs {
+            let secs = timeout.parse::<u64>()?;
+            self.consensus.timeout = Duration::from_secs(secs);
+        }
+
+        Ok(self)
+    }
+
+    pub fn update_overlay(mut self, overlay_args: OverlayArgs) -> Result<Self> {
+        let OverlayArgs {
+            overlay_nodes,
+            overlay_leader_super_majority_threshold,
+            ..
+        } = overlay_args;
+
+        if let Some(nodes) = overlay_nodes {
+            self.consensus.overlay_settings.nodes = nodes
+                .iter()
+                .map(|n| {
+                    <[u8; 32]>::from_hex(n)
+                        .map_err(|e| eyre::eyre!("Failed to decode hex: {}", e))
+                        .map(|b| b.into())
+                })
+                .collect::<Result<Vec<_>, eyre::Report>>()?;
+        }
+
+        if let Some(threshold) = overlay_leader_super_majority_threshold {
+            self.consensus
+                .overlay_settings
+                .leader_super_majority_threshold = Some(threshold.into());
         }
 
         Ok(self)
