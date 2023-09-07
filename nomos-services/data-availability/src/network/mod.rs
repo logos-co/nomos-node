@@ -22,4 +22,6 @@ pub trait NetworkAdapter {
     async fn blob_stream(&self) -> Box<dyn Stream<Item = Self::Blob> + Unpin + Send>;
 
     async fn send_attestation(&self, attestation: Self::Attestation) -> Result<(), DynError>;
+
+    async fn send_blob(&self, blob: Self::Blob) -> Result<(), DynError>;
 }
