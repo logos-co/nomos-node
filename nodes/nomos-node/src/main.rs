@@ -1,4 +1,4 @@
-use nomos_node::{Config, LogArgs, NetworkArgs, Nomos, NomosServiceSettings, Tx};
+use nomos_node::{Config, HttpArgs, LogArgs, NetworkArgs, Nomos, NomosServiceSettings, Tx};
 
 mod bridges;
 
@@ -28,16 +28,21 @@ struct Args {
     /// Overrides network config.
     #[clap(flatten)]
     network_args: NetworkArgs,
+    /// Overrides http config.
+    #[clap(flatten)]
+    http_args: HttpArgs,
 }
 
 fn main() -> Result<()> {
     let Args {
         config,
         log_args,
+        http_args,
         network_args,
     } = Args::parse();
     let config = serde_yaml::from_reader::<_, Config>(std::fs::File::open(config)?)?
         .update_log(log_args)?
+        .update_http(http_args)?
         .update_network(network_args)?;
 
     let bridges: Vec<HttpBridge> = vec![

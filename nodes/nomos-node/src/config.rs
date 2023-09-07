@@ -36,7 +36,7 @@ pub enum LoggerBackendType {
 pub struct LogArgs {
     /// Address for the Gelf backend
     #[clap(long = "log-addr", env = "LOG_ADDR", required_if_eq("backend", "Gelf"))]
-    addr: Option<SocketAddr>,
+    log_addr: Option<SocketAddr>,
 
     /// Directory for the File backend
     #[clap(long = "log-dir", env = "LOG_DIR", required_if_eq("backend", "File"))]
@@ -72,6 +72,15 @@ pub struct NetworkArgs {
     pub initial_peers: Option<Vec<Multiaddr>>,
 }
 
+#[derive(Parser, Debug, Clone)]
+pub struct HttpArgs {
+    #[clap(long = "http-host", env = "HTTP_HOST")]
+    http_addr: Option<SocketAddr>,
+
+    #[clap(long = "http-cors-origin", env = "HTTP_CORS_ORIGIN")]
+    pub cors_origins: Option<Vec<String>>,
+}
+
 #[derive(Deserialize, Debug, Clone, Serialize)]
 pub struct Config {
     pub log: <Logger as ServiceData>::Settings,
@@ -89,7 +98,7 @@ impl Config {
     pub fn update_log(mut self, log_args: LogArgs) -> Result<Self> {
         let LogArgs {
             backend,
-            addr,
+            log_addr: addr,
             directory,
             prefix,
             format,
@@ -184,6 +193,23 @@ impl Config {
 
         if let Some(peers) = initial_peers {
             self.network.backend.initial_peers = peers;
+        }
+
+        Ok(self)
+    }
+
+    pub fn update_http(mut self, http_args: HttpArgs) -> Result<Self> {
+        let HttpArgs {
+            http_addr: addr,
+            cors_origins,
+        } = http_args;
+
+        if let Some(addr) = addr {
+            self.http.backend.address = addr;
+        }
+
+        if let Some(cors) = cors_origins {
+            self.http.backend.cors_origins = cors;
         }
 
         Ok(self)
