@@ -1,4 +1,4 @@
-use nomos_node::{Config, Nomos, NomosServiceSettings, Tx};
+use nomos_node::{Config, LogArgs, Nomos, NomosServiceSettings, Tx};
 
 mod bridges;
 
@@ -23,14 +23,14 @@ struct Args {
     /// Path for a yaml-encoded network config file
     config: std::path::PathBuf,
     /// Overrides node key in config file
-    #[clap(long = "node-key")]
-    node_key: Option<String>,
+    #[clap(flatten)]
+    log_args: LogArgs,
 }
 
 fn main() -> Result<()> {
-    let Args { config, node_key } = Args::parse();
-    let mut config = serde_yaml::from_reader::<_, Config>(std::fs::File::open(config)?)?;
-    config.set_node_key(node_key)?;
+    let Args { config, log_args } = Args::parse();
+    let config =
+        serde_yaml::from_reader::<_, Config>(std::fs::File::open(config)?)?.update_log(log_args)?;
 
     let bridges: Vec<HttpBridge> = vec![
         Arc::new(Box::new(bridges::carnot_info_bridge)),
