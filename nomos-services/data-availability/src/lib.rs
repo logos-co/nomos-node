@@ -73,7 +73,7 @@ where
     B::Blob: Send,
     <B::Blob as Blob>::Hash: Debug + Send + Sync,
     // TODO: Reply type must be piped together, for now empty array.
-    N: NetworkAdapter<Blob = B::Blob, Reply = [u8; 32]> + Send + Sync,
+    N: NetworkAdapter<Blob = B::Blob, Attestation = [u8; 32]> + Send + Sync,
 {
     fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, DynError> {
         let network_relay = service_state.overwatch_handle.relay();
@@ -117,7 +117,10 @@ where
     }
 }
 
-async fn handle_new_blob<B: DaBackend, A: NetworkAdapter<Blob = B::Blob, Reply = [u8; 32]>>(
+async fn handle_new_blob<
+    B: DaBackend,
+    A: NetworkAdapter<Blob = B::Blob, Attestation = [u8; 32]>,
+>(
     backend: &mut B,
     adapter: &A,
     blob: B::Blob,

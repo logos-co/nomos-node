@@ -13,7 +13,7 @@ pub trait NetworkAdapter {
     type Backend: NetworkBackend + 'static;
 
     type Blob: Send + Sync + 'static;
-    type Reply: Send + Sync + 'static;
+    type Attestation: Send + Sync + 'static;
 
     async fn new(
         network_relay: OutboundRelay<<NetworkService<Self::Backend> as ServiceData>::Message>,
@@ -21,5 +21,5 @@ pub trait NetworkAdapter {
 
     async fn blob_stream(&self) -> Box<dyn Stream<Item = Self::Blob> + Unpin + Send>;
 
-    async fn send_attestation(&self, attestation: Self::Reply) -> Result<(), DynError>;
+    async fn send_attestation(&self, attestation: Self::Attestation) -> Result<(), DynError>;
 }
