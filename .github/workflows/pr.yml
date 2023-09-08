@@ -52,7 +52,6 @@ jobs:
         with:
           profile: minimal
           toolchain: stable-gnu
-          target: x86_64-pc-windows-gnu
           override: true
       # Setup Rust toolchain for other OSes
       - name: Setup Rust toolchain (Other OSes)
