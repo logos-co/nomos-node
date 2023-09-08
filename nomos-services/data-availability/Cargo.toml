@@ -8,6 +8,8 @@ edition = "2021"
 [dependencies]
 async-trait = "0.1"
 futures = "0.3"
+moka = { version = "0.11", features = ["future"] }
+nomos-core = { path = "../../nomos-core" }
 nomos-network = { path = "../network" }
 overwatch-rs = { git = "https://github.com/logos-co/Overwatch", branch = "main" }
 tracing = "0.1"

@@ -10,6 +10,7 @@ use tokio::sync::oneshot::Sender;
 // internal
 use crate::backend::{DaBackend, DaError};
 use crate::network::NetworkAdapter;
+use nomos_core::blob::Blob;
 use nomos_network::NetworkService;
 use overwatch_rs::services::handle::ServiceStateHandle;
 use overwatch_rs::services::relay::{Relay, RelayMessage};
@@ -27,23 +28,29 @@ where
     network_relay: Relay<NetworkService<N::Backend>>,
 }
 
-pub enum DaMsg<Blob> {
+pub enum DaMsg<B: Blob> {
     PendingBlobs {
-        reply_channel: Sender<Box<dyn Iterator<Item = Blob> + Send>>,
+        reply_channel: Sender<Box<dyn Iterator<Item = B> + Send>>,
+    },
+    RemoveBlobs {
+        blobs: Box<dyn Iterator<Item = <B as Blob>::Hash> + Send>,
     },
 }
 
-impl<Blob: 'static> Debug for DaMsg<Blob> {
+impl<B: Blob + 'static> Debug for DaMsg<B> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             DaMsg::PendingBlobs { .. } => {
                 write!(f, "DaMsg::PendingBlobs")
             }
+            DaMsg::RemoveBlobs { .. } => {
+                write!(f, "DaMsg::RemoveBlobs")
+            }
         }
     }
 }
 
-impl<Blob: 'static> RelayMessage for DaMsg<Blob> {}
+impl<B: Blob + 'static> RelayMessage for DaMsg<B> {}
 
 impl<B, N> ServiceData for DataAvailabilityService<B, N>
 where
@@ -61,11 +68,12 @@ where
 #[async_trait::async_trait]
 impl<B, N> ServiceCore for DataAvailabilityService<B, N>
 where
-    B: DaBackend + Send,
+    B: DaBackend + Send + Sync,
     B::Settings: Clone + Send + Sync + 'static,
     B::Blob: Send,
+    <B::Blob as Blob>::Hash: Debug + Send + Sync,
     // TODO: Reply type must be piped together, for now empty array.
-    N: NetworkAdapter<Blob = B::Blob, Reply = [u8; 32]> + Send + Sync,
+    N: NetworkAdapter<Blob = B::Blob, Attestation = [u8; 32]> + Send + Sync,
 {
     fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, DynError> {
         let network_relay = service_state.overwatch_handle.relay();
@@ -109,26 +117,42 @@ where
     }
 }
 
-async fn handle_new_blob<B: DaBackend, A: NetworkAdapter<Blob = B::Blob, Reply = [u8; 32]>>(
+async fn handle_new_blob<
+    B: DaBackend,
+    A: NetworkAdapter<Blob = B::Blob, Attestation = [u8; 32]>,
+>(
     backend: &mut B,
     adapter: &A,
     blob: B::Blob,
 ) -> Result<(), DaError> {
     // we need to handle the reply (verification + signature)
-    backend.add_blob(blob)?;
+    backend.add_blob(blob).await?;
     adapter
         .send_attestation([0u8; 32])
         .await
         .map_err(DaError::Dyn)
 }
 
-async fn handle_da_msg<B: DaBackend>(backend: &mut B, msg: DaMsg<B::Blob>) -> Result<(), DaError> {
+async fn handle_da_msg<B: DaBackend>(backend: &mut B, msg: DaMsg<B::Blob>) -> Result<(), DaError>
+where
+    <B::Blob as Blob>::Hash: Debug,
+{
     match msg {
         DaMsg::PendingBlobs { reply_channel } => {
             let pending_blobs = backend.pending_blobs();
             if reply_channel.send(pending_blobs).is_err() {
                 tracing::debug!("Could not send pending blobs");
             }
+        }
+        DaMsg::RemoveBlobs { blobs } => {
+            let backend = &*backend;
+            futures::stream::iter(blobs)
+                .for_each_concurrent(None, |blob| async move {
+                    if let Err(e) = backend.remove_blob(&blob).await {
+                        tracing::debug!("Could not remove blob {blob:?} due to: {e:?}");
+                    }
+                })
+                .await;
         }
     }
     Ok(())
