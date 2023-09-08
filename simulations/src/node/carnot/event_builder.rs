@@ -10,6 +10,7 @@ use std::hash::Hash;
 use std::time::Duration;
 
 pub type CarnotTx = [u8; 32];
+pub type CarnotBlob = Box<[u8]>;
 
 pub(crate) struct EventBuilder {
     id: NodeId,
@@ -230,7 +231,7 @@ impl EventBuilder {
 
 pub enum Event<Tx: Clone + Hash + Eq> {
     Proposal {
-        block: Block<Tx>,
+        block: Block<Tx, Box<[u8]>>,
     },
     #[allow(dead_code)]
     Approve {

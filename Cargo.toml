@@ -9,6 +9,7 @@ members = [
     "nomos-services/consensus",
     "nomos-services/mempool",
     "nomos-services/http",
+    "nomos-services/data-availability",
     "nomos-da-core/reed-solomon",
     "nomos-da-core/kzg",
     "nodes/nomos-node",

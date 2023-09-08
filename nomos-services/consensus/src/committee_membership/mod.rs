@@ -15,9 +15,9 @@ use nomos_core::block::Block;
 pub trait UpdateableCommitteeMembership: CommitteeMembership {
     type Error: Error;
 
-    fn on_new_block_received<Tx: Hash + Clone + Eq>(
+    fn on_new_block_received<Tx: Hash + Clone + Eq, Blob: Clone + Eq + Hash>(
         &self,
-        block: &Block<Tx>,
+        block: &Block<Tx, Blob>,
     ) -> Result<Self, Self::Error>;
     fn on_timeout_qc_received(&self, qc: &TimeoutQc) -> Result<Self, Self::Error>;
 }
@@ -25,9 +25,9 @@ pub trait UpdateableCommitteeMembership: CommitteeMembership {
 impl UpdateableCommitteeMembership for FreezeMembership {
     type Error = Infallible;
 
-    fn on_new_block_received<Tx: Hash + Clone + Eq>(
+    fn on_new_block_received<Tx: Hash + Clone + Eq, Blob: Clone + Eq + Hash>(
         &self,
-        _block: &Block<Tx>,
+        _block: &Block<Tx, Blob>,
     ) -> Result<Self, Self::Error> {
         Ok(Self)
     }
@@ -40,9 +40,9 @@ impl UpdateableCommitteeMembership for FreezeMembership {
 impl UpdateableCommitteeMembership for RandomBeaconState {
     type Error = RandomBeaconError;
 
-    fn on_new_block_received<Tx: Hash + Clone + Eq>(
+    fn on_new_block_received<Tx: Hash + Clone + Eq, Blob: Clone + Eq + Hash>(
         &self,
-        block: &Block<Tx>,
+        block: &Block<Tx, Blob>,
     ) -> Result<Self, Self::Error> {
         self.check_advance_happy(block.beacon().clone(), block.header().parent_qc.view())
     }

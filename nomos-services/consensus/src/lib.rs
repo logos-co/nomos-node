@@ -96,7 +96,7 @@ impl<Fountain: FountainCode, O: Overlay> CarnotSettings<Fountain, O> {
     }
 }
 
-pub struct CarnotConsensus<A, P, M, F, O>
+pub struct CarnotConsensus<A, P, M, F, O, B>
 where
     F: FountainCode,
     A: NetworkAdapter,
@@ -114,9 +114,11 @@ where
     mempool_relay: Relay<MempoolService<M, P>>,
     _fountain: std::marker::PhantomData<F>,
     _overlay: std::marker::PhantomData<O>,
+    // this need to be substituted by some kind DA bo
+    _blob: std::marker::PhantomData<B>,
 }
 
-impl<A, P, M, F, O> ServiceData for CarnotConsensus<A, P, M, F, O>
+impl<A, P, M, F, O, B> ServiceData for CarnotConsensus<A, P, M, F, O, B>
 where
     F: FountainCode,
     A: NetworkAdapter,
@@ -134,7 +136,7 @@ where
 }
 
 #[async_trait::async_trait]
-impl<A, P, M, F, O> ServiceCore for CarnotConsensus<A, P, M, F, O>
+impl<A, P, M, F, O, B> ServiceCore for CarnotConsensus<A, P, M, F, O, B>
 where
     F: FountainCode + Clone + Send + Sync + 'static,
     A: NetworkAdapter + Clone + Send + Sync + 'static,
@@ -143,6 +145,7 @@ where
     P::Tx:
         Debug + Clone + Eq + Hash + Serialize + serde::de::DeserializeOwned + Send + Sync + 'static,
     <P::Tx as Transaction>::Hash: Debug + Send + Sync,
+    B: Debug + Clone + Eq + Hash + Serialize + DeserializeOwned + Send + Sync + 'static,
     M: MempoolAdapter<Tx = P::Tx> + Send + Sync + 'static,
     O: Overlay + Debug + Send + Sync + 'static,
     O::LeaderSelection: UpdateableLeaderSelection,
@@ -156,6 +159,7 @@ where
             network_relay,
             _fountain: Default::default(),
             _overlay: Default::default(),
+            _blob: Default::default(),
             mempool_relay,
         })
     }
@@ -268,13 +272,13 @@ where
 
 #[derive(Debug)]
 #[allow(clippy::large_enum_variant)]
-enum Output<Tx: Clone + Eq + Hash> {
+enum Output<Tx: Clone + Eq + Hash, Blob: Clone + Eq + Hash> {
     Send(consensus_engine::Send),
     BroadcastTimeoutQc { timeout_qc: TimeoutQc },
-    BroadcastProposal { proposal: Block<Tx> },
+    BroadcastProposal { proposal: Block<Tx, Blob> },
 }
 
-impl<A, P, M, F, O> CarnotConsensus<A, P, M, F, O>
+impl<A, P, M, F, O, B> CarnotConsensus<A, P, M, F, O, B>
 where
     F: FountainCode + Clone + Send + Sync + 'static,
     A: NetworkAdapter + Clone + Send + Sync + 'static,
@@ -283,6 +287,7 @@ where
     P::Tx:
         Debug + Clone + Eq + Hash + Serialize + serde::de::DeserializeOwned + Send + Sync + 'static,
     <P::Tx as Transaction>::Hash: Debug + Send + Sync,
+    B: Debug + Clone + Eq + Hash + Serialize + DeserializeOwned + Send + Sync + 'static,
     M: MempoolAdapter<Tx = P::Tx> + Send + Sync + 'static,
     O: Overlay + Debug + Send + Sync + 'static,
     O::LeaderSelection: UpdateableLeaderSelection,
@@ -310,8 +315,8 @@ where
     #[allow(clippy::too_many_arguments)]
     async fn process_carnot_event(
         mut carnot: Carnot<O>,
-        event: Event<P::Tx>,
-        task_manager: &mut TaskManager<View, Event<P::Tx>>,
+        event: Event<P::Tx, B>,
+        task_manager: &mut TaskManager<View, Event<P::Tx, B>>,
         adapter: A,
         private_key: PrivateKey,
         mempool_relay: OutboundRelay<MempoolMsg<P::Tx>>,
@@ -329,7 +334,7 @@ where
                 tracing::debug!("approving proposal {:?}", block);
                 let (new_carnot, out) = carnot.approve_block(block);
                 carnot = new_carnot;
-                output = Some(Output::Send::<P::Tx>(out));
+                output = Some(Output::Send::<P::Tx, B>(out));
             }
             Event::LocalTimeout { view } => {
                 tracing::debug!("local timeout");
@@ -391,11 +396,11 @@ where
     #[instrument(level = "debug", skip(adapter, task_manager, stream))]
     async fn process_block(
         mut carnot: Carnot<O>,
-        block: Block<P::Tx>,
-        mut stream: Pin<Box<dyn Stream<Item = Block<P::Tx>> + Send>>,
-        task_manager: &mut TaskManager<View, Event<P::Tx>>,
+        block: Block<P::Tx, B>,
+        mut stream: Pin<Box<dyn Stream<Item = Block<P::Tx, B>> + Send>>,
+        task_manager: &mut TaskManager<View, Event<P::Tx, B>>,
         adapter: A,
-    ) -> (Carnot<O>, Option<Output<P::Tx>>) {
+    ) -> (Carnot<O>, Option<Output<P::Tx, B>>) {
         tracing::debug!("received proposal {:?}", block);
         if carnot.highest_voted_view() >= block.header().view {
             tracing::debug!("already voted for view {}", block.header().view);
@@ -471,9 +476,9 @@ where
         carnot: Carnot<O>,
         timeout_qc: TimeoutQc,
         new_views: HashSet<NewView>,
-        task_manager: &mut TaskManager<View, Event<P::Tx>>,
+        task_manager: &mut TaskManager<View, Event<P::Tx, B>>,
         adapter: A,
-    ) -> (Carnot<O>, Option<Output<P::Tx>>) {
+    ) -> (Carnot<O>, Option<Output<P::Tx, B>>) {
         let leader_committee = [carnot.id()].into_iter().collect();
         let leader_tally_settings = CarnotTallySettings {
             threshold: carnot.leader_super_majority_threshold(),
@@ -508,9 +513,9 @@ where
     async fn receive_timeout_qc(
         carnot: Carnot<O>,
         timeout_qc: TimeoutQc,
-        task_manager: &mut TaskManager<View, Event<P::Tx>>,
+        task_manager: &mut TaskManager<View, Event<P::Tx, B>>,
         adapter: A,
-    ) -> (Carnot<O>, Option<Output<P::Tx>>) {
+    ) -> (Carnot<O>, Option<Output<P::Tx, B>>) {
         let mut new_state = carnot.receive_timeout_qc(timeout_qc.clone());
         let self_committee = carnot.self_committee();
         let tally_settings = CarnotTallySettings {
@@ -535,7 +540,7 @@ where
     async fn process_root_timeout(
         carnot: Carnot<O>,
         timeouts: HashSet<Timeout>,
-    ) -> (Carnot<O>, Option<Output<P::Tx>>) {
+    ) -> (Carnot<O>, Option<Output<P::Tx, B>>) {
         // we might have received a timeout_qc sent by some other node and advanced the view
         // already, in which case we should ignore the timeout
         if carnot.current_view()
@@ -575,7 +580,7 @@ where
         private_key: PrivateKey,
         qc: Qc,
         mempool_relay: OutboundRelay<MempoolMsg<P::Tx>>,
-    ) -> Option<Output<P::Tx>> {
+    ) -> Option<Output<P::Tx, B>> {
         let (reply_channel, rx) = tokio::sync::oneshot::channel();
         let mut output = None;
         mempool_relay
@@ -600,7 +605,7 @@ where
     async fn process_view_change(
         carnot: Carnot<O>,
         prev_view: View,
-        task_manager: &mut TaskManager<View, Event<P::Tx>>,
+        task_manager: &mut TaskManager<View, Event<P::Tx, B>>,
         adapter: A,
         timeout: Duration,
     ) {
@@ -637,7 +642,7 @@ where
         }
     }
 
-    async fn gather_timeout_qc(adapter: A, view: consensus_engine::View) -> Event<P::Tx> {
+    async fn gather_timeout_qc(adapter: A, view: consensus_engine::View) -> Event<P::Tx, B> {
         if let Some(timeout_qc) = adapter
             .timeout_qc_stream(view)
             .await
@@ -657,7 +662,7 @@ where
         committee: Committee,
         block: consensus_engine::Block,
         tally: CarnotTallySettings,
-    ) -> Event<P::Tx> {
+    ) -> Event<P::Tx, B> {
         let tally = CarnotTally::new(tally);
         let votes_stream = adapter.votes_stream(&committee, block.view, block.id).await;
         match tally.tally(block.clone(), votes_stream).await {
@@ -674,7 +679,7 @@ where
         committee: Committee,
         timeout_qc: TimeoutQc,
         tally: CarnotTallySettings,
-    ) -> Event<P::Tx> {
+    ) -> Event<P::Tx, B> {
         let tally = NewViewTally::new(tally);
         let stream = adapter
             .new_view_stream(&committee, timeout_qc.view().next())
@@ -696,7 +701,7 @@ where
         committee: Committee,
         view: consensus_engine::View,
         tally: CarnotTallySettings,
-    ) -> Event<P::Tx> {
+    ) -> Event<P::Tx, B> {
         let tally = TimeoutTally::new(tally);
         let stream = adapter.timeout_stream(&committee, view).await;
         match tally.tally(view, stream).await {
@@ -708,7 +713,7 @@ where
     }
 
     #[instrument(level = "debug", skip(adapter))]
-    async fn gather_block(adapter: A, view: consensus_engine::View) -> Event<P::Tx> {
+    async fn gather_block(adapter: A, view: consensus_engine::View) -> Event<P::Tx, B> {
         let stream = adapter
             .proposal_chunks_stream(view)
             .await
@@ -770,11 +775,16 @@ where
     }
 }
 
-async fn handle_output<A, F, Tx>(adapter: &A, fountain: &F, node_id: NodeId, output: Output<Tx>)
-where
+async fn handle_output<A, F, Tx, B>(
+    adapter: &A,
+    fountain: &F,
+    node_id: NodeId,
+    output: Output<Tx, B>,
+) where
     A: NetworkAdapter,
     F: FountainCode,
     Tx: Hash + Eq + Clone + Serialize + DeserializeOwned + Debug,
+    B: Clone + Eq + Hash + Serialize + DeserializeOwned,
 {
     match output {
         Output::Send(consensus_engine::Send { to, payload }) => match payload {
@@ -836,10 +846,11 @@ where
     }
 }
 
-enum Event<Tx: Clone + Hash + Eq> {
+#[allow(clippy::large_enum_variant)]
+enum Event<Tx: Clone + Hash + Eq, Blob: Clone + Eq + Hash> {
     Proposal {
-        block: Block<Tx>,
-        stream: Pin<Box<dyn Stream<Item = Block<Tx>> + Send>>,
+        block: Block<Tx, Blob>,
+        stream: Pin<Box<dyn Stream<Item = Block<Tx, Blob>> + Send>>,
     },
     #[allow(dead_code)]
     Approve {
