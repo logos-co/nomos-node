@@ -50,6 +50,8 @@ impl Receiver {
                     Some((Err(MixnetClientError::UnexpectedStreamBody), socket))
                 }
                 Body::FinalPayload(payload) => Some((Self::fragment_from_payload(payload), socket)),
+                // Client should not receive AckResponse
+                _ => unreachable!(),
             }
         })
     }

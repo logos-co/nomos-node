@@ -1,4 +1,7 @@
-use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
+use std::{
+    net::{Ipv4Addr, SocketAddr, SocketAddrV4},
+    time::Duration,
+};
 
 use nym_sphinx::{PrivateKey, PublicKey};
 use serde::{Deserialize, Serialize};
@@ -14,6 +17,10 @@ pub struct MixnetNodeConfig {
     pub private_key: [u8; PRIVATE_KEY_SIZE],
     /// The size of the connection pool.
     pub connection_pool_size: usize,
+    /// The maximum number of retries.
+    pub max_retries: usize,
+    /// The retry delay between retries.
+    pub retry_delay: Duration,
 }
 
 impl Default for MixnetNodeConfig {
@@ -26,6 +33,8 @@ impl Default for MixnetNodeConfig {
             )),
             private_key: PrivateKey::new().to_bytes(),
             connection_pool_size: 255,
+            max_retries: 3,
+            retry_delay: Duration::from_secs(5),
         }
     }
 }
