@@ -25,4 +25,6 @@ pub trait DaProtocol {
         &self,
         attestations: S,
     ) -> Self::Certificate;
+
+    fn validate_certificate(certificate: &Self::Certificate) -> bool;
 }
