@@ -39,9 +39,10 @@ pub struct SwarmConfig {
     // TCP listening port. Use 0 for random
     pub port: u16,
     // Secp256k1 private key in Hex format (`0x123...abc`). Default random
-    #[serde(with = "secret_key_serde")]
+    #[serde(with = "secret_key_serde", default = "secp256k1::SecretKey::generate")]
     pub node_key: secp256k1::SecretKey,
     // Initial peers to connect to
+    #[serde(default)]
     pub initial_peers: Vec<Multiaddr>,
 }
 
