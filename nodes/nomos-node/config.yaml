@@ -7,6 +7,7 @@ consensus:
   fountain_settings: null
   overlay_settings:
     nodes: [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]]
+    leader_super_majority_threshold: 1
     leader:
       cur: 0
 network:
@@ -14,7 +15,7 @@ network:
     host: 0.0.0.0
     port: 3000
     log_level: "fatal"
-    nodeKey: null
+    node_key: "0000000000000000000000000000000000000000000000000000000000000001"
     discV5BootstrapNodes: []
     initial_peers: []
     relayTopics: []
