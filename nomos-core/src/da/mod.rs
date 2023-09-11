@@ -16,7 +16,7 @@ pub trait DaProtocol {
 
     fn encode<T: AsRef<[u8]>>(&self, data: T) -> Box<dyn Stream<Item = Self::Blob>>;
     fn decode<S: Stream<Item = Self::Blob>>(&self, s: S) -> Result<Bytes, Box<dyn Error>>;
-    fn validate(&self, blob: &Self::Blob, attestation: &Self::Attestation) -> bool;
+    fn validate_attestation(&self, blob: &Self::Blob, attestation: &Self::Attestation) -> bool;
 
     fn certificate_dispersal<S: Stream<Item = Self::Attestation>>(
         &self,
