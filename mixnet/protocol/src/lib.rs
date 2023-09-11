@@ -1,5 +1,8 @@
 use sphinx_packet::{payload::Payload, SphinxPacket};
-use std::error::Error;
+use std::{
+    error::Error,
+    net::{Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV6},
+};
 
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 
@@ -26,6 +29,7 @@ impl core::fmt::Display for PacketId {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct AckResponse {
     pub id: PacketId,
+    pub sender: SocketAddr,
 }
 
 #[non_exhaustive]
@@ -90,8 +94,43 @@ impl Body {
     where
         R: AsyncRead + Unpin,
     {
-        let size = reader.read_u32().await?;
-        Ok(Self::AckResponse(AckResponse { id: PacketId(size) }))
+        let cks = reader.read_u32().await?;
+        let id = PacketId(cks);
+        let socket_type = reader.read_u8().await?;
+        match socket_type {
+            0 => {
+                let mut buf = [0; 6];
+                reader.read_exact(&mut buf).await?;
+                let id = PacketId::from_bytes(&buf);
+                let ip_addr = Ipv4Addr::new(buf[0], buf[1], buf[2], buf[3]);
+                let port = u16::from_be_bytes([buf[4], buf[5]]);
+                Ok(Self::AckResponse(AckResponse {
+                    id,
+                    sender: SocketAddr::V4(SocketAddrV4::new(ip_addr, port)),
+                }))
+            }
+            1 => {
+                let mut buf = [0; 18];
+                reader.read_exact(&mut buf).await?;
+                // Manually inline here for better performance?
+                let ip_addr = Ipv6Addr::new(
+                    u16::from_be_bytes([buf[0], buf[1]]),
+                    u16::from_be_bytes([buf[2], buf[3]]),
+                    u16::from_be_bytes([buf[4], buf[5]]),
+                    u16::from_be_bytes([buf[6], buf[7]]),
+                    u16::from_be_bytes([buf[8], buf[9]]),
+                    u16::from_be_bytes([buf[10], buf[11]]),
+                    u16::from_be_bytes([buf[12], buf[13]]),
+                    u16::from_be_bytes([buf[14], buf[15]]),
+                );
+                let port = u16::from_be_bytes([buf[16], buf[17]]);
+                Ok(Self::AckResponse(AckResponse {
+                    id,
+                    sender: SocketAddr::V6(SocketAddrV6::new(ip_addr, port, 0, 0)),
+                }))
+            }
+            _ => Err("Invalid socket type".into()),
+        }
     }
 
     pub fn final_payload_from_bytes(
@@ -173,6 +212,18 @@ impl Body {
             }
             Self::AckResponse(ack) => {
                 writer.write_u32(ack.id.0).await?;
+                match ack.sender {
+                    SocketAddr::V4(addr) => {
+                        writer.write_u8(0).await?;
+                        writer.write_all(&addr.ip().octets()).await?;
+                        writer.write_u16(addr.port()).await?;
+                    }
+                    SocketAddr::V6(addr) => {
+                        writer.write_u8(1).await?;
+                        writer.write_all(&addr.ip().octets()).await?;
+                        writer.write_u16(addr.port()).await?;
+                    }
+                }
                 Ok(None)
             }
         }

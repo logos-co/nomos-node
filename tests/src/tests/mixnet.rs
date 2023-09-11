@@ -136,6 +136,8 @@ async fn run_nodes_and_destination_client() -> (
             mode: MixnetClientMode::SenderReceiver(config3.client_listen_address),
             topology: topology.clone(),
             connection_pool_size: 255,
+            max_retries: 3,
+            retry_delay: Duration::from_secs(5),
         },
         OsRng,
     );

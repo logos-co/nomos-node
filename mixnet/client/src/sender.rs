@@ -193,12 +193,10 @@ impl<R: Rng> Sender<R> {
                             });
                             Ok(())
                         }
-                        _ => {
-                            return Err(e.into());
-                        }
+                        _ => Err(e),
                     }
                 } else {
-                    return Err(e.into());
+                    Err(e)
                 }
             }
         }
