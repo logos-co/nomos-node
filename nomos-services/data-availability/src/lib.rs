@@ -10,7 +10,7 @@ use tokio::sync::oneshot::Sender;
 // internal
 use crate::backend::{DaBackend, DaError};
 use crate::network::NetworkAdapter;
-use nomos_core::blob::Blob;
+use nomos_core::da::blob::Blob;
 use nomos_network::NetworkService;
 use overwatch_rs::services::handle::ServiceStateHandle;
 use overwatch_rs::services::relay::{Relay, RelayMessage};
