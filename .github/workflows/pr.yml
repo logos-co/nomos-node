@@ -51,14 +51,8 @@ jobs:
         uses: actions-rs/toolchain@v1
         with:
           toolchain: stable-gnu
-          override: true
           target: x86_64-pc-windows-gnu
-      - name: Comment out simulations in Cargo.toml (Windows)
-        if: matrix.os == 'windows-latest'
-        run: |
-          $content = Get-Content Cargo.toml
-          $content | ForEach-Object { $_ -replace '^simulations', '#simulations' } | Set-Content Cargo.toml
-        shell: powershell
+          override: true
       # Setup Rust toolchain for other OSes
       - name: Setup Rust toolchain (Other OSes)
         if: matrix.os != 'windows-latest'
@@ -71,12 +65,6 @@ jobs:
         with:
           command: build
           args: --all --no-default-features --features ${{ matrix.feature }}
-      - uses: actions-rs/toolchain@v1
-        if: matrix.os == 'windows-latest'
-        with:
-          toolchain: stable-gnu
-          override: true
-          target: x86_64-pc-windows-gnu
       - uses: actions-rs/cargo@v1
         with:
           command: test
