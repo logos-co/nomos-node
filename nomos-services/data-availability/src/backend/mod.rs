@@ -1,6 +1,6 @@
 mod memory_cache;
 
-use nomos_core::blob::Blob;
+use nomos_core::da::blob::Blob;
 use overwatch_rs::DynError;
 
 #[derive(Debug)]

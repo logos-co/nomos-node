@@ -1,6 +1,6 @@
 use crate::backend::{DaBackend, DaError};
 use moka::future::{Cache, CacheBuilder};
-use nomos_core::blob::Blob;
+use nomos_core::da::blob::Blob;
 use std::time::Duration;
 
 #[derive(Clone, Copy)]
