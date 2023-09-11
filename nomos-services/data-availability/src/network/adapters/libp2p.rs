@@ -15,7 +15,7 @@ use serde::de::DeserializeOwned;
 use serde::Serialize;
 use tokio_stream::wrappers::BroadcastStream;
 use tokio_stream::StreamExt;
-use tracing::log::error;
+use tracing::error;
 
 pub const NOMOS_DA_TOPIC: &str = "NomosDa";
 
