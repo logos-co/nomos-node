@@ -1,9 +1,12 @@
+// std
+use std::error::Error;
+// crates
+use bytes::Bytes;
+use futures::Stream;
+// internal
 use crate::da::attestation::Attestation;
 use crate::da::blob::Blob;
 use crate::da::certificate::Certificate;
-use bytes::Bytes;
-use futures::Stream;
-use serde::de::Error;
 
 pub mod attestation;
 pub mod blob;
