@@ -11,6 +11,10 @@ impl PacketId {
     pub const fn new(id: u32) -> Self {
         Self(id)
     }
+
+    pub fn from_bytes(bytes: &[u8]) -> Self {
+        Self(crc32fast::hash(bytes))
+    }
 }
 
 impl core::fmt::Display for PacketId {
@@ -129,6 +133,18 @@ impl Body {
             }
             _ => unreachable!(),
         }
+        Ok(())
+    }
+
+    pub async fn write_sphinx_packet_bytes<W>(
+        writer: &mut W,
+        data: &[u8],
+    ) -> Result<(), Box<dyn Error + Send + Sync + 'static>>
+    where
+        W: AsyncWrite + Unpin + ?Sized,
+    {
+        writer.write_u64(data.len() as u64).await?;
+        writer.write_all(data).await?;
         Ok(())
     }
 

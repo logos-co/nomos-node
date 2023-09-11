@@ -1,6 +1,13 @@
-use std::{error::Error, net::SocketAddr, time::Duration};
+use std::{
+    collections::{HashMap, HashSet},
+    error::Error,
+    io::ErrorKind,
+    net::SocketAddr,
+    sync::Arc,
+    time::Duration,
+};
 
-use mixnet_protocol::Body;
+use mixnet_protocol::{Body, PacketId};
 use mixnet_topology::MixnetTopology;
 use mixnet_util::ConnectionPool;
 use nym_sphinx::{
@@ -10,21 +17,34 @@ use nym_sphinx::{
 };
 use rand::{distributions::Uniform, prelude::Distribution, Rng};
 use sphinx_packet::{route, SphinxPacket, SphinxPacketBuilder};
+use tokio::{net::TcpStream, sync::Mutex};
 
 // Sender splits messages into Sphinx packets and sends them to the Mixnet.
 pub struct Sender<R: Rng> {
     //TODO: handle topology update
     topology: MixnetTopology,
     pool: ConnectionPool,
+    ack_cache: Arc<Mutex<HashMap<SocketAddr, HashSet<PacketId>>>>,
+    max_retries: usize,
+    retry_delay: Duration,
     rng: R,
 }
 
 impl<R: Rng> Sender<R> {
-    pub fn new(topology: MixnetTopology, pool: ConnectionPool, rng: R) -> Self {
+    pub fn new(
+        topology: MixnetTopology,
+        pool: ConnectionPool,
+        rng: R,
+        max_retries: usize,
+        retry_delay: Duration,
+    ) -> Self {
         Self {
             topology,
             rng,
             pool,
+            ack_cache: Arc::new(Mutex::new(HashMap::new())),
+            max_retries,
+            retry_delay,
         }
     }
 
@@ -46,9 +66,19 @@ impl<R: Rng> Sender<R> {
             .into_iter()
             .for_each(|(packet, first_node)| {
                 let pool = self.pool.clone();
+                let ack_cache = self.ack_cache.clone();
+                let max_retries = self.max_retries;
+                let retry_delay = self.retry_delay;
                 tokio::spawn(async move {
-                    if let Err(e) =
-                        Self::send_packet(&pool, Box::new(packet), first_node.address).await
+                    if let Err(e) = Self::send_packet(
+                        &pool,
+                        ack_cache,
+                        max_retries,
+                        retry_delay,
+                        Box::new(packet),
+                        first_node.address,
+                    )
+                    .await
                     {
                         tracing::error!("failed to send packet to the first node: {e}");
                     }
@@ -101,6 +131,9 @@ impl<R: Rng> Sender<R> {
 
     async fn send_packet(
         pool: &ConnectionPool,
+        ack_cache: Arc<Mutex<HashMap<SocketAddr, HashSet<PacketId>>>>,
+        max_retries: usize,
+        retry_delay: Duration,
         packet: Box<SphinxPacket>,
         addr: NodeAddressBytes,
     ) -> Result<(), Box<dyn Error + Send + Sync + 'static>> {
@@ -109,13 +142,131 @@ impl<R: Rng> Sender<R> {
 
         let mu: std::sync::Arc<tokio::sync::Mutex<tokio::net::TcpStream>> =
             pool.get_or_init(&addr).await?;
+        let arc_socket = mu.clone();
         let mut socket = mu.lock().await;
-        let body = Body::new_sphinx(packet);
-        body.write(&mut *socket).await?;
+        let bytes = packet.to_bytes();
+        let packet_id = PacketId::from_bytes(&bytes);
+        match Body::write_sphinx_packet_bytes(&mut *socket, &bytes).await {
+            Ok(_) => {
+                tracing::info!("Sent a Sphinx packet successuflly to the node: {addr}");
+                Self::insert_packet_id(&ack_cache, addr, packet_id).await;
 
-        tracing::debug!("Sent a Sphinx packet successuflly to the node: {addr:?}");
+                tokio::spawn(async move {
+                    Self::retry_backoff(
+                        ack_cache,
+                        max_retries,
+                        retry_delay,
+                        packet_id,
+                        bytes,
+                        addr,
+                        arc_socket,
+                    )
+                    .await;
+                });
+                Ok(())
+            }
+            Err(e) => {
+                if let Some(err) = e.downcast_ref::<std::io::Error>() {
+                    match err.kind() {
+                        ErrorKind::BrokenPipe
+                        | ErrorKind::NotConnected
+                        | ErrorKind::ConnectionAborted => {
+                            tracing::warn!("broken pipe error while sending a Sphinx packet to the node: {addr}, try to update the connection and retry");
+                            // update the connection
+                            let mut tcp = TcpStream::connect(addr).await?;
+                            // resend packet immediately
+                            Body::write_sphinx_packet_bytes(&mut tcp, &bytes).await?;
+                            *socket = tcp;
+                            tracing::info!("Sent a Sphinx packet successuflly to the node: {addr}");
+                            Self::insert_packet_id(&ack_cache, addr, packet_id).await;
+                            tokio::spawn(async move {
+                                Self::retry_backoff(
+                                    ack_cache,
+                                    max_retries,
+                                    retry_delay,
+                                    packet_id,
+                                    bytes,
+                                    addr,
+                                    arc_socket,
+                                )
+                                .await;
+                            });
+                            Ok(())
+                        }
+                        _ => {
+                            return Err(e.into());
+                        }
+                    }
+                } else {
+                    return Err(e.into());
+                }
+            }
+        }
+    }
 
-        Ok(())
+    async fn insert_packet_id(
+        ack_cache: &Arc<Mutex<HashMap<SocketAddr, HashSet<PacketId>>>>,
+        addr: SocketAddr,
+        packet_id: PacketId,
+    ) {
+        ack_cache
+            .lock()
+            .await
+            .entry(addr)
+            .or_insert_with(HashSet::new)
+            .insert(packet_id);
+    }
+
+    async fn retry_backoff(
+        ack_cache: Arc<Mutex<HashMap<SocketAddr, HashSet<PacketId>>>>,
+        max_retries: usize,
+        retry_delay: Duration,
+        packet_id: PacketId,
+        sphinx_bytes: Vec<u8>,
+        peer_addr: SocketAddr,
+        socket: Arc<Mutex<TcpStream>>,
+    ) {
+        for _ in 0..max_retries {
+            tokio::time::sleep(retry_delay).await;
+            let mu = ack_cache.lock().await;
+            if let Some(ids) = mu.get(&peer_addr) {
+                if ids.contains(&packet_id) {
+                    tracing::debug!("retrying to send a Sphinx packet to the peer {peer_addr}");
+                    let mut socket = socket.lock().await;
+                    match Body::write_sphinx_packet_bytes(&mut *socket, &sphinx_bytes).await {
+                        Ok(_) => {
+                            tracing::info!(
+                                "Sent a Sphinx packet successuflly to the node: {peer_addr}"
+                            );
+                            return;
+                        }
+                        Err(e) => {
+                            if let Some(err) = e.downcast_ref::<std::io::Error>() {
+                                match err.kind() {
+                                    ErrorKind::BrokenPipe
+                                    | ErrorKind::NotConnected
+                                    | ErrorKind::ConnectionAborted => {
+                                        tracing::warn!("broken pipe error while sending a Sphinx packet to the node: {peer_addr}, try to update the connection and retry");
+                                        // update the connection
+                                        match TcpStream::connect(peer_addr).await {
+                                            Ok(tcp) => {
+                                                *socket = tcp;
+                                            }
+                                            Err(e) => {
+                                                tracing::error!("failed to update the connection to the node: {peer_addr}, error: {e}");
+                                            }
+                                        }
+                                    }
+                                    _ => {}
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    return;
+                }
+            }
+        }
     }
 }
 
