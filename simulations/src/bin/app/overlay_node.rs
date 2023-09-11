@@ -25,6 +25,7 @@ pub fn to_overlay_node<R: Rng>(
         simulations::streaming::StreamSettings::IO(_) => {
             simulations::streaming::SubscriberFormat::Csv
         }
+        #[cfg(feature = "polars")]
         simulations::streaming::StreamSettings::Polars(p) => p.format,
     };
     match &settings.overlay_settings {
