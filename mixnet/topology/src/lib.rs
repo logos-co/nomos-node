@@ -20,7 +20,37 @@ pub struct Layer {
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Node {
     pub address: SocketAddr,
+    #[serde(with = "hex_serde")]
     pub public_key: [u8; PUBLIC_KEY_SIZE],
+}
+
+mod hex_serde {
+    use super::PUBLIC_KEY_SIZE;
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
+    pub fn serialize<S: Serializer>(
+        pk: &[u8; PUBLIC_KEY_SIZE],
+        serializer: S,
+    ) -> Result<S::Ok, S::Error> {
+        if serializer.is_human_readable() {
+            hex::encode(pk).serialize(serializer)
+        } else {
+            serializer.serialize_bytes(pk)
+        }
+    }
+
+    pub fn deserialize<'de, D: Deserializer<'de>>(
+        deserializer: D,
+    ) -> Result<[u8; PUBLIC_KEY_SIZE], D::Error> {
+        if deserializer.is_human_readable() {
+            let hex_str = String::deserialize(deserializer)?;
+            hex::decode(hex_str)
+                .map_err(serde::de::Error::custom)
+                .and_then(|v| v.as_slice().try_into().map_err(serde::de::Error::custom))
+        } else {
+            <[u8; PUBLIC_KEY_SIZE]>::deserialize(deserializer)
+        }
+    }
 }
 
 impl MixnetTopology {

@@ -25,15 +25,11 @@ network:
         layers:
          - nodes:
             - address: 127.0.0.1:7777
-              public_key: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+              public_key: "0000000000000000000000000000000000000000000000000000000000000000"
       connection_pool_size: 255
     mixnet_delay:
-      start:
-        secs: 0
-        nanos: 0
-      end:
-        secs: 0
-        nanos: 0
+      start: "0ms"
+      end: "0ms"
 http:
   backend:
     address: 0.0.0.0:8080
