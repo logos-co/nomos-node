@@ -11,3 +11,11 @@ pub trait Blob {
     }
     fn as_bytes(&self) -> Bytes;
 }
+
+pub trait BlobSelect {
+    type Blob: Blob;
+    fn select_blob_from<I: Iterator<Item = Self::Blob>>(
+        &self,
+        blobs: I,
+    ) -> Box<dyn Iterator<Item = Self::Blob>>;
+}
