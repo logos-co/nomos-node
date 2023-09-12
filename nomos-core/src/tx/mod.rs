@@ -18,3 +18,11 @@ pub trait Transaction {
     }
     fn as_bytes(&self) -> Bytes;
 }
+
+pub trait TxSelect {
+    type Tx: Transaction;
+    fn select_tx_from<I: Iterator<Item = Self::Tx>>(
+        &self,
+        txs: I,
+    ) -> Box<dyn Iterator<Item = Self::Tx>>;
+}
