@@ -1,13 +1,13 @@
 #!/bin/sh
 
-END=10
+END=$DOCKER_LIBP2P_REPLICAS
 NODE_ID=1
 NODE_IP=$(hostname -i)
 NODE_KEY=$(printf '%064s' $(printf '%x' $NODE_ID) | tr ' ' '0')
 
 register_node() {
 	## Conditional transaction to set node config key if it doesn't exist.
-	## White spaces in EOF block is important, more info here:
+	## Newlines in EOF block are important, more info here:
 	## https://github.com/etcd-io/etcd/tree/main/etcdctl#examples-3
 	etcdctl txn <<EOF
 mod("/node/$NODE_ID") = "0"
