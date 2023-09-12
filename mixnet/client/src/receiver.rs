@@ -1,36 +1,24 @@
-use std::{
-    collections::{HashMap, HashSet},
-    error::Error,
-    net::SocketAddr,
-    sync::Arc,
-};
+use std::{error::Error, net::SocketAddr};
 
 use futures::{stream, Stream, StreamExt};
-use mixnet_protocol::{Body, PacketId};
+use mixnet_protocol::Body;
 use nym_sphinx::{
     chunking::{fragment::Fragment, reconstruction::MessageReconstructor},
     message::{NymMessage, PaddedMessage},
     Payload,
 };
-use tokio::{net::TcpStream, sync::Mutex};
+use tokio::net::TcpStream;
 
 use crate::MixnetClientError;
 
 // Receiver accepts TCP connections to receive incoming payloads from the Mixnet.
 pub struct Receiver {
     node_address: SocketAddr,
-    ack_cache: Arc<Mutex<HashMap<SocketAddr, HashSet<PacketId>>>>,
 }
 
 impl Receiver {
-    pub fn new(
-        node_address: SocketAddr,
-        ack_cache: Arc<Mutex<HashMap<SocketAddr, HashSet<PacketId>>>>,
-    ) -> Self {
-        Self {
-            node_address,
-            ack_cache,
-        }
+    pub fn new(node_address: SocketAddr) -> Self {
+        Self { node_address }
     }
 
     pub async fn run(
@@ -42,19 +30,16 @@ impl Receiver {
         let Ok(socket) = TcpStream::connect(self.node_address).await else {
             return Err(MixnetClientError::MixnetNodeConnectError);
         };
-        let ack_cache = self.ack_cache.clone();
 
         Ok(Self::message_stream(Box::pin(Self::fragment_stream(
-            socket, ack_cache,
+            socket,
         ))))
     }
 
     fn fragment_stream(
         socket: TcpStream,
-        ack_cache: Arc<Mutex<HashMap<SocketAddr, HashSet<PacketId>>>>,
     ) -> impl Stream<Item = Result<Fragment, MixnetClientError>> + Send + 'static {
         stream::unfold(socket, move |mut socket| {
-            let cache = ack_cache.clone();
             async move {
                 let Ok(body) = Body::read(&mut socket).await else {
                     // TODO: Maybe this is a hard error and the stream is corrupted? In that case stop the stream
@@ -67,14 +52,6 @@ impl Receiver {
                     }
                     Body::FinalPayload(payload) => {
                         Some((Self::fragment_from_payload(payload), socket))
-                    }
-                    // Client should not receive AckResponse
-                    Body::AckResponse(resp) => {
-                        let mut mu = cache.lock().await;
-                        if let Some(ids) = mu.get_mut(&resp.sender) {
-                            ids.remove(&resp.id);
-                        }
-                        None
                     }
                     _ => unreachable!(),
                 }
