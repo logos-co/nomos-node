@@ -69,7 +69,8 @@ mod humantime {
         deserializer: D,
     ) -> Result<Range<Duration>, D::Error> {
         if deserializer.is_human_readable() {
-            let DurationRangeHelper { start, end } = DurationRangeHelper::deserialize(deserializer)?;
+            let DurationRangeHelper { start, end } =
+                DurationRangeHelper::deserialize(deserializer)?;
             Ok(start..end)
         } else {
             Range::<Duration>::deserialize(deserializer)
