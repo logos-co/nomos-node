@@ -10,7 +10,7 @@ ARCHIVE="etcd-${ETCD_VER}-${ARCH}.tar.gz"
 install_packages curl ca-certificates
 
 # Download and extract etcdctl
-curl -L $DOWNLOAD_URL -o $ARCHIVE
+curl -s -L $DOWNLOAD_URL -o $ARCHIVE
 tar xzf $ARCHIVE etcd-${ETCD_VER}-${ARCH}/etcdctl --strip-components=1
 
 # Move to /usr/bin and cleanup

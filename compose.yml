@@ -1,19 +1,5 @@
 services:
 
-  bootstrap:
-    build:
-      context: .
-      dockerfile: Dockerfile.libp2p
-    ports:
-      - "3000:3000"
-      - "8080:8080"
-    volumes:
-      - ./testnet:/etc/nomos
-    depends_on:
-      - etcd
-    entrypoint: sh
-    command: "/etc/nomos/run_bootstrap.sh"
-
   libp2p-node:
     build:
       context: .
@@ -24,9 +10,11 @@ services:
     volumes:
       - ./testnet:/etc/nomos
     deploy:
-      replicas: 2 
+      replicas: 10 
     depends_on:
-      - bootstrap
+      - etcd
+    environment:
+      - ETCDCTL_ENDPOINTS=etcd:2379
     entrypoint: sh
     command: "/etc/nomos/run_libp2p.sh"
 

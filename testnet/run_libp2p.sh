@@ -7,12 +7,27 @@ if [ ! -f /usr/bin/etcdctl ]; then
 fi
 
 
-NODE_ID=$(./etc/nomos/etcd/register_etcd.sh)
-NODE_KEY=$(printf '%064s' $(printf '%x' $NODE_ID) | tr ' ' '0')
+NET_NODE_KEY=$(./etc/nomos/etcd/register_etcd.sh)
+NET_INITIAL_PEERS=""
+CONSENSUS_NODE_KEY=$NET_NODE_KEY
+OVERLAY_NODES=""
 
-NET_NODE_KEY=$NODE_KEY
-CONSENSUS_NODE_KEY=$NODE_KEY
+sleep 2
 
-echo "I am a libp2p container $HOSTNAME node $NODE_KEY"
+node_ids=$(etcdctl get "/node/" --prefix --keys-only)
+for node_id in $node_ids; do
+	node_key=$(etcdctl get "/config$node_id/key" --print-value-only)
+	node_ip=$(etcdctl get "/config$node_id/ip" --print-value-only)
+
+    if [ -z "$OVERLAY_NODES" ]; then
+        OVERLAY_NODES="$node_key"
+		NET_INITIAL_PEERS="/ip/$node_ip/3000/$node_key"
+    else
+        OVERLAY_NODES="$OVERLAY_NODES,$node_key"
+		NET_INITIAL_PEERS="$NET_INITIAL_PEERS,/ip/$node_ip/3000/$node_key"
+    fi
+done
+
+echo "I am a libp2p container $HOSTNAME node $NET_NODE_KEY"
 
 exec /usr/bin/nomos-node /etc/nomos/config.yaml
