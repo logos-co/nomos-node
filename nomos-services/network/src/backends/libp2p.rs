@@ -54,18 +54,26 @@ mod humantime {
         val: &Range<Duration>,
         serializer: S,
     ) -> Result<S::Ok, S::Error> {
-        DurationRangeHelper {
-            start: val.start,
-            end: val.end,
+        if serializer.is_human_readable() {
+            DurationRangeHelper {
+                start: val.start,
+                end: val.end,
+            }
+            .serialize(serializer)
+        } else {
+            val.serialize(serializer)
         }
-        .serialize(serializer)
     }
 
     pub fn deserialize<'de, D: Deserializer<'de>>(
         deserializer: D,
     ) -> Result<Range<Duration>, D::Error> {
-        let DurationRangeHelper { start, end } = DurationRangeHelper::deserialize(deserializer)?;
-        Ok(start..end)
+        if deserializer.is_human_readable() {
+            let DurationRangeHelper { start, end } = DurationRangeHelper::deserialize(deserializer)?;
+            Ok(start..end)
+        } else {
+            Range::<Duration>::deserialize(deserializer)
+        }
     }
 }
 
