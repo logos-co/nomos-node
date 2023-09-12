@@ -4,10 +4,9 @@ set -e
 
 ./etc/nomos/install_etcd.sh
 
-echo "I am a libp2p node $HOSTNAME"
+NODE_ID=$(./etc/nomos/register_etcd.sh)
+NODE_KEY=$(printf '%064s' $(printf '%x' $NODE_ID) | tr ' ' '0')
 
-# Using container name as the end of node key.
-# TODO: For persistence between runs, node key needs to be the same.
-NODE_KEY=0000000000000000000000000000000000000000000000000000$HOSTNAME
+echo "I am a libp2p containet $HOSTNAME node $NODE_KEY"
 
 exec /usr/bin/nomos-node /etc/nomos/config.yaml --node-key=$NODE_KEY
