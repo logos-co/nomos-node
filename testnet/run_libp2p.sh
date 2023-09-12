@@ -1,5 +1,9 @@
 #!/bin/sh
 
+set -e
+
+./etc/nomos/install_etcd.sh
+
 echo "I am a libp2p node $HOSTNAME"
 
 # Using container name as the end of node key.

@@ -9,6 +9,8 @@ services:
       - "8080:8080"
     volumes:
       - ./testnet:/etc/nomos
+    depends_on:
+      - etcd
     entrypoint: sh
     command: "/etc/nomos/run_bootstrap.sh"
 
@@ -22,9 +24,17 @@ services:
     volumes:
       - ./testnet:/etc/nomos
     deploy:
-      replicas: 10 
+      replicas: 2 
     depends_on:
       - bootstrap
     entrypoint: sh
     command: "/etc/nomos/run_libp2p.sh"
 
+  etcd:
+    image: quay.io/coreos/etcd:v3.4.15
+    ports:
+      - "2379:2379"
+    command:
+      - /usr/local/bin/etcd
+      - --advertise-client-urls=http://etcd:2379
+      - --listen-client-urls=http://0.0.0.0:2379
