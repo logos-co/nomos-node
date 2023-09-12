@@ -66,6 +66,7 @@ impl MixNode {
                 )),
                 private_key,
                 connection_pool_size: 255,
+                ..Default::default()
             };
             configs.push(config);
         }

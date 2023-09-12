@@ -265,6 +265,7 @@ fn create_node_config(
                     mode: mixnet_client_mode,
                     topology: mixnet_topology,
                     connection_pool_size: 255,
+                    ..Default::default()
                 },
                 mixnet_delay: Duration::ZERO..Duration::from_millis(10),
             },
