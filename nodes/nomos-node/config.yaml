@@ -30,6 +30,7 @@ network:
     mixnet_delay:
       start: "0ms"
       end: "0ms"
+
 http:
   backend:
     address: 0.0.0.0:8080
