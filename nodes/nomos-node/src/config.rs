@@ -214,22 +214,23 @@ impl Config {
         } = network_args;
 
         if let Some(IpAddr::V4(h)) = host {
-            self.network.backend.host = h;
+            self.network.backend.inner.host = h;
         } else if host.is_some() {
             return Err(eyre!("Unsupported ip version"));
         }
 
         if let Some(port) = port {
-            self.network.backend.port = port as u16;
+            self.network.backend.inner.port = port as u16;
         }
 
         if let Some(node_key) = node_key {
             let mut key_bytes = hex::decode(node_key)?;
-            self.network.backend.node_key = SecretKey::try_from_bytes(key_bytes.as_mut_slice())?;
+            self.network.backend.inner.node_key =
+                SecretKey::try_from_bytes(key_bytes.as_mut_slice())?;
         }
 
         if let Some(peers) = initial_peers {
-            self.network.backend.initial_peers = peers;
+            self.network.backend.inner.initial_peers = peers;
         }
 
         Ok(self)
