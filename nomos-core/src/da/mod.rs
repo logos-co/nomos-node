@@ -8,6 +8,7 @@ use crate::da::certificate::Certificate;
 pub mod attestation;
 pub mod blob;
 pub mod certificate;
+pub mod full_replication;
 
 pub trait DaProtocol {
     type Blob: Blob;
@@ -31,7 +32,7 @@ pub trait DaProtocol {
     fn recv_attestation(&mut self, attestation: Self::Attestation);
     /// Attempt to produce a certificate of correct disperal for a blob.
     /// If the protocol is not yet ready to return the certificate, return None.
-    fn certify_dispersal(&self) -> Option<Self::Certificate>;
+    fn certify_dispersal(&mut self) -> Option<Self::Certificate>;
     /// Validate a certificate.
     fn validate_certificate(certificate: &Self::Certificate) -> bool;
 }
