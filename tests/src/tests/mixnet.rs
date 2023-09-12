@@ -25,6 +25,8 @@ async fn mixnet() {
             mode: MixnetClientMode::Sender,
             topology: topology.clone(),
             connection_pool_size: 255,
+            max_retries: 3,
+            retry_delay: Duration::from_secs(5),
         },
         OsRng,
     );
