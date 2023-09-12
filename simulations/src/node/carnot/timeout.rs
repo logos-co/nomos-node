@@ -1,5 +1,8 @@
 use consensus_engine::View;
+#[cfg(feature = "polars")]
 use polars::export::ahash::HashMap;
+#[cfg(not(feature = "polars"))]
+use std::collections::HashMap;
 use std::time::Duration;
 
 pub(crate) struct TimeoutHandler {

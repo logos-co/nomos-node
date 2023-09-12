@@ -23,9 +23,9 @@ use simulations::node::carnot::{CarnotRecord, CarnotSettings, CarnotState};
 use simulations::node::{NodeId, NodeIdExt};
 use simulations::output_processors::Record;
 use simulations::runner::{BoxedNode, SimulationRunnerHandle};
-use simulations::streaming::{
-    io::IOSubscriber, naive::NaiveSubscriber, polars::PolarsSubscriber, StreamType,
-};
+#[cfg(feature = "polars")]
+use simulations::streaming::polars::PolarsSubscriber;
+use simulations::streaming::{io::IOSubscriber, naive::NaiveSubscriber, StreamType};
 // internal
 use simulations::{runner::SimulationRunner, settings::SimulationSettings};
 mod log;
@@ -163,6 +163,7 @@ where
             let settings = stream_settings.unwrap_io();
             runner.simulate_and_subscribe::<IOSubscriber<CarnotRecord>>(settings)?
         }
+        #[cfg(feature = "polars")]
         Some(StreamType::Polars) => {
             let settings = stream_settings.unwrap_polars();
             runner.simulate_and_subscribe::<PolarsSubscriber<CarnotRecord>>(settings)?
