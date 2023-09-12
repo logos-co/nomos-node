@@ -1,5 +1,4 @@
 use std::{
-    collections::HashMap,
     net::{Ipv4Addr, SocketAddr, SocketAddrV4},
     process::{Child, Command, Stdio},
     time::Duration,
@@ -81,24 +80,16 @@ impl MixNode {
 
     fn build_topology(configs: Vec<MixnetNodeConfig>) -> MixnetTopology {
         // Build three empty layers first
-        let mut layers = vec![
-            Layer {
-                nodes: HashMap::new(),
-            };
-            3
-        ];
+        let mut layers = vec![Layer { nodes: Vec::new() }; 3];
         let mut layer_id = 0;
 
         // Assign nodes to each layer in round-robin
         for config in &configs {
             let public_key = config.public_key();
-            layers.get_mut(layer_id).unwrap().nodes.insert(
+            layers.get_mut(layer_id).unwrap().nodes.push(Node {
+                address: config.listen_address,
                 public_key,
-                Node {
-                    address: config.listen_address,
-                    public_key,
-                },
-            );
+            });
             layer_id = (layer_id + 1) % layers.len();
         }
 

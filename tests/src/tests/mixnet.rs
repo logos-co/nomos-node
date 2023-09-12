@@ -1,5 +1,4 @@
 use std::{
-    collections::HashMap,
     net::{Ipv4Addr, SocketAddr, SocketAddrV4},
     time::Duration,
 };
@@ -81,31 +80,22 @@ async fn run_nodes_and_destination_client() -> (
     let topology = MixnetTopology {
         layers: vec![
             Layer {
-                nodes: HashMap::from([(
-                    mixnode1.id(),
-                    Node {
-                        address: config1.listen_address,
-                        public_key: mixnode1.public_key(),
-                    },
-                )]),
+                nodes: vec![Node {
+                    address: config1.listen_address,
+                    public_key: mixnode1.public_key(),
+                }],
             },
             Layer {
-                nodes: HashMap::from([(
-                    mixnode2.id(),
-                    Node {
-                        address: config2.listen_address,
-                        public_key: mixnode2.public_key(),
-                    },
-                )]),
+                nodes: vec![Node {
+                    address: config2.listen_address,
+                    public_key: mixnode2.public_key(),
+                }],
             },
             Layer {
-                nodes: HashMap::from([(
-                    mixnode3.id(),
-                    Node {
-                        address: config3.listen_address,
-                        public_key: mixnode3.public_key(),
-                    },
-                )]),
+                nodes: vec![Node {
+                    address: config3.listen_address,
+                    public_key: mixnode3.public_key(),
+                }],
             },
         ],
     };

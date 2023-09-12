@@ -1,4 +1,4 @@
-use std::{collections::HashMap, error::Error, net::SocketAddr};
+use std::{error::Error, net::SocketAddr};
 
 use nym_sphinx::addressing::nodes::{NymNodeRoutingAddress, NymNodeRoutingAddressError};
 use rand::{seq::IteratorRandom, Rng};
@@ -14,7 +14,7 @@ pub struct MixnetTopology {
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Layer {
-    pub nodes: HashMap<MixnetNodeId, Node>,
+    pub nodes: Vec<Node>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -66,7 +66,7 @@ impl MixnetTopology {
 
 impl Layer {
     pub fn random_node<R: Rng>(&self, rng: &mut R) -> Option<&Node> {
-        self.nodes.values().choose(rng)
+        self.nodes.iter().choose(rng)
     }
 }
 
