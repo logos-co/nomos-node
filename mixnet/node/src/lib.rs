@@ -238,12 +238,13 @@ impl MixnetNode {
         to: NymNodeRoutingAddress,
     ) -> Result<(), Box<dyn Error + Send + Sync + 'static>> {
         let addr = SocketAddr::try_from(to)?;
-        if let Some(data) = body
+        if body
             .write(&mut *pool.get_or_init(&addr).await?.lock().await)
-            .await?
+            .await
+            .is_err()
         {
             let pool = pool.clone();
-            tokio::spawn(retry(addr, pool, max_retries, retry_delay, data));
+            tokio::spawn(retry(addr, pool, max_retries, retry_delay, body));
         }
         Ok(())
     }
@@ -254,7 +255,7 @@ async fn retry(
     pool: ConnectionPool,
     max_retries: usize,
     retry_delay: Duration,
-    msg: Vec<u8>,
+    body: Body,
 ) {
     'l: for _ in 0..max_retries {
         tokio::time::sleep(retry_delay).await;
@@ -265,7 +266,7 @@ async fn retry(
         };
 
         let mut socket = mu.lock().await;
-        if let Err(e) = Body::write_sphinx_packet_bytes(&mut *socket, msg.as_slice()).await {
+        if let Err(e) = body.write(&mut *socket).await {
             tracing::error!("Failed to send a Sphinx packet: {e}");
             // If we fail to send a Sphinx packet retry, try to update the pool
             match TcpStream::connect(target).await {

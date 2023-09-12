@@ -76,23 +76,10 @@ impl Body {
         Self::final_payload_from_bytes(&buf)
     }
 
-    pub async fn write_sphinx_packet_bytes<W>(
-        writer: &mut W,
-        data: &[u8],
-    ) -> Result<(), Box<dyn Error + Send + Sync + 'static>>
-    where
-        W: AsyncWrite + Unpin + ?Sized,
-    {
-        writer.write_u64(data.len() as u64).await?;
-        writer.write_all(data).await?;
-        Ok(())
-    }
-
-    /// Returns `Some(data)` if the body is a SphinxPacket for packet send retry.
     pub async fn write<W>(
-        self,
+        &self,
         writer: &mut W,
-    ) -> Result<Option<Vec<u8>>, Box<dyn Error + Send + Sync + 'static>>
+    ) -> Result<(), Box<dyn Error + Send + Sync + 'static>>
     where
         W: AsyncWrite + Unpin + ?Sized,
     {
@@ -103,14 +90,13 @@ impl Body {
                 let data = packet.to_bytes();
                 writer.write_u64(data.len() as u64).await?;
                 writer.write_all(&data).await?;
-                Ok(Some(data))
             }
             Self::FinalPayload(payload) => {
                 let data = payload.as_bytes();
                 writer.write_u64(data.len() as u64).await?;
                 writer.write_all(data).await?;
-                Ok(None)
             }
         }
+        Ok(())
     }
 }

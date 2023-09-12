@@ -132,14 +132,10 @@ impl<R: Rng> Sender<R> {
             pool.get_or_init(&addr).await?;
         let arc_socket = mu.clone();
         let mut socket = mu.lock().await;
-        let bytes = packet.to_bytes();
-        match Body::write_sphinx_packet_bytes(&mut *socket, &bytes).await {
+        let body = Body::SphinxPacket(packet);
+        match body.write(&mut *socket).await {
             Ok(_) => {
                 tracing::info!("Sent a Sphinx packet successuflly to the node: {addr}");
-
-                tokio::spawn(async move {
-                    Self::retry_backoff(max_retries, retry_delay, bytes, addr, arc_socket).await;
-                });
                 Ok(())
             }
             Err(e) => {
@@ -152,26 +148,22 @@ impl<R: Rng> Sender<R> {
                             // update the connection
                             let mut tcp = TcpStream::connect(addr).await?;
                             // resend packet immediately
-                            Body::write_sphinx_packet_bytes(&mut tcp, &bytes).await?;
-                            *socket = tcp;
-                            tracing::info!("Sent a Sphinx packet successuflly to the node: {addr}");
-                            tokio::spawn(async move {
-                                Self::retry_backoff(
-                                    max_retries,
-                                    retry_delay,
-                                    bytes,
-                                    addr,
-                                    arc_socket,
-                                )
-                                .await;
-                            });
-                            Ok(())
+                            if body.write(&mut tcp).await.is_ok() {
+                                *socket = tcp;
+                                tracing::info!(
+                                    "Sent a Sphinx packet successuflly to the node: {addr}"
+                                );
+                                return Ok(());
+                            }
                         }
-                        _ => Err(e),
+                        _ => {}
                     }
-                } else {
-                    Err(e)
                 }
+
+                tokio::spawn(async move {
+                    Self::retry_backoff(max_retries, retry_delay, body, addr, arc_socket).await;
+                });
+                Err(e)
             }
         }
     }
@@ -179,7 +171,7 @@ impl<R: Rng> Sender<R> {
     async fn retry_backoff(
         max_retries: usize,
         retry_delay: Duration,
-        sphinx_bytes: Vec<u8>,
+        body: Body,
         peer_addr: SocketAddr,
         socket: Arc<Mutex<TcpStream>>,
     ) {
@@ -187,7 +179,7 @@ impl<R: Rng> Sender<R> {
             tokio::time::sleep(retry_delay).await;
             tracing::debug!("retrying to send a Sphinx packet to the peer {peer_addr}");
             let mut socket = socket.lock().await;
-            match Body::write_sphinx_packet_bytes(&mut *socket, &sphinx_bytes).await {
+            match body.write(&mut *socket).await {
                 Ok(_) => {
                     tracing::info!("Sent a Sphinx packet successuflly to the node: {peer_addr}");
                     return;
