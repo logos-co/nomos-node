@@ -1,19 +1,23 @@
+mod adapters;
+
 // std
 // crates
 use futures::Stream;
-use overwatch_rs::DynError;
 // internal
 use nomos_network::backends::NetworkBackend;
 use nomos_network::NetworkService;
 use overwatch_rs::services::relay::OutboundRelay;
 use overwatch_rs::services::ServiceData;
+use overwatch_rs::DynError;
+use serde::de::DeserializeOwned;
+use serde::Serialize;
 
 #[async_trait::async_trait]
 pub trait NetworkAdapter {
     type Backend: NetworkBackend + 'static;
 
-    type Blob: Send + Sync + 'static;
-    type Reply: Send + Sync + 'static;
+    type Blob: Serialize + DeserializeOwned + Send + Sync + 'static;
+    type Attestation: Serialize + DeserializeOwned + Send + Sync + 'static;
 
     async fn new(
         network_relay: OutboundRelay<<NetworkService<Self::Backend> as ServiceData>::Message>,
@@ -21,5 +25,9 @@ pub trait NetworkAdapter {
 
     async fn blob_stream(&self) -> Box<dyn Stream<Item = Self::Blob> + Unpin + Send>;
 
-    async fn send_attestation(&self, attestation: Self::Reply) -> Result<(), DynError>;
+    async fn attestation_stream(&self) -> Box<dyn Stream<Item = Self::Attestation> + Unpin + Send>;
+
+    async fn send_attestation(&self, attestation: Self::Attestation) -> Result<(), DynError>;
+
+    async fn send_blob(&self, blob: Self::Blob) -> Result<(), DynError>;
 }

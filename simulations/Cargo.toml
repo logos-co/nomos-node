@@ -28,7 +28,7 @@ nomos-core = { path = "../nomos-core" }
 nomos-consensus = { path = "../nomos-services/consensus" }
 once_cell = "1.17"
 parking_lot = "0.12"
-polars = { version = "0.27", features = ["serde", "object", "json", "csv-file", "parquet", "dtype-struct"] }
+polars = { version = "0.27", features = ["serde", "object", "json", "csv-file", "parquet", "dtype-struct"], optional = true }
 rand = { version = "0.8", features = ["small_rng"] }
 rayon = "1.7"
 scopeguard = "1"
@@ -44,3 +44,6 @@ getrandom = { version = "0.2", features = ["js"] }
 
 [dev-dependencies]
 tempfile = "3.4"
+
+[features]
+polars = ["dep:polars"]
