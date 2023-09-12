@@ -2,6 +2,7 @@
 
 END=10
 NODE_ID=1
+NODE_IP=$(hostname -i)
 
 register_node() {
 	## Conditional transaction to set node config key if it doesn't exist.
@@ -11,6 +12,7 @@ register_node() {
 mod("config/$NODE_ID") = "0"
 
 put config/$NODE_ID "$NODE_ID"
+put config/$NODE_ID/ip "$NODE_IP"
 
 
 EOF

@@ -2,7 +2,9 @@
 
 set -e
 
-./etc/nomos/install_etcd.sh
+if [ ! -f /usr/bin/etcdctl ]; then
+	./etc/nomos/etcd/install_etcd.sh
+fi
 
 echo "I am a bootstrap node"
 
