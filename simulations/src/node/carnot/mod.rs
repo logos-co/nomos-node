@@ -269,6 +269,7 @@ impl<
                         qc.view().next(),
                         qc.clone(),
                         [].into_iter(),
+                        [].into_iter(),
                         self.id,
                         RandomBeaconState::generate_happy(qc.view().next(), &self.random_beacon_pk),
                     ),
