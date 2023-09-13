@@ -15,7 +15,7 @@ use serde::de::DeserializeOwned;
 use serde::Serialize;
 use tokio_stream::wrappers::BroadcastStream;
 use tokio_stream::StreamExt;
-use tracing::error;
+use tracing::debug;
 
 pub const NOMOS_DA_TOPIC: &str = "NomosDa";
 
@@ -47,7 +47,7 @@ where
                     match wire::deserialize::<E>(&data) {
                         Ok(msg) => Some(msg),
                         Err(e) => {
-                            error!("Unrecognized Blob message: {e}");
+                            debug!("Unrecognized message: {e}");
                             None
                         }
                     }
