@@ -1,10 +1,8 @@
 // std
+use std::hash::Hash;
+// crates
 use serde::de::DeserializeOwned;
 use serde::Serialize;
-use std::hash::Hash;
-use std::marker::PhantomData;
-// crates
-
 // internal
 use crate::block::Block;
 use crate::da::blob::{Blob, BlobSelect};
@@ -13,8 +11,6 @@ use consensus_engine::overlay::RandomBeaconState;
 use consensus_engine::{NodeId, Qc, View};
 
 pub struct BlockBuilder<Tx, Blob, TxSelector, BlobSelector> {
-    _tx: PhantomData<Tx>,
-    _blob: PhantomData<Blob>,
     tx_selector: TxSelector,
     blob_selector: BlobSelector,
     view: Option<View>,
@@ -34,8 +30,6 @@ where
 {
     pub fn new(tx_selector: TxSelector, blob_selector: BlobSelector) -> Self {
         Self {
-            _tx: Default::default(),
-            _blob: Default::default(),
             tx_selector,
             blob_selector,
             view: None,
@@ -82,7 +76,6 @@ where
             beacon: Some(beacon),
             txs: Some(txs),
             blobs: Some(blobs),
-            ..
         } = self
         {
             Ok(Block::new(
