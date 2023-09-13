@@ -10,6 +10,24 @@ use crate::tx::{Transaction, TxSelect};
 use consensus_engine::overlay::RandomBeaconState;
 use consensus_engine::{NodeId, Qc, View};
 
+/// Wrapper over a block building `new` method than holds intermediary state and can be
+/// passed around. It also compounds the transaction selection and blob selection heuristics to be
+/// used for transaction and blob selection.
+///
+/// Example:
+/// ``` ignore
+/// use nomos_core::block::builder::BlockBuilder;
+/// let builder: BlockBuilder<(), (), FirstTx, FirstBlob> = {
+///     BlockBuilder::new( FirstTx::default(), FirstBlob::default())
+///         .with_view(View::from(0))
+///         .with_parent_qc(qc)
+///         .with_proposer(proposer)
+///         .with_beacon_state(beacon)
+///         .with_transactions([tx1].into_iter())
+///         .with_blobs([blob1].into_iter())
+/// };
+/// builder.build().expect("All block attributes should have been set")
+/// ```
 pub struct BlockBuilder<Tx, Blob, TxSelector, BlobSelector> {
     tx_selector: TxSelector,
     blob_selector: BlobSelector,
