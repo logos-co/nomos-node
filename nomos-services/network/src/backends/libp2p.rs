@@ -5,7 +5,7 @@ use super::NetworkBackend;
 pub use nomos_libp2p::libp2p::gossipsub::{Message, TopicHash};
 use nomos_libp2p::{
     libp2p::{gossipsub, Multiaddr, PeerId},
-    BehaviourEvent, Swarm, SwarmConfig, SwarmEvent,
+    Behaviour, BehaviourEvent, Swarm, SwarmConfig, SwarmEvent, THandlerErr,
 };
 // crates
 use overwatch_rs::{overwatch::handle::OverwatchHandle, services::state::NoState};
@@ -79,87 +79,10 @@ impl NetworkBackend for Libp2p {
             loop {
                 tokio::select! {
                     Some(event) = swarm.next() => {
-                        match event {
-                            SwarmEvent::Behaviour(BehaviourEvent::Gossipsub(gossipsub::Event::Message {
-                                propagation_source: peer_id,
-                                message_id: id,
-                                message,
-                            })) => {
-                                tracing::debug!("Got message with id: {id} from peer: {peer_id}");
-                                log_error!(events_tx.send(Event::Message(message)));
-                            }
-                            SwarmEvent::ConnectionEstablished {
-                                peer_id,
-                                connection_id,
-                               ..
-                            } => {
-                                tracing::debug!("connected to peer: {peer_id} {connection_id:?}");
-                            }
-                            SwarmEvent::ConnectionClosed {
-                                peer_id,
-                                connection_id,
-                                cause,
-                                ..
-                            } => {
-                                tracing::debug!("connection closed from peer: {peer_id} {connection_id:?} due to {cause:?}");
-                            }
-                            SwarmEvent::OutgoingConnectionError {
-                                peer_id,
-                                connection_id,
-                                error,
-                                ..
-                            } => {
-                                tracing::debug!("failed to connect to peer: {peer_id:?} {connection_id:?} due to: {error}");
-                            }
-                            _ => {}
-                        }
+                        handle_swarm_event(event, &events_tx);
                     }
                     Some(command) = commands_rx.recv() => {
-                        match command {
-                            Command::Connect(peer_id, peer_addr) => {
-                                tracing::debug!("connecting to peer: {peer_id} {peer_addr}");
-                                log_error!(swarm.connect(peer_id, peer_addr));
-                            }
-                            Command::Broadcast { topic, message } => {
-                                match swarm.broadcast(&topic, message.to_vec()) {
-                                    Ok(id) => {
-                                        tracing::debug!("broadcasted message with id: {id} tp topic: {topic}");
-                                    }
-                                    Err(e) => {
-                                        tracing::error!("failed to broadcast message to topic: {topic} {e:?}");
-                                    }
-                                }
-
-                                if swarm.is_subscribed(&topic) {
-                                    log_error!(events_tx.send(Event::Message(Message {
-                                        source: None,
-                                        data: message.into(),
-                                        sequence_number: None,
-                                        topic: Swarm::topic_hash(&topic),
-                                    })));
-                                }
-                            }
-                            Command::Subscribe(topic) => {
-                                tracing::debug!("subscribing to topic: {topic}");
-                                log_error!(swarm.subscribe(&topic));
-                            }
-                            Command::Unsubscribe(topic) => {
-                                tracing::debug!("unsubscribing to topic: {topic}");
-                                log_error!(swarm.unsubscribe(&topic));
-                            }
-                            Command::Info { reply } => {
-                                let swarm = swarm.swarm();
-                                let network_info = swarm.network_info();
-                                let counters = network_info.connection_counters();
-                                let info = Libp2pInfo {
-                                    listen_addresses: swarm.listeners().cloned().collect(),
-                                    n_peers: network_info.num_peers(),
-                                    n_connections: counters.num_connections(),
-                                    n_pending_connections: counters.num_pending(),
-                                };
-                                log_error!(reply.send(info));
-                            }
-                        };
+                        handle_command(command, &mut swarm, &events_tx);
                     }
                 }
             }
@@ -184,4 +107,96 @@ impl NetworkBackend for Libp2p {
             }
         }
     }
+}
+
+fn handle_swarm_event(
+    event: SwarmEvent<BehaviourEvent, THandlerErr<Behaviour>>,
+    events_tx: &broadcast::Sender<Event>,
+) {
+    match event {
+        SwarmEvent::Behaviour(BehaviourEvent::Gossipsub(gossipsub::Event::Message {
+            propagation_source: peer_id,
+            message_id: id,
+            message,
+        })) => {
+            tracing::debug!("Got message with id: {id} from peer: {peer_id}");
+            log_error!(events_tx.send(Event::Message(message)));
+        }
+        SwarmEvent::ConnectionEstablished {
+            peer_id,
+            connection_id,
+            ..
+        } => {
+            tracing::debug!("connected to peer: {peer_id} {connection_id:?}");
+        }
+        SwarmEvent::ConnectionClosed {
+            peer_id,
+            connection_id,
+            cause,
+            ..
+        } => {
+            tracing::debug!(
+                "connection closed from peer: {peer_id} {connection_id:?} due to {cause:?}"
+            );
+        }
+        SwarmEvent::OutgoingConnectionError {
+            peer_id,
+            connection_id,
+            error,
+            ..
+        } => {
+            tracing::debug!(
+                "failed to connect to peer: {peer_id:?} {connection_id:?} due to: {error}"
+            );
+        }
+        _ => {}
+    }
+}
+
+fn handle_command(command: Command, swarm: &mut Swarm, events_tx: &broadcast::Sender<Event>) {
+    match command {
+        Command::Connect(peer_id, peer_addr) => {
+            tracing::debug!("connecting to peer: {peer_id} {peer_addr}");
+            log_error!(swarm.connect(peer_id, peer_addr));
+        }
+        Command::Broadcast { topic, message } => {
+            match swarm.broadcast(&topic, message.to_vec()) {
+                Ok(id) => {
+                    tracing::debug!("broadcasted message with id: {id} tp topic: {topic}");
+                }
+                Err(e) => {
+                    tracing::error!("failed to broadcast message to topic: {topic} {e:?}");
+                }
+            }
+
+            if swarm.is_subscribed(&topic) {
+                log_error!(events_tx.send(Event::Message(Message {
+                    source: None,
+                    data: message.into(),
+                    sequence_number: None,
+                    topic: Swarm::topic_hash(&topic),
+                })));
+            }
+        }
+        Command::Subscribe(topic) => {
+            tracing::debug!("subscribing to topic: {topic}");
+            log_error!(swarm.subscribe(&topic));
+        }
+        Command::Unsubscribe(topic) => {
+            tracing::debug!("unsubscribing to topic: {topic}");
+            log_error!(swarm.unsubscribe(&topic));
+        }
+        Command::Info { reply } => {
+            let swarm = swarm.swarm();
+            let network_info = swarm.network_info();
+            let counters = network_info.connection_counters();
+            let info = Libp2pInfo {
+                listen_addresses: swarm.listeners().cloned().collect(),
+                n_peers: network_info.num_peers(),
+                n_connections: counters.num_connections(),
+                n_pending_connections: counters.num_pending(),
+            };
+            log_error!(reply.send(info));
+        }
+    };
 }
