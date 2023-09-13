@@ -1,4 +1,4 @@
-mod memory_cache;
+pub mod memory_cache;
 
 use nomos_core::da::blob::Blob;
 use overwatch_rs::DynError;
