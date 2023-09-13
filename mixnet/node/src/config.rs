@@ -16,10 +16,13 @@ pub struct MixnetNodeConfig {
     /// A key for decrypting Sphinx packets
     pub private_key: [u8; PRIVATE_KEY_SIZE],
     /// The size of the connection pool.
+    #[serde(default = "MixnetNodeConfig::default_connection_pool_size")]
     pub connection_pool_size: usize,
     /// The maximum number of retries.
+    #[serde(default = "MixnetNodeConfig::default_max_retries")]
     pub max_retries: usize,
     /// The retry delay between retries.
+    #[serde(default = "MixnetNodeConfig::default_retry_delay")]
     pub retry_delay: Duration,
 }
 
@@ -40,6 +43,18 @@ impl Default for MixnetNodeConfig {
 }
 
 impl MixnetNodeConfig {
+    const fn default_connection_pool_size() -> usize {
+        255
+    }
+
+    const fn default_max_retries() -> usize {
+        3
+    }
+
+    const fn default_retry_delay() -> Duration {
+        Duration::from_secs(5)
+    }
+
     pub fn public_key(&self) -> [u8; PUBLIC_KEY_SIZE] {
         *PublicKey::from(&PrivateKey::from(self.private_key)).as_bytes()
     }

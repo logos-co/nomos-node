@@ -259,12 +259,10 @@ async fn retry(
     retry_delay: Duration,
     body: Body,
 ) {
-    'l: for _ in 0..max_retries {
+    for _ in 0..max_retries {
         tokio::time::sleep(retry_delay).await;
-
-        tracing::warn!("Retrying send a Sphinx packet to the node: {target}");
         let Ok(mu) = pool.get_or_init(&target).await else {
-            continue 'l;
+            continue;
         };
 
         let mut socket = mu.lock().await;

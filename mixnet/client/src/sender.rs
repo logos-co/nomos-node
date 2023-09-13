@@ -133,39 +133,33 @@ impl<R: Rng> Sender<R> {
         let arc_socket = mu.clone();
         let mut socket = mu.lock().await;
         let body = Body::SphinxPacket(packet);
-        match body.write(&mut *socket).await {
-            Ok(_) => {
-                tracing::info!("Sent a Sphinx packet successuflly to the node: {addr}");
-                Ok(())
-            }
-            Err(e) => {
-                if let Some(err) = e.downcast_ref::<std::io::Error>() {
-                    match err.kind() {
-                        ErrorKind::BrokenPipe
-                        | ErrorKind::NotConnected
-                        | ErrorKind::ConnectionAborted => {
-                            tracing::warn!("broken pipe error while sending a Sphinx packet to the node: {addr}, try to update the connection and retry");
-                            // update the connection
-                            let mut tcp = TcpStream::connect(addr).await?;
-                            // resend packet immediately
-                            if body.write(&mut tcp).await.is_ok() {
-                                *socket = tcp;
-                                tracing::info!(
-                                    "Sent a Sphinx packet successuflly to the node: {addr}"
-                                );
-                                return Ok(());
-                            }
+
+        if let Err(e) = body.write(&mut *socket).await {
+            if let Some(err) = e.downcast_ref::<std::io::Error>() {
+                match err.kind() {
+                    ErrorKind::Unsupported
+                    | ErrorKind::NotFound
+                    | ErrorKind::PermissionDenied
+                    | ErrorKind::Other => {}
+                    _ => {
+                        tracing::warn!("broken pipe error while sending a Sphinx packet to the node: {addr}, try to update the connection and retry");
+                        // update the connection
+                        let tcp = TcpStream::connect(addr).await?;
+                        *socket = tcp;
+                        // resend packet immediately
+                        if body.write(&mut *socket).await.is_ok() {
+                            return Ok(());
                         }
-                        _ => {}
                     }
                 }
-
-                tokio::spawn(async move {
-                    Self::retry_backoff(max_retries, retry_delay, body, addr, arc_socket).await;
-                });
-                Err(e)
             }
+
+            tokio::spawn(async move {
+                Self::retry_backoff(max_retries, retry_delay, body, addr, arc_socket).await;
+            });
+            return Err(e);
         }
+        Ok(())
     }
 
     async fn retry_backoff(
@@ -180,17 +174,16 @@ impl<R: Rng> Sender<R> {
             tracing::debug!("retrying to send a Sphinx packet to the peer {peer_addr}");
             let mut socket = socket.lock().await;
             match body.write(&mut *socket).await {
-                Ok(_) => {
-                    tracing::info!("Sent a Sphinx packet successuflly to the node: {peer_addr}");
-                    return;
-                }
+                Ok(_) => return,
                 Err(e) => {
                     if let Some(err) = e.downcast_ref::<std::io::Error>() {
                         match err.kind() {
-                            ErrorKind::BrokenPipe
-                            | ErrorKind::NotConnected
-                            | ErrorKind::ConnectionAborted => {
-                                tracing::warn!("broken pipe error while sending a Sphinx packet to the node: {peer_addr}, try to update the connection and retry");
+                            ErrorKind::Unsupported
+                            | ErrorKind::NotFound
+                            | ErrorKind::PermissionDenied
+                            | ErrorKind::Other => {}
+                            _ => {
+                                tracing::warn!("error while sending a Sphinx packet to the node {peer_addr}: {err}, try to update the connection and retry");
                                 // update the connection
                                 match TcpStream::connect(peer_addr).await {
                                     Ok(tcp) => {
@@ -201,7 +194,6 @@ impl<R: Rng> Sender<R> {
                                     }
                                 }
                             }
-                            _ => {}
                         }
                     }
                 }
