@@ -2,6 +2,7 @@ mixnode:
   listen_address: 127.0.0.1:7777
   client_listen_address: 127.0.0.1:7778
   private_key: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+  connection_pool_size: 255
 log:
   backend: "Stdout"
   format: "Json"

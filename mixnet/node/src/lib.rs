@@ -42,6 +42,8 @@ impl MixnetNode {
     const CLIENT_NOTI_CHANNEL_SIZE: usize = 100;
 
     pub async fn run(self) -> Result<(), Box<dyn Error + Send + Sync + 'static>> {
+        tracing::info!("Public key: {:?}", self.public_key());
+
         // Spawn a ClientNotifier
         let (client_tx, client_rx) = mpsc::channel(Self::CLIENT_NOTI_CHANNEL_SIZE);
         tokio::spawn(async move {
