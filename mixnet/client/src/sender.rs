@@ -1,4 +1,4 @@
-use std::{error::Error, io::ErrorKind, net::SocketAddr, sync::Arc, time::Duration};
+use std::{error::Error, net::SocketAddr, time::Duration};
 
 use mixnet_protocol::Body;
 use mixnet_topology::MixnetTopology;
@@ -10,7 +10,6 @@ use nym_sphinx::{
 };
 use rand::{distributions::Uniform, prelude::Distribution, Rng};
 use sphinx_packet::{route, SphinxPacket, SphinxPacketBuilder};
-use tokio::{net::TcpStream, sync::Mutex};
 
 // Sender splits messages into Sphinx packets and sends them to the Mixnet.
 pub struct Sender<R: Rng> {
@@ -135,70 +134,13 @@ impl<R: Rng> Sender<R> {
         let body = Body::SphinxPacket(packet);
 
         if let Err(e) = body.write(&mut *socket).await {
-            if let Some(err) = e.downcast_ref::<std::io::Error>() {
-                match err.kind() {
-                    ErrorKind::Unsupported
-                    | ErrorKind::NotFound
-                    | ErrorKind::PermissionDenied
-                    | ErrorKind::Other => {}
-                    _ => {
-                        tracing::warn!("broken pipe error while sending a Sphinx packet to the node: {addr}, try to update the connection and retry");
-                        // update the connection
-                        let tcp = TcpStream::connect(addr).await?;
-                        *socket = tcp;
-                        // resend packet immediately
-                        if body.write(&mut *socket).await.is_ok() {
-                            return Ok(());
-                        }
-                    }
-                }
-            }
-
             tokio::spawn(async move {
-                Self::retry_backoff(max_retries, retry_delay, body, addr, arc_socket).await;
+                mixnet_protocol::retry_backoff(addr, max_retries, retry_delay, body, arc_socket)
+                    .await;
             });
             return Err(e);
         }
         Ok(())
-    }
-
-    async fn retry_backoff(
-        max_retries: usize,
-        retry_delay: Duration,
-        body: Body,
-        peer_addr: SocketAddr,
-        socket: Arc<Mutex<TcpStream>>,
-    ) {
-        for _ in 0..max_retries {
-            tokio::time::sleep(retry_delay).await;
-            tracing::debug!("retrying to send a Sphinx packet to the peer {peer_addr}");
-            let mut socket = socket.lock().await;
-            match body.write(&mut *socket).await {
-                Ok(_) => return,
-                Err(e) => {
-                    if let Some(err) = e.downcast_ref::<std::io::Error>() {
-                        match err.kind() {
-                            ErrorKind::Unsupported
-                            | ErrorKind::NotFound
-                            | ErrorKind::PermissionDenied
-                            | ErrorKind::Other => {}
-                            _ => {
-                                tracing::warn!("error while sending a Sphinx packet to the node {peer_addr}: {err}, try to update the connection and retry");
-                                // update the connection
-                                match TcpStream::connect(peer_addr).await {
-                                    Ok(tcp) => {
-                                        *socket = tcp;
-                                    }
-                                    Err(e) => {
-                                        tracing::error!("failed to update the connection to the node: {peer_addr}, error: {e}");
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
     }
 }
 

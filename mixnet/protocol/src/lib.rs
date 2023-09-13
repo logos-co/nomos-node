@@ -1,7 +1,11 @@
 use sphinx_packet::{payload::Payload, SphinxPacket};
-use std::error::Error;
+use std::{error::Error, io::ErrorKind, net::SocketAddr, sync::Arc, time::Duration};
 
-use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
+use tokio::{
+    io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt},
+    net::TcpStream,
+    sync::Mutex,
+};
 
 #[non_exhaustive]
 pub enum Body {
@@ -98,5 +102,40 @@ impl Body {
             }
         }
         Ok(())
+    }
+}
+
+pub async fn retry_backoff(
+    peer_addr: SocketAddr,
+    max_retries: usize,
+    retry_delay: Duration,
+    body: Body,
+    socket: Arc<Mutex<TcpStream>>,
+) {
+    for idx in 0..max_retries {
+        // backoff
+        let wait = retry_delay * (idx as u32);
+
+        tokio::time::sleep(wait).await;
+        let mut socket = socket.lock().await;
+        match body.write(&mut *socket).await {
+            Ok(_) => return,
+            Err(e) => {
+                if let Some(err) = e.downcast_ref::<std::io::Error>() {
+                    match err.kind() {
+                        ErrorKind::Unsupported
+                        | ErrorKind::NotFound
+                        | ErrorKind::PermissionDenied
+                        | ErrorKind::Other => {}
+                        _ => {
+                            // update the connection
+                            if let Ok(tcp) = TcpStream::connect(peer_addr).await {
+                                *socket = tcp;
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 }

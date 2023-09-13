@@ -240,46 +240,16 @@ impl MixnetNode {
         to: NymNodeRoutingAddress,
     ) -> Result<(), Box<dyn Error + Send + Sync + 'static>> {
         let addr = SocketAddr::try_from(to)?;
-        if body
-            .write(&mut *pool.get_or_init(&addr).await?.lock().await)
-            .await
-            .is_err()
-        {
-            let pool = pool.clone();
-            tokio::spawn(retry(addr, pool, max_retries, retry_delay, body));
+        let socket = pool.get_or_init(&addr).await?;
+        if body.write(&mut *socket.lock().await).await.is_err() {
+            tokio::spawn(mixnet_protocol::retry_backoff(
+                addr,
+                max_retries,
+                retry_delay,
+                body,
+                socket,
+            ));
         }
         Ok(())
-    }
-}
-
-async fn retry(
-    target: SocketAddr,
-    pool: ConnectionPool,
-    max_retries: usize,
-    retry_delay: Duration,
-    body: Body,
-) {
-    for _ in 0..max_retries {
-        tokio::time::sleep(retry_delay).await;
-        let Ok(mu) = pool.get_or_init(&target).await else {
-            continue;
-        };
-
-        let mut socket = mu.lock().await;
-        if let Err(e) = body.write(&mut *socket).await {
-            tracing::error!("Failed to send a Sphinx packet: {e}");
-            // If we fail to send a Sphinx packet retry, try to update the pool
-            match TcpStream::connect(target).await {
-                Ok(tcp) => {
-                    // If we can connect to the peer, let's update the pool
-                    *socket = tcp;
-                }
-                Err(e) => {
-                    tracing::error!("Peer is not connectable: {e}");
-                }
-            }
-        } else {
-            tracing::debug!("Sent a Sphinx packet successuflly to the node: {target}");
-        }
     }
 }
