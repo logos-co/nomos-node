@@ -107,9 +107,6 @@ mod tests {
             committee_membership: FisherYatesShuffle::new(ENTROPY),
         });
 
-        let mut expected_committee = Committee::new();
-        expected_committee.extend(nodes.iter());
-
         overlay_fns_match(&tree_overlay, &branch_overlay, &nodes);
     }
 }
