@@ -6,8 +6,17 @@ use std::marker::PhantomData;
 use crate::da::blob::{Blob, BlobSelect};
 use crate::utils;
 
+#[derive(Default)]
 pub struct FillSize<const SIZE: usize, B> {
     _tx: PhantomData<B>,
+}
+
+impl<const SIZE: usize, B> FillSize<SIZE, B> {
+    pub fn new() -> Self {
+        Self {
+            _tx: Default::default(),
+        }
+    }
 }
 
 impl<const SIZE: usize, B: Blob> BlobSelect for FillSize<SIZE, B> {

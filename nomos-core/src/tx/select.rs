@@ -6,8 +6,17 @@ use std::marker::PhantomData;
 use crate::tx::{Transaction, TxSelect};
 use crate::utils;
 
+#[derive(Default)]
 pub struct FillSize<const SIZE: usize, Tx> {
     _tx: PhantomData<Tx>,
+}
+
+impl<const SIZE: usize, Tx> FillSize<SIZE, Tx> {
+    pub fn new() -> Self {
+        Self {
+            _tx: Default::default(),
+        }
+    }
 }
 
 impl<const SIZE: usize, Tx: Transaction> TxSelect for FillSize<SIZE, Tx> {
