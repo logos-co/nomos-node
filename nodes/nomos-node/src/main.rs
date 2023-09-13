@@ -83,6 +83,8 @@ fn main() -> Result<()> {
             bridges: HttpBridgeSettings { bridges },
             #[cfg(feature = "metrics")]
             metrics: config.metrics,
+            #[cfg(feature = "libp2p")]
+            da: config.da,
         },
         None,
     )

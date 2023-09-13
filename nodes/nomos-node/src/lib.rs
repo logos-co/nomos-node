@@ -1,9 +1,10 @@
-mod blob;
 mod config;
 mod tx;
 
 use color_eyre::eyre::Result;
 use consensus_engine::overlay::{FlatOverlay, RandomBeaconState, RoundRobin};
+#[cfg(feature = "libp2p")]
+use full_replication::{AbsoluteNumber, Attestation, Blob, Certificate, FullReplication};
 #[cfg(feature = "metrics")]
 use metrics::{backend::map::MapMetricsBackend, types::MetricsData, MetricsService};
 #[cfg(feature = "libp2p")]
@@ -11,6 +12,11 @@ use nomos_consensus::network::adapters::libp2p::Libp2pAdapter as ConsensusLibp2p
 #[cfg(feature = "waku")]
 use nomos_consensus::network::adapters::waku::WakuAdapter as ConsensusWakuAdapter;
 use nomos_consensus::CarnotConsensus;
+#[cfg(feature = "libp2p")]
+use nomos_da::{
+    backend::memory_cache::BlobCache, network::adapters::libp2p::Libp2pAdapter as DaLibp2pAdapter,
+    DataAvailabilityService,
+};
 use nomos_http::backends::axum::AxumBackend;
 use nomos_http::bridge::HttpBridgeService;
 use nomos_http::http::HttpService;
@@ -28,7 +34,6 @@ use nomos_network::NetworkService;
 use overwatch_derive::*;
 use overwatch_rs::services::handle::ServiceHandle;
 
-use crate::blob::Blob;
 pub use config::{Config, ConsensusArgs, HttpArgs, LogArgs, NetworkArgs, OverlayArgs};
 pub use tx::Tx;
 
@@ -53,6 +58,12 @@ pub type Carnot = CarnotConsensus<
     Blob,
 >;
 
+type DataAvailability = DataAvailabilityService<
+    FullReplication<AbsoluteNumber<Attestation, Certificate>>,
+    BlobCache<<Blob as nomos_core::da::blob::Blob>::Hash, Blob>,
+    DaLibp2pAdapter<Blob, Attestation>,
+>;
+
 #[derive(Services)]
 pub struct Nomos {
     logging: ServiceHandle<Logger>,
@@ -69,4 +80,6 @@ pub struct Nomos {
     bridges: ServiceHandle<HttpBridgeService>,
     #[cfg(feature = "metrics")]
     metrics: ServiceHandle<MetricsService<MapMetricsBackend<MetricsData>>>,
+    #[cfg(feature = "libp2p")]
+    da: ServiceHandle<DataAvailability>,
 }
