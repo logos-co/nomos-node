@@ -1,3 +1,5 @@
+pub mod select;
+
 use bytes::Bytes;
 use std::hash::Hash;
 
@@ -14,8 +16,8 @@ pub trait Blob {
 
 pub trait BlobSelect {
     type Blob: Blob;
-    fn select_blob_from<I: Iterator<Item = Self::Blob>>(
+    fn select_blob_from<'i, I: Iterator<Item = Self::Blob> + 'i>(
         &self,
         blobs: I,
-    ) -> Box<dyn Iterator<Item = Self::Blob>>;
+    ) -> Box<dyn Iterator<Item = Self::Blob> + 'i>;
 }
