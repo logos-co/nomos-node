@@ -1,10 +1,8 @@
 use clap::{Args, ValueEnum};
 use crossterm::execute;
+use full_replication::{AbsoluteNumber, FullReplication};
 use futures::StreamExt;
-use nomos_core::da::{
-    DaProtocol,
-};
-use full_replication::{FullReplication, AbsoluteNumber};
+use nomos_core::da::DaProtocol;
 use nomos_da::network::{adapters::libp2p::Libp2pAdapter, NetworkAdapter};
 use nomos_network::{backends::libp2p::Libp2p, NetworkService};
 use overwatch_derive::*;
@@ -184,7 +182,7 @@ impl ServiceCore for DisseminateService {
     }
 }
 
-// This format is for clap args convenience, I could not 
+// This format is for clap args convenience, I could not
 // find a way to use enums directly without having to implement
 // parsing by hand.
 // The `settings` field will hold the settings for all possible
@@ -209,7 +207,6 @@ struct ProtocolSettings {
 pub(super) enum Protocol {
     FullReplication,
 }
-
 
 impl Default for FullReplicationSettings {
     fn default() -> Self {
