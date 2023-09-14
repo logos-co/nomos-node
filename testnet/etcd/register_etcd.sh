@@ -1,6 +1,6 @@
 #!/bin/sh
 
-END=$DOCKER_LIBP2P_REPLICAS
+END=$DOCKER_REPLICAS
 NODE_ID=1
 NODE_IP=$(hostname -i)
 NODE_KEY=$(printf '%064s' $(printf '%x' $NODE_ID) | tr ' ' '0')
