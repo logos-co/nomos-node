@@ -2,8 +2,9 @@
 
 set -e
 
+# Set env variables for nomos-node.
 NET_NODE_KEY=$(./etc/nomos/register_node.sh)
-CONSENSUS_NODE_KEY=$NET_NODE_KEY
+CONSENSUS_PRIV_KEY=$NET_NODE_KEY
 
 node_ids=$(etcdctl get "/node/" --prefix --keys-only)
 for node_id in $node_ids; do

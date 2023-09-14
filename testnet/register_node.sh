@@ -3,8 +3,7 @@
 # NODE_MASK is set via compose.yml file.
 
 node_key_from_id() {
-	LENGTH=$(echo -n $NODE_ID | wc -c)
-	echo $(echo $NODE_MASK | sed "s/.\{${LENGTH}\}$/${NODE_ID}/")
+	echo "${NODE_MASK}" | sed "s/.\{${#NODE_ID}\}$/${NODE_ID}/"
 }
 
 END=$DOCKER_REPLICAS
@@ -27,21 +26,21 @@ put /config/node/${NODE_ID}/ip "${NODE_IP}"
 EOF
 }
 
-while [ $NODE_ID -le $END ]; do
+while [ "${NODE_ID}" -le "${END}" ]; do
 	result=$(register_node)
 
 	# Check if the key was registered or already exists
-	if [ "$result" != "FAILURE" ]; then
+	if [ "${result}" != "FAILURE" ]; then
 		break
 	else
-		NODE_ID=$(($NODE_ID + 1))
+		NODE_ID=$((NODE_ID + 1))
 		NODE_KEY=$(node_key_from_id)
 	fi
 done
 
-if [ $NODE_ID -gt $END ]; then
-	echo "Reached the limit without registering a NODE_ID."
+if [ "${NODE_ID}" -gt "${END}" ]; then
+	echo "Reached the limit without registering a ${NODE_ID}."
 	return 1
 fi
 
-echo $NODE_KEY
+echo "${NODE_KEY}"
