@@ -6,8 +6,8 @@ consensus:
   private_key: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
   fountain_settings: null
   overlay_settings:
-    leader_super_majority_threshold: 1
     nodes: [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]]
+    leader_super_majority_threshold: 1
     leader:
       cur: 0
 network:
@@ -17,8 +17,20 @@ network:
     log_level: "fatal"
     node_key: "0000000000000000000000000000000000000000000000000000000000000001"
     discV5BootstrapNodes: []
-    initial_peers: ["/dns/nomos-node-bootstrap-1/tcp/3000"]
+    initial_peers: []
     relayTopics: []
+    mixnet_client:
+      mode: Sender
+      topology:
+        layers:
+         - nodes:
+            - address: 127.0.0.1:7777
+              public_key: "0000000000000000000000000000000000000000000000000000000000000000"
+      connection_pool_size: 255
+    mixnet_delay:
+      start: "0ms"
+      end: "0ms"
+
 http:
   backend:
     address: 0.0.0.0:8080
