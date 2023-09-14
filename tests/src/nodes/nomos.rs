@@ -271,7 +271,6 @@ fn create_node_config(
         },
         consensus: CarnotSettings {
             private_key,
-            fountain_settings: (),
             overlay_settings: FlatOverlaySettings {
                 nodes,
                 leader: RoundRobin::new(),
