@@ -8,13 +8,13 @@ use crate::utils;
 
 #[derive(Default)]
 pub struct FillSize<const SIZE: usize, B> {
-    _tx: PhantomData<B>,
+    _blob: PhantomData<B>,
 }
 
 impl<const SIZE: usize, B> FillSize<SIZE, B> {
     pub fn new() -> Self {
         Self {
-            _tx: Default::default(),
+            _blob: Default::default(),
         }
     }
 }
@@ -27,7 +27,7 @@ impl<const SIZE: usize, B: Blob> BlobSelect for FillSize<SIZE, B> {
         blobs: I,
     ) -> Box<dyn Iterator<Item = Self::Blob> + 'i> {
         utils::select::select_from_till_fill_size::<SIZE, Self::Blob>(
-            |tx| tx.as_bytes().len(),
+            |blob| blob.as_bytes().len(),
             blobs,
         )
     }
