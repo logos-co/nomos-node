@@ -1,4 +1,7 @@
 mod nodes;
+use mixnet_node::MixnetNodeConfig;
+use mixnet_topology::MixnetTopology;
+pub use nodes::MixNode;
 pub use nodes::NomosNode;
 use once_cell::sync::Lazy;
 
@@ -11,7 +14,7 @@ use std::{fmt::Debug, sync::Mutex};
 use fraction::Fraction;
 use rand::{thread_rng, Rng};
 
-static NET_PORT: Lazy<Mutex<u16>> = Lazy::new(|| Mutex::new(thread_rng().gen_range(8000..10000)));
+static NET_PORT: Lazy<Mutex<u16>> = Lazy::new(|| Mutex::new(thread_rng().gen_range(8000, 10000)));
 
 pub fn get_available_port() -> u16 {
     let mut port = NET_PORT.lock().unwrap();
@@ -30,11 +33,13 @@ pub trait Node: Sized {
     fn stop(&mut self);
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub enum SpawnConfig {
     Star {
         n_participants: usize,
         threshold: Fraction,
         timeout: Duration,
+        mixnet_node_configs: Vec<MixnetNodeConfig>,
+        mixnet_topology: MixnetTopology,
     },
 }

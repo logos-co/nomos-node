@@ -14,8 +14,13 @@ members = [
     "nomos-da/kzg",
     "nomos-da/full-replication",
     "nodes/nomos-node",
+    "nodes/mixnode",
     "simulations",
     "consensus-engine",
     "tests",
+    "mixnet/node",
+    "mixnet/client",
+    "mixnet/protocol",
+    "mixnet/topology",
 ]
 resolver = "2"

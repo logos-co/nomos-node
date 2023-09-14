@@ -1,7 +1,9 @@
 // std
-use std::error::Error;
+use std::{error::Error, ops::Range, time::Duration};
 // internal
 use super::NetworkBackend;
+use mixnet_client::{MixnetClient, MixnetClientConfig};
+use nomos_core::wire;
 pub use nomos_libp2p::libp2p::gossipsub::{Message, TopicHash};
 use nomos_libp2p::{
     libp2p::{gossipsub, Multiaddr, PeerId},
@@ -9,8 +11,10 @@ use nomos_libp2p::{
 };
 // crates
 use overwatch_rs::{overwatch::handle::OverwatchHandle, services::state::NoState};
+use rand::{rngs::OsRng, thread_rng, Rng};
 use serde::{Deserialize, Serialize};
 use tokio::sync::{broadcast, mpsc, oneshot};
+use tokio_stream::StreamExt;
 
 macro_rules! log_error {
     ($e:expr) => {
@@ -23,6 +27,55 @@ macro_rules! log_error {
 pub struct Libp2p {
     events_tx: broadcast::Sender<Event>,
     commands_tx: mpsc::Sender<Command>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct Libp2pConfig {
+    #[serde(flatten)]
+    pub inner: SwarmConfig,
+    pub mixnet_client: MixnetClientConfig,
+    #[serde(with = "humantime")]
+    pub mixnet_delay: Range<Duration>,
+}
+
+mod humantime {
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+    use std::{ops::Range, time::Duration};
+
+    #[derive(Serialize, Deserialize)]
+    struct DurationRangeHelper {
+        #[serde(with = "humantime_serde")]
+        start: Duration,
+        #[serde(with = "humantime_serde")]
+        end: Duration,
+    }
+
+    pub fn serialize<S: Serializer>(
+        val: &Range<Duration>,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error> {
+        if serializer.is_human_readable() {
+            DurationRangeHelper {
+                start: val.start,
+                end: val.end,
+            }
+            .serialize(serializer)
+        } else {
+            val.serialize(serializer)
+        }
+    }
+
+    pub fn deserialize<'de, D: Deserializer<'de>>(
+        deserializer: D,
+    ) -> Result<Range<Duration>, D::Error> {
+        if deserializer.is_human_readable() {
+            let DurationRangeHelper { start, end } =
+                DurationRangeHelper::deserialize(deserializer)?;
+            Ok(start..end)
+        } else {
+            Range::<Duration>::deserialize(deserializer)
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -39,14 +92,29 @@ pub enum EventKind {
 }
 
 const BUFFER_SIZE: usize = 64;
+const BACKOFF: u64 = 5;
+const MAX_RETRY: usize = 3;
 
 #[derive(Debug)]
+#[non_exhaustive]
 pub enum Command {
     Connect(PeerId, Multiaddr),
-    Broadcast { topic: Topic, message: Box<[u8]> },
+    Broadcast {
+        topic: Topic,
+        message: Box<[u8]>,
+    },
     Subscribe(Topic),
     Unsubscribe(Topic),
-    Info { reply: oneshot::Sender<Libp2pInfo> },
+    Info {
+        reply: oneshot::Sender<Libp2pInfo>,
+    },
+    #[doc(hidden)]
+    // broadcast a message directly through gossipsub without mixnet
+    DirectBroadcastAndRetry {
+        topic: Topic,
+        message: Box<[u8]>,
+        retry: usize,
+    },
 }
 
 pub type Topic = String;
@@ -58,24 +126,73 @@ pub enum Event {
     Message(Message),
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct MixnetMessage {
+    topic: Topic,
+    message: Box<[u8]>,
+}
+
+impl MixnetMessage {
+    pub fn as_bytes(&self) -> Vec<u8> {
+        wire::serialize(self).expect("Couldn't serialize MixnetMessage")
+    }
+    pub fn from_bytes(data: &[u8]) -> Result<Self, wire::Error> {
+        wire::deserialize(data)
+    }
+}
+
 #[async_trait::async_trait]
 impl NetworkBackend for Libp2p {
-    type Settings = SwarmConfig;
-    type State = NoState<SwarmConfig>;
+    type Settings = Libp2pConfig;
+    type State = NoState<Libp2pConfig>;
     type Message = Command;
     type EventKind = EventKind;
     type NetworkEvent = Event;
 
     fn new(config: Self::Settings, overwatch_handle: OverwatchHandle) -> Self {
+        let mixnet_client = MixnetClient::new(config.mixnet_client.clone(), OsRng);
         let (commands_tx, mut commands_rx) = tokio::sync::mpsc::channel(BUFFER_SIZE);
         let (events_tx, _) = tokio::sync::broadcast::channel(BUFFER_SIZE);
-        let libp2p = Self {
-            events_tx: events_tx.clone(),
-            commands_tx,
-        };
+
+        let cmd_tx = commands_tx.clone();
         overwatch_handle.runtime().spawn(async move {
-            use tokio_stream::StreamExt;
-            let mut swarm = Swarm::build(&config).unwrap();
+            let Ok(mut stream) = mixnet_client.run().await else {
+                tracing::error!("Could not quickstart mixnet stream");
+                return;
+            };
+
+            while let Some(result) = stream.next().await {
+                match result {
+                    Ok(msg) => {
+                        tracing::debug!("receiving message from mixnet client");
+                        let Ok(MixnetMessage { topic, message }) = MixnetMessage::from_bytes(&msg)
+                        else {
+                            tracing::error!(
+                                "failed to deserialize json received from mixnet client"
+                            );
+                            continue;
+                        };
+
+                        cmd_tx
+                            .send(Command::DirectBroadcastAndRetry {
+                                topic,
+                                message,
+                                retry: 0,
+                            })
+                            .await
+                            .unwrap_or_else(|_| tracing::error!("could not schedule broadcast"));
+                    }
+                    Err(e) => {
+                        todo!("Handle mixclient error: {e}");
+                    }
+                }
+            }
+        });
+        let cmd_tx = commands_tx.clone();
+        let notify = events_tx.clone();
+        overwatch_handle.runtime().spawn(async move {
+            let mut swarm = Swarm::build(&config.inner).unwrap();
+            let mut mixnet_client = MixnetClient::new(config.mixnet_client, OsRng);
             loop {
                 tokio::select! {
                     Some(event) = swarm.next() => {
@@ -86,7 +203,7 @@ impl NetworkBackend for Libp2p {
                                 message,
                             })) => {
                                 tracing::debug!("Got message with id: {id} from peer: {peer_id}");
-                                log_error!(events_tx.send(Event::Message(message)));
+                                log_error!(notify.send(Event::Message(message)));
                             }
                             SwarmEvent::ConnectionEstablished {
                                 peer_id,
@@ -121,23 +238,10 @@ impl NetworkBackend for Libp2p {
                                 log_error!(swarm.connect(peer_id, peer_addr));
                             }
                             Command::Broadcast { topic, message } => {
-                                match swarm.broadcast(&topic, message.to_vec()) {
-                                    Ok(id) => {
-                                        tracing::debug!("broadcasted message with id: {id} tp topic: {topic}");
-                                    }
-                                    Err(e) => {
-                                        tracing::error!("failed to broadcast message to topic: {topic} {e:?}");
-                                    }
-                                }
-
-                                if swarm.is_subscribed(&topic) {
-                                    log_error!(events_tx.send(Event::Message(Message {
-                                        source: None,
-                                        data: message.into(),
-                                        sequence_number: None,
-                                        topic: Swarm::topic_hash(&topic),
-                                    })));
-                                }
+                                tracing::debug!("sending message to mixnet client");
+                                let msg = MixnetMessage { topic, message };
+                                let delay = random_delay(&config.mixnet_delay);
+                                log_error!(mixnet_client.send(msg.as_bytes(), delay));
                             }
                             Command::Subscribe(topic) => {
                                 tracing::debug!("subscribing to topic: {topic}");
@@ -159,12 +263,18 @@ impl NetworkBackend for Libp2p {
                                 };
                                 log_error!(reply.send(info));
                             }
+                            Command::DirectBroadcastAndRetry { topic, message, retry } => {
+                               broadcast_and_retry(topic, message, retry, cmd_tx.clone(), &mut swarm, notify.clone()).await;
+                            }
                         };
                     }
                 }
             }
         });
-        libp2p
+        Self {
+            events_tx,
+            commands_tx,
+        }
     }
 
     async fn process(&self, msg: Self::Message) {
@@ -183,5 +293,77 @@ impl NetworkBackend for Libp2p {
                 self.events_tx.subscribe()
             }
         }
+    }
+}
+
+fn random_delay(range: &Range<Duration>) -> Duration {
+    if range.start == range.end {
+        return range.start;
+    }
+    thread_rng().gen_range(range.start, range.end)
+}
+
+async fn broadcast_and_retry(
+    topic: Topic,
+    message: Box<[u8]>,
+    retry: usize,
+    commands_tx: mpsc::Sender<Command>,
+    swarm: &mut Swarm,
+    events_tx: broadcast::Sender<Event>,
+) {
+    tracing::debug!("broadcasting message to topic: {topic}");
+
+    let wait = BACKOFF.pow(retry as u32);
+
+    match swarm.broadcast(&topic, message.to_vec()) {
+        Ok(id) => {
+            tracing::debug!("broadcasted message with id: {id} tp topic: {topic}");
+            // self-notification because libp2p doesn't do it
+            if swarm.is_subscribed(&topic) {
+                log_error!(events_tx.send(Event::Message(Message {
+                    source: None,
+                    data: message.into(),
+                    sequence_number: None,
+                    topic: Swarm::topic_hash(&topic),
+                })));
+            }
+        }
+        Err(gossipsub::PublishError::InsufficientPeers) if retry < MAX_RETRY => {
+            tracing::error!("failed to broadcast message to topic due to insufficient peers, trying again in {wait:?}");
+
+            tokio::spawn(async move {
+                tokio::time::sleep(std::time::Duration::from_secs(wait)).await;
+                commands_tx
+                    .send(Command::DirectBroadcastAndRetry {
+                        topic,
+                        message,
+                        retry: retry + 1,
+                    })
+                    .await
+                    .unwrap_or_else(|_| tracing::error!("could not schedule retry"));
+            });
+        }
+        Err(e) => {
+            tracing::error!("failed to broadcast message to topic: {topic} {e:?}");
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::time::Duration;
+
+    use super::random_delay;
+
+    #[test]
+    fn test_random_delay() {
+        assert_eq!(
+            random_delay(&(Duration::ZERO..Duration::ZERO)),
+            Duration::ZERO
+        );
+
+        let range = Duration::from_millis(10)..Duration::from_millis(100);
+        let delay = random_delay(&range);
+        assert!(range.start <= delay && delay < range.end);
     }
 }

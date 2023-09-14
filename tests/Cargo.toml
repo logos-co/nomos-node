@@ -14,9 +14,14 @@ overwatch-rs = { git = "https://github.com/logos-co/Overwatch", branch = "main" 
 nomos-core = { path = "../nomos-core" }
 consensus-engine = { path = "../consensus-engine", features = ["serde"] }
 nomos-mempool = { path = "../nomos-services/mempool", features = ["mock"] }
-rand = "0.8"
+mixnode = { path = "../nodes/mixnode" }
+mixnet-node = { path = "../mixnet/node" }
+mixnet-client = { path = "../mixnet/client" }
+mixnet-topology = { path = "../mixnet/topology" }
+# Using older versions, since `mixnet-*` crates depend on `rand` v0.7.3.
+rand = "0.7.3"
+rand_xoshiro = "0.4"
 once_cell = "1"
-rand_xoshiro = "0.6"
 secp256k1 = { version = "0.26", features = ["rand"] }
 waku-bindings = { version = "0.1.1", optional = true }
 reqwest = { version = "0.11", features = ["json"] }
@@ -27,6 +32,8 @@ tokio = "1"
 futures = "0.3"
 async-trait = "0.1"
 fraction = "0.13"
+ntest = "0.9.0"
+criterion = { version = "0.5", features = ["async_tokio"] }
 
 [[test]]
 name = "test_consensus_happy_path"
@@ -35,6 +42,15 @@ path = "src/tests/happy.rs"
 [[test]]
 name = "test_consensus_unhappy_path"
 path = "src/tests/unhappy.rs"
+
+[[test]]
+name = "test_mixnet"
+path = "src/tests/mixnet.rs"
+
+[[bench]]
+name = "mixnet"
+path = "src/benches/mixnet.rs"
+harness = false
 
 
 [features]
