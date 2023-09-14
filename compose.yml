@@ -10,9 +10,8 @@ services:
     volumes:
       - ./testnet:/etc/nomos
     environment:
-      - NET_NODE_KEY=1000000000000000000000000000000000000000000000000000000000000000
-    entrypoint: sh
-    command: "/etc/nomos/run_bootstrap.sh"
+      - NET_NODE_KEY=${DOCKER_COMPOSE_BOOSTRAP_NET_NODE_KEY}
+    entrypoint: /etc/nomos/run_bootstrap.sh
 
   libp2p-node:
     build:
@@ -24,18 +23,17 @@ services:
     volumes:
       - ./testnet:/etc/nomos
     deploy:
-      replicas: 1
+      replicas: ${DOCKER_COMPOSE_LIBP2P_REPLICAS} 
     depends_on:
       - bootstrap
       - etcd
     environment:
-      - DOCKER_LIBP2P_REPLICAS=10
-      - ETCDCTL_ENDPOINTS=etcd:2379
-      - ETCDCTL_API=3
-      - OVERLAY_NODES=1000000000000000000000000000000000000000000000000000000000000000
-      - NET_INITIAL_PEERS=/dns/nomos-node-bootstrap-1/tcp/3000
-    entrypoint: sh
-    command: "/etc/nomos/run_libp2p.sh"
+      - DOCKER_REPLICAS=${DOCKER_COMPOSE_LIBP2P_REPLICAS}
+      - ETCDCTL_ENDPOINTS=${DOCKER_COMPOSE_ETCDCTL_ENDPOINTS}
+      - ETCDCTL_API=${DOCKER_COMPOSE_ETCDCTL_API}
+      - OVERLAY_NODES=${DOCKER_COMPOSE_OVERLAY_NODES}
+      - NET_INITIAL_PEERS=${DOCKER_COMPOSE_NET_INITIAL_PEERS}
+    entrypoint: /etc/nomos/run_libp2p.sh
 
   mixnet-node:
     build:
@@ -47,23 +45,22 @@ services:
     volumes:
       - ./testnet:/etc/nomos
     deploy:
-      replicas: 1
+      replicas: ${DOCKER_COMPOSE_MIXNET_REPLICAS} 
     depends_on:
       - bootstrap
       - etcd
     environment:
-      - DOCKER_LIBP2P_REPLICAS=10
-      - ETCDCTL_ENDPOINTS=etcd:2379
-      - ETCDCTL_API=3
-      - OVERLAY_NODES=1000000000000000000000000000000000000000000000000000000000000000
-      - NET_INITIAL_PEERS=/dns/nomos-node-bootstrap-1/tcp/3000
-    entrypoint: sh
-    command: "/etc/nomos/run_libp2p.sh"
+      - DOCKER_REPLICAS=${DOCKER_COMPOSE_MIXNET_REPLICAS}
+      - ETCDCTL_ENDPOINTS=${DOCKER_COMPOSE_ETCDCTL_ENDPOINTS}
+      - ETCDCTL_API=${DOCKER_COMPOSE_ETCDCTL_API}
+      - OVERLAY_NODES=${DOCKER_COMPOSE_OVERLAY_NODES}
+      - NET_INITIAL_PEERS=${DOCKER_COMPOSE_NET_INITIAL_PEERS}
+    entrypoint: /etc/nomos/run_mixnet.sh
 
   etcd:
     image: quay.io/coreos/etcd:v3.4.15
     ports:
-      - "2379:2379"
+      - "2379:2379/tcp"
     command:
       - /usr/local/bin/etcd
       - --advertise-client-urls=http://etcd:2379
