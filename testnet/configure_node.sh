@@ -21,6 +21,11 @@ for node_id in $node_ids; do
 	fi
 done
 
+export CONSENSUS_PRIV_KEY \
+       OVERLAY_NODES \
+       NET_NODE_KEY \
+       NET_INITIAL_PEERS
+
 echo "I am a container ${HOSTNAME} node ${NET_NODE_KEY}"
 
 exec /usr/bin/nomos-node /etc/nomos/config.yaml
