@@ -241,17 +241,20 @@ impl MixnetNode {
     ) -> Result<(), Box<dyn Error + Send + Sync + 'static>> {
         let addr = SocketAddr::try_from(to)?;
         let arc_socket = pool.get_or_init(&addr).await?;
-        let mut socket = arc_socket.lock().await;
-        if let Err(e) = body.write(&mut *socket).await {
+
+        if let Err(e) = {
+            let mut socket = arc_socket.lock().await;
+            body.write(&mut *socket).await
+        } {
             tracing::error!("Failed to forward packet to {addr} with error: {e}. Retrying...");
-            drop(socket);
             return mixnet_protocol::retry_backoff(
                 addr,
                 max_retries,
                 retry_delay,
                 body,
                 arc_socket,
-            ).await;
+            )
+            .await;
         }
         Ok(())
     }

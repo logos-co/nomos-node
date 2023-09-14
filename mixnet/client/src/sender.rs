@@ -130,12 +130,21 @@ impl<R: Rng> Sender<R> {
         let mu: std::sync::Arc<tokio::sync::Mutex<tokio::net::TcpStream>> =
             pool.get_or_init(&addr).await?;
         let arc_socket = mu.clone();
-        let mut socket = mu.lock().await;
+
         let body = Body::SphinxPacket(packet);
 
-        if let Err(e) = body.write(&mut *socket).await {
+        if let Err(e) = {
+            let mut socket = mu.lock().await;
+            body.write(&mut *socket).await
+        } {
             tracing::error!("Failed to send packet to {addr} with error: {e}. Retrying...");
-            return mixnet_protocol::retry_backoff(addr, max_retries, retry_delay, body, arc_socket)
+            return mixnet_protocol::retry_backoff(
+                addr,
+                max_retries,
+                retry_delay,
+                body,
+                arc_socket,
+            )
             .await;
         }
         Ok(())
