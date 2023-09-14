@@ -240,15 +240,18 @@ impl MixnetNode {
         to: NymNodeRoutingAddress,
     ) -> Result<(), Box<dyn Error + Send + Sync + 'static>> {
         let addr = SocketAddr::try_from(to)?;
-        let socket = pool.get_or_init(&addr).await?;
-        if body.write(&mut *socket.lock().await).await.is_err() {
-            tokio::spawn(mixnet_protocol::retry_backoff(
+        let arc_socket = pool.get_or_init(&addr).await?;
+        let mut socket = arc_socket.lock().await;
+        if let Err(e) = body.write(&mut *socket).await {
+            tracing::error!("Failed to forward packet to {addr} with error: {e}. Retrying...");
+            drop(socket);
+            return mixnet_protocol::retry_backoff(
                 addr,
                 max_retries,
                 retry_delay,
                 body,
-                socket,
-            ));
+                arc_socket,
+            ).await;
         }
         Ok(())
     }

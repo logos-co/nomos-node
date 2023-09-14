@@ -111,7 +111,7 @@ pub async fn retry_backoff(
     retry_delay: Duration,
     body: Body,
     socket: Arc<Mutex<TcpStream>>,
-) {
+) -> Result<(), Box<dyn Error + Send + Sync + 'static>> {
     for idx in 0..max_retries {
         // backoff
         let wait = retry_delay * (idx as u32);
@@ -119,7 +119,7 @@ pub async fn retry_backoff(
         tokio::time::sleep(wait).await;
         let mut socket = socket.lock().await;
         match body.write(&mut *socket).await {
-            Ok(_) => return,
+            Ok(_) => return Ok(()),
             Err(e) => {
                 if let Some(err) = e.downcast_ref::<std::io::Error>() {
                     match err.kind() {
@@ -138,4 +138,5 @@ pub async fn retry_backoff(
             }
         }
     }
+    Err(format!("Failure after {max_retries} retries").into())
 }

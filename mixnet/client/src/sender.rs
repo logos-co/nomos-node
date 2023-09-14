@@ -134,11 +134,9 @@ impl<R: Rng> Sender<R> {
         let body = Body::SphinxPacket(packet);
 
         if let Err(e) = body.write(&mut *socket).await {
-            tokio::spawn(async move {
-                mixnet_protocol::retry_backoff(addr, max_retries, retry_delay, body, arc_socket)
-                    .await;
-            });
-            return Err(e);
+            tracing::error!("Failed to send packet to {addr} with error: {e}. Retrying...");
+            return mixnet_protocol::retry_backoff(addr, max_retries, retry_delay, body, arc_socket)
+            .await;
         }
         Ok(())
     }
