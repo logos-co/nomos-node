@@ -17,9 +17,6 @@ services:
     build:
       context: .
       dockerfile: testnet/Dockerfile.libp2p
-    ports:
-      - "3001-3101:3000/tcp"
-      - "8081-8181:8080/tcp"
     volumes:
       - ./testnet:/etc/nomos
     deploy:
@@ -31,6 +28,7 @@ services:
       - DOCKER_REPLICAS=${DOCKER_COMPOSE_LIBP2P_REPLICAS}
       - ETCDCTL_ENDPOINTS=${DOCKER_COMPOSE_ETCDCTL_ENDPOINTS}
       - ETCDCTL_API=${DOCKER_COMPOSE_ETCDCTL_API}
+      - NODE_MASK=${DOCKER_COMPOSE_LIBP2P_NODE_KEY_MASK}
       - OVERLAY_NODES=${DOCKER_COMPOSE_OVERLAY_NODES}
       - NET_INITIAL_PEERS=${DOCKER_COMPOSE_NET_INITIAL_PEERS}
     entrypoint: /etc/nomos/run_libp2p.sh
@@ -39,9 +37,6 @@ services:
     build:
       context: .
       dockerfile: testnet/Dockerfile.mixnet
-    ports:
-      - "3102-3202:3000/tcp"
-      - "8182-8282:8080/tcp"
     volumes:
       - ./testnet:/etc/nomos
     deploy:
@@ -53,6 +48,7 @@ services:
       - DOCKER_REPLICAS=${DOCKER_COMPOSE_MIXNET_REPLICAS}
       - ETCDCTL_ENDPOINTS=${DOCKER_COMPOSE_ETCDCTL_ENDPOINTS}
       - ETCDCTL_API=${DOCKER_COMPOSE_ETCDCTL_API}
+      - NODE_MASK=${DOCKER_COMPOSE_MIXNET_NODE_KEY_MASK}
       - OVERLAY_NODES=${DOCKER_COMPOSE_OVERLAY_NODES}
       - NET_INITIAL_PEERS=${DOCKER_COMPOSE_NET_INITIAL_PEERS}
     entrypoint: /etc/nomos/run_mixnet.sh

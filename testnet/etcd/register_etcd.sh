@@ -1,20 +1,27 @@
 #!/bin/sh
 
+# NODE_MASK is set via compose.yml file.
+
+node_key_from_id() {
+	LENGTH=$(echo -n $NODE_ID | wc -c)
+	echo $(echo $NODE_MASK | sed "s/.\{${LENGTH}\}$/${NODE_ID}/")
+}
+
 END=$DOCKER_REPLICAS
 NODE_ID=1
 NODE_IP=$(hostname -i)
-NODE_KEY=$(printf '%064s' $(printf '%x' $NODE_ID) | tr ' ' '0')
+NODE_KEY=$(node_key_from_id)
 
 register_node() {
 	## Conditional transaction to set node config key if it doesn't exist.
 	## Newlines in EOF block are important, more info here:
 	## https://github.com/etcd-io/etcd/tree/main/etcdctl#examples-3
 	etcdctl txn <<EOF
-mod("/node/$NODE_ID") = "0"
+mod("/node/${NODE_ID}") = "0"
 
-put /node/$NODE_ID "$NODE_ID"
-put /config/node/$NODE_ID/key "$NODE_KEY"
-put /config/node/$NODE_ID/ip "$NODE_IP"
+put /node/${NODE_ID} "${NODE_ID}"
+put /config/node/${NODE_ID}/key "${NODE_KEY}"
+put /config/node/${NODE_ID}/ip "${NODE_IP}"
 
 
 EOF
@@ -27,8 +34,8 @@ while [ $NODE_ID -le $END ]; do
     if [ "$result" != "FAILURE" ]; then
         break
     else
-        NODE_ID=$((NODE_ID + 1))
-		NODE_KEY=$(printf '%064s' $(printf '%x' $NODE_ID) | tr ' ' '0')
+        NODE_ID=$(($NODE_ID + 1))
+		NODE_KEY=$(node_key_from_id)
     fi
 done
 
