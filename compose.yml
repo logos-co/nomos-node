@@ -11,6 +11,7 @@ services:
       - ./testnet:/etc/nomos
     environment:
       - NET_NODE_KEY=${DOCKER_COMPOSE_BOOSTRAP_NET_NODE_KEY:-1000000000000000000000000000000000000000000000000000000000000000}
+    command: /etc/nomos/config.yaml
 
   libp2p-node:
     build:
