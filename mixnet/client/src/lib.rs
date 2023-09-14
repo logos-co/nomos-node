@@ -1,8 +1,8 @@
 pub mod config;
 pub mod error;
+pub use error::*;
 mod receiver;
 mod sender;
-use error::*;
 
 use std::time::Duration;
 
