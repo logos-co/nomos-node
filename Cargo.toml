@@ -12,6 +12,7 @@ members = [
     "nomos-services/data-availability",
     "nomos-da/reed-solomon",
     "nomos-da/kzg",
+    "nomos-da/full-replication",
     "nodes/nomos-node",
     "nodes/mixnode",
     "simulations",
