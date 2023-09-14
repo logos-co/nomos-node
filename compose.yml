@@ -3,10 +3,10 @@ services:
   bootstrap:
     build:
       context: .
-      dockerfile: Dockerfile.libp2p
+      dockerfile: testnet/Dockerfile.libp2p
     ports:
-      - "3000:3000"
-      - "8080:8080"
+      - "3000:3000/tcp"
+      - "8080:8080/tcp"
     volumes:
       - ./testnet:/etc/nomos
     environment:
@@ -17,20 +17,44 @@ services:
   libp2p-node:
     build:
       context: .
-      dockerfile: Dockerfile.libp2p
+      dockerfile: testnet/Dockerfile.libp2p
     ports:
-      - "3001-4001:3000"
-      - "8081-9081:8080"
+      - "3001-3101:3000/tcp"
+      - "8081-8181:8080/tcp"
     volumes:
       - ./testnet:/etc/nomos
     deploy:
-      replicas: 10 
+      replicas: 1
     depends_on:
       - bootstrap
       - etcd
     environment:
       - DOCKER_LIBP2P_REPLICAS=10
       - ETCDCTL_ENDPOINTS=etcd:2379
+      - ETCDCTL_API=3
+      - OVERLAY_NODES=1000000000000000000000000000000000000000000000000000000000000000
+      - NET_INITIAL_PEERS=/dns/nomos-node-bootstrap-1/tcp/3000
+    entrypoint: sh
+    command: "/etc/nomos/run_libp2p.sh"
+
+  mixnet-node:
+    build:
+      context: .
+      dockerfile: testnet/Dockerfile.mixnet
+    ports:
+      - "3102-3202:3000/tcp"
+      - "8182-8282:8080/tcp"
+    volumes:
+      - ./testnet:/etc/nomos
+    deploy:
+      replicas: 1
+    depends_on:
+      - bootstrap
+      - etcd
+    environment:
+      - DOCKER_LIBP2P_REPLICAS=10
+      - ETCDCTL_ENDPOINTS=etcd:2379
+      - ETCDCTL_API=3
       - OVERLAY_NODES=1000000000000000000000000000000000000000000000000000000000000000
       - NET_INITIAL_PEERS=/dns/nomos-node-bootstrap-1/tcp/3000
     entrypoint: sh

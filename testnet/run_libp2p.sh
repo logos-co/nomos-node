@@ -2,15 +2,8 @@
 
 set -e
 
-if [ ! -f /usr/bin/etcdctl ]; then
-	./etc/nomos/etcd/install_etcd.sh
-fi
-
-
 NET_NODE_KEY=$(./etc/nomos/etcd/register_etcd.sh)
 CONSENSUS_NODE_KEY=$NET_NODE_KEY
-
-sleep 2
 
 node_ids=$(etcdctl get "/node/" --prefix --keys-only)
 for node_id in $node_ids; do
