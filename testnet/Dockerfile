@@ -17,6 +17,7 @@ WORKDIR /nomos
 COPY . . 
 
 RUN cargo build --release -p nomos-node --no-default-features --features libp2p
+RUN cargo build --release -p mixnode
 
 # NODE IMAGE ----------------------------------------------------------
 
@@ -30,6 +31,7 @@ LABEL description="Nomos node image"
 EXPOSE 3000 8080 9000 60000	
 
 COPY --from=builder /nomos/target/release/nomos-node /usr/bin/nomos-node
+COPY --from=builder /nomos/target/release/mixnode /usr/bin/mixnode
 COPY --from=builder /usr/bin/etcdctl /usr/bin/etcdctl
 COPY nodes/nomos-node/config.yaml /etc/nomos/config.yaml
 

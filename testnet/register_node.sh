@@ -30,17 +30,17 @@ EOF
 while [ $NODE_ID -le $END ]; do
 	result=$(register_node)
 
-    # Check if the key was registered or already exists
-    if [ "$result" != "FAILURE" ]; then
-        break
-    else
-        NODE_ID=$(($NODE_ID + 1))
+	# Check if the key was registered or already exists
+	if [ "$result" != "FAILURE" ]; then
+		break
+	else
+		NODE_ID=$(($NODE_ID + 1))
 		NODE_KEY=$(node_key_from_id)
-    fi
+	fi
 done
 
 if [ $NODE_ID -gt $END ]; then
-    echo "Reached the limit without registering a NODE_ID."
+	echo "Reached the limit without registering a NODE_ID."
 	return 1
 fi
 

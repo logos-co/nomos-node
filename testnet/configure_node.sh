@@ -2,7 +2,7 @@
 
 set -e
 
-NET_NODE_KEY=$(./etc/nomos/etcd/register_etcd.sh)
+NET_NODE_KEY=$(./etc/nomos/register_node.sh)
 CONSENSUS_NODE_KEY=$NET_NODE_KEY
 
 node_ids=$(etcdctl get "/node/" --prefix --keys-only)
@@ -20,6 +20,6 @@ for node_id in $node_ids; do
 	fi
 done
 
-echo "I am a mixnet container ${HOSTNAME} node ${NET_NODE_KEY}"
+echo "I am a container ${HOSTNAME} node ${NET_NODE_KEY}"
 
 exec /usr/bin/nomos-node /etc/nomos/config.yaml

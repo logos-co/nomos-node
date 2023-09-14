@@ -3,7 +3,7 @@ services:
   bootstrap:
     build:
       context: .
-      dockerfile: testnet/Dockerfile.libp2p
+      dockerfile: testnet/Dockerfile
     ports:
       - "3000:3000/tcp"
       - "8080:8080/tcp"
@@ -11,12 +11,11 @@ services:
       - ./testnet:/etc/nomos
     environment:
       - NET_NODE_KEY=${DOCKER_COMPOSE_BOOSTRAP_NET_NODE_KEY}
-    entrypoint: /etc/nomos/run_bootstrap.sh
 
   libp2p-node:
     build:
       context: .
-      dockerfile: testnet/Dockerfile.libp2p
+      dockerfile: testnet/Dockerfile
     volumes:
       - ./testnet:/etc/nomos
     deploy:
@@ -31,27 +30,7 @@ services:
       - NODE_MASK=${DOCKER_COMPOSE_LIBP2P_NODE_KEY_MASK}
       - OVERLAY_NODES=${DOCKER_COMPOSE_OVERLAY_NODES}
       - NET_INITIAL_PEERS=${DOCKER_COMPOSE_NET_INITIAL_PEERS}
-    entrypoint: /etc/nomos/run_libp2p.sh
-
-  mixnet-node:
-    build:
-      context: .
-      dockerfile: testnet/Dockerfile.mixnet
-    volumes:
-      - ./testnet:/etc/nomos
-    deploy:
-      replicas: ${DOCKER_COMPOSE_MIXNET_REPLICAS} 
-    depends_on:
-      - bootstrap
-      - etcd
-    environment:
-      - DOCKER_REPLICAS=${DOCKER_COMPOSE_MIXNET_REPLICAS}
-      - ETCDCTL_ENDPOINTS=${DOCKER_COMPOSE_ETCDCTL_ENDPOINTS}
-      - ETCDCTL_API=${DOCKER_COMPOSE_ETCDCTL_API}
-      - NODE_MASK=${DOCKER_COMPOSE_MIXNET_NODE_KEY_MASK}
-      - OVERLAY_NODES=${DOCKER_COMPOSE_OVERLAY_NODES}
-      - NET_INITIAL_PEERS=${DOCKER_COMPOSE_NET_INITIAL_PEERS}
-    entrypoint: /etc/nomos/run_mixnet.sh
+    entrypoint: /etc/nomos/configure_node.sh
 
   etcd:
     image: quay.io/coreos/etcd:v3.4.15
