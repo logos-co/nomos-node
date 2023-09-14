@@ -6,7 +6,7 @@ use tokio_stream::wrappers::BroadcastStream;
 // internal
 use crate::network::messages::{NetworkMessage, NewViewMsg, TimeoutMsg, TimeoutQcMsg};
 use crate::network::{
-    messages::{ProposalChunkMsg, VoteMsg},
+    messages::{ProposalMsg, VoteMsg},
     BoxedStream, NetworkAdapter,
 };
 use consensus_engine::{BlockId, Committee, View};
@@ -161,13 +161,13 @@ impl NetworkAdapter for WakuAdapter {
         Self { network_relay }
     }
 
-    async fn proposal_chunks_stream(&self, view: View) -> BoxedStream<ProposalChunkMsg> {
+    async fn proposal_chunks_stream(&self, view: View) -> BoxedStream<ProposalMsg> {
         Box::new(Box::pin(
             self.cached_stream_with_content_topic(create_topic(PROPOSAL_TAG, None))
                 .await
                 .filter_map(move |message| {
                     let payload = message.payload();
-                    let proposal = ProposalChunkMsg::from_bytes(payload);
+                    let proposal = ProposalMsg::from_bytes(payload);
                     async move {
                         if view == proposal.view {
                             Some(proposal)
@@ -291,7 +291,7 @@ fn create_topic(tag: &str, committee: Option<&Committee>) -> WakuContentTopic {
 fn unwrap_message_to_bytes(message: &NetworkMessage) -> Box<[u8]> {
     match message {
         NetworkMessage::NewView(msg) => msg.as_bytes(),
-        NetworkMessage::ProposalChunk(msg) => msg.as_bytes(),
+        NetworkMessage::Proposal(msg) => msg.as_bytes(),
         NetworkMessage::Vote(msg) => msg.as_bytes(),
         NetworkMessage::Timeout(msg) => msg.as_bytes(),
         NetworkMessage::TimeoutQc(msg) => msg.as_bytes(),
@@ -301,7 +301,7 @@ fn unwrap_message_to_bytes(message: &NetworkMessage) -> Box<[u8]> {
 fn message_tag(message: &NetworkMessage) -> &str {
     match message {
         NetworkMessage::NewView(_) => NEW_VIEW_TAG,
-        NetworkMessage::ProposalChunk(_) => PROPOSAL_TAG,
+        NetworkMessage::Proposal(_) => PROPOSAL_TAG,
         NetworkMessage::Vote(_) => VOTE_TAG,
         NetworkMessage::Timeout(_) => TIMEOUT_TAG,
         NetworkMessage::TimeoutQc(_) => TIMEOUT_QC_TAG,

@@ -6,7 +6,7 @@ pub mod messages;
 use futures::Stream;
 // internal
 use crate::network::messages::{
-    NetworkMessage, NewViewMsg, ProposalChunkMsg, TimeoutMsg, TimeoutQcMsg, VoteMsg,
+    NetworkMessage, NewViewMsg, ProposalMsg, TimeoutMsg, TimeoutQcMsg, VoteMsg,
 };
 use consensus_engine::{BlockId, Committee, View};
 use nomos_network::backends::NetworkBackend;
@@ -25,7 +25,7 @@ pub trait NetworkAdapter {
     async fn proposal_chunks_stream(
         &self,
         view: View,
-    ) -> Box<dyn Stream<Item = ProposalChunkMsg> + Send + Sync + Unpin>;
+    ) -> Box<dyn Stream<Item = ProposalMsg> + Send + Sync + Unpin>;
     async fn broadcast(&self, message: NetworkMessage);
     async fn timeout_stream(&self, committee: &Committee, view: View) -> BoxedStream<TimeoutMsg>;
     async fn timeout_qc_stream(&self, view: View) -> BoxedStream<TimeoutQcMsg>;

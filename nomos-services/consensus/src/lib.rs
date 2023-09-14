@@ -22,7 +22,7 @@ use tokio::sync::oneshot::Sender;
 use tracing::instrument;
 // internal
 use crate::network::messages::{
-    NetworkMessage, NewViewMsg, ProposalChunkMsg, TimeoutMsg, TimeoutQcMsg, VoteMsg,
+    NetworkMessage, NewViewMsg, ProposalMsg, TimeoutMsg, TimeoutQcMsg, VoteMsg,
 };
 use crate::network::NetworkAdapter;
 use crate::tally::{
@@ -704,7 +704,7 @@ where
             .await
             .filter_map(move |msg| {
                 async move {
-                    let proposal = Block::from_bytes(&msg.chunk);
+                    let proposal = Block::from_bytes(&msg.data);
                     if proposal.header().id == msg.proposal {
                         // TODO: Leader is faulty? what should we do?
                         Some(proposal)
@@ -805,9 +805,9 @@ where
         },
         Output::BroadcastProposal { proposal } => {
             adapter
-                .broadcast(NetworkMessage::ProposalChunk(ProposalChunkMsg {
+                .broadcast(NetworkMessage::Proposal(ProposalMsg {
                     proposal: proposal.header().id,
-                    chunk: proposal.as_bytes().to_vec().into_boxed_slice(),
+                    data: proposal.as_bytes().to_vec().into_boxed_slice(),
                     view: proposal.header().view,
                 }))
                 .await;

@@ -10,7 +10,7 @@ use tokio_stream::wrappers::BroadcastStream;
 
 use crate::network::messages::{NetworkMessage, NewViewMsg, TimeoutMsg, TimeoutQcMsg};
 use crate::network::{
-    messages::{ProposalChunkMsg, VoteMsg},
+    messages::{ProposalMsg, VoteMsg},
     BoxedStream, NetworkAdapter,
 };
 use consensus_engine::{BlockId, Committee, View};
@@ -57,7 +57,7 @@ impl NetworkAdapter for MockAdapter {
         Self { network_relay }
     }
 
-    async fn proposal_chunks_stream(&self, _view: View) -> BoxedStream<ProposalChunkMsg> {
+    async fn proposal_chunks_stream(&self, _view: View) -> BoxedStream<ProposalMsg> {
         let stream_channel = self
             .message_subscriber_channel()
             .await
@@ -72,7 +72,7 @@ impl NetworkAdapter for MockAdapter {
                                 == message.content_topic().content_topic_name
                             {
                                 let payload = message.payload();
-                                Some(ProposalChunkMsg::from_bytes(payload.as_bytes()))
+                                Some(ProposalMsg::from_bytes(payload.as_bytes()))
                             } else {
                                 None
                             }
