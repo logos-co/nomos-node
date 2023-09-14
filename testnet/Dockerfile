@@ -23,9 +23,9 @@ RUN cargo build --release -p mixnode
 
 FROM bitnami/minideb:latest
 
-LABEL maintainer="augustinas@status.im"
-LABEL source="https://github.com/logos-co/nomos-node"
-LABEL description="Nomos node image"
+LABEL maintainer="augustinas@status.im" \
+      source="https://github.com/logos-co/nomos-node" \
+      description="Nomos testnet image"
 
 # nomos default ports
 EXPOSE 3000 8080 9000 60000	
@@ -35,4 +35,4 @@ COPY --from=builder /nomos/target/release/mixnode /usr/bin/mixnode
 COPY --from=builder /usr/bin/etcdctl /usr/bin/etcdctl
 COPY nodes/nomos-node/config.yaml /etc/nomos/config.yaml
 
-ENTRYPOINT ["nomos-node"]
+ENTRYPOINT ["/usr/bin/nomos-node"]

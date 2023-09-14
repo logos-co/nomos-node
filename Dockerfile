@@ -22,9 +22,9 @@ RUN cargo build --release -p nomos-node --no-default-features --features libp2p
 
 FROM bitnami/minideb:latest
 
-LABEL maintainer="augustinas@status.im"
-LABEL source="https://github.com/logos-co/nomos-node"
-LABEL description="Nomos node image"
+LABEL maintainer="augustinas@status.im" \
+      source="https://github.com/logos-co/nomos-node" \
+      description="Nomos node image"
 
 # nomos default ports
 EXPOSE 3000 8080 9000 60000	
