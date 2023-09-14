@@ -1,4 +1,4 @@
-use std::{error::Error, net::SocketAddr};
+use std::net::SocketAddr;
 
 use nym_sphinx::addressing::nodes::{NymNodeRoutingAddress, NymNodeRoutingAddressError};
 use rand::{seq::IteratorRandom, Rng};
@@ -6,6 +6,8 @@ use serde::{Deserialize, Serialize};
 use sphinx_packet::{crypto::PUBLIC_KEY_SIZE, route};
 
 pub type MixnetNodeId = [u8; PUBLIC_KEY_SIZE];
+
+pub type Result<T> = core::result::Result<T, NymNodeRoutingAddressError>;
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct MixnetTopology {
@@ -54,10 +56,7 @@ mod hex_serde {
 }
 
 impl MixnetTopology {
-    pub fn random_route<R: Rng>(
-        &self,
-        rng: &mut R,
-    ) -> Result<Vec<route::Node>, Box<dyn Error + Send + Sync + 'static>> {
+    pub fn random_route<R: Rng>(&self, rng: &mut R) -> Result<Vec<route::Node>> {
         let num_hops = self.layers.len();
 
         let route: Vec<route::Node> = self
@@ -81,7 +80,7 @@ impl MixnetTopology {
     pub fn random_destination<R: Rng>(
         &self,
         rng: &mut R,
-    ) -> Result<route::Node, Box<dyn Error + Send + Sync + 'static>> {
+    ) -> core::result::Result<route::Node, NymNodeRoutingAddressError> {
         Ok(self
             .layers
             .last()
@@ -103,7 +102,7 @@ impl Layer {
 impl TryInto<route::Node> for Node {
     type Error = NymNodeRoutingAddressError;
 
-    fn try_into(self) -> Result<route::Node, Self::Error> {
+    fn try_into(self) -> core::result::Result<route::Node, Self::Error> {
         Ok(route::Node {
             address: NymNodeRoutingAddress::from(self.address).try_into()?,
             pub_key: self.public_key.into(),

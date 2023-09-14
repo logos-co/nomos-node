@@ -1,6 +1,6 @@
-use std::{error::Error, net::SocketAddr, time::Duration};
+use std::{net::SocketAddr, time::Duration};
 
-use mixnet_protocol::Body;
+use mixnet_protocol::{Body, ProtocolError};
 use mixnet_topology::MixnetTopology;
 use mixnet_util::ConnectionPool;
 use nym_sphinx::{
@@ -10,6 +10,8 @@ use nym_sphinx::{
 };
 use rand::{distributions::Uniform, prelude::Distribution, Rng};
 use sphinx_packet::{route, SphinxPacket, SphinxPacketBuilder};
+
+use super::error::*;
 
 // Sender splits messages into Sphinx packets and sends them to the Mixnet.
 pub struct Sender<R: Rng> {
@@ -28,11 +30,7 @@ impl<R: Rng> Sender<R> {
         }
     }
 
-    pub fn send(
-        &mut self,
-        msg: Vec<u8>,
-        total_delay: Duration,
-    ) -> Result<(), Box<dyn Error + Send + Sync + 'static>> {
+    pub fn send(&mut self, msg: Vec<u8>, total_delay: Duration) -> Result<()> {
         let destination = self.topology.random_destination(&mut self.rng)?;
         let destination = Destination::new(
             DestinationAddressBytes::from_bytes(destination.address.as_bytes()),
@@ -42,7 +40,7 @@ impl<R: Rng> Sender<R> {
         self.pad_and_split_message(msg)
             .into_iter()
             .map(|fragment| self.build_sphinx_packet(fragment, &destination, total_delay))
-            .collect::<Result<Vec<_>, _>>()?
+            .collect::<Result<Vec<_>>>()?
             .into_iter()
             .for_each(|(packet, first_node)| {
                 let pool = self.pool.clone();
@@ -77,8 +75,7 @@ impl<R: Rng> Sender<R> {
         fragment: Fragment,
         destination: &Destination,
         total_delay: Duration,
-    ) -> Result<(sphinx_packet::SphinxPacket, route::Node), Box<dyn Error + Send + Sync + 'static>>
-    {
+    ) -> Result<(sphinx_packet::SphinxPacket, route::Node)> {
         let route = self.topology.random_route(&mut self.rng)?;
 
         let delays: Vec<Delay> =
@@ -92,7 +89,8 @@ impl<R: Rng> Sender<R> {
 
         let packet = SphinxPacketBuilder::new()
             .with_payload_size(payload.len() + PAYLOAD_OVERHEAD_SIZE)
-            .build_packet(payload, &route, destination, &delays)?;
+            .build_packet(payload, &route, destination, &delays)
+            .map_err(ProtocolError::InvalidSphinxPacket)?;
 
         let first_mixnode = route.first().cloned().expect("route is not empty");
 
@@ -103,12 +101,12 @@ impl<R: Rng> Sender<R> {
         pool: &ConnectionPool,
         packet: Box<SphinxPacket>,
         addr: NodeAddressBytes,
-    ) -> Result<(), Box<dyn Error + Send + Sync + 'static>> {
-        let addr = SocketAddr::try_from(NymNodeRoutingAddress::try_from(addr)?)?;
+    ) -> Result<()> {
+        let addr = SocketAddr::from(NymNodeRoutingAddress::try_from(addr)?);
         tracing::debug!("Sending a Sphinx packet to the node: {addr:?}");
 
         let mu: std::sync::Arc<tokio::sync::Mutex<tokio::net::TcpStream>> =
-            pool.get_or_init(&addr).await?;
+            pool.get_or_init(&addr).await.map_err(ProtocolError::IO)?;
         let mut socket = mu.lock().await;
         let body = Body::new_sphinx(packet);
         body.write(&mut *socket).await?;
