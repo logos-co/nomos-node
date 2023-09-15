@@ -10,16 +10,18 @@ use blake2::digest::{consts::U32, Digest};
 use blake2::Blake2b;
 use libp2p::gossipsub::{Message, MessageId, TopicHash};
 
-use libp2p::tcp::tokio::Tcp;
 pub use libp2p::{
     core::upgrade,
     dns,
     gossipsub::{self, PublishError, SubscriptionError},
     identity::{self, secp256k1},
     plaintext::PlainText2Config,
-    swarm::{DialError, NetworkBehaviour, SwarmBuilder, SwarmEvent, THandlerErr},
+    swarm::{
+        dial_opts::DialOpts, DialError, NetworkBehaviour, SwarmBuilder, SwarmEvent, THandlerErr,
+    },
     tcp, yamux, PeerId, Transport,
 };
+use libp2p::{swarm::ConnectionId, tcp::tokio::Tcp};
 pub use multiaddr::{multiaddr, Multiaddr, Protocol};
 use serde::{Deserialize, Serialize};
 
@@ -43,9 +45,6 @@ pub struct SwarmConfig {
     // Secp256k1 private key in Hex format (`0x123...abc`). Default random
     #[serde(with = "secret_key_serde", default = "secp256k1::SecretKey::generate")]
     pub node_key: secp256k1::SecretKey,
-    // Initial peers to connect to
-    #[serde(default)]
-    pub initial_peers: Vec<Multiaddr>,
 }
 
 impl Default for SwarmConfig {
@@ -54,7 +53,6 @@ impl Default for SwarmConfig {
             host: std::net::Ipv4Addr::new(0, 0, 0, 0),
             port: 60000,
             node_key: secp256k1::SecretKey::generate(),
-            initial_peers: Vec::new(),
         }
     }
 }
@@ -110,18 +108,17 @@ impl Swarm {
 
         swarm.listen_on(multiaddr!(Ip4(config.host), Tcp(config.port)))?;
 
-        for peer in &config.initial_peers {
-            swarm.dial(peer.clone())?;
-        }
-
         Ok(Swarm { swarm })
     }
 
     /// Initiates a connection attempt to a peer
-    pub fn connect(&mut self, peer_id: PeerId, peer_addr: Multiaddr) -> Result<(), DialError> {
-        tracing::debug!("attempting to dial {peer_id}");
-        self.swarm.dial(peer_addr.with(Protocol::P2p(peer_id)))?;
-        Ok(())
+    pub fn connect(&mut self, peer_addr: Multiaddr) -> Result<ConnectionId, DialError> {
+        let opt = DialOpts::from(peer_addr.clone());
+        let connection_id = opt.connection_id();
+
+        tracing::debug!("attempting to dial {peer_addr}. connection_id:{connection_id:?}",);
+        self.swarm.dial(opt)?;
+        Ok(connection_id)
     }
 
     /// Subscribes to a topic
