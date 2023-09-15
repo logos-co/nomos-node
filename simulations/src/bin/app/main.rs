@@ -110,6 +110,7 @@ impl SimulationApp {
                     View::new(0),
                     Block::genesis().parent_qc,
                     [].into_iter(),
+                    [].into_iter(),
                     leader,
                     RandomBeaconState::Sad {
                         entropy: Box::new([0; 32]),

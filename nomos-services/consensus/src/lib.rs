@@ -594,7 +594,7 @@ where
         match rx.await {
             Ok(txs) => {
                 let beacon = RandomBeaconState::generate_happy(qc.view(), &private_key);
-                let proposal = Block::new(qc.view().next(), qc, txs, id, beacon);
+                let proposal = Block::new(qc.view().next(), qc, txs, [].into_iter(), id, beacon);
                 output = Some(Output::BroadcastProposal { proposal });
             }
             Err(e) => tracing::error!("Could not fetch txs {e}"),

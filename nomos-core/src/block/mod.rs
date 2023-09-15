@@ -1,3 +1,5 @@
+pub mod builder;
+
 use consensus_engine::overlay::RandomBeaconState;
 use indexmap::IndexSet;
 // std
@@ -31,11 +33,12 @@ impl<
         view: View,
         parent_qc: Qc,
         txs: impl Iterator<Item = Tx>,
+        blobs: impl Iterator<Item = Blob>,
         proposer: NodeId,
         beacon: RandomBeaconState,
     ) -> Self {
         let transactions = txs.collect();
-        let blobs = IndexSet::new();
+        let blobs = blobs.collect();
         let header = consensus_engine::Block {
             id: BlockId::zeros(),
             view,
