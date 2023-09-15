@@ -11,7 +11,6 @@ use nomos_consensus::network::adapters::libp2p::Libp2pAdapter as ConsensusLibp2p
 #[cfg(feature = "waku")]
 use nomos_consensus::network::adapters::waku::WakuAdapter as ConsensusWakuAdapter;
 use nomos_consensus::CarnotConsensus;
-use nomos_core::fountain::mock::MockFountain;
 use nomos_http::backends::axum::AxumBackend;
 use nomos_http::bridge::HttpBridgeService;
 use nomos_http::http::HttpService;
@@ -41,7 +40,6 @@ pub type Carnot = CarnotConsensus<
     ConsensusWakuAdapter,
     MockPool<Tx>,
     MempoolWakuAdapter<Tx>,
-    MockFountain,
     FlatOverlay<RoundRobin, RandomBeaconState>,
     Blob,
 >;
@@ -51,7 +49,6 @@ pub type Carnot = CarnotConsensus<
     ConsensusLibp2pAdapter,
     MockPool<Tx>,
     MempoolLibp2pAdapter<Tx>,
-    MockFountain,
     FlatOverlay<RoundRobin, RandomBeaconState>,
     Blob,
 >;

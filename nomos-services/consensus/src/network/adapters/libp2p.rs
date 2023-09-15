@@ -10,7 +10,7 @@ use tokio_stream::wrappers::ReceiverStream;
 // internal
 use crate::network::messages::{NewViewMsg, TimeoutMsg, TimeoutQcMsg};
 use crate::network::{
-    messages::{NetworkMessage, ProposalChunkMsg, VoteMsg},
+    messages::{NetworkMessage, ProposalMsg, VoteMsg},
     BoxedStream, NetworkAdapter,
 };
 use consensus_engine::{BlockId, Committee, CommitteeId, View};
@@ -93,7 +93,7 @@ impl<T> Spsc<T> {
 
 #[derive(Default)]
 struct Messages {
-    proposal_chunks: Spsc<ProposalChunkMsg>,
+    proposal_chunks: Spsc<ProposalMsg>,
     votes: HashMap<CommitteeId, HashMap<BlockId, Spsc<VoteMsg>>>,
     new_views: HashMap<CommitteeId, Spsc<NewViewMsg>>,
     timeouts: HashMap<CommitteeId, Spsc<TimeoutMsg>>,
@@ -130,7 +130,7 @@ impl MessageCache {
     }
 
     // This will also advance the cache to use view - 1 as the current view
-    fn get_proposals(&self, view: View) -> Option<Receiver<ProposalChunkMsg>> {
+    fn get_proposals(&self, view: View) -> Option<Receiver<ProposalMsg>> {
         let mut cache = self.cache.lock().unwrap();
         let res = cache
             .get_mut(&view)
@@ -255,7 +255,7 @@ impl NetworkAdapter for Libp2pAdapter {
                     Ok(Event::Message(message)) => {
                         match nomos_core::wire::deserialize(&message.data) {
                             Ok(GossipsubMessage { to, message }) => match message {
-                                NetworkMessage::ProposalChunk(msg) => {
+                                NetworkMessage::Proposal(msg) => {
                                     tracing::debug!("received proposal chunk");
                                     let mut cache = cache.cache.lock().unwrap();
                                     let view = msg.view;
@@ -326,10 +326,10 @@ impl NetworkAdapter for Libp2pAdapter {
         }
     }
 
-    async fn proposal_chunks_stream(&self, view: View) -> BoxedStream<ProposalChunkMsg> {
+    async fn proposal_chunks_stream(&self, view: View) -> BoxedStream<ProposalMsg> {
         self.message_cache
             .get_proposals(view)
-            .map::<BoxedStream<ProposalChunkMsg>, _>(|stream| Box::new(ReceiverStream::new(stream)))
+            .map::<BoxedStream<ProposalMsg>, _>(|stream| Box::new(ReceiverStream::new(stream)))
             .unwrap_or_else(|| Box::new(tokio_stream::empty()))
     }
 

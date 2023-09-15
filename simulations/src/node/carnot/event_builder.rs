@@ -93,7 +93,7 @@ impl EventBuilder {
         for message in messages {
             match message {
                 CarnotMessage::Proposal(msg) => {
-                    let block = Block::from_bytes(&msg.chunk);
+                    let block = Block::from_bytes(&msg.data);
                     tracing::info!(
                         node=%self.id,
                         current_view = %engine.current_view(),
