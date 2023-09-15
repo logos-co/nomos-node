@@ -7,6 +7,7 @@ use bytes::Bytes;
 pub mod carnot;
 #[cfg(feature = "mock")]
 pub mod mock;
+pub mod select;
 
 pub type TransactionHasher<T> = fn(&T) -> <T as Transaction>::Hash;
 
@@ -17,4 +18,12 @@ pub trait Transaction {
         Self::HASHER(self)
     }
     fn as_bytes(&self) -> Bytes;
+}
+
+pub trait TxSelect {
+    type Tx: Transaction;
+    fn select_tx_from<'i, I: Iterator<Item = Self::Tx> + 'i>(
+        &self,
+        txs: I,
+    ) -> Box<dyn Iterator<Item = Self::Tx> + 'i>;
 }

@@ -123,8 +123,9 @@ where
         (committee_size * 2 / 3) + 1
     }
 
-    fn leader_super_majority_threshold(&self, id: NodeId) -> usize {
-        self.super_majority_threshold(id)
+    fn leader_super_majority_threshold(&self, _id: NodeId) -> usize {
+        let committee_size = self.root_committee().len();
+        (committee_size * 2 / 3) + 1
     }
 
     fn update_leader_selection<F, E>(&self, f: F) -> Result<Self, E>

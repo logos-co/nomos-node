@@ -34,7 +34,7 @@ use consensus_engine::{
     Block, BlockId, Carnot, Committee, Overlay, Payload, Qc, StandardQc, TimeoutQc, View, Vote,
 };
 use nomos_consensus::committee_membership::UpdateableCommitteeMembership;
-use nomos_consensus::network::messages::{ProposalChunkMsg, TimeoutQcMsg};
+use nomos_consensus::network::messages::{ProposalMsg, TimeoutQcMsg};
 use nomos_consensus::{
     leader_selection::UpdateableLeaderSelection,
     network::messages::{NewViewMsg, TimeoutMsg, VoteMsg},
@@ -177,8 +177,8 @@ impl<
             }
             Output::BroadcastProposal { proposal } => {
                 self.network_interface
-                    .broadcast(CarnotMessage::Proposal(ProposalChunkMsg {
-                        chunk: proposal.as_bytes().to_vec().into(),
+                    .broadcast(CarnotMessage::Proposal(ProposalMsg {
+                        data: proposal.as_bytes().to_vec().into(),
                         proposal: proposal.header().id,
                         view: proposal.header().view,
                     }))
@@ -268,6 +268,7 @@ impl<
                     proposal: nomos_core::block::Block::new(
                         qc.view().next(),
                         qc.clone(),
+                        [].into_iter(),
                         [].into_iter(),
                         self.id,
                         RandomBeaconState::generate_happy(qc.view().next(), &self.random_beacon_pk),
