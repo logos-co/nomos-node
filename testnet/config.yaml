@@ -19,28 +19,14 @@ network:
     discV5BootstrapNodes: []
     initial_peers: []
     relayTopics: []
-    # Mixclient configuration to communicate with mixnodes.
-    # The libp2p network backend always requires this mixclient configuration
-    # (cannot be disabled for now).
     mixnet_client:
-      # A mixclient mode. For details, see the documentation of the "mixnet" crate.
-      # - Sender
-      # - !SenderReceiver [mixnode_client_listen_address]
       mode: Sender
-      # A mixnet topology, which contains the information of all mixnodes in the mixnet.
-      # (The topology is static for now.)
       topology:
-        # Each mixnet layer consists of a list of mixnodes.
         layers:
          - nodes:
-            - address: 127.0.0.1:7777  # A listen address of the mixnode
-              # A ed25519 public key for encrypting Sphinx packets for the mixnode
+            - address: 127.0.0.1:7777
               public_key: "0000000000000000000000000000000000000000000000000000000000000000"
-      # A max number of connections that will stay connected to mixnodes in the first mixnet layer.
       connection_pool_size: 255
-    # A range of total delay that will be set to each Sphinx packets
-    # sent to the mixnet for timing obfuscation.
-    # Panics if start > end.
     mixnet_delay:
       start: "0ms"
       end: "0ms"

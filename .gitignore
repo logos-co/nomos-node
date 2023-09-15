@@ -14,3 +14,4 @@ config.yml
 store.*
 sim_config.json
 *.txt
+.env
