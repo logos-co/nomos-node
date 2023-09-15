@@ -22,7 +22,7 @@ use tokio::sync::oneshot::Sender;
 use tracing::instrument;
 // internal
 use crate::network::messages::{
-    NetworkMessage, NewViewMsg, ProposalChunkMsg, TimeoutMsg, TimeoutQcMsg, VoteMsg,
+    NetworkMessage, NewViewMsg, ProposalMsg, TimeoutMsg, TimeoutQcMsg, VoteMsg,
 };
 use crate::network::NetworkAdapter;
 use crate::tally::{
@@ -36,7 +36,6 @@ use task_manager::TaskManager;
 
 use crate::committee_membership::UpdateableCommitteeMembership;
 use nomos_core::block::Block;
-use nomos_core::fountain::FountainCode;
 use nomos_core::tx::Transaction;
 use nomos_core::vote::Tally;
 use nomos_mempool::{
@@ -60,45 +59,40 @@ fn default_timeout() -> Duration {
 pub type Seed = [u8; 32];
 
 #[derive(Debug, Deserialize, Serialize)]
-pub struct CarnotSettings<Fountain: FountainCode, O: Overlay> {
+pub struct CarnotSettings<O: Overlay> {
     pub private_key: [u8; 32],
-    pub fountain_settings: Fountain::Settings,
     pub overlay_settings: O::Settings,
     #[serde(default = "default_timeout")]
     pub timeout: Duration,
 }
 
-impl<Fountain: FountainCode, O: Overlay> Clone for CarnotSettings<Fountain, O> {
+impl<O: Overlay> Clone for CarnotSettings<O> {
     fn clone(&self) -> Self {
         Self {
             private_key: self.private_key,
-            fountain_settings: self.fountain_settings.clone(),
             overlay_settings: self.overlay_settings.clone(),
             timeout: self.timeout,
         }
     }
 }
 
-impl<Fountain: FountainCode, O: Overlay> CarnotSettings<Fountain, O> {
+impl<O: Overlay> CarnotSettings<O> {
     #[inline]
     pub const fn new(
         private_key: [u8; 32],
-        fountain_settings: Fountain::Settings,
         overlay_settings: O::Settings,
         timeout: Duration,
     ) -> Self {
         Self {
             private_key,
-            fountain_settings,
             overlay_settings,
             timeout,
         }
     }
 }
 
-pub struct CarnotConsensus<A, P, M, F, O, B>
+pub struct CarnotConsensus<A, P, M, O, B>
 where
-    F: FountainCode,
     A: NetworkAdapter,
     M: MempoolAdapter<Tx = P::Tx>,
     P: MemPool,
@@ -112,15 +106,13 @@ where
     // when implementing ServiceCore for CarnotConsensus
     network_relay: Relay<NetworkService<A::Backend>>,
     mempool_relay: Relay<MempoolService<M, P>>,
-    _fountain: std::marker::PhantomData<F>,
     _overlay: std::marker::PhantomData<O>,
     // this need to be substituted by some kind DA bo
     _blob: std::marker::PhantomData<B>,
 }
 
-impl<A, P, M, F, O, B> ServiceData for CarnotConsensus<A, P, M, F, O, B>
+impl<A, P, M, O, B> ServiceData for CarnotConsensus<A, P, M, O, B>
 where
-    F: FountainCode,
     A: NetworkAdapter,
     P: MemPool,
     P::Tx: Transaction + Debug,
@@ -129,16 +121,15 @@ where
     O: Overlay + Debug,
 {
     const SERVICE_ID: ServiceId = "Carnot";
-    type Settings = CarnotSettings<F, O>;
+    type Settings = CarnotSettings<O>;
     type State = NoState<Self::Settings>;
     type StateOperator = NoOperator<Self::State>;
     type Message = ConsensusMsg;
 }
 
 #[async_trait::async_trait]
-impl<A, P, M, F, O, B> ServiceCore for CarnotConsensus<A, P, M, F, O, B>
+impl<A, P, M, O, B> ServiceCore for CarnotConsensus<A, P, M, O, B>
 where
-    F: FountainCode + Clone + Send + Sync + 'static,
     A: NetworkAdapter + Clone + Send + Sync + 'static,
     P: MemPool + Send + Sync + 'static,
     P::Settings: Send + Sync + 'static,
@@ -157,7 +148,6 @@ where
         Ok(Self {
             service_state,
             network_relay,
-            _fountain: Default::default(),
             _overlay: Default::default(),
             _blob: Default::default(),
             mempool_relay,
@@ -179,7 +169,6 @@ where
 
         let CarnotSettings {
             private_key,
-            fountain_settings,
             overlay_settings,
             timeout,
         } = self.service_state.settings_reader.get_updated_settings();
@@ -195,7 +184,6 @@ where
         };
         let mut carnot = Carnot::from_genesis(NodeId::new(private_key), genesis, overlay);
         let adapter = A::new(network_relay).await;
-        let fountain = F::new(fountain_settings);
         let private_key = PrivateKey::new(private_key);
         let self_committee = carnot.self_committee();
         let leader_committee = [carnot.id()].into_iter().collect::<Committee>();
@@ -257,7 +245,6 @@ where
                             adapter.clone(),
                             private_key,
                             mempool_relay.clone(),
-                            &fountain,
                             timeout,
                         )
                         .await
@@ -278,9 +265,8 @@ enum Output<Tx: Clone + Eq + Hash, Blob: Clone + Eq + Hash> {
     BroadcastProposal { proposal: Block<Tx, Blob> },
 }
 
-impl<A, P, M, F, O, B> CarnotConsensus<A, P, M, F, O, B>
+impl<A, P, M, O, B> CarnotConsensus<A, P, M, O, B>
 where
-    F: FountainCode + Clone + Send + Sync + 'static,
     A: NetworkAdapter + Clone + Send + Sync + 'static,
     P: MemPool + Send + Sync + 'static,
     P::Settings: Send + Sync + 'static,
@@ -320,7 +306,6 @@ where
         adapter: A,
         private_key: PrivateKey,
         mempool_relay: OutboundRelay<MempoolMsg<P::Tx>>,
-        fountain: &F,
         timeout: Duration,
     ) -> Carnot<O> {
         let mut output = None;
@@ -387,7 +372,7 @@ where
         }
 
         if let Some(output) = output {
-            handle_output(&adapter, fountain, carnot.id(), output).await;
+            handle_output(&adapter, carnot.id(), output).await;
         }
 
         carnot
@@ -719,7 +704,7 @@ where
             .await
             .filter_map(move |msg| {
                 async move {
-                    let proposal = Block::from_bytes(&msg.chunk);
+                    let proposal = Block::from_bytes(&msg.data);
                     if proposal.header().id == msg.proposal {
                         // TODO: Leader is faulty? what should we do?
                         Some(proposal)
@@ -775,14 +760,9 @@ where
     }
 }
 
-async fn handle_output<A, F, Tx, B>(
-    adapter: &A,
-    fountain: &F,
-    node_id: NodeId,
-    output: Output<Tx, B>,
-) where
+async fn handle_output<A, Tx, B>(adapter: &A, node_id: NodeId, output: Output<Tx, B>)
+where
     A: NetworkAdapter,
-    F: FountainCode,
     Tx: Hash + Eq + Clone + Serialize + DeserializeOwned + Debug,
     B: Clone + Eq + Hash + Serialize + DeserializeOwned,
 {
@@ -824,15 +804,12 @@ async fn handle_output<A, F, Tx, B>(
             }
         },
         Output::BroadcastProposal { proposal } => {
-            fountain
-                .encode(&proposal.as_bytes())
-                .for_each(|chunk| {
-                    adapter.broadcast(NetworkMessage::ProposalChunk(ProposalChunkMsg {
-                        proposal: proposal.header().id,
-                        chunk: chunk.to_vec().into_boxed_slice(),
-                        view: proposal.header().view,
-                    }))
-                })
+            adapter
+                .broadcast(NetworkMessage::Proposal(ProposalMsg {
+                    proposal: proposal.header().id,
+                    data: proposal.as_bytes().to_vec().into_boxed_slice(),
+                    view: proposal.header().view,
+                }))
                 .await;
         }
         Output::BroadcastTimeoutQc { timeout_qc } => {

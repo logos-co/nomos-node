@@ -7,13 +7,13 @@ use consensus_engine::{BlockId, NewView, Qc, Timeout, TimeoutQc, View, Vote};
 use nomos_core::wire;
 
 #[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash)]
-pub struct ProposalChunkMsg {
-    pub chunk: Box<[u8]>,
+pub struct ProposalMsg {
+    pub data: Box<[u8]>,
     pub proposal: BlockId,
     pub view: View,
 }
 
-impl ProposalChunkMsg {
+impl ProposalMsg {
     pub fn as_bytes(&self) -> Box<[u8]> {
         wire::serialize(self).unwrap().into_boxed_slice()
     }
@@ -90,7 +90,7 @@ pub enum NetworkMessage {
     TimeoutQc(TimeoutQcMsg),
     Vote(VoteMsg),
     NewView(NewViewMsg),
-    ProposalChunk(ProposalChunkMsg),
+    Proposal(ProposalMsg),
 }
 
 impl NetworkMessage {
