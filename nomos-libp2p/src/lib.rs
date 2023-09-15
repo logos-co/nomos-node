@@ -10,8 +10,10 @@ use blake2::digest::{consts::U32, Digest};
 use blake2::Blake2b;
 use libp2p::gossipsub::{Message, MessageId, TopicHash};
 
+use libp2p::tcp::tokio::Tcp;
 pub use libp2p::{
     core::upgrade,
+    dns,
     gossipsub::{self, PublishError, SubscriptionError},
     identity::{self, secp256k1},
     plaintext::PlainText2Config,
@@ -76,7 +78,7 @@ impl Swarm {
         log::info!("libp2p peer_id:{}", local_peer_id);
 
         // TODO: consider using noise authentication
-        let tcp_transport = tcp::tokio::Transport::new(tcp::Config::default().nodelay(true))
+        let tcp_transport = tcp::Transport::<Tcp>::new(tcp::Config::default().nodelay(true))
             .upgrade(upgrade::Version::V1Lazy)
             .authenticate(PlainText2Config {
                 local_public_key: id_keys.public(),
@@ -84,6 +86,9 @@ impl Swarm {
             .multiplex(yamux::Config::default())
             .timeout(TRANSPORT_TIMEOUT)
             .boxed();
+
+        // Wrapping TCP transport into DNS transport to resolve hostnames.
+        let tcp_transport = dns::TokioDnsConfig::system(tcp_transport)?.boxed();
 
         // TODO: consider using Signed or Anonymous.
         //       For Anonymous, a custom `message_id` function need to be set
