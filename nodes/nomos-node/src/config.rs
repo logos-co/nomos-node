@@ -230,7 +230,7 @@ impl Config {
         }
 
         if let Some(peers) = initial_peers {
-            self.network.backend.inner.initial_peers = peers;
+            self.network.backend.initial_peers = peers;
         }
 
         Ok(self)
