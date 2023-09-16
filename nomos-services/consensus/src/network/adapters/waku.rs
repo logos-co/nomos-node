@@ -134,7 +134,9 @@ impl WakuAdapter {
             payload,
             content_topic,
             1,
-            chrono::Utc::now().timestamp_nanos() as usize,
+            chrono::Utc::now()
+                .timestamp_nanos_opt()
+                .expect("timestamp should be in valid range") as usize,
             [],
             false,
         );
