@@ -4,7 +4,7 @@ use std::process::{Child, Command, Stdio};
 use std::time::Duration;
 // internal
 use crate::{get_available_port, Node, SpawnConfig};
-use consensus_engine::overlay::{FlatOverlaySettings, RoundRobin};
+use consensus_engine::overlay::{RandomBeaconState, RoundRobin, TreeOverlaySettings};
 use consensus_engine::NodeId;
 #[cfg(feature = "libp2p")]
 use mixnet_client::{MixnetClientConfig, MixnetClientMode};
@@ -227,7 +227,7 @@ impl Node for NomosNode {
 fn create_node_config(
     nodes: Vec<NodeId>,
     private_key: [u8; 32],
-    threshold: Fraction,
+    _threshold: Fraction,
     timeout: Duration,
     #[cfg(feature = "libp2p")] mixnet_node_config: Option<MixnetNodeConfig>,
     #[cfg(feature = "waku")] _mixnet_node_config: Option<MixnetNodeConfig>,
@@ -263,13 +263,12 @@ fn create_node_config(
         },
         consensus: CarnotSettings {
             private_key,
-            overlay_settings: FlatOverlaySettings {
+            overlay_settings: TreeOverlaySettings {
                 nodes,
                 leader: RoundRobin::new(),
-                // By setting the leader_threshold to 1 we ensure that all nodes come
-                // online before progressing. This is only necessary until we add a way
-                // to recover poast blocks from other nodes.
-                leader_super_majority_threshold: Some(threshold),
+                current_leader: [0; 32].into(),
+                number_of_committees: 1,
+                committee_membership: RandomBeaconState::initial_sad_from_entropy([0; 32]),
             },
             timeout,
         },
