@@ -1,7 +1,7 @@
 mod client_notifier;
 pub mod config;
 
-use std::{error::Error, net::SocketAddr, time::Duration};
+use std::{net::SocketAddr, time::Duration};
 
 use client_notifier::ClientNotifier;
 pub use config::MixnetNodeConfig;
@@ -258,7 +258,7 @@ impl MixnetNode {
         body: Body,
         to: NymNodeRoutingAddress,
     ) -> Result<()> {
-        let addr = SocketAddr::try_from(to)?;
+        let addr = SocketAddr::from(to);
         let arc_socket = pool.get_or_init(&addr).await?;
 
         if let Err(e) = {
@@ -273,7 +273,8 @@ impl MixnetNode {
                 body,
                 arc_socket,
             )
-            .await;
+            .await
+            .map_err(Into::into);
         }
         Ok(())
     }

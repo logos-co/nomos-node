@@ -1,8 +1,10 @@
 use sphinx_packet::{payload::Payload, SphinxPacket};
 
-use std::{error::Error, io::ErrorKind, net::SocketAddr, sync::Arc, time::Duration};
-use tokio::io::{
-    self, net::TcpStream, sync::Mutex, AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt,
+use std::{io::ErrorKind, net::SocketAddr, sync::Arc, time::Duration};
+use tokio::{
+    io::{self, AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt},
+    net::TcpStream,
+    sync::Mutex,
 };
 
 pub type Result<T> = core::result::Result<T, ProtocolError>;
@@ -88,7 +90,7 @@ impl Body {
         Self::final_payload_from_bytes(&buf)
     }
 
-    pub async fn write<W>(self, writer: &mut W) -> Result<()>
+    pub async fn write<W>(&self, writer: &mut W) -> Result<()>
     where
         W: AsyncWrite + Unpin + ?Sized,
     {

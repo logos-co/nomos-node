@@ -143,7 +143,8 @@ impl<R: Rng> Sender<R> {
                 body,
                 arc_socket,
             )
-            .await;
+            .await
+            .map_err(Into::into);
         }
         Ok(())
     }
