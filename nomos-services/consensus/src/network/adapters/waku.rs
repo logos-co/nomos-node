@@ -134,7 +134,7 @@ impl WakuAdapter {
             payload,
             content_topic,
             1,
-            chrono::Utc::now().timestamp_nanos() as usize,
+            chrono::Utc::now().timestamp_nanos_opt().unwrap() as usize,
             [],
             false,
         );

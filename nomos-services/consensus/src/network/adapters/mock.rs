@@ -131,7 +131,7 @@ impl NetworkAdapter for MockAdapter {
             String::from_utf8_lossy(&message.as_bytes()).to_string(),
             MOCK_APPROVAL_CONTENT_TOPIC,
             1,
-            chrono::Utc::now().timestamp_nanos() as usize,
+            chrono::Utc::now().timestamp_nanos_opt().unwrap() as usize,
         );
         if let Err((e, _e)) = self
             .network_relay
