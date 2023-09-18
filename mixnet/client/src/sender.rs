@@ -106,7 +106,7 @@ impl<R: Rng> Sender<R> {
         tracing::debug!("Sending a Sphinx packet to the node: {addr:?}");
 
         let mu: std::sync::Arc<tokio::sync::Mutex<tokio::net::TcpStream>> =
-            pool.get_or_init(&addr).await.map_err(ProtocolError::IO)?;
+            pool.get_or_init(&addr).await?;
         let mut socket = mu.lock().await;
         let body = Body::new_sphinx(packet);
         body.write(&mut *socket).await?;

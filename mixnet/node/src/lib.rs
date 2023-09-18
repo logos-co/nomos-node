@@ -199,15 +199,8 @@ impl MixnetNode {
 
     async fn forward(pool: &ConnectionPool, body: Body, to: NymNodeRoutingAddress) -> Result<()> {
         let addr = SocketAddr::from(to);
-        body.write(
-            &mut *pool
-                .get_or_init(&addr)
-                .await
-                .map_err(ProtocolError::IO)?
-                .lock()
-                .await,
-        )
-        .await?;
+        body.write(&mut *pool.get_or_init(&addr).await?.lock().await)
+            .await?;
         Ok(())
     }
 }

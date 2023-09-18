@@ -77,19 +77,14 @@ impl MixnetTopology {
     }
 
     // Choose a destination mixnet node randomly from the last layer.
-    pub fn random_destination<R: Rng>(
-        &self,
-        rng: &mut R,
-    ) -> core::result::Result<route::Node, NymNodeRoutingAddressError> {
-        Ok(self
-            .layers
+    pub fn random_destination<R: Rng>(&self, rng: &mut R) -> Result<route::Node> {
+        self.layers
             .last()
             .expect("topology is not empty")
             .random_node(rng)
             .expect("layer is not empty")
             .clone()
             .try_into()
-            .unwrap())
     }
 }
 
@@ -102,7 +97,7 @@ impl Layer {
 impl TryInto<route::Node> for Node {
     type Error = NymNodeRoutingAddressError;
 
-    fn try_into(self) -> core::result::Result<route::Node, Self::Error> {
+    fn try_into(self) -> Result<route::Node> {
         Ok(route::Node {
             address: NymNodeRoutingAddress::from(self.address).try_into()?,
             pub_key: self.public_key.into(),
