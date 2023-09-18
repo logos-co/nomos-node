@@ -25,6 +25,7 @@ nomos-mempool = { path = "../../nomos-services/mempool", features = ["mock"] }
 nomos-http = { path = "../../nomos-services/http", features = ["http"] }
 nomos-consensus = { path = "../../nomos-services/consensus" }
 nomos-libp2p = { path = "../../nomos-libp2p", optional = true }
+nomos-da = { path = "../../nomos-services/data-availability" }
 metrics = { path = "../../nomos-services/metrics", optional = true }
 tracing-subscriber = "0.3"
 consensus-engine = { path = "../../consensus-engine" }
@@ -34,7 +35,7 @@ serde_yaml = "0.9"
 color-eyre = "0.6.0"
 serde = "1"
 waku-bindings = { version = "0.1.1", optional = true }
-
+full-replication = { path = "../../nomos-da/full-replication" }
 
 [features]
 default = ["libp2p"]

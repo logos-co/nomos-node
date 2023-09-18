@@ -255,6 +255,8 @@ fn create_node_config(
                     mode: mixnet_client_mode,
                     topology: mixnet_topology,
                     connection_pool_size: 255,
+                    max_retries: 3,
+                    retry_delay: Duration::from_secs(5),
                 },
                 mixnet_delay: Duration::ZERO..Duration::from_millis(10),
             },
@@ -282,6 +284,16 @@ fn create_node_config(
         },
         #[cfg(feature = "metrics")]
         metrics: Default::default(),
+        #[cfg(feature = "libp2p")]
+        da: nomos_da::Settings {
+            da_protocol: full_replication::Settings {
+                num_attestations: 1,
+            },
+            backend: nomos_da::backend::memory_cache::BlobCacheSettings {
+                max_capacity: usize::MAX,
+                evicting_period: Duration::from_secs(60 * 60 * 24), // 1 day
+            },
+        },
     };
     #[cfg(feature = "waku")]
     {

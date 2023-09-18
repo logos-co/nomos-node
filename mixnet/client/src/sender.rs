@@ -18,15 +18,25 @@ pub struct Sender<R: Rng> {
     //TODO: handle topology update
     topology: MixnetTopology,
     pool: ConnectionPool,
+    max_retries: usize,
+    retry_delay: Duration,
     rng: R,
 }
 
 impl<R: Rng> Sender<R> {
-    pub fn new(topology: MixnetTopology, pool: ConnectionPool, rng: R) -> Self {
+    pub fn new(
+        topology: MixnetTopology,
+        pool: ConnectionPool,
+        rng: R,
+        max_retries: usize,
+        retry_delay: Duration,
+    ) -> Self {
         Self {
             topology,
             rng,
             pool,
+            max_retries,
+            retry_delay,
         }
     }
 
@@ -44,9 +54,17 @@ impl<R: Rng> Sender<R> {
             .into_iter()
             .for_each(|(packet, first_node)| {
                 let pool = self.pool.clone();
+                let max_retries = self.max_retries;
+                let retry_delay = self.retry_delay;
                 tokio::spawn(async move {
-                    if let Err(e) =
-                        Self::send_packet(&pool, Box::new(packet), first_node.address).await
+                    if let Err(e) = Self::send_packet(
+                        &pool,
+                        max_retries,
+                        retry_delay,
+                        Box::new(packet),
+                        first_node.address,
+                    )
+                    .await
                     {
                         tracing::error!("failed to send packet to the first node: {e}");
                     }
@@ -99,6 +117,8 @@ impl<R: Rng> Sender<R> {
 
     async fn send_packet(
         pool: &ConnectionPool,
+        max_retries: usize,
+        retry_delay: Duration,
         packet: Box<SphinxPacket>,
         addr: NodeAddressBytes,
     ) -> Result<()> {
@@ -107,12 +127,24 @@ impl<R: Rng> Sender<R> {
 
         let mu: std::sync::Arc<tokio::sync::Mutex<tokio::net::TcpStream>> =
             pool.get_or_init(&addr).await?;
-        let mut socket = mu.lock().await;
-        let body = Body::new_sphinx(packet);
-        body.write(&mut *socket).await?;
+        let arc_socket = mu.clone();
 
-        tracing::debug!("Sent a Sphinx packet successuflly to the node: {addr:?}");
+        let body = Body::SphinxPacket(packet);
 
+        if let Err(e) = {
+            let mut socket = mu.lock().await;
+            body.write(&mut *socket).await
+        } {
+            tracing::error!("Failed to send packet to {addr} with error: {e}. Retrying...");
+            return mixnet_protocol::retry_backoff(
+                addr,
+                max_retries,
+                retry_delay,
+                body,
+                arc_socket,
+            )
+            .await;
+        }
         Ok(())
     }
 }

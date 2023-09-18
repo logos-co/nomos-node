@@ -33,17 +33,22 @@ impl Receiver {
     }
 
     fn fragment_stream(socket: TcpStream) -> impl Stream<Item = Result<Fragment>> + Send + 'static {
-        stream::unfold(socket, |mut socket| async move {
-            let Ok(body) = Body::read(&mut socket).await else {
-                // TODO: Maybe this is a hard error and the stream is corrupted? In that case stop the stream
-                return Some((Err(MixnetClientError::MixnetNodeStreamClosed), socket));
-            };
+        stream::unfold(socket, move |mut socket| {
+            async move {
+                let Ok(body) = Body::read(&mut socket).await else {
+                    // TODO: Maybe this is a hard error and the stream is corrupted? In that case stop the stream
+                    return Some((Err(MixnetClientError::MixnetNodeStreamClosed), socket));
+                };
 
-            match body {
-                Body::SphinxPacket(_) => {
-                    Some((Err(MixnetClientError::UnexpectedStreamBody), socket))
+                match body {
+                    Body::SphinxPacket(_) => {
+                        Some((Err(MixnetClientError::UnexpectedStreamBody), socket))
+                    }
+                    Body::FinalPayload(payload) => {
+                        Some((Self::fragment_from_payload(payload), socket))
+                    }
+                    _ => unreachable!(),
                 }
-                Body::FinalPayload(payload) => Some((Self::fragment_from_payload(payload), socket)),
             }
         })
     }

@@ -26,7 +26,13 @@ impl<R: Rng> MixnetClient<R> {
         let cache = ConnectionPool::new(config.connection_pool_size);
         Self {
             mode: config.mode,
-            sender: Sender::new(config.topology, cache, rng),
+            sender: Sender::new(
+                config.topology,
+                cache,
+                rng,
+                config.max_retries,
+                config.retry_delay,
+            ),
         }
     }
 

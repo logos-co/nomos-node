@@ -1,6 +1,9 @@
 use sphinx_packet::{payload::Payload, SphinxPacket};
 
-use tokio::io::{self, AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
+use std::{error::Error, io::ErrorKind, net::SocketAddr, sync::Arc, time::Duration};
+use tokio::io::{
+    self, net::TcpStream, sync::Mutex, AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt,
+};
 
 pub type Result<T> = core::result::Result<T, ProtocolError>;
 
@@ -14,8 +17,11 @@ pub enum ProtocolError {
     InvalidPayload(sphinx_packet::Error),
     #[error("{0}")]
     IO(#[from] io::Error),
+    #[error("fail to send packet, reach maximum retries {0}")]
+    ReachMaxRetries(usize),
 }
 
+#[non_exhaustive]
 pub enum Body {
     SphinxPacket(Box<SphinxPacket>),
     FinalPayload(Payload),
@@ -89,12 +95,12 @@ impl Body {
         let variant = self.variant_as_u8();
         writer.write_u8(variant).await?;
         match self {
-            Body::SphinxPacket(packet) => {
+            Self::SphinxPacket(packet) => {
                 let data = packet.to_bytes();
                 writer.write_u64(data.len() as u64).await?;
                 writer.write_all(&data).await?;
             }
-            Body::FinalPayload(payload) => {
+            Self::FinalPayload(payload) => {
                 let data = payload.as_bytes();
                 writer.write_u64(data.len() as u64).await?;
                 writer.write_all(data).await?;
@@ -102,4 +108,40 @@ impl Body {
         }
         Ok(())
     }
+}
+
+pub async fn retry_backoff(
+    peer_addr: SocketAddr,
+    max_retries: usize,
+    retry_delay: Duration,
+    body: Body,
+    socket: Arc<Mutex<TcpStream>>,
+) -> Result<()> {
+    for idx in 0..max_retries {
+        // backoff
+        let wait = Duration::from_millis((retry_delay.as_millis() as u64).pow(idx as u32));
+
+        tokio::time::sleep(wait).await;
+        let mut socket = socket.lock().await;
+        match body.write(&mut *socket).await {
+            Ok(_) => return Ok(()),
+            Err(e) => {
+                match &e {
+                    ProtocolError::IO(err) => {
+                        match err.kind() {
+                            ErrorKind::Unsupported => return Err(e),
+                            _ => {
+                                // update the connection
+                                if let Ok(tcp) = TcpStream::connect(peer_addr).await {
+                                    *socket = tcp;
+                                }
+                            }
+                        }
+                    }
+                    _ => return Err(e),
+                }
+            }
+        }
+    }
+    Err(ProtocolError::ReachMaxRetries(max_retries))
 }

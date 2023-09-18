@@ -13,7 +13,10 @@ pub trait DaProtocol {
     type Blob: Blob;
     type Attestation: Attestation;
     type Certificate: Certificate;
+    type Settings: Clone;
 
+    // Construct a new instance
+    fn new(settings: Self::Settings) -> Self;
     /// Encode bytes into blobs
     fn encode<T: AsRef<[u8]>>(&self, data: T) -> Vec<Self::Blob>;
     /// Feed a blob for decoding.

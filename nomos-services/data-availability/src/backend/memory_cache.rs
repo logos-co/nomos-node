@@ -1,12 +1,13 @@
 use crate::backend::{DaBackend, DaError};
 use moka::future::{Cache, CacheBuilder};
 use nomos_core::da::blob::Blob;
+use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 pub struct BlobCacheSettings {
-    max_capacity: usize,
-    evicting_period: Duration,
+    pub max_capacity: usize,
+    pub evicting_period: Duration,
 }
 
 pub struct BlobCache<H, B>(Cache<H, B>);

@@ -59,6 +59,11 @@ impl<A, C> AbsoluteNumber<A, C> {
     }
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct Settings {
+    pub num_attestations: usize,
+}
+
 impl CertificateStrategy for AbsoluteNumber<Attestation, Certificate> {
     type Attestation = Attestation;
     type Certificate = Certificate;
@@ -79,7 +84,7 @@ impl CertificateStrategy for AbsoluteNumber<Attestation, Certificate> {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, Hash, PartialEq)]
 
 pub struct Blob {
     data: Bytes,
@@ -130,6 +135,11 @@ impl DaProtocol for FullReplication<AbsoluteNumber<Attestation, Certificate>> {
     type Blob = Blob;
     type Attestation = Attestation;
     type Certificate = Certificate;
+    type Settings = Settings;
+
+    fn new(settings: Self::Settings) -> Self {
+        Self::new(AbsoluteNumber::new(settings.num_attestations))
+    }
 
     fn encode<T: AsRef<[u8]>>(&self, data: T) -> Vec<Self::Blob> {
         vec![Blob {
