@@ -34,6 +34,8 @@ async fn setup(msg_size: usize) -> (Vec<MixNode>, MixnetClient<OsRng>, MessageSt
             mode: MixnetClientMode::Sender,
             topology: topology.clone(),
             connection_pool_size: 255,
+            max_retries: 3,
+            retry_delay: Duration::from_secs(5),
         },
         OsRng,
     );
@@ -47,6 +49,8 @@ async fn setup(msg_size: usize) -> (Vec<MixNode>, MixnetClient<OsRng>, MessageSt
             ),
             topology,
             connection_pool_size: 255,
+            max_retries: 3,
+            retry_delay: Duration::from_secs(5),
         },
         OsRng,
     );

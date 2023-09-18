@@ -255,6 +255,8 @@ fn create_node_config(
                     mode: mixnet_client_mode,
                     topology: mixnet_topology,
                     connection_pool_size: 255,
+                    max_retries: 3,
+                    retry_delay: Duration::from_secs(5),
                 },
                 mixnet_delay: Duration::ZERO..Duration::from_millis(10),
             },

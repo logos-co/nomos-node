@@ -11,6 +11,21 @@ pub struct MixnetClientConfig {
     pub mode: MixnetClientMode,
     pub topology: MixnetTopology,
     pub connection_pool_size: usize,
+    pub max_retries: usize,
+    pub retry_delay: std::time::Duration,
+}
+
+impl MixnetClientConfig {
+    /// Creates a new `MixnetClientConfig` with default values.
+    pub fn new(mode: MixnetClientMode, topology: MixnetTopology) -> Self {
+        Self {
+            mode,
+            topology,
+            connection_pool_size: 256,
+            max_retries: 3,
+            retry_delay: std::time::Duration::from_secs(5),
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
