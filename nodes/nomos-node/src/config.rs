@@ -70,7 +70,7 @@ pub struct NetworkArgs {
     #[clap(long = "net-node-key", env = "NET_NODE_KEY")]
     node_key: Option<String>,
 
-    #[clap(long = "net-initial-peers", env = "NET_INITIAL_PEERS")]
+    #[clap(long = "net-initial-peers", env = "NET_INITIAL_PEERS", num_args = 1.., value_delimiter = ',')]
     pub initial_peers: Option<Vec<Multiaddr>>,
 }
 
@@ -105,7 +105,7 @@ pub struct OverlayArgs {
     #[clap(long = "overlay-type", env = "OVERLAY_TYPE")]
     pub overlay_type: Option<OverlayType>,
 
-    #[clap(long = "overlay-nodes", env = "OVERLAY_NODES")]
+    #[clap(long = "overlay-nodes", env = "OVERLAY_NODES", num_args = 1.., value_delimiter = ',')]
     pub overlay_nodes: Option<Vec<String>>,
 
     #[clap(long = "overlay-leader", env = "OVERLAY_LEADER")]
@@ -230,7 +230,7 @@ impl Config {
         }
 
         if let Some(peers) = initial_peers {
-            self.network.backend.inner.initial_peers = peers;
+            self.network.backend.initial_peers = peers;
         }
 
         Ok(self)

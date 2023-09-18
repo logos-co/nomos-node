@@ -39,6 +39,3 @@ jobs:
         with:
           directory: /tmp/cov/
           name: nomos-node-codecov
-          fail_ci_if_error: true
-
-

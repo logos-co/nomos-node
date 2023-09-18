@@ -1,0 +1,37 @@
+log:
+  backend: "Stdout"
+  format: "Json"
+  level: "debug"
+consensus:
+  private_key: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+  fountain_settings: null
+  overlay_settings:
+    nodes: [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]]
+    leader_super_majority_threshold: 1
+    leader:
+      cur: 0
+network:
+  backend:
+    host: 0.0.0.0
+    port: 3000
+    log_level: "fatal"
+    node_key: "0000000000000000000000000000000000000000000000000000000000000001"
+    discV5BootstrapNodes: []
+    initial_peers: []
+    relayTopics: []
+    mixnet_client:
+      mode: Sender
+      topology:
+        layers:
+         - nodes:
+            - address: 127.0.0.1:7777
+              public_key: "0000000000000000000000000000000000000000000000000000000000000000"
+      connection_pool_size: 255
+    mixnet_delay:
+      start: "0ms"
+      end: "0ms"
+
+http:
+  backend:
+    address: 0.0.0.0:8080
+    cors_origins: []
