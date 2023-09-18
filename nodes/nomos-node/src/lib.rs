@@ -2,7 +2,7 @@ mod config;
 mod tx;
 
 use color_eyre::eyre::Result;
-use consensus_engine::overlay::{FlatOverlay, RandomBeaconState, RoundRobin};
+use consensus_engine::overlay::{RandomBeaconState, RoundRobin, TreeOverlay};
 use full_replication::Blob;
 #[cfg(feature = "libp2p")]
 use full_replication::{AbsoluteNumber, Attestation, Certificate, FullReplication};
@@ -46,7 +46,7 @@ pub type Carnot = CarnotConsensus<
     ConsensusWakuAdapter,
     MockPool<Tx>,
     MempoolWakuAdapter<Tx>,
-    FlatOverlay<RoundRobin, RandomBeaconState>,
+    TreeOverlay<RoundRobin, RandomBeaconState>,
     Blob,
 >;
 
@@ -55,7 +55,7 @@ pub type Carnot = CarnotConsensus<
     ConsensusLibp2pAdapter,
     MockPool<Tx>,
     MempoolLibp2pAdapter<Tx>,
-    FlatOverlay<RoundRobin, RandomBeaconState>,
+    TreeOverlay<RoundRobin, RandomBeaconState>,
     Blob,
 >;
 

@@ -1,8 +1,10 @@
 use super::tree::Tree;
 use crate::overlay::CommitteeMembership;
 use crate::{overlay::LeaderSelection, Committee, NodeId, Overlay};
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct TreeOverlaySettings<L: LeaderSelection, M: CommitteeMembership> {
     pub nodes: Vec<NodeId>,
     pub current_leader: NodeId,

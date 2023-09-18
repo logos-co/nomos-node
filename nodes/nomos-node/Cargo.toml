@@ -40,4 +40,4 @@ full-replication = { path = "../../nomos-da/full-replication" }
 [features]
 default = ["libp2p"]
 waku = ["waku-bindings", "nomos-network/waku", "nomos-mempool/waku", "nomos-consensus/waku"]
-libp2p = ["nomos-libp2p", "nomos-network/libp2p", "nomos-mempool/libp2p", "nomos-consensus/libp2p"]
+libp2p = ["nomos-libp2p", "nomos-network/libp2p", "nomos-mempool/libp2p", "nomos-consensus/libp2p", "nomos-da/libp2p"]
