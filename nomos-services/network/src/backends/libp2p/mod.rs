@@ -1,20 +1,23 @@
+mod command;
+mod config;
+
 // std
-use std::{collections::HashMap, error::Error, ops::Range, time::Duration};
+pub use self::command::{Command, Libp2pInfo};
+use self::command::{Dial, Topic};
+pub use self::config::Libp2pConfig;
+use std::{collections::HashMap, ops::Range, time::Duration};
+
 // internal
 use super::NetworkBackend;
-use mixnet_client::{MixnetClient, MixnetClientConfig};
+use mixnet_client::MixnetClient;
 use nomos_core::wire;
 pub use nomos_libp2p::libp2p::gossipsub::{Message, TopicHash};
-use nomos_libp2p::{
-    gossipsub,
-    libp2p::{swarm::ConnectionId, Multiaddr},
-    BehaviourEvent, Swarm, SwarmConfig, SwarmEvent,
-};
+use nomos_libp2p::{gossipsub, libp2p::swarm::ConnectionId, BehaviourEvent, Swarm, SwarmEvent};
 // crates
 use overwatch_rs::{overwatch::handle::OverwatchHandle, services::state::NoState};
 use rand::{rngs::OsRng, thread_rng, Rng};
 use serde::{Deserialize, Serialize};
-use tokio::sync::{broadcast, mpsc, oneshot};
+use tokio::sync::{broadcast, mpsc};
 use tokio_stream::StreamExt;
 
 macro_rules! log_error {
@@ -30,66 +33,6 @@ pub struct Libp2p {
     commands_tx: mpsc::Sender<Command>,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct Libp2pConfig {
-    #[serde(flatten)]
-    pub inner: SwarmConfig,
-    // Initial peers to connect to
-    #[serde(default)]
-    pub initial_peers: Vec<Multiaddr>,
-    pub mixnet_client: MixnetClientConfig,
-    #[serde(with = "humantime")]
-    pub mixnet_delay: Range<Duration>,
-}
-
-mod humantime {
-    use serde::{Deserialize, Deserializer, Serialize, Serializer};
-    use std::{ops::Range, time::Duration};
-
-    #[derive(Serialize, Deserialize)]
-    struct DurationRangeHelper {
-        #[serde(with = "humantime_serde")]
-        start: Duration,
-        #[serde(with = "humantime_serde")]
-        end: Duration,
-    }
-
-    pub fn serialize<S: Serializer>(
-        val: &Range<Duration>,
-        serializer: S,
-    ) -> Result<S::Ok, S::Error> {
-        if serializer.is_human_readable() {
-            DurationRangeHelper {
-                start: val.start,
-                end: val.end,
-            }
-            .serialize(serializer)
-        } else {
-            val.serialize(serializer)
-        }
-    }
-
-    pub fn deserialize<'de, D: Deserializer<'de>>(
-        deserializer: D,
-    ) -> Result<Range<Duration>, D::Error> {
-        if deserializer.is_human_readable() {
-            let DurationRangeHelper { start, end } =
-                DurationRangeHelper::deserialize(deserializer)?;
-            Ok(start..end)
-        } else {
-            Range::<Duration>::deserialize(deserializer)
-        }
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Libp2pInfo {
-    pub listen_addresses: Vec<Multiaddr>,
-    pub n_peers: usize,
-    pub n_connections: u32,
-    pub n_pending_connections: u32,
-}
-
 #[derive(Debug)]
 pub enum EventKind {
     Message,
@@ -100,37 +43,6 @@ const BUFFER_SIZE: usize = 64;
 const BACKOFF: u64 = 5;
 // TODO: make this configurable
 const MAX_RETRY: usize = 3;
-
-#[derive(Debug)]
-#[non_exhaustive]
-pub enum Command {
-    Connect(Dial),
-    Broadcast {
-        topic: Topic,
-        message: Box<[u8]>,
-    },
-    Subscribe(Topic),
-    Unsubscribe(Topic),
-    Info {
-        reply: oneshot::Sender<Libp2pInfo>,
-    },
-    #[doc(hidden)]
-    // broadcast a message directly through gossipsub without mixnet
-    DirectBroadcastAndRetry {
-        topic: Topic,
-        message: Box<[u8]>,
-        retry_count: usize,
-    },
-}
-
-#[derive(Debug, Clone)]
-pub struct Dial {
-    addr: Multiaddr,
-    retry_count: usize,
-}
-
-pub type Topic = String;
-pub type CommandResultSender = oneshot::Sender<Result<(), Box<dyn Error + Send>>>;
 
 /// Events emitted from [`NomosLibp2p`], which users can subscribe
 #[derive(Debug, Clone)]
