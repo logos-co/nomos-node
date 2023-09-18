@@ -39,13 +39,24 @@ pipeline {
           }
         }
         stages {
-          stage('BuildAndTest') {
-            steps {
-              script {
-                /* To prevent rebuilding node for each test, tests are defined here */
-                def tests = ['ten_nodes_happy', 'two_nodes_happy', 'ten_nodes_one_down']
+          stage('Tests') {
+            options {
+              lock('sync-integration-${env.GIT_COMMIT}')
+            }
+            stages {
+              stage("BuildAndTest") {
+                steps {
+                  script {
+                    /* To prevent rebuilding node for each test, tests are defined here */
+                    def tests = ['ten_nodes_happy', 'two_nodes_happy', 'ten_nodes_one_down']
 
-                runBuildAndTestsForFeature(FEATURE, tests)
+                    if (FEATURE == 'libp2p') {
+                      tests.add('mixnet')
+                    }
+
+                    runBuildAndTestsForFeature(FEATURE, tests)
+                  }
+                }
               }
             }
           }
