@@ -1,4 +1,4 @@
-mod adapters;
+pub mod adapters;
 
 // std
 // crates

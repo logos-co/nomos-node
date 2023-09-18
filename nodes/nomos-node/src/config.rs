@@ -5,6 +5,8 @@ use std::{
 };
 
 use crate::Carnot;
+#[cfg(feature = "libp2p")]
+use crate::DataAvailability;
 use clap::{Parser, ValueEnum};
 use color_eyre::eyre::{self, eyre, Result};
 use hex::FromHex;
@@ -129,6 +131,8 @@ pub struct Config {
     pub consensus: <Carnot as ServiceData>::Settings,
     #[cfg(feature = "metrics")]
     pub metrics: <MetricsService<MapMetricsBackend<MetricsData>> as ServiceData>::Settings,
+    #[cfg(feature = "libp2p")]
+    pub da: <DataAvailability as ServiceData>::Settings,
 }
 
 impl Config {
