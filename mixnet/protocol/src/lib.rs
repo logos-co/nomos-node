@@ -123,10 +123,10 @@ pub async fn retry_backoff(
             Err(e) => {
                 if let Some(err) = e.downcast_ref::<std::io::Error>() {
                     match err.kind() {
-                        ErrorKind::Unsupported
-                        | ErrorKind::NotFound
+                        ErrorKind::Unsupported => return Err(e),
+                        ErrorKind::NotFound
                         | ErrorKind::PermissionDenied
-                        | ErrorKind::Other => return Err(e),
+                        | ErrorKind::Other => {},
                         _ => {
                             // update the connection
                             if let Ok(tcp) = TcpStream::connect(peer_addr).await {
