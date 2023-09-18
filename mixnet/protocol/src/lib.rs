@@ -114,7 +114,7 @@ pub async fn retry_backoff(
 ) -> Result<(), Box<dyn Error + Send + Sync + 'static>> {
     for idx in 0..max_retries {
         // backoff
-        let wait = retry_delay * (idx as u32);
+        let wait = Duration::from_millis((retry_delay.as_millis() as u64).pow(idx as u32));
 
         tokio::time::sleep(wait).await;
         let mut socket = socket.lock().await;
@@ -126,7 +126,7 @@ pub async fn retry_backoff(
                         ErrorKind::Unsupported
                         | ErrorKind::NotFound
                         | ErrorKind::PermissionDenied
-                        | ErrorKind::Other => {}
+                        | ErrorKind::Other => return Err(e),
                         _ => {
                             // update the connection
                             if let Ok(tcp) = TcpStream::connect(peer_addr).await {
