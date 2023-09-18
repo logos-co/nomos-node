@@ -1,11 +1,13 @@
 use fraction::{Fraction, One};
-use std::time::Duration;
-use tests::{MixNode, Node, NomosNode, SpawnConfig};
 use nomos_cli::cmds::{
-    disseminate::{DaProtocolChoice, FullReplicationSettings, Protocol, ProtocolSettings, Disseminate},
+    disseminate::{
+        DaProtocolChoice, Disseminate, FullReplicationSettings, Protocol, ProtocolSettings,
+    },
     Command,
 };
+use std::time::Duration;
 use tempfile::NamedTempFile;
+use tests::{MixNode, Node, NomosNode, SpawnConfig};
 
 #[tokio::test]
 #[cfg(feature = "libp2p")]
@@ -41,7 +43,7 @@ async fn disseminate_blob() {
         },
     });
 
-    std::thread::spawn(move || { cmd.run().unwrap() }).join().unwrap();
+    std::thread::spawn(move || cmd.run().unwrap())
+        .join()
+        .unwrap();
 }
-
-
