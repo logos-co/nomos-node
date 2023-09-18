@@ -1,8 +1,8 @@
-FROM rust:1.70.0-slim-bullseye
+FROM rust:1.72.0-slim-bullseye
 
-LABEL maintainer="augustinas@status.im"
-LABEL source="https://github.com/logos-co/nomos-research"
-LABEL description="nomos-research ci build image"
+LABEL maintainer="augustinas@status.im" \
+      source="https://github.com/logos-co/nomos-node" \
+      description="nomos-node ci build image"
 
 # Using backports for go 1.19
 RUN echo 'deb http://deb.debian.org/debian bullseye-backports main' \

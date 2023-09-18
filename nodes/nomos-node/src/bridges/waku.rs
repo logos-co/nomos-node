@@ -70,7 +70,9 @@ pub(super) async fn waku_send_transaction(
                 payload,
                 WAKU_CARNOT_TX_CONTENT_TOPIC.clone(),
                 1,
-                chrono::Utc::now().timestamp_nanos() as usize,
+                chrono::Utc::now()
+                    .timestamp_nanos_opt()
+                    .expect("timestamp should be in valid range") as usize,
                 [],
                 false,
             ),

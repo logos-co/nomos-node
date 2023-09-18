@@ -359,7 +359,10 @@ mod tests {
                         content_topic_name: "foo content".into(),
                     },
                     version: 1,
-                    timestamp: chrono::Utc::now().timestamp_nanos() as usize,
+                    timestamp: chrono::Utc::now()
+                        .timestamp_nanos_opt()
+                        .expect("timestamp should be in valid range")
+                        as usize,
                 },
             })
             .await;
@@ -376,7 +379,10 @@ mod tests {
                         content_topic_name: "bar content".into(),
                     },
                     version: 1,
-                    timestamp: chrono::Utc::now().timestamp_nanos() as usize,
+                    timestamp: chrono::Utc::now()
+                        .timestamp_nanos_opt()
+                        .expect("timestamp should be in valid range")
+                        as usize,
                 },
             })
             .await;
