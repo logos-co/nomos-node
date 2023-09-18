@@ -96,9 +96,9 @@ where
 
     // 2) Send blob to network
     tracing::info!("Sending blobs to network...");
-    for blob in blobs {
-        adapter.send_blob(blob).await.unwrap();
-    }
+    futures::future::try_join_all(blobs.into_iter().map(|blob| adapter.send_blob(blob)))
+        .await
+        .map_err(|e| e as Box<dyn std::error::Error>)?;
     terminal_cmd_done();
 
     // 3) Collect attestations and create proof
