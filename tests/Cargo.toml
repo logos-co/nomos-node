@@ -53,6 +53,8 @@ path = "src/tests/mixnet.rs"
 [[test]]
 name = "test_cli"
 path = "src/tests/cli.rs"
+# disseminate is only implemented for libp2p
+required-features = ["libp2p"]
 
 [[bench]]
 name = "mixnet"

@@ -10,7 +10,6 @@ use tempfile::NamedTempFile;
 use tests::{MixNode, Node, NomosNode, SpawnConfig};
 
 #[tokio::test]
-#[cfg(feature = "libp2p")]
 async fn disseminate_blob() {
     let (_mixnodes, mixnet_node_configs, mixnet_topology) = MixNode::spawn_nodes(2).await;
     let mut nodes = NomosNode::spawn_nodes(SpawnConfig::Star {
