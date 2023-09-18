@@ -105,11 +105,12 @@ where
     tracing::info!("Collecting attestations to create proof...");
     let mut attestations = adapter.attestation_stream().await;
     loop {
+        da.recv_attestation(attestations.next().await.unwrap());
+
         if let Some(cert) = da.certify_dispersal() {
             terminal_cmd_done();
             return Ok(cert);
         }
-        da.recv_attestation(attestations.next().await.unwrap());
     }
 }
 
