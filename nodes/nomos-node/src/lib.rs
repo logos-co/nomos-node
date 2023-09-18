@@ -3,8 +3,9 @@ mod tx;
 
 use color_eyre::eyre::Result;
 use consensus_engine::overlay::{FlatOverlay, RandomBeaconState, RoundRobin};
+use full_replication::Blob;
 #[cfg(feature = "libp2p")]
-use full_replication::{AbsoluteNumber, Attestation, Blob, Certificate, FullReplication};
+use full_replication::{AbsoluteNumber, Attestation, Certificate, FullReplication};
 #[cfg(feature = "metrics")]
 use metrics::{backend::map::MapMetricsBackend, types::MetricsData, MetricsService};
 #[cfg(feature = "libp2p")]
@@ -58,6 +59,7 @@ pub type Carnot = CarnotConsensus<
     Blob,
 >;
 
+#[cfg(feature = "libp2p")]
 type DataAvailability = DataAvailabilityService<
     FullReplication<AbsoluteNumber<Attestation, Certificate>>,
     BlobCache<<Blob as nomos_core::da::blob::Blob>::Hash, Blob>,
