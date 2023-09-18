@@ -7,7 +7,7 @@ use client_notifier::ClientNotifier;
 pub use config::MixnetNodeConfig;
 use mixnet_protocol::{Body, ProtocolError};
 use mixnet_topology::MixnetNodeId;
-use mixnet_util::ConnectionPool;
+use mixnet_util::{ConnectionPool, MessagePool};
 use nym_sphinx::{
     addressing::nodes::{NymNodeRoutingAddress, NymNodeRoutingAddressError},
     Delay, DestinationAddressBytes, NodeAddressBytes, Payload, PrivateKey,
@@ -16,7 +16,7 @@ pub use sphinx_packet::crypto::PRIVATE_KEY_SIZE;
 use sphinx_packet::{crypto::PUBLIC_KEY_SIZE, ProcessedPacket, SphinxPacket};
 use tokio::{
     net::{TcpListener, TcpStream},
-    sync::mpsc,
+    sync::mpsc::{self, Receiver},
 };
 
 pub type Result<T> = core::result::Result<T, MixnetNodeError>;
@@ -36,13 +36,15 @@ pub enum MixnetNodeError {
 // A mix node that routes packets in the Mixnet.
 pub struct MixnetNode {
     config: MixnetNodeConfig,
-    pool: ConnectionPool,
+    message_pool: MessagePool<Message>,
 }
 
 impl MixnetNode {
     pub fn new(config: MixnetNodeConfig) -> Self {
-        let pool = ConnectionPool::new(config.connection_pool_size);
-        Self { config, pool }
+        Self {
+            config,
+            message_pool: MessagePool::new(),
+        }
     }
 
     pub fn id(&self) -> MixnetNodeId {
@@ -77,25 +79,19 @@ impl MixnetNode {
             self.config.listen_address
         );
 
+        MixnetNodeRunner {
+            config: self.config,
+            message_pool: self.message_pool,
+            client_tx,
+        };
         loop {
             match listener.accept().await {
                 Ok((socket, remote_addr)) => {
                     tracing::debug!("Accepted incoming connection from {remote_addr:?}");
 
-                    let client_tx = client_tx.clone();
-                    let private_key = self.config.private_key;
-                    let pool = self.pool.clone();
+                    let runner = self.runner();
                     tokio::spawn(async move {
-                        if let Err(e) = Self::handle_connection(
-                            socket,
-                            self.config.max_retries,
-                            self.config.retry_delay,
-                            pool,
-                            private_key,
-                            client_tx,
-                        )
-                        .await
-                        {
+                        if let Err(e) = runner.handle_connection(socket).await {
                             tracing::error!("failed to handle conn: {e}");
                         }
                     });
@@ -103,179 +99,182 @@ impl MixnetNode {
                 Err(e) => tracing::warn!("Failed to accept incoming connection: {e}"),
             }
         }
+        Ok(())
     }
 
-    async fn handle_connection(
-        mut socket: TcpStream,
-        max_retries: usize,
-        retry_delay: Duration,
-        pool: ConnectionPool,
-        private_key: [u8; PRIVATE_KEY_SIZE],
-        client_tx: mpsc::Sender<Body>,
-    ) -> Result<()> {
+    fn runner(&self) -> MixnetNodeRunner {
+        MixnetNodeRunner {
+            config: self.config,
+            message_pool: self.message_pool.clone(),
+            client_tx: self.client_tx.clone(),
+        }
+    }
+}
+
+struct Message {
+    // number of retries already done
+    retries: usize,
+    body: Body,
+}
+
+struct MixnetNodeRunner {
+    config: MixnetNodeConfig,
+    message_pool: MessagePool<Message>,
+    client_tx: mpsc::Sender<Body>,
+}
+
+impl MixnetNodeRunner {
+    async fn handle_connection(&self, mut socket: TcpStream) -> Result<()> {
         loop {
             let body = Body::read(&mut socket).await?;
 
-            let pool = pool.clone();
-            let private_key = PrivateKey::from(private_key);
-            let client_tx = client_tx.clone();
-
             tokio::spawn(async move {
-                if let Err(e) = Self::handle_body(
-                    max_retries,
-                    retry_delay,
-                    body,
-                    &pool,
-                    &private_key,
-                    &client_tx,
-                )
-                .await
-                {
+                if let Err(e) = self.handle_body(Message { retries: 0, body }).await {
                     tracing::error!("failed to handle body: {e}");
                 }
             });
         }
     }
 
-    // TODO: refactor this fn to make it receive less arguments
-    #[allow(clippy::too_many_arguments)]
-    async fn handle_body(
-        max_retries: usize,
-        retry_delay: Duration,
-        body: Body,
-        pool: &ConnectionPool,
-        private_key: &PrivateKey,
-        client_tx: &mpsc::Sender<Body>,
-    ) -> Result<()> {
-        match body {
+    async fn handle_body(&self, msg: Message) -> Result<()> {
+        match msg.body {
             Body::SphinxPacket(packet) => {
-                Self::handle_sphinx_packet(pool, max_retries, retry_delay, private_key, packet)
-                    .await
+                self.handle_sphinx_packet(Message {
+                    retries: msg.retries,
+                    body: Body::SphinxPacket(packet),
+                })
+                .await
             }
             Body::FinalPayload(payload) => {
-                Self::forward_body_to_client_notifier(
-                    private_key,
-                    client_tx,
-                    Body::FinalPayload(payload),
-                )
-                .await
+                self.forward_body_to_client_notifier(Body::FinalPayload(payload))
+                    .await
             }
             _ => unreachable!(),
         }
     }
 
-    async fn handle_sphinx_packet(
-        pool: &ConnectionPool,
-        max_retries: usize,
-        retry_delay: Duration,
-        private_key: &PrivateKey,
-        packet: Box<SphinxPacket>,
-    ) -> Result<()> {
+    async fn handle_sphinx_packet(&self, packet: Message) -> Result<()> {
         match packet
-            .process(private_key)
+            .process(&PrivateKey::from(self.config.private_key))
             .map_err(ProtocolError::InvalidSphinxPacket)?
         {
             ProcessedPacket::ForwardHop(packet, next_node_addr, delay) => {
-                Self::forward_packet_to_next_hop(
-                    pool,
-                    max_retries,
-                    retry_delay,
-                    packet,
-                    next_node_addr,
-                    delay,
-                )
-                .await
+                self.forward_packet_to_next_hop(packet, next_node_addr, delay)
+                    .await
             }
             ProcessedPacket::FinalHop(destination_addr, _, payload) => {
-                Self::forward_payload_to_destination(
-                    pool,
-                    max_retries,
-                    retry_delay,
-                    payload,
-                    destination_addr,
-                )
-                .await
+                self.forward_payload_to_destination(payload, destination_addr)
+                    .await
             }
         }
     }
 
-    async fn forward_body_to_client_notifier(
-        _private_key: &PrivateKey,
-        client_tx: &mpsc::Sender<Body>,
-        body: Body,
-    ) -> Result<()> {
+    async fn forward_body_to_client_notifier(&self, body: Body) -> Result<()> {
         // TODO: Decrypt the final payload using the private key, if it's encrypted
 
         // Do not wait when the channel is full or no receiver exists
-        client_tx.try_send(body)?;
+        self.client_tx.try_send(body)?;
         Ok(())
     }
 
     async fn forward_packet_to_next_hop(
-        pool: &ConnectionPool,
-        max_retries: usize,
-        retry_delay: Duration,
-        packet: Box<SphinxPacket>,
+        &self,
+        packet: Message,
         next_node_addr: NodeAddressBytes,
         delay: Delay,
     ) -> Result<()> {
         tracing::debug!("Delaying the packet for {delay:?}");
         tokio::time::sleep(delay.to_duration()).await;
 
-        Self::forward(
-            pool,
-            max_retries,
-            retry_delay,
-            Body::new_sphinx(packet),
-            NymNodeRoutingAddress::try_from(next_node_addr)?,
-        )
-        .await
+        self.forward(packet, NymNodeRoutingAddress::try_from(next_node_addr)?)
+            .await
     }
 
     async fn forward_payload_to_destination(
-        pool: &ConnectionPool,
-        max_retries: usize,
-        retry_delay: Duration,
-        payload: Payload,
+        &self,
+        payload: Message,
         destination_addr: DestinationAddressBytes,
     ) -> Result<()> {
         tracing::debug!("Forwarding final payload to destination mixnode");
 
-        Self::forward(
-            pool,
-            max_retries,
-            retry_delay,
-            Body::new_final_payload(payload),
+        self.forward(
+            payload,
             NymNodeRoutingAddress::try_from_bytes(&destination_addr.as_bytes())?,
         )
         .await
     }
 
-    async fn forward(
-        pool: &ConnectionPool,
-        max_retries: usize,
-        retry_delay: Duration,
-        body: Body,
-        to: NymNodeRoutingAddress,
-    ) -> Result<()> {
+    async fn forward(&self, msg: Message, to: NymNodeRoutingAddress) -> Result<()> {
         let addr = SocketAddr::from(to);
-        let arc_socket = pool.get_or_init(&addr).await?;
 
-        if let Err(e) = {
-            let mut socket = arc_socket.lock().await;
-            body.write(&mut *socket).await
-        } {
-            tracing::error!("Failed to forward packet to {addr} with error: {e}. Retrying...");
-            return mixnet_protocol::retry_backoff(
-                addr,
-                max_retries,
-                retry_delay,
-                body,
-                arc_socket,
-            )
-            .await
-            .map_err(Into::into);
-        }
+        let body = if let Some(handle) = self.message_pool.get(&addr) {
+            if let Err(err) = handle.send(body).await {
+                err.0
+            } else {
+                // If succesfull send message to msg writting thread,
+                // then we just return
+                return Ok(());
+            }
+        } else {
+            body
+        };
+
+        // the target msg handling thread does not live,
+        // so we need to create a new one
+        let (tx, rx) = mpsc::unbounded_channel();
+        tx.send(body).unwrap();
+
+        let this = MessageHandler {
+            config: self.config,
+            remote_addr: addr,
+            receiver: rx,
+            // TODO: do we need to retry on error for the tcp stream here?
+            conn: TcpStream::connect(addr).await?,
+        };
+
+        let handle = tokio::spawn(this.run());
+        self.message_pool.insert(addr, handle);
         Ok(())
+    }
+}
+
+struct MessageHandler {
+    config: MixnetNodeConfig,
+    remote_addr: SocketAddr,
+    receiver: Receiver<Message>,
+    conn: TcpStream,
+}
+
+impl MessageHandler {
+    pub fn new(
+        remote_addr: SocketAddr,
+        conn: TcpStream,
+        receiver: Receiver<Message>,
+        config: MixnetNodeConfig,
+    ) -> Self {
+        Self {
+            receiver,
+            remote_addr,
+            conn,
+            config,
+        }
+    }
+
+    pub async fn run(mut self) {
+        loop {
+            tokio::select! {
+                msg = self.receiver.recv() => {
+                    if let Some(msg) = msg {
+                        // TODO: handle msg sending
+                    } else {
+                        break;
+                    }
+                },
+                _ = tokio::signal::ctrl_c() => {
+                    tracing::info!("Shutting down message handler thread for {}...", self.remote_addr);
+                    break;
+                }
+            }
+        }
     }
 }

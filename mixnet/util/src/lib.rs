@@ -1,7 +1,10 @@
 use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 
+use crossbeam_skiplist::SkipMap;
 use tokio::net::TcpStream;
-use tokio::sync::Mutex;
+use tokio::sync::mpsc::error::SendError;
+use tokio::sync::{mpsc::Sender, Mutex};
+use tokio::task::JoinHandle;
 
 #[derive(Clone)]
 pub struct ConnectionPool {
@@ -32,5 +35,81 @@ impl ConnectionPool {
                 Ok(tcp)
             }
         }
+    }
+}
+
+pub struct MessageHandle<M> {
+    handle: Arc<JoinHandle<()>>,
+    sender: Sender<M>,
+}
+
+impl<M> Clone for MessageHandle<M> {
+    fn clone(&self) -> Self {
+        Self {
+            handle: self.handle.clone(),
+            sender: self.sender.clone(),
+        }
+    }
+}
+
+impl<M> MessageHandle<M> {
+    pub fn new(sender: Sender<M>, handle: JoinHandle<()>) -> Self {
+        Self {
+            handle: Arc::new(handle),
+            sender,
+        }
+    }
+
+    pub async fn send(&self, msg: M) -> Result<(), SendError<M>> {
+        self.sender.send(msg).await
+    }
+}
+
+pub struct MessagePool<M> {
+    pool: Arc<SkipMap<SocketAddr, MessageHandle<M>>>,
+}
+
+impl<M> Default for MessagePool<M> {
+    fn default() -> Self {
+        Self {
+            pool: Arc::new(SkipMap::new()),
+        }
+    }
+}
+
+impl<M> Clone for MessagePool<M> {
+    fn clone(&self) -> Self {
+        Self {
+            pool: self.pool.clone(),
+        }
+    }
+}
+
+impl<M> MessagePool<M>
+where
+    M: Send + 'static,
+{
+    pub fn new() -> Self {
+        Self {
+            pool: Arc::new(SkipMap::new()),
+        }
+    }
+
+    pub fn get(&self, socket: &SocketAddr) -> Option<MessageHandle<M>> {
+        self.pool.get(socket).and_then(|ent| {
+            let val = ent.value();
+            // check if the message handling thread for this socket exits
+            // if it exits, then remove it from the pool
+            if val.handle.is_finished() {
+                ent.remove();
+                None
+            } else {
+                Some(val.clone())
+            }
+        })
+    }
+
+    pub fn insert(&self, socket: SocketAddr, handle: MessageHandle<M>) {
+        self.pool.insert(socket, handle);
     }
 }

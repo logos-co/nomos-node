@@ -7,7 +7,7 @@ use nym_sphinx::{PrivateKey, PublicKey};
 use serde::{Deserialize, Serialize};
 use sphinx_packet::crypto::{PRIVATE_KEY_SIZE, PUBLIC_KEY_SIZE};
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Copy, Clone, Debug)]
 pub struct MixnetNodeConfig {
     /// A listen address for receiving Sphinx packets
     pub listen_address: SocketAddr,

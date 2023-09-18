@@ -23,18 +23,19 @@ pub enum ProtocolError {
     ReachMaxRetries(usize),
 }
 
+#[derive(Clone)]
 #[non_exhaustive]
 pub enum Body {
-    SphinxPacket(Box<SphinxPacket>),
-    FinalPayload(Payload),
+    SphinxPacket(Arc<SphinxPacket>),
+    FinalPayload(Arc<Payload>),
 }
 
 impl Body {
-    pub fn new_sphinx(packet: Box<SphinxPacket>) -> Self {
+    pub fn new_sphinx(packet: Arc<SphinxPacket>) -> Self {
         Self::SphinxPacket(packet)
     }
 
-    pub fn new_final_payload(payload: Payload) -> Self {
+    pub fn new_final_payload(payload: Arc<Payload>) -> Self {
         Self::FinalPayload(payload)
     }
 
@@ -59,7 +60,7 @@ impl Body {
 
     fn sphinx_packet_from_bytes(data: &[u8]) -> Result<Self> {
         SphinxPacket::from_bytes(data)
-            .map(|packet| Self::new_sphinx(Box::new(packet)))
+            .map(|packet| Self::new_sphinx(Arc::new(packet)))
             .map_err(ProtocolError::InvalidPayload)
     }
 
@@ -75,7 +76,7 @@ impl Body {
 
     pub fn final_payload_from_bytes(data: &[u8]) -> Result<Self> {
         Payload::from_bytes(data)
-            .map(Self::new_final_payload)
+            .map(|p| Self::new_final_payload(Arc::new(p)))
             .map_err(ProtocolError::InvalidPayload)
     }
 
