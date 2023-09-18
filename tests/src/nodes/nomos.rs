@@ -40,6 +40,7 @@ pub struct NomosNode {
     addr: SocketAddr,
     _tempdir: tempfile::TempDir,
     child: Child,
+    config: Config,
 }
 
 impl Drop for NomosNode {
@@ -82,6 +83,7 @@ impl NomosNode {
             addr: config.http.backend.address,
             child,
             _tempdir: dir,
+            config,
         };
         tokio::time::timeout(std::time::Duration::from_secs(10), async {
             node.wait_online().await
@@ -162,6 +164,10 @@ impl NomosNode {
             })
             .map(|f| std::fs::read_to_string(f).unwrap())
             .collect::<String>()
+    }
+
+    pub fn config(&self) -> &Config {
+        &self.config
     }
 }
 

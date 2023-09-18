@@ -36,6 +36,7 @@ async-trait = "0.1"
 fraction = "0.13"
 ntest = "0.9.0"
 criterion = { version = "0.5", features = ["async_tokio"] }
+nomos-cli = { path = "../nomos-cli" }
 
 [[test]]
 name = "test_consensus_happy_path"
@@ -48,6 +49,10 @@ path = "src/tests/unhappy.rs"
 [[test]]
 name = "test_mixnet"
 path = "src/tests/mixnet.rs"
+
+[[test]]
+name = "test_cli"
+path = "src/tests/cli.rs"
 
 [[bench]]
 name = "mixnet"
