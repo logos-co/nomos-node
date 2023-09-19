@@ -1,7 +1,7 @@
 mod client_notifier;
 pub mod config;
 
-use std::{net::SocketAddr, time::Duration};
+use std::net::SocketAddr;
 
 use client_notifier::ClientNotifier;
 pub use config::MixnetNodeConfig;
@@ -10,14 +10,13 @@ use mixnet_topology::MixnetNodeId;
 use mixnet_util::{MessageHandle, MessagePool};
 use nym_sphinx::{
     addressing::nodes::{NymNodeRoutingAddress, NymNodeRoutingAddressError},
-    Delay, DestinationAddressBytes, NodeAddressBytes, Payload, PrivateKey,
+    Delay, DestinationAddressBytes, NodeAddressBytes, PrivateKey,
 };
-use serde::de::Error;
 pub use sphinx_packet::crypto::PRIVATE_KEY_SIZE;
 use sphinx_packet::{crypto::PUBLIC_KEY_SIZE, ProcessedPacket, SphinxPacket};
 use tokio::{
     net::{TcpListener, TcpStream},
-    sync::mpsc::{self, Receiver},
+    sync::mpsc,
 };
 
 pub type Result<T> = core::result::Result<T, MixnetNodeError>;
@@ -106,6 +105,8 @@ impl MixnetNode {
 
 struct Message {
     // number of retries already done
+    // TODO: remove this allow when we implement the retry logic
+    #[allow(dead_code)]
     retries: usize,
     body: Body,
 }
@@ -245,6 +246,8 @@ impl MixnetNodeRunner {
 }
 
 struct MessageHandler {
+    // TODO: remove this allow when we implement the retry logic
+    #[allow(dead_code)]
     config: MixnetNodeConfig,
     remote_addr: SocketAddr,
     receiver: mpsc::UnboundedReceiver<Message>,
@@ -294,7 +297,7 @@ impl MessageHandler {
                                             self.conn = tcp;
                                         }
                                         Err(e) => {
-                                            tracing::error!("failed to update connection to {}, the local machine network is down", self.remote_addr);
+                                            tracing::error!("failed to update connection to {}, the local machine network is down: {e}", self.remote_addr);
                                             return;
                                         }
                                     }
