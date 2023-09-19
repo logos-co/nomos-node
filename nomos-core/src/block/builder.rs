@@ -46,13 +46,10 @@ where
     TxSelector: TxSelect<Tx = Tx>,
     BlobSelector: BlobSelect<Blob = B>,
 {
-    pub fn new(
-        tx_selector_settings: TxSelector::Settings,
-        blob_selector_settings: BlobSelector::Settings,
-    ) -> Self {
+    pub fn new(tx_selector: TxSelector, blob_selector: BlobSelector) -> Self {
         Self {
-            tx_selector: TxSelector::new(tx_selector_settings),
-            blob_selector: BlobSelector::new(blob_selector_settings),
+            tx_selector,
+            blob_selector,
             view: None,
             parent_qc: None,
             proposer: None,

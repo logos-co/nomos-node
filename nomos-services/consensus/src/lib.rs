@@ -37,7 +37,7 @@ use task_manager::TaskManager;
 use crate::committee_membership::UpdateableCommitteeMembership;
 use nomos_core::block::builder::BlockBuilder;
 use nomos_core::block::Block;
-use nomos_core::da::blob::BlobSelect;
+use nomos_core::da::blob::{Blob, BlobSelect};
 use nomos_core::tx::{Transaction, TxSelect};
 use nomos_core::vote::Tally;
 use nomos_mempool::{
@@ -152,14 +152,14 @@ where
     P::Tx:
         Debug + Clone + Eq + Hash + Serialize + serde::de::DeserializeOwned + Send + Sync + 'static,
     <P::Tx as Transaction>::Hash: Debug + Send + Sync,
-    B: Debug + Clone + Eq + Hash + Serialize + DeserializeOwned + Send + Sync + 'static,
+    B: Blob + Debug + Clone + Eq + Hash + Serialize + DeserializeOwned + Send + Sync + 'static,
     M: MempoolAdapter<Tx = P::Tx> + Send + Sync + 'static,
     O: Overlay + Debug + Send + Sync + 'static,
     O::LeaderSelection: UpdateableLeaderSelection,
     O::CommitteeMembership: UpdateableCommitteeMembership,
-    TxS: TxSelect<Tx = P::Tx> + Send + Sync + 'static,
+    TxS: TxSelect<Tx = P::Tx> + Clone + Send + Sync + 'static,
     TxS::Settings: Send + Sync + 'static,
-    BS: BlobSelect<Blob = B> + Send + Sync + 'static,
+    BS: BlobSelect<Blob = B> + Clone + Send + Sync + 'static,
     BS::Settings: Send + Sync + 'static,
 {
     fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, overwatch_rs::DynError> {
@@ -218,6 +218,9 @@ where
             participating_nodes: carnot.root_committee(),
         };
 
+        let tx_selector = TxS::new(transaction_selector_settings);
+        let blob_selector = BS::new(blob_selector_settings);
+
         let mut task_manager = TaskManager::new();
 
         let genesis_block = carnot.genesis_block();
@@ -267,6 +270,8 @@ where
                             adapter.clone(),
                             private_key,
                             mempool_relay.clone(),
+                            tx_selector.clone(),
+                            blob_selector.clone(),
                             timeout,
                         )
                         .await
@@ -295,13 +300,13 @@ where
     P::Tx:
         Debug + Clone + Eq + Hash + Serialize + serde::de::DeserializeOwned + Send + Sync + 'static,
     <P::Tx as Transaction>::Hash: Debug + Send + Sync,
-    B: Debug + Clone + Eq + Hash + Serialize + DeserializeOwned + Send + Sync + 'static,
+    B: Blob + Debug + Clone + Eq + Hash + Serialize + DeserializeOwned + Send + Sync + 'static,
     M: MempoolAdapter<Tx = P::Tx> + Send + Sync + 'static,
     O: Overlay + Debug + Send + Sync + 'static,
     O::LeaderSelection: UpdateableLeaderSelection,
     O::CommitteeMembership: UpdateableCommitteeMembership,
-    TxS: TxSelect<Tx = P::Tx> + 'static,
-    BS: BlobSelect<Blob = B> + 'static,
+    TxS: TxSelect<Tx = P::Tx> + Clone + Send + Sync + 'static,
+    BS: BlobSelect<Blob = B> + Clone + Send + Sync + 'static,
 {
     fn process_message(carnot: &Carnot<O>, msg: ConsensusMsg) {
         match msg {
@@ -330,6 +335,8 @@ where
         adapter: A,
         private_key: PrivateKey,
         mempool_relay: OutboundRelay<MempoolMsg<P::Tx>>,
+        tx_selector: TxS,
+        blobl_selector: BS,
         timeout: Duration,
     ) -> Carnot<O> {
         let mut output = None;
@@ -378,7 +385,15 @@ where
                 (carnot, output) = Self::process_root_timeout(carnot, timeouts).await;
             }
             Event::ProposeBlock { qc } => {
-                output = Self::propose_block(carnot.id(), private_key, qc, mempool_relay).await;
+                output = Self::propose_block(
+                    carnot.id(),
+                    private_key,
+                    qc,
+                    tx_selector.clone(),
+                    blobl_selector.clone(),
+                    mempool_relay,
+                )
+                .await;
             }
             _ => {}
         }
@@ -583,11 +598,16 @@ where
         (carnot, output)
     }
 
-    #[instrument(level = "debug", skip(mempool_relay, private_key))]
+    #[instrument(
+        level = "debug",
+        skip(mempool_relay, private_key, tx_selector, blob_selector)
+    )]
     async fn propose_block(
         id: NodeId,
         private_key: PrivateKey,
         qc: Qc,
+        tx_selector: TxS,
+        blob_selector: BS,
         mempool_relay: OutboundRelay<MempoolMsg<P::Tx>>,
     ) -> Option<Output<P::Tx, B>> {
         let (reply_channel, rx) = tokio::sync::oneshot::channel();
@@ -603,17 +623,19 @@ where
         match rx.await {
             Ok(txs) => {
                 let beacon = RandomBeaconState::generate_happy(qc.view(), &private_key);
-                // let proposal: Block = BlockBuilder::new(Fill)
-                //     .with_view(qc.view().next())
-                //     .with_parent_qc(qc)
-                //     .with_proposer(id)
-                //     .with_beacon_state(beacon)
-                //     .with_transactions(txs)
-                //     .with_blobs([].into_iter())
-                //     .build()
-                //     .expect();
+                let Ok(proposal) = BlockBuilder::new(tx_selector, blob_selector)
+                    .with_view(qc.view().next())
+                    .with_parent_qc(qc)
+                    .with_proposer(id)
+                    .with_beacon_state(beacon)
+                    .with_transactions(txs)
+                    .with_blobs([].into_iter())
+                    .build()
+                else {
+                    panic!("Proposal block should always succeed to be built")
+                };
 
-                let proposal = Block::new(qc.view().next(), qc, txs, [].into_iter(), id, beacon);
+                // let proposal = Block::new(qc.view().next(), qc, txs, [].into_iter(), id, beacon);
 
                 output = Some(Output::BroadcastProposal { proposal });
             }

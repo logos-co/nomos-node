@@ -6,7 +6,7 @@ use std::marker::PhantomData;
 use crate::da::blob::{Blob, BlobSelect};
 use crate::utils;
 
-#[derive(Default)]
+#[derive(Default, Clone, Copy)]
 pub struct FillSize<const SIZE: usize, B> {
     _blob: PhantomData<B>,
 }
@@ -23,7 +23,7 @@ impl<const SIZE: usize, B: Blob> BlobSelect for FillSize<SIZE, B> {
     type Blob = B;
     type Settings = ();
 
-    fn new(settings: Self::Settings) -> Self {
+    fn new(_settings: Self::Settings) -> Self {
         FillSize::new()
     }
 
