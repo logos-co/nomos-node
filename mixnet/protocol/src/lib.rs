@@ -1,6 +1,6 @@
 use sphinx_packet::{payload::Payload, SphinxPacket};
 
-use std::{io::ErrorKind, net::SocketAddr, sync::Arc, time::Duration};
+use std::{io::ErrorKind, net::SocketAddr, time::Duration};
 use tokio::{
     io::{self, AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt},
     net::TcpStream,
@@ -23,19 +23,18 @@ pub enum ProtocolError {
     ReachMaxRetries(usize),
 }
 
-#[derive(Clone)]
 #[non_exhaustive]
 pub enum Body {
-    SphinxPacket(Arc<SphinxPacket>),
-    FinalPayload(Arc<Payload>),
+    SphinxPacket(Box<SphinxPacket>),
+    FinalPayload(Payload),
 }
 
 impl Body {
-    pub fn new_sphinx(packet: Arc<SphinxPacket>) -> Self {
+    pub fn new_sphinx(packet: Box<SphinxPacket>) -> Self {
         Self::SphinxPacket(packet)
     }
 
-    pub fn new_final_payload(payload: Arc<Payload>) -> Self {
+    pub fn new_final_payload(payload: Payload) -> Self {
         Self::FinalPayload(payload)
     }
 
@@ -60,7 +59,7 @@ impl Body {
 
     fn sphinx_packet_from_bytes(data: &[u8]) -> Result<Self> {
         SphinxPacket::from_bytes(data)
-            .map(|packet| Self::new_sphinx(Arc::new(packet)))
+            .map(|packet| Self::new_sphinx(Box::new(packet)))
             .map_err(ProtocolError::InvalidPayload)
     }
 
@@ -76,7 +75,7 @@ impl Body {
 
     pub fn final_payload_from_bytes(data: &[u8]) -> Result<Self> {
         Payload::from_bytes(data)
-            .map(|p| Self::new_final_payload(Arc::new(p)))
+            .map(Self::new_final_payload)
             .map_err(ProtocolError::InvalidPayload)
     }
 
@@ -118,7 +117,7 @@ pub async fn retry_backoff(
     max_retries: usize,
     retry_delay: Duration,
     body: Body,
-    socket: Arc<Mutex<TcpStream>>,
+    socket: std::sync::Arc<Mutex<TcpStream>>,
 ) -> Result<()> {
     for idx in 0..max_retries {
         // backoff

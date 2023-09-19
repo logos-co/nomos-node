@@ -7,7 +7,7 @@ use client_notifier::ClientNotifier;
 pub use config::MixnetNodeConfig;
 use mixnet_protocol::{Body, ProtocolError};
 use mixnet_topology::MixnetNodeId;
-use mixnet_util::{ConnectionPool, MessagePool};
+use mixnet_util::{MessageHandle, MessagePool};
 use nym_sphinx::{
     addressing::nodes::{NymNodeRoutingAddress, NymNodeRoutingAddressError},
     Delay, DestinationAddressBytes, NodeAddressBytes, Payload, PrivateKey,
@@ -101,7 +101,6 @@ impl MixnetNode {
                 Err(e) => tracing::warn!("Failed to accept incoming connection: {e}"),
             }
         }
-        Ok(())
     }
 }
 
@@ -122,24 +121,18 @@ impl MixnetNodeRunner {
     async fn handle_connection(&self, mut socket: TcpStream) -> Result<()> {
         loop {
             let body = Body::read(&mut socket).await?;
-
+            let this = self.clone();
             tokio::spawn(async move {
-                if let Err(e) = self.handle_body(Message { retries: 0, body }).await {
+                if let Err(e) = this.handle_body(body).await {
                     tracing::error!("failed to handle body: {e}");
                 }
             });
         }
     }
 
-    async fn handle_body(&self, msg: Message) -> Result<()> {
-        match msg.body {
-            Body::SphinxPacket(packet) => {
-                self.handle_sphinx_packet(Message {
-                    retries: msg.retries,
-                    body: Body::SphinxPacket(packet),
-                })
-                .await
-            }
+    async fn handle_body(&self, msg: Body) -> Result<()> {
+        match msg {
+            Body::SphinxPacket(packet) => self.handle_sphinx_packet(packet).await,
             Body::FinalPayload(payload) => {
                 self.forward_body_to_client_notifier(Body::FinalPayload(payload))
                     .await
@@ -148,18 +141,31 @@ impl MixnetNodeRunner {
         }
     }
 
-    async fn handle_sphinx_packet(&self, packet: Message) -> Result<()> {
+    async fn handle_sphinx_packet(&self, packet: Box<SphinxPacket>) -> Result<()> {
         match packet
             .process(&PrivateKey::from(self.config.private_key))
             .map_err(ProtocolError::InvalidSphinxPacket)?
         {
             ProcessedPacket::ForwardHop(packet, next_node_addr, delay) => {
-                self.forward_packet_to_next_hop(packet, next_node_addr, delay)
-                    .await
+                self.forward_packet_to_next_hop(
+                    Message {
+                        retries: 0,
+                        body: Body::SphinxPacket(packet),
+                    },
+                    next_node_addr,
+                    delay,
+                )
+                .await
             }
             ProcessedPacket::FinalHop(destination_addr, _, payload) => {
-                self.forward_payload_to_destination(payload, destination_addr)
-                    .await
+                self.forward_payload_to_destination(
+                    Message {
+                        retries: 0,
+                        body: Body::FinalPayload(payload),
+                    },
+                    destination_addr,
+                )
+                .await
             }
         }
     }
@@ -203,7 +209,7 @@ impl MixnetNodeRunner {
         let addr = SocketAddr::from(to);
 
         let body = if let Some(handle) = self.message_pool.get(&addr) {
-            if let Err(err) = handle.send(body).await {
+            if let Err(err) = handle.send(msg) {
                 err.0
             } else {
                 // If succesfull send message to msg writting thread,
@@ -211,7 +217,7 @@ impl MixnetNodeRunner {
                 return Ok(());
             }
         } else {
-            body
+            msg
         };
 
         // the target msg handling thread does not live,
@@ -222,13 +228,18 @@ impl MixnetNodeRunner {
         let this = MessageHandler::new(
             addr,
             // TODO: do we need to retry on error for the tcp stream here?
-            TcpStream::connect(addr).await?,
+            TcpStream::connect(addr)
+                .await
+                .map_err(|e| MixnetNodeError::Protocol(ProtocolError::IO(e)))?,
             rx,
             self.config,
         );
 
-        let handle = tokio::spawn(this.run());
-        self.message_pool.insert(addr, handle);
+        let handle = tokio::spawn(async move {
+            this.run().await;
+        });
+        self.message_pool
+            .insert(addr, MessageHandle::new(tx, handle));
         Ok(())
     }
 }
@@ -236,7 +247,7 @@ impl MixnetNodeRunner {
 struct MessageHandler {
     config: MixnetNodeConfig,
     remote_addr: SocketAddr,
-    receiver: mpsc::Receiver<Message>,
+    receiver: mpsc::UnboundedReceiver<Message>,
     conn: TcpStream,
 }
 
@@ -244,7 +255,7 @@ impl MessageHandler {
     pub fn new(
         remote_addr: SocketAddr,
         conn: TcpStream,
-        receiver: mpsc::Receiver<Message>,
+        receiver: mpsc::UnboundedReceiver<Message>,
         config: MixnetNodeConfig,
     ) -> Self {
         Self {
@@ -276,19 +287,15 @@ impl MessageHandler {
                                     | ErrorKind::ConnectionRefused
                                     | ErrorKind::NotConnected
                                     | ErrorKind::BrokenPipe
-                                    | ErrorKind::HostUnreachable
                                     | ErrorKind::TimedOut
-                                    | ErrorKind::NetworkUnreachable
                                 ) {
                                     match TcpStream::connect(self.remote_addr).await {
                                         Ok(tcp) => {
                                             self.conn = tcp;
                                         }
                                         Err(e) => {
-                                            if matches!(e.kind(), ErrorKind::NetworkDown) {
-                                                tracing::error!("failed to update connection to {}, the local machine network is down", self.remote_addr);
-                                                return;
-                                            }
+                                            tracing::error!("failed to update connection to {}, the local machine network is down", self.remote_addr);
+                                            return;
                                         }
                                     }
                                 }

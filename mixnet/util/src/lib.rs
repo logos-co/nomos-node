@@ -1,10 +1,15 @@
 use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 
 use crossbeam_skiplist::SkipMap;
-use tokio::net::TcpStream;
-use tokio::sync::mpsc::error::SendError;
-use tokio::sync::{mpsc::Sender, Mutex};
-use tokio::task::JoinHandle;
+
+use tokio::{
+    net::TcpStream,
+    sync::{
+        mpsc::{error::SendError, UnboundedSender},
+        Mutex,
+    },
+    task::JoinHandle,
+};
 
 #[derive(Clone)]
 pub struct ConnectionPool {
@@ -40,7 +45,7 @@ impl ConnectionPool {
 
 pub struct MessageHandle<M> {
     handle: Arc<JoinHandle<()>>,
-    sender: Sender<M>,
+    sender: UnboundedSender<M>,
 }
 
 impl<M> Clone for MessageHandle<M> {
@@ -53,15 +58,15 @@ impl<M> Clone for MessageHandle<M> {
 }
 
 impl<M> MessageHandle<M> {
-    pub fn new(sender: Sender<M>, handle: JoinHandle<()>) -> Self {
+    pub fn new(sender: UnboundedSender<M>, handle: JoinHandle<()>) -> Self {
         Self {
             handle: Arc::new(handle),
             sender,
         }
     }
 
-    pub async fn send(&self, msg: M) -> Result<(), SendError<M>> {
-        self.sender.send(msg).await
+    pub fn send(&self, msg: M) -> Result<(), SendError<M>> {
+        self.sender.send(msg)
     }
 }
 
