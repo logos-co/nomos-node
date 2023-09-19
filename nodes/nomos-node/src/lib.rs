@@ -36,6 +36,9 @@ use overwatch_derive::*;
 use overwatch_rs::services::handle::ServiceHandle;
 
 pub use config::{Config, ConsensusArgs, HttpArgs, LogArgs, NetworkArgs, OverlayArgs};
+use nomos_core::{
+    da::blob::select::FillSize as FillSizeWithBlobs, tx::select::FillSize as FillSizeWithTx,
+};
 pub use tx::Tx;
 
 #[cfg(all(feature = "waku", feature = "libp2p"))]
@@ -50,6 +53,8 @@ pub type Carnot = CarnotConsensus<
     Blob,
 >;
 
+const MB16: usize = 1024 * 1024 * 16;
+
 #[cfg(feature = "libp2p")]
 pub type Carnot = CarnotConsensus<
     ConsensusLibp2pAdapter,
@@ -57,6 +62,8 @@ pub type Carnot = CarnotConsensus<
     MempoolLibp2pAdapter<Tx>,
     FlatOverlay<RoundRobin, RandomBeaconState>,
     Blob,
+    FillSizeWithTx<MB16, Tx>,
+    FillSizeWithBlobs<MB16, Blob>,
 >;
 
 #[cfg(feature = "libp2p")]

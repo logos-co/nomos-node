@@ -35,8 +35,10 @@ use consensus_engine::{
 use task_manager::TaskManager;
 
 use crate::committee_membership::UpdateableCommitteeMembership;
+use nomos_core::block::builder::BlockBuilder;
 use nomos_core::block::Block;
-use nomos_core::tx::Transaction;
+use nomos_core::da::blob::BlobSelect;
+use nomos_core::tx::{Transaction, TxSelect};
 use nomos_core::vote::Tally;
 use nomos_mempool::{
     backend::MemPool, network::NetworkAdapter as MempoolAdapter, MempoolMsg, MempoolService,
@@ -59,39 +61,49 @@ fn default_timeout() -> Duration {
 pub type Seed = [u8; 32];
 
 #[derive(Debug, Deserialize, Serialize)]
-pub struct CarnotSettings<O: Overlay> {
+pub struct CarnotSettings<O: Overlay, Ts, Bs> {
     pub private_key: [u8; 32],
     pub overlay_settings: O::Settings,
     #[serde(default = "default_timeout")]
     pub timeout: Duration,
+    #[serde(default)]
+    pub transaction_selector_settings: Ts,
+    #[serde(default)]
+    pub blob_selector_settings: Bs,
 }
 
-impl<O: Overlay> Clone for CarnotSettings<O> {
+impl<O: Overlay, Ts: Clone, Bs: Clone> Clone for CarnotSettings<O, Ts, Bs> {
     fn clone(&self) -> Self {
         Self {
             private_key: self.private_key,
             overlay_settings: self.overlay_settings.clone(),
             timeout: self.timeout,
+            transaction_selector_settings: self.transaction_selector_settings.clone(),
+            blob_selector_settings: self.blob_selector_settings.clone(),
         }
     }
 }
 
-impl<O: Overlay> CarnotSettings<O> {
+impl<O: Overlay, Ts, Bs> CarnotSettings<O, Ts, Bs> {
     #[inline]
     pub const fn new(
         private_key: [u8; 32],
         overlay_settings: O::Settings,
+        transaction_selector_settings: Ts,
+        blob_selector_settings: Bs,
         timeout: Duration,
     ) -> Self {
         Self {
             private_key,
             overlay_settings,
             timeout,
+            transaction_selector_settings,
+            blob_selector_settings,
         }
     }
 }
 
-pub struct CarnotConsensus<A, P, M, O, B>
+pub struct CarnotConsensus<A, P, M, O, B, TxS, BS>
 where
     A: NetworkAdapter,
     M: MempoolAdapter<Tx = P::Tx>,
@@ -100,6 +112,8 @@ where
     P::Tx: Transaction + Debug + 'static,
     <P::Tx as Transaction>::Hash: Debug,
     A::Backend: 'static,
+    TxS: TxSelect<Tx = P::Tx>,
+    BS: BlobSelect<Blob = B>,
 {
     service_state: ServiceStateHandle<Self>,
     // underlying networking backend. We need this so we can relay and check the types properly
@@ -111,7 +125,7 @@ where
     _blob: std::marker::PhantomData<B>,
 }
 
-impl<A, P, M, O, B> ServiceData for CarnotConsensus<A, P, M, O, B>
+impl<A, P, M, O, B, TxS, BS> ServiceData for CarnotConsensus<A, P, M, O, B, TxS, BS>
 where
     A: NetworkAdapter,
     P: MemPool,
@@ -119,16 +133,18 @@ where
     <P::Tx as Transaction>::Hash: Debug,
     M: MempoolAdapter<Tx = P::Tx>,
     O: Overlay + Debug,
+    TxS: TxSelect<Tx = P::Tx>,
+    BS: BlobSelect<Blob = B>,
 {
     const SERVICE_ID: ServiceId = "Carnot";
-    type Settings = CarnotSettings<O>;
+    type Settings = CarnotSettings<O, TxS::Settings, BS::Settings>;
     type State = NoState<Self::Settings>;
     type StateOperator = NoOperator<Self::State>;
     type Message = ConsensusMsg;
 }
 
 #[async_trait::async_trait]
-impl<A, P, M, O, B> ServiceCore for CarnotConsensus<A, P, M, O, B>
+impl<A, P, M, O, B, TxS, BS> ServiceCore for CarnotConsensus<A, P, M, O, B, TxS, BS>
 where
     A: NetworkAdapter + Clone + Send + Sync + 'static,
     P: MemPool + Send + Sync + 'static,
@@ -141,6 +157,10 @@ where
     O: Overlay + Debug + Send + Sync + 'static,
     O::LeaderSelection: UpdateableLeaderSelection,
     O::CommitteeMembership: UpdateableCommitteeMembership,
+    TxS: TxSelect<Tx = P::Tx> + Send + Sync + 'static,
+    TxS::Settings: Send + Sync + 'static,
+    BS: BlobSelect<Blob = B> + Send + Sync + 'static,
+    BS::Settings: Send + Sync + 'static,
 {
     fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, overwatch_rs::DynError> {
         let network_relay = service_state.overwatch_handle.relay();
@@ -171,6 +191,8 @@ where
             private_key,
             overlay_settings,
             timeout,
+            transaction_selector_settings,
+            blob_selector_settings,
         } = self.service_state.settings_reader.get_updated_settings();
 
         let overlay = O::new(overlay_settings);
@@ -265,7 +287,7 @@ enum Output<Tx: Clone + Eq + Hash, Blob: Clone + Eq + Hash> {
     BroadcastProposal { proposal: Block<Tx, Blob> },
 }
 
-impl<A, P, M, O, B> CarnotConsensus<A, P, M, O, B>
+impl<A, P, M, O, B, TxS, BS> CarnotConsensus<A, P, M, O, B, TxS, BS>
 where
     A: NetworkAdapter + Clone + Send + Sync + 'static,
     P: MemPool + Send + Sync + 'static,
@@ -278,6 +300,8 @@ where
     O: Overlay + Debug + Send + Sync + 'static,
     O::LeaderSelection: UpdateableLeaderSelection,
     O::CommitteeMembership: UpdateableCommitteeMembership,
+    TxS: TxSelect<Tx = P::Tx> + 'static,
+    BS: BlobSelect<Blob = B> + 'static,
 {
     fn process_message(carnot: &Carnot<O>, msg: ConsensusMsg) {
         match msg {
@@ -579,7 +603,18 @@ where
         match rx.await {
             Ok(txs) => {
                 let beacon = RandomBeaconState::generate_happy(qc.view(), &private_key);
+                // let proposal: Block = BlockBuilder::new(Fill)
+                //     .with_view(qc.view().next())
+                //     .with_parent_qc(qc)
+                //     .with_proposer(id)
+                //     .with_beacon_state(beacon)
+                //     .with_transactions(txs)
+                //     .with_blobs([].into_iter())
+                //     .build()
+                //     .expect();
+
                 let proposal = Block::new(qc.view().next(), qc, txs, [].into_iter(), id, beacon);
+
                 output = Some(Output::BroadcastProposal { proposal });
             }
             Err(e) => tracing::error!("Could not fetch txs {e}"),
