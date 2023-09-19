@@ -12,6 +12,7 @@ use nym_sphinx::{
     addressing::nodes::{NymNodeRoutingAddress, NymNodeRoutingAddressError},
     Delay, DestinationAddressBytes, NodeAddressBytes, Payload, PrivateKey,
 };
+use serde::de::Error;
 pub use sphinx_packet::crypto::PRIVATE_KEY_SIZE;
 use sphinx_packet::{crypto::PUBLIC_KEY_SIZE, ProcessedPacket, SphinxPacket};
 use tokio::{
@@ -79,17 +80,18 @@ impl MixnetNode {
             self.config.listen_address
         );
 
-        MixnetNodeRunner {
+        let runner = MixnetNodeRunner {
             config: self.config,
             message_pool: self.message_pool,
             client_tx,
         };
+
         loop {
             match listener.accept().await {
                 Ok((socket, remote_addr)) => {
                     tracing::debug!("Accepted incoming connection from {remote_addr:?}");
 
-                    let runner = self.runner();
+                    let runner = runner.clone();
                     tokio::spawn(async move {
                         if let Err(e) = runner.handle_connection(socket).await {
                             tracing::error!("failed to handle conn: {e}");
@@ -101,14 +103,6 @@ impl MixnetNode {
         }
         Ok(())
     }
-
-    fn runner(&self) -> MixnetNodeRunner {
-        MixnetNodeRunner {
-            config: self.config,
-            message_pool: self.message_pool.clone(),
-            client_tx: self.client_tx.clone(),
-        }
-    }
 }
 
 struct Message {
@@ -117,6 +111,7 @@ struct Message {
     body: Body,
 }
 
+#[derive(Clone)]
 struct MixnetNodeRunner {
     config: MixnetNodeConfig,
     message_pool: MessagePool<Message>,
@@ -224,13 +219,13 @@ impl MixnetNodeRunner {
         let (tx, rx) = mpsc::unbounded_channel();
         tx.send(body).unwrap();
 
-        let this = MessageHandler {
-            config: self.config,
-            remote_addr: addr,
-            receiver: rx,
+        let this = MessageHandler::new(
+            addr,
             // TODO: do we need to retry on error for the tcp stream here?
-            conn: TcpStream::connect(addr).await?,
-        };
+            TcpStream::connect(addr).await?,
+            rx,
+            self.config,
+        );
 
         let handle = tokio::spawn(this.run());
         self.message_pool.insert(addr, handle);
@@ -241,7 +236,7 @@ impl MixnetNodeRunner {
 struct MessageHandler {
     config: MixnetNodeConfig,
     remote_addr: SocketAddr,
-    receiver: Receiver<Message>,
+    receiver: mpsc::Receiver<Message>,
     conn: TcpStream,
 }
 
@@ -249,7 +244,7 @@ impl MessageHandler {
     pub fn new(
         remote_addr: SocketAddr,
         conn: TcpStream,
-        receiver: Receiver<Message>,
+        receiver: mpsc::Receiver<Message>,
         config: MixnetNodeConfig,
     ) -> Self {
         Self {
@@ -265,14 +260,58 @@ impl MessageHandler {
             tokio::select! {
                 msg = self.receiver.recv() => {
                     if let Some(msg) = msg {
-                        // TODO: handle msg sending
+                        use std::io::ErrorKind;
+
+                        match msg.body.write(&mut self.conn).await {
+                            Ok(_) => {},
+                            // we should only retry io errors (exclude unsupported for now, may be more in future)
+                            Err(ProtocolError::IO(e)) if e.kind() != ErrorKind::Unsupported => {
+                                // Update the connection, I actully do not want to do it unless the connection is in broken
+                                // situation, but rust does not provide a method to let us check if the connection is broken
+                                // or not, so I just hard code the possible situations worth to refresh.
+                                if matches!(
+                                    e.kind(),
+                                    ErrorKind::ConnectionAborted
+                                    | ErrorKind::ConnectionReset
+                                    | ErrorKind::ConnectionRefused
+                                    | ErrorKind::NotConnected
+                                    | ErrorKind::BrokenPipe
+                                    | ErrorKind::HostUnreachable
+                                    | ErrorKind::TimedOut
+                                    | ErrorKind::NetworkUnreachable
+                                ) {
+                                    match TcpStream::connect(self.remote_addr).await {
+                                        Ok(tcp) => {
+                                            self.conn = tcp;
+                                        }
+                                        Err(e) => {
+                                            if matches!(e.kind(), ErrorKind::NetworkDown) {
+                                                tracing::error!("failed to update connection to {}, the local machine network is down", self.remote_addr);
+                                                return;
+                                            }
+                                        }
+                                    }
+                                }
+
+                                // TODO: Retry here, but currently, I cannot think of a better way to do it
+                                // I don't think a blocking retry is a good idea, this will block
+                                // the all of message forwarding to this address.
+                                // And I also don't think spawning a new task is a good idea either,
+                                // because then we need to add a Mutex wrapper to the TcpStream, which
+                                // will introduce the same problems as the previous connection pool solution.
+                            },
+                            Err(e) => {
+                                tracing::error!("failed to forward msg to {}: {e}", self.remote_addr);
+                            }
+                        }
                     } else {
-                        break;
+                        // Channel closed, we should shutdown the message handler thread
+                        return;
                     }
                 },
                 _ = tokio::signal::ctrl_c() => {
                     tracing::info!("Shutting down message handler thread for {}...", self.remote_addr);
-                    break;
+                    return;
                 }
             }
         }
