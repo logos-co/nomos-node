@@ -46,10 +46,13 @@ where
     TxSelector: TxSelect<Tx = Tx>,
     BlobSelector: BlobSelect<Blob = B>,
 {
-    pub fn new(tx_selector: TxSelector, blob_selector: BlobSelector) -> Self {
+    pub fn new(
+        tx_selector_settings: TxSelector::Settings,
+        blob_selector_settings: BlobSelector::Settings,
+    ) -> Self {
         Self {
-            tx_selector,
-            blob_selector,
+            tx_selector: TxSelector::new(tx_selector_settings),
+            blob_selector: BlobSelector::new(blob_selector_settings),
             view: None,
             parent_qc: None,
             proposer: None,
@@ -80,6 +83,18 @@ where
     #[must_use]
     pub fn with_beacon_state(mut self, beacon: RandomBeaconState) -> Self {
         self.beacon = Some(beacon);
+        self
+    }
+
+    #[must_use]
+    pub fn with_transactions(mut self, txs: impl Iterator<Item = Tx> + 'static) -> Self {
+        self.txs = Some(Box::new(txs));
+        self
+    }
+
+    #[must_use]
+    pub fn with_blobs(mut self, blobs: impl Iterator<Item = B> + 'static) -> Self {
+        self.blobs = Some(Box::new(blobs));
         self
     }
 
