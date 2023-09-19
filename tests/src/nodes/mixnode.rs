@@ -72,7 +72,7 @@ impl MixNode {
 
         let mut nodes = Vec::<MixNode>::new();
         for config in &configs {
-            nodes.push(Self::spawn(config.clone()).await);
+            nodes.push(Self::spawn(*config).await);
         }
 
         // We need to return configs as well, to configure mixclients accordingly
