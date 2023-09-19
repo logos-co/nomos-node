@@ -122,7 +122,6 @@ pub async fn retry_backoff(
     for idx in 0..max_retries {
         // backoff
         let wait = Duration::from_millis((retry_delay.as_millis() as u64).pow(idx as u32));
-
         tokio::time::sleep(wait).await;
         let mut socket = socket.lock().await;
         match body.write(&mut *socket).await {

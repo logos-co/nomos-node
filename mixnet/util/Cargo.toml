@@ -7,3 +7,5 @@ edition = "2021"
 tokio = { version = "1.32", default-features = false, features = ["sync", "net"] }
 mixnet-protocol = { path = "../protocol" }
 crossbeam-skiplist = "0.1"
+pin-project-lite = "0.2"
+itertools = "0.11"

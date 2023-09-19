@@ -11,6 +11,9 @@ use tokio::{
     task::JoinHandle,
 };
 
+mod retry_pool;
+pub use retry_pool::*;
+
 #[derive(Clone)]
 pub struct ConnectionPool {
     pool: Arc<Mutex<HashMap<SocketAddr, Arc<Mutex<TcpStream>>>>>,

@@ -1,13 +1,13 @@
 mod client_notifier;
 pub mod config;
 
-use std::net::SocketAddr;
+use std::{net::SocketAddr, time::Duration};
 
 use client_notifier::ClientNotifier;
 pub use config::MixnetNodeConfig;
 use mixnet_protocol::{Body, ProtocolError};
 use mixnet_topology::MixnetNodeId;
-use mixnet_util::{MessageHandle, MessagePool};
+use mixnet_util::{MessageHandle, MessagePool, OneOrMore, RetryPool};
 use nym_sphinx::{
     addressing::nodes::{NymNodeRoutingAddress, NymNodeRoutingAddressError},
     Delay, DestinationAddressBytes, NodeAddressBytes, PrivateKey,
@@ -251,6 +251,7 @@ struct MessageHandler {
     config: MixnetNodeConfig,
     remote_addr: SocketAddr,
     receiver: mpsc::UnboundedReceiver<Message>,
+    retry_pool: RetryPool<Message>,
     conn: TcpStream,
 }
 
@@ -264,6 +265,7 @@ impl MessageHandler {
         Self {
             receiver,
             remote_addr,
+            retry_pool: RetryPool::new(),
             conn,
             config,
         }
@@ -274,55 +276,132 @@ impl MessageHandler {
             tokio::select! {
                 msg = self.receiver.recv() => {
                     if let Some(msg) = msg {
-                        use std::io::ErrorKind;
-
-                        match msg.body.write(&mut self.conn).await {
-                            Ok(_) => {},
-                            // we should only retry io errors (exclude unsupported for now, may be more in future)
-                            Err(ProtocolError::IO(e)) if e.kind() != ErrorKind::Unsupported => {
-                                // Update the connection, I actully do not want to do it unless the connection is in broken
-                                // situation, but rust does not provide a method to let us check if the connection is broken
-                                // or not, so I just hard code the possible situations worth to refresh.
-                                if matches!(
-                                    e.kind(),
-                                    ErrorKind::ConnectionAborted
-                                    | ErrorKind::ConnectionReset
-                                    | ErrorKind::ConnectionRefused
-                                    | ErrorKind::NotConnected
-                                    | ErrorKind::BrokenPipe
-                                    | ErrorKind::TimedOut
-                                ) {
-                                    match TcpStream::connect(self.remote_addr).await {
-                                        Ok(tcp) => {
-                                            self.conn = tcp;
-                                        }
-                                        Err(e) => {
-                                            tracing::error!("failed to update connection to {}, the local machine network is down: {e}", self.remote_addr);
-                                            return;
-                                        }
-                                    }
-                                }
-
-                                // TODO: Retry here, but currently, I cannot think of a better way to do it
-                                // I don't think a blocking retry is a good idea, this will block
-                                // the all of message forwarding to this address.
-                                // And I also don't think spawning a new task is a good idea either,
-                                // because then we need to add a Mutex wrapper to the TcpStream, which
-                                // will introduce the same problems as the previous connection pool solution.
-                            },
-                            Err(e) => {
-                                tracing::error!("failed to forward msg to {}: {e}", self.remote_addr);
+                        match self.send(msg, None).await {
+                            Ok(Some((delay, msg))) => {
+                                self.retry_pool.insert(msg, delay).await;
                             }
+                            Ok(None) => {},
+                            Err(e) => return,
                         }
                     } else {
                         // Channel closed, we should shutdown the message handler thread
                         return;
                     }
                 },
+                retry_msg = async {
+                    let fut = self.retry_pool.get().await;
+                    fut.await
+                } => {
+                    match retry_msg {
+                        OneOrMore::One((last_delay, msg)) => {
+                            match self.send(msg, Some(last_delay)).await {
+                                Ok(Some((delay, msg))) => {
+                                    self.retry_pool.insert(msg, delay).await;
+                                }
+                                Ok(None) => {},
+                                Err(e) => return,
+                            }
+                        },
+                        OneOrMore::More(msgs) => {
+                            match self.send_many(msgs).await {
+                                Ok(Some(msgs)) => {
+                                    self.retry_pool.insert_many(msgs.into_iter()).await;
+                                }
+                                Ok(None) => {},
+                                Err(e) => return,
+                            }
+                        },
+                    }
+                }
                 _ = tokio::signal::ctrl_c() => {
                     tracing::info!("Shutting down message handler thread for {}...", self.remote_addr);
                     return;
                 }
+            }
+        }
+    }
+
+    /// Send a message to the remote node,
+    /// return Ok(Some(Vec<(Duration, Message)>)) if the message is not sent and the error is retryable
+    /// return Ok(None) if the message is sent successfully
+    /// return Err(e) if the message is not sent and the error is not retryable
+    async fn send_many(
+        &mut self,
+        msgs: Vec<(Duration, Message)>,
+    ) -> Result<Option<Vec<(Duration, Message)>>> {
+        let mut retries = Vec::new();
+        for (delay, msg) in msgs {
+            match self.send(msg, Some(delay)).await {
+                Ok(None) => continue,
+                Ok(Some((d, msg))) => retries.push((d, msg)),
+                Err(e) => return Err(e),
+            }
+        }
+
+        Ok(Some(retries))
+    }
+
+    /// Send a message to the remote node,
+    /// return Ok(Some((Duration, Message))) if the message is not sent and the error is retryable
+    /// return Ok(None) if the message is sent successfully
+    /// return Err(e) if the message is not sent and the error is not retryable
+    async fn send(
+        &mut self,
+        mut msg: Message,
+        last_delay: Option<Duration>,
+    ) -> Result<Option<(Duration, Message)>> {
+        use std::io::ErrorKind;
+
+        match msg.body.write(&mut self.conn).await {
+            Ok(_) => Ok(None),
+            // we should only retry io errors (exclude unsupported for now, may be more in future)
+            Err(ProtocolError::IO(e)) if e.kind() != ErrorKind::Unsupported => {
+                // Update the connection, I actully do not want to do it unless the connection is in broken
+                // situation, but rust does not provide a method to let us check if the connection is broken
+                // or not, so I just hard code the possible situations worth to refresh.
+                if matches!(
+                    e.kind(),
+                    ErrorKind::ConnectionAborted
+                        | ErrorKind::ConnectionReset
+                        | ErrorKind::ConnectionRefused
+                        | ErrorKind::NotConnected
+                        | ErrorKind::BrokenPipe
+                        | ErrorKind::TimedOut
+                ) {
+                    match TcpStream::connect(self.remote_addr).await {
+                        Ok(tcp) => {
+                            self.conn = tcp;
+                        }
+                        Err(e) => {
+                            tracing::error!("failed to update connection to {}, the local machine network is down: {e}", self.remote_addr);
+                            return Err(MixnetNodeError::Protocol(ProtocolError::IO(e)));
+                        }
+                    }
+                }
+
+                if msg.retries < self.config.max_retries {
+                    msg.retries += 1;
+                    let delay = match last_delay {
+                        // exponential backoff
+                        Some(last_delay) => Duration::from_millis(
+                            (last_delay.as_millis() as u64).pow(msg.retries as u32),
+                        ),
+                        None => self.config.retry_delay,
+                    };
+                    return Ok(Some((delay, msg)));
+                }
+
+                tracing::error!(
+                    "failed to forward msg to {}: reach the maximum retries",
+                    self.remote_addr
+                );
+                Err(MixnetNodeError::Protocol(ProtocolError::ReachMaxRetries(
+                    self.config.max_retries,
+                )))
+            }
+            Err(e) => {
+                tracing::error!("failed to forward msg to {}: {e}", self.remote_addr);
+                Err(MixnetNodeError::Protocol(e))
             }
         }
     }
