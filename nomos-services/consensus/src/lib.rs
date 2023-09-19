@@ -634,9 +634,6 @@ where
                 else {
                     panic!("Proposal block should always succeed to be built")
                 };
-
-                // let proposal = Block::new(qc.view().next(), qc, txs, [].into_iter(), id, beacon);
-
                 output = Some(Output::BroadcastProposal { proposal });
             }
             Err(e) => tracing::error!("Could not fetch txs {e}"),
