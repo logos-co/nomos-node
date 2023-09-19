@@ -57,12 +57,10 @@ impl MixnetHandler {
                 Ok(msg) => {
                     tracing::debug!("receiving message from mixnet client");
                     let Ok(MixnetMessage { topic, message }) = MixnetMessage::from_bytes(&msg)
-                        else {
-                            tracing::error!(
-                                "failed to deserialize json received from mixnet client"
-                            );
-                            continue;
-                        };
+                    else {
+                        tracing::error!("failed to deserialize msg received from mixnet client");
+                        continue;
+                    };
 
                     self.commands_tx
                         .send(Command::DirectBroadcastAndRetry {
