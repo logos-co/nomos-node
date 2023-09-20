@@ -57,6 +57,7 @@ pub fn to_overlay_node<R: Rng>(
                 number_of_committees: tree_settings.number_of_committees,
                 leader: RoundRobin::new(),
                 committee_membership: RandomBeaconState::initial_sad_from_entropy([0; 32]),
+                leader_super_majority_threshold: None,
             };
             Box::new(
                 CarnotNode::<TreeOverlay<RoundRobin, RandomBeaconState>>::new(

@@ -240,7 +240,7 @@ impl Node for NomosNode {
 fn create_node_config(
     nodes: Vec<NodeId>,
     private_key: [u8; 32],
-    _threshold: Fraction,
+    threshold: Fraction,
     timeout: Duration,
     #[cfg(feature = "libp2p")] mixnet_node_config: Option<MixnetNodeConfig>,
     #[cfg(feature = "waku")] _mixnet_node_config: Option<MixnetNodeConfig>,
@@ -282,6 +282,10 @@ fn create_node_config(
                 current_leader: [0; 32].into(),
                 number_of_committees: 1,
                 committee_membership: RandomBeaconState::initial_sad_from_entropy([0; 32]),
+                // By setting the leader_threshold to 1 we ensure that all nodes come
+                // online before progressing. This is only necessary until we add a way
+                // to recover poast blocks from other nodes.
+                leader_super_majority_threshold: Some(threshold),
             },
             timeout,
         },
