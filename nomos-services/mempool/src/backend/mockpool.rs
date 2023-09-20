@@ -7,58 +7,57 @@ use std::{collections::BTreeMap, time::UNIX_EPOCH};
 // internal
 use crate::backend::{MemPool, MempoolError};
 use nomos_core::block::BlockId;
-use nomos_core::tx::Transaction;
 
 /// A mock mempool implementation that stores all transactions in memory in the order received.
-pub struct MockPool<Tx: Transaction>
-where
-    Tx::Hash: Hash,
-{
-    pending_txs: LinkedHashMap<Tx::Hash, Tx>,
-    in_block_txs: BTreeMap<BlockId, Vec<Tx>>,
-    in_block_txs_by_id: BTreeMap<Tx::Hash, BlockId>,
-    last_tx_timestamp: u64,
+pub struct MockPool<Item, Key> {
+    pending_items: LinkedHashMap<Key, Item>,
+    in_block_items: BTreeMap<BlockId, Vec<Item>>,
+    in_block_items_by_id: BTreeMap<Key, BlockId>,
+    last_item_timestamp: u64,
 }
 
-impl<Tx: Transaction> Default for MockPool<Tx> {
+impl<Item, Key> Default for MockPool<Item, Key>
+where
+    Key: Hash + Eq,
+{
     fn default() -> Self {
         Self {
-            pending_txs: LinkedHashMap::new(),
-            in_block_txs: BTreeMap::new(),
-            in_block_txs_by_id: BTreeMap::new(),
-            last_tx_timestamp: 0,
+            pending_items: LinkedHashMap::new(),
+            in_block_items: BTreeMap::new(),
+            in_block_items_by_id: BTreeMap::new(),
+            last_item_timestamp: 0,
         }
     }
 }
 
-impl<Tx: Transaction> MockPool<Tx>
+impl<Item, Key> MockPool<Item, Key>
 where
-    Tx::Hash: Ord,
+    Key: Hash + Eq + Clone,
 {
     pub fn new() -> Self {
         Default::default()
     }
 }
 
-impl<Tx> MemPool for MockPool<Tx>
+impl<Item, Key> MemPool for MockPool<Item, Key>
 where
-    Tx: Transaction + Clone + Send + Sync + 'static + Hash,
-    Tx::Hash: Ord,
+    Item: Clone + Send + Sync + 'static + Hash,
+    Key: Clone + Ord + Hash,
 {
     type Settings = ();
-    type Tx = Tx;
+    type Item = Item;
+    type Key = Key;
 
     fn new(_settings: Self::Settings) -> Self {
         Self::new()
     }
 
-    fn add_tx(&mut self, tx: Self::Tx) -> Result<(), MempoolError> {
-        let id = <Self::Tx as Transaction>::hash(&tx);
-        if self.pending_txs.contains_key(&id) || self.in_block_txs_by_id.contains_key(&id) {
-            return Err(MempoolError::ExistingTx);
+    fn add_item(&mut self, key: Self::Key, item: Self::Item) -> Result<(), MempoolError> {
+        if self.pending_items.contains_key(&key) || self.in_block_items_by_id.contains_key(&key) {
+            return Err(MempoolError::ExistingItem);
         }
-        self.pending_txs.insert(id, tx);
-        self.last_tx_timestamp = SystemTime::now()
+        self.pending_items.insert(key, item);
+        self.last_item_timestamp = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap()
             .as_millis() as u64;
@@ -66,47 +65,44 @@ where
         Ok(())
     }
 
-    fn view(&self, _ancestor_hint: BlockId) -> Box<dyn Iterator<Item = Self::Tx> + Send> {
+    fn view(&self, _ancestor_hint: BlockId) -> Box<dyn Iterator<Item = Self::Item> + Send> {
         // we need to have an owned version of the iterator to bypass adding a lifetime bound to the return iterator type
         #[allow(clippy::needless_collect)]
-        let pending_txs: Vec<Tx> = self.pending_txs.values().cloned().collect();
-        Box::new(pending_txs.into_iter())
+        let pending_items: Vec<Item> = self.pending_items.values().cloned().collect();
+        Box::new(pending_items.into_iter())
     }
 
-    fn mark_in_block(&mut self, txs: &[<Self::Tx as Transaction>::Hash], block: BlockId) {
-        let mut txs_in_block = Vec::with_capacity(txs.len());
-        for tx_id in txs.iter() {
-            if let Some(tx) = self.pending_txs.remove(tx_id) {
-                txs_in_block.push(tx);
+    fn mark_in_block(&mut self, keys: &[Self::Key], block: BlockId) {
+        let mut items_in_block = Vec::with_capacity(keys.len());
+        for key in keys {
+            if let Some(item) = self.pending_items.remove(key) {
+                items_in_block.push(item);
             }
         }
-        let block_entry = self.in_block_txs.entry(block).or_default();
-        self.in_block_txs_by_id
-            .extend(txs.iter().cloned().map(|tx| (tx, block)));
-        block_entry.append(&mut txs_in_block);
+        let block_entry = self.in_block_items.entry(block).or_default();
+        self.in_block_items_by_id
+            .extend(keys.iter().cloned().map(|key| (key, block)));
+        block_entry.append(&mut items_in_block);
     }
 
     #[cfg(test)]
-    fn block_transactions(
-        &self,
-        block: BlockId,
-    ) -> Option<Box<dyn Iterator<Item = Self::Tx> + Send>> {
-        self.in_block_txs.get(&block).map(|txs| {
-            Box::new(txs.clone().into_iter()) as Box<dyn Iterator<Item = Self::Tx> + Send>
+    fn block_items(&self, block: BlockId) -> Option<Box<dyn Iterator<Item = Self::Item> + Send>> {
+        self.in_block_items.get(&block).map(|items| {
+            Box::new(items.clone().into_iter()) as Box<dyn Iterator<Item = Self::Item> + Send>
         })
     }
 
-    fn prune(&mut self, txs: &[<Self::Tx as Transaction>::Hash]) {
-        for tx_id in txs {
-            self.pending_txs.remove(tx_id);
+    fn prune(&mut self, keys: &[Self::Key]) {
+        for key in keys {
+            self.pending_items.remove(key);
         }
     }
 
-    fn pending_tx_count(&self) -> usize {
-        self.pending_txs.len()
+    fn pending_item_count(&self) -> usize {
+        self.pending_items.len()
     }
 
-    fn last_tx_timestamp(&self) -> u64 {
-        self.last_tx_timestamp
+    fn last_item_timestamp(&self) -> u64 {
+        self.last_item_timestamp
     }
 }
