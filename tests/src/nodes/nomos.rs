@@ -6,23 +6,18 @@ use std::time::Duration;
 use crate::{get_available_port, Node, SpawnConfig};
 use consensus_engine::overlay::{FlatOverlaySettings, RoundRobin};
 use consensus_engine::NodeId;
-#[cfg(feature = "libp2p")]
 use mixnet_client::{MixnetClientConfig, MixnetClientMode};
 use mixnet_node::MixnetNodeConfig;
 use mixnet_topology::MixnetTopology;
 use nomos_consensus::{CarnotInfo, CarnotSettings};
 use nomos_http::backends::axum::AxumBackendSettings;
-#[cfg(feature = "libp2p")]
 use nomos_libp2p::Multiaddr;
 use nomos_log::{LoggerBackend, LoggerFormat};
-#[cfg(feature = "libp2p")]
 use nomos_network::backends::libp2p::{Libp2pConfig, Libp2pInfo};
 #[cfg(feature = "waku")]
 use nomos_network::backends::waku::{WakuConfig, WakuInfo};
 use nomos_network::NetworkConfig;
 use nomos_node::Config;
-#[cfg(feature = "waku")]
-use waku_bindings::{Multiaddr, PeerId};
 // crates
 use fraction::Fraction;
 use once_cell::sync::Lazy;
@@ -104,33 +99,6 @@ impl NomosNode {
             tokio::time::sleep(Duration::from_millis(100)).await;
         }
     }
-
-    #[cfg(feature = "waku")]
-    pub async fn peer_id(&self) -> PeerId {
-        self.get(NETWORK_INFO_API)
-            .await
-            .unwrap()
-            .json::<WakuInfo>()
-            .await
-            .unwrap()
-            .peer_id
-            .unwrap()
-    }
-
-    #[cfg(feature = "waku")]
-    pub async fn get_listening_address(&self) -> Multiaddr {
-        self.get(NETWORK_INFO_API)
-            .await
-            .unwrap()
-            .json::<WakuInfo>()
-            .await
-            .unwrap()
-            .listen_addresses
-            .unwrap()
-            .swap_remove(0)
-    }
-
-    #[cfg(feature = "libp2p")]
     pub async fn get_listening_address(&self) -> Multiaddr {
         self.get(NETWORK_INFO_API)
             .await
@@ -229,12 +197,9 @@ fn create_node_config(
     private_key: [u8; 32],
     threshold: Fraction,
     timeout: Duration,
-    #[cfg(feature = "libp2p")] mixnet_node_config: Option<MixnetNodeConfig>,
-    #[cfg(feature = "waku")] _mixnet_node_config: Option<MixnetNodeConfig>,
-    #[cfg(feature = "libp2p")] mixnet_topology: MixnetTopology,
-    #[cfg(feature = "waku")] _mixnet_topology: MixnetTopology,
+    mixnet_node_config: Option<MixnetNodeConfig>,
+    mixnet_topology: MixnetTopology,
 ) -> Config {
-    #[cfg(feature = "libp2p")]
     let mixnet_client_mode = match mixnet_node_config {
         Some(node_config) => MixnetClientMode::SenderReceiver(node_config.client_listen_address),
         None => MixnetClientMode::Sender,
@@ -242,12 +207,6 @@ fn create_node_config(
 
     let mut config = Config {
         network: NetworkConfig {
-            #[cfg(feature = "waku")]
-            backend: WakuConfig {
-                inner: Default::default(),
-                initial_peers: vec![],
-            },
-            #[cfg(feature = "libp2p")]
             backend: Libp2pConfig {
                 inner: Default::default(),
                 initial_peers: vec![],
@@ -286,7 +245,6 @@ fn create_node_config(
         },
         #[cfg(feature = "metrics")]
         metrics: Default::default(),
-        #[cfg(feature = "libp2p")]
         da: nomos_da::Settings {
             da_protocol: full_replication::Settings {
                 num_attestations: 1,
@@ -297,14 +255,8 @@ fn create_node_config(
             },
         },
     };
-    #[cfg(feature = "waku")]
-    {
-        config.network.backend.inner.port = Some(get_available_port() as usize);
-    }
-    #[cfg(feature = "libp2p")]
-    {
-        config.network.backend.inner.port = get_available_port();
-    }
+
+    config.network.backend.inner.port = get_available_port();
 
     config
 }
