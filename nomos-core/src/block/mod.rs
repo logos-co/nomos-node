@@ -17,23 +17,23 @@ pub type TxHash = [u8; 32];
 
 /// A block
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct Block<Tx: Clone + Eq + Hash, Blob: Clone + Eq + Hash> {
+pub struct Block<Tx: Clone + Eq + Hash, BlobCertificate: Clone + Eq + Hash> {
     header: consensus_engine::Block,
     beacon: RandomBeaconState,
     cl_transactions: IndexSet<Tx>,
-    bl_blobs: IndexSet<Blob>,
+    bl_blobs: IndexSet<BlobCertificate>,
 }
 
 impl<
         Tx: Clone + Eq + Hash + Serialize + DeserializeOwned,
-        Blob: Clone + Eq + Hash + Serialize + DeserializeOwned,
-    > Block<Tx, Blob>
+        BlobCertificate: Clone + Eq + Hash + Serialize + DeserializeOwned,
+    > Block<Tx, BlobCertificate>
 {
     pub fn new(
         view: View,
         parent_qc: Qc,
         txs: impl Iterator<Item = Tx>,
-        blobs: impl Iterator<Item = Blob>,
+        blobs: impl Iterator<Item = BlobCertificate>,
         proposer: NodeId,
         beacon: RandomBeaconState,
     ) -> Self {
@@ -59,7 +59,7 @@ impl<
     }
 }
 
-impl<Tx: Clone + Eq + Hash, Blob: Clone + Eq + Hash> Block<Tx, Blob> {
+impl<Tx: Clone + Eq + Hash, BlobCertificate: Clone + Eq + Hash> Block<Tx, BlobCertificate> {
     pub fn header(&self) -> &consensus_engine::Block {
         &self.header
     }
@@ -68,7 +68,7 @@ impl<Tx: Clone + Eq + Hash, Blob: Clone + Eq + Hash> Block<Tx, Blob> {
         self.cl_transactions.iter()
     }
 
-    pub fn blobs(&self) -> impl Iterator<Item = &Blob> + '_ {
+    pub fn blobs(&self) -> impl Iterator<Item = &BlobCertificate> + '_ {
         self.bl_blobs.iter()
     }
 
@@ -79,9 +79,9 @@ impl<Tx: Clone + Eq + Hash, Blob: Clone + Eq + Hash> Block<Tx, Blob> {
 
 pub fn block_id_from_wire_content<
     Tx: Clone + Eq + Hash + Serialize + DeserializeOwned,
-    Blob: Clone + Eq + Hash + Serialize + DeserializeOwned,
+    BlobCertificate: Clone + Eq + Hash + Serialize + DeserializeOwned,
 >(
-    block: &Block<Tx, Blob>,
+    block: &Block<Tx, BlobCertificate>,
 ) -> consensus_engine::BlockId {
     use blake2::digest::{consts::U32, Digest};
     use blake2::Blake2b;
@@ -93,8 +93,8 @@ pub fn block_id_from_wire_content<
 
 impl<
         Tx: Clone + Eq + Hash + Serialize + DeserializeOwned,
-        Blob: Clone + Eq + Hash + Serialize + DeserializeOwned,
-    > Block<Tx, Blob>
+        BlobCertificate: Clone + Eq + Hash + Serialize + DeserializeOwned,
+    > Block<Tx, BlobCertificate>
 {
     /// Encode block into bytes
     pub fn as_bytes(&self) -> Bytes {
