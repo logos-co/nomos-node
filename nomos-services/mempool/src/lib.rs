@@ -83,7 +83,7 @@ where
                 )
             }
             #[cfg(test)]
-            Self::BlockItem { block, .. } => {
+            Self::BlockItems { block, .. } => {
                 write!(f, "MempoolMsg::BlockItem{{block: {block:?}}}")
             }
             Self::Metrics { .. } => write!(f, "MempoolMsg::Metrics"),
@@ -173,7 +173,7 @@ where
                             pool.mark_in_block(&ids, block);
                         }
                         #[cfg(test)]
-                        MempoolMsg::BlockTransaction { block, reply_channel } => {
+                        MempoolMsg::BlockItems { block, reply_channel } => {
                             reply_channel.send(pool.block_items(block)).unwrap_or_else(|_| {
                                 tracing::debug!("could not send back block items")
                             });
