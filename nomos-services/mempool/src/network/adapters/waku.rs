@@ -5,7 +5,6 @@ use futures::{Stream, StreamExt};
 use serde::de::DeserializeOwned;
 use tokio_stream::wrappers::BroadcastStream;
 // internal
-use crate::network::messages::TransactionMsg;
 use crate::network::NetworkAdapter;
 use nomos_core::wire;
 use nomos_network::backends::waku::{EventKind, NetworkEvent, Waku, WakuBackendMessage};
@@ -21,14 +20,13 @@ pub const WAKU_CARNOT_PUB_SUB_TOPIC: WakuPubSubTopic =
 pub const WAKU_CARNOT_TX_CONTENT_TOPIC: WakuContentTopic =
     WakuContentTopic::new("CarnotSim", 1, "CarnotTx", Encoding::Proto);
 
-pub struct WakuAdapter<Item, Key> {
+pub struct WakuAdapter<Item> {
     network_relay: OutboundRelay<<NetworkService<Waku> as ServiceData>::Message>,
     _item: PhantomData<Item>,
-    _key: PhantomData<Key>,
 }
 
 #[async_trait::async_trait]
-impl<Item, Key> NetworkAdapter for WakuAdapter<Item, Key>
+impl<Item> NetworkAdapter for WakuAdapter<Item>
 where
     Item: DeserializeOwned + Serialize + Send + Sync + 'static,
 {
@@ -55,11 +53,11 @@ where
         };
         Self {
             network_relay,
-            _tx: Default::default(),
+            _item: Default::default(),
         }
     }
 
-    async fn transactions_stream(&self) -> Box<dyn Stream<Item = Self::Item> + Unpin + Send> {
+    async fn transactions_stream(&self) -> Box<dyn Stream<Item = (Self::Key, Self::Item)> + Unpin + Send> {
         let (sender, receiver) = tokio::sync::oneshot::channel();
         if let Err((_, _e)) = self
             .network_relay
