@@ -25,10 +25,12 @@ pub struct MockAdapter {
 #[async_trait::async_trait]
 impl NetworkAdapter for MockAdapter {
     type Backend = Mock;
+    type Settings = ();
     type Item = MockTransaction<MockMessage>;
     type Key = MockTxId;
 
     async fn new(
+        _settings: Self::Settings,
         network_relay: OutboundRelay<<NetworkService<Self::Backend> as ServiceData>::Message>,
     ) -> Self {
         // send message to boot the network producer

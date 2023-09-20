@@ -120,11 +120,11 @@ where
 {
     fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, overwatch_rs::DynError> {
         let network_relay = service_state.overwatch_handle.relay();
-        let pool_settings = service_state.settings_reader.get_updated_settings();
+        let settings = service_state.settings_reader.get_updated_settings();
         Ok(Self {
             service_state,
             network_relay,
-            pool: P::new(pool_settings),
+            pool: P::new(settings.backend),
         })
     }
 
@@ -140,8 +140,13 @@ where
             .await
             .expect("Relay connection with NetworkService should succeed");
 
-        let adapter = N::new(network_relay).await;
-        let mut network_txs = adapter.transactions_stream().await;
+        let adapter = N::new(
+            service_state.settings_reader.get_updated_settings().network,
+            network_relay,
+        );
+        let adapter = adapter.await;
+
+        let mut network_items = adapter.transactions_stream().await;
 
         loop {
             tokio::select! {
@@ -193,4 +198,10 @@ where
             }
         }
     }
+}
+
+#[derive(Clone, Debug)]
+pub struct Settings<B, N> {
+    pub backend: B,
+    pub network: N,
 }

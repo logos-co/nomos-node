@@ -33,11 +33,13 @@ where
     Item: DeserializeOwned + Serialize + Send + Sync + 'static,
 {
     type Backend = Waku;
+    type Settings = ();
     type Item = Item;
     // TODO: implement real key
     type Key = ();
 
     async fn new(
+        _settings: Self::Settings,
         network_relay: OutboundRelay<<NetworkService<Self::Backend> as ServiceData>::Message>,
     ) -> Self {
         // Subscribe to the carnot pubsub topic

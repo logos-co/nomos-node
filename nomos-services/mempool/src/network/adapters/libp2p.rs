@@ -15,7 +15,7 @@ pub const CARNOT_TX_TOPIC: &str = "CarnotTx";
 
 pub struct Libp2pAdapter<Item, Key> {
     network_relay: OutboundRelay<<NetworkService<Libp2p> as ServiceData>::Message>,
-    _tx: PhantomData<Tx>,
+    settings: Settings<Key, Item>,
 }
 
 #[async_trait::async_trait]
@@ -25,10 +25,12 @@ where
     Key: Clone + Send + Sync + 'static,
 {
     type Backend = Libp2p;
+    type Settings = Settings<Key, Item>;
     type Item = Item;
     type Key = Key;
 
     async fn new(
+        settings: Self::Settings,
         network_relay: OutboundRelay<<NetworkService<Self::Backend> as ServiceData>::Message>,
     ) -> Self {
         network_relay
@@ -71,4 +73,10 @@ where
             },
         )))
     }
+}
+
+#[derive(Clone, Debug)]
+pub struct Settings<K, V> {
+    pub topic: String,
+    pub id: fn(&V) -> K,
 }
