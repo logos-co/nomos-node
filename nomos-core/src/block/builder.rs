@@ -5,7 +5,8 @@ use serde::de::DeserializeOwned;
 use serde::Serialize;
 // internal
 use crate::block::Block;
-use crate::da::blob::{Blob, BlobSelect};
+use crate::da::certificate::BlobCertificateSelect;
+use crate::da::certificate::Certificate;
 use crate::tx::{Transaction, TxSelect};
 use consensus_engine::overlay::RandomBeaconState;
 use consensus_engine::{NodeId, Qc, View};
@@ -39,12 +40,12 @@ pub struct BlockBuilder<Tx, Blob, TxSelector, BlobSelector> {
     blobs: Option<Box<dyn Iterator<Item = Blob>>>,
 }
 
-impl<Tx, B, TxSelector, BlobSelector> BlockBuilder<Tx, B, TxSelector, BlobSelector>
+impl<Tx, C, TxSelector, BlobSelector> BlockBuilder<Tx, C, TxSelector, BlobSelector>
 where
     Tx: Transaction + Clone + Eq + Hash + Serialize + DeserializeOwned,
-    B: Blob + Clone + Eq + Hash + Serialize + DeserializeOwned,
+    C: Certificate + Clone + Eq + Hash + Serialize + DeserializeOwned,
     TxSelector: TxSelect<Tx = Tx>,
-    BlobSelector: BlobSelect<Blob = B>,
+    BlobSelector: BlobCertificateSelect<Certificate = C>,
 {
     pub fn new(tx_selector: TxSelector, blob_selector: BlobSelector) -> Self {
         Self {
@@ -90,13 +91,13 @@ where
     }
 
     #[must_use]
-    pub fn with_blobs(mut self, blobs: impl Iterator<Item = B> + 'static) -> Self {
+    pub fn with_blobs(mut self, blobs: impl Iterator<Item = C> + 'static) -> Self {
         self.blobs = Some(Box::new(blobs));
         self
     }
 
     #[allow(clippy::result_large_err)]
-    pub fn build(self) -> Result<Block<Tx, B>, Self> {
+    pub fn build(self) -> Result<Block<Tx, C>, Self> {
         if let Self {
             tx_selector,
             blob_selector,
