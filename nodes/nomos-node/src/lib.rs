@@ -30,7 +30,8 @@ use overwatch_rs::services::handle::ServiceHandle;
 
 pub use config::{Config, ConsensusArgs, HttpArgs, LogArgs, NetworkArgs, OverlayArgs};
 use nomos_core::{
-    da::certificate::select::FillSize as FillSizeWithBlobs, tx::select::FillSize as FillSizeWithTx,
+    da::certificate::select::FillSize as FillSizeWithBlobsCertificate,
+    tx::select::FillSize as FillSizeWithTx,
 };
 pub use tx::Tx;
 
@@ -41,9 +42,9 @@ pub type Carnot = CarnotConsensus<
     MockPool<Tx>,
     MempoolLibp2pAdapter<Tx>,
     FlatOverlay<RoundRobin, RandomBeaconState>,
-    Blob,
+    Certificate,
     FillSizeWithTx<MB16, Tx>,
-    FillSizeWithBlobs<MB16, Blob>,
+    FillSizeWithBlobsCertificate<MB16, Certificate>,
 >;
 
 type DataAvailability = DataAvailabilityService<
