@@ -13,7 +13,7 @@ pub fn default_leader_super_majority_threshold() -> GenericFraction<u64> {
 pub fn apply_threshold(size: usize, threshold: GenericFraction<u64>) -> usize {
     // `threshold` is a tuple of (num, den) where `num/den` is the super majority threshold
     (Fraction::from(size) * threshold)
-        .floor()
+        .ceil()
         .to_usize()
         .unwrap()
 }
