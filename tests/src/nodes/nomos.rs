@@ -272,6 +272,8 @@ fn create_node_config(
                 leader_super_majority_threshold: Some(threshold),
             },
             timeout,
+            transaction_selector_settings: (),
+            blob_selector_settings: (),
         },
         log: Default::default(),
         http: nomos_http::http::HttpServiceSettings {
