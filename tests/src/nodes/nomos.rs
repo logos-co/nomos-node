@@ -4,8 +4,8 @@ use std::process::{Child, Command, Stdio};
 use std::time::Duration;
 // internal
 use crate::{get_available_port, Node, SpawnConfig};
-use consensus_engine::overlay::{RandomBeaconState, RoundRobin, TreeOverlaySettings};
-use consensus_engine::NodeId;
+use consensus_engine::overlay::{RandomBeaconState, RoundRobin, TreeOverlay, TreeOverlaySettings};
+use consensus_engine::{NodeId, Overlay};
 #[cfg(feature = "libp2p")]
 use mixnet_client::{MixnetClientConfig, MixnetClientMode};
 use mixnet_node::MixnetNodeConfig;
@@ -182,6 +182,7 @@ impl Node for NomosNode {
                 for id in &mut ids {
                     thread_rng().fill(id);
                 }
+
                 let mut configs = ids
                     .iter()
                     .map(|id| {
@@ -195,7 +196,19 @@ impl Node for NomosNode {
                         )
                     })
                     .collect::<Vec<_>>();
-                let mut nodes = vec![Self::spawn(configs.swap_remove(0)).await];
+
+                let overlay = TreeOverlay::new(configs[0].consensus.overlay_settings.clone());
+                let next_leader = overlay.next_leader();
+                let next_leader_idx = ids
+                    .iter()
+                    .position(|&id| NodeId::from(id) == next_leader)
+                    .unwrap();
+
+                // Spawn the next leader first, so the leader can receive votes from
+                // all nodes that will be subsequently spawned.
+                // If not, the leader will miss votes from nodes spawned before itself.
+                // This issue will be resolved by devising the block catch-up mechanism in the future
+                let mut nodes = vec![Self::spawn(configs.swap_remove(next_leader_idx)).await];
                 let listening_addr = nodes[0].get_listening_address().await;
                 for mut conf in configs {
                     conf.network
