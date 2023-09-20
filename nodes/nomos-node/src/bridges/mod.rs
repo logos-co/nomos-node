@@ -1,9 +1,10 @@
-use bytes::Bytes;
-use http::StatusCode;
+mod libp2p;
+
 // std
 // crates
+use bytes::Bytes;
+use http::StatusCode;
 use nomos_consensus::{CarnotInfo, ConsensusMsg};
-
 use tokio::sync::mpsc::Sender;
 use tokio::sync::oneshot;
 use tracing::error;
@@ -15,25 +16,13 @@ use nomos_mempool::backend::mockpool::MockPool;
 
 use nomos_mempool::{MempoolMetrics, MempoolMsg, MempoolService};
 
-#[cfg(feature = "libp2p")]
 use nomos_mempool::network::adapters::libp2p::Libp2pAdapter;
-#[cfg(feature = "waku")]
-use nomos_mempool::network::adapters::waku::WakuAdapter;
-#[cfg(feature = "libp2p")]
+
 use nomos_network::backends::libp2p::Libp2p;
-#[cfg(feature = "waku")]
-use nomos_network::backends::waku::Waku;
 use nomos_network::NetworkService;
 use nomos_node::{Carnot, Tx};
 use overwatch_rs::services::relay::OutboundRelay;
 
-#[cfg(feature = "waku")]
-mod waku;
-#[cfg(feature = "waku")]
-use waku::*;
-#[cfg(feature = "libp2p")]
-mod libp2p;
-#[cfg(feature = "libp2p")]
 use libp2p::*;
 use nomos_mempool::network::NetworkAdapter;
 use nomos_network::backends::NetworkBackend;
@@ -65,11 +54,6 @@ pub fn mempool_metrics_bridge(
     handle: overwatch_rs::overwatch::handle::OverwatchHandle,
 ) -> HttpBridgeRunner {
     Box::new(Box::pin(async move {
-        #[cfg(feature = "waku")]
-        {
-            get_handler!(handle, MempoolService<WakuAdapter<Tx>, MockPool<Tx>>, "metrics" => handle_mempool_metrics_req)
-        }
-        #[cfg(feature = "libp2p")]
         get_handler!(handle, MempoolService<Libp2pAdapter<Tx>, MockPool<Tx>>, "metrics" => handle_mempool_metrics_req)
     }))
 }
@@ -78,11 +62,6 @@ pub fn network_info_bridge(
     handle: overwatch_rs::overwatch::handle::OverwatchHandle,
 ) -> HttpBridgeRunner {
     Box::new(Box::pin(async move {
-        #[cfg(feature = "waku")]
-        {
-            get_handler!(handle, NetworkService<Waku>, "info" => handle_waku_info_req)
-        }
-        #[cfg(feature = "libp2p")]
         get_handler!(handle, NetworkService<Libp2p>, "info" => handle_libp2p_info_req)
     }))
 }
@@ -110,31 +89,6 @@ pub fn mempool_add_tx_bridge<
             if let Err(e) =
                 handle_mempool_add_tx_req(&handle, &mempool_channel, res_tx, payload).await
             {
-                error!(e);
-            }
-        }
-        Ok(())
-    }))
-}
-
-#[cfg(feature = "waku")]
-pub fn waku_add_conn_bridge(
-    handle: overwatch_rs::overwatch::handle::OverwatchHandle,
-) -> HttpBridgeRunner {
-    Box::new(Box::pin(async move {
-        let (waku_channel, mut http_request_channel) = build_http_bridge::<
-            NetworkService<Waku>,
-            AxumBackend,
-            _,
-        >(handle, HttpMethod::POST, "conn")
-        .await
-        .unwrap();
-
-        while let Some(HttpRequest {
-            res_tx, payload, ..
-        }) = http_request_channel.recv().await
-        {
-            if let Err(e) = handle_add_conn_req(&waku_channel, res_tx, payload).await {
                 error!(e);
             }
         }
@@ -207,16 +161,8 @@ pub(super) async fn handle_mempool_add_tx_req(
         match receiver.await {
             Ok(Ok(())) => {
                 // broadcast transaction to peers
-                #[cfg(feature = "waku")]
-                {
-                    let network_relay = handle.relay::<NetworkService<Waku>>().connect().await?;
-                    waku_send_transaction(network_relay, tx).await?;
-                }
-                #[cfg(feature = "libp2p")]
-                {
-                    let network_relay = handle.relay::<NetworkService<Libp2p>>().connect().await?;
-                    libp2p_send_transaction(network_relay, tx).await?;
-                }
+                let network_relay = handle.relay::<NetworkService<Libp2p>>().connect().await?;
+                libp2p_send_transaction(network_relay, tx).await?;
                 Ok(res_tx.send(Ok(b"".to_vec().into())).await?)
             }
             Ok(Err(())) => Ok(res_tx
