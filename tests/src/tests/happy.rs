@@ -1,13 +1,44 @@
-use consensus_engine::View;
+use consensus_engine::{AggregateQc, Block, Qc, View};
 use fraction::{Fraction, One};
 use futures::stream::{self, StreamExt};
-use std::collections::HashSet;
+use std::fs::OpenOptions;
 use std::time::Duration;
+use std::{collections::HashSet, fs::File};
 use tests::{MixNode, Node, NomosNode, SpawnConfig};
 
 const TARGET_VIEW: View = View::new(20);
 
-async fn happy_test(nodes: Vec<NomosNode>) {
+pub fn persist(name: &'static str, blocks: impl Iterator<Item = &Block>) {
+    // We need to persist the block to disk before dropping it
+    // if there is a aggregated qc when testing happy path
+    if let Qc::Aggregated(qcs) = &block.parent_qc {
+        #[derive(serde::Serialize)]
+        struct Info<'a> {
+            id: String,
+            view: View,
+            qcs: &'a AggregateQc,
+        }
+
+        let mut file = OpenOptions::new()
+            .create(true)
+            .truncate(true)
+            .read(true)
+            .write(true)
+            .open(format!("{name}.json"))
+            .unwrap();
+        let infos = blocks
+            .map(|b| Info {
+                id: format!("{}", header.id),
+                view: header.view,
+                qcs,
+            })
+            .collect::<Vec<_>>();
+        // Use pretty print to make it easier to read, because we need the this for debugging.
+        serde_json::to_writer_pretty(&mut *file, &infos).unwrap();
+    }
+}
+
+async fn happy_test(name: &'static str, nodes: Vec<NomosNode>) {
     let timeout = std::time::Duration::from_secs(20);
     let timeout = tokio::time::sleep(timeout);
     tokio::select! {
@@ -43,6 +74,9 @@ async fn happy_test(nodes: Vec<NomosNode>) {
                 .unwrap()
         })
         .collect::<HashSet<_>>();
+
+    // persist the blocks for debugging
+    persist(name, infos.iter().flat_map(|i| i.safe_blocks.values()));
     assert_eq!(blocks.len(), 1);
 }
 
@@ -57,7 +91,7 @@ async fn two_nodes_happy() {
         mixnet_topology,
     })
     .await;
-    happy_test(nodes).await;
+    happy_test("two_nodes", nodes).await;
 }
 
 #[tokio::test]
@@ -71,5 +105,5 @@ async fn ten_nodes_happy() {
         mixnet_topology,
     })
     .await;
-    happy_test(nodes).await;
+    happy_test("ten_nodes", nodes).await;
 }

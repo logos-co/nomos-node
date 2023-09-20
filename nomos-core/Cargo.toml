@@ -21,11 +21,6 @@ bincode = "1.3"
 once_cell = "1.0"
 indexmap = { version = "1.9", features = ["serde"] }
 
-# The below three crates, only used for debug-happy feature, need to be removed in the future.
-parking_lot = { version = "0.12", optional = true }
-tempfile = { version = "3.8", optional = true }
-serde_json = { version = "1", optional = true }
-
 [dev-dependencies]
 rand = "0.8"
 tokio = { version = "1.23", features = ["macros", "rt"] }
@@ -35,6 +30,3 @@ tokio = { version = "1.23", features = ["macros", "rt"] }
 default = []
 raptor = ["raptorq"]
 mock = []
-
-# This feature needs to be removed when we have fixed the nomos node bug
-debug-happy = ["parking_lot", "tempfile", "serde_json"]
