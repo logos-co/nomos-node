@@ -51,6 +51,8 @@ pub type Carnot = CarnotConsensus<
     MempoolWakuAdapter<Tx>,
     FlatOverlay<RoundRobin, RandomBeaconState>,
     Blob,
+    FillSizeWithTx<MB16, Tx>,
+    FillSizeWithBlobs<MB16, Blob>,
 >;
 
 const MB16: usize = 1024 * 1024 * 16;
