@@ -13,6 +13,7 @@ use blake2::{
     Blake2bVar,
 };
 use bytes::Bytes;
+use nomos_core::wire;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone)]
@@ -120,7 +121,9 @@ impl attestation::Attestation for Attestation {
         self.blob
     }
     fn as_bytes(&self) -> Bytes {
-        Bytes::from([self.blob.as_ref(), self.voter.as_ref()].concat())
+        wire::serialize(self)
+            .expect("Attestation shouldn't fail to be serialized")
+            .into()
     }
 }
 
@@ -143,10 +146,9 @@ impl certificate::Certificate for Certificate {
     }
 
     fn as_bytes(&self) -> Bytes {
-        self.attestations
-            .iter()
-            .flat_map(attestation::Attestation::as_bytes)
-            .collect()
+        wire::serialize(self)
+            .expect("Certificate shouldn't fail to be serialized")
+            .into()
     }
 }
 
