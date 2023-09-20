@@ -11,7 +11,7 @@ nomos-network = { path = "../nomos-services/network" }
 nomos-log = { path = "../nomos-services/log" }
 nomos-http = { path = "../nomos-services/http", features = ["http"] }
 overwatch-rs = { git = "https://github.com/logos-co/Overwatch", branch = "main" }
-nomos-core = { path = "../nomos-core" }
+nomos-core = { path = "../nomos-core", features = ["debug-happy"] }
 consensus-engine = { path = "../consensus-engine", features = ["serde"] }
 nomos-mempool = { path = "../nomos-services/mempool", features = ["mock"] }
 nomos-da = { path = "../nomos-services/data-availability" }
