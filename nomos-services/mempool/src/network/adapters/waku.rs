@@ -57,7 +57,9 @@ where
         }
     }
 
-    async fn transactions_stream(&self) -> Box<dyn Stream<Item = (Self::Key, Self::Item)> + Unpin + Send> {
+    async fn transactions_stream(
+        &self,
+    ) -> Box<dyn Stream<Item = (Self::Key, Self::Item)> + Unpin + Send> {
         let (sender, receiver) = tokio::sync::oneshot::channel();
         if let Err((_, _e)) = self
             .network_relay

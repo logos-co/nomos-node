@@ -349,7 +349,6 @@ where
     O::LeaderSelection: UpdateableLeaderSelection,
     O::CommitteeMembership: UpdateableCommitteeMembership,
     TxS: TxSelect<Tx = P::Item> + Clone + Send + Sync + 'static,
-    BS: BlobSelect<Blob = B> + Clone + Send + Sync + 'static,
 {
     fn process_message(carnot: &Carnot<O>, msg: ConsensusMsg) {
         match msg {
