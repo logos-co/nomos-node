@@ -1,8 +1,8 @@
 use consensus_engine::{AggregateQc, Block, Qc, View};
 use fraction::{Fraction, One};
 use futures::stream::{self, StreamExt};
-use std::time::Duration;
 use std::collections::HashSet;
+use std::time::Duration;
 use tests::{MixNode, Node, NomosNode, SpawnConfig};
 
 const TARGET_VIEW: View = View::new(20);
