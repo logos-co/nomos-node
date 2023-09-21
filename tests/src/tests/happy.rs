@@ -8,34 +8,10 @@ use tests::{MixNode, Node, NomosNode, SpawnConfig};
 
 const TARGET_VIEW: View = View::new(20);
 
-pub fn persist(name: &'static str, blocks: impl Iterator<Item = &Block>) {
-    // We need to persist the block to disk before dropping it
-    // if there is a aggregated qc when testing happy path
-    if let Qc::Aggregated(qcs) = &block.parent_qc {
-        #[derive(serde::Serialize)]
-        struct Info<'a> {
-            id: String,
-            view: View,
-            qcs: &'a AggregateQc,
-        }
-
-        let mut file = OpenOptions::new()
-            .create(true)
-            .truncate(true)
-            .read(true)
-            .write(true)
-            .open(format!("{name}.json"))
-            .unwrap();
-        let infos = blocks
-            .map(|b| Info {
-                id: format!("{}", header.id),
-                view: header.view,
-                qcs,
-            })
-            .collect::<Vec<_>>();
-        // Use pretty print to make it easier to read, because we need the this for debugging.
-        serde_json::to_writer_pretty(&mut *file, &infos).unwrap();
-    }
+#[derive(serde::Serialize)]
+struct Info {
+    id: String,
+    view: View,
 }
 
 async fn happy_test(name: &'static str, nodes: Vec<NomosNode>) {
@@ -75,8 +51,16 @@ async fn happy_test(name: &'static str, nodes: Vec<NomosNode>) {
         })
         .collect::<HashSet<_>>();
 
-    // persist the blocks for debugging
-    persist(name, infos.iter().flat_map(|i| i.safe_blocks.values()));
+    // try to see if we have invalid blocks
+    let invalid_blocks = infos.iter().flat_map(|i| i.safe_blocks.values().filter_map(|b| match &b.parent_qc {
+        Qc::Standard(_) => None,
+        Qc::Aggregated(_) => Some(Info {
+            id: b.id.to_string(),
+            view: b.view,
+        }),
+    })).collect::<Vec<_>>();
+
+    assert!(invalid_blocks.is_empty(), "{}", serde_json::to_string_pretty(&invalid_blocks).unwrap());
     assert_eq!(blocks.len(), 1);
 }
 
