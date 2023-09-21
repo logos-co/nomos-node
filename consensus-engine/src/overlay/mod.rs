@@ -99,7 +99,7 @@ mod tests {
             number_of_committees: 1,
             leader: RoundRobin::new(),
             committee_membership: FisherYatesShuffle::new(ENTROPY),
-            leader_super_majority_threshold: None,
+            super_majority_threshold: None,
         });
         let branch_overlay = BranchOverlay::new(BranchOverlaySettings {
             current_leader: nodes[0],

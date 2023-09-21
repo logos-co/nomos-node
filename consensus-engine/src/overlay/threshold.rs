@@ -1,16 +1,13 @@
 use fraction::{Fraction, GenericFraction, ToPrimitive};
 
-const LEADER_SUPER_MAJORITY_THRESHOLD_NUM: u64 = 2;
-const LEADER_SUPER_MAJORITY_THRESHOLD_DEN: u64 = 3;
+const SUPER_MAJORITY_THRESHOLD_NUM: u64 = 2;
+const SUPER_MAJORITY_THRESHOLD_DEN: u64 = 3;
 
-pub fn default_leader_super_majority_threshold() -> GenericFraction<u64> {
-    Fraction::new(
-        LEADER_SUPER_MAJORITY_THRESHOLD_NUM,
-        LEADER_SUPER_MAJORITY_THRESHOLD_DEN,
-    )
+pub(crate) fn default_super_majority_threshold() -> GenericFraction<u64> {
+    Fraction::new(SUPER_MAJORITY_THRESHOLD_NUM, SUPER_MAJORITY_THRESHOLD_DEN)
 }
 
-pub fn apply_threshold(size: usize, threshold: GenericFraction<u64>) -> usize {
+pub(crate) fn apply_threshold(size: usize, threshold: GenericFraction<u64>) -> usize {
     // `threshold` is a tuple of (num, den) where `num/den` is the super majority threshold
     (Fraction::from(size) * threshold)
         .ceil()

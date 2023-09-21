@@ -1,4 +1,4 @@
-use super::threshold::{apply_threshold, default_leader_super_majority_threshold, deser_fraction};
+use super::threshold::{apply_threshold, default_super_majority_threshold, deser_fraction};
 use super::LeaderSelection;
 use crate::overlay::CommitteeMembership;
 use crate::{NodeId, Overlay};
@@ -35,7 +35,7 @@ where
             nodes,
             leader,
             leader_threshold: leader_super_majority_threshold
-                .unwrap_or_else(default_leader_super_majority_threshold),
+                .unwrap_or_else(default_super_majority_threshold),
             _committee_membership: Default::default(),
         }
     }
