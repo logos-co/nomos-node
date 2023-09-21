@@ -61,14 +61,10 @@ jobs:
           profile: minimal
           toolchain: stable
           override: true
-      # Setup latest binutils for Windows
-      - name: Update binutils (Windows)
+      # Setup build environment (Windows)
+      - name: Setup build environment (Windows)
         if: matrix.os == 'windows-latest'
-        uses: msys2/setup-msys2@v2
-        with:
-          msystem: mingw64
-          update: true
-          pacboy: binutils
+        uses: ./.github/actions/mingw-env
       - uses: actions-rs/cargo@v1
         with:
           command: build
