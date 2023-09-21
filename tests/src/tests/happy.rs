@@ -52,15 +52,24 @@ async fn happy_test(name: &'static str, nodes: Vec<NomosNode>) {
         .collect::<HashSet<_>>();
 
     // try to see if we have invalid blocks
-    let invalid_blocks = infos.iter().flat_map(|i| i.safe_blocks.values().filter_map(|b| match &b.parent_qc {
-        Qc::Standard(_) => None,
-        Qc::Aggregated(_) => Some(Info {
-            id: b.id.to_string(),
-            view: b.view,
-        }),
-    })).collect::<Vec<_>>();
+    let invalid_blocks = infos
+        .iter()
+        .flat_map(|i| {
+            i.safe_blocks.values().filter_map(|b| match &b.parent_qc {
+                Qc::Standard(_) => None,
+                Qc::Aggregated(_) => Some(Info {
+                    id: b.id.to_string(),
+                    view: b.view,
+                }),
+            })
+        })
+        .collect::<Vec<_>>();
 
-    assert!(invalid_blocks.is_empty(), "{}", serde_json::to_string_pretty(&invalid_blocks).unwrap());
+    assert!(
+        invalid_blocks.is_empty(),
+        "{}",
+        serde_json::to_string_pretty(&invalid_blocks).unwrap()
+    );
     assert_eq!(blocks.len(), 1);
 }
 
