@@ -651,7 +651,7 @@ where
                     .with_proposer(id)
                     .with_beacon_state(beacon)
                     .with_transactions(txs)
-                    .with_blobs([].into_iter())
+                    .with_blobs_certificates([].into_iter())
                     .build()
                 else {
                     panic!("Proposal block should always succeed to be built")

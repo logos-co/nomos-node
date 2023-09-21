@@ -91,8 +91,11 @@ where
     }
 
     #[must_use]
-    pub fn with_blobs(mut self, blobs: impl Iterator<Item = C> + 'static) -> Self {
-        self.blobs = Some(Box::new(blobs));
+    pub fn with_blobs_certificates(
+        mut self,
+        blobs_certificates: impl Iterator<Item = C> + 'static,
+    ) -> Self {
+        self.blobs = Some(Box::new(blobs_certificates));
         self
     }
 
