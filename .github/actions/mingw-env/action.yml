@@ -11,6 +11,11 @@ runs:
         msystem: mingw64
         update: true
         pacboy: binutils
+    - name: Configure CC and CXX for GNU
+      shell: pwsh
+      run: |
+        "CC=x86_64-w64-mingw32-gcc" >> $env.GITHUB_ENV
+        "CXX=x86_64-w64-mingw32-g++" >> $env.GITHUB_ENV
     - name: Configure environment
       shell: pwsh
       run: |
