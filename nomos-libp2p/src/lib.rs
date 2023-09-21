@@ -10,6 +10,8 @@ use blake2::digest::{consts::U32, Digest};
 use blake2::Blake2b;
 use libp2p::gossipsub::{Message, MessageId, TopicHash};
 
+#[cfg(feature = "metrics")]
+use libp2p::metrics::Metrics;
 pub use libp2p::{
     core::upgrade,
     dns,
@@ -23,12 +25,16 @@ pub use libp2p::{
 };
 use libp2p::{swarm::ConnectionId, tcp::tokio::Tcp};
 pub use multiaddr::{multiaddr, Multiaddr, Protocol};
+#[cfg(feature = "metrics")]
+use prometheus_client::registry::Registry;
 use serde::{Deserialize, Serialize};
 
 /// Wraps [`libp2p::Swarm`], and config it for use within Nomos.
 pub struct Swarm {
     // A core libp2p swarm
     swarm: libp2p::Swarm<Behaviour>,
+    #[cfg(feature = "metrics")]
+    metrics: Metrics,
 }
 
 #[derive(NetworkBehaviour)]
@@ -108,7 +114,19 @@ impl Swarm {
 
         swarm.listen_on(multiaddr!(Ip4(config.host), Tcp(config.port)))?;
 
-        Ok(Swarm { swarm })
+        #[cfg(feature = "metrics")]
+        let metrics = {
+            let mut metric_registry = Registry::default();
+            Metrics::new(&mut metric_registry)
+            //TODO: use `metric_registry` to expose metrics to external
+            //      https://github.com/libp2p/rust-libp2p/blob/c1551d71b6a7ad673706d7106c797fe464cb2820/examples/metrics/src/main.rs#L67-L67
+        };
+
+        Ok(Swarm {
+            swarm,
+            #[cfg(feature = "metrics")]
+            metrics,
+        })
     }
 
     /// Initiates a connection attempt to a peer
@@ -155,6 +173,11 @@ impl Swarm {
     /// Returns a reference to the underlying [`libp2p::Swarm`]
     pub fn swarm(&self) -> &libp2p::Swarm<Behaviour> {
         &self.swarm
+    }
+
+    #[cfg(feature = "metrics")]
+    pub fn metrics(&self) -> &Metrics {
+        &self.metrics
     }
 
     pub fn is_subscribed(&mut self, topic: &str) -> bool {

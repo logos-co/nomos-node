@@ -37,4 +37,5 @@ tokio = { version = "1", features = ["full"] }
 default = []
 waku = ["waku-bindings"]
 libp2p = ["nomos-libp2p", "rand", "humantime-serde"]
+metrics = ["nomos-libp2p/metrics"]
 mock = ["rand", "chrono"]

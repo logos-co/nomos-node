@@ -1,6 +1,8 @@
 use std::{collections::HashMap, ops::Range, time::Duration};
 
 use mixnet_client::MixnetClient;
+#[cfg(feature = "metrics")]
+use nomos_libp2p::libp2p::metrics::Recorder;
 use nomos_libp2p::{
     gossipsub::{self, Message},
     libp2p::swarm::ConnectionId,
@@ -90,14 +92,41 @@ impl SwarmHandler {
 
     fn handle_event(&mut self, event: SwarmEvent<BehaviourEvent, THandlerErr<Behaviour>>) {
         match event {
-            SwarmEvent::Behaviour(BehaviourEvent::Gossipsub(gossipsub::Event::Message {
-                propagation_source: peer_id,
-                message_id: id,
+            SwarmEvent::Behaviour(BehaviourEvent::Gossipsub(event)) => {
+                self.handle_gossipsub_event(event);
+            }
+            swarm_event => {
+                self.handle_swarm_event(swarm_event);
+            }
+        }
+    }
+
+    fn handle_gossipsub_event(&mut self, event: gossipsub::Event) {
+        #[cfg(feature = "metrics")]
+        self.swarm.metrics().record(&event);
+
+        match event {
+            gossipsub::Event::Message {
+                propagation_source,
+                message_id,
                 message,
-            })) => {
-                tracing::debug!("Got message with id: {id} from peer: {peer_id}");
+            } => {
+                tracing::debug!(
+                    "Got message with id: {message_id} propagated from {propagation_source}"
+                );
                 log_error!(self.events_tx.send(Event::Message(message)));
             }
+            event => {
+                tracing::debug!("gossipsub event: {event:?}");
+            }
+        }
+    }
+
+    fn handle_swarm_event(&mut self, event: SwarmEvent<BehaviourEvent, THandlerErr<Behaviour>>) {
+        #[cfg(feature = "metrics")]
+        self.swarm.metrics().record(&event);
+
+        match event {
             SwarmEvent::ConnectionEstablished {
                 peer_id,
                 connection_id,
@@ -130,7 +159,9 @@ impl SwarmHandler {
                 );
                 self.retry_connect(connection_id);
             }
-            _ => {}
+            event => {
+                tracing::debug!("swarm event: {event:?}");
+            }
         }
     }
 
