@@ -1,4 +1,4 @@
-use consensus_engine::{AggregateQc, Block, Qc, View};
+use consensus_engine::{Qc, View};
 use fraction::{Fraction, One};
 use futures::stream::{self, StreamExt};
 use std::collections::HashSet;
@@ -13,7 +13,7 @@ struct Info {
     view: View,
 }
 
-async fn happy_test(name: &'static str, nodes: Vec<NomosNode>) {
+async fn happy_test(nodes: Vec<NomosNode>) {
     let timeout = std::time::Duration::from_secs(20);
     let timeout = tokio::time::sleep(timeout);
     tokio::select! {
@@ -83,7 +83,7 @@ async fn two_nodes_happy() {
         mixnet_topology,
     })
     .await;
-    happy_test("two_nodes", nodes).await;
+    happy_test(nodes).await;
 }
 
 #[tokio::test]
@@ -97,5 +97,5 @@ async fn ten_nodes_happy() {
         mixnet_topology,
     })
     .await;
-    happy_test("ten_nodes", nodes).await;
+    happy_test(nodes).await;
 }
