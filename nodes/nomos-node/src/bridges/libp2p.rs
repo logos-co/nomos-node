@@ -10,7 +10,6 @@ use nomos_network::NetworkMsg;
 use nomos_node::Tx;
 use overwatch_rs::services::relay::OutboundRelay;
 
-#[cfg(feature = "libp2p")]
 pub(super) async fn handle_libp2p_info_req(
     channel: &OutboundRelay<NetworkMsg<Libp2p>>,
     res_tx: Sender<HttpResponse>,
@@ -28,7 +27,6 @@ pub(super) async fn handle_libp2p_info_req(
     Ok(())
 }
 
-#[cfg(feature = "libp2p")]
 pub(super) async fn libp2p_send_transaction(
     network_relay: OutboundRelay<NetworkMsg<Libp2p>>,
     tx: Tx,

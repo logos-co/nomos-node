@@ -1,0 +1,25 @@
+[package]
+name = "nomos-cli"
+version = "0.1.0"
+edition = "2021"
+description = "Cli app to interact with Nomos nodes and perform various tasks"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+fraction = "0.13"
+tracing = "0.1"
+tracing-subscriber = "0.3"
+async-trait = "0.1"
+clap = {version = "4", features = ["derive"] }
+crossterm = "0.27"
+serde_yaml = "0.9"
+futures = "0.3"
+tokio = { version = "1", features = ["sync"] }
+overwatch-rs = { git = "https://github.com/logos-co/Overwatch", branch = "main" }
+overwatch-derive = { git = "https://github.com/logos-co/Overwatch", branch = "main" }
+nomos-network = { path = "../nomos-services/network", features = ["libp2p"] }
+nomos-da = { path = "../nomos-services/data-availability", features = ["libp2p"] }
+nomos-libp2p = { path = "../nomos-libp2p"}
+nomos-core = { path = "../nomos-core" }
+full-replication = { path = "../nomos-da/full-replication" }
