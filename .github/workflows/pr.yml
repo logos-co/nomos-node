@@ -68,7 +68,7 @@ jobs:
       - uses: actions-rs/cargo@v1
         with:
           command: test
-          args: --all --no-default-features --features ${{ matrix.feature }} -- --skip ten_nodes_happy --skip two_nodes_happy --skip ten_nodes_one_down
+          args: --all --no-default-features --features ${{ matrix.feature }}
 
   lints:
     name: Rust lints

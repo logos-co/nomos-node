@@ -83,6 +83,18 @@ where
         self
     }
 
+    #[must_use]
+    pub fn with_transactions(mut self, txs: impl Iterator<Item = Tx> + 'static) -> Self {
+        self.txs = Some(Box::new(txs));
+        self
+    }
+
+    #[must_use]
+    pub fn with_blobs(mut self, blobs: impl Iterator<Item = B> + 'static) -> Self {
+        self.blobs = Some(Box::new(blobs));
+        self
+    }
+
     #[allow(clippy::result_large_err)]
     pub fn build(self) -> Result<Block<Tx, B>, Self> {
         if let Self {
