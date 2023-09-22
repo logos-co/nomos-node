@@ -16,6 +16,9 @@ pub trait Blob {
 
 pub trait BlobSelect {
     type Blob: Blob;
+    type Settings: Clone;
+
+    fn new(settings: Self::Settings) -> Self;
     fn select_blob_from<'i, I: Iterator<Item = Self::Blob> + 'i>(
         &self,
         blobs: I,

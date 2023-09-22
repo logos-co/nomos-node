@@ -8,15 +8,8 @@ mod bridges;
 use clap::Parser;
 use color_eyre::eyre::{eyre, Result};
 use nomos_http::bridge::{HttpBridge, HttpBridgeSettings};
-
-#[cfg(feature = "libp2p")]
 use nomos_mempool::network::adapters::libp2p::Libp2pAdapter;
-#[cfg(feature = "waku")]
-use nomos_mempool::network::adapters::waku::WakuAdapter;
-#[cfg(feature = "libp2p")]
 use nomos_network::backends::libp2p::Libp2p;
-#[cfg(feature = "waku")]
-use nomos_network::backends::waku::Waku;
 use overwatch_rs::overwatch::*;
 use std::sync::Arc;
 
@@ -62,16 +55,9 @@ fn main() -> Result<()> {
         Arc::new(Box::new(bridges::carnot_info_bridge)),
         Arc::new(Box::new(bridges::mempool_metrics_bridge)),
         Arc::new(Box::new(bridges::network_info_bridge)),
-        #[cfg(feature = "waku")]
-        Arc::new(Box::new(
-            bridges::mempool_add_tx_bridge::<Waku, WakuAdapter<Tx>>,
-        )),
-        #[cfg(feature = "libp2p")]
         Arc::new(Box::new(
             bridges::mempool_add_tx_bridge::<Libp2p, Libp2pAdapter<Tx>>,
         )),
-        #[cfg(feature = "waku")]
-        Arc::new(Box::new(bridges::waku_add_conn_bridge)),
     ];
     let app = OverwatchRunner::<Nomos>::run(
         NomosServiceSettings {
@@ -83,7 +69,6 @@ fn main() -> Result<()> {
             bridges: HttpBridgeSettings { bridges },
             #[cfg(feature = "metrics")]
             metrics: config.metrics,
-            #[cfg(feature = "libp2p")]
             da: config.da,
         },
         None,
