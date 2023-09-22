@@ -44,13 +44,13 @@ jobs:
           submodules: true
       - uses: actions/setup-go@v3 # we need go to build go-waku
         with:
-          go-version: '1.19'
+          go-version: '1.20'
       # Setup Rust toolchain with GNU for Windows
       - name: Setup Rust with GNU toolchain (Windows)
         if: matrix.os == 'windows-latest'
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: 1.71.1-gnu
+          toolchain: stable-gnu
           target: x86_64-pc-windows-gnu
           override: true
       # Setup Rust toolchain for other OSes
