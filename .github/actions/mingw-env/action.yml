@@ -1,0 +1,22 @@
+# Adapting https://github.com/microsoft/windows-rs/blob/master/.github/actions/fix-environment/action.yml
+# for waku windows builds to use desired binutils version.
+name: Fix environment
+description: GitHub VMs aren't configured correctly
+runs:
+  using: "composite"
+  steps:
+    - name: Update binutils (Windows)
+      uses: msys2/setup-msys2@v2
+      with:
+        msystem: mingw64
+        update: true
+        pacboy: binutils
+    - name: Configure CC and CXX for GNU
+      shell: pwsh
+      run: |
+        "CC=x86_64-w64-mingw32-gcc" >> $env.GITHUB_ENV
+        "CXX=x86_64-w64-mingw32-g++" >> $env.GITHUB_ENV
+    - name: Configure environment
+      shell: pwsh
+      run: |
+        "C:\msys64\mingw64\bin" >> $env:GITHUB_PATH
