@@ -3,9 +3,8 @@ mod tx;
 
 use color_eyre::eyre::Result;
 use consensus_engine::overlay::{FlatOverlay, RandomBeaconState, RoundRobin};
-use full_replication::Blob;
-
-use full_replication::{AbsoluteNumber, Attestation, Certificate, FullReplication};
+use full_replication::Certificate;
+use full_replication::{AbsoluteNumber, Attestation, Blob, FullReplication};
 #[cfg(feature = "metrics")]
 use metrics::{backend::map::MapMetricsBackend, types::MetricsData, MetricsService};
 use nomos_consensus::network::adapters::libp2p::Libp2pAdapter as ConsensusLibp2pAdapter;
@@ -31,7 +30,8 @@ use overwatch_rs::services::handle::ServiceHandle;
 
 pub use config::{Config, ConsensusArgs, HttpArgs, LogArgs, NetworkArgs, OverlayArgs};
 use nomos_core::{
-    da::blob::select::FillSize as FillSizeWithBlobs, tx::select::FillSize as FillSizeWithTx,
+    da::certificate::select::FillSize as FillSizeWithBlobsCertificate,
+    tx::select::FillSize as FillSizeWithTx,
 };
 pub use tx::Tx;
 
@@ -42,9 +42,9 @@ pub type Carnot = CarnotConsensus<
     MockPool<Tx>,
     MempoolLibp2pAdapter<Tx>,
     FlatOverlay<RoundRobin, RandomBeaconState>,
-    Blob,
+    Certificate,
     FillSizeWithTx<MB16, Tx>,
-    FillSizeWithBlobs<MB16, Blob>,
+    FillSizeWithBlobsCertificate<MB16, Certificate>,
 >;
 
 type DataAvailability = DataAvailabilityService<
