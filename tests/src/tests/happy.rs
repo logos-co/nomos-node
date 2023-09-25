@@ -9,7 +9,8 @@ const TARGET_VIEW: View = View::new(20);
 
 #[derive(serde::Serialize)]
 struct Info {
-    id: String,
+    node_id: String,
+    block_id: String,
     view: View,
 }
 
@@ -57,7 +58,8 @@ async fn happy_test(nodes: Vec<NomosNode>) {
             i.safe_blocks.values().filter_map(|b| match &b.parent_qc {
                 Qc::Standard(_) => None,
                 Qc::Aggregated(_) => Some(Info {
-                    id: b.id.to_string(),
+                    node_id: i.id.to_string(),
+                    block_id: b.id.to_string(),
                     view: b.view,
                 }),
             })
