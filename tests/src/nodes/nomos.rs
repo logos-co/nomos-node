@@ -4,25 +4,20 @@ use std::process::{Child, Command, Stdio};
 use std::time::Duration;
 // internal
 use crate::{get_available_port, Node, SpawnConfig};
-use consensus_engine::overlay::{FlatOverlaySettings, RoundRobin};
-use consensus_engine::NodeId;
-#[cfg(feature = "libp2p")]
+use consensus_engine::overlay::{RandomBeaconState, RoundRobin, TreeOverlay, TreeOverlaySettings};
+use consensus_engine::{NodeId, Overlay};
 use mixnet_client::{MixnetClientConfig, MixnetClientMode};
 use mixnet_node::MixnetNodeConfig;
 use mixnet_topology::MixnetTopology;
 use nomos_consensus::{CarnotInfo, CarnotSettings};
 use nomos_http::backends::axum::AxumBackendSettings;
-#[cfg(feature = "libp2p")]
 use nomos_libp2p::Multiaddr;
 use nomos_log::{LoggerBackend, LoggerFormat};
-#[cfg(feature = "libp2p")]
 use nomos_network::backends::libp2p::{Libp2pConfig, Libp2pInfo};
 #[cfg(feature = "waku")]
 use nomos_network::backends::waku::{WakuConfig, WakuInfo};
 use nomos_network::NetworkConfig;
 use nomos_node::Config;
-#[cfg(feature = "waku")]
-use waku_bindings::{Multiaddr, PeerId};
 // crates
 use fraction::Fraction;
 use once_cell::sync::Lazy;
@@ -104,33 +99,6 @@ impl NomosNode {
             tokio::time::sleep(Duration::from_millis(100)).await;
         }
     }
-
-    #[cfg(feature = "waku")]
-    pub async fn peer_id(&self) -> PeerId {
-        self.get(NETWORK_INFO_API)
-            .await
-            .unwrap()
-            .json::<WakuInfo>()
-            .await
-            .unwrap()
-            .peer_id
-            .unwrap()
-    }
-
-    #[cfg(feature = "waku")]
-    pub async fn get_listening_address(&self) -> Multiaddr {
-        self.get(NETWORK_INFO_API)
-            .await
-            .unwrap()
-            .json::<WakuInfo>()
-            .await
-            .unwrap()
-            .listen_addresses
-            .unwrap()
-            .swap_remove(0)
-    }
-
-    #[cfg(feature = "libp2p")]
     pub async fn get_listening_address(&self) -> Multiaddr {
         self.get(NETWORK_INFO_API)
             .await
@@ -182,6 +150,7 @@ impl Node for NomosNode {
                 for id in &mut ids {
                     thread_rng().fill(id);
                 }
+
                 let mut configs = ids
                     .iter()
                     .map(|id| {
@@ -195,7 +164,19 @@ impl Node for NomosNode {
                         )
                     })
                     .collect::<Vec<_>>();
-                let mut nodes = vec![Self::spawn(configs.swap_remove(0)).await];
+
+                let overlay = TreeOverlay::new(configs[0].consensus.overlay_settings.clone());
+                let next_leader = overlay.next_leader();
+                let next_leader_idx = ids
+                    .iter()
+                    .position(|&id| NodeId::from(id) == next_leader)
+                    .unwrap();
+
+                // Spawn the next leader first, so the leader can receive votes from
+                // all nodes that will be subsequently spawned.
+                // If not, the leader will miss votes from nodes spawned before itself.
+                // This issue will be resolved by devising the block catch-up mechanism in the future
+                let mut nodes = vec![Self::spawn(configs.swap_remove(next_leader_idx)).await];
                 let listening_addr = nodes[0].get_listening_address().await;
                 for mut conf in configs {
                     conf.network
@@ -227,14 +208,11 @@ impl Node for NomosNode {
 fn create_node_config(
     nodes: Vec<NodeId>,
     private_key: [u8; 32],
-    threshold: Fraction,
+    _threshold: Fraction,
     timeout: Duration,
-    #[cfg(feature = "libp2p")] mixnet_node_config: Option<MixnetNodeConfig>,
-    #[cfg(feature = "waku")] _mixnet_node_config: Option<MixnetNodeConfig>,
-    #[cfg(feature = "libp2p")] mixnet_topology: MixnetTopology,
-    #[cfg(feature = "waku")] _mixnet_topology: MixnetTopology,
+    mixnet_node_config: Option<MixnetNodeConfig>,
+    mixnet_topology: MixnetTopology,
 ) -> Config {
-    #[cfg(feature = "libp2p")]
     let mixnet_client_mode = match mixnet_node_config {
         Some(node_config) => MixnetClientMode::SenderReceiver(node_config.client_listen_address),
         None => MixnetClientMode::Sender,
@@ -242,12 +220,6 @@ fn create_node_config(
 
     let mut config = Config {
         network: NetworkConfig {
-            #[cfg(feature = "waku")]
-            backend: WakuConfig {
-                inner: Default::default(),
-                initial_peers: vec![],
-            },
-            #[cfg(feature = "libp2p")]
             backend: Libp2pConfig {
                 inner: Default::default(),
                 initial_peers: vec![],
@@ -263,15 +235,16 @@ fn create_node_config(
         },
         consensus: CarnotSettings {
             private_key,
-            overlay_settings: FlatOverlaySettings {
+            overlay_settings: TreeOverlaySettings {
                 nodes,
                 leader: RoundRobin::new(),
-                // By setting the leader_threshold to 1 we ensure that all nodes come
-                // online before progressing. This is only necessary until we add a way
-                // to recover poast blocks from other nodes.
-                leader_super_majority_threshold: Some(threshold),
+                current_leader: [0; 32].into(),
+                number_of_committees: 1,
+                committee_membership: RandomBeaconState::initial_sad_from_entropy([0; 32]),
             },
             timeout,
+            transaction_selector_settings: (),
+            blob_selector_settings: (),
         },
         log: Default::default(),
         http: nomos_http::http::HttpServiceSettings {
@@ -284,7 +257,6 @@ fn create_node_config(
         },
         #[cfg(feature = "metrics")]
         metrics: Default::default(),
-        #[cfg(feature = "libp2p")]
         da: nomos_da::Settings {
             da_protocol: full_replication::Settings {
                 num_attestations: 1,
@@ -295,14 +267,8 @@ fn create_node_config(
             },
         },
     };
-    #[cfg(feature = "waku")]
-    {
-        config.network.backend.inner.port = Some(get_available_port() as usize);
-    }
-    #[cfg(feature = "libp2p")]
-    {
-        config.network.backend.inner.port = get_available_port();
-    }
+
+    config.network.backend.inner.port = get_available_port();
 
     config
 }

@@ -5,7 +5,6 @@ use std::{
 };
 
 use crate::Carnot;
-#[cfg(feature = "libp2p")]
 use crate::DataAvailability;
 use clap::{Parser, ValueEnum};
 use color_eyre::eyre::{self, eyre, Result};
@@ -13,19 +12,13 @@ use hex::FromHex;
 #[cfg(feature = "metrics")]
 use metrics::{backend::map::MapMetricsBackend, types::MetricsData, MetricsService};
 use nomos_http::{backends::axum::AxumBackend, http::HttpService};
-#[cfg(feature = "libp2p")]
 use nomos_libp2p::{secp256k1::SecretKey, Multiaddr};
 use nomos_log::{Logger, LoggerBackend, LoggerFormat};
-#[cfg(feature = "libp2p")]
 use nomos_network::backends::libp2p::Libp2p;
-#[cfg(feature = "waku")]
-use nomos_network::backends::waku::Waku;
 use nomos_network::NetworkService;
 use overwatch_rs::services::ServiceData;
 use serde::{Deserialize, Serialize};
 use tracing::Level;
-#[cfg(feature = "waku")]
-use waku_bindings::{Multiaddr, SecretKey};
 
 #[derive(ValueEnum, Clone, Debug, Default)]
 pub enum LoggerBackendType {
@@ -94,44 +87,29 @@ pub struct ConsensusArgs {
     consensus_timeout_secs: Option<String>,
 }
 
-#[derive(ValueEnum, Clone, Debug, Default)]
-pub enum OverlayType {
-    #[default]
-    Flat,
-    Tree,
-}
-
 #[derive(Parser, Debug, Clone)]
 pub struct OverlayArgs {
-    // TODO: Act on type and support other overlays.
-    #[clap(long = "overlay-type", env = "OVERLAY_TYPE")]
-    pub overlay_type: Option<OverlayType>,
-
     #[clap(long = "overlay-nodes", env = "OVERLAY_NODES", num_args = 1.., value_delimiter = ',')]
     pub overlay_nodes: Option<Vec<String>>,
 
     #[clap(long = "overlay-leader", env = "OVERLAY_LEADER")]
-    pub overlay_leader: Option<usize>,
+    pub overlay_leader: Option<String>,
 
     #[clap(
         long = "overlay-leader-super-majority-threshold",
-        env = "OVERLAY_LEADER_SUPER_MAJORITY_THRESHOLD"
+        env = "OVERLAY_NUMBER_OF_COMMITTEES"
     )]
-    pub overlay_leader_super_majority_threshold: Option<usize>,
+    pub overlay_number_of_committees: Option<usize>,
 }
 
 #[derive(Deserialize, Debug, Clone, Serialize)]
 pub struct Config {
     pub log: <Logger as ServiceData>::Settings,
-    #[cfg(feature = "waku")]
-    pub network: <NetworkService<Waku> as ServiceData>::Settings,
-    #[cfg(feature = "libp2p")]
     pub network: <NetworkService<Libp2p> as ServiceData>::Settings,
     pub http: <HttpService<AxumBackend> as ServiceData>::Settings,
     pub consensus: <Carnot as ServiceData>::Settings,
     #[cfg(feature = "metrics")]
     pub metrics: <MetricsService<MapMetricsBackend<MetricsData>> as ServiceData>::Settings,
-    #[cfg(feature = "libp2p")]
     pub da: <DataAvailability as ServiceData>::Settings,
 }
 
@@ -178,37 +156,6 @@ impl Config {
         }
         Ok(self)
     }
-
-    #[cfg(feature = "waku")]
-    pub fn update_network(mut self, network_args: NetworkArgs) -> Result<Self> {
-        let NetworkArgs {
-            host,
-            port,
-            node_key,
-            initial_peers,
-        } = network_args;
-
-        if let Some(host) = host {
-            self.network.backend.inner.host = Some(host);
-        }
-
-        if let Some(port) = port {
-            self.network.backend.inner.port = Some(port);
-        }
-
-        if let Some(node_key) = node_key {
-            use std::str::FromStr;
-            self.network.backend.inner.node_key = Some(SecretKey::from_str(&node_key)?);
-        }
-
-        if let Some(peers) = initial_peers {
-            self.network.backend.initial_peers = peers;
-        }
-
-        Ok(self)
-    }
-
-    #[cfg(feature = "libp2p")]
     pub fn update_network(mut self, network_args: NetworkArgs) -> Result<Self> {
         let NetworkArgs {
             host,
@@ -279,8 +226,8 @@ impl Config {
     pub fn update_overlay(mut self, overlay_args: OverlayArgs) -> Result<Self> {
         let OverlayArgs {
             overlay_nodes,
-            overlay_leader_super_majority_threshold,
-            ..
+            overlay_leader,
+            overlay_number_of_committees,
         } = overlay_args;
 
         if let Some(nodes) = overlay_nodes {
@@ -294,10 +241,13 @@ impl Config {
                 .collect::<Result<Vec<_>, eyre::Report>>()?;
         }
 
-        if let Some(threshold) = overlay_leader_super_majority_threshold {
-            self.consensus
-                .overlay_settings
-                .leader_super_majority_threshold = Some(threshold.into());
+        if let Some(leader) = overlay_leader {
+            let bytes = <[u8; 32]>::from_hex(leader)?;
+            self.consensus.overlay_settings.current_leader = bytes.into();
+        }
+
+        if let Some(committees) = overlay_number_of_committees {
+            self.consensus.overlay_settings.number_of_committees = committees;
         }
 
         Ok(self)

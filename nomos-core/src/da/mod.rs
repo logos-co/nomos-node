@@ -23,7 +23,7 @@ pub trait DaProtocol {
     /// Depending on the protocol, it may be necessary to feed multiple blobs to
     /// recover the initial data.
     fn recv_blob(&mut self, blob: Self::Blob);
-    /// Attempt to recover the initial data from feeded blobs.
+    /// Attempt to recover the initial data from fed blobs.
     /// If the protocol is not yet ready to return the data, return None.
     fn extract(&mut self) -> Option<Bytes>;
     /// Attest that we have received and stored a blob.

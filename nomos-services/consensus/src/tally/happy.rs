@@ -20,6 +20,8 @@ pub enum CarnotTallyError {
     InvalidVote(String),
     #[error("Did not receive enough votes")]
     InsufficientVotes,
+    #[error("The vote stream ended without tally")]
+    StreamEnded,
 }
 
 #[derive(Clone, Debug)]
@@ -80,6 +82,7 @@ impl Tally for CarnotTally {
                 ));
             }
         }
-        unreachable!()
+
+        Err(CarnotTallyError::StreamEnded)
     }
 }
