@@ -246,7 +246,7 @@ impl PacketForwarder {
         }
     }
 
-    async fn get_connection(&mut self, target: SocketAddr) -> std::io::Result<&mut TcpStream> {
+    async fn try_send(&mut self, target: SocketAddr, body: &Body) -> Result<()> {
         if let std::collections::hash_map::Entry::Vacant(e) = self.connections.entry(target) {
             match TcpStream::connect(target).await {
                 Ok(tcp) => {
@@ -254,11 +254,13 @@ impl PacketForwarder {
                 }
                 Err(e) => {
                     tracing::error!("failed to connect to {}: {e}", target);
-                    return Err(e);
+                    return Err(MixnetNodeError::Protocol(e.into()));
                 }
             }
         }
-        Ok(self.connections.get_mut(&target).unwrap())
+        body.write(self.connections.get_mut(&target).unwrap())
+            .await
+            .map_err(From::from)
     }
 
     async fn handle_msg(&mut self, msg: Message) {
@@ -274,28 +276,24 @@ impl PacketForwarder {
 
     async fn send(&mut self, target: SocketAddr, body: Body, retry_count: usize) {
         let config = self.config;
-        let tx = self.message_tx.clone();
-        match self.get_connection(target).await {
-            Ok(tcp) => {
-                let retry_delay = config.retry_delay;
-                let max_retries = config.max_retries;
-                if let Err(err) = body.write(tcp).await {
-                    match err {
-                        ProtocolError::IO(e) if e.kind() == std::io::ErrorKind::Unsupported => {
-                            tracing::error!("fail to send message to {target}: {e}");
-                        }
-                        _ => Self::handle_retry(
-                            tx,
-                            target,
-                            body,
-                            retry_count,
-                            retry_delay,
-                            max_retries,
-                        ),
-                    }
+        if let Err(err) = self.try_send(target, &body).await {
+            let retry_delay = config.retry_delay;
+            let max_retries = config.max_retries;
+            match err {
+                MixnetNodeError::Protocol(ProtocolError::IO(e))
+                    if e.kind() == std::io::ErrorKind::Unsupported =>
+                {
+                    tracing::error!("fail to send message to {target}: {e}");
                 }
+                _ => Self::handle_retry(
+                    self.message_tx.clone(),
+                    target,
+                    body,
+                    retry_count,
+                    retry_delay,
+                    max_retries,
+                ),
             }
-            Err(e) => self.handle_connection_failure(e, target, body, retry_count),
         }
     }
 
@@ -322,46 +320,6 @@ impl PacketForwarder {
             });
         } else {
             tracing::error!("fail to send message to {target}: reach maximum retries");
-        }
-    }
-
-    fn handle_connection_failure(
-        &self,
-        e: std::io::Error,
-        target: SocketAddr,
-        body: Body,
-        retry_count: usize,
-    ) {
-        use std::io::ErrorKind;
-
-        // If we got those conn errors, retry message, otherwise drop the message
-        if matches!(
-            e.kind(),
-            ErrorKind::ConnectionAborted
-                | ErrorKind::ConnectionReset
-                | ErrorKind::ConnectionRefused
-                | ErrorKind::NotConnected
-                | ErrorKind::BrokenPipe
-                | ErrorKind::TimedOut
-        ) {
-            if retry_count < self.config.max_retries {
-                let tx = self.message_tx.clone();
-                let delay = Duration::from_millis(
-                    (self.config.retry_delay.as_millis() as u64).pow(retry_count as u32),
-                );
-                tokio::spawn(async move {
-                    tokio::time::sleep(delay).await;
-                    if let Err(e) = tx.send(Message::Retry {
-                        target,
-                        body,
-                        retry_count: retry_count + 1,
-                    }) {
-                        tracing::error!("fail to enqueue retry message: {e}");
-                    }
-                });
-            } else {
-                tracing::error!("fail to send message to {target}: reach maximum retries");
-            }
         }
     }
 }
