@@ -27,7 +27,7 @@ pub enum MixnetNodeError {
     #[error("invalid routing address: {0}")]
     InvalidRoutingAddress(#[from] NymNodeRoutingAddressError),
     #[error("send error: {0}")]
-    MessageSendError(#[from] tokio::sync::mpsc::error::SendError<TargetedMessage>),
+    MessageSendError(#[from] tokio::sync::mpsc::error::SendError<Message>),
     #[error("send error: fail to send {0} to client")]
     ClientSendError(#[from] tokio::sync::mpsc::error::TrySendError<Body>),
     #[error("client: {0}")]
@@ -120,7 +120,7 @@ impl MixnetNode {
 struct MixnetNodeRunner {
     config: MixnetNodeConfig,
     client_tx: mpsc::Sender<Body>,
-    message_tx: mpsc::UnboundedSender<TargetedMessage>,
+    message_tx: mpsc::UnboundedSender<Message>,
 }
 
 impl MixnetNodeRunner {
@@ -201,22 +201,22 @@ impl MixnetNodeRunner {
     async fn forward(&self, msg: Body, to: NymNodeRoutingAddress) -> Result<()> {
         let addr = SocketAddr::from(to);
 
-        self.message_tx.send(TargetedMessage::new(addr, msg))?;
+        self.message_tx.send(Message::new(addr, msg))?;
         Ok(())
     }
 }
 
-struct PacketForwarder { 
+struct PacketForwarder {
     config: MixnetNodeConfig,
-    message_rx: mpsc::UnboundedReceiver<TargetedMessage>,
-    message_tx: mpsc::UnboundedSender<TargetedMessage>,
+    message_rx: mpsc::UnboundedReceiver<Message>,
+    message_tx: mpsc::UnboundedSender<Message>,
     connections: HashMap<SocketAddr, TcpStream>,
 }
 
 impl PacketForwarder {
     pub fn new(
-        message_tx: mpsc::UnboundedSender<TargetedMessage>,
-        message_rx: mpsc::UnboundedReceiver<TargetedMessage>,
+        message_tx: mpsc::UnboundedSender<Message>,
+        message_rx: mpsc::UnboundedReceiver<Message>,
         config: MixnetNodeConfig,
     ) -> Self {
         Self {
@@ -232,15 +232,7 @@ impl PacketForwarder {
             tokio::select! {
                 msg = self.message_rx.recv() => {
                     if let Some(msg) = msg {
-                        match self.send(msg).await {
-                            Ok(Some(msg)) => {
-                                let _ = self.message_tx.send(msg);
-                            }
-                            Ok(None) => {},
-                            Err(e) => {
-                                tracing::error!("failed to send msg: {e}");
-                            },
-                        }
+                        self.handle_msg(msg).await;
                     } else {
                         // Channel closed, we should shutdown the message handler thread
                         return;
@@ -254,100 +246,140 @@ impl PacketForwarder {
         }
     }
 
-    /// Send a message to the remote node,
-    /// return Ok(Some((Duration, Message))) if the message is not sent and the error is retryable
-    /// return Ok(None) if the message is sent successfully
-    /// return Err(e) if the message is not sent and the error is not retryable
-    async fn send(&mut self, mut msg: TargetedMessage) -> Result<Option<TargetedMessage>> {
-        use std::io::ErrorKind;
-
-        if msg.retry_count >= self.config.max_retries {
-            return Err(MixnetNodeError::Protocol(ProtocolError::ReachMaxRetries(
-                self.config.max_retries,
-            )));
-        }
-
-        if msg.retry_count > 0 {
-            let wait = Duration::from_millis(
-                (self.config.retry_delay.as_millis() as u64).pow(msg.retry_count as u32),
-            );
-            tokio::time::sleep(wait).await;
-        }
-
-        if let std::collections::hash_map::Entry::Vacant(e) = self.connections.entry(msg.target) {
-            match TcpStream::connect(msg.target).await {
+    async fn get_connection(&mut self, target: SocketAddr) -> std::io::Result<&mut TcpStream> {
+        if let std::collections::hash_map::Entry::Vacant(e) = self.connections.entry(target) {
+            match TcpStream::connect(target).await {
                 Ok(tcp) => {
                     e.insert(tcp);
                 }
                 Err(e) => {
-                    tracing::error!("failed to connect to {}: {e}", msg.target);
-                    return Err(MixnetNodeError::Protocol(ProtocolError::IO(e)));
+                    tracing::error!("failed to connect to {}: {e}", target);
+                    return Err(e);
                 }
             }
         }
+        Ok(self.connections.get_mut(&target).unwrap())
+    }
 
-        let tcp = self.connections.get_mut(&msg.target).unwrap();
+    async fn handle_msg(&mut self, msg: Message) {
+        match msg {
+            Message::Packet { target, body } => self.send(target, body, 0).await,
+            Message::Retry {
+                target,
+                body,
+                retry_count,
+            } => self.send(target, body, retry_count).await,
+        }
+    }
 
-        match msg.body.write(tcp).await {
-            Ok(_) => Ok(None),
-            // we should only retry io errors (exclude unsupported for now, may be more in future)
-            Err(ProtocolError::IO(e)) if e.kind() != ErrorKind::Unsupported => {
-                // Update the connection, I actully do not want to do it unless the connection is in broken
-                // situation, but rust does not provide a method to let us check if the connection is broken
-                // or not, so I just hard code the possible situations worth to refresh.
-                if matches!(
-                    e.kind(),
-                    ErrorKind::ConnectionAborted
-                        | ErrorKind::ConnectionReset
-                        | ErrorKind::ConnectionRefused
-                        | ErrorKind::NotConnected
-                        | ErrorKind::BrokenPipe
-                        | ErrorKind::TimedOut
-                ) {
-                    match TcpStream::connect(msg.target).await {
-                        Ok(fresh_tcp) => {
-                            *tcp = fresh_tcp;
+    async fn send(&mut self, target: SocketAddr, body: Body, retry_count: usize) {
+        let config = self.config;
+        let tx = self.message_tx.clone();
+        match self.get_connection(target).await {
+            Ok(tcp) => {
+                let retry_delay = config.retry_delay;
+                let max_retries = config.max_retries;
+                if let Err(err) = body.write(tcp).await {
+                    match err {
+                        ProtocolError::IO(e) if e.kind() == std::io::ErrorKind::Unsupported => {
+                            tracing::error!("fail to send message to {target}: {e}");
                         }
-                        Err(e) => {
-                            tracing::error!("failed to update connection to {}, the local machine network is down: {e}", msg.target);
-                            return Err(MixnetNodeError::Protocol(ProtocolError::IO(e)));
-                        }
+                        _ => Self::handle_retry(
+                            tx,
+                            target,
+                            body,
+                            retry_count,
+                            retry_delay,
+                            max_retries,
+                        ),
                     }
                 }
-
-                if msg.retry_count < self.config.max_retries {
-                    msg.retry_count += 1;
-                    return Ok(Some(msg));
-                }
-
-                tracing::error!(
-                    "failed to forward msg to {}: reach the maximum retries",
-                    msg.target,
-                );
-                Err(MixnetNodeError::Protocol(ProtocolError::ReachMaxRetries(
-                    self.config.max_retries,
-                )))
             }
-            Err(e) => {
-                tracing::error!("failed to forward msg to {}: {e}", msg.target);
-                Err(MixnetNodeError::Protocol(e))
+            Err(e) => self.handle_connection_failure(e, target, body, retry_count),
+        }
+    }
+
+    fn handle_retry(
+        tx: mpsc::UnboundedSender<Message>,
+        target: SocketAddr,
+        body: Body,
+        retry_count: usize,
+        retry_delay: Duration,
+        max_retries: usize,
+    ) {
+        if retry_count < max_retries {
+            let delay =
+                Duration::from_millis((retry_delay.as_millis() as u64).pow(retry_count as u32));
+            tokio::spawn(async move {
+                tokio::time::sleep(delay);
+                if let Err(e) = tx.send(Message::Retry {
+                    target,
+                    body,
+                    retry_count: retry_count + 1,
+                }) {
+                    tracing::error!("fail to enqueue retry message: {e}");
+                }
+            });
+        } else {
+            tracing::error!("fail to send message to {target}: reach maximum retries");
+        }
+    }
+
+    fn handle_connection_failure(
+        &self,
+        e: std::io::Error,
+        target: SocketAddr,
+        body: Body,
+        retry_count: usize,
+    ) {
+        use std::io::ErrorKind;
+
+        // If we got those conn errors, retry message, otherwise drop the message
+        if matches!(
+            e.kind(),
+            ErrorKind::ConnectionAborted
+                | ErrorKind::ConnectionReset
+                | ErrorKind::ConnectionRefused
+                | ErrorKind::NotConnected
+                | ErrorKind::BrokenPipe
+                | ErrorKind::TimedOut
+        ) {
+            if retry_count < self.config.max_retries {
+                let tx = self.message_tx.clone();
+                let delay = Duration::from_millis(
+                    (self.config.retry_delay.as_millis() as u64).pow(retry_count as u32),
+                );
+                tokio::spawn(async move {
+                    tokio::time::sleep(delay);
+                    if let Err(e) = tx.send(Message::Retry {
+                        target,
+                        body,
+                        retry_count: retry_count + 1,
+                    }) {
+                        tracing::error!("fail to enqueue retry message: {e}");
+                    }
+                });
+            } else {
+                tracing::error!("fail to send message to {target}: reach maximum retries");
             }
         }
     }
 }
 
-pub struct TargetedMessage {
-    target: SocketAddr,
-    body: Body,
-    retry_count: usize,
+pub enum Message {
+    Packet {
+        target: SocketAddr,
+        body: Body,
+    },
+    Retry {
+        target: SocketAddr,
+        body: Body,
+        retry_count: usize,
+    },
 }
 
-impl TargetedMessage {
+impl Message {
     fn new(target: SocketAddr, body: Body) -> Self {
-        Self {
-            target,
-            body,
-            retry_count: 0,
-        }
+        Self::Packet { target, body }
     }
 }
