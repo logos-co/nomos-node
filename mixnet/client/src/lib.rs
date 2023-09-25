@@ -1,8 +1,9 @@
 pub mod config;
+pub mod error;
+pub use error::*;
 mod receiver;
 mod sender;
 
-use std::error::Error;
 use std::time::Duration;
 
 pub use config::MixnetClientConfig;
@@ -11,7 +12,6 @@ use futures::stream::BoxStream;
 use mixnet_util::ConnectionPool;
 use rand::Rng;
 use sender::Sender;
-use thiserror::Error;
 
 // A client for sending packets to Mixnet and receiving packets from Mixnet.
 pub struct MixnetClient<R: Rng> {
@@ -19,7 +19,7 @@ pub struct MixnetClient<R: Rng> {
     sender: Sender<R>,
 }
 
-pub type MessageStream = BoxStream<'static, Result<Vec<u8>, MixnetClientError>>;
+pub type MessageStream = BoxStream<'static, Result<Vec<u8>>>;
 
 impl<R: Rng> MixnetClient<R> {
     pub fn new(config: MixnetClientConfig, rng: R) -> Self {
@@ -36,27 +36,11 @@ impl<R: Rng> MixnetClient<R> {
         }
     }
 
-    pub async fn run(&self) -> Result<MessageStream, MixnetClientError> {
+    pub async fn run(&self) -> Result<MessageStream> {
         self.mode.run().await
     }
 
-    pub fn send(
-        &mut self,
-        msg: Vec<u8>,
-        total_delay: Duration,
-    ) -> Result<(), Box<dyn Error + Send + Sync + 'static>> {
+    pub fn send(&mut self, msg: Vec<u8>, total_delay: Duration) -> Result<()> {
         self.sender.send(msg, total_delay)
     }
-}
-
-#[derive(Error, Debug)]
-pub enum MixnetClientError {
-    #[error("mixnet node connect error")]
-    MixnetNodeConnectError,
-    #[error("mixnode stream has been closed")]
-    MixnetNodeStreamClosed,
-    #[error("unexpected stream body received")]
-    UnexpectedStreamBody,
-    #[error("invalid payload")]
-    InvalidPayload,
 }
