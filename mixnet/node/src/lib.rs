@@ -264,14 +264,7 @@ impl PacketForwarder {
     }
 
     async fn handle_msg(&mut self, msg: Message) {
-        match msg {
-            Message::Packet { target, body } => self.send(target, body, 0).await,
-            Message::Retry {
-                target,
-                body,
-                retry_count,
-            } => self.send(target, body, retry_count).await,
-        }
+        self.send(msg.target, msg.body, msg.retry_count).await
     }
 
     async fn send(&mut self, target: SocketAddr, body: Body, retry_count: usize) {
@@ -310,7 +303,7 @@ impl PacketForwarder {
                 Duration::from_millis((retry_delay.as_millis() as u64).pow(retry_count as u32));
             tokio::spawn(async move {
                 tokio::time::sleep(delay).await;
-                if let Err(e) = tx.send(Message::Retry {
+                if let Err(e) = tx.send(Message {
                     target,
                     body,
                     retry_count: retry_count + 1,
@@ -324,20 +317,18 @@ impl PacketForwarder {
     }
 }
 
-pub enum Message {
-    Packet {
-        target: SocketAddr,
-        body: Body,
-    },
-    Retry {
-        target: SocketAddr,
-        body: Body,
-        retry_count: usize,
-    },
+pub struct Message {
+    target: SocketAddr,
+    body: Body,
+    retry_count: usize,
 }
 
 impl Message {
     fn new(target: SocketAddr, body: Body) -> Self {
-        Self::Packet { target, body }
+        Self {
+            target,
+            body,
+            retry_count: 0,
+        }
     }
 }
