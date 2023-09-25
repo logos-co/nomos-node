@@ -90,7 +90,7 @@ impl Receiver {
             match next {
                 Ok(fragment) => {
                     if let Some(message) =
-                        Self::try_reconstruct_message(fragment, message_reconstructor)
+                        Self::try_reconstruct_message(fragment, message_reconstructor)?
                     {
                         return Ok(message);
                     }
@@ -108,14 +108,14 @@ impl Receiver {
     fn try_reconstruct_message(
         fragment: Fragment,
         message_reconstructor: &mut MessageReconstructor,
-    ) -> Option<Vec<u8>> {
+    ) -> Result<Option<Vec<u8>>> {
         let reconstruction_result = message_reconstructor.insert_new_fragment(fragment);
         match reconstruction_result {
             Some((padded_message, _)) => {
-                let message = Self::remove_padding(padded_message).unwrap();
-                Some(message)
+                let message = Self::remove_padding(padded_message)?;
+                Ok(Some(message))
             }
-            None => None,
+            None => Ok(None),
         }
     }
 
@@ -126,7 +126,7 @@ impl Receiver {
 
         match padded_message.remove_padding(dummy_num_mix_hops)? {
             NymMessage::Plain(msg) => Ok(msg),
-            _ => todo!("return error"),
+            _ => Err(MixnetClientError::InvalidFragment),
         }
     }
 }
