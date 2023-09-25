@@ -24,6 +24,7 @@ use once_cell::sync::Lazy;
 use rand::{thread_rng, Rng};
 use reqwest::Client;
 use tempfile::NamedTempFile;
+use tracing::Level;
 
 static CLIENT: Lazy<Client> = Lazy::new(Client::new);
 const NOMOS_BIN: &str = "../target/debug/nomos-node";
@@ -60,17 +61,18 @@ impl NomosNode {
         let config_path = file.path().to_owned();
 
         // setup logging so that we can intercept it later in testing
-        config.log.backend = LoggerBackend::File {
-            directory: dir.path().to_owned(),
-            prefix: Some(LOGS_PREFIX.into()),
-        };
-        config.log.format = LoggerFormat::Json;
+        // config.log.backend = LoggerBackend::File {
+        //     directory: dir.path().to_owned(),
+        //     prefix: Some(LOGS_PREFIX.into()),
+        // };
+        // config.log.format = LoggerFormat::Json;
+        config.log.level = Level::INFO;
 
         serde_yaml::to_writer(&mut file, &config).unwrap();
         let child = Command::new(std::env::current_dir().unwrap().join(NOMOS_BIN))
             .arg(&config_path)
             .current_dir(dir.path())
-            .stdout(Stdio::null())
+            // .stdout(Stdio::null())
             .spawn()
             .unwrap();
         let node = Self {
@@ -213,6 +215,8 @@ fn create_node_config(
     mixnet_node_config: Option<MixnetNodeConfig>,
     mixnet_topology: MixnetTopology,
 ) -> Config {
+    tracing::info!("threshold: {threshold:?}");
+
     let mixnet_client_mode = match mixnet_node_config {
         Some(node_config) => MixnetClientMode::SenderReceiver(node_config.client_listen_address),
         None => MixnetClientMode::Sender,
