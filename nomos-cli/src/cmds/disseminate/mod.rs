@@ -169,13 +169,23 @@ impl ServiceCore for DisseminateService {
                 let adapter = Libp2pAdapter::new(network_relay).await;
                 let da = FullReplication::new(AbsoluteNumber::new(da_settings.num_attestations));
 
-                if tokio::time::timeout(settings.timeout, disseminate(da, settings.bytes, adapter))
-                    .await
-                    .is_err()
+                match tokio::time::timeout(
+                    settings.timeout,
+                    disseminate(da, settings.bytes, adapter),
+                )
+                .await
                 {
-                    tracing::error!("Timeout reached, check the logs for additional details");
-                    service_state.overwatch_handle.shutdown().await;
-                    std::process::exit(1);
+                    Err(_) => {
+                        tracing::error!("Timeout reached, check the logs for additional details");
+                        std::process::exit(1);
+                    }
+                    Ok(Err(_)) => {
+                        tracing::error!(
+                            "Could not disseminate blob, check logs for additional details"
+                        );
+                        std::process::exit(1);
+                    }
+                    _ => {}
                 }
             }
         }
