@@ -311,7 +311,7 @@ impl PacketForwarder {
             let delay =
                 Duration::from_millis((retry_delay.as_millis() as u64).pow(retry_count as u32));
             tokio::spawn(async move {
-                tokio::time::sleep(delay);
+                tokio::time::sleep(delay).await;
                 if let Err(e) = tx.send(Message::Retry {
                     target,
                     body,
@@ -350,7 +350,7 @@ impl PacketForwarder {
                     (self.config.retry_delay.as_millis() as u64).pow(retry_count as u32),
                 );
                 tokio::spawn(async move {
-                    tokio::time::sleep(delay);
+                    tokio::time::sleep(delay).await;
                     if let Err(e) = tx.send(Message::Retry {
                         target,
                         body,
