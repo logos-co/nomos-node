@@ -104,37 +104,38 @@ impl<O: Overlay, Ts, Bs> CarnotSettings<O, Ts, Bs> {
     }
 }
 
-pub struct CarnotConsensus<A, P, M, O, C, TxS, BS>
+pub struct CarnotConsensus<A, ClPool, ClPoolAdapter, O, C, TxS, BS>
 where
     A: NetworkAdapter,
-    M: MempoolAdapter<Item = P::Item, Key = P::Key>,
-    P: MemPool,
+    ClPoolAdapter: MempoolAdapter<Item = ClPool::Item, Key = ClPool::Key>,
+    ClPool: MemPool,
     O: Overlay + Debug,
-    P::Item: Debug + 'static,
-    P::Key: Debug + 'static,
+    ClPool::Item: Debug + 'static,
+    ClPool::Key: Debug + 'static,
     A::Backend: 'static,
-    TxS: TxSelect<Tx = P::Item>,
+    TxS: TxSelect<Tx = ClPool::Item>,
     BS: BlobCertificateSelect<Certificate = C>,
 {
     service_state: ServiceStateHandle<Self>,
     // underlying networking backend. We need this so we can relay and check the types properly
     // when implementing ServiceCore for CarnotConsensus
     network_relay: Relay<NetworkService<A::Backend>>,
-    mempool_relay: Relay<MempoolService<M, P, TxDiscriminant>>,
+    cl_mempool_relay: Relay<MempoolService<ClPoolAdapter, ClPool, TxDiscriminant>>,
     _overlay: std::marker::PhantomData<O>,
     // this need to be substituted by some kind DA bo
     _blob_certificate: std::marker::PhantomData<C>,
 }
 
-impl<A, P, M, O, C, TxS, BS> ServiceData for CarnotConsensus<A, P, M, O, C, TxS, BS>
+impl<A, ClPool, ClPoolAdapter, O, C, TxS, BS> ServiceData
+    for CarnotConsensus<A, ClPool, ClPoolAdapter, O, C, TxS, BS>
 where
     A: NetworkAdapter,
-    P: MemPool,
-    P::Item: Debug,
-    P::Key: Debug,
-    M: MempoolAdapter<Item = P::Item, Key = P::Key>,
+    ClPool: MemPool,
+    ClPool::Item: Debug,
+    ClPool::Key: Debug,
+    ClPoolAdapter: MempoolAdapter<Item = ClPool::Item, Key = ClPool::Key>,
     O: Overlay + Debug,
-    TxS: TxSelect<Tx = P::Item>,
+    TxS: TxSelect<Tx = ClPool::Item>,
     BS: BlobCertificateSelect<Certificate = C>,
 {
     const SERVICE_ID: ServiceId = "Carnot";
@@ -145,12 +146,13 @@ where
 }
 
 #[async_trait::async_trait]
-impl<A, P, M, O, C, TxS, BS> ServiceCore for CarnotConsensus<A, P, M, O, C, TxS, BS>
+impl<A, ClPool, ClPoolAdapter, O, C, TxS, BS> ServiceCore
+    for CarnotConsensus<A, ClPool, ClPoolAdapter, O, C, TxS, BS>
 where
     A: NetworkAdapter + Clone + Send + Sync + 'static,
-    P: MemPool + Send + Sync + 'static,
-    P::Settings: Send + Sync + 'static,
-    P::Item: Transaction
+    ClPool: MemPool + Send + Sync + 'static,
+    ClPool::Settings: Send + Sync + 'static,
+    ClPool::Item: Transaction
         + Debug
         + Clone
         + Eq
@@ -170,25 +172,25 @@ where
         + Send
         + Sync
         + 'static,
-    P::Key: Debug + Send + Sync,
-    M: MempoolAdapter<Item = P::Item, Key = P::Key> + Send + Sync + 'static,
+    ClPool::Key: Debug + Send + Sync,
+    ClPoolAdapter: MempoolAdapter<Item = ClPool::Item, Key = ClPool::Key> + Send + Sync + 'static,
     O: Overlay + Debug + Send + Sync + 'static,
     O::LeaderSelection: UpdateableLeaderSelection,
     O::CommitteeMembership: UpdateableCommitteeMembership,
-    TxS: TxSelect<Tx = P::Item> + Clone + Send + Sync + 'static,
+    TxS: TxSelect<Tx = ClPool::Item> + Clone + Send + Sync + 'static,
     TxS::Settings: Send + Sync + 'static,
     BS: BlobCertificateSelect<Certificate = C> + Clone + Send + Sync + 'static,
     BS::Settings: Send + Sync + 'static,
 {
     fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, overwatch_rs::DynError> {
         let network_relay = service_state.overwatch_handle.relay();
-        let mempool_relay = service_state.overwatch_handle.relay();
+        let cl_mempool_relay = service_state.overwatch_handle.relay();
         Ok(Self {
             service_state,
             network_relay,
             _overlay: Default::default(),
             _blob_certificate: Default::default(),
-            mempool_relay,
+            cl_mempool_relay,
         })
     }
 
@@ -199,8 +201,8 @@ where
             .await
             .expect("Relay connection with NetworkService should succeed");
 
-        let mempool_relay: OutboundRelay<_> = self
-            .mempool_relay
+        let cl_mempool_relay: OutboundRelay<_> = self
+            .cl_mempool_relay
             .connect()
             .await
             .expect("Relay connection with MemPoolService should succeed");
@@ -287,7 +289,7 @@ where
                             &mut task_manager,
                             adapter.clone(),
                             private_key,
-                            mempool_relay.clone(),
+                            cl_mempool_relay.clone(),
                             tx_selector.clone(),
                             blob_selector.clone(),
                             timeout,
@@ -314,12 +316,13 @@ enum Output<Tx: Clone + Eq + Hash, BlobCertificate: Clone + Eq + Hash> {
     },
 }
 
-impl<A, P, M, O, C, TxS, BS> CarnotConsensus<A, P, M, O, C, TxS, BS>
+impl<A, ClPool, ClPoolAdapter, O, C, TxS, BS>
+    CarnotConsensus<A, ClPool, ClPoolAdapter, O, C, TxS, BS>
 where
     A: NetworkAdapter + Clone + Send + Sync + 'static,
-    P: MemPool + Send + Sync + 'static,
-    P::Settings: Send + Sync + 'static,
-    P::Item: Transaction
+    ClPool: MemPool + Send + Sync + 'static,
+    ClPool::Settings: Send + Sync + 'static,
+    ClPool::Item: Transaction
         + Debug
         + Clone
         + Eq
@@ -342,14 +345,14 @@ where
     O: Overlay + Debug + Send + Sync + 'static,
     O::LeaderSelection: UpdateableLeaderSelection,
     O::CommitteeMembership: UpdateableCommitteeMembership,
-    TxS: TxSelect<Tx = P::Item> + Clone + Send + Sync + 'static,
+    TxS: TxSelect<Tx = ClPool::Item> + Clone + Send + Sync + 'static,
     BS: BlobCertificateSelect<Certificate = C> + Clone + Send + Sync + 'static,
-    P::Key: Debug + Send + Sync,
-    M: MempoolAdapter<Item = P::Item, Key = P::Key> + Send + Sync + 'static,
+    ClPool::Key: Debug + Send + Sync,
+    ClPoolAdapter: MempoolAdapter<Item = ClPool::Item, Key = ClPool::Key> + Send + Sync + 'static,
     O: Overlay + Debug + Send + Sync + 'static,
     O::LeaderSelection: UpdateableLeaderSelection,
     O::CommitteeMembership: UpdateableCommitteeMembership,
-    TxS: TxSelect<Tx = P::Item> + Clone + Send + Sync + 'static,
+    TxS: TxSelect<Tx = ClPool::Item> + Clone + Send + Sync + 'static,
 {
     fn process_message(carnot: &Carnot<O>, msg: ConsensusMsg) {
         match msg {
@@ -373,11 +376,11 @@ where
     #[allow(clippy::too_many_arguments)]
     async fn process_carnot_event(
         mut carnot: Carnot<O>,
-        event: Event<P::Item, C>,
-        task_manager: &mut TaskManager<View, Event<P::Item, C>>,
+        event: Event<ClPool::Item, C>,
+        task_manager: &mut TaskManager<View, Event<ClPool::Item, C>>,
         adapter: A,
         private_key: PrivateKey,
-        mempool_relay: OutboundRelay<MempoolMsg<P::Item, P::Key>>,
+        cl_mempool_relay: OutboundRelay<MempoolMsg<ClPool::Item, ClPool::Key>>,
         tx_selector: TxS,
         blobl_selector: BS,
         timeout: Duration,
@@ -393,7 +396,7 @@ where
                 tracing::debug!("approving proposal {:?}", block);
                 let (new_carnot, out) = carnot.approve_block(block);
                 carnot = new_carnot;
-                output = Some(Output::Send::<P::Item, C>(out));
+                output = Some(Output::Send::<ClPool::Item, C>(out));
             }
             Event::LocalTimeout { view } => {
                 tracing::debug!("local timeout");
@@ -434,7 +437,7 @@ where
                     qc,
                     tx_selector.clone(),
                     blobl_selector.clone(),
-                    mempool_relay,
+                    cl_mempool_relay,
                 )
                 .await;
             }
@@ -463,11 +466,11 @@ where
     #[instrument(level = "debug", skip(adapter, task_manager, stream))]
     async fn process_block(
         mut carnot: Carnot<O>,
-        block: Block<P::Item, C>,
-        mut stream: Pin<Box<dyn Stream<Item = Block<P::Item, C>> + Send>>,
-        task_manager: &mut TaskManager<View, Event<P::Item, C>>,
+        block: Block<ClPool::Item, C>,
+        mut stream: Pin<Box<dyn Stream<Item = Block<ClPool::Item, C>> + Send>>,
+        task_manager: &mut TaskManager<View, Event<ClPool::Item, C>>,
         adapter: A,
-    ) -> (Carnot<O>, Option<Output<P::Item, C>>) {
+    ) -> (Carnot<O>, Option<Output<ClPool::Item, C>>) {
         tracing::debug!("received proposal {:?}", block);
         if carnot.highest_voted_view() >= block.header().view {
             tracing::debug!("already voted for view {}", block.header().view);
@@ -543,9 +546,9 @@ where
         carnot: Carnot<O>,
         timeout_qc: TimeoutQc,
         new_views: HashSet<NewView>,
-        task_manager: &mut TaskManager<View, Event<P::Item, C>>,
+        task_manager: &mut TaskManager<View, Event<ClPool::Item, C>>,
         adapter: A,
-    ) -> (Carnot<O>, Option<Output<P::Item, C>>) {
+    ) -> (Carnot<O>, Option<Output<ClPool::Item, C>>) {
         let leader_committee = [carnot.id()].into_iter().collect();
         let leader_tally_settings = CarnotTallySettings {
             threshold: carnot.leader_super_majority_threshold(),
@@ -580,9 +583,9 @@ where
     async fn receive_timeout_qc(
         carnot: Carnot<O>,
         timeout_qc: TimeoutQc,
-        task_manager: &mut TaskManager<View, Event<P::Item, C>>,
+        task_manager: &mut TaskManager<View, Event<ClPool::Item, C>>,
         adapter: A,
-    ) -> (Carnot<O>, Option<Output<P::Item, C>>) {
+    ) -> (Carnot<O>, Option<Output<ClPool::Item, C>>) {
         let mut new_state = carnot.receive_timeout_qc(timeout_qc.clone());
         let self_committee = carnot.self_committee();
         let tally_settings = CarnotTallySettings {
@@ -607,7 +610,7 @@ where
     async fn process_root_timeout(
         carnot: Carnot<O>,
         timeouts: HashSet<Timeout>,
-    ) -> (Carnot<O>, Option<Output<P::Item, C>>) {
+    ) -> (Carnot<O>, Option<Output<ClPool::Item, C>>) {
         // we might have received a timeout_qc sent by some other node and advanced the view
         // already, in which case we should ignore the timeout
         if carnot.current_view()
@@ -643,7 +646,7 @@ where
 
     #[instrument(
         level = "debug",
-        skip(mempool_relay, private_key, tx_selector, blob_selector)
+        skip(cl_mempool_relay, private_key, tx_selector, blob_selector)
     )]
     async fn propose_block(
         id: NodeId,
@@ -651,11 +654,11 @@ where
         qc: Qc,
         tx_selector: TxS,
         blob_selector: BS,
-        mempool_relay: OutboundRelay<MempoolMsg<P::Item, P::Key>>,
-    ) -> Option<Output<P::Item, C>> {
+        cl_mempool_relay: OutboundRelay<MempoolMsg<ClPool::Item, ClPool::Key>>,
+    ) -> Option<Output<ClPool::Item, C>> {
         let (reply_channel, rx) = tokio::sync::oneshot::channel();
         let mut output = None;
-        mempool_relay
+        cl_mempool_relay
             .send(MempoolMsg::View {
                 ancestor_hint: BlockId::zeros(),
                 reply_channel,
@@ -687,7 +690,7 @@ where
     async fn process_view_change(
         carnot: Carnot<O>,
         prev_view: View,
-        task_manager: &mut TaskManager<View, Event<P::Item, C>>,
+        task_manager: &mut TaskManager<View, Event<ClPool::Item, C>>,
         adapter: A,
         timeout: Duration,
     ) {
@@ -724,7 +727,7 @@ where
         }
     }
 
-    async fn gather_timeout_qc(adapter: A, view: consensus_engine::View) -> Event<P::Item, C> {
+    async fn gather_timeout_qc(adapter: A, view: consensus_engine::View) -> Event<ClPool::Item, C> {
         if let Some(timeout_qc) = adapter
             .timeout_qc_stream(view)
             .await
@@ -744,7 +747,7 @@ where
         committee: Committee,
         block: consensus_engine::Block,
         tally: CarnotTallySettings,
-    ) -> Event<P::Item, C> {
+    ) -> Event<ClPool::Item, C> {
         let tally = CarnotTally::new(tally);
         let votes_stream = adapter.votes_stream(&committee, block.view, block.id).await;
         match tally.tally(block.clone(), votes_stream).await {
@@ -761,7 +764,7 @@ where
         committee: Committee,
         timeout_qc: TimeoutQc,
         tally: CarnotTallySettings,
-    ) -> Event<P::Item, C> {
+    ) -> Event<ClPool::Item, C> {
         let tally = NewViewTally::new(tally);
         let stream = adapter
             .new_view_stream(&committee, timeout_qc.view().next())
@@ -783,7 +786,7 @@ where
         committee: Committee,
         view: consensus_engine::View,
         tally: CarnotTallySettings,
-    ) -> Event<P::Item, C> {
+    ) -> Event<ClPool::Item, C> {
         let tally = TimeoutTally::new(tally);
         let stream = adapter.timeout_stream(&committee, view).await;
         match tally.tally(view, stream).await {
@@ -795,7 +798,7 @@ where
     }
 
     #[instrument(level = "debug", skip(adapter))]
-    async fn gather_block(adapter: A, view: consensus_engine::View) -> Event<P::Item, C> {
+    async fn gather_block(adapter: A, view: consensus_engine::View) -> Event<ClPool::Item, C> {
         let stream = adapter
             .proposal_chunks_stream(view)
             .await
