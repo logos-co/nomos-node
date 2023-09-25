@@ -1,4 +1,4 @@
-use std::{error::Error, net::SocketAddr};
+use std::net::SocketAddr;
 
 use futures::{stream, Stream, StreamExt};
 use mixnet_protocol::Body;
@@ -9,6 +9,7 @@ use nym_sphinx::{
 };
 use tokio::net::TcpStream;
 
+use super::error::*;
 use crate::MixnetClientError;
 
 // Receiver accepts TCP connections to receive incoming payloads from the Mixnet.
@@ -21,12 +22,7 @@ impl Receiver {
         Self { node_address }
     }
 
-    pub async fn run(
-        &self,
-    ) -> Result<
-        impl Stream<Item = Result<Vec<u8>, MixnetClientError>> + Send + 'static,
-        MixnetClientError,
-    > {
+    pub async fn run(&self) -> Result<impl Stream<Item = Result<Vec<u8>>> + Send + 'static> {
         let Ok(socket) = TcpStream::connect(self.node_address).await else {
             return Err(MixnetClientError::MixnetNodeConnectError);
         };
@@ -36,9 +32,7 @@ impl Receiver {
         ))))
     }
 
-    fn fragment_stream(
-        socket: TcpStream,
-    ) -> impl Stream<Item = Result<Fragment, MixnetClientError>> + Send + 'static {
+    fn fragment_stream(socket: TcpStream) -> impl Stream<Item = Result<Fragment>> + Send + 'static {
         stream::unfold(socket, move |mut socket| {
             async move {
                 let Ok(body) = Body::read(&mut socket).await else {
@@ -60,11 +54,8 @@ impl Receiver {
     }
 
     fn message_stream(
-        fragment_stream: impl Stream<Item = Result<Fragment, MixnetClientError>>
-            + Send
-            + Unpin
-            + 'static,
-    ) -> impl Stream<Item = Result<Vec<u8>, MixnetClientError>> + Send + 'static {
+        fragment_stream: impl Stream<Item = Result<Fragment>> + Send + Unpin + 'static,
+    ) -> impl Stream<Item = Result<Vec<u8>>> + Send + 'static {
         // MessageReconstructor buffers all received fragments
         // and eventually returns reconstructed messages.
         let message_reconstructor: MessageReconstructor = Default::default();
@@ -80,7 +71,7 @@ impl Receiver {
         )
     }
 
-    fn fragment_from_payload(payload: Payload) -> Result<Fragment, MixnetClientError> {
+    fn fragment_from_payload(payload: Payload) -> Result<Fragment> {
         let Ok(payload_plaintext) = payload.recover_plaintext() else {
             return Err(MixnetClientError::InvalidPayload);
         };
@@ -91,12 +82,9 @@ impl Receiver {
     }
 
     async fn reconstruct_message(
-        fragment_stream: &mut (impl Stream<Item = Result<Fragment, MixnetClientError>>
-                  + Send
-                  + Unpin
-                  + 'static),
+        fragment_stream: &mut (impl Stream<Item = Result<Fragment>> + Send + Unpin + 'static),
         message_reconstructor: &mut MessageReconstructor,
-    ) -> Result<Vec<u8>, MixnetClientError> {
+    ) -> Result<Vec<u8>> {
         // Read fragments until at least one message is fully reconstructed.
         while let Some(next) = fragment_stream.next().await {
             match next {
@@ -131,7 +119,7 @@ impl Receiver {
         }
     }
 
-    fn remove_padding(msg: Vec<u8>) -> Result<Vec<u8>, Box<dyn Error>> {
+    fn remove_padding(msg: Vec<u8>) -> Result<Vec<u8>> {
         let padded_message = PaddedMessage::new_reconstructed(msg);
         // we need this because PaddedMessage.remove_padding requires it for other NymMessage types.
         let dummy_num_mix_hops = 0;

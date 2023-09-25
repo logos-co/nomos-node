@@ -1,4 +1,4 @@
-use std::{error::Error, net::SocketAddr};
+use std::net::SocketAddr;
 
 use mixnet_protocol::Body;
 use tokio::{
@@ -12,8 +12,10 @@ impl ClientNotifier {
     pub async fn run(
         listen_address: SocketAddr,
         mut rx: mpsc::Receiver<Body>,
-    ) -> Result<(), Box<dyn Error>> {
-        let listener = TcpListener::bind(listen_address).await?;
+    ) -> super::Result<()> {
+        let listener = TcpListener::bind(listen_address)
+            .await
+            .map_err(super::ProtocolError::IO)?;
         tracing::info!("Listening mixnet client connections: {listen_address}");
 
         // Currently, handling only a single incoming connection
@@ -21,7 +23,7 @@ impl ClientNotifier {
         loop {
             match listener.accept().await {
                 Ok((socket, remote_addr)) => {
-                    tracing::debug!("Accepted incoming client connection from {remote_addr:?}");
+                    tracing::debug!("Accepted incoming client connection from {remote_addr}");
 
                     if let Err(e) = Self::handle_connection(socket, &mut rx).await {
                         tracing::error!("failed to handle conn: {e}");
@@ -35,10 +37,10 @@ impl ClientNotifier {
     async fn handle_connection(
         mut socket: TcpStream,
         rx: &mut mpsc::Receiver<Body>,
-    ) -> Result<(), Box<dyn Error>> {
+    ) -> super::Result<()> {
         while let Some(body) = rx.recv().await {
             if let Err(e) = body.write(&mut socket).await {
-                return Err(format!("error from client conn: {e}").into());
+                return Err(super::MixnetNodeError::Client(e));
             }
         }
         tracing::debug!("body receiver closed");
