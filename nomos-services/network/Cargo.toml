@@ -21,9 +21,6 @@ thiserror = "1.0"
 tracing = "0.1"
 rand = { version = "0.7.3", optional = true }
 waku-bindings = { version = "0.1.1", optional = true }
-tracing-appender = "0.2"
-tracing-subscriber = { version = "0.3", features = ["json"] }
-tracing-gelf = "0.7"
 futures = "0.3"
 parking_lot = "0.12"
 nomos-core = { path = "../../nomos-core" }

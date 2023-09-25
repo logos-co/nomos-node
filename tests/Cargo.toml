@@ -22,7 +22,6 @@ mixnet-client = { path = "../mixnet/client" }
 mixnet-topology = { path = "../mixnet/topology" }
 # Using older versions, since `mixnet-*` crates depend on `rand` v0.7.3.
 rand = "0.7.3"
-rand_xoshiro = "0.6"
 once_cell = "1"
 secp256k1 = { version = "0.26", features = ["rand"] }
 waku-bindings = { version = "0.1.1", optional = true }
@@ -36,6 +35,7 @@ async-trait = "0.1"
 fraction = "0.13"
 ntest = "0.9.0"
 criterion = { version = "0.5", features = ["async_tokio"] }
+nomos-cli = { path = "../nomos-cli" }
 
 [[test]]
 name = "test_consensus_happy_path"
@@ -48,6 +48,12 @@ path = "src/tests/unhappy.rs"
 [[test]]
 name = "test_mixnet"
 path = "src/tests/mixnet.rs"
+
+[[test]]
+name = "test_cli"
+path = "src/tests/cli.rs"
+# disseminate is only implemented for libp2p
+required-features = ["libp2p"]
 
 [[bench]]
 name = "mixnet"
