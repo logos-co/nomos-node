@@ -67,7 +67,6 @@ impl MixnetNode {
         });
 
         //TODO: Accepting ad-hoc TCP conns for now. Improve conn handling.
-        //TODO: Add graceful shutdown
         let listener = TcpListener::bind(self.config.listen_address)
             .await
             .map_err(ProtocolError::IO)?;
@@ -78,10 +77,10 @@ impl MixnetNode {
 
         let (tx, rx) = mpsc::unbounded_channel();
 
-        let message_handler = PacketForwarder::new(tx.clone(), rx, self.config);
+        let packet_forwarder = PacketForwarder::new(tx.clone(), rx, self.config);
 
         tokio::spawn(async move {
-            message_handler.run().await;
+            packet_forwarder.run().await;
         });
 
         let runner = MixnetNodeRunner {
@@ -234,12 +233,12 @@ impl PacketForwarder {
                     if let Some(msg) = msg {
                         self.handle_msg(msg).await;
                     } else {
-                        // Channel closed, we should shutdown the message handler thread
+                        // Channel closed, we should shutdown the packet forwarder thread
                         return;
                     }
                 },
                 _ = tokio::signal::ctrl_c() => {
-                    tracing::info!("Shutting down message handler thread...");
+                    tracing::info!("Shutting down packet forwarder thread...");
                     return;
                 }
             }
@@ -264,55 +263,40 @@ impl PacketForwarder {
     }
 
     async fn handle_msg(&mut self, msg: Message) {
-        self.send(msg.target, msg.body, msg.retry_count).await
+        self.send(msg).await
     }
 
-    async fn send(&mut self, target: SocketAddr, body: Body, retry_count: usize) {
-        let config = self.config;
-        if let Err(err) = self.try_send(target, &body).await {
-            let retry_delay = config.retry_delay;
-            let max_retries = config.max_retries;
+    async fn send(&mut self, msg: Message) {
+        if let Err(err) = self.try_send(msg.target, &msg.body).await {
             match err {
                 MixnetNodeError::Protocol(ProtocolError::IO(e))
                     if e.kind() == std::io::ErrorKind::Unsupported =>
                 {
-                    tracing::error!("fail to send message to {target}: {e}");
+                    tracing::error!("fail to send message to {}: {e}", msg.target);
                 }
-                _ => Self::handle_retry(
-                    self.message_tx.clone(),
-                    target,
-                    body,
-                    retry_count,
-                    retry_delay,
-                    max_retries,
-                ),
+                _ => self.handle_retry(msg),
             }
         }
     }
 
-    fn handle_retry(
-        tx: mpsc::UnboundedSender<Message>,
-        target: SocketAddr,
-        body: Body,
-        retry_count: usize,
-        retry_delay: Duration,
-        max_retries: usize,
-    ) {
-        if retry_count < max_retries {
-            let delay =
-                Duration::from_millis((retry_delay.as_millis() as u64).pow(retry_count as u32));
+    fn handle_retry(&self, mut msg: Message) {
+        if msg.retry_count < self.config.max_retries {
+            let delay = Duration::from_millis(
+                (self.config.retry_delay.as_millis() as u64).pow(msg.retry_count as u32),
+            );
+            let tx = self.message_tx.clone();
             tokio::spawn(async move {
                 tokio::time::sleep(delay).await;
-                if let Err(e) = tx.send(Message {
-                    target,
-                    body,
-                    retry_count: retry_count + 1,
-                }) {
+                msg.retry_count += 1;
+                if let Err(e) = tx.send(msg) {
                     tracing::error!("fail to enqueue retry message: {e}");
                 }
             });
         } else {
-            tracing::error!("fail to send message to {target}: reach maximum retries");
+            tracing::error!(
+                "fail to send message to {}: reach maximum retries",
+                msg.target
+            );
         }
     }
 }
