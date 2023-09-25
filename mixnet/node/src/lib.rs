@@ -78,7 +78,7 @@ impl MixnetNode {
 
         let (tx, rx) = mpsc::unbounded_channel();
 
-        let message_handler = MessageHandler::new(tx.clone(), rx, self.config);
+        let message_handler = PacketForwarder::new(tx.clone(), rx, self.config);
 
         tokio::spawn(async move {
             message_handler.run().await;
@@ -206,16 +206,14 @@ impl MixnetNodeRunner {
     }
 }
 
-struct MessageHandler {
-    // TODO: remove this allow when we implement the retry logic
-    #[allow(dead_code)]
+struct PacketForwarder { 
     config: MixnetNodeConfig,
     message_rx: mpsc::UnboundedReceiver<TargetedMessage>,
     message_tx: mpsc::UnboundedSender<TargetedMessage>,
     connections: HashMap<SocketAddr, TcpStream>,
 }
 
-impl MessageHandler {
+impl PacketForwarder {
     pub fn new(
         message_tx: mpsc::UnboundedSender<TargetedMessage>,
         message_rx: mpsc::UnboundedReceiver<TargetedMessage>,
@@ -261,12 +259,20 @@ impl MessageHandler {
     /// return Ok(None) if the message is sent successfully
     /// return Err(e) if the message is not sent and the error is not retryable
     async fn send(&mut self, mut msg: TargetedMessage) -> Result<Option<TargetedMessage>> {
+        use std::io::ErrorKind;
+
         if msg.retry_count >= self.config.max_retries {
             return Err(MixnetNodeError::Protocol(ProtocolError::ReachMaxRetries(
                 self.config.max_retries,
             )));
         }
-        use std::io::ErrorKind;
+
+        if msg.retry_count > 0 {
+            let wait = Duration::from_millis(
+                (self.config.retry_delay.as_millis() as u64).pow(msg.retry_count as u32),
+            );
+            tokio::time::sleep(wait).await;
+        }
 
         if let std::collections::hash_map::Entry::Vacant(e) = self.connections.entry(msg.target) {
             match TcpStream::connect(msg.target).await {
@@ -275,19 +281,12 @@ impl MessageHandler {
                 }
                 Err(e) => {
                     tracing::error!("failed to connect to {}: {e}", msg.target);
-                    return Ok(Some(msg));
+                    return Err(MixnetNodeError::Protocol(ProtocolError::IO(e)));
                 }
             }
         }
 
         let tcp = self.connections.get_mut(&msg.target).unwrap();
-
-        if msg.retry_count > 0 {
-            let wait = Duration::from_millis(
-                (self.config.retry_delay.as_millis() as u64).pow(msg.retry_count as u32),
-            );
-            tokio::time::sleep(wait).await;
-        }
 
         match msg.body.write(tcp).await {
             Ok(_) => Ok(None),
