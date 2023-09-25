@@ -10,3 +10,4 @@ rand = "0.7.3"
 serde = { version = "1.0", features = ["derive"] }
 sphinx-packet = "0.1.0"
 nym-sphinx = { package = "nym-sphinx", git = "https://github.com/nymtech/nym", tag = "v1.1.22" }
+thiserror = "1"
