@@ -27,7 +27,7 @@ pub enum MixnetNodeError {
     #[error("invalid routing address: {0}")]
     InvalidRoutingAddress(#[from] NymNodeRoutingAddressError),
     #[error("send error: {0}")]
-    MessageSendError(#[from] tokio::sync::mpsc::error::SendError<Message>),
+    PacketSendError(#[from] tokio::sync::mpsc::error::SendError<Packet>),
     #[error("send error: fail to send {0} to client")]
     ClientSendError(#[from] tokio::sync::mpsc::error::TrySendError<Body>),
     #[error("client: {0}")]
@@ -119,7 +119,7 @@ impl MixnetNode {
 struct MixnetNodeRunner {
     config: MixnetNodeConfig,
     client_tx: mpsc::Sender<Body>,
-    message_tx: mpsc::UnboundedSender<Message>,
+    message_tx: mpsc::UnboundedSender<Packet>,
 }
 
 impl MixnetNodeRunner {
@@ -135,8 +135,8 @@ impl MixnetNodeRunner {
         }
     }
 
-    async fn handle_body(&self, msg: Body) -> Result<()> {
-        match msg {
+    async fn handle_body(&self, pkt: Body) -> Result<()> {
+        match pkt {
             Body::SphinxPacket(packet) => self.handle_sphinx_packet(packet).await,
             Body::FinalPayload(payload) => {
                 self.forward_body_to_client_notifier(Body::FinalPayload(payload))
@@ -197,25 +197,25 @@ impl MixnetNodeRunner {
         .await
     }
 
-    async fn forward(&self, msg: Body, to: NymNodeRoutingAddress) -> Result<()> {
+    async fn forward(&self, pkt: Body, to: NymNodeRoutingAddress) -> Result<()> {
         let addr = SocketAddr::from(to);
 
-        self.message_tx.send(Message::new(addr, msg))?;
+        self.message_tx.send(Packet::new(addr, pkt))?;
         Ok(())
     }
 }
 
 struct PacketForwarder {
     config: MixnetNodeConfig,
-    message_rx: mpsc::UnboundedReceiver<Message>,
-    message_tx: mpsc::UnboundedSender<Message>,
+    message_rx: mpsc::UnboundedReceiver<Packet>,
+    message_tx: mpsc::UnboundedSender<Packet>,
     connections: HashMap<SocketAddr, TcpStream>,
 }
 
 impl PacketForwarder {
     pub fn new(
-        message_tx: mpsc::UnboundedSender<Message>,
-        message_rx: mpsc::UnboundedReceiver<Message>,
+        message_tx: mpsc::UnboundedSender<Packet>,
+        message_rx: mpsc::UnboundedReceiver<Packet>,
         config: MixnetNodeConfig,
     ) -> Self {
         Self {
@@ -229,11 +229,12 @@ impl PacketForwarder {
     pub async fn run(mut self) {
         loop {
             tokio::select! {
-                msg = self.message_rx.recv() => {
-                    if let Some(msg) = msg {
-                        self.handle_msg(msg).await;
+                pkt = self.message_rx.recv() => {
+                    if let Some(pkt) = pkt {
+                        self.send(pkt).await;
                     } else {
                         // Channel closed, we should shutdown the packet forwarder thread
+                        tracing::info!("Channel closed, shutting down packet forwarder thread...");
                         return;
                     }
                 },
@@ -262,52 +263,48 @@ impl PacketForwarder {
             .map_err(From::from)
     }
 
-    async fn handle_msg(&mut self, msg: Message) {
-        self.send(msg).await
-    }
-
-    async fn send(&mut self, msg: Message) {
-        if let Err(err) = self.try_send(msg.target, &msg.body).await {
+    async fn send(&mut self, pkt: Packet) {
+        if let Err(err) = self.try_send(pkt.target, &pkt.body).await {
             match err {
                 MixnetNodeError::Protocol(ProtocolError::IO(e))
                     if e.kind() == std::io::ErrorKind::Unsupported =>
                 {
-                    tracing::error!("fail to send message to {}: {e}", msg.target);
+                    tracing::error!("fail to send message to {}: {e}", pkt.target);
                 }
-                _ => self.handle_retry(msg),
+                _ => self.handle_retry(pkt),
             }
         }
     }
 
-    fn handle_retry(&self, mut msg: Message) {
-        if msg.retry_count < self.config.max_retries {
+    fn handle_retry(&self, mut pkt: Packet) {
+        if pkt.retry_count < self.config.max_retries {
             let delay = Duration::from_millis(
-                (self.config.retry_delay.as_millis() as u64).pow(msg.retry_count as u32),
+                (self.config.retry_delay.as_millis() as u64).pow(pkt.retry_count as u32),
             );
             let tx = self.message_tx.clone();
             tokio::spawn(async move {
                 tokio::time::sleep(delay).await;
-                msg.retry_count += 1;
-                if let Err(e) = tx.send(msg) {
+                pkt.retry_count += 1;
+                if let Err(e) = tx.send(pkt) {
                     tracing::error!("fail to enqueue retry message: {e}");
                 }
             });
         } else {
             tracing::error!(
                 "fail to send message to {}: reach maximum retries",
-                msg.target
+                pkt.target
             );
         }
     }
 }
 
-pub struct Message {
+pub struct Packet {
     target: SocketAddr,
     body: Body,
     retry_count: usize,
 }
 
-impl Message {
+impl Packet {
     fn new(target: SocketAddr, body: Body) -> Self {
         Self {
             target,
