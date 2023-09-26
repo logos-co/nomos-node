@@ -54,6 +54,8 @@ impl Drop for NomosNode {
 
 impl NomosNode {
     pub async fn spawn(mut config: Config) -> Self {
+        println!("SPAWNING NODE {}", config.consensus.private_key[0]);
+
         // Waku stores the messages in a db file in the current dir, we need a different
         // directory for each node to avoid conflicts
         let dir = tempfile::tempdir().unwrap();
@@ -149,8 +151,8 @@ impl Node for NomosNode {
                 mixnet_topology,
             } => {
                 let mut ids = vec![[0; 32]; n_participants];
-                for id in &mut ids {
-                    thread_rng().fill(id);
+                for (i, id) in ids.iter_mut().enumerate() {
+                    id[0] = i as u8;
                 }
 
                 let mut configs = ids
@@ -215,7 +217,11 @@ fn create_node_config(
     mixnet_node_config: Option<MixnetNodeConfig>,
     mixnet_topology: MixnetTopology,
 ) -> Config {
-    tracing::info!("threshold: {threshold:?}");
+    println!(
+        "id:{}, mix:{}, threshold: {threshold:?}",
+        private_key[0],
+        mixnet_node_config.is_some()
+    );
 
     let mixnet_client_mode = match mixnet_node_config {
         Some(node_config) => MixnetClientMode::SenderReceiver(node_config.client_listen_address),

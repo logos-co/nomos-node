@@ -8,6 +8,7 @@ use mixnet_node::{MixnetNodeConfig, PRIVATE_KEY_SIZE};
 use mixnet_topology::{Layer, MixnetTopology, Node};
 use rand::{thread_rng, RngCore};
 use tempfile::NamedTempFile;
+use tracing::Level;
 
 use crate::get_available_port;
 
@@ -25,10 +26,11 @@ impl Drop for MixNode {
 
 impl MixNode {
     pub async fn spawn(config: MixnetNodeConfig) -> Self {
-        let config = mixnode::Config {
+        let mut config = mixnode::Config {
             mixnode: config,
             log: Default::default(),
         };
+        config.log.level = Level::INFO;
 
         let mut file = NamedTempFile::new().unwrap();
         let config_path = file.path().to_owned();
@@ -36,7 +38,7 @@ impl MixNode {
 
         let child = Command::new(std::env::current_dir().unwrap().join(MIXNODE_BIN))
             .arg(&config_path)
-            .stdout(Stdio::null())
+            // .stdout(Stdio::null())
             .spawn()
             .unwrap();
 
