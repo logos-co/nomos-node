@@ -426,7 +426,7 @@ where
         task_manager: &mut TaskManager<View, Event<P::Tx, B>>,
         adapter: A,
     ) -> (Carnot<O>, Option<Output<P::Tx, B>>) {
-        tracing::info!("received proposal {:?}", block);
+        tracing::debug!("received proposal {:?}", block);
         if carnot.highest_voted_view() >= block.header().view {
             tracing::error!("already voted for view {}", block.header().view);
             return (carnot, None);

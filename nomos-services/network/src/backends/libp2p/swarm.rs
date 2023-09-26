@@ -104,7 +104,7 @@ impl SwarmHandler {
                 endpoint,
                 ..
             } => {
-                tracing::debug!("connected to peer:{peer_id}, connection_id:{connection_id:?}");
+                tracing::info!("connected to peer:{peer_id}, connection_id:{connection_id:?}");
                 if endpoint.is_dialer() {
                     self.complete_connect(connection_id);
                 }
@@ -140,7 +140,7 @@ impl SwarmHandler {
                 self.connect(dial);
             }
             Command::Broadcast { topic, message } => {
-                tracing::debug!("sending message to mixnet client");
+                tracing::info!("sending message to mixnet client");
                 let msg = MixnetMessage { topic, message };
                 let delay = random_delay(&self.mixnet_delay);
                 log_error!(self.mixnet_client.send(msg.as_bytes(), delay));
@@ -183,7 +183,7 @@ impl SwarmHandler {
     }
 
     fn connect(&mut self, dial: Dial) {
-        tracing::debug!("Connecting to {}", dial.addr);
+        tracing::info!("Connecting to {}", dial.addr);
 
         match self.swarm.connect(dial.addr.clone()) {
             Ok(connection_id) => {
@@ -208,12 +208,12 @@ impl SwarmHandler {
         if let Some(mut dial) = self.pending_dials.remove(&connection_id) {
             dial.retry_count += 1;
             if dial.retry_count > MAX_RETRY {
-                tracing::debug!("Max retry({MAX_RETRY}) has been reached: {dial:?}");
+                tracing::error!("Max retry({MAX_RETRY}) has been reached: {dial:?}");
                 return;
             }
 
             let wait = Self::exp_backoff(dial.retry_count);
-            tracing::debug!("Retry dialing in {wait:?}: {dial:?}");
+            tracing::warn!("Retry dialing in {wait:?}: {dial:?}");
 
             let commands_tx = self.commands_tx.clone();
             tokio::spawn(async move {
@@ -224,11 +224,11 @@ impl SwarmHandler {
     }
 
     async fn broadcast_and_retry(&mut self, topic: Topic, message: Box<[u8]>, retry_count: usize) {
-        tracing::debug!("broadcasting message to topic: {topic}");
+        tracing::info!("broadcasting message to topic: {topic}");
 
         match self.swarm.broadcast(&topic, message.to_vec()) {
             Ok(id) => {
-                tracing::debug!("broadcasted message with id: {id} tp topic: {topic}");
+                tracing::info!("broadcasted message with id: {id} tp topic: {topic}");
                 // self-notification because libp2p doesn't do it
                 if self.swarm.is_subscribed(&topic) {
                     log_error!(self.events_tx.send(Event::Message(Message {
