@@ -354,7 +354,7 @@ where
                 output = Some(Output::Send::<P::Tx, B>(out));
             }
             Event::LocalTimeout { view } => {
-                tracing::debug!("local timeout");
+                tracing::warn!("local timeout");
                 let (new_carnot, out) = carnot.local_timeout();
                 carnot = new_carnot;
                 output = out.map(Output::Send);
