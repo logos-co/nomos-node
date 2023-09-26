@@ -1,4 +1,5 @@
 mod libp2p;
+use libp2p::*;
 
 // std
 // crates
@@ -9,23 +10,19 @@ use tokio::sync::mpsc::Sender;
 use tokio::sync::oneshot;
 use tracing::error;
 // internal
+use nomos_core::tx::Transaction;
 use nomos_http::backends::axum::AxumBackend;
 use nomos_http::bridge::{build_http_bridge, HttpBridgeRunner};
 use nomos_http::http::{HttpMethod, HttpRequest, HttpResponse};
 use nomos_mempool::backend::mockpool::MockPool;
-
-use nomos_mempool::{MempoolMetrics, MempoolMsg, MempoolService};
-
 use nomos_mempool::network::adapters::libp2p::Libp2pAdapter;
-
+use nomos_mempool::network::NetworkAdapter;
+use nomos_mempool::{MempoolMetrics, MempoolMsg, MempoolService};
 use nomos_network::backends::libp2p::Libp2p;
+use nomos_network::backends::NetworkBackend;
 use nomos_network::NetworkService;
 use nomos_node::{Carnot, Tx};
 use overwatch_rs::services::relay::OutboundRelay;
-
-use libp2p::*;
-use nomos_mempool::network::NetworkAdapter;
-use nomos_network::backends::NetworkBackend;
 
 macro_rules! get_handler {
     ($handle:expr, $service:ty, $path:expr => $handler:tt) => {{
@@ -54,7 +51,7 @@ pub fn mempool_metrics_bridge(
     handle: overwatch_rs::overwatch::handle::OverwatchHandle,
 ) -> HttpBridgeRunner {
     Box::new(Box::pin(async move {
-        get_handler!(handle, MempoolService<Libp2pAdapter<Tx>, MockPool<Tx>>, "metrics" => handle_mempool_metrics_req)
+        get_handler!(handle, MempoolService<Libp2pAdapter<Tx, <Tx as Transaction>::Hash>, MockPool<Tx, <Tx as Transaction>::Hash>>, "metrics" => handle_mempool_metrics_req)
     }))
 }
 
@@ -66,19 +63,24 @@ pub fn network_info_bridge(
     }))
 }
 
-pub fn mempool_add_tx_bridge<
-    N: NetworkBackend,
-    A: NetworkAdapter<Backend = N, Tx = Tx> + Send + Sync + 'static,
->(
+pub fn mempool_add_tx_bridge<N, A>(
     handle: overwatch_rs::overwatch::handle::OverwatchHandle,
-) -> HttpBridgeRunner {
+) -> HttpBridgeRunner
+where
+    N: NetworkBackend,
+    A: NetworkAdapter<Backend = N, Item = Tx, Key = <Tx as Transaction>::Hash>
+        + Send
+        + Sync
+        + 'static,
+    A::Settings: Send + Sync,
+{
     Box::new(Box::pin(async move {
         let (mempool_channel, mut http_request_channel) =
-            build_http_bridge::<MempoolService<A, MockPool<Tx>>, AxumBackend, _>(
-                handle.clone(),
-                HttpMethod::POST,
-                "addtx",
-            )
+            build_http_bridge::<
+                MempoolService<A, MockPool<Tx, <Tx as Transaction>::Hash>>,
+                AxumBackend,
+                _,
+            >(handle.clone(), HttpMethod::POST, "addtx")
             .await
             .unwrap();
 
@@ -114,7 +116,7 @@ async fn handle_carnot_info_req(
 }
 
 async fn handle_mempool_metrics_req(
-    mempool_channel: &OutboundRelay<MempoolMsg<Tx>>,
+    mempool_channel: &OutboundRelay<MempoolMsg<Tx, <Tx as Transaction>::Hash>>,
     res_tx: Sender<HttpResponse>,
 ) -> Result<(), overwatch_rs::DynError> {
     let (sender, receiver) = oneshot::channel();
@@ -129,8 +131,8 @@ async fn handle_mempool_metrics_req(
     res_tx
         // TODO: use serde to serialize metrics
         .send(Ok(format!(
-            "{{\"pending_tx\": {}, \"last_tx\": {}}}",
-            metrics.pending_txs, metrics.last_tx_timestamp
+            "{{\"pending_items\": {}, \"last_item\": {}}}",
+            metrics.pending_items, metrics.last_item_timestamp
         )
         .into()))
         .await?;
@@ -140,7 +142,7 @@ async fn handle_mempool_metrics_req(
 
 pub(super) async fn handle_mempool_add_tx_req(
     handle: &overwatch_rs::overwatch::handle::OverwatchHandle,
-    mempool_channel: &OutboundRelay<MempoolMsg<Tx>>,
+    mempool_channel: &OutboundRelay<MempoolMsg<Tx, <Tx as Transaction>::Hash>>,
     res_tx: Sender<HttpResponse>,
     payload: Option<Bytes>,
 ) -> Result<(), overwatch_rs::DynError> {
@@ -151,8 +153,9 @@ pub(super) async fn handle_mempool_add_tx_req(
         let tx = Tx(data);
         let (sender, receiver) = oneshot::channel();
         mempool_channel
-            .send(MempoolMsg::AddTx {
-                tx: tx.clone(),
+            .send(MempoolMsg::Add {
+                item: tx.clone(),
+                key: tx.hash(),
                 reply_channel: sender,
             })
             .await
