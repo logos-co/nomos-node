@@ -140,19 +140,10 @@ impl SwarmHandler {
                 self.connect(dial);
             }
             Command::Broadcast { topic, message } => {
-                // tracing::debug!("sending message to mixnet client");
-                // let msg = MixnetMessage { topic, message };
-                // let delay = random_delay(&self.mixnet_delay);
-                // log_error!(self.mixnet_client.send(msg.as_bytes(), delay));
-
-                self.commands_tx
-                    .send(Command::DirectBroadcastAndRetry {
-                        topic,
-                        message,
-                        retry_count: 0,
-                    })
-                    .await
-                    .unwrap_or_else(|_| tracing::error!("could not schedule broadcast"));
+                tracing::debug!("sending message to mixnet client");
+                let msg = MixnetMessage { topic, message };
+                let delay = random_delay(&self.mixnet_delay);
+                log_error!(self.mixnet_client.send(msg.as_bytes(), delay));
             }
             Command::Subscribe(topic) => {
                 tracing::debug!("subscribing to topic: {topic}");
