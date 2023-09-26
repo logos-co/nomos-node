@@ -142,7 +142,7 @@ where
 
         let adapter = N::new(
             service_state.settings_reader.get_updated_settings().network,
-            network_relay,
+            network_relay.clone(),
         );
         let adapter = adapter.await;
 
@@ -153,8 +153,16 @@ where
                 Some(msg) = service_state.inbound_relay.recv() => {
                     match msg {
                         MempoolMsg::Add { item, key, reply_channel } => {
-                            match pool.add_item(key, item) {
+                            match pool.add_item(key, item.clone()) {
                                 Ok(_id) => {
+                                    // Broadcast the transaction to the network
+                                    let net = network_relay.clone();
+                                    let settings = service_state.settings_reader.get_updated_settings().network;
+                                    // move sending to a new task so local operations can complete in the meantime
+                                    tokio::spawn(async move {
+                                        let adapter = N::new(settings, net).await;
+                                        adapter.send(item).await;
+                                    });
                                     if let Err(e) = reply_channel.send(Ok(())) {
                                         tracing::debug!("Failed to send reply to AddTx: {:?}", e);
                                     }

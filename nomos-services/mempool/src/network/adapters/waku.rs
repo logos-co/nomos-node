@@ -12,7 +12,7 @@ use nomos_network::{NetworkMsg, NetworkService};
 use overwatch_rs::services::relay::OutboundRelay;
 use overwatch_rs::services::ServiceData;
 use serde::Serialize;
-use waku_bindings::{Encoding, WakuContentTopic, WakuPubSubTopic};
+use waku_bindings::{Encoding, WakuContentTopic, WakuMessage, WakuPubSubTopic};
 
 pub const WAKU_CARNOT_PUB_SUB_TOPIC: WakuPubSubTopic =
     WakuPubSubTopic::new("CarnotSim", Encoding::Proto);
@@ -89,5 +89,32 @@ where
                 }
             },
         )))
+    }
+
+    async fn send(&self, item: Self::Item) {
+        if let Ok(wire) = wire::serialize(&item) {
+            if let Err((e, _)) = self
+                .network_relay
+                .send(NetworkMsg::Process(WakuBackendMessage::Broadcast {
+                    topic: Some(WAKU_CARNOT_PUB_SUB_TOPIC.clone()),
+                    message: WakuMessage::new(
+                        wire,
+                        WAKU_CARNOT_TX_CONTENT_TOPIC.clone(),
+                        1,
+                        chrono::Utc::now()
+                            .timestamp_nanos_opt()
+                            .expect("timestamp should be in valid range")
+                            as usize,
+                        [],
+                        false,
+                    ),
+                }))
+                .await
+            {
+                tracing::error!("failed to send item to topic: {e}");
+            }
+        } else {
+            tracing::error!("Failed to serialize item");
+        }
     }
 }
