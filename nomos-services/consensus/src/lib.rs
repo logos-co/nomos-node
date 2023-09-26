@@ -42,6 +42,7 @@ use nomos_core::tx::{Transaction, TxSelect};
 use nomos_core::vote::Tally;
 use nomos_mempool::{
     backend::MemPool, network::NetworkAdapter as MempoolAdapter, MempoolMsg, MempoolService,
+    Transaction as TxDiscriminant,
 };
 use nomos_network::NetworkService;
 use overwatch_rs::services::relay::{OutboundRelay, Relay, RelayMessage};
@@ -119,7 +120,7 @@ where
     // underlying networking backend. We need this so we can relay and check the types properly
     // when implementing ServiceCore for CarnotConsensus
     network_relay: Relay<NetworkService<A::Backend>>,
-    mempool_relay: Relay<MempoolService<M, P>>,
+    mempool_relay: Relay<MempoolService<M, P, TxDiscriminant>>,
     _overlay: std::marker::PhantomData<O>,
     // this need to be substituted by some kind DA bo
     _blob_certificate: std::marker::PhantomData<C>,

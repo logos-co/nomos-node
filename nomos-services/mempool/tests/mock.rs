@@ -13,7 +13,7 @@ use overwatch_rs::{overwatch::OverwatchRunner, services::handle::ServiceHandle};
 use nomos_mempool::{
     backend::mockpool::MockPool,
     network::adapters::mock::{MockAdapter, MOCK_TX_CONTENT_TOPIC},
-    MempoolMsg, MempoolService, Settings,
+    MempoolMsg, MempoolService, Settings, Transaction,
 };
 
 #[derive(Services)]
@@ -21,7 +21,7 @@ struct MockPoolNode {
     logging: ServiceHandle<Logger>,
     network: ServiceHandle<NetworkService<Mock>>,
     mockpool: ServiceHandle<
-        MempoolService<MockAdapter, MockPool<MockTransaction<MockMessage>, MockTxId>>,
+        MempoolService<MockAdapter, MockPool<MockTransaction<MockMessage>, MockTxId>, Transaction>,
     >,
 }
 
@@ -73,9 +73,11 @@ fn test_mockmempool() {
     .unwrap();
 
     let network = app.handle().relay::<NetworkService<Mock>>();
-    let mempool = app
-        .handle()
-        .relay::<MempoolService<MockAdapter, MockPool<MockTransaction<MockMessage>, MockTxId>>>();
+    let mempool = app.handle().relay::<MempoolService<
+        MockAdapter,
+        MockPool<MockTransaction<MockMessage>, MockTxId>,
+        Transaction,
+    >>();
 
     app.spawn(async move {
         let network_outbound = network.connect().await.unwrap();
