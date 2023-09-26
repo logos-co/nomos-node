@@ -50,7 +50,8 @@ async fn ten_nodes_one_down() {
         .iter()
         .map(|i| i.safe_blocks.values().find(|b| b.view == TARGET_VIEW))
         .collect::<HashSet<_>>();
-    // Every nodes must have the target block or no node must have it.
+    // Every nodes must have the same target block (Some(block))
+    // , or no node must have it (None).
     assert_eq!(target_blocks.len(), 1);
 
     // If no node has the target block, check that TARGET_VIEW was reached by timeout_qc.
