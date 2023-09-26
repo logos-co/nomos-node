@@ -86,7 +86,7 @@ impl MixnetNode {
         let runner = MixnetNodeRunner {
             config: self.config,
             client_tx,
-            message_tx: tx,
+            packet_tx: tx,
         };
 
         loop {
@@ -119,7 +119,7 @@ impl MixnetNode {
 struct MixnetNodeRunner {
     config: MixnetNodeConfig,
     client_tx: mpsc::Sender<Body>,
-    message_tx: mpsc::UnboundedSender<Packet>,
+    packet_tx: mpsc::UnboundedSender<Packet>,
 }
 
 impl MixnetNodeRunner {
@@ -200,27 +200,27 @@ impl MixnetNodeRunner {
     async fn forward(&self, pkt: Body, to: NymNodeRoutingAddress) -> Result<()> {
         let addr = SocketAddr::from(to);
 
-        self.message_tx.send(Packet::new(addr, pkt))?;
+        self.packet_tx.send(Packet::new(addr, pkt))?;
         Ok(())
     }
 }
 
 struct PacketForwarder {
     config: MixnetNodeConfig,
-    message_rx: mpsc::UnboundedReceiver<Packet>,
-    message_tx: mpsc::UnboundedSender<Packet>,
+    packet_rx: mpsc::UnboundedReceiver<Packet>,
+    packet_tx: mpsc::UnboundedSender<Packet>,
     connections: HashMap<SocketAddr, TcpStream>,
 }
 
 impl PacketForwarder {
     pub fn new(
-        message_tx: mpsc::UnboundedSender<Packet>,
-        message_rx: mpsc::UnboundedReceiver<Packet>,
+        packet_tx: mpsc::UnboundedSender<Packet>,
+        packet_rx: mpsc::UnboundedReceiver<Packet>,
         config: MixnetNodeConfig,
     ) -> Self {
         Self {
-            message_tx,
-            message_rx,
+            packet_tx,
+            packet_rx,
             connections: HashMap::with_capacity(config.connection_pool_size),
             config,
         }
@@ -229,17 +229,15 @@ impl PacketForwarder {
     pub async fn run(mut self) {
         loop {
             tokio::select! {
-                pkt = self.message_rx.recv() => {
+                pkt = self.packet_rx.recv() => {
                     if let Some(pkt) = pkt {
                         self.send(pkt).await;
                     } else {
-                        // Channel closed, we should shutdown the packet forwarder thread
-                        tracing::info!("Channel closed, shutting down packet forwarder thread...");
-                        return;
+                        unreachable!("Packet channel should not be closed, because PacketForwarder is also holding the send half");
                     }
                 },
                 _ = tokio::signal::ctrl_c() => {
-                    tracing::info!("Shutting down packet forwarder thread...");
+                    tracing::info!("Shutting down packet forwarder task...");
                     return;
                 }
             }
@@ -258,9 +256,9 @@ impl PacketForwarder {
                 }
             }
         }
-        body.write(self.connections.get_mut(&target).unwrap())
-            .await
-            .map_err(From::from)
+        Ok(body
+            .write(self.connections.get_mut(&target).unwrap())
+            .await?)
     }
 
     async fn send(&mut self, pkt: Packet) {
@@ -281,7 +279,7 @@ impl PacketForwarder {
             let delay = Duration::from_millis(
                 (self.config.retry_delay.as_millis() as u64).pow(pkt.retry_count as u32),
             );
-            let tx = self.message_tx.clone();
+            let tx = self.packet_tx.clone();
             tokio::spawn(async move {
                 tokio::time::sleep(delay).await;
                 pkt.retry_count += 1;
