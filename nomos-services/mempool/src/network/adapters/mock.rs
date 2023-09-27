@@ -93,4 +93,17 @@ impl NetworkAdapter for MockAdapter {
             },
         )))
     }
+
+    async fn send(&self, msg: Self::Item) {
+        if let Err((e, _)) = self
+            .network_relay
+            .send(NetworkMsg::Process(MockBackendMessage::Broadcast {
+                topic: MOCK_PUB_SUB_TOPIC.into(),
+                msg: msg.message().clone(),
+            }))
+            .await
+        {
+            tracing::error!("failed to send item to topic: {e}");
+        }
+    }
 }

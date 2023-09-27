@@ -89,9 +89,7 @@ where
             res_tx, payload, ..
         }) = http_request_channel.recv().await
         {
-            if let Err(e) =
-                handle_mempool_add_tx_req(&handle, &mempool_channel, res_tx, payload).await
-            {
+            if let Err(e) = handle_mempool_add_tx_req(&mempool_channel, res_tx, payload).await {
                 error!(e);
             }
         }
@@ -142,7 +140,6 @@ async fn handle_mempool_metrics_req(
 }
 
 pub(super) async fn handle_mempool_add_tx_req(
-    handle: &overwatch_rs::overwatch::handle::OverwatchHandle,
     mempool_channel: &OutboundRelay<MempoolMsg<Tx, <Tx as Transaction>::Hash>>,
     res_tx: Sender<HttpResponse>,
     payload: Option<Bytes>,
@@ -163,12 +160,7 @@ pub(super) async fn handle_mempool_add_tx_req(
             .map_err(|(e, _)| e)?;
 
         match receiver.await {
-            Ok(Ok(())) => {
-                // broadcast transaction to peers
-                let network_relay = handle.relay::<NetworkService<Libp2p>>().connect().await?;
-                libp2p_send_transaction(network_relay, tx).await?;
-                Ok(res_tx.send(Ok(b"".to_vec().into())).await?)
-            }
+            Ok(Ok(())) => Ok(res_tx.send(Ok(b"".to_vec().into())).await?),
             Ok(Err(())) => Ok(res_tx
                 .send(Err((
                     StatusCode::CONFLICT,

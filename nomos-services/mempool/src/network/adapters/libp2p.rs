@@ -11,8 +11,6 @@ use nomos_network::{NetworkMsg, NetworkService};
 use overwatch_rs::services::relay::OutboundRelay;
 use overwatch_rs::services::ServiceData;
 
-pub const CARNOT_TX_TOPIC: &str = "CarnotTx";
-
 pub struct Libp2pAdapter<Item, Key> {
     network_relay: OutboundRelay<<NetworkService<Libp2p> as ServiceData>::Message>,
     settings: Settings<Key, Item>,
@@ -35,7 +33,7 @@ where
     ) -> Self {
         network_relay
             .send(NetworkMsg::Process(Command::Subscribe(
-                CARNOT_TX_TOPIC.to_string(),
+                settings.topic.clone(),
             )))
             .await
             .expect("Network backend should be ready");
@@ -72,6 +70,23 @@ where
                 _ => None,
             },
         )))
+    }
+
+    async fn send(&self, item: Item) {
+        if let Ok(wire) = wire::serialize(&item) {
+            if let Err((e, _)) = self
+                .network_relay
+                .send(NetworkMsg::Process(Command::Broadcast {
+                    topic: self.settings.topic.clone(),
+                    message: wire.into(),
+                }))
+                .await
+            {
+                tracing::error!("failed to send item to topic: {e}");
+            }
+        } else {
+            tracing::error!("Failed to serialize item");
+        }
     }
 }
 
