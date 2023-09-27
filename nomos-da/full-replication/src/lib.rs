@@ -6,12 +6,14 @@ use nomos_core::da::{
 };
 // std
 use std::collections::HashSet;
+use std::hash::{Hash, Hasher};
 // crates
 use blake2::{
     digest::{Update, VariableOutput},
     Blake2bVar,
 };
 use bytes::Bytes;
+use nomos_core::wire;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone)]
@@ -99,15 +101,15 @@ fn hasher(blob: &Blob) -> [u8; 32] {
 }
 
 impl blob::Blob for Blob {
-    type Hash = [u8; 32];
     const HASHER: BlobHasher<Self> = hasher as BlobHasher<Self>;
+    type Hash = [u8; 32];
 
     fn as_bytes(&self) -> bytes::Bytes {
         self.data.clone()
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub struct Attestation {
     blob: [u8; 32],
     voter: [u8; 32],
@@ -119,16 +121,36 @@ impl attestation::Attestation for Attestation {
         self.blob
     }
     fn as_bytes(&self) -> Bytes {
-        Bytes::from([self.blob.as_ref(), self.voter.as_ref()].concat())
+        wire::serialize(self)
+            .expect("Attestation shouldn't fail to be serialized")
+            .into()
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub struct Certificate {
     attestations: Vec<Attestation>,
 }
 
-impl certificate::Certificate for Certificate {}
+impl Hash for Certificate {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        state.write(certificate::Certificate::as_bytes(self).as_ref());
+    }
+}
+
+impl certificate::Certificate for Certificate {
+    type Blob = Blob;
+
+    fn blob(&self) -> <Self::Blob as blob::Blob>::Hash {
+        self.attestations[0].blob
+    }
+
+    fn as_bytes(&self) -> Bytes {
+        wire::serialize(self)
+            .expect("Certificate shouldn't fail to be serialized")
+            .into()
+    }
+}
 
 // TODO: add generic impl when the trait for Certificate is expanded
 impl DaProtocol for FullReplication<AbsoluteNumber<Attestation, Certificate>> {

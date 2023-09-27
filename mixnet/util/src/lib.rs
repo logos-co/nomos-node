@@ -1,7 +1,6 @@
 use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 
-use tokio::net::TcpStream;
-use tokio::sync::Mutex;
+use tokio::{net::TcpStream, sync::Mutex};
 
 #[derive(Clone)]
 pub struct ConnectionPool {

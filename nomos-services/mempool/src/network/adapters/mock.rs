@@ -2,7 +2,7 @@
 
 // crates
 use futures::{Stream, StreamExt};
-use nomos_core::tx::mock::MockTransaction;
+use nomos_core::tx::mock::{MockTransaction, MockTxId};
 use nomos_network::backends::mock::{
     EventKind, Mock, MockBackendMessage, MockContentTopic, MockMessage, NetworkEvent,
 };
@@ -25,9 +25,12 @@ pub struct MockAdapter {
 #[async_trait::async_trait]
 impl NetworkAdapter for MockAdapter {
     type Backend = Mock;
-    type Tx = MockTransaction<MockMessage>;
+    type Settings = ();
+    type Item = MockTransaction<MockMessage>;
+    type Key = MockTxId;
 
     async fn new(
+        _settings: Self::Settings,
         network_relay: OutboundRelay<<NetworkService<Self::Backend> as ServiceData>::Message>,
     ) -> Self {
         // send message to boot the network producer
@@ -57,7 +60,9 @@ impl NetworkAdapter for MockAdapter {
         Self { network_relay }
     }
 
-    async fn transactions_stream(&self) -> Box<dyn Stream<Item = Self::Tx> + Unpin + Send> {
+    async fn transactions_stream(
+        &self,
+    ) -> Box<dyn Stream<Item = (Self::Key, Self::Item)> + Unpin + Send> {
         let (sender, receiver) = tokio::sync::oneshot::channel();
         if let Err((_, e)) = self
             .network_relay
@@ -77,7 +82,8 @@ impl NetworkAdapter for MockAdapter {
                     Ok(NetworkEvent::RawMessage(message)) => {
                         tracing::info!("Received message: {:?}", message.payload());
                         if message.content_topic().eq(&MOCK_TX_CONTENT_TOPIC) {
-                            Some(MockTransaction::new(message))
+                            let tx = MockTransaction::new(message);
+                            Some((tx.id(), tx))
                         } else {
                             None
                         }

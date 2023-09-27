@@ -22,22 +22,22 @@ use std::{path::PathBuf, time::Duration};
 pub struct Disseminate {
     // TODO: accept bytes
     #[clap(short, long)]
-    data: String,
+    pub data: String,
     /// Path to the network config file
     #[clap(short, long)]
-    network_config: PathBuf,
+    pub network_config: PathBuf,
     /// The data availability protocol to use. Defaults to full replication.
     #[clap(flatten)]
-    da_protocol: DaProtocolChoice,
+    pub da_protocol: DaProtocolChoice,
     /// Timeout in seconds. Defaults to 120 seconds.
     #[clap(short, long, default_value = "120")]
-    timeout: u64,
+    pub timeout: u64,
 }
 
 #[derive(Debug, Clone, Args)]
 pub struct FullReplicationSettings {
     #[clap(long, default_value = "1")]
-    num_attestations: usize,
+    pub num_attestations: usize,
 }
 
 impl Disseminate {
@@ -169,11 +169,23 @@ impl ServiceCore for DisseminateService {
                 let adapter = Libp2pAdapter::new(network_relay).await;
                 let da = FullReplication::new(AbsoluteNumber::new(da_settings.num_attestations));
 
-                if tokio::time::timeout(settings.timeout, disseminate(da, settings.bytes, adapter))
-                    .await
-                    .is_err()
+                match tokio::time::timeout(
+                    settings.timeout,
+                    disseminate(da, settings.bytes, adapter),
+                )
+                .await
                 {
-                    tracing::error!("Timeout reached, check the logs for additional details");
+                    Err(_) => {
+                        tracing::error!("Timeout reached, check the logs for additional details");
+                        std::process::exit(1);
+                    }
+                    Ok(Err(_)) => {
+                        tracing::error!(
+                            "Could not disseminate blob, check logs for additional details"
+                        );
+                        std::process::exit(1);
+                    }
+                    _ => {}
                 }
             }
         }
@@ -191,21 +203,21 @@ impl ServiceCore for DisseminateService {
 // We can enforce only sensible combinations of protocol/settings
 // are specified by using special clap directives
 #[derive(Clone, Debug, Args)]
-pub(super) struct DaProtocolChoice {
+pub struct DaProtocolChoice {
     #[clap(long, default_value = "full-replication")]
-    da_protocol: Protocol,
+    pub da_protocol: Protocol,
     #[clap(flatten)]
-    settings: ProtocolSettings,
+    pub settings: ProtocolSettings,
 }
 
 #[derive(Clone, Debug, Args)]
-struct ProtocolSettings {
+pub struct ProtocolSettings {
     #[clap(flatten)]
-    full_replication: FullReplicationSettings,
+    pub full_replication: FullReplicationSettings,
 }
 
 #[derive(Clone, Debug, ValueEnum)]
-pub(super) enum Protocol {
+pub enum Protocol {
     FullReplication,
 }
 
