@@ -155,7 +155,7 @@ where
                         MempoolMsg::Add { item, key, reply_channel } => {
                             match pool.add_item(key, item.clone()) {
                                 Ok(_id) => {
-                                    // Broadcast the transaction to the network
+                                    // Broadcast the item to the network
                                     let net = network_relay.clone();
                                     let settings = service_state.settings_reader.get_updated_settings().network;
                                     // move sending to a new task so local operations can complete in the meantime
