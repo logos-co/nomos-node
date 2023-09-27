@@ -11,9 +11,9 @@ use mixnet_node::MixnetNodeConfig;
 use mixnet_topology::MixnetTopology;
 use nomos_consensus::{CarnotInfo, CarnotSettings};
 use nomos_http::backends::axum::AxumBackendSettings;
-use nomos_libp2p::Multiaddr;
+use nomos_libp2p::multiaddr;
 use nomos_log::{LoggerBackend, LoggerFormat};
-use nomos_network::backends::libp2p::{Libp2pConfig, Libp2pInfo};
+use nomos_network::backends::libp2p::Libp2pConfig;
 #[cfg(feature = "waku")]
 use nomos_network::backends::waku::{WakuConfig, WakuInfo};
 use nomos_network::NetworkConfig;
@@ -28,7 +28,6 @@ use tempfile::NamedTempFile;
 static CLIENT: Lazy<Client> = Lazy::new(Client::new);
 const NOMOS_BIN: &str = "../target/debug/nomos-node";
 const CARNOT_INFO_API: &str = "carnot/info";
-const NETWORK_INFO_API: &str = "network/info";
 const LOGS_PREFIX: &str = "__logs";
 
 pub struct NomosNode {
@@ -101,16 +100,6 @@ impl NomosNode {
             tokio::time::sleep(Duration::from_millis(100)).await;
         }
     }
-    pub async fn get_listening_address(&self) -> Multiaddr {
-        self.get(NETWORK_INFO_API)
-            .await
-            .unwrap()
-            .json::<Libp2pInfo>()
-            .await
-            .unwrap()
-            .listen_addresses
-            .swap_remove(0)
-    }
 
     // not async so that we can use this in `Drop`
     pub fn get_logs_from_file(&self) -> String {
@@ -182,15 +171,17 @@ impl Node for NomosNode {
                 // all nodes that will be subsequently spawned.
                 // If not, the leader will miss votes from nodes spawned before itself.
                 // This issue will be resolved by devising the block catch-up mechanism in the future
-                let mut nodes = vec![Self::spawn(configs.swap_remove(next_leader_idx)).await];
-                let listening_addr = nodes[0].get_listening_address().await;
-                for mut conf in configs {
-                    conf.network
-                        .backend
-                        .initial_peers
-                        .push(listening_addr.clone());
+                configs.swap(0, next_leader_idx);
 
-                    nodes.push(Self::spawn(conf).await);
+                let mut nodes = Vec::new();
+                for (i, conf) in configs.clone().iter_mut().enumerate() {
+                    if i > 0 {
+                        let prev_node_port = configs[i - 1].network.backend.inner.port;
+                        let addr = multiaddr!(Ip4([127, 0, 0, 1]), Tcp(prev_node_port));
+                        conf.network.backend.initial_peers.push(addr);
+                    }
+
+                    nodes.push(Self::spawn(conf.clone()).await);
                 }
                 nodes
             }
