@@ -20,7 +20,7 @@ use nomos_http::bridge::HttpBridgeService;
 use nomos_http::http::HttpService;
 use nomos_log::Logger;
 use nomos_mempool::network::adapters::libp2p::Libp2pAdapter as MempoolLibp2pAdapter;
-
+use nomos_mempool::Transaction as TxDiscriminant;
 use nomos_mempool::{backend::mockpool::MockPool, MempoolService};
 use nomos_network::backends::libp2p::Libp2p;
 
@@ -56,6 +56,7 @@ type DataAvailability = DataAvailabilityService<
 type Mempool = MempoolService<
     MempoolLibp2pAdapter<Tx, <Tx as Transaction>::Hash>,
     MockPool<Tx, <Tx as Transaction>::Hash>,
+    TxDiscriminant,
 >;
 
 #[derive(Services)]

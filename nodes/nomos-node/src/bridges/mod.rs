@@ -17,6 +17,7 @@ use nomos_http::http::{HttpMethod, HttpRequest, HttpResponse};
 use nomos_mempool::backend::mockpool::MockPool;
 use nomos_mempool::network::adapters::libp2p::Libp2pAdapter;
 use nomos_mempool::network::NetworkAdapter;
+use nomos_mempool::Transaction as TxDiscriminant;
 use nomos_mempool::{MempoolMetrics, MempoolMsg, MempoolService};
 use nomos_network::backends::libp2p::Libp2p;
 use nomos_network::backends::NetworkBackend;
@@ -51,7 +52,7 @@ pub fn mempool_metrics_bridge(
     handle: overwatch_rs::overwatch::handle::OverwatchHandle,
 ) -> HttpBridgeRunner {
     Box::new(Box::pin(async move {
-        get_handler!(handle, MempoolService<Libp2pAdapter<Tx, <Tx as Transaction>::Hash>, MockPool<Tx, <Tx as Transaction>::Hash>>, "metrics" => handle_mempool_metrics_req)
+        get_handler!(handle, MempoolService<Libp2pAdapter<Tx, <Tx as Transaction>::Hash>, MockPool<Tx, <Tx as Transaction>::Hash>, TxDiscriminant>, "metrics" => handle_mempool_metrics_req)
     }))
 }
 
@@ -77,7 +78,7 @@ where
     Box::new(Box::pin(async move {
         let (mempool_channel, mut http_request_channel) =
             build_http_bridge::<
-                MempoolService<A, MockPool<Tx, <Tx as Transaction>::Hash>>,
+                MempoolService<A, MockPool<Tx, <Tx as Transaction>::Hash>, TxDiscriminant>,
                 AxumBackend,
                 _,
             >(handle.clone(), HttpMethod::POST, "addtx")
