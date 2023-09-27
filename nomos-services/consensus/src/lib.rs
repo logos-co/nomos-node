@@ -484,6 +484,7 @@ where
         carnot
     }
 
+    #[allow(clippy::type_complexity)]
     #[instrument(level = "debug", skip(adapter, task_manager, stream))]
     async fn process_block(
         mut carnot: Carnot<O>,
@@ -562,6 +563,7 @@ where
         (carnot, None)
     }
 
+    #[allow(clippy::type_complexity)]
     #[instrument(level = "debug", skip(task_manager, adapter))]
     async fn approve_new_view(
         carnot: Carnot<O>,
@@ -600,6 +602,7 @@ where
         (new_carnot, Some(Output::Send(out)))
     }
 
+    #[allow(clippy::type_complexity)]
     #[instrument(level = "debug", skip(task_manager, adapter))]
     async fn receive_timeout_qc(
         carnot: Carnot<O>,
@@ -627,6 +630,7 @@ where
         (new_state, None)
     }
 
+    #[allow(clippy::type_complexity)]
     #[instrument(level = "debug")]
     async fn process_root_timeout(
         carnot: Carnot<O>,
