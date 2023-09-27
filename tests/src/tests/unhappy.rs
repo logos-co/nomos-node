@@ -44,15 +44,31 @@ async fn ten_nodes_one_down() {
         .then(|n| async move { n.consensus_info().await })
         .collect::<Vec<_>>()
         .await;
+
     // check that they have the same block
-    let blocks = infos
+    let target_blocks = infos
         .iter()
-        .map(|i| {
-            i.safe_blocks
-                .values()
-                .find(|b| b.view == TARGET_VIEW)
-                .unwrap()
-        })
+        .map(|i| i.safe_blocks.values().find(|b| b.view == TARGET_VIEW))
         .collect::<HashSet<_>>();
-    assert_eq!(blocks.len(), 1);
+    // Every nodes must have the same target block (Some(block))
+    // , or no node must have it (None).
+    assert_eq!(target_blocks.len(), 1);
+
+    // If no node has the target block, check that TARGET_VIEW was reached by timeout_qc.
+    let target_block = target_blocks.iter().next().unwrap();
+    if target_block.is_none() {
+        println!("No node has the block with {TARGET_VIEW:?}. Checking timeout_qcs...");
+
+        let timeout_qcs = infos
+            .iter()
+            .map(|i| i.last_view_timeout_qc.clone())
+            .collect::<HashSet<_>>();
+        assert_eq!(timeout_qcs.len(), 1);
+
+        let timeout_qc = timeout_qcs.iter().next().unwrap().clone();
+        assert!(timeout_qc.is_some());
+        // NOTE: This check could be failed if other timeout_qc had occured before `infos` were gathered.
+        //       But it should be okay as long as the `timeout` is not too short.
+        assert_eq!(timeout_qc.unwrap().view(), TARGET_VIEW.prev());
+    }
 }

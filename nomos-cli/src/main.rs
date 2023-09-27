@@ -1,15 +1,7 @@
-mod cmds;
-
 use clap::Parser;
-use cmds::Command;
-#[derive(Parser)]
-#[command(author, version, about, long_about = None)]
-struct Cli {
-    #[command(subcommand)]
-    command: Command,
-}
+use nomos_cli::Cli;
 
 fn main() {
     let cli = Cli::parse();
-    cli.command.run().unwrap();
+    cli.run().unwrap();
 }

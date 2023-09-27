@@ -3,7 +3,7 @@ use std::marker::PhantomData;
 // crates
 
 // internal
-use crate::da::blob::{Blob, BlobSelect};
+use crate::da::certificate::{BlobCertificateSelect, Certificate};
 use crate::utils;
 
 #[derive(Default, Clone, Copy)]
@@ -19,21 +19,21 @@ impl<const SIZE: usize, B> FillSize<SIZE, B> {
     }
 }
 
-impl<const SIZE: usize, B: Blob> BlobSelect for FillSize<SIZE, B> {
-    type Blob = B;
+impl<const SIZE: usize, C: Certificate> BlobCertificateSelect for FillSize<SIZE, C> {
+    type Certificate = C;
     type Settings = ();
 
     fn new(_settings: Self::Settings) -> Self {
         FillSize::new()
     }
 
-    fn select_blob_from<'i, I: Iterator<Item = Self::Blob> + 'i>(
+    fn select_blob_from<'i, I: Iterator<Item = Self::Certificate> + 'i>(
         &self,
-        blobs: I,
-    ) -> Box<dyn Iterator<Item = Self::Blob> + 'i> {
-        utils::select::select_from_till_fill_size::<SIZE, Self::Blob>(
+        certificates: I,
+    ) -> Box<dyn Iterator<Item = Self::Certificate> + 'i> {
+        utils::select::select_from_till_fill_size::<SIZE, Self::Certificate>(
             |blob| blob.as_bytes().len(),
-            blobs,
+            certificates,
         )
     }
 }

@@ -5,7 +5,6 @@ use futures::{Stream, StreamExt};
 use serde::de::DeserializeOwned;
 use tokio_stream::wrappers::BroadcastStream;
 // internal
-use crate::network::messages::TransactionMsg;
 use crate::network::NetworkAdapter;
 use nomos_core::wire;
 use nomos_network::backends::waku::{EventKind, NetworkEvent, Waku, WakuBackendMessage};
@@ -21,20 +20,24 @@ pub const WAKU_CARNOT_PUB_SUB_TOPIC: WakuPubSubTopic =
 pub const WAKU_CARNOT_TX_CONTENT_TOPIC: WakuContentTopic =
     WakuContentTopic::new("CarnotSim", 1, "CarnotTx", Encoding::Proto);
 
-pub struct WakuAdapter<Tx> {
+pub struct WakuAdapter<Item> {
     network_relay: OutboundRelay<<NetworkService<Waku> as ServiceData>::Message>,
-    _tx: PhantomData<Tx>,
+    _item: PhantomData<Item>,
 }
 
 #[async_trait::async_trait]
-impl<Tx> NetworkAdapter for WakuAdapter<Tx>
+impl<Item> NetworkAdapter for WakuAdapter<Item>
 where
-    Tx: DeserializeOwned + Serialize + Send + Sync + 'static,
+    Item: DeserializeOwned + Serialize + Send + Sync + 'static,
 {
     type Backend = Waku;
-    type Tx = Tx;
+    type Settings = ();
+    type Item = Item;
+    // TODO: implement real key
+    type Key = ();
 
     async fn new(
+        _settings: Self::Settings,
         network_relay: OutboundRelay<<NetworkService<Self::Backend> as ServiceData>::Message>,
     ) -> Self {
         // Subscribe to the carnot pubsub topic
@@ -50,10 +53,13 @@ where
         };
         Self {
             network_relay,
-            _tx: Default::default(),
+            _item: Default::default(),
         }
     }
-    async fn transactions_stream(&self) -> Box<dyn Stream<Item = Self::Tx> + Unpin + Send> {
+
+    async fn transactions_stream(
+        &self,
+    ) -> Box<dyn Stream<Item = (Self::Key, Self::Item)> + Unpin + Send> {
         let (sender, receiver) = tokio::sync::oneshot::channel();
         if let Err((_, _e)) = self
             .network_relay
@@ -71,9 +77,10 @@ where
                 match event {
                     Ok(NetworkEvent::RawMessage(message)) => {
                         if message.content_topic() == &WAKU_CARNOT_TX_CONTENT_TOPIC {
-                            let tx: TransactionMsg<Self::Tx> =
+                            let item: Self::Item =
                                 wire::deserializer(message.payload()).deserialize().unwrap();
-                            Some(tx.tx)
+                            // TODO: implement real key
+                            Some(((), item))
                         } else {
                             None
                         }

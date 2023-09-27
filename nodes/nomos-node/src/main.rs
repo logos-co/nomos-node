@@ -8,10 +8,12 @@ mod bridges;
 use clap::Parser;
 use color_eyre::eyre::{eyre, Result};
 use nomos_http::bridge::{HttpBridge, HttpBridgeSettings};
-use nomos_mempool::network::adapters::libp2p::Libp2pAdapter;
+use nomos_mempool::network::adapters::libp2p::{Libp2pAdapter, Settings as AdapterSettings};
 use nomos_network::backends::libp2p::Libp2p;
 use overwatch_rs::overwatch::*;
 use std::sync::Arc;
+
+use nomos_core::tx::Transaction;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -56,7 +58,7 @@ fn main() -> Result<()> {
         Arc::new(Box::new(bridges::mempool_metrics_bridge)),
         Arc::new(Box::new(bridges::network_info_bridge)),
         Arc::new(Box::new(
-            bridges::mempool_add_tx_bridge::<Libp2p, Libp2pAdapter<Tx>>,
+            bridges::mempool_add_tx_bridge::<Libp2p, Libp2pAdapter<Tx, <Tx as Transaction>::Hash>>,
         )),
     ];
     let app = OverwatchRunner::<Nomos>::run(
@@ -64,7 +66,13 @@ fn main() -> Result<()> {
             network: config.network,
             logging: config.log,
             http: config.http,
-            mockpool: (),
+            mockpool: nomos_mempool::Settings {
+                backend: (),
+                network: AdapterSettings {
+                    topic: String::from("tx"),
+                    id: <Tx as Transaction>::hash,
+                },
+            },
             consensus: config.consensus,
             bridges: HttpBridgeSettings { bridges },
             #[cfg(feature = "metrics")]

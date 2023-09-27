@@ -3,15 +3,14 @@ mod tx;
 
 use color_eyre::eyre::Result;
 use consensus_engine::overlay::{RandomBeaconState, RoundRobin, TreeOverlay};
-use full_replication::Blob;
-
-use full_replication::{AbsoluteNumber, Attestation, Certificate, FullReplication};
+use full_replication::Certificate;
+use full_replication::{AbsoluteNumber, Attestation, Blob, FullReplication};
 #[cfg(feature = "metrics")]
 use metrics::{backend::map::MapMetricsBackend, types::MetricsData, MetricsService};
 use nomos_consensus::network::adapters::libp2p::Libp2pAdapter as ConsensusLibp2pAdapter;
 
 use nomos_consensus::CarnotConsensus;
-
+use nomos_core::tx::Transaction;
 use nomos_da::{
     backend::memory_cache::BlobCache, network::adapters::libp2p::Libp2pAdapter as DaLibp2pAdapter,
     DataAvailabilityService,
@@ -31,7 +30,8 @@ use overwatch_rs::services::handle::ServiceHandle;
 
 pub use config::{Config, ConsensusArgs, HttpArgs, LogArgs, NetworkArgs, OverlayArgs};
 use nomos_core::{
-    da::blob::select::FillSize as FillSizeWithBlobs, tx::select::FillSize as FillSizeWithTx,
+    da::certificate::select::FillSize as FillSizeWithBlobsCertificate,
+    tx::select::FillSize as FillSizeWithTx,
 };
 pub use tx::Tx;
 
@@ -39,12 +39,12 @@ const MB16: usize = 1024 * 1024 * 16;
 
 pub type Carnot = CarnotConsensus<
     ConsensusLibp2pAdapter,
-    MockPool<Tx>,
-    MempoolLibp2pAdapter<Tx>,
+    MockPool<Tx, <Tx as Transaction>::Hash>,
+    MempoolLibp2pAdapter<Tx, <Tx as Transaction>::Hash>,
     TreeOverlay<RoundRobin, RandomBeaconState>,
-    Blob,
+    Certificate,
     FillSizeWithTx<MB16, Tx>,
-    FillSizeWithBlobs<MB16, Blob>,
+    FillSizeWithBlobsCertificate<MB16, Certificate>,
 >;
 
 type DataAvailability = DataAvailabilityService<
@@ -53,11 +53,16 @@ type DataAvailability = DataAvailabilityService<
     DaLibp2pAdapter<Blob, Attestation>,
 >;
 
+type Mempool = MempoolService<
+    MempoolLibp2pAdapter<Tx, <Tx as Transaction>::Hash>,
+    MockPool<Tx, <Tx as Transaction>::Hash>,
+>;
+
 #[derive(Services)]
 pub struct Nomos {
     logging: ServiceHandle<Logger>,
     network: ServiceHandle<NetworkService<Libp2p>>,
-    mockpool: ServiceHandle<MempoolService<MempoolLibp2pAdapter<Tx>, MockPool<Tx>>>,
+    mockpool: ServiceHandle<Mempool>,
     consensus: ServiceHandle<Carnot>,
     http: ServiceHandle<HttpService<AxumBackend>>,
     bridges: ServiceHandle<HttpBridgeService>,

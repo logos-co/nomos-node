@@ -11,6 +11,8 @@ pub enum MixnetClientError {
     UnexpectedStreamBody,
     #[error("invalid payload")]
     InvalidPayload,
+    #[error("invalid fragment")]
+    InvalidFragment,
     #[error("invalid routing address: {0}")]
     InvalidRoutingAddress(#[from] NymNodeRoutingAddressError),
     #[error("{0}")]
