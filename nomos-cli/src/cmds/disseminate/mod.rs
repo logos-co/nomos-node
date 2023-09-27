@@ -2,7 +2,7 @@ use clap::{Args, ValueEnum};
 use crossterm::execute;
 use full_replication::{AbsoluteNumber, FullReplication};
 use futures::StreamExt;
-use nomos_core::da::DaProtocol;
+use nomos_core::{da::DaProtocol, wire};
 use nomos_da::network::{adapters::libp2p::Libp2pAdapter, NetworkAdapter};
 use nomos_network::{backends::libp2p::Libp2p, NetworkService};
 use overwatch_derive::*;
@@ -16,7 +16,10 @@ use overwatch_rs::{
     },
     DynError,
 };
+use reqwest::{Client, Url};
 use std::{path::PathBuf, time::Duration};
+
+const NODE_CERT_PATH: &str = "mempool-da/addcert";
 
 #[derive(Args, Debug)]
 pub struct Disseminate {
@@ -32,6 +35,9 @@ pub struct Disseminate {
     /// Timeout in seconds. Defaults to 120 seconds.
     #[clap(short, long, default_value = "120")]
     pub timeout: u64,
+    /// Address of the node to send the certificate to
+    /// for block inclusion, if present.
+    pub node_addr: Option<Url>,
 }
 
 #[derive(Debug, Clone, Args)]
@@ -55,6 +61,7 @@ impl Disseminate {
                     bytes: self.data.clone().as_bytes().into(),
                     timeout: Duration::from_secs(self.timeout),
                     da_protocol: self.da_protocol.clone(),
+                    node_addr: self.node_addr.clone(),
                 },
             },
             None,
@@ -84,7 +91,7 @@ async fn disseminate<D, B, N, A, C>(
     mut da: D,
     data: Box<[u8]>,
     adapter: N,
-) -> Result<C, Box<dyn std::error::Error>>
+) -> Result<C, Box<dyn std::error::Error + Send + Sync>>
 where
     D: DaProtocol<Blob = B, Attestation = A, Certificate = C>,
     N: NetworkAdapter<Blob = B, Attestation = A> + Send + Sync,
@@ -96,9 +103,7 @@ where
 
     // 2) Send blob to network
     tracing::info!("Sending blobs to network...");
-    futures::future::try_join_all(blobs.into_iter().map(|blob| adapter.send_blob(blob)))
-        .await
-        .map_err(|e| e as Box<dyn std::error::Error>)?;
+    futures::future::try_join_all(blobs.into_iter().map(|blob| adapter.send_blob(blob))).await?;
     terminal_cmd_done();
 
     // 3) Collect attestations and create proof
@@ -127,6 +132,7 @@ pub struct Settings {
     bytes: Box<[u8]>,
     timeout: Duration,
     da_protocol: DaProtocolChoice,
+    node_addr: Option<Url>,
 }
 
 pub struct DisseminateService {
@@ -150,6 +156,7 @@ impl ServiceCore for DisseminateService {
     async fn run(self) -> Result<(), DynError> {
         let Self { service_state } = self;
         let settings = service_state.settings_reader.get_updated_settings();
+        let node_addr = settings.node_addr.clone();
 
         match settings.da_protocol {
             DaProtocolChoice {
@@ -185,7 +192,25 @@ impl ServiceCore for DisseminateService {
                         );
                         std::process::exit(1);
                     }
-                    _ => {}
+                    Ok(Ok(cert)) => {
+                        if let Some(node_addr) = node_addr {
+                            let client = Client::new();
+                            tracing::info!("Sending certificate to node...");
+                            let res = client
+                                .post(node_addr.join(NODE_CERT_PATH).unwrap())
+                                .body(wire::serialize(&cert).unwrap())
+                                .send()
+                                .await?;
+                            if !res.status().is_success() {
+                                tracing::error!(
+                                    "Failed to send certificate to node: {}",
+                                    res.status()
+                                );
+                                std::process::exit(1);
+                            }
+                            terminal_cmd_done();
+                        }
+                    }
                 }
             }
         }
