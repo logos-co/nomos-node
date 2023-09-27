@@ -26,7 +26,7 @@ nomos-http = { path = "../../nomos-services/http", features = ["http"] }
 nomos-consensus = { path = "../../nomos-services/consensus", features = ["libp2p"] }
 nomos-storage = { path = "../../nomos-services/storage", features = ["sled"] }
 nomos-libp2p = { path = "../../nomos-libp2p" }
-nomos-da = { path = "../../nomos-services/data-availability" }
+nomos-da = { path = "../../nomos-services/data-availability", features = ["libp2p"] }
 metrics = { path = "../../nomos-services/metrics", optional = true }
 tracing-subscriber = "0.3"
 consensus-engine = { path = "../../consensus-engine" }
