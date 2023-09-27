@@ -13,7 +13,7 @@ RUN apt-get update && apt-get install -yq \
 WORKDIR /nomos
 COPY . . 
 
-RUN cargo build --release -p nomos-node --no-default-features --features libp2p
+RUN cargo build --release -p nomos-node
 RUN cargo build --release -p mixnode
 
 # NODE IMAGE ----------------------------------------------------------
