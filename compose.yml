@@ -31,7 +31,27 @@ services:
       - NODE_MASK=${DOCKER_COMPOSE_LIBP2P_NODE_KEY_MASK:-2000000000000000000000000000000000000000000000000000000000000000}
       - OVERLAY_NODES=${DOCKER_COMPOSE_OVERLAY_NODES:-1000000000000000000000000000000000000000000000000000000000000000}
       - NET_INITIAL_PEERS=${DOCKER_COMPOSE_NET_INITIAL_PEERS:-/dns/bootstrap/tcp/3000}
-    entrypoint: /etc/nomos/configure_node.sh
+    entrypoint: /etc/nomos/run_libp2p_node.sh
+
+  mix-node:
+    build:
+      context: .
+      dockerfile: testnet/Dockerfile
+    volumes:
+      - ./testnet:/etc/nomos
+    deploy:
+      replicas: ${DOCKER_COMPOSE_MIXNET_REPLICAS:-1} 
+    depends_on:
+      - bootstrap
+      - etcd
+    environment:
+      - DOCKER_REPLICAS=${DOCKER_COMPOSE_MIXNET_REPLICAS:-1}
+      - ETCDCTL_ENDPOINTS=${DOCKER_COMPOSE_ETCDCTL_ENDPOINTS:-etcd:2379}
+      - ETCDCTL_API=${DOCKER_COMPOSE_ETCDCTL_API:-3}
+      - NODE_MASK=${DOCKER_COMPOSE_MIXNET_NODE_KEY_MASK:-2000000000000000000000000000000000000000000000000000000000000000}
+      - OVERLAY_NODES=${DOCKER_COMPOSE_OVERLAY_NODES:-1000000000000000000000000000000000000000000000000000000000000000}
+      - NET_INITIAL_PEERS=${DOCKER_COMPOSE_NET_INITIAL_PEERS:-/dns/bootstrap/tcp/3000}
+    entrypoint: /etc/nomos/run_mix_node.sh
 
   etcd:
     image: quay.io/coreos/etcd:v3.4.15

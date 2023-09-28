@@ -1,6 +1,6 @@
 # BUILD IMAGE ---------------------------------------------------------
 
-FROM rust:1.72.0-slim-bullseye AS builder
+FROM rust:1.72.1-slim-bullseye AS builder
 
 # Using backports for go 1.19
 RUN echo 'deb http://deb.debian.org/debian bullseye-backports main' \
