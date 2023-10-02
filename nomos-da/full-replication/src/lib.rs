@@ -158,7 +158,7 @@ impl certificate::Certificate for Certificate {
             .collect::<Vec<_>>();
         // sort to make the hash deterministic
         input.sort();
-        hash(&input.concat())
+        hash(input.concat())
     }
 
     fn as_bytes(&self) -> Bytes {
