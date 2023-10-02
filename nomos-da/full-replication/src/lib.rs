@@ -1,6 +1,6 @@
 // internal
 use nomos_core::da::{
-    attestation,
+    attestation::{self, Attestation as _},
     blob::{self, BlobHasher},
     certificate, DaProtocol,
 };
@@ -120,6 +120,11 @@ impl attestation::Attestation for Attestation {
     fn blob(&self) -> [u8; 32] {
         self.blob
     }
+
+    fn hash(&self) -> <Self::Blob as blob::Blob>::Hash {
+        hash([self.blob, self.voter].concat())
+    }
+
     fn as_bytes(&self) -> Bytes {
         wire::serialize(self)
             .expect("Attestation shouldn't fail to be serialized")
@@ -143,6 +148,17 @@ impl certificate::Certificate for Certificate {
 
     fn blob(&self) -> <Self::Blob as blob::Blob>::Hash {
         self.attestations[0].blob
+    }
+
+    fn hash(&self) -> <Self::Blob as blob::Blob>::Hash {
+        let mut input = self
+            .attestations
+            .iter()
+            .map(|a| a.hash())
+            .collect::<Vec<_>>();
+        // sort to make the hash deterministic
+        input.sort();
+        hash(&input.concat())
     }
 
     fn as_bytes(&self) -> Bytes {
@@ -207,4 +223,12 @@ impl DaProtocol for FullReplication<AbsoluteNumber<Attestation, Certificate>> {
         self.certificate_strategy
             .can_build(&certificate.attestations)
     }
+}
+
+fn hash(item: impl AsRef<[u8]>) -> [u8; 32] {
+    let mut hasher = Blake2bVar::new(32).unwrap();
+    hasher.update(item.as_ref());
+    let mut output = [0; 32];
+    hasher.finalize_variable(&mut output).unwrap();
+    output
 }

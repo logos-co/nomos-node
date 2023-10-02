@@ -107,5 +107,5 @@ fn main() -> Result<()> {
 
 fn cert_id(cert: &Certificate) -> <Blob as blob::Blob>::Hash {
     use certificate::Certificate;
-    cert.blob()
+    cert.hash()
 }
