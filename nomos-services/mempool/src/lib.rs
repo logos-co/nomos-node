@@ -12,7 +12,7 @@ use futures::StreamExt;
 use tokio::sync::oneshot::Sender;
 // internal
 use crate::network::NetworkAdapter;
-use backend::MemPool;
+use backend::{MemPool, Status};
 use nomos_core::block::BlockId;
 use nomos_network::NetworkService;
 use overwatch_rs::services::{
@@ -71,6 +71,10 @@ pub enum MempoolMsg<Item, Key> {
     Metrics {
         reply_channel: Sender<MempoolMetrics>,
     },
+    Status {
+        items: Vec<Key>,
+        reply_channel: Sender<Vec<Status>>,
+    },
 }
 
 impl<Item, Key> Debug for MempoolMsg<Item, Key>
@@ -96,6 +100,7 @@ where
                 write!(f, "MempoolMsg::BlockItem{{block: {block:?}}}")
             }
             Self::Metrics { .. } => write!(f, "MempoolMsg::Metrics"),
+            Self::Status { items, .. } => write!(f, "MempoolMsg::Status{{items: {items:?}}}"),
         }
     }
 }
@@ -222,6 +227,13 @@ where
                             };
                             reply_channel.send(metrics).unwrap_or_else(|_| {
                                 tracing::debug!("could not send back mempool metrics")
+                            });
+                        }
+                        MempoolMsg::Status {
+                            items, reply_channel
+                        } => {
+                            reply_channel.send(pool.status(&items)).unwrap_or_else(|_| {
+                                tracing::debug!("could not send back mempool status")
                             });
                         }
                     }
