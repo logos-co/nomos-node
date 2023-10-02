@@ -7,7 +7,9 @@ use nomos_cli::cmds::{
 };
 use std::time::Duration;
 use tempfile::NamedTempFile;
-use tests::{MixNode, Node, NomosNode, SpawnConfig};
+use tests::{nodes::nomos::Pool, MixNode, Node, NomosNode, SpawnConfig};
+
+const TIMEOUT_SECS: u64 = 20;
 
 #[tokio::test]
 async fn disseminate_blob() {
@@ -40,9 +42,30 @@ async fn disseminate_blob() {
                 },
             },
         },
+        node_addr: Some(
+            format!("http://{}", nodes[0].config().http.backend.address.clone())
+                .parse()
+                .unwrap(),
+        ),
     });
 
     std::thread::spawn(move || cmd.run().unwrap())
         .join()
         .unwrap();
+
+    tokio::time::timeout(
+        Duration::from_secs(TIMEOUT_SECS),
+        wait_for_cert_in_mempool(&nodes[0]),
+    )
+    .await
+    .unwrap();
+}
+
+async fn wait_for_cert_in_mempool(node: &NomosNode) {
+    loop {
+        if node.get_mempoool_metrics(Pool::Da).await.pending_items > 0 {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
 }
