@@ -19,7 +19,7 @@ use overwatch_rs::{
 use reqwest::{Client, Url};
 use std::{path::PathBuf, time::Duration};
 
-const NODE_CERT_PATH: &str = "mempool-da/addcert";
+const NODE_CERT_PATH: &str = "mempool-da/add";
 
 #[derive(Args, Debug)]
 pub struct Disseminate {

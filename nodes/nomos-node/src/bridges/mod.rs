@@ -166,7 +166,7 @@ where
                 MempoolService<A, MockPool<Tx, <Tx as Transaction>::Hash>, TxDiscriminant>,
                 AxumBackend,
                 _,
-            >(handle.clone(), HttpMethod::POST, "addtx")
+            >(handle.clone(), HttpMethod::POST, "add")
             .await
             .unwrap();
 
@@ -206,9 +206,7 @@ where
             AxumBackend,
             _,
         >(
-            handle.clone(),
-            HttpMethod::POST,
-            "addcert",
+            handle.clone(), HttpMethod::POST, "add"
         )
         .await
         .unwrap();
