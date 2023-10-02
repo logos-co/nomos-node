@@ -14,8 +14,6 @@ use nomos_http::backends::axum::AxumBackendSettings;
 use nomos_libp2p::Multiaddr;
 use nomos_log::{LoggerBackend, LoggerFormat};
 use nomos_network::backends::libp2p::{Libp2pConfig, Libp2pInfo};
-#[cfg(feature = "waku")]
-use nomos_network::backends::waku::{WakuConfig, WakuInfo};
 use nomos_network::NetworkConfig;
 use nomos_node::Config;
 // crates

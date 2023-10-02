@@ -8,12 +8,9 @@ LABEL maintainer="augustinas@status.im" \
 RUN echo 'deb http://deb.debian.org/debian bullseye-backports main' \
     >> /etc/apt/sources.list
 
-# Dependecies for publishing documentation and building waku-bindings.
+# Dependecies for publishing documentation.
 RUN apt-get update && apt-get install -yq \
-    libssl-dev openssh-client git python3-pip clang \
-    golang-src/bullseye-backports \
-    golang-doc/bullseye-backports \
-    golang/bullseye-backports
+    libssl-dev openssh-client git python3-pip clang 
 
 RUN pip install ghp-import
 RUN rustup component add rustfmt clippy

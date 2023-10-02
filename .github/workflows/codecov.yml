@@ -17,10 +17,7 @@ jobs:
         with:
           submodules: true
       - name: Checkout submodules
-        run: git submodule update --init --recursive
-      - uses: actions/setup-go@v3 # we need go to build go-waku
-        with:
-          go-version: '1.19'
+        run: git submodule update --init --recursive 
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
