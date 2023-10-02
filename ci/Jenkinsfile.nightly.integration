@@ -35,7 +35,7 @@ pipeline {
         axes {
           axis {
             name 'FEATURE'
-            values 'waku', 'libp2p'
+            values 'libp2p'
           }
         }
         stages {

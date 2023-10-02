@@ -20,7 +20,6 @@ tokio-stream = "0.1"
 thiserror = "1.0"
 tracing = "0.1"
 rand = { version = "0.7.3", optional = true }
-waku-bindings = { version = "0.1.1", optional = true }
 futures = "0.3"
 parking_lot = "0.12"
 nomos-core = { path = "../../nomos-core" }
@@ -32,6 +31,5 @@ tokio = { version = "1", features = ["full"] }
 
 [features]
 default = []
-waku = ["waku-bindings"]
 libp2p = ["nomos-libp2p", "rand", "humantime-serde"]
 mock = ["rand", "chrono"]
