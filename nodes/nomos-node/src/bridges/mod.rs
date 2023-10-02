@@ -150,7 +150,7 @@ where
                 &mempool_channel,
                 res_tx,
                 payload.unwrap_or_default(),
-                |cert| cert.blob(),
+                |cert| cert.hash(),
             )
             .await
             {
