@@ -117,7 +117,7 @@ impl NomosNode {
             Pool::Cl => "cl",
             Pool::Da => "da",
         };
-        let addr = format!("{}{}/{}_metrics", MEMPOOL_API, discr, discr);
+        let addr = format!("{}{}/metrics", MEMPOOL_API, discr);
         let res = self
             .get(&addr)
             .await
