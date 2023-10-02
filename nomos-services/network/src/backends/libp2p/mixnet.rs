@@ -47,16 +47,20 @@ impl MixnetHandler {
     }
 
     pub async fn run(&mut self) {
+        const BASE_DELAY: Duration = Duration::from_secs(5);
         // we need this loop to help us reestablish the connection in case
         // the mixnet client fails for whatever reason
+        let mut backoff = 0;
         loop {
-            tokio::select! {
-                stream = self.client.run() => {
-                    if let Ok(stream) = stream {
-                        Self::handle_stream(self.commands_tx.clone(), stream).await;
-                    } else {
-                        tracing::error!("Could not quickstart mixnet stream");
-                    }
+            match self.client.run().await {
+                Ok(stream) => {
+                    backoff = 0;
+                    Self::handle_stream(self.commands_tx.clone(), stream).await;
+                }
+                Err(e) => {
+                    tracing::error!("mixnet client error: {e}");
+                    backoff += 1;
+                    tokio::time::sleep(BASE_DELAY * backoff).await;
                 }
             }
         }
