@@ -47,6 +47,7 @@ async fn disseminate_blob() {
                 .parse()
                 .unwrap(),
         ),
+        output: None,
     });
 
     std::thread::spawn(move || cmd.run().unwrap())

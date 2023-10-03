@@ -38,6 +38,8 @@ pub struct Disseminate {
     /// Address of the node to send the certificate to
     /// for block inclusion, if present.
     pub node_addr: Option<Url>,
+    /// File to write the certificate to, if present.
+    pub output: Option<PathBuf>,
 }
 
 #[derive(Debug, Clone, Args)]
@@ -62,6 +64,7 @@ impl Disseminate {
                     timeout: Duration::from_secs(self.timeout),
                     da_protocol: self.da_protocol.clone(),
                     node_addr: self.node_addr.clone(),
+                    output: self.output.clone(),
                 },
             },
             None,
@@ -133,6 +136,7 @@ pub struct Settings {
     timeout: Duration,
     da_protocol: DaProtocolChoice,
     node_addr: Option<Url>,
+    output: Option<PathBuf>,
 }
 
 pub struct DisseminateService {
@@ -193,6 +197,12 @@ impl ServiceCore for DisseminateService {
                         std::process::exit(1);
                     }
                     Ok(Ok(cert)) => {
+                        if let Some(output) = settings.output {
+                            tracing::info!("Writing certificate to file...");
+                            std::fs::write(output, wire::serialize(&cert).unwrap())?;
+                            terminal_cmd_done();
+                        }
+
                         if let Some(node_addr) = node_addr {
                             let client = Client::new();
                             tracing::info!("Sending certificate to node...");
