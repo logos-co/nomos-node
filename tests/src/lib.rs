@@ -1,4 +1,4 @@
-mod nodes;
+pub mod nodes;
 use mixnet_node::MixnetNodeConfig;
 use mixnet_topology::MixnetTopology;
 pub use nodes::MixNode;

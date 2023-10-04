@@ -13,6 +13,7 @@ use nomos_consensus::{CarnotInfo, CarnotSettings};
 use nomos_http::backends::axum::AxumBackendSettings;
 use nomos_libp2p::Multiaddr;
 use nomos_log::{LoggerBackend, LoggerFormat};
+use nomos_mempool::MempoolMetrics;
 use nomos_network::backends::libp2p::{Libp2pConfig, Libp2pInfo};
 use nomos_network::NetworkConfig;
 use nomos_node::Config;
@@ -27,6 +28,7 @@ static CLIENT: Lazy<Client> = Lazy::new(Client::new);
 const NOMOS_BIN: &str = "../target/debug/nomos-node";
 const CARNOT_INFO_API: &str = "carnot/info";
 const NETWORK_INFO_API: &str = "network/info";
+const MEMPOOL_API: &str = "mempool-";
 const LOGS_PREFIX: &str = "__logs";
 
 pub struct NomosNode {
@@ -108,6 +110,25 @@ impl NomosNode {
             .unwrap()
             .listen_addresses
             .swap_remove(0)
+    }
+
+    pub async fn get_mempoool_metrics(&self, pool: Pool) -> MempoolMetrics {
+        let discr = match pool {
+            Pool::Cl => "cl",
+            Pool::Da => "da",
+        };
+        let addr = format!("{}{}/metrics", MEMPOOL_API, discr);
+        let res = self
+            .get(&addr)
+            .await
+            .unwrap()
+            .json::<serde_json::Value>()
+            .await
+            .unwrap();
+        MempoolMetrics {
+            pending_items: res["pending_items"].as_u64().unwrap() as usize,
+            last_item_timestamp: res["last_item"].as_u64().unwrap(),
+        }
     }
 
     // not async so that we can use this in `Drop`
@@ -263,4 +284,9 @@ fn create_node_config(
     config.network.backend.inner.port = get_available_port();
 
     config
+}
+
+pub enum Pool {
+    Da,
+    Cl,
 }
