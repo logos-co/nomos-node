@@ -3,7 +3,7 @@ use fraction::{Fraction, One};
 use futures::stream::{self, StreamExt};
 use std::collections::HashSet;
 use std::time::Duration;
-use tests::{MixNode, Node, NomosNode, SpawnConfig};
+use tests::{ConsensusConfig, MixNode, Node, NomosNode, SpawnConfig};
 
 const TARGET_VIEW: View = View::new(20);
 
@@ -76,13 +76,14 @@ async fn happy_test(nodes: Vec<NomosNode>) {
 
 #[tokio::test]
 async fn two_nodes_happy() {
-    let (_mixnodes, mixnet_node_configs, mixnet_topology) = MixNode::spawn_nodes(2).await;
-    let nodes = NomosNode::spawn_nodes(SpawnConfig::Star {
-        n_participants: 2,
-        threshold: Fraction::one(),
-        timeout: Duration::from_secs(10),
-        mixnet_node_configs,
-        mixnet_topology,
+    let (_mixnodes, mixnet_config) = MixNode::spawn_nodes(2).await;
+    let nodes = NomosNode::spawn_nodes(SpawnConfig::Chain {
+        consensus: ConsensusConfig {
+            n_participants: 2,
+            threshold: Fraction::one(),
+            timeout: Duration::from_secs(10),
+        },
+        mixnet: mixnet_config,
     })
     .await;
     happy_test(nodes).await;
@@ -90,13 +91,14 @@ async fn two_nodes_happy() {
 
 #[tokio::test]
 async fn ten_nodes_happy() {
-    let (_mixnodes, mixnet_node_configs, mixnet_topology) = MixNode::spawn_nodes(3).await;
-    let nodes = NomosNode::spawn_nodes(SpawnConfig::Star {
-        n_participants: 10,
-        threshold: Fraction::one(),
-        timeout: Duration::from_secs(10),
-        mixnet_node_configs,
-        mixnet_topology,
+    let (_mixnodes, mixnet_config) = MixNode::spawn_nodes(3).await;
+    let nodes = NomosNode::spawn_nodes(SpawnConfig::Chain {
+        consensus: ConsensusConfig {
+            n_participants: 10,
+            threshold: Fraction::one(),
+            timeout: Duration::from_secs(10),
+        },
+        mixnet: mixnet_config,
     })
     .await;
     happy_test(nodes).await;
