@@ -50,9 +50,7 @@ async fn disseminate_blob() {
         output: None,
     });
 
-    std::thread::spawn(move || cmd.run().unwrap())
-        .join()
-        .unwrap();
+    let thread = std::thread::spawn(move || cmd.run().unwrap());
 
     tokio::time::timeout(
         Duration::from_secs(TIMEOUT_SECS),
@@ -60,6 +58,8 @@ async fn disseminate_blob() {
     )
     .await
     .unwrap();
+
+    thread.join().unwrap();
 }
 
 async fn wait_for_cert_in_mempool(node: &NomosNode) {
