@@ -1,5 +1,4 @@
 use clap::{Args, ValueEnum};
-use crossterm::execute;
 use full_replication::{AbsoluteNumber, FullReplication};
 use futures::StreamExt;
 use nomos_core::{da::DaProtocol, wire};
@@ -75,21 +74,6 @@ impl Disseminate {
     }
 }
 
-// Write '✓' at the end of the previous line in terminal
-fn terminal_cmd_done() {
-    let go_to_previous_line = crossterm::cursor::MoveToPreviousLine(1);
-    let go_to_end_of_line =
-        crossterm::cursor::MoveToColumn(crossterm::terminal::size().unwrap().0 - 1);
-    let write_done = crossterm::style::Print("✓");
-    execute!(
-        std::io::stdout(),
-        go_to_previous_line,
-        go_to_end_of_line,
-        write_done
-    )
-    .unwrap()
-}
-
 async fn disseminate<D, B, N, A, C>(
     mut da: D,
     data: Box<[u8]>,
@@ -102,12 +86,10 @@ where
     // 1) Building blob
     tracing::info!("Building blobs...");
     let blobs = da.encode(data);
-    terminal_cmd_done();
 
     // 2) Send blob to network
     tracing::info!("Sending blobs to network...");
     futures::future::try_join_all(blobs.into_iter().map(|blob| adapter.send_blob(blob))).await?;
-    terminal_cmd_done();
 
     // 3) Collect attestations and create proof
     tracing::info!("Collecting attestations to create proof...");
@@ -116,7 +98,6 @@ where
         da.recv_attestation(attestations.next().await.unwrap());
 
         if let Some(cert) = da.certify_dispersal() {
-            terminal_cmd_done();
             return Ok(cert);
         }
     }
@@ -200,7 +181,6 @@ impl ServiceCore for DisseminateService {
                         if let Some(output) = settings.output {
                             tracing::info!("Writing certificate to file...");
                             std::fs::write(output, wire::serialize(&cert).unwrap())?;
-                            terminal_cmd_done();
                         }
 
                         if let Some(node_addr) = node_addr {
@@ -218,7 +198,6 @@ impl ServiceCore for DisseminateService {
                                 );
                                 std::process::exit(1);
                             }
-                            terminal_cmd_done();
                         }
                     }
                 }
