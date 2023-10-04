@@ -11,7 +11,7 @@ use overwatch_rs::{
 /// A simple abstraction so that we can easily
 /// change the underlying http server
 #[async_trait::async_trait]
-pub trait Endpoint {
+pub trait Backend {
     type Error: std::error::Error + Send + Sync + 'static;
     type Settings: Clone + Send + Sync + 'static;
 
@@ -27,11 +27,11 @@ pub struct ApiServiceSettings<S> {
     pub server_settings: S,
 }
 
-pub struct ApiService<E: Endpoint> {
+pub struct ApiService<E: Backend> {
     settings: ApiServiceSettings<E::Settings>,
 }
 
-impl<E: Endpoint> ServiceData for ApiService<E> {
+impl<E: Backend> ServiceData for ApiService<E> {
     const SERVICE_ID: overwatch_rs::services::ServiceId = "nomos-api";
 
     type Settings = ApiServiceSettings<E::Settings>;
@@ -46,7 +46,7 @@ impl<E: Endpoint> ServiceData for ApiService<E> {
 #[async_trait::async_trait]
 impl<E> ServiceCore for ApiService<E>
 where
-    E: Endpoint + Send + Sync + 'static,
+    E: Backend + Send + Sync + 'static,
 {
     /// Initialize the service with the given state
     fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, DynError> {

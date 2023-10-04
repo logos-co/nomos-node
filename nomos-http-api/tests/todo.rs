@@ -6,7 +6,7 @@ use std::{
 
 use axum::{routing, Router, Server};
 use hyper::Error;
-use nomos_http_api::{ApiService, ApiServiceSettings, Endpoint};
+use nomos_http_api::{ApiService, ApiServiceSettings, Backend};
 use overwatch_derive::Services;
 use overwatch_rs::{overwatch::OverwatchRunner, services::handle::ServiceHandle};
 use utoipa::{
@@ -19,7 +19,7 @@ use crate::todo::Store;
 
 #[derive(Services)]
 pub struct NomosApi {
-    http: ServiceHandle<ApiService<TodoEndpoint>>,
+    http: ServiceHandle<ApiService<WebServer>>,
 }
 
 #[derive(OpenApi)]
@@ -54,12 +54,12 @@ impl Modify for SecurityAddon {
     }
 }
 
-pub struct TodoEndpoint {
+pub struct WebServer {
     addr: SocketAddr,
 }
 
 #[async_trait::async_trait]
-impl Endpoint for TodoEndpoint {
+impl Backend for WebServer {
     type Error = hyper::Error;
 
     type Settings = SocketAddr;
