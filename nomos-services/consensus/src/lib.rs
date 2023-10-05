@@ -292,7 +292,8 @@ where
                 )
                 .await
                 else {
-                    unreachable!()
+                    tracing::debug!("Failed to gather initial votes");
+                    return Event::None;
                 };
                 Event::ProposeBlock { qc }
             });
@@ -782,8 +783,9 @@ where
         let votes_stream = adapter.votes_stream(&committee, block.view, block.id).await;
         match tally.tally(block.clone(), votes_stream).await {
             Ok((qc, votes)) => Event::Approve { qc, votes, block },
-            Err(_e) => {
-                todo!("Handle tally error {_e}");
+            Err(e) => {
+                tracing::debug!("Error gathering votes: {e}");
+                Event::None
             }
         }
     }

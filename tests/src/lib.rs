@@ -35,11 +35,27 @@ pub trait Node: Sized {
 
 #[derive(Clone)]
 pub enum SpawnConfig {
+    // Star topology: Every node is initially connected to a single node.
     Star {
-        n_participants: usize,
-        threshold: Fraction,
-        timeout: Duration,
-        mixnet_node_configs: Vec<MixnetNodeConfig>,
-        mixnet_topology: MixnetTopology,
+        consensus: ConsensusConfig,
+        mixnet: MixnetConfig,
     },
+    // Chain topology: Every node is chained to the node next to it.
+    Chain {
+        consensus: ConsensusConfig,
+        mixnet: MixnetConfig,
+    },
+}
+
+#[derive(Clone)]
+pub struct ConsensusConfig {
+    pub n_participants: usize,
+    pub threshold: Fraction,
+    pub timeout: Duration,
+}
+
+#[derive(Clone)]
+pub struct MixnetConfig {
+    pub node_configs: Vec<MixnetNodeConfig>,
+    pub topology: MixnetTopology,
 }

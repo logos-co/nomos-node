@@ -5,6 +5,7 @@ mod flat_overlay;
 mod leadership;
 mod membership;
 mod random_beacon;
+mod threshold;
 mod tree_overlay;
 
 pub use branch_overlay::*;
@@ -98,6 +99,7 @@ mod tests {
             number_of_committees: 1,
             leader: RoundRobin::new(),
             committee_membership: FisherYatesShuffle::new(ENTROPY),
+            super_majority_threshold: None,
         });
         let branch_overlay = BranchOverlay::new(BranchOverlaySettings {
             current_leader: nodes[0],

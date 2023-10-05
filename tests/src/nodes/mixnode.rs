@@ -9,7 +9,7 @@ use mixnet_topology::{Layer, MixnetTopology, Node};
 use rand::{thread_rng, RngCore};
 use tempfile::NamedTempFile;
 
-use crate::get_available_port;
+use crate::{get_available_port, MixnetConfig};
 
 const MIXNODE_BIN: &str = "../target/debug/mixnode";
 
@@ -46,9 +46,7 @@ impl MixNode {
         Self { child }
     }
 
-    pub async fn spawn_nodes(
-        num_nodes: usize,
-    ) -> (Vec<Self>, Vec<MixnetNodeConfig>, MixnetTopology) {
+    pub async fn spawn_nodes(num_nodes: usize) -> (Vec<Self>, MixnetConfig) {
         let mut configs = Vec::<MixnetNodeConfig>::new();
         for _ in 0..num_nodes {
             let mut private_key = [0u8; PRIVATE_KEY_SIZE];
@@ -76,7 +74,13 @@ impl MixNode {
         }
 
         // We need to return configs as well, to configure mixclients accordingly
-        (nodes, configs.clone(), Self::build_topology(configs))
+        (
+            nodes,
+            MixnetConfig {
+                node_configs: configs.clone(),
+                topology: Self::build_topology(configs),
+            },
+        )
     }
 
     fn build_topology(configs: Vec<MixnetNodeConfig>) -> MixnetTopology {
