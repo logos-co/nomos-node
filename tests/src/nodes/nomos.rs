@@ -3,7 +3,7 @@ use std::net::SocketAddr;
 use std::process::{Child, Command, Stdio};
 use std::time::Duration;
 // internal
-use crate::{get_available_port, Node, SpawnConfig};
+use crate::{get_available_port, ConsensusConfig, MixnetConfig, Node, SpawnConfig};
 use consensus_engine::overlay::{RandomBeaconState, RoundRobin, TreeOverlay, TreeOverlaySettings};
 use consensus_engine::{NodeId, Overlay};
 use mixnet_client::{MixnetClientConfig, MixnetClientMode};
@@ -11,9 +11,9 @@ use mixnet_node::MixnetNodeConfig;
 use mixnet_topology::MixnetTopology;
 use nomos_consensus::{CarnotInfo, CarnotSettings};
 use nomos_http::backends::axum::AxumBackendSettings;
-use nomos_libp2p::Multiaddr;
+use nomos_libp2p::{multiaddr, Multiaddr};
 use nomos_log::{LoggerBackend, LoggerFormat};
-use nomos_network::backends::libp2p::{Libp2pConfig, Libp2pInfo};
+use nomos_network::backends::libp2p::Libp2pConfig;
 #[cfg(feature = "waku")]
 use nomos_network::backends::waku::{WakuConfig, WakuInfo};
 use nomos_network::NetworkConfig;
@@ -28,7 +28,6 @@ use tempfile::NamedTempFile;
 static CLIENT: Lazy<Client> = Lazy::new(Client::new);
 const NOMOS_BIN: &str = "../target/debug/nomos-node";
 const CARNOT_INFO_API: &str = "carnot/info";
-const NETWORK_INFO_API: &str = "network/info";
 const LOGS_PREFIX: &str = "__logs";
 
 pub struct NomosNode {
@@ -101,16 +100,6 @@ impl NomosNode {
             tokio::time::sleep(Duration::from_millis(100)).await;
         }
     }
-    pub async fn get_listening_address(&self) -> Multiaddr {
-        self.get(NETWORK_INFO_API)
-            .await
-            .unwrap()
-            .json::<Libp2pInfo>()
-            .await
-            .unwrap()
-            .listen_addresses
-            .swap_remove(0)
-    }
 
     // not async so that we can use this in `Drop`
     pub fn get_logs_from_file(&self) -> String {
@@ -145,50 +134,29 @@ impl Node for NomosNode {
 
     async fn spawn_nodes(config: SpawnConfig) -> Vec<Self> {
         match config {
-            SpawnConfig::Star {
-                n_participants,
-                threshold,
-                timeout,
-                mut mixnet_node_configs,
-                mixnet_topology,
-            } => {
-                let mut ids = vec![[0; 32]; n_participants];
-                for id in &mut ids {
-                    thread_rng().fill(id);
-                }
+            SpawnConfig::Star { consensus, mixnet } => {
+                let (next_leader_config, configs) = create_node_configs(consensus, mixnet);
 
-                let mut configs = ids
-                    .iter()
-                    .map(|id| {
-                        create_node_config(
-                            ids.iter().copied().map(NodeId::new).collect(),
-                            *id,
-                            threshold,
-                            timeout,
-                            mixnet_node_configs.pop(),
-                            mixnet_topology.clone(),
-                        )
-                    })
-                    .collect::<Vec<_>>();
-
-                let overlay = TreeOverlay::new(configs[0].consensus.overlay_settings.clone());
-                let next_leader = overlay.next_leader();
-                let next_leader_idx = ids
-                    .iter()
-                    .position(|&id| NodeId::from(id) == next_leader)
-                    .unwrap();
-
-                // Spawn the next leader first, so the leader can receive votes from
-                // all nodes that will be subsequently spawned.
-                // If not, the leader will miss votes from nodes spawned before itself.
-                // This issue will be resolved by devising the block catch-up mechanism in the future
-                let mut nodes = vec![Self::spawn(configs.swap_remove(next_leader_idx)).await];
-                let listening_addr = nodes[0].get_listening_address().await;
+                let first_node_addr = node_address(&next_leader_config);
+                let mut nodes = vec![Self::spawn(next_leader_config).await];
                 for mut conf in configs {
                     conf.network
                         .backend
                         .initial_peers
-                        .push(listening_addr.clone());
+                        .push(first_node_addr.clone());
+
+                    nodes.push(Self::spawn(conf).await);
+                }
+                nodes
+            }
+            SpawnConfig::Chain { consensus, mixnet } => {
+                let (next_leader_config, configs) = create_node_configs(consensus, mixnet);
+
+                let mut prev_node_addr = node_address(&next_leader_config);
+                let mut nodes = vec![Self::spawn(next_leader_config).await];
+                for mut conf in configs {
+                    conf.network.backend.initial_peers.push(prev_node_addr);
+                    prev_node_addr = node_address(&conf);
 
                     nodes.push(Self::spawn(conf).await);
                 }
@@ -209,6 +177,47 @@ impl Node for NomosNode {
     fn stop(&mut self) {
         self.child.kill().unwrap();
     }
+}
+
+/// Returns the config of the next leader and all other nodes.
+///
+/// Depending on the network topology, the next leader must be spawned first,
+/// so the leader can receive votes from all other nodes that will be subsequently spawned.
+/// If not, the leader will miss votes from nodes spawned before itself.
+/// This issue will be resolved by devising the block catch-up mechanism in the future.
+fn create_node_configs(
+    consensus: ConsensusConfig,
+    mut mixnet: MixnetConfig,
+) -> (Config, Vec<Config>) {
+    let mut ids = vec![[0; 32]; consensus.n_participants];
+    for id in &mut ids {
+        thread_rng().fill(id);
+    }
+
+    let mut configs = ids
+        .iter()
+        .map(|id| {
+            create_node_config(
+                ids.iter().copied().map(NodeId::new).collect(),
+                *id,
+                consensus.threshold,
+                consensus.timeout,
+                mixnet.node_configs.pop(),
+                mixnet.topology.clone(),
+            )
+        })
+        .collect::<Vec<_>>();
+
+    let overlay = TreeOverlay::new(configs[0].consensus.overlay_settings.clone());
+    let next_leader = overlay.next_leader();
+    let next_leader_idx = ids
+        .iter()
+        .position(|&id| NodeId::from(id) == next_leader)
+        .unwrap();
+
+    let next_leader_config = configs.swap_remove(next_leader_idx);
+
+    (next_leader_config, configs)
 }
 
 fn create_node_config(
@@ -281,4 +290,8 @@ fn create_node_config(
     config.network.backend.inner.port = get_available_port();
 
     config
+}
+
+fn node_address(config: &Config) -> Multiaddr {
+    multiaddr!(Ip4([127, 0, 0, 1]), Tcp(config.network.backend.inner.port))
 }
