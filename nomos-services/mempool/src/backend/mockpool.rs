@@ -8,6 +8,8 @@ use std::{collections::BTreeMap, time::UNIX_EPOCH};
 use crate::backend::{MemPool, MempoolError};
 use nomos_core::block::BlockId;
 
+use super::Status;
+
 /// A mock mempool implementation that stores all transactions in memory in the order received.
 pub struct MockPool<Item, Key> {
     pending_items: LinkedHashMap<Key, Item>,
@@ -104,5 +106,20 @@ where
 
     fn last_item_timestamp(&self) -> u64 {
         self.last_item_timestamp
+    }
+
+    fn status(&self, items: &[Self::Key]) -> Vec<Status> {
+        items
+            .iter()
+            .map(|key| {
+                if self.pending_items.contains_key(key) {
+                    Status::Pending
+                } else if let Some(block) = self.in_block_items_by_id.get(key) {
+                    Status::InBlock { block: *block }
+                } else {
+                    Status::Unknown
+                }
+            })
+            .collect()
     }
 }

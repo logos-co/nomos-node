@@ -25,4 +25,6 @@ pub trait NetworkAdapter {
     async fn transactions_stream(
         &self,
     ) -> Box<dyn Stream<Item = (Self::Key, Self::Item)> + Unpin + Send>;
+
+    async fn send(&self, item: Self::Item);
 }

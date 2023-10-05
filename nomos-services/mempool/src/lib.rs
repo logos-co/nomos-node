@@ -2,14 +2,17 @@ pub mod backend;
 pub mod network;
 
 // std
-use std::fmt::{Debug, Error, Formatter};
+use std::{
+    fmt::{Debug, Error, Formatter},
+    marker::PhantomData,
+};
 
 // crates
 use futures::StreamExt;
 use tokio::sync::oneshot::Sender;
 // internal
 use crate::network::NetworkAdapter;
-use backend::MemPool;
+use backend::{MemPool, Status};
 use nomos_core::block::BlockId;
 use nomos_network::NetworkService;
 use overwatch_rs::services::{
@@ -19,17 +22,23 @@ use overwatch_rs::services::{
     ServiceCore, ServiceData, ServiceId,
 };
 
-pub struct MempoolService<N, P>
+pub struct MempoolService<N, P, D>
 where
     N: NetworkAdapter<Item = P::Item, Key = P::Key>,
     P: MemPool,
     P::Settings: Clone,
     P::Item: Debug + 'static,
     P::Key: Debug + 'static,
+    D: Discriminant,
 {
     service_state: ServiceStateHandle<Self>,
     network_relay: Relay<NetworkService<N::Backend>>,
     pool: P,
+    // This is an hack because SERVICE_ID has to be univoque and associated const
+    // values can't depend on generic parameters.
+    // Unfortunately, this means that the mempools for certificates and transactions
+    // would have the same SERVICE_ID and break overwatch asumptions.
+    _d: PhantomData<D>,
 }
 
 pub struct MempoolMetrics {
@@ -62,6 +71,10 @@ pub enum MempoolMsg<Item, Key> {
     Metrics {
         reply_channel: Sender<MempoolMetrics>,
     },
+    Status {
+        items: Vec<Key>,
+        reply_channel: Sender<Vec<Status>>,
+    },
 }
 
 impl<Item, Key> Debug for MempoolMsg<Item, Key>
@@ -87,21 +100,38 @@ where
                 write!(f, "MempoolMsg::BlockItem{{block: {block:?}}}")
             }
             Self::Metrics { .. } => write!(f, "MempoolMsg::Metrics"),
+            Self::Status { items, .. } => write!(f, "MempoolMsg::Status{{items: {items:?}}}"),
         }
     }
 }
 
 impl<Item: 'static, Key: 'static> RelayMessage for MempoolMsg<Item, Key> {}
 
-impl<N, P> ServiceData for MempoolService<N, P>
+pub struct Transaction;
+pub struct Certificate;
+
+pub trait Discriminant {
+    const ID: &'static str;
+}
+
+impl Discriminant for Transaction {
+    const ID: &'static str = "mempool-cl";
+}
+
+impl Discriminant for Certificate {
+    const ID: &'static str = "mempool-da";
+}
+
+impl<N, P, D> ServiceData for MempoolService<N, P, D>
 where
     N: NetworkAdapter<Item = P::Item, Key = P::Key>,
     P: MemPool,
     P::Settings: Clone,
     P::Item: Debug + 'static,
     P::Key: Debug + 'static,
+    D: Discriminant,
 {
-    const SERVICE_ID: ServiceId = "Mempool";
+    const SERVICE_ID: ServiceId = D::ID;
     type Settings = Settings<P::Settings, N::Settings>;
     type State = NoState<Self::Settings>;
     type StateOperator = NoOperator<Self::State>;
@@ -109,7 +139,7 @@ where
 }
 
 #[async_trait::async_trait]
-impl<N, P> ServiceCore for MempoolService<N, P>
+impl<N, P, D> ServiceCore for MempoolService<N, P, D>
 where
     P: MemPool + Send + 'static,
     P::Settings: Clone + Send + Sync + 'static,
@@ -117,6 +147,7 @@ where
     P::Item: Clone + Debug + Send + Sync + 'static,
     P::Key: Debug + Send + Sync + 'static,
     N: NetworkAdapter<Item = P::Item, Key = P::Key> + Send + Sync + 'static,
+    D: Discriminant + Send,
 {
     fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, overwatch_rs::DynError> {
         let network_relay = service_state.overwatch_handle.relay();
@@ -125,6 +156,7 @@ where
             service_state,
             network_relay,
             pool: P::new(settings.backend),
+            _d: PhantomData,
         })
     }
 
@@ -133,6 +165,7 @@ where
             mut service_state,
             network_relay,
             mut pool,
+            ..
         } = self;
 
         let network_relay: OutboundRelay<_> = network_relay
@@ -142,7 +175,7 @@ where
 
         let adapter = N::new(
             service_state.settings_reader.get_updated_settings().network,
-            network_relay,
+            network_relay.clone(),
         );
         let adapter = adapter.await;
 
@@ -153,8 +186,16 @@ where
                 Some(msg) = service_state.inbound_relay.recv() => {
                     match msg {
                         MempoolMsg::Add { item, key, reply_channel } => {
-                            match pool.add_item(key, item) {
+                            match pool.add_item(key, item.clone()) {
                                 Ok(_id) => {
+                                    // Broadcast the item to the network
+                                    let net = network_relay.clone();
+                                    let settings = service_state.settings_reader.get_updated_settings().network;
+                                    // move sending to a new task so local operations can complete in the meantime
+                                    tokio::spawn(async move {
+                                        let adapter = N::new(settings, net).await;
+                                        adapter.send(item).await;
+                                    });
                                     if let Err(e) = reply_channel.send(Ok(())) {
                                         tracing::debug!("Failed to send reply to AddTx: {:?}", e);
                                     }
@@ -186,6 +227,13 @@ where
                             };
                             reply_channel.send(metrics).unwrap_or_else(|_| {
                                 tracing::debug!("could not send back mempool metrics")
+                            });
+                        }
+                        MempoolMsg::Status {
+                            items, reply_channel
+                        } => {
+                            reply_channel.send(pool.status(&items)).unwrap_or_else(|_| {
+                                tracing::debug!("could not send back mempool status")
                             });
                         }
                     }

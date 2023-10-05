@@ -10,7 +10,10 @@ use metrics::{backend::map::MapMetricsBackend, types::MetricsData, MetricsServic
 use nomos_consensus::network::adapters::libp2p::Libp2pAdapter as ConsensusLibp2pAdapter;
 
 use nomos_consensus::CarnotConsensus;
-use nomos_core::tx::Transaction;
+use nomos_core::{
+    da::{blob, certificate},
+    tx::Transaction,
+};
 use nomos_da::{
     backend::memory_cache::BlobCache, network::adapters::libp2p::Libp2pAdapter as DaLibp2pAdapter,
     DataAvailabilityService,
@@ -20,8 +23,10 @@ use nomos_http::bridge::HttpBridgeService;
 use nomos_http::http::HttpService;
 use nomos_log::Logger;
 use nomos_mempool::network::adapters::libp2p::Libp2pAdapter as MempoolLibp2pAdapter;
-
-use nomos_mempool::{backend::mockpool::MockPool, MempoolService};
+use nomos_mempool::{
+    backend::mockpool::MockPool, Certificate as CertDiscriminant, MempoolService,
+    Transaction as TxDiscriminant,
+};
 use nomos_network::backends::libp2p::Libp2p;
 
 use nomos_network::NetworkService;
@@ -35,14 +40,20 @@ use nomos_core::{
 };
 pub use tx::Tx;
 
+pub const CL_TOPIC: &str = "cl";
+pub const DA_TOPIC: &str = "da";
 const MB16: usize = 1024 * 1024 * 16;
 
 pub type Carnot = CarnotConsensus<
     ConsensusLibp2pAdapter,
     MockPool<Tx, <Tx as Transaction>::Hash>,
     MempoolLibp2pAdapter<Tx, <Tx as Transaction>::Hash>,
+    MockPool<Certificate, <<Certificate as certificate::Certificate>::Blob as blob::Blob>::Hash>,
+    MempoolLibp2pAdapter<
+        Certificate,
+        <<Certificate as certificate::Certificate>::Blob as blob::Blob>::Hash,
+    >,
     TreeOverlay<RoundRobin, RandomBeaconState>,
-    Certificate,
     FillSizeWithTx<MB16, Tx>,
     FillSizeWithBlobsCertificate<MB16, Certificate>,
 >;
@@ -53,16 +64,20 @@ type DataAvailability = DataAvailabilityService<
     DaLibp2pAdapter<Blob, Attestation>,
 >;
 
-type Mempool = MempoolService<
-    MempoolLibp2pAdapter<Tx, <Tx as Transaction>::Hash>,
-    MockPool<Tx, <Tx as Transaction>::Hash>,
->;
+type Mempool<K, V, D> = MempoolService<MempoolLibp2pAdapter<K, V>, MockPool<K, V>, D>;
 
 #[derive(Services)]
 pub struct Nomos {
     logging: ServiceHandle<Logger>,
     network: ServiceHandle<NetworkService<Libp2p>>,
-    mockpool: ServiceHandle<Mempool>,
+    cl_mempool: ServiceHandle<Mempool<Tx, <Tx as Transaction>::Hash, TxDiscriminant>>,
+    da_mempool: ServiceHandle<
+        Mempool<
+            Certificate,
+            <<Certificate as certificate::Certificate>::Blob as blob::Blob>::Hash,
+            CertDiscriminant,
+        >,
+    >,
     consensus: ServiceHandle<Carnot>,
     http: ServiceHandle<HttpService<AxumBackend>>,
     bridges: ServiceHandle<HttpBridgeService>,

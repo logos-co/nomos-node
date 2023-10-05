@@ -7,7 +7,6 @@ Nomos blockchain node
 
 Nomos node can be configured with one of the following network backends:
 - [libp2p](../../nomos-services/backends/libp2p.rs)
-- [Waku](../../nomos-services/backends/waku.rs)
 
 ### Mixclient integration
 

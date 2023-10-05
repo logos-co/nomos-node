@@ -16,7 +16,7 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        feature: [libp2p, waku]
+        feature: [libp2p]
     steps:
       - uses: actions/checkout@v2
         with:
@@ -37,16 +37,13 @@ jobs:
     strategy:
       fail-fast: false # all OSes should be tested even if one fails (default: true)
       matrix:
-        feature: [libp2p, waku]
+        feature: [libp2p]
         os: [ubuntu-latest, windows-latest, macos-latest]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v2
         with:
           submodules: true
-      - uses: actions/setup-go@v3 # we need go to build go-waku
-        with:
-          go-version: '1.20'
       # Setup Rust toolchain with GNU for Windows
       - name: Setup Rust with GNU toolchain (Windows)
         if: matrix.os == 'windows-latest'
@@ -81,7 +78,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        feature: [libp2p, waku]
+        feature: [libp2p]
     steps:
       - uses: actions/checkout@v2
         with:

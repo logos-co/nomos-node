@@ -13,9 +13,8 @@ use nomos_consensus::{CarnotInfo, CarnotSettings};
 use nomos_http::backends::axum::AxumBackendSettings;
 use nomos_libp2p::{multiaddr, Multiaddr};
 use nomos_log::{LoggerBackend, LoggerFormat};
+use nomos_mempool::MempoolMetrics;
 use nomos_network::backends::libp2p::Libp2pConfig;
-#[cfg(feature = "waku")]
-use nomos_network::backends::waku::{WakuConfig, WakuInfo};
 use nomos_network::NetworkConfig;
 use nomos_node::Config;
 // crates
@@ -28,6 +27,7 @@ use tempfile::NamedTempFile;
 static CLIENT: Lazy<Client> = Lazy::new(Client::new);
 const NOMOS_BIN: &str = "../target/debug/nomos-node";
 const CARNOT_INFO_API: &str = "carnot/info";
+const MEMPOOL_API: &str = "mempool-";
 const LOGS_PREFIX: &str = "__logs";
 
 pub struct NomosNode {
@@ -98,6 +98,25 @@ impl NomosNode {
     async fn wait_online(&self) {
         while self.get(CARNOT_INFO_API).await.is_err() {
             tokio::time::sleep(Duration::from_millis(100)).await;
+        }
+    }
+
+    pub async fn get_mempoool_metrics(&self, pool: Pool) -> MempoolMetrics {
+        let discr = match pool {
+            Pool::Cl => "cl",
+            Pool::Da => "da",
+        };
+        let addr = format!("{}{}/metrics", MEMPOOL_API, discr);
+        let res = self
+            .get(&addr)
+            .await
+            .unwrap()
+            .json::<serde_json::Value>()
+            .await
+            .unwrap();
+        MempoolMetrics {
+            pending_items: res["pending_items"].as_u64().unwrap() as usize,
+            last_item_timestamp: res["last_item"].as_u64().unwrap(),
         }
     }
 
@@ -294,4 +313,9 @@ fn create_node_config(
 
 fn node_address(config: &Config) -> Multiaddr {
     multiaddr!(Ip4([127, 0, 0, 1]), Tcp(config.network.backend.inner.port))
+}
+
+pub enum Pool {
+    Da,
+    Cl,
 }
