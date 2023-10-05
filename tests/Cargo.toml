@@ -27,7 +27,9 @@ secp256k1 = { version = "0.26", features = ["rand"] }
 reqwest = { version = "0.11", features = ["json"] }
 nomos-libp2p = { path = "../nomos-libp2p" }
 tempfile = "3.6"
+serde = { version = "1", features = ["derive"] }
 serde_yaml = "0.9"
+serde_json = "1.0"
 tokio = "1"
 futures = "0.3"
 async-trait = "0.1"
@@ -51,8 +53,6 @@ path = "src/tests/mixnet.rs"
 [[test]]
 name = "test_cli"
 path = "src/tests/cli.rs"
-# disseminate is only implemented for libp2p
-required-features = ["libp2p"]
 
 [[bench]]
 name = "mixnet"

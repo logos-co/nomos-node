@@ -2,6 +2,7 @@
 pub mod mockpool;
 
 use nomos_core::block::BlockId;
+use serde::{Deserialize, Serialize};
 
 #[derive(thiserror::Error, Debug)]
 pub enum MempoolError {
@@ -42,4 +43,16 @@ pub trait MemPool {
 
     fn pending_item_count(&self) -> usize;
     fn last_item_timestamp(&self) -> u64;
+
+    // Return the status of a set of items.
+    // This is a best effort attempt, and implementations are free to return `Unknown` for all of them.
+    fn status(&self, items: &[Self::Key]) -> Vec<Status>;
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
+pub enum Status {
+    Unknown,
+    Pending,
+    Rejected,
+    InBlock { block: BlockId },
 }

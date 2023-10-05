@@ -7,9 +7,13 @@ consensus:
   fountain_settings: null
   overlay_settings:
     nodes: [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]]
-    leader_super_majority_threshold: 1
+    number_of_committees: 1
+    current_leader: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
     leader:
       cur: 0
+    committee_membership: !Sad
+      entropy: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+
 network:
   backend:
     host: 0.0.0.0
@@ -49,3 +53,12 @@ http:
   backend:
     address: 0.0.0.0:8080
     cors_origins: []
+
+da:
+  da_protocol:
+    num_attestations: 1
+  backend:
+    max_capacity: 10
+    evicting_period: 
+      secs: 3600
+      nanos: 0

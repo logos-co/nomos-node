@@ -2,7 +2,7 @@ mod config;
 mod tx;
 
 use color_eyre::eyre::Result;
-use consensus_engine::overlay::{FlatOverlay, RandomBeaconState, RoundRobin};
+use consensus_engine::overlay::{RandomBeaconState, RoundRobin, TreeOverlay};
 use full_replication::Certificate;
 use full_replication::{AbsoluteNumber, Attestation, Blob, FullReplication};
 #[cfg(feature = "metrics")]
@@ -53,7 +53,7 @@ pub type Carnot = CarnotConsensus<
         Certificate,
         <<Certificate as certificate::Certificate>::Blob as blob::Blob>::Hash,
     >,
-    FlatOverlay<RoundRobin, RandomBeaconState>,
+    TreeOverlay<RoundRobin, RandomBeaconState>,
     FillSizeWithTx<MB16, Tx>,
     FillSizeWithBlobsCertificate<MB16, Certificate>,
 >;
