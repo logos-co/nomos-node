@@ -6,12 +6,9 @@ FROM rust:1.72.0-slim-bullseye AS builder
 RUN echo 'deb http://deb.debian.org/debian bullseye-backports main' \
     >> /etc/apt/sources.list
 
-# Dependecies for publishing documentation and building waku-bindings.
+# Dependecies for publishing documentation.
 RUN apt-get update && apt-get install -yq \
-    git clang etcd-client \
-    golang-src/bullseye-backports \
-    golang-doc/bullseye-backports \
-    golang/bullseye-backports
+    git clang etcd-client 
 
 WORKDIR /nomos
 COPY . . 

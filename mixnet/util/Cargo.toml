@@ -5,4 +5,4 @@ edition = "2021"
 
 [dependencies]
 tokio = { version = "1.32", default-features = false, features = ["sync", "net"] }
-parking_lot = { version = "0.12", features = ["send_guard"] }  
+mixnet-protocol = { path = "../protocol" }

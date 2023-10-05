@@ -1,6 +1,6 @@
 use clap::Subcommand;
 
-mod disseminate;
+pub mod disseminate;
 
 #[derive(Debug, Subcommand)]
 pub enum Command {

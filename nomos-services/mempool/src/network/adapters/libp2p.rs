@@ -1,14 +1,9 @@
-// std
-use std::marker::PhantomData;
 // crates
 use futures::Stream;
 use serde::{de::DeserializeOwned, Serialize};
 use tokio_stream::wrappers::BroadcastStream;
 use tokio_stream::StreamExt;
-use tracing::log::error;
-
 // internal
-use crate::network::messages::TransactionMsg;
 use crate::network::NetworkAdapter;
 use nomos_core::wire;
 use nomos_network::backends::libp2p::{Command, Event, EventKind, Libp2p, Message, TopicHash};
@@ -16,37 +11,42 @@ use nomos_network::{NetworkMsg, NetworkService};
 use overwatch_rs::services::relay::OutboundRelay;
 use overwatch_rs::services::ServiceData;
 
-pub const CARNOT_TX_TOPIC: &str = "CarnotTx";
-
-pub struct Libp2pAdapter<Tx> {
+pub struct Libp2pAdapter<Item, Key> {
     network_relay: OutboundRelay<<NetworkService<Libp2p> as ServiceData>::Message>,
-    _tx: PhantomData<Tx>,
+    settings: Settings<Key, Item>,
 }
 
 #[async_trait::async_trait]
-impl<Tx> NetworkAdapter for Libp2pAdapter<Tx>
+impl<Item, Key> NetworkAdapter for Libp2pAdapter<Item, Key>
 where
-    Tx: DeserializeOwned + Serialize + Send + Sync + 'static,
+    Item: DeserializeOwned + Serialize + Send + Sync + 'static + Clone,
+    Key: Clone + Send + Sync + 'static,
 {
     type Backend = Libp2p;
-    type Tx = Tx;
+    type Settings = Settings<Key, Item>;
+    type Item = Item;
+    type Key = Key;
 
     async fn new(
+        settings: Self::Settings,
         network_relay: OutboundRelay<<NetworkService<Self::Backend> as ServiceData>::Message>,
     ) -> Self {
         network_relay
             .send(NetworkMsg::Process(Command::Subscribe(
-                CARNOT_TX_TOPIC.to_string(),
+                settings.topic.clone(),
             )))
             .await
             .expect("Network backend should be ready");
         Self {
             network_relay,
-            _tx: PhantomData,
+            settings,
         }
     }
-    async fn transactions_stream(&self) -> Box<dyn Stream<Item = Self::Tx> + Unpin + Send> {
-        let topic_hash = TopicHash::from_raw(CARNOT_TX_TOPIC);
+    async fn transactions_stream(
+        &self,
+    ) -> Box<dyn Stream<Item = (Self::Key, Self::Item)> + Unpin + Send> {
+        let topic_hash = TopicHash::from_raw(self.settings.topic.clone());
+        let id = self.settings.id;
         let (sender, receiver) = tokio::sync::oneshot::channel();
         self.network_relay
             .send(NetworkMsg::Subscribe {
@@ -59,10 +59,10 @@ where
         Box::new(Box::pin(BroadcastStream::new(receiver).filter_map(
             move |message| match message {
                 Ok(Event::Message(Message { data, topic, .. })) if topic == topic_hash => {
-                    match wire::deserialize::<TransactionMsg<Tx>>(&data) {
-                        Ok(msg) => Some(msg.tx),
+                    match wire::deserialize::<Item>(&data) {
+                        Ok(item) => Some((id(&item), item)),
                         Err(e) => {
-                            error!("Unrecognized Tx message: {e}");
+                            tracing::debug!("Unrecognized message: {e}");
                             None
                         }
                     }
@@ -71,4 +71,27 @@ where
             },
         )))
     }
+
+    async fn send(&self, item: Item) {
+        if let Ok(wire) = wire::serialize(&item) {
+            if let Err((e, _)) = self
+                .network_relay
+                .send(NetworkMsg::Process(Command::Broadcast {
+                    topic: self.settings.topic.clone(),
+                    message: wire.into(),
+                }))
+                .await
+            {
+                tracing::error!("failed to send item to topic: {e}");
+            }
+        } else {
+            tracing::error!("Failed to serialize item");
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct Settings<K, V> {
+    pub topic: String,
+    pub id: fn(&V) -> K,
 }

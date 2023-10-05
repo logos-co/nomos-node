@@ -1,12 +1,10 @@
+use super::threshold::{apply_threshold, default_super_majority_threshold, deser_fraction};
 use super::LeaderSelection;
 use crate::overlay::CommitteeMembership;
 use crate::{NodeId, Overlay};
-use fraction::{Fraction, ToPrimitive};
+use fraction::Fraction;
 use serde::{Deserialize, Serialize};
 use std::marker::PhantomData;
-
-const LEADER_SUPER_MAJORITY_THRESHOLD_NUM: u64 = 2;
-const LEADER_SUPER_MAJORITY_THRESHOLD_DEN: u64 = 3;
 
 #[derive(Clone, Debug, PartialEq)]
 /// Flat overlay with a single committee and round robin leader selection.
@@ -36,12 +34,8 @@ where
         Self {
             nodes,
             leader,
-            leader_threshold: leader_super_majority_threshold.unwrap_or_else(|| {
-                Fraction::new(
-                    LEADER_SUPER_MAJORITY_THRESHOLD_NUM,
-                    LEADER_SUPER_MAJORITY_THRESHOLD_DEN,
-                )
-            }),
+            leader_threshold: leader_super_majority_threshold
+                .unwrap_or_else(default_super_majority_threshold),
             _committee_membership: Default::default(),
         }
     }
@@ -91,11 +85,7 @@ where
     }
 
     fn leader_super_majority_threshold(&self, _id: NodeId) -> usize {
-        // self.leader_threshold is a tuple of (num, den) where num/den is the super majority threshold
-        (Fraction::from(self.nodes.len()) * self.leader_threshold)
-            .floor()
-            .to_usize()
-            .unwrap()
+        apply_threshold(self.nodes.len(), self.leader_threshold)
     }
 
     fn update_leader_selection<F, E>(&self, f: F) -> Result<Self, E>
@@ -125,30 +115,8 @@ pub struct FlatOverlaySettings<L> {
     pub nodes: Vec<NodeId>,
     /// A fraction representing the threshold in the form `<num>/<den>'
     /// Defaults to 2/3
-    #[serde(with = "deser")]
+    #[serde(with = "deser_fraction")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub leader_super_majority_threshold: Option<Fraction>,
     pub leader: L,
-}
-
-mod deser {
-    use fraction::Fraction;
-    use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
-    use std::str::FromStr;
-
-    pub fn deserialize<'de, D>(deserializer: D) -> Result<Option<Fraction>, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        <Option<String>>::deserialize(deserializer)?
-            .map(|s| FromStr::from_str(&s).map_err(de::Error::custom))
-            .transpose()
-    }
-
-    pub fn serialize<S>(value: &Option<Fraction>, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        value.map(|v| v.to_string()).serialize(serializer)
-    }
 }

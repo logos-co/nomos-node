@@ -1,11 +1,13 @@
 # copy of https://github.com/actions-rs/meta/blob/master/recipes/quickstart.md
-# These tasks are supposed to run when updating the main branch.
-# The steps are identical to those that run on PRs, but this script includes macos environment.
+# Steps for checking PRs.
 on:
+  pull_request:
+    branches:
+      - "*"
   push:
     branches: [master]
 
-name: Master branch updates check
+name: PR check
 
 jobs:
   check:
@@ -14,7 +16,7 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        feature: [libp2p, waku]
+        feature: [libp2p]
     steps:
       - uses: actions/checkout@v2
         with:
@@ -31,19 +33,17 @@ jobs:
 
   test:
     name: Test Suite
+    if: ${{ !startsWith(github.event.pull_request.title, '[WIP]') && !contains(github.event.label.name,  'DO NOT MERGE') }}
     strategy:
       fail-fast: false # all OSes should be tested even if one fails (default: true)
       matrix:
-        feature: [libp2p, waku]
+        feature: [libp2p]
         os: [ubuntu-latest, windows-latest, macos-latest]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v2
         with:
           submodules: true
-      - uses: actions/setup-go@v3 # we need go to build go-waku
-        with:
-          go-version: '1.19'
       # Setup Rust toolchain with GNU for Windows
       - name: Setup Rust with GNU toolchain (Windows)
         if: matrix.os == 'windows-latest'
@@ -60,6 +60,10 @@ jobs:
           profile: minimal
           toolchain: stable
           override: true
+      # Setup build environment (Windows)
+      - name: Setup build environment (Windows)
+        if: matrix.os == 'windows-latest'
+        uses: ./.github/actions/mingw-env
       - uses: actions-rs/cargo@v1
         with:
           command: build
@@ -74,7 +78,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        feature: [libp2p, waku]
+        feature: [libp2p]
     steps:
       - uses: actions/checkout@v2
         with:

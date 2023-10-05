@@ -2,19 +2,20 @@ use consensus_engine::View;
 use fraction::Fraction;
 use futures::stream::{self, StreamExt};
 use std::collections::HashSet;
-use tests::{MixNode, Node, NomosNode, SpawnConfig};
+use tests::{ConsensusConfig, MixNode, Node, NomosNode, SpawnConfig};
 
 const TARGET_VIEW: View = View::new(20);
 
 #[tokio::test]
 async fn ten_nodes_one_down() {
-    let (_mixnodes, mixnet_node_configs, mixnet_topology) = MixNode::spawn_nodes(3).await;
-    let mut nodes = NomosNode::spawn_nodes(SpawnConfig::Star {
-        n_participants: 10,
-        threshold: Fraction::new(9u32, 10u32),
-        timeout: std::time::Duration::from_secs(5),
-        mixnet_node_configs,
-        mixnet_topology,
+    let (_mixnodes, mixnet_config) = MixNode::spawn_nodes(3).await;
+    let mut nodes = NomosNode::spawn_nodes(SpawnConfig::Chain {
+        consensus: ConsensusConfig {
+            n_participants: 10,
+            threshold: Fraction::new(9u32, 10u32),
+            timeout: std::time::Duration::from_secs(5),
+        },
+        mixnet: mixnet_config,
     })
     .await;
     let mut failed_node = nodes.pop().unwrap();
@@ -44,15 +45,31 @@ async fn ten_nodes_one_down() {
         .then(|n| async move { n.consensus_info().await })
         .collect::<Vec<_>>()
         .await;
+
     // check that they have the same block
-    let blocks = infos
+    let target_blocks = infos
         .iter()
-        .map(|i| {
-            i.safe_blocks
-                .values()
-                .find(|b| b.view == TARGET_VIEW)
-                .unwrap()
-        })
+        .map(|i| i.safe_blocks.values().find(|b| b.view == TARGET_VIEW))
         .collect::<HashSet<_>>();
-    assert_eq!(blocks.len(), 1);
+    // Every nodes must have the same target block (Some(block))
+    // , or no node must have it (None).
+    assert_eq!(target_blocks.len(), 1);
+
+    // If no node has the target block, check that TARGET_VIEW was reached by timeout_qc.
+    let target_block = target_blocks.iter().next().unwrap();
+    if target_block.is_none() {
+        println!("No node has the block with {TARGET_VIEW:?}. Checking timeout_qcs...");
+
+        let timeout_qcs = infos
+            .iter()
+            .map(|i| i.last_view_timeout_qc.clone())
+            .collect::<HashSet<_>>();
+        assert_eq!(timeout_qcs.len(), 1);
+
+        let timeout_qc = timeout_qcs.iter().next().unwrap().clone();
+        assert!(timeout_qc.is_some());
+        // NOTE: This check could be failed if other timeout_qc had occured before `infos` were gathered.
+        //       But it should be okay as long as the `timeout` is not too short.
+        assert_eq!(timeout_qc.unwrap().view(), TARGET_VIEW.prev());
+    }
 }

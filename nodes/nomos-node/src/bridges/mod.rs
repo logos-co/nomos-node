@@ -1,31 +1,46 @@
 mod libp2p;
+use libp2p::*;
 
 // std
 // crates
 use bytes::Bytes;
 use http::StatusCode;
 use nomos_consensus::{CarnotInfo, ConsensusMsg};
+use serde::de::DeserializeOwned;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::oneshot;
 use tracing::error;
 // internal
+use full_replication::{Blob, Certificate};
+use nomos_core::wire;
+use nomos_core::{
+    da::{blob, certificate::Certificate as _},
+    tx::Transaction,
+};
 use nomos_http::backends::axum::AxumBackend;
 use nomos_http::bridge::{build_http_bridge, HttpBridgeRunner};
 use nomos_http::http::{HttpMethod, HttpRequest, HttpResponse};
 use nomos_mempool::backend::mockpool::MockPool;
-
-use nomos_mempool::{MempoolMetrics, MempoolMsg, MempoolService};
-
 use nomos_mempool::network::adapters::libp2p::Libp2pAdapter;
-
+use nomos_mempool::network::NetworkAdapter;
+use nomos_mempool::{Certificate as CertDiscriminant, Transaction as TxDiscriminant};
+use nomos_mempool::{MempoolMetrics, MempoolMsg, MempoolService};
 use nomos_network::backends::libp2p::Libp2p;
+use nomos_network::backends::NetworkBackend;
 use nomos_network::NetworkService;
 use nomos_node::{Carnot, Tx};
 use overwatch_rs::services::relay::OutboundRelay;
 
-use libp2p::*;
-use nomos_mempool::network::NetworkAdapter;
-use nomos_network::backends::NetworkBackend;
+type DaMempoolService = MempoolService<
+    Libp2pAdapter<Certificate, <Blob as blob::Blob>::Hash>,
+    MockPool<Certificate, <Blob as blob::Blob>::Hash>,
+    CertDiscriminant,
+>;
+type ClMempoolService = MempoolService<
+    Libp2pAdapter<Tx, <Tx as Transaction>::Hash>,
+    MockPool<Tx, <Tx as Transaction>::Hash>,
+    TxDiscriminant,
+>;
 
 macro_rules! get_handler {
     ($handle:expr, $service:ty, $path:expr => $handler:tt) => {{
@@ -42,6 +57,24 @@ macro_rules! get_handler {
     }};
 }
 
+macro_rules! post_handler {
+    ($handle:expr, $service:ty, $path:expr => $handler:tt) => {{
+        let (channel, mut http_request_channel) =
+            build_http_bridge::<$service, AxumBackend, _>($handle, HttpMethod::POST, $path)
+                .await
+                .unwrap();
+        while let Some(HttpRequest {
+            res_tx, payload, ..
+        }) = http_request_channel.recv().await
+        {
+            if let Err(e) = $handler(&channel, payload, res_tx).await {
+                error!(e);
+            }
+        }
+        Ok(())
+    }};
+}
+
 pub fn carnot_info_bridge(
     handle: overwatch_rs::overwatch::handle::OverwatchHandle,
 ) -> HttpBridgeRunner {
@@ -50,11 +83,35 @@ pub fn carnot_info_bridge(
     }))
 }
 
-pub fn mempool_metrics_bridge(
+pub fn cl_mempool_metrics_bridge(
     handle: overwatch_rs::overwatch::handle::OverwatchHandle,
 ) -> HttpBridgeRunner {
     Box::new(Box::pin(async move {
-        get_handler!(handle, MempoolService<Libp2pAdapter<Tx>, MockPool<Tx>>, "metrics" => handle_mempool_metrics_req)
+        get_handler!(handle, ClMempoolService, "metrics" => handle_mempool_metrics_req)
+    }))
+}
+
+pub fn da_mempool_metrics_bridge(
+    handle: overwatch_rs::overwatch::handle::OverwatchHandle,
+) -> HttpBridgeRunner {
+    Box::new(Box::pin(async move {
+        get_handler!(handle, DaMempoolService, "metrics" => handle_mempool_metrics_req)
+    }))
+}
+
+pub fn da_mempool_status_bridge(
+    handle: overwatch_rs::overwatch::handle::OverwatchHandle,
+) -> HttpBridgeRunner {
+    Box::new(Box::pin(async move {
+        post_handler!(handle, DaMempoolService, "status" => handle_mempool_status_req)
+    }))
+}
+
+pub fn cl_mempool_status_bridge(
+    handle: overwatch_rs::overwatch::handle::OverwatchHandle,
+) -> HttpBridgeRunner {
+    Box::new(Box::pin(async move {
+        post_handler!(handle, ClMempoolService, "status" => handle_mempool_status_req)
     }))
 }
 
@@ -66,19 +123,50 @@ pub fn network_info_bridge(
     }))
 }
 
-pub fn mempool_add_tx_bridge<
-    N: NetworkBackend,
-    A: NetworkAdapter<Backend = N, Tx = Tx> + Send + Sync + 'static,
->(
+pub async fn handle_mempool_status_req<K, V>(
+    mempool_channel: &OutboundRelay<MempoolMsg<V, K>>,
+    payload: Option<Bytes>,
+    res_tx: Sender<HttpResponse>,
+) -> Result<(), overwatch_rs::DynError>
+where
+    K: DeserializeOwned,
+{
+    let (sender, receiver) = oneshot::channel();
+    let items: Vec<K> = serde_json::from_slice(payload.unwrap_or_default().as_ref())?;
+    mempool_channel
+        .send(MempoolMsg::Status {
+            items,
+            reply_channel: sender,
+        })
+        .await
+        .map_err(|(e, _)| e)?;
+
+    let status = receiver.await.unwrap();
+    res_tx
+        .send(Ok(serde_json::to_string(&status).unwrap().into()))
+        .await?;
+
+    Ok(())
+}
+
+pub fn mempool_add_tx_bridge<N, A>(
     handle: overwatch_rs::overwatch::handle::OverwatchHandle,
-) -> HttpBridgeRunner {
+) -> HttpBridgeRunner
+where
+    N: NetworkBackend,
+    A: NetworkAdapter<Backend = N, Item = Tx, Key = <Tx as Transaction>::Hash>
+        + Send
+        + Sync
+        + 'static,
+    A::Settings: Send + Sync,
+{
     Box::new(Box::pin(async move {
         let (mempool_channel, mut http_request_channel) =
-            build_http_bridge::<MempoolService<A, MockPool<Tx>>, AxumBackend, _>(
-                handle.clone(),
-                HttpMethod::POST,
-                "addtx",
-            )
+            build_http_bridge::<
+                MempoolService<A, MockPool<Tx, <Tx as Transaction>::Hash>, TxDiscriminant>,
+                AxumBackend,
+                _,
+            >(handle.clone(), HttpMethod::POST, "add")
             .await
             .unwrap();
 
@@ -86,8 +174,54 @@ pub fn mempool_add_tx_bridge<
             res_tx, payload, ..
         }) = http_request_channel.recv().await
         {
-            if let Err(e) =
-                handle_mempool_add_tx_req(&handle, &mempool_channel, res_tx, payload).await
+            if let Err(e) = handle_mempool_add_req(
+                &mempool_channel,
+                res_tx,
+                payload.unwrap_or_default(),
+                |tx| tx.hash(),
+            )
+            .await
+            {
+                error!(e);
+            }
+        }
+        Ok(())
+    }))
+}
+
+pub fn mempool_add_cert_bridge<N, A>(
+    handle: overwatch_rs::overwatch::handle::OverwatchHandle,
+) -> HttpBridgeRunner
+where
+    N: NetworkBackend,
+    A: NetworkAdapter<Backend = N, Item = Certificate, Key = <Blob as blob::Blob>::Hash>
+        + Send
+        + Sync
+        + 'static,
+    A::Settings: Send + Sync,
+{
+    Box::new(Box::pin(async move {
+        let (mempool_channel, mut http_request_channel) = build_http_bridge::<
+            MempoolService<A, MockPool<Certificate, <Blob as blob::Blob>::Hash>, CertDiscriminant>,
+            AxumBackend,
+            _,
+        >(
+            handle.clone(), HttpMethod::POST, "add"
+        )
+        .await
+        .unwrap();
+
+        while let Some(HttpRequest {
+            res_tx, payload, ..
+        }) = http_request_channel.recv().await
+        {
+            if let Err(e) = handle_mempool_add_req(
+                &mempool_channel,
+                res_tx,
+                payload.unwrap_or_default(),
+                |cert| cert.hash(),
+            )
+            .await
             {
                 error!(e);
             }
@@ -113,8 +247,8 @@ async fn handle_carnot_info_req(
     Ok(())
 }
 
-async fn handle_mempool_metrics_req(
-    mempool_channel: &OutboundRelay<MempoolMsg<Tx>>,
+async fn handle_mempool_metrics_req<K, V>(
+    mempool_channel: &OutboundRelay<MempoolMsg<K, V>>,
     res_tx: Sender<HttpResponse>,
 ) -> Result<(), overwatch_rs::DynError> {
     let (sender, receiver) = oneshot::channel();
@@ -129,8 +263,8 @@ async fn handle_mempool_metrics_req(
     res_tx
         // TODO: use serde to serialize metrics
         .send(Ok(format!(
-            "{{\"pending_tx\": {}, \"last_tx\": {}}}",
-            metrics.pending_txs, metrics.last_tx_timestamp
+            "{{\"pending_items\": {}, \"last_item\": {}}}",
+            metrics.pending_items, metrics.last_item_timestamp
         )
         .into()))
         .await?;
@@ -138,47 +272,37 @@ async fn handle_mempool_metrics_req(
     Ok(())
 }
 
-pub(super) async fn handle_mempool_add_tx_req(
-    handle: &overwatch_rs::overwatch::handle::OverwatchHandle,
-    mempool_channel: &OutboundRelay<MempoolMsg<Tx>>,
+pub(super) async fn handle_mempool_add_req<K, V>(
+    mempool_channel: &OutboundRelay<MempoolMsg<K, V>>,
     res_tx: Sender<HttpResponse>,
-    payload: Option<Bytes>,
-) -> Result<(), overwatch_rs::DynError> {
-    if let Some(data) = payload
-        .as_ref()
-        .and_then(|b| String::from_utf8(b.to_vec()).ok())
-    {
-        let tx = Tx(data);
-        let (sender, receiver) = oneshot::channel();
-        mempool_channel
-            .send(MempoolMsg::AddTx {
-                tx: tx.clone(),
-                reply_channel: sender,
-            })
-            .await
-            .map_err(|(e, _)| e)?;
+    wire_item: Bytes,
+    key: impl Fn(&K) -> V,
+) -> Result<(), overwatch_rs::DynError>
+where
+    K: DeserializeOwned,
+{
+    let item = wire::deserialize::<K>(&wire_item)?;
+    let (sender, receiver) = oneshot::channel();
+    let key = key(&item);
+    mempool_channel
+        .send(MempoolMsg::Add {
+            item,
+            key,
+            reply_channel: sender,
+        })
+        .await
+        .map_err(|(e, _)| e)?;
 
-        match receiver.await {
-            Ok(Ok(())) => {
-                // broadcast transaction to peers
-                let network_relay = handle.relay::<NetworkService<Libp2p>>().connect().await?;
-                libp2p_send_transaction(network_relay, tx).await?;
-                Ok(res_tx.send(Ok(b"".to_vec().into())).await?)
-            }
-            Ok(Err(())) => Ok(res_tx
-                .send(Err((
-                    StatusCode::CONFLICT,
-                    "error: unable to add tx".into(),
-                )))
-                .await?),
-            Err(err) => Ok(res_tx
-                .send(Err((StatusCode::INTERNAL_SERVER_ERROR, err.to_string())))
-                .await?),
-        }
-    } else {
-        Err(
-            format!("Invalid payload, {payload:?}. Empty or couldn't transform into a utf8 String")
-                .into(),
-        )
+    match receiver.await {
+        Ok(Ok(())) => Ok(res_tx.send(Ok(b"".to_vec().into())).await?),
+        Ok(Err(())) => Ok(res_tx
+            .send(Err((
+                StatusCode::CONFLICT,
+                "error: unable to add tx".into(),
+            )))
+            .await?),
+        Err(err) => Ok(res_tx
+            .send(Err((StatusCode::INTERNAL_SERVER_ERROR, err.to_string())))
+            .await?),
     }
 }

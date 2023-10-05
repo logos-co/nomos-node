@@ -1,5 +1,3 @@
-pub mod select;
-
 use bytes::Bytes;
 use std::hash::Hash;
 
@@ -12,15 +10,4 @@ pub trait Blob {
         Self::HASHER(self)
     }
     fn as_bytes(&self) -> Bytes;
-}
-
-pub trait BlobSelect {
-    type Blob: Blob;
-    type Settings: Clone;
-
-    fn new(settings: Self::Settings) -> Self;
-    fn select_blob_from<'i, I: Iterator<Item = Self::Blob> + 'i>(
-        &self,
-        blobs: I,
-    ) -> Box<dyn Iterator<Item = Self::Blob> + 'i>;
 }
