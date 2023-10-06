@@ -87,30 +87,19 @@ pub struct ConsensusArgs {
     consensus_timeout_secs: Option<String>,
 }
 
-#[derive(ValueEnum, Clone, Debug, Default)]
-pub enum OverlayType {
-    #[default]
-    Flat,
-    Tree,
-}
-
 #[derive(Parser, Debug, Clone)]
 pub struct OverlayArgs {
-    // TODO: Act on type and support other overlays.
-    #[clap(long = "overlay-type", env = "OVERLAY_TYPE")]
-    pub overlay_type: Option<OverlayType>,
-
     #[clap(long = "overlay-nodes", env = "OVERLAY_NODES", num_args = 1.., value_delimiter = ',')]
     pub overlay_nodes: Option<Vec<String>>,
 
     #[clap(long = "overlay-leader", env = "OVERLAY_LEADER")]
-    pub overlay_leader: Option<usize>,
+    pub overlay_leader: Option<String>,
 
     #[clap(
         long = "overlay-leader-super-majority-threshold",
-        env = "OVERLAY_LEADER_SUPER_MAJORITY_THRESHOLD"
+        env = "OVERLAY_NUMBER_OF_COMMITTEES"
     )]
-    pub overlay_leader_super_majority_threshold: Option<usize>,
+    pub overlay_number_of_committees: Option<usize>,
 }
 
 #[derive(Deserialize, Debug, Clone, Serialize)]
@@ -237,8 +226,8 @@ impl Config {
     pub fn update_overlay(mut self, overlay_args: OverlayArgs) -> Result<Self> {
         let OverlayArgs {
             overlay_nodes,
-            overlay_leader_super_majority_threshold,
-            ..
+            overlay_leader,
+            overlay_number_of_committees,
         } = overlay_args;
 
         if let Some(nodes) = overlay_nodes {
@@ -252,10 +241,13 @@ impl Config {
                 .collect::<Result<Vec<_>, eyre::Report>>()?;
         }
 
-        if let Some(threshold) = overlay_leader_super_majority_threshold {
-            self.consensus
-                .overlay_settings
-                .leader_super_majority_threshold = Some(threshold.into());
+        if let Some(leader) = overlay_leader {
+            let bytes = <[u8; 32]>::from_hex(leader)?;
+            self.consensus.overlay_settings.current_leader = bytes.into();
+        }
+
+        if let Some(committees) = overlay_number_of_committees {
+            self.consensus.overlay_settings.number_of_committees = committees;
         }
 
         Ok(self)

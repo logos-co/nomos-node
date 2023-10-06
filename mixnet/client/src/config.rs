@@ -1,4 +1,4 @@
-use std::net::SocketAddr;
+use std::{net::SocketAddr, time::Duration};
 
 use futures::{stream, StreamExt};
 use mixnet_topology::MixnetTopology;
@@ -11,7 +11,9 @@ pub struct MixnetClientConfig {
     pub mode: MixnetClientMode,
     pub topology: MixnetTopology,
     pub connection_pool_size: usize,
+    #[serde(default = "MixnetClientConfig::default_max_retries")]
     pub max_retries: usize,
+    #[serde(default = "MixnetClientConfig::default_retry_delay")]
     pub retry_delay: std::time::Duration,
 }
 
@@ -42,5 +44,15 @@ impl MixnetClientMode {
                 Ok(Receiver::new(*node_address).run().await?.boxed())
             }
         }
+    }
+}
+
+impl MixnetClientConfig {
+    const fn default_max_retries() -> usize {
+        3
+    }
+
+    const fn default_retry_delay() -> Duration {
+        Duration::from_secs(5)
     }
 }

@@ -1,14 +1,25 @@
 use super::tree::Tree;
+use crate::overlay::threshold::{
+    apply_threshold, default_super_majority_threshold, deser_fraction,
+};
 use crate::overlay::CommitteeMembership;
 use crate::{overlay::LeaderSelection, Committee, NodeId, Overlay};
+use fraction::Fraction;
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct TreeOverlaySettings<L: LeaderSelection, M: CommitteeMembership> {
     pub nodes: Vec<NodeId>,
     pub current_leader: NodeId,
     pub number_of_committees: usize,
     pub leader: L,
     pub committee_membership: M,
+    /// A fraction representing the threshold in the form `<num>/<den>'
+    /// Defaults to 2/3
+    #[serde(with = "deser_fraction")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub super_majority_threshold: Option<Fraction>,
 }
 
 #[derive(Debug, Clone)]
@@ -19,6 +30,7 @@ pub struct TreeOverlay<L, M> {
     pub(super) carnot_tree: Tree,
     pub(super) leader: L,
     pub(super) committee_membership: M,
+    pub(super) threshold: Fraction,
 }
 
 impl<L, M> Overlay for TreeOverlay<L, M>
@@ -38,6 +50,7 @@ where
             number_of_committees,
             leader,
             committee_membership,
+            super_majority_threshold,
         } = settings;
 
         committee_membership.reshape_committees(&mut nodes);
@@ -50,6 +63,7 @@ where
             carnot_tree,
             leader,
             committee_membership,
+            threshold: super_majority_threshold.unwrap_or_else(default_super_majority_threshold),
         }
     }
 
@@ -134,7 +148,7 @@ where
         }
         self.carnot_tree
             .committee_by_member_id(&id)
-            .map(|c| (c.len() * 2 / 3) + 1)
+            .map(|c| apply_threshold(c.len(), self.threshold))
             .expect("node is not part of any committee")
     }
 
@@ -156,8 +170,7 @@ where
         // });
         // let root_size = self.root_committee().len();
         // let committee_size = root_size + children_size;
-        let committee_size = self.root_committee().len();
-        (committee_size * 2 / 3) + 1
+        apply_threshold(self.root_committee().len(), self.threshold)
     }
 
     fn update_leader_selection<F, E>(&self, f: F) -> Result<Self, E>
@@ -184,6 +197,7 @@ where
                 number_of_committees: self.number_of_committees,
                 leader: self.leader.clone(),
                 committee_membership,
+                super_majority_threshold: Some(self.threshold),
             };
             Self::new(settings)
         })
@@ -202,6 +216,7 @@ where
             number_of_committees: self.number_of_committees,
             leader,
             committee_membership,
+            super_majority_threshold: Some(self.threshold),
         })
     }
 
@@ -232,6 +247,7 @@ mod tests {
             number_of_committees: 3,
             leader: RoundRobin::new(),
             committee_membership: FisherYatesShuffle::new(ENTROPY),
+            super_majority_threshold: None,
         });
 
         assert_eq!(*overlay.leader(), nodes[0]);
@@ -246,6 +262,7 @@ mod tests {
             number_of_committees: 3,
             leader: RoundRobin::new(),
             committee_membership: FisherYatesShuffle::new(ENTROPY),
+            super_majority_threshold: None,
         });
 
         let leader = overlay.next_leader();
@@ -263,6 +280,7 @@ mod tests {
             number_of_committees: 3,
             leader: RoundRobin::new(),
             committee_membership: FisherYatesShuffle::new(ENTROPY),
+            super_majority_threshold: None,
         });
 
         let mut expected_root = Committee::new();
@@ -281,6 +299,7 @@ mod tests {
             number_of_committees: 3,
             leader: RoundRobin::new(),
             committee_membership: FisherYatesShuffle::new(ENTROPY),
+            super_majority_threshold: None,
         });
 
         let mut leaf_committees = overlay
@@ -311,6 +330,7 @@ mod tests {
             number_of_committees: 3,
             leader: RoundRobin::new(),
             committee_membership: FisherYatesShuffle::new(ENTROPY),
+            super_majority_threshold: None,
         });
 
         assert_eq!(overlay.super_majority_threshold(overlay.nodes[8]), 0);
@@ -325,6 +345,7 @@ mod tests {
             number_of_committees: 3,
             leader: RoundRobin::new(),
             committee_membership: FisherYatesShuffle::new(ENTROPY),
+            super_majority_threshold: None,
         });
 
         assert_eq!(overlay.super_majority_threshold(overlay.nodes[0]), 3);
@@ -339,6 +360,7 @@ mod tests {
             number_of_committees: 3,
             leader: RoundRobin::new(),
             committee_membership: FisherYatesShuffle::new(ENTROPY),
+            super_majority_threshold: None,
         });
 
         assert_eq!(
