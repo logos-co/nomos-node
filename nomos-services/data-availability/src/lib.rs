@@ -98,8 +98,8 @@ where
     async fn run(self) -> Result<(), DynError> {
         let Self {
             mut service_state,
-            mut backend,
-            mut da,
+            backend,
+            da,
             network_relay,
         } = self;
 
@@ -113,12 +113,12 @@ where
         loop {
             tokio::select! {
                 Some(blob) = network_blobs.next() => {
-                    if let Err(e) = handle_new_blob(&mut da, &mut backend, &adapter, blob).await {
+                    if let Err(e) = handle_new_blob(&da, &backend, &adapter, blob).await {
                         tracing::debug!("Failed to add a new received blob: {e:?}");
                     }
                 }
                 Some(msg) = service_state.inbound_relay.recv() => {
-                    if let Err(e) = handle_da_msg(&mut backend, msg).await {
+                    if let Err(e) = handle_da_msg(&backend, msg).await {
                         tracing::debug!("Failed to handle da msg: {e:?}");
                     }
                 }
@@ -132,8 +132,8 @@ async fn handle_new_blob<
     Backend: DaBackend<Blob = Protocol::Blob>,
     A: NetworkAdapter<Blob = Protocol::Blob, Attestation = Protocol::Attestation>,
 >(
-    da: &mut Protocol,
-    backend: &mut Backend,
+    da: &Protocol,
+    backend: &Backend,
     adapter: &A,
     blob: Protocol::Blob,
 ) -> Result<(), DaError> {
@@ -151,7 +151,7 @@ async fn handle_new_blob<
         .map_err(DaError::Dyn)
 }
 
-async fn handle_da_msg<B: DaBackend>(backend: &mut B, msg: DaMsg<B::Blob>) -> Result<(), DaError>
+async fn handle_da_msg<B: DaBackend>(backend: &B, msg: DaMsg<B::Blob>) -> Result<(), DaError>
 where
     <B::Blob as Blob>::Hash: Debug,
 {
@@ -163,7 +163,6 @@ where
             }
         }
         DaMsg::RemoveBlobs { blobs } => {
-            let backend = &*backend;
             futures::stream::iter(blobs)
                 .for_each_concurrent(None, |blob| async move {
                     if let Err(e) = backend.remove_blob(&blob).await {
