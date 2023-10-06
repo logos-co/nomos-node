@@ -71,4 +71,8 @@ where
     fn pending_blobs(&self) -> Box<dyn Iterator<Item = Self::Blob> + Send> {
         BlobCache::pending_blobs(self)
     }
+
+    fn get_blob(&self, id: &<Self::Blob as Blob>::Hash) -> Option<Self::Blob> {
+        self.0.get(id)
+    }
 }

@@ -3,6 +3,7 @@ pub mod network;
 
 // std
 use overwatch_rs::DynError;
+use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
 // crates
 use futures::StreamExt;
@@ -38,6 +39,10 @@ pub enum DaMsg<B: Blob> {
     RemoveBlobs {
         blobs: Box<dyn Iterator<Item = <B as Blob>::Hash> + Send>,
     },
+    Get {
+        ids: Box<dyn Iterator<Item = <B as Blob>::Hash> + Send>,
+        reply_channel: Sender<HashMap<<B as Blob>::Hash, B>>,
+    },
 }
 
 impl<B: Blob + 'static> Debug for DaMsg<B> {
@@ -48,6 +53,9 @@ impl<B: Blob + 'static> Debug for DaMsg<B> {
             }
             DaMsg::RemoveBlobs { .. } => {
                 write!(f, "DaMsg::RemoveBlobs")
+            }
+            DaMsg::Get { .. } => {
+                write!(f, "DaMsg::Get")
             }
         }
     }
@@ -170,6 +178,14 @@ where
                     }
                 })
                 .await;
+        }
+        DaMsg::Get { ids, reply_channel } => {
+            let res = ids
+                .filter_map(|id| backend.get_blob(&id).map(|blob| (id, blob)))
+                .collect();
+            if reply_channel.send(res).is_err() {
+                tracing::error!("Could not returns blobs");
+            }
         }
     }
     Ok(())
