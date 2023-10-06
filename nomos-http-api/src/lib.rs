@@ -24,14 +24,14 @@ pub trait Backend {
 
 #[derive(Debug, Clone)]
 pub struct ApiServiceSettings<S> {
-    pub server_settings: S,
+    pub backend_settings: S,
 }
 
-pub struct ApiService<E: Backend> {
-    settings: ApiServiceSettings<E::Settings>,
+pub struct ApiService<B: Backend> {
+    settings: ApiServiceSettings<B::Settings>,
 }
 
-impl<E: Backend> ServiceData for ApiService<E> {
+impl<B: Backend> ServiceData for ApiService<B> {
     const SERVICE_ID: overwatch_rs::services::ServiceId = "nomos-api";
 
     type Settings = ApiServiceSettings<E::Settings>;
