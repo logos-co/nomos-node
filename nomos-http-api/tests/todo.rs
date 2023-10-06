@@ -101,7 +101,7 @@ fn test_todo() -> Result<(), Error> {
         let app = OverwatchRunner::<NomosApi>::run(
             NomosApiServiceSettings {
                 http: ApiServiceSettings {
-                    server_settings: addr,
+                    backend_settings: addr,
                 },
             },
             None,

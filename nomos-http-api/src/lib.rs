@@ -34,7 +34,7 @@ pub struct ApiService<B: Backend> {
 impl<B: Backend> ServiceData for ApiService<B> {
     const SERVICE_ID: overwatch_rs::services::ServiceId = "nomos-api";
 
-    type Settings = ApiServiceSettings<E::Settings>;
+    type Settings = ApiServiceSettings<B::Settings>;
 
     type State = NoState<Self::Settings>;
 
@@ -44,9 +44,9 @@ impl<B: Backend> ServiceData for ApiService<B> {
 }
 
 #[async_trait::async_trait]
-impl<E> ServiceCore for ApiService<E>
+impl<B> ServiceCore for ApiService<B>
 where
-    E: Backend + Send + Sync + 'static,
+    B: Backend + Send + Sync + 'static,
 {
     /// Initialize the service with the given state
     fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, DynError> {
@@ -56,7 +56,7 @@ where
 
     /// Service main loop
     async fn run(mut self) -> Result<(), DynError> {
-        let endpoint = E::new(self.settings.server_settings).await?;
+        let endpoint = B::new(self.settings.backend_settings).await?;
         endpoint.serve().await?;
         Ok(())
     }
