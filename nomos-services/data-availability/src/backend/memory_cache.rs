@@ -37,12 +37,6 @@ where
     pub async fn remove(&self, hash: &B::Hash) {
         self.0.remove(hash).await;
     }
-
-    pub fn pending_blobs(&self) -> Box<dyn Iterator<Item = B> + Send> {
-        // bypass lifetime
-        let blobs: Vec<_> = self.0.iter().map(|t| t.1).collect();
-        Box::new(blobs.into_iter())
-    }
 }
 
 #[async_trait::async_trait]
@@ -66,10 +60,6 @@ where
     async fn remove_blob(&self, blob: &<Self::Blob as Blob>::Hash) -> Result<(), DaError> {
         self.remove(blob).await;
         Ok(())
-    }
-
-    fn pending_blobs(&self) -> Box<dyn Iterator<Item = Self::Blob> + Send> {
-        BlobCache::pending_blobs(self)
     }
 
     fn get_blob(&self, id: &<Self::Blob as Blob>::Hash) -> Option<Self::Blob> {

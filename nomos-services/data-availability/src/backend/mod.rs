@@ -20,7 +20,5 @@ pub trait DaBackend {
 
     async fn remove_blob(&self, blob: &<Self::Blob as Blob>::Hash) -> Result<(), DaError>;
 
-    fn pending_blobs(&self) -> Box<dyn Iterator<Item = Self::Blob> + Send>;
-
     fn get_blob(&self, id: &<Self::Blob as Blob>::Hash) -> Option<Self::Blob>;
 }
