@@ -1,0 +1,22 @@
+[package]
+name = "nomos-http-api"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+async-trait = "0.1"
+overwatch-rs = { git = "https://github.com/logos-co/Overwatch", branch = "main" }
+overwatch-derive = { git = "https://github.com/logos-co/Overwatch", branch = "main" }
+tracing = "0.1"
+
+[dev-dependencies]
+axum = "0.6.20"
+tokio = { version = "1.32", features = ["full"] }
+hyper = { version = "*", features = ["full"] }
+utoipa = "3.5"
+reqwest = { version = "0.11", features = ["blocking", "json"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+utoipa-swagger-ui = { version = "3.1", features = ["axum"] }

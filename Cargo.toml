@@ -13,6 +13,7 @@ members = [
     "nomos-da/reed-solomon",
     "nomos-da/kzg",
     "nomos-da/full-replication",
+    "nomos-http-api",
     "nomos-cli",
     "nodes/nomos-node",
     "nodes/mixnode",
