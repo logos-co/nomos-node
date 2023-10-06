@@ -266,7 +266,7 @@ impl NetworkBackend for Mock {
                     .lock()
                     .unwrap()
                     .entry(topic)
-                    .or_insert_with(Vec::new)
+                    .or_default()
                     .push(msg.clone());
                 let _ = self.message_event.send(NetworkEvent::RawMessage(msg));
             }
