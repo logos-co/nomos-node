@@ -154,7 +154,7 @@ impl ReferenceStateMachine for RefState {
             }
             Transition::ApproveNewViewWithLatestTimeoutQc(timeout_qc, _) => {
                 let new_view = RefState::new_view_from(timeout_qc);
-                state.chain.entry(new_view).or_insert(ViewEntry::new());
+                state.chain.entry(new_view).or_default();
                 state.highest_voted_view = new_view;
             }
         }
@@ -407,10 +407,6 @@ impl RefState {
 }
 
 impl ViewEntry {
-    fn new() -> ViewEntry {
-        Default::default()
-    }
-
     fn is_empty(&self) -> bool {
         self.blocks.is_empty() && self.timeout_qcs.is_empty()
     }

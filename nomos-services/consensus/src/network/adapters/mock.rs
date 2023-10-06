@@ -88,10 +88,12 @@ impl NetworkAdapter for MockAdapter {
         self.send(message, &Committee::default()).await
     }
 
+    #[allow(clippy::diverging_sub_expression)]
     async fn timeout_stream(&self, _committee: &Committee, _view: View) -> BoxedStream<TimeoutMsg> {
         todo!()
     }
 
+    #[allow(clippy::diverging_sub_expression)]
     async fn timeout_qc_stream(&self, _view: View) -> BoxedStream<TimeoutQcMsg> {
         todo!()
     }
@@ -122,6 +124,7 @@ impl NetworkAdapter for MockAdapter {
         )))
     }
 
+    #[allow(clippy::diverging_sub_expression)]
     async fn new_view_stream(&self, _: &Committee, _view: View) -> BoxedStream<NewViewMsg> {
         todo!()
     }
