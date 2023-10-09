@@ -15,8 +15,11 @@ tracing = "0.1"
 axum = "0.6.20"
 tokio = { version = "1.32", features = ["full"] }
 hyper = { version = "*", features = ["full"] }
-utoipa = "3.5"
+utoipa = "4.0"
 reqwest = { version = "0.11", features = ["blocking", "json"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-utoipa-swagger-ui = { version = "3.1", features = ["axum"] }
+utoipa-swagger-ui = { version = "4.0", features = ["axum"] }
+nomos-da = { path = "../nomos-services/data-availability" }
+nomos-mempool = { path = "../nomos-services/mempool", features = ["mock", "libp2p", "openapi"] }
+

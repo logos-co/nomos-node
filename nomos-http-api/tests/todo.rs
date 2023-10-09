@@ -166,12 +166,12 @@ mod todo {
     ///
     /// List all Todo items from in-memory storage.
     #[utoipa::path(
-      get,
-      path = "/todo",
-      responses(
-          (status = 200, description = "List all todos successfully", body = [Todo])
-      )
-  )]
+        get,
+        path = "/todo",
+        responses(
+            (status = 200, description = "List all todos successfully", body = [Todo])
+        )
+    )]
     pub(super) async fn list_todos(State(store): State<Arc<Store>>) -> Json<Vec<Todo>> {
         let todos = store.lock().await.clone();
 

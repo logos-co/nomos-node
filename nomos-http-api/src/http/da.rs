@@ -12,6 +12,7 @@ pub async fn da_mempool_metrics(handle: overwatch_rs::overwatch::handle::Overwat
     todo!()
 }
 
+
 async fn handle_mempool_metrics_req<K, V>(
   mempool_channel: &OutboundRelay<MempoolMsg<K, V>>,
   res_tx: Sender<HttpResponse>,

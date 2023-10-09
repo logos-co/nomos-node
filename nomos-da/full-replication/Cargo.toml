@@ -5,8 +5,15 @@ edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[features]
+default = []
+openapi = ["dep:utoipa", "serde_json"]
+
 [dependencies]
 blake2 = { version = "0.10" }
 bytes = { version = "1.3", features = ["serde"] }
 nomos-core = { path = "../../nomos-core" }
 serde = { version = "1.0", features = ["derive"] }
+
+utoipa = { version = "3.5", optional = true }
+serde_json = { version = "1.0", optional = true }

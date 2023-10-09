@@ -16,6 +16,12 @@ use bytes::Bytes;
 use nomos_core::wire;
 use serde::{Deserialize, Serialize};
 
+/// Re-export the types for OpenAPI
+#[cfg(feature = "openapi")]
+pub mod openapi {
+    pub use super::{Certificate, Attestation};
+}
+
 #[derive(Debug, Clone)]
 pub struct FullReplication<CertificateStrategy> {
     certificate_strategy: CertificateStrategy,
@@ -110,6 +116,7 @@ impl blob::Blob for Blob {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct Attestation {
     blob: [u8; 32],
     voter: [u8; 32],
@@ -133,6 +140,7 @@ impl attestation::Attestation for Attestation {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct Certificate {
     attestations: Vec<Attestation>,
 }

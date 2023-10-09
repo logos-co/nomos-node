@@ -50,9 +50,17 @@ pub trait MemPool {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub enum Status {
+    /// Unknown status
     Unknown,
+    /// Pending status
     Pending,
+    /// Rejected status
     Rejected,
+    /// Accepted status
+    /// 
+    /// The block id of the block that contains the item
+    #[cfg_attr(feature = "openapi", schema(example = "e.g. [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]"))]
     InBlock { block: BlockId },
 }

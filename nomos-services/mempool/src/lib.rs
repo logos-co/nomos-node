@@ -1,6 +1,12 @@
 pub mod backend;
 pub mod network;
 
+/// Re-export for OpenAPI
+#[cfg(feature = "openapi")]
+pub mod openapi {
+    pub use super::{backend::Status, MempoolMetrics};
+}
+
 // std
 use std::{
     fmt::{Debug, Error, Formatter},
@@ -41,6 +47,7 @@ where
     _d: PhantomData<D>,
 }
 
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct MempoolMetrics {
     pub pending_items: usize,
     pub last_item_timestamp: u64,
