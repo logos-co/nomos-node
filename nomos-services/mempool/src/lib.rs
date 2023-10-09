@@ -48,6 +48,7 @@ where
 }
 
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(serde::Serialize, serde::Deserialize)]
 pub struct MempoolMetrics {
     pub pending_items: usize,
     pub last_item_timestamp: u64,

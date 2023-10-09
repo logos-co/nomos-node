@@ -16,7 +16,7 @@ rand_chacha = "0.3"
 thiserror = "1"
 fraction = { version = "0.13" }
 
-utoipa = { version = "3.5", optional = true }
+utoipa = { version = "4.0", optional = true }
 serde_json = { version = "1.0", optional = true }
 
 [features]

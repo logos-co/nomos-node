@@ -59,8 +59,13 @@ pub enum Status {
     /// Rejected status
     Rejected,
     /// Accepted status
-    /// 
+    ///
     /// The block id of the block that contains the item
-    #[cfg_attr(feature = "openapi", schema(example = "e.g. [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]"))]
+    #[cfg_attr(
+        feature = "openapi",
+        schema(
+            example = "e.g. [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]"
+        )
+    )]
     InBlock { block: BlockId },
 }

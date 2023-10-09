@@ -19,7 +19,7 @@ use serde::{Deserialize, Serialize};
 /// Re-export the types for OpenAPI
 #[cfg(feature = "openapi")]
 pub mod openapi {
-    pub use super::{Certificate, Attestation};
+    pub use super::{Attestation, Certificate};
 }
 
 #[derive(Debug, Clone)]
