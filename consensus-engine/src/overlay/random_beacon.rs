@@ -4,7 +4,7 @@ use bls_signatures::{PrivateKey, PublicKey, Serialize, Signature};
 use rand::{seq::SliceRandom, SeedableRng};
 use serde::{Deserialize, Serialize as SerdeSerialize};
 use sha2::{Digest, Sha256};
-use std::ops::Deref;
+
 use thiserror::Error;
 
 use super::LeaderSelection;
@@ -96,7 +96,7 @@ fn view_to_bytes(view: View) -> Box<[u8]> {
 // for now, just use something that works
 fn choice(state: &RandomBeaconState, nodes: &[NodeId]) -> NodeId {
     let mut seed = [0; 32];
-    seed.copy_from_slice(&state.entropy().deref()[..32]);
+    seed.copy_from_slice(&state.entropy()[..32]);
     let mut rng = rand_chacha::ChaChaRng::from_seed(seed);
     *nodes.choose(&mut rng).unwrap()
 }
@@ -110,7 +110,7 @@ impl LeaderSelection for RandomBeaconState {
 impl CommitteeMembership for RandomBeaconState {
     fn reshape_committees(&self, nodes: &mut [NodeId]) {
         let mut seed = [0; 32];
-        seed.copy_from_slice(&self.entropy().deref()[..32]);
+        seed.copy_from_slice(&self.entropy()[..32]);
         FisherYatesShuffle::shuffle(nodes, seed);
     }
 }

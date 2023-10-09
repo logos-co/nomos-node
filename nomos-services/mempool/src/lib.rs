@@ -115,11 +115,11 @@ pub trait Discriminant {
 }
 
 impl Discriminant for Transaction {
-    const ID: &'static str = "mempool-txs";
+    const ID: &'static str = "mempool-cl";
 }
 
 impl Discriminant for Certificate {
-    const ID: &'static str = "mempool-certs";
+    const ID: &'static str = "mempool-da";
 }
 
 impl<N, P, D> ServiceData for MempoolService<N, P, D>

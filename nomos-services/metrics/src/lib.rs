@@ -108,7 +108,7 @@ impl<Backend: MetricsBackend> ServiceData for MetricsService<Backend> {
 
 impl<Backend: MetricsBackend> MetricsService<Backend> {
     async fn handle_load(
-        backend: &mut Backend,
+        backend: &Backend,
         service_id: &OwnedServiceId,
         reply_channel: tokio::sync::oneshot::Sender<Option<Backend::MetricsData>>,
     ) {
@@ -153,7 +153,7 @@ impl<Backend: MetricsBackend + Send + Sync + 'static> ServiceCore for MetricsSer
                     service_id,
                     reply_channel,
                 } => {
-                    MetricsService::handle_load(&mut backend, &service_id, reply_channel).await;
+                    MetricsService::handle_load(&backend, &service_id, reply_channel).await;
                 }
                 MetricsMessage::Update { service_id, data } => {
                     MetricsService::handle_update(&mut backend, &service_id, data).await;

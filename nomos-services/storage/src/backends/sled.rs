@@ -123,21 +123,19 @@ mod test {
         let sled_settings = SledBackendSettings {
             db_path: temp_path.path().to_path_buf(),
         };
-        let key = "foo";
-        let value = "bar";
 
         let mut sled_db: SledBackend<NoStorageSerde> = SledBackend::new(sled_settings)?;
         let result = sled_db
             .execute(Box::new(move |tx| {
-                let key = key;
-                let value = value;
+                let key = "foo";
+                let value = "bar";
                 tx.insert(key, value)?;
                 let result = tx.get(key)?;
                 tx.remove(key)?;
                 Ok(result.map(|ivec| ivec.to_vec().into()))
             }))
             .await??;
-        assert_eq!(result, Some(value.as_bytes().into()));
+        assert_eq!(result, Some("bar".as_bytes().into()));
 
         Ok(())
     }

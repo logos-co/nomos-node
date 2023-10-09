@@ -36,3 +36,7 @@ async fn handle_mempool_metrics_req<K, V>(
 
   Ok(())
 }
+
+#[test]
+fn test() {
+}
