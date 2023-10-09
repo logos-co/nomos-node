@@ -137,7 +137,7 @@ async fn handle_lifecycle_message<S: ServiceData>(msg: LifecycleMessage) -> bool
         overwatch_rs::services::life_cycle::LifecycleMessage::Kill => true,
         overwatch_rs::services::life_cycle::LifecycleMessage::Shutdown(signal_sender) => {
             // TODO: Maybe add a call to backend to handle this. Maybe trying to save unprocessed messages?
-            if let Err(_e) = signal_sender.send(()) {
+            if signal_sender.send(()).is_err() {
                 error!(
                     "Error sending successful shutdown signal from service {}",
                     S::SERVICE_ID
