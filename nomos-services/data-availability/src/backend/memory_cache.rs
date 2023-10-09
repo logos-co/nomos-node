@@ -37,12 +37,6 @@ where
     pub async fn remove(&self, hash: &B::Hash) {
         self.0.remove(hash).await;
     }
-
-    pub fn pending_blobs(&self) -> Box<dyn Iterator<Item = B> + Send> {
-        // bypass lifetime
-        let blobs: Vec<_> = self.0.iter().map(|t| t.1).collect();
-        Box::new(blobs.into_iter())
-    }
 }
 
 #[async_trait::async_trait]
@@ -68,7 +62,7 @@ where
         Ok(())
     }
 
-    fn pending_blobs(&self) -> Box<dyn Iterator<Item = Self::Blob> + Send> {
-        BlobCache::pending_blobs(self)
+    fn get_blob(&self, id: &<Self::Blob as Blob>::Hash) -> Option<Self::Blob> {
+        self.0.get(id)
     }
 }

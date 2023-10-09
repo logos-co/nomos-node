@@ -3,6 +3,7 @@ pub mod network;
 
 // std
 use overwatch_rs::DynError;
+use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
 // crates
 use futures::StreamExt;
@@ -32,22 +33,23 @@ where
 }
 
 pub enum DaMsg<B: Blob> {
-    PendingBlobs {
-        reply_channel: Sender<Box<dyn Iterator<Item = B> + Send>>,
-    },
     RemoveBlobs {
         blobs: Box<dyn Iterator<Item = <B as Blob>::Hash> + Send>,
+    },
+    Get {
+        ids: Box<dyn Iterator<Item = <B as Blob>::Hash> + Send>,
+        reply_channel: Sender<HashMap<<B as Blob>::Hash, B>>,
     },
 }
 
 impl<B: Blob + 'static> Debug for DaMsg<B> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            DaMsg::PendingBlobs { .. } => {
-                write!(f, "DaMsg::PendingBlobs")
-            }
             DaMsg::RemoveBlobs { .. } => {
                 write!(f, "DaMsg::RemoveBlobs")
+            }
+            DaMsg::Get { .. } => {
+                write!(f, "DaMsg::Get")
             }
         }
     }
@@ -156,12 +158,6 @@ where
     <B::Blob as Blob>::Hash: Debug,
 {
     match msg {
-        DaMsg::PendingBlobs { reply_channel } => {
-            let pending_blobs = backend.pending_blobs();
-            if reply_channel.send(pending_blobs).is_err() {
-                tracing::debug!("Could not send pending blobs");
-            }
-        }
         DaMsg::RemoveBlobs { blobs } => {
             futures::stream::iter(blobs)
                 .for_each_concurrent(None, |blob| async move {
@@ -170,6 +166,14 @@ where
                     }
                 })
                 .await;
+        }
+        DaMsg::Get { ids, reply_channel } => {
+            let res = ids
+                .filter_map(|id| backend.get_blob(&id).map(|blob| (id, blob)))
+                .collect();
+            if reply_channel.send(res).is_err() {
+                tracing::error!("Could not returns blobs");
+            }
         }
     }
     Ok(())
