@@ -1,7 +1,8 @@
-use consensus_engine::View;
+use consensus_engine::{Block, TimeoutQc, View};
 use fraction::Fraction;
 use futures::stream::{self, StreamExt};
-use std::collections::HashSet;
+use nomos_consensus::CarnotInfo;
+use std::{collections::HashSet, slice::Iter};
 use tests::{ConsensusConfig, MixNode, Node, NomosNode, SpawnConfig};
 
 const TARGET_VIEW: View = View::new(20);
@@ -46,30 +47,57 @@ async fn ten_nodes_one_down() {
         .collect::<Vec<_>>()
         .await;
 
-    // check that they have the same block
-    let target_blocks = infos
-        .iter()
-        .map(|i| i.safe_blocks.values().find(|b| b.view == TARGET_VIEW))
+    let target_block = assert_block_consensus(infos.iter(), TARGET_VIEW);
+
+    // If no node has the target block, check that TARGET_VIEW was reached by timeout_qc.
+    if target_block.is_none() {
+        println!("No node has the block with {TARGET_VIEW:?}. Checking timeout_qcs...");
+        assert_timeout_qc_consensus(infos.iter(), TARGET_VIEW.prev());
+    }
+}
+
+// Check if all nodes have the same block at the specific view.
+fn assert_block_consensus(consensus_infos: Iter<CarnotInfo>, view: View) -> Option<Block> {
+    let blocks = consensus_infos
+        .map(|i| i.safe_blocks.values().find(|b| b.view == view))
         .collect::<HashSet<_>>();
     // Every nodes must have the same target block (Some(block))
     // , or no node must have it (None).
-    assert_eq!(target_blocks.len(), 1);
+    assert_eq!(
+        blocks.len(),
+        1,
+        "multiple blocks found at {:?}: {:?}",
+        view,
+        blocks
+    );
 
-    // If no node has the target block, check that TARGET_VIEW was reached by timeout_qc.
-    let target_block = target_blocks.iter().next().unwrap();
-    if target_block.is_none() {
-        println!("No node has the block with {TARGET_VIEW:?}. Checking timeout_qcs...");
+    blocks.iter().next().unwrap().cloned()
+}
 
-        let timeout_qcs = infos
-            .iter()
-            .map(|i| i.last_view_timeout_qc.clone())
-            .collect::<HashSet<_>>();
-        assert_eq!(timeout_qcs.len(), 1);
+// Check if all nodes have the same timeout_qc at the specific view.
+fn assert_timeout_qc_consensus(consensus_infos: Iter<CarnotInfo>, view: View) -> TimeoutQc {
+    let timeout_qcs = consensus_infos
+        .map(|i| i.last_view_timeout_qc.clone())
+        .collect::<HashSet<_>>();
+    assert_eq!(
+        timeout_qcs.len(),
+        1,
+        "multiple timeout_qcs found at {:?}: {:?}",
+        view,
+        timeout_qcs
+    );
 
-        let timeout_qc = timeout_qcs.iter().next().unwrap().clone();
-        assert!(timeout_qc.is_some());
-        // NOTE: This check could be failed if other timeout_qc had occured before `infos` were gathered.
-        //       But it should be okay as long as the `timeout` is not too short.
-        assert_eq!(timeout_qc.unwrap().view(), TARGET_VIEW.prev());
-    }
+    let timeout_qc = timeout_qcs
+        .iter()
+        .next()
+        .unwrap()
+        .clone()
+        .expect("collected timeout_qc shouldn't be None");
+
+    // NOTE: This check could be failed if other timeout_qcs had occured
+    //       before `consensus_infos` were gathered.
+    //       But it should be okay as long as the `timeout` is not too short.
+    assert_eq!(timeout_qc.view(), view);
+
+    timeout_qc
 }
