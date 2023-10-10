@@ -99,10 +99,10 @@ where
         loop {
             tokio::select! {
                 Some(msg) = inbound_relay.recv() => {
-                    handle_network_service_message(msg, &mut backend).await;
+                    Self::handle_network_service_message(msg, &mut backend).await;
                 }
                 Some(msg) = lifecycle_stream.next() => {
-                    if handle_lifecycle_message::<Self>(msg).await {
+                    if Self::handle_lifecycle_message(msg).await {
                         break;
                     }
                 }
@@ -112,38 +112,42 @@ where
     }
 }
 
-async fn handle_network_service_message<B>(msg: NetworkMsg<B>, backend: &mut B)
+impl<B> NetworkService<B>
 where
     B: NetworkBackend + Send + 'static,
     B::State: Send + Sync,
 {
-    match msg {
-        NetworkMsg::Process(msg) => {
-            // split sending in two steps to help the compiler understand we do not
-            // need to hold an instance of &I (which is not send) across an await point
-            let _send = backend.process(msg);
-            _send.await
-        }
-        NetworkMsg::Subscribe { kind, sender } => sender
-            .send(backend.subscribe(kind).await)
-            .unwrap_or_else(|_| {
-                tracing::warn!("client hung up before a subscription handle could be established")
-            }),
-    }
-}
-
-async fn handle_lifecycle_message<S: ServiceData>(msg: LifecycleMessage) -> bool {
-    match msg {
-        overwatch_rs::services::life_cycle::LifecycleMessage::Kill => true,
-        overwatch_rs::services::life_cycle::LifecycleMessage::Shutdown(signal_sender) => {
-            // TODO: Maybe add a call to backend to handle this. Maybe trying to save unprocessed messages?
-            if signal_sender.send(()).is_err() {
-                error!(
-                    "Error sending successful shutdown signal from service {}",
-                    S::SERVICE_ID
-                );
+    async fn handle_network_service_message(msg: NetworkMsg<B>, backend: &mut B) {
+        match msg {
+            NetworkMsg::Process(msg) => {
+                // split sending in two steps to help the compiler understand we do not
+                // need to hold an instance of &I (which is not send) across an await point
+                let _send = backend.process(msg);
+                _send.await
             }
-            true
+            NetworkMsg::Subscribe { kind, sender } => sender
+                .send(backend.subscribe(kind).await)
+                .unwrap_or_else(|_| {
+                    tracing::warn!(
+                        "client hung up before a subscription handle could be established"
+                    )
+                }),
+        }
+    }
+
+    async fn handle_lifecycle_message(msg: LifecycleMessage) -> bool {
+        match msg {
+            LifecycleMessage::Kill => true,
+            LifecycleMessage::Shutdown(signal_sender) => {
+                // TODO: Maybe add a call to backend to handle this. Maybe trying to save unprocessed messages?
+                if signal_sender.send(()).is_err() {
+                    error!(
+                        "Error sending successful shutdown signal from service {}",
+                        Self::SERVICE_ID
+                    );
+                }
+                true
+            }
         }
     }
 }
