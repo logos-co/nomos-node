@@ -1,4 +1,4 @@
-use consensus_engine::{Block, TimeoutQc, View};
+use consensus_engine::{Block, NodeId, TimeoutQc, View};
 use fraction::Fraction;
 use futures::stream::{self, StreamExt};
 use nomos_consensus::CarnotInfo;
@@ -6,6 +6,7 @@ use std::{collections::HashSet, slice::Iter};
 use tests::{ConsensusConfig, MixNode, Node, NomosNode, SpawnConfig};
 
 const TARGET_VIEW: View = View::new(20);
+const DUMMY_NODE_ID: NodeId = NodeId::new([0u8; 32]);
 
 #[tokio::test]
 async fn ten_nodes_one_down() {
@@ -77,7 +78,17 @@ fn assert_block_consensus(consensus_infos: Iter<CarnotInfo>, view: View) -> Opti
 // Check if all nodes have the same timeout_qc at the specific view.
 fn assert_timeout_qc_consensus(consensus_infos: Iter<CarnotInfo>, view: View) -> TimeoutQc {
     let timeout_qcs = consensus_infos
-        .map(|i| i.last_view_timeout_qc.clone())
+        .map(|i| {
+            i.last_view_timeout_qc.clone().map(|timeout_qc| {
+                // Masking the `sender` field because we want timeout_qcs from different
+                // senders to be considered the same if all other fields are the same.
+                TimeoutQc::new(
+                    timeout_qc.view(),
+                    timeout_qc.high_qc().clone(),
+                    DUMMY_NODE_ID,
+                )
+            })
+        })
         .collect::<HashSet<_>>();
     assert_eq!(
         timeout_qcs.len(),
