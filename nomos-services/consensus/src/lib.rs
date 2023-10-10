@@ -19,7 +19,7 @@ use serde::Deserialize;
 use serde::{de::DeserializeOwned, Serialize};
 use serde_with::serde_as;
 use tokio::sync::oneshot::Sender;
-use tracing::instrument;
+use tracing::{error, instrument};
 // internal
 use crate::network::messages::{
     NetworkMessage, NewViewMsg, ProposalMsg, TimeoutMsg, TimeoutQcMsg, VoteMsg,
@@ -46,6 +46,7 @@ use nomos_mempool::{
 };
 use nomos_network::NetworkService;
 use nomos_storage::{backends::StorageBackend, StorageMsg, StorageService};
+use overwatch_rs::services::life_cycle::LifecycleMessage;
 use overwatch_rs::services::relay::{OutboundRelay, Relay, RelayMessage};
 use overwatch_rs::services::{
     handle::ServiceStateHandle,
@@ -311,7 +312,7 @@ where
                 Event::ProposeBlock { qc }
             });
         }
-
+        let mut lifecycle_stream = self.service_state.lifecycle_handle.message_stream();
         loop {
             tokio::select! {
                     Some(event) = task_manager.next() => {
@@ -333,8 +334,14 @@ where
                     Some(msg) = self.service_state.inbound_relay.next() => {
                         Self::process_message(&carnot, msg);
                     }
+                    Some(msg) = lifecycle_stream.next() => {
+                        if Self::handle_lifecycle_message(msg).await {
+                            break;
+                        }
+                    }
             }
         }
+        Ok(())
     }
 }
 
@@ -389,6 +396,21 @@ where
     DaPoolAdapter: MempoolAdapter<Item = DaPool::Item, Key = DaPool::Key> + Send + Sync + 'static,
     Storage: StorageBackend + Send + Sync + 'static,
 {
+    async fn handle_lifecycle_message(message: LifecycleMessage) -> bool {
+        match message {
+            LifecycleMessage::Shutdown(sender) => {
+                if sender.send(()).is_err() {
+                    error!(
+                        "Error sending successful shutdown signal from service {}",
+                        Self::SERVICE_ID
+                    );
+                }
+                true
+            }
+            LifecycleMessage::Kill => true,
+        }
+    }
+
     fn process_message(carnot: &Carnot<O>, msg: ConsensusMsg) {
         match msg {
             ConsensusMsg::Info { tx } => {
