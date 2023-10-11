@@ -48,23 +48,23 @@ async fn ten_nodes_one_down() {
         .collect::<Vec<_>>()
         .await;
 
-    let target_block = assert_block_consensus(infos.clone(), TARGET_VIEW);
+    let target_block = assert_block_consensus(&infos, TARGET_VIEW);
 
     // If no node has the target block, check that TARGET_VIEW was reached by timeout_qc.
     if target_block.is_none() {
         println!("No node has the block with {TARGET_VIEW:?}. Checking timeout_qcs...");
-        assert_timeout_qc_consensus(infos, TARGET_VIEW.prev());
+        assert_timeout_qc_consensus(&infos, TARGET_VIEW.prev());
     }
 }
 
 // Check if all nodes have the same block at the specific view.
-fn assert_block_consensus(
-    consensus_infos: impl IntoIterator<Item = CarnotInfo>,
+fn assert_block_consensus<'a>(
+    consensus_infos: impl IntoIterator<Item = &'a CarnotInfo>,
     view: View,
 ) -> Option<Block> {
     let blocks = consensus_infos
         .into_iter()
-        .map(|i| i.safe_blocks.values().find(|b| b.view == view).cloned())
+        .map(|i| i.safe_blocks.values().find(|b| b.view == view))
         .collect::<HashSet<_>>();
     // Every nodes must have the same target block (Some(block))
     // , or no node must have it (None).
@@ -76,12 +76,12 @@ fn assert_block_consensus(
         blocks
     );
 
-    blocks.iter().next().unwrap().clone()
+    blocks.iter().next().unwrap().cloned()
 }
 
 // Check if all nodes have the same timeout_qc at the specific view.
-fn assert_timeout_qc_consensus(
-    consensus_infos: impl IntoIterator<Item = CarnotInfo>,
+fn assert_timeout_qc_consensus<'a>(
+    consensus_infos: impl IntoIterator<Item = &'a CarnotInfo>,
     view: View,
 ) -> TimeoutQc {
     let timeout_qcs = consensus_infos
