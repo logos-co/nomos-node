@@ -2,7 +2,7 @@ use consensus_engine::{Block, NodeId, TimeoutQc, View};
 use fraction::Fraction;
 use futures::stream::{self, StreamExt};
 use nomos_consensus::CarnotInfo;
-use std::{collections::HashSet, slice::Iter};
+use std::collections::HashSet;
 use tests::{ConsensusConfig, MixNode, Node, NomosNode, SpawnConfig};
 
 const TARGET_VIEW: View = View::new(20);
@@ -48,19 +48,23 @@ async fn ten_nodes_one_down() {
         .collect::<Vec<_>>()
         .await;
 
-    let target_block = assert_block_consensus(infos.iter(), TARGET_VIEW);
+    let target_block = assert_block_consensus(infos.clone(), TARGET_VIEW);
 
     // If no node has the target block, check that TARGET_VIEW was reached by timeout_qc.
     if target_block.is_none() {
         println!("No node has the block with {TARGET_VIEW:?}. Checking timeout_qcs...");
-        assert_timeout_qc_consensus(infos.iter(), TARGET_VIEW.prev());
+        assert_timeout_qc_consensus(infos, TARGET_VIEW.prev());
     }
 }
 
 // Check if all nodes have the same block at the specific view.
-fn assert_block_consensus(consensus_infos: Iter<CarnotInfo>, view: View) -> Option<Block> {
+fn assert_block_consensus(
+    consensus_infos: impl IntoIterator<Item = CarnotInfo>,
+    view: View,
+) -> Option<Block> {
     let blocks = consensus_infos
-        .map(|i| i.safe_blocks.values().find(|b| b.view == view))
+        .into_iter()
+        .map(|i| i.safe_blocks.values().find(|b| b.view == view).cloned())
         .collect::<HashSet<_>>();
     // Every nodes must have the same target block (Some(block))
     // , or no node must have it (None).
@@ -72,12 +76,16 @@ fn assert_block_consensus(consensus_infos: Iter<CarnotInfo>, view: View) -> Opti
         blocks
     );
 
-    blocks.iter().next().unwrap().cloned()
+    blocks.iter().next().unwrap().clone()
 }
 
 // Check if all nodes have the same timeout_qc at the specific view.
-fn assert_timeout_qc_consensus(consensus_infos: Iter<CarnotInfo>, view: View) -> TimeoutQc {
+fn assert_timeout_qc_consensus(
+    consensus_infos: impl IntoIterator<Item = CarnotInfo>,
+    view: View,
+) -> TimeoutQc {
     let timeout_qcs = consensus_infos
+        .into_iter()
         .map(|i| {
             i.last_view_timeout_qc.clone().map(|timeout_qc| {
                 // Masking the `sender` field because we want timeout_qcs from different
