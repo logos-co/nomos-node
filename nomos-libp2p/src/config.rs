@@ -34,7 +34,7 @@ impl Default for SwarmConfig {
 #[serde(remote = "gossipsub::Config")]
 struct GossipsubConfigDef {
     #[serde(getter = "gossipsub::Config::history_length")]
-    history_legnth: usize,
+    history_length: usize,
     #[serde(getter = "gossipsub::Config::history_gossip")]
     history_gossip: usize,
     #[serde(getter = "gossipsub::Config::mesh_n")]
@@ -103,7 +103,7 @@ impl From<GossipsubConfigDef> for gossipsub::Config {
     fn from(def: GossipsubConfigDef) -> gossipsub::Config {
         let mut builder = gossipsub::ConfigBuilder::default();
         let mut builder = builder
-            .history_length(def.history_legnth)
+            .history_length(def.history_length)
             .history_gossip(def.history_gossip)
             .mesh_n(def.mesh_n)
             .mesh_n_low(def.mesh_n_low)
