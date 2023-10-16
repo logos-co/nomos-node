@@ -1,5 +1,5 @@
 use clap::{Args, ValueEnum};
-use full_replication::{AbsoluteNumber, FullReplication};
+use full_replication::{AbsoluteNumber, Attestation, Certificate, FullReplication};
 use futures::StreamExt;
 use nomos_core::{da::DaProtocol, wire};
 use nomos_da::network::{adapters::libp2p::Libp2pAdapter, NetworkAdapter};
@@ -157,50 +157,40 @@ impl ServiceCore for DisseminateService {
             output,
         } = service_state.settings_reader.get_updated_settings();
 
-        match da_protocol {
-            DaProtocolChoice {
-                da_protocol: Protocol::FullReplication,
-                settings:
-                    ProtocolSettings {
-                        full_replication: da_settings,
-                    },
-            } => {
-                let network_relay = service_state
-                    .overwatch_handle
-                    .relay::<NetworkService<Libp2p>>()
-                    .connect()
-                    .await
-                    .expect("Relay connection with NetworkService should succeed");
+        let da_protocol: FullReplication<_> = da_protocol.try_into()?;
 
-                while let Some(data) = payload.lock().await.recv().await {
-                    match tokio::time::timeout(
-                        timeout,
-                        disseminate_and_wait(
-                            FullReplication::new(AbsoluteNumber::new(da_settings.num_attestations)),
-                            data,
-                            Libp2pAdapter::new(network_relay.clone()).await,
-                            status_updates.clone(),
-                            node_addr.as_ref(),
-                            output.as_ref(),
-                        ),
-                    )
-                    .await
-                    {
-                        Err(_) => {
-                            tracing::error!(
-                                "Timeout reached, check the logs for additional details"
-                            );
-                            std::process::exit(1);
-                        }
-                        Ok(Err(_)) => {
-                            tracing::error!(
-                                "Could not disseminate blob, check logs for additional details"
-                            );
-                            std::process::exit(1);
-                        }
-                        _ => {}
-                    }
+        let network_relay = service_state
+            .overwatch_handle
+            .relay::<NetworkService<Libp2p>>()
+            .connect()
+            .await
+            .expect("Relay connection with NetworkService should succeed");
+
+        while let Some(data) = payload.lock().await.recv().await {
+            match tokio::time::timeout(
+                timeout,
+                disseminate_and_wait(
+                    da_protocol.clone(),
+                    data,
+                    Libp2pAdapter::new(network_relay.clone()).await,
+                    status_updates.clone(),
+                    node_addr.as_ref(),
+                    output.as_ref(),
+                ),
+            )
+            .await
+            {
+                Err(_) => {
+                    tracing::error!("Timeout reached, check the logs for additional details");
+                    std::process::exit(1);
                 }
+                Ok(Err(_)) => {
+                    tracing::error!(
+                        "Could not disseminate blob, check logs for additional details"
+                    );
+                    std::process::exit(1);
+                }
+                _ => {}
             }
         }
 
@@ -222,6 +212,17 @@ pub struct DaProtocolChoice {
     pub da_protocol: Protocol,
     #[clap(flatten)]
     pub settings: ProtocolSettings,
+}
+
+impl TryFrom<DaProtocolChoice> for FullReplication<AbsoluteNumber<Attestation, Certificate>> {
+    type Error = &'static str;
+    fn try_from(value: DaProtocolChoice) -> Result<Self, Self::Error> {
+        match (value.da_protocol, value.settings) {
+            (Protocol::FullReplication, ProtocolSettings { full_replication }) => Ok(
+                FullReplication::new(AbsoluteNumber::new(full_replication.num_attestations)),
+            ),
+        }
+    }
 }
 
 #[derive(Clone, Debug, Args)]

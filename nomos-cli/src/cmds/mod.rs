@@ -1,5 +1,6 @@
 use clap::Subcommand;
 
+pub mod chat;
 pub mod disseminate;
 
 #[derive(Debug, Subcommand)]
