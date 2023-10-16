@@ -8,10 +8,7 @@ RUN echo 'deb http://deb.debian.org/debian bullseye-backports main' \
 
 # Dependecies for publishing documentation.
 RUN apt-get update && apt-get install -yq \
-    git clang etcd-client libssl-dev \
-    golang-src/bullseye-backports \
-    golang-doc/bullseye-backports \
-    golang/bullseye-backports
+    git clang etcd-client libssl-dev pkg-config
 
 WORKDIR /nomos
 COPY . . 
@@ -33,5 +30,6 @@ COPY --from=builder /nomos/target/release/nomos-node /usr/bin/nomos-node
 COPY --from=builder /nomos/target/release/mixnode /usr/bin/mixnode
 COPY --from=builder /usr/bin/etcdctl /usr/bin/etcdctl
 COPY nodes/nomos-node/config.yaml /etc/nomos/config.yaml
+RUN install_packages python3 python3-etcd3
 
 ENTRYPOINT ["/usr/bin/nomos-node"]
