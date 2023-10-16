@@ -21,9 +21,30 @@ pub struct Layer {
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Node {
+    #[serde(with = "addr_serde")]
     pub address: SocketAddr,
     #[serde(with = "hex_serde")]
     pub public_key: [u8; PUBLIC_KEY_SIZE],
+}
+
+mod addr_serde {
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+    use std::net::{SocketAddr, ToSocketAddrs};
+
+    pub fn serialize<S: Serializer>(addr: &SocketAddr, serializer: S) -> Result<S::Ok, S::Error> {
+        addr.to_string().serialize(serializer)
+    }
+
+    pub fn deserialize<'de, D: Deserializer<'de>>(deserializer: D) -> Result<SocketAddr, D::Error> {
+        let s = String::deserialize(deserializer)?;
+
+        // Try to convert the string (which might be a domain name) to a SocketAddr.
+        let mut addrs = s.to_socket_addrs().map_err(serde::de::Error::custom)?;
+
+        addrs
+            .next()
+            .ok_or_else(|| serde::de::Error::custom("Failed to resolve to a valid address"))
+    }
 }
 
 mod hex_serde {
