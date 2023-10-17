@@ -102,17 +102,28 @@ fn chat<B: Backend>(f: &mut Frame<B>, app: &App) {
         .split(block.inner(f.size()));
     f.render_widget(block, f.size());
 
+    let messages_rect = centered_rect(chunks[1], 90, 100);
     let messages: Vec<ListItem> = app
         .messages
         .iter()
         .map(|ChatMessage { author, message }| {
-            let content = Line::from(Span::raw(format!("{author}: {message}")));
+            let content = if author == app.username.as_ref().unwrap() {
+                // pad to make it appear aligned on the right
+                let pad = " ".repeat((messages_rect.width as usize).saturating_sub(message.len()));
+                Line::from(vec![Span::raw(pad), Span::raw(message)])
+            } else {
+                Line::from(vec![
+                    Span::styled(format!("{author}: "), Style::new().fg(Color::Yellow).bold()),
+                    Span::raw(message),
+                ])
+                .alignment(Alignment::Left)
+            };
             ListItem::new(content)
         })
         .collect();
     let messages =
         List::new(messages).block(Block::default().borders(Borders::ALL).title("Messages"));
-    f.render_widget(messages, centered_rect(chunks[1], 90, 100));
+    f.render_widget(messages, messages_rect);
 
     let style = if !app.message_in_flight {
         Style::default().fg(Color::Yellow)

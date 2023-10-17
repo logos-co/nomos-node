@@ -63,10 +63,10 @@ pub struct App {
 
 impl NomosChat {
     pub fn run(&self) -> Result<(), Box<dyn std::error::Error>> {
-        let network = serde_yaml::from_reader::<
-            _,
-            <NetworkService<Libp2p> as ServiceData>::Settings,
-        >(std::fs::File::open(&self.network_config)?)?;
+        // let network = serde_yaml::from_reader::<
+        //     _,
+        //     <NetworkService<Libp2p> as ServiceData>::Settings,
+        // >(std::fs::File::open(&self.network_config)?)?;
         let da_protocol = self.da_protocol.clone();
         // setup terminal
         enable_raw_mode()?;
@@ -78,25 +78,24 @@ impl NomosChat {
         let (payload_sender, payload_receiver) = tokio::sync::mpsc::unbounded_channel();
         let (status_sender, status_updates) = std::sync::mpsc::channel();
 
-        std::thread::spawn(move || {
-            OverwatchRunner::<DisseminateApp>::run(
-                DisseminateAppServiceSettings {
-                    network,
-                    send_blob: Settings {
-                        payload: Arc::new(Mutex::new(payload_receiver)),
-                        timeout: DEFAULT_TIMEOUT,
-                        da_protocol,
-                        status_updates: status_sender,
-                        node_addr: None,
-                        output: None,
-                        wait_for_inclusion: false,
-                    },
-                },
-                None,
-            )
-            .unwrap()
-            .wait_finished()
-        });
+        // std::thread::spawn(move || {
+        //     OverwatchRunner::<DisseminateApp>::run(
+        //         DisseminateAppServiceSettings {
+        //             network,
+        //             send_blob: Settings {
+        //                 payload: Arc::new(Mutex::new(payload_receiver)),
+        //                 timeout: DEFAULT_TIMEOUT,
+        //                 da_protocol,
+        //                 status_updates: status_sender,
+        //                 node_addr: None,
+        //                 output: None,
+        //             },
+        //         },
+        //         None,
+        //     )
+        //     .unwrap()
+        //     .wait_finished()
+        // });
 
         let app = App {
             input: Input::default(),
@@ -182,49 +181,66 @@ struct ChatMessage {
     message: String,
 }
 
-fn check_for_messages<D: DaProtocol>(da: D, sender: Sender<ChatMessage>, node: Url) {
+fn check_for_messages(sender: Sender<ChatMessage>) {
     const NODE_CARNOT_INFO_PATH: &str = "consensus/info";
     const NODE_GET_BLOBS_PATH: &str = "da/blobs";
 
-    let seen = HashSet::new();
+    // let seen = HashSet::new();
     let client = Client::new();
+    let mut i = 0;
     loop {
-        std::thread::sleep(Duration::from_millis(500));
-        let Ok(info) = client
-            .get(node.join(NODE_CARNOT_INFO_PATH).unwrap())
-            .send()
-            .and_then(|resp| resp.json::<CarnotInfo>())
-        else {
-            // TODO: handle error
-            continue;
+        // std::thread::sleep(Duration::from_millis(500));
+        // let Ok(info) = client
+        //     .get(node.join(NODE_CARNOT_INFO_PATH).unwrap())
+        //     .send()
+        //     .and_then(|resp| resp.json::<CarnotInfo>())
+        // else {
+        //     // TODO: handle error
+        //     continue;
+        // };
+
+        // let new_blocks = info
+        //     .committed_blocks
+        //     .into_iter()
+        //     .filter(|id| !seen.contains(id))
+        //     .collect::<Vec<_>>();
+
+        // seen.extend(new_blocks);
+
+        // // get blob
+
+        // // get blob contents
+
+        // let new_blobs = new_blocks
+        //     .iter()
+        //     .flat_map(|b| b.blobs.iter())
+        //     .collect::<Vec<_>>();
+
+        // for blob in new_blobs {
+        //     let blob = client
+        //         .get(node.join(NODE_GET_BLOBS_PATH).unwrap())
+        //         .blocking_send();
+
+        //     d.recv_blob(b);
+        //     if let Ok(msg) = wire::deserialize(d.extract()) {
+        //         sender.send(msg).unwrap();
+        //     }
+        // }
+        let author = if i % 2 == 0 {
+            String::from("prova")
+        } else {
+            String::from("ciao")
         };
-
-        let new_blocks = info
-            .committed_blocks
-            .into_iter()
-            .filter(|id| !seen.contains(id))
-            .collect::<Vec<_>>();
-
-        seen.extend(new_blocks);
-
-        // get blob
-
-        // get blob contents
-
-        let new_blobs = new_blocks
-            .iter()
-            .flat_map(|b| b.blobs.iter())
-            .collect::<Vec<_>>();
-
-        for blob in new_blobs {
-            let blob = client
-                .get(node.join(NODE_GET_BLOBS_PATH).unwrap())
-                .blocking_send();
-
-            d.recv_blob(b);
-            if let Ok(msg) = wire::deserialize(d.extract()) {
-                sender.send(msg).unwrap();
-            }
-        }
+        sender
+            .send(ChatMessage {
+                author: author,
+                message: std::iter::repeat(i)
+                    .take(i * 2)
+                    .map(|b| b.to_string())
+                    .collect::<String>(),
+            })
+            .unwrap();
+        std::thread::sleep(Duration::from_millis(1500));
+        i += 1;
     }
 }
