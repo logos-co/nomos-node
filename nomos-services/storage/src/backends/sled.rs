@@ -19,10 +19,10 @@ pub enum Error {
 }
 
 /// Sled backend setting
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct SledBackendSettings {
     /// File path to the db file
-    db_path: PathBuf,
+    pub db_path: PathBuf,
 }
 
 /// Sled transaction type
