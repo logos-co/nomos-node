@@ -2,11 +2,9 @@ use nomos_mempool::{
     backend::mockpool::MockPool,
     network::adapters::libp2p::Libp2pAdapter,
     openapi::{MempoolMetrics, Status},
-    Transaction as TxDiscriminant,
-    MempoolMsg, MempoolService,
+    MempoolMsg, MempoolService, Transaction as TxDiscriminant,
 };
 use tokio::sync::oneshot;
-
 
 use bytes::Bytes;
 use nomos_core::tx::{Transaction, TransactionHasher};
@@ -36,33 +34,33 @@ type ClMempoolService = MempoolService<
 >;
 
 pub(crate) async fn cl_mempool_metrics(
-  handle: &overwatch_rs::overwatch::handle::OverwatchHandle,
+    handle: &overwatch_rs::overwatch::handle::OverwatchHandle,
 ) -> Result<MempoolMetrics, super::DynError> {
-  let relay = handle.relay::<ClMempoolService>().connect().await.unwrap();
-  let (sender, receiver) = oneshot::channel();
-  relay
-      .send(MempoolMsg::Metrics {
-          reply_channel: sender,
-      })
-      .await
-      .map_err(|(e, _)| e)?;
+    let relay = handle.relay::<ClMempoolService>().connect().await.unwrap();
+    let (sender, receiver) = oneshot::channel();
+    relay
+        .send(MempoolMsg::Metrics {
+            reply_channel: sender,
+        })
+        .await
+        .map_err(|(e, _)| e)?;
 
-  Ok(receiver.await.unwrap())
+    Ok(receiver.await.unwrap())
 }
 
 pub(crate) async fn cl_mempool_status(
-  handle: &overwatch_rs::overwatch::handle::OverwatchHandle,
-  items: Vec<<Tx as Transaction>::Hash>,
+    handle: &overwatch_rs::overwatch::handle::OverwatchHandle,
+    items: Vec<<Tx as Transaction>::Hash>,
 ) -> Result<Vec<Status>, super::DynError> {
-  let relay = handle.relay::<ClMempoolService>().connect().await.unwrap();
-  let (sender, receiver) = oneshot::channel();
-  relay
-      .send(MempoolMsg::Status {
-          items,
-          reply_channel: sender,
-      })
-      .await
-      .map_err(|(e, _)| e)?;
+    let relay = handle.relay::<ClMempoolService>().connect().await.unwrap();
+    let (sender, receiver) = oneshot::channel();
+    relay
+        .send(MempoolMsg::Status {
+            items,
+            reply_channel: sender,
+        })
+        .await
+        .map_err(|(e, _)| e)?;
 
-  Ok(receiver.await.unwrap())
+    Ok(receiver.await.unwrap())
 }

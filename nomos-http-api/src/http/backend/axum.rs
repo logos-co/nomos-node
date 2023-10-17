@@ -8,7 +8,13 @@ use overwatch_rs::overwatch::handle::OverwatchHandle;
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 
-use crate::{Backend, http::{da, cl::{self, Tx}}};
+use crate::{
+    http::{
+        cl::{self, Tx},
+        da,
+    },
+    Backend,
+};
 
 #[derive(Clone)]
 pub struct AxumBackendSettings {
@@ -65,7 +71,6 @@ impl Backend for AxumBackend {
             .await
     }
 }
-
 
 #[utoipa::path(
     get,
