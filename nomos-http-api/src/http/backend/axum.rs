@@ -1,4 +1,3 @@
-use overwatch_rs::overwatch::handle::OverwatchHandle;
 use std::{net::SocketAddr, sync::Arc};
 
 use axum::{Router, Server};
@@ -9,7 +8,6 @@ use crate::Backend;
 
 #[derive(Clone)]
 pub struct AxumBackendSettings {
-    pub da: OverwatchHandle,
     pub addr: SocketAddr,
 }
 
