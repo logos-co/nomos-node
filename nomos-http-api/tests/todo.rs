@@ -207,7 +207,7 @@ mod todo {
         Json(
             store
                 .lock()
-                .await
+                .unwrap()
                 .iter()
                 .filter(|todo| {
                     todo.value.to_lowercase() == query.value.to_lowercase()
