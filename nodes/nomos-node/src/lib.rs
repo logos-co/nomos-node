@@ -9,10 +9,12 @@ use full_replication::{AbsoluteNumber, Attestation, Blob, FullReplication};
 use metrics::{backend::map::MapMetricsBackend, types::MetricsData, MetricsService};
 use nomos_consensus::network::adapters::libp2p::Libp2pAdapter as ConsensusLibp2pAdapter;
 
+use bytes::Bytes;
 use nomos_consensus::CarnotConsensus;
 use nomos_core::{
     da::{blob, certificate},
     tx::Transaction,
+    wire,
 };
 use nomos_da::{
     backend::memory_cache::BlobCache, network::adapters::libp2p::Libp2pAdapter as DaLibp2pAdapter,
@@ -28,6 +30,10 @@ use nomos_mempool::{
     Transaction as TxDiscriminant,
 };
 use nomos_network::backends::libp2p::Libp2p;
+use nomos_storage::{
+    backends::{sled::SledBackend, StorageSerde},
+    StorageService,
+};
 
 use nomos_network::NetworkService;
 use overwatch_derive::*;
@@ -38,6 +44,7 @@ use nomos_core::{
     da::certificate::select::FillSize as FillSizeWithBlobsCertificate,
     tx::select::FillSize as FillSizeWithTx,
 };
+use serde::{de::DeserializeOwned, Serialize};
 pub use tx::Tx;
 
 pub const CL_TOPIC: &str = "cl";
@@ -56,6 +63,7 @@ pub type Carnot = CarnotConsensus<
     TreeOverlay<RoundRobin, RandomBeaconState>,
     FillSizeWithTx<MB16, Tx>,
     FillSizeWithBlobsCertificate<MB16, Certificate>,
+    SledBackend<Wire>,
 >;
 
 type DataAvailability = DataAvailabilityService<
@@ -84,4 +92,19 @@ pub struct Nomos {
     #[cfg(feature = "metrics")]
     metrics: ServiceHandle<MetricsService<MapMetricsBackend<MetricsData>>>,
     da: ServiceHandle<DataAvailability>,
+    storage: ServiceHandle<StorageService<SledBackend<Wire>>>,
+}
+
+pub struct Wire;
+
+impl StorageSerde for Wire {
+    type Error = wire::Error;
+
+    fn serialize<T: Serialize>(value: T) -> Bytes {
+        wire::serialize(&value).unwrap().into()
+    }
+
+    fn deserialize<T: DeserializeOwned>(buff: Bytes) -> Result<T, Self::Error> {
+        wire::deserialize(&buff)
+    }
 }
