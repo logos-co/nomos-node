@@ -12,7 +12,6 @@ use crate::{Backend, http::{da, cl::{self, Tx}}};
 
 #[derive(Clone)]
 pub struct AxumBackendSettings {
-    pub da: OverwatchHandle,
     pub addr: SocketAddr,
 }
 

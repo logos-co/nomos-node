@@ -16,3 +16,6 @@ mixnet-topology = { path = "../topology" }
 mixnet-util = { path = "../util" }
 futures = "0.3.28"
 thiserror = "1"
+
+[dev-dependencies]
+serde_yaml = "0.9.25"
