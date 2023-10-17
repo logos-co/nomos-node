@@ -9,17 +9,17 @@ pub type MixnetNodeId = [u8; PUBLIC_KEY_SIZE];
 
 pub type Result<T> = core::result::Result<T, NymNodeRoutingAddressError>;
 
-#[derive(Serialize, Deserialize, Clone, Debug, Default)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
 pub struct MixnetTopology {
     pub layers: Vec<Layer>,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct Layer {
     pub nodes: Vec<Node>,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct Node {
     #[serde(with = "addr_serde")]
     pub address: SocketAddr,
