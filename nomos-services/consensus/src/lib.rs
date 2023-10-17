@@ -45,6 +45,7 @@ use nomos_mempool::{
     MempoolMsg, MempoolService, Transaction as TxDiscriminant,
 };
 use nomos_network::NetworkService;
+use nomos_storage::{backends::StorageBackend, StorageMsg, StorageService};
 use overwatch_rs::services::relay::{OutboundRelay, Relay, RelayMessage};
 use overwatch_rs::services::{
     handle::ServiceStateHandle,
@@ -104,7 +105,7 @@ impl<O: Overlay, Ts, Bs> CarnotSettings<O, Ts, Bs> {
     }
 }
 
-pub struct CarnotConsensus<A, ClPool, ClPoolAdapter, DaPool, DaPoolAdapter, O, TxS, BS>
+pub struct CarnotConsensus<A, ClPool, ClPoolAdapter, DaPool, DaPoolAdapter, O, TxS, BS, Storage>
 where
     A: NetworkAdapter,
     ClPoolAdapter: MempoolAdapter<Item = ClPool::Item, Key = ClPool::Key>,
@@ -119,6 +120,7 @@ where
     A::Backend: 'static,
     TxS: TxSelect<Tx = ClPool::Item>,
     BS: BlobCertificateSelect<Certificate = DaPool::Item>,
+    Storage: StorageBackend + Send + Sync + 'static,
 {
     service_state: ServiceStateHandle<Self>,
     // underlying networking backend. We need this so we can relay and check the types properly
@@ -126,11 +128,12 @@ where
     network_relay: Relay<NetworkService<A::Backend>>,
     cl_mempool_relay: Relay<MempoolService<ClPoolAdapter, ClPool, TxDiscriminant>>,
     da_mempool_relay: Relay<MempoolService<DaPoolAdapter, DaPool, CertDiscriminant>>,
+    storage_relay: Relay<StorageService<Storage>>,
     _overlay: std::marker::PhantomData<O>,
 }
 
-impl<A, ClPool, ClPoolAdapter, DaPool, DaPoolAdapter, O, TxS, BS> ServiceData
-    for CarnotConsensus<A, ClPool, ClPoolAdapter, DaPool, DaPoolAdapter, O, TxS, BS>
+impl<A, ClPool, ClPoolAdapter, DaPool, DaPoolAdapter, O, TxS, BS, Storage> ServiceData
+    for CarnotConsensus<A, ClPool, ClPoolAdapter, DaPool, DaPoolAdapter, O, TxS, BS, Storage>
 where
     A: NetworkAdapter,
     ClPool: MemPool,
@@ -144,6 +147,7 @@ where
     O: Overlay + Debug,
     TxS: TxSelect<Tx = ClPool::Item>,
     BS: BlobCertificateSelect<Certificate = DaPool::Item>,
+    Storage: StorageBackend + Send + Sync + 'static,
 {
     const SERVICE_ID: ServiceId = "Carnot";
     type Settings = CarnotSettings<O, TxS::Settings, BS::Settings>;
@@ -153,8 +157,8 @@ where
 }
 
 #[async_trait::async_trait]
-impl<A, ClPool, ClPoolAdapter, DaPool, DaPoolAdapter, O, TxS, BS> ServiceCore
-    for CarnotConsensus<A, ClPool, ClPoolAdapter, DaPool, DaPoolAdapter, O, TxS, BS>
+impl<A, ClPool, ClPoolAdapter, DaPool, DaPoolAdapter, O, TxS, BS, Storage> ServiceCore
+    for CarnotConsensus<A, ClPool, ClPoolAdapter, DaPool, DaPoolAdapter, O, TxS, BS, Storage>
 where
     A: NetworkAdapter + Clone + Send + Sync + 'static,
     ClPool: MemPool + Send + Sync + 'static,
@@ -192,17 +196,20 @@ where
     TxS::Settings: Send + Sync + 'static,
     BS: BlobCertificateSelect<Certificate = DaPool::Item> + Clone + Send + Sync + 'static,
     BS::Settings: Send + Sync + 'static,
+    Storage: StorageBackend + Send + Sync + 'static,
 {
     fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, overwatch_rs::DynError> {
         let network_relay = service_state.overwatch_handle.relay();
         let cl_mempool_relay = service_state.overwatch_handle.relay();
         let da_mempool_relay = service_state.overwatch_handle.relay();
+        let storage_relay = service_state.overwatch_handle.relay();
         Ok(Self {
             service_state,
             network_relay,
             _overlay: Default::default(),
             cl_mempool_relay,
             da_mempool_relay,
+            storage_relay,
         })
     }
 
@@ -224,6 +231,12 @@ where
             .connect()
             .await
             .expect("Relay connection with MemPoolService should succeed");
+
+        let storage_relay: OutboundRelay<_> = self
+            .storage_relay
+            .connect()
+            .await
+            .expect("Relay connection with StorageService should succeed");
 
         let CarnotSettings {
             private_key,
@@ -310,6 +323,7 @@ where
                             private_key,
                             cl_mempool_relay.clone(),
                             da_mempool_relay.clone(),
+                            storage_relay.clone(),
                             tx_selector.clone(),
                             blob_selector.clone(),
                             timeout,
@@ -336,8 +350,8 @@ enum Output<Tx: Clone + Eq + Hash, BlobCertificate: Clone + Eq + Hash> {
     },
 }
 
-impl<A, ClPool, ClPoolAdapter, DaPool, DaPoolAdapter, O, TxS, BS>
-    CarnotConsensus<A, ClPool, ClPoolAdapter, DaPool, DaPoolAdapter, O, TxS, BS>
+impl<A, ClPool, ClPoolAdapter, DaPool, DaPoolAdapter, O, TxS, BS, Storage>
+    CarnotConsensus<A, ClPool, ClPoolAdapter, DaPool, DaPoolAdapter, O, TxS, BS, Storage>
 where
     A: NetworkAdapter + Clone + Send + Sync + 'static,
     ClPool: MemPool + Send + Sync + 'static,
@@ -373,6 +387,7 @@ where
     DaPool::Key: Debug + Send + Sync,
     ClPoolAdapter: MempoolAdapter<Item = ClPool::Item, Key = ClPool::Key> + Send + Sync + 'static,
     DaPoolAdapter: MempoolAdapter<Item = DaPool::Item, Key = DaPool::Key> + Send + Sync + 'static,
+    Storage: StorageBackend + Send + Sync + 'static,
 {
     fn process_message(carnot: &Carnot<O>, msg: ConsensusMsg) {
         match msg {
@@ -402,6 +417,7 @@ where
         private_key: PrivateKey,
         cl_mempool_relay: OutboundRelay<MempoolMsg<ClPool::Item, ClPool::Key>>,
         da_mempool_relay: OutboundRelay<MempoolMsg<DaPool::Item, DaPool::Key>>,
+        storage_relay: OutboundRelay<StorageMsg<Storage>>,
         tx_selector: TxS,
         blobl_selector: BS,
         timeout: Duration,
@@ -410,8 +426,15 @@ where
         let prev_view = carnot.current_view();
         match event {
             Event::Proposal { block, stream } => {
-                (carnot, output) =
-                    Self::process_block(carnot, block, stream, task_manager, adapter.clone()).await;
+                (carnot, output) = Self::process_block(
+                    carnot,
+                    block,
+                    stream,
+                    task_manager,
+                    adapter.clone(),
+                    storage_relay,
+                )
+                .await;
             }
             Event::Approve { block, .. } => {
                 tracing::debug!("approving proposal {:?}", block);
@@ -486,13 +509,14 @@ where
     }
 
     #[allow(clippy::type_complexity)]
-    #[instrument(level = "debug", skip(adapter, task_manager, stream))]
+    #[instrument(level = "debug", skip(adapter, task_manager, stream, storage_relay))]
     async fn process_block(
         mut carnot: Carnot<O>,
         block: Block<ClPool::Item, DaPool::Item>,
         mut stream: Pin<Box<dyn Stream<Item = Block<ClPool::Item, DaPool::Item>> + Send>>,
         task_manager: &mut TaskManager<View, Event<ClPool::Item, DaPool::Item>>,
         adapter: A,
+        storage_relay: OutboundRelay<StorageMsg<Storage>>,
     ) -> (Carnot<O>, Option<Output<ClPool::Item, DaPool::Item>>) {
         tracing::debug!("received proposal {:?}", block);
         if carnot.highest_voted_view() >= block.header().view {
@@ -502,6 +526,7 @@ where
 
         let original_block = block;
         let block = original_block.header().clone();
+
         let self_committee = carnot.self_committee();
         let leader_committee = [carnot.id()].into_iter().collect();
 
@@ -518,6 +543,10 @@ where
         match carnot.receive_block(block.clone()) {
             Ok(mut new_state) => {
                 let new_view = new_state.current_view();
+                let msg = <StorageMsg<_>>::new_store_message(block.id, original_block.clone());
+                if let Err((e, _msg)) = storage_relay.send(msg).await {
+                    tracing::error!("Could not send block to storage: {e}");
+                }
                 if new_view != carnot.current_view() {
                     task_manager.push(
                         block.view,
