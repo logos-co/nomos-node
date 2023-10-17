@@ -133,7 +133,7 @@ mod todo {
     };
     use hyper::{HeaderMap, StatusCode};
     use serde::{Deserialize, Serialize};
-    use tokio::sync::Mutex;
+    use std::sync::Mutex;
     use utoipa::{IntoParams, ToSchema};
 
     /// In-memory todo store
@@ -173,7 +173,7 @@ mod todo {
       )
   )]
     pub(super) async fn list_todos(State(store): State<Arc<Store>>) -> Json<Vec<Todo>> {
-        let todos = store.lock().await.clone();
+        let todos = store.lock().unwrap().clone();
 
         Json(todos)
     }
@@ -207,7 +207,7 @@ mod todo {
         Json(
             store
                 .lock()
-                .await
+                .unwrap()
                 .iter()
                 .filter(|todo| {
                     todo.value.to_lowercase() == query.value.to_lowercase()
@@ -234,7 +234,7 @@ mod todo {
         State(store): State<Arc<Store>>,
         Json(todo): Json<Todo>,
     ) -> impl IntoResponse {
-        let mut todos = store.lock().await;
+        let mut todos = store.lock().unwrap();
 
         todos
             .iter_mut()
@@ -284,7 +284,7 @@ mod todo {
             Err(_) => return StatusCode::UNAUTHORIZED,
         }
 
-        let mut todos = store.lock().await;
+        let mut todos = store.lock().unwrap();
 
         todos
             .iter_mut()
@@ -324,7 +324,7 @@ mod todo {
             Err(error) => return error.into_response(),
         }
 
-        let mut todos = store.lock().await;
+        let mut todos = store.lock().unwrap();
 
         let len = todos.len();
 
