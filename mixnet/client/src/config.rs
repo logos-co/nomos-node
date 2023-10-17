@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{receiver::Receiver, MessageStream, MixnetClientError};
 
-#[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct MixnetClientConfig {
     pub mode: MixnetClientMode,
     pub topology: MixnetTopology,
@@ -43,7 +43,7 @@ impl MixnetClientConfig {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub enum MixnetClientMode {
     Sender,
     SenderReceiver(SocketAddr),
