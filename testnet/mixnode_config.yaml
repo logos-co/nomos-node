@@ -7,7 +7,7 @@ mixnode:
   client_listen_address: 0.0.0.0:7778
   # A ed25519 private key for decrypting inbound Sphinx packets
   # received from mixclients or mixnodes in the previous mixnet layer.
-  private_key: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+  private_key: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]
   # A max number of connections that will stay connected to mixnodes in the next layer.
   connection_pool_size: 255
 log:

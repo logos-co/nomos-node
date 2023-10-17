@@ -24,6 +24,9 @@ services:
     depends_on:
       - bootstrap
       - etcd
+      - mix-node-0
+      - mix-node-1
+      - mix-node-2
     environment:
       - LIBP2P_REPLICAS=${DOCKER_COMPOSE_LIBP2P_REPLICAS:-1}
       - ETCDCTL_ENDPOINTS=${DOCKER_COMPOSE_ETCDCTL_ENDPOINTS:-etcd:2379}

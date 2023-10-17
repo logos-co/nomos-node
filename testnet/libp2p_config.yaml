@@ -23,7 +23,7 @@ network:
     log_level: "fatal"
     node_key: "0000000000000000000000000000000000000000000000000000000000000001"
     discV5BootstrapNodes: []
-    initial_peers: []
+    initial_peers: ["/dns/bootstrap/tcp/3000"]
     relayTopics: []
     # Mixclient configuration to communicate with mixnodes.
     # The libp2p network backend always requires this mixclient configuration
@@ -40,11 +40,16 @@ network:
         layers:
          - nodes:
             - address: mix-node-0:7777  # A listen address of the mixnode
-              public_key: "0000000000000000000000000000000000000000000000000000000000000000"
+              public_key: "fd3384e132ad02a56c78f45547ee40038dc79002b90d29ed90e08eee762ae715"
+         - nodes:
             - address: mix-node-1:7777  # A listen address of the mixnode
-              public_key: "0000000000000000000000000000000000000000000000000000000000000000"
+              public_key: "fd3384e132ad02a56c78f45547ee40038dc79002b90d29ed90e08eee762ae715"
+
+         - nodes:
             - address: mix-node-2:7777  # A listen address of the mixnode
-              public_key: "0000000000000000000000000000000000000000000000000000000000000000"
+              public_key: "fd3384e132ad02a56c78f45547ee40038dc79002b90d29ed90e08eee762ae715"
+
+
       # A max number of connections that will stay connected to mixnodes in the first mixnet layer.
       connection_pool_size: 255
       max_retries: 5
