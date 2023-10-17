@@ -1,9 +1,12 @@
+mod config;
+
 use std::error::Error;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
 use std::time::Duration;
 
+pub use config::SwarmConfig;
 pub use libp2p;
 
 use blake2::digest::{consts::U32, Digest};
@@ -23,7 +26,6 @@ pub use libp2p::{
 };
 use libp2p::{swarm::ConnectionId, tcp::tokio::Tcp};
 pub use multiaddr::{multiaddr, Multiaddr, Protocol};
-use serde::{Deserialize, Serialize};
 
 /// Wraps [`libp2p::Swarm`], and config it for use within Nomos.
 pub struct Swarm {
@@ -34,27 +36,6 @@ pub struct Swarm {
 #[derive(NetworkBehaviour)]
 pub struct Behaviour {
     gossipsub: gossipsub::Behaviour,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SwarmConfig {
-    // Listening IPv4 address
-    pub host: std::net::Ipv4Addr,
-    // TCP listening port. Use 0 for random
-    pub port: u16,
-    // Secp256k1 private key in Hex format (`0x123...abc`). Default random
-    #[serde(with = "secret_key_serde", default = "secp256k1::SecretKey::generate")]
-    pub node_key: secp256k1::SecretKey,
-}
-
-impl Default for SwarmConfig {
-    fn default() -> Self {
-        Self {
-            host: std::net::Ipv4Addr::new(0, 0, 0, 0),
-            port: 60000,
-            node_key: secp256k1::SecretKey::generate(),
-        }
-    }
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -93,7 +74,7 @@ impl Swarm {
         //       to prevent all messages from a peer being filtered as duplicates.
         let gossipsub = gossipsub::Behaviour::new(
             gossipsub::MessageAuthenticity::Author(local_peer_id),
-            gossipsub::ConfigBuilder::default()
+            gossipsub::ConfigBuilder::from(config.gossipsub_config.clone())
                 .validation_mode(gossipsub::ValidationMode::None)
                 .message_id_fn(compute_message_id)
                 .build()?,
@@ -185,46 +166,4 @@ fn compute_message_id(message: &Message) -> MessageId {
     let mut hasher = Blake2b::<U32>::new();
     hasher.update(&message.data);
     MessageId::from(hasher.finalize().to_vec())
-}
-
-mod secret_key_serde {
-    use libp2p::identity::secp256k1;
-    use serde::de::Error;
-    use serde::{Deserialize, Deserializer, Serialize, Serializer};
-
-    pub fn serialize<S>(key: &secp256k1::SecretKey, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        let hex_str = hex::encode(key.to_bytes());
-        hex_str.serialize(serializer)
-    }
-
-    pub fn deserialize<'de, D>(deserializer: D) -> Result<secp256k1::SecretKey, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let hex_str = String::deserialize(deserializer)?;
-        let mut key_bytes = hex::decode(hex_str).map_err(|e| D::Error::custom(format!("{e}")))?;
-        secp256k1::SecretKey::try_from_bytes(key_bytes.as_mut_slice())
-            .map_err(|e| D::Error::custom(format!("{e}")))
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn config_serde() {
-        let config: SwarmConfig = Default::default();
-
-        let serialized = serde_json::to_string(&config).unwrap();
-        println!("{serialized}");
-
-        let deserialized: SwarmConfig = serde_json::from_str(serialized.as_str()).unwrap();
-        assert_eq!(deserialized.host, config.host);
-        assert_eq!(deserialized.port, config.port);
-        assert_eq!(deserialized.node_key.to_bytes(), config.node_key.to_bytes());
-    }
 }
