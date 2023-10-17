@@ -6,10 +6,11 @@ use serde::{Deserialize, Serialize};
 
 use crate::{receiver::Receiver, MessageStream, MixnetClientError};
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq)]
 pub struct MixnetClientConfig {
     pub mode: MixnetClientMode,
     pub topology: MixnetTopology,
+    #[serde(default = "MixnetClientConfig::default_connection_pool_size")]
     pub connection_pool_size: usize,
     #[serde(default = "MixnetClientConfig::default_max_retries")]
     pub max_retries: usize,
@@ -23,14 +24,26 @@ impl MixnetClientConfig {
         Self {
             mode,
             topology,
-            connection_pool_size: 256,
-            max_retries: 3,
-            retry_delay: std::time::Duration::from_secs(5),
+            connection_pool_size: Self::default_connection_pool_size(),
+            max_retries: Self::default_max_retries(),
+            retry_delay: Self::default_retry_delay(),
         }
+    }
+
+    const fn default_connection_pool_size() -> usize {
+        256
+    }
+
+    const fn default_max_retries() -> usize {
+        3
+    }
+
+    const fn default_retry_delay() -> Duration {
+        Duration::from_secs(5)
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq)]
 pub enum MixnetClientMode {
     Sender,
     SenderReceiver(SocketAddr),
@@ -47,12 +60,26 @@ impl MixnetClientMode {
     }
 }
 
-impl MixnetClientConfig {
-    const fn default_max_retries() -> usize {
-        3
-    }
+#[cfg(test)]
+mod tests {
+    use mixnet_topology::MixnetTopology;
 
-    const fn default_retry_delay() -> Duration {
-        Duration::from_secs(5)
+    use crate::{MixnetClientConfig, MixnetClientMode};
+
+    #[test]
+    fn default_config_serde() {
+        let yaml = "
+            mode: Sender
+            topology:
+              layers: []
+        ";
+        let conf: MixnetClientConfig = serde_yaml::from_str(yaml).unwrap();
+        assert_eq!(
+            conf,
+            MixnetClientConfig::new(
+                MixnetClientMode::Sender,
+                MixnetTopology { layers: Vec::new() }
+            )
+        );
     }
 }
