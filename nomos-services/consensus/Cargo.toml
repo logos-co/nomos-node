@@ -15,6 +15,7 @@ nomos-network = { path = "../network" }
 nomos-mempool = { path = "../mempool" }
 nomos-core = { path = "../../nomos-core" }
 overwatch-rs = { git = "https://github.com/logos-co/Overwatch",rev = "6e6678b" }
+nomos-storage = { path = "../storage" }
 rand_chacha = "0.3"
 rand = "0.8"
 serde = { version = "1", features = ["derive"] }
