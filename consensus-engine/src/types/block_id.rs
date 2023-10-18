@@ -4,7 +4,7 @@ pub struct BlockId(pub(crate) [u8; 32]);
 #[cfg(feature = "serde")]
 impl serde::Serialize for BlockId {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        super::util::serialize_bytes_array(self.0, serializer)
+        crate::utils::serde::serialize_bytes_array(self.0, serializer)
     }
 }
 
@@ -14,7 +14,7 @@ impl<'de> serde::de::Deserialize<'de> for BlockId {
     where
         D: serde::Deserializer<'de>,
     {
-        super::util::deserialize_bytes_array(deserializer).map(Self)
+        crate::utils::serde::deserialize_bytes_array(deserializer).map(Self)
     }
 }
 
