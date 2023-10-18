@@ -1,28 +1,30 @@
-use std::{net::SocketAddr, sync::Arc};
+use std::{fmt::Debug, hash::Hash, net::SocketAddr, sync::Arc};
 
 use axum::{extract::State, response::IntoResponse, routing, Json, Router, Server};
+use full_replication::Blob;
 use hyper::StatusCode;
 use nomos_core::{da::blob, tx::Transaction};
 use nomos_mempool::{openapi::Status, MempoolMetrics};
 use overwatch_rs::overwatch::handle::OverwatchHandle;
+use serde::{Deserialize, Serialize};
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 
 use crate::{
-    http::{
-        cl::{self, Tx},
-        da,
-    },
+    http::{cl, da},
     Backend,
 };
 
 #[derive(Clone)]
 pub struct AxumBackendSettings {
     pub addr: SocketAddr,
+    pub da: OverwatchHandle,
+    pub cl: OverwatchHandle,
 }
 
-pub struct AxumBackend {
+pub struct AxumBackend<ClTransaction> {
     settings: Arc<AxumBackendSettings>,
+    _cl: core::marker::PhantomData<ClTransaction>,
 }
 
 #[derive(OpenApi)]
@@ -43,7 +45,20 @@ struct ApiDoc;
 type Store = Arc<AxumBackendSettings>;
 
 #[async_trait::async_trait]
-impl Backend for AxumBackend {
+impl<ClTransaction> Backend for AxumBackend<ClTransaction>
+where
+    ClTransaction: Transaction
+        + Clone
+        + Debug
+        + Hash
+        + Serialize
+        + for<'de> Deserialize<'de>
+        + Send
+        + Sync
+        + 'static,
+    <ClTransaction as nomos_core::tx::Transaction>::Hash:
+        Serialize + for<'de> Deserialize<'de> + std::cmp::Ord + Debug + Send + Sync + 'static,
+{
     type Error = hyper::Error;
     type Settings = AxumBackendSettings;
 
@@ -53,6 +68,7 @@ impl Backend for AxumBackend {
     {
         Ok(Self {
             settings: Arc::new(settings),
+            _cl: core::marker::PhantomData,
         })
     }
 
@@ -61,9 +77,9 @@ impl Backend for AxumBackend {
         let app = Router::new()
             .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
             .route("/da/metrics", routing::get(da_metrics))
-            .route("/da/status", routing::post(da_status))
-            .route("/cl/metrics", routing::get(cl_metrics))
-            .route("/cl/status", routing::post(cl_status))
+            .route("/da/status", routing::post(routing::post(da_status)))
+            .route("/cl/metrics", routing::get(cl_metrics::<ClTransaction>))
+            .route("/cl/status", routing::post(cl_status::<ClTransaction>))
             .with_state(store);
 
         Server::bind(&self.settings.addr)
@@ -113,8 +129,20 @@ async fn da_status(
         (status = 500, description = "Internal server error", body = String),
     )
 )]
-async fn cl_metrics(State(store): State<Store>) -> impl IntoResponse {
-    match cl::cl_mempool_metrics(&store.da).await {
+async fn cl_metrics<T>(State(store): State<Store>) -> impl IntoResponse
+where
+    T: Transaction
+        + Clone
+        + Debug
+        + Hash
+        + Serialize
+        + for<'de> Deserialize<'de>
+        + Send
+        + Sync
+        + 'static,
+    <T as nomos_core::tx::Transaction>::Hash: std::cmp::Ord + Debug + Send + Sync + 'static,
+{
+    match cl::cl_mempool_metrics::<T>(&store.cl).await {
         Ok(metrics) => (StatusCode::OK, Json(metrics)).into_response(),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
     }
@@ -124,15 +152,28 @@ async fn cl_metrics(State(store): State<Store>) -> impl IntoResponse {
     post,
     path = "/cl/status",
     responses(
-        (status = 200, description = "Query the mempool status of the cl service", body = Vec<<Tx as Transaction>::Hash>),
+        (status = 200, description = "Query the mempool status of the cl service", body = Vec<<T as Transaction>::Hash>),
         (status = 500, description = "Internal server error", body = String),
     )
 )]
-async fn cl_status(
+async fn cl_status<T>(
     State(store): State<Store>,
-    Json(items): Json<Vec<<Tx as Transaction>::Hash>>,
-) -> impl IntoResponse {
-    match cl::cl_mempool_status(&store.da, items).await {
+    Json(items): Json<Vec<<T as Transaction>::Hash>>,
+) -> impl IntoResponse
+where
+    T: Transaction
+        + Clone
+        + Debug
+        + Hash
+        + Serialize
+        + for<'de> Deserialize<'de>
+        + Send
+        + Sync
+        + 'static,
+    <T as nomos_core::tx::Transaction>::Hash:
+        Serialize + for<'de> Deserialize<'de> + std::cmp::Ord + Debug + Send + Sync + 'static,
+{
+    match cl::cl_mempool_status::<T>(&store.cl, items).await {
         Ok(status) => (StatusCode::OK, Json(status)).into_response(),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
     }
