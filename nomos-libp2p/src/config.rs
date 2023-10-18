@@ -13,7 +13,7 @@ pub struct SwarmConfig {
     #[serde(with = "secret_key_serde", default = "secp256k1::SecretKey::generate")]
     pub node_key: secp256k1::SecretKey,
     // Gossipsub config
-    #[serde(with = "GossipsubConfigDef")]
+    #[serde(with = "GossipsubConfigDef", default = "gossipsub::Config::default")]
     pub gossipsub_config: gossipsub::Config,
 }
 

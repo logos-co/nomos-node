@@ -18,6 +18,8 @@ use nomos_network::backends::libp2p::Libp2p;
 use overwatch_rs::overwatch::*;
 use std::sync::Arc;
 
+const DEFAULT_DB_PATH: &str = "./db";
+
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 struct Args {
@@ -99,6 +101,9 @@ fn main() -> Result<()> {
             #[cfg(feature = "metrics")]
             metrics: config.metrics,
             da: config.da,
+            storage: nomos_storage::backends::sled::SledBackendSettings {
+                db_path: std::path::PathBuf::from(DEFAULT_DB_PATH),
+            },
         },
         None,
     )
