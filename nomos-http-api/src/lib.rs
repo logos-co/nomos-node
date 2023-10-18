@@ -63,6 +63,3 @@ where
         Ok(())
     }
 }
-
-#[test]
-fn test_service_() {}
