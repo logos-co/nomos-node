@@ -248,7 +248,9 @@ fn create_node_config(
     mixnet_topology: MixnetTopology,
 ) -> Config {
     let mixnet_client_mode = match mixnet_node_config {
-        Some(node_config) => MixnetClientMode::SenderReceiver(node_config.client_listen_address),
+        Some(node_config) => {
+            MixnetClientMode::SenderReceiver(node_config.client_listen_address.to_string())
+        }
         None => MixnetClientMode::Sender,
     };
 

@@ -125,7 +125,7 @@ async fn run_nodes_and_destination_client() -> (
     // one of mixnodes the exit layer always will be selected as a destination.
     let client = MixnetClient::new(
         MixnetClientConfig {
-            mode: MixnetClientMode::SenderReceiver(config3.client_listen_address),
+            mode: MixnetClientMode::SenderReceiver(config3.client_listen_address.to_string()),
             topology: topology.clone(),
             connection_pool_size: 255,
             max_retries: 3,
