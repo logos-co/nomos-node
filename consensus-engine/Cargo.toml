@@ -7,7 +7,6 @@ edition = "2021"
 serde = { version = "1.0", features = ["derive"], optional = true }
 blake2 = "0.10"
 bls-signatures = "0.14"
-const-hex = "1"
 digest = "0.10"
 derive_more = "0.99"
 integer-encoding = "3"
@@ -16,10 +15,11 @@ rand = "0.8"
 rand_chacha = "0.3"
 thiserror = "1"
 fraction = { version = "0.13" }
+nomos-utils = { path = "../nomos-utils", optional = true }
 
 [features]
 default = []
-serde = ["dep:serde"]
+serde = ["dep:serde", "nomos-utils/serde"]
 simulation = []
 
 [dev-dependencies]

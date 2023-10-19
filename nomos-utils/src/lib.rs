@@ -1,5 +1,5 @@
 #[cfg(feature = "serde")]
-pub(crate) mod serde {
+pub mod serde {
     fn serialize_human_readable_bytes_array<const N: usize, S: serde::Serializer>(
         src: [u8; N],
         serializer: S,
@@ -10,7 +10,7 @@ pub(crate) mod serde {
             .serialize(serializer)
     }
 
-    pub(crate) fn serialize_bytes_array<const N: usize, S: serde::Serializer>(
+    pub fn serialize_bytes_array<const N: usize, S: serde::Serializer>(
         src: [u8; N],
         serializer: S,
     ) -> Result<S::Ok, S::Error> {
@@ -54,7 +54,7 @@ pub(crate) mod serde {
         })
     }
 
-    pub(crate) fn deserialize_bytes_array<'de, const N: usize, D: serde::Deserializer<'de>>(
+    pub fn deserialize_bytes_array<'de, const N: usize, D: serde::Deserializer<'de>>(
         deserializer: D,
     ) -> Result<[u8; N], D::Error> {
         if deserializer.is_human_readable() {
