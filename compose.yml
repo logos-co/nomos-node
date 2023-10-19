@@ -9,6 +9,11 @@ services:
       - "8080:8080/tcp"
     volumes:
       - ./testnet:/etc/nomos
+    depends_on:
+      - etcd
+      - mix-node-0
+      - mix-node-1
+      - mix-node-2
     environment:
       - NET_NODE_KEY=${DOCKER_COMPOSE_BOOSTRAP_NET_NODE_KEY:-1000000000000000000000000000000000000000000000000000000000000000}
     command: /etc/nomos/bootstrap_config.yaml
