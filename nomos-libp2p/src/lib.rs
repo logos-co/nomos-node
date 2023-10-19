@@ -19,14 +19,8 @@ pub use libp2p::{
     gossipsub::{self, PublishError, SubscriptionError},
     identity::{self, secp256k1},
     plaintext::Config as PlainText2Config,
-    swarm::{
-        dial_opts::DialOpts, DialError, NetworkBehaviour, SwarmEvent, THandlerErr,
-    },
-    tcp,
-    yamux,
-    PeerId,
-    SwarmBuilder,
-    Transport,
+    swarm::{dial_opts::DialOpts, DialError, NetworkBehaviour, SwarmEvent, THandlerErr},
+    tcp, yamux, PeerId, SwarmBuilder, Transport,
 };
 use libp2p::{swarm::ConnectionId, tcp::tokio::Tcp};
 pub use multiaddr::{multiaddr, Multiaddr, Protocol};
