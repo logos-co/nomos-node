@@ -76,12 +76,12 @@ impl Swarm {
                 .build()?,
         )?;
 
-        let mut swarm = SwarmBuilder::with_tokio_executor(
+        let mut swarm = libp2p::Swarm::new(
             tcp_transport,
             Behaviour { gossipsub },
             local_peer_id,
-        )
-        .build();
+            libp2p::swarm::Config::with_tokio_executor(),
+        );
 
         swarm.listen_on(multiaddr!(Ip4(config.host), Tcp(config.port)))?;
 
