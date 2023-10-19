@@ -6,7 +6,7 @@ node_key_from_id() {
 	echo "${NODE_MASK}" | sed "s/.\{${#NODE_ID}\}$/${NODE_ID}/"
 }
 
-END=$DOCKER_REPLICAS
+END=$LIBP2P_REPLICAS
 NODE_ID=1
 NODE_IP=$(hostname -i)
 NODE_KEY=$(node_key_from_id)
