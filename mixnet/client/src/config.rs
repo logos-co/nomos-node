@@ -1,4 +1,4 @@
-use std::{net::SocketAddr, time::Duration};
+use std::{net::ToSocketAddrs, time::Duration};
 
 use futures::{stream, StreamExt};
 use mixnet_topology::MixnetTopology;
@@ -46,7 +46,7 @@ impl MixnetClientConfig {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub enum MixnetClientMode {
     Sender,
-    SenderReceiver(SocketAddr),
+    SenderReceiver(String),
 }
 
 impl MixnetClientMode {
@@ -54,7 +54,15 @@ impl MixnetClientMode {
         match self {
             Self::Sender => Ok(stream::empty().boxed()),
             Self::SenderReceiver(node_address) => {
-                Ok(Receiver::new(*node_address).run().await?.boxed())
+                let mut addrs = node_address
+                    .to_socket_addrs()
+                    .map_err(|e| MixnetClientError::MixnetNodeAddressError(e.to_string()))?;
+                let socket_addr = addrs
+                    .next()
+                    .ok_or(MixnetClientError::MixnetNodeAddressError(
+                        "No address provided".into(),
+                    ))?;
+                Ok(Receiver::new(socket_addr).run().await?.boxed())
             }
         }
     }

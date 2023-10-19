@@ -28,4 +28,4 @@ export CONSENSUS_PRIV_KEY \
 
 echo "I am a container ${HOSTNAME} node ${NET_NODE_KEY}"
 
-exec /usr/bin/nomos-node /etc/nomos/config.yaml
+exec /usr/bin/nomos-node /etc/nomos/libp2p_config.yaml

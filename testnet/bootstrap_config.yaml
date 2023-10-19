@@ -13,6 +13,8 @@ consensus:
       cur: 0
     committee_membership: !Sad
       entropy: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    leader_super_majority_threshold: 1
+    super_majority_threshold: 1
 
 network:
   backend:
@@ -30,18 +32,30 @@ network:
       # A mixclient mode. For details, see the documentation of the "mixnet" crate.
       # - Sender
       # - !SenderReceiver [mixnode_client_listen_address]
-      mode: Sender
+      mode: !SenderReceiver mix-node-2:7778
       # A mixnet topology, which contains the information of all mixnodes in the mixnet.
       # (The topology is static for now.)
       topology:
         # Each mixnet layer consists of a list of mixnodes.
         layers:
          - nodes:
-            - address: 127.0.0.1:7777  # A listen address of the mixnode
-              # A ed25519 public key for encrypting Sphinx packets for the mixnode
-              public_key: "0000000000000000000000000000000000000000000000000000000000000000"
+            - address: mix-node-0:7777  # A listen address of the mixnode
+              public_key: "fd3384e132ad02a56c78f45547ee40038dc79002b90d29ed90e08eee762ae715"
+         - nodes:
+            - address: mix-node-1:7777  # A listen address of the mixnode
+              public_key: "fd3384e132ad02a56c78f45547ee40038dc79002b90d29ed90e08eee762ae715"
+
+         - nodes:
+            - address: mix-node-2:7777  # A listen address of the mixnode
+              public_key: "fd3384e132ad02a56c78f45547ee40038dc79002b90d29ed90e08eee762ae715"
+
+
       # A max number of connections that will stay connected to mixnodes in the first mixnet layer.
       connection_pool_size: 255
+      max_retries: 5
+      retry_delay:
+        secs: 1
+        nanos: 0
     # A range of total delay that will be set to each Sphinx packets
     # sent to the mixnet for timing obfuscation.
     # Panics if start > end.
