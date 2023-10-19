@@ -5,7 +5,9 @@ pub(crate) mod serde {
         serializer: S,
     ) -> Result<S::Ok, S::Error> {
         use serde::Serialize;
-        const_hex::const_encode::<N, true>(&src).as_str().serialize(serializer)
+        const_hex::const_encode::<N, true>(&src)
+            .as_str()
+            .serialize(serializer)
     }
 
     pub(crate) fn serialize_bytes_array<const N: usize, S: serde::Serializer>(
@@ -25,7 +27,9 @@ pub(crate) mod serde {
         use serde::Deserialize;
         let s = <&[u8]>::deserialize(deserializer)?;
         let mut output = [0u8; N];
-        const_hex::decode_to_slice(s, &mut output).map(|_| output).map_err(<D::Error as serde::de::Error>::custom)
+        const_hex::decode_to_slice(s, &mut output)
+            .map(|_| output)
+            .map_err(<D::Error as serde::de::Error>::custom)
     }
 
     fn deserialize_human_unreadable_bytes_array<
