@@ -34,7 +34,7 @@ impl Default for SwarmConfig {
 #[serde(remote = "gossipsub::Config")]
 struct GossipsubConfigDef {
     #[serde(getter = "gossipsub::Config::history_length")]
-    history_legnth: usize,
+    history_length: usize,
     #[serde(getter = "gossipsub::Config::history_gossip")]
     history_gossip: usize,
     #[serde(getter = "gossipsub::Config::mesh_n")]
@@ -57,8 +57,6 @@ struct GossipsubConfigDef {
     fanout_ttl: Duration,
     #[serde(getter = "gossipsub::Config::check_explicit_peers_ticks")]
     check_explicit_peers_ticks: u64,
-    #[serde(getter = "gossipsub::Config::idle_timeout")]
-    idle_timeout: Duration,
     #[serde(getter = "gossipsub::Config::duplicate_cache_time")]
     duplicate_cache_time: Duration,
     #[serde(getter = "gossipsub::Config::validate_messages")]
@@ -103,7 +101,7 @@ impl From<GossipsubConfigDef> for gossipsub::Config {
     fn from(def: GossipsubConfigDef) -> gossipsub::Config {
         let mut builder = gossipsub::ConfigBuilder::default();
         let mut builder = builder
-            .history_length(def.history_legnth)
+            .history_length(def.history_length)
             .history_gossip(def.history_gossip)
             .mesh_n(def.mesh_n)
             .mesh_n_low(def.mesh_n_low)
@@ -115,7 +113,6 @@ impl From<GossipsubConfigDef> for gossipsub::Config {
             .heartbeat_interval(def.heartbeat_interval)
             .fanout_ttl(def.fanout_ttl)
             .check_explicit_peers_ticks(def.check_explicit_peers_ticks)
-            .idle_timeout(def.idle_timeout)
             .duplicate_cache_time(def.duplicate_cache_time)
             .allow_self_origin(def.allow_self_origin)
             .prune_peers(def.prune_peers)

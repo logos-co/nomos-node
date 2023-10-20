@@ -1,3 +1,4 @@
+
 use std::{fmt::Debug, hash::Hash, net::SocketAddr, sync::Arc};
 
 use axum::{extract::State, response::IntoResponse, routing, Json, Router, Server};
@@ -45,20 +46,7 @@ struct ApiDoc;
 type Store = Arc<AxumBackendSettings>;
 
 #[async_trait::async_trait]
-impl<ClTransaction> Backend for AxumBackend<ClTransaction>
-where
-    ClTransaction: Transaction
-        + Clone
-        + Debug
-        + Hash
-        + Serialize
-        + for<'de> Deserialize<'de>
-        + Send
-        + Sync
-        + 'static,
-    <ClTransaction as nomos_core::tx::Transaction>::Hash:
-        Serialize + for<'de> Deserialize<'de> + std::cmp::Ord + Debug + Send + Sync + 'static,
-{
+impl Backend for AxumBackend {
     type Error = hyper::Error;
     type Settings = AxumBackendSettings;
 

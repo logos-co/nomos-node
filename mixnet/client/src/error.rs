@@ -3,6 +3,8 @@ use nym_sphinx::addressing::nodes::NymNodeRoutingAddressError;
 
 #[derive(thiserror::Error, Debug)]
 pub enum MixnetClientError {
+    #[error("invalid node address: {0}")]
+    MixnetNodeAddressError(String),
     #[error("mixnet node connect error")]
     MixnetNodeConnectError,
     #[error("mixnode stream has been closed")]
