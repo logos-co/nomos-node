@@ -45,7 +45,6 @@ impl NetworkBackend for Libp2p {
     fn new(config: Self::Settings, overwatch_handle: OverwatchHandle) -> Self {
         let (commands_tx, commands_rx) = tokio::sync::mpsc::channel(BUFFER_SIZE);
         let (events_tx, _) = tokio::sync::broadcast::channel(BUFFER_SIZE);
-
         let mut mixnet_handler = MixnetHandler::new(&config, commands_tx.clone());
         overwatch_handle.runtime().spawn(async move {
             mixnet_handler.run().await;
