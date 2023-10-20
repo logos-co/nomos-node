@@ -8,6 +8,8 @@ use overwatch_rs::{
     DynError,
 };
 
+pub mod http;
+
 /// A simple abstraction so that we can easily
 /// change the underlying http server
 #[async_trait::async_trait]
