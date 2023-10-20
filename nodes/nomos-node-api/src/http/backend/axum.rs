@@ -1,4 +1,3 @@
-
 use std::{fmt::Debug, hash::Hash, net::SocketAddr, sync::Arc};
 
 use axum::{extract::State, response::IntoResponse, routing, Json, Router, Server};
