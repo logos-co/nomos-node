@@ -18,11 +18,9 @@ pub use libp2p::{
     dns,
     gossipsub::{self, PublishError, SubscriptionError},
     identity::{self, secp256k1},
-    plaintext::PlainText2Config,
-    swarm::{
-        dial_opts::DialOpts, DialError, NetworkBehaviour, SwarmBuilder, SwarmEvent, THandlerErr,
-    },
-    tcp, yamux, PeerId, Transport,
+    plaintext::Config as PlainText2Config,
+    swarm::{dial_opts::DialOpts, DialError, NetworkBehaviour, SwarmEvent, THandlerErr},
+    tcp, yamux, PeerId, SwarmBuilder, Transport,
 };
 use libp2p::{swarm::ConnectionId, tcp::tokio::Tcp};
 pub use multiaddr::{multiaddr, Multiaddr, Protocol};
@@ -59,15 +57,13 @@ impl Swarm {
         // TODO: consider using noise authentication
         let tcp_transport = tcp::Transport::<Tcp>::new(tcp::Config::default().nodelay(true))
             .upgrade(upgrade::Version::V1Lazy)
-            .authenticate(PlainText2Config {
-                local_public_key: id_keys.public(),
-            })
+            .authenticate(PlainText2Config::new(&id_keys))
             .multiplex(yamux::Config::default())
             .timeout(TRANSPORT_TIMEOUT)
             .boxed();
 
         // Wrapping TCP transport into DNS transport to resolve hostnames.
-        let tcp_transport = dns::TokioDnsConfig::system(tcp_transport)?.boxed();
+        let tcp_transport = dns::tokio::Transport::system(tcp_transport)?.boxed();
 
         // TODO: consider using Signed or Anonymous.
         //       For Anonymous, a custom `message_id` function need to be set
@@ -80,12 +76,12 @@ impl Swarm {
                 .build()?,
         )?;
 
-        let mut swarm = SwarmBuilder::with_tokio_executor(
+        let mut swarm = libp2p::Swarm::new(
             tcp_transport,
             Behaviour { gossipsub },
             local_peer_id,
-        )
-        .build();
+            libp2p::swarm::Config::with_tokio_executor(),
+        );
 
         swarm.listen_on(multiaddr!(Ip4(config.host), Tcp(config.port)))?;
 
