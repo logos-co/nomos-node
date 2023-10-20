@@ -46,7 +46,20 @@ struct ApiDoc;
 type Store = Arc<AxumBackendSettings>;
 
 #[async_trait::async_trait]
-impl Backend for AxumBackend {
+impl<ClTransaction> Backend for AxumBackend<ClTransaction>
+where
+    ClTransaction: Transaction
+        + Clone
+        + Debug
+        + Hash
+        + Serialize
+        + for<'de> Deserialize<'de>
+        + Send
+        + Sync
+        + 'static,
+    <ClTransaction as nomos_core::tx::Transaction>::Hash:
+        Serialize + for<'de> Deserialize<'de> + std::cmp::Ord + Debug + Send + Sync + 'static,
+{
     type Error = hyper::Error;
     type Settings = AxumBackendSettings;
 
