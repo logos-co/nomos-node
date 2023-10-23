@@ -335,7 +335,7 @@ where
                         Self::process_message(&carnot, msg);
                     }
                     Some(msg) = lifecycle_stream.next() => {
-                        if Self::handle_lifecycle_message(msg).await {
+                        if Self::should_stop_service(msg).await {
                             break;
                         }
                     }
@@ -396,7 +396,7 @@ where
     DaPoolAdapter: MempoolAdapter<Item = DaPool::Item, Key = DaPool::Key> + Send + Sync + 'static,
     Storage: StorageBackend + Send + Sync + 'static,
 {
-    async fn handle_lifecycle_message(message: LifecycleMessage) -> bool {
+    async fn should_stop_service(message: LifecycleMessage) -> bool {
         match message {
             LifecycleMessage::Shutdown(sender) => {
                 if sender.send(()).is_err() {

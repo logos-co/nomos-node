@@ -102,7 +102,7 @@ where
                     Self::handle_network_service_message(msg, &mut backend).await;
                 }
                 Some(msg) = lifecycle_stream.next() => {
-                    if Self::handle_lifecycle_message(msg).await {
+                    if Self::should_stop_service(msg).await {
                         break;
                     }
                 }
@@ -135,7 +135,7 @@ where
         }
     }
 
-    async fn handle_lifecycle_message(msg: LifecycleMessage) -> bool {
+    async fn should_stop_service(msg: LifecycleMessage) -> bool {
         match msg {
             LifecycleMessage::Kill => true,
             LifecycleMessage::Shutdown(signal_sender) => {

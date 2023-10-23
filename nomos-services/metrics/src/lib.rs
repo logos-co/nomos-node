@@ -150,7 +150,7 @@ impl<Backend: MetricsBackend> MetricsService<Backend> {
         }
     }
 
-    async fn handle_lifecycle_message(message: LifecycleMessage) -> bool {
+    async fn should_stop_service(message: LifecycleMessage) -> bool {
         match message {
             LifecycleMessage::Shutdown(sender) => {
                 if sender.send(()).is_err() {
@@ -194,7 +194,7 @@ impl<Backend: MetricsBackend + Send + Sync + 'static> ServiceCore for MetricsSer
                     Self::handle_message(message, &mut backend).await;
                 }
                 Some(message) = lifecycle_stream.next() => {
-                    if Self::handle_lifecycle_message(message).await {
+                    if Self::should_stop_service(message).await {
                         break;
                     }
                 }

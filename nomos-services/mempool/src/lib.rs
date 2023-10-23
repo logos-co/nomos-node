@@ -195,7 +195,7 @@ where
                     });
                 }
                 Some(msg) = lifecycle_stream.next() =>  {
-                    if Self::handle_lifecycle_message(msg).await {
+                    if Self::should_stop_service(msg).await {
                         break;
                     }
                 }
@@ -215,7 +215,7 @@ where
     N: NetworkAdapter<Item = P::Item, Key = P::Key> + Send + Sync + 'static,
     D: Discriminant + Send,
 {
-    async fn handle_lifecycle_message(message: LifecycleMessage) -> bool {
+    async fn should_stop_service(message: LifecycleMessage) -> bool {
         match message {
             LifecycleMessage::Shutdown(sender) => {
                 if sender.send(()).is_err() {

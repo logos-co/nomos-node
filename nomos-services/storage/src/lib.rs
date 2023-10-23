@@ -165,7 +165,7 @@ pub struct StorageService<Backend: StorageBackend + Send + Sync + 'static> {
 }
 
 impl<Backend: StorageBackend + Send + Sync + 'static> StorageService<Backend> {
-    async fn handle_lifecycle_message(msg: LifecycleMessage) -> bool {
+    async fn should_stop_service(msg: LifecycleMessage) -> bool {
         match msg {
             LifecycleMessage::Shutdown(sender) => {
                 // TODO: Try to finish pending transactions if any and close connections properly
@@ -294,7 +294,7 @@ impl<Backend: StorageBackend + Send + Sync + 'static> ServiceCore for StorageSer
                     Self::handle_storage_message(msg, backend).await;
                 }
                 Some(msg) = lifecycle_stream.next() => {
-                    if Self::handle_lifecycle_message(msg).await {
+                    if Self::should_stop_service(msg).await {
                         break;
                     }
                 }
