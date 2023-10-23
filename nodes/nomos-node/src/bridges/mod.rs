@@ -1,4 +1,5 @@
 mod libp2p;
+use consensus_engine::BlockId;
 use libp2p::*;
 
 // std
@@ -14,6 +15,7 @@ use tracing::error;
 use full_replication::{Blob, Certificate};
 use nomos_core::wire;
 use nomos_core::{
+    block::Block,
     da::{blob, certificate::Certificate as _},
     tx::Transaction,
 };
@@ -29,8 +31,9 @@ use nomos_mempool::{MempoolMetrics, MempoolMsg, MempoolService};
 use nomos_network::backends::libp2p::Libp2p;
 use nomos_network::backends::NetworkBackend;
 use nomos_network::NetworkService;
-use nomos_node::DataAvailability as DataAvailabilityService;
 use nomos_node::{Carnot, Tx};
+use nomos_node::{DataAvailability as DataAvailabilityService, Wire};
+use nomos_storage::{backends::sled::SledBackend, StorageMsg, StorageService};
 use overwatch_rs::services::relay::OutboundRelay;
 
 type DaMempoolService = MempoolService<
@@ -117,6 +120,14 @@ pub fn cl_mempool_status_bridge(
     }))
 }
 
+pub fn storage_get_blocks_bridge(
+    handle: overwatch_rs::overwatch::handle::OverwatchHandle,
+) -> HttpBridgeRunner {
+    Box::new(Box::pin(async move {
+        post_handler!(handle, StorageService<SledBackend<Wire>>, "block" => handle_block_get_req)
+    }))
+}
+
 pub fn network_info_bridge(
     handle: overwatch_rs::overwatch::handle::OverwatchHandle,
 ) -> HttpBridgeRunner {
@@ -155,6 +166,22 @@ where
     let blobs = receiver.await.unwrap();
     res_tx
         .send(Ok(serde_json::to_string(&blobs).unwrap().into()))
+        .await?;
+
+    Ok(())
+}
+
+pub async fn handle_block_get_req(
+    storage_channel: &OutboundRelay<StorageMsg<SledBackend<Wire>>>,
+    payload: Option<Bytes>,
+    res_tx: Sender<HttpResponse>,
+) -> Result<(), overwatch_rs::DynError> {
+    let key: BlockId = serde_json::from_slice(payload.unwrap_or_default().as_ref())?;
+    let (msg, receiver) = StorageMsg::new_load_message(key);
+    storage_channel.send(msg).await.map_err(|(e, _)| e)?;
+    let block: Option<Block<Tx, Certificate>> = receiver.recv().await?;
+    res_tx
+        .send(Ok(serde_json::to_string(&block).unwrap().into()))
         .await?;
 
     Ok(())
