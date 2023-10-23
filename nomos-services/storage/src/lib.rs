@@ -56,19 +56,23 @@ impl<T, Backend> StorageReplyReceiver<T, Backend> {
     }
 }
 
-impl<Backend: StorageBackend> StorageReplyReceiver<Bytes, Backend> {
+impl<Backend: StorageBackend> StorageReplyReceiver<Option<Bytes>, Backend> {
     /// Receive and transform the reply into the desired type
     /// Target type must implement `From` from the original backend stored type.
-    pub async fn recv<Output>(self) -> Result<Output, tokio::sync::oneshot::error::RecvError>
+    pub async fn recv<Output>(
+        self,
+    ) -> Result<Option<Output>, tokio::sync::oneshot::error::RecvError>
     where
         Output: DeserializeOwned,
     {
         self.channel
             .await
             // TODO: This should probably just return a result anyway. But for now we can consider in infallible.
-            .map(|b| {
-                Backend::SerdeOperator::deserialize(b)
-                    .expect("Recovery from storage should never fail")
+            .map(|maybe_bytes| {
+                maybe_bytes.map(|bytes| {
+                    Backend::SerdeOperator::deserialize(bytes)
+                        .expect("Recovery from storage should never fail")
+                })
             })
     }
 }
