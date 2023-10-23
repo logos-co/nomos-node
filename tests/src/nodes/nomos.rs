@@ -5,18 +5,20 @@ use std::time::Duration;
 // internal
 use crate::{get_available_port, ConsensusConfig, MixnetConfig, Node, SpawnConfig};
 use consensus_engine::overlay::{RandomBeaconState, RoundRobin, TreeOverlay, TreeOverlaySettings};
-use consensus_engine::{NodeId, Overlay};
+use consensus_engine::{BlockId, NodeId, Overlay};
+use full_replication::Certificate;
 use mixnet_client::{MixnetClientConfig, MixnetClientMode};
 use mixnet_node::MixnetNodeConfig;
 use mixnet_topology::MixnetTopology;
 use nomos_consensus::{CarnotInfo, CarnotSettings};
+use nomos_core::block::Block;
 use nomos_http::backends::axum::AxumBackendSettings;
 use nomos_libp2p::{multiaddr, Multiaddr};
 use nomos_log::{LoggerBackend, LoggerFormat};
 use nomos_mempool::MempoolMetrics;
 use nomos_network::backends::libp2p::Libp2pConfig;
 use nomos_network::NetworkConfig;
-use nomos_node::Config;
+use nomos_node::{Config, Tx};
 // crates
 use fraction::Fraction;
 use once_cell::sync::Lazy;
@@ -27,6 +29,7 @@ use tempfile::NamedTempFile;
 static CLIENT: Lazy<Client> = Lazy::new(Client::new);
 const NOMOS_BIN: &str = "../target/debug/nomos-node";
 const CARNOT_INFO_API: &str = "carnot/info";
+const STORAGE_BLOCKS_API: &str = "storage/block";
 const MEMPOOL_API: &str = "mempool-";
 const LOGS_PREFIX: &str = "__logs";
 
@@ -99,6 +102,18 @@ impl NomosNode {
         while self.get(CARNOT_INFO_API).await.is_err() {
             tokio::time::sleep(Duration::from_millis(100)).await;
         }
+    }
+
+    pub async fn get_block(&self, id: BlockId) -> Option<Block<Tx, Certificate>> {
+        CLIENT
+            .post(&format!("http://{}/{}", self.addr, STORAGE_BLOCKS_API))
+            .body(serde_json::to_string(&id).unwrap())
+            .send()
+            .await
+            .unwrap()
+            .json::<Option<Block<Tx, Certificate>>>()
+            .await
+            .unwrap()
     }
 
     pub async fn get_mempoool_metrics(&self, pool: Pool) -> MempoolMetrics {

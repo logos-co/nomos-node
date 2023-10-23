@@ -14,18 +14,18 @@ struct Info {
     view: View,
 }
 
-async fn happy_test(nodes: Vec<NomosNode>) {
+async fn happy_test(nodes: &[NomosNode]) {
     let timeout = std::time::Duration::from_secs(20);
     let timeout = tokio::time::sleep(timeout);
     tokio::select! {
         _ = timeout => panic!("timed out waiting for nodes to reach view {}", TARGET_VIEW),
-        _ = async { while stream::iter(&nodes)
+        _ = async { while stream::iter(nodes)
             .any(|n| async move { n.consensus_info().await.current_view < TARGET_VIEW })
             .await
         {
             println!(
                 "waiting... {}",
-                stream::iter(&nodes)
+                stream::iter(nodes)
                     .then(|n| async move { format!("{}", n.consensus_info().await.current_view) })
                     .collect::<Vec<_>>()
                     .await
@@ -86,7 +86,7 @@ async fn two_nodes_happy() {
         mixnet: mixnet_config,
     })
     .await;
-    happy_test(nodes).await;
+    happy_test(&nodes).await;
 }
 
 #[tokio::test]
@@ -101,5 +101,29 @@ async fn ten_nodes_happy() {
         mixnet: mixnet_config,
     })
     .await;
-    happy_test(nodes).await;
+    happy_test(&nodes).await;
+}
+
+#[tokio::test]
+async fn test_get_block() {
+    let (_mixnodes, mixnet_config) = MixNode::spawn_nodes(3).await;
+    let nodes = NomosNode::spawn_nodes(SpawnConfig::Chain {
+        consensus: ConsensusConfig {
+            n_participants: 2,
+            threshold: Fraction::one(),
+            timeout: Duration::from_secs(10),
+        },
+        mixnet: mixnet_config,
+    })
+    .await;
+    happy_test(&nodes).await;
+    let id = nodes[0].consensus_info().await.committed_blocks[0];
+    tokio::time::timeout(Duration::from_secs(10), async {
+        while nodes[0].get_block(id).await.is_none() {
+            tokio::time::sleep(Duration::from_millis(100)).await;
+            println!("trying...");
+        }
+    })
+    .await
+    .unwrap();
 }
