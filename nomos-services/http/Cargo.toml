@@ -25,7 +25,7 @@ clap = { version = "4", features = ["derive", "env"], optional = true }
 futures = "0.3"
 http = "0.2.9"
 hyper = { version = "0.14", optional = true }
-overwatch-rs = { git = "https://github.com/logos-co/Overwatch", rev = "ac28d01" }
+overwatch-rs = { git = "https://github.com/logos-co/Overwatch", rev = "2f70806" }
 overwatch-derive = { git = "https://github.com/logos-co/Overwatch", rev = "ac28d01" }
 parking_lot = { version = "0.12", optional = true }
 serde = { version = "1.0", features = ["derive"] }
