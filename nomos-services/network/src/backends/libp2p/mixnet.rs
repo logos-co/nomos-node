@@ -1,6 +1,6 @@
 use std::{ops::Range, time::Duration};
 
-use mixnet_client::{MessageStream, MixnetClient};
+use mixnet_client::MixnetClient;
 use nomos_core::wire;
 use rand::{rngs::OsRng, thread_rng, Rng};
 use serde::{Deserialize, Serialize};
@@ -47,26 +47,11 @@ impl MixnetHandler {
     }
 
     pub async fn run(&mut self) {
-        const BASE_DELAY: Duration = Duration::from_secs(5);
-        // we need this loop to help us reestablish the connection in case
-        // the mixnet client fails for whatever reason
-        let mut backoff = 0;
-        loop {
-            match self.client.run().await {
-                Ok(stream) => {
-                    backoff = 0;
-                    Self::handle_stream(self.commands_tx.clone(), stream).await;
-                }
-                Err(e) => {
-                    tracing::error!("mixnet client error: {e}");
-                    backoff += 1;
-                    tokio::time::sleep(BASE_DELAY * backoff).await;
-                }
-            }
-        }
-    }
+        let Ok(mut stream) = self.client.run().await else {
+            tracing::error!("Could not quickstart mixnet stream");
+            return;
+        };
 
-    async fn handle_stream(tx: mpsc::Sender<Command>, mut stream: MessageStream) {
         while let Some(result) = stream.next().await {
             match result {
                 Ok(msg) => {
@@ -77,17 +62,17 @@ impl MixnetHandler {
                         continue;
                     };
 
-                    tx.send(Command::DirectBroadcastAndRetry {
-                        topic,
-                        message,
-                        retry_count: 0,
-                    })
-                    .await
-                    .unwrap_or_else(|_| tracing::error!("could not schedule broadcast"));
+                    self.commands_tx
+                        .send(Command::DirectBroadcastAndRetry {
+                            topic,
+                            message,
+                            retry_count: 0,
+                        })
+                        .await
+                        .unwrap_or_else(|_| tracing::error!("could not schedule broadcast"));
                 }
                 Err(e) => {
-                    tracing::error!("mixnet client stream error: {e}");
-                    // TODO: handle mixnet client stream error
+                    todo!("Handle mixclient error: {e}");
                 }
             }
         }
