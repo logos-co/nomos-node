@@ -200,12 +200,9 @@ impl Node for NomosNode {
     }
 
     async fn consensus_info(&self) -> Self::ConsensusInfo {
-        self.get(CARNOT_INFO_API)
-            .await
-            .unwrap()
-            .json()
-            .await
-            .unwrap()
+        let res = self.get(CARNOT_INFO_API).await;
+        println!("res: {:?}", res);
+        res.unwrap().json().await.unwrap()
     }
 
     fn stop(&mut self) {
