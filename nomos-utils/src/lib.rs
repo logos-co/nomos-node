@@ -25,7 +25,7 @@ pub mod serde {
         deserializer: D,
     ) -> Result<[u8; N], D::Error> {
         use serde::Deserialize;
-        let s = <&[u8]>::deserialize(deserializer)?;
+        let s = String::deserialize(deserializer)?;
         let mut output = [0u8; N];
         const_hex::decode_to_slice(s, &mut output)
             .map(|_| output)
