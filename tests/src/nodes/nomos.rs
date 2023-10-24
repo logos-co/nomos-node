@@ -99,7 +99,11 @@ impl NomosNode {
     }
 
     async fn wait_online(&self) {
-        while self.get(CARNOT_INFO_API).await.is_err() {
+        loop {
+            let res = self.get(CARNOT_INFO_API).await;
+            if res.is_ok() && res.unwrap().status().is_success() {
+                break;
+            }
             tokio::time::sleep(Duration::from_millis(100)).await;
         }
     }
@@ -201,7 +205,6 @@ impl Node for NomosNode {
 
     async fn consensus_info(&self) -> Self::ConsensusInfo {
         let res = self.get(CARNOT_INFO_API).await;
-        println!("res: {:?}", res);
         res.unwrap().json().await.unwrap()
     }
 
