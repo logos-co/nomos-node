@@ -1,6 +1,6 @@
 use std::{
     net::{Ipv4Addr, SocketAddr, SocketAddrV4},
-    process::{Child, Command, Stdio},
+    process::{Child, Command},
     time::Duration,
 };
 
@@ -25,10 +25,11 @@ impl Drop for MixNode {
 
 impl MixNode {
     pub async fn spawn(config: MixnetNodeConfig) -> Self {
-        let config = mixnode::Config {
+        let mut config = mixnode::Config {
             mixnode: config,
             log: Default::default(),
         };
+        config.log.level = tracing::Level::INFO;
 
         let mut file = NamedTempFile::new().unwrap();
         let config_path = file.path().to_owned();
@@ -36,7 +37,7 @@ impl MixNode {
 
         let child = Command::new(std::env::current_dir().unwrap().join(MIXNODE_BIN))
             .arg(&config_path)
-            .stdout(Stdio::null())
+            // .stdout(Stdio::null())
             .spawn()
             .unwrap();
 

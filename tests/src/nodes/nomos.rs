@@ -1,6 +1,6 @@
 // std
 use std::net::SocketAddr;
-use std::process::{Child, Command, Stdio};
+use std::process::{Child, Command};
 use std::time::Duration;
 // internal
 use crate::{get_available_port, ConsensusConfig, MixnetConfig, Node, SpawnConfig};
@@ -12,7 +12,6 @@ use mixnet_topology::MixnetTopology;
 use nomos_consensus::{CarnotInfo, CarnotSettings};
 use nomos_http::backends::axum::AxumBackendSettings;
 use nomos_libp2p::{multiaddr, Multiaddr};
-use nomos_log::{LoggerBackend, LoggerFormat};
 use nomos_mempool::MempoolMetrics;
 use nomos_network::backends::libp2p::Libp2pConfig;
 use nomos_network::NetworkConfig;
@@ -60,17 +59,18 @@ impl NomosNode {
         let config_path = file.path().to_owned();
 
         // setup logging so that we can intercept it later in testing
-        config.log.backend = LoggerBackend::File {
-            directory: dir.path().to_owned(),
-            prefix: Some(LOGS_PREFIX.into()),
-        };
-        config.log.format = LoggerFormat::Json;
+        // config.log.backend = LoggerBackend::File {
+        //     directory: dir.path().to_owned(),
+        //     prefix: Some(LOGS_PREFIX.into()),
+        // };
+        // config.log.format = LoggerFormat::Json;
+        config.log.level = tracing::Level::INFO;
 
         serde_yaml::to_writer(&mut file, &config).unwrap();
         let child = Command::new(std::env::current_dir().unwrap().join(NOMOS_BIN))
             .arg(&config_path)
             .current_dir(dir.path())
-            .stdout(Stdio::null())
+            // .stdout(Stdio::null())
             .spawn()
             .unwrap();
         let node = Self {
