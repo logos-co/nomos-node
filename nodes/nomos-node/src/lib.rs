@@ -66,7 +66,7 @@ pub type Carnot = CarnotConsensus<
     SledBackend<Wire>,
 >;
 
-type DataAvailability = DataAvailabilityService<
+pub type DataAvailability = DataAvailabilityService<
     FullReplication<AbsoluteNumber<Attestation, Certificate>>,
     BlobCache<<Blob as nomos_core::da::blob::Blob>::Hash, Blob>,
     DaLibp2pAdapter<Blob, Attestation>,
