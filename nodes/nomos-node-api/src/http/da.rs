@@ -17,7 +17,7 @@ pub(crate) type DaMempoolService = MempoolService<
 pub(crate) async fn da_mempool_metrics(
     handle: &overwatch_rs::overwatch::handle::OverwatchHandle,
 ) -> Result<MempoolMetrics, super::DynError> {
-    let relay = handle.relay::<DaMempoolService>().connect().await.unwrap();
+    let relay = handle.relay::<DaMempoolService>().connect().await?;
     let (sender, receiver) = oneshot::channel();
     relay
         .send(MempoolMsg::Metrics {
@@ -33,7 +33,7 @@ pub(crate) async fn da_mempool_status(
     handle: &overwatch_rs::overwatch::handle::OverwatchHandle,
     items: Vec<<Blob as blob::Blob>::Hash>,
 ) -> Result<Vec<Status>, super::DynError> {
-    let relay = handle.relay::<DaMempoolService>().connect().await.unwrap();
+    let relay = handle.relay::<DaMempoolService>().connect().await?;
     let (sender, receiver) = oneshot::channel();
     relay
         .send(MempoolMsg::Status {

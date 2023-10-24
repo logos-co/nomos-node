@@ -31,11 +31,7 @@ where
         + 'static,
     <T as nomos_core::tx::Transaction>::Hash: std::cmp::Ord + Debug + Send + Sync + 'static,
 {
-    let relay = handle
-        .relay::<ClMempoolService<T>>()
-        .connect()
-        .await
-        .unwrap();
+    let relay = handle.relay::<ClMempoolService<T>>().connect().await?;
     let (sender, receiver) = oneshot::channel();
     relay
         .send(MempoolMsg::Metrics {
@@ -44,7 +40,7 @@ where
         .await
         .map_err(|(e, _)| e)?;
 
-    Ok(receiver.await.unwrap())
+    Ok(receiver.await?)
 }
 
 pub(crate) async fn cl_mempool_status<T>(
@@ -63,11 +59,7 @@ where
         + 'static,
     <T as nomos_core::tx::Transaction>::Hash: std::cmp::Ord + Debug + Send + Sync + 'static,
 {
-    let relay = handle
-        .relay::<ClMempoolService<T>>()
-        .connect()
-        .await
-        .unwrap();
+    let relay = handle.relay::<ClMempoolService<T>>().connect().await?;
     let (sender, receiver) = oneshot::channel();
     relay
         .send(MempoolMsg::Status {
@@ -77,5 +69,5 @@ where
         .await
         .map_err(|(e, _)| e)?;
 
-    Ok(receiver.await.unwrap())
+    Ok(receiver.await?)
 }

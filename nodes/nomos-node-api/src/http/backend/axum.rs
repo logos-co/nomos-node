@@ -77,7 +77,7 @@ where
         let app = Router::new()
             .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
             .route("/da/metrics", routing::get(da_metrics))
-            .route("/da/status", routing::post(routing::post(da_status)))
+            .route("/da/status", routing::post(da_status))
             .route("/cl/metrics", routing::get(cl_metrics::<ClTransaction>))
             .route("/cl/status", routing::post(cl_status::<ClTransaction>))
             .with_state(store);
@@ -166,12 +166,12 @@ where
         + Debug
         + Hash
         + Serialize
-        + for<'de> Deserialize<'de>
+        + serde::de::DeserializeOwned
         + Send
         + Sync
         + 'static,
     <T as nomos_core::tx::Transaction>::Hash:
-        Serialize + for<'de> Deserialize<'de> + std::cmp::Ord + Debug + Send + Sync + 'static,
+        Serialize + serde::de::DeserializeOwned + std::cmp::Ord + Debug + Send + Sync + 'static,
 {
     match cl::cl_mempool_status::<T>(&store.cl, items).await {
         Ok(status) => (StatusCode::OK, Json(status)).into_response(),

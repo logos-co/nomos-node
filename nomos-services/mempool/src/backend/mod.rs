@@ -64,7 +64,7 @@ pub enum Status {
     #[cfg_attr(
         feature = "openapi",
         schema(
-            example = "e.g. [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]"
+            example = "e.g. 0x"
         )
     )]
     InBlock { block: BlockId },
