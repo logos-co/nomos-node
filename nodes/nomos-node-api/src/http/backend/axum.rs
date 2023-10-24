@@ -49,7 +49,7 @@ struct ApiDoc;
 type Store = Arc<AxumBackendSettings>;
 
 #[async_trait::async_trait]
-impl<T, S, const SIZE: usize> Backend for AxumBackend<T, SIZE>
+impl<T, S, const SIZE: usize> Backend for AxumBackend<T, S, SIZE>
 where
     T: Transaction
         + Clone
