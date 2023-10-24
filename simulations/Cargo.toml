@@ -11,7 +11,9 @@ path = "src/bin/app/main.rs"
 
 [dependencies]
 anyhow = "1"
+blake2 = "0.10"
 bls-signatures = "0.14"
+digest = "0.10"
 csv = "1"
 clap = { version = "4", features = ["derive"] }
 ctrlc = "3.4"
