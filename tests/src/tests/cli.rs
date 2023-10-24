@@ -1,9 +1,7 @@
 use fraction::{Fraction, One};
-use nomos_cli::cmds::{
-    disseminate::{
-        DaProtocolChoice, Disseminate, FullReplicationSettings, Protocol, ProtocolSettings,
-    },
-    Command,
+use nomos_cli::{
+    cmds::{disseminate::Disseminate, Command},
+    da::{DaProtocolChoice, FullReplicationSettings, Protocol, ProtocolSettings},
 };
 use std::time::Duration;
 use tempfile::NamedTempFile;
