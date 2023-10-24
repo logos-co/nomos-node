@@ -5,13 +5,14 @@ use full_replication::Blob;
 use hyper::StatusCode;
 use nomos_core::{da::blob, tx::Transaction};
 use nomos_mempool::{openapi::Status, MempoolMetrics};
+use nomos_storage::backends::StorageSerde;
 use overwatch_rs::overwatch::handle::OverwatchHandle;
-use serde::{Deserialize, Serialize};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 
 use crate::{
-    http::{cl, da},
+    http::{cl, da, info},
     Backend,
 };
 
@@ -20,11 +21,14 @@ pub struct AxumBackendSettings {
     pub addr: SocketAddr,
     pub da: OverwatchHandle,
     pub cl: OverwatchHandle,
+    pub carnot: OverwatchHandle,
+    pub network: OverwatchHandle,
 }
 
-pub struct AxumBackend<ClTransaction> {
+pub struct AxumBackend<T, S, const SIZE: usize> {
     settings: Arc<AxumBackendSettings>,
-    _cl: core::marker::PhantomData<ClTransaction>,
+    _tx: core::marker::PhantomData<T>,
+    _storage_serde: core::marker::PhantomData<S>,
 }
 
 #[derive(OpenApi)]
@@ -45,9 +49,9 @@ struct ApiDoc;
 type Store = Arc<AxumBackendSettings>;
 
 #[async_trait::async_trait]
-impl<ClTransaction> Backend for AxumBackend<ClTransaction>
+impl<T, S, const SIZE: usize> Backend for AxumBackend<T, SIZE>
 where
-    ClTransaction: Transaction
+    T: Transaction
         + Clone
         + Debug
         + Hash
@@ -56,8 +60,9 @@ where
         + Send
         + Sync
         + 'static,
-    <ClTransaction as nomos_core::tx::Transaction>::Hash:
+    <T as nomos_core::tx::Transaction>::Hash:
         Serialize + for<'de> Deserialize<'de> + std::cmp::Ord + Debug + Send + Sync + 'static,
+    S: StorageSerde + Send + Sync + 'static,
 {
     type Error = hyper::Error;
     type Settings = AxumBackendSettings;
@@ -68,7 +73,8 @@ where
     {
         Ok(Self {
             settings: Arc::new(settings),
-            _cl: core::marker::PhantomData,
+            _tx: core::marker::PhantomData,
+            _storage_serde: core::marker::PhantomData,
         })
     }
 
@@ -78,8 +84,10 @@ where
             .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
             .route("/da/metrics", routing::get(da_metrics))
             .route("/da/status", routing::post(da_status))
-            .route("/cl/metrics", routing::get(cl_metrics::<ClTransaction>))
-            .route("/cl/status", routing::post(cl_status::<ClTransaction>))
+            .route("/cl/metrics", routing::get(cl_metrics::<T>))
+            .route("/cl/status", routing::post(cl_status::<T>))
+            .route("/carnot/info", routing::get(carnot_info::<T, S, SIZE>))
+            .route("/network/info", routing::get(libp2p_info))
             .with_state(store);
 
         Server::bind(&self.settings.addr)
@@ -161,20 +169,47 @@ async fn cl_status<T>(
     Json(items): Json<Vec<<T as Transaction>::Hash>>,
 ) -> impl IntoResponse
 where
-    T: Transaction
-        + Clone
-        + Debug
-        + Hash
-        + Serialize
-        + serde::de::DeserializeOwned
-        + Send
-        + Sync
-        + 'static,
+    T: Transaction + Clone + Debug + Hash + Serialize + DeserializeOwned + Send + Sync + 'static,
     <T as nomos_core::tx::Transaction>::Hash:
-        Serialize + serde::de::DeserializeOwned + std::cmp::Ord + Debug + Send + Sync + 'static,
+        Serialize + DeserializeOwned + std::cmp::Ord + Debug + Send + Sync + 'static,
 {
     match cl::cl_mempool_status::<T>(&store.cl, items).await {
         Ok(status) => (StatusCode::OK, Json(status)).into_response(),
+        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+    }
+}
+
+#[utoipa::path(
+    get,
+    path = "/carnot/info",
+    responses(
+        (status = 200, description = "Query the carnot information", body = nomos_consensus::CarnotInfo),
+        (status = 500, description = "Internal server error", body = String),
+    )
+)]
+async fn carnot_info<Tx, SS, const SIZE: usize>(State(store): State<Store>) -> impl IntoResponse
+where
+    Tx: Transaction + Clone + Debug + Hash + Serialize + DeserializeOwned + Send + Sync + 'static,
+    <Tx as Transaction>::Hash: std::cmp::Ord + Debug + Send + Sync + 'static,
+    SS: StorageSerde + Send + Sync + 'static,
+{
+    match info::carnot_info::<Tx, SS, SIZE>(&store.carnot).await {
+        Ok(info) => (StatusCode::OK, Json(info)).into_response(),
+        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+    }
+}
+
+#[utoipa::path(
+    get,
+    path = "/network/info",
+    responses(
+        (status = 200, description = "Query the network information", body = nomos_network::backends::libp2p::Libp2pInfo),
+        (status = 500, description = "Internal server error", body = String),
+    )
+)]
+async fn libp2p_info(State(store): State<Store>) -> impl IntoResponse {
+    match info::libp2p_info(&store.network).await {
+        Ok(info) => (StatusCode::OK, Json(info)).into_response(),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
     }
 }

@@ -29,10 +29,14 @@ serde_with = "3.0.0"
 nomos-libp2p = { path = "../../nomos-libp2p", optional = true }
 blake2 = "0.10"
 
+utoipa = { version = "4.0", optional = true }
+serde_json = { version = "1", optional = true }
+
 [features]
 default = []
 mock = ["nomos-network/mock"]
 libp2p = ["nomos-network/libp2p", "nomos-libp2p"]
+openapi = ["dep:utoipa", "serde_json"]
 
 [dev-dependencies]
 serde_json = "1.0.96"

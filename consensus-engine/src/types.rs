@@ -20,6 +20,7 @@ pub use view::View;
 /// can't be directly used in the network as they lack things like cryptographic signatures.
 #[derive(Debug, Clone, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub enum Payload {
     /// Vote for a block in a view
     Vote(Vote),
@@ -32,6 +33,7 @@ pub enum Payload {
 /// Returned
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct Vote {
     pub view: View,
     pub block: BlockId,
@@ -39,6 +41,7 @@ pub struct Vote {
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct Timeout {
     pub view: View,
     pub sender: NodeId,
@@ -50,6 +53,7 @@ pub struct Timeout {
 // We should consider to remove the TimoutQc from the NewView message and use a hash or id instead.
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct NewView {
     pub view: View,
     pub sender: NodeId,
@@ -59,6 +63,7 @@ pub struct NewView {
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct TimeoutQc {
     view: View,
     high_qc: StandardQc,
@@ -96,6 +101,7 @@ impl TimeoutQc {
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct Block {
     #[cfg_attr(feature = "serde", serde(skip))]
     pub id: BlockId,
@@ -106,6 +112,7 @@ pub struct Block {
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub enum LeaderProof {
     LeaderId { leader_id: NodeId },
 }
@@ -136,6 +143,7 @@ pub struct Send {
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct StandardQc {
     pub view: View,
     pub id: BlockId,
@@ -152,6 +160,7 @@ impl StandardQc {
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct AggregateQc {
     pub high_qc: StandardQc,
     pub view: View,
@@ -159,6 +168,7 @@ pub struct AggregateQc {
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub enum Qc {
     Standard(StandardQc),
     Aggregated(AggregateQc),

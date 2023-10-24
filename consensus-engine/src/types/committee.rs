@@ -4,6 +4,7 @@ use crate::NodeId;
 
 #[derive(Debug, Default, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct CommitteeId(pub(crate) [u8; 32]);
 
 impl CommitteeId {

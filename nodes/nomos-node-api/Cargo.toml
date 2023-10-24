@@ -13,16 +13,25 @@ overwatch-rs = { git = "https://github.com/logos-co/Overwatch", rev = "6e6678b" 
 overwatch-derive = { git = "https://github.com/logos-co/Overwatch", rev = "6e6678b" }
 tracing = "0.1"
 
+
+consensus-engine = { path = "../../consensus-engine" }
+nomos-core = { path = "../../nomos-core" }
+nomos-consensus = { path = "../../nomos-services/consensus" }
+nomos-network = { path = "../../nomos-services/network" }
+nomos-da = { path = "../../nomos-services/data-availability" }
+nomos-mempool = { path = "../../nomos-services/mempool", features = ["mock", "libp2p", "openapi"] }
+nomos-storage = { path = "../../nomos-services/storage", features = ["sled"] }
+nomos-libp2p = { path = "../../nomos-libp2p" }
+full-replication = { path = "../../nomos-da/full-replication" }
+serde = { version = "1", features = ["derive"] }
+tokio = { version = "1.33", default-features = false, features = ["sync"] }
+
+
 # axum related dependencies
 axum = { version = "0.6", optional = true }
 hyper = { version = "0.14", features = ["full"], optional = true }
 
-nomos-core = { path = "../../nomos-core" }
-nomos-da = { path = "../../nomos-services/data-availability" }
-nomos-mempool = { path = "../../nomos-services/mempool", features = ["mock", "libp2p", "openapi"] }
-full-replication = { path = "../../nomos-da/full-replication" }
-serde = { version = "1", features = ["derive"] }
-tokio = { version = "1.33", default-features = false, features = ["sync"] }
+# openapi related dependencies
 utoipa = "4.0"
 utoipa-swagger-ui = { version = "4.0" }
 

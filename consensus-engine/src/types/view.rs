@@ -17,6 +17,7 @@ use derive_more::{Add, AddAssign, Sub, SubAssign};
 )]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(transparent))]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct View(pub(crate) i64);
 
 impl View {
