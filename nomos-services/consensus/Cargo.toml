@@ -14,13 +14,13 @@ futures = "0.3"
 nomos-network = { path = "../network" }
 nomos-mempool = { path = "../mempool" }
 nomos-core = { path = "../../nomos-core" }
-overwatch-rs = { git = "https://github.com/logos-co/Overwatch",rev = "6e6678b" }
+overwatch-rs = { git = "https://github.com/logos-co/Overwatch",rev = "ac28d01" }
 nomos-storage = { path = "../storage" }
 rand_chacha = "0.3"
 rand = "0.8"
 serde = { version = "1", features = ["derive"] }
 thiserror = "1.0"
-tokio = { version = "1", features = ["sync"] }
+tokio = { version = "1.32", features = ["sync"] }
 tokio-stream = "0.1"
 tokio-util = "0.7"
 tracing = "0.1"

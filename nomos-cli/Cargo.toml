@@ -14,9 +14,9 @@ async-trait = "0.1"
 clap = {version = "4", features = ["derive"] }
 serde_yaml = "0.9"
 futures = "0.3"
-tokio = { version = "1", features = ["sync"] }
-overwatch-rs = { git = "https://github.com/logos-co/Overwatch", rev = "6e6678b" }
-overwatch-derive = { git = "https://github.com/logos-co/Overwatch", rev = "6e6678b" }
+tokio = { version = "1.32", features = ["sync"] }
+overwatch-rs = { git = "https://github.com/logos-co/Overwatch", rev = "ac28d01" }
+overwatch-derive = { git = "https://github.com/logos-co/Overwatch", rev = "ac28d01" }
 nomos-network = { path = "../nomos-services/network", features = ["libp2p"] }
 nomos-da = { path = "../nomos-services/data-availability", features = ["libp2p"] }
 nomos-libp2p = { path = "../nomos-libp2p"}

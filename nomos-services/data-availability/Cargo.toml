@@ -11,10 +11,10 @@ futures = "0.3"
 moka = { version = "0.11", features = ["future"] }
 nomos-core = { path = "../../nomos-core" }
 nomos-network = { path = "../network" }
-overwatch-rs = { git = "https://github.com/logos-co/Overwatch", rev = "6e6678b" }
+overwatch-rs = { git = "https://github.com/logos-co/Overwatch", rev = "ac28d01" }
 serde = "1.0"
 tracing = "0.1"
-tokio = { version = "1", features = ["sync", "macros"] }
+tokio = { version = "1.32", features = ["sync", "macros"] }
 tokio-stream = "0.1"
 
 [features]
