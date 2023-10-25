@@ -1,15 +1,22 @@
+// std
 use std::fmt::Debug;
+
+// crates
+use futures::StreamExt;
+use tracing::error;
+
+// internal
+use overwatch_rs::services::life_cycle::LifecycleMessage;
+use overwatch_rs::services::{
+    handle::ServiceStateHandle,
+    relay::RelayMessage,
+    state::{NoOperator, NoState},
+    ServiceCore, ServiceData, ServiceId,
+};
 
 pub mod backend;
 pub mod frontend;
 pub mod types;
-
-use overwatch_rs::services::{
-    handle::ServiceStateHandle,
-    relay::{InboundRelay, RelayMessage},
-    state::{NoOperator, NoState},
-    ServiceCore, ServiceData, ServiceId,
-};
 
 #[async_trait::async_trait]
 pub trait MetricsBackend {
@@ -22,7 +29,7 @@ pub trait MetricsBackend {
 }
 
 pub struct MetricsService<Backend: MetricsBackend> {
-    inbound_relay: InboundRelay<MetricsMessage<Backend::MetricsData>>,
+    service_state: ServiceStateHandle<Self>,
     backend: Backend,
 }
 
@@ -128,6 +135,35 @@ impl<Backend: MetricsBackend> MetricsService<Backend> {
     ) {
         backend.update(service_id, metrics).await;
     }
+
+    async fn handle_message(message: MetricsMessage<Backend::MetricsData>, backend: &mut Backend) {
+        match message {
+            MetricsMessage::Load {
+                service_id,
+                reply_channel,
+            } => {
+                MetricsService::handle_load(backend, &service_id, reply_channel).await;
+            }
+            MetricsMessage::Update { service_id, data } => {
+                MetricsService::handle_update(backend, &service_id, data).await;
+            }
+        }
+    }
+
+    async fn should_stop_service(message: LifecycleMessage) -> bool {
+        match message {
+            LifecycleMessage::Shutdown(sender) => {
+                if sender.send(()).is_err() {
+                    error!(
+                        "Error sending successful shutdown signal from service {}",
+                        Self::SERVICE_ID
+                    );
+                }
+                true
+            }
+            LifecycleMessage::Kill => true,
+        }
+    }
 }
 
 #[async_trait::async_trait]
@@ -135,28 +171,32 @@ impl<Backend: MetricsBackend + Send + Sync + 'static> ServiceCore for MetricsSer
     fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, overwatch_rs::DynError> {
         let settings = service_state.settings_reader.get_updated_settings();
         let backend = Backend::init(settings);
-        let inbound_relay = service_state.inbound_relay;
         Ok(Self {
-            inbound_relay,
+            service_state,
             backend,
         })
     }
 
     async fn run(self) -> Result<(), overwatch_rs::DynError> {
         let Self {
-            mut inbound_relay,
+            service_state:
+                ServiceStateHandle {
+                    mut inbound_relay,
+                    lifecycle_handle,
+                    ..
+                },
             mut backend,
         } = self;
-        while let Some(message) = inbound_relay.recv().await {
-            match message {
-                MetricsMessage::Load {
-                    service_id,
-                    reply_channel,
-                } => {
-                    MetricsService::handle_load(&backend, &service_id, reply_channel).await;
+        let mut lifecycle_stream = lifecycle_handle.message_stream();
+        loop {
+            tokio::select! {
+                Some(message) = inbound_relay.recv() => {
+                    Self::handle_message(message, &mut backend).await;
                 }
-                MetricsMessage::Update { service_id, data } => {
-                    MetricsService::handle_update(&mut backend, &service_id, data).await;
+                Some(message) = lifecycle_stream.next() => {
+                    if Self::should_stop_service(message).await {
+                        break;
+                    }
                 }
             }
         }
