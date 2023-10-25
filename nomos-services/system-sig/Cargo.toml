@@ -1,5 +1,5 @@
 [package]
-name = "system-sig"
+name = "nomos-system-sig"
 version = "0.1.0"
 edition = "2021"
 

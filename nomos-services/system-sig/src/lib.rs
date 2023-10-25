@@ -20,7 +20,6 @@ impl SystemSig {
     async fn should_stop_service(msg: LifecycleMessage) -> bool {
         match msg {
             LifecycleMessage::Shutdown(sender) => {
-                // TODO: Try to finish pending transactions if any and close connections properly
                 if sender.send(()).is_err() {
                     error!(
                         "Error sending successful shutdown signal from service {}",
@@ -40,7 +39,6 @@ impl SystemSig {
 
 impl ServiceData for SystemSig {
     const SERVICE_ID: ServiceId = "SystemSig";
-    const SERVICE_RELAY_BUFFER_SIZE: usize = 0;
     type Settings = ();
     type State = NoState<Self::Settings>;
     type StateOperator = NoOperator<Self::State>;
