@@ -12,7 +12,7 @@ futures = "0.3"
 linked-hash-map = { version = "0.5.6", optional = true }
 nomos-network = { path = "../network" }
 nomos-core = { path = "../../nomos-core" }
-overwatch-rs = { git = "https://github.com/logos-co/Overwatch", rev = "6e6678b" }
+overwatch-rs = { git = "https://github.com/logos-co/Overwatch", rev = "2f70806" }
 rand = { version = "0.8", optional = true }
 serde = { version = "1.0", features = ["derive"] }
 thiserror = "1.0"
@@ -23,7 +23,7 @@ chrono = "0.4"
 
 [dev-dependencies]
 nomos-log = { path = "../log" }
-overwatch-derive = { git = "https://github.com/logos-co/Overwatch", rev = "6e6678b" }
+overwatch-derive = { git = "https://github.com/logos-co/Overwatch", rev = "ac28d01" }
 tokio = { version = "1", features = ["full"] }
 blake2 = "0.10"
 
