@@ -39,6 +39,7 @@ impl SystemSig {
 
 impl ServiceData for SystemSig {
     const SERVICE_ID: ServiceId = "SystemSig";
+    const SERVICE_RELAY_BUFFER_SIZE: usize = 1;
     type Settings = ();
     type State = NoState<Self::Settings>;
     type StateOperator = NoOperator<Self::State>;
