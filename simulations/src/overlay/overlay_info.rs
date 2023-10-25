@@ -1,10 +1,11 @@
 use consensus_engine::{CommitteeId, NodeId, Overlay};
+use serde::Serialize;
 use std::collections::{BTreeSet, HashMap, VecDeque};
 
 pub type Blake2bU32 = blake2::Blake2b<digest::typenum::U32>;
 
-#[derive(Debug)]
-pub(crate) struct OverlayInfo {
+#[derive(Debug, Serialize)]
+pub struct OverlayInfo {
     pub committees: BTreeSet<CommitteeId>,
     pub committee_sizes: HashMap<CommitteeId, usize>,
     pub edges: Vec<(CommitteeId, CommitteeId)>,
@@ -12,7 +13,7 @@ pub(crate) struct OverlayInfo {
     pub root_id: CommitteeId,
 }
 
-pub(crate) trait OverlayInfoExt {
+pub trait OverlayInfoExt {
     fn info(&self) -> OverlayInfo;
 }
 
