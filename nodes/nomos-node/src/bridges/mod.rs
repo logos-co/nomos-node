@@ -1,4 +1,5 @@
 mod libp2p;
+use consensus_engine::BlockId;
 use libp2p::*;
 
 // std
@@ -6,7 +7,7 @@ use libp2p::*;
 use bytes::Bytes;
 use http::StatusCode;
 use nomos_consensus::{CarnotInfo, ConsensusMsg};
-use serde::de::DeserializeOwned;
+use serde::{de::DeserializeOwned, Serialize};
 use tokio::sync::mpsc::Sender;
 use tokio::sync::oneshot;
 use tracing::error;
@@ -14,9 +15,11 @@ use tracing::error;
 use full_replication::{Blob, Certificate};
 use nomos_core::wire;
 use nomos_core::{
+    block::Block,
     da::{blob, certificate::Certificate as _},
     tx::Transaction,
 };
+use nomos_da::DaMsg;
 use nomos_http::backends::axum::AxumBackend;
 use nomos_http::bridge::{build_http_bridge, HttpBridgeRunner};
 use nomos_http::http::{HttpMethod, HttpRequest, HttpResponse};
@@ -29,6 +32,8 @@ use nomos_network::backends::libp2p::Libp2p;
 use nomos_network::backends::NetworkBackend;
 use nomos_network::NetworkService;
 use nomos_node::{Carnot, Tx};
+use nomos_node::{DataAvailability as DataAvailabilityService, Wire};
+use nomos_storage::{backends::sled::SledBackend, StorageMsg, StorageService};
 use overwatch_rs::services::relay::OutboundRelay;
 
 type DaMempoolService = MempoolService<
@@ -115,12 +120,71 @@ pub fn cl_mempool_status_bridge(
     }))
 }
 
+pub fn storage_get_blocks_bridge(
+    handle: overwatch_rs::overwatch::handle::OverwatchHandle,
+) -> HttpBridgeRunner {
+    Box::new(Box::pin(async move {
+        post_handler!(handle, StorageService<SledBackend<Wire>>, "block" => handle_block_get_req)
+    }))
+}
+
 pub fn network_info_bridge(
     handle: overwatch_rs::overwatch::handle::OverwatchHandle,
 ) -> HttpBridgeRunner {
     Box::new(Box::pin(async move {
         get_handler!(handle, NetworkService<Libp2p>, "info" => handle_libp2p_info_req)
     }))
+}
+
+pub fn da_blob_get_bridge(
+    handle: overwatch_rs::overwatch::handle::OverwatchHandle,
+) -> HttpBridgeRunner {
+    Box::new(Box::pin(async move {
+        post_handler!(handle, DataAvailabilityService, "blobs" => handle_da_blobs_req)
+    }))
+}
+
+pub async fn handle_da_blobs_req<B>(
+    da_channel: &OutboundRelay<DaMsg<B>>,
+    payload: Option<Bytes>,
+    res_tx: Sender<HttpResponse>,
+) -> Result<(), overwatch_rs::DynError>
+where
+    B: blob::Blob + Serialize,
+    B::Hash: DeserializeOwned + Send + 'static,
+{
+    let (reply_channel, receiver) = oneshot::channel();
+    let ids: Vec<B::Hash> = serde_json::from_slice(payload.unwrap_or_default().as_ref())?;
+    da_channel
+        .send(DaMsg::Get {
+            ids: Box::new(ids.into_iter()),
+            reply_channel,
+        })
+        .await
+        .map_err(|(e, _)| e)?;
+
+    let blobs = receiver.await.unwrap();
+    res_tx
+        .send(Ok(serde_json::to_string(&blobs).unwrap().into()))
+        .await?;
+
+    Ok(())
+}
+
+pub async fn handle_block_get_req(
+    storage_channel: &OutboundRelay<StorageMsg<SledBackend<Wire>>>,
+    payload: Option<Bytes>,
+    res_tx: Sender<HttpResponse>,
+) -> Result<(), overwatch_rs::DynError> {
+    let key: BlockId = serde_json::from_slice(payload.unwrap_or_default().as_ref())?;
+    let (msg, receiver) = StorageMsg::new_load_message(key);
+    storage_channel.send(msg).await.map_err(|(e, _)| e)?;
+    let block: Option<Block<Tx, Certificate>> = receiver.recv().await?;
+    res_tx
+        .send(Ok(serde_json::to_string(&block).unwrap().into()))
+        .await?;
+
+    Ok(())
 }
 
 pub async fn handle_mempool_status_req<K, V>(
