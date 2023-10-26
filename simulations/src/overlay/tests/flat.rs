@@ -4,9 +4,8 @@ use consensus_engine::NodeId;
 use rand::prelude::IteratorRandom;
 use rand::Rng;
 // internal
-use super::Overlay;
+use super::{Committee, Layout, Overlay};
 use crate::node::NodeIdExt;
-use crate::overlay::{Committee, Layout};
 
 pub struct FlatOverlay;
 impl FlatOverlay {
