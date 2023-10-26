@@ -624,7 +624,7 @@ mod tests {
         assert!(!nodes[&NodeId::from_index(1)].state().view_state[&View::new(1)].vote_sent); // Internal
         assert!(!nodes[&NodeId::from_index(2)].state().view_state[&View::new(1)].vote_sent); // Internal
 
-        // Leaves should have thier vote sent.
+        // Leaves should have their vote sent.
         assert!(nodes[&NodeId::from_index(3)].state().view_state[&View::new(1)].vote_sent); // Leaf
         assert!(nodes[&NodeId::from_index(4)].state().view_state[&View::new(1)].vote_sent); // Leaf
         assert!(nodes[&NodeId::from_index(5)].state().view_state[&View::new(1)].vote_sent); // Leaf
@@ -640,7 +640,7 @@ mod tests {
         // Root hasn't sent its votes yet.
         assert!(!nodes[&NodeId::from_index(0)].state().view_state[&View::new(1)].vote_sent); // Root
 
-        // Internal and leaves should have thier vote sent.
+        // Internal and leaves should have their vote sent.
         assert!(nodes[&NodeId::from_index(1)].state().view_state[&View::new(1)].vote_sent); // Internal
         assert!(nodes[&NodeId::from_index(2)].state().view_state[&View::new(1)].vote_sent); // Internal
         assert!(nodes[&NodeId::from_index(3)].state().view_state[&View::new(1)].vote_sent); // Leaf
@@ -694,7 +694,7 @@ mod tests {
         assert!(!nodes[&NodeId::from_index(1)].state().view_state[&View::new(2)].vote_sent); // Internal
         assert!(!nodes[&NodeId::from_index(2)].state().view_state[&View::new(2)].vote_sent); // Internal
 
-        // Leaves should have thier vote sent.
+        // Leaves should have their vote sent.
         assert!(nodes[&NodeId::from_index(3)].state().view_state[&View::new(2)].vote_sent); // Leaf
         assert!(nodes[&NodeId::from_index(4)].state().view_state[&View::new(2)].vote_sent); // Leaf
         assert!(nodes[&NodeId::from_index(5)].state().view_state[&View::new(2)].vote_sent); // Leaf
