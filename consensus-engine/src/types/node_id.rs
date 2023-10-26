@@ -1,7 +1,22 @@
 #[derive(Clone, Copy, Default, Debug, Eq, PartialEq, Hash, Ord, PartialOrd)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "serde", serde(transparent))]
 pub struct NodeId(pub(crate) [u8; 32]);
+
+#[cfg(feature = "serde")]
+impl serde::Serialize for NodeId {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        nomos_utils::serde::serialize_bytes_array(self.0, serializer)
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<'de> serde::de::Deserialize<'de> for NodeId {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        nomos_utils::serde::deserialize_bytes_array(deserializer).map(Self)
+    }
+}
 
 impl NodeId {
     pub const fn new(val: [u8; 32]) -> Self {

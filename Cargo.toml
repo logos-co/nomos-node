@@ -15,6 +15,7 @@ members = [
     "nomos-da/full-replication",
     "nomos-http-api",
     "nomos-cli",
+    "nomos-utils",
     "nodes/nomos-node",
     "nodes/mixnode",
     "simulations",
