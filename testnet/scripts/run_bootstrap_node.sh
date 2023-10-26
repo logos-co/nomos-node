@@ -8,7 +8,7 @@ OVERLAY_NODES=$(/etc/nomos/scripts/consensus_node_list.sh)
 
 export CONSENSUS_PRIV_KEY \
        OVERLAY_NODES \
-	   NET_NODE_KEY
+       NET_NODE_KEY
 
 echo "I am a container ${HOSTNAME} node ${NET_NODE_KEY}"
 echo "CONSENSUS_PRIV_KEY: ${CONSENSUS_PRIV_KEY}"
