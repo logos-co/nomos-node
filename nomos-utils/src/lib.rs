@@ -25,9 +25,10 @@ pub mod serde {
         deserializer: D,
     ) -> Result<[u8; N], D::Error> {
         use serde::Deserialize;
-        let s = <&[u8]>::deserialize(deserializer)?;
+        use std::borrow::Cow;
+        let s: Cow<str> = Cow::deserialize(deserializer)?;
         let mut output = [0u8; N];
-        const_hex::decode_to_slice(s, &mut output)
+        const_hex::decode_to_slice(s.as_ref(), &mut output)
             .map(|_| output)
             .map_err(<D::Error as serde::de::Error>::custom)
     }
