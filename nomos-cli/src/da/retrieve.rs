@@ -1,42 +1,53 @@
 use consensus_engine::BlockId;
 use full_replication::{Blob, Certificate};
-use nomos_core::block::Block;
+use nomos_core::{
+    block::Block,
+    da::{blob, certificate::Certificate as _},
+};
 use nomos_node::Tx;
 use reqwest::Url;
+use thiserror::Error;
+
+#[derive(Error, Debug)]
+pub enum Error {
+    #[error(transparent)]
+    Reqwest(#[from] reqwest::Error),
+    #[error("Block not found")]
+    NotFound,
+}
 
 /// Return the blobs whose certificate has been included in the proived block.
-pub async fn get_block_blobs(
-    node: Url,
-    block: BlockId,
-) -> Result<Vec<Blob>, Box<dyn std::error::Error>> {
-    let block = get_block_contents(node, block)
+pub async fn get_block_blobs(node: Url, block: BlockId) -> Result<Vec<Blob>, Error> {
+    let block = get_block_contents(&node, block)
         .await?
-        .ok_or(Box::new("Block not found"))?;
+        .ok_or(Error::NotFound)?;
 
-    let mut res = Vec::new();
-    for cert in block.blobs() {
-        res.push(value)
-    }
+    Ok(get_blobs(node, block.blobs().map(|cert| cert.blob()).collect()).await?)
 }
 
 pub async fn get_block_contents(
-    node: Url,
+    node: &Url,
     block: BlockId,
-) -> Result<Option<Block<Tx, Certificate>>, Box<dyn std::error::Error>> {
-    let block = node.join("storage/block")?;
-    let block = reqwest::get(block).await?.bytes().await?;
-    let block = serde_json::deserialize(&block)?;
+) -> Result<Option<Block<Tx, Certificate>>, reqwest::Error> {
+    let block = reqwest::Client::new()
+        .post(node.join("storage/block").unwrap())
+        .body(serde_json::to_string(&block).unwrap())
+        .send()
+        .await?
+        .json()
+        .await?;
     Ok(block)
 }
 
 pub async fn get_blobs(
     node: Url,
-    ids: Vec<Blob::Hash>,
-) -> Result<Vec<Blob>, Box<dyn std::error::Error>> {
-    let mut res = Vec::new();
-    for id in ids {
-        let blob = get_blob(node, id).await?;
-        res.push(blob);
-    }
-    Ok(res)
+    ids: Vec<<Blob as blob::Blob>::Hash>,
+) -> Result<Vec<Blob>, reqwest::Error> {
+    reqwest::Client::new()
+        .post(node)
+        .body(serde_json::to_string(&ids).unwrap())
+        .send()
+        .await?
+        .json()
+        .await
 }

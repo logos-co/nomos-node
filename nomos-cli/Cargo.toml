@@ -12,7 +12,7 @@ tracing = "0.1"
 tracing-subscriber = "0.3"
 async-trait = "0.1"
 clap = {version = "4", features = ["derive"] }
-consensus_engine = { path = "../consensus-engine" }
+consensus-engine = { path = "../consensus-engine" }
 serde_yaml = "0.9"
 futures = "0.3"
 tokio = { version = "1", features = ["sync"] }
@@ -22,6 +22,7 @@ nomos-network = { path = "../nomos-services/network", features = ["libp2p"] }
 nomos-da = { path = "../nomos-services/data-availability", features = ["libp2p"] }
 nomos-libp2p = { path = "../nomos-libp2p"}
 nomos-core = { path = "../nomos-core" }
+nomos-node = { path = "../nodes/nomos-node" }
 nomos-consensus = { path = "../nomos-services/consensus" }
 full-replication = { path = "../nomos-da/full-replication" }
 crossterm = "0.27"
@@ -29,3 +30,5 @@ ratatui = "0.23"
 tui-input = "0.8"
 reqwest = { version = "0.11", features = ["blocking"] }
 serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "1.0"
