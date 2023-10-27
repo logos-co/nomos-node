@@ -19,7 +19,6 @@ pipeline {
     GOCACHE = "${env.WORKSPACE_TMP}/go-build"
     GOPATH  = "${env.WORKSPACE_TMP}/go"
     RUST_BACKTRACE = 1
-    REPORT = ''
   }
 
   options {
@@ -55,7 +54,8 @@ pipeline {
                       tests.add('mixnet')
                     }
 
-                    env.REPORT = runBuildAndTestsForFeature(FEATURE, tests)
+                    def report = runBuildAndTestsForFeature(FEATURE, tests)
+                    writeFile(file: "${WORKSPACE}/report.txt", text: report)
                   }
                 }
               }
@@ -69,14 +69,16 @@ pipeline {
   post {
     failure {
       script {
+        def report = readFile("${WORKSPACE}/report.txt").trim()
         def discord = load "${WORKSPACE}/ci/discord.groovy"
-        discord.sendMessage(header: "Nightly Integration Tests Failed: ${env.REPORT}")
+        discord.sendMessage(header: "Nightly Integration Tests Failed: ${report}")
       }
     }
     success {
       script {
+        def report = readFile('report.txt').trim()
         def discord = load "${WORKSPACE}/ci/discord.groovy"
-        discord.sendMessage(header: "Nightly Integration Tests Passed: ${env.REPORT}")
+        discord.sendMessage(header: "Nightly Integration Tests Passed: ${report}")
       }
     }
     cleanup { cleanWs() }
