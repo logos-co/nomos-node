@@ -76,7 +76,7 @@ If you are a node operator who wants to run only a Nomos node (not a mixnode),
 you can configure the mixclient as the `Sender` mode (like `nomos-node-1` or `nomos-node-2` above).
 Then, the Nomos node sends messages to the mixnet instead of broadcasting them directly through libp2p gossipsub.
 
-The mixclient in the `Sender` mode will splits a message into multiple Sphinx packets by constructing mix routes based on the mixnet topology configured, and sends packets to the mixnode.
+The mixclient in the `Sender` mode will split a message into multiple Sphinx packets by constructing mix routes based on the mixnet topology configured, and sends packets to the mixnode.
 
 #### SenderReceiver mode
 
