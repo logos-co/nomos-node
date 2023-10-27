@@ -19,8 +19,7 @@ pipeline {
     GOCACHE = "${env.WORKSPACE_TMP}/go-build"
     GOPATH  = "${env.WORKSPACE_TMP}/go"
     RUST_BACKTRACE = 1
-    REPORT_FAILURE = ''
-    REPORT_SUCCESS = ''
+    REPORT = ''
   }
 
   options {
@@ -56,7 +55,7 @@ pipeline {
                       tests.add('mixnet')
                     }
 
-                    runBuildAndTestsForFeature(FEATURE, tests)
+                    env.REPORT = runBuildAndTestsForFeature(FEATURE, tests)
                   }
                 }
               }
@@ -71,13 +70,13 @@ pipeline {
     failure {
       script {
         def discord = load "${WORKSPACE}/ci/discord.groovy"
-        discord.sendMessage(header: "Nightly Integration Tests Failed: ${env.REPORT_FAILURE}")
+        discord.sendMessage(header: "Nightly Integration Tests Failed: ${env.REPORT}")
       }
     }
     success {
       script {
         def discord = load "${WORKSPACE}/ci/discord.groovy"
-        discord.sendMessage(header: "Nightly Integration Tests Passed: ${env.REPORT_SUCCESS}")
+        discord.sendMessage(header: "Nightly Integration Tests Passed: ${env.REPORT}")
       }
     }
     cleanup { cleanWs() }
@@ -89,12 +88,11 @@ def runBuildAndTestsForFeature(feature, tests) {
   def build_node = "cargo build --all --no-default-features --features ${feature}"
 
   if (sh(script: build_node, returnStatus: true) != 0) {
-    reportError("Build '${feature}' node failed")
-    return
+    return reportError("Build '${feature}' node failed")
   }
 
   int iterations = params.ITERATIONS.toInteger()
-  runTestCases(tests, iterations)
+  return runTestCases(tests, iterations)
 }
 
 def runTestCases(test_cases, iterations) {
@@ -104,16 +102,15 @@ def runTestCases(test_cases, iterations) {
     for (test_case in test_cases) {
       def test_cmd = "cargo test -p tests --all --no-default-features --features ${feature} ${test_case}"
       if (sh(script: test_cmd, returnStatus: true) != 0) {
-        reportError("Test '${test_case}' failed on iteration ${i + 1}")
-        return
+        return reportError("Test '${test_case}' failed on iteration ${i + 1}")
       }
     }
   }
 
-  env.REPORT_SUCCESS = "${iterations}/${iterations} iterations succeeded"
+  return "${iterations}/${iterations} iterations succeeded"
 }
 
 def reportError(e) {
-  env.REPORT_FAILURE = e
   error(e)
+  return e
 }
