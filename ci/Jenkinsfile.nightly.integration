@@ -1,3 +1,6 @@
+/* Global map to store brief report from different stages for notifications */
+def report = [:]
+
 pipeline {
   agent {
     dockerfile {
@@ -69,13 +72,13 @@ pipeline {
     failure {
       script {
         def discord = load "${WORKSPACE}/ci/discord.groovy"
-        discord.sendMessage(header: 'Nightly Integration Tests Failed')
+        discord.sendMessage(header: "Nightly Integration Tests Failed: ${report['Failure']}")
       }
     }
     success {
       script {
         def discord = load "${WORKSPACE}/ci/discord.groovy"
-        discord.sendMessage(header: 'Nightly Integration Tests Passed')
+        discord.sendMessage(header: "Nightly Integration Tests Passed: ${report['Success']}")
       }
     }
     cleanup { cleanWs() }
@@ -87,7 +90,7 @@ def runBuildAndTestsForFeature(feature, tests) {
   def build_node = "cargo build --all --no-default-features --features ${feature}"
 
   if (sh(script: build_node, returnStatus: true) != 0) {
-    error("Build '${feature}' node failed")
+    reportError("Build '${feature}' node failed")
     return
   }
 
@@ -102,10 +105,20 @@ def runTestCases(test_cases, iterations) {
     for (test_case in test_cases) {
       def test_cmd = "cargo test -p tests --all --no-default-features --features ${feature} ${test_case}"
       if (sh(script: test_cmd, returnStatus: true) != 0) {
-        error("Test '${test_case}' failed on iteration ${i + 1}")
+        reportError("Test '${test_case}' failed on iteration ${i + 1}")
         return
       }
     }
   }
+
+  reportSuccess("${iterations}/${iterations} iterations succeeded")
 }
 
+def reportError(e) {
+  report["Failure"] = e
+  error(e)
+}
+
+def reportSuccess(msg) {
+  report["Success"] = msg
+}
