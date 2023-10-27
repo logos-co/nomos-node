@@ -1,6 +1,3 @@
-/* Global map to store brief report from different stages for notifications */
-def report = [:]
-
 pipeline {
   agent {
     dockerfile {
@@ -22,6 +19,8 @@ pipeline {
     GOCACHE = "${env.WORKSPACE_TMP}/go-build"
     GOPATH  = "${env.WORKSPACE_TMP}/go"
     RUST_BACKTRACE = 1
+    REPORT_FAILURE = ''
+    REPORT_SUCCESS = ''
   }
 
   options {
@@ -72,13 +71,13 @@ pipeline {
     failure {
       script {
         def discord = load "${WORKSPACE}/ci/discord.groovy"
-        discord.sendMessage(header: "Nightly Integration Tests Failed: ${report['Failure']}")
+        discord.sendMessage(header: "Nightly Integration Tests Failed: ${env.REPORT_FAILURE}")
       }
     }
     success {
       script {
         def discord = load "${WORKSPACE}/ci/discord.groovy"
-        discord.sendMessage(header: "Nightly Integration Tests Passed: ${report['Success']}")
+        discord.sendMessage(header: "Nightly Integration Tests Passed: ${env.REPORT_SUCCESS}")
       }
     }
     cleanup { cleanWs() }
@@ -111,14 +110,10 @@ def runTestCases(test_cases, iterations) {
     }
   }
 
-  reportSuccess("${iterations}/${iterations} iterations succeeded")
+  env.REPORT_SUCCESS = "${iterations}/${iterations} iterations succeeded"
 }
 
 def reportError(e) {
-  report["Failure"] = e
+  env.REPORT_FAILURE = e
   error(e)
-}
-
-def reportSuccess(msg) {
-  report["Success"] = msg
 }
