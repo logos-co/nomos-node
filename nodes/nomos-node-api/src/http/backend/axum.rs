@@ -1,6 +1,7 @@
 use std::{fmt::Debug, hash::Hash, net::SocketAddr, sync::Arc};
 
 use axum::{extract::State, response::IntoResponse, routing, Json, Router, Server};
+use consensus_engine::BlockId;
 use full_replication::Blob;
 use hyper::StatusCode;
 use nomos_core::{da::blob, tx::Transaction};
@@ -12,7 +13,7 @@ use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 
 use crate::{
-    http::{cl, da, info},
+    http::{cl, da, info, storage},
     Backend,
 };
 
@@ -24,6 +25,7 @@ pub struct AxumBackendSettings {
     pub cl: OverwatchHandle,
     pub carnot: OverwatchHandle,
     pub network: OverwatchHandle,
+    pub storage: OverwatchHandle,
 }
 
 pub struct AxumBackend<T, S, const SIZE: usize> {
@@ -55,6 +57,7 @@ where
     T: Transaction
         + Clone
         + Debug
+        + Eq
         + Hash
         + Serialize
         + for<'de> Deserialize<'de>
@@ -90,6 +93,7 @@ where
             .route("/cl/status", routing::post(cl_status::<T>))
             .route("/carnot/info", routing::get(carnot_info::<T, S, SIZE>))
             .route("/network/info", routing::get(libp2p_info))
+            .route("/storage/block", routing::post(block::<S, T>))
             .with_state(store);
 
         Server::bind(&self.settings.addr)
@@ -230,6 +234,25 @@ where
 async fn libp2p_info(State(store): State<Store>) -> impl IntoResponse {
     match info::libp2p_info(&store.network).await {
         Ok(info) => (StatusCode::OK, Json(info)).into_response(),
+        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+    }
+}
+
+#[utoipa::path(
+    get,
+    path = "/storage/block",
+    responses(
+        (status = 200, description = "Get the block by block id", body = Block<Tx, full_replication::Certificate>),
+        (status = 500, description = "Internal server error", body = String),
+    )
+)]
+async fn block<S, Tx>(State(store): State<Store>, Json(id): Json<BlockId>) -> impl IntoResponse
+where
+    Tx: serde::Serialize + serde::de::DeserializeOwned + Clone + Eq + core::hash::Hash,
+    S: StorageSerde + Send + Sync + 'static,
+{
+    match storage::block_req::<S, Tx>(&store.storage, id).await {
+        Ok(status) => (StatusCode::OK, Json(status)).into_response(),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
     }
 }

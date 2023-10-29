@@ -70,6 +70,5 @@ pub(crate) async fn da_blob(
         .await
         .map_err(|(e, _)| e)?;
 
-    let blobs = receiver.await.unwrap();
-    Ok(blobs)
+    Ok(receiver.await?)
 }
