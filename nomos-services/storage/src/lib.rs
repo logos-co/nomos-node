@@ -6,15 +6,18 @@ use std::marker::PhantomData;
 // crates
 use async_trait::async_trait;
 use bytes::Bytes;
+use futures::StreamExt;
 use overwatch_rs::services::handle::ServiceStateHandle;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 // internal
 use backends::StorageBackend;
 use backends::{StorageSerde, StorageTransaction};
+use overwatch_rs::services::life_cycle::LifecycleMessage;
 use overwatch_rs::services::relay::RelayMessage;
 use overwatch_rs::services::state::{NoOperator, NoState};
 use overwatch_rs::services::{ServiceCore, ServiceData, ServiceId};
+use tracing::error;
 
 /// Storage message that maps to [`StorageBackend`] trait
 pub enum StorageMsg<Backend: StorageBackend> {
@@ -56,19 +59,23 @@ impl<T, Backend> StorageReplyReceiver<T, Backend> {
     }
 }
 
-impl<Backend: StorageBackend> StorageReplyReceiver<Bytes, Backend> {
+impl<Backend: StorageBackend> StorageReplyReceiver<Option<Bytes>, Backend> {
     /// Receive and transform the reply into the desired type
     /// Target type must implement `From` from the original backend stored type.
-    pub async fn recv<Output>(self) -> Result<Output, tokio::sync::oneshot::error::RecvError>
+    pub async fn recv<Output>(
+        self,
+    ) -> Result<Option<Output>, tokio::sync::oneshot::error::RecvError>
     where
         Output: DeserializeOwned,
     {
         self.channel
             .await
             // TODO: This should probably just return a result anyway. But for now we can consider in infallible.
-            .map(|b| {
-                Backend::SerdeOperator::deserialize(b)
-                    .expect("Recovery from storage should never fail")
+            .map(|maybe_bytes| {
+                maybe_bytes.map(|bytes| {
+                    Backend::SerdeOperator::deserialize(bytes)
+                        .expect("Recovery from storage should never fail")
+                })
             })
     }
 }
@@ -162,6 +169,39 @@ pub struct StorageService<Backend: StorageBackend + Send + Sync + 'static> {
 }
 
 impl<Backend: StorageBackend + Send + Sync + 'static> StorageService<Backend> {
+    async fn should_stop_service(msg: LifecycleMessage) -> bool {
+        match msg {
+            LifecycleMessage::Shutdown(sender) => {
+                // TODO: Try to finish pending transactions if any and close connections properly
+                if sender.send(()).is_err() {
+                    error!(
+                        "Error sending successful shutdown signal from service {}",
+                        Self::SERVICE_ID
+                    );
+                }
+                true
+            }
+            LifecycleMessage::Kill => true,
+        }
+    }
+    async fn handle_storage_message(msg: StorageMsg<Backend>, backend: &mut Backend) {
+        if let Err(e) = match msg {
+            StorageMsg::Load { key, reply_channel } => {
+                Self::handle_load(backend, key, reply_channel).await
+            }
+            StorageMsg::Store { key, value } => Self::handle_store(backend, key, value).await,
+            StorageMsg::Remove { key, reply_channel } => {
+                Self::handle_remove(backend, key, reply_channel).await
+            }
+            StorageMsg::Execute {
+                transaction,
+                reply_channel,
+            } => Self::handle_execute(backend, transaction, reply_channel).await,
+        } {
+            // TODO: add proper logging
+            println!("{e}");
+        }
+    }
     /// Handle load message
     async fn handle_load(
         backend: &mut Backend,
@@ -243,27 +283,25 @@ impl<Backend: StorageBackend + Send + Sync + 'static> ServiceCore for StorageSer
     async fn run(mut self) -> Result<(), overwatch_rs::DynError> {
         let Self {
             mut backend,
-            service_state: ServiceStateHandle {
-                mut inbound_relay, ..
-            },
+            service_state:
+                ServiceStateHandle {
+                    mut inbound_relay,
+                    lifecycle_handle,
+                    ..
+                },
         } = self;
+        let mut lifecycle_stream = lifecycle_handle.message_stream();
         let backend = &mut backend;
-        while let Some(msg) = inbound_relay.recv().await {
-            if let Err(e) = match msg {
-                StorageMsg::Load { key, reply_channel } => {
-                    Self::handle_load(backend, key, reply_channel).await
+        loop {
+            tokio::select! {
+                Some(msg) = inbound_relay.recv() => {
+                    Self::handle_storage_message(msg, backend).await;
                 }
-                StorageMsg::Store { key, value } => Self::handle_store(backend, key, value).await,
-                StorageMsg::Remove { key, reply_channel } => {
-                    Self::handle_remove(backend, key, reply_channel).await
+                Some(msg) = lifecycle_stream.next() => {
+                    if Self::should_stop_service(msg).await {
+                        break;
+                    }
                 }
-                StorageMsg::Execute {
-                    transaction,
-                    reply_channel,
-                } => Self::handle_execute(backend, transaction, reply_channel).await,
-            } {
-                // TODO: add proper logging
-                println!("{e}");
             }
         }
         Ok(())

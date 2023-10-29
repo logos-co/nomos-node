@@ -19,7 +19,7 @@ use serde::Deserialize;
 use serde::{de::DeserializeOwned, Serialize};
 use serde_with::serde_as;
 use tokio::sync::oneshot::Sender;
-use tracing::instrument;
+use tracing::{error, instrument};
 // internal
 use crate::network::messages::{
     NetworkMessage, NewViewMsg, ProposalMsg, TimeoutMsg, TimeoutQcMsg, VoteMsg,
@@ -46,6 +46,7 @@ use nomos_mempool::{
 };
 use nomos_network::NetworkService;
 use nomos_storage::{backends::StorageBackend, StorageMsg, StorageService};
+use overwatch_rs::services::life_cycle::LifecycleMessage;
 use overwatch_rs::services::relay::{OutboundRelay, Relay, RelayMessage};
 use overwatch_rs::services::{
     handle::ServiceStateHandle,
@@ -311,7 +312,7 @@ where
                 Event::ProposeBlock { qc }
             });
         }
-
+        let mut lifecycle_stream = self.service_state.lifecycle_handle.message_stream();
         loop {
             tokio::select! {
                     Some(event) = task_manager.next() => {
@@ -333,8 +334,14 @@ where
                     Some(msg) = self.service_state.inbound_relay.next() => {
                         Self::process_message(&carnot, msg);
                     }
+                    Some(msg) = lifecycle_stream.next() => {
+                        if Self::should_stop_service(msg).await {
+                            break;
+                        }
+                    }
             }
         }
+        Ok(())
     }
 }
 
@@ -389,6 +396,21 @@ where
     DaPoolAdapter: MempoolAdapter<Item = DaPool::Item, Key = DaPool::Key> + Send + Sync + 'static,
     Storage: StorageBackend + Send + Sync + 'static,
 {
+    async fn should_stop_service(message: LifecycleMessage) -> bool {
+        match message {
+            LifecycleMessage::Shutdown(sender) => {
+                if sender.send(()).is_err() {
+                    error!(
+                        "Error sending successful shutdown signal from service {}",
+                        Self::SERVICE_ID
+                    );
+                }
+                true
+            }
+            LifecycleMessage::Kill => true,
+        }
+    }
+
     fn process_message(carnot: &Carnot<O>, msg: ConsensusMsg) {
         match msg {
             ConsensusMsg::Info { tx } => {
@@ -1039,6 +1061,22 @@ pub struct CarnotInfo {
     pub committed_blocks: Vec<BlockId>,
 }
 
+async fn get_mempool_contents<Item, Key>(
+    mempool: OutboundRelay<MempoolMsg<Item, Key>>,
+) -> Result<Box<dyn Iterator<Item = Item> + Send>, tokio::sync::oneshot::error::RecvError> {
+    let (reply_channel, rx) = tokio::sync::oneshot::channel();
+
+    mempool
+        .send(MempoolMsg::View {
+            ancestor_hint: BlockId::zeros(),
+            reply_channel,
+        })
+        .await
+        .unwrap_or_else(|(e, _)| eprintln!("Could not get transactions from mempool {e}"));
+
+    rx.await
+}
+
 #[cfg(test)]
 mod tests {
     use consensus_engine::Block;
@@ -1077,26 +1115,10 @@ mod tests {
         eprintln!("{serialized}");
         assert_eq!(
             serialized,
-            r#"{"id":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"current_view":1,"highest_voted_view":-1,"local_high_qc":{"view":0,"id":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]},"safe_blocks":[[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],{"view":0,"parent_qc":{"Standard":{"view":0,"id":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]}},"leader_proof":{"LeaderId":{"leader_id":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]}}}]],"last_view_timeout_qc":null,"committed_blocks":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]]}"#
+            r#"{"id":"0x0000000000000000000000000000000000000000000000000000000000000000","current_view":1,"highest_voted_view":-1,"local_high_qc":{"view":0,"id":"0x0000000000000000000000000000000000000000000000000000000000000000"},"safe_blocks":[["0x0000000000000000000000000000000000000000000000000000000000000000",{"view":0,"parent_qc":{"Standard":{"view":0,"id":"0x0000000000000000000000000000000000000000000000000000000000000000"}},"leader_proof":{"LeaderId":{"leader_id":"0x0000000000000000000000000000000000000000000000000000000000000000"}}}]],"last_view_timeout_qc":null,"committed_blocks":["0x0000000000000000000000000000000000000000000000000000000000000000"]}"#
         );
 
         let deserialized: CarnotInfo = serde_json::from_str(&serialized).unwrap();
         assert_eq!(deserialized, info);
     }
-}
-
-async fn get_mempool_contents<Item, Key>(
-    mempool: OutboundRelay<MempoolMsg<Item, Key>>,
-) -> Result<Box<dyn Iterator<Item = Item> + Send>, tokio::sync::oneshot::error::RecvError> {
-    let (reply_channel, rx) = tokio::sync::oneshot::channel();
-
-    mempool
-        .send(MempoolMsg::View {
-            ancestor_hint: BlockId::zeros(),
-            reply_channel,
-        })
-        .await
-        .unwrap_or_else(|(e, _)| eprintln!("Could not get transactions from mempool {e}"));
-
-    rx.await
 }

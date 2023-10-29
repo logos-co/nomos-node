@@ -66,6 +66,8 @@ fn main() -> Result<()> {
         Arc::new(Box::new(bridges::da_mempool_metrics_bridge)),
         Arc::new(Box::new(bridges::cl_mempool_status_bridge)),
         Arc::new(Box::new(bridges::da_mempool_status_bridge)),
+        Arc::new(Box::new(bridges::da_blob_get_bridge)),
+        Arc::new(Box::new(bridges::storage_get_blocks_bridge)),
         Arc::new(Box::new(bridges::network_info_bridge)),
         Arc::new(Box::new(
             bridges::mempool_add_tx_bridge::<Libp2p, Libp2pAdapter<Tx, <Tx as Transaction>::Hash>>,
