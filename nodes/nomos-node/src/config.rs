@@ -4,18 +4,18 @@ use std::{
     time::Duration,
 };
 
-use crate::Carnot;
 use crate::DataAvailability;
+use crate::{Carnot, Tx, Wire, MB16};
 use clap::{Parser, ValueEnum};
 use color_eyre::eyre::{self, eyre, Result};
 use hex::FromHex;
 #[cfg(feature = "metrics")]
 use metrics::{backend::map::MapMetricsBackend, types::MetricsData, MetricsService};
-use nomos_http::{backends::axum::AxumBackend, http::HttpService};
 use nomos_libp2p::{secp256k1::SecretKey, Multiaddr};
 use nomos_log::{Logger, LoggerBackend, LoggerFormat};
 use nomos_network::backends::libp2p::Libp2p;
 use nomos_network::NetworkService;
+use nomos_node_api::{http::backend::axum::AxumBackend, ApiService};
 use overwatch_rs::services::ServiceData;
 use serde::{Deserialize, Serialize};
 use tracing::Level;
@@ -106,7 +106,7 @@ pub struct OverlayArgs {
 pub struct Config {
     pub log: <Logger as ServiceData>::Settings,
     pub network: <NetworkService<Libp2p> as ServiceData>::Settings,
-    pub http: <HttpService<AxumBackend> as ServiceData>::Settings,
+    pub http: <ApiService<AxumBackend<Tx, Wire, MB16>> as ServiceData>::Settings,
     pub consensus: <Carnot as ServiceData>::Settings,
     #[cfg(feature = "metrics")]
     pub metrics: <MetricsService<MapMetricsBackend<MetricsData>> as ServiceData>::Settings,
@@ -194,11 +194,11 @@ impl Config {
         } = http_args;
 
         if let Some(addr) = http_addr {
-            self.http.backend.address = addr;
+            self.http.backend_settings.address = addr;
         }
 
         if let Some(cors) = cors_origins {
-            self.http.backend.cors_origins = cors;
+            self.http.backend_settings.cors_origins = cors;
         }
 
         Ok(self)

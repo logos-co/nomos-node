@@ -1,15 +1,24 @@
-use std::{fmt::Debug, hash::Hash, net::SocketAddr, sync::Arc};
+use std::{fmt::Debug, hash::Hash, sync::Arc};
 
-use axum::{extract::State, response::IntoResponse, routing, Json, Router, Server};
+use axum::{
+    extract::State, http::HeaderValue, response::IntoResponse, routing, Json, Router, Server,
+};
 use consensus_engine::BlockId;
 use full_replication::{Blob, Certificate};
-use hyper::StatusCode;
+use hyper::{
+    header::{CONTENT_TYPE, USER_AGENT},
+    StatusCode,
+};
 use nomos_core::{da::blob, tx::Transaction};
 use nomos_mempool::{network::adapters::libp2p::Libp2pAdapter, openapi::Status, MempoolMetrics};
 use nomos_network::backends::libp2p::Libp2p;
 use nomos_storage::backends::StorageSerde;
 use overwatch_rs::overwatch::handle::OverwatchHandle;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use tower_http::{
+    cors::{Any, CorsLayer},
+    trace::TraceLayer,
+};
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 
@@ -18,17 +27,23 @@ use crate::{
     Backend,
 };
 
-#[derive(Clone)]
+/// Configuration for the Http Server
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
+#[cfg_attr(feature = "clap", derive(clap::Args))]
 pub struct AxumBackendSettings {
-    pub addr: SocketAddr,
-    pub da_mempool: OverwatchHandle,
-    pub da: OverwatchHandle,
-    pub cl: OverwatchHandle,
-    pub carnot: OverwatchHandle,
-    pub network: OverwatchHandle,
-    pub storage: OverwatchHandle,
-    pub cert_mempool: OverwatchHandle,
-    pub tx_mempool: OverwatchHandle,
+    /// Socket where the server will be listening on for incoming requests.
+    #[cfg_attr(feature = "clap", arg(
+        short, long = "http-addr",
+        default_value_t = std::net::SocketAddr::new(
+            std::net::IpAddr::V4(std::net::Ipv4Addr::new(127, 0, 0, 1)),
+            8080,
+        ),
+        env = "HTTP_BIND_ADDRESS"
+    ))]
+    pub address: std::net::SocketAddr,
+    /// Allowed origins for this server deployment requests.
+    #[cfg_attr(feature = "clap", arg(long = "http-cors-origin"))]
+    pub cors_origins: Vec<String>,
 }
 
 pub struct AxumBackend<T, S, const SIZE: usize> {
@@ -52,7 +67,7 @@ pub struct AxumBackend<T, S, const SIZE: usize> {
 )]
 struct ApiDoc;
 
-type Store = Arc<AxumBackendSettings>;
+// type Store = Arc<AxumBackendSettings>;
 
 #[async_trait::async_trait]
 impl<T, S, const SIZE: usize> Backend for AxumBackend<T, S, SIZE>
@@ -85,9 +100,28 @@ where
         })
     }
 
-    async fn serve(self) -> Result<(), Self::Error> {
-        let store = self.settings.clone();
+    async fn serve(self, handle: OverwatchHandle) -> Result<(), Self::Error> {
+        let mut builder = CorsLayer::new();
+        if self.settings.cors_origins.is_empty() {
+            builder = builder.allow_origin(Any);
+        }
+
+        for origin in &self.settings.cors_origins {
+            builder = builder.allow_origin(
+                origin
+                    .as_str()
+                    .parse::<HeaderValue>()
+                    .expect("fail to parse origin"),
+            );
+        }
+
         let app = Router::new()
+            .layer(
+                builder
+                    .allow_headers([CONTENT_TYPE, USER_AGENT])
+                    .allow_methods(Any),
+            )
+            .layer(TraceLayer::new_for_http())
             .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
             .route("/da/metrics", routing::get(da_metrics))
             .route("/da/status", routing::post(da_status))
@@ -99,9 +133,9 @@ where
             .route("/storage/block", routing::post(block::<S, T>))
             .route("/mempool/add/tx", routing::post(add_tx::<T>))
             .route("/mempool/add/cert", routing::post(add_cert))
-            .with_state(store);
+            .with_state(handle);
 
-        Server::bind(&self.settings.addr)
+        Server::bind(&self.settings.address)
             .serve(app.into_make_service())
             .await
     }
@@ -115,8 +149,8 @@ where
         (status = 500, description = "Internal server error", body = String),
     )
 )]
-async fn da_metrics(State(store): State<Store>) -> impl IntoResponse {
-    match da::da_mempool_metrics(&store.da_mempool).await {
+async fn da_metrics(State(handle): State<OverwatchHandle>) -> impl IntoResponse {
+    match da::da_mempool_metrics(&handle).await {
         Ok(metrics) => (StatusCode::OK, Json(metrics)).into_response(),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
     }
@@ -131,10 +165,10 @@ async fn da_metrics(State(store): State<Store>) -> impl IntoResponse {
     )
 )]
 async fn da_status(
-    State(store): State<Store>,
+    State(handle): State<OverwatchHandle>,
     Json(items): Json<Vec<<Blob as blob::Blob>::Hash>>,
 ) -> impl IntoResponse {
-    match da::da_mempool_status(&store.da_mempool, items).await {
+    match da::da_mempool_status(&handle, items).await {
         Ok(status) => (StatusCode::OK, Json(status)).into_response(),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
     }
@@ -149,10 +183,10 @@ async fn da_status(
     )
 )]
 async fn da_blob(
-    State(store): State<Store>,
+    State(handle): State<OverwatchHandle>,
     Json(items): Json<Vec<<Blob as blob::Blob>::Hash>>,
 ) -> impl IntoResponse {
-    match da::da_blob(&store.da, items).await {
+    match da::da_blob(&handle, items).await {
         Ok(status) => (StatusCode::OK, Json(status)).into_response(),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
     }
@@ -166,7 +200,7 @@ async fn da_blob(
         (status = 500, description = "Internal server error", body = String),
     )
 )]
-async fn cl_metrics<T>(State(store): State<Store>) -> impl IntoResponse
+async fn cl_metrics<T>(State(handle): State<OverwatchHandle>) -> impl IntoResponse
 where
     T: Transaction
         + Clone
@@ -179,7 +213,7 @@ where
         + 'static,
     <T as nomos_core::tx::Transaction>::Hash: std::cmp::Ord + Debug + Send + Sync + 'static,
 {
-    match cl::cl_mempool_metrics::<T>(&store.cl).await {
+    match cl::cl_mempool_metrics::<T>(&handle).await {
         Ok(metrics) => (StatusCode::OK, Json(metrics)).into_response(),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
     }
@@ -194,7 +228,7 @@ where
     )
 )]
 async fn cl_status<T>(
-    State(store): State<Store>,
+    State(handle): State<OverwatchHandle>,
     Json(items): Json<Vec<<T as Transaction>::Hash>>,
 ) -> impl IntoResponse
 where
@@ -202,7 +236,7 @@ where
     <T as nomos_core::tx::Transaction>::Hash:
         Serialize + DeserializeOwned + std::cmp::Ord + Debug + Send + Sync + 'static,
 {
-    match cl::cl_mempool_status::<T>(&store.cl, items).await {
+    match cl::cl_mempool_status::<T>(&handle, items).await {
         Ok(status) => (StatusCode::OK, Json(status)).into_response(),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
     }
@@ -216,13 +250,15 @@ where
         (status = 500, description = "Internal server error", body = String),
     )
 )]
-async fn carnot_info<Tx, SS, const SIZE: usize>(State(store): State<Store>) -> impl IntoResponse
+async fn carnot_info<Tx, SS, const SIZE: usize>(
+    State(handle): State<OverwatchHandle>,
+) -> impl IntoResponse
 where
     Tx: Transaction + Clone + Debug + Hash + Serialize + DeserializeOwned + Send + Sync + 'static,
     <Tx as Transaction>::Hash: std::cmp::Ord + Debug + Send + Sync + 'static,
     SS: StorageSerde + Send + Sync + 'static,
 {
-    match info::carnot_info::<Tx, SS, SIZE>(&store.carnot).await {
+    match info::carnot_info::<Tx, SS, SIZE>(&handle).await {
         Ok(info) => (StatusCode::OK, Json(info)).into_response(),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
     }
@@ -236,8 +272,8 @@ where
         (status = 500, description = "Internal server error", body = String),
     )
 )]
-async fn libp2p_info(State(store): State<Store>) -> impl IntoResponse {
-    match info::libp2p_info(&store.network).await {
+async fn libp2p_info(State(handle): State<OverwatchHandle>) -> impl IntoResponse {
+    match info::libp2p_info(&handle).await {
         Ok(info) => (StatusCode::OK, Json(info)).into_response(),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
     }
@@ -251,12 +287,15 @@ async fn libp2p_info(State(store): State<Store>) -> impl IntoResponse {
         (status = 500, description = "Internal server error", body = String),
     )
 )]
-async fn block<S, Tx>(State(store): State<Store>, Json(id): Json<BlockId>) -> impl IntoResponse
+async fn block<S, Tx>(
+    State(handle): State<OverwatchHandle>,
+    Json(id): Json<BlockId>,
+) -> impl IntoResponse
 where
     Tx: serde::Serialize + serde::de::DeserializeOwned + Clone + Eq + core::hash::Hash,
     S: StorageSerde + Send + Sync + 'static,
 {
-    match storage::block_req::<S, Tx>(&store.storage, id).await {
+    match storage::block_req::<S, Tx>(&handle, id).await {
         Ok(status) => (StatusCode::OK, Json(status)).into_response(),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
     }
@@ -270,16 +309,13 @@ where
         (status = 500, description = "Internal server error", body = String),
     )
 )]
-async fn add_tx<Tx>(State(store): State<Store>, Json(tx): Json<Tx>) -> impl IntoResponse
+async fn add_tx<Tx>(State(handle): State<OverwatchHandle>, Json(tx): Json<Tx>) -> impl IntoResponse
 where
     Tx: Transaction + Clone + Debug + Hash + Serialize + DeserializeOwned + Send + Sync + 'static,
     <Tx as Transaction>::Hash: std::cmp::Ord + Debug + Send + Sync + 'static,
 {
-    match mempool::add_tx::<Libp2p, Libp2pAdapter<Tx, <Tx as Transaction>::Hash>, Tx>(
-        &store.tx_mempool,
-        tx,
-    )
-    .await
+    match mempool::add_tx::<Libp2p, Libp2pAdapter<Tx, <Tx as Transaction>::Hash>, Tx>(&handle, tx)
+        .await
     {
         Ok(status) => (StatusCode::OK, Json(status)).into_response(),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
@@ -294,10 +330,12 @@ where
         (status = 500, description = "Internal server error", body = String),
     )
 )]
-async fn add_cert(State(store): State<Store>, Json(cert): Json<Certificate>) -> impl IntoResponse {
+async fn add_cert(
+    State(handle): State<OverwatchHandle>,
+    Json(cert): Json<Certificate>,
+) -> impl IntoResponse {
     match mempool::add_cert::<Libp2p, Libp2pAdapter<Certificate, <Blob as blob::Blob>::Hash>>(
-        &store.tx_mempool,
-        cert,
+        &handle, cert,
     )
     .await
     {

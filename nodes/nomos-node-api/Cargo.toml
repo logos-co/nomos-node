@@ -5,7 +5,8 @@ edition = "2021"
 
 [features]
 default = ["axum"]
-axum = ["dep:axum", "dep:hyper", "utoipa-swagger-ui/axum"]
+axum = ["dep:axum", "dep:hyper", "dep:tower-http", "utoipa-swagger-ui/axum"]
+clap = ["dep:clap"]
 
 [dependencies]
 async-trait = "0.1"
@@ -13,7 +14,7 @@ overwatch-rs = { git = "https://github.com/logos-co/Overwatch", rev = "2f70806" 
 overwatch-derive = { git = "https://github.com/logos-co/Overwatch", rev = "ac28d01" }
 tracing = "0.1"
 
-
+clap = { version = "4", features = ["derive", "env"], optional = true }
 consensus-engine = { path = "../../consensus-engine" }
 nomos-core = { path = "../../nomos-core" }
 nomos-consensus = { path = "../../nomos-services/consensus" }
@@ -30,6 +31,7 @@ tokio = { version = "1.33", default-features = false, features = ["sync"] }
 # axum related dependencies
 axum = { version = "0.6", optional = true }
 hyper = { version = "0.14", features = ["full"], optional = true }
+tower-http = { version = "0.4", optional = true, features = ["cors", "trace"] }
 
 # openapi related dependencies
 utoipa = "4.0"
