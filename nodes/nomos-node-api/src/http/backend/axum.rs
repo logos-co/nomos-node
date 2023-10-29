@@ -19,6 +19,7 @@ use crate::{
 #[derive(Clone)]
 pub struct AxumBackendSettings {
     pub addr: SocketAddr,
+    pub da_mempool: OverwatchHandle,
     pub da: OverwatchHandle,
     pub cl: OverwatchHandle,
     pub carnot: OverwatchHandle,
@@ -84,6 +85,7 @@ where
             .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
             .route("/da/metrics", routing::get(da_metrics))
             .route("/da/status", routing::post(da_status))
+            .route("/da/blob", routing::post(da_blob))
             .route("/cl/metrics", routing::get(cl_metrics::<T>))
             .route("/cl/status", routing::post(cl_status::<T>))
             .route("/carnot/info", routing::get(carnot_info::<T, S, SIZE>))
@@ -105,7 +107,7 @@ where
     )
 )]
 async fn da_metrics(State(store): State<Store>) -> impl IntoResponse {
-    match da::da_mempool_metrics(&store.da).await {
+    match da::da_mempool_metrics(&store.da_mempool).await {
         Ok(metrics) => (StatusCode::OK, Json(metrics)).into_response(),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
     }
@@ -123,7 +125,25 @@ async fn da_status(
     State(store): State<Store>,
     Json(items): Json<Vec<<Blob as blob::Blob>::Hash>>,
 ) -> impl IntoResponse {
-    match da::da_mempool_status(&store.da, items).await {
+    match da::da_mempool_status(&store.da_mempool, items).await {
+        Ok(status) => (StatusCode::OK, Json(status)).into_response(),
+        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+    }
+}
+
+#[utoipa::path(
+    post,
+    path = "/da/blob",
+    responses(
+        (status = 200, description = "Query the mempool status of the da service", body = Vec<Blob>),
+        (status = 500, description = "Internal server error", body = String),
+    )
+)]
+async fn da_blob(
+    State(store): State<Store>,
+    Json(items): Json<Vec<<Blob as blob::Blob>::Hash>>,
+) -> impl IntoResponse {
+    match da::da_blob(&store.da, items).await {
         Ok(status) => (StatusCode::OK, Json(status)).into_response(),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
     }

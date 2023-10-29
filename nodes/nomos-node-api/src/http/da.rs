@@ -1,5 +1,9 @@
-use full_replication::{Blob, Certificate};
+use full_replication::{AbsoluteNumber, Attestation, Blob, Certificate, FullReplication};
 use nomos_core::da::blob;
+use nomos_da::{
+    backend::memory_cache::BlobCache, network::adapters::libp2p::Libp2pAdapter as DaLibp2pAdapter,
+    DaMsg, DataAvailabilityService,
+};
 use nomos_mempool::{
     backend::mockpool::MockPool,
     network::adapters::libp2p::Libp2pAdapter,
@@ -12,6 +16,12 @@ pub(crate) type DaMempoolService = MempoolService<
     Libp2pAdapter<Certificate, <Blob as blob::Blob>::Hash>,
     MockPool<Certificate, <Blob as blob::Blob>::Hash>,
     CertDiscriminant,
+>;
+
+pub type DataAvailability = DataAvailabilityService<
+    FullReplication<AbsoluteNumber<Attestation, Certificate>>,
+    BlobCache<<Blob as nomos_core::da::blob::Blob>::Hash, Blob>,
+    DaLibp2pAdapter<Blob, Attestation>,
 >;
 
 pub(crate) async fn da_mempool_metrics(
@@ -44,4 +54,22 @@ pub(crate) async fn da_mempool_status(
         .map_err(|(e, _)| e)?;
 
     Ok(receiver.await.unwrap())
+}
+
+pub(crate) async fn da_blob(
+    handle: &overwatch_rs::overwatch::handle::OverwatchHandle,
+    ids: Vec<<Blob as blob::Blob>::Hash>,
+) -> Result<Vec<Blob>, super::DynError> {
+    let relay = handle.relay::<DataAvailability>().connect().await?;
+    let (reply_channel, receiver) = oneshot::channel();
+    relay
+        .send(DaMsg::Get {
+            ids: Box::new(ids.into_iter()),
+            reply_channel,
+        })
+        .await
+        .map_err(|(e, _)| e)?;
+
+    let blobs = receiver.await.unwrap();
+    Ok(blobs)
 }

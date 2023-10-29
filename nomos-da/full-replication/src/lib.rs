@@ -93,6 +93,7 @@ impl CertificateStrategy for AbsoluteNumber<Attestation, Certificate> {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, Hash, PartialEq)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 
 pub struct Blob {
     data: Bytes,
