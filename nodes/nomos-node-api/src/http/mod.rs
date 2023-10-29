@@ -4,4 +4,5 @@ pub mod backend;
 pub(crate) mod cl;
 pub(crate) mod da;
 pub(crate) mod info;
+pub(crate) mod mempool;
 pub(crate) mod storage;

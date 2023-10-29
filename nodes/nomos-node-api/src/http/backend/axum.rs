@@ -2,10 +2,11 @@ use std::{fmt::Debug, hash::Hash, net::SocketAddr, sync::Arc};
 
 use axum::{extract::State, response::IntoResponse, routing, Json, Router, Server};
 use consensus_engine::BlockId;
-use full_replication::Blob;
+use full_replication::{Blob, Certificate};
 use hyper::StatusCode;
 use nomos_core::{da::blob, tx::Transaction};
-use nomos_mempool::{openapi::Status, MempoolMetrics};
+use nomos_mempool::{network::adapters::libp2p::Libp2pAdapter, openapi::Status, MempoolMetrics};
+use nomos_network::backends::libp2p::Libp2p;
 use nomos_storage::backends::StorageSerde;
 use overwatch_rs::overwatch::handle::OverwatchHandle;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
@@ -13,7 +14,7 @@ use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 
 use crate::{
-    http::{cl, da, info, storage},
+    http::{cl, da, info, mempool, storage},
     Backend,
 };
 
@@ -26,6 +27,8 @@ pub struct AxumBackendSettings {
     pub carnot: OverwatchHandle,
     pub network: OverwatchHandle,
     pub storage: OverwatchHandle,
+    pub cert_mempool: OverwatchHandle,
+    pub tx_mempool: OverwatchHandle,
 }
 
 pub struct AxumBackend<T, S, const SIZE: usize> {
@@ -94,6 +97,8 @@ where
             .route("/carnot/info", routing::get(carnot_info::<T, S, SIZE>))
             .route("/network/info", routing::get(libp2p_info))
             .route("/storage/block", routing::post(block::<S, T>))
+            .route("/mempool/add/tx", routing::post(add_tx::<T>))
+            .route("/mempool/add/cert", routing::post(add_cert))
             .with_state(store);
 
         Server::bind(&self.settings.addr)
@@ -252,6 +257,50 @@ where
     S: StorageSerde + Send + Sync + 'static,
 {
     match storage::block_req::<S, Tx>(&store.storage, id).await {
+        Ok(status) => (StatusCode::OK, Json(status)).into_response(),
+        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+    }
+}
+
+#[utoipa::path(
+    post,
+    path = "/mempool/add/tx",
+    responses(
+        (status = 200, description = "add transaction to the mempool"),
+        (status = 500, description = "Internal server error", body = String),
+    )
+)]
+async fn add_tx<Tx>(State(store): State<Store>, Json(tx): Json<Tx>) -> impl IntoResponse
+where
+    Tx: Transaction + Clone + Debug + Hash + Serialize + DeserializeOwned + Send + Sync + 'static,
+    <Tx as Transaction>::Hash: std::cmp::Ord + Debug + Send + Sync + 'static,
+{
+    match mempool::add_tx::<Libp2p, Libp2pAdapter<Tx, <Tx as Transaction>::Hash>, Tx>(
+        &store.tx_mempool,
+        tx,
+    )
+    .await
+    {
+        Ok(status) => (StatusCode::OK, Json(status)).into_response(),
+        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+    }
+}
+
+#[utoipa::path(
+    post,
+    path = "/mempool/add/tx",
+    responses(
+        (status = 200, description = "add certificate to the mempool"),
+        (status = 500, description = "Internal server error", body = String),
+    )
+)]
+async fn add_cert(State(store): State<Store>, Json(cert): Json<Certificate>) -> impl IntoResponse {
+    match mempool::add_cert::<Libp2p, Libp2pAdapter<Certificate, <Blob as blob::Blob>::Hash>>(
+        &store.tx_mempool,
+        cert,
+    )
+    .await
+    {
         Ok(status) => (StatusCode::OK, Json(status)).into_response(),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
     }
