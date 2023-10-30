@@ -1,6 +1,10 @@
 use std::{fmt::Debug, hash::Hash, net::SocketAddr, sync::Arc};
 
-use axum::{extract::State, response::{IntoResponse, Response}, routing, Json, Router, Server};
+use axum::{
+    extract::State,
+    response::{IntoResponse, Response},
+    routing, Json, Router, Server,
+};
 use full_replication::Blob;
 use hyper::StatusCode;
 use nomos_core::{da::blob, tx::Transaction};
