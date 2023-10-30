@@ -1,5 +1,4 @@
 use consensus_engine::{Qc, View};
-use fraction::{Fraction, One};
 use futures::stream::{self, StreamExt};
 use std::collections::HashSet;
 use std::time::Duration;
