@@ -1,9 +1,8 @@
 #!/bin/sh
 
-# NODE_MASK is set via compose.yml file.
-
+# LIBP2P_NODE_MASK is set via compose.yml file.
 node_key_from_id() {
-	echo "${NODE_MASK}" | sed "s/.\{${#NODE_ID}\}$/${NODE_ID}/"
+	echo "${LIBP2P_NODE_MASK}" | sed "s/.\{${#NODE_ID}\}$/${NODE_ID}/"
 }
 
 END=$LIBP2P_REPLICAS
