@@ -16,7 +16,7 @@ type ClMempoolService<T> = MempoolService<
     TxDiscriminant,
 >;
 
-pub(crate) async fn cl_mempool_metrics<T>(
+pub async fn cl_mempool_metrics<T>(
     handle: &overwatch_rs::overwatch::handle::OverwatchHandle,
 ) -> Result<MempoolMetrics, super::DynError>
 where
@@ -43,7 +43,7 @@ where
     Ok(receiver.await?)
 }
 
-pub(crate) async fn cl_mempool_status<T>(
+pub async fn cl_mempool_status<T>(
     handle: &overwatch_rs::overwatch::handle::OverwatchHandle,
     items: Vec<<T as Transaction>::Hash>,
 ) -> Result<Vec<Status>, super::DynError>

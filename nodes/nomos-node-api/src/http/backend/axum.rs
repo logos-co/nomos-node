@@ -1,13 +1,7 @@
 use std::{fmt::Debug, hash::Hash, net::SocketAddr, sync::Arc};
 
-
-use axum::{
-    extract::State,
-    response::{IntoResponse, Response},
-    routing, Json, Router, Server,
-};
+use axum::{extract::State, response::Response, routing, Json, Router, Server};
 use full_replication::Blob;
-use hyper::StatusCode;
 use nomos_core::{da::blob, tx::Transaction};
 use nomos_mempool::{openapi::Status, MempoolMetrics};
 use nomos_storage::backends::StorageSerde;
@@ -17,18 +11,14 @@ use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 
 use crate::{
-    http::{cl, da, info},
+    http::{cl, consensus, da, libp2p},
     Backend,
 };
 
 #[derive(Clone)]
 pub struct AxumBackendSettings {
     pub addr: SocketAddr,
-    pub da_mempool: OverwatchHandle,
-    pub da: OverwatchHandle,
-    pub cl: OverwatchHandle,
-    pub carnot: OverwatchHandle,
-    pub network: OverwatchHandle,
+    pub handle: OverwatchHandle,
 }
 
 pub struct AxumBackend<T, S, const SIZE: usize> {
@@ -103,6 +93,15 @@ where
     }
 }
 
+macro_rules! make_request_and_return_response {
+    ($mod:tt::$fn:tt $(:: < $($generic: ident), + $(,)? > )? ($handle:ident $(,)? $($($param:ident),+ $(,)?)? )) => {{
+        match $mod::$fn $(:: <$($generic),+> )? (&$handle.handle, $($($param),+)?).await {
+            ::std::result::Result::Ok(val) => ::axum::response::IntoResponse::into_response((::hyper::StatusCode::OK, ::axum::Json(val))),
+            ::std::result::Result::Err(e) => ::axum::response::IntoResponse::into_response((::hyper::StatusCode::INTERNAL_SERVER_ERROR, e.to_string())),
+        }
+    }};
+}
+
 #[utoipa::path(
     get,
     path = "/da/metrics",
@@ -112,10 +111,7 @@ where
     )
 )]
 async fn da_metrics(State(store): State<Store>) -> Response {
-    match da::da_mempool_metrics(&store.da_mempool).await {
-        Ok(metrics) => (StatusCode::OK, Json(metrics)).into_response(),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
-    }
+    make_request_and_return_response!(da::da_mempool_metrics(store))
 }
 
 #[utoipa::path(
@@ -130,10 +126,7 @@ async fn da_status(
     State(store): State<Store>,
     Json(items): Json<Vec<<Blob as blob::Blob>::Hash>>,
 ) -> Response {
-    match da::da_mempool_status(&store.da_mempool, items).await {
-        Ok(status) => (StatusCode::OK, Json(status)).into_response(),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
-    }
+    make_request_and_return_response!(da::da_mempool_status(store, items))
 }
 
 #[utoipa::path(
@@ -148,10 +141,7 @@ async fn da_blobs(
     State(store): State<Store>,
     Json(items): Json<Vec<<Blob as blob::Blob>::Hash>>,
 ) -> Response {
-    match da::da_blob(&store.da, items).await {
-        Ok(status) => (StatusCode::OK, Json(status)).into_response(),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
-    }
+    make_request_and_return_response!(da::da_blobs(store, items))
 }
 
 #[utoipa::path(
@@ -175,10 +165,7 @@ where
         + 'static,
     <T as nomos_core::tx::Transaction>::Hash: std::cmp::Ord + Debug + Send + Sync + 'static,
 {
-    match cl::cl_mempool_metrics::<T>(&store.cl).await {
-        Ok(metrics) => (StatusCode::OK, Json(metrics)).into_response(),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
-    }
+    make_request_and_return_response!(cl::cl_mempool_metrics::<T>(store))
 }
 
 #[utoipa::path(
@@ -198,10 +185,7 @@ where
     <T as nomos_core::tx::Transaction>::Hash:
         Serialize + DeserializeOwned + std::cmp::Ord + Debug + Send + Sync + 'static,
 {
-    match cl::cl_mempool_status::<T>(&store.cl, items).await {
-        Ok(status) => (StatusCode::OK, Json(status)).into_response(),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
-    }
+    make_request_and_return_response!(cl::cl_mempool_status::<T>(store, items))
 }
 
 #[utoipa::path(
@@ -218,10 +202,7 @@ where
     <Tx as Transaction>::Hash: std::cmp::Ord + Debug + Send + Sync + 'static,
     SS: StorageSerde + Send + Sync + 'static,
 {
-    match info::carnot_info::<Tx, SS, SIZE>(&store.carnot).await {
-        Ok(info) => (StatusCode::OK, Json(info)).into_response(),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
-    }
+    make_request_and_return_response!(consensus::carnot_info::<Tx, SS, SIZE>(store))
 }
 
 #[utoipa::path(
@@ -233,8 +214,5 @@ where
     )
 )]
 async fn libp2p_info(State(store): State<Store>) -> Response {
-    match info::libp2p_info(&store.network).await {
-        Ok(info) => (StatusCode::OK, Json(info)).into_response(),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
-    }
+    make_request_and_return_response!(libp2p::libp2p_info(store))
 }

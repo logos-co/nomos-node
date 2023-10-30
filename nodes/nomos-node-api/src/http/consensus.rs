@@ -16,10 +16,6 @@ use nomos_core::{
 use nomos_mempool::{
     backend::mockpool::MockPool, network::adapters::libp2p::Libp2pAdapter as MempoolLibp2pAdapter,
 };
-use nomos_network::{
-    backends::libp2p::{Command, Libp2p, Libp2pInfo},
-    NetworkMsg, NetworkService,
-};
 use nomos_storage::backends::{sled::SledBackend, StorageSerde};
 use serde::{de::DeserializeOwned, Serialize};
 use tokio::sync::oneshot;
@@ -39,7 +35,7 @@ pub type Carnot<Tx, SS, const SIZE: usize> = CarnotConsensus<
     SledBackend<SS>,
 >;
 
-pub(crate) async fn carnot_info<Tx, SS, const SIZE: usize>(
+pub async fn carnot_info<Tx, SS, const SIZE: usize>(
     handle: &overwatch_rs::overwatch::handle::OverwatchHandle,
 ) -> Result<CarnotInfo, overwatch_rs::DynError>
 where
@@ -53,19 +49,5 @@ where
         .send(ConsensusMsg::Info { tx: sender })
         .await
         .map_err(|(e, _)| e)?;
-    Ok(receiver.await?)
-}
-
-pub(crate) async fn libp2p_info(
-    handle: &overwatch_rs::overwatch::handle::OverwatchHandle,
-) -> Result<Libp2pInfo, overwatch_rs::DynError> {
-    let relay = handle.relay::<NetworkService<Libp2p>>().connect().await?;
-    let (sender, receiver) = oneshot::channel();
-
-    relay
-        .send(NetworkMsg::Process(Command::Info { reply: sender }))
-        .await
-        .map_err(|(e, _)| e)?;
-
     Ok(receiver.await?)
 }
