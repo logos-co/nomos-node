@@ -11,7 +11,7 @@ use std::time::Duration;
 use std::{fmt::Debug, sync::Mutex};
 
 //crates
-use fraction::Fraction;
+use fraction::{Fraction, One};
 use rand::{thread_rng, Rng};
 
 static NET_PORT: Lazy<Mutex<u16>> = Lazy::new(|| Mutex::new(thread_rng().gen_range(8000, 10000)));
@@ -52,6 +52,18 @@ pub struct ConsensusConfig {
     pub n_participants: usize,
     pub threshold: Fraction,
     pub timeout: Duration,
+}
+
+impl ConsensusConfig {
+    pub fn happy(n_participants: usize) -> Self {
+        Self {
+            n_participants,
+            threshold: Fraction::one(),
+            // Since it takes 1+ secs to start each nomos-node,
+            // set the timeout conservatively.
+            timeout: Duration::from_millis(n_participants as u64 * 2500),
+        }
+    }
 }
 
 #[derive(Clone)]

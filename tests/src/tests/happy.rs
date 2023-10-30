@@ -78,7 +78,7 @@ async fn happy_test(nodes: &[NomosNode]) {
 async fn two_nodes_happy() {
     let (_mixnodes, mixnet_config) = MixNode::spawn_nodes(2).await;
     let nodes = NomosNode::spawn_nodes(SpawnConfig::Chain {
-        consensus: get_consensus_config(2),
+        consensus: ConsensusConfig::happy(2),
         mixnet: mixnet_config,
     })
     .await;
@@ -89,7 +89,7 @@ async fn two_nodes_happy() {
 async fn ten_nodes_happy() {
     let (_mixnodes, mixnet_config) = MixNode::spawn_nodes(3).await;
     let nodes = NomosNode::spawn_nodes(SpawnConfig::Chain {
-        consensus: get_consensus_config(10),
+        consensus: ConsensusConfig::happy(10),
         mixnet: mixnet_config,
     })
     .await;
@@ -100,7 +100,7 @@ async fn ten_nodes_happy() {
 async fn test_get_block() {
     let (_mixnodes, mixnet_config) = MixNode::spawn_nodes(3).await;
     let nodes = NomosNode::spawn_nodes(SpawnConfig::Chain {
-        consensus: get_consensus_config(2),
+        consensus: ConsensusConfig::happy(2),
         mixnet: mixnet_config,
     })
     .await;
@@ -114,14 +114,4 @@ async fn test_get_block() {
     })
     .await
     .unwrap();
-}
-
-fn get_consensus_config(n_participants: usize) -> ConsensusConfig {
-    ConsensusConfig {
-        n_participants,
-        threshold: Fraction::one(),
-        // Since it takes 1+ secs to start each nomos-node,
-        // set the timeout conservatively.
-        timeout: Duration::from_millis(n_participants as u64 * 2500),
-    }
 }
