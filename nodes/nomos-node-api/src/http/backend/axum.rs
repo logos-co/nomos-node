@@ -11,7 +11,7 @@ use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 
 use crate::{
-    http::{cl, da, libp2p, consensus},
+    http::{cl, consensus, da, libp2p},
     Backend,
 };
 
