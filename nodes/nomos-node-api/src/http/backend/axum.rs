@@ -270,7 +270,7 @@ where
     post,
     path = "/mempool/add/tx",
     responses(
-        (status = 200, description = "add transaction to the mempool"),
+        (status = 200, description = "Add transaction to the mempool"),
         (status = 500, description = "Internal server error", body = String),
     )
 )]
@@ -294,7 +294,7 @@ where
     post,
     path = "/mempool/add/tx",
     responses(
-        (status = 200, description = "add certificate to the mempool"),
+        (status = 200, description = "Add certificate to the mempool"),
         (status = 500, description = "Internal server error", body = String),
     )
 )]
