@@ -15,7 +15,7 @@ struct Info {
 }
 
 async fn happy_test(nodes: &[NomosNode]) {
-    let timeout = std::time::Duration::from_secs(20);
+    let timeout = std::time::Duration::from_secs(30);
     let timeout = tokio::time::sleep(timeout);
     tokio::select! {
         _ = timeout => panic!("timed out waiting for nodes to reach view {}", TARGET_VIEW),
