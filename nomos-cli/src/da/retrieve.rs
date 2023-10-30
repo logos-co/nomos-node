@@ -19,7 +19,7 @@ pub enum Error {
     NotFound,
 }
 
-/// Return the blobs whose certificate has been included in the proived block.
+/// Return the blobs whose certificate has been included in the provided block.
 pub async fn get_block_blobs(node: Url, block: BlockId) -> Result<Vec<Blob>, Error> {
     let block = get_block_contents(&node, block)
         .await?
