@@ -35,7 +35,7 @@ pub type Carnot<Tx, SS, const SIZE: usize> = CarnotConsensus<
     SledBackend<SS>,
 >;
 
-pub(crate) async fn carnot_info<Tx, SS, const SIZE: usize>(
+pub async fn carnot_info<Tx, SS, const SIZE: usize>(
     handle: &overwatch_rs::overwatch::handle::OverwatchHandle,
 ) -> Result<CarnotInfo, overwatch_rs::DynError>
 where
