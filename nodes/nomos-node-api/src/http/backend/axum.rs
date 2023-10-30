@@ -11,7 +11,7 @@ use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 
 use crate::{
-    http::{cl, da, info},
+    http::{cl, da, libp2p, consensus},
     Backend,
 };
 
@@ -92,7 +92,7 @@ where
     }
 }
 
-macro_rules! sugar {
+macro_rules! handler {
     ($mod:tt::$fn:tt $(:: < $($generic: ident), + $(,)? > )? ($handle:ident $(,)? $($($param:ident),+ $(,)?)? )) => {{
         match $mod::$fn $(:: <$($generic),+> )? (&$handle.handle, $($($param),+)?).await {
             ::std::result::Result::Ok(val) => ::axum::response::IntoResponse::into_response((::hyper::StatusCode::OK, ::axum::Json(val))),
@@ -110,7 +110,7 @@ macro_rules! sugar {
     )
 )]
 async fn da_metrics(State(store): State<Store>) -> Response {
-    sugar!(da::da_mempool_metrics(store))
+    handler!(da::da_mempool_metrics(store))
 }
 
 #[utoipa::path(
@@ -125,7 +125,7 @@ async fn da_status(
     State(store): State<Store>,
     Json(items): Json<Vec<<Blob as blob::Blob>::Hash>>,
 ) -> Response {
-    sugar!(da::da_mempool_status(store, items))
+    handler!(da::da_mempool_status(store, items))
 }
 
 #[utoipa::path(
@@ -149,7 +149,7 @@ where
         + 'static,
     <T as nomos_core::tx::Transaction>::Hash: std::cmp::Ord + Debug + Send + Sync + 'static,
 {
-    sugar!(cl::cl_mempool_metrics::<T>(store))
+    handler!(cl::cl_mempool_metrics::<T>(store))
 }
 
 #[utoipa::path(
@@ -169,7 +169,7 @@ where
     <T as nomos_core::tx::Transaction>::Hash:
         Serialize + DeserializeOwned + std::cmp::Ord + Debug + Send + Sync + 'static,
 {
-    sugar!(cl::cl_mempool_status::<T>(store, items))
+    handler!(cl::cl_mempool_status::<T>(store, items))
 }
 
 #[utoipa::path(
@@ -186,7 +186,7 @@ where
     <Tx as Transaction>::Hash: std::cmp::Ord + Debug + Send + Sync + 'static,
     SS: StorageSerde + Send + Sync + 'static,
 {
-    sugar!(info::carnot_info::<Tx, SS, SIZE>(store))
+    handler!(consensus::carnot_info::<Tx, SS, SIZE>(store))
 }
 
 #[utoipa::path(
@@ -198,5 +198,5 @@ where
     )
 )]
 async fn libp2p_info(State(store): State<Store>) -> Response {
-    sugar!(info::libp2p_info(store))
+    handler!(libp2p::libp2p_info(store))
 }
