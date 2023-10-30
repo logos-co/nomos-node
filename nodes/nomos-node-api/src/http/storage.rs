@@ -5,7 +5,7 @@ use nomos_storage::{
     StorageMsg, StorageService,
 };
 
-pub(crate) async fn block_req<S, Tx>(
+pub async fn block_req<S, Tx>(
     handle: &overwatch_rs::overwatch::handle::OverwatchHandle,
     id: BlockId,
 ) -> Result<Option<Block<Tx, full_replication::Certificate>>, super::DynError>
