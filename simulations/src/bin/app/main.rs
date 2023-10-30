@@ -44,6 +44,8 @@ pub struct SimulationApp {
     log_format: log::LogFormat,
     #[clap(long, default_value = "stdout")]
     log_to: log::LogOutput,
+    #[clap(long)]
+    dump_overlay_info: bool,
 }
 
 impl SimulationApp {
@@ -53,6 +55,7 @@ impl SimulationApp {
             stream_type,
             log_format: _,
             log_to: _,
+            dump_overlay_info,
         } = self;
         let simulation_settings: SimulationSettings = load_json_from_file(&input_settings)?;
 
@@ -74,6 +77,18 @@ impl SimulationApp {
 
         let ids = node_ids.clone();
         let network = Arc::new(Mutex::new(Network::new(regions_data, seed)));
+
+        if dump_overlay_info {
+            dump_json_to_file(
+                Path::new("overlay_info.json"),
+                &overlay_node::overlay_info(
+                    node_ids.clone(),
+                    node_ids.first().copied().unwrap(),
+                    &simulation_settings.overlay_settings,
+                ),
+            )?;
+        }
+
         let nodes: Vec<BoxedNode<CarnotSettings, CarnotState>> = node_ids
             .par_iter()
             .copied()
@@ -204,6 +219,11 @@ fn signal<R: Record>(handle: SimulationRunnerHandle<R>) -> anyhow::Result<()> {
 fn load_json_from_file<T: DeserializeOwned>(path: &Path) -> anyhow::Result<T> {
     let f = File::open(path).map_err(Box::new)?;
     Ok(serde_json::from_reader(f)?)
+}
+
+fn dump_json_to_file<T: Serialize>(path: &Path, data: &T) -> anyhow::Result<()> {
+    let f = File::create(path).map_err(Box::new)?;
+    Ok(serde_json::to_writer(f, data)?)
 }
 
 fn main() -> anyhow::Result<()> {

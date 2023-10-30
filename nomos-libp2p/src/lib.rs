@@ -12,7 +12,7 @@ pub use libp2p;
 use blake2::digest::{consts::U32, Digest};
 use blake2::Blake2b;
 use libp2p::gossipsub::{Message, MessageId, TopicHash};
-
+#[allow(deprecated)]
 pub use libp2p::{
     core::upgrade,
     dns,
@@ -151,6 +151,7 @@ impl Swarm {
 }
 
 impl futures::Stream for Swarm {
+    #[allow(deprecated)]
     type Item = SwarmEvent<BehaviourEvent, THandlerErr<Behaviour>>;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {

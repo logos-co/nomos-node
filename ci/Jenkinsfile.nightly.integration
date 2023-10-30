@@ -54,7 +54,8 @@ pipeline {
                       tests.add('mixnet')
                     }
 
-                    runBuildAndTestsForFeature(FEATURE, tests)
+                    def report = runBuildAndTestsForFeature(FEATURE, tests)
+                    writeFile(file: "${WORKSPACE}/report.txt", text: report)
                   }
                 }
               }
@@ -68,14 +69,16 @@ pipeline {
   post {
     failure {
       script {
+        def report = readFile("${WORKSPACE}/report.txt").trim()
         def discord = load "${WORKSPACE}/ci/discord.groovy"
-        discord.sendMessage(header: 'Nightly Integration Tests Failed')
+        discord.sendMessage(header: "Nightly Integration Tests Failed: ${report}")
       }
     }
     success {
       script {
+        def report = readFile('report.txt').trim()
         def discord = load "${WORKSPACE}/ci/discord.groovy"
-        discord.sendMessage(header: 'Nightly Integration Tests Passed')
+        discord.sendMessage(header: "Nightly Integration Tests Passed: ${report}")
       }
     }
     cleanup { cleanWs() }
@@ -87,12 +90,11 @@ def runBuildAndTestsForFeature(feature, tests) {
   def build_node = "cargo build --all --no-default-features --features ${feature}"
 
   if (sh(script: build_node, returnStatus: true) != 0) {
-    error("Build '${feature}' node failed")
-    return
+    return reportError("Build '${feature}' node failed")
   }
 
   int iterations = params.ITERATIONS.toInteger()
-  runTestCases(tests, iterations)
+  return runTestCases(tests, iterations)
 }
 
 def runTestCases(test_cases, iterations) {
@@ -102,10 +104,15 @@ def runTestCases(test_cases, iterations) {
     for (test_case in test_cases) {
       def test_cmd = "cargo test -p tests --all --no-default-features --features ${feature} ${test_case}"
       if (sh(script: test_cmd, returnStatus: true) != 0) {
-        error("Test '${test_case}' failed on iteration ${i + 1}")
-        return
+        return reportError("Test '${test_case}' failed on iteration ${i + 1}")
       }
     }
   }
+
+  return "${iterations}/${iterations} iterations succeeded"
 }
 
+def reportError(e) {
+  error(e)
+  return e
+}
