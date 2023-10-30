@@ -2,6 +2,7 @@ use std::{fmt::Debug, hash::Hash, net::SocketAddr};
 
 use axum::{extract::State, response::Response, routing, Json, Router, Server};
 use consensus_engine::BlockId;
+
 use full_replication::{Blob, Certificate};
 use nomos_core::{da::blob, tx::Transaction};
 use nomos_mempool::{network::adapters::libp2p::Libp2pAdapter, openapi::Status, MempoolMetrics};
