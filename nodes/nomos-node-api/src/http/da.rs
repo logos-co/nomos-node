@@ -12,7 +12,7 @@ use nomos_mempool::{
 };
 use tokio::sync::oneshot;
 
-pub(crate) type DaMempoolService = MempoolService<
+pub type DaMempoolService = MempoolService<
     Libp2pAdapter<Certificate, <Blob as blob::Blob>::Hash>,
     MockPool<Certificate, <Blob as blob::Blob>::Hash>,
     CertDiscriminant,
@@ -24,7 +24,7 @@ pub type DataAvailability = DataAvailabilityService<
     DaLibp2pAdapter<Blob, Attestation>,
 >;
 
-pub(crate) async fn da_mempool_metrics(
+pub async fn da_mempool_metrics(
     handle: &overwatch_rs::overwatch::handle::OverwatchHandle,
 ) -> Result<MempoolMetrics, super::DynError> {
     let relay = handle.relay::<DaMempoolService>().connect().await?;
@@ -39,7 +39,7 @@ pub(crate) async fn da_mempool_metrics(
     Ok(receiver.await.unwrap())
 }
 
-pub(crate) async fn da_mempool_status(
+pub async fn da_mempool_status(
     handle: &overwatch_rs::overwatch::handle::OverwatchHandle,
     items: Vec<<Blob as blob::Blob>::Hash>,
 ) -> Result<Vec<Status>, super::DynError> {
@@ -56,7 +56,7 @@ pub(crate) async fn da_mempool_status(
     Ok(receiver.await.unwrap())
 }
 
-pub(crate) async fn da_blob(
+pub async fn da_blobs(
     handle: &overwatch_rs::overwatch::handle::OverwatchHandle,
     ids: Vec<<Blob as blob::Blob>::Hash>,
 ) -> Result<Vec<Blob>, super::DynError> {
