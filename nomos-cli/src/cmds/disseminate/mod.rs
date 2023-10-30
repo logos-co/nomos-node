@@ -1,4 +1,6 @@
-use crate::da::{DaProtocolChoice, DisseminateApp, DisseminateAppServiceSettings, Settings};
+use crate::da::disseminate::{
+    DaProtocolChoice, DisseminateApp, DisseminateAppServiceSettings, Settings,
+};
 use clap::Args;
 use nomos_network::{backends::libp2p::Libp2p, NetworkService};
 use overwatch_rs::{overwatch::OverwatchRunner, services::ServiceData};
