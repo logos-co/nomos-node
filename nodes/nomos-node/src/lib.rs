@@ -34,16 +34,17 @@ use nomos_storage::{
     StorageService,
 };
 
-use nomos_network::NetworkService;
-use overwatch_derive::*;
-use overwatch_rs::services::handle::ServiceHandle;
-
 pub use config::{Config, ConsensusArgs, HttpArgs, LogArgs, NetworkArgs, OverlayArgs};
 use nomos_core::{
     da::certificate::select::FillSize as FillSizeWithBlobsCertificate,
     tx::select::FillSize as FillSizeWithTx,
 };
+use nomos_network::NetworkService;
+use nomos_system_sig::SystemSig;
+use overwatch_derive::*;
+use overwatch_rs::services::handle::ServiceHandle;
 use serde::{de::DeserializeOwned, Serialize};
+
 pub use tx::Tx;
 
 pub const CL_TOPIC: &str = "cl";
@@ -91,6 +92,7 @@ pub struct Nomos {
     metrics: ServiceHandle<MetricsService<MapMetricsBackend<MetricsData>>>,
     da: ServiceHandle<DataAvailability>,
     storage: ServiceHandle<StorageService<SledBackend<Wire>>>,
+    system_sig: ServiceHandle<SystemSig>,
 }
 
 pub struct Wire;

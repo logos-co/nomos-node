@@ -1,14 +1,9 @@
-use std::{fmt::Debug, hash::Hash, sync::Arc};
+use std::{fmt::Debug, hash::Hash};
 
-use axum::{
-    extract::State, http::HeaderValue, response::IntoResponse, routing, Json, Router, Server,
-};
+use axum::{extract::State, http::HeaderValue, response::Response, routing, Json, Router, Server};
 use consensus_engine::BlockId;
 use full_replication::{Blob, Certificate};
-use hyper::{
-    header::{CONTENT_TYPE, USER_AGENT},
-    StatusCode,
-};
+use hyper::header::{CONTENT_TYPE, USER_AGENT};
 use nomos_core::{da::blob, tx::Transaction};
 use nomos_mempool::{network::adapters::libp2p::Libp2pAdapter, openapi::Status, MempoolMetrics};
 use nomos_network::backends::libp2p::Libp2p;
@@ -23,7 +18,7 @@ use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 
 use crate::{
-    http::{cl, da, info, mempool, storage},
+    http::{cl, consensus, da, libp2p, mempool, storage},
     Backend,
 };
 
@@ -47,7 +42,7 @@ pub struct AxumBackendSettings {
 }
 
 pub struct AxumBackend<T, S, const SIZE: usize> {
-    settings: Arc<AxumBackendSettings>,
+    settings: AxumBackendSettings,
     _tx: core::marker::PhantomData<T>,
     _storage_serde: core::marker::PhantomData<S>,
 }
@@ -66,8 +61,6 @@ pub struct AxumBackend<T, S, const SIZE: usize> {
     )
 )]
 struct ApiDoc;
-
-// type Store = Arc<AxumBackendSettings>;
 
 #[async_trait::async_trait]
 impl<T, S, const SIZE: usize> Backend for AxumBackend<T, S, SIZE>
@@ -94,7 +87,7 @@ where
         Self: Sized,
     {
         Ok(Self {
-            settings: Arc::new(settings),
+            settings,
             _tx: core::marker::PhantomData,
             _storage_serde: core::marker::PhantomData,
         })
@@ -125,7 +118,7 @@ where
             .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
             .route("/da/metrics", routing::get(da_metrics))
             .route("/da/status", routing::post(da_status))
-            .route("/da/blob", routing::post(da_blob))
+            .route("/da/blobs", routing::post(da_blobs))
             .route("/cl/metrics", routing::get(cl_metrics::<T>))
             .route("/cl/status", routing::post(cl_status::<T>))
             .route("/carnot/info", routing::get(carnot_info::<T, S, SIZE>))
@@ -141,6 +134,21 @@ where
     }
 }
 
+macro_rules! make_request_and_return_response {
+    ($cond:expr) => {{
+        match $cond.await {
+            ::std::result::Result::Ok(val) => ::axum::response::IntoResponse::into_response((
+                ::hyper::StatusCode::OK,
+                ::axum::Json(val),
+            )),
+            ::std::result::Result::Err(e) => ::axum::response::IntoResponse::into_response((
+                ::hyper::StatusCode::INTERNAL_SERVER_ERROR,
+                e.to_string(),
+            )),
+        }
+    }};
+}
+
 #[utoipa::path(
     get,
     path = "/da/metrics",
@@ -149,11 +157,8 @@ where
         (status = 500, description = "Internal server error", body = String),
     )
 )]
-async fn da_metrics(State(handle): State<OverwatchHandle>) -> impl IntoResponse {
-    match da::da_mempool_metrics(&handle).await {
-        Ok(metrics) => (StatusCode::OK, Json(metrics)).into_response(),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
-    }
+async fn da_metrics(State(handle): State<OverwatchHandle>) -> Response {
+    make_request_and_return_response!(da::da_mempool_metrics(&handle))
 }
 
 #[utoipa::path(
@@ -167,29 +172,23 @@ async fn da_metrics(State(handle): State<OverwatchHandle>) -> impl IntoResponse 
 async fn da_status(
     State(handle): State<OverwatchHandle>,
     Json(items): Json<Vec<<Blob as blob::Blob>::Hash>>,
-) -> impl IntoResponse {
-    match da::da_mempool_status(&handle, items).await {
-        Ok(status) => (StatusCode::OK, Json(status)).into_response(),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
-    }
+) -> Response {
+    make_request_and_return_response!(da::da_mempool_status(&handle, items))
 }
 
 #[utoipa::path(
     post,
-    path = "/da/blob",
+    path = "/da/blobs",
     responses(
-        (status = 200, description = "Query the mempool status of the da service", body = Vec<Blob>),
+        (status = 200, description = "Get pending blobs", body = Vec<Blob>),
         (status = 500, description = "Internal server error", body = String),
     )
 )]
-async fn da_blob(
+async fn da_blobs(
     State(handle): State<OverwatchHandle>,
     Json(items): Json<Vec<<Blob as blob::Blob>::Hash>>,
-) -> impl IntoResponse {
-    match da::da_blob(&handle, items).await {
-        Ok(status) => (StatusCode::OK, Json(status)).into_response(),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
-    }
+) -> Response {
+    make_request_and_return_response!(da::da_blobs(&handle, items))
 }
 
 #[utoipa::path(
@@ -200,7 +199,7 @@ async fn da_blob(
         (status = 500, description = "Internal server error", body = String),
     )
 )]
-async fn cl_metrics<T>(State(handle): State<OverwatchHandle>) -> impl IntoResponse
+async fn cl_metrics<T>(State(handle): State<OverwatchHandle>) -> Response
 where
     T: Transaction
         + Clone
@@ -213,10 +212,7 @@ where
         + 'static,
     <T as nomos_core::tx::Transaction>::Hash: std::cmp::Ord + Debug + Send + Sync + 'static,
 {
-    match cl::cl_mempool_metrics::<T>(&handle).await {
-        Ok(metrics) => (StatusCode::OK, Json(metrics)).into_response(),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
-    }
+    make_request_and_return_response!(cl::cl_mempool_metrics::<T>(&handle))
 }
 
 #[utoipa::path(
@@ -230,16 +226,13 @@ where
 async fn cl_status<T>(
     State(handle): State<OverwatchHandle>,
     Json(items): Json<Vec<<T as Transaction>::Hash>>,
-) -> impl IntoResponse
+) -> Response
 where
     T: Transaction + Clone + Debug + Hash + Serialize + DeserializeOwned + Send + Sync + 'static,
     <T as nomos_core::tx::Transaction>::Hash:
         Serialize + DeserializeOwned + std::cmp::Ord + Debug + Send + Sync + 'static,
 {
-    match cl::cl_mempool_status::<T>(&handle, items).await {
-        Ok(status) => (StatusCode::OK, Json(status)).into_response(),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
-    }
+    make_request_and_return_response!(cl::cl_mempool_status::<T>(&handle, items))
 }
 
 #[utoipa::path(
@@ -250,18 +243,13 @@ where
         (status = 500, description = "Internal server error", body = String),
     )
 )]
-async fn carnot_info<Tx, SS, const SIZE: usize>(
-    State(handle): State<OverwatchHandle>,
-) -> impl IntoResponse
+async fn carnot_info<Tx, SS, const SIZE: usize>(State(handle): State<OverwatchHandle>) -> Response
 where
     Tx: Transaction + Clone + Debug + Hash + Serialize + DeserializeOwned + Send + Sync + 'static,
     <Tx as Transaction>::Hash: std::cmp::Ord + Debug + Send + Sync + 'static,
     SS: StorageSerde + Send + Sync + 'static,
 {
-    match info::carnot_info::<Tx, SS, SIZE>(&handle).await {
-        Ok(info) => (StatusCode::OK, Json(info)).into_response(),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
-    }
+    make_request_and_return_response!(consensus::carnot_info::<Tx, SS, SIZE>(&handle))
 }
 
 #[utoipa::path(
@@ -272,11 +260,8 @@ where
         (status = 500, description = "Internal server error", body = String),
     )
 )]
-async fn libp2p_info(State(handle): State<OverwatchHandle>) -> impl IntoResponse {
-    match info::libp2p_info(&handle).await {
-        Ok(info) => (StatusCode::OK, Json(info)).into_response(),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
-    }
+async fn libp2p_info(State(handle): State<OverwatchHandle>) -> Response {
+    make_request_and_return_response!(libp2p::libp2p_info(&handle))
 }
 
 #[utoipa::path(
@@ -287,59 +272,57 @@ async fn libp2p_info(State(handle): State<OverwatchHandle>) -> impl IntoResponse
         (status = 500, description = "Internal server error", body = String),
     )
 )]
-async fn block<S, Tx>(
-    State(handle): State<OverwatchHandle>,
-    Json(id): Json<BlockId>,
-) -> impl IntoResponse
+async fn block<S, Tx>(State(handle): State<OverwatchHandle>, Json(id): Json<BlockId>) -> Response
 where
     Tx: serde::Serialize + serde::de::DeserializeOwned + Clone + Eq + core::hash::Hash,
     S: StorageSerde + Send + Sync + 'static,
 {
-    match storage::block_req::<S, Tx>(&handle, id).await {
-        Ok(status) => (StatusCode::OK, Json(status)).into_response(),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
-    }
+    make_request_and_return_response!(storage::block_req::<S, Tx>(&handle, id))
 }
 
 #[utoipa::path(
     post,
     path = "/mempool/add/tx",
     responses(
-        (status = 200, description = "add transaction to the mempool"),
+        (status = 200, description = "Add transaction to the mempool"),
         (status = 500, description = "Internal server error", body = String),
     )
 )]
-async fn add_tx<Tx>(State(handle): State<OverwatchHandle>, Json(tx): Json<Tx>) -> impl IntoResponse
+async fn add_tx<Tx>(State(handle): State<OverwatchHandle>, Json(tx): Json<Tx>) -> Response
 where
     Tx: Transaction + Clone + Debug + Hash + Serialize + DeserializeOwned + Send + Sync + 'static,
     <Tx as Transaction>::Hash: std::cmp::Ord + Debug + Send + Sync + 'static,
 {
-    match mempool::add_tx::<Libp2p, Libp2pAdapter<Tx, <Tx as Transaction>::Hash>, Tx>(&handle, tx)
-        .await
-    {
-        Ok(status) => (StatusCode::OK, Json(status)).into_response(),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
-    }
+    make_request_and_return_response!(mempool::add::<
+        Libp2p,
+        Libp2pAdapter<Tx, <Tx as Transaction>::Hash>,
+        nomos_mempool::Transaction,
+        Tx,
+        <Tx as Transaction>::Hash,
+    >(&handle, tx, Transaction::hash))
 }
 
 #[utoipa::path(
     post,
     path = "/mempool/add/tx",
     responses(
-        (status = 200, description = "add certificate to the mempool"),
+        (status = 200, description = "Add certificate to the mempool"),
         (status = 500, description = "Internal server error", body = String),
     )
 )]
 async fn add_cert(
     State(handle): State<OverwatchHandle>,
     Json(cert): Json<Certificate>,
-) -> impl IntoResponse {
-    match mempool::add_cert::<Libp2p, Libp2pAdapter<Certificate, <Blob as blob::Blob>::Hash>>(
-        &handle, cert,
-    )
-    .await
-    {
-        Ok(status) => (StatusCode::OK, Json(status)).into_response(),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
-    }
+) -> Response {
+    make_request_and_return_response!(mempool::add::<
+        Libp2p,
+        Libp2pAdapter<Certificate, <Blob as blob::Blob>::Hash>,
+        nomos_mempool::Certificate,
+        Certificate,
+        <Blob as blob::Blob>::Hash,
+    >(
+        &handle,
+        cert,
+        nomos_core::da::certificate::Certificate::hash
+    ))
 }
