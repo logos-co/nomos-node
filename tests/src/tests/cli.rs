@@ -4,18 +4,14 @@ use nomos_cli::{
 };
 use std::time::Duration;
 use tempfile::NamedTempFile;
-use tests::{nodes::nomos::Pool, ConsensusConfig, MixNode, Node, NomosNode, SpawnConfig};
+use tests::{nodes::nomos::Pool, MixNode, Node, NomosNode, SpawnConfig};
 
 const TIMEOUT_SECS: u64 = 20;
 
 #[tokio::test]
 async fn disseminate_blob() {
     let (_mixnodes, mixnet_config) = MixNode::spawn_nodes(2).await;
-    let mut nodes = NomosNode::spawn_nodes(SpawnConfig::Chain {
-        consensus: ConsensusConfig::happy(2),
-        mixnet: mixnet_config,
-    })
-    .await;
+    let mut nodes = NomosNode::spawn_nodes(SpawnConfig::chain_happy(2, mixnet_config)).await;
 
     // kill the node so that we can reuse its network config
     nodes[1].stop();
