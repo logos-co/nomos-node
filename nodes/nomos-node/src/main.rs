@@ -106,6 +106,7 @@ fn main() -> Result<()> {
             storage: nomos_storage::backends::sled::SledBackendSettings {
                 db_path: std::path::PathBuf::from(DEFAULT_DB_PATH),
             },
+            system_sig: (),
         },
         None,
     )

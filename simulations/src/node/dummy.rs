@@ -482,7 +482,7 @@ mod tests {
                     channel::unbounded();
                 let network_message_receiver = network.connect(
                     *node_id,
-                    0,
+                    None,
                     node_message_receiver,
                     node_message_broadcast_receiver,
                 );
