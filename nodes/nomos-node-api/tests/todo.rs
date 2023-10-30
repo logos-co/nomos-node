@@ -233,7 +233,7 @@ mod todo {
     pub(super) async fn create_todo(
         State(store): State<Arc<Store>>,
         Json(todo): Json<Todo>,
-    ) -> impl IntoResponse {
+    ) -> Response {
         let mut todos = store.lock().unwrap();
 
         todos
@@ -318,7 +318,7 @@ mod todo {
         Path(id): Path<i32>,
         State(store): State<Arc<Store>>,
         headers: HeaderMap,
-    ) -> impl IntoResponse {
+    ) -> Response {
         match check_api_key(true, headers) {
             Ok(_) => (),
             Err(error) => return error.into_response(),
