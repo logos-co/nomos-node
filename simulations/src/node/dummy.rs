@@ -451,7 +451,7 @@ mod tests {
             dummy::{get_child_nodes, get_parent_nodes, get_roles, DummyRole},
             Node, NodeId, NodeIdExt, OverlayState, SharedState, SimulationOverlay, ViewOverlay,
         },
-        overlay::{
+        overlay::tests::{
             tree::{TreeOverlay, TreeSettings},
             Overlay,
         },
