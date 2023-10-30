@@ -12,7 +12,7 @@ use mixnet_node::MixnetNodeConfig;
 use mixnet_topology::MixnetTopology;
 use nomos_consensus::{CarnotInfo, CarnotSettings};
 use nomos_core::block::Block;
-use nomos_http::backends::axum::AxumBackendSettings;
+use nomos_node_api::http::backend::axum::AxumBackendSettings;
 use nomos_libp2p::{multiaddr, Multiaddr};
 use nomos_log::{LoggerBackend, LoggerFormat};
 use nomos_mempool::MempoolMetrics;
@@ -21,6 +21,7 @@ use nomos_network::NetworkConfig;
 use nomos_node::{Config, Tx};
 // crates
 use fraction::Fraction;
+
 use once_cell::sync::Lazy;
 use rand::{thread_rng, Rng};
 use reqwest::Client;
@@ -30,7 +31,6 @@ static CLIENT: Lazy<Client> = Lazy::new(Client::new);
 const NOMOS_BIN: &str = "../target/debug/nomos-node";
 const CARNOT_INFO_API: &str = "carnot/info";
 const STORAGE_BLOCKS_API: &str = "storage/block";
-const MEMPOOL_API: &str = "mempool-";
 const LOGS_PREFIX: &str = "__logs";
 
 pub struct NomosNode {
@@ -77,7 +77,7 @@ impl NomosNode {
             .spawn()
             .unwrap();
         let node = Self {
-            addr: config.http.backend.address,
+            addr: config.http.backend_settings.address,
             child,
             _tempdir: dir,
             config,
@@ -125,7 +125,7 @@ impl NomosNode {
             Pool::Cl => "cl",
             Pool::Da => "da",
         };
-        let addr = format!("{}{}/metrics", MEMPOOL_API, discr);
+        let addr = format!("{}/metrics", discr);
         let res = self
             .get(&addr)
             .await
@@ -302,8 +302,8 @@ fn create_node_config(
             blob_selector_settings: (),
         },
         log: Default::default(),
-        http: nomos_http::http::HttpServiceSettings {
-            backend: AxumBackendSettings {
+        http: nomos_node_api::ApiServiceSettings {
+            backend_settings: AxumBackendSettings {
                 address: format!("127.0.0.1:{}", get_available_port())
                     .parse()
                     .unwrap(),
