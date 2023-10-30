@@ -124,6 +124,8 @@ pub struct Attestation {
 
 impl attestation::Attestation for Attestation {
     type Blob = Blob;
+    type Hash = [u8; 32];
+
     fn blob(&self) -> [u8; 32] {
         self.blob
     }
@@ -153,6 +155,7 @@ impl Hash for Certificate {
 
 impl certificate::Certificate for Certificate {
     type Blob = Blob;
+    type Hash = [u8; 32];
 
     fn blob(&self) -> <Self::Blob as blob::Blob>::Hash {
         self.attestations[0].blob
