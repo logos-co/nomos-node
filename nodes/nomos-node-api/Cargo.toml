@@ -20,7 +20,7 @@ hyper = { version = "0.14", features = ["full"], optional = true }
 nomos-core = { path = "../../nomos-core" }
 nomos-da = { path = "../../nomos-services/data-availability" }
 nomos-mempool = { path = "../../nomos-services/mempool", features = ["mock", "libp2p", "openapi"] }
-full-replication = { path = "../../nomos-da/full-replication" }
+full-replication = { path = "../../nomos-da/full-replication", features = ["openapi"] }
 serde = { version = "1", features = ["derive"] }
 tokio = { version = "1.33", default-features = false, features = ["sync"] }
 utoipa = "4.0"
