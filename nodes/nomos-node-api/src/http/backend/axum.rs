@@ -23,10 +23,7 @@ use crate::{
 #[derive(Clone)]
 pub struct AxumBackendSettings {
     pub addr: SocketAddr,
-    pub da: OverwatchHandle,
-    pub cl: OverwatchHandle,
-    pub carnot: OverwatchHandle,
-    pub network: OverwatchHandle,
+    pub handle: OverwatchHandle,
 }
 
 pub struct AxumBackend<T, S, const SIZE: usize> {
@@ -109,7 +106,7 @@ where
     )
 )]
 async fn da_metrics(State(store): State<Store>) -> Response {
-    match da::da_mempool_metrics(&store.da).await {
+    match da::da_mempool_metrics(&store.handle).await {
         Ok(metrics) => (StatusCode::OK, Json(metrics)).into_response(),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
     }
@@ -127,7 +124,7 @@ async fn da_status(
     State(store): State<Store>,
     Json(items): Json<Vec<<Blob as blob::Blob>::Hash>>,
 ) -> Response {
-    match da::da_mempool_status(&store.da, items).await {
+    match da::da_mempool_status(&store.handle, items).await {
         Ok(status) => (StatusCode::OK, Json(status)).into_response(),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
     }
@@ -154,7 +151,7 @@ where
         + 'static,
     <T as nomos_core::tx::Transaction>::Hash: std::cmp::Ord + Debug + Send + Sync + 'static,
 {
-    match cl::cl_mempool_metrics::<T>(&store.cl).await {
+    match cl::cl_mempool_metrics::<T>(&store.handle).await {
         Ok(metrics) => (StatusCode::OK, Json(metrics)).into_response(),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
     }
@@ -177,7 +174,7 @@ where
     <T as nomos_core::tx::Transaction>::Hash:
         Serialize + DeserializeOwned + std::cmp::Ord + Debug + Send + Sync + 'static,
 {
-    match cl::cl_mempool_status::<T>(&store.cl, items).await {
+    match cl::cl_mempool_status::<T>(&store.handle, items).await {
         Ok(status) => (StatusCode::OK, Json(status)).into_response(),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
     }
@@ -197,7 +194,7 @@ where
     <Tx as Transaction>::Hash: std::cmp::Ord + Debug + Send + Sync + 'static,
     SS: StorageSerde + Send + Sync + 'static,
 {
-    match info::carnot_info::<Tx, SS, SIZE>(&store.carnot).await {
+    match info::carnot_info::<Tx, SS, SIZE>(&store.handle).await {
         Ok(info) => (StatusCode::OK, Json(info)).into_response(),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
     }
@@ -212,7 +209,7 @@ where
     )
 )]
 async fn libp2p_info(State(store): State<Store>) -> Response {
-    match info::libp2p_info(&store.network).await {
+    match info::libp2p_info(&store.handle).await {
         Ok(info) => (StatusCode::OK, Json(info)).into_response(),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
     }
