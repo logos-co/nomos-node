@@ -43,7 +43,7 @@ pub struct BranchSettings {
 
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
 pub struct NodeSettings {
-    pub network_capacity_kbps: u32,
+    pub network_capacity_kbps: Option<u32>,
     #[serde(with = "humantime_serde")]
     pub timeout: std::time::Duration,
 }
