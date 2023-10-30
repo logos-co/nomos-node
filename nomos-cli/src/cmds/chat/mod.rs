@@ -85,6 +85,8 @@ impl NomosChat {
         let backend = CrosstermBackend::new(stdout);
         let mut terminal = Terminal::new(backend)?;
 
+        let node_addr = Some(self.node.clone());
+
         let (payload_sender, payload_receiver) = tokio::sync::mpsc::unbounded_channel();
         let (status_sender, status_updates) = std::sync::mpsc::channel();
 
@@ -97,7 +99,7 @@ impl NomosChat {
                         timeout: DEFAULT_TIMEOUT,
                         da_protocol,
                         status_updates: status_sender,
-                        node_addr: None,
+                        node_addr,
                         output: None,
                     },
                 },
@@ -168,7 +170,14 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) {
                         if !app.message_in_flight && !app.input.value().is_empty() {
                             app.message_in_flight = true;
                             app.payload_sender
-                                .send(app.input.value().as_bytes().into())
+                                .send(
+                                    wire::serialize(&ChatMessage {
+                                        author: app.username.clone().unwrap(),
+                                        message: app.input.value().into(),
+                                    })
+                                    .unwrap()
+                                    .into(),
+                                )
                                 .unwrap();
                         }
                     }
@@ -187,7 +196,7 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 struct ChatMessage {
     author: String,
     message: String,
@@ -209,7 +218,7 @@ async fn fetch_new_messages(
     old_blocks: &mut HashSet<BlockId>,
     node: Url,
 ) -> Result<Vec<ChatMessage>, Box<dyn std::error::Error>> {
-    const NODE_CARNOT_INFO_PATH: &str = "consensus/info";
+    const NODE_CARNOT_INFO_PATH: &str = "carnot/info";
 
     let mut new_messages = Vec::new();
 
@@ -221,7 +230,7 @@ async fn fetch_new_messages(
     let new_blocks = info
         .committed_blocks
         .into_iter()
-        .filter(|id| !old_blocks.contains(id))
+        .filter(|id| !old_blocks.contains(id) && id != BlockId::zeros())
         .collect::<Vec<_>>();
 
     // note that number of attestations is ignored here since we only use the da protocol to

@@ -8,6 +8,9 @@ use nomos_node::Tx;
 use reqwest::Url;
 use thiserror::Error;
 
+const BLOCK_PATH: &str = "storage/block";
+const BLOBS_PATH: &str = "da/blobs";
+
 #[derive(Error, Debug)]
 pub enum Error {
     #[error(transparent)]
@@ -30,7 +33,7 @@ pub async fn get_block_contents(
     block: BlockId,
 ) -> Result<Option<Block<Tx, Certificate>>, reqwest::Error> {
     let block = reqwest::Client::new()
-        .post(node.join("storage/block").unwrap())
+        .post(node.join(BLOCK_PATH).unwrap())
         .body(serde_json::to_string(&block).unwrap())
         .send()
         .await?
@@ -44,7 +47,7 @@ pub async fn get_blobs(
     ids: Vec<<Blob as blob::Blob>::Hash>,
 ) -> Result<Vec<Blob>, reqwest::Error> {
     reqwest::Client::new()
-        .post(node)
+        .post(node.join(BLOBS_PATH).unwrap())
         .body(serde_json::to_string(&ids).unwrap())
         .send()
         .await?
