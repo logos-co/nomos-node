@@ -11,7 +11,7 @@ use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 
 use crate::{
-    http::{cl, da},
+    http::{cl::*, da::*},
     Backend,
 };
 
@@ -96,7 +96,7 @@ where
     )
 )]
 async fn da_metrics(State(store): State<Store>) -> impl IntoResponse {
-    match da::da_mempool_metrics(&store.handle).await {
+    match da_mempool_metrics(&store.handle).await {
         Ok(metrics) => (StatusCode::OK, Json(metrics)).into_response(),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
     }
@@ -114,7 +114,7 @@ async fn da_status(
     State(store): State<Store>,
     Json(items): Json<Vec<<Blob as blob::Blob>::Hash>>,
 ) -> impl IntoResponse {
-    match da::da_mempool_status(&store.handle, items).await {
+    match da_mempool_status(&store.handle, items).await {
         Ok(status) => (StatusCode::OK, Json(status)).into_response(),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
     }
@@ -141,7 +141,7 @@ where
         + 'static,
     <T as nomos_core::tx::Transaction>::Hash: std::cmp::Ord + Debug + Send + Sync + 'static,
 {
-    match cl::cl_mempool_metrics::<T>(&store.handle).await {
+    match cl_mempool_metrics::<T>(&store.handle).await {
         Ok(metrics) => (StatusCode::OK, Json(metrics)).into_response(),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
     }
@@ -172,7 +172,7 @@ where
     <T as nomos_core::tx::Transaction>::Hash:
         Serialize + serde::de::DeserializeOwned + std::cmp::Ord + Debug + Send + Sync + 'static,
 {
-    match cl::cl_mempool_status::<T>(&store.handle, items).await {
+    match cl_mempool_status::<T>(&store.handle, items).await {
         Ok(status) => (StatusCode::OK, Json(status)).into_response(),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
     }
