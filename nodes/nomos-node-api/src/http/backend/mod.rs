@@ -1,4 +1,2 @@
 #[cfg(feature = "axum")]
-mod axum;
-#[cfg(feature = "axum")]
-pub use axum::{AxumBackend, AxumBackendSettings};
+pub mod axum;
