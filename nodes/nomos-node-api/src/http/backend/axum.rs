@@ -1,6 +1,6 @@
 use std::{fmt::Debug, hash::Hash, net::SocketAddr, sync::Arc};
 
-use axum::{extract::State, response::IntoResponse, routing, Json, Router, Server};
+use axum::{extract::State, response::{IntoResponse, Response}, routing, Json, Router, Server};
 use full_replication::Blob;
 use hyper::StatusCode;
 use nomos_core::{da::blob, tx::Transaction};
@@ -85,7 +85,7 @@ where
             .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
             .route("/da/metrics", routing::get(da_metrics))
             .route("/da/status", routing::post(da_status))
-            .route("/da/blob", routing::post(da_blob))
+            .route("/da/blobs", routing::post(da_blobs))
             .route("/cl/metrics", routing::get(cl_metrics::<T>))
             .route("/cl/status", routing::post(cl_status::<T>))
             .route("/carnot/info", routing::get(carnot_info::<T, S, SIZE>))
@@ -106,7 +106,7 @@ where
         (status = 500, description = "Internal server error", body = String),
     )
 )]
-async fn da_metrics(State(store): State<Store>) -> impl IntoResponse {
+async fn da_metrics(State(store): State<Store>) -> Response {
     match da::da_mempool_metrics(&store.da_mempool).await {
         Ok(metrics) => (StatusCode::OK, Json(metrics)).into_response(),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
@@ -124,7 +124,7 @@ async fn da_metrics(State(store): State<Store>) -> impl IntoResponse {
 async fn da_status(
     State(store): State<Store>,
     Json(items): Json<Vec<<Blob as blob::Blob>::Hash>>,
-) -> impl IntoResponse {
+) -> Response {
     match da::da_mempool_status(&store.da_mempool, items).await {
         Ok(status) => (StatusCode::OK, Json(status)).into_response(),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
@@ -133,16 +133,16 @@ async fn da_status(
 
 #[utoipa::path(
     post,
-    path = "/da/blob",
+    path = "/da/blobs",
     responses(
-        (status = 200, description = "Query the mempool status of the da service", body = Vec<Blob>),
+        (status = 200, description = "Get pending blobs", body = Vec<Blob>),
         (status = 500, description = "Internal server error", body = String),
     )
 )]
-async fn da_blob(
+async fn da_blobs(
     State(store): State<Store>,
     Json(items): Json<Vec<<Blob as blob::Blob>::Hash>>,
-) -> impl IntoResponse {
+) -> Response {
     match da::da_blob(&store.da, items).await {
         Ok(status) => (StatusCode::OK, Json(status)).into_response(),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
@@ -157,7 +157,7 @@ async fn da_blob(
         (status = 500, description = "Internal server error", body = String),
     )
 )]
-async fn cl_metrics<T>(State(store): State<Store>) -> impl IntoResponse
+async fn cl_metrics<T>(State(store): State<Store>) -> Response
 where
     T: Transaction
         + Clone
@@ -187,7 +187,7 @@ where
 async fn cl_status<T>(
     State(store): State<Store>,
     Json(items): Json<Vec<<T as Transaction>::Hash>>,
-) -> impl IntoResponse
+) -> Response
 where
     T: Transaction + Clone + Debug + Hash + Serialize + DeserializeOwned + Send + Sync + 'static,
     <T as nomos_core::tx::Transaction>::Hash:
@@ -207,7 +207,7 @@ where
         (status = 500, description = "Internal server error", body = String),
     )
 )]
-async fn carnot_info<Tx, SS, const SIZE: usize>(State(store): State<Store>) -> impl IntoResponse
+async fn carnot_info<Tx, SS, const SIZE: usize>(State(store): State<Store>) -> Response
 where
     Tx: Transaction + Clone + Debug + Hash + Serialize + DeserializeOwned + Send + Sync + 'static,
     <Tx as Transaction>::Hash: std::cmp::Ord + Debug + Send + Sync + 'static,
@@ -227,7 +227,7 @@ where
         (status = 500, description = "Internal server error", body = String),
     )
 )]
-async fn libp2p_info(State(store): State<Store>) -> impl IntoResponse {
+async fn libp2p_info(State(store): State<Store>) -> Response {
     match info::libp2p_info(&store.network).await {
         Ok(info) => (StatusCode::OK, Json(info)).into_response(),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
