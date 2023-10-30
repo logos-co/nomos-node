@@ -1,6 +1,7 @@
 use std::{collections::HashMap, ops::Range, time::Duration};
 
 use mixnet_client::MixnetClient;
+#[allow(deprecated)]
 use nomos_libp2p::{
     gossipsub::{self, Message},
     libp2p::swarm::ConnectionId,
@@ -88,6 +89,7 @@ impl SwarmHandler {
         }
     }
 
+    #[allow(deprecated)]
     fn handle_event(&mut self, event: SwarmEvent<BehaviourEvent, THandlerErr<Behaviour>>) {
         match event {
             SwarmEvent::Behaviour(BehaviourEvent::Gossipsub(gossipsub::Event::Message {
