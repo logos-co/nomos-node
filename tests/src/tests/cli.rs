@@ -42,9 +42,12 @@ async fn disseminate_blob() {
             },
         },
         node_addr: Some(
-            format!("http://{}", nodes[0].config().http.backend_settings.address.clone())
-                .parse()
-                .unwrap(),
+            format!(
+                "http://{}",
+                nodes[0].config().http.backend_settings.address.clone()
+            )
+            .parse()
+            .unwrap(),
         ),
         output: None,
     });

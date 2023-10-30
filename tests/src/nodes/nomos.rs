@@ -12,13 +12,13 @@ use mixnet_node::MixnetNodeConfig;
 use mixnet_topology::MixnetTopology;
 use nomos_consensus::{CarnotInfo, CarnotSettings};
 use nomos_core::block::Block;
-use nomos_node_api::http::backend::axum::AxumBackendSettings;
 use nomos_libp2p::{multiaddr, Multiaddr};
 use nomos_log::{LoggerBackend, LoggerFormat};
 use nomos_mempool::MempoolMetrics;
 use nomos_network::backends::libp2p::Libp2pConfig;
 use nomos_network::NetworkConfig;
 use nomos_node::{Config, Tx};
+use nomos_node_api::http::backend::axum::AxumBackendSettings;
 // crates
 use fraction::Fraction;
 
