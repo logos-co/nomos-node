@@ -75,7 +75,7 @@ mod tests {
             Node, NodeId, NodeIdExt, OverlayState, SharedState, ViewOverlay,
         },
         output_processors::OutData,
-        overlay::{
+        overlay::tests::{
             tree::{TreeOverlay, TreeSettings},
             Overlay, SimulationOverlay,
         },
