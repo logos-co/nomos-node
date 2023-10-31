@@ -16,7 +16,6 @@ consensus:
     leader_super_majority_threshold: 1
     super_majority_threshold: 1
 
-
 network:
   backend:
     host: 0.0.0.0
