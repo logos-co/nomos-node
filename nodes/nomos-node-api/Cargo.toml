@@ -1,9 +1,10 @@
 [package]
-name = "nomos-http-api"
+name = "nomos-node-api"
 version = "0.1.0"
 edition = "2021"
 
 [features]
+default = ["axum"]
 axum = ["dep:axum", "dep:hyper", "utoipa-swagger-ui/axum"]
 
 [dependencies]
@@ -11,12 +12,19 @@ async-trait = "0.1"
 overwatch-rs = { git = "https://github.com/logos-co/Overwatch", rev = "2f70806" }
 overwatch-derive = { git = "https://github.com/logos-co/Overwatch", rev = "ac28d01" }
 tracing = "0.1"
-utoipa = "4.0"
-utoipa-swagger-ui = { version = "4.0" }
 
 # axum related dependencies
 axum = { version = "0.6", optional = true }
 hyper = { version = "0.14", features = ["full"], optional = true }
+
+nomos-core = { path = "../../nomos-core" }
+nomos-da = { path = "../../nomos-services/data-availability" }
+nomos-mempool = { path = "../../nomos-services/mempool", features = ["mock", "libp2p", "openapi"] }
+full-replication = { path = "../../nomos-da/full-replication", features = ["openapi"] }
+serde = { version = "1", features = ["derive"] }
+tokio = { version = "1.33", default-features = false, features = ["sync"] }
+utoipa = "4.0"
+utoipa-swagger-ui = { version = "4.0" }
 
 [dev-dependencies]
 axum = "0.6"

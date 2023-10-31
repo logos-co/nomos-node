@@ -1,4 +1,6 @@
+/// The block id
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq, Ord, PartialOrd)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct BlockId(pub(crate) [u8; 32]);
 
 #[cfg(feature = "serde")]
