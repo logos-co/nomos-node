@@ -451,7 +451,7 @@ mod tests {
             dummy::{get_child_nodes, get_parent_nodes, get_roles, DummyRole},
             Node, NodeId, NodeIdExt, OverlayState, SharedState, SimulationOverlay, ViewOverlay,
         },
-        overlay::{
+        overlay::tests::{
             tree::{TreeOverlay, TreeSettings},
             Overlay,
         },
@@ -482,7 +482,7 @@ mod tests {
                     channel::unbounded();
                 let network_message_receiver = network.connect(
                     *node_id,
-                    0,
+                    None,
                     node_message_receiver,
                     node_message_broadcast_receiver,
                 );

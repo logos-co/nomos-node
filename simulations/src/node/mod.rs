@@ -16,7 +16,7 @@ use std::{
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 // internal
-use crate::overlay::{Layout, OverlaySettings, SimulationOverlay};
+use crate::overlay::tests::{Layout, OverlaySettings, SimulationOverlay};
 
 pub use consensus_engine::NodeId;
 

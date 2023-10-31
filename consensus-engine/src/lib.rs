@@ -5,6 +5,12 @@ mod types;
 pub use overlay::Overlay;
 pub use types::*;
 
+/// Re-export of the OpenAPI types
+#[cfg(feature = "openapi")]
+pub mod openapi {
+    pub use crate::types::BlockId;
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct Carnot<O: Overlay> {
     id: NodeId,

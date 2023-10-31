@@ -96,10 +96,16 @@ pub struct OverlayArgs {
     pub overlay_leader: Option<String>,
 
     #[clap(
-        long = "overlay-leader-super-majority-threshold",
+        long = "overlay-number-of-committees",
         env = "OVERLAY_NUMBER_OF_COMMITTEES"
     )]
     pub overlay_number_of_committees: Option<usize>,
+
+    #[clap(
+        long = "overlay-super-majority-threshold",
+        env = "OVERLAY_SUPER_MAJORITY_THRESHOLD"
+    )]
+    pub overlay_super_majority_threshold: Option<f32>,
 }
 
 #[derive(Deserialize, Debug, Clone, Serialize)]
@@ -228,6 +234,7 @@ impl Config {
             overlay_nodes,
             overlay_leader,
             overlay_number_of_committees,
+            overlay_super_majority_threshold,
         } = overlay_args;
 
         if let Some(nodes) = overlay_nodes {
@@ -248,6 +255,11 @@ impl Config {
 
         if let Some(committees) = overlay_number_of_committees {
             self.consensus.overlay_settings.number_of_committees = committees;
+        }
+
+        if let Some(super_majority_threshold) = overlay_super_majority_threshold {
+            self.consensus.overlay_settings.super_majority_threshold =
+                Some(super_majority_threshold.into());
         }
 
         Ok(self)
