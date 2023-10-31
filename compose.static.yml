@@ -6,7 +6,7 @@ services:
       dockerfile: testnet/Dockerfile
     ports:
       - "4000:3000/tcp"
-      - "9080:8080/tcp"
+      - "18080:8080/tcp"
     volumes:
       - ./testnet:/etc/nomos
     environment:
@@ -32,7 +32,7 @@ services:
       - mix-node-2
     ports:
       - "4001:3000/tcp"
-      - "9081:8080/tcp"
+      - "18081:8080/tcp"
     environment:
       - LIBP2P_REPLICAS=3
       - ETCDCTL_ENDPOINTS=${DOCKER_COMPOSE_ETCDCTL_ENDPOINTS:-etcd:2379}
@@ -59,7 +59,7 @@ services:
       - mix-node-2
     ports:
       - "4002:3000/tcp"
-      - "9082:8080/tcp"
+      - "18082:8080/tcp"
     environment:
       - LIBP2P_REPLICAS=3
       - ETCDCTL_ENDPOINTS=${DOCKER_COMPOSE_ETCDCTL_ENDPOINTS:-etcd:2379}
@@ -86,7 +86,7 @@ services:
       - mix-node-2
     ports:
       - "4003:3000/tcp"
-      - "9083:8080/tcp"
+      - "18083:8080/tcp"
     environment:
       - LIBP2P_REPLICAS=3
       - ETCDCTL_ENDPOINTS=${DOCKER_COMPOSE_ETCDCTL_ENDPOINTS:-etcd:2379}
