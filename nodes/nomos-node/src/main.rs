@@ -1,15 +1,14 @@
-use full_replication::{Blob, Certificate};
-use nomos_node::{
-    Config, ConsensusArgs, HttpArgs, LogArgs, NetworkArgs, Nomos, NomosServiceSettings,
-    OverlayArgs, Tx,
-};
-
 use clap::Parser;
 use color_eyre::eyre::{eyre, Result};
+use full_replication::{Blob, Certificate};
 use nomos_core::{
     da::{blob, certificate},
     tx::Transaction,
 };
+use nomos_node::{
+    Config, ConsensusArgs, HttpArgs, LogArgs, NetworkArgs, Nomos, NomosServiceSettings, OverlayArgs,
+};
+use nomos_node_types::tx::Tx;
 
 use nomos_mempool::network::adapters::libp2p::Settings as AdapterSettings;
 

@@ -4,8 +4,6 @@ use std::{
     time::Duration,
 };
 
-use crate::DataAvailability;
-use crate::{Carnot, Tx, Wire, MB16};
 use clap::{Parser, ValueEnum};
 use color_eyre::eyre::{self, eyre, Result};
 use hex::FromHex;
@@ -16,6 +14,7 @@ use nomos_log::{Logger, LoggerBackend, LoggerFormat};
 use nomos_network::backends::libp2p::Libp2p;
 use nomos_network::NetworkService;
 use nomos_node_api::{http::backend::axum::AxumBackend, ApiService};
+use nomos_node_types::{Carnot, DataAvailability};
 use overwatch_rs::services::ServiceData;
 use serde::{Deserialize, Serialize};
 use tracing::Level;
@@ -112,7 +111,7 @@ pub struct OverlayArgs {
 pub struct Config {
     pub log: <Logger as ServiceData>::Settings,
     pub network: <NetworkService<Libp2p> as ServiceData>::Settings,
-    pub http: <ApiService<AxumBackend<Tx, Wire, MB16>> as ServiceData>::Settings,
+    pub http: <ApiService<AxumBackend> as ServiceData>::Settings,
     pub consensus: <Carnot as ServiceData>::Settings,
     #[cfg(feature = "metrics")]
     pub metrics: <MetricsService<MapMetricsBackend<MetricsData>> as ServiceData>::Settings,
