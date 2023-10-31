@@ -9,9 +9,7 @@ use std::time::Duration;
 pub use config::SwarmConfig;
 pub use libp2p;
 
-use blake2::digest::{consts::U32, Digest};
-use blake2::Blake2b;
-use libp2p::gossipsub::{Message, MessageId, TopicHash};
+use libp2p::gossipsub::{MessageId, TopicHash};
 #[allow(deprecated)]
 pub use libp2p::{
     core::upgrade,
@@ -65,14 +63,14 @@ impl Swarm {
         // Wrapping TCP transport into DNS transport to resolve hostnames.
         let tcp_transport = dns::tokio::Transport::system(tcp_transport)?.boxed();
 
-        // TODO: consider using Signed or Anonymous.
-        //       For Anonymous, a custom `message_id` function need to be set
-        //       to prevent all messages from a peer being filtered as duplicates.
         let gossipsub = gossipsub::Behaviour::new(
             gossipsub::MessageAuthenticity::Author(local_peer_id),
             gossipsub::ConfigBuilder::from(config.gossipsub_config.clone())
-                .validation_mode(gossipsub::ValidationMode::None)
-                .message_id_fn(compute_message_id)
+                // To use the default `message_id_fn` that uses the message sender info,
+                // we shouldn't use ValidationMode::None that discards sender info
+                // from the received message, which causes the message ID to be created wrongly.
+                // https://github.com/libp2p/rust-libp2p/blob/ec157171a7c1d733dcaff80b00ad9596c15701a1/protocols/gossipsub/src/protocol.rs#L377
+                .validation_mode(gossipsub::ValidationMode::Permissive)
                 .build()?,
         )?;
 
@@ -157,10 +155,4 @@ impl futures::Stream for Swarm {
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         Pin::new(&mut self.swarm).poll_next(cx)
     }
-}
-
-fn compute_message_id(message: &Message) -> MessageId {
-    let mut hasher = Blake2b::<U32>::new();
-    hasher.update(&message.data);
-    MessageId::from(hasher.finalize().to_vec())
 }
