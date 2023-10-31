@@ -5,7 +5,7 @@ services:
       context: .
       dockerfile: testnet/Dockerfile
     ports:
-      - "4000:3000/tcp"
+      - "3000:3000/tcp"
       - "18080:8080/tcp"
     volumes:
       - ./testnet:/etc/nomos
@@ -29,7 +29,7 @@ services:
       - mix-node-1
       - mix-node-2
     ports:
-      - "4001:3000/tcp"
+      - "3001:3000/tcp"
       - "18081:8080/tcp"
     environment:
       - LIBP2P_REPLICAS=3
@@ -54,7 +54,7 @@ services:
       - mix-node-1
       - mix-node-2
     ports:
-      - "4002:3000/tcp"
+      - "3002:3000/tcp"
       - "18082:8080/tcp"
     environment:
       - LIBP2P_REPLICAS=3
@@ -79,7 +79,7 @@ services:
       - mix-node-1
       - mix-node-2
     ports:
-      - "4003:3000/tcp"
+      - "3003:3000/tcp"
       - "18083:8080/tcp"
     environment:
       - LIBP2P_REPLICAS=3
