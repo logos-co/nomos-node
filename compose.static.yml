@@ -22,8 +22,6 @@ services:
       dockerfile: testnet/Dockerfile
     volumes:
       - ./testnet:/etc/nomos
-    deploy:
-      replicas: ${DOCKER_COMPOSE_LIBP2P_REPLICAS:-1} 
     depends_on:
       - bootstrap
       - etcd
@@ -49,8 +47,6 @@ services:
       dockerfile: testnet/Dockerfile
     volumes:
       - ./testnet:/etc/nomos
-    deploy:
-      replicas: ${DOCKER_COMPOSE_LIBP2P_REPLICAS:-1} 
     depends_on:
       - bootstrap
       - etcd
@@ -76,8 +72,6 @@ services:
       dockerfile: testnet/Dockerfile
     volumes:
       - ./testnet:/etc/nomos
-    deploy:
-      replicas: ${DOCKER_COMPOSE_LIBP2P_REPLICAS:-1} 
     depends_on:
       - bootstrap
       - etcd
