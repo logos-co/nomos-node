@@ -285,4 +285,3 @@ async fn add_cert(State(store): State<OverwatchHandle>, Json(cert): Json<Certifi
         nomos_core::da::certificate::Certificate::hash
     ))
 }
-
