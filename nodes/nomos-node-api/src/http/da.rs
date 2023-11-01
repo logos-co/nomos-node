@@ -5,7 +5,7 @@ use nomos_mempool::{
     openapi::{MempoolMetrics, Status},
     MempoolMsg,
 };
-use nomos_node_types::{DaMempoolService, DataAvailability};
+use nomos_node_lib::{DaMempoolService, DataAvailabilityService};
 use overwatch_rs::overwatch::handle::OverwatchHandle;
 use tokio::sync::oneshot;
 
@@ -45,7 +45,7 @@ pub async fn da_blobs(
     handle: &OverwatchHandle,
     ids: Vec<<Blob as blob::Blob>::Hash>,
 ) -> Result<Vec<Blob>, super::DynError> {
-    let relay = handle.relay::<DataAvailability>().connect().await?;
+    let relay = handle.relay::<DataAvailabilityService>().connect().await?;
     let (reply_channel, receiver) = oneshot::channel();
     relay
         .send(DaMsg::Get {

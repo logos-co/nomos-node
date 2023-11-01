@@ -1,6 +1,6 @@
 use consensus_engine::BlockId;
 use nomos_core::block::Block;
-use nomos_node_types::{tx::Tx, Wire};
+use nomos_node_lib::{tx::Tx, Wire};
 use nomos_storage::{backends::sled::SledBackend, StorageMsg, StorageService};
 
 pub async fn block_req(

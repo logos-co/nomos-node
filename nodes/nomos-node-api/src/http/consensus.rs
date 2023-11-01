@@ -1,5 +1,5 @@
 use nomos_consensus::{CarnotInfo, ConsensusMsg};
-use nomos_node_types::Carnot;
+use nomos_node_lib::Carnot;
 
 use tokio::sync::oneshot;
 

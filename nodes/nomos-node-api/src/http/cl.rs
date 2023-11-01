@@ -3,7 +3,7 @@ use nomos_mempool::{
     openapi::{MempoolMetrics, Status},
     MempoolMsg,
 };
-use nomos_node_types::{tx::Tx, ClMempoolService};
+use nomos_node_lib::{tx::Tx, ClMempoolService};
 use tokio::sync::oneshot;
 
 pub async fn cl_mempool_metrics(

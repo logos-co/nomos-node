@@ -13,7 +13,7 @@ use nomos_log::Logger;
 use nomos_mempool::{Certificate as CertDiscriminant, Transaction as TxDiscriminant};
 use nomos_network::backends::libp2p::Libp2p;
 use nomos_node_api::{http::backend::axum::AxumBackend, ApiService};
-use nomos_node_types::{tx::Tx, Carnot, DataAvailability, Mempool, Wire};
+use nomos_node_lib::{tx::Tx, Carnot, DataAvailabilityService, Mempool, Wire};
 use nomos_storage::{backends::sled::SledBackend, StorageService};
 
 pub use config::{Config, ConsensusArgs, HttpArgs, LogArgs, NetworkArgs, OverlayArgs};
@@ -42,7 +42,7 @@ pub struct Nomos {
     http: ServiceHandle<ApiService<AxumBackend>>,
     #[cfg(feature = "metrics")]
     metrics: ServiceHandle<MetricsService<MapMetricsBackend<MetricsData>>>,
-    da: ServiceHandle<DataAvailability>,
+    da: ServiceHandle<DataAvailabilityService>,
     storage: ServiceHandle<StorageService<SledBackend<Wire>>>,
     system_sig: ServiceHandle<SystemSig>,
 }

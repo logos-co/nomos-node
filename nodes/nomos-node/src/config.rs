@@ -14,7 +14,7 @@ use nomos_log::{Logger, LoggerBackend, LoggerFormat};
 use nomos_network::backends::libp2p::Libp2p;
 use nomos_network::NetworkService;
 use nomos_node_api::{http::backend::axum::AxumBackend, ApiService};
-use nomos_node_types::{Carnot, DataAvailability};
+use nomos_node_lib::{Carnot, DataAvailabilityService};
 use overwatch_rs::services::ServiceData;
 use serde::{Deserialize, Serialize};
 use tracing::Level;
@@ -115,7 +115,7 @@ pub struct Config {
     pub consensus: <Carnot as ServiceData>::Settings,
     #[cfg(feature = "metrics")]
     pub metrics: <MetricsService<MapMetricsBackend<MetricsData>> as ServiceData>::Settings,
-    pub da: <DataAvailability as ServiceData>::Settings,
+    pub da: <DataAvailabilityService as ServiceData>::Settings,
 }
 
 impl Config {

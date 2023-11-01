@@ -8,7 +8,7 @@ use nomos_core::{
 use nomos_node::{
     Config, ConsensusArgs, HttpArgs, LogArgs, NetworkArgs, Nomos, NomosServiceSettings, OverlayArgs,
 };
-use nomos_node_types::tx::Tx;
+use nomos_node_lib::tx::Tx;
 
 use nomos_mempool::network::adapters::libp2p::Settings as AdapterSettings;
 

@@ -14,7 +14,7 @@ use nomos_core::{
 };
 use nomos_da::{
     backend::memory_cache::BlobCache, network::adapters::libp2p::Libp2pAdapter as DaLibp2pAdapter,
-    DataAvailabilityService,
+    DataAvailabilityService as DataAvailability,
 };
 use nomos_mempool::{
     backend::mockpool::MockPool, network::adapters::libp2p::Libp2pAdapter as MempoolLibp2pAdapter,
@@ -45,7 +45,7 @@ pub type Carnot = CarnotConsensus<
     SledBackend<Wire>,
 >;
 
-pub type DataAvailability = DataAvailabilityService<
+pub type DataAvailabilityService = DataAvailability<
     FullReplication<AbsoluteNumber<Attestation, Certificate>>,
     BlobCache<<Blob as nomos_core::da::blob::Blob>::Hash, Blob>,
     DaLibp2pAdapter<Blob, Attestation>,

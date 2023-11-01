@@ -7,7 +7,7 @@ use hyper::header::{CONTENT_TYPE, USER_AGENT};
 use nomos_core::{da::blob, tx::Transaction};
 use nomos_mempool::{network::adapters::libp2p::Libp2pAdapter, openapi::Status, MempoolMetrics};
 use nomos_network::backends::libp2p::Libp2p;
-use nomos_node_types::tx::Tx;
+use nomos_node_lib::tx::Tx;
 use overwatch_rs::overwatch::handle::OverwatchHandle;
 use tower_http::{
     cors::{Any, CorsLayer},

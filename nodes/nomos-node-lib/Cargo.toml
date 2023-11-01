@@ -1,5 +1,5 @@
 [package]
-name = "nomos-node-types"
+name = "nomos-node-lib"
 version = "0.1.0"
 edition = "2021"
 

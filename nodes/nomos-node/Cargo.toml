@@ -25,7 +25,7 @@ full-replication = { path = "../../nomos-da/full-replication" }
 nomos-core = { path = "../../nomos-core" }
 nomos-network = { path = "../../nomos-services/network", features = ["libp2p"] }
 nomos-node-api = { path = "../nomos-node-api", features = ["axum", "clap"] }
-nomos-node-types = { path = "../nomos-node-types" }
+nomos-node-lib = { path = "../nomos-node-lib" }
 nomos-log = { path = "../../nomos-services/log" }
 nomos-mempool = { path = "../../nomos-services/mempool", features = ["mock", "libp2p"] }
 nomos-consensus = { path = "../../nomos-services/consensus", features = ["libp2p"] }
