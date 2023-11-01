@@ -17,7 +17,7 @@ where
     A::Settings: Send + Sync,
     D: Discriminant,
     Item: Clone + Debug + Send + Sync + 'static + Hash,
-    Key: Clone + Debug + Ord + Hash,
+    Key: Clone + Debug + Ord + Hash + 'static,
 {
     let relay = handle
         .relay::<MempoolService<A, MockPool<Item, Key>, D>>()
