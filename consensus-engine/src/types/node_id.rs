@@ -1,4 +1,5 @@
 #[derive(Clone, Copy, Default, Debug, Eq, PartialEq, Hash, Ord, PartialOrd)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct NodeId(pub(crate) [u8; 32]);
 
 #[cfg(feature = "serde")]
