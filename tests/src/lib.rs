@@ -11,7 +11,7 @@ use std::time::Duration;
 use std::{fmt::Debug, sync::Mutex};
 
 //crates
-use fraction::Fraction;
+use fraction::{Fraction, One};
 use rand::{thread_rng, Rng};
 
 static NET_PORT: Lazy<Mutex<u16>> = Lazy::new(|| Mutex::new(thread_rng().gen_range(8000, 10000)));
@@ -45,6 +45,24 @@ pub enum SpawnConfig {
         consensus: ConsensusConfig,
         mixnet: MixnetConfig,
     },
+}
+
+impl SpawnConfig {
+    // Returns a SpawnConfig::Chain with proper configurations for happy-path tests
+    pub fn chain_happy(n_participants: usize, mixnet_config: MixnetConfig) -> Self {
+        Self::Chain {
+            consensus: ConsensusConfig {
+                n_participants,
+                // All nodes are expected to be responsive in happy-path tests.
+                threshold: Fraction::one(),
+                // Set the timeout conservatively
+                // since nodes should be spawned sequentially in the chain topology
+                // and it takes 1+ secs for each nomos-node to be started.
+                timeout: Duration::from_millis(n_participants as u64 * 2500),
+            },
+            mixnet: mixnet_config,
+        }
+    }
 }
 
 #[derive(Clone)]
