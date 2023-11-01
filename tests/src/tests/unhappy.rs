@@ -113,7 +113,7 @@ fn assert_timeout_qc_consensus<'a>(
         .clone()
         .expect("collected timeout_qc shouldn't be None");
 
-    // NOTE: This check could be failed if other timeout_qcs had occured
+    // NOTE: This check could be failed if other timeout_qcs had occurred
     //       before `consensus_infos` were gathered.
     //       But it should be okay as long as the `timeout` is not too short.
     assert_eq!(timeout_qc.view(), view);
