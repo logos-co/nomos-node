@@ -1,6 +1,7 @@
 use std::{fmt::Debug, hash::Hash, net::SocketAddr, sync::Arc};
 
 use axum::{extract::State, response::Response, routing, Json, Router, Server};
+use consensus_engine::BlockId;
 use full_replication::Blob;
 use nomos_core::{da::blob, tx::Transaction};
 use nomos_mempool::{openapi::Status, MempoolMetrics};
@@ -11,7 +12,7 @@ use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 
 use crate::{
-    http::{cl, consensus, da, libp2p},
+    http::{cl, consensus, da, libp2p, storage},
     Backend,
 };
 
@@ -50,6 +51,7 @@ where
     T: Transaction
         + Clone
         + Debug
+        + Eq
         + Hash
         + Serialize
         + for<'de> Deserialize<'de>
@@ -85,6 +87,7 @@ where
             .route("/cl/status", routing::post(cl_status::<T>))
             .route("/carnot/info", routing::get(carnot_info::<T, S, SIZE>))
             .route("/network/info", routing::get(libp2p_info))
+            .route("/storage/block", routing::post(block::<S, T>))
             .with_state(store);
 
         Server::bind(&self.settings.addr)
@@ -215,4 +218,20 @@ where
 )]
 async fn libp2p_info(State(store): State<Store>) -> Response {
     make_request_and_return_response!(libp2p::libp2p_info(store))
+}
+
+#[utoipa::path(
+    get,
+    path = "/storage/block",
+    responses(
+        (status = 200, description = "Get the block by block id", body = Block<Tx, full_replication::Certificate>),
+        (status = 500, description = "Internal server error", body = String),
+    )
+)]
+async fn block<S, Tx>(State(store): State<Store>, Json(id): Json<BlockId>) -> Response
+where
+    Tx: serde::Serialize + serde::de::DeserializeOwned + Clone + Eq + core::hash::Hash,
+    S: StorageSerde + Send + Sync + 'static,
+{
+    make_request_and_return_response!(storage::block_req::<S, Tx>(store, id))
 }
