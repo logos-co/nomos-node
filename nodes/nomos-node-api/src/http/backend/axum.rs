@@ -80,6 +80,7 @@ where
             .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
             .route("/da/metrics", routing::get(da_metrics))
             .route("/da/status", routing::post(da_status))
+            .route("/da/blobs", routing::post(da_blobs))
             .route("/cl/metrics", routing::get(cl_metrics::<T>))
             .route("/cl/status", routing::post(cl_status::<T>))
             .route("/carnot/info", routing::get(carnot_info::<T, S, SIZE>))
@@ -126,6 +127,21 @@ async fn da_status(
     Json(items): Json<Vec<<Blob as blob::Blob>::Hash>>,
 ) -> Response {
     make_request_and_return_response!(da::da_mempool_status(store, items))
+}
+
+#[utoipa::path(
+    post,
+    path = "/da/blobs",
+    responses(
+        (status = 200, description = "Get pending blobs", body = Vec<Blob>),
+        (status = 500, description = "Internal server error", body = String),
+    )
+)]
+async fn da_blobs(
+    State(store): State<Store>,
+    Json(items): Json<Vec<<Blob as blob::Blob>::Hash>>,
+) -> Response {
+    make_request_and_return_response!(da::da_blobs(store, items))
 }
 
 #[utoipa::path(
