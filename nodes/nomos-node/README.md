@@ -13,7 +13,7 @@ Nomos node can be configured with one of the following network backends:
 The [mixclient](../../mixnet/client/) is currently integrated as a part of the libp2p network backend.
 To run a Nomos node with the libp2p network backend, the `mixnet_client` and `mixnet_delay` fields in the [`config.yaml`](./config.yaml) must be specified, so the Nomos node can send/receive packets to/from mixnodes.
 
-For more detials about the mixnode/mixclient architecture, see the [mixnet documentation](../../mixnet/README.md).
+For more details about the mixnode/mixclient architecture, see the [mixnet documentation](../../mixnet/README.md).
 
 ```mermaid
 flowchart LR
