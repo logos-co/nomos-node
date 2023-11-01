@@ -1080,6 +1080,7 @@ impl RelayMessage for ConsensusMsg {}
 
 #[serde_as]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct CarnotInfo {
     pub id: NodeId,
     pub current_view: View,

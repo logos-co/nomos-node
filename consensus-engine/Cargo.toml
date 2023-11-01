@@ -25,7 +25,7 @@ default = []
 serde = ["dep:serde", "nomos-utils/serde"]
 simulation = []
 
-openapi = ["dep:utoipa", "serde_json"]
+openapi = ["dep:utoipa", "serde_json", "serde"]
 
 [dev-dependencies]
 proptest = "1.2.0"

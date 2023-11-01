@@ -96,6 +96,7 @@ impl CertificateStrategy for AbsoluteNumber<Attestation, Certificate> {
 }
 
 #[derive(Debug, Copy, Clone, Serialize, Deserialize, Eq, PartialEq)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct Voter([u8; 32]);
 
 impl Voter {
@@ -111,6 +112,7 @@ impl From<Voter> for [u8; 32] {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, Hash, PartialEq)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct Blob {
     data: Bytes,
 }
