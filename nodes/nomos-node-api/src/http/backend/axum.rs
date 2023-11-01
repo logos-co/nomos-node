@@ -25,20 +25,10 @@ use crate::{
 
 /// Configuration for the Http Server
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
-#[cfg_attr(feature = "clap", derive(clap::Args))]
 pub struct AxumBackendSettings {
     /// Socket where the server will be listening on for incoming requests.
-    #[cfg_attr(feature = "clap", arg(
-        short, long = "http-addr",
-        default_value_t = std::net::SocketAddr::new(
-            std::net::IpAddr::V4(std::net::Ipv4Addr::new(127, 0, 0, 1)),
-            8080,
-        ),
-        env = "HTTP_BIND_ADDRESS"
-    ))]
     pub address: std::net::SocketAddr,
     /// Allowed origins for this server deployment requests.
-    #[cfg_attr(feature = "clap", arg(long = "http-cors-origin"))]
     pub cors_origins: Vec<String>,
 }
 
@@ -305,7 +295,7 @@ where
 
 #[utoipa::path(
     post,
-    path = "/mempool/add/tx",
+    path = "/mempool/add/cert",
     responses(
         (status = 200, description = "Add certificate to the mempool"),
         (status = 500, description = "Internal server error", body = String),
