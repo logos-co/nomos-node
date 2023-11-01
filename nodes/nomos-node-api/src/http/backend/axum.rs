@@ -1,13 +1,7 @@
 use std::fmt::Debug;
 
 use axum::{extract::State, http::HeaderValue, response::Response, routing, Json, Router, Server};
-use consensus_engine::BlockId;
-use full_replication::{Blob, Certificate};
 use hyper::header::{CONTENT_TYPE, USER_AGENT};
-use nomos_core::{da::blob, tx::Transaction};
-use nomos_mempool::{network::adapters::libp2p::Libp2pAdapter, openapi::Status, MempoolMetrics};
-use nomos_network::backends::libp2p::Libp2p;
-use nomos_node_lib::tx::Tx;
 use overwatch_rs::overwatch::handle::OverwatchHandle;
 use tower_http::{
     cors::{Any, CorsLayer},
@@ -15,6 +9,13 @@ use tower_http::{
 };
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
+
+use consensus_engine::BlockId;
+use full_replication::{Blob, Certificate};
+use nomos_core::{da::blob, tx::Transaction};
+use nomos_mempool::{network::adapters::libp2p::Libp2pAdapter, openapi::Status, MempoolMetrics};
+use nomos_network::backends::libp2p::Libp2p;
+use nomos_node_lib::tx::Tx;
 
 use crate::{
     http::{cl, consensus, da, libp2p, mempool, storage},
