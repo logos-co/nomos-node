@@ -314,6 +314,7 @@ fn create_node_config(
         metrics: Default::default(),
         da: nomos_da::Settings {
             da_protocol: full_replication::Settings {
+                private_key,
                 num_attestations: 1,
             },
             backend: nomos_da::backend::memory_cache::BlobCacheSettings {

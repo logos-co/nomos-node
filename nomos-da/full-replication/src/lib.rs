@@ -24,6 +24,7 @@ pub mod openapi {
 
 #[derive(Debug, Clone)]
 pub struct FullReplication<CertificateStrategy> {
+    voter: Voter,
     certificate_strategy: CertificateStrategy,
     output_buffer: Vec<Bytes>,
     attestations: Vec<Attestation>,
@@ -31,8 +32,9 @@ pub struct FullReplication<CertificateStrategy> {
 }
 
 impl<S> FullReplication<S> {
-    pub fn new(strategy: S) -> Self {
+    pub fn new(voter: Voter, strategy: S) -> Self {
         Self {
+            voter,
             certificate_strategy: strategy,
             output_buffer: Vec::new(),
             attestations: Vec::new(),
@@ -69,6 +71,7 @@ impl<A, C> AbsoluteNumber<A, C> {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Settings {
+    pub private_key: [u8; 32],
     pub num_attestations: usize,
 }
 
@@ -92,8 +95,22 @@ impl CertificateStrategy for AbsoluteNumber<Attestation, Certificate> {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Eq, Hash, PartialEq)]
+#[derive(Debug, Copy, Clone, Serialize, Deserialize, Eq, PartialEq)]
+pub struct Voter([u8; 32]);
 
+impl Voter {
+    pub const fn new(id: [u8; 32]) -> Self {
+        Self(id)
+    }
+}
+
+impl From<Voter> for [u8; 32] {
+    fn from(voter: Voter) -> Self {
+        voter.0
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, Hash, PartialEq)]
 pub struct Blob {
     data: Bytes,
 }
@@ -119,7 +136,7 @@ impl blob::Blob for Blob {
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct Attestation {
     blob: [u8; 32],
-    voter: [u8; 32],
+    voter: Voter,
 }
 
 impl attestation::Attestation for Attestation {
@@ -131,7 +148,7 @@ impl attestation::Attestation for Attestation {
     }
 
     fn hash(&self) -> <Self::Blob as blob::Blob>::Hash {
-        hash([self.blob, self.voter].concat())
+        hash([self.blob, self.voter.into()].concat())
     }
 
     fn as_bytes(&self) -> Bytes {
@@ -187,7 +204,10 @@ impl DaProtocol for FullReplication<AbsoluteNumber<Attestation, Certificate>> {
     type Settings = Settings;
 
     fn new(settings: Self::Settings) -> Self {
-        Self::new(AbsoluteNumber::new(settings.num_attestations))
+        Self::new(
+            Voter::new(settings.private_key),
+            AbsoluteNumber::new(settings.num_attestations),
+        )
     }
 
     fn encode<T: AsRef<[u8]>>(&self, data: T) -> Vec<Self::Blob> {
@@ -207,8 +227,7 @@ impl DaProtocol for FullReplication<AbsoluteNumber<Attestation, Certificate>> {
     fn attest(&self, blob: &Self::Blob) -> Self::Attestation {
         Attestation {
             blob: hasher(blob),
-            // TODO: voter id?
-            voter: [0; 32],
+            voter: self.voter,
         }
     }
 
