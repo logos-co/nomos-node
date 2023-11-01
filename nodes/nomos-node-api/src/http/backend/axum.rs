@@ -154,21 +154,6 @@ async fn da_blobs(
 }
 
 #[utoipa::path(
-    post,
-    path = "/da/blobs",
-    responses(
-        (status = 200, description = "Get pending blobs", body = Vec<Blob>),
-        (status = 500, description = "Internal server error", body = String),
-    )
-)]
-async fn da_blobs(
-    State(store): State<Store>,
-    Json(items): Json<Vec<<Blob as blob::Blob>::Hash>>,
-) -> Response {
-    make_request_and_return_response!(da::da_blobs(store, items))
-}
-
-#[utoipa::path(
     get,
     path = "/cl/metrics",
     responses(
@@ -301,18 +286,3 @@ async fn add_cert(State(store): State<OverwatchHandle>, Json(cert): Json<Certifi
     ))
 }
 
-#[utoipa::path(
-    get,
-    path = "/storage/block",
-    responses(
-        (status = 200, description = "Get the block by block id", body = Block<Tx, full_replication::Certificate>),
-        (status = 500, description = "Internal server error", body = String),
-    )
-)]
-async fn block<S, Tx>(State(store): State<Store>, Json(id): Json<BlockId>) -> Response
-where
-    Tx: serde::Serialize + serde::de::DeserializeOwned + Clone + Eq + core::hash::Hash,
-    S: StorageSerde + Send + Sync + 'static,
-{
-    make_request_and_return_response!(storage::block_req::<S, Tx>(store, id))
-}
