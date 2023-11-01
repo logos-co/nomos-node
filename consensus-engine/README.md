@@ -9,7 +9,7 @@ To test consensus-engine with randomized state transitions,
 cargo test --test fuzz_test
 ```
 
-By default, the fuzz test runs only [few test cases and transisions](tests/fuzz_test.rs#L15).
+By default, the fuzz test runs only [few test cases and transitions](tests/fuzz_test.rs#L15).
 To trigger a long-running fuzz test, please use the following environment variables:
 ```bash
 PROPTEST_CASES=500000 \  # Num of successful test cases that must execute

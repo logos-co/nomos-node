@@ -806,7 +806,7 @@ mod tests {
         assert_eq!(b.receive_messages().len(), 1);
 
         // Node A should receive a message during the third step, because it's throughput during the
-        // step is 5, but the message it recieves is of size 15.
+        // step is 5, but the message it receives is of size 15.
         network.step(Duration::from_millis(100));
         assert_eq!(a.receive_messages().len(), 1);
         assert_eq!(b.receive_messages().len(), 0);
