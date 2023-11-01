@@ -89,7 +89,6 @@ where
             .route("/mempool/add/tx", routing::post(add_tx::<T>))
             .route("/mempool/add/cert", routing::post(add_cert))
             .with_state(self.settings.handle);
-            .with_state(store);
 
 
         Server::bind(&self.settings.addr)
