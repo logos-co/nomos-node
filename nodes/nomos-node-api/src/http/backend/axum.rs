@@ -90,7 +90,6 @@ where
             .route("/mempool/add/cert", routing::post(add_cert))
             .with_state(self.settings.handle);
 
-
         Server::bind(&self.settings.addr)
             .serve(app.into_make_service())
             .await
