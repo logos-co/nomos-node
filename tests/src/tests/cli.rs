@@ -28,7 +28,7 @@ async fn disseminate_blob() {
             da_protocol: Protocol::FullReplication,
             settings: ProtocolSettings {
                 full_replication: FullReplicationSettings {
-                    private_key: [0; 32],
+                    voter: [0; 32],
                     num_attestations: 1,
                 },
             },

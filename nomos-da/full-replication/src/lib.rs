@@ -71,7 +71,7 @@ impl<A, C> AbsoluteNumber<A, C> {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Settings {
-    pub private_key: [u8; 32],
+    pub voter: Voter,
     pub num_attestations: usize,
 }
 
@@ -95,21 +95,8 @@ impl CertificateStrategy for AbsoluteNumber<Attestation, Certificate> {
     }
 }
 
-#[derive(Debug, Copy, Clone, Serialize, Deserialize, Eq, PartialEq)]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
-pub struct Voter([u8; 32]);
-
-impl Voter {
-    pub const fn new(id: [u8; 32]) -> Self {
-        Self(id)
-    }
-}
-
-impl From<Voter> for [u8; 32] {
-    fn from(voter: Voter) -> Self {
-        voter.0
-    }
-}
+pub type Voter = [u8; 32];
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, Hash, PartialEq)]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
@@ -150,7 +137,7 @@ impl attestation::Attestation for Attestation {
     }
 
     fn hash(&self) -> <Self::Blob as blob::Blob>::Hash {
-        hash([self.blob, self.voter.into()].concat())
+        hash([self.blob, self.voter].concat())
     }
 
     fn as_bytes(&self) -> Bytes {
@@ -207,7 +194,7 @@ impl DaProtocol for FullReplication<AbsoluteNumber<Attestation, Certificate>> {
 
     fn new(settings: Self::Settings) -> Self {
         Self::new(
-            Voter::new(settings.private_key),
+            settings.voter,
             AbsoluteNumber::new(settings.num_attestations),
         )
     }

@@ -314,7 +314,10 @@ fn create_node_config(
         metrics: Default::default(),
         da: nomos_da::Settings {
             da_protocol: full_replication::Settings {
-                private_key,
+                // Using private_key as a voter only for easy deployment.
+                // It doesn't mean that private_key will be used for anything like signing
+                // in the FullReplication.
+                voter: private_key,
                 num_attestations: 1,
             },
             backend: nomos_da::backend::memory_cache::BlobCacheSettings {
