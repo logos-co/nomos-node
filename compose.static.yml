@@ -3,7 +3,6 @@ services:
 
   bootstrap:
     build:
-      context: .
       dockerfile: testnet/Dockerfile
     ports:
       - "3000:3000/tcp"
@@ -23,7 +22,6 @@ services:
 
   libp2p-node-1:
     build:
-      context: .
       dockerfile: testnet/Dockerfile
     volumes:
       - ./testnet:/etc/nomos
@@ -48,7 +46,6 @@ services:
 
   libp2p-node-2:
     build:
-      context: .
       dockerfile: testnet/Dockerfile
     volumes:
       - ./testnet:/etc/nomos
@@ -73,7 +70,6 @@ services:
 
   libp2p-node-3:
     build:
-      context: .
       dockerfile: testnet/Dockerfile
     volumes:
       - ./testnet:/etc/nomos
@@ -98,7 +94,6 @@ services:
 
   mix-node-0:
     build:
-      context: .
       dockerfile: testnet/Dockerfile
     volumes:
       - ./testnet:/etc/nomos
@@ -110,7 +105,6 @@ services:
 
   mix-node-1:
     build:
-      context: .
       dockerfile: testnet/Dockerfile
     volumes:
       - ./testnet:/etc/nomos
@@ -122,7 +116,6 @@ services:
 
   mix-node-2:
     build:
-      context: .
       dockerfile: testnet/Dockerfile
     volumes:
       - ./testnet:/etc/nomos
