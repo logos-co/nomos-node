@@ -1,0 +1,136 @@
+version: '3.7'
+services:
+
+  bootstrap:
+    container_name: bootstrap
+    build: "testnet"
+    ports:
+      - "3000:3000/tcp"
+      - "18080:8080/tcp"
+    volumes:
+      - ./testnet:/etc/nomos
+    depends_on:
+      - mix-node-0
+      - mix-node-1
+      - mix-node-2
+    environment:
+      - BOOTSTRAP_NODE_KEY=${DOCKER_COMPOSE_BOOSTRAP_NET_NODE_KEY:-1000000000000000000000000000000000000000000000000000000000000000}
+      - LIBP2P_NODE_MASK=${DOCKER_COMPOSE_LIBP2P_NODE_KEY_MASK:-2000000000000000000000000000000000000000000000000000000000000000}
+      - LIBP2P_REPLICAS=3
+      - OVERLAY_NODES=${DOCKER_COMPOSE_OVERLAY_NODES:-1000000000000000000000000000000000000000000000000000000000000000}
+    entrypoint: /etc/nomos/scripts/run_bootstrap_node.sh
+
+  libp2p-node-1:
+    container_name: libp2p_node_1
+    build: "testnet"
+    volumes:
+      - ./testnet:/etc/nomos
+    depends_on:
+      - bootstrap
+      - etcd
+      - mix-node-0
+      - mix-node-1
+      - mix-node-2
+    ports:
+      - "3001:3000/tcp"
+      - "18081:8080/tcp"
+    environment:
+      - LIBP2P_REPLICAS=3
+      - ETCDCTL_ENDPOINTS=${DOCKER_COMPOSE_ETCDCTL_ENDPOINTS:-etcd:2379}
+      - ETCDCTL_API=${DOCKER_COMPOSE_ETCDCTL_API:-3}
+      - LIBP2P_NODE_MASK=${DOCKER_COMPOSE_LIBP2P_NODE_KEY_MASK:-2000000000000000000000000000000000000000000000000000000000000000}
+      - OVERLAY_NODES=${DOCKER_COMPOSE_OVERLAY_NODES:-1000000000000000000000000000000000000000000000000000000000000000}
+      - OVERLAY_SUPER_MAJORITY_THRESHOLD=${DOCKER_COMPOSE_SUPER_MAJORITY_THRESHOLD:-1}
+      - NET_INITIAL_PEERS=${DOCKER_COMPOSE_NET_INITIAL_PEERS:-/dns/bootstrap/tcp/3000}
+    entrypoint: /etc/nomos/scripts/run_nomos_node.sh
+
+  libp2p-node-2:
+    container_name: libp2p_node_2
+    build: "testnet"
+    volumes:
+      - ./testnet:/etc/nomos
+    depends_on:
+      - bootstrap
+      - etcd
+      - mix-node-0
+      - mix-node-1
+      - mix-node-2
+    ports:
+      - "3002:3000/tcp"
+      - "18082:8080/tcp"
+    environment:
+      - LIBP2P_REPLICAS=3
+      - ETCDCTL_ENDPOINTS=${DOCKER_COMPOSE_ETCDCTL_ENDPOINTS:-etcd:2379}
+      - ETCDCTL_API=${DOCKER_COMPOSE_ETCDCTL_API:-3}
+      - LIBP2P_NODE_MASK=${DOCKER_COMPOSE_LIBP2P_NODE_KEY_MASK:-2000000000000000000000000000000000000000000000000000000000000000}
+      - OVERLAY_NODES=${DOCKER_COMPOSE_OVERLAY_NODES:-1000000000000000000000000000000000000000000000000000000000000000}
+      - OVERLAY_SUPER_MAJORITY_THRESHOLD=${DOCKER_COMPOSE_SUPER_MAJORITY_THRESHOLD:-1}
+      - NET_INITIAL_PEERS=${DOCKER_COMPOSE_NET_INITIAL_PEERS:-/dns/bootstrap/tcp/3000}
+    entrypoint: /etc/nomos/scripts/run_nomos_node.sh
+
+  libp2p-node-3:
+    container_name: libp2p_node_3
+    build: "testnet"
+    volumes:
+      - ./testnet:/etc/nomos
+    depends_on:
+      - bootstrap
+      - etcd
+      - mix-node-0
+      - mix-node-1
+      - mix-node-2
+    ports:
+      - "3003:3000/tcp"
+      - "18083:8080/tcp"
+    environment:
+      - LIBP2P_REPLICAS=3
+      - ETCDCTL_ENDPOINTS=${DOCKER_COMPOSE_ETCDCTL_ENDPOINTS:-etcd:2379}
+      - ETCDCTL_API=${DOCKER_COMPOSE_ETCDCTL_API:-3}
+      - LIBP2P_NODE_MASK=${DOCKER_COMPOSE_LIBP2P_NODE_KEY_MASK:-2000000000000000000000000000000000000000000000000000000000000000}
+      - OVERLAY_NODES=${DOCKER_COMPOSE_OVERLAY_NODES:-1000000000000000000000000000000000000000000000000000000000000000}
+      - OVERLAY_SUPER_MAJORITY_THRESHOLD=${DOCKER_COMPOSE_SUPER_MAJORITY_THRESHOLD:-1}
+      - NET_INITIAL_PEERS=${DOCKER_COMPOSE_NET_INITIAL_PEERS:-/dns/bootstrap/tcp/3000}
+    entrypoint: /etc/nomos/scripts/run_nomos_node.sh
+
+  mix-node-0:
+    container_name: mix_node_0
+    build: "testnet"
+    volumes:
+      - ./testnet:/etc/nomos
+    ports:
+      - "7707:7777/tcp"
+      - "7708:7778/tcp"
+    entrypoint: /usr/bin/mixnode
+    command: /etc/nomos/mixnode_config.yaml
+
+  mix-node-1:
+    container_name: mix_node_1
+    build: "testnet"
+    volumes:
+      - ./testnet:/etc/nomos
+    ports:
+      - "7717:7777/tcp"
+      - "7718:7778/tcp"
+    entrypoint: /usr/bin/mixnode
+    command: /etc/nomos/mixnode_config.yaml
+
+  mix-node-2:
+    container_name: mix_node_2
+    build: "testnet"
+    volumes:
+      - ./testnet:/etc/nomos
+    ports:
+      - "7727:7777/tcp"
+      - "7728:7778/tcp"
+    entrypoint: /usr/bin/mixnode
+    command: /etc/nomos/mixnode_config.yaml
+
+  etcd:
+    container_name: etcd
+    image: quay.io/coreos/etcd:v3.4.15
+    ports:
+      - "2379:2379/tcp"
+    command:
+      - /usr/local/bin/etcd
+      - --advertise-client-urls=http://etcd:2379
+      - --listen-client-urls=http://0.0.0.0:2379
