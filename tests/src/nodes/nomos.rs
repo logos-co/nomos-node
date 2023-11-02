@@ -256,7 +256,7 @@ fn create_node_configs(
 
 fn create_node_config(
     nodes: Vec<NodeId>,
-    private_key: [u8; 32],
+    id: [u8; 32],
     threshold: Fraction,
     timeout: Duration,
     mixnet_node_config: Option<MixnetNodeConfig>,
@@ -285,7 +285,7 @@ fn create_node_config(
             },
         },
         consensus: CarnotSettings {
-            private_key,
+            private_key: id,
             overlay_settings: TreeOverlaySettings {
                 nodes,
                 leader: RoundRobin::new(),
@@ -314,6 +314,7 @@ fn create_node_config(
         metrics: Default::default(),
         da: nomos_da::Settings {
             da_protocol: full_replication::Settings {
+                voter: id,
                 num_attestations: 1,
             },
             backend: nomos_da::backend::memory_cache::BlobCacheSettings {
