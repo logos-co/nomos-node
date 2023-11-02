@@ -432,7 +432,7 @@ where
             ConsensusMsg::GetBlocks { from, to, tx } => {
                 // default to tip block if not present
                 let from = from.unwrap_or(carnot.tip().id);
-                // default to tip block if not present
+                // default to genesis block if not present
                 let to = to.unwrap_or(carnot.genesis_block().id);
 
                 let mut res = Vec::new();
