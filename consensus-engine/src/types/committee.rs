@@ -3,6 +3,7 @@ use std::collections::BTreeSet;
 use crate::NodeId;
 
 #[derive(Debug, Default, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct CommitteeId(pub(crate) [u8; 32]);
 
 #[cfg(feature = "serde")]

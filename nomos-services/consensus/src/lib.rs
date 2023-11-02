@@ -166,7 +166,7 @@ where
     ClPool::Settings: Send + Sync + 'static,
     DaPool: MemPool + Send + Sync + 'static,
     DaPool::Settings: Send + Sync + 'static,
-    ClPool::Item: Transaction
+    ClPool::Item: Transaction<Hash = ClPool::Key>
         + Debug
         + Clone
         + Eq
@@ -176,7 +176,7 @@ where
         + Send
         + Sync
         + 'static,
-    DaPool::Item: Certificate
+    DaPool::Item: Certificate<Hash = DaPool::Key>
         + Debug
         + Clone
         + Eq
@@ -365,7 +365,7 @@ where
     ClPool::Settings: Send + Sync + 'static,
     DaPool: MemPool + Send + Sync + 'static,
     DaPool::Settings: Send + Sync + 'static,
-    ClPool::Item: Transaction
+    ClPool::Item: Transaction<Hash = ClPool::Key>
         + Debug
         + Clone
         + Eq
@@ -375,7 +375,7 @@ where
         + Send
         + Sync
         + 'static,
-    DaPool::Item: Certificate
+    DaPool::Item: Certificate<Hash = DaPool::Key>
         + Debug
         + Clone
         + Eq
@@ -455,6 +455,8 @@ where
                     task_manager,
                     adapter.clone(),
                     storage_relay,
+                    cl_mempool_relay,
+                    da_mempool_relay,
                 )
                 .await;
             }
@@ -530,8 +532,19 @@ where
         carnot
     }
 
-    #[allow(clippy::type_complexity)]
-    #[instrument(level = "debug", skip(adapter, task_manager, stream, storage_relay))]
+    #[allow(clippy::type_complexity, clippy::too_many_arguments)]
+    #[instrument(
+        level = "debug",
+        skip(
+            carnot,
+            adapter,
+            task_manager,
+            stream,
+            storage_relay,
+            cl_mempool_relay,
+            da_mempool_relay
+        )
+    )]
     async fn process_block(
         mut carnot: Carnot<O>,
         block: Block<ClPool::Item, DaPool::Item>,
@@ -539,6 +552,8 @@ where
         task_manager: &mut TaskManager<View, Event<ClPool::Item, DaPool::Item>>,
         adapter: A,
         storage_relay: OutboundRelay<StorageMsg<Storage>>,
+        cl_mempool_relay: OutboundRelay<MempoolMsg<ClPool::Item, ClPool::Key>>,
+        da_mempool_relay: OutboundRelay<MempoolMsg<DaPool::Item, DaPool::Key>>,
     ) -> (Carnot<O>, Option<Output<ClPool::Item, DaPool::Item>>) {
         tracing::debug!("received proposal {:?}", block);
         if carnot.highest_voted_view() >= block.header().view {
@@ -569,6 +584,22 @@ where
                 if let Err((e, _msg)) = storage_relay.send(msg).await {
                     tracing::error!("Could not send block to storage: {e}");
                 }
+
+                // remove included content from mempool
+                mark_in_block(
+                    cl_mempool_relay,
+                    original_block.transactions().map(Transaction::hash),
+                    block.id,
+                )
+                .await;
+
+                mark_in_block(
+                    da_mempool_relay,
+                    original_block.blobs().map(Certificate::hash),
+                    block.id,
+                )
+                .await;
+
                 if new_view != carnot.current_view() {
                     task_manager.push(
                         block.view,
@@ -1049,6 +1080,7 @@ impl RelayMessage for ConsensusMsg {}
 
 #[serde_as]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct CarnotInfo {
     pub id: NodeId,
     pub current_view: View,
@@ -1074,6 +1106,20 @@ async fn get_mempool_contents<Item, Key>(
         .unwrap_or_else(|(e, _)| eprintln!("Could not get transactions from mempool {e}"));
 
     rx.await
+}
+
+async fn mark_in_block<Item, Key>(
+    mempool: OutboundRelay<MempoolMsg<Item, Key>>,
+    ids: impl Iterator<Item = Key>,
+    block: BlockId,
+) {
+    mempool
+        .send(MempoolMsg::MarkInBlock {
+            ids: ids.collect(),
+            block,
+        })
+        .await
+        .unwrap_or_else(|(e, _)| tracing::error!("Could not mark items in block: {e}"))
 }
 
 #[cfg(test)]

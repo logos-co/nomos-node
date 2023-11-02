@@ -1,4 +1,6 @@
+/// The block id
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq, Ord, PartialOrd)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct BlockId(pub(crate) [u8; 32]);
 
 #[cfg(feature = "serde")]
@@ -27,7 +29,7 @@ impl BlockId {
         Self([0; 32])
     }
 
-    /// Returns a random block id, only avaliable with feature `simulation` or test
+    /// Returns a random block id, only available with feature `simulation` or test
     #[cfg(any(test, feature = "simulation"))]
     pub fn random<R: rand::Rng>(rng: &mut R) -> Self {
         let mut bytes = [0u8; 32];

@@ -6,7 +6,7 @@ use std::{
 
 use axum::{routing, Router, Server};
 use hyper::Error;
-use nomos_http_api::{ApiService, ApiServiceSettings, Backend};
+use nomos_node_api::{ApiService, ApiServiceSettings, Backend};
 use overwatch_derive::Services;
 use overwatch_rs::{overwatch::OverwatchRunner, services::handle::ServiceHandle};
 use utoipa::{

@@ -33,6 +33,7 @@ pub struct Dial {
 pub type Topic = String;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct Libp2pInfo {
     pub listen_addresses: Vec<Multiaddr>,
     pub n_peers: usize,

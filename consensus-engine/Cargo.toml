@@ -17,10 +17,15 @@ thiserror = "1"
 fraction = { version = "0.13" }
 nomos-utils = { path = "../nomos-utils", optional = true }
 
+utoipa = { version = "4.0", optional = true }
+serde_json = { version = "1.0", optional = true }
+
 [features]
 default = []
 serde = ["dep:serde", "nomos-utils/serde"]
 simulation = []
+
+openapi = ["dep:utoipa", "serde_json", "serde"]
 
 [dev-dependencies]
 proptest = "1.2.0"
