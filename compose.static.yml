@@ -2,6 +2,7 @@ version: '3.7'
 services:
 
   bootstrap:
+    container_name: bootstrap
     build:
       dockerfile: testnet/Dockerfile
     ports:
@@ -21,6 +22,7 @@ services:
     entrypoint: /etc/nomos/scripts/run_bootstrap_node.sh
 
   libp2p-node-1:
+    container_name: libp2p_node_1
     build:
       dockerfile: testnet/Dockerfile
     volumes:
@@ -45,6 +47,7 @@ services:
     entrypoint: /etc/nomos/scripts/run_nomos_node.sh
 
   libp2p-node-2:
+    container_name: libp2p_node_2
     build:
       dockerfile: testnet/Dockerfile
     volumes:
@@ -69,6 +72,7 @@ services:
     entrypoint: /etc/nomos/scripts/run_nomos_node.sh
 
   libp2p-node-3:
+    container_name: libp2p_node_3
     build:
       dockerfile: testnet/Dockerfile
     volumes:
@@ -93,6 +97,7 @@ services:
     entrypoint: /etc/nomos/scripts/run_nomos_node.sh
 
   mix-node-0:
+    container_name: mix_node_0
     build:
       dockerfile: testnet/Dockerfile
     volumes:
@@ -104,6 +109,7 @@ services:
     command: /etc/nomos/mixnode_config.yaml
 
   mix-node-1:
+    container_name: mix_node_1
     build:
       dockerfile: testnet/Dockerfile
     volumes:
@@ -115,6 +121,7 @@ services:
     command: /etc/nomos/mixnode_config.yaml
 
   mix-node-2:
+    container_name: mix_node_2
     build:
       dockerfile: testnet/Dockerfile
     volumes:
@@ -126,6 +133,7 @@ services:
     command: /etc/nomos/mixnode_config.yaml
 
   etcd:
+    container_name: etcd
     image: quay.io/coreos/etcd:v3.4.15
     ports:
       - "2379:2379/tcp"
