@@ -43,7 +43,7 @@ cc c2157c559fe10276985a8f2284b0c294c2d6a5a293cce45f2e4ad2a3b4a23233 # shrinks to
 ```
 We should manually check if the error is caused by consensus-engine, or by something wrong in the fuzz test.
 
-If the error is came from consensus-engine, we should fix the consensus-engine and commit the fix to Git along with the regression file.
+If the error came from consensus-engine, we should fix the consensus-engine and commit the fix to Git along with the regression file.
 If the fuzz test starts with the regression files existing, the files are automatically captured and used as test cases to check if the issue is not reproduced anymore.
 
 If the error is caused by something wrong in the fuzz test, we should fix the test.
