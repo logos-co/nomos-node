@@ -56,7 +56,7 @@ Bootstrap node is accessible from the host via `3000` and `8080` ports. To expos
     - "8081-8190:8080"
 ```
 
-After running `docker compose up`, the randomlly assigned ports can be viewed with `ps` command:
+After running `docker compose up`, the randomly assigned ports can be viewed with `ps` command:
 
 ```bash
 docker compose ps 

@@ -25,7 +25,7 @@ to other services to interchange information through a specified messaging API.
 ### Service architecture
 
 Most of the services are implemented with the same idea behind. There is a front layer responsible for handling the `Overwatch` service
-and a back layer that implement the actual service logic.
+and a back layer that implements the actual service logic.
 
 This allows us to easily replace components as needed in a type level system. In any case, a node can be setup in a declarative way composing the types.
 For example:

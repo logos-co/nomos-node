@@ -8,7 +8,7 @@ To run this example use:
 cargo run --example axum --features http
 ```
 
-A GET enpoint will be registered at `http://localhost:8080/dummy/`. An endpoint corresponds with the Service name.
+A GET endpoint will be registered at `http://localhost:8080/dummy/`. An endpoint corresponds with the Service name.
 
 ## Graphql.rs
 A demonstration of usage from within an overwatch service over the http.
@@ -18,7 +18,7 @@ To run this example use:
 cargo run --example graphql --features http,gql
 ```
 
-An enpoint will be registered at `http://localhost:8080/dummygraphqlservice/`. An endpoint corresponds with the Service name.
+An endpoint will be registered at `http://localhost:8080/dummygraphqlservice/`. An endpoint corresponds with the Service name.
 
 To query this endpoint use:
 ```bash
