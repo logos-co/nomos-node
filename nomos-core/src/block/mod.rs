@@ -6,17 +6,19 @@ use indexmap::IndexSet;
 use core::hash::Hash;
 // crates
 use crate::wire;
+use ::serde::{
+    de::{DeserializeOwned, Deserializer},
+    Deserialize, Serialize, Serializer,
+};
 use bytes::Bytes;
 pub use consensus_engine::BlockId;
 use consensus_engine::{LeaderProof, NodeId, Qc, View};
-use serde::de::DeserializeOwned;
-use serde::{Deserialize, Serialize};
 // internal
 
 pub type TxHash = [u8; 32];
 
 /// A block
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 pub struct Block<Tx: Clone + Eq + Hash, BlobCertificate: Clone + Eq + Hash> {
     header: consensus_engine::Block,
     beacon: RandomBeaconState,
@@ -105,5 +107,84 @@ impl<
         let mut result: Self = wire::deserialize(bytes).unwrap();
         result.header.id = block_id_from_wire_content(&result);
         result
+    }
+}
+
+mod serde {
+    use super::*;
+    // use ::serde::{de::Deserializer, Deserialize, Serialize};
+
+    /// consensus_engine::Block but without the id field, which will be computed
+    /// from the rest of the block.
+    #[derive(Serialize, Deserialize)]
+    struct StrippedHeader {
+        pub view: View,
+        pub parent_qc: Qc,
+        pub leader_proof: LeaderProof,
+    }
+
+    #[derive(Serialize, Deserialize)]
+    struct StrippedBlock<Tx: Clone + Eq + Hash, BlobCertificate: Clone + Eq + Hash> {
+        header: StrippedHeader,
+        beacon: RandomBeaconState,
+        cl_transactions: IndexSet<Tx>,
+        bl_blobs: IndexSet<BlobCertificate>,
+    }
+
+    impl<
+            'de,
+            Tx: Clone + Eq + Hash + Serialize + DeserializeOwned,
+            BlobCertificate: Clone + Eq + Hash + Serialize + DeserializeOwned,
+        > Deserialize<'de> for Block<Tx, BlobCertificate>
+    {
+        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: Deserializer<'de>,
+        {
+            let StrippedBlock {
+                header,
+                beacon,
+                cl_transactions,
+                bl_blobs,
+            } = StrippedBlock::deserialize(deserializer)?;
+            let header = consensus_engine::Block {
+                id: BlockId::zeros(),
+                view: header.view,
+                parent_qc: header.parent_qc,
+                leader_proof: header.leader_proof,
+            };
+            let mut block = Block {
+                beacon,
+                cl_transactions,
+                bl_blobs,
+                header,
+            };
+            block.header.id = block_id_from_wire_content(&block);
+            Ok(block)
+        }
+    }
+
+    impl<
+            Tx: Clone + Eq + Hash + Serialize + DeserializeOwned,
+            BlobCertificate: Clone + Eq + Hash + Serialize + DeserializeOwned,
+        > Serialize for Block<Tx, BlobCertificate>
+    {
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+        {
+            // TODO: zero copy serialization
+            let block = StrippedBlock {
+                header: StrippedHeader {
+                    view: self.header.view,
+                    parent_qc: self.header.parent_qc.clone(),
+                    leader_proof: self.header.leader_proof.clone(),
+                },
+                beacon: self.beacon.clone(),
+                cl_transactions: self.cl_transactions.clone(),
+                bl_blobs: self.bl_blobs.clone(),
+            };
+            block.serialize(serializer)
+        }
     }
 }
