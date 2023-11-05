@@ -23,7 +23,7 @@ use std::{
 };
 use tokio::sync::{mpsc::UnboundedReceiver, Mutex};
 
-const NODE_CERT_PATH: &str = "mempool-da/add";
+const NODE_CERT_PATH: &str = "mempool/add/cert";
 
 pub async fn disseminate_and_wait<D, B, N, A, C>(
     mut da: D,
@@ -70,7 +70,8 @@ where
         let client = Client::new();
         let res = client
             .post(node.join(NODE_CERT_PATH).unwrap())
-            .body(wire::serialize(&cert).unwrap())
+            .header("Content-Type", "application/json")
+            .body(serde_json::to_string(&cert).unwrap())
             .send()
             .await?;
 

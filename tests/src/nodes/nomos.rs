@@ -111,6 +111,7 @@ impl NomosNode {
     pub async fn get_block(&self, id: BlockId) -> Option<Block<Tx, Certificate>> {
         CLIENT
             .post(&format!("http://{}/{}", self.addr, STORAGE_BLOCKS_API))
+            .header("Content-Type", "application/json")
             .body(serde_json::to_string(&id).unwrap())
             .send()
             .await
