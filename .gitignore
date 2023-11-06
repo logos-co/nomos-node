@@ -15,3 +15,6 @@ store.*
 sim_config.json
 *.txt
 .env
+
+# Integration test temp dirs
+tests/.tmp*

@@ -58,7 +58,11 @@ impl NomosNode {
     pub async fn spawn(mut config: Config) -> Self {
         // Waku stores the messages in a db file in the current dir, we need a different
         // directory for each node to avoid conflicts
-        let dir = tempfile::tempdir().unwrap();
+        //
+        // NOTE: It's easier to use the current location instead of OS-default tempfile location
+        // because Github Actions can easily access files in the current location using wildcard
+        // to upload them as artifacts.
+        let dir = tempfile::TempDir::new_in(std::env::current_dir().unwrap()).unwrap();
         let mut file = NamedTempFile::new().unwrap();
         let config_path = file.path().to_owned();
 
