@@ -185,7 +185,7 @@ impl ServiceCore for DisseminateService {
                     tracing::error!(
                         "Could not disseminate blob, check logs for additional details"
                     );
-                    let _ = status_updates.send(Status::Err(e.into()));
+                    let _ = status_updates.send(Status::Err(e));
                 }
                 _ => {}
             }
