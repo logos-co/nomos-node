@@ -68,6 +68,8 @@ pub enum LoggerBackend {
     Stderr,
     #[serde(skip)]
     Writer(SharedWriter),
+    // do not collect logs
+    None,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -158,6 +160,12 @@ impl ServiceCore for Logger {
             LoggerBackend::Stdout => tracing_appender::non_blocking(std::io::stdout()),
             LoggerBackend::Stderr => tracing_appender::non_blocking(std::io::stderr()),
             LoggerBackend::Writer(writer) => tracing_appender::non_blocking(writer),
+            LoggerBackend::None => {
+                return Ok(Self {
+                    service_state,
+                    worker_guard: None,
+                })
+            }
         };
 
         let layer = tracing_subscriber::fmt::Layer::new()
