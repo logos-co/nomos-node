@@ -95,18 +95,30 @@ fn chat(f: &mut Frame, app: &App) {
         .style(Style::new().white().on_black());
     let chunks = Layout::default()
         .direction(Direction::Vertical)
-        .constraints([Constraint::Min(5), Constraint::Min(1)].as_ref())
+        .constraints([Constraint::Min(5), Constraint::Min(1), Constraint::Max(10)].as_ref())
         .split(block.inner(f.size()));
     f.render_widget(block, f.size());
 
     let messages_rect = centered_rect(chunks[1], 90, 100);
+    render_messages(f, app, messages_rect);
+
+    let chunks = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref())
+        .split(chunks[0]);
+
+    render_input(f, app, chunks[0]);
+    render_status(f, app, chunks[1]);
+}
+
+fn render_messages(f: &mut Frame, app: &App, rect: Rect) {
     let messages: Vec<ListItem> = app
         .messages
         .iter()
         .map(|ChatMessage { author, message }| {
             let content = if author == app.username.as_ref().unwrap() {
                 // pad to make it appear aligned on the right
-                let pad = " ".repeat((messages_rect.width as usize).saturating_sub(message.len()));
+                let pad = " ".repeat((rect.width as usize).saturating_sub(message.len()));
                 Line::from(vec![Span::raw(pad), Span::raw(message)])
             } else {
                 Line::from(vec![
@@ -120,8 +132,10 @@ fn chat(f: &mut Frame, app: &App) {
         .collect();
     let messages =
         List::new(messages).block(Block::default().borders(Borders::ALL).title("Messages"));
-    f.render_widget(messages, messages_rect);
+    f.render_widget(messages, rect);
+}
 
+fn render_input(f: &mut Frame, app: &App, rect: Rect) {
     let style = if !app.message_in_flight {
         Style::default().fg(Color::Yellow)
     } else {
@@ -135,12 +149,9 @@ fn chat(f: &mut Frame, app: &App) {
                 .title("Press <Enter> to send message")
                 .border_style(style),
         );
-
-    let chunks = Layout::default()
-        .direction(Direction::Horizontal)
-        .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref())
-        .split(chunks[0]);
-
+    f.render_widget(input, rect);
+}
+fn render_status(f: &mut Frame, app: &App, rect: Rect) {
     let waiting_animation = std::iter::repeat(".")
         .take(app.last_updated.elapsed().as_secs() as usize % 4)
         .collect::<Vec<_>>()
@@ -153,7 +164,5 @@ fn chat(f: &mut Frame, app: &App) {
             .unwrap_or_default(),
     )
     .block(Block::default().borders(Borders::ALL).title("Status:"));
-
-    f.render_widget(input, centered_rect(chunks[0], 80, 50));
-    f.render_widget(status, centered_rect(chunks[1], 80, 50));
+    f.render_widget(status, rect);
 }
