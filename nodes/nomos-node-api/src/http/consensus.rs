@@ -41,8 +41,8 @@ pub type Carnot<Tx, SS, const SIZE: usize> = CarnotConsensus<
 >;
 
 pub async fn carnot_info<Tx, SS, const SIZE: usize>(
-    handle: &overwatch_rs::overwatch::handle::OverwatchHandle,
-) -> Result<CarnotInfo, overwatch_rs::DynError>
+    handle: &OverwatchHandle,
+) -> Result<CarnotInfo, super::DynError>
 where
     Tx: Transaction + Clone + Debug + Hash + Serialize + DeserializeOwned + Send + Sync + 'static,
     <Tx as Transaction>::Hash: std::cmp::Ord + Debug + Send + Sync + 'static,
