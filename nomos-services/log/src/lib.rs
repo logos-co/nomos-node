@@ -2,6 +2,9 @@
 use futures::StreamExt;
 use std::net::SocketAddr;
 use std::path::PathBuf;
+use std::sync::{Arc, Mutex};
+use std::io::Write;
+use std::fmt::{Debug, Formatter};
 // crates
 use serde::{Deserialize, Serialize};
 use tracing::{error, Level};
@@ -21,6 +24,38 @@ pub struct Logger {
     worker_guard: Option<WorkerGuard>,
 }
 
+/// This is a wrapper around a writer to allow cloning which is
+/// required by contract by Overwatch for a configuration struct
+#[derive(Clone)]
+pub struct SharedWriter {
+    inner: Arc<Mutex<Box<dyn Write + Send + Sync>>>
+}
+
+impl Write for SharedWriter {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        self.inner.lock().unwrap().write(buf)
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        self.inner.lock().unwrap().flush()
+    }
+}
+
+impl SharedWriter {
+    pub fn new<W: Write + Send + Sync + 'static>(writer: W) -> Self {
+        Self {
+            inner: Arc::new(Mutex::new(Box::new(writer)))
+        }
+    }
+}
+
+impl Debug for SharedWriter {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SharedWriter")
+            .finish()
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum LoggerBackend {
     Gelf {
@@ -32,6 +67,8 @@ pub enum LoggerBackend {
     },
     Stdout,
     Stderr,
+    #[serde(skip)]
+    Writer(SharedWriter),
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -121,6 +158,7 @@ impl ServiceCore for Logger {
             }
             LoggerBackend::Stdout => tracing_appender::non_blocking(std::io::stdout()),
             LoggerBackend::Stderr => tracing_appender::non_blocking(std::io::stderr()),
+            LoggerBackend::Writer(writer) => tracing_appender::non_blocking(writer),
         };
 
         let layer = tracing_subscriber::fmt::Layer::new()
