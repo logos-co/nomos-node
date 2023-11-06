@@ -47,6 +47,15 @@ impl<O: Overlay> Carnot<O> {
         &self.safe_blocks
     }
 
+    /// Return the most recent safe block
+    pub fn tip(&self) -> Block {
+        self.safe_blocks
+            .iter()
+            .max_by_key(|(_, b)| b.view)
+            .map(|(_, b)| b.clone())
+            .unwrap()
+    }
+
     /// Upon reception of a block
     ///
     /// Preconditions:
