@@ -19,10 +19,7 @@ use nomos_core::{
 use nomos_mempool::{
     backend::mockpool::MockPool, network::adapters::libp2p::Libp2pAdapter as MempoolLibp2pAdapter,
 };
-use nomos_storage::{
-    backends::{sled::SledBackend, StorageSerde},
-    StorageMsg, StorageService,
-};
+use nomos_storage::backends::{sled::SledBackend, StorageSerde};
 use overwatch_rs::overwatch::handle::OverwatchHandle;
 use serde::{de::DeserializeOwned, Serialize};
 use tokio::sync::oneshot;
@@ -59,7 +56,7 @@ where
     Ok(receiver.await?)
 }
 
-pub async fn block_info<Tx, Cert, SS>(
+pub async fn block_info<Tx, SS, const SIZE: usize>(
     handle: &OverwatchHandle,
     from: Option<BlockId>,
     to: Option<BlockId>,
