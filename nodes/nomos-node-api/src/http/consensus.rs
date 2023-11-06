@@ -56,7 +56,7 @@ where
     Ok(receiver.await?)
 }
 
-pub async fn block_info<Tx, SS, const SIZE: usize>(
+pub async fn carnot_blocks<Tx, SS, const SIZE: usize>(
     handle: &OverwatchHandle,
     from: Option<BlockId>,
     to: Option<BlockId>,
