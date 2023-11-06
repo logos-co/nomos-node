@@ -89,7 +89,7 @@ where
             .route("/cl/metrics", routing::get(cl_metrics::<T>))
             .route("/cl/status", routing::post(cl_status::<T>))
             .route("/carnot/info", routing::get(carnot_info::<T, S, SIZE>))
-            .route("/block/info", routing::get(block_info::<T, S, SIZE>))
+            .route("/carnot/blocks", routing::get(block_info::<T, S, SIZE>))
             .route("/network/info", routing::get(libp2p_info))
             .route("/storage/block", routing::post(block::<S, T>))
             .route("/mempool/add/tx", routing::post(add_tx::<T>))
@@ -228,7 +228,7 @@ struct QueryParams {
 
 #[utoipa::path(
     get,
-    path = "/block/info",
+    path = "/carnot/blocks",
     responses(
         (status = 200, description = "Query the block information", body = Vec<consensus_engine::Block>),
         (status = 500, description = "Internal server error", body = String),
