@@ -1,3 +1,4 @@
+use crate::api::mempool::send_certificate;
 use clap::{Args, ValueEnum};
 use full_replication::{AbsoluteNumber, Attestation, Certificate, FullReplication, Voter};
 use futures::StreamExt;
@@ -15,7 +16,7 @@ use overwatch_rs::{
     },
     DynError,
 };
-use reqwest::{Client, Url};
+use reqwest::Url;
 use serde::Serialize;
 use std::{
     error::Error,
@@ -24,8 +25,6 @@ use std::{
     time::Duration,
 };
 use tokio::sync::{mpsc::UnboundedReceiver, Mutex};
-
-const NODE_CERT_PATH: &str = "mempool-da/add";
 
 pub async fn disseminate_and_wait<D, B, N, A, C>(
     mut da: D,
@@ -69,12 +68,7 @@ where
 
     if let Some(node) = node_addr {
         status_updates.send(Status::SendingCert)?;
-        let client = Client::new();
-        let res = client
-            .post(node.join(NODE_CERT_PATH).unwrap())
-            .body(wire::serialize(&cert).unwrap())
-            .send()
-            .await?;
+        let res = send_certificate(node, &cert).await?;
 
         tracing::info!("Response: {:?}", res);
         if !res.status().is_success() {

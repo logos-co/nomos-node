@@ -14,7 +14,6 @@ use tokio::sync::oneshot;
 use tracing::error;
 // internal
 use full_replication::{Blob, Certificate};
-use nomos_core::wire;
 use nomos_core::{
     block::Block,
     da::{blob, certificate::Certificate as _},
@@ -400,7 +399,7 @@ pub(super) async fn handle_mempool_add_req<K, V>(
 where
     K: DeserializeOwned,
 {
-    let item = wire::deserialize::<K>(&wire_item)?;
+    let item: K = serde_json::from_slice(&wire_item)?;
     let (sender, receiver) = oneshot::channel();
     let key = key(&item);
     mempool_channel
