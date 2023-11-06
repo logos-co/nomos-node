@@ -76,5 +76,5 @@ where
         })
         .await
         .map_err(|(e, _)| e)?;
-    Ok(receiver.recv().await?)
+    Ok(receiver.await?)
 }
