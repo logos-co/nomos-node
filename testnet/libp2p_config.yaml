@@ -70,6 +70,7 @@ http:
 
 da:
   da_protocol:
+    voter: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
     num_attestations: 1
   backend:
     max_capacity: 10
