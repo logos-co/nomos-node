@@ -108,6 +108,12 @@ pub struct OverlayArgs {
     pub overlay_super_majority_threshold: Option<f32>,
 }
 
+#[derive(Parser, Debug, Clone)]
+pub struct DaArgs {
+    #[clap(long = "da-voter-key", env = "DA_VOTER_KEY")]
+    da_voter_key: Option<String>,
+}
+
 #[derive(Deserialize, Debug, Clone, Serialize)]
 pub struct Config {
     pub log: <Logger as ServiceData>::Settings,
@@ -260,6 +266,17 @@ impl Config {
         if let Some(super_majority_threshold) = overlay_super_majority_threshold {
             self.consensus.overlay_settings.super_majority_threshold =
                 Some(super_majority_threshold.into());
+        }
+
+        Ok(self)
+    }
+
+    pub fn update_da(mut self, da_args: DaArgs) -> Result<Self> {
+        let DaArgs { da_voter_key } = da_args;
+
+        if let Some(private_key) = da_voter_key {
+            let bytes = <[u8; 32]>::from_hex(private_key)?;
+            self.da.da_protocol.voter = bytes;
         }
 
         Ok(self)
