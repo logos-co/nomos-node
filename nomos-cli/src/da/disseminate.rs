@@ -33,7 +33,7 @@ pub async fn disseminate_and_wait<D, B, N, A, C>(
     status_updates: Sender<Status>,
     node_addr: Option<&Url>,
     output: Option<&PathBuf>,
-) -> Result<(), Box<dyn std::error::Error>>
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>>
 where
     D: DaProtocol<Blob = B, Attestation = A, Certificate = C>,
     N: NetworkAdapter<Blob = B, Attestation = A> + Send + Sync,
@@ -47,7 +47,7 @@ where
     status_updates.send(Status::Disseminating)?;
     futures::future::try_join_all(blobs.into_iter().map(|blob| adapter.send_blob(blob)))
         .await
-        .map_err(|e| e as Box<dyn std::error::Error>)?;
+        .map_err(|e| e as Box<dyn std::error::Error + Sync + Send>)?;
 
     // 3) Collect attestations and create proof
     status_updates.send(Status::WaitingAttestations)?;
@@ -70,7 +70,6 @@ where
         status_updates.send(Status::SendingCert)?;
         let res = send_certificate(node, &cert).await?;
 
-        tracing::info!("Response: {:?}", res);
         if !res.status().is_success() {
             tracing::error!("ERROR: {:?}", res);
             return Err(format!("Failed to send certificate to node: {}", res.status()).into());
@@ -89,6 +88,7 @@ pub enum Status {
     SavingCert,
     SendingCert,
     Done,
+    Err(Box<dyn std::error::Error + Send + Sync>),
 }
 
 impl Status {
@@ -101,6 +101,7 @@ impl Status {
             Self::SavingCert => "Saving certificate to file",
             Self::SendingCert => "Sending certificate to node",
             Self::Done => "",
+            Self::Err(_) => "Error",
         }
     }
 }
@@ -178,13 +179,13 @@ impl ServiceCore for DisseminateService {
             {
                 Err(_) => {
                     tracing::error!("Timeout reached, check the logs for additional details");
-                    std::process::exit(1);
+                    let _ = status_updates.send(Status::Err("Timeout reached".into()));
                 }
-                Ok(Err(_)) => {
+                Ok(Err(e)) => {
                     tracing::error!(
                         "Could not disseminate blob, check logs for additional details"
                     );
-                    std::process::exit(1);
+                    let _ = status_updates.send(Status::Err(e.into()));
                 }
                 _ => {}
             }
