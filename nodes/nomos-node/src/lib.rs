@@ -13,7 +13,8 @@ use nomos_log::Logger;
 use nomos_mempool::{Certificate as CertDiscriminant, Transaction as TxDiscriminant};
 use nomos_network::backends::libp2p::Libp2p;
 use nomos_node_api::{http::backend::axum::AxumBackend, ApiService};
-use nomos_node_lib::{tx::Tx, Carnot, DataAvailabilityService, Mempool, Wire};
+pub use nomos_node_lib::tx::Tx;
+use nomos_node_lib::{Carnot, DataAvailabilityService, Mempool, Wire};
 use nomos_storage::{backends::sled::SledBackend, StorageService};
 
 pub use config::{Config, ConsensusArgs, HttpArgs, LogArgs, NetworkArgs, OverlayArgs};
