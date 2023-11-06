@@ -1,6 +1,7 @@
 use clap::{Args, ValueEnum};
-use full_replication::{AbsoluteNumber, Attestation, Certificate, FullReplication};
+use full_replication::{AbsoluteNumber, Attestation, Certificate, FullReplication, Voter};
 use futures::StreamExt;
+use hex::FromHex;
 use nomos_core::{da::DaProtocol, wire};
 use nomos_da::network::{adapters::libp2p::Libp2pAdapter, NetworkAdapter};
 use nomos_network::{backends::libp2p::Libp2p, NetworkService};
@@ -17,13 +18,14 @@ use overwatch_rs::{
 use reqwest::{Client, Url};
 use serde::Serialize;
 use std::{
+    error::Error,
     path::PathBuf,
     sync::{mpsc::Sender, Arc},
     time::Duration,
 };
 use tokio::sync::{mpsc::UnboundedReceiver, Mutex};
 
-const NODE_CERT_PATH: &str = "mempool-da/add";
+const NODE_CERT_PATH: &str = "mempool/add/cert";
 
 pub async fn disseminate_and_wait<D, B, N, A, C>(
     mut da: D,
@@ -70,7 +72,8 @@ where
         let client = Client::new();
         let res = client
             .post(node.join(NODE_CERT_PATH).unwrap())
-            .body(wire::serialize(&cert).unwrap())
+            .header("Content-Type", "application/json")
+            .body(serde_json::to_string(&cert).unwrap())
             .send()
             .await?;
 
@@ -218,9 +221,12 @@ impl TryFrom<DaProtocolChoice> for FullReplication<AbsoluteNumber<Attestation, C
     type Error = &'static str;
     fn try_from(value: DaProtocolChoice) -> Result<Self, Self::Error> {
         match (value.da_protocol, value.settings) {
-            (Protocol::FullReplication, ProtocolSettings { full_replication }) => Ok(
-                FullReplication::new(AbsoluteNumber::new(full_replication.num_attestations)),
-            ),
+            (Protocol::FullReplication, ProtocolSettings { full_replication }) => {
+                Ok(FullReplication::new(
+                    full_replication.voter,
+                    AbsoluteNumber::new(full_replication.num_attestations),
+                ))
+            }
         }
     }
 }
@@ -239,6 +245,7 @@ pub enum Protocol {
 impl Default for FullReplicationSettings {
     fn default() -> Self {
         Self {
+            voter: [0; 32],
             num_attestations: 1,
         }
     }
@@ -246,6 +253,12 @@ impl Default for FullReplicationSettings {
 
 #[derive(Debug, Clone, Args)]
 pub struct FullReplicationSettings {
+    #[clap(long, value_parser = parse_key, default_value = "0000000000000000000000000000000000000000000000000000000000000000")]
+    pub voter: Voter,
     #[clap(long, default_value = "1")]
     pub num_attestations: usize,
+}
+
+fn parse_key(s: &str) -> Result<Voter, Box<dyn Error + Send + Sync + 'static>> {
+    Ok(<[u8; 32]>::from_hex(s)?)
 }

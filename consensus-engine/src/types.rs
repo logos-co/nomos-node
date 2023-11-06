@@ -103,7 +103,6 @@ impl TimeoutQc {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct Block {
-    #[cfg_attr(feature = "serde", serde(skip))]
     pub id: BlockId,
     pub view: View,
     pub parent_qc: Qc,

@@ -4,7 +4,7 @@ use nomos_cli::{
 };
 use std::time::Duration;
 use tempfile::NamedTempFile;
-use tests::{nodes::nomos::Pool, MixNode, Node, NomosNode, SpawnConfig};
+use tests::{get_available_port, nodes::nomos::Pool, MixNode, Node, NomosNode, SpawnConfig};
 
 const TIMEOUT_SECS: u64 = 20;
 
@@ -16,7 +16,10 @@ async fn disseminate_blob() {
     // kill the node so that we can reuse its network config
     nodes[1].stop();
 
-    let network_config = nodes[1].config().network.clone();
+    let mut network_config = nodes[1].config().network.clone();
+    // use a new port because the old port is sometimes not closed immediately
+    network_config.backend.inner.port = get_available_port();
+
     let mut file = NamedTempFile::new().unwrap();
     let config_path = file.path().to_owned();
     serde_yaml::to_writer(&mut file, &network_config).unwrap();
@@ -28,6 +31,7 @@ async fn disseminate_blob() {
             da_protocol: Protocol::FullReplication,
             settings: ProtocolSettings {
                 full_replication: FullReplicationSettings {
+                    voter: [0; 32],
                     num_attestations: 1,
                 },
             },

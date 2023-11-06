@@ -111,6 +111,7 @@ impl NomosNode {
     pub async fn get_block(&self, id: BlockId) -> Option<Block<Tx, Certificate>> {
         CLIENT
             .post(&format!("http://{}/{}", self.addr, STORAGE_BLOCKS_API))
+            .header("Content-Type", "application/json")
             .body(serde_json::to_string(&id).unwrap())
             .send()
             .await
@@ -135,7 +136,7 @@ impl NomosNode {
             .unwrap();
         MempoolMetrics {
             pending_items: res["pending_items"].as_u64().unwrap() as usize,
-            last_item_timestamp: res["last_item"].as_u64().unwrap(),
+            last_item_timestamp: res["last_item_timestamp"].as_u64().unwrap(),
         }
     }
 
@@ -256,7 +257,7 @@ fn create_node_configs(
 
 fn create_node_config(
     nodes: Vec<NodeId>,
-    private_key: [u8; 32],
+    id: [u8; 32],
     threshold: Fraction,
     timeout: Duration,
     mixnet_node_config: Option<MixnetNodeConfig>,
@@ -285,7 +286,7 @@ fn create_node_config(
             },
         },
         consensus: CarnotSettings {
-            private_key,
+            private_key: id,
             overlay_settings: TreeOverlaySettings {
                 nodes,
                 leader: RoundRobin::new(),
@@ -314,6 +315,7 @@ fn create_node_config(
         metrics: Default::default(),
         da: nomos_da::Settings {
             da_protocol: full_replication::Settings {
+                voter: id,
                 num_attestations: 1,
             },
             backend: nomos_da::backend::memory_cache::BlobCacheSettings {
