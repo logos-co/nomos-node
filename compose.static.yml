@@ -3,7 +3,9 @@ services:
 
   bootstrap:
     container_name: bootstrap
-    build: "testnet"
+    build:
+      context: .
+      dockerfile: testnet/Dockerfile
     ports:
       - "3000:3000/tcp"
       - "18080:8080/tcp"
@@ -22,7 +24,9 @@ services:
 
   libp2p-node-1:
     container_name: libp2p_node_1
-    build: "testnet"
+    build:
+      context: .
+      dockerfile: testnet/Dockerfile
     volumes:
       - ./testnet:/etc/nomos
     depends_on:
@@ -46,7 +50,9 @@ services:
 
   libp2p-node-2:
     container_name: libp2p_node_2
-    build: "testnet"
+    build:
+      context: .
+      dockerfile: testnet/Dockerfile
     volumes:
       - ./testnet:/etc/nomos
     depends_on:
@@ -70,7 +76,9 @@ services:
 
   libp2p-node-3:
     container_name: libp2p_node_3
-    build: "testnet"
+    build:
+      context: .
+      dockerfile: testnet/Dockerfile
     volumes:
       - ./testnet:/etc/nomos
     depends_on:
@@ -94,7 +102,9 @@ services:
 
   mix-node-0:
     container_name: mix_node_0
-    build: "testnet"
+    build:
+      context: .
+      dockerfile: testnet/Dockerfile
     volumes:
       - ./testnet:/etc/nomos
     ports:
@@ -105,7 +115,9 @@ services:
 
   mix-node-1:
     container_name: mix_node_1
-    build: "testnet"
+    build:
+      context: .
+      dockerfile: testnet/Dockerfile
     volumes:
       - ./testnet:/etc/nomos
     ports:
@@ -116,7 +128,9 @@ services:
 
   mix-node-2:
     container_name: mix_node_2
-    build: "testnet"
+    build:
+      context: .
+      dockerfile: testnet/Dockerfile
     volumes:
       - ./testnet:/etc/nomos
     ports:
