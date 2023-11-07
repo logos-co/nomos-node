@@ -9,6 +9,7 @@ where
     const NODE_CERT_PATH: &str = "mempool-da/add";
     CLIENT
         .post(node.join(NODE_CERT_PATH).unwrap())
+        .header("Content-Type", "application/json")
         .body(serde_json::to_string(cert).unwrap())
         .send()
         .await

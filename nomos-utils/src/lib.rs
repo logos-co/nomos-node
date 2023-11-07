@@ -5,7 +5,7 @@ pub mod serde {
         serializer: S,
     ) -> Result<S::Ok, S::Error> {
         use serde::Serialize;
-        const_hex::const_encode::<N, true>(&src)
+        const_hex::const_encode::<N, false>(&src)
             .as_str()
             .serialize(serializer)
     }
