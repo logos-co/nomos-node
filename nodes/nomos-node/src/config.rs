@@ -110,8 +110,8 @@ pub struct OverlayArgs {
 
 #[derive(Parser, Debug, Clone)]
 pub struct DaArgs {
-    #[clap(long = "da-voter-key", env = "DA_VOTER_KEY")]
-    da_voter_key: Option<String>,
+    #[clap(long = "da-voter", env = "DA_VOTER")]
+    da_voter: Option<String>,
 }
 
 #[derive(Deserialize, Debug, Clone, Serialize)]
@@ -272,10 +272,10 @@ impl Config {
     }
 
     pub fn update_da(mut self, da_args: DaArgs) -> Result<Self> {
-        let DaArgs { da_voter_key } = da_args;
+        let DaArgs { da_voter } = da_args;
 
-        if let Some(private_key) = da_voter_key {
-            let bytes = <[u8; 32]>::from_hex(private_key)?;
+        if let Some(voter) = da_voter {
+            let bytes = <[u8; 32]>::from_hex(voter)?;
             self.da.da_protocol.voter = bytes;
         }
 
