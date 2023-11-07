@@ -35,6 +35,11 @@ jobs:
           cargo test --no-default-features --features libp2p
           mkdir /tmp/cov;
           grcov . --binary-path ./target/debug/ -s . -t lcov --branch --ignore-not-existing --ignore '../*' --ignore "/*" -o /tmp/cov/tests.lcov;
+      - uses: actions/upload-artifact@v3
+        if: failure()
+        with:
+          name: integration-test-artifacts
+          path: tests/.tmp*
       - uses: codecov/codecov-action@v3
         with:
           directory: /tmp/cov/
