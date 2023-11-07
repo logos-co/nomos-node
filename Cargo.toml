@@ -20,6 +20,7 @@ members = [
     "nomos-utils",
     "nodes/nomos-node",
     "nodes/mixnode",
+    "nodes/explorer",
     "simulations",
     "consensus/carnot-engine",
     "tests",
