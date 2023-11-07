@@ -3,6 +3,7 @@ use std::net::SocketAddr;
 use std::process::{Child, Command, Stdio};
 use std::time::Duration;
 // internal
+use super::{create_tempdir, persist_tempdir, LOGS_PREFIX};
 use crate::{get_available_port, ConsensusConfig, MixnetConfig, Node, SpawnConfig};
 use consensus_engine::overlay::{RandomBeaconState, RoundRobin, TreeOverlay, TreeOverlaySettings};
 use consensus_engine::{BlockId, NodeId, Overlay};
@@ -31,7 +32,6 @@ const NOMOS_BIN: &str = "../target/debug/nomos-node";
 const CARNOT_INFO_API: &str = "carnot/info";
 const STORAGE_BLOCKS_API: &str = "storage/block";
 const MEMPOOL_API: &str = "mempool-";
-const LOGS_PREFIX: &str = "__logs";
 
 pub struct NomosNode {
     addr: SocketAddr,
@@ -43,11 +43,7 @@ pub struct NomosNode {
 impl Drop for NomosNode {
     fn drop(&mut self) {
         if std::thread::panicking() {
-            println!("persisting directory at {}", self._tempdir.path().display());
-            // we need ownership of the dir to persist it
-            let dir = std::mem::replace(&mut self._tempdir, tempfile::tempdir().unwrap());
-            // a bit confusing but `into_path` persists the directory
-            let _ = dir.into_path();
+            persist_tempdir(&mut self._tempdir, "nomos-node");
         }
 
         self.child.kill().unwrap();
@@ -58,7 +54,7 @@ impl NomosNode {
     pub async fn spawn(mut config: Config) -> Self {
         // Waku stores the messages in a db file in the current dir, we need a different
         // directory for each node to avoid conflicts
-        let dir = tempfile::tempdir().unwrap();
+        let dir = create_tempdir();
         let mut file = NamedTempFile::new().unwrap();
         let config_path = file.path().to_owned();
 
