@@ -1,10 +1,10 @@
 // std
 use futures::StreamExt;
+use std::fmt::{Debug, Formatter};
+use std::io::Write;
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
-use std::io::Write;
-use std::fmt::{Debug, Formatter};
 // crates
 use serde::{Deserialize, Serialize};
 use tracing::{error, Level};
@@ -28,7 +28,7 @@ pub struct Logger {
 /// required by contract by Overwatch for a configuration struct
 #[derive(Clone)]
 pub struct SharedWriter {
-    inner: Arc<Mutex<Box<dyn Write + Send + Sync>>>
+    inner: Arc<Mutex<Box<dyn Write + Send + Sync>>>,
 }
 
 impl Write for SharedWriter {
@@ -44,15 +44,14 @@ impl Write for SharedWriter {
 impl SharedWriter {
     pub fn new<W: Write + Send + Sync + 'static>(writer: W) -> Self {
         Self {
-            inner: Arc::new(Mutex::new(Box::new(writer)))
+            inner: Arc::new(Mutex::new(Box::new(writer))),
         }
     }
 }
 
 impl Debug for SharedWriter {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("SharedWriter")
-            .finish()
+        f.debug_struct("SharedWriter").finish()
     }
 }
 
