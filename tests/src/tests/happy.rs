@@ -36,28 +36,24 @@ async fn happy_test(nodes: &[NomosNode]) {
     };
 
     let infos = stream::iter(nodes)
-        .then(|n| async move { n.consensus_info().await })
+        .then(|n| async move { n.get_blocks_info(None, None).await })
         .collect::<Vec<_>>()
         .await;
     // check that they have the same block
     let blocks = infos
         .iter()
-        .map(|i| {
-            i.safe_blocks
-                .values()
-                .find(|b| b.view == TARGET_VIEW)
-                .unwrap()
-        })
+        .map(|i| i.iter().find(|b| b.view == TARGET_VIEW).unwrap())
         .collect::<HashSet<_>>();
 
     // try to see if we have invalid blocks
     let invalid_blocks = infos
         .iter()
-        .flat_map(|i| {
-            i.safe_blocks.values().filter_map(|b| match &b.parent_qc {
+        .zip(nodes.iter())
+        .flat_map(|(blocks, node)| {
+            blocks.iter().filter_map(|b| match &b.parent_qc {
                 Qc::Standard(_) => None,
                 Qc::Aggregated(_) => Some(Info {
-                    node_id: i.id.to_string(),
+                    node_id: node.id().to_string(),
                     block_id: b.id.to_string(),
                     view: b.view,
                 }),
@@ -92,7 +88,7 @@ async fn test_get_block() {
     let (_mixnodes, mixnet_config) = MixNode::spawn_nodes(3).await;
     let nodes = NomosNode::spawn_nodes(SpawnConfig::chain_happy(2, mixnet_config)).await;
     happy_test(&nodes).await;
-    let id = nodes[0].consensus_info().await.committed_blocks[0];
+    let id = nodes[0].consensus_info().await.last_committed_block.id;
     tokio::time::timeout(Duration::from_secs(10), async {
         while nodes[0].get_block(id).await.is_none() {
             tokio::time::sleep(Duration::from_millis(100)).await;

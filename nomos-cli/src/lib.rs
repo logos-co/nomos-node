@@ -1,3 +1,4 @@
+pub mod api;
 pub mod cmds;
 pub mod da;
 

@@ -60,6 +60,7 @@ fn main() -> Result<()> {
 
     let bridges: Vec<HttpBridge> = vec![
         Arc::new(Box::new(bridges::carnot_info_bridge)),
+        Arc::new(Box::new(bridges::block_info_bridge)),
         // Due to a limitation in the current api system, we can't connect a single endopint to multiple services
         // which means we need two different paths for complete mempool metrics.
         Arc::new(Box::new(bridges::cl_mempool_metrics_bridge)),

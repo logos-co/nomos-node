@@ -43,12 +43,17 @@ async fn ten_nodes_one_down() {
         } => {}
     };
 
-    let infos = stream::iter(nodes)
-        .then(|n| async move { n.consensus_info().await })
-        .collect::<Vec<_>>()
+    let (infos, blocks): (Vec<_>, Vec<_>) = stream::iter(nodes)
+        .then(|n| async move {
+            (
+                n.consensus_info().await,
+                n.get_blocks_info(None, None).await,
+            )
+        })
+        .unzip()
         .await;
 
-    let target_block = assert_block_consensus(&infos, TARGET_VIEW);
+    let target_block = assert_block_consensus(&blocks, TARGET_VIEW);
 
     // If no node has the target block, check that TARGET_VIEW was reached by timeout_qc.
     if target_block.is_none() {
@@ -58,13 +63,10 @@ async fn ten_nodes_one_down() {
 }
 
 // Check if all nodes have the same block at the specific view.
-fn assert_block_consensus<'a>(
-    consensus_infos: impl IntoIterator<Item = &'a CarnotInfo>,
-    view: View,
-) -> Option<Block> {
-    let blocks = consensus_infos
+fn assert_block_consensus<'a>(blocks: &[Vec<Block>], view: View) -> Option<Block> {
+    let blocks = blocks
         .into_iter()
-        .map(|i| i.safe_blocks.values().find(|b| b.view == view))
+        .map(|b| b.iter().find(|b| b.view == view))
         .collect::<HashSet<_>>();
     // Every nodes must have the same target block (Some(block))
     // , or no node must have it (None).

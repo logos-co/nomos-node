@@ -1,6 +1,7 @@
 mod libp2p;
 use consensus_engine::BlockId;
 use libp2p::*;
+use std::collections::HashMap;
 
 // std
 // crates
@@ -13,7 +14,6 @@ use tokio::sync::oneshot;
 use tracing::error;
 // internal
 use full_replication::{Blob, Certificate};
-use nomos_core::wire;
 use nomos_core::{
     block::Block,
     da::{blob, certificate::Certificate as _},
@@ -85,6 +85,23 @@ pub fn carnot_info_bridge(
 ) -> HttpBridgeRunner {
     Box::new(Box::pin(async move {
         get_handler!(handle, Carnot, "info" => handle_carnot_info_req)
+    }))
+}
+
+pub fn block_info_bridge(
+    handle: overwatch_rs::overwatch::handle::OverwatchHandle,
+) -> HttpBridgeRunner {
+    Box::new(Box::pin(async move {
+        let (channel, mut http_request_channel) =
+            build_http_bridge::<Carnot, AxumBackend, _>(handle, HttpMethod::GET, "blocks")
+                .await
+                .unwrap();
+        while let Some(HttpRequest { res_tx, query, .. }) = http_request_channel.recv().await {
+            if let Err(e) = handle_block_info_req(&channel, query, res_tx).await {
+                error!(e);
+            }
+        }
+        Ok(())
     }))
 }
 
@@ -183,6 +200,43 @@ pub async fn handle_block_get_req(
     res_tx
         .send(Ok(serde_json::to_string(&block).unwrap().into()))
         .await?;
+
+    Ok(())
+}
+
+pub async fn handle_block_info_req(
+    carnot_channel: &OutboundRelay<ConsensusMsg>,
+    query: HashMap<String, String>,
+    res_tx: Sender<HttpResponse>,
+) -> Result<(), overwatch_rs::DynError> {
+    fn parse_block_id(field: Option<&String>) -> Result<Option<BlockId>, overwatch_rs::DynError> {
+        field
+            .map(|id| {
+                hex::decode(id)
+                    .map_err(|e| e.into())
+                    .and_then(|bytes| {
+                        <[u8; 32]>::try_from(bytes)
+                            .map_err(|e| format!("expected 32 bytes found {}", e.len()).into())
+                    })
+                    .map(BlockId::from)
+            })
+            .transpose()
+    }
+
+    const QUERY_FROM: &str = "from";
+    const QUERY_TO: &str = "to";
+
+    let (sender, receiver) = oneshot::channel();
+    carnot_channel
+        .send(ConsensusMsg::GetBlocks {
+            from: parse_block_id(query.get(QUERY_FROM))?,
+            to: parse_block_id(query.get(QUERY_TO))?,
+            tx: sender,
+        })
+        .await
+        .map_err(|(e, _)| e)?;
+    let blocks = receiver.await.unwrap();
+    res_tx.send(Ok(serde_json::to_vec(&blocks)?.into())).await?;
 
     Ok(())
 }
@@ -345,7 +399,7 @@ pub(super) async fn handle_mempool_add_req<K, V>(
 where
     K: DeserializeOwned,
 {
-    let item = wire::deserialize::<K>(&wire_item)?;
+    let item: K = serde_json::from_slice(&wire_item)?;
     let (sender, receiver) = oneshot::channel();
     let key = key(&item);
     mempool_channel

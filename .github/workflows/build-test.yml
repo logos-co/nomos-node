@@ -72,6 +72,11 @@ jobs:
         with:
           command: test
           args: --all --no-default-features --features ${{ matrix.feature }}
+      - uses: actions/upload-artifact@v3
+        if: failure()
+        with:
+          name: integration-test-artifacts
+          path: tests/.tmp*
 
   lints:
     name: Rust lints
