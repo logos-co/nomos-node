@@ -95,12 +95,13 @@ fn chat(f: &mut Frame, app: &App) {
         .style(Style::new().white().on_black());
     let chunks = Layout::default()
         .direction(Direction::Vertical)
-        .constraints([Constraint::Min(5), Constraint::Min(1), Constraint::Max(10)].as_ref())
+        .constraints([Constraint::Max(3), Constraint::Percentage(80), Constraint::Max(10)].as_ref())
         .split(block.inner(f.size()));
     f.render_widget(block, f.size());
 
     let messages_rect = centered_rect(chunks[1], 90, 100);
     render_messages(f, app, messages_rect);
+    render_logs(f, app, chunks[2]);
 
     let chunks = Layout::default()
         .direction(Direction::Horizontal)
@@ -160,9 +161,21 @@ fn render_status(f: &mut Frame, app: &App, rect: Rect) {
     let status = Paragraph::new(
         app.message_status
             .as_ref()
-            .map(|s| format!("{}{}", s.display(), waiting_animation))
+            .map(|s| format!("{}{}", s, waiting_animation))
             .unwrap_or_default(),
     )
     .block(Block::default().borders(Borders::ALL).title("Status:"));
     f.render_widget(status, rect);
+}
+
+fn render_logs<'a>(f: &mut Frame, app: &App, rect: Rect) {
+    use ansi_to_tui::IntoText;
+    let logs = app.logs.lock().unwrap();
+    f.render_widget(
+        Paragraph::new(logs.into_text().unwrap())
+            .wrap(Wrap { trim: true })
+            .scroll((app.scroll_logs, 0))
+            .block(Block::default().borders(Borders::ALL).title("Logs: (use ←/→ to scroll up/down")),
+        rect,
+    );
 }

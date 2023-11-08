@@ -21,6 +21,7 @@ overwatch-derive = { git = "https://github.com/logos-co/Overwatch", rev = "ac28d
 nomos-network = { path = "../nomos-services/network", features = ["libp2p"] }
 nomos-da = { path = "../nomos-services/data-availability", features = ["libp2p"] }
 nomos-consensus = { path = "../nomos-services/consensus" }
+nomos-log = { path = "../nomos-services/log" }
 nomos-libp2p = { path = "../nomos-libp2p"}
 nomos-core = { path = "../nomos-core" }
 nomos-node = { path = "../nodes/nomos-node" }
@@ -34,3 +35,4 @@ once_cell = "1"
 crossterm = "0.27"
 ratatui = "0.24"
 tui-input = "0.8"
+ansi-to-tui = "3"

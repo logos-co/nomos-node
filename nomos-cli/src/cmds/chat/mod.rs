@@ -18,6 +18,7 @@ use full_replication::{
     AbsoluteNumber, Attestation, Certificate, FullReplication, Settings as DaSettings,
 };
 use nomos_core::{block::BlockId, da::DaProtocol, wire};
+use nomos_log::{LoggerBackend, LoggerSettings, SharedWriter};
 use nomos_network::{backends::libp2p::Libp2p, NetworkService};
 use overwatch_rs::{overwatch::OverwatchRunner, services::ServiceData};
 use reqwest::Url;
@@ -27,7 +28,7 @@ use std::{
     path::PathBuf,
     sync::{
         mpsc::{Receiver, Sender},
-        Arc,
+        Arc, self
     },
     time::{Duration, Instant},
 };
@@ -70,6 +71,8 @@ pub struct App {
     payload_sender: UnboundedSender<Box<[u8]>>,
     status_updates: Receiver<Status>,
     node: Url,
+    logs: Arc<sync::Mutex<Vec<u8>>>,
+    scroll_logs: u16,
 }
 
 impl NomosChat {
@@ -91,6 +94,9 @@ impl NomosChat {
         let (payload_sender, payload_receiver) = tokio::sync::mpsc::unbounded_channel();
         let (status_sender, status_updates) = std::sync::mpsc::channel();
 
+        let shared_writer = Arc::new(sync::Mutex::new(Vec::new()));
+        let backend =  SharedWriter::from_inner(shared_writer.clone());
+
         std::thread::spawn(move || {
             OverwatchRunner::<DisseminateApp>::run(
                 DisseminateAppServiceSettings {
@@ -102,6 +108,11 @@ impl NomosChat {
                         status_updates: status_sender,
                         node_addr,
                         output: None,
+                    },
+                    logger: LoggerSettings {
+                        backend: LoggerBackend::Writer(backend),
+                        level: tracing::Level::INFO,
+                        ..Default::default()
                     },
                 },
                 None,
@@ -120,6 +131,8 @@ impl NomosChat {
             payload_sender,
             status_updates,
             node: self.node.clone(),
+            logs: shared_writer,
+            scroll_logs: 0,
         };
 
         run_app(&mut terminal, app);
@@ -187,6 +200,12 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) {
                 }
                 KeyCode::Esc => {
                     return;
+                }
+                KeyCode::Left => {
+                    app.scroll_logs = app.scroll_logs.saturating_sub(1);
+                }
+                KeyCode::Right => {
+                    app.scroll_logs = app.scroll_logs.saturating_add(1);
                 }
                 _ => {
                     if !app.message_in_flight {

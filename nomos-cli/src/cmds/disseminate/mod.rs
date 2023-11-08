@@ -2,6 +2,7 @@ use crate::da::disseminate::{
     DaProtocolChoice, DisseminateApp, DisseminateAppServiceSettings, Settings, Status,
 };
 use clap::Args;
+use nomos_log::{LoggerBackend, LoggerSettings};
 use nomos_network::{backends::libp2p::Libp2p, NetworkService};
 use overwatch_rs::{overwatch::OverwatchRunner, services::ServiceData};
 use reqwest::Url;
@@ -59,6 +60,10 @@ impl Disseminate {
                         node_addr,
                         output,
                     },
+                    logger: LoggerSettings {
+                        backend: LoggerBackend::None,
+                        ..Default::default()
+                    },
                 },
                 None,
             )
@@ -67,13 +72,13 @@ impl Disseminate {
         });
         // drop to signal we're not going to send more blobs
         drop(payload_sender);
-        tracing::info!("{}", rx.recv().unwrap().display());
+        tracing::info!("{}", rx.recv().unwrap());
         while let Ok(update) = rx.recv() {
             if let Status::Err(e) = update {
                 tracing::error!("{e}");
                 return Err(e);
             }
-            tracing::info!("{}", update.display());
+            tracing::info!("{}", update);
         }
         tracing::info!("done");
         Ok(())

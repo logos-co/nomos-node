@@ -28,7 +28,7 @@ pub struct Logger {
 /// required by contract by Overwatch for a configuration struct
 #[derive(Clone)]
 pub struct SharedWriter {
-    inner: Arc<Mutex<Box<dyn Write + Send + Sync>>>,
+    inner: Arc<Mutex<dyn Write + Send + Sync>>,
 }
 
 impl Write for SharedWriter {
@@ -44,8 +44,16 @@ impl Write for SharedWriter {
 impl SharedWriter {
     pub fn new<W: Write + Send + Sync + 'static>(writer: W) -> Self {
         Self {
-            inner: Arc::new(Mutex::new(Box::new(writer))),
+            inner: Arc::new(Mutex::new(writer)),
         }
+    }
+
+    pub fn into_inner(&self) -> Arc<Mutex<dyn Write + Send + Sync>> {
+        self.inner.clone()
+    }
+
+    pub fn from_inner(inner: Arc<Mutex<dyn Write + Send + Sync>>) -> Self {
+        Self { inner }
     }
 }
 
