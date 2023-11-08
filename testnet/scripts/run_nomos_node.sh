@@ -5,6 +5,7 @@ set -e
 # Set env variables for nomos-node.
 NET_NODE_KEY=$(/etc/nomos/scripts/register_node.sh)
 CONSENSUS_PRIV_KEY=$NET_NODE_KEY
+DA_VOTER_KEY=$CONSENSUS_PRIV_KEY
 OVERLAY_NODES=$(/etc/nomos/scripts/consensus_node_list.sh)
 
 node_ids=$(etcdctl get "/node/" --prefix --keys-only)
@@ -21,12 +22,14 @@ for node_id in $node_ids; do
 done
 
 export CONSENSUS_PRIV_KEY \
+       DA_VOTER_KEY \
        OVERLAY_NODES \
        NET_NODE_KEY \
        NET_INITIAL_PEERS
 
 echo "I am a container ${HOSTNAME} node ${NET_NODE_KEY}"
 echo "CONSENSUS_PRIV_KEY: ${CONSENSUS_PRIV_KEY}"
+echo "DA_VOTER_KEY: ${DA_VOTER_KEY}"
 echo "OVERLAY_NODES: ${OVERLAY_NODES}"
 echo "NET_INITIAL_PEERS: ${NET_INITIAL_PEERS}"
 

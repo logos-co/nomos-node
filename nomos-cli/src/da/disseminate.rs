@@ -1,3 +1,4 @@
+use crate::api::mempool::send_certificate;
 use clap::{Args, ValueEnum};
 use full_replication::{AbsoluteNumber, Attestation, Certificate, FullReplication, Voter};
 use futures::StreamExt;
@@ -15,7 +16,7 @@ use overwatch_rs::{
     },
     DynError,
 };
-use reqwest::{Client, Url};
+use reqwest::Url;
 use serde::Serialize;
 use std::{
     error::Error,
@@ -25,8 +26,6 @@ use std::{
 };
 use tokio::sync::{mpsc::UnboundedReceiver, Mutex};
 
-const NODE_CERT_PATH: &str = "mempool/add/cert";
-
 pub async fn disseminate_and_wait<D, B, N, A, C>(
     mut da: D,
     data: Box<[u8]>,
@@ -34,7 +33,7 @@ pub async fn disseminate_and_wait<D, B, N, A, C>(
     status_updates: Sender<Status>,
     node_addr: Option<&Url>,
     output: Option<&PathBuf>,
-) -> Result<(), Box<dyn std::error::Error>>
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>>
 where
     D: DaProtocol<Blob = B, Attestation = A, Certificate = C>,
     N: NetworkAdapter<Blob = B, Attestation = A> + Send + Sync,
@@ -48,7 +47,7 @@ where
     status_updates.send(Status::Disseminating)?;
     futures::future::try_join_all(blobs.into_iter().map(|blob| adapter.send_blob(blob)))
         .await
-        .map_err(|e| e as Box<dyn std::error::Error>)?;
+        .map_err(|e| e as Box<dyn std::error::Error + Sync + Send>)?;
 
     // 3) Collect attestations and create proof
     status_updates.send(Status::WaitingAttestations)?;
@@ -69,15 +68,8 @@ where
 
     if let Some(node) = node_addr {
         status_updates.send(Status::SendingCert)?;
-        let client = Client::new();
-        let res = client
-            .post(node.join(NODE_CERT_PATH).unwrap())
-            .header("Content-Type", "application/json")
-            .body(serde_json::to_string(&cert).unwrap())
-            .send()
-            .await?;
+        let res = send_certificate(node, &cert).await?;
 
-        tracing::info!("Response: {:?}", res);
         if !res.status().is_success() {
             tracing::error!("ERROR: {:?}", res);
             return Err(format!("Failed to send certificate to node: {}", res.status()).into());
@@ -96,6 +88,7 @@ pub enum Status {
     SavingCert,
     SendingCert,
     Done,
+    Err(Box<dyn std::error::Error + Send + Sync>),
 }
 
 impl Status {
@@ -108,6 +101,7 @@ impl Status {
             Self::SavingCert => "Saving certificate to file",
             Self::SendingCert => "Sending certificate to node",
             Self::Done => "",
+            Self::Err(_) => "Error",
         }
     }
 }
@@ -185,13 +179,13 @@ impl ServiceCore for DisseminateService {
             {
                 Err(_) => {
                     tracing::error!("Timeout reached, check the logs for additional details");
-                    std::process::exit(1);
+                    let _ = status_updates.send(Status::Err("Timeout reached".into()));
                 }
-                Ok(Err(_)) => {
+                Ok(Err(e)) => {
                     tracing::error!(
                         "Could not disseminate blob, check logs for additional details"
                     );
-                    std::process::exit(1);
+                    let _ = status_updates.send(Status::Err(e));
                 }
                 _ => {}
             }

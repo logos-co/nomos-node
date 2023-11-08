@@ -5,7 +5,7 @@ mod tally;
 mod task_manager;
 
 // std
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::fmt::Debug;
 use std::hash::Hash;
 use std::pin::Pin;
@@ -55,6 +55,9 @@ use overwatch_rs::services::{
 };
 
 const DEFAULT_TIMEOUT: Duration = Duration::from_secs(30);
+// Limit the number of blocks returned by GetBlocks
+// Approx 64KB of data
+const BLOCKS_LIMIT: usize = 512;
 
 fn default_timeout() -> Duration {
     DEFAULT_TIMEOUT
@@ -419,13 +422,37 @@ where
                     current_view: carnot.current_view(),
                     highest_voted_view: carnot.highest_voted_view(),
                     local_high_qc: carnot.high_qc(),
-                    safe_blocks: carnot.safe_blocks().clone(),
+                    tip: carnot.tip(),
                     last_view_timeout_qc: carnot.last_view_timeout_qc(),
-                    committed_blocks: carnot.latest_committed_blocks(),
+                    last_committed_block: carnot.safe_blocks()
+                        [&carnot.latest_committed_blocks()[0]]
+                        .clone(),
                 };
                 tx.send(info).unwrap_or_else(|e| {
                     tracing::error!("Could not send consensus info through channel: {:?}", e)
                 });
+            }
+            ConsensusMsg::GetBlocks { from, to, tx } => {
+                // default to tip block if not present
+                let from = from.unwrap_or(carnot.tip().id);
+                // default to genesis block if not present
+                let to = to.unwrap_or(carnot.genesis_block().id);
+
+                let mut res = Vec::new();
+                let mut cur = from;
+                let blocks = carnot.safe_blocks();
+
+                while let Some(block) = blocks.get(&cur) {
+                    res.push(block.clone());
+                    // limit the response size
+                    if cur == to || cur == carnot.genesis_block().id || res.len() >= BLOCKS_LIMIT {
+                        break;
+                    }
+                    cur = block.parent();
+                }
+
+                tx.send(res)
+                    .unwrap_or_else(|_| tracing::error!("could not send blocks through channel"));
             }
         }
     }
@@ -1073,7 +1100,17 @@ enum Event<Tx: Clone + Hash + Eq, BlobCertificate: Clone + Eq + Hash> {
 
 #[derive(Debug)]
 pub enum ConsensusMsg {
-    Info { tx: Sender<CarnotInfo> },
+    Info {
+        tx: Sender<CarnotInfo>,
+    },
+    /// Walk the chain back from 'from' (the most recent block) to
+    /// 'to' (the oldest block). If 'from' is None, the tip of the chain is used as a starting
+    /// point. If 'to' is None or not known to the node, the genesis block is used as an end point.
+    GetBlocks {
+        from: Option<BlockId>,
+        to: Option<BlockId>,
+        tx: Sender<Vec<consensus_engine::Block>>,
+    },
 }
 
 impl RelayMessage for ConsensusMsg {}
@@ -1086,10 +1123,9 @@ pub struct CarnotInfo {
     pub current_view: View,
     pub highest_voted_view: View,
     pub local_high_qc: StandardQc,
-    #[serde_as(as = "Vec<(_, _)>")]
-    pub safe_blocks: HashMap<BlockId, consensus_engine::Block>,
+    pub tip: consensus_engine::Block,
     pub last_view_timeout_qc: Option<TimeoutQc>,
-    pub committed_blocks: Vec<BlockId>,
+    pub last_committed_block: consensus_engine::Block,
 }
 
 async fn get_mempool_contents<Item, Key>(
@@ -1138,29 +1174,36 @@ mod tests {
                 view: View::new(0),
                 id: BlockId::zeros(),
             },
-            safe_blocks: HashMap::from([(
-                BlockId::zeros(),
-                Block {
-                    id: BlockId::zeros(),
+            tip: Block {
+                id: BlockId::zeros(),
+                view: View::new(0),
+                parent_qc: Qc::Standard(StandardQc {
                     view: View::new(0),
-                    parent_qc: Qc::Standard(StandardQc {
-                        view: View::new(0),
-                        id: BlockId::zeros(),
-                    }),
-                    leader_proof: LeaderProof::LeaderId {
-                        leader_id: NodeId::new([0; 32]),
-                    },
+                    id: BlockId::zeros(),
+                }),
+                leader_proof: LeaderProof::LeaderId {
+                    leader_id: NodeId::new([0; 32]),
                 },
-            )]),
+            },
             last_view_timeout_qc: None,
-            committed_blocks: vec![BlockId::zeros()],
+            last_committed_block: Block {
+                id: BlockId::zeros(),
+                view: View::new(0),
+                parent_qc: Qc::Standard(StandardQc {
+                    view: View::new(0),
+                    id: BlockId::zeros(),
+                }),
+                leader_proof: LeaderProof::LeaderId {
+                    leader_id: NodeId::new([0; 32]),
+                },
+            },
         };
 
         let serialized = serde_json::to_string(&info).unwrap();
         eprintln!("{serialized}");
         assert_eq!(
             serialized,
-            r#"{"id":"0x0000000000000000000000000000000000000000000000000000000000000000","current_view":1,"highest_voted_view":-1,"local_high_qc":{"view":0,"id":"0x0000000000000000000000000000000000000000000000000000000000000000"},"safe_blocks":[["0x0000000000000000000000000000000000000000000000000000000000000000",{"id":"0x0000000000000000000000000000000000000000000000000000000000000000","view":0,"parent_qc":{"Standard":{"view":0,"id":"0x0000000000000000000000000000000000000000000000000000000000000000"}},"leader_proof":{"LeaderId":{"leader_id":"0x0000000000000000000000000000000000000000000000000000000000000000"}}}]],"last_view_timeout_qc":null,"committed_blocks":["0x0000000000000000000000000000000000000000000000000000000000000000"]}"#
+            r#"{"id":"0000000000000000000000000000000000000000000000000000000000000000","current_view":1,"highest_voted_view":-1,"local_high_qc":{"view":0,"id":"0000000000000000000000000000000000000000000000000000000000000000"},"tip":{"id":"0000000000000000000000000000000000000000000000000000000000000000","view":0,"parent_qc":{"Standard":{"view":0,"id":"0000000000000000000000000000000000000000000000000000000000000000"}},"leader_proof":{"LeaderId":{"leader_id":"0000000000000000000000000000000000000000000000000000000000000000"}}},"last_view_timeout_qc":null,"last_committed_block":{"id":"0000000000000000000000000000000000000000000000000000000000000000","view":0,"parent_qc":{"Standard":{"view":0,"id":"0000000000000000000000000000000000000000000000000000000000000000"}},"leader_proof":{"LeaderId":{"leader_id":"0000000000000000000000000000000000000000000000000000000000000000"}}}}"#
         );
 
         let deserialized: CarnotInfo = serde_json::from_str(&serialized).unwrap();

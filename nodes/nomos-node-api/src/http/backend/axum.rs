@@ -1,6 +1,11 @@
 use std::fmt::Debug;
 
-use axum::{extract::State, http::HeaderValue, response::Response, routing, Json, Router, Server};
+use axum::{
+    extract::{Query, State},
+    http::HeaderValue,
+    response::Response,
+    routing, Json, Router, Server,
+};
 use hyper::header::{CONTENT_TYPE, USER_AGENT};
 use overwatch_rs::overwatch::handle::OverwatchHandle;
 use tower_http::{
@@ -91,6 +96,7 @@ impl Backend for AxumBackend {
             .route("/cl/metrics", routing::get(cl_metrics))
             .route("/cl/status", routing::post(cl_status))
             .route("/carnot/info", routing::get(carnot_info))
+            .route("/carnot/blocks", routing::get(carnot_blocks))
             .route("/network/info", routing::get(libp2p_info))
             .route("/storage/block", routing::post(block))
             .route("/mempool/add/tx", routing::post(add_tx))
@@ -197,6 +203,28 @@ async fn cl_status(
 )]
 async fn carnot_info(State(handle): State<OverwatchHandle>) -> Response {
     make_request_and_return_response!(consensus::carnot_info(&handle))
+}
+
+#[derive(serde::Deserialize)]
+struct QueryParams {
+    from: Option<BlockId>,
+    to: Option<BlockId>,
+}
+
+#[utoipa::path(
+    get,
+    path = "/carnot/blocks",
+    responses(
+        (status = 200, description = "Query the carnot information", body = nomos_consensus::CarnotInfo),
+        (status = 500, description = "Internal server error", body = String),
+    )
+)]
+async fn carnot_blocks(
+    State(handle): State<OverwatchHandle>,
+    Query(params): Query<QueryParams>,
+) -> Response {
+    let QueryParams { from, to } = params;
+    make_request_and_return_response!(consensus::carnot_blocks(&handle, from, to))
 }
 
 #[utoipa::path(
