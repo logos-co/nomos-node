@@ -6,7 +6,8 @@ use nomos_core::{
     tx::Transaction,
 };
 use nomos_node::{
-    Config, ConsensusArgs, DaArgs, HttpArgs, LogArgs, NetworkArgs, Nomos, NomosServiceSettings, OverlayArgs,
+    Config, ConsensusArgs, DaArgs, HttpArgs, LogArgs, NetworkArgs, Nomos, NomosServiceSettings,
+    OverlayArgs,
 };
 use nomos_node_lib::tx::Tx;
 
