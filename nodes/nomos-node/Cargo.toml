@@ -14,19 +14,26 @@ chrono = "0.4"
 futures = "0.3"
 http = "0.2.9"
 hex = "0.4.3"
-overwatch-rs = { git = "https://github.com/logos-co/Overwatch", rev = "2f70806" }
-overwatch-derive = { git = "https://github.com/logos-co/Overwatch", rev = "ac28d01" }
+overwatch-rs = { git = "https://github.com/logos-co/Overwatch", branch = "concrete-error" }
+overwatch-derive = { git = "https://github.com/logos-co/Overwatch", branch = "concrete-error" }
 tracing = "0.1"
 multiaddr = "0.18"
 nomos-core = { path = "../../nomos-core" }
 nomos-network = { path = "../../nomos-services/network", features = ["libp2p"] }
 nomos-log = { path = "../../nomos-services/log" }
-nomos-mempool = { path = "../../nomos-services/mempool", features = ["mock", "libp2p"] }
+nomos-mempool = { path = "../../nomos-services/mempool", features = [
+  "mock",
+  "libp2p",
+] }
 nomos-http = { path = "../../nomos-services/http", features = ["http"] }
-nomos-consensus = { path = "../../nomos-services/consensus", features = ["libp2p"] }
+nomos-consensus = { path = "../../nomos-services/consensus", features = [
+  "libp2p",
+] }
 nomos-storage = { path = "../../nomos-services/storage", features = ["sled"] }
 nomos-libp2p = { path = "../../nomos-libp2p" }
-nomos-da = { path = "../../nomos-services/data-availability", features = ["libp2p"] }
+nomos-da = { path = "../../nomos-services/data-availability", features = [
+  "libp2p",
+] }
 nomos-system-sig = { path = "../../nomos-services/system-sig" }
 metrics = { path = "../../nomos-services/metrics", optional = true }
 tracing-subscriber = "0.3"

@@ -9,8 +9,8 @@ axum = ["dep:axum", "dep:hyper", "utoipa-swagger-ui/axum"]
 
 [dependencies]
 async-trait = "0.1"
-overwatch-rs = { git = "https://github.com/logos-co/Overwatch", rev = "2f70806" }
-overwatch-derive = { git = "https://github.com/logos-co/Overwatch", rev = "ac28d01" }
+overwatch-rs = { git = "https://github.com/logos-co/Overwatch", branch = "concrete-error" }
+overwatch-derive = { git = "https://github.com/logos-co/Overwatch", branch = "concrete-error" }
 tracing = "0.1"
 
 
@@ -19,7 +19,11 @@ nomos-core = { path = "../../nomos-core" }
 nomos-consensus = { path = "../../nomos-services/consensus" }
 nomos-network = { path = "../../nomos-services/network" }
 nomos-da = { path = "../../nomos-services/data-availability" }
-nomos-mempool = { path = "../../nomos-services/mempool", features = ["mock", "libp2p", "openapi"] }
+nomos-mempool = { path = "../../nomos-services/mempool", features = [
+  "mock",
+  "libp2p",
+  "openapi",
+] }
 nomos-storage = { path = "../../nomos-services/storage", features = ["sled"] }
 nomos-libp2p = { path = "../../nomos-libp2p" }
 full-replication = { path = "../../nomos-da/full-replication" }
