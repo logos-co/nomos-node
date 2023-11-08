@@ -11,7 +11,7 @@ use overwatch_rs::services::{
     handle::{ServiceHandle, ServiceStateHandle},
     relay::NoMessage,
     state::*,
-    ServiceCore, ServiceData, ServiceId, ServiceError,
+    ServiceCore, ServiceData, ServiceError, ServiceId,
 };
 use reqwest::Url;
 use serde::Serialize;
