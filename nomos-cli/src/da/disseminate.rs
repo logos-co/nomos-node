@@ -152,7 +152,7 @@ impl ServiceCore for DisseminateService {
         } = service_state.settings_reader.get_updated_settings();
 
         let da_protocol: Result<FullReplication<_>, _> = da_protocol.try_into();
-        let da_protocol = da_protocol.map_err(ServiceError::custom(e))?;
+        let da_protocol = da_protocol.map_err(ServiceError::custom)?;
 
         let network_relay = service_state
             .overwatch_handle
