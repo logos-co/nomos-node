@@ -17,7 +17,7 @@ pub use nomos_node_lib::tx::Tx;
 use nomos_node_lib::{Carnot, DataAvailabilityService, Mempool, Wire};
 use nomos_storage::{backends::sled::SledBackend, StorageService};
 
-pub use config::{Config, ConsensusArgs, HttpArgs, LogArgs, NetworkArgs, OverlayArgs};
+pub use config::{Config, ConsensusArgs, DaArgs, HttpArgs, LogArgs, NetworkArgs, OverlayArgs};
 
 use nomos_network::NetworkService;
 use nomos_system_sig::SystemSig;
