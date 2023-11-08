@@ -1,6 +1,11 @@
 use std::{fmt::Debug, hash::Hash};
 
-use axum::{extract::State, http::HeaderValue, response::Response, routing, Json, Router, Server};
+use axum::{
+    extract::{Query, State},
+    http::HeaderValue,
+    response::Response,
+    routing, Json, Router, Server,
+};
 use hyper::header::{CONTENT_TYPE, USER_AGENT};
 use overwatch_rs::overwatch::handle::OverwatchHandle;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
@@ -113,6 +118,7 @@ where
             .route("/cl/metrics", routing::get(cl_metrics::<T>))
             .route("/cl/status", routing::post(cl_status::<T>))
             .route("/carnot/info", routing::get(carnot_info::<T, S, SIZE>))
+            .route("/carnot/blocks", routing::get(carnot_blocks::<T, S, SIZE>))
             .route("/network/info", routing::get(libp2p_info))
             .route("/storage/block", routing::post(block::<S, T>))
             .route("/mempool/add/tx", routing::post(add_tx::<T>))
@@ -241,6 +247,33 @@ where
     SS: StorageSerde + Send + Sync + 'static,
 {
     make_request_and_return_response!(consensus::carnot_info::<Tx, SS, SIZE>(&handle))
+}
+
+#[derive(Deserialize)]
+struct QueryParams {
+    from: Option<BlockId>,
+    to: Option<BlockId>,
+}
+
+#[utoipa::path(
+    get,
+    path = "/carnot/blocks",
+    responses(
+        (status = 200, description = "Query the block information", body = Vec<consensus_engine::Block>),
+        (status = 500, description = "Internal server error", body = String),
+    )
+)]
+async fn carnot_blocks<Tx, SS, const SIZE: usize>(
+    State(store): State<OverwatchHandle>,
+    Query(query): Query<QueryParams>,
+) -> Response
+where
+    Tx: Transaction + Clone + Debug + Hash + Serialize + DeserializeOwned + Send + Sync + 'static,
+    <Tx as Transaction>::Hash: std::cmp::Ord + Debug + Send + Sync + 'static,
+    SS: StorageSerde + Send + Sync + 'static,
+{
+    let QueryParams { from, to } = query;
+    make_request_and_return_response!(consensus::carnot_blocks::<Tx, SS, SIZE>(&store, from, to))
 }
 
 #[utoipa::path(

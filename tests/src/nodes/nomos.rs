@@ -21,7 +21,6 @@ use nomos_node::{Config, Tx};
 use nomos_node_api::http::backend::axum::AxumBackendSettings;
 // crates
 use fraction::Fraction;
-
 use once_cell::sync::Lazy;
 use rand::{thread_rng, Rng};
 use reqwest::Client;
@@ -32,6 +31,7 @@ const NOMOS_BIN: &str = "../target/debug/nomos-node";
 const CARNOT_INFO_API: &str = "carnot/info";
 const STORAGE_BLOCKS_API: &str = "storage/block";
 const LOGS_PREFIX: &str = "__logs";
+const GET_BLOCKS_INFO: &str = "carnot/blocks";
 
 pub struct NomosNode {
     addr: SocketAddr,
@@ -55,10 +55,18 @@ impl Drop for NomosNode {
 }
 
 impl NomosNode {
+    pub fn id(&self) -> NodeId {
+        NodeId::from(self.config.consensus.private_key)
+    }
+
     pub async fn spawn(mut config: Config) -> Self {
         // Waku stores the messages in a db file in the current dir, we need a different
         // directory for each node to avoid conflicts
-        let dir = tempfile::tempdir().unwrap();
+        //
+        // NOTE: It's easier to use the current location instead of OS-default tempfile location
+        // because Github Actions can easily access files in the current location using wildcard
+        // to upload them as artifacts.
+        let dir = tempfile::TempDir::new_in(std::env::current_dir().unwrap()).unwrap();
         let mut file = NamedTempFile::new().unwrap();
         let config_path = file.path().to_owned();
 
@@ -73,7 +81,7 @@ impl NomosNode {
         let child = Command::new(std::env::current_dir().unwrap().join(NOMOS_BIN))
             .arg(&config_path)
             .current_dir(dir.path())
-            .stdout(Stdio::null())
+            .stdout(Stdio::inherit())
             .spawn()
             .unwrap();
         let node = Self {
@@ -138,6 +146,29 @@ impl NomosNode {
             pending_items: res["pending_items"].as_u64().unwrap() as usize,
             last_item_timestamp: res["last_item_timestamp"].as_u64().unwrap(),
         }
+    }
+
+    pub async fn get_blocks_info(
+        &self,
+        from: Option<BlockId>,
+        to: Option<BlockId>,
+    ) -> Vec<consensus_engine::Block> {
+        let mut req = CLIENT.get(format!("http://{}/{}", self.addr, GET_BLOCKS_INFO));
+
+        if let Some(from) = from {
+            req = req.query(&[("from", from)]);
+        }
+
+        if let Some(to) = to {
+            req = req.query(&[("to", to)]);
+        }
+
+        req.send()
+            .await
+            .unwrap()
+            .json::<Vec<consensus_engine::Block>>()
+            .await
+            .unwrap()
     }
 
     // not async so that we can use this in `Drop`
