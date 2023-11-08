@@ -2,6 +2,7 @@
 members = [
     "nomos-core",
     "nomos-libp2p",
+    "nomos-services/api",
     "nomos-services/log",
     "nomos-services/metrics",
     "nomos-services/network",
@@ -17,7 +18,6 @@ members = [
     "nomos-cli",
     "nomos-utils",
     "nodes/nomos-node",
-    "nodes/nomos-node-api",
     "nodes/mixnode",
     "simulations",
     "consensus-engine",

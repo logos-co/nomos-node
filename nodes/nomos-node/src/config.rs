@@ -4,6 +4,7 @@ use std::{
     time::Duration,
 };
 
+use crate::api::AxumBackend;
 use crate::DataAvailability;
 use crate::{Carnot, Tx, Wire, MB16};
 use clap::{Parser, ValueEnum};
@@ -11,11 +12,11 @@ use color_eyre::eyre::{self, eyre, Result};
 use hex::FromHex;
 #[cfg(feature = "metrics")]
 use metrics::{backend::map::MapMetricsBackend, types::MetricsData, MetricsService};
+use nomos_api::ApiService;
 use nomos_libp2p::{secp256k1::SecretKey, Multiaddr};
 use nomos_log::{Logger, LoggerBackend, LoggerFormat};
 use nomos_network::backends::libp2p::Libp2p;
 use nomos_network::NetworkService;
-use nomos_node_api::{http::backend::axum::AxumBackend, ApiService};
 use overwatch_rs::services::ServiceData;
 use serde::{Deserialize, Serialize};
 use tracing::Level;
