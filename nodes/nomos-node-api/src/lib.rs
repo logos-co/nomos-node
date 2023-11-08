@@ -3,7 +3,7 @@ use overwatch_rs::{
         handle::ServiceStateHandle,
         relay::NoMessage,
         state::{NoOperator, NoState},
-        ServiceCore, ServiceData,
+        ServiceCore, ServiceData, ServiceError,
     },
     DynError,
 };
@@ -51,14 +51,16 @@ where
     B: Backend + Send + Sync + 'static,
 {
     /// Initialize the service with the given state
-    fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, DynError> {
+    fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, ServiceError> {
         let settings = service_state.settings_reader.get_updated_settings();
         Ok(Self { settings })
     }
 
     /// Service main loop
-    async fn run(mut self) -> Result<(), DynError> {
-        let endpoint = B::new(self.settings.backend_settings).await?;
+    async fn run(mut self) -> Result<(), ServiceError> {
+        let endpoint = B::new(self.settings.backend_settings)
+            .await
+            .map_err(|e| ServiceError::Service(Box::new(e)))?;
         endpoint.serve().await?;
         Ok(())
     }
