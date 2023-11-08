@@ -6,7 +6,6 @@ use overwatch_rs::{
         state::{NoOperator, NoState},
         ServiceCore, ServiceData, ServiceError,
     },
-    DynError,
 };
 
 pub mod http;
@@ -67,7 +66,7 @@ where
             .await
             .map_err(|e| ServiceError::Service(Box::new(e)))?;
         endpoint
-            .serve()
+            .serve(self.handle)
             .await
             .map_err(|e| ServiceError::Service(Box::new(e)))?;
         Ok(())
