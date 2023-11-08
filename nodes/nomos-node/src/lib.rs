@@ -20,9 +20,6 @@ use nomos_da::{
     backend::memory_cache::BlobCache, network::adapters::libp2p::Libp2pAdapter as DaLibp2pAdapter,
     DataAvailabilityService,
 };
-use nomos_http::backends::axum::AxumBackend;
-use nomos_http::bridge::HttpBridgeService;
-use nomos_http::http::HttpService;
 use nomos_log::Logger;
 use nomos_mempool::network::adapters::libp2p::Libp2pAdapter as MempoolLibp2pAdapter;
 use nomos_mempool::{
@@ -30,6 +27,8 @@ use nomos_mempool::{
     Transaction as TxDiscriminant,
 };
 use nomos_network::backends::libp2p::Libp2p;
+use nomos_node_api::http::backend::axum::AxumBackend;
+use nomos_node_api::ApiService;
 use nomos_storage::{
     backends::{sled::SledBackend, StorageSerde},
     StorageService,
@@ -88,8 +87,7 @@ pub struct Nomos {
         >,
     >,
     consensus: ServiceHandle<Carnot>,
-    http: ServiceHandle<HttpService<AxumBackend>>,
-    bridges: ServiceHandle<HttpBridgeService>,
+    http: ServiceHandle<ApiService<AxumBackend<Tx, Wire, MB16>>>,
     #[cfg(feature = "metrics")]
     metrics: ServiceHandle<MetricsService<MapMetricsBackend<MetricsData>>>,
     da: ServiceHandle<DataAvailability>,
