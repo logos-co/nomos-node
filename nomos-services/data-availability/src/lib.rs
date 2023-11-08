@@ -2,7 +2,6 @@ pub mod backend;
 pub mod network;
 
 // std
-use overwatch_rs::DynError;
 use std::fmt::{Debug, Formatter};
 // crates
 use futures::StreamExt;
@@ -17,7 +16,7 @@ use overwatch_rs::services::handle::ServiceStateHandle;
 use overwatch_rs::services::life_cycle::LifecycleMessage;
 use overwatch_rs::services::relay::{Relay, RelayMessage};
 use overwatch_rs::services::state::{NoOperator, NoState};
-use overwatch_rs::services::{ServiceCore, ServiceData, ServiceId};
+use overwatch_rs::services::{ServiceCore, ServiceData, ServiceError, ServiceId};
 use tracing::error;
 
 pub struct DataAvailabilityService<Protocol, Backend, Network>
@@ -155,7 +154,7 @@ where
     Network:
         NetworkAdapter<Blob = Protocol::Blob, Attestation = Protocol::Attestation> + Send + Sync,
 {
-    fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, DynError> {
+    fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, ServiceError> {
         let network_relay = service_state.overwatch_handle.relay();
         let settings = service_state.settings_reader.get_updated_settings();
         let backend = Backend::new(settings.backend);
@@ -168,7 +167,7 @@ where
         })
     }
 
-    async fn run(self) -> Result<(), DynError> {
+    async fn run(self) -> Result<(), ServiceError> {
         let Self {
             mut service_state,
             backend,

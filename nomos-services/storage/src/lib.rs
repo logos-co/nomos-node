@@ -16,7 +16,7 @@ use backends::{StorageSerde, StorageTransaction};
 use overwatch_rs::services::life_cycle::LifecycleMessage;
 use overwatch_rs::services::relay::RelayMessage;
 use overwatch_rs::services::state::{NoOperator, NoState};
-use overwatch_rs::services::{ServiceCore, ServiceData, ServiceId};
+use overwatch_rs::services::{ServiceCore, ServiceData, ServiceError, ServiceId};
 use tracing::error;
 
 /// Storage message that maps to [`StorageBackend`] trait
@@ -273,14 +273,15 @@ impl<Backend: StorageBackend + Send + Sync + 'static> StorageService<Backend> {
 
 #[async_trait]
 impl<Backend: StorageBackend + Send + Sync + 'static> ServiceCore for StorageService<Backend> {
-    fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, overwatch_rs::DynError> {
+    fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, ServiceError> {
         Ok(Self {
-            backend: Backend::new(service_state.settings_reader.get_updated_settings())?,
+            backend: Backend::new(service_state.settings_reader.get_updated_settings())
+                .map_err(|e| ServiceError::Service(Box::new(e)))?,
             service_state,
         })
     }
 
-    async fn run(mut self) -> Result<(), overwatch_rs::DynError> {
+    async fn run(mut self) -> Result<(), ServiceError> {
         let Self {
             mut backend,
             service_state:

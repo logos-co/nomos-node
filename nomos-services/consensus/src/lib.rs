@@ -51,7 +51,7 @@ use overwatch_rs::services::relay::{OutboundRelay, Relay, RelayMessage};
 use overwatch_rs::services::{
     handle::ServiceStateHandle,
     state::{NoOperator, NoState},
-    ServiceCore, ServiceData, ServiceId,
+    ServiceCore, ServiceData, ServiceError, ServiceId,
 };
 
 const DEFAULT_TIMEOUT: Duration = Duration::from_secs(30);
@@ -202,7 +202,7 @@ where
     BS::Settings: Send + Sync + 'static,
     Storage: StorageBackend + Send + Sync + 'static,
 {
-    fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, overwatch_rs::DynError> {
+    fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, ServiceError> {
         let network_relay = service_state.overwatch_handle.relay();
         let cl_mempool_relay = service_state.overwatch_handle.relay();
         let da_mempool_relay = service_state.overwatch_handle.relay();
@@ -217,7 +217,7 @@ where
         })
     }
 
-    async fn run(mut self) -> Result<(), overwatch_rs::DynError> {
+    async fn run(mut self) -> Result<(), ServiceError> {
         let network_relay: OutboundRelay<_> = self
             .network_relay
             .connect()

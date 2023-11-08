@@ -21,13 +21,13 @@ use crate::network::NetworkAdapter;
 use backend::{MemPool, Status};
 use nomos_core::block::BlockId;
 use nomos_network::{NetworkMsg, NetworkService};
-use overwatch_rs::services::life_cycle::LifecycleMessage;
 use overwatch_rs::services::{
     handle::ServiceStateHandle,
     relay::{OutboundRelay, Relay, RelayMessage},
     state::{NoOperator, NoState},
     ServiceCore, ServiceData, ServiceId,
 };
+use overwatch_rs::services::{life_cycle::LifecycleMessage, ServiceError};
 use tracing::error;
 
 pub struct MempoolService<N, P, D>
@@ -159,7 +159,7 @@ where
     N: NetworkAdapter<Item = P::Item, Key = P::Key> + Send + Sync + 'static,
     D: Discriminant + Send,
 {
-    fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, overwatch_rs::DynError> {
+    fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, ServiceError> {
         let network_relay = service_state.overwatch_handle.relay();
         let settings = service_state.settings_reader.get_updated_settings();
         Ok(Self {
@@ -170,7 +170,7 @@ where
         })
     }
 
-    async fn run(mut self) -> Result<(), overwatch_rs::DynError> {
+    async fn run(mut self) -> Result<(), ServiceError> {
         let Self {
             mut service_state,
             network_relay,

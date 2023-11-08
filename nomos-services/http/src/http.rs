@@ -14,7 +14,7 @@ use overwatch_rs::services::{
     handle::ServiceStateHandle,
     relay::{InboundRelay, RelayMessage},
     state::{NoOperator, NoState},
-    ServiceCore, ServiceData, ServiceId,
+    ServiceCore, ServiceData, ServiceError, ServiceId,
 };
 use serde::{Deserialize, Serialize};
 use tokio::sync::{mpsc::Sender, oneshot};
@@ -124,17 +124,17 @@ where
     B: HttpBackend + Send + Sync + 'static,
     <B as HttpBackend>::Error: Error + Send + Sync + 'static,
 {
-    fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, overwatch_rs::DynError> {
+    fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, ServiceError> {
         let inbound_relay = service_state.inbound_relay;
         <B as HttpBackend>::new(service_state.settings_reader.get_updated_settings().backend)
             .map(|backend| Self {
                 backend,
                 inbound_relay,
             })
-            .map_err(|e| Box::new(e) as Box<dyn Error + Send + Sync>)
+            .map_err(|e| ServiceError::Service(Box::new(e)))
     }
 
-    async fn run(mut self) -> Result<(), overwatch_rs::DynError> {
+    async fn run(mut self) -> Result<(), ServiceError> {
         let Self {
             backend,
             mut inbound_relay,
@@ -169,7 +169,7 @@ where
             if stop_tx.send(()).is_err() {
                 tracing::error!("HTTP service: failed to send stop signal to HTTP backend.");
             }
-            e
+            ServiceError::Service(e)
         })
     }
 }
@@ -188,25 +188,44 @@ pub async fn handle_graphql_req<M, F>(
     payload: Option<Bytes>,
     relay: OutboundRelay<M>,
     f: F,
-) -> Result<String, overwatch_rs::DynError>
+) -> Result<String, ServiceError>
 where
     F: FnOnce(
         async_graphql::Request,
         oneshot::Sender<async_graphql::Response>,
-    ) -> Result<M, overwatch_rs::DynError>,
+    ) -> Result<M, ServiceError>,
 {
-    let payload = payload.ok_or("empty payload")?;
+    #[derive(Debug)]
+    struct EmptyPayload;
+
+    impl core::fmt::Display for EmptyPayload {
+        fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+            write!(f, "empty payload")
+        }
+    }
+
+    impl Error for EmptyPayload {}
+
+    let payload = payload
+        .ok_or(EmptyPayload)
+        .map_err(|e| ServiceError::Service(Box::new(e)))?;
     let req = async_graphql::http::receive_batch_json(&payload[..])
-        .await?
-        .into_single()?;
+        .await
+        .map_err(|e| ServiceError::Service(Box::new(e)))?
+        .into_single()
+        .map_err(|e| ServiceError::Service(Box::new(e)))?;
 
     let (sender, receiver) = oneshot::channel();
-    relay.send(f(req, sender)?).await.map_err(|_| {
-        tracing::error!(err = "failed to send graphql request to the http service");
-        "failed to send graphql request to the frontend"
-    })?;
+    relay
+        .send(f(req, sender)?)
+        .await
+        .map_err(|e| {
+            tracing::error!(err = "failed to send graphql request to the http service");
+            e
+        })
+        .map_err(|e| ServiceError::RelayError(e.0))?;
 
     let res = receiver.await.unwrap();
-    let res = serde_json::to_string(&res)?;
+    let res = serde_json::to_string(&res).map_err(|e| ServiceError::Service(Box::new(e)))?;
     Ok(res)
 }

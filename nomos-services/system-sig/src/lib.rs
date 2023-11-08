@@ -9,8 +9,7 @@ use overwatch_rs::services::handle::ServiceStateHandle;
 use overwatch_rs::services::life_cycle::LifecycleMessage;
 use overwatch_rs::services::relay::NoMessage;
 use overwatch_rs::services::state::{NoOperator, NoState};
-use overwatch_rs::services::{ServiceCore, ServiceData, ServiceId};
-use overwatch_rs::DynError;
+use overwatch_rs::services::{ServiceCore, ServiceData, ServiceError, ServiceId};
 
 pub struct SystemSig {
     service_state: ServiceStateHandle<Self>,
@@ -48,13 +47,14 @@ impl ServiceData for SystemSig {
 
 #[async_trait::async_trait]
 impl ServiceCore for SystemSig {
-    fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, DynError> {
+    fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, ServiceError> {
         Ok(Self { service_state })
     }
 
-    async fn run(self) -> Result<(), DynError> {
+    async fn run(self) -> Result<(), ServiceError> {
         let Self { service_state } = self;
-        let mut ctrlc = async_ctrlc::CtrlC::new()?;
+        let mut ctrlc =
+            async_ctrlc::CtrlC::new().map_err(|e| ServiceError::Service(Box::new(e)))?;
         let mut lifecycle_stream = service_state.lifecycle_handle.message_stream();
         loop {
             tokio::select! {

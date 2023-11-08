@@ -5,6 +5,7 @@ use std::fmt::{self, Debug};
 // crates
 use async_trait::async_trait;
 use futures::StreamExt;
+use overwatch_rs::services::ServiceError;
 use serde::{Deserialize, Serialize};
 use tokio::sync::broadcast;
 use tokio::sync::oneshot;
@@ -75,7 +76,7 @@ where
     B: NetworkBackend + Send + 'static,
     B::State: Send + Sync,
 {
-    fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, overwatch_rs::DynError> {
+    fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, ServiceError> {
         Ok(Self {
             backend: <B as NetworkBackend>::new(
                 service_state.settings_reader.get_updated_settings().backend,
@@ -85,7 +86,7 @@ where
         })
     }
 
-    async fn run(mut self) -> Result<(), overwatch_rs::DynError> {
+    async fn run(mut self) -> Result<(), ServiceError> {
         let Self {
             service_state:
                 ServiceStateHandle {

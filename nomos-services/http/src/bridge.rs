@@ -8,16 +8,15 @@ use overwatch_rs::services::handle::ServiceStateHandle;
 use overwatch_rs::services::relay::{NoMessage, OutboundRelay};
 use overwatch_rs::services::{
     state::{NoOperator, NoState},
-    ServiceCore, ServiceData, ServiceId,
+    ServiceCore, ServiceData, ServiceError, ServiceId,
 };
-use overwatch_rs::DynError;
 use tokio::sync::mpsc::{channel, Receiver};
 
 use crate::backends::HttpBackend;
 use crate::http::{HttpMethod, HttpMsg, HttpRequest, HttpService};
 
 pub type HttpBridgeRunner =
-    Box<dyn Future<Output = Result<(), overwatch_rs::DynError>> + Send + Unpin + 'static>;
+    Box<dyn Future<Output = Result<(), ServiceError>> + Send + Unpin + 'static>;
 
 // TODO: If we can get rid of the clone bound on here remove Arc.
 // For now as we bind this through the settings we need to keep it.
@@ -35,7 +34,7 @@ pub async fn build_http_bridge<S, B, P>(
     handle: overwatch_rs::overwatch::handle::OverwatchHandle,
     method: HttpMethod,
     path: P,
-) -> Result<(OutboundRelay<S::Message>, Receiver<HttpRequest>), overwatch_rs::DynError>
+) -> Result<(OutboundRelay<S::Message>, Receiver<HttpRequest>), ServiceError>
 where
     S: ServiceCore + Send + Sync + 'static,
     B: HttpBackend + Send + Sync + 'static,
@@ -89,7 +88,7 @@ impl ServiceData for HttpBridgeService {
 
 #[async_trait]
 impl ServiceCore for HttpBridgeService {
-    fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, DynError> {
+    fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, ServiceError> {
         let runners = service_state.settings_reader.get_updated_settings().bridges;
         let runners: Vec<_> = runners
             .into_iter()
@@ -98,7 +97,7 @@ impl ServiceCore for HttpBridgeService {
         Ok(Self { runners })
     }
 
-    async fn run(self) -> Result<(), DynError> {
+    async fn run(self) -> Result<(), ServiceError> {
         futures::future::join_all(self.runners).await;
         Ok(())
     }

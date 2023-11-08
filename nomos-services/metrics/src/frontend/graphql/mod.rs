@@ -10,7 +10,7 @@ use overwatch_rs::services::relay::{Relay, RelayMessage};
 use overwatch_rs::services::{
     handle::ServiceStateHandle,
     state::{NoOperator, NoState},
-    ServiceCore, ServiceData, ServiceId,
+    ServiceCore, ServiceData, ServiceError, ServiceId,
 };
 
 /// Configuration for the GraphQl Server
@@ -68,7 +68,7 @@ where
             {
                 Ok(r) => r,
                 Err(err) => {
-                    tracing::error!(err);
+                    tracing::error!(%err);
                     err.to_string()
                 }
             };
@@ -148,7 +148,7 @@ impl<Backend: MetricsBackend + Send + Sync + 'static> ServiceCore for Graphql<Ba
 where
     Backend::MetricsData: async_graphql::OutputType,
 {
-    fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, overwatch_rs::DynError> {
+    fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, ServiceError> {
         let backend_channel: Relay<MetricsService<Backend>> =
             service_state.overwatch_handle.relay();
         let settings = service_state.settings_reader.get_updated_settings();
@@ -159,7 +159,7 @@ where
         })
     }
 
-    async fn run(mut self) -> Result<(), overwatch_rs::DynError> {
+    async fn run(mut self) -> Result<(), ServiceError> {
         let max_complexity = self.settings.max_complexity;
         let max_depth = self.settings.max_depth;
         let mut inbound_relay = self.service_state.take().unwrap().inbound_relay;

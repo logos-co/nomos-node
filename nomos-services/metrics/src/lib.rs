@@ -3,6 +3,7 @@ use std::fmt::Debug;
 
 // crates
 use futures::StreamExt;
+use overwatch_rs::services::ServiceError;
 use tracing::error;
 
 // internal
@@ -168,7 +169,7 @@ impl<Backend: MetricsBackend> MetricsService<Backend> {
 
 #[async_trait::async_trait]
 impl<Backend: MetricsBackend + Send + Sync + 'static> ServiceCore for MetricsService<Backend> {
-    fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, overwatch_rs::DynError> {
+    fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, ServiceError> {
         let settings = service_state.settings_reader.get_updated_settings();
         let backend = Backend::init(settings);
         Ok(Self {
@@ -177,7 +178,7 @@ impl<Backend: MetricsBackend + Send + Sync + 'static> ServiceCore for MetricsSer
         })
     }
 
-    async fn run(self) -> Result<(), overwatch_rs::DynError> {
+    async fn run(self) -> Result<(), ServiceError> {
         let Self {
             service_state:
                 ServiceStateHandle {
