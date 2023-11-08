@@ -27,8 +27,9 @@ use std::{
     io,
     path::PathBuf,
     sync::{
+        self,
         mpsc::{Receiver, Sender},
-        Arc, self
+        Arc,
     },
     time::{Duration, Instant},
 };
@@ -95,7 +96,7 @@ impl NomosChat {
         let (status_sender, status_updates) = std::sync::mpsc::channel();
 
         let shared_writer = Arc::new(sync::Mutex::new(Vec::new()));
-        let backend =  SharedWriter::from_inner(shared_writer.clone());
+        let backend = SharedWriter::from_inner(shared_writer.clone());
 
         std::thread::spawn(move || {
             OverwatchRunner::<DisseminateApp>::run(

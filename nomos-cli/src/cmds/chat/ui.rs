@@ -95,7 +95,14 @@ fn chat(f: &mut Frame, app: &App) {
         .style(Style::new().white().on_black());
     let chunks = Layout::default()
         .direction(Direction::Vertical)
-        .constraints([Constraint::Max(3), Constraint::Percentage(80), Constraint::Max(10)].as_ref())
+        .constraints(
+            [
+                Constraint::Max(3),
+                Constraint::Percentage(80),
+                Constraint::Max(10),
+            ]
+            .as_ref(),
+        )
         .split(block.inner(f.size()));
     f.render_widget(block, f.size());
 
@@ -168,14 +175,18 @@ fn render_status(f: &mut Frame, app: &App, rect: Rect) {
     f.render_widget(status, rect);
 }
 
-fn render_logs<'a>(f: &mut Frame, app: &App, rect: Rect) {
+fn render_logs(f: &mut Frame, app: &App, rect: Rect) {
     use ansi_to_tui::IntoText;
     let logs = app.logs.lock().unwrap();
     f.render_widget(
         Paragraph::new(logs.into_text().unwrap())
             .wrap(Wrap { trim: true })
             .scroll((app.scroll_logs, 0))
-            .block(Block::default().borders(Borders::ALL).title("Logs: (use ←/→ to scroll up/down")),
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .title("Logs: (use ←/→ to scroll up/down"),
+            ),
         rect,
     );
 }
