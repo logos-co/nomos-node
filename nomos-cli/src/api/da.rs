@@ -10,6 +10,7 @@ pub async fn get_blobs(
     const BLOBS_PATH: &str = "da/blobs";
     CLIENT
         .post(node.join(BLOBS_PATH).unwrap())
+        .header("Content-Type", "application/json")
         .body(serde_json::to_string(&ids).unwrap())
         .send()
         .await?

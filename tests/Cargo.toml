@@ -9,7 +9,7 @@ nomos-node = { path = "../nodes/nomos-node", default-features = false }
 nomos-consensus = { path = "../nomos-services/consensus" }
 nomos-network = { path = "../nomos-services/network", features = ["libp2p"]}
 nomos-log = { path = "../nomos-services/log" }
-nomos-http = { path = "../nomos-services/http", features = ["http"] }
+nomos-node-api = { path = "../nodes/nomos-node-api", features = ["axum"] }
 overwatch-rs = { git = "https://github.com/logos-co/Overwatch", rev = "2f70806" }
 nomos-core = { path = "../nomos-core" }
 consensus-engine = { path = "../consensus-engine", features = ["serde"] }
