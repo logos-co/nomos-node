@@ -23,16 +23,20 @@ pub struct MixNode {
 impl Drop for MixNode {
     fn drop(&mut self) {
         if std::thread::panicking() {
-            persist_tempdir(&mut self._tempdir, "mixnode");
+            if let Err(e) = persist_tempdir(&mut self._tempdir, "mixnode") {
+                println!("failed to persist tempdir: {e}");
+            }
         }
 
-        self.child.kill().unwrap();
+        if let Err(e) = self.child.kill() {
+            println!("failed to kill the child process: {e}");
+        }
     }
 }
 
 impl MixNode {
     pub async fn spawn(config: MixnetNodeConfig) -> Self {
-        let dir = create_tempdir();
+        let dir = create_tempdir().unwrap();
 
         let mut config = mixnode::Config {
             mixnode: config,

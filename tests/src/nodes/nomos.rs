@@ -44,10 +44,14 @@ pub struct NomosNode {
 impl Drop for NomosNode {
     fn drop(&mut self) {
         if std::thread::panicking() {
-            persist_tempdir(&mut self._tempdir, "nomos-node");
+            if let Err(e) = persist_tempdir(&mut self._tempdir, "nomos-node") {
+                println!("failed to persist tempdir: {e}");
+            }
         }
 
-        self.child.kill().unwrap();
+        if let Err(e) = self.child.kill() {
+            println!("failed to kill the child process: {e}");
+        }
     }
 }
 
@@ -59,7 +63,7 @@ impl NomosNode {
     pub async fn spawn(mut config: Config) -> Self {
         // Waku stores the messages in a db file in the current dir, we need a different
         // directory for each node to avoid conflicts
-        let dir = create_tempdir();
+        let dir = create_tempdir().unwrap();
         let mut file = NamedTempFile::new().unwrap();
         let config_path = file.path().to_owned();
 
