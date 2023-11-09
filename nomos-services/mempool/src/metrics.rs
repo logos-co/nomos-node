@@ -1,13 +1,13 @@
+// std
 use std::fmt::Debug;
-
-use nomos_metrics::prometheus_client::{
-    self, encoding::EncodeLabelSet, encoding::EncodeLabelValue,
+// crates
+use nomos_metrics::{
+    metrics::{counter::Counter, family::Family},
+    prometheus_client::{self, encoding::EncodeLabelSet, encoding::EncodeLabelValue},
+    NomosRegistry,
 };
-use nomos_metrics::NomosRegistry;
-
-use nomos_metrics::metrics::{counter::Counter, family::Family};
 use overwatch_rs::services::ServiceId;
-
+// internal
 use crate::MempoolMsg;
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq, EncodeLabelValue)]
