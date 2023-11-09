@@ -53,7 +53,7 @@ impl Metrics {
         let messages = Family::default();
         sub_registry.register(
             "messages",
-            "Messages emitted by the relay Mempool",
+            "Messages emitted by the Mempool",
             messages.clone(),
         );
 

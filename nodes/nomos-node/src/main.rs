@@ -1,7 +1,8 @@
 use full_replication::{Blob, Certificate};
+use nomos_metrics::NomosRegistry;
 use nomos_node::{
-    Config, ConsensusArgs, DaArgs, HttpArgs, LogArgs, NetworkArgs, Nomos, NomosServiceSettings,
-    OverlayArgs, Tx,
+    Config, ConsensusArgs, DaArgs, HttpArgs, LogArgs, MetricsArgs, NetworkArgs, Nomos,
+    NomosServiceSettings, OverlayArgs, Tx,
 };
 
 use clap::Parser;
@@ -40,6 +41,9 @@ struct Args {
     /// Overrides da config.
     #[clap(flatten)]
     da_args: DaArgs,
+    /// Overrides metrics config.
+    #[clap(flatten)]
+    metrics_args: MetricsArgs,
 }
 
 fn main() -> Result<()> {
@@ -51,6 +55,7 @@ fn main() -> Result<()> {
         network_args,
         consensus_args,
         overlay_args,
+        metrics_args,
     } = Args::parse();
     let config = serde_yaml::from_reader::<_, Config>(std::fs::File::open(config)?)?
         .update_da(da_args)?
@@ -59,6 +64,8 @@ fn main() -> Result<()> {
         .update_consensus(consensus_args)?
         .update_overlay(overlay_args)?
         .update_network(network_args)?;
+
+    let metrics = metrics_args.with_metrics.then(NomosRegistry::default);
 
     let app = OverwatchRunner::<Nomos>::run(
         NomosServiceSettings {
@@ -71,7 +78,7 @@ fn main() -> Result<()> {
                     topic: String::from(nomos_node::CL_TOPIC),
                     id: <Tx as Transaction>::hash,
                 },
-                metrics: None,
+                metrics: metrics.clone(),
             },
             da_mempool: nomos_mempool::Settings {
                 backend: (),
@@ -79,7 +86,7 @@ fn main() -> Result<()> {
                     topic: String::from(nomos_node::DA_TOPIC),
                     id: cert_id,
                 },
-                metrics: None,
+                metrics,
             },
             consensus: config.consensus,
             #[cfg(feature = "metrics")]
