@@ -123,6 +123,7 @@ where
             .route("/storage/block", routing::post(block::<S, T>))
             .route("/mempool/add/tx", routing::post(add_tx::<T>))
             .route("/mempool/add/cert", routing::post(add_cert))
+            .route("/metrics", routing::get(get_metrics))
             .with_state(handle);
 
         Server::bind(&self.settings.address)
@@ -335,6 +336,31 @@ where
     )
 )]
 async fn add_cert(
+    State(handle): State<OverwatchHandle>,
+    Json(cert): Json<Certificate>,
+) -> Response {
+    make_request_and_return_response!(mempool::add::<
+        Libp2p,
+        Libp2pAdapter<Certificate, <Blob as blob::Blob>::Hash>,
+        nomos_mempool::Certificate,
+        Certificate,
+        <Blob as blob::Blob>::Hash,
+    >(
+        &handle,
+        cert,
+        nomos_core::da::certificate::Certificate::hash
+    ))
+}
+
+#[utoipa::path(
+    get,
+    path = "/metrics",
+    responses(
+        (status = 200, description = "Get all metrics"),
+        (status = 500, description = "Internal server error", body = String),
+    )
+)]
+async fn get_metrics(
     State(handle): State<OverwatchHandle>,
     Json(cert): Json<Certificate>,
 ) -> Response {
