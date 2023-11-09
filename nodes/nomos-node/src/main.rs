@@ -65,7 +65,7 @@ fn main() -> Result<()> {
         .update_overlay(overlay_args)?
         .update_network(network_args)?;
 
-    let metrics = metrics_args.with_metrics.then(NomosRegistry::default);
+    let registry = metrics_args.with_metrics.then(NomosRegistry::default);
 
     let app = OverwatchRunner::<Nomos>::run(
         NomosServiceSettings {
@@ -78,7 +78,7 @@ fn main() -> Result<()> {
                     topic: String::from(nomos_node::CL_TOPIC),
                     id: <Tx as Transaction>::hash,
                 },
-                metrics: metrics.clone(),
+                registry: registry.clone(),
             },
             da_mempool: nomos_mempool::Settings {
                 backend: (),
@@ -86,10 +86,10 @@ fn main() -> Result<()> {
                     topic: String::from(nomos_node::DA_TOPIC),
                     id: cert_id,
                 },
-                metrics: metrics.clone(),
+                registry: registry.clone(),
             },
             consensus: config.consensus,
-            metrics: MetricsSettings { registry: metrics },
+            metrics: MetricsSettings { registry },
             da: config.da,
             storage: nomos_storage::backends::sled::SledBackendSettings {
                 db_path: std::path::PathBuf::from(DEFAULT_DB_PATH),

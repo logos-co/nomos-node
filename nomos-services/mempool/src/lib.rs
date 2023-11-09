@@ -167,7 +167,7 @@ where
         let network_relay = service_state.overwatch_handle.relay();
         let settings = service_state.settings_reader.get_updated_settings();
         let metrics = settings
-            .metrics
+            .registry
             .map(|reg| Metrics::new(reg, service_state.id()));
         Ok(Self {
             service_state,
@@ -328,5 +328,5 @@ where
 pub struct Settings<B, N> {
     pub backend: B,
     pub network: N,
-    pub metrics: Option<NomosRegistry>,
+    pub registry: Option<NomosRegistry>,
 }
