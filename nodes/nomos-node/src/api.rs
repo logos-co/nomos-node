@@ -3,10 +3,13 @@ use std::{fmt::Debug, hash::Hash};
 use axum::{
     extract::{Query, State},
     http::HeaderValue,
-    response::Response,
+    response::{IntoResponse, Response},
     routing, Json, Router, Server,
 };
-use hyper::header::{CONTENT_TYPE, USER_AGENT};
+use hyper::{
+    header::{CONTENT_TYPE, USER_AGENT},
+    Body, StatusCode,
+};
 use overwatch_rs::overwatch::handle::OverwatchHandle;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use tower_http::{
@@ -24,7 +27,7 @@ use nomos_network::backends::libp2p::Libp2p;
 use nomos_storage::backends::StorageSerde;
 
 use nomos_api::{
-    http::{cl, consensus, da, libp2p, mempool, storage},
+    http::{cl, consensus, da, libp2p, mempool, metrics, storage},
     Backend,
 };
 
@@ -360,19 +363,20 @@ async fn add_cert(
         (status = 500, description = "Internal server error", body = String),
     )
 )]
-async fn get_metrics(
-    State(handle): State<OverwatchHandle>,
-    Json(cert): Json<Certificate>,
-) -> Response {
-    make_request_and_return_response!(mempool::add::<
-        Libp2p,
-        Libp2pAdapter<Certificate, <Blob as blob::Blob>::Hash>,
-        nomos_mempool::Certificate,
-        Certificate,
-        <Blob as blob::Blob>::Hash,
-    >(
-        &handle,
-        cert,
-        nomos_core::da::certificate::Certificate::hash
-    ))
+async fn get_metrics(State(handle): State<OverwatchHandle>) -> Response {
+    match metrics::gather(&handle).await {
+        Ok(encoded_metrics) => Response::builder()
+            .status(StatusCode::OK)
+            .header(
+                CONTENT_TYPE,
+                HeaderValue::from_static("text/plain; version=0.0.4"),
+            )
+            .body(Body::from(encoded_metrics))
+            .unwrap()
+            .into_response(),
+        Err(e) => axum::response::IntoResponse::into_response((
+            hyper::StatusCode::INTERNAL_SERVER_ERROR,
+            e.to_string(),
+        )),
+    }
 }
