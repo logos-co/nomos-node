@@ -71,6 +71,7 @@ fn main() -> Result<()> {
                     topic: String::from(nomos_node::CL_TOPIC),
                     id: <Tx as Transaction>::hash,
                 },
+                metrics: None,
             },
             da_mempool: nomos_mempool::Settings {
                 backend: (),
@@ -78,6 +79,7 @@ fn main() -> Result<()> {
                     topic: String::from(nomos_node::DA_TOPIC),
                     id: cert_id,
                 },
+                metrics: None,
             },
             consensus: config.consensus,
             #[cfg(feature = "metrics")]
