@@ -5,7 +5,8 @@ use overwatch_rs::{
         relay::NoMessage,
         state::{NoOperator, NoState},
         ServiceCore, ServiceData, ServiceError,
-    }, DynError,
+    },
+    DynError,
 };
 
 pub mod http;
