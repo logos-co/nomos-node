@@ -4,9 +4,8 @@ use overwatch_rs::{
         handle::ServiceStateHandle,
         relay::NoMessage,
         state::{NoOperator, NoState},
-        ServiceCore, ServiceData,
-    },
-    DynError,
+        ServiceCore, ServiceData, ServiceError,
+    }, DynError,
 };
 
 pub mod http;
@@ -53,7 +52,7 @@ where
     B: Backend + Send + Sync + 'static,
 {
     /// Initialize the service with the given state
-    fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, DynError> {
+    fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, ServiceError> {
         let settings = service_state.settings_reader.get_updated_settings();
         Ok(Self {
             settings,
@@ -62,9 +61,14 @@ where
     }
 
     /// Service main loop
-    async fn run(mut self) -> Result<(), DynError> {
-        let endpoint = B::new(self.settings.backend_settings).await?;
-        endpoint.serve(self.handle).await?;
+    async fn run(mut self) -> Result<(), ServiceError> {
+        let endpoint = B::new(self.settings.backend_settings)
+            .await
+            .map_err(|e| Box::new(e) as DynError)?;
+        endpoint
+            .serve(self.handle)
+            .await
+            .map_err(|e| Box::new(e) as DynError)?;
         Ok(())
     }
 }
