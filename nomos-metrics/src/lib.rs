@@ -32,12 +32,8 @@ pub struct MetricsSettings {
     pub registry: Option<NomosRegistry>,
 }
 
-pub struct GatherResult {}
-
 pub enum MetricsMsg {
-    Gather {
-        reply_channel: Sender<String>
-    },
+    Gather { reply_channel: Sender<String> },
 }
 
 impl RelayMessage for MetricsMsg {}

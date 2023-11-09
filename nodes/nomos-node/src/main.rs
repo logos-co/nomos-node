@@ -1,5 +1,6 @@
 use full_replication::{Blob, Certificate};
-use nomos_metrics::{MetricsSettings, NomosRegistry};
+#[cfg(feature = "metrics")]
+use nomos_metrics::MetricsSettings;
 use nomos_node::{
     Config, ConsensusArgs, DaArgs, HttpArgs, LogArgs, MetricsArgs, NetworkArgs, Nomos,
     NomosServiceSettings, OverlayArgs, Tx,
@@ -65,7 +66,13 @@ fn main() -> Result<()> {
         .update_overlay(overlay_args)?
         .update_network(network_args)?;
 
-    let registry = metrics_args.with_metrics.then(NomosRegistry::default);
+    let registry = if cfg!(feature = "metrics") {
+        metrics_args
+            .with_metrics
+            .then(nomos_metrics::NomosRegistry::default)
+    } else {
+        None
+    };
 
     let app = OverwatchRunner::<Nomos>::run(
         NomosServiceSettings {
@@ -89,6 +96,7 @@ fn main() -> Result<()> {
                 registry: registry.clone(),
             },
             consensus: config.consensus,
+            #[cfg(feature = "metrics")]
             metrics: MetricsSettings { registry },
             da: config.da,
             storage: nomos_storage::backends::sled::SledBackendSettings {
