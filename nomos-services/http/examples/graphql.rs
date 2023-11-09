@@ -85,7 +85,7 @@ async fn handle_graphql_req(
     >,
     payload: Option<Bytes>,
     dummy: OutboundRelay<DummyGraphqlMsg>,
-) -> Result<String, Box<dyn Error + Send + Sync + 'static>> {
+) -> Result<String, overwatch_rs::DynError> {
     // TODO: Move to the graphql frontend as a helper function?
     let payload = payload.ok_or("empty payload")?;
     let req = async_graphql::http::receive_batch_json(&payload[..])
@@ -179,7 +179,7 @@ pub struct Args {
     http: AxumBackendSettings,
 }
 
-fn main() -> Result<(), Box<dyn Error + Send + Sync + 'static>> {
+fn main() -> Result<(), overwatch_rs::DynError> {
     tracing_subscriber::fmt::fmt().with_file(false).init();
 
     let settings = Args::parse();
