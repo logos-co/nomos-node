@@ -1,4 +1,5 @@
 pub mod backend;
+#[cfg(feature = "metrics")]
 pub mod metrics;
 pub mod network;
 
@@ -16,6 +17,7 @@ use std::{
 
 // crates
 use futures::StreamExt;
+#[cfg(feature = "metrics")]
 use metrics::Metrics;
 use nomos_metrics::NomosRegistry;
 use tokio::sync::oneshot::Sender;
@@ -45,6 +47,7 @@ where
     service_state: ServiceStateHandle<Self>,
     network_relay: Relay<NetworkService<N::Backend>>,
     pool: P,
+    #[cfg(feature = "metrics")]
     metrics: Option<Metrics>,
     // This is an hack because SERVICE_ID has to be univoque and associated const
     // values can't depend on generic parameters.
@@ -166,13 +169,17 @@ where
     fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, overwatch_rs::DynError> {
         let network_relay = service_state.overwatch_handle.relay();
         let settings = service_state.settings_reader.get_updated_settings();
+
+        #[cfg(feature = "metrics")]
         let metrics = settings
             .registry
             .map(|reg| Metrics::new(reg, service_state.id()));
+
         Ok(Self {
             service_state,
             network_relay,
             pool: P::new(settings.backend),
+            #[cfg(feature = "metrics")]
             metrics,
             _d: PhantomData,
         })
@@ -203,9 +210,8 @@ where
         loop {
             tokio::select! {
                 Some(msg) = service_state.inbound_relay.recv() => {
-                    if let Some(metrics) = &self.metrics {
-                        metrics.record(&msg);
-                    }
+                    #[cfg(feature = "metrics")]
+                    if let Some(metrics) = &self.metrics { metrics.record(&msg) }
                     Self::handle_mempool_message(msg, &mut pool, &mut network_relay, &mut service_state).await;
                 }
                 Some((key, item )) = network_items.next() => {
