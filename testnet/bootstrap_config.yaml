@@ -1,7 +1,7 @@
 log:
   backend: "Stdout"
   format: "Json"
-  level: "debug"
+  level: "info"
 consensus:
   private_key: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
   fountain_settings: null
