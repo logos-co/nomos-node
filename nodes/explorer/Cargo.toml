@@ -21,3 +21,6 @@ tower-http = "0.4"
 utoipa = "4.0"
 utoipa-swagger-ui = "4.0"
 futures = "0.3"
+serde_yaml = "0.9.25"
+clap = { version = "4.4.6", features = ["derive"] }
+eyre = "0.6"

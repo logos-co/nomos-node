@@ -32,25 +32,25 @@ pub enum LoggerBackendType {
 pub struct LogArgs {
     /// Address for the Gelf backend
     #[clap(long = "log-addr", env = "LOG_ADDR", required_if_eq("backend", "Gelf"))]
-    log_addr: Option<SocketAddr>,
+    pub log_addr: Option<SocketAddr>,
 
     /// Directory for the File backend
     #[clap(long = "log-dir", env = "LOG_DIR", required_if_eq("backend", "File"))]
-    directory: Option<PathBuf>,
+    pub directory: Option<PathBuf>,
 
     /// Prefix for the File backend
     #[clap(long = "log-path", env = "LOG_PATH", required_if_eq("backend", "File"))]
-    prefix: Option<PathBuf>,
+    pub prefix: Option<PathBuf>,
 
     /// Backend type
     #[clap(long = "log-backend", env = "LOG_BACKEND", value_enum)]
-    backend: Option<LoggerBackendType>,
+    pub backend: Option<LoggerBackendType>,
 
     #[clap(long = "log-format", env = "LOG_FORMAT")]
-    format: Option<String>,
+    pub format: Option<String>,
 
     #[clap(long = "log-level", env = "LOG_LEVEL")]
-    level: Option<String>,
+    pub level: Option<String>,
 }
 
 #[derive(Parser, Debug, Clone)]
@@ -71,7 +71,7 @@ pub struct NetworkArgs {
 #[derive(Parser, Debug, Clone)]
 pub struct HttpArgs {
     #[clap(long = "http-host", env = "HTTP_HOST")]
-    http_addr: Option<SocketAddr>,
+    pub http_addr: Option<SocketAddr>,
 
     #[clap(long = "http-cors-origin", env = "HTTP_CORS_ORIGIN")]
     pub cors_origins: Option<Vec<String>>,
