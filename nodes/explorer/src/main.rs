@@ -1,3 +1,5 @@
+mod api_backend;
+
 use overwatch_rs::services::handle::ServiceHandle;
 use overwatch_rs::Services;
 

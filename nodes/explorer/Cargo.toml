@@ -9,5 +9,15 @@ edition = "2021"
 overwatch-rs = { git = "https://github.com/logos-co/Overwatch", rev = "2f70806", features = ["derive"] }
 nomos-log = { path = "../../nomos-services/log" }
 nomos-storage = { path = "../../nomos-services/storage", features = ["sled"] }
-nomos-node = { path = "../nomos-node" }
+nomos-api = { path = "../../nomos-services/api" }
+nomos-node =  { path = "../nomos-node" }
+nomos-core = { path = "../../nomos-core" }
+serde = "1.0"
 tracing = "0.1"
+async-trait = "0.1.73"
+axum = "0.6"
+hyper = "0.14.27"
+tower-http = "0.4"
+utoipa = "4.0"
+utoipa-swagger-ui = "4.0"
+futures = "0.3"
