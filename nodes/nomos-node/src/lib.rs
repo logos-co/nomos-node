@@ -1,3 +1,4 @@
+pub mod api;
 mod config;
 mod tx;
 
@@ -9,7 +10,9 @@ use full_replication::{AbsoluteNumber, Attestation, Blob, FullReplication};
 use metrics::{backend::map::MapMetricsBackend, types::MetricsData, MetricsService};
 use nomos_consensus::network::adapters::libp2p::Libp2pAdapter as ConsensusLibp2pAdapter;
 
+use api::AxumBackend;
 use bytes::Bytes;
+use nomos_api::ApiService;
 use nomos_consensus::CarnotConsensus;
 use nomos_core::{
     da::{blob, certificate},
@@ -27,8 +30,6 @@ use nomos_mempool::{
     Transaction as TxDiscriminant,
 };
 use nomos_network::backends::libp2p::Libp2p;
-use nomos_node_api::http::backend::axum::AxumBackend;
-use nomos_node_api::ApiService;
 use nomos_storage::{
     backends::{sled::SledBackend, StorageSerde},
     StorageService,

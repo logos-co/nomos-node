@@ -17,8 +17,7 @@ use nomos_log::{LoggerBackend, LoggerFormat};
 use nomos_mempool::MempoolMetrics;
 use nomos_network::backends::libp2p::Libp2pConfig;
 use nomos_network::NetworkConfig;
-use nomos_node::{Config, Tx};
-use nomos_node_api::http::backend::axum::AxumBackendSettings;
+use nomos_node::{api::AxumBackendSettings, Config, Tx};
 // crates
 use fraction::Fraction;
 use once_cell::sync::Lazy;
@@ -334,7 +333,7 @@ fn create_node_config(
             blob_selector_settings: (),
         },
         log: Default::default(),
-        http: nomos_node_api::ApiServiceSettings {
+        http: nomos_api::ApiServiceSettings {
             backend_settings: AxumBackendSettings {
                 address: format!("127.0.0.1:{}", get_available_port())
                     .parse()
