@@ -24,14 +24,14 @@ pub struct AxumBackendSettings {
     pub cors_origins: Vec<String>,
 }
 
-pub struct AxumBackend<T, S, const SIZE: usize> {
+pub struct AxumBackend<T, S> {
     settings: AxumBackendSettings,
     _tx: core::marker::PhantomData<T>,
     _storage_serde: core::marker::PhantomData<S>,
 }
 
 #[async_trait::async_trait]
-impl<T, S, const SIZE: usize> Backend for AxumBackend<T, S, SIZE>
+impl<T, S> Backend for AxumBackend<T, S>
 where
     T: Transaction
         + Clone
