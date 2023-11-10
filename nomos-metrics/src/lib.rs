@@ -83,7 +83,7 @@ impl ServiceCore for Metrics {
                         let reg = registry.lock().unwrap();
                         // If encoding fails, we need to stop trying process subsequent metrics gather
                         // requests. If it succeds, encode method returns empty unit type.
-                        _ = encode(&mut buf, &reg).map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e));
+                        _ = encode(&mut buf, &reg).map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
                     }
 
                     reply_channel

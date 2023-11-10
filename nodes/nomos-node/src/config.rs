@@ -10,8 +10,6 @@ use crate::{Carnot, Tx, Wire, MB16};
 use clap::{Parser, ValueEnum};
 use color_eyre::eyre::{self, eyre, Result};
 use hex::FromHex;
-#[cfg(feature = "metrics")]
-use metrics::{backend::map::MapMetricsBackend, types::MetricsData, MetricsService};
 use nomos_api::ApiService;
 use nomos_libp2p::{secp256k1::SecretKey, Multiaddr};
 use nomos_log::{Logger, LoggerBackend, LoggerFormat};
@@ -127,8 +125,6 @@ pub struct Config {
     pub network: <NetworkService<Libp2p> as ServiceData>::Settings,
     pub http: <ApiService<AxumBackend<Tx, Wire, MB16>> as ServiceData>::Settings,
     pub consensus: <Carnot as ServiceData>::Settings,
-    #[cfg(feature = "metrics")]
-    pub metrics: <MetricsService<MapMetricsBackend<MetricsData>> as ServiceData>::Settings,
     pub da: <DataAvailability as ServiceData>::Settings,
 }
 

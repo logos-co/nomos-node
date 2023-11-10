@@ -66,13 +66,13 @@ fn main() -> Result<()> {
         .update_overlay(overlay_args)?
         .update_network(network_args)?;
 
-    let registry = if cfg!(feature = "metrics") {
-        metrics_args
-            .with_metrics
-            .then(nomos_metrics::NomosRegistry::default)
-    } else {
-        None
-    };
+    let registry = cfg!(feature = "metrics")
+        .then(|| {
+            metrics_args
+                .with_metrics
+                .then(nomos_metrics::NomosRegistry::default)
+        })
+        .flatten();
 
     let app = OverwatchRunner::<Nomos>::run(
         NomosServiceSettings {
