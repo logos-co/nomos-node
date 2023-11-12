@@ -6,6 +6,7 @@ use overwatch_rs::{
         state::{NoOperator, NoState},
         ServiceCore, ServiceData,
     },
+    DynError,
 };
 
 pub mod http;
