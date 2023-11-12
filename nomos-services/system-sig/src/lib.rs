@@ -53,8 +53,7 @@ impl ServiceCore for SystemSig {
 
     async fn run(self) -> Result<(), ServiceError> {
         let Self { service_state } = self;
-        let mut ctrlc =
-            async_ctrlc::CtrlC::new().map_err(|e| ServiceError::Service(Box::new(e)))?;
+        let mut ctrlc = async_ctrlc::CtrlC::new().map_err(ServiceError::service)?;
         let mut lifecycle_stream = service_state.lifecycle_handle.message_stream();
         loop {
             tokio::select! {

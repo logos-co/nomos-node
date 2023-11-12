@@ -131,7 +131,7 @@ where
                 backend,
                 inbound_relay,
             })
-            .map_err(|e| ServiceError::Service(Box::new(e)))
+            .map_err(ServiceError::service)
     }
 
     async fn run(mut self) -> Result<(), ServiceError> {
@@ -195,25 +195,12 @@ where
         oneshot::Sender<async_graphql::Response>,
     ) -> Result<M, ServiceError>,
 {
-    #[derive(Debug)]
-    struct EmptyPayload;
-
-    impl core::fmt::Display for EmptyPayload {
-        fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-            write!(f, "empty payload")
-        }
-    }
-
-    impl Error for EmptyPayload {}
-
-    let payload = payload
-        .ok_or(EmptyPayload)
-        .map_err(|e| ServiceError::Service(Box::new(e)))?;
+    let payload = payload.ok_or(ServiceError::custom("empty payload"))?;
     let req = async_graphql::http::receive_batch_json(&payload[..])
         .await
-        .map_err(|e| ServiceError::Service(Box::new(e)))?
+        .map_err(ServiceError::service)?
         .into_single()
-        .map_err(|e| ServiceError::Service(Box::new(e)))?;
+        .map_err(ServiceError::service)?;
 
     let (sender, receiver) = oneshot::channel();
     relay
@@ -226,6 +213,6 @@ where
         .map_err(|e| ServiceError::RelayError(e.0))?;
 
     let res = receiver.await.unwrap();
-    let res = serde_json::to_string(&res).map_err(|e| ServiceError::Service(Box::new(e)))?;
+    let res = serde_json::to_string(&res).map_err(ServiceError::service)?;
     Ok(res)
 }

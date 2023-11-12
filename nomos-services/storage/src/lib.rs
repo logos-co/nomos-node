@@ -276,7 +276,7 @@ impl<Backend: StorageBackend + Send + Sync + 'static> ServiceCore for StorageSer
     fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, ServiceError> {
         Ok(Self {
             backend: Backend::new(service_state.settings_reader.get_updated_settings())
-                .map_err(|e| ServiceError::Service(Box::new(e)))?,
+                .map_err(ServiceError::service)?,
             service_state,
         })
     }

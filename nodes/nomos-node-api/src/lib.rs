@@ -65,11 +65,10 @@ where
     async fn run(mut self) -> Result<(), ServiceError> {
         let endpoint = B::new(self.settings.backend_settings)
             .await
-            .map_err(|e| Box::new(e) as DynError)?;
+            .map_err(ServiceError::service)?;
         endpoint
             .serve(self.handle)
             .await
-            .map_err(|e| Box::new(e) as DynError)?;
-        Ok(())
+            .map_err(ServiceError::service)
     }
 }
