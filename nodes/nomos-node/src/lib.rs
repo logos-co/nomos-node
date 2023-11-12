@@ -1,3 +1,4 @@
+pub mod api;
 mod config;
 
 use color_eyre::eyre::Result;
