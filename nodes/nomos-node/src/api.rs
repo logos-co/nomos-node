@@ -23,7 +23,7 @@ use nomos_mempool::{network::adapters::libp2p::Libp2pAdapter, openapi::Status, M
 use nomos_network::backends::libp2p::Libp2p;
 use nomos_storage::backends::StorageSerde;
 
-use crate::{
+use nomos_api::{
     http::{cl, consensus, da, libp2p, mempool, storage},
     Backend,
 };

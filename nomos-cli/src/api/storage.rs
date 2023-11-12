@@ -10,12 +10,11 @@ pub async fn get_block_contents(
     block: &BlockId,
 ) -> Result<Option<Block<Tx, Certificate>>, reqwest::Error> {
     const BLOCK_PATH: &str = "storage/block";
-    let block = CLIENT
+    CLIENT
         .post(node.join(BLOCK_PATH).unwrap())
-        .body(serde_json::to_string(block).unwrap())
+        .json(block)
         .send()
         .await?
         .json()
-        .await?;
-    Ok(block)
+        .await
 }
