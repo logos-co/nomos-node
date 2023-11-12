@@ -16,7 +16,7 @@ tracing = "0.1"
 consensus-engine = { path = "../../consensus-engine" }
 nomos-core = { path = "../../nomos-core" }
 nomos-consensus = { path = "../../nomos-services/consensus" }
-nomos-node-lib = { path = "../nomos-node-lib" }
+nomos-node-lib = { path = "../../nodes/nomos-node-lib" }
 nomos-network = { path = "../../nomos-services/network" }
 nomos-da = { path = "../../nomos-services/data-availability" }
 nomos-mempool = { path = "../../nomos-services/mempool", features = ["mock", "libp2p", "openapi"] }
