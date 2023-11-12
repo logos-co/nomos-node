@@ -1,6 +1,7 @@
 pub mod api;
 mod config;
 
+use crate::api::AxumBackend;
 use color_eyre::eyre::Result;
 use full_replication::Certificate;
 #[cfg(feature = "metrics")]
@@ -10,15 +11,15 @@ use nomos_core::{
     tx::Transaction,
 };
 
+use nomos_api::ApiService;
 use nomos_log::Logger;
 use nomos_mempool::{Certificate as CertDiscriminant, Transaction as TxDiscriminant};
 use nomos_network::backends::libp2p::Libp2p;
-use nomos_node_api::{http::backend::axum::AxumBackend, ApiService};
+
+pub use config::{Config, ConsensusArgs, DaArgs, HttpArgs, LogArgs, NetworkArgs, OverlayArgs};
 pub use nomos_node_lib::tx::Tx;
 use nomos_node_lib::{Carnot, DataAvailabilityService, Mempool, Wire};
 use nomos_storage::{backends::sled::SledBackend, StorageService};
-
-pub use config::{Config, ConsensusArgs, DaArgs, HttpArgs, LogArgs, NetworkArgs, OverlayArgs};
 
 use nomos_network::NetworkService;
 use nomos_system_sig::SystemSig;

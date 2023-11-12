@@ -11,7 +11,6 @@ use hex::FromHex;
 #[cfg(feature = "metrics")]
 use metrics::{backend::map::MapMetricsBackend, types::MetricsData, MetricsService};
 use nomos_api::ApiService;
-use nomos_api::ApiService;
 use nomos_libp2p::{secp256k1::SecretKey, Multiaddr};
 use nomos_log::{Logger, LoggerBackend, LoggerFormat};
 use nomos_network::backends::libp2p::Libp2p;
