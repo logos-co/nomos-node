@@ -18,9 +18,6 @@ pub struct MixnetNodeConfig {
     /// The size of the connection pool.
     #[serde(default = "MixnetNodeConfig::default_connection_pool_size")]
     pub connection_pool_size: usize,
-    /// The maximum number of retries.
-    #[serde(default = "MixnetNodeConfig::default_max_retries")]
-    pub max_retries: usize,
     /// The retry delay between retries.
     #[serde(default = "MixnetNodeConfig::default_retry_delay")]
     pub retry_delay: Duration,
@@ -36,7 +33,6 @@ impl Default for MixnetNodeConfig {
             )),
             private_key: PrivateKey::new().to_bytes(),
             connection_pool_size: 255,
-            max_retries: 3,
             retry_delay: Duration::from_secs(5),
         }
     }
@@ -45,10 +41,6 @@ impl Default for MixnetNodeConfig {
 impl MixnetNodeConfig {
     const fn default_connection_pool_size() -> usize {
         255
-    }
-
-    const fn default_max_retries() -> usize {
-        3
     }
 
     const fn default_retry_delay() -> Duration {

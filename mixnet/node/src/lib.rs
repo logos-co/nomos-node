@@ -1,7 +1,10 @@
 mod client_notifier;
 pub mod config;
 
-use std::{collections::HashMap, net::SocketAddr, time::Duration};
+use std::{
+    collections::{hash_map::Entry, HashMap},
+    net::SocketAddr,
+};
 
 use client_notifier::ClientNotifier;
 pub use config::MixnetNodeConfig;
@@ -77,13 +80,13 @@ impl MixnetNode {
 
         let (tx, rx) = mpsc::unbounded_channel();
 
-        let packet_forwarder = PacketForwarder::new(tx.clone(), rx, self.config);
+        let packet_forwarder = ForwardScheduler::new(rx, self.config);
 
         tokio::spawn(async move {
             packet_forwarder.run().await;
         });
 
-        let runner = MixnetNodeRunner {
+        let inbound_handler = InboundHandler {
             config: self.config,
             client_tx,
             packet_tx: tx,
@@ -96,9 +99,9 @@ impl MixnetNode {
                         Ok((socket, remote_addr)) => {
                             tracing::debug!("Accepted incoming connection from {remote_addr:?}");
 
-                            let runner = runner.clone();
+                            let inbound_handler = inbound_handler.clone();
                             tokio::spawn(async move {
-                                if let Err(e) = runner.handle_connection(socket).await {
+                                if let Err(e) = inbound_handler.handle_connection(socket).await {
                                     tracing::error!("failed to handle conn: {e}");
                                 }
                             });
@@ -116,13 +119,13 @@ impl MixnetNode {
 }
 
 #[derive(Clone)]
-struct MixnetNodeRunner {
+struct InboundHandler {
     config: MixnetNodeConfig,
     client_tx: mpsc::Sender<Body>,
     packet_tx: mpsc::UnboundedSender<Packet>,
 }
 
-impl MixnetNodeRunner {
+impl InboundHandler {
     async fn handle_connection(&self, mut socket: TcpStream) -> Result<()> {
         loop {
             let body = Body::read(&mut socket).await?;
@@ -135,8 +138,8 @@ impl MixnetNodeRunner {
         }
     }
 
-    async fn handle_body(&self, pkt: Body) -> Result<()> {
-        match pkt {
+    async fn handle_body(&self, body: Body) -> Result<()> {
+        match body {
             Body::SphinxPacket(packet) => self.handle_sphinx_packet(packet).await,
             Body::FinalPayload(payload) => {
                 self.forward_body_to_client_notifier(Body::FinalPayload(payload))
@@ -197,41 +200,35 @@ impl MixnetNodeRunner {
         .await
     }
 
-    async fn forward(&self, pkt: Body, to: NymNodeRoutingAddress) -> Result<()> {
+    async fn forward(&self, body: Body, to: NymNodeRoutingAddress) -> Result<()> {
         let addr = SocketAddr::from(to);
 
-        self.packet_tx.send(Packet::new(addr, pkt))?;
+        self.packet_tx.send(Packet::new(addr, body))?;
         Ok(())
     }
 }
 
-struct PacketForwarder {
+struct ForwardScheduler {
     config: MixnetNodeConfig,
-    packet_rx: mpsc::UnboundedReceiver<Packet>,
-    packet_tx: mpsc::UnboundedSender<Packet>,
-    connections: HashMap<SocketAddr, TcpStream>,
+    rx: mpsc::UnboundedReceiver<Packet>,
+    forwarders: HashMap<SocketAddr, Forwarder>,
 }
 
-impl PacketForwarder {
-    pub fn new(
-        packet_tx: mpsc::UnboundedSender<Packet>,
-        packet_rx: mpsc::UnboundedReceiver<Packet>,
-        config: MixnetNodeConfig,
-    ) -> Self {
+impl ForwardScheduler {
+    pub fn new(rx: mpsc::UnboundedReceiver<Packet>, config: MixnetNodeConfig) -> Self {
         Self {
-            packet_tx,
-            packet_rx,
-            connections: HashMap::with_capacity(config.connection_pool_size),
             config,
+            rx,
+            forwarders: HashMap::with_capacity(config.connection_pool_size),
         }
     }
 
     pub async fn run(mut self) {
         loop {
             tokio::select! {
-                pkt = self.packet_rx.recv() => {
-                    if let Some(pkt) = pkt {
-                        self.send(pkt).await;
+                packet = self.rx.recv() => {
+                    if let Some(packet) = packet {
+                        self.schedule(packet, self.config).await;
                     } else {
                         unreachable!("Packet channel should not be closed, because PacketForwarder is also holding the send half");
                     }
@@ -244,70 +241,96 @@ impl PacketForwarder {
         }
     }
 
-    async fn try_send(&mut self, target: SocketAddr, body: &Body) -> Result<()> {
-        if let std::collections::hash_map::Entry::Vacant(e) = self.connections.entry(target) {
-            match TcpStream::connect(target).await {
-                Ok(tcp) => {
-                    e.insert(tcp);
+    async fn schedule(&mut self, packet: Packet, config: MixnetNodeConfig) {
+        if let Entry::Vacant(entry) = self.forwarders.entry(packet.target) {
+            entry.insert(Forwarder::new(packet.target, config));
+        }
+
+        let forwarder = self.forwarders.get_mut(&packet.target).unwrap();
+        forwarder.schedule(packet.body);
+    }
+}
+
+struct Forwarder {
+    tx: mpsc::UnboundedSender<Body>,
+}
+
+impl Forwarder {
+    fn new(addr: SocketAddr, config: MixnetNodeConfig) -> Self {
+        let (tx, rx) = mpsc::unbounded_channel();
+
+        let tx_ = tx.clone();
+        tokio::spawn(async move {
+            Forwarder::run(addr, rx, tx_, config).await;
+        });
+
+        Self { tx }
+    }
+
+    async fn run(
+        addr: SocketAddr,
+        mut rx: mpsc::UnboundedReceiver<Body>,
+        mut tx: mpsc::UnboundedSender<Body>,
+        config: MixnetNodeConfig,
+    ) {
+        loop {
+            match Forwarder::connect_and_forward(addr, &mut rx, &mut tx).await {
+                Ok(_) => {
+                    tracing::debug!("closing the forwarder: {addr}");
+                    return;
                 }
                 Err(e) => {
-                    tracing::error!("failed to connect to {}: {e}", target);
-                    return Err(MixnetNodeError::Protocol(e.into()));
+                    tracing::error!("retrying: failed to connect and forward to {addr}: {e}");
+                    tokio::time::sleep(config.retry_delay).await;
                 }
-            }
-        }
-        Ok(body
-            .write(self.connections.get_mut(&target).unwrap())
-            .await?)
-    }
-
-    async fn send(&mut self, pkt: Packet) {
-        if let Err(err) = self.try_send(pkt.target, &pkt.body).await {
-            match err {
-                MixnetNodeError::Protocol(ProtocolError::IO(e))
-                    if e.kind() == std::io::ErrorKind::Unsupported =>
-                {
-                    tracing::error!("fail to send message to {}: {e}", pkt.target);
-                }
-                _ => self.handle_retry(pkt),
             }
         }
     }
 
-    fn handle_retry(&self, mut pkt: Packet) {
-        if pkt.retry_count < self.config.max_retries {
-            let delay = Duration::from_millis(
-                (self.config.retry_delay.as_millis() as u64).pow(pkt.retry_count as u32),
-            );
-            let tx = self.packet_tx.clone();
-            tokio::spawn(async move {
-                tokio::time::sleep(delay).await;
-                pkt.retry_count += 1;
-                if let Err(e) = tx.send(pkt) {
-                    tracing::error!("fail to enqueue retry message: {e}");
+    async fn connect_and_forward(
+        addr: SocketAddr,
+        rx: &mut mpsc::UnboundedReceiver<Body>,
+        tx: &mut mpsc::UnboundedSender<Body>,
+    ) -> core::result::Result<(), ProtocolError> {
+        match TcpStream::connect(addr).await {
+            Ok(mut conn) => {
+                while let Some(body) = rx.recv().await {
+                    if let Err(e) = body.write(&mut conn).await {
+                        match e {
+                            ProtocolError::IO(_) => {
+                                tx.send(body).expect("the receiver half is always open");
+                                return Err(e);
+                            }
+                            _ => {
+                                tracing::error!("ignoring: failed to forward body to {addr}: {e}",);
+                            }
+                        }
+                    } else {
+                        tracing::debug!("forwarded body to {addr}");
+                    }
                 }
-            });
-        } else {
-            tracing::error!(
-                "fail to send message to {}: reach maximum retries",
-                pkt.target
-            );
+
+                // the sender half has been closed.
+                Ok(())
+            }
+            Err(e) => Err(ProtocolError::from(e)),
         }
+    }
+
+    pub fn schedule(&mut self, body: Body) {
+        self.tx
+            .send(body)
+            .expect("the receiver half is always open");
     }
 }
 
 pub struct Packet {
     target: SocketAddr,
     body: Body,
-    retry_count: usize,
 }
 
 impl Packet {
     fn new(target: SocketAddr, body: Body) -> Self {
-        Self {
-            target,
-            body,
-            retry_count: 0,
-        }
+        Self { target, body }
     }
 }
