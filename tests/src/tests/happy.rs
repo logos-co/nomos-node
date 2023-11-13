@@ -2,7 +2,7 @@ use consensus_engine::{Qc, View};
 use futures::stream::{self, StreamExt};
 use std::collections::HashSet;
 use std::time::Duration;
-use tests::{MixNode, Node, NomosNode, SpawnConfig};
+use tests::{adjust_timeout, MixNode, Node, NomosNode, SpawnConfig};
 
 const TARGET_VIEW: View = View::new(20);
 
@@ -14,7 +14,7 @@ struct Info {
 }
 
 async fn happy_test(nodes: &[NomosNode]) {
-    let timeout = std::time::Duration::from_secs(30);
+    let timeout = adjust_timeout(Duration::from_secs(30));
     let timeout = tokio::time::sleep(timeout);
     tokio::select! {
         _ = timeout => panic!("timed out waiting for nodes to reach view {}", TARGET_VIEW),

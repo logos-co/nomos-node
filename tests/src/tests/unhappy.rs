@@ -2,8 +2,8 @@ use consensus_engine::{Block, NodeId, TimeoutQc, View};
 use fraction::Fraction;
 use futures::stream::{self, StreamExt};
 use nomos_consensus::CarnotInfo;
-use std::collections::HashSet;
-use tests::{ConsensusConfig, MixNode, Node, NomosNode, SpawnConfig};
+use std::{collections::HashSet, time::Duration};
+use tests::{adjust_timeout, ConsensusConfig, MixNode, Node, NomosNode, SpawnConfig};
 
 const TARGET_VIEW: View = View::new(20);
 const DUMMY_NODE_ID: NodeId = NodeId::new([0u8; 32]);
@@ -22,7 +22,7 @@ async fn ten_nodes_one_down() {
     .await;
     let mut failed_node = nodes.pop().unwrap();
     failed_node.stop();
-    let timeout = std::time::Duration::from_secs(120);
+    let timeout = adjust_timeout(Duration::from_secs(120));
     let timeout = tokio::time::sleep(timeout);
     tokio::select! {
         _ = timeout => panic!("timed out waiting for nodes to reach view {}", TARGET_VIEW),
