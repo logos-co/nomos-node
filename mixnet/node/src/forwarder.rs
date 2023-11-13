@@ -5,6 +5,8 @@ use tokio::{net::TcpStream, sync::mpsc};
 
 use crate::MixnetNodeConfig;
 
+/// [`Forwarder`] holds a TCP connection to another mix node,
+/// and forwards all incoming packets to it.
 pub struct Forwarder {
     tx: mpsc::UnboundedSender<Body>,
 }

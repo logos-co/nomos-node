@@ -10,6 +10,9 @@ use tokio::{net::TcpStream, sync::mpsc};
 
 use crate::{forward_scheduler::Packet, MixnetNodeConfig, Result};
 
+/// [`InboundHandler`] spawns a task for each body coming from a TCP connection.
+/// Each task decapsulates/delays/sends a body to the [`ForwardScheduler`].
+/// It is recommended to spawn a [`InboundHandler`] per TCP connection.
 #[derive(Clone)]
 pub struct InboundHandler {
     config: MixnetNodeConfig,

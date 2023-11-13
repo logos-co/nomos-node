@@ -6,6 +6,11 @@ use tokio::sync::mpsc;
 
 use crate::{forwarder::Forwarder, MixnetNodeConfig};
 
+/// [`ForwardScheduler`] receives all packets processed by [`InboundHandler`]s,
+/// and tosses them to corresponding [`Forwarder`]s.
+///
+/// Because [`ForwardScheduler`] is a single component where all packets are gathered to,
+/// it must be as light as possible.
 pub struct ForwardScheduler {
     config: MixnetNodeConfig,
     rx: mpsc::UnboundedReceiver<Packet>,
