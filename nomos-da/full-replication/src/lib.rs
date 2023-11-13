@@ -95,7 +95,6 @@ impl CertificateStrategy for AbsoluteNumber<Attestation, Certificate> {
     }
 }
 
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub type Voter = [u8; 32];
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, Hash, PartialEq)]

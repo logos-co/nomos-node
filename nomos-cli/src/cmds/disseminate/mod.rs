@@ -1,5 +1,5 @@
 use crate::da::disseminate::{
-    DaProtocolChoice, DisseminateApp, DisseminateAppServiceSettings, Settings,
+    DaProtocolChoice, DisseminateApp, DisseminateAppServiceSettings, Settings, Status,
 };
 use clap::Args;
 use nomos_network::{backends::libp2p::Libp2p, NetworkService};
@@ -69,6 +69,10 @@ impl Disseminate {
         drop(payload_sender);
         tracing::info!("{}", rx.recv().unwrap().display());
         while let Ok(update) = rx.recv() {
+            if let Status::Err(e) = update {
+                tracing::error!("{e}");
+                return Err(e);
+            }
             tracing::info!("{}", update.display());
         }
         tracing::info!("done");

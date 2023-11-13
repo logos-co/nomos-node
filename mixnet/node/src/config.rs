@@ -11,7 +11,7 @@ use sphinx_packet::crypto::{PRIVATE_KEY_SIZE, PUBLIC_KEY_SIZE};
 pub struct MixnetNodeConfig {
     /// A listen address for receiving Sphinx packets
     pub listen_address: SocketAddr,
-    /// An listen address fro communicating with mixnet clients
+    /// An listen address for communicating with mixnet clients
     pub client_listen_address: SocketAddr,
     /// A key for decrypting Sphinx packets
     pub private_key: [u8; PRIVATE_KEY_SIZE],

@@ -13,13 +13,12 @@ use mixnet_node::MixnetNodeConfig;
 use mixnet_topology::MixnetTopology;
 use nomos_consensus::{CarnotInfo, CarnotSettings};
 use nomos_core::block::Block;
-use nomos_http::backends::axum::AxumBackendSettings;
 use nomos_libp2p::{multiaddr, Multiaddr};
 use nomos_log::{LoggerBackend, LoggerFormat};
 use nomos_mempool::MempoolMetrics;
 use nomos_network::backends::libp2p::Libp2pConfig;
 use nomos_network::NetworkConfig;
-use nomos_node::{Config, Tx};
+use nomos_node::{api::AxumBackendSettings, Config, Tx};
 // crates
 use fraction::Fraction;
 use once_cell::sync::Lazy;
@@ -31,7 +30,6 @@ static CLIENT: Lazy<Client> = Lazy::new(Client::new);
 const NOMOS_BIN: &str = "../target/debug/nomos-node";
 const CARNOT_INFO_API: &str = "carnot/info";
 const STORAGE_BLOCKS_API: &str = "storage/block";
-const MEMPOOL_API: &str = "mempool-";
 const GET_BLOCKS_INFO: &str = "carnot/blocks";
 
 pub struct NomosNode {
@@ -78,11 +76,11 @@ impl NomosNode {
         let child = Command::new(std::env::current_dir().unwrap().join(NOMOS_BIN))
             .arg(&config_path)
             .current_dir(dir.path())
-            .stdout(Stdio::null())
+            .stdout(Stdio::inherit())
             .spawn()
             .unwrap();
         let node = Self {
-            addr: config.http.backend.address,
+            addr: config.http.backend_settings.address,
             child,
             _tempdir: dir,
             config,
@@ -116,6 +114,7 @@ impl NomosNode {
     pub async fn get_block(&self, id: BlockId) -> Option<Block<Tx, Certificate>> {
         CLIENT
             .post(&format!("http://{}/{}", self.addr, STORAGE_BLOCKS_API))
+            .header("Content-Type", "application/json")
             .body(serde_json::to_string(&id).unwrap())
             .send()
             .await
@@ -130,7 +129,7 @@ impl NomosNode {
             Pool::Cl => "cl",
             Pool::Da => "da",
         };
-        let addr = format!("{}{}/metrics", MEMPOOL_API, discr);
+        let addr = format!("{}/metrics", discr);
         let res = self
             .get(&addr)
             .await
@@ -140,7 +139,7 @@ impl NomosNode {
             .unwrap();
         MempoolMetrics {
             pending_items: res["pending_items"].as_u64().unwrap() as usize,
-            last_item_timestamp: res["last_item"].as_u64().unwrap(),
+            last_item_timestamp: res["last_item_timestamp"].as_u64().unwrap(),
         }
     }
 
@@ -330,8 +329,8 @@ fn create_node_config(
             blob_selector_settings: (),
         },
         log: Default::default(),
-        http: nomos_http::http::HttpServiceSettings {
-            backend: AxumBackendSettings {
+        http: nomos_api::ApiServiceSettings {
+            backend_settings: AxumBackendSettings {
                 address: format!("127.0.0.1:{}", get_available_port())
                     .parse()
                     .unwrap(),

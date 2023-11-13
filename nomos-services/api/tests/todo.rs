@@ -6,9 +6,12 @@ use std::{
 
 use axum::{routing, Router, Server};
 use hyper::Error;
-use nomos_node_api::{ApiService, ApiServiceSettings, Backend};
+use nomos_api::{ApiService, ApiServiceSettings, Backend};
 use overwatch_derive::Services;
-use overwatch_rs::{overwatch::OverwatchRunner, services::handle::ServiceHandle};
+use overwatch_rs::{
+    overwatch::{handle::OverwatchHandle, OverwatchRunner},
+    services::handle::ServiceHandle,
+};
 use utoipa::{
     openapi::security::{ApiKey, ApiKeyValue, SecurityScheme},
     Modify, OpenApi,
@@ -71,7 +74,7 @@ impl Backend for WebServer {
         Ok(Self { addr: settings })
     }
 
-    async fn serve(self) -> Result<(), Self::Error> {
+    async fn serve(self, _handle: OverwatchHandle) -> Result<(), Self::Error> {
         let store = Arc::new(Store::default());
         let app = Router::new()
             .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))

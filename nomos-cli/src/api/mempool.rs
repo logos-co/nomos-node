@@ -6,10 +6,10 @@ pub async fn send_certificate<C>(node: &Url, cert: &C) -> Result<Response, Error
 where
     C: Serialize,
 {
-    const NODE_CERT_PATH: &str = "mempool-da/add";
+    const NODE_CERT_PATH: &str = "mempool/add/cert";
     CLIENT
         .post(node.join(NODE_CERT_PATH).unwrap())
-        .body(serde_json::to_string(cert).unwrap())
+        .json(cert)
         .send()
         .await
 }
