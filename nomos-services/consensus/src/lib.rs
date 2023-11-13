@@ -55,6 +55,9 @@ use overwatch_rs::services::{
 };
 
 const DEFAULT_TIMEOUT: Duration = Duration::from_secs(30);
+// Limit the number of blocks returned by GetBlocks
+// Approx 64KB of data
+const BLOCKS_LIMIT: usize = 512;
 
 fn default_timeout() -> Duration {
     DEFAULT_TIMEOUT
@@ -441,7 +444,8 @@ where
 
                 while let Some(block) = blocks.get(&cur) {
                     res.push(block.clone());
-                    if cur == to || cur == carnot.genesis_block().id {
+                    // limit the response size
+                    if cur == to || cur == carnot.genesis_block().id || res.len() >= BLOCKS_LIMIT {
                         break;
                     }
                     cur = block.parent();
@@ -1199,7 +1203,7 @@ mod tests {
         eprintln!("{serialized}");
         assert_eq!(
             serialized,
-            r#"{"id":"0x0000000000000000000000000000000000000000000000000000000000000000","current_view":1,"highest_voted_view":-1,"local_high_qc":{"view":0,"id":"0x0000000000000000000000000000000000000000000000000000000000000000"},"tip":{"id":"0x0000000000000000000000000000000000000000000000000000000000000000","view":0,"parent_qc":{"Standard":{"view":0,"id":"0x0000000000000000000000000000000000000000000000000000000000000000"}},"leader_proof":{"LeaderId":{"leader_id":"0x0000000000000000000000000000000000000000000000000000000000000000"}}},"last_view_timeout_qc":null,"last_committed_block":{"id":"0x0000000000000000000000000000000000000000000000000000000000000000","view":0,"parent_qc":{"Standard":{"view":0,"id":"0x0000000000000000000000000000000000000000000000000000000000000000"}},"leader_proof":{"LeaderId":{"leader_id":"0x0000000000000000000000000000000000000000000000000000000000000000"}}}}"#
+            r#"{"id":"0000000000000000000000000000000000000000000000000000000000000000","current_view":1,"highest_voted_view":-1,"local_high_qc":{"view":0,"id":"0000000000000000000000000000000000000000000000000000000000000000"},"tip":{"id":"0000000000000000000000000000000000000000000000000000000000000000","view":0,"parent_qc":{"Standard":{"view":0,"id":"0000000000000000000000000000000000000000000000000000000000000000"}},"leader_proof":{"LeaderId":{"leader_id":"0000000000000000000000000000000000000000000000000000000000000000"}}},"last_view_timeout_qc":null,"last_committed_block":{"id":"0000000000000000000000000000000000000000000000000000000000000000","view":0,"parent_qc":{"Standard":{"view":0,"id":"0000000000000000000000000000000000000000000000000000000000000000"}},"leader_proof":{"LeaderId":{"leader_id":"0000000000000000000000000000000000000000000000000000000000000000"}}}}"#
         );
 
         let deserialized: CarnotInfo = serde_json::from_str(&serialized).unwrap();
