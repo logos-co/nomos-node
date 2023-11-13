@@ -13,4 +13,4 @@ mixnode:
 log:
   backend: "Stdout"
   format: "Json"
-  level: "debug"
+  level: "info"

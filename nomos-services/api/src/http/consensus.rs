@@ -1,5 +1,9 @@
 use std::{fmt::Debug, hash::Hash};
 
+use overwatch_rs::overwatch::handle::OverwatchHandle;
+use serde::{de::DeserializeOwned, Serialize};
+use tokio::sync::oneshot;
+
 use consensus_engine::{
     overlay::{RandomBeaconState, RoundRobin, TreeOverlay},
     Block, BlockId,
@@ -20,9 +24,6 @@ use nomos_mempool::{
     backend::mockpool::MockPool, network::adapters::libp2p::Libp2pAdapter as MempoolLibp2pAdapter,
 };
 use nomos_storage::backends::{sled::SledBackend, StorageSerde};
-use overwatch_rs::overwatch::handle::OverwatchHandle;
-use serde::{de::DeserializeOwned, Serialize};
-use tokio::sync::oneshot;
 
 pub type Carnot<Tx, SS, const SIZE: usize> = CarnotConsensus<
     ConsensusLibp2pAdapter,
@@ -53,6 +54,7 @@ where
         .send(ConsensusMsg::Info { tx: sender })
         .await
         .map_err(|(e, _)| e)?;
+
     Ok(receiver.await?)
 }
 
@@ -76,5 +78,6 @@ where
         })
         .await
         .map_err(|(e, _)| e)?;
+
     Ok(receiver.await?)
 }

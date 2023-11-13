@@ -1,3 +1,4 @@
+pub mod api;
 mod config;
 mod tx;
 
@@ -9,7 +10,9 @@ use full_replication::{AbsoluteNumber, Attestation, Blob, FullReplication};
 use metrics::{backend::map::MapMetricsBackend, types::MetricsData, MetricsService};
 use nomos_consensus::network::adapters::libp2p::Libp2pAdapter as ConsensusLibp2pAdapter;
 
+use api::AxumBackend;
 use bytes::Bytes;
+use nomos_api::ApiService;
 use nomos_consensus::CarnotConsensus;
 use nomos_core::{
     da::{blob, certificate},
@@ -20,9 +23,6 @@ use nomos_da::{
     backend::memory_cache::BlobCache, network::adapters::libp2p::Libp2pAdapter as DaLibp2pAdapter,
     DataAvailabilityService,
 };
-use nomos_http::backends::axum::AxumBackend;
-use nomos_http::bridge::HttpBridgeService;
-use nomos_http::http::HttpService;
 use nomos_log::Logger;
 use nomos_mempool::network::adapters::libp2p::Libp2pAdapter as MempoolLibp2pAdapter;
 use nomos_mempool::{
@@ -35,7 +35,7 @@ use nomos_storage::{
     StorageService,
 };
 
-pub use config::{Config, ConsensusArgs, HttpArgs, LogArgs, NetworkArgs, OverlayArgs};
+pub use config::{Config, ConsensusArgs, DaArgs, HttpArgs, LogArgs, NetworkArgs, OverlayArgs};
 use nomos_core::{
     da::certificate::select::FillSize as FillSizeWithBlobsCertificate,
     tx::select::FillSize as FillSizeWithTx,
@@ -88,8 +88,7 @@ pub struct Nomos {
         >,
     >,
     consensus: ServiceHandle<Carnot>,
-    http: ServiceHandle<HttpService<AxumBackend>>,
-    bridges: ServiceHandle<HttpBridgeService>,
+    http: ServiceHandle<ApiService<AxumBackend<Tx, Wire, MB16>>>,
     #[cfg(feature = "metrics")]
     metrics: ServiceHandle<MetricsService<MapMetricsBackend<MetricsData>>>,
     da: ServiceHandle<DataAvailability>,
