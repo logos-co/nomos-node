@@ -1,10 +1,8 @@
 use std::collections::{hash_map::Entry, HashMap};
 use std::net::SocketAddr;
 
-use futures::{future, StreamExt};
 use mixnet_protocol::Body;
 use tokio::sync::mpsc;
-use tokio_stream::wrappers::UnboundedReceiverStream;
 
 use crate::{forwarder::Forwarder, MixnetNodeConfig};
 
@@ -29,24 +27,17 @@ impl ForwardScheduler {
     }
 
     pub async fn run(mut self) {
-        UnboundedReceiverStream::new(self.rx)
-            .for_each(|packet| {
-                Self::schedule(packet, &mut self.forwarders, self.config);
-                future::ready(())
-            })
-            .await;
+        while let Some(packet) = self.rx.recv().await {
+            self.schedule(packet);
+        }
     }
 
-    fn schedule(
-        packet: Packet,
-        forwarders: &mut HashMap<SocketAddr, Forwarder>,
-        config: MixnetNodeConfig,
-    ) {
-        if let Entry::Vacant(entry) = forwarders.entry(packet.target) {
-            entry.insert(Forwarder::new(packet.target, config));
+    fn schedule(&mut self, packet: Packet) {
+        if let Entry::Vacant(entry) = self.forwarders.entry(packet.target) {
+            entry.insert(Forwarder::new(packet.target, self.config));
         }
 
-        let forwarder = forwarders.get_mut(&packet.target).unwrap();
+        let forwarder = self.forwarders.get_mut(&packet.target).unwrap();
         forwarder.schedule(packet.body);
     }
 }

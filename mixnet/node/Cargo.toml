@@ -13,8 +13,6 @@ nym-sphinx = { package = "nym-sphinx", git = "https://github.com/nymtech/nym", t
 mixnet-protocol = { path = "../protocol" }
 mixnet-topology = { path = "../topology" }
 mixnet-util = { path = "../util" }
-futures = "0.3"
-tokio-stream = "0.1"
 
 [dev-dependencies]
 tokio = {version = "1.32", features =["full"]}
