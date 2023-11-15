@@ -1,8 +1,10 @@
 use std::collections::{hash_map::Entry, HashMap};
 use std::net::SocketAddr;
 
+use futures::{future, StreamExt};
 use mixnet_protocol::Body;
 use tokio::sync::mpsc;
+use tokio_stream::wrappers::UnboundedReceiverStream;
 
 use crate::{forwarder::Forwarder, MixnetNodeConfig};
 
@@ -27,29 +29,24 @@ impl ForwardScheduler {
     }
 
     pub async fn run(mut self) {
-        loop {
-            tokio::select! {
-                packet = self.rx.recv() => {
-                    if let Some(packet) = packet {
-                        self.schedule(packet, self.config).await;
-                    } else {
-                        unreachable!("Packet channel should not be closed, because PacketForwarder is also holding the send half");
-                    }
-                },
-                _ = tokio::signal::ctrl_c() => {
-                    tracing::info!("Shutting down packet forwarder task...");
-                    return;
-                }
-            }
-        }
+        UnboundedReceiverStream::new(self.rx)
+            .for_each(|packet| {
+                Self::schedule(packet, &mut self.forwarders, self.config);
+                future::ready(())
+            })
+            .await;
     }
 
-    async fn schedule(&mut self, packet: Packet, config: MixnetNodeConfig) {
-        if let Entry::Vacant(entry) = self.forwarders.entry(packet.target) {
+    fn schedule(
+        packet: Packet,
+        forwarders: &mut HashMap<SocketAddr, Forwarder>,
+        config: MixnetNodeConfig,
+    ) {
+        if let Entry::Vacant(entry) = forwarders.entry(packet.target) {
             entry.insert(Forwarder::new(packet.target, config));
         }
 
-        let forwarder = self.forwarders.get_mut(&packet.target).unwrap();
+        let forwarder = forwarders.get_mut(&packet.target).unwrap();
         forwarder.schedule(packet.body);
     }
 }
