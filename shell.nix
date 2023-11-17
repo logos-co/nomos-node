@@ -6,7 +6,7 @@
     overlays = [
       (import (fetchGit {
         url = "https://github.com/oxalica/rust-overlay.git";
-        rev = "86302751ef371597d48951983e1a2f04fe78d4ff";
+        rev = "b7a041430733fccaa1ffc3724bb9454289d0f701";
       }))
     ];
    }
@@ -17,8 +17,7 @@ pkgs.mkShell {
 
   buildInputs = with pkgs; [
     pkg-config
-    rust-bin.stable."1.70.0".default
-    go_1_19 # 1.19.5
+    rust-bin.stable."1.73.0".default
     clang_14
     llvmPackages_14.libclang
   ];
