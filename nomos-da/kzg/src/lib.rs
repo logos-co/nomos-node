@@ -1,5 +1,7 @@
 mod dynamic_kzg;
-mod kzg;
+
+#[cfg(feature = "mock")]
+pub mod mock;
 mod types;
 
 use std::error::Error;
@@ -13,9 +15,10 @@ pub trait KzgBundle {
     type MasterCommitment;
     type Proof;
 
-    fn master_commitment(&self) -> Self::MasterCommitment;
-    fn row_commitments(&self) -> Vec<Self::RowCommitment>;
-    fn col_commitments(&self) -> Vec<Self::ColCommitment>;
+    fn master_commitment(&self) -> &Self::MasterCommitment;
+    fn row_commitments(&self) -> &[Self::RowCommitment];
+    fn col_commitments(&self) -> &[Self::ColCommitment];
+    fn proof(&self) -> &Self::Proof;
 }
 
 pub trait KzgProvider {
