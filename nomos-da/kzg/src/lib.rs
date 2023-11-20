@@ -26,19 +26,19 @@ pub trait KzgProvider {
     type Settings;
 
     fn compute_commitment(
+        &self,
         data: &[u8],
-        settings: &Self::Settings,
     ) -> Result<Self::Bundle, Box<dyn Error>>;
 
     fn compute_proofs(
+        &self,
         data: &[u8],
         kzg_bundle: &Self::Bundle,
-        settings: &Self::Settings,
     ) -> Result<Vec<<Self::Bundle as KzgBundle>::Proof>, Box<dyn Error>>;
 
     fn verify_blob(
+        &self,
         blob: &[u8],
         kzg_bundle: &Self::Bundle,
-        settings: &Self::Settings,
     ) -> Result<bool, Box<dyn Error>>;
 }

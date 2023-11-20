@@ -1,6 +1,13 @@
-pub struct MockSettings {}
+use std::num::NonZeroUsize;
 
-pub struct MockRowCommitment {}
+pub struct MockKzgSettings {
+    pub rows: NonZeroUsize,
+    pub cols: NonZeroUsize,
+}
+
+pub struct MockRowCommitment {
+    data: Vec<u8>,
+}
 
 pub struct MockColCommitment {}
 
@@ -41,32 +48,49 @@ impl super::KzgBundle for MockKzgBundle {
     }
 }
 
-pub struct MockKzg {}
+pub struct MockKzg {
+    pub settings: MockKzgSettings,
+}
 
 impl super::KzgProvider for MockKzg {
     type Bundle = MockKzgBundle;
 
-    type Settings = MockSettings;
+    type Settings = MockKzgSettings;
 
     fn compute_commitment(
+        &self,
         data: &[u8],
-        settings: &Self::Settings,
     ) -> Result<Self::Bundle, Box<dyn std::error::Error>> {
+        let chunk_size = data.len() / self.settings.rows;
+        let mut cur = 0;
+        let mut row_commitments = Vec::with_capacity(self.settings.rows.get());
+        for _ in 0..self.settings.rows.get() - 1 {
+            let chunk = &data[cur..cur + chunk_size];
+            cur += chunk_size;
+            row_commitments.push(MockRowCommitment {
+                data: chunk.to_vec(),
+            });
+        }
+        let chunk = &data[cur..];
+        row_commitments.push(MockRowCommitment {
+            data: chunk.to_vec(),
+        });
+
         todo!()
     }
 
     fn compute_proofs(
+        &self,
         data: &[u8],
         kzg_bundle: &Self::Bundle,
-        settings: &Self::Settings,
     ) -> Result<Vec<<Self::Bundle as crate::KzgBundle>::Proof>, Box<dyn std::error::Error>> {
         todo!()
     }
 
     fn verify_blob(
+        &self,
         blob: &[u8],
         kzg_bundle: &Self::Bundle,
-        settings: &Self::Settings,
     ) -> Result<bool, Box<dyn std::error::Error>> {
         todo!()
     }
