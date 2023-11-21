@@ -1,25 +1,30 @@
-use std::num::NonZeroUsize;
+use std::{error::Error, num::NonZeroUsize};
+
+use crate::KzgBundle;
 
 pub struct MockKzgSettings {
     pub rows: NonZeroUsize,
     pub cols: NonZeroUsize,
 }
 
-pub struct MockRowCommitment {
-    data: Vec<u8>,
-}
+pub struct MockRowCommitment {}
 
 pub struct MockColCommitment {}
 
-pub struct MockMasterCommitment {}
+pub struct MockMasterCommitment {
+    pub nonce: u64,
+}
 
-pub struct MockProof {}
+#[derive(PartialEq, Eq)]
+pub struct MockProof {
+    pub cks: u32,
+}
 
 pub struct MockKzgBundle {
     pub master_commitment: MockMasterCommitment,
     pub row_commitments: Vec<MockRowCommitment>,
     pub col_commitments: Vec<MockColCommitment>,
-    pub proof: MockProof,
+    pub proof: Vec<MockProof>,
 }
 
 impl super::KzgBundle for MockKzgBundle {
@@ -30,6 +35,8 @@ impl super::KzgBundle for MockKzgBundle {
     type MasterCommitment = MockMasterCommitment;
 
     type Proof = MockProof;
+
+    type Nonce = u64;
 
     fn master_commitment(&self) -> &Self::MasterCommitment {
         &self.master_commitment
@@ -43,8 +50,12 @@ impl super::KzgBundle for MockKzgBundle {
         &self.col_commitments
     }
 
-    fn proof(&self) -> &Self::Proof {
+    fn proof(&self) -> &[Self::Proof] {
         &self.proof
+    }
+
+    fn nonce(&self) -> &Self::Nonce {
+        &self.master_commitment.nonce
     }
 }
 
@@ -57,34 +68,32 @@ impl super::KzgProvider for MockKzg {
 
     type Settings = MockKzgSettings;
 
+    type Nonce = u64;
+
     fn compute_commitment(
         &self,
         data: &[u8],
+        nonce: Self::Nonce,
     ) -> Result<Self::Bundle, Box<dyn std::error::Error>> {
-        let chunk_size = data.len() / self.settings.rows;
-        let mut cur = 0;
-        let mut row_commitments = Vec::with_capacity(self.settings.rows.get());
-        for _ in 0..self.settings.rows.get() - 1 {
-            let chunk = &data[cur..cur + chunk_size];
-            cur += chunk_size;
-            row_commitments.push(MockRowCommitment {
-                data: chunk.to_vec(),
-            });
-        }
-        let chunk = &data[cur..];
-        row_commitments.push(MockRowCommitment {
-            data: chunk.to_vec(),
-        });
-
-        todo!()
+        Ok(MockKzgBundle {
+            master_commitment: MockMasterCommitment { nonce: nonce + 1 },
+            row_commitments: Vec::new(),
+            col_commitments: Vec::new(),
+            proof: vec![MockProof {
+                cks: crc32fast::hash(data),
+            }],
+        })
     }
 
     fn compute_proofs(
         &self,
         data: &[u8],
-        kzg_bundle: &Self::Bundle,
+        _kzg_bundle: &Self::Bundle,
     ) -> Result<Vec<<Self::Bundle as crate::KzgBundle>::Proof>, Box<dyn std::error::Error>> {
-        todo!()
+        std::io::Error::new(std::io::ErrorKind::Other, "x").source();
+        Ok(vec![MockProof {
+            cks: crc32fast::hash(data),
+        }])
     }
 
     fn verify_blob(
@@ -92,6 +101,7 @@ impl super::KzgProvider for MockKzg {
         blob: &[u8],
         kzg_bundle: &Self::Bundle,
     ) -> Result<bool, Box<dyn std::error::Error>> {
-        todo!()
+        let proof = &self.compute_proofs(blob, kzg_bundle)?;
+        Ok(proof == kzg_bundle.proof())
     }
 }

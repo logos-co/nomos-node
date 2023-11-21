@@ -1,7 +1,7 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use kzg::{types::kzg_settings::FsKZGSettings, utils::generate_trusted_setup};
 use kzg_traits::{FFTSettings, KZGSettings};
-use nomos_kzg::{Blob, KzgSettings};
+use nomos_kzg::types::{Blob, KzgSettings};
 
 fn nomos_dynamic_vs_external(c: &mut Criterion) {
     let (g1s, g2s) = generate_trusted_setup(4096, [0; 32]);
@@ -17,7 +17,7 @@ fn nomos_dynamic_vs_external(c: &mut Criterion) {
     let mut group = c.benchmark_group("KZG Commitment Benchmarks");
 
     group.bench_function("nomos blob commitment", |b| {
-        b.iter(|| nomos_kzg::compute_commitment(black_box(&data), black_box(&kzg_settings)))
+        b.iter(|| nomos_kzg::kzg::compute_commitment(black_box(&data), black_box(&kzg_settings)))
     });
 
     group.bench_function("external blob commitment", |b| {
