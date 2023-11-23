@@ -1,14 +1,7 @@
 pub mod connection;
 
 use sphinx_packet::{payload::Payload, SphinxPacket};
-
-use std::{io::ErrorKind, net::SocketAddr, sync::Arc, time::Duration};
-
-use tokio::{
-    io::{self, AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt},
-    net::TcpStream,
-    sync::Mutex,
-};
+use tokio::io::{self, AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 
 pub type Result<T> = core::result::Result<T, ProtocolError>;
 
@@ -102,14 +95,7 @@ impl Body {
         Self::final_payload_from_bytes(&buf)
     }
 
-    pub async fn write<W>(&self, writer: &mut W) -> Result<()>
-    where
-        W: AsyncWrite + Unpin + ?Sized,
-    {
-        self.write_inner(writer).await.map_err(ProtocolError::from)
-    }
-
-    pub(crate) async fn write_inner<W>(&self, writer: &mut W) -> std::io::Result<()>
+    pub async fn write<W>(&self, writer: &mut W) -> std::io::Result<()>
     where
         W: AsyncWrite + Unpin + ?Sized,
     {
@@ -129,39 +115,4 @@ impl Body {
         }
         Ok(())
     }
-}
-
-pub async fn retry_backoff(
-    peer_addr: SocketAddr,
-    max_retries: usize,
-    retry_delay: Duration,
-    body: Body,
-    socket: Arc<Mutex<TcpStream>>,
-) -> Result<()> {
-    for idx in 0..max_retries {
-        // backoff
-        let wait = Duration::from_millis((retry_delay.as_millis() as u64).pow(idx as u32));
-        tokio::time::sleep(wait).await;
-        let mut socket = socket.lock().await;
-        match body.write(&mut *socket).await {
-            Ok(_) => return Ok(()),
-            Err(e) => {
-                match &e {
-                    ProtocolError::IO(err) => {
-                        match err.kind() {
-                            ErrorKind::Unsupported => return Err(e),
-                            _ => {
-                                // update the connection
-                                if let Ok(tcp) = TcpStream::connect(peer_addr).await {
-                                    *socket = tcp;
-                                }
-                            }
-                        }
-                    }
-                    _ => return Err(e),
-                }
-            }
-        }
-    }
-    Err(ProtocolError::ReachMaxRetries(max_retries))
 }

@@ -76,9 +76,7 @@ impl MixnetNode {
             self.config.listen_address
         );
 
-        // TODO: expose the conn pool config
         let runner = MixnetNodeRunner::new(self.config, client_tx);
-
         loop {
             tokio::select! {
                 res = listener.accept() => {

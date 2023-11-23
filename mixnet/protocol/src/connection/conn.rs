@@ -88,7 +88,7 @@ impl ConnectionRunner {
         stream: &mut Option<TcpStream>,
         num_backoff: &mut i32,
     ) {
-        // connection has been never established or has been closed).
+        // if connection has been never established or has been closed
         if stream.is_none() {
             Self::backoff(self.config.reconnect_backoff, *num_backoff).await;
 
@@ -119,7 +119,7 @@ impl ConnectionRunner {
         match cmd {
             ConnectionCommand::Write { body, tx } => {
                 tracing::trace!("writing body...");
-                match body.write_inner(stream).await {
+                match body.write(stream).await {
                     Ok(_) => {
                         tx.send(Ok(())).unwrap();
                         Ok(())

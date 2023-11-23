@@ -1,6 +1,6 @@
 use std::net::SocketAddr;
 
-use mixnet_protocol::Body;
+use mixnet_protocol::{Body, ProtocolError};
 use tokio::{
     net::{TcpListener, TcpStream},
     sync::mpsc,
@@ -40,7 +40,7 @@ impl ClientNotifier {
     ) -> super::Result<()> {
         while let Some(body) = rx.recv().await {
             if let Err(e) = body.write(&mut socket).await {
-                return Err(super::MixnetNodeError::Client(e));
+                return Err(super::MixnetNodeError::Client(ProtocolError::from(e)));
             }
         }
         tracing::debug!("body receiver closed");
