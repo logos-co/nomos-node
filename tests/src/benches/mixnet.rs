@@ -27,15 +27,14 @@ pub fn mixnet(c: &mut Criterion) {
 }
 
 async fn setup(msg_size: usize) -> (Vec<MixNode>, MixnetClient<OsRng>, MessageStream, Vec<u8>) {
-    let (mixnodes, node_configs, topology) = MixNode::spawn_nodes(3).await;
+    let (mixnodes, mixnet_config) = MixNode::spawn_nodes(3).await;
 
     let sender_client = MixnetClient::new(
         MixnetClientConfig {
             mode: MixnetClientMode::Sender,
-            topology: topology.clone(),
-            connection_pool_size: 255,
-            max_retries: 3,
-            retry_delay: Duration::from_secs(5),
+            topology: mixnet_config.topology.clone(),
+            max_net_write_tries: 3,
+            connection_pool_config: Default::default(),
         },
         OsRng,
     );
@@ -45,12 +44,16 @@ async fn setup(msg_size: usize) -> (Vec<MixNode>, MixnetClient<OsRng>, MessageSt
                 // Connect with the MixnetNode in the exit layer
                 // According to the current implementation,
                 // one of mixnodes the exit layer always will be selected as a destination.
-                node_configs.last().unwrap().client_listen_address,
+                mixnet_config
+                    .node_configs
+                    .last()
+                    .unwrap()
+                    .client_listen_address
+                    .to_string(),
             ),
-            topology,
-            connection_pool_size: 255,
-            max_retries: 3,
-            retry_delay: Duration::from_secs(5),
+            topology: mixnet_config.topology,
+            max_net_write_tries: 3,
+            connection_pool_config: Default::default(),
         },
         OsRng,
     );
