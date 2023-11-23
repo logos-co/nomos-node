@@ -12,7 +12,6 @@ sphinx-packet = "0.1.0"
 nym-sphinx = { package = "nym-sphinx", git = "https://github.com/nymtech/nym", tag = "v1.1.22" }
 mixnet-protocol = { path = "../protocol" }
 mixnet-topology = { path = "../topology" }
-mixnet-util = { path = "../util" }
 
 [dev-dependencies]
-tokio = {version = "1.32", features =["full"]}
+tokio = { version = "1.32", features = ["full"] }

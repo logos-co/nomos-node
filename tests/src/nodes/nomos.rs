@@ -308,9 +308,8 @@ fn create_node_config(
                 mixnet_client: MixnetClientConfig {
                     mode: mixnet_client_mode,
                     topology: mixnet_topology,
-                    connection_pool_size: 255,
-                    max_retries: 3,
-                    retry_delay: Duration::from_secs(5),
+                    max_net_write_tries: 3,
+                    connection_pool_config: Default::default(),
                 },
                 mixnet_delay: Duration::ZERO..Duration::from_millis(10),
             },

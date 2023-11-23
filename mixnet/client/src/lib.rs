@@ -1,6 +1,7 @@
 pub mod config;
 pub mod error;
 pub use error::*;
+use mixnet_protocol::connection::ConnectionPool;
 mod receiver;
 mod sender;
 
@@ -9,7 +10,6 @@ use std::time::Duration;
 pub use config::MixnetClientConfig;
 pub use config::MixnetClientMode;
 use futures::stream::BoxStream;
-use mixnet_util::ConnectionPool;
 use rand::Rng;
 use sender::Sender;
 
@@ -23,15 +23,13 @@ pub type MessageStream = BoxStream<'static, Result<Vec<u8>>>;
 
 impl<R: Rng> MixnetClient<R> {
     pub fn new(config: MixnetClientConfig, rng: R) -> Self {
-        let cache = ConnectionPool::new(config.connection_pool_size);
         Self {
             mode: config.mode,
             sender: Sender::new(
                 config.topology,
-                cache,
+                ConnectionPool::new(config.connection_pool_config),
                 rng,
-                config.max_retries,
-                config.retry_delay,
+                config.max_net_write_tries,
             ),
         }
     }

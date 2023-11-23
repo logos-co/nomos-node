@@ -1,8 +1,10 @@
 use std::{net::SocketAddr, time::Duration};
 
-use mixnet_protocol::{Body, ProtocolError};
+use mixnet_protocol::{
+    connection::{Command, ConnectionCommand, ConnectionPool},
+    Body, ProtocolError,
+};
 use mixnet_topology::MixnetTopology;
-use mixnet_util::ConnectionPool;
 use nym_sphinx::{
     addressing::nodes::NymNodeRoutingAddress, chunking::fragment::Fragment, message::NymMessage,
     params::PacketSize, Delay, Destination, DestinationAddressBytes, NodeAddressBytes,
@@ -10,6 +12,7 @@ use nym_sphinx::{
 };
 use rand::{distributions::Uniform, prelude::Distribution, Rng};
 use sphinx_packet::{route, SphinxPacket, SphinxPacketBuilder};
+use tokio::sync::oneshot;
 
 use super::error::*;
 
@@ -17,26 +20,23 @@ use super::error::*;
 pub struct Sender<R: Rng> {
     //TODO: handle topology update
     topology: MixnetTopology,
-    pool: ConnectionPool,
-    max_retries: usize,
-    retry_delay: Duration,
+    conn_pool: ConnectionPool,
+    max_tries: usize,
     rng: R,
 }
 
 impl<R: Rng> Sender<R> {
     pub fn new(
         topology: MixnetTopology,
-        pool: ConnectionPool,
+        conn_pool: ConnectionPool,
         rng: R,
-        max_retries: usize,
-        retry_delay: Duration,
+        max_tries: usize,
     ) -> Self {
         Self {
             topology,
             rng,
-            pool,
-            max_retries,
-            retry_delay,
+            conn_pool,
+            max_tries,
         }
     }
 
@@ -53,14 +53,12 @@ impl<R: Rng> Sender<R> {
             .collect::<Result<Vec<_>>>()?
             .into_iter()
             .for_each(|(packet, first_node)| {
-                let pool = self.pool.clone();
-                let max_retries = self.max_retries;
-                let retry_delay = self.retry_delay;
+                let conn_pool = self.conn_pool.clone();
+                let max_tries = self.max_tries;
                 tokio::spawn(async move {
                     if let Err(e) = Self::send_packet(
-                        &pool,
-                        max_retries,
-                        retry_delay,
+                        conn_pool,
+                        max_tries,
                         Box::new(packet),
                         first_node.address,
                     )
@@ -116,37 +114,52 @@ impl<R: Rng> Sender<R> {
     }
 
     async fn send_packet(
-        pool: &ConnectionPool,
+        mut conn_pool: ConnectionPool,
         max_retries: usize,
-        retry_delay: Duration,
         packet: Box<SphinxPacket>,
         addr: NodeAddressBytes,
     ) -> Result<()> {
         let addr = SocketAddr::from(NymNodeRoutingAddress::try_from(addr)?);
         tracing::debug!("Sending a Sphinx packet to the node: {addr:?}");
+        let mut body = Body::SphinxPacket(packet);
 
-        let mu: std::sync::Arc<tokio::sync::Mutex<tokio::net::TcpStream>> =
-            pool.get_or_init(&addr).await?;
-        let arc_socket = mu.clone();
-
-        let body = Body::SphinxPacket(packet);
-
-        if let Err(e) = {
-            let mut socket = mu.lock().await;
-            body.write(&mut *socket).await
-        } {
-            tracing::error!("Failed to send packet to {addr} with error: {e}. Retrying...");
-            return mixnet_protocol::retry_backoff(
-                addr,
-                max_retries,
-                retry_delay,
-                body,
-                arc_socket,
-            )
-            .await
-            .map_err(Into::into);
+        let mut num_tries = 0;
+        loop {
+            match Self::send_packet_once(&mut conn_pool, body, addr).await {
+                Ok(_) => return Ok(()),
+                Err((body_, e)) => {
+                    if num_tries < max_retries {
+                        num_tries += 1;
+                        tracing::warn!(
+                            "failed to send packet. retrying({}/{})...: {}",
+                            num_tries,
+                            max_retries,
+                            e
+                        );
+                        body = body_;
+                    } else {
+                        return Err(MixnetClientError::from(ProtocolError::from(e)));
+                    }
+                }
+            }
         }
-        Ok(())
+    }
+
+    async fn send_packet_once(
+        conn_pool: &mut ConnectionPool,
+        body: Body,
+        addr: SocketAddr,
+    ) -> core::result::Result<(), (Body, std::io::Error)> {
+        let (tx, rx) = oneshot::channel();
+        let cmd = Command {
+            addr,
+            command: ConnectionCommand::Write { body, tx },
+        };
+
+        conn_pool.submit(cmd);
+
+        rx.await
+            .expect("command result must be returned from connection pool")
     }
 }
 

@@ -30,7 +30,7 @@ impl Default for MixnetNodeConfig {
                 7778,
             )),
             private_key: PrivateKey::new().to_bytes(),
-            max_net_write_tries: MixnetNodeConfig::default_max_net_write_tries(),
+            max_net_write_tries: Self::default_max_net_write_tries(),
             connection_pool_config: ConnectionPoolConfig::default(),
         }
     }

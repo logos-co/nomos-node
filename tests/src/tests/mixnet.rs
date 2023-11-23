@@ -23,9 +23,8 @@ async fn mixnet() {
         MixnetClientConfig {
             mode: MixnetClientMode::Sender,
             topology: topology.clone(),
-            connection_pool_size: 255,
-            max_retries: 3,
-            retry_delay: Duration::from_secs(5),
+            max_net_write_tries: 3,
+            connection_pool_config: Default::default(),
         },
         OsRng,
     );
@@ -127,9 +126,8 @@ async fn run_nodes_and_destination_client() -> (
         MixnetClientConfig {
             mode: MixnetClientMode::SenderReceiver(config3.client_listen_address.to_string()),
             topology: topology.clone(),
-            connection_pool_size: 255,
-            max_retries: 3,
-            retry_delay: Duration::from_secs(5),
+            max_net_write_tries: 3,
+            connection_pool_config: Default::default(),
         },
         OsRng,
     );
