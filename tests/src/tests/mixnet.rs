@@ -75,9 +75,9 @@ async fn run_nodes_and_destination_client() -> (
         ..Default::default()
     };
 
-    let mixnode1 = MixnetNode::new(config1);
-    let mixnode2 = MixnetNode::new(config2);
-    let mixnode3 = MixnetNode::new(config3);
+    let mixnode1 = MixnetNode::new(config1.clone());
+    let mixnode2 = MixnetNode::new(config2.clone());
+    let mixnode3 = MixnetNode::new(config3.clone());
 
     let topology = MixnetTopology {
         layers: vec![

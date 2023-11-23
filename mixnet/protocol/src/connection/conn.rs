@@ -1,5 +1,6 @@
 use std::{net::SocketAddr, time::Duration};
 
+use serde::{Deserialize, Serialize};
 use tokio::{
     net::TcpStream,
     sync::{mpsc, oneshot},
@@ -19,11 +20,11 @@ pub(crate) struct Connection {
 pub enum ConnectionCommand {
     Write {
         body: Body,
-        tx: oneshot::Sender<std::io::Result<()>>,
+        tx: oneshot::Sender<core::result::Result<(), (Body, std::io::Error)>>,
     },
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ConnectionConfig {
     reconnect_backoff: Duration,
 }
@@ -116,7 +117,7 @@ impl ConnectionRunner {
 
     async fn handle_command(cmd: ConnectionCommand, stream: &mut TcpStream) -> std::io::Result<()> {
         match cmd {
-            ConnectionCommand::Write { body, tx, .. } => {
+            ConnectionCommand::Write { body, tx } => {
                 tracing::trace!("writing body...");
                 match body.write_inner(stream).await {
                     Ok(_) => {
@@ -125,7 +126,7 @@ impl ConnectionRunner {
                     }
                     Err(e) => {
                         let internal_err = std::io::Error::from(e.kind());
-                        tx.send(Err(e)).unwrap();
+                        tx.send(Err((body, e))).unwrap();
                         Err(internal_err)
                     }
                 }
@@ -135,8 +136,8 @@ impl ConnectionRunner {
 
     async fn return_err(cmd: ConnectionCommand, e: std::io::Error) {
         match cmd {
-            ConnectionCommand::Write { tx, .. } => {
-                tx.send(Err(e)).unwrap();
+            ConnectionCommand::Write { body, tx } => {
+                tx.send(Err((body, e))).unwrap();
             }
         }
     }

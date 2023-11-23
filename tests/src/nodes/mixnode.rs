@@ -62,7 +62,6 @@ impl MixNode {
                     get_available_port(),
                 )),
                 private_key,
-                connection_pool_size: 255,
                 ..Default::default()
             };
             configs.push(config);
@@ -70,7 +69,7 @@ impl MixNode {
 
         let mut nodes = Vec::<MixNode>::new();
         for config in &configs {
-            nodes.push(Self::spawn(*config).await);
+            nodes.push(Self::spawn(config.clone()).await);
         }
 
         // We need to return configs as well, to configure mixclients accordingly

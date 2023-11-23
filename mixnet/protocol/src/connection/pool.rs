@@ -1,5 +1,6 @@
 use std::{collections::HashMap, net::SocketAddr};
 
+use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
 
 use super::{
@@ -7,6 +8,7 @@ use super::{
     ConnectionConfig,
 };
 
+#[derive(Clone)]
 pub struct ConnectionPool {
     tx: mpsc::UnboundedSender<Command>,
 }
@@ -17,7 +19,7 @@ pub struct Command {
 }
 
 // TODO: add capacity and eviction
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct ConnectionPoolConfig {
     pub conn_config: ConnectionConfig,
 }

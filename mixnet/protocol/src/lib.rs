@@ -1,4 +1,4 @@
-mod connection;
+pub mod connection;
 
 use sphinx_packet::{payload::Payload, SphinxPacket};
 
@@ -30,6 +30,15 @@ pub enum ProtocolError {
 pub enum Body {
     SphinxPacket(Box<SphinxPacket>),
     FinalPayload(Payload),
+}
+
+impl std::fmt::Debug for Body {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::SphinxPacket(_) => f.debug_tuple("SphinxPacket").finish(),
+            Self::FinalPayload(_) => f.debug_tuple("FinalPayload").finish(),
+        }
+    }
 }
 
 impl Body {

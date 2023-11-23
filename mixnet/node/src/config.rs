@@ -1,13 +1,11 @@
-use std::{
-    net::{Ipv4Addr, SocketAddr, SocketAddrV4},
-    time::Duration,
-};
+use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
 
+use mixnet_protocol::connection::ConnectionPoolConfig;
 use nym_sphinx::{PrivateKey, PublicKey};
 use serde::{Deserialize, Serialize};
 use sphinx_packet::crypto::{PRIVATE_KEY_SIZE, PUBLIC_KEY_SIZE};
 
-#[derive(Serialize, Deserialize, Copy, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct MixnetNodeConfig {
     /// A listen address for receiving Sphinx packets
     pub listen_address: SocketAddr,
@@ -15,15 +13,12 @@ pub struct MixnetNodeConfig {
     pub client_listen_address: SocketAddr,
     /// A key for decrypting Sphinx packets
     pub private_key: [u8; PRIVATE_KEY_SIZE],
-    /// The size of the connection pool.
-    #[serde(default = "MixnetNodeConfig::default_connection_pool_size")]
-    pub connection_pool_size: usize,
     /// The maximum number of retries.
-    #[serde(default = "MixnetNodeConfig::default_max_retries")]
-    pub max_retries: usize,
-    /// The retry delay between retries.
-    #[serde(default = "MixnetNodeConfig::default_retry_delay")]
-    pub retry_delay: Duration,
+    #[serde(default = "MixnetNodeConfig::default_max_net_write_tries")]
+    pub max_net_write_tries: usize,
+    /// Connection pool config
+    #[serde(default = "ConnectionPoolConfig::default")]
+    pub connection_pool_config: ConnectionPoolConfig,
 }
 
 impl Default for MixnetNodeConfig {
@@ -35,24 +30,15 @@ impl Default for MixnetNodeConfig {
                 7778,
             )),
             private_key: PrivateKey::new().to_bytes(),
-            connection_pool_size: 255,
-            max_retries: 3,
-            retry_delay: Duration::from_secs(5),
+            max_net_write_tries: MixnetNodeConfig::default_max_net_write_tries(),
+            connection_pool_config: ConnectionPoolConfig::default(),
         }
     }
 }
 
 impl MixnetNodeConfig {
-    const fn default_connection_pool_size() -> usize {
-        255
-    }
-
-    const fn default_max_retries() -> usize {
+    const fn default_max_net_write_tries() -> usize {
         3
-    }
-
-    const fn default_retry_delay() -> Duration {
-        Duration::from_secs(5)
     }
 
     pub fn public_key(&self) -> [u8; PUBLIC_KEY_SIZE] {
