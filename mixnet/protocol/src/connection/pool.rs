@@ -36,6 +36,10 @@ impl ConnectionPool {
         Self { tx }
     }
 
+    /// Submit a command, so that it can be processed by a corresponding connection.
+    /// If the caller wants to retry submitting the command (in the case of IO errors),
+    /// any backoff delay is not mandatory because the connection is reestablished with exponential
+    /// backoff.
     pub fn submit(&mut self, cmd: Command) {
         self.tx.send(cmd).unwrap();
     }

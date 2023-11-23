@@ -18,12 +18,16 @@ pub(crate) struct Connection {
 }
 
 pub enum ConnectionCommand {
+    /// Write a body to a connection, and return a result via channel.
+    /// If failed, the body is returned along with an error,
+    /// so that the caller can retry it if needed.
     Write {
         body: Body,
         tx: oneshot::Sender<core::result::Result<(), (Body, std::io::Error)>>,
     },
 }
 
+// TODO: add reconnect_max_backoff, so that the reconnect is not delayed for a long time
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ConnectionConfig {
     reconnect_backoff: Duration,
