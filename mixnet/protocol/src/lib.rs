@@ -1,3 +1,5 @@
+mod connection;
+
 use sphinx_packet::{payload::Payload, SphinxPacket};
 
 use std::{io::ErrorKind, net::SocketAddr, sync::Arc, time::Duration};
@@ -92,6 +94,13 @@ impl Body {
     }
 
     pub async fn write<W>(&self, writer: &mut W) -> Result<()>
+    where
+        W: AsyncWrite + Unpin + ?Sized,
+    {
+        self.write_inner(writer).await.map_err(ProtocolError::from)
+    }
+
+    pub(crate) async fn write_inner<W>(&self, writer: &mut W) -> std::io::Result<()>
     where
         W: AsyncWrite + Unpin + ?Sized,
     {
