@@ -4,7 +4,9 @@ use nomos_cli::{
 };
 use std::time::Duration;
 use tempfile::NamedTempFile;
-use tests::{get_available_port, nodes::nomos::Pool, MixNode, Node, NomosNode, SpawnConfig};
+use tests::{
+    adjust_timeout, get_available_port, nodes::nomos::Pool, MixNode, Node, NomosNode, SpawnConfig,
+};
 
 const TIMEOUT_SECS: u64 = 20;
 
@@ -50,7 +52,7 @@ async fn disseminate_blob() {
     let thread = std::thread::spawn(move || cmd.run().unwrap());
 
     tokio::time::timeout(
-        Duration::from_secs(TIMEOUT_SECS),
+        adjust_timeout(Duration::from_secs(TIMEOUT_SECS)),
         wait_for_cert_in_mempool(&nodes[0]),
     )
     .await

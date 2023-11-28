@@ -5,8 +5,10 @@ pub use nodes::MixNode;
 pub use nodes::NomosNode;
 use once_cell::sync::Lazy;
 
+use std::env;
 // std
 use std::net::TcpListener;
+use std::ops::Mul;
 use std::time::Duration;
 use std::{fmt::Debug, sync::Mutex};
 
@@ -15,6 +17,8 @@ use fraction::{Fraction, One};
 use rand::{thread_rng, Rng};
 
 static NET_PORT: Lazy<Mutex<u16>> = Lazy::new(|| Mutex::new(thread_rng().gen_range(8000, 10000)));
+static IS_SLOW_TEST_ENV: Lazy<bool> =
+    Lazy::new(|| env::var("SLOW_TEST_ENV").is_ok_and(|s| s == "true"));
 
 pub fn get_available_port() -> u16 {
     let mut port = NET_PORT.lock().unwrap();
@@ -23,6 +27,15 @@ pub fn get_available_port() -> u16 {
         *port += 1;
     }
     *port
+}
+
+/// In slow test environments like Codecov, use 2x timeout.
+pub fn adjust_timeout(d: Duration) -> Duration {
+    if *IS_SLOW_TEST_ENV {
+        d.mul(2)
+    } else {
+        d
+    }
 }
 
 #[async_trait::async_trait]
@@ -58,7 +71,7 @@ impl SpawnConfig {
                 // Set the timeout conservatively
                 // since nodes should be spawned sequentially in the chain topology
                 // and it takes 1+ secs for each nomos-node to be started.
-                timeout: Duration::from_millis(n_participants as u64 * 2500),
+                timeout: adjust_timeout(Duration::from_millis(n_participants as u64 * 2500)),
             },
             mixnet: mixnet_config,
         }
