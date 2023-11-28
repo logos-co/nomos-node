@@ -4,7 +4,7 @@ use std::process::{Child, Command, Stdio};
 use std::time::Duration;
 // internal
 use super::{create_tempdir, persist_tempdir, LOGS_PREFIX};
-use crate::{get_available_port, ConsensusConfig, MixnetConfig, Node, SpawnConfig};
+use crate::{adjust_timeout, get_available_port, ConsensusConfig, MixnetConfig, Node, SpawnConfig};
 use consensus_engine::overlay::{RandomBeaconState, RoundRobin, TreeOverlay, TreeOverlaySettings};
 use consensus_engine::{BlockId, NodeId, Overlay};
 use full_replication::Certificate;
@@ -85,7 +85,7 @@ impl NomosNode {
             _tempdir: dir,
             config,
         };
-        tokio::time::timeout(std::time::Duration::from_secs(10), async {
+        tokio::time::timeout(adjust_timeout(Duration::from_secs(10)), async {
             node.wait_online().await
         })
         .await
