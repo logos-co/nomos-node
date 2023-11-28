@@ -64,11 +64,23 @@ jobs:
       - name: Setup build environment (Windows)
         if: matrix.os == 'windows-latest'
         uses: ./.github/actions/mingw-env
-      - uses: actions-rs/cargo@v1
+      - name: Cargo build
+        uses: actions-rs/cargo@v1
         with:
           command: build
           args: --all --no-default-features --features ${{ matrix.feature }}
-      - uses: actions-rs/cargo@v1
+      - name: Cargo test (Other OSes)
+        if: matrix.os != 'windows-latest'
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: --all --no-default-features --features ${{ matrix.feature }}
+      - name: Cargo test (Windows)
+        if: matrix.os == 'windows-latest'
+        uses: actions-rs/cargo@v1
+        env:
+          # Because Windows runners in Github Actions tend to be slow.
+          SLOW_TEST_ENV: true
         with:
           command: test
           args: --all --no-default-features --features ${{ matrix.feature }}
