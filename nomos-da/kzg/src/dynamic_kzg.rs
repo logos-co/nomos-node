@@ -4,14 +4,14 @@
 //! Blob related constants were removed and we use a config based approach.
 
 use crate::types::{Blob, Commitment, KzgSettings, Proof};
-use kzg::eip_4844::{hash_to_bls_field, verify_kzg_proof_rust};
 use kzg::kzg_proofs::g1_linear_combination;
 use kzg::types::fr::FsFr;
 use kzg::types::g1::FsG1;
 use kzg::types::kzg_settings::FsKZGSettings;
 use kzg::types::poly::FsPoly;
 use kzg_traits::eip_4844::{
-    bytes_of_uint64, hash, CHALLENGE_INPUT_SIZE, FIAT_SHAMIR_PROTOCOL_DOMAIN,
+    bytes_of_uint64, hash, hash_to_bls_field, verify_kzg_proof_rust, CHALLENGE_INPUT_SIZE,
+    FIAT_SHAMIR_PROTOCOL_DOMAIN,
 };
 use kzg_traits::{Fr, Poly, G1};
 
@@ -105,7 +105,7 @@ fn compute_kzg_proof(blob: &Blob, z: &FsFr, s: &KzgSettings) -> (FsG1, FsFr) {
     let roots_of_unity: &Vec<FsFr> = &s.settings.fs.roots_of_unity;
 
     let mut m: usize = 0;
-    let mut q: FsPoly = FsPoly::new(poly_len).unwrap();
+    let mut q: FsPoly = FsPoly::new(poly_len);
 
     let mut inverses_in: Vec<FsFr> = vec![FsFr::default(); poly_len];
     let mut inverses: Vec<FsFr> = vec![FsFr::default(); poly_len];
@@ -217,7 +217,7 @@ fn g1_lincomb(points: &[FsG1], scalars: &[FsFr], length: usize) -> FsG1 {
 }
 
 fn blob_to_polynomial(blob: &[FsFr]) -> FsPoly {
-    let mut p: FsPoly = FsPoly::new(blob.len()).unwrap();
+    let mut p: FsPoly = FsPoly::new(blob.len());
     p.coeffs = blob.to_vec();
     p
 }
@@ -225,9 +225,8 @@ fn blob_to_polynomial(blob: &[FsFr]) -> FsPoly {
 #[cfg(test)]
 mod test {
     use super::*;
-    use kzg::eip_4844::blob_to_kzg_commitment_rust;
     use kzg::utils::generate_trusted_setup;
-    use kzg_traits::{FFTSettings, KZGSettings};
+    use kzg_traits::{eip_4844::blob_to_kzg_commitment_rust, FFTSettings, KZGSettings};
 
     #[test]
     fn test_blob_to_kzg_commitment() {
@@ -240,7 +239,7 @@ mod test {
         };
         let blob = Blob::from_bytes(&[5; 4096 * 32], &kzg_settings).unwrap();
         let commitment = blob_to_kzg_commitment(&blob, &kzg_settings.settings, 4096);
-        let commitment2 = blob_to_kzg_commitment_rust(&blob.inner, &kzg_settings.settings);
+        let commitment2 = blob_to_kzg_commitment_rust(&blob.inner, &kzg_settings.settings).unwrap();
         assert_eq!(commitment, commitment2);
     }
 }
