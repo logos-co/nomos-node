@@ -90,7 +90,7 @@ impl ConnectionRunner {
         &mut self,
         cmd: ConnectionCommand,
         stream: &mut Option<TcpStream>,
-        num_backoff: &mut i32,
+        num_backoff: &mut u64,
     ) {
         // if connection has been never established or has been closed
         if stream.is_none() {
@@ -146,7 +146,7 @@ impl ConnectionRunner {
         }
     }
 
-    async fn backoff(reconnect_backoff: Duration, num_backoff: i32) {
+    async fn backoff(reconnect_backoff: Duration, num_backoff: u64) {
         if num_backoff == 0 {
             return;
         }
