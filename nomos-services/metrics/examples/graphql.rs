@@ -14,7 +14,7 @@ use overwatch_rs::{
         handle::{ServiceHandle, ServiceStateHandle},
         relay::{NoMessage, Relay},
         state::{NoOperator, NoState},
-        ServiceCore, ServiceData, ServiceId,
+        ServiceCore, ServiceData, ServiceError, ServiceId,
     },
 };
 
@@ -67,13 +67,13 @@ impl<Backend: MetricsBackend<MetricsData = MetricsData> + Clone + Send + Sync + 
 where
     Backend::MetricsData: async_graphql::OutputType,
 {
-    fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, overwatch_rs::DynError> {
+    fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, ServiceError> {
         let backend_channel: Relay<MetricsService<Backend>> =
             service_state.overwatch_handle.relay();
         Ok(Self { backend_channel })
     }
 
-    async fn run(self) -> Result<(), overwatch_rs::DynError> {
+    async fn run(self) -> Result<(), ServiceError> {
         let replay = self.backend_channel.connect().await.map_err(|e| {
             tracing::error!(err = ?e, "Metrics Updater: relay connect error");
             e

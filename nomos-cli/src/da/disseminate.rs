@@ -7,14 +7,11 @@ use nomos_core::{da::DaProtocol, wire};
 use nomos_da::network::{adapters::libp2p::Libp2pAdapter, NetworkAdapter};
 use nomos_network::{backends::libp2p::Libp2p, NetworkService};
 use overwatch_derive::*;
-use overwatch_rs::{
-    services::{
-        handle::{ServiceHandle, ServiceStateHandle},
-        relay::NoMessage,
-        state::*,
-        ServiceCore, ServiceData, ServiceId,
-    },
-    DynError,
+use overwatch_rs::services::{
+    handle::{ServiceHandle, ServiceStateHandle},
+    relay::NoMessage,
+    state::*,
+    ServiceCore, ServiceData, ServiceError, ServiceId,
 };
 use reqwest::Url;
 use serde::Serialize;
@@ -139,11 +136,11 @@ impl ServiceData for DisseminateService {
 
 #[async_trait::async_trait]
 impl ServiceCore for DisseminateService {
-    fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, DynError> {
+    fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, ServiceError> {
         Ok(Self { service_state })
     }
 
-    async fn run(self) -> Result<(), DynError> {
+    async fn run(self) -> Result<(), ServiceError> {
         let Self { service_state } = self;
         let Settings {
             payload,
@@ -154,8 +151,8 @@ impl ServiceCore for DisseminateService {
             output,
         } = service_state.settings_reader.get_updated_settings();
 
-        let da_protocol: FullReplication<_> = da_protocol.try_into()?;
-
+        let da_protocol: FullReplication<_> =
+            da_protocol.try_into().map_err(ServiceError::custom)?;
         let network_relay = service_state
             .overwatch_handle
             .relay::<NetworkService<Libp2p>>()

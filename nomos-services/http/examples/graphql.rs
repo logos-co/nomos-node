@@ -13,7 +13,7 @@ use overwatch_rs::services::relay::{OutboundRelay, RelayMessage};
 use overwatch_rs::services::{
     handle::ServiceStateHandle,
     state::{NoOperator, NoState},
-    ServiceCore, ServiceData, ServiceId,
+    ServiceCore, ServiceData, ServiceError, ServiceId,
 };
 use overwatch_rs::{overwatch::OverwatchRunner, services::handle::ServiceHandle};
 use parking_lot::Mutex;
@@ -66,7 +66,7 @@ where
             let res = match handle_graphql_req(&SCHEMA, payload, dummy.clone()).await {
                 Ok(r) => r,
                 Err(err) => {
-                    tracing::error!(err);
+                    tracing::error!(%err);
                     err.to_string()
                 }
             };
@@ -142,14 +142,14 @@ impl ServiceData for DummyGraphqlService {
 
 #[async_trait::async_trait]
 impl ServiceCore for DummyGraphqlService {
-    fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, overwatch_rs::DynError> {
+    fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, ServiceError> {
         Ok(Self {
             service_state,
             val: Arc::new(Mutex::new(0)),
         })
     }
 
-    async fn run(self) -> Result<(), overwatch_rs::DynError> {
+    async fn run(self) -> Result<(), ServiceError> {
         let Self {
             service_state: ServiceStateHandle {
                 mut inbound_relay, ..

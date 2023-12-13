@@ -12,7 +12,7 @@ use overwatch_rs::services::relay::RelayMessage;
 use overwatch_rs::services::{
     handle::ServiceStateHandle,
     state::{NoOperator, NoState},
-    ServiceCore, ServiceData, ServiceId,
+    ServiceCore, ServiceData, ServiceError, ServiceId,
 };
 use overwatch_rs::{overwatch::OverwatchRunner, services::handle::ServiceHandle};
 use parking_lot::Mutex;
@@ -40,14 +40,14 @@ impl ServiceData for DummyService {
 
 #[async_trait::async_trait]
 impl ServiceCore for DummyService {
-    fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, overwatch_rs::DynError> {
+    fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, ServiceError> {
         Ok(Self {
             counter: Default::default(),
             service_state,
         })
     }
 
-    async fn run(self) -> Result<(), overwatch_rs::DynError> {
+    async fn run(self) -> Result<(), ServiceError> {
         let Self {
             counter,
             service_state: ServiceStateHandle {

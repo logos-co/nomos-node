@@ -2,8 +2,7 @@ use mixnet_node::{MixnetNode, MixnetNodeConfig};
 use overwatch_rs::services::handle::ServiceStateHandle;
 use overwatch_rs::services::relay::NoMessage;
 use overwatch_rs::services::state::{NoOperator, NoState};
-use overwatch_rs::services::{ServiceCore, ServiceData, ServiceId};
-use overwatch_rs::DynError;
+use overwatch_rs::services::{ServiceCore, ServiceData, ServiceError, ServiceId};
 
 pub struct MixnetNodeService(MixnetNode);
 
@@ -17,12 +16,12 @@ impl ServiceData for MixnetNodeService {
 
 #[async_trait::async_trait]
 impl ServiceCore for MixnetNodeService {
-    fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, DynError> {
+    fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, ServiceError> {
         let settings: Self::Settings = service_state.settings_reader.get_updated_settings();
         Ok(Self(MixnetNode::new(settings)))
     }
 
-    async fn run(self) -> Result<(), DynError> {
+    async fn run(self) -> Result<(), ServiceError> {
         if let Err(_e) = self.0.run().await {
             todo!("Errors should match");
         }
