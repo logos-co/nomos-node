@@ -74,7 +74,7 @@ impl Tree {
         } else {
             self.committee_id_to_index
                 .get(committee_id)
-                .map(|&idx| &self.inner_committees[(idx / 2).saturating_sub(1)])
+                .map(|&idx| &self.inner_committees[(idx - 1) / 2])
         }
     }
 
@@ -184,5 +184,59 @@ mod tests {
         let two = &tree.inner_committees[2];
 
         assert_eq!(tree.child_committees(root), (Some(one), Some(two)));
+    }
+
+    #[test]
+    fn test_carnot_tree_leaf_parents() {
+        let nodes: Vec<_> = (0..10).map(|i| NodeId::new([i as u8; 32])).collect();
+        let tree = Tree::new(&nodes, 7);
+
+        // Helper function to get nodes from a committee.
+        fn get_nodes_from_committee(tree: &Tree, committee: &CommitteeId) -> Vec<NodeId> {
+            tree.committee_by_committee_id(committee)
+                .unwrap()
+                .iter()
+                .cloned()
+                .collect()
+        }
+
+        // Helper function to test committee and parent relationship.
+        fn test_committee_parent(tree: &Tree, child: &CommitteeId, parent: &CommitteeId) {
+            let child_nodes = get_nodes_from_committee(tree, child);
+            let node_comm = tree.committee_by_member_id(&child_nodes[0]).unwrap();
+            assert_eq!(
+                node_comm.id::<blake2::Blake2b<digest::typenum::U32>>(),
+                *child
+            );
+            assert_eq!(
+                tree.parent_committee_from_member_id(&child_nodes[0])
+                    .map(|c| c.id::<blake2::Blake2b<digest::typenum::U32>>()),
+                Some(*parent)
+            );
+        }
+
+        // (Upper Committee, (Leaf 1, Leaf 2))
+        let test_cases = [
+            (
+                &tree.inner_committees[1],
+                (
+                    Some(&tree.inner_committees[3]),
+                    Some(&tree.inner_committees[4]),
+                ),
+            ),
+            (
+                &tree.inner_committees[2],
+                (
+                    Some(&tree.inner_committees[5]),
+                    Some(&tree.inner_committees[6]),
+                ),
+            ),
+        ];
+        test_cases.iter().for_each(|tcase| {
+            let child_comm = tree.child_committees(tcase.0);
+            assert_eq!(child_comm, tcase.1);
+            test_committee_parent(&tree, tcase.1 .0.unwrap(), tcase.0);
+            test_committee_parent(&tree, tcase.1 .1.unwrap(), tcase.0);
+        });
     }
 }
