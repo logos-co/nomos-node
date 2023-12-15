@@ -1,8 +1,11 @@
 // internal
-use nomos_core::da::{
-    attestation::{self, Attestation as _},
-    blob::{self, BlobHasher},
-    certificate, DaProtocol,
+use nomos_core::{
+    crypto::PublicKey,
+    da::{
+        attestation::{self, Attestation as _},
+        blob::{self, BlobHasher},
+        certificate, DaProtocol,
+    },
 };
 // std
 use std::collections::HashSet;
@@ -100,6 +103,7 @@ pub type Voter = [u8; 32];
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, Hash, PartialEq)]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct Blob {
+    sender: PublicKey,
     data: Bytes,
 }
 
@@ -114,9 +118,14 @@ fn hasher(blob: &Blob) -> [u8; 32] {
 impl blob::Blob for Blob {
     const HASHER: BlobHasher<Self> = hasher as BlobHasher<Self>;
     type Hash = [u8; 32];
+    type Sender = PublicKey;
 
     fn as_bytes(&self) -> bytes::Bytes {
         self.data.clone()
+    }
+
+    fn sender(&self) -> Self::Sender {
+        self.sender.clone()
     }
 }
 
@@ -198,8 +207,13 @@ impl DaProtocol for FullReplication<AbsoluteNumber<Attestation, Certificate>> {
         )
     }
 
-    fn encode<T: AsRef<[u8]>>(&self, data: T) -> Vec<Self::Blob> {
+    fn encode<S, T>(&self, sender: S, data: T) -> Vec<Self::Blob>
+    where
+        T: AsRef<[u8]>,
+        S: Into<PublicKey>,
+    {
         vec![Blob {
+            sender: sender.into(),
             data: Bytes::copy_from_slice(data.as_ref()),
         }]
     }

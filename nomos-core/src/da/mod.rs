@@ -18,7 +18,11 @@ pub trait DaProtocol {
     // Construct a new instance
     fn new(settings: Self::Settings) -> Self;
     /// Encode bytes into blobs
-    fn encode<T: AsRef<[u8]>>(&self, data: T) -> Vec<Self::Blob>;
+    fn encode<S: Into<<Self::Blob as Blob>::Sender>, T: AsRef<[u8]>>(
+        &self,
+        sender: S,
+        data: T,
+    ) -> Vec<Self::Blob>;
     /// Feed a blob for decoding.
     /// Depending on the protocol, it may be necessary to feed multiple blobs to
     /// recover the initial data.

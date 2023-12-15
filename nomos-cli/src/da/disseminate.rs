@@ -3,7 +3,7 @@ use clap::{Args, ValueEnum};
 use full_replication::{AbsoluteNumber, Attestation, Certificate, FullReplication, Voter};
 use futures::StreamExt;
 use hex::FromHex;
-use nomos_core::{da::DaProtocol, wire};
+use nomos_core::{crypto::PublicKey, da::DaProtocol, wire};
 use nomos_da::network::{adapters::libp2p::Libp2pAdapter, NetworkAdapter};
 use nomos_network::{backends::libp2p::Libp2p, NetworkService};
 use overwatch_derive::*;
@@ -38,10 +38,12 @@ where
     D: DaProtocol<Blob = B, Attestation = A, Certificate = C>,
     N: NetworkAdapter<Blob = B, Attestation = A> + Send + Sync,
     C: Serialize,
+    B: nomos_core::da::blob::Blob,
+    <B as nomos_core::da::blob::Blob>::Sender: From<[u8; 32]>,
 {
     // 1) Building blob
     status_updates.send(Status::Encoding)?;
-    let blobs = da.encode(data);
+    let blobs = da.encode(PublicKey::default(), data);
 
     // 2) Send blob to network
     status_updates.send(Status::Disseminating)?;
