@@ -3,7 +3,7 @@ use clap::{Args, ValueEnum};
 use full_replication::{AbsoluteNumber, Attestation, Certificate, FullReplication, Voter};
 use futures::StreamExt;
 use hex::FromHex;
-use nomos_core::{crypto::PublicKey, da::DaProtocol, wire};
+use nomos_core::{crypto::PrivateKey, da::DaProtocol, wire};
 use nomos_da::network::{adapters::libp2p::Libp2pAdapter, NetworkAdapter};
 use nomos_network::{backends::libp2p::Libp2p, NetworkService};
 use overwatch_derive::*;
@@ -33,6 +33,7 @@ pub async fn disseminate_and_wait<D, B, N, A, C>(
     status_updates: Sender<Status>,
     node_addr: Option<&Url>,
     output: Option<&PathBuf>,
+    private_key: PrivateKey,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>>
 where
     D: DaProtocol<Blob = B, Attestation = A, Certificate = C>,
@@ -43,7 +44,7 @@ where
 {
     // 1) Building blob
     status_updates.send(Status::Encoding)?;
-    let blobs = da.encode(PublicKey::default(), data);
+    let blobs = da.encode(private_key, data);
 
     // 2) Send blob to network
     status_updates.send(Status::Disseminating)?;
@@ -125,6 +126,7 @@ pub struct Settings {
     pub status_updates: Sender<Status>,
     pub node_addr: Option<Url>,
     pub output: Option<std::path::PathBuf>,
+    pub private_key: PrivateKey,
 }
 
 pub struct DisseminateService {
@@ -154,6 +156,7 @@ impl ServiceCore for DisseminateService {
             status_updates,
             node_addr,
             output,
+            private_key,
         } = service_state.settings_reader.get_updated_settings();
 
         let da_protocol: FullReplication<_> = da_protocol.try_into()?;
@@ -175,6 +178,7 @@ impl ServiceCore for DisseminateService {
                     status_updates.clone(),
                     node_addr.as_ref(),
                     output.as_ref(),
+                    private_key,
                 ),
             )
             .await

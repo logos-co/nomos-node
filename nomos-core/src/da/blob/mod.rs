@@ -14,4 +14,5 @@ pub trait Blob {
     }
     fn as_bytes(&self) -> Bytes;
     fn sender(&self) -> Self::Sender;
+    fn verify(&self) -> bool;
 }

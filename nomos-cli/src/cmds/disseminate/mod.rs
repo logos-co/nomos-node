@@ -2,6 +2,7 @@ use crate::da::disseminate::{
     DaProtocolChoice, DisseminateApp, DisseminateAppServiceSettings, Settings, Status,
 };
 use clap::Args;
+use nomos_core::crypto::PrivateKey;
 use nomos_network::{backends::libp2p::Libp2p, NetworkService};
 use overwatch_rs::{overwatch::OverwatchRunner, services::ServiceData};
 use reqwest::Url;
@@ -47,6 +48,7 @@ impl Disseminate {
         let output = self.output.clone();
         let (payload_sender, payload_rx) = tokio::sync::mpsc::unbounded_channel();
         payload_sender.send(bytes).unwrap();
+        let private_key = PrivateKey::default(); // TODO: pass private_key via the cli args.
         std::thread::spawn(move || {
             OverwatchRunner::<DisseminateApp>::run(
                 DisseminateAppServiceSettings {
@@ -58,6 +60,7 @@ impl Disseminate {
                         status_updates,
                         node_addr,
                         output,
+                        private_key,
                     },
                 },
                 None,

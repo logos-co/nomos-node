@@ -1,6 +1,6 @@
 // internal
 use nomos_core::{
-    crypto::PublicKey,
+    crypto::{PublicKey, Signature},
     da::{
         attestation::{self, Attestation as _},
         blob::{self, BlobHasher},
@@ -105,6 +105,7 @@ pub type Voter = [u8; 32];
 pub struct Blob {
     sender: PublicKey,
     data: Bytes,
+    sig: Signature,
 }
 
 fn hasher(blob: &Blob) -> [u8; 32] {
@@ -125,7 +126,12 @@ impl blob::Blob for Blob {
     }
 
     fn sender(&self) -> Self::Sender {
-        self.sender.clone()
+        self.sender
+    }
+
+    // TODO: blob has to use the public key to verify the data signature.
+    fn verify(&self) -> bool {
+        true
     }
 }
 
@@ -215,6 +221,7 @@ impl DaProtocol for FullReplication<AbsoluteNumber<Attestation, Certificate>> {
         vec![Blob {
             sender: sender.into(),
             data: Bytes::copy_from_slice(data.as_ref()),
+            sig: [0; 32],
         }]
     }
 
