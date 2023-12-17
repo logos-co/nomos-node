@@ -26,17 +26,18 @@ use std::{
 };
 use tokio::sync::{mpsc::UnboundedReceiver, Mutex};
 
-pub async fn disseminate_and_wait<D, B, N, A, C>(
+pub async fn disseminate_and_wait<D, B, N, A, C, Auth>(
     mut da: D,
     data: Box<[u8]>,
     adapter: N,
     status_updates: Sender<Status>,
     node_addr: Option<&Url>,
     output: Option<&PathBuf>,
-    private_key: PrivateKey,
+    private_key: &PrivateKey,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>>
 where
-    D: DaProtocol<Blob = B, Attestation = A, Certificate = C>,
+    D: DaProtocol<Blob = B, Attestation = A, Certificate = C, Auth = Auth>,
+    Auth: From<PrivateKey>,
     N: NetworkAdapter<Blob = B, Attestation = A> + Send + Sync,
     C: Serialize,
     B: nomos_core::da::blob::Blob,
@@ -44,7 +45,7 @@ where
 {
     // 1) Building blob
     status_updates.send(Status::Encoding)?;
-    let blobs = da.encode(private_key, data);
+    let blobs = da.encode(Auth::from(*private_key), data);
 
     // 2) Send blob to network
     status_updates.send(Status::Disseminating)?;
@@ -178,7 +179,7 @@ impl ServiceCore for DisseminateService {
                     status_updates.clone(),
                     node_addr.as_ref(),
                     output.as_ref(),
-                    private_key,
+                    &private_key,
                 ),
             )
             .await

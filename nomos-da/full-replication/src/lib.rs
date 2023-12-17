@@ -1,9 +1,9 @@
 // internal
 use nomos_core::{
-    crypto::{PublicKey, Signature},
+    crypto::{PrivateKey, PublicKey, Signature},
     da::{
         attestation::{self, Attestation as _},
-        blob::{self, BlobHasher},
+        blob::{self, BlobAuth, BlobHasher},
         certificate, DaProtocol,
     },
 };
@@ -116,10 +116,21 @@ fn hasher(blob: &Blob) -> [u8; 32] {
     output
 }
 
+impl Blob {
+    pub fn new<T: AsRef<[u8]>>(auth: MockBlobAuth, data: T) -> Self {
+        Self {
+            sender: auth.public_key(),
+            data: Bytes::copy_from_slice(data.as_ref()),
+            sig: auth.sign(hash(data)),
+        }
+    }
+}
+
 impl blob::Blob for Blob {
     const HASHER: BlobHasher<Self> = hasher as BlobHasher<Self>;
     type Hash = [u8; 32];
     type Sender = PublicKey;
+    type Signature = Signature;
 
     fn as_bytes(&self) -> bytes::Bytes {
         self.data.clone()
@@ -129,7 +140,10 @@ impl blob::Blob for Blob {
         self.sender
     }
 
-    // TODO: blob has to use the public key to verify the data signature.
+    fn signature(&self) -> Self::Signature {
+        self.sig
+    }
+
     fn verify(&self) -> bool {
         true
     }
@@ -199,9 +213,34 @@ impl certificate::Certificate for Certificate {
     }
 }
 
+pub struct MockBlobAuth(PrivateKey);
+
+impl From<PrivateKey> for MockBlobAuth {
+    fn from(value: PrivateKey) -> Self {
+        Self(value)
+    }
+}
+
+impl BlobAuth for MockBlobAuth {
+    type PublicKey = PublicKey;
+
+    type Signature = Signature;
+
+    fn public_key(&self) -> Self::PublicKey {
+        // TODO: update when implemented in nomos_core.
+        Default::default()
+    }
+
+    fn sign<H>(&self, _hash: H) -> Self::Signature {
+        // TODO: update when implemented in nomos_core.
+        Default::default()
+    }
+}
+
 // TODO: add generic impl when the trait for Certificate is expanded
 impl DaProtocol for FullReplication<AbsoluteNumber<Attestation, Certificate>> {
     type Blob = Blob;
+    type Auth = MockBlobAuth;
     type Attestation = Attestation;
     type Certificate = Certificate;
     type Settings = Settings;
@@ -213,16 +252,11 @@ impl DaProtocol for FullReplication<AbsoluteNumber<Attestation, Certificate>> {
         )
     }
 
-    fn encode<S, T>(&self, sender: S, data: T) -> Vec<Self::Blob>
+    fn encode<T>(&self, auth: MockBlobAuth, data: T) -> Vec<Self::Blob>
     where
         T: AsRef<[u8]>,
-        S: Into<PublicKey>,
     {
-        vec![Blob {
-            sender: sender.into(),
-            data: Bytes::copy_from_slice(data.as_ref()),
-            sig: [0; 32],
-        }]
+        vec![Blob::new(auth, data)]
     }
 
     fn recv_blob(&mut self, blob: Self::Blob) {

@@ -5,12 +5,15 @@ use crate::da::attestation::Attestation;
 use crate::da::blob::Blob;
 use crate::da::certificate::Certificate;
 
+use self::blob::BlobAuth;
+
 pub mod attestation;
 pub mod blob;
 pub mod certificate;
 
 pub trait DaProtocol {
     type Blob: Blob;
+    type Auth: BlobAuth;
     type Attestation: Attestation;
     type Certificate: Certificate;
     type Settings: Clone;
@@ -18,11 +21,7 @@ pub trait DaProtocol {
     // Construct a new instance
     fn new(settings: Self::Settings) -> Self;
     /// Encode bytes into blobs
-    fn encode<S: Into<<Self::Blob as Blob>::Sender>, T: AsRef<[u8]>>(
-        &self,
-        sender: S,
-        data: T,
-    ) -> Vec<Self::Blob>;
+    fn encode<T: AsRef<[u8]>>(&self, auth: Self::Auth, data: T) -> Vec<Self::Blob>;
     /// Feed a blob for decoding.
     /// Depending on the protocol, it may be necessary to feed multiple blobs to
     /// recover the initial data.
