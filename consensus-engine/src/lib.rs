@@ -18,6 +18,7 @@ pub struct Carnot<O: Overlay> {
     highest_voted_view: View,
     local_high_qc: StandardQc,
     safe_blocks: HashMap<BlockId, Block>,
+    tip: Block,
     last_view_timeout_qc: Option<TimeoutQc>,
     overlay: O,
 }
@@ -31,7 +32,8 @@ impl<O: Overlay> Carnot<O> {
             highest_voted_view: View(-1),
             last_view_timeout_qc: None,
             overlay,
-            safe_blocks: [(genesis_block.id, genesis_block)].into(),
+            safe_blocks: [(genesis_block.id, genesis_block.clone())].into(),
+            tip: genesis_block,
         }
     }
 
@@ -49,11 +51,7 @@ impl<O: Overlay> Carnot<O> {
 
     /// Return the most recent safe block
     pub fn tip(&self) -> Block {
-        self.safe_blocks
-            .iter()
-            .max_by_key(|(_, b)| b.view)
-            .map(|(_, b)| b.clone())
-            .unwrap()
+        self.tip.clone()
     }
 
     /// Upon reception of a block
@@ -99,6 +97,7 @@ impl<O: Overlay> Carnot<O> {
         let mut new_state = self.clone();
         if new_state.block_is_safe(block.clone()) {
             new_state.safe_blocks.insert(block.id, block.clone());
+            new_state.tip = block.clone();
             new_state.update_high_qc(block.parent_qc);
         } else {
             // Non safe block, not necessarily an error
