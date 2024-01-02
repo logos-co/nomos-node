@@ -97,7 +97,9 @@ impl<O: Overlay> Carnot<O> {
         let mut new_state = self.clone();
         if new_state.block_is_safe(block.clone()) {
             new_state.safe_blocks.insert(block.id, block.clone());
-            new_state.tip = block.clone();
+            if block.view > new_state.tip.view {
+                new_state.tip = block.clone();
+            }
             new_state.update_high_qc(block.parent_qc);
         } else {
             // Non safe block, not necessarily an error
