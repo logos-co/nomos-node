@@ -28,5 +28,5 @@ pub trait TxSelect {
     fn select_tx_from<'i, I: Iterator<Item = Self::Tx> + 'i>(
         &self,
         txs: I,
-    ) -> Box<dyn Iterator<Item = Self::Tx> + 'i>;
+    ) -> impl Iterator<Item = Self::Tx> + 'i;
 }

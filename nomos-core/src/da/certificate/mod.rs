@@ -20,5 +20,5 @@ pub trait BlobCertificateSelect {
     fn select_blob_from<'i, I: Iterator<Item = Self::Certificate> + 'i>(
         &self,
         certificates: I,
-    ) -> Box<dyn Iterator<Item = Self::Certificate> + 'i>;
+    ) -> impl Iterator<Item = Self::Certificate> + 'i;
 }
