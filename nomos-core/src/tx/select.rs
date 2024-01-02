@@ -30,7 +30,7 @@ impl<const SIZE: usize, Tx: Transaction> TxSelect for FillSize<SIZE, Tx> {
     fn select_tx_from<'i, I: Iterator<Item = Self::Tx> + 'i>(
         &self,
         txs: I,
-    ) -> Box<dyn Iterator<Item = Self::Tx> + 'i> {
+    ) -> impl Iterator<Item = Self::Tx> + 'i {
         utils::select::select_from_till_fill_size::<SIZE, Self::Tx>(|tx| tx.as_bytes().len(), txs)
     }
 }
