@@ -125,8 +125,13 @@ fn render_messages(f: &mut Frame, app: &App, rect: Rect) {
         .iter()
         .map(|ChatMessage { author, message }| {
             let content = if author == app.username.as_ref().unwrap() {
+                static MARGIN: usize = 2;
                 // pad to make it appear aligned on the right
-                let pad = " ".repeat((rect.width as usize).saturating_sub(message.len()));
+                let pad = " ".repeat(
+                    (rect.width as usize)
+                        .saturating_sub(message.len())
+                        .saturating_sub(MARGIN),
+                );
                 Line::from(vec![Span::raw(pad), Span::raw(message)])
             } else {
                 Line::from(vec![
