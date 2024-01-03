@@ -268,7 +268,7 @@ async fn fetch_new_messages(
         );
 
     for block in new_blocks.iter().rev() {
-        let blobs = get_block_blobs(node, &block).await?;
+        let blobs = get_block_blobs(node, block).await?;
         for blob in blobs {
             da_protocol.recv_blob(blob);
             // Full replication only needs one blob to decode the data, so the unwrap is safe

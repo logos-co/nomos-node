@@ -1,6 +1,7 @@
 use super::{App, ChatMessage};
 use ratatui::prelude::*;
 use ratatui::widgets::{Block, Borders, List, ListItem, Paragraph, Wrap};
+use std::ops::Deref;
 
 pub fn ui(f: &mut Frame, app: &App) {
     if app.username.is_none() {
@@ -181,10 +182,9 @@ fn render_status(f: &mut Frame, app: &App, rect: Rect) {
 }
 
 fn render_logs(f: &mut Frame, app: &App, rect: Rect) {
-    use ansi_to_tui::IntoText;
-    let logs = app.logs.lock().unwrap();
+    let logs = String::from_utf8(app.logs.lock().unwrap().deref().clone()).unwrap();
     f.render_widget(
-        Paragraph::new(logs.into_text().unwrap())
+        Paragraph::new(logs)
             .wrap(Wrap { trim: true })
             .scroll((app.scroll_logs, 0))
             .block(
