@@ -20,6 +20,7 @@ use nomos_network::NetworkConfig;
 use nomos_node::{api::AxumBackendSettings, Config, Tx};
 // crates
 use fraction::Fraction;
+
 use once_cell::sync::Lazy;
 use rand::{thread_rng, Rng};
 use reqwest::Client;

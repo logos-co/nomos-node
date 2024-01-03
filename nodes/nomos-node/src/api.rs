@@ -1,4 +1,4 @@
-use std::{fmt::Debug, hash::Hash};
+use std::fmt::Debug;
 
 use axum::{
     extract::{Query, State},
@@ -8,7 +8,6 @@ use axum::{
 };
 use hyper::header::{CONTENT_TYPE, USER_AGENT};
 use overwatch_rs::overwatch::handle::OverwatchHandle;
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use tower_http::{
     cors::{Any, CorsLayer},
     trace::TraceLayer,
@@ -21,7 +20,7 @@ use full_replication::{Blob, Certificate};
 use nomos_core::{da::blob, tx::Transaction};
 use nomos_mempool::{network::adapters::libp2p::Libp2pAdapter, openapi::Status, MempoolMetrics};
 use nomos_network::backends::libp2p::Libp2p;
-use nomos_storage::backends::StorageSerde;
+use nomos_node_lib::tx::Tx;
 
 use nomos_api::{
     http::{cl, consensus, da, libp2p, mempool, storage},
@@ -37,10 +36,8 @@ pub struct AxumBackendSettings {
     pub cors_origins: Vec<String>,
 }
 
-pub struct AxumBackend<T, S, const SIZE: usize> {
+pub struct AxumBackend {
     settings: AxumBackendSettings,
-    _tx: core::marker::PhantomData<T>,
-    _storage_serde: core::marker::PhantomData<S>,
 }
 
 #[derive(OpenApi)]
@@ -59,22 +56,7 @@ pub struct AxumBackend<T, S, const SIZE: usize> {
 struct ApiDoc;
 
 #[async_trait::async_trait]
-impl<T, S, const SIZE: usize> Backend for AxumBackend<T, S, SIZE>
-where
-    T: Transaction
-        + Clone
-        + Debug
-        + Eq
-        + Hash
-        + Serialize
-        + for<'de> Deserialize<'de>
-        + Send
-        + Sync
-        + 'static,
-    <T as nomos_core::tx::Transaction>::Hash:
-        Serialize + for<'de> Deserialize<'de> + std::cmp::Ord + Debug + Send + Sync + 'static,
-    S: StorageSerde + Send + Sync + 'static,
-{
+impl Backend for AxumBackend {
     type Error = hyper::Error;
     type Settings = AxumBackendSettings;
 
@@ -82,11 +64,7 @@ where
     where
         Self: Sized,
     {
-        Ok(Self {
-            settings,
-            _tx: core::marker::PhantomData,
-            _storage_serde: core::marker::PhantomData,
-        })
+        Ok(Self { settings })
     }
 
     async fn serve(self, handle: OverwatchHandle) -> Result<(), Self::Error> {
@@ -115,13 +93,13 @@ where
             .route("/da/metrics", routing::get(da_metrics))
             .route("/da/status", routing::post(da_status))
             .route("/da/blobs", routing::post(da_blobs))
-            .route("/cl/metrics", routing::get(cl_metrics::<T>))
-            .route("/cl/status", routing::post(cl_status::<T>))
-            .route("/carnot/info", routing::get(carnot_info::<T, S, SIZE>))
-            .route("/carnot/blocks", routing::get(carnot_blocks::<T, S, SIZE>))
+            .route("/cl/metrics", routing::get(cl_metrics))
+            .route("/cl/status", routing::post(cl_status))
+            .route("/carnot/info", routing::get(carnot_info))
+            .route("/carnot/blocks", routing::get(carnot_blocks))
             .route("/network/info", routing::get(libp2p_info))
-            .route("/storage/block", routing::post(block::<S, T>))
-            .route("/mempool/add/tx", routing::post(add_tx::<T>))
+            .route("/storage/block", routing::post(block))
+            .route("/mempool/add/tx", routing::post(add_tx))
             .route("/mempool/add/cert", routing::post(add_cert))
             .with_state(handle);
 
@@ -196,40 +174,23 @@ async fn da_blobs(
         (status = 500, description = "Internal server error", body = String),
     )
 )]
-async fn cl_metrics<T>(State(handle): State<OverwatchHandle>) -> Response
-where
-    T: Transaction
-        + Clone
-        + Debug
-        + Hash
-        + Serialize
-        + for<'de> Deserialize<'de>
-        + Send
-        + Sync
-        + 'static,
-    <T as nomos_core::tx::Transaction>::Hash: std::cmp::Ord + Debug + Send + Sync + 'static,
-{
-    make_request_and_return_response!(cl::cl_mempool_metrics::<T>(&handle))
+async fn cl_metrics(State(handle): State<OverwatchHandle>) -> Response {
+    make_request_and_return_response!(cl::cl_mempool_metrics(&handle))
 }
 
 #[utoipa::path(
     post,
     path = "/cl/status",
     responses(
-        (status = 200, description = "Query the mempool status of the cl service", body = Vec<<T as Transaction>::Hash>),
+        (status = 200, description = "Query the mempool status of the cl service", body = Vec<<Tx as Transaction>::Hash>),
         (status = 500, description = "Internal server error", body = String),
     )
 )]
-async fn cl_status<T>(
+async fn cl_status(
     State(handle): State<OverwatchHandle>,
-    Json(items): Json<Vec<<T as Transaction>::Hash>>,
-) -> Response
-where
-    T: Transaction + Clone + Debug + Hash + Serialize + DeserializeOwned + Send + Sync + 'static,
-    <T as nomos_core::tx::Transaction>::Hash:
-        Serialize + DeserializeOwned + std::cmp::Ord + Debug + Send + Sync + 'static,
-{
-    make_request_and_return_response!(cl::cl_mempool_status::<T>(&handle, items))
+    Json(items): Json<Vec<<Tx as Transaction>::Hash>>,
+) -> Response {
+    make_request_and_return_response!(cl::cl_mempool_status(&handle, items))
 }
 
 #[utoipa::path(
@@ -240,16 +201,11 @@ where
         (status = 500, description = "Internal server error", body = String),
     )
 )]
-async fn carnot_info<Tx, SS, const SIZE: usize>(State(handle): State<OverwatchHandle>) -> Response
-where
-    Tx: Transaction + Clone + Debug + Hash + Serialize + DeserializeOwned + Send + Sync + 'static,
-    <Tx as Transaction>::Hash: std::cmp::Ord + Debug + Send + Sync + 'static,
-    SS: StorageSerde + Send + Sync + 'static,
-{
-    make_request_and_return_response!(consensus::carnot_info::<Tx, SS, SIZE>(&handle))
+async fn carnot_info(State(handle): State<OverwatchHandle>) -> Response {
+    make_request_and_return_response!(consensus::carnot_info(&handle))
 }
 
-#[derive(Deserialize)]
+#[derive(serde::Deserialize)]
 struct QueryParams {
     from: Option<BlockId>,
     to: Option<BlockId>,
@@ -259,21 +215,16 @@ struct QueryParams {
     get,
     path = "/carnot/blocks",
     responses(
-        (status = 200, description = "Query the block information", body = Vec<consensus_engine::Block>),
+        (status = 200, description = "Query the carnot information", body = nomos_consensus::CarnotInfo),
         (status = 500, description = "Internal server error", body = String),
     )
 )]
-async fn carnot_blocks<Tx, SS, const SIZE: usize>(
-    State(store): State<OverwatchHandle>,
-    Query(query): Query<QueryParams>,
-) -> Response
-where
-    Tx: Transaction + Clone + Debug + Hash + Serialize + DeserializeOwned + Send + Sync + 'static,
-    <Tx as Transaction>::Hash: std::cmp::Ord + Debug + Send + Sync + 'static,
-    SS: StorageSerde + Send + Sync + 'static,
-{
-    let QueryParams { from, to } = query;
-    make_request_and_return_response!(consensus::carnot_blocks::<Tx, SS, SIZE>(&store, from, to))
+async fn carnot_blocks(
+    State(handle): State<OverwatchHandle>,
+    Query(params): Query<QueryParams>,
+) -> Response {
+    let QueryParams { from, to } = params;
+    make_request_and_return_response!(consensus::carnot_blocks(&handle, from, to))
 }
 
 #[utoipa::path(
@@ -296,12 +247,8 @@ async fn libp2p_info(State(handle): State<OverwatchHandle>) -> Response {
         (status = 500, description = "Internal server error", body = String),
     )
 )]
-async fn block<S, Tx>(State(handle): State<OverwatchHandle>, Json(id): Json<BlockId>) -> Response
-where
-    Tx: serde::Serialize + serde::de::DeserializeOwned + Clone + Eq + core::hash::Hash,
-    S: StorageSerde + Send + Sync + 'static,
-{
-    make_request_and_return_response!(storage::block_req::<S, Tx>(&handle, id))
+async fn block(State(handle): State<OverwatchHandle>, Json(id): Json<BlockId>) -> Response {
+    make_request_and_return_response!(storage::block_req(&handle, id))
 }
 
 #[utoipa::path(
@@ -312,11 +259,7 @@ where
         (status = 500, description = "Internal server error", body = String),
     )
 )]
-async fn add_tx<Tx>(State(handle): State<OverwatchHandle>, Json(tx): Json<Tx>) -> Response
-where
-    Tx: Transaction + Clone + Debug + Hash + Serialize + DeserializeOwned + Send + Sync + 'static,
-    <Tx as Transaction>::Hash: std::cmp::Ord + Debug + Send + Sync + 'static,
-{
+async fn add_tx(State(handle): State<OverwatchHandle>, Json(tx): Json<Tx>) -> Response {
     make_request_and_return_response!(mempool::add::<
         Libp2p,
         Libp2pAdapter<Tx, <Tx as Transaction>::Hash>,
