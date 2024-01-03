@@ -267,7 +267,7 @@ async fn fetch_new_messages(
             },
         );
 
-    for block in new_blocks {
+    for block in new_blocks.iter().rev() {
         let blobs = get_block_blobs(node, &block).await?;
         for blob in blobs {
             da_protocol.recv_blob(blob);
