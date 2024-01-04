@@ -11,6 +11,8 @@ pub mod openapi {
     pub use crate::types::BlockId;
 }
 
+const LATEST_COMMITTED_BLOCKS_LIMIT: usize = 3;
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct Carnot<O: Overlay> {
     id: NodeId,
@@ -20,6 +22,7 @@ pub struct Carnot<O: Overlay> {
     safe_blocks: HashMap<BlockId, Block>,
     tip: BlockId,
     last_view_timeout_qc: Option<TimeoutQc>,
+    latest_committed_block: Option<BlockId>,
     overlay: O,
 }
 
@@ -31,6 +34,7 @@ impl<O: Overlay> Carnot<O> {
             id,
             highest_voted_view: View(-1),
             last_view_timeout_qc: None,
+            latest_committed_block: None,
             overlay,
             safe_blocks: [(genesis_block.id, genesis_block.clone())].into(),
             tip: genesis_block.id,
@@ -99,6 +103,7 @@ impl<O: Overlay> Carnot<O> {
             new_state.safe_blocks.insert(block.id, block.clone());
             if block.view > new_state.tip().view {
                 new_state.tip = block.id;
+                new_state.update_latest_committed_block(&block);
             }
             new_state.update_high_qc(block.parent_qc);
         } else {
@@ -297,6 +302,12 @@ impl<O: Overlay> Carnot<O> {
         }
     }
 
+    fn update_latest_committed_block(&mut self, block: &Block) {
+        if let Some(block) = self.can_commit_grandparent(block) {
+            self.latest_committed_block = Some(block.id);
+        }
+    }
+
     pub fn blocks_in_view(&self, view: View) -> Vec<Block> {
         self.safe_blocks
             .iter()
@@ -310,7 +321,7 @@ impl<O: Overlay> Carnot<O> {
     }
 
     // Returns the id of the grandparent block if it can be committed or None otherwise
-    fn can_commit_grandparent(&self, block: Block) -> Option<Block> {
+    fn can_commit_grandparent(&self, block: &Block) -> Option<Block> {
         let parent = self.safe_blocks.get(&block.parent())?;
         let grandparent = self.safe_blocks.get(&parent.parent())?;
 
@@ -324,14 +335,9 @@ impl<O: Overlay> Carnot<O> {
     }
 
     pub fn latest_committed_block(&self) -> Block {
-        for view in (0..=self.current_view.0).rev() {
-            for block in self.blocks_in_view(View(view)) {
-                if let Some(block) = self.can_commit_grandparent(block) {
-                    return block;
-                }
-            }
-        }
-        self.genesis_block()
+        self.latest_committed_block
+            .and_then(|id| self.safe_blocks.get(&id).cloned())
+            .unwrap_or_else(|| self.genesis_block())
     }
 
     pub fn latest_committed_view(&self) -> View {
@@ -341,16 +347,20 @@ impl<O: Overlay> Carnot<O> {
     pub fn latest_committed_blocks(&self) -> Vec<BlockId> {
         let mut res = vec![];
         let mut current = self.latest_committed_block();
-        while current != self.genesis_block() {
+
+        while res.len() < LATEST_COMMITTED_BLOCKS_LIMIT {
             res.push(current.id);
-            current = if let Some(new_current) = self.safe_blocks.get(&current.parent()) {
-                new_current.clone()
-            } else {
+
+            if current == self.genesis_block() {
                 break;
+            }
+
+            current = match self.safe_blocks.get(&current.parent()) {
+                Some(new_current) => new_current.clone(),
+                None => break,
             };
-            // current = self.safe_blocks.get(&current.parent()).unwrap().clone();
         }
-        res.push(self.genesis_block().id);
+
         res
     }
 
