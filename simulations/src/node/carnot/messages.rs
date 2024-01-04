@@ -1,4 +1,4 @@
-use consensus_engine::View;
+use carnot_engine::View;
 use nomos_consensus::network::messages::{
     NewViewMsg, ProposalMsg, TimeoutMsg, TimeoutQcMsg, VoteMsg,
 };

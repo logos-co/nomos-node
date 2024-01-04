@@ -1,5 +1,5 @@
 use super::CLIENT;
-use consensus_engine::{Block, BlockId};
+use carnot_engine::{Block, BlockId};
 use nomos_consensus::CarnotInfo;
 use reqwest::Url;
 

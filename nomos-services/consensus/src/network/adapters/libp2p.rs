@@ -13,7 +13,7 @@ use crate::network::{
     messages::{NetworkMessage, ProposalMsg, VoteMsg},
     BoxedStream, NetworkAdapter,
 };
-use consensus_engine::{BlockId, Committee, CommitteeId, View};
+use carnot_engine::{BlockId, Committee, CommitteeId, View};
 use nomos_core::wire;
 use nomos_network::{
     backends::libp2p::{Command, Event, EventKind, Libp2p},

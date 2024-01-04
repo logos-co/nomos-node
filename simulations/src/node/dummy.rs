@@ -1,5 +1,5 @@
 // std
-use consensus_engine::View;
+use carnot_engine::View;
 use std::collections::{BTreeMap, BTreeSet};
 use std::time::Duration;
 // crates

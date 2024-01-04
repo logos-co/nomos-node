@@ -8,7 +8,7 @@ use futures::Stream;
 use crate::network::messages::{
     NetworkMessage, NewViewMsg, ProposalMsg, TimeoutMsg, TimeoutQcMsg, VoteMsg,
 };
-use consensus_engine::{BlockId, Committee, View};
+use carnot_engine::{BlockId, Committee, View};
 use nomos_network::backends::NetworkBackend;
 use nomos_network::NetworkService;
 use overwatch_rs::services::relay::OutboundRelay;

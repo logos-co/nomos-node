@@ -1,6 +1,6 @@
-use consensus_engine::overlay::{BranchOverlay, FisherYatesShuffle, RandomBeaconState};
-use consensus_engine::Overlay;
-use consensus_engine::{
+use carnot_engine::overlay::{BranchOverlay, FisherYatesShuffle, RandomBeaconState};
+use carnot_engine::Overlay;
+use carnot_engine::{
     overlay::{FlatOverlay, FreezeMembership, RoundRobin, TreeOverlay},
     NodeId,
 };
@@ -22,7 +22,7 @@ pub fn overlay_info(
     match &overlay_settings {
         simulations::settings::OverlaySettings::Flat => {
             FlatOverlay::<RoundRobin, FisherYatesShuffle>::new(
-                consensus_engine::overlay::FlatOverlaySettings {
+                carnot_engine::overlay::FlatOverlaySettings {
                     nodes: nodes.to_vec(),
                     leader: RoundRobin::new(),
                     leader_super_majority_threshold: None,
@@ -31,7 +31,7 @@ pub fn overlay_info(
             .info()
         }
         simulations::settings::OverlaySettings::Tree(tree_settings) => {
-            TreeOverlay::new(consensus_engine::overlay::TreeOverlaySettings {
+            TreeOverlay::new(carnot_engine::overlay::TreeOverlaySettings {
                 nodes,
                 current_leader: leader,
                 number_of_committees: tree_settings.number_of_committees,
@@ -42,7 +42,7 @@ pub fn overlay_info(
             .info()
         }
         simulations::settings::OverlaySettings::Branch(branch_settings) => {
-            BranchOverlay::new(consensus_engine::overlay::BranchOverlaySettings {
+            BranchOverlay::new(carnot_engine::overlay::BranchOverlaySettings {
                 nodes,
                 current_leader: leader,
                 branch_depth: branch_settings.branch_depth,
@@ -73,7 +73,7 @@ pub fn to_overlay_node<R: Rng>(
     };
     match &settings.overlay_settings {
         simulations::settings::OverlaySettings::Flat => {
-            let overlay_settings = consensus_engine::overlay::FlatOverlaySettings {
+            let overlay_settings = carnot_engine::overlay::FlatOverlaySettings {
                 nodes: nodes.to_vec(),
                 leader: RoundRobin::new(),
                 leader_super_majority_threshold: None,
@@ -94,7 +94,7 @@ pub fn to_overlay_node<R: Rng>(
             )
         }
         simulations::settings::OverlaySettings::Tree(tree_settings) => {
-            let overlay_settings = consensus_engine::overlay::TreeOverlaySettings {
+            let overlay_settings = carnot_engine::overlay::TreeOverlaySettings {
                 nodes,
                 current_leader: leader,
                 number_of_committees: tree_settings.number_of_committees,
@@ -118,7 +118,7 @@ pub fn to_overlay_node<R: Rng>(
             )
         }
         simulations::settings::OverlaySettings::Branch(branch_settings) => {
-            let overlay_settings = consensus_engine::overlay::BranchOverlaySettings {
+            let overlay_settings = carnot_engine::overlay::BranchOverlaySettings {
                 nodes,
                 current_leader: leader,
                 branch_depth: branch_settings.branch_depth,

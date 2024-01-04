@@ -1,4 +1,4 @@
-use consensus_engine::NodeId;
+use carnot_engine::NodeId;
 // std
 use rand::{seq::SliceRandom, Rng};
 use std::{collections::HashMap, str::FromStr};

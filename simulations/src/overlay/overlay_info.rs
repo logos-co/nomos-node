@@ -1,4 +1,4 @@
-use consensus_engine::{CommitteeId, NodeId, Overlay};
+use carnot_engine::{CommitteeId, NodeId, Overlay};
 use serde::Serialize;
 use std::collections::{BTreeSet, HashMap, VecDeque};
 

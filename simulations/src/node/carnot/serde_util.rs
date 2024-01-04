@@ -10,7 +10,7 @@ use self::{
     standard_qc::StandardQcHelper,
     timeout_qc::TimeoutQcHelper,
 };
-use consensus_engine::{AggregateQc, Block, BlockId, Committee, Qc, StandardQc, TimeoutQc, View};
+use carnot_engine::{AggregateQc, Block, BlockId, Committee, Qc, StandardQc, TimeoutQc, View};
 
 const NODE_ID: &str = "node_id";
 const CURRENT_VIEW: &str = "current_view";
@@ -208,7 +208,7 @@ pub(crate) mod qc {
 
 pub(crate) mod timeout_qc {
     use super::*;
-    use consensus_engine::NodeId;
+    use carnot_engine::NodeId;
 
     #[derive(Serialize)]
     pub(crate) struct TimeoutQcHelper<'a> {
@@ -238,7 +238,7 @@ pub(crate) mod timeout_qc {
 }
 
 pub(crate) mod serde_id {
-    use consensus_engine::{BlockId, NodeId};
+    use carnot_engine::{BlockId, NodeId};
 
     use super::*;
 

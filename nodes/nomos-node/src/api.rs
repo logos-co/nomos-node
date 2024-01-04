@@ -16,7 +16,7 @@ use tower_http::{
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 
-use consensus_engine::BlockId;
+use carnot_engine::BlockId;
 use full_replication::{Blob, Certificate};
 use nomos_core::{da::blob, tx::Transaction};
 use nomos_mempool::{network::adapters::libp2p::Libp2pAdapter, openapi::Status, MempoolMetrics};

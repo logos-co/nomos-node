@@ -8,7 +8,7 @@ use futures::{Stream, StreamExt};
 // internal
 use super::CarnotTallySettings;
 use crate::network::messages::VoteMsg;
-use consensus_engine::{Block, Qc, StandardQc, Vote};
+use carnot_engine::{Block, Qc, StandardQc, Vote};
 use nomos_core::crypto::PublicKey;
 use nomos_core::vote::Tally;
 

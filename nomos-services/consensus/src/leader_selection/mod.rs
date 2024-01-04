@@ -1,5 +1,5 @@
-use consensus_engine::overlay::RoundRobin;
-use consensus_engine::{
+use carnot_engine::overlay::RoundRobin;
+use carnot_engine::{
     overlay::{Error as RandomBeaconError, LeaderSelection, RandomBeaconState},
     TimeoutQc,
 };

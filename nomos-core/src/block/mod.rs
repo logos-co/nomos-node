@@ -1,6 +1,6 @@
 pub mod builder;
 
-use consensus_engine::overlay::RandomBeaconState;
+use carnot_engine::overlay::RandomBeaconState;
 use indexmap::IndexSet;
 // std
 use core::hash::Hash;
@@ -11,8 +11,8 @@ use ::serde::{
     Deserialize, Serialize, Serializer,
 };
 use bytes::Bytes;
-pub use consensus_engine::BlockId;
-use consensus_engine::{LeaderProof, NodeId, Qc, View};
+pub use carnot_engine::BlockId;
+use carnot_engine::{LeaderProof, NodeId, Qc, View};
 // internal
 
 pub type TxHash = [u8; 32];
@@ -20,7 +20,7 @@ pub type TxHash = [u8; 32];
 /// A block
 #[derive(Clone, Debug)]
 pub struct Block<Tx: Clone + Eq + Hash, BlobCertificate: Clone + Eq + Hash> {
-    header: consensus_engine::Block,
+    header: carnot_engine::Block,
     beacon: RandomBeaconState,
     cl_transactions: IndexSet<Tx>,
     bl_blobs: IndexSet<BlobCertificate>,
@@ -41,7 +41,7 @@ impl<
     ) -> Self {
         let transactions = txs.collect();
         let blobs = blobs.collect();
-        let header = consensus_engine::Block {
+        let header = carnot_engine::Block {
             id: BlockId::zeros(),
             view,
             parent_qc,
@@ -62,7 +62,7 @@ impl<
 }
 
 impl<Tx: Clone + Eq + Hash, BlobCertificate: Clone + Eq + Hash> Block<Tx, BlobCertificate> {
-    pub fn header(&self) -> &consensus_engine::Block {
+    pub fn header(&self) -> &carnot_engine::Block {
         &self.header
     }
 
@@ -84,7 +84,7 @@ pub fn block_id_from_wire_content<
     BlobCertificate: Clone + Eq + Hash + Serialize + DeserializeOwned,
 >(
     block: &Block<Tx, BlobCertificate>,
-) -> consensus_engine::BlockId {
+) -> carnot_engine::BlockId {
     use blake2::digest::{consts::U32, Digest};
     use blake2::Blake2b;
     let bytes = block.as_bytes();
@@ -147,7 +147,7 @@ mod serde {
                 cl_transactions,
                 bl_blobs,
             } = StrippedBlock::deserialize(deserializer)?;
-            let header = consensus_engine::Block {
+            let header = carnot_engine::Block {
                 id: BlockId::zeros(),
                 view: header.view,
                 parent_qc: header.parent_qc,

@@ -1,5 +1,5 @@
 use crate::warding::{SimulationState, SimulationWard};
-use consensus_engine::View;
+use carnot_engine::View;
 use serde::{Deserialize, Serialize};
 
 /// MinMaxView. It monitors the gap between a min view and max view, triggers when surpassing

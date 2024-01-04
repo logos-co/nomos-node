@@ -12,7 +12,7 @@ nomos-log = { path = "../nomos-services/log" }
 nomos-api = { path = "../nomos-services/api" }
 overwatch-rs = { git = "https://github.com/logos-co/Overwatch", rev = "2f70806" }
 nomos-core = { path = "../nomos-core" }
-consensus-engine = { path = "../consensus-engine", features = ["serde"] }
+carnot-engine = { path = "../consensus/carnot-engine", features = ["serde"] }
 nomos-mempool = { path = "../nomos-services/mempool", features = ["mock", "libp2p"] }
 nomos-da = { path = "../nomos-services/data-availability" }
 full-replication = { path = "../nomos-da/full-replication" }

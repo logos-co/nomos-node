@@ -1,4 +1,4 @@
-use consensus_engine::BlockId;
+use carnot_engine::BlockId;
 use full_replication::Blob;
 use nomos_core::da::certificate::Certificate;
 use reqwest::Url;

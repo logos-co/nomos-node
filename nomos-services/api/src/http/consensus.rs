@@ -4,7 +4,7 @@ use overwatch_rs::overwatch::handle::OverwatchHandle;
 use serde::{de::DeserializeOwned, Serialize};
 use tokio::sync::oneshot;
 
-use consensus_engine::{
+use carnot_engine::{
     overlay::{RandomBeaconState, RoundRobin, TreeOverlay},
     Block, BlockId,
 };
