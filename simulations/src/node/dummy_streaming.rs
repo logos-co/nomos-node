@@ -1,4 +1,4 @@
-use consensus_engine::View;
+use carnot_engine::View;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 

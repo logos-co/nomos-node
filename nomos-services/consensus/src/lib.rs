@@ -1160,7 +1160,7 @@ async fn mark_in_block<Item, Key>(
 
 #[cfg(test)]
 mod tests {
-    use consensus_engine::Block;
+    use carnot_engine::Block;
 
     use super::*;
 

@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, HashSet};
 
-use consensus_engine::{
+use carnot_engine::{
     AggregateQc, Block, BlockId, LeaderProof, NodeId, Qc, StandardQc, TimeoutQc, View,
 };
 use proptest::prelude::*;

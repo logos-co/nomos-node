@@ -58,7 +58,7 @@ impl<T: Overlay> OverlayInfoExt for T {
 
 #[cfg(test)]
 mod tests {
-    use consensus_engine::{
+    use carnot_engine::{
         overlay::{
             BranchOverlay, BranchOverlaySettings, FisherYatesShuffle, RoundRobin, TreeOverlay,
             TreeOverlaySettings,

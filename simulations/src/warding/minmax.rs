@@ -29,7 +29,7 @@ impl<S, T> SimulationWard<S, T> for MinMaxViewWard {
 mod test {
     use crate::warding::minmax::MinMaxViewWard;
     use crate::warding::{SimulationState, SimulationWard};
-    use consensus_engine::View;
+    use carnot_engine::View;
     use parking_lot::RwLock;
     use std::sync::Arc;
 

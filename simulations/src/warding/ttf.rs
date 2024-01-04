@@ -25,7 +25,7 @@ impl<S, T> SimulationWard<S, T> for MaxViewWard {
 mod test {
     use crate::warding::ttf::MaxViewWard;
     use crate::warding::{SimulationState, SimulationWard};
-    use consensus_engine::View;
+    use carnot_engine::View;
     use parking_lot::RwLock;
     use std::sync::Arc;
 

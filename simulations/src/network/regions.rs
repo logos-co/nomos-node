@@ -157,7 +157,7 @@ pub fn create_regions<R: Rng>(
 mod tests {
     use std::collections::HashMap;
 
-    use consensus_engine::NodeId;
+    use carnot_engine::NodeId;
     use rand::rngs::mock::StepRng;
 
     use crate::{
