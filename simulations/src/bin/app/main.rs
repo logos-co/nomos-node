@@ -5,9 +5,9 @@ use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 // crates
 use anyhow::Ok;
+use carnot_engine::overlay::RandomBeaconState;
+use carnot_engine::{Block, View};
 use clap::Parser;
-use consensus_engine::overlay::RandomBeaconState;
-use consensus_engine::{Block, View};
 use crossbeam::channel;
 use parking_lot::Mutex;
 use rand::rngs::SmallRng;

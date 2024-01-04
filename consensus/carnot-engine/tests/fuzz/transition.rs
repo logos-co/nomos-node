@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use consensus_engine::{Block, NewView, TimeoutQc};
+use carnot_engine::{Block, NewView, TimeoutQc};
 
 // State transtitions that will be picked randomly
 #[derive(Clone, Debug)]

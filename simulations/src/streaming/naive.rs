@@ -196,7 +196,7 @@ fn write_csv_record<W: std::io::Write, R: Record>(
 mod tests {
     use std::{collections::HashMap, time::Duration};
 
-    use consensus_engine::View;
+    use carnot_engine::View;
 
     use crate::{
         network::{

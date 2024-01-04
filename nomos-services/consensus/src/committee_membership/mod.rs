@@ -6,10 +6,10 @@ use std::hash::Hash;
 // crates
 
 // internal
-use consensus_engine::overlay::{
+use carnot_engine::overlay::{
     CommitteeMembership, Error as RandomBeaconError, FreezeMembership, RandomBeaconState,
 };
-use consensus_engine::TimeoutQc;
+use carnot_engine::TimeoutQc;
 use nomos_core::block::Block;
 
 pub trait UpdateableCommitteeMembership: CommitteeMembership {

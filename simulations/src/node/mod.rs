@@ -5,7 +5,7 @@ pub mod dummy;
 pub mod dummy_streaming;
 
 // std
-use consensus_engine::View;
+use carnot_engine::View;
 use std::{
     collections::BTreeMap,
     ops::{Deref, DerefMut},
@@ -18,7 +18,7 @@ use serde::{Deserialize, Serialize};
 // internal
 use crate::overlay::tests::{Layout, OverlaySettings, SimulationOverlay};
 
-pub use consensus_engine::NodeId;
+pub use carnot_engine::NodeId;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(transparent)]

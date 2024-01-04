@@ -8,7 +8,7 @@ pub mod unhappy;
 use serde::{Deserialize, Serialize};
 
 // internal
-use consensus_engine::Committee;
+use carnot_engine::Committee;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct CarnotTallySettings {

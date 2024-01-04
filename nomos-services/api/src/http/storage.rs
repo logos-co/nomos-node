@@ -1,4 +1,4 @@
-use consensus_engine::BlockId;
+use carnot_engine::BlockId;
 use nomos_core::block::Block;
 use nomos_storage::{
     backends::{sled::SledBackend, StorageSerde},

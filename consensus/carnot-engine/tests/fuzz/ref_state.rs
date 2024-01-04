@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, HashSet};
 
-use consensus_engine::{
+use carnot_engine::{
     AggregateQc, Block, BlockId, LeaderProof, NodeId, Qc, StandardQc, TimeoutQc, View,
 };
 use proptest::prelude::*;
@@ -14,7 +14,7 @@ use crate::fuzz::transition::Transition;
 // Also, RefState can be used to check invariants of the real state machine in some cases.
 //
 // We should try to design this reference state as simple/intuitive as possible,
-// so that we don't need to replicate the logic implemented in consensus-engine.
+// so that we don't need to replicate the logic implemented in carnot-engine.
 #[derive(Clone, Debug)]
 pub struct RefState {
     pub chain: BTreeMap<View, ViewEntry>,

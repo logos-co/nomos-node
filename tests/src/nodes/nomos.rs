@@ -4,8 +4,8 @@ use std::process::{Child, Command, Stdio};
 use std::time::Duration;
 // internal
 use crate::{adjust_timeout, get_available_port, ConsensusConfig, MixnetConfig, Node, SpawnConfig};
-use consensus_engine::overlay::{RandomBeaconState, RoundRobin, TreeOverlay, TreeOverlaySettings};
-use consensus_engine::{BlockId, NodeId, Overlay};
+use carnot_engine::overlay::{RandomBeaconState, RoundRobin, TreeOverlay, TreeOverlaySettings};
+use carnot_engine::{BlockId, NodeId, Overlay};
 use full_replication::Certificate;
 use mixnet_client::{MixnetClientConfig, MixnetClientMode};
 use mixnet_node::MixnetNodeConfig;
@@ -151,7 +151,7 @@ impl NomosNode {
         &self,
         from: Option<BlockId>,
         to: Option<BlockId>,
-    ) -> Vec<consensus_engine::Block> {
+    ) -> Vec<carnot_engine::Block> {
         let mut req = CLIENT.get(format!("http://{}/{}", self.addr, GET_BLOCKS_INFO));
 
         if let Some(from) = from {
@@ -165,7 +165,7 @@ impl NomosNode {
         req.send()
             .await
             .unwrap()
-            .json::<Vec<consensus_engine::Block>>()
+            .json::<Vec<carnot_engine::Block>>()
             .await
             .unwrap()
     }

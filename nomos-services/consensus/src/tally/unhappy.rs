@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 // internal
 use super::CarnotTallySettings;
 use crate::network::messages::NewViewMsg;
-use consensus_engine::{NewView, TimeoutQc};
+use carnot_engine::{NewView, TimeoutQc};
 use nomos_core::vote::Tally;
 
 #[derive(thiserror::Error, Debug)]

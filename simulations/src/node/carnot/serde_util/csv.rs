@@ -4,7 +4,7 @@ use serde_block::BlockHelper;
 serializer!(CarnotStateCsvSerializer);
 
 pub(crate) mod serde_block {
-    use consensus_engine::LeaderProof;
+    use carnot_engine::LeaderProof;
 
     use super::{qc::QcHelper, *};
 

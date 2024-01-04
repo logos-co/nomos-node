@@ -1,4 +1,4 @@
-use consensus_engine::NodeId;
+use carnot_engine::NodeId;
 // std
 // crates
 use rand::prelude::IteratorRandom;

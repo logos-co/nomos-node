@@ -1,7 +1,7 @@
 use std::{collections::HashSet, panic};
 
-use consensus_engine::overlay::FreezeMembership;
-use consensus_engine::{
+use carnot_engine::overlay::FreezeMembership;
+use carnot_engine::{
     overlay::{FlatOverlay, FlatOverlaySettings, RoundRobin},
     *,
 };

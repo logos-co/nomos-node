@@ -1,4 +1,4 @@
-use consensus_engine::View;
+use carnot_engine::View;
 use std::collections::{HashMap, HashSet};
 
 pub(crate) struct Tally<T: core::hash::Hash + Eq + Clone> {

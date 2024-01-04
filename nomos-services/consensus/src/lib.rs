@@ -12,7 +12,7 @@ use std::pin::Pin;
 use std::time::Duration;
 // crates
 use bls_signatures::PrivateKey;
-pub use consensus_engine::NodeId;
+pub use carnot_engine::NodeId;
 use futures::{Stream, StreamExt};
 use leader_selection::UpdateableLeaderSelection;
 use serde::Deserialize;
@@ -28,7 +28,7 @@ use crate::network::NetworkAdapter;
 use crate::tally::{
     happy::CarnotTally, timeout::TimeoutTally, unhappy::NewViewTally, CarnotTallySettings,
 };
-use consensus_engine::{
+use carnot_engine::{
     overlay::RandomBeaconState, AggregateQc, BlockId, Carnot, Committee, LeaderProof, NewView,
     Overlay, Payload, Qc, StandardQc, Timeout, TimeoutQc, View, Vote,
 };
@@ -251,7 +251,7 @@ where
         } = self.service_state.settings_reader.get_updated_settings();
 
         let overlay = O::new(overlay_settings);
-        let genesis = consensus_engine::Block {
+        let genesis = carnot_engine::Block {
             id: BlockId::zeros(),
             view: View::new(0),
             parent_qc: Qc::Standard(StandardQc::genesis()),
@@ -351,7 +351,7 @@ where
 #[derive(Debug)]
 #[allow(clippy::large_enum_variant)]
 enum Output<Tx: Clone + Eq + Hash, BlobCertificate: Clone + Eq + Hash> {
-    Send(consensus_engine::Send),
+    Send(carnot_engine::Send),
     BroadcastTimeoutQc {
         timeout_qc: TimeoutQc,
     },
@@ -866,7 +866,7 @@ where
 
     async fn gather_timeout_qc(
         adapter: A,
-        view: consensus_engine::View,
+        view: carnot_engine::View,
     ) -> Event<ClPool::Item, DaPool::Item> {
         if let Some(timeout_qc) = adapter
             .timeout_qc_stream(view)
@@ -885,7 +885,7 @@ where
     async fn gather_votes(
         adapter: A,
         committee: Committee,
-        block: consensus_engine::Block,
+        block: carnot_engine::Block,
         tally: CarnotTallySettings,
     ) -> Event<ClPool::Item, DaPool::Item> {
         let tally = CarnotTally::new(tally);
@@ -925,7 +925,7 @@ where
     async fn gather_timeout(
         adapter: A,
         committee: Committee,
-        view: consensus_engine::View,
+        view: carnot_engine::View,
         tally: CarnotTallySettings,
     ) -> Event<ClPool::Item, DaPool::Item> {
         let tally = TimeoutTally::new(tally);
@@ -941,7 +941,7 @@ where
     #[instrument(level = "debug", skip(adapter))]
     async fn gather_block(
         adapter: A,
-        view: consensus_engine::View,
+        view: carnot_engine::View,
     ) -> Event<ClPool::Item, DaPool::Item> {
         let stream = adapter
             .proposal_chunks_stream(view)
@@ -1011,7 +1011,7 @@ where
     C: Clone + Eq + Hash + Serialize + DeserializeOwned,
 {
     match output {
-        Output::Send(consensus_engine::Send { to, payload }) => match payload {
+        Output::Send(carnot_engine::Send { to, payload }) => match payload {
             Payload::Vote(vote) => {
                 adapter
                     .send(
@@ -1076,7 +1076,7 @@ enum Event<Tx: Clone + Hash + Eq, BlobCertificate: Clone + Eq + Hash> {
     #[allow(dead_code)]
     Approve {
         qc: Qc,
-        block: consensus_engine::Block,
+        block: carnot_engine::Block,
         votes: HashSet<Vote>,
     },
     LocalTimeout {
@@ -1109,7 +1109,7 @@ pub enum ConsensusMsg {
     GetBlocks {
         from: Option<BlockId>,
         to: Option<BlockId>,
-        tx: Sender<Vec<consensus_engine::Block>>,
+        tx: Sender<Vec<carnot_engine::Block>>,
     },
 }
 
@@ -1123,9 +1123,9 @@ pub struct CarnotInfo {
     pub current_view: View,
     pub highest_voted_view: View,
     pub local_high_qc: StandardQc,
-    pub tip: consensus_engine::Block,
+    pub tip: carnot_engine::Block,
     pub last_view_timeout_qc: Option<TimeoutQc>,
-    pub last_committed_block: consensus_engine::Block,
+    pub last_committed_block: carnot_engine::Block,
 }
 
 async fn get_mempool_contents<Item, Key>(
@@ -1160,7 +1160,7 @@ async fn mark_in_block<Item, Key>(
 
 #[cfg(test)]
 mod tests {
-    use consensus_engine::Block;
+    use carnot_engine::Block;
 
     use super::*;
 
