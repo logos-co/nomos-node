@@ -65,7 +65,7 @@ network:
 
 http:
   backend_settings:
-    address: 0.0.0.0:8080
+    address: 0.0.0.0:18080
     cors_origins: []
 
 da:
@@ -73,7 +73,7 @@ da:
     voter: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
     num_attestations: 1
   backend:
-    max_capacity: 10
+    max_capacity: 10000
     evicting_period: 
       secs: 3600
       nanos: 0
