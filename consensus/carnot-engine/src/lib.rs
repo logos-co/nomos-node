@@ -20,6 +20,7 @@ pub struct Carnot<O: Overlay> {
     safe_blocks: HashMap<BlockId, Block>,
     tip: BlockId,
     last_view_timeout_qc: Option<TimeoutQc>,
+    latest_committed_block: Option<BlockId>,
     overlay: O,
 }
 
@@ -31,6 +32,7 @@ impl<O: Overlay> Carnot<O> {
             id,
             highest_voted_view: View(-1),
             last_view_timeout_qc: None,
+            latest_committed_block: None,
             overlay,
             safe_blocks: [(genesis_block.id, genesis_block.clone())].into(),
             tip: genesis_block.id,
@@ -99,6 +101,7 @@ impl<O: Overlay> Carnot<O> {
             new_state.safe_blocks.insert(block.id, block.clone());
             if block.view > new_state.tip().view {
                 new_state.tip = block.id;
+                new_state.update_latest_committed_block(&block);
             }
             new_state.update_high_qc(block.parent_qc);
         } else {
@@ -297,6 +300,12 @@ impl<O: Overlay> Carnot<O> {
         }
     }
 
+    fn update_latest_committed_block(&mut self, block: &Block) {
+        if let Some(block) = self.can_commit_grandparent(block) {
+            self.latest_committed_block = Some(block.id);
+        }
+    }
+
     pub fn blocks_in_view(&self, view: View) -> Vec<Block> {
         self.safe_blocks
             .iter()
@@ -310,7 +319,7 @@ impl<O: Overlay> Carnot<O> {
     }
 
     // Returns the id of the grandparent block if it can be committed or None otherwise
-    fn can_commit_grandparent(&self, block: Block) -> Option<Block> {
+    fn can_commit_grandparent(&self, block: &Block) -> Option<Block> {
         let parent = self.safe_blocks.get(&block.parent())?;
         let grandparent = self.safe_blocks.get(&parent.parent())?;
 
@@ -324,33 +333,33 @@ impl<O: Overlay> Carnot<O> {
     }
 
     pub fn latest_committed_block(&self) -> Block {
-        for view in (0..=self.current_view.0).rev() {
-            for block in self.blocks_in_view(View(view)) {
-                if let Some(block) = self.can_commit_grandparent(block) {
-                    return block;
-                }
-            }
-        }
-        self.genesis_block()
+        self.latest_committed_block
+            .and_then(|id| self.safe_blocks.get(&id).cloned())
+            .unwrap_or_else(|| self.genesis_block())
     }
 
     pub fn latest_committed_view(&self) -> View {
         self.latest_committed_block().view
     }
 
-    pub fn latest_committed_blocks(&self) -> Vec<BlockId> {
+    pub fn latest_committed_blocks(&self, limit: Option<usize>) -> Vec<BlockId> {
+        let limit = limit.unwrap_or(self.safe_blocks.len());
         let mut res = vec![];
         let mut current = self.latest_committed_block();
-        while current != self.genesis_block() {
+
+        while res.len() < limit {
             res.push(current.id);
-            current = if let Some(new_current) = self.safe_blocks.get(&current.parent()) {
-                new_current.clone()
-            } else {
+
+            if current == self.genesis_block() {
                 break;
+            }
+
+            current = match self.safe_blocks.get(&current.parent()) {
+                Some(new_current) => new_current.clone(),
+                None => break,
             };
-            // current = self.safe_blocks.get(&current.parent()).unwrap().clone();
         }
-        res.push(self.genesis_block().id);
+
         res
     }
 
@@ -501,7 +510,7 @@ mod test {
         assert_eq!(engine.high_qc(), genesis.parent_qc.high_qc());
         assert_eq!(engine.blocks_in_view(View(0)), vec![genesis.clone()]);
         assert_eq!(engine.last_view_timeout_qc(), None);
-        assert_eq!(engine.latest_committed_blocks(), vec![genesis.id]);
+        assert_eq!(engine.latest_committed_blocks(None), vec![genesis.id]);
     }
 
     #[test]
@@ -595,7 +604,7 @@ mod test {
         engine = engine.receive_block(block3.clone()).unwrap();
         assert_eq!(engine.latest_committed_block(), block1);
         assert_eq!(
-            engine.latest_committed_blocks(),
+            engine.latest_committed_blocks(None),
             vec![block1.id, engine.genesis_block().id] // without block2 and block3
         );
         engine = update_leader_selection(&engine);
@@ -604,7 +613,7 @@ mod test {
         engine = engine.receive_block(block4).unwrap();
         assert_eq!(engine.latest_committed_block(), block2);
         assert_eq!(
-            engine.latest_committed_blocks(),
+            engine.latest_committed_blocks(None),
             vec![block2.id, block1.id, engine.genesis_block().id] // without block3, block4
         );
     }

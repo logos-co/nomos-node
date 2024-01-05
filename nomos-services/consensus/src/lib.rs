@@ -424,9 +424,7 @@ where
                     local_high_qc: carnot.high_qc(),
                     tip: carnot.tip(),
                     last_view_timeout_qc: carnot.last_view_timeout_qc(),
-                    last_committed_block: carnot.safe_blocks()
-                        [&carnot.latest_committed_blocks()[0]]
-                        .clone(),
+                    last_committed_block: carnot.latest_committed_block(),
                 };
                 tx.send(info).unwrap_or_else(|e| {
                     tracing::error!("Could not send consensus info through channel: {:?}", e)
