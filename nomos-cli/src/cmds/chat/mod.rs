@@ -159,9 +159,8 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) {
         terminal.draw(|f| ui::ui(f, &app)).unwrap();
 
         if let Ok(update) = app.status_updates.try_recv() {
-            if let Status::Done = update {
+            if let Status::Done | Status::Err(_) = update {
                 app.message_in_flight = false;
-                app.message_status = None;
             }
             app.message_status = Some(update);
             app.last_updated = Instant::now();
