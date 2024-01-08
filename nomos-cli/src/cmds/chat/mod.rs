@@ -17,6 +17,7 @@ use clap::Args;
 use full_replication::{
     AbsoluteNumber, Attestation, Certificate, FullReplication, Settings as DaSettings,
 };
+use futures::{stream, StreamExt};
 use nomos_core::{block::BlockId, da::DaProtocol, wire};
 use nomos_log::{LoggerBackend, LoggerSettings, SharedWriter};
 use nomos_network::{backends::libp2p::Libp2p, NetworkService};
@@ -238,11 +239,36 @@ async fn check_for_messages(sender: Sender<Vec<ChatMessage>>, node: Url) {
     }
 }
 
+// Process a single block's blobs and return chat messages
+async fn process_block_blobs(
+    node: Url,
+    block_id: &BlockId,
+    da_settings: DaSettings,
+) -> Result<Vec<ChatMessage>, Box<dyn std::error::Error>> {
+    let blobs = get_block_blobs(&node, block_id).await?;
+
+    // Note that number of attestations is ignored here since we only use the da protocol to
+    // decode the blob data, not to validate the certificate
+    let mut da_protocol =
+        <FullReplication<AbsoluteNumber<Attestation, Certificate>> as DaProtocol>::new(da_settings);
+    let mut messages = Vec::new();
+
+    for blob in blobs {
+        da_protocol.recv_blob(blob);
+        let bytes = da_protocol.extract().unwrap();
+        if let Ok(message) = wire::deserialize::<ChatMessage>(&bytes) {
+            messages.push(message);
+        }
+    }
+
+    Ok(messages)
+}
+
+// Fetch new messages since the last tip
 async fn fetch_new_messages(
     last_tip: &BlockId,
     node: &Url,
 ) -> Result<(BlockId, Vec<ChatMessage>), Box<dyn std::error::Error>> {
-    let mut new_messages = Vec::new();
     // By only specifying the 'to' parameter we get all the blocks since the last tip
     let mut new_blocks = get_blocks_info(node, None, Some(*last_tip))
         .await?
@@ -257,26 +283,26 @@ async fn fetch_new_messages(
     // We already processed the last block so let's remove it
     new_blocks.pop();
 
-    // Note that number of attestations is ignored here since we only use the da protocol to
-    // decode the blob data, not to validate the certificate
-    let mut da_protocol =
-        <FullReplication<AbsoluteNumber<Attestation, Certificate>> as DaProtocol>::new(
-            DaSettings {
-                num_attestations: 1,
-                voter: [0; 32], // voter is ignored as well
-            },
-        );
+    let da_settings = DaSettings {
+        num_attestations: 1,
+        voter: [0; 32],
+    };
 
-    for block in new_blocks.iter().rev() {
-        let blobs = get_block_blobs(node, block).await?;
-        for blob in blobs {
-            da_protocol.recv_blob(blob);
-            // Full replication only needs one blob to decode the data, so the unwrap is safe
-            let bytes = da_protocol.extract().unwrap();
-            if let Ok(message) = wire::deserialize::<ChatMessage>(&bytes) {
-                new_messages.push(message);
-            }
-        }
+    let block_stream = stream::iter(new_blocks.iter().rev());
+    let results: Vec<_> = block_stream
+        .map(|block| {
+            let node = node.clone();
+            let da_settings = da_settings.clone();
+
+            process_block_blobs(node, block, da_settings)
+        })
+        .buffer_unordered(new_blocks.len())
+        .collect::<Vec<_>>()
+        .await;
+
+    let mut new_messages = Vec::new();
+    for result in results {
+        new_messages.extend(result?);
     }
 
     Ok((new_tip, new_messages))
