@@ -124,25 +124,31 @@ fn render_messages(f: &mut Frame, app: &App, rect: Rect) {
     let messages: Vec<ListItem> = app
         .messages
         .iter()
-        .map(|ChatMessage { author, message }| {
-            let content = if author == app.username.as_ref().unwrap() {
-                static MARGIN: usize = 2;
-                // pad to make it appear aligned on the right
-                let pad = " ".repeat(
-                    (rect.width as usize)
-                        .saturating_sub(message.len())
-                        .saturating_sub(MARGIN),
-                );
-                Line::from(vec![Span::raw(pad), Span::raw(message)])
-            } else {
-                Line::from(vec![
-                    Span::styled(format!("{author}: "), Style::new().fg(Color::Yellow).bold()),
-                    Span::raw(message),
-                ])
-                .alignment(Alignment::Left)
-            };
-            ListItem::new(content)
-        })
+        .map(
+            |ChatMessage {
+                 author,
+                 message,
+                 _nonce,
+             }| {
+                let content = if author == app.username.as_ref().unwrap() {
+                    static MARGIN: usize = 2;
+                    // pad to make it appear aligned on the right
+                    let pad = " ".repeat(
+                        (rect.width as usize)
+                            .saturating_sub(message.len())
+                            .saturating_sub(MARGIN),
+                    );
+                    Line::from(vec![Span::raw(pad), Span::raw(message)])
+                } else {
+                    Line::from(vec![
+                        Span::styled(format!("{author}: "), Style::new().fg(Color::Yellow).bold()),
+                        Span::raw(message),
+                    ])
+                    .alignment(Alignment::Left)
+                };
+                ListItem::new(content)
+            },
+        )
         .collect();
     let messages =
         List::new(messages).block(Block::default().borders(Borders::ALL).title("Messages"));
