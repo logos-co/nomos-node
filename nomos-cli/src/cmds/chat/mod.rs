@@ -190,6 +190,7 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) {
                                     wire::serialize(&ChatMessage {
                                         author: app.username.clone().unwrap(),
                                         message: app.input.value().into(),
+                                        _nonce: rand::random(),
                                     })
                                     .unwrap()
                                     .into(),
@@ -222,6 +223,9 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) {
 struct ChatMessage {
     author: String,
     message: String,
+    // Since DA will rightfully ignore duplicated messages, we need to add a nonce to make sure
+    // every message is unique. This is randomly generated for simplicity.
+    _nonce: u64,
 }
 
 #[tokio::main]
