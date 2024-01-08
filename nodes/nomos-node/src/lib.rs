@@ -2,18 +2,18 @@ pub mod api;
 mod config;
 mod tx;
 
+use carnot_consensus::network::adapters::libp2p::Libp2pAdapter as ConsensusLibp2pAdapter;
 use carnot_engine::overlay::{RandomBeaconState, RoundRobin, TreeOverlay};
 use color_eyre::eyre::Result;
 use full_replication::Certificate;
 use full_replication::{AbsoluteNumber, Attestation, Blob, FullReplication};
 #[cfg(feature = "metrics")]
 use metrics::{backend::map::MapMetricsBackend, types::MetricsData, MetricsService};
-use nomos_consensus::network::adapters::libp2p::Libp2pAdapter as ConsensusLibp2pAdapter;
 
 use api::AxumBackend;
 use bytes::Bytes;
+use carnot_consensus::CarnotConsensus;
 use nomos_api::ApiService;
-use nomos_consensus::CarnotConsensus;
 use nomos_core::{
     da::{blob, certificate},
     tx::Transaction,

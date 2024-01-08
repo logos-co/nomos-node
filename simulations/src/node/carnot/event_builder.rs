@@ -1,9 +1,9 @@
 use crate::node::carnot::{messages::CarnotMessage, tally::Tally, timeout::TimeoutHandler};
+use carnot_consensus::network::messages::{NewViewMsg, TimeoutMsg, VoteMsg};
+use carnot_consensus::NodeId;
 use carnot_engine::{
     AggregateQc, Carnot, NewView, Overlay, Qc, StandardQc, Timeout, TimeoutQc, View, Vote,
 };
-use nomos_consensus::network::messages::{NewViewMsg, TimeoutMsg, VoteMsg};
-use nomos_consensus::NodeId;
 use nomos_core::block::Block;
 use std::collections::HashSet;
 use std::hash::Hash;

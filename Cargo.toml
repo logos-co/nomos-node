@@ -7,7 +7,7 @@ members = [
     "nomos-services/metrics",
     "nomos-services/network",
     "nomos-services/storage",
-    "nomos-services/consensus",
+    "nomos-services/carnot-consensus",
     "nomos-services/mempool",
     "nomos-services/http",
     "nomos-services/data-availability",
