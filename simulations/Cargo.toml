@@ -26,7 +26,7 @@ futures = "0.3"
 humantime = "2.1"
 humantime-serde = "1"
 nomos-core = { path = "../nomos-core" }
-nomos-consensus = { path = "../nomos-services/consensus" }
+carnot-consensus = { path = "../nomos-services/carnot-consensus" }
 once_cell = "1.17"
 parking_lot = "0.12"
 polars = { version = "0.27", features = ["serde", "object", "json", "csv-file", "parquet", "dtype-struct"], optional = true }

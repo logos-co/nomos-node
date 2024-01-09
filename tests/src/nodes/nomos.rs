@@ -4,13 +4,13 @@ use std::process::{Child, Command, Stdio};
 use std::time::Duration;
 // internal
 use crate::{adjust_timeout, get_available_port, ConsensusConfig, MixnetConfig, Node, SpawnConfig};
+use carnot_consensus::{CarnotInfo, CarnotSettings};
 use carnot_engine::overlay::{RandomBeaconState, RoundRobin, TreeOverlay, TreeOverlaySettings};
 use carnot_engine::{BlockId, NodeId, Overlay};
 use full_replication::Certificate;
 use mixnet_client::{MixnetClientConfig, MixnetClientMode};
 use mixnet_node::MixnetNodeConfig;
 use mixnet_topology::MixnetTopology;
-use nomos_consensus::{CarnotInfo, CarnotSettings};
 use nomos_core::block::Block;
 use nomos_libp2p::{multiaddr, Multiaddr};
 use nomos_log::{LoggerBackend, LoggerFormat};

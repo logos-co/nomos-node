@@ -1,6 +1,6 @@
 use super::CLIENT;
+use carnot_consensus::CarnotInfo;
 use carnot_engine::{Block, BlockId};
-use nomos_consensus::CarnotInfo;
 use reqwest::Url;
 
 pub async fn carnot_info(node: &Url) -> Result<CarnotInfo, reqwest::Error> {

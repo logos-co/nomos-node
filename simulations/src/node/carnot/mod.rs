@@ -29,15 +29,15 @@ use crate::output_processors::{Record, RecordType, Runtime};
 use crate::settings::SimulationSettings;
 use crate::streaming::SubscriberFormat;
 use crate::warding::SimulationState;
+use carnot_consensus::committee_membership::UpdateableCommitteeMembership;
+use carnot_consensus::network::messages::{ProposalMsg, TimeoutQcMsg};
+use carnot_consensus::{
+    leader_selection::UpdateableLeaderSelection,
+    network::messages::{NewViewMsg, TimeoutMsg, VoteMsg},
+};
 use carnot_engine::overlay::RandomBeaconState;
 use carnot_engine::{
     Block, BlockId, Carnot, Committee, Overlay, Payload, Qc, StandardQc, TimeoutQc, View, Vote,
-};
-use nomos_consensus::committee_membership::UpdateableCommitteeMembership;
-use nomos_consensus::network::messages::{ProposalMsg, TimeoutQcMsg};
-use nomos_consensus::{
-    leader_selection::UpdateableLeaderSelection,
-    network::messages::{NewViewMsg, TimeoutMsg, VoteMsg},
 };
 
 static RECORD_SETTINGS: std::sync::OnceLock<BTreeMap<String, bool>> = std::sync::OnceLock::new();
