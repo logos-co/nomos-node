@@ -148,3 +148,14 @@ services:
       - /usr/local/bin/etcd
       - --advertise-client-urls=http://etcd:2379
       - --listen-client-urls=http://0.0.0.0:2379
+
+  prometheus:
+    image: prom/prometheus:latest
+    volumes:
+      - ./testnet/monitoring/prometheus-config.yml:/etc/prometheus/prometheus.yml:z
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=7d
+    ports:
+      - 127.0.0.1:9090:9090
+    restart: on-failure
