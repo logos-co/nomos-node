@@ -27,9 +27,9 @@ pub struct Metrics {
     registry: NomosRegistry,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct MetricsSettings {
-    registry: Option<NomosRegistry>,
+    pub registry: Option<NomosRegistry>,
 }
 
 pub struct GatherResult {}

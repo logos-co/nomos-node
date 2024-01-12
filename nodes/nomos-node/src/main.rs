@@ -1,5 +1,5 @@
 use full_replication::{Blob, Certificate};
-use nomos_metrics::NomosRegistry;
+use nomos_metrics::{MetricsSettings, NomosRegistry};
 use nomos_node::{
     Config, ConsensusArgs, DaArgs, HttpArgs, LogArgs, MetricsArgs, NetworkArgs, Nomos,
     NomosServiceSettings, OverlayArgs, Tx,
@@ -86,11 +86,10 @@ fn main() -> Result<()> {
                     topic: String::from(nomos_node::DA_TOPIC),
                     id: cert_id,
                 },
-                metrics,
+                metrics: metrics.clone(),
             },
             consensus: config.consensus,
-            #[cfg(feature = "metrics")]
-            metrics: config.metrics,
+            metrics: MetricsSettings { registry: metrics },
             da: config.da,
             storage: nomos_storage::backends::sled::SledBackendSettings {
                 db_path: std::path::PathBuf::from(DEFAULT_DB_PATH),

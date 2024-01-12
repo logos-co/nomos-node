@@ -29,6 +29,7 @@ use nomos_mempool::{
     backend::mockpool::MockPool, Certificate as CertDiscriminant, MempoolService,
     Transaction as TxDiscriminant,
 };
+use nomos_metrics::Metrics;
 use nomos_network::backends::libp2p::Libp2p;
 use nomos_storage::{
     backends::{sled::SledBackend, StorageSerde},
@@ -91,10 +92,9 @@ pub struct Nomos {
     >,
     consensus: ServiceHandle<Carnot>,
     http: ServiceHandle<ApiService<AxumBackend<Tx, Wire, MB16>>>,
-    #[cfg(feature = "metrics")]
-    metrics: ServiceHandle<MetricsService<MapMetricsBackend<MetricsData>>>,
     da: ServiceHandle<DataAvailability>,
     storage: ServiceHandle<StorageService<SledBackend<Wire>>>,
+    metrics: ServiceHandle<Metrics>,
     system_sig: ServiceHandle<SystemSig>,
 }
 
