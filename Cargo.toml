@@ -3,6 +3,7 @@ members = [
     "nomos-core",
     "nomos-libp2p",
     "nomos-services/api",
+    "nomos-metrics",
     "nomos-services/log",
     "nomos-services/metrics",
     "nomos-services/network",
