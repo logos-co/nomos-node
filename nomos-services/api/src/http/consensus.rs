@@ -6,7 +6,7 @@ use tokio::sync::oneshot;
 
 use carnot_consensus::{
     network::adapters::libp2p::Libp2pAdapter as ConsensusLibp2pAdapter, CarnotConsensus,
-    CarnotInfo, ConsensusMsg,
+    CarnotInfo, ConsensusMsg, PruneOffset,
 };
 use carnot_engine::{
     overlay::{RandomBeaconState, RoundRobin, TreeOverlay},
@@ -76,6 +76,25 @@ where
             to,
             tx: sender,
         })
+        .await
+        .map_err(|(e, _)| e)?;
+
+    Ok(receiver.await?)
+}
+
+pub async fn carnot_prune<Tx, SS, const SIZE: usize>(
+    handle: &OverwatchHandle,
+    offset: PruneOffset,
+) -> Result<(), super::DynError>
+where
+    Tx: Transaction + Clone + Debug + Hash + Serialize + DeserializeOwned + Send + Sync + 'static,
+    <Tx as Transaction>::Hash: std::cmp::Ord + Debug + Send + Sync + 'static,
+    SS: StorageSerde + Send + Sync + 'static,
+{
+    let relay = handle.relay::<Carnot<Tx, SS, SIZE>>().connect().await?;
+    let (sender, receiver) = oneshot::channel();
+    relay
+        .send(ConsensusMsg::Prune { offset, tx: sender })
         .await
         .map_err(|(e, _)| e)?;
 

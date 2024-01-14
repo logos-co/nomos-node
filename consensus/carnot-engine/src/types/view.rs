@@ -43,6 +43,10 @@ impl View {
     pub const fn prev(&self) -> Self {
         Self(self.0 - 1)
     }
+
+    pub fn checked_sub(&self, rhs: Self) -> Option<Self> {
+        self.0.checked_sub(rhs.0).map(Self)
+    }
 }
 
 impl From<i64> for View {

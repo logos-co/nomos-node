@@ -13,6 +13,16 @@ pub async fn carnot_info(node: &Url) -> Result<CarnotInfo, reqwest::Error> {
         .await
 }
 
+pub async fn carnot_prune(node: &Url) -> Result<(), reqwest::Error> {
+    const NODE_CARNOT_PRUNE_PATH: &str = "carnot/prune";
+    CLIENT
+        .get(node.join(NODE_CARNOT_PRUNE_PATH).unwrap())
+        .send()
+        .await?
+        .json::<()>()
+        .await
+}
+
 pub async fn get_blocks_info(
     node: &Url,
     from: Option<BlockId>,

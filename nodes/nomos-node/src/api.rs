@@ -119,6 +119,7 @@ where
             .route("/cl/status", routing::post(cl_status::<T>))
             .route("/carnot/info", routing::get(carnot_info::<T, S, SIZE>))
             .route("/carnot/blocks", routing::get(carnot_blocks::<T, S, SIZE>))
+            .route("/carnot/prune", routing::get(carnot_prune::<T, S, SIZE>))
             .route("/network/info", routing::get(libp2p_info))
             .route("/storage/block", routing::post(block::<S, T>))
             .route("/mempool/add/tx", routing::post(add_tx::<T>))
@@ -247,6 +248,53 @@ where
     SS: StorageSerde + Send + Sync + 'static,
 {
     make_request_and_return_response!(consensus::carnot_info::<Tx, SS, SIZE>(&handle))
+}
+
+#[derive(Default, Deserialize)]
+#[serde(rename_all = "snake_case")]
+enum PruneKind {
+    Start,
+    #[default]
+    End,
+}
+
+#[derive(Deserialize)]
+struct PruneParams {
+    #[serde(default)]
+    kind: PruneKind,
+    offset: i64,
+}
+
+impl From<PruneParams> for carnot_consensus::PruneOffset {
+    fn from(params: PruneParams) -> Self {
+        match params.kind {
+            PruneKind::Start => Self::Start(params.offset.into()),
+            PruneKind::End => Self::End(params.offset.into()),
+        }
+    }
+}
+
+#[utoipa::path(
+    get,
+    path = "/carnot/prune",
+    responses(
+        (status = 200, description = "Prune the carnot blocks by view"),
+        (status = 500, description = "Internal server error", body = String),
+    )
+)]
+async fn carnot_prune<Tx, SS, const SIZE: usize>(
+    State(handle): State<OverwatchHandle>,
+    Query(query): Query<PruneParams>,
+) -> Response
+where
+    Tx: Transaction + Clone + Debug + Hash + Serialize + DeserializeOwned + Send + Sync + 'static,
+    <Tx as Transaction>::Hash: std::cmp::Ord + Debug + Send + Sync + 'static,
+    SS: StorageSerde + Send + Sync + 'static,
+{
+    make_request_and_return_response!(consensus::carnot_prune::<Tx, SS, SIZE>(
+        &handle,
+        query.into()
+    ))
 }
 
 #[derive(Deserialize)]

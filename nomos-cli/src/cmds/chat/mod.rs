@@ -5,7 +5,7 @@
 mod ui;
 
 use crate::{
-    api::consensus::get_blocks_info,
+    api::consensus::{carnot_prune, get_blocks_info},
     da::{
         disseminate::{
             DaProtocolChoice, DisseminateApp, DisseminateAppServiceSettings, Settings, Status,
@@ -232,13 +232,21 @@ struct ChatMessage {
 async fn check_for_messages(sender: Sender<Vec<ChatMessage>>, node: Url) {
     // Should ask for the genesis block to be more robust
     let mut last_tip = BlockId::zeros();
-
+    let node = Arc::new(node);
     loop {
         if let Ok((new_tip, messages)) = fetch_new_messages(&last_tip, &node).await {
             sender.send(messages).expect("channel closed");
             last_tip = new_tip;
         }
+
         tokio::time::sleep(Duration::from_millis(100)).await;
+
+        // After every iteration, prune the chain to avoid running out of resource
+        let n = node.clone();
+        tokio::spawn(async move {
+            // We do not care the prune result
+            let _ = carnot_prune(&n).await;
+        });
     }
 }
 

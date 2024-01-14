@@ -318,30 +318,30 @@ where
         let mut lifecycle_stream = self.service_state.lifecycle_handle.message_stream();
         loop {
             tokio::select! {
-                    Some(event) = task_manager.next() => {
-                        carnot = Self::process_carnot_event(
-                            carnot,
-                            event,
-                            &mut task_manager,
-                            adapter.clone(),
-                            private_key,
-                            cl_mempool_relay.clone(),
-                            da_mempool_relay.clone(),
-                            storage_relay.clone(),
-                            tx_selector.clone(),
-                            blob_selector.clone(),
-                            timeout,
-                        )
-                        .await
+                Some(event) = task_manager.next() => {
+                    carnot = Self::process_carnot_event(
+                        carnot,
+                        event,
+                        &mut task_manager,
+                        adapter.clone(),
+                        private_key,
+                        cl_mempool_relay.clone(),
+                        da_mempool_relay.clone(),
+                        storage_relay.clone(),
+                        tx_selector.clone(),
+                        blob_selector.clone(),
+                        timeout,
+                    )
+                    .await
+                }
+                Some(msg) = self.service_state.inbound_relay.next() => {
+                    Self::process_message(&mut carnot, msg);
+                }
+                Some(msg) = lifecycle_stream.next() => {
+                    if Self::should_stop_service(msg).await {
+                        break;
                     }
-                    Some(msg) = self.service_state.inbound_relay.next() => {
-                        Self::process_message(&carnot, msg);
-                    }
-                    Some(msg) = lifecycle_stream.next() => {
-                        if Self::should_stop_service(msg).await {
-                            break;
-                        }
-                    }
+                }
             }
         }
         Ok(())
@@ -414,7 +414,7 @@ where
         }
     }
 
-    fn process_message(carnot: &Carnot<O>, msg: ConsensusMsg) {
+    fn process_message(carnot: &mut Carnot<O>, msg: ConsensusMsg) {
         match msg {
             ConsensusMsg::Info { tx } => {
                 let info = CarnotInfo {
@@ -451,6 +451,21 @@ where
 
                 tx.send(res)
                     .unwrap_or_else(|_| tracing::error!("could not send blocks through channel"));
+            }
+            ConsensusMsg::Prune { offset, tx } => {
+                match offset {
+                    PruneOffset::Start(offset) => {
+                        carnot.prune_older_blocks_by_view(offset);
+                    }
+                    PruneOffset::End(offset) => {
+                        if let Some(view) = carnot.current_view().checked_sub(offset) {
+                            carnot.prune_older_blocks_by_view(view);
+                        }
+                    }
+                }
+
+                // We can just ignore the error here, since we don't care if the receiver is gone
+                let _ = tx.send(());
             }
         }
     }
@@ -1097,6 +1112,14 @@ enum Event<Tx: Clone + Hash + Eq, BlobCertificate: Clone + Eq + Hash> {
 }
 
 #[derive(Debug)]
+pub enum PruneOffset {
+    /// Offset from the start view, which means `offset` itself will be applied
+    Start(View),
+    /// Offset from the end view, which means `current - offset` will be applied
+    End(View),
+}
+
+#[derive(Debug)]
 pub enum ConsensusMsg {
     Info {
         tx: Sender<CarnotInfo>,
@@ -1108,6 +1131,11 @@ pub enum ConsensusMsg {
         from: Option<BlockId>,
         to: Option<BlockId>,
         tx: Sender<Vec<carnot_engine::Block>>,
+    },
+    /// Prune the chain up to the given view.
+    Prune {
+        offset: PruneOffset,
+        tx: Sender<()>,
     },
 }
 
