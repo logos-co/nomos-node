@@ -642,6 +642,10 @@ where
                             committee_membership.on_new_block_received(&original_block)
                         },
                     );
+                    // prune old blocks, older than grand parent
+                    new_state.prune_older_blocks_by_view(
+                        new_state.latest_committed_view().prev().prev(),
+                    );
                 } else {
                     task_manager.push(block.view, async move {
                         if let Some(block) = stream.next().await {
