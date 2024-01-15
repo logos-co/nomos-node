@@ -1,7 +1,9 @@
 use full_replication::{Blob, Certificate};
+#[cfg(feature = "metrics")]
+use nomos_metrics::MetricsSettings;
 use nomos_node::{
-    Config, ConsensusArgs, DaArgs, HttpArgs, LogArgs, NetworkArgs, Nomos, NomosServiceSettings,
-    OverlayArgs, Tx,
+    Config, ConsensusArgs, DaArgs, HttpArgs, LogArgs, MetricsArgs, NetworkArgs, Nomos,
+    NomosServiceSettings, OverlayArgs, Tx,
 };
 
 use clap::Parser;
@@ -40,6 +42,9 @@ struct Args {
     /// Overrides da config.
     #[clap(flatten)]
     da_args: DaArgs,
+    /// Overrides metrics config.
+    #[clap(flatten)]
+    metrics_args: MetricsArgs,
 }
 
 fn main() -> Result<()> {
@@ -51,6 +56,7 @@ fn main() -> Result<()> {
         network_args,
         consensus_args,
         overlay_args,
+        metrics_args,
     } = Args::parse();
     let config = serde_yaml::from_reader::<_, Config>(std::fs::File::open(config)?)?
         .update_da(da_args)?
@@ -59,6 +65,14 @@ fn main() -> Result<()> {
         .update_consensus(consensus_args)?
         .update_overlay(overlay_args)?
         .update_network(network_args)?;
+
+    let registry = cfg!(feature = "metrics")
+        .then(|| {
+            metrics_args
+                .with_metrics
+                .then(nomos_metrics::NomosRegistry::default)
+        })
+        .flatten();
 
     let app = OverwatchRunner::<Nomos>::run(
         NomosServiceSettings {
@@ -71,6 +85,7 @@ fn main() -> Result<()> {
                     topic: String::from(nomos_node::CL_TOPIC),
                     id: <Tx as Transaction>::hash,
                 },
+                registry: registry.clone(),
             },
             da_mempool: nomos_mempool::Settings {
                 backend: (),
@@ -78,10 +93,11 @@ fn main() -> Result<()> {
                     topic: String::from(nomos_node::DA_TOPIC),
                     id: cert_id,
                 },
+                registry: registry.clone(),
             },
             consensus: config.consensus,
             #[cfg(feature = "metrics")]
-            metrics: config.metrics,
+            metrics: MetricsSettings { registry },
             da: config.da,
             storage: nomos_storage::backends::sled::SledBackendSettings {
                 db_path: std::path::PathBuf::from(DEFAULT_DB_PATH),
