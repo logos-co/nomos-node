@@ -245,7 +245,7 @@ async fn check_for_messages(sender: Sender<Vec<ChatMessage>>, node: Url) {
         let n = node.clone();
         tokio::spawn(async move {
             // We do not care the prune result
-            let _ = carnot_prune(&n).await;
+            let _ = carnot_prune(&n, 3).await;
         });
     }
 }

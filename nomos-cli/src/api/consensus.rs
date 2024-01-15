@@ -13,10 +13,11 @@ pub async fn carnot_info(node: &Url) -> Result<CarnotInfo, reqwest::Error> {
         .await
 }
 
-pub async fn carnot_prune(node: &Url) -> Result<(), reqwest::Error> {
+pub async fn carnot_prune(node: &Url, offset: i64) -> Result<(), reqwest::Error> {
     const NODE_CARNOT_PRUNE_PATH: &str = "carnot/prune";
-    CLIENT
-        .get(node.join(NODE_CARNOT_PRUNE_PATH).unwrap())
+    let mut req = CLIENT.get(node.join(NODE_CARNOT_PRUNE_PATH).unwrap());
+    req = req.query(&[("kind", "end")]);
+    req.query(&[("offset", offset)])
         .send()
         .await?
         .json::<()>()
