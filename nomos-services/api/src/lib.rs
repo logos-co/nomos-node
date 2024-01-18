@@ -8,21 +8,22 @@ use overwatch_rs::{
     },
     DynError,
 };
+use std::future::Future;
 
 pub mod http;
 
 /// A simple abstraction so that we can easily
 /// change the underlying http server
-#[async_trait::async_trait]
 pub trait Backend {
     type Error: std::error::Error + Send + Sync + 'static;
     type Settings: Clone + Send + Sync + 'static;
 
-    async fn new(settings: Self::Settings) -> Result<Self, Self::Error>
+    fn new(settings: Self::Settings) -> impl Future<Output = Result<Self, Self::Error>> + Send
     where
         Self: Sized;
 
-    async fn serve(self, handle: OverwatchHandle) -> Result<(), Self::Error>;
+    fn serve(self, handle: OverwatchHandle)
+        -> impl Future<Output = Result<(), Self::Error>> + Send;
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -47,7 +48,6 @@ impl<B: Backend> ServiceData for ApiService<B> {
     type Message = NoMessage;
 }
 
-#[async_trait::async_trait]
 impl<B> ServiceCore for ApiService<B>
 where
     B: Backend + Send + Sync + 'static,
@@ -62,7 +62,7 @@ where
     }
 
     /// Service main loop
-    async fn run(mut self) -> Result<(), DynError> {
+    async fn run(self) -> Result<(), DynError> {
         let endpoint = B::new(self.settings.backend_settings).await?;
         endpoint.serve(self.handle).await?;
         Ok(())

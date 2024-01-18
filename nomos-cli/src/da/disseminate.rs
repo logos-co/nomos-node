@@ -7,7 +7,6 @@ use nomos_core::{da::DaProtocol, wire};
 use nomos_da::network::{adapters::libp2p::Libp2pAdapter, NetworkAdapter};
 use nomos_log::Logger;
 use nomos_network::{backends::libp2p::Libp2p, NetworkService};
-use overwatch_derive::*;
 use overwatch_rs::{
     services::{
         handle::{ServiceHandle, ServiceStateHandle},
@@ -15,7 +14,7 @@ use overwatch_rs::{
         state::*,
         ServiceCore, ServiceData, ServiceId,
     },
-    DynError,
+    DynError, Services,
 };
 use reqwest::Url;
 use serde::Serialize;
@@ -139,7 +138,6 @@ impl ServiceData for DisseminateService {
     type Message = NoMessage;
 }
 
-#[async_trait::async_trait]
 impl ServiceCore for DisseminateService {
     fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, DynError> {
         Ok(Self { service_state })

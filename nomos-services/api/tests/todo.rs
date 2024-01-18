@@ -7,10 +7,10 @@ use std::{
 use axum::{routing, Router, Server};
 use hyper::Error;
 use nomos_api::{ApiService, ApiServiceSettings, Backend};
-use overwatch_derive::Services;
 use overwatch_rs::{
     overwatch::{handle::OverwatchHandle, OverwatchRunner},
     services::handle::ServiceHandle,
+    Services,
 };
 use utoipa::{
     openapi::security::{ApiKey, ApiKeyValue, SecurityScheme},
@@ -61,7 +61,6 @@ pub struct WebServer {
     addr: SocketAddr,
 }
 
-#[async_trait::async_trait]
 impl Backend for WebServer {
     type Error = hyper::Error;
 

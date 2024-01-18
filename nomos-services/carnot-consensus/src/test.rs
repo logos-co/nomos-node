@@ -2,7 +2,6 @@ use crate::network::messages::*;
 use crate::overlay::committees::*;
 use crate::overlay::*;
 use crate::*;
-use async_trait::async_trait;
 use bytes::Bytes;
 use futures::Stream;
 use nomos_core::fountain::FountainError;
@@ -18,7 +17,6 @@ struct DummyOverlay;
 struct DummyAdapter;
 struct DummyBackend;
 
-#[async_trait]
 impl<N: NetworkAdapter + Sync, F: FountainCode + Sync> Overlay<N, F, MockTally> for DummyOverlay {
     fn new(_: &View, _: NodeId) -> Self {
         DummyOverlay
@@ -52,7 +50,6 @@ impl<N: NetworkAdapter + Sync, F: FountainCode + Sync> Overlay<N, F, MockTally> 
     }
 }
 
-#[async_trait]
 impl NetworkAdapter for DummyAdapter {
     type Backend = DummyBackend;
     async fn new(
@@ -87,7 +84,6 @@ impl NetworkAdapter for DummyAdapter {
     }
 }
 
-#[async_trait]
 impl NetworkBackend for DummyBackend {
     type Settings = ();
     type State = NoState<()>;

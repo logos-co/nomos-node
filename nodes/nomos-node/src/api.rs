@@ -61,7 +61,6 @@ pub struct AxumBackend<T, S, const SIZE: usize> {
 )]
 struct ApiDoc;
 
-#[async_trait::async_trait]
 impl<T, S, const SIZE: usize> Backend for AxumBackend<T, S, SIZE>
 where
     T: Transaction

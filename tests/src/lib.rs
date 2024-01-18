@@ -1,4 +1,5 @@
 pub mod nodes;
+use futures::Future;
 use mixnet_node::MixnetNodeConfig;
 use mixnet_topology::MixnetTopology;
 pub use nodes::MixNode;
@@ -38,11 +39,10 @@ pub fn adjust_timeout(d: Duration) -> Duration {
     }
 }
 
-#[async_trait::async_trait]
 pub trait Node: Sized {
     type ConsensusInfo: Debug + Clone + PartialEq;
-    async fn spawn_nodes(config: SpawnConfig) -> Vec<Self>;
-    async fn consensus_info(&self) -> Self::ConsensusInfo;
+    fn spawn_nodes(config: SpawnConfig) -> impl Future<Output = Vec<Self>> + Send;
+    fn consensus_info(&self) -> impl Future<Output = Self::ConsensusInfo> + Send;
     fn stop(&mut self);
 }
 

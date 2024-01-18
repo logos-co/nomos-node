@@ -7,8 +7,6 @@ use carnot_engine::overlay::{RandomBeaconState, RoundRobin, TreeOverlay};
 use color_eyre::eyre::Result;
 use full_replication::Certificate;
 use full_replication::{AbsoluteNumber, Attestation, Blob, FullReplication};
-#[cfg(feature = "metrics")]
-use metrics::{backend::map::MapMetricsBackend, types::MetricsData, MetricsService};
 
 use api::AxumBackend;
 use bytes::Bytes;
@@ -46,8 +44,7 @@ use nomos_core::{
 };
 use nomos_network::NetworkService;
 use nomos_system_sig::SystemSig;
-use overwatch_derive::*;
-use overwatch_rs::services::handle::ServiceHandle;
+use overwatch_rs::{services::handle::ServiceHandle, Services};
 use serde::{de::DeserializeOwned, Serialize};
 
 pub use tx::Tx;
