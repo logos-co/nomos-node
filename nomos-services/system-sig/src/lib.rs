@@ -46,7 +46,6 @@ impl ServiceData for SystemSig {
     type Message = NoMessage;
 }
 
-#[async_trait::async_trait]
 impl ServiceCore for SystemSig {
     fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, DynError> {
         Ok(Self { service_state })

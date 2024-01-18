@@ -1,4 +1,5 @@
 // std
+use futures::{future::Either, Stream};
 use std::collections::{BTreeMap, HashMap};
 use std::ops::DerefMut;
 use std::sync::{Arc, Mutex};
@@ -11,7 +12,7 @@ use tokio_stream::wrappers::ReceiverStream;
 use crate::network::messages::{NewViewMsg, TimeoutMsg, TimeoutQcMsg};
 use crate::network::{
     messages::{NetworkMessage, ProposalMsg, VoteMsg},
-    BoxedStream, NetworkAdapter,
+    NetworkAdapter,
 };
 use carnot_engine::{BlockId, Committee, CommitteeId, View};
 use nomos_core::wire;
@@ -222,7 +223,6 @@ impl Libp2pAdapter {
     }
 }
 
-#[async_trait::async_trait]
 impl NetworkAdapter for Libp2pAdapter {
     type Backend = Libp2p;
 
@@ -326,11 +326,14 @@ impl NetworkAdapter for Libp2pAdapter {
         }
     }
 
-    async fn proposal_chunks_stream(&self, view: View) -> BoxedStream<ProposalMsg> {
+    async fn proposal_chunks_stream(
+        &self,
+        view: View,
+    ) -> impl Stream<Item = ProposalMsg> + Send + Sync + Unpin + 'static {
         self.message_cache
             .get_proposals(view)
-            .map::<BoxedStream<ProposalMsg>, _>(|stream| Box::new(ReceiverStream::new(stream)))
-            .unwrap_or_else(|| Box::new(tokio_stream::empty()))
+            .map(|stream| Either::Left(ReceiverStream::new(stream)))
+            .unwrap_or_else(|| Either::Right(tokio_stream::empty()))
     }
 
     async fn broadcast(&self, message: NetworkMessage) {
@@ -338,18 +341,25 @@ impl NetworkAdapter for Libp2pAdapter {
         self.broadcast(message, TOPIC).await;
     }
 
-    async fn timeout_stream(&self, committee: &Committee, view: View) -> BoxedStream<TimeoutMsg> {
+    async fn timeout_stream(
+        &self,
+        committee: &Committee,
+        view: View,
+    ) -> impl Stream<Item = TimeoutMsg> + Send + Sync + Unpin + 'static {
         self.message_cache
             .get_timeouts(view, committee.id::<blake2::Blake2s256>())
-            .map::<BoxedStream<TimeoutMsg>, _>(|stream| Box::new(ReceiverStream::new(stream)))
-            .unwrap_or_else(|| Box::new(tokio_stream::empty()))
+            .map(|stream| Either::Left(ReceiverStream::new(stream)))
+            .unwrap_or_else(|| Either::Right(tokio_stream::empty()))
     }
 
-    async fn timeout_qc_stream(&self, view: View) -> BoxedStream<TimeoutQcMsg> {
+    async fn timeout_qc_stream(
+        &self,
+        view: View,
+    ) -> impl Stream<Item = TimeoutQcMsg> + Send + Sync + Unpin + 'static {
         self.message_cache
             .get_timeout_qcs(view)
-            .map::<BoxedStream<TimeoutQcMsg>, _>(|stream| Box::new(ReceiverStream::new(stream)))
-            .unwrap_or_else(|| Box::new(tokio_stream::empty()))
+            .map(|stream| Either::Left(ReceiverStream::new(stream)))
+            .unwrap_or_else(|| Either::Right(tokio_stream::empty()))
     }
 
     async fn votes_stream(
@@ -357,18 +367,22 @@ impl NetworkAdapter for Libp2pAdapter {
         committee: &Committee,
         view: View,
         proposal_id: BlockId,
-    ) -> BoxedStream<VoteMsg> {
+    ) -> impl Stream<Item = VoteMsg> + Send + Sync + Unpin + 'static {
         self.message_cache
             .get_votes(view, committee.id::<blake2::Blake2s256>(), proposal_id)
-            .map::<BoxedStream<VoteMsg>, _>(|stream| Box::new(ReceiverStream::new(stream)))
-            .unwrap_or_else(|| Box::new(tokio_stream::empty()))
+            .map(|stream| Either::Left(ReceiverStream::new(stream)))
+            .unwrap_or_else(|| Either::Right(tokio_stream::empty()))
     }
 
-    async fn new_view_stream(&self, committee: &Committee, view: View) -> BoxedStream<NewViewMsg> {
+    async fn new_view_stream(
+        &self,
+        committee: &Committee,
+        view: View,
+    ) -> impl Stream<Item = NewViewMsg> + Send + Sync + Unpin + 'static {
         self.message_cache
             .get_new_views(view, committee.id::<blake2::Blake2s256>())
-            .map::<BoxedStream<NewViewMsg>, _>(|stream| Box::new(ReceiverStream::new(stream)))
-            .unwrap_or_else(|| Box::new(tokio_stream::empty()))
+            .map(|stream| Either::Left(ReceiverStream::new(stream)))
+            .unwrap_or_else(|| Either::Right(tokio_stream::empty()))
     }
 
     async fn send(&self, message: NetworkMessage, committee: &Committee) {

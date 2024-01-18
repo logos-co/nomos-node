@@ -1,9 +1,9 @@
 mod services;
 
 use nomos_log::Logger;
-use overwatch_derive::Services;
 use overwatch_rs::services::handle::ServiceHandle;
 use overwatch_rs::services::ServiceData;
+use overwatch_rs::Services;
 use serde::{Deserialize, Serialize};
 use services::mixnet::MixnetNodeService;
 

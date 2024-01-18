@@ -29,7 +29,6 @@ pub struct CarnotTally {
     settings: CarnotTallySettings,
 }
 
-#[async_trait::async_trait]
 impl Tally for CarnotTally {
     type Vote = VoteMsg;
     type Qc = Qc;

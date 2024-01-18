@@ -140,7 +140,6 @@ impl ServiceData for DummyGraphqlService {
     type Message = DummyGraphqlMsg;
 }
 
-#[async_trait::async_trait]
 impl ServiceCore for DummyGraphqlService {
     fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, overwatch_rs::DynError> {
         Ok(Self {
@@ -166,7 +165,7 @@ impl ServiceCore for DummyGraphqlService {
     }
 }
 
-#[derive(overwatch_derive::Services)]
+#[derive(overwatch_rs::Services)]
 struct Services {
     http: ServiceHandle<HttpService<AxumBackend>>,
     router: ServiceHandle<HttpBridgeService>,

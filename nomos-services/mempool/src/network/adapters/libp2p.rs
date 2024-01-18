@@ -16,7 +16,6 @@ pub struct Libp2pAdapter<Item, Key> {
     settings: Settings<Key, Item>,
 }
 
-#[async_trait::async_trait]
 impl<Item, Key> NetworkAdapter for Libp2pAdapter<Item, Key>
 where
     Item: DeserializeOwned + Serialize + Send + Sync + 'static + Clone,
@@ -44,7 +43,7 @@ where
     }
     async fn transactions_stream(
         &self,
-    ) -> Box<dyn Stream<Item = (Self::Key, Self::Item)> + Unpin + Send> {
+    ) -> impl Stream<Item = (Self::Key, Self::Item)> + Unpin + Send {
         let topic_hash = TopicHash::from_raw(self.settings.topic.clone());
         let id = self.settings.id;
         let (sender, receiver) = tokio::sync::oneshot::channel();

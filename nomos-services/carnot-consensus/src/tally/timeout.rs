@@ -13,7 +13,6 @@ pub struct TimeoutTally {
     settings: CarnotTallySettings,
 }
 
-#[async_trait::async_trait]
 impl Tally for TimeoutTally {
     type Vote = TimeoutMsg;
     type Qc = ();

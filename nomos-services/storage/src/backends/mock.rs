@@ -2,7 +2,6 @@
 use std::collections::HashMap;
 use std::marker::PhantomData;
 // crates
-use async_trait::async_trait;
 use bytes::Bytes;
 use thiserror::Error;
 // internal
@@ -31,7 +30,6 @@ impl<SerdeOp> core::fmt::Debug for MockStorage<SerdeOp> {
     }
 }
 
-#[async_trait]
 impl<SerdeOp: StorageSerde + Send + Sync + 'static> StorageBackend for MockStorage<SerdeOp> {
     type Settings = ();
     type Error = MockStorageError;

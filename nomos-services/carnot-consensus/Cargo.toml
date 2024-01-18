@@ -6,7 +6,6 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-async-trait = "0.1"
 bytes = "1.3"
 chrono = "0.4"
 carnot-engine = { path = "../../consensus/carnot-engine", features = ["serde"] }
@@ -14,7 +13,9 @@ futures = "0.3"
 nomos-network = { path = "../network" }
 nomos-mempool = { path = "../mempool" }
 nomos-core = { path = "../../nomos-core" }
-overwatch-rs = { git = "https://github.com/logos-co/Overwatch", rev = "2f70806" }
+overwatch-rs = { git = "https://github.com/logos-co/Overwatch", branch = "remove-async-trait", features = [
+  "derive",
+] }
 nomos-storage = { path = "../storage" }
 rand_chacha = "0.3"
 rand = "0.8"

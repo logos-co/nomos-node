@@ -30,7 +30,7 @@ where
     B: Serialize + DeserializeOwned + Send + Sync + 'static,
     A: Serialize + DeserializeOwned + Send + Sync + 'static,
 {
-    async fn stream_for<E: DeserializeOwned>(&self) -> Box<dyn Stream<Item = E> + Unpin + Send> {
+    async fn stream_for<E: DeserializeOwned>(&self) -> impl Stream<Item = E> + Unpin + Send {
         let topic_hash = TopicHash::from_raw(NOMOS_DA_TOPIC);
         let (sender, receiver) = tokio::sync::oneshot::channel();
         self.network_relay
@@ -69,7 +69,6 @@ where
     }
 }
 
-#[async_trait::async_trait]
 impl<B, A> NetworkAdapter for Libp2pAdapter<B, A>
 where
     B: Serialize + DeserializeOwned + Send + Sync + 'static,
@@ -95,11 +94,11 @@ where
         }
     }
 
-    async fn blob_stream(&self) -> Box<dyn Stream<Item = Self::Blob> + Unpin + Send> {
+    async fn blob_stream(&self) -> impl Stream<Item = Self::Blob> + Unpin + Send {
         self.stream_for::<Self::Blob>().await
     }
 
-    async fn attestation_stream(&self) -> Box<dyn Stream<Item = Self::Attestation> + Unpin + Send> {
+    async fn attestation_stream(&self) -> impl Stream<Item = Self::Attestation> + Unpin + Send {
         self.stream_for::<Self::Attestation>().await
     }
 

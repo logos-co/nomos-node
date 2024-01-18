@@ -15,7 +15,6 @@ impl ServiceData for MixnetNodeService {
     type Message = NoMessage;
 }
 
-#[async_trait::async_trait]
 impl ServiceCore for MixnetNodeService {
     fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, DynError> {
         let settings: Self::Settings = service_state.settings_reader.get_updated_settings();

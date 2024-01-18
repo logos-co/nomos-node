@@ -3,7 +3,7 @@ pub mod messages;
 
 // std
 // crates
-use futures::Stream;
+use futures::{Future, Stream};
 // internal
 use crate::network::messages::{
     NetworkMessage, NewViewMsg, ProposalMsg, TimeoutMsg, TimeoutQcMsg, VoteMsg,
@@ -14,27 +14,41 @@ use nomos_network::NetworkService;
 use overwatch_rs::services::relay::OutboundRelay;
 use overwatch_rs::services::ServiceData;
 
-type BoxedStream<T> = Box<dyn Stream<Item = T> + Send + Sync + Unpin>;
-
-#[async_trait::async_trait]
 pub trait NetworkAdapter {
     type Backend: NetworkBackend + 'static;
-    async fn new(
+    fn new(
         network_relay: OutboundRelay<<NetworkService<Self::Backend> as ServiceData>::Message>,
-    ) -> Self;
-    async fn proposal_chunks_stream(
+    ) -> impl Future<Output = Self> + Send
+    where
+        Self: Sized;
+    fn proposal_chunks_stream(
         &self,
         view: View,
-    ) -> Box<dyn Stream<Item = ProposalMsg> + Send + Sync + Unpin>;
-    async fn broadcast(&self, message: NetworkMessage);
-    async fn timeout_stream(&self, committee: &Committee, view: View) -> BoxedStream<TimeoutMsg>;
-    async fn timeout_qc_stream(&self, view: View) -> BoxedStream<TimeoutQcMsg>;
-    async fn votes_stream(
+    ) -> impl Future<Output = impl Stream<Item = ProposalMsg> + Send + Sync + Unpin + 'static> + Send;
+    fn broadcast(&self, message: NetworkMessage) -> impl Future<Output = ()> + Send;
+    fn timeout_stream(
+        &self,
+        committee: &Committee,
+        view: View,
+    ) -> impl Future<Output = impl Stream<Item = TimeoutMsg> + Send + Sync + Unpin + 'static> + Send;
+    fn timeout_qc_stream(
+        &self,
+        view: View,
+    ) -> impl Future<Output = impl Stream<Item = TimeoutQcMsg> + Send + Sync + Unpin + 'static> + Send;
+    fn votes_stream(
         &self,
         committee: &Committee,
         view: View,
         proposal_id: BlockId,
-    ) -> BoxedStream<VoteMsg>;
-    async fn new_view_stream(&self, committee: &Committee, view: View) -> BoxedStream<NewViewMsg>;
-    async fn send(&self, message: NetworkMessage, committee: &Committee);
+    ) -> impl Future<Output = impl Stream<Item = VoteMsg> + Send + Sync + Unpin + 'static> + Send;
+    fn new_view_stream(
+        &self,
+        committee: &Committee,
+        view: View,
+    ) -> impl Future<Output = impl Stream<Item = NewViewMsg> + Send + Sync + Unpin + 'static> + Send;
+    fn send(
+        &self,
+        message: NetworkMessage,
+        committee: &Committee,
+    ) -> impl Future<Output = ()> + Send;
 }

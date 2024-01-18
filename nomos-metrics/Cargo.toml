@@ -6,10 +6,11 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-async-trait = "0.1"
+
 futures = "0.3"
-overwatch-rs = { git = "https://github.com/logos-co/Overwatch", rev = "2f70806" }
-overwatch-derive = { git = "https://github.com/logos-co/Overwatch", rev = "ac28d01" }
+overwatch-rs = { git = "https://github.com/logos-co/Overwatch", branch = "remove-async-trait", features = [
+  "derive",
+] }
 prometheus-client = "0.22.0"
 tracing = "0.1"
 tokio = { version = "1", features = ["sync", "macros"] }

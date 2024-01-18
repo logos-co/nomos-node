@@ -113,17 +113,23 @@ pub struct CarnotConsensus<A, ClPool, ClPoolAdapter, DaPool, DaPoolAdapter, O, T
 where
     A: NetworkAdapter,
     ClPoolAdapter: MempoolAdapter<Item = ClPool::Item, Key = ClPool::Key>,
+    ClPoolAdapter::Settings: Send,
     ClPool: MemPool,
     DaPool: MemPool,
     DaPoolAdapter: MempoolAdapter<Item = DaPool::Item, Key = DaPool::Key>,
+    DaPoolAdapter::Settings: Send,
     O: Overlay + Debug,
     ClPool::Item: Debug + 'static,
+    ClPool::Settings: Send,
     ClPool::Key: Debug + 'static,
     DaPool::Item: Debug + 'static,
+    DaPool::Settings: Send,
     DaPool::Key: Debug + 'static,
     A::Backend: 'static,
     TxS: TxSelect<Tx = ClPool::Item>,
+    TxS::Settings: Send,
     BS: BlobCertificateSelect<Certificate = DaPool::Item>,
+    BS::Settings: Send,
     Storage: StorageBackend + Send + Sync + 'static,
 {
     service_state: ServiceStateHandle<Self>,
@@ -141,16 +147,22 @@ impl<A, ClPool, ClPoolAdapter, DaPool, DaPoolAdapter, O, TxS, BS, Storage> Servi
 where
     A: NetworkAdapter,
     ClPool: MemPool,
+    ClPool::Settings: Send,
     ClPool::Item: Debug,
     ClPool::Key: Debug,
     DaPool: MemPool,
+    DaPool::Settings: Send,
     DaPool::Item: Debug,
     DaPool::Key: Debug,
     ClPoolAdapter: MempoolAdapter<Item = ClPool::Item, Key = ClPool::Key>,
+    ClPoolAdapter::Settings: Send,
     DaPoolAdapter: MempoolAdapter<Item = DaPool::Item, Key = DaPool::Key>,
+    DaPoolAdapter::Settings: Send,
     O: Overlay + Debug,
     TxS: TxSelect<Tx = ClPool::Item>,
+    TxS::Settings: Send,
     BS: BlobCertificateSelect<Certificate = DaPool::Item>,
+    BS::Settings: Send,
     Storage: StorageBackend + Send + Sync + 'static,
 {
     const SERVICE_ID: ServiceId = "Carnot";
@@ -160,7 +172,6 @@ where
     type Message = ConsensusMsg;
 }
 
-#[async_trait::async_trait]
 impl<A, ClPool, ClPoolAdapter, DaPool, DaPoolAdapter, O, TxS, BS, Storage> ServiceCore
     for CarnotConsensus<A, ClPool, ClPoolAdapter, DaPool, DaPoolAdapter, O, TxS, BS, Storage>
 where
@@ -192,7 +203,9 @@ where
     ClPool::Key: Debug + Send + Sync,
     DaPool::Key: Debug + Send + Sync,
     ClPoolAdapter: MempoolAdapter<Item = ClPool::Item, Key = ClPool::Key> + Send + Sync + 'static,
+    ClPoolAdapter::Settings: Send,
     DaPoolAdapter: MempoolAdapter<Item = DaPool::Item, Key = DaPool::Key> + Send + Sync + 'static,
+    DaPoolAdapter::Settings: Send,
     O: Overlay + Debug + Send + Sync + 'static,
     O::LeaderSelection: UpdateableLeaderSelection,
     O::CommitteeMembership: UpdateableCommitteeMembership,
@@ -392,11 +405,15 @@ where
     O::LeaderSelection: UpdateableLeaderSelection,
     O::CommitteeMembership: UpdateableCommitteeMembership,
     TxS: TxSelect<Tx = ClPool::Item> + Clone + Send + Sync + 'static,
+    TxS::Settings: Send,
     BS: BlobCertificateSelect<Certificate = DaPool::Item> + Clone + Send + Sync + 'static,
+    BS::Settings: Send,
     ClPool::Key: Debug + Send + Sync,
     DaPool::Key: Debug + Send + Sync,
     ClPoolAdapter: MempoolAdapter<Item = ClPool::Item, Key = ClPool::Key> + Send + Sync + 'static,
+    ClPoolAdapter::Settings: Send,
     DaPoolAdapter: MempoolAdapter<Item = DaPool::Item, Key = DaPool::Key> + Send + Sync + 'static,
+    DaPoolAdapter::Settings: Send,
     Storage: StorageBackend + Send + Sync + 'static,
 {
     async fn should_stop_service(message: LifecycleMessage) -> bool {

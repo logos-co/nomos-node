@@ -2,7 +2,7 @@ pub mod adapters;
 
 // std
 // crates
-use futures::Stream;
+use futures::{Future, Stream};
 // internal
 use nomos_network::backends::NetworkBackend;
 use nomos_network::NetworkService;
@@ -12,22 +12,30 @@ use overwatch_rs::DynError;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
-#[async_trait::async_trait]
 pub trait NetworkAdapter {
     type Backend: NetworkBackend + 'static;
 
     type Blob: Serialize + DeserializeOwned + Send + Sync + 'static;
     type Attestation: Serialize + DeserializeOwned + Send + Sync + 'static;
 
-    async fn new(
+    fn new(
         network_relay: OutboundRelay<<NetworkService<Self::Backend> as ServiceData>::Message>,
-    ) -> Self;
+    ) -> impl Future<Output = Self> + Send
+    where
+        Self: Sized;
 
-    async fn blob_stream(&self) -> Box<dyn Stream<Item = Self::Blob> + Unpin + Send>;
+    fn blob_stream(
+        &self,
+    ) -> impl Future<Output = impl Stream<Item = Self::Blob> + Unpin + Send> + Send;
 
-    async fn attestation_stream(&self) -> Box<dyn Stream<Item = Self::Attestation> + Unpin + Send>;
+    fn attestation_stream(
+        &self,
+    ) -> impl Future<Output = impl Stream<Item = Self::Attestation> + Unpin + Send> + Send;
 
-    async fn send_attestation(&self, attestation: Self::Attestation) -> Result<(), DynError>;
+    fn send_attestation(
+        &self,
+        attestation: Self::Attestation,
+    ) -> impl Future<Output = Result<(), DynError>> + Send;
 
-    async fn send_blob(&self, blob: Self::Blob) -> Result<(), DynError>;
+    fn send_blob(&self, blob: Self::Blob) -> impl Future<Output = Result<(), DynError>> + Send;
 }

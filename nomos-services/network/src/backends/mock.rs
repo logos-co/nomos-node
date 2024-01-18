@@ -223,7 +223,6 @@ impl Mock {
     }
 }
 
-#[async_trait::async_trait]
 impl NetworkBackend for Mock {
     type Settings = MockConfig;
     type State = NoState<MockConfig>;

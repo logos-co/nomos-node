@@ -23,6 +23,7 @@ use tracing::error;
 pub struct DataAvailabilityService<Protocol, Backend, Network>
 where
     Protocol: DaProtocol,
+    Protocol::Settings: Send,
     Backend: DaBackend<Blob = Protocol::Blob>,
     Backend::Blob: 'static,
     Network: NetworkAdapter<Blob = Protocol::Blob, Attestation = Protocol::Attestation>,
@@ -61,6 +62,7 @@ impl<B: Blob + 'static> RelayMessage for DaMsg<B> {}
 impl<Protocol, Backend, Network> ServiceData for DataAvailabilityService<Protocol, Backend, Network>
 where
     Protocol: DaProtocol,
+    Protocol::Settings: Send,
     Backend: DaBackend<Blob = Protocol::Blob>,
     Backend::Blob: 'static,
     Network: NetworkAdapter<Blob = Protocol::Blob, Attestation = Protocol::Attestation>,
@@ -142,7 +144,6 @@ where
     }
 }
 
-#[async_trait::async_trait]
 impl<Protocol, Backend, Network> ServiceCore for DataAvailabilityService<Protocol, Backend, Network>
 where
     Protocol: DaProtocol + Send + Sync,

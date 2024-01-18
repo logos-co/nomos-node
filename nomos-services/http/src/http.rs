@@ -118,7 +118,6 @@ impl Debug for HttpMsg {
     }
 }
 
-#[async_trait::async_trait]
 impl<B> ServiceCore for HttpService<B>
 where
     B: HttpBackend + Send + Sync + 'static,
@@ -134,7 +133,7 @@ where
             .map_err(|e| Box::new(e) as Box<dyn Error + Send + Sync>)
     }
 
-    async fn run(mut self) -> Result<(), overwatch_rs::DynError> {
+    async fn run(self) -> Result<(), overwatch_rs::DynError> {
         let Self {
             backend,
             mut inbound_relay,

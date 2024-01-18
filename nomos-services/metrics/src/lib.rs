@@ -2,7 +2,7 @@
 use std::fmt::Debug;
 
 // crates
-use futures::StreamExt;
+use futures::{Future, StreamExt};
 use tracing::error;
 
 // internal
@@ -18,14 +18,20 @@ pub mod backend;
 pub mod frontend;
 pub mod types;
 
-#[async_trait::async_trait]
 pub trait MetricsBackend {
     type MetricsData: Clone + Send + Sync + Debug + 'static;
     type Error: Send + Sync;
     type Settings: Clone + Send + Sync + 'static;
     fn init(config: Self::Settings) -> Self;
-    async fn update(&mut self, service_id: ServiceId, data: Self::MetricsData);
-    async fn load(&self, service_id: &OwnedServiceId) -> Option<Self::MetricsData>;
+    fn update(
+        &mut self,
+        service_id: ServiceId,
+        data: Self::MetricsData,
+    ) -> impl Future<Output = ()> + Send;
+    fn load(
+        &self,
+        service_id: &OwnedServiceId,
+    ) -> impl Future<Output = Option<Self::MetricsData>> + Send;
 }
 
 pub struct MetricsService<Backend: MetricsBackend> {
@@ -166,7 +172,6 @@ impl<Backend: MetricsBackend> MetricsService<Backend> {
     }
 }
 
-#[async_trait::async_trait]
 impl<Backend: MetricsBackend + Send + Sync + 'static> ServiceCore for MetricsService<Backend> {
     fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, overwatch_rs::DynError> {
         let settings = service_state.settings_reader.get_updated_settings();

@@ -2,7 +2,6 @@
 use std::marker::PhantomData;
 use std::path::PathBuf;
 // crates
-use async_trait::async_trait;
 use bytes::Bytes;
 use sled::transaction::{
     ConflictableTransactionResult, TransactionError, TransactionResult, TransactionalTree,
@@ -52,7 +51,6 @@ impl<SerdeOp> core::fmt::Debug for SledBackend<SerdeOp> {
     }
 }
 
-#[async_trait]
 impl<SerdeOp: StorageSerde + Send + Sync + 'static> StorageBackend for SledBackend<SerdeOp> {
     type Settings = SledBackendSettings;
     type Error = Error;

@@ -20,7 +20,6 @@ pub struct NewViewTally {
     settings: CarnotTallySettings,
 }
 
-#[async_trait::async_trait]
 impl Tally for NewViewTally {
     type Vote = NewViewMsg;
     type Qc = ();

@@ -21,7 +21,6 @@ use overwatch_rs::{
 #[derive(Debug, Clone)]
 pub struct ConcurrentMapMetricsBackend(Arc<Mutex<HashMap<ServiceId, MetricsData>>>);
 
-#[async_trait::async_trait]
 impl MetricsBackend for ConcurrentMapMetricsBackend {
     type MetricsData = MetricsData;
     type Error = ();
@@ -61,7 +60,6 @@ impl<Backend: MetricsBackend + Send + Sync + 'static> ServiceData for MetricsUpd
     type Message = NoMessage;
 }
 
-#[async_trait::async_trait]
 impl<Backend: MetricsBackend<MetricsData = MetricsData> + Clone + Send + Sync + 'static> ServiceCore
     for MetricsUpdater<Backend>
 where
@@ -96,7 +94,7 @@ where
     }
 }
 
-#[derive(overwatch_derive::Services)]
+#[derive(overwatch_rs::Services)]
 struct Services {
     graphql: ServiceHandle<Graphql<ConcurrentMapMetricsBackend>>,
     metrics: ServiceHandle<MetricsService<ConcurrentMapMetricsBackend>>,

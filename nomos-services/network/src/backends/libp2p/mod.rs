@@ -34,7 +34,6 @@ pub enum Event {
 
 const BUFFER_SIZE: usize = 64;
 
-#[async_trait::async_trait]
 impl NetworkBackend for Libp2p {
     type Settings = Libp2pConfig;
     type State = NoState<Libp2pConfig>;

@@ -4,7 +4,6 @@ pub mod backends;
 use std::fmt::{Debug, Formatter};
 use std::marker::PhantomData;
 // crates
-use async_trait::async_trait;
 use bytes::Bytes;
 use futures::StreamExt;
 use overwatch_rs::services::handle::ServiceStateHandle;
@@ -271,7 +270,6 @@ impl<Backend: StorageBackend + Send + Sync + 'static> StorageService<Backend> {
     }
 }
 
-#[async_trait]
 impl<Backend: StorageBackend + Send + Sync + 'static> ServiceCore for StorageService<Backend> {
     fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, overwatch_rs::DynError> {
         Ok(Self {
@@ -280,7 +278,7 @@ impl<Backend: StorageBackend + Send + Sync + 'static> ServiceCore for StorageSer
         })
     }
 
-    async fn run(mut self) -> Result<(), overwatch_rs::DynError> {
+    async fn run(self) -> Result<(), overwatch_rs::DynError> {
         let Self {
             mut backend,
             service_state:

@@ -38,7 +38,6 @@ impl ServiceData for DummyService {
     type Message = DummyMsg;
 }
 
-#[async_trait::async_trait]
 impl ServiceCore for DummyService {
     fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, overwatch_rs::DynError> {
         Ok(Self {
@@ -102,7 +101,7 @@ where
     }))
 }
 
-#[derive(overwatch_derive::Services)]
+#[derive(overwatch_rs::Services)]
 struct Services {
     http: ServiceHandle<HttpService<AxumBackend>>,
     router: ServiceHandle<HttpBridgeService>,

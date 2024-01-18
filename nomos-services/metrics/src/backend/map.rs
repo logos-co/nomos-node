@@ -9,7 +9,6 @@ use overwatch_rs::services::ServiceId;
 #[derive(Debug, Clone)]
 pub struct MapMetricsBackend<MetricsData>(HashMap<ServiceId, MetricsData>);
 
-#[async_trait::async_trait]
 impl<MetricsData: Clone + Debug + Send + Sync + 'static> MetricsBackend
     for MapMetricsBackend<MetricsData>
 {

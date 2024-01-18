@@ -61,7 +61,6 @@ pub struct AxumBackend {
     router: Arc<Mutex<Router>>,
 }
 
-#[async_trait::async_trait]
 impl HttpBackend for AxumBackend {
     type Settings = AxumBackendSettings;
     type State = NoState<AxumBackendSettings>;

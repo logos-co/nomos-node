@@ -56,7 +56,6 @@ impl ServiceData for Metrics {
     type Message = MetricsMsg;
 }
 
-#[async_trait::async_trait]
 impl ServiceCore for Metrics {
     fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, overwatch_rs::DynError> {
         let config = service_state.settings_reader.get_updated_settings();

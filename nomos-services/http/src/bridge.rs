@@ -3,7 +3,6 @@ use std::fmt::{Debug, Formatter};
 use std::future::Future;
 use std::sync::Arc;
 
-use async_trait::async_trait;
 use overwatch_rs::services::handle::ServiceStateHandle;
 use overwatch_rs::services::relay::{NoMessage, OutboundRelay};
 use overwatch_rs::services::{
@@ -87,7 +86,6 @@ impl ServiceData for HttpBridgeService {
     type Message = NoMessage;
 }
 
-#[async_trait]
 impl ServiceCore for HttpBridgeService {
     fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, DynError> {
         let runners = service_state.settings_reader.get_updated_settings().bridges;

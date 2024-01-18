@@ -143,7 +143,6 @@ where
     }
 }
 
-#[async_trait::async_trait]
 impl<Backend: MetricsBackend + Send + Sync + 'static> ServiceCore for Graphql<Backend>
 where
     Backend::MetricsData: async_graphql::OutputType,

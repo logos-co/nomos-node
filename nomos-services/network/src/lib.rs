@@ -3,7 +3,6 @@ pub mod backends;
 use std::fmt::{self, Debug};
 
 // crates
-use async_trait::async_trait;
 use futures::StreamExt;
 use serde::{Deserialize, Serialize};
 use tokio::sync::broadcast;
@@ -69,7 +68,6 @@ impl<B: NetworkBackend + 'static> ServiceData for NetworkService<B> {
     type Message = NetworkMsg<B>;
 }
 
-#[async_trait]
 impl<B> ServiceCore for NetworkService<B>
 where
     B: NetworkBackend + Send + 'static,
@@ -85,7 +83,7 @@ where
         })
     }
 
-    async fn run(mut self) -> Result<(), overwatch_rs::DynError> {
+    async fn run(self) -> Result<(), overwatch_rs::DynError> {
         let Self {
             service_state:
                 ServiceStateHandle {

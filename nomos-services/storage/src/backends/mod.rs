@@ -6,8 +6,8 @@ pub mod sled;
 // std
 use std::error::Error;
 // crates
-use async_trait::async_trait;
 use bytes::Bytes;
+use futures::Future;
 use serde::{de::DeserializeOwned, Serialize};
 // internal
 
@@ -27,7 +27,6 @@ pub trait StorageTransaction: Send + Sync {
 }
 
 /// Main storage functionality trait
-#[async_trait]
 pub trait StorageBackend: Sized {
     /// Backend settings
     type Settings: Clone + Send + Sync + 'static;
@@ -40,14 +39,25 @@ pub trait StorageBackend: Sized {
     /// Operator to dump/load custom types into the defined backend store type [`Bytes`]
     type SerdeOperator: StorageSerde + Send + Sync + 'static;
     fn new(config: Self::Settings) -> Result<Self, Self::Error>;
-    async fn store(&mut self, key: Bytes, value: Bytes) -> Result<(), Self::Error>;
-    async fn load(&mut self, key: &[u8]) -> Result<Option<Bytes>, Self::Error>;
-    async fn remove(&mut self, key: &[u8]) -> Result<Option<Bytes>, Self::Error>;
+    fn store(
+        &mut self,
+        key: Bytes,
+        value: Bytes,
+    ) -> impl Future<Output = Result<(), Self::Error>> + Send;
+    fn load(
+        &mut self,
+        key: &[u8],
+    ) -> impl Future<Output = Result<Option<Bytes>, Self::Error>> + Send;
+    fn remove(
+        &mut self,
+        key: &[u8],
+    ) -> impl Future<Output = Result<Option<Bytes>, Self::Error>> + Send;
     /// Execute a transaction in the current backend
-    async fn execute(
+    fn execute(
         &mut self,
         transaction: Self::Transaction,
-    ) -> Result<<Self::Transaction as StorageTransaction>::Result, Self::Error>;
+    ) -> impl Future<Output = Result<<Self::Transaction as StorageTransaction>::Result, Self::Error>>
+           + Send;
 }
 
 #[cfg(test)]

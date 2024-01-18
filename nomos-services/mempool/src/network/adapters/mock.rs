@@ -22,7 +22,6 @@ pub struct MockAdapter {
     network_relay: OutboundRelay<<NetworkService<Mock> as ServiceData>::Message>,
 }
 
-#[async_trait::async_trait]
 impl NetworkAdapter for MockAdapter {
     type Backend = Mock;
     type Settings = ();
@@ -62,7 +61,7 @@ impl NetworkAdapter for MockAdapter {
 
     async fn transactions_stream(
         &self,
-    ) -> Box<dyn Stream<Item = (Self::Key, Self::Item)> + Unpin + Send> {
+    ) -> impl Stream<Item = (Self::Key, Self::Item)> + Unpin + Send {
         let (sender, receiver) = tokio::sync::oneshot::channel();
         if let Err((_, e)) = self
             .network_relay

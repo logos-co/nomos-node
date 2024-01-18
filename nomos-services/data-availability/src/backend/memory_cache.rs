@@ -39,7 +39,6 @@ where
     }
 }
 
-#[async_trait::async_trait]
 impl<B> DaBackend for BlobCache<B::Hash, B>
 where
     B: Clone + Blob + Send + Sync + 'static,

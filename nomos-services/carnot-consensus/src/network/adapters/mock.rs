@@ -1,4 +1,4 @@
-use futures::StreamExt;
+use futures::{Stream, StreamExt};
 use nomos_network::{
     backends::mock::{
         EventKind, Mock, MockBackendMessage, MockContentTopic, MockMessage, NetworkEvent,
@@ -11,9 +11,9 @@ use tokio_stream::wrappers::BroadcastStream;
 use crate::network::messages::{NetworkMessage, NewViewMsg, TimeoutMsg, TimeoutQcMsg};
 use crate::network::{
     messages::{ProposalMsg, VoteMsg},
-    BoxedStream, NetworkAdapter,
+    NetworkAdapter,
 };
-use consensus_engine::{BlockId, Committee, View};
+use carnot_engine::{BlockId, Committee, View};
 
 const MOCK_PUB_SUB_TOPIC: &str = "MockPubSubTopic";
 const MOCK_BLOCK_CONTENT_TOPIC: MockContentTopic = MockContentTopic::new("MockSim", 1, "MockBlock");
@@ -47,7 +47,6 @@ impl MockAdapter {
     }
 }
 
-#[async_trait::async_trait]
 impl NetworkAdapter for MockAdapter {
     type Backend = Mock;
 
@@ -57,13 +56,20 @@ impl NetworkAdapter for MockAdapter {
         Self { network_relay }
     }
 
-    async fn proposal_chunks_stream(&self, _view: View) -> BoxedStream<ProposalMsg> {
+    async fn broadcast(&self, message: NetworkMessage) {
+        self.send(message, &Committee::default()).await
+    }
+
+    async fn proposal_chunks_stream(
+        &self,
+        _view: View,
+    ) -> impl Stream<Item = ProposalMsg> + Send + Sync + Unpin + 'static {
         let stream_channel = self
             .message_subscriber_channel()
             .await
             .map_err(|e| tracing::error!("handle error {e:?}"))
             .unwrap();
-        Box::new(BroadcastStream::new(stream_channel).filter_map(|msg| {
+        BroadcastStream::new(stream_channel).filter_map(|msg| {
             Box::pin(async move {
                 match msg {
                     Ok(event) => match event {
@@ -81,24 +87,30 @@ impl NetworkAdapter for MockAdapter {
                     Err(_e) => None,
                 }
             })
-        }))
+        })
     }
 
-    async fn broadcast(&self, message: NetworkMessage) {
-        self.send(message, &Committee::default()).await
+    async fn timeout_stream(
+        &self,
+        _committee: &Committee,
+        _view: View,
+    ) -> impl Stream<Item = TimeoutMsg> + Send + Sync + Unpin + 'static {
+        tokio_stream::empty::<TimeoutMsg>().map(|_| todo!())
     }
 
-    #[allow(clippy::diverging_sub_expression)]
-    async fn timeout_stream(&self, _committee: &Committee, _view: View) -> BoxedStream<TimeoutMsg> {
-        todo!()
+    async fn timeout_qc_stream(
+        &self,
+        _view: View,
+    ) -> impl Stream<Item = TimeoutQcMsg> + Send + Sync + Unpin + 'static {
+        tokio_stream::empty::<TimeoutQcMsg>().map(|_| todo!())
     }
 
-    #[allow(clippy::diverging_sub_expression)]
-    async fn timeout_qc_stream(&self, _view: View) -> BoxedStream<TimeoutQcMsg> {
-        todo!()
-    }
-
-    async fn votes_stream(&self, _: &Committee, _: View, _: BlockId) -> BoxedStream<VoteMsg> {
+    async fn votes_stream(
+        &self,
+        _committee: &Committee,
+        _view: View,
+        _proposal_id: BlockId,
+    ) -> impl Stream<Item = VoteMsg> + Send + Sync + Unpin + 'static {
         let stream_channel = self
             .message_subscriber_channel()
             .await
@@ -124,9 +136,12 @@ impl NetworkAdapter for MockAdapter {
         )))
     }
 
-    #[allow(clippy::diverging_sub_expression)]
-    async fn new_view_stream(&self, _: &Committee, _view: View) -> BoxedStream<NewViewMsg> {
-        todo!()
+    async fn new_view_stream(
+        &self,
+        _: &Committee,
+        _view: View,
+    ) -> impl Stream<Item = NewViewMsg> + Send + Sync + Unpin + 'static {
+        tokio_stream::empty::<NewViewMsg>().map(|_| todo!())
     }
 
     async fn send(&self, message: NetworkMessage, _committee: &Committee) {

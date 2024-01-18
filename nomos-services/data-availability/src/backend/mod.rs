@@ -1,5 +1,6 @@
 pub mod memory_cache;
 
+use futures::Future;
 use nomos_core::da::blob::Blob;
 use overwatch_rs::DynError;
 
@@ -8,17 +9,19 @@ pub enum DaError {
     Dyn(DynError),
 }
 
-#[async_trait::async_trait]
-pub trait DaBackend {
-    type Settings: Clone;
+pub trait DaBackend: Send {
+    type Settings: Send + Clone;
 
     type Blob: Blob;
 
     fn new(settings: Self::Settings) -> Self;
 
-    async fn add_blob(&self, blob: Self::Blob) -> Result<(), DaError>;
+    fn add_blob(&self, blob: Self::Blob) -> impl Future<Output = Result<(), DaError>> + Send;
 
-    async fn remove_blob(&self, blob: &<Self::Blob as Blob>::Hash) -> Result<(), DaError>;
+    fn remove_blob(
+        &self,
+        blob: &<Self::Blob as Blob>::Hash,
+    ) -> impl Future<Output = Result<(), DaError>> + Send;
 
     fn get_blob(&self, id: &<Self::Blob as Blob>::Hash) -> Option<Self::Blob>;
 }

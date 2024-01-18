@@ -38,11 +38,12 @@ use tracing::error;
 pub struct MempoolService<N, P, D>
 where
     N: NetworkAdapter<Item = P::Item, Key = P::Key>,
+    N::Settings: Send,
     P: MemPool,
-    P::Settings: Clone,
+    P::Settings: Send + Clone,
     P::Item: Debug + 'static,
     P::Key: Debug + 'static,
-    D: Discriminant,
+    D: Discriminant + Send,
 {
     service_state: ServiceStateHandle<Self>,
     network_relay: Relay<NetworkService<N::Backend>>,
@@ -142,11 +143,12 @@ impl Discriminant for Certificate {
 impl<N, P, D> ServiceData for MempoolService<N, P, D>
 where
     N: NetworkAdapter<Item = P::Item, Key = P::Key>,
+    N::Settings: Send,
     P: MemPool,
-    P::Settings: Clone,
+    P::Settings: Clone + Send,
     P::Item: Debug + 'static,
     P::Key: Debug + 'static,
-    D: Discriminant,
+    D: Discriminant + Send,
 {
     const SERVICE_ID: ServiceId = D::ID;
     type Settings = Settings<P::Settings, N::Settings>;
@@ -155,7 +157,6 @@ where
     type Message = MempoolMsg<<P as MemPool>::Item, <P as MemPool>::Key>;
 }
 
-#[async_trait::async_trait]
 impl<N, P, D> ServiceCore for MempoolService<N, P, D>
 where
     P: MemPool + Send + 'static,
@@ -185,7 +186,7 @@ where
         })
     }
 
-    async fn run(mut self) -> Result<(), overwatch_rs::DynError> {
+    async fn run(self) -> Result<(), overwatch_rs::DynError> {
         let Self {
             mut service_state,
             network_relay,

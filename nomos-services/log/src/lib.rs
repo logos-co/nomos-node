@@ -141,7 +141,6 @@ macro_rules! registry_init {
     };
 }
 
-#[async_trait::async_trait]
 impl ServiceCore for Logger {
     fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, overwatch_rs::DynError> {
         let config = service_state.settings_reader.get_updated_settings();
