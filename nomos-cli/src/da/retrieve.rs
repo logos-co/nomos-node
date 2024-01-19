@@ -20,5 +20,16 @@ pub async fn get_block_blobs(node: &Url, block: &BlockId) -> Result<Vec<Blob>, E
         .await?
         .ok_or(Error::NotFound)?;
 
-    Ok(get_blobs(node, block.blobs().map(|cert| cert.blob()).collect()).await?)
+    let blobs = block.blobs().map(|cert| cert.blob()).collect::<Vec<_>>();
+
+    if blobs.is_empty() {
+        return Ok(vec![]);
+    }
+
+    let n_blobs = blobs.len();
+    let resp = get_blobs(node, blobs).await?;
+    if resp.len() != n_blobs {
+        tracing::warn!("Only {}/{} blobs returned", resp.len(), n_blobs);
+    }
+    Ok(resp)
 }
