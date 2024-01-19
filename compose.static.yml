@@ -164,16 +164,6 @@ services:
   grafana:
     container_name: grafana
     image: grafana/grafana:latest
-    env_file:
-      - ./testnet/monitoring/configuration/grafana-plugins.env
-    volumes:
-      - ./testnet/monitoring/configuration/grafana.ini:/etc/grafana/grafana.ini:z
-      - ./testnet/monitoring/configuration/dashboards.yaml:/etc/grafana/provisioning/dashboards/dashboards.yaml:z
-      - ./testnet/monitoring/configuration/datasources.yaml:/etc/grafana/provisioning/datasources/datasources.yaml:z
-      - ./testnet/monitoring/configuration/dashboards:/var/lib/grafana/dashboards/:z
-      - ./testnet/monitoring/configuration/customizations/custom-logo.svg:/usr/share/grafana/public/img/grafana_icon.svg:z
-      - ./testnet/monitoring/configuration/customizations/custom-logo.svg:/usr/share/grafana/public/img/grafana_typelogo.svg:z
-      - ./testnet/monitoring/configuration/customizations/custom-logo.png:/usr/share/grafana/public/img/fav32.png:z
     ports:
       - 9091:3000
     restart: on-failure
