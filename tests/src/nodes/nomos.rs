@@ -22,7 +22,7 @@ use nomos_node::{api::AxumBackendSettings, Config, Tx};
 use fraction::Fraction;
 use once_cell::sync::Lazy;
 use rand::{thread_rng, Rng};
-use reqwest::Client;
+use reqwest::{Client, Url};
 use tempfile::NamedTempFile;
 
 static CLIENT: Lazy<Client> = Lazy::new(Client::new);
@@ -113,6 +113,10 @@ impl NomosNode {
             }
             tokio::time::sleep(Duration::from_millis(100)).await;
         }
+    }
+
+    pub fn url(&self) -> Url {
+        format!("http://{}", self.addr).parse().unwrap()
     }
 
     pub async fn get_block(&self, id: BlockId) -> Option<Block<Tx, Certificate>> {

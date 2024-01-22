@@ -48,6 +48,8 @@ use ratatui::{
 use tui_input::{backend::crossterm::EventHandler, Input};
 
 const DEFAULT_TIMEOUT: Duration = Duration::from_secs(120);
+// Limit the number of maximum in-flight requests
+const MAX_BUFFERED_REQUESTS: usize = 20;
 
 #[derive(Clone, Debug, Args)]
 /// The almost-instant messaging protocol.
@@ -299,7 +301,7 @@ async fn fetch_new_messages(
 
             process_block_blobs(node, block, da_settings)
         })
-        .buffer_unordered(new_blocks.len())
+        .buffered(MAX_BUFFERED_REQUESTS)
         .collect::<Vec<_>>()
         .await;
 
