@@ -13,7 +13,7 @@ RUN apt-get update && apt-get install -yq \
 WORKDIR /nomos
 COPY . . 
 
-RUN cargo build --release --all
+RUN cargo build --release --all --features metrics
 
 # NODE IMAGE ----------------------------------------------------------
 

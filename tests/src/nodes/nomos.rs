@@ -345,8 +345,6 @@ fn create_node_config(
                 cors_origins: vec![],
             },
         },
-        #[cfg(feature = "metrics")]
-        metrics: Default::default(),
         da: nomos_da::Settings {
             da_protocol: full_replication::Settings {
                 voter: id,
