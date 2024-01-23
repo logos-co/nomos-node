@@ -1,14 +1,11 @@
-use full_replication::{AbsoluteNumber, Attestation, Blob, Certificate, FullReplication};
+use full_replication::{AbsoluteNumber, Attestation, Certificate, FullReplication};
 use nomos_cli::{
     api::da::get_blobs,
-    cmds::disseminate::{self, Disseminate},
+    cmds::disseminate::Disseminate,
     da::disseminate::{DaProtocolChoice, FullReplicationSettings, Protocol, ProtocolSettings},
 };
 use nomos_core::da::{blob::Blob as _, DaProtocol};
-use std::{
-    path::{self, PathBuf},
-    time::Duration,
-};
+use std::{io::Write, time::Duration};
 use tempfile::NamedTempFile;
 use tests::{
     adjust_timeout, get_available_port, nodes::nomos::Pool, MixNode, Node, NomosNode, SpawnConfig,
@@ -21,17 +18,23 @@ use std::process::Command;
 const TIMEOUT_SECS: u64 = 20;
 
 fn run_disseminate(disseminate: &Disseminate) {
-    Command::new(CLI_BIN)
+    let mut binding = Command::new(CLI_BIN);
+    let c = binding
         .args(["disseminate", "--network-config"])
         .arg(disseminate.network_config.as_os_str())
-        .args(["--data", &disseminate.data])
         .arg("--node-addr")
-        .arg(disseminate.node_addr.as_ref().unwrap().as_str())
-        .status()
-        .expect("failed to execute nomos cli");
+        .arg(disseminate.node_addr.as_ref().unwrap().as_str());
+
+    match (&disseminate.data, &disseminate.file) {
+        (Some(data), None) => c.args(["--data", &data]),
+        (None, Some(file)) => c.args(["--file", file.as_os_str().to_str().unwrap()]),
+        (_, _) => panic!("Either data or file needs to be provided, but not both"),
+    };
+
+    c.status().expect("failed to execute nomos cli");
 }
 
-async fn disseminate(data: String) {
+async fn disseminate(config: &mut Disseminate) {
     let (_mixnodes, mixnet_config) = MixNode::spawn_nodes(2).await;
     let mut nodes = NomosNode::spawn_nodes(SpawnConfig::chain_happy(2, mixnet_config)).await;
 
@@ -58,21 +61,18 @@ async fn disseminate(data: String) {
     let da =
         <FullReplication<AbsoluteNumber<Attestation, Certificate>>>::try_from(da_protocol.clone())
             .unwrap();
-    let config = Disseminate {
-        data: data.clone(),
-        timeout: 20,
-        network_config: config_path,
-        da_protocol,
-        node_addr: Some(
-            format!(
-                "http://{}",
-                nodes[0].config().http.backend_settings.address.clone()
-            )
-            .parse()
-            .unwrap(),
-        ),
-        output: None,
-    };
+
+    config.timeout = 20;
+    config.network_config = config_path;
+    config.da_protocol = da_protocol;
+    config.node_addr = Some(
+        format!(
+            "http://{}",
+            nodes[0].config().http.backend_settings.address.clone()
+        )
+        .parse()
+        .unwrap(),
+    );
 
     run_disseminate(&config);
     // let thread = std::thread::spawn(move || cmd.run().unwrap());
@@ -84,29 +84,53 @@ async fn disseminate(data: String) {
     .await
     .unwrap();
 
-    let blob = da.encode(data.as_bytes().to_vec())[0].hash();
+    let (blob, bytes) = if let Some(data) = &config.data {
+        let bytes = data.as_bytes().to_vec();
+        (da.encode(bytes.clone())[0].hash(), bytes)
+    } else {
+        let bytes = std::fs::read(&config.file.as_ref().unwrap()).unwrap();
+        (da.encode(bytes.clone())[0].hash(), bytes)
+    };
 
     assert_eq!(
         get_blobs(&nodes[0].url(), vec![blob]).await.unwrap()[0].as_bytes(),
-        data.as_bytes()
+        bytes.clone()
     );
 }
 
 #[tokio::test]
 async fn disseminate_blob() {
-    disseminate("hello world".to_string()).await;
+    let mut config = Disseminate {
+        data: Some("hello world".to_string()),
+        ..Default::default()
+    };
+    disseminate(&mut config).await;
 }
 
 #[tokio::test]
 async fn disseminate_big_blob() {
     const MSG_SIZE: usize = 1024;
-    disseminate(
-        std::iter::repeat(String::from("X"))
+    let mut config = Disseminate {
+        data: std::iter::repeat(String::from("X"))
             .take(MSG_SIZE)
             .collect::<Vec<_>>()
-            .join(""),
-    )
-    .await;
+            .join("")
+            .into(),
+        ..Default::default()
+    };
+    disseminate(&mut config).await;
+}
+
+#[tokio::test]
+async fn disseminate_blob_from_file() {
+    let mut file = NamedTempFile::new().unwrap();
+    file.write_all("hello world".as_bytes()).unwrap();
+
+    let mut config = Disseminate {
+        file: Some(file.path().to_path_buf()),
+        ..Default::default()
+    };
+    disseminate(&mut config).await;
 }
 
 async fn wait_for_cert_in_mempool(node: &NomosNode) {
