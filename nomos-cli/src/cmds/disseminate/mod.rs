@@ -2,17 +2,18 @@ use crate::da::disseminate::{
     DaProtocolChoice, DisseminateApp, DisseminateAppServiceSettings, Settings, Status,
 };
 use clap::Args;
+use nomos_log::{LoggerBackend, LoggerSettings};
 use nomos_network::{backends::libp2p::Libp2p, NetworkService};
 use overwatch_rs::{overwatch::OverwatchRunner, services::ServiceData};
 use reqwest::Url;
 use std::{path::PathBuf, sync::Arc, time::Duration};
 use tokio::sync::Mutex;
 
-#[derive(Args, Debug)]
+#[derive(Args, Debug, Default)]
 pub struct Disseminate {
     // TODO: accept bytes
     #[clap(short, long)]
-    pub data: String,
+    pub data: Option<String>,
     /// Path to the network config file
     #[clap(short, long)]
     pub network_config: PathBuf,
@@ -29,6 +30,9 @@ pub struct Disseminate {
     /// File to write the certificate to, if present.
     #[clap(long)]
     pub output: Option<PathBuf>,
+    /// File to disseminate
+    #[clap(short, long)]
+    pub file: Option<PathBuf>,
 }
 
 impl Disseminate {
@@ -40,7 +44,15 @@ impl Disseminate {
             <NetworkService<Libp2p> as ServiceData>::Settings,
         >(std::fs::File::open(&self.network_config)?)?;
         let (status_updates, rx) = std::sync::mpsc::channel();
-        let bytes: Box<[u8]> = self.data.clone().as_bytes().into();
+        let bytes: Box<[u8]> = match (&self.data, &self.file) {
+            (Some(data), None) => data.clone().as_bytes().into(),
+            (None, Some(file_path)) => {
+                let file_bytes = std::fs::read(file_path)?;
+                file_bytes.into_boxed_slice()
+            }
+            (Some(_), Some(_)) => return Err("Cannot specify both data and file".into()),
+            (None, None) => return Err("Either data or file must be specified".into()),
+        };
         let timeout = Duration::from_secs(self.timeout);
         let da_protocol = self.da_protocol.clone();
         let node_addr = self.node_addr.clone();
@@ -59,6 +71,10 @@ impl Disseminate {
                         node_addr,
                         output,
                     },
+                    logger: LoggerSettings {
+                        backend: LoggerBackend::None,
+                        ..Default::default()
+                    },
                 },
                 None,
             )
@@ -67,13 +83,13 @@ impl Disseminate {
         });
         // drop to signal we're not going to send more blobs
         drop(payload_sender);
-        tracing::info!("{}", rx.recv().unwrap().display());
+        tracing::info!("{}", rx.recv().unwrap());
         while let Ok(update) = rx.recv() {
             if let Status::Err(e) = update {
                 tracing::error!("{e}");
                 return Err(e);
             }
-            tracing::info!("{}", update.display());
+            tracing::info!("{}", update);
         }
         tracing::info!("done");
         Ok(())

@@ -1,4 +1,4 @@
-use consensus_engine::{Qc, View};
+use carnot_engine::{Qc, View};
 use futures::stream::{self, StreamExt};
 use std::collections::HashSet;
 use std::time::Duration;

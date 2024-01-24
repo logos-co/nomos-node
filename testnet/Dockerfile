@@ -1,6 +1,6 @@
 # BUILD IMAGE ---------------------------------------------------------
 
-FROM rust:1.74.0-slim-bullseye AS builder
+FROM rust:1.75.0-slim-bullseye AS builder
 
 # Using backports for go 1.19
 RUN echo 'deb http://deb.debian.org/debian bullseye-backports main' \
@@ -13,7 +13,7 @@ RUN apt-get update && apt-get install -yq \
 WORKDIR /nomos
 COPY . . 
 
-RUN cargo build --release --all
+RUN cargo build --release --all --features metrics
 
 # NODE IMAGE ----------------------------------------------------------
 

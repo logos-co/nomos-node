@@ -1,4 +1,4 @@
-use consensus_engine::{CommitteeId, NodeId, Overlay};
+use carnot_engine::{CommitteeId, NodeId, Overlay};
 use serde::Serialize;
 use std::collections::{BTreeSet, HashMap, VecDeque};
 
@@ -58,7 +58,7 @@ impl<T: Overlay> OverlayInfoExt for T {
 
 #[cfg(test)]
 mod tests {
-    use consensus_engine::{
+    use carnot_engine::{
         overlay::{
             BranchOverlay, BranchOverlaySettings, FisherYatesShuffle, RoundRobin, TreeOverlay,
             TreeOverlaySettings,

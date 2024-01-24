@@ -8,7 +8,7 @@ services:
       dockerfile: testnet/Dockerfile
     ports:
       - "3000:3000/tcp"
-      - "18080:8080/tcp"
+      - "18080:18080/tcp"
     volumes:
       - ./testnet:/etc/nomos
     depends_on:
@@ -37,7 +37,7 @@ services:
       - mix-node-2
     ports:
       - "3001:3000/tcp"
-      - "18081:8080/tcp"
+      - "18081:18080/tcp"
     environment:
       - LIBP2P_REPLICAS=3
       - ETCDCTL_ENDPOINTS=${DOCKER_COMPOSE_ETCDCTL_ENDPOINTS:-etcd:2379}
@@ -63,7 +63,7 @@ services:
       - mix-node-2
     ports:
       - "3002:3000/tcp"
-      - "18082:8080/tcp"
+      - "18082:18080/tcp"
     environment:
       - LIBP2P_REPLICAS=3
       - ETCDCTL_ENDPOINTS=${DOCKER_COMPOSE_ETCDCTL_ENDPOINTS:-etcd:2379}
@@ -89,7 +89,7 @@ services:
       - mix-node-2
     ports:
       - "3003:3000/tcp"
-      - "18083:8080/tcp"
+      - "18083:18080/tcp"
     environment:
       - LIBP2P_REPLICAS=3
       - ETCDCTL_ENDPOINTS=${DOCKER_COMPOSE_ETCDCTL_ENDPOINTS:-etcd:2379}
@@ -148,3 +148,29 @@ services:
       - /usr/local/bin/etcd
       - --advertise-client-urls=http://etcd:2379
       - --listen-client-urls=http://0.0.0.0:2379
+
+  prometheus:
+    container_name: prometheus
+    image: prom/prometheus:latest
+    volumes:
+      - ./testnet/monitoring/prometheus-config.yml:/etc/prometheus/prometheus.yml:z
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=7d
+    ports:
+      - 127.0.0.1:9090:9090
+    restart: on-failure
+
+  grafana:
+    container_name: grafana
+    image: grafana/grafana:latest
+    env_file:
+      - ./testnet/monitoring/grafana/plugins.env
+    volumes:
+      - ./testnet/monitoring/grafana/grafana.ini:/etc/grafana/grafana.ini
+        ./testnet/monitoring/grafana/datasources.yaml:/etc/grafana/provisioning/datasources/datasources.yaml
+    ports:
+      - 9091:3000
+    restart: on-failure
+    depends_on:
+      - prometheus

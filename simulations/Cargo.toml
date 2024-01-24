@@ -20,18 +20,18 @@ ctrlc = "3.4"
 chrono = { version = "0.4", features = ["serde"] }
 crc32fast = "1.3"
 crossbeam = { version = "0.8.2", features = ["crossbeam-channel"] }
-consensus-engine = { path = "../consensus-engine", features = ["simulation"] }
+carnot-engine = { path = "../consensus/carnot-engine", features = ["simulation"] }
 fixed-slice-deque = "0.1.0-beta2"
 futures = "0.3"
 humantime = "2.1"
 humantime-serde = "1"
 nomos-core = { path = "../nomos-core" }
-nomos-consensus = { path = "../nomos-services/consensus" }
+carnot-consensus = { path = "../nomos-services/carnot-consensus" }
 once_cell = "1.17"
 parking_lot = "0.12"
 polars = { version = "0.27", features = ["serde", "object", "json", "csv-file", "parquet", "dtype-struct"], optional = true }
 rand = { version = "0.8", features = ["small_rng"] }
-rayon = "1.7"
+rayon = "1.8"
 scopeguard = "1"
 serde = { version = "1.0", features = ["derive", "rc"] }
 serde_with = "2.3"

@@ -1,6 +1,6 @@
 // std
 // crates
-use consensus_engine::{Block, View};
+use carnot_engine::{Block, View};
 use futures::{Stream, StreamExt};
 use serde::{Deserialize, Serialize};
 // internal

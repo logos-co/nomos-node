@@ -3,10 +3,13 @@ use std::{fmt::Debug, hash::Hash};
 use axum::{
     extract::{Query, State},
     http::HeaderValue,
-    response::Response,
+    response::{IntoResponse, Response},
     routing, Json, Router, Server,
 };
-use hyper::header::{CONTENT_TYPE, USER_AGENT};
+use hyper::{
+    header::{CONTENT_TYPE, USER_AGENT},
+    Body, StatusCode,
+};
 use overwatch_rs::overwatch::handle::OverwatchHandle;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use tower_http::{
@@ -16,7 +19,7 @@ use tower_http::{
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 
-use consensus_engine::BlockId;
+use carnot_engine::BlockId;
 use full_replication::{Blob, Certificate};
 use nomos_core::{da::blob, tx::Transaction};
 use nomos_mempool::{network::adapters::libp2p::Libp2pAdapter, openapi::Status, MempoolMetrics};
@@ -24,7 +27,7 @@ use nomos_network::backends::libp2p::Libp2p;
 use nomos_storage::backends::StorageSerde;
 
 use nomos_api::{
-    http::{cl, consensus, da, libp2p, mempool, storage},
+    http::{cl, consensus, da, libp2p, mempool, metrics, storage},
     Backend,
 };
 
@@ -123,6 +126,7 @@ where
             .route("/storage/block", routing::post(block::<S, T>))
             .route("/mempool/add/tx", routing::post(add_tx::<T>))
             .route("/mempool/add/cert", routing::post(add_cert))
+            .route("/metrics", routing::get(get_metrics))
             .with_state(handle);
 
         Server::bind(&self.settings.address)
@@ -349,4 +353,30 @@ async fn add_cert(
         cert,
         nomos_core::da::certificate::Certificate::hash
     ))
+}
+
+#[utoipa::path(
+    get,
+    path = "/metrics",
+    responses(
+        (status = 200, description = "Get all metrics"),
+        (status = 500, description = "Internal server error", body = String),
+    )
+)]
+async fn get_metrics(State(handle): State<OverwatchHandle>) -> Response {
+    match metrics::gather(&handle).await {
+        Ok(encoded_metrics) => Response::builder()
+            .status(StatusCode::OK)
+            .header(
+                CONTENT_TYPE,
+                HeaderValue::from_static("text/plain; version=0.0.4"),
+            )
+            .body(Body::from(encoded_metrics))
+            .unwrap()
+            .into_response(),
+        Err(e) => axum::response::IntoResponse::into_response((
+            hyper::StatusCode::INTERNAL_SERVER_ERROR,
+            e.to_string(),
+        )),
+    }
 }

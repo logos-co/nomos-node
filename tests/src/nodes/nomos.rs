@@ -5,13 +5,13 @@ use std::time::Duration;
 // internal
 use super::{create_tempdir, persist_tempdir, LOGS_PREFIX};
 use crate::{adjust_timeout, get_available_port, ConsensusConfig, MixnetConfig, Node, SpawnConfig};
-use consensus_engine::overlay::{RandomBeaconState, RoundRobin, TreeOverlay, TreeOverlaySettings};
-use consensus_engine::{BlockId, NodeId, Overlay};
+use carnot_consensus::{CarnotInfo, CarnotSettings};
+use carnot_engine::overlay::{RandomBeaconState, RoundRobin, TreeOverlay, TreeOverlaySettings};
+use carnot_engine::{BlockId, NodeId, Overlay};
 use full_replication::Certificate;
 use mixnet_client::{MixnetClientConfig, MixnetClientMode};
 use mixnet_node::MixnetNodeConfig;
 use mixnet_topology::MixnetTopology;
-use nomos_consensus::{CarnotInfo, CarnotSettings};
 use nomos_core::block::Block;
 use nomos_libp2p::{multiaddr, Multiaddr};
 use nomos_log::{LoggerBackend, LoggerFormat};
@@ -23,7 +23,7 @@ use nomos_node::{api::AxumBackendSettings, Config, Tx};
 use fraction::Fraction;
 use once_cell::sync::Lazy;
 use rand::{thread_rng, Rng};
-use reqwest::Client;
+use reqwest::{Client, Url};
 use tempfile::NamedTempFile;
 
 static CLIENT: Lazy<Client> = Lazy::new(Client::new);
@@ -111,6 +111,10 @@ impl NomosNode {
         }
     }
 
+    pub fn url(&self) -> Url {
+        format!("http://{}", self.addr).parse().unwrap()
+    }
+
     pub async fn get_block(&self, id: BlockId) -> Option<Block<Tx, Certificate>> {
         CLIENT
             .post(&format!("http://{}/{}", self.addr, STORAGE_BLOCKS_API))
@@ -147,7 +151,7 @@ impl NomosNode {
         &self,
         from: Option<BlockId>,
         to: Option<BlockId>,
-    ) -> Vec<consensus_engine::Block> {
+    ) -> Vec<carnot_engine::Block> {
         let mut req = CLIENT.get(format!("http://{}/{}", self.addr, GET_BLOCKS_INFO));
 
         if let Some(from) = from {
@@ -161,7 +165,7 @@ impl NomosNode {
         req.send()
             .await
             .unwrap()
-            .json::<Vec<consensus_engine::Block>>()
+            .json::<Vec<carnot_engine::Block>>()
             .await
             .unwrap()
     }
@@ -337,8 +341,6 @@ fn create_node_config(
                 cors_origins: vec![],
             },
         },
-        #[cfg(feature = "metrics")]
-        metrics: Default::default(),
         da: nomos_da::Settings {
             da_protocol: full_replication::Settings {
                 voter: id,

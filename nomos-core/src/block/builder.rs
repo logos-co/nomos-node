@@ -8,8 +8,8 @@ use crate::block::Block;
 use crate::da::certificate::BlobCertificateSelect;
 use crate::da::certificate::Certificate;
 use crate::tx::{Transaction, TxSelect};
-use consensus_engine::overlay::RandomBeaconState;
-use consensus_engine::{NodeId, Qc, View};
+use carnot_engine::overlay::RandomBeaconState;
+use carnot_engine::{NodeId, Qc, View};
 
 /// Wrapper over a block building `new` method than holds intermediary state and can be
 /// passed around. It also compounds the transaction selection and blob selection heuristics to be

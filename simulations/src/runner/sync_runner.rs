@@ -83,7 +83,7 @@ mod tests {
         settings::SimulationSettings,
         streaming::StreamProducer,
     };
-    use consensus_engine::View;
+    use carnot_engine::View;
     use crossbeam::channel;
     use parking_lot::RwLock;
     use rand::rngs::mock::StepRng;

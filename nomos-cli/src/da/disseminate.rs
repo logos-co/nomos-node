@@ -5,6 +5,7 @@ use futures::StreamExt;
 use hex::FromHex;
 use nomos_core::{da::DaProtocol, wire};
 use nomos_da::network::{adapters::libp2p::Libp2pAdapter, NetworkAdapter};
+use nomos_log::Logger;
 use nomos_network::{backends::libp2p::Libp2p, NetworkService};
 use overwatch_derive::*;
 use overwatch_rs::{
@@ -91,17 +92,17 @@ pub enum Status {
     Err(Box<dyn std::error::Error + Send + Sync>),
 }
 
-impl Status {
-    pub fn display(&self) -> &str {
+impl std::fmt::Display for Status {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Encoding => "Encoding message into blob(s)",
-            Self::Disseminating => "Sending blob(s) to the network",
-            Self::WaitingAttestations => "Waiting for attestations",
-            Self::CreatingCert => "Creating certificate",
-            Self::SavingCert => "Saving certificate to file",
-            Self::SendingCert => "Sending certificate to node",
-            Self::Done => "",
-            Self::Err(_) => "Error",
+            Self::Encoding => write!(f, "Encoding message into blob(s)"),
+            Self::Disseminating => write!(f, "Sending blob(s) to the network"),
+            Self::WaitingAttestations => write!(f, "Waiting for attestations"),
+            Self::CreatingCert => write!(f, "Creating certificate"),
+            Self::SavingCert => write!(f, "Saving certificate to file"),
+            Self::SendingCert => write!(f, "Sending certificate to node"),
+            Self::Done => write!(f, ""),
+            Self::Err(e) => write!(f, "Error: {e}"),
         }
     }
 }
@@ -112,6 +113,7 @@ impl Status {
 pub struct DisseminateApp {
     network: ServiceHandle<NetworkService<Libp2p>>,
     send_blob: ServiceHandle<DisseminateService>,
+    logger: ServiceHandle<Logger>,
 }
 
 #[derive(Clone, Debug)]
@@ -203,7 +205,7 @@ impl ServiceCore for DisseminateService {
 // protocols, but only the one chosen will be used.
 // We can enforce only sensible combinations of protocol/settings
 // are specified by using special clap directives
-#[derive(Clone, Debug, Args)]
+#[derive(Clone, Debug, Args, Default)]
 pub struct DaProtocolChoice {
     #[clap(long, default_value = "full-replication")]
     pub da_protocol: Protocol,
@@ -225,14 +227,15 @@ impl TryFrom<DaProtocolChoice> for FullReplication<AbsoluteNumber<Attestation, C
     }
 }
 
-#[derive(Clone, Debug, Args)]
+#[derive(Clone, Debug, Args, Default)]
 pub struct ProtocolSettings {
     #[clap(flatten)]
     pub full_replication: FullReplicationSettings,
 }
 
-#[derive(Clone, Debug, ValueEnum)]
+#[derive(Clone, Debug, ValueEnum, Default)]
 pub enum Protocol {
+    #[default]
     FullReplication,
 }
 

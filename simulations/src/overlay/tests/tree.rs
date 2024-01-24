@@ -1,5 +1,5 @@
 // std
-use consensus_engine::NodeId;
+use carnot_engine::NodeId;
 use std::collections::HashMap;
 // crates
 use rand::seq::IteratorRandom;

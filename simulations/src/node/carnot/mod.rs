@@ -29,15 +29,15 @@ use crate::output_processors::{Record, RecordType, Runtime};
 use crate::settings::SimulationSettings;
 use crate::streaming::SubscriberFormat;
 use crate::warding::SimulationState;
-use consensus_engine::overlay::RandomBeaconState;
-use consensus_engine::{
-    Block, BlockId, Carnot, Committee, Overlay, Payload, Qc, StandardQc, TimeoutQc, View, Vote,
-};
-use nomos_consensus::committee_membership::UpdateableCommitteeMembership;
-use nomos_consensus::network::messages::{ProposalMsg, TimeoutQcMsg};
-use nomos_consensus::{
+use carnot_consensus::committee_membership::UpdateableCommitteeMembership;
+use carnot_consensus::network::messages::{ProposalMsg, TimeoutQcMsg};
+use carnot_consensus::{
     leader_selection::UpdateableLeaderSelection,
     network::messages::{NewViewMsg, TimeoutMsg, VoteMsg},
+};
+use carnot_engine::overlay::RandomBeaconState;
+use carnot_engine::{
+    Block, BlockId, Carnot, Committee, Overlay, Payload, Qc, StandardQc, TimeoutQc, View, Vote,
 };
 
 static RECORD_SETTINGS: std::sync::OnceLock<BTreeMap<String, bool>> = std::sync::OnceLock::new();
@@ -67,7 +67,7 @@ impl CarnotSettings {
 
 #[allow(dead_code)] // TODO: remove when handling settings
 pub struct CarnotNode<O: Overlay> {
-    id: consensus_engine::NodeId,
+    id: carnot_engine::NodeId,
     state: CarnotState,
     /// A step counter
     current_step: usize,
@@ -87,7 +87,7 @@ impl<
     > CarnotNode<O>
 {
     pub fn new<R: Rng>(
-        id: consensus_engine::NodeId,
+        id: carnot_engine::NodeId,
         settings: CarnotSettings,
         overlay_settings: O::Settings,
         genesis: nomos_core::block::Block<CarnotTx, CarnotBlob>,
@@ -122,7 +122,7 @@ impl<
 
     fn handle_output(&self, output: Output<CarnotTx, CarnotBlob>) {
         match output {
-            Output::Send(consensus_engine::Send {
+            Output::Send(carnot_engine::Send {
                 to,
                 payload: Payload::Vote(vote),
             }) => {
@@ -140,7 +140,7 @@ impl<
                     );
                 }
             }
-            Output::Send(consensus_engine::Send {
+            Output::Send(carnot_engine::Send {
                 to,
                 payload: Payload::NewView(new_view),
             }) => {
@@ -154,7 +154,7 @@ impl<
                     );
                 }
             }
-            Output::Send(consensus_engine::Send {
+            Output::Send(carnot_engine::Send {
                 to,
                 payload: Payload::Timeout(timeout),
             }) => {
@@ -226,7 +226,7 @@ impl<
                             "Parent committee of non root committee members should be present",
                         )
                     };
-                    output = Some(Output::Send(consensus_engine::Send {
+                    output = Some(Output::Send(carnot_engine::Send {
                         to,
                         payload: Payload::Vote(Vote {
                             view: self.engine.current_view(),
@@ -440,7 +440,7 @@ impl<
 #[derive(Debug)]
 #[allow(clippy::large_enum_variant)]
 enum Output<Tx: Clone + Eq + Hash, Blob: Clone + Eq + Hash> {
-    Send(consensus_engine::Send),
+    Send(carnot_engine::Send),
     BroadcastTimeoutQc {
         timeout_qc: TimeoutQc,
     },

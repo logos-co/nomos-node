@@ -4,15 +4,15 @@ use overwatch_rs::overwatch::handle::OverwatchHandle;
 use serde::{de::DeserializeOwned, Serialize};
 use tokio::sync::oneshot;
 
-use consensus_engine::{
+use carnot_consensus::{
+    network::adapters::libp2p::Libp2pAdapter as ConsensusLibp2pAdapter, CarnotConsensus,
+    CarnotInfo, ConsensusMsg,
+};
+use carnot_engine::{
     overlay::{RandomBeaconState, RoundRobin, TreeOverlay},
     Block, BlockId,
 };
 use full_replication::Certificate;
-use nomos_consensus::{
-    network::adapters::libp2p::Libp2pAdapter as ConsensusLibp2pAdapter, CarnotConsensus,
-    CarnotInfo, ConsensusMsg,
-};
 use nomos_core::{
     da::{
         blob,

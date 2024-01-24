@@ -2,18 +2,18 @@ pub mod api;
 mod config;
 mod tx;
 
+use carnot_consensus::network::adapters::libp2p::Libp2pAdapter as ConsensusLibp2pAdapter;
+use carnot_engine::overlay::{RandomBeaconState, RoundRobin, TreeOverlay};
 use color_eyre::eyre::Result;
-use consensus_engine::overlay::{RandomBeaconState, RoundRobin, TreeOverlay};
 use full_replication::Certificate;
 use full_replication::{AbsoluteNumber, Attestation, Blob, FullReplication};
 #[cfg(feature = "metrics")]
 use metrics::{backend::map::MapMetricsBackend, types::MetricsData, MetricsService};
-use nomos_consensus::network::adapters::libp2p::Libp2pAdapter as ConsensusLibp2pAdapter;
 
 use api::AxumBackend;
 use bytes::Bytes;
+use carnot_consensus::CarnotConsensus;
 use nomos_api::ApiService;
-use nomos_consensus::CarnotConsensus;
 use nomos_core::{
     da::{blob, certificate},
     tx::Transaction,
@@ -29,13 +29,17 @@ use nomos_mempool::{
     backend::mockpool::MockPool, Certificate as CertDiscriminant, MempoolService,
     Transaction as TxDiscriminant,
 };
+#[cfg(feature = "metrics")]
+use nomos_metrics::Metrics;
 use nomos_network::backends::libp2p::Libp2p;
 use nomos_storage::{
     backends::{sled::SledBackend, StorageSerde},
     StorageService,
 };
 
-pub use config::{Config, ConsensusArgs, DaArgs, HttpArgs, LogArgs, NetworkArgs, OverlayArgs};
+pub use config::{
+    Config, ConsensusArgs, DaArgs, HttpArgs, LogArgs, MetricsArgs, NetworkArgs, OverlayArgs,
+};
 use nomos_core::{
     da::certificate::select::FillSize as FillSizeWithBlobsCertificate,
     tx::select::FillSize as FillSizeWithTx,
@@ -89,10 +93,10 @@ pub struct Nomos {
     >,
     consensus: ServiceHandle<Carnot>,
     http: ServiceHandle<ApiService<AxumBackend<Tx, Wire, MB16>>>,
-    #[cfg(feature = "metrics")]
-    metrics: ServiceHandle<MetricsService<MapMetricsBackend<MetricsData>>>,
     da: ServiceHandle<DataAvailability>,
     storage: ServiceHandle<StorageService<SledBackend<Wire>>>,
+    #[cfg(feature = "metrics")]
+    metrics: ServiceHandle<Metrics>,
     system_sig: ServiceHandle<SystemSig>,
 }
 

@@ -1,7 +1,7 @@
-use consensus_engine::View;
-use nomos_consensus::network::messages::{
+use carnot_consensus::network::messages::{
     NewViewMsg, ProposalMsg, TimeoutMsg, TimeoutQcMsg, VoteMsg,
 };
+use carnot_engine::View;
 
 use crate::network::PayloadSize;
 

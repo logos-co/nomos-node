@@ -13,12 +13,13 @@ overwatch-rs = { git = "https://github.com/logos-co/Overwatch", rev = "2f70806" 
 overwatch-derive = { git = "https://github.com/logos-co/Overwatch", rev = "ac28d01" }
 tracing = "0.1"
 
-consensus-engine = { path = "../../consensus-engine" }
+carnot-engine = { path = "../../consensus/carnot-engine" }
 nomos-core = { path = "../../nomos-core" }
-nomos-consensus = { path = "../../nomos-services/consensus" }
+carnot-consensus = { path = "../carnot-consensus" }
 nomos-network = { path = "../../nomos-services/network" }
 nomos-da = { path = "../../nomos-services/data-availability" }
 nomos-mempool = { path = "../../nomos-services/mempool", features = ["mock", "libp2p", "openapi"] }
+nomos-metrics = { path = "../../nomos-metrics" }
 nomos-storage = { path = "../../nomos-services/storage", features = ["sled"] }
 nomos-libp2p = { path = "../../nomos-libp2p" }
 full-replication = { path = "../../nomos-da/full-replication" }

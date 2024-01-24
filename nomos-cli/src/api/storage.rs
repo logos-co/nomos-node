@@ -1,5 +1,5 @@
 use super::CLIENT;
-use consensus_engine::BlockId;
+use carnot_engine::BlockId;
 use full_replication::Certificate;
 use nomos_core::block::Block;
 use nomos_node::Tx;

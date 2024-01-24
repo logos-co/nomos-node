@@ -64,6 +64,7 @@ fn test_mockmempool() {
             mockpool: Settings {
                 backend: (),
                 network: (),
+                registry: None,
             },
             logging: LoggerSettings::default(),
         },

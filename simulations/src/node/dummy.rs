@@ -1,5 +1,5 @@
 // std
-use consensus_engine::View;
+use carnot_engine::View;
 use std::collections::{BTreeMap, BTreeSet};
 use std::time::Duration;
 // crates
@@ -432,7 +432,7 @@ mod tests {
         time::{Duration, SystemTime, UNIX_EPOCH},
     };
 
-    use consensus_engine::View;
+    use carnot_engine::View;
     use crossbeam::channel;
     use parking_lot::RwLock;
     use rand::{

@@ -1,5 +1,5 @@
 use crate::warding::{SimulationState, SimulationWard};
-use consensus_engine::View;
+use carnot_engine::View;
 use serde::{Deserialize, Serialize};
 
 /// MinMaxView. It monitors the gap between a min view and max view, triggers when surpassing
@@ -29,7 +29,7 @@ impl<S, T> SimulationWard<S, T> for MinMaxViewWard {
 mod test {
     use crate::warding::minmax::MinMaxViewWard;
     use crate::warding::{SimulationState, SimulationWard};
-    use consensus_engine::View;
+    use carnot_engine::View;
     use parking_lot::RwLock;
     use std::sync::Arc;
 
