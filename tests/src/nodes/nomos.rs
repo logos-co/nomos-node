@@ -3,6 +3,7 @@ use std::net::SocketAddr;
 use std::process::{Child, Command, Stdio};
 use std::time::Duration;
 // internal
+use super::{create_tempdir, persist_tempdir, LOGS_PREFIX};
 use crate::{adjust_timeout, get_available_port, ConsensusConfig, MixnetConfig, Node, SpawnConfig};
 use carnot_consensus::{CarnotInfo, CarnotSettings};
 use carnot_engine::overlay::{RandomBeaconState, RoundRobin, TreeOverlay, TreeOverlaySettings};
@@ -29,7 +30,6 @@ static CLIENT: Lazy<Client> = Lazy::new(Client::new);
 const NOMOS_BIN: &str = "../target/debug/nomos-node";
 const CARNOT_INFO_API: &str = "carnot/info";
 const STORAGE_BLOCKS_API: &str = "storage/block";
-const LOGS_PREFIX: &str = "__logs";
 const GET_BLOCKS_INFO: &str = "carnot/blocks";
 
 pub struct NomosNode {
@@ -42,14 +42,14 @@ pub struct NomosNode {
 impl Drop for NomosNode {
     fn drop(&mut self) {
         if std::thread::panicking() {
-            println!("persisting directory at {}", self._tempdir.path().display());
-            // we need ownership of the dir to persist it
-            let dir = std::mem::replace(&mut self._tempdir, tempfile::tempdir().unwrap());
-            // a bit confusing but `into_path` persists the directory
-            let _ = dir.into_path();
+            if let Err(e) = persist_tempdir(&mut self._tempdir, "nomos-node") {
+                println!("failed to persist tempdir: {e}");
+            }
         }
 
-        self.child.kill().unwrap();
+        if let Err(e) = self.child.kill() {
+            println!("failed to kill the child process: {e}");
+        }
     }
 }
 
@@ -61,11 +61,7 @@ impl NomosNode {
     pub async fn spawn(mut config: Config) -> Self {
         // Waku stores the messages in a db file in the current dir, we need a different
         // directory for each node to avoid conflicts
-        //
-        // NOTE: It's easier to use the current location instead of OS-default tempfile location
-        // because Github Actions can easily access files in the current location using wildcard
-        // to upload them as artifacts.
-        let dir = tempfile::TempDir::new_in(std::env::current_dir().unwrap()).unwrap();
+        let dir = create_tempdir().unwrap();
         let mut file = NamedTempFile::new().unwrap();
         let config_path = file.path().to_owned();
 

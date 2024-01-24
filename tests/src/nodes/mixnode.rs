@@ -4,8 +4,10 @@ use std::{
     time::Duration,
 };
 
+use super::{create_tempdir, persist_tempdir, LOGS_PREFIX};
 use mixnet_node::{MixnetNodeConfig, PRIVATE_KEY_SIZE};
 use mixnet_topology::{Layer, MixnetTopology, Node};
+use nomos_log::{LoggerBackend, LoggerFormat};
 use rand::{thread_rng, RngCore};
 use tempfile::NamedTempFile;
 
@@ -14,21 +16,37 @@ use crate::{get_available_port, MixnetConfig};
 const MIXNODE_BIN: &str = "../target/debug/mixnode";
 
 pub struct MixNode {
+    _tempdir: tempfile::TempDir,
     child: Child,
 }
 
 impl Drop for MixNode {
     fn drop(&mut self) {
-        self.child.kill().unwrap();
+        if std::thread::panicking() {
+            if let Err(e) = persist_tempdir(&mut self._tempdir, "mixnode") {
+                println!("failed to persist tempdir: {e}");
+            }
+        }
+
+        if let Err(e) = self.child.kill() {
+            println!("failed to kill the child process: {e}");
+        }
     }
 }
 
 impl MixNode {
     pub async fn spawn(config: MixnetNodeConfig) -> Self {
-        let config = mixnode::Config {
+        let dir = create_tempdir().unwrap();
+
+        let mut config = mixnode::Config {
             mixnode: config,
             log: Default::default(),
         };
+        config.log.backend = LoggerBackend::File {
+            directory: dir.path().to_owned(),
+            prefix: Some(LOGS_PREFIX.into()),
+        };
+        config.log.format = LoggerFormat::Json;
 
         let mut file = NamedTempFile::new().unwrap();
         let config_path = file.path().to_owned();
@@ -43,7 +61,10 @@ impl MixNode {
         //TODO: use a sophisticated way to wait until the node is ready
         tokio::time::sleep(Duration::from_secs(1)).await;
 
-        Self { child }
+        Self {
+            _tempdir: dir,
+            child,
+        }
     }
 
     pub async fn spawn_nodes(num_nodes: usize) -> (Vec<Self>, MixnetConfig) {
