@@ -67,7 +67,7 @@ pub struct NomosChat {
     #[clap(long, requires("message"))]
     pub author: Option<String>,
     /// Message for non interactive message formation
-    #[clap(long)]
+    #[clap(long, requires("author"))]
     pub message: Option<String>,
 }
 
