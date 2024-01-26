@@ -84,7 +84,8 @@ where
             )
             .layer(TraceLayer::new_for_http())
             // .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
-            .route("/blocks", routing::get(store::store_blocks::<T, S>))
+            .route("/store/blocks", routing::get(store::store_blocks::<T, S>))
+            .route("/blocks", routing::get(store::blocks::<T, S>))
             .with_state(handle);
 
         Server::bind(&self.settings.address)
