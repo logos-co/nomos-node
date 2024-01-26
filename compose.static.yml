@@ -139,6 +139,13 @@ services:
     entrypoint: /usr/bin/mixnode
     command: /etc/nomos/mixnode_config.yaml
 
+  chatbot:
+    container_name: chatbot
+    build:
+      context: .
+      dockerfile: testnet/Dockerfile
+    entrypoint: /etc/nomos/scripts/run_nomos_bot.sh
+
   etcd:
     container_name: etcd
     image: quay.io/coreos/etcd:v3.4.15
