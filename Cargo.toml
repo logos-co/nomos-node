@@ -13,6 +13,7 @@ members = [
     "nomos-services/http",
     "nomos-services/data-availability",
     "nomos-services/system-sig",
+    "nomos-services/robustness",
     "nomos-da/reed-solomon",
     "nomos-da/kzg",
     "nomos-da/full-replication",
