@@ -1,4 +1,4 @@
-# Mixnet
+# Mixnet (deprecated)
 
 ## Components
 
