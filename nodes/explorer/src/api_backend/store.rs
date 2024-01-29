@@ -51,19 +51,14 @@ where
 type Depth = usize;
 
 #[derive(Deserialize)]
-pub(crate) struct BlocksQueryParams {
+pub(crate) struct BlocksByIdQueryParams {
     from: BlockId,
-    #[serde(default = "default_to")]
-    to: Either<BlockId, Depth>,
-}
-
-fn default_to() -> Either<BlockId, Depth> {
-    Either::Right(500)
+    to: Option<BlockId>,
 }
 
 pub(crate) async fn blocks<Tx, S>(
     State(store): State<OverwatchHandle>,
-    Query(query): Query<BlocksQueryParams>,
+    Query(query): Query<BlocksByIdQueryParams>,
 ) -> Response
 where
     Tx: Transaction
@@ -79,7 +74,7 @@ where
     <Tx as Transaction>::Hash: std::cmp::Ord + Debug + Send + Sync + 'static,
     S: StorageSerde + Send + Sync + 'static,
 {
-    let BlocksQueryParams { from, to } = query;
+    let BlocksByIdQueryParams { from, to } = query;
     // get the from block
     let from = match storage::block_req::<S, Tx>(&store, from).await {
         Ok(from) => match from {
@@ -95,73 +90,23 @@ where
 
     // check if to is valid
     match to {
-        Either::Left(to) => match storage::block_req::<S, Tx>(&store, to).await {
+        Some(to) => match storage::block_req::<S, Tx>(&store, to).await {
             Ok(to) => match to {
-                Some(to) => handle_to::<S, Tx>(store, from, to).await,
+                Some(to) => handle_to::<S, Tx>(store, from, Some(to)).await,
                 None => IntoResponse::into_response((StatusCode::NOT_FOUND, "to block not found")),
             },
             Err(e) => {
                 IntoResponse::into_response((StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
             }
         },
-        Either::Right(depth) => handle_depth::<S, Tx>(store, from, depth).await,
+        None => handle_to::<S, Tx>(store, from, None).await,
     }
-}
-
-async fn handle_depth<S, Tx>(
-    store: OverwatchHandle,
-    from: Block<Tx, Certificate>,
-    depth: usize,
-) -> Response
-where
-    Tx: Transaction
-        + Clone
-        + Debug
-        + Eq
-        + Hash
-        + Serialize
-        + DeserializeOwned
-        + Send
-        + Sync
-        + 'static,
-    <Tx as Transaction>::Hash: std::cmp::Ord + Debug + Send + Sync + 'static,
-    S: StorageSerde + Send + Sync + 'static,
-{
-    let mut cur = Some(from.header().parent());
-    let mut blocks = Vec::new();
-    while blocks.len() < depth {
-        if let Some(id) = cur {
-            let block = match storage::block_req::<S, Tx>(&store, id).await {
-                Ok(block) => block,
-                Err(e) => {
-                    return IntoResponse::into_response((
-                        StatusCode::INTERNAL_SERVER_ERROR,
-                        e.to_string(),
-                    ))
-                }
-            };
-
-            match block {
-                Some(block) => {
-                    cur = Some(block.header().parent());
-                    blocks.push(block);
-                }
-                None => {
-                    cur = None;
-                }
-            }
-        } else {
-            break;
-        }
-    }
-
-    IntoResponse::into_response((StatusCode::OK, ::axum::Json(blocks)))
 }
 
 async fn handle_to<S, Tx>(
     store: OverwatchHandle,
     from: Block<Tx, Certificate>,
-    to: Block<Tx, Certificate>,
+    to: Option<Block<Tx, Certificate>>,
 ) -> Response
 where
     Tx: Transaction
@@ -177,11 +122,13 @@ where
     <Tx as Transaction>::Hash: std::cmp::Ord + Debug + Send + Sync + 'static,
     S: StorageSerde + Send + Sync + 'static,
 {
-    let mut cur = Some(from.header().parent());
+    let mut current = Some(from.header().parent());
     let mut blocks = Vec::new();
-    while let Some(id) = cur {
-        if id == to.header().id {
-            break;
+    while let Some(id) = current {
+        if let Some(to) = to {
+            if id == to.header().id {
+                break;
+            }
         }
 
         let block = match storage::block_req::<S, Tx>(&store, id).await {
@@ -196,12 +143,86 @@ where
 
         match block {
             Some(block) => {
-                cur = Some(block.header().parent());
+                current = Some(block.header().parent());
                 blocks.push(block);
             }
             None => {
-                cur = None;
+                current = None;
             }
+        }
+    }
+
+    IntoResponse::into_response((StatusCode::OK, ::axum::Json(blocks)))
+}
+
+#[derive(Deserialize)]
+pub(crate) struct BlocksByDepthQueryParams {
+    from: BlockId,
+    #[serde(default = "default_depth")]
+    depth: usize,
+}
+
+fn default_depth() -> usize {
+    500
+}
+
+pub(crate) async fn block_depth<Tx, S>(
+    State(store): State<OverwatchHandle>,
+    Query(query): Query<BlocksByDepthQueryParams>,
+) -> Response
+where
+    Tx: Transaction
+        + Clone
+        + Debug
+        + Eq
+        + Hash
+        + Serialize
+        + DeserializeOwned
+        + Send
+        + Sync
+        + 'static,
+    <Tx as Transaction>::Hash: std::cmp::Ord + Debug + Send + Sync + 'static,
+    S: StorageSerde + Send + Sync + 'static,
+{
+    let BlocksByDepthQueryParams { from, depth } = query;
+    // get the from block
+    let from = match storage::block_req::<S, Tx>(&store, from).await {
+        Ok(from) => match from {
+            Some(from) => from,
+            None => {
+                return IntoResponse::into_response((StatusCode::NOT_FOUND, "from block not found"))
+            }
+        },
+        Err(e) => {
+            return IntoResponse::into_response((StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
+        }
+    };
+
+    let mut current = Some(from.header().parent());
+    let mut blocks = Vec::new();
+    while blocks.len() < depth {
+        if let Some(id) = current {
+            let block = match storage::block_req::<S, Tx>(&store, id).await {
+                Ok(block) => block,
+                Err(e) => {
+                    return IntoResponse::into_response((
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        e.to_string(),
+                    ))
+                }
+            };
+
+            match block {
+                Some(block) => {
+                    current = Some(block.header().parent());
+                    blocks.push(block);
+                }
+                None => {
+                    current = None;
+                }
+            }
+        } else {
+            break;
         }
     }
 

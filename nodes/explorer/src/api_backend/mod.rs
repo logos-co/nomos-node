@@ -86,6 +86,10 @@ where
             // .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
             .route("/store/blocks", routing::get(store::store_blocks::<T, S>))
             .route("/explorer/blocks", routing::get(store::blocks::<T, S>))
+            .route(
+                "/explorer/blocks/depth",
+                routing::get(store::block_depth::<T, S>),
+            )
             .with_state(handle);
 
         Server::bind(&self.settings.address)
