@@ -12,15 +12,17 @@ nomos-storage = { path = "../../nomos-services/storage", features = ["sled"] }
 nomos-api = { path = "../../nomos-services/api" }
 nomos-node =  { path = "../nomos-node" }
 nomos-core = { path = "../../nomos-core" }
+full-replication = { path = "../../nomos-da/full-replication" }
 serde = "1.0"
 tracing = "0.1"
 async-trait = "0.1.73"
-axum = "0.6"
-hyper = "0.14.27"
-tower-http = "0.4"
+axum = "0.7"
+hyper = "1"
+tower-http = "0.5"
 utoipa = "4.0"
-utoipa-swagger-ui = "4.0"
+utoipa-swagger-ui = "6.0"
 futures = "0.3"
 serde_yaml = "0.9.25"
 clap = { version = "4.4.6", features = ["derive"] }
 eyre = "0.6"
+either = { version = "1", features = ["serde"] }
