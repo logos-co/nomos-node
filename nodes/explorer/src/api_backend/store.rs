@@ -4,7 +4,8 @@ use std::hash::Hash;
 
 // crates
 use axum::extract::{Query, State};
-use axum::response::Response;
+use axum::response::{IntoResponse, Response};
+use hyper::StatusCode;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 // internal
@@ -75,25 +76,47 @@ where
         Ok(from) => match from {
             Some(from) => from,
             None => {
-                return ::axum::response::IntoResponse::into_response((
-                    ::axum::http::StatusCode::NOT_FOUND,
+                return IntoResponse::into_response((
+                    StatusCode::NOT_FOUND,
                     "from block not found",
                 ))
             }
         },
         Err(e) => {
-            return ::axum::response::IntoResponse::into_response((
-                ::axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+            return IntoResponse::into_response((
+                StatusCode::INTERNAL_SERVER_ERROR,
                 e.to_string(),
             ))
         }
+    };
+
+    // check if to is valid
+    let to = match to {
+        Some(to) => match storage::block_req::<S, Tx>(&store, to).await {
+            Ok(to) => match to {
+                Some(to) => Some(to),
+                None => {
+                    return IntoResponse::into_response((
+                        StatusCode::NOT_FOUND,
+                        "to block not found",
+                    ))
+                }
+            },
+            Err(e) => {
+                return IntoResponse::into_response((
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    e.to_string(),
+                ))
+            }
+        },
+        None => None,
     };
 
     let mut cur = Some(from.header().parent());
     let mut blocks = Vec::new();
     while let Some(id) = cur {
         if let Some(to) = to {
-            if id == to {
+            if id == to.header().id {
                 break;
             }
         }
@@ -101,8 +124,8 @@ where
         let block = match storage::block_req::<S, Tx>(&store, id).await {
             Ok(block) => block,
             Err(e) => {
-                return ::axum::response::IntoResponse::into_response((
-                    ::axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                return IntoResponse::into_response((
+                    StatusCode::INTERNAL_SERVER_ERROR,
                     e.to_string(),
                 ))
             }
@@ -119,5 +142,5 @@ where
         }
     }
 
-    ::axum::response::IntoResponse::into_response((::hyper::StatusCode::OK, ::axum::Json(blocks)))
+    IntoResponse::into_response((::hyper::StatusCode::OK, ::axum::Json(blocks)))
 }
