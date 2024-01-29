@@ -108,7 +108,11 @@ where
     }
 }
 
-async fn handle_depth<S, Tx>(store: OverwatchHandle, from: Block<Tx, Certificate>, depth: usize) -> Response
+async fn handle_depth<S, Tx>(
+    store: OverwatchHandle,
+    from: Block<Tx, Certificate>,
+    depth: usize,
+) -> Response
 where
     Tx: Transaction
         + Clone
@@ -125,34 +129,40 @@ where
 {
     let mut cur = Some(from.header().parent());
     let mut blocks = Vec::new();
-    while let Some(id) = cur
-        && blocks.len() < depth
-    {
-        let block = match storage::block_req::<S, Tx>(&store, id).await {
-            Ok(block) => block,
-            Err(e) => {
-                return IntoResponse::into_response((
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    e.to_string(),
-                ))
-            }
-        };
+    while blocks.len() < depth {
+        if let Some(id) = cur {
+            let block = match storage::block_req::<S, Tx>(&store, id).await {
+                Ok(block) => block,
+                Err(e) => {
+                    return IntoResponse::into_response((
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        e.to_string(),
+                    ))
+                }
+            };
 
-        match block {
-            Some(block) => {
-                cur = Some(block.header().parent());
-                blocks.push(block);
+            match block {
+                Some(block) => {
+                    cur = Some(block.header().parent());
+                    blocks.push(block);
+                }
+                None => {
+                    cur = None;
+                }
             }
-            None => {
-                cur = None;
-            }
+        } else {
+            break;
         }
     }
 
     IntoResponse::into_response((StatusCode::OK, ::axum::Json(blocks)))
 }
 
-async fn handle_to<S, Tx>(store: OverwatchHandle, from: Block<Tx, Certificate>, to: Block<Tx, Certificate>) -> Response
+async fn handle_to<S, Tx>(
+    store: OverwatchHandle,
+    from: Block<Tx, Certificate>,
+    to: Block<Tx, Certificate>,
+) -> Response
 where
     Tx: Transaction
         + Clone
