@@ -97,18 +97,18 @@ where
     match to {
         Either::Left(to) => match storage::block_req::<S, Tx>(&store, to).await {
             Ok(to) => match to {
-                Some(to) => handle_to::<S, Tx>(from, to).await,
+                Some(to) => handle_to::<S, Tx>(store, from, to).await,
                 None => IntoResponse::into_response((StatusCode::NOT_FOUND, "to block not found")),
             },
             Err(e) => {
                 IntoResponse::into_response((StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
             }
         },
-        Either::Right(depth) => handle_depth::<S, Tx>(from, depth).await,
+        Either::Right(depth) => handle_depth::<S, Tx>(store, from, depth).await,
     }
 }
 
-async fn handle_depth<S, Tx>(from: Block<Tx, Certificate>, depth: usize) -> Response
+async fn handle_depth<S, Tx>(store: OverwatchHandle, from: Block<Tx, Certificate>, depth: usize) -> Response
 where
     Tx: Transaction
         + Clone
@@ -152,7 +152,7 @@ where
     IntoResponse::into_response((StatusCode::OK, ::axum::Json(blocks)))
 }
 
-async fn handle_to<S, Tx>(from: Block<Tx, Certificate>, to: Block<Tx, Certificate>) -> Response
+async fn handle_to<S, Tx>(store: OverwatchHandle, from: Block<Tx, Certificate>, to: Block<Tx, Certificate>) -> Response
 where
     Tx: Transaction
         + Clone
