@@ -7,9 +7,7 @@ use nomos_cli::{
 use nomos_core::da::{blob::Blob as _, DaProtocol};
 use std::{io::Write, time::Duration};
 use tempfile::NamedTempFile;
-use tests::{
-    adjust_timeout, get_available_port, nodes::nomos::Pool, MixNode, Node, NomosNode, SpawnConfig,
-};
+use tests::{adjust_timeout, get_available_port, nodes::nomos::Pool, Node, NomosNode, SpawnConfig};
 
 const CLI_BIN: &str = "../target/debug/nomos-cli";
 
@@ -35,8 +33,7 @@ fn run_disseminate(disseminate: &Disseminate) {
 }
 
 async fn disseminate(config: &mut Disseminate) {
-    let (_mixnodes, mixnet_config) = MixNode::spawn_nodes(2).await;
-    let mut nodes = NomosNode::spawn_nodes(SpawnConfig::chain_happy(2, mixnet_config)).await;
+    let mut nodes = NomosNode::spawn_nodes(SpawnConfig::chain_happy(2)).await;
 
     // kill the node so that we can reuse its network config
     nodes[1].stop();

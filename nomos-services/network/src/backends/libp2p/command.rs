@@ -16,8 +16,7 @@ pub enum Command {
         reply: oneshot::Sender<Libp2pInfo>,
     },
     #[doc(hidden)]
-    // broadcast a message directly through gossipsub without mixnet
-    DirectBroadcastAndRetry {
+    RetryBroadcast {
         topic: Topic,
         message: Box<[u8]>,
         retry_count: usize,

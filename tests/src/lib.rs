@@ -49,20 +49,14 @@ pub trait Node: Sized {
 #[derive(Clone)]
 pub enum SpawnConfig {
     // Star topology: Every node is initially connected to a single node.
-    Star {
-        consensus: ConsensusConfig,
-        mixnet: MixnetConfig,
-    },
+    Star { consensus: ConsensusConfig },
     // Chain topology: Every node is chained to the node next to it.
-    Chain {
-        consensus: ConsensusConfig,
-        mixnet: MixnetConfig,
-    },
+    Chain { consensus: ConsensusConfig },
 }
 
 impl SpawnConfig {
     // Returns a SpawnConfig::Chain with proper configurations for happy-path tests
-    pub fn chain_happy(n_participants: usize, mixnet_config: MixnetConfig) -> Self {
+    pub fn chain_happy(n_participants: usize) -> Self {
         Self::Chain {
             consensus: ConsensusConfig {
                 n_participants,
@@ -73,7 +67,6 @@ impl SpawnConfig {
                 // and it takes 1+ secs for each nomos-node to be started.
                 timeout: adjust_timeout(Duration::from_millis(n_participants as u64 * 2500)),
             },
-            mixnet: mixnet_config,
         }
     }
 }
