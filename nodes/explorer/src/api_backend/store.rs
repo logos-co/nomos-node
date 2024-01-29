@@ -5,7 +5,6 @@ use std::hash::Hash;
 // crates
 use axum::extract::{Query, State};
 use axum::response::{IntoResponse, Response};
-use either::Either;
 use hyper::StatusCode;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
@@ -125,7 +124,7 @@ where
     let mut current = Some(from.header().parent());
     let mut blocks = Vec::new();
     while let Some(id) = current {
-        if let Some(to) = to {
+        if let Some(to) = &to {
             if id == to.header().id {
                 break;
             }

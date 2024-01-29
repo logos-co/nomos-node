@@ -25,4 +25,4 @@ futures = "0.3"
 serde_yaml = "0.9.25"
 clap = { version = "4.4.6", features = ["derive"] }
 eyre = "0.6"
-either = { version = "1", features = ["serde"] }
+
