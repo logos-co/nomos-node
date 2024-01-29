@@ -1,20 +1,15 @@
-use std::{collections::HashMap, ops::Range, time::Duration};
+use std::{collections::HashMap, time::Duration};
 
-use mixnet_client::MixnetClient;
 #[allow(deprecated)]
 use nomos_libp2p::{
     gossipsub::{self, Message},
     libp2p::swarm::ConnectionId,
     Behaviour, BehaviourEvent, Multiaddr, Swarm, SwarmEvent, THandlerErr,
 };
-use rand::rngs::OsRng;
 use tokio::sync::{broadcast, mpsc};
 use tokio_stream::StreamExt;
 
-use crate::backends::libp2p::{
-    mixnet::{random_delay, MixnetMessage},
-    Libp2pInfo,
-};
+use crate::backends::libp2p::Libp2pInfo;
 
 use super::{
     command::{Command, Dial, Topic},
@@ -27,8 +22,6 @@ pub struct SwarmHandler {
     pub commands_tx: mpsc::Sender<Command>,
     pub commands_rx: mpsc::Receiver<Command>,
     pub events_tx: broadcast::Sender<Event>,
-    pub mixnet_client: MixnetClient<OsRng>,
-    pub mixnet_delay: Range<Duration>,
 }
 
 macro_rules! log_error {
@@ -52,7 +45,6 @@ impl SwarmHandler {
         events_tx: broadcast::Sender<Event>,
     ) -> Self {
         let swarm = Swarm::build(&config.inner).unwrap();
-        let mixnet_client = MixnetClient::new(config.mixnet_client.clone(), OsRng);
 
         // Keep the dialing history since swarm.connect doesn't return the result synchronously
         let pending_dials = HashMap::<ConnectionId, Dial>::new();
@@ -63,8 +55,6 @@ impl SwarmHandler {
             commands_tx,
             commands_rx,
             events_tx,
-            mixnet_client,
-            mixnet_delay: config.mixnet_delay.clone(),
         }
     }
 
@@ -142,10 +132,7 @@ impl SwarmHandler {
                 self.connect(dial);
             }
             Command::Broadcast { topic, message } => {
-                tracing::debug!("sending message to mixnet client");
-                let msg = MixnetMessage { topic, message };
-                let delay = random_delay(&self.mixnet_delay);
-                log_error!(self.mixnet_client.send(msg.as_bytes(), delay));
+                self.broadcast_and_retry(topic, message, 0).await;
             }
             Command::Subscribe(topic) => {
                 tracing::debug!("subscribing to topic: {topic}");
@@ -167,7 +154,7 @@ impl SwarmHandler {
                 };
                 log_error!(reply.send(info));
             }
-            Command::DirectBroadcastAndRetry {
+            Command::RetryBroadcast {
                 topic,
                 message,
                 retry_count,
@@ -249,7 +236,7 @@ impl SwarmHandler {
                 tokio::spawn(async move {
                     tokio::time::sleep(wait).await;
                     commands_tx
-                        .send(Command::DirectBroadcastAndRetry {
+                        .send(Command::RetryBroadcast {
                             topic,
                             message,
                             retry_count: retry_count + 1,

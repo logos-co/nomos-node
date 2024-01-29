@@ -4,14 +4,11 @@ use std::process::{Child, Command, Stdio};
 use std::time::Duration;
 // internal
 use super::{create_tempdir, persist_tempdir, LOGS_PREFIX};
-use crate::{adjust_timeout, get_available_port, ConsensusConfig, MixnetConfig, Node, SpawnConfig};
+use crate::{adjust_timeout, get_available_port, ConsensusConfig, Node, SpawnConfig};
 use carnot_consensus::{CarnotInfo, CarnotSettings};
 use carnot_engine::overlay::{RandomBeaconState, RoundRobin, TreeOverlay, TreeOverlaySettings};
 use carnot_engine::{BlockId, NodeId, Overlay};
 use full_replication::Certificate;
-use mixnet_client::{MixnetClientConfig, MixnetClientMode};
-use mixnet_node::MixnetNodeConfig;
-use mixnet_topology::MixnetTopology;
 use nomos_core::block::Block;
 use nomos_libp2p::{multiaddr, Multiaddr};
 use nomos_log::{LoggerBackend, LoggerFormat};
@@ -203,8 +200,8 @@ impl Node for NomosNode {
 
     async fn spawn_nodes(config: SpawnConfig) -> Vec<Self> {
         match config {
-            SpawnConfig::Star { consensus, mixnet } => {
-                let (next_leader_config, configs) = create_node_configs(consensus, mixnet);
+            SpawnConfig::Star { consensus } => {
+                let (next_leader_config, configs) = create_node_configs(consensus);
 
                 let first_node_addr = node_address(&next_leader_config);
                 let mut nodes = vec![Self::spawn(next_leader_config).await];
@@ -218,8 +215,8 @@ impl Node for NomosNode {
                 }
                 nodes
             }
-            SpawnConfig::Chain { consensus, mixnet } => {
-                let (next_leader_config, configs) = create_node_configs(consensus, mixnet);
+            SpawnConfig::Chain { consensus } => {
+                let (next_leader_config, configs) = create_node_configs(consensus);
 
                 let mut prev_node_addr = node_address(&next_leader_config);
                 let mut nodes = vec![Self::spawn(next_leader_config).await];
@@ -250,10 +247,7 @@ impl Node for NomosNode {
 /// so the leader can receive votes from all other nodes that will be subsequently spawned.
 /// If not, the leader will miss votes from nodes spawned before itself.
 /// This issue will be resolved by devising the block catch-up mechanism in the future.
-fn create_node_configs(
-    consensus: ConsensusConfig,
-    mut mixnet: MixnetConfig,
-) -> (Config, Vec<Config>) {
+fn create_node_configs(consensus: ConsensusConfig) -> (Config, Vec<Config>) {
     let mut ids = vec![[0; 32]; consensus.n_participants];
     for id in &mut ids {
         thread_rng().fill(id);
@@ -267,8 +261,6 @@ fn create_node_configs(
                 *id,
                 consensus.threshold,
                 consensus.timeout,
-                mixnet.node_configs.pop(),
-                mixnet.topology.clone(),
             )
         })
         .collect::<Vec<_>>();
@@ -290,29 +282,12 @@ fn create_node_config(
     id: [u8; 32],
     threshold: Fraction,
     timeout: Duration,
-    mixnet_node_config: Option<MixnetNodeConfig>,
-    mixnet_topology: MixnetTopology,
 ) -> Config {
-    let mixnet_client_mode = match mixnet_node_config {
-        Some(node_config) => {
-            MixnetClientMode::SenderReceiver(node_config.client_listen_address.to_string())
-        }
-        None => MixnetClientMode::Sender,
-    };
-
     let mut config = Config {
         network: NetworkConfig {
             backend: Libp2pConfig {
                 inner: Default::default(),
                 initial_peers: vec![],
-                mixnet_client: MixnetClientConfig {
-                    mode: mixnet_client_mode,
-                    topology: mixnet_topology,
-                    connection_pool_size: 255,
-                    max_retries: 3,
-                    retry_delay: Duration::from_secs(5),
-                },
-                mixnet_delay: Duration::ZERO..Duration::from_millis(10),
             },
         },
         consensus: CarnotSettings {

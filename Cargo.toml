@@ -20,13 +20,8 @@ members = [
     "nomos-cli",
     "nomos-utils",
     "nodes/nomos-node",
-    "nodes/mixnode",
     "simulations",
     "consensus/carnot-engine",
     "tests",
-    "mixnet/node",
-    "mixnet/client",
-    "mixnet/protocol",
-    "mixnet/topology",
 ]
 resolver = "2"
