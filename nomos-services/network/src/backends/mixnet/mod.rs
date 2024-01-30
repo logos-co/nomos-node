@@ -38,9 +38,17 @@ pub struct MixnetConfig {}
 
 #[derive(Debug)]
 pub enum Command {
-    /// Broadcast a message through mixnet
+    /// Broadcast a message through mixnet.
+    ///
+    /// A message will be split into multiple Sphinx packets, mixed through mixnet,
+    /// reconstructed to the original message, and broadcasted to the entire network.
     BroadcastMessage(Box<[u8]>),
     /// Update config (topology, etc.)
+    ///
+    /// Once a new config is injected, internal mixnet components will work
+    /// based on the new config.
+    /// If a topology in the config has been changed, new network connections
+    /// will be established in background to build the network topology.
     UpdateConfig(MixnetConfig),
 }
 
