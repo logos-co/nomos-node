@@ -176,8 +176,8 @@ services:
     env_file:
       - ./testnet/monitoring/grafana/plugins.env
     volumes:
-      - ./testnet/monitoring/grafana/grafana.ini:/etc/grafana/grafana.ini
-        ./testnet/monitoring/grafana/datasources.yaml:/etc/grafana/provisioning/datasources/datasources.yaml
+      - ./testnet/monitoring/grafana/grafana.ini:/etc/grafana/grafana.ini:z
+      - ./testnet/monitoring/grafana/datasources.yaml:/etc/grafana/provisioning/datasources/datasources.yaml:z
     ports:
       - 9091:3000
     restart: on-failure
