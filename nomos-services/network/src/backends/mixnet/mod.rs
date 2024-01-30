@@ -18,6 +18,12 @@ impl NetworkBackend for MixnetNetworkBackend {
     type NetworkEvent = NetworkEvent;
 
     fn new(_config: Self::Settings, _overwatch_handle: OverwatchHandle) -> Self {
+        // TODO: One important task that should be spawned is
+        // subscribing NewEntropy events that will be emitted from the consensus service soon.
+        // so that new topology can be built internally.
+        // In the mixnet spec, the robustness layer is responsible for this task.
+        // We can implement the robustness layer in the mixnet-specific crate,
+        // that we're going to define at the root of the project.
         todo!()
     }
 
@@ -43,13 +49,6 @@ pub enum Command {
     /// A message will be split into multiple Sphinx packets, mixed through mixnet,
     /// reconstructed to the original message, and broadcasted to the entire network.
     BroadcastMessage(Box<[u8]>),
-    /// Update config (topology, etc.)
-    ///
-    /// Once a new config is injected, internal mixnet components will work
-    /// based on the new config.
-    /// If a topology in the config has been changed, new network connections
-    /// will be established in background to build the network topology.
-    UpdateConfig(MixnetConfig),
 }
 
 #[derive(Debug)]
