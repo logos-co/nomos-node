@@ -1,12 +1,10 @@
 mod command;
 mod config;
-mod mixnet;
 mod swarm;
 
 // std
 pub use self::command::{Command, Libp2pInfo};
 pub use self::config::Libp2pConfig;
-use self::mixnet::MixnetHandler;
 use self::swarm::SwarmHandler;
 
 // internal
@@ -45,11 +43,6 @@ impl NetworkBackend for Libp2p {
     fn new(config: Self::Settings, overwatch_handle: OverwatchHandle) -> Self {
         let (commands_tx, commands_rx) = tokio::sync::mpsc::channel(BUFFER_SIZE);
         let (events_tx, _) = tokio::sync::broadcast::channel(BUFFER_SIZE);
-
-        let mut mixnet_handler = MixnetHandler::new(&config, commands_tx.clone());
-        overwatch_handle.runtime().spawn(async move {
-            mixnet_handler.run().await;
-        });
 
         let mut swarm_handler =
             SwarmHandler::new(&config, commands_tx.clone(), commands_rx, events_tx.clone());

@@ -2,7 +2,7 @@ use carnot_engine::{Qc, View};
 use futures::stream::{self, StreamExt};
 use std::collections::HashSet;
 use std::time::Duration;
-use tests::{adjust_timeout, MixNode, Node, NomosNode, SpawnConfig};
+use tests::{adjust_timeout, Node, NomosNode, SpawnConfig};
 
 const TARGET_VIEW: View = View::new(20);
 
@@ -71,22 +71,19 @@ async fn happy_test(nodes: &[NomosNode]) {
 
 #[tokio::test]
 async fn two_nodes_happy() {
-    let (_mixnodes, mixnet_config) = MixNode::spawn_nodes(2).await;
-    let nodes = NomosNode::spawn_nodes(SpawnConfig::chain_happy(2, mixnet_config)).await;
+    let nodes = NomosNode::spawn_nodes(SpawnConfig::chain_happy(2)).await;
     happy_test(&nodes).await;
 }
 
 #[tokio::test]
 async fn ten_nodes_happy() {
-    let (_mixnodes, mixnet_config) = MixNode::spawn_nodes(3).await;
-    let nodes = NomosNode::spawn_nodes(SpawnConfig::chain_happy(10, mixnet_config)).await;
+    let nodes = NomosNode::spawn_nodes(SpawnConfig::chain_happy(10)).await;
     happy_test(&nodes).await;
 }
 
 #[tokio::test]
 async fn test_get_block() {
-    let (_mixnodes, mixnet_config) = MixNode::spawn_nodes(3).await;
-    let nodes = NomosNode::spawn_nodes(SpawnConfig::chain_happy(2, mixnet_config)).await;
+    let nodes = NomosNode::spawn_nodes(SpawnConfig::chain_happy(2)).await;
     happy_test(&nodes).await;
     let id = nodes[0].consensus_info().await.last_committed_block.id;
     tokio::time::timeout(Duration::from_secs(10), async {

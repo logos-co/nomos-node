@@ -27,7 +27,6 @@ LABEL maintainer="augustinas@status.im" \
 EXPOSE 3000 8080 9000 60000	
 
 COPY --from=builder /nomos/target/release/nomos-node /usr/bin/nomos-node
-COPY --from=builder /nomos/target/release/mixnode /usr/bin/mixnode
 COPY --from=builder /usr/bin/etcdctl /usr/bin/etcdctl
 COPY nodes/nomos-node/config.yaml /etc/nomos/config.yaml
 RUN install_packages python3 python3-etcd3
