@@ -46,7 +46,7 @@ impl<R: SeedableRng> FisherYates<R> {
 
 impl<R: SeedableRng + RngCore> FisherYates<R> {
     /// Shuffle the given elements in place.
-    pub fn shuffle<T>(elements: &mut [T], entropy: R::Seed) {
+    pub fn shuffle<T>(&self, elements: &mut [T], entropy: R::Seed) {
         let mut rng = R::from_seed(entropy);
 
         for i in (1..elements.len()).rev() {
