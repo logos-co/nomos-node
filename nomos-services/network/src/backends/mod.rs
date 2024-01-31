@@ -5,6 +5,8 @@ use tokio::sync::broadcast::Receiver;
 #[cfg(feature = "libp2p")]
 pub mod libp2p;
 
+pub mod mixnet;
+
 #[cfg(feature = "mock")]
 pub mod mock;
 
