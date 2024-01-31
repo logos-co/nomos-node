@@ -1,7 +1,4 @@
 pub mod nodes;
-use mixnet_node::MixnetNodeConfig;
-use mixnet_topology::MixnetTopology;
-pub use nodes::MixNode;
 pub use nodes::NomosNode;
 use once_cell::sync::Lazy;
 
@@ -16,7 +13,7 @@ use std::{fmt::Debug, sync::Mutex};
 use fraction::{Fraction, One};
 use rand::{thread_rng, Rng};
 
-static NET_PORT: Lazy<Mutex<u16>> = Lazy::new(|| Mutex::new(thread_rng().gen_range(8000, 10000)));
+static NET_PORT: Lazy<Mutex<u16>> = Lazy::new(|| Mutex::new(thread_rng().gen_range(8000..10000)));
 static IS_SLOW_TEST_ENV: Lazy<bool> =
     Lazy::new(|| env::var("SLOW_TEST_ENV").is_ok_and(|s| s == "true"));
 
@@ -76,10 +73,4 @@ pub struct ConsensusConfig {
     pub n_participants: usize,
     pub threshold: Fraction,
     pub timeout: Duration,
-}
-
-#[derive(Clone)]
-pub struct MixnetConfig {
-    pub node_configs: Vec<MixnetNodeConfig>,
-    pub topology: MixnetTopology,
 }

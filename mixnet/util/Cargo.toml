@@ -1,8 +1,0 @@
-[package]
-name = "mixnet-util"
-version = "0.1.0"
-edition = "2021"
-
-[dependencies]
-tokio = { version = "1.32", default-features = false, features = ["sync", "net"] }
-mixnet-protocol = { path = "../protocol" }
