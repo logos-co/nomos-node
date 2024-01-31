@@ -27,5 +27,6 @@ members = [
     "mixnet/client",
     "mixnet/protocol",
     "mixnet/topology",
+    "mixnet-utils"
 ]
 resolver = "2"
