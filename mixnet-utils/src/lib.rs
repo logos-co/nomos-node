@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use rand::{thread_rng, rngs::StdRng, Rng, RngCore, SeedableRng};
+use rand::{rngs::StdRng, thread_rng, Rng, RngCore, SeedableRng};
 use rand_distr::{Distribution, Exp};
 
 /// Get a random interval from an exponential distribution.
@@ -58,7 +58,10 @@ impl<R: SeedableRng + RngCore> FisherYates<R> {
 
 /// An extension trait for [`StdRng`] that provides the [`FisherYates`] algorithm.
 pub trait StdRngFisherYatesExt {
-    fn fisher_yates_shuffle<T>(&mut self, entropy: <StdRng as SeedableRng>::Seed) where Self: AsMut<[T]> {
+    fn fisher_yates_shuffle<T>(&mut self, entropy: <StdRng as SeedableRng>::Seed)
+    where
+        Self: AsMut<[T]>,
+    {
         FisherYates::<StdRng>::new().shuffle(<Self as AsMut<[T]>>::as_mut(self), entropy);
     }
 }
