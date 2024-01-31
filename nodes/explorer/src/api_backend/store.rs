@@ -47,8 +47,6 @@ where
     make_request_and_return_response!(futures::future::try_join_all(results))
 }
 
-type Depth = usize;
-
 #[derive(Deserialize)]
 pub(crate) struct BlocksByIdQueryParams {
     from: BlockId,
