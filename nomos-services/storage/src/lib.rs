@@ -136,16 +136,16 @@ impl<Backend: StorageBackend> StorageMsg<Backend> {
 impl<Backend: StorageBackend> Debug for StorageMsg<Backend> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            StorageMsg::Load { key, .. } => {
+            Self::Load { key, .. } => {
                 write!(f, "Load {{ {key:?} }}")
             }
-            StorageMsg::Store { key, value } => {
+            Self::Store { key, value } => {
                 write!(f, "Store {{ {key:?}, {value:?}}}")
             }
-            StorageMsg::Remove { key, .. } => {
+            Self::Remove { key, .. } => {
                 write!(f, "Remove {{ {key:?} }}")
             }
-            StorageMsg::Execute { .. } => write!(f, "Execute transaction"),
+            Self::Execute { .. } => write!(f, "Execute transaction"),
         }
     }
 }
