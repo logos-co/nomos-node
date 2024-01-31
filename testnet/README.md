@@ -5,7 +5,6 @@ The Nomos Docker Compose Testnet contains four distinct service types:
 - **Bootstrap Node Service**: A singular Nomos node with its own service and a deterministic DNS address. Other nodes utilize this as their initial peer.
 - **Libp2p Node Services**: Multiple dynamically spawned Nomos nodes that announce their existence through etcd.
 - **Etcd Service**: A container running an etcd instance.
-- **Mix-Node-{0,1,2}**: These are statically configured mixnet nodes. Every Libp2p node includes these in its topology configuration.
 
 ## Building
 
@@ -42,7 +41,7 @@ docker compose up -d
 Followed by:
 
 ```bash
-docker compose logs -f {bootstrap,libp2p-node,mixnode,etcd}
+docker compose logs -f {bootstrap,libp2p-node,etcd}
 ```
 
 ## Using testnet
