@@ -17,4 +17,4 @@ echo "CONSENSUS_PRIV_KEY: ${CONSENSUS_PRIV_KEY}"
 echo "DA_VOTER: ${DA_VOTER}"
 echo "OVERLAY_NODES: ${OVERLAY_NODES}"
 
-exec /usr/bin/nomos-node /etc/nomos/bootstrap_config.yaml
+exec /usr/bin/nomos-node /etc/nomos/bootstrap_config.yaml --with-metrics

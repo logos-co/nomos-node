@@ -5,6 +5,8 @@ use nomos_api::ApiService;
 use nomos_log::{Logger, LoggerBackend, LoggerFormat};
 use nomos_node::config::LoggerBackendType;
 use nomos_node::{HttpArgs, LogArgs, Tx, Wire};
+use nomos_storage::backends::rocksdb::RocksBackend;
+use nomos_storage::StorageService;
 use overwatch_rs::services::ServiceData;
 use serde::{Deserialize, Serialize};
 use tracing::Level;
@@ -15,6 +17,7 @@ pub type ApiArgs = HttpArgs;
 pub struct Config {
     pub log: <Logger as ServiceData>::Settings,
     pub api: <ApiService<AxumBackend<Tx, Wire>> as ServiceData>::Settings,
+    pub storage: <StorageService<RocksBackend<Wire>> as ServiceData>::Settings,
 }
 
 impl Config {

@@ -15,6 +15,10 @@ use nomos_libp2p::{secp256k1::SecretKey, Multiaddr};
 use nomos_log::{Logger, LoggerBackend, LoggerFormat};
 use nomos_network::backends::libp2p::Libp2p;
 use nomos_network::NetworkService;
+use nomos_storage::{
+    backends::rocksdb::{RocksBackend, RocksBackendSettings},
+    StorageService,
+};
 use overwatch_rs::services::ServiceData;
 use serde::{Deserialize, Serialize};
 use tracing::Level;
@@ -126,6 +130,19 @@ pub struct Config {
     pub http: <ApiService<AxumBackend<Tx, Wire, MB16>> as ServiceData>::Settings,
     pub consensus: <Carnot as ServiceData>::Settings,
     pub da: <DataAvailability as ServiceData>::Settings,
+
+    #[serde(default = "default_storage_settings")]
+    pub storage: <StorageService<RocksBackend<Wire>> as ServiceData>::Settings,
+}
+
+const DEFAULT_DB_PATH: &str = "./db";
+
+fn default_storage_settings() -> <StorageService<RocksBackend<Wire>> as ServiceData>::Settings {
+    RocksBackendSettings {
+        db_path: DEFAULT_DB_PATH.into(),
+        read_only: false,
+        column_family: Some("blocks".into()),
+    }
 }
 
 impl Config {

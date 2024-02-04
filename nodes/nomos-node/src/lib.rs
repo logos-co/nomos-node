@@ -7,8 +7,6 @@ use carnot_engine::overlay::{RandomBeaconState, RoundRobin, TreeOverlay};
 use color_eyre::eyre::Result;
 use full_replication::Certificate;
 use full_replication::{AbsoluteNumber, Attestation, Blob, FullReplication};
-#[cfg(feature = "metrics")]
-use metrics::{backend::map::MapMetricsBackend, types::MetricsData, MetricsService};
 
 use api::AxumBackend;
 use bytes::Bytes;
@@ -33,7 +31,7 @@ use nomos_mempool::{
 use nomos_metrics::Metrics;
 use nomos_network::backends::libp2p::Libp2p;
 use nomos_storage::{
-    backends::{sled::SledBackend, StorageSerde},
+    backends::{rocksdb::RocksBackend, StorageSerde},
     StorageService,
 };
 
@@ -68,7 +66,7 @@ pub type Carnot = CarnotConsensus<
     TreeOverlay<RoundRobin, RandomBeaconState>,
     FillSizeWithTx<MB16, Tx>,
     FillSizeWithBlobsCertificate<MB16, Certificate>,
-    SledBackend<Wire>,
+    RocksBackend<Wire>,
 >;
 
 pub type DataAvailability = DataAvailabilityService<
@@ -94,7 +92,7 @@ pub struct Nomos {
     consensus: ServiceHandle<Carnot>,
     http: ServiceHandle<ApiService<AxumBackend<Tx, Wire, MB16>>>,
     da: ServiceHandle<DataAvailability>,
-    storage: ServiceHandle<StorageService<SledBackend<Wire>>>,
+    storage: ServiceHandle<StorageService<RocksBackend<Wire>>>,
     #[cfg(feature = "metrics")]
     metrics: ServiceHandle<Metrics>,
     system_sig: ServiceHandle<SystemSig>,
@@ -112,4 +110,67 @@ impl StorageSerde for Wire {
     fn deserialize<T: DeserializeOwned>(buff: Bytes) -> Result<T, Self::Error> {
         wire::deserialize(&buff)
     }
+}
+
+pub fn run(
+    config: Config,
+    #[cfg(feature = "metrics")] metrics_args: MetricsArgs,
+) -> color_eyre::Result<()> {
+    use color_eyre::eyre::eyre;
+
+    use nomos_mempool::network::adapters::libp2p::Settings as AdapterSettings;
+    #[cfg(feature = "metrics")]
+    use nomos_metrics::MetricsSettings;
+    use overwatch_rs::overwatch::*;
+
+    #[cfg(feature = "metrics")]
+    let registry = cfg!(feature = "metrics")
+        .then(|| {
+            metrics_args
+                .with_metrics
+                .then(nomos_metrics::NomosRegistry::default)
+        })
+        .flatten();
+
+    #[cfg(not(feature = "metrics"))]
+    let registry = None;
+
+    let app = OverwatchRunner::<Nomos>::run(
+        NomosServiceSettings {
+            network: config.network,
+            logging: config.log,
+            http: config.http,
+            cl_mempool: nomos_mempool::Settings {
+                backend: (),
+                network: AdapterSettings {
+                    topic: String::from(crate::CL_TOPIC),
+                    id: <Tx as Transaction>::hash,
+                },
+                registry: registry.clone(),
+            },
+            da_mempool: nomos_mempool::Settings {
+                backend: (),
+                network: AdapterSettings {
+                    topic: String::from(crate::DA_TOPIC),
+                    id: cert_id,
+                },
+                registry: registry.clone(),
+            },
+            consensus: config.consensus,
+            #[cfg(feature = "metrics")]
+            metrics: MetricsSettings { registry },
+            da: config.da,
+            storage: config.storage,
+            system_sig: (),
+        },
+        None,
+    )
+    .map_err(|e| eyre!("Error encountered: {}", e))?;
+    app.wait_finished();
+    Ok(())
+}
+
+fn cert_id(cert: &Certificate) -> <Blob as blob::Blob>::Hash {
+    use certificate::Certificate;
+    cert.hash()
 }

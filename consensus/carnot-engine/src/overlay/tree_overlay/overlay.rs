@@ -146,10 +146,15 @@ where
         if self.is_member_of_leaf_committee(id) {
             return 0;
         }
-        self.carnot_tree
+        println!("{:?}", self.carnot_tree);
+        match self
+            .carnot_tree
             .committee_by_member_id(&id)
             .map(|c| apply_threshold(c.len(), self.threshold))
-            .expect("node is not part of any committee")
+        {
+            Some(threshold) => threshold,
+            None => panic!("node {id} is not part of any committee"),
+        }
     }
 
     // TODO: Carnot node in sim does not send votes to the next leader from the child committee of

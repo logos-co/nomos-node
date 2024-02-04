@@ -11,14 +11,17 @@ const DUMMY_NODE_ID: NodeId = NodeId::new([0u8; 32]);
 #[tokio::test]
 async fn ten_nodes_one_down() {
     let (_mixnodes, mixnet_config) = MixNode::spawn_nodes(3).await;
-    let mut nodes = NomosNode::spawn_nodes(SpawnConfig::Chain {
-        consensus: ConsensusConfig {
-            n_participants: 10,
-            threshold: Fraction::new(9u32, 10u32),
-            timeout: std::time::Duration::from_secs(5),
+    let mut nodes = NomosNode::spawn_nodes(
+        SpawnConfig::Chain {
+            consensus: ConsensusConfig {
+                n_participants: 10,
+                threshold: Fraction::new(9u32, 10u32),
+                timeout: std::time::Duration::from_secs(5),
+            },
+            mixnet: mixnet_config,
         },
-        mixnet: mixnet_config,
-    })
+        None,
+    )
     .await;
     let mut failed_node = nodes.pop().unwrap();
     failed_node.stop();

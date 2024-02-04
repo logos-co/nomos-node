@@ -1,8 +1,10 @@
 // std
 use std::net::SocketAddr;
+use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
 use std::time::Duration;
 // internal
+use super::{create_tempdir, persist_tempdir, LOGS_PREFIX};
 use crate::{adjust_timeout, get_available_port, ConsensusConfig, MixnetConfig, Node, SpawnConfig};
 use carnot_consensus::{CarnotInfo, CarnotSettings};
 use carnot_engine::overlay::{RandomBeaconState, RoundRobin, TreeOverlay, TreeOverlaySettings};
@@ -22,14 +24,13 @@ use nomos_node::{api::AxumBackendSettings, Config, Tx};
 use fraction::Fraction;
 use once_cell::sync::Lazy;
 use rand::{thread_rng, Rng};
-use reqwest::Client;
+use reqwest::{Client, Url};
 use tempfile::NamedTempFile;
 
 static CLIENT: Lazy<Client> = Lazy::new(Client::new);
 const NOMOS_BIN: &str = "../target/debug/nomos-node";
 const CARNOT_INFO_API: &str = "carnot/info";
 const STORAGE_BLOCKS_API: &str = "storage/block";
-const LOGS_PREFIX: &str = "__logs";
 const GET_BLOCKS_INFO: &str = "carnot/blocks";
 
 pub struct NomosNode {
@@ -42,14 +43,14 @@ pub struct NomosNode {
 impl Drop for NomosNode {
     fn drop(&mut self) {
         if std::thread::panicking() {
-            println!("persisting directory at {}", self._tempdir.path().display());
-            // we need ownership of the dir to persist it
-            let dir = std::mem::replace(&mut self._tempdir, tempfile::tempdir().unwrap());
-            // a bit confusing but `into_path` persists the directory
-            let _ = dir.into_path();
+            if let Err(e) = persist_tempdir(&mut self._tempdir, "nomos-node") {
+                println!("failed to persist tempdir: {e}");
+            }
         }
 
-        self.child.kill().unwrap();
+        if let Err(e) = self.child.kill() {
+            println!("failed to kill the child process: {e}");
+        }
     }
 }
 
@@ -61,11 +62,7 @@ impl NomosNode {
     pub async fn spawn(mut config: Config) -> Self {
         // Waku stores the messages in a db file in the current dir, we need a different
         // directory for each node to avoid conflicts
-        //
-        // NOTE: It's easier to use the current location instead of OS-default tempfile location
-        // because Github Actions can easily access files in the current location using wildcard
-        // to upload them as artifacts.
-        let dir = tempfile::TempDir::new_in(std::env::current_dir().unwrap()).unwrap();
+        let dir = create_tempdir().unwrap();
         let mut file = NamedTempFile::new().unwrap();
         let config_path = file.path().to_owned();
 
@@ -113,6 +110,10 @@ impl NomosNode {
             }
             tokio::time::sleep(Duration::from_millis(100)).await;
         }
+    }
+
+    pub fn url(&self) -> Url {
+        format!("http://{}", self.addr).parse().unwrap()
     }
 
     pub async fn get_block(&self, id: BlockId) -> Option<Block<Tx, Certificate>> {
@@ -201,10 +202,11 @@ impl NomosNode {
 impl Node for NomosNode {
     type ConsensusInfo = CarnotInfo;
 
-    async fn spawn_nodes(config: SpawnConfig) -> Vec<Self> {
+    async fn spawn_nodes(config: SpawnConfig, storage_dir: Option<PathBuf>) -> Vec<Self> {
         match config {
             SpawnConfig::Star { consensus, mixnet } => {
-                let (next_leader_config, configs) = create_node_configs(consensus, mixnet);
+                let (next_leader_config, configs) =
+                    create_node_configs(consensus, mixnet, storage_dir);
 
                 let first_node_addr = node_address(&next_leader_config);
                 let mut nodes = vec![Self::spawn(next_leader_config).await];
@@ -219,7 +221,8 @@ impl Node for NomosNode {
                 nodes
             }
             SpawnConfig::Chain { consensus, mixnet } => {
-                let (next_leader_config, configs) = create_node_configs(consensus, mixnet);
+                let (next_leader_config, configs) =
+                    create_node_configs(consensus, mixnet, storage_dir);
 
                 let mut prev_node_addr = node_address(&next_leader_config);
                 let mut nodes = vec![Self::spawn(next_leader_config).await];
@@ -253,6 +256,7 @@ impl Node for NomosNode {
 fn create_node_configs(
     consensus: ConsensusConfig,
     mut mixnet: MixnetConfig,
+    storage_dir: Option<PathBuf>,
 ) -> (Config, Vec<Config>) {
     let mut ids = vec![[0; 32]; consensus.n_participants];
     for id in &mut ids {
@@ -269,6 +273,7 @@ fn create_node_configs(
                 consensus.timeout,
                 mixnet.node_configs.pop(),
                 mixnet.topology.clone(),
+                storage_dir.clone(),
             )
         })
         .collect::<Vec<_>>();
@@ -292,6 +297,7 @@ fn create_node_config(
     timeout: Duration,
     mixnet_node_config: Option<MixnetNodeConfig>,
     mixnet_topology: MixnetTopology,
+    storage_dir: Option<PathBuf>,
 ) -> Config {
     let mixnet_client_mode = match mixnet_node_config {
         Some(node_config) => {
@@ -341,8 +347,6 @@ fn create_node_config(
                 cors_origins: vec![],
             },
         },
-        #[cfg(feature = "metrics")]
-        metrics: Default::default(),
         da: nomos_da::Settings {
             da_protocol: full_replication::Settings {
                 voter: id,
@@ -352,6 +356,17 @@ fn create_node_config(
                 max_capacity: usize::MAX,
                 evicting_period: Duration::from_secs(60 * 60 * 24), // 1 day
             },
+        },
+        storage: nomos_storage::backends::rocksdb::RocksBackendSettings {
+            db_path: {
+                let p = storage_dir
+                    .unwrap_or("db".into())
+                    .join(NodeId::new(id).to_string());
+                let _ = std::fs::create_dir_all(&p);
+                p
+            },
+            read_only: false,
+            column_family: Some("blocks".into()),
         },
     };
 
