@@ -5,7 +5,7 @@
 mod ui;
 
 use crate::{
-    api::consensus::get_blocks_info,
+    api::{consensus::carnot_info, storage::get_block_contents},
     da::{
         disseminate::{
             DaProtocolChoice, DisseminateApp, DisseminateAppServiceSettings, Settings, Status,
@@ -18,7 +18,7 @@ use full_replication::{
     AbsoluteNumber, Attestation, Certificate, FullReplication, Settings as DaSettings,
 };
 use futures::{stream, StreamExt};
-use nomos_core::{block::BlockId, da::DaProtocol, wire};
+use nomos_core::{da::DaProtocol, wire};
 use nomos_log::{LoggerBackend, LoggerSettings, SharedWriter};
 use nomos_network::{backends::libp2p::Libp2p, NetworkService};
 use overwatch_rs::{overwatch::OverwatchRunner, services::ServiceData};
@@ -58,9 +58,12 @@ pub struct NomosChat {
     /// The data availability protocol to use. Defaults to full replication.
     #[clap(flatten)]
     pub da_protocol: DaProtocolChoice,
-    /// The node to connect to to fetch blocks and blobs
+    /// The node to connect to to fetch carnot info
     #[clap(long)]
     pub node: Url,
+    /// The explorer to connect to to fetch blocks and blobs
+    #[clap(long)]
+    pub explorer: Url,
 }
 
 pub struct App {
@@ -73,6 +76,7 @@ pub struct App {
     payload_sender: UnboundedSender<Box<[u8]>>,
     status_updates: Receiver<Status>,
     node: Url,
+    explorer: Url,
     logs: Arc<sync::Mutex<Vec<u8>>>,
     scroll_logs: u16,
 }
@@ -133,6 +137,7 @@ impl NomosChat {
             payload_sender,
             status_updates,
             node: self.node.clone(),
+            explorer: self.explorer.clone(),
             logs: shared_writer,
             scroll_logs: 0,
         };
@@ -155,7 +160,8 @@ impl NomosChat {
 fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) {
     let (message_tx, message_rx) = std::sync::mpsc::channel();
     let node = app.node.clone();
-    std::thread::spawn(move || check_for_messages(message_tx, node));
+    let explorer = app.explorer.clone();
+    std::thread::spawn(move || check_for_messages(message_tx, node, explorer));
     loop {
         terminal.draw(|f| ui::ui(f, &app)).unwrap();
 
@@ -229,14 +235,10 @@ struct ChatMessage {
 }
 
 #[tokio::main]
-async fn check_for_messages(sender: Sender<Vec<ChatMessage>>, node: Url) {
-    // Should ask for the genesis block to be more robust
-    let mut last_tip = BlockId::zeros();
-
+async fn check_for_messages(sender: Sender<Vec<ChatMessage>>, node: Url, explorer: Url) {
     loop {
-        if let Ok((new_tip, messages)) = fetch_new_messages(&last_tip, &node).await {
+        if let Ok(messages) = fetch_new_messages(&explorer, &node).await {
             sender.send(messages).expect("channel closed");
-            last_tip = new_tip;
         }
         tokio::time::sleep(Duration::from_millis(100)).await;
     }
@@ -245,10 +247,10 @@ async fn check_for_messages(sender: Sender<Vec<ChatMessage>>, node: Url) {
 // Process a single block's blobs and return chat messages
 async fn process_block_blobs(
     node: Url,
-    block_id: &BlockId,
+    block: &nomos_core::block::Block<nomos_node::Tx, full_replication::Certificate>,
     da_settings: DaSettings,
 ) -> Result<Vec<ChatMessage>, Box<dyn std::error::Error>> {
-    let blobs = get_block_blobs(&node, block_id).await?;
+    let blobs = get_block_blobs(&node, block).await?;
 
     // Note that number of attestations is ignored here since we only use the da protocol to
     // decode the blob data, not to validate the certificate
@@ -269,29 +271,25 @@ async fn process_block_blobs(
 
 // Fetch new messages since the last tip
 async fn fetch_new_messages(
-    last_tip: &BlockId,
+    explorer: &Url,
     node: &Url,
-) -> Result<(BlockId, Vec<ChatMessage>), Box<dyn std::error::Error>> {
+) -> Result<Vec<ChatMessage>, Box<dyn std::error::Error>> {
+    let info = carnot_info(node).await?;
     // By only specifying the 'to' parameter we get all the blocks since the last tip
-    let mut new_blocks = get_blocks_info(node, None, Some(*last_tip))
+    let mut blocks = get_block_contents(explorer, &info.tip.id)
         .await?
         .into_iter()
-        .map(|block| block.id)
         .collect::<Vec<_>>();
 
-    // The first block is the most recent one.
-    // Note that the 'to' is inclusive so the above request will always return at least one block
-    // as long as the block exists (which is the case since it was returned by a previous call)
-    let new_tip = new_blocks[0];
     // We already processed the last block so let's remove it
-    new_blocks.pop();
+    blocks.pop();
 
     let da_settings = DaSettings {
         num_attestations: 1,
         voter: [0; 32],
     };
 
-    let block_stream = stream::iter(new_blocks.iter().rev());
+    let block_stream = stream::iter(blocks.iter());
     let results: Vec<_> = block_stream
         .map(|block| {
             let node = node.clone();
@@ -299,7 +297,7 @@ async fn fetch_new_messages(
 
             process_block_blobs(node, block, da_settings)
         })
-        .buffer_unordered(new_blocks.len())
+        .buffer_unordered(blocks.len())
         .collect::<Vec<_>>()
         .await;
 
@@ -308,5 +306,5 @@ async fn fetch_new_messages(
         new_messages.extend(result?);
     }
 
-    Ok((new_tip, new_messages))
+    Ok(new_messages)
 }

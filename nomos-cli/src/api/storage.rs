@@ -6,13 +6,13 @@ use nomos_node::Tx;
 use reqwest::Url;
 
 pub async fn get_block_contents(
-    node: &Url,
+    explorer: &Url,
     block: &BlockId,
 ) -> Result<Option<Block<Tx, Certificate>>, reqwest::Error> {
-    const BLOCK_PATH: &str = "storage/block";
+    const BLOCK_PATH: &str = "explorer/blocks/depth";
     CLIENT
-        .post(node.join(BLOCK_PATH).unwrap())
-        .json(block)
+        .get(explorer.join(BLOCK_PATH).unwrap())
+        .query(&[("from", block)])
         .send()
         .await?
         .json()

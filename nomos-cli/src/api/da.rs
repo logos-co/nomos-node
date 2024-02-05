@@ -4,12 +4,12 @@ use nomos_core::da::blob;
 use reqwest::Url;
 
 pub async fn get_blobs(
-    node: &Url,
+    explorer: &Url,
     ids: Vec<<Blob as blob::Blob>::Hash>,
 ) -> Result<Vec<Blob>, reqwest::Error> {
     const BLOBS_PATH: &str = "da/blobs";
     CLIENT
-        .post(node.join(BLOBS_PATH).unwrap())
+        .post(explorer.join(BLOBS_PATH).unwrap())
         .json(&ids)
         .send()
         .await?
