@@ -11,7 +11,7 @@ use overwatch_rs::Services;
 use crate::api_backend::AxumBackend;
 use crate::config::{ApiArgs, Config};
 use nomos_log::Logger;
-use nomos_node::{DataAvailability, LogArgs, Tx, Wire};
+use nomos_node::{LogArgs, Tx, Wire};
 use nomos_storage::backends::sled::SledBackendSettings;
 use nomos_storage::{backends::sled::SledBackend, StorageService};
 
