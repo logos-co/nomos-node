@@ -15,7 +15,6 @@ pub type ApiArgs = HttpArgs;
 pub struct Config {
     pub log: <Logger as ServiceData>::Settings,
     pub api: <ApiService<AxumBackend<Tx, Wire>> as ServiceData>::Settings,
-    pub da: <DataAvailability as ServiceData>::Settings,
 }
 
 impl Config {

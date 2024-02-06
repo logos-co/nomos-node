@@ -19,7 +19,6 @@ use nomos_storage::{backends::sled::SledBackend, StorageService};
 struct Explorer {
     log: ServiceHandle<Logger>,
     storage: ServiceHandle<StorageService<SledBackend<Wire>>>,
-    da: ServiceHandle<DataAvailability>,
     api: ServiceHandle<ApiService<AxumBackend<Tx, Wire>>>,
 }
 
@@ -55,7 +54,6 @@ fn main() -> Result<()> {
             storage: SledBackendSettings {
                 db_path: DEFAULT_DB_PATH.into(),
             },
-            da: config.da,
             api: config.api,
         },
         None,

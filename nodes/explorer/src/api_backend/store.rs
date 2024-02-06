@@ -13,7 +13,6 @@ use full_replication::Certificate;
 use nomos_api::http::storage;
 use nomos_core::block::{Block, BlockId};
 use nomos_core::tx::Transaction;
-use nomos_node::make_request_and_return_response;
 use nomos_storage::backends::StorageSerde;
 use overwatch_rs::overwatch::handle::OverwatchHandle;
 
