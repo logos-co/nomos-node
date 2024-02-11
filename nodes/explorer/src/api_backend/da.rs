@@ -1,14 +1,11 @@
 // crates
-use axum::extract::{Json, Query, State};
-use axum::response::{IntoResponse, Response};
-use hyper::StatusCode;
+use axum::extract::{Json, State};
+use axum::response::Response;
 use nomos_node::make_request_and_return_response;
-use serde::de::DeserializeOwned;
-use serde::{Deserialize, Serialize};
 // internal
-use full_replication::{Blob, Certificate};
+use full_replication::Blob;
 use nomos_api::http::da::da_blobs;
-use nomos_core::{da::blob, tx::Transaction};
+use nomos_core::da::blob;
 use overwatch_rs::overwatch::handle::OverwatchHandle;
 
 pub(crate) async fn blobs(
