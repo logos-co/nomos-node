@@ -144,6 +144,10 @@ macro_rules! registry_init {
 #[async_trait::async_trait]
 impl ServiceCore for Logger {
     fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, overwatch_rs::DynError> {
+        use std::sync::Once;
+
+        static ONCE_INIT: Once = Once::new();
+
         let config = service_state.settings_reader.get_updated_settings();
         let (non_blocking, _guard) = match config.backend {
             LoggerBackend::Gelf { addr } => {
@@ -152,7 +156,10 @@ impl ServiceCore for Logger {
                     .overwatch_handle
                     .runtime()
                     .spawn(async move { task.connect().await });
-                registry_init!(layer, config.format, config.level);
+                ONCE_INIT.call_once(move || {
+                    registry_init!(layer, config.format, config.level);
+                });
+
                 return Ok(Self {
                     service_state,
                     worker_guard: None,
@@ -179,7 +186,9 @@ impl ServiceCore for Logger {
         let layer = tracing_subscriber::fmt::Layer::new()
             .with_level(true)
             .with_writer(non_blocking);
-        registry_init!(layer, config.format, config.level);
+        ONCE_INIT.call_once(move || {
+            registry_init!(layer, config.format, config.level);
+        });
         Ok(Self {
             service_state,
             worker_guard: Some(_guard),
