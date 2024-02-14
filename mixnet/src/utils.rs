@@ -3,22 +3,25 @@ use std::time::Duration;
 use rand::{Rng, SeedableRng};
 use rand_distr::{Distribution, Exp};
 
-/// A struct which helps give us a random interval from an exponential distribution.
+/// The Poisson distribution
+///
+/// The Poisson distribution is used because of its memoryless properties,
+/// which is known to offer optimal anonymity properties (Nym whitepaper 4.4).
 #[derive(Copy, Clone, Debug)]
-pub struct PoissonExpInterval<R>(R);
+pub struct Poisson<R>(R);
 
-impl<R: SeedableRng> PoissonExpInterval<R> {
+impl<R: SeedableRng> Poisson<R> {
     /// Returns a new instance
     pub fn new(seed: R::Seed) -> Self {
         Self(R::from_seed(seed))
     }
 }
 
-impl<R: Rng> PoissonExpInterval<R> {
-    /// Get a random interval from an exponential distribution in seconds.
+impl<R: Rng> Poisson<R> {
+    /// Get a random interval between events that follow a Poisson distribution.
     ///
-    /// The Poisson (exponential) distribution is used because of its memoryless properties,
-    /// which is known to offer optimal anonymity properties (Nym whitepaper 4.4).
+    /// If events occur in a Poisson distribution with rate_per_min,
+    /// the interval between events follow the exponential distribution with rate_per_min.
     pub fn interval(&mut self, rate_per_min: f64) -> Duration {
         // create an exponential distribution
         let exp = Exp::new(rate_per_min).unwrap();
@@ -26,12 +29,6 @@ impl<R: Rng> PoissonExpInterval<R> {
         let interval_min = exp.sample(&mut self.0);
         // convert minutes to seconds
         Duration::from_secs_f64(interval_min * 60.0)
-    }
-
-    /// Get the mean interval in seconds for a Poisson.
-    pub fn mean_interval(rate_per_min: f64) -> Duration {
-        // the mean interval in seconds for a Poisson process
-        Duration::from_secs_f64(1.0 / rate_per_min * 60.0)
     }
 }
 
@@ -45,7 +42,7 @@ mod tests {
     #[test]
     fn test_poisson_exp_interval_creation() {
         let seed = [0u8; 32]; // A seed for StdRng
-        let _instance = PoissonExpInterval::<StdRng>::new(seed);
+        let _instance = Poisson::<StdRng>::new(seed);
         // If no panic occurs, the test passes
     }
 
@@ -53,21 +50,12 @@ mod tests {
     #[test]
     fn test_interval_generation() {
         let seed = [0u8; 32]; // A seed for StdRng
-        let mut instance = PoissonExpInterval::<StdRng>::new(seed);
+        let mut instance = Poisson::<StdRng>::new(seed);
         let rate_per_min = 1.0; // 1 event per minute
         let interval = instance.interval(rate_per_min);
         // Check if the interval is within a plausible range
         // This is a basic check; in practice, you may want to perform a statistical test
         assert!(interval > Duration::from_secs(0)); // Must be positive
-    }
-
-    // Test the mean interval calculation
-    #[test]
-    fn test_mean_interval() {
-        let rate_per_min = 1.0; // 1 event per minute
-        let expected_mean = Duration::from_secs(60); // 60 seconds
-        let mean_interval = PoissonExpInterval::<StdRng>::mean_interval(rate_per_min);
-        assert_eq!(mean_interval, expected_mean);
     }
 
     // Compute the empirical CDF
@@ -92,7 +80,7 @@ mod tests {
     #[test]
     fn test_distribution_fit() {
         let seed = [1u8; 32];
-        let mut instance = PoissonExpInterval::<StdRng>::new(seed);
+        let mut instance = Poisson::<StdRng>::new(seed);
         let rate_per_min = 1.0;
         let mut intervals = Vec::new();
 
