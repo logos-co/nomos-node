@@ -92,22 +92,20 @@ mod tests {
     #[test]
     fn test_distribution_fit() {
         let seed = [1u8; 32];
-        let mut rng = StdRng::from_seed(seed);
+        let mut instance = PoissonExpInterval::<StdRng>::new(seed);
         let rate_per_min = 1.0;
-        let lambda = rate_per_min / 60.0;
         let mut intervals = Vec::new();
 
         // Generate 10,000 samples
         for _ in 0..10_000 {
-            let exp = Exp::new(lambda).unwrap();
-            let interval_sec = exp.sample(&mut rng);
-            intervals.push(Duration::from_secs_f64(interval_sec));
+            intervals.push(instance.interval(rate_per_min));
         }
 
         let empirical = empirical_cdf(&intervals);
 
         // theoretical CDF for exponential distribution
-        let theoretical_cdf = |x: f64| 1.0 - (-lambda * x).exp();
+        let rate_per_sec = rate_per_min / 60.0;
+        let theoretical_cdf = |x: f64| 1.0 - (-rate_per_sec * x).exp();
 
         // Kolmogorov-Smirnov test
         let ks_statistic: f64 = empirical
