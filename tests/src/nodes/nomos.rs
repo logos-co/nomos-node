@@ -198,6 +198,8 @@ impl NomosNode {
 impl Node for NomosNode {
     type ConsensusInfo = CarnotInfo;
 
+    /// Spawn nodes sequentially.
+    /// After one node is spawned successfully, the next node is spawned.
     async fn spawn_nodes(config: SpawnConfig) -> Vec<Self> {
         let mut nodes = Vec::new();
         for conf in Self::node_configs(config) {
