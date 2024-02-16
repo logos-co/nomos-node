@@ -4,7 +4,7 @@ use std::{collections::HashMap, time::Duration};
 use nomos_libp2p::{
     gossipsub::{self, Message},
     libp2p::swarm::ConnectionId,
-    Behaviour, BehaviourEvent, Multiaddr, Swarm, SwarmEvent, THandlerErr,
+    BehaviourEvent, Multiaddr, Swarm, SwarmEvent,
 };
 use tokio::sync::{broadcast, mpsc};
 use tokio_stream::StreamExt;
@@ -79,8 +79,7 @@ impl SwarmHandler {
         }
     }
 
-    #[allow(deprecated)]
-    fn handle_event(&mut self, event: SwarmEvent<BehaviourEvent, THandlerErr<Behaviour>>) {
+    fn handle_event(&mut self, event: SwarmEvent<BehaviourEvent>) {
         match event {
             SwarmEvent::Behaviour(BehaviourEvent::Gossipsub(gossipsub::Event::Message {
                 propagation_source: peer_id,

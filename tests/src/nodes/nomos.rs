@@ -10,7 +10,7 @@ use carnot_engine::overlay::{RandomBeaconState, RoundRobin, TreeOverlay, TreeOve
 use carnot_engine::{BlockId, NodeId, Overlay};
 use full_replication::Certificate;
 use nomos_core::block::Block;
-use nomos_libp2p::{multiaddr, Multiaddr};
+use nomos_libp2p::{Multiaddr, Swarm};
 use nomos_log::{LoggerBackend, LoggerFormat};
 use nomos_mempool::MempoolMetrics;
 use nomos_network::backends::libp2p::Libp2pConfig;
@@ -334,7 +334,10 @@ fn create_node_config(
 }
 
 fn node_address(config: &Config) -> Multiaddr {
-    multiaddr!(Ip4([127, 0, 0, 1]), Tcp(config.network.backend.inner.port))
+    Swarm::multiaddr(
+        std::net::Ipv4Addr::new(127, 0, 0, 1),
+        config.network.backend.inner.port,
+    )
 }
 
 pub enum Pool {

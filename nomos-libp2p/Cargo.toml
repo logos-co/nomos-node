@@ -7,15 +7,12 @@ edition = "2021"
 multiaddr = "0.18"
 tokio = { version = "1", features = ["sync", "macros"] }
 futures = "0.3"
-libp2p = { version = "0.52.4", features = [
+libp2p = { version = "0.53.2", features = [
   "dns",
-  "yamux",
-  "plaintext",
   "macros",
   "gossipsub",
-  "identify",
-  "tcp",
   "tokio",
+  "quic",
   "secp256k1",
 ] }
 blake2 = { version = "0.10" }
