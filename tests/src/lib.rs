@@ -39,6 +39,7 @@ pub fn adjust_timeout(d: Duration) -> Duration {
 pub trait Node: Sized {
     type ConsensusInfo: Debug + Clone + PartialEq;
     async fn spawn_nodes(config: SpawnConfig) -> Vec<Self>;
+    fn node_configs(config: SpawnConfig) -> Vec<nomos_node::Config>;
     async fn consensus_info(&self) -> Self::ConsensusInfo;
     fn stop(&mut self);
 }
