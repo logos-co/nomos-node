@@ -198,35 +198,45 @@ impl NomosNode {
 impl Node for NomosNode {
     type ConsensusInfo = CarnotInfo;
 
+    /// Spawn nodes sequentially.
+    /// After one node is spawned successfully, the next node is spawned.
     async fn spawn_nodes(config: SpawnConfig) -> Vec<Self> {
+        let mut nodes = Vec::new();
+        for conf in Self::node_configs(config) {
+            nodes.push(Self::spawn(conf).await);
+        }
+        nodes
+    }
+
+    fn node_configs(config: SpawnConfig) -> Vec<nomos_node::Config> {
         match config {
             SpawnConfig::Star { consensus } => {
                 let (next_leader_config, configs) = create_node_configs(consensus);
 
                 let first_node_addr = node_address(&next_leader_config);
-                let mut nodes = vec![Self::spawn(next_leader_config).await];
+                let mut node_configs = vec![next_leader_config];
                 for mut conf in configs {
                     conf.network
                         .backend
                         .initial_peers
                         .push(first_node_addr.clone());
 
-                    nodes.push(Self::spawn(conf).await);
+                    node_configs.push(conf);
                 }
-                nodes
+                node_configs
             }
             SpawnConfig::Chain { consensus } => {
                 let (next_leader_config, configs) = create_node_configs(consensus);
 
                 let mut prev_node_addr = node_address(&next_leader_config);
-                let mut nodes = vec![Self::spawn(next_leader_config).await];
+                let mut node_configs = vec![next_leader_config];
                 for mut conf in configs {
                     conf.network.backend.initial_peers.push(prev_node_addr);
                     prev_node_addr = node_address(&conf);
 
-                    nodes.push(Self::spawn(conf).await);
+                    node_configs.push(conf);
                 }
-                nodes
+                node_configs
             }
         }
     }
