@@ -19,6 +19,7 @@ members = [
     "nomos-cli",
     "nomos-utils",
     "nodes/nomos-node",
+    "mixnet",
     "simulations",
     "consensus/carnot-engine",
     "tests",
