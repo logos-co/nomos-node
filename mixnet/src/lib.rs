@@ -2,5 +2,5 @@
 #![deny(missing_docs, warnings)]
 #![forbid(unsafe_code)]
 
-/// Utility functions for the mixnet.
-pub mod utils;
+/// Poisson distribution
+pub mod poisson;
