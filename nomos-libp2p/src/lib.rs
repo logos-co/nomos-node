@@ -12,17 +12,14 @@ pub use libp2p;
 use blake2::digest::{consts::U32, Digest};
 use blake2::Blake2b;
 use libp2p::gossipsub::{Message, MessageId, TopicHash};
-#[allow(deprecated)]
+use libp2p::swarm::ConnectionId;
 pub use libp2p::{
     core::upgrade,
-    dns,
     gossipsub::{self, PublishError, SubscriptionError},
     identity::{self, secp256k1},
-    plaintext::Config as PlainText2Config,
-    swarm::{dial_opts::DialOpts, DialError, NetworkBehaviour, SwarmEvent, THandlerErr},
-    tcp, yamux, PeerId, SwarmBuilder, Transport,
+    swarm::{dial_opts::DialOpts, DialError, NetworkBehaviour, SwarmEvent},
+    PeerId, SwarmBuilder, Transport,
 };
-use libp2p::{swarm::ConnectionId, tcp::tokio::Tcp};
 pub use multiaddr::{multiaddr, Multiaddr, Protocol};
 
 /// Wraps [`libp2p::Swarm`], and config it for use within Nomos.
@@ -36,54 +33,47 @@ pub struct Behaviour {
     gossipsub: gossipsub::Behaviour,
 }
 
+impl Behaviour {
+    fn new(peer_id: PeerId, gossipsub_config: gossipsub::Config) -> Result<Self, Box<dyn Error>> {
+        let gossipsub = gossipsub::Behaviour::new(
+            gossipsub::MessageAuthenticity::Author(peer_id),
+            gossipsub::ConfigBuilder::from(gossipsub_config)
+                .validation_mode(gossipsub::ValidationMode::None)
+                .message_id_fn(compute_message_id)
+                .build()?,
+        )?;
+        Ok(Self { gossipsub })
+    }
+}
+
 #[derive(thiserror::Error, Debug)]
 pub enum SwarmError {
     #[error("duplicate dialing")]
     DuplicateDialing,
 }
 
-/// A timeout for the setup and protocol upgrade process for all in/outbound connections
-const TRANSPORT_TIMEOUT: Duration = Duration::from_secs(20);
+/// How long to keep a connection alive once it is idling.
+const IDLE_CONN_TIMEOUT: Duration = Duration::from_secs(300);
 
 impl Swarm {
     /// Builds a [`Swarm`] configured for use with Nomos on top of a tokio executor.
     //
     // TODO: define error types
     pub fn build(config: &SwarmConfig) -> Result<Self, Box<dyn Error>> {
-        let id_keys = identity::Keypair::from(secp256k1::Keypair::from(config.node_key.clone()));
-        let local_peer_id = PeerId::from(id_keys.public());
-        log::info!("libp2p peer_id:{}", local_peer_id);
+        let keypair =
+            libp2p::identity::Keypair::from(secp256k1::Keypair::from(config.node_key.clone()));
+        let peer_id = PeerId::from(keypair.public());
+        log::info!("libp2p peer_id:{}", peer_id);
 
-        // TODO: consider using noise authentication
-        let tcp_transport = tcp::Transport::<Tcp>::new(tcp::Config::default().nodelay(true))
-            .upgrade(upgrade::Version::V1Lazy)
-            .authenticate(PlainText2Config::new(&id_keys))
-            .multiplex(yamux::Config::default())
-            .timeout(TRANSPORT_TIMEOUT)
-            .boxed();
+        let mut swarm = libp2p::SwarmBuilder::with_existing_identity(keypair)
+            .with_tokio()
+            .with_quic()
+            .with_dns()?
+            .with_behaviour(|_| Behaviour::new(peer_id, config.gossipsub_config.clone()).unwrap())?
+            .with_swarm_config(|c| c.with_idle_connection_timeout(IDLE_CONN_TIMEOUT))
+            .build();
 
-        // Wrapping TCP transport into DNS transport to resolve hostnames.
-        let tcp_transport = dns::tokio::Transport::system(tcp_transport)?.boxed();
-
-        // TODO: consider using Signed or Anonymous.
-        //       For Anonymous, a custom `message_id` function need to be set
-        //       to prevent all messages from a peer being filtered as duplicates.
-        let gossipsub = gossipsub::Behaviour::new(
-            gossipsub::MessageAuthenticity::Author(local_peer_id),
-            gossipsub::ConfigBuilder::from(config.gossipsub_config.clone())
-                .validation_mode(gossipsub::ValidationMode::None)
-                .message_id_fn(compute_message_id)
-                .build()?,
-        )?;
-
-        let mut swarm = libp2p::Swarm::new(
-            tcp_transport,
-            Behaviour { gossipsub },
-            local_peer_id,
-            libp2p::swarm::Config::with_tokio_executor(),
-        );
-
-        swarm.listen_on(multiaddr!(Ip4(config.host), Tcp(config.port)))?;
+        swarm.listen_on(Self::multiaddr(config.host, config.port))?;
 
         Ok(Swarm { swarm })
     }
@@ -148,11 +138,14 @@ impl Swarm {
     pub fn topic_hash(topic: &str) -> TopicHash {
         gossipsub::IdentTopic::new(topic).hash()
     }
+
+    pub fn multiaddr(ip: std::net::Ipv4Addr, port: u16) -> Multiaddr {
+        multiaddr!(Ip4(ip), Udp(port), QuicV1)
+    }
 }
 
 impl futures::Stream for Swarm {
-    #[allow(deprecated)]
-    type Item = SwarmEvent<BehaviourEvent, THandlerErr<Behaviour>>;
+    type Item = SwarmEvent<BehaviourEvent>;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         Pin::new(&mut self.swarm).poll_next(cx)

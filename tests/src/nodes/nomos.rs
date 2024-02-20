@@ -10,7 +10,7 @@ use carnot_engine::overlay::{RandomBeaconState, RoundRobin, TreeOverlay, TreeOve
 use carnot_engine::{BlockId, NodeId, Overlay};
 use full_replication::Certificate;
 use nomos_core::block::Block;
-use nomos_libp2p::{multiaddr, Multiaddr};
+use nomos_libp2p::{Multiaddr, Swarm};
 use nomos_log::{LoggerBackend, LoggerFormat};
 use nomos_mempool::MempoolMetrics;
 use nomos_network::backends::libp2p::Libp2pConfig;
@@ -198,35 +198,45 @@ impl NomosNode {
 impl Node for NomosNode {
     type ConsensusInfo = CarnotInfo;
 
+    /// Spawn nodes sequentially.
+    /// After one node is spawned successfully, the next node is spawned.
     async fn spawn_nodes(config: SpawnConfig) -> Vec<Self> {
+        let mut nodes = Vec::new();
+        for conf in Self::node_configs(config) {
+            nodes.push(Self::spawn(conf).await);
+        }
+        nodes
+    }
+
+    fn node_configs(config: SpawnConfig) -> Vec<nomos_node::Config> {
         match config {
             SpawnConfig::Star { consensus } => {
                 let (next_leader_config, configs) = create_node_configs(consensus);
 
                 let first_node_addr = node_address(&next_leader_config);
-                let mut nodes = vec![Self::spawn(next_leader_config).await];
+                let mut node_configs = vec![next_leader_config];
                 for mut conf in configs {
                     conf.network
                         .backend
                         .initial_peers
                         .push(first_node_addr.clone());
 
-                    nodes.push(Self::spawn(conf).await);
+                    node_configs.push(conf);
                 }
-                nodes
+                node_configs
             }
             SpawnConfig::Chain { consensus } => {
                 let (next_leader_config, configs) = create_node_configs(consensus);
 
                 let mut prev_node_addr = node_address(&next_leader_config);
-                let mut nodes = vec![Self::spawn(next_leader_config).await];
+                let mut node_configs = vec![next_leader_config];
                 for mut conf in configs {
                     conf.network.backend.initial_peers.push(prev_node_addr);
                     prev_node_addr = node_address(&conf);
 
-                    nodes.push(Self::spawn(conf).await);
+                    node_configs.push(conf);
                 }
-                nodes
+                node_configs
             }
         }
     }
@@ -334,7 +344,10 @@ fn create_node_config(
 }
 
 fn node_address(config: &Config) -> Multiaddr {
-    multiaddr!(Ip4([127, 0, 0, 1]), Tcp(config.network.backend.inner.port))
+    Swarm::multiaddr(
+        std::net::Ipv4Addr::new(127, 0, 0, 1),
+        config.network.backend.inner.port,
+    )
 }
 
 pub enum Pool {
