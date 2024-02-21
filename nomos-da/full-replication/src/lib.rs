@@ -2,7 +2,8 @@
 use nomos_core::da::{
     attestation::{self, Attestation as _},
     blob::{self, BlobHasher},
-    certificate, DaProtocol,
+    certificate::{self, CertificateStrategy},
+    DaProtocol,
 };
 // std
 use std::collections::HashSet;
@@ -41,15 +42,6 @@ impl<S> FullReplication<S> {
             output_certificate_buf: Vec::new(),
         }
     }
-}
-
-// TODO: maybe abstract in a general library?
-trait CertificateStrategy {
-    type Attestation: attestation::Attestation;
-    type Certificate: certificate::Certificate;
-
-    fn can_build(&self, attestations: &[Self::Attestation]) -> bool;
-    fn build(&self, attestations: Vec<Self::Attestation>) -> Certificate;
 }
 
 #[derive(Debug, Clone)]
