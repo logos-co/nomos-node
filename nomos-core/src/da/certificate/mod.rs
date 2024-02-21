@@ -22,3 +22,11 @@ pub trait BlobCertificateSelect {
         certificates: I,
     ) -> impl Iterator<Item = Self::Certificate> + 'i;
 }
+
+pub trait CertificateStrategy {
+    type Attestation;
+    type Certificate;
+
+    fn can_build(&self, attestations: &[Self::Attestation]) -> bool;
+    fn build(&self, attestations: Vec<Self::Attestation>) -> Self::Certificate;
+}
