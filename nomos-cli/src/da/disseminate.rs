@@ -1,9 +1,11 @@
 use crate::api::mempool::send_certificate;
 use clap::{Args, ValueEnum};
-use full_replication::{AbsoluteNumber, Attestation, Certificate, FullReplication, Voter};
+use full_replication::{
+    AbsoluteNumber, Attestation, Certificate, FullReplication, Metadata, Voter,
+};
 use futures::StreamExt;
 use hex::FromHex;
-use nomos_core::{da::DaProtocol, wire};
+use nomos_core::{da::certificate, da::DaProtocol, wire};
 use nomos_da::network::{adapters::libp2p::Libp2pAdapter, NetworkAdapter};
 use nomos_log::Logger;
 use nomos_network::{backends::libp2p::Libp2p, NetworkService};
@@ -30,6 +32,7 @@ use tokio::sync::{mpsc::UnboundedReceiver, Mutex};
 pub async fn disseminate_and_wait<D, B, N, A, C>(
     mut da: D,
     data: Box<[u8]>,
+    metadata: C::Extension,
     adapter: N,
     status_updates: Sender<Status>,
     node_addr: Option<&Url>,
@@ -38,7 +41,8 @@ pub async fn disseminate_and_wait<D, B, N, A, C>(
 where
     D: DaProtocol<Blob = B, Attestation = A, Certificate = C>,
     N: NetworkAdapter<Blob = B, Attestation = A> + Send + Sync,
-    C: Serialize,
+    C: Serialize + certificate::Certificate,
+    C::Extension: Clone,
 {
     // 1) Building blob
     status_updates.send(Status::Encoding)?;
@@ -54,7 +58,7 @@ where
     status_updates.send(Status::WaitingAttestations)?;
     let mut attestations = adapter.attestation_stream().await;
     let cert: C = loop {
-        da.recv_attestation(attestations.next().await.unwrap());
+        da.recv_attestation(attestations.next().await.unwrap(), metadata.clone());
 
         if let Some(certificate) = da.certify_dispersal() {
             status_updates.send(Status::CreatingCert)?;
@@ -119,7 +123,7 @@ pub struct DisseminateApp {
 #[derive(Clone, Debug)]
 pub struct Settings {
     // This is wrapped in an Arc just to make the struct Clone
-    pub payload: Arc<Mutex<UnboundedReceiver<Box<[u8]>>>>,
+    pub payload: Arc<Mutex<UnboundedReceiver<(Metadata, Box<[u8]>)>>>,
     pub timeout: Duration,
     pub da_protocol: DaProtocolChoice,
     pub status_updates: Sender<Status>,
@@ -165,12 +169,13 @@ impl ServiceCore for DisseminateService {
             .await
             .expect("Relay connection with NetworkService should succeed");
 
-        while let Some(data) = payload.lock().await.recv().await {
+        while let Some((metadata, data)) = payload.lock().await.recv().await {
             match tokio::time::timeout(
                 timeout,
                 disseminate_and_wait(
                     da_protocol.clone(),
                     data,
+                    metadata,
                     Libp2pAdapter::new(network_relay.clone()).await,
                     status_updates.clone(),
                     node_addr.as_ref(),

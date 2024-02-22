@@ -15,7 +15,7 @@ use crate::{
 };
 use clap::Args;
 use full_replication::{
-    AbsoluteNumber, Attestation, Certificate, FullReplication, Settings as DaSettings,
+    AbsoluteNumber, Attestation, Certificate, FullReplication, Metadata, Settings as DaSettings,
 };
 use futures::{stream, StreamExt};
 use nomos_core::{block::BlockId, da::DaProtocol, wire};
@@ -78,7 +78,7 @@ pub struct App {
     message_status: Option<Status>,
     message_in_flight: bool,
     last_updated: Instant,
-    payload_sender: UnboundedSender<Box<[u8]>>,
+    payload_sender: UnboundedSender<(Metadata, Box<[u8]>)>,
     status_updates: Receiver<Status>,
     node: Url,
     logs: Arc<sync::Mutex<Vec<u8>>>,
@@ -172,9 +172,10 @@ impl NomosChat {
 fn run_once(
     author: &str,
     message: &str,
-    payload_sender: UnboundedSender<Box<[u8]>>,
+    payload_sender: UnboundedSender<(Metadata, Box<[u8]>)>,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    payload_sender.send(
+    payload_sender.send((
+        Metadata::default(),
         wire::serialize(&ChatMessage {
             author: author.to_string(),
             message: message.to_string(),
@@ -182,7 +183,7 @@ fn run_once(
         })
         .unwrap()
         .into(),
-    )?;
+    ))?;
 
     Ok(())
 }
@@ -221,7 +222,8 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) {
                         if !app.message_in_flight && !app.input.value().is_empty() {
                             app.message_in_flight = true;
                             app.payload_sender
-                                .send(
+                                .send((
+                                    Metadata::default(), // TODO: track index and pass app_id
                                     wire::serialize(&ChatMessage {
                                         author: app.username.clone().unwrap(),
                                         message: app.input.value().into(),
@@ -229,7 +231,7 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) {
                                     })
                                     .unwrap()
                                     .into(),
-                                )
+                                ))
                                 .unwrap();
                         }
                     }
