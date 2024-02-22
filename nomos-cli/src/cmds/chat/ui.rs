@@ -129,6 +129,7 @@ fn render_messages(f: &mut Frame, app: &App, rect: Rect) {
                  author,
                  message,
                  _nonce,
+                 ..
              }| {
                 let content = if author == app.username.as_ref().unwrap() {
                     static MARGIN: usize = 2;

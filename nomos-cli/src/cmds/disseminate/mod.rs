@@ -2,6 +2,7 @@ use crate::da::disseminate::{
     DaProtocolChoice, DisseminateApp, DisseminateAppServiceSettings, Settings, Status,
 };
 use clap::Args;
+use full_replication::Metadata;
 use nomos_log::{LoggerBackend, LoggerSettings};
 use nomos_network::backends::libp2p::Libp2p as NetworkBackend;
 use nomos_network::NetworkService;
@@ -59,7 +60,7 @@ impl Disseminate {
         let node_addr = self.node_addr.clone();
         let output = self.output.clone();
         let (payload_sender, payload_rx) = tokio::sync::mpsc::unbounded_channel();
-        payload_sender.send(bytes).unwrap();
+        payload_sender.send((Metadata::default(), bytes)).unwrap(); // TODO: pass index and app_id
         std::thread::spawn(move || {
             OverwatchRunner::<DisseminateApp>::run(
                 DisseminateAppServiceSettings {
