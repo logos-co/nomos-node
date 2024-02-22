@@ -31,7 +31,11 @@ pub trait DaProtocol {
     /// Validate that an attestation is valid for a blob.
     fn validate_attestation(&self, blob: &Self::Blob, attestation: &Self::Attestation) -> bool;
     /// Buffer attestations to produce a certificate of correct dispersal.
-    fn recv_attestation(&mut self, attestation: Self::Attestation);
+    fn recv_attestation(
+        &mut self,
+        attestation: Self::Attestation,
+        ext: <Self::Certificate as Certificate>::Extension,
+    );
     /// Attempt to produce a certificate of correct disperal for a blob.
     /// If the protocol is not yet ready to return the certificate, return None.
     fn certify_dispersal(&mut self) -> Option<Self::Certificate>;

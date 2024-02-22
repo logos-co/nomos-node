@@ -6,9 +6,11 @@ use std::hash::Hash;
 
 pub trait Certificate {
     type Blob: Blob;
+    type Extension;
     type Hash: Hash + Eq + Clone;
     fn blob(&self) -> <Self::Blob as Blob>::Hash;
     fn hash(&self) -> Self::Hash;
+    fn extension(&self) -> Self::Extension;
     fn as_bytes(&self) -> Bytes;
 }
 
@@ -25,8 +27,12 @@ pub trait BlobCertificateSelect {
 
 pub trait CertificateStrategy {
     type Attestation;
-    type Certificate;
+    type Certificate: Certificate;
 
     fn can_build(&self, attestations: &[Self::Attestation]) -> bool;
-    fn build(&self, attestations: Vec<Self::Attestation>) -> Self::Certificate;
+    fn build(
+        &self,
+        attestations: Vec<Self::Attestation>,
+        extension: <Self::Certificate as Certificate>::Extension,
+    ) -> Self::Certificate;
 }
