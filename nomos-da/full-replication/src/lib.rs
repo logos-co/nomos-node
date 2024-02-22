@@ -81,9 +81,12 @@ impl CertificateStrategy for AbsoluteNumber<Attestation, Certificate> {
                 == 1
     }
 
-    fn build(&self, attestations: Vec<Self::Attestation>) -> Certificate {
+    fn build(&self, attestations: Vec<Self::Attestation>, metadata: Metadata) -> Certificate {
         assert!(self.can_build(&attestations));
-        Certificate { attestations }
+        Certificate {
+            attestations,
+            metadata,
+        }
     }
 }
 
@@ -138,10 +141,17 @@ impl attestation::Attestation for Attestation {
     }
 }
 
+#[derive(Default, Debug, Copy, Clone, Serialize, Deserialize, Eq, PartialEq)]
+pub struct Metadata {
+    app_id: [u8; 32],
+    index: u64,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct Certificate {
     attestations: Vec<Attestation>,
+    metadata: Metadata,
 }
 
 impl Hash for Certificate {
@@ -153,6 +163,7 @@ impl Hash for Certificate {
 impl certificate::Certificate for Certificate {
     type Blob = Blob;
     type Hash = [u8; 32];
+    type Extension = Metadata;
 
     fn blob(&self) -> <Self::Blob as blob::Blob>::Hash {
         self.attestations[0].blob
@@ -173,6 +184,10 @@ impl certificate::Certificate for Certificate {
         wire::serialize(self)
             .expect("Certificate shouldn't fail to be serialized")
             .into()
+    }
+
+    fn extension(&self) -> Self::Extension {
+        self.metadata
     }
 }
 
@@ -215,12 +230,12 @@ impl DaProtocol for FullReplication<AbsoluteNumber<Attestation, Certificate>> {
         hasher(blob) == attestation.blob
     }
 
-    fn recv_attestation(&mut self, attestation: Self::Attestation) {
+    fn recv_attestation(&mut self, attestation: Self::Attestation, metadata: Metadata) {
         self.attestations.push(attestation);
         if self.certificate_strategy.can_build(&self.attestations) {
             self.output_certificate_buf.push(
                 self.certificate_strategy
-                    .build(std::mem::take(&mut self.attestations)),
+                    .build(std::mem::take(&mut self.attestations), metadata),
             );
         }
     }
