@@ -30,6 +30,8 @@ use std::{
 };
 use tokio::sync::{mpsc::UnboundedReceiver, Mutex};
 
+pub type Payload = (Metadata, Box<[u8]>);
+
 pub async fn disseminate_and_wait<D, B, N, A, C>(
     mut da: D,
     data: Box<[u8]>,
@@ -124,7 +126,7 @@ pub struct DisseminateApp {
 #[derive(Clone, Debug)]
 pub struct Settings {
     // This is wrapped in an Arc just to make the struct Clone
-    pub payload: Arc<Mutex<UnboundedReceiver<(Metadata, Box<[u8]>)>>>,
+    pub payload: Arc<Mutex<UnboundedReceiver<Payload>>>,
     pub timeout: Duration,
     pub da_protocol: DaProtocolChoice,
     pub status_updates: Sender<Status>,

@@ -8,7 +8,8 @@ use crate::{
     api::consensus::get_blocks_info,
     da::{
         disseminate::{
-            DaProtocolChoice, DisseminateApp, DisseminateAppServiceSettings, Settings, Status,
+            DaProtocolChoice, DisseminateApp, DisseminateAppServiceSettings, Payload, Settings,
+            Status,
         },
         retrieve::get_block_blobs,
     },
@@ -79,7 +80,7 @@ pub struct App {
     message_status: Option<Status>,
     message_in_flight: bool,
     last_updated: Instant,
-    payload_sender: UnboundedSender<(Metadata, Box<[u8]>)>,
+    payload_sender: UnboundedSender<Payload>,
     status_updates: Receiver<Status>,
     node: Url,
     logs: Arc<sync::Mutex<Vec<u8>>>,
@@ -173,7 +174,7 @@ impl NomosChat {
 fn run_once(
     author: &str,
     message: &str,
-    payload_sender: UnboundedSender<(Metadata, Box<[u8]>)>,
+    payload_sender: UnboundedSender<Payload>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     payload_sender.send((
         Metadata::default(),
