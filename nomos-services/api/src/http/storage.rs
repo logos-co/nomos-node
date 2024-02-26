@@ -1,7 +1,7 @@
 use carnot_engine::BlockId;
 use nomos_core::block::Block;
 use nomos_storage::{
-    backends::{sled::SledBackend, StorageSerde},
+    backends::{rocksdb::RocksBackend, StorageSerde},
     StorageMsg, StorageService,
 };
 
@@ -14,7 +14,7 @@ where
     S: StorageSerde + Send + Sync + 'static,
 {
     let relay = handle
-        .relay::<StorageService<SledBackend<S>>>()
+        .relay::<StorageService<RocksBackend<S>>>()
         .connect()
         .await?;
     let (msg, receiver) = StorageMsg::new_load_message(id);
