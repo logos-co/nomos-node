@@ -139,6 +139,15 @@ services:
     entrypoint: /usr/bin/mixnode
     command: /etc/nomos/mixnode_config.yaml
 
+  chatbot:
+    container_name: chatbot
+    build:
+      context: .
+      dockerfile: testnet/Dockerfile
+    volumes:
+      - ./testnet:/etc/nomos
+    entrypoint: /etc/nomos/scripts/run_nomos_bot.sh
+
   etcd:
     container_name: etcd
     image: quay.io/coreos/etcd:v3.4.15
@@ -148,3 +157,29 @@ services:
       - /usr/local/bin/etcd
       - --advertise-client-urls=http://etcd:2379
       - --listen-client-urls=http://0.0.0.0:2379
+
+  prometheus:
+    container_name: prometheus
+    image: prom/prometheus:latest
+    volumes:
+      - ./testnet/monitoring/prometheus-config.yml:/etc/prometheus/prometheus.yml:z
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=7d
+    ports:
+      - 127.0.0.1:9090:9090
+    restart: on-failure
+
+  grafana:
+    container_name: grafana
+    image: grafana/grafana:latest
+    env_file:
+      - ./testnet/monitoring/grafana/plugins.env
+    volumes:
+      - ./testnet/monitoring/grafana/grafana.ini:/etc/grafana/grafana.ini:z
+      - ./testnet/monitoring/grafana/datasources.yaml:/etc/grafana/provisioning/datasources/datasources.yaml:z
+    ports:
+      - 9091:3000
+    restart: on-failure
+    depends_on:
+      - prometheus

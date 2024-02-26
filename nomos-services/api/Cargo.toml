@@ -20,7 +20,7 @@ nomos-network = { path = "../../nomos-services/network" }
 nomos-da = { path = "../../nomos-services/data-availability" }
 nomos-mempool = { path = "../../nomos-services/mempool", features = ["mock", "libp2p", "openapi"] }
 nomos-metrics = { path = "../../nomos-metrics" }
-nomos-storage = { path = "../../nomos-services/storage", features = ["sled"] }
+nomos-storage = { path = "../../nomos-services/storage", features = ["rocksdb"] }
 nomos-libp2p = { path = "../../nomos-libp2p" }
 full-replication = { path = "../../nomos-da/full-replication" }
 serde = { version = "1", features = ["derive"] }
