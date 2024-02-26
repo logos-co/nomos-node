@@ -92,11 +92,13 @@ impl<SerdeOp: StorageSerde + Send + Sync + 'static> StorageBackend for RocksBack
             (false, None) => {
                 let mut opts = Options::default();
                 opts.create_if_missing(true);
+                opts.create_missing_column_families(true);
                 DB::open(&opts, db_path)?
             }
             (false, Some(cf)) => {
                 let mut opts = Options::default();
                 opts.create_if_missing(true);
+                opts.create_missing_column_families(true);
                 DB::open_cf(&opts, db_path, [cf])?
             }
         };
