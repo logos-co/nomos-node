@@ -3,17 +3,25 @@ use std::time::Duration;
 use rand::Rng;
 use rand_distr::{Distribution, Exp};
 
-/// Get a random interval between events that follow a Poisson distribution.
-///
-/// If events occur in a Poisson distribution with rate_per_min,
-/// the interval between events follow the exponential distribution with rate_per_min.
-pub fn poisson_interval<R: Rng + ?Sized>(rng: &mut R, rate_per_min: f64) -> Duration {
-    // create an exponential distribution
-    let exp = Exp::new(rate_per_min).unwrap();
-    // generate a random value from the distribution
-    let interval_min = exp.sample(rng);
-    // convert minutes to seconds
-    Duration::from_secs_f64(interval_min * 60.0)
+use crate::error::MixnetError;
+
+pub struct Poisson(Exp<f64>);
+
+impl Poisson {
+    pub fn new(rate_per_min: f64) -> Result<Self, MixnetError> {
+        Ok(Self(Exp::new(rate_per_min)?))
+    }
+
+    /// Get a random interval between events that follow a Poisson distribution.
+    ///
+    /// If events occur in a Poisson distribution with rate_per_min,
+    /// the interval between events follow the exponential distribution with rate_per_min.
+    pub fn interval<R: Rng + ?Sized>(&self, rng: &mut R) -> Duration {
+        // generate a random value from the distribution
+        let interval_min = self.0.sample(rng);
+        // convert minutes to seconds
+        Duration::from_secs_f64(interval_min * 60.0)
+    }
 }
 
 #[cfg(test)]
@@ -25,7 +33,7 @@ mod tests {
     // Test the interval generation for a specific rate
     #[test]
     fn test_interval_generation() {
-        let interval = poisson_interval(&mut OsRng, 1.0);
+        let interval = Poisson::new(1.0).unwrap().interval(&mut OsRng);
         // Check if the interval is within a plausible range
         // This is a basic check; in practice, you may want to perform a statistical test
         assert!(interval > Duration::from_secs(0)); // Must be positive
@@ -56,8 +64,9 @@ mod tests {
         let mut intervals = Vec::new();
 
         // Generate 10,000 samples
+        let poisson = Poisson::new(rate_per_min).unwrap();
         for _ in 0..10_000 {
-            intervals.push(poisson_interval(&mut OsRng, rate_per_min));
+            intervals.push(poisson.interval(&mut OsRng));
         }
 
         let empirical = empirical_cdf(&intervals);
