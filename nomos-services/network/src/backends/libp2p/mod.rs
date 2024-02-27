@@ -15,7 +15,7 @@ use super::NetworkBackend;
 use futures::StreamExt;
 use mixnet::address::NodeAddress;
 use mixnet::client::{MessageQueue, MixClient};
-use mixnet::node::{MixNode, PacketQueue};
+use mixnet::node::{MixNode, Output, PacketQueue};
 use nomos_core::wire;
 pub use nomos_libp2p::libp2p::gossipsub::{Message, TopicHash};
 use nomos_libp2p::libp2p::{Stream, StreamProtocol};
@@ -159,7 +159,35 @@ impl Libp2p {
         packet_queue: PacketQueue,
         swarm_commands_tx: mpsc::Sender<SwarmCommand>,
     ) {
-        todo!()
+        while let Some(output) = mixnode.next().await {
+            match output {
+                Output::Forward(packet) => {
+                    Self::stream_send(
+                        packet.address(),
+                        packet.body(),
+                        &swarm_commands_tx,
+                        &packet_queue,
+                    )
+                    .await;
+                }
+                Output::ReconstructedMessage(message) => {
+                    match MixnetMessage::from_bytes(&message) {
+                        Ok(msg) => {
+                            swarm_commands_tx
+                                .send(SwarmCommand::Broadcast {
+                                    topic: msg.topic,
+                                    message: msg.message,
+                                })
+                                .await
+                                .unwrap();
+                        }
+                        Err(e) => {
+                            tracing::error!("failed to parse message received from mixnet: {e}");
+                        }
+                    }
+                }
+            }
+        }
     }
 
     async fn run_mixclient(
