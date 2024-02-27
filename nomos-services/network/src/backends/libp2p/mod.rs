@@ -10,12 +10,13 @@ use self::swarm::SwarmHandler;
 
 // internal
 use super::NetworkBackend;
+use futures::StreamExt;
 use mixnet::client::{MessageQueue, MixClient};
 use mixnet::node::{MixNode, PacketQueue};
 use nomos_core::wire;
 use nomos_libp2p::gossipsub;
 pub use nomos_libp2p::libp2p::gossipsub::{Message, TopicHash};
-use nomos_libp2p::libp2p::StreamProtocol;
+use nomos_libp2p::libp2p::{Stream, StreamProtocol};
 use nomos_libp2p::libp2p_stream::IncomingStreams;
 // crates
 use overwatch_rs::{overwatch::handle::OverwatchHandle, services::state::NoState};
@@ -171,7 +172,21 @@ impl Libp2p {
         packet_queue: PacketQueue,
         runtime_handle: Handle,
     ) {
-        todo!()
+        while let Some((_, stream)) = incoming_streams.next().await {
+            let queue = packet_queue.clone();
+            runtime_handle.spawn(async move {
+                if let Err(e) = Self::handle_stream(stream, queue).await {
+                    tracing::warn!("stream closed: {e}");
+                }
+            });
+        }
+    }
+
+    async fn handle_stream(mut stream: Stream, packet_queue: PacketQueue) -> std::io::Result<()> {
+        loop {
+            let msg = SwarmHandler::stream_read(&mut stream).await?;
+            packet_queue.send(msg).await.unwrap();
+        }
     }
 }
 

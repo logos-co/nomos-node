@@ -45,10 +45,11 @@ pub enum SwarmCommand {
     },
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct Dial {
     pub addr: Multiaddr,
     pub retry_count: usize,
+    pub result_sender: oneshot::Sender<Result<PeerId, nomos_libp2p::DialError>>,
 }
 
 pub type Topic = String;
