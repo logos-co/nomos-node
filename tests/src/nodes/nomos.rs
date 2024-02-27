@@ -392,7 +392,7 @@ fn create_mixnet_config(ports: &[u16]) -> MixnetConfig {
     MixnetConfig {
         mixclient_config: MixClientConfig {
             topology,
-            emission_rate_per_min: 500.0,
+            emission_rate_per_min: 120.0,
             redundancy: 1,
         },
         mixnode_configs,
