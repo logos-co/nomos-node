@@ -10,6 +10,7 @@ pub mod client;
 pub mod crypto;
 /// Mixnet errors
 pub mod error;
+mod fragment;
 /// Mix node
 pub mod node;
 mod packet;
