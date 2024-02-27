@@ -2,9 +2,11 @@ use rand::rngs::OsRng;
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
 
-use crate::fragment::{Fragment, MessageReconstructor};
-use crate::packet::{Message, Packet, PacketBody};
 use crate::{crypto::PrivateKey, error::MixnetError, poisson::Poisson};
+use crate::{
+    fragment::{Fragment, MessageReconstructor},
+    packet::{Message, Packet, PacketBody},
+};
 
 /// Mix node implementation that returns [`Output`] if exists.
 pub struct MixNode {
@@ -123,4 +125,60 @@ pub enum Output {
     Forward(Packet),
     /// Message reconstructed from [`Packet`]s
     ReconstructedMessage(Box<[u8]>),
+}
+
+#[cfg(test)]
+mod tests {
+    use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+
+    use crate::{
+        crypto::PublicKey,
+        packet::Packet,
+        topology::{tests::gen_entropy, MixNodeInfo, MixnetTopology},
+    };
+
+    use super::*;
+
+    #[tokio::test]
+    async fn mixnode() {
+        let encryption_private_key = PrivateKey::new();
+        let node_info = MixNodeInfo::new(
+            SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 1000u16).into(),
+            PublicKey::from(&encryption_private_key),
+        )
+        .unwrap();
+
+        let topology = MixnetTopology::new(
+            (0..2).map(|_| node_info.clone()).collect(),
+            2,
+            1,
+            gen_entropy(),
+        )
+        .unwrap();
+        let (mut mixnode, packet_queue) = MixNode::new(MixNodeConfig {
+            encryption_private_key,
+            delay_rate_per_min: 60.0,
+        })
+        .unwrap();
+
+        let msg = "hello".as_bytes();
+        let packets = Packet::build_real(msg, &topology).unwrap();
+        for packet in &packets {
+            packet_queue.send(packet.body()).await.unwrap();
+        }
+
+        for _ in &packets {
+            match mixnode.next().await.unwrap() {
+                Output::Forward(packet_to) => {
+                    packet_queue.send(packet_to.body()).await.unwrap();
+                }
+                Output::ReconstructedMessage(_) => unreachable!(),
+            }
+        }
+
+        assert_eq!(
+            Output::ReconstructedMessage(msg.to_vec().into_boxed_slice()),
+            mixnode.next().await.unwrap()
+        );
+    }
 }
