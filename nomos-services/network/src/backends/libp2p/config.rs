@@ -1,3 +1,4 @@
+use mixnet::{client::MixClientConfig, node::MixNodeConfig};
 use nomos_libp2p::{Multiaddr, SwarmConfig};
 use serde::{Deserialize, Serialize};
 
@@ -8,4 +9,6 @@ pub struct Libp2pConfig {
     // Initial peers to connect to
     #[serde(default)]
     pub initial_peers: Vec<Multiaddr>,
+    pub mixclient_config: MixClientConfig,
+    pub mixnode_config: MixNodeConfig,
 }

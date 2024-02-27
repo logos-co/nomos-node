@@ -9,6 +9,8 @@ use carnot_consensus::{CarnotInfo, CarnotSettings};
 use carnot_engine::overlay::{RandomBeaconState, RoundRobin, TreeOverlay, TreeOverlaySettings};
 use carnot_engine::{BlockId, NodeId, Overlay};
 use full_replication::Certificate;
+use mixnet::client::MixClientConfig;
+use mixnet::node::MixNodeConfig;
 use nomos_core::block::Block;
 use nomos_libp2p::{Multiaddr, Swarm};
 use nomos_log::{LoggerBackend, LoggerFormat};
@@ -298,6 +300,8 @@ fn create_node_config(
             backend: Libp2pConfig {
                 inner: Default::default(),
                 initial_peers: vec![],
+                mixclient_config: MixClientConfig {},
+                mixnode_config: MixNodeConfig {},
             },
         },
         consensus: CarnotSettings {

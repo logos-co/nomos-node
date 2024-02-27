@@ -2,25 +2,24 @@ use std::{collections::HashMap, time::Duration};
 
 #[allow(deprecated)]
 use nomos_libp2p::{
-    gossipsub::{self, Message},
-    libp2p::swarm::ConnectionId,
-    BehaviourEvent, Multiaddr, Swarm, SwarmEvent,
+    gossipsub, libp2p::swarm::ConnectionId, BehaviourEvent, Multiaddr, Swarm, SwarmEvent,
 };
-use tokio::sync::{broadcast, mpsc};
+use nomos_libp2p::{libp2p::StreamProtocol, libp2p_stream::IncomingStreams};
+use tokio::sync::{broadcast, mpsc, oneshot};
 use tokio_stream::StreamExt;
 
 use crate::backends::libp2p::Libp2pInfo;
 
 use super::{
-    command::{Command, Dial, Topic},
+    command::{Dial, SwarmCommand, Topic},
     Event, Libp2pConfig,
 };
 
 pub struct SwarmHandler {
     pub swarm: Swarm,
     pub pending_dials: HashMap<ConnectionId, Dial>,
-    pub commands_tx: mpsc::Sender<Command>,
-    pub commands_rx: mpsc::Receiver<Command>,
+    pub commands_tx: mpsc::Sender<SwarmCommand>,
+    pub commands_rx: mpsc::Receiver<SwarmCommand>,
     pub events_tx: broadcast::Sender<Event>,
 }
 
@@ -40,8 +39,8 @@ const MAX_RETRY: usize = 3;
 impl SwarmHandler {
     pub fn new(
         config: &Libp2pConfig,
-        commands_tx: mpsc::Sender<Command>,
-        commands_rx: mpsc::Receiver<Command>,
+        commands_tx: mpsc::Sender<SwarmCommand>,
+        commands_rx: mpsc::Receiver<SwarmCommand>,
         events_tx: broadcast::Sender<Event>,
     ) -> Self {
         let swarm = Swarm::build(&config.inner).unwrap();
@@ -125,23 +124,23 @@ impl SwarmHandler {
         }
     }
 
-    async fn handle_command(&mut self, command: Command) {
+    async fn handle_command(&mut self, command: SwarmCommand) {
         match command {
-            Command::Connect(dial) => {
+            SwarmCommand::Connect(dial) => {
                 self.connect(dial);
             }
-            Command::Broadcast { topic, message } => {
+            SwarmCommand::Broadcast { topic, message } => {
                 self.broadcast_and_retry(topic, message, 0).await;
             }
-            Command::Subscribe(topic) => {
+            SwarmCommand::Subscribe(topic) => {
                 tracing::debug!("subscribing to topic: {topic}");
                 log_error!(self.swarm.subscribe(&topic));
             }
-            Command::Unsubscribe(topic) => {
+            SwarmCommand::Unsubscribe(topic) => {
                 tracing::debug!("unsubscribing to topic: {topic}");
                 log_error!(self.swarm.unsubscribe(&topic));
             }
-            Command::Info { reply } => {
+            SwarmCommand::Info { reply } => {
                 let swarm = self.swarm.swarm();
                 let network_info = swarm.network_info();
                 let counters = network_info.connection_counters();
@@ -153,19 +152,26 @@ impl SwarmHandler {
                 };
                 log_error!(reply.send(info));
             }
-            Command::RetryBroadcast {
+            SwarmCommand::RetryBroadcast {
                 topic,
                 message,
                 retry_count,
             } => {
                 self.broadcast_and_retry(topic, message, retry_count).await;
             }
+            SwarmCommand::StreamSend {
+                peer_id,
+                protocol,
+                message,
+            } => {
+                todo!()
+            }
         }
     }
 
-    async fn schedule_connect(dial: Dial, commands_tx: mpsc::Sender<Command>) {
+    async fn schedule_connect(dial: Dial, commands_tx: mpsc::Sender<SwarmCommand>) {
         commands_tx
-            .send(Command::Connect(dial))
+            .send(SwarmCommand::Connect(dial))
             .await
             .unwrap_or_else(|_| tracing::error!("could not schedule connect"));
     }
@@ -219,7 +225,7 @@ impl SwarmHandler {
                 tracing::debug!("broadcasted message with id: {id} tp topic: {topic}");
                 // self-notification because libp2p doesn't do it
                 if self.swarm.is_subscribed(&topic) {
-                    log_error!(self.events_tx.send(Event::Message(Message {
+                    log_error!(self.events_tx.send(Event::Message(gossipsub::Message {
                         source: None,
                         data: message.into(),
                         sequence_number: None,
@@ -235,7 +241,7 @@ impl SwarmHandler {
                 tokio::spawn(async move {
                     tokio::time::sleep(wait).await;
                     commands_tx
-                        .send(Command::RetryBroadcast {
+                        .send(SwarmCommand::RetryBroadcast {
                             topic,
                             message,
                             retry_count: retry_count + 1,
@@ -252,5 +258,9 @@ impl SwarmHandler {
 
     fn exp_backoff(retry: usize) -> Duration {
         std::time::Duration::from_secs(BACKOFF.pow(retry as u32))
+    }
+
+    pub fn incoming_streams(&self, protocol: StreamProtocol) -> IncomingStreams {
+        todo!()
     }
 }
