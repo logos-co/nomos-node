@@ -300,7 +300,11 @@ fn create_node_config(
             backend: Libp2pConfig {
                 inner: Default::default(),
                 initial_peers: vec![],
-                mixclient_config: MixClientConfig {},
+                mixclient_config: MixClientConfig {
+                    topology: todo!(),
+                    emission_rate_per_min: todo!(),
+                    redundancy: todo!(),
+                },
                 mixnode_config: MixNodeConfig {},
             },
         },
