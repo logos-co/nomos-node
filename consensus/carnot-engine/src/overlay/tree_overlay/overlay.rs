@@ -231,8 +231,9 @@ where
 
 #[cfg(test)]
 mod tests {
+    use nomos_utils::fisheryates::FisherYatesShuffle;
+
     use crate::overlay::leadership::RoundRobin;
-    use crate::overlay::membership::FisherYatesShuffle;
     use crate::Overlay;
 
     use super::*;

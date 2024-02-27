@@ -60,11 +60,11 @@ impl<T: Overlay> OverlayInfoExt for T {
 mod tests {
     use carnot_engine::{
         overlay::{
-            BranchOverlay, BranchOverlaySettings, FisherYatesShuffle, RoundRobin, TreeOverlay,
-            TreeOverlaySettings,
+            BranchOverlay, BranchOverlaySettings, RoundRobin, TreeOverlay, TreeOverlaySettings,
         },
         NodeId, Overlay,
     };
+    use nomos_utils::fisheryates::FisherYatesShuffle;
 
     use super::*;
     const ENTROPY: [u8; 32] = [0; 32];
