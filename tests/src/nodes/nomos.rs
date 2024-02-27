@@ -43,11 +43,11 @@ pub struct NomosNode {
 
 impl Drop for NomosNode {
     fn drop(&mut self) {
-        // if std::thread::panicking() {
-        if let Err(e) = persist_tempdir(&mut self._tempdir, "nomos-node") {
-            println!("failed to persist tempdir: {e}");
+        if std::thread::panicking() {
+            if let Err(e) = persist_tempdir(&mut self._tempdir, "nomos-node") {
+                println!("failed to persist tempdir: {e}");
+            }
         }
-        // }
 
         if let Err(e) = self.child.kill() {
             println!("failed to kill the child process: {e}");
