@@ -374,7 +374,6 @@ fn create_node_config(
     };
 
     config.network.backend.inner.port = port;
-    config.log.level = tracing::Level::INFO;
 
     config
 }
