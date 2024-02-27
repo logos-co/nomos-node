@@ -1,8 +1,10 @@
+use sphinx_packet::header::delays::Delay;
 use sphinx_packet::ProcessedPacket;
 
 use crate::address::NodeAddress;
 use crate::crypto::PrivateKey;
 use crate::error::MixnetError;
+use crate::fragment::{Fragment, FragmentSet};
 use crate::topology::MixnetTopology;
 
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -13,21 +15,60 @@ pub struct Packet {
 
 impl Packet {
     fn new(processed_packet: ProcessedPacket) -> Result<Self, MixnetError> {
-        todo!()
+        match processed_packet {
+            ProcessedPacket::ForwardHop(packet, addr, _) => Ok(Packet {
+                address: addr.try_into()?,
+                body: PacketBody::from(packet.as_ref()),
+            }),
+            ProcessedPacket::FinalHop(addr, _, payload) => Ok(Packet {
+                address: addr.try_into()?,
+                body: PacketBody::try_from(payload)?,
+            }),
+        }
     }
 
     pub(crate) fn build_real(
         msg: &[u8],
         topology: &MixnetTopology,
     ) -> Result<Vec<Packet>, MixnetError> {
-        todo!()
+        Self::build(Message::Real(msg), topology)
     }
 
     pub(crate) fn build_drop_cover(
         msg: &[u8],
         topology: &MixnetTopology,
     ) -> Result<Vec<Packet>, MixnetError> {
-        todo!()
+        Self::build(Message::DropCover(msg), topology)
+    }
+
+    fn build(msg: Message, topology: &MixnetTopology) -> Result<Vec<Packet>, MixnetError> {
+        let destination = topology.choose_destination();
+
+        let fragment_set = FragmentSet::new(&msg.bytes())?;
+        let mut packets = Vec::with_capacity(fragment_set.len());
+        for fragment in fragment_set.iter() {
+            let route = topology.gen_route();
+            if route.is_empty() {
+                // Create a packet that will be directly sent to the mix destination
+                packets.push(Packet {
+                    address: NodeAddress::try_from(destination.address)?,
+                    body: PacketBody::from(fragment),
+                });
+            } else {
+                // Use dummy delays because mixnodes will ignore this value and generate delay randomly by themselves.
+                let delays = vec![Delay::new_from_nanos(0); route.len()];
+                packets.push(Packet {
+                    address: NodeAddress::try_from(route[0].address)?,
+                    body: PacketBody::from(&sphinx_packet::SphinxPacket::new(
+                        fragment.bytes(),
+                        &route,
+                        &destination,
+                        &delays,
+                    )?),
+                });
+            }
+        }
+        Ok(packets)
     }
 
     pub fn address(&self) -> NodeAddress {
@@ -45,8 +86,31 @@ pub(crate) enum PacketBody {
     Fragment(Box<[u8]>),
 }
 
+impl From<&sphinx_packet::SphinxPacket> for PacketBody {
+    fn from(packet: &sphinx_packet::SphinxPacket) -> Self {
+        Self::SphinxPacket(packet.to_bytes().into_boxed_slice())
+    }
+}
+
+impl From<&Fragment> for PacketBody {
+    fn from(fragment: &Fragment) -> Self {
+        Self::Fragment(fragment.bytes().into_boxed_slice())
+    }
+}
+
+impl TryFrom<sphinx_packet::payload::Payload> for PacketBody {
+    type Error = MixnetError;
+
+    fn try_from(payload: sphinx_packet::payload::Payload) -> Result<Self, Self::Error> {
+        Ok(Self::Fragment(
+            payload.recover_plaintext()?.into_boxed_slice(),
+        ))
+    }
+}
+
 impl PacketBody {
     pub(crate) fn bytes(&self) -> Box<[u8]> {
+        //TODO: optimize memcpy
         match self {
             Self::SphinxPacket(data) => PacketBodyFlag::SphinxPacket.set(data),
             Self::Fragment(data) => PacketBodyFlag::Fragment.set(data),
