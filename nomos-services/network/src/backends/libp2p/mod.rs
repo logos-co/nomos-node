@@ -2,27 +2,30 @@ mod command;
 mod config;
 mod swarm;
 
+use std::net::SocketAddr;
+
 // std
 pub use self::command::{Command, Libp2pInfo};
-use self::command::{SwarmCommand, Topic};
+use self::command::{Dial, SwarmCommand, Topic};
 pub use self::config::Libp2pConfig;
 use self::swarm::SwarmHandler;
 
 // internal
 use super::NetworkBackend;
 use futures::StreamExt;
+use mixnet::address::NodeAddress;
 use mixnet::client::{MessageQueue, MixClient};
 use mixnet::node::{MixNode, PacketQueue};
 use nomos_core::wire;
-use nomos_libp2p::gossipsub;
 pub use nomos_libp2p::libp2p::gossipsub::{Message, TopicHash};
 use nomos_libp2p::libp2p::{Stream, StreamProtocol};
 use nomos_libp2p::libp2p_stream::IncomingStreams;
+use nomos_libp2p::{gossipsub, Multiaddr, Protocol};
 // crates
 use overwatch_rs::{overwatch::handle::OverwatchHandle, services::state::NoState};
 use serde::{Deserialize, Serialize};
 use tokio::runtime::Handle;
-use tokio::sync::{broadcast, mpsc};
+use tokio::sync::{broadcast, mpsc, oneshot};
 
 /// A Libp2p network backend broadcasts messages to the network with mixing packets through mixnet,
 /// and receives messages broadcasted from the network.
@@ -164,7 +167,15 @@ impl Libp2p {
         packet_queue: PacketQueue,
         swarm_commands_tx: mpsc::Sender<SwarmCommand>,
     ) {
-        todo!()
+        while let Some(packet) = mixclient.next().await {
+            Self::stream_send(
+                packet.address(),
+                packet.body(),
+                &swarm_commands_tx,
+                &packet_queue,
+            )
+            .await;
+        }
     }
 
     async fn handle_incoming_streams(
@@ -186,6 +197,62 @@ impl Libp2p {
         loop {
             let msg = SwarmHandler::stream_read(&mut stream).await?;
             packet_queue.send(msg).await.unwrap();
+        }
+    }
+
+    async fn stream_send(
+        addr: NodeAddress,
+        data: Box<[u8]>,
+        swarm_commands_tx: &mpsc::Sender<SwarmCommand>,
+        packet_queue: &PacketQueue,
+    ) {
+        let addr = Self::multiaddr_from(addr);
+        let (tx, rx) = oneshot::channel();
+        swarm_commands_tx
+            .send(SwarmCommand::Connect(Dial {
+                addr: addr.clone(),
+                retry_count: 3,
+                result_sender: tx,
+            }))
+            .await
+            .unwrap();
+
+        match rx.await {
+            Ok(result) => match result {
+                Ok(peer_id) => {
+                    swarm_commands_tx
+                        .send(SwarmCommand::StreamSend {
+                            peer_id,
+                            protocol: STREAM_PROTOCOL,
+                            message: data,
+                        })
+                        .await
+                        .unwrap();
+                }
+                Err(e) => match e {
+                    nomos_libp2p::DialError::NoAddresses => {
+                        tracing::debug!("Dialing failed because the peer is the local node. Sending msg directly to the queue");
+                        packet_queue.send(data).await.unwrap();
+                    }
+                    _ => tracing::error!("failed to dial with unrecoverable error: {e}"),
+                },
+            },
+            Err(e) => {
+                tracing::error!("channel closed before receiving: {e}");
+            }
+        }
+    }
+
+    fn multiaddr_from(addr: NodeAddress) -> Multiaddr {
+        match SocketAddr::from(addr) {
+            SocketAddr::V4(addr) => Multiaddr::empty()
+                .with(Protocol::Ip4(*addr.ip()))
+                .with(Protocol::Udp(addr.port()))
+                .with(Protocol::QuicV1),
+            SocketAddr::V6(addr) => Multiaddr::empty()
+                .with(Protocol::Ip6(*addr.ip()))
+                .with(Protocol::Udp(addr.port()))
+                .with(Protocol::QuicV1),
         }
     }
 }
