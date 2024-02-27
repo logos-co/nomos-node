@@ -4,11 +4,15 @@ use crate::da::blob::Blob;
 use bytes::Bytes;
 use std::hash::Hash;
 
+use super::attestation::Attestation;
+
 pub trait Certificate {
     type Blob: Blob;
+    type Attestation: Attestation;
     type Extension;
     type Hash: Hash + Eq + Clone;
     fn blob(&self) -> <Self::Blob as Blob>::Hash;
+    fn attestations(&self) -> Vec<Self::Attestation>;
     fn hash(&self) -> Self::Hash;
     fn extension(&self) -> Self::Extension;
     fn as_bytes(&self) -> Bytes;

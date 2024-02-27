@@ -2,14 +2,17 @@
 use bytes::Bytes;
 // internal
 use crate::da::attestation::Attestation;
+use crate::da::auth::Signer;
 use crate::da::blob::Blob;
 use crate::da::certificate::Certificate;
 
 pub mod attestation;
+pub mod auth;
 pub mod blob;
 pub mod certificate;
 
 pub trait DaProtocol {
+    type Auth: Signer;
     type Blob: Blob;
     type Attestation: Attestation;
     type Certificate: Certificate;
@@ -27,7 +30,7 @@ pub trait DaProtocol {
     /// If the protocol is not yet ready to return the data, return None.
     fn extract(&mut self) -> Option<Bytes>;
     /// Attest that we have received and stored a blob.
-    fn attest(&self, blob: &Self::Blob) -> Self::Attestation;
+    fn attest(&self, blob: &Self::Blob, auth: &Self::Auth) -> Self::Attestation;
     /// Validate that an attestation is valid for a blob.
     fn validate_attestation(&self, blob: &Self::Blob, attestation: &Self::Attestation) -> bool;
     /// Buffer attestations to produce a certificate of correct dispersal.
