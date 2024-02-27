@@ -1,4 +1,7 @@
+use sphinx_packet::ProcessedPacket;
+
 use crate::address::NodeAddress;
+use crate::crypto::PrivateKey;
 use crate::error::MixnetError;
 use crate::topology::MixnetTopology;
 
@@ -9,6 +12,10 @@ pub struct Packet {
 }
 
 impl Packet {
+    fn new(processed_packet: ProcessedPacket) -> Result<Self, MixnetError> {
+        todo!()
+    }
+
     pub(crate) fn build_real(
         msg: &[u8],
         topology: &MixnetTopology,
@@ -51,6 +58,13 @@ impl PacketBody {
             PacketBodyFlag::SphinxPacket => Ok(Self::SphinxPacket(value[1..].into())),
             PacketBodyFlag::Fragment => Ok(Self::Fragment(value[1..].into())),
         }
+    }
+
+    pub(crate) fn process_sphinx_packet(
+        packet: &[u8],
+        private_key: &PrivateKey,
+    ) -> Result<Packet, MixnetError> {
+        Packet::new(sphinx_packet::SphinxPacket::from_bytes(packet)?.process(private_key)?)
     }
 }
 

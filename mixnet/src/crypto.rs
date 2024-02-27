@@ -40,6 +40,26 @@ impl Default for PrivateKey {
     }
 }
 
+impl Serialize for PrivateKey {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        SerializablePrivateKey::from(self).serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for PrivateKey {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        Ok(Self::from(SerializablePrivateKey::deserialize(
+            deserializer,
+        )?))
+    }
+}
+
 /// Public key for encrypting Sphinx packets
 #[derive(Clone, Debug)]
 pub struct PublicKey(sphinx_packet::crypto::PublicKey);
@@ -62,5 +82,57 @@ impl From<&PrivateKey> for PublicKey {
 impl From<sphinx_packet::crypto::PublicKey> for PublicKey {
     fn from(public_key: sphinx_packet::crypto::PublicKey) -> Self {
         Self(public_key)
+    }
+}
+
+impl Serialize for PublicKey {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        SerializablePublicKey::from(self).serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for PublicKey {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        Ok(Self::from(SerializablePublicKey::deserialize(
+            deserializer,
+        )?))
+    }
+}
+
+// Only for serializing/deserializing [`PrivateKey`] since [`sphinx_packet::crypto::PrivateKey`] is not serializable.
+#[derive(Serialize, Deserialize, Clone, Debug)]
+struct SerializablePrivateKey([u8; 32]);
+
+impl From<&PrivateKey> for SerializablePrivateKey {
+    fn from(key: &PrivateKey) -> Self {
+        Self(key.0.to_bytes())
+    }
+}
+
+impl From<SerializablePrivateKey> for PrivateKey {
+    fn from(key: SerializablePrivateKey) -> Self {
+        Self(sphinx_packet::crypto::PrivateKey::from(key.0))
+    }
+}
+
+// Only for serializing/deserializing [`PublicKey`] since [`sphinx_packet::crypto::PublicKey`] is not serializable.
+#[derive(Serialize, Deserialize, Clone, Debug)]
+struct SerializablePublicKey([u8; 32]);
+
+impl From<&PublicKey> for SerializablePublicKey {
+    fn from(key: &PublicKey) -> Self {
+        Self(*key.0.as_bytes())
+    }
+}
+
+impl From<SerializablePublicKey> for PublicKey {
+    fn from(key: SerializablePublicKey) -> Self {
+        Self(sphinx_packet::crypto::PublicKey::from(key.0))
     }
 }

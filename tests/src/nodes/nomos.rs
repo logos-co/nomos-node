@@ -305,7 +305,10 @@ fn create_node_config(
                     emission_rate_per_min: todo!(),
                     redundancy: todo!(),
                 },
-                mixnode_config: MixNodeConfig {},
+                mixnode_config: MixNodeConfig {
+                    encryption_private_key: todo!(),
+                    delay_rate_per_min: todo!(),
+                },
             },
         },
         consensus: CarnotSettings {
