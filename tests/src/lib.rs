@@ -1,9 +1,5 @@
-pub mod nodes;
-pub use nodes::NomosNode;
-use once_cell::sync::Lazy;
-
-use std::env;
 // std
+use std::env;
 use std::net::TcpListener;
 use std::ops::Mul;
 use std::time::Duration;
@@ -11,7 +7,14 @@ use std::{fmt::Debug, sync::Mutex};
 
 //crates
 use fraction::{Fraction, One};
+use once_cell::sync::Lazy;
 use rand::{thread_rng, Rng};
+
+// internal
+pub mod nodes;
+use mixnet::client::MixClientConfig;
+use mixnet::node::MixNodeConfig;
+pub use nodes::NomosNode;
 
 static NET_PORT: Lazy<Mutex<u16>> = Lazy::new(|| Mutex::new(thread_rng().gen_range(8000..10000)));
 static IS_SLOW_TEST_ENV: Lazy<bool> =
@@ -74,4 +77,9 @@ pub struct ConsensusConfig {
     pub n_participants: usize,
     pub threshold: Fraction,
     pub timeout: Duration,
+}
+
+pub struct MixnetConfig {
+    pub mixclient_config: MixClientConfig,
+    pub mixnode_configs: Vec<MixNodeConfig>,
 }

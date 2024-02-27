@@ -1,16 +1,19 @@
 // std
-use std::net::SocketAddr;
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::process::{Child, Command, Stdio};
 use std::time::Duration;
 // internal
 use super::{create_tempdir, persist_tempdir, LOGS_PREFIX};
-use crate::{adjust_timeout, get_available_port, ConsensusConfig, Node, SpawnConfig};
+use crate::{adjust_timeout, get_available_port, ConsensusConfig, MixnetConfig, Node, SpawnConfig};
 use carnot_consensus::{CarnotInfo, CarnotSettings};
 use carnot_engine::overlay::{RandomBeaconState, RoundRobin, TreeOverlay, TreeOverlaySettings};
 use carnot_engine::{BlockId, NodeId, Overlay};
 use full_replication::Certificate;
+use mixnet::address::NodeAddress;
 use mixnet::client::MixClientConfig;
+use mixnet::crypto::{PrivateKey, PublicKey};
 use mixnet::node::MixNodeConfig;
+use mixnet::topology::{MixNodeInfo, MixnetTopology};
 use nomos_core::block::Block;
 use nomos_libp2p::{Multiaddr, Swarm};
 use nomos_log::{LoggerBackend, LoggerFormat};
@@ -40,11 +43,11 @@ pub struct NomosNode {
 
 impl Drop for NomosNode {
     fn drop(&mut self) {
-        if std::thread::panicking() {
-            if let Err(e) = persist_tempdir(&mut self._tempdir, "nomos-node") {
-                println!("failed to persist tempdir: {e}");
-            }
+        // if std::thread::panicking() {
+        if let Err(e) = persist_tempdir(&mut self._tempdir, "nomos-node") {
+            println!("failed to persist tempdir: {e}");
         }
+        // }
 
         if let Err(e) = self.child.kill() {
             println!("failed to kill the child process: {e}");
@@ -253,6 +256,8 @@ impl Node for NomosNode {
     }
 }
 
+const NUM_MIXNODE_CANDIDATES: usize = 2;
+
 /// Returns the config of the next leader and all other nodes.
 ///
 /// Depending on the network topology, the next leader must be spawned first,
@@ -264,15 +269,24 @@ fn create_node_configs(consensus: ConsensusConfig) -> (Config, Vec<Config>) {
     for id in &mut ids {
         thread_rng().fill(id);
     }
+    let ports: Vec<u16> = (0..consensus.n_participants)
+        .map(|_| get_available_port())
+        .collect();
+
+    let mixnet = create_mixnet_config(&ports);
 
     let mut configs = ids
         .iter()
-        .map(|id| {
+        .enumerate()
+        .map(|(i, id)| {
             create_node_config(
                 ids.iter().copied().map(NodeId::new).collect(),
                 *id,
+                ports[i],
                 consensus.threshold,
                 consensus.timeout,
+                mixnet.mixclient_config.clone(),
+                mixnet.mixnode_configs[i].clone(),
             )
         })
         .collect::<Vec<_>>();
@@ -284,7 +298,21 @@ fn create_node_configs(consensus: ConsensusConfig) -> (Config, Vec<Config>) {
         .position(|&id| NodeId::from(id) == next_leader)
         .unwrap();
 
-    let next_leader_config = configs.swap_remove(next_leader_idx);
+    let mut next_leader_config = configs.swap_remove(next_leader_idx);
+
+    // Build a topology using only a subset of nodes.
+    let mut mixnode_candidates = vec![&next_leader_config];
+    configs
+        .iter()
+        .take(NUM_MIXNODE_CANDIDATES - 1)
+        .for_each(|config| mixnode_candidates.push(config));
+    let topology = build_mixnet_topology(&mixnode_candidates);
+
+    // Set the topology to all configs
+    next_leader_config.network.backend.mixclient_config.topology = topology.clone();
+    configs.iter_mut().for_each(|config| {
+        config.network.backend.mixclient_config.topology = topology.clone();
+    });
 
     (next_leader_config, configs)
 }
@@ -292,23 +320,19 @@ fn create_node_configs(consensus: ConsensusConfig) -> (Config, Vec<Config>) {
 fn create_node_config(
     nodes: Vec<NodeId>,
     id: [u8; 32],
+    port: u16,
     threshold: Fraction,
     timeout: Duration,
+    mixclient_config: MixClientConfig,
+    mixnode_config: MixNodeConfig,
 ) -> Config {
     let mut config = Config {
         network: NetworkConfig {
             backend: Libp2pConfig {
                 inner: Default::default(),
                 initial_peers: vec![],
-                mixclient_config: MixClientConfig {
-                    topology: todo!(),
-                    emission_rate_per_min: todo!(),
-                    redundancy: todo!(),
-                },
-                mixnode_config: MixNodeConfig {
-                    encryption_private_key: todo!(),
-                    delay_rate_per_min: todo!(),
-                },
+                mixclient_config,
+                mixnode_config,
             },
         },
         consensus: CarnotSettings {
@@ -349,9 +373,49 @@ fn create_node_config(
         },
     };
 
-    config.network.backend.inner.port = get_available_port();
+    config.network.backend.inner.port = port;
+    config.log.level = tracing::Level::INFO;
 
     config
+}
+
+fn create_mixnet_config(ports: &[u16]) -> MixnetConfig {
+    let mixnode_configs: Vec<MixNodeConfig> = ports
+        .iter()
+        .map(|_| MixNodeConfig {
+            encryption_private_key: PrivateKey::new(),
+            delay_rate_per_min: 100000000.0,
+        })
+        .collect();
+    // Build an empty topology because it will be constructed with meaningful node infos later
+    let topology = MixnetTopology::new(Vec::new(), 0, 0, [1u8; 32]).unwrap();
+
+    MixnetConfig {
+        mixclient_config: MixClientConfig {
+            topology,
+            emission_rate_per_min: 500.0,
+            redundancy: 1,
+        },
+        mixnode_configs,
+    }
+}
+
+fn build_mixnet_topology(mixnode_candidates: &[&Config]) -> MixnetTopology {
+    let candidates = mixnode_candidates
+        .iter()
+        .map(|config| {
+            MixNodeInfo::new(
+                NodeAddress::from(SocketAddr::new(
+                    IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
+                    config.network.backend.inner.port,
+                )),
+                PublicKey::from(&config.network.backend.mixnode_config.encryption_private_key),
+            )
+            .unwrap()
+        })
+        .collect::<Vec<_>>();
+    let num_layers = candidates.len();
+    MixnetTopology::new(candidates, num_layers, 1, [1u8; 32]).unwrap()
 }
 
 fn node_address(config: &Config) -> Multiaddr {

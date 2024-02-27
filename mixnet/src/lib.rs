@@ -1,6 +1,6 @@
 //! Mixnet
-// #![deny(missing_docs, warnings)]
-// #![forbid(unsafe_code)]
+#![deny(missing_docs, warnings)]
+#![forbid(unsafe_code)]
 
 /// Mix node address
 pub mod address;

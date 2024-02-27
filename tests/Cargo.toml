@@ -33,6 +33,7 @@ fraction = "0.13"
 ntest = "0.9.0"
 criterion = { version = "0.5", features = ["async_tokio"] }
 nomos-cli = { path = "../nomos-cli" }
+tracing = "0.1.40"
 
 [[test]]
 name = "test_consensus_happy_path"
