@@ -1,26 +1,35 @@
-use std::{collections::HashMap, time::Duration};
+use std::{
+    collections::{hash_map::Entry, HashMap},
+    time::Duration,
+};
 
+use futures::{AsyncReadExt, AsyncWriteExt};
 #[allow(deprecated)]
 use nomos_libp2p::{
-    gossipsub::{self, Message},
-    libp2p::swarm::ConnectionId,
-    BehaviourEvent, Multiaddr, Swarm, SwarmEvent,
+    gossipsub, libp2p::swarm::ConnectionId, BehaviourEvent, Multiaddr, Swarm, SwarmEvent,
 };
-use tokio::sync::{broadcast, mpsc};
+use nomos_libp2p::{
+    libp2p::{Stream, StreamProtocol},
+    libp2p_stream::{Control, IncomingStreams, OpenStreamError},
+    PeerId,
+};
+use tokio::sync::{broadcast, mpsc, oneshot};
 use tokio_stream::StreamExt;
 
 use crate::backends::libp2p::Libp2pInfo;
 
 use super::{
-    command::{Command, Dial, Topic},
+    command::{Dial, SwarmCommand, Topic},
     Event, Libp2pConfig,
 };
 
 pub struct SwarmHandler {
     pub swarm: Swarm,
+    stream_control: Control,
+    streams: HashMap<PeerId, Stream>,
     pub pending_dials: HashMap<ConnectionId, Dial>,
-    pub commands_tx: mpsc::Sender<Command>,
-    pub commands_rx: mpsc::Receiver<Command>,
+    pub commands_tx: mpsc::Sender<SwarmCommand>,
+    pub commands_rx: mpsc::Receiver<SwarmCommand>,
     pub events_tx: broadcast::Sender<Event>,
 }
 
@@ -40,17 +49,20 @@ const MAX_RETRY: usize = 3;
 impl SwarmHandler {
     pub fn new(
         config: &Libp2pConfig,
-        commands_tx: mpsc::Sender<Command>,
-        commands_rx: mpsc::Receiver<Command>,
+        commands_tx: mpsc::Sender<SwarmCommand>,
+        commands_rx: mpsc::Receiver<SwarmCommand>,
         events_tx: broadcast::Sender<Event>,
     ) -> Self {
         let swarm = Swarm::build(&config.inner).unwrap();
+        let stream_control = swarm.stream_control();
 
         // Keep the dialing history since swarm.connect doesn't return the result synchronously
         let pending_dials = HashMap::<ConnectionId, Dial>::new();
 
         Self {
             swarm,
+            stream_control,
+            streams: HashMap::new(),
             pending_dials,
             commands_tx,
             commands_rx,
@@ -60,9 +72,11 @@ impl SwarmHandler {
 
     pub async fn run(&mut self, initial_peers: Vec<Multiaddr>) {
         for initial_peer in initial_peers {
+            let (tx, _) = oneshot::channel();
             let dial = Dial {
                 addr: initial_peer,
                 retry_count: 0,
+                result_sender: tx,
             };
             Self::schedule_connect(dial, self.commands_tx.clone()).await;
         }
@@ -97,7 +111,7 @@ impl SwarmHandler {
             } => {
                 tracing::debug!("connected to peer:{peer_id}, connection_id:{connection_id:?}");
                 if endpoint.is_dialer() {
-                    self.complete_connect(connection_id);
+                    self.complete_connect(connection_id, peer_id);
                 }
             }
             SwarmEvent::ConnectionClosed {
@@ -125,23 +139,23 @@ impl SwarmHandler {
         }
     }
 
-    async fn handle_command(&mut self, command: Command) {
+    async fn handle_command(&mut self, command: SwarmCommand) {
         match command {
-            Command::Connect(dial) => {
+            SwarmCommand::Connect(dial) => {
                 self.connect(dial);
             }
-            Command::Broadcast { topic, message } => {
+            SwarmCommand::Broadcast { topic, message } => {
                 self.broadcast_and_retry(topic, message, 0).await;
             }
-            Command::Subscribe(topic) => {
+            SwarmCommand::Subscribe(topic) => {
                 tracing::debug!("subscribing to topic: {topic}");
                 log_error!(self.swarm.subscribe(&topic));
             }
-            Command::Unsubscribe(topic) => {
+            SwarmCommand::Unsubscribe(topic) => {
                 tracing::debug!("unsubscribing to topic: {topic}");
                 log_error!(self.swarm.unsubscribe(&topic));
             }
-            Command::Info { reply } => {
+            SwarmCommand::Info { reply } => {
                 let swarm = self.swarm.swarm();
                 let network_info = swarm.network_info();
                 let counters = network_info.connection_counters();
@@ -153,19 +167,37 @@ impl SwarmHandler {
                 };
                 log_error!(reply.send(info));
             }
-            Command::RetryBroadcast {
+            SwarmCommand::RetryBroadcast {
                 topic,
                 message,
                 retry_count,
             } => {
                 self.broadcast_and_retry(topic, message, retry_count).await;
             }
+            SwarmCommand::StreamSend {
+                peer_id,
+                protocol,
+                message,
+            } => {
+                tracing::debug!("StreamSend to {peer_id}: len:{}", message.len());
+                match self.open_stream(peer_id, protocol).await {
+                    Ok(stream) => {
+                        if let Err(e) = Self::stream_write(stream, &message).await {
+                            tracing::error!("failed to write to the stream with ${peer_id}: {e}");
+                            self.close_stream(&peer_id).await;
+                        }
+                    }
+                    Err(e) => {
+                        tracing::error!("failed to open stream with {peer_id}: {e}");
+                    }
+                }
+            }
         }
     }
 
-    async fn schedule_connect(dial: Dial, commands_tx: mpsc::Sender<Command>) {
+    async fn schedule_connect(dial: Dial, commands_tx: mpsc::Sender<SwarmCommand>) {
         commands_tx
-            .send(Command::Connect(dial))
+            .send(SwarmCommand::Connect(dial))
             .await
             .unwrap_or_else(|_| tracing::error!("could not schedule connect"));
     }
@@ -183,12 +215,19 @@ impl SwarmHandler {
                     "Failed to connect to {} with unretriable error: {e}",
                     dial.addr
                 );
+                if let Err(err) = dial.result_sender.send(Err(e)) {
+                    tracing::warn!("failed to send the Err result of dialing: {err:?}");
+                }
             }
         }
     }
 
-    fn complete_connect(&mut self, connection_id: ConnectionId) {
-        self.pending_dials.remove(&connection_id);
+    fn complete_connect(&mut self, connection_id: ConnectionId, peer_id: PeerId) {
+        if let Some(dial) = self.pending_dials.remove(&connection_id) {
+            if let Err(e) = dial.result_sender.send(Ok(peer_id)) {
+                tracing::warn!("failed to send the Ok result of dialing: {e:?}");
+            }
+        }
     }
 
     // TODO: Consider a common retry module for all use cases
@@ -196,12 +235,12 @@ impl SwarmHandler {
         if let Some(mut dial) = self.pending_dials.remove(&connection_id) {
             dial.retry_count += 1;
             if dial.retry_count > MAX_RETRY {
-                tracing::debug!("Max retry({MAX_RETRY}) has been reached: {dial:?}");
+                tracing::error!("Max retry({MAX_RETRY}) has been reached: {dial:?}");
                 return;
             }
 
             let wait = Self::exp_backoff(dial.retry_count);
-            tracing::debug!("Retry dialing in {wait:?}: {dial:?}");
+            tracing::warn!("Retry dialing in {wait:?}: {dial:?}");
 
             let commands_tx = self.commands_tx.clone();
             tokio::spawn(async move {
@@ -219,7 +258,7 @@ impl SwarmHandler {
                 tracing::debug!("broadcasted message with id: {id} tp topic: {topic}");
                 // self-notification because libp2p doesn't do it
                 if self.swarm.is_subscribed(&topic) {
-                    log_error!(self.events_tx.send(Event::Message(Message {
+                    log_error!(self.events_tx.send(Event::Message(gossipsub::Message {
                         source: None,
                         data: message.into(),
                         sequence_number: None,
@@ -235,7 +274,7 @@ impl SwarmHandler {
                 tokio::spawn(async move {
                     tokio::time::sleep(wait).await;
                     commands_tx
-                        .send(Command::RetryBroadcast {
+                        .send(SwarmCommand::RetryBroadcast {
                             topic,
                             message,
                             retry_count: retry_count + 1,
@@ -252,5 +291,42 @@ impl SwarmHandler {
 
     fn exp_backoff(retry: usize) -> Duration {
         std::time::Duration::from_secs(BACKOFF.pow(retry as u32))
+    }
+
+    pub fn incoming_streams(&mut self, protocol: StreamProtocol) -> IncomingStreams {
+        self.stream_control.accept(protocol).unwrap()
+    }
+
+    async fn open_stream(
+        &mut self,
+        peer_id: PeerId,
+        protocol: StreamProtocol,
+    ) -> Result<&mut Stream, OpenStreamError> {
+        if let Entry::Vacant(entry) = self.streams.entry(peer_id) {
+            let stream = self.stream_control.open_stream(peer_id, protocol).await?;
+            entry.insert(stream);
+        }
+        Ok(self.streams.get_mut(&peer_id).unwrap())
+    }
+
+    async fn close_stream(&mut self, peer_id: &PeerId) {
+        if let Some(mut stream) = self.streams.remove(peer_id) {
+            let _ = stream.close().await;
+        }
+    }
+
+    async fn stream_write(stream: &mut Stream, msg: &[u8]) -> std::io::Result<()> {
+        stream.write_all(&msg.len().to_le_bytes()).await?;
+        stream.write_all(msg).await?;
+        Ok(())
+    }
+
+    pub async fn stream_read(stream: &mut Stream) -> std::io::Result<Box<[u8]>> {
+        let mut size = [0u8; std::mem::size_of::<usize>()];
+        stream.read_exact(&mut size).await?;
+
+        let mut msg = vec![0u8; usize::from_le_bytes(size)];
+        stream.read_exact(&mut msg).await?;
+        Ok(msg.into_boxed_slice())
     }
 }

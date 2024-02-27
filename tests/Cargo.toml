@@ -8,6 +8,7 @@ publish = false
 nomos-node = { path = "../nodes/nomos-node", default-features = false }
 carnot-consensus = { path = "../nomos-services/carnot-consensus" }
 nomos-network = { path = "../nomos-services/network", features = ["libp2p"]}
+mixnet = { path = "../mixnet" }
 nomos-log = { path = "../nomos-services/log" }
 nomos-api = { path = "../nomos-services/api" }
 overwatch-rs = { git = "https://github.com/logos-co/Overwatch", rev = "2f70806" }
