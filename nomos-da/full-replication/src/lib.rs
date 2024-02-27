@@ -1,6 +1,7 @@
+use auth::FullReplicationKeyPair;
 // internal
 use nomos_core::da::{
-    attestation::{self, Attestation as _},
+    attestation::Attestation as _,
     blob::{self, BlobHasher},
     certificate::{self, CertificateStrategy},
     DaProtocol,
@@ -16,6 +17,11 @@ use blake2::{
 use bytes::Bytes;
 use nomos_core::wire;
 use serde::{Deserialize, Serialize};
+
+pub mod attestation;
+pub mod auth;
+
+pub use attestation::Attestation;
 
 /// Re-export the types for OpenAPI
 #[cfg(feature = "openapi")]
@@ -75,7 +81,7 @@ impl CertificateStrategy for AbsoluteNumber<Attestation, Certificate> {
         attestations.len() >= self.num_attestations
             && attestations
                 .iter()
-                .map(|a| &a.blob)
+                .map(|a| a.blob())
                 .collect::<HashSet<_>>()
                 .len()
                 == 1
@@ -115,32 +121,6 @@ impl blob::Blob for Blob {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
-pub struct Attestation {
-    blob: [u8; 32],
-    voter: Voter,
-}
-
-impl attestation::Attestation for Attestation {
-    type Blob = Blob;
-    type Hash = [u8; 32];
-
-    fn blob(&self) -> [u8; 32] {
-        self.blob
-    }
-
-    fn hash(&self) -> <Self::Blob as blob::Blob>::Hash {
-        hash([self.blob, self.voter].concat())
-    }
-
-    fn as_bytes(&self) -> Bytes {
-        wire::serialize(self)
-            .expect("Attestation shouldn't fail to be serialized")
-            .into()
-    }
-}
-
 #[derive(Default, Debug, Copy, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub struct Metadata {
     app_id: [u8; 32],
@@ -164,9 +144,10 @@ impl certificate::Certificate for Certificate {
     type Blob = Blob;
     type Hash = [u8; 32];
     type Extension = Metadata;
+    type Attestation = Attestation;
 
     fn blob(&self) -> <Self::Blob as blob::Blob>::Hash {
-        self.attestations[0].blob
+        self.attestations[0].blob()
     }
 
     fn hash(&self) -> <Self::Blob as blob::Blob>::Hash {
@@ -189,10 +170,15 @@ impl certificate::Certificate for Certificate {
     fn extension(&self) -> Self::Extension {
         self.metadata
     }
+
+    fn attestations(&self) -> Vec<Self::Attestation> {
+        self.attestations.clone()
+    }
 }
 
 // TODO: add generic impl when the trait for Certificate is expanded
 impl DaProtocol for FullReplication<AbsoluteNumber<Attestation, Certificate>> {
+    type Auth = FullReplicationKeyPair;
     type Blob = Blob;
     type Attestation = Attestation;
     type Certificate = Certificate;
@@ -219,15 +205,13 @@ impl DaProtocol for FullReplication<AbsoluteNumber<Attestation, Certificate>> {
         self.output_buffer.pop()
     }
 
-    fn attest(&self, blob: &Self::Blob) -> Self::Attestation {
-        Attestation {
-            blob: hasher(blob),
-            voter: self.voter,
-        }
+    fn attest(&self, blob: &Self::Blob, auth: &Self::Auth) -> Self::Attestation {
+        let blob_hash = hasher(blob);
+        Attestation::new_signed(blob_hash, self.voter, auth)
     }
 
     fn validate_attestation(&self, blob: &Self::Blob, attestation: &Self::Attestation) -> bool {
-        hasher(blob) == attestation.blob
+        hasher(blob) == attestation.blob()
     }
 
     fn recv_attestation(&mut self, attestation: Self::Attestation, metadata: Metadata) {
@@ -250,7 +234,7 @@ impl DaProtocol for FullReplication<AbsoluteNumber<Attestation, Certificate>> {
     }
 }
 
-fn hash(item: impl AsRef<[u8]>) -> [u8; 32] {
+pub(crate) fn hash(item: impl AsRef<[u8]>) -> [u8; 32] {
     let mut hasher = Blake2bVar::new(32).unwrap();
     hasher.update(item.as_ref());
     let mut output = [0; 32];

@@ -90,9 +90,10 @@ where
         backend: &Backend,
         adapter: &Network,
         blob: Protocol::Blob,
+        auth: Protocol::Auth,
     ) -> Result<(), DaError> {
         // we need to handle the reply (verification + signature)
-        let attestation = da.attest(&blob);
+        let attestation = da.attest(&blob, &auth);
         backend.add_blob(blob).await?;
         // we do not call `da.recv_blob` here because that is meant to
         // be called to retrieve the original data, while here we're only interested
@@ -184,10 +185,11 @@ where
         let adapter = Network::new(network_relay).await;
         let mut network_blobs = adapter.blob_stream().await;
         let mut lifecycle_stream = service_state.lifecycle_handle.message_stream();
+        let da_auth = todo!();
         loop {
             tokio::select! {
                 Some(blob) = network_blobs.next() => {
-                    if let Err(e) = Self::handle_new_blob(&da, &backend, &adapter, blob).await {
+                    if let Err(e) = Self::handle_new_blob(&da, &backend, &adapter, blob, da_auth).await {
                         tracing::debug!("Failed to add a new received blob: {e:?}");
                     }
                 }
