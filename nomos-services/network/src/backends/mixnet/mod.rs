@@ -20,7 +20,7 @@ use tokio::{
 /// A Mixnet network backend broadcasts messages to the network with mixing packets through mixnet,
 /// and receives messages broadcasted from the network.
 pub struct MixnetNetworkBackend {
-    events_tx: broadcast::Sender<libp2p::Event>,
+    libp2p_events_tx: broadcast::Sender<libp2p::Event>,
     libp2p_commands_tx: mpsc::Sender<libp2p::Command>,
 
     mixclient_message_queue: MessageQueue,
@@ -53,8 +53,7 @@ impl NetworkBackend for MixnetNetworkBackend {
         // that we're going to define at the root of the project.
 
         let (libp2p_commands_tx, libp2p_commands_rx) = tokio::sync::mpsc::channel(BUFFER_SIZE);
-        let (libp2p_events_tx, libp2p_events_rx) = tokio::sync::broadcast::channel(BUFFER_SIZE);
-        let (events_tx, _) = tokio::sync::broadcast::channel(BUFFER_SIZE);
+        let (libp2p_events_tx, _) = tokio::sync::broadcast::channel(BUFFER_SIZE);
 
         let mut swarm_handler = SwarmHandler::new(
             &config.libp2p_config,
@@ -84,19 +83,13 @@ impl NetworkBackend for MixnetNetworkBackend {
             Self::run_mixclient(mixclient, packet_queue, libp2p_cmd_tx).await;
         });
 
-        // Run event pipeline
-        let evt_tx = events_tx.clone();
-        overwatch_handle.runtime().spawn(async move {
-            Self::pipe_events(libp2p_events_rx, evt_tx).await;
-        });
-
         // Run libp2p swarm to make progress
         overwatch_handle.runtime().spawn(async move {
             swarm_handler.run(config.libp2p_config.initial_peers).await;
         });
 
         Self {
-            events_tx,
+            libp2p_events_tx,
             libp2p_commands_tx,
 
             mixclient_message_queue: message_queue,
@@ -124,7 +117,7 @@ impl NetworkBackend for MixnetNetworkBackend {
         kind: Self::EventKind,
     ) -> broadcast::Receiver<Self::NetworkEvent> {
         match kind {
-            libp2p::EventKind::Message => self.events_tx.subscribe(),
+            libp2p::EventKind::Message => self.libp2p_events_tx.subscribe(),
         }
     }
 }
@@ -152,25 +145,6 @@ impl MixnetNetworkBackend {
         runtime_handle: Handle,
     ) {
         todo!()
-    }
-
-    /// Forwards events from libp2p swarm to the user of the [`MixnetNetworkBackend`].
-    async fn pipe_events(
-        mut libp2p_events_rx: broadcast::Receiver<libp2p::Event>,
-        events_tx: broadcast::Sender<libp2p::Event>,
-    ) {
-        loop {
-            match libp2p_events_rx.recv().await {
-                Ok(event) => {
-                    if let Err(e) = events_tx.send(event) {
-                        tracing::error!("failed to send event to channel: {e}");
-                    }
-                }
-                Err(e) => {
-                    tracing::error!("failed to receive event from libp2p swarm: {e}");
-                }
-            }
-        }
     }
 }
 
