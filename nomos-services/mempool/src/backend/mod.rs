@@ -10,12 +10,19 @@ pub enum MempoolError {
     ExistingItem,
     #[error(transparent)]
     DynamicPoolError(#[from] overwatch_rs::DynError),
+    #[error("Verification failed")]
+    VerificationError,
+}
+
+pub trait Verifier<T> {
+    fn verify(&self, item: &T) -> bool;
 }
 
 pub trait MemPool {
     type Settings: Clone;
     type Item;
     type Key;
+    type Verifier: Verifier<Self::Item>;
 
     /// Construct a new empty pool
     fn new(settings: Self::Settings) -> Self;

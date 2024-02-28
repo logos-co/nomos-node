@@ -41,3 +41,9 @@ pub trait CertificateStrategy {
         extension: <Self::Certificate as Certificate>::Extension,
     ) -> Self::Certificate;
 }
+
+pub trait CertificateVerifier {
+    type Certificate: Certificate;
+
+    fn verify(&self, certificate: &Self::Certificate) -> bool;
+}

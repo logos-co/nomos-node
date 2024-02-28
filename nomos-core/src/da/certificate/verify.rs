@@ -1,4 +1,8 @@
+use std::marker::PhantomData;
+
 use crate::da::{attestation::Attestation, auth::Verifier, certificate::Certificate};
+
+use super::CertificateVerifier;
 
 pub trait KeyStore {
     type Key;
@@ -7,20 +11,30 @@ pub trait KeyStore {
     fn get_key(&self, node_id: &Self::Key) -> Option<&Self::Verifier>;
 }
 
-pub struct CertificateVerifier<KS: KeyStore> {
+pub struct DaCertificateVerifier<KS: KeyStore, C> {
     key_store: KS,
+    _cert: PhantomData<C>,
 }
 
-impl<KS: KeyStore> CertificateVerifier<KS> {
+impl<KS: KeyStore, C> DaCertificateVerifier<KS, C> {
     pub fn new(key_store: KS) -> Self {
-        CertificateVerifier { key_store }
+        Self {
+            key_store,
+            _cert: Default::default(),
+        }
     }
+}
 
-    pub fn verify_certificate<C>(&self, certificate: &C) -> bool
-    where
-        C: Certificate,
-        KS: KeyStore<Key = <C::Attestation as Attestation>::Voter> + Clone + 'static,
-    {
+impl<KS, C> CertificateVerifier for DaCertificateVerifier<KS, C>
+where
+    C: Certificate + Clone,
+    <<C as Certificate>::Attestation as Attestation>::Voter: Clone,
+    KS: KeyStore<Key = <C::Attestation as Attestation>::Voter> + Default + Clone + 'static,
+    KS::Verifier: 'static,
+{
+    type Certificate = C;
+
+    fn verify(&self, certificate: &Self::Certificate) -> bool {
         // TODO: At the moment the node that verifies the certificate needs to have all public
         // keys of voters that attested given certificate.
         certificate.attestations().iter().all(|attestation| {
@@ -165,7 +179,7 @@ mod tests {
         key_store.add_key("attester2", MockPublicKey);
         key_store.add_key("attester3", MockPublicKey);
 
-        let verifier = CertificateVerifier::new(key_store);
+        let verifier = DaCertificateVerifier::new(key_store);
 
         let certificate = MockCertificate::new(vec![
             MockAttestation::new("attester1", b"valid_signature"),
@@ -173,7 +187,7 @@ mod tests {
             MockAttestation::new("attester3", b"valid_signature"),
         ]);
 
-        assert!(verifier.verify_certificate(&certificate));
+        assert!(verifier.verify(&certificate));
     }
 
     #[test]
@@ -183,7 +197,7 @@ mod tests {
         key_store.add_key("attester2", MockPublicKey);
         key_store.add_key("attester3", MockPublicKey);
 
-        let verifier = CertificateVerifier::new(key_store);
+        let verifier = DaCertificateVerifier::new(key_store);
 
         let certificate = MockCertificate::new(vec![
             MockAttestation::new("attester1", b"invalid_signature"),
@@ -191,6 +205,6 @@ mod tests {
             MockAttestation::new("attester3", b"valid_signature"),
         ]);
 
-        assert!(!verifier.verify_certificate(&certificate));
+        assert!(!verifier.verify(&certificate));
     }
 }

@@ -8,19 +8,21 @@ use std::{collections::BTreeMap, time::UNIX_EPOCH};
 use crate::backend::{MemPool, MempoolError};
 use nomos_core::block::BlockId;
 
-use super::Status;
+use super::{Status, Verifier};
 
 /// A mock mempool implementation that stores all transactions in memory in the order received.
-pub struct MockPool<Item, Key> {
+pub struct MockPool<Item, Key, Verifier> {
     pending_items: LinkedHashMap<Key, Item>,
     in_block_items: BTreeMap<BlockId, Vec<Item>>,
     in_block_items_by_id: BTreeMap<Key, BlockId>,
     last_item_timestamp: u64,
+    verifier: Verifier,
 }
 
-impl<Item, Key> Default for MockPool<Item, Key>
+impl<Item, Key, Verifier> Default for MockPool<Item, Key, Verifier>
 where
     Key: Hash + Eq,
+    Verifier: Default,
 {
     fn default() -> Self {
         Self {
@@ -28,27 +30,31 @@ where
             in_block_items: BTreeMap::new(),
             in_block_items_by_id: BTreeMap::new(),
             last_item_timestamp: 0,
+            verifier: Default::default(),
         }
     }
 }
 
-impl<Item, Key> MockPool<Item, Key>
+impl<Item, Key, Verifier> MockPool<Item, Key, Verifier>
 where
     Key: Hash + Eq + Clone,
+    Verifier: Default,
 {
     pub fn new() -> Self {
         Default::default()
     }
 }
 
-impl<Item, Key> MemPool for MockPool<Item, Key>
+impl<Item, Key, V> MemPool for MockPool<Item, Key, V>
 where
     Item: Clone + Send + Sync + 'static + Hash,
     Key: Clone + Ord + Hash,
+    V: Verifier<Item> + Default,
 {
     type Settings = ();
     type Item = Item;
     type Key = Key;
+    type Verifier = V;
 
     fn new(_settings: Self::Settings) -> Self {
         Self::new()
@@ -57,6 +63,9 @@ where
     fn add_item(&mut self, key: Self::Key, item: Self::Item) -> Result<(), MempoolError> {
         if self.pending_items.contains_key(&key) || self.in_block_items_by_id.contains_key(&key) {
             return Err(MempoolError::ExistingItem);
+        }
+        if !self.verifier.verify(&item) {
+            return Err(MempoolError::VerificationError);
         }
         self.pending_items.insert(key, item);
         self.last_item_timestamp = SystemTime::now()
