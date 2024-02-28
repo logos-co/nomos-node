@@ -1,5 +1,7 @@
 use rocksdb::{Options, DB};
 
+const TEMP_ROCKS_PATH: &str = "rocks";
+
 pub fn rocksdb_ro() {
     let mut opts = Options::default();
     opts.create_if_missing(true);
