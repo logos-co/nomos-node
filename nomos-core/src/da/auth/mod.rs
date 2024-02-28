@@ -3,5 +3,5 @@ pub trait Signer {
 }
 
 pub trait Verifier {
-    fn verify(&self, message: &[u8]) -> bool;
+    fn verify(&self, message: &[u8], sig: &[u8]) -> bool;
 }
