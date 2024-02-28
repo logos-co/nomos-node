@@ -25,3 +25,9 @@ tempfile = "3"
 default = []
 mock = []
 sled-backend = ["sled"]
+rocksdb-backend = ["rocksdb"]
+
+[[bin]]
+name = "rocks"
+path = "src/bin/rocks.rs"
+required-features = ["rocksdb-backend"]
