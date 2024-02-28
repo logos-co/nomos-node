@@ -1,4 +1,5 @@
 pub mod select;
+pub mod verify;
 
 use crate::da::blob::Blob;
 use bytes::Bytes;
