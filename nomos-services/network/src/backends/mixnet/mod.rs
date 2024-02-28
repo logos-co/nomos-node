@@ -1,19 +1,17 @@
-mod command;
-
-use self::command::{Command, MixnetMessage};
-
 // internal
 use super::{
-    libp2p::{self, swarm::SwarmHandler, Libp2pConfig},
+    libp2p::{self, swarm::SwarmHandler, Libp2pConfig, Topic},
     NetworkBackend,
 };
 use mixnet::{
     client::{MessageQueue, MixClient, MixClientConfig},
     node::{MixNode, MixNodeConfig, PacketQueue},
 };
+use nomos_core::wire;
 use nomos_libp2p::{gossipsub, libp2p::StreamProtocol, libp2p_stream::IncomingStreams};
 // crates
 use overwatch_rs::{overwatch::handle::OverwatchHandle, services::state::NoState};
+use serde::{Deserialize, Serialize};
 use tokio::{
     runtime::Handle,
     sync::{broadcast, mpsc},
@@ -53,7 +51,7 @@ const STREAM_PROTOCOL: StreamProtocol = StreamProtocol::new("/mixnet");
 impl NetworkBackend for MixnetNetworkBackend {
     type Settings = MixnetConfig;
     type State = NoState<MixnetConfig>;
-    type Message = Command;
+    type Message = libp2p::Command;
     type EventKind = EventKind;
     type NetworkEvent = NetworkEvent;
 
@@ -118,36 +116,14 @@ impl NetworkBackend for MixnetNetworkBackend {
 
     async fn process(&self, msg: Self::Message) {
         match msg {
-            Command::Broadcast { topic, message } => {
+            libp2p::Command::Broadcast { topic, message } => {
                 let msg = MixnetMessage { topic, message };
                 if let Err(e) = self.mixclient_message_queue.send(msg.as_bytes()).await {
                     tracing::error!("failed to send messasge to mixclient: {e}");
                 }
             }
-            Command::Subscribe(topic) => {
-                if let Err(e) = self
-                    .libp2p_commands_tx
-                    .send(libp2p::Command::Subscribe(topic))
-                    .await
-                {
-                    tracing::error!("failed to send command to libp2p swarm: {e:?}");
-                }
-            }
-            Command::Unsubscribe(topic) => {
-                if let Err(e) = self
-                    .libp2p_commands_tx
-                    .send(libp2p::Command::Unsubscribe(topic))
-                    .await
-                {
-                    tracing::error!("failed to send command to libp2p swarm: {e:?}");
-                }
-            }
-            Command::Info { reply } => {
-                if let Err(e) = self
-                    .libp2p_commands_tx
-                    .send(libp2p::Command::Info { reply })
-                    .await
-                {
+            cmd => {
+                if let Err(e) = self.libp2p_commands_tx.send(cmd).await {
                     tracing::error!("failed to send command to libp2p swarm: {e:?}");
                 }
             }
@@ -208,5 +184,23 @@ impl MixnetNetworkBackend {
                 }
             }
         }
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct MixnetMessage {
+    pub topic: Topic,
+    pub message: Box<[u8]>,
+}
+
+impl MixnetMessage {
+    pub fn as_bytes(&self) -> Box<[u8]> {
+        wire::serialize(self)
+            .expect("Couldn't serialize MixnetMessage")
+            .into_boxed_slice()
+    }
+
+    pub fn from_bytes(data: &[u8]) -> Result<Self, wire::Error> {
+        wire::deserialize(data)
     }
 }
