@@ -45,7 +45,6 @@ impl attestation::Attestation for Attestation {
     type Blob = Blob;
     type Hash = [u8; 32];
     type Voter = Voter;
-    type Signature = Vec<u8>;
 
     fn blob(&self) -> [u8; 32] {
         self.blob
@@ -65,7 +64,7 @@ impl attestation::Attestation for Attestation {
         self.voter
     }
 
-    fn signature(&self) -> Option<Self::Signature> {
-        self.sig.clone()
+    fn signature(&self) -> Option<&[u8]> {
+        self.sig.as_deref()
     }
 }
