@@ -1,8 +1,10 @@
 use std::marker::PhantomData;
 
-use crate::da::{attestation::Attestation, auth::Verifier, certificate::Certificate};
-
-use super::CertificateVerifier;
+use crate::da::{
+    attestation::Attestation,
+    auth::Verifier,
+    certificate::{Certificate, CertificateVerifier},
+};
 
 pub trait KeyStore {
     type Key;

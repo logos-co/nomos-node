@@ -1,5 +1,10 @@
 // std
 use linked_hash_map::LinkedHashMap;
+use nomos_core::da::attestation::Attestation;
+use nomos_core::da::certificate::verify::{DaCertificateVerifier, KeyStore};
+use nomos_core::da::certificate::{Certificate, CertificateVerifier};
+use nomos_core::tx::verify::DummyTxVerifier;
+use nomos_core::tx::Transaction;
 use std::hash::Hash;
 use std::time::SystemTime;
 use std::{collections::BTreeMap, time::UNIX_EPOCH};
@@ -130,5 +135,23 @@ where
                 }
             })
             .collect()
+    }
+}
+
+impl<T: Transaction> Verifier<T> for DummyTxVerifier {
+    fn verify(&self, item: &T) -> bool {
+        self.verify_tx(item)
+    }
+}
+
+impl<C, KS> Verifier<C> for DaCertificateVerifier<KS, C>
+where
+    C: Certificate + Clone,
+    <<C as Certificate>::Attestation as Attestation>::Voter: Clone,
+    KS: KeyStore<Key = <C::Attestation as Attestation>::Voter> + Default + Clone + 'static,
+    KS::Verifier: 'static,
+{
+    fn verify(&self, item: &C) -> bool {
+        CertificateVerifier::verify(self, item)
     }
 }
