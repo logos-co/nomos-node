@@ -1,7 +1,7 @@
-use auth::FullReplicationKeyPair;
 // internal
 use nomos_core::da::{
     attestation::Attestation as _,
+    auth::Signer,
     blob::{self, BlobHasher},
     certificate::{self, CertificateStrategy},
     DaProtocol,
@@ -19,8 +19,6 @@ use nomos_core::wire;
 use serde::{Deserialize, Serialize};
 
 pub mod attestation;
-pub mod auth;
-
 pub use attestation::Attestation;
 
 /// Re-export the types for OpenAPI
@@ -178,7 +176,6 @@ impl certificate::Certificate for Certificate {
 
 // TODO: add generic impl when the trait for Certificate is expanded
 impl DaProtocol for FullReplication<AbsoluteNumber<Attestation, Certificate>> {
-    type Auth = FullReplicationKeyPair;
     type Blob = Blob;
     type Attestation = Attestation;
     type Certificate = Certificate;
@@ -205,7 +202,7 @@ impl DaProtocol for FullReplication<AbsoluteNumber<Attestation, Certificate>> {
         self.output_buffer.pop()
     }
 
-    fn attest(&self, blob: &Self::Blob, auth: &Self::Auth) -> Self::Attestation {
+    fn attest<S: Signer>(&self, blob: &Self::Blob, auth: &S) -> Self::Attestation {
         let blob_hash = hasher(blob);
         Attestation::new_signed(blob_hash, self.voter, auth)
     }

@@ -2,14 +2,14 @@ use bytes::Bytes;
 use nomos_core::{
     da::{
         attestation::{self, Attestation as _},
-        auth::Signer as _,
+        auth::Signer,
         blob,
     },
     wire,
 };
 use serde::{Deserialize, Serialize};
 
-use crate::{auth::FullReplicationKeyPair, hash, Blob, Voter};
+use crate::{hash, Blob, Voter};
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
@@ -28,13 +28,13 @@ impl Attestation {
         }
     }
 
-    pub fn new_signed(blob: [u8; 32], voter: Voter, key_pair: &FullReplicationKeyPair) -> Self {
+    pub fn new_signed<S: Signer>(blob: [u8; 32], voter: Voter, key_pair: &S) -> Self {
         let mut a = Self::new(blob, voter);
         a.sign(key_pair);
         a
     }
 
-    fn sign(&mut self, key_pair: &FullReplicationKeyPair) {
+    fn sign<S: Signer>(&mut self, key_pair: &S) {
         let attestation_hash = self.hash();
         let signature = key_pair.sign(&attestation_hash);
         self.sig = Some(signature);

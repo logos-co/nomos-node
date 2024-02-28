@@ -12,7 +12,6 @@ pub mod blob;
 pub mod certificate;
 
 pub trait DaProtocol {
-    type Auth: Signer;
     type Blob: Blob;
     type Attestation: Attestation;
     type Certificate: Certificate;
@@ -30,7 +29,7 @@ pub trait DaProtocol {
     /// If the protocol is not yet ready to return the data, return None.
     fn extract(&mut self) -> Option<Bytes>;
     /// Attest that we have received and stored a blob.
-    fn attest(&self, blob: &Self::Blob, auth: &Self::Auth) -> Self::Attestation;
+    fn attest<S: Signer>(&self, blob: &Self::Blob, auth: &S) -> Self::Attestation;
     /// Validate that an attestation is valid for a blob.
     fn validate_attestation(&self, blob: &Self::Blob, attestation: &Self::Attestation) -> bool;
     /// Buffer attestations to produce a certificate of correct dispersal.

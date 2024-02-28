@@ -19,6 +19,7 @@ use nomos_core::{
     tx::Transaction,
     wire,
 };
+use nomos_da::auth::mock::MockDaAuth;
 use nomos_da::{
     backend::memory_cache::BlobCache, network::adapters::libp2p::Libp2pAdapter as DaLibp2pAdapter,
     DataAvailabilityService,
@@ -75,6 +76,7 @@ pub type DataAvailability = DataAvailabilityService<
     FullReplication<AbsoluteNumber<Attestation, Certificate>>,
     BlobCache<<Blob as nomos_core::da::blob::Blob>::Hash, Blob>,
     DaLibp2pAdapter<Blob, Attestation>,
+    MockDaAuth,
 >;
 
 type Mempool<K, V, D> = MempoolService<MempoolLibp2pAdapter<K, V>, MockPool<K, V>, D>;

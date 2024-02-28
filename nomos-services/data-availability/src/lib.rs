@@ -1,6 +1,9 @@
+pub mod auth;
 pub mod backend;
 pub mod network;
 
+use auth::DaAuth;
+use nomos_core::da::auth::Signer;
 // std
 use overwatch_rs::DynError;
 use std::fmt::{Debug, Formatter};
@@ -20,8 +23,9 @@ use overwatch_rs::services::state::{NoOperator, NoState};
 use overwatch_rs::services::{ServiceCore, ServiceData, ServiceId};
 use tracing::error;
 
-pub struct DataAvailabilityService<Protocol, Backend, Network>
+pub struct DataAvailabilityService<Protocol, Backend, Network, Auth>
 where
+    Auth: DaAuth,
     Protocol: DaProtocol,
     Backend: DaBackend<Blob = Protocol::Blob>,
     Backend::Blob: 'static,
@@ -30,6 +34,7 @@ where
     service_state: ServiceStateHandle<Self>,
     backend: Backend,
     da: Protocol,
+    da_auth: Auth,
     network_relay: Relay<NetworkService<Network::Backend>>,
 }
 
@@ -58,8 +63,10 @@ impl<B: Blob + 'static> Debug for DaMsg<B> {
 
 impl<B: Blob + 'static> RelayMessage for DaMsg<B> {}
 
-impl<Protocol, Backend, Network> ServiceData for DataAvailabilityService<Protocol, Backend, Network>
+impl<Protocol, Backend, Network, Auth> ServiceData
+    for DataAvailabilityService<Protocol, Backend, Network, Auth>
 where
+    Auth: DaAuth,
     Protocol: DaProtocol,
     Backend: DaBackend<Blob = Protocol::Blob>,
     Backend::Blob: 'static,
@@ -72,8 +79,9 @@ where
     type Message = DaMsg<Protocol::Blob>;
 }
 
-impl<Protocol, Backend, Network> DataAvailabilityService<Protocol, Backend, Network>
+impl<Protocol, Backend, Network, Auth> DataAvailabilityService<Protocol, Backend, Network, Auth>
 where
+    Auth: DaAuth + Signer + Send + Sync,
     Protocol: DaProtocol + Send + Sync,
     Backend: DaBackend<Blob = Protocol::Blob> + Send + Sync,
     Protocol::Settings: Clone + Send + Sync + 'static,
@@ -90,10 +98,10 @@ where
         backend: &Backend,
         adapter: &Network,
         blob: Protocol::Blob,
-        auth: Protocol::Auth,
+        auth: &Auth,
     ) -> Result<(), DaError> {
         // we need to handle the reply (verification + signature)
-        let attestation = da.attest(&blob, &auth);
+        let attestation = da.attest(&blob, auth);
         backend.add_blob(blob).await?;
         // we do not call `da.recv_blob` here because that is meant to
         // be called to retrieve the original data, while here we're only interested
@@ -144,8 +152,10 @@ where
 }
 
 #[async_trait::async_trait]
-impl<Protocol, Backend, Network> ServiceCore for DataAvailabilityService<Protocol, Backend, Network>
+impl<Protocol, Backend, Network, Auth> ServiceCore
+    for DataAvailabilityService<Protocol, Backend, Network, Auth>
 where
+    Auth: DaAuth + Signer + Default + Clone + Send + Sync,
     Protocol: DaProtocol + Send + Sync,
     Backend: DaBackend<Blob = Protocol::Blob> + Send + Sync,
     Protocol::Settings: Clone + Send + Sync + 'static,
@@ -161,10 +171,12 @@ where
         let settings = service_state.settings_reader.get_updated_settings();
         let backend = Backend::new(settings.backend);
         let da = Protocol::new(settings.da_protocol);
+        let da_auth = Auth::default();
         Ok(Self {
             service_state,
             backend,
             da,
+            da_auth,
             network_relay,
         })
     }
@@ -174,6 +186,7 @@ where
             mut service_state,
             backend,
             da,
+            da_auth,
             network_relay,
         } = self;
 
@@ -185,11 +198,10 @@ where
         let adapter = Network::new(network_relay).await;
         let mut network_blobs = adapter.blob_stream().await;
         let mut lifecycle_stream = service_state.lifecycle_handle.message_stream();
-        let da_auth = todo!();
         loop {
             tokio::select! {
                 Some(blob) = network_blobs.next() => {
-                    if let Err(e) = Self::handle_new_blob(&da, &backend, &adapter, blob, da_auth).await {
+                    if let Err(e) = Self::handle_new_blob(&da, &backend, &adapter, blob, &da_auth.clone()).await {
                         tracing::debug!("Failed to add a new received blob: {e:?}");
                     }
                 }

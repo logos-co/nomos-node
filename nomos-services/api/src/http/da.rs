@@ -1,8 +1,8 @@
 use full_replication::{AbsoluteNumber, Attestation, Blob, Certificate, FullReplication};
 use nomos_core::da::blob;
 use nomos_da::{
-    backend::memory_cache::BlobCache, network::adapters::libp2p::Libp2pAdapter as DaLibp2pAdapter,
-    DaMsg, DataAvailabilityService,
+    auth::mock::MockDaAuth, backend::memory_cache::BlobCache,
+    network::adapters::libp2p::Libp2pAdapter as DaLibp2pAdapter, DaMsg, DataAvailabilityService,
 };
 use nomos_mempool::{
     backend::mockpool::MockPool,
@@ -22,6 +22,7 @@ pub type DataAvailability = DataAvailabilityService<
     FullReplication<AbsoluteNumber<Attestation, Certificate>>,
     BlobCache<<Blob as nomos_core::da::blob::Blob>::Hash, Blob>,
     DaLibp2pAdapter<Blob, Attestation>,
+    MockDaAuth,
 >;
 
 pub async fn da_mempool_metrics(
