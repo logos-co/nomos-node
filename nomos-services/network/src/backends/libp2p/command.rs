@@ -3,25 +3,8 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::oneshot;
 
 #[derive(Debug)]
-pub enum Command {
-    /// Broadcast a message through mixnet.
-    ///
-    /// A message will be split into multiple Sphinx packets, mixed through mixnet,
-    /// reconstructed to the original message, and broadcasted to the entire network.
-    Broadcast {
-        topic: Topic,
-        message: Box<[u8]>,
-    },
-    Subscribe(Topic),
-    Unsubscribe(Topic),
-    Info {
-        reply: oneshot::Sender<Libp2pInfo>,
-    },
-}
-
-#[derive(Debug)]
 #[non_exhaustive]
-pub enum SwarmCommand {
+pub enum Command {
     Connect(Dial),
     Broadcast {
         topic: Topic,
