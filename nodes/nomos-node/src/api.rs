@@ -21,7 +21,10 @@ use utoipa_swagger_ui::SwaggerUi;
 
 use carnot_engine::BlockId;
 use full_replication::{Blob, Certificate};
-use nomos_core::{da::blob, tx::Transaction};
+use nomos_core::{
+    da::{blob, certificate::mock::MockCertVerifier},
+    tx::{mock::MockTxVerifier, Transaction},
+};
 use nomos_mempool::{network::adapters::libp2p::Libp2pAdapter, openapi::Status, MempoolMetrics};
 use nomos_network::backends::libp2p::Libp2p;
 use nomos_storage::backends::StorageSerde;
@@ -325,6 +328,7 @@ where
         Libp2p,
         Libp2pAdapter<Tx, <Tx as Transaction>::Hash>,
         nomos_mempool::Transaction,
+        MockTxVerifier,
         Tx,
         <Tx as Transaction>::Hash,
     >(&handle, tx, Transaction::hash))
@@ -346,6 +350,7 @@ async fn add_cert(
         Libp2p,
         Libp2pAdapter<Certificate, <Blob as blob::Blob>::Hash>,
         nomos_mempool::Certificate,
+        MockCertVerifier,
         Certificate,
         <Blob as blob::Blob>::Hash,
     >(

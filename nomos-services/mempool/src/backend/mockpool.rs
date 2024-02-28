@@ -1,9 +1,10 @@
 // std
 use linked_hash_map::LinkedHashMap;
 use nomos_core::da::attestation::Attestation;
+use nomos_core::da::certificate::mock::MockCertVerifier;
 use nomos_core::da::certificate::verify::{DaCertificateVerifier, KeyStore};
 use nomos_core::da::certificate::{Certificate, CertificateVerifier};
-use nomos_core::tx::verify::DummyTxVerifier;
+use nomos_core::tx::mock::MockTxVerifier;
 use nomos_core::tx::Transaction;
 use std::hash::Hash;
 use std::time::SystemTime;
@@ -138,9 +139,15 @@ where
     }
 }
 
-impl<T: Transaction> Verifier<T> for DummyTxVerifier {
+impl<T: Transaction> Verifier<T> for MockTxVerifier {
     fn verify(&self, item: &T) -> bool {
         self.verify_tx(item)
+    }
+}
+
+impl<C: Certificate> Verifier<C> for MockCertVerifier {
+    fn verify(&self, item: &C) -> bool {
+        self.verify_cert(item)
     }
 }
 

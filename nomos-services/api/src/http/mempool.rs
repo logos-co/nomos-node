@@ -1,12 +1,14 @@
 use core::{fmt::Debug, hash::Hash};
 
 use nomos_mempool::{
-    backend::mockpool::MockPool, network::NetworkAdapter, Discriminant, MempoolMsg, MempoolService,
+    backend::{mockpool::MockPool, Verifier},
+    network::NetworkAdapter,
+    Discriminant, MempoolMsg, MempoolService,
 };
 use nomos_network::backends::NetworkBackend;
 use tokio::sync::oneshot;
 
-pub async fn add<N, A, D, Item, Key>(
+pub async fn add<N, A, D, V, Item, Key>(
     handle: &overwatch_rs::overwatch::handle::OverwatchHandle,
     item: Item,
     converter: impl Fn(&Item) -> Key,
@@ -16,11 +18,12 @@ where
     A: NetworkAdapter<Backend = N, Item = Item, Key = Key> + Send + Sync + 'static,
     A::Settings: Send + Sync,
     D: Discriminant,
+    V: Verifier<Item> + Default,
     Item: Clone + Debug + Send + Sync + 'static + Hash,
     Key: Clone + Debug + Ord + Hash + 'static,
 {
     let relay = handle
-        .relay::<MempoolService<A, MockPool<Item, Key>, D>>()
+        .relay::<MempoolService<A, MockPool<Item, Key, V>, D>>()
         .connect()
         .await?;
     let (sender, receiver) = oneshot::channel();

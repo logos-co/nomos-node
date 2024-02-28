@@ -1,6 +1,6 @@
 use nomos_core::{
     block::BlockId,
-    tx::mock::{MockTransaction, MockTxId},
+    tx::mock::{MockTransaction, MockTxId, MockTxVerifier},
 };
 use nomos_log::{Logger, LoggerSettings};
 use nomos_network::{
@@ -21,7 +21,11 @@ struct MockPoolNode {
     logging: ServiceHandle<Logger>,
     network: ServiceHandle<NetworkService<Mock>>,
     mockpool: ServiceHandle<
-        MempoolService<MockAdapter, MockPool<MockTransaction<MockMessage>, MockTxId>, Transaction>,
+        MempoolService<
+            MockAdapter,
+            MockPool<MockTransaction<MockMessage>, MockTxId, MockTxVerifier>,
+            Transaction,
+        >,
     >,
 }
 
@@ -76,7 +80,7 @@ fn test_mockmempool() {
     let network = app.handle().relay::<NetworkService<Mock>>();
     let mempool = app.handle().relay::<MempoolService<
         MockAdapter,
-        MockPool<MockTransaction<MockMessage>, MockTxId>,
+        MockPool<MockTransaction<MockMessage>, MockTxId, MockTxVerifier>,
         Transaction,
     >>();
 

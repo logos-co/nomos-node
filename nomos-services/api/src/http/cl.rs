@@ -1,6 +1,6 @@
 use core::{fmt::Debug, hash::Hash};
 
-use nomos_core::tx::Transaction;
+use nomos_core::tx::{mock::MockTxVerifier, Transaction};
 use nomos_mempool::{
     backend::mockpool::MockPool,
     network::adapters::libp2p::Libp2pAdapter,
@@ -12,7 +12,7 @@ use tokio::sync::oneshot;
 
 type ClMempoolService<T> = MempoolService<
     Libp2pAdapter<T, <T as Transaction>::Hash>,
-    MockPool<T, <T as Transaction>::Hash>,
+    MockPool<T, <T as Transaction>::Hash, MockTxVerifier>,
     TxDiscriminant,
 >;
 

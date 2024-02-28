@@ -16,9 +16,11 @@ use full_replication::Certificate;
 use nomos_core::{
     da::{
         blob,
-        certificate::{self, select::FillSize as FillSizeWithBlobsCertificate},
+        certificate::{
+            self, mock::MockCertVerifier, select::FillSize as FillSizeWithBlobsCertificate,
+        },
     },
-    tx::{select::FillSize as FillSizeWithTx, Transaction},
+    tx::{mock::MockTxVerifier, select::FillSize as FillSizeWithTx, Transaction},
 };
 use nomos_mempool::{
     backend::mockpool::MockPool, network::adapters::libp2p::Libp2pAdapter as MempoolLibp2pAdapter,
@@ -27,9 +29,13 @@ use nomos_storage::backends::{sled::SledBackend, StorageSerde};
 
 pub type Carnot<Tx, SS, const SIZE: usize> = CarnotConsensus<
     ConsensusLibp2pAdapter,
-    MockPool<Tx, <Tx as Transaction>::Hash>,
+    MockPool<Tx, <Tx as Transaction>::Hash, MockTxVerifier>,
     MempoolLibp2pAdapter<Tx, <Tx as Transaction>::Hash>,
-    MockPool<Certificate, <<Certificate as certificate::Certificate>::Blob as blob::Blob>::Hash>,
+    MockPool<
+        Certificate,
+        <<Certificate as certificate::Certificate>::Blob as blob::Blob>::Hash,
+        MockCertVerifier,
+    >,
     MempoolLibp2pAdapter<
         Certificate,
         <<Certificate as certificate::Certificate>::Blob as blob::Blob>::Hash,

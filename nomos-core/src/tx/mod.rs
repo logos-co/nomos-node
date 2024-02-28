@@ -8,7 +8,6 @@ pub mod carnot;
 #[cfg(feature = "mock")]
 pub mod mock;
 pub mod select;
-pub mod verify;
 
 pub type TransactionHasher<T> = fn(&T) -> <T as Transaction>::Hash;
 
