@@ -52,8 +52,8 @@ impl Attestation for MockAttestation {
     fn as_bytes(&self) -> Bytes {
         Bytes::new()
     }
-    fn signature(&self) -> Option<&[u8]> {
-        Some(&self.signature)
+    fn signature(&self) -> &[u8] {
+        &self.signature
     }
 }
 

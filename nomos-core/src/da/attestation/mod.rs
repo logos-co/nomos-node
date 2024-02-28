@@ -10,5 +10,5 @@ pub trait Attestation {
     fn hash(&self) -> Self::Hash;
     fn voter(&self) -> Self::Voter;
     fn as_bytes(&self) -> Bytes;
-    fn signature(&self) -> Option<&[u8]>;
+    fn signature(&self) -> &[u8];
 }

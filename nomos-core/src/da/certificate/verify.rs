@@ -42,11 +42,7 @@ where
         certificate.attestations().iter().all(|attestation| {
             self.key_store
                 .get_key(&attestation.voter())
-                .and_then(|verifier| {
-                    attestation.signature().map(|signature| {
-                        verifier.verify(&attestation.as_bytes(), signature.as_ref())
-                    })
-                })
+                .map(|verifier| verifier.verify(&attestation.as_bytes(), attestation.signature()))
                 .unwrap_or(false)
         })
     }
