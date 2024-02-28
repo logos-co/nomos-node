@@ -1,11 +1,20 @@
-use std::{collections::HashMap, time::Duration};
+use std::{
+    collections::{hash_map::Entry, HashMap},
+    time::Duration,
+};
 
+use futures::{AsyncReadExt, AsyncWriteExt};
 #[allow(deprecated)]
 use nomos_libp2p::{
     gossipsub, libp2p::swarm::ConnectionId, BehaviourEvent, Multiaddr, Swarm, SwarmEvent,
 };
-use nomos_libp2p::{libp2p::StreamProtocol, libp2p_stream::IncomingStreams};
-use tokio::sync::{broadcast, mpsc};
+use nomos_libp2p::{
+    libp2p::Stream,
+    libp2p_stream::{IncomingStreams, OpenStreamError},
+    PeerId,
+};
+use nomos_libp2p::{libp2p::StreamProtocol, libp2p_stream::Control};
+use tokio::sync::{broadcast, mpsc, oneshot};
 use tokio_stream::StreamExt;
 
 use crate::backends::libp2p::Libp2pInfo;
@@ -17,6 +26,8 @@ use super::{
 
 pub struct SwarmHandler {
     pub swarm: Swarm,
+    stream_control: Control,
+    streams: HashMap<PeerId, Stream>,
     pub pending_dials: HashMap<ConnectionId, Dial>,
     pub commands_tx: mpsc::Sender<Command>,
     pub commands_rx: mpsc::Receiver<Command>,
@@ -44,12 +55,15 @@ impl SwarmHandler {
         events_tx: broadcast::Sender<Event>,
     ) -> Self {
         let swarm = Swarm::build(&config.inner).unwrap();
+        let stream_control = swarm.stream_control();
 
         // Keep the dialing history since swarm.connect doesn't return the result synchronously
         let pending_dials = HashMap::<ConnectionId, Dial>::new();
 
         Self {
             swarm,
+            stream_control,
+            streams: HashMap::new(),
             pending_dials,
             commands_tx,
             commands_rx,
@@ -59,9 +73,11 @@ impl SwarmHandler {
 
     pub async fn run(&mut self, initial_peers: Vec<Multiaddr>) {
         for initial_peer in initial_peers {
+            let (tx, _) = oneshot::channel();
             let dial = Dial {
                 addr: initial_peer,
                 retry_count: 0,
+                result_sender: tx,
             };
             Self::schedule_connect(dial, self.commands_tx.clone()).await;
         }
@@ -96,7 +112,7 @@ impl SwarmHandler {
             } => {
                 tracing::debug!("connected to peer:{peer_id}, connection_id:{connection_id:?}");
                 if endpoint.is_dialer() {
-                    self.complete_connect(connection_id);
+                    self.complete_connect(connection_id, peer_id);
                 }
             }
             SwarmEvent::ConnectionClosed {
@@ -164,7 +180,18 @@ impl SwarmHandler {
                 protocol,
                 message,
             } => {
-                todo!()
+                tracing::debug!("StreamSend to {peer_id}: len:{}", message.len());
+                match self.open_stream(peer_id, protocol).await {
+                    Ok(stream) => {
+                        if let Err(e) = Self::stream_write(stream, &message).await {
+                            tracing::error!("failed to write to the stream with ${peer_id}: {e}");
+                            self.close_stream(&peer_id).await;
+                        }
+                    }
+                    Err(e) => {
+                        tracing::error!("failed to open stream with {peer_id}: {e}");
+                    }
+                }
             }
         }
     }
@@ -189,12 +216,19 @@ impl SwarmHandler {
                     "Failed to connect to {} with unretriable error: {e}",
                     dial.addr
                 );
+                if let Err(err) = dial.result_sender.send(Err(e)) {
+                    tracing::warn!("failed to send the Err result of dialing: {err:?}");
+                }
             }
         }
     }
 
-    fn complete_connect(&mut self, connection_id: ConnectionId) {
-        self.pending_dials.remove(&connection_id);
+    fn complete_connect(&mut self, connection_id: ConnectionId, peer_id: PeerId) {
+        if let Some(dial) = self.pending_dials.remove(&connection_id) {
+            if let Err(e) = dial.result_sender.send(Ok(peer_id)) {
+                tracing::warn!("failed to send the Ok result of dialing: {e:?}");
+            }
+        }
     }
 
     // TODO: Consider a common retry module for all use cases
@@ -260,7 +294,40 @@ impl SwarmHandler {
         std::time::Duration::from_secs(BACKOFF.pow(retry as u32))
     }
 
-    pub fn incoming_streams(&self, protocol: StreamProtocol) -> IncomingStreams {
-        todo!()
+    pub fn incoming_streams(&mut self, protocol: StreamProtocol) -> IncomingStreams {
+        self.stream_control.accept(protocol).unwrap()
+    }
+
+    async fn open_stream(
+        &mut self,
+        peer_id: PeerId,
+        protocol: StreamProtocol,
+    ) -> Result<&mut Stream, OpenStreamError> {
+        if let Entry::Vacant(entry) = self.streams.entry(peer_id) {
+            let stream = self.stream_control.open_stream(peer_id, protocol).await?;
+            entry.insert(stream);
+        }
+        Ok(self.streams.get_mut(&peer_id).unwrap())
+    }
+
+    async fn close_stream(&mut self, peer_id: &PeerId) {
+        if let Some(mut stream) = self.streams.remove(peer_id) {
+            let _ = stream.close().await;
+        }
+    }
+
+    async fn stream_write(stream: &mut Stream, msg: &[u8]) -> std::io::Result<()> {
+        stream.write_all(&msg.len().to_le_bytes()).await?;
+        stream.write_all(msg).await?;
+        Ok(())
+    }
+
+    pub async fn stream_read(stream: &mut Stream) -> std::io::Result<Box<[u8]>> {
+        let mut size = [0u8; std::mem::size_of::<usize>()];
+        stream.read_exact(&mut size).await?;
+
+        let mut msg = vec![0u8; usize::from_le_bytes(size)];
+        stream.read_exact(&mut msg).await?;
+        Ok(msg.into_boxed_slice())
     }
 }
