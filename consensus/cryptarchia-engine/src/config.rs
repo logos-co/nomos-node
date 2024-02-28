@@ -11,9 +11,7 @@ pub struct TimeConfig {
 #[derive(Clone, Debug, PartialEq)]
 pub struct Config {
     // Depth of forks that trigger the density rule
-    pub k: u8,
-    // Number of slots after forking point to consider for the density rule
-    pub s: u8,
+    pub security_param: u32,
     // f, the rate of occupied slots
     pub active_slot_coeff: f64,
     // The stake distribution is always taken at the beginning of the previous epoch.
@@ -34,7 +32,12 @@ impl Config {
     }
 
     pub fn base_period_length(&self) -> u64 {
-        (f64::from(self.k) / self.active_slot_coeff).floor() as u64
+        (f64::from(self.security_param) / self.active_slot_coeff).floor() as u64
+    }
+
+    // return the number of slots required to have great confidence at least k blocks have been produced
+    pub fn s(&self) -> u64 {
+        self.base_period_length() * 3
     }
 
     pub fn epoch_length(&self) -> u64 {

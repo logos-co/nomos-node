@@ -139,8 +139,8 @@ impl Cryptarchia {
     }
 
     pub fn fork_choice(&self) -> Branch {
-        let k = self.config.k as u64;
-        let s = self.config.s as u64;
+        let k = self.config.security_param as u64;
+        let s = self.config.s();
         Self::maxvalid_bg(self.local_chain.clone(), &self.branches, k, s)
     }
 
@@ -244,7 +244,7 @@ pub mod tests {
 
     pub fn config() -> Config {
         Config {
-            k: 1,
+            security_param: 1,
             s: 1,
             active_slot_coeff: 1.0,
             epoch_stake_distribution_stabilization: 4,
@@ -318,7 +318,7 @@ pub mod tests {
         ]);
         // by setting a low k we trigger the density choice rule, and the shorter chain is denser after
         // the fork
-        engine.config.k = 10;
+        engine.config.security_param = 10;
         engine.config.s = 50;
 
         let mut parent = *engine.genesis();

@@ -89,15 +89,25 @@ impl Header {
         self.parent
     }
 
-    pub fn id(&self) -> HeaderId {
-        let mut h = Blake2b::new();
+    fn update_hasher(&self, h: &mut Blake2b) {
         h.update(b"\x01");
         h.update(self.content_size.to_be_bytes());
         h.update(self.content_id.0);
         h.update(self.slot.to_be_bytes());
         h.update(self.parent.0);
 
-        // TODO: add proof
+        h.update(self.leader_proof.commitment.0);
+        h.update(self.leader_proof.nullifier.0);
+        h.update(self.leader_proof.evolved_commitment.0);
+
+        for proof in &self.orphaned_leader_proofs {
+            proof.update_hasher(h)
+        }
+    }
+
+    pub fn id(&self) -> HeaderId {
+        let mut h = Blake2b::new();
+        self.update_hasher(&mut h);
         HeaderId(h.finalize().into())
     }
 

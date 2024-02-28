@@ -47,7 +47,7 @@ impl EpochState {
         let commitments = if ledger.slot < stake_snapshot_slot {
             ledger.lead_commitments.clone()
         } else {
-            self.commitments.clone()
+            self.commitments
         };
         Self {
             epoch: self.epoch,
