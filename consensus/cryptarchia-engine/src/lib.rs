@@ -1,11 +1,13 @@
-pub mod chain;
+pub mod block;
 pub mod config;
 pub mod crypto;
+pub mod leader_proof;
 pub mod ledger;
 pub mod time;
 
-pub use chain::*;
+pub use block::*;
 pub use config::*;
+pub use leader_proof::*;
 use ledger::{Ledger, LedgerState};
 use std::collections::{HashMap, HashSet};
 use thiserror::Error;
@@ -115,7 +117,7 @@ impl Cryptarchia {
     pub fn from_genesis(header: Header, state: LedgerState, config: Config) -> Self {
         assert_eq!(header.slot(), Slot::genesis());
         Self {
-            ledger: Ledger::from_genesis(header.clone(), state, config.clone()),
+            ledger: Ledger::from_genesis(header.id(), state, config.clone()),
             branches: Branches::from_genesis(&header),
             local_chain: Branch {
                 header: header.clone(),
@@ -179,6 +181,13 @@ impl Cryptarchia {
                 // Classic longest chain rule with parameter k
                 if cmax.length < chain.length {
                     cmax = chain;
+                } else {
+                    println!(
+                        "shorter {:?} {} {}",
+                        chain.header.id(),
+                        cmax.length,
+                        chain.length
+                    )
                 }
             } else {
                 // The chain is forking too much, we need to pay a bit more attention
@@ -188,6 +197,13 @@ impl Cryptarchia {
                 let candidate_density = branches.walk_back_before(&chain, density_slot).length;
                 if cmax_density < candidate_density {
                     cmax = chain;
+                } else {
+                    println!(
+                        "less dense {:?} {} {}",
+                        chain.header.id(),
+                        cmax_density,
+                        candidate_density
+                    )
                 }
             }
         }
@@ -245,7 +261,6 @@ pub mod tests {
     pub fn config() -> Config {
         Config {
             security_param: 1,
-            s: 1,
             active_slot_coeff: 1.0,
             epoch_stake_distribution_stabilization: 4,
             epoch_period_nonce_buffer: 3,
@@ -319,7 +334,6 @@ pub mod tests {
         // by setting a low k we trigger the density choice rule, and the shorter chain is denser after
         // the fork
         engine.config.security_param = 10;
-        engine.config.s = 50;
 
         let mut parent = *engine.genesis();
         for i in 1..50 {
@@ -332,21 +346,21 @@ pub mod tests {
         let mut long_p = parent;
         let mut short_p = parent;
         // the node sees first the short chain
-        for slot in 50..100 {
+        for slot in 50..70 {
             short_p = propose_and_evolve(slot, short_p, &mut short_coin, &mut engine);
         }
 
         assert_eq!(engine.tip_id(), short_p);
 
         // then it receives a longer chain which is however less dense after the fork
-        for slot in 50..100 {
+        for slot in 50..70 {
             if slot % 2 == 0 {
                 long_p = propose_and_evolve(slot, long_p, &mut long_coin, &mut engine);
             }
             assert_eq!(engine.tip_id(), short_p);
         }
         // even if the long chain is much longer, it will never be accepted as it's not dense enough
-        for slot in 100..200 {
+        for slot in 70..100 {
             long_p = propose_and_evolve(slot, long_p, &mut long_coin, &mut engine);
             assert_eq!(engine.tip_id(), short_p);
         }
@@ -363,7 +377,7 @@ pub mod tests {
                 short_branch.clone(),
                 engine.branches(),
                 k,
-                engine.config.s as u64
+                engine.config.s()
             )
             .header
             .id(),
@@ -371,7 +385,7 @@ pub mod tests {
         );
 
         // a longer chain which is equally dense after the fork will be selected as the main tip
-        for slot in 50..101 {
+        for slot in 50..71 {
             parent = propose_and_evolve(slot, parent, &mut long_dense_coin, &mut engine);
         }
         assert_eq!(engine.tip_id(), parent);

@@ -68,10 +68,9 @@ pub struct Ledger {
 }
 
 impl Ledger {
-    pub fn from_genesis(header: Header, state: LedgerState, config: Config) -> Self {
-        assert_eq!(header.slot(), Slot::genesis());
+    pub fn from_genesis(id: HeaderId, state: LedgerState, config: Config) -> Self {
         Self {
-            states: [(header.id(), state)].into_iter().collect(),
+            states: [(id, state)].into_iter().collect(),
             config,
         }
     }
@@ -252,7 +251,7 @@ impl LedgerState {
             nonce: <[u8; 32]>::from(
                 Blake2b::new_with_prefix("epoch-nonce".as_bytes())
                     .chain_update(<[u8; 32]>::from(self.nonce))
-                    .chain_update(proof.nullifier().as_bytes())
+                    .chain_update(proof.nullifier())
                     .chain_update(proof.slot().to_be_bytes())
                     .finalize(),
             )
@@ -314,7 +313,7 @@ pub mod tests {
         let genesis_state = genesis_state(commitments);
         let genesis_header = genesis_header();
         (
-            Ledger::from_genesis(genesis_header.clone(), genesis_state, config()),
+            Ledger::from_genesis(genesis_header.id(), genesis_state, config()),
             genesis_header,
         )
     }
