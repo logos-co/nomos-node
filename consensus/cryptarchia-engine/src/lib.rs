@@ -454,6 +454,16 @@ pub mod tests {
                 vec![fork_1.header().clone(), fork_2.header().clone()],
             ))
             .unwrap();
+        // but we can't import just the second proof because it's using an evolved coin that has not been seen yet
+        assert!(matches!(
+            engine.receive_block(block_with_orphans(
+                1,
+                *engine.genesis(),
+                coin_new_new,
+                vec![fork_2.header().clone()]
+            )),
+            Err(Error::LedgerError(LedgerError::CommitmentNotFound))
+        ));
 
         // an imported proof that uses a coin that was already used in the base branch should not be allowed
         let block_1 = block(1, *engine.genesis(), coin);
