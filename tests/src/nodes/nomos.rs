@@ -31,6 +31,7 @@ const NOMOS_BIN: &str = "../target/debug/nomos-node";
 const CARNOT_INFO_API: &str = "carnot/info";
 const STORAGE_BLOCKS_API: &str = "storage/block";
 const GET_BLOCKS_INFO: &str = "carnot/blocks";
+const MOCK_DA_AUTH_PEM: &str = "../tests/mock_da_auth_key.p8";
 
 pub struct NomosNode {
     addr: SocketAddr,
@@ -349,6 +350,9 @@ fn create_node_config(
             backend: nomos_da::backend::memory_cache::BlobCacheSettings {
                 max_capacity: usize::MAX,
                 evicting_period: Duration::from_secs(60 * 60 * 24), // 1 day
+            },
+            da_auth: nomos_da::auth::mock::MockDaAuthSettings {
+                pkcs8_file_path: std::env::current_dir().unwrap().join(MOCK_DA_AUTH_PEM),
             },
         },
     };

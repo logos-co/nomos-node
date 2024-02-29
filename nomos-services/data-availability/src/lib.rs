@@ -73,7 +73,7 @@ where
     Network: NetworkAdapter<Blob = Protocol::Blob, Attestation = Protocol::Attestation>,
 {
     const SERVICE_ID: ServiceId = "DA";
-    type Settings = Settings<Protocol::Settings, Backend::Settings>;
+    type Settings = Settings<Protocol::Settings, Backend::Settings, Auth::Settings>;
     type State = NoState<Self::Settings>;
     type StateOperator = NoOperator<Self::State>;
     type Message = DaMsg<Protocol::Blob>;
@@ -89,6 +89,7 @@ where
     Backend::Settings: Clone + Send + Sync + 'static,
     Protocol::Blob: Send,
     Protocol::Attestation: Send,
+    Auth::Settings: Clone + Send + Sync + 'static,
     <Backend::Blob as Blob>::Hash: Debug + Send + Sync,
     Network:
         NetworkAdapter<Blob = Protocol::Blob, Attestation = Protocol::Attestation> + Send + Sync,
@@ -155,13 +156,14 @@ where
 impl<Protocol, Backend, Network, Auth> ServiceCore
     for DataAvailabilityService<Protocol, Backend, Network, Auth>
 where
-    Auth: DaAuth + Signer + Default + Clone + Send + Sync,
+    Auth: DaAuth + Signer + Clone + Send + Sync,
     Protocol: DaProtocol + Send + Sync,
     Backend: DaBackend<Blob = Protocol::Blob> + Send + Sync,
     Protocol::Settings: Clone + Send + Sync + 'static,
     Backend::Settings: Clone + Send + Sync + 'static,
     Protocol::Blob: Send,
     Protocol::Attestation: Send,
+    Auth::Settings: Clone + Send + Sync + 'static,
     <Backend::Blob as Blob>::Hash: Debug + Send + Sync,
     Network:
         NetworkAdapter<Blob = Protocol::Blob, Attestation = Protocol::Attestation> + Send + Sync,
@@ -171,7 +173,7 @@ where
         let settings = service_state.settings_reader.get_updated_settings();
         let backend = Backend::new(settings.backend);
         let da = Protocol::new(settings.da_protocol);
-        let da_auth = Auth::default();
+        let da_auth = Auth::new(settings.da_auth);
         Ok(Self {
             service_state,
             backend,
@@ -222,7 +224,8 @@ where
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct Settings<P, B> {
+pub struct Settings<P, B, A> {
     pub da_protocol: P,
     pub backend: B,
+    pub da_auth: A,
 }
