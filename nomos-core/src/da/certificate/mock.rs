@@ -22,14 +22,14 @@ impl Blob for MockBlob {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct MockAttestation {
-    voter: String,
+    voter: [u8; 32],
     signature: Vec<u8>,
 }
 
 impl MockAttestation {
-    pub fn new(voter: &str, signature: &[u8]) -> Self {
+    pub fn new(voter: &[u8; 32], signature: &[u8]) -> Self {
         MockAttestation {
-            voter: voter.to_string(),
+            voter: *voter,
             signature: signature.to_vec(),
         }
     }
@@ -38,7 +38,7 @@ impl MockAttestation {
 impl Attestation for MockAttestation {
     type Blob = MockBlob;
     type Hash = Vec<u8>;
-    type Voter = String;
+    type Voter = [u8; 32];
 
     fn blob(&self) -> Self::Hash {
         unimplemented!()
@@ -47,7 +47,7 @@ impl Attestation for MockAttestation {
         unimplemented!()
     }
     fn voter(&self) -> Self::Voter {
-        self.voter.clone()
+        self.voter
     }
     fn as_bytes(&self) -> Bytes {
         Bytes::new()
@@ -104,22 +104,29 @@ impl Verifier for MockPublicKey {
     }
 }
 
-#[derive(Default, Clone)]
+#[derive(Clone)]
 pub struct MockKeyStore {
-    keys: HashMap<String, MockPublicKey>,
+    keys: HashMap<[u8; 32], MockPublicKey>,
 }
 
-impl MockKeyStore {
-    pub fn add_key(&mut self, voter: &str, verifier: MockPublicKey) {
-        self.keys.insert(voter.to_string(), verifier);
+impl Default for MockKeyStore {
+    fn default() -> Self {
+        Self {
+            keys: [([0u8; 32], MockPublicKey)].into(),
+        }
     }
 }
 
-impl KeyStore for MockKeyStore {
-    type Key = String;
+impl MockKeyStore {
+    pub fn add_key(&mut self, voter: &[u8; 32], verifier: MockPublicKey) {
+        self.keys.insert(*voter, verifier);
+    }
+}
+
+impl KeyStore<[u8; 32]> for MockKeyStore {
     type Verifier = MockPublicKey;
 
-    fn get_key(&self, node_id: &Self::Key) -> Option<&Self::Verifier> {
+    fn get_key(&self, node_id: &[u8; 32]) -> Option<&Self::Verifier> {
         self.keys.get(node_id)
     }
 }

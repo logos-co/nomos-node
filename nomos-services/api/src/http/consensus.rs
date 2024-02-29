@@ -15,9 +15,11 @@ use carnot_engine::{
 use full_replication::Certificate;
 use nomos_core::{
     da::{
-        blob,
+        attestation, blob,
         certificate::{
-            self, mock::MockCertVerifier, select::FillSize as FillSizeWithBlobsCertificate,
+            self,
+            select::FillSize as FillSizeWithBlobsCertificate,
+            verify::{DaCertificateVerifier, KeyStore},
         },
     },
     tx::{mock::MockTxVerifier, select::FillSize as FillSizeWithTx, Transaction},
@@ -27,14 +29,16 @@ use nomos_mempool::{
 };
 use nomos_storage::backends::{sled::SledBackend, StorageSerde};
 
-pub type Carnot<Tx, SS, const SIZE: usize> = CarnotConsensus<
+pub type Carnot<Tx, SS, KS, const SIZE: usize> = CarnotConsensus<
     ConsensusLibp2pAdapter,
     MockPool<Tx, <Tx as Transaction>::Hash, MockTxVerifier>,
     MempoolLibp2pAdapter<Tx, <Tx as Transaction>::Hash>,
     MockPool<
         Certificate,
         <<Certificate as certificate::Certificate>::Blob as blob::Blob>::Hash,
-        MockCertVerifier,
+        DaCertificateVerifier<
+<<Certificate as certificate::Certificate>::Attestation as attestation::Attestation>::Voter,
+        KS, Certificate>,
     >,
     MempoolLibp2pAdapter<
         Certificate,
@@ -46,15 +50,16 @@ pub type Carnot<Tx, SS, const SIZE: usize> = CarnotConsensus<
     SledBackend<SS>,
 >;
 
-pub async fn carnot_info<Tx, SS, const SIZE: usize>(
+pub async fn carnot_info<Tx, SS, KS, const SIZE: usize>(
     handle: &OverwatchHandle,
 ) -> Result<CarnotInfo, super::DynError>
 where
     Tx: Transaction + Clone + Debug + Hash + Serialize + DeserializeOwned + Send + Sync + 'static,
     <Tx as Transaction>::Hash: std::cmp::Ord + Debug + Send + Sync + 'static,
     SS: StorageSerde + Send + Sync + 'static,
+    KS: KeyStore<[u8; 32]> + Clone + 'static,
 {
-    let relay = handle.relay::<Carnot<Tx, SS, SIZE>>().connect().await?;
+    let relay = handle.relay::<Carnot<Tx, SS, KS, SIZE>>().connect().await?;
     let (sender, receiver) = oneshot::channel();
     relay
         .send(ConsensusMsg::Info { tx: sender })
@@ -64,7 +69,7 @@ where
     Ok(receiver.await?)
 }
 
-pub async fn carnot_blocks<Tx, SS, const SIZE: usize>(
+pub async fn carnot_blocks<Tx, SS, KS, const SIZE: usize>(
     handle: &OverwatchHandle,
     from: Option<BlockId>,
     to: Option<BlockId>,
@@ -73,8 +78,9 @@ where
     Tx: Transaction + Clone + Debug + Hash + Serialize + DeserializeOwned + Send + Sync + 'static,
     <Tx as Transaction>::Hash: std::cmp::Ord + Debug + Send + Sync + 'static,
     SS: StorageSerde + Send + Sync + 'static,
+    KS: KeyStore<[u8; 32]> + Clone + 'static,
 {
-    let relay = handle.relay::<Carnot<Tx, SS, SIZE>>().connect().await?;
+    let relay = handle.relay::<Carnot<Tx, SS, KS, SIZE>>().connect().await?;
     let (sender, receiver) = oneshot::channel();
     relay
         .send(ConsensusMsg::GetBlocks {

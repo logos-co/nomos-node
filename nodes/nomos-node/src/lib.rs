@@ -14,11 +14,13 @@ use api::AxumBackend;
 use bytes::Bytes;
 use carnot_consensus::CarnotConsensus;
 use nomos_api::ApiService;
-use nomos_core::da::certificate::mock::MockCertVerifier;
-use nomos_core::tx::mock::MockTxVerifier;
+use nomos_core::da::attestation;
 use nomos_core::{
-    da::{blob, certificate},
-    tx::Transaction,
+    da::{
+        blob,
+        certificate::{self, mock::MockKeyStore, verify::DaCertificateVerifier},
+    },
+    tx::{mock::MockTxVerifier, Transaction},
     wire,
 };
 use nomos_da::auth::mock::MockDaAuth;
@@ -66,7 +68,10 @@ pub type Carnot = CarnotConsensus<
     MockPool<
         Certificate,
         <<Certificate as certificate::Certificate>::Blob as blob::Blob>::Hash,
-        MockCertVerifier,
+        DaCertificateVerifier<
+            <<Certificate as certificate::Certificate>::Attestation as attestation::Attestation>::Voter,
+            MockKeyStore, Certificate,
+        >,
     >,
     MempoolLibp2pAdapter<
         Certificate,
@@ -87,22 +92,22 @@ pub type DataAvailability = DataAvailabilityService<
 
 type Mempool<K, V, D, VRF> = MempoolService<MempoolLibp2pAdapter<K, V>, MockPool<K, V, VRF>, D>;
 
+type DaMempool = Mempool<
+    Certificate,
+    <<Certificate as certificate::Certificate>::Blob as blob::Blob>::Hash,
+    CertDiscriminant,
+    DaCertificateVerifier<[u8; 32], MockKeyStore, Certificate>,
+>;
+
 #[derive(Services)]
 pub struct Nomos {
     logging: ServiceHandle<Logger>,
     network: ServiceHandle<NetworkService<Libp2p>>,
     cl_mempool:
         ServiceHandle<Mempool<Tx, <Tx as Transaction>::Hash, TxDiscriminant, MockTxVerifier>>,
-    da_mempool: ServiceHandle<
-        Mempool<
-            Certificate,
-            <<Certificate as certificate::Certificate>::Blob as blob::Blob>::Hash,
-            CertDiscriminant,
-            MockCertVerifier,
-        >,
-    >,
+    da_mempool: ServiceHandle<DaMempool>,
     consensus: ServiceHandle<Carnot>,
-    http: ServiceHandle<ApiService<AxumBackend<Tx, Wire, MB16>>>,
+    http: ServiceHandle<ApiService<AxumBackend<Tx, Wire, MockKeyStore, MB16>>>,
     da: ServiceHandle<DataAvailability>,
     storage: ServiceHandle<StorageService<SledBackend<Wire>>>,
     #[cfg(feature = "metrics")]

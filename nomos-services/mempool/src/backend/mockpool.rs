@@ -22,13 +22,12 @@ pub struct MockPool<Item, Key, Verifier> {
     in_block_items: BTreeMap<BlockId, Vec<Item>>,
     in_block_items_by_id: BTreeMap<Key, BlockId>,
     last_item_timestamp: u64,
-    verifier: Verifier,
+    verifier: Option<Verifier>,
 }
 
 impl<Item, Key, Verifier> Default for MockPool<Item, Key, Verifier>
 where
     Key: Hash + Eq,
-    Verifier: Default,
 {
     fn default() -> Self {
         Self {
@@ -36,7 +35,7 @@ where
             in_block_items: BTreeMap::new(),
             in_block_items_by_id: BTreeMap::new(),
             last_item_timestamp: 0,
-            verifier: Default::default(),
+            verifier: None,
         }
     }
 }
@@ -44,7 +43,6 @@ where
 impl<Item, Key, Verifier> MockPool<Item, Key, Verifier>
 where
     Key: Hash + Eq + Clone,
-    Verifier: Default,
 {
     pub fn new() -> Self {
         Default::default()
@@ -55,7 +53,7 @@ impl<Item, Key, V> MemPool for MockPool<Item, Key, V>
 where
     Item: Clone + Send + Sync + 'static + Hash,
     Key: Clone + Ord + Hash,
-    V: Verifier<Item> + Default,
+    V: Verifier<Item>,
 {
     type Settings = ();
     type Item = Item;
@@ -70,7 +68,12 @@ where
         if self.pending_items.contains_key(&key) || self.in_block_items_by_id.contains_key(&key) {
             return Err(MempoolError::ExistingItem);
         }
-        if !self.verifier.verify(&item) {
+        if !self
+            .verifier
+            .as_ref()
+            .map(|verifier| verifier.verify(&item))
+            .unwrap_or(true)
+        {
             return Err(MempoolError::VerificationError);
         }
         self.pending_items.insert(key, item);
@@ -151,11 +154,11 @@ impl<C: Certificate> Verifier<C> for MockCertVerifier {
     }
 }
 
-impl<C, KS> Verifier<C> for DaCertificateVerifier<KS, C>
+impl<C, K, KS> Verifier<C> for DaCertificateVerifier<K, KS, C>
 where
     C: Certificate + Clone,
-    <<C as Certificate>::Attestation as Attestation>::Voter: Clone,
-    KS: KeyStore<Key = <C::Attestation as Attestation>::Voter> + Default + Clone + 'static,
+    <<C as Certificate>::Attestation as Attestation>::Voter: Into<K> + Clone,
+    KS: KeyStore<K> + Clone + 'static,
     KS::Verifier: 'static,
 {
     fn verify(&self, item: &C) -> bool {

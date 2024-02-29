@@ -20,9 +20,15 @@ use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 
 use carnot_engine::BlockId;
-use full_replication::{Blob, Certificate};
+use full_replication::{Attestation, Blob, Certificate};
 use nomos_core::{
-    da::{blob, certificate::mock::MockCertVerifier},
+    da::{
+        attestation, blob,
+        certificate::{
+            mock::MockKeyStore,
+            verify::{DaCertificateVerifier, KeyStore},
+        },
+    },
     tx::{mock::MockTxVerifier, Transaction},
 };
 use nomos_mempool::{network::adapters::libp2p::Libp2pAdapter, openapi::Status, MempoolMetrics};
@@ -43,10 +49,11 @@ pub struct AxumBackendSettings {
     pub cors_origins: Vec<String>,
 }
 
-pub struct AxumBackend<T, S, const SIZE: usize> {
+pub struct AxumBackend<T, S, KS, const SIZE: usize> {
     settings: AxumBackendSettings,
     _tx: core::marker::PhantomData<T>,
     _storage_serde: core::marker::PhantomData<S>,
+    _key_store: core::marker::PhantomData<KS>,
 }
 
 #[derive(OpenApi)]
@@ -65,7 +72,7 @@ pub struct AxumBackend<T, S, const SIZE: usize> {
 struct ApiDoc;
 
 #[async_trait::async_trait]
-impl<T, S, const SIZE: usize> Backend for AxumBackend<T, S, SIZE>
+impl<T, S, KS, const SIZE: usize> Backend for AxumBackend<T, S, KS, SIZE>
 where
     T: Transaction
         + Clone
@@ -80,6 +87,7 @@ where
     <T as nomos_core::tx::Transaction>::Hash:
         Serialize + for<'de> Deserialize<'de> + std::cmp::Ord + Debug + Send + Sync + 'static,
     S: StorageSerde + Send + Sync + 'static,
+    KS: KeyStore<[u8; 32]> + Clone + Send + 'static,
 {
     type Error = hyper::Error;
     type Settings = AxumBackendSettings;
@@ -92,6 +100,7 @@ where
             settings,
             _tx: core::marker::PhantomData,
             _storage_serde: core::marker::PhantomData,
+            _key_store: core::marker::PhantomData,
         })
     }
 
@@ -123,8 +132,11 @@ where
             .route("/da/blobs", routing::post(da_blobs))
             .route("/cl/metrics", routing::get(cl_metrics::<T>))
             .route("/cl/status", routing::post(cl_status::<T>))
-            .route("/carnot/info", routing::get(carnot_info::<T, S, SIZE>))
-            .route("/carnot/blocks", routing::get(carnot_blocks::<T, S, SIZE>))
+            .route("/carnot/info", routing::get(carnot_info::<T, S, KS, SIZE>))
+            .route(
+                "/carnot/blocks",
+                routing::get(carnot_blocks::<T, S, KS, SIZE>),
+            )
             .route("/network/info", routing::get(libp2p_info))
             .route("/storage/block", routing::post(block::<S, T>))
             .route("/mempool/add/tx", routing::post(add_tx::<T>))
@@ -247,13 +259,16 @@ where
         (status = 500, description = "Internal server error", body = String),
     )
 )]
-async fn carnot_info<Tx, SS, const SIZE: usize>(State(handle): State<OverwatchHandle>) -> Response
+async fn carnot_info<Tx, SS, KS, const SIZE: usize>(
+    State(handle): State<OverwatchHandle>,
+) -> Response
 where
     Tx: Transaction + Clone + Debug + Hash + Serialize + DeserializeOwned + Send + Sync + 'static,
     <Tx as Transaction>::Hash: std::cmp::Ord + Debug + Send + Sync + 'static,
     SS: StorageSerde + Send + Sync + 'static,
+    KS: KeyStore<[u8; 32]> + Clone + 'static,
 {
-    make_request_and_return_response!(consensus::carnot_info::<Tx, SS, SIZE>(&handle))
+    make_request_and_return_response!(consensus::carnot_info::<Tx, SS, KS, SIZE>(&handle))
 }
 
 #[derive(Deserialize)]
@@ -270,7 +285,7 @@ struct QueryParams {
         (status = 500, description = "Internal server error", body = String),
     )
 )]
-async fn carnot_blocks<Tx, SS, const SIZE: usize>(
+async fn carnot_blocks<Tx, SS, KS, const SIZE: usize>(
     State(store): State<OverwatchHandle>,
     Query(query): Query<QueryParams>,
 ) -> Response
@@ -278,9 +293,12 @@ where
     Tx: Transaction + Clone + Debug + Hash + Serialize + DeserializeOwned + Send + Sync + 'static,
     <Tx as Transaction>::Hash: std::cmp::Ord + Debug + Send + Sync + 'static,
     SS: StorageSerde + Send + Sync + 'static,
+    KS: KeyStore<[u8; 32]> + Clone + 'static,
 {
     let QueryParams { from, to } = query;
-    make_request_and_return_response!(consensus::carnot_blocks::<Tx, SS, SIZE>(&store, from, to))
+    make_request_and_return_response!(consensus::carnot_blocks::<Tx, SS, KS, SIZE>(
+        &store, from, to
+    ))
 }
 
 #[utoipa::path(
@@ -350,7 +368,11 @@ async fn add_cert(
         Libp2p,
         Libp2pAdapter<Certificate, <Blob as blob::Blob>::Hash>,
         nomos_mempool::Certificate,
-        MockCertVerifier,
+        DaCertificateVerifier<
+            <Attestation as attestation::Attestation>::Voter,
+            MockKeyStore,
+            Certificate,
+        >,
         Certificate,
         <Blob as blob::Blob>::Hash,
     >(

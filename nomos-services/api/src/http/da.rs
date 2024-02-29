@@ -1,5 +1,8 @@
 use full_replication::{AbsoluteNumber, Attestation, Blob, Certificate, FullReplication};
-use nomos_core::da::{blob, certificate::mock::MockCertVerifier};
+use nomos_core::da::{
+    attestation, blob,
+    certificate::{mock::MockKeyStore, verify::DaCertificateVerifier},
+};
 use nomos_da::{
     auth::mock::MockDaAuth, backend::memory_cache::BlobCache,
     network::adapters::libp2p::Libp2pAdapter as DaLibp2pAdapter, DaMsg, DataAvailabilityService,
@@ -14,7 +17,15 @@ use tokio::sync::oneshot;
 
 pub type DaMempoolService = MempoolService<
     Libp2pAdapter<Certificate, <Blob as blob::Blob>::Hash>,
-    MockPool<Certificate, <Blob as blob::Blob>::Hash, MockCertVerifier>,
+    MockPool<
+        Certificate,
+        <Blob as blob::Blob>::Hash,
+        DaCertificateVerifier<
+            <Attestation as attestation::Attestation>::Voter,
+            MockKeyStore,
+            Certificate,
+        >,
+    >,
     CertDiscriminant,
 >;
 

@@ -18,7 +18,7 @@ where
     A: NetworkAdapter<Backend = N, Item = Item, Key = Key> + Send + Sync + 'static,
     A::Settings: Send + Sync,
     D: Discriminant,
-    V: Verifier<Item> + Default,
+    V: Verifier<Item>,
     Item: Clone + Debug + Send + Sync + 'static + Hash,
     Key: Clone + Debug + Ord + Hash + 'static,
 {
