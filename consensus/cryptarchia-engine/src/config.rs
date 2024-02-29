@@ -10,7 +10,10 @@ pub struct TimeConfig {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Config {
-    // Depth of forks that trigger the density rule
+    // The k parameter in the Common Prefix property.
+    // Blocks deeper than k are generally considered stable and forks deeper than that
+    // trigger the additional fork selection rule, which is however only expected to be used
+    // during bootstrapping.
     pub security_param: u32,
     // f, the rate of occupied slots
     pub active_slot_coeff: f64,
