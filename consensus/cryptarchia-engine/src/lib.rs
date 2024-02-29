@@ -181,13 +181,6 @@ impl Cryptarchia {
                 // Classic longest chain rule with parameter k
                 if cmax.length < chain.length {
                     cmax = chain;
-                } else {
-                    println!(
-                        "shorter {:?} {} {}",
-                        chain.header.id(),
-                        cmax.length,
-                        chain.length
-                    )
                 }
             } else {
                 // The chain is forking too much, we need to pay a bit more attention
@@ -197,13 +190,6 @@ impl Cryptarchia {
                 let candidate_density = branches.walk_back_before(&chain, density_slot).length;
                 if cmax_density < candidate_density {
                     cmax = chain;
-                } else {
-                    println!(
-                        "less dense {:?} {} {}",
-                        chain.header.id(),
-                        cmax_density,
-                        candidate_density
-                    )
                 }
             }
         }
@@ -220,7 +206,10 @@ pub mod tests {
     use blake2::Digest;
     use std::hash::{DefaultHasher, Hash, Hasher};
 
-    use super::{ledger::tests::genesis_state, Cryptarchia};
+    use super::{
+        ledger::{tests::genesis_state, LedgerError},
+        Cryptarchia, Error,
+    };
 
     pub fn header(slot: impl Into<Slot>, parent: HeaderId, coin: Coin) -> Header {
         let slot = slot.into();
@@ -229,6 +218,15 @@ pub mod tests {
 
     pub fn block(slot: impl Into<Slot>, parent: HeaderId, coin: Coin) -> Block {
         Block::new(header(slot, parent, coin))
+    }
+
+    pub fn block_with_orphans(
+        slot: impl Into<Slot>,
+        parent: HeaderId,
+        coin: Coin,
+        orphans: Vec<Header>,
+    ) -> Block {
+        Block::new(header(slot, parent, coin).with_orphaned_proofs(orphans))
     }
 
     pub fn propose_and_evolve(
@@ -389,5 +387,85 @@ pub mod tests {
             parent = propose_and_evolve(slot, parent, &mut long_dense_coin, &mut engine);
         }
         assert_eq!(engine.tip_id(), parent);
+    }
+
+    #[test]
+    fn test_orphan_proof_import() {
+        let coin = Coin::new(0);
+        let mut engine = engine(&[coin.commitment()]);
+
+        let coin_new = coin.evolve();
+        let coin_new_new = coin_new.evolve();
+
+        // produce a fork where the coin has been spent twice
+        let fork_1 = block(1, *engine.genesis(), coin);
+        let fork_2 = block(2, fork_1.header().id(), coin_new);
+
+        // neither of the evolved coins should be usable right away in another branch
+        assert!(matches!(
+            engine.receive_block(block(1, *engine.genesis(), coin_new)),
+            Err(Error::LedgerError(LedgerError::CommitmentNotFound))
+        ));
+        assert!(matches!(
+            engine.receive_block(block(1, *engine.genesis(), coin_new_new)),
+            Err(Error::LedgerError(LedgerError::CommitmentNotFound))
+        ));
+
+        // they also should not be accepted if the fork from where they have been imported has not been seen already
+        assert!(matches!(
+            engine.receive_block(block_with_orphans(
+                1,
+                *engine.genesis(),
+                coin_new,
+                vec![fork_1.header().clone()]
+            )),
+            Err(Error::LedgerError(LedgerError::OrphanMissing(_)))
+        ));
+
+        // now the first block of the fork is seen (and accepted)
+        engine = engine.receive_block(fork_1.clone()).unwrap();
+        // and it can now be imported in another branch (note this does not validate it's for an earlier slot)
+        engine
+            .receive_block(block_with_orphans(
+                1,
+                *engine.genesis(),
+                coin_new,
+                vec![fork_1.header().clone()],
+            ))
+            .unwrap();
+        // but the next coin is still not accepted since the second block using the evolved coin has not been seen yet
+        assert!(matches!(
+            engine.receive_block(block_with_orphans(
+                1,
+                *engine.genesis(),
+                coin_new_new,
+                vec![fork_1.header().clone(), fork_2.header().clone()]
+            )),
+            Err(Error::LedgerError(LedgerError::OrphanMissing(_)))
+        ));
+
+        // now the second block of the fork is seen as well and the coin evolved twice can be used in another branch
+        engine = engine.receive_block(fork_2.clone()).unwrap();
+        engine
+            .receive_block(block_with_orphans(
+                1,
+                *engine.genesis(),
+                coin_new_new,
+                vec![fork_1.header().clone(), fork_2.header().clone()],
+            ))
+            .unwrap();
+
+        // an imported proof that uses a coin that was already used in the base branch should not be allowed
+        let block_1 = block(1, *engine.genesis(), coin);
+        engine = engine.receive_block(block_1.clone()).unwrap();
+        assert!(matches!(
+            engine.receive_block(block_with_orphans(
+                2,
+                block_1.header().id(),
+                coin_new_new,
+                vec![fork_1.header().clone(), fork_2.header().clone()]
+            )),
+            Err(Error::LedgerError(LedgerError::NullifierExists))
+        ));
     }
 }
