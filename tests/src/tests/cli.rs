@@ -4,11 +4,23 @@ use nomos_cli::{
     cmds::disseminate::Disseminate,
     da::disseminate::{DaProtocolChoice, FullReplicationSettings, Protocol, ProtocolSettings},
 };
-use nomos_core::da::{blob::Blob as _, DaProtocol};
-use std::{io::Write, time::Duration};
+use nomos_core::{
+    da::{
+        attestation::Attestation as _, auth::Verifier, blob::Blob as _,
+        certificate::Certificate as _, DaProtocol,
+    },
+    wire,
+};
+use nomos_da::auth::{
+    mock::{MockDaAuth, MockDaAuthSettings},
+    DaAuth,
+};
+use std::{fs, io::Write, time::Duration};
 use tempfile::NamedTempFile;
 use tests::{
-    adjust_timeout, get_available_port, nodes::nomos::Pool, MixNode, Node, NomosNode, SpawnConfig,
+    adjust_timeout, get_available_port,
+    nodes::nomos::{Pool, MOCK_DA_AUTH_PEM},
+    MixNode, Node, NomosNode, SpawnConfig,
 };
 
 const CLI_BIN: &str = "../target/debug/nomos-cli";
@@ -30,6 +42,10 @@ fn run_disseminate(disseminate: &Disseminate) {
         (None, Some(file)) => c.args(["--file", file.as_os_str().to_str().unwrap()]),
         (_, _) => panic!("Either data or file needs to be provided, but not both"),
     };
+
+    if let Some(output) = &disseminate.output {
+        c.args(["--output", &output.as_os_str().to_str().unwrap()]);
+    }
 
     c.status().expect("failed to execute nomos cli");
 }
@@ -133,6 +149,31 @@ async fn disseminate_blob_from_file() {
     disseminate(&mut config).await;
 }
 
+#[tokio::test]
+async fn disseminate_verify_signature() {
+    let cert_output = NamedTempFile::new().unwrap();
+
+    let da_auth_file = std::env::current_dir().unwrap().join(MOCK_DA_AUTH_PEM);
+    let da_auth = MockDaAuth::new(MockDaAuthSettings {
+        pkcs8_file_path: da_auth_file,
+    });
+
+    let mut config = Disseminate {
+        data: Some("Lisan Al Gaib".to_string()),
+        output: Some(cert_output.path().to_path_buf()),
+        ..Default::default()
+    };
+    disseminate(&mut config).await;
+
+    let cert = deserialize_certificate_from_file(cert_output).unwrap();
+
+    // This independantly verifies the signature of certificate attestations.
+    // The nomos node might use different verifier (DaCertificateVerifier).
+    for attestation in cert.attestations() {
+        assert!(da_auth.verify(attestation.hash().as_ref(), attestation.signature()))
+    }
+}
+
 async fn wait_for_cert_in_mempool(node: &NomosNode) {
     loop {
         if node
@@ -145,4 +186,13 @@ async fn wait_for_cert_in_mempool(node: &NomosNode) {
         }
         tokio::time::sleep(Duration::from_millis(100)).await;
     }
+}
+
+fn deserialize_certificate_from_file(
+    file_path: NamedTempFile,
+) -> Result<full_replication::Certificate, Box<dyn std::error::Error>> {
+    let serialized_data = fs::read(file_path)?;
+    let certificate: full_replication::Certificate = wire::deserialize(&serialized_data)?;
+
+    Ok(certificate)
 }

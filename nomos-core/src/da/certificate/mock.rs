@@ -44,7 +44,7 @@ impl Attestation for MockAttestation {
         unimplemented!()
     }
     fn hash(&self) -> Self::Hash {
-        unimplemented!()
+        vec![0u8]
     }
     fn voter(&self) -> Self::Voter {
         self.voter

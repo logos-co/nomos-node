@@ -158,6 +158,7 @@ impl<C, K, KS> Verifier<C> for DaCertificateVerifier<K, KS, C>
 where
     C: Certificate + Clone,
     <<C as Certificate>::Attestation as Attestation>::Voter: Into<K> + Clone,
+    <<C as Certificate>::Attestation as Attestation>::Hash: AsRef<[u8]>,
     KS: KeyStore<K> + Clone + 'static,
     KS::Verifier: 'static,
 {

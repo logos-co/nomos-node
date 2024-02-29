@@ -32,6 +32,7 @@ impl<K, KS, C> CertificateVerifier for DaCertificateVerifier<K, KS, C>
 where
     C: Certificate + Clone,
     <<C as Certificate>::Attestation as Attestation>::Voter: Into<K> + Clone,
+    <<C as Certificate>::Attestation as Attestation>::Hash: AsRef<[u8]>,
     KS: KeyStore<K> + Clone + 'static,
     KS::Verifier: 'static,
 {
@@ -43,7 +44,9 @@ where
         certificate.attestations().iter().all(|attestation| {
             self.key_store
                 .get_key(&attestation.voter().into())
-                .map(|verifier| verifier.verify(&attestation.as_bytes(), attestation.signature()))
+                .map(|verifier| {
+                    verifier.verify(attestation.hash().as_ref(), attestation.signature())
+                })
                 .unwrap_or(false)
         })
     }

@@ -31,7 +31,7 @@ const NOMOS_BIN: &str = "../target/debug/nomos-node";
 const CARNOT_INFO_API: &str = "carnot/info";
 const STORAGE_BLOCKS_API: &str = "storage/block";
 const GET_BLOCKS_INFO: &str = "carnot/blocks";
-const MOCK_DA_AUTH_PEM: &str = "../tests/mock_da_auth_key.p8";
+pub const MOCK_DA_AUTH_PEM: &str = "../tests/mock_da_auth_key.p8";
 
 pub struct NomosNode {
     addr: SocketAddr,
