@@ -14,11 +14,11 @@ use api::AxumBackend;
 use bytes::Bytes;
 use carnot_consensus::CarnotConsensus;
 use nomos_api::ApiService;
-use nomos_core::da::attestation;
+use nomos_core::da::certificate::mock::MockCertVerifier;
 use nomos_core::{
     da::{
         blob,
-        certificate::{self, mock::MockKeyStore, verify::DaCertificateVerifier},
+        certificate::{self, mock::MockKeyStore},
     },
     tx::{mock::MockTxVerifier, Transaction},
     wire,
@@ -63,16 +63,9 @@ const MB16: usize = 1024 * 1024 * 16;
 
 pub type Carnot = CarnotConsensus<
     ConsensusLibp2pAdapter,
-    MockPool<Tx, <Tx as Transaction>::Hash, MockTxVerifier>,
+    MockPool<Tx, <Tx as Transaction>::Hash>,
     MempoolLibp2pAdapter<Tx, <Tx as Transaction>::Hash>,
-    MockPool<
-        Certificate,
-        <<Certificate as certificate::Certificate>::Blob as blob::Blob>::Hash,
-        DaCertificateVerifier<
-            <<Certificate as certificate::Certificate>::Attestation as attestation::Attestation>::Voter,
-            MockKeyStore<MockDaAuth>, Certificate,
-        >,
-    >,
+    MockPool<Certificate, <<Certificate as certificate::Certificate>::Blob as blob::Blob>::Hash>,
     MempoolLibp2pAdapter<
         Certificate,
         <<Certificate as certificate::Certificate>::Blob as blob::Blob>::Hash,
@@ -90,13 +83,13 @@ pub type DataAvailability = DataAvailabilityService<
     MockDaAuth,
 >;
 
-type Mempool<K, V, D, VRF> = MempoolService<MempoolLibp2pAdapter<K, V>, MockPool<K, V, VRF>, D>;
+type Mempool<K, V, D, VRF> = MempoolService<MempoolLibp2pAdapter<K, V>, MockPool<K, V>, D, VRF>;
 
 type DaMempool = Mempool<
     Certificate,
     <<Certificate as certificate::Certificate>::Blob as blob::Blob>::Hash,
     CertDiscriminant,
-    DaCertificateVerifier<[u8; 32], MockKeyStore<MockDaAuth>, Certificate>,
+    MockCertVerifier,
 >;
 
 #[derive(Services)]

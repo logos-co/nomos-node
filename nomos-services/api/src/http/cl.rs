@@ -12,8 +12,9 @@ use tokio::sync::oneshot;
 
 type ClMempoolService<T> = MempoolService<
     Libp2pAdapter<T, <T as Transaction>::Hash>,
-    MockPool<T, <T as Transaction>::Hash, MockTxVerifier>,
+    MockPool<T, <T as Transaction>::Hash>,
     TxDiscriminant,
+    MockTxVerifier,
 >;
 
 pub async fn cl_mempool_metrics<T>(

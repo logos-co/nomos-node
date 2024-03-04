@@ -23,7 +23,7 @@ use nomos_metrics::NomosRegistry;
 use tokio::sync::oneshot::Sender;
 // internal
 use crate::network::NetworkAdapter;
-use backend::{MemPool, Status};
+use backend::{MemPool, Status, Verifier};
 use nomos_core::block::BlockId;
 use nomos_network::{NetworkMsg, NetworkService};
 use overwatch_rs::services::life_cycle::LifecycleMessage;
@@ -35,7 +35,7 @@ use overwatch_rs::services::{
 };
 use tracing::error;
 
-pub struct MempoolService<N, P, D>
+pub struct MempoolService<N, P, D, V>
 where
     N: NetworkAdapter<Item = P::Item, Key = P::Key>,
     P: MemPool,
@@ -43,10 +43,12 @@ where
     P::Item: Debug + 'static,
     P::Key: Debug + 'static,
     D: Discriminant,
+    V: Verifier<P::Item>,
 {
     service_state: ServiceStateHandle<Self>,
     network_relay: Relay<NetworkService<N::Backend>>,
     pool: P,
+    verifier: V,
     #[cfg(feature = "metrics")]
     metrics: Option<Metrics>,
     // This is an hack because SERVICE_ID has to be univoque and associated const
@@ -139,7 +141,7 @@ impl Discriminant for Certificate {
     const ID: &'static str = "mempool-da";
 }
 
-impl<N, P, D> ServiceData for MempoolService<N, P, D>
+impl<N, P, D, V> ServiceData for MempoolService<N, P, D, V>
 where
     N: NetworkAdapter<Item = P::Item, Key = P::Key>,
     P: MemPool,
@@ -147,16 +149,17 @@ where
     P::Item: Debug + 'static,
     P::Key: Debug + 'static,
     D: Discriminant,
+    V: Verifier<P::Item>,
 {
     const SERVICE_ID: ServiceId = D::ID;
-    type Settings = Settings<P::Settings, N::Settings>;
+    type Settings = Settings<P::Settings, N::Settings, V::Settings>;
     type State = NoState<Self::Settings>;
     type StateOperator = NoOperator<Self::State>;
     type Message = MempoolMsg<<P as MemPool>::Item, <P as MemPool>::Key>;
 }
 
 #[async_trait::async_trait]
-impl<N, P, D> ServiceCore for MempoolService<N, P, D>
+impl<N, P, D, V> ServiceCore for MempoolService<N, P, D, V>
 where
     P: MemPool + Send + 'static,
     P::Settings: Clone + Send + Sync + 'static,
@@ -165,6 +168,8 @@ where
     P::Key: Debug + Send + Sync + 'static,
     N: NetworkAdapter<Item = P::Item, Key = P::Key> + Send + Sync + 'static,
     D: Discriminant + Send,
+    V: Verifier<P::Item> + Send + Sync + 'static,
+    V::Settings: Clone + Send + Sync + 'static,
 {
     fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, overwatch_rs::DynError> {
         let network_relay = service_state.overwatch_handle.relay();
@@ -175,17 +180,11 @@ where
             .registry
             .map(|reg| Metrics::new(reg, service_state.id()));
 
-        // TODO: Mempool needs to verify that certificates are composed of attestations signed by
-        // valid da nodes. To verify that, node needs to maintain a list of DA Node public keys. At
-        // the moment we are using mock key store, which implements KeyStore trait. The main
-        // functionality of this trait is to get public key which could be used for signature
-        // verification. In the future public key retrieval might be implemented as a seperate
-        // Overwatch service.
-
         Ok(Self {
             service_state,
             network_relay,
             pool: P::new(settings.backend),
+            verifier: V::new(settings.verifier),
             #[cfg(feature = "metrics")]
             metrics,
             _d: PhantomData,
@@ -219,10 +218,10 @@ where
                 Some(msg) = service_state.inbound_relay.recv() => {
                     #[cfg(feature = "metrics")]
                     if let Some(metrics) = &self.metrics { metrics.record(&msg) }
-                    Self::handle_mempool_message(msg, &mut pool, &mut network_relay, &mut service_state).await;
+                    Self::handle_mempool_message(msg, &mut pool, &mut network_relay, &mut service_state, &self.verifier).await;
                 }
                 Some((key, item )) = network_items.next() => {
-                    pool.add_item(key, item).unwrap_or_else(|e| {
+                    pool.add_item(key, item, &self.verifier).unwrap_or_else(|e| {
                         tracing::debug!("could not add item to the pool due to: {}", e)
                     });
                 }
@@ -237,7 +236,7 @@ where
     }
 }
 
-impl<N, P, D> MempoolService<N, P, D>
+impl<N, P, D, V> MempoolService<N, P, D, V>
 where
     P: MemPool + Send + 'static,
     P::Settings: Clone + Send + Sync + 'static,
@@ -246,6 +245,7 @@ where
     P::Key: Debug + Send + Sync + 'static,
     N: NetworkAdapter<Item = P::Item, Key = P::Key> + Send + Sync + 'static,
     D: Discriminant + Send,
+    V: Verifier<P::Item>,
 {
     async fn should_stop_service(message: LifecycleMessage) -> bool {
         match message {
@@ -267,6 +267,7 @@ where
         pool: &mut P,
         network_relay: &mut OutboundRelay<NetworkMsg<N::Backend>>,
         service_state: &mut ServiceStateHandle<Self>,
+        verifier: &V,
     ) {
         match message {
             MempoolMsg::Add {
@@ -274,7 +275,7 @@ where
                 key,
                 reply_channel,
             } => {
-                match pool.add_item(key, item.clone()) {
+                match pool.add_item(key, item.clone(), verifier) {
                     Ok(_id) => {
                         // Broadcast the item to the network
                         let net = network_relay.clone();
@@ -338,8 +339,9 @@ where
 }
 
 #[derive(Clone, Debug)]
-pub struct Settings<B, N> {
+pub struct Settings<B, N, V> {
     pub backend: B,
     pub network: N,
+    pub verifier: V,
     pub registry: Option<NomosRegistry>,
 }

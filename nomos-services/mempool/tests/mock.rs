@@ -16,17 +16,18 @@ use nomos_mempool::{
     MempoolMsg, MempoolService, Settings, Transaction,
 };
 
+type CLMempoolService = MempoolService<
+    MockAdapter,
+    MockPool<MockTransaction<MockMessage>, MockTxId>,
+    Transaction,
+    MockTxVerifier,
+>;
+
 #[derive(Services)]
 struct MockPoolNode {
     logging: ServiceHandle<Logger>,
     network: ServiceHandle<NetworkService<Mock>>,
-    mockpool: ServiceHandle<
-        MempoolService<
-            MockAdapter,
-            MockPool<MockTransaction<MockMessage>, MockTxId, MockTxVerifier>,
-            Transaction,
-        >,
-    >,
+    mockpool: ServiceHandle<CLMempoolService>,
 }
 
 #[test]
@@ -68,6 +69,7 @@ fn test_mockmempool() {
             mockpool: Settings {
                 backend: (),
                 network: (),
+                verifier: (),
                 registry: None,
             },
             logging: LoggerSettings::default(),
@@ -80,8 +82,9 @@ fn test_mockmempool() {
     let network = app.handle().relay::<NetworkService<Mock>>();
     let mempool = app.handle().relay::<MempoolService<
         MockAdapter,
-        MockPool<MockTransaction<MockMessage>, MockTxId, MockTxVerifier>,
+        MockPool<MockTransaction<MockMessage>, MockTxId>,
         Transaction,
+        MockTxVerifier,
     >>();
 
     app.spawn(async move {

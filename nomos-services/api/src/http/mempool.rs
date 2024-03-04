@@ -23,7 +23,7 @@ where
     Key: Clone + Debug + Ord + Hash + 'static,
 {
     let relay = handle
-        .relay::<MempoolService<A, MockPool<Item, Key, V>, D>>()
+        .relay::<MempoolService<A, MockPool<Item, Key>, D, V>>()
         .connect()
         .await?;
     let (sender, receiver) = oneshot::channel();

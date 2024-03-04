@@ -15,6 +15,9 @@ pub enum MempoolError {
 }
 
 pub trait Verifier<T> {
+    type Settings: Clone;
+
+    fn new(settings: Self::Settings) -> Self;
     fn verify(&self, item: &T) -> bool;
 }
 
@@ -22,13 +25,17 @@ pub trait MemPool {
     type Settings: Clone;
     type Item;
     type Key;
-    type Verifier: Verifier<Self::Item>;
 
     /// Construct a new empty pool
     fn new(settings: Self::Settings) -> Self;
 
     /// Add a new item to the mempool, for example because we received it from the network
-    fn add_item(&mut self, key: Self::Key, item: Self::Item) -> Result<(), MempoolError>;
+    fn add_item<V: Verifier<Self::Item>>(
+        &mut self,
+        key: Self::Key,
+        item: Self::Item,
+        verifier: &V,
+    ) -> Result<(), MempoolError>;
 
     /// Return a view over items contained in the mempool.
     /// Implementations should provide *at least* all the items which have not been marked as

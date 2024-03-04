@@ -15,6 +15,8 @@ use bls_signatures::PrivateKey;
 pub use carnot_engine::NodeId;
 use futures::{Stream, StreamExt};
 use leader_selection::UpdateableLeaderSelection;
+use nomos_core::da::certificate::mock::MockCertVerifier;
+use nomos_core::tx::mock::MockTxVerifier;
 use serde::Deserialize;
 use serde::{de::DeserializeOwned, Serialize};
 use serde_with::serde_as;
@@ -117,9 +119,9 @@ where
     DaPool: MemPool,
     DaPoolAdapter: MempoolAdapter<Item = DaPool::Item, Key = DaPool::Key>,
     O: Overlay + Debug,
-    ClPool::Item: Debug + 'static,
+    ClPool::Item: Transaction + Debug + 'static,
     ClPool::Key: Debug + 'static,
-    DaPool::Item: Debug + 'static,
+    DaPool::Item: Certificate + Debug + 'static,
     DaPool::Key: Debug + 'static,
     A::Backend: 'static,
     TxS: TxSelect<Tx = ClPool::Item>,
@@ -130,8 +132,9 @@ where
     // underlying networking backend. We need this so we can relay and check the types properly
     // when implementing ServiceCore for CarnotConsensus
     network_relay: Relay<NetworkService<A::Backend>>,
-    cl_mempool_relay: Relay<MempoolService<ClPoolAdapter, ClPool, TxDiscriminant>>,
-    da_mempool_relay: Relay<MempoolService<DaPoolAdapter, DaPool, CertDiscriminant>>,
+    cl_mempool_relay: Relay<MempoolService<ClPoolAdapter, ClPool, TxDiscriminant, MockTxVerifier>>,
+    da_mempool_relay:
+        Relay<MempoolService<DaPoolAdapter, DaPool, CertDiscriminant, MockCertVerifier>>,
     storage_relay: Relay<StorageService<Storage>>,
     _overlay: std::marker::PhantomData<O>,
 }
@@ -141,10 +144,10 @@ impl<A, ClPool, ClPoolAdapter, DaPool, DaPoolAdapter, O, TxS, BS, Storage> Servi
 where
     A: NetworkAdapter,
     ClPool: MemPool,
-    ClPool::Item: Debug,
+    ClPool::Item: Transaction + Debug,
     ClPool::Key: Debug,
     DaPool: MemPool,
-    DaPool::Item: Debug,
+    DaPool::Item: Certificate + Debug,
     DaPool::Key: Debug,
     ClPoolAdapter: MempoolAdapter<Item = ClPool::Item, Key = ClPool::Key>,
     DaPoolAdapter: MempoolAdapter<Item = DaPool::Item, Key = DaPool::Key>,

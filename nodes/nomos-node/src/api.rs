@@ -133,11 +133,8 @@ where
             .route("/da/blobs", routing::post(da_blobs))
             .route("/cl/metrics", routing::get(cl_metrics::<T>))
             .route("/cl/status", routing::post(cl_status::<T>))
-            .route("/carnot/info", routing::get(carnot_info::<T, S, KS, SIZE>))
-            .route(
-                "/carnot/blocks",
-                routing::get(carnot_blocks::<T, S, KS, SIZE>),
-            )
+            .route("/carnot/info", routing::get(carnot_info::<T, S, SIZE>))
+            .route("/carnot/blocks", routing::get(carnot_blocks::<T, S, SIZE>))
             .route("/network/info", routing::get(libp2p_info))
             .route("/storage/block", routing::post(block::<S, T>))
             .route("/mempool/add/tx", routing::post(add_tx::<T>))
@@ -260,16 +257,13 @@ where
         (status = 500, description = "Internal server error", body = String),
     )
 )]
-async fn carnot_info<Tx, SS, KS, const SIZE: usize>(
-    State(handle): State<OverwatchHandle>,
-) -> Response
+async fn carnot_info<Tx, SS, const SIZE: usize>(State(handle): State<OverwatchHandle>) -> Response
 where
     Tx: Transaction + Clone + Debug + Hash + Serialize + DeserializeOwned + Send + Sync + 'static,
     <Tx as Transaction>::Hash: std::cmp::Ord + Debug + Send + Sync + 'static,
     SS: StorageSerde + Send + Sync + 'static,
-    KS: KeyStore<[u8; 32]> + Clone + 'static,
 {
-    make_request_and_return_response!(consensus::carnot_info::<Tx, SS, KS, SIZE>(&handle))
+    make_request_and_return_response!(consensus::carnot_info::<Tx, SS, SIZE>(&handle))
 }
 
 #[derive(Deserialize)]
@@ -286,7 +280,7 @@ struct QueryParams {
         (status = 500, description = "Internal server error", body = String),
     )
 )]
-async fn carnot_blocks<Tx, SS, KS, const SIZE: usize>(
+async fn carnot_blocks<Tx, SS, const SIZE: usize>(
     State(store): State<OverwatchHandle>,
     Query(query): Query<QueryParams>,
 ) -> Response
@@ -294,12 +288,9 @@ where
     Tx: Transaction + Clone + Debug + Hash + Serialize + DeserializeOwned + Send + Sync + 'static,
     <Tx as Transaction>::Hash: std::cmp::Ord + Debug + Send + Sync + 'static,
     SS: StorageSerde + Send + Sync + 'static,
-    KS: KeyStore<[u8; 32]> + Clone + 'static,
 {
     let QueryParams { from, to } = query;
-    make_request_and_return_response!(consensus::carnot_blocks::<Tx, SS, KS, SIZE>(
-        &store, from, to
-    ))
+    make_request_and_return_response!(consensus::carnot_blocks::<Tx, SS, SIZE>(&store, from, to))
 }
 
 #[utoipa::path(

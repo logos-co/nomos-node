@@ -12,6 +12,7 @@ futures = "0.3"
 linked-hash-map = { version = "0.5.6", optional = true }
 nomos-metrics = { path = "../../nomos-metrics" }
 nomos-network = { path = "../network" }
+nomos-da = { path = "../data-availability" }
 nomos-core = { path = "../../nomos-core" }
 overwatch-rs = { git = "https://github.com/logos-co/Overwatch", rev = "2f70806" }
 rand = { version = "0.8", optional = true }
