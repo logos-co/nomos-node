@@ -113,53 +113,6 @@ impl NomosChat {
         >(std::fs::File::open(&self.network_config)?)?;
         let da_protocol = self.da_protocol.clone();
 
-        let node_addr = Some(self.node.clone());
-
-        let (payload_sender, payload_receiver) = tokio::sync::mpsc::unbounded_channel();
-        let (status_sender, status_updates) = std::sync::mpsc::channel();
-
-        let shared_writer = Arc::new(sync::Mutex::new(Vec::new()));
-        let backend = SharedWriter::from_inner(shared_writer.clone());
-
-        std::thread::spawn(move || {
-            OverwatchRunner::<DisseminateApp>::run(
-                DisseminateAppServiceSettings {
-                    network,
-                    send_blob: Settings {
-                        payload: Arc::new(Mutex::new(payload_receiver)),
-                        timeout: DEFAULT_TIMEOUT,
-                        da_protocol,
-                        status_updates: status_sender,
-                        node_addr,
-                        output: None,
-                    },
-                    logger: LoggerSettings {
-                        backend: LoggerBackend::Writer(backend),
-                        level: tracing::Level::INFO,
-                        ..Default::default()
-                    },
-                },
-                None,
-            )
-            .unwrap()
-            .wait_finished()
-        });
-
-        if let Some(author) = self.author.as_ref() {
-            let message = self
-                .message
-                .as_ref()
-                .expect("Should be available if author is set");
-            return run_once(author, message, payload_sender);
-        }
-
-        // setup terminal
-        enable_raw_mode()?;
-        let mut stdout = io::stdout();
-        execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
-        let backend = CrosstermBackend::new(stdout);
-        let mut terminal = Terminal::new(backend)?;
-
         let app = App {
             input: Input::default(),
             username: None,
@@ -231,6 +184,21 @@ impl NomosChat {
             .unwrap()
             .wait_finished()
         });
+
+        if let Some(author) = self.author.as_ref() {
+            let message = self
+                .message
+                .as_ref()
+                .expect("Should be available if author is set");
+            return run_once(author, message, payload_sender);
+        }
+
+        // setup terminal
+        enable_raw_mode()?;
+        let mut stdout = io::stdout();
+        execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
+        let backend = CrosstermBackend::new(stdout);
+        let mut terminal = Terminal::new(backend)?;
 
         let app = App {
             input: Input::default(),

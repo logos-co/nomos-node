@@ -1,6 +1,6 @@
 # BUILD IMAGE ---------------------------------------------------------
 
-FROM rust:1.75.0-slim-bullseye AS builder
+FROM rust:1.76.0-slim-bullseye AS builder
 
 # Dependecies for publishing documentation.
 RUN apt-get update && apt-get install -yq \
