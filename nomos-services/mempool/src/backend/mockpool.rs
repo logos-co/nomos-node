@@ -16,6 +16,11 @@ use nomos_core::block::BlockId;
 
 use super::{Status, Verifier};
 
+#[derive(Clone, Debug)]
+pub struct MockPoolSettings<V> {
+    pub verifier: Option<V>,
+}
+
 /// A mock mempool implementation that stores all transactions in memory in the order received.
 pub struct MockPool<Item, Key, Verifier> {
     pending_items: LinkedHashMap<Key, Item>,
@@ -53,15 +58,17 @@ impl<Item, Key, V> MemPool for MockPool<Item, Key, V>
 where
     Item: Clone + Send + Sync + 'static + Hash,
     Key: Clone + Ord + Hash,
-    V: Verifier<Item>,
+    V: Verifier<Item> + Clone,
 {
-    type Settings = ();
+    type Settings = MockPoolSettings<V>;
     type Item = Item;
     type Key = Key;
     type Verifier = V;
 
-    fn new(_settings: Self::Settings) -> Self {
-        Self::new()
+    fn new(settings: Self::Settings) -> Self {
+        let mut p = Self::new();
+        p.verifier = settings.verifier;
+        p
     }
 
     fn add_item(&mut self, key: Self::Key, item: Self::Item) -> Result<(), MempoolError> {

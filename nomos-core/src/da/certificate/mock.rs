@@ -104,7 +104,7 @@ impl Verifier for MockPublicKey {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct MockKeyStore<V> {
     keys: HashMap<[u8; 32], V>,
 }

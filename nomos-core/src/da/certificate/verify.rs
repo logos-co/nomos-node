@@ -12,6 +12,7 @@ pub trait KeyStore<K> {
     fn get_key(&self, node_id: &K) -> Option<&Self::Verifier>;
 }
 
+#[derive(Clone, Debug)]
 pub struct DaCertificateVerifier<K, KS: KeyStore<K>, C> {
     key_store: KS,
     _cert: PhantomData<C>,

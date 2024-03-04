@@ -100,7 +100,7 @@ impl<M> From<&MockTransaction<M>> for MockTxId {
     }
 }
 
-#[derive(Default)]
+#[derive(Clone, Default, Debug)]
 pub struct MockTxVerifier;
 
 impl MockTxVerifier {

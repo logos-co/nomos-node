@@ -11,7 +11,7 @@ pub struct MockDaAuthSettings {
     pub pkcs8_file_path: PathBuf,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct MockDaAuth(Arc<Ed25519KeyPair>);
 
 impl DaAuth for MockDaAuth {

@@ -13,7 +13,9 @@ use nomos_core::{
     tx::Transaction,
 };
 
-use nomos_mempool::network::adapters::libp2p::Settings as AdapterSettings;
+use nomos_mempool::{
+    backend::mockpool::MockPoolSettings, network::adapters::libp2p::Settings as AdapterSettings,
+};
 
 use overwatch_rs::overwatch::*;
 
@@ -80,7 +82,7 @@ fn main() -> Result<()> {
             logging: config.log,
             http: config.http,
             cl_mempool: nomos_mempool::Settings {
-                backend: (),
+                backend: MockPoolSettings { verifier: None },
                 network: AdapterSettings {
                     topic: String::from(nomos_node::CL_TOPIC),
                     id: <Tx as Transaction>::hash,
@@ -88,7 +90,7 @@ fn main() -> Result<()> {
                 registry: registry.clone(),
             },
             da_mempool: nomos_mempool::Settings {
-                backend: (),
+                backend: MockPoolSettings { verifier: None },
                 network: AdapterSettings {
                     topic: String::from(nomos_node::DA_TOPIC),
                     id: cert_id,

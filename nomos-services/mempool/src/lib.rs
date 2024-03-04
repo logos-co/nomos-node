@@ -175,6 +175,13 @@ where
             .registry
             .map(|reg| Metrics::new(reg, service_state.id()));
 
+        // TODO: Mempool needs to verify that certificates are composed of attestations signed by
+        // valid da nodes. To verify that, node needs to maintain a list of DA Node public keys. At
+        // the moment we are using mock key store, which implements KeyStore trait. The main
+        // functionality of this trait is to get public key which could be used for signature
+        // verification. In the future public key retrieval might be implemented as a seperate
+        // Overwatch service.
+
         Ok(Self {
             service_state,
             network_relay,
