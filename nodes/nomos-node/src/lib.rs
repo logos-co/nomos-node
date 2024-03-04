@@ -1,5 +1,5 @@
 pub mod api;
-mod config;
+pub mod config;
 mod tx;
 
 use carnot_consensus::network::adapters::libp2p::Libp2pAdapter as ConsensusLibp2pAdapter;

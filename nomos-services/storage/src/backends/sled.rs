@@ -40,7 +40,6 @@ impl StorageTransaction for SledTransaction {
 }
 
 /// Sled storage backend
-
 pub struct SledBackend<SerdeOp> {
     sled: sled::Db,
     _serde_op: PhantomData<SerdeOp>,

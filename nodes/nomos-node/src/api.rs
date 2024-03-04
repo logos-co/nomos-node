@@ -135,6 +135,7 @@ where
     }
 }
 
+#[macro_export]
 macro_rules! make_request_and_return_response {
     ($cond:expr) => {{
         match $cond.await {
