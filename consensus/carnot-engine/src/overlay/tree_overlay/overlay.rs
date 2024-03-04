@@ -146,7 +146,6 @@ where
         if self.is_member_of_leaf_committee(id) {
             return 0;
         }
-        println!("{:?}", self.carnot_tree);
         match self
             .carnot_tree
             .committee_by_member_id(&id)
