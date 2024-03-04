@@ -33,4 +33,4 @@ echo "DA_VOTER: ${DA_VOTER}"
 echo "OVERLAY_NODES: ${OVERLAY_NODES}"
 echo "NET_INITIAL_PEERS: ${NET_INITIAL_PEERS}"
 
-exec /usr/bin/nomos-node /etc/nomos/libp2p_config.yaml
+exec /usr/bin/nomos-node /etc/nomos/libp2p_config.yaml --with-metrics

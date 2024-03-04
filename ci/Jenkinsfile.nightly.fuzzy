@@ -1,3 +1,6 @@
+#!/usr/bin/env groovy
+library 'status-jenkins-lib@v1.8.6'
+
 pipeline {
   agent {
     dockerfile {
@@ -43,16 +46,16 @@ pipeline {
   }
 
   post {
-    failure {
+    always {
       script {
-        def discord = load "${WORKSPACE}/ci/discord.groovy"
-        discord.sendMessage(header: 'Nightly Fuzztest Failed. Regression files archived as job artifacts')
-      }
-    }
-    success {
-      script {
-        def discord = load "${WORKSPACE}/ci/discord.groovy"
-        discord.sendMessage(header: 'Nightly Fuzztest Passed')
+        discord.send(
+          header: (
+            currentBuild.currentResult == 'SUCCESS' ?
+              'Nightly Fuzztest Passed' :
+              'Nightly Fuzztest Failed. Regression files archived as job artifacts'
+          ),
+          cred: 'nomos-node-discord-commits-webhook',
+        )
       }
     }
     cleanup { cleanWs() }

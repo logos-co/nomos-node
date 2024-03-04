@@ -1,4 +1,4 @@
-FROM rust:1.75.0-slim-bullseye
+FROM rust:1.76.0-slim-bullseye
 
 LABEL maintainer="augustinas@status.im" \
       source="https://github.com/logos-co/nomos-node" \

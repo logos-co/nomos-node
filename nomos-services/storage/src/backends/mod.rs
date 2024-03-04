@@ -3,6 +3,9 @@ pub mod mock;
 #[cfg(feature = "sled")]
 pub mod sled;
 
+#[cfg(feature = "rocksdb")]
+pub mod rocksdb;
+
 // std
 use std::error::Error;
 // crates
