@@ -84,6 +84,17 @@ impl Ledger {
             .ok_or(LedgerError::ParentNotFound(parent_id))?;
         let config = self.config.clone();
 
+        // Oprhan proofs need to be:
+        // * locally valid for the block they were originally in
+        // * not in conflict with the current ledger state
+        // This first condition is checked here, the second one is checked in the state update
+        // (in particular, we do not check the imported leader proof is for an earlier slot)
+        for orphan in header.orphaned_proofs() {
+            if !self.states.contains_key(&orphan.id()) {
+                return Err(LedgerError::OrphanMissing(orphan.id()));
+            }
+        }
+
         let new_state = parent_state
             .clone()
             .try_apply_header(header, &self.config)?;
@@ -140,7 +151,6 @@ impl LedgerState {
         //    use the next epoch state as the current epoch state and reset next epoch state
         // 3. we are in the next-next or later epoch:
         //    use the parent state as the epoch state and reset next epoch state
-
         if current_epoch == new_epoch {
             // case 1)
             let next_epoch_state = self
@@ -222,6 +232,10 @@ impl LedgerState {
         header: &Header,
         config: &Config,
     ) -> Result<Self, LedgerError> {
+        for proof in header.orphaned_proofs() {
+            self = self.try_apply_proof(proof.leader_proof(), config)?;
+        }
+
         self = self
             .try_apply_proof(header.leader_proof(), config)?
             .update_nonce(header.leader_proof());
