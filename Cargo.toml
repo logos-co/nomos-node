@@ -23,6 +23,7 @@ members = [
     "nodes/explorer",
     "simulations",
     "consensus/carnot-engine",
+    "consensus/cryptarchia-engine",
     "tests",
     "mixnet/node",
     "mixnet/client",

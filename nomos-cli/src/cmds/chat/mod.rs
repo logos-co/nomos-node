@@ -48,6 +48,8 @@ use ratatui::{
 use tui_input::{backend::crossterm::EventHandler, Input};
 
 const DEFAULT_TIMEOUT: Duration = Duration::from_secs(120);
+// Limit the number of maximum in-flight requests
+const MAX_BUFFERED_REQUESTS: usize = 20;
 
 #[derive(Clone, Debug, Args)]
 /// The almost-instant messaging protocol.
@@ -61,6 +63,12 @@ pub struct NomosChat {
     /// The node to connect to to fetch blocks and blobs
     #[clap(long)]
     pub node: Url,
+    /// Author for non interactive message formation
+    #[clap(long, requires("message"))]
+    pub author: Option<String>,
+    /// Message for non interactive message formation
+    #[clap(long, requires("author"))]
+    pub message: Option<String>,
 }
 
 pub struct App {
@@ -84,12 +92,6 @@ impl NomosChat {
             <NetworkService<Libp2p> as ServiceData>::Settings,
         >(std::fs::File::open(&self.network_config)?)?;
         let da_protocol = self.da_protocol.clone();
-        // setup terminal
-        enable_raw_mode()?;
-        let mut stdout = io::stdout();
-        execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
-        let backend = CrosstermBackend::new(stdout);
-        let mut terminal = Terminal::new(backend)?;
 
         let node_addr = Some(self.node.clone());
 
@@ -123,6 +125,21 @@ impl NomosChat {
             .wait_finished()
         });
 
+        if let Some(author) = self.author.as_ref() {
+            let message = self
+                .message
+                .as_ref()
+                .expect("Should be available if author is set");
+            return run_once(author, message, payload_sender);
+        }
+
+        // setup terminal
+        enable_raw_mode()?;
+        let mut stdout = io::stdout();
+        execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
+        let backend = CrosstermBackend::new(stdout);
+        let mut terminal = Terminal::new(backend)?;
+
         let app = App {
             input: Input::default(),
             username: None,
@@ -150,6 +167,24 @@ impl NomosChat {
 
         Ok(())
     }
+}
+
+fn run_once(
+    author: &str,
+    message: &str,
+    payload_sender: UnboundedSender<Box<[u8]>>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    payload_sender.send(
+        wire::serialize(&ChatMessage {
+            author: author.to_string(),
+            message: message.to_string(),
+            _nonce: rand::random(),
+        })
+        .unwrap()
+        .into(),
+    )?;
+
+    Ok(())
 }
 
 fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) {
@@ -299,7 +334,7 @@ async fn fetch_new_messages(
 
             process_block_blobs(node, block, da_settings)
         })
-        .buffer_unordered(new_blocks.len())
+        .buffered(MAX_BUFFERED_REQUESTS)
         .collect::<Vec<_>>()
         .await;
 

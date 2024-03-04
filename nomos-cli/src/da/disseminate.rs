@@ -205,7 +205,7 @@ impl ServiceCore for DisseminateService {
 // protocols, but only the one chosen will be used.
 // We can enforce only sensible combinations of protocol/settings
 // are specified by using special clap directives
-#[derive(Clone, Debug, Args)]
+#[derive(Clone, Debug, Args, Default)]
 pub struct DaProtocolChoice {
     #[clap(long, default_value = "full-replication")]
     pub da_protocol: Protocol,
@@ -227,14 +227,15 @@ impl TryFrom<DaProtocolChoice> for FullReplication<AbsoluteNumber<Attestation, C
     }
 }
 
-#[derive(Clone, Debug, Args)]
+#[derive(Clone, Debug, Args, Default)]
 pub struct ProtocolSettings {
     #[clap(flatten)]
     pub full_replication: FullReplicationSettings,
 }
 
-#[derive(Clone, Debug, ValueEnum)]
+#[derive(Clone, Debug, ValueEnum, Default)]
 pub enum Protocol {
+    #[default]
     FullReplication,
 }
 

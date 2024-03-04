@@ -1,10 +1,6 @@
 # BUILD IMAGE ---------------------------------------------------------
 
-FROM rust:1.75.0-slim-bullseye AS builder
-
-# Using backports for go 1.19
-RUN echo 'deb http://deb.debian.org/debian bullseye-backports main' \
-    >> /etc/apt/sources.list
+FROM rust:1.76.0-slim-bullseye AS builder
 
 # Dependecies for publishing documentation.
 RUN apt-get update && apt-get install -yq \
@@ -13,11 +9,11 @@ RUN apt-get update && apt-get install -yq \
 WORKDIR /nomos
 COPY . . 
 
-RUN cargo build --release --all
+RUN cargo build --release --all --features metrics
 
 # NODE IMAGE ----------------------------------------------------------
 
-FROM bitnami/minideb:latest
+FROM bitnami/minideb:bullseye
 
 LABEL maintainer="augustinas@status.im" \
       source="https://github.com/logos-co/nomos-node" \
@@ -27,9 +23,9 @@ LABEL maintainer="augustinas@status.im" \
 EXPOSE 3000 8080 9000 60000	
 
 COPY --from=builder /nomos/target/release/nomos-node /usr/bin/nomos-node
+COPY --from=builder /nomos/target/release/nomos-cli /usr/bin/nomos-cli
 COPY --from=builder /nomos/target/release/mixnode /usr/bin/mixnode
 COPY --from=builder /usr/bin/etcdctl /usr/bin/etcdctl
 COPY nodes/nomos-node/config.yaml /etc/nomos/config.yaml
-RUN install_packages python3 python3-etcd3
 
 ENTRYPOINT ["/usr/bin/nomos-node"]
