@@ -2,6 +2,7 @@ pub mod backend;
 #[cfg(feature = "metrics")]
 pub mod metrics;
 pub mod network;
+pub mod verifier;
 
 /// Re-export for OpenAPI
 #[cfg(feature = "openapi")]
@@ -21,9 +22,10 @@ use futures::StreamExt;
 use metrics::Metrics;
 use nomos_metrics::NomosRegistry;
 use tokio::sync::oneshot::Sender;
+use verifier::Verifier;
 // internal
 use crate::network::NetworkAdapter;
-use backend::{MemPool, Status, Verifier};
+use backend::{MemPool, Status};
 use nomos_core::block::BlockId;
 use nomos_network::{NetworkMsg, NetworkService};
 use overwatch_rs::services::life_cycle::LifecycleMessage;

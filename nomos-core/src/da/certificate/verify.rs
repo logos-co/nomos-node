@@ -6,36 +6,36 @@ use crate::da::{
     certificate::{Certificate, CertificateVerifier},
 };
 
-pub trait KeyStore<K> {
+pub trait KeyProvider<K> {
     type Verifier: Verifier;
 
     fn get_key(&self, node_id: &K) -> Option<&Self::Verifier>;
 }
 
 #[derive(Clone, Debug)]
-pub struct DaCertificateVerifier<K, KS: KeyStore<K>, C> {
-    key_store: KS,
+pub struct DaCertificateVerifier<K, KP: KeyProvider<K>, C> {
+    key_provider: KP,
     _cert: PhantomData<C>,
     _key: PhantomData<K>,
 }
 
-impl<K, KS: KeyStore<K>, C> DaCertificateVerifier<K, KS, C> {
-    pub fn new(key_store: KS) -> Self {
+impl<K, KP: KeyProvider<K>, C> DaCertificateVerifier<K, KP, C> {
+    pub fn new(key_provider: KP) -> Self {
         Self {
-            key_store,
+            key_provider,
             _cert: Default::default(),
             _key: Default::default(),
         }
     }
 }
 
-impl<K, KS, C> CertificateVerifier for DaCertificateVerifier<K, KS, C>
+impl<K, KP, C> CertificateVerifier for DaCertificateVerifier<K, KP, C>
 where
     C: Certificate + Clone,
     <<C as Certificate>::Attestation as Attestation>::Voter: Into<K> + Clone,
     <<C as Certificate>::Attestation as Attestation>::Hash: AsRef<[u8]>,
-    KS: KeyStore<K> + Clone + 'static,
-    KS::Verifier: 'static,
+    KP: KeyProvider<K> + Clone + 'static,
+    KP::Verifier: 'static,
 {
     type Certificate = C;
 
@@ -43,7 +43,7 @@ where
         // TODO: At the moment the node that verifies the certificate needs to have all public
         // keys of voters that attested given certificate.
         certificate.attestations().iter().all(|attestation| {
-            self.key_store
+            self.key_provider
                 .get_key(&attestation.voter().into())
                 .map(|verifier| {
                     verifier.verify(attestation.hash().as_ref(), attestation.signature())

@@ -1,9 +1,8 @@
 use core::{fmt::Debug, hash::Hash};
 
 use nomos_mempool::{
-    backend::{mockpool::MockPool, Verifier},
-    network::NetworkAdapter,
-    Discriminant, MempoolMsg, MempoolService,
+    backend::mockpool::MockPool, network::NetworkAdapter, verifier::Verifier, Discriminant,
+    MempoolMsg, MempoolService,
 };
 use nomos_network::backends::NetworkBackend;
 use tokio::sync::oneshot;

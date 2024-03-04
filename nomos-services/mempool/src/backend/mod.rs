@@ -4,6 +4,8 @@ pub mod mockpool;
 use nomos_core::block::BlockId;
 use serde::{Deserialize, Serialize};
 
+use crate::verifier::Verifier;
+
 #[derive(thiserror::Error, Debug)]
 pub enum MempoolError {
     #[error("Item already in mempool")]
@@ -12,13 +14,6 @@ pub enum MempoolError {
     DynamicPoolError(#[from] overwatch_rs::DynError),
     #[error("Verification failed")]
     VerificationError,
-}
-
-pub trait Verifier<T> {
-    type Settings: Clone;
-
-    fn new(settings: Self::Settings) -> Self;
-    fn verify(&self, item: &T) -> bool;
 }
 
 pub trait MemPool {

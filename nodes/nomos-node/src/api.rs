@@ -27,7 +27,7 @@ use nomos_core::{
         attestation, blob,
         certificate::{
             mock::MockKeyStore,
-            verify::{DaCertificateVerifier, KeyStore},
+            verify::{DaCertificateVerifier, KeyProvider},
         },
     },
     tx::{mock::MockTxVerifier, Transaction},
@@ -88,7 +88,7 @@ where
     <T as nomos_core::tx::Transaction>::Hash:
         Serialize + for<'de> Deserialize<'de> + std::cmp::Ord + Debug + Send + Sync + 'static,
     S: StorageSerde + Send + Sync + 'static,
-    KS: KeyStore<[u8; 32]> + Clone + Send + 'static,
+    KS: KeyProvider<[u8; 32]> + Clone + Send + 'static,
 {
     type Error = hyper::Error;
     type Settings = AxumBackendSettings;

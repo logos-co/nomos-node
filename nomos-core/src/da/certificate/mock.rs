@@ -6,7 +6,7 @@ use crate::da::{
     attestation::Attestation,
     auth::Verifier,
     blob::Blob,
-    certificate::{verify::KeyStore, Certificate},
+    certificate::{verify::KeyProvider, Certificate},
 };
 
 pub struct MockBlob;
@@ -123,7 +123,7 @@ impl<V> MockKeyStore<V> {
     }
 }
 
-impl<V> KeyStore<[u8; 32]> for MockKeyStore<V>
+impl<V> KeyProvider<[u8; 32]> for MockKeyStore<V>
 where
     V: Verifier,
 {
