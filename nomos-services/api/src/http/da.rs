@@ -22,7 +22,7 @@ pub type DaMempoolService = MempoolService<
         <Blob as blob::Blob>::Hash,
         DaCertificateVerifier<
             <Attestation as attestation::Attestation>::Voter,
-            MockKeyStore,
+            MockKeyStore<MockDaAuth>,
             Certificate,
         >,
     >,

@@ -10,6 +10,7 @@ use hyper::{
     header::{CONTENT_TYPE, USER_AGENT},
     Body, StatusCode,
 };
+use nomos_da::auth::mock::MockDaAuth;
 use overwatch_rs::overwatch::handle::OverwatchHandle;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use tower_http::{
@@ -370,7 +371,7 @@ async fn add_cert(
         nomos_mempool::Certificate,
         DaCertificateVerifier<
             <Attestation as attestation::Attestation>::Voter,
-            MockKeyStore,
+            MockKeyStore<MockDaAuth>,
             Certificate,
         >,
         Certificate,

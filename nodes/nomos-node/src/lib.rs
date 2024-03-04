@@ -70,7 +70,7 @@ pub type Carnot = CarnotConsensus<
         <<Certificate as certificate::Certificate>::Blob as blob::Blob>::Hash,
         DaCertificateVerifier<
             <<Certificate as certificate::Certificate>::Attestation as attestation::Attestation>::Voter,
-            MockKeyStore, Certificate,
+            MockKeyStore<MockDaAuth>, Certificate,
         >,
     >,
     MempoolLibp2pAdapter<
@@ -96,7 +96,7 @@ type DaMempool = Mempool<
     Certificate,
     <<Certificate as certificate::Certificate>::Blob as blob::Blob>::Hash,
     CertDiscriminant,
-    DaCertificateVerifier<[u8; 32], MockKeyStore, Certificate>,
+    DaCertificateVerifier<[u8; 32], MockKeyStore<MockDaAuth>, Certificate>,
 >;
 
 #[derive(Services)]
@@ -107,7 +107,7 @@ pub struct Nomos {
         ServiceHandle<Mempool<Tx, <Tx as Transaction>::Hash, TxDiscriminant, MockTxVerifier>>,
     da_mempool: ServiceHandle<DaMempool>,
     consensus: ServiceHandle<Carnot>,
-    http: ServiceHandle<ApiService<AxumBackend<Tx, Wire, MockKeyStore, MB16>>>,
+    http: ServiceHandle<ApiService<AxumBackend<Tx, Wire, MockKeyStore<MockDaAuth>, MB16>>>,
     da: ServiceHandle<DataAvailability>,
     storage: ServiceHandle<StorageService<SledBackend<Wire>>>,
     #[cfg(feature = "metrics")]

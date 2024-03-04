@@ -105,26 +105,29 @@ impl Verifier for MockPublicKey {
 }
 
 #[derive(Clone)]
-pub struct MockKeyStore {
-    keys: HashMap<[u8; 32], MockPublicKey>,
+pub struct MockKeyStore<V> {
+    keys: HashMap<[u8; 32], V>,
 }
 
-impl Default for MockKeyStore {
+impl<V> Default for MockKeyStore<V> {
     fn default() -> Self {
         Self {
-            keys: [([0u8; 32], MockPublicKey)].into(),
+            keys: Default::default(),
         }
     }
 }
 
-impl MockKeyStore {
-    pub fn add_key(&mut self, voter: &[u8; 32], verifier: MockPublicKey) {
+impl<V> MockKeyStore<V> {
+    pub fn add_key(&mut self, voter: &[u8; 32], verifier: V) {
         self.keys.insert(*voter, verifier);
     }
 }
 
-impl KeyStore<[u8; 32]> for MockKeyStore {
-    type Verifier = MockPublicKey;
+impl<V> KeyStore<[u8; 32]> for MockKeyStore<V>
+where
+    V: Verifier,
+{
+    type Verifier = V;
 
     fn get_key(&self, node_id: &[u8; 32]) -> Option<&Self::Verifier> {
         self.keys.get(node_id)
