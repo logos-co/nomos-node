@@ -11,10 +11,9 @@ use clap::{Parser, ValueEnum};
 use color_eyre::eyre::{self, eyre, Result};
 use hex::FromHex;
 use nomos_api::ApiService;
-use nomos_core::da::certificate::mock::MockKeyStore;
-use nomos_da::auth::mock::MockDaAuth;
 use nomos_libp2p::{secp256k1::SecretKey, Multiaddr};
 use nomos_log::{Logger, LoggerBackend, LoggerFormat};
+use nomos_mempool::verifier::certificate::mock::MockDaVerifierSettings;
 use nomos_network::backends::libp2p::Libp2p;
 use nomos_network::NetworkService;
 use overwatch_rs::services::ServiceData;
@@ -125,9 +124,10 @@ pub struct MetricsArgs {
 pub struct Config {
     pub log: <Logger as ServiceData>::Settings,
     pub network: <NetworkService<Libp2p> as ServiceData>::Settings,
-    pub http: <ApiService<AxumBackend<Tx, Wire, MockKeyStore<MockDaAuth>, MB16>> as ServiceData>::Settings,
+    pub http: <ApiService<AxumBackend<Tx, Wire, MB16>> as ServiceData>::Settings,
     pub consensus: <Carnot as ServiceData>::Settings,
     pub da: <DataAvailability as ServiceData>::Settings,
+    pub da_verifier: MockDaVerifierSettings,
 }
 
 impl Config {

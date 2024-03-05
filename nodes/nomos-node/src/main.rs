@@ -95,7 +95,7 @@ fn main() -> Result<()> {
                     id: cert_id,
                 },
                 registry: registry.clone(),
-                verifier: (),
+                verifier: config.da_verifier,
             },
             consensus: config.consensus,
             #[cfg(feature = "metrics")]

@@ -300,6 +300,7 @@ fn create_node_config(
         }
         None => MixnetClientMode::Sender,
     };
+    let mock_da_auth_key = std::env::current_dir().unwrap().join(MOCK_DA_AUTH_PEM);
 
     let mut config = Config {
         network: NetworkConfig {
@@ -319,7 +320,7 @@ fn create_node_config(
         consensus: CarnotSettings {
             private_key: id,
             overlay_settings: TreeOverlaySettings {
-                nodes,
+                nodes: nodes.clone(),
                 leader: RoundRobin::new(),
                 current_leader: [0; 32].into(),
                 number_of_committees: 1,
@@ -352,8 +353,14 @@ fn create_node_config(
                 evicting_period: Duration::from_secs(60 * 60 * 24), // 1 day
             },
             da_auth: nomos_da::auth::mock::MockDaAuthSettings {
-                pkcs8_file_path: std::env::current_dir().unwrap().join(MOCK_DA_AUTH_PEM),
+                pkcs8_file_path: mock_da_auth_key.clone(),
             },
+        },
+        da_verifier: nomos_mempool::verifier::certificate::mock::MockDaVerifierSettings {
+            node_keys: nodes
+                .into_iter()
+                .map(|id| (id.into(), mock_da_auth_key.clone()))
+                .collect(),
         },
     };
 
