@@ -14,7 +14,7 @@ use api::AxumBackend;
 use bytes::Bytes;
 use carnot_consensus::CarnotConsensus;
 use nomos_api::ApiService;
-use nomos_core::da::certificate::mock::MockCertVerifier;
+use nomos_core::da::certificate::verify::DaCertificateVerifier;
 use nomos_core::{
     da::{
         blob,
@@ -65,11 +65,13 @@ pub type Carnot = CarnotConsensus<
     ConsensusLibp2pAdapter,
     MockPool<Tx, <Tx as Transaction>::Hash>,
     MempoolLibp2pAdapter<Tx, <Tx as Transaction>::Hash>,
+    MockTxVerifier,
     MockPool<Certificate, <<Certificate as certificate::Certificate>::Blob as blob::Blob>::Hash>,
     MempoolLibp2pAdapter<
         Certificate,
         <<Certificate as certificate::Certificate>::Blob as blob::Blob>::Hash,
     >,
+    DaCertificateVerifier<[u8; 32], MockKeyStore<MockDaAuth>, Certificate>,
     TreeOverlay<RoundRobin, RandomBeaconState>,
     FillSizeWithTx<MB16, Tx>,
     FillSizeWithBlobsCertificate<MB16, Certificate>,
@@ -89,7 +91,7 @@ type DaMempool = Mempool<
     Certificate,
     <<Certificate as certificate::Certificate>::Blob as blob::Blob>::Hash,
     CertDiscriminant,
-    MockCertVerifier,
+    DaCertificateVerifier<[u8; 32], MockKeyStore<MockDaAuth>, Certificate>,
 >;
 
 #[derive(Services)]
@@ -100,7 +102,7 @@ pub struct Nomos {
         ServiceHandle<Mempool<Tx, <Tx as Transaction>::Hash, TxDiscriminant, MockTxVerifier>>,
     da_mempool: ServiceHandle<DaMempool>,
     consensus: ServiceHandle<Carnot>,
-    http: ServiceHandle<ApiService<AxumBackend<Tx, Wire, MockKeyStore<MockDaAuth>, MB16>>>,
+    http: ServiceHandle<ApiService<AxumBackend<Tx, Wire, MB16>>>,
     da: ServiceHandle<DataAvailability>,
     storage: ServiceHandle<StorageService<SledBackend<Wire>>>,
     #[cfg(feature = "metrics")]

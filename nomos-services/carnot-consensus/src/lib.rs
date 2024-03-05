@@ -15,8 +15,7 @@ use bls_signatures::PrivateKey;
 pub use carnot_engine::NodeId;
 use futures::{Stream, StreamExt};
 use leader_selection::UpdateableLeaderSelection;
-use nomos_core::da::certificate::mock::MockCertVerifier;
-use nomos_core::tx::mock::MockTxVerifier;
+use nomos_mempool::verifier::Verifier;
 use serde::Deserialize;
 use serde::{de::DeserializeOwned, Serialize};
 use serde_with::serde_as;
@@ -111,8 +110,19 @@ impl<O: Overlay, Ts, Bs> CarnotSettings<O, Ts, Bs> {
     }
 }
 
-pub struct CarnotConsensus<A, ClPool, ClPoolAdapter, DaPool, DaPoolAdapter, O, TxS, BS, Storage>
-where
+pub struct CarnotConsensus<
+    A,
+    ClPool,
+    ClPoolAdapter,
+    ClPoolVerifier,
+    DaPool,
+    DaPoolAdapter,
+    DaPoolVerifier,
+    O,
+    TxS,
+    BS,
+    Storage,
+> where
     A: NetworkAdapter,
     ClPoolAdapter: MempoolAdapter<Item = ClPool::Item, Key = ClPool::Key>,
     ClPool: MemPool,
@@ -127,20 +137,46 @@ where
     TxS: TxSelect<Tx = ClPool::Item>,
     BS: BlobCertificateSelect<Certificate = DaPool::Item>,
     Storage: StorageBackend + Send + Sync + 'static,
+    ClPoolVerifier: Verifier<ClPool::Item> + Send + Sync + 'static,
+    DaPoolVerifier: Verifier<DaPool::Item> + Send + Sync + 'static,
 {
     service_state: ServiceStateHandle<Self>,
     // underlying networking backend. We need this so we can relay and check the types properly
     // when implementing ServiceCore for CarnotConsensus
     network_relay: Relay<NetworkService<A::Backend>>,
-    cl_mempool_relay: Relay<MempoolService<ClPoolAdapter, ClPool, TxDiscriminant, MockTxVerifier>>,
+    cl_mempool_relay: Relay<MempoolService<ClPoolAdapter, ClPool, TxDiscriminant, ClPoolVerifier>>,
     da_mempool_relay:
-        Relay<MempoolService<DaPoolAdapter, DaPool, CertDiscriminant, MockCertVerifier>>,
+        Relay<MempoolService<DaPoolAdapter, DaPool, CertDiscriminant, DaPoolVerifier>>,
     storage_relay: Relay<StorageService<Storage>>,
     _overlay: std::marker::PhantomData<O>,
 }
 
-impl<A, ClPool, ClPoolAdapter, DaPool, DaPoolAdapter, O, TxS, BS, Storage> ServiceData
-    for CarnotConsensus<A, ClPool, ClPoolAdapter, DaPool, DaPoolAdapter, O, TxS, BS, Storage>
+impl<
+        A,
+        ClPool,
+        ClPoolAdapter,
+        ClPoolVerifier,
+        DaPool,
+        DaPoolAdapter,
+        DaPoolVerifier,
+        O,
+        TxS,
+        BS,
+        Storage,
+    > ServiceData
+    for CarnotConsensus<
+        A,
+        ClPool,
+        ClPoolAdapter,
+        ClPoolVerifier,
+        DaPool,
+        DaPoolAdapter,
+        DaPoolVerifier,
+        O,
+        TxS,
+        BS,
+        Storage,
+    >
 where
     A: NetworkAdapter,
     ClPool: MemPool,
@@ -155,6 +191,8 @@ where
     TxS: TxSelect<Tx = ClPool::Item>,
     BS: BlobCertificateSelect<Certificate = DaPool::Item>,
     Storage: StorageBackend + Send + Sync + 'static,
+    ClPoolVerifier: Verifier<ClPool::Item> + Send + Sync + 'static,
+    DaPoolVerifier: Verifier<DaPool::Item> + Send + Sync + 'static,
 {
     const SERVICE_ID: ServiceId = "Carnot";
     type Settings = CarnotSettings<O, TxS::Settings, BS::Settings>;
@@ -164,8 +202,32 @@ where
 }
 
 #[async_trait::async_trait]
-impl<A, ClPool, ClPoolAdapter, DaPool, DaPoolAdapter, O, TxS, BS, Storage> ServiceCore
-    for CarnotConsensus<A, ClPool, ClPoolAdapter, DaPool, DaPoolAdapter, O, TxS, BS, Storage>
+impl<
+        A,
+        ClPool,
+        ClPoolAdapter,
+        ClPoolVerifier,
+        DaPool,
+        DaPoolAdapter,
+        DaPoolVerifier,
+        O,
+        TxS,
+        BS,
+        Storage,
+    > ServiceCore
+    for CarnotConsensus<
+        A,
+        ClPool,
+        ClPoolAdapter,
+        ClPoolVerifier,
+        DaPool,
+        DaPoolAdapter,
+        DaPoolVerifier,
+        O,
+        TxS,
+        BS,
+        Storage,
+    >
 where
     A: NetworkAdapter + Clone + Send + Sync + 'static,
     ClPool: MemPool + Send + Sync + 'static,
@@ -204,6 +266,8 @@ where
     BS: BlobCertificateSelect<Certificate = DaPool::Item> + Clone + Send + Sync + 'static,
     BS::Settings: Send + Sync + 'static,
     Storage: StorageBackend + Send + Sync + 'static,
+    ClPoolVerifier: Verifier<ClPool::Item> + Send + Sync + 'static,
+    DaPoolVerifier: Verifier<DaPool::Item> + Send + Sync + 'static,
 {
     fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, overwatch_rs::DynError> {
         let network_relay = service_state.overwatch_handle.relay();
@@ -363,8 +427,32 @@ enum Output<Tx: Clone + Eq + Hash, BlobCertificate: Clone + Eq + Hash> {
     },
 }
 
-impl<A, ClPool, ClPoolAdapter, DaPool, DaPoolAdapter, O, TxS, BS, Storage>
-    CarnotConsensus<A, ClPool, ClPoolAdapter, DaPool, DaPoolAdapter, O, TxS, BS, Storage>
+impl<
+        A,
+        ClPool,
+        ClPoolAdapter,
+        ClPoolVerifier,
+        DaPool,
+        DaPoolAdapter,
+        DaPoolVerifier,
+        O,
+        TxS,
+        BS,
+        Storage,
+    >
+    CarnotConsensus<
+        A,
+        ClPool,
+        ClPoolAdapter,
+        ClPoolVerifier,
+        DaPool,
+        DaPoolAdapter,
+        DaPoolVerifier,
+        O,
+        TxS,
+        BS,
+        Storage,
+    >
 where
     A: NetworkAdapter + Clone + Send + Sync + 'static,
     ClPool: MemPool + Send + Sync + 'static,
@@ -401,6 +489,8 @@ where
     ClPoolAdapter: MempoolAdapter<Item = ClPool::Item, Key = ClPool::Key> + Send + Sync + 'static,
     DaPoolAdapter: MempoolAdapter<Item = DaPool::Item, Key = DaPool::Key> + Send + Sync + 'static,
     Storage: StorageBackend + Send + Sync + 'static,
+    ClPoolVerifier: Verifier<ClPool::Item> + Send + Sync + 'static,
+    DaPoolVerifier: Verifier<DaPool::Item> + Send + Sync + 'static,
 {
     async fn should_stop_service(message: LifecycleMessage) -> bool {
         match message {

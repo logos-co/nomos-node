@@ -25,10 +25,7 @@ use full_replication::{Attestation, Blob, Certificate};
 use nomos_core::{
     da::{
         attestation, blob,
-        certificate::{
-            mock::MockKeyStore,
-            verify::{DaCertificateVerifier, KeyProvider},
-        },
+        certificate::{mock::MockKeyStore, verify::DaCertificateVerifier},
     },
     tx::{mock::MockTxVerifier, Transaction},
 };
@@ -50,11 +47,10 @@ pub struct AxumBackendSettings {
     pub cors_origins: Vec<String>,
 }
 
-pub struct AxumBackend<T, S, KS, const SIZE: usize> {
+pub struct AxumBackend<T, S, const SIZE: usize> {
     settings: AxumBackendSettings,
     _tx: core::marker::PhantomData<T>,
     _storage_serde: core::marker::PhantomData<S>,
-    _key_store: core::marker::PhantomData<KS>,
 }
 
 #[derive(OpenApi)]
@@ -73,7 +69,7 @@ pub struct AxumBackend<T, S, KS, const SIZE: usize> {
 struct ApiDoc;
 
 #[async_trait::async_trait]
-impl<T, S, KS, const SIZE: usize> Backend for AxumBackend<T, S, KS, SIZE>
+impl<T, S, const SIZE: usize> Backend for AxumBackend<T, S, SIZE>
 where
     T: Transaction
         + Clone
@@ -88,7 +84,6 @@ where
     <T as nomos_core::tx::Transaction>::Hash:
         Serialize + for<'de> Deserialize<'de> + std::cmp::Ord + Debug + Send + Sync + 'static,
     S: StorageSerde + Send + Sync + 'static,
-    KS: KeyProvider<[u8; 32]> + Clone + Send + 'static,
 {
     type Error = hyper::Error;
     type Settings = AxumBackendSettings;
@@ -101,7 +96,6 @@ where
             settings,
             _tx: core::marker::PhantomData,
             _storage_serde: core::marker::PhantomData,
-            _key_store: core::marker::PhantomData,
         })
     }
 

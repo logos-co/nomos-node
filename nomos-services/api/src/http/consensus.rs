@@ -1,5 +1,6 @@
 use std::{fmt::Debug, hash::Hash};
 
+use nomos_da::auth::mock::MockDaAuth;
 use overwatch_rs::overwatch::handle::OverwatchHandle;
 use serde::{de::DeserializeOwned, Serialize};
 use tokio::sync::oneshot;
@@ -16,9 +17,12 @@ use full_replication::Certificate;
 use nomos_core::{
     da::{
         blob,
-        certificate::{self, select::FillSize as FillSizeWithBlobsCertificate},
+        certificate::{
+            self, mock::MockKeyStore, select::FillSize as FillSizeWithBlobsCertificate,
+            verify::DaCertificateVerifier,
+        },
     },
-    tx::{select::FillSize as FillSizeWithTx, Transaction},
+    tx::{mock::MockTxVerifier, select::FillSize as FillSizeWithTx, Transaction},
 };
 use nomos_mempool::{
     backend::mockpool::MockPool, network::adapters::libp2p::Libp2pAdapter as MempoolLibp2pAdapter,
@@ -29,11 +33,13 @@ pub type Carnot<Tx, SS, const SIZE: usize> = CarnotConsensus<
     ConsensusLibp2pAdapter,
     MockPool<Tx, <Tx as Transaction>::Hash>,
     MempoolLibp2pAdapter<Tx, <Tx as Transaction>::Hash>,
+    MockTxVerifier,
     MockPool<Certificate, <<Certificate as certificate::Certificate>::Blob as blob::Blob>::Hash>,
     MempoolLibp2pAdapter<
         Certificate,
         <<Certificate as certificate::Certificate>::Blob as blob::Blob>::Hash,
     >,
+    DaCertificateVerifier<[u8; 32], MockKeyStore<MockDaAuth>, Certificate>,
     TreeOverlay<RoundRobin, RandomBeaconState>,
     FillSizeWithTx<SIZE, Tx>,
     FillSizeWithBlobsCertificate<SIZE, Certificate>,
