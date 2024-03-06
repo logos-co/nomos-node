@@ -124,25 +124,25 @@ impl NetworkBackend for MixnetNetworkBackend {
 
 impl MixnetNetworkBackend {
     async fn run_mixnode(
-        mut mixnode: MixNode,
-        packet_queue: PacketQueue,
-        swarm_commands_tx: mpsc::Sender<libp2p::Command>,
+        mut _mixnode: MixNode,
+        _packet_queue: PacketQueue,
+        _swarm_commands_tx: mpsc::Sender<libp2p::Command>,
     ) {
         todo!()
     }
 
     async fn run_mixclient(
-        mut mixclient: MixClient,
-        packet_queue: PacketQueue,
-        swarm_commands_tx: mpsc::Sender<libp2p::Command>,
+        mut _mixclient: MixClient,
+        _packet_queue: PacketQueue,
+        _swarm_commands_tx: mpsc::Sender<libp2p::Command>,
     ) {
         todo!()
     }
 
     async fn handle_incoming_streams(
-        mut incoming_streams: IncomingStreams,
-        packet_queue: PacketQueue,
-        runtime_handle: Handle,
+        mut _incoming_streams: IncomingStreams,
+        _packet_queue: PacketQueue,
+        _runtime_handle: Handle,
     ) {
         todo!()
     }

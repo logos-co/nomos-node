@@ -160,9 +160,9 @@ impl SwarmHandler {
                 self.broadcast_and_retry(topic, message, retry_count).await;
             }
             Command::StreamSend {
-                peer_id,
-                protocol,
-                message,
+                peer_id: _,
+                protocol: _,
+                message: _,
             } => {
                 todo!()
             }
@@ -260,7 +260,7 @@ impl SwarmHandler {
         std::time::Duration::from_secs(BACKOFF.pow(retry as u32))
     }
 
-    pub fn incoming_streams(&self, protocol: StreamProtocol) -> IncomingStreams {
+    pub fn incoming_streams(&self, _protocol: StreamProtocol) -> IncomingStreams {
         todo!()
     }
 }
