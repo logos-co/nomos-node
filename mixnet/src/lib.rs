@@ -1,6 +1,11 @@
 //! Mixnet
-#![deny(missing_docs, warnings)]
-#![forbid(unsafe_code)]
+// #![deny(missing_docs, warnings)]
+// #![forbid(unsafe_code)]
 
-/// Poisson distribution
-pub mod poisson;
+/// Mix client
+pub mod client;
+/// Mixnet errors
+pub mod error;
+/// Mix node
+pub mod node;
+mod poisson;

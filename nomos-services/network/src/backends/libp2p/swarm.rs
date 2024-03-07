@@ -2,10 +2,9 @@ use std::{collections::HashMap, time::Duration};
 
 #[allow(deprecated)]
 use nomos_libp2p::{
-    gossipsub::{self, Message},
-    libp2p::swarm::ConnectionId,
-    BehaviourEvent, Multiaddr, Swarm, SwarmEvent,
+    gossipsub, libp2p::swarm::ConnectionId, BehaviourEvent, Multiaddr, Swarm, SwarmEvent,
 };
+use nomos_libp2p::{libp2p::StreamProtocol, libp2p_stream::IncomingStreams};
 use tokio::sync::{broadcast, mpsc};
 use tokio_stream::StreamExt;
 
@@ -160,6 +159,13 @@ impl SwarmHandler {
             } => {
                 self.broadcast_and_retry(topic, message, retry_count).await;
             }
+            Command::StreamSend {
+                peer_id: _,
+                protocol: _,
+                message: _,
+            } => {
+                todo!()
+            }
         }
     }
 
@@ -219,7 +225,7 @@ impl SwarmHandler {
                 tracing::debug!("broadcasted message with id: {id} tp topic: {topic}");
                 // self-notification because libp2p doesn't do it
                 if self.swarm.is_subscribed(&topic) {
-                    log_error!(self.events_tx.send(Event::Message(Message {
+                    log_error!(self.events_tx.send(Event::Message(gossipsub::Message {
                         source: None,
                         data: message.into(),
                         sequence_number: None,
@@ -252,5 +258,9 @@ impl SwarmHandler {
 
     fn exp_backoff(retry: usize) -> Duration {
         std::time::Duration::from_secs(BACKOFF.pow(retry as u32))
+    }
+
+    pub fn incoming_streams(&self, _protocol: StreamProtocol) -> IncomingStreams {
+        todo!()
     }
 }

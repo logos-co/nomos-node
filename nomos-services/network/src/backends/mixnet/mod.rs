@@ -1,63 +1,167 @@
 // internal
-use super::NetworkBackend;
-use nomos_libp2p::gossipsub;
+use super::{
+    libp2p::{self, swarm::SwarmHandler, Libp2pConfig, Topic},
+    NetworkBackend,
+};
+use mixnet::{
+    client::{MessageQueue, MixClient, MixClientConfig},
+    node::{MixNode, MixNodeConfig, PacketQueue},
+};
+use nomos_core::wire;
+use nomos_libp2p::{libp2p::StreamProtocol, libp2p_stream::IncomingStreams};
 // crates
 use overwatch_rs::{overwatch::handle::OverwatchHandle, services::state::NoState};
-use tokio::sync::broadcast;
+use serde::{Deserialize, Serialize};
+use tokio::{
+    runtime::Handle,
+    sync::{broadcast, mpsc},
+};
 
 /// A Mixnet network backend broadcasts messages to the network with mixing packets through mixnet,
 /// and receives messages broadcasted from the network.
-pub struct MixnetNetworkBackend {}
+pub struct MixnetNetworkBackend {
+    libp2p_events_tx: broadcast::Sender<libp2p::Event>,
+    libp2p_commands_tx: mpsc::Sender<libp2p::Command>,
+
+    mixclient_message_queue: MessageQueue,
+}
+
+#[derive(Clone, Debug)]
+pub struct MixnetConfig {
+    libp2p_config: Libp2pConfig,
+    mixclient_config: MixClientConfig,
+    mixnode_config: MixNodeConfig,
+}
+
+const BUFFER_SIZE: usize = 64;
+const STREAM_PROTOCOL: StreamProtocol = StreamProtocol::new("/mixnet");
 
 #[async_trait::async_trait]
 impl NetworkBackend for MixnetNetworkBackend {
     type Settings = MixnetConfig;
     type State = NoState<MixnetConfig>;
-    type Message = Command;
-    type EventKind = EventKind;
-    type NetworkEvent = NetworkEvent;
+    type Message = libp2p::Command;
+    type EventKind = libp2p::EventKind;
+    type NetworkEvent = libp2p::Event;
 
-    fn new(_config: Self::Settings, _overwatch_handle: OverwatchHandle) -> Self {
+    fn new(config: Self::Settings, overwatch_handle: OverwatchHandle) -> Self {
         // TODO: One important task that should be spawned is
         // subscribing NewEntropy events that will be emitted from the consensus service soon.
         // so that new topology can be built internally.
         // In the mixnet spec, the robustness layer is responsible for this task.
         // We can implement the robustness layer in the mixnet-specific crate,
         // that we're going to define at the root of the project.
-        todo!()
+
+        let (libp2p_commands_tx, libp2p_commands_rx) = tokio::sync::mpsc::channel(BUFFER_SIZE);
+        let (libp2p_events_tx, _) = tokio::sync::broadcast::channel(BUFFER_SIZE);
+
+        let mut swarm_handler = SwarmHandler::new(
+            &config.libp2p_config,
+            libp2p_commands_tx.clone(),
+            libp2p_commands_rx,
+            libp2p_events_tx.clone(),
+        );
+
+        // Run mixnode
+        let (mixnode, packet_queue) = MixNode::new(config.mixnode_config).unwrap();
+        let libp2p_cmd_tx = libp2p_commands_tx.clone();
+        let queue = packet_queue.clone();
+        overwatch_handle.runtime().spawn(async move {
+            Self::run_mixnode(mixnode, queue, libp2p_cmd_tx).await;
+        });
+        let incoming_streams = swarm_handler.incoming_streams(STREAM_PROTOCOL);
+        let runtime_handle = overwatch_handle.runtime().clone();
+        let queue = packet_queue.clone();
+        overwatch_handle.runtime().spawn(async move {
+            Self::handle_incoming_streams(incoming_streams, queue, runtime_handle).await;
+        });
+
+        // Run mixclient
+        let (mixclient, message_queue) = MixClient::new(config.mixclient_config).unwrap();
+        let libp2p_cmd_tx = libp2p_commands_tx.clone();
+        overwatch_handle.runtime().spawn(async move {
+            Self::run_mixclient(mixclient, packet_queue, libp2p_cmd_tx).await;
+        });
+
+        // Run libp2p swarm to make progress
+        overwatch_handle.runtime().spawn(async move {
+            swarm_handler.run(config.libp2p_config.initial_peers).await;
+        });
+
+        Self {
+            libp2p_events_tx,
+            libp2p_commands_tx,
+
+            mixclient_message_queue: message_queue,
+        }
     }
 
-    async fn process(&self, _msg: Self::Message) {
-        todo!()
+    async fn process(&self, msg: Self::Message) {
+        match msg {
+            libp2p::Command::Broadcast { topic, message } => {
+                let msg = MixnetMessage { topic, message };
+                if let Err(e) = self.mixclient_message_queue.send(msg.as_bytes()).await {
+                    tracing::error!("failed to send messasge to mixclient: {e}");
+                }
+            }
+            cmd => {
+                if let Err(e) = self.libp2p_commands_tx.send(cmd).await {
+                    tracing::error!("failed to send command to libp2p swarm: {e:?}");
+                }
+            }
+        }
     }
 
     async fn subscribe(
         &mut self,
-        _kind: Self::EventKind,
+        kind: Self::EventKind,
     ) -> broadcast::Receiver<Self::NetworkEvent> {
+        match kind {
+            libp2p::EventKind::Message => self.libp2p_events_tx.subscribe(),
+        }
+    }
+}
+
+impl MixnetNetworkBackend {
+    async fn run_mixnode(
+        mut _mixnode: MixNode,
+        _packet_queue: PacketQueue,
+        _swarm_commands_tx: mpsc::Sender<libp2p::Command>,
+    ) {
+        todo!()
+    }
+
+    async fn run_mixclient(
+        mut _mixclient: MixClient,
+        _packet_queue: PacketQueue,
+        _swarm_commands_tx: mpsc::Sender<libp2p::Command>,
+    ) {
+        todo!()
+    }
+
+    async fn handle_incoming_streams(
+        mut _incoming_streams: IncomingStreams,
+        _packet_queue: PacketQueue,
+        _runtime_handle: Handle,
+    ) {
         todo!()
     }
 }
 
-#[derive(Clone, Debug)]
-pub struct MixnetConfig {}
-
-#[derive(Debug)]
-pub enum Command {
-    /// Broadcast a message through mixnet.
-    ///
-    /// A message will be split into multiple Sphinx packets, mixed through mixnet,
-    /// reconstructed to the original message, and broadcasted to the entire network.
-    BroadcastMessage(Box<[u8]>),
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct MixnetMessage {
+    pub topic: Topic,
+    pub message: Box<[u8]>,
 }
 
-#[derive(Debug)]
-pub enum EventKind {
-    MessageReceived,
-}
+impl MixnetMessage {
+    pub fn as_bytes(&self) -> Box<[u8]> {
+        wire::serialize(self)
+            .expect("Couldn't serialize MixnetMessage")
+            .into_boxed_slice()
+    }
 
-#[derive(Debug, Clone)]
-pub enum NetworkEvent {
-    /// Received a message broadcasted
-    MessageReceived(gossipsub::Message),
+    pub fn from_bytes(data: &[u8]) -> Result<Self, wire::Error> {
+        wire::deserialize(data)
+    }
 }

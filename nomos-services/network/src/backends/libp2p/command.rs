@@ -1,4 +1,4 @@
-use nomos_libp2p::Multiaddr;
+use nomos_libp2p::{libp2p::StreamProtocol, Multiaddr, PeerId};
 use serde::{Deserialize, Serialize};
 use tokio::sync::oneshot;
 
@@ -20,6 +20,11 @@ pub enum Command {
         topic: Topic,
         message: Box<[u8]>,
         retry_count: usize,
+    },
+    StreamSend {
+        peer_id: PeerId,
+        protocol: StreamProtocol,
+        message: Box<[u8]>,
     },
 }
 

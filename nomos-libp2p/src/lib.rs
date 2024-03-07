@@ -20,6 +20,7 @@ pub use libp2p::{
     swarm::{dial_opts::DialOpts, DialError, NetworkBehaviour, SwarmEvent},
     PeerId, SwarmBuilder, Transport,
 };
+pub use libp2p_stream;
 pub use multiaddr::{multiaddr, Multiaddr, Protocol};
 
 /// Wraps [`libp2p::Swarm`], and config it for use within Nomos.
@@ -63,7 +64,7 @@ impl Swarm {
         let keypair =
             libp2p::identity::Keypair::from(secp256k1::Keypair::from(config.node_key.clone()));
         let peer_id = PeerId::from(keypair.public());
-        log::info!("libp2p peer_id:{}", peer_id);
+        tracing::info!("libp2p peer_id:{}", peer_id);
 
         let mut swarm = libp2p::SwarmBuilder::with_existing_identity(keypair)
             .with_tokio()

@@ -15,6 +15,7 @@ libp2p = { version = "0.53.2", features = [
   "quic",
   "secp256k1",
 ] }
+libp2p-stream = "0.1.0-alpha"
 blake2 = { version = "0.10" }
 serde = { version = "1.0.166", features = ["derive"] }
 hex = "0.4.3"

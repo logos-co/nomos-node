@@ -1,9 +1,9 @@
 mod command;
 mod config;
-mod swarm;
+pub(crate) mod swarm;
 
 // std
-pub use self::command::{Command, Libp2pInfo};
+pub use self::command::{Command, Libp2pInfo, Topic};
 pub use self::config::Libp2pConfig;
 use self::swarm::SwarmHandler;
 
