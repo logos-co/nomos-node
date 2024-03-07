@@ -7,6 +7,7 @@ use rand_distr::{Distribution, Exp};
 ///
 /// If events occur in a Poisson distribution with rate_per_min,
 /// the interval between events follow the exponential distribution with rate_per_min.
+#[allow(dead_code)]
 pub fn poisson_interval<R: Rng + ?Sized>(rng: &mut R, rate_per_min: f64) -> Duration {
     // create an exponential distribution
     let exp = Exp::new(rate_per_min).unwrap();

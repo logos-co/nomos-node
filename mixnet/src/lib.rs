@@ -10,5 +10,5 @@ pub mod client;
 pub mod error;
 /// Mix node
 pub mod node;
-mod packet;
+pub mod packet;
 mod poisson;
