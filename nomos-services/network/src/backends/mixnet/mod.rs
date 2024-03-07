@@ -214,24 +214,22 @@ impl MixnetNetworkBackend {
             .unwrap();
 
         match rx.await {
-            Ok(result) => match result {
-                Ok(peer_id) => {
-                    swarm_commands_tx
-                        .send(libp2p::Command::StreamSend {
-                            peer_id,
-                            protocol: STREAM_PROTOCOL,
-                            message: data,
-                        })
-                        .await
-                        .unwrap();
+            Ok(Ok(peer_id)) => {
+                swarm_commands_tx
+                    .send(libp2p::Command::StreamSend {
+                        peer_id,
+                        protocol: STREAM_PROTOCOL,
+                        message: data,
+                    })
+                    .await
+                    .unwrap();
+            }
+            Ok(Err(e)) => match e {
+                nomos_libp2p::DialError::NoAddresses => {
+                    tracing::debug!("Dialing failed because the peer is the local node. Sending msg directly to the queue");
+                    packet_queue.send(data).await.unwrap();
                 }
-                Err(e) => match e {
-                    nomos_libp2p::DialError::NoAddresses => {
-                        tracing::debug!("Dialing failed because the peer is the local node. Sending msg directly to the queue");
-                        packet_queue.send(data).await.unwrap();
-                    }
-                    _ => tracing::error!("failed to dial with unrecoverable error: {e}"),
-                },
+                _ => tracing::error!("failed to dial with unrecoverable error: {e}"),
             },
             Err(e) => {
                 tracing::error!("channel closed before receiving: {e}");
