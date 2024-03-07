@@ -141,9 +141,9 @@ impl MixnetNetworkBackend {
     }
 
     async fn run_mixclient(
-        mut _mixclient: MixClient,
-        _packet_queue: PacketQueue,
-        _swarm_commands_tx: mpsc::Sender<libp2p::Command>,
+        mut mixclient: MixClient,
+        packet_queue: PacketQueue,
+        swarm_commands_tx: mpsc::Sender<libp2p::Command>,
     ) {
         while let Some(packet) = mixclient.next().await {
             Self::stream_send(
