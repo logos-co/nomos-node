@@ -10,7 +10,6 @@ use mixnet::{
 };
 use nomos_core::wire;
 use nomos_libp2p::{
-    gossipsub,
     libp2p::{Stream, StreamProtocol},
     libp2p_stream::IncomingStreams,
 };
@@ -145,9 +144,9 @@ impl MixnetNetworkBackend {
     }
 
     async fn handle_incoming_streams(
-        mut _incoming_streams: IncomingStreams,
-        _packet_queue: PacketQueue,
-        _runtime_handle: Handle,
+        mut incoming_streams: IncomingStreams,
+        packet_queue: PacketQueue,
+        runtime_handle: Handle,
     ) {
         while let Some((_, stream)) = incoming_streams.next().await {
             let queue = packet_queue.clone();

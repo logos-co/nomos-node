@@ -176,9 +176,9 @@ impl SwarmHandler {
                 self.broadcast_and_retry(topic, message, retry_count).await;
             }
             Command::StreamSend {
-                peer_id: _,
-                protocol: _,
-                message: _,
+                peer_id,
+                protocol,
+                message,
             } => {
                 tracing::debug!("StreamSend to {peer_id}: len:{}", message.len());
                 match self.open_stream(peer_id, protocol).await {
