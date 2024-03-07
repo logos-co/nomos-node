@@ -2,6 +2,7 @@ mod block;
 mod config;
 mod crypto;
 mod leader_proof;
+mod utils;
 
 use crate::{crypto::Blake2b, Commitment, LeaderProof, Nullifier};
 use blake2::Digest;
@@ -278,6 +279,27 @@ impl LedgerState {
             )
             .into(),
             ..self
+        }
+    }
+
+    pub fn from_commitments(commitments: impl Iterator<Item = Commitment>) -> Self {
+        let commitments = commitments.collect::<HashTrieSet<_>>();
+        Self {
+            lead_commitments: commitments.clone(),
+            spend_commitments: commitments,
+            nullifiers: Default::default(),
+            nonce: [0; 32].into(),
+            slot: 0.into(),
+            next_epoch_state: EpochState {
+                epoch: 1.into(),
+                nonce: [0; 32].into(),
+                commitments: Default::default(),
+            },
+            epoch_state: EpochState {
+                epoch: 0.into(),
+                nonce: [0; 32].into(),
+                commitments: Default::default(),
+            },
         }
     }
 }

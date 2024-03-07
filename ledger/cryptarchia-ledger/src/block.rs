@@ -11,6 +11,7 @@ pub struct ContentId([u8; 32]);
 #[derive(Clone, Debug, Eq, PartialEq, Copy)]
 pub struct Nonce([u8; 32]);
 
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub struct Header {
     parent: HeaderId,
@@ -122,3 +123,10 @@ impl From<ContentId> for [u8; 32] {
         id.0
     }
 }
+
+// ----------- serialization
+use crate::utils::serialize_bytes_newtype;
+
+serialize_bytes_newtype!(HeaderId);
+serialize_bytes_newtype!(ContentId);
+serialize_bytes_newtype!(Nonce);
