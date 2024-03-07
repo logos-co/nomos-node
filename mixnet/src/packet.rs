@@ -1,10 +1,15 @@
+use std::{io, u8};
+
+use futures::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
+use sphinx_packet::crypto::PrivateKey;
 use sphinx_packet::header::delays::Delay;
 
-use crate::address::NodeAddress;
-use crate::crypto::PrivateKey;
-use crate::error::MixnetError;
-use crate::fragment::{Fragment, FragmentSet};
-use crate::topology::MixnetTopology;
+use crate::{
+    address::NodeAddress,
+    error::MixnetError,
+    fragment::{Fragment, FragmentSet},
+    topology::MixnetTopology,
+};
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Packet {
@@ -27,14 +32,14 @@ impl Packet {
     }
 
     pub(crate) fn build_real(
-        msg: &[u8],
+        msg: Vec<u8>,
         topology: &MixnetTopology,
     ) -> Result<Vec<Packet>, MixnetError> {
         Self::build(Message::Real(msg), topology)
     }
 
     pub(crate) fn build_drop_cover(
-        msg: &[u8],
+        msg: Vec<u8>,
         topology: &MixnetTopology,
     ) -> Result<Vec<Packet>, MixnetError> {
         Self::build(Message::DropCover(msg), topology)
@@ -74,26 +79,26 @@ impl Packet {
         self.address
     }
 
-    pub fn body(&self) -> Box<[u8]> {
-        self.body.bytes()
+    pub fn body(self) -> PacketBody {
+        self.body
     }
 }
 
 #[derive(Clone, PartialEq, Eq, Debug)]
-pub(crate) enum PacketBody {
-    SphinxPacket(Box<[u8]>),
-    Fragment(Box<[u8]>),
+pub enum PacketBody {
+    SphinxPacket(Vec<u8>),
+    Fragment(Vec<u8>),
 }
 
 impl From<&sphinx_packet::SphinxPacket> for PacketBody {
     fn from(packet: &sphinx_packet::SphinxPacket) -> Self {
-        Self::SphinxPacket(packet.to_bytes().into_boxed_slice())
+        Self::SphinxPacket(packet.to_bytes())
     }
 }
 
 impl From<&Fragment> for PacketBody {
     fn from(fragment: &Fragment) -> Self {
-        Self::Fragment(fragment.bytes().into_boxed_slice())
+        Self::Fragment(fragment.bytes())
     }
 }
 
@@ -101,24 +106,47 @@ impl TryFrom<sphinx_packet::payload::Payload> for PacketBody {
     type Error = MixnetError;
 
     fn try_from(payload: sphinx_packet::payload::Payload) -> Result<Self, Self::Error> {
-        Ok(Self::Fragment(
-            payload.recover_plaintext()?.into_boxed_slice(),
-        ))
+        Ok(Self::Fragment(payload.recover_plaintext()?))
     }
 }
 
 impl PacketBody {
-    pub(crate) fn bytes(&self) -> Box<[u8]> {
+    pub async fn write_to<W: AsyncWrite + Unpin + ?Sized>(&self, writer: &mut W) -> io::Result<()> {
         match self {
-            Self::SphinxPacket(data) => PacketBodyFlag::SphinxPacket.set(data),
-            Self::Fragment(data) => PacketBodyFlag::Fragment.set(data),
+            Self::SphinxPacket(data) => {
+                Self::write(writer, PacketBodyFlag::SphinxPacket, data).await
+            }
+            Self::Fragment(data) => Self::write(writer, PacketBodyFlag::Fragment, data).await,
         }
     }
 
-    pub(crate) fn from_bytes(value: &[u8]) -> Result<Self, MixnetError> {
-        match PacketBodyFlag::try_from(value[0])? {
-            PacketBodyFlag::SphinxPacket => Ok(Self::SphinxPacket(value[1..].into())),
-            PacketBodyFlag::Fragment => Ok(Self::Fragment(value[1..].into())),
+    async fn write<W: AsyncWrite + Unpin + ?Sized>(
+        writer: &mut W,
+        flag: PacketBodyFlag,
+        data: &[u8],
+    ) -> io::Result<()> {
+        writer.write_all(&[flag as u8]).await?;
+        writer.write_all(&data.len().to_le_bytes()).await?;
+        writer.write_all(data).await?;
+        Ok(())
+    }
+
+    pub async fn read_from<R: AsyncRead + Unpin>(
+        reader: &mut R,
+    ) -> io::Result<Result<Self, MixnetError>> {
+        let mut flag = [0u8; 1];
+        reader.read_exact(&mut flag).await?;
+
+        let mut size = [0u8; std::mem::size_of::<usize>()];
+        reader.read_exact(&mut size).await?;
+
+        let mut data = vec![0u8; usize::from_le_bytes(size)];
+        reader.read_exact(&mut data).await?;
+
+        match PacketBodyFlag::try_from(flag[0]) {
+            Ok(PacketBodyFlag::SphinxPacket) => Ok(Ok(PacketBody::SphinxPacket(data))),
+            Ok(PacketBodyFlag::Fragment) => Ok(Ok(PacketBody::Fragment(data))),
+            Err(e) => Ok(Err(e)),
         }
     }
 
@@ -136,15 +164,6 @@ enum PacketBodyFlag {
     Fragment,
 }
 
-impl PacketBodyFlag {
-    fn set(self, body: &[u8]) -> Box<[u8]> {
-        let mut out = Vec::with_capacity(1 + body.len());
-        out.push(self as u8);
-        out.extend_from_slice(body);
-        out.into_boxed_slice()
-    }
-}
-
 impl TryFrom<u8> for PacketBodyFlag {
     type Error = MixnetError;
 
@@ -157,20 +176,30 @@ impl TryFrom<u8> for PacketBodyFlag {
     }
 }
 
-pub(crate) enum Message<'a> {
-    Real(&'a [u8]),
-    DropCover(&'a [u8]),
+pub(crate) enum Message {
+    Real(Vec<u8>),
+    DropCover(Vec<u8>),
 }
 
-impl<'a> Message<'a> {
-    pub(crate) fn bytes(&self) -> Box<[u8]> {
+impl Message {
+    fn bytes(self) -> Box<[u8]> {
         match self {
-            Message::Real(value) => MessageFlag::Real.set(value),
-            Message::DropCover(value) => MessageFlag::DropCover.set(value),
+            Self::Real(msg) => Self::bytes_with_flag(MessageFlag::Real, msg),
+            Self::DropCover(msg) => Self::bytes_with_flag(MessageFlag::DropCover, msg),
         }
     }
 
-    pub(crate) fn from_bytes(value: &'a [u8]) -> Result<Self, MixnetError> {
+    fn bytes_with_flag(flag: MessageFlag, mut msg: Vec<u8>) -> Box<[u8]> {
+        let mut out = Vec::with_capacity(1 + msg.len());
+        out.push(flag as u8);
+        out.append(&mut msg);
+        out.into_boxed_slice()
+    }
+
+    pub(crate) fn from_bytes(value: &[u8]) -> Result<Self, MixnetError> {
+        if value.is_empty() {
+            return Err(MixnetError::InvalidMessage);
+        }
         match MessageFlag::try_from(value[0])? {
             MessageFlag::Real => Ok(Self::Real(value[1..].into())),
             MessageFlag::DropCover => Ok(Self::DropCover(value[1..].into())),
@@ -184,15 +213,6 @@ enum MessageFlag {
     DropCover,
 }
 
-impl MessageFlag {
-    fn set(self, body: &[u8]) -> Box<[u8]> {
-        let mut out = Vec::with_capacity(1 + body.len());
-        out.push(self as u8);
-        out.extend_from_slice(body);
-        out.into_boxed_slice()
-    }
-}
-
 impl TryFrom<u8> for MessageFlag {
     type Error = MixnetError;
 
@@ -202,16 +222,5 @@ impl TryFrom<u8> for MessageFlag {
             1u8 => Ok(MessageFlag::DropCover),
             _ => Err(MixnetError::InvalidPacketFlag),
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn message_flag() {
-        assert_eq!(&[0, 1, 2], MessageFlag::Real.set(&[1, 2]).as_ref());
-        assert_eq!(&[1, 1, 2], MessageFlag::DropCover.set(&[1, 2]).as_ref());
     }
 }

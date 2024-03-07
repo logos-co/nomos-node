@@ -3,10 +3,11 @@ use rand::Rng;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use sphinx_packet::{
     constants::IDENTIFIER_LENGTH,
+    crypto::{PublicKey, PUBLIC_KEY_SIZE},
     route::{DestinationAddressBytes, SURBIdentifier},
 };
 
-use crate::{address::NodeAddress, crypto::PublicKey, error::MixnetError};
+use crate::{address::NodeAddress, error::MixnetError};
 
 /// Defines Mixnet topology construction and route selection
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -22,11 +23,12 @@ impl MixnetTopology {
     /// # Errors
     ///
     /// This function will return an error if parameters are invalid.
+    #[allow(dead_code)]
     pub fn new(
-        mut mixnode_candidates: Vec<MixNodeInfo>,
-        num_layers: usize,
-        num_mixnodes_per_layer: usize,
-        entropy: [u8; 32],
+        mut _mixnode_candidates: Vec<MixNodeInfo>,
+        _num_layers: usize,
+        _num_mixnodes_per_layer: usize,
+        _entropy: [u8; 32],
     ) -> Result<Self, MixnetError> {
         if mixnode_candidates.len() < num_layers * num_mixnodes_per_layer {
             return Err(MixnetError::InvalidTopologySize);
@@ -41,6 +43,7 @@ impl MixnetTopology {
     }
 
     /// Selects a mix destination randomly from the last mix layer
+    #[allow(dead_code)]
     pub(crate) fn choose_destination(&self) -> sphinx_packet::route::Destination {
         let idx_in_layer = rand::thread_rng().gen_range(0..self.num_mixnodes_per_layer);
         let idx = self.num_mixnodes_per_layer * (self.num_layers - 1) + idx_in_layer;
@@ -51,6 +54,7 @@ impl MixnetTopology {
     /// and append a mix destination to the end of the mix route.
     ///
     /// That is, the caller can generate multiple routes with one mix destination.
+    #[allow(dead_code)]
     pub(crate) fn gen_route(&self) -> Vec<sphinx_packet::route::Node> {
         let mut route = Vec::with_capacity(self.num_layers);
         for layer in 0..self.num_layers - 1 {
@@ -68,10 +72,13 @@ pub struct MixNodeInfo(sphinx_packet::route::Node);
 
 impl MixNodeInfo {
     /// Creates a [`MixNodeInfo`].
-    pub fn new(address: NodeAddress, public_key: PublicKey) -> Result<Self, MixnetError> {
+    pub fn new(
+        address: NodeAddress,
+        public_key: [u8; PUBLIC_KEY_SIZE],
+    ) -> Result<Self, MixnetError> {
         Ok(Self(sphinx_packet::route::Node::new(
             address.try_into()?,
-            *public_key,
+            PublicKey::from(public_key),
         )))
     }
 }
