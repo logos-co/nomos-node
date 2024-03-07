@@ -11,29 +11,39 @@ impl Packet {
         self.address
     }
 
-    pub fn body(&self) -> Box<[u8]> {
+    pub fn body(self) -> Box<[u8]> {
         self.body.bytes()
     }
 }
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub(crate) enum PacketBody {
-    SphinxPacket(Box<[u8]>),
-    Fragment(Box<[u8]>),
+    SphinxPacket(Vec<u8>),
+    Fragment(Vec<u8>),
 }
 
 impl PacketBody {
-    pub(crate) fn bytes(&self) -> Box<[u8]> {
+    pub(crate) fn bytes(self) -> Box<[u8]> {
         match self {
-            Self::SphinxPacket(data) => PacketBodyFlag::SphinxPacket.set(data),
-            Self::Fragment(data) => PacketBodyFlag::Fragment.set(data),
+            Self::SphinxPacket(data) => Self::bytes_with_flag(PacketBodyFlag::SphinxPacket, data),
+            Self::Fragment(data) => Self::bytes_with_flag(PacketBodyFlag::Fragment, data),
         }
     }
 
-    pub(crate) fn from_bytes(value: &[u8]) -> Result<Self, MixnetError> {
+    fn bytes_with_flag(flag: PacketBodyFlag, mut data: Vec<u8>) -> Box<[u8]> {
+        let mut out = Vec::with_capacity(1 + data.len());
+        out.push(flag as u8);
+        out.append(&mut data);
+        out.into_boxed_slice()
+    }
+
+    pub(crate) fn from_bytes(mut value: Vec<u8>) -> Result<Self, MixnetError> {
+        if value.len() < 1 {
+            return Err(MixnetError::InvalidPacketBody);
+        }
         match PacketBodyFlag::try_from(value[0])? {
-            PacketBodyFlag::SphinxPacket => Ok(Self::SphinxPacket(value[1..].into())),
-            PacketBodyFlag::Fragment => Ok(Self::Fragment(value[1..].into())),
+            PacketBodyFlag::SphinxPacket => Ok(Self::SphinxPacket(value.split_off(1))),
+            PacketBodyFlag::Fragment => Ok(Self::Fragment(value.split_off(1))),
         }
     }
 }
@@ -42,15 +52,6 @@ impl PacketBody {
 enum PacketBodyFlag {
     SphinxPacket,
     Fragment,
-}
-
-impl PacketBodyFlag {
-    fn set(self, body: &[u8]) -> Box<[u8]> {
-        let mut out = Vec::with_capacity(1 + body.len());
-        out.push(self as u8);
-        out.extend_from_slice(body);
-        out.into_boxed_slice()
-    }
 }
 
 impl TryFrom<u8> for PacketBodyFlag {
