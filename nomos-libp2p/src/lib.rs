@@ -21,6 +21,7 @@ pub use libp2p::{
     PeerId, SwarmBuilder, Transport,
 };
 pub use libp2p_stream;
+use libp2p_stream::Control;
 pub use multiaddr::{multiaddr, Multiaddr, Protocol};
 
 /// Wraps [`libp2p::Swarm`], and config it for use within Nomos.
@@ -31,6 +32,7 @@ pub struct Swarm {
 
 #[derive(NetworkBehaviour)]
 pub struct Behaviour {
+    stream: libp2p_stream::Behaviour,
     gossipsub: gossipsub::Behaviour,
 }
 
@@ -43,7 +45,10 @@ impl Behaviour {
                 .message_id_fn(compute_message_id)
                 .build()?,
         )?;
-        Ok(Self { gossipsub })
+        Ok(Self {
+            stream: libp2p_stream::Behaviour::new(),
+            gossipsub,
+        })
     }
 }
 
@@ -140,6 +145,13 @@ impl Swarm {
         gossipsub::IdentTopic::new(topic).hash()
     }
 
+    /// Returns a stream control that can be used to accept streams and establish streams to
+    /// other peers.
+    /// Stream controls can be cloned.
+    pub fn stream_control(&self) -> Control {
+        self.swarm.behaviour().stream.new_control()
+    }
+
     pub fn multiaddr(ip: std::net::Ipv4Addr, port: u16) -> Multiaddr {
         multiaddr!(Ip4(ip), Udp(port), QuicV1)
     }
@@ -157,4 +169,69 @@ fn compute_message_id(message: &Message) -> MessageId {
     let mut hasher = Blake2b::<U32>::new();
     hasher.update(&message.data);
     MessageId::from(hasher.finalize().to_vec())
+}
+
+#[cfg(test)]
+mod tests {
+    use std::time::Duration;
+
+    use futures::{AsyncReadExt, AsyncWriteExt, StreamExt};
+    use libp2p::StreamProtocol;
+    use rand::Rng;
+
+    use crate::{Swarm, SwarmConfig};
+
+    #[tokio::test]
+    async fn stream() {
+        // Init two swarms
+        let (config1, mut swarm1) = init_swarm();
+        let (_, mut swarm2) = init_swarm();
+        let swarm1_peer_id = *swarm1.swarm().local_peer_id();
+
+        // Dial to swarm1
+        swarm2
+            .connect(Swarm::multiaddr(config1.host, config1.port))
+            .unwrap();
+
+        // Prepare stream controls
+        let mut stream_control1 = swarm1.stream_control();
+        let mut stream_control2 = swarm2.stream_control();
+
+        // Poll swarms to make progress
+        tokio::spawn(async move { while (swarm1.next().await).is_some() {} });
+        tokio::spawn(async move { while (swarm2.next().await).is_some() {} });
+
+        // Make swarm1 accept incoming streams
+        let protocol = StreamProtocol::new("/test");
+        let mut incoming_streams = stream_control1.accept(protocol).unwrap();
+        tokio::spawn(async move {
+            // If a new stream is established, write bytes and close the stream.
+            while let Some((_, mut stream)) = incoming_streams.next().await {
+                stream.write_all(&[1, 2, 3, 4]).await.unwrap();
+                stream.close().await.unwrap();
+            }
+        });
+
+        // Wait until the connection is established
+        tokio::time::sleep(Duration::from_secs(1)).await;
+
+        // Establish a stream with swarm1 and read bytes
+        let mut stream = stream_control2
+            .open_stream(swarm1_peer_id, StreamProtocol::new("/test"))
+            .await
+            .unwrap();
+        let mut buf = [0u8; 4];
+        stream.read_exact(&mut buf).await.unwrap();
+        assert_eq!(buf, [1, 2, 3, 4]);
+    }
+
+    fn init_swarm() -> (SwarmConfig, Swarm) {
+        let config = SwarmConfig {
+            host: std::net::Ipv4Addr::new(127, 0, 0, 1),
+            port: rand::thread_rng().gen_range(10000..30000),
+            ..Default::default()
+        };
+        let swarm = Swarm::build(&config).unwrap();
+        (config, swarm)
+    }
 }

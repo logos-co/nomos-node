@@ -3,12 +3,16 @@ use super::{
     libp2p::{self, swarm::SwarmHandler, Libp2pConfig, Topic},
     NetworkBackend,
 };
+use futures::StreamExt;
 use mixnet::{
     client::{MessageQueue, MixClient, MixClientConfig},
     node::{MixNode, MixNodeConfig, PacketQueue},
 };
 use nomos_core::wire;
-use nomos_libp2p::{libp2p::StreamProtocol, libp2p_stream::IncomingStreams};
+use nomos_libp2p::{
+    libp2p::{Stream, StreamProtocol},
+    libp2p_stream::IncomingStreams,
+};
 // crates
 use overwatch_rs::{overwatch::handle::OverwatchHandle, services::state::NoState};
 use serde::{Deserialize, Serialize};
@@ -140,11 +144,25 @@ impl MixnetNetworkBackend {
     }
 
     async fn handle_incoming_streams(
-        mut _incoming_streams: IncomingStreams,
-        _packet_queue: PacketQueue,
-        _runtime_handle: Handle,
+        mut incoming_streams: IncomingStreams,
+        packet_queue: PacketQueue,
+        runtime_handle: Handle,
     ) {
-        todo!()
+        while let Some((_, stream)) = incoming_streams.next().await {
+            let queue = packet_queue.clone();
+            runtime_handle.spawn(async move {
+                if let Err(e) = Self::handle_stream(stream, queue).await {
+                    tracing::warn!("stream closed: {e}");
+                }
+            });
+        }
+    }
+
+    async fn handle_stream(mut stream: Stream, packet_queue: PacketQueue) -> std::io::Result<()> {
+        loop {
+            let msg = SwarmHandler::stream_read(&mut stream).await?;
+            packet_queue.send(msg).await.unwrap();
+        }
     }
 }
 
