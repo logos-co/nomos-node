@@ -4,16 +4,12 @@ use std::{
 };
 
 use futures::{AsyncReadExt, AsyncWriteExt};
-#[allow(deprecated)]
 use nomos_libp2p::{
-    gossipsub, libp2p::swarm::ConnectionId, BehaviourEvent, Multiaddr, Swarm, SwarmEvent,
+    gossipsub,
+    libp2p::{swarm::ConnectionId, Stream, StreamProtocol},
+    libp2p_stream::{Control, IncomingStreams, OpenStreamError},
+    BehaviourEvent, Multiaddr, PeerId, Swarm, SwarmEvent,
 };
-use nomos_libp2p::{
-    libp2p::Stream,
-    libp2p_stream::{IncomingStreams, OpenStreamError},
-    PeerId,
-};
-use nomos_libp2p::{libp2p::StreamProtocol, libp2p_stream::Control};
 use tokio::sync::{broadcast, mpsc, oneshot};
 use tokio_stream::StreamExt;
 
