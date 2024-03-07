@@ -1,10 +1,14 @@
 use rand::rngs::OsRng;
 use serde::{Deserialize, Serialize};
+use sphinx_packet::crypto::{PrivateKey, PRIVATE_KEY_SIZE};
 use tokio::sync::mpsc;
 
-use crate::fragment::{Fragment, MessageReconstructor};
-use crate::packet::{Message, Packet, PacketBody};
-use crate::{crypto::PrivateKey, error::MixnetError, poisson::Poisson};
+use crate::{
+    error::MixnetError,
+    fragment::{Fragment, MessageReconstructor},
+    packet::{Message, Packet, PacketBody},
+    poisson::Poisson,
+};
 
 /// Mix node implementation that returns Sphinx packets which needs to be forwarded to next mix nodes,
 /// or messages reconstructed from Sphinx packets delivered through all mix layers.
@@ -13,7 +17,8 @@ pub struct MixNode {
 }
 
 struct MixNodeRunner {
-    config: MixNodeConfig,
+    _config: MixNodeConfig,
+    encryption_private_key: PrivateKey,
     poisson: Poisson,
     packet_queue: mpsc::Receiver<PacketBody>,
     message_reconstructor: MessageReconstructor,
@@ -24,7 +29,7 @@ struct MixNodeRunner {
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct MixNodeConfig {
     /// Private key for decrypting Sphinx packets
-    pub encryption_private_key: PrivateKey,
+    pub encryption_private_key: [u8; PRIVATE_KEY_SIZE],
     /// Poisson delay rate per minutes
     pub delay_rate_per_min: f64,
 }
@@ -39,12 +44,14 @@ impl MixNode {
     ///
     /// This returns [`MixnetError`] if the given `config` is invalid.
     pub fn new(config: MixNodeConfig) -> Result<(Self, PacketQueue), MixnetError> {
+        let encryption_private_key = PrivateKey::from(config.encryption_private_key);
         let poisson = Poisson::new(config.delay_rate_per_min)?;
         let (packet_tx, packet_rx) = mpsc::channel(PACKET_QUEUE_SIZE);
         let (output_tx, output_rx) = mpsc::unbounded_channel();
 
         MixNodeRunner {
-            config,
+            _config: config,
+            encryption_private_key,
             poisson,
             packet_queue: packet_rx,
             message_reconstructor: MessageReconstructor::new(),
@@ -85,7 +92,7 @@ impl MixNodeRunner {
     fn process_sphinx_packet(&self, packet: &[u8]) -> Result<(), MixnetError> {
         let output = Output::Forward(PacketBody::process_sphinx_packet(
             packet,
-            &self.config.encryption_private_key,
+            &self.encryption_private_key,
         )?);
         let delay = self.poisson.interval(&mut OsRng);
         let output_tx = self.output_tx.clone();

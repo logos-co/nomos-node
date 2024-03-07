@@ -1,11 +1,9 @@
 use std::{io, u8};
 
 use futures::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
-use sphinx_packet::ProcessedPacket;
+use sphinx_packet::{crypto::PrivateKey, ProcessedPacket};
 
-use crate::{
-    address::NodeAddress, crypto::PrivateKey, error::MixnetError, topology::MixnetTopology,
-};
+use crate::{address::NodeAddress, error::MixnetError, topology::MixnetTopology};
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Packet {
