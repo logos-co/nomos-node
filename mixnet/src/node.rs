@@ -3,7 +3,8 @@ use tokio::sync::mpsc;
 
 use crate::error::MixnetError;
 
-/// Mix node implementation that returns [`Output`] if exists.
+/// Mix node implementation that returns Sphinx packets which needs to be forwarded to next mix nodes,
+/// or messages reconstructed from Sphinx packets delivered through all mix layers.
 pub struct MixNode {}
 
 /// Mix node configuration
