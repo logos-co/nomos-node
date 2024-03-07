@@ -12,12 +12,6 @@ impl PrivateKey {
     }
 }
 
-impl Clone for PrivateKey {
-    fn clone(&self) -> Self {
-        Self(sphinx_packet::crypto::PrivateKey::from(self.0.to_bytes()))
-    }
-}
-
 impl Debug for PrivateKey {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_tuple("PrivateKey").finish()
