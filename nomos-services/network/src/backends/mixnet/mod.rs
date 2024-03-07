@@ -10,10 +10,10 @@ use mixnet::{
     address::NodeAddress,
     client::{MessageQueue, MixClient, MixClientConfig},
     node::{MixNode, MixNodeConfig, Output, PacketQueue},
+    packet::PacketBody,
 };
 use nomos_core::wire;
 use nomos_libp2p::{
-    gossipsub,
     libp2p::{Stream, StreamProtocol},
     libp2p_stream::IncomingStreams,
     Multiaddr, Protocol,
@@ -29,7 +29,7 @@ use tokio::{
 /// A Mixnet network backend broadcasts messages to the network with mixing packets through mixnet,
 /// and receives messages broadcasted from the network.
 pub struct MixnetNetworkBackend {
-    events_tx: broadcast::Sender<NetworkEvent>,
+    libp2p_events_tx: broadcast::Sender<libp2p::Event>,
     libp2p_commands_tx: mpsc::Sender<libp2p::Command>,
 
     mixclient_message_queue: MessageQueue,
@@ -42,17 +42,6 @@ pub struct MixnetConfig {
     mixnode_config: MixNodeConfig,
 }
 
-#[derive(Debug)]
-pub enum EventKind {
-    MessageReceived,
-}
-
-#[derive(Debug, Clone)]
-pub enum NetworkEvent {
-    /// Received a message broadcasted
-    MessageReceived(gossipsub::Message),
-}
-
 const BUFFER_SIZE: usize = 64;
 const STREAM_PROTOCOL: StreamProtocol = StreamProtocol::new("/mixnet");
 
@@ -61,8 +50,8 @@ impl NetworkBackend for MixnetNetworkBackend {
     type Settings = MixnetConfig;
     type State = NoState<MixnetConfig>;
     type Message = libp2p::Command;
-    type EventKind = EventKind;
-    type NetworkEvent = NetworkEvent;
+    type EventKind = libp2p::EventKind;
+    type NetworkEvent = libp2p::Event;
 
     fn new(config: Self::Settings, overwatch_handle: OverwatchHandle) -> Self {
         // TODO: One important task that should be spawned is
@@ -73,8 +62,7 @@ impl NetworkBackend for MixnetNetworkBackend {
         // that we're going to define at the root of the project.
 
         let (libp2p_commands_tx, libp2p_commands_rx) = tokio::sync::mpsc::channel(BUFFER_SIZE);
-        let (libp2p_events_tx, libp2p_events_rx) = tokio::sync::broadcast::channel(BUFFER_SIZE);
-        let (events_tx, _) = tokio::sync::broadcast::channel(BUFFER_SIZE);
+        let (libp2p_events_tx, _) = tokio::sync::broadcast::channel(BUFFER_SIZE);
 
         let mut swarm_handler = SwarmHandler::new(
             &config.libp2p_config,
@@ -104,19 +92,13 @@ impl NetworkBackend for MixnetNetworkBackend {
             Self::run_mixclient(mixclient, packet_queue, libp2p_cmd_tx).await;
         });
 
-        // Run event pipeline
-        let evt_tx = events_tx.clone();
-        overwatch_handle.runtime().spawn(async move {
-            Self::pipe_events(libp2p_events_rx, evt_tx).await;
-        });
-
         // Run libp2p swarm to make progress
         overwatch_handle.runtime().spawn(async move {
             swarm_handler.run(config.libp2p_config.initial_peers).await;
         });
 
         Self {
-            events_tx,
+            libp2p_events_tx,
             libp2p_commands_tx,
 
             mixclient_message_queue: message_queue,
@@ -144,7 +126,7 @@ impl NetworkBackend for MixnetNetworkBackend {
         kind: Self::EventKind,
     ) -> broadcast::Receiver<Self::NetworkEvent> {
         match kind {
-            EventKind::MessageReceived => self.events_tx.subscribe(),
+            libp2p::EventKind::Message => self.libp2p_events_tx.subscribe(),
         }
     }
 }
@@ -219,47 +201,58 @@ impl MixnetNetworkBackend {
 
     async fn handle_stream(mut stream: Stream, packet_queue: PacketQueue) -> std::io::Result<()> {
         loop {
-            let msg = SwarmHandler::stream_read(&mut stream).await?;
-            packet_queue.send(msg).await.unwrap();
+            match PacketBody::read_from(&mut stream).await? {
+                Ok(packet_body) => {
+                    packet_queue
+                        .send(packet_body)
+                        .await
+                        .expect("The receiving half of packet queue should be always open");
+                }
+                Err(e) => {
+                    tracing::error!(
+                        "failed to parse packet body. continuing reading the next packet: {e}"
+                    );
+                }
+            }
         }
     }
 
     async fn stream_send(
         addr: NodeAddress,
-        data: Box<[u8]>,
+        packet_body: PacketBody,
         swarm_commands_tx: &mpsc::Sender<libp2p::Command>,
         packet_queue: &PacketQueue,
     ) {
-        let addr = Self::multiaddr_from(addr);
         let (tx, rx) = oneshot::channel();
         swarm_commands_tx
             .send(libp2p::Command::Connect(libp2p::Dial {
-                addr: addr.clone(),
+                addr: Self::multiaddr_from(addr),
                 retry_count: 3,
                 result_sender: tx,
             }))
             .await
-            .unwrap();
+            .expect("Command receiver should be always open");
 
         match rx.await {
-            Ok(result) => match result {
-                Ok(peer_id) => {
-                    swarm_commands_tx
-                        .send(libp2p::Command::StreamSend {
-                            peer_id,
-                            protocol: STREAM_PROTOCOL,
-                            message: data,
-                        })
+            Ok(Ok(peer_id)) => {
+                swarm_commands_tx
+                    .send(libp2p::Command::StreamSend {
+                        peer_id,
+                        protocol: STREAM_PROTOCOL,
+                        packet_body,
+                    })
+                    .await
+                    .expect("Command receiver should be always open");
+            }
+            Ok(Err(e)) => match e {
+                nomos_libp2p::DialError::NoAddresses => {
+                    tracing::debug!("Dialing failed because the peer is the local node. Sending msg directly to the queue");
+                    packet_queue
+                        .send(packet_body)
                         .await
-                        .unwrap();
+                        .expect("The receiving half of packet queue should be always open");
                 }
-                Err(e) => match e {
-                    nomos_libp2p::DialError::NoAddresses => {
-                        tracing::debug!("Dialing failed because the peer is the local node. Sending msg directly to the queue");
-                        packet_queue.send(data).await.unwrap();
-                    }
-                    _ => tracing::error!("failed to dial with unrecoverable error: {e}"),
-                },
+                _ => tracing::error!("failed to dial with unrecoverable error: {e}"),
             },
             Err(e) => {
                 tracing::error!("channel closed before receiving: {e}");
@@ -277,27 +270,6 @@ impl MixnetNetworkBackend {
                 .with(Protocol::Ip6(*addr.ip()))
                 .with(Protocol::Udp(addr.port()))
                 .with(Protocol::QuicV1),
-        }
-    }
-
-    /// Forwards events from libp2p swarm to the user of the [`MixnetNetworkBackend`].
-    async fn pipe_events(
-        mut libp2p_events_rx: broadcast::Receiver<libp2p::Event>,
-        events_tx: broadcast::Sender<NetworkEvent>,
-    ) {
-        loop {
-            match libp2p_events_rx.recv().await {
-                Ok(event) => match event {
-                    libp2p::Event::Message(msg) => {
-                        if let Err(e) = events_tx.send(NetworkEvent::MessageReceived(msg)) {
-                            tracing::error!("failed to send NetworkEvent to channel: {e}");
-                        }
-                    }
-                },
-                Err(e) => {
-                    tracing::error!("failed to receive event from libp2p swarm: {e}");
-                }
-            }
         }
     }
 }

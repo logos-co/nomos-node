@@ -6,7 +6,8 @@ use crate::fragment::{Fragment, MessageReconstructor};
 use crate::packet::{Message, Packet, PacketBody};
 use crate::{crypto::PrivateKey, error::MixnetError, poisson::Poisson};
 
-/// Mix node implementation that returns [`Output`] if exists.
+/// Mix node implementation that returns Sphinx packets which needs to be forwarded to next mix nodes,
+/// or messages reconstructed from Sphinx packets delivered through all mix layers.
 pub struct MixNode {
     output_rx: mpsc::UnboundedReceiver<Output>,
 }
@@ -14,7 +15,7 @@ pub struct MixNode {
 struct MixNodeRunner {
     config: MixNodeConfig,
     poisson: Poisson,
-    packet_queue: mpsc::Receiver<Box<[u8]>>,
+    packet_queue: mpsc::Receiver<PacketBody>,
     message_reconstructor: MessageReconstructor,
     output_tx: mpsc::UnboundedSender<Output>,
 }
@@ -31,7 +32,7 @@ pub struct MixNodeConfig {
 const PACKET_QUEUE_SIZE: usize = 256;
 
 /// Queue for sending packets to [`MixNode`]
-pub type PacketQueue = mpsc::Sender<Box<[u8]>>;
+pub type PacketQueue = mpsc::Sender<PacketBody>;
 
 impl MixNode {
     /// Creates a [`MixNode`] and a [`PacketQueue`].
@@ -65,7 +66,7 @@ impl MixNodeRunner {
         tokio::spawn(async move {
             loop {
                 if let Some(packet) = self.packet_queue.recv().await {
-                    if let Err(e) = self.process_packet(packet.as_ref()) {
+                    if let Err(e) = self.process_packet(packet) {
                         tracing::error!("failed to process packet. skipping it: {e}");
                     }
                 }
@@ -73,8 +74,8 @@ impl MixNodeRunner {
         });
     }
 
-    fn process_packet(&mut self, packet: &[u8]) -> Result<(), MixnetError> {
-        match PacketBody::from_bytes(packet)? {
+    fn process_packet(&mut self, packet: PacketBody) -> Result<(), MixnetError> {
+        match packet {
             PacketBody::SphinxPacket(packet) => self.process_sphinx_packet(packet.as_ref())?,
             PacketBody::Fragment(fragment) => self.process_fragment(fragment.as_ref())?,
         }
@@ -103,7 +104,7 @@ impl MixNodeRunner {
         {
             match Message::from_bytes(&msg)? {
                 Message::Real(msg) => {
-                    let output = Output::ReconstructedMessage(msg.to_vec().into_boxed_slice());
+                    let output = Output::ReconstructedMessage(msg);
                     // output_tx is always expected to be not closed/dropped.
                     self.output_tx.send(output).unwrap();
                 }

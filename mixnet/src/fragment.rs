@@ -4,7 +4,7 @@ use crate::error::MixnetError;
 pub(crate) struct Fragment {}
 
 impl Fragment {
-    pub(crate) fn from_bytes(value: &[u8]) -> Result<Self, MixnetError> {
+    pub(crate) fn from_bytes(_value: &[u8]) -> Result<Self, MixnetError> {
         todo!()
     }
 }
@@ -16,7 +16,7 @@ impl MessageReconstructor {
         todo!()
     }
 
-    pub fn add(&mut self, fragment: Fragment) -> Option<Vec<u8>> {
+    pub fn add(&mut self, _fragment: Fragment) -> Option<Vec<u8>> {
         todo!()
     }
 }

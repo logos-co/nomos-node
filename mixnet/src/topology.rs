@@ -16,16 +16,18 @@ impl MixnetTopology {
     /// # Errors
     ///
     /// This function will return an error if parameters are invalid.
+    #[allow(dead_code)]
     pub fn new(
-        mut mixnode_candidates: Vec<MixNodeInfo>,
-        num_layers: usize,
-        num_mixnodes_per_layer: usize,
-        entropy: [u8; 32],
+        mut _mixnode_candidates: Vec<MixNodeInfo>,
+        _num_layers: usize,
+        _num_mixnodes_per_layer: usize,
+        _entropy: [u8; 32],
     ) -> Result<Self, MixnetError> {
         todo!()
     }
 
     /// Selects a mix destination randomly from the last mix layer
+    #[allow(dead_code)]
     pub(crate) fn choose_destination(&self) -> sphinx_packet::route::Destination {
         todo!()
     }
@@ -34,6 +36,7 @@ impl MixnetTopology {
     /// and append a mix destination to the end of the mix route.
     ///
     /// That is, the caller can generate multiple routes with one mix destination.
+    #[allow(dead_code)]
     pub(crate) fn gen_route(&self) -> Vec<sphinx_packet::route::Node> {
         todo!()
     }

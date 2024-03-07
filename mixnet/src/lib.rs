@@ -13,7 +13,7 @@ pub mod error;
 mod fragment;
 /// Mix node
 pub mod node;
-mod packet;
+pub mod packet;
 mod poisson;
 /// Mixnet topology
 pub mod topology;

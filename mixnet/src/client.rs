@@ -1,4 +1,4 @@
-use std::collections::VecDeque;
+use std::{collections::VecDeque, num::NonZeroU8};
 
 use rand::rngs::OsRng;
 use serde::{Deserialize, Serialize};
@@ -6,7 +6,11 @@ use tokio::sync::mpsc;
 
 use crate::{error::MixnetError, packet::Packet, poisson::Poisson, topology::MixnetTopology};
 
-/// Mix client implementation that returns packets in Poisson intervals
+/// Mix client implementation that is used to schedule messages to be sent to the mixnet.
+/// Messages inserted to the [`MessageQueue`] are scheduled according to the Poisson interals
+/// and returns from [`MixClient.next()`] when it is ready to be sent to the mixnet.
+/// If there is no messages inserted to the [`MessageQueue`], cover packets are generated and
+/// returned from [`MixClient.next()`].
 pub struct MixClient {
     packet_rx: mpsc::UnboundedReceiver<Packet>,
 }
@@ -27,7 +31,7 @@ pub struct MixClientConfig {
     /// Poisson rate for packet emissions (per minute)
     pub emission_rate_per_min: f64,
     /// Packet redundancy for passive retransmission
-    pub redundancy: u8,
+    pub redundancy: NonZeroU8,
 }
 
 const MESSAGE_QUEUE_SIZE: usize = 256;
@@ -94,17 +98,19 @@ impl MixClientRunner {
         match self.message_queue.try_recv() {
             Ok(msg) => {
                 for packet in Packet::build_real(&msg, &self.config.topology)? {
-                    for _ in 0..self.config.redundancy {
+                    for _ in 0..self.config.redundancy.get() {
                         self.real_packet_queue.push_back(packet.clone());
                     }
                 }
-                Ok(self.real_packet_queue.pop_front().unwrap())
+                Ok(self
+                    .real_packet_queue
+                    .pop_front()
+                    .expect("real packet queue should not be empty"))
             }
             Err(_) => {
                 let mut packets =
                     Packet::build_drop_cover("drop cover".as_ref(), &self.config.topology)?;
-                assert_eq!(1, packets.len()); // since the cover msg is short
-                Ok(packets.pop().unwrap())
+                Ok(packets.pop().expect("drop cover should not be empty"))
             }
         }
     }
