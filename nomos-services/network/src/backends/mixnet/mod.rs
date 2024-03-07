@@ -10,6 +10,7 @@ use mixnet::{
     address::NodeAddress,
     client::{MessageQueue, MixClient, MixClientConfig},
     node::{MixNode, MixNodeConfig, PacketQueue},
+    packet::PacketBody,
 };
 use nomos_core::wire;
 use nomos_libp2p::{
@@ -191,17 +192,25 @@ impl MixnetNetworkBackend {
 
     async fn handle_stream(mut stream: Stream, packet_queue: PacketQueue) -> std::io::Result<()> {
         loop {
-            let msg = SwarmHandler::stream_read(&mut stream).await?;
-            packet_queue
-                .send(msg)
-                .await
-                .expect("The receiving half of packet queue should be always open");
+            match PacketBody::read_from(&mut stream).await? {
+                Ok(packet_body) => {
+                    packet_queue
+                        .send(packet_body)
+                        .await
+                        .expect("The receiving half of packet queue should be always open");
+                }
+                Err(e) => {
+                    tracing::error!(
+                        "failed to parse packet body. continuing reading the next packet: {e}"
+                    );
+                }
+            }
         }
     }
 
     async fn stream_send(
         addr: NodeAddress,
-        data: Box<[u8]>,
+        packet_body: PacketBody,
         swarm_commands_tx: &mpsc::Sender<libp2p::Command>,
         packet_queue: &PacketQueue,
     ) {
@@ -221,7 +230,7 @@ impl MixnetNetworkBackend {
                     .send(libp2p::Command::StreamSend {
                         peer_id,
                         protocol: STREAM_PROTOCOL,
-                        message: data,
+                        packet_body,
                     })
                     .await
                     .expect("Command receiver should be always open");
@@ -230,7 +239,7 @@ impl MixnetNetworkBackend {
                 nomos_libp2p::DialError::NoAddresses => {
                     tracing::debug!("Dialing failed because the peer is the local node. Sending msg directly to the queue");
                     packet_queue
-                        .send(data)
+                        .send(packet_body)
                         .await
                         .expect("The receiving half of packet queue should be always open");
                 }
