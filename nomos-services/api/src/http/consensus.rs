@@ -27,9 +27,13 @@ use nomos_storage::backends::{sled::SledBackend, StorageSerde};
 
 pub type Carnot<Tx, SS, const SIZE: usize> = CarnotConsensus<
     ConsensusLibp2pAdapter,
-    MockPool<Tx, <Tx as Transaction>::Hash>,
+    MockPool<BlockId, Tx, <Tx as Transaction>::Hash>,
     MempoolLibp2pAdapter<Tx, <Tx as Transaction>::Hash>,
-    MockPool<Certificate, <<Certificate as certificate::Certificate>::Blob as blob::Blob>::Hash>,
+    MockPool<
+        BlockId,
+        Certificate,
+        <<Certificate as certificate::Certificate>::Blob as blob::Blob>::Hash,
+    >,
     MempoolLibp2pAdapter<
         Certificate,
         <<Certificate as certificate::Certificate>::Blob as blob::Blob>::Hash,
