@@ -122,7 +122,7 @@ impl MixClientRunner {
 
 #[cfg(test)]
 mod tests {
-    use std::time::Instant;
+    use std::{num::NonZeroU8, time::Instant};
 
     use crate::{
         client::MixClientConfig,
@@ -140,7 +140,7 @@ mod tests {
         let (mut client, _) = MixClient::new(MixClientConfig {
             topology: MixnetTopology::new(gen_mixnodes(10), 3, 2, gen_entropy()).unwrap(),
             emission_rate_per_min,
-            redundancy: 3,
+            redundancy: NonZeroU8::new(3).unwrap(),
         })
         .unwrap();
 
@@ -166,7 +166,7 @@ mod tests {
         let (mut client, msg_queue) = MixClient::new(MixClientConfig {
             topology: MixnetTopology::new(gen_mixnodes(10), 3, 2, gen_entropy()).unwrap(),
             emission_rate_per_min: 360.0,
-            redundancy: 3,
+            redundancy: NonZeroU8::new(3).unwrap(),
         })
         .unwrap();
 
