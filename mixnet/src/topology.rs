@@ -25,10 +25,10 @@ impl MixnetTopology {
     /// This function will return an error if parameters are invalid.
     #[allow(dead_code)]
     pub fn new(
-        mut _mixnode_candidates: Vec<MixNodeInfo>,
-        _num_layers: usize,
-        _num_mixnodes_per_layer: usize,
-        _entropy: [u8; 32],
+        mut mixnode_candidates: Vec<MixNodeInfo>,
+        num_layers: usize,
+        num_mixnodes_per_layer: usize,
+        entropy: [u8; 32],
     ) -> Result<Self, MixnetError> {
         if mixnode_candidates.len() < num_layers * num_mixnodes_per_layer {
             return Err(MixnetError::InvalidTopologySize);
@@ -124,7 +124,7 @@ impl<'de> Deserialize<'de> for MixNodeInfo {
 #[derive(Serialize, Deserialize, Clone, Debug)]
 struct SerializableMixNodeInfo {
     address: NodeAddress,
-    public_key: PublicKey,
+    public_key: [u8; PUBLIC_KEY_SIZE],
 }
 
 impl TryFrom<&MixNodeInfo> for SerializableMixNodeInfo {
@@ -133,7 +133,7 @@ impl TryFrom<&MixNodeInfo> for SerializableMixNodeInfo {
     fn try_from(info: &MixNodeInfo) -> Result<Self, Self::Error> {
         Ok(Self {
             address: NodeAddress::try_from(info.0.address)?,
-            public_key: PublicKey::from(info.0.pub_key),
+            public_key: *info.0.pub_key.as_bytes(),
         })
     }
 }
@@ -151,11 +151,9 @@ pub mod tests {
     use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
     use rand::RngCore;
+    use sphinx_packet::crypto::{PrivateKey, PublicKey};
 
-    use crate::{
-        crypto::{PrivateKey, PublicKey},
-        error::MixnetError,
-    };
+    use crate::error::MixnetError;
 
     use super::{MixNodeInfo, MixnetTopology};
 
@@ -188,7 +186,7 @@ pub mod tests {
             .map(|i| {
                 MixNodeInfo::new(
                     SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), i as u16).into(),
-                    PublicKey::from(&PrivateKey::new()),
+                    *PublicKey::from(&PrivateKey::new()).as_bytes(),
                 )
                 .unwrap()
             })
