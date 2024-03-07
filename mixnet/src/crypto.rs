@@ -1,7 +1,5 @@
 use std::{fmt::Debug, ops::Deref};
 
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
-
 /// Private key for decrypting Sphinx packets.
 ///
 /// The key type is basically X25519, but with small modifications: https://github.com/nymtech/sphinx/blob/ca107d94360cdf8bbfbdb12fe5320ed74f80e40c/src/crypto/keys.rs#L15

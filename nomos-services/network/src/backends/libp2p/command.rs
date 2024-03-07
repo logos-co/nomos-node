@@ -1,3 +1,4 @@
+use mixnet::packet::PacketBody;
 use nomos_libp2p::{libp2p::StreamProtocol, Multiaddr, PeerId};
 use serde::{Deserialize, Serialize};
 use tokio::sync::oneshot;
@@ -24,7 +25,7 @@ pub enum Command {
     StreamSend {
         peer_id: PeerId,
         protocol: StreamProtocol,
-        message: Box<[u8]>,
+        packet_body: PacketBody,
     },
 }
 

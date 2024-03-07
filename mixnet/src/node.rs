@@ -1,9 +1,10 @@
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
 
-use crate::{error::MixnetError, packet::Packet};
+use crate::{error::MixnetError, packet::Packet, packet::PacketBody};
 
-/// Mix node implementation that returns [`Output`] if exists.
+/// Mix node implementation that returns Sphinx packets which needs to be forwarded to next mix nodes,
+/// or messages reconstructed from Sphinx packets delivered through all mix layers.
 pub struct MixNode {}
 
 /// Mix node configuration
@@ -11,7 +12,7 @@ pub struct MixNode {}
 pub struct MixNodeConfig {}
 
 /// Queue for sending packets to [`MixNode`]
-pub type PacketQueue = mpsc::Sender<Box<[u8]>>;
+pub type PacketQueue = mpsc::Sender<PacketBody>;
 
 impl MixNode {
     pub fn new(_: MixNodeConfig) -> Result<(Self, PacketQueue), MixnetError> {
