@@ -1,3 +1,7 @@
+use std::io;
+
+use futures::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
+
 use crate::{address::NodeAddress, error::MixnetError};
 
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -11,29 +15,53 @@ impl Packet {
         self.address
     }
 
-    pub fn body(&self) -> Box<[u8]> {
-        self.body.bytes()
+    pub fn body(self) -> PacketBody {
+        self.body
     }
 }
 
 #[derive(Clone, PartialEq, Eq, Debug)]
-pub(crate) enum PacketBody {
-    SphinxPacket(Box<[u8]>),
-    Fragment(Box<[u8]>),
+pub enum PacketBody {
+    SphinxPacket(Vec<u8>),
+    Fragment(Vec<u8>),
 }
 
 impl PacketBody {
-    pub(crate) fn bytes(&self) -> Box<[u8]> {
+    pub async fn write_to<W: AsyncWrite + Unpin + ?Sized>(&self, writer: &mut W) -> io::Result<()> {
         match self {
-            Self::SphinxPacket(data) => PacketBodyFlag::SphinxPacket.set(data),
-            Self::Fragment(data) => PacketBodyFlag::Fragment.set(data),
+            Self::SphinxPacket(data) => {
+                Self::write(writer, PacketBodyFlag::SphinxPacket, data).await
+            }
+            Self::Fragment(data) => Self::write(writer, PacketBodyFlag::Fragment, data).await,
         }
     }
+    async fn write<W: AsyncWrite + Unpin + ?Sized>(
+        writer: &mut W,
+        flag: PacketBodyFlag,
+        data: &[u8],
+    ) -> io::Result<()> {
+        writer.write_all(&[flag as u8]).await?;
+        writer.write_all(&data.len().to_le_bytes()).await?;
+        writer.write_all(data).await?;
+        Ok(())
+    }
 
-    pub(crate) fn from_bytes(value: &[u8]) -> Result<Self, MixnetError> {
-        match PacketBodyFlag::try_from(value[0])? {
-            PacketBodyFlag::SphinxPacket => Ok(Self::SphinxPacket(value[1..].into())),
-            PacketBodyFlag::Fragment => Ok(Self::Fragment(value[1..].into())),
+    pub async fn read_from<R: AsyncRead + Unpin>(
+        reader: &mut R,
+    ) -> io::Result<Result<Self, MixnetError>> {
+        let mut flag = [0u8; 1];
+        reader.read_exact(&mut flag).await?;
+
+        let mut size = [0u8; std::mem::size_of::<usize>()];
+        reader.read_exact(&mut size).await?;
+
+        let mut data = vec![0u8; usize::from_le_bytes(size)];
+        reader.read_exact(&mut data).await?;
+
+        match PacketBodyFlag::try_from(flag[0]) {
+            Ok(PacketBodyFlag::SphinxPacket) => Ok(Ok(PacketBody::SphinxPacket(data))),
+            Ok(PacketBodyFlag::Fragment) => Ok(Ok(PacketBody::Fragment(data))),
+            Err(e) => Ok(Err(e)),
         }
     }
 }
@@ -42,15 +70,6 @@ impl PacketBody {
 enum PacketBodyFlag {
     SphinxPacket,
     Fragment,
-}
-
-impl PacketBodyFlag {
-    fn set(self, body: &[u8]) -> Box<[u8]> {
-        let mut out = Vec::with_capacity(1 + body.len());
-        out.push(self as u8);
-        out.extend_from_slice(body);
-        out.into_boxed_slice()
-    }
 }
 
 impl TryFrom<u8> for PacketBodyFlag {
