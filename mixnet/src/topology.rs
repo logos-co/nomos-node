@@ -103,7 +103,7 @@ impl Serialize for MixNodeInfo {
         S: Serializer,
     {
         SerializableMixNodeInfo::try_from(self)
-            .unwrap()
+            .map_err(serde::ser::Error::custom)?
             .serialize(serializer)
     }
 }
@@ -113,7 +113,8 @@ impl<'de> Deserialize<'de> for MixNodeInfo {
     where
         D: Deserializer<'de>,
     {
-        Ok(Self::try_from(SerializableMixNodeInfo::deserialize(deserializer)?).unwrap())
+        Self::try_from(SerializableMixNodeInfo::deserialize(deserializer)?)
+            .map_err(serde::de::Error::custom)
     }
 }
 
