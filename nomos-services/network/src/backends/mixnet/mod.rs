@@ -192,7 +192,10 @@ impl MixnetNetworkBackend {
     async fn handle_stream(mut stream: Stream, packet_queue: PacketQueue) -> std::io::Result<()> {
         loop {
             let msg = SwarmHandler::stream_read(&mut stream).await?;
-            packet_queue.send(msg).await.unwrap();
+            packet_queue
+                .send(msg)
+                .await
+                .expect("The receiving half of packet queue should be always open");
         }
     }
 
@@ -210,7 +213,7 @@ impl MixnetNetworkBackend {
                 result_sender: tx,
             }))
             .await
-            .unwrap();
+            .expect("Command receiver should be always open");
 
         match rx.await {
             Ok(Ok(peer_id)) => {
@@ -221,12 +224,15 @@ impl MixnetNetworkBackend {
                         message: data,
                     })
                     .await
-                    .unwrap();
+                    .expect("Command receiver should be always open");
             }
             Ok(Err(e)) => match e {
                 nomos_libp2p::DialError::NoAddresses => {
                     tracing::debug!("Dialing failed because the peer is the local node. Sending msg directly to the queue");
-                    packet_queue.send(data).await.unwrap();
+                    packet_queue
+                        .send(data)
+                        .await
+                        .expect("The receiving half of packet queue should be always open");
                 }
                 _ => tracing::error!("failed to dial with unrecoverable error: {e}"),
             },
