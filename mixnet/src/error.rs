@@ -16,6 +16,9 @@ pub enum MixnetError {
     /// Message too long
     #[error("message too long: {0} bytes")]
     MessageTooLong(usize),
+    /// Invalid message
+    #[error("invalid message")]
+    InvalidMessage,
     /// Node address error
     #[error("node address error: {0}")]
     NodeAddressError(#[from] nym_sphinx_addressing::nodes::NymNodeRoutingAddressError),

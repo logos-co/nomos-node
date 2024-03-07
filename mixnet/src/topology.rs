@@ -3,10 +3,11 @@ use rand::Rng;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use sphinx_packet::{
     constants::IDENTIFIER_LENGTH,
+    crypto::{PublicKey, PUBLIC_KEY_SIZE},
     route::{DestinationAddressBytes, SURBIdentifier},
 };
 
-use crate::{address::NodeAddress, crypto::PublicKey, error::MixnetError};
+use crate::{address::NodeAddress, error::MixnetError};
 
 /// Defines Mixnet topology construction and route selection
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -68,10 +69,13 @@ pub struct MixNodeInfo(sphinx_packet::route::Node);
 
 impl MixNodeInfo {
     /// Creates a [`MixNodeInfo`].
-    pub fn new(address: NodeAddress, public_key: PublicKey) -> Result<Self, MixnetError> {
+    pub fn new(
+        address: NodeAddress,
+        public_key: [u8; PUBLIC_KEY_SIZE],
+    ) -> Result<Self, MixnetError> {
         Ok(Self(sphinx_packet::route::Node::new(
             address.try_into()?,
-            *public_key,
+            PublicKey::from(public_key),
         )))
     }
 }
@@ -99,7 +103,7 @@ impl Serialize for MixNodeInfo {
         S: Serializer,
     {
         SerializableMixNodeInfo::try_from(self)
-            .unwrap()
+            .map_err(serde::ser::Error::custom)?
             .serialize(serializer)
     }
 }
@@ -109,7 +113,8 @@ impl<'de> Deserialize<'de> for MixNodeInfo {
     where
         D: Deserializer<'de>,
     {
-        Ok(Self::try_from(SerializableMixNodeInfo::deserialize(deserializer)?).unwrap())
+        Self::try_from(SerializableMixNodeInfo::deserialize(deserializer)?)
+            .map_err(serde::de::Error::custom)
     }
 }
 
@@ -117,7 +122,7 @@ impl<'de> Deserialize<'de> for MixNodeInfo {
 #[derive(Serialize, Deserialize, Clone, Debug)]
 struct SerializableMixNodeInfo {
     address: NodeAddress,
-    public_key: PublicKey,
+    public_key: [u8; PUBLIC_KEY_SIZE],
 }
 
 impl TryFrom<&MixNodeInfo> for SerializableMixNodeInfo {
@@ -126,7 +131,7 @@ impl TryFrom<&MixNodeInfo> for SerializableMixNodeInfo {
     fn try_from(info: &MixNodeInfo) -> Result<Self, Self::Error> {
         Ok(Self {
             address: NodeAddress::try_from(info.0.address)?,
-            public_key: PublicKey::from(info.0.pub_key),
+            public_key: *info.0.pub_key.as_bytes(),
         })
     }
 }
@@ -144,11 +149,9 @@ pub mod tests {
     use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
     use rand::RngCore;
+    use sphinx_packet::crypto::{PrivateKey, PublicKey};
 
-    use crate::{
-        crypto::{PrivateKey, PublicKey},
-        error::MixnetError,
-    };
+    use crate::error::MixnetError;
 
     use super::{MixNodeInfo, MixnetTopology};
 
@@ -181,7 +184,7 @@ pub mod tests {
             .map(|i| {
                 MixNodeInfo::new(
                     SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), i as u16).into(),
-                    PublicKey::from(&PrivateKey::new()),
+                    *PublicKey::from(&PrivateKey::new()).as_bytes(),
                 )
                 .unwrap()
             })
