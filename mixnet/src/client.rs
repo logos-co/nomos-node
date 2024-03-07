@@ -1,4 +1,4 @@
-use std::collections::VecDeque;
+use std::{collections::VecDeque, num::NonZeroU8};
 
 use rand::rngs::OsRng;
 use serde::{Deserialize, Serialize};
@@ -31,7 +31,7 @@ pub struct MixClientConfig {
     /// Poisson rate for packet emissions (per minute)
     pub emission_rate_per_min: f64,
     /// Packet redundancy for passive retransmission
-    pub redundancy: u8,
+    pub redundancy: NonZeroU8,
 }
 
 const MESSAGE_QUEUE_SIZE: usize = 256;
@@ -98,17 +98,19 @@ impl MixClientRunner {
         match self.message_queue.try_recv() {
             Ok(msg) => {
                 for packet in Packet::build_real(&msg, &self.config.topology)? {
-                    for _ in 0..self.config.redundancy {
+                    for _ in 0..self.config.redundancy.get() {
                         self.real_packet_queue.push_back(packet.clone());
                     }
                 }
-                Ok(self.real_packet_queue.pop_front().unwrap())
+                Ok(self
+                    .real_packet_queue
+                    .pop_front()
+                    .expect("real packet queue should not be empty"))
             }
             Err(_) => {
                 let mut packets =
                     Packet::build_drop_cover("drop cover".as_ref(), &self.config.topology)?;
-                assert_eq!(1, packets.len()); // since the cover msg is short
-                Ok(packets.pop().unwrap())
+                Ok(packets.pop().expect("drop cover should not be empty"))
             }
         }
     }
