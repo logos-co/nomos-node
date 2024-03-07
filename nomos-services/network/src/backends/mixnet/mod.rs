@@ -202,11 +202,10 @@ impl MixnetNetworkBackend {
         swarm_commands_tx: &mpsc::Sender<libp2p::Command>,
         packet_queue: &PacketQueue,
     ) {
-        let addr = Self::multiaddr_from(addr);
         let (tx, rx) = oneshot::channel();
         swarm_commands_tx
             .send(libp2p::Command::Connect(libp2p::Dial {
-                addr: addr.clone(),
+                addr: Self::multiaddr_from(addr),
                 retry_count: 3,
                 result_sender: tx,
             }))
