@@ -107,7 +107,7 @@ impl MixNodeRunner {
     fn process_fragment(&mut self, fragment: &[u8]) -> Result<(), MixnetError> {
         if let Some(msg) = self
             .message_reconstructor
-            .add(Fragment::from_bytes(fragment)?)
+            .add_and_reconstruct(Fragment::from_bytes(fragment)?)
         {
             match Message::from_bytes(&msg)? {
                 Message::Real(msg) => {

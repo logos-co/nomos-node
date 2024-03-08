@@ -144,7 +144,9 @@ impl MessageReconstructor {
         }
     }
 
-    pub fn add(&mut self, fragment: Fragment) -> Option<Vec<u8>> {
+    /// Adds a fragment to the reconstructor and tries to reconstruct a message from the fragment set.
+    /// This returns `None` if the message has not been reconstructed yet.
+    pub fn add_and_reconstruct(&mut self, fragment: Fragment) -> Option<Vec<u8>> {
         let set_id = fragment.header.set_id;
         let reconstructed_msg = self
             .fragment_sets
@@ -152,7 +154,8 @@ impl MessageReconstructor {
             .or_insert(FragmentSetReconstructor::new(
                 fragment.header.last_fragment_id,
             ))
-            .add(fragment)?;
+            .add(fragment)
+            .try_reconstruct_message()?;
         // A message has been reconstructed completely from the fragment set.
         // Delete the fragment set from the reconstructor.
         self.fragment_sets.remove(&set_id);
@@ -177,19 +180,18 @@ impl FragmentSetReconstructor {
         }
     }
 
-    fn add(&mut self, fragment: Fragment) -> Option<Vec<u8>> {
+    fn add(&mut self, fragment: Fragment) -> &mut Self {
         self.message_size += fragment.body.len();
         if let Some(old_fragment) = self.fragments.insert(fragment.header.fragment_id, fragment) {
             // In the case when a new fragment replaces the old one, adjust the `meesage_size`.
             // e.g. The same fragment has been received multiple times.
             self.message_size -= old_fragment.body.len();
         }
-
-        self.try_build_message()
+        self
     }
 
     /// Merges all fragments gathered if possible
-    fn try_build_message(&self) -> Option<Vec<u8>> {
+    fn try_reconstruct_message(&self) -> Option<Vec<u8>> {
         if self.fragments.len() - 1 == self.last_fragment_id.into() {
             let mut msg = Vec::with_capacity(self.message_size);
             for id in 0..=self.last_fragment_id.0 {
@@ -268,10 +270,13 @@ mod tests {
 
         let mut reconstructor = MessageReconstructor::new();
         let mut fragments = set.as_ref().iter();
-        assert_eq!(None, reconstructor.add(fragments.next().unwrap().clone()));
+        assert_eq!(
+            None,
+            reconstructor.add_and_reconstruct(fragments.next().unwrap().clone())
+        );
         assert_eq!(
             Some(msg),
-            reconstructor.add(fragments.next().unwrap().clone())
+            reconstructor.add_and_reconstruct(fragments.next().unwrap().clone())
         );
     }
 }
