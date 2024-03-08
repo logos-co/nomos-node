@@ -1,8 +1,7 @@
 use std::{io, u8};
 
 use futures::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
-use sphinx_packet::crypto::PrivateKey;
-use sphinx_packet::header::delays::Delay;
+use sphinx_packet::{crypto::PrivateKey, header::delays::Delay};
 
 use crate::{
     address::NodeAddress,
@@ -200,6 +199,7 @@ impl Message {
         if value.is_empty() {
             return Err(MixnetError::InvalidMessage);
         }
+
         match MessageFlag::try_from(value[0])? {
             MessageFlag::Real => Ok(Self::Real(value[1..].into())),
             MessageFlag::DropCover => Ok(Self::DropCover(value[1..].into())),
