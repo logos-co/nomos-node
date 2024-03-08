@@ -3,7 +3,7 @@ use std::{
     time::Duration,
 };
 
-use futures::{AsyncReadExt, AsyncWriteExt};
+use futures::AsyncWriteExt;
 use nomos_libp2p::{
     gossipsub,
     libp2p::{swarm::ConnectionId, Stream, StreamProtocol},
@@ -174,12 +174,12 @@ impl SwarmHandler {
             Command::StreamSend {
                 peer_id,
                 protocol,
-                message,
+                packet_body: packet,
             } => {
-                tracing::debug!("StreamSend to {peer_id}: len:{}", message.len());
+                tracing::debug!("StreamSend to {peer_id}");
                 match self.open_stream(peer_id, protocol).await {
                     Ok(stream) => {
-                        if let Err(e) = Self::stream_write(stream, &message).await {
+                        if let Err(e) = packet.write_to(stream).await {
                             tracing::error!("failed to write to the stream with ${peer_id}: {e}");
                             self.close_stream(&peer_id).await;
                         }
@@ -310,20 +310,5 @@ impl SwarmHandler {
         if let Some(mut stream) = self.streams.remove(peer_id) {
             let _ = stream.close().await;
         }
-    }
-
-    async fn stream_write(stream: &mut Stream, msg: &[u8]) -> std::io::Result<()> {
-        stream.write_all(&msg.len().to_le_bytes()).await?;
-        stream.write_all(msg).await?;
-        Ok(())
-    }
-
-    pub async fn stream_read(stream: &mut Stream) -> std::io::Result<Box<[u8]>> {
-        let mut size = [0u8; std::mem::size_of::<usize>()];
-        stream.read_exact(&mut size).await?;
-
-        let mut msg = vec![0u8; usize::from_le_bytes(size)];
-        stream.read_exact(&mut msg).await?;
-        Ok(msg.into_boxed_slice())
     }
 }
