@@ -192,15 +192,13 @@ impl FragmentSetReconstructor {
 
     /// Merges all fragments gathered if possible
     fn try_reconstruct_message(&self) -> Option<Vec<u8>> {
-        if self.fragments.len() - 1 == self.last_fragment_id.into() {
+        (self.fragments.len() - 1 == self.last_fragment_id.into()).then(|| {
             let mut msg = Vec::with_capacity(self.message_size);
             for id in 0..=self.last_fragment_id.0 {
                 msg.extend(&self.fragments.get(&FragmentId(id)).unwrap().body);
             }
-            Some(msg)
-        } else {
-            None
-        }
+            msg
+        })
     }
 }
 
