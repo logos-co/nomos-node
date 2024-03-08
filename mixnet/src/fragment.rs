@@ -146,18 +146,17 @@ impl MessageReconstructor {
 
     pub fn add(&mut self, fragment: Fragment) -> Option<Vec<u8>> {
         let set_id = fragment.header.set_id;
-        self.fragment_sets
+        let reconstructed_msg = self
+            .fragment_sets
             .entry(set_id)
             .or_insert(FragmentSetReconstructor::new(
                 fragment.header.last_fragment_id,
             ))
-            .add(fragment)
-            .map(|msg| {
-                // A message has been reconstructed completely from the fragment set.
-                // Delete the fragment set from the reconstructor.
-                self.fragment_sets.remove(&set_id);
-                msg
-            })
+            .add(fragment)?;
+        // A message has been reconstructed completely from the fragment set.
+        // Delete the fragment set from the reconstructor.
+        self.fragment_sets.remove(&set_id);
+        Some(reconstructed_msg)
     }
 }
 
