@@ -83,10 +83,9 @@ impl MixNodeRunner {
 
     fn process_packet(&mut self, packet: PacketBody) -> Result<(), MixnetError> {
         match packet {
-            PacketBody::SphinxPacket(packet) => self.process_sphinx_packet(packet.as_ref())?,
-            PacketBody::Fragment(fragment) => self.process_fragment(fragment.as_ref())?,
+            PacketBody::SphinxPacket(packet) => self.process_sphinx_packet(packet.as_ref()),
+            PacketBody::Fragment(fragment) => self.process_fragment(fragment.as_ref()),
         }
-        Ok(())
     }
 
     fn process_sphinx_packet(&self, packet: &[u8]) -> Result<(), MixnetError> {
