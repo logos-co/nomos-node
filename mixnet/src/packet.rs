@@ -49,8 +49,8 @@ impl Packet {
         let destination = topology.choose_destination();
 
         let fragment_set = FragmentSet::new(&msg.bytes())?;
-        let mut packets = Vec::with_capacity(fragment_set.len());
-        for fragment in fragment_set.iter() {
+        let mut packets = Vec::with_capacity(fragment_set.as_ref().len());
+        for fragment in fragment_set.as_ref().iter() {
             let route = topology.gen_route();
             if route.is_empty() {
                 // Create a packet that will be directly sent to the mix destination
