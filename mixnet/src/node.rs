@@ -49,15 +49,15 @@ impl MixNode {
         let (packet_tx, packet_rx) = mpsc::channel(PACKET_QUEUE_SIZE);
         let (output_tx, output_rx) = mpsc::unbounded_channel();
 
-        MixNodeRunner {
+        let mixnode_runner = MixNodeRunner {
             _config: config,
             encryption_private_key,
             poisson,
             packet_queue: packet_rx,
             message_reconstructor: MessageReconstructor::new(),
             output_tx,
-        }
-        .run();
+        };
+        tokio::spawn(mixnode_runner.run());
 
         Ok((Self { output_rx }, packet_tx))
     }
@@ -69,16 +69,14 @@ impl MixNode {
 }
 
 impl MixNodeRunner {
-    fn run(mut self) {
-        tokio::spawn(async move {
-            loop {
-                if let Some(packet) = self.packet_queue.recv().await {
-                    if let Err(e) = self.process_packet(packet) {
-                        tracing::error!("failed to process packet. skipping it: {e}");
-                    }
+    async fn run(mut self) {
+        loop {
+            if let Some(packet) = self.packet_queue.recv().await {
+                if let Err(e) = self.process_packet(packet) {
+                    tracing::error!("failed to process packet. skipping it: {e}");
                 }
             }
-        });
+        }
     }
 
     fn process_packet(&mut self, packet: PacketBody) -> Result<(), MixnetError> {
