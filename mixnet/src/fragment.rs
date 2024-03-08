@@ -35,7 +35,7 @@ impl FragmentSet {
     }
 
     fn num_chunks(msg: &[u8]) -> usize {
-        msg.len() / Self::CHUNK_SIZE + (msg.len() % Self::CHUNK_SIZE > 0) as usize
+        msg.len().div_ceil(Self::CHUNK_SIZE)
     }
 }
 
