@@ -1,4 +1,4 @@
-use std::{collections::HashMap, ops::Deref, usize};
+use std::collections::HashMap;
 
 use sphinx_packet::{constants::PAYLOAD_SIZE, payload::PAYLOAD_OVERHEAD_SIZE};
 use uuid::Uuid;
@@ -39,10 +39,8 @@ impl FragmentSet {
     }
 }
 
-impl Deref for FragmentSet {
-    type Target = Vec<Fragment>;
-
-    fn deref(&self) -> &Self::Target {
+impl AsRef<Vec<Fragment>> for FragmentSet {
+    fn as_ref(&self) -> &Vec<Fragment> {
         &self.0
     }
 }
@@ -248,13 +246,16 @@ mod tests {
         assert_eq!(4, FragmentSet::num_chunks(&msg));
 
         let set = FragmentSet::new(&msg).unwrap();
-        assert_eq!(4, set.iter().len());
+        assert_eq!(4, set.as_ref().iter().len());
         assert_eq!(
             1,
-            HashSet::<FragmentSetId>::from_iter(set.iter().map(|fragment| fragment.header.set_id))
-                .len()
+            HashSet::<FragmentSetId>::from_iter(
+                set.as_ref().iter().map(|fragment| fragment.header.set_id)
+            )
+            .len()
         );
-        set.iter()
+        set.as_ref()
+            .iter()
             .enumerate()
             .for_each(|(i, fragment)| assert_eq!(i, fragment.header.fragment_id.0 as usize));
     }
@@ -267,7 +268,7 @@ mod tests {
         let set = FragmentSet::new(&msg).unwrap();
 
         let mut reconstructor = MessageReconstructor::new();
-        let mut fragments = set.iter();
+        let mut fragments = set.as_ref().iter();
         assert_eq!(None, reconstructor.add(fragments.next().unwrap().clone()));
         assert_eq!(
             Some(msg),
