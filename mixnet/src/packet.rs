@@ -2,7 +2,7 @@ use std::io;
 
 use futures::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 
-use crate::{address::NodeAddress, error::MixnetError};
+use crate::{address::NodeAddress, error::MixnetError, topology::MixnetTopology};
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Packet {
@@ -11,6 +11,20 @@ pub struct Packet {
 }
 
 impl Packet {
+    pub(crate) fn build_real(
+        _msg: &[u8],
+        _topology: &MixnetTopology,
+    ) -> Result<Vec<Packet>, MixnetError> {
+        todo!()
+    }
+
+    pub(crate) fn build_drop_cover(
+        _msg: &[u8],
+        _topology: &MixnetTopology,
+    ) -> Result<Vec<Packet>, MixnetError> {
+        todo!()
+    }
+
     pub fn address(&self) -> NodeAddress {
         self.address
     }
@@ -81,5 +95,68 @@ impl TryFrom<u8> for PacketBodyFlag {
             1u8 => Ok(PacketBodyFlag::Fragment),
             _ => Err(MixnetError::InvalidPacketFlag),
         }
+    }
+}
+
+#[allow(dead_code)]
+pub(crate) enum Message<'a> {
+    Real(&'a [u8]),
+    DropCover(&'a [u8]),
+}
+
+impl<'a> Message<'a> {
+    #[allow(dead_code)]
+    pub(crate) fn bytes(&self) -> Box<[u8]> {
+        //TODO: optimize memcpy
+        match self {
+            Message::Real(value) => MessageFlag::Real.set(value),
+            Message::DropCover(value) => MessageFlag::DropCover.set(value),
+        }
+    }
+
+    #[allow(dead_code)]
+    pub(crate) fn from_bytes(value: &'a [u8]) -> Result<Self, MixnetError> {
+        match MessageFlag::try_from(value[0])? {
+            MessageFlag::Real => Ok(Self::Real(value[1..].into())),
+            MessageFlag::DropCover => Ok(Self::DropCover(value[1..].into())),
+        }
+    }
+}
+
+#[repr(u8)]
+enum MessageFlag {
+    Real,
+    DropCover,
+}
+
+impl MessageFlag {
+    fn set(self, body: &[u8]) -> Box<[u8]> {
+        let mut out = Vec::with_capacity(1 + body.len());
+        out.push(self as u8);
+        out.extend_from_slice(body);
+        out.into_boxed_slice()
+    }
+}
+
+impl TryFrom<u8> for MessageFlag {
+    type Error = MixnetError;
+
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        match value {
+            0u8 => Ok(MessageFlag::Real),
+            1u8 => Ok(MessageFlag::DropCover),
+            _ => Err(MixnetError::InvalidPacketFlag),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn message_flag() {
+        assert_eq!(&[0, 1, 2], MessageFlag::Real.set(&[1, 2]).as_ref());
+        assert_eq!(&[1, 1, 2], MessageFlag::DropCover.set(&[1, 2]).as_ref());
     }
 }
