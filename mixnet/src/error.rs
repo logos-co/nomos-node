@@ -1,6 +1,9 @@
 /// Mixnet Errors
 #[derive(thiserror::Error, Debug)]
 pub enum MixnetError {
+    /// Invalid topology size
+    #[error("invalid mixnet topology size")]
+    InvalidTopologySize,
     /// Invalid packet flag
     #[error("invalid packet flag")]
     InvalidPacketFlag,
