@@ -7,22 +7,21 @@ use crate::error::MixnetError;
 
 pub(crate) struct FragmentSet(Vec<Fragment>);
 
-const MAX_PLAIN_PAYLOAD_SIZE: usize = PAYLOAD_SIZE - PAYLOAD_OVERHEAD_SIZE;
-
 impl FragmentSet {
-    pub(crate) fn new(msg: &[u8]) -> Result<Self, MixnetError> {
-        let chunk_size = MAX_PLAIN_PAYLOAD_SIZE - FRAGMENT_HEADER_SIZE;
+    const MAX_PLAIN_PAYLOAD_SIZE: usize = PAYLOAD_SIZE - PAYLOAD_OVERHEAD_SIZE;
+    const CHUNK_SIZE: usize = Self::MAX_PLAIN_PAYLOAD_SIZE - FRAGMENT_HEADER_SIZE;
 
+    pub(crate) fn new(msg: &[u8]) -> Result<Self, MixnetError> {
         // For now, we don't support more than max_fragments() fragments.
         // If needed, we can devise the FragmentSet chaining to support larger messages, like Nym.
-        let num_chunks = Self::num_chunks(msg, chunk_size);
+        let num_chunks = Self::num_chunks(msg);
         if num_chunks > MAX_NUM_FRAGMENTS {
             return Err(MixnetError::MessageTooLong(msg.len()));
         }
 
         let set_id = Uuid::new_v4();
         Ok(FragmentSet(
-            msg.chunks(chunk_size)
+            msg.chunks(Self::CHUNK_SIZE)
                 .enumerate()
                 .map(|(i, chunk)| Fragment {
                     header: FragmentHeader {
@@ -36,8 +35,8 @@ impl FragmentSet {
         ))
     }
 
-    fn num_chunks(msg: &[u8], chunk_size: usize) -> usize {
-        msg.len() / chunk_size + (msg.len() % chunk_size > 0) as usize
+    fn num_chunks(msg: &[u8]) -> usize {
+        msg.len() / Self::CHUNK_SIZE + (msg.len() % Self::CHUNK_SIZE > 0) as usize
     }
 }
 
@@ -212,11 +211,10 @@ mod tests {
 
     #[test]
     fn fragment_set() {
-        let chunk_size = MAX_PLAIN_PAYLOAD_SIZE;
-        let mut msg = vec![0u8; chunk_size * 3 + chunk_size / 2];
+        let mut msg = vec![0u8; FragmentSet::CHUNK_SIZE * 3 + FragmentSet::CHUNK_SIZE / 2];
         rand::thread_rng().fill_bytes(&mut msg);
 
-        assert_eq!(4, FragmentSet::num_chunks(&msg, chunk_size));
+        assert_eq!(4, FragmentSet::num_chunks(&msg));
 
         let set = FragmentSet::new(&msg).unwrap();
         assert_eq!(4, set.iter().len());
@@ -232,8 +230,7 @@ mod tests {
 
     #[test]
     fn message_reconstructor() {
-        let chunk_size = MAX_PLAIN_PAYLOAD_SIZE - FRAGMENT_HEADER_SIZE;
-        let mut msg = vec![0u8; chunk_size * 2];
+        let mut msg = vec![0u8; FragmentSet::CHUNK_SIZE * 2];
         rand::thread_rng().fill_bytes(&mut msg);
 
         let set = FragmentSet::new(&msg).unwrap();
