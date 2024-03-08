@@ -121,6 +121,7 @@ impl Message {
         if value.is_empty() {
             return Err(MixnetError::InvalidMessage);
         }
+
         match MessageFlag::try_from(value[0])? {
             MessageFlag::Real => Ok(Self::Real(value[1..].into())),
             MessageFlag::DropCover => Ok(Self::DropCover(value[1..].into())),
