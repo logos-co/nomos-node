@@ -1,6 +1,7 @@
-use std::io;
+use std::{io, u8};
 
 use futures::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
+use sphinx_packet::{crypto::PrivateKey, ProcessedPacket};
 
 use crate::{address::NodeAddress, error::MixnetError, topology::MixnetTopology};
 
@@ -11,6 +12,10 @@ pub struct Packet {
 }
 
 impl Packet {
+    fn new(_processed_packet: ProcessedPacket) -> Result<Self, MixnetError> {
+        todo!()
+    }
+
     pub(crate) fn build_real(
         _msg: &[u8],
         _topology: &MixnetTopology,
@@ -49,6 +54,7 @@ impl PacketBody {
             Self::Fragment(data) => Self::write(writer, PacketBodyFlag::Fragment, data).await,
         }
     }
+
     async fn write<W: AsyncWrite + Unpin + ?Sized>(
         writer: &mut W,
         flag: PacketBodyFlag,
@@ -78,6 +84,13 @@ impl PacketBody {
             Err(e) => Ok(Err(e)),
         }
     }
+
+    pub(crate) fn process_sphinx_packet(
+        packet: &[u8],
+        private_key: &PrivateKey,
+    ) -> Result<Packet, MixnetError> {
+        Packet::new(sphinx_packet::SphinxPacket::from_bytes(packet)?.process(private_key)?)
+    }
 }
 
 #[repr(u8)]
@@ -98,24 +111,17 @@ impl TryFrom<u8> for PacketBodyFlag {
     }
 }
 
-#[allow(dead_code)]
-pub(crate) enum Message<'a> {
-    Real(&'a [u8]),
-    DropCover(&'a [u8]),
+pub(crate) enum Message {
+    Real(Box<[u8]>),
+    DropCover(Box<[u8]>),
 }
 
-impl<'a> Message<'a> {
-    #[allow(dead_code)]
-    pub(crate) fn bytes(&self) -> Box<[u8]> {
-        //TODO: optimize memcpy
-        match self {
-            Message::Real(value) => MessageFlag::Real.set(value),
-            Message::DropCover(value) => MessageFlag::DropCover.set(value),
+impl Message {
+    pub(crate) fn from_bytes(value: &[u8]) -> Result<Self, MixnetError> {
+        if value.is_empty() {
+            return Err(MixnetError::InvalidMessage);
         }
-    }
 
-    #[allow(dead_code)]
-    pub(crate) fn from_bytes(value: &'a [u8]) -> Result<Self, MixnetError> {
         match MessageFlag::try_from(value[0])? {
             MessageFlag::Real => Ok(Self::Real(value[1..].into())),
             MessageFlag::DropCover => Ok(Self::DropCover(value[1..].into())),
@@ -129,15 +135,6 @@ enum MessageFlag {
     DropCover,
 }
 
-impl MessageFlag {
-    fn set(self, body: &[u8]) -> Box<[u8]> {
-        let mut out = Vec::with_capacity(1 + body.len());
-        out.push(self as u8);
-        out.extend_from_slice(body);
-        out.into_boxed_slice()
-    }
-}
-
 impl TryFrom<u8> for MessageFlag {
     type Error = MixnetError;
 
@@ -147,16 +144,5 @@ impl TryFrom<u8> for MessageFlag {
             1u8 => Ok(MessageFlag::DropCover),
             _ => Err(MixnetError::InvalidPacketFlag),
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn message_flag() {
-        assert_eq!(&[0, 1, 2], MessageFlag::Real.set(&[1, 2]).as_ref());
-        assert_eq!(&[1, 1, 2], MessageFlag::DropCover.set(&[1, 2]).as_ref());
     }
 }

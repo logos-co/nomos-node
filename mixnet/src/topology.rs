@@ -1,10 +1,11 @@
 use serde::{Deserialize, Serialize};
 use sphinx_packet::{
     constants::IDENTIFIER_LENGTH,
+    crypto::{PublicKey, PUBLIC_KEY_SIZE},
     route::{DestinationAddressBytes, SURBIdentifier},
 };
 
-use crate::{address::NodeAddress, crypto::PublicKey, error::MixnetError};
+use crate::{address::NodeAddress, error::MixnetError};
 
 /// Defines Mixnet topology construction and route selection
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -48,10 +49,13 @@ pub struct MixNodeInfo(sphinx_packet::route::Node);
 
 impl MixNodeInfo {
     /// Creates a [`MixNodeInfo`].
-    pub fn new(address: NodeAddress, public_key: PublicKey) -> Result<Self, MixnetError> {
+    pub fn new(
+        address: NodeAddress,
+        public_key: [u8; PUBLIC_KEY_SIZE],
+    ) -> Result<Self, MixnetError> {
         Ok(Self(sphinx_packet::route::Node::new(
             address.try_into()?,
-            *public_key,
+            PublicKey::from(public_key),
         )))
     }
 }
