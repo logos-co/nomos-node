@@ -1,9 +1,10 @@
-use carnot_engine::overlay::{BranchOverlay, FisherYatesShuffle, RandomBeaconState};
+use carnot_engine::overlay::{BranchOverlay, RandomBeaconState};
 use carnot_engine::Overlay;
 use carnot_engine::{
     overlay::{FlatOverlay, FreezeMembership, RoundRobin, TreeOverlay},
     NodeId,
 };
+use nomos_utils::fisheryates::FisherYatesShuffle;
 use rand::Rng;
 use simulations::overlay::overlay_info::{OverlayInfo, OverlayInfoExt};
 use simulations::settings::OverlaySettings;
