@@ -130,3 +130,62 @@ pub enum Output {
     /// Message reconstructed from [`Packet`]s
     ReconstructedMessage(Box<[u8]>),
 }
+
+#[cfg(test)]
+mod tests {
+    use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+
+    use sphinx_packet::crypto::PublicKey;
+
+    use crate::{
+        packet::Packet,
+        topology::{tests::gen_entropy, MixNodeInfo, MixnetTopology},
+    };
+
+    use super::*;
+
+    #[tokio::test]
+    async fn mixnode() {
+        let encryption_private_key = PrivateKey::new();
+        let node_info = MixNodeInfo::new(
+            SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 1000u16).into(),
+            *PublicKey::from(&encryption_private_key).as_bytes(),
+        )
+        .unwrap();
+
+        let topology = MixnetTopology::new(
+            (0..2).map(|_| node_info.clone()).collect(),
+            2,
+            1,
+            gen_entropy(),
+        )
+        .unwrap();
+        let (mut mixnode, packet_queue) = MixNode::new(MixNodeConfig {
+            encryption_private_key: encryption_private_key.to_bytes(),
+            delay_rate_per_min: 60.0,
+        })
+        .unwrap();
+
+        let msg = "hello".as_bytes().to_vec();
+        let packets = Packet::build_real(msg.clone(), &topology).unwrap();
+        let num_packets = packets.len();
+
+        for packet in packets.into_iter() {
+            packet_queue.send(packet.body()).await.unwrap();
+        }
+
+        for _ in 0..num_packets {
+            match mixnode.next().await.unwrap() {
+                Output::Forward(packet_to) => {
+                    packet_queue.send(packet_to.body()).await.unwrap();
+                }
+                Output::ReconstructedMessage(_) => unreachable!(),
+            }
+        }
+
+        assert_eq!(
+            Output::ReconstructedMessage(msg.into_boxed_slice()),
+            mixnode.next().await.unwrap()
+        );
+    }
+}

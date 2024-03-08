@@ -119,3 +119,65 @@ impl MixClientRunner {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::{num::NonZeroU8, time::Instant};
+
+    use crate::{
+        client::MixClientConfig,
+        topology::{
+            tests::{gen_entropy, gen_mixnodes},
+            MixnetTopology,
+        },
+    };
+
+    use super::MixClient;
+
+    #[tokio::test]
+    async fn poisson_emission() {
+        let emission_rate_per_min = 60.0;
+        let (mut client, _) = MixClient::new(MixClientConfig {
+            topology: MixnetTopology::new(gen_mixnodes(10), 3, 2, gen_entropy()).unwrap(),
+            emission_rate_per_min,
+            redundancy: NonZeroU8::new(3).unwrap(),
+        })
+        .unwrap();
+
+        let mut ts = Instant::now();
+        let mut intervals = Vec::new();
+        for _ in 0..30 {
+            assert!(client.next().await.is_some());
+            let now = Instant::now();
+            intervals.push(now - ts);
+            ts = now;
+        }
+
+        let avg_sec = intervals.iter().map(|d| d.as_secs()).sum::<u64>() / intervals.len() as u64;
+        let expected_avg_sec = (60.0 / emission_rate_per_min) as u64;
+        assert!(
+            avg_sec.abs_diff(expected_avg_sec) <= 1,
+            "{avg_sec} -{expected_avg_sec}"
+        );
+    }
+
+    #[tokio::test]
+    async fn real_packet_emission() {
+        let (mut client, msg_queue) = MixClient::new(MixClientConfig {
+            topology: MixnetTopology::new(gen_mixnodes(10), 3, 2, gen_entropy()).unwrap(),
+            emission_rate_per_min: 360.0,
+            redundancy: NonZeroU8::new(3).unwrap(),
+        })
+        .unwrap();
+
+        msg_queue.send("hello".as_bytes().into()).await.unwrap();
+
+        // Check if the next 3 packets are the same, according to the redundancy
+        let packet = client.next().await.unwrap();
+        assert_eq!(packet, client.next().await.unwrap());
+        assert_eq!(packet, client.next().await.unwrap());
+
+        // Check if the next packet is different (drop cover)
+        assert_ne!(packet, client.next().await.unwrap());
+    }
+}
