@@ -49,15 +49,15 @@ impl MixNode {
         let (packet_tx, packet_rx) = mpsc::channel(PACKET_QUEUE_SIZE);
         let (output_tx, output_rx) = mpsc::unbounded_channel();
 
-        MixNodeRunner {
+        let mixnode_runner = MixNodeRunner {
             _config: config,
             encryption_private_key,
             poisson,
             packet_queue: packet_rx,
             message_reconstructor: MessageReconstructor::new(),
             output_tx,
-        }
-        .run();
+        };
+        tokio::spawn(mixnode_runner.run());
 
         Ok((Self { output_rx }, packet_tx))
     }
@@ -69,24 +69,21 @@ impl MixNode {
 }
 
 impl MixNodeRunner {
-    fn run(mut self) {
-        tokio::spawn(async move {
-            loop {
-                if let Some(packet) = self.packet_queue.recv().await {
-                    if let Err(e) = self.process_packet(packet) {
-                        tracing::error!("failed to process packet. skipping it: {e}");
-                    }
+    async fn run(mut self) {
+        loop {
+            if let Some(packet) = self.packet_queue.recv().await {
+                if let Err(e) = self.process_packet(packet) {
+                    tracing::error!("failed to process packet. skipping it: {e}");
                 }
             }
-        });
+        }
     }
 
     fn process_packet(&mut self, packet: PacketBody) -> Result<(), MixnetError> {
         match packet {
-            PacketBody::SphinxPacket(packet) => self.process_sphinx_packet(packet.as_ref())?,
-            PacketBody::Fragment(fragment) => self.process_fragment(fragment.as_ref())?,
+            PacketBody::SphinxPacket(packet) => self.process_sphinx_packet(packet.as_ref()),
+            PacketBody::Fragment(fragment) => self.process_fragment(fragment.as_ref()),
         }
-        Ok(())
     }
 
     fn process_sphinx_packet(&self, packet: &[u8]) -> Result<(), MixnetError> {
@@ -112,8 +109,9 @@ impl MixNodeRunner {
             match Message::from_bytes(&msg)? {
                 Message::Real(msg) => {
                     let output = Output::ReconstructedMessage(msg.into_boxed_slice());
-                    // output_tx is always expected to be not closed/dropped.
-                    self.output_tx.send(output).unwrap();
+                    self.output_tx
+                        .send(output)
+                        .expect("output channel shouldn't be closed");
                 }
                 Message::DropCover(_) => {
                     tracing::debug!("Drop cover message has been reconstructed. Dropping it...");
