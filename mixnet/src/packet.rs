@@ -1,9 +1,14 @@
 use std::{io, u8};
 
 use futures::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
-use sphinx_packet::{crypto::PrivateKey, ProcessedPacket};
+use sphinx_packet::{crypto::PrivateKey, header::delays::Delay};
 
-use crate::{address::NodeAddress, error::MixnetError, topology::MixnetTopology};
+use crate::{
+    address::NodeAddress,
+    error::MixnetError,
+    fragment::{Fragment, FragmentSet},
+    topology::MixnetTopology,
+};
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Packet {
@@ -12,22 +17,61 @@ pub struct Packet {
 }
 
 impl Packet {
-    fn new(_processed_packet: ProcessedPacket) -> Result<Self, MixnetError> {
-        todo!()
+    fn new(processed_packet: sphinx_packet::ProcessedPacket) -> Result<Self, MixnetError> {
+        match processed_packet {
+            sphinx_packet::ProcessedPacket::ForwardHop(packet, addr, _) => Ok(Packet {
+                address: addr.try_into()?,
+                body: PacketBody::from(packet.as_ref()),
+            }),
+            sphinx_packet::ProcessedPacket::FinalHop(addr, _, payload) => Ok(Packet {
+                address: addr.try_into()?,
+                body: PacketBody::try_from(payload)?,
+            }),
+        }
     }
 
     pub(crate) fn build_real(
-        _msg: &[u8],
-        _topology: &MixnetTopology,
+        msg: Vec<u8>,
+        topology: &MixnetTopology,
     ) -> Result<Vec<Packet>, MixnetError> {
-        todo!()
+        Self::build(Message::Real(msg), topology)
     }
 
     pub(crate) fn build_drop_cover(
-        _msg: &[u8],
-        _topology: &MixnetTopology,
+        msg: Vec<u8>,
+        topology: &MixnetTopology,
     ) -> Result<Vec<Packet>, MixnetError> {
-        todo!()
+        Self::build(Message::DropCover(msg), topology)
+    }
+
+    fn build(msg: Message, topology: &MixnetTopology) -> Result<Vec<Packet>, MixnetError> {
+        let destination = topology.choose_destination();
+
+        let fragment_set = FragmentSet::new(&msg.bytes())?;
+        let mut packets = Vec::with_capacity(fragment_set.as_ref().len());
+        for fragment in fragment_set.as_ref().iter() {
+            let route = topology.gen_route();
+            if route.is_empty() {
+                // Create a packet that will be directly sent to the mix destination
+                packets.push(Packet {
+                    address: NodeAddress::try_from(destination.address)?,
+                    body: PacketBody::from(fragment),
+                });
+            } else {
+                // Use dummy delays because mixnodes will ignore this value and generate delay randomly by themselves.
+                let delays = vec![Delay::new_from_nanos(0); route.len()];
+                packets.push(Packet {
+                    address: NodeAddress::try_from(route[0].address)?,
+                    body: PacketBody::from(&sphinx_packet::SphinxPacket::new(
+                        fragment.bytes(),
+                        &route,
+                        &destination,
+                        &delays,
+                    )?),
+                });
+            }
+        }
+        Ok(packets)
     }
 
     pub fn address(&self) -> NodeAddress {
@@ -43,6 +87,26 @@ impl Packet {
 pub enum PacketBody {
     SphinxPacket(Vec<u8>),
     Fragment(Vec<u8>),
+}
+
+impl From<&sphinx_packet::SphinxPacket> for PacketBody {
+    fn from(packet: &sphinx_packet::SphinxPacket) -> Self {
+        Self::SphinxPacket(packet.to_bytes())
+    }
+}
+
+impl From<&Fragment> for PacketBody {
+    fn from(fragment: &Fragment) -> Self {
+        Self::Fragment(fragment.bytes())
+    }
+}
+
+impl TryFrom<sphinx_packet::payload::Payload> for PacketBody {
+    type Error = MixnetError;
+
+    fn try_from(payload: sphinx_packet::payload::Payload) -> Result<Self, Self::Error> {
+        Ok(Self::Fragment(payload.recover_plaintext()?))
+    }
 }
 
 impl PacketBody {
@@ -112,11 +176,25 @@ impl TryFrom<u8> for PacketBodyFlag {
 }
 
 pub(crate) enum Message {
-    Real(Box<[u8]>),
-    DropCover(Box<[u8]>),
+    Real(Vec<u8>),
+    DropCover(Vec<u8>),
 }
 
 impl Message {
+    fn bytes(self) -> Box<[u8]> {
+        match self {
+            Self::Real(msg) => Self::bytes_with_flag(MessageFlag::Real, msg),
+            Self::DropCover(msg) => Self::bytes_with_flag(MessageFlag::DropCover, msg),
+        }
+    }
+
+    fn bytes_with_flag(flag: MessageFlag, mut msg: Vec<u8>) -> Box<[u8]> {
+        let mut out = Vec::with_capacity(1 + msg.len());
+        out.push(flag as u8);
+        out.append(&mut msg);
+        out.into_boxed_slice()
+    }
+
     pub(crate) fn from_bytes(value: &[u8]) -> Result<Self, MixnetError> {
         if value.is_empty() {
             return Err(MixnetError::InvalidMessage);

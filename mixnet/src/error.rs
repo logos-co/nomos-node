@@ -4,6 +4,18 @@ pub enum MixnetError {
     /// Invalid packet flag
     #[error("invalid packet flag")]
     InvalidPacketFlag,
+    /// Invalid fragment header
+    #[error("invalid fragment header")]
+    InvalidFragmentHeader,
+    /// Invalid fragment set ID
+    #[error("invalid fragment set ID: {0}")]
+    InvalidFragmentSetId(#[from] uuid::Error),
+    /// Invalid fragment ID
+    #[error("invalid fragment ID")]
+    InvalidFragmentId,
+    /// Message too long
+    #[error("message too long: {0} bytes")]
+    MessageTooLong(usize),
     /// Invalid message
     #[error("invalid message")]
     InvalidMessage,

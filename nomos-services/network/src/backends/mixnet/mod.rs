@@ -281,10 +281,8 @@ pub struct MixnetMessage {
 }
 
 impl MixnetMessage {
-    pub fn as_bytes(&self) -> Box<[u8]> {
-        wire::serialize(self)
-            .expect("Couldn't serialize MixnetMessage")
-            .into_boxed_slice()
+    pub fn as_bytes(&self) -> Vec<u8> {
+        wire::serialize(self).expect("Couldn't serialize MixnetMessage")
     }
 
     pub fn from_bytes(data: &[u8]) -> Result<Self, wire::Error> {

@@ -18,7 +18,7 @@ pub struct MixClient {
 struct MixClientRunner {
     config: MixClientConfig,
     poisson: Poisson,
-    message_queue: mpsc::Receiver<Box<[u8]>>,
+    message_queue: mpsc::Receiver<Vec<u8>>,
     real_packet_queue: VecDeque<Packet>,
     packet_tx: mpsc::UnboundedSender<Packet>,
 }
@@ -37,7 +37,7 @@ pub struct MixClientConfig {
 const MESSAGE_QUEUE_SIZE: usize = 256;
 
 /// Queue for sending messages to [`MixClient`]
-pub type MessageQueue = mpsc::Sender<Box<[u8]>>;
+pub type MessageQueue = mpsc::Sender<Vec<u8>>;
 
 impl MixClient {
     /// Creates a [`MixClient`] and a [`MessageQueue`].
@@ -90,6 +90,8 @@ impl MixClientRunner {
         });
     }
 
+    const DROP_COVER_MSG: &'static [u8] = b"drop cover";
+
     async fn next_packet(&mut self) -> Result<Packet, MixnetError> {
         if let Some(packet) = self.real_packet_queue.pop_front() {
             return Ok(packet);
@@ -97,7 +99,7 @@ impl MixClientRunner {
 
         match self.message_queue.try_recv() {
             Ok(msg) => {
-                for packet in Packet::build_real(&msg, &self.config.topology)? {
+                for packet in Packet::build_real(msg, &self.config.topology)? {
                     for _ in 0..self.config.redundancy.get() {
                         self.real_packet_queue.push_back(packet.clone());
                     }
@@ -108,8 +110,10 @@ impl MixClientRunner {
                     .expect("real packet queue should not be empty"))
             }
             Err(_) => {
-                let mut packets =
-                    Packet::build_drop_cover("drop cover".as_ref(), &self.config.topology)?;
+                let mut packets = Packet::build_drop_cover(
+                    Vec::from(Self::DROP_COVER_MSG),
+                    &self.config.topology,
+                )?;
                 Ok(packets.pop().expect("drop cover should not be empty"))
             }
         }

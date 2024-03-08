@@ -104,13 +104,14 @@ impl MixNodeRunner {
     fn process_fragment(&mut self, fragment: &[u8]) -> Result<(), MixnetError> {
         if let Some(msg) = self
             .message_reconstructor
-            .add(Fragment::from_bytes(fragment)?)
+            .add_and_reconstruct(Fragment::from_bytes(fragment)?)
         {
             match Message::from_bytes(&msg)? {
                 Message::Real(msg) => {
-                    let output = Output::ReconstructedMessage(msg);
-                    // output_tx is always expected to be not closed/dropped.
-                    self.output_tx.send(output).unwrap();
+                    let output = Output::ReconstructedMessage(msg.into_boxed_slice());
+                    self.output_tx
+                        .send(output)
+                        .expect("output channel shouldn't be closed");
                 }
                 Message::DropCover(_) => {
                     tracing::debug!("Drop cover message has been reconstructed. Dropping it...");

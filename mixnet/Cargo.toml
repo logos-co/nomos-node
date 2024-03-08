@@ -14,6 +14,7 @@ serde = { version = "1.0.197", features = ["derive"] }
 sphinx-packet = "0.1.0"
 nym-sphinx-addressing = { package = "nym-sphinx-addressing", git = "https://github.com/nymtech/nym", tag = "v1.1.22" }
 tracing = "0.1.40"
+uuid = { version = "1.7.0", features = ["v4"] }
 futures = "0.3"
 
 [dev-dependencies]
