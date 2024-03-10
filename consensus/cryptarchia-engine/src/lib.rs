@@ -49,7 +49,7 @@ where
         Self { branches, tips }
     }
 
-    #[must_use]
+    #[must_use = "this returns the result of the operation, without modifying the original"]
     fn apply_header(&self, header: Id, parent: Id, slot: Slot) -> Result<Self, Error<Id>> {
         let mut branches = self.branches.clone();
         let mut tips = self.tips.clone();
