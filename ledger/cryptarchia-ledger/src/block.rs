@@ -1,5 +1,6 @@
-use crate::{crypto::Blake2b, leader_proof::LeaderProof, time::Slot};
+use crate::{crypto::Blake2b, leader_proof::LeaderProof};
 use blake2::Digest;
+use cryptarchia_engine::Slot;
 
 #[derive(Clone, Debug, Eq, PartialEq, Copy, Hash)]
 pub struct HeaderId([u8; 32]);
@@ -81,25 +82,6 @@ impl Header {
     pub fn with_orphaned_proofs(mut self, orphaned_leader_proofs: Vec<Header>) -> Self {
         self.orphaned_leader_proofs = orphaned_leader_proofs;
         self
-    }
-}
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Block {
-    header: Header,
-    _contents: (),
-}
-
-impl Block {
-    pub fn header(&self) -> &Header {
-        &self.header
-    }
-
-    pub fn new(header: Header) -> Self {
-        Self {
-            header,
-            _contents: (),
-        }
     }
 }
 

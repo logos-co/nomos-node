@@ -23,6 +23,7 @@ members = [
     "simulations",
     "consensus/carnot-engine",
     "consensus/cryptarchia-engine",
+    "ledger/cryptarchia-ledger",
     "tests",
     "mixnet/node",
     "mixnet/client",

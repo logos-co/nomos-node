@@ -1,4 +1,4 @@
-use crate::time::Slot;
+use cryptarchia_engine::Slot;
 
 #[derive(Clone, Debug, Eq, PartialEq, Copy, Hash)]
 pub struct LeaderProof {
