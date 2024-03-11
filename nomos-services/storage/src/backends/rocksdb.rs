@@ -82,24 +82,36 @@ impl<SerdeOp: StorageSerde + Send + Sync + 'static> StorageBackend for RocksBack
             (true, None) => {
                 let mut opts = Options::default();
                 opts.create_if_missing(false);
-                DB::open_for_read_only(&opts, db_path, false)?
+                DB::open_for_read_only(&opts, &db_path, false).map_err(|e| {
+                    tracing::error!(err=%e, "rocks storage: fail to open {}", db_path.display());
+                    e
+                })?
             }
             (true, Some(cf)) => {
                 let mut opts = Options::default();
                 opts.create_if_missing(false);
-                DB::open_cf_for_read_only(&opts, db_path, [cf], false)?
+                DB::open_cf_for_read_only(&opts, &db_path, [cf], false).map_err(|e| {
+                    tracing::error!(err=%e, "rocks storage: fail to open {}", db_path.display());
+                    e
+                })?
             }
             (false, None) => {
                 let mut opts = Options::default();
                 opts.create_if_missing(true);
                 opts.create_missing_column_families(true);
-                DB::open(&opts, db_path)?
+                DB::open(&opts, &db_path).map_err(|e| {
+                    tracing::error!(err=%e, "rocks storage: fail to open {}", db_path.display());
+                    e
+                })?
             }
             (false, Some(cf)) => {
                 let mut opts = Options::default();
                 opts.create_if_missing(true);
                 opts.create_missing_column_families(true);
-                DB::open_cf(&opts, db_path, [cf])?
+                DB::open_cf(&opts, &db_path, [cf]).map_err(|e| {
+                    tracing::error!(err=%e, "rocks storage: fail to open {}", db_path.display());
+                    e
+                })?
             }
         };
 

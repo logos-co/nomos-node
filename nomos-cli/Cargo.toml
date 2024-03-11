@@ -51,7 +51,3 @@ mixnet-node = { path = "../mixnet/node", default-features = false }
 mixnet-client = { path = "../mixnet/client" }
 mixnet-topology = { path = "../mixnet/topology" }
 scopeguard = "1"
-
-[[test]]
-name = "integration"
-path = "tests/main.rs"

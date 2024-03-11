@@ -91,6 +91,10 @@ impl MixNode {
 
         let mut nodes = Vec::<MixNode>::new();
         for config in &configs {
+            println!(
+                "mixnode client {} mixnode listener {}",
+                config.client_listen_address, config.listen_address
+            );
             nodes.push(Self::spawn(*config).await);
         }
 

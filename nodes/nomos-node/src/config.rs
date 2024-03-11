@@ -141,7 +141,7 @@ fn default_storage_settings() -> <StorageService<RocksBackend<Wire>> as ServiceD
     RocksBackendSettings {
         db_path: DEFAULT_DB_PATH.into(),
         read_only: false,
-        column_family: Some("blocks".into()),
+        column_family: None,
     }
 }
 

@@ -91,7 +91,7 @@ where
             )
             .route("/da/blobs", routing::post(da::blobs))
             .with_state(handle);
-
+        tracing::info!("Explorer listen on: {}...", self.settings.address);
         Server::bind(&self.settings.address)
             .serve(app.into_make_service())
             .await

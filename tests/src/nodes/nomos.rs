@@ -72,7 +72,7 @@ impl NomosNode {
             prefix: Some(LOGS_PREFIX.into()),
         };
         config.log.format = LoggerFormat::Json;
-
+        config.storage.db_path = dir.path().join("db");
         serde_yaml::to_writer(&mut file, &config).unwrap();
         let child = Command::new(std::env::current_dir().unwrap().join(NOMOS_BIN))
             .arg(&config_path)
@@ -366,11 +366,15 @@ fn create_node_config(
                 p
             },
             read_only: false,
-            column_family: Some("blocks".into()),
+            column_family: None,
         },
     };
 
     config.network.backend.inner.port = get_available_port();
+    println!(
+        "config.network.backend.inner.port {}",
+        config.network.backend.inner.port
+    );
 
     config
 }
