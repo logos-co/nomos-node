@@ -10,11 +10,13 @@ use crate::crypto::Blake2b;
 use crate::da::certificate::BlobCertificateSelect;
 use crate::da::certificate::Certificate;
 use crate::header::{
-    carnot::Builder as CarnotBuilder, cryptarchia::Builder as CryptarchiaBuilder, Header,
+    carnot::Builder as CarnotBuilder, cryptarchia::Builder as CryptarchiaBuilder, Header, HeaderId,
 };
 use crate::tx::{Transaction, TxSelect};
 use crate::wire;
 use blake2::digest::Digest;
+use carnot_engine::overlay::RandomBeaconState;
+use carnot_engine::{LeaderProof, Qc, View};
 /// Wrapper over a block building `new` method than holds intermediary state and can be
 /// passed around. It also compounds the transaction selection and blob selection heuristics to be
 /// used for transaction and blob selection.
@@ -37,6 +39,27 @@ pub struct BlockBuilder<Tx, Blob, TxSelector, BlobSelector> {
     cryptarchia_header_builder: Option<CryptarchiaBuilder>,
     txs: Option<Box<dyn Iterator<Item = Tx>>>,
     blobs: Option<Box<dyn Iterator<Item = Blob>>>,
+}
+
+impl<Tx, C, TxSelector, BlobSelector> BlockBuilder<Tx, C, TxSelector, BlobSelector>
+where
+    Tx: Clone + Eq + Hash,
+    C: Clone + Eq + Hash,
+{
+    pub fn empty_carnot(
+        beacon: RandomBeaconState,
+        view: View,
+        parent_qc: Qc<HeaderId>,
+        leader_proof: LeaderProof,
+    ) -> Block<Tx, C> {
+        Block {
+            header: Header::Carnot(
+                CarnotBuilder::new(beacon, view, parent_qc, leader_proof).build([0; 32].into(), 0),
+            ),
+            cl_transactions: IndexSet::new(),
+            bl_blobs: IndexSet::new(),
+        }
+    }
 }
 
 impl<Tx, C, TxSelector, BlobSelector> BlockBuilder<Tx, C, TxSelector, BlobSelector>

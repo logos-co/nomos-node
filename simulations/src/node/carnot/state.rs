@@ -8,14 +8,14 @@ pub struct CarnotState {
     pub(crate) current_view: View,
     pub(crate) highest_voted_view: View,
     pub(crate) local_high_qc: StandardQc,
-    pub(crate) safe_blocks: HashMap<BlockId, Block>,
+    pub(crate) safe_blocks: HashMap<HeaderId, Block>,
     pub(crate) last_view_timeout_qc: Option<TimeoutQc>,
     pub(crate) latest_committed_block: Block,
     pub(crate) latest_committed_view: View,
     pub(crate) root_committee: Committee,
     pub(crate) parent_committee: Option<Committee>,
     pub(crate) child_committees: Vec<Committee>,
-    pub(crate) committed_blocks: Vec<BlockId>,
+    pub(crate) committed_blocks: Vec<HeaderId>,
     pub(super) step_duration: Duration,
 
     /// Step id for this state

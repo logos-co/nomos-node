@@ -5,7 +5,7 @@ use crate::utils::display_hex_bytes_newtype;
 pub mod carnot;
 pub mod cryptarchia;
 
-#[derive(Clone, Debug, Eq, PartialEq, Copy, Hash, Serialize, Deserialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Copy, Hash, Serialize, Deserialize, PartialOrd, Ord)]
 pub struct HeaderId([u8; 32]);
 
 #[derive(Clone, Debug, Eq, PartialEq, Copy, Hash, Serialize, Deserialize)]
