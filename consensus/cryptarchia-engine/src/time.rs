@@ -1,4 +1,3 @@
-use crate::config::Config;
 use std::ops::Add;
 
 #[derive(Clone, Debug, Eq, PartialEq, Copy, Hash, PartialOrd, Ord)]
@@ -14,10 +13,6 @@ impl Slot {
 
     pub fn genesis() -> Self {
         Self(0)
-    }
-
-    pub fn epoch(&self, config: &Config) -> Epoch {
-        Epoch((self.0 / config.epoch_length()) as u32)
     }
 }
 
