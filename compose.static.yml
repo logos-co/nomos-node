@@ -7,7 +7,7 @@ services:
       context: .
       dockerfile: testnet/Dockerfile
     ports:
-      - "3000:3000/tcp"
+      - "3000:3000/udp"
       - "18080:18080/tcp"
     volumes:
       - ./testnet:/etc/nomos
@@ -29,7 +29,7 @@ services:
       - bootstrap
       - etcd
     ports:
-      - "3001:3000/tcp"
+      - "3001:3000/udp"
       - "18081:18080/tcp"
     environment:
       - LIBP2P_REPLICAS=3
@@ -38,7 +38,7 @@ services:
       - LIBP2P_NODE_MASK=${DOCKER_COMPOSE_LIBP2P_NODE_KEY_MASK:-2000000000000000000000000000000000000000000000000000000000000000}
       - OVERLAY_NODES=${DOCKER_COMPOSE_OVERLAY_NODES:-1000000000000000000000000000000000000000000000000000000000000000}
       - OVERLAY_SUPER_MAJORITY_THRESHOLD=${DOCKER_COMPOSE_SUPER_MAJORITY_THRESHOLD:-1}
-      - NET_INITIAL_PEERS=${DOCKER_COMPOSE_NET_INITIAL_PEERS:-/dns/bootstrap/tcp/3000}
+      - NET_INITIAL_PEERS=${DOCKER_COMPOSE_NET_INITIAL_PEERS:-/dns/bootstrap/udp/3000/quic-v1}
     entrypoint: /etc/nomos/scripts/run_nomos_node.sh
 
   libp2p-node-2:
@@ -52,7 +52,7 @@ services:
       - bootstrap
       - etcd
     ports:
-      - "3002:3000/tcp"
+      - "3002:3000/udp"
       - "18082:18080/tcp"
     environment:
       - LIBP2P_REPLICAS=3
@@ -61,7 +61,7 @@ services:
       - LIBP2P_NODE_MASK=${DOCKER_COMPOSE_LIBP2P_NODE_KEY_MASK:-2000000000000000000000000000000000000000000000000000000000000000}
       - OVERLAY_NODES=${DOCKER_COMPOSE_OVERLAY_NODES:-1000000000000000000000000000000000000000000000000000000000000000}
       - OVERLAY_SUPER_MAJORITY_THRESHOLD=${DOCKER_COMPOSE_SUPER_MAJORITY_THRESHOLD:-1}
-      - NET_INITIAL_PEERS=${DOCKER_COMPOSE_NET_INITIAL_PEERS:-/dns/bootstrap/tcp/3000}
+      - NET_INITIAL_PEERS=${DOCKER_COMPOSE_NET_INITIAL_PEERS:-/dns/bootstrap/udp/3000/quic-v1}
     entrypoint: /etc/nomos/scripts/run_nomos_node.sh
 
   libp2p-node-3:
@@ -75,7 +75,7 @@ services:
       - bootstrap
       - etcd
     ports:
-      - "3003:3000/tcp"
+      - "3003:3000/udp"
       - "18083:18080/tcp"
     environment:
       - LIBP2P_REPLICAS=3
@@ -84,7 +84,7 @@ services:
       - LIBP2P_NODE_MASK=${DOCKER_COMPOSE_LIBP2P_NODE_KEY_MASK:-2000000000000000000000000000000000000000000000000000000000000000}
       - OVERLAY_NODES=${DOCKER_COMPOSE_OVERLAY_NODES:-1000000000000000000000000000000000000000000000000000000000000000}
       - OVERLAY_SUPER_MAJORITY_THRESHOLD=${DOCKER_COMPOSE_SUPER_MAJORITY_THRESHOLD:-1}
-      - NET_INITIAL_PEERS=${DOCKER_COMPOSE_NET_INITIAL_PEERS:-/dns/bootstrap/tcp/3000}
+      - NET_INITIAL_PEERS=${DOCKER_COMPOSE_NET_INITIAL_PEERS:-/dns/bootstrap/udp/3000/quic-v1}
     entrypoint: /etc/nomos/scripts/run_nomos_node.sh
 
   chatbot:
