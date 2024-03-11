@@ -87,6 +87,15 @@ services:
       - NET_INITIAL_PEERS=${DOCKER_COMPOSE_NET_INITIAL_PEERS:-/dns/bootstrap/tcp/3000}
     entrypoint: /etc/nomos/scripts/run_nomos_node.sh
 
+  chatbot:
+    container_name: chatbot
+    build:
+      context: .
+      dockerfile: testnet/Dockerfile
+    volumes:
+      - ./testnet:/etc/nomos
+    entrypoint: /etc/nomos/scripts/run_nomos_bot.sh
+
   etcd:
     container_name: etcd
     image: quay.io/coreos/etcd:v3.4.15
@@ -115,8 +124,8 @@ services:
     env_file:
       - ./testnet/monitoring/grafana/plugins.env
     volumes:
-      - ./testnet/monitoring/grafana/grafana.ini:/etc/grafana/grafana.ini
-        ./testnet/monitoring/grafana/datasources.yaml:/etc/grafana/provisioning/datasources/datasources.yaml
+      - ./testnet/monitoring/grafana/grafana.ini:/etc/grafana/grafana.ini:z
+      - ./testnet/monitoring/grafana/datasources.yaml:/etc/grafana/provisioning/datasources/datasources.yaml:z
     ports:
       - 9091:3000
     restart: on-failure

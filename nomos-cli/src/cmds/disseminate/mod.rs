@@ -12,7 +12,7 @@ use tokio::sync::Mutex;
 #[derive(Args, Debug, Default)]
 pub struct Disseminate {
     // TODO: accept bytes
-    #[clap(short, long)]
+    #[clap(short, long, required_unless_present("file"))]
     pub data: Option<String>,
     /// Path to the network config file
     #[clap(short, long)]
@@ -44,15 +44,15 @@ impl Disseminate {
             <NetworkService<Libp2p> as ServiceData>::Settings,
         >(std::fs::File::open(&self.network_config)?)?;
         let (status_updates, rx) = std::sync::mpsc::channel();
-        let bytes: Box<[u8]> = match (&self.data, &self.file) {
-            (Some(data), None) => data.clone().as_bytes().into(),
-            (None, Some(file_path)) => {
-                let file_bytes = std::fs::read(file_path)?;
-                file_bytes.into_boxed_slice()
-            }
-            (Some(_), Some(_)) => return Err("Cannot specify both data and file".into()),
-            (None, None) => return Err("Either data or file must be specified".into()),
+
+        let bytes: Box<[u8]> = if let Some(data) = &self.data {
+            data.clone().as_bytes().into()
+        } else {
+            let file_path = self.file.as_ref().unwrap();
+            let file_bytes = std::fs::read(file_path)?;
+            file_bytes.into_boxed_slice()
         };
+
         let timeout = Duration::from_secs(self.timeout);
         let da_protocol = self.da_protocol.clone();
         let node_addr = self.node_addr.clone();
