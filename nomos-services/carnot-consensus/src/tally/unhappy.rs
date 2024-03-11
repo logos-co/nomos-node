@@ -6,8 +6,9 @@ use serde::{Deserialize, Serialize};
 // internal
 use super::CarnotTallySettings;
 use crate::network::messages::NewViewMsg;
-use carnot_engine::{NewView, TimeoutQc};
 use nomos_core::vote::Tally;
+
+use crate::{NewView, TimeoutQc};
 
 #[derive(thiserror::Error, Debug)]
 pub enum NewViewTallyError {

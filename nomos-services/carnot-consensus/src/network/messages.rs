@@ -3,13 +3,15 @@
 use serde::{Deserialize, Serialize};
 // internal
 use crate::NodeId;
-use carnot_engine::{BlockId, NewView, Qc, Timeout, TimeoutQc, View, Vote};
+use crate::{NewView, Qc, Timeout, TimeoutQc, Vote};
+use carnot_engine::View;
+use nomos_core::header::HeaderId;
 use nomos_core::wire;
 
 #[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash)]
 pub struct ProposalMsg {
     pub data: Box<[u8]>,
-    pub proposal: BlockId,
+    pub proposal: HeaderId,
     pub view: View,
 }
 

@@ -4,15 +4,17 @@
 use std::collections::HashSet;
 // crates
 use futures::{Stream, StreamExt};
+use nomos_core::header::HeaderId;
 
 // internal
 use super::CarnotTallySettings;
 use crate::network::messages::VoteMsg;
-use carnot_engine::{Block, Qc, StandardQc, Vote};
+use crate::{Qc, StandardQc, Vote};
 use nomos_core::crypto::PublicKey;
 use nomos_core::vote::Tally;
 
 pub type NodeId = PublicKey;
+type Block = carnot_engine::Block<HeaderId>;
 
 #[derive(thiserror::Error, Debug)]
 pub enum CarnotTallyError {

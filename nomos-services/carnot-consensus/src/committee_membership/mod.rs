@@ -6,10 +6,10 @@ use std::hash::Hash;
 // crates
 
 // internal
+use crate::TimeoutQc;
 use carnot_engine::overlay::{
     CommitteeMembership, Error as RandomBeaconError, FreezeMembership, RandomBeaconState,
 };
-use carnot_engine::TimeoutQc;
 use nomos_core::block::Block;
 
 pub trait UpdateableCommitteeMembership: CommitteeMembership {
@@ -44,7 +44,10 @@ impl UpdateableCommitteeMembership for RandomBeaconState {
         &self,
         block: &Block<Tx, Blob>,
     ) -> Result<Self, Self::Error> {
-        self.check_advance_happy(block.beacon().clone(), block.header().parent_qc.view())
+        self.check_advance_happy(
+            block.header().carnot().beacon().clone(),
+            block.header().carnot().parent_qc().view(),
+        )
     }
 
     fn on_timeout_qc_received(&self, qc: &TimeoutQc) -> Result<Self, Self::Error> {

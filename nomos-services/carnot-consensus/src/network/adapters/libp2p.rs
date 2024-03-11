@@ -13,8 +13,8 @@ use crate::network::{
     messages::{NetworkMessage, ProposalMsg, VoteMsg},
     BoxedStream, NetworkAdapter,
 };
-use carnot_engine::{BlockId, Committee, CommitteeId, View};
-use nomos_core::wire;
+use carnot_engine::{Committee, CommitteeId, View};
+use nomos_core::{header::HeaderId, wire};
 use nomos_network::{
     backends::libp2p::{Command, Event, EventKind, Libp2p},
     NetworkMsg, NetworkService,
@@ -94,7 +94,7 @@ impl<T> Spsc<T> {
 #[derive(Default)]
 struct Messages {
     proposal_chunks: Spsc<ProposalMsg>,
-    votes: HashMap<CommitteeId, HashMap<BlockId, Spsc<VoteMsg>>>,
+    votes: HashMap<CommitteeId, HashMap<HeaderId, Spsc<VoteMsg>>>,
     new_views: HashMap<CommitteeId, Spsc<NewViewMsg>>,
     timeouts: HashMap<CommitteeId, Spsc<TimeoutMsg>>,
     timeout_qcs: Spsc<TimeoutQcMsg>,
@@ -153,7 +153,7 @@ impl MessageCache {
         &self,
         view: View,
         committee_id: CommitteeId,
-        proposal_id: BlockId,
+        proposal_id: HeaderId,
     ) -> Option<Receiver<VoteMsg>> {
         self.cache.lock().unwrap().get_mut(&view).map(|m| {
             m.votes
@@ -356,7 +356,7 @@ impl NetworkAdapter for Libp2pAdapter {
         &self,
         committee: &Committee,
         view: View,
-        proposal_id: BlockId,
+        proposal_id: HeaderId,
     ) -> BoxedStream<VoteMsg> {
         self.message_cache
             .get_votes(view, committee.id::<blake2::Blake2s256>(), proposal_id)
