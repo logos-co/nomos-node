@@ -21,7 +21,11 @@ struct MockPoolNode {
     logging: ServiceHandle<Logger>,
     network: ServiceHandle<NetworkService<Mock>>,
     mockpool: ServiceHandle<
-        MempoolService<MockAdapter, MockPool<MockTransaction<MockMessage>, MockTxId>, Transaction>,
+        MempoolService<
+            MockAdapter,
+            MockPool<BlockId, MockTransaction<MockMessage>, MockTxId>,
+            Transaction,
+        >,
     >,
 }
 
@@ -76,7 +80,7 @@ fn test_mockmempool() {
     let network = app.handle().relay::<NetworkService<Mock>>();
     let mempool = app.handle().relay::<MempoolService<
         MockAdapter,
-        MockPool<MockTransaction<MockMessage>, MockTxId>,
+        MockPool<BlockId, MockTransaction<MockMessage>, MockTxId>,
         Transaction,
     >>();
 

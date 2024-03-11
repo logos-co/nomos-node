@@ -24,7 +24,6 @@ use tokio::sync::oneshot::Sender;
 // internal
 use crate::network::NetworkAdapter;
 use backend::{MemPool, Status};
-use nomos_core::block::BlockId;
 use nomos_network::{NetworkMsg, NetworkService};
 use overwatch_rs::services::life_cycle::LifecycleMessage;
 use overwatch_rs::services::{
@@ -42,6 +41,7 @@ where
     P::Settings: Clone,
     P::Item: Debug + 'static,
     P::Key: Debug + 'static,
+    P::BlockId: Debug + 'static,
     D: Discriminant,
 {
     service_state: ServiceStateHandle<Self>,
@@ -63,7 +63,7 @@ pub struct MempoolMetrics {
     pub last_item_timestamp: u64,
 }
 
-pub enum MempoolMsg<Item, Key> {
+pub enum MempoolMsg<BlockId, Item, Key> {
     Add {
         item: Item,
         key: Key,
@@ -90,12 +90,13 @@ pub enum MempoolMsg<Item, Key> {
     },
     Status {
         items: Vec<Key>,
-        reply_channel: Sender<Vec<Status>>,
+        reply_channel: Sender<Vec<Status<BlockId>>>,
     },
 }
 
-impl<Item, Key> Debug for MempoolMsg<Item, Key>
+impl<BlockId, Item, Key> Debug for MempoolMsg<BlockId, Item, Key>
 where
+    BlockId: Debug,
     Item: Debug,
     Key: Debug,
 {
@@ -122,7 +123,10 @@ where
     }
 }
 
-impl<Item: 'static, Key: 'static> RelayMessage for MempoolMsg<Item, Key> {}
+impl<BlockId: 'static, Item: 'static, Key: 'static> RelayMessage
+    for MempoolMsg<BlockId, Item, Key>
+{
+}
 
 pub struct Transaction;
 pub struct Certificate;
@@ -146,13 +150,14 @@ where
     P::Settings: Clone,
     P::Item: Debug + 'static,
     P::Key: Debug + 'static,
+    P::BlockId: Debug + 'static,
     D: Discriminant,
 {
     const SERVICE_ID: ServiceId = D::ID;
     type Settings = Settings<P::Settings, N::Settings>;
     type State = NoState<Self::Settings>;
     type StateOperator = NoOperator<Self::State>;
-    type Message = MempoolMsg<<P as MemPool>::Item, <P as MemPool>::Key>;
+    type Message = MempoolMsg<<P as MemPool>::BlockId, <P as MemPool>::Item, <P as MemPool>::Key>;
 }
 
 #[async_trait::async_trait]
@@ -163,6 +168,7 @@ where
     N::Settings: Clone + Send + Sync + 'static,
     P::Item: Clone + Debug + Send + Sync + 'static,
     P::Key: Debug + Send + Sync + 'static,
+    P::BlockId: Send + Debug + 'static,
     N: NetworkAdapter<Item = P::Item, Key = P::Key> + Send + Sync + 'static,
     D: Discriminant + Send,
 {
@@ -237,6 +243,7 @@ where
     N::Settings: Clone + Send + Sync + 'static,
     P::Item: Clone + Debug + Send + Sync + 'static,
     P::Key: Debug + Send + Sync + 'static,
+    P::BlockId: Debug + Send + 'static,
     N: NetworkAdapter<Item = P::Item, Key = P::Key> + Send + Sync + 'static,
     D: Discriminant + Send,
 {
@@ -256,7 +263,7 @@ where
     }
 
     async fn handle_mempool_message(
-        message: MempoolMsg<P::Item, P::Key>,
+        message: MempoolMsg<P::BlockId, P::Item, P::Key>,
         pool: &mut P,
         network_relay: &mut OutboundRelay<NetworkMsg<N::Backend>>,
         service_state: &mut ServiceStateHandle<Self>,

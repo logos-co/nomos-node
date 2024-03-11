@@ -1,5 +1,6 @@
 use core::{fmt::Debug, hash::Hash};
 
+use nomos_core::block::BlockId;
 use nomos_core::tx::Transaction;
 use nomos_mempool::{
     backend::mockpool::MockPool,
@@ -12,7 +13,7 @@ use tokio::sync::oneshot;
 
 type ClMempoolService<T> = MempoolService<
     Libp2pAdapter<T, <T as Transaction>::Hash>,
-    MockPool<T, <T as Transaction>::Hash>,
+    MockPool<BlockId, T, <T as Transaction>::Hash>,
     TxDiscriminant,
 >;
 
@@ -46,7 +47,7 @@ where
 pub async fn cl_mempool_status<T>(
     handle: &overwatch_rs::overwatch::handle::OverwatchHandle,
     items: Vec<<T as Transaction>::Hash>,
-) -> Result<Vec<Status>, super::DynError>
+) -> Result<Vec<Status<BlockId>>, super::DynError>
 where
     T: Transaction
         + Clone

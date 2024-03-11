@@ -6,19 +6,18 @@ use std::{collections::BTreeMap, time::UNIX_EPOCH};
 // crates
 // internal
 use crate::backend::{MemPool, MempoolError};
-use nomos_core::block::BlockId;
 
 use super::Status;
 
 /// A mock mempool implementation that stores all transactions in memory in the order received.
-pub struct MockPool<Item, Key> {
+pub struct MockPool<BlockId, Item, Key> {
     pending_items: LinkedHashMap<Key, Item>,
     in_block_items: BTreeMap<BlockId, Vec<Item>>,
     in_block_items_by_id: BTreeMap<Key, BlockId>,
     last_item_timestamp: u64,
 }
 
-impl<Item, Key> Default for MockPool<Item, Key>
+impl<BlockId, Item, Key> Default for MockPool<BlockId, Item, Key>
 where
     Key: Hash + Eq,
 {
@@ -32,7 +31,7 @@ where
     }
 }
 
-impl<Item, Key> MockPool<Item, Key>
+impl<BlockId, Item, Key> MockPool<BlockId, Item, Key>
 where
     Key: Hash + Eq + Clone,
 {
@@ -41,14 +40,16 @@ where
     }
 }
 
-impl<Item, Key> MemPool for MockPool<Item, Key>
+impl<BlockId, Item, Key> MemPool for MockPool<BlockId, Item, Key>
 where
     Item: Clone + Send + Sync + 'static + Hash,
     Key: Clone + Ord + Hash,
+    BlockId: Copy + Ord,
 {
     type Settings = ();
     type Item = Item;
     type Key = Key;
+    type BlockId = BlockId;
 
     fn new(_settings: Self::Settings) -> Self {
         Self::new()
@@ -108,7 +109,7 @@ where
         self.last_item_timestamp
     }
 
-    fn status(&self, items: &[Self::Key]) -> Vec<Status> {
+    fn status(&self, items: &[Self::Key]) -> Vec<Status<BlockId>> {
         items
             .iter()
             .map(|key| {

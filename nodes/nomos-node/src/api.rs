@@ -53,7 +53,7 @@ pub struct AxumBackend<T, S, const SIZE: usize> {
         da_status,
     ),
     components(
-        schemas(Status, MempoolMetrics)
+        schemas(Status<BlockId>, MempoolMetrics)
     ),
     tags(
         (name = "da", description = "data availibility related APIs")
