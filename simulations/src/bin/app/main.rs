@@ -136,9 +136,7 @@ impl SimulationApp {
                     },
                     View::new(0),
                     Block::genesis([0; 32].into()).parent_qc,
-                    LeaderProof::LeaderId {
-                        leader_id: leader.into(),
-                    },
+                    LeaderProof::LeaderId { leader_id: leader },
                 );
                 let mut rng = SmallRng::seed_from_u64(seed);
                 overlay_node::to_overlay_node(
