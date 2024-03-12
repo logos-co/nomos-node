@@ -6,7 +6,7 @@ services:
       dockerfile: testnet/Dockerfile
     ports:
       - "3000:3000/tcp"
-      - "8080:8080/tcp"
+      - "18080:18080/tcp"
     volumes:
       - ./testnet:/etc/nomos
     environment:
