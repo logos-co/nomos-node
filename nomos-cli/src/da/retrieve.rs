@@ -1,6 +1,6 @@
-use carnot_engine::BlockId;
 use full_replication::Blob;
 use nomos_core::da::certificate::Certificate;
+use nomos_core::header::HeaderId;
 use reqwest::Url;
 use thiserror::Error;
 
@@ -15,7 +15,7 @@ pub enum Error {
 }
 
 /// Return the blobs whose certificate has been included in the provided block.
-pub async fn get_block_blobs(node: &Url, block: &BlockId) -> Result<Vec<Blob>, Error> {
+pub async fn get_block_blobs(node: &Url, block: &HeaderId) -> Result<Vec<Blob>, Error> {
     let block = get_block_contents(node, block)
         .await?
         .ok_or(Error::NotFound)?;

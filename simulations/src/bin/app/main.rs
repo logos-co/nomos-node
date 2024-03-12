@@ -6,9 +6,10 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 // crates
 use anyhow::Ok;
 use carnot_engine::overlay::RandomBeaconState;
-use carnot_engine::{Block, View};
+use carnot_engine::{Block, LeaderProof, View};
 use clap::Parser;
 use crossbeam::channel;
+use nomos_core::block::builder::BlockBuilder;
 use parking_lot::Mutex;
 use rand::rngs::SmallRng;
 use rand::seq::SliceRandom;
@@ -129,14 +130,14 @@ impl SimulationApp {
                 let leader = nodes.first().copied().unwrap();
 
                 // FIXME: Actually use a proposer and a key to generate random beacon state
-                let genesis = nomos_core::block::Block::new(
-                    View::new(0),
-                    Block::genesis().parent_qc,
-                    [].into_iter(),
-                    [].into_iter(),
-                    leader,
+                let genesis = <BlockBuilder<_, _, (), ()>>::empty_carnot(
                     RandomBeaconState::Sad {
                         entropy: Box::new([0; 32]),
+                    },
+                    View::new(0),
+                    Block::genesis([0; 32].into()).parent_qc,
+                    LeaderProof::LeaderId {
+                        leader_id: leader.into(),
                     },
                 );
                 let mut rng = SmallRng::seed_from_u64(seed);

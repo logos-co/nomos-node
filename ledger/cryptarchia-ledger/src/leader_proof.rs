@@ -1,5 +1,6 @@
 use cryptarchia_engine::Slot;
 
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone, Debug, Eq, PartialEq, Copy, Hash)]
 pub struct LeaderProof {
     commitment: Commitment,
@@ -91,3 +92,9 @@ impl AsRef<[u8]> for Commitment {
         &self.0
     }
 }
+
+// ----------- serialization
+use crate::utils::serialize_bytes_newtype;
+
+serialize_bytes_newtype!(Commitment);
+serialize_bytes_newtype!(Nullifier);

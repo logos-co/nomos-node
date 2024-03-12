@@ -19,9 +19,8 @@ use tower_http::{
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 
-use carnot_engine::BlockId;
 use full_replication::{Blob, Certificate};
-use nomos_core::{da::blob, tx::Transaction};
+use nomos_core::{da::blob, header::HeaderId, tx::Transaction};
 use nomos_mempool::{network::adapters::libp2p::Libp2pAdapter, openapi::Status, MempoolMetrics};
 use nomos_network::backends::libp2p::Libp2p;
 use nomos_storage::backends::StorageSerde;
@@ -53,7 +52,7 @@ pub struct AxumBackend<T, S, const SIZE: usize> {
         da_status,
     ),
     components(
-        schemas(Status<BlockId>, MempoolMetrics)
+        schemas(Status<HeaderId>, MempoolMetrics)
     ),
     tags(
         (name = "da", description = "data availibility related APIs")
@@ -255,8 +254,8 @@ where
 
 #[derive(Deserialize)]
 struct QueryParams {
-    from: Option<BlockId>,
-    to: Option<BlockId>,
+    from: Option<HeaderId>,
+    to: Option<HeaderId>,
 }
 
 #[utoipa::path(
@@ -300,7 +299,7 @@ async fn libp2p_info(State(handle): State<OverwatchHandle>) -> Response {
         (status = 500, description = "Internal server error", body = String),
     )
 )]
-async fn block<S, Tx>(State(handle): State<OverwatchHandle>, Json(id): Json<BlockId>) -> Response
+async fn block<S, Tx>(State(handle): State<OverwatchHandle>, Json(id): Json<HeaderId>) -> Response
 where
     Tx: serde::Serialize + serde::de::DeserializeOwned + Clone + Eq + core::hash::Hash,
     S: StorageSerde + Send + Sync + 'static,
