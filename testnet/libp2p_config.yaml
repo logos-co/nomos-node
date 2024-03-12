@@ -23,7 +23,7 @@ network:
     log_level: "fatal"
     node_key: "0000000000000000000000000000000000000000000000000000000000000001"
     discV5BootstrapNodes: []
-    initial_peers: ["/dns/bootstrap/tcp/3000"]
+    initial_peers: ["/dns/bootstrap/udp/3000/quic-v1"]
     relayTopics: []
 
 http:
