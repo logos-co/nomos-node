@@ -1,5 +1,5 @@
 use core::{fmt::Debug, hash::Hash};
-
+use nomos_core::block::BlockId;
 use nomos_mempool::{
     backend::mockpool::MockPool, network::NetworkAdapter, Discriminant, MempoolMsg, MempoolService,
 };
@@ -20,7 +20,7 @@ where
     Key: Clone + Debug + Ord + Hash + 'static,
 {
     let relay = handle
-        .relay::<MempoolService<A, MockPool<Item, Key>, D>>()
+        .relay::<MempoolService<A, MockPool<BlockId, Item, Key>, D>>()
         .connect()
         .await?;
     let (sender, receiver) = oneshot::channel();

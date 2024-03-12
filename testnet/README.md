@@ -46,13 +46,13 @@ docker compose logs -f {bootstrap,libp2p-node,etcd}
 
 ## Using testnet
 
-Bootstrap node is accessible from the host via `3000` and `8080` ports. To expose other nomos nodes, please update `libp2p-node` service in the `compose.yml` file with this configuration:
+Bootstrap node is accessible from the host via `3000` and `18080` ports. To expose other nomos nodes, please update `libp2p-node` service in the `compose.yml` file with this configuration:
 
 ```bash
   libp2p-node:
     ports:
     - "3001-3010:3000" # Use range depending on the number of nomos node replicas.
-    - "8081-8190:8080"
+    - "18081-18190:18080"
 ```
 
 After running `docker compose up`, the randomly assigned ports can be viewed with `ps` command:

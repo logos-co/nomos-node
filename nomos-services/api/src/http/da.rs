@@ -1,4 +1,5 @@
 use full_replication::{AbsoluteNumber, Attestation, Blob, Certificate, FullReplication};
+use nomos_core::block::BlockId;
 use nomos_core::da::blob;
 use nomos_da::{
     backend::memory_cache::BlobCache, network::adapters::libp2p::Libp2pAdapter as DaLibp2pAdapter,
@@ -14,7 +15,7 @@ use tokio::sync::oneshot;
 
 pub type DaMempoolService = MempoolService<
     Libp2pAdapter<Certificate, <Blob as blob::Blob>::Hash>,
-    MockPool<Certificate, <Blob as blob::Blob>::Hash>,
+    MockPool<BlockId, Certificate, <Blob as blob::Blob>::Hash>,
     CertDiscriminant,
 >;
 
@@ -42,7 +43,7 @@ pub async fn da_mempool_metrics(
 pub async fn da_mempool_status(
     handle: &overwatch_rs::overwatch::handle::OverwatchHandle,
     items: Vec<<Blob as blob::Blob>::Hash>,
-) -> Result<Vec<Status>, super::DynError> {
+) -> Result<Vec<Status<BlockId>>, super::DynError> {
     let relay = handle.relay::<DaMempoolService>().connect().await?;
     let (sender, receiver) = oneshot::channel();
     relay

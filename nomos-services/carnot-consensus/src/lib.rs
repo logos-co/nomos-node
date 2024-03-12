@@ -113,8 +113,8 @@ pub struct CarnotConsensus<A, ClPool, ClPoolAdapter, DaPool, DaPoolAdapter, O, T
 where
     A: NetworkAdapter,
     ClPoolAdapter: MempoolAdapter<Item = ClPool::Item, Key = ClPool::Key>,
-    ClPool: MemPool,
-    DaPool: MemPool,
+    ClPool: MemPool<BlockId = BlockId>,
+    DaPool: MemPool<BlockId = BlockId>,
     DaPoolAdapter: MempoolAdapter<Item = DaPool::Item, Key = DaPool::Key>,
     O: Overlay + Debug,
     ClPool::Item: Debug + 'static,
@@ -140,10 +140,10 @@ impl<A, ClPool, ClPoolAdapter, DaPool, DaPoolAdapter, O, TxS, BS, Storage> Servi
     for CarnotConsensus<A, ClPool, ClPoolAdapter, DaPool, DaPoolAdapter, O, TxS, BS, Storage>
 where
     A: NetworkAdapter,
-    ClPool: MemPool,
+    ClPool: MemPool<BlockId = BlockId>,
     ClPool::Item: Debug,
     ClPool::Key: Debug,
-    DaPool: MemPool,
+    DaPool: MemPool<BlockId = BlockId>,
     DaPool::Item: Debug,
     DaPool::Key: Debug,
     ClPoolAdapter: MempoolAdapter<Item = ClPool::Item, Key = ClPool::Key>,
@@ -165,9 +165,9 @@ impl<A, ClPool, ClPoolAdapter, DaPool, DaPoolAdapter, O, TxS, BS, Storage> Servi
     for CarnotConsensus<A, ClPool, ClPoolAdapter, DaPool, DaPoolAdapter, O, TxS, BS, Storage>
 where
     A: NetworkAdapter + Clone + Send + Sync + 'static,
-    ClPool: MemPool + Send + Sync + 'static,
+    ClPool: MemPool<BlockId = BlockId> + Send + Sync + 'static,
     ClPool::Settings: Send + Sync + 'static,
-    DaPool: MemPool + Send + Sync + 'static,
+    DaPool: MemPool<BlockId = BlockId> + Send + Sync + 'static,
     DaPool::Settings: Send + Sync + 'static,
     ClPool::Item: Transaction<Hash = ClPool::Key>
         + Debug
@@ -364,9 +364,9 @@ impl<A, ClPool, ClPoolAdapter, DaPool, DaPoolAdapter, O, TxS, BS, Storage>
     CarnotConsensus<A, ClPool, ClPoolAdapter, DaPool, DaPoolAdapter, O, TxS, BS, Storage>
 where
     A: NetworkAdapter + Clone + Send + Sync + 'static,
-    ClPool: MemPool + Send + Sync + 'static,
+    ClPool: MemPool<BlockId = BlockId> + Send + Sync + 'static,
     ClPool::Settings: Send + Sync + 'static,
-    DaPool: MemPool + Send + Sync + 'static,
+    DaPool: MemPool<BlockId = BlockId> + Send + Sync + 'static,
     DaPool::Settings: Send + Sync + 'static,
     ClPool::Item: Transaction<Hash = ClPool::Key>
         + Debug
@@ -462,8 +462,8 @@ where
         task_manager: &mut TaskManager<View, Event<ClPool::Item, DaPool::Item>>,
         adapter: A,
         private_key: PrivateKey,
-        cl_mempool_relay: OutboundRelay<MempoolMsg<ClPool::Item, ClPool::Key>>,
-        da_mempool_relay: OutboundRelay<MempoolMsg<DaPool::Item, DaPool::Key>>,
+        cl_mempool_relay: OutboundRelay<MempoolMsg<BlockId, ClPool::Item, ClPool::Key>>,
+        da_mempool_relay: OutboundRelay<MempoolMsg<BlockId, DaPool::Item, DaPool::Key>>,
         storage_relay: OutboundRelay<StorageMsg<Storage>>,
         tx_selector: TxS,
         blobl_selector: BS,
@@ -577,8 +577,8 @@ where
         task_manager: &mut TaskManager<View, Event<ClPool::Item, DaPool::Item>>,
         adapter: A,
         storage_relay: OutboundRelay<StorageMsg<Storage>>,
-        cl_mempool_relay: OutboundRelay<MempoolMsg<ClPool::Item, ClPool::Key>>,
-        da_mempool_relay: OutboundRelay<MempoolMsg<DaPool::Item, DaPool::Key>>,
+        cl_mempool_relay: OutboundRelay<MempoolMsg<BlockId, ClPool::Item, ClPool::Key>>,
+        da_mempool_relay: OutboundRelay<MempoolMsg<BlockId, DaPool::Item, DaPool::Key>>,
     ) -> (Carnot<O>, Option<Output<ClPool::Item, DaPool::Item>>) {
         tracing::debug!("received proposal {:?}", block);
         if carnot.highest_voted_view() >= block.header().view {
@@ -793,8 +793,8 @@ where
         qc: Qc,
         tx_selector: TxS,
         blob_selector: BS,
-        cl_mempool_relay: OutboundRelay<MempoolMsg<ClPool::Item, ClPool::Key>>,
-        da_mempool_relay: OutboundRelay<MempoolMsg<DaPool::Item, DaPool::Key>>,
+        cl_mempool_relay: OutboundRelay<MempoolMsg<BlockId, ClPool::Item, ClPool::Key>>,
+        da_mempool_relay: OutboundRelay<MempoolMsg<BlockId, DaPool::Item, DaPool::Key>>,
     ) -> Option<Output<ClPool::Item, DaPool::Item>> {
         let mut output = None;
         let cl_txs = get_mempool_contents(cl_mempool_relay);
@@ -1127,7 +1127,7 @@ pub struct CarnotInfo {
 }
 
 async fn get_mempool_contents<Item, Key>(
-    mempool: OutboundRelay<MempoolMsg<Item, Key>>,
+    mempool: OutboundRelay<MempoolMsg<BlockId, Item, Key>>,
 ) -> Result<Box<dyn Iterator<Item = Item> + Send>, tokio::sync::oneshot::error::RecvError> {
     let (reply_channel, rx) = tokio::sync::oneshot::channel();
 
@@ -1143,7 +1143,7 @@ async fn get_mempool_contents<Item, Key>(
 }
 
 async fn mark_in_block<Item, Key>(
-    mempool: OutboundRelay<MempoolMsg<Item, Key>>,
+    mempool: OutboundRelay<MempoolMsg<BlockId, Item, Key>>,
     ids: impl Iterator<Item = Key>,
     block: BlockId,
 ) {

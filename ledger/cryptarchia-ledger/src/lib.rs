@@ -1,11 +1,18 @@
-use crate::{
-    crypto::Blake2b, Commitment, Config, Epoch, Header, HeaderId, LeaderProof, Nonce, Nullifier,
-    Slot,
-};
+mod block;
+mod config;
+mod crypto;
+mod leader_proof;
+
+use crate::{crypto::Blake2b, Commitment, LeaderProof, Nullifier};
 use blake2::Digest;
+use cryptarchia_engine::{Epoch, Slot};
 use rpds::HashTrieSet;
 use std::collections::HashMap;
 use thiserror::Error;
+
+pub use block::*;
+pub use config::Config;
+pub use leader_proof::*;
 
 #[derive(Clone, Debug, Error)]
 pub enum LedgerError {
@@ -141,8 +148,8 @@ impl LedgerState {
             });
         }
 
-        let current_epoch = self.slot.epoch(config);
-        let new_epoch = slot.epoch(config);
+        let current_epoch = config.epoch(self.slot);
+        let new_epoch = config.epoch(slot);
 
         // there are 3 cases to consider:
         // 1. we are in the same epoch as the parent state
@@ -198,7 +205,7 @@ impl LedgerState {
     }
 
     fn try_apply_proof(self, proof: &LeaderProof, config: &Config) -> Result<Self, LedgerError> {
-        assert_eq!(proof.slot().epoch(config), self.epoch_state.epoch);
+        assert_eq!(config.epoch(proof.slot()), self.epoch_state.epoch);
         // The leadership coin either has to be in the state snapshot or be derived from
         // a coin that is in the state snapshot (i.e. be in the lead coins commitments)
         if !self.can_lead(proof.commitment())
@@ -295,13 +302,97 @@ impl core::fmt::Debug for LedgerState {
 
 #[cfg(test)]
 pub mod tests {
-
-    use crate::{ledger::LedgerError, Commitment, Header};
-
-    use super::{
-        super::tests::{config, genesis_header, header, Coin},
-        EpochState, Ledger, LedgerState,
+    use super::{EpochState, Ledger, LedgerState};
+    use crate::{
+        crypto::Blake2b, Commitment, Config, Header, HeaderId, LeaderProof, LedgerError, Nullifier,
     };
+    use blake2::Digest;
+    use cryptarchia_engine::Slot;
+    use std::hash::{DefaultHasher, Hash, Hasher};
+
+    pub fn header(slot: impl Into<Slot>, parent: HeaderId, coin: Coin) -> Header {
+        let slot = slot.into();
+        Header::new(parent, 0, [0; 32].into(), slot, coin.to_proof(slot))
+    }
+
+    pub fn header_with_orphans(
+        slot: impl Into<Slot>,
+        parent: HeaderId,
+        coin: Coin,
+        orphans: Vec<Header>,
+    ) -> Header {
+        header(slot, parent, coin).with_orphaned_proofs(orphans)
+    }
+
+    pub fn genesis_header() -> Header {
+        Header::new(
+            [0; 32].into(),
+            0,
+            [0; 32].into(),
+            0.into(),
+            LeaderProof::dummy(0.into()),
+        )
+    }
+
+    pub fn config() -> Config {
+        Config {
+            epoch_stake_distribution_stabilization: 4,
+            epoch_period_nonce_buffer: 3,
+            epoch_period_nonce_stabilization: 3,
+            consensus_config: cryptarchia_engine::Config {
+                security_param: 1,
+                active_slot_coeff: 1.0,
+            },
+        }
+    }
+
+    #[derive(Debug, Clone, Copy)]
+    pub struct Coin {
+        sk: u64,
+        nonce: u64,
+    }
+
+    impl Coin {
+        pub fn new(sk: u64) -> Self {
+            Self { sk, nonce: 0 }
+        }
+
+        pub fn commitment(&self) -> Commitment {
+            <[u8; 32]>::from(
+                Blake2b::new_with_prefix("commitment".as_bytes())
+                    .chain_update(self.sk.to_be_bytes())
+                    .chain_update(self.nonce.to_be_bytes())
+                    .finalize(),
+            )
+            .into()
+        }
+
+        pub fn nullifier(&self) -> Nullifier {
+            <[u8; 32]>::from(
+                Blake2b::new_with_prefix("nullifier".as_bytes())
+                    .chain_update(self.sk.to_be_bytes())
+                    .chain_update(self.nonce.to_be_bytes())
+                    .finalize(),
+            )
+            .into()
+        }
+
+        pub fn evolve(&self) -> Self {
+            let mut h = DefaultHasher::new();
+            self.nonce.hash(&mut h);
+            let nonce = h.finish();
+            Self { sk: self.sk, nonce }
+        }
+
+        pub fn to_proof(&self, slot: Slot) -> LeaderProof {
+            LeaderProof::new(
+                self.commitment(),
+                self.nullifier(),
+                slot,
+                self.evolve().commitment(),
+            )
+        }
+    }
 
     pub fn genesis_state(commitments: &[Commitment]) -> LedgerState {
         LedgerState {
@@ -512,5 +603,95 @@ pub mod tests {
         // and now the minted coin can freely use the evolved coin for subsequent blocks
         let h_2_1 = header(21, h_2_0.id(), coin_1.evolve());
         ledger.try_apply_header(&h_2_1).unwrap();
+    }
+
+    #[test]
+    fn test_orphan_proof_import() {
+        let coin = Coin::new(0);
+        let (mut ledger, genesis) = ledger(&[coin.commitment()]);
+
+        let coin_new = coin.evolve();
+        let coin_new_new = coin_new.evolve();
+
+        // produce a fork where the coin has been spent twice
+        let fork_1 = header(1, genesis.id(), coin);
+        let fork_2 = header(2, fork_1.id(), coin_new);
+
+        // neither of the evolved coins should be usable right away in another branch
+        assert!(matches!(
+            ledger.try_apply_header(&header(1, genesis.id(), coin_new)),
+            Err(LedgerError::CommitmentNotFound)
+        ));
+        assert!(matches!(
+            ledger.try_apply_header(&header(1, genesis.id(), coin_new_new)),
+            Err(LedgerError::CommitmentNotFound)
+        ));
+
+        // they also should not be accepted if the fork from where they have been imported has not been seen already
+        assert!(matches!(
+            ledger.try_apply_header(&header_with_orphans(
+                1,
+                genesis.id(),
+                coin_new,
+                vec![fork_1.clone()]
+            )),
+            Err(LedgerError::OrphanMissing(_))
+        ));
+
+        // now the first block of the fork is seen (and accepted)
+        ledger = ledger.try_apply_header(&fork_1).unwrap();
+        // and it can now be imported in another branch (note this does not validate it's for an earlier slot)
+        ledger
+            .try_apply_header(&header_with_orphans(
+                1,
+                genesis.id(),
+                coin_new,
+                vec![fork_1.clone()],
+            ))
+            .unwrap();
+        // but the next coin is still not accepted since the second block using the evolved coin has not been seen yet
+        assert!(matches!(
+            ledger.try_apply_header(&header_with_orphans(
+                1,
+                genesis.id(),
+                coin_new_new,
+                vec![fork_1.clone(), fork_2.clone()]
+            )),
+            Err(LedgerError::OrphanMissing(_))
+        ));
+
+        // now the second block of the fork is seen as well and the coin evolved twice can be used in another branch
+        ledger = ledger.try_apply_header(&fork_2).unwrap();
+        ledger
+            .try_apply_header(&header_with_orphans(
+                1,
+                genesis.id(),
+                coin_new_new,
+                vec![fork_1.clone(), fork_2.clone()],
+            ))
+            .unwrap();
+        // but we can't import just the second proof because it's using an evolved coin that has not been seen yet
+        assert!(matches!(
+            ledger.try_apply_header(&header_with_orphans(
+                1,
+                genesis.id(),
+                coin_new_new,
+                vec![fork_2.clone()]
+            )),
+            Err(LedgerError::CommitmentNotFound)
+        ));
+
+        // an imported proof that uses a coin that was already used in the base branch should not be allowed
+        let header_1 = header(1, genesis.id(), coin);
+        ledger = ledger.try_apply_header(&header_1).unwrap();
+        assert!(matches!(
+            ledger.try_apply_header(&header_with_orphans(
+                2,
+                header_1.id(),
+                coin_new_new,
+                vec![fork_1.clone(), fork_2.clone()]
+            )),
+            Err(LedgerError::NullifierExists)
+        ));
     }
 }
