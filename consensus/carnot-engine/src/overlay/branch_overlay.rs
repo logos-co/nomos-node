@@ -188,7 +188,9 @@ fn build_committee_from_nodes_with_size(
 
 #[cfg(test)]
 mod tests {
-    use crate::overlay::{FisherYatesShuffle, RoundRobin};
+    use nomos_utils::fisheryates::FisherYatesShuffle;
+
+    use crate::overlay::RoundRobin;
 
     use super::*;
     const ENTROPY: [u8; 32] = [0; 32];

@@ -1,4 +1,5 @@
-use nomos_libp2p::Multiaddr;
+use mixnet::packet::PacketBody;
+use nomos_libp2p::{libp2p::StreamProtocol, Multiaddr, PeerId};
 use serde::{Deserialize, Serialize};
 use tokio::sync::oneshot;
 
@@ -16,18 +17,23 @@ pub enum Command {
         reply: oneshot::Sender<Libp2pInfo>,
     },
     #[doc(hidden)]
-    // broadcast a message directly through gossipsub without mixnet
-    DirectBroadcastAndRetry {
+    RetryBroadcast {
         topic: Topic,
         message: Box<[u8]>,
         retry_count: usize,
     },
+    StreamSend {
+        peer_id: PeerId,
+        protocol: StreamProtocol,
+        packet_body: PacketBody,
+    },
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct Dial {
     pub addr: Multiaddr,
     pub retry_count: usize,
+    pub result_sender: oneshot::Sender<Result<PeerId, nomos_libp2p::DialError>>,
 }
 
 pub type Topic = String;

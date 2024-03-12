@@ -1,20 +1,19 @@
-use std::{collections::HashMap, ops::Range, time::Duration};
-
-use mixnet_client::MixnetClient;
-#[allow(deprecated)]
-use nomos_libp2p::{
-    gossipsub::{self, Message},
-    libp2p::swarm::ConnectionId,
-    Behaviour, BehaviourEvent, Multiaddr, Swarm, SwarmEvent, THandlerErr,
+use std::{
+    collections::{hash_map::Entry, HashMap},
+    time::Duration,
 };
-use rand::rngs::OsRng;
-use tokio::sync::{broadcast, mpsc};
+
+use futures::AsyncWriteExt;
+use nomos_libp2p::{
+    gossipsub,
+    libp2p::{swarm::ConnectionId, Stream, StreamProtocol},
+    libp2p_stream::{Control, IncomingStreams, OpenStreamError},
+    BehaviourEvent, Multiaddr, PeerId, Swarm, SwarmEvent,
+};
+use tokio::sync::{broadcast, mpsc, oneshot};
 use tokio_stream::StreamExt;
 
-use crate::backends::libp2p::{
-    mixnet::{random_delay, MixnetMessage},
-    Libp2pInfo,
-};
+use crate::backends::libp2p::Libp2pInfo;
 
 use super::{
     command::{Command, Dial, Topic},
@@ -23,12 +22,12 @@ use super::{
 
 pub struct SwarmHandler {
     pub swarm: Swarm,
+    stream_control: Control,
+    streams: HashMap<PeerId, Stream>,
     pub pending_dials: HashMap<ConnectionId, Dial>,
     pub commands_tx: mpsc::Sender<Command>,
     pub commands_rx: mpsc::Receiver<Command>,
     pub events_tx: broadcast::Sender<Event>,
-    pub mixnet_client: MixnetClient<OsRng>,
-    pub mixnet_delay: Range<Duration>,
 }
 
 macro_rules! log_error {
@@ -52,27 +51,29 @@ impl SwarmHandler {
         events_tx: broadcast::Sender<Event>,
     ) -> Self {
         let swarm = Swarm::build(&config.inner).unwrap();
-        let mixnet_client = MixnetClient::new(config.mixnet_client.clone(), OsRng);
+        let stream_control = swarm.stream_control();
 
         // Keep the dialing history since swarm.connect doesn't return the result synchronously
         let pending_dials = HashMap::<ConnectionId, Dial>::new();
 
         Self {
             swarm,
+            stream_control,
+            streams: HashMap::new(),
             pending_dials,
             commands_tx,
             commands_rx,
             events_tx,
-            mixnet_client,
-            mixnet_delay: config.mixnet_delay.clone(),
         }
     }
 
     pub async fn run(&mut self, initial_peers: Vec<Multiaddr>) {
         for initial_peer in initial_peers {
+            let (tx, _) = oneshot::channel();
             let dial = Dial {
                 addr: initial_peer,
                 retry_count: 0,
+                result_sender: tx,
             };
             Self::schedule_connect(dial, self.commands_tx.clone()).await;
         }
@@ -89,8 +90,7 @@ impl SwarmHandler {
         }
     }
 
-    #[allow(deprecated)]
-    fn handle_event(&mut self, event: SwarmEvent<BehaviourEvent, THandlerErr<Behaviour>>) {
+    fn handle_event(&mut self, event: SwarmEvent<BehaviourEvent>) {
         match event {
             SwarmEvent::Behaviour(BehaviourEvent::Gossipsub(gossipsub::Event::Message {
                 propagation_source: peer_id,
@@ -108,7 +108,7 @@ impl SwarmHandler {
             } => {
                 tracing::debug!("connected to peer:{peer_id}, connection_id:{connection_id:?}");
                 if endpoint.is_dialer() {
-                    self.complete_connect(connection_id);
+                    self.complete_connect(connection_id, peer_id);
                 }
             }
             SwarmEvent::ConnectionClosed {
@@ -142,10 +142,7 @@ impl SwarmHandler {
                 self.connect(dial);
             }
             Command::Broadcast { topic, message } => {
-                tracing::debug!("sending message to mixnet client");
-                let msg = MixnetMessage { topic, message };
-                let delay = random_delay(&self.mixnet_delay);
-                log_error!(self.mixnet_client.send(msg.as_bytes(), delay));
+                self.broadcast_and_retry(topic, message, 0).await;
             }
             Command::Subscribe(topic) => {
                 tracing::debug!("subscribing to topic: {topic}");
@@ -167,12 +164,30 @@ impl SwarmHandler {
                 };
                 log_error!(reply.send(info));
             }
-            Command::DirectBroadcastAndRetry {
+            Command::RetryBroadcast {
                 topic,
                 message,
                 retry_count,
             } => {
                 self.broadcast_and_retry(topic, message, retry_count).await;
+            }
+            Command::StreamSend {
+                peer_id,
+                protocol,
+                packet_body: packet,
+            } => {
+                tracing::debug!("StreamSend to {peer_id}");
+                match self.open_stream(peer_id, protocol).await {
+                    Ok(stream) => {
+                        if let Err(e) = packet.write_to(stream).await {
+                            tracing::error!("failed to write to the stream with ${peer_id}: {e}");
+                            self.close_stream(&peer_id).await;
+                        }
+                    }
+                    Err(e) => {
+                        tracing::error!("failed to open stream with {peer_id}: {e}");
+                    }
+                }
             }
         }
     }
@@ -197,12 +212,19 @@ impl SwarmHandler {
                     "Failed to connect to {} with unretriable error: {e}",
                     dial.addr
                 );
+                if let Err(err) = dial.result_sender.send(Err(e)) {
+                    tracing::warn!("failed to send the Err result of dialing: {err:?}");
+                }
             }
         }
     }
 
-    fn complete_connect(&mut self, connection_id: ConnectionId) {
-        self.pending_dials.remove(&connection_id);
+    fn complete_connect(&mut self, connection_id: ConnectionId, peer_id: PeerId) {
+        if let Some(dial) = self.pending_dials.remove(&connection_id) {
+            if let Err(e) = dial.result_sender.send(Ok(peer_id)) {
+                tracing::warn!("failed to send the Ok result of dialing: {e:?}");
+            }
+        }
     }
 
     // TODO: Consider a common retry module for all use cases
@@ -233,7 +255,7 @@ impl SwarmHandler {
                 tracing::debug!("broadcasted message with id: {id} tp topic: {topic}");
                 // self-notification because libp2p doesn't do it
                 if self.swarm.is_subscribed(&topic) {
-                    log_error!(self.events_tx.send(Event::Message(Message {
+                    log_error!(self.events_tx.send(Event::Message(gossipsub::Message {
                         source: None,
                         data: message.into(),
                         sequence_number: None,
@@ -249,7 +271,7 @@ impl SwarmHandler {
                 tokio::spawn(async move {
                     tokio::time::sleep(wait).await;
                     commands_tx
-                        .send(Command::DirectBroadcastAndRetry {
+                        .send(Command::RetryBroadcast {
                             topic,
                             message,
                             retry_count: retry_count + 1,
@@ -266,5 +288,27 @@ impl SwarmHandler {
 
     fn exp_backoff(retry: usize) -> Duration {
         std::time::Duration::from_secs(BACKOFF.pow(retry as u32))
+    }
+
+    pub fn incoming_streams(&mut self, protocol: StreamProtocol) -> IncomingStreams {
+        self.stream_control.accept(protocol).unwrap()
+    }
+
+    async fn open_stream(
+        &mut self,
+        peer_id: PeerId,
+        protocol: StreamProtocol,
+    ) -> Result<&mut Stream, OpenStreamError> {
+        if let Entry::Vacant(entry) = self.streams.entry(peer_id) {
+            let stream = self.stream_control.open_stream(peer_id, protocol).await?;
+            entry.insert(stream);
+        }
+        Ok(self.streams.get_mut(&peer_id).unwrap())
+    }
+
+    async fn close_stream(&mut self, peer_id: &PeerId) {
+        if let Some(mut stream) = self.streams.remove(peer_id) {
+            let _ = stream.close().await;
+        }
     }
 }
