@@ -351,16 +351,18 @@ pub mod tests {
     use cryptarchia_engine::Slot;
     use std::hash::{DefaultHasher, Hash, Hasher};
 
+    type HeaderId = [u8; 32];
+
     fn update_ledger(
-        ledger: &mut Ledger<[u8; 32]>,
-        parent: [u8; 32],
+        ledger: &mut Ledger<HeaderId>,
+        parent: HeaderId,
         slot: impl Into<Slot>,
         coin: Coin,
-    ) -> Result<[u8; 32], LedgerError<[u8; 32]>> {
+    ) -> Result<HeaderId, LedgerError<HeaderId>> {
         update_orphans(ledger, parent, slot, coin, vec![])
     }
 
-    fn make_id(parent: [u8; 32], slot: impl Into<Slot>, coin: Coin) -> [u8; 32] {
+    fn make_id(parent: HeaderId, slot: impl Into<Slot>, coin: Coin) -> HeaderId {
         Blake2b::new()
             .chain_update(parent)
             .chain_update(slot.into().to_be_bytes())
@@ -371,12 +373,12 @@ pub mod tests {
     }
 
     fn update_orphans(
-        ledger: &mut Ledger<[u8; 32]>,
-        parent: [u8; 32],
+        ledger: &mut Ledger<HeaderId>,
+        parent: HeaderId,
         slot: impl Into<Slot>,
         coin: Coin,
-        orphans: Vec<([u8; 32], (u64, Coin))>,
-    ) -> Result<[u8; 32], LedgerError<[u8; 32]>> {
+        orphans: Vec<(HeaderId, (u64, Coin))>,
+    ) -> Result<HeaderId, LedgerError<HeaderId>> {
         let slot = slot.into();
         let id = make_id(parent, slot, coin);
         *ledger = ledger.try_update(
@@ -471,7 +473,7 @@ pub mod tests {
         }
     }
 
-    fn ledger(commitments: &[Commitment]) -> (Ledger<[u8; 32]>, [u8; 32]) {
+    fn ledger(commitments: &[Commitment]) -> (Ledger<HeaderId>, HeaderId) {
         let genesis_state = genesis_state(commitments);
 
         (
@@ -481,12 +483,12 @@ pub mod tests {
     }
 
     fn apply_and_add_coin(
-        ledger: &mut Ledger<[u8; 32]>,
-        parent: [u8; 32],
+        ledger: &mut Ledger<HeaderId>,
+        parent: HeaderId,
         slot: impl Into<Slot>,
         coin_proof: Coin,
         coin_add: Coin,
-    ) -> [u8; 32] {
+    ) -> HeaderId {
         let id = update_ledger(ledger, parent, slot, coin_proof).unwrap();
         // we still don't have transactions, so the only way to add a commitment to spendable commitments and
         // test epoch snapshotting is by doing this manually
