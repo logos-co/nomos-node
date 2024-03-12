@@ -8,13 +8,13 @@ use carnot_engine::{
 use proptest_state_machine::{ReferenceStateMachine, StateMachineTest};
 
 use crate::fuzz::ref_state::RefState;
-use crate::fuzz::transition::Transition;
+use crate::fuzz::{transition::Transition, Block};
 
 // ConsensusEngineTest defines a state that we want to test.
 // This is called as SUT (System Under Test).
 #[derive(Clone, Debug)]
 pub struct ConsensusEngineTest {
-    pub engine: Carnot<FlatOverlay<RoundRobin, FreezeMembership>>,
+    pub engine: Carnot<FlatOverlay<RoundRobin, FreezeMembership>, [u8; 32]>,
 }
 
 impl ConsensusEngineTest {
@@ -23,8 +23,8 @@ impl ConsensusEngineTest {
             NodeId::new([0; 32]),
             Block {
                 view: View::new(0),
-                id: BlockId::zeros(),
-                parent_qc: Qc::Standard(StandardQc::genesis()),
+                id: [0; 32],
+                parent_qc: Qc::Standard(StandardQc::genesis([0; 32])),
                 leader_proof: LeaderProof::LeaderId {
                     leader_id: NodeId::new([0; 32]),
                 },

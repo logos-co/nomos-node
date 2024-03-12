@@ -1,12 +1,16 @@
 use carnot_consensus::CarnotInfo;
-use carnot_engine::{Block, NodeId, TimeoutQc, View};
+use carnot_engine::{NodeId, View};
 use fraction::Fraction;
 use futures::stream::{self, StreamExt};
+use nomos_core::header::HeaderId;
 use std::{collections::HashSet, time::Duration};
 use tests::{adjust_timeout, ConsensusConfig, MixNode, Node, NomosNode, SpawnConfig};
 
 const TARGET_VIEW: View = View::new(20);
 const DUMMY_NODE_ID: NodeId = NodeId::new([0u8; 32]);
+
+type Block = carnot_engine::Block<HeaderId>;
+type TimeoutQc = carnot_engine::TimeoutQc<HeaderId>;
 
 #[tokio::test]
 async fn ten_nodes_one_down() {

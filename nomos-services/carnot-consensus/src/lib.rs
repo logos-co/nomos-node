@@ -306,6 +306,7 @@ where
         );
 
         if carnot.is_next_leader() {
+            tracing::info!("is next leader, gathering vores");
             let network_adapter = adapter.clone();
             task_manager.push(genesis_block.view.next(), async move {
                 let Event::Approve { qc, .. } = Self::gather_votes(
@@ -319,6 +320,7 @@ where
                     tracing::debug!("Failed to gather initial votes");
                     return Event::None;
                 };
+                tracing::info!("got enough votes");
                 Event::ProposeBlock { qc }
             });
         }

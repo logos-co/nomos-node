@@ -1,13 +1,12 @@
 use std::collections::{BTreeMap, HashSet};
 
-use carnot_engine::{
-    AggregateQc, Block, BlockId, LeaderProof, NodeId, Qc, StandardQc, TimeoutQc, View,
-};
+use carnot_engine::{LeaderProof, NodeId, View};
 use proptest::prelude::*;
 use proptest::strategy::BoxedStrategy;
 use proptest_state_machine::ReferenceStateMachine;
 
 use crate::fuzz::transition::Transition;
+use crate::fuzz::{AggregateQc, Block, Qc, StandardQc, TimeoutQc};
 
 // A reference state machine (RefState) is used to generated state transitions.
 // To generate some kinds of transition, we may need to keep historical blocks in RefState.
@@ -42,8 +41,8 @@ impl ReferenceStateMachine for RefState {
     fn init_state() -> BoxedStrategy<Self::State> {
         let genesis_block = Block {
             view: View::new(0),
-            id: BlockId::zeros(),
-            parent_qc: Qc::Standard(StandardQc::genesis()),
+            id: [0; 32],
+            parent_qc: Qc::Standard(StandardQc::genesis([0; 32])),
             leader_proof: LEADER_PROOF.clone(),
         };
 
@@ -330,10 +329,11 @@ impl RefState {
     fn transition_receive_safe_block_with_aggregated_qc(&self) -> BoxedStrategy<Transition> {
         //TODO: more randomness
         let current_view = self.current_view();
-
+        let mut id = [0; 32];
+        rand::thread_rng().fill_bytes(&mut id);
         Just(Transition::ReceiveSafeBlock(Block {
             view: current_view.next(),
-            id: BlockId::random(&mut rand::thread_rng()),
+            id,
             parent_qc: Qc::Aggregated(AggregateQc {
                 high_qc: self.high_qc(),
                 view: current_view,
@@ -360,9 +360,13 @@ impl RefState {
     pub fn high_qc(&self) -> StandardQc {
         self.chain
             .values()
-            .map(|entry| entry.high_qc().unwrap_or_else(StandardQc::genesis))
+            .map(|entry| {
+                entry
+                    .high_qc()
+                    .unwrap_or_else(|| StandardQc::genesis([0; 32]))
+            })
             .max_by_key(|qc| qc.view)
-            .unwrap_or_else(StandardQc::genesis)
+            .unwrap_or_else(|| StandardQc::genesis([0; 32]))
     }
 
     pub fn latest_timeout_qcs(&self) -> Vec<TimeoutQc> {
@@ -386,17 +390,19 @@ impl RefState {
         self.contains_block(block.parent_qc.block())
     }
 
-    fn contains_block(&self, block_id: BlockId) -> bool {
+    fn contains_block(&self, block_id: [u8; 32]) -> bool {
         self.chain
             .iter()
             .any(|(_, entry)| entry.blocks.iter().any(|block| block.id == block_id))
     }
 
     fn consecutive_block(parent: &Block) -> Block {
+        let mut id = [0; 32];
+        rand::thread_rng().fill_bytes(&mut id);
         Block {
             // use rand because we don't want this to be shrinked by proptest
             view: parent.view.next(),
-            id: BlockId::random(&mut rand::thread_rng()),
+            id,
             parent_qc: Qc::Standard(StandardQc {
                 view: parent.view,
                 id: parent.id,

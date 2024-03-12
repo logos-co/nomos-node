@@ -84,7 +84,6 @@ impl Tally for CarnotTally {
                 ));
             }
         }
-
         Err(CarnotTallyError::StreamEnded)
     }
 }

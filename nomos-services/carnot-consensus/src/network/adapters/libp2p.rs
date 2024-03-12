@@ -264,7 +264,7 @@ impl NetworkAdapter for Libp2pAdapter {
                                     }
                                 }
                                 NetworkMessage::Vote(msg) => {
-                                    tracing::debug!("received vote");
+                                    tracing::debug!("received vote {:?}", msg);
                                     let mut cache = cache.cache.lock().unwrap();
                                     let view = msg.vote.view;
                                     if let Some(messages) = cache.get_mut(&view) {

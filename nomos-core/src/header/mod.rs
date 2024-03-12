@@ -1,14 +1,14 @@
 use serde::{Deserialize, Serialize};
 
-use crate::utils::display_hex_bytes_newtype;
+use crate::utils::{display_hex_bytes_newtype, serde_bytes_newtype};
 
 pub mod carnot;
 pub mod cryptarchia;
 
-#[derive(Clone, Debug, Eq, PartialEq, Copy, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Clone, Debug, Eq, PartialEq, Copy, Hash, PartialOrd, Ord)]
 pub struct HeaderId([u8; 32]);
 
-#[derive(Clone, Debug, Eq, PartialEq, Copy, Hash, Serialize, Deserialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Copy, Hash)]
 pub struct ContentId([u8; 32]);
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -73,3 +73,15 @@ impl From<ContentId> for [u8; 32] {
 
 display_hex_bytes_newtype!(HeaderId);
 display_hex_bytes_newtype!(ContentId);
+
+serde_bytes_newtype!(HeaderId, 32);
+serde_bytes_newtype!(ContentId, 32);
+
+#[test]
+fn test_serde() {
+    assert_eq!(
+        crate::wire::deserialize::<HeaderId>(&crate::wire::serialize(&HeaderId([0; 32])).unwrap())
+            .unwrap(),
+        HeaderId([0; 32])
+    );
+}

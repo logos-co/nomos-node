@@ -86,7 +86,7 @@ impl TimeoutQcMsg {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub enum NetworkMessage {
     Timeout(TimeoutMsg),
     TimeoutQc(TimeoutQcMsg),
