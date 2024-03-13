@@ -15,8 +15,12 @@ use crate::network::{
 };
 use carnot_engine::{BlockId, Committee, CommitteeId, View};
 use nomos_core::wire;
+#[cfg(feature = "libp2p")]
+use nomos_network::backends::libp2p::Libp2p as Backend;
+#[cfg(feature = "mixnet")]
+use nomos_network::backends::mixnet::MixnetNetworkBackend as Backend;
 use nomos_network::{
-    backends::libp2p::{Command, Event, EventKind, Libp2p},
+    backends::libp2p::{Command, Event, EventKind},
     NetworkMsg, NetworkService,
 };
 use overwatch_rs::services::{relay::OutboundRelay, ServiceData};
@@ -103,8 +107,8 @@ struct Messages {
 /// Requesting the same stream type multiple times will re-initialize it and new items will only be forwarded to the latest one.
 /// It's required for the consumer to keep the stream around for the time it's necessary
 #[derive(Clone)]
-pub struct Libp2pAdapter {
-    network_relay: OutboundRelay<<NetworkService<Libp2p> as ServiceData>::Message>,
+pub struct P2pAdapter {
+    network_relay: OutboundRelay<<NetworkService<Backend> as ServiceData>::Message>,
     message_cache: MessageCache,
 }
 
@@ -198,7 +202,7 @@ impl GossipsubMessage {
     }
 }
 
-impl Libp2pAdapter {
+impl P2pAdapter {
     async fn broadcast(&self, message: GossipsubMessage, topic: &str) {
         if let Err((e, message)) = self
             .network_relay
@@ -212,7 +216,7 @@ impl Libp2pAdapter {
         };
     }
 
-    async fn subscribe(relay: &Relay<Libp2p>, topic: &str) {
+    async fn subscribe(relay: &Relay<Backend>, topic: &str) {
         if let Err((e, _)) = relay
             .send(NetworkMsg::Process(Command::Subscribe(topic.into())))
             .await
@@ -223,10 +227,10 @@ impl Libp2pAdapter {
 }
 
 #[async_trait::async_trait]
-impl NetworkAdapter for Libp2pAdapter {
-    type Backend = Libp2p;
+impl NetworkAdapter for P2pAdapter {
+    type Backend = Backend;
 
-    async fn new(network_relay: Relay<Libp2p>) -> Self {
+    async fn new(network_relay: Relay<Backend>) -> Self {
         let message_cache = MessageCache::new();
         let cache = message_cache.clone();
         let relay = network_relay.clone();

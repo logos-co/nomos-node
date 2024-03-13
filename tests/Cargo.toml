@@ -7,14 +7,14 @@ publish = false
 [dependencies]
 nomos-node = { path = "../nodes/nomos-node", default-features = false }
 carnot-consensus = { path = "../nomos-services/carnot-consensus" }
-nomos-network = { path = "../nomos-services/network", features = ["libp2p"]}
+nomos-network = { path = "../nomos-services/network" }
 mixnet = { path = "../mixnet" }
 nomos-log = { path = "../nomos-services/log" }
 nomos-api = { path = "../nomos-services/api" }
 overwatch-rs = { git = "https://github.com/logos-co/Overwatch", rev = "2f70806" }
 nomos-core = { path = "../nomos-core" }
 carnot-engine = { path = "../consensus/carnot-engine", features = ["serde"] }
-nomos-mempool = { path = "../nomos-services/mempool", features = ["mock", "libp2p"] }
+nomos-mempool = { path = "../nomos-services/mempool", features = ["mock"] }
 nomos-da = { path = "../nomos-services/data-availability" }
 full-replication = { path = "../nomos-da/full-replication" }
 rand = "0.8"
@@ -48,4 +48,6 @@ path = "src/tests/cli.rs"
 
 
 [features]
+libp2p = ["nomos-network/libp2p", "nomos-mempool/libp2p"]
+mixnet = ["nomos-network/mixnet", "nomos-mempool/mixnet"]
 metrics = ["nomos-node/metrics"]

@@ -13,7 +13,7 @@ use nomos_core::{
     tx::Transaction,
 };
 
-use nomos_mempool::network::adapters::libp2p::Settings as AdapterSettings;
+use nomos_mempool::network::adapters::p2p::Settings as AdapterSettings;
 
 use overwatch_rs::overwatch::*;
 

@@ -2,7 +2,7 @@ pub mod api;
 mod config;
 mod tx;
 
-use carnot_consensus::network::adapters::libp2p::Libp2pAdapter as ConsensusLibp2pAdapter;
+use carnot_consensus::network::adapters::p2p::P2pAdapter as ConsensusNetworkAdapter;
 use carnot_engine::overlay::{RandomBeaconState, RoundRobin, TreeOverlay};
 use color_eyre::eyre::Result;
 use full_replication::Certificate;
@@ -21,11 +21,11 @@ use nomos_core::{
     wire,
 };
 use nomos_da::{
-    backend::memory_cache::BlobCache, network::adapters::libp2p::Libp2pAdapter as DaLibp2pAdapter,
+    backend::memory_cache::BlobCache, network::adapters::p2p::P2pAdapter as DaNetworkAdapter,
     DataAvailabilityService,
 };
 use nomos_log::Logger;
-use nomos_mempool::network::adapters::libp2p::Libp2pAdapter as MempoolLibp2pAdapter;
+use nomos_mempool::network::adapters::p2p::P2pAdapter as MempoolNetworkAdapter;
 use nomos_mempool::{
     backend::mockpool::MockPool, Certificate as CertDiscriminant, MempoolService,
     Transaction as TxDiscriminant,
@@ -58,15 +58,15 @@ pub const DA_TOPIC: &str = "da";
 const MB16: usize = 1024 * 1024 * 16;
 
 pub type Carnot = CarnotConsensus<
-    ConsensusLibp2pAdapter,
+    ConsensusNetworkAdapter,
     MockPool<BlockId, Tx, <Tx as Transaction>::Hash>,
-    MempoolLibp2pAdapter<Tx, <Tx as Transaction>::Hash>,
+    MempoolNetworkAdapter<Tx, <Tx as Transaction>::Hash>,
     MockPool<
         BlockId,
         Certificate,
         <<Certificate as certificate::Certificate>::Blob as blob::Blob>::Hash,
     >,
-    MempoolLibp2pAdapter<
+    MempoolNetworkAdapter<
         Certificate,
         <<Certificate as certificate::Certificate>::Blob as blob::Blob>::Hash,
     >,
@@ -79,10 +79,10 @@ pub type Carnot = CarnotConsensus<
 pub type DataAvailability = DataAvailabilityService<
     FullReplication<AbsoluteNumber<Attestation, Certificate>>,
     BlobCache<<Blob as nomos_core::da::blob::Blob>::Hash, Blob>,
-    DaLibp2pAdapter<Blob, Attestation>,
+    DaNetworkAdapter<Blob, Attestation>,
 >;
 
-type Mempool<K, V, D> = MempoolService<MempoolLibp2pAdapter<K, V>, MockPool<BlockId, K, V>, D>;
+type Mempool<K, V, D> = MempoolService<MempoolNetworkAdapter<K, V>, MockPool<BlockId, K, V>, D>;
 
 #[derive(Services)]
 pub struct Nomos {

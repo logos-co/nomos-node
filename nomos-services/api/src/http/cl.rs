@@ -4,7 +4,7 @@ use nomos_core::block::BlockId;
 use nomos_core::tx::Transaction;
 use nomos_mempool::{
     backend::mockpool::MockPool,
-    network::adapters::libp2p::Libp2pAdapter,
+    network::adapters::p2p::P2pAdapter as MempoolNetworkAdapter,
     openapi::{MempoolMetrics, Status},
     MempoolMsg, MempoolService, Transaction as TxDiscriminant,
 };
@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::oneshot;
 
 type ClMempoolService<T> = MempoolService<
-    Libp2pAdapter<T, <T as Transaction>::Hash>,
+    MempoolNetworkAdapter<T, <T as Transaction>::Hash>,
     MockPool<BlockId, T, <T as Transaction>::Hash>,
     TxDiscriminant,
 >;

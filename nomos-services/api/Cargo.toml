@@ -6,6 +6,8 @@ edition = "2021"
 [features]
 default = ["axum"]
 axum = ["dep:axum", "dep:hyper", "dep:tower-http", "utoipa-swagger-ui/axum"]
+libp2p = ["nomos-mempool/libp2p"]
+mixnet = ["nomos-mempool/mixnet"]
 
 [dependencies]
 async-trait = "0.1"
@@ -18,7 +20,10 @@ nomos-core = { path = "../../nomos-core" }
 carnot-consensus = { path = "../carnot-consensus" }
 nomos-network = { path = "../../nomos-services/network" }
 nomos-da = { path = "../../nomos-services/data-availability" }
-nomos-mempool = { path = "../../nomos-services/mempool", features = ["mock", "libp2p", "openapi"] }
+nomos-mempool = { path = "../../nomos-services/mempool", features = [
+  "mock",
+  "openapi",
+] }
 nomos-metrics = { path = "../../nomos-metrics" }
 nomos-storage = { path = "../../nomos-services/storage", features = ["sled"] }
 nomos-libp2p = { path = "../../nomos-libp2p" }

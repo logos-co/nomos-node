@@ -22,8 +22,13 @@ use utoipa_swagger_ui::SwaggerUi;
 use carnot_engine::BlockId;
 use full_replication::{Blob, Certificate};
 use nomos_core::{da::blob, tx::Transaction};
-use nomos_mempool::{network::adapters::libp2p::Libp2pAdapter, openapi::Status, MempoolMetrics};
-use nomos_network::backends::libp2p::Libp2p;
+use nomos_mempool::{
+    network::adapters::p2p::P2pAdapter as MempoolNetworkAdapter, openapi::Status, MempoolMetrics,
+};
+#[cfg(feature = "libp2p")]
+use nomos_network::backends::libp2p::Libp2p as NetworkBackend;
+#[cfg(feature = "mixnet")]
+use nomos_network::backends::mixnet::MixnetNetworkBackend as NetworkBackend;
 use nomos_storage::backends::StorageSerde;
 
 use nomos_api::{
@@ -322,8 +327,8 @@ where
     <Tx as Transaction>::Hash: std::cmp::Ord + Debug + Send + Sync + 'static,
 {
     make_request_and_return_response!(mempool::add::<
-        Libp2p,
-        Libp2pAdapter<Tx, <Tx as Transaction>::Hash>,
+        NetworkBackend,
+        MempoolNetworkAdapter<Tx, <Tx as Transaction>::Hash>,
         nomos_mempool::Transaction,
         Tx,
         <Tx as Transaction>::Hash,
@@ -343,8 +348,8 @@ async fn add_cert(
     Json(cert): Json<Certificate>,
 ) -> Response {
     make_request_and_return_response!(mempool::add::<
-        Libp2p,
-        Libp2pAdapter<Certificate, <Blob as blob::Blob>::Hash>,
+        NetworkBackend,
+        MempoolNetworkAdapter<Certificate, <Blob as blob::Blob>::Hash>,
         nomos_mempool::Certificate,
         Certificate,
         <Blob as blob::Blob>::Hash,

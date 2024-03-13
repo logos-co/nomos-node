@@ -20,16 +20,19 @@ overwatch-derive = { git = "https://github.com/logos-co/Overwatch", rev = "ac28d
 tracing = "0.1"
 multiaddr = "0.18"
 nomos-core = { path = "../../nomos-core" }
-nomos-network = { path = "../../nomos-services/network", features = ["libp2p"] }
+nomos-network = { path = "../../nomos-services/network" }
 nomos-api = { path = "../../nomos-services/api" }
 nomos-log = { path = "../../nomos-services/log" }
-nomos-mempool = { path = "../../nomos-services/mempool", features = ["mock", "libp2p", "metrics"] }
+nomos-mempool = { path = "../../nomos-services/mempool", features = [
+  "mock",
+  "metrics",
+] }
 nomos-metrics = { path = "../../nomos-metrics" }
 nomos-http = { path = "../../nomos-services/http", features = ["http"] }
-carnot-consensus = { path = "../../nomos-services/carnot-consensus", features = ["libp2p"] }
+carnot-consensus = { path = "../../nomos-services/carnot-consensus" }
 nomos-storage = { path = "../../nomos-services/storage", features = ["sled"] }
 nomos-libp2p = { path = "../../nomos-libp2p" }
-nomos-da = { path = "../../nomos-services/data-availability", features = ["libp2p"] }
+nomos-da = { path = "../../nomos-services/data-availability" }
 nomos-system-sig = { path = "../../nomos-services/system-sig" }
 metrics = { path = "../../nomos-services/metrics", optional = true }
 tracing-subscriber = "0.3"
@@ -47,3 +50,18 @@ utoipa-swagger-ui = { version = "4.0" }
 axum = { version = "0.6" }
 hyper = { version = "0.14", features = ["full"] }
 tower-http = { version = "0.4", features = ["cors", "trace"] }
+
+[features]
+default = []
+libp2p = [
+  "nomos-network/libp2p",
+  "nomos-mempool/libp2p",
+  "nomos-da/libp2p",
+  "carnot-consensus/libp2p",
+]
+mixnet = [
+  "nomos-network/mixnet",
+  "nomos-mempool/mixnet",
+  "nomos-da/mixnet",
+  "carnot-consensus/mixnet",
+]
