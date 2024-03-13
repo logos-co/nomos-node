@@ -5,7 +5,8 @@ use futures::{Stream, StreamExt};
 // internal
 use super::CarnotTallySettings;
 use crate::network::messages::TimeoutMsg;
-use carnot_engine::{Timeout, View};
+use crate::Timeout;
+use carnot_engine::View;
 use nomos_core::vote::Tally;
 
 #[derive(Clone, Debug)]

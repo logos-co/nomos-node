@@ -3,23 +3,6 @@
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct BlockId(pub(crate) [u8; 32]);
 
-#[cfg(feature = "serde")]
-impl serde::Serialize for BlockId {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        nomos_utils::serde::serialize_bytes_array(self.0, serializer)
-    }
-}
-
-#[cfg(feature = "serde")]
-impl<'de> serde::de::Deserialize<'de> for BlockId {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        nomos_utils::serde::deserialize_bytes_array(deserializer).map(Self)
-    }
-}
-
 impl BlockId {
     pub const fn new(val: [u8; 32]) -> Self {
         Self(val)

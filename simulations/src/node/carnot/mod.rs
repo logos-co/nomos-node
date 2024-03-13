@@ -4,6 +4,8 @@ mod event_builder;
 mod message_cache;
 pub mod messages;
 mod state;
+use nomos_core::block::builder::BlockBuilder;
+use nomos_core::header::HeaderId;
 pub use state::*;
 mod serde_util;
 mod tally;
@@ -36,9 +38,18 @@ use carnot_consensus::{
     network::messages::{NewViewMsg, TimeoutMsg, VoteMsg},
 };
 use carnot_engine::overlay::RandomBeaconState;
-use carnot_engine::{
-    Block, BlockId, Carnot, Committee, Overlay, Payload, Qc, StandardQc, TimeoutQc, View, Vote,
-};
+use carnot_engine::{Committee, LeaderProof, Overlay, View};
+
+type Block = carnot_engine::Block<HeaderId>;
+type AggregateQc = carnot_engine::AggregateQc<HeaderId>;
+type Carnot<O> = carnot_engine::Carnot<O, HeaderId>;
+type Payload = carnot_engine::Payload<HeaderId>;
+type TimeoutQc = carnot_engine::TimeoutQc<HeaderId>;
+type Vote = carnot_engine::Vote<HeaderId>;
+type Qc = carnot_engine::Qc<HeaderId>;
+type StandardQc = carnot_engine::StandardQc<HeaderId>;
+type NewView = carnot_engine::NewView<HeaderId>;
+type Timeout = carnot_engine::Timeout<HeaderId>;
 
 static RECORD_SETTINGS: std::sync::OnceLock<BTreeMap<String, bool>> = std::sync::OnceLock::new();
 
@@ -95,7 +106,7 @@ impl<
         rng: &mut R,
     ) -> Self {
         let overlay = O::new(overlay_settings);
-        let engine = Carnot::from_genesis(id, genesis.header().clone(), overlay);
+        let engine = Carnot::from_genesis(id, genesis.header().carnot().to_carnot_block(), overlay);
         let state = CarnotState::from(&engine);
         let timeout = settings.timeout;
         RECORD_SETTINGS.get_or_init(|| settings.record_settings.clone());
@@ -179,8 +190,8 @@ impl<
                 self.network_interface
                     .broadcast(CarnotMessage::Proposal(ProposalMsg {
                         data: proposal.as_bytes().to_vec().into(),
-                        proposal: proposal.header().id,
-                        view: proposal.header().view,
+                        proposal: proposal.header().id(),
+                        view: proposal.header().carnot().view(),
                     }))
             }
         }
@@ -195,12 +206,15 @@ impl<
                     node=%self.id,
                     last_committed_view=%self.engine.latest_committed_view(),
                     current_view = %current_view,
-                    block_view = %block.header().view,
-                    block = %block.header().id,
+                    block_view = %block.header().carnot().view(),
+                    block = %block.header().id(),
                     parent_block=%block.header().parent(),
                     "receive block proposal",
                 );
-                match self.engine.receive_block(block.header().clone()) {
+                match self
+                    .engine
+                    .receive_block(block.header().carnot().to_carnot_block())
+                {
                     Ok(mut new) => {
                         if self.engine.current_view() != new.current_view() {
                             new = Self::update_overlay_with_block(new, &block);
@@ -211,7 +225,7 @@ impl<
                         tracing::error!(
                             node = %self.id,
                             current_view = %self.engine.current_view(),
-                            block_view = %block.header().view, block = %block.header().id,
+                            block_view = %block.header().carnot().view(), block = %block.header().id(),
                             "receive block proposal, but is invalid",
                         );
                     }
@@ -230,7 +244,7 @@ impl<
                         to,
                         payload: Payload::Vote(Vote {
                             view: self.engine.current_view(),
-                            block: block.header().id,
+                            block: block.header().id(),
                         }),
                     }))
                 }
@@ -265,13 +279,13 @@ impl<
             }
             Event::ProposeBlock { qc } => {
                 output = Some(Output::BroadcastProposal {
-                    proposal: nomos_core::block::Block::new(
-                        qc.view().next(),
-                        qc.clone(),
-                        [].into_iter(),
-                        [].into_iter(),
-                        self.id,
+                    proposal: <BlockBuilder<_, _, (), ()>>::empty_carnot(
                         RandomBeaconState::generate_happy(qc.view().next(), &self.random_beacon_pk),
+                        qc.view().next(),
+                        qc,
+                        LeaderProof::LeaderId {
+                            leader_id: [0; 32].into(),
+                        },
                     ),
                 });
             }
@@ -440,7 +454,7 @@ impl<
 #[derive(Debug)]
 #[allow(clippy::large_enum_variant)]
 enum Output<Tx: Clone + Eq + Hash, Blob: Clone + Eq + Hash> {
-    Send(carnot_engine::Send),
+    Send(carnot_engine::Send<HeaderId>),
     BroadcastTimeoutQc {
         timeout_qc: TimeoutQc,
     },

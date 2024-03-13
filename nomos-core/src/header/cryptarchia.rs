@@ -1,24 +1,22 @@
-use crate::{crypto::Blake2b, leader_proof::LeaderProof};
+use super::{ContentId, HeaderId};
+use crate::crypto::Blake2b;
 use blake2::Digest;
 use cryptarchia_engine::Slot;
-
-#[derive(Clone, Debug, Eq, PartialEq, Copy, Hash)]
-pub struct HeaderId([u8; 32]);
-
-#[derive(Clone, Debug, Eq, PartialEq, Copy, Hash)]
-pub struct ContentId([u8; 32]);
+use cryptarchia_ledger::LeaderProof;
+use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Eq, PartialEq, Copy)]
 pub struct Nonce([u8; 32]);
 
-#[derive(Clone, Debug, Eq, PartialEq, Hash)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Header {
     parent: HeaderId,
+    slot: Slot,
+    // TODO: move this to common header fields
     // length of block contents in bytes
     content_size: u32,
     // id of block contents
     content_id: ContentId,
-    slot: Slot,
     leader_proof: LeaderProof,
     orphaned_leader_proofs: Vec<Header>,
 }
@@ -85,40 +83,36 @@ impl Header {
     }
 }
 
-// ----------- conversions
-
-impl From<[u8; 32]> for Nonce {
-    fn from(nonce: [u8; 32]) -> Self {
-        Self(nonce)
-    }
+pub struct Builder {
+    parent: HeaderId,
+    slot: Slot,
+    leader_proof: LeaderProof,
+    orphaned_leader_proofs: Vec<Header>,
 }
 
-impl From<Nonce> for [u8; 32] {
-    fn from(nonce: Nonce) -> [u8; 32] {
-        nonce.0
+impl Builder {
+    pub fn new(parent: HeaderId, slot: Slot, leader_proof: LeaderProof) -> Self {
+        Self {
+            parent,
+            slot,
+            leader_proof,
+            orphaned_leader_proofs: vec![],
+        }
     }
-}
 
-impl From<[u8; 32]> for HeaderId {
-    fn from(id: [u8; 32]) -> Self {
-        Self(id)
+    pub fn with_orphaned_proofs(mut self, orphaned_leader_proofs: Vec<Header>) -> Self {
+        self.orphaned_leader_proofs = orphaned_leader_proofs;
+        self
     }
-}
 
-impl From<HeaderId> for [u8; 32] {
-    fn from(id: HeaderId) -> Self {
-        id.0
-    }
-}
-
-impl From<[u8; 32]> for ContentId {
-    fn from(id: [u8; 32]) -> Self {
-        Self(id)
-    }
-}
-
-impl From<ContentId> for [u8; 32] {
-    fn from(id: ContentId) -> Self {
-        id.0
+    pub fn build(self, content_id: ContentId, content_size: u32) -> Header {
+        Header {
+            parent: self.parent,
+            slot: self.slot,
+            content_size,
+            content_id,
+            leader_proof: self.leader_proof,
+            orphaned_leader_proofs: self.orphaned_leader_proofs,
+        }
     }
 }

@@ -7,9 +7,9 @@ use super::{create_tempdir, persist_tempdir, LOGS_PREFIX};
 use crate::{adjust_timeout, get_available_port, ConsensusConfig, Node, SpawnConfig};
 use carnot_consensus::{CarnotInfo, CarnotSettings};
 use carnot_engine::overlay::{RandomBeaconState, RoundRobin, TreeOverlay, TreeOverlaySettings};
-use carnot_engine::{BlockId, NodeId, Overlay};
+use carnot_engine::{NodeId, Overlay};
 use full_replication::Certificate;
-use nomos_core::block::Block;
+use nomos_core::{block::Block, header::HeaderId};
 use nomos_libp2p::{Multiaddr, Swarm};
 use nomos_log::{LoggerBackend, LoggerFormat};
 use nomos_mempool::MempoolMetrics;
@@ -112,7 +112,7 @@ impl NomosNode {
         format!("http://{}", self.addr).parse().unwrap()
     }
 
-    pub async fn get_block(&self, id: BlockId) -> Option<Block<Tx, Certificate>> {
+    pub async fn get_block(&self, id: HeaderId) -> Option<Block<Tx, Certificate>> {
         CLIENT
             .post(&format!("http://{}/{}", self.addr, STORAGE_BLOCKS_API))
             .header("Content-Type", "application/json")
@@ -146,9 +146,9 @@ impl NomosNode {
 
     pub async fn get_blocks_info(
         &self,
-        from: Option<BlockId>,
-        to: Option<BlockId>,
-    ) -> Vec<carnot_engine::Block> {
+        from: Option<HeaderId>,
+        to: Option<HeaderId>,
+    ) -> Vec<carnot_engine::Block<HeaderId>> {
         let mut req = CLIENT.get(format!("http://{}/{}", self.addr, GET_BLOCKS_INFO));
 
         if let Some(from) = from {
@@ -162,7 +162,7 @@ impl NomosNode {
         req.send()
             .await
             .unwrap()
-            .json::<Vec<carnot_engine::Block>>()
+            .json::<Vec<carnot_engine::Block<_>>>()
             .await
             .unwrap()
     }

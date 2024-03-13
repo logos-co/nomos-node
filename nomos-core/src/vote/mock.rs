@@ -1,5 +1,6 @@
 // std
 // crates
+use crate::header::HeaderId;
 use carnot_engine::{Block, View};
 use futures::{Stream, StreamExt};
 use serde::{Deserialize, Serialize};
@@ -49,7 +50,7 @@ impl Tally for MockTally {
     type Vote = MockVote;
     type Qc = MockQc;
     type Outcome = ();
-    type Subject = Block;
+    type Subject = Block<HeaderId>;
     type TallyError = Error;
     type Settings = MockTallySettings;
 
@@ -60,7 +61,7 @@ impl Tally for MockTally {
 
     async fn tally<S: Stream<Item = Self::Vote> + Unpin + Send>(
         &self,
-        block: Block,
+        block: Block<HeaderId>,
         mut vote_stream: S,
     ) -> Result<(Self::Qc, Self::Outcome), Self::TallyError> {
         let mut count_votes = 0;
