@@ -94,7 +94,7 @@ where
         slot: Slot,
         proof: &LeaderProof,
         // (update corresponding to the leader proof, leader proof)
-        orphan_proofs: impl Iterator<Item = (Id, LeaderProof)>,
+        orphan_proofs: impl IntoIterator<Item = (Id, LeaderProof)>,
     ) -> Result<Self, LedgerError<Id>> {
         let parent_state = self
             .states
@@ -107,7 +107,7 @@ where
         // * not in conflict with the current ledger state
         // This first condition is checked here, the second one is checked in the state update
         // (in particular, we do not check the imported leader proof is for an earlier slot)
-        let (orphan_ids, orphan_proofs): (Vec<_>, Vec<_>) = orphan_proofs.unzip();
+        let (orphan_ids, orphan_proofs): (Vec<_>, Vec<_>) = orphan_proofs.into_iter().unzip();
         for orphan_id in orphan_ids {
             if !self.states.contains_key(&orphan_id) {
                 return Err(LedgerError::OrphanMissing(orphan_id));
@@ -303,8 +303,8 @@ impl LedgerState {
         }
     }
 
-    pub fn from_commitments(commitments: impl Iterator<Item = Commitment>) -> Self {
-        let commitments = commitments.collect::<HashTrieSet<_>>();
+    pub fn from_commitments(commitments: impl IntoIterator<Item = Commitment>) -> Self {
+        let commitments = commitments.into_iter().collect::<HashTrieSet<_>>();
         Self {
             lead_commitments: commitments.clone(),
             spend_commitments: commitments,
