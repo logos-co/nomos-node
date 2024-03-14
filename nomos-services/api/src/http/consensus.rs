@@ -5,8 +5,8 @@ use serde::{de::DeserializeOwned, Serialize};
 use tokio::sync::oneshot;
 
 use carnot_consensus::{
-    network::adapters::libp2p::Libp2pAdapter as ConsensusLibp2pAdapter, CarnotConsensus,
-    CarnotInfo, ConsensusMsg,
+    network::adapters::p2p::P2pAdapter as ConsensusNetworkAdapter, CarnotConsensus, CarnotInfo,
+    ConsensusMsg,
 };
 use carnot_engine::{
     overlay::{RandomBeaconState, RoundRobin, TreeOverlay},
@@ -22,20 +22,20 @@ use nomos_core::{
     tx::{select::FillSize as FillSizeWithTx, Transaction},
 };
 use nomos_mempool::{
-    backend::mockpool::MockPool, network::adapters::libp2p::Libp2pAdapter as MempoolLibp2pAdapter,
+    backend::mockpool::MockPool, network::adapters::p2p::P2pAdapter as MempoolNetworkAdapter,
 };
 use nomos_storage::backends::{sled::SledBackend, StorageSerde};
 
 pub type Carnot<Tx, SS, const SIZE: usize> = CarnotConsensus<
-    ConsensusLibp2pAdapter,
+    ConsensusNetworkAdapter,
     MockPool<HeaderId, Tx, <Tx as Transaction>::Hash>,
-    MempoolLibp2pAdapter<Tx, <Tx as Transaction>::Hash>,
+    MempoolNetworkAdapter<Tx, <Tx as Transaction>::Hash>,
     MockPool<
         HeaderId,
         Certificate,
         <<Certificate as certificate::Certificate>::Blob as blob::Blob>::Hash,
     >,
-    MempoolLibp2pAdapter<
+    MempoolNetworkAdapter<
         Certificate,
         <<Certificate as certificate::Certificate>::Blob as blob::Blob>::Hash,
     >,

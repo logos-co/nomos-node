@@ -2,9 +2,10 @@ use super::*;
 use overwatch_rs::{overwatch::handle::OverwatchHandle, services::state::ServiceState};
 use tokio::sync::broadcast::Receiver;
 
-#[cfg(feature = "libp2p")]
+#[cfg(any(feature = "libp2p", feature = "mixnet"))]
 pub mod libp2p;
 
+#[cfg(feature = "mixnet")]
 pub mod mixnet;
 
 #[cfg(feature = "mock")]

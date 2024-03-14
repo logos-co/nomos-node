@@ -16,7 +16,7 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        feature: [libp2p]
+        feature: [libp2p, mixnet]
     steps:
       - uses: actions/checkout@v2
         with:
@@ -37,7 +37,7 @@ jobs:
     strategy:
       fail-fast: false # all OSes should be tested even if one fails (default: true)
       matrix:
-        feature: [libp2p]
+        feature: [libp2p, mixnet]
         os: [ubuntu-latest, windows-latest, macos-latest]
     runs-on: ${{ matrix.os }}
     steps:
@@ -70,13 +70,15 @@ jobs:
           command: build
           args: --all --no-default-features --features ${{ matrix.feature }}
       - name: Cargo test (Other OSes)
-        if: matrix.os != 'windows-latest'
+        # TODO: enable tests for mixnet
+        if: matrix.os != 'windows-latest' && matrix.feature != 'mixnet'
         uses: actions-rs/cargo@v1
         with:
           command: test
           args: --all --no-default-features --features ${{ matrix.feature }}
       - name: Cargo test (Windows)
-        if: matrix.os == 'windows-latest'
+        # TODO: enable tests for mixnet
+        if: matrix.os == 'windows-latest' && matrix.feature != 'mixnet'
         uses: actions-rs/cargo@v1
         env:
           # Because Windows runners in Github Actions tend to be slow.
@@ -95,7 +97,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        feature: [libp2p]
+        feature: [libp2p, mixnet]
     steps:
       - uses: actions/checkout@v2
         with:

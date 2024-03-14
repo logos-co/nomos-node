@@ -35,7 +35,7 @@ pub struct MixnetNetworkBackend {
     mixclient_message_queue: MessageQueue,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct MixnetConfig {
     libp2p_config: Libp2pConfig,
     mixclient_config: MixClientConfig,

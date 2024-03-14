@@ -290,6 +290,7 @@ impl SwarmHandler {
         std::time::Duration::from_secs(BACKOFF.pow(retry as u32))
     }
 
+    #[allow(dead_code)]
     pub fn incoming_streams(&mut self, protocol: StreamProtocol) -> IncomingStreams {
         self.stream_control.accept(protocol).unwrap()
     }
