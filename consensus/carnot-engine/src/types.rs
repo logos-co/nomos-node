@@ -8,8 +8,6 @@ mod committee;
 pub use committee::{Committee, CommitteeId};
 mod node_id;
 pub use node_id::NodeId;
-mod block_id;
-pub use block_id::BlockId;
 mod view;
 pub use view::View;
 
@@ -21,32 +19,32 @@ pub use view::View;
 #[derive(Debug, Clone, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
-pub enum Payload {
+pub enum Payload<Id> {
     /// Vote for a block in a view
-    Vote(Vote),
+    Vote(Vote<Id>),
     /// Signal that a local timeout has occurred
-    Timeout(Timeout),
+    Timeout(Timeout<Id>),
     /// Vote for moving to a new view
-    NewView(NewView),
+    NewView(NewView<Id>),
 }
 
 /// Returned
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
-pub struct Vote {
+pub struct Vote<Id> {
     pub view: View,
-    pub block: BlockId,
+    pub block: Id,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
-pub struct Timeout {
+pub struct Timeout<Id> {
     pub view: View,
     pub sender: NodeId,
-    pub high_qc: StandardQc,
-    pub timeout_qc: Option<TimeoutQc>,
+    pub high_qc: StandardQc<Id>,
+    pub timeout_qc: Option<TimeoutQc<Id>>,
 }
 
 // TODO: We are making "mandatory" to have received the timeout_qc before the new_view votes.
@@ -54,24 +52,24 @@ pub struct Timeout {
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
-pub struct NewView {
+pub struct NewView<Id> {
     pub view: View,
     pub sender: NodeId,
-    pub timeout_qc: TimeoutQc,
-    pub high_qc: StandardQc,
+    pub timeout_qc: TimeoutQc<Id>,
+    pub high_qc: StandardQc<Id>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
-pub struct TimeoutQc {
+pub struct TimeoutQc<Id> {
     view: View,
-    high_qc: StandardQc,
+    high_qc: StandardQc<Id>,
     sender: NodeId,
 }
 
-impl TimeoutQc {
-    pub fn new(view: View, high_qc: StandardQc, sender: NodeId) -> Self {
+impl<Id> TimeoutQc<Id> {
+    pub fn new(view: View, high_qc: StandardQc<Id>, sender: NodeId) -> Self {
         assert!(
             view >= high_qc.view,
             "timeout_qc.view:{} shouldn't be lower than timeout_qc.high_qc.view:{}",
@@ -90,7 +88,7 @@ impl TimeoutQc {
         self.view
     }
 
-    pub fn high_qc(&self) -> &StandardQc {
+    pub fn high_qc(&self) -> &StandardQc<Id> {
         &self.high_qc
     }
 
@@ -102,10 +100,10 @@ impl TimeoutQc {
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
-pub struct Block {
-    pub id: BlockId,
+pub struct Block<Id> {
+    pub id: Id,
     pub view: View,
-    pub parent_qc: Qc,
+    pub parent_qc: Qc<Id>,
     pub leader_proof: LeaderProof,
 }
 
@@ -116,16 +114,16 @@ pub enum LeaderProof {
     LeaderId { leader_id: NodeId },
 }
 
-impl Block {
-    pub fn parent(&self) -> BlockId {
+impl<Id: Copy> Block<Id> {
+    pub fn parent(&self) -> Id {
         self.parent_qc.block()
     }
 
-    pub fn genesis() -> Self {
+    pub fn genesis(id: Id) -> Self {
         Self {
             view: View(0),
-            id: BlockId::zeros(),
-            parent_qc: Qc::Standard(StandardQc::genesis()),
+            id,
+            parent_qc: Qc::Standard(StandardQc::genesis(id)),
             leader_proof: LeaderProof::LeaderId {
                 leader_id: NodeId::new([0; 32]),
             },
@@ -135,45 +133,42 @@ impl Block {
 
 /// Possible output events.
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub struct Send {
+pub struct Send<Id> {
     pub to: Committee,
-    pub payload: Payload,
+    pub payload: Payload<Id>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
-pub struct StandardQc {
+pub struct StandardQc<Id> {
     pub view: View,
-    pub id: BlockId,
+    pub id: Id,
 }
 
-impl StandardQc {
-    pub fn genesis() -> Self {
-        Self {
-            view: View(-1),
-            id: BlockId::zeros(),
-        }
+impl<Id> StandardQc<Id> {
+    pub fn genesis(id: Id) -> Self {
+        Self { view: View(-1), id }
     }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
-pub struct AggregateQc {
-    pub high_qc: StandardQc,
+pub struct AggregateQc<Id> {
+    pub high_qc: StandardQc<Id>,
     pub view: View,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
-pub enum Qc {
-    Standard(StandardQc),
-    Aggregated(AggregateQc),
+pub enum Qc<Id> {
+    Standard(StandardQc<Id>),
+    Aggregated(AggregateQc<Id>),
 }
 
-impl Qc {
+impl<Id: Copy> Qc<Id> {
     /// The view in which this Qc was built.
     pub fn view(&self) -> View {
         match self {
@@ -184,14 +179,14 @@ impl Qc {
 
     /// The id of the block this qc is for.
     /// This will be the parent of the block which will include this qc
-    pub fn block(&self) -> BlockId {
+    pub fn block(&self) -> Id {
         match self {
             Qc::Standard(StandardQc { id, .. }) => *id,
             Qc::Aggregated(AggregateQc { high_qc, .. }) => high_qc.id,
         }
     }
 
-    pub fn high_qc(&self) -> StandardQc {
+    pub fn high_qc(&self) -> StandardQc<Id> {
         match self {
             Qc::Standard(qc) => qc.clone(),
             Qc::Aggregated(AggregateQc { high_qc, .. }) => high_qc.clone(),
@@ -207,11 +202,11 @@ mod test {
     fn standard_qc() {
         let standard_qc = StandardQc {
             view: View(10),
-            id: BlockId::zeros(),
+            id: 0,
         };
         let qc = Qc::Standard(standard_qc.clone());
         assert_eq!(qc.view(), View(10));
-        assert_eq!(qc.block(), BlockId::new([0; 32]));
+        assert_eq!(qc.block(), 0);
         assert_eq!(qc.high_qc(), standard_qc);
     }
 
@@ -221,12 +216,12 @@ mod test {
             view: View(20),
             high_qc: StandardQc {
                 view: View(10),
-                id: BlockId::zeros(),
+                id: 0,
             },
         };
         let qc = Qc::Aggregated(aggregated_qc.clone());
         assert_eq!(qc.view(), View(20));
-        assert_eq!(qc.block(), BlockId::new([0; 32]));
+        assert_eq!(qc.block(), 0);
         assert_eq!(qc.high_qc(), aggregated_qc.high_qc);
     }
 
@@ -236,26 +231,26 @@ mod test {
             View(2),
             StandardQc {
                 view: View(1),
-                id: BlockId::zeros(),
+                id: 0,
             },
             NodeId::new([0; 32]),
         );
         assert_eq!(timeout_qc.view(), View(2));
         assert_eq!(timeout_qc.high_qc().view, View(1));
-        assert_eq!(timeout_qc.high_qc().id, BlockId::new([0; 32]));
+        assert_eq!(timeout_qc.high_qc().id, 0);
         assert_eq!(timeout_qc.sender(), NodeId::new([0; 32]));
 
         let timeout_qc = TimeoutQc::new(
             View(2),
             StandardQc {
                 view: View(2),
-                id: BlockId::zeros(),
+                id: 0,
             },
             NodeId::new([0; 32]),
         );
         assert_eq!(timeout_qc.view(), View(2));
         assert_eq!(timeout_qc.high_qc().view, View(2));
-        assert_eq!(timeout_qc.high_qc().id, BlockId::new([0; 32]));
+        assert_eq!(timeout_qc.high_qc().id, 0);
         assert_eq!(timeout_qc.sender(), NodeId::new([0; 32]));
     }
 
@@ -268,7 +263,7 @@ mod test {
             View(1),
             StandardQc {
                 view: View(2),
-                id: BlockId::zeros(),
+                id: 0,
             },
             NodeId::new([0; 32]),
         );

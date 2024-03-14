@@ -1,16 +1,22 @@
 // std
+use indexmap::IndexSet;
 use std::hash::Hash;
 // crates
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 // internal
 use crate::block::Block;
+use crate::crypto::Blake2b;
 use crate::da::certificate::BlobCertificateSelect;
 use crate::da::certificate::Certificate;
+use crate::header::{
+    carnot::Builder as CarnotBuilder, cryptarchia::Builder as CryptarchiaBuilder, Header, HeaderId,
+};
 use crate::tx::{Transaction, TxSelect};
+use crate::wire;
+use blake2::digest::Digest;
 use carnot_engine::overlay::RandomBeaconState;
-use carnot_engine::{NodeId, Qc, View};
-
+use carnot_engine::{LeaderProof, Qc, View};
 /// Wrapper over a block building `new` method than holds intermediary state and can be
 /// passed around. It also compounds the transaction selection and blob selection heuristics to be
 /// used for transaction and blob selection.
@@ -20,10 +26,6 @@ use carnot_engine::{NodeId, Qc, View};
 /// use nomos_core::block::builder::BlockBuilder;
 /// let builder: BlockBuilder<(), (), FirstTx, FirstBlob> = {
 ///     BlockBuilder::new( FirstTx::default(), FirstBlob::default())
-///         .with_view(View::from(0))
-///         .with_parent_qc(qc)
-///         .with_proposer(proposer)
-///         .with_beacon_state(beacon)
 ///         .with_transactions([tx1].into_iter())
 ///         .with_blobs([blob1].into_iter())
 /// };
@@ -32,12 +34,31 @@ use carnot_engine::{NodeId, Qc, View};
 pub struct BlockBuilder<Tx, Blob, TxSelector, BlobSelector> {
     tx_selector: TxSelector,
     blob_selector: BlobSelector,
-    view: Option<View>,
-    parent_qc: Option<Qc>,
-    proposer: Option<NodeId>,
-    beacon: Option<RandomBeaconState>,
+    carnot_header_builder: Option<CarnotBuilder>,
+    cryptarchia_header_builder: Option<CryptarchiaBuilder>,
     txs: Option<Box<dyn Iterator<Item = Tx>>>,
     blobs: Option<Box<dyn Iterator<Item = Blob>>>,
+}
+
+impl<Tx, C, TxSelector, BlobSelector> BlockBuilder<Tx, C, TxSelector, BlobSelector>
+where
+    Tx: Clone + Eq + Hash,
+    C: Clone + Eq + Hash,
+{
+    pub fn empty_carnot(
+        beacon: RandomBeaconState,
+        view: View,
+        parent_qc: Qc<HeaderId>,
+        leader_proof: LeaderProof,
+    ) -> Block<Tx, C> {
+        Block {
+            header: Header::Carnot(
+                CarnotBuilder::new(beacon, view, parent_qc, leader_proof).build([0; 32].into(), 0),
+            ),
+            cl_transactions: IndexSet::new(),
+            bl_blobs: IndexSet::new(),
+        }
+    }
 }
 
 impl<Tx, C, TxSelector, BlobSelector> BlockBuilder<Tx, C, TxSelector, BlobSelector>
@@ -51,36 +72,25 @@ where
         Self {
             tx_selector,
             blob_selector,
-            view: None,
-            parent_qc: None,
-            proposer: None,
-            beacon: None,
+            carnot_header_builder: None,
+            cryptarchia_header_builder: None,
             txs: None,
             blobs: None,
         }
     }
 
     #[must_use]
-    pub fn with_view(mut self, view: View) -> Self {
-        self.view = Some(view);
+    pub fn with_carnot_builder(mut self, carnot_header_builder: CarnotBuilder) -> Self {
+        self.carnot_header_builder = Some(carnot_header_builder);
         self
     }
 
     #[must_use]
-    pub fn with_parent_qc(mut self, qc: Qc) -> Self {
-        self.parent_qc = Some(qc);
-        self
-    }
-
-    #[must_use]
-    pub fn with_proposer(mut self, proposer: NodeId) -> Self {
-        self.proposer = Some(proposer);
-        self
-    }
-
-    #[must_use]
-    pub fn with_beacon_state(mut self, beacon: RandomBeaconState) -> Self {
-        self.beacon = Some(beacon);
+    pub fn with_cryptarchia_builder(
+        mut self,
+        cryptarchia_header_builder: CryptarchiaBuilder,
+    ) -> Self {
+        self.cryptarchia_header_builder = Some(cryptarchia_header_builder);
         self
     }
 
@@ -100,28 +110,48 @@ where
     }
 
     #[allow(clippy::result_large_err)]
-    pub fn build(self) -> Result<Block<Tx, C>, Self> {
+    pub fn build(self) -> Result<Block<Tx, C>, String> {
         if let Self {
             tx_selector,
             blob_selector,
-            view: Some(view),
-            parent_qc: Some(parent_qc),
-            proposer: Some(proposer),
-            beacon: Some(beacon),
+            carnot_header_builder: carnot_builder,
+            cryptarchia_header_builder: cryptarchia_builder,
             txs: Some(txs),
             blobs: Some(blobs),
         } = self
         {
-            Ok(Block::new(
-                view,
-                parent_qc,
-                tx_selector.select_tx_from(txs),
-                blob_selector.select_blob_from(blobs),
-                proposer,
-                beacon,
-            ))
+            let txs = tx_selector.select_tx_from(txs).collect::<IndexSet<_>>();
+            let blobs = blob_selector
+                .select_blob_from(blobs)
+                .collect::<IndexSet<_>>();
+
+            let serialized_content = wire::serialize(&(&txs, &blobs)).unwrap();
+            let content_size = u32::try_from(serialized_content.len()).map_err(|_| {
+                format!(
+                    "Content is too big: {} out of {} max",
+                    serialized_content.len(),
+                    u32::MAX
+                )
+            })?;
+            let content_id = <[u8; 32]>::from(Blake2b::digest(&serialized_content)).into();
+
+            let header = match (carnot_builder, cryptarchia_builder) {
+                (Some(carnot_builder), None) => {
+                    Header::Carnot(carnot_builder.build(content_id, content_size))
+                }
+                (None, Some(cryptarchia_builder)) => {
+                    Header::Cryptarchia(cryptarchia_builder.build(content_id, content_size))
+                }
+                _ => return Err("Exactly one header builder should be set".to_string()),
+            };
+
+            Ok(Block {
+                header,
+                cl_transactions: txs,
+                bl_blobs: blobs,
+            })
         } else {
-            Err(self)
+            Err("incomplete block".to_string())
         }
     }
 }

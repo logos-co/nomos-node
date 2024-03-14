@@ -10,7 +10,7 @@ use carnot_consensus::{
 };
 use carnot_engine::{
     overlay::{RandomBeaconState, RoundRobin, TreeOverlay},
-    Block, BlockId,
+    Block,
 };
 use full_replication::Certificate;
 use nomos_core::{
@@ -18,6 +18,7 @@ use nomos_core::{
         blob,
         certificate::{self, select::FillSize as FillSizeWithBlobsCertificate},
     },
+    header::HeaderId,
     tx::{select::FillSize as FillSizeWithTx, Transaction},
 };
 use nomos_mempool::{
@@ -27,10 +28,10 @@ use nomos_storage::backends::{sled::SledBackend, StorageSerde};
 
 pub type Carnot<Tx, SS, const SIZE: usize> = CarnotConsensus<
     ConsensusNetworkAdapter,
-    MockPool<BlockId, Tx, <Tx as Transaction>::Hash>,
+    MockPool<HeaderId, Tx, <Tx as Transaction>::Hash>,
     MempoolNetworkAdapter<Tx, <Tx as Transaction>::Hash>,
     MockPool<
-        BlockId,
+        HeaderId,
         Certificate,
         <<Certificate as certificate::Certificate>::Blob as blob::Blob>::Hash,
     >,
@@ -64,9 +65,9 @@ where
 
 pub async fn carnot_blocks<Tx, SS, const SIZE: usize>(
     handle: &OverwatchHandle,
-    from: Option<BlockId>,
-    to: Option<BlockId>,
-) -> Result<Vec<Block>, super::DynError>
+    from: Option<HeaderId>,
+    to: Option<HeaderId>,
+) -> Result<Vec<Block<HeaderId>>, super::DynError>
 where
     Tx: Transaction + Clone + Debug + Hash + Serialize + DeserializeOwned + Send + Sync + 'static,
     <Tx as Transaction>::Hash: std::cmp::Ord + Debug + Send + Sync + 'static,

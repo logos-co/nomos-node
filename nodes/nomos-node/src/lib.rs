@@ -15,8 +15,8 @@ use bytes::Bytes;
 use carnot_consensus::CarnotConsensus;
 use nomos_api::ApiService;
 use nomos_core::{
-    block::BlockId,
     da::{blob, certificate},
+    header::HeaderId,
     tx::Transaction,
     wire,
 };
@@ -59,10 +59,10 @@ const MB16: usize = 1024 * 1024 * 16;
 
 pub type Carnot = CarnotConsensus<
     ConsensusNetworkAdapter,
-    MockPool<BlockId, Tx, <Tx as Transaction>::Hash>,
+    MockPool<HeaderId, Tx, <Tx as Transaction>::Hash>,
     MempoolNetworkAdapter<Tx, <Tx as Transaction>::Hash>,
     MockPool<
-        BlockId,
+        HeaderId,
         Certificate,
         <<Certificate as certificate::Certificate>::Blob as blob::Blob>::Hash,
     >,
@@ -82,7 +82,7 @@ pub type DataAvailability = DataAvailabilityService<
     DaNetworkAdapter<Blob, Attestation>,
 >;
 
-type Mempool<K, V, D> = MempoolService<MempoolNetworkAdapter<K, V>, MockPool<BlockId, K, V>, D>;
+type Mempool<K, V, D> = MempoolService<MempoolNetworkAdapter<K, V>, MockPool<HeaderId, K, V>, D>;
 
 #[derive(Services)]
 pub struct Nomos {

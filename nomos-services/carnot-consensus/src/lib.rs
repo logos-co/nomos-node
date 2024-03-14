@@ -29,8 +29,7 @@ use crate::tally::{
     happy::CarnotTally, timeout::TimeoutTally, unhappy::NewViewTally, CarnotTallySettings,
 };
 use carnot_engine::{
-    overlay::RandomBeaconState, AggregateQc, BlockId, Carnot, Committee, LeaderProof, NewView,
-    Overlay, Payload, Qc, StandardQc, Timeout, TimeoutQc, View, Vote,
+    overlay::RandomBeaconState, Carnot, Committee, LeaderProof, Overlay, Payload, View,
 };
 use task_manager::TaskManager;
 
@@ -38,6 +37,7 @@ use crate::committee_membership::UpdateableCommitteeMembership;
 use nomos_core::block::builder::BlockBuilder;
 use nomos_core::block::Block;
 use nomos_core::da::certificate::{BlobCertificateSelect, Certificate};
+use nomos_core::header::{carnot::Builder, HeaderId};
 use nomos_core::tx::{Transaction, TxSelect};
 use nomos_core::vote::Tally;
 use nomos_mempool::{
@@ -65,6 +65,13 @@ fn default_timeout() -> Duration {
 
 // Random seed for each round provided by the protocol
 pub type Seed = [u8; 32];
+type TimeoutQc = carnot_engine::TimeoutQc<HeaderId>;
+type NewView = carnot_engine::NewView<HeaderId>;
+type AggregateQc = carnot_engine::AggregateQc<HeaderId>;
+type Qc = carnot_engine::Qc<HeaderId>;
+type StandardQc = carnot_engine::StandardQc<HeaderId>;
+type Vote = carnot_engine::Vote<HeaderId>;
+type Timeout = carnot_engine::Timeout<HeaderId>;
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct CarnotSettings<O: Overlay, Ts, Bs> {
@@ -113,8 +120,8 @@ pub struct CarnotConsensus<A, ClPool, ClPoolAdapter, DaPool, DaPoolAdapter, O, T
 where
     A: NetworkAdapter,
     ClPoolAdapter: MempoolAdapter<Item = ClPool::Item, Key = ClPool::Key>,
-    ClPool: MemPool<BlockId = BlockId>,
-    DaPool: MemPool<BlockId = BlockId>,
+    ClPool: MemPool<BlockId = HeaderId>,
+    DaPool: MemPool<BlockId = HeaderId>,
     DaPoolAdapter: MempoolAdapter<Item = DaPool::Item, Key = DaPool::Key>,
     O: Overlay + Debug,
     ClPool::Item: Debug + 'static,
@@ -140,10 +147,10 @@ impl<A, ClPool, ClPoolAdapter, DaPool, DaPoolAdapter, O, TxS, BS, Storage> Servi
     for CarnotConsensus<A, ClPool, ClPoolAdapter, DaPool, DaPoolAdapter, O, TxS, BS, Storage>
 where
     A: NetworkAdapter,
-    ClPool: MemPool<BlockId = BlockId>,
+    ClPool: MemPool<BlockId = HeaderId>,
     ClPool::Item: Debug,
     ClPool::Key: Debug,
-    DaPool: MemPool<BlockId = BlockId>,
+    DaPool: MemPool<BlockId = HeaderId>,
     DaPool::Item: Debug,
     DaPool::Key: Debug,
     ClPoolAdapter: MempoolAdapter<Item = ClPool::Item, Key = ClPool::Key>,
@@ -165,9 +172,9 @@ impl<A, ClPool, ClPoolAdapter, DaPool, DaPoolAdapter, O, TxS, BS, Storage> Servi
     for CarnotConsensus<A, ClPool, ClPoolAdapter, DaPool, DaPoolAdapter, O, TxS, BS, Storage>
 where
     A: NetworkAdapter + Clone + Send + Sync + 'static,
-    ClPool: MemPool<BlockId = BlockId> + Send + Sync + 'static,
+    ClPool: MemPool<BlockId = HeaderId> + Send + Sync + 'static,
     ClPool::Settings: Send + Sync + 'static,
-    DaPool: MemPool<BlockId = BlockId> + Send + Sync + 'static,
+    DaPool: MemPool<BlockId = HeaderId> + Send + Sync + 'static,
     DaPool::Settings: Send + Sync + 'static,
     ClPool::Item: Transaction<Hash = ClPool::Key>
         + Debug
@@ -252,9 +259,9 @@ where
 
         let overlay = O::new(overlay_settings);
         let genesis = carnot_engine::Block {
-            id: BlockId::zeros(),
+            id: [0; 32].into(),
             view: View::new(0),
-            parent_qc: Qc::Standard(StandardQc::genesis()),
+            parent_qc: Qc::Standard(StandardQc::genesis([0; 32].into())),
             leader_proof: LeaderProof::LeaderId {
                 leader_id: NodeId::new([0; 32]),
             },
@@ -299,6 +306,7 @@ where
         );
 
         if carnot.is_next_leader() {
+            tracing::info!("is next leader, gathering vores");
             let network_adapter = adapter.clone();
             task_manager.push(genesis_block.view.next(), async move {
                 let Event::Approve { qc, .. } = Self::gather_votes(
@@ -312,6 +320,7 @@ where
                     tracing::debug!("Failed to gather initial votes");
                     return Event::None;
                 };
+                tracing::info!("got enough votes");
                 Event::ProposeBlock { qc }
             });
         }
@@ -351,7 +360,7 @@ where
 #[derive(Debug)]
 #[allow(clippy::large_enum_variant)]
 enum Output<Tx: Clone + Eq + Hash, BlobCertificate: Clone + Eq + Hash> {
-    Send(carnot_engine::Send),
+    Send(carnot_engine::Send<HeaderId>),
     BroadcastTimeoutQc {
         timeout_qc: TimeoutQc,
     },
@@ -364,9 +373,9 @@ impl<A, ClPool, ClPoolAdapter, DaPool, DaPoolAdapter, O, TxS, BS, Storage>
     CarnotConsensus<A, ClPool, ClPoolAdapter, DaPool, DaPoolAdapter, O, TxS, BS, Storage>
 where
     A: NetworkAdapter + Clone + Send + Sync + 'static,
-    ClPool: MemPool<BlockId = BlockId> + Send + Sync + 'static,
+    ClPool: MemPool<BlockId = HeaderId> + Send + Sync + 'static,
     ClPool::Settings: Send + Sync + 'static,
-    DaPool: MemPool<BlockId = BlockId> + Send + Sync + 'static,
+    DaPool: MemPool<BlockId = HeaderId> + Send + Sync + 'static,
     DaPool::Settings: Send + Sync + 'static,
     ClPool::Item: Transaction<Hash = ClPool::Key>
         + Debug
@@ -414,7 +423,7 @@ where
         }
     }
 
-    fn process_message(carnot: &Carnot<O>, msg: ConsensusMsg) {
+    fn process_message(carnot: &Carnot<O, HeaderId>, msg: ConsensusMsg) {
         match msg {
             ConsensusMsg::Info { tx } => {
                 let info = CarnotInfo {
@@ -457,18 +466,18 @@ where
 
     #[allow(clippy::too_many_arguments)]
     async fn process_carnot_event(
-        mut carnot: Carnot<O>,
+        mut carnot: Carnot<O, HeaderId>,
         event: Event<ClPool::Item, DaPool::Item>,
         task_manager: &mut TaskManager<View, Event<ClPool::Item, DaPool::Item>>,
         adapter: A,
         private_key: PrivateKey,
-        cl_mempool_relay: OutboundRelay<MempoolMsg<BlockId, ClPool::Item, ClPool::Key>>,
-        da_mempool_relay: OutboundRelay<MempoolMsg<BlockId, DaPool::Item, DaPool::Key>>,
+        cl_mempool_relay: OutboundRelay<MempoolMsg<HeaderId, ClPool::Item, ClPool::Key>>,
+        da_mempool_relay: OutboundRelay<MempoolMsg<HeaderId, DaPool::Item, DaPool::Key>>,
         storage_relay: OutboundRelay<StorageMsg<Storage>>,
         tx_selector: TxS,
         blobl_selector: BS,
         timeout: Duration,
-    ) -> Carnot<O> {
+    ) -> Carnot<O, HeaderId> {
         let mut output = None;
         let prev_view = carnot.current_view();
         match event {
@@ -571,23 +580,25 @@ where
         )
     )]
     async fn process_block(
-        mut carnot: Carnot<O>,
+        mut carnot: Carnot<O, HeaderId>,
         block: Block<ClPool::Item, DaPool::Item>,
         mut stream: Pin<Box<dyn Stream<Item = Block<ClPool::Item, DaPool::Item>> + Send>>,
         task_manager: &mut TaskManager<View, Event<ClPool::Item, DaPool::Item>>,
         adapter: A,
         storage_relay: OutboundRelay<StorageMsg<Storage>>,
-        cl_mempool_relay: OutboundRelay<MempoolMsg<BlockId, ClPool::Item, ClPool::Key>>,
-        da_mempool_relay: OutboundRelay<MempoolMsg<BlockId, DaPool::Item, DaPool::Key>>,
-    ) -> (Carnot<O>, Option<Output<ClPool::Item, DaPool::Item>>) {
+        cl_mempool_relay: OutboundRelay<MempoolMsg<HeaderId, ClPool::Item, ClPool::Key>>,
+        da_mempool_relay: OutboundRelay<MempoolMsg<HeaderId, DaPool::Item, DaPool::Key>>,
+    ) -> (
+        Carnot<O, HeaderId>,
+        Option<Output<ClPool::Item, DaPool::Item>>,
+    ) {
         tracing::debug!("received proposal {:?}", block);
-        if carnot.highest_voted_view() >= block.header().view {
-            tracing::debug!("already voted for view {}", block.header().view);
+        let original_block = block;
+        let block = original_block.header().carnot().clone();
+        if carnot.highest_voted_view() >= block.view() {
+            tracing::debug!("already voted for view {}", block.view());
             return (carnot, None);
         }
-
-        let original_block = block;
-        let block = original_block.header().clone();
 
         let self_committee = carnot.self_committee();
         let leader_committee = [carnot.id()].into_iter().collect();
@@ -602,10 +613,10 @@ where
             participating_nodes: carnot.root_committee(),
         };
 
-        match carnot.receive_block(block.clone()) {
+        match carnot.receive_block(block.to_carnot_block()) {
             Ok(mut new_state) => {
                 let new_view = new_state.current_view();
-                let msg = <StorageMsg<_>>::new_store_message(block.id, original_block.clone());
+                let msg = <StorageMsg<_>>::new_store_message(block.id(), original_block.clone());
                 if let Err((e, _msg)) = storage_relay.send(msg).await {
                     tracing::error!("Could not send block to storage: {e}");
                 }
@@ -614,24 +625,24 @@ where
                 mark_in_block(
                     cl_mempool_relay,
                     original_block.transactions().map(Transaction::hash),
-                    block.id,
+                    block.id(),
                 )
                 .await;
 
                 mark_in_block(
                     da_mempool_relay,
                     original_block.blobs().map(Certificate::hash),
-                    block.id,
+                    block.id(),
                 )
                 .await;
 
                 if new_view != carnot.current_view() {
                     task_manager.push(
-                        block.view,
+                        block.view(),
                         Self::gather_votes(
                             adapter.clone(),
                             self_committee,
-                            block.clone(),
+                            block.to_carnot_block(),
                             tally_settings,
                         ),
                     );
@@ -643,7 +654,7 @@ where
                         },
                     );
                 } else {
-                    task_manager.push(block.view, async move {
+                    task_manager.push(block.view(), async move {
                         if let Some(block) = stream.next().await {
                             Event::Proposal { block, stream }
                         } else {
@@ -657,10 +668,14 @@ where
         }
 
         if carnot.is_next_leader() {
-            task_manager.push(block.view, async move {
-                let Event::Approve { qc, .. } =
-                    Self::gather_votes(adapter, leader_committee, block, leader_tally_settings)
-                        .await
+            task_manager.push(block.view(), async move {
+                let Event::Approve { qc, .. } = Self::gather_votes(
+                    adapter,
+                    leader_committee,
+                    block.to_carnot_block(),
+                    leader_tally_settings,
+                )
+                .await
                 else {
                     unreachable!()
                 };
@@ -674,12 +689,15 @@ where
     #[allow(clippy::type_complexity)]
     #[instrument(level = "debug", skip(task_manager, adapter))]
     async fn approve_new_view(
-        carnot: Carnot<O>,
+        carnot: Carnot<O, HeaderId>,
         timeout_qc: TimeoutQc,
         new_views: HashSet<NewView>,
         task_manager: &mut TaskManager<View, Event<ClPool::Item, DaPool::Item>>,
         adapter: A,
-    ) -> (Carnot<O>, Option<Output<ClPool::Item, DaPool::Item>>) {
+    ) -> (
+        Carnot<O, HeaderId>,
+        Option<Output<ClPool::Item, DaPool::Item>>,
+    ) {
         let leader_committee = [carnot.id()].into_iter().collect();
         let leader_tally_settings = CarnotTallySettings {
             threshold: carnot.leader_super_majority_threshold(),
@@ -713,11 +731,14 @@ where
     #[allow(clippy::type_complexity)]
     #[instrument(level = "debug", skip(task_manager, adapter))]
     async fn receive_timeout_qc(
-        carnot: Carnot<O>,
+        carnot: Carnot<O, HeaderId>,
         timeout_qc: TimeoutQc,
         task_manager: &mut TaskManager<View, Event<ClPool::Item, DaPool::Item>>,
         adapter: A,
-    ) -> (Carnot<O>, Option<Output<ClPool::Item, DaPool::Item>>) {
+    ) -> (
+        Carnot<O, HeaderId>,
+        Option<Output<ClPool::Item, DaPool::Item>>,
+    ) {
         let mut new_state = carnot.receive_timeout_qc(timeout_qc.clone());
         let self_committee = carnot.self_committee();
         let tally_settings = CarnotTallySettings {
@@ -741,9 +762,12 @@ where
     #[allow(clippy::type_complexity)]
     #[instrument(level = "debug")]
     async fn process_root_timeout(
-        carnot: Carnot<O>,
+        carnot: Carnot<O, HeaderId>,
         timeouts: HashSet<Timeout>,
-    ) -> (Carnot<O>, Option<Output<ClPool::Item, DaPool::Item>>) {
+    ) -> (
+        Carnot<O, HeaderId>,
+        Option<Output<ClPool::Item, DaPool::Item>>,
+    ) {
         // we might have received a timeout_qc sent by some other node and advanced the view
         // already, in which case we should ignore the timeout
         if carnot.current_view()
@@ -793,8 +817,8 @@ where
         qc: Qc,
         tx_selector: TxS,
         blob_selector: BS,
-        cl_mempool_relay: OutboundRelay<MempoolMsg<BlockId, ClPool::Item, ClPool::Key>>,
-        da_mempool_relay: OutboundRelay<MempoolMsg<BlockId, DaPool::Item, DaPool::Key>>,
+        cl_mempool_relay: OutboundRelay<MempoolMsg<HeaderId, ClPool::Item, ClPool::Key>>,
+        da_mempool_relay: OutboundRelay<MempoolMsg<HeaderId, DaPool::Item, DaPool::Key>>,
     ) -> Option<Output<ClPool::Item, DaPool::Item>> {
         let mut output = None;
         let cl_txs = get_mempool_contents(cl_mempool_relay);
@@ -804,10 +828,12 @@ where
             (Ok(cl_txs), Ok(da_certs)) => {
                 let beacon = RandomBeaconState::generate_happy(qc.view(), &private_key);
                 let Ok(proposal) = BlockBuilder::new(tx_selector, blob_selector)
-                    .with_view(qc.view().next())
-                    .with_parent_qc(qc)
-                    .with_proposer(id)
-                    .with_beacon_state(beacon)
+                    .with_carnot_builder(Builder::new(
+                        beacon,
+                        qc.view().next(),
+                        qc,
+                        LeaderProof::LeaderId { leader_id: id },
+                    ))
                     .with_transactions(cl_txs)
                     .with_blobs_certificates(da_certs)
                     .build()
@@ -823,7 +849,7 @@ where
     }
 
     async fn process_view_change(
-        carnot: Carnot<O>,
+        carnot: Carnot<O, HeaderId>,
         prev_view: View,
         task_manager: &mut TaskManager<View, Event<ClPool::Item, DaPool::Item>>,
         adapter: A,
@@ -883,7 +909,7 @@ where
     async fn gather_votes(
         adapter: A,
         committee: Committee,
-        block: carnot_engine::Block,
+        block: carnot_engine::Block<HeaderId>,
         tally: CarnotTallySettings,
     ) -> Event<ClPool::Item, DaPool::Item> {
         let tally = CarnotTally::new(tally);
@@ -947,7 +973,7 @@ where
             .filter_map(move |msg| {
                 async move {
                     let proposal = Block::from_bytes(&msg.data);
-                    if proposal.header().id == msg.proposal {
+                    if proposal.header().id() == msg.proposal {
                         // TODO: Leader is faulty? what should we do?
                         Some(proposal)
                     } else {
@@ -967,9 +993,9 @@ where
         E: std::error::Error,
         Fl: FnOnce(O::LeaderSelection) -> Result<O::LeaderSelection, E>,
     >(
-        carnot: Carnot<O>,
+        carnot: Carnot<O, HeaderId>,
         leader_selection_f: Fl,
-    ) -> Carnot<O> {
+    ) -> Carnot<O, HeaderId> {
         carnot
             .update_overlay(|overlay| overlay.update_leader_selection(leader_selection_f))
             .unwrap()
@@ -979,9 +1005,9 @@ where
         E: std::error::Error,
         Fm: FnOnce(O::CommitteeMembership) -> Result<O::CommitteeMembership, E>,
     >(
-        carnot: Carnot<O>,
+        carnot: Carnot<O, HeaderId>,
         committee_membership_f: Fm,
-    ) -> Carnot<O> {
+    ) -> Carnot<O, HeaderId> {
         carnot
             .update_overlay(|overlay| overlay.update_committees(committee_membership_f))
             .unwrap()
@@ -993,10 +1019,10 @@ where
         Fl: FnOnce(O::LeaderSelection) -> Result<O::LeaderSelection, El>,
         Fm: FnOnce(O::CommitteeMembership) -> Result<O::CommitteeMembership, Em>,
     >(
-        carnot: Carnot<O>,
+        carnot: Carnot<O, HeaderId>,
         leader_selection_f: Fl,
         committee_membership_f: Fm,
-    ) -> Carnot<O> {
+    ) -> Carnot<O, HeaderId> {
         let carnot = Self::update_leader_selection(carnot, leader_selection_f);
         Self::update_committee_membership(carnot, committee_membership_f)
     }
@@ -1048,9 +1074,9 @@ where
         Output::BroadcastProposal { proposal } => {
             adapter
                 .broadcast(NetworkMessage::Proposal(ProposalMsg {
-                    proposal: proposal.header().id,
+                    proposal: proposal.header().id(),
                     data: proposal.as_bytes().to_vec().into_boxed_slice(),
-                    view: proposal.header().view,
+                    view: proposal.header().carnot().view(),
                 }))
                 .await;
         }
@@ -1074,7 +1100,7 @@ enum Event<Tx: Clone + Hash + Eq, BlobCertificate: Clone + Eq + Hash> {
     #[allow(dead_code)]
     Approve {
         qc: Qc,
-        block: carnot_engine::Block,
+        block: carnot_engine::Block<HeaderId>,
         votes: HashSet<Vote>,
     },
     LocalTimeout {
@@ -1105,9 +1131,9 @@ pub enum ConsensusMsg {
     /// 'to' (the oldest block). If 'from' is None, the tip of the chain is used as a starting
     /// point. If 'to' is None or not known to the node, the genesis block is used as an end point.
     GetBlocks {
-        from: Option<BlockId>,
-        to: Option<BlockId>,
-        tx: Sender<Vec<carnot_engine::Block>>,
+        from: Option<HeaderId>,
+        to: Option<HeaderId>,
+        tx: Sender<Vec<carnot_engine::Block<HeaderId>>>,
     },
 }
 
@@ -1121,19 +1147,19 @@ pub struct CarnotInfo {
     pub current_view: View,
     pub highest_voted_view: View,
     pub local_high_qc: StandardQc,
-    pub tip: carnot_engine::Block,
+    pub tip: carnot_engine::Block<HeaderId>,
     pub last_view_timeout_qc: Option<TimeoutQc>,
-    pub last_committed_block: carnot_engine::Block,
+    pub last_committed_block: carnot_engine::Block<HeaderId>,
 }
 
 async fn get_mempool_contents<Item, Key>(
-    mempool: OutboundRelay<MempoolMsg<BlockId, Item, Key>>,
+    mempool: OutboundRelay<MempoolMsg<HeaderId, Item, Key>>,
 ) -> Result<Box<dyn Iterator<Item = Item> + Send>, tokio::sync::oneshot::error::RecvError> {
     let (reply_channel, rx) = tokio::sync::oneshot::channel();
 
     mempool
         .send(MempoolMsg::View {
-            ancestor_hint: BlockId::zeros(),
+            ancestor_hint: [0; 32].into(),
             reply_channel,
         })
         .await
@@ -1143,9 +1169,9 @@ async fn get_mempool_contents<Item, Key>(
 }
 
 async fn mark_in_block<Item, Key>(
-    mempool: OutboundRelay<MempoolMsg<BlockId, Item, Key>>,
+    mempool: OutboundRelay<MempoolMsg<HeaderId, Item, Key>>,
     ids: impl Iterator<Item = Key>,
-    block: BlockId,
+    block: HeaderId,
 ) {
     mempool
         .send(MempoolMsg::MarkInBlock {
@@ -1170,14 +1196,14 @@ mod tests {
             highest_voted_view: View::new(-1),
             local_high_qc: StandardQc {
                 view: View::new(0),
-                id: BlockId::zeros(),
+                id: [0; 32].into(),
             },
             tip: Block {
-                id: BlockId::zeros(),
+                id: [0; 32].into(),
                 view: View::new(0),
                 parent_qc: Qc::Standard(StandardQc {
                     view: View::new(0),
-                    id: BlockId::zeros(),
+                    id: [0; 32].into(),
                 }),
                 leader_proof: LeaderProof::LeaderId {
                     leader_id: NodeId::new([0; 32]),
@@ -1185,11 +1211,11 @@ mod tests {
             },
             last_view_timeout_qc: None,
             last_committed_block: Block {
-                id: BlockId::zeros(),
+                id: [0; 32].into(),
                 view: View::new(0),
                 parent_qc: Qc::Standard(StandardQc {
                     view: View::new(0),
-                    id: BlockId::zeros(),
+                    id: [0; 32].into(),
                 }),
                 leader_proof: LeaderProof::LeaderId {
                     leader_id: NodeId::new([0; 32]),

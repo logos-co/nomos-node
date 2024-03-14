@@ -1,6 +1,7 @@
 use super::CLIENT;
 use carnot_consensus::CarnotInfo;
-use carnot_engine::{Block, BlockId};
+use carnot_engine::Block;
+use nomos_core::header::HeaderId;
 use reqwest::Url;
 
 pub async fn carnot_info(node: &Url) -> Result<CarnotInfo, reqwest::Error> {
@@ -15,9 +16,9 @@ pub async fn carnot_info(node: &Url) -> Result<CarnotInfo, reqwest::Error> {
 
 pub async fn get_blocks_info(
     node: &Url,
-    from: Option<BlockId>,
-    to: Option<BlockId>,
-) -> Result<Vec<Block>, reqwest::Error> {
+    from: Option<HeaderId>,
+    to: Option<HeaderId>,
+) -> Result<Vec<Block<HeaderId>>, reqwest::Error> {
     const NODE_CARNOT_INFO_PATH: &str = "carnot/blocks";
     let mut req = CLIENT.get(node.join(NODE_CARNOT_INFO_PATH).unwrap());
     if let Some(from) = from {

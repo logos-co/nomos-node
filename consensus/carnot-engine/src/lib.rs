@@ -1,4 +1,7 @@
-use std::collections::{HashMap, HashSet};
+use std::{
+    collections::{HashMap, HashSet},
+    hash::Hash,
+};
 
 pub mod overlay;
 mod types;
@@ -12,23 +15,27 @@ pub mod openapi {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct Carnot<O: Overlay> {
+pub struct Carnot<O: Overlay, Id: Eq + Hash> {
     id: NodeId,
     current_view: View,
     highest_voted_view: View,
-    local_high_qc: StandardQc,
-    safe_blocks: HashMap<BlockId, Block>,
-    tip: BlockId,
-    last_view_timeout_qc: Option<TimeoutQc>,
-    latest_committed_block: Option<BlockId>,
+    local_high_qc: StandardQc<Id>,
+    safe_blocks: HashMap<Id, Block<Id>>,
+    tip: Id,
+    last_view_timeout_qc: Option<TimeoutQc<Id>>,
+    latest_committed_block: Option<Id>,
     overlay: O,
 }
 
-impl<O: Overlay> Carnot<O> {
-    pub fn from_genesis(id: NodeId, genesis_block: Block, overlay: O) -> Self {
+impl<O, Id> Carnot<O, Id>
+where
+    O: Overlay,
+    Id: Copy + Eq + Hash + core::fmt::Debug,
+{
+    pub fn from_genesis(id: NodeId, genesis_block: Block<Id>, overlay: O) -> Self {
         Self {
             current_view: View(0),
-            local_high_qc: StandardQc::genesis(),
+            local_high_qc: StandardQc::genesis(genesis_block.id),
             id,
             highest_voted_view: View(-1),
             last_view_timeout_qc: None,
@@ -47,12 +54,12 @@ impl<O: Overlay> Carnot<O> {
         self.highest_voted_view
     }
 
-    pub fn safe_blocks(&self) -> &HashMap<BlockId, Block> {
+    pub fn safe_blocks(&self) -> &HashMap<Id, Block<Id>> {
         &self.safe_blocks
     }
 
     /// Return the most recent safe block
-    pub fn tip(&self) -> Block {
+    pub fn tip(&self) -> Block<Id> {
         self.safe_blocks[&self.tip].clone()
     }
 
@@ -65,7 +72,7 @@ impl<O: Overlay> Carnot<O> {
     ///  *  Overlay changes for views < block.view should be made available before trying to process
     ///     a block by calling `receive_timeout_qc`.
     #[allow(clippy::result_unit_err)]
-    pub fn receive_block(&self, block: Block) -> Result<Self, ()> {
+    pub fn receive_block(&self, block: Block<Id>) -> Result<Self, ()> {
         assert!(
             self.safe_blocks.contains_key(&block.parent()),
             "out of order view not supported, missing parent block for {block:?}",
@@ -114,7 +121,7 @@ impl<O: Overlay> Carnot<O> {
     /// Upon reception of a global timeout event
     ///
     /// Preconditions:
-    pub fn receive_timeout_qc(&self, timeout_qc: TimeoutQc) -> Self {
+    pub fn receive_timeout_qc(&self, timeout_qc: TimeoutQc<Id>) -> Self {
         let mut new_state = self.clone();
 
         if timeout_qc.view() < new_state.current_view {
@@ -134,7 +141,7 @@ impl<O: Overlay> Carnot<O> {
     /// Preconditions:
     /// *  `receive_block(b)` must have been called successfully before trying to approve a block b.
     /// *   A node should not attempt to vote for a block in a view earlier than the latest one it actively participated in.
-    pub fn approve_block(&self, block: Block) -> (Self, Send) {
+    pub fn approve_block(&self, block: Block<Id>) -> (Self, Send<Id>) {
         assert!(
             self.safe_blocks.contains_key(&block.id),
             "{:?} not in {:?}",
@@ -179,9 +186,9 @@ impl<O: Overlay> Carnot<O> {
     /// *   A node should not attempt to approve a view earlier than the latest one it actively participated in.
     pub fn approve_new_view(
         &self,
-        timeout_qc: TimeoutQc,
-        new_views: HashSet<NewView>,
-    ) -> (Self, Send) {
+        timeout_qc: TimeoutQc<Id>,
+        new_views: HashSet<NewView<Id>>,
+    ) -> (Self, Send<Id>) {
         let new_view = timeout_qc.view().next();
         assert!(
             new_view
@@ -243,7 +250,7 @@ impl<O: Overlay> Carnot<O> {
     /// Preconditions: none!
     /// Just notice that the timer only reset after a view change, i.e. a node can't timeout
     /// more than once for the same view
-    pub fn local_timeout(&self) -> (Self, Option<Send>) {
+    pub fn local_timeout(&self) -> (Self, Option<Send<Id>>) {
         let mut new_state = self.clone();
 
         new_state.highest_voted_view = new_state.current_view;
@@ -268,11 +275,11 @@ impl<O: Overlay> Carnot<O> {
         (new_state, None)
     }
 
-    fn block_is_safe(&self, block: Block) -> bool {
+    fn block_is_safe(&self, block: Block<Id>) -> bool {
         block.view >= self.current_view && block.view == block.parent_qc.view().next()
     }
 
-    fn update_high_qc(&mut self, qc: Qc) {
+    fn update_high_qc(&mut self, qc: Qc<Id>) {
         let qc_view = qc.view();
         match qc {
             Qc::Standard(new_qc) if new_qc.view > self.local_high_qc.view => {
@@ -288,7 +295,7 @@ impl<O: Overlay> Carnot<O> {
         }
     }
 
-    fn update_timeout_qc(&mut self, timeout_qc: TimeoutQc) {
+    fn update_timeout_qc(&mut self, timeout_qc: TimeoutQc<Id>) {
         match (&self.last_view_timeout_qc, timeout_qc) {
             (None, timeout_qc) => {
                 self.last_view_timeout_qc = Some(timeout_qc);
@@ -300,13 +307,13 @@ impl<O: Overlay> Carnot<O> {
         }
     }
 
-    fn update_latest_committed_block(&mut self, block: &Block) {
+    fn update_latest_committed_block(&mut self, block: &Block<Id>) {
         if let Some(block) = self.can_commit_grandparent(block) {
             self.latest_committed_block = Some(block.id);
         }
     }
 
-    pub fn blocks_in_view(&self, view: View) -> Vec<Block> {
+    pub fn blocks_in_view(&self, view: View) -> Vec<Block<Id>> {
         self.safe_blocks
             .iter()
             .filter(|(_, b)| b.view == view)
@@ -314,12 +321,12 @@ impl<O: Overlay> Carnot<O> {
             .collect()
     }
 
-    pub fn genesis_block(&self) -> Block {
+    pub fn genesis_block(&self) -> Block<Id> {
         self.blocks_in_view(View(0))[0].clone()
     }
 
     // Returns the id of the grandparent block if it can be committed or None otherwise
-    fn can_commit_grandparent(&self, block: &Block) -> Option<Block> {
+    fn can_commit_grandparent(&self, block: &Block<Id>) -> Option<Block<Id>> {
         let parent = self.safe_blocks.get(&block.parent())?;
         let grandparent = self.safe_blocks.get(&parent.parent())?;
 
@@ -332,7 +339,7 @@ impl<O: Overlay> Carnot<O> {
         None
     }
 
-    pub fn latest_committed_block(&self) -> Block {
+    pub fn latest_committed_block(&self) -> Block<Id> {
         self.latest_committed_block
             .and_then(|id| self.safe_blocks.get(&id).cloned())
             .unwrap_or_else(|| self.genesis_block())
@@ -342,7 +349,7 @@ impl<O: Overlay> Carnot<O> {
         self.latest_committed_block().view
     }
 
-    pub fn latest_committed_blocks(&self, limit: Option<usize>) -> Vec<BlockId> {
+    pub fn latest_committed_blocks(&self, limit: Option<usize>) -> Vec<Id> {
         let limit = limit.unwrap_or(self.safe_blocks.len());
         let mut res = vec![];
         let mut current = self.latest_committed_block();
@@ -363,11 +370,11 @@ impl<O: Overlay> Carnot<O> {
         res
     }
 
-    pub fn last_view_timeout_qc(&self) -> Option<TimeoutQc> {
+    pub fn last_view_timeout_qc(&self) -> Option<TimeoutQc<Id>> {
         self.last_view_timeout_qc.clone()
     }
 
-    pub fn high_qc(&self) -> StandardQc {
+    pub fn high_qc(&self) -> StandardQc<Id> {
         self.local_high_qc.clone()
     }
 
@@ -444,15 +451,15 @@ mod test {
 
     use super::*;
 
-    fn init(nodes: Vec<NodeId>) -> Carnot<FlatOverlay<RoundRobin, FreezeMembership>> {
+    fn init(nodes: Vec<NodeId>) -> Carnot<FlatOverlay<RoundRobin, FreezeMembership>, usize> {
         assert!(!nodes.is_empty());
 
         Carnot::from_genesis(
             *nodes.first().unwrap(),
             Block {
                 view: View(0),
-                id: BlockId::zeros(),
-                parent_qc: Qc::Standard(StandardQc::genesis()),
+                id: 0,
+                parent_qc: Qc::Standard(StandardQc::genesis(0)),
                 leader_proof: LeaderProof::LeaderId {
                     leader_id: *nodes.first().unwrap(),
                 },
@@ -466,11 +473,10 @@ mod test {
     }
 
     fn next_block(
-        engine: &Carnot<FlatOverlay<RoundRobin, FreezeMembership>>,
-        block: &Block,
-    ) -> Block {
-        let mut next_id = block.id;
-        next_id.0[0] += 1;
+        engine: &Carnot<FlatOverlay<RoundRobin, FreezeMembership>, usize>,
+        block: &Block<usize>,
+    ) -> Block<usize> {
+        let next_id = block.id + 1;
 
         Block {
             view: block.view.next(),
@@ -486,8 +492,8 @@ mod test {
     }
 
     fn update_leader_selection(
-        engine: &Carnot<FlatOverlay<RoundRobin, FreezeMembership>>,
-    ) -> Carnot<FlatOverlay<RoundRobin, FreezeMembership>> {
+        engine: &Carnot<FlatOverlay<RoundRobin, FreezeMembership>, usize>,
+    ) -> Carnot<FlatOverlay<RoundRobin, FreezeMembership>, usize> {
         engine
             .update_overlay(|overlay| {
                 overlay.update_leader_selection(
@@ -545,11 +551,10 @@ mod test {
     // Ensure that receive_block() fails if the parent block has never been received.
     fn receive_block_with_unknown_parent() {
         let engine = init(vec![NodeId::new([0; 32])]);
-        let mut parent_block_id = engine.genesis_block().id;
-        parent_block_id.0[0] += 1; // generate an unknown parent block ID
+        let parent_block_id = 42;
         let block = Block {
             view: engine.current_view().next(),
-            id: BlockId::new([1; 32]),
+            id: 1,
             parent_qc: Qc::Standard(StandardQc {
                 view: engine.current_view(),
                 id: parent_block_id,
@@ -649,7 +654,7 @@ mod test {
 
         // a future block should be rejected
         let future_block = Block {
-            id: BlockId::new([10; 32]),
+            id: 10,
             view: View(11), // a future view
             parent_qc: Qc::Aggregated(AggregateQc {
                 view: View(10),
@@ -667,7 +672,7 @@ mod test {
 
         // a past block should be also rejected
         let mut past_block = block1; // with the same view as block1
-        past_block.id = BlockId::new([10; 32]);
+        past_block.id = 10;
         assert!(engine.receive_block(past_block).is_err());
     }
 
@@ -744,7 +749,7 @@ mod test {
                     sender: NodeId::new([0; 32]),
                     high_qc: StandardQc {
                         view: View(0), // genesis
-                        id: BlockId::zeros(),
+                        id: 0,
                     },
                     timeout_qc: None
                 }),
@@ -767,7 +772,7 @@ mod test {
             View(1),
             StandardQc {
                 view: View::new(0), // genesis
-                id: BlockId::zeros(),
+                id: 0,
             },
             NodeId::new([0; 32]),
         );
@@ -792,7 +797,7 @@ mod test {
             View(1),
             StandardQc {
                 view: View(0), // genesis
-                id: BlockId::zeros(),
+                id: 0,
             },
             NodeId::new([0; 32]),
         );
@@ -819,7 +824,7 @@ mod test {
             View(1),
             StandardQc {
                 view: View(0), // genesis
-                id: BlockId::zeros(),
+                id: 0,
             },
             NodeId::new([0; 32]),
         );
@@ -861,7 +866,7 @@ mod test {
             View(1),
             StandardQc {
                 view: View(0), // genesis
-                id: BlockId::zeros(),
+                id: 0,
             },
             NodeId::new([0; 32]),
         );
@@ -874,7 +879,7 @@ mod test {
             View(2),
             StandardQc {
                 view: View(0), // genesis
-                id: BlockId::zeros(),
+                id: 0,
             },
             NodeId::new([0; 32]),
         );
