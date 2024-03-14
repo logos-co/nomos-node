@@ -15,4 +15,4 @@ cryptarchia-engine = { path = "../../consensus/cryptarchia-engine" }
 nomos-utils = { path = "../../nomos-utils", optional = true }
 
 [features]
-serde = ["dep:serde", "nomos-utils/serde"]
+serde = ["dep:serde", "nomos-utils/serde", "rpds/serde"]
