@@ -56,9 +56,10 @@ impl Cryptarchia {
             parent,
             header.slot(),
             header.leader_proof(),
-            header.orphaned_proofs().into_iter().map(|imported_header| {
-                (imported_header.id(), imported_header.leader_proof().clone())
-            }),
+            header
+                .orphaned_proofs()
+                .iter()
+                .map(|imported_header| (imported_header.id(), *imported_header.leader_proof())),
         )?;
         let consensus = self.consensus.receive_block(id, parent, slot)?;
 
