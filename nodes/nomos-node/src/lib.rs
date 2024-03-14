@@ -32,7 +32,10 @@ use nomos_mempool::{
 };
 #[cfg(feature = "metrics")]
 use nomos_metrics::Metrics;
-use nomos_network::backends::libp2p::Libp2p;
+#[cfg(feature = "libp2p")]
+use nomos_network::backends::libp2p::Libp2p as NetworkBackend;
+#[cfg(feature = "mixnet")]
+use nomos_network::backends::mixnet::MixnetNetworkBackend as NetworkBackend;
 use nomos_storage::{
     backends::{sled::SledBackend, StorageSerde},
     StorageService,
@@ -87,7 +90,7 @@ type Mempool<K, V, D> = MempoolService<MempoolNetworkAdapter<K, V>, MockPool<Hea
 #[derive(Services)]
 pub struct Nomos {
     logging: ServiceHandle<Logger>,
-    network: ServiceHandle<NetworkService<Libp2p>>,
+    network: ServiceHandle<NetworkService<NetworkBackend>>,
     cl_mempool: ServiceHandle<Mempool<Tx, <Tx as Transaction>::Hash, TxDiscriminant>>,
     da_mempool: ServiceHandle<
         Mempool<

@@ -37,9 +37,9 @@ pub struct MixnetNetworkBackend {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct MixnetConfig {
-    libp2p_config: Libp2pConfig,
-    mixclient_config: MixClientConfig,
-    mixnode_config: MixNodeConfig,
+    pub libp2p: Libp2pConfig,
+    pub mixclient: MixClientConfig,
+    pub mixnode: MixNodeConfig,
 }
 
 const BUFFER_SIZE: usize = 64;
@@ -65,14 +65,14 @@ impl NetworkBackend for MixnetNetworkBackend {
         let (libp2p_events_tx, _) = tokio::sync::broadcast::channel(BUFFER_SIZE);
 
         let mut swarm_handler = SwarmHandler::new(
-            &config.libp2p_config,
+            &config.libp2p,
             libp2p_commands_tx.clone(),
             libp2p_commands_rx,
             libp2p_events_tx.clone(),
         );
 
         // Run mixnode
-        let (mixnode, packet_queue) = MixNode::new(config.mixnode_config).unwrap();
+        let (mixnode, packet_queue) = MixNode::new(config.mixnode).unwrap();
         let libp2p_cmd_tx = libp2p_commands_tx.clone();
         let queue = packet_queue.clone();
         overwatch_handle.runtime().spawn(async move {
@@ -86,7 +86,7 @@ impl NetworkBackend for MixnetNetworkBackend {
         });
 
         // Run mixclient
-        let (mixclient, message_queue) = MixClient::new(config.mixclient_config).unwrap();
+        let (mixclient, message_queue) = MixClient::new(config.mixclient).unwrap();
         let libp2p_cmd_tx = libp2p_commands_tx.clone();
         overwatch_handle.runtime().spawn(async move {
             Self::run_mixclient(mixclient, packet_queue, libp2p_cmd_tx).await;
@@ -94,7 +94,7 @@ impl NetworkBackend for MixnetNetworkBackend {
 
         // Run libp2p swarm to make progress
         overwatch_handle.runtime().spawn(async move {
-            swarm_handler.run(config.libp2p_config.initial_peers).await;
+            swarm_handler.run(config.libp2p.initial_peers).await;
         });
 
         Self {

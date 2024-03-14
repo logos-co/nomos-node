@@ -13,7 +13,10 @@ use hex::FromHex;
 use nomos_api::ApiService;
 use nomos_libp2p::{secp256k1::SecretKey, Multiaddr};
 use nomos_log::{Logger, LoggerBackend, LoggerFormat};
-use nomos_network::backends::libp2p::Libp2p;
+#[cfg(feature = "libp2p")]
+use nomos_network::backends::libp2p::Libp2p as NetworkBackend;
+#[cfg(feature = "mixnet")]
+use nomos_network::backends::mixnet::MixnetNetworkBackend as NetworkBackend;
 use nomos_network::NetworkService;
 use overwatch_rs::services::ServiceData;
 use serde::{Deserialize, Serialize};
@@ -122,7 +125,7 @@ pub struct MetricsArgs {
 #[derive(Deserialize, Debug, Clone, Serialize)]
 pub struct Config {
     pub log: <Logger as ServiceData>::Settings,
-    pub network: <NetworkService<Libp2p> as ServiceData>::Settings,
+    pub network: <NetworkService<NetworkBackend> as ServiceData>::Settings,
     pub http: <ApiService<AxumBackend<Tx, Wire, MB16>> as ServiceData>::Settings,
     pub consensus: <Carnot as ServiceData>::Settings,
     pub da: <DataAvailability as ServiceData>::Settings,
@@ -171,6 +174,7 @@ impl Config {
         }
         Ok(self)
     }
+
     pub fn update_network(mut self, network_args: NetworkArgs) -> Result<Self> {
         let NetworkArgs {
             host,
@@ -179,25 +183,31 @@ impl Config {
             initial_peers,
         } = network_args;
 
+        #[cfg(feature = "libp2p")]
+        let libp2p_config = &mut self.network.backend;
+        #[cfg(feature = "mixnet")]
+        let libp2p_config = &mut self.network.backend.libp2p;
+
         if let Some(IpAddr::V4(h)) = host {
-            self.network.backend.inner.host = h;
+            libp2p_config.inner.host = h;
         } else if host.is_some() {
             return Err(eyre!("Unsupported ip version"));
         }
 
         if let Some(port) = port {
-            self.network.backend.inner.port = port as u16;
+            libp2p_config.inner.port = port as u16;
         }
 
         if let Some(node_key) = node_key {
             let mut key_bytes = hex::decode(node_key)?;
-            self.network.backend.inner.node_key =
-                SecretKey::try_from_bytes(key_bytes.as_mut_slice())?;
+            libp2p_config.inner.node_key = SecretKey::try_from_bytes(key_bytes.as_mut_slice())?;
         }
 
         if let Some(peers) = initial_peers {
-            self.network.backend.initial_peers = peers;
+            libp2p_config.initial_peers = peers;
         }
+
+        // TODO: configure mixclient and mixnode
 
         Ok(self)
     }

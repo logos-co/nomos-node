@@ -6,6 +6,8 @@
 pub mod address;
 /// Mix client
 pub mod client;
+/// Mixnet cryptography
+pub mod crypto;
 /// Mixnet errors
 pub mod error;
 mod fragment;

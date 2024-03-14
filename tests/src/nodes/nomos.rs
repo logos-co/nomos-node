@@ -2,6 +2,11 @@
 use std::net::SocketAddr;
 use std::process::{Child, Command, Stdio};
 use std::time::Duration;
+#[cfg(feature = "mixnet")]
+use std::{
+    net::{IpAddr, Ipv4Addr},
+    num::NonZeroU8,
+};
 // internal
 use super::{create_tempdir, persist_tempdir, LOGS_PREFIX};
 use crate::{adjust_timeout, get_available_port, ConsensusConfig, Node, SpawnConfig};
@@ -9,12 +14,20 @@ use carnot_consensus::{CarnotInfo, CarnotSettings};
 use carnot_engine::overlay::{RandomBeaconState, RoundRobin, TreeOverlay, TreeOverlaySettings};
 use carnot_engine::{NodeId, Overlay};
 use full_replication::Certificate;
+#[cfg(feature = "mixnet")]
+use mixnet::{
+    address::NodeAddress,
+    client::MixClientConfig,
+    node::MixNodeConfig,
+    topology::{MixNodeInfo, MixnetTopology},
+};
 use nomos_core::{block::Block, header::HeaderId};
 use nomos_libp2p::{Multiaddr, Swarm};
 use nomos_log::{LoggerBackend, LoggerFormat};
 use nomos_mempool::MempoolMetrics;
-use nomos_network::backends::libp2p::Libp2pConfig;
-use nomos_network::NetworkConfig;
+#[cfg(feature = "mixnet")]
+use nomos_network::backends::mixnet::MixnetConfig;
+use nomos_network::{backends::libp2p::Libp2pConfig, NetworkConfig};
 use nomos_node::{api::AxumBackendSettings, Config, Tx};
 // crates
 use fraction::Fraction;
@@ -216,11 +229,7 @@ impl Node for NomosNode {
                 let first_node_addr = node_address(&next_leader_config);
                 let mut node_configs = vec![next_leader_config];
                 for mut conf in configs {
-                    conf.network
-                        .backend
-                        .initial_peers
-                        .push(first_node_addr.clone());
-
+                    add_initial_peer(&mut conf, first_node_addr.clone());
                     node_configs.push(conf);
                 }
                 node_configs
@@ -231,9 +240,8 @@ impl Node for NomosNode {
                 let mut prev_node_addr = node_address(&next_leader_config);
                 let mut node_configs = vec![next_leader_config];
                 for mut conf in configs {
-                    conf.network.backend.initial_peers.push(prev_node_addr);
+                    add_initial_peer(&mut conf, prev_node_addr.clone());
                     prev_node_addr = node_address(&conf);
-
                     node_configs.push(conf);
                 }
                 node_configs
@@ -251,6 +259,9 @@ impl Node for NomosNode {
     }
 }
 
+#[cfg(feature = "mixnet")]
+const NUM_MIXNODE_CANDIDATES: usize = 2;
+
 /// Returns the config of the next leader and all other nodes.
 ///
 /// Depending on the network topology, the next leader must be spawned first,
@@ -263,14 +274,22 @@ fn create_node_configs(consensus: ConsensusConfig) -> (Config, Vec<Config>) {
         thread_rng().fill(id);
     }
 
+    #[cfg(feature = "mixnet")]
+    let (mixclient_config, mixnode_configs) = create_mixnet_config(&ids);
+
     let mut configs = ids
         .iter()
-        .map(|id| {
+        .enumerate()
+        .map(|(_i, id)| {
             create_node_config(
                 ids.iter().copied().map(NodeId::new).collect(),
                 *id,
                 consensus.threshold,
                 consensus.timeout,
+                #[cfg(feature = "mixnet")]
+                mixclient_config.clone(),
+                #[cfg(feature = "mixnet")]
+                mixnode_configs[_i].clone(),
             )
         })
         .collect::<Vec<_>>();
@@ -282,9 +301,31 @@ fn create_node_configs(consensus: ConsensusConfig) -> (Config, Vec<Config>) {
         .position(|&id| NodeId::from(id) == next_leader)
         .unwrap();
 
-    let next_leader_config = configs.swap_remove(next_leader_idx);
+    #[cfg(feature = "libp2p")]
+    {
+        let next_leader_config = configs.swap_remove(next_leader_idx);
+        (next_leader_config, configs)
+    }
+    #[cfg(feature = "mixnet")]
+    {
+        let mut next_leader_config = configs.swap_remove(next_leader_idx);
 
-    (next_leader_config, configs)
+        // Build a topology using only a subset of nodes.
+        let mut mixnode_candidates = vec![&next_leader_config];
+        configs
+            .iter()
+            .take(NUM_MIXNODE_CANDIDATES - 1)
+            .for_each(|config| mixnode_candidates.push(config));
+        let topology = build_mixnet_topology(&mixnode_candidates);
+
+        // Set the topology to all configs
+        next_leader_config.network.backend.mixclient.topology = topology.clone();
+        configs.iter_mut().for_each(|config| {
+            config.network.backend.mixclient.topology = topology.clone();
+        });
+
+        (next_leader_config, configs)
+    }
 }
 
 fn create_node_config(
@@ -292,12 +333,24 @@ fn create_node_config(
     id: [u8; 32],
     threshold: Fraction,
     timeout: Duration,
+    #[cfg(feature = "mixnet")] mixclient_config: MixClientConfig,
+    #[cfg(feature = "mixnet")] mixnode_config: MixNodeConfig,
 ) -> Config {
     let mut config = Config {
         network: NetworkConfig {
+            #[cfg(feature = "libp2p")]
             backend: Libp2pConfig {
                 inner: Default::default(),
                 initial_peers: vec![],
+            },
+            #[cfg(feature = "mixnet")]
+            backend: MixnetConfig {
+                libp2p: Libp2pConfig {
+                    inner: Default::default(),
+                    initial_peers: vec![],
+                },
+                mixclient: mixclient_config,
+                mixnode: mixnode_config,
             },
         },
         consensus: CarnotSettings {
@@ -338,16 +391,76 @@ fn create_node_config(
         },
     };
 
-    config.network.backend.inner.port = get_available_port();
+    #[cfg(feature = "libp2p")]
+    {
+        config.network.backend.inner.port = get_available_port();
+    }
+    #[cfg(feature = "mixnet")]
+    {
+        config.network.backend.libp2p.inner.port = get_available_port();
+    }
 
     config
+}
+
+#[cfg(feature = "mixnet")]
+fn create_mixnet_config(ids: &[[u8; 32]]) -> (MixClientConfig, Vec<MixNodeConfig>) {
+    let mixnode_configs: Vec<MixNodeConfig> = ids
+        .iter()
+        .map(|id| MixNodeConfig {
+            encryption_private_key: *id,
+            delay_rate_per_min: 100000000.0,
+        })
+        .collect();
+    // Build an empty topology because it will be constructed with meaningful node infos later
+    let topology = MixnetTopology::new(Vec::new(), 0, 0, [1u8; 32]).unwrap();
+
+    (
+        MixClientConfig {
+            topology,
+            emission_rate_per_min: 120.0,
+            redundancy: NonZeroU8::new(1).unwrap(),
+        },
+        mixnode_configs,
+    )
+}
+
+#[cfg(feature = "mixnet")]
+fn build_mixnet_topology(mixnode_candidates: &[&Config]) -> MixnetTopology {
+    use mixnet::crypto::public_key_from;
+
+    let candidates = mixnode_candidates
+        .iter()
+        .map(|config| {
+            MixNodeInfo::new(
+                NodeAddress::from(SocketAddr::new(
+                    IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
+                    config.network.backend.libp2p.inner.port,
+                )),
+                public_key_from(config.network.backend.mixnode.encryption_private_key),
+            )
+            .unwrap()
+        })
+        .collect::<Vec<_>>();
+    let num_layers = candidates.len();
+    MixnetTopology::new(candidates, num_layers, 1, [1u8; 32]).unwrap()
 }
 
 fn node_address(config: &Config) -> Multiaddr {
     Swarm::multiaddr(
         std::net::Ipv4Addr::new(127, 0, 0, 1),
+        #[cfg(feature = "libp2p")]
         config.network.backend.inner.port,
+        #[cfg(feature = "mixnet")]
+        config.network.backend.libp2p.inner.port,
     )
+}
+
+fn add_initial_peer(config: &mut Config, addr: Multiaddr) {
+    #[cfg(feature = "libp2p")]
+    config.network.backend.initial_peers.push(addr);
+    #[cfg(feature = "mixnet")]
+    config.network.backend.libp2p.initial_peers.push(addr);
 }
 
 pub enum Pool {
