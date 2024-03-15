@@ -91,10 +91,10 @@ pub struct Builder {
 }
 
 impl Builder {
-    pub fn new(parent: HeaderId, slot: Slot, leader_proof: LeaderProof) -> Self {
+    pub fn new(parent: HeaderId, leader_proof: LeaderProof) -> Self {
         Self {
             parent,
-            slot,
+            slot: leader_proof.slot(),
             leader_proof,
             orphaned_leader_proofs: vec![],
         }
