@@ -1,5 +1,6 @@
 use cryptarchia_engine::{Epoch, Slot};
 
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone, Debug, PartialEq)]
 pub struct Config {
     // The stake distribution is always taken at the beginning of the previous epoch.

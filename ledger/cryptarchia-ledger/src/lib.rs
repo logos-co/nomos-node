@@ -7,9 +7,10 @@ mod utils;
 use blake2::Digest;
 use cryptarchia_engine::{Epoch, Slot};
 use crypto::Blake2b;
-use rpds::HashTrieSet;
 use std::{collections::HashMap, hash::Hash};
 use thiserror::Error;
+
+type HashTrieSet<T> = rpds::HashTrieSetSync<T>;
 
 pub use config::Config;
 pub use leader_proof::*;
@@ -31,6 +32,7 @@ pub enum LedgerError<Id> {
     OrphanMissing(Id),
 }
 
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct EpochState {
     // The epoch this snapshot is for
@@ -131,6 +133,7 @@ where
     }
 }
 
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone, Eq, PartialEq)]
 pub struct LedgerState {
     // commitments to coins that can be used to propose new blocks
