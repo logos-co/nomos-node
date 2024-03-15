@@ -6,7 +6,7 @@ use futures::StreamExt;
 use network::NetworkAdapter;
 use nomos_core::block::Block;
 use nomos_core::da::certificate::{BlobCertificateSelect, Certificate};
-use nomos_core::header::{Header, HeaderId};
+use nomos_core::header::{cryptarchia, HeaderId};
 use nomos_core::tx::{Transaction, TxSelect};
 use nomos_mempool::{
     backend::MemPool, network::NetworkAdapter as MempoolAdapter, Certificate as CertDiscriminant,
@@ -46,15 +46,14 @@ impl Cryptarchia {
         self.consensus.tip()
     }
 
-    fn try_apply_header(&self, header: &Header) -> Result<Self, Error> {
-        let header = header.cryptarchia();
+    fn try_apply_header(&self, header: &cryptarchia::Header) -> Result<Self, Error> {
         let id = header.id();
         let parent = header.parent();
         let slot = header.slot();
         let ledger = self.ledger.try_update(
             id,
             parent,
-            header.slot(),
+            slot,
             header.leader_proof(),
             header
                 .orphaned_proofs()
@@ -359,7 +358,7 @@ where
 
         let header = block.header();
         let id = header.id();
-        match cryptarchia.try_apply_header(block.header()) {
+        match cryptarchia.try_apply_header(block.header().cryptarchia()) {
             Ok(new_state) => {
                 // remove included content from mempool
                 mark_in_block(
