@@ -1,12 +1,13 @@
 use std::{
     collections::{hash_map::Entry, HashMap},
+    pin::Pin,
     time::Duration,
 };
 
-use futures::AsyncWriteExt;
+use futures::{AsyncWrite, AsyncWriteExt};
 use nomos_libp2p::{
     gossipsub,
-    libp2p::{swarm::ConnectionId, Stream, StreamProtocol},
+    libp2p::{swarm::ConnectionId, StreamProtocol},
     libp2p_stream::{Control, IncomingStreams, OpenStreamError},
     BehaviourEvent, Multiaddr, PeerId, Swarm, SwarmEvent,
 };
@@ -23,7 +24,7 @@ use super::{
 pub struct SwarmHandler {
     pub swarm: Swarm,
     stream_control: Control,
-    streams: HashMap<PeerId, Stream>,
+    streams: HashMap<PeerId, Pin<Box<dyn AsyncWrite + Send>>>,
     pub pending_dials: HashMap<ConnectionId, Dial>,
     pub commands_tx: mpsc::Sender<Command>,
     pub commands_rx: mpsc::Receiver<Command>,
@@ -174,12 +175,12 @@ impl SwarmHandler {
             Command::StreamSend {
                 peer_id,
                 protocol,
-                packet_body: packet,
+                data,
             } => {
                 tracing::debug!("StreamSend to {peer_id}");
                 match self.open_stream(peer_id, protocol).await {
                     Ok(stream) => {
-                        if let Err(e) = packet.write_to(stream).await {
+                        if let Err(e) = data.write(stream).await {
                             tracing::error!("failed to write to the stream with ${peer_id}: {e}");
                             self.close_stream(&peer_id).await;
                         }
@@ -299,10 +300,11 @@ impl SwarmHandler {
         &mut self,
         peer_id: PeerId,
         protocol: StreamProtocol,
-    ) -> Result<&mut Stream, OpenStreamError> {
+    ) -> Result<&mut Pin<Box<dyn AsyncWrite + Send>>, OpenStreamError> {
         if let Entry::Vacant(entry) = self.streams.entry(peer_id) {
-            let stream = self.stream_control.open_stream(peer_id, protocol).await?;
-            entry.insert(stream);
+            entry.insert(Box::pin(
+                self.stream_control.open_stream(peer_id, protocol).await?,
+            ));
         }
         Ok(self.streams.get_mut(&peer_id).unwrap())
     }

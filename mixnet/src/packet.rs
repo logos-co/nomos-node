@@ -1,6 +1,7 @@
-use std::{io, u8};
+use std::{io, pin::Pin, u8};
 
 use futures::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
+use nomos_core::utils::asyncwritable::AsyncWritable;
 use sphinx_packet::{crypto::PrivateKey, header::delays::Delay};
 
 use crate::{
@@ -109,8 +110,9 @@ impl TryFrom<sphinx_packet::payload::Payload> for PacketBody {
     }
 }
 
-impl PacketBody {
-    pub async fn write_to<W: AsyncWrite + Unpin + ?Sized>(&self, writer: &mut W) -> io::Result<()> {
+#[async_trait::async_trait]
+impl AsyncWritable for PacketBody {
+    async fn write(&self, writer: &mut Pin<Box<dyn AsyncWrite + Send>>) -> io::Result<()> {
         match self {
             Self::SphinxPacket(data) => {
                 Self::write(writer, PacketBodyFlag::SphinxPacket, data).await
@@ -118,9 +120,11 @@ impl PacketBody {
             Self::Fragment(data) => Self::write(writer, PacketBodyFlag::Fragment, data).await,
         }
     }
+}
 
-    async fn write<W: AsyncWrite + Unpin + ?Sized>(
-        writer: &mut W,
+impl PacketBody {
+    async fn write(
+        writer: &mut Pin<Box<dyn AsyncWrite + Send>>,
         flag: PacketBodyFlag,
         data: &[u8],
     ) -> io::Result<()> {
