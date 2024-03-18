@@ -180,7 +180,7 @@ impl SwarmHandler {
                 tracing::debug!("StreamSend to {peer_id}");
                 match self.open_stream(peer_id, protocol).await {
                     Ok(stream) => {
-                        if let Err(e) = data.write(stream).await {
+                        if let Err(e) = data.write_to(stream).await {
                             tracing::error!("failed to write to the stream with ${peer_id}: {e}");
                             self.close_stream(&peer_id).await;
                         }

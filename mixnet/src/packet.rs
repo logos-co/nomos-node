@@ -112,7 +112,7 @@ impl TryFrom<sphinx_packet::payload::Payload> for PacketBody {
 
 #[async_trait::async_trait]
 impl AsyncWritable for PacketBody {
-    async fn write(&self, writer: &mut Pin<Box<dyn AsyncWrite + Send>>) -> io::Result<()> {
+    async fn write_to(&self, writer: &mut Pin<Box<dyn AsyncWrite + Send>>) -> io::Result<()> {
         match self {
             Self::SphinxPacket(data) => {
                 Self::write(writer, PacketBodyFlag::SphinxPacket, data).await
