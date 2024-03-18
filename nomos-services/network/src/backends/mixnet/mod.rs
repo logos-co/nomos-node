@@ -239,7 +239,7 @@ impl MixnetNetworkBackend {
                     .send(libp2p::Command::StreamSend {
                         peer_id,
                         protocol: STREAM_PROTOCOL,
-                        data: Box::new(packet_body),
+                        data: packet_body.bytes(),
                     })
                     .await
                     .expect("Command receiver should be always open");

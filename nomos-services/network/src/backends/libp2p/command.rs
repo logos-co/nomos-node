@@ -1,4 +1,3 @@
-use nomos_core::utils::asyncwritable::AsyncWritable;
 use nomos_libp2p::{libp2p::StreamProtocol, Multiaddr, PeerId};
 use serde::{Deserialize, Serialize};
 use tokio::sync::oneshot;
@@ -25,7 +24,7 @@ pub enum Command {
     StreamSend {
         peer_id: PeerId,
         protocol: StreamProtocol,
-        data: Box<dyn AsyncWritable + Send + Sync>,
+        data: Box<[u8]>,
     },
 }
 

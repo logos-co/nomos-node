@@ -1,13 +1,12 @@
 use std::{
     collections::{hash_map::Entry, HashMap},
-    pin::Pin,
     time::Duration,
 };
 
-use futures::{AsyncWrite, AsyncWriteExt};
+use futures::AsyncWriteExt;
 use nomos_libp2p::{
     gossipsub,
-    libp2p::{swarm::ConnectionId, StreamProtocol},
+    libp2p::{swarm::ConnectionId, Stream, StreamProtocol},
     libp2p_stream::{Control, IncomingStreams, OpenStreamError},
     BehaviourEvent, Multiaddr, PeerId, Swarm, SwarmEvent,
 };
@@ -24,7 +23,7 @@ use super::{
 pub struct SwarmHandler {
     pub swarm: Swarm,
     stream_control: Control,
-    streams: HashMap<PeerId, Pin<Box<dyn AsyncWrite + Send>>>,
+    streams: HashMap<PeerId, Stream>,
     pub pending_dials: HashMap<ConnectionId, Dial>,
     pub commands_tx: mpsc::Sender<Command>,
     pub commands_rx: mpsc::Receiver<Command>,
@@ -180,7 +179,7 @@ impl SwarmHandler {
                 tracing::debug!("StreamSend to {peer_id}");
                 match self.open_stream(peer_id, protocol).await {
                     Ok(stream) => {
-                        if let Err(e) = data.write_to(stream).await {
+                        if let Err(e) = stream.write_all(&data).await {
                             tracing::error!("failed to write to the stream with ${peer_id}: {e}");
                             self.close_stream(&peer_id).await;
                         }
@@ -300,11 +299,9 @@ impl SwarmHandler {
         &mut self,
         peer_id: PeerId,
         protocol: StreamProtocol,
-    ) -> Result<&mut Pin<Box<dyn AsyncWrite + Send>>, OpenStreamError> {
+    ) -> Result<&mut Stream, OpenStreamError> {
         if let Entry::Vacant(entry) = self.streams.entry(peer_id) {
-            entry.insert(Box::pin(
-                self.stream_control.open_stream(peer_id, protocol).await?,
-            ));
+            entry.insert(self.stream_control.open_stream(peer_id, protocol).await?);
         }
         Ok(self.streams.get_mut(&peer_id).unwrap())
     }
