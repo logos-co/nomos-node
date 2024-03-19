@@ -1,3 +1,4 @@
+mod coin;
 mod config;
 mod crypto;
 mod leader_proof;
@@ -7,10 +8,12 @@ mod utils;
 use blake2::Digest;
 use cryptarchia_engine::{Epoch, Slot};
 use crypto::Blake2b;
-use rpds::HashTrieSet;
 use std::{collections::HashMap, hash::Hash};
 use thiserror::Error;
 
+type HashTrieSet<T> = rpds::HashTrieSetSync<T>;
+
+pub use coin::{Coin, Value};
 pub use config::Config;
 pub use leader_proof::*;
 pub use nonce::*;
@@ -31,6 +34,7 @@ pub enum LedgerError<Id> {
     OrphanMissing(Id),
 }
 
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct EpochState {
     // The epoch this snapshot is for
@@ -40,6 +44,7 @@ pub struct EpochState {
     // stake distribution snapshot taken at the beginning of the epoch
     // (in practice, this is equivalent to the coins the are spendable at the beginning of the epoch)
     commitments: HashTrieSet<Commitment>,
+    total_stake: Value,
 }
 
 impl EpochState {
@@ -61,11 +66,16 @@ impl EpochState {
             epoch: self.epoch,
             nonce,
             commitments,
+            total_stake: self.total_stake,
         }
     }
 
     fn is_eligible_leader(&self, commitment: &Commitment) -> bool {
         self.commitments.contains(commitment)
+    }
+
+    pub fn epoch(&self) -> Epoch {
+        self.epoch
     }
 }
 
@@ -129,8 +139,13 @@ where
     pub fn state(&self, id: &Id) -> Option<&LedgerState> {
         self.states.get(id)
     }
+
+    pub fn config(&self) -> &Config {
+        &self.config
+    }
 }
 
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone, Eq, PartialEq)]
 pub struct LedgerState {
     // commitments to coins that can be used to propose new blocks
@@ -167,6 +182,8 @@ impl LedgerState {
             });
         }
 
+        // TODO: update once supply can change
+        let total_stake = self.epoch_state.total_stake;
         let current_epoch = config.epoch(self.slot);
         let new_epoch = config.epoch(slot);
 
@@ -195,6 +212,7 @@ impl LedgerState {
                 epoch: new_epoch + 1,
                 nonce: self.nonce,
                 commitments: self.spend_commitments.clone(),
+                total_stake,
             };
             Ok(Self {
                 slot,
@@ -208,11 +226,13 @@ impl LedgerState {
                 epoch: new_epoch,
                 nonce: self.nonce,
                 commitments: self.spend_commitments.clone(),
+                total_stake,
             };
             let next_epoch_state = EpochState {
                 epoch: new_epoch + 1,
                 nonce: self.nonce,
                 commitments: self.spend_commitments.clone(),
+                total_stake,
             };
             Ok(Self {
                 slot,
@@ -315,13 +335,27 @@ impl LedgerState {
                 epoch: 1.into(),
                 nonce: [0; 32].into(),
                 commitments: Default::default(),
+                total_stake: 1.into(),
             },
             epoch_state: EpochState {
                 epoch: 0.into(),
                 nonce: [0; 32].into(),
                 commitments: Default::default(),
+                total_stake: 1.into(),
             },
         }
+    }
+
+    pub fn slot(&self) -> Slot {
+        self.slot
+    }
+
+    pub fn epoch_state(&self) -> &EpochState {
+        &self.epoch_state
+    }
+
+    pub fn next_epoch_state(&self) -> &EpochState {
+        &self.next_epoch_state
     }
 }
 
@@ -345,13 +379,18 @@ impl core::fmt::Debug for LedgerState {
 
 #[cfg(test)]
 pub mod tests {
-    use super::{EpochState, Ledger, LedgerState};
-    use crate::{crypto::Blake2b, Commitment, Config, LeaderProof, LedgerError, Nullifier};
+    use super::{Coin, EpochState, Ledger, LedgerState};
+    use crate::{crypto::Blake2b, Commitment, Config, LedgerError};
     use blake2::Digest;
     use cryptarchia_engine::Slot;
-    use std::hash::{DefaultHasher, Hash, Hasher};
 
     type HeaderId = [u8; 32];
+
+    fn coin(id: u64) -> Coin {
+        let mut sk = [0; 32];
+        sk[..8].copy_from_slice(&id.to_be_bytes());
+        Coin::new(sk, [0; 32].into(), 1.into())
+    }
 
     fn update_ledger(
         ledger: &mut Ledger<HeaderId>,
@@ -366,8 +405,7 @@ pub mod tests {
         Blake2b::new()
             .chain_update(parent)
             .chain_update(slot.into().to_be_bytes())
-            .chain_update(coin.sk.to_be_bytes())
-            .chain_update(coin.nonce.to_be_bytes())
+            .chain_update(coin.vrf([0; 32].into(), 0.into()))
             .finalize()
             .into()
     }
@@ -405,54 +443,6 @@ pub mod tests {
         }
     }
 
-    #[derive(Debug, Clone, Copy)]
-    pub struct Coin {
-        sk: u64,
-        nonce: u64,
-    }
-
-    impl Coin {
-        pub fn new(sk: u64) -> Self {
-            Self { sk, nonce: 0 }
-        }
-
-        pub fn commitment(&self) -> Commitment {
-            <[u8; 32]>::from(
-                Blake2b::new_with_prefix("commitment".as_bytes())
-                    .chain_update(self.sk.to_be_bytes())
-                    .chain_update(self.nonce.to_be_bytes())
-                    .finalize(),
-            )
-            .into()
-        }
-
-        pub fn nullifier(&self) -> Nullifier {
-            <[u8; 32]>::from(
-                Blake2b::new_with_prefix("nullifier".as_bytes())
-                    .chain_update(self.sk.to_be_bytes())
-                    .chain_update(self.nonce.to_be_bytes())
-                    .finalize(),
-            )
-            .into()
-        }
-
-        pub fn evolve(&self) -> Self {
-            let mut h = DefaultHasher::new();
-            self.nonce.hash(&mut h);
-            let nonce = h.finish();
-            Self { sk: self.sk, nonce }
-        }
-
-        pub fn to_proof(&self, slot: Slot) -> LeaderProof {
-            LeaderProof::new(
-                self.commitment(),
-                self.nullifier(),
-                slot,
-                self.evolve().commitment(),
-            )
-        }
-    }
-
     pub fn genesis_state(commitments: &[Commitment]) -> LedgerState {
         LedgerState {
             lead_commitments: commitments.iter().cloned().collect(),
@@ -464,11 +454,13 @@ pub mod tests {
                 epoch: 1.into(),
                 nonce: [0; 32].into(),
                 commitments: commitments.iter().cloned().collect(),
+                total_stake: 1.into(),
             },
             epoch_state: EpochState {
                 epoch: 0.into(),
                 nonce: [0; 32].into(),
                 commitments: commitments.iter().cloned().collect(),
+                total_stake: 1.into(),
             },
         }
     }
@@ -500,7 +492,7 @@ pub mod tests {
 
     #[test]
     fn test_ledger_state_prevents_coin_reuse() {
-        let coin = Coin::new(0);
+        let coin = coin(0);
         let (mut ledger, genesis) = ledger(&[coin.commitment()]);
 
         let h = update_ledger(&mut ledger, genesis, 1, coin).unwrap();
@@ -514,7 +506,7 @@ pub mod tests {
 
     #[test]
     fn test_ledger_state_uncommited_coin() {
-        let coin = Coin::new(0);
+        let coin = coin(0);
         let (mut ledger, genesis) = ledger(&[]);
         assert!(matches!(
             update_ledger(&mut ledger, genesis, 1, coin),
@@ -524,9 +516,9 @@ pub mod tests {
 
     #[test]
     fn test_ledger_state_is_properly_updated_on_reorg() {
-        let coin_1 = Coin::new(0);
-        let coin_2 = Coin::new(1);
-        let coin_3 = Coin::new(2);
+        let coin_1 = coin(0);
+        let coin_2 = coin(1);
+        let coin_3 = coin(2);
 
         let (mut ledger, genesis) = ledger(&[
             coin_1.commitment(),
@@ -547,9 +539,9 @@ pub mod tests {
 
     #[test]
     fn test_epoch_transition() {
-        let coins = (0..4).map(Coin::new).collect::<Vec<_>>();
-        let coin_4 = Coin::new(4);
-        let coin_5 = Coin::new(5);
+        let coins = (0..4).map(coin).collect::<Vec<_>>();
+        let coin_4 = coin(4);
+        let coin_5 = coin(5);
         let (mut ledger, genesis) =
             ledger(&coins.iter().map(|c| c.commitment()).collect::<Vec<_>>());
 
@@ -594,7 +586,7 @@ pub mod tests {
 
     #[test]
     fn test_evolved_coin_is_eligible_for_leadership() {
-        let coin = Coin::new(0);
+        let coin = coin(0);
         let (mut ledger, genesis) = ledger(&[coin.commitment()]);
 
         let h = update_ledger(&mut ledger, genesis, 1, coin).unwrap();
@@ -617,8 +609,9 @@ pub mod tests {
 
     #[test]
     fn test_new_coins_becoming_eligible_after_stake_distribution_stabilizes() {
-        let coin = Coin::new(0);
-        let coin_1 = Coin::new(1);
+        let coin_1 = coin(1);
+        let coin = coin(0);
+
         let (mut ledger, genesis) = ledger(&[coin.commitment()]);
 
         // EPOCH 0
@@ -654,7 +647,7 @@ pub mod tests {
 
     #[test]
     fn test_orphan_proof_import() {
-        let coin = Coin::new(0);
+        let coin = coin(0);
         let (mut ledger, genesis) = ledger(&[coin.commitment()]);
 
         let coin_new = coin.evolve();

@@ -14,4 +14,9 @@ impl From<Nonce> for [u8; 32] {
     }
 }
 
+impl AsRef<[u8]> for Nonce {
+    fn as_ref(&self) -> &[u8] {
+        &self.0
+    }
+}
 serialize_bytes_newtype!(Nonce);

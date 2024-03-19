@@ -9,6 +9,7 @@ members = [
     "nomos-services/network",
     "nomos-services/storage",
     "nomos-services/carnot-consensus",
+    "nomos-services/cryptarchia-consensus",
     "nomos-services/mempool",
     "nomos-services/http",
     "nomos-services/data-availability",
