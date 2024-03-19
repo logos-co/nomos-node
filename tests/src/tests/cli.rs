@@ -7,7 +7,7 @@ use nomos_cli::{
 use nomos_core::da::{blob::Blob as _, DaProtocol};
 use std::{io::Write, time::Duration};
 use tempfile::NamedTempFile;
-use tests::{adjust_timeout, get_available_port, nodes::nomos::Pool, Node, NomosNode, SpawnConfig};
+use tests::{adjust_timeout, nodes::nomos::Pool, Node, NomosNode, SpawnConfig};
 
 const CLI_BIN: &str = "../target/debug/nomos-cli";
 
@@ -36,13 +36,9 @@ async fn disseminate(config: &mut Disseminate) {
     let node_configs = NomosNode::node_configs(SpawnConfig::chain_happy(2));
     let first_node = NomosNode::spawn(node_configs[0].clone()).await;
 
-    let mut network_config = node_configs[1].network.clone();
-    // use a new port because the old port is sometimes not closed immediately
-    network_config.backend.inner.port = get_available_port();
-
     let mut file = NamedTempFile::new().unwrap();
     let config_path = file.path().to_owned();
-    serde_yaml::to_writer(&mut file, &network_config).unwrap();
+    serde_yaml::to_writer(&mut file, &node_configs[1].network).unwrap();
     let da_protocol = DaProtocolChoice {
         da_protocol: Protocol::FullReplication,
         settings: ProtocolSettings {

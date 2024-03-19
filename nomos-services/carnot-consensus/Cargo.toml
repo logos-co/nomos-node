@@ -36,7 +36,6 @@ serde_json = { version = "1", optional = true }
 default = []
 mock = ["nomos-network/mock"]
 libp2p = ["nomos-network/libp2p", "nomos-libp2p"]
-mixnet = ["nomos-network/mixnet", "nomos-libp2p"]
 openapi = ["dep:utoipa", "serde_json"]
 
 [dev-dependencies]

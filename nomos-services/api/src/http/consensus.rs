@@ -5,8 +5,8 @@ use serde::{de::DeserializeOwned, Serialize};
 use tokio::sync::oneshot;
 
 use carnot_consensus::{
-    network::adapters::p2p::P2pAdapter as ConsensusNetworkAdapter, CarnotConsensus, CarnotInfo,
-    ConsensusMsg,
+    network::adapters::libp2p::Libp2pAdapter as ConsensusNetworkAdapter, CarnotConsensus,
+    CarnotInfo, ConsensusMsg,
 };
 use carnot_engine::{
     overlay::{RandomBeaconState, RoundRobin, TreeOverlay},
@@ -22,7 +22,7 @@ use nomos_core::{
     tx::{select::FillSize as FillSizeWithTx, Transaction},
 };
 use nomos_mempool::{
-    backend::mockpool::MockPool, network::adapters::p2p::P2pAdapter as MempoolNetworkAdapter,
+    backend::mockpool::MockPool, network::adapters::libp2p::Libp2pAdapter as MempoolNetworkAdapter,
 };
 use nomos_storage::backends::{sled::SledBackend, StorageSerde};
 

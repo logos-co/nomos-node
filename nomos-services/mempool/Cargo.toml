@@ -35,7 +35,6 @@ blake2 = "0.10"
 default = []
 mock = ["linked-hash-map", "nomos-network/mock", "rand", "nomos-core/mock"]
 libp2p = ["nomos-network/libp2p"]
-mixnet = ["nomos-network/mixnet"]
 metrics = []
 
 # enable to help generate OpenAPI

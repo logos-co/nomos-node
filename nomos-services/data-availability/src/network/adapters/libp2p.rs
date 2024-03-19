@@ -7,11 +7,7 @@ use std::marker::PhantomData;
 // internal
 use crate::network::NetworkAdapter;
 use nomos_core::wire;
-#[cfg(feature = "libp2p")]
-use nomos_network::backends::libp2p::Libp2p as Backend;
-use nomos_network::backends::libp2p::{Command, Event, EventKind, Message, TopicHash};
-#[cfg(feature = "mixnet")]
-use nomos_network::backends::mixnet::MixnetNetworkBackend as Backend;
+use nomos_network::backends::libp2p::{Command, Event, EventKind, Libp2p, Message, TopicHash};
 use nomos_network::{NetworkMsg, NetworkService};
 use overwatch_rs::services::relay::OutboundRelay;
 use overwatch_rs::services::ServiceData;
@@ -23,13 +19,13 @@ use tracing::debug;
 
 pub const NOMOS_DA_TOPIC: &str = "NomosDa";
 
-pub struct P2pAdapter<B, A> {
-    network_relay: OutboundRelay<<NetworkService<Backend> as ServiceData>::Message>,
+pub struct Libp2pAdapter<B, A> {
+    network_relay: OutboundRelay<<NetworkService<Libp2p> as ServiceData>::Message>,
     _blob: PhantomData<B>,
     _attestation: PhantomData<A>,
 }
 
-impl<B, A> P2pAdapter<B, A>
+impl<B, A> Libp2pAdapter<B, A>
 where
     B: Serialize + DeserializeOwned + Send + Sync + 'static,
     A: Serialize + DeserializeOwned + Send + Sync + 'static,
@@ -74,12 +70,12 @@ where
 }
 
 #[async_trait::async_trait]
-impl<B, A> NetworkAdapter for P2pAdapter<B, A>
+impl<B, A> NetworkAdapter for Libp2pAdapter<B, A>
 where
     B: Serialize + DeserializeOwned + Send + Sync + 'static,
     A: Serialize + DeserializeOwned + Send + Sync + 'static,
 {
-    type Backend = Backend;
+    type Backend = Libp2p;
     type Blob = B;
     type Attestation = A;
 

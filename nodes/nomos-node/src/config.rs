@@ -13,7 +13,7 @@ use hex::FromHex;
 use nomos_api::ApiService;
 use nomos_libp2p::{secp256k1::SecretKey, Multiaddr};
 use nomos_log::{Logger, LoggerBackend, LoggerFormat};
-use nomos_network::backends::libp2p::Libp2p;
+use nomos_network::backends::libp2p::Libp2p as NetworkBackend;
 use nomos_network::NetworkService;
 use overwatch_rs::services::ServiceData;
 use serde::{Deserialize, Serialize};
@@ -122,7 +122,7 @@ pub struct MetricsArgs {
 #[derive(Deserialize, Debug, Clone, Serialize)]
 pub struct Config {
     pub log: <Logger as ServiceData>::Settings,
-    pub network: <NetworkService<Libp2p> as ServiceData>::Settings,
+    pub network: <NetworkService<NetworkBackend> as ServiceData>::Settings,
     pub http: <ApiService<AxumBackend<Tx, Wire, MB16>> as ServiceData>::Settings,
     pub consensus: <Carnot as ServiceData>::Settings,
     pub da: <DataAvailability as ServiceData>::Settings,
@@ -171,6 +171,7 @@ impl Config {
         }
         Ok(self)
     }
+
     pub fn update_network(mut self, network_args: NetworkArgs) -> Result<Self> {
         let NetworkArgs {
             host,
@@ -198,6 +199,8 @@ impl Config {
         if let Some(peers) = initial_peers {
             self.network.backend.initial_peers = peers;
         }
+
+        // TODO: configure mixclient and mixnode if the mixnet feature is enabled
 
         Ok(self)
     }

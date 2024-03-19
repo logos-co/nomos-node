@@ -22,12 +22,10 @@ use utoipa_swagger_ui::SwaggerUi;
 use full_replication::{Blob, Certificate};
 use nomos_core::{da::blob, header::HeaderId, tx::Transaction};
 use nomos_mempool::{
-    network::adapters::p2p::P2pAdapter as MempoolNetworkAdapter, openapi::Status, MempoolMetrics,
+    network::adapters::libp2p::Libp2pAdapter as MempoolNetworkAdapter, openapi::Status,
+    MempoolMetrics,
 };
-#[cfg(feature = "libp2p")]
 use nomos_network::backends::libp2p::Libp2p as NetworkBackend;
-#[cfg(feature = "mixnet")]
-use nomos_network::backends::mixnet::MixnetNetworkBackend as NetworkBackend;
 use nomos_storage::backends::StorageSerde;
 
 use nomos_api::{
