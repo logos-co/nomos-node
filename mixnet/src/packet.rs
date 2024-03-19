@@ -1,6 +1,6 @@
-use std::{io, u8};
+use std::io;
 
-use futures::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
+use futures::{AsyncRead, AsyncReadExt};
 use sphinx_packet::{crypto::PrivateKey, header::delays::Delay};
 
 use crate::{
@@ -110,24 +110,19 @@ impl TryFrom<sphinx_packet::payload::Payload> for PacketBody {
 }
 
 impl PacketBody {
-    pub async fn write_to<W: AsyncWrite + Unpin + ?Sized>(&self, writer: &mut W) -> io::Result<()> {
+    pub fn bytes(self) -> Box<[u8]> {
         match self {
-            Self::SphinxPacket(data) => {
-                Self::write(writer, PacketBodyFlag::SphinxPacket, data).await
-            }
-            Self::Fragment(data) => Self::write(writer, PacketBodyFlag::Fragment, data).await,
+            Self::SphinxPacket(data) => Self::bytes_with_flag(PacketBodyFlag::SphinxPacket, data),
+            Self::Fragment(data) => Self::bytes_with_flag(PacketBodyFlag::Fragment, data),
         }
     }
 
-    async fn write<W: AsyncWrite + Unpin + ?Sized>(
-        writer: &mut W,
-        flag: PacketBodyFlag,
-        data: &[u8],
-    ) -> io::Result<()> {
-        writer.write_all(&[flag as u8]).await?;
-        writer.write_all(&data.len().to_le_bytes()).await?;
-        writer.write_all(data).await?;
-        Ok(())
+    fn bytes_with_flag(flag: PacketBodyFlag, mut msg: Vec<u8>) -> Box<[u8]> {
+        let mut out = Vec::with_capacity(1 + std::mem::size_of::<usize>() + msg.len());
+        out.push(flag as u8);
+        out.extend_from_slice(&msg.len().to_le_bytes());
+        out.append(&mut msg);
+        out.into_boxed_slice()
     }
 
     pub async fn read_from<R: AsyncRead + Unpin>(

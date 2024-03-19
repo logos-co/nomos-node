@@ -174,12 +174,12 @@ impl SwarmHandler {
             Command::StreamSend {
                 peer_id,
                 protocol,
-                packet_body: packet,
+                data,
             } => {
                 tracing::debug!("StreamSend to {peer_id}");
                 match self.open_stream(peer_id, protocol).await {
                     Ok(stream) => {
-                        if let Err(e) = packet.write_to(stream).await {
+                        if let Err(e) = stream.write_all(&data).await {
                             tracing::error!("failed to write to the stream with ${peer_id}: {e}");
                             self.close_stream(&peer_id).await;
                         }
@@ -301,8 +301,7 @@ impl SwarmHandler {
         protocol: StreamProtocol,
     ) -> Result<&mut Stream, OpenStreamError> {
         if let Entry::Vacant(entry) = self.streams.entry(peer_id) {
-            let stream = self.stream_control.open_stream(peer_id, protocol).await?;
-            entry.insert(stream);
+            entry.insert(self.stream_control.open_stream(peer_id, protocol).await?);
         }
         Ok(self.streams.get_mut(&peer_id).unwrap())
     }
