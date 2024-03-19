@@ -13,10 +13,7 @@ use hex::FromHex;
 use nomos_api::ApiService;
 use nomos_libp2p::{secp256k1::SecretKey, Multiaddr};
 use nomos_log::{Logger, LoggerBackend, LoggerFormat};
-#[cfg(feature = "libp2p")]
 use nomos_network::backends::libp2p::Libp2p as NetworkBackend;
-#[cfg(feature = "mixnet")]
-use nomos_network::backends::mixnet::MixnetNetworkBackend as NetworkBackend;
 use nomos_network::NetworkService;
 use overwatch_rs::services::ServiceData;
 use serde::{Deserialize, Serialize};
@@ -183,31 +180,27 @@ impl Config {
             initial_peers,
         } = network_args;
 
-        #[cfg(feature = "libp2p")]
-        let libp2p_config = &mut self.network.backend;
-        #[cfg(feature = "mixnet")]
-        let libp2p_config = &mut self.network.backend.libp2p;
-
         if let Some(IpAddr::V4(h)) = host {
-            libp2p_config.inner.host = h;
+            self.network.backend.inner.host = h;
         } else if host.is_some() {
             return Err(eyre!("Unsupported ip version"));
         }
 
         if let Some(port) = port {
-            libp2p_config.inner.port = port as u16;
+            self.network.backend.inner.port = port as u16;
         }
 
         if let Some(node_key) = node_key {
             let mut key_bytes = hex::decode(node_key)?;
-            libp2p_config.inner.node_key = SecretKey::try_from_bytes(key_bytes.as_mut_slice())?;
+            self.network.backend.inner.node_key =
+                SecretKey::try_from_bytes(key_bytes.as_mut_slice())?;
         }
 
         if let Some(peers) = initial_peers {
-            libp2p_config.initial_peers = peers;
+            self.network.backend.initial_peers = peers;
         }
 
-        // TODO: configure mixclient and mixnode
+        // TODO: configure mixclient and mixnode if the mixnet feature is enabled
 
         Ok(self)
     }

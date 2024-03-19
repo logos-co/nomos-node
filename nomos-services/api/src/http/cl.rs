@@ -4,7 +4,7 @@ use nomos_core::header::HeaderId;
 use nomos_core::tx::Transaction;
 use nomos_mempool::{
     backend::mockpool::MockPool,
-    network::adapters::p2p::P2pAdapter as MempoolNetworkAdapter,
+    network::adapters::libp2p::Libp2pAdapter as MempoolNetworkAdapter,
     openapi::{MempoolMetrics, Status},
     MempoolMsg, MempoolService, Transaction as TxDiscriminant,
 };

@@ -19,4 +19,3 @@ tokio-stream = "0.1"
 
 [features]
 libp2p = ["nomos-network/libp2p"]
-mixnet = ["nomos-network/mixnet"]

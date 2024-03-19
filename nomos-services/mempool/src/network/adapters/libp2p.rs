@@ -6,27 +6,23 @@ use tokio_stream::StreamExt;
 // internal
 use crate::network::NetworkAdapter;
 use nomos_core::wire;
-#[cfg(feature = "libp2p")]
-use nomos_network::backends::libp2p::Libp2p as Backend;
-use nomos_network::backends::libp2p::{Command, Event, EventKind, Message, TopicHash};
-#[cfg(feature = "mixnet")]
-use nomos_network::backends::mixnet::MixnetNetworkBackend as Backend;
+use nomos_network::backends::libp2p::{Command, Event, EventKind, Libp2p, Message, TopicHash};
 use nomos_network::{NetworkMsg, NetworkService};
 use overwatch_rs::services::relay::OutboundRelay;
 use overwatch_rs::services::ServiceData;
 
-pub struct P2pAdapter<Item, Key> {
-    network_relay: OutboundRelay<<NetworkService<Backend> as ServiceData>::Message>,
+pub struct Libp2pAdapter<Item, Key> {
+    network_relay: OutboundRelay<<NetworkService<Libp2p> as ServiceData>::Message>,
     settings: Settings<Key, Item>,
 }
 
 #[async_trait::async_trait]
-impl<Item, Key> NetworkAdapter for P2pAdapter<Item, Key>
+impl<Item, Key> NetworkAdapter for Libp2pAdapter<Item, Key>
 where
     Item: DeserializeOwned + Serialize + Send + Sync + 'static + Clone,
     Key: Clone + Send + Sync + 'static,
 {
-    type Backend = Backend;
+    type Backend = Libp2p;
     type Settings = Settings<Key, Item>;
     type Item = Item;
     type Key = Key;

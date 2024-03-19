@@ -4,12 +4,9 @@ use full_replication::{AbsoluteNumber, Attestation, Certificate, FullReplication
 use futures::StreamExt;
 use hex::FromHex;
 use nomos_core::{da::DaProtocol, wire};
-use nomos_da::network::{adapters::p2p::P2pAdapter as DaNetworkAdapter, NetworkAdapter};
+use nomos_da::network::{adapters::libp2p::Libp2pAdapter as DaNetworkAdapter, NetworkAdapter};
 use nomos_log::Logger;
-#[cfg(feature = "libp2p")]
 use nomos_network::backends::libp2p::Libp2p as NetworkBackend;
-#[cfg(feature = "mixnet")]
-use nomos_network::backends::mixnet::MixnetNetworkBackend as NetworkBackend;
 use nomos_network::NetworkService;
 use overwatch_derive::*;
 use overwatch_rs::{

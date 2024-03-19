@@ -20,10 +20,7 @@ use full_replication::{
 use futures::{stream, StreamExt};
 use nomos_core::{da::DaProtocol, header::HeaderId, wire};
 use nomos_log::{LoggerBackend, LoggerSettings, SharedWriter};
-#[cfg(feature = "libp2p")]
 use nomos_network::backends::libp2p::Libp2p as NetworkBackend;
-#[cfg(feature = "mixnet")]
-use nomos_network::backends::mixnet::MixnetNetworkBackend as NetworkBackend;
 use nomos_network::NetworkService;
 use overwatch_rs::{overwatch::OverwatchRunner, services::ServiceData};
 use reqwest::Url;

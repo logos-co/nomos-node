@@ -4,10 +4,12 @@ use std::{
 };
 
 use futures::AsyncWriteExt;
+#[cfg(feature = "mixnet")]
+use nomos_libp2p::libp2p_stream::IncomingStreams;
 use nomos_libp2p::{
     gossipsub,
     libp2p::{swarm::ConnectionId, Stream, StreamProtocol},
-    libp2p_stream::{Control, IncomingStreams, OpenStreamError},
+    libp2p_stream::{Control, OpenStreamError},
     BehaviourEvent, Multiaddr, PeerId, Swarm, SwarmEvent,
 };
 use tokio::sync::{broadcast, mpsc, oneshot};
@@ -290,7 +292,7 @@ impl SwarmHandler {
         std::time::Duration::from_secs(BACKOFF.pow(retry as u32))
     }
 
-    #[allow(dead_code)]
+    #[cfg(feature = "mixnet")]
     pub fn incoming_streams(&mut self, protocol: StreamProtocol) -> IncomingStreams {
         self.stream_control.accept(protocol).unwrap()
     }

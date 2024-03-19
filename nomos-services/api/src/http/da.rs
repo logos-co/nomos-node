@@ -2,12 +2,12 @@ use full_replication::{AbsoluteNumber, Attestation, Blob, Certificate, FullRepli
 use nomos_core::da::blob;
 use nomos_core::header::HeaderId;
 use nomos_da::{
-    backend::memory_cache::BlobCache, network::adapters::p2p::P2pAdapter as DaNetworkAdapter,
+    backend::memory_cache::BlobCache, network::adapters::libp2p::Libp2pAdapter as DaNetworkAdapter,
     DaMsg, DataAvailabilityService,
 };
 use nomos_mempool::{
     backend::mockpool::MockPool,
-    network::adapters::p2p::P2pAdapter as MempoolNetworkAdapter,
+    network::adapters::libp2p::Libp2pAdapter as MempoolNetworkAdapter,
     openapi::{MempoolMetrics, Status},
     Certificate as CertDiscriminant, MempoolMsg, MempoolService,
 };

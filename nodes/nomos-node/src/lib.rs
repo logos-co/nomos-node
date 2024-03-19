@@ -2,7 +2,7 @@ pub mod api;
 mod config;
 mod tx;
 
-use carnot_consensus::network::adapters::p2p::P2pAdapter as ConsensusNetworkAdapter;
+use carnot_consensus::network::adapters::libp2p::Libp2pAdapter as ConsensusNetworkAdapter;
 use carnot_engine::overlay::{RandomBeaconState, RoundRobin, TreeOverlay};
 use color_eyre::eyre::Result;
 use full_replication::Certificate;
@@ -21,21 +21,18 @@ use nomos_core::{
     wire,
 };
 use nomos_da::{
-    backend::memory_cache::BlobCache, network::adapters::p2p::P2pAdapter as DaNetworkAdapter,
+    backend::memory_cache::BlobCache, network::adapters::libp2p::Libp2pAdapter as DaNetworkAdapter,
     DataAvailabilityService,
 };
 use nomos_log::Logger;
-use nomos_mempool::network::adapters::p2p::P2pAdapter as MempoolNetworkAdapter;
+use nomos_mempool::network::adapters::libp2p::Libp2pAdapter as MempoolNetworkAdapter;
 use nomos_mempool::{
     backend::mockpool::MockPool, Certificate as CertDiscriminant, MempoolService,
     Transaction as TxDiscriminant,
 };
 #[cfg(feature = "metrics")]
 use nomos_metrics::Metrics;
-#[cfg(feature = "libp2p")]
 use nomos_network::backends::libp2p::Libp2p as NetworkBackend;
-#[cfg(feature = "mixnet")]
-use nomos_network::backends::mixnet::MixnetNetworkBackend as NetworkBackend;
 use nomos_storage::{
     backends::{sled::SledBackend, StorageSerde},
     StorageService,
