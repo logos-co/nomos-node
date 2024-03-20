@@ -1,6 +1,7 @@
 use nomos_core::da::certificate::Certificate;
 use overwatch_rs::DynError;
 
+#[derive(Debug)]
 pub enum DaIndexError {
     Dyn(DynError),
 }
