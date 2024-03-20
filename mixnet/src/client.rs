@@ -65,7 +65,7 @@ impl MixClient {
 impl Stream for MixClient {
     type Item = Packet;
 
-    /// Returns a next [`Packet`] to be emitted to the next, if it exists and the Poisson timer is done.
+    /// Returns a next [`Packet`] to be emitted, if it exists and the Poisson timer is done.
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         if self.delay.is_none() {
             // We've never set an initial delay. Let's do it now.
