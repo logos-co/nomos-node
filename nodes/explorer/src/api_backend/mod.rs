@@ -1,3 +1,4 @@
+mod da;
 mod store;
 
 use std::{fmt::Debug, hash::Hash};
@@ -11,10 +12,9 @@ use tower_http::{
     trace::TraceLayer,
 };
 
+use nomos_api::Backend;
 use nomos_core::tx::Transaction;
 use nomos_storage::backends::StorageSerde;
-
-use nomos_api::Backend;
 
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
 pub struct AxumBackendSettings {
@@ -84,12 +84,12 @@ where
             )
             .layer(TraceLayer::new_for_http())
             // .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
-            .route("/store/blocks", routing::get(store::store_blocks::<T, S>))
             .route("/explorer/blocks", routing::get(store::blocks::<T, S>))
             .route(
                 "/explorer/blocks/depth",
                 routing::get(store::block_depth::<T, S>),
             )
+            .route("/da/blobs", routing::post(da::blobs))
             .with_state(handle);
 
         Server::bind(&self.settings.address)
