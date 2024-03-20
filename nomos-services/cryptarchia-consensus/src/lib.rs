@@ -31,8 +31,8 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_with::serde_as;
 use std::hash::Hash;
 use thiserror::Error;
-use tokio::sync::broadcast;
 use tokio::sync::oneshot::Sender;
+use tokio::sync::{broadcast, oneshot};
 use tokio_stream::wrappers::IntervalStream;
 use tracing::{error, instrument};
 
@@ -164,7 +164,7 @@ where
     type Settings = CryptarchiaSettings<TxS::Settings, BS::Settings>;
     type State = NoState<Self::Settings>;
     type StateOperator = NoOperator<Self::State>;
-    type Message = ConsensusMsg;
+    type Message = ConsensusMsg<Block<ClPool::Item, DaPool::Item>>;
 }
 
 #[async_trait::async_trait]
@@ -322,7 +322,7 @@ where
                     }
 
                     Some(msg) = self.service_state.inbound_relay.next() => {
-                        Self::process_message(&cryptarchia, msg);
+                        Self::process_message(&cryptarchia, &self.block_subscription_sender, msg);
                     }
                     Some(msg) = lifecycle_stream.next() => {
                         if Self::should_stop_service(msg).await {
@@ -386,7 +386,11 @@ where
         }
     }
 
-    fn process_message(cryptarchia: &Cryptarchia, msg: ConsensusMsg) {
+    fn process_message(
+        cryptarchia: &Cryptarchia,
+        block_channel: &broadcast::Sender<Block<ClPool::Item, DaPool::Item>>,
+        msg: ConsensusMsg<Block<ClPool::Item, DaPool::Item>>,
+    ) {
         match msg {
             ConsensusMsg::Info { tx } => {
                 let info = CryptarchiaInfo {
@@ -394,6 +398,11 @@ where
                 };
                 tx.send(info).unwrap_or_else(|e| {
                     tracing::error!("Could not send consensus info through channel: {:?}", e)
+                });
+            }
+            ConsensusMsg::BlockSubscribe { sender } => {
+                sender.send(block_channel.subscribe()).unwrap_or_else(|_| {
+                    tracing::error!("Could not subscribe to block subscription channel")
                 });
             }
         }
@@ -488,11 +497,16 @@ where
 }
 
 #[derive(Debug)]
-pub enum ConsensusMsg {
-    Info { tx: Sender<CryptarchiaInfo> },
+pub enum ConsensusMsg<Block> {
+    Info {
+        tx: Sender<CryptarchiaInfo>,
+    },
+    BlockSubscribe {
+        sender: oneshot::Sender<broadcast::Receiver<Block>>,
+    },
 }
 
-impl RelayMessage for ConsensusMsg {}
+impl<Block: 'static> RelayMessage for ConsensusMsg<Block> {}
 
 #[serde_as]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
