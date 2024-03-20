@@ -13,6 +13,7 @@ members = [
     "nomos-services/mempool",
     "nomos-services/http",
     "nomos-services/data-availability",
+    "nomos-services/data-index",
     "nomos-services/system-sig",
     "nomos-da/reed-solomon",
     "nomos-da/kzg",
