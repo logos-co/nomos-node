@@ -1,7 +1,10 @@
+pub mod backend;
+
+// std
 use std::fmt::{Debug, Formatter};
-
+// crates
 use serde::{Deserialize, Serialize};
-
+// internal
 use nomos_core::da::{certificate::Certificate, DaProtocol};
 use overwatch_rs::{
     services::{
@@ -14,6 +17,9 @@ use overwatch_rs::{
 };
 
 pub enum DaIndexMsg<C: Certificate> {
+    // TODO: The certificate receival most likely won't happen by sending a new VIDs
+    // to the DAIndexService. The service should subscribe to the event about new VIDs
+    // observerd/added to the block.
     ReceiveCert { cert: C },
     GetRange {},
 }
