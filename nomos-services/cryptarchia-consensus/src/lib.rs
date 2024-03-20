@@ -5,7 +5,7 @@ mod time;
 use core::fmt::Debug;
 use cryptarchia_engine::Slot;
 use cryptarchia_ledger::{LeaderProof, LedgerState};
-use futures::StreamExt;
+use futures::{SinkExt, StreamExt};
 use network::{messages::NetworkMessage, NetworkAdapter};
 use nomos_core::da::certificate::{BlobCertificateSelect, Certificate};
 use nomos_core::header::{cryptarchia::Header, HeaderId};
@@ -31,6 +31,7 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_with::serde_as;
 use std::hash::Hash;
 use thiserror::Error;
+use tokio::sync::broadcast;
 use tokio::sync::oneshot::Sender;
 use tokio_stream::wrappers::IntervalStream;
 use tracing::{error, instrument};
@@ -124,9 +125,9 @@ where
     DaPool: MemPool<BlockId = HeaderId>,
     DaPoolAdapter: MempoolAdapter<Item = DaPool::Item, Key = DaPool::Key>,
 
-    ClPool::Item: Debug + 'static,
+    ClPool::Item: Clone + Eq + Hash + Debug + 'static,
     ClPool::Key: Debug + 'static,
-    DaPool::Item: Debug + 'static,
+    DaPool::Item: Clone + Eq + Hash + Debug + 'static,
     DaPool::Key: Debug + 'static,
     A::Backend: 'static,
     TxS: TxSelect<Tx = ClPool::Item>,
@@ -139,6 +140,7 @@ where
     network_relay: Relay<NetworkService<A::Backend>>,
     cl_mempool_relay: Relay<MempoolService<ClPoolAdapter, ClPool, TxDiscriminant>>,
     da_mempool_relay: Relay<MempoolService<DaPoolAdapter, DaPool, CertDiscriminant>>,
+    block_subscription_sender: broadcast::Sender<Block<ClPool::Item, DaPool::Item>>,
     storage_relay: Relay<StorageService<Storage>>,
 }
 
@@ -147,10 +149,10 @@ impl<A, ClPool, ClPoolAdapter, DaPool, DaPoolAdapter, TxS, BS, Storage> ServiceD
 where
     A: NetworkAdapter,
     ClPool: MemPool<BlockId = HeaderId>,
-    ClPool::Item: Debug,
+    ClPool::Item: Clone + Eq + Hash + Debug,
     ClPool::Key: Debug,
     DaPool: MemPool<BlockId = HeaderId>,
-    DaPool::Item: Debug,
+    DaPool::Item: Clone + Eq + Hash + Debug,
     DaPool::Key: Debug,
     ClPoolAdapter: MempoolAdapter<Item = ClPool::Item, Key = ClPool::Key>,
     DaPoolAdapter: MempoolAdapter<Item = DaPool::Item, Key = DaPool::Key>,
@@ -213,11 +215,13 @@ where
         let cl_mempool_relay = service_state.overwatch_handle.relay();
         let da_mempool_relay = service_state.overwatch_handle.relay();
         let storage_relay = service_state.overwatch_handle.relay();
+        let (block_subscription_sender, _) = broadcast::channel(16);
         Ok(Self {
             service_state,
             network_relay,
             cl_mempool_relay,
             da_mempool_relay,
+            block_subscription_sender,
             storage_relay,
         })
     }
@@ -287,6 +291,7 @@ where
                             storage_relay.clone(),
                             cl_mempool_relay.clone(),
                             da_mempool_relay.clone(),
+                            &mut self.block_subscription_sender
                         )
                         .await;
                     }
@@ -405,6 +410,7 @@ where
         storage_relay: OutboundRelay<StorageMsg<Storage>>,
         cl_mempool_relay: OutboundRelay<MempoolMsg<HeaderId, ClPool::Item, ClPool::Key>>,
         da_mempool_relay: OutboundRelay<MempoolMsg<HeaderId, DaPool::Item, DaPool::Key>>,
+        block_broadcaster: &mut broadcast::Sender<Block<ClPool::Item, DaPool::Item>>,
     ) -> Cryptarchia {
         tracing::debug!("received proposal {:?}", block);
 
@@ -425,9 +431,13 @@ where
                 mark_in_block(da_mempool_relay, block.blobs().map(Certificate::hash), id).await;
 
                 // store block
-                let msg = <StorageMsg<_>>::new_store_message(header.id(), block);
+                let msg = <StorageMsg<_>>::new_store_message(header.id(), block.clone());
                 if let Err((e, _msg)) = storage_relay.send(msg).await {
                     tracing::error!("Could not send block to storage: {e}");
+                }
+
+                if let Err(e) = block_broadcaster.send(block) {
+                    tracing::error!("Could not notify block to services {e}");
                 }
 
                 cryptarchia = new_state;
