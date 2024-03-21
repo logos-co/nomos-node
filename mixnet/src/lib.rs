@@ -15,6 +15,7 @@ mod fragment;
 pub mod node;
 /// Mix packet
 pub mod packet;
+/// Poisson distribution
 mod poisson;
 /// Mixnet topology
 pub mod topology;
