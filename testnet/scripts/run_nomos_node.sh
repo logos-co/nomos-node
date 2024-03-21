@@ -12,7 +12,7 @@ node_ids=$(etcdctl get "/node/" --prefix --keys-only)
 for node_id in $node_ids; do
 	node_key=$(etcdctl get "/config${node_id}/key" --print-value-only)
 	node_ip=$(etcdctl get "/config${node_id}/ip" --print-value-only)
-	node_multiaddr="/ip4/${node_ip}/tcp/3000"
+	node_multiaddr="/ip4/${node_ip}/udp/3000/quic-v1"
 
 	if [ -z "$NET_INITIAL_PEERS" ]; then
 		NET_INITIAL_PEERS=$node_multiaddr

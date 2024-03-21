@@ -39,6 +39,7 @@ serde_json = "1.0"
 thiserror = "1"
 tracing = { version = "0.1", default-features = false, features = ["log", "attributes"] }
 tracing-subscriber = { version = "0.3", features = ["json", "env-filter", "tracing-log"]}
+nomos-utils = { path = "../nomos-utils" }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 getrandom = { version = "0.2", features = ["js"] }

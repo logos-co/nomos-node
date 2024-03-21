@@ -19,11 +19,13 @@ use tower_http::{
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 
-use carnot_engine::BlockId;
 use full_replication::{Blob, Certificate};
-use nomos_core::{da::blob, tx::Transaction};
-use nomos_mempool::{network::adapters::libp2p::Libp2pAdapter, openapi::Status, MempoolMetrics};
-use nomos_network::backends::libp2p::Libp2p;
+use nomos_core::{da::blob, header::HeaderId, tx::Transaction};
+use nomos_mempool::{
+    network::adapters::libp2p::Libp2pAdapter as MempoolNetworkAdapter, openapi::Status,
+    MempoolMetrics,
+};
+use nomos_network::backends::libp2p::Libp2p as NetworkBackend;
 use nomos_storage::backends::StorageSerde;
 
 use nomos_api::{
@@ -53,7 +55,7 @@ pub struct AxumBackend<T, S, const SIZE: usize> {
         da_status,
     ),
     components(
-        schemas(Status, MempoolMetrics)
+        schemas(Status<HeaderId>, MempoolMetrics)
     ),
     tags(
         (name = "da", description = "data availibility related APIs")
@@ -255,8 +257,8 @@ where
 
 #[derive(Deserialize)]
 struct QueryParams {
-    from: Option<BlockId>,
-    to: Option<BlockId>,
+    from: Option<HeaderId>,
+    to: Option<HeaderId>,
 }
 
 #[utoipa::path(
@@ -300,7 +302,7 @@ async fn libp2p_info(State(handle): State<OverwatchHandle>) -> Response {
         (status = 500, description = "Internal server error", body = String),
     )
 )]
-async fn block<S, Tx>(State(handle): State<OverwatchHandle>, Json(id): Json<BlockId>) -> Response
+async fn block<S, Tx>(State(handle): State<OverwatchHandle>, Json(id): Json<HeaderId>) -> Response
 where
     Tx: serde::Serialize + serde::de::DeserializeOwned + Clone + Eq + core::hash::Hash,
     S: StorageSerde + Send + Sync + 'static,
@@ -322,8 +324,8 @@ where
     <Tx as Transaction>::Hash: std::cmp::Ord + Debug + Send + Sync + 'static,
 {
     make_request_and_return_response!(mempool::add::<
-        Libp2p,
-        Libp2pAdapter<Tx, <Tx as Transaction>::Hash>,
+        NetworkBackend,
+        MempoolNetworkAdapter<Tx, <Tx as Transaction>::Hash>,
         nomos_mempool::Transaction,
         Tx,
         <Tx as Transaction>::Hash,
@@ -343,8 +345,8 @@ async fn add_cert(
     Json(cert): Json<Certificate>,
 ) -> Response {
     make_request_and_return_response!(mempool::add::<
-        Libp2p,
-        Libp2pAdapter<Certificate, <Blob as blob::Blob>::Hash>,
+        NetworkBackend,
+        MempoolNetworkAdapter<Certificate, <Blob as blob::Blob>::Hash>,
         nomos_mempool::Certificate,
         Certificate,
         <Blob as blob::Blob>::Hash,

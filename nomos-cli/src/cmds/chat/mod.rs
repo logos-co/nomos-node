@@ -18,9 +18,10 @@ use full_replication::{
     AbsoluteNumber, Attestation, Certificate, FullReplication, Settings as DaSettings,
 };
 use futures::{stream, StreamExt};
-use nomos_core::{block::BlockId, da::DaProtocol, wire};
+use nomos_core::{da::DaProtocol, header::HeaderId, wire};
 use nomos_log::{LoggerBackend, LoggerSettings, SharedWriter};
-use nomos_network::{backends::libp2p::Libp2p, NetworkService};
+use nomos_network::backends::libp2p::Libp2p as NetworkBackend;
+use nomos_network::NetworkService;
 use overwatch_rs::{overwatch::OverwatchRunner, services::ServiceData};
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
@@ -89,7 +90,7 @@ impl NomosChat {
     pub fn run(&self) -> Result<(), Box<dyn std::error::Error>> {
         let network = serde_yaml::from_reader::<
             _,
-            <NetworkService<Libp2p> as ServiceData>::Settings,
+            <NetworkService<NetworkBackend> as ServiceData>::Settings,
         >(std::fs::File::open(&self.network_config)?)?;
         let da_protocol = self.da_protocol.clone();
 
@@ -266,7 +267,7 @@ struct ChatMessage {
 #[tokio::main]
 async fn check_for_messages(sender: Sender<Vec<ChatMessage>>, node: Url) {
     // Should ask for the genesis block to be more robust
-    let mut last_tip = BlockId::zeros();
+    let mut last_tip = [0; 32].into();
 
     loop {
         if let Ok((new_tip, messages)) = fetch_new_messages(&last_tip, &node).await {
@@ -280,7 +281,7 @@ async fn check_for_messages(sender: Sender<Vec<ChatMessage>>, node: Url) {
 // Process a single block's blobs and return chat messages
 async fn process_block_blobs(
     node: Url,
-    block_id: &BlockId,
+    block_id: &HeaderId,
     da_settings: DaSettings,
 ) -> Result<Vec<ChatMessage>, Box<dyn std::error::Error>> {
     let blobs = get_block_blobs(&node, block_id).await?;
@@ -304,9 +305,9 @@ async fn process_block_blobs(
 
 // Fetch new messages since the last tip
 async fn fetch_new_messages(
-    last_tip: &BlockId,
+    last_tip: &HeaderId,
     node: &Url,
-) -> Result<(BlockId, Vec<ChatMessage>), Box<dyn std::error::Error>> {
+) -> Result<(HeaderId, Vec<ChatMessage>), Box<dyn std::error::Error>> {
     // By only specifying the 'to' parameter we get all the blocks since the last tip
     let mut new_blocks = get_blocks_info(node, None, Some(*last_tip))
         .await?

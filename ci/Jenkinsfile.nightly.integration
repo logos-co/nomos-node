@@ -53,10 +53,6 @@ pipeline {
                     /* To prevent rebuilding node for each test, tests are defined here */
                     def tests = ['ten_nodes_happy', 'two_nodes_happy', 'ten_nodes_one_down']
 
-                    if (FEATURE == 'libp2p') {
-                      tests.add('mixnet')
-                    }
-
                     def report = runBuildAndTestsForFeature(FEATURE, tests)
                     writeFile(file: "${WORKSPACE}/report.txt", text: report)
                   }

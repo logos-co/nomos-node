@@ -1,7 +1,6 @@
 #[cfg(feature = "mock")]
 pub mod mockpool;
 
-use nomos_core::block::BlockId;
 use serde::{Deserialize, Serialize};
 
 #[derive(thiserror::Error, Debug)]
@@ -16,6 +15,7 @@ pub trait MemPool {
     type Settings: Clone;
     type Item;
     type Key;
+    type BlockId;
 
     /// Construct a new empty pool
     fn new(settings: Self::Settings) -> Self;
@@ -28,14 +28,17 @@ pub trait MemPool {
     /// in a block.
     /// The hint on the ancestor *can* be used by the implementation to display additional
     /// items that were not included up to that point if available.
-    fn view(&self, ancestor_hint: BlockId) -> Box<dyn Iterator<Item = Self::Item> + Send>;
+    fn view(&self, ancestor_hint: Self::BlockId) -> Box<dyn Iterator<Item = Self::Item> + Send>;
 
     /// Record that a set of items were included in a block
-    fn mark_in_block(&mut self, items: &[Self::Key], block: BlockId);
+    fn mark_in_block(&mut self, items: &[Self::Key], block: Self::BlockId);
 
     /// Returns all of the transactions for the block
     #[cfg(test)]
-    fn block_items(&self, block: BlockId) -> Option<Box<dyn Iterator<Item = Self::Item> + Send>>;
+    fn block_items(
+        &self,
+        block: Self::BlockId,
+    ) -> Option<Box<dyn Iterator<Item = Self::Item> + Send>>;
 
     /// Signal that a set of transactions can't be possibly requested anymore and can be
     /// discarded.
@@ -46,12 +49,12 @@ pub trait MemPool {
 
     // Return the status of a set of items.
     // This is a best effort attempt, and implementations are free to return `Unknown` for all of them.
-    fn status(&self, items: &[Self::Key]) -> Vec<Status>;
+    fn status(&self, items: &[Self::Key]) -> Vec<Status<Self::BlockId>>;
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
-pub enum Status {
+pub enum Status<BlockId> {
     /// Unknown status
     Unknown,
     /// Pending status

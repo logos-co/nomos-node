@@ -4,9 +4,10 @@ use full_replication::{AbsoluteNumber, Attestation, Certificate, FullReplication
 use futures::StreamExt;
 use hex::FromHex;
 use nomos_core::{da::DaProtocol, wire};
-use nomos_da::network::{adapters::libp2p::Libp2pAdapter, NetworkAdapter};
+use nomos_da::network::{adapters::libp2p::Libp2pAdapter as DaNetworkAdapter, NetworkAdapter};
 use nomos_log::Logger;
-use nomos_network::{backends::libp2p::Libp2p, NetworkService};
+use nomos_network::backends::libp2p::Libp2p as NetworkBackend;
+use nomos_network::NetworkService;
 use overwatch_derive::*;
 use overwatch_rs::{
     services::{
@@ -111,7 +112,7 @@ impl std::fmt::Display for Status {
 // an overwatch app
 #[derive(Services)]
 pub struct DisseminateApp {
-    network: ServiceHandle<NetworkService<Libp2p>>,
+    network: ServiceHandle<NetworkService<NetworkBackend>>,
     send_blob: ServiceHandle<DisseminateService>,
     logger: ServiceHandle<Logger>,
 }
@@ -160,7 +161,7 @@ impl ServiceCore for DisseminateService {
 
         let network_relay = service_state
             .overwatch_handle
-            .relay::<NetworkService<Libp2p>>()
+            .relay::<NetworkService<NetworkBackend>>()
             .connect()
             .await
             .expect("Relay connection with NetworkService should succeed");
@@ -171,7 +172,7 @@ impl ServiceCore for DisseminateService {
                 disseminate_and_wait(
                     da_protocol.clone(),
                     data,
-                    Libp2pAdapter::new(network_relay.clone()).await,
+                    DaNetworkAdapter::new(network_relay.clone()).await,
                     status_updates.clone(),
                     node_addr.as_ref(),
                     output.as_ref(),

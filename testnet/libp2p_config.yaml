@@ -23,45 +23,8 @@ network:
     log_level: "fatal"
     node_key: "0000000000000000000000000000000000000000000000000000000000000001"
     discV5BootstrapNodes: []
-    initial_peers: ["/dns/bootstrap/tcp/3000"]
+    initial_peers: ["/dns/bootstrap/udp/3000/quic-v1"]
     relayTopics: []
-    # Mixclient configuration to communicate with mixnodes.
-    # The libp2p network backend always requires this mixclient configuration
-    # (cannot be disabled for now).
-    mixnet_client:
-      # A mixclient mode. For details, see the documentation of the "mixnet" crate.
-      # - Sender
-      # - !SenderReceiver [mixnode_client_listen_address]
-      mode: Sender
-      # A mixnet topology, which contains the information of all mixnodes in the mixnet.
-      # (The topology is static for now.)
-      topology:
-        # Each mixnet layer consists of a list of mixnodes.
-        layers:
-         - nodes:
-            - address: mix-node-0:7777  # A listen address of the mixnode
-              public_key: "fd3384e132ad02a56c78f45547ee40038dc79002b90d29ed90e08eee762ae715"
-         - nodes:
-            - address: mix-node-1:7777  # A listen address of the mixnode
-              public_key: "fd3384e132ad02a56c78f45547ee40038dc79002b90d29ed90e08eee762ae715"
-
-         - nodes:
-            - address: mix-node-2:7777  # A listen address of the mixnode
-              public_key: "fd3384e132ad02a56c78f45547ee40038dc79002b90d29ed90e08eee762ae715"
-
-
-      # A max number of connections that will stay connected to mixnodes in the first mixnet layer.
-      connection_pool_size: 255
-      max_retries: 5
-      retry_delay:
-        secs: 1
-        nanos: 0
-    # A range of total delay that will be set to each Sphinx packets
-    # sent to the mixnet for timing obfuscation.
-    # Panics if start > end.
-    mixnet_delay:
-      start: "0ms"
-      end: "0ms"
 
 http:
   backend_settings:

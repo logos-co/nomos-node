@@ -1,9 +1,10 @@
-use crate::config::Config;
 use std::ops::Add;
 
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone, Debug, Eq, PartialEq, Copy, Hash, PartialOrd, Ord)]
 pub struct Slot(u64);
 
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone, Debug, Eq, PartialEq, Copy, Hash, PartialOrd, Ord)]
 pub struct Epoch(u32);
 
@@ -14,10 +15,6 @@ impl Slot {
 
     pub fn genesis() -> Self {
         Self(0)
-    }
-
-    pub fn epoch(&self, config: &Config) -> Epoch {
-        Epoch((self.0 / config.epoch_length()) as u32)
     }
 }
 

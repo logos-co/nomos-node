@@ -10,7 +10,8 @@ use self::{
     standard_qc::StandardQcHelper,
     timeout_qc::TimeoutQcHelper,
 };
-use carnot_engine::{AggregateQc, Block, BlockId, Committee, Qc, StandardQc, TimeoutQc, View};
+use crate::node::carnot::{AggregateQc, Block, Committee, Qc, StandardQc, TimeoutQc};
+use carnot_engine::View;
 
 const NODE_ID: &str = "node_id";
 const CURRENT_VIEW: &str = "current_view";
@@ -238,16 +239,24 @@ pub(crate) mod timeout_qc {
 }
 
 pub(crate) mod serde_id {
-    use carnot_engine::{BlockId, NodeId};
+    use carnot_engine::NodeId;
+    use nomos_core::header::HeaderId;
 
     use super::*;
 
     #[derive(Serialize)]
-    pub(crate) struct BlockIdHelper<'a>(#[serde(with = "serde_array32")] &'a [u8; 32]);
+    pub(crate) struct BlockIdHelper<'a> {
+        #[serde(with = "serde_array32")]
+        header: [u8; 32],
+        _marker: std::marker::PhantomData<&'a HeaderId>,
+    }
 
-    impl<'a> From<&'a BlockId> for BlockIdHelper<'a> {
-        fn from(val: &'a BlockId) -> Self {
-            Self(val.into())
+    impl<'a> From<&'a HeaderId> for BlockIdHelper<'a> {
+        fn from(val: &'a HeaderId) -> Self {
+            Self {
+                header: (*val).into(),
+                _marker: std::marker::PhantomData,
+            }
         }
     }
 

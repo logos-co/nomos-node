@@ -1,23 +1,25 @@
 use carnot_consensus::CarnotInfo;
-use carnot_engine::{Block, NodeId, TimeoutQc, View};
+use carnot_engine::{NodeId, View};
 use fraction::Fraction;
 use futures::stream::{self, StreamExt};
+use nomos_core::header::HeaderId;
 use std::{collections::HashSet, time::Duration};
-use tests::{adjust_timeout, ConsensusConfig, MixNode, Node, NomosNode, SpawnConfig};
+use tests::{adjust_timeout, ConsensusConfig, Node, NomosNode, SpawnConfig};
 
 const TARGET_VIEW: View = View::new(20);
 const DUMMY_NODE_ID: NodeId = NodeId::new([0u8; 32]);
 
+type Block = carnot_engine::Block<HeaderId>;
+type TimeoutQc = carnot_engine::TimeoutQc<HeaderId>;
+
 #[tokio::test]
 async fn ten_nodes_one_down() {
-    let (_mixnodes, mixnet_config) = MixNode::spawn_nodes(3).await;
     let mut nodes = NomosNode::spawn_nodes(SpawnConfig::Chain {
         consensus: ConsensusConfig {
             n_participants: 10,
             threshold: Fraction::new(9u32, 10u32),
             timeout: std::time::Duration::from_secs(5),
         },
-        mixnet: mixnet_config,
     })
     .await;
     let mut failed_node = nodes.pop().unwrap();

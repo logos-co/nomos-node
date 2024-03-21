@@ -1,5 +1,5 @@
-use carnot_engine::BlockId;
 use nomos_core::block::Block;
+use nomos_core::header::HeaderId;
 use nomos_storage::{
     backends::{rocksdb::RocksBackend, StorageSerde},
     StorageMsg, StorageService,
@@ -7,7 +7,7 @@ use nomos_storage::{
 
 pub async fn block_req<S, Tx>(
     handle: &overwatch_rs::overwatch::handle::OverwatchHandle,
-    id: BlockId,
+    id: HeaderId,
 ) -> Result<Option<Block<Tx, full_replication::Certificate>>, super::DynError>
 where
     Tx: serde::Serialize + serde::de::DeserializeOwned + Clone + Eq + core::hash::Hash,
