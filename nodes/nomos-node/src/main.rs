@@ -41,7 +41,7 @@ fn main() -> Result<()> {
         network_args,
         consensus_args,
         overlay_args,
-        metrics_args,
+        metrics_args: _metrics_args,
     } = Args::parse();
 
     let config = serde_yaml::from_reader::<_, Config>(std::fs::File::open(config)?)?
@@ -55,6 +55,6 @@ fn main() -> Result<()> {
     nomos_node::run(
         config,
         #[cfg(feature = "metrics")]
-        metrics_args,
+        _metrics_args,
     )
 }
