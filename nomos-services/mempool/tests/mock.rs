@@ -1,5 +1,5 @@
 use nomos_core::{
-    block::BlockId,
+    header::HeaderId,
     tx::mock::{MockTransaction, MockTxId},
 };
 use nomos_log::{Logger, LoggerSettings};
@@ -21,7 +21,11 @@ struct MockPoolNode {
     logging: ServiceHandle<Logger>,
     network: ServiceHandle<NetworkService<Mock>>,
     mockpool: ServiceHandle<
-        MempoolService<MockAdapter, MockPool<MockTransaction<MockMessage>, MockTxId>, Transaction>,
+        MempoolService<
+            MockAdapter,
+            MockPool<HeaderId, MockTransaction<MockMessage>, MockTxId>,
+            Transaction,
+        >,
     >,
 }
 
@@ -76,7 +80,7 @@ fn test_mockmempool() {
     let network = app.handle().relay::<NetworkService<Mock>>();
     let mempool = app.handle().relay::<MempoolService<
         MockAdapter,
-        MockPool<MockTransaction<MockMessage>, MockTxId>,
+        MockPool<HeaderId, MockTransaction<MockMessage>, MockTxId>,
         Transaction,
     >>();
 
@@ -98,7 +102,7 @@ fn test_mockmempool() {
             let (mtx, mrx) = tokio::sync::oneshot::channel();
             mempool_outbound
                 .send(MempoolMsg::View {
-                    ancestor_hint: BlockId::default(),
+                    ancestor_hint: [0; 32].into(),
                     reply_channel: mtx,
                 })
                 .await

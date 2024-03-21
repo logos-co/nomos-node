@@ -1,10 +1,10 @@
 use crate::node::carnot::{messages::CarnotMessage, tally::Tally, timeout::TimeoutHandler};
+use crate::node::carnot::{AggregateQc, Carnot, NewView, Qc, StandardQc, Timeout, TimeoutQc, Vote};
 use carnot_consensus::network::messages::{NewViewMsg, TimeoutMsg, VoteMsg};
 use carnot_consensus::NodeId;
-use carnot_engine::{
-    AggregateQc, Carnot, NewView, Overlay, Qc, StandardQc, Timeout, TimeoutQc, View, Vote,
-};
+use carnot_engine::{Overlay, View};
 use nomos_core::block::Block;
+use nomos_core::header::HeaderId;
 use std::collections::HashSet;
 use std::hash::Hash;
 use std::time::Duration;
@@ -97,8 +97,8 @@ impl EventBuilder {
                     tracing::info!(
                         node=%self.id,
                         current_view = %engine.current_view(),
-                        block_view=%block.header().view,
-                        block=?block.header().id,
+                        block_view=%block.header().carnot().view(),
+                        block=?block.header().id(),
                         parent_block=?block.header().parent(),
                         "receive proposal message",
                     );
@@ -236,7 +236,7 @@ pub enum Event<Tx: Clone + Hash + Eq> {
     #[allow(dead_code)]
     Approve {
         qc: Qc,
-        block: carnot_engine::Block,
+        block: carnot_engine::Block<HeaderId>,
         votes: HashSet<Vote>,
     },
     ProposeBlock {

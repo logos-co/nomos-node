@@ -1,16 +1,191 @@
-use std::{ops::Range, time::Duration};
+use std::net::SocketAddr;
 
-use mixnet_client::{MessageStream, MixnetClient};
+use futures::StreamExt;
+use mixnet::{
+    address::NodeAddress,
+    client::{MessageQueue, MixClient, MixClientConfig},
+    node::{MixNode, MixNodeConfig, Output, PacketQueue},
+    packet::PacketBody,
+};
 use nomos_core::wire;
-use rand::{rngs::OsRng, thread_rng, Rng};
+use nomos_libp2p::{
+    libp2p::{Stream, StreamProtocol},
+    libp2p_stream::IncomingStreams,
+    Multiaddr, Protocol,
+};
 use serde::{Deserialize, Serialize};
-use tokio::sync::mpsc;
-use tokio_stream::StreamExt;
+use tokio::{
+    runtime::Handle,
+    sync::{mpsc, oneshot},
+};
 
-use super::{command::Topic, Command, Libp2pConfig};
+use crate::backends::libp2p::{Command, Dial, Topic};
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct MixnetMessage {
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct MixnetConfig {
+    pub mixclient: MixClientConfig,
+    pub mixnode: MixNodeConfig,
+}
+
+pub(crate) const STREAM_PROTOCOL: StreamProtocol = StreamProtocol::new("/mixnet");
+
+pub(crate) fn init_mixnet(
+    config: MixnetConfig,
+    runtime_handle: Handle,
+    cmd_tx: mpsc::Sender<Command>,
+    incoming_streams: IncomingStreams,
+) -> MessageQueue {
+    // Run mixnode
+    let (mixnode, packet_queue) = MixNode::new(config.mixnode).unwrap();
+    let libp2p_cmd_tx = cmd_tx.clone();
+    let queue = packet_queue.clone();
+    runtime_handle.spawn(async move {
+        run_mixnode(mixnode, queue, libp2p_cmd_tx).await;
+    });
+    let handle = runtime_handle.clone();
+    let queue = packet_queue.clone();
+    runtime_handle.spawn(async move {
+        handle_incoming_streams(incoming_streams, queue, handle).await;
+    });
+
+    // Run mixclient
+    let (mixclient, message_queue) = MixClient::new(config.mixclient).unwrap();
+    runtime_handle.spawn(async move {
+        run_mixclient(mixclient, packet_queue, cmd_tx).await;
+    });
+
+    message_queue
+}
+
+async fn run_mixnode(
+    mut mixnode: MixNode,
+    packet_queue: PacketQueue,
+    cmd_tx: mpsc::Sender<Command>,
+) {
+    while let Some(output) = mixnode.next().await {
+        match output {
+            Output::Forward(packet) => {
+                stream_send(packet.address(), packet.body(), &cmd_tx, &packet_queue).await;
+            }
+            Output::ReconstructedMessage(message) => match MixnetMessage::from_bytes(&message) {
+                Ok(msg) => {
+                    cmd_tx
+                        .send(Command::Broadcast {
+                            topic: msg.topic,
+                            message: msg.message,
+                        })
+                        .await
+                        .unwrap();
+                }
+                Err(e) => {
+                    tracing::error!("failed to parse message received from mixnet: {e}");
+                }
+            },
+        }
+    }
+}
+
+async fn run_mixclient(
+    mut mixclient: MixClient,
+    packet_queue: PacketQueue,
+    cmd_tx: mpsc::Sender<Command>,
+) {
+    while let Some(packet) = mixclient.next().await {
+        stream_send(packet.address(), packet.body(), &cmd_tx, &packet_queue).await;
+    }
+}
+
+async fn handle_incoming_streams(
+    mut incoming_streams: IncomingStreams,
+    packet_queue: PacketQueue,
+    runtime_handle: Handle,
+) {
+    while let Some((_, stream)) = incoming_streams.next().await {
+        let queue = packet_queue.clone();
+        runtime_handle.spawn(async move {
+            if let Err(e) = handle_stream(stream, queue).await {
+                tracing::warn!("stream closed: {e}");
+            }
+        });
+    }
+}
+
+async fn handle_stream(mut stream: Stream, packet_queue: PacketQueue) -> std::io::Result<()> {
+    loop {
+        match PacketBody::read_from(&mut stream).await? {
+            Ok(packet_body) => {
+                packet_queue
+                    .send(packet_body)
+                    .await
+                    .expect("The receiving half of packet queue should be always open");
+            }
+            Err(e) => {
+                tracing::error!(
+                    "failed to parse packet body. continuing reading the next packet: {e}"
+                );
+            }
+        }
+    }
+}
+
+async fn stream_send(
+    addr: NodeAddress,
+    packet_body: PacketBody,
+    cmd_tx: &mpsc::Sender<Command>,
+    packet_queue: &PacketQueue,
+) {
+    let (tx, rx) = oneshot::channel();
+    cmd_tx
+        .send(Command::Connect(Dial {
+            addr: multiaddr_from(addr),
+            retry_count: 3,
+            result_sender: tx,
+        }))
+        .await
+        .expect("Command receiver should be always open");
+
+    match rx.await {
+        Ok(Ok(peer_id)) => {
+            cmd_tx
+                .send(Command::StreamSend {
+                    peer_id,
+                    protocol: STREAM_PROTOCOL,
+                    data: packet_body.bytes(),
+                })
+                .await
+                .expect("Command receiver should be always open");
+        }
+        Ok(Err(e)) => match e {
+            nomos_libp2p::DialError::NoAddresses => {
+                tracing::debug!("Dialing failed because the peer is the local node. Sending msg directly to the queue");
+                packet_queue
+                    .send(packet_body)
+                    .await
+                    .expect("The receiving half of packet queue should be always open");
+            }
+            _ => tracing::error!("failed to dial with unrecoverable error: {e}"),
+        },
+        Err(e) => {
+            tracing::error!("channel closed before receiving: {e}");
+        }
+    }
+}
+
+fn multiaddr_from(addr: NodeAddress) -> Multiaddr {
+    match SocketAddr::from(addr) {
+        SocketAddr::V4(addr) => Multiaddr::empty()
+            .with(Protocol::Ip4(*addr.ip()))
+            .with(Protocol::Udp(addr.port()))
+            .with(Protocol::QuicV1),
+        SocketAddr::V6(addr) => Multiaddr::empty()
+            .with(Protocol::Ip6(*addr.ip()))
+            .with(Protocol::Udp(addr.port()))
+            .with(Protocol::QuicV1),
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub(crate) struct MixnetMessage {
     pub topic: Topic,
     pub message: Box<[u8]>,
 }
@@ -19,97 +194,8 @@ impl MixnetMessage {
     pub fn as_bytes(&self) -> Vec<u8> {
         wire::serialize(self).expect("Couldn't serialize MixnetMessage")
     }
+
     pub fn from_bytes(data: &[u8]) -> Result<Self, wire::Error> {
         wire::deserialize(data)
-    }
-}
-
-pub fn random_delay(range: &Range<Duration>) -> Duration {
-    if range.start == range.end {
-        return range.start;
-    }
-    thread_rng().gen_range(range.start, range.end)
-}
-
-pub struct MixnetHandler {
-    client: MixnetClient<OsRng>,
-    commands_tx: mpsc::Sender<Command>,
-}
-
-impl MixnetHandler {
-    pub fn new(config: &Libp2pConfig, commands_tx: mpsc::Sender<Command>) -> Self {
-        let client = MixnetClient::new(config.mixnet_client.clone(), OsRng);
-
-        Self {
-            client,
-            commands_tx,
-        }
-    }
-
-    pub async fn run(&mut self) {
-        const BASE_DELAY: Duration = Duration::from_secs(5);
-        // we need this loop to help us reestablish the connection in case
-        // the mixnet client fails for whatever reason
-        let mut backoff = 0;
-        loop {
-            match self.client.run().await {
-                Ok(stream) => {
-                    backoff = 0;
-                    self.handle_stream(stream).await;
-                }
-                Err(e) => {
-                    tracing::error!("mixnet client error: {e}");
-                    backoff += 1;
-                    tokio::time::sleep(BASE_DELAY * backoff).await;
-                }
-            }
-        }
-    }
-
-    async fn handle_stream(&mut self, mut stream: MessageStream) {
-        while let Some(result) = stream.next().await {
-            match result {
-                Ok(msg) => {
-                    tracing::debug!("receiving message from mixnet client");
-                    let Ok(MixnetMessage { topic, message }) = MixnetMessage::from_bytes(&msg)
-                    else {
-                        tracing::error!("failed to deserialize msg received from mixnet client");
-                        continue;
-                    };
-
-                    self.commands_tx
-                        .send(Command::DirectBroadcastAndRetry {
-                            topic,
-                            message,
-                            retry_count: 0,
-                        })
-                        .await
-                        .unwrap_or_else(|_| tracing::error!("could not schedule broadcast"));
-                }
-                Err(e) => {
-                    tracing::error!("mixnet client stream error: {e}");
-                    return;
-                }
-            }
-        }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use std::time::Duration;
-
-    use super::random_delay;
-
-    #[test]
-    fn test_random_delay() {
-        assert_eq!(
-            random_delay(&(Duration::ZERO..Duration::ZERO)),
-            Duration::ZERO
-        );
-
-        let range = Duration::from_millis(10)..Duration::from_millis(100);
-        let delay = random_delay(&range);
-        assert!(range.start <= delay && delay < range.end);
     }
 }

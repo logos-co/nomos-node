@@ -16,7 +16,7 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        feature: [libp2p]
+        feature: [libp2p, "libp2p,mixnet"]
     steps:
       - uses: actions/checkout@v2
         with:
@@ -37,7 +37,7 @@ jobs:
     strategy:
       fail-fast: false # all OSes should be tested even if one fails (default: true)
       matrix:
-        feature: [libp2p]
+        feature: [libp2p, "libp2p,mixnet"]
         os: [ubuntu-latest, windows-latest, macos-latest]
     runs-on: ${{ matrix.os }}
     steps:
@@ -95,7 +95,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        feature: [libp2p]
+        feature: [libp2p, "libp2p,mixnet"]
     steps:
       - uses: actions/checkout@v2
         with:

@@ -1,6 +1,6 @@
 # BUILD IMAGE ---------------------------------------------------------
 
-FROM rust:1.75.0-slim-bullseye AS builder
+FROM rust:1.76.0-slim-bullseye AS builder
 
 # Dependecies for publishing documentation.
 RUN apt-get update && apt-get install -yq \
@@ -24,7 +24,6 @@ EXPOSE 3000 8080 9000 60000
 
 COPY --from=builder /nomos/target/release/nomos-node /usr/bin/nomos-node
 COPY --from=builder /nomos/target/release/nomos-cli /usr/bin/nomos-cli
-COPY --from=builder /nomos/target/release/mixnode /usr/bin/mixnode
 COPY --from=builder /usr/bin/etcdctl /usr/bin/etcdctl
 COPY nodes/nomos-node/config.yaml /etc/nomos/config.yaml
 

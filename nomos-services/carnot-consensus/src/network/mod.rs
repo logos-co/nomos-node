@@ -4,11 +4,12 @@ pub mod messages;
 // std
 // crates
 use futures::Stream;
+use nomos_core::header::HeaderId;
 // internal
 use crate::network::messages::{
     NetworkMessage, NewViewMsg, ProposalMsg, TimeoutMsg, TimeoutQcMsg, VoteMsg,
 };
-use carnot_engine::{BlockId, Committee, View};
+use carnot_engine::{Committee, View};
 use nomos_network::backends::NetworkBackend;
 use nomos_network::NetworkService;
 use overwatch_rs::services::relay::OutboundRelay;
@@ -33,7 +34,7 @@ pub trait NetworkAdapter {
         &self,
         committee: &Committee,
         view: View,
-        proposal_id: BlockId,
+        proposal_id: HeaderId,
     ) -> BoxedStream<VoteMsg>;
     async fn new_view_stream(&self, committee: &Committee, view: View) -> BoxedStream<NewViewMsg>;
     async fn send(&self, message: NetworkMessage, committee: &Committee);

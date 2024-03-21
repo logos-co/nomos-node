@@ -1,8 +1,6 @@
+use crate::TimeoutQc;
 use carnot_engine::overlay::RoundRobin;
-use carnot_engine::{
-    overlay::{Error as RandomBeaconError, LeaderSelection, RandomBeaconState},
-    TimeoutQc,
-};
+use carnot_engine::overlay::{Error as RandomBeaconError, LeaderSelection, RandomBeaconState};
 use nomos_core::block::Block;
 use std::{convert::Infallible, error::Error, hash::Hash};
 
@@ -38,7 +36,10 @@ impl UpdateableLeaderSelection for RandomBeaconState {
         &self,
         block: &Block<Tx, Blob>,
     ) -> Result<Self, Self::Error> {
-        self.check_advance_happy(block.beacon().clone(), block.header().parent_qc.view())
+        self.check_advance_happy(
+            block.header().carnot().beacon().clone(),
+            block.header().carnot().parent_qc().view(),
+        )
         // TODO: check random beacon public keys is leader id
     }
 

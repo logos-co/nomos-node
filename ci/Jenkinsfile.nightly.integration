@@ -1,3 +1,6 @@
+#!/usr/bin/env groovy
+library 'status-jenkins-lib@v1.8.6'
+
 pipeline {
   agent {
     dockerfile {
@@ -50,10 +53,6 @@ pipeline {
                     /* To prevent rebuilding node for each test, tests are defined here */
                     def tests = ['ten_nodes_happy', 'two_nodes_happy', 'ten_nodes_one_down']
 
-                    if (FEATURE == 'libp2p') {
-                      tests.add('mixnet')
-                    }
-
                     def report = runBuildAndTestsForFeature(FEATURE, tests)
                     writeFile(file: "${WORKSPACE}/report.txt", text: report)
                   }
@@ -67,20 +66,13 @@ pipeline {
   }
 
   post {
-    failure {
-      script {
-        def report = readFile("${WORKSPACE}/report.txt").trim()
-        def discord = load "${WORKSPACE}/ci/discord.groovy"
-        discord.sendMessage(header: "Nightly Integration Tests Failed: ${report}")
-      }
-    }
-    success {
-      script {
-        def report = readFile('report.txt').trim()
-        def discord = load "${WORKSPACE}/ci/discord.groovy"
-        discord.sendMessage(header: "Nightly Integration Tests Passed: ${report}")
-      }
-    }
+    always { script {
+      def report = readFile("${WORKSPACE}/report.txt").trim()
+      discord.send(
+        header: "Nightly Integration Tests ${currentBuild.currentResult}: ${report}",
+        cred: 'nomos-node-discord-commits-webhook',
+      )
+    } }
     cleanup { cleanWs() }
   }
 }

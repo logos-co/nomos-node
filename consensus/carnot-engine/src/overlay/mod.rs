@@ -53,8 +53,10 @@ pub trait CommitteeMembership: Clone {
 
 #[cfg(test)]
 mod tests {
+    use nomos_utils::fisheryates::FisherYatesShuffle;
+
     use super::*;
-    use crate::overlay::{FisherYatesShuffle, RoundRobin};
+    use crate::overlay::RoundRobin;
 
     const ENTROPY: [u8; 32] = [0; 32];
 

@@ -1,6 +1,7 @@
-use crate::overlay::{CommitteeMembership, FisherYatesShuffle};
+use crate::overlay::CommitteeMembership;
 use crate::types::*;
 use bls_signatures::{PrivateKey, PublicKey, Serialize, Signature};
+use nomos_utils::fisheryates::FisherYatesShuffle;
 use rand::{seq::SliceRandom, SeedableRng};
 use serde::{Deserialize, Serialize as SerdeSerialize};
 use sha2::{Digest, Sha256};

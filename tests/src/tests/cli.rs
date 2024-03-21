@@ -7,9 +7,7 @@ use nomos_cli::{
 use nomos_core::da::{blob::Blob as _, DaProtocol};
 use std::{io::Write, time::Duration};
 use tempfile::NamedTempFile;
-use tests::{
-    adjust_timeout, get_available_port, nodes::nomos::Pool, MixNode, Node, NomosNode, SpawnConfig,
-};
+use tests::{adjust_timeout, nodes::nomos::Pool, Node, NomosNode, SpawnConfig};
 
 const CLI_BIN: &str = "../target/debug/nomos-cli";
 
@@ -35,19 +33,12 @@ fn run_disseminate(disseminate: &Disseminate) {
 }
 
 async fn disseminate(config: &mut Disseminate) {
-    let (_mixnodes, mixnet_config) = MixNode::spawn_nodes(2).await;
-    let mut nodes = NomosNode::spawn_nodes(SpawnConfig::chain_happy(2, mixnet_config)).await;
-
-    // kill the node so that we can reuse its network config
-    nodes[1].stop();
-
-    let mut network_config = nodes[1].config().network.clone();
-    // use a new port because the old port is sometimes not closed immediately
-    network_config.backend.inner.port = get_available_port();
+    let node_configs = NomosNode::node_configs(SpawnConfig::chain_happy(2));
+    let first_node = NomosNode::spawn(node_configs[0].clone()).await;
 
     let mut file = NamedTempFile::new().unwrap();
     let config_path = file.path().to_owned();
-    serde_yaml::to_writer(&mut file, &network_config).unwrap();
+    serde_yaml::to_writer(&mut file, &node_configs[1].network).unwrap();
     let da_protocol = DaProtocolChoice {
         da_protocol: Protocol::FullReplication,
         settings: ProtocolSettings {
@@ -68,7 +59,7 @@ async fn disseminate(config: &mut Disseminate) {
     config.node_addr = Some(
         format!(
             "http://{}",
-            nodes[0].config().http.backend_settings.address.clone()
+            first_node.config().http.backend_settings.address.clone()
         )
         .parse()
         .unwrap(),
@@ -79,7 +70,7 @@ async fn disseminate(config: &mut Disseminate) {
 
     tokio::time::timeout(
         adjust_timeout(Duration::from_secs(TIMEOUT_SECS)),
-        wait_for_cert_in_mempool(&nodes[0]),
+        wait_for_cert_in_mempool(&first_node),
     )
     .await
     .unwrap();
@@ -93,7 +84,7 @@ async fn disseminate(config: &mut Disseminate) {
     };
 
     assert_eq!(
-        get_blobs(&nodes[0].url(), vec![blob]).await.unwrap()[0].as_bytes(),
+        get_blobs(&first_node.url(), vec![blob]).await.unwrap()[0].as_bytes(),
         bytes.clone()
     );
 }

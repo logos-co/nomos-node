@@ -3,7 +3,8 @@ use crate::da::disseminate::{
 };
 use clap::Args;
 use nomos_log::{LoggerBackend, LoggerSettings};
-use nomos_network::{backends::libp2p::Libp2p, NetworkService};
+use nomos_network::backends::libp2p::Libp2p as NetworkBackend;
+use nomos_network::NetworkService;
 use overwatch_rs::{overwatch::OverwatchRunner, services::ServiceData};
 use reqwest::Url;
 use std::{path::PathBuf, sync::Arc, time::Duration};
@@ -41,7 +42,7 @@ impl Disseminate {
             .expect("setting tracing default failed");
         let network = serde_yaml::from_reader::<
             _,
-            <NetworkService<Libp2p> as ServiceData>::Settings,
+            <NetworkService<NetworkBackend> as ServiceData>::Settings,
         >(std::fs::File::open(&self.network_config)?)?;
         let (status_updates, rx) = std::sync::mpsc::channel();
 

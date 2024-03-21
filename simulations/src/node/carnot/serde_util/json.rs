@@ -1,4 +1,5 @@
 use super::*;
+use nomos_core::header::HeaderId;
 use serde_block::BlockHelper;
 
 serializer!(CarnotStateJsonSerializer);
@@ -50,10 +51,10 @@ pub(crate) mod serde_block {
     }
 }
 
-struct SafeBlocksHelper<'a>(&'a HashMap<BlockId, Block>);
+struct SafeBlocksHelper<'a>(&'a HashMap<HeaderId, Block>);
 
-impl<'a> From<&'a HashMap<BlockId, Block>> for SafeBlocksHelper<'a> {
-    fn from(val: &'a HashMap<BlockId, Block>) -> Self {
+impl<'a> From<&'a HashMap<HeaderId, Block>> for SafeBlocksHelper<'a> {
+    fn from(val: &'a HashMap<HeaderId, Block>) -> Self {
         Self(val)
     }
 }
@@ -115,10 +116,10 @@ impl<'a> Serialize for CommitteesHelper<'a> {
     }
 }
 
-struct CommittedBlockHelper<'a>(&'a [BlockId]);
+struct CommittedBlockHelper<'a>(&'a [HeaderId]);
 
-impl<'a> From<&'a [BlockId]> for CommittedBlockHelper<'a> {
-    fn from(val: &'a [BlockId]) -> Self {
+impl<'a> From<&'a [HeaderId]> for CommittedBlockHelper<'a> {
+    fn from(val: &'a [HeaderId]) -> Self {
         Self(val)
     }
 }
