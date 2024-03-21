@@ -23,6 +23,8 @@ pub struct MockQc {
     count_votes: usize,
 }
 
+#[derive(Debug, thiserror::Error)]
+#[error("{0}")]
 pub struct Error(String);
 
 #[derive(Clone, Debug)]
