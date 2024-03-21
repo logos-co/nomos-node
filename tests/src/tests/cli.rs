@@ -70,7 +70,6 @@ async fn spawn_and_setup_config(
     };
 
     let config_path = file.path().to_owned();
-    println!("network config {:?}", network_config);
     serde_yaml::to_writer(file, &network_config).unwrap();
     let da_protocol = DaProtocolChoice {
         da_protocol: Protocol::FullReplication,
