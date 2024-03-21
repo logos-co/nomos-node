@@ -5,7 +5,7 @@ mod time;
 use core::fmt::Debug;
 use cryptarchia_engine::Slot;
 use cryptarchia_ledger::{LeaderProof, LedgerState};
-use futures::{SinkExt, StreamExt};
+use futures::StreamExt;
 use network::{messages::NetworkMessage, NetworkAdapter};
 use nomos_core::da::certificate::{BlobCertificateSelect, Certificate};
 use nomos_core::header::{cryptarchia::Header, HeaderId};
