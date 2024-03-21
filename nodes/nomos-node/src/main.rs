@@ -99,8 +99,10 @@ fn main() -> Result<()> {
             #[cfg(feature = "metrics")]
             metrics: MetricsSettings { registry },
             da: config.da,
-            storage: nomos_storage::backends::sled::SledBackendSettings {
+            storage: nomos_storage::backends::rocksdb::RocksBackendSettings {
                 db_path: std::path::PathBuf::from(DEFAULT_DB_PATH),
+                read_only: false,
+                column_family: Some("blocks".into()),
             },
             system_sig: (),
         },

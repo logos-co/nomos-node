@@ -30,10 +30,12 @@ nomos-mempool = { path = "../../nomos-services/mempool", features = [
 ] }
 nomos-metrics = { path = "../../nomos-metrics" }
 nomos-http = { path = "../../nomos-services/http", features = ["http"] }
+nomos-storage = { path = "../../nomos-services/storage", features = ["rocksdb"] }
+
 carnot-consensus = { path = "../../nomos-services/carnot-consensus", features = [
   "libp2p",
 ] }
-nomos-storage = { path = "../../nomos-services/storage", features = ["sled"] }
+
 nomos-libp2p = { path = "../../nomos-libp2p" }
 nomos-da = { path = "../../nomos-services/data-availability", features = [
   "libp2p",

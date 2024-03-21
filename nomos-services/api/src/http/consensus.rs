@@ -24,7 +24,7 @@ use nomos_core::{
 use nomos_mempool::{
     backend::mockpool::MockPool, network::adapters::libp2p::Libp2pAdapter as MempoolNetworkAdapter,
 };
-use nomos_storage::backends::{sled::SledBackend, StorageSerde};
+use nomos_storage::backends::{rocksdb::RocksBackend, StorageSerde};
 
 pub type Carnot<Tx, SS, const SIZE: usize> = CarnotConsensus<
     ConsensusNetworkAdapter,
@@ -42,7 +42,7 @@ pub type Carnot<Tx, SS, const SIZE: usize> = CarnotConsensus<
     TreeOverlay<RoundRobin, RandomBeaconState>,
     FillSizeWithTx<SIZE, Tx>,
     FillSizeWithBlobsCertificate<SIZE, Certificate>,
-    SledBackend<SS>,
+    RocksBackend<SS>,
 >;
 
 pub async fn carnot_info<Tx, SS, const SIZE: usize>(

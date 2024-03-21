@@ -34,7 +34,7 @@ use nomos_mempool::{
 use nomos_metrics::Metrics;
 use nomos_network::backends::libp2p::Libp2p as NetworkBackend;
 use nomos_storage::{
-    backends::{sled::SledBackend, StorageSerde},
+    backends::{rocksdb::RocksBackend, StorageSerde},
     StorageService,
 };
 
@@ -73,7 +73,7 @@ pub type Carnot = CarnotConsensus<
     TreeOverlay<RoundRobin, RandomBeaconState>,
     FillSizeWithTx<MB16, Tx>,
     FillSizeWithBlobsCertificate<MB16, Certificate>,
-    SledBackend<Wire>,
+    RocksBackend<Wire>,
 >;
 
 pub type DataAvailability = DataAvailabilityService<
@@ -99,7 +99,7 @@ pub struct Nomos {
     consensus: ServiceHandle<Carnot>,
     http: ServiceHandle<ApiService<AxumBackend<Tx, Wire, MB16>>>,
     da: ServiceHandle<DataAvailability>,
-    storage: ServiceHandle<StorageService<SledBackend<Wire>>>,
+    storage: ServiceHandle<StorageService<RocksBackend<Wire>>>,
     #[cfg(feature = "metrics")]
     metrics: ServiceHandle<Metrics>,
     system_sig: ServiceHandle<SystemSig>,
