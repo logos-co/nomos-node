@@ -5,11 +5,11 @@ use rand_distr::{Distribution, Exp};
 
 use crate::error::MixnetError;
 
-#[allow(dead_code)]
+/// A Poisson process that models the times at which events occur.
 pub struct Poisson(Exp<f64>);
 
 impl Poisson {
-    #[allow(dead_code)]
+    /// Create a new Poisson process with the given rate per minute.
     pub fn new(rate_per_min: f64) -> Result<Self, MixnetError> {
         Ok(Self(Exp::new(rate_per_min)?))
     }
@@ -18,7 +18,6 @@ impl Poisson {
     ///
     /// If events occur in a Poisson distribution with rate_per_min,
     /// the interval between events follow the exponential distribution with rate_per_min.
-    #[allow(dead_code)]
     pub fn interval<R: Rng + ?Sized>(&self, rng: &mut R) -> Duration {
         // generate a random value from the distribution
         let interval_min = self.0.sample(rng);

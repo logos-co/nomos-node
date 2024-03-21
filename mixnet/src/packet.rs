@@ -10,6 +10,7 @@ use crate::{
     topology::MixnetTopology,
 };
 
+/// A packet to be sent through the mixnet
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Packet {
     address: NodeAddress,
@@ -74,18 +75,23 @@ impl Packet {
         Ok(packets)
     }
 
+    /// Returns the address of the mix node that this packet is being sent to
     pub fn address(&self) -> NodeAddress {
         self.address
     }
 
+    /// Returns the body of the packet
     pub fn body(self) -> PacketBody {
         self.body
     }
 }
 
+/// The body of a packet to be sent through the mixnet
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub enum PacketBody {
+    /// A Sphinx packet to be sent to the next mix node
     SphinxPacket(Vec<u8>),
+    /// A fragment that has been through the mixnet and can be reconstructed into the original message
     Fragment(Vec<u8>),
 }
 
@@ -110,6 +116,7 @@ impl TryFrom<sphinx_packet::payload::Payload> for PacketBody {
 }
 
 impl PacketBody {
+    /// Consumes the packet body and serialize it into a byte array
     pub fn bytes(self) -> Box<[u8]> {
         match self {
             Self::SphinxPacket(data) => Self::bytes_with_flag(PacketBodyFlag::SphinxPacket, data),
@@ -125,6 +132,7 @@ impl PacketBody {
         out.into_boxed_slice()
     }
 
+    /// Deserialize a packet body from a reader
     pub async fn read_from<R: AsyncRead + Unpin>(
         reader: &mut R,
     ) -> io::Result<Result<Self, MixnetError>> {
