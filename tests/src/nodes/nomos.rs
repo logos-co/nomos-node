@@ -1,5 +1,6 @@
 // std
 use std::net::SocketAddr;
+use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
 use std::time::Duration;
 // internal
@@ -71,7 +72,7 @@ impl NomosNode {
             prefix: Some(LOGS_PREFIX.into()),
         };
         config.log.format = LoggerFormat::Json;
-
+        config.storage.db_path = dir.path().join("db");
         serde_yaml::to_writer(&mut file, &config).unwrap();
         let child = Command::new(std::env::current_dir().unwrap().join(NOMOS_BIN))
             .arg(&config_path)
@@ -201,10 +202,11 @@ impl NomosNode {
 impl Node for NomosNode {
     type ConsensusInfo = CarnotInfo;
 
-    async fn spawn_nodes(config: SpawnConfig) -> Vec<Self> {
+    async fn spawn_nodes(config: SpawnConfig, storage_dir: Option<PathBuf>) -> Vec<Self> {
         match config {
             SpawnConfig::Star { consensus, mixnet } => {
-                let (next_leader_config, configs) = create_node_configs(consensus, mixnet);
+                let (next_leader_config, configs) =
+                    create_node_configs(consensus, mixnet, storage_dir);
 
                 let first_node_addr = node_address(&next_leader_config);
                 let mut nodes = vec![Self::spawn(next_leader_config).await];
@@ -219,7 +221,8 @@ impl Node for NomosNode {
                 nodes
             }
             SpawnConfig::Chain { consensus, mixnet } => {
-                let (next_leader_config, configs) = create_node_configs(consensus, mixnet);
+                let (next_leader_config, configs) =
+                    create_node_configs(consensus, mixnet, storage_dir);
 
                 let mut prev_node_addr = node_address(&next_leader_config);
                 let mut nodes = vec![Self::spawn(next_leader_config).await];
@@ -253,6 +256,7 @@ impl Node for NomosNode {
 fn create_node_configs(
     consensus: ConsensusConfig,
     mut mixnet: MixnetConfig,
+    storage_dir: Option<PathBuf>,
 ) -> (Config, Vec<Config>) {
     let mut ids = vec![[0; 32]; consensus.n_participants];
     for id in &mut ids {
@@ -269,6 +273,7 @@ fn create_node_configs(
                 consensus.timeout,
                 mixnet.node_configs.pop(),
                 mixnet.topology.clone(),
+                storage_dir.clone(),
             )
         })
         .collect::<Vec<_>>();
@@ -292,6 +297,7 @@ fn create_node_config(
     timeout: Duration,
     mixnet_node_config: Option<MixnetNodeConfig>,
     mixnet_topology: MixnetTopology,
+    storage_dir: Option<PathBuf>,
 ) -> Config {
     let mixnet_client_mode = match mixnet_node_config {
         Some(node_config) => {
@@ -351,9 +357,24 @@ fn create_node_config(
                 evicting_period: Duration::from_secs(60 * 60 * 24), // 1 day
             },
         },
+        storage: nomos_storage::backends::rocksdb::RocksBackendSettings {
+            db_path: {
+                let p = storage_dir
+                    .unwrap_or("db".into())
+                    .join(NodeId::new(id).to_string());
+                let _ = std::fs::create_dir_all(&p);
+                p
+            },
+            read_only: false,
+            column_family: None,
+        },
     };
 
     config.network.backend.inner.port = get_available_port();
+    println!(
+        "config.network.backend.inner.port {}",
+        config.network.backend.inner.port
+    );
 
     config
 }

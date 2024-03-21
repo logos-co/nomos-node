@@ -89,6 +89,22 @@ pub struct App {
     scroll_logs: u16,
 }
 
+impl App {
+    pub fn send_message(&self, msg: String) {
+        self.payload_sender
+            .send(
+                wire::serialize(&ChatMessage {
+                    author: self.username.clone().unwrap(),
+                    message: msg,
+                    _nonce: rand::random(),
+                })
+                .unwrap()
+                .into(),
+            )
+            .unwrap();
+    }
+}
+
 impl NomosChat {
     pub fn run(&self) -> Result<(), Box<dyn std::error::Error>> {
         let network = serde_yaml::from_reader::<
@@ -153,8 +169,8 @@ impl NomosChat {
             last_updated: Instant::now(),
             payload_sender,
             status_updates,
-            node: self.node.clone(),
             explorer: self.explorer.clone(),
+            node: self.node.clone(),
             logs: shared_writer,
             scroll_logs: 0,
         };
@@ -261,12 +277,22 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-struct ChatMessage {
+pub struct ChatMessage {
     author: String,
     message: String,
     // Since DA will rightfully ignore duplicated messages, we need to add a nonce to make sure
     // every message is unique. This is randomly generated for simplicity.
     _nonce: u64,
+}
+
+impl ChatMessage {
+    pub fn author(&self) -> &str {
+        &self.author
+    }
+
+    pub fn message(&self) -> &str {
+        &self.message
+    }
 }
 
 #[tokio::main]

@@ -6,10 +6,12 @@ publish = false
 
 [dependencies]
 nomos-node = { path = "../nodes/nomos-node", default-features = false }
+nomos-explorer = { path = "../nodes/explorer", default-features = false }
 carnot-consensus = { path = "../nomos-services/carnot-consensus" }
 nomos-network = { path = "../nomos-services/network", features = ["libp2p"]}
 nomos-log = { path = "../nomos-services/log" }
 nomos-api = { path = "../nomos-services/api" }
+nomos-storage = { path = "../nomos-services/storage" }
 overwatch-rs = { git = "https://github.com/logos-co/Overwatch", rev = "2f70806" }
 nomos-core = { path = "../nomos-core" }
 carnot-engine = { path = "../consensus/carnot-engine", features = ["serde"] }
@@ -31,6 +33,7 @@ serde = { version = "1", features = ["derive"] }
 serde_yaml = "0.9"
 serde_json = "1.0"
 tokio = "1"
+tracing = "0.1"
 futures = "0.3"
 async-trait = "0.1"
 fraction = "0.13"
@@ -53,6 +56,10 @@ path = "src/tests/mixnet.rs"
 [[test]]
 name = "test_cli"
 path = "src/tests/cli.rs"
+
+[[test]]
+name = "test_explorer"
+path = "src/tests/explorer.rs"
 
 [[bench]]
 name = "mixnet"

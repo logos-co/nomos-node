@@ -13,7 +13,7 @@ use crate::network::{
     messages::{ProposalMsg, VoteMsg},
     BoxedStream, NetworkAdapter,
 };
-use consensus_engine::{BlockId, Committee, View};
+use carnot_engine::{BlockId, Committee, View};
 
 const MOCK_PUB_SUB_TOPIC: &str = "MockPubSubTopic";
 const MOCK_BLOCK_CONTENT_TOPIC: MockContentTopic = MockContentTopic::new("MockSim", 1, "MockBlock");

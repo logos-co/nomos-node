@@ -9,6 +9,7 @@ use std::env;
 // std
 use std::net::TcpListener;
 use std::ops::Mul;
+use std::path::PathBuf;
 use std::time::Duration;
 use std::{fmt::Debug, sync::Mutex};
 
@@ -41,7 +42,7 @@ pub fn adjust_timeout(d: Duration) -> Duration {
 #[async_trait::async_trait]
 pub trait Node: Sized {
     type ConsensusInfo: Debug + Clone + PartialEq;
-    async fn spawn_nodes(config: SpawnConfig) -> Vec<Self>;
+    async fn spawn_nodes(config: SpawnConfig, storage_dir: Option<PathBuf>) -> Vec<Self>;
     async fn consensus_info(&self) -> Self::ConsensusInfo;
     fn stop(&mut self);
 }

@@ -19,7 +19,7 @@ pub enum Error {
 }
 
 /// Sled backend setting
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct SledBackendSettings {
     /// File path to the db file
     pub db_path: PathBuf,

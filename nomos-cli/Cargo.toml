@@ -37,3 +37,17 @@ ratatui = "0.24"
 tui-input = "0.8"
 ansi-to-tui = "3"
 rand = "0.8"
+
+[dev-dependencies]
+tempfile = "3"
+tokio = { version = "1", features = ["full"] }
+nomos-api = { path = "../nomos-services/api" }
+nomos-explorer = { path = "../nodes/explorer" }
+nomos-log = { path = "../nomos-services/log" }
+nomos-libp2p = { path = "../nomos-libp2p" }
+nomos-storage = { path = "../nomos-services/storage" }
+mixnode = { path = "../nodes/mixnode" }
+mixnet-node = { path = "../mixnet/node", default-features = false }
+mixnet-client = { path = "../mixnet/client" }
+mixnet-topology = { path = "../mixnet/topology" }
+scopeguard = "1"
