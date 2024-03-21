@@ -156,9 +156,12 @@ impl ServiceCore for Logger {
                     .overwatch_handle
                     .runtime()
                     .spawn(async move { task.connect().await });
+                #[cfg(test)]
                 ONCE_INIT.call_once(move || {
                     registry_init!(layer, config.format, config.level);
                 });
+                #[cfg(not(test))]
+                registry_init!(layer, config.format, config.level);
 
                 return Ok(Self {
                     service_state,
@@ -186,9 +189,13 @@ impl ServiceCore for Logger {
         let layer = tracing_subscriber::fmt::Layer::new()
             .with_level(true)
             .with_writer(non_blocking);
+        #[cfg(test)]
         ONCE_INIT.call_once(move || {
             registry_init!(layer, config.format, config.level);
         });
+        #[cfg(not(test))]
+        registry_init!(layer, config.format, config.level);
+
         Ok(Self {
             service_state,
             worker_guard: Some(_guard),
