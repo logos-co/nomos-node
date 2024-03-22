@@ -5,7 +5,7 @@ on:
     branches:
       - "*"
   push:
-    branches: [master]
+    branches: [ master ]
 
 name: PR check
 
@@ -16,7 +16,7 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        feature: [libp2p, "libp2p,mixnet"]
+        feature: [ libp2p, "libp2p,mixnet" ]
     steps:
       - uses: actions/checkout@v2
         with:
@@ -37,8 +37,8 @@ jobs:
     strategy:
       fail-fast: false # all OSes should be tested even if one fails (default: true)
       matrix:
-        feature: [libp2p, "libp2p,mixnet"]
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        feature: [ libp2p, "libp2p,mixnet" ]
+        os: [ ubuntu-latest, windows-latest, macos-latest ]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v2
@@ -49,8 +49,8 @@ jobs:
         if: matrix.os == 'windows-latest'
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: stable-gnu
-          target: x86_64-pc-windows-gnu
+          toolchain: stable-msvc
+          target: x86_64-pc-windows-msvc
           override: true
       # Setup Rust toolchain for other OSes
       - name: Setup Rust toolchain (Other OSes)
@@ -95,7 +95,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        feature: [libp2p, "libp2p,mixnet"]
+        feature: [ libp2p, "libp2p,mixnet" ]
     steps:
       - uses: actions/checkout@v2
         with:
