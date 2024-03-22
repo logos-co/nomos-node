@@ -23,7 +23,7 @@ nomos-mempool = { path = "../../nomos-services/mempool", features = [
   "libp2p",
   "openapi",
 ] }
-nomos-metrics = { path = "../../nomos-metrics" }
+nomos-metrics = { path = "../../nomos-services/metrics" }
 nomos-storage = { path = "../../nomos-services/storage", features = ["rocksdb"] }
 nomos-libp2p = { path = "../../nomos-libp2p" }
 full-replication = { path = "../../nomos-da/full-replication" }

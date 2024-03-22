@@ -52,4 +52,3 @@ path = "src/tests/cli.rs"
 
 [features]
 mixnet = ["nomos-network/mixnet"]
-metrics = ["nomos-node/metrics"]

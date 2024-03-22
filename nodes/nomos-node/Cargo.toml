@@ -27,7 +27,7 @@ nomos-mempool = { path = "../../nomos-services/mempool", features = [
   "mock",
   "libp2p",
 ] }
-nomos-metrics = { path = "../../nomos-metrics" }
+nomos-metrics = { path = "../../nomos-services/metrics" }
 nomos-storage = { path = "../../nomos-services/storage", features = ["rocksdb"] }
 
 carnot-consensus = { path = "../../nomos-services/carnot-consensus", features = [
