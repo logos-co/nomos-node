@@ -1,155 +1,107 @@
-// std
-use std::fmt::Debug;
+pub use prometheus_client::{self, *};
 
+// std
+use std::fmt::{Debug, Error, Formatter};
+use std::sync::{Arc, Mutex};
 // crates
 use futures::StreamExt;
-use tracing::error;
-
-// internal
 use overwatch_rs::services::life_cycle::LifecycleMessage;
 use overwatch_rs::services::{
     handle::ServiceStateHandle,
     relay::RelayMessage,
     state::{NoOperator, NoState},
-    ServiceCore, ServiceData, ServiceId,
+    ServiceCore, ServiceData,
 };
+use prometheus_client::encoding::text::encode;
+use prometheus_client::registry::Registry;
+use tokio::sync::oneshot::Sender;
+use tracing::error;
+// internal
 
-pub mod backend;
-pub mod frontend;
-pub mod types;
+// A wrapper for prometheus_client Registry.
+// Lock is only used during services initialization and prometheus pull query.
+pub type NomosRegistry = Arc<Mutex<Registry>>;
 
-#[async_trait::async_trait]
-pub trait MetricsBackend {
-    type MetricsData: Clone + Send + Sync + Debug + 'static;
-    type Error: Send + Sync;
-    type Settings: Clone + Send + Sync + 'static;
-    fn init(config: Self::Settings) -> Self;
-    async fn update(&mut self, service_id: ServiceId, data: Self::MetricsData);
-    async fn load(&self, service_id: &OwnedServiceId) -> Option<Self::MetricsData>;
-}
-
-pub struct MetricsService<Backend: MetricsBackend> {
+pub struct Metrics {
     service_state: ServiceStateHandle<Self>,
-    backend: Backend,
+    registry: NomosRegistry,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Ord, PartialOrd)]
-pub struct OwnedServiceId {
-    id: String,
+#[derive(Clone, Debug)]
+pub struct MetricsSettings {
+    pub registry: Option<NomosRegistry>,
 }
 
-impl From<ServiceId> for OwnedServiceId {
-    fn from(id: ServiceId) -> Self {
-        Self { id: id.into() }
-    }
+pub enum MetricsMsg {
+    Gather { reply_channel: Sender<String> },
 }
 
-impl From<String> for OwnedServiceId {
-    fn from(id: String) -> Self {
-        Self { id }
-    }
-}
+impl RelayMessage for MetricsMsg {}
 
-impl core::fmt::Display for OwnedServiceId {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.id)
-    }
-}
-
-impl AsRef<str> for OwnedServiceId {
-    fn as_ref(&self) -> &str {
-        &self.id
+impl Debug for MetricsMsg {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
+        match self {
+            Self::Gather { .. } => {
+                write!(f, "MetricsMsg::Gather")
+            }
+        }
     }
 }
 
-#[cfg(feature = "async-graphql")]
-impl async_graphql::InputType for OwnedServiceId {
-    type RawValueType = Self;
-
-    fn type_name() -> std::borrow::Cow<'static, str> {
-        <String as async_graphql::InputType>::type_name()
-    }
-
-    fn create_type_info(registry: &mut async_graphql::registry::Registry) -> String {
-        <String as async_graphql::InputType>::create_type_info(registry)
-    }
-
-    fn parse(
-        value: Option<async_graphql::Value>,
-    ) -> async_graphql::InputValueResult<OwnedServiceId> {
-        <String as async_graphql::InputType>::parse(value)
-            .map(Self::from)
-            .map_err(async_graphql::InputValueError::propagate)
-    }
-
-    fn to_value(&self) -> async_graphql::Value {
-        <String as async_graphql::InputType>::to_value(&self.id)
-    }
-
-    fn as_raw_value(&self) -> Option<&Self::RawValueType> {
-        Some(self)
-    }
-}
-
-#[derive(Debug)]
-pub enum MetricsMessage<Data> {
-    Load {
-        service_id: OwnedServiceId,
-        reply_channel: tokio::sync::oneshot::Sender<Option<Data>>,
-    },
-    Update {
-        service_id: ServiceId,
-        data: Data,
-    },
-}
-
-impl<Data: Send + Sync + 'static> RelayMessage for MetricsMessage<Data> {}
-
-impl<Backend: MetricsBackend> ServiceData for MetricsService<Backend> {
-    const SERVICE_ID: ServiceId = "Metrics";
-    type Settings = Backend::Settings;
+impl ServiceData for Metrics {
+    const SERVICE_ID: &'static str = "Metrics";
+    type Settings = MetricsSettings;
     type State = NoState<Self::Settings>;
     type StateOperator = NoOperator<Self::State>;
-    type Message = MetricsMessage<Backend::MetricsData>;
+    type Message = MetricsMsg;
 }
 
-impl<Backend: MetricsBackend> MetricsService<Backend> {
-    async fn handle_load(
-        backend: &Backend,
-        service_id: &OwnedServiceId,
-        reply_channel: tokio::sync::oneshot::Sender<Option<Backend::MetricsData>>,
-    ) {
-        let metrics = backend.load(service_id).await;
-        if let Err(e) = reply_channel.send(metrics) {
-            tracing::error!(
-                "Failed to send metric data for service: {service_id}. data: {:?}",
-                e
-            );
-        }
+#[async_trait::async_trait]
+impl ServiceCore for Metrics {
+    fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, overwatch_rs::DynError> {
+        let config = service_state.settings_reader.get_updated_settings();
+
+        Ok(Self {
+            service_state,
+            registry: config.registry.ok_or("No registry provided")?,
+        })
     }
 
-    async fn handle_update(
-        backend: &mut Backend,
-        service_id: &ServiceId,
-        metrics: Backend::MetricsData,
-    ) {
-        backend.update(service_id, metrics).await;
-    }
+    async fn run(self) -> Result<(), overwatch_rs::DynError> {
+        let Self {
+            mut service_state,
+            registry,
+        } = self;
+        let mut lifecycle_stream = service_state.lifecycle_handle.message_stream();
+        loop {
+            tokio::select! {
+                Some(msg) = service_state.inbound_relay.recv() => {
+                    let MetricsMsg::Gather{reply_channel} = msg;
 
-    async fn handle_message(message: MetricsMessage<Backend::MetricsData>, backend: &mut Backend) {
-        match message {
-            MetricsMessage::Load {
-                service_id,
-                reply_channel,
-            } => {
-                MetricsService::handle_load(backend, &service_id, reply_channel).await;
+                    let mut buf = String::new();
+                    {
+                        let reg = registry.lock().unwrap();
+                        // If encoding fails, we need to stop trying process subsequent metrics gather
+                        // requests. If it succeds, encode method returns empty unit type.
+                        _ = encode(&mut buf, &reg).map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+                    }
+
+                    reply_channel
+                        .send(buf)
+                        .unwrap_or_else(|_| tracing::debug!("could not send back metrics"));
+                }
+                Some(msg) = lifecycle_stream.next() =>  {
+                    if Self::should_stop_service(msg).await {
+                        break;
+                    }
+                }
             }
-            MetricsMessage::Update { service_id, data } => {
-                MetricsService::handle_update(backend, &service_id, data).await;
-            }
         }
+        Ok(())
     }
+}
 
+impl Metrics {
     async fn should_stop_service(message: LifecycleMessage) -> bool {
         match message {
             LifecycleMessage::Shutdown(sender) => {
@@ -163,43 +115,5 @@ impl<Backend: MetricsBackend> MetricsService<Backend> {
             }
             LifecycleMessage::Kill => true,
         }
-    }
-}
-
-#[async_trait::async_trait]
-impl<Backend: MetricsBackend + Send + Sync + 'static> ServiceCore for MetricsService<Backend> {
-    fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, overwatch_rs::DynError> {
-        let settings = service_state.settings_reader.get_updated_settings();
-        let backend = Backend::init(settings);
-        Ok(Self {
-            service_state,
-            backend,
-        })
-    }
-
-    async fn run(self) -> Result<(), overwatch_rs::DynError> {
-        let Self {
-            service_state:
-                ServiceStateHandle {
-                    mut inbound_relay,
-                    lifecycle_handle,
-                    ..
-                },
-            mut backend,
-        } = self;
-        let mut lifecycle_stream = lifecycle_handle.message_stream();
-        loop {
-            tokio::select! {
-                Some(message) = inbound_relay.recv() => {
-                    Self::handle_message(message, &mut backend).await;
-                }
-                Some(message) = lifecycle_stream.next() => {
-                    if Self::should_stop_service(message).await {
-                        break;
-                    }
-                }
-            }
-        }
-        Ok(())
     }
 }
