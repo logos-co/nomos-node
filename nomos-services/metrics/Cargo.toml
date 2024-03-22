@@ -15,7 +15,6 @@ async-trait = "0.1"
 bytes = "1.3"
 clap = { version = "4", features = ["derive", "env"], optional = true }
 futures = "0.3"
-nomos-http = { path = "../http", optional = true }
 overwatch-rs = { git = "https://github.com/logos-co/Overwatch", rev = "2f70806" }
 overwatch-derive = { git = "https://github.com/logos-co/Overwatch", rev = "ac28d01" }
 once_cell = "1.16"
@@ -31,4 +30,4 @@ thiserror = "1"
 
 [features]
 default = []
-gql = ["clap", "axum", "async-graphql", "tower-http", "nomos-http/gql"]
+gql = ["clap", "axum", "async-graphql", "tower-http"]
