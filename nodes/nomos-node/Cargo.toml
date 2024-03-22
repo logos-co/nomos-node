@@ -26,9 +26,8 @@ nomos-log = { path = "../../nomos-services/log" }
 nomos-mempool = { path = "../../nomos-services/mempool", features = [
   "mock",
   "libp2p",
-  "metrics",
 ] }
-nomos-metrics = { path = "../../nomos-metrics" }
+nomos-metrics = { path = "../../nomos-services/metrics" }
 nomos-storage = { path = "../../nomos-services/storage", features = ["rocksdb"] }
 
 carnot-consensus = { path = "../../nomos-services/carnot-consensus", features = [
@@ -40,7 +39,6 @@ nomos-da = { path = "../../nomos-services/data-availability", features = [
   "libp2p",
 ] }
 nomos-system-sig = { path = "../../nomos-services/system-sig" }
-metrics = { path = "../../nomos-services/metrics", optional = true }
 tracing-subscriber = "0.3"
 carnot-engine = { path = "../../consensus/carnot-engine" }
 tokio = { version = "1.24", features = ["sync"] }
@@ -60,3 +58,4 @@ tower-http = { version = "0.4", features = ["cors", "trace"] }
 [features]
 default = []
 mixnet = ["nomos-network/mixnet"]
+metrics = []
