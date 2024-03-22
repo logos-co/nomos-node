@@ -5,7 +5,6 @@ members = [
     "nomos-services/api",
     "nomos-metrics",
     "nomos-services/log",
-    "nomos-services/metrics",
     "nomos-services/network",
     "nomos-services/storage",
     "nomos-services/carnot-consensus",
