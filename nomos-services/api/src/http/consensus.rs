@@ -14,10 +14,7 @@ use carnot_engine::{
 };
 use full_replication::Certificate;
 use nomos_core::{
-    da::{
-        blob,
-        certificate::{self, select::FillSize as FillSizeWithBlobsCertificate},
-    },
+    da::certificate::{self, select::FillSize as FillSizeWithBlobsCertificate},
     header::HeaderId,
     tx::{select::FillSize as FillSizeWithTx, Transaction},
 };
@@ -30,15 +27,8 @@ pub type Carnot<Tx, SS, const SIZE: usize> = CarnotConsensus<
     ConsensusNetworkAdapter,
     MockPool<HeaderId, Tx, <Tx as Transaction>::Hash>,
     MempoolNetworkAdapter<Tx, <Tx as Transaction>::Hash>,
-    MockPool<
-        HeaderId,
-        Certificate,
-        <<Certificate as certificate::Certificate>::Blob as blob::Blob>::Hash,
-    >,
-    MempoolNetworkAdapter<
-        Certificate,
-        <<Certificate as certificate::Certificate>::Blob as blob::Blob>::Hash,
-    >,
+    MockPool<HeaderId, Certificate, <Certificate as certificate::Certificate>::Id>,
+    MempoolNetworkAdapter<Certificate, <Certificate as certificate::Certificate>::Id>,
     TreeOverlay<RoundRobin, RandomBeaconState>,
     FillSizeWithTx<SIZE, Tx>,
     FillSizeWithBlobsCertificate<SIZE, Certificate>,

@@ -1,8 +1,7 @@
 // internal
 use nomos_core::da::{
     attestation::{self, Attestation as _},
-    blob::{self, BlobHasher},
-    certificate, DaProtocol,
+    certificate,
 };
 // std
 use std::collections::HashSet;
@@ -13,6 +12,7 @@ use blake2::{
     Blake2bVar,
 };
 use bytes::Bytes;
+use nomos_core::da::certificate_metadata::CertificateExtension;
 use nomos_core::wire;
 use serde::{Deserialize, Serialize};
 
@@ -111,15 +111,6 @@ fn hasher(blob: &Blob) -> [u8; 32] {
     output
 }
 
-impl blob::Blob for Blob {
-    const HASHER: BlobHasher<Self> = hasher as BlobHasher<Self>;
-    type Hash = [u8; 32];
-
-    fn as_bytes(&self) -> bytes::Bytes {
-        self.data.clone()
-    }
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct Attestation {
@@ -128,21 +119,10 @@ pub struct Attestation {
 }
 
 impl attestation::Attestation for Attestation {
-    type Blob = Blob;
-    type Hash = [u8; 32];
+    type Signature = [u8; 32];
 
-    fn blob(&self) -> [u8; 32] {
-        self.blob
-    }
-
-    fn hash(&self) -> <Self::Blob as blob::Blob>::Hash {
+    fn attestation_signature(&self) -> Self::Signature {
         hash([self.blob, self.voter].concat())
-    }
-
-    fn as_bytes(&self) -> Bytes {
-        wire::serialize(self)
-            .expect("Attestation shouldn't fail to be serialized")
-            .into()
     }
 }
 
@@ -154,92 +134,54 @@ pub struct Certificate {
 
 impl Hash for Certificate {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        state.write(certificate::Certificate::as_bytes(self).as_ref());
+        state.write(<Certificate as certificate::Certificate>::id(self).as_ref());
     }
 }
 
-impl certificate::Certificate for Certificate {
-    type Blob = Blob;
-    type Hash = [u8; 32];
+pub struct CertificateVerificationParameters {
+    threshold: usize,
+}
 
-    fn blob(&self) -> <Self::Blob as blob::Blob>::Hash {
-        self.attestations[0].blob
+impl certificate::Certificate for Certificate {
+    type VerificationParameters = CertificateVerificationParameters;
+    type Signature = [u8; 32];
+    type Id = [u8; 32];
+
+    fn signers(&self) -> Vec<bool> {
+        self.attestations.iter().map(|_| true).collect()
     }
 
-    fn hash(&self) -> <Self::Blob as blob::Blob>::Hash {
+    fn signature(&self) -> Self::Signature {
+        let signatures: Vec<u8> = self
+            .attestations
+            .iter()
+            .map(|attestation| attestation.attestation_signature())
+            .flatten()
+            .collect();
+        hash(signatures)
+    }
+
+    fn id(&self) -> Self::Id {
         let mut input = self
             .attestations
             .iter()
-            .map(|a| a.hash())
+            .map(|a| a.attestation_signature())
             .collect::<Vec<_>>();
         // sort to make the hash deterministic
         input.sort();
         hash(input.concat())
     }
 
-    fn as_bytes(&self) -> Bytes {
-        wire::serialize(self)
-            .expect("Certificate shouldn't fail to be serialized")
-            .into()
+    fn verify(&self, authorization_parameters: Self::VerificationParameters) -> bool {
+        authorization_parameters.threshold <= self.attestations.len()
     }
 }
 
-// TODO: add generic impl when the trait for Certificate is expanded
-impl DaProtocol for FullReplication<AbsoluteNumber<Attestation, Certificate>> {
-    type Blob = Blob;
-    type Attestation = Attestation;
-    type Certificate = Certificate;
-    type Settings = Settings;
+impl CertificateExtension for Certificate {
+    type Extension = ();
 
-    fn new(settings: Self::Settings) -> Self {
-        Self::new(
-            settings.voter,
-            AbsoluteNumber::new(settings.num_attestations),
-        )
-    }
-
-    fn encode<T: AsRef<[u8]>>(&self, data: T) -> Vec<Self::Blob> {
-        vec![Blob {
-            data: Bytes::copy_from_slice(data.as_ref()),
-        }]
-    }
-
-    fn recv_blob(&mut self, blob: Self::Blob) {
-        self.output_buffer.push(blob.data);
-    }
-
-    fn extract(&mut self) -> Option<Bytes> {
-        self.output_buffer.pop()
-    }
-
-    fn attest(&self, blob: &Self::Blob) -> Self::Attestation {
-        Attestation {
-            blob: hasher(blob),
-            voter: self.voter,
-        }
-    }
-
-    fn validate_attestation(&self, blob: &Self::Blob, attestation: &Self::Attestation) -> bool {
-        hasher(blob) == attestation.blob
-    }
-
-    fn recv_attestation(&mut self, attestation: Self::Attestation) {
-        self.attestations.push(attestation);
-        if self.certificate_strategy.can_build(&self.attestations) {
-            self.output_certificate_buf.push(
-                self.certificate_strategy
-                    .build(std::mem::take(&mut self.attestations)),
-            );
-        }
-    }
-
-    fn certify_dispersal(&mut self) -> Option<Self::Certificate> {
-        self.output_certificate_buf.pop()
-    }
-
-    fn validate_certificate(&self, certificate: &Self::Certificate) -> bool {
-        self.certificate_strategy
-            .can_build(&certificate.attestations)
+    fn extension(&self) -> Self::Extension {
+        ()
     }
 }
 

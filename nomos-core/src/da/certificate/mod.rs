@@ -1,15 +1,16 @@
 pub mod select;
 
-use crate::da::blob::Blob;
 use bytes::Bytes;
 use std::hash::Hash;
 
 pub trait Certificate {
-    type Blob: Blob;
-    type Hash: Hash + Eq + Clone;
-    fn blob(&self) -> <Self::Blob as Blob>::Hash;
-    fn hash(&self) -> Self::Hash;
-    fn as_bytes(&self) -> Bytes;
+    type VerificationParameters;
+    type Signature;
+    type Id;
+    fn signers(&self) -> Vec<bool>;
+    fn signature(&self) -> Self::Signature;
+    fn id(&self) -> Self::Id;
+    fn verify(&self, authorization_parameters: Self::VerificationParameters) -> bool;
 }
 
 pub trait BlobCertificateSelect {

@@ -5,7 +5,6 @@ use std::{
 };
 
 use crate::api::AxumBackend;
-use crate::DataAvailability;
 use crate::{Carnot, Tx, Wire, MB16};
 use clap::{Parser, ValueEnum};
 use color_eyre::eyre::{self, eyre, Result};
@@ -108,12 +107,6 @@ pub struct OverlayArgs {
 }
 
 #[derive(Parser, Debug, Clone)]
-pub struct DaArgs {
-    #[clap(long = "da-voter", env = "DA_VOTER")]
-    da_voter: Option<String>,
-}
-
-#[derive(Parser, Debug, Clone)]
 pub struct MetricsArgs {
     #[clap(long = "with-metrics", env = "WITH_METRICS")]
     pub with_metrics: bool,
@@ -125,7 +118,6 @@ pub struct Config {
     pub network: <NetworkService<NetworkBackend> as ServiceData>::Settings,
     pub http: <ApiService<AxumBackend<Tx, Wire, MB16>> as ServiceData>::Settings,
     pub consensus: <Carnot as ServiceData>::Settings,
-    pub da: <DataAvailability as ServiceData>::Settings,
 }
 
 impl Config {
@@ -272,17 +264,6 @@ impl Config {
         if let Some(super_majority_threshold) = overlay_super_majority_threshold {
             self.consensus.overlay_settings.super_majority_threshold =
                 Some(super_majority_threshold.into());
-        }
-
-        Ok(self)
-    }
-
-    pub fn update_da(mut self, da_args: DaArgs) -> Result<Self> {
-        let DaArgs { da_voter } = da_args;
-
-        if let Some(voter) = da_voter {
-            let bytes = <[u8; 32]>::from_hex(voter)?;
-            self.da.da_protocol.voter = bytes;
         }
 
         Ok(self)

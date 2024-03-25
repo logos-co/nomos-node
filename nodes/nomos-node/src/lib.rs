@@ -14,16 +14,7 @@ use api::AxumBackend;
 use bytes::Bytes;
 use carnot_consensus::CarnotConsensus;
 use nomos_api::ApiService;
-use nomos_core::{
-    da::{blob, certificate},
-    header::HeaderId,
-    tx::Transaction,
-    wire,
-};
-use nomos_da::{
-    backend::memory_cache::BlobCache, network::adapters::libp2p::Libp2pAdapter as DaNetworkAdapter,
-    DataAvailabilityService,
-};
+use nomos_core::{da::certificate, header::HeaderId, tx::Transaction, wire};
 use nomos_log::Logger;
 use nomos_mempool::network::adapters::libp2p::Libp2pAdapter as MempoolNetworkAdapter;
 use nomos_mempool::{
@@ -38,9 +29,7 @@ use nomos_storage::{
     StorageService,
 };
 
-pub use config::{
-    Config, ConsensusArgs, DaArgs, HttpArgs, LogArgs, MetricsArgs, NetworkArgs, OverlayArgs,
-};
+pub use config::{Config, ConsensusArgs, HttpArgs, LogArgs, MetricsArgs, NetworkArgs, OverlayArgs};
 use nomos_core::{
     da::certificate::select::FillSize as FillSizeWithBlobsCertificate,
     tx::select::FillSize as FillSizeWithTx,
@@ -61,25 +50,12 @@ pub type Carnot = CarnotConsensus<
     ConsensusNetworkAdapter,
     MockPool<HeaderId, Tx, <Tx as Transaction>::Hash>,
     MempoolNetworkAdapter<Tx, <Tx as Transaction>::Hash>,
-    MockPool<
-        HeaderId,
-        Certificate,
-        <<Certificate as certificate::Certificate>::Blob as blob::Blob>::Hash,
-    >,
-    MempoolNetworkAdapter<
-        Certificate,
-        <<Certificate as certificate::Certificate>::Blob as blob::Blob>::Hash,
-    >,
+    MockPool<HeaderId, Certificate, <Certificate as certificate::Certificate>::Id>,
+    MempoolNetworkAdapter<Certificate, <Certificate as certificate::Certificate>::Id>,
     TreeOverlay<RoundRobin, RandomBeaconState>,
     FillSizeWithTx<MB16, Tx>,
     FillSizeWithBlobsCertificate<MB16, Certificate>,
     RocksBackend<Wire>,
->;
-
-pub type DataAvailability = DataAvailabilityService<
-    FullReplication<AbsoluteNumber<Attestation, Certificate>>,
-    BlobCache<<Blob as nomos_core::da::blob::Blob>::Hash, Blob>,
-    DaNetworkAdapter<Blob, Attestation>,
 >;
 
 type Mempool<K, V, D> = MempoolService<MempoolNetworkAdapter<K, V>, MockPool<HeaderId, K, V>, D>;
@@ -90,15 +66,10 @@ pub struct Nomos {
     network: ServiceHandle<NetworkService<NetworkBackend>>,
     cl_mempool: ServiceHandle<Mempool<Tx, <Tx as Transaction>::Hash, TxDiscriminant>>,
     da_mempool: ServiceHandle<
-        Mempool<
-            Certificate,
-            <<Certificate as certificate::Certificate>::Blob as blob::Blob>::Hash,
-            CertDiscriminant,
-        >,
+        Mempool<Certificate, <Certificate as certificate::Certificate>::Id, CertDiscriminant>,
     >,
     consensus: ServiceHandle<Carnot>,
     http: ServiceHandle<ApiService<AxumBackend<Tx, Wire, MB16>>>,
-    da: ServiceHandle<DataAvailability>,
     storage: ServiceHandle<StorageService<RocksBackend<Wire>>>,
     #[cfg(feature = "metrics")]
     metrics: ServiceHandle<Metrics>,

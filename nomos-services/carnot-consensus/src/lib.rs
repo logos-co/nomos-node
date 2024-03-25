@@ -37,6 +37,7 @@ use crate::committee_membership::UpdateableCommitteeMembership;
 use nomos_core::block::builder::BlockBuilder;
 use nomos_core::block::Block;
 use nomos_core::da::certificate::{BlobCertificateSelect, Certificate};
+use nomos_core::da::certificate_metadata::CertificateExtension;
 use nomos_core::header::{carnot::Builder, HeaderId};
 use nomos_core::tx::{Transaction, TxSelect};
 use nomos_core::vote::Tally;
@@ -186,7 +187,8 @@ where
         + Send
         + Sync
         + 'static,
-    DaPool::Item: Certificate<Hash = DaPool::Key>
+    DaPool::Item: Certificate<Id = DaPool::Key>
+        + CertificateExtension
         + Debug
         + Clone
         + Eq
@@ -387,7 +389,7 @@ where
         + Send
         + Sync
         + 'static,
-    DaPool::Item: Certificate<Hash = DaPool::Key>
+    DaPool::Item: Certificate<Id = DaPool::Key>
         + Debug
         + Clone
         + Eq
@@ -631,7 +633,7 @@ where
 
                 mark_in_block(
                     da_mempool_relay,
-                    original_block.blobs().map(Certificate::hash),
+                    original_block.blobs().map(Certificate::id),
                     block.id(),
                 )
                 .await;
