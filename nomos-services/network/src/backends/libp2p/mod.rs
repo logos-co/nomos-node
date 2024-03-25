@@ -12,9 +12,7 @@ use self::swarm::SwarmHandler;
 // internal
 use super::NetworkBackend;
 #[cfg(feature = "mixnet")]
-use crate::backends::libp2p::mixnet::{init_mixnet, MixnetMessage, STREAM_PROTOCOL};
-#[cfg(feature = "mixnet")]
-use ::mixnet::client::MessageQueue;
+use crate::backends::libp2p::mixnet::{Mixnet, MixnetMessage, STREAM_PROTOCOL};
 pub use nomos_libp2p::libp2p::gossipsub::{Message, TopicHash};
 // crates
 use overwatch_rs::{overwatch::handle::OverwatchHandle, services::state::NoState};
@@ -24,7 +22,7 @@ pub struct Libp2p {
     events_tx: broadcast::Sender<Event>,
     commands_tx: mpsc::Sender<Command>,
     #[cfg(feature = "mixnet")]
-    mixclient_message_queue: MessageQueue,
+    mixnet: Mixnet,
 }
 
 #[derive(Debug)]
@@ -56,7 +54,7 @@ impl NetworkBackend for Libp2p {
             SwarmHandler::new(&config, commands_tx.clone(), commands_rx, events_tx.clone());
 
         #[cfg(feature = "mixnet")]
-        let mixclient_message_queue = init_mixnet(
+        let mixnet = Mixnet::new(
             config.mixnet,
             overwatch_handle.runtime().clone(),
             commands_tx.clone(),
@@ -71,7 +69,7 @@ impl NetworkBackend for Libp2p {
             events_tx,
             commands_tx,
             #[cfg(feature = "mixnet")]
-            mixclient_message_queue,
+            mixnet,
         }
     }
 
@@ -87,7 +85,7 @@ impl NetworkBackend for Libp2p {
         match msg {
             Command::Broadcast { topic, message } => {
                 let msg = MixnetMessage { topic, message };
-                if let Err(e) = self.mixclient_message_queue.send(msg.as_bytes()).await {
+                if let Err(e) = self.mixnet.message_queue().send(msg.as_bytes()).await {
                     tracing::error!("failed to send messasge to mixclient: {e}");
                 }
             }
