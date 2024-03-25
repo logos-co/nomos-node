@@ -17,7 +17,6 @@ pub struct MixNode {
 }
 
 struct MixNodeRunner {
-    _config: MixNodeConfig,
     encryption_private_key: PrivateKey,
     poisson: Poisson,
     packet_queue: mpsc::Receiver<PacketBody>,
@@ -50,7 +49,6 @@ impl MixNode {
         let (output_tx, output_rx) = mpsc::unbounded_channel();
 
         let mixnode_runner = MixNodeRunner {
-            _config: config,
             encryption_private_key,
             poisson,
             packet_queue: packet_rx,
