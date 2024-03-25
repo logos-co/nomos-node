@@ -10,18 +10,9 @@ use metrics::{backend::map::MapMetricsBackend, types::MetricsData, MetricsServic
 
 use api::AxumBackend;
 use bytes::Bytes;
-pub use config::{Config, CryptarchiaArgs, DaArgs, HttpArgs, LogArgs, MetricsArgs, NetworkArgs};
+pub use config::{Config, CryptarchiaArgs, HttpArgs, LogArgs, MetricsArgs, NetworkArgs};
 use nomos_api::ApiService;
-use nomos_core::{
-    da::{blob, certificate},
-    header::HeaderId,
-    tx::Transaction,
-    wire,
-};
-use nomos_da::{
-    backend::memory_cache::BlobCache, network::adapters::libp2p::Libp2pAdapter as DaNetworkAdapter,
-    DataAvailabilityService,
-};
+use nomos_core::{da::certificate, header::HeaderId, tx::Transaction, wire};
 use nomos_log::Logger;
 use nomos_mempool::network::adapters::libp2p::Libp2pAdapter as MempoolNetworkAdapter;
 use nomos_mempool::{
@@ -58,24 +49,11 @@ pub type Cryptarchia = cryptarchia_consensus::CryptarchiaConsensus<
     cryptarchia_consensus::network::adapters::libp2p::LibP2pAdapter<Tx, Certificate>,
     MockPool<HeaderId, Tx, <Tx as Transaction>::Hash>,
     MempoolNetworkAdapter<Tx, <Tx as Transaction>::Hash>,
-    MockPool<
-        HeaderId,
-        Certificate,
-        <<Certificate as certificate::Certificate>::Blob as blob::Blob>::Hash,
-    >,
-    MempoolNetworkAdapter<
-        Certificate,
-        <<Certificate as certificate::Certificate>::Blob as blob::Blob>::Hash,
-    >,
+    MockPool<HeaderId, Certificate, <Certificate as certificate::Certificate>::Id>,
+    MempoolNetworkAdapter<Certificate, <Certificate as certificate::Certificate>::Id>,
     FillSizeWithTx<MB16, Tx>,
     FillSizeWithBlobsCertificate<MB16, Certificate>,
     RocksBackend<Wire>,
->;
-
-pub type DataAvailability = DataAvailabilityService<
-    FullReplication<AbsoluteNumber<Attestation, Certificate>>,
-    BlobCache<<Blob as nomos_core::da::blob::Blob>::Hash, Blob>,
-    DaNetworkAdapter<Blob, Attestation>,
 >;
 
 type Mempool<K, V, D> = MempoolService<MempoolNetworkAdapter<K, V>, MockPool<HeaderId, K, V>, D>;
@@ -86,15 +64,10 @@ pub struct Nomos {
     network: ServiceHandle<NetworkService<NetworkBackend>>,
     cl_mempool: ServiceHandle<Mempool<Tx, <Tx as Transaction>::Hash, TxDiscriminant>>,
     da_mempool: ServiceHandle<
-        Mempool<
-            Certificate,
-            <<Certificate as certificate::Certificate>::Blob as blob::Blob>::Hash,
-            CertDiscriminant,
-        >,
+        Mempool<Certificate, <Certificate as certificate::Certificate>::Id, CertDiscriminant>,
     >,
     cryptarchia: ServiceHandle<Cryptarchia>,
     http: ServiceHandle<ApiService<AxumBackend<Tx, Wire, MB16>>>,
-    da: ServiceHandle<DataAvailability>,
     storage: ServiceHandle<StorageService<RocksBackend<Wire>>>,
     #[cfg(feature = "metrics")]
     metrics: ServiceHandle<Metrics>,
