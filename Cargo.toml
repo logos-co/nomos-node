@@ -9,8 +9,8 @@ members = [
     "nomos-services/cryptarchia-consensus",
     "nomos-services/mempool",
     "nomos-services/metrics",
-    "nomos-services/data-availability",
     "nomos-services/system-sig",
+    "nomos-services/data-availability/storage",
     "nomos-da/full-replication",
     # TODO: add it again and reimplement full replication
     #    "nomos-cli",
