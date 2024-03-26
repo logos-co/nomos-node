@@ -18,7 +18,6 @@ nomos-mempool = { path = "../nomos-services/mempool", features = [
   "mock",
   "libp2p",
 ] }
-nomos-da = { path = "../nomos-services/data-availability" }
 full-replication = { path = "../nomos-da/full-replication" }
 rand = "0.8"
 once_cell = "1"

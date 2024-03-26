@@ -35,9 +35,6 @@ carnot-consensus = { path = "../../nomos-services/carnot-consensus", features = 
 ] }
 
 nomos-libp2p = { path = "../../nomos-libp2p" }
-nomos-da = { path = "../../nomos-services/data-availability", features = [
-  "libp2p",
-] }
 nomos-system-sig = { path = "../../nomos-services/system-sig" }
 tracing-subscriber = "0.3"
 carnot-engine = { path = "../../consensus/carnot-engine" }
