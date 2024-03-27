@@ -25,19 +25,15 @@ where
 }
 
 pub enum DaMsg<B, V> {
-    // Add verified blob to the da storage.
-    Add {
-        blob: B,
-    },
-    // Promote blob to indexed application data.
+    // Index blob to indexed application data.
     //
     // TODO: naming - Store is used by the verifier and the indexer services. Verifier adds
     // verified blobs, indexer tracks the blockchain and promotes blobs to be available via the
     // api.
-    Promote {
+    AddIndex {
         vid: V,
     },
-    Get {
+    GetRange {
         ids: Box<dyn Iterator<Item = B> + Send>,
         reply_channel: Sender<Vec<B>>,
     },
@@ -46,13 +42,10 @@ pub enum DaMsg<B, V> {
 impl<B: 'static, V: 'static> Debug for DaMsg<B, V> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            DaMsg::Add { .. } => {
-                write!(f, "DaMsg::Add")
+            DaMsg::AddIndex { .. } => {
+                write!(f, "DaMsg::Index")
             }
-            DaMsg::Promote { .. } => {
-                write!(f, "DaMsg::Promote")
-            }
-            DaMsg::Get { .. } => {
+            DaMsg::GetRange { .. } => {
                 write!(f, "DaMsg::Get")
             }
         }
@@ -85,13 +78,10 @@ where
         msg: DaMsg<Backend::Blob, Backend::VID>,
     ) -> Result<(), DynError> {
         match msg {
-            DaMsg::Add { blob } => {
+            DaMsg::AddIndex { vid } => {
                 todo!()
             }
-            DaMsg::Promote { vid } => {
-                todo!()
-            }
-            DaMsg::Get { ids, reply_channel } => {
+            DaMsg::GetRange { ids, reply_channel } => {
                 todo!()
             }
         }
