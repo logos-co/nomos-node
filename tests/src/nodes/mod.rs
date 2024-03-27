@@ -1,6 +1,6 @@
 pub mod nomos;
-
 pub use nomos::NomosNode;
+
 use tempfile::TempDir;
 
 const LOGS_PREFIX: &str = "__logs";

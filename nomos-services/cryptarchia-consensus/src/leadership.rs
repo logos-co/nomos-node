@@ -12,9 +12,18 @@ impl Leader {
     }
 
     pub fn build_proof_for(&mut self, epoch_state: &EpochState, slot: Slot) -> Option<LeaderProof> {
-        for coin in &self.coins {
+        for coin in &mut self.coins {
             if coin.is_slot_leader(epoch_state, slot, &self.config.consensus_config) {
-                return Some(coin.to_proof(slot));
+                tracing::debug!(
+                    "leader for slot {:?}, {:?}/{:?}",
+                    slot,
+                    coin.value(),
+                    epoch_state.total_stake()
+                );
+                let proof = coin.to_proof(slot);
+                // TODO: import orphan proofs
+                *coin = coin.evolve();
+                return Some(proof);
             }
         }
         None

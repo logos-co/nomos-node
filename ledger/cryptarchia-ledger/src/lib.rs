@@ -77,6 +77,10 @@ impl EpochState {
     pub fn epoch(&self) -> Epoch {
         self.epoch
     }
+
+    pub fn total_stake(&self) -> Value {
+        self.total_stake
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -323,7 +327,10 @@ impl LedgerState {
         }
     }
 
-    pub fn from_commitments(commitments: impl IntoIterator<Item = Commitment>) -> Self {
+    pub fn from_commitments(
+        commitments: impl IntoIterator<Item = Commitment>,
+        total_stake: Value,
+    ) -> Self {
         let commitments = commitments.into_iter().collect::<HashTrieSet<_>>();
         Self {
             lead_commitments: commitments.clone(),
@@ -335,13 +342,13 @@ impl LedgerState {
                 epoch: 1.into(),
                 nonce: [0; 32].into(),
                 commitments: Default::default(),
-                total_stake: 1.into(),
+                total_stake,
             },
             epoch_state: EpochState {
                 epoch: 0.into(),
                 nonce: [0; 32].into(),
                 commitments: Default::default(),
-                total_stake: 1.into(),
+                total_stake,
             },
         }
     }

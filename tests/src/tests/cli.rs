@@ -7,7 +7,8 @@ use nomos_cli::{
 use nomos_core::da::{blob::Blob as _, DaProtocol};
 use std::{io::Write, time::Duration};
 use tempfile::NamedTempFile;
-use tests::{adjust_timeout, nodes::nomos::Pool, Node, NomosNode, SpawnConfig};
+use tests::{adjust_timeout, nodes::nomos::Pool, SpawnConfig};
+use tests::{Node, NomosNode};
 
 const CLI_BIN: &str = "../target/debug/nomos-cli";
 

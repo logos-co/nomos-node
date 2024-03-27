@@ -122,8 +122,14 @@ where
             .route("/da/blobs", routing::post(da_blobs))
             .route("/cl/metrics", routing::get(cl_metrics::<T>))
             .route("/cl/status", routing::post(cl_status::<T>))
-            .route("/carnot/info", routing::get(carnot_info::<T, S, SIZE>))
-            .route("/carnot/blocks", routing::get(carnot_blocks::<T, S, SIZE>))
+            .route(
+                "/cryptarchia/info",
+                routing::get(cryptarchia_info::<T, S, SIZE>),
+            )
+            .route(
+                "/cryptarchia/headers",
+                routing::get(cryptarchia_headers::<T, S, SIZE>),
+            )
             .route("/network/info", routing::get(libp2p_info))
             .route("/storage/block", routing::post(block::<S, T>))
             .route("/mempool/add/tx", routing::post(add_tx::<T>))
@@ -237,25 +243,8 @@ where
 {
     make_request_and_return_response!(cl::cl_mempool_status::<T>(&handle, items))
 }
-
-#[utoipa::path(
-    get,
-    path = "/carnot/info",
-    responses(
-        (status = 200, description = "Query the carnot information", body = nomos_consensus::CarnotInfo),
-        (status = 500, description = "Internal server error", body = String),
-    )
-)]
-async fn carnot_info<Tx, SS, const SIZE: usize>(State(handle): State<OverwatchHandle>) -> Response
-where
-    Tx: Transaction + Clone + Debug + Hash + Serialize + DeserializeOwned + Send + Sync + 'static,
-    <Tx as Transaction>::Hash: std::cmp::Ord + Debug + Send + Sync + 'static,
-    SS: StorageSerde + Send + Sync + 'static,
-{
-    make_request_and_return_response!(consensus::carnot_info::<Tx, SS, SIZE>(&handle))
-}
-
 #[derive(Deserialize)]
+#[allow(dead_code)]
 struct QueryParams {
     from: Option<HeaderId>,
     to: Option<HeaderId>,
@@ -263,23 +252,62 @@ struct QueryParams {
 
 #[utoipa::path(
     get,
-    path = "/carnot/blocks",
+    path = "/cryptarchia/info",
     responses(
-        (status = 200, description = "Query the block information", body = Vec<consensus_engine::Block>),
+        (status = 200, description = "Query consensus information", body = nomos_consensus::CryptarchiaInfo),
         (status = 500, description = "Internal server error", body = String),
     )
 )]
-async fn carnot_blocks<Tx, SS, const SIZE: usize>(
+async fn cryptarchia_info<Tx, SS, const SIZE: usize>(
+    State(handle): State<OverwatchHandle>,
+) -> Response
+where
+    Tx: Transaction
+        + Clone
+        + Eq
+        + Debug
+        + Hash
+        + Serialize
+        + DeserializeOwned
+        + Send
+        + Sync
+        + 'static,
+    <Tx as Transaction>::Hash: std::cmp::Ord + Debug + Send + Sync + 'static,
+    SS: StorageSerde + Send + Sync + 'static,
+{
+    make_request_and_return_response!(consensus::cryptarchia_info::<Tx, SS, SIZE>(&handle))
+}
+
+#[utoipa::path(
+    get,
+    path = "/cryptarchia/headers",
+    responses(
+        (status = 200, description = "Query header ids", body = Vec<HeaderId>),
+        (status = 500, description = "Internal server error", body = String),
+    )
+)]
+async fn cryptarchia_headers<Tx, SS, const SIZE: usize>(
     State(store): State<OverwatchHandle>,
     Query(query): Query<QueryParams>,
 ) -> Response
 where
-    Tx: Transaction + Clone + Debug + Hash + Serialize + DeserializeOwned + Send + Sync + 'static,
+    Tx: Transaction
+        + Eq
+        + Clone
+        + Debug
+        + Hash
+        + Serialize
+        + DeserializeOwned
+        + Send
+        + Sync
+        + 'static,
     <Tx as Transaction>::Hash: std::cmp::Ord + Debug + Send + Sync + 'static,
     SS: StorageSerde + Send + Sync + 'static,
 {
     let QueryParams { from, to } = query;
-    make_request_and_return_response!(consensus::carnot_blocks::<Tx, SS, SIZE>(&store, from, to))
+    make_request_and_return_response!(consensus::cryptarchia_headers::<Tx, SS, SIZE>(
+        &store, from, to
+    ))
 }
 
 #[utoipa::path(

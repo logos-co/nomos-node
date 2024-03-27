@@ -6,18 +6,16 @@ publish = false
 
 [dependencies]
 nomos-node = { path = "../nodes/nomos-node", default-features = false }
-carnot-consensus = { path = "../nomos-services/carnot-consensus" }
 nomos-network = { path = "../nomos-services/network", features = ["libp2p"] }
+cryptarchia-consensus = { path = "../nomos-services/cryptarchia-consensus" }
 mixnet = { path = "../mixnet" }
 nomos-log = { path = "../nomos-services/log" }
 nomos-api = { path = "../nomos-services/api" }
 overwatch-rs = { git = "https://github.com/logos-co/Overwatch", rev = "2f70806" }
 nomos-core = { path = "../nomos-core" }
-carnot-engine = { path = "../consensus/carnot-engine", features = ["serde"] }
-nomos-mempool = { path = "../nomos-services/mempool", features = [
-  "mock",
-  "libp2p",
-] }
+cryptarchia-engine = { path = "../consensus/cryptarchia-engine", features = ["serde"] }
+cryptarchia-ledger = { path = "../ledger/cryptarchia-ledger", features = ["serde"] }
+nomos-mempool = { path = "../nomos-services/mempool", features = ["mock", "libp2p"] }
 nomos-da = { path = "../nomos-services/data-availability" }
 full-replication = { path = "../nomos-da/full-replication" }
 rand = "0.8"
@@ -36,14 +34,11 @@ fraction = "0.13"
 ntest = "0.9.0"
 criterion = { version = "0.5", features = ["async_tokio"] }
 nomos-cli = { path = "../nomos-cli" }
+time = "0.3"
 
 [[test]]
-name = "test_consensus_happy_path"
-path = "src/tests/happy.rs"
-
-[[test]]
-name = "test_consensus_unhappy_path"
-path = "src/tests/unhappy.rs"
+name = "test_cryptarchia_happy_path"
+path = "src/tests/cryptarchia/happy.rs"
 
 [[test]]
 name = "test_cli"
@@ -52,3 +47,4 @@ path = "src/tests/cli.rs"
 
 [features]
 mixnet = ["nomos-network/mixnet"]
+metrics = ["nomos-node/metrics"]

@@ -5,7 +5,7 @@
 mod ui;
 
 use crate::{
-    api::consensus::get_blocks_info,
+    api::consensus::get_headers_info,
     da::{
         disseminate::{
             DaProtocolChoice, DisseminateApp, DisseminateAppServiceSettings, Settings, Status,
@@ -309,10 +309,9 @@ async fn fetch_new_messages(
     node: &Url,
 ) -> Result<(HeaderId, Vec<ChatMessage>), Box<dyn std::error::Error>> {
     // By only specifying the 'to' parameter we get all the blocks since the last tip
-    let mut new_blocks = get_blocks_info(node, None, Some(*last_tip))
+    let mut new_blocks = get_headers_info(node, None, Some(*last_tip))
         .await?
         .into_iter()
-        .map(|block| block.id)
         .collect::<Vec<_>>();
 
     // The first block is the most recent one.

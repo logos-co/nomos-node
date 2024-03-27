@@ -1,14 +1,13 @@
 use std::{
     net::{IpAddr, SocketAddr},
     path::PathBuf,
-    time::Duration,
 };
 
 use crate::api::AxumBackend;
 use crate::DataAvailability;
-use crate::{Carnot, Tx, Wire, MB16};
+use crate::{Tx, Wire, MB16};
 use clap::{Parser, ValueEnum};
-use color_eyre::eyre::{self, eyre, Result};
+use color_eyre::eyre::{eyre, Result};
 use hex::FromHex;
 use nomos_api::ApiService;
 use nomos_libp2p::{secp256k1::SecretKey, Multiaddr};
@@ -78,33 +77,12 @@ pub struct HttpArgs {
 }
 
 #[derive(Parser, Debug, Clone)]
-pub struct ConsensusArgs {
-    #[clap(long = "consensus-priv-key", env = "CONSENSUS_PRIV_KEY")]
-    consensus_priv_key: Option<String>,
+pub struct CryptarchiaArgs {
+    #[clap(long = "consensus-chain-start", env = "CONSENSUS_CHAIN_START")]
+    chain_start_time: Option<i64>,
 
-    #[clap(long = "consensus-timeout-secs", env = "CONSENSUS_TIMEOUT_SECS")]
-    consensus_timeout_secs: Option<String>,
-}
-
-#[derive(Parser, Debug, Clone)]
-pub struct OverlayArgs {
-    #[clap(long = "overlay-nodes", env = "OVERLAY_NODES", num_args = 1.., value_delimiter = ',')]
-    pub overlay_nodes: Option<Vec<String>>,
-
-    #[clap(long = "overlay-leader", env = "OVERLAY_LEADER")]
-    pub overlay_leader: Option<String>,
-
-    #[clap(
-        long = "overlay-number-of-committees",
-        env = "OVERLAY_NUMBER_OF_COMMITTEES"
-    )]
-    pub overlay_number_of_committees: Option<usize>,
-
-    #[clap(
-        long = "overlay-super-majority-threshold",
-        env = "OVERLAY_SUPER_MAJORITY_THRESHOLD"
-    )]
-    pub overlay_super_majority_threshold: Option<f32>,
+    #[clap(long = "consensus-slot-duration", env = "CONSENSUS_SLOT_DURATION")]
+    slot_duration: Option<u64>,
 }
 
 #[derive(Parser, Debug, Clone)]
@@ -124,7 +102,7 @@ pub struct Config {
     pub log: <Logger as ServiceData>::Settings,
     pub network: <NetworkService<NetworkBackend> as ServiceData>::Settings,
     pub http: <ApiService<AxumBackend<Tx, Wire, MB16>> as ServiceData>::Settings,
-    pub consensus: <Carnot as ServiceData>::Settings,
+    pub cryptarchia: <crate::Cryptarchia as ServiceData>::Settings,
     pub da: <DataAvailability as ServiceData>::Settings,
 }
 
@@ -222,56 +200,19 @@ impl Config {
         Ok(self)
     }
 
-    pub fn update_consensus(mut self, consensus_args: ConsensusArgs) -> Result<Self> {
-        let ConsensusArgs {
-            consensus_priv_key,
-            consensus_timeout_secs,
+    pub fn update_cryptarchia_consensus(mut self, consensus_args: CryptarchiaArgs) -> Result<Self> {
+        let CryptarchiaArgs {
+            chain_start_time,
+            slot_duration,
         } = consensus_args;
 
-        if let Some(private_key) = consensus_priv_key {
-            let bytes = <[u8; 32]>::from_hex(private_key)?;
-            self.consensus.private_key = bytes;
+        if let Some(start_time) = chain_start_time {
+            self.cryptarchia.time.chain_start_time =
+                time::OffsetDateTime::from_unix_timestamp(start_time)?;
         }
 
-        if let Some(timeout) = consensus_timeout_secs {
-            let secs = timeout.parse::<u64>()?;
-            self.consensus.timeout = Duration::from_secs(secs);
-        }
-
-        Ok(self)
-    }
-
-    pub fn update_overlay(mut self, overlay_args: OverlayArgs) -> Result<Self> {
-        let OverlayArgs {
-            overlay_nodes,
-            overlay_leader,
-            overlay_number_of_committees,
-            overlay_super_majority_threshold,
-        } = overlay_args;
-
-        if let Some(nodes) = overlay_nodes {
-            self.consensus.overlay_settings.nodes = nodes
-                .iter()
-                .map(|n| {
-                    <[u8; 32]>::from_hex(n)
-                        .map_err(|e| eyre::eyre!("Failed to decode hex: {}", e))
-                        .map(|b| b.into())
-                })
-                .collect::<Result<Vec<_>, eyre::Report>>()?;
-        }
-
-        if let Some(leader) = overlay_leader {
-            let bytes = <[u8; 32]>::from_hex(leader)?;
-            self.consensus.overlay_settings.current_leader = bytes.into();
-        }
-
-        if let Some(committees) = overlay_number_of_committees {
-            self.consensus.overlay_settings.number_of_committees = committees;
-        }
-
-        if let Some(super_majority_threshold) = overlay_super_majority_threshold {
-            self.consensus.overlay_settings.super_majority_threshold =
-                Some(super_majority_threshold.into());
+        if let Some(duration) = slot_duration {
+            self.cryptarchia.time.slot_duration = std::time::Duration::from_secs(duration);
         }
 
         Ok(self)

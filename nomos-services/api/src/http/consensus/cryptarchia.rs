@@ -4,13 +4,10 @@ use overwatch_rs::overwatch::handle::OverwatchHandle;
 use serde::{de::DeserializeOwned, Serialize};
 use tokio::sync::oneshot;
 
-use carnot_consensus::{
-    network::adapters::libp2p::Libp2pAdapter as ConsensusNetworkAdapter, CarnotConsensus,
-    CarnotInfo, ConsensusMsg,
-};
-use carnot_engine::{
-    overlay::{RandomBeaconState, RoundRobin, TreeOverlay},
-    Block,
+use crate::http::DynError;
+use cryptarchia_consensus::{
+    network::adapters::libp2p::LibP2pAdapter as ConsensusNetworkAdapter, ConsensusMsg,
+    CryptarchiaConsensus, CryptarchiaInfo,
 };
 use full_replication::Certificate;
 use nomos_core::{
@@ -26,8 +23,8 @@ use nomos_mempool::{
 };
 use nomos_storage::backends::{rocksdb::RocksBackend, StorageSerde};
 
-pub type Carnot<Tx, SS, const SIZE: usize> = CarnotConsensus<
-    ConsensusNetworkAdapter,
+pub type Cryptarchia<Tx, SS, const SIZE: usize> = CryptarchiaConsensus<
+    ConsensusNetworkAdapter<Tx, Certificate>,
     MockPool<HeaderId, Tx, <Tx as Transaction>::Hash>,
     MempoolNetworkAdapter<Tx, <Tx as Transaction>::Hash>,
     MockPool<
@@ -39,21 +36,32 @@ pub type Carnot<Tx, SS, const SIZE: usize> = CarnotConsensus<
         Certificate,
         <<Certificate as certificate::Certificate>::Blob as blob::Blob>::Hash,
     >,
-    TreeOverlay<RoundRobin, RandomBeaconState>,
     FillSizeWithTx<SIZE, Tx>,
     FillSizeWithBlobsCertificate<SIZE, Certificate>,
     RocksBackend<SS>,
 >;
 
-pub async fn carnot_info<Tx, SS, const SIZE: usize>(
+pub async fn cryptarchia_info<Tx, SS, const SIZE: usize>(
     handle: &OverwatchHandle,
-) -> Result<CarnotInfo, super::DynError>
+) -> Result<CryptarchiaInfo, DynError>
 where
-    Tx: Transaction + Clone + Debug + Hash + Serialize + DeserializeOwned + Send + Sync + 'static,
+    Tx: Transaction
+        + Eq
+        + Clone
+        + Debug
+        + Hash
+        + Serialize
+        + DeserializeOwned
+        + Send
+        + Sync
+        + 'static,
     <Tx as Transaction>::Hash: std::cmp::Ord + Debug + Send + Sync + 'static,
     SS: StorageSerde + Send + Sync + 'static,
 {
-    let relay = handle.relay::<Carnot<Tx, SS, SIZE>>().connect().await?;
+    let relay = handle
+        .relay::<Cryptarchia<Tx, SS, SIZE>>()
+        .connect()
+        .await?;
     let (sender, receiver) = oneshot::channel();
     relay
         .send(ConsensusMsg::Info { tx: sender })
@@ -63,20 +71,32 @@ where
     Ok(receiver.await?)
 }
 
-pub async fn carnot_blocks<Tx, SS, const SIZE: usize>(
+pub async fn cryptarchia_headers<Tx, SS, const SIZE: usize>(
     handle: &OverwatchHandle,
     from: Option<HeaderId>,
     to: Option<HeaderId>,
-) -> Result<Vec<Block<HeaderId>>, super::DynError>
+) -> Result<Vec<HeaderId>, DynError>
 where
-    Tx: Transaction + Clone + Debug + Hash + Serialize + DeserializeOwned + Send + Sync + 'static,
+    Tx: Transaction
+        + Clone
+        + Debug
+        + Eq
+        + Hash
+        + Serialize
+        + DeserializeOwned
+        + Send
+        + Sync
+        + 'static,
     <Tx as Transaction>::Hash: std::cmp::Ord + Debug + Send + Sync + 'static,
     SS: StorageSerde + Send + Sync + 'static,
 {
-    let relay = handle.relay::<Carnot<Tx, SS, SIZE>>().connect().await?;
+    let relay = handle
+        .relay::<Cryptarchia<Tx, SS, SIZE>>()
+        .connect()
+        .await?;
     let (sender, receiver) = oneshot::channel();
     relay
-        .send(ConsensusMsg::GetBlocks {
+        .send(ConsensusMsg::GetHeaders {
             from,
             to,
             tx: sender,
