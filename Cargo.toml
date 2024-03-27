@@ -10,7 +10,7 @@ members = [
     "nomos-services/mempool",
     "nomos-services/metrics",
     "nomos-services/system-sig",
-    "nomos-services/data-availability/storage",
+    "nomos-services/data-availability/indexer",
     "nomos-da/reed-solomon",
     "nomos-da/kzg",
     "nomos-da/full-replication",
