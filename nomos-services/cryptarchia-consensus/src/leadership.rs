@@ -27,7 +27,7 @@ impl Leader {
                     if coin.commitment() == to_evolve {
                         coin.evolve()
                     } else {
-                        coin.clone()
+                        *coin
                     }
                 })
                 .collect();
