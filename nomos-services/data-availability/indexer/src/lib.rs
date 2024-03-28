@@ -1,4 +1,5 @@
 pub mod indexer;
+pub mod storage;
 
 use std::fmt::{Debug, Formatter};
 use std::hash::Hash;
