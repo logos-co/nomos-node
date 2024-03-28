@@ -1,13 +1,13 @@
-pub mod backend;
+pub mod indexer;
 
 use std::fmt::{Debug, Formatter};
 use std::hash::Hash;
 use std::sync::mpsc::Sender;
 
-use backend::DaStorageBackend;
 use cryptarchia_consensus::network::NetworkAdapter;
 use cryptarchia_consensus::CryptarchiaConsensus;
 use futures::StreamExt;
+use indexer::DaIndexer;
 use nomos_core::da::certificate::{BlobCertificateSelect, Certificate};
 use nomos_core::header::HeaderId;
 use nomos_core::tx::{Transaction, TxSelect};
@@ -24,30 +24,11 @@ use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use tracing::error;
 
-pub type ConsensusRelay<
-    A,
-    ClPool,
-    ClPoolAdapter,
-    DaPool,
-    DaPoolAdapter,
-    TxS,
-    BS,
-    ConsensusStorage,
-> = Relay<
-    CryptarchiaConsensus<
-        A,
-        ClPool,
-        ClPoolAdapter,
-        DaPool,
-        DaPoolAdapter,
-        TxS,
-        BS,
-        ConsensusStorage,
-    >,
->;
+pub type ConsensusRelay<A, ClPool, ClPoolAdapter, DaPool, DaPoolAdapter, TxS, BS, Storage> =
+    Relay<CryptarchiaConsensus<A, ClPool, ClPoolAdapter, DaPool, DaPoolAdapter, TxS, BS, Storage>>;
 
 pub struct DataIndexerService<
-    Backend,
+    Indexer,
     Storage,
     A,
     ClPool,
@@ -58,15 +39,14 @@ pub struct DataIndexerService<
     BS,
     ConsensusStorage,
 > where
-    Backend: DaStorageBackend,
-    Backend::Blob: 'static,
-    Backend::VID: 'static,
+    Indexer: DaIndexer,
+    Indexer::Blob: 'static,
+    Indexer::VID: 'static,
     A: NetworkAdapter,
     ClPoolAdapter: MempoolAdapter<Item = ClPool::Item, Key = ClPool::Key>,
     ClPool: MemPool<BlockId = HeaderId>,
     DaPool: MemPool<BlockId = HeaderId>,
     DaPoolAdapter: MempoolAdapter<Item = DaPool::Item, Key = DaPool::Key>,
-
     ClPool::Item: Clone + Eq + Hash + Debug + 'static,
     ClPool::Key: Debug + 'static,
     DaPool::Item: Clone + Eq + Hash + Debug + 'static,
@@ -78,14 +58,14 @@ pub struct DataIndexerService<
     ConsensusStorage: StorageBackend + Send + Sync + 'static,
 {
     service_state: ServiceStateHandle<Self>,
-    backend: Backend,
+    indexer: Indexer,
     storage_relay: Relay<StorageService<Storage>>,
     consensus_relay:
         ConsensusRelay<A, ClPool, ClPoolAdapter, DaPool, DaPoolAdapter, TxS, BS, ConsensusStorage>,
 }
 
 impl<
-        Backend,
+        Indexer,
         Storage,
         A,
         ClPool,
@@ -97,7 +77,7 @@ impl<
         ConsensusStorage,
     >
     DataIndexerService<
-        Backend,
+        Indexer,
         Storage,
         A,
         ClPool,
@@ -109,15 +89,14 @@ impl<
         ConsensusStorage,
     >
 where
-    Backend: DaStorageBackend,
-    Backend::Blob: 'static,
-    Backend::VID: 'static,
+    Indexer: DaIndexer,
+    Indexer::Blob: 'static,
+    Indexer::VID: 'static,
     A: NetworkAdapter,
     ClPoolAdapter: MempoolAdapter<Item = ClPool::Item, Key = ClPool::Key>,
     ClPool: MemPool<BlockId = HeaderId>,
     DaPool: MemPool<BlockId = HeaderId>,
     DaPoolAdapter: MempoolAdapter<Item = DaPool::Item, Key = DaPool::Key>,
-
     ClPool::Item: Clone + Eq + Hash + Debug + 'static,
     ClPool::Key: Debug + 'static,
     DaPool::Item: Clone + Eq + Hash + Debug + 'static,
@@ -161,7 +140,7 @@ impl<B: 'static, V: 'static> Debug for DaMsg<B, V> {
 impl<B: 'static, V: 'static> RelayMessage for DaMsg<B, V> {}
 
 impl<
-        Backend,
+        Indexer,
         Storage,
         A,
         ClPool,
@@ -173,7 +152,7 @@ impl<
         ConsensusStorage,
     > ServiceData
     for DataIndexerService<
-        Backend,
+        Indexer,
         Storage,
         A,
         ClPool,
@@ -185,15 +164,14 @@ impl<
         ConsensusStorage,
     >
 where
-    Backend: DaStorageBackend,
-    Backend::Blob: 'static,
-    Backend::VID: 'static,
+    Indexer: DaIndexer,
+    Indexer::Blob: 'static,
+    Indexer::VID: 'static,
     A: NetworkAdapter,
     ClPoolAdapter: MempoolAdapter<Item = ClPool::Item, Key = ClPool::Key>,
     ClPool: MemPool<BlockId = HeaderId>,
     DaPool: MemPool<BlockId = HeaderId>,
     DaPoolAdapter: MempoolAdapter<Item = DaPool::Item, Key = DaPool::Key>,
-
     ClPool::Item: Clone + Eq + Hash + Debug + 'static,
     ClPool::Key: Debug + 'static,
     DaPool::Item: Clone + Eq + Hash + Debug + 'static,
@@ -205,14 +183,14 @@ where
     ConsensusStorage: StorageBackend + Send + Sync + 'static,
 {
     const SERVICE_ID: ServiceId = "DaStorage";
-    type Settings = Settings<Backend::Settings>;
+    type Settings = Settings<Indexer::Settings>;
     type State = NoState<Self::Settings>;
     type StateOperator = NoOperator<Self::State>;
-    type Message = DaMsg<Backend::Blob, Backend::VID>;
+    type Message = DaMsg<Indexer::Blob, Indexer::VID>;
 }
 
 impl<
-        Backend,
+        Indexer,
         Storage,
         A,
         ClPool,
@@ -224,7 +202,7 @@ impl<
         ConsensusStorage,
     >
     DataIndexerService<
-        Backend,
+        Indexer,
         Storage,
         A,
         ClPool,
@@ -236,15 +214,14 @@ impl<
         ConsensusStorage,
     >
 where
-    Backend: DaStorageBackend + Send + Sync,
-    Backend::Blob: 'static,
-    Backend::VID: 'static,
+    Indexer: DaIndexer + Send + Sync,
+    Indexer::Blob: 'static,
+    Indexer::VID: 'static,
     A: NetworkAdapter,
     ClPoolAdapter: MempoolAdapter<Item = ClPool::Item, Key = ClPool::Key>,
     ClPool: MemPool<BlockId = HeaderId>,
     DaPool: MemPool<BlockId = HeaderId>,
     DaPoolAdapter: MempoolAdapter<Item = DaPool::Item, Key = DaPool::Key>,
-
     ClPool::Item: Clone + Eq + Hash + Debug + 'static,
     ClPool::Key: Debug + 'static,
     DaPool::Item: Clone + Eq + Hash + Debug + 'static,
@@ -256,8 +233,8 @@ where
     ConsensusStorage: StorageBackend + Send + Sync + 'static,
 {
     async fn handle_da_msg(
-        backend: &Backend,
-        msg: DaMsg<Backend::Blob, Backend::VID>,
+        indexer: &Indexer,
+        msg: DaMsg<Indexer::Blob, Indexer::VID>,
     ) -> Result<(), DynError> {
         match msg {
             DaMsg::AddIndex { vid } => {
@@ -288,7 +265,7 @@ where
 
 #[async_trait::async_trait]
 impl<
-        Backend,
+        Indexer,
         Storage,
         A,
         ClPool,
@@ -300,7 +277,7 @@ impl<
         ConsensusStorage,
     > ServiceCore
     for DataIndexerService<
-        Backend,
+        Indexer,
         Storage,
         A,
         ClPool,
@@ -312,10 +289,10 @@ impl<
         ConsensusStorage,
     >
 where
-    Backend: DaStorageBackend + Send + Sync + 'static,
-    Backend::Settings: Clone + Send + Sync + 'static,
-    Backend::Blob: Debug + Send + Sync,
-    Backend::VID: Debug + Send + Sync,
+    Indexer: DaIndexer + Send + Sync + 'static,
+    Indexer::Settings: Clone + Send + Sync + 'static,
+    Indexer::Blob: Debug + Send + Sync,
+    Indexer::VID: Debug + Send + Sync,
     A: NetworkAdapter,
     ClPoolAdapter: MempoolAdapter<Item = ClPool::Item, Key = ClPool::Key>,
     ClPool: MemPool<BlockId = HeaderId>,
@@ -352,12 +329,12 @@ where
 {
     fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, DynError> {
         let settings = service_state.settings_reader.get_updated_settings();
-        let backend = Backend::new(settings.backend);
+        let indexer = Indexer::new(settings.indexer);
         let consensus_relay = service_state.overwatch_handle.relay();
         let storage_relay = service_state.overwatch_handle.relay();
         Ok(Self {
             service_state,
-            backend,
+            indexer,
             storage_relay,
             consensus_relay,
         })
@@ -366,7 +343,7 @@ where
     async fn run(self) -> Result<(), DynError> {
         let Self {
             mut service_state,
-            backend,
+            indexer,
             consensus_relay,
             storage_relay,
         } = self;
@@ -396,5 +373,5 @@ where
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct Settings<B> {
-    pub backend: B,
+    pub indexer: B,
 }
