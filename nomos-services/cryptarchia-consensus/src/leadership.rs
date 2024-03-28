@@ -3,6 +3,7 @@ use cryptarchia_ledger::{Coin, Commitment, Config, EpochState, LeaderProof};
 use nomos_core::header::HeaderId;
 use std::collections::HashMap;
 
+#[derive(Clone, Debug)]
 pub struct Leader {
     coins: HashMap<HeaderId, Vec<Coin>>,
     config: cryptarchia_ledger::Config,

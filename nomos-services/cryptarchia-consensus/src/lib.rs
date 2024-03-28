@@ -1,4 +1,4 @@
-mod leadership;
+pub mod leadership;
 pub mod network;
 mod time;
 
@@ -48,13 +48,14 @@ pub enum Error {
     Consensus(#[from] cryptarchia_engine::Error<HeaderId>),
 }
 
-struct Cryptarchia {
-    ledger: cryptarchia_ledger::Ledger<HeaderId>,
-    consensus: cryptarchia_engine::Cryptarchia<HeaderId>,
+#[derive(Debug, Clone)]
+pub struct Cryptarchia {
+    pub ledger: cryptarchia_ledger::Ledger<HeaderId>,
+    pub consensus: cryptarchia_engine::Cryptarchia<HeaderId>,
 }
 
 impl Cryptarchia {
-    fn tip(&self) -> HeaderId {
+    pub fn tip(&self) -> HeaderId {
         self.consensus.tip()
     }
 
@@ -62,7 +63,7 @@ impl Cryptarchia {
         self.consensus.genesis()
     }
 
-    fn try_apply_header(&self, header: &Header) -> Result<Self, Error> {
+    pub fn try_apply_header(&self, header: &Header) -> Result<Self, Error> {
         let id = header.id();
         let parent = header.parent();
         let slot = header.slot();
@@ -81,7 +82,7 @@ impl Cryptarchia {
         Ok(Self { ledger, consensus })
     }
 
-    fn epoch_state_for_slot(&self, slot: Slot) -> Option<&cryptarchia_ledger::EpochState> {
+    pub fn epoch_state_for_slot(&self, slot: Slot) -> Option<&cryptarchia_ledger::EpochState> {
         let tip = self.tip();
         let state = self.ledger.state(&tip).expect("no state for tip");
         let requested_epoch = self.ledger.config().epoch(slot);

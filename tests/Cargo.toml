@@ -35,6 +35,8 @@ ntest = "0.9.0"
 criterion = { version = "0.5", features = ["async_tokio"] }
 nomos-cli = { path = "../nomos-cli" }
 time = "0.3"
+proptest = "1.4.0"
+proptest-state-machine = "0.3.0"
 
 [[test]]
 name = "test_cryptarchia_happy_path"
@@ -44,6 +46,9 @@ path = "src/tests/cryptarchia/happy.rs"
 name = "test_cli"
 path = "src/tests/cli.rs"
 
+[[test]]
+name = "fuzz_cryptarchia"
+path = "src/tests/cryptarchia/fuzz.rs"
 
 [features]
 mixnet = ["nomos-network/mixnet"]
