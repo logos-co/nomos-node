@@ -288,7 +288,7 @@ where
         let blob_selector = BS::new(blob_selector_settings);
 
         let mut incoming_blocks = adapter.blocks_stream().await;
-        let mut leader = leadership::Leader::new(coins, config);
+        let mut leader = leadership::Leader::new(genesis_id, coins, config);
         let timer = time::Timer::new(time);
 
         let mut slot_timer = IntervalStream::new(timer.slot_interval());
@@ -299,6 +299,7 @@ where
                     Some(block) = incoming_blocks.next() => {
                         cryptarchia = Self::process_block(
                             cryptarchia,
+                            &mut leader,
                             block,
                             storage_relay.clone(),
                             cl_mempool_relay.clone(),
@@ -317,7 +318,7 @@ where
                             tracing::error!("trying to propose a block for slot {} but epoch state is not available", u64::from(slot));
                             continue;
                         };
-                        if let Some(proof) = leader.build_proof_for(epoch_state, slot) {
+                        if let Some(proof) = leader.build_proof_for(epoch_state, slot, parent) {
                             tracing::debug!("proposing block...");
                             // TODO: spawn as a separate task?
                             let block = Self::propose_block(
@@ -458,10 +459,11 @@ where
     #[allow(clippy::type_complexity, clippy::too_many_arguments)]
     #[instrument(
         level = "debug",
-        skip(cryptarchia, storage_relay, cl_mempool_relay, da_mempool_relay)
+        skip(cryptarchia, storage_relay, cl_mempool_relay, da_mempool_relay, leader)
     )]
     async fn process_block(
         mut cryptarchia: Cryptarchia,
+        leader: &mut leadership::Leader,
         block: Block<ClPool::Item, DaPool::Item>,
         storage_relay: OutboundRelay<StorageMsg<Storage>>,
         cl_mempool_relay: OutboundRelay<MempoolMsg<HeaderId, ClPool::Item, ClPool::Key>>,
@@ -472,10 +474,13 @@ where
 
         // TODO: filter on time?
 
-        let header = block.header();
+        let header = block.header().cryptarchia();
         let id = header.id();
-        match cryptarchia.try_apply_header(block.header().cryptarchia()) {
+        match cryptarchia.try_apply_header(header) {
             Ok(new_state) => {
+                // update leader
+                leader.follow_chain(header.parent(), id, *header.leader_proof().commitment());
+
                 // remove included content from mempool
                 mark_in_block(
                     cl_mempool_relay,
