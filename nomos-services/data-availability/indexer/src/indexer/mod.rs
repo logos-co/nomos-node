@@ -1,4 +1,4 @@
-pub trait DaStorageBackend {
+pub trait DaIndexer {
     type Settings: Clone;
 
     type Blob;
