@@ -98,7 +98,7 @@ impl SpawnConfig {
         Self::Chain {
             consensus: ConsensusConfig {
                 n_participants,
-                // by setting the slot coeff to 1, we also increase the probability of multiple blocks (forks)
+                // by setting the active slot coeff close to 1, we also increase the probability of multiple blocks (forks)
                 // being produced in the same slot (epoch). Setting the security parameter to some value > 1
                 // ensures nodes have some time to sync before deciding on the longest chain.
                 security_param: 10,
