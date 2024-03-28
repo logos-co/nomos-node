@@ -4,11 +4,9 @@ use std::{
 };
 
 use crate::api::AxumBackend;
-use crate::DataAvailability;
 use crate::{Tx, Wire, MB16};
 use clap::{Parser, ValueEnum};
 use color_eyre::eyre::{eyre, Result};
-use hex::FromHex;
 use nomos_api::ApiService;
 use nomos_libp2p::{secp256k1::SecretKey, Multiaddr};
 use nomos_log::{Logger, LoggerBackend, LoggerFormat};
@@ -86,12 +84,6 @@ pub struct CryptarchiaArgs {
 }
 
 #[derive(Parser, Debug, Clone)]
-pub struct DaArgs {
-    #[clap(long = "da-voter", env = "DA_VOTER")]
-    da_voter: Option<String>,
-}
-
-#[derive(Parser, Debug, Clone)]
 pub struct MetricsArgs {
     #[clap(long = "with-metrics", env = "WITH_METRICS")]
     pub with_metrics: bool,
@@ -103,7 +95,6 @@ pub struct Config {
     pub network: <NetworkService<NetworkBackend> as ServiceData>::Settings,
     pub http: <ApiService<AxumBackend<Tx, Wire, MB16>> as ServiceData>::Settings,
     pub cryptarchia: <crate::Cryptarchia as ServiceData>::Settings,
-    pub da: <DataAvailability as ServiceData>::Settings,
 }
 
 impl Config {
@@ -213,17 +204,6 @@ impl Config {
 
         if let Some(duration) = slot_duration {
             self.cryptarchia.time.slot_duration = std::time::Duration::from_secs(duration);
-        }
-
-        Ok(self)
-    }
-
-    pub fn update_da(mut self, da_args: DaArgs) -> Result<Self> {
-        let DaArgs { da_voter } = da_args;
-
-        if let Some(voter) = da_voter {
-            let bytes = <[u8; 32]>::from_hex(voter)?;
-            self.da.da_protocol.voter = bytes;
         }
 
         Ok(self)

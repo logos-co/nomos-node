@@ -1,5 +1,5 @@
-pub mod nomos;
-pub use nomos::NomosNode;
+// pub mod nomos;
+// pub use nomos::NomosNode;
 
 use tempfile::TempDir;
 

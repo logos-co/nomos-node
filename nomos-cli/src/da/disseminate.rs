@@ -3,7 +3,7 @@ use clap::{Args, ValueEnum};
 use full_replication::{AbsoluteNumber, Attestation, Certificate, FullReplication, Voter};
 use futures::StreamExt;
 use hex::FromHex;
-use nomos_core::{da::DaProtocol, wire};
+use nomos_core::wire;
 use nomos_da::network::{adapters::libp2p::Libp2pAdapter as DaNetworkAdapter, NetworkAdapter};
 use nomos_log::Logger;
 use nomos_network::backends::libp2p::Libp2p as NetworkBackend;

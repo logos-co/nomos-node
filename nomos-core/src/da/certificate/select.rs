@@ -32,7 +32,7 @@ impl<const SIZE: usize, C: Certificate> BlobCertificateSelect for FillSize<SIZE,
         certificates: I,
     ) -> impl Iterator<Item = Self::Certificate> + 'i {
         utils::select::select_from_till_fill_size::<SIZE, Self::Certificate>(
-            |blob| blob.as_bytes().len(),
+            |blob| SIZE,
             certificates,
         )
     }
