@@ -48,9 +48,9 @@ pub enum Error {
     Consensus(#[from] cryptarchia_engine::Error<HeaderId>),
 }
 
-struct Cryptarchia {
-    ledger: cryptarchia_ledger::Ledger<HeaderId>,
-    consensus: cryptarchia_engine::Cryptarchia<HeaderId>,
+pub struct Cryptarchia {
+    pub ledger: cryptarchia_ledger::Ledger<HeaderId>,
+    pub consensus: cryptarchia_engine::Cryptarchia<HeaderId>,
 }
 
 impl Cryptarchia {
@@ -62,7 +62,7 @@ impl Cryptarchia {
         self.consensus.genesis()
     }
 
-    fn try_apply_header(&self, header: &Header) -> Result<Self, Error> {
+    pub fn try_apply_header(&self, header: &Header) -> Result<Self, Error> {
         let id = header.id();
         let parent = header.parent();
         let slot = header.slot();
