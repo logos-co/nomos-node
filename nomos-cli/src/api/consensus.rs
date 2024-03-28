@@ -1,26 +1,25 @@
 use super::CLIENT;
-use carnot_consensus::CarnotInfo;
-use carnot_engine::Block;
+use cryptarchia_consensus::CryptarchiaInfo;
 use nomos_core::header::HeaderId;
 use reqwest::Url;
 
-pub async fn carnot_info(node: &Url) -> Result<CarnotInfo, reqwest::Error> {
-    const NODE_CARNOT_INFO_PATH: &str = "carnot/info";
+pub async fn cryptarchia_info(node: &Url) -> Result<CryptarchiaInfo, reqwest::Error> {
+    const NODE_CRYPTARCHIA_INFO_PATH: &str = "cryptarchia/info";
     CLIENT
-        .get(node.join(NODE_CARNOT_INFO_PATH).unwrap())
+        .get(node.join(NODE_CRYPTARCHIA_INFO_PATH).unwrap())
         .send()
         .await?
-        .json::<CarnotInfo>()
+        .json::<CryptarchiaInfo>()
         .await
 }
 
-pub async fn get_blocks_info(
+pub async fn get_headers_info(
     node: &Url,
     from: Option<HeaderId>,
     to: Option<HeaderId>,
-) -> Result<Vec<Block<HeaderId>>, reqwest::Error> {
-    const NODE_CARNOT_INFO_PATH: &str = "carnot/blocks";
-    let mut req = CLIENT.get(node.join(NODE_CARNOT_INFO_PATH).unwrap());
+) -> Result<Vec<HeaderId>, reqwest::Error> {
+    const NODE_CRYPTARCHIA_HEADERS_PATH: &str = "cryptarchia/headers";
+    let mut req = CLIENT.get(node.join(NODE_CRYPTARCHIA_HEADERS_PATH).unwrap());
     if let Some(from) = from {
         req = req.query(&[("from", from)]);
     }

@@ -12,7 +12,6 @@ tracing = "0.1"
 tracing-subscriber = "0.3"
 async-trait = "0.1"
 clap = { version = "4", features = ["derive"] }
-carnot-engine = { path = "../consensus/carnot-engine" }
 serde_yaml = "0.9"
 futures = "0.3"
 tokio = { version = "1", features = ["sync"] }
@@ -22,7 +21,7 @@ nomos-network = { path = "../nomos-services/network", features = ["libp2p"] }
 nomos-da = { path = "../nomos-services/data-availability", features = [
   "libp2p",
 ] }
-carnot-consensus = { path = "../nomos-services/carnot-consensus" }
+cryptarchia-consensus = { path = "../nomos-services/cryptarchia-consensus" }
 nomos-log = { path = "../nomos-services/log" }
 nomos-libp2p = { path = "../nomos-libp2p" }
 nomos-core = { path = "../nomos-core" }

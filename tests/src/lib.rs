@@ -10,7 +10,8 @@ use std::time::Duration;
 use std::{fmt::Debug, sync::Mutex};
 
 //crates
-use fraction::{Fraction, One};
+use nomos_libp2p::{Multiaddr, Swarm};
+use nomos_node::Config;
 use rand::{thread_rng, Rng};
 
 static NET_PORT: Lazy<Mutex<u16>> = Lazy::new(|| Mutex::new(thread_rng().gen_range(8000..10000)));
@@ -38,8 +39,47 @@ pub fn adjust_timeout(d: Duration) -> Duration {
 #[async_trait::async_trait]
 pub trait Node: Sized {
     type ConsensusInfo: Debug + Clone + PartialEq;
-    async fn spawn_nodes(config: SpawnConfig) -> Vec<Self>;
-    fn node_configs(config: SpawnConfig) -> Vec<nomos_node::Config>;
+    async fn spawn(mut config: Config) -> Self;
+    async fn spawn_nodes(config: SpawnConfig) -> Vec<Self> {
+        let mut nodes = Vec::new();
+        for conf in Self::node_configs(config) {
+            nodes.push(Self::spawn(conf).await);
+        }
+        nodes
+    }
+    fn node_configs(config: SpawnConfig) -> Vec<Config> {
+        match config {
+            SpawnConfig::Star { consensus } => {
+                let mut configs = Self::create_node_configs(consensus);
+                let next_leader_config = configs.remove(0);
+                let first_node_addr = node_address(&next_leader_config);
+                let mut node_configs = vec![next_leader_config];
+                for mut conf in configs {
+                    conf.network
+                        .backend
+                        .initial_peers
+                        .push(first_node_addr.clone());
+
+                    node_configs.push(conf);
+                }
+                node_configs
+            }
+            SpawnConfig::Chain { consensus } => {
+                let mut configs = Self::create_node_configs(consensus);
+                let next_leader_config = configs.remove(0);
+                let mut prev_node_addr = node_address(&next_leader_config);
+                let mut node_configs = vec![next_leader_config];
+                for mut conf in configs {
+                    conf.network.backend.initial_peers.push(prev_node_addr);
+                    prev_node_addr = node_address(&conf);
+
+                    node_configs.push(conf);
+                }
+                node_configs
+            }
+        }
+    }
+    fn create_node_configs(consensus: ConsensusConfig) -> Vec<Config>;
     async fn consensus_info(&self) -> Self::ConsensusInfo;
     fn stop(&mut self);
 }
@@ -58,20 +98,41 @@ impl SpawnConfig {
         Self::Chain {
             consensus: ConsensusConfig {
                 n_participants,
-                // All nodes are expected to be responsive in happy-path tests.
-                threshold: Fraction::one(),
-                // Set the timeout conservatively
-                // since nodes should be spawned sequentially in the chain topology
-                // and it takes 1+ secs for each nomos-node to be started.
-                timeout: adjust_timeout(Duration::from_millis(n_participants as u64 * 2500)),
+                // by setting the active slot coeff close to 1, we also increase the probability of multiple blocks (forks)
+                // being produced in the same slot (epoch). Setting the security parameter to some value > 1
+                // ensures nodes have some time to sync before deciding on the longest chain.
+                security_param: 10,
+                // a block should be produced (on average) every slot
+                active_slot_coeff: 0.9,
+            },
+        }
+    }
+
+    pub fn star_happy(n_participants: usize) -> Self {
+        Self::Star {
+            consensus: ConsensusConfig {
+                n_participants,
+                // by setting the slot coeff to 1, we also increase the probability of multiple blocks (forks)
+                // being produced in the same slot (epoch). Setting the security parameter to some value > 1
+                // ensures nodes have some time to sync before deciding on the longest chain.
+                security_param: 10,
+                // a block should be produced (on average) every slot
+                active_slot_coeff: 0.9,
             },
         }
     }
 }
 
+fn node_address(config: &Config) -> Multiaddr {
+    Swarm::multiaddr(
+        std::net::Ipv4Addr::new(127, 0, 0, 1),
+        config.network.backend.inner.port,
+    )
+}
+
 #[derive(Clone)]
 pub struct ConsensusConfig {
     pub n_participants: usize,
-    pub threshold: Fraction,
-    pub timeout: Duration,
+    pub security_param: u32,
+    pub active_slot_coeff: f64,
 }

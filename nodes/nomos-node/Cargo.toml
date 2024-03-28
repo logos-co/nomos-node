@@ -29,18 +29,15 @@ nomos-mempool = { path = "../../nomos-services/mempool", features = [
 ] }
 nomos-metrics = { path = "../../nomos-services/metrics" }
 nomos-storage = { path = "../../nomos-services/storage", features = ["rocksdb"] }
-
-carnot-consensus = { path = "../../nomos-services/carnot-consensus", features = [
-  "libp2p",
-] }
-
+cryptarchia-consensus = { path = "../../nomos-services/cryptarchia-consensus", features = ["libp2p"] }
 nomos-libp2p = { path = "../../nomos-libp2p" }
 nomos-da = { path = "../../nomos-services/data-availability", features = [
   "libp2p",
 ] }
 nomos-system-sig = { path = "../../nomos-services/system-sig" }
 tracing-subscriber = "0.3"
-carnot-engine = { path = "../../consensus/carnot-engine" }
+cryptarchia-engine = { path = "../../consensus/cryptarchia-engine" }
+cryptarchia-ledger = { path = "../../ledger/cryptarchia-ledger" }
 tokio = { version = "1.24", features = ["sync"] }
 serde_json = "1.0"
 serde_yaml = "0.9"
@@ -54,8 +51,8 @@ utoipa-swagger-ui = { version = "4.0" }
 axum = { version = "0.6" }
 hyper = { version = "0.14", features = ["full"] }
 tower-http = { version = "0.4", features = ["cors", "trace"] }
+time = "0.3"
 
 [features]
-default = []
 mixnet = ["nomos-network/mixnet"]
 metrics = []

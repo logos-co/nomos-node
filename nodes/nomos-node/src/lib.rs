@@ -2,8 +2,6 @@ pub mod api;
 mod config;
 mod tx;
 
-use carnot_consensus::network::adapters::libp2p::Libp2pAdapter as ConsensusNetworkAdapter;
-use carnot_engine::overlay::{RandomBeaconState, RoundRobin, TreeOverlay};
 use color_eyre::eyre::Result;
 use full_replication::Certificate;
 use full_replication::{AbsoluteNumber, Attestation, Blob, FullReplication};
@@ -12,7 +10,7 @@ use metrics::{backend::map::MapMetricsBackend, types::MetricsData, MetricsServic
 
 use api::AxumBackend;
 use bytes::Bytes;
-use carnot_consensus::CarnotConsensus;
+pub use config::{Config, CryptarchiaArgs, DaArgs, HttpArgs, LogArgs, MetricsArgs, NetworkArgs};
 use nomos_api::ApiService;
 use nomos_core::{
     da::{blob, certificate},
@@ -38,10 +36,9 @@ use nomos_storage::{
     StorageService,
 };
 
-pub use config::{
-    Config, ConsensusArgs, DaArgs, HttpArgs, LogArgs, MetricsArgs, NetworkArgs, OverlayArgs,
-};
-use nomos_core::{
+#[cfg(feature = "carnot")]
+use carnot_engine::overlay::{RandomBeaconState, RoundRobin, TreeOverlay};
+pub use nomos_core::{
     da::certificate::select::FillSize as FillSizeWithBlobsCertificate,
     tx::select::FillSize as FillSizeWithTx,
 };
@@ -57,8 +54,8 @@ pub const CL_TOPIC: &str = "cl";
 pub const DA_TOPIC: &str = "da";
 const MB16: usize = 1024 * 1024 * 16;
 
-pub type Carnot = CarnotConsensus<
-    ConsensusNetworkAdapter,
+pub type Cryptarchia = cryptarchia_consensus::CryptarchiaConsensus<
+    cryptarchia_consensus::network::adapters::libp2p::LibP2pAdapter<Tx, Certificate>,
     MockPool<HeaderId, Tx, <Tx as Transaction>::Hash>,
     MempoolNetworkAdapter<Tx, <Tx as Transaction>::Hash>,
     MockPool<
@@ -70,7 +67,6 @@ pub type Carnot = CarnotConsensus<
         Certificate,
         <<Certificate as certificate::Certificate>::Blob as blob::Blob>::Hash,
     >,
-    TreeOverlay<RoundRobin, RandomBeaconState>,
     FillSizeWithTx<MB16, Tx>,
     FillSizeWithBlobsCertificate<MB16, Certificate>,
     RocksBackend<Wire>,
@@ -96,7 +92,7 @@ pub struct Nomos {
             CertDiscriminant,
         >,
     >,
-    consensus: ServiceHandle<Carnot>,
+    cryptarchia: ServiceHandle<Cryptarchia>,
     http: ServiceHandle<ApiService<AxumBackend<Tx, Wire, MB16>>>,
     da: ServiceHandle<DataAvailability>,
     storage: ServiceHandle<StorageService<RocksBackend<Wire>>>,

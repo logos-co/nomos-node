@@ -18,6 +18,7 @@ impl From<u32> for Value {
 
 // This implementatio is only a stub
 // see https://github.com/logos-co/nomos-specs/blob/master/cryptarchia/cryptarchia.py for a spec
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, PartialEq, Eq, Copy)]
 pub struct Coin {
     sk: SecretKey,
@@ -28,6 +29,10 @@ pub struct Coin {
 impl Coin {
     pub fn new(sk: SecretKey, nonce: Nonce, value: Value) -> Self {
         Self { sk, nonce, value }
+    }
+
+    pub fn value(&self) -> Value {
+        self.value
     }
 
     pub fn evolve(&self) -> Self {

@@ -4,7 +4,7 @@ mod time;
 
 use core::fmt::Debug;
 use cryptarchia_engine::Slot;
-use cryptarchia_ledger::{LeaderProof, LedgerState};
+use cryptarchia_ledger::{Coin, LeaderProof, LedgerState};
 use futures::StreamExt;
 use network::{messages::NetworkMessage, NetworkAdapter};
 use nomos_core::da::certificate::{BlobCertificateSelect, Certificate};
@@ -31,10 +31,14 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_with::serde_as;
 use std::hash::Hash;
 use thiserror::Error;
+pub use time::Config as TimeConfig;
 use tokio::sync::oneshot::Sender;
 use tokio::sync::{broadcast, oneshot};
 use tokio_stream::wrappers::IntervalStream;
 use tracing::{error, instrument};
+
+// Limit the number of blocks returned by GetHeaders
+const HEADERS_LIMIT: usize = 512;
 
 #[derive(Debug, Clone, Error)]
 pub enum Error {
@@ -52,6 +56,10 @@ struct Cryptarchia {
 impl Cryptarchia {
     fn tip(&self) -> HeaderId {
         self.consensus.tip()
+    }
+
+    fn genesis(&self) -> HeaderId {
+        self.consensus.genesis()
     }
 
     fn try_apply_header(&self, header: &Header) -> Result<Self, Error> {
@@ -95,7 +103,8 @@ pub struct CryptarchiaSettings<Ts, Bs> {
     pub blob_selector_settings: Bs,
     pub config: cryptarchia_ledger::Config,
     pub genesis_state: LedgerState,
-    pub time: time::Config,
+    pub time: TimeConfig,
+    pub coins: Vec<Coin>,
 }
 
 impl<Ts, Bs> CryptarchiaSettings<Ts, Bs> {
@@ -105,7 +114,8 @@ impl<Ts, Bs> CryptarchiaSettings<Ts, Bs> {
         blob_selector_settings: Bs,
         config: cryptarchia_ledger::Config,
         genesis_state: LedgerState,
-        time: time::Config,
+        time: TimeConfig,
+        coins: Vec<Coin>,
     ) -> Self {
         Self {
             transaction_selector_settings,
@@ -113,6 +123,7 @@ impl<Ts, Bs> CryptarchiaSettings<Ts, Bs> {
             config,
             genesis_state,
             time,
+            coins,
         }
     }
 }
@@ -257,6 +268,7 @@ where
             transaction_selector_settings,
             blob_selector_settings,
             time,
+            coins,
         } = self.service_state.settings_reader.get_updated_settings();
 
         let genesis_id = HeaderId::from([0; 32]);
@@ -276,7 +288,7 @@ where
         let blob_selector = BS::new(blob_selector_settings);
 
         let mut incoming_blocks = adapter.blocks_stream().await;
-        let mut leader = leadership::Leader::new(vec![], config);
+        let mut leader = leadership::Leader::new(genesis_id, coins, config);
         let timer = time::Timer::new(time);
 
         let mut slot_timer = IntervalStream::new(timer.slot_interval());
@@ -287,6 +299,7 @@ where
                     Some(block) = incoming_blocks.next() => {
                         cryptarchia = Self::process_block(
                             cryptarchia,
+                            &mut leader,
                             block,
                             storage_relay.clone(),
                             cl_mempool_relay.clone(),
@@ -299,12 +312,14 @@ where
                     _ = slot_timer.next() => {
                         let slot = timer.current_slot();
                         let parent = cryptarchia.tip();
+                        tracing::debug!("ticking for slot {}", u64::from(slot));
 
                         let Some(epoch_state) = cryptarchia.epoch_state_for_slot(slot) else {
                             tracing::error!("trying to propose a block for slot {} but epoch state is not available", u64::from(slot));
                             continue;
                         };
-                        if let Some(proof) = leader.build_proof_for(epoch_state, slot) {
+                        if let Some(proof) = leader.build_proof_for(epoch_state, slot, parent) {
+                            tracing::debug!("proposing block...");
                             // TODO: spawn as a separate task?
                             let block = Self::propose_block(
                                 parent,
@@ -316,7 +331,7 @@ where
                             ).await;
 
                             if let Some(block) = block {
-                                let _ = adapter.broadcast(NetworkMessage::Block(block)).await;
+                                adapter.broadcast(NetworkMessage::Block(block)).await;
                             }
                         }
                     }
@@ -395,6 +410,17 @@ where
             ConsensusMsg::Info { tx } => {
                 let info = CryptarchiaInfo {
                     tip: cryptarchia.tip(),
+                    slot: cryptarchia
+                        .ledger
+                        .state(&cryptarchia.tip())
+                        .expect("tip state not available")
+                        .slot(),
+                    height: cryptarchia
+                        .consensus
+                        .branches()
+                        .get(&cryptarchia.tip())
+                        .expect("tip branch not available")
+                        .length(),
                 };
                 tx.send(info).unwrap_or_else(|e| {
                     tracing::error!("Could not send consensus info through channel: {:?}", e)
@@ -405,16 +431,39 @@ where
                     tracing::error!("Could not subscribe to block subscription channel")
                 });
             }
+            ConsensusMsg::GetHeaders { from, to, tx } => {
+                // default to tip block if not present
+                let from = from.unwrap_or(cryptarchia.tip());
+                // default to genesis block if not present
+                let to = to.unwrap_or(cryptarchia.genesis());
+
+                let mut res = Vec::new();
+                let mut cur = from;
+
+                let branches = cryptarchia.consensus.branches();
+                while let Some(h) = branches.get(&cur) {
+                    res.push(h.id());
+                    // limit the response size
+                    if cur == to || cur == cryptarchia.genesis() || res.len() >= HEADERS_LIMIT {
+                        break;
+                    }
+                    cur = h.parent();
+                }
+
+                tx.send(res)
+                    .unwrap_or_else(|_| tracing::error!("could not send blocks through channel"));
+            }
         }
     }
 
     #[allow(clippy::type_complexity, clippy::too_many_arguments)]
     #[instrument(
         level = "debug",
-        skip(cryptarchia, storage_relay, cl_mempool_relay, da_mempool_relay)
+        skip(cryptarchia, storage_relay, cl_mempool_relay, da_mempool_relay, leader)
     )]
     async fn process_block(
         mut cryptarchia: Cryptarchia,
+        leader: &mut leadership::Leader,
         block: Block<ClPool::Item, DaPool::Item>,
         storage_relay: OutboundRelay<StorageMsg<Storage>>,
         cl_mempool_relay: OutboundRelay<MempoolMsg<HeaderId, ClPool::Item, ClPool::Key>>,
@@ -425,10 +474,13 @@ where
 
         // TODO: filter on time?
 
-        let header = block.header();
+        let header = block.header().cryptarchia();
         let id = header.id();
-        match cryptarchia.try_apply_header(block.header().cryptarchia()) {
+        match cryptarchia.try_apply_header(header) {
             Ok(new_state) => {
+                // update leader
+                leader.follow_chain(header.parent(), id, *header.leader_proof().commitment());
+
                 // remove included content from mempool
                 mark_in_block(
                     cl_mempool_relay,
@@ -487,6 +539,7 @@ where
                 else {
                     panic!("Proposal block should always succeed to be built")
                 };
+                tracing::debug!("proposed block with id {:?}", block.header().id());
                 output = Some(block);
             }
             (Err(_), _) => tracing::error!("Could not fetch block cl transactions"),
@@ -504,6 +557,11 @@ pub enum ConsensusMsg<Block> {
     BlockSubscribe {
         sender: oneshot::Sender<broadcast::Receiver<Block>>,
     },
+    GetHeaders {
+        from: Option<HeaderId>,
+        to: Option<HeaderId>,
+        tx: Sender<Vec<HeaderId>>,
+    },
 }
 
 impl<Block: 'static> RelayMessage for ConsensusMsg<Block> {}
@@ -513,6 +571,8 @@ impl<Block: 'static> RelayMessage for ConsensusMsg<Block> {}
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct CryptarchiaInfo {
     pub tip: HeaderId,
+    pub slot: Slot,
+    pub height: u64,
 }
 
 async fn get_mempool_contents<Item, Key>(

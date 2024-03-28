@@ -2,8 +2,8 @@ use full_replication::{Blob, Certificate};
 #[cfg(feature = "metrics")]
 use nomos_metrics::MetricsSettings;
 use nomos_node::{
-    Config, ConsensusArgs, DaArgs, HttpArgs, LogArgs, MetricsArgs, NetworkArgs, Nomos,
-    NomosServiceSettings, OverlayArgs, Tx,
+    Config, CryptarchiaArgs, DaArgs, HttpArgs, LogArgs, MetricsArgs, NetworkArgs, Nomos,
+    NomosServiceSettings, Tx,
 };
 
 use clap::Parser;
@@ -33,12 +33,8 @@ struct Args {
     /// Overrides http config.
     #[clap(flatten)]
     http_args: HttpArgs,
-    /// Overrides consensus config.
     #[clap(flatten)]
-    consensus_args: ConsensusArgs,
-    /// Overrides overlay config.
-    #[clap(flatten)]
-    overlay_args: OverlayArgs,
+    cryptarchia_args: CryptarchiaArgs,
     /// Overrides da config.
     #[clap(flatten)]
     da_args: DaArgs,
@@ -54,17 +50,15 @@ fn main() -> Result<()> {
         log_args,
         http_args,
         network_args,
-        consensus_args,
-        overlay_args,
+        cryptarchia_args,
         metrics_args,
     } = Args::parse();
     let config = serde_yaml::from_reader::<_, Config>(std::fs::File::open(config)?)?
         .update_da(da_args)?
         .update_log(log_args)?
         .update_http(http_args)?
-        .update_consensus(consensus_args)?
-        .update_overlay(overlay_args)?
-        .update_network(network_args)?;
+        .update_network(network_args)?
+        .update_cryptarchia_consensus(cryptarchia_args)?;
 
     let registry = cfg!(feature = "metrics")
         .then(|| {
@@ -95,7 +89,7 @@ fn main() -> Result<()> {
                 },
                 registry: registry.clone(),
             },
-            consensus: config.consensus,
+            cryptarchia: config.cryptarchia,
             #[cfg(feature = "metrics")]
             metrics: MetricsSettings { registry },
             da: config.da,

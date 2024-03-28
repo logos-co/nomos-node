@@ -30,6 +30,21 @@ pub struct Branch<Id> {
     length: u64,
 }
 
+impl<Id: Copy> Branch<Id> {
+    pub fn id(&self) -> Id {
+        self.id
+    }
+    pub fn parent(&self) -> Id {
+        self.parent
+    }
+    pub fn slot(&self) -> Slot {
+        self.slot
+    }
+    pub fn length(&self) -> u64 {
+        self.length
+    }
+}
+
 impl<Id> Branches<Id>
 where
     Id: Eq + std::hash::Hash + Copy,
