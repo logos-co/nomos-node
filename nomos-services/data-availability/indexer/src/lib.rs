@@ -23,6 +23,7 @@ use overwatch_rs::services::{ServiceCore, ServiceData, ServiceId};
 use overwatch_rs::DynError;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
+use storage::DaStorageAdapter;
 use tracing::error;
 
 pub type ConsensusRelay<A, ClPool, ClPoolAdapter, DaPool, DaPoolAdapter, TxS, BS, Storage> =
@@ -30,7 +31,7 @@ pub type ConsensusRelay<A, ClPool, ClPoolAdapter, DaPool, DaPoolAdapter, TxS, BS
 
 pub struct DataIndexerService<
     Indexer,
-    Storage,
+    DaStorage,
     A,
     ClPool,
     ClPoolAdapter,
@@ -55,19 +56,19 @@ pub struct DataIndexerService<
     A::Backend: 'static,
     TxS: TxSelect<Tx = ClPool::Item>,
     BS: BlobCertificateSelect<Certificate = DaPool::Item>,
-    Storage: StorageBackend + Send + Sync + 'static,
+    DaStorage: DaStorageAdapter,
     ConsensusStorage: StorageBackend + Send + Sync + 'static,
 {
     service_state: ServiceStateHandle<Self>,
     indexer: Indexer,
-    storage_relay: Relay<StorageService<Storage>>,
+    storage_relay: Relay<StorageService<DaStorage::Backend>>,
     consensus_relay:
         ConsensusRelay<A, ClPool, ClPoolAdapter, DaPool, DaPoolAdapter, TxS, BS, ConsensusStorage>,
 }
 
 impl<
         Indexer,
-        Storage,
+        DaStorage,
         A,
         ClPool,
         ClPoolAdapter,
@@ -79,7 +80,7 @@ impl<
     >
     DataIndexerService<
         Indexer,
-        Storage,
+        DaStorage,
         A,
         ClPool,
         ClPoolAdapter,
@@ -105,22 +106,17 @@ where
     A::Backend: 'static,
     TxS: TxSelect<Tx = ClPool::Item>,
     BS: BlobCertificateSelect<Certificate = DaPool::Item>,
-    Storage: StorageBackend + Send + Sync + 'static,
+    DaStorage: DaStorageAdapter,
     ConsensusStorage: StorageBackend + Send + Sync + 'static,
 {
 }
 
 pub enum DaMsg<B, V> {
-    // Index blob to indexed application data.
-    //
-    // TODO: naming - Store is used by the verifier and the indexer services. Verifier adds
-    // verified blobs, indexer tracks the blockchain and promotes blobs to be available via the
-    // api.
     AddIndex {
         vid: V,
     },
     GetRange {
-        ids: Box<dyn Iterator<Item = B> + Send>,
+        ids: Box<dyn Iterator<Item = V> + Send>,
         reply_channel: Sender<Vec<B>>,
     },
 }
@@ -142,7 +138,7 @@ impl<B: 'static, V: 'static> RelayMessage for DaMsg<B, V> {}
 
 impl<
         Indexer,
-        Storage,
+        DaStorage,
         A,
         ClPool,
         ClPoolAdapter,
@@ -154,7 +150,7 @@ impl<
     > ServiceData
     for DataIndexerService<
         Indexer,
-        Storage,
+        DaStorage,
         A,
         ClPool,
         ClPoolAdapter,
@@ -180,7 +176,7 @@ where
     A::Backend: 'static,
     TxS: TxSelect<Tx = ClPool::Item>,
     BS: BlobCertificateSelect<Certificate = DaPool::Item>,
-    Storage: StorageBackend + Send + Sync + 'static,
+    DaStorage: DaStorageAdapter,
     ConsensusStorage: StorageBackend + Send + Sync + 'static,
 {
     const SERVICE_ID: ServiceId = "DaStorage";
@@ -192,7 +188,7 @@ where
 
 impl<
         Indexer,
-        Storage,
+        DaStorage,
         A,
         ClPool,
         ClPoolAdapter,
@@ -204,7 +200,7 @@ impl<
     >
     DataIndexerService<
         Indexer,
-        Storage,
+        DaStorage,
         A,
         ClPool,
         ClPoolAdapter,
@@ -230,7 +226,7 @@ where
     A::Backend: 'static,
     TxS: TxSelect<Tx = ClPool::Item>,
     BS: BlobCertificateSelect<Certificate = DaPool::Item>,
-    Storage: StorageBackend + Send + Sync + 'static,
+    DaStorage: DaStorageAdapter,
     ConsensusStorage: StorageBackend + Send + Sync + 'static,
 {
     async fn handle_da_msg(
@@ -267,7 +263,7 @@ where
 #[async_trait::async_trait]
 impl<
         Indexer,
-        Storage,
+        DaStorage,
         A,
         ClPool,
         ClPoolAdapter,
@@ -279,7 +275,7 @@ impl<
     > ServiceCore
     for DataIndexerService<
         Indexer,
-        Storage,
+        DaStorage,
         A,
         ClPool,
         ClPoolAdapter,
@@ -325,7 +321,7 @@ where
     A::Backend: 'static,
     TxS: TxSelect<Tx = ClPool::Item>,
     BS: BlobCertificateSelect<Certificate = DaPool::Item>,
-    Storage: StorageBackend + Send + Sync + 'static,
+    DaStorage: DaStorageAdapter + Send,
     ConsensusStorage: StorageBackend + Send + Sync + 'static,
 {
     fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, DynError> {
@@ -357,6 +353,8 @@ where
             .await
             .expect("Relay connection with NetworkService should succeed");
 
+        let storage_adapter = DaStorage::new(storage_relay);
+
         let mut lifecycle_stream = service_state.lifecycle_handle.message_stream();
         loop {
             tokio::select! {
@@ -364,7 +362,9 @@ where
                     todo!()
                 }
                 Some(msg) = lifecycle_stream.next() => {
-                    todo!()
+                    if Self::should_stop_service(msg).await {
+                        break;
+                    }
                 }
             }
         }
