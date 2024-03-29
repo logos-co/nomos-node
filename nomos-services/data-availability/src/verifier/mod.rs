@@ -2,11 +2,11 @@ mod backend;
 mod network;
 
 // std
-
-// crates
-
 use std::error::Error;
 use std::fmt::Debug;
+// crates
+use tokio_stream::StreamExt;
+use tracing::error;
 // internal
 use crate::verifier::backend::VerifierBackend;
 use crate::verifier::network::NetworkAdapter;
@@ -17,8 +17,6 @@ use overwatch_rs::services::relay::{NoMessage, Relay};
 use overwatch_rs::services::state::{NoOperator, NoState};
 use overwatch_rs::services::{ServiceCore, ServiceData, ServiceId};
 use overwatch_rs::DynError;
-use tokio_stream::StreamExt;
-use tracing::error;
 
 pub struct DaVerifierService<Backend, N>
 where
@@ -73,8 +71,11 @@ where
             verifier: Backend::new(verifier_settings),
         })
     }
-
     async fn run(self) -> Result<(), DynError> {
+        // This service will likely have to be modified later on.
+        // Most probably the verifier itself need to be constructed/update for every message with
+        // an updated list of the available nodes list, as it needs his own index coming from the
+        // position of his bls public key landing in the above-mentioned list.
         let Self {
             network_relay,
             service_state,
@@ -88,11 +89,13 @@ where
         let adapter = N::new(network_adapter_settings, network_relay).await;
         let mut blob_stream = adapter.blob_stream().await;
         while let Some((blob, reply_channel)) = blob_stream.next().await {
+            // TODO: Verify if blob was already processed
             match verifier.verify(&blob) {
                 Ok(attestation) => {
                     if let Err(attestation) = reply_channel.send(attestation) {
                         error!("Error replying attestation {:?}", attestation);
                     }
+                    // TODO: Send blob to storage
                 }
                 Err(e) => {
                     error!("Received unverified blob {:?}", blob);
