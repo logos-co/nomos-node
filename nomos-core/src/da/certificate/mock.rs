@@ -64,4 +64,8 @@ impl Certificate for MockCertificate {
     fn verify(&self, _: Self::VerificationParameters) -> bool {
         todo!()
     }
+
+    fn size(&self) -> usize {
+        todo!()
+    }
 }

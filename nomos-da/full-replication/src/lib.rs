@@ -150,6 +150,13 @@ impl certificate::Certificate for Certificate {
     fn verify(&self, params: Self::VerificationParameters) -> bool {
         self.attestations.len() >= params.threshold
     }
+
+    fn size(&self) -> usize {
+        self.attestations
+            .iter()
+            .map(|_| std::mem::size_of::<[u8; 32]>() * 2)
+            .sum()
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
