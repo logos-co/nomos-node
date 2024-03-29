@@ -2,7 +2,6 @@ mod backend;
 mod network;
 
 // std
-use std::error::Error;
 use std::fmt::Debug;
 // crates
 use tokio_stream::StreamExt;
@@ -10,7 +9,6 @@ use tracing::error;
 // internal
 use crate::verifier::backend::VerifierBackend;
 use crate::verifier::network::NetworkAdapter;
-use nomos_core::da::DaVerifier;
 use nomos_network::NetworkService;
 use overwatch_rs::services::handle::ServiceStateHandle;
 use overwatch_rs::services::relay::{NoMessage, Relay};
@@ -98,7 +96,7 @@ where
                     // TODO: Send blob to storage
                 }
                 Err(e) => {
-                    error!("Received unverified blob {:?}", blob);
+                    error!("Received unverified blob {blob:?} due to {e:?}");
                 }
             }
         }

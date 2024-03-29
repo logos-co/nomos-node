@@ -21,6 +21,7 @@ impl<const SIZE: usize, B> FillSize<SIZE, B> {
 
 impl<const SIZE: usize, C: VidCertificate> BlobCertificateSelect for FillSize<SIZE, C> {
     type Certificate = C;
+
     type Settings = ();
 
     fn new(_settings: Self::Settings) -> Self {
@@ -31,6 +32,9 @@ impl<const SIZE: usize, C: VidCertificate> BlobCertificateSelect for FillSize<SI
         &self,
         certificates: I,
     ) -> impl Iterator<Item = Self::Certificate> + 'i {
-        utils::select::select_from_till_fill_size::<SIZE, Self::Certificate>(|_| SIZE, certificates)
+        utils::select::select_from_till_fill_size::<SIZE, Self::Certificate>(
+            |c| c.size(),
+            certificates,
+        )
     }
 }
