@@ -1,0 +1,18 @@
+[package]
+name = "kzgrs"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+ark-bls12-381 = { version = "0.4.0" }
+ark-bls12-381-ext = "0.4.1"
+ark-ff = { version = "0.4.2" }
+ark-poly = "0.4.2"
+ark-poly-commit = "0.4.0"
+ark-serialize = { version = "0.4" }
+thiserror = "1.0.58"
+
+[dev-dependencies]
+rand = "0.8.5"
