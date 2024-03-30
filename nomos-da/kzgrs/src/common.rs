@@ -23,20 +23,12 @@ pub enum KzgRsError {
     ChunkSizeTooBig(usize),
 }
 
-fn bytes_to_polynomial<const CHUNK_SIZE: usize>(
+fn bytes_to_evaluations<const CHUNK_SIZE: usize>(
     data: &[u8],
     domain: GeneralEvaluationDomain<Fr>,
-) -> Result<DensePolynomial<Fr>, KzgRsError> {
-    if CHUNK_SIZE >= 32 {
-        return Err(KzgRsError::ChunkSizeTooBig(CHUNK_SIZE));
-    }
-    if data.len() % CHUNK_SIZE != 0 {
-        return Err(KzgRsError::UnpaddedDataError {
-            expected_modulus: CHUNK_SIZE,
-            current_size: data.len(),
-        });
-    }
-    let coefficients = Evaluations::from_vec_and_domain(
+) -> Evaluations<Fr> {
+    assert!((data.len() % CHUNK_SIZE).is_zero());
+    Evaluations::from_vec_and_domain(
         data.chunks(CHUNK_SIZE)
             .map(|e| {
                 let mut buff = [0u8; 32];
@@ -49,13 +41,24 @@ fn bytes_to_polynomial<const CHUNK_SIZE: usize>(
             .collect(),
         domain,
     )
-    .interpolate()
-    .coeffs
-    .into_iter()
-    .take(data.len() / CHUNK_SIZE);
-    Ok(DensePolynomial::from_coefficients_vec(
-        coefficients.collect(),
-    ))
+}
+
+pub fn bytes_to_polynomial<const CHUNK_SIZE: usize>(
+    data: &[u8],
+    domain: GeneralEvaluationDomain<Fr>,
+) -> Result<DensePolynomial<Fr>, KzgRsError> {
+    if CHUNK_SIZE >= 32 {
+        return Err(KzgRsError::ChunkSizeTooBig(CHUNK_SIZE));
+    }
+    if data.len() % CHUNK_SIZE != 0 {
+        return Err(KzgRsError::UnpaddedDataError {
+            expected_modulus: CHUNK_SIZE,
+            current_size: data.len(),
+        });
+    }
+    let evals = bytes_to_evaluations::<CHUNK_SIZE>(data, domain);
+    let coefficients = evals.interpolate();
+    Ok(coefficients)
 }
 
 #[cfg(test)]
@@ -78,7 +81,6 @@ mod test {
         let mut rng = thread_rng();
         bytes.try_fill(&mut rng).unwrap();
         let poly = bytes_to_polynomial::<31>(&bytes, *DOMAIN).unwrap();
-        assert_eq!(poly.degree(), N - 1);
         for (i, e) in (0..100).map(|i| 2u32.pow(i)).enumerate() {
             let eval_point = Fr::from(e);
             let point = poly.evaluate(&eval_point);
