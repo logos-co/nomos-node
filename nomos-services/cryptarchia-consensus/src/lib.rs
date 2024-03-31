@@ -503,7 +503,8 @@ where
 
                 cryptarchia = new_state;
             }
-            Err(Error::Consensus(cryptarchia_engine::Error::ParentMissing(parent))) => {
+            Err(Error::Ledger(cryptarchia_ledger::LedgerError::ParentNotFound(parent)))
+            | Err(Error::Consensus(cryptarchia_engine::Error::ParentMissing(parent))) => {
                 tracing::debug!("missing parent {:?}", parent);
                 // TODO: request parent block
             }
