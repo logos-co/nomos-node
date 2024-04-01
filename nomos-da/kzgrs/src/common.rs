@@ -4,12 +4,14 @@ use std::thread::current;
 // crates
 use ark_bls12_381::{fr::Fr, Bls12_381};
 use ark_ec::pairing::Pairing;
-use ark_ff::{BigInteger256, FftField, Zero};
+use ark_ff::{BigInteger, BigInteger256, FftField, Zero};
 use ark_poly::domain::general::GeneralEvaluationDomain;
 use ark_poly::evaluations::univariate::Evaluations;
 use ark_poly::univariate::DensePolynomial;
 use ark_poly::{DenseUVPolynomial, EvaluationDomain, Polynomial};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
+use num_bigint;
+use num_traits::ops::bytes::FromBytes;
 use thiserror::Error;
 // internal
 
@@ -32,10 +34,11 @@ fn bytes_to_evaluations<const CHUNK_SIZE: usize>(
     Evaluations::from_vec_and_domain(
         data.chunks(CHUNK_SIZE)
             .map(|e| {
-                let mut buff = [0u8; 32];
-                buff[0..31].copy_from_slice(e);
-                let bint = BigInteger256::deserialize_uncompressed(BufReader::new(buff.as_slice()))
-                    .unwrap();
+                // use little endian for convenience as shortening 1 byte (<32 supported)
+                // do not matter in this endianness
+                let bint: BigInteger256 = num_bigint::BigUint::from_le_bytes(e)
+                    .try_into()
+                    .expect("Bytes size should fit for an 256 bits integer");
                 Fr::new(bint)
             })
             .collect(),
@@ -85,10 +88,16 @@ mod test {
         bytes.try_fill(&mut rng).unwrap();
         let evals = bytes_to_evaluations::<31>(&bytes, *DOMAIN);
         let poly = bytes_to_polynomial::<31>(&bytes, *DOMAIN).unwrap();
-        for i in (0..32) {
+        for i in (0..100) {
             let eval_point = DOMAIN.element(i);
             let point = poly.evaluate(&eval_point);
+            // check point is the same
             assert_eq!(evals[i as usize], point);
+            // check point bytes are the same
+            assert_eq!(
+                &bytes[CHUNK_SIZE * i..CHUNK_SIZE * i + CHUNK_SIZE],
+                &point.into_bigint().to_bytes_le()[..CHUNK_SIZE]
+            )
         }
     }
 
