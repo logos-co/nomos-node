@@ -1,15 +1,10 @@
 // std
-use std::io::{BufReader, Cursor};
-use std::thread::current;
 // crates
-use ark_bls12_381::{fr::Fr, Bls12_381};
-use ark_ec::pairing::Pairing;
-use ark_ff::{BigInteger, BigInteger256, FftField, Zero};
+use ark_bls12_381::fr::Fr;
+use ark_ff::{BigInteger256, Zero};
 use ark_poly::domain::general::GeneralEvaluationDomain;
 use ark_poly::evaluations::univariate::Evaluations;
 use ark_poly::univariate::DensePolynomial;
-use ark_poly::{DenseUVPolynomial, EvaluationDomain, Polynomial};
-use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use num_bigint;
 use num_traits::ops::bytes::FromBytes;
 use thiserror::Error;
@@ -68,14 +63,10 @@ pub fn bytes_to_polynomial<const CHUNK_SIZE: usize>(
 mod test {
     use super::{bytes_to_evaluations, bytes_to_polynomial, KzgRsError};
     use ark_bls12_381::fr::Fr;
-    use ark_ec::pairing::Pairing;
-    use ark_ff::{BigInteger, FftField, PrimeField};
+    use ark_ff::{BigInteger, PrimeField};
     use ark_poly::{EvaluationDomain, GeneralEvaluationDomain, Polynomial};
-    use ark_serialize::CanonicalSerialize;
     use once_cell::sync::Lazy;
     use rand::{thread_rng, Fill};
-    use std::io::{BufWriter, Cursor};
-    use std::ops::Deref;
 
     const CHUNK_SIZE: usize = 31;
     static DOMAIN: Lazy<GeneralEvaluationDomain<Fr>> =
@@ -88,7 +79,7 @@ mod test {
         bytes.try_fill(&mut rng).unwrap();
         let evals = bytes_to_evaluations::<31>(&bytes, *DOMAIN);
         let poly = bytes_to_polynomial::<31>(&bytes, *DOMAIN).unwrap();
-        for i in (0..100) {
+        for i in 0..100 {
             let eval_point = DOMAIN.element(i);
             let point = poly.evaluate(&eval_point);
             // check point is the same
