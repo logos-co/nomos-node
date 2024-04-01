@@ -17,7 +17,7 @@ pub fn commit_polynomial(
 }
 
 /// Compute a witness polynomial in that satisfies `witness(x) = (f(x)-v)/(x-u)`
-fn generate_element_proof(
+pub fn generate_element_proof(
     element_index: usize,
     polynomial: &DensePolynomial<Fr>,
     roots_of_unity: &Powers<Bls12_381>,
@@ -34,6 +34,16 @@ fn generate_element_proof(
         random_v: None,
     };
     Ok(proof)
+}
+
+pub fn verify_element_proof(
+    element: &Fr,
+    commitment: &Commitment<Bls12_381>,
+    proof: &Proof<Bls12_381>,
+    element_index: usize,
+    roots_of_unity: &Powers<Fr>,
+) -> bool {
+    todo!()
 }
 
 #[cfg(test)]
