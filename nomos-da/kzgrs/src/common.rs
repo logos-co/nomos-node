@@ -19,6 +19,8 @@ pub enum KzgRsError {
     },
     #[error("ChunkSize should be < 32 (bytes), got {0}")]
     ChunkSizeTooBig(usize),
+    #[error(transparent)]
+    PolyCommitError(#[from] ark_poly_commit::Error),
 }
 
 /// Transform chunks of bytes (of size `CHUNK_SIZE`) into `Fr` which are considered evaluations of a
