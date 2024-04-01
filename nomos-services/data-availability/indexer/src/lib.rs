@@ -1,3 +1,4 @@
+pub mod consensus;
 pub mod indexer;
 pub mod storage;
 
@@ -5,6 +6,7 @@ use std::fmt::{Debug, Formatter};
 use std::hash::Hash;
 use std::sync::mpsc::Sender;
 
+use consensus::ConsensusAdapter;
 use cryptarchia_consensus::network::NetworkAdapter;
 use cryptarchia_consensus::CryptarchiaConsensus;
 use futures::StreamExt;
@@ -32,6 +34,7 @@ pub type ConsensusRelay<A, ClPool, ClPoolAdapter, DaPool, DaPoolAdapter, TxS, BS
 pub struct DataIndexerService<
     Indexer,
     DaStorage,
+    Consensus,
     A,
     ClPool,
     ClPoolAdapter,
@@ -69,6 +72,7 @@ pub struct DataIndexerService<
 impl<
         Indexer,
         DaStorage,
+        Consensus,
         A,
         ClPool,
         ClPoolAdapter,
@@ -81,6 +85,7 @@ impl<
     DataIndexerService<
         Indexer,
         DaStorage,
+        Consensus,
         A,
         ClPool,
         ClPoolAdapter,
@@ -139,6 +144,7 @@ impl<B: 'static, V: 'static> RelayMessage for DaMsg<B, V> {}
 impl<
         Indexer,
         DaStorage,
+        Consensus,
         A,
         ClPool,
         ClPoolAdapter,
@@ -151,6 +157,7 @@ impl<
     for DataIndexerService<
         Indexer,
         DaStorage,
+        Consensus,
         A,
         ClPool,
         ClPoolAdapter,
@@ -189,6 +196,7 @@ where
 impl<
         Indexer,
         DaStorage,
+        Consensus,
         A,
         ClPool,
         ClPoolAdapter,
@@ -201,6 +209,7 @@ impl<
     DataIndexerService<
         Indexer,
         DaStorage,
+        Consensus,
         A,
         ClPool,
         ClPoolAdapter,
@@ -264,6 +273,7 @@ where
 impl<
         Indexer,
         DaStorage,
+        Consensus,
         A,
         ClPool,
         ClPoolAdapter,
@@ -276,6 +286,7 @@ impl<
     for DataIndexerService<
         Indexer,
         DaStorage,
+        Consensus,
         A,
         ClPool,
         ClPoolAdapter,
@@ -323,6 +334,7 @@ where
     BS: BlobCertificateSelect<Certificate = DaPool::Item>,
     DaStorage: DaStorageAdapter + Send,
     ConsensusStorage: StorageBackend + Send + Sync + 'static,
+    Consensus: ConsensusAdapter<Tx = ClPool::Item, Cert = DaPool::Item> + Send,
 {
     fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, DynError> {
         let settings = service_state.settings_reader.get_updated_settings();
@@ -353,7 +365,8 @@ where
             .await
             .expect("Relay connection with NetworkService should succeed");
 
-        let storage_adapter = DaStorage::new(storage_relay);
+        let consensus_adapter = Consensus::new(consensus_relay).await;
+        let storage_adapter = DaStorage::new(storage_relay).await;
 
         let mut lifecycle_stream = service_state.lifecycle_handle.message_stream();
         loop {

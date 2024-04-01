@@ -8,7 +8,7 @@ pub trait DaStorageAdapter {
     type Blob;
     type VID;
 
-    fn new(
+    async fn new(
         storage_relay: OutboundRelay<<StorageService<Self::Backend> as ServiceData>::Message>,
     ) -> Self;
 
