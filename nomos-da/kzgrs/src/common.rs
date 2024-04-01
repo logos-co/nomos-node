@@ -1,5 +1,6 @@
 // std
-use std::io::BufReader;
+use std::io::{BufReader, Cursor};
+use std::thread::current;
 // crates
 use ark_bls12_381::{fr::Fr, Bls12_381};
 use ark_ec::pairing::Pairing;
@@ -8,7 +9,7 @@ use ark_poly::domain::general::GeneralEvaluationDomain;
 use ark_poly::evaluations::univariate::Evaluations;
 use ark_poly::univariate::DensePolynomial;
 use ark_poly::{DenseUVPolynomial, EvaluationDomain, Polynomial};
-use ark_serialize::CanonicalDeserialize;
+use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use thiserror::Error;
 // internal
 
@@ -33,10 +34,9 @@ fn bytes_to_evaluations<const CHUNK_SIZE: usize>(
             .map(|e| {
                 let mut buff = [0u8; 32];
                 buff[0..31].copy_from_slice(e);
-                Fr::new_unchecked(
-                    BigInteger256::deserialize_uncompressed(BufReader::new(buff.as_slice()))
-                        .unwrap(),
-                )
+                let bint = BigInteger256::deserialize_uncompressed(BufReader::new(buff.as_slice()))
+                    .unwrap();
+                Fr::new(bint)
             })
             .collect(),
         domain,
@@ -63,13 +63,16 @@ pub fn bytes_to_polynomial<const CHUNK_SIZE: usize>(
 
 #[cfg(test)]
 mod test {
-    use super::{bytes_to_polynomial, KzgRsError};
+    use super::{bytes_to_evaluations, bytes_to_polynomial, KzgRsError};
     use ark_bls12_381::fr::Fr;
     use ark_ec::pairing::Pairing;
-    use ark_ff::{BigInteger, PrimeField};
+    use ark_ff::{BigInteger, FftField, PrimeField};
     use ark_poly::{EvaluationDomain, GeneralEvaluationDomain, Polynomial};
+    use ark_serialize::CanonicalSerialize;
     use once_cell::sync::Lazy;
     use rand::{thread_rng, Fill};
+    use std::io::{BufWriter, Cursor};
+    use std::ops::Deref;
 
     const CHUNK_SIZE: usize = 31;
     static DOMAIN: Lazy<GeneralEvaluationDomain<Fr>> =
@@ -80,15 +83,12 @@ mod test {
         let mut bytes: [u8; CHUNK_SIZE * N] = [0; CHUNK_SIZE * N];
         let mut rng = thread_rng();
         bytes.try_fill(&mut rng).unwrap();
+        let evals = bytes_to_evaluations::<31>(&bytes, *DOMAIN);
         let poly = bytes_to_polynomial::<31>(&bytes, *DOMAIN).unwrap();
-        for (i, e) in (0..100).map(|i| 2u32.pow(i)).enumerate() {
-            let eval_point = Fr::from(e);
+        for i in (0..32) {
+            let eval_point = DOMAIN.element(i);
             let point = poly.evaluate(&eval_point);
-            let bint = point.into_bigint();
-            assert_eq!(
-                &bytes[CHUNK_SIZE * i..CHUNK_SIZE * i + CHUNK_SIZE],
-                &bint.to_bytes_be()
-            )
+            assert_eq!(evals[i as usize], point);
         }
     }
 
