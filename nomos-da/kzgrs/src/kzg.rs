@@ -5,15 +5,20 @@ use ark_poly::univariate::DensePolynomial;
 use ark_poly::{DenseUVPolynomial, EvaluationDomain, GeneralEvaluationDomain, Polynomial};
 use ark_poly_commit::kzg10::{Commitment, Powers, Proof, UniversalParams, KZG10};
 use num_traits::One;
+use std::borrow::Cow;
 use std::ops::{Mul, Neg};
 
 /// Commit to a polynomial where each of the evaluations are over `w(i)` for the degree
 /// of the polynomial being omega (`w`) the root of unity (2^x).
 pub fn commit_polynomial(
     polynomial: &DensePolynomial<Fr>,
-    roots_of_unity: &Powers<Bls12_381>,
+    global_parameters: &UniversalParams<Bls12_381>,
 ) -> Result<Commitment<Bls12_381>, KzgRsError> {
-    KZG10::commit(roots_of_unity, polynomial, None, None)
+    let roots_of_unity = Powers {
+        powers_of_g: Cow::Borrowed(&global_parameters.powers_of_g),
+        powers_of_gamma_g: Cow::Owned(vec![]),
+    };
+    KZG10::commit(&roots_of_unity, polynomial, None, None)
         .map_err(KzgRsError::PolyCommitError)
         .map(|(commitment, _)| commitment)
 }
@@ -22,7 +27,7 @@ pub fn commit_polynomial(
 pub fn generate_element_proof(
     element_index: usize,
     polynomial: &DensePolynomial<Fr>,
-    roots_of_unity: &Powers<Bls12_381>,
+    global_parameters: &UniversalParams<Bls12_381>,
     domain: &GeneralEvaluationDomain<Fr>,
 ) -> Result<Proof<Bls12_381>, KzgRsError> {
     let u = domain.element(element_index);
@@ -30,7 +35,7 @@ pub fn generate_element_proof(
     let f_x_v = polynomial + &DensePolynomial::<Fr>::from_coefficients_vec(vec![-v]);
     let x_u = DensePolynomial::<Fr>::from_coefficients_vec(vec![-u, Fr::one()]);
     let witness_polynomial: DensePolynomial<_> = &f_x_v / &x_u;
-    let proof = commit_polynomial(&witness_polynomial, roots_of_unity)?;
+    let proof = commit_polynomial(&witness_polynomial, global_parameters)?;
     let proof = Proof {
         w: proof.0,
         random_v: None,
@@ -38,6 +43,7 @@ pub fn generate_element_proof(
     Ok(proof)
 }
 
+/// Verify proof for a single element
 pub fn verify_element_proof(
     element_index: usize,
     element: &Fr,
@@ -57,31 +63,69 @@ pub fn verify_element_proof(
 
 #[cfg(test)]
 mod test {
-    use crate::kzg::commit_polynomial;
+    use crate::common::{bytes_to_evaluations, bytes_to_polynomial};
+    use crate::kzg::{commit_polynomial, generate_element_proof, verify_element_proof};
     use ark_bls12_381::{Bls12_381, Fr};
     use ark_poly::univariate::DensePolynomial;
-    use ark_poly::DenseUVPolynomial;
-    use ark_poly_commit::kzg10::{Powers, KZG10};
-    use std::borrow::Cow;
+    use ark_poly::{DenseUVPolynomial, EvaluationDomain, GeneralEvaluationDomain};
+    use ark_poly_commit::kzg10::{UniversalParams, KZG10};
+    use once_cell::sync::Lazy;
+    use rand::{thread_rng, Fill};
 
+    const COEFFICIENTS_SIZE: usize = 16;
+    static GLOBAL_PARAMETERS: Lazy<UniversalParams<Bls12_381>> = Lazy::new(|| {
+        let mut rng = rand::thread_rng();
+        KZG10::<Bls12_381, DensePolynomial<Fr>>::setup(
+            crate::kzg::test::COEFFICIENTS_SIZE - 1,
+            true,
+            &mut rng,
+        )
+        .unwrap()
+    });
+
+    static DOMAIN: Lazy<GeneralEvaluationDomain<Fr>> =
+        Lazy::new(|| GeneralEvaluationDomain::new(COEFFICIENTS_SIZE).unwrap());
     #[test]
     fn test_poly_commit() {
-        const COEFFICIENTS_SIZE: usize = 10;
-        let mut rng = rand::thread_rng();
-        let trusted_setup =
-            KZG10::<Bls12_381, DensePolynomial<Fr>>::setup(COEFFICIENTS_SIZE - 1, true, &mut rng)
-                .unwrap();
-
-        let roots_of_unity = Powers {
-            powers_of_g: Cow::Borrowed(&trusted_setup.powers_of_g),
-            powers_of_gamma_g: Cow::Owned(
-                (0..COEFFICIENTS_SIZE)
-                    .map(|i| trusted_setup.powers_of_gamma_g[&i])
-                    .collect(),
-            ),
-        };
-
         let poly = DensePolynomial::from_coefficients_vec((0..10).map(|i| Fr::from(i)).collect());
-        let _ = commit_polynomial(&poly, &roots_of_unity).unwrap();
+        assert!(matches!(
+            commit_polynomial(&poly, &GLOBAL_PARAMETERS),
+            Ok(_)
+        ));
+    }
+
+    #[test]
+    fn generate_proof_and_validate() {
+        let mut bytes: [u8; 310] = [0; 310];
+        let mut rng = thread_rng();
+        bytes.try_fill(&mut rng).unwrap();
+        let evaluations = bytes_to_evaluations::<31>(&bytes, *DOMAIN).evals;
+        let poly = bytes_to_polynomial::<31>(&bytes, *DOMAIN).unwrap();
+        let commitment = commit_polynomial(&poly, &GLOBAL_PARAMETERS).unwrap();
+        let proofs: Vec<_> = (0..10)
+            .map(|i| generate_element_proof(i, &poly, &GLOBAL_PARAMETERS, &DOMAIN).unwrap())
+            .collect();
+        for (i, (element, proof)) in evaluations.iter().zip(proofs.iter()).enumerate() {
+            // verifying works
+            assert!(verify_element_proof(
+                i,
+                element,
+                &commitment,
+                proof,
+                &DOMAIN,
+                &GLOBAL_PARAMETERS
+            ));
+            // verification fails for other items
+            for ii in i + 1..10 {
+                assert!(!verify_element_proof(
+                    ii,
+                    element,
+                    &commitment,
+                    proof,
+                    &DOMAIN,
+                    &GLOBAL_PARAMETERS
+                ));
+            }
+        }
     }
 }

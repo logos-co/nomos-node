@@ -25,7 +25,7 @@ pub enum KzgRsError {
 
 /// Transform chunks of bytes (of size `CHUNK_SIZE`) into `Fr` which are considered evaluations of a
 /// polynomial.
-fn bytes_to_evaluations<const CHUNK_SIZE: usize>(
+pub fn bytes_to_evaluations<const CHUNK_SIZE: usize>(
     data: &[u8],
     domain: GeneralEvaluationDomain<Fr>,
 ) -> Evaluations<Fr> {
