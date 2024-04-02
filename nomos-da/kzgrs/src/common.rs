@@ -5,8 +5,6 @@ use ark_ff::{BigInteger256, PrimeField, Zero};
 use ark_poly::domain::general::GeneralEvaluationDomain;
 use ark_poly::evaluations::univariate::Evaluations;
 use ark_poly::univariate::DensePolynomial;
-use num_bigint;
-use num_traits::ops::bytes::FromBytes;
 use thiserror::Error;
 // internal
 
