@@ -1,7 +1,7 @@
 // std
 // crates
 use ark_bls12_381::fr::Fr;
-use ark_ff::{BigInteger256, Zero};
+use ark_ff::{BigInteger256, PrimeField, Zero};
 use ark_poly::domain::general::GeneralEvaluationDomain;
 use ark_poly::evaluations::univariate::Evaluations;
 use ark_poly::univariate::DensePolynomial;
@@ -35,7 +35,7 @@ pub fn bytes_to_evaluations<const CHUNK_SIZE: usize>(
             .map(|e| {
                 // use little endian for convenience as shortening 1 byte (<32 supported)
                 // do not matter in this endianness
-                let bint: BigInteger256 = num_bigint::BigUint::from_le_bytes(e)
+                let bint: BigInteger256 = Fr::from_le_bytes_mod_order(e)
                     .try_into()
                     .expect("Bytes size should fit for an 256 bits integer");
                 Fr::new(bint)
