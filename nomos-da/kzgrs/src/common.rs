@@ -49,10 +49,11 @@ pub fn bytes_to_evaluations<const CHUNK_SIZE: usize>(
 /// polynomial. Then use FFT to transform that polynomial into coefficient form.
 /// `CHUNK_SIZE` needs to be 31 (bytes) or less, otherwise it cannot be encoded.
 /// The input data need to be padded, so it fits in a len modulus of `CHUNK_SIZE`.
+/// Returns the polynomial in evaluation form and in coefficient form
 pub fn bytes_to_polynomial<const CHUNK_SIZE: usize>(
     data: &[u8],
     domain: GeneralEvaluationDomain<Fr>,
-) -> Result<DensePolynomial<Fr>, KzgRsError> {
+) -> Result<(Evaluations<Fr>, DensePolynomial<Fr>), KzgRsError> {
     if CHUNK_SIZE >= 32 {
         return Err(KzgRsError::ChunkSizeTooBig(CHUNK_SIZE));
     }
@@ -63,8 +64,8 @@ pub fn bytes_to_polynomial<const CHUNK_SIZE: usize>(
         });
     }
     let evals = bytes_to_evaluations::<CHUNK_SIZE>(data, domain);
-    let coefficients = evals.interpolate();
-    Ok(coefficients)
+    let coefficients = evals.interpolate_by_ref();
+    Ok((evals, coefficients))
 }
 
 #[cfg(test)]
@@ -86,7 +87,7 @@ mod test {
         let mut rng = thread_rng();
         bytes.try_fill(&mut rng).unwrap();
         let evals = bytes_to_evaluations::<31>(&bytes, *DOMAIN);
-        let poly = bytes_to_polynomial::<31>(&bytes, *DOMAIN).unwrap();
+        let (_, poly) = bytes_to_polynomial::<31>(&bytes, *DOMAIN).unwrap();
         for i in 0..100 {
             let eval_point = DOMAIN.element(i);
             let point = poly.evaluate(&eval_point);
