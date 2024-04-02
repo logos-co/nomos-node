@@ -1,9 +1,11 @@
 use crate::common::KzgRsError;
 use ark_bls12_381::{Bls12_381, Fr};
+use ark_ec::pairing::Pairing;
 use ark_poly::univariate::DensePolynomial;
 use ark_poly::{DenseUVPolynomial, EvaluationDomain, GeneralEvaluationDomain, Polynomial};
-use ark_poly_commit::kzg10::{Commitment, Powers, Proof, KZG10};
+use ark_poly_commit::kzg10::{Commitment, Powers, Proof, UniversalParams, KZG10};
 use num_traits::One;
+use std::ops::{Mul, Neg};
 
 /// Commit to a polynomial where each of the evaluations are over `w(i)` for the degree
 /// of the polynomial being omega (`w`) the root of unity (2^x).
@@ -37,13 +39,20 @@ pub fn generate_element_proof(
 }
 
 pub fn verify_element_proof(
+    element_index: usize,
     element: &Fr,
     commitment: &Commitment<Bls12_381>,
     proof: &Proof<Bls12_381>,
-    element_index: usize,
-    roots_of_unity: &Powers<Fr>,
+    domain: &GeneralEvaluationDomain<Fr>,
+    global_parameters: &UniversalParams<Bls12_381>,
 ) -> bool {
-    todo!()
+    let u = domain.element(element_index);
+    let v = element;
+    let commitment_check_g1 = commitment.0 + global_parameters.powers_of_g[0].mul(v).neg();
+    let proof_check_g2 = global_parameters.beta_h + global_parameters.h.mul(u).neg();
+    let lhs = Bls12_381::pairing(commitment_check_g1, global_parameters.h);
+    let rhs = Bls12_381::pairing(proof.w, proof_check_g2);
+    lhs == rhs
 }
 
 #[cfg(test)]
