@@ -1,4 +1,4 @@
-use full_replication::{Blob, Certificate};
+use full_replication::Certificate;
 #[cfg(feature = "metrics")]
 use nomos_metrics::MetricsSettings;
 use nomos_node::{
