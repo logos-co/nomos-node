@@ -11,9 +11,12 @@ use cryptarchia_consensus::network::NetworkAdapter;
 use cryptarchia_consensus::CryptarchiaConsensus;
 use futures::StreamExt;
 use indexer::DaIndexer;
+use nomos_core::block::Block;
 use nomos_core::da::certificate::{BlobCertificateSelect, Certificate};
 use nomos_core::header::HeaderId;
 use nomos_core::tx::{Transaction, TxSelect};
+use nomos_mempool::da::verify::fullreplication::DaVerificationProvider;
+use nomos_mempool::verify::MempoolVerificationProvider;
 use nomos_mempool::{backend::MemPool, network::NetworkAdapter as MempoolAdapter};
 use nomos_storage::backends::StorageBackend;
 use nomos_storage::StorageService;
@@ -28,8 +31,29 @@ use serde::{Deserialize, Serialize};
 use storage::DaStorageAdapter;
 use tracing::error;
 
-pub type ConsensusRelay<A, ClPool, ClPoolAdapter, DaPool, DaPoolAdapter, TxS, BS, Storage> =
-    Relay<CryptarchiaConsensus<A, ClPool, ClPoolAdapter, DaPool, DaPoolAdapter, TxS, BS, Storage>>;
+pub type ConsensusRelay<
+    A,
+    ClPool,
+    ClPoolAdapter,
+    DaPool,
+    DaPoolAdapter,
+    DaVerificationProvider,
+    TxS,
+    BS,
+    Storage,
+> = Relay<
+    CryptarchiaConsensus<
+        A,
+        ClPool,
+        ClPoolAdapter,
+        DaPool,
+        DaPoolAdapter,
+        DaVerificationProvider,
+        TxS,
+        BS,
+        Storage,
+    >,
+>;
 
 pub struct DataIndexerService<
     Indexer,
@@ -40,6 +64,7 @@ pub struct DataIndexerService<
     ClPoolAdapter,
     DaPool,
     DaPoolAdapter,
+    DaVerificationProvider,
     TxS,
     BS,
     ConsensusStorage,
@@ -48,10 +73,15 @@ pub struct DataIndexerService<
     Indexer::Blob: 'static,
     Indexer::VID: 'static,
     A: NetworkAdapter,
-    ClPoolAdapter: MempoolAdapter<Item = ClPool::Item, Key = ClPool::Key>,
+    ClPoolAdapter: MempoolAdapter<Payload = ClPool::Item, Key = ClPool::Key>,
     ClPool: MemPool<BlockId = HeaderId>,
     DaPool: MemPool<BlockId = HeaderId>,
-    DaPoolAdapter: MempoolAdapter<Item = DaPool::Item, Key = DaPool::Key>,
+    DaPoolAdapter: MempoolAdapter<Key = DaPool::Key>,
+    DaPoolAdapter::Payload: Certificate + Into<DaPool::Item> + Debug,
+    DaVerificationProvider: MempoolVerificationProvider<
+        Payload = DaPoolAdapter::Payload,
+        Parameters = <DaPoolAdapter::Payload as Certificate>::VerificationParameters,
+    >,
     ClPool::Item: Clone + Eq + Hash + Debug + 'static,
     ClPool::Key: Debug + 'static,
     DaPool::Item: Clone + Eq + Hash + Debug + 'static,
@@ -65,8 +95,17 @@ pub struct DataIndexerService<
     service_state: ServiceStateHandle<Self>,
     indexer: Indexer,
     storage_relay: Relay<StorageService<DaStorage::Backend>>,
-    consensus_relay:
-        ConsensusRelay<A, ClPool, ClPoolAdapter, DaPool, DaPoolAdapter, TxS, BS, ConsensusStorage>,
+    consensus_relay: ConsensusRelay<
+        A,
+        ClPool,
+        ClPoolAdapter,
+        DaPool,
+        DaPoolAdapter,
+        DaVerificationProvider,
+        TxS,
+        BS,
+        ConsensusStorage,
+    >,
 }
 
 impl<
@@ -78,6 +117,7 @@ impl<
         ClPoolAdapter,
         DaPool,
         DaPoolAdapter,
+        DaVerificationProvider,
         TxS,
         BS,
         ConsensusStorage,
@@ -91,6 +131,7 @@ impl<
         ClPoolAdapter,
         DaPool,
         DaPoolAdapter,
+        DaVerificationProvider,
         TxS,
         BS,
         ConsensusStorage,
@@ -100,10 +141,15 @@ where
     Indexer::Blob: 'static,
     Indexer::VID: 'static,
     A: NetworkAdapter,
-    ClPoolAdapter: MempoolAdapter<Item = ClPool::Item, Key = ClPool::Key>,
+    ClPoolAdapter: MempoolAdapter<Payload = ClPool::Item, Key = ClPool::Key>,
     ClPool: MemPool<BlockId = HeaderId>,
     DaPool: MemPool<BlockId = HeaderId>,
-    DaPoolAdapter: MempoolAdapter<Item = DaPool::Item, Key = DaPool::Key>,
+    DaPoolAdapter: MempoolAdapter<Key = DaPool::Key>,
+    DaPoolAdapter::Payload: Certificate + Into<DaPool::Item> + Debug,
+    DaVerificationProvider: MempoolVerificationProvider<
+        Payload = DaPoolAdapter::Payload,
+        Parameters = <DaPoolAdapter::Payload as Certificate>::VerificationParameters,
+    >,
     ClPool::Item: Clone + Eq + Hash + Debug + 'static,
     ClPool::Key: Debug + 'static,
     DaPool::Item: Clone + Eq + Hash + Debug + 'static,
@@ -150,6 +196,7 @@ impl<
         ClPoolAdapter,
         DaPool,
         DaPoolAdapter,
+        DaVerificationProvider,
         TxS,
         BS,
         ConsensusStorage,
@@ -163,6 +210,7 @@ impl<
         ClPoolAdapter,
         DaPool,
         DaPoolAdapter,
+        DaVerificationProvider,
         TxS,
         BS,
         ConsensusStorage,
@@ -172,10 +220,15 @@ where
     Indexer::Blob: 'static,
     Indexer::VID: 'static,
     A: NetworkAdapter,
-    ClPoolAdapter: MempoolAdapter<Item = ClPool::Item, Key = ClPool::Key>,
+    ClPoolAdapter: MempoolAdapter<Payload = ClPool::Item, Key = ClPool::Key>,
     ClPool: MemPool<BlockId = HeaderId>,
     DaPool: MemPool<BlockId = HeaderId>,
-    DaPoolAdapter: MempoolAdapter<Item = DaPool::Item, Key = DaPool::Key>,
+    DaPoolAdapter: MempoolAdapter<Key = DaPool::Key>,
+    DaPoolAdapter::Payload: Certificate + Into<DaPool::Item> + Debug,
+    DaVerificationProvider: MempoolVerificationProvider<
+        Payload = DaPoolAdapter::Payload,
+        Parameters = <DaPoolAdapter::Payload as Certificate>::VerificationParameters,
+    >,
     ClPool::Item: Clone + Eq + Hash + Debug + 'static,
     ClPool::Key: Debug + 'static,
     DaPool::Item: Clone + Eq + Hash + Debug + 'static,
@@ -202,6 +255,7 @@ impl<
         ClPoolAdapter,
         DaPool,
         DaPoolAdapter,
+        DaVerificationProvider,
         TxS,
         BS,
         ConsensusStorage,
@@ -215,6 +269,7 @@ impl<
         ClPoolAdapter,
         DaPool,
         DaPoolAdapter,
+        DaVerificationProvider,
         TxS,
         BS,
         ConsensusStorage,
@@ -224,10 +279,15 @@ where
     Indexer::Blob: 'static,
     Indexer::VID: 'static,
     A: NetworkAdapter,
-    ClPoolAdapter: MempoolAdapter<Item = ClPool::Item, Key = ClPool::Key>,
+    ClPoolAdapter: MempoolAdapter<Payload = ClPool::Item, Key = ClPool::Key>,
     ClPool: MemPool<BlockId = HeaderId>,
     DaPool: MemPool<BlockId = HeaderId>,
-    DaPoolAdapter: MempoolAdapter<Item = DaPool::Item, Key = DaPool::Key>,
+    DaPoolAdapter: MempoolAdapter<Key = DaPool::Key>,
+    DaPoolAdapter::Payload: Certificate + Into<DaPool::Item> + Debug,
+    DaVerificationProvider: MempoolVerificationProvider<
+        Payload = DaPoolAdapter::Payload,
+        Parameters = <DaPoolAdapter::Payload as Certificate>::VerificationParameters,
+    >,
     ClPool::Item: Clone + Eq + Hash + Debug + 'static,
     ClPool::Key: Debug + 'static,
     DaPool::Item: Clone + Eq + Hash + Debug + 'static,
@@ -238,6 +298,14 @@ where
     DaStorage: DaStorageAdapter,
     ConsensusStorage: StorageBackend + Send + Sync + 'static,
 {
+    async fn handle_new_block(
+        indexer: &Indexer,
+        consensus_adapter: &Consensus,
+        storage_adapter: &DaStorage,
+        block: Block<ClPool::Item, DaPool::Item>,
+    ) -> Result<(), DynError> {
+        todo!()
+    }
     async fn handle_da_msg(
         indexer: &Indexer,
         msg: DaMsg<Indexer::Blob, Indexer::VID>,
@@ -279,6 +347,7 @@ impl<
         ClPoolAdapter,
         DaPool,
         DaPoolAdapter,
+        DaVerificationProvider,
         TxS,
         BS,
         ConsensusStorage,
@@ -292,6 +361,7 @@ impl<
         ClPoolAdapter,
         DaPool,
         DaPoolAdapter,
+        DaVerificationProvider,
         TxS,
         BS,
         ConsensusStorage,
@@ -302,10 +372,15 @@ where
     Indexer::Blob: Debug + Send + Sync,
     Indexer::VID: Debug + Send + Sync,
     A: NetworkAdapter,
-    ClPoolAdapter: MempoolAdapter<Item = ClPool::Item, Key = ClPool::Key>,
+    ClPoolAdapter: MempoolAdapter<Payload = ClPool::Item, Key = ClPool::Key>,
     ClPool: MemPool<BlockId = HeaderId>,
     DaPool: MemPool<BlockId = HeaderId>,
-    DaPoolAdapter: MempoolAdapter<Item = DaPool::Item, Key = DaPool::Key>,
+    DaPoolAdapter: MempoolAdapter<Key = DaPool::Key>,
+    DaPoolAdapter::Payload: Certificate + Into<DaPool::Item> + Debug,
+    DaVerificationProvider: MempoolVerificationProvider<
+        Payload = DaPoolAdapter::Payload,
+        Parameters = <DaPoolAdapter::Payload as Certificate>::VerificationParameters,
+    >,
     ClPool::Key: Debug + 'static,
     DaPool::Key: Debug + 'static,
     ClPool::Item: Transaction<Hash = ClPool::Key>
@@ -332,9 +407,9 @@ where
     A::Backend: 'static,
     TxS: TxSelect<Tx = ClPool::Item>,
     BS: BlobCertificateSelect<Certificate = DaPool::Item>,
-    DaStorage: DaStorageAdapter + Send,
+    DaStorage: DaStorageAdapter + Send + Sync + 'static,
     ConsensusStorage: StorageBackend + Send + Sync + 'static,
-    Consensus: ConsensusAdapter<Tx = ClPool::Item, Cert = DaPool::Item> + Send,
+    Consensus: ConsensusAdapter<Tx = ClPool::Item, Cert = DaPool::Item> + Send + Sync,
 {
     fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, DynError> {
         let settings = service_state.settings_reader.get_updated_settings();
@@ -366,13 +441,21 @@ where
             .expect("Relay connection with NetworkService should succeed");
 
         let consensus_adapter = Consensus::new(consensus_relay).await;
+        let mut consensus_blocks = consensus_adapter.block_stream().await;
         let storage_adapter = DaStorage::new(storage_relay).await;
 
         let mut lifecycle_stream = service_state.lifecycle_handle.message_stream();
         loop {
             tokio::select! {
+                Some(block) = consensus_blocks.next() => {
+                    if let Err(e) = Self::handle_new_block(&indexer, &consensus_adapter, &storage_adapter, block).await {
+                        tracing::debug!("Failed to add  a new received block: {e:?}");
+                    }
+                }
                 Some(msg) = service_state.inbound_relay.recv() => {
-                    todo!()
+                    if let Err(e) = Self::handle_da_msg(&indexer, msg).await {
+                        tracing::debug!("Failed to handle da msg: {e:?}");
+                    }
                 }
                 Some(msg) = lifecycle_stream.next() => {
                     if Self::should_stop_service(msg).await {
