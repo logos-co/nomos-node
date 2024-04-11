@@ -19,6 +19,7 @@ pub type Commitment = kzg10::Commitment<Bls12_381>;
 pub type Proof = kzg10::Proof<Bls12_381>;
 pub type FieldElement = ark_bls12_381::Fr;
 pub type Polynomial = DensePolynomial<Fr>;
+pub type Evaluations = ark_poly::Evaluations<Fr>;
 pub type PolynomialEvaluationDomain = GeneralEvaluationDomain<Fr>;
 
 pub type GlobalParameters = UniversalParams<Bls12_381>;
