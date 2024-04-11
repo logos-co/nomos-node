@@ -2,7 +2,7 @@
 pub struct Chunk(Vec<u8>);
 pub struct Row(Vec<Chunk>);
 pub struct Column(Vec<Chunk>);
-struct ChunksMatrix(Vec<Row>);
+pub struct ChunksMatrix(Vec<Row>);
 
 impl Chunk {
     pub fn as_bytes(&self) -> Vec<u8> {
@@ -14,15 +14,27 @@ impl Chunk {
     }
 }
 
+impl From<&[u8]> for Chunk {
+    fn from(value: &[u8]) -> Self {
+        Self(value.to_vec())
+    }
+}
+
 impl Row {
     pub fn as_bytes(&self) -> Vec<u8> {
-        self.0.iter().map(Chunk::as_bytes).flatten().collect()
+        self.0.iter().flat_map(Chunk::as_bytes).collect()
     }
 }
 
 impl Column {
     pub fn as_bytes(&self) -> Vec<u8> {
-        self.0.iter().map(Chunk::as_bytes).flatten().collect()
+        self.0.iter().flat_map(Chunk::as_bytes).collect()
+    }
+}
+
+impl FromIterator<Chunk> for Row {
+    fn from_iter<T: IntoIterator<Item = Chunk>>(iter: T) -> Self {
+        Self(iter.into_iter().collect())
     }
 }
 
@@ -45,5 +57,11 @@ impl ChunksMatrix {
 
     pub fn transposed(&self) -> Self {
         Self(self.columns().map(|c| Row(c.0)).collect())
+    }
+}
+
+impl FromIterator<Row> for ChunksMatrix {
+    fn from_iter<T: IntoIterator<Item = Row>>(iter: T) -> Self {
+        Self(iter.into_iter().collect())
     }
 }
