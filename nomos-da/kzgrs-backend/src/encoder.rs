@@ -1,19 +1,18 @@
 use crate::common::{Chunk, ChunksMatrix};
-use kzgrs::{Commitment, Proof, BYTES_PER_FIELD_ELEMENT};
-
+use crate::global::{DOMAIN, GLOBAL_PARAMETERS};
+use kzgrs::{
+    bytes_to_polynomial, commit_polynomial, Commitment, Polynomial, PolynomialEvaluationDomain,
+    Proof, BYTES_PER_FIELD_ELEMENT,
+};
 pub struct DaEncoderParams {
     column_count: usize,
-    bytes_per_chunk: usize,
 }
 
 impl DaEncoderParams {
     const MAX_BLS12_381_ENCODING_CHUNK_SIZE: usize = 31;
 
     const fn default_with(column_count: usize) -> Self {
-        Self {
-            column_count,
-            bytes_per_chunk: Self::MAX_BLS12_381_ENCODING_CHUNK_SIZE,
-        }
+        Self { column_count }
     }
 }
 
@@ -34,17 +33,31 @@ struct DaEncoder {
 
 impl DaEncoder {
     pub const fn new(settings: DaEncoderParams) -> Self {
-        assert!(settings.bytes_per_chunk < BYTES_PER_FIELD_ELEMENT);
         Self { params: settings }
     }
 
     fn chunkify(&self, data: &[u8]) -> ChunksMatrix {
-        let size = self.params.column_count * self.params.bytes_per_chunk;
+        let size = self.params.column_count * DaEncoderParams::MAX_BLS12_381_ENCODING_CHUNK_SIZE;
         data.windows(size)
             .map(|d| {
-                d.windows(self.params.bytes_per_chunk)
+                d.windows(DaEncoderParams::MAX_BLS12_381_ENCODING_CHUNK_SIZE)
                     .map(Chunk::from)
                     .collect()
+            })
+            .collect()
+    }
+
+    fn compute_kzg_row_commitments(matrix: ChunksMatrix) -> Vec<(Polynomial, Commitment)> {
+        matrix
+            .rows()
+            .map(|r| {
+                let (_, poly) = bytes_to_polynomial::<
+                    { DaEncoderParams::MAX_BLS12_381_ENCODING_CHUNK_SIZE },
+                >(r.as_bytes().as_ref(), *DOMAIN)
+                .unwrap();
+
+                let commitment = commit_polynomial(&poly, &GLOBAL_PARAMETERS).unwrap();
+                (poly, commitment)
             })
             .collect()
     }
