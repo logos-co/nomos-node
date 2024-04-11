@@ -88,8 +88,7 @@ pub fn points_to_bytes<const CHUNK_SIZE: usize>(points: &[Fr]) -> Vec<u8> {
     }
     points
         .iter()
-        .map(point_to_buff::<CHUNK_SIZE>)
-        .flatten()
+        .flat_map(point_to_buff::<CHUNK_SIZE>)
         .collect()
 }
 
