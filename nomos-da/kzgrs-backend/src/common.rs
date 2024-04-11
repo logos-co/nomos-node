@@ -45,6 +45,9 @@ impl FromIterator<Chunk> for Column {
 }
 
 impl ChunksMatrix {
+    pub fn rows(&self) -> impl Iterator<Item = &Row> + '_ {
+        self.0.iter()
+    }
     pub fn columns(&self) -> impl Iterator<Item = Column> + '_ {
         let size = self.0.first().map(|r| r.0.len()).unwrap_or(0);
         (0..size).map(|i| {
