@@ -4,10 +4,10 @@ use kzgrs::Commitment;
 use std::io::Cursor;
 
 #[derive(Clone)]
-pub struct Chunk(Vec<u8>);
-pub struct Row(Vec<Chunk>);
-pub struct Column(Vec<Chunk>);
-pub struct ChunksMatrix(Vec<Row>);
+pub struct Chunk(pub Vec<u8>);
+pub struct Row(pub Vec<Chunk>);
+pub struct Column(pub Vec<Chunk>);
+pub struct ChunksMatrix(pub Vec<Row>);
 
 impl Chunk {
     pub fn as_bytes(&self) -> Vec<u8> {
