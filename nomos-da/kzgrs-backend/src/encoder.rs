@@ -1,10 +1,9 @@
-use crate::common::{hash_column_and_commitment, Chunk, ChunksMatrix};
+use crate::common::{hash_column_and_commitment, Chunk, ChunksMatrix, Row};
 use crate::global::{DOMAIN, GLOBAL_PARAMETERS};
 use ark_poly::univariate::DensePolynomial;
 use kzgrs::{
     bytes_to_polynomial, commit_polynomial, encode, generate_element_proof, Commitment,
-    Evaluations, KzgRsError, Polynomial, PolynomialEvaluationDomain, Proof,
-    BYTES_PER_FIELD_ELEMENT,
+    Evaluations, KzgRsError, Polynomial, Proof,
 };
 pub struct DaEncoderParams {
     column_count: usize,
@@ -23,7 +22,7 @@ pub struct EncodedData {
     chunked_data: ChunksMatrix,
     extended_data: ChunksMatrix,
     row_commitments: Vec<Commitment>,
-    row_proofs: Vec<Vec<Proof>>,
+    rows_proofs: Vec<Vec<Proof>>,
     column_commitments: Vec<Commitment>,
     aggregated_column_commitment: Commitment,
     aggregated_column_proofs: Vec<Proof>,
@@ -133,7 +132,54 @@ impl DaEncoder {
             .collect()
     }
 
+    fn evals_to_chunk_matrix(evals: &[Evaluations]) -> ChunksMatrix {
+        ChunksMatrix(
+            evals
+                .iter()
+                .map(|eval| {
+                    Row(eval
+                        .evals
+                        .iter()
+                        .map(|point| {
+                            Chunk(point.0 .0.iter().flat_map(|n| n.to_le_bytes()).collect())
+                        })
+                        .collect())
+                })
+                .collect(),
+        )
+    }
+
     pub fn encode(&self, data: &[u8]) -> Result<EncodedData, kzgrs::KzgRsError> {
-        todo!()
+        let chunked_data = self.chunkify(data);
+        let (row_polynomials, row_commitments): (Vec<_>, Vec<_>) =
+            Self::compute_kzg_row_commitments(&chunked_data)?
+                .into_iter()
+                .unzip();
+        let extended_data =
+            Self::evals_to_chunk_matrix(Self::rs_encode_rows(&row_polynomials).as_ref());
+        let row_polynomials: Vec<_> = row_polynomials.into_iter().map(|(_, p)| p).collect();
+        let rows_proofs = Self::compute_rows_proofs(
+            &row_polynomials,
+            &row_commitments,
+            self.params.column_count,
+        )?;
+        let (column_polynomials, column_commitments): (Vec<_>, Vec<_>) =
+            Self::compute_kzg_column_commitments(&extended_data)?
+                .into_iter()
+                .unzip();
+        let ((aggregated_evals, aggregated_polynomial), aggregated_column_commitment) =
+            Self::compute_aggregated_column_commitment(&extended_data, &column_commitments)?;
+        let aggregated_column_proofs =
+            Self::compute_aggregated_column_proofs(&aggregated_polynomial, &column_commitments)?;
+        Ok(EncodedData {
+            data: data.to_vec(),
+            chunked_data,
+            extended_data,
+            row_commitments,
+            rows_proofs,
+            column_commitments,
+            aggregated_column_commitment,
+            aggregated_column_proofs,
+        })
     }
 }
