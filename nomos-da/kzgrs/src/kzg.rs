@@ -28,7 +28,7 @@ pub fn generate_element_proof(
     element_index: usize,
     polynomial: &DensePolynomial<Fr>,
     global_parameters: &UniversalParams<Bls12_381>,
-    domain: &GeneralEvaluationDomain<Fr>,
+    domain: GeneralEvaluationDomain<Fr>,
 ) -> Result<Proof<Bls12_381>, KzgRsError> {
     let u = domain.element(element_index);
     let v = polynomial.evaluate(&u);
