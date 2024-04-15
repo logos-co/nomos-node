@@ -1,5 +1,6 @@
 // std
 // crates
+use crate::Commitment;
 use ark_bls12_381::fr::Fr;
 use ark_ff::{BigInteger256, PrimeField, Zero};
 use ark_poly::domain::general::GeneralEvaluationDomain;

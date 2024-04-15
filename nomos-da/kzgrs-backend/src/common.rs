@@ -1,3 +1,8 @@
+use ark_serialize::CanonicalSerialize;
+use blake2::digest::{Update, VariableOutput};
+use kzgrs::Commitment;
+use std::io::Cursor;
+
 #[derive(Clone)]
 pub struct Chunk(Vec<u8>);
 pub struct Row(Vec<Chunk>);
@@ -67,4 +72,24 @@ impl FromIterator<Row> for ChunksMatrix {
     fn from_iter<T: IntoIterator<Item = Row>>(iter: T) -> Self {
         Self(iter.into_iter().collect())
     }
+}
+
+pub fn hash_column_and_commitment<const HASH_SIZE: usize>(
+    column: &Column,
+    commitment: &Commitment,
+) -> [u8; HASH_SIZE] {
+    use ark_serialize::CanonicalSerialize;
+    let mut hasher = blake2::Blake2bVar::new(HASH_SIZE)
+        .unwrap_or_else(|e| panic!("Blake2b should work for size {HASH_SIZE}, {e}"));
+    hasher.update(column.as_bytes().as_ref());
+    let mut buff = Cursor::new(vec![]);
+    commitment
+        .serialize_uncompressed(&mut buff)
+        .expect("Serialization of commitment should work");
+    hasher.update(buff.into_inner().as_ref());
+    hasher
+        .finalize_boxed()
+        .to_vec()
+        .try_into()
+        .unwrap_or_else(|_| panic!("Size is guaranteed by constant {HASH_SIZE:?}"))
 }
