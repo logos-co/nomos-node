@@ -78,6 +78,10 @@ impl ChunksMatrix {
     pub fn transposed(&self) -> Self {
         Self(self.columns().map(|c| Row(c.0)).collect())
     }
+
+    pub fn iter(&self) -> impl Iterator<Item = &Row> {
+        self.0.iter()
+    }
 }
 
 impl FromIterator<Row> for ChunksMatrix {

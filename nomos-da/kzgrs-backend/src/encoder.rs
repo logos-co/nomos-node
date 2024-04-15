@@ -31,7 +31,7 @@ pub struct EncodedData {
     aggregated_column_proofs: Vec<Proof>,
 }
 
-struct DaEncoder {
+pub struct DaEncoder {
     params: DaEncoderParams,
 }
 
@@ -77,7 +77,7 @@ impl DaEncoder {
     }
 
     fn rs_encode_row(evaluations: &Evaluations, row: &Polynomial) -> Evaluations {
-        encode(row, evaluations, 2, &DOMAIN)
+        encode(row, evaluations, 2, *DOMAIN)
     }
 
     fn rs_encode_rows(rows: &[(Evaluations, Polynomial)]) -> Vec<Evaluations> {
@@ -196,7 +196,9 @@ impl DaEncoder {
 #[cfg(test)]
 pub mod test {
     use crate::encoder::{DaEncoder, DaEncoderParams};
-    use kzgrs::BYTES_PER_FIELD_ELEMENT;
+    use crate::global::DOMAIN;
+    use kzgrs::common::bytes_to_polynomial_unchecked;
+    use kzgrs::{decode, BYTES_PER_FIELD_ELEMENT};
     use rand::RngCore;
     use std::ops::Div;
 
@@ -229,5 +231,27 @@ pub mod test {
         let matrix = ENCODER.chunkify(data.as_ref());
         let commitments_data = DaEncoder::compute_kzg_row_commitments(&matrix).unwrap();
         assert_eq!(commitments_data.len(), matrix.len());
+    }
+
+    #[test]
+    fn test_rs_encode_rows() {
+        let data = rand_data(32);
+        let matrix = ENCODER.chunkify(data.as_ref());
+        let (poly_data, _): (Vec<_>, Vec<_>) = DaEncoder::compute_kzg_row_commitments(&matrix)
+            .unwrap()
+            .into_iter()
+            .unzip();
+        let extended_rows = DaEncoder::rs_encode_rows(&poly_data);
+        let extended_matrix = DaEncoder::evals_to_chunk_matrix(&extended_rows);
+        for ((r1, r2), evals) in matrix.iter().zip(extended_matrix.iter()).zip(extended_rows) {
+            assert_eq!(r1.len(), r2.len().div(2));
+            let points: Vec<_> = evals.evals.iter().cloned().map(Some).collect();
+            let poly_2 = decode(r1.len(), &points, *DOMAIN);
+            let (poly_1, _) = bytes_to_polynomial_unchecked::<BYTES_PER_FIELD_ELEMENT>(
+                r1.as_bytes().as_ref(),
+                *DOMAIN,
+            );
+            assert_eq!(poly_1, poly_2);
+        }
     }
 }
