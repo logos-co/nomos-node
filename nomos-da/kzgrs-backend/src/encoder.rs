@@ -1,8 +1,10 @@
-use crate::common::{Chunk, ChunksMatrix};
+use crate::common::{hash_column_and_commitment, Chunk, ChunksMatrix};
 use crate::global::{DOMAIN, GLOBAL_PARAMETERS};
+use ark_poly::univariate::DensePolynomial;
 use kzgrs::{
     bytes_to_polynomial, commit_polynomial, encode, generate_element_proof, Commitment,
-    Evaluations, Polynomial, PolynomialEvaluationDomain, Proof, BYTES_PER_FIELD_ELEMENT,
+    Evaluations, KzgRsError, Polynomial, PolynomialEvaluationDomain, Proof,
+    BYTES_PER_FIELD_ELEMENT,
 };
 pub struct DaEncoderParams {
     column_count: usize,
@@ -48,18 +50,19 @@ impl DaEncoder {
     }
 
     fn compute_kzg_row_commitments(
-        matrix: ChunksMatrix,
-    ) -> Vec<((Evaluations, Polynomial), Commitment)> {
+        matrix: &ChunksMatrix,
+    ) -> Result<Vec<((Evaluations, Polynomial), Commitment)>, KzgRsError> {
         matrix
             .rows()
             .map(|r| {
-                let (evals, poly) = bytes_to_polynomial::<
-                    { DaEncoderParams::MAX_BLS12_381_ENCODING_CHUNK_SIZE },
-                >(r.as_bytes().as_ref(), *DOMAIN)
-                .unwrap();
-
-                let commitment = commit_polynomial(&poly, &GLOBAL_PARAMETERS).unwrap();
-                ((evals, poly), commitment)
+                bytes_to_polynomial::<{ DaEncoderParams::MAX_BLS12_381_ENCODING_CHUNK_SIZE }>(
+                    r.as_bytes().as_ref(),
+                    *DOMAIN,
+                )
+                .and_then(|(evals, poly)| {
+                    commit_polynomial(&poly, &GLOBAL_PARAMETERS)
+                        .map(|commitment| ((evals, poly), commitment))
+                })
             })
             .collect()
     }
@@ -78,15 +81,59 @@ impl DaEncoder {
         polynomials: &[Polynomial],
         commitments: &[Commitment],
         size: usize,
-    ) -> Vec<Vec<Proof>> {
+    ) -> Result<Vec<Vec<Proof>>, KzgRsError> {
         polynomials
             .iter()
             .zip(commitments.iter())
             .map(|(poly, commitment)| {
                 (0..size)
-                    .map(|i| generate_element_proof(i, poly, &GLOBAL_PARAMETERS, &DOMAIN).unwrap())
+                    .map(|i| generate_element_proof(i, poly, &GLOBAL_PARAMETERS, *DOMAIN))
                     .collect()
             })
             .collect()
+    }
+
+    fn compute_kzg_column_commitments(
+        matrix: &ChunksMatrix,
+    ) -> Result<Vec<((Evaluations, Polynomial), Commitment)>, KzgRsError> {
+        Self::compute_kzg_row_commitments(&matrix.transposed())
+    }
+
+    fn compute_aggregated_column_commitment(
+        matrix: &ChunksMatrix,
+        commitments: &[Commitment],
+    ) -> Result<((Evaluations, Polynomial), Commitment), KzgRsError> {
+        let hashes: Vec<u8> =
+            matrix
+                .columns()
+                .zip(commitments)
+                .flat_map(|(column, commitment)| {
+                    hash_column_and_commitment::<
+                        { DaEncoderParams::MAX_BLS12_381_ENCODING_CHUNK_SIZE },
+                    >(&column, commitment)
+                })
+                .collect();
+        let (evals, poly) = bytes_to_polynomial::<
+            { DaEncoderParams::MAX_BLS12_381_ENCODING_CHUNK_SIZE },
+        >(hashes.as_ref(), *DOMAIN)?;
+        let commitment = commit_polynomial(&poly, &GLOBAL_PARAMETERS)?;
+        Ok(((evals, poly), commitment))
+    }
+
+    fn compute_aggregated_column_proofs(
+        polynomial: &Polynomial,
+        column_commitments: &[Commitment],
+    ) -> Result<Vec<Proof>, KzgRsError> {
+        column_commitments
+            .iter()
+            .enumerate()
+            .map(|(i, commitment)| {
+                generate_element_proof(i, polynomial, &GLOBAL_PARAMETERS, *DOMAIN)
+            })
+            .collect()
+    }
+
+    pub fn encode(&self, data: &[u8]) -> Result<EncodedData, kzgrs::KzgRsError> {
+        todo!()
     }
 }
