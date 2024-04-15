@@ -1,7 +1,7 @@
 // internal
 use nomos_core::da::{
     attestation::{self, Attestation as _},
-    certificate,
+    certificate::{self, metadata::Metadata},
 };
 // std
 use std::collections::HashSet;
@@ -12,7 +12,6 @@ use blake2::{
     Blake2bVar,
 };
 use bytes::Bytes;
-use nomos_core::da::certificate_metadata::CertificateExtension;
 use serde::{Deserialize, Serialize};
 
 /// Re-export the types for OpenAPI
@@ -154,8 +153,7 @@ impl certificate::Certificate for Certificate {
         let signatures: Vec<u8> = self
             .attestations
             .iter()
-            .map(|attestation| attestation.attestation_signature())
-            .flatten()
+            .flat_map(|attestation| attestation.attestation_signature())
             .collect();
         hash(signatures)
     }
@@ -176,11 +174,12 @@ impl certificate::Certificate for Certificate {
     }
 }
 
-impl CertificateExtension for Certificate {
-    type Extension = ();
+impl Metadata for Certificate {
+    type AppId = [u8; 32];
+    type Index = u64;
 
-    fn extension(&self) -> Self::Extension {
-        ()
+    fn metadata(&self) -> (Self::AppId, Self::Index) {
+        todo!()
     }
 }
 

@@ -1,4 +1,6 @@
+pub mod metadata;
 pub mod select;
+pub mod vid;
 
 pub trait Certificate {
     type VerificationParameters;
