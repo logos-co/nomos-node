@@ -3,8 +3,10 @@ use crate::global::{DOMAIN, GLOBAL_PARAMETERS};
 use ark_poly::univariate::DensePolynomial;
 use kzgrs::{
     bytes_to_polynomial, commit_polynomial, encode, generate_element_proof, Commitment,
-    Evaluations, KzgRsError, Polynomial, Proof,
+    Evaluations, KzgRsError, Polynomial, Proof, BYTES_PER_FIELD_ELEMENT,
 };
+
+#[derive(Copy, Clone)]
 pub struct DaEncoderParams {
     column_count: usize,
 }
@@ -38,11 +40,17 @@ impl DaEncoder {
     }
 
     fn chunkify(&self, data: &[u8]) -> ChunksMatrix {
-        let size = self.params.column_count * DaEncoderParams::MAX_BLS12_381_ENCODING_CHUNK_SIZE;
-        data.windows(size)
+        let chunk_size =
+            self.params.column_count * DaEncoderParams::MAX_BLS12_381_ENCODING_CHUNK_SIZE;
+        data.chunks(chunk_size)
             .map(|d| {
-                d.windows(DaEncoderParams::MAX_BLS12_381_ENCODING_CHUNK_SIZE)
-                    .map(Chunk::from)
+                d.chunks(DaEncoderParams::MAX_BLS12_381_ENCODING_CHUNK_SIZE)
+                    .map(|chunk| {
+                        let mut buff = [0u8; BYTES_PER_FIELD_ELEMENT];
+                        buff[..DaEncoderParams::MAX_BLS12_381_ENCODING_CHUNK_SIZE]
+                            .copy_from_slice(chunk);
+                        Chunk::from(buff.as_slice())
+                    })
                     .collect()
             })
             .collect()
@@ -54,14 +62,11 @@ impl DaEncoder {
         matrix
             .rows()
             .map(|r| {
-                bytes_to_polynomial::<{ DaEncoderParams::MAX_BLS12_381_ENCODING_CHUNK_SIZE }>(
-                    r.as_bytes().as_ref(),
-                    *DOMAIN,
-                )
-                .and_then(|(evals, poly)| {
-                    commit_polynomial(&poly, &GLOBAL_PARAMETERS)
-                        .map(|commitment| ((evals, poly), commitment))
-                })
+                bytes_to_polynomial::<BYTES_PER_FIELD_ELEMENT>(r.as_bytes().as_ref(), *DOMAIN)
+                    .and_then(|(evals, poly)| {
+                        commit_polynomial(&poly, &GLOBAL_PARAMETERS)
+                            .map(|commitment| ((evals, poly), commitment))
+                    })
             })
             .collect()
     }
@@ -112,9 +117,8 @@ impl DaEncoder {
                     >(&column, commitment)
                 })
                 .collect();
-        let (evals, poly) = bytes_to_polynomial::<
-            { DaEncoderParams::MAX_BLS12_381_ENCODING_CHUNK_SIZE },
-        >(hashes.as_ref(), *DOMAIN)?;
+        let (evals, poly) =
+            bytes_to_polynomial::<BYTES_PER_FIELD_ELEMENT>(hashes.as_ref(), *DOMAIN)?;
         let commitment = commit_polynomial(&poly, &GLOBAL_PARAMETERS)?;
         Ok(((evals, poly), commitment))
     }
@@ -181,5 +185,36 @@ impl DaEncoder {
             aggregated_column_commitment,
             aggregated_column_proofs,
         })
+    }
+}
+
+#[cfg(test)]
+pub mod test {
+    use crate::encoder::{DaEncoder, DaEncoderParams};
+    use kzgrs::BYTES_PER_FIELD_ELEMENT;
+    use rand::RngCore;
+    use std::ops::Div;
+
+    pub const PARAMS: DaEncoderParams = DaEncoderParams::default_with(16);
+    pub const ENCODER: DaEncoder = DaEncoder::new(PARAMS);
+
+    pub fn rand_data(elements_count: usize) -> Vec<u8> {
+        let mut buff = vec![0; elements_count * DaEncoderParams::MAX_BLS12_381_ENCODING_CHUNK_SIZE];
+        rand::thread_rng().fill_bytes(&mut buff);
+        buff
+    }
+
+    #[test]
+    fn test_chunkify() {
+        let params = DaEncoderParams::default_with(2);
+        let elements = 10usize;
+        let data = rand_data(10);
+        let encoder = DaEncoder::new(params);
+        let matrix = encoder.chunkify(&data);
+        assert_eq!(matrix.len(), elements.div(params.column_count));
+        for row in matrix.rows() {
+            assert_eq!(row.len(), params.column_count);
+            assert_eq!(row.0[0].len(), BYTES_PER_FIELD_ELEMENT);
+        }
     }
 }

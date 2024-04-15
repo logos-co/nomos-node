@@ -12,3 +12,6 @@ ark-poly = "0.4.2"
 kzgrs = { path = "../kzgrs" }
 rand = "0.8.5"
 once_cell = "1.19"
+
+[dev-dependencies]
+rand = "0.8"

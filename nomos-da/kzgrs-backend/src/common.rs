@@ -10,6 +10,9 @@ pub struct Column(pub Vec<Chunk>);
 pub struct ChunksMatrix(pub Vec<Row>);
 
 impl Chunk {
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
     pub fn as_bytes(&self) -> Vec<u8> {
         self.0.to_vec()
     }
@@ -26,12 +29,18 @@ impl From<&[u8]> for Chunk {
 }
 
 impl Row {
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
     pub fn as_bytes(&self) -> Vec<u8> {
         self.0.iter().flat_map(Chunk::as_bytes).collect()
     }
 }
 
 impl Column {
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
     pub fn as_bytes(&self) -> Vec<u8> {
         self.0.iter().flat_map(Chunk::as_bytes).collect()
     }
@@ -50,6 +59,9 @@ impl FromIterator<Chunk> for Column {
 }
 
 impl ChunksMatrix {
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
     pub fn rows(&self) -> impl Iterator<Item = &Row> + '_ {
         self.0.iter()
     }
