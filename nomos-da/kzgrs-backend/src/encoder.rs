@@ -1,6 +1,7 @@
 use crate::common::{hash_column_and_commitment, Chunk, ChunksMatrix, Row};
 use crate::global::{DOMAIN, GLOBAL_PARAMETERS};
 use ark_poly::univariate::DensePolynomial;
+use kzgrs::common::bytes_to_polynomial_unchecked;
 use kzgrs::{
     bytes_to_polynomial, commit_polynomial, encode, generate_element_proof, Commitment,
     Evaluations, KzgRsError, Polynomial, Proof, BYTES_PER_FIELD_ELEMENT,
@@ -62,11 +63,15 @@ impl DaEncoder {
         matrix
             .rows()
             .map(|r| {
-                bytes_to_polynomial::<BYTES_PER_FIELD_ELEMENT>(r.as_bytes().as_ref(), *DOMAIN)
-                    .and_then(|(evals, poly)| {
-                        commit_polynomial(&poly, &GLOBAL_PARAMETERS)
-                            .map(|commitment| ((evals, poly), commitment))
-                    })
+                // Using the unchecked version here. Because during the process of chunkifiying
+                // we already make sure to have the chunks of proper elements.
+                // Also, after rs encoding, we are sure all `Fr` elements already fits within modulus.
+                let (evals, poly) = bytes_to_polynomial_unchecked::<BYTES_PER_FIELD_ELEMENT>(
+                    r.as_bytes().as_ref(),
+                    *DOMAIN,
+                );
+                commit_polynomial(&poly, &GLOBAL_PARAMETERS)
+                    .map(|commitment| ((evals, poly), commitment))
             })
             .collect()
     }
@@ -216,5 +221,13 @@ pub mod test {
             assert_eq!(row.len(), params.column_count);
             assert_eq!(row.0[0].len(), BYTES_PER_FIELD_ELEMENT);
         }
+    }
+
+    #[test]
+    fn test_compute_row_kzg_commitments() {
+        let data = rand_data(32);
+        let matrix = ENCODER.chunkify(data.as_ref());
+        let commitments_data = DaEncoder::compute_kzg_row_commitments(&matrix).unwrap();
+        assert_eq!(commitments_data.len(), matrix.len());
     }
 }
