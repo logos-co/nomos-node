@@ -1,8 +1,10 @@
+pub mod attestation;
+
+use attestation::Attestation;
+use nomos_core::da::attestation::Attestation as _;
+use nomos_core::da::certificate::CertificateStrategy;
 // internal
-use nomos_core::da::{
-    attestation::{self, Attestation as _},
-    certificate::{self, metadata::Metadata},
-};
+use nomos_core::da::certificate::{self, metadata};
 // std
 use std::collections::HashSet;
 use std::hash::{Hash, Hasher};
@@ -17,7 +19,7 @@ use serde::{Deserialize, Serialize};
 /// Re-export the types for OpenAPI
 #[cfg(feature = "openapi")]
 pub mod openapi {
-    pub use super::{Attestation, Certificate};
+    pub use super::Certificate;
 }
 
 #[derive(Debug, Clone)]
@@ -39,15 +41,6 @@ impl<S> FullReplication<S> {
             output_certificate_buf: Vec::new(),
         }
     }
-}
-
-// TODO: maybe abstract in a general library?
-trait CertificateStrategy {
-    type Attestation: attestation::Attestation;
-    type Certificate: certificate::Certificate;
-
-    fn can_build(&self, attestations: &[Self::Attestation]) -> bool;
-    fn build(&self, attestations: Vec<Self::Attestation>) -> Certificate;
 }
 
 #[derive(Debug, Clone)]
@@ -76,20 +69,29 @@ pub struct Settings {
 impl CertificateStrategy for AbsoluteNumber<Attestation, Certificate> {
     type Attestation = Attestation;
     type Certificate = Certificate;
+    type Metadata = Certificate;
 
     fn can_build(&self, attestations: &[Self::Attestation]) -> bool {
         attestations.len() >= self.num_attestations
             && attestations
                 .iter()
-                .map(|a| &a.blob)
+                .map(|a| a.blob_hash())
                 .collect::<HashSet<_>>()
                 .len()
                 == 1
     }
 
-    fn build(&self, attestations: Vec<Self::Attestation>) -> Certificate {
+    fn build(
+        &self,
+        attestations: Vec<Self::Attestation>,
+        app_id: [u8; 32],
+        index: u64,
+    ) -> Certificate {
         assert!(self.can_build(&attestations));
-        Certificate { attestations }
+        Certificate {
+            attestations,
+            metadata: Metadata { app_id, index },
+        }
     }
 }
 
@@ -109,25 +111,17 @@ fn hasher(blob: &Blob) -> [u8; 32] {
     output
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
-pub struct Attestation {
-    blob: [u8; 32],
-    voter: Voter,
-}
-
-impl attestation::Attestation for Attestation {
-    type Signature = [u8; 32];
-
-    fn attestation_signature(&self) -> Self::Signature {
-        hash([self.blob, self.voter].concat())
-    }
+#[derive(Default, Debug, Copy, Clone, Serialize, Deserialize, Eq, PartialEq)]
+pub struct Metadata {
+    app_id: [u8; 32],
+    index: u64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct Certificate {
     attestations: Vec<Attestation>,
+    metadata: Metadata,
 }
 
 impl Hash for Certificate {
@@ -141,20 +135,15 @@ pub struct CertificateVerificationParameters {
 }
 
 impl certificate::Certificate for Certificate {
-    type VerificationParameters = CertificateVerificationParameters;
-    type Signature = [u8; 32];
+    type Attestation = Attestation;
     type Id = [u8; 32];
-
-    fn signers(&self) -> Vec<bool> {
-        self.attestations.iter().map(|_| true).collect()
-    }
+    type Signature = [u8; 32];
 
     fn signature(&self) -> Self::Signature {
-        let signatures: Vec<u8> = self
-            .attestations
-            .iter()
-            .flat_map(|attestation| attestation.attestation_signature())
-            .collect();
+        let mut signatures = Vec::new();
+        for attestation in &self.attestations {
+            signatures.extend_from_slice(&attestation.signature());
+        }
         hash(signatures)
     }
 
@@ -162,24 +151,28 @@ impl certificate::Certificate for Certificate {
         let mut input = self
             .attestations
             .iter()
-            .map(|a| a.attestation_signature())
+            .map(|a| a.signature())
             .collect::<Vec<_>>();
         // sort to make the hash deterministic
         input.sort();
         hash(input.concat())
     }
 
-    fn verify(&self, authorization_parameters: Self::VerificationParameters) -> bool {
-        authorization_parameters.threshold <= self.attestations.len()
+    fn attestations(&self) -> Vec<Self::Attestation> {
+        self.attestations.clone()
+    }
+
+    fn signers(&self) -> Vec<bool> {
+        todo!()
     }
 }
 
-impl Metadata for Certificate {
+impl metadata::Metadata for Certificate {
     type AppId = [u8; 32];
     type Index = u64;
 
     fn metadata(&self) -> (Self::AppId, Self::Index) {
-        todo!()
+        (self.metadata.app_id, self.metadata.index)
     }
 }
 
