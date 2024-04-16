@@ -1,9 +1,10 @@
-use super::attestation::Attestation;
-
 pub mod metadata;
+pub mod mock;
 pub mod select;
 pub mod verify;
 pub mod vid;
+
+use super::attestation::Attestation;
 
 pub trait Certificate {
     type Attestation: Attestation;
