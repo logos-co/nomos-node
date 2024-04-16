@@ -3,7 +3,7 @@ use blake2::digest::{Update, VariableOutput};
 use kzgrs::Commitment;
 use std::io::Cursor;
 
-#[derive(Clone)]
+#[derive(Clone, Eq, PartialEq, Debug)]
 pub struct Chunk(pub Vec<u8>);
 pub struct Row(pub Vec<Chunk>);
 pub struct Column(pub Vec<Chunk>);
@@ -29,6 +29,9 @@ impl From<&[u8]> for Chunk {
 }
 
 impl Row {
+    pub fn iter(&self) -> impl Iterator<Item = &Chunk> {
+        self.0.iter()
+    }
     pub fn len(&self) -> usize {
         self.0.len()
     }
@@ -38,6 +41,9 @@ impl Row {
 }
 
 impl Column {
+    pub fn iter(&self) -> impl Iterator<Item = &Chunk> {
+        self.0.iter()
+    }
     pub fn len(&self) -> usize {
         self.0.len()
     }

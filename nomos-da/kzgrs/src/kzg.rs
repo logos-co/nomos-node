@@ -49,7 +49,7 @@ pub fn verify_element_proof(
     element: &Fr,
     commitment: &Commitment<Bls12_381>,
     proof: &Proof<Bls12_381>,
-    domain: &GeneralEvaluationDomain<Fr>,
+    domain: GeneralEvaluationDomain<Fr>,
     global_parameters: &UniversalParams<Bls12_381>,
 ) -> bool {
     let u = domain.element(element_index);
