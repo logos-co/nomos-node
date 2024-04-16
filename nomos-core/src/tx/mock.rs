@@ -99,3 +99,15 @@ impl<M> From<&MockTransaction<M>> for MockTxId {
         msg.id
     }
 }
+
+#[derive(Clone, Default, Debug)]
+pub struct MockTxVerifier;
+
+impl MockTxVerifier {
+    pub fn verify_tx<Tx>(&self, _tx: &Tx) -> bool
+    where
+        Tx: Transaction,
+    {
+        true
+    }
+}

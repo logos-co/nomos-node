@@ -11,7 +11,11 @@ use api::AxumBackend;
 use bytes::Bytes;
 pub use config::{Config, CryptarchiaArgs, HttpArgs, LogArgs, MetricsArgs, NetworkArgs};
 use nomos_api::ApiService;
+use nomos_core::da::certificate::mock::MockKeyStore;
+use nomos_core::da::certificate::verify::DaCertificateVerifier;
+use nomos_core::tx::mock::MockTxVerifier;
 use nomos_core::{da::certificate, header::HeaderId, tx::Transaction, wire};
+use nomos_da::auth::mock::MockDaAuth;
 use nomos_log::Logger;
 use nomos_mempool::network::adapters::libp2p::Libp2pAdapter as MempoolNetworkAdapter;
 use nomos_mempool::{backend::mockpool::MockPool, TxMempoolService};
@@ -46,8 +50,10 @@ pub type Cryptarchia = cryptarchia_consensus::CryptarchiaConsensus<
     cryptarchia_consensus::network::adapters::libp2p::LibP2pAdapter<Tx, Certificate>,
     MockPool<HeaderId, Tx, <Tx as Transaction>::Hash>,
     MempoolNetworkAdapter<Tx, <Tx as Transaction>::Hash>,
+    MockTxVerifier,
     MockPool<HeaderId, Certificate, <Certificate as certificate::Certificate>::Id>,
     MempoolNetworkAdapter<Certificate, <Certificate as certificate::Certificate>::Id>,
+    DaCertificateVerifier<[u8; 32], MockKeyStore<MockDaAuth>, Certificate>,
     FillSizeWithTx<MB16, Tx>,
     FillSizeWithBlobsCertificate<MB16, Certificate>,
     RocksBackend<Wire>,

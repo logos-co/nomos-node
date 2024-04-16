@@ -72,6 +72,7 @@ fn main() -> Result<()> {
                     id: <Tx as Transaction>::hash,
                 },
                 registry: registry.clone(),
+                verifier: (),
             },
             cryptarchia: config.cryptarchia,
             #[cfg(feature = "metrics")]

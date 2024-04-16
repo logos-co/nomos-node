@@ -14,7 +14,7 @@ pub async fn add_tx<N, A, Item, Key>(
 ) -> Result<(), super::DynError>
 where
     N: NetworkBackend,
-    A: NetworkAdapter<Backend = N, Item = Item, Key = Key> + Send + Sync + 'static,
+    A: NetworkAdapter<Backend = N, Payload = Item, Key = Key> + Send + Sync + 'static,
     A::Settings: Send + Sync,
     Item: Clone + Debug + Send + Sync + 'static + Hash,
     Key: Clone + Debug + Ord + Hash + 'static,
@@ -62,7 +62,7 @@ where
     relay
         .send(MempoolMsg::Add {
             key: converter(&item),
-            item,
+            payload: item,
             reply_channel: sender,
         })
         .await

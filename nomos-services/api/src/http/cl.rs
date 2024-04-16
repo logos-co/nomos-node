@@ -1,7 +1,7 @@
 use core::{fmt::Debug, hash::Hash};
 
-use nomos_core::header::HeaderId;
 use nomos_core::tx::Transaction;
+use nomos_core::{header::HeaderId, tx::mock::MockTxVerifier};
 use nomos_mempool::{
     backend::mockpool::MockPool, network::adapters::libp2p::Libp2pAdapter as MempoolNetworkAdapter,
     tx::service::openapi::Status, MempoolMetrics, MempoolMsg, TxMempoolService,
