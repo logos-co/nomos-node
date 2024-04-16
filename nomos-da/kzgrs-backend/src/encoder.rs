@@ -129,8 +129,9 @@ impl DaEncoder {
                     >(&column, commitment)
                 })
                 .collect();
-        let (evals, poly) =
-            bytes_to_polynomial::<BYTES_PER_FIELD_ELEMENT>(hashes.as_ref(), *DOMAIN)?;
+        let (evals, poly) = bytes_to_polynomial::<
+            { DaEncoderParams::MAX_BLS12_381_ENCODING_CHUNK_SIZE },
+        >(hashes.as_ref(), *DOMAIN)?;
         let commitment = commit_polynomial(&poly, &GLOBAL_PARAMETERS)?;
         Ok(((evals, poly), commitment))
     }
@@ -340,5 +341,39 @@ pub mod test {
                 ));
             }
         }
+    }
+
+    #[test]
+    fn test_compute_column_kzg_commitments() {
+        let data = rand_data(32);
+        let matrix = ENCODER.chunkify(data.as_ref());
+        let commitments_data = DaEncoder::compute_kzg_column_commitments(&matrix).unwrap();
+        assert_eq!(commitments_data.len(), matrix.columns().count());
+    }
+
+    #[test]
+    fn test_compute_aggregated_column_kzg_commitment() {
+        let data = rand_data(32);
+        let matrix = ENCODER.chunkify(data.as_ref());
+        let (_, commitments): (Vec<_>, Vec<_>) = DaEncoder::compute_kzg_column_commitments(&matrix)
+            .unwrap()
+            .into_iter()
+            .unzip();
+        let (poly_data, commitment) =
+            DaEncoder::compute_aggregated_column_commitment(&matrix, &commitments).unwrap();
+    }
+
+    #[test]
+    fn test_compute_aggregated_column_kzg_proofs() {
+        let data = rand_data(32);
+        let matrix = ENCODER.chunkify(data.as_ref());
+        let (poly_data, commitments): (Vec<_>, Vec<_>) =
+            DaEncoder::compute_kzg_column_commitments(&matrix)
+                .unwrap()
+                .into_iter()
+                .unzip();
+        let ((_, polynomial), aggregated_commitment) =
+            DaEncoder::compute_aggregated_column_commitment(&matrix, &commitments).unwrap();
+        DaEncoder::compute_aggregated_column_proofs(&polynomial, &commitments).unwrap();
     }
 }
