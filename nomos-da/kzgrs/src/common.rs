@@ -1,8 +1,8 @@
 // std
 // crates
-use crate::{Commitment, BYTES_PER_FIELD_ELEMENT};
+use crate::BYTES_PER_FIELD_ELEMENT;
 use ark_bls12_381::fr::Fr;
-use ark_ff::{BigInteger256, PrimeField, Zero};
+use ark_ff::Zero;
 use ark_poly::domain::general::GeneralEvaluationDomain;
 use ark_poly::evaluations::univariate::Evaluations;
 use ark_poly::univariate::DensePolynomial;
