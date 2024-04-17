@@ -13,7 +13,6 @@ use blake2::{
 };
 use bytes::Bytes;
 use nomos_core::da::certificate_metadata::CertificateExtension;
-use nomos_core::wire;
 use serde::{Deserialize, Serialize};
 
 /// Re-export the types for OpenAPI
