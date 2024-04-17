@@ -133,7 +133,6 @@ pub fn build_attestation_message(
 }
 
 pub fn commitment_to_bytes(commitment: &Commitment) -> Vec<u8> {
-    use ark_serialize::CanonicalSerialize;
     let mut buff = Cursor::new(vec![]);
     commitment
         .serialize_uncompressed(&mut buff)

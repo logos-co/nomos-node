@@ -36,13 +36,7 @@ pub fn decode(
     let (points, roots_of_unity): (Vec<Fr>, Vec<Fr>) = points
         .iter()
         .enumerate()
-        .flat_map(|(i, e)| {
-            if let Some(e) = e {
-                Some((*e, domain.element(i)))
-            } else {
-                None
-            }
-        })
+        .flat_map(|(i, e)| e.map(|e| (e, domain.element(i))))
         .unzip();
     let coeffs = lagrange_interpolate(&points, &roots_of_unity);
     Evaluations::from_vec_and_domain(
