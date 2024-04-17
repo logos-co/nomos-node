@@ -11,8 +11,6 @@ members = [
     "nomos-services/metrics",
     "nomos-services/data-availability",
     "nomos-services/system-sig",
-    "nomos-da/reed-solomon",
-    "nomos-da/kzg",
     "nomos-da/full-replication",
     # TODO: add it again and reimplement full replication
     #    "nomos-cli",
@@ -22,6 +20,6 @@ members = [
     "consensus/carnot-engine",
     "consensus/cryptarchia-engine",
     "ledger/cryptarchia-ledger",
-    "tests",
+    "tests", "nomos-da/kzgrs",
 ]
 resolver = "2"
