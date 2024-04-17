@@ -3,6 +3,7 @@ use ark_serialize::CanonicalSerialize;
 use std::io::Cursor;
 // crates
 use blake2::digest::{Update, VariableOutput};
+use blst::min_sig::Signature;
 use sha3::{Digest, Sha3_256};
 // internal
 use kzgrs::Commitment;
@@ -67,6 +68,18 @@ impl FromIterator<Chunk> for Row {
 impl FromIterator<Chunk> for Column {
     fn from_iter<T: IntoIterator<Item = Chunk>>(iter: T) -> Self {
         Self(iter.into_iter().collect())
+    }
+}
+
+impl AsRef<[Chunk]> for Row {
+    fn as_ref(&self) -> &[Chunk] {
+        &self.0
+    }
+}
+
+impl AsRef<[Chunk]> for Column {
+    fn as_ref(&self) -> &[Chunk] {
+        &self.0
     }
 }
 
@@ -138,4 +151,8 @@ pub fn commitment_to_bytes(commitment: &Commitment) -> Vec<u8> {
         .serialize_uncompressed(&mut buff)
         .expect("Serialization of commitment should work");
     buff.into_inner()
+}
+
+pub struct Attestation {
+    pub signature: Signature,
 }
