@@ -159,3 +159,45 @@ impl DaVerifier {
         Some(self.build_attestation(&blob))
     }
 }
+
+#[cfg(test)]
+mod test {
+    use crate::common::{hash_column_and_commitment, Chunk, Column};
+    use crate::encoder::{DaEncoder, DaEncoderParams};
+    use crate::global::{DOMAIN, GLOBAL_PARAMETERS};
+    use crate::verifier::DaVerifier;
+    use kzgrs::{
+        bytes_to_polynomial, commit_polynomial, generate_element_proof, BYTES_PER_FIELD_ELEMENT,
+    };
+
+    #[test]
+    fn test_verify_column() {
+        let column: Column = (0..10).map(|i| Chunk(vec![i; 32])).collect();
+        let (_, column_poly) =
+            bytes_to_polynomial::<BYTES_PER_FIELD_ELEMENT>(column.as_bytes().as_slice(), *DOMAIN)
+                .unwrap();
+        let column_commitment = commit_polynomial(&column_poly, &GLOBAL_PARAMETERS).unwrap();
+        let (_, aggregated_poly) = bytes_to_polynomial::<
+            { DaEncoderParams::MAX_BLS12_381_ENCODING_CHUNK_SIZE },
+        >(
+            hash_column_and_commitment::<{ DaEncoderParams::MAX_BLS12_381_ENCODING_CHUNK_SIZE }>(
+                &column,
+                &column_commitment,
+            )
+            .as_slice(),
+            *DOMAIN,
+        )
+        .unwrap();
+        let aggregated_commitment =
+            commit_polynomial(&aggregated_poly, &GLOBAL_PARAMETERS).unwrap();
+        let column_proof =
+            generate_element_proof(0, &aggregated_poly, &GLOBAL_PARAMETERS, *DOMAIN).unwrap();
+        assert!(DaVerifier::verify_column(
+            &column,
+            &column_commitment,
+            &aggregated_commitment,
+            &column_proof,
+            0
+        ));
+    }
+}
