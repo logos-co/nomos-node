@@ -25,14 +25,14 @@ impl DaEncoderParams {
 }
 
 pub struct EncodedData {
-    data: Vec<u8>,
-    chunked_data: ChunksMatrix,
-    extended_data: ChunksMatrix,
-    row_commitments: Vec<Commitment>,
-    rows_proofs: Vec<Vec<Proof>>,
-    column_commitments: Vec<Commitment>,
-    aggregated_column_commitment: Commitment,
-    aggregated_column_proofs: Vec<Proof>,
+    pub data: Vec<u8>,
+    pub chunked_data: ChunksMatrix,
+    pub extended_data: ChunksMatrix,
+    pub row_commitments: Vec<Commitment>,
+    pub rows_proofs: Vec<Vec<Proof>>,
+    pub column_commitments: Vec<Commitment>,
+    pub aggregated_column_commitment: Commitment,
+    pub aggregated_column_proofs: Vec<Proof>,
 }
 
 pub struct DaEncoder {
