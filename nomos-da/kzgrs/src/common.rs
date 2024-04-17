@@ -1,6 +1,6 @@
 // std
 // crates
-use crate::BYTES_PER_FIELD_ELEMENT;
+use crate::{FieldElement, BYTES_PER_FIELD_ELEMENT};
 use ark_bls12_381::fr::Fr;
 use ark_ff::Zero;
 use ark_poly::domain::general::GeneralEvaluationDomain;
@@ -32,12 +32,11 @@ pub fn bytes_to_evaluations<const CHUNK_SIZE: usize>(
     assert!((data.len() % CHUNK_SIZE).is_zero());
     Evaluations::from_vec_and_domain(
         data.chunks(CHUNK_SIZE)
-            .map(|e| {
+            .map(
                 // use little endian for convenience as shortening 1 byte (<32 supported)
                 // do not matter in this endianness
-                let bui = BigUint::from_bytes_le(e);
-                Fr::from(bui)
-            })
+                field_element_from_bytes_le,
+            )
             .collect(),
         domain,
     )
@@ -76,6 +75,15 @@ pub fn bytes_to_polynomial_unchecked<const CHUNK_SIZE: usize>(
     let evals = bytes_to_evaluations::<CHUNK_SIZE>(data, domain);
     let coefficients = evals.interpolate_by_ref();
     (evals, coefficients)
+}
+
+/// Transform arbitrary bytes into a field element
+/// This transformation is bounds unchecked, it's up to the caller to know if
+/// data fits within the bls modulus.
+/// Data len cannot be higher than `BYTES_PER_FIELD_ELEMENT`
+pub fn field_element_from_bytes_le(b: &[u8]) -> FieldElement {
+    assert!(b.len() <= BYTES_PER_FIELD_ELEMENT);
+    FieldElement::from(BigUint::from_bytes_le(b))
 }
 
 #[cfg(test)]
