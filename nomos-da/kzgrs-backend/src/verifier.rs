@@ -135,7 +135,6 @@ impl DaVerifier {
     }
 
     pub fn verify(&self, blob: DaBlob) -> Option<Attestation> {
-        let blob_id = blob.id();
         let is_column_verified = DaVerifier::verify_column(
             &blob.column,
             &blob.column_commitment,
@@ -163,12 +162,15 @@ impl DaVerifier {
 #[cfg(test)]
 mod test {
     use crate::common::{hash_column_and_commitment, Chunk, Column};
+    use crate::encoder::test::{rand_data, ENCODER};
     use crate::encoder::{DaEncoder, DaEncoderParams};
     use crate::global::{DOMAIN, GLOBAL_PARAMETERS};
-    use crate::verifier::DaVerifier;
+    use crate::verifier::{DaBlob, DaVerifier};
+    use blst::min_sig::{PublicKey, SecretKey};
     use kzgrs::{
         bytes_to_polynomial, commit_polynomial, generate_element_proof, BYTES_PER_FIELD_ELEMENT,
     };
+    use rand::{thread_rng, RngCore};
 
     #[test]
     fn test_verify_column() {
@@ -199,5 +201,41 @@ mod test {
             &column_proof,
             0
         ));
+    }
+
+    #[test]
+    fn test_verify() {
+        let encoder = &ENCODER;
+        let data = rand_data(8);
+        let mut rng = thread_rng();
+        let sks: Vec<SecretKey> = (0..16)
+            .map(|_| {
+                let mut buff = [0u8; 32];
+                rng.fill_bytes(&mut buff);
+                SecretKey::key_gen(&buff, &[]).unwrap()
+            })
+            .collect();
+        let verifiers: Vec<DaVerifier> = sks
+            .into_iter()
+            .enumerate()
+            .map(|(index, sk)| DaVerifier { sk, index })
+            .collect();
+        let encoded_data = encoder.encode(&data).unwrap();
+        for (i, column) in encoded_data.extended_data.columns().enumerate() {
+            let verifier = &verifiers[i];
+            let da_blob = DaBlob {
+                column,
+                column_commitment: encoded_data.column_commitments[i].clone(),
+                aggregated_column_commitment: encoded_data.aggregated_column_commitment.clone(),
+                aggregated_column_proof: encoded_data.aggregated_column_proofs[i].clone(),
+                rows_commitments: encoded_data.row_commitments.clone(),
+                rows_proofs: encoded_data
+                    .rows_proofs
+                    .iter()
+                    .map(|proofs| proofs.get(i).cloned().unwrap())
+                    .collect(),
+            };
+            assert!(verifier.verify(da_blob).is_some());
+        }
     }
 }
