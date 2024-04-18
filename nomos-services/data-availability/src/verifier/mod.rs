@@ -84,6 +84,7 @@ where
                     if let Err(attestation) = reply_channel.send(attestation) {
                         error!("Error replying attestation {:?}", attestation);
                     }
+                    // TODO: Send blob to indexer service
                 }
                 _ => {
                     error!("Received unverified blob {:?}", blob);
