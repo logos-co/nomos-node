@@ -73,7 +73,7 @@ fn main() -> Result<()> {
             network: config.network,
             logging: config.log,
             http: config.http,
-            cl_mempool: nomos_mempool::Settings {
+            cl_mempool: nomos_mempool::TxMempoolSettings {
                 backend: (),
                 network: AdapterSettings {
                     topic: String::from(nomos_node::CL_TOPIC),
@@ -81,7 +81,7 @@ fn main() -> Result<()> {
                 },
                 registry: registry.clone(),
             },
-            da_mempool: nomos_mempool::Settings {
+            da_mempool: nomos_mempool::DaMempoolSettings {
                 backend: (),
                 network: AdapterSettings {
                     topic: String::from(nomos_node::DA_TOPIC),

@@ -22,8 +22,8 @@ use utoipa_swagger_ui::SwaggerUi;
 use full_replication::{Blob, Certificate};
 use nomos_core::{da::blob, header::HeaderId, tx::Transaction};
 use nomos_mempool::{
-    network::adapters::libp2p::Libp2pAdapter as MempoolNetworkAdapter, openapi::Status,
-    MempoolMetrics,
+    network::adapters::libp2p::Libp2pAdapter as MempoolNetworkAdapter,
+    tx::service::openapi::Status, MempoolMetrics,
 };
 use nomos_network::backends::libp2p::Libp2p as NetworkBackend;
 use nomos_storage::backends::StorageSerde;
@@ -351,10 +351,9 @@ where
     Tx: Transaction + Clone + Debug + Hash + Serialize + DeserializeOwned + Send + Sync + 'static,
     <Tx as Transaction>::Hash: std::cmp::Ord + Debug + Send + Sync + 'static,
 {
-    make_request_and_return_response!(mempool::add::<
+    make_request_and_return_response!(mempool::add_tx::<
         NetworkBackend,
         MempoolNetworkAdapter<Tx, <Tx as Transaction>::Hash>,
-        nomos_mempool::Transaction,
         Tx,
         <Tx as Transaction>::Hash,
     >(&handle, tx, Transaction::hash))
@@ -372,10 +371,9 @@ async fn add_cert(
     State(handle): State<OverwatchHandle>,
     Json(cert): Json<Certificate>,
 ) -> Response {
-    make_request_and_return_response!(mempool::add::<
+    make_request_and_return_response!(mempool::add_cert::<
         NetworkBackend,
         MempoolNetworkAdapter<Certificate, <Blob as blob::Blob>::Hash>,
-        nomos_mempool::Certificate,
         Certificate,
         <Blob as blob::Blob>::Hash,
     >(

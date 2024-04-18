@@ -15,8 +15,8 @@ use nomos_core::{
     header::cryptarchia::Builder,
 };
 use nomos_mempool::{
-    backend::MemPool, network::NetworkAdapter as MempoolAdapter, Certificate as CertDiscriminant,
-    MempoolMsg, MempoolService, Transaction as TxDiscriminant,
+    backend::MemPool, network::NetworkAdapter as MempoolAdapter, DaMempoolService, MempoolMsg,
+    TxMempoolService,
 };
 use nomos_network::NetworkService;
 use nomos_storage::{backends::StorageBackend, StorageMsg, StorageService};
@@ -149,8 +149,8 @@ where
     // underlying networking backend. We need this so we can relay and check the types properly
     // when implementing ServiceCore for CryptarchiaConsensus
     network_relay: Relay<NetworkService<A::Backend>>,
-    cl_mempool_relay: Relay<MempoolService<ClPoolAdapter, ClPool, TxDiscriminant>>,
-    da_mempool_relay: Relay<MempoolService<DaPoolAdapter, DaPool, CertDiscriminant>>,
+    cl_mempool_relay: Relay<TxMempoolService<ClPoolAdapter, ClPool>>,
+    da_mempool_relay: Relay<DaMempoolService<DaPoolAdapter, DaPool>>,
     block_subscription_sender: broadcast::Sender<Block<ClPool::Item, DaPool::Item>>,
     storage_relay: Relay<StorageService<Storage>>,
 }
