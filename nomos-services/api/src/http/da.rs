@@ -5,11 +5,12 @@ use nomos_da::{
     backend::memory_cache::BlobCache, network::adapters::libp2p::Libp2pAdapter as DaNetworkAdapter,
     DaMsg, DataAvailabilityService,
 };
-use nomos_mempool::da::service::{DaMempoolMetrics, DaMempoolMsg, DaMempoolService};
+use nomos_mempool::da::service::DaMempoolService;
 use nomos_mempool::{
     backend::mockpool::MockPool, network::adapters::libp2p::Libp2pAdapter as MempoolNetworkAdapter,
     tx::service::openapi::Status,
 };
+use nomos_mempool::{MempoolMetrics, MempoolMsg};
 use tokio::sync::oneshot;
 
 pub type MempoolServiceDa = DaMempoolService<
@@ -25,11 +26,11 @@ pub type DataAvailability = DataAvailabilityService<
 
 pub async fn da_mempool_metrics(
     handle: &overwatch_rs::overwatch::handle::OverwatchHandle,
-) -> Result<DaMempoolMetrics, super::DynError> {
+) -> Result<MempoolMetrics, super::DynError> {
     let relay = handle.relay::<MempoolServiceDa>().connect().await?;
     let (sender, receiver) = oneshot::channel();
     relay
-        .send(DaMempoolMsg::Metrics {
+        .send(MempoolMsg::Metrics {
             reply_channel: sender,
         })
         .await
@@ -45,7 +46,7 @@ pub async fn da_mempool_status(
     let relay = handle.relay::<MempoolServiceDa>().connect().await?;
     let (sender, receiver) = oneshot::channel();
     relay
-        .send(DaMempoolMsg::Status {
+        .send(MempoolMsg::Status {
             items,
             reply_channel: sender,
         })

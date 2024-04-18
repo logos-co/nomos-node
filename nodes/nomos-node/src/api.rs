@@ -1,4 +1,3 @@
-use nomos_mempool::da::service::DaMempoolMetrics;
 use std::{fmt::Debug, hash::Hash};
 
 use axum::{
@@ -23,7 +22,8 @@ use utoipa_swagger_ui::SwaggerUi;
 use full_replication::{Blob, Certificate};
 use nomos_core::{da::blob, header::HeaderId, tx::Transaction};
 use nomos_mempool::{
-    network::adapters::libp2p::Libp2pAdapter as MempoolNetworkAdapter, tx::service::openapi::Status,
+    network::adapters::libp2p::Libp2pAdapter as MempoolNetworkAdapter,
+    tx::service::openapi::Status, MempoolMetrics,
 };
 use nomos_network::backends::libp2p::Libp2p as NetworkBackend;
 use nomos_storage::backends::StorageSerde;
@@ -55,7 +55,7 @@ pub struct AxumBackend<T, S, const SIZE: usize> {
         da_status,
     ),
     components(
-        schemas(Status<HeaderId>, DaMempoolMetrics)
+        schemas(Status<HeaderId>, MempoolMetrics)
     ),
     tags(
         (name = "da", description = "data availibility related APIs")

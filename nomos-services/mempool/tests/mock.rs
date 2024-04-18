@@ -13,7 +13,7 @@ use overwatch_rs::{overwatch::OverwatchRunner, services::handle::ServiceHandle};
 use nomos_mempool::{
     backend::mockpool::MockPool,
     network::adapters::mock::{MockAdapter, MOCK_TX_CONTENT_TOPIC},
-    TxMempoolMsg, TxMempoolService, TxMempoolSettings,
+    MempoolMsg, TxMempoolService, TxMempoolSettings,
 };
 
 #[derive(Services)]
@@ -97,7 +97,7 @@ fn test_mockmempool() {
             tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
             let (mtx, mrx) = tokio::sync::oneshot::channel();
             mempool_outbound
-                .send(TxMempoolMsg::View {
+                .send(MempoolMsg::View {
                     ancestor_hint: [0; 32].into(),
                     reply_channel: mtx,
                 })

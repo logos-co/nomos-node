@@ -1,8 +1,8 @@
 use core::{fmt::Debug, hash::Hash};
 use nomos_core::header::HeaderId;
 use nomos_mempool::{
-    backend::mockpool::MockPool, network::NetworkAdapter, DaMempoolMsg, DaMempoolService,
-    TxMempoolMsg, TxMempoolService,
+    backend::mockpool::MockPool, network::NetworkAdapter, DaMempoolService, MempoolMsg,
+    TxMempoolService,
 };
 use nomos_network::backends::NetworkBackend;
 use tokio::sync::oneshot;
@@ -26,7 +26,7 @@ where
     let (sender, receiver) = oneshot::channel();
 
     relay
-        .send(TxMempoolMsg::Add {
+        .send(MempoolMsg::Add {
             key: converter(&item),
             item,
             reply_channel: sender,
@@ -60,7 +60,7 @@ where
     let (sender, receiver) = oneshot::channel();
 
     relay
-        .send(DaMempoolMsg::Add {
+        .send(MempoolMsg::Add {
             key: converter(&item),
             item,
             reply_channel: sender,

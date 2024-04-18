@@ -5,22 +5,22 @@ pub mod openapi {
 }
 
 // std
-use std::fmt::{Debug, Error, Formatter};
+use std::fmt::Debug;
 
 // crates
 #[cfg(feature = "metrics")]
 use super::metrics::Metrics;
 use futures::StreamExt;
 use nomos_metrics::NomosRegistry;
-use tokio::sync::oneshot::Sender;
 // internal
-use crate::backend::{MemPool, Status};
+use crate::backend::MemPool;
 use crate::network::NetworkAdapter;
+use crate::{MempoolMetrics, MempoolMsg};
 use nomos_network::{NetworkMsg, NetworkService};
 use overwatch_rs::services::life_cycle::LifecycleMessage;
 use overwatch_rs::services::{
     handle::ServiceStateHandle,
-    relay::{OutboundRelay, Relay, RelayMessage},
+    relay::{OutboundRelay, Relay},
     state::{NoOperator, NoState},
     ServiceCore, ServiceData, ServiceId,
 };
@@ -42,78 +42,6 @@ where
     metrics: Option<Metrics>,
 }
 
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
-#[derive(serde::Serialize, serde::Deserialize)]
-pub struct TxMempoolMetrics {
-    pub pending_items: usize,
-    pub last_item_timestamp: u64,
-}
-
-pub enum TxMempoolMsg<BlockId, Item, Key> {
-    Add {
-        item: Item,
-        key: Key,
-        reply_channel: Sender<Result<(), ()>>,
-    },
-    View {
-        ancestor_hint: BlockId,
-        reply_channel: Sender<Box<dyn Iterator<Item = Item> + Send>>,
-    },
-    Prune {
-        ids: Vec<Key>,
-    },
-    #[cfg(test)]
-    BlockItems {
-        block: BlockId,
-        reply_channel: Sender<Option<Box<dyn Iterator<Item = Item> + Send>>>,
-    },
-    MarkInBlock {
-        ids: Vec<Key>,
-        block: BlockId,
-    },
-    Metrics {
-        reply_channel: Sender<TxMempoolMetrics>,
-    },
-    Status {
-        items: Vec<Key>,
-        reply_channel: Sender<Vec<Status<BlockId>>>,
-    },
-}
-
-impl<BlockId, Item, Key> Debug for TxMempoolMsg<BlockId, Item, Key>
-where
-    BlockId: Debug,
-    Item: Debug,
-    Key: Debug,
-{
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        match self {
-            Self::View { ancestor_hint, .. } => {
-                write!(f, "MempoolMsg::View {{ ancestor_hint: {ancestor_hint:?}}}")
-            }
-            Self::Add { item, .. } => write!(f, "MempoolMsg::Add{{item: {item:?}}}"),
-            Self::Prune { ids } => write!(f, "MempoolMsg::Prune{{ids: {ids:?}}}"),
-            Self::MarkInBlock { ids, block } => {
-                write!(
-                    f,
-                    "MempoolMsg::MarkInBlock{{ids: {ids:?}, block: {block:?}}}"
-                )
-            }
-            #[cfg(test)]
-            Self::BlockItems { block, .. } => {
-                write!(f, "MempoolMsg::BlockItem{{block: {block:?}}}")
-            }
-            Self::Metrics { .. } => write!(f, "MempoolMsg::Metrics"),
-            Self::Status { items, .. } => write!(f, "MempoolMsg::Status{{items: {items:?}}}"),
-        }
-    }
-}
-
-impl<BlockId: 'static, Item: 'static, Key: 'static> RelayMessage
-    for TxMempoolMsg<BlockId, Item, Key>
-{
-}
-
 impl<N, P> ServiceData for TxMempoolService<N, P>
 where
     N: NetworkAdapter<Item = P::Item, Key = P::Key>,
@@ -127,7 +55,7 @@ where
     type Settings = TxMempoolSettings<P::Settings, N::Settings>;
     type State = NoState<Self::Settings>;
     type StateOperator = NoOperator<Self::State>;
-    type Message = TxMempoolMsg<<P as MemPool>::BlockId, <P as MemPool>::Item, <P as MemPool>::Key>;
+    type Message = MempoolMsg<<P as MemPool>::BlockId, <P as MemPool>::Item, <P as MemPool>::Key>;
 }
 
 #[async_trait::async_trait]
@@ -230,13 +158,13 @@ where
     }
 
     async fn handle_mempool_message(
-        message: TxMempoolMsg<P::BlockId, P::Item, P::Key>,
+        message: MempoolMsg<P::BlockId, P::Item, P::Key>,
         pool: &mut P,
         network_relay: &mut OutboundRelay<NetworkMsg<N::Backend>>,
         service_state: &mut ServiceStateHandle<Self>,
     ) {
         match message {
-            TxMempoolMsg::Add {
+            MempoolMsg::Add {
                 item,
                 key,
                 reply_channel,
@@ -260,7 +188,7 @@ where
                     }
                 }
             }
-            TxMempoolMsg::View {
+            MempoolMsg::View {
                 ancestor_hint,
                 reply_channel,
             } => {
@@ -268,11 +196,11 @@ where
                     .send(pool.view(ancestor_hint))
                     .unwrap_or_else(|_| tracing::debug!("could not send back pool view"));
             }
-            TxMempoolMsg::MarkInBlock { ids, block } => {
+            MempoolMsg::MarkInBlock { ids, block } => {
                 pool.mark_in_block(&ids, block);
             }
             #[cfg(test)]
-            TxMempoolMsg::BlockItems {
+            MempoolMsg::BlockItems {
                 block,
                 reply_channel,
             } => {
@@ -280,11 +208,11 @@ where
                     .send(pool.block_items(block))
                     .unwrap_or_else(|_| tracing::debug!("could not send back block items"));
             }
-            TxMempoolMsg::Prune { ids } => {
+            MempoolMsg::Prune { ids } => {
                 pool.prune(&ids);
             }
-            TxMempoolMsg::Metrics { reply_channel } => {
-                let metrics = TxMempoolMetrics {
+            MempoolMsg::Metrics { reply_channel } => {
+                let metrics = MempoolMetrics {
                     pending_items: pool.pending_item_count(),
                     last_item_timestamp: pool.last_item_timestamp(),
                 };
@@ -292,7 +220,7 @@ where
                     .send(metrics)
                     .unwrap_or_else(|_| tracing::debug!("could not send back mempool metrics"));
             }
-            TxMempoolMsg::Status {
+            MempoolMsg::Status {
                 items,
                 reply_channel,
             } => {
