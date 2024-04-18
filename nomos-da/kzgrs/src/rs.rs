@@ -113,10 +113,10 @@ mod test {
 
         let (evals, poly) = bytes_to_polynomial::<31>(&bytes, *DOMAIN).unwrap();
 
-        let encoded = encode(&poly, &evals, 2, &DOMAIN);
+        let encoded = encode(&poly, &evals, 2, *DOMAIN);
         let mut encoded: Vec<Option<Fr>> = encoded.evals.into_iter().map(Some).collect();
 
-        let decoded = decode(10, &encoded, &DOMAIN);
+        let decoded = decode(10, &encoded, *DOMAIN);
         let decoded_bytes = points_to_bytes::<31>(&decoded.evals);
         assert_eq!(decoded_bytes, bytes);
 
