@@ -14,9 +14,9 @@ use nomos_core::{
     block::{builder::BlockBuilder, Block},
     header::cryptarchia::Builder,
 };
+use nomos_mempool::TxMempoolMsg;
 use nomos_mempool::{
-    backend::MemPool, network::NetworkAdapter as MempoolAdapter, Certificate as CertDiscriminant,
-    MempoolMsg, MempoolService, Transaction as TxDiscriminant,
+    backend::MemPool, network::NetworkAdapter as MempoolAdapter, TxMempoolService,
 };
 use nomos_network::NetworkService;
 use nomos_storage::{backends::StorageBackend, StorageMsg, StorageService};
@@ -149,8 +149,8 @@ where
     // underlying networking backend. We need this so we can relay and check the types properly
     // when implementing ServiceCore for CryptarchiaConsensus
     network_relay: Relay<NetworkService<A::Backend>>,
-    cl_mempool_relay: Relay<MempoolService<ClPoolAdapter, ClPool, TxDiscriminant>>,
-    da_mempool_relay: Relay<MempoolService<DaPoolAdapter, DaPool, CertDiscriminant>>,
+    cl_mempool_relay: Relay<TxMempoolService<ClPoolAdapter, ClPool>>,
+    da_mempool_relay: Relay<TxMempoolService<DaPoolAdapter, DaPool>>,
     block_subscription_sender: broadcast::Sender<Block<ClPool::Item, DaPool::Item>>,
     storage_relay: Relay<StorageService<Storage>>,
 }
@@ -466,8 +466,8 @@ where
         leader: &mut leadership::Leader,
         block: Block<ClPool::Item, DaPool::Item>,
         storage_relay: OutboundRelay<StorageMsg<Storage>>,
-        cl_mempool_relay: OutboundRelay<MempoolMsg<HeaderId, ClPool::Item, ClPool::Key>>,
-        da_mempool_relay: OutboundRelay<MempoolMsg<HeaderId, DaPool::Item, DaPool::Key>>,
+        cl_mempool_relay: OutboundRelay<TxMempoolMsg<HeaderId, ClPool::Item, ClPool::Key>>,
+        da_mempool_relay: OutboundRelay<TxMempoolMsg<HeaderId, DaPool::Item, DaPool::Key>>,
         block_broadcaster: &mut broadcast::Sender<Block<ClPool::Item, DaPool::Item>>,
     ) -> Cryptarchia {
         tracing::debug!("received proposal {:?}", block);
@@ -522,8 +522,8 @@ where
         proof: LeaderProof,
         tx_selector: TxS,
         blob_selector: BS,
-        cl_mempool_relay: OutboundRelay<MempoolMsg<HeaderId, ClPool::Item, ClPool::Key>>,
-        da_mempool_relay: OutboundRelay<MempoolMsg<HeaderId, DaPool::Item, DaPool::Key>>,
+        cl_mempool_relay: OutboundRelay<TxMempoolMsg<HeaderId, ClPool::Item, ClPool::Key>>,
+        da_mempool_relay: OutboundRelay<TxMempoolMsg<HeaderId, DaPool::Item, DaPool::Key>>,
     ) -> Option<Block<ClPool::Item, DaPool::Item>> {
         let mut output = None;
         let cl_txs = get_mempool_contents(cl_mempool_relay);
@@ -576,12 +576,12 @@ pub struct CryptarchiaInfo {
 }
 
 async fn get_mempool_contents<Item, Key>(
-    mempool: OutboundRelay<MempoolMsg<HeaderId, Item, Key>>,
+    mempool: OutboundRelay<TxMempoolMsg<HeaderId, Item, Key>>,
 ) -> Result<Box<dyn Iterator<Item = Item> + Send>, tokio::sync::oneshot::error::RecvError> {
     let (reply_channel, rx) = tokio::sync::oneshot::channel();
 
     mempool
-        .send(MempoolMsg::View {
+        .send(TxMempoolMsg::View {
             ancestor_hint: [0; 32].into(),
             reply_channel,
         })
@@ -592,12 +592,12 @@ async fn get_mempool_contents<Item, Key>(
 }
 
 async fn mark_in_block<Item, Key>(
-    mempool: OutboundRelay<MempoolMsg<HeaderId, Item, Key>>,
+    mempool: OutboundRelay<TxMempoolMsg<HeaderId, Item, Key>>,
     ids: impl Iterator<Item = Key>,
     block: HeaderId,
 ) {
     mempool
-        .send(MempoolMsg::MarkInBlock {
+        .send(TxMempoolMsg::MarkInBlock {
             ids: ids.collect(),
             block,
         })

@@ -13,7 +13,7 @@ use overwatch_rs::{overwatch::OverwatchRunner, services::handle::ServiceHandle};
 use nomos_mempool::{
     backend::mockpool::MockPool,
     network::adapters::mock::{MockAdapter, MOCK_TX_CONTENT_TOPIC},
-    MempoolMsg, MempoolService, Settings, Transaction,
+    Transaction, TxMempoolMsg, TxMempoolService, TxMempoolSettings,
 };
 
 #[derive(Services)]
@@ -21,7 +21,7 @@ struct MockPoolNode {
     logging: ServiceHandle<Logger>,
     network: ServiceHandle<NetworkService<Mock>>,
     mockpool: ServiceHandle<
-        MempoolService<
+        TxMempoolService<
             MockAdapter,
             MockPool<HeaderId, MockTransaction<MockMessage>, MockTxId>,
             Transaction,
@@ -65,7 +65,7 @@ fn test_mockmempool() {
                     weights: None,
                 },
             },
-            mockpool: Settings {
+            mockpool: TxMempoolSettings {
                 backend: (),
                 network: (),
                 registry: None,
@@ -78,7 +78,7 @@ fn test_mockmempool() {
     .unwrap();
 
     let network = app.handle().relay::<NetworkService<Mock>>();
-    let mempool = app.handle().relay::<MempoolService<
+    let mempool = app.handle().relay::<TxMempoolService<
         MockAdapter,
         MockPool<HeaderId, MockTransaction<MockMessage>, MockTxId>,
         Transaction,
@@ -101,7 +101,7 @@ fn test_mockmempool() {
             tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
             let (mtx, mrx) = tokio::sync::oneshot::channel();
             mempool_outbound
-                .send(MempoolMsg::View {
+                .send(TxMempoolMsg::View {
                     ancestor_hint: [0; 32].into(),
                     reply_channel: mtx,
                 })

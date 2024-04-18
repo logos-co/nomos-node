@@ -24,10 +24,7 @@ use nomos_da::{
 };
 use nomos_log::Logger;
 use nomos_mempool::network::adapters::libp2p::Libp2pAdapter as MempoolNetworkAdapter;
-use nomos_mempool::{
-    backend::mockpool::MockPool, Certificate as CertDiscriminant, MempoolService,
-    Transaction as TxDiscriminant,
-};
+use nomos_mempool::{backend::mockpool::MockPool, TxMempoolService};
 #[cfg(feature = "metrics")]
 use nomos_metrics::Metrics;
 use nomos_network::backends::libp2p::Libp2p as NetworkBackend;
@@ -42,6 +39,7 @@ pub use nomos_core::{
     da::certificate::select::FillSize as FillSizeWithBlobsCertificate,
     tx::select::FillSize as FillSizeWithTx,
 };
+use nomos_mempool::da::service::DaMempoolService;
 use nomos_network::NetworkService;
 use nomos_system_sig::SystemSig;
 use overwatch_derive::*;
@@ -78,20 +76,29 @@ pub type DataAvailability = DataAvailabilityService<
     DaNetworkAdapter<Blob, Attestation>,
 >;
 
-type Mempool<K, V, D> = MempoolService<MempoolNetworkAdapter<K, V>, MockPool<HeaderId, K, V>, D>;
+pub type DaMempool = DaMempoolService<
+    MempoolNetworkAdapter<
+        Certificate,
+        <<Certificate as certificate::Certificate>::Blob as blob::Blob>::Hash,
+    >,
+    MockPool<
+        HeaderId,
+        Certificate,
+        <<Certificate as certificate::Certificate>::Blob as blob::Blob>::Hash,
+    >,
+>;
+
+pub type TxMempool = TxMempoolService<
+    MempoolNetworkAdapter<Tx, <Tx as Transaction>::Hash>,
+    MockPool<HeaderId, Tx, <Tx as Transaction>::Hash>,
+>;
 
 #[derive(Services)]
 pub struct Nomos {
     logging: ServiceHandle<Logger>,
     network: ServiceHandle<NetworkService<NetworkBackend>>,
-    cl_mempool: ServiceHandle<Mempool<Tx, <Tx as Transaction>::Hash, TxDiscriminant>>,
-    da_mempool: ServiceHandle<
-        Mempool<
-            Certificate,
-            <<Certificate as certificate::Certificate>::Blob as blob::Blob>::Hash,
-            CertDiscriminant,
-        >,
-    >,
+    cl_mempool: ServiceHandle<TxMempool>,
+    da_mempool: ServiceHandle<DaMempool>,
     cryptarchia: ServiceHandle<Cryptarchia>,
     http: ServiceHandle<ApiService<AxumBackend<Tx, Wire, MB16>>>,
     da: ServiceHandle<DataAvailability>,

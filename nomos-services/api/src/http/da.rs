@@ -5,18 +5,16 @@ use nomos_da::{
     backend::memory_cache::BlobCache, network::adapters::libp2p::Libp2pAdapter as DaNetworkAdapter,
     DaMsg, DataAvailabilityService,
 };
+use nomos_mempool::da::service::{DaMempoolMetrics, DaMempoolMsg, DaMempoolService};
 use nomos_mempool::{
-    backend::mockpool::MockPool,
-    network::adapters::libp2p::Libp2pAdapter as MempoolNetworkAdapter,
-    openapi::{MempoolMetrics, Status},
-    Certificate as CertDiscriminant, MempoolMsg, MempoolService,
+    backend::mockpool::MockPool, network::adapters::libp2p::Libp2pAdapter as MempoolNetworkAdapter,
+    tx::service::openapi::Status,
 };
 use tokio::sync::oneshot;
 
-pub type DaMempoolService = MempoolService<
+pub type MempoolServiceDa = DaMempoolService<
     MempoolNetworkAdapter<Certificate, <Blob as blob::Blob>::Hash>,
     MockPool<HeaderId, Certificate, <Blob as blob::Blob>::Hash>,
-    CertDiscriminant,
 >;
 
 pub type DataAvailability = DataAvailabilityService<
@@ -27,11 +25,11 @@ pub type DataAvailability = DataAvailabilityService<
 
 pub async fn da_mempool_metrics(
     handle: &overwatch_rs::overwatch::handle::OverwatchHandle,
-) -> Result<MempoolMetrics, super::DynError> {
-    let relay = handle.relay::<DaMempoolService>().connect().await?;
+) -> Result<DaMempoolMetrics, super::DynError> {
+    let relay = handle.relay::<MempoolServiceDa>().connect().await?;
     let (sender, receiver) = oneshot::channel();
     relay
-        .send(MempoolMsg::Metrics {
+        .send(DaMempoolMsg::Metrics {
             reply_channel: sender,
         })
         .await
@@ -44,10 +42,10 @@ pub async fn da_mempool_status(
     handle: &overwatch_rs::overwatch::handle::OverwatchHandle,
     items: Vec<<Blob as blob::Blob>::Hash>,
 ) -> Result<Vec<Status<HeaderId>>, super::DynError> {
-    let relay = handle.relay::<DaMempoolService>().connect().await?;
+    let relay = handle.relay::<MempoolServiceDa>().connect().await?;
     let (sender, receiver) = oneshot::channel();
     relay
-        .send(MempoolMsg::Status {
+        .send(DaMempoolMsg::Status {
             items,
             reply_channel: sender,
         })

@@ -1,3 +1,4 @@
+use nomos_mempool::da::service::DaMempoolMetrics;
 use std::{fmt::Debug, hash::Hash};
 
 use axum::{
@@ -22,8 +23,7 @@ use utoipa_swagger_ui::SwaggerUi;
 use full_replication::{Blob, Certificate};
 use nomos_core::{da::blob, header::HeaderId, tx::Transaction};
 use nomos_mempool::{
-    network::adapters::libp2p::Libp2pAdapter as MempoolNetworkAdapter, openapi::Status,
-    MempoolMetrics,
+    network::adapters::libp2p::Libp2pAdapter as MempoolNetworkAdapter, tx::service::openapi::Status,
 };
 use nomos_network::backends::libp2p::Libp2p as NetworkBackend;
 use nomos_storage::backends::StorageSerde;
@@ -55,7 +55,7 @@ pub struct AxumBackend<T, S, const SIZE: usize> {
         da_status,
     ),
     components(
-        schemas(Status<HeaderId>, MempoolMetrics)
+        schemas(Status<HeaderId>, DaMempoolMetrics)
     ),
     tags(
         (name = "da", description = "data availibility related APIs")
@@ -354,7 +354,6 @@ where
     make_request_and_return_response!(mempool::add::<
         NetworkBackend,
         MempoolNetworkAdapter<Tx, <Tx as Transaction>::Hash>,
-        nomos_mempool::Transaction,
         Tx,
         <Tx as Transaction>::Hash,
     >(&handle, tx, Transaction::hash))
@@ -375,7 +374,6 @@ async fn add_cert(
     make_request_and_return_response!(mempool::add::<
         NetworkBackend,
         MempoolNetworkAdapter<Certificate, <Blob as blob::Blob>::Hash>,
-        nomos_mempool::Certificate,
         Certificate,
         <Blob as blob::Blob>::Hash,
     >(

@@ -17,7 +17,7 @@ use mixnet::{
 };
 use nomos_core::{block::Block, header::HeaderId};
 use nomos_log::{LoggerBackend, LoggerFormat};
-use nomos_mempool::MempoolMetrics;
+use nomos_mempool::tx::service::TxMempoolMetrics;
 #[cfg(feature = "mixnet")]
 use nomos_network::backends::libp2p::mixnet::MixnetConfig;
 use nomos_network::{backends::libp2p::Libp2pConfig, NetworkConfig};
@@ -128,7 +128,7 @@ impl NomosNode {
             .unwrap()
     }
 
-    pub async fn get_mempoool_metrics(&self, pool: Pool) -> MempoolMetrics {
+    pub async fn get_mempoool_metrics(&self, pool: Pool) -> TxMempoolMetrics {
         let discr = match pool {
             Pool::Cl => "cl",
             Pool::Da => "da",
@@ -141,7 +141,7 @@ impl NomosNode {
             .json::<serde_json::Value>()
             .await
             .unwrap();
-        MempoolMetrics {
+        TxMempoolMetrics {
             pending_items: res["pending_items"].as_u64().unwrap() as usize,
             last_item_timestamp: res["last_item_timestamp"].as_u64().unwrap(),
         }

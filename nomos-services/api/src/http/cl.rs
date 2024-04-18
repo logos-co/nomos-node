@@ -2,24 +2,22 @@ use core::{fmt::Debug, hash::Hash};
 
 use nomos_core::header::HeaderId;
 use nomos_core::tx::Transaction;
+use nomos_mempool::tx::service::TxMempoolMetrics;
 use nomos_mempool::{
-    backend::mockpool::MockPool,
-    network::adapters::libp2p::Libp2pAdapter as MempoolNetworkAdapter,
-    openapi::{MempoolMetrics, Status},
-    MempoolMsg, MempoolService, Transaction as TxDiscriminant,
+    backend::mockpool::MockPool, network::adapters::libp2p::Libp2pAdapter as MempoolNetworkAdapter,
+    tx::service::openapi::Status, TxMempoolMsg, TxMempoolService,
 };
 use serde::{Deserialize, Serialize};
 use tokio::sync::oneshot;
 
-type ClMempoolService<T> = MempoolService<
+type ClMempoolService<T> = TxMempoolService<
     MempoolNetworkAdapter<T, <T as Transaction>::Hash>,
     MockPool<HeaderId, T, <T as Transaction>::Hash>,
-    TxDiscriminant,
 >;
 
 pub async fn cl_mempool_metrics<T>(
     handle: &overwatch_rs::overwatch::handle::OverwatchHandle,
-) -> Result<MempoolMetrics, super::DynError>
+) -> Result<TxMempoolMetrics, super::DynError>
 where
     T: Transaction
         + Clone
@@ -35,7 +33,7 @@ where
     let relay = handle.relay::<ClMempoolService<T>>().connect().await?;
     let (sender, receiver) = oneshot::channel();
     relay
-        .send(MempoolMsg::Metrics {
+        .send(TxMempoolMsg::Metrics {
             reply_channel: sender,
         })
         .await
@@ -63,7 +61,7 @@ where
     let relay = handle.relay::<ClMempoolService<T>>().connect().await?;
     let (sender, receiver) = oneshot::channel();
     relay
-        .send(MempoolMsg::Status {
+        .send(TxMempoolMsg::Status {
             items,
             reply_channel: sender,
         })

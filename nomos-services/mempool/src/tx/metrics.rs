@@ -8,7 +8,7 @@ use nomos_metrics::{
 };
 use overwatch_rs::services::ServiceId;
 // internal
-use crate::MempoolMsg;
+use super::service::TxMempoolMsg;
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq, EncodeLabelValue)]
 enum MempoolMsgType {
@@ -18,17 +18,17 @@ enum MempoolMsgType {
     MarkInBlock,
 }
 
-impl<BlockId, I, K> From<&MempoolMsg<BlockId, I, K>> for MempoolMsgType
+impl<BlockId, I, K> From<&TxMempoolMsg<BlockId, I, K>> for MempoolMsgType
 where
     I: 'static + Debug,
     K: 'static + Debug,
 {
-    fn from(event: &MempoolMsg<BlockId, I, K>) -> Self {
+    fn from(event: &TxMempoolMsg<BlockId, I, K>) -> Self {
         match event {
-            MempoolMsg::Add { .. } => MempoolMsgType::Add,
-            MempoolMsg::View { .. } => MempoolMsgType::View,
-            MempoolMsg::Prune { .. } => MempoolMsgType::Prune,
-            MempoolMsg::MarkInBlock { .. } => MempoolMsgType::MarkInBlock,
+            TxMempoolMsg::Add { .. } => MempoolMsgType::Add,
+            TxMempoolMsg::View { .. } => MempoolMsgType::View,
+            TxMempoolMsg::Prune { .. } => MempoolMsgType::Prune,
+            TxMempoolMsg::MarkInBlock { .. } => MempoolMsgType::MarkInBlock,
             _ => unimplemented!(),
         }
     }
@@ -60,16 +60,16 @@ impl Metrics {
         Self { messages }
     }
 
-    pub(crate) fn record<BlockId, I, K>(&self, msg: &MempoolMsg<BlockId, I, K>)
+    pub(crate) fn record<BlockId, I, K>(&self, msg: &TxMempoolMsg<BlockId, I, K>)
     where
         I: 'static + Debug,
         K: 'static + Debug,
     {
         match msg {
-            MempoolMsg::Add { .. }
-            | MempoolMsg::View { .. }
-            | MempoolMsg::Prune { .. }
-            | MempoolMsg::MarkInBlock { .. } => {
+            TxMempoolMsg::Add { .. }
+            | TxMempoolMsg::View { .. }
+            | TxMempoolMsg::Prune { .. }
+            | TxMempoolMsg::MarkInBlock { .. } => {
                 self.messages
                     .get_or_create(&MessageLabels { label: msg.into() })
                     .inc();
