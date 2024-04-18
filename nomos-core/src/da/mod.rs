@@ -14,8 +14,14 @@ pub trait DaEncoder {
 
 pub trait DaVerifier {
     type DaBlob;
+    type Sk;
+    type Pk;
     type Attestation;
-    fn verify(&self, blob: &Self::DaBlob) -> Result<Self::Attestation, impl Error>;
+    fn verify(
+        blob: &Self::DaBlob,
+        sk: &Self::Sk,
+        nodes_public_keys: &[Self::Pk],
+    ) -> Option<Self::Attestation>;
 }
 
 pub trait DaDispersal {

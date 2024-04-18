@@ -1,14 +1,12 @@
-mod backend;
 mod network;
 
-// std
-
-// crates
-
-use std::error::Error;
 use std::fmt::Debug;
+use std::marker::PhantomData;
+// std
+// crates
+use tokio_stream::StreamExt;
+use tracing::error;
 // internal
-use crate::verifier::backend::VerifierBackend;
 use crate::verifier::network::NetworkAdapter;
 use nomos_core::da::DaVerifier;
 use nomos_network::NetworkService;
@@ -17,60 +15,51 @@ use overwatch_rs::services::relay::{NoMessage, Relay};
 use overwatch_rs::services::state::{NoOperator, NoState};
 use overwatch_rs::services::{ServiceCore, ServiceData, ServiceId};
 use overwatch_rs::DynError;
-use tokio_stream::StreamExt;
-use tracing::error;
 
-pub struct DaVerifierService<Backend, N>
+pub struct DaVerifierService<N, V>
 where
-    Backend: VerifierBackend,
-    Backend::Settings: Clone,
     N: NetworkAdapter,
     N::Settings: Clone,
+    V: DaVerifier,
 {
     network_relay: Relay<NetworkService<N::Backend>>,
     service_state: ServiceStateHandle<Self>,
-    verifier: Backend,
+    _verifier: PhantomData<V>,
 }
 
 #[derive(Clone)]
-pub struct DaVerifierServiceSettings<BackendSettings, AdapterSettings> {
-    verifier_settings: BackendSettings,
+pub struct DaVerifierServiceSettings<AdapterSettings> {
     network_adapter_settings: AdapterSettings,
 }
 
-impl<Backend, N> ServiceData for DaVerifierService<Backend, N>
+impl<N, V> ServiceData for DaVerifierService<N, V>
 where
-    Backend: VerifierBackend,
-    Backend::Settings: Clone,
     N: NetworkAdapter,
     N::Settings: Clone,
+    V: DaVerifier,
 {
     const SERVICE_ID: ServiceId = "DaVerifier";
-    type Settings = DaVerifierServiceSettings<Backend::Settings, N::Settings>;
+    type Settings = DaVerifierServiceSettings<N::Settings>;
     type State = NoState<Self::Settings>;
     type StateOperator = NoOperator<Self::State>;
     type Message = NoMessage;
 }
 
 #[async_trait::async_trait]
-impl<Backend, N> ServiceCore for DaVerifierService<Backend, N>
+impl<N, V> ServiceCore for DaVerifierService<N, V>
 where
-    Backend: VerifierBackend + Send + 'static,
-    Backend::Settings: Clone + Send + Sync + 'static,
-    Backend::DaBlob: Debug,
-    Backend::Attestation: Debug,
-    N: NetworkAdapter<Blob = Backend::DaBlob, Attestation = Backend::Attestation> + Send + 'static,
+    N: NetworkAdapter<Blob = V::DaBlob, Attestation = V::Attestation> + Send + 'static,
     N::Settings: Clone + Send + Sync + 'static,
+    V: DaVerifier + Send + Sync + 'static,
+    V::DaBlob: Debug,
+    V::Attestation: Debug,
 {
     fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, DynError> {
-        let DaVerifierServiceSettings {
-            verifier_settings, ..
-        } = service_state.settings_reader.get_updated_settings();
         let network_relay = service_state.overwatch_handle.relay();
         Ok(Self {
             network_relay,
             service_state,
-            verifier: Backend::new(verifier_settings),
+            _verifier: Default::default(),
         })
     }
 
@@ -78,7 +67,7 @@ where
         let Self {
             network_relay,
             service_state,
-            verifier,
+            ..
         } = self;
         let DaVerifierServiceSettings {
             network_adapter_settings,
@@ -88,17 +77,23 @@ where
         let adapter = N::new(network_adapter_settings, network_relay).await;
         let mut blob_stream = adapter.blob_stream().await;
         while let Some((blob, reply_channel)) = blob_stream.next().await {
-            match verifier.verify(&blob) {
-                Ok(attestation) => {
+            let sk = get_sk();
+            let pks = &[];
+            match V::verify(&blob, sk, pks) {
+                Some(attestation) => {
                     if let Err(attestation) = reply_channel.send(attestation) {
                         error!("Error replying attestation {:?}", attestation);
                     }
                 }
-                Err(e) => {
+                _ => {
                     error!("Received unverified blob {:?}", blob);
                 }
             }
         }
         Ok(())
     }
+}
+
+fn get_sk<Sk>() -> &'static Sk {
+    todo!()
 }

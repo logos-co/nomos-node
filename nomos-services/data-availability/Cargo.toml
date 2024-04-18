@@ -11,6 +11,7 @@ futures = "0.3"
 moka = { version = "0.11", features = ["future"] }
 nomos-core = { path = "../../nomos-core" }
 nomos-network = { path = "../network" }
+kzgrs-backend = { path = "../../nomos-da/kzgrs-backend" }
 overwatch-rs = { git = "https://github.com/logos-co/Overwatch", rev = "2f70806" }
 serde = "1.0"
 tracing = "0.1"

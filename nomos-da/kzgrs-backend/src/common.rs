@@ -10,8 +10,13 @@ use kzgrs::Commitment;
 
 #[derive(Clone, Eq, PartialEq, Debug)]
 pub struct Chunk(pub Vec<u8>);
+
+#[derive(Debug)]
 pub struct Row(pub Vec<Chunk>);
+
+#[derive(Debug)]
 pub struct Column(pub Vec<Chunk>);
+
 pub struct ChunksMatrix(pub Vec<Row>);
 
 impl Chunk {
@@ -153,6 +158,7 @@ pub fn commitment_to_bytes(commitment: &Commitment) -> Vec<u8> {
     buff.into_inner()
 }
 
+#[derive(Debug)]
 pub struct Attestation {
     pub signature: Signature,
 }

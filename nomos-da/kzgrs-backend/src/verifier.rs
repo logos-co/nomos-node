@@ -1,9 +1,7 @@
 // std
-
 // crates
-use blst::min_sig::{PublicKey, SecretKey, Signature};
+use blst::min_sig::{PublicKey, SecretKey};
 use itertools::{izip, Itertools};
-use num_bigint::BigUint;
 use sha3::{Digest, Sha3_256};
 
 // internal
@@ -14,10 +12,11 @@ use crate::encoder::DaEncoderParams;
 use crate::global::{DOMAIN, GLOBAL_PARAMETERS};
 use kzgrs::common::field_element_from_bytes_le;
 use kzgrs::{
-    bytes_to_polynomial, commit_polynomial, verify_element_proof, Commitment, FieldElement, Proof,
+    bytes_to_polynomial, commit_polynomial, verify_element_proof, Commitment, Proof,
     BYTES_PER_FIELD_ELEMENT,
 };
 
+#[derive(Debug)]
 pub struct DaBlob {
     column: Column,
     column_commitment: Commitment,
@@ -39,25 +38,9 @@ impl DaBlob {
     }
 }
 
-pub struct DaVerifier {
-    // TODO: substitute this for an abstraction to sign things over
-    sk: SecretKey,
-    index: usize,
-}
+pub struct DaVerifier;
 
 impl DaVerifier {
-    pub fn new(sk: SecretKey, nodes_public_keys: &[PublicKey]) -> Self {
-        // TODO: `is_sorted` is experimental, and by contract `nodes_public_keys` should be shorted
-        // but not sure how we could enforce it here without re-sorting anyway.
-        // assert!(nodes_public_keys.is_sorted());
-        let self_pk = sk.sk_to_pk();
-        let (index, _) = nodes_public_keys
-            .iter()
-            .find_position(|&pk| pk == &self_pk)
-            .expect("Self pk should be registered");
-        Self { sk, index }
-    }
-
     fn verify_column(
         column: &Column,
         column_commitment: &Commitment,
@@ -127,20 +110,20 @@ impl DaVerifier {
         true
     }
 
-    fn build_attestation(&self, blob: &DaBlob) -> Attestation {
+    fn build_attestation(sk: &SecretKey, blob: &DaBlob) -> Attestation {
         let message =
             build_attestation_message(&blob.aggregated_column_commitment, &blob.rows_commitments);
-        let signature = self.sk.sign(&message, b"", b"");
+        let signature = sk.sign(&message, b"", b"");
         Attestation { signature }
     }
 
-    pub fn verify(&self, blob: DaBlob) -> Option<Attestation> {
+    pub fn verify_with_index(blob: &DaBlob, sk: &SecretKey, index: usize) -> Option<Attestation> {
         let is_column_verified = DaVerifier::verify_column(
             &blob.column,
             &blob.column_commitment,
             &blob.aggregated_column_commitment,
             &blob.aggregated_column_proof,
-            self.index,
+            index,
         );
         if !is_column_verified {
             return None;
@@ -150,12 +133,42 @@ impl DaVerifier {
             blob.column.as_ref(),
             &blob.rows_commitments,
             &blob.rows_proofs,
-            self.index,
+            index,
         );
         if !are_chunks_verified {
             return None;
         }
-        Some(self.build_attestation(&blob))
+        Some(Self::build_attestation(&sk, &blob))
+    }
+    pub fn verify(
+        blob: &DaBlob,
+        sk: &SecretKey,
+        nodes_public_keys: &[PublicKey],
+    ) -> Option<Attestation> {
+        // TODO: `is_sorted` is experimental, and by contract `nodes_public_keys` should be shorted
+        // but not sure how we could enforce it here without re-sorting anyway.
+        // assert!(nodes_public_keys.is_sorted());
+        let self_pk = sk.sk_to_pk();
+        let (index, _) = nodes_public_keys
+            .iter()
+            .find_position(|&pk| pk == &self_pk)
+            .expect("Self pk should be registered");
+        Self::verify_with_index(blob, sk, index)
+    }
+}
+
+impl nomos_core::da::DaVerifier for DaVerifier {
+    type DaBlob = DaBlob;
+    type Sk = SecretKey;
+    type Pk = PublicKey;
+    type Attestation = Attestation;
+
+    fn verify(
+        blob: &Self::DaBlob,
+        sk: &Self::Sk,
+        nodes_public_keys: &[Self::Pk],
+    ) -> Option<Self::Attestation> {
+        DaVerifier::verify(blob, sk, nodes_public_keys)
     }
 }
 
@@ -171,6 +184,7 @@ mod test {
         bytes_to_polynomial, commit_polynomial, generate_element_proof, BYTES_PER_FIELD_ELEMENT,
     };
     use rand::{thread_rng, RngCore};
+    use std::collections::HashMap;
 
     #[test]
     fn test_verify_column() {
@@ -215,14 +229,9 @@ mod test {
                 SecretKey::key_gen(&buff, &[]).unwrap()
             })
             .collect();
-        let verifiers: Vec<DaVerifier> = sks
-            .into_iter()
-            .enumerate()
-            .map(|(index, sk)| DaVerifier { sk, index })
-            .collect();
+        let pks: Vec<_> = sks.iter().map(SecretKey::sk_to_pk).enumerate().collect();
         let encoded_data = encoder.encode(&data).unwrap();
         for (i, column) in encoded_data.extended_data.columns().enumerate() {
-            let verifier = &verifiers[i];
             let da_blob = DaBlob {
                 column,
                 column_commitment: encoded_data.column_commitments[i].clone(),
@@ -235,7 +244,7 @@ mod test {
                     .map(|proofs| proofs.get(i).cloned().unwrap())
                     .collect(),
             };
-            assert!(verifier.verify(da_blob).is_some());
+            assert!(DaVerifier::verify_with_index(&da_blob, &sks[i], i).is_some());
         }
     }
 }
