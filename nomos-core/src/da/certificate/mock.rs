@@ -1,10 +1,6 @@
 use std::collections::HashMap;
 
-use crate::da::{
-    attestation::Attestation,
-    auth::Verifier,
-    certificate::{verify::KeyProvider, Certificate},
-};
+use crate::da::{attestation::Attestation, certificate::Certificate};
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct MockAttestation {
@@ -51,9 +47,9 @@ impl MockCertificate {
 }
 
 impl Certificate for MockCertificate {
-    type Attestation = MockAttestation;
     type Signature = [u8; 32];
     type Id = [u8; 32];
+    type AuthParams = ();
 
     fn signers(&self) -> Vec<bool> {
         todo!()
@@ -63,23 +59,17 @@ impl Certificate for MockCertificate {
         todo!()
     }
 
-    fn attestations(&self) -> Vec<Self::Attestation> {
-        self.attestations.clone()
+    fn id(&self) -> Self::Id {
+        todo!()
     }
 
-    fn id(&self) -> Self::Id {
+    fn verify(&self, _: Self::AuthParams) -> bool {
         todo!()
     }
 }
 
 #[derive(Clone)]
 pub struct MockPublicKey;
-
-impl Verifier for MockPublicKey {
-    fn verify(&self, _message: &[u8], sig: &[u8]) -> bool {
-        sig == b"valid_signature"
-    }
-}
 
 #[derive(Clone, Debug)]
 pub struct MockKeyStore<V> {
@@ -97,17 +87,6 @@ impl<V> Default for MockKeyStore<V> {
 impl<V> MockKeyStore<V> {
     pub fn add_key(&mut self, voter: &[u8; 32], verifier: V) {
         self.keys.insert(*voter, verifier);
-    }
-}
-
-impl<V> KeyProvider<[u8; 32]> for MockKeyStore<V>
-where
-    V: Verifier,
-{
-    type Verifier = V;
-
-    fn get_key(&self, node_id: &[u8; 32]) -> Option<&Self::Verifier> {
-        self.keys.get(node_id)
     }
 }
 

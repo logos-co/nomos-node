@@ -135,9 +135,9 @@ pub struct CertificateVerificationParameters {
 }
 
 impl certificate::Certificate for Certificate {
-    type Attestation = Attestation;
     type Id = [u8; 32];
     type Signature = [u8; 32];
+    type AuthParams = ();
 
     fn signature(&self) -> Self::Signature {
         let mut signatures = Vec::new();
@@ -158,11 +158,11 @@ impl certificate::Certificate for Certificate {
         hash(input.concat())
     }
 
-    fn attestations(&self) -> Vec<Self::Attestation> {
-        self.attestations.clone()
+    fn signers(&self) -> Vec<bool> {
+        todo!()
     }
 
-    fn signers(&self) -> Vec<bool> {
+    fn verify(&self, params: Self::AuthParams) -> bool {
         todo!()
     }
 }

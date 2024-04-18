@@ -1,7 +1,11 @@
-use nomos_core::da::{attestation, auth::Signer};
+use nomos_core::da::attestation;
 use serde::{Deserialize, Serialize};
 
 use crate::{hash, Voter};
+
+pub trait Signer {
+    fn sign(&self, message: &[u8]) -> Vec<u8>;
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]

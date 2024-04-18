@@ -1,20 +1,17 @@
 pub mod metadata;
 pub mod mock;
 pub mod select;
-pub mod verify;
 pub mod vid;
 
-use super::attestation::Attestation;
-
 pub trait Certificate {
-    type Attestation: Attestation;
     type Signature;
     type Id;
+    type AuthParams;
 
     fn signers(&self) -> Vec<bool>;
     fn signature(&self) -> Self::Signature;
-    fn attestations(&self) -> Vec<Self::Attestation>;
     fn id(&self) -> Self::Id;
+    fn verify(&self, params: Self::AuthParams) -> bool;
 }
 
 pub trait BlobCertificateSelect {
@@ -40,10 +37,4 @@ pub trait CertificateStrategy {
         app_id: <Self::Metadata as metadata::Metadata>::AppId,
         index: <Self::Metadata as metadata::Metadata>::Index,
     ) -> Self::Certificate;
-}
-
-pub trait CertificateVerifier {
-    type Certificate: Certificate;
-
-    fn verify(&self, certificate: &Self::Certificate) -> bool;
 }

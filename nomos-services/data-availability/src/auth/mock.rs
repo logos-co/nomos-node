@@ -1,7 +1,7 @@
+use crate::auth::Signer;
 use std::{fs, path::PathBuf, sync::Arc};
 
-use nomos_core::da::auth::{Signer, Verifier};
-use ring::signature::{self, Ed25519KeyPair, KeyPair};
+use ring::signature::Ed25519KeyPair;
 use serde::{Deserialize, Serialize};
 
 use crate::auth::DaAuth;
@@ -31,17 +31,6 @@ impl DaAuth for MockDaAuth {
 impl Signer for MockDaAuth {
     fn sign(&self, message: &[u8]) -> Vec<u8> {
         self.0.sign(message).as_ref().to_vec()
-    }
-}
-
-impl Verifier for MockDaAuth {
-    /// MockDaAuth verifier implementation is used in integration tests.
-    /// Certificates should be verified by the CertificateVerifier trait implementor from
-    /// nomos_core::da module.
-    fn verify(&self, message: &[u8], sig: &[u8]) -> bool {
-        let peer_public_key =
-            signature::UnparsedPublicKey::new(&signature::ED25519, self.0.public_key());
-        peer_public_key.verify(message, sig.as_ref()).is_ok()
     }
 }
 
