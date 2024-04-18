@@ -351,7 +351,7 @@ where
     Tx: Transaction + Clone + Debug + Hash + Serialize + DeserializeOwned + Send + Sync + 'static,
     <Tx as Transaction>::Hash: std::cmp::Ord + Debug + Send + Sync + 'static,
 {
-    make_request_and_return_response!(mempool::add::<
+    make_request_and_return_response!(mempool::add_tx::<
         NetworkBackend,
         MempoolNetworkAdapter<Tx, <Tx as Transaction>::Hash>,
         Tx,
@@ -371,7 +371,7 @@ async fn add_cert(
     State(handle): State<OverwatchHandle>,
     Json(cert): Json<Certificate>,
 ) -> Response {
-    make_request_and_return_response!(mempool::add::<
+    make_request_and_return_response!(mempool::add_cert::<
         NetworkBackend,
         MempoolNetworkAdapter<Certificate, <Blob as blob::Blob>::Hash>,
         Certificate,

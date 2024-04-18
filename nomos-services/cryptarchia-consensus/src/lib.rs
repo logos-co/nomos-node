@@ -14,10 +14,10 @@ use nomos_core::{
     block::{builder::BlockBuilder, Block},
     header::cryptarchia::Builder,
 };
-use nomos_mempool::TxMempoolMsg;
 use nomos_mempool::{
     backend::MemPool, network::NetworkAdapter as MempoolAdapter, TxMempoolService,
 };
+use nomos_mempool::{DaMempoolMsg, DaMempoolService, TxMempoolMsg};
 use nomos_network::NetworkService;
 use nomos_storage::{backends::StorageBackend, StorageMsg, StorageService};
 use overwatch_rs::services::life_cycle::LifecycleMessage;
@@ -150,7 +150,7 @@ where
     // when implementing ServiceCore for CryptarchiaConsensus
     network_relay: Relay<NetworkService<A::Backend>>,
     cl_mempool_relay: Relay<TxMempoolService<ClPoolAdapter, ClPool>>,
-    da_mempool_relay: Relay<TxMempoolService<DaPoolAdapter, DaPool>>,
+    da_mempool_relay: Relay<DaMempoolService<DaPoolAdapter, DaPool>>,
     block_subscription_sender: broadcast::Sender<Block<ClPool::Item, DaPool::Item>>,
     storage_relay: Relay<StorageService<Storage>>,
 }
@@ -467,7 +467,7 @@ where
         block: Block<ClPool::Item, DaPool::Item>,
         storage_relay: OutboundRelay<StorageMsg<Storage>>,
         cl_mempool_relay: OutboundRelay<TxMempoolMsg<HeaderId, ClPool::Item, ClPool::Key>>,
-        da_mempool_relay: OutboundRelay<TxMempoolMsg<HeaderId, DaPool::Item, DaPool::Key>>,
+        da_mempool_relay: OutboundRelay<DaMempoolMsg<HeaderId, DaPool::Item, DaPool::Key>>,
         block_broadcaster: &mut broadcast::Sender<Block<ClPool::Item, DaPool::Item>>,
     ) -> Cryptarchia {
         tracing::debug!("received proposal {:?}", block);
@@ -482,14 +482,14 @@ where
                 leader.follow_chain(header.parent(), id, *header.leader_proof().commitment());
 
                 // remove included content from mempool
-                mark_in_block(
+                mark_in_cl_block(
                     cl_mempool_relay,
                     block.transactions().map(Transaction::hash),
                     id,
                 )
                 .await;
 
-                mark_in_block(da_mempool_relay, block.blobs().map(Certificate::hash), id).await;
+                mark_in_da_block(da_mempool_relay, block.blobs().map(Certificate::hash), id).await;
 
                 // store block
                 let msg = <StorageMsg<_>>::new_store_message(header.id(), block.clone());
@@ -523,11 +523,11 @@ where
         tx_selector: TxS,
         blob_selector: BS,
         cl_mempool_relay: OutboundRelay<TxMempoolMsg<HeaderId, ClPool::Item, ClPool::Key>>,
-        da_mempool_relay: OutboundRelay<TxMempoolMsg<HeaderId, DaPool::Item, DaPool::Key>>,
+        da_mempool_relay: OutboundRelay<DaMempoolMsg<HeaderId, DaPool::Item, DaPool::Key>>,
     ) -> Option<Block<ClPool::Item, DaPool::Item>> {
         let mut output = None;
-        let cl_txs = get_mempool_contents(cl_mempool_relay);
-        let da_certs = get_mempool_contents(da_mempool_relay);
+        let cl_txs = get_cl_mempool_contents(cl_mempool_relay);
+        let da_certs = get_da_mempool_contents(da_mempool_relay);
 
         match futures::join!(cl_txs, da_certs) {
             (Ok(cl_txs), Ok(da_certs)) => {
@@ -575,7 +575,7 @@ pub struct CryptarchiaInfo {
     pub height: u64,
 }
 
-async fn get_mempool_contents<Item, Key>(
+async fn get_cl_mempool_contents<Item, Key>(
     mempool: OutboundRelay<TxMempoolMsg<HeaderId, Item, Key>>,
 ) -> Result<Box<dyn Iterator<Item = Item> + Send>, tokio::sync::oneshot::error::RecvError> {
     let (reply_channel, rx) = tokio::sync::oneshot::channel();
@@ -591,13 +591,43 @@ async fn get_mempool_contents<Item, Key>(
     rx.await
 }
 
-async fn mark_in_block<Item, Key>(
+async fn get_da_mempool_contents<Item, Key>(
+    mempool: OutboundRelay<DaMempoolMsg<HeaderId, Item, Key>>,
+) -> Result<Box<dyn Iterator<Item = Item> + Send>, tokio::sync::oneshot::error::RecvError> {
+    let (reply_channel, rx) = tokio::sync::oneshot::channel();
+
+    mempool
+        .send(DaMempoolMsg::View {
+            ancestor_hint: [0; 32].into(),
+            reply_channel,
+        })
+        .await
+        .unwrap_or_else(|(e, _)| eprintln!("Could not get transactions from mempool {e}"));
+
+    rx.await
+}
+
+async fn mark_in_cl_block<Item, Key>(
     mempool: OutboundRelay<TxMempoolMsg<HeaderId, Item, Key>>,
     ids: impl Iterator<Item = Key>,
     block: HeaderId,
 ) {
     mempool
         .send(TxMempoolMsg::MarkInBlock {
+            ids: ids.collect(),
+            block,
+        })
+        .await
+        .unwrap_or_else(|(e, _)| tracing::error!("Could not mark items in block: {e}"))
+}
+
+async fn mark_in_da_block<Item, Key>(
+    mempool: OutboundRelay<DaMempoolMsg<HeaderId, Item, Key>>,
+    ids: impl Iterator<Item = Key>,
+    block: HeaderId,
+) {
+    mempool
+        .send(DaMempoolMsg::MarkInBlock {
             ids: ids.collect(),
             block,
         })
