@@ -14,7 +14,6 @@ use nomos_core::{
     block::{builder::BlockBuilder, Block},
     header::cryptarchia::Builder,
 };
-use nomos_mempool::verifier::Verifier;
 use nomos_mempool::{
     backend::MemPool, network::NetworkAdapter as MempoolAdapter, DaMempoolService, MempoolMsg,
     TxMempoolService,
@@ -129,18 +128,8 @@ impl<Ts, Bs> CryptarchiaSettings<Ts, Bs> {
     }
 }
 
-pub struct CryptarchiaConsensus<
-    A,
-    ClPool,
-    ClPoolAdapter,
-    ClPoolVerifier,
-    DaPool,
-    DaPoolAdapter,
-    DaPoolVerifier,
-    TxS,
-    BS,
-    Storage,
-> where
+pub struct CryptarchiaConsensus<A, ClPool, ClPoolAdapter, DaPool, DaPoolAdapter, TxS, BS, Storage>
+where
     A: NetworkAdapter,
     ClPoolAdapter: MempoolAdapter<Payload = ClPool::Item, Key = ClPool::Key>,
     ClPool: MemPool<BlockId = HeaderId>,
@@ -151,8 +140,6 @@ pub struct CryptarchiaConsensus<
     ClPool::Key: Debug + 'static,
     DaPool::Item: Clone + Eq + Hash + Debug + 'static,
     DaPool::Key: Debug + 'static,
-    ClPoolVerifier: Verifier<ClPool::Item> + Send + Sync + 'static,
-    DaPoolVerifier: Verifier<DaPool::Item> + Send + Sync + 'static,
     A::Backend: 'static,
     TxS: TxSelect<Tx = ClPool::Item>,
     BS: BlobCertificateSelect<Certificate = DaPool::Item>,
@@ -168,30 +155,8 @@ pub struct CryptarchiaConsensus<
     storage_relay: Relay<StorageService<Storage>>,
 }
 
-impl<
-        A,
-        ClPool,
-        ClPoolAdapter,
-        ClPoolVerifier,
-        DaPool,
-        DaPoolAdapter,
-        DaPoolVerifier,
-        TxS,
-        BS,
-        Storage,
-    > ServiceData
-    for CryptarchiaConsensus<
-        A,
-        ClPool,
-        ClPoolAdapter,
-        ClPoolVerifier,
-        DaPool,
-        DaPoolAdapter,
-        DaPoolVerifier,
-        TxS,
-        BS,
-        Storage,
-    >
+impl<A, ClPool, ClPoolAdapter, DaPool, DaPoolAdapter, TxS, BS, Storage> ServiceData
+    for CryptarchiaConsensus<A, ClPool, ClPoolAdapter, DaPool, DaPoolAdapter, TxS, BS, Storage>
 where
     A: NetworkAdapter,
     ClPool: MemPool<BlockId = HeaderId>,
@@ -202,8 +167,6 @@ where
     DaPool::Key: Debug,
     ClPoolAdapter: MempoolAdapter<Payload = ClPool::Item, Key = ClPool::Key>,
     DaPoolAdapter: MempoolAdapter<Payload = DaPool::Item, Key = DaPool::Key>,
-    ClPoolVerifier: Verifier<ClPool::Item> + Send + Sync + 'static,
-    DaPoolVerifier: Verifier<DaPool::Item> + Send + Sync + 'static,
     TxS: TxSelect<Tx = ClPool::Item>,
     BS: BlobCertificateSelect<Certificate = DaPool::Item>,
     Storage: StorageBackend + Send + Sync + 'static,
@@ -216,30 +179,8 @@ where
 }
 
 #[async_trait::async_trait]
-impl<
-        A,
-        ClPool,
-        ClPoolAdapter,
-        ClPoolVerifier,
-        DaPool,
-        DaPoolAdapter,
-        DaPoolVerifier,
-        TxS,
-        BS,
-        Storage,
-    > ServiceCore
-    for CryptarchiaConsensus<
-        A,
-        ClPool,
-        ClPoolAdapter,
-        ClPoolVerifier,
-        DaPool,
-        DaPoolAdapter,
-        DaPoolVerifier,
-        TxS,
-        BS,
-        Storage,
-    >
+impl<A, ClPool, ClPoolAdapter, DaPool, DaPoolAdapter, TxS, BS, Storage> ServiceCore
+    for CryptarchiaConsensus<A, ClPool, ClPoolAdapter, DaPool, DaPoolAdapter, TxS, BS, Storage>
 where
     A: NetworkAdapter<Tx = ClPool::Item, BlobCertificate = DaPool::Item>
         + Clone
@@ -278,8 +219,6 @@ where
         MempoolAdapter<Payload = ClPool::Item, Key = ClPool::Key> + Send + Sync + 'static,
     DaPoolAdapter:
         MempoolAdapter<Payload = DaPool::Item, Key = DaPool::Key> + Send + Sync + 'static,
-    ClPoolVerifier: Verifier<ClPool::Item> + Send + Sync + 'static,
-    DaPoolVerifier: Verifier<DaPool::Item> + Send + Sync + 'static,
     TxS: TxSelect<Tx = ClPool::Item> + Clone + Send + Sync + 'static,
     TxS::Settings: Send + Sync + 'static,
     BS: BlobCertificateSelect<Certificate = DaPool::Item> + Clone + Send + Sync + 'static,
@@ -415,30 +354,8 @@ where
     }
 }
 
-impl<
-        A,
-        ClPool,
-        ClPoolAdapter,
-        ClPoolVerifier,
-        DaPool,
-        DaPoolAdapter,
-        DaPoolVerifier,
-        TxS,
-        BS,
-        Storage,
-    >
-    CryptarchiaConsensus<
-        A,
-        ClPool,
-        ClPoolAdapter,
-        ClPoolVerifier,
-        DaPool,
-        DaPoolAdapter,
-        DaPoolVerifier,
-        TxS,
-        BS,
-        Storage,
-    >
+impl<A, ClPool, ClPoolAdapter, DaPool, DaPoolAdapter, TxS, BS, Storage>
+    CryptarchiaConsensus<A, ClPool, ClPoolAdapter, DaPool, DaPoolAdapter, TxS, BS, Storage>
 where
     A: NetworkAdapter + Clone + Send + Sync + 'static,
     ClPool: MemPool<BlockId = HeaderId> + Send + Sync + 'static,
@@ -474,8 +391,6 @@ where
         MempoolAdapter<Payload = ClPool::Item, Key = ClPool::Key> + Send + Sync + 'static,
     DaPoolAdapter:
         MempoolAdapter<Payload = DaPool::Item, Key = DaPool::Key> + Send + Sync + 'static,
-    ClPoolVerifier: Verifier<ClPool::Item> + Send + Sync + 'static,
-    DaPoolVerifier: Verifier<DaPool::Item> + Send + Sync + 'static,
     Storage: StorageBackend + Send + Sync + 'static,
 {
     async fn should_stop_service(message: LifecycleMessage) -> bool {

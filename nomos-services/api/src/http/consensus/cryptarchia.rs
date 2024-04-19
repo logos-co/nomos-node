@@ -12,10 +12,7 @@ use cryptarchia_consensus::{
 };
 use full_replication::Certificate;
 use nomos_core::{
-    da::certificate::{
-        self, mock::MockKeyStore, select::FillSize as FillSizeWithBlobsCertificate,
-        verify::DaCertificateVerifier,
-    },
+    da::certificate::{self, mock::MockKeyStore, select::FillSize as FillSizeWithBlobsCertificate},
     header::HeaderId,
     tx::{mock::MockTxVerifier, select::FillSize as FillSizeWithTx, Transaction},
 };
@@ -28,10 +25,8 @@ pub type Cryptarchia<Tx, SS, const SIZE: usize> = CryptarchiaConsensus<
     ConsensusNetworkAdapter<Tx, Certificate>,
     MockPool<HeaderId, Tx, <Tx as Transaction>::Hash>,
     MempoolNetworkAdapter<Tx, <Tx as Transaction>::Hash>,
-    MockTxVerifier,
     MockPool<HeaderId, Certificate, <Certificate as certificate::Certificate>::Id>,
     MempoolNetworkAdapter<Certificate, <Certificate as certificate::Certificate>::Id>,
-    DaCertificateVerifier<[u8; 32], MockKeyStore<MockDaAuth>, Certificate>,
     FillSizeWithTx<SIZE, Tx>,
     FillSizeWithBlobsCertificate<SIZE, Certificate>,
     RocksBackend<SS>,

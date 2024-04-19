@@ -2,7 +2,6 @@ pub mod backend;
 pub mod da;
 pub mod network;
 pub mod tx;
-pub mod verifier;
 
 use backend::Status;
 use overwatch_rs::services::relay::RelayMessage;
@@ -80,7 +79,7 @@ pub struct MempoolMetrics {
     pub last_item_timestamp: u64,
 }
 
-impl<BlockId: 'static, Item: 'static, Key: 'static> RelayMessage
-    for MempoolMsg<BlockId, Item, Key>
+impl<BlockId: 'static, Payload: 'static, Item: 'static, Key: 'static> RelayMessage
+    for MempoolMsg<BlockId, Payload, Item, Key>
 {
 }

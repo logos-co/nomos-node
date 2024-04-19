@@ -20,10 +20,7 @@ use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 
 use full_replication::{Blob, Certificate};
-use nomos_core::{
-    header::HeaderId,
-    tx::{mock::MockTxVerifier, Transaction},
-};
+use nomos_core::{header::HeaderId, tx::Transaction};
 use nomos_mempool::{
     network::adapters::libp2p::Libp2pAdapter as MempoolNetworkAdapter,
     tx::service::openapi::Status, MempoolMetrics,
@@ -309,8 +306,6 @@ where
     make_request_and_return_response!(mempool::add_tx::<
         NetworkBackend,
         MempoolNetworkAdapter<Tx, <Tx as Transaction>::Hash>,
-        nomos_mempool::Transaction,
-        MockTxVerifier,
         Tx,
         <Tx as Transaction>::Hash,
     >(&handle, tx, Transaction::hash))
