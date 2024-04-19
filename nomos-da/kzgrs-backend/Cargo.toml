@@ -1,0 +1,20 @@
+[package]
+name = "kzgrs-backend"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+ark-ff = "0.4"
+blake2 = "0.10"
+ark-serialize = "0.4.2"
+ark-poly = "0.4.2"
+kzgrs = { path = "../kzgrs" }
+rand = "0.8.5"
+once_cell = "1.19"
+
+[dev-dependencies]
+rand = "0.8"
+itertools = "0.12"
+num-bigint = "0.4.4"

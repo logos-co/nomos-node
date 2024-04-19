@@ -1,10 +1,12 @@
 // std
 // crates
+use crate::BYTES_PER_FIELD_ELEMENT;
 use ark_bls12_381::fr::Fr;
-use ark_ff::{BigInteger256, PrimeField, Zero};
+use ark_ff::Zero;
 use ark_poly::domain::general::GeneralEvaluationDomain;
 use ark_poly::evaluations::univariate::Evaluations;
 use ark_poly::univariate::DensePolynomial;
+use num_bigint::BigUint;
 use thiserror::Error;
 // internal
 
@@ -33,10 +35,8 @@ pub fn bytes_to_evaluations<const CHUNK_SIZE: usize>(
             .map(|e| {
                 // use little endian for convenience as shortening 1 byte (<32 supported)
                 // do not matter in this endianness
-                let bint: BigInteger256 = Fr::from_le_bytes_mod_order(e)
-                    .try_into()
-                    .expect("Bytes size should fit for an 256 bits integer");
-                Fr::new(bint)
+                let bui = BigUint::from_bytes_le(e);
+                Fr::from(bui)
             })
             .collect(),
         domain,
@@ -52,7 +52,7 @@ pub fn bytes_to_polynomial<const CHUNK_SIZE: usize>(
     data: &[u8],
     domain: GeneralEvaluationDomain<Fr>,
 ) -> Result<(Evaluations<Fr>, DensePolynomial<Fr>), KzgRsError> {
-    if CHUNK_SIZE >= 32 {
+    if CHUNK_SIZE > BYTES_PER_FIELD_ELEMENT {
         return Err(KzgRsError::ChunkSizeTooBig(CHUNK_SIZE));
     }
     if data.len() % CHUNK_SIZE != 0 {
@@ -61,9 +61,21 @@ pub fn bytes_to_polynomial<const CHUNK_SIZE: usize>(
             current_size: data.len(),
         });
     }
+    Ok(bytes_to_polynomial_unchecked::<CHUNK_SIZE>(data, domain))
+}
+
+/// Transform chunks of bytes (of size `CHUNK_SIZE`) into `Fr` which are considered evaluations of a
+/// polynomial. Then use FFT to transform that polynomial into coefficient form.
+/// No extra checks are done for the caller.
+/// Caller need to ensure that `CHUNK_SIZE` is not bigger than the underlying `Fr` element can be
+/// decoded from.
+pub fn bytes_to_polynomial_unchecked<const CHUNK_SIZE: usize>(
+    data: &[u8],
+    domain: GeneralEvaluationDomain<Fr>,
+) -> (Evaluations<Fr>, DensePolynomial<Fr>) {
     let evals = bytes_to_evaluations::<CHUNK_SIZE>(data, domain);
     let coefficients = evals.interpolate_by_ref();
-    Ok((evals, coefficients))
+    (evals, coefficients)
 }
 
 #[cfg(test)]
