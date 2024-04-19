@@ -17,7 +17,7 @@ pub enum KzgRsError {
         expected_modulus: usize,
         current_size: usize,
     },
-    #[error("ChunkSize should be < 32 (bytes), got {0}")]
+    #[error("ChunkSize should be <= 32 (bytes), got {0}")]
     ChunkSizeTooBig(usize),
     #[error(transparent)]
     PolyCommitError(#[from] ark_poly_commit::Error),
@@ -114,8 +114,8 @@ mod test {
     #[test]
     fn encode_chunk_size_too_big() {
         assert!(matches!(
-            bytes_to_polynomial::<32>(&[], *DOMAIN),
-            Err(KzgRsError::ChunkSizeTooBig(32))
+            bytes_to_polynomial::<33>(&[], *DOMAIN),
+            Err(KzgRsError::ChunkSizeTooBig(33))
         ));
     }
 
