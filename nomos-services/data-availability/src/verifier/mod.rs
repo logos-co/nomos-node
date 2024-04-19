@@ -78,6 +78,7 @@ where
         let mut blob_stream = adapter.blob_stream().await;
         while let Some((blob, reply_channel)) = blob_stream.next().await {
             let sk = get_sk();
+            // TODO: Get list of DA nodes
             let pks = &[];
             match V::verify(&blob, sk, pks) {
                 Some(attestation) => {
@@ -96,5 +97,5 @@ where
 }
 
 fn get_sk<Sk>() -> &'static Sk {
-    todo!()
+    todo!("Sk retrieval for da verifier is not yet implemented")
 }
