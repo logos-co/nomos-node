@@ -1,6 +1,5 @@
 use std::{fmt::Debug, hash::Hash};
 
-use nomos_da::auth::mock::MockDaAuth;
 use overwatch_rs::overwatch::handle::OverwatchHandle;
 use serde::{de::DeserializeOwned, Serialize};
 use tokio::sync::oneshot;
@@ -14,7 +13,7 @@ use full_replication::Certificate;
 use nomos_core::{
     da::certificate::{self, mock::MockKeyStore, select::FillSize as FillSizeWithBlobsCertificate},
     header::HeaderId,
-    tx::{mock::MockTxVerifier, select::FillSize as FillSizeWithTx, Transaction},
+    tx::{select::FillSize as FillSizeWithTx, Transaction},
 };
 use nomos_mempool::{
     backend::mockpool::MockPool, network::adapters::libp2p::Libp2pAdapter as MempoolNetworkAdapter,

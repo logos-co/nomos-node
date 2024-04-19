@@ -1,7 +1,7 @@
 use futures::stream::{self, StreamExt};
 use std::collections::HashSet;
 use std::time::Duration;
-use tests::{adjust_timeout, Node, NomosNode, SpawnConfig};
+use tests::{adjust_timeout, nodes::NomosNode, Node, SpawnConfig};
 
 // how many times more than the expected time to produce a predefined number of blocks we wait before timing out
 const TIMEOUT_MULTIPLIER: f64 = 3.0;

@@ -89,15 +89,3 @@ impl<V> MockKeyStore<V> {
         self.keys.insert(*voter, verifier);
     }
 }
-
-#[derive(Default)]
-pub struct MockCertVerifier;
-
-impl MockCertVerifier {
-    pub fn verify_cert<C>(&self, _cert: &C) -> bool
-    where
-        C: Certificate,
-    {
-        true
-    }
-}

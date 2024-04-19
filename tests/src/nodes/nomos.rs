@@ -107,7 +107,7 @@ impl NomosNode {
 
     async fn wait_online(&self) {
         loop {
-            let res = self.get("da/metrics").await;
+            let res = self.get("cl/metrics").await;
             if res.is_ok() && res.unwrap().status().is_success() {
                 break;
             }
@@ -374,16 +374,6 @@ fn create_node_config(
                     .parse()
                     .unwrap(),
                 cors_origins: vec![],
-            },
-        },
-        da: nomos_da::Settings {
-            da_protocol: full_replication::Settings {
-                voter: id,
-                num_attestations: 1,
-            },
-            backend: nomos_da::backend::memory_cache::BlobCacheSettings {
-                max_capacity: usize::MAX,
-                evicting_period: Duration::from_secs(60 * 60 * 24), // 1 day
             },
         },
     };
