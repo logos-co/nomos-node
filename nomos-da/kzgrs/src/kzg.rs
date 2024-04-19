@@ -28,7 +28,7 @@ pub fn generate_element_proof(
     element_index: usize,
     polynomial: &DensePolynomial<Fr>,
     global_parameters: &UniversalParams<Bls12_381>,
-    domain: &GeneralEvaluationDomain<Fr>,
+    domain: GeneralEvaluationDomain<Fr>,
 ) -> Result<Proof<Bls12_381>, KzgRsError> {
     let u = domain.element(element_index);
     let v = polynomial.evaluate(&u);
@@ -49,7 +49,7 @@ pub fn verify_element_proof(
     element: &Fr,
     commitment: &Commitment<Bls12_381>,
     proof: &Proof<Bls12_381>,
-    domain: &GeneralEvaluationDomain<Fr>,
+    domain: GeneralEvaluationDomain<Fr>,
     global_parameters: &UniversalParams<Bls12_381>,
 ) -> bool {
     let u = domain.element(element_index);
@@ -103,7 +103,7 @@ mod test {
         let (_, poly) = bytes_to_polynomial::<31>(&bytes, *DOMAIN).unwrap();
         let commitment = commit_polynomial(&poly, &GLOBAL_PARAMETERS).unwrap();
         let proofs: Vec<_> = (0..10)
-            .map(|i| generate_element_proof(i, &poly, &GLOBAL_PARAMETERS, &DOMAIN).unwrap())
+            .map(|i| generate_element_proof(i, &poly, &GLOBAL_PARAMETERS, *DOMAIN).unwrap())
             .collect();
         for (i, (element, proof)) in evaluations.iter().zip(proofs.iter()).enumerate() {
             // verifying works
@@ -112,7 +112,7 @@ mod test {
                 element,
                 &commitment,
                 proof,
-                &DOMAIN,
+                *DOMAIN,
                 &GLOBAL_PARAMETERS
             ));
             // verification fails for other items
@@ -122,7 +122,7 @@ mod test {
                     element,
                     &commitment,
                     proof,
-                    &DOMAIN,
+                    *DOMAIN,
                     &GLOBAL_PARAMETERS
                 ));
             }

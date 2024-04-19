@@ -14,14 +14,14 @@ pub fn encode(
     polynomial: &DensePolynomial<Fr>,
     evaluations: &Evaluations<Fr>,
     factor: usize,
-    domain: &GeneralEvaluationDomain<Fr>,
+    domain: GeneralEvaluationDomain<Fr>,
 ) -> Evaluations<Fr> {
     assert!(factor > 1);
     Evaluations::from_vec_and_domain(
         (0..evaluations.evals.len() * factor)
             .map(|i| polynomial.evaluate(&domain.element(i)))
             .collect(),
-        *domain,
+        domain,
     )
 }
 
@@ -31,7 +31,7 @@ pub fn encode(
 pub fn decode(
     original_chunks_len: usize,
     points: &[Option<Fr>],
-    domain: &GeneralEvaluationDomain<Fr>,
+    domain: GeneralEvaluationDomain<Fr>,
 ) -> Evaluations<Fr> {
     let (points, roots_of_unity): (Vec<Fr>, Vec<Fr>) = points
         .iter()
@@ -49,7 +49,7 @@ pub fn decode(
         (0..original_chunks_len)
             .map(|i| coeffs.evaluate(&domain.element(i)))
             .collect(),
-        *domain,
+        domain,
     )
 }
 
@@ -88,8 +88,7 @@ pub fn points_to_bytes<const CHUNK_SIZE: usize>(points: &[Fr]) -> Vec<u8> {
     }
     points
         .iter()
-        .map(point_to_buff::<CHUNK_SIZE>)
-        .flatten()
+        .flat_map(point_to_buff::<CHUNK_SIZE>)
         .collect()
 }
 
@@ -114,10 +113,10 @@ mod test {
 
         let (evals, poly) = bytes_to_polynomial::<31>(&bytes, *DOMAIN).unwrap();
 
-        let encoded = encode(&poly, &evals, 2, &DOMAIN);
+        let encoded = encode(&poly, &evals, 2, *DOMAIN);
         let mut encoded: Vec<Option<Fr>> = encoded.evals.into_iter().map(Some).collect();
 
-        let decoded = decode(10, &encoded, &DOMAIN);
+        let decoded = decode(10, &encoded, *DOMAIN);
         let decoded_bytes = points_to_bytes::<31>(&decoded.evals);
         assert_eq!(decoded_bytes, bytes);
 
