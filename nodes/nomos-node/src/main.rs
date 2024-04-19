@@ -97,8 +97,3 @@ fn main() -> Result<()> {
     app.wait_finished();
     Ok(())
 }
-
-fn cert_id(cert: &Certificate) -> <Certificate as certificate::Certificate>::Id {
-    use certificate::Certificate;
-    cert.id()
-}

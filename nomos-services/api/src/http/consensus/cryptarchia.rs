@@ -11,7 +11,7 @@ use cryptarchia_consensus::{
 };
 use full_replication::Certificate;
 use nomos_core::{
-    da::certificate::{self, mock::MockKeyStore, select::FillSize as FillSizeWithBlobsCertificate},
+    da::certificate::{self, select::FillSize as FillSizeWithBlobsCertificate},
     header::HeaderId,
     tx::{select::FillSize as FillSizeWithTx, Transaction},
 };

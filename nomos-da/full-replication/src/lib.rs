@@ -103,14 +103,6 @@ pub struct Blob {
     data: Bytes,
 }
 
-fn hasher(blob: &Blob) -> [u8; 32] {
-    let mut hasher = Blake2bVar::new(32).unwrap();
-    hasher.update(&blob.data);
-    let mut output = [0; 32];
-    hasher.finalize_variable(&mut output).unwrap();
-    output
-}
-
 #[derive(Default, Debug, Copy, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub struct Metadata {
     app_id: [u8; 32],
@@ -137,12 +129,12 @@ pub struct CertificateVerificationParameters {
 impl certificate::Certificate for Certificate {
     type Id = [u8; 32];
     type Signature = [u8; 32];
-    type AuthParams = ();
+    type VerificationParameters = ();
 
     fn signature(&self) -> Self::Signature {
         let mut signatures = Vec::new();
         for attestation in &self.attestations {
-            signatures.extend_from_slice(&attestation.signature());
+            signatures.extend_from_slice(attestation.signature());
         }
         hash(signatures)
     }
@@ -162,7 +154,7 @@ impl certificate::Certificate for Certificate {
         todo!()
     }
 
-    fn verify(&self, params: Self::AuthParams) -> bool {
+    fn verify(&self, _: Self::VerificationParameters) -> bool {
         todo!()
     }
 }

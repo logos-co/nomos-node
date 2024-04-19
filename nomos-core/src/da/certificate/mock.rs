@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use crate::da::{attestation::Attestation, certificate::Certificate};
 
 #[derive(Clone, Debug, PartialEq)]
@@ -49,7 +47,7 @@ impl MockCertificate {
 impl Certificate for MockCertificate {
     type Signature = [u8; 32];
     type Id = [u8; 32];
-    type AuthParams = ();
+    type VerificationParameters = ();
 
     fn signers(&self) -> Vec<bool> {
         todo!()
@@ -63,29 +61,7 @@ impl Certificate for MockCertificate {
         todo!()
     }
 
-    fn verify(&self, _: Self::AuthParams) -> bool {
+    fn verify(&self, _: Self::VerificationParameters) -> bool {
         todo!()
-    }
-}
-
-#[derive(Clone)]
-pub struct MockPublicKey;
-
-#[derive(Clone, Debug)]
-pub struct MockKeyStore<V> {
-    keys: HashMap<[u8; 32], V>,
-}
-
-impl<V> Default for MockKeyStore<V> {
-    fn default() -> Self {
-        Self {
-            keys: Default::default(),
-        }
-    }
-}
-
-impl<V> MockKeyStore<V> {
-    pub fn add_key(&mut self, voter: &[u8; 32], verifier: V) {
-        self.keys.insert(*voter, verifier);
     }
 }

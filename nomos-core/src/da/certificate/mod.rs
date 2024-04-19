@@ -6,12 +6,12 @@ pub mod vid;
 pub trait Certificate {
     type Signature;
     type Id;
-    type AuthParams;
+    type VerificationParameters;
 
     fn signers(&self) -> Vec<bool>;
     fn signature(&self) -> Self::Signature;
     fn id(&self) -> Self::Id;
-    fn verify(&self, params: Self::AuthParams) -> bool;
+    fn verify(&self, verification_params: Self::VerificationParameters) -> bool;
 }
 
 pub trait BlobCertificateSelect {

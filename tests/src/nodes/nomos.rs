@@ -343,7 +343,7 @@ fn build_mixnet_topology(mixnode_candidates: &[&Config]) -> MixnetTopology {
 }
 
 fn create_node_config(
-    id: [u8; 32],
+    _id: [u8; 32],
     genesis_state: LedgerState,
     config: cryptarchia_ledger::Config,
     coins: Vec<Coin>,
