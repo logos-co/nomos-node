@@ -1,6 +1,12 @@
-use blake2::digest::{Update, VariableOutput};
-use kzgrs::Commitment;
+// std
+use ark_serialize::CanonicalSerialize;
 use std::io::Cursor;
+// crates
+use blake2::digest::{Update, VariableOutput};
+use blst::min_sig::Signature;
+use sha3::{Digest, Sha3_256};
+// internal
+use kzgrs::Commitment;
 
 #[derive(Clone, Eq, PartialEq, Debug)]
 pub struct Chunk(pub Vec<u8>);
@@ -65,6 +71,18 @@ impl FromIterator<Chunk> for Column {
     }
 }
 
+impl AsRef<[Chunk]> for Row {
+    fn as_ref(&self) -> &[Chunk] {
+        &self.0
+    }
+}
+
+impl AsRef<[Chunk]> for Column {
+    fn as_ref(&self) -> &[Chunk] {
+        &self.0
+    }
+}
+
 impl ChunksMatrix {
     pub fn len(&self) -> usize {
         self.0.len()
@@ -101,18 +119,40 @@ pub fn hash_column_and_commitment<const HASH_SIZE: usize>(
     column: &Column,
     commitment: &Commitment,
 ) -> [u8; HASH_SIZE] {
-    use ark_serialize::CanonicalSerialize;
     let mut hasher = blake2::Blake2bVar::new(HASH_SIZE)
         .unwrap_or_else(|e| panic!("Blake2b should work for size {HASH_SIZE}, {e}"));
     hasher.update(column.as_bytes().as_ref());
-    let mut buff = Cursor::new(vec![]);
-    commitment
-        .serialize_uncompressed(&mut buff)
-        .expect("Serialization of commitment should work");
-    hasher.update(buff.into_inner().as_ref());
+    hasher.update(commitment_to_bytes(commitment).as_ref());
     hasher
         .finalize_boxed()
         .to_vec()
         .try_into()
         .unwrap_or_else(|_| panic!("Size is guaranteed by constant {HASH_SIZE:?}"))
+}
+
+pub fn build_attestation_message(
+    aggregated_column_commitment: &Commitment,
+    rows_commitments: &[Commitment],
+) -> Vec<u8> {
+    let mut hasher = Sha3_256::new();
+    Digest::update(
+        &mut hasher,
+        commitment_to_bytes(aggregated_column_commitment),
+    );
+    for c in rows_commitments {
+        Digest::update(&mut hasher, commitment_to_bytes(c));
+    }
+    hasher.finalize().to_vec()
+}
+
+pub fn commitment_to_bytes(commitment: &Commitment) -> Vec<u8> {
+    let mut buff = Cursor::new(vec![]);
+    commitment
+        .serialize_uncompressed(&mut buff)
+        .expect("Serialization of commitment should work");
+    buff.into_inner()
+}
+
+pub struct Attestation {
+    pub signature: Signature,
 }
