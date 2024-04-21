@@ -1,8 +1,7 @@
 // std
-use ark_ff::{BigInteger, PrimeField};
 use std::ops::Div;
 // crates
-
+use ark_ff::{BigInteger, PrimeField};
 // internal
 use crate::common::{hash_column_and_commitment, Chunk, ChunksMatrix, Row};
 use crate::global::{DOMAIN, GLOBAL_PARAMETERS};
@@ -18,7 +17,7 @@ pub struct DaEncoderParams {
 }
 
 impl DaEncoderParams {
-    const MAX_BLS12_381_ENCODING_CHUNK_SIZE: usize = 31;
+    pub const MAX_BLS12_381_ENCODING_CHUNK_SIZE: usize = 31;
 
     const fn default_with(column_count: usize) -> Self {
         Self { column_count }
@@ -26,14 +25,14 @@ impl DaEncoderParams {
 }
 
 pub struct EncodedData {
-    data: Vec<u8>,
-    chunked_data: ChunksMatrix,
-    extended_data: ChunksMatrix,
-    row_commitments: Vec<Commitment>,
-    rows_proofs: Vec<Vec<Proof>>,
-    column_commitments: Vec<Commitment>,
-    aggregated_column_commitment: Commitment,
-    aggregated_column_proofs: Vec<Proof>,
+    pub data: Vec<u8>,
+    pub chunked_data: ChunksMatrix,
+    pub extended_data: ChunksMatrix,
+    pub row_commitments: Vec<Commitment>,
+    pub rows_proofs: Vec<Vec<Proof>>,
+    pub column_commitments: Vec<Commitment>,
+    pub aggregated_column_commitment: Commitment,
+    pub aggregated_column_proofs: Vec<Proof>,
 }
 
 pub struct DaEncoder {
@@ -63,6 +62,7 @@ impl DaEncoder {
             .collect()
     }
 
+    #[allow(clippy::type_complexity)]
     fn compute_kzg_row_commitments(
         matrix: &ChunksMatrix,
     ) -> Result<Vec<((Evaluations, Polynomial), Commitment)>, KzgRsError> {
@@ -106,6 +106,7 @@ impl DaEncoder {
             .collect()
     }
 
+    #[allow(clippy::type_complexity)]
     fn compute_kzg_column_commitments(
         matrix: &ChunksMatrix,
     ) -> Result<Vec<((Evaluations, Polynomial), Commitment)>, KzgRsError> {
