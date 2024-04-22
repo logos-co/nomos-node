@@ -1,5 +1,5 @@
 use core::{fmt::Debug, hash::Hash};
-use nomos_core::header::HeaderId;
+use nomos_core::{da::certificate::Certificate, header::HeaderId};
 use nomos_mempool::{
     backend::mockpool::MockPool, network::NetworkAdapter, DaMempoolService, MempoolMsg,
     TxMempoolService,
@@ -43,12 +43,13 @@ where
 
 pub async fn add_cert<N, A, Item, Key>(
     handle: &overwatch_rs::overwatch::handle::OverwatchHandle,
-    item: Item,
-    converter: impl Fn(&Item) -> Key,
+    item: A::Payload,
+    converter: impl Fn(&A::Payload) -> Key,
 ) -> Result<(), super::DynError>
 where
     N: NetworkBackend,
-    A: NetworkAdapter<Backend = N, Payload = Item, Key = Key> + Send + Sync + 'static,
+    A: NetworkAdapter<Backend = N, Key = Key> + Send + Sync + 'static,
+    A::Payload: Certificate + Into<Item> + Debug,
     A::Settings: Send + Sync,
     Item: Clone + Debug + Send + Sync + 'static + Hash,
     Key: Clone + Debug + Ord + Hash + 'static,

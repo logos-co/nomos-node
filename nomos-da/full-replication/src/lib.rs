@@ -129,7 +129,7 @@ pub struct CertificateVerificationParameters {
 impl certificate::Certificate for Certificate {
     type Id = [u8; 32];
     type Signature = [u8; 32];
-    type VerificationParameters = ();
+    type VerificationParameters = CertificateVerificationParameters;
 
     fn signature(&self) -> Self::Signature {
         let mut signatures = Vec::new();
@@ -151,11 +151,15 @@ impl certificate::Certificate for Certificate {
     }
 
     fn signers(&self) -> Vec<bool> {
-        todo!()
+        unimplemented!()
     }
 
-    fn verify(&self, _: Self::VerificationParameters) -> bool {
-        todo!()
+    fn verify(&self, params: Self::VerificationParameters) -> bool {
+        if self.attestations.len() >= params.threshold {
+            return true;
+        }
+
+        false
     }
 }
 
@@ -163,8 +167,8 @@ impl metadata::Metadata for Certificate {
     type AppId = [u8; 32];
     type Index = u64;
 
-    fn metadata(&self) -> (Self::AppId, Self::Index) {
-        (self.metadata.app_id, self.metadata.index)
+    fn metadata(&self) -> Option<(Self::AppId, Self::Index)> {
+        Some((self.metadata.app_id, self.metadata.index))
     }
 }
 

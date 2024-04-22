@@ -19,7 +19,6 @@ use tower_http::{
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 
-use full_replication::{Blob, Certificate};
 use nomos_core::{header::HeaderId, tx::Transaction};
 use nomos_mempool::{
     network::adapters::libp2p::Libp2pAdapter as MempoolNetworkAdapter,
