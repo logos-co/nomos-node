@@ -155,11 +155,7 @@ impl certificate::Certificate for Certificate {
     }
 
     fn verify(&self, params: Self::VerificationParameters) -> bool {
-        if self.attestations.len() >= params.threshold {
-            return true;
-        }
-
-        false
+        self.attestations.len() >= params.threshold
     }
 }
 
