@@ -132,11 +132,12 @@ impl certificate::Certificate for Certificate {
     type VerificationParameters = CertificateVerificationParameters;
 
     fn signature(&self) -> Self::Signature {
+        let mut attestations = self.attestations.clone();
+        attestations.sort();
         let mut signatures = Vec::new();
-        for attestation in &self.attestations {
+        for attestation in &attestations {
             signatures.extend_from_slice(attestation.signature());
         }
-        signatures.sort();
         hash(signatures)
     }
 

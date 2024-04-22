@@ -7,7 +7,7 @@ pub trait Signer {
     fn sign(&self, message: &[u8]) -> Vec<u8>;
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, PartialOrd, Ord)]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct Attestation {
     blob_hash: [u8; 32],
