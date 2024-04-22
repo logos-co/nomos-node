@@ -136,6 +136,7 @@ impl certificate::Certificate for Certificate {
         for attestation in &self.attestations {
             signatures.extend_from_slice(attestation.signature());
         }
+        signatures.sort();
         hash(signatures)
     }
 
