@@ -73,6 +73,14 @@ fn main() -> Result<()> {
                 },
                 registry: registry.clone(),
             },
+            da_mempool: nomos_mempool::DaMempoolSettings {
+                backend: (),
+                network: AdapterSettings {
+                    topic: String::from(nomos_node::DA_TOPIC),
+                    id: <Certificate as certificate::Certificate>::id,
+                },
+                registry: registry.clone(),
+            },
             cryptarchia: config.cryptarchia,
             #[cfg(feature = "metrics")]
             metrics: MetricsSettings { registry },
@@ -88,9 +96,4 @@ fn main() -> Result<()> {
     .map_err(|e| eyre!("Error encountered: {}", e))?;
     app.wait_finished();
     Ok(())
-}
-
-fn cert_id(cert: &Certificate) -> <Certificate as certificate::Certificate>::Id {
-    use certificate::Certificate;
-    cert.id()
 }

@@ -110,7 +110,7 @@ mod test {
             let eval_point = DOMAIN.element(i);
             let point = poly.evaluate(&eval_point);
             // check point is the same
-            assert_eq!(evals[i as usize], point);
+            assert_eq!(evals[i], point);
             // check point bytes are the same
             assert_eq!(
                 &bytes[CHUNK_SIZE * i..CHUNK_SIZE * i + CHUNK_SIZE],

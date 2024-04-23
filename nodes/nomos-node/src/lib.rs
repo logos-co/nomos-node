@@ -58,11 +58,17 @@ pub type TxMempool = TxMempoolService<
     MockPool<HeaderId, Tx, <Tx as Transaction>::Hash>,
 >;
 
+pub type DaMempool = DaMempoolService<
+    MempoolNetworkAdapter<Certificate, <Certificate as certificate::Certificate>::Id>,
+    MockPool<HeaderId, Certificate, <Certificate as certificate::Certificate>::Id>,
+>;
+
 #[derive(Services)]
 pub struct Nomos {
     logging: ServiceHandle<Logger>,
     network: ServiceHandle<NetworkService<NetworkBackend>>,
     cl_mempool: ServiceHandle<TxMempool>,
+    da_mempool: ServiceHandle<DaMempool>,
     cryptarchia: ServiceHandle<Cryptarchia>,
     http: ServiceHandle<ApiService<AxumBackend<Tx, Wire, MB16>>>,
     storage: ServiceHandle<StorageService<RocksBackend<Wire>>>,
