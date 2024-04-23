@@ -1,13 +1,17 @@
+pub mod metadata;
+pub mod mock;
 pub mod select;
+pub mod vid;
 
 pub trait Certificate {
-    type VerificationParameters;
     type Signature;
     type Id;
+    type VerificationParameters;
+
     fn signers(&self) -> Vec<bool>;
     fn signature(&self) -> Self::Signature;
     fn id(&self) -> Self::Id;
-    fn verify(&self, authorization_parameters: Self::VerificationParameters) -> bool;
+    fn verify(&self, verification_params: Self::VerificationParameters) -> bool;
 }
 
 pub trait BlobCertificateSelect {
@@ -19,4 +23,18 @@ pub trait BlobCertificateSelect {
         &self,
         certificates: I,
     ) -> impl Iterator<Item = Self::Certificate> + 'i;
+}
+
+pub trait CertificateStrategy {
+    type Attestation;
+    type Certificate;
+    type Metadata: metadata::Metadata;
+
+    fn can_build(&self, attestations: &[Self::Attestation]) -> bool;
+    fn build(
+        &self,
+        attestations: Vec<Self::Attestation>,
+        app_id: <Self::Metadata as metadata::Metadata>::AppId,
+        index: <Self::Metadata as metadata::Metadata>::Index,
+    ) -> Self::Certificate;
 }
