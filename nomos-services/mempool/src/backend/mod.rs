@@ -21,7 +21,11 @@ pub trait MemPool {
     fn new(settings: Self::Settings) -> Self;
 
     /// Add a new item to the mempool, for example because we received it from the network
-    fn add_item(&mut self, key: Self::Key, item: Self::Item) -> Result<(), MempoolError>;
+    fn add_item<I: Into<Self::Item>>(
+        &mut self,
+        key: Self::Key,
+        item: I,
+    ) -> Result<(), MempoolError>;
 
     /// Return a view over items contained in the mempool.
     /// Implementations should provide *at least* all the items which have not been marked as

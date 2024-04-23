@@ -28,7 +28,7 @@ use tracing::error;
 
 pub struct TxMempoolService<N, P>
 where
-    N: NetworkAdapter<Item = P::Item, Key = P::Key>,
+    N: NetworkAdapter<Payload = P::Item, Key = P::Key>,
     P: MemPool,
     P::Settings: Clone,
     P::Item: Debug + 'static,
@@ -44,7 +44,7 @@ where
 
 impl<N, P> ServiceData for TxMempoolService<N, P>
 where
-    N: NetworkAdapter<Item = P::Item, Key = P::Key>,
+    N: NetworkAdapter<Payload = P::Item, Key = P::Key>,
     P: MemPool,
     P::Settings: Clone,
     P::Item: Debug + 'static,
@@ -55,7 +55,12 @@ where
     type Settings = TxMempoolSettings<P::Settings, N::Settings>;
     type State = NoState<Self::Settings>;
     type StateOperator = NoOperator<Self::State>;
-    type Message = MempoolMsg<<P as MemPool>::BlockId, <P as MemPool>::Item, <P as MemPool>::Key>;
+    type Message = MempoolMsg<
+        <P as MemPool>::BlockId,
+        <P as MemPool>::Item,
+        <P as MemPool>::Item,
+        <P as MemPool>::Key,
+    >;
 }
 
 #[async_trait::async_trait]
@@ -67,7 +72,7 @@ where
     P::Item: Clone + Debug + Send + Sync + 'static,
     P::Key: Debug + Send + Sync + 'static,
     P::BlockId: Send + Debug + 'static,
-    N: NetworkAdapter<Item = P::Item, Key = P::Key> + Send + Sync + 'static,
+    N: NetworkAdapter<Payload = P::Item, Key = P::Key> + Send + Sync + 'static,
 {
     fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, overwatch_rs::DynError> {
         let network_relay = service_state.overwatch_handle.relay();
@@ -106,7 +111,7 @@ where
         );
         let adapter = adapter.await;
 
-        let mut network_items = adapter.transactions_stream().await;
+        let mut network_items = adapter.payload_stream().await;
         let mut lifecycle_stream = service_state.lifecycle_handle.message_stream();
 
         loop {
@@ -140,7 +145,7 @@ where
     P::Item: Clone + Debug + Send + Sync + 'static,
     P::Key: Debug + Send + Sync + 'static,
     P::BlockId: Debug + Send + 'static,
-    N: NetworkAdapter<Item = P::Item, Key = P::Key> + Send + Sync + 'static,
+    N: NetworkAdapter<Payload = P::Item, Key = P::Key> + Send + Sync + 'static,
 {
     async fn should_stop_service(message: LifecycleMessage) -> bool {
         match message {
@@ -158,14 +163,14 @@ where
     }
 
     async fn handle_mempool_message(
-        message: MempoolMsg<P::BlockId, P::Item, P::Key>,
+        message: MempoolMsg<P::BlockId, P::Item, P::Item, P::Key>,
         pool: &mut P,
         network_relay: &mut OutboundRelay<NetworkMsg<N::Backend>>,
         service_state: &mut ServiceStateHandle<Self>,
     ) {
         match message {
             MempoolMsg::Add {
-                item,
+                payload: item,
                 key,
                 reply_channel,
             } => {

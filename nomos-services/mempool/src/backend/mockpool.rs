@@ -55,11 +55,15 @@ where
         Self::new()
     }
 
-    fn add_item(&mut self, key: Self::Key, item: Self::Item) -> Result<(), MempoolError> {
+    fn add_item<I: Into<Self::Item>>(
+        &mut self,
+        key: Self::Key,
+        item: I,
+    ) -> Result<(), MempoolError> {
         if self.pending_items.contains_key(&key) || self.in_block_items_by_id.contains_key(&key) {
             return Err(MempoolError::ExistingItem);
         }
-        self.pending_items.insert(key, item);
+        self.pending_items.insert(key, item.into());
         self.last_item_timestamp = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap()
