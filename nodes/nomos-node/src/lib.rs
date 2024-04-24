@@ -13,6 +13,7 @@ pub use config::{Config, CryptarchiaArgs, HttpArgs, LogArgs, MetricsArgs, Networ
 use nomos_api::ApiService;
 use nomos_core::{da::certificate, header::HeaderId, tx::Transaction, wire};
 use nomos_log::Logger;
+use nomos_mempool::da::verify::fullreplication::DaVerificationProvider as MempoolVerificationProvider;
 use nomos_mempool::network::adapters::libp2p::Libp2pAdapter as MempoolNetworkAdapter;
 use nomos_mempool::{backend::mockpool::MockPool, TxMempoolService};
 #[cfg(feature = "metrics")]
@@ -48,6 +49,7 @@ pub type Cryptarchia = cryptarchia_consensus::CryptarchiaConsensus<
     MempoolNetworkAdapter<Tx, <Tx as Transaction>::Hash>,
     MockPool<HeaderId, Certificate, <Certificate as certificate::Certificate>::Id>,
     MempoolNetworkAdapter<Certificate, <Certificate as certificate::Certificate>::Id>,
+    MempoolVerificationProvider,
     FillSizeWithTx<MB16, Tx>,
     FillSizeWithBlobsCertificate<MB16, Certificate>,
     RocksBackend<Wire>,
@@ -61,6 +63,7 @@ pub type TxMempool = TxMempoolService<
 pub type DaMempool = DaMempoolService<
     MempoolNetworkAdapter<Certificate, <Certificate as certificate::Certificate>::Id>,
     MockPool<HeaderId, Certificate, <Certificate as certificate::Certificate>::Id>,
+    MempoolVerificationProvider,
 >;
 
 #[derive(Services)]

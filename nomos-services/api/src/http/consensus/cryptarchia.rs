@@ -16,7 +16,9 @@ use nomos_core::{
     tx::{select::FillSize as FillSizeWithTx, Transaction},
 };
 use nomos_mempool::{
-    backend::mockpool::MockPool, network::adapters::libp2p::Libp2pAdapter as MempoolNetworkAdapter,
+    backend::mockpool::MockPool,
+    da::verify::fullreplication::DaVerificationProvider as MempoolVerificationProvider,
+    network::adapters::libp2p::Libp2pAdapter as MempoolNetworkAdapter,
 };
 use nomos_storage::backends::{rocksdb::RocksBackend, StorageSerde};
 
@@ -26,6 +28,7 @@ pub type Cryptarchia<Tx, SS, const SIZE: usize> = CryptarchiaConsensus<
     MempoolNetworkAdapter<Tx, <Tx as Transaction>::Hash>,
     MockPool<HeaderId, Certificate, <Certificate as certificate::Certificate>::Id>,
     MempoolNetworkAdapter<Certificate, <Certificate as certificate::Certificate>::Id>,
+    MempoolVerificationProvider,
     FillSizeWithTx<SIZE, Tx>,
     FillSizeWithBlobsCertificate<SIZE, Certificate>,
     RocksBackend<SS>,
