@@ -2,28 +2,64 @@ log:
   backend: "Stdout"
   format: "Json"
   level: "debug"
-consensus:
-  private_key: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-  fountain_settings: null
-  overlay_settings:
-    nodes: ["0000000000000000000000000000000000000000000000000000000000000000", "0000000000000000000000000000000000000000000000000000000000000001"]
-    number_of_committees: 1
-    current_leader: 0000000000000000000000000000000000000000000000000000000000000000
-    leader:
-      cur: 0
-    committee_membership: !Sad
-      entropy: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-    super_majority_threshold: 1
+
+cryptarchia:
+  config:
+    epoch_stake_distribution_stabilization: 3
+    epoch_period_nonce_buffer: 3
+    epoch_period_nonce_stabilization: 4
+    consensus_config:
+      security_param: 10
+      active_slot_coeff: 0.9
+  time:
+    slot_duration:
+      secs: 1
+      nanos: 0
+    chain_start_time: [2024, 115, 6, 45, 44, 159214915, 0, 0, 0]
+  coins:
+  - sk: [183, 50, 199, 33, 53, 46, 43, 123, 6, 173, 255, 66, 183, 156, 146, 221, 80, 102, 22, 155, 216, 234, 28, 99, 107, 231, 99, 27, 250, 17, 36, 108]
+    nonce: b732c721352e2b7b06adff42b79c92dd5066169bd8ea1c636be7631bfa11246c
+    value: 1
+  genesis_state:
+    lead_commitments:
+    - b4a58d7e250492d34624e511350a18013a413069939f294ab396feb3999155f5
+    - 11375eb29f3be52d44535a725bc791735051b01dd499f8d48cef97d4e7b53dce
+    spend_commitments:
+    - b4a58d7e250492d34624e511350a18013a413069939f294ab396feb3999155f5
+    - 11375eb29f3be52d44535a725bc791735051b01dd499f8d48cef97d4e7b53dce
+    nullifiers: []
+    nonce: '0000000000000000000000000000000000000000000000000000000000000000'
+    slot: 0
+    next_epoch_state:
+      epoch: 1
+      nonce: '0000000000000000000000000000000000000000000000000000000000000000'
+      commitments: []
+      total_stake: 2
+    epoch_state:
+      epoch: 0
+      nonce: '0000000000000000000000000000000000000000000000000000000000000000'
+      commitments: []
+      total_stake: 2
 
 network:
   backend:
     host: 0.0.0.0
     port: 3000
-    log_level: "fatal"
-    node_key: "0000000000000000000000000000000000000000000000000000000000000001"
-    discV5BootstrapNodes: []
+    node_key: 40fb62acf1604000c1b8d3bd0880e43eb2f6ae52029fde75d992ba0fed6e01c3
     initial_peers: []
-    relayTopics: []
+    mixnet:
+      mixclient:
+        topology:
+          mixnode_candidates:
+          - address: 127.0.0.1:3000
+            public_key: [110, 177, 93, 41, 184, 16, 49, 126, 195, 57, 202, 199, 160, 161, 47, 195, 221, 40, 143, 151, 38, 250, 22, 82, 40, 83, 91, 3, 200, 239, 155, 67]
+          num_layers: 1
+          num_mixnodes_per_layer: 1
+        emission_rate_per_min: 600.0
+        redundancy: 1
+      mixnode:
+        encryption_private_key: [183, 50, 199, 33, 53, 46, 43, 123, 6, 173, 255, 66, 183, 156, 146, 221, 80, 102, 22, 155, 216, 234, 28, 99, 107, 231, 99, 27, 250, 17, 36, 108]
+        delay_rate_per_min: 60000.0
 
 http:
   backend_settings:
@@ -32,7 +68,7 @@ http:
 
 da:
   da_protocol:
-    voter: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    voter: [183, 50, 199, 33, 53, 46, 43, 123, 6, 173, 255, 66, 183, 156, 146, 221, 80, 102, 22, 155, 216, 234, 28, 99, 107, 231, 99, 27, 250, 17, 36, 108]
     num_attestations: 1
   backend:
     max_capacity: 10
