@@ -210,10 +210,6 @@ impl SwarmHandler {
                 self.pending_dials.insert(connection_id, dial);
             }
             Err(e) => {
-                tracing::error!(
-                    "Failed to connect to {} with unretriable error: {e}",
-                    dial.addr
-                );
                 if let Err(err) = dial.result_sender.send(Err(e)) {
                     tracing::warn!("failed to send the Err result of dialing: {err:?}");
                 }
