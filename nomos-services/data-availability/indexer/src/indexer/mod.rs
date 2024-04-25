@@ -1,11 +1,8 @@
+use std::ops::Range;
+
 use nomos_core::da::certificate::{metadata::Metadata, vid::VID};
 
 use crate::storage::DaStorageAdapter;
-
-pub struct Range<Index> {
-    pub from: Index,
-    pub to: Index,
-}
 
 #[async_trait::async_trait]
 pub trait DaIndexer {

@@ -108,60 +108,6 @@ pub struct DataIndexerService<
     >,
 }
 
-impl<
-        Indexer,
-        DaStorage,
-        Consensus,
-        A,
-        ClPool,
-        ClPoolAdapter,
-        DaPool,
-        DaPoolAdapter,
-        DaVerificationProvider,
-        TxS,
-        BS,
-        ConsensusStorage,
-    >
-    DataIndexerService<
-        Indexer,
-        DaStorage,
-        Consensus,
-        A,
-        ClPool,
-        ClPoolAdapter,
-        DaPool,
-        DaPoolAdapter,
-        DaVerificationProvider,
-        TxS,
-        BS,
-        ConsensusStorage,
-    >
-where
-    Indexer: DaIndexer,
-    Indexer::Blob: 'static,
-    Indexer::VID: 'static,
-    A: NetworkAdapter,
-    ClPoolAdapter: MempoolAdapter<Payload = ClPool::Item, Key = ClPool::Key>,
-    ClPool: MemPool<BlockId = HeaderId>,
-    DaPool: MemPool<BlockId = HeaderId>,
-    DaPoolAdapter: MempoolAdapter<Key = DaPool::Key>,
-    DaPoolAdapter::Payload: Certificate + Into<DaPool::Item> + Debug,
-    DaVerificationProvider: MempoolVerificationProvider<
-        Payload = DaPoolAdapter::Payload,
-        Parameters = <DaPoolAdapter::Payload as Certificate>::VerificationParameters,
-    >,
-    ClPool::Item: Clone + Eq + Hash + Debug + 'static,
-    ClPool::Key: Debug + 'static,
-    DaPool::Item: Clone + Eq + Hash + Debug + 'static,
-    DaPool::Key: Debug + 'static,
-    A::Backend: 'static,
-    TxS: TxSelect<Tx = ClPool::Item>,
-    BS: BlobCertificateSelect<Certificate = DaPool::Item>,
-    DaStorage: DaStorageAdapter,
-    ConsensusStorage: StorageBackend + Send + Sync + 'static,
-{
-}
-
 pub enum DaMsg<B, V> {
     AddIndex {
         vid: V,
