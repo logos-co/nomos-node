@@ -1,8 +1,8 @@
 use core::{fmt::Debug, hash::Hash};
 use nomos_core::{da::certificate::Certificate, header::HeaderId};
 use nomos_mempool::{
-    backend::mockpool::MockPool, network::NetworkAdapter, DaMempoolService, MempoolMsg,
-    TxMempoolService,
+    backend::mockpool::MockPool, network::NetworkAdapter, verify::MempoolVerificationProvider,
+    DaMempoolService, MempoolMsg, TxMempoolService,
 };
 use nomos_network::backends::NetworkBackend;
 use tokio::sync::oneshot;
@@ -41,7 +41,7 @@ where
     }
 }
 
-pub async fn add_cert<N, A, Item, Key>(
+pub async fn add_cert<N, A, V, Item, Key>(
     handle: &overwatch_rs::overwatch::handle::OverwatchHandle,
     item: A::Payload,
     converter: impl Fn(&A::Payload) -> Key,
@@ -51,11 +51,15 @@ where
     A: NetworkAdapter<Backend = N, Key = Key> + Send + Sync + 'static,
     A::Payload: Certificate + Into<Item> + Debug,
     A::Settings: Send + Sync,
+    V: MempoolVerificationProvider<
+        Payload = A::Payload,
+        Parameters = <A::Payload as Certificate>::VerificationParameters,
+    >,
     Item: Clone + Debug + Send + Sync + 'static + Hash,
     Key: Clone + Debug + Ord + Hash + 'static,
 {
     let relay = handle
-        .relay::<DaMempoolService<A, MockPool<HeaderId, Item, Key>>>()
+        .relay::<DaMempoolService<A, MockPool<HeaderId, Item, Key>, V>>()
         .connect()
         .await?;
     let (sender, receiver) = oneshot::channel();
