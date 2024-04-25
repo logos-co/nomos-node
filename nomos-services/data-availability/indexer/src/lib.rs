@@ -434,7 +434,7 @@ where
         let consensus_relay = consensus_relay
             .connect()
             .await
-            .expect("Relay connection with NetworkService should succeed");
+            .expect("Relay connection with ConsensusService should succeed");
         let storage_relay = storage_relay
             .connect()
             .await
