@@ -438,7 +438,7 @@ where
         let storage_relay = storage_relay
             .connect()
             .await
-            .expect("Relay connection with NetworkService should succeed");
+            .expect("Relay connection with StorageService should succeed");
 
         let consensus_adapter = Consensus::new(consensus_relay).await;
         let mut consensus_blocks = consensus_adapter.block_stream().await;
