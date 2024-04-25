@@ -122,8 +122,9 @@ impl Hash for Certificate {
     }
 }
 
+#[derive(Clone, Debug)]
 pub struct CertificateVerificationParameters {
-    threshold: usize,
+    pub threshold: usize,
 }
 
 impl certificate::Certificate for Certificate {
