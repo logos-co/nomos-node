@@ -79,6 +79,9 @@ fn main() -> Result<()> {
                     topic: String::from(nomos_node::DA_TOPIC),
                     id: <Certificate as certificate::Certificate>::id,
                 },
+                verification_provider: full_replication::CertificateVerificationParameters {
+                    threshold: 0,
+                },
                 registry: registry.clone(),
             },
             cryptarchia: config.cryptarchia,

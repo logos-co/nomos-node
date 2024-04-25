@@ -17,6 +17,7 @@ use nomos_metrics::NomosRegistry;
 // internal
 use crate::backend::MemPool;
 use crate::network::NetworkAdapter;
+use crate::verify::MempoolVerificationProvider;
 use crate::{MempoolMetrics, MempoolMsg};
 use nomos_network::{NetworkMsg, NetworkService};
 use overwatch_rs::services::life_cycle::LifecycleMessage;
@@ -28,7 +29,7 @@ use overwatch_rs::services::{
 };
 use tracing::error;
 
-pub struct DaMempoolService<N, P>
+pub struct DaMempoolService<N, P, V>
 where
     N: NetworkAdapter<Key = P::Key>,
     N::Payload: Certificate + Into<P::Item> + Debug + 'static,
@@ -37,16 +38,21 @@ where
     P::Item: Debug + 'static,
     P::Key: Debug + 'static,
     P::BlockId: Debug + 'static,
+    V: MempoolVerificationProvider<
+        Payload = N::Payload,
+        Parameters = <N::Payload as Certificate>::VerificationParameters,
+    >,
 {
     service_state: ServiceStateHandle<Self>,
     network_relay: Relay<NetworkService<N::Backend>>,
     pool: P,
+    verification_provider: V,
     // TODO: Add again after metrics refactor
     // #[cfg(feature = "metrics")]
     // metrics: Option<Metrics>,
 }
 
-impl<N, P> ServiceData for DaMempoolService<N, P>
+impl<N, P, V> ServiceData for DaMempoolService<N, P, V>
 where
     N: NetworkAdapter<Key = P::Key>,
     N::Payload: Certificate + Debug + Into<P::Item> + 'static,
@@ -55,9 +61,13 @@ where
     P::Item: Debug + 'static,
     P::Key: Debug + 'static,
     P::BlockId: Debug + 'static,
+    V: MempoolVerificationProvider<
+        Payload = N::Payload,
+        Parameters = <N::Payload as Certificate>::VerificationParameters,
+    >,
 {
     const SERVICE_ID: ServiceId = "mempool-da";
-    type Settings = DaMempoolSettings<P::Settings, N::Settings>;
+    type Settings = DaMempoolSettings<P::Settings, N::Settings, V::Settings>;
     type State = NoState<Self::Settings>;
     type StateOperator = NoOperator<Self::State>;
     type Message = MempoolMsg<
@@ -69,16 +79,23 @@ where
 }
 
 #[async_trait::async_trait]
-impl<N, P> ServiceCore for DaMempoolService<N, P>
+impl<N, P, V> ServiceCore for DaMempoolService<N, P, V>
 where
     P: MemPool + Send + 'static,
     P::Settings: Clone + Send + Sync + 'static,
     N::Settings: Clone + Send + Sync + 'static,
+    V::Settings: Clone + Send + Sync + 'static,
     P::Item: Clone + Debug + Send + Sync + 'static,
     P::Key: Debug + Send + Sync + 'static,
     P::BlockId: Send + Debug + 'static,
     N::Payload: Certificate + Into<P::Item> + Clone + Debug + Send + 'static,
     N: NetworkAdapter<Key = P::Key> + Send + Sync + 'static,
+    V: MempoolVerificationProvider<
+            Payload = N::Payload,
+            Parameters = <N::Payload as Certificate>::VerificationParameters,
+        > + Send
+        + Sync
+        + 'static,
 {
     fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, overwatch_rs::DynError> {
         let network_relay = service_state.overwatch_handle.relay();
@@ -94,6 +111,7 @@ where
             service_state,
             network_relay,
             pool: P::new(settings.backend),
+            verification_provider: V::new(settings.verification_provider),
             // #[cfg(feature = "metrics")]
             // metrics,
         })
@@ -129,10 +147,13 @@ where
                     // if let Some(metrics) = &self.metrics { metrics.record(&msg) }
                     Self::handle_mempool_message(msg, &mut pool, &mut network_relay, &mut service_state).await;
                 }
-                Some((key, item )) = network_items.next() => {
-                    pool.add_item(key, item).unwrap_or_else(|e| {
-                        tracing::debug!("could not add item to the pool due to: {}", e)
-                    });
+                Some((key, item)) = network_items.next() => {
+                    let params = self.verification_provider.get_parameters(&item).await;
+                    if item.verify(params) {
+                        pool.add_item(key, item).unwrap_or_else(|e| {
+                            tracing::debug!("could not add item to the pool due to: {}", e)
+                        });
+                    }
                 }
                 Some(msg) = lifecycle_stream.next() =>  {
                     if Self::should_stop_service(msg).await {
@@ -145,7 +166,7 @@ where
     }
 }
 
-impl<N, P> DaMempoolService<N, P>
+impl<N, P, V> DaMempoolService<N, P, V>
 where
     P: MemPool + Send + 'static,
     P::Settings: Clone + Send + Sync + 'static,
@@ -155,6 +176,12 @@ where
     P::BlockId: Debug + Send + 'static,
     N::Payload: Certificate + Into<P::Item> + Debug + Clone + Send + 'static,
     N: NetworkAdapter<Key = P::Key> + Send + Sync + 'static,
+    V: MempoolVerificationProvider<
+            Payload = N::Payload,
+            Parameters = <N::Payload as Certificate>::VerificationParameters,
+        > + Send
+        + Sync
+        + 'static,
 {
     async fn should_stop_service(message: LifecycleMessage) -> bool {
         match message {
@@ -247,8 +274,9 @@ where
 }
 
 #[derive(Clone, Debug)]
-pub struct DaMempoolSettings<B, N> {
+pub struct DaMempoolSettings<B, N, V> {
     pub backend: B,
     pub network: N,
+    pub verification_provider: V,
     pub registry: Option<NomosRegistry>,
 }

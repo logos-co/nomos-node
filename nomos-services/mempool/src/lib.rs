@@ -2,6 +2,7 @@ pub mod backend;
 pub mod da;
 pub mod network;
 pub mod tx;
+pub mod verify;
 
 use backend::Status;
 use overwatch_rs::services::relay::RelayMessage;
