@@ -20,4 +20,9 @@ sha3 = "0.10"
 
 [dev-dependencies]
 rand = "0.8"
+divan = "0.1"
+
+[[bench]]
+name = "encode"
+harness = false
 

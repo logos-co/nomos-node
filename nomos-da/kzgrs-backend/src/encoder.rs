@@ -19,7 +19,7 @@ pub struct DaEncoderParams {
 impl DaEncoderParams {
     pub const MAX_BLS12_381_ENCODING_CHUNK_SIZE: usize = 31;
 
-    const fn default_with(column_count: usize) -> Self {
+    pub const fn default_with(column_count: usize) -> Self {
         Self { column_count }
     }
 }
@@ -44,7 +44,7 @@ impl DaEncoder {
         Self { params: settings }
     }
 
-    fn chunkify(&self, data: &[u8]) -> ChunksMatrix {
+    pub fn chunkify(&self, data: &[u8]) -> ChunksMatrix {
         let chunk_size =
             // column count is divided by two, as later on rows are encoded to twice the size
             self.params.column_count.div(2) * DaEncoderParams::MAX_BLS12_381_ENCODING_CHUNK_SIZE;
@@ -62,23 +62,26 @@ impl DaEncoder {
             .collect()
     }
 
+    pub fn compute_kzg_row_commitment(
+        row: &Row,
+    ) -> Result<((Evaluations, Polynomial), Commitment), KzgRsError> {
+        // Using the unchecked version here. Because during the process of chunkifiying
+        // we already make sure to have the chunks of proper elements.
+        // Also, after rs encoding, we are sure all `Fr` elements already fits within modulus.
+        let (evals, poly) = bytes_to_polynomial_unchecked::<BYTES_PER_FIELD_ELEMENT>(
+            row.as_bytes().as_ref(),
+            *DOMAIN,
+        );
+        commit_polynomial(&poly, &GLOBAL_PARAMETERS).map(|commitment| ((evals, poly), commitment))
+    }
+
     #[allow(clippy::type_complexity)]
-    fn compute_kzg_row_commitments(
+    pub fn compute_kzg_row_commitments(
         matrix: &ChunksMatrix,
     ) -> Result<Vec<((Evaluations, Polynomial), Commitment)>, KzgRsError> {
         matrix
             .rows()
-            .map(|r| {
-                // Using the unchecked version here. Because during the process of chunkifiying
-                // we already make sure to have the chunks of proper elements.
-                // Also, after rs encoding, we are sure all `Fr` elements already fits within modulus.
-                let (evals, poly) = bytes_to_polynomial_unchecked::<BYTES_PER_FIELD_ELEMENT>(
-                    r.as_bytes().as_ref(),
-                    *DOMAIN,
-                );
-                commit_polynomial(&poly, &GLOBAL_PARAMETERS)
-                    .map(|commitment| ((evals, poly), commitment))
-            })
+            .map(Self::compute_kzg_row_commitment)
             .collect()
     }
 

@@ -107,6 +107,15 @@ impl ChunksMatrix {
     pub fn iter(&self) -> impl Iterator<Item = &Row> {
         self.0.iter()
     }
+
+    pub fn bytes_size(&self) -> usize {
+        // This can be done taking into consideration that each chunk should be the same size and just
+        // multiplying sizes. But for now iterating should be ok.
+        self.0
+            .iter()
+            .flat_map(|row: &Row| row.0.iter().map(|chunk| chunk.0.len()))
+            .sum()
+    }
 }
 
 impl FromIterator<Row> for ChunksMatrix {
