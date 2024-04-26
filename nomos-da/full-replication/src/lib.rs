@@ -166,8 +166,8 @@ impl metadata::Metadata for Certificate {
     type AppId = [u8; 32];
     type Index = u64;
 
-    fn metadata(&self) -> Option<(Self::AppId, Self::Index)> {
-        Some((self.metadata.app_id, self.metadata.index))
+    fn metadata(&self) -> (Self::AppId, Self::Index) {
+        (self.metadata.app_id, self.metadata.index)
     }
 }
 
