@@ -2,5 +2,5 @@ pub trait Metadata {
     type AppId;
     type Index;
 
-    fn metadata(&self) -> Option<(Self::AppId, Self::Index)>;
+    fn metadata(&self) -> (Self::AppId, Self::Index);
 }
