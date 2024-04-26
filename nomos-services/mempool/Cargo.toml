@@ -13,7 +13,6 @@ linked-hash-map = { version = "0.5.6", optional = true }
 nomos-metrics = { path = "../../nomos-services/metrics" }
 nomos-network = { path = "../network" }
 nomos-core = { path = "../../nomos-core" }
-nomos-da = { path = "../data-availability" }
 full-replication = { path = "../../nomos-da/full-replication" }
 overwatch-rs = { git = "https://github.com/logos-co/Overwatch", rev = "2f70806" }
 rand = { version = "0.8", optional = true }

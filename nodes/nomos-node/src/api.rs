@@ -31,6 +31,7 @@ use nomos_api::{
     http::{cl, consensus, libp2p, mempool, metrics, storage},
     Backend,
 };
+use nomos_core::da::certificate;
 
 /// Configuration for the Http Server
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
