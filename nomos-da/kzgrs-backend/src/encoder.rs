@@ -89,13 +89,13 @@ impl DaEncoder {
         encode(row, evaluations, 2, *DOMAIN)
     }
 
-    fn rs_encode_rows(rows: &[(Evaluations, Polynomial)]) -> Vec<Evaluations> {
+    pub fn rs_encode_rows(rows: &[(Evaluations, Polynomial)]) -> Vec<Evaluations> {
         rows.iter()
             .map(|(eval, poly)| Self::rs_encode_row(eval, poly))
             .collect()
     }
 
-    fn compute_rows_proofs(
+    pub fn compute_rows_proofs(
         polynomials: &[Polynomial],
         proof_count: usize,
     ) -> Result<Vec<Vec<Proof>>, KzgRsError> {

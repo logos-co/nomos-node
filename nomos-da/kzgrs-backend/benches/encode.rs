@@ -1,4 +1,6 @@
+use divan::counter::ItemsCount;
 use divan::{black_box, counter::BytesCount, AllocProfiler, Bencher};
+use kzgrs::{Evaluations, Polynomial};
 use rand::RngCore;
 
 use kzgrs_backend::encoder::{DaEncoder, DaEncoderParams};
@@ -56,6 +58,49 @@ fn compute_1MB_data_matrix_kzg_row_commitments_with_column_count(
         .with_inputs(|| encoder.chunkify(rand_data(1).as_ref()))
         .input_counter(|matrix| BytesCount::new(matrix.bytes_size()))
         .bench_refs(|matrix| black_box(DaEncoder::compute_kzg_row_commitments(&matrix).is_ok()));
+}
+
+#[allow(non_snake_case)]
+#[divan::bench(args = [100, 1000, 10000], sample_count = 1, sample_size = 1)]
+fn compute_1MB_data_rs_encode_rows_with_column_count(bencher: Bencher, column_count: usize) {
+    let encoder_params: DaEncoderParams = DaEncoderParams::default_with(column_count);
+    let encoder: DaEncoder = DaEncoder::new(encoder_params);
+    let size = bencher
+        .with_inputs(|| {
+            let matrix = encoder.chunkify(rand_data(1).as_ref());
+            let (row_polynomials, _): (Vec<(Evaluations, Polynomial)>, Vec<_>) =
+                DaEncoder::compute_kzg_row_commitments(&matrix)
+                    .unwrap()
+                    .into_iter()
+                    .unzip();
+            row_polynomials
+        })
+        .input_counter(|polynomials| ItemsCount::new(polynomials.len()))
+        .bench_refs(|polynomials| black_box(DaEncoder::rs_encode_rows(polynomials)));
+}
+
+#[allow(non_snake_case)]
+#[divan::bench(args = [100, 1000, 10000], sample_count = 1, sample_size = 1)]
+fn compute_1MB_data_compute_rows_proofs_with_column_count(bencher: Bencher, column_count: usize) {
+    let encoder_params: DaEncoderParams = DaEncoderParams::default_with(column_count);
+    let encoder: DaEncoder = DaEncoder::new(encoder_params);
+    let size = bencher
+        .with_inputs(|| {
+            let matrix = encoder.chunkify(rand_data(1).as_ref());
+            let (row_polynomials, _): (Vec<(Evaluations, Polynomial)>, Vec<_>) =
+                DaEncoder::compute_kzg_row_commitments(&matrix)
+                    .unwrap()
+                    .into_iter()
+                    .unzip();
+            row_polynomials
+                .into_iter()
+                .map(|(_, poly)| poly)
+                .collect::<Vec<_>>()
+        })
+        .input_counter(|polynomials| ItemsCount::new(polynomials.len()))
+        .bench_refs(|polynomials| {
+            black_box(DaEncoder::compute_rows_proofs(polynomials, column_count).is_ok())
+        });
 }
 
 #[allow(non_snake_case)]
