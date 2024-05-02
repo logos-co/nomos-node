@@ -15,7 +15,6 @@ use nomos_core::block::Block;
 use nomos_core::da::certificate::{BlobCertificateSelect, Certificate};
 use nomos_core::header::HeaderId;
 use nomos_core::tx::{Transaction, TxSelect};
-use nomos_mempool::da::verify::fullreplication::DaVerificationProvider;
 use nomos_mempool::verify::MempoolVerificationProvider;
 use nomos_mempool::{backend::MemPool, network::NetworkAdapter as MempoolAdapter};
 use nomos_storage::backends::StorageBackend;

@@ -2,6 +2,7 @@ pub mod attestation;
 
 use attestation::Attestation;
 use nomos_core::da::attestation::Attestation as _;
+use nomos_core::da::certificate::metadata::Next;
 use nomos_core::da::certificate::CertificateStrategy;
 // internal
 use nomos_core::da::certificate::{self, metadata};
@@ -15,6 +16,9 @@ use blake2::{
 };
 use bytes::Bytes;
 use serde::{Deserialize, Serialize};
+
+#[derive(Copy, Clone, Default, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct FRIndex(u64);
 
 /// Re-export the types for OpenAPI
 #[cfg(feature = "openapi")]
@@ -85,7 +89,7 @@ impl CertificateStrategy for AbsoluteNumber<Attestation, Certificate> {
         &self,
         attestations: Vec<Self::Attestation>,
         app_id: [u8; 32],
-        index: u64,
+        index: FRIndex,
     ) -> Certificate {
         assert!(self.can_build(&attestations));
         Certificate {
@@ -106,7 +110,7 @@ pub struct Blob {
 #[derive(Default, Debug, Copy, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub struct Metadata {
     app_id: [u8; 32],
-    index: u64,
+    index: FRIndex,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
@@ -164,10 +168,16 @@ impl certificate::Certificate for Certificate {
 
 impl metadata::Metadata for Certificate {
     type AppId = [u8; 32];
-    type Index = u64;
+    type Index = FRIndex;
 
     fn metadata(&self) -> (Self::AppId, Self::Index) {
         (self.metadata.app_id, self.metadata.index)
+    }
+}
+
+impl Next for FRIndex {
+    fn next(self) -> Self {
+        Self(self.0 + 1)
     }
 }
 

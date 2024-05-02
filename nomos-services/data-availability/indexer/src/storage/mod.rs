@@ -1,5 +1,8 @@
+pub mod adapters;
+
 use std::ops::Range;
 
+use futures::Stream;
 use nomos_core::da::certificate::{metadata::Metadata, vid::VID};
 use nomos_storage::{backends::StorageBackend, StorageService};
 use overwatch_rs::services::{relay::OutboundRelay, ServiceData};
@@ -16,8 +19,9 @@ pub trait DaStorageAdapter {
     ) -> Self;
 
     async fn add_index(&self, vid: Self::VID) -> bool;
-    async fn get_range(
+    async fn get_range_stream(
         &self,
+        app_id: <Self::VID as Metadata>::AppId,
         range: Range<<Self::VID as Metadata>::Index>,
-    ) -> Vec<Option<Self::Blob>>;
+    ) -> Box<dyn Stream<Item = (<Self::VID as Metadata>::Index, Option<Self::Blob>)> + Unpin + Send>;
 }
