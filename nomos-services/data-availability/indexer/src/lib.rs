@@ -4,6 +4,7 @@ pub mod storage;
 
 use std::fmt::{Debug, Formatter};
 use std::hash::Hash;
+use std::ops::Range;
 use std::sync::mpsc::Sender;
 
 use consensus::ConsensusAdapter;
@@ -12,6 +13,7 @@ use cryptarchia_consensus::CryptarchiaConsensus;
 use futures::StreamExt;
 use indexer::DaIndexer;
 use nomos_core::block::Block;
+use nomos_core::da::certificate::metadata::Metadata;
 use nomos_core::da::certificate::{BlobCertificateSelect, Certificate};
 use nomos_core::header::HeaderId;
 use nomos_core::tx::{Transaction, TxSelect};
@@ -68,9 +70,11 @@ pub struct DataIndexerService<
     BS,
     ConsensusStorage,
 > where
-    Indexer: DaIndexer,
+    Indexer: DaIndexer<Storage = DaStorage, VID = DaPool::Item> + Send + Sync,
     Indexer::Blob: 'static,
-    Indexer::VID: 'static,
+    Indexer::VID: Metadata + 'static,
+    <Indexer::VID as Metadata>::AppId: Send + Sync,
+    <Indexer::VID as Metadata>::Index: Send + Sync,
     A: NetworkAdapter,
     ClPoolAdapter: MempoolAdapter<Payload = ClPool::Item, Key = ClPool::Key>,
     ClPool: MemPool<BlockId = HeaderId>,
@@ -83,7 +87,7 @@ pub struct DataIndexerService<
     >,
     ClPool::Item: Clone + Eq + Hash + Debug + 'static,
     ClPool::Key: Debug + 'static,
-    DaPool::Item: Clone + Eq + Hash + Debug + 'static,
+    DaPool::Item: Metadata + Clone + Eq + Hash + Debug + 'static,
     DaPool::Key: Debug + 'static,
     A::Backend: 'static,
     TxS: TxSelect<Tx = ClPool::Item>,
@@ -107,30 +111,31 @@ pub struct DataIndexerService<
     >,
 }
 
-pub enum DaMsg<B, V> {
+pub enum DaMsg<B, V: Metadata> {
     AddIndex {
         vid: V,
     },
     GetRange {
-        ids: Box<dyn Iterator<Item = V> + Send>,
-        reply_channel: Sender<Vec<B>>,
+        app_id: <V as Metadata>::AppId,
+        range: Range<<V as Metadata>::Index>,
+        reply_channel: Sender<Vec<Option<B>>>,
     },
 }
 
-impl<B: 'static, V: 'static> Debug for DaMsg<B, V> {
+impl<B: 'static, V: Metadata + 'static> Debug for DaMsg<B, V> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             DaMsg::AddIndex { .. } => {
-                write!(f, "DaMsg::Index")
+                write!(f, "DaMsg::AddIndex")
             }
             DaMsg::GetRange { .. } => {
-                write!(f, "DaMsg::Get")
+                write!(f, "DaMsg::GetRange")
             }
         }
     }
 }
 
-impl<B: 'static, V: 'static> RelayMessage for DaMsg<B, V> {}
+impl<B: 'static, V: Metadata + 'static> RelayMessage for DaMsg<B, V> {}
 
 impl<
         Indexer,
@@ -161,9 +166,11 @@ impl<
         ConsensusStorage,
     >
 where
-    Indexer: DaIndexer,
+    Indexer: DaIndexer<Storage = DaStorage, VID = DaPool::Item> + Send + Sync,
     Indexer::Blob: 'static,
     Indexer::VID: 'static,
+    <Indexer::VID as Metadata>::AppId: Send + Sync,
+    <Indexer::VID as Metadata>::Index: Send + Sync,
     A: NetworkAdapter,
     ClPoolAdapter: MempoolAdapter<Payload = ClPool::Item, Key = ClPool::Key>,
     ClPool: MemPool<BlockId = HeaderId>,
@@ -176,7 +183,7 @@ where
     >,
     ClPool::Item: Clone + Eq + Hash + Debug + 'static,
     ClPool::Key: Debug + 'static,
-    DaPool::Item: Clone + Eq + Hash + Debug + 'static,
+    DaPool::Item: Metadata + Clone + Eq + Hash + Debug + 'static,
     DaPool::Key: Debug + 'static,
     A::Backend: 'static,
     TxS: TxSelect<Tx = ClPool::Item>,
@@ -220,9 +227,11 @@ impl<
         ConsensusStorage,
     >
 where
-    Indexer: DaIndexer + Send + Sync,
-    Indexer::Blob: 'static,
-    Indexer::VID: 'static,
+    Indexer: DaIndexer<Storage = DaStorage, VID = DaPool::Item> + Send + Sync,
+    Indexer::Blob: Send + Sync + 'static,
+    Indexer::VID: Send + Sync + 'static,
+    <Indexer::VID as Metadata>::AppId: Send + Sync,
+    <Indexer::VID as Metadata>::Index: Send + Sync,
     A: NetworkAdapter,
     ClPoolAdapter: MempoolAdapter<Payload = ClPool::Item, Key = ClPool::Key>,
     ClPool: MemPool<BlockId = HeaderId>,
@@ -235,7 +244,7 @@ where
     >,
     ClPool::Item: Clone + Eq + Hash + Debug + 'static,
     ClPool::Key: Debug + 'static,
-    DaPool::Item: Clone + Eq + Hash + Debug + 'static,
+    DaPool::Item: Metadata + Clone + Eq + Hash + Debug + 'static,
     DaPool::Key: Debug + 'static,
     A::Backend: 'static,
     TxS: TxSelect<Tx = ClPool::Item>,
@@ -245,22 +254,29 @@ where
 {
     async fn handle_new_block(
         indexer: &Indexer,
-        consensus_adapter: &Consensus,
         storage_adapter: &DaStorage,
         block: Block<ClPool::Item, DaPool::Item>,
     ) -> Result<(), DynError> {
-        todo!()
+        for vid in block.blobs() {
+            indexer.add_index(vid, storage_adapter).await?;
+        }
+        Ok(())
     }
+
     async fn handle_da_msg(
         indexer: &Indexer,
+        storage_adapter: &DaStorage,
         msg: DaMsg<Indexer::Blob, Indexer::VID>,
     ) -> Result<(), DynError> {
         match msg {
-            DaMsg::AddIndex { vid } => {
-                todo!()
-            }
-            DaMsg::GetRange { ids, reply_channel } => {
-                todo!()
+            DaMsg::AddIndex { vid } => indexer.add_index(&vid, storage_adapter).await?,
+            DaMsg::GetRange {
+                app_id,
+                range,
+                reply_channel,
+            } => {
+                let blobs = indexer.get_range(app_id, range, storage_adapter).await?;
+                reply_channel.send(blobs)?;
             }
         }
         Ok(())
@@ -312,10 +328,12 @@ impl<
         ConsensusStorage,
     >
 where
-    Indexer: DaIndexer + Send + Sync + 'static,
+    Indexer: DaIndexer<Storage = DaStorage, VID = DaPool::Item> + Send + Sync,
     Indexer::Settings: Clone + Send + Sync + 'static,
     Indexer::Blob: Debug + Send + Sync,
     Indexer::VID: Debug + Send + Sync,
+    <Indexer::VID as Metadata>::AppId: Send + Sync,
+    <Indexer::VID as Metadata>::Index: Send + Sync,
     A: NetworkAdapter,
     ClPoolAdapter: MempoolAdapter<Payload = ClPool::Item, Key = ClPool::Key>,
     ClPool: MemPool<BlockId = HeaderId>,
@@ -339,6 +357,7 @@ where
         + Sync
         + 'static,
     DaPool::Item: Certificate<Id = DaPool::Key>
+        + Metadata
         + Debug
         + Clone
         + Eq
@@ -393,12 +412,12 @@ where
         loop {
             tokio::select! {
                 Some(block) = consensus_blocks.next() => {
-                    if let Err(e) = Self::handle_new_block(&indexer, &consensus_adapter, &storage_adapter, block).await {
+                    if let Err(e) = Self::handle_new_block(&indexer, &storage_adapter, block).await {
                         tracing::debug!("Failed to add  a new received block: {e:?}");
                     }
                 }
                 Some(msg) = service_state.inbound_relay.recv() => {
-                    if let Err(e) = Self::handle_da_msg(&indexer, msg).await {
+                    if let Err(e) = Self::handle_da_msg(&indexer, &storage_adapter, msg).await {
                         tracing::debug!("Failed to handle da msg: {e:?}");
                     }
                 }
