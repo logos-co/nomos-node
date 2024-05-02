@@ -14,7 +14,7 @@ use overwatch_rs::{
 pub trait DaStorageAdapter {
     type Backend: StorageBackend + Send + Sync + 'static;
 
-    type Blob: Clone;
+    type Blob;
     type VID: VID;
 
     async fn new(

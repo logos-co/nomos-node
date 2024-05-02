@@ -63,6 +63,7 @@ where
         self.storage_relay
             .send(StorageMsg::<Self::Backend>::Store { key, value })
             .await
+            .map_err(|(e, _)| e.into())
     }
 
     async fn get_range_stream(

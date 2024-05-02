@@ -112,7 +112,7 @@ pub enum DaMsg<B, V: Metadata> {
     GetRange {
         app_id: <V as Metadata>::AppId,
         range: Range<<V as Metadata>::Index>,
-        reply_channel: Sender<Vec<Option<B>>>,
+        reply_channel: Sender<Vec<(<V as Metadata>::Index, Option<B>)>>,
     },
 }
 
@@ -232,6 +232,7 @@ where
     ClPool::Key: Debug + 'static,
     DaPool::Item: Metadata + Clone + Eq + Hash + Debug + 'static,
     DaPool::Key: Debug + 'static,
+    <DaPool::Item as Metadata>::Index: Send + Sync,
     A::Backend: 'static,
     TxS: TxSelect<Tx = ClPool::Item>,
     BS: BlobCertificateSelect<Certificate = DaPool::Item>,
@@ -260,13 +261,7 @@ where
                 reply_channel,
             } => {
                 let stream = storage_adapter.get_range_stream(app_id, range).await;
-
                 let results = stream.collect::<Vec<_>>().await;
-
-                let results = results
-                    .into_iter()
-                    .map(|(_, maybe_blob)| maybe_blob)
-                    .collect::<Vec<Option<B>>>();
 
                 Ok(reply_channel.send(results)?)
             }
