@@ -5,20 +5,23 @@ use std::ops::Range;
 use futures::Stream;
 use nomos_core::da::certificate::{metadata::Metadata, vid::VID};
 use nomos_storage::{backends::StorageBackend, StorageService};
-use overwatch_rs::services::{relay::OutboundRelay, ServiceData};
+use overwatch_rs::{
+    services::{relay::OutboundRelay, ServiceData},
+    DynError,
+};
 
 #[async_trait::async_trait]
 pub trait DaStorageAdapter {
     type Backend: StorageBackend + Send + Sync + 'static;
 
-    type Blob;
+    type Blob: Clone;
     type VID: VID;
 
     async fn new(
         storage_relay: OutboundRelay<<StorageService<Self::Backend> as ServiceData>::Message>,
     ) -> Self;
 
-    async fn add_index(&self, vid: Self::VID) -> bool;
+    async fn add_index(&self, vid: &Self::VID) -> Result<(), DynError>;
     async fn get_range_stream(
         &self,
         app_id: <Self::VID as Metadata>::AppId,

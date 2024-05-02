@@ -15,7 +15,10 @@ use nomos_storage::{
     backends::{rocksdb::RocksBackend, StorageSerde},
     StorageMsg, StorageService,
 };
-use overwatch_rs::services::{relay::OutboundRelay, ServiceData};
+use overwatch_rs::{
+    services::{relay::OutboundRelay, ServiceData},
+    DynError,
+};
 use tokio_stream::wrappers::ReceiverStream;
 
 use crate::storage::DaStorageAdapter;
@@ -52,7 +55,7 @@ where
         }
     }
 
-    async fn add_index(&self, vid: Self::VID) -> bool {
+    async fn add_index(&self, vid: &Self::VID) -> Result<(), DynError> {
         let (app_id, idx) = vid.metadata();
         let key = meta_to_key_bytes(app_id, idx);
         let value = Bytes::from(vid.certificate_id().to_vec());
@@ -60,9 +63,6 @@ where
         self.storage_relay
             .send(StorageMsg::<Self::Backend>::Store { key, value })
             .await
-            .expect("Storage backend should be ready");
-
-        false
     }
 
     async fn get_range_stream(
@@ -73,8 +73,13 @@ where
     {
         let futures = FuturesUnordered::new();
 
+        // TODO: Using while loop here until `Step` trait is stable.
+        //
+        // For index_range to be used as Range with the stepping capabilities (eg. `for idx in
+        // item_range`), Metadata::Index needs to implement `Step` trait, which is unstable.
+        // See issue #42168 <https://github.com/rust-lang/rust/issues/42168> for more information.
         let mut current_index = index_range.start.clone();
-        while current_index < index_range.end {
+        while current_index <= index_range.end {
             let idx = current_index.clone();
 
             let (reply_tx, reply_rx) = tokio::sync::oneshot::channel();
@@ -93,7 +98,7 @@ where
                     Ok(Some(blob)) => (idx, Some(blob)),
                     Ok(None) => (idx, None),
                     Err(_) => {
-                        eprintln!("Failed to receive storage response");
+                        tracing::error!("Failed to receive storage response");
                         (idx, None)
                     }
                 }
@@ -107,7 +112,7 @@ where
 }
 
 fn meta_to_key_bytes(app_id: impl AsRef<[u8]>, idx: impl AsRef<[u8]>) -> Bytes {
-    let mut buffer = BytesMut::with_capacity(42 + app_id.as_ref().len() + idx.as_ref().len());
+    let mut buffer = BytesMut::new();
 
     buffer.extend_from_slice(DA_KEY_PREFIX.as_bytes());
     buffer.extend_from_slice(app_id.as_ref());
