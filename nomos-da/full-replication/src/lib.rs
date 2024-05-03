@@ -166,6 +166,25 @@ impl certificate::Certificate for Certificate {
     }
 }
 
+pub struct VID {
+    id: [u8; 32],
+    metadata: Metadata,
+}
+
+impl From<Certificate> for VID {
+    fn from(cert: Certificate) -> Self {
+        // To simulate the propery of aggregate committment + row commitment in Nomos Da Protocol,
+        // when full replication certificate is converted into the VID (which should happen after
+        // the verification in the mempool) the id is set to the blob hash to allow identification
+        // of the distributed data accross nomos nodes.
+        let id = cert.attestations[0].blob_hash();
+        Self {
+            id,
+            metadata: cert.metadata,
+        }
+    }
+}
+
 impl metadata::Metadata for Certificate {
     type AppId = [u8; 32];
     type Index = FRIndex;

@@ -19,11 +19,14 @@ use overwatch_rs::{
     services::{relay::OutboundRelay, ServiceData},
     DynError,
 };
+use tokio::{fs::File, io::AsyncReadExt};
 use tokio_stream::wrappers::ReceiverStream;
 
 use crate::storage::DaStorageAdapter;
 
-const DA_KEY_PREFIX: &str = "da";
+const DA_VID_KEY_PREFIX: &str = "da/vid/";
+const DA_ATTESTED_KEY_PREFIX: &str = "da/attested/";
+const DA_BLOB_PATH: &str = "blobs/";
 
 pub struct RocksAdapter<S, V>
 where
@@ -40,7 +43,7 @@ where
     S: StorageSerde + Send + Sync + 'static,
     V: VID<CertificateId = [u8; 32]> + Metadata + Send + Sync,
     V::Index: AsRef<[u8]> + Next + Clone + PartialOrd + Send + Sync + 'static,
-    V::AppId: AsRef<[u8]> + Send + Sync,
+    V::AppId: AsRef<[u8]> + Clone + Send + Sync + 'static,
 {
     type Backend = RocksBackend<S>;
     type Blob = Bytes;
@@ -57,11 +60,38 @@ where
 
     async fn add_index(&self, vid: &Self::VID) -> Result<(), DynError> {
         let (app_id, idx) = vid.metadata();
-        let key = meta_to_key_bytes(app_id, idx);
+
+        // Check if VID in a block is something that the node've seen before.
+        let attested_key = meta_to_key_bytes(DA_ATTESTED_KEY_PREFIX, vid.certificate_id());
+        let (reply_tx, reply_rx) = tokio::sync::oneshot::channel();
+
+        // Remove item from attested list as it shouldn't be used again.
+        self.storage_relay
+            .send(StorageMsg::Remove {
+                key: attested_key,
+                reply_channel: reply_tx,
+            })
+            .await
+            .expect("Failed to send load request to storage relay");
+
+        // If node haven't attested this vid, return early.
+        if reply_rx.await?.is_none() {
+            return Ok(());
+        }
+
+        let vid_key = meta_to_key_bytes(
+            DA_VID_KEY_PREFIX,
+            [app_id.clone().as_ref(), idx.as_ref()].concat(),
+        );
+
+        // We are only persisting the id part of VID, the metadata can be derived from the key.
         let value = Bytes::from(vid.certificate_id().to_vec());
 
         self.storage_relay
-            .send(StorageMsg::<Self::Backend>::Store { key, value })
+            .send(StorageMsg::Store {
+                key: vid_key,
+                value,
+            })
             .await
             .map_err(|(e, _)| e.into())
     }
@@ -82,9 +112,13 @@ where
         let mut current_index = index_range.start.clone();
         while current_index <= index_range.end {
             let idx = current_index.clone();
+            let app_id = app_id.clone();
 
             let (reply_tx, reply_rx) = tokio::sync::oneshot::channel();
-            let key = meta_to_key_bytes(app_id.as_ref(), current_index.as_ref());
+            let key = meta_to_key_bytes(
+                DA_VID_KEY_PREFIX,
+                [app_id.as_ref(), current_index.as_ref()].concat(),
+            );
 
             self.storage_relay
                 .send(StorageMsg::Load {
@@ -96,7 +130,7 @@ where
 
             futures.push(async move {
                 match reply_rx.await {
-                    Ok(Some(blob)) => (idx, Some(blob)),
+                    Ok(Some(id)) => (idx, Some(load_blob(app_id.as_ref(), &id).await)),
                     Ok(None) => (idx, None),
                     Err(_) => {
                         tracing::error!("Failed to receive storage response");
@@ -112,12 +146,35 @@ where
     }
 }
 
-fn meta_to_key_bytes(app_id: impl AsRef<[u8]>, idx: impl AsRef<[u8]>) -> Bytes {
+fn meta_to_key_bytes(prefix: &str, id: impl AsRef<[u8]>) -> Bytes {
     let mut buffer = BytesMut::new();
 
-    buffer.extend_from_slice(DA_KEY_PREFIX.as_bytes());
-    buffer.extend_from_slice(app_id.as_ref());
-    buffer.extend_from_slice(idx.as_ref());
+    buffer.extend_from_slice(prefix.as_bytes());
+    buffer.extend_from_slice(id.as_ref());
 
     buffer.freeze()
+}
+
+// TODO: Rocksdb has a feature called BlobDB that handles largo blob storing, but further
+// investigation needs to be done to see if rust wrapper supports it.
+async fn load_blob(app_id: &[u8], id: &[u8]) -> Bytes {
+    let app_id = hex::encode(app_id);
+    let id = hex::encode(id);
+    let path = format!("{DA_BLOB_PATH}/{app_id}/{id}");
+
+    let mut file = match File::open(path).await {
+        Ok(file) => file,
+        Err(e) => {
+            eprintln!("Failed to open file: {}", e);
+            return Bytes::new();
+        }
+    };
+
+    let mut contents = vec![];
+    if let Err(e) = file.read_to_end(&mut contents).await {
+        tracing::error!("Failed to read file: {}", e);
+        return Bytes::new();
+    }
+
+    Bytes::from(contents)
 }
