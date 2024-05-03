@@ -1,8 +1,4 @@
-use std::{
-    fmt::{Debug, Display},
-    marker::PhantomData,
-    ops::Range,
-};
+use std::{marker::PhantomData, ops::Range};
 
 use bytes::{Bytes, BytesMut};
 
@@ -20,7 +16,6 @@ use overwatch_rs::{
     DynError,
 };
 use tokio::{fs::File, io::AsyncReadExt};
-use tokio_stream::wrappers::ReceiverStream;
 
 use crate::storage::DaStorageAdapter;
 

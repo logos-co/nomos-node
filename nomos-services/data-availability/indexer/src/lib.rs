@@ -6,13 +6,13 @@ use std::hash::Hash;
 use std::ops::Range;
 use std::sync::mpsc::Sender;
 
-use bytes::Bytes;
 use consensus::ConsensusAdapter;
 use cryptarchia_consensus::network::NetworkAdapter;
 use cryptarchia_consensus::CryptarchiaConsensus;
 use futures::StreamExt;
 use nomos_core::block::Block;
 use nomos_core::da::certificate::metadata::Metadata;
+use nomos_core::da::certificate::vid::VID;
 use nomos_core::da::certificate::{BlobCertificateSelect, Certificate};
 use nomos_core::header::HeaderId;
 use nomos_core::tx::{Transaction, TxSelect};
@@ -27,7 +27,7 @@ use overwatch_rs::services::state::{NoOperator, NoState};
 use overwatch_rs::services::{ServiceCore, ServiceData, ServiceId};
 use overwatch_rs::DynError;
 use serde::de::DeserializeOwned;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use storage::DaStorageAdapter;
 use tracing::error;
 
@@ -337,7 +337,7 @@ where
         + Send
         + Sync
         + 'static,
-    DaPool::Item: Certificate<Id = DaPool::Key>
+    DaPool::Item: VID<CertificateId = DaPool::Key>
         + Metadata
         + Debug
         + Clone

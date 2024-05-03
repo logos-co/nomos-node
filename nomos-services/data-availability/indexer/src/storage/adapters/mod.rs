@@ -1,2 +1,2 @@
 #[cfg(feature = "rocksdb-backend")]
-mod rocksdb;
+pub mod rocksdb;
