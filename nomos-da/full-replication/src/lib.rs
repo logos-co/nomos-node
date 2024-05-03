@@ -6,6 +6,7 @@ use nomos_core::da::certificate::metadata::Next;
 use nomos_core::da::certificate::CertificateStrategy;
 // internal
 use nomos_core::da::certificate::{self, metadata};
+use std::cmp::Ordering;
 // std
 use std::collections::HashSet;
 use std::hash::{Hash, Hasher};
@@ -18,7 +19,7 @@ use bytes::Bytes;
 use serde::{Deserialize, Serialize};
 
 #[derive(Copy, Clone, Default, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct FRIndex(u64);
+pub struct FRIndex([u8; 8]);
 
 /// Re-export the types for OpenAPI
 #[cfg(feature = "openapi")]
@@ -166,9 +167,33 @@ impl certificate::Certificate for Certificate {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub struct VID {
     id: [u8; 32],
     metadata: Metadata,
+}
+
+impl certificate::vid::VID for VID {
+    type CertificateId = [u8; 32];
+
+    fn certificate_id(&self) -> Self::CertificateId {
+        self.id
+    }
+}
+
+impl metadata::Metadata for VID {
+    type AppId = [u8; 32];
+    type Index = FRIndex;
+
+    fn metadata(&self) -> (Self::AppId, Self::Index) {
+        (self.metadata.app_id, self.metadata.index)
+    }
+}
+
+impl Hash for VID {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        state.write(<VID as certificate::vid::VID>::certificate_id(self).as_ref());
+    }
 }
 
 impl From<Certificate> for VID {
@@ -196,7 +221,27 @@ impl metadata::Metadata for Certificate {
 
 impl Next for FRIndex {
     fn next(self) -> Self {
-        Self(self.0 + 1)
+        let num = u64::from_be_bytes(self.0);
+        let incremented_num = num.wrapping_add(1);
+        Self(incremented_num.to_be_bytes())
+    }
+}
+
+impl AsRef<[u8]> for FRIndex {
+    fn as_ref(&self) -> &[u8] {
+        self.0.as_ref()
+    }
+}
+
+impl PartialOrd for FRIndex {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for FRIndex {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.0.cmp(&other.0)
     }
 }
 
