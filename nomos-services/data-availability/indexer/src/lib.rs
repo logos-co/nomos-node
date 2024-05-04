@@ -4,7 +4,6 @@ pub mod storage;
 use std::fmt::{Debug, Formatter};
 use std::hash::Hash;
 use std::ops::Range;
-use std::sync::mpsc::Sender;
 
 use consensus::ConsensusAdapter;
 use cryptarchia_consensus::network::NetworkAdapter;
@@ -29,6 +28,7 @@ use overwatch_rs::DynError;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use storage::DaStorageAdapter;
+use tokio::sync::oneshot::Sender;
 use tracing::error;
 
 pub type ConsensusRelay<
@@ -263,7 +263,8 @@ where
                 let stream = storage_adapter.get_range_stream(app_id, range).await;
                 let results = stream.collect::<Vec<_>>().await;
 
-                Ok(reply_channel.send(results)?)
+                let _ = reply_channel.send(results);
+                Ok(())
             }
         }
     }

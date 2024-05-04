@@ -219,6 +219,12 @@ impl metadata::Metadata for Certificate {
     }
 }
 
+impl From<u64> for FRIndex {
+    fn from(value: u64) -> Self {
+        Self(value.to_be_bytes())
+    }
+}
+
 impl Next for FRIndex {
     fn next(self) -> Self {
         let num = u64::from_be_bytes(self.0);

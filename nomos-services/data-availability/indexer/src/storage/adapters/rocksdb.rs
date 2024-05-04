@@ -57,7 +57,7 @@ where
         let (app_id, idx) = vid.metadata();
 
         // Check if VID in a block is something that the node've seen before.
-        let attested_key = meta_to_key_bytes(DA_ATTESTED_KEY_PREFIX, vid.certificate_id());
+        let attested_key = key_bytes(DA_ATTESTED_KEY_PREFIX, vid.certificate_id());
         let (reply_tx, reply_rx) = tokio::sync::oneshot::channel();
 
         // Remove item from attested list as it shouldn't be used again.
@@ -74,7 +74,7 @@ where
             return Ok(());
         }
 
-        let vid_key = meta_to_key_bytes(
+        let vid_key = key_bytes(
             DA_VID_KEY_PREFIX,
             [app_id.clone().as_ref(), idx.as_ref()].concat(),
         );
@@ -110,7 +110,7 @@ where
             let app_id = app_id.clone();
 
             let (reply_tx, reply_rx) = tokio::sync::oneshot::channel();
-            let key = meta_to_key_bytes(
+            let key = key_bytes(
                 DA_VID_KEY_PREFIX,
                 [app_id.as_ref(), current_index.as_ref()].concat(),
             );
@@ -141,7 +141,7 @@ where
     }
 }
 
-fn meta_to_key_bytes(prefix: &str, id: impl AsRef<[u8]>) -> Bytes {
+fn key_bytes(prefix: &str, id: impl AsRef<[u8]>) -> Bytes {
     let mut buffer = BytesMut::new();
 
     buffer.extend_from_slice(prefix.as_bytes());
@@ -160,7 +160,7 @@ async fn load_blob(app_id: &[u8], id: &[u8]) -> Bytes {
     let mut file = match File::open(path).await {
         Ok(file) => file,
         Err(e) => {
-            eprintln!("Failed to open file: {}", e);
+            tracing::error!("Failed to open file: {}", e);
             return Bytes::new();
         }
     };
