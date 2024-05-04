@@ -31,6 +31,7 @@ nomos-network = { path = "../../network", features = ["mock"] }
 nomos-libp2p = { path = "../../../nomos-libp2p" }
 cryptarchia-ledger = { path = "../../../ledger/cryptarchia-ledger", features = ["serde"] }
 cryptarchia-engine = { path = "../../../consensus/cryptarchia-engine", features = ["serde"] }
+tempfile = "3.6"
 time = "0.3"
 rand = "0.8"
 

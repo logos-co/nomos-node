@@ -4,6 +4,9 @@ use std::sync::atomic::Ordering::SeqCst;
 use std::sync::Arc;
 use std::time::Duration;
 
+use crate::consensus::adapters::cryptarchia::CryptarchiaConsensusAdapter;
+use crate::storage::adapters::rocksdb::RocksAdapter;
+use crate::DataIndexerService;
 use bytes::Bytes;
 use cryptarchia_consensus::TimeConfig;
 use cryptarchia_ledger::{Coin, LedgerState};
@@ -11,9 +14,6 @@ use full_replication::attestation::{Attestation, Signer};
 use full_replication::{Certificate, VID};
 use nomos_core::da::certificate::CertificateStrategy;
 use nomos_core::{da::certificate, header::HeaderId, tx::Transaction};
-use nomos_da_indexer::consensus::adapters::cryptarchia::CryptarchiaConsensusAdapter;
-use nomos_da_indexer::storage::adapters::rocksdb::RocksAdapter;
-use nomos_da_indexer::DataIndexerService;
 use nomos_libp2p::{Multiaddr, Swarm, SwarmConfig};
 use nomos_mempool::da::verify::fullreplication::DaVerificationProvider as MempoolVerificationProvider;
 use nomos_mempool::network::adapters::libp2p::Libp2pAdapter as MempoolNetworkAdapter;
@@ -35,6 +35,7 @@ use nomos_node::{Tx, Wire};
 use overwatch_derive::*;
 use overwatch_rs::overwatch::{Overwatch, OverwatchRunner};
 use overwatch_rs::services::handle::ServiceHandle;
+use tempfile::NamedTempFile;
 use time::OffsetDateTime;
 
 const MB16: usize = 1024 * 1024 * 16;
@@ -197,7 +198,7 @@ fn test_indexer() {
         &genesis_state,
         &time_config,
         &swarm_config1,
-        PathBuf::from("db1"),
+        NamedTempFile::new().unwrap().path().to_path_buf(),
         vec![node_address(&swarm_config2)],
     );
 
@@ -207,7 +208,7 @@ fn test_indexer() {
         &genesis_state,
         &time_config,
         &swarm_config2,
-        PathBuf::from("db2"),
+        NamedTempFile::new().unwrap().path().to_path_buf(),
         vec![node_address(&swarm_config1)],
     );
 
@@ -260,7 +261,7 @@ fn test_indexer() {
         // Request range of vids from indexer.
         let (indexer_tx, indexer_rx) = tokio::sync::oneshot::channel();
         indexer_outbound
-            .send(nomos_da_indexer::DaMsg::GetRange {
+            .send(crate::DaMsg::GetRange {
                 app_id,
                 range,
                 reply_channel: indexer_tx,
