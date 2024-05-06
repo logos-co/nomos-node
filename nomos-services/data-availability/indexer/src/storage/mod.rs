@@ -13,11 +13,13 @@ use overwatch_rs::{
 #[async_trait::async_trait]
 pub trait DaStorageAdapter {
     type Backend: StorageBackend + Send + Sync + 'static;
+    type Settings: Clone;
 
     type Blob;
     type VID: VidCertificate;
 
     async fn new(
+        config: Self::Settings,
         storage_relay: OutboundRelay<<StorageService<Self::Backend> as ServiceData>::Message>,
     ) -> Self;
 

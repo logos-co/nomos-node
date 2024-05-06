@@ -1,3 +1,5 @@
+use std::fs::File;
+use std::io::Write;
 use std::path::PathBuf;
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering::SeqCst;
@@ -5,13 +7,14 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use crate::consensus::adapters::cryptarchia::CryptarchiaConsensusAdapter;
-use crate::storage::adapters::rocksdb::RocksAdapter;
-use crate::DataIndexerService;
+use crate::storage::adapters::rocksdb::{RocksAdapter, RocksAdapterSettings};
+use crate::{DataIndexerService, IndexerSettings};
 use bytes::Bytes;
 use cryptarchia_consensus::TimeConfig;
 use cryptarchia_ledger::{Coin, LedgerState};
 use full_replication::attestation::{Attestation, Signer};
 use full_replication::{Certificate, VidCertificate};
+use nomos_core::da::certificate::vid::VidCertificate as _;
 use nomos_core::da::certificate::CertificateStrategy;
 use nomos_core::{da::certificate, header::HeaderId, tx::Transaction};
 use nomos_libp2p::{Multiaddr, Swarm, SwarmConfig};
@@ -35,7 +38,7 @@ use nomos_node::{Tx, Wire};
 use overwatch_derive::*;
 use overwatch_rs::overwatch::{Overwatch, OverwatchRunner};
 use overwatch_rs::services::handle::ServiceHandle;
-use tempfile::NamedTempFile;
+use tempfile::{NamedTempFile, TempDir};
 use time::OffsetDateTime;
 
 const MB16: usize = 1024 * 1024 * 16;
@@ -44,7 +47,11 @@ pub type Cryptarchia = cryptarchia_consensus::CryptarchiaConsensus<
     cryptarchia_consensus::network::adapters::libp2p::LibP2pAdapter<Tx, VidCertificate>,
     MockPool<HeaderId, Tx, <Tx as Transaction>::Hash>,
     MempoolNetworkAdapter<Tx, <Tx as Transaction>::Hash>,
-    MockPool<HeaderId, VidCertificate, <VidCertificate as certificate::vid::VidCertificate>::CertificateId>,
+    MockPool<
+        HeaderId,
+        VidCertificate,
+        <VidCertificate as certificate::vid::VidCertificate>::CertificateId,
+    >,
     MempoolNetworkAdapter<Certificate, <Certificate as certificate::Certificate>::Id>,
     MempoolVerificationProvider,
     FillSizeWithTx<MB16, Tx>,
@@ -61,7 +68,11 @@ pub type DaIndexer = DataIndexerService<
     cryptarchia_consensus::network::adapters::libp2p::LibP2pAdapter<Tx, VidCertificate>,
     MockPool<HeaderId, Tx, <Tx as Transaction>::Hash>,
     MempoolNetworkAdapter<Tx, <Tx as Transaction>::Hash>,
-    MockPool<HeaderId, VidCertificate, <VidCertificate as certificate::vid::VidCertificate>::CertificateId>,
+    MockPool<
+        HeaderId,
+        VidCertificate,
+        <VidCertificate as certificate::vid::VidCertificate>::CertificateId,
+    >,
     MempoolNetworkAdapter<Certificate, <Certificate as certificate::Certificate>::Id>,
     MempoolVerificationProvider,
     FillSizeWithTx<MB16, Tx>,
@@ -76,7 +87,11 @@ pub type TxMempool = TxMempoolService<
 
 pub type DaMempool = DaMempoolService<
     MempoolNetworkAdapter<Certificate, <Certificate as certificate::Certificate>::Id>,
-    MockPool<HeaderId, VidCertificate, <VidCertificate as certificate::vid::VidCertificate>::CertificateId>,
+    MockPool<
+        HeaderId,
+        VidCertificate,
+        <VidCertificate as certificate::vid::VidCertificate>::CertificateId,
+    >,
     MempoolVerificationProvider,
 >;
 
@@ -97,6 +112,7 @@ fn new_node(
     time_config: &TimeConfig,
     swarm_config: &SwarmConfig,
     db_path: PathBuf,
+    blobs_dir: &PathBuf,
     initial_peers: Vec<Multiaddr>,
 ) -> Overwatch {
     OverwatchRunner::<IndexerNode>::run(
@@ -131,7 +147,11 @@ fn new_node(
                 read_only: false,
                 column_family: Some("blocks".into()),
             },
-            indexer: (),
+            indexer: IndexerSettings {
+                storage: RocksAdapterSettings {
+                    blob_storage_directory: blobs_dir.clone(),
+                },
+            },
             cryptarchia: cryptarchia_consensus::CryptarchiaSettings {
                 transaction_selector_settings: (),
                 blob_selector_settings: (),
@@ -192,6 +212,8 @@ fn test_indexer() {
         ..Default::default()
     };
 
+    let blobs_dir = TempDir::new().unwrap().path().to_path_buf();
+
     let node1 = new_node(
         &coins[0],
         &ledger_config,
@@ -199,6 +221,7 @@ fn test_indexer() {
         &time_config,
         &swarm_config1,
         NamedTempFile::new().unwrap().path().to_path_buf(),
+        &blobs_dir,
         vec![node_address(&swarm_config2)],
     );
 
@@ -209,6 +232,7 @@ fn test_indexer() {
         &time_config,
         &swarm_config2,
         NamedTempFile::new().unwrap().path().to_path_buf(),
+        &blobs_dir,
         vec![node_address(&swarm_config1)],
     );
 
@@ -224,7 +248,20 @@ fn test_indexer() {
     let certificate_strategy = full_replication::AbsoluteNumber::new(1);
     let cert = certificate_strategy.build(vec![attestation], app_id, index);
     let cert_id = cert.id();
+    let vid: VidCertificate = cert.clone().into();
     let range = 0.into()..1.into(); // get idx 0 and 1.
+
+    // Mock attestation step where blob is persisted in nodes blob storage.
+    let app_id_hex = hex::encode(app_id);
+    let id_hex = hex::encode(vid.certificate_id());
+
+    let mut path = blobs_dir;
+    path.push(app_id_hex);
+    std::fs::create_dir_all(&path).unwrap(); // app_id as dir
+    path.push(id_hex);
+
+    let mut file = File::create(path).unwrap();
+    file.write_all(b"blob").unwrap();
 
     node1.spawn(async move {
         let mempool_outbound = mempool.connect().await.unwrap();
@@ -274,8 +311,10 @@ fn test_indexer() {
         // item should have "some" data, other indexes should be None.
         app_id_blobs.sort_by(|(a, _), (b, _)| a.partial_cmp(b).unwrap());
         let app_id_blobs = app_id_blobs.iter().map(|(_, b)| b).collect::<Vec<_>>();
-        if app_id_blobs[0].is_some() && app_id_blobs[1].is_none() {
-            is_success_tx.store(true, SeqCst);
+        if let Some(blob) = app_id_blobs[0] {
+            if **blob == *b"blob" && app_id_blobs[1].is_none() {
+                is_success_tx.store(true, SeqCst);
+            }
         }
 
         performed_tx.store(true, SeqCst);

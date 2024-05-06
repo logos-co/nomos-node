@@ -1,7 +1,7 @@
+use std::path::PathBuf;
 use std::{marker::PhantomData, ops::Range};
 
 use bytes::{Bytes, BytesMut};
-
 use futures::{stream::FuturesUnordered, Stream};
 use nomos_core::da::certificate::{
     metadata::{Metadata, Next},
@@ -21,13 +21,13 @@ use crate::storage::DaStorageAdapter;
 
 const DA_VID_KEY_PREFIX: &str = "da/vid/";
 const DA_ATTESTED_KEY_PREFIX: &str = "da/attested/";
-const DA_BLOB_PATH: &str = "blobs/";
 
 pub struct RocksAdapter<S, V>
 where
     S: StorageSerde + Send + Sync + 'static,
     V: VidCertificate + Metadata + Send + Sync,
 {
+    settings: RocksAdapterSettings,
     storage_relay: OutboundRelay<StorageMsg<RocksBackend<S>>>,
     _vid: PhantomData<V>,
 }
@@ -43,11 +43,14 @@ where
     type Backend = RocksBackend<S>;
     type Blob = Bytes;
     type VID = V;
+    type Settings = RocksAdapterSettings;
 
     async fn new(
+        settings: Self::Settings,
         storage_relay: OutboundRelay<<StorageService<Self::Backend> as ServiceData>::Message>,
     ) -> Self {
         Self {
+            settings,
             storage_relay,
             _vid: PhantomData,
         }
@@ -108,6 +111,7 @@ where
         while current_index <= index_range.end {
             let idx = current_index.clone();
             let app_id = app_id.clone();
+            let settings = self.settings.clone();
 
             let (reply_tx, reply_rx) = tokio::sync::oneshot::channel();
             let key = key_bytes(
@@ -125,7 +129,10 @@ where
 
             futures.push(async move {
                 match reply_rx.await {
-                    Ok(Some(id)) => (idx, Some(load_blob(app_id.as_ref(), &id).await)),
+                    Ok(Some(id)) => (
+                        idx,
+                        load_blob(settings.blob_storage_directory, app_id.as_ref(), &id).await,
+                    ),
                     Ok(None) => (idx, None),
                     Err(_) => {
                         tracing::error!("Failed to receive storage response");
@@ -152,24 +159,32 @@ fn key_bytes(prefix: &str, id: impl AsRef<[u8]>) -> Bytes {
 
 // TODO: Rocksdb has a feature called BlobDB that handles largo blob storing, but further
 // investigation needs to be done to see if rust wrapper supports it.
-async fn load_blob(app_id: &[u8], id: &[u8]) -> Bytes {
+async fn load_blob(base_dir: PathBuf, app_id: &[u8], id: &[u8]) -> Option<Bytes> {
     let app_id = hex::encode(app_id);
     let id = hex::encode(id);
-    let path = format!("{DA_BLOB_PATH}/{app_id}/{id}");
+
+    let mut path = base_dir;
+    path.push(app_id);
+    path.push(id);
 
     let mut file = match File::open(path).await {
         Ok(file) => file,
         Err(e) => {
             tracing::error!("Failed to open file: {}", e);
-            return Bytes::new();
+            return None;
         }
     };
 
     let mut contents = vec![];
     if let Err(e) = file.read_to_end(&mut contents).await {
         tracing::error!("Failed to read file: {}", e);
-        return Bytes::new();
+        return None;
     }
 
-    Bytes::from(contents)
+    Some(Bytes::from(contents))
+}
+
+#[derive(Debug, Clone)]
+pub struct RocksAdapterSettings {
+    pub blob_storage_directory: PathBuf,
 }

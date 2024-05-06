@@ -184,8 +184,8 @@ where
     ConsensusStorage: StorageBackend + Send + Sync + 'static,
 {
     const SERVICE_ID: ServiceId = "DaStorage";
-    type State = NoState<()>;
-    type Settings = ();
+    type Settings = IndexerSettings<DaStorage::Settings>;
+    type State = NoState<Self::Settings>;
     type StateOperator = NoOperator<Self::State>;
     type Message = DaMsg<B, DaPool::Item>;
 }
@@ -359,12 +359,14 @@ where
     TxS: TxSelect<Tx = ClPool::Item>,
     BS: BlobCertificateSelect<Certificate = DaPool::Item>,
     DaStorage: DaStorageAdapter<VID = DaPool::Item, Blob = B> + Send + Sync + 'static,
+    DaStorage::Settings: Clone + Send + Sync + 'static,
     ConsensusStorage: StorageBackend + Send + Sync + 'static,
     Consensus: ConsensusAdapter<Tx = ClPool::Item, Cert = DaPool::Item> + Send + Sync,
 {
     fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, DynError> {
         let consensus_relay = service_state.overwatch_handle.relay();
         let storage_relay = service_state.overwatch_handle.relay();
+
         Ok(Self {
             service_state,
             storage_relay,
@@ -389,7 +391,11 @@ where
 
         let consensus_adapter = Consensus::new(consensus_relay).await;
         let mut consensus_blocks = consensus_adapter.block_stream().await;
-        let storage_adapter = DaStorage::new(storage_relay).await;
+        let storage_adapter = DaStorage::new(
+            service_state.settings_reader.get_updated_settings().storage,
+            storage_relay,
+        )
+        .await;
 
         let mut lifecycle_stream = service_state.lifecycle_handle.message_stream();
         loop {
@@ -413,4 +419,9 @@ where
         }
         Ok(())
     }
+}
+
+#[derive(Debug, Clone)]
+pub struct IndexerSettings<S> {
+    pub storage: S,
 }
