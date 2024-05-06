@@ -265,8 +265,9 @@ where
                 let stream = storage_adapter.get_range_stream(app_id, range).await;
                 let results = stream.collect::<Vec<_>>().await;
 
-                let _ = reply_channel.send(results);
-                Ok(())
+                reply_channel
+                    .send(results)
+                    .map_err(|_| "Error sending range response".into())
             }
         }
     }
