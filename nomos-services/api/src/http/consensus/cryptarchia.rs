@@ -9,7 +9,7 @@ use cryptarchia_consensus::{
     network::adapters::libp2p::LibP2pAdapter as ConsensusNetworkAdapter, ConsensusMsg,
     CryptarchiaConsensus, CryptarchiaInfo,
 };
-use full_replication::{Certificate, VID};
+use full_replication::{Certificate, VidCertificate};
 use nomos_core::{
     da::certificate::{self, select::FillSize as FillSizeWithBlobsCertificate},
     header::HeaderId,
@@ -26,11 +26,11 @@ pub type Cryptarchia<Tx, SS, const SIZE: usize> = CryptarchiaConsensus<
     ConsensusNetworkAdapter<Tx, Certificate>,
     MockPool<HeaderId, Tx, <Tx as Transaction>::Hash>,
     MempoolNetworkAdapter<Tx, <Tx as Transaction>::Hash>,
-    MockPool<HeaderId, VID, <VID as certificate::vid::VID>::CertificateId>,
+    MockPool<HeaderId, VidCertificate, <VidCertificate as certificate::vid::VidCertificate>::CertificateId>,
     MempoolNetworkAdapter<Certificate, <Certificate as certificate::Certificate>::Id>,
     MempoolVerificationProvider,
     FillSizeWithTx<SIZE, Tx>,
-    FillSizeWithBlobsCertificate<SIZE, VID>,
+    FillSizeWithBlobsCertificate<SIZE, VidCertificate>,
     RocksBackend<SS>,
 >;
 

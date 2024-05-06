@@ -11,7 +11,7 @@ use bytes::Bytes;
 use cryptarchia_consensus::TimeConfig;
 use cryptarchia_ledger::{Coin, LedgerState};
 use full_replication::attestation::{Attestation, Signer};
-use full_replication::{Certificate, VID};
+use full_replication::{Certificate, VidCertificate};
 use nomos_core::da::certificate::CertificateStrategy;
 use nomos_core::{da::certificate, header::HeaderId, tx::Transaction};
 use nomos_libp2p::{Multiaddr, Swarm, SwarmConfig};
@@ -41,31 +41,31 @@ use time::OffsetDateTime;
 const MB16: usize = 1024 * 1024 * 16;
 
 pub type Cryptarchia = cryptarchia_consensus::CryptarchiaConsensus<
-    cryptarchia_consensus::network::adapters::libp2p::LibP2pAdapter<Tx, VID>,
+    cryptarchia_consensus::network::adapters::libp2p::LibP2pAdapter<Tx, VidCertificate>,
     MockPool<HeaderId, Tx, <Tx as Transaction>::Hash>,
     MempoolNetworkAdapter<Tx, <Tx as Transaction>::Hash>,
-    MockPool<HeaderId, VID, <VID as certificate::vid::VID>::CertificateId>,
+    MockPool<HeaderId, VidCertificate, <VidCertificate as certificate::vid::VidCertificate>::CertificateId>,
     MempoolNetworkAdapter<Certificate, <Certificate as certificate::Certificate>::Id>,
     MempoolVerificationProvider,
     FillSizeWithTx<MB16, Tx>,
-    FillSizeWithBlobsCertificate<MB16, VID>,
+    FillSizeWithBlobsCertificate<MB16, VidCertificate>,
     RocksBackend<Wire>,
 >;
 
 pub type DaIndexer = DataIndexerService<
     // Indexer specific.
     Bytes,
-    RocksAdapter<Wire, full_replication::VID>,
-    CryptarchiaConsensusAdapter<Tx, full_replication::VID>,
+    RocksAdapter<Wire, full_replication::VidCertificate>,
+    CryptarchiaConsensusAdapter<Tx, full_replication::VidCertificate>,
     // Cryptarchia specific, should be the same as in `Cryptarchia` type above.
-    cryptarchia_consensus::network::adapters::libp2p::LibP2pAdapter<Tx, VID>,
+    cryptarchia_consensus::network::adapters::libp2p::LibP2pAdapter<Tx, VidCertificate>,
     MockPool<HeaderId, Tx, <Tx as Transaction>::Hash>,
     MempoolNetworkAdapter<Tx, <Tx as Transaction>::Hash>,
-    MockPool<HeaderId, VID, <VID as certificate::vid::VID>::CertificateId>,
+    MockPool<HeaderId, VidCertificate, <VidCertificate as certificate::vid::VidCertificate>::CertificateId>,
     MempoolNetworkAdapter<Certificate, <Certificate as certificate::Certificate>::Id>,
     MempoolVerificationProvider,
     FillSizeWithTx<MB16, Tx>,
-    FillSizeWithBlobsCertificate<MB16, VID>,
+    FillSizeWithBlobsCertificate<MB16, VidCertificate>,
     RocksBackend<Wire>,
 >;
 
@@ -76,7 +76,7 @@ pub type TxMempool = TxMempoolService<
 
 pub type DaMempool = DaMempoolService<
     MempoolNetworkAdapter<Certificate, <Certificate as certificate::Certificate>::Id>,
-    MockPool<HeaderId, VID, <VID as certificate::vid::VID>::CertificateId>,
+    MockPool<HeaderId, VidCertificate, <VidCertificate as certificate::vid::VidCertificate>::CertificateId>,
     MempoolVerificationProvider,
 >;
 

@@ -3,7 +3,7 @@ pub mod adapters;
 use std::ops::Range;
 
 use futures::Stream;
-use nomos_core::da::certificate::{metadata::Metadata, vid::VID};
+use nomos_core::da::certificate::{metadata::Metadata, vid::VidCertificate};
 use nomos_storage::{backends::StorageBackend, StorageService};
 use overwatch_rs::{
     services::{relay::OutboundRelay, ServiceData},
@@ -15,7 +15,7 @@ pub trait DaStorageAdapter {
     type Backend: StorageBackend + Send + Sync + 'static;
 
     type Blob;
-    type VID: VID;
+    type VID: VidCertificate;
 
     async fn new(
         storage_relay: OutboundRelay<<StorageService<Self::Backend> as ServiceData>::Message>,

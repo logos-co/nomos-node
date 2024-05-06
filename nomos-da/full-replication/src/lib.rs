@@ -168,12 +168,12 @@ impl certificate::Certificate for Certificate {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
-pub struct VID {
+pub struct VidCertificate {
     id: [u8; 32],
     metadata: Metadata,
 }
 
-impl certificate::vid::VID for VID {
+impl certificate::vid::VidCertificate for VidCertificate {
     type CertificateId = [u8; 32];
 
     fn certificate_id(&self) -> Self::CertificateId {
@@ -181,7 +181,7 @@ impl certificate::vid::VID for VID {
     }
 }
 
-impl metadata::Metadata for VID {
+impl metadata::Metadata for VidCertificate {
     type AppId = [u8; 32];
     type Index = Index;
 
@@ -190,13 +190,13 @@ impl metadata::Metadata for VID {
     }
 }
 
-impl Hash for VID {
+impl Hash for VidCertificate {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        state.write(<VID as certificate::vid::VID>::certificate_id(self).as_ref());
+        state.write(<VidCertificate as certificate::vid::VidCertificate>::certificate_id(self).as_ref());
     }
 }
 
-impl From<Certificate> for VID {
+impl From<Certificate> for VidCertificate {
     fn from(cert: Certificate) -> Self {
         // To simulate the propery of aggregate committment + row commitment in Nomos Da Protocol,
         // when full replication certificate is converted into the VID (which should happen after

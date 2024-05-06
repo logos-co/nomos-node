@@ -5,7 +5,7 @@ use bytes::{Bytes, BytesMut};
 use futures::{stream::FuturesUnordered, Stream};
 use nomos_core::da::certificate::{
     metadata::{Metadata, Next},
-    vid::VID,
+    vid::VidCertificate,
 };
 use nomos_storage::{
     backends::{rocksdb::RocksBackend, StorageSerde},
@@ -26,7 +26,7 @@ const DA_BLOB_PATH: &str = "blobs/";
 pub struct RocksAdapter<S, V>
 where
     S: StorageSerde + Send + Sync + 'static,
-    V: VID + Metadata + Send + Sync,
+    V: VidCertificate + Metadata + Send + Sync,
 {
     storage_relay: OutboundRelay<StorageMsg<RocksBackend<S>>>,
     _vid: PhantomData<V>,
@@ -36,7 +36,7 @@ where
 impl<S, V> DaStorageAdapter for RocksAdapter<S, V>
 where
     S: StorageSerde + Send + Sync + 'static,
-    V: VID<CertificateId = [u8; 32]> + Metadata + Send + Sync,
+    V: VidCertificate<CertificateId = [u8; 32]> + Metadata + Send + Sync,
     V::Index: AsRef<[u8]> + Next + Clone + PartialOrd + Send + Sync + 'static,
     V::AppId: AsRef<[u8]> + Clone + Send + Sync + 'static,
 {

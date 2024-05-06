@@ -8,7 +8,7 @@ use cryptarchia_ledger::{Coin, LeaderProof, LedgerState};
 use futures::StreamExt;
 use network::{messages::NetworkMessage, NetworkAdapter};
 use nomos_core::da::certificate::{
-    metadata::Metadata, vid::VID, BlobCertificateSelect, Certificate,
+    metadata::Metadata, vid::VidCertificate, BlobCertificateSelect, Certificate,
 };
 use nomos_core::header::{cryptarchia::Header, HeaderId};
 use nomos_core::tx::{Transaction, TxSelect};
@@ -245,7 +245,7 @@ where
         + Sync
         + 'static,
     // TODO: Change to specific certificate bounds here
-    DaPool::Item: VID<CertificateId = DaPool::Key>
+    DaPool::Item: VidCertificate<CertificateId = DaPool::Key>
         + Metadata
         + Debug
         + Clone
@@ -431,7 +431,7 @@ where
         + Send
         + Sync
         + 'static,
-    DaPool::Item: VID<CertificateId = DaPool::Key>
+    DaPool::Item: VidCertificate<CertificateId = DaPool::Key>
         + Metadata
         + Debug
         + Clone
@@ -565,7 +565,7 @@ where
                 )
                 .await;
 
-                mark_in_block(da_mempool_relay, block.blobs().map(VID::certificate_id), id).await;
+                mark_in_block(da_mempool_relay, block.blobs().map(VidCertificate::certificate_id), id).await;
 
                 // store block
                 let msg = <StorageMsg<_>>::new_store_message(header.id(), block.clone());

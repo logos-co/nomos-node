@@ -15,7 +15,7 @@ pub trait Certificate {
 }
 
 pub trait BlobCertificateSelect {
-    type Certificate: vid::VID;
+    type Certificate: vid::VidCertificate;
     type Settings: Clone;
 
     fn new(settings: Self::Settings) -> Self;

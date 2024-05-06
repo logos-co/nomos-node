@@ -13,7 +13,7 @@ use cryptarchia_consensus::CryptarchiaConsensus;
 use futures::StreamExt;
 use nomos_core::block::Block;
 use nomos_core::da::certificate::metadata::Metadata;
-use nomos_core::da::certificate::vid::VID;
+use nomos_core::da::certificate::vid::VidCertificate;
 use nomos_core::da::certificate::{BlobCertificateSelect, Certificate};
 use nomos_core::header::HeaderId;
 use nomos_core::tx::{Transaction, TxSelect};
@@ -341,7 +341,7 @@ where
         + Send
         + Sync
         + 'static,
-    DaPool::Item: VID<CertificateId = DaPool::Key>
+    DaPool::Item: VidCertificate<CertificateId = DaPool::Key>
         + Metadata
         + Debug
         + Clone
