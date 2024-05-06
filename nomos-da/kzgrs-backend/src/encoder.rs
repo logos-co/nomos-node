@@ -94,13 +94,15 @@ impl DaEncoder {
 
     fn compute_rows_proofs(
         polynomials: &[Polynomial],
+        evals: &[Evaluations],
         proof_count: usize,
     ) -> Result<Vec<Vec<Proof>>, KzgRsError> {
         polynomials
             .iter()
-            .map(|poly| {
+            .zip(evals)
+            .map(|(poly, eval)| {
                 (0..proof_count)
-                    .map(|i| generate_element_proof(i, poly, &GLOBAL_PARAMETERS, *DOMAIN))
+                    .map(|i| generate_element_proof(i, poly, eval, &GLOBAL_PARAMETERS, *DOMAIN))
                     .collect()
             })
             .collect()
@@ -136,10 +138,11 @@ impl DaEncoder {
 
     fn compute_aggregated_column_proofs(
         polynomial: &Polynomial,
+        evals: &Evaluations,
         proof_count: usize,
     ) -> Result<Vec<Proof>, KzgRsError> {
         (0..proof_count)
-            .map(|i| generate_element_proof(i, polynomial, &GLOBAL_PARAMETERS, *DOMAIN))
+            .map(|i| generate_element_proof(i, polynomial, evals, &GLOBAL_PARAMETERS, *DOMAIN))
             .collect()
     }
 
@@ -164,18 +167,23 @@ impl DaEncoder {
             Self::compute_kzg_row_commitments(&chunked_data)?
                 .into_iter()
                 .unzip();
-        let extended_data =
-            Self::evals_to_chunk_matrix(Self::rs_encode_rows(&row_polynomials).as_ref());
+        let encoded_evaluations = Self::rs_encode_rows(&row_polynomials);
+        let extended_data = Self::evals_to_chunk_matrix(&encoded_evaluations);
         let row_polynomials: Vec<_> = row_polynomials.into_iter().map(|(_, p)| p).collect();
-        let rows_proofs = Self::compute_rows_proofs(&row_polynomials, self.params.column_count)?;
+        let rows_proofs = Self::compute_rows_proofs(
+            &row_polynomials,
+            &encoded_evaluations,
+            self.params.column_count,
+        )?;
         let (_column_polynomials, column_commitments): (Vec<_>, Vec<_>) =
             Self::compute_kzg_column_commitments(&extended_data)?
                 .into_iter()
                 .unzip();
-        let ((_aggregated_evals, aggregated_polynomial), aggregated_column_commitment) =
+        let ((aggregated_evals, aggregated_polynomial), aggregated_column_commitment) =
             Self::compute_aggregated_column_commitment(&extended_data, &column_commitments)?;
         let aggregated_column_proofs = Self::compute_aggregated_column_proofs(
             &aggregated_polynomial,
+            &aggregated_evals,
             column_commitments.len(),
         )?;
         Ok(EncodedData {
@@ -291,13 +299,18 @@ pub mod test {
                 .unwrap()
                 .into_iter()
                 .unzip();
-        let extended_rows = DaEncoder::rs_encode_rows(&poly_data);
-        let (_evals, polynomials): (Vec<_>, Vec<_>) = poly_data.into_iter().unzip();
-        let extended_matrix = DaEncoder::evals_to_chunk_matrix(&extended_rows);
+        let extended_evaluations = DaEncoder::rs_encode_rows(&poly_data);
+        let (evals, polynomials): (Vec<_>, Vec<_>) = poly_data.into_iter().unzip();
+        let extended_matrix = DaEncoder::evals_to_chunk_matrix(&extended_evaluations);
         let original_proofs =
-            DaEncoder::compute_rows_proofs(&polynomials, PARAMS.column_count.div(2)).unwrap();
-        let extended_proofs =
-            DaEncoder::compute_rows_proofs(&polynomials, PARAMS.column_count).unwrap();
+            DaEncoder::compute_rows_proofs(&polynomials, &evals, PARAMS.column_count.div(2))
+                .unwrap();
+        let extended_proofs = DaEncoder::compute_rows_proofs(
+            &polynomials,
+            &extended_evaluations,
+            PARAMS.column_count,
+        )
+        .unwrap();
 
         let checks = izip!(matrix.iter(), &commitments, &original_proofs);
         for (row, commitment, proofs) in checks {
@@ -359,8 +372,9 @@ pub mod test {
                 .unwrap()
                 .into_iter()
                 .unzip();
-        let ((_, polynomial), _aggregated_commitment) =
+        let ((evals, polynomial), _aggregated_commitment) =
             DaEncoder::compute_aggregated_column_commitment(&matrix, &commitments).unwrap();
-        DaEncoder::compute_aggregated_column_proofs(&polynomial, commitments.len()).unwrap();
+        DaEncoder::compute_aggregated_column_proofs(&polynomial, &evals, commitments.len())
+            .unwrap();
     }
 }

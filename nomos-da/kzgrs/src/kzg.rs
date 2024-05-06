@@ -1,4 +1,5 @@
 use crate::common::KzgRsError;
+use crate::Evaluations;
 use ark_bls12_381::{Bls12_381, Fr};
 use ark_ec::pairing::Pairing;
 use ark_poly::univariate::DensePolynomial;
@@ -27,11 +28,14 @@ pub fn commit_polynomial(
 pub fn generate_element_proof(
     element_index: usize,
     polynomial: &DensePolynomial<Fr>,
+    evaluations: &Evaluations,
     global_parameters: &UniversalParams<Bls12_381>,
     domain: GeneralEvaluationDomain<Fr>,
 ) -> Result<Proof<Bls12_381>, KzgRsError> {
     let u = domain.element(element_index);
-    let v = polynomial.evaluate(&u);
+    // Instead of evaluating over the polynomial, we can reuse the evaluation points from the rs encoding
+    // let v = polynomial.evaluate(&u);
+    let v = evaluations.evals[element_index];
     let f_x_v = polynomial + &DensePolynomial::<Fr>::from_coefficients_vec(vec![-v]);
     let x_u = DensePolynomial::<Fr>::from_coefficients_vec(vec![-u, Fr::one()]);
     let witness_polynomial: DensePolynomial<_> = &f_x_v / &x_u;
