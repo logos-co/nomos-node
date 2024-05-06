@@ -19,7 +19,7 @@ use bytes::Bytes;
 use serde::{Deserialize, Serialize};
 
 #[derive(Copy, Clone, Default, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct FRIndex([u8; 8]);
+pub struct Index([u8; 8]);
 
 /// Re-export the types for OpenAPI
 #[cfg(feature = "openapi")]
@@ -90,7 +90,7 @@ impl CertificateStrategy for AbsoluteNumber<Attestation, Certificate> {
         &self,
         attestations: Vec<Self::Attestation>,
         app_id: [u8; 32],
-        index: FRIndex,
+        index: Index,
     ) -> Certificate {
         assert!(self.can_build(&attestations));
         Certificate {
@@ -111,7 +111,7 @@ pub struct Blob {
 #[derive(Default, Debug, Copy, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub struct Metadata {
     app_id: [u8; 32],
-    index: FRIndex,
+    index: Index,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
@@ -183,7 +183,7 @@ impl certificate::vid::VID for VID {
 
 impl metadata::Metadata for VID {
     type AppId = [u8; 32];
-    type Index = FRIndex;
+    type Index = Index;
 
     fn metadata(&self) -> (Self::AppId, Self::Index) {
         (self.metadata.app_id, self.metadata.index)
@@ -212,20 +212,20 @@ impl From<Certificate> for VID {
 
 impl metadata::Metadata for Certificate {
     type AppId = [u8; 32];
-    type Index = FRIndex;
+    type Index = Index;
 
     fn metadata(&self) -> (Self::AppId, Self::Index) {
         (self.metadata.app_id, self.metadata.index)
     }
 }
 
-impl From<u64> for FRIndex {
+impl From<u64> for Index {
     fn from(value: u64) -> Self {
         Self(value.to_be_bytes())
     }
 }
 
-impl Next for FRIndex {
+impl Next for Index {
     fn next(self) -> Self {
         let num = u64::from_be_bytes(self.0);
         let incremented_num = num.wrapping_add(1);
@@ -233,19 +233,19 @@ impl Next for FRIndex {
     }
 }
 
-impl AsRef<[u8]> for FRIndex {
+impl AsRef<[u8]> for Index {
     fn as_ref(&self) -> &[u8] {
         self.0.as_ref()
     }
 }
 
-impl PartialOrd for FRIndex {
+impl PartialOrd for Index {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
 }
 
-impl Ord for FRIndex {
+impl Ord for Index {
     fn cmp(&self, other: &Self) -> Ordering {
         self.0.cmp(&other.0)
     }
