@@ -18,3 +18,10 @@ num-bigint = "0.4.4"
 thiserror = "1.0.58"
 num-traits = "0.2.18"
 rand = "0.8.5"
+
+[dev-dependencies]
+divan = "0.1"
+
+[[bench]]
+name = "kzg"
+harness = false

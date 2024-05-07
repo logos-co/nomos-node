@@ -104,10 +104,10 @@ mod test {
         let mut rng = thread_rng();
         bytes.try_fill(&mut rng).unwrap();
         let evaluations = bytes_to_evaluations::<31>(&bytes, *DOMAIN).evals;
-        let (_, poly) = bytes_to_polynomial::<31>(&bytes, *DOMAIN).unwrap();
+        let (eval, poly) = bytes_to_polynomial::<31>(&bytes, *DOMAIN).unwrap();
         let commitment = commit_polynomial(&poly, &GLOBAL_PARAMETERS).unwrap();
         let proofs: Vec<_> = (0..10)
-            .map(|i| generate_element_proof(i, &poly, &GLOBAL_PARAMETERS, *DOMAIN).unwrap())
+            .map(|i| generate_element_proof(i, &poly, &eval, &GLOBAL_PARAMETERS, *DOMAIN).unwrap())
             .collect();
         for (i, (element, proof)) in evaluations.iter().zip(proofs.iter()).enumerate() {
             // verifying works
