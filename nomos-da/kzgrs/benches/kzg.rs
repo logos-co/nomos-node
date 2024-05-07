@@ -4,7 +4,6 @@ use ark_poly::{EvaluationDomain, GeneralEvaluationDomain};
 use ark_poly_commit::kzg10::{UniversalParams, KZG10};
 use divan::counter::ItemsCount;
 use divan::{black_box, counter::BytesCount, AllocProfiler, Bencher};
-use kzgrs::{Evaluations, Polynomial};
 use once_cell::sync::Lazy;
 use rand::RngCore;
 
@@ -16,7 +15,6 @@ fn main() {
 
 #[global_allocator]
 static ALLOC: AllocProfiler = AllocProfiler::system();
-const SIZES: &[usize] = &[1usize, 2, 3, 4, 5, 6, 7, 8];
 
 static GLOBAL_PARAMETERS: Lazy<UniversalParams<Bls12_381>> = Lazy::new(|| {
     let mut rng = rand::thread_rng();
@@ -37,19 +35,19 @@ const CHUNK_SIZE: usize = 31;
 #[allow(non_snake_case)]
 #[divan::bench(args = [10, 100, 1000])]
 fn commit_polynomial_with_element_count(bencher: Bencher, element_count: usize) {
-    let size = bencher
+    bencher
         .with_inputs(|| {
             let data = rand_data_elements(element_count, CHUNK_SIZE);
             bytes_to_polynomial_unchecked::<CHUNK_SIZE>(&data, *DOMAIN)
         })
-        .input_counter(move |(_evals, poly)| BytesCount::new(element_count * CHUNK_SIZE))
+        .input_counter(move |(_evals, _poly)| BytesCount::new(element_count * CHUNK_SIZE))
         .bench_refs(|(_evals, poly)| black_box(commit_polynomial(poly, &GLOBAL_PARAMETERS)));
 }
 
 #[allow(non_snake_case)]
 #[divan::bench]
 fn compute_single_proof(bencher: Bencher) {
-    let size = bencher
+    bencher
         .with_inputs(|| {
             let data = rand_data_elements(10, CHUNK_SIZE);
             bytes_to_polynomial_unchecked::<CHUNK_SIZE>(&data, *DOMAIN)
@@ -69,7 +67,7 @@ fn compute_single_proof(bencher: Bencher) {
 #[allow(non_snake_case)]
 #[divan::bench]
 fn verify_single_proof(bencher: Bencher) {
-    let size = bencher
+    bencher
         .with_inputs(|| {
             let data = rand_data_elements(10, CHUNK_SIZE);
             let (eval, poly) = bytes_to_polynomial_unchecked::<CHUNK_SIZE>(&data, *DOMAIN);

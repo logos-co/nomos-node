@@ -3,7 +3,7 @@ use crate::Evaluations;
 use ark_bls12_381::{Bls12_381, Fr};
 use ark_ec::pairing::Pairing;
 use ark_poly::univariate::DensePolynomial;
-use ark_poly::{DenseUVPolynomial, EvaluationDomain, GeneralEvaluationDomain, Polynomial};
+use ark_poly::{DenseUVPolynomial, EvaluationDomain, GeneralEvaluationDomain};
 use ark_poly_commit::kzg10::{Commitment, Powers, Proof, UniversalParams, KZG10};
 use num_traits::One;
 use std::borrow::Cow;
