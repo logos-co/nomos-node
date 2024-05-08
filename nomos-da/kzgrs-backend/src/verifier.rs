@@ -179,7 +179,7 @@ mod test {
             bytes_to_polynomial::<BYTES_PER_FIELD_ELEMENT>(column.as_bytes().as_slice(), *DOMAIN)
                 .unwrap();
         let column_commitment = commit_polynomial(&column_poly, &GLOBAL_PARAMETERS).unwrap();
-        let (_, aggregated_poly) = bytes_to_polynomial::<
+        let (aggregated_evals, aggregated_poly) = bytes_to_polynomial::<
             { DaEncoderParams::MAX_BLS12_381_ENCODING_CHUNK_SIZE },
         >(
             hash_column_and_commitment::<{ DaEncoderParams::MAX_BLS12_381_ENCODING_CHUNK_SIZE }>(
@@ -192,8 +192,14 @@ mod test {
         .unwrap();
         let aggregated_commitment =
             commit_polynomial(&aggregated_poly, &GLOBAL_PARAMETERS).unwrap();
-        let column_proof =
-            generate_element_proof(0, &aggregated_poly, &GLOBAL_PARAMETERS, *DOMAIN).unwrap();
+        let column_proof = generate_element_proof(
+            0,
+            &aggregated_poly,
+            &aggregated_evals,
+            &GLOBAL_PARAMETERS,
+            *DOMAIN,
+        )
+        .unwrap();
         assert!(DaVerifier::verify_column(
             &column,
             &column_commitment,
