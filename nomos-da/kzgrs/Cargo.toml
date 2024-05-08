@@ -21,6 +21,7 @@ rand = "0.8.5"
 
 [dev-dependencies]
 divan = "0.1"
+rayon = "1.10"
 
 [[bench]]
 name = "kzg"

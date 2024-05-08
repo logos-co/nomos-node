@@ -6,6 +6,8 @@ use divan::counter::ItemsCount;
 use divan::{black_box, counter::BytesCount, AllocProfiler, Bencher};
 use once_cell::sync::Lazy;
 use rand::RngCore;
+use rayon::iter::IntoParallelIterator;
+use rayon::iter::ParallelIterator;
 
 use kzgrs::{common::bytes_to_polynomial_unchecked, kzg::*};
 
@@ -61,6 +63,46 @@ fn compute_single_proof(bencher: Bencher) {
                 &GLOBAL_PARAMETERS,
                 *DOMAIN,
             ))
+        });
+}
+
+#[allow(non_snake_case)]
+#[divan::bench(args = [1000, 5000, 10000], sample_count = 3, sample_size = 5)]
+fn compute_batch_proofs(bencher: Bencher, element_count: usize) {
+    bencher
+        .with_inputs(|| {
+            let data = rand_data_elements(element_count, CHUNK_SIZE);
+            bytes_to_polynomial_unchecked::<CHUNK_SIZE>(&data, *DOMAIN)
+        })
+        .input_counter(move |_| ItemsCount::new(element_count))
+        .bench_refs(|(evals, poly)| {
+            for i in 0..element_count {
+                black_box(
+                    generate_element_proof(i, poly, evals, &GLOBAL_PARAMETERS, *DOMAIN).unwrap(),
+                );
+            }
+        });
+}
+
+#[allow(non_snake_case)]
+#[divan::bench(args = [1000, 5000, 10000], sample_count = 3, sample_size = 5)]
+fn compute_parallelize_batch_proofs(bencher: Bencher, element_count: usize) {
+    bencher
+        .with_inputs(|| {
+            let data = rand_data_elements(element_count, CHUNK_SIZE);
+            bytes_to_polynomial_unchecked::<CHUNK_SIZE>(&data, *DOMAIN)
+        })
+        .input_counter(move |_| ItemsCount::new(element_count))
+        .bench_refs(|(evals, poly)| {
+            let _: Vec<_> = (0..element_count)
+                .into_par_iter()
+                .map(|i| {
+                    black_box(
+                        generate_element_proof(i, poly, evals, &GLOBAL_PARAMETERS, *DOMAIN)
+                            .unwrap(),
+                    )
+                })
+                .collect();
         });
 }
 
