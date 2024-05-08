@@ -1,8 +1,9 @@
 use crate::common::KzgRsError;
+use crate::Evaluations;
 use ark_bls12_381::{Bls12_381, Fr};
 use ark_ec::pairing::Pairing;
 use ark_poly::univariate::DensePolynomial;
-use ark_poly::{DenseUVPolynomial, EvaluationDomain, GeneralEvaluationDomain, Polynomial};
+use ark_poly::{DenseUVPolynomial, EvaluationDomain, GeneralEvaluationDomain};
 use ark_poly_commit::kzg10::{Commitment, Powers, Proof, UniversalParams, KZG10};
 use num_traits::One;
 use std::borrow::Cow;
@@ -27,11 +28,14 @@ pub fn commit_polynomial(
 pub fn generate_element_proof(
     element_index: usize,
     polynomial: &DensePolynomial<Fr>,
+    evaluations: &Evaluations,
     global_parameters: &UniversalParams<Bls12_381>,
     domain: GeneralEvaluationDomain<Fr>,
 ) -> Result<Proof<Bls12_381>, KzgRsError> {
     let u = domain.element(element_index);
-    let v = polynomial.evaluate(&u);
+    // Instead of evaluating over the polynomial, we can reuse the evaluation points from the rs encoding
+    // let v = polynomial.evaluate(&u);
+    let v = evaluations.evals[element_index];
     let f_x_v = polynomial + &DensePolynomial::<Fr>::from_coefficients_vec(vec![-v]);
     let x_u = DensePolynomial::<Fr>::from_coefficients_vec(vec![-u, Fr::one()]);
     let witness_polynomial: DensePolynomial<_> = &f_x_v / &x_u;
@@ -100,10 +104,10 @@ mod test {
         let mut rng = thread_rng();
         bytes.try_fill(&mut rng).unwrap();
         let evaluations = bytes_to_evaluations::<31>(&bytes, *DOMAIN).evals;
-        let (_, poly) = bytes_to_polynomial::<31>(&bytes, *DOMAIN).unwrap();
+        let (eval, poly) = bytes_to_polynomial::<31>(&bytes, *DOMAIN).unwrap();
         let commitment = commit_polynomial(&poly, &GLOBAL_PARAMETERS).unwrap();
         let proofs: Vec<_> = (0..10)
-            .map(|i| generate_element_proof(i, &poly, &GLOBAL_PARAMETERS, *DOMAIN).unwrap())
+            .map(|i| generate_element_proof(i, &poly, &eval, &GLOBAL_PARAMETERS, *DOMAIN).unwrap())
             .collect();
         for (i, (element, proof)) in evaluations.iter().zip(proofs.iter()).enumerate() {
             // verifying works
