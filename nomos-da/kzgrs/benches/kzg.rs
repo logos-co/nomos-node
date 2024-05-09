@@ -84,6 +84,9 @@ fn compute_batch_proofs(bencher: Bencher, element_count: usize) {
         });
 }
 
+// This is a test on how will perform by having a wrapping rayon on top of the proof computation
+// ark libraries already use rayon underneath so no great improvements are probably come up from this.
+// But it should help reusing the same thread pool for all jobs saving a little time.
 #[allow(non_snake_case)]
 #[divan::bench(args = [1000, 5000, 10000], sample_count = 3, sample_size = 5)]
 fn compute_parallelize_batch_proofs(bencher: Bencher, element_count: usize) {
