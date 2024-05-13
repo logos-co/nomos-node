@@ -67,18 +67,22 @@ fn compute_single_proof(bencher: Bencher) {
 }
 
 #[allow(non_snake_case)]
-#[divan::bench(args = [1000, 5000, 10000], sample_count = 3, sample_size = 5)]
+#[divan::bench(args = [10, 100, 500], sample_count = 3, sample_size = 5)]
 fn compute_batch_proofs(bencher: Bencher, element_count: usize) {
     bencher
         .with_inputs(|| {
+            let domain = GeneralEvaluationDomain::new(element_count).unwrap();
             let data = rand_data_elements(element_count, CHUNK_SIZE);
-            bytes_to_polynomial_unchecked::<CHUNK_SIZE>(&data, *DOMAIN)
+            (
+                bytes_to_polynomial_unchecked::<CHUNK_SIZE>(&data, domain),
+                domain,
+            )
         })
         .input_counter(move |_| ItemsCount::new(element_count))
-        .bench_refs(|(evals, poly)| {
+        .bench_refs(|((evals, poly), domain)| {
             for i in 0..element_count {
                 black_box(
-                    generate_element_proof(i, poly, evals, &GLOBAL_PARAMETERS, *DOMAIN).unwrap(),
+                    generate_element_proof(i, poly, evals, &GLOBAL_PARAMETERS, *domain).unwrap(),
                 );
             }
         });
