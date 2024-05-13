@@ -7,8 +7,8 @@ use std::fmt::Debug;
 use tokio_stream::StreamExt;
 use tracing::error;
 // internal
-use crate::verifier::backend::VerifierBackend;
-use crate::verifier::network::NetworkAdapter;
+use backend::VerifierBackend;
+use network::NetworkAdapter;
 use nomos_network::NetworkService;
 use overwatch_rs::services::handle::ServiceStateHandle;
 use overwatch_rs::services::relay::{NoMessage, Relay};

@@ -1,0 +1,15 @@
+[package]
+name = "nomos-da-verifier"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+async-trait = "0.1"
+futures = "0.3"
+nomos-core = { path = "../../../nomos-core" }
+nomos-network = { path = "../../../nomos-services/network" }
+overwatch-rs = { git = "https://github.com/logos-co/Overwatch", rev = "2f70806" }
+overwatch-derive = { git = "https://github.com/logos-co/Overwatch", rev = "ac28d01" }
+tokio = { version = "1", features = ["sync", "macros"] }
+tokio-stream = "0.1.15"
+tracing = "0.1"

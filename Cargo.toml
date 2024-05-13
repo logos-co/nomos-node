@@ -11,6 +11,7 @@ members = [
     "nomos-services/metrics",
     "nomos-services/system-sig",
     "nomos-services/data-availability/indexer",
+    "nomos-services/data-availability/verifier",
     "nomos-da/full-replication",
     # TODO: add it again and reimplement full replication
     #    "nomos-cli",
@@ -22,6 +23,6 @@ members = [
     "ledger/cryptarchia-ledger",
     "tests",
     "nomos-da/kzgrs",
-    "nomos-da/kzgrs-backend",
+    "nomos-da/kzgrs-backend"
 ]
 resolver = "2"
