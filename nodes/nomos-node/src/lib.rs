@@ -3,7 +3,7 @@ mod config;
 mod tx;
 
 use color_eyre::eyre::Result;
-use full_replication::Certificate;
+use full_replication::{Certificate, VidCertificate};
 #[cfg(feature = "metrics")]
 use metrics::{backend::map::MapMetricsBackend, types::MetricsData, MetricsService};
 
@@ -44,14 +44,14 @@ pub const DA_TOPIC: &str = "da";
 const MB16: usize = 1024 * 1024 * 16;
 
 pub type Cryptarchia = cryptarchia_consensus::CryptarchiaConsensus<
-    cryptarchia_consensus::network::adapters::libp2p::LibP2pAdapter<Tx, Certificate>,
+    cryptarchia_consensus::network::adapters::libp2p::LibP2pAdapter<Tx, VidCertificate>,
     MockPool<HeaderId, Tx, <Tx as Transaction>::Hash>,
     MempoolNetworkAdapter<Tx, <Tx as Transaction>::Hash>,
-    MockPool<HeaderId, Certificate, <Certificate as certificate::Certificate>::Id>,
+    MockPool<HeaderId, VidCertificate, <VidCertificate as certificate::vid::VidCertificate>::CertificateId>,
     MempoolNetworkAdapter<Certificate, <Certificate as certificate::Certificate>::Id>,
     MempoolVerificationProvider,
     FillSizeWithTx<MB16, Tx>,
-    FillSizeWithBlobsCertificate<MB16, Certificate>,
+    FillSizeWithBlobsCertificate<MB16, VidCertificate>,
     RocksBackend<Wire>,
 >;
 
@@ -62,7 +62,7 @@ pub type TxMempool = TxMempoolService<
 
 pub type DaMempool = DaMempoolService<
     MempoolNetworkAdapter<Certificate, <Certificate as certificate::Certificate>::Id>,
-    MockPool<HeaderId, Certificate, <Certificate as certificate::Certificate>::Id>,
+    MockPool<HeaderId, VidCertificate, <VidCertificate as certificate::vid::VidCertificate>::CertificateId>,
     MempoolVerificationProvider,
 >;
 

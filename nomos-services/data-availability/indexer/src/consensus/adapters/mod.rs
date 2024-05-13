@@ -1,1 +1,1 @@
-mod cryptarchia;
+pub mod cryptarchia;

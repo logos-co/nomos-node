@@ -2,9 +2,11 @@ pub mod attestation;
 
 use attestation::Attestation;
 use nomos_core::da::attestation::Attestation as _;
+use nomos_core::da::certificate::metadata::Next;
 use nomos_core::da::certificate::CertificateStrategy;
 // internal
 use nomos_core::da::certificate::{self, metadata};
+use std::cmp::Ordering;
 // std
 use std::collections::HashSet;
 use std::hash::{Hash, Hasher};
@@ -15,6 +17,9 @@ use blake2::{
 };
 use bytes::Bytes;
 use serde::{Deserialize, Serialize};
+
+#[derive(Copy, Clone, Default, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Index([u8; 8]);
 
 /// Re-export the types for OpenAPI
 #[cfg(feature = "openapi")]
@@ -85,7 +90,7 @@ impl CertificateStrategy for AbsoluteNumber<Attestation, Certificate> {
         &self,
         attestations: Vec<Self::Attestation>,
         app_id: [u8; 32],
-        index: u64,
+        index: Index,
     ) -> Certificate {
         assert!(self.can_build(&attestations));
         Certificate {
@@ -106,7 +111,7 @@ pub struct Blob {
 #[derive(Default, Debug, Copy, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub struct Metadata {
     app_id: [u8; 32],
-    index: u64,
+    index: Index,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
@@ -162,12 +167,87 @@ impl certificate::Certificate for Certificate {
     }
 }
 
-impl metadata::Metadata for Certificate {
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
+pub struct VidCertificate {
+    id: [u8; 32],
+    metadata: Metadata,
+}
+
+impl certificate::vid::VidCertificate for VidCertificate {
+    type CertificateId = [u8; 32];
+
+    fn certificate_id(&self) -> Self::CertificateId {
+        self.id
+    }
+}
+
+impl metadata::Metadata for VidCertificate {
     type AppId = [u8; 32];
-    type Index = u64;
+    type Index = Index;
 
     fn metadata(&self) -> (Self::AppId, Self::Index) {
         (self.metadata.app_id, self.metadata.index)
+    }
+}
+
+impl Hash for VidCertificate {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        state.write(<VidCertificate as certificate::vid::VidCertificate>::certificate_id(self).as_ref());
+    }
+}
+
+impl From<Certificate> for VidCertificate {
+    fn from(cert: Certificate) -> Self {
+        // To simulate the propery of aggregate committment + row commitment in Nomos Da Protocol,
+        // when full replication certificate is converted into the VID (which should happen after
+        // the verification in the mempool) the id is set to the blob hash to allow identification
+        // of the distributed data accross nomos nodes.
+        let id = cert.attestations[0].blob_hash();
+        Self {
+            id,
+            metadata: cert.metadata,
+        }
+    }
+}
+
+impl metadata::Metadata for Certificate {
+    type AppId = [u8; 32];
+    type Index = Index;
+
+    fn metadata(&self) -> (Self::AppId, Self::Index) {
+        (self.metadata.app_id, self.metadata.index)
+    }
+}
+
+impl From<u64> for Index {
+    fn from(value: u64) -> Self {
+        Self(value.to_be_bytes())
+    }
+}
+
+impl Next for Index {
+    fn next(self) -> Self {
+        let num = u64::from_be_bytes(self.0);
+        let incremented_num = num.wrapping_add(1);
+        Self(incremented_num.to_be_bytes())
+    }
+}
+
+impl AsRef<[u8]> for Index {
+    fn as_ref(&self) -> &[u8] {
+        self.0.as_ref()
+    }
+}
+
+impl PartialOrd for Index {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for Index {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.0.cmp(&other.0)
     }
 }
 
