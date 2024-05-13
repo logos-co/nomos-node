@@ -114,6 +114,12 @@ pub struct Metadata {
     index: Index,
 }
 
+impl Metadata {
+    fn size(&self) -> usize {
+        std::mem::size_of_val(&self.app_id) + std::mem::size_of_val(&self.index)
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct Certificate {
@@ -165,13 +171,6 @@ impl certificate::Certificate for Certificate {
     fn verify(&self, params: Self::VerificationParameters) -> bool {
         self.attestations.len() >= params.threshold
     }
-
-    fn size(&self) -> usize {
-        self.attestations
-            .iter()
-            .map(|_| std::mem::size_of::<[u8; 32]>() * 2)
-            .sum()
-    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
@@ -186,6 +185,10 @@ impl certificate::vid::VidCertificate for VidCertificate {
     fn certificate_id(&self) -> Self::CertificateId {
         self.id
     }
+
+    fn size(&self) -> usize {
+        std::mem::size_of_val(&self.id) + self.metadata.size()
+    }
 }
 
 impl metadata::Metadata for VidCertificate {
@@ -199,7 +202,9 @@ impl metadata::Metadata for VidCertificate {
 
 impl Hash for VidCertificate {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        state.write(<VidCertificate as certificate::vid::VidCertificate>::certificate_id(self).as_ref());
+        state.write(
+            <VidCertificate as certificate::vid::VidCertificate>::certificate_id(self).as_ref(),
+        );
     }
 }
 

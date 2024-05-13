@@ -12,7 +12,6 @@ pub trait Certificate {
     fn signature(&self) -> Self::Signature;
     fn id(&self) -> Self::Id;
     fn verify(&self, verification_params: Self::VerificationParameters) -> bool;
-    fn size(&self) -> usize;
 }
 
 pub trait BlobCertificateSelect {
