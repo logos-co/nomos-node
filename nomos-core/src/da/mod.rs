@@ -5,8 +5,6 @@ use std::error::Error;
 pub mod attestation;
 pub mod blob;
 pub mod certificate;
-pub mod certificate_metadata;
-pub mod vid;
 
 pub trait DaEncoder {
     type EncodedData;

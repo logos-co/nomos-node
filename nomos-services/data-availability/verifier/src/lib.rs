@@ -86,6 +86,7 @@ where
         let network_relay = network_relay.connect().await?;
         let adapter = N::new(network_adapter_settings, network_relay).await;
         let mut blob_stream = adapter.blob_stream().await;
+
         while let Some((blob, reply_channel)) = blob_stream.next().await {
             // TODO: Verify if blob was already processed
             match verifier.verify(&blob) {

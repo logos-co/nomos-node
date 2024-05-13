@@ -19,6 +19,7 @@ pub trait NetworkAdapter {
         settings: Self::Settings,
         network_relay: OutboundRelay<<NetworkService<Self::Backend> as ServiceData>::Message>,
     ) -> Self;
+
     async fn blob_stream(
         &self,
     ) -> Box<dyn Stream<Item = (Self::Blob, oneshot::Sender<Self::Attestation>)> + Unpin + Send>;
