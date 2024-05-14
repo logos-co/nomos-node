@@ -3,6 +3,7 @@ use std::error::Error;
 // internal
 
 pub mod attestation;
+pub mod blob;
 pub mod certificate;
 
 pub trait DaEncoder {
