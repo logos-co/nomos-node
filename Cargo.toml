@@ -24,8 +24,6 @@ members = [
     "consensus/carnot-engine",
     "consensus/cryptarchia-engine",
     "ledger/cryptarchia-ledger",
-    "tests",
-    "nomos-da/kzgrs",
-    "nomos-da/kzgrs-backend"
+    "tests"
 ]
 resolver = "2"
