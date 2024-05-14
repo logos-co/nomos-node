@@ -11,6 +11,7 @@ bytes = "1.2"
 futures = "0.3"
 hex = "0.4.3"
 nomos-core = { path = "../../../nomos-core" }
+nomos-da-storage = { path = "../../../nomos-da/storage" }
 nomos-storage = { path = "../../../nomos-services/storage" }
 nomos-mempool = { path = "../../../nomos-services/mempool" }
 cryptarchia-consensus = { path = "../../../nomos-services/cryptarchia-consensus" }

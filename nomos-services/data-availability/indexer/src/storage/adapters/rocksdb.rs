@@ -1,12 +1,14 @@
 use std::path::PathBuf;
 use std::{marker::PhantomData, ops::Range};
 
-use bytes::{Bytes, BytesMut};
+use bytes::Bytes;
 use futures::{stream::FuturesUnordered, Stream};
 use nomos_core::da::certificate::{
     metadata::{Metadata, Next},
     vid::VidCertificate,
 };
+use nomos_da_storage::fs::load_blob;
+use nomos_da_storage::rocksdb::{key_bytes, DA_ATTESTED_KEY_PREFIX, DA_VID_KEY_PREFIX};
 use nomos_storage::{
     backends::{rocksdb::RocksBackend, StorageSerde},
     StorageMsg, StorageService,
@@ -15,12 +17,8 @@ use overwatch_rs::{
     services::{relay::OutboundRelay, ServiceData},
     DynError,
 };
-use tokio::{fs::File, io::AsyncReadExt};
 
 use crate::storage::DaStorageAdapter;
-
-const DA_VID_KEY_PREFIX: &str = "da/vid/";
-const DA_ATTESTED_KEY_PREFIX: &str = "da/attested/";
 
 pub struct RocksAdapter<S, V>
 where
@@ -146,42 +144,6 @@ where
 
         Box::new(futures)
     }
-}
-
-fn key_bytes(prefix: &str, id: impl AsRef<[u8]>) -> Bytes {
-    let mut buffer = BytesMut::new();
-
-    buffer.extend_from_slice(prefix.as_bytes());
-    buffer.extend_from_slice(id.as_ref());
-
-    buffer.freeze()
-}
-
-// TODO: Rocksdb has a feature called BlobDB that handles largo blob storing, but further
-// investigation needs to be done to see if rust wrapper supports it.
-async fn load_blob(base_dir: PathBuf, app_id: &[u8], id: &[u8]) -> Option<Bytes> {
-    let app_id = hex::encode(app_id);
-    let id = hex::encode(id);
-
-    let mut path = base_dir;
-    path.push(app_id);
-    path.push(id);
-
-    let mut file = match File::open(path).await {
-        Ok(file) => file,
-        Err(e) => {
-            tracing::error!("Failed to open file: {}", e);
-            return None;
-        }
-    };
-
-    let mut contents = vec![];
-    if let Err(e) = file.read_to_end(&mut contents).await {
-        tracing::error!("Failed to read file: {}", e);
-        return None;
-    }
-
-    Some(Bytes::from(contents))
 }
 
 #[derive(Debug, Clone)]
