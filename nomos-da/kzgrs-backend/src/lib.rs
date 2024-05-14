@@ -1,4 +1,4 @@
 mod common;
 mod encoder;
 mod global;
-mod verifier;
+pub mod verifier;
