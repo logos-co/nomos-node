@@ -1,3 +1,5 @@
+pub mod kzgrs;
+
 use nomos_core::da::DaVerifier;
 
 pub trait VerifierBackend: DaVerifier {
