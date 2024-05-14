@@ -4,7 +4,8 @@ mod storage;
 
 // std
 use nomos_storage::StorageService;
-use std::fmt::Debug;
+use overwatch_rs::services::life_cycle::LifecycleMessage;
+use std::fmt::{Debug, Formatter};
 use storage::DaStorageAdapter;
 // crates
 use tokio_stream::StreamExt;
@@ -14,15 +15,32 @@ use backend::VerifierBackend;
 use network::NetworkAdapter;
 use nomos_network::NetworkService;
 use overwatch_rs::services::handle::ServiceStateHandle;
-use overwatch_rs::services::relay::{NoMessage, Relay};
+use overwatch_rs::services::relay::{NoMessage, Relay, RelayMessage};
 use overwatch_rs::services::state::{NoOperator, NoState};
 use overwatch_rs::services::{ServiceCore, ServiceData, ServiceId};
 use overwatch_rs::DynError;
+
+pub enum DaVerifierMsg<B> {
+    AddBlob { blob: B },
+}
+
+impl<B: 'static> Debug for DaVerifierMsg<B> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            DaVerifierMsg::AddBlob { .. } => {
+                write!(f, "DaVerifierMsg::AddBlob")
+            }
+        }
+    }
+}
+
+impl<B: 'static> RelayMessage for DaVerifierMsg<B> {}
 
 pub struct DaVerifierService<Backend, N, S>
 where
     Backend: VerifierBackend,
     Backend::Settings: Clone,
+    Backend::DaBlob: 'static,
     N: NetworkAdapter,
     N::Settings: Clone,
     S: DaStorageAdapter,
@@ -31,6 +49,48 @@ where
     service_state: ServiceStateHandle<Self>,
     storage_relay: Relay<StorageService<S::Backend>>,
     verifier: Backend,
+}
+
+impl<Backend, N, S> DaVerifierService<Backend, N, S>
+where
+    Backend: VerifierBackend + Send + 'static,
+    Backend::DaBlob: Debug + Send,
+    Backend::Attestation: Debug + Send,
+    Backend::Settings: Clone,
+    N: NetworkAdapter<Blob = Backend::DaBlob, Attestation = Backend::Attestation> + Send + 'static,
+    N::Settings: Clone,
+    S: DaStorageAdapter<Blob = Backend::DaBlob, Attestation = Backend::Attestation>
+        + Send
+        + 'static,
+{
+    async fn handle_new_blob(
+        verifier: &Backend,
+        storage_adapter: &S,
+        blob: &Backend::DaBlob,
+    ) -> Result<Backend::Attestation, DynError> {
+        if let Some(attestation) = storage_adapter.get_attestation(&blob).await? {
+            Ok(attestation)
+        } else {
+            let attestation = verifier.verify(&blob)?;
+            storage_adapter.add_blob(&blob, &attestation).await?;
+            Ok(attestation)
+        }
+    }
+
+    async fn should_stop_service(message: LifecycleMessage) -> bool {
+        match message {
+            LifecycleMessage::Shutdown(sender) => {
+                if sender.send(()).is_err() {
+                    error!(
+                        "Error sending successful shutdown signal from service {}",
+                        Self::SERVICE_ID
+                    );
+                }
+                true
+            }
+            LifecycleMessage::Kill => true,
+        }
+    }
 }
 
 impl<Backend, N, S> ServiceData for DaVerifierService<Backend, N, S>
@@ -46,20 +106,21 @@ where
     type Settings = DaVerifierServiceSettings<Backend::Settings, N::Settings, S::Settings>;
     type State = NoState<Self::Settings>;
     type StateOperator = NoOperator<Self::State>;
-    type Message = NoMessage;
+    type Message = DaVerifierMsg<Backend::DaBlob>;
 }
 
 #[async_trait::async_trait]
 impl<Backend, N, S> ServiceCore for DaVerifierService<Backend, N, S>
 where
-    Backend: VerifierBackend + Send + 'static,
+    Backend: VerifierBackend + Send + Sync + 'static,
     Backend::Settings: Clone + Send + Sync + 'static,
-    Backend::DaBlob: Debug + Send,
+    Backend::DaBlob: Debug + Send + Sync + 'static,
     Backend::Attestation: Debug + Send,
     N: NetworkAdapter<Blob = Backend::DaBlob, Attestation = Backend::Attestation> + Send + 'static,
     N::Settings: Clone + Send + Sync + 'static,
     S: DaStorageAdapter<Blob = Backend::DaBlob, Attestation = Backend::Attestation>
         + Send
+        + Sync
         + 'static,
     S::Settings: Clone + Send + Sync + 'static,
 {
@@ -76,6 +137,7 @@ where
             verifier: Backend::new(verifier_settings),
         })
     }
+
     async fn run(self) -> Result<(), DynError> {
         // This service will likely have to be modified later on.
         // Most probably the verifier itself need to be constructed/update for every message with
@@ -84,49 +146,49 @@ where
         let Self {
             network_relay,
             storage_relay,
-            service_state,
+            mut service_state,
             verifier,
         } = self;
+
         let DaVerifierServiceSettings {
             network_adapter_settings,
             storage_adapter_settings,
             ..
         } = service_state.settings_reader.get_updated_settings();
+
         let network_relay = network_relay.connect().await?;
         let network_adapter = N::new(network_adapter_settings, network_relay).await;
         let mut blob_stream = network_adapter.blob_stream().await;
+
         let storage_relay = storage_relay.connect().await?;
         let storage_adapter = S::new(storage_adapter_settings, storage_relay).await;
 
-        while let Some((blob, reply_channel)) = blob_stream.next().await {
-            match storage_adapter.get_attestation(&blob).await {
-                Ok(Some(attestation)) => {
-                    if let Err(attestation) = reply_channel.send(attestation) {
-                        error!("Error replying attestation {:?}", attestation);
-                    }
-                    continue;
-                }
-                Ok(None) => (), // Blob needs to be verified, pass through.
-                Err(err) => {
-                    error!("Error getting attestation for blob {blob:?} due to {err:?}");
-                    continue;
-                }
-            }
-
-            match verifier.verify(&blob) {
-                Ok(attestation) => {
-                    if let Err(err) = storage_adapter.add_blob(&blob, &attestation).await {
-                        error!("Error storing blob {blob:?} due to {err:?}");
-                    }
-                    if let Err(attestation) = reply_channel.send(attestation) {
-                        error!("Error replying attestation {attestation:?}");
+        let mut lifecycle_stream = service_state.lifecycle_handle.message_stream();
+        loop {
+            tokio::select! {
+                Some((blob, reply_channel)) = blob_stream.next() => {
+                    match Self::handle_new_blob(&verifier,&storage_adapter, &blob).await {
+                        Ok(attestation) => if let Err(attestation) = reply_channel.send(attestation) {
+                            error!("Error replying attestation {:?}", attestation);
+                        },
+                        Err(err) => error!("Error handling blob {blob:?} due to {err:?}"),
                     }
                 }
-                Err(e) => {
-                    error!("Received unverified blob {blob:?} due to {e:?}");
+                Some(msg) = service_state.inbound_relay.recv() => {
+                    if let DaVerifierMsg::AddBlob { blob } = msg {
+                        if let Err(err) = Self::handle_new_blob(&verifier, &storage_adapter, &blob).await {
+                            error!("Error handling blob {blob:?} due to {err:?}");
+                        }
+                    }
+                }
+                Some(msg) = lifecycle_stream.next() => {
+                    if Self::should_stop_service(msg).await {
+                        break;
+                    }
                 }
             }
         }
+
         Ok(())
     }
 }
