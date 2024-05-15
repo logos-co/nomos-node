@@ -1,3 +1,5 @@
+pub mod adapters;
+
 use nomos_storage::{backends::StorageBackend, StorageService};
 use overwatch_rs::{
     services::{relay::OutboundRelay, ServiceData},

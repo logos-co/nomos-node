@@ -15,7 +15,7 @@ use backend::VerifierBackend;
 use network::NetworkAdapter;
 use nomos_network::NetworkService;
 use overwatch_rs::services::handle::ServiceStateHandle;
-use overwatch_rs::services::relay::{NoMessage, Relay, RelayMessage};
+use overwatch_rs::services::relay::{Relay, RelayMessage};
 use overwatch_rs::services::state::{NoOperator, NoState};
 use overwatch_rs::services::{ServiceCore, ServiceData, ServiceId};
 use overwatch_rs::DynError;
@@ -175,10 +175,9 @@ where
                     }
                 }
                 Some(msg) = service_state.inbound_relay.recv() => {
-                    if let DaVerifierMsg::AddBlob { blob } = msg {
-                        if let Err(err) = Self::handle_new_blob(&verifier, &storage_adapter, &blob).await {
-                            error!("Error handling blob {blob:?} due to {err:?}");
-                        }
+                    let DaVerifierMsg::AddBlob { blob } = msg;
+                    if let Err(err) = Self::handle_new_blob(&verifier, &storage_adapter, &blob).await {
+                        error!("Error handling blob {blob:?} due to {err:?}");
                     }
                 }
                 Some(msg) = lifecycle_stream.next() => {
