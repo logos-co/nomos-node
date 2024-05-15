@@ -47,7 +47,11 @@ pub type Cryptarchia = cryptarchia_consensus::CryptarchiaConsensus<
     cryptarchia_consensus::network::adapters::libp2p::LibP2pAdapter<Tx, VidCertificate>,
     MockPool<HeaderId, Tx, <Tx as Transaction>::Hash>,
     MempoolNetworkAdapter<Tx, <Tx as Transaction>::Hash>,
-    MockPool<HeaderId, VidCertificate, <VidCertificate as certificate::vid::VidCertificate>::CertificateId>,
+    MockPool<
+        HeaderId,
+        VidCertificate,
+        <VidCertificate as certificate::vid::VidCertificate>::CertificateId,
+    >,
     MempoolNetworkAdapter<Certificate, <Certificate as certificate::Certificate>::Id>,
     MempoolVerificationProvider,
     FillSizeWithTx<MB16, Tx>,
@@ -62,7 +66,11 @@ pub type TxMempool = TxMempoolService<
 
 pub type DaMempool = DaMempoolService<
     MempoolNetworkAdapter<Certificate, <Certificate as certificate::Certificate>::Id>,
-    MockPool<HeaderId, VidCertificate, <VidCertificate as certificate::vid::VidCertificate>::CertificateId>,
+    MockPool<
+        HeaderId,
+        VidCertificate,
+        <VidCertificate as certificate::vid::VidCertificate>::CertificateId,
+    >,
     MempoolVerificationProvider,
 >;
 

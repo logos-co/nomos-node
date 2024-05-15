@@ -565,7 +565,12 @@ where
                 )
                 .await;
 
-                mark_in_block(da_mempool_relay, block.blobs().map(VidCertificate::certificate_id), id).await;
+                mark_in_block(
+                    da_mempool_relay,
+                    block.blobs().map(VidCertificate::certificate_id),
+                    id,
+                )
+                .await;
 
                 // store block
                 let msg = <StorageMsg<_>>::new_store_message(header.id(), block.clone());
