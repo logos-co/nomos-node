@@ -14,10 +14,9 @@ pub trait DaEncoder {
 pub trait DaVerifier {
     type DaBlob;
     type Attestation;
-    fn verify(
-        &self,
-        blob: &Self::DaBlob,
-    ) -> Result<Self::Attestation, impl Error + Send + Sync + 'static>;
+    type Error;
+
+    fn verify(&self, blob: &Self::DaBlob) -> Result<Self::Attestation, Self::Error>;
 }
 
 pub trait DaDispersal {

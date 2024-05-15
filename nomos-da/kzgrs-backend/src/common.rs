@@ -11,6 +11,7 @@ use kzgrs::Commitment;
 #[derive(Clone, Eq, PartialEq, Debug)]
 pub struct Chunk(pub Vec<u8>);
 pub struct Row(pub Vec<Chunk>);
+#[derive(Clone)]
 pub struct Column(pub Vec<Chunk>);
 pub struct ChunksMatrix(pub Vec<Row>);
 

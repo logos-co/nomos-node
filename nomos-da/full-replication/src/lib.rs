@@ -28,27 +28,6 @@ pub mod openapi {
 }
 
 #[derive(Debug, Clone)]
-pub struct FullReplication<CertificateStrategy> {
-    voter: Voter,
-    certificate_strategy: CertificateStrategy,
-    output_buffer: Vec<Bytes>,
-    attestations: Vec<Attestation>,
-    output_certificate_buf: Vec<Certificate>,
-}
-
-impl<S> FullReplication<S> {
-    pub fn new(voter: Voter, strategy: S) -> Self {
-        Self {
-            voter,
-            certificate_strategy: strategy,
-            output_buffer: Vec::new(),
-            attestations: Vec::new(),
-            output_certificate_buf: Vec::new(),
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
 pub struct AbsoluteNumber<A, C> {
     num_attestations: usize,
     _a: std::marker::PhantomData<A>,

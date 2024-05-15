@@ -17,6 +17,7 @@ use kzgrs::{
     BYTES_PER_FIELD_ELEMENT,
 };
 
+#[derive(Clone)]
 pub struct DaBlob {
     column: Column,
     column_commitment: Commitment,
