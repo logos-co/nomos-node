@@ -19,10 +19,12 @@ impl Chunk {
     pub fn len(&self) -> usize {
         self.0.len()
     }
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
     pub fn as_bytes(&self) -> Vec<u8> {
         self.0.to_vec()
     }
-
     pub const fn empty() -> Self {
         Self(vec![])
     }
@@ -41,6 +43,9 @@ impl Row {
     pub fn len(&self) -> usize {
         self.0.len()
     }
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
     pub fn as_bytes(&self) -> Vec<u8> {
         self.0.iter().flat_map(Chunk::as_bytes).collect()
     }
@@ -54,6 +59,9 @@ impl Column {
     #[allow(unused)]
     pub fn len(&self) -> usize {
         self.0.len()
+    }
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
     }
     pub fn as_bytes(&self) -> Vec<u8> {
         self.0.iter().flat_map(Chunk::as_bytes).collect()
@@ -87,6 +95,9 @@ impl AsRef<[Chunk]> for Column {
 impl ChunksMatrix {
     pub fn len(&self) -> usize {
         self.0.len()
+    }
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
     }
     pub fn rows(&self) -> impl Iterator<Item = &Row> + '_ {
         self.0.iter()
