@@ -166,10 +166,10 @@ where
         let mut lifecycle_stream = service_state.lifecycle_handle.message_stream();
         loop {
             tokio::select! {
-                Some((blob, reply_channel)) = blob_stream.next() => {
+                Some(blob) = blob_stream.next() => {
                     match Self::handle_new_blob(&verifier,&storage_adapter, &blob).await {
-                        Ok(attestation) => if let Err(attestation) = reply_channel.send(attestation) {
-                            error!("Error replying attestation {:?}", attestation);
+                        Ok(attestation) => if let Err(e) = network_adapter.send_attestation(attestation).await {
+                            error!("Error replying attestation {e:?}");
                         },
                         Err(err) => error!("Error handling blob {blob:?} due to {err:?}"),
                     }

@@ -21,3 +21,4 @@ tracing = "0.1"
 
 [features]
 rocksdb-backend = ["nomos-storage/rocksdb-backend"]
+libp2p = ["nomos-network/libp2p"]
