@@ -5,6 +5,7 @@ mod storage;
 // std
 use nomos_storage::StorageService;
 use overwatch_rs::services::life_cycle::LifecycleMessage;
+use std::error::Error;
 use std::fmt::{Debug, Formatter};
 use storage::DaStorageAdapter;
 // crates
@@ -41,6 +42,7 @@ where
     Backend: VerifierBackend,
     Backend::Settings: Clone,
     Backend::DaBlob: 'static,
+    Backend::Error: Error,
     N: NetworkAdapter,
     N::Settings: Clone,
     S: DaStorageAdapter,
@@ -56,6 +58,7 @@ where
     Backend: VerifierBackend + Send + 'static,
     Backend::DaBlob: Debug + Send,
     Backend::Attestation: Debug + Send,
+    Backend::Error: Error + Send + Sync + 'static,
     Backend::Settings: Clone,
     N: NetworkAdapter<Blob = Backend::DaBlob, Attestation = Backend::Attestation> + Send + 'static,
     N::Settings: Clone,
@@ -68,11 +71,11 @@ where
         storage_adapter: &S,
         blob: &Backend::DaBlob,
     ) -> Result<Backend::Attestation, DynError> {
-        if let Some(attestation) = storage_adapter.get_attestation(&blob).await? {
+        if let Some(attestation) = storage_adapter.get_attestation(blob).await? {
             Ok(attestation)
         } else {
-            let attestation = verifier.verify(&blob)?;
-            storage_adapter.add_blob(&blob, &attestation).await?;
+            let attestation = verifier.verify(blob)?;
+            storage_adapter.add_blob(blob, &attestation).await?;
             Ok(attestation)
         }
     }
@@ -97,6 +100,7 @@ impl<Backend, N, S> ServiceData for DaVerifierService<Backend, N, S>
 where
     Backend: VerifierBackend,
     Backend::Settings: Clone,
+    Backend::Error: Error,
     N: NetworkAdapter,
     N::Settings: Clone,
     S: DaStorageAdapter,
@@ -116,6 +120,7 @@ where
     Backend::Settings: Clone + Send + Sync + 'static,
     Backend::DaBlob: Debug + Send + Sync + 'static,
     Backend::Attestation: Debug + Send,
+    Backend::Error: Error + Send + Sync,
     N: NetworkAdapter<Blob = Backend::DaBlob, Attestation = Backend::Attestation> + Send + 'static,
     N::Settings: Clone + Send + Sync + 'static,
     S: DaStorageAdapter<Blob = Backend::DaBlob, Attestation = Backend::Attestation>
