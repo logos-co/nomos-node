@@ -8,6 +8,7 @@ use overwatch_rs::services::life_cycle::LifecycleMessage;
 use std::error::Error;
 use std::fmt::{Debug, Formatter};
 use storage::DaStorageAdapter;
+use tokio::sync::oneshot::Sender;
 // crates
 use tokio_stream::StreamExt;
 use tracing::error;
@@ -21,11 +22,14 @@ use overwatch_rs::services::state::{NoOperator, NoState};
 use overwatch_rs::services::{ServiceCore, ServiceData, ServiceId};
 use overwatch_rs::DynError;
 
-pub enum DaVerifierMsg<B> {
-    AddBlob { blob: B },
+pub enum DaVerifierMsg<B, A> {
+    AddBlob {
+        blob: B,
+        reply_channel: Sender<Option<A>>,
+    },
 }
 
-impl<B: 'static> Debug for DaVerifierMsg<B> {
+impl<B: 'static, A: 'static> Debug for DaVerifierMsg<B, A> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             DaVerifierMsg::AddBlob { .. } => {
@@ -35,13 +39,14 @@ impl<B: 'static> Debug for DaVerifierMsg<B> {
     }
 }
 
-impl<B: 'static> RelayMessage for DaVerifierMsg<B> {}
+impl<B: 'static, A: 'static> RelayMessage for DaVerifierMsg<B, A> {}
 
 pub struct DaVerifierService<Backend, N, S>
 where
     Backend: VerifierBackend,
     Backend::Settings: Clone,
     Backend::DaBlob: 'static,
+    Backend::Attestation: 'static,
     Backend::Error: Error,
     N: NetworkAdapter,
     N::Settings: Clone,
@@ -110,7 +115,7 @@ where
     type Settings = DaVerifierServiceSettings<Backend::Settings, N::Settings, S::Settings>;
     type State = NoState<Self::Settings>;
     type StateOperator = NoOperator<Self::State>;
-    type Message = DaVerifierMsg<Backend::DaBlob>;
+    type Message = DaVerifierMsg<Backend::DaBlob, Backend::Attestation>;
 }
 
 #[async_trait::async_trait]
@@ -119,7 +124,7 @@ where
     Backend: VerifierBackend + Send + Sync + 'static,
     Backend::Settings: Clone + Send + Sync + 'static,
     Backend::DaBlob: Debug + Send + Sync + 'static,
-    Backend::Attestation: Debug + Send,
+    Backend::Attestation: Debug + Send + Sync + 'static,
     Backend::Error: Error + Send + Sync,
     N: NetworkAdapter<Blob = Backend::DaBlob, Attestation = Backend::Attestation> + Send + 'static,
     N::Settings: Clone + Send + Sync + 'static,
@@ -173,17 +178,25 @@ where
             tokio::select! {
                 Some(blob) = blob_stream.next() => {
                     match Self::handle_new_blob(&verifier,&storage_adapter, &blob).await {
-                        Ok(attestation) => if let Err(e) = network_adapter.send_attestation(attestation).await {
-                            error!("Error replying attestation {e:?}");
+                        Ok(attestation) => if let Err(err) = network_adapter.send_attestation(attestation).await {
+                            error!("Error replying attestation {err:?}");
                         },
                         Err(err) => error!("Error handling blob {blob:?} due to {err:?}"),
                     }
                 }
                 Some(msg) = service_state.inbound_relay.recv() => {
-                    let DaVerifierMsg::AddBlob { blob } = msg;
-                    if let Err(err) = Self::handle_new_blob(&verifier, &storage_adapter, &blob).await {
-                        error!("Error handling blob {blob:?} due to {err:?}");
-                    }
+                    let DaVerifierMsg::AddBlob { blob, reply_channel } = msg;
+                    match Self::handle_new_blob(&verifier, &storage_adapter, &blob).await {
+                        Ok(attestation) => if let Err(err) = reply_channel.send(Some(attestation)) {
+                            error!("Error replying attestation {err:?}");
+                        },
+                        Err(err) => {
+                            error!("Error handling blob {blob:?} due to {err:?}");
+                            if let Err(err) = reply_channel.send(None) {
+                                error!("Error replying attestation {err:?}");
+                            }
+                        },
+                    };
                 }
                 Some(msg) = lifecycle_stream.next() => {
                     if Self::should_stop_service(msg).await {

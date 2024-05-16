@@ -1,2 +1,4 @@
 #[cfg(test)]
-mod rocks_integration;
+mod indexer_integration;
+#[cfg(test)]
+mod verifier_integration;
