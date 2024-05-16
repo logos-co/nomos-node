@@ -15,6 +15,7 @@ members = [
     "nomos-services/system-sig",
     "nomos-services/data-availability/indexer",
     "nomos-services/data-availability/verifier",
+    "nomos-services/data-availability/tests",
     "nomos-da/full-replication",
     # TODO: add it again and reimplement full replication
     #    "nomos-cli",

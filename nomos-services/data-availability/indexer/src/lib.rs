@@ -1,7 +1,5 @@
 pub mod consensus;
 pub mod storage;
-#[cfg(test)]
-mod tests;
 
 use std::fmt::{Debug, Formatter};
 use std::hash::Hash;

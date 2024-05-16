@@ -21,20 +21,6 @@ serde = { version = "1.0", features = ["derive"] }
 tracing = "0.1"
 tokio-stream = "0.1.15"
 
-[dev-dependencies]
-full-replication = { path = "../../../nomos-da/full-replication" }
-nomos-node = { path = "../../../nodes/nomos-node" }
-nomos-mempool = { path = "../../../nomos-services/mempool" }
-nomos-storage = { path = "../../../nomos-services/storage" }
-nomos-log = { path = "../../log" }
-nomos-network = { path = "../../network", features = ["mock"] }
-nomos-libp2p = { path = "../../../nomos-libp2p" }
-cryptarchia-ledger = { path = "../../../ledger/cryptarchia-ledger", features = ["serde"] }
-cryptarchia-engine = { path = "../../../consensus/cryptarchia-engine", features = ["serde"] }
-tempfile = "3.6"
-time = "0.3"
-rand = "0.8"
-
 [features]
 rocksdb-backend = ["nomos-storage/rocksdb-backend"]
 

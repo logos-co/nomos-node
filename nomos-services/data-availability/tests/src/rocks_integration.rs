@@ -4,9 +4,6 @@ use std::sync::atomic::Ordering::SeqCst;
 use std::sync::Arc;
 use std::time::Duration;
 
-use crate::consensus::adapters::cryptarchia::CryptarchiaConsensusAdapter;
-use crate::storage::adapters::rocksdb::{RocksAdapter, RocksAdapterSettings};
-use crate::{DataIndexerService, IndexerSettings};
 use bytes::Bytes;
 use cryptarchia_consensus::TimeConfig;
 use cryptarchia_ledger::{Coin, LedgerState};
@@ -15,6 +12,9 @@ use full_replication::{Certificate, VidCertificate};
 use nomos_core::da::certificate::vid::VidCertificate as _;
 use nomos_core::da::certificate::CertificateStrategy;
 use nomos_core::{da::certificate, header::HeaderId, tx::Transaction};
+use nomos_da_indexer::consensus::adapters::cryptarchia::CryptarchiaConsensusAdapter;
+use nomos_da_indexer::storage::adapters::rocksdb::{RocksAdapter, RocksAdapterSettings};
+use nomos_da_indexer::{DataIndexerService, IndexerSettings};
 use nomos_da_storage::fs::write_blob;
 use nomos_libp2p::{Multiaddr, Swarm, SwarmConfig};
 use nomos_mempool::da::verify::fullreplication::DaVerificationProvider as MempoolVerificationProvider;
@@ -294,7 +294,7 @@ fn test_indexer() {
         // Request range of vids from indexer.
         let (indexer_tx, indexer_rx) = tokio::sync::oneshot::channel();
         indexer_outbound
-            .send(crate::DaMsg::GetRange {
+            .send(nomos_da_indexer::DaMsg::GetRange {
                 app_id,
                 range,
                 reply_channel: indexer_tx,
