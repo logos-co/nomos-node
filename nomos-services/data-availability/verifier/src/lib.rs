@@ -1,6 +1,6 @@
-mod backend;
-mod network;
-mod storage;
+pub mod backend;
+pub mod network;
+pub mod storage;
 
 // std
 use nomos_storage::StorageService;
@@ -212,7 +212,7 @@ where
 
 #[derive(Clone)]
 pub struct DaVerifierServiceSettings<BackendSettings, NetworkSettings, StorageSettings> {
-    verifier_settings: BackendSettings,
-    network_adapter_settings: NetworkSettings,
-    storage_adapter_settings: StorageSettings,
+    pub verifier_settings: BackendSettings,
+    pub network_adapter_settings: NetworkSettings,
+    pub storage_adapter_settings: StorageSettings,
 }

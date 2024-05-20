@@ -2,8 +2,8 @@ use blst::{min_sig::PublicKey, min_sig::SecretKey};
 // std
 // crates
 use kzgrs_backend::{
-    common::Attestation,
-    verifier::{DaBlob, DaVerifier as NomosKzgrsVerifier},
+    common::{blob::DaBlob, Attestation},
+    verifier::DaVerifier as NomosKzgrsVerifier,
 };
 use nomos_core::da::DaVerifier;
 use overwatch_rs::DynError;
