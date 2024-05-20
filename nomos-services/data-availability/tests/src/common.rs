@@ -1,7 +1,7 @@
 use bytes::Bytes;
 use full_replication::{Certificate, VidCertificate};
-use kzgrs_backend::common::Attestation;
-use kzgrs_backend::verifier::DaBlob;
+use kzgrs_backend::common::attestation::Attestation;
+use kzgrs_backend::common::blob::DaBlob;
 use nomos_core::{da::certificate, header::HeaderId, tx::Transaction};
 use nomos_da_indexer::consensus::adapters::cryptarchia::CryptarchiaConsensusAdapter;
 use nomos_da_indexer::storage::adapters::rocksdb::RocksAdapter as IndexerStorageAdapter;
@@ -77,7 +77,7 @@ pub(crate) type DaMempool = DaMempoolService<
 pub(crate) type DaVerifier = DaVerifierService<
     KzgrsDaVerifier,
     Libp2pAdapter<DaBlob, Attestation>,
-    VerifierStorageAdapter<Attestation, DaBlob, RocksBackend<Wire>>,
+    VerifierStorageAdapter<Attestation, DaBlob, Wire>,
 >;
 
 pub(crate) const MB16: usize = 1024 * 1024 * 16;

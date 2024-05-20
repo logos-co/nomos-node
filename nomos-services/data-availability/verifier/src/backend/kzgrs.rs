@@ -2,7 +2,7 @@ use blst::{min_sig::PublicKey, min_sig::SecretKey};
 // std
 // crates
 use kzgrs_backend::{
-    common::{blob::DaBlob, Attestation},
+    common::{attestation::Attestation, blob::DaBlob},
     verifier::DaVerifier as NomosKzgrsVerifier,
 };
 use nomos_core::da::DaVerifier;
@@ -39,6 +39,7 @@ impl DaVerifier for KzgrsDaVerifier {
 }
 
 // TODO: `sk` and `nodes_public_keys` need to be fetched from the params provider service.
+#[derive(Debug, Clone)]
 pub struct KzgrsDaVerifierSettings {
     pub sk: SecretKey,
     pub nodes_public_keys: Vec<PublicKey>,

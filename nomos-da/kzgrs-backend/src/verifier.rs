@@ -12,7 +12,7 @@ use kzgrs::{
 use crate::common::blob::DaBlob;
 // internal
 use crate::common::{
-    build_attestation_message, hash_column_and_commitment, Attestation, Chunk, Column,
+    attestation::Attestation, build_attestation_message, hash_column_and_commitment, Chunk, Column,
 };
 use crate::encoder::DaEncoderParams;
 use crate::global::{DOMAIN, GLOBAL_PARAMETERS};
@@ -109,7 +109,11 @@ impl DaVerifier {
         let message =
             build_attestation_message(&blob.aggregated_column_commitment, &blob.rows_commitments);
         let signature = self.sk.sign(&message, b"", b"");
-        Attestation { signature }
+        Attestation {
+            signature: signature.to_bytes().to_vec(),
+            attester: todo!(),
+            blob_hash: todo!(),
+        }
     }
 
     pub fn verify(&self, blob: DaBlob) -> Option<Attestation> {

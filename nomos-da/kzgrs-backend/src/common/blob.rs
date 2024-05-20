@@ -2,6 +2,7 @@
 // crates
 use ark_serialize::*;
 use kzgrs::Proof;
+use nomos_core::da::blob;
 use serde::de::{self, SeqAccess, Visitor};
 use serde::ser::SerializeSeq;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -11,7 +12,7 @@ use super::build_attestation_message;
 use crate::common::Column;
 use crate::common::Commitment;
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DaBlob {
     pub(crate) column: Column,
     #[serde(
@@ -50,6 +51,14 @@ impl DaBlob {
         let mut hasher = Sha3_256::new();
         hasher.update(self.column.as_bytes());
         hasher.finalize().as_slice().to_vec()
+    }
+}
+
+impl blob::Blob for DaBlob {
+    type BlobId = Vec<u8>;
+
+    fn id(&self) -> Self::BlobId {
+        build_attestation_message(&self.aggregated_column_commitment, &self.rows_commitments)
     }
 }
 

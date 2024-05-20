@@ -7,11 +7,12 @@ use std::time::Duration;
 use bytes::Bytes;
 use cryptarchia_consensus::TimeConfig;
 use cryptarchia_ledger::{Coin, LedgerState};
-use full_replication::attestation::{Attestation, Signer};
+use full_replication::attestation::Attestation;
 use full_replication::{Certificate, VidCertificate};
 use nomos_core::da::certificate::vid::VidCertificate as _;
 use nomos_core::da::certificate::Certificate as _;
 use nomos_core::da::certificate::CertificateStrategy;
+use nomos_core::da::Signer;
 use nomos_core::{da::certificate, tx::Transaction};
 use nomos_da_indexer::storage::adapters::rocksdb::RocksAdapterSettings;
 use nomos_da_indexer::IndexerSettings;
@@ -55,7 +56,7 @@ fn new_node(
     initial_peers: Vec<Multiaddr>,
 ) -> Overwatch {
     OverwatchRunner::<VerifierNode>::run(
-        IndexerNodeServiceSettings {
+        VerifierNodeServiceSettings {
             network: NetworkConfig {
                 backend: Libp2pConfig {
                     inner: swarm_config.clone(),

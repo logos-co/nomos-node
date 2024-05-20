@@ -1,3 +1,4 @@
+pub mod attestation;
 pub mod blob;
 
 // std
@@ -5,8 +6,10 @@ use ark_serialize::CanonicalSerialize;
 use serde::{Deserialize, Serialize};
 use std::io::Cursor;
 // crates
-use blake2::digest::{Update, VariableOutput};
-use blst::min_sig::Signature;
+use blake2::{
+    digest::{Update, VariableOutput},
+    Blake2bVar,
+};
 use sha3::{Digest, Sha3_256};
 // internal
 use kzgrs::Commitment;
@@ -14,7 +17,7 @@ use kzgrs::Commitment;
 #[derive(Clone, Eq, PartialEq, Debug, Serialize, Deserialize)]
 pub struct Chunk(pub Vec<u8>);
 pub struct Row(pub Vec<Chunk>);
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Column(pub Vec<Chunk>);
 pub struct ChunksMatrix(pub Vec<Row>);
 
@@ -168,7 +171,10 @@ pub fn commitment_to_bytes(commitment: &Commitment) -> Vec<u8> {
     buff.into_inner()
 }
 
-#[derive(Clone, Serialize, Deserialize)]
-pub struct Attestation {
-    pub signature: Signature,
+fn hash(item: impl AsRef<[u8]>) -> [u8; 32] {
+    let mut hasher = Blake2bVar::new(32).unwrap();
+    hasher.update(item.as_ref());
+    let mut output = [0; 32];
+    hasher.finalize_variable(&mut output).unwrap();
+    output
 }
