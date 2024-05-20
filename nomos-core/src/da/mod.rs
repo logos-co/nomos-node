@@ -3,6 +3,7 @@ use std::error::Error;
 // internal
 
 pub mod attestation;
+pub mod blob;
 pub mod certificate;
 
 pub trait DaEncoder {
@@ -13,7 +14,9 @@ pub trait DaEncoder {
 pub trait DaVerifier {
     type DaBlob;
     type Attestation;
-    fn verify(&self, blob: Self::DaBlob) -> Result<Self::Attestation, impl Error>;
+    type Error;
+
+    fn verify(&self, blob: &Self::DaBlob) -> Result<Self::Attestation, Self::Error>;
 }
 
 pub trait DaDispersal {

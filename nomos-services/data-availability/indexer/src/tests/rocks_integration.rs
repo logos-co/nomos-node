@@ -1,5 +1,3 @@
-use std::fs::File;
-use std::io::Write;
 use std::path::PathBuf;
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering::SeqCst;
@@ -17,6 +15,7 @@ use full_replication::{Certificate, VidCertificate};
 use nomos_core::da::certificate::vid::VidCertificate as _;
 use nomos_core::da::certificate::CertificateStrategy;
 use nomos_core::{da::certificate, header::HeaderId, tx::Transaction};
+use nomos_da_storage::fs::write_blob;
 use nomos_libp2p::{Multiaddr, Swarm, SwarmConfig};
 use nomos_mempool::da::verify::fullreplication::DaVerificationProvider as MempoolVerificationProvider;
 use nomos_mempool::network::adapters::libp2p::Libp2pAdapter as MempoolNetworkAdapter;
@@ -252,16 +251,13 @@ fn test_indexer() {
     let range = 0.into()..1.into(); // get idx 0 and 1.
 
     // Mock attestation step where blob is persisted in nodes blob storage.
-    let app_id_hex = hex::encode(app_id);
-    let id_hex = hex::encode(vid.certificate_id());
-
-    let mut path = blobs_dir;
-    path.push(app_id_hex);
-    std::fs::create_dir_all(&path).unwrap(); // app_id as dir
-    path.push(id_hex);
-
-    let mut file = File::create(path).unwrap();
-    file.write_all(b"blob").unwrap();
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    rt.block_on(write_blob(
+        blobs_dir,
+        vid.certificate_id().as_ref(),
+        b"blob",
+    ))
+    .unwrap();
 
     node1.spawn(async move {
         let mempool_outbound = mempool.connect().await.unwrap();
