@@ -183,7 +183,7 @@ where
     DaStorage: DaStorageAdapter<VID = DaPool::Item, Blob = B>,
     ConsensusStorage: StorageBackend + Send + Sync + 'static,
 {
-    const SERVICE_ID: ServiceId = "DaStorage";
+    const SERVICE_ID: ServiceId = "DaIndexer";
     type Settings = IndexerSettings<DaStorage::Settings>;
     type State = NoState<Self::Settings>;
     type StateOperator = NoOperator<Self::State>;

@@ -9,14 +9,14 @@ edition = "2021"
 async-trait = "0.1"
 bytes = "1.2"
 futures = "0.3"
-hex = "0.4.3"
 nomos-core = { path = "../../../nomos-core" }
+nomos-da-storage = { path = "../../../nomos-da/storage" }
 nomos-storage = { path = "../../../nomos-services/storage" }
 nomos-mempool = { path = "../../../nomos-services/mempool" }
 cryptarchia-consensus = { path = "../../../nomos-services/cryptarchia-consensus" }
 overwatch-rs = { git = "https://github.com/logos-co/Overwatch", rev = "2f70806" }
 overwatch-derive = { git = "https://github.com/logos-co/Overwatch", rev = "ac28d01" }
-tokio = { version = "1", features = ["sync", "fs", "io-util"] }
+tokio = { version = "1", features = ["sync"] }
 serde = { version = "1.0", features = ["derive"] }
 tracing = "0.1"
 tokio-stream = "0.1.15"

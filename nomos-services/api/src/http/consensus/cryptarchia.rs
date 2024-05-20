@@ -26,7 +26,11 @@ pub type Cryptarchia<Tx, SS, const SIZE: usize> = CryptarchiaConsensus<
     ConsensusNetworkAdapter<Tx, Certificate>,
     MockPool<HeaderId, Tx, <Tx as Transaction>::Hash>,
     MempoolNetworkAdapter<Tx, <Tx as Transaction>::Hash>,
-    MockPool<HeaderId, VidCertificate, <VidCertificate as certificate::vid::VidCertificate>::CertificateId>,
+    MockPool<
+        HeaderId,
+        VidCertificate,
+        <VidCertificate as certificate::vid::VidCertificate>::CertificateId,
+    >,
     MempoolNetworkAdapter<Certificate, <Certificate as certificate::Certificate>::Id>,
     MempoolVerificationProvider,
     FillSizeWithTx<SIZE, Tx>,

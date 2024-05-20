@@ -1,9 +1,8 @@
 // std
 
 // crates
-use blst::min_sig::{PublicKey, SecretKey, Signature};
+use blst::min_sig::{PublicKey, SecretKey};
 use itertools::{izip, Itertools};
-use num_bigint::BigUint;
 use sha3::{Digest, Sha3_256};
 
 // internal
@@ -14,10 +13,11 @@ use crate::encoder::DaEncoderParams;
 use crate::global::{DOMAIN, GLOBAL_PARAMETERS};
 use kzgrs::common::field_element_from_bytes_le;
 use kzgrs::{
-    bytes_to_polynomial, commit_polynomial, verify_element_proof, Commitment, FieldElement, Proof,
+    bytes_to_polynomial, commit_polynomial, verify_element_proof, Commitment, Proof,
     BYTES_PER_FIELD_ELEMENT,
 };
 
+#[derive(Clone)]
 pub struct DaBlob {
     column: Column,
     column_commitment: Commitment,
@@ -163,10 +163,10 @@ impl DaVerifier {
 mod test {
     use crate::common::{hash_column_and_commitment, Chunk, Column};
     use crate::encoder::test::{rand_data, ENCODER};
-    use crate::encoder::{DaEncoder, DaEncoderParams};
+    use crate::encoder::DaEncoderParams;
     use crate::global::{DOMAIN, GLOBAL_PARAMETERS};
     use crate::verifier::{DaBlob, DaVerifier};
-    use blst::min_sig::{PublicKey, SecretKey};
+    use blst::min_sig::SecretKey;
     use kzgrs::{
         bytes_to_polynomial, commit_polynomial, generate_element_proof, BYTES_PER_FIELD_ELEMENT,
     };
@@ -231,9 +231,9 @@ mod test {
             let verifier = &verifiers[i];
             let da_blob = DaBlob {
                 column,
-                column_commitment: encoded_data.column_commitments[i].clone(),
-                aggregated_column_commitment: encoded_data.aggregated_column_commitment.clone(),
-                aggregated_column_proof: encoded_data.aggregated_column_proofs[i].clone(),
+                column_commitment: encoded_data.column_commitments[i],
+                aggregated_column_commitment: encoded_data.aggregated_column_commitment,
+                aggregated_column_proof: encoded_data.aggregated_column_proofs[i],
                 rows_commitments: encoded_data.row_commitments.clone(),
                 rows_proofs: encoded_data
                     .rows_proofs

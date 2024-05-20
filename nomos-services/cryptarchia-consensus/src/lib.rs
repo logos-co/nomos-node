@@ -40,6 +40,8 @@ use tokio::sync::{broadcast, oneshot};
 use tokio_stream::wrappers::IntervalStream;
 use tracing::{error, instrument};
 
+type MempoolRelay<Payload, Item, Key> = OutboundRelay<MempoolMsg<HeaderId, Payload, Item, Key>>;
+
 // Limit the number of blocks returned by GetHeaders
 const HEADERS_LIMIT: usize = 512;
 
@@ -565,7 +567,12 @@ where
                 )
                 .await;
 
-                mark_in_block(da_mempool_relay, block.blobs().map(VidCertificate::certificate_id), id).await;
+                mark_in_block(
+                    da_mempool_relay,
+                    block.blobs().map(VidCertificate::certificate_id),
+                    id,
+                )
+                .await;
 
                 // store block
                 let msg = <StorageMsg<_>>::new_store_message(header.id(), block.clone());
@@ -598,12 +605,8 @@ where
         proof: LeaderProof,
         tx_selector: TxS,
         blob_selector: BS,
-        cl_mempool_relay: OutboundRelay<
-            MempoolMsg<HeaderId, ClPool::Item, ClPool::Item, ClPool::Key>,
-        >,
-        da_mempool_relay: OutboundRelay<
-            MempoolMsg<HeaderId, DaPoolAdapter::Payload, DaPool::Item, DaPool::Key>,
-        >,
+        cl_mempool_relay: MempoolRelay<ClPool::Item, ClPool::Item, ClPool::Key>,
+        da_mempool_relay: MempoolRelay<DaPoolAdapter::Payload, DaPool::Item, DaPool::Key>,
     ) -> Option<Block<ClPool::Item, DaPool::Item>> {
         let mut output = None;
         let cl_txs = get_mempool_contents(cl_mempool_relay);

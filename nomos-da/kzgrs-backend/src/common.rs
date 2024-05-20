@@ -11,6 +11,7 @@ use kzgrs::Commitment;
 #[derive(Clone, Eq, PartialEq, Debug)]
 pub struct Chunk(pub Vec<u8>);
 pub struct Row(pub Vec<Chunk>);
+#[derive(Clone)]
 pub struct Column(pub Vec<Chunk>);
 pub struct ChunksMatrix(pub Vec<Row>);
 
@@ -18,10 +19,12 @@ impl Chunk {
     pub fn len(&self) -> usize {
         self.0.len()
     }
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
     pub fn as_bytes(&self) -> Vec<u8> {
         self.0.to_vec()
     }
-
     pub const fn empty() -> Self {
         Self(vec![])
     }
@@ -40,6 +43,9 @@ impl Row {
     pub fn len(&self) -> usize {
         self.0.len()
     }
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
     pub fn as_bytes(&self) -> Vec<u8> {
         self.0.iter().flat_map(Chunk::as_bytes).collect()
     }
@@ -53,6 +59,9 @@ impl Column {
     #[allow(unused)]
     pub fn len(&self) -> usize {
         self.0.len()
+    }
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
     }
     pub fn as_bytes(&self) -> Vec<u8> {
         self.0.iter().flat_map(Chunk::as_bytes).collect()
@@ -86,6 +95,9 @@ impl AsRef<[Chunk]> for Column {
 impl ChunksMatrix {
     pub fn len(&self) -> usize {
         self.0.len()
+    }
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
     }
     pub fn rows(&self) -> impl Iterator<Item = &Row> + '_ {
         self.0.iter()

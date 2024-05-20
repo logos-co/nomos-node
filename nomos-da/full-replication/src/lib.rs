@@ -28,27 +28,6 @@ pub mod openapi {
 }
 
 #[derive(Debug, Clone)]
-pub struct FullReplication<CertificateStrategy> {
-    voter: Voter,
-    certificate_strategy: CertificateStrategy,
-    output_buffer: Vec<Bytes>,
-    attestations: Vec<Attestation>,
-    output_certificate_buf: Vec<Certificate>,
-}
-
-impl<S> FullReplication<S> {
-    pub fn new(voter: Voter, strategy: S) -> Self {
-        Self {
-            voter,
-            certificate_strategy: strategy,
-            output_buffer: Vec::new(),
-            attestations: Vec::new(),
-            output_certificate_buf: Vec::new(),
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
 pub struct AbsoluteNumber<A, C> {
     num_attestations: usize,
     _a: std::marker::PhantomData<A>,
@@ -112,6 +91,12 @@ pub struct Blob {
 pub struct Metadata {
     app_id: [u8; 32],
     index: Index,
+}
+
+impl Metadata {
+    fn size(&self) -> usize {
+        std::mem::size_of_val(&self.app_id) + std::mem::size_of_val(&self.index)
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
@@ -179,6 +164,10 @@ impl certificate::vid::VidCertificate for VidCertificate {
     fn certificate_id(&self) -> Self::CertificateId {
         self.id
     }
+
+    fn size(&self) -> usize {
+        std::mem::size_of_val(&self.id) + self.metadata.size()
+    }
 }
 
 impl metadata::Metadata for VidCertificate {
@@ -192,7 +181,9 @@ impl metadata::Metadata for VidCertificate {
 
 impl Hash for VidCertificate {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        state.write(<VidCertificate as certificate::vid::VidCertificate>::certificate_id(self).as_ref());
+        state.write(
+            <VidCertificate as certificate::vid::VidCertificate>::certificate_id(self).as_ref(),
+        );
     }
 }
 

@@ -19,7 +19,7 @@ pub struct DaEncoderParams {
 impl DaEncoderParams {
     pub const MAX_BLS12_381_ENCODING_CHUNK_SIZE: usize = 31;
 
-    const fn default_with(column_count: usize) -> Self {
+    pub const fn default_with(column_count: usize) -> Self {
         Self { column_count }
     }
 }
