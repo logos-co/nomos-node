@@ -3,41 +3,19 @@
 // crates
 use blst::min_sig::{PublicKey, SecretKey};
 use itertools::{izip, Itertools};
-use sha3::{Digest, Sha3_256};
-
-// internal
-use crate::common::{
-    build_attestation_message, hash_column_and_commitment, Attestation, Chunk, Column,
-};
-use crate::encoder::DaEncoderParams;
-use crate::global::{DOMAIN, GLOBAL_PARAMETERS};
 use kzgrs::common::field_element_from_bytes_le;
 use kzgrs::{
     bytes_to_polynomial, commit_polynomial, verify_element_proof, Commitment, Proof,
     BYTES_PER_FIELD_ELEMENT,
 };
 
-#[derive(Clone)]
-pub struct DaBlob {
-    column: Column,
-    column_commitment: Commitment,
-    aggregated_column_commitment: Commitment,
-    aggregated_column_proof: Proof,
-    rows_commitments: Vec<Commitment>,
-    rows_proofs: Vec<Proof>,
-}
-
-impl DaBlob {
-    pub fn id(&self) -> Vec<u8> {
-        build_attestation_message(&self.aggregated_column_commitment, &self.rows_commitments)
-    }
-
-    pub fn column_id(&self) -> Vec<u8> {
-        let mut hasher = Sha3_256::new();
-        hasher.update(self.column.as_bytes());
-        hasher.finalize().as_slice().to_vec()
-    }
-}
+use crate::common::blob::DaBlob;
+// internal
+use crate::common::{
+    build_attestation_message, hash_column_and_commitment, Attestation, Chunk, Column,
+};
+use crate::encoder::DaEncoderParams;
+use crate::global::{DOMAIN, GLOBAL_PARAMETERS};
 
 pub struct DaVerifier {
     // TODO: substitute this for an abstraction to sign things over

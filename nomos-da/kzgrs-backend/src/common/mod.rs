@@ -1,5 +1,8 @@
+pub mod blob;
+
 // std
 use ark_serialize::CanonicalSerialize;
+use serde::{Deserialize, Serialize};
 use std::io::Cursor;
 // crates
 use blake2::digest::{Update, VariableOutput};
@@ -8,10 +11,10 @@ use sha3::{Digest, Sha3_256};
 // internal
 use kzgrs::Commitment;
 
-#[derive(Clone, Eq, PartialEq, Debug)]
+#[derive(Clone, Eq, PartialEq, Debug, Serialize, Deserialize)]
 pub struct Chunk(pub Vec<u8>);
 pub struct Row(pub Vec<Chunk>);
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct Column(pub Vec<Chunk>);
 pub struct ChunksMatrix(pub Vec<Row>);
 
@@ -165,6 +168,7 @@ pub fn commitment_to_bytes(commitment: &Commitment) -> Vec<u8> {
     buff.into_inner()
 }
 
+#[derive(Clone, Serialize, Deserialize)]
 pub struct Attestation {
     pub signature: Signature,
 }
