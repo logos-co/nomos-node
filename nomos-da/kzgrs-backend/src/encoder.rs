@@ -5,6 +5,7 @@ use ark_ff::{BigInteger, PrimeField};
 // internal
 use crate::common::{hash_column_and_commitment, Chunk, ChunksMatrix, Row};
 use crate::global::{DOMAIN, GLOBAL_PARAMETERS};
+use crate::verifier::DaBlob;
 use kzgrs::common::bytes_to_polynomial_unchecked;
 use kzgrs::{
     bytes_to_polynomial, commit_polynomial, encode, generate_element_proof, Commitment,
@@ -33,6 +34,30 @@ pub struct EncodedData {
     pub column_commitments: Vec<Commitment>,
     pub aggregated_column_commitment: Commitment,
     pub aggregated_column_proofs: Vec<Proof>,
+}
+
+impl EncodedData {
+    pub fn prepare_data(&self) -> impl Iterator<Item = DaBlob> + '_ {
+        let row_proofs_iter = self.rows_proofs.iter().map(|rp| rp.iter());
+
+        self.extended_data
+            .columns()
+            .zip(&self.column_commitments)
+            .zip(row_proofs_iter)
+            .zip(&self.aggregated_column_proofs)
+            .map(
+                move |(((column, column_commitment), row_proofs), aggregated_column_proof)| {
+                    DaBlob {
+                        column,
+                        column_commitment: *column_commitment,
+                        aggregated_column_commitment: self.aggregated_column_commitment,
+                        aggregated_column_proof: *aggregated_column_proof,
+                        rows_commitments: self.row_commitments.clone(),
+                        rows_proofs: row_proofs.cloned().collect(),
+                    }
+                },
+            )
+    }
 }
 
 pub struct DaEncoder {

@@ -19,12 +19,12 @@ use kzgrs::{
 
 #[derive(Clone)]
 pub struct DaBlob {
-    column: Column,
-    column_commitment: Commitment,
-    aggregated_column_commitment: Commitment,
-    aggregated_column_proof: Proof,
-    rows_commitments: Vec<Commitment>,
-    rows_proofs: Vec<Proof>,
+    pub column: Column,
+    pub column_commitment: Commitment,
+    pub aggregated_column_commitment: Commitment,
+    pub aggregated_column_proof: Proof,
+    pub rows_commitments: Vec<Commitment>,
+    pub rows_proofs: Vec<Proof>,
 }
 
 impl DaBlob {
