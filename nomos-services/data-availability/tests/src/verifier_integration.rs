@@ -38,6 +38,13 @@ use time::OffsetDateTime;
 
 use crate::common::*;
 
+// Client node is only created for asyncroniously interact with nodes in the test.
+// The services defined in it are not used.
+#[derive(Services)]
+struct ClientNode {
+    storage: ServiceHandle<StorageService<RocksBackend<Wire>>>,
+}
+
 #[derive(Services)]
 struct VerifierNode {
     network: ServiceHandle<NetworkService<NetworkBackend>>,
@@ -47,6 +54,21 @@ struct VerifierNode {
     cryptarchia: ServiceHandle<Cryptarchia>,
     indexer: ServiceHandle<DaIndexer>,
     verifier: ServiceHandle<DaVerifier>,
+}
+
+fn new_client(db_path: PathBuf) -> Overwatch {
+    OverwatchRunner::<ClientNode>::run(
+        ClientNodeServiceSettings {
+            storage: nomos_storage::backends::rocksdb::RocksBackendSettings {
+                db_path,
+                read_only: false,
+                column_family: None,
+            },
+        },
+        None,
+    )
+    .map_err(|e| eprintln!("Error encountered: {}", e))
+    .unwrap()
 }
 
 fn new_node(
@@ -120,14 +142,11 @@ fn new_node(
 }
 
 fn generate_keys() -> (blst::min_sig::SecretKey, blst::min_sig::PublicKey) {
-    // Generate a random scalar as a private key
     let mut rng = rand::thread_rng();
     let sk_bytes: [u8; 32] = rng.gen();
     let sk = blst::min_sig::SecretKey::key_gen(&sk_bytes, &[]).unwrap();
 
-    // Derive the public key from the private key
     let pk = sk.sk_to_pk();
-
     (sk, pk)
 }
 
@@ -137,8 +156,9 @@ pub fn rand_data(elements_count: usize) -> Vec<u8> {
     buff
 }
 
-// TODO: When verifier is implemented this test should be removed and a new one
-// performed in integration tests crate using the real node.
+pub const PARAMS: DaEncoderParams = DaEncoderParams::default_with(2);
+pub const ENCODER: DaEncoder = DaEncoder::new(PARAMS);
+
 #[test]
 fn test_verifier() {
     let performed_tx = Arc::new(AtomicBool::new(false));
@@ -187,6 +207,8 @@ fn test_verifier() {
     let (node1_sk, node1_pk) = generate_keys();
     let (node2_sk, node2_pk) = generate_keys();
 
+    let client_zone = new_client(NamedTempFile::new().unwrap().path().to_path_buf());
+
     let node1 = new_node(
         &coins[0],
         &ledger_config,
@@ -202,7 +224,7 @@ fn test_verifier() {
         },
     );
 
-    let _node2 = new_node(
+    let node2 = new_node(
         &coins[1],
         &ledger_config,
         &genesis_state,
@@ -217,94 +239,79 @@ fn test_verifier() {
         },
     );
 
-    let mempool = node1.handle().relay::<DaMempool>();
-    let storage = node1.handle().relay::<StorageService<RocksBackend<Wire>>>();
-    let indexer = node1.handle().relay::<DaIndexer>();
+    let node1_mempool = node1.handle().relay::<DaMempool>();
+    let node1_indexer = node1.handle().relay::<DaIndexer>();
+    let node1_verifier = node1.handle().relay::<DaVerifier>();
 
-    let encoder_params = DaEncoderParams::default_with(10);
-    let elements = 10usize;
-    let data = rand_data(elements);
-    let encoder = DaEncoder::new(encoder_params);
-    let encoded_data = encoder.encode(&data).unwrap();
-    let blobs: Vec<DaBlob> = encoded_data.prepare_data().collect();
+    let node2_verifier = node2.handle().relay::<DaVerifier>();
 
-    println!("blobs: {blobs:?}");
-    println!("blobs len: {}", blobs.len());
+    // let blob_hash = [0u8; 32];
+    // let app_id = [7u8; 32];
+    // let index = 0.into();
 
-    let blob_hash = [9u8; 32];
-    let app_id = [7u8; 32];
-    let index = 0.into();
+    // let attestation = Attestation::new_signed(blob_hash, ids[0], &MockKeyPair);
+    // let certificate_strategy = full_replication::AbsoluteNumber::new(1);
+    // let cert = certificate_strategy.build(vec![attestation], app_id, index);
+    // let cert_id = cert.id();
+    // let vid: VidCertificate = cert.clone().into();
+    // let range = 0.into()..1.into(); // get idx 0 and 1.
 
-    let attestation = Attestation::new_signed(blob_hash, ids[0], &MockKeyPair);
-    let certificate_strategy = full_replication::AbsoluteNumber::new(1);
-    let cert = certificate_strategy.build(vec![attestation], app_id, index);
-    let cert_id = cert.id();
-    let vid: VidCertificate = cert.clone().into();
-    let range = 0.into()..1.into(); // get idx 0 and 1.
+    client_zone.spawn(async move {
+        let node1_verifier = node1_verifier.connect().await.unwrap();
+        let (node1_reply_tx, node1_reply_rx) = tokio::sync::oneshot::channel();
 
-    // Mock attestation step where blob is persisted in nodes blob storage.
-    let rt = tokio::runtime::Runtime::new().unwrap();
-    rt.block_on(write_blob(
-        blobs_dir,
-        vid.certificate_id().as_ref(),
-        b"blob",
-    ))
-    .unwrap();
+        let node2_verifier = node2_verifier.connect().await.unwrap();
+        let (node2_reply_tx, node2_reply_rx) = tokio::sync::oneshot::channel();
 
-    node1.spawn(async move {
-        let mempool_outbound = mempool.connect().await.unwrap();
-        let storage_outbound = storage.connect().await.unwrap();
-        let indexer_outbound = indexer.connect().await.unwrap();
+        let verifiers = vec![
+            (node1_verifier, node1_reply_tx),
+            (node2_verifier, node2_reply_tx),
+        ];
 
-        // Mock attested blob by writting directly into the da storage.
-        let mut attested_key = Vec::from(b"da/attested/" as &[u8]);
-        attested_key.extend_from_slice(&blob_hash);
+        let node1_mempool = node1_mempool.connect().await.unwrap();
+        let node1_indexer = node1_indexer.connect().await.unwrap();
 
-        storage_outbound
-            .send(nomos_storage::StorageMsg::Store {
-                key: attested_key.into(),
-                value: Bytes::new(),
-            })
-            .await
-            .unwrap();
+        // Encode data
+        let encoder = &ENCODER;
+        let data = rand_data(10);
 
-        // Put cert into the mempool.
-        let (mempool_tx, mempool_rx) = tokio::sync::oneshot::channel();
-        mempool_outbound
-            .send(nomos_mempool::MempoolMsg::Add {
-                payload: cert,
-                key: cert_id,
-                reply_channel: mempool_tx,
-            })
-            .await
-            .unwrap();
-        let _ = mempool_rx.await.unwrap();
+        let encoded_data = encoder.encode(&data).unwrap();
+        let columns: Vec<_> = encoded_data.extended_data.columns().collect();
 
-        // Wait for block in the network.
-        tokio::time::sleep(Duration::from_secs(2)).await;
+        for (i, (verifier, reply_tx)) in verifiers.into_iter().enumerate() {
+            let column = &columns[i];
 
-        // Request range of vids from indexer.
-        let (indexer_tx, indexer_rx) = tokio::sync::oneshot::channel();
-        indexer_outbound
-            .send(nomos_da_indexer::DaMsg::GetRange {
-                app_id,
-                range,
-                reply_channel: indexer_tx,
-            })
-            .await
-            .unwrap();
-        let mut app_id_blobs = indexer_rx.await.unwrap();
+            let da_blob = DaBlob {
+                column: column.clone(),
+                column_commitment: encoded_data.column_commitments[i],
+                aggregated_column_commitment: encoded_data.aggregated_column_commitment,
+                aggregated_column_proof: encoded_data.aggregated_column_proofs[i],
+                rows_commitments: encoded_data.row_commitments.clone(),
+                rows_proofs: encoded_data
+                    .rows_proofs
+                    .iter()
+                    .map(|proofs| proofs.get(i).cloned().unwrap())
+                    .collect(),
+            };
 
-        // Since we've only attested to certificate at idx 0, the first
-        // item should have "some" data, other indexes should be None.
-        app_id_blobs.sort_by(|(a, _), (b, _)| a.partial_cmp(b).unwrap());
-        let app_id_blobs = app_id_blobs.iter().map(|(_, b)| b).collect::<Vec<_>>();
-        if let Some(blob) = app_id_blobs[0] {
-            if **blob == *b"blob" && app_id_blobs[1].is_none() {
-                is_success_tx.store(true, SeqCst);
-            }
+            verifier
+                .send(nomos_da_verifier::DaVerifierMsg::AddBlob {
+                    blob: da_blob,
+                    reply_channel: reply_tx,
+                })
+                .await
+                .unwrap();
         }
 
+        // Create cert
+        let a1 = node1_reply_rx.await.unwrap();
+        let a2 = node2_reply_rx.await.unwrap();
+
+        if a1.is_some() && a2.is_some() {
+            is_success_tx.store(true, SeqCst);
+        }
+
+        // TODO: Create cert and check indexer integration.
         performed_tx.store(true, SeqCst);
     });
 

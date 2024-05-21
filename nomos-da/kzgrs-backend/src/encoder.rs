@@ -10,7 +10,6 @@ use kzgrs::{
 };
 
 // internal
-use crate::common::blob::DaBlob;
 use crate::common::{hash_column_and_commitment, Chunk, ChunksMatrix, Row};
 use crate::global::{DOMAIN, GLOBAL_PARAMETERS};
 
