@@ -38,23 +38,23 @@ pub struct EncodedData {
 
 impl EncodedData {
     pub fn prepare_data(&self) -> impl Iterator<Item = DaBlob> + '_ {
-        let row_proofs_iter = self.rows_proofs.iter().map(|rp| rp.iter());
+        let mut row_proofs_iter = self.rows_proofs.iter().map(|rp| rp.iter()).cycle();
 
         self.extended_data
             .columns()
             .zip(&self.column_commitments)
-            .zip(row_proofs_iter)
             .zip(&self.aggregated_column_proofs)
             .map(
-                move |(((column, column_commitment), row_proofs), aggregated_column_proof)| {
-                    DaBlob {
-                        column,
-                        column_commitment: *column_commitment,
-                        aggregated_column_commitment: self.aggregated_column_commitment,
-                        aggregated_column_proof: *aggregated_column_proof,
-                        rows_commitments: self.row_commitments.clone(),
-                        rows_proofs: row_proofs.cloned().collect(),
-                    }
+                move |((column, column_commitment), aggregated_column_proof)| DaBlob {
+                    column,
+                    column_commitment: *column_commitment,
+                    aggregated_column_commitment: self.aggregated_column_commitment,
+                    aggregated_column_proof: *aggregated_column_proof,
+                    rows_commitments: self.row_commitments.clone(),
+                    rows_proofs: row_proofs_iter
+                        .take(column.len())
+                        .map(|mut proofs| proofs.next())
+                        .collect(),
                 },
             )
     }
