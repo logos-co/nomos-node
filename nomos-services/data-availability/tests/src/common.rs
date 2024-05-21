@@ -10,6 +10,7 @@ use nomos_da_verifier::backend::kzgrs::KzgrsDaVerifier;
 use nomos_da_verifier::network::adapters::libp2p::Libp2pAdapter;
 use nomos_da_verifier::storage::adapters::rocksdb::RocksAdapter as VerifierStorageAdapter;
 use nomos_da_verifier::DaVerifierService;
+use nomos_libp2p::{Multiaddr, Swarm, SwarmConfig};
 use nomos_mempool::da::verify::fullreplication::DaVerificationProvider as MempoolVerificationProvider;
 use nomos_mempool::network::adapters::libp2p::Libp2pAdapter as MempoolNetworkAdapter;
 use nomos_mempool::{backend::mockpool::MockPool, TxMempoolService};
@@ -81,3 +82,7 @@ pub(crate) type DaVerifier = DaVerifierService<
 >;
 
 pub(crate) const MB16: usize = 1024 * 1024 * 16;
+
+pub fn node_address(config: &SwarmConfig) -> Multiaddr {
+    Swarm::multiaddr(std::net::Ipv4Addr::new(127, 0, 0, 1), config.port)
+}

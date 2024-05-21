@@ -268,7 +268,3 @@ impl Signer for MockKeyPair {
         vec![]
     }
 }
-
-fn node_address(config: &SwarmConfig) -> Multiaddr {
-    Swarm::multiaddr(std::net::Ipv4Addr::new(127, 0, 0, 1), config.port)
-}

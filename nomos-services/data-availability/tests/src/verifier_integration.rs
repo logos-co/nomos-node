@@ -56,6 +56,8 @@ struct VerifierNode {
     verifier: ServiceHandle<DaVerifier>,
 }
 
+// Client node is just an empty overwatch service to spawn a task that could communicate with other
+// nodes and manage the data availability cycle during tests.
 fn new_client(db_path: PathBuf) -> Overwatch {
     OverwatchRunner::<ClientNode>::run(
         ClientNodeServiceSettings {
@@ -245,17 +247,6 @@ fn test_verifier() {
 
     let node2_verifier = node2.handle().relay::<DaVerifier>();
 
-    // let blob_hash = [0u8; 32];
-    // let app_id = [7u8; 32];
-    // let index = 0.into();
-
-    // let attestation = Attestation::new_signed(blob_hash, ids[0], &MockKeyPair);
-    // let certificate_strategy = full_replication::AbsoluteNumber::new(1);
-    // let cert = certificate_strategy.build(vec![attestation], app_id, index);
-    // let cert_id = cert.id();
-    // let vid: VidCertificate = cert.clone().into();
-    // let range = 0.into()..1.into(); // get idx 0 and 1.
-
     client_zone.spawn(async move {
         let node1_verifier = node1_verifier.connect().await.unwrap();
         let (node1_reply_tx, node1_reply_rx) = tokio::sync::oneshot::channel();
@@ -319,16 +310,4 @@ fn test_verifier() {
         std::thread::sleep(std::time::Duration::from_millis(200));
     }
     assert!(is_success_rx.load(SeqCst));
-}
-
-struct MockKeyPair;
-
-impl Signer for MockKeyPair {
-    fn sign(&self, _message: &[u8]) -> Vec<u8> {
-        vec![]
-    }
-}
-
-fn node_address(config: &SwarmConfig) -> Multiaddr {
-    Swarm::multiaddr(std::net::Ipv4Addr::new(127, 0, 0, 1), config.port)
 }

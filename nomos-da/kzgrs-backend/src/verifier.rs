@@ -117,6 +117,7 @@ impl DaVerifier {
 
         Attestation {
             signature: signature.to_bytes().to_vec(),
+            // TODO: Remove if not required, or implement serialization for 96 bytes pub key.
             attester: [0u8; 32],
             blob_hash,
         }
