@@ -109,10 +109,16 @@ impl DaVerifier {
         let message =
             build_attestation_message(&blob.aggregated_column_commitment, &blob.rows_commitments);
         let signature = self.sk.sign(&message, b"", b"");
+
+        let blob_id = blob.id();
+        let blob_hash: [u8; 32] = blob_id
+            .try_into()
+            .expect("Blob ID must be exactly 32 bytes long");
+
         Attestation {
             signature: signature.to_bytes().to_vec(),
-            attester: todo!(),
-            blob_hash: todo!(),
+            attester: [0u8; 32],
+            blob_hash,
         }
     }
 

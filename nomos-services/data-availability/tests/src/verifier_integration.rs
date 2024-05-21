@@ -9,14 +9,18 @@ use cryptarchia_consensus::TimeConfig;
 use cryptarchia_ledger::{Coin, LedgerState};
 use full_replication::attestation::Attestation;
 use full_replication::{Certificate, VidCertificate};
+use kzgrs_backend::common::blob::DaBlob;
+use kzgrs_backend::encoder::{DaEncoder, DaEncoderParams};
 use nomos_core::da::certificate::vid::VidCertificate as _;
 use nomos_core::da::certificate::Certificate as _;
 use nomos_core::da::certificate::CertificateStrategy;
 use nomos_core::da::Signer;
 use nomos_core::{da::certificate, tx::Transaction};
-use nomos_da_indexer::storage::adapters::rocksdb::RocksAdapterSettings;
+use nomos_da_indexer::storage::adapters::rocksdb::RocksAdapterSettings as IndexerStorageSettings;
 use nomos_da_indexer::IndexerSettings;
 use nomos_da_storage::fs::write_blob;
+use nomos_da_verifier::backend::kzgrs::KzgrsDaVerifierSettings;
+use nomos_da_verifier::storage::adapters::rocksdb::RocksAdapterSettings as VerifierStorageSettings;
 use nomos_da_verifier::DaVerifierServiceSettings;
 use nomos_libp2p::{Multiaddr, Swarm, SwarmConfig};
 use nomos_mempool::network::adapters::libp2p::Settings as AdapterSettings;
@@ -28,7 +32,7 @@ use nomos_storage::{backends::rocksdb::RocksBackend, StorageService};
 use overwatch_derive::*;
 use overwatch_rs::overwatch::{Overwatch, OverwatchRunner};
 use overwatch_rs::services::handle::ServiceHandle;
-use rand::{thread_rng, Rng};
+use rand::{thread_rng, Rng, RngCore};
 use tempfile::{NamedTempFile, TempDir};
 use time::OffsetDateTime;
 
@@ -54,6 +58,7 @@ fn new_node(
     db_path: PathBuf,
     blobs_dir: &PathBuf,
     initial_peers: Vec<Multiaddr>,
+    verifier_settings: KzgrsDaVerifierSettings,
 ) -> Overwatch {
     OverwatchRunner::<VerifierNode>::run(
         VerifierNodeServiceSettings {
@@ -88,7 +93,7 @@ fn new_node(
                 column_family: Some("blocks".into()),
             },
             indexer: IndexerSettings {
-                storage: RocksAdapterSettings {
+                storage: IndexerStorageSettings {
                     blob_storage_directory: blobs_dir.clone(),
                 },
             },
@@ -101,15 +106,35 @@ fn new_node(
                 coins: vec![coin.clone()],
             },
             verifier: DaVerifierServiceSettings {
-                verifier_settings: todo!(),
-                network_adapter_settings: todo!(),
-                storage_adapter_settings: todo!(),
+                verifier_settings,
+                network_adapter_settings: (),
+                storage_adapter_settings: VerifierStorageSettings {
+                    blob_storage_directory: blobs_dir.clone(),
+                },
             },
         },
         None,
     )
     .map_err(|e| eprintln!("Error encountered: {}", e))
     .unwrap()
+}
+
+fn generate_keys() -> (blst::min_sig::SecretKey, blst::min_sig::PublicKey) {
+    // Generate a random scalar as a private key
+    let mut rng = rand::thread_rng();
+    let sk_bytes: [u8; 32] = rng.gen();
+    let sk = blst::min_sig::SecretKey::key_gen(&sk_bytes, &[]).unwrap();
+
+    // Derive the public key from the private key
+    let pk = sk.sk_to_pk();
+
+    (sk, pk)
+}
+
+pub fn rand_data(elements_count: usize) -> Vec<u8> {
+    let mut buff = vec![0; elements_count * DaEncoderParams::MAX_BLS12_381_ENCODING_CHUNK_SIZE];
+    rand::thread_rng().fill_bytes(&mut buff);
+    buff
 }
 
 // TODO: When verifier is implemented this test should be removed and a new one
@@ -159,6 +184,9 @@ fn test_verifier() {
 
     let blobs_dir = TempDir::new().unwrap().path().to_path_buf();
 
+    let (node1_sk, node1_pk) = generate_keys();
+    let (node2_sk, node2_pk) = generate_keys();
+
     let node1 = new_node(
         &coins[0],
         &ledger_config,
@@ -168,6 +196,10 @@ fn test_verifier() {
         NamedTempFile::new().unwrap().path().to_path_buf(),
         &blobs_dir,
         vec![node_address(&swarm_config2)],
+        KzgrsDaVerifierSettings {
+            sk: node1_sk,
+            nodes_public_keys: vec![node1_pk, node2_pk],
+        },
     );
 
     let _node2 = new_node(
@@ -179,11 +211,25 @@ fn test_verifier() {
         NamedTempFile::new().unwrap().path().to_path_buf(),
         &blobs_dir,
         vec![node_address(&swarm_config1)],
+        KzgrsDaVerifierSettings {
+            sk: node2_sk,
+            nodes_public_keys: vec![node1_pk, node2_pk],
+        },
     );
 
     let mempool = node1.handle().relay::<DaMempool>();
     let storage = node1.handle().relay::<StorageService<RocksBackend<Wire>>>();
     let indexer = node1.handle().relay::<DaIndexer>();
+
+    let encoder_params = DaEncoderParams::default_with(10);
+    let elements = 10usize;
+    let data = rand_data(elements);
+    let encoder = DaEncoder::new(encoder_params);
+    let encoded_data = encoder.encode(&data).unwrap();
+    let blobs: Vec<DaBlob> = encoded_data.prepare_data().collect();
+
+    println!("blobs: {blobs:?}");
+    println!("blobs len: {}", blobs.len());
 
     let blob_hash = [9u8; 32];
     let app_id = [7u8; 32];

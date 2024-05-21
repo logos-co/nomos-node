@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+blst = "0.3.11"
 bytes = "1.2"
 cryptarchia-consensus = { path = "../../../nomos-services/cryptarchia-consensus" }
 cryptarchia-engine = { path = "../../../consensus/cryptarchia-engine", features = ["serde"] }

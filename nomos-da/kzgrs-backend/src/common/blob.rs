@@ -14,32 +14,32 @@ use crate::common::Commitment;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DaBlob {
-    pub(crate) column: Column,
+    pub column: Column,
     #[serde(
         serialize_with = "serialize_commitment",
         deserialize_with = "deserialize_commitment"
     )]
-    pub(crate) column_commitment: Commitment,
+    pub column_commitment: Commitment,
     #[serde(
         serialize_with = "serialize_commitment",
         deserialize_with = "deserialize_commitment"
     )]
-    pub(crate) aggregated_column_commitment: Commitment,
+    pub aggregated_column_commitment: Commitment,
     #[serde(
         serialize_with = "serialize_proof",
         deserialize_with = "deserialize_proof"
     )]
-    pub(crate) aggregated_column_proof: Proof,
+    pub aggregated_column_proof: Proof,
     #[serde(
         serialize_with = "serialize_vec_commitment",
         deserialize_with = "deserialize_vec_commitment"
     )]
-    pub(crate) rows_commitments: Vec<Commitment>,
+    pub rows_commitments: Vec<Commitment>,
     #[serde(
         serialize_with = "serialize_vec_proof",
         deserialize_with = "deserialize_vec_proof"
     )]
-    pub(crate) rows_proofs: Vec<Proof>,
+    pub rows_proofs: Vec<Proof>,
 }
 
 impl DaBlob {
