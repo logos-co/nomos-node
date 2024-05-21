@@ -1,6 +1,9 @@
-#[cfg(test)]
+// Networking is not essential for verifier and indexer tests.
+// Libp2p network is chosen for consensus requirement, mixnet is ignored.
+
+#[cfg(all(test, feature = "libp2p", not(feature = "mixnet")))]
 mod common;
-#[cfg(test)]
+#[cfg(all(test, feature = "libp2p", not(feature = "mixnet")))]
 mod indexer_integration;
-#[cfg(test)]
+#[cfg(all(test, feature = "libp2p", not(feature = "mixnet")))]
 mod verifier_integration;
