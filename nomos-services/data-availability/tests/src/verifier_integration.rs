@@ -4,25 +4,18 @@ use std::sync::atomic::Ordering::SeqCst;
 use std::sync::Arc;
 use std::time::Duration;
 
-use bytes::Bytes;
 use cryptarchia_consensus::TimeConfig;
 use cryptarchia_ledger::{Coin, LedgerState};
-use full_replication::attestation::Attestation;
-use full_replication::{Certificate, VidCertificate};
+use full_replication::Certificate;
 use kzgrs_backend::common::blob::DaBlob;
 use kzgrs_backend::encoder::{DaEncoder, DaEncoderParams};
-use nomos_core::da::certificate::vid::VidCertificate as _;
-use nomos_core::da::certificate::Certificate as _;
-use nomos_core::da::certificate::CertificateStrategy;
-use nomos_core::da::Signer;
 use nomos_core::{da::certificate, tx::Transaction};
 use nomos_da_indexer::storage::adapters::rocksdb::RocksAdapterSettings as IndexerStorageSettings;
 use nomos_da_indexer::IndexerSettings;
-use nomos_da_storage::fs::write_blob;
 use nomos_da_verifier::backend::kzgrs::KzgrsDaVerifierSettings;
 use nomos_da_verifier::storage::adapters::rocksdb::RocksAdapterSettings as VerifierStorageSettings;
 use nomos_da_verifier::DaVerifierServiceSettings;
-use nomos_libp2p::{Multiaddr, Swarm, SwarmConfig};
+use nomos_libp2p::{Multiaddr, SwarmConfig};
 use nomos_mempool::network::adapters::libp2p::Settings as AdapterSettings;
 use nomos_mempool::{DaMempoolSettings, TxMempoolSettings};
 use nomos_network::backends::libp2p::{Libp2p as NetworkBackend, Libp2pConfig};
@@ -241,8 +234,6 @@ fn test_verifier() {
         },
     );
 
-    let node1_mempool = node1.handle().relay::<DaMempool>();
-    let node1_indexer = node1.handle().relay::<DaIndexer>();
     let node1_verifier = node1.handle().relay::<DaVerifier>();
 
     let node2_verifier = node2.handle().relay::<DaVerifier>();
@@ -258,9 +249,6 @@ fn test_verifier() {
             (node1_verifier, node1_reply_tx),
             (node2_verifier, node2_reply_tx),
         ];
-
-        let node1_mempool = node1_mempool.connect().await.unwrap();
-        let node1_indexer = node1_indexer.connect().await.unwrap();
 
         // Encode data
         let encoder = &ENCODER;

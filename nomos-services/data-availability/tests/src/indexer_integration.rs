@@ -17,7 +17,7 @@ use nomos_core::{da::certificate, tx::Transaction};
 use nomos_da_indexer::storage::adapters::rocksdb::RocksAdapterSettings;
 use nomos_da_indexer::IndexerSettings;
 use nomos_da_storage::fs::write_blob;
-use nomos_libp2p::{Multiaddr, Swarm, SwarmConfig};
+use nomos_libp2p::{Multiaddr, SwarmConfig};
 use nomos_mempool::network::adapters::libp2p::Settings as AdapterSettings;
 use nomos_mempool::{DaMempoolSettings, TxMempoolSettings};
 use nomos_network::backends::libp2p::{Libp2p as NetworkBackend, Libp2pConfig};
