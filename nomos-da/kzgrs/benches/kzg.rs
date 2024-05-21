@@ -47,11 +47,10 @@ fn commit_polynomial_with_element_count(bencher: Bencher, element_count: usize) 
 }
 
 #[allow(non_snake_case)]
-#[divan::bench]
-fn compute_single_proof(bencher: Bencher) {
+#[divan::bench(args = [1024, 2048, 4096])]
+fn compute_single_proof(bencher: Bencher, element_count: usize) {
     bencher
         .with_inputs(|| {
-            let element_count = 10;
             let domain = GeneralEvaluationDomain::new(element_count).unwrap();
             let data = rand_data_elements(element_count, CHUNK_SIZE);
             (
@@ -110,15 +109,9 @@ fn compute_parallelize_batch_proofs(bencher: Bencher, element_count: usize) {
         })
         .input_counter(move |_| ItemsCount::new(element_count))
         .bench_refs(|((evals, poly), domain)| {
-            let _: Vec<_> = (0..element_count)
-                .into_par_iter()
-                .map(|i| {
-                    black_box(
-                        generate_element_proof(i, poly, evals, &GLOBAL_PARAMETERS, *domain)
-                            .unwrap(),
-                    )
-                })
-                .collect();
+            black_box((0..element_count).into_par_iter().for_each(|i| {
+                generate_element_proof(i, poly, evals, &GLOBAL_PARAMETERS, *domain).unwrap();
+            }));
         });
 }
 
