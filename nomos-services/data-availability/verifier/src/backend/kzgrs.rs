@@ -1,15 +1,29 @@
-use blst::{min_sig::PublicKey, min_sig::SecretKey};
 // std
+use core::fmt;
 // crates
+use blst::{min_sig::PublicKey, min_sig::SecretKey};
 use kzgrs_backend::{
     common::{attestation::Attestation, blob::DaBlob},
     verifier::DaVerifier as NomosKzgrsVerifier,
 };
 use nomos_core::da::DaVerifier;
-use overwatch_rs::DynError;
-
-use super::VerifierBackend;
 // internal
+use super::VerifierBackend;
+
+#[derive(Debug)]
+pub enum KzgrsDaVerifierError {
+    VerificationError,
+}
+
+impl fmt::Display for KzgrsDaVerifierError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            KzgrsDaVerifierError::VerificationError => write!(f, "Verification failed"),
+        }
+    }
+}
+
+impl std::error::Error for KzgrsDaVerifierError {}
 
 pub struct KzgrsDaVerifier {
     verifier: NomosKzgrsVerifier,
@@ -27,13 +41,13 @@ impl VerifierBackend for KzgrsDaVerifier {
 impl DaVerifier for KzgrsDaVerifier {
     type DaBlob = DaBlob;
     type Attestation = Attestation;
-    type Error = DynError;
+    type Error = KzgrsDaVerifierError;
 
-    fn verify(&self, blob: &Self::DaBlob) -> Result<Self::Attestation, DynError> {
+    fn verify(&self, blob: &Self::DaBlob) -> Result<Self::Attestation, Self::Error> {
         let blob = blob.clone();
         match self.verifier.verify(blob) {
             Some(attestation) => Ok(attestation),
-            None => Err("Failed to attest the blob".into()),
+            None => Err(KzgrsDaVerifierError::VerificationError),
         }
     }
 }

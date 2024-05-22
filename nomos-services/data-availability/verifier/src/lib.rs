@@ -5,6 +5,7 @@ pub mod storage;
 // std
 use nomos_storage::StorageService;
 use overwatch_rs::services::life_cycle::LifecycleMessage;
+use std::error::Error;
 use std::fmt::{Debug, Formatter};
 use storage::DaStorageAdapter;
 use tokio::sync::oneshot::Sender;
@@ -42,10 +43,11 @@ impl<B: 'static, A: 'static> RelayMessage for DaVerifierMsg<B, A> {}
 
 pub struct DaVerifierService<Backend, N, S>
 where
-    Backend: VerifierBackend<Error = DynError>,
+    Backend: VerifierBackend,
     Backend::Settings: Clone,
     Backend::DaBlob: 'static,
     Backend::Attestation: 'static,
+    Backend::Error: Error,
     N: NetworkAdapter,
     N::Settings: Clone,
     S: DaStorageAdapter,
@@ -58,9 +60,10 @@ where
 
 impl<Backend, N, S> DaVerifierService<Backend, N, S>
 where
-    Backend: VerifierBackend<Error = DynError> + Send + 'static,
+    Backend: VerifierBackend + Send + 'static,
     Backend::DaBlob: Debug + Send,
     Backend::Attestation: Debug + Send,
+    Backend::Error: Error + Send + Sync,
     Backend::Settings: Clone,
     N: NetworkAdapter<Blob = Backend::DaBlob, Attestation = Backend::Attestation> + Send + 'static,
     N::Settings: Clone,
@@ -100,8 +103,9 @@ where
 
 impl<Backend, N, S> ServiceData for DaVerifierService<Backend, N, S>
 where
-    Backend: VerifierBackend<Error = DynError>,
+    Backend: VerifierBackend,
     Backend::Settings: Clone,
+    Backend::Error: Error,
     N: NetworkAdapter,
     N::Settings: Clone,
     S: DaStorageAdapter,
@@ -117,10 +121,11 @@ where
 #[async_trait::async_trait]
 impl<Backend, N, S> ServiceCore for DaVerifierService<Backend, N, S>
 where
-    Backend: VerifierBackend<Error = DynError> + Send + Sync + 'static,
+    Backend: VerifierBackend + Send + Sync + 'static,
     Backend::Settings: Clone + Send + Sync + 'static,
     Backend::DaBlob: Debug + Send + Sync + 'static,
     Backend::Attestation: Debug + Send + Sync + 'static,
+    Backend::Error: Error + Send + Sync + 'static,
     N: NetworkAdapter<Blob = Backend::DaBlob, Attestation = Backend::Attestation> + Send + 'static,
     N::Settings: Clone + Send + Sync + 'static,
     S: DaStorageAdapter<Blob = Backend::DaBlob, Attestation = Backend::Attestation>
