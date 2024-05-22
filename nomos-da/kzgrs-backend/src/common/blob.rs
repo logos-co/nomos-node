@@ -1,9 +1,9 @@
 // std
+use std::io::Cursor;
 // crates
 use ark_serialize::*;
 use kzgrs::Proof;
 use nomos_core::da::blob;
-use serde::de::{self, SeqAccess, Visitor};
 use serde::ser::SerializeSeq;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use sha3::{Digest, Sha3_256};
@@ -16,28 +16,28 @@ use crate::common::Commitment;
 pub struct DaBlob {
     pub column: Column,
     #[serde(
-        serialize_with = "serialize_commitment",
-        deserialize_with = "deserialize_commitment"
+        serialize_with = "serialize_canonical",
+        deserialize_with = "deserialize_canonical"
     )]
     pub column_commitment: Commitment,
     #[serde(
-        serialize_with = "serialize_commitment",
-        deserialize_with = "deserialize_commitment"
+        serialize_with = "serialize_canonical",
+        deserialize_with = "deserialize_canonical"
     )]
     pub aggregated_column_commitment: Commitment,
     #[serde(
-        serialize_with = "serialize_proof",
-        deserialize_with = "deserialize_proof"
+        serialize_with = "serialize_canonical",
+        deserialize_with = "deserialize_canonical"
     )]
     pub aggregated_column_proof: Proof,
     #[serde(
-        serialize_with = "serialize_vec_commitment",
-        deserialize_with = "deserialize_vec_commitment"
+        serialize_with = "serialize_vec_canonical",
+        deserialize_with = "deserialize_vec_canonical"
     )]
     pub rows_commitments: Vec<Commitment>,
     #[serde(
-        serialize_with = "serialize_vec_proof",
-        deserialize_with = "deserialize_vec_proof"
+        serialize_with = "serialize_vec_canonical",
+        deserialize_with = "deserialize_vec_canonical"
     )]
     pub rows_proofs: Vec<Proof>,
 }
@@ -62,176 +62,55 @@ impl blob::Blob for DaBlob {
     }
 }
 
-fn serialize_commitment<S>(commitment: &Commitment, serializer: S) -> Result<S::Ok, S::Error>
+fn serialize_canonical<S, T>(value: &T, serializer: S) -> Result<S::Ok, S::Error>
 where
     S: Serializer,
+    T: CanonicalSerialize,
 {
     let mut bytes = Vec::new();
-    commitment
-        .serialize_with_mode(&mut bytes, Compress::Yes)
+    value
+        .serialize_compressed(&mut bytes)
         .map_err(serde::ser::Error::custom)?;
     serializer.serialize_bytes(&bytes)
 }
 
-fn deserialize_commitment<'de, D>(deserializer: D) -> Result<Commitment, D::Error>
+fn deserialize_canonical<'de, D, T>(deserializer: D) -> Result<T, D::Error>
 where
     D: Deserializer<'de>,
+    T: CanonicalDeserialize,
 {
-    struct BytesVisitor;
-
-    impl<'de> Visitor<'de> for BytesVisitor {
-        type Value = Commitment;
-
-        fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-            formatter.write_str("a byte array representing a Commitment")
-        }
-
-        fn visit_bytes<E>(self, v: &[u8]) -> Result<Self::Value, E>
-        where
-            E: de::Error,
-        {
-            let cursor = std::io::Cursor::new(v);
-            Commitment::deserialize_with_mode(cursor, Compress::Yes, Validate::Yes)
-                .map_err(de::Error::custom)
-        }
-    }
-
-    deserializer.deserialize_bytes(BytesVisitor)
+    let bytes: Vec<u8> = serde::Deserialize::deserialize(deserializer)?;
+    let mut cursor = Cursor::new(bytes);
+    T::deserialize_compressed(&mut cursor).map_err(serde::de::Error::custom)
 }
 
-fn serialize_vec_commitment<S>(commitments: &[Commitment], serializer: S) -> Result<S::Ok, S::Error>
+fn serialize_vec_canonical<S, T>(values: &[T], serializer: S) -> Result<S::Ok, S::Error>
 where
     S: Serializer,
+    T: CanonicalSerialize,
 {
-    let mut container = serializer.serialize_seq(Some(commitments.len()))?;
-    for commitment in commitments {
+    let mut container = serializer.serialize_seq(Some(values.len()))?;
+    for value in values {
         let mut bytes = Vec::new();
-        commitment
-            .serialize_with_mode(&mut bytes, ark_serialize::Compress::Yes)
+        value
+            .serialize_compressed(&mut bytes)
             .map_err(serde::ser::Error::custom)?;
         container.serialize_element(&bytes)?;
     }
     container.end()
 }
 
-fn deserialize_vec_commitment<'de, D>(deserializer: D) -> Result<Vec<Commitment>, D::Error>
+fn deserialize_vec_canonical<'de, D, T>(deserializer: D) -> Result<Vec<T>, D::Error>
 where
     D: Deserializer<'de>,
+    T: CanonicalDeserialize,
 {
-    struct VecBytesVisitor;
-
-    impl<'de> Visitor<'de> for VecBytesVisitor {
-        type Value = Vec<Commitment>;
-
-        fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-            formatter.write_str("a sequence of byte arrays representing Commitments")
-        }
-
-        fn visit_seq<V>(self, mut seq: V) -> Result<Vec<Commitment>, V::Error>
-        where
-            V: SeqAccess<'de>,
-        {
-            let mut commitments = Vec::new();
-            while let Some(bytes) = seq.next_element::<Vec<u8>>()? {
-                let cursor = std::io::Cursor::new(bytes);
-                let commitment = Commitment::deserialize_with_mode(
-                    cursor,
-                    ark_serialize::Compress::Yes,
-                    ark_serialize::Validate::Yes,
-                )
-                .map_err(de::Error::custom)?;
-                commitments.push(commitment);
-            }
-            Ok(commitments)
-        }
-    }
-
-    deserializer.deserialize_seq(VecBytesVisitor)
-}
-
-fn serialize_vec_proof<S>(proofs: &[Proof], serializer: S) -> Result<S::Ok, S::Error>
-where
-    S: Serializer,
-{
-    let mut container = serializer.serialize_seq(Some(proofs.len()))?;
-    for proof in proofs {
-        let mut bytes = Vec::new();
-        proof
-            .serialize_with_mode(&mut bytes, ark_serialize::Compress::Yes)
-            .map_err(serde::ser::Error::custom)?;
-        container.serialize_element(&bytes)?;
-    }
-    container.end()
-}
-
-fn deserialize_vec_proof<'de, D>(deserializer: D) -> Result<Vec<Proof>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    struct VecBytesVisitor;
-
-    impl<'de> Visitor<'de> for VecBytesVisitor {
-        type Value = Vec<Proof>;
-
-        fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-            formatter.write_str("a sequence of byte arrays representing Proofs")
-        }
-
-        fn visit_seq<V>(self, mut seq: V) -> Result<Vec<Proof>, V::Error>
-        where
-            V: SeqAccess<'de>,
-        {
-            let mut proofs = Vec::new();
-            while let Some(bytes) = seq.next_element::<Vec<u8>>()? {
-                let cursor = std::io::Cursor::new(bytes);
-                let proof = Proof::deserialize_with_mode(
-                    cursor,
-                    ark_serialize::Compress::Yes,
-                    ark_serialize::Validate::Yes,
-                )
-                .map_err(de::Error::custom)?;
-                proofs.push(proof);
-            }
-            Ok(proofs)
-        }
-    }
-
-    deserializer.deserialize_seq(VecBytesVisitor)
-}
-
-fn serialize_proof<S>(proof: &Proof, serializer: S) -> Result<S::Ok, S::Error>
-where
-    S: Serializer,
-{
-    let mut bytes = Vec::new();
-    proof
-        .serialize_with_mode(&mut bytes, Compress::Yes)
-        .map_err(serde::ser::Error::custom)?;
-    serializer.serialize_bytes(&bytes)
-}
-
-fn deserialize_proof<'de, D>(deserializer: D) -> Result<Proof, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    struct BytesVisitor;
-
-    impl<'de> Visitor<'de> for BytesVisitor {
-        type Value = Proof;
-
-        fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-            formatter.write_str("a byte array representing a Proof")
-        }
-
-        fn visit_bytes<E>(self, v: &[u8]) -> Result<Self::Value, E>
-        where
-            E: de::Error,
-        {
-            let cursor = std::io::Cursor::new(v);
-            Proof::deserialize_with_mode(cursor, Compress::Yes, Validate::Yes)
-                .map_err(de::Error::custom)
-        }
-    }
-
-    deserializer.deserialize_bytes(BytesVisitor)
+    let bytes_vecs: Vec<Vec<u8>> = Deserialize::deserialize(deserializer)?;
+    bytes_vecs
+        .iter()
+        .map(|bytes| {
+            let mut cursor = Cursor::new(bytes);
+            T::deserialize_compressed(&mut cursor).map_err(serde::de::Error::custom)
+        })
+        .collect()
 }
