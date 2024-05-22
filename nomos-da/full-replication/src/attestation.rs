@@ -25,7 +25,6 @@ impl Attestation {
 
 impl attestation::Attestation for Attestation {
     type Hash = [u8; 32];
-    type Attester = Voter;
 
     fn blob_hash(&self) -> Self::Hash {
         self.blob_hash
@@ -33,10 +32,6 @@ impl attestation::Attestation for Attestation {
 
     fn hash(&self) -> Self::Hash {
         hash([self.blob_hash, self.attester].concat())
-    }
-
-    fn attester(&self) -> Self::Attester {
-        self.attester
     }
 
     fn signature(&self) -> &[u8] {

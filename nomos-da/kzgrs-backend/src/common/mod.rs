@@ -6,10 +6,7 @@ use ark_serialize::CanonicalSerialize;
 use serde::{Deserialize, Serialize};
 use std::io::Cursor;
 // crates
-use blake2::{
-    digest::{Update, VariableOutput},
-    Blake2bVar,
-};
+use blake2::digest::{Update, VariableOutput};
 use sha3::{Digest, Sha3_256};
 // internal
 use kzgrs::Commitment;
@@ -169,12 +166,4 @@ pub fn commitment_to_bytes(commitment: &Commitment) -> Vec<u8> {
         .serialize_uncompressed(&mut buff)
         .expect("Serialization of commitment should work");
     buff.into_inner()
-}
-
-fn hash(item: impl AsRef<[u8]>) -> [u8; 32] {
-    let mut hasher = Blake2bVar::new(32).unwrap();
-    hasher.update(item.as_ref());
-    let mut output = [0; 32];
-    hasher.finalize_variable(&mut output).unwrap();
-    output
 }

@@ -17,16 +17,12 @@ impl MockAttestation {
 
 impl Attestation for MockAttestation {
     type Hash = Vec<u8>;
-    type Attester = [u8; 32];
 
     fn blob_hash(&self) -> Self::Hash {
         unimplemented!()
     }
     fn hash(&self) -> Self::Hash {
         vec![0u8]
-    }
-    fn attester(&self) -> Self::Attester {
-        self.voter
     }
     fn signature(&self) -> &[u8] {
         &self.signature
