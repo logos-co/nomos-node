@@ -4,7 +4,7 @@ use crate::encoder::EncodedData;
 use bitvec::prelude::*;
 use blst::min_sig::{AggregateSignature, PublicKey, Signature};
 use blst::BLST_ERROR;
-use kzgrs::Commitment;
+use kzgrs::{Commitment, KzgRsError};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Certificate {
@@ -40,36 +40,49 @@ impl Certificate {
         attestations: &[Attestation],
         signers: BitVec<u8>,
         threshold: usize,
-    ) -> Self {
-        assert!(attestations.len() >= threshold, "Not enough attestations");
-        assert_eq!(
-            attestations.len(),
-            signers.count_ones(),
-            "Mismatch between attestations and signers count"
-        );
+    ) -> Result<Self, KzgRsError> {
+        if attestations.len() < threshold {
+            return Err(KzgRsError::NotEnoughAttestations {
+                required: threshold,
+                received: attestations.len(),
+            });
+        }
+
+        if attestations.len() != signers.count_ones() {
+            return Err(KzgRsError::AttestationSignersMismatch {
+                attestations_count: attestations.len(),
+                signers_count: signers.count_ones(),
+            });
+        }
 
         let signatures: Vec<Signature> = attestations
             .iter()
-            .map(|att| {
-                Signature::from_bytes(&att.signature)
-                    .expect("Attestation should have valid bls signature")
-            })
+            .filter_map(|att| Signature::from_bytes(&att.signature).ok())
             .collect();
-        let aggregated_signatures = aggregate_signatures(signatures).expect("");
 
-        Self {
+        // Certificate will fail to be built if number of valid signatures from the attestations
+        // doesn't satisfy the same threshold used for attestations.
+        if signatures.len() < threshold {
+            return Err(KzgRsError::NotEnoughAttestations {
+                required: threshold,
+                received: signatures.len(),
+            });
+        }
+
+        let aggregated_signatures = aggregate_signatures(signatures)?;
+
+        Ok(Self {
             aggregated_signatures,
             signers,
             aggregated_column_commitment: encoded_data.aggregated_column_commitment,
             row_commitments: encoded_data.row_commitments.clone(),
-        }
+        })
     }
 }
 
 fn aggregate_signatures(signatures: Vec<Signature>) -> Result<Signature, BLST_ERROR> {
     let refs: Vec<&Signature> = signatures.iter().collect();
-    let agg_result = AggregateSignature::aggregate(&refs, true);
-    agg_result.map(|agg_sig| agg_sig.to_signature())
+    AggregateSignature::aggregate(&refs, true).map(|agg_sig| agg_sig.to_signature())
 }
 
 fn verify_aggregate_signature(
@@ -186,7 +199,8 @@ mod tests {
         }
 
         let signers = bitvec![u8, Lsb0; 1; 16];
-        let cert = Certificate::build_certificate(&encoded_data, &attestations, signers, 16);
+        let cert =
+            Certificate::build_certificate(&encoded_data, &attestations, signers, 16).unwrap();
 
         let public_keys: Vec<PublicKey> = sks.iter().map(|sk| sk.sk_to_pk()).collect();
         assert!(cert.verify(&public_keys));
