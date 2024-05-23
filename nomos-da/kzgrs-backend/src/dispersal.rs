@@ -1,10 +1,17 @@
-use crate::common::attestation::Attestation;
-use crate::common::{build_attestation_message, NOMOS_DA_DST};
-use crate::encoder::EncodedData;
+// std
+use std::hash::{Hash, Hasher};
+
+// crates
 use bitvec::prelude::*;
 use blst::min_sig::{AggregateSignature, PublicKey, Signature};
 use blst::BLST_ERROR;
 use kzgrs::{Commitment, KzgRsError};
+use nomos_core::da::certificate::metadata::Next;
+use nomos_core::da::certificate::{self, metadata};
+
+// internal
+use crate::common::{attestation::Attestation, build_attestation_message, NOMOS_DA_DST};
+use crate::encoder::EncodedData;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Certificate {
@@ -12,6 +19,7 @@ pub struct Certificate {
     signers: BitVec<u8>,
     aggregated_column_commitment: Commitment,
     row_commitments: Vec<Commitment>,
+    metadata: Metadata,
 }
 
 impl Certificate {
@@ -40,6 +48,7 @@ impl Certificate {
         attestations: &[Attestation],
         signers: BitVec<u8>,
         threshold: usize,
+        metadata: Metadata,
     ) -> Result<Self, KzgRsError> {
         if attestations.len() < threshold {
             return Err(KzgRsError::NotEnoughAttestations {
@@ -76,6 +85,7 @@ impl Certificate {
             signers,
             aggregated_column_commitment: encoded_data.aggregated_column_commitment,
             row_commitments: encoded_data.row_commitments.clone(),
+            metadata,
         })
     }
 }
@@ -94,6 +104,121 @@ fn verify_aggregate_signature(
         == aggregate_signature.aggregate_verify(true, messages, NOMOS_DA_DST, public_keys, true)
 }
 
+#[derive(Clone, Debug)]
+pub struct CertificateVerificationParameters {
+    pub nodes_public_keys: Vec<PublicKey>,
+}
+
+impl certificate::Certificate for Certificate {
+    type Signature = Signature;
+    type Id = Vec<u8>;
+    type VerificationParameters = CertificateVerificationParameters;
+
+    fn signers(&self) -> Vec<bool> {
+        self.signers.iter().map(|b| *b).collect()
+    }
+
+    fn signature(&self) -> Self::Signature {
+        self.aggregated_signatures
+    }
+
+    fn id(&self) -> Self::Id {
+        build_attestation_message(&self.aggregated_column_commitment, &self.row_commitments)
+    }
+
+    fn verify(&self, params: Self::VerificationParameters) -> bool {
+        self.verify(&params.nodes_public_keys)
+    }
+}
+
+#[derive(Copy, Clone, Default, Debug, PartialEq, Eq)]
+pub struct Index([u8; 8]);
+
+#[derive(Default, Debug, Copy, Clone, Eq, PartialEq)]
+pub struct Metadata {
+    app_id: [u8; 32],
+    index: Index,
+}
+
+impl Metadata {
+    pub fn size(&self) -> usize {
+        std::mem::size_of_val(&self.app_id) + std::mem::size_of_val(&self.index)
+    }
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct VidCertificate {
+    id: Vec<u8>,
+    metadata: Metadata,
+}
+
+impl certificate::vid::VidCertificate for VidCertificate {
+    type CertificateId = Vec<u8>;
+
+    fn certificate_id(&self) -> Self::CertificateId {
+        self.id.clone()
+    }
+
+    fn size(&self) -> usize {
+        std::mem::size_of_val(&self.id) + self.metadata.size()
+    }
+}
+
+impl metadata::Metadata for VidCertificate {
+    type AppId = [u8; 32];
+    type Index = Index;
+
+    fn metadata(&self) -> (Self::AppId, Self::Index) {
+        (self.metadata.app_id, self.metadata.index)
+    }
+}
+
+impl Hash for VidCertificate {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        state.write(
+            <VidCertificate as certificate::vid::VidCertificate>::certificate_id(self).as_ref(),
+        );
+    }
+}
+
+impl From<Certificate> for VidCertificate {
+    fn from(cert: Certificate) -> Self {
+        Self {
+            id: cert.id(),
+            metadata: cert.metadata,
+        }
+    }
+}
+
+impl metadata::Metadata for Certificate {
+    type AppId = [u8; 32];
+    type Index = Index;
+
+    fn metadata(&self) -> (Self::AppId, Self::Index) {
+        (self.metadata.app_id, self.metadata.index)
+    }
+}
+
+impl From<u64> for Index {
+    fn from(value: u64) -> Self {
+        Self(value.to_be_bytes())
+    }
+}
+
+impl Next for Index {
+    fn next(self) -> Self {
+        let num = u64::from_be_bytes(self.0);
+        let incremented_num = num.wrapping_add(1);
+        Self(incremented_num.to_be_bytes())
+    }
+}
+
+impl AsRef<[u8]> for Index {
+    fn as_ref(&self) -> &[u8] {
+        self.0.as_ref()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use bitvec::prelude::*;
@@ -102,7 +227,7 @@ mod tests {
 
     use crate::{
         common::{blob::DaBlob, NOMOS_DA_DST},
-        dispersal::{aggregate_signatures, verify_aggregate_signature},
+        dispersal::{aggregate_signatures, verify_aggregate_signature, Metadata},
         encoder::test::{rand_data, ENCODER},
         verifier::DaVerifier,
     };
@@ -199,8 +324,14 @@ mod tests {
         }
 
         let signers = bitvec![u8, Lsb0; 1; 16];
-        let cert =
-            Certificate::build_certificate(&encoded_data, &attestations, signers, 16).unwrap();
+        let cert = Certificate::build_certificate(
+            &encoded_data,
+            &attestations,
+            signers,
+            16,
+            Metadata::default(),
+        )
+        .unwrap();
 
         let public_keys: Vec<PublicKey> = sks.iter().map(|sk| sk.sk_to_pk()).collect();
         assert!(cert.verify(&public_keys));
