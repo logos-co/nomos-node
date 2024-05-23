@@ -6,7 +6,6 @@ use nomos_core::da::certificate::metadata::Next;
 use nomos_core::da::certificate::CertificateStrategy;
 // internal
 use nomos_core::da::certificate::{self, metadata};
-use std::cmp::Ordering;
 // std
 use std::collections::HashSet;
 use std::hash::{Hash, Hasher};
@@ -18,7 +17,7 @@ use blake2::{
 use bytes::Bytes;
 use serde::{Deserialize, Serialize};
 
-#[derive(Copy, Clone, Default, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Copy, Clone, Default, Debug, PartialEq, PartialOrd, Ord, Eq, Serialize, Deserialize)]
 pub struct Index([u8; 8]);
 
 /// Re-export the types for OpenAPI
@@ -227,18 +226,6 @@ impl Next for Index {
 impl AsRef<[u8]> for Index {
     fn as_ref(&self) -> &[u8] {
         self.0.as_ref()
-    }
-}
-
-impl PartialOrd for Index {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl Ord for Index {
-    fn cmp(&self, other: &Self) -> Ordering {
-        self.0.cmp(&other.0)
     }
 }
 

@@ -131,7 +131,7 @@ impl certificate::Certificate for Certificate {
     }
 }
 
-#[derive(Copy, Clone, Default, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Default, Debug, Ord, PartialOrd, PartialEq, Eq)]
 pub struct Index([u8; 8]);
 
 #[derive(Default, Debug, Copy, Clone, Eq, PartialEq)]
