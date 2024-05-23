@@ -9,6 +9,7 @@ edition = "2021"
 ark-ff = "0.4"
 ark-serialize = "0.4.2"
 ark-poly = "0.4.2"
+bitvec = "1.0.1"
 blake2 = "0.10"
 blst = { version = "0.3.11", features = ["serde"] }
 itertools = "0.12"
