@@ -32,7 +32,7 @@ where
 impl<A, B, S> DaStorageAdapter for RocksAdapter<A, B, S>
 where
     A: Attestation + Serialize + DeserializeOwned + Clone + Send + Sync,
-    B: Blob + AsRef<[u8]> + Clone + Send + Sync + 'static,
+    B: Blob + Serialize + Clone + Send + Sync + 'static,
     B::BlobId: AsRef<[u8]> + Send + Sync + 'static,
     S: StorageSerde + Send + Sync + 'static,
 {
@@ -58,10 +58,12 @@ where
         blob: &Self::Blob,
         attestation: &Self::Attestation,
     ) -> Result<(), DynError> {
+        let blob_bytes = S::serialize(blob);
+
         write_blob(
             self.settings.blob_storage_directory.clone(),
             blob.id().as_ref(),
-            blob.as_ref(),
+            &blob_bytes,
         )
         .await?;
 

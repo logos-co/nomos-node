@@ -1,11 +1,7 @@
-use nomos_core::da::attestation;
+use nomos_core::da::{attestation, Signer};
 use serde::{Deserialize, Serialize};
 
 use crate::{hash, Voter};
-
-pub trait Signer {
-    fn sign(&self, message: &[u8]) -> Vec<u8>;
-}
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, PartialOrd, Ord)]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
@@ -29,7 +25,6 @@ impl Attestation {
 
 impl attestation::Attestation for Attestation {
     type Hash = [u8; 32];
-    type Attester = Voter;
 
     fn blob_hash(&self) -> Self::Hash {
         self.blob_hash
@@ -37,10 +32,6 @@ impl attestation::Attestation for Attestation {
 
     fn hash(&self) -> Self::Hash {
         hash([self.blob_hash, self.attester].concat())
-    }
-
-    fn attester(&self) -> Self::Attester {
-        self.attester
     }
 
     fn signature(&self) -> &[u8] {

@@ -25,3 +25,7 @@ pub trait DaDispersal {
 
     fn disperse(&self, encoded_data: Self::EncodedData) -> Result<Self::Certificate, impl Error>;
 }
+
+pub trait Signer {
+    fn sign(&self, message: &[u8]) -> Vec<u8>;
+}
