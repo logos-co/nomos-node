@@ -10,6 +10,7 @@ use kzgrs::{
 };
 
 use crate::common::blob::DaBlob;
+use crate::common::NOMOS_DA_DST;
 // internal
 use crate::common::{
     attestation::Attestation, build_attestation_message, hash_column_and_commitment, Chunk, Column,
@@ -108,7 +109,7 @@ impl DaVerifier {
     fn build_attestation(&self, blob: &DaBlob) -> Attestation {
         let message =
             build_attestation_message(&blob.aggregated_column_commitment, &blob.rows_commitments);
-        let signature = self.sk.sign(&message, b"", b"");
+        let signature = self.sk.sign(&message, NOMOS_DA_DST, b"");
 
         let blob_id = blob.id();
         let blob_hash: [u8; 32] = blob_id

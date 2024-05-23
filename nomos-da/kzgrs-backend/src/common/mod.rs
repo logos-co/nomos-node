@@ -18,6 +18,8 @@ pub struct Row(pub Vec<Chunk>);
 pub struct Column(pub Vec<Chunk>);
 pub struct ChunksMatrix(pub Vec<Row>);
 
+pub const NOMOS_DA_DST: &[u8] = b"NOMOS_DA_AVAIL";
+
 impl Chunk {
     pub fn len(&self) -> usize {
         self.0.len()

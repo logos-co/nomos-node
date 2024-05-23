@@ -1,5 +1,5 @@
 use crate::common::attestation::Attestation;
-use crate::common::build_attestation_message;
+use crate::common::{build_attestation_message, NOMOS_DA_DST};
 use crate::encoder::EncodedData;
 use bitvec::prelude::*;
 use blst::min_sig::{AggregateSignature, PublicKey, Signature};
@@ -78,7 +78,7 @@ fn verify_aggregate_signature(
     messages: &[&[u8]],
 ) -> bool {
     BLST_ERROR::BLST_SUCCESS
-        == aggregate_signature.aggregate_verify(true, messages, &[], public_keys, true)
+        == aggregate_signature.aggregate_verify(true, messages, NOMOS_DA_DST, public_keys, true)
 }
 
 #[cfg(test)]
@@ -88,7 +88,7 @@ mod tests {
     use rand::{rngs::OsRng, thread_rng, Rng, RngCore};
 
     use crate::{
-        common::blob::DaBlob,
+        common::{blob::DaBlob, NOMOS_DA_DST},
         dispersal::{aggregate_signatures, verify_aggregate_signature},
         encoder::test::{rand_data, ENCODER},
         verifier::DaVerifier,
@@ -111,9 +111,9 @@ mod tests {
         let (pk3, sk3) = generate_keys();
 
         let message = b"Test message";
-        let sig1 = sk1.sign(message, &[], &[]);
-        let sig2 = sk2.sign(message, &[], &[]);
-        let sig3 = sk3.sign(message, &[], &[]);
+        let sig1 = sk1.sign(message, NOMOS_DA_DST, &[]);
+        let sig2 = sk2.sign(message, NOMOS_DA_DST, &[]);
+        let sig3 = sk3.sign(message, NOMOS_DA_DST, &[]);
 
         let aggregated_signature = aggregate_signatures(vec![sig1, sig2, sig3]).unwrap();
 
@@ -131,9 +131,9 @@ mod tests {
         let (_, sk3) = generate_keys(); // Wrong secret key for pk2
 
         let message = b"Test message";
-        let sig1 = sk1.sign(message, &[], &[]);
-        let sig2 = sk2.sign(message, &[], &[]);
-        let sig3 = sk3.sign(message, &[], &[]);
+        let sig1 = sk1.sign(message, NOMOS_DA_DST, &[]);
+        let sig2 = sk2.sign(message, NOMOS_DA_DST, &[]);
+        let sig3 = sk3.sign(message, NOMOS_DA_DST, &[]);
 
         let aggregated_signature = aggregate_signatures(vec![sig1, sig2, sig3]).unwrap();
 
