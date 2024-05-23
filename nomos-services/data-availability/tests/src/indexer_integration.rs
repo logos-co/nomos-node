@@ -4,95 +4,34 @@ use std::sync::atomic::Ordering::SeqCst;
 use std::sync::Arc;
 use std::time::Duration;
 
-use crate::consensus::adapters::cryptarchia::CryptarchiaConsensusAdapter;
-use crate::storage::adapters::rocksdb::{RocksAdapter, RocksAdapterSettings};
-use crate::{DataIndexerService, IndexerSettings};
 use bytes::Bytes;
 use cryptarchia_consensus::TimeConfig;
 use cryptarchia_ledger::{Coin, LedgerState};
-use full_replication::attestation::{Attestation, Signer};
+use full_replication::attestation::Attestation;
 use full_replication::{Certificate, VidCertificate};
 use nomos_core::da::certificate::vid::VidCertificate as _;
+use nomos_core::da::certificate::Certificate as _;
 use nomos_core::da::certificate::CertificateStrategy;
-use nomos_core::{da::certificate, header::HeaderId, tx::Transaction};
+use nomos_core::da::Signer;
+use nomos_core::{da::certificate, tx::Transaction};
+use nomos_da_indexer::storage::adapters::rocksdb::RocksAdapterSettings;
+use nomos_da_indexer::IndexerSettings;
 use nomos_da_storage::fs::write_blob;
-use nomos_libp2p::{Multiaddr, Swarm, SwarmConfig};
-use nomos_mempool::da::verify::fullreplication::DaVerificationProvider as MempoolVerificationProvider;
-use nomos_mempool::network::adapters::libp2p::Libp2pAdapter as MempoolNetworkAdapter;
+use nomos_libp2p::{Multiaddr, SwarmConfig};
 use nomos_mempool::network::adapters::libp2p::Settings as AdapterSettings;
-use nomos_mempool::{backend::mockpool::MockPool, TxMempoolService};
 use nomos_mempool::{DaMempoolSettings, TxMempoolSettings};
 use nomos_network::backends::libp2p::{Libp2p as NetworkBackend, Libp2pConfig};
-use nomos_storage::{backends::rocksdb::RocksBackend, StorageService};
-use rand::{thread_rng, Rng};
-
-use nomos_core::da::certificate::Certificate as _;
-pub use nomos_core::{
-    da::certificate::select::FillSize as FillSizeWithBlobsCertificate,
-    tx::select::FillSize as FillSizeWithTx,
-};
-use nomos_mempool::da::service::DaMempoolService;
 use nomos_network::{NetworkConfig, NetworkService};
 use nomos_node::{Tx, Wire};
+use nomos_storage::{backends::rocksdb::RocksBackend, StorageService};
 use overwatch_derive::*;
 use overwatch_rs::overwatch::{Overwatch, OverwatchRunner};
 use overwatch_rs::services::handle::ServiceHandle;
+use rand::{thread_rng, Rng};
 use tempfile::{NamedTempFile, TempDir};
 use time::OffsetDateTime;
 
-const MB16: usize = 1024 * 1024 * 16;
-
-pub type Cryptarchia = cryptarchia_consensus::CryptarchiaConsensus<
-    cryptarchia_consensus::network::adapters::libp2p::LibP2pAdapter<Tx, VidCertificate>,
-    MockPool<HeaderId, Tx, <Tx as Transaction>::Hash>,
-    MempoolNetworkAdapter<Tx, <Tx as Transaction>::Hash>,
-    MockPool<
-        HeaderId,
-        VidCertificate,
-        <VidCertificate as certificate::vid::VidCertificate>::CertificateId,
-    >,
-    MempoolNetworkAdapter<Certificate, <Certificate as certificate::Certificate>::Id>,
-    MempoolVerificationProvider,
-    FillSizeWithTx<MB16, Tx>,
-    FillSizeWithBlobsCertificate<MB16, VidCertificate>,
-    RocksBackend<Wire>,
->;
-
-pub type DaIndexer = DataIndexerService<
-    // Indexer specific.
-    Bytes,
-    RocksAdapter<Wire, full_replication::VidCertificate>,
-    CryptarchiaConsensusAdapter<Tx, full_replication::VidCertificate>,
-    // Cryptarchia specific, should be the same as in `Cryptarchia` type above.
-    cryptarchia_consensus::network::adapters::libp2p::LibP2pAdapter<Tx, VidCertificate>,
-    MockPool<HeaderId, Tx, <Tx as Transaction>::Hash>,
-    MempoolNetworkAdapter<Tx, <Tx as Transaction>::Hash>,
-    MockPool<
-        HeaderId,
-        VidCertificate,
-        <VidCertificate as certificate::vid::VidCertificate>::CertificateId,
-    >,
-    MempoolNetworkAdapter<Certificate, <Certificate as certificate::Certificate>::Id>,
-    MempoolVerificationProvider,
-    FillSizeWithTx<MB16, Tx>,
-    FillSizeWithBlobsCertificate<MB16, VidCertificate>,
-    RocksBackend<Wire>,
->;
-
-pub type TxMempool = TxMempoolService<
-    MempoolNetworkAdapter<Tx, <Tx as Transaction>::Hash>,
-    MockPool<HeaderId, Tx, <Tx as Transaction>::Hash>,
->;
-
-pub type DaMempool = DaMempoolService<
-    MempoolNetworkAdapter<Certificate, <Certificate as certificate::Certificate>::Id>,
-    MockPool<
-        HeaderId,
-        VidCertificate,
-        <VidCertificate as certificate::vid::VidCertificate>::CertificateId,
-    >,
-    MempoolVerificationProvider,
->;
+use crate::common::*;
 
 #[derive(Services)]
 struct IndexerNode {
@@ -294,7 +233,7 @@ fn test_indexer() {
         // Request range of vids from indexer.
         let (indexer_tx, indexer_rx) = tokio::sync::oneshot::channel();
         indexer_outbound
-            .send(crate::DaMsg::GetRange {
+            .send(nomos_da_indexer::DaMsg::GetRange {
                 app_id,
                 range,
                 reply_channel: indexer_tx,
@@ -328,8 +267,4 @@ impl Signer for MockKeyPair {
     fn sign(&self, _message: &[u8]) -> Vec<u8> {
         vec![]
     }
-}
-
-fn node_address(config: &SwarmConfig) -> Multiaddr {
-    Swarm::multiaddr(std::net::Ipv4Addr::new(127, 0, 0, 1), config.port)
 }

@@ -1,15 +1,17 @@
 // std
 use std::ops::Div;
+
 // crates
 use ark_ff::{BigInteger, PrimeField};
-// internal
-use crate::common::{hash_column_and_commitment, Chunk, ChunksMatrix, Row};
-use crate::global::{DOMAIN, GLOBAL_PARAMETERS};
 use kzgrs::common::bytes_to_polynomial_unchecked;
 use kzgrs::{
     bytes_to_polynomial, commit_polynomial, encode, generate_element_proof, Commitment,
     Evaluations, KzgRsError, Polynomial, Proof, BYTES_PER_FIELD_ELEMENT,
 };
+
+// internal
+use crate::common::{hash_column_and_commitment, Chunk, ChunksMatrix, Row};
+use crate::global::{DOMAIN, GLOBAL_PARAMETERS};
 
 #[derive(Copy, Clone)]
 pub struct DaEncoderParams {
