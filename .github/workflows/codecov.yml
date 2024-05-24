@@ -10,7 +10,7 @@ name: Codecov
 
 jobs:
   test:
-    name: Test
+    name: Test with Coverage
     env:
       RUSTFLAGS: -C instrument-coverage
     runs-on: ubuntu-latest
