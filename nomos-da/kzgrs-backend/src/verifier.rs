@@ -10,6 +10,7 @@ use kzgrs::{
 };
 
 use crate::common::blob::DaBlob;
+use crate::common::NOMOS_DA_DST;
 // internal
 use crate::common::{
     attestation::Attestation, build_attestation_message, hash_column_and_commitment, Chunk, Column,
@@ -19,8 +20,8 @@ use crate::global::{DOMAIN, GLOBAL_PARAMETERS};
 
 pub struct DaVerifier {
     // TODO: substitute this for an abstraction to sign things over
-    sk: SecretKey,
-    index: usize,
+    pub sk: SecretKey,
+    pub index: usize,
 }
 
 impl DaVerifier {
@@ -108,7 +109,7 @@ impl DaVerifier {
     fn build_attestation(&self, blob: &DaBlob) -> Attestation {
         let message =
             build_attestation_message(&blob.aggregated_column_commitment, &blob.rows_commitments);
-        let signature = self.sk.sign(&message, b"", b"");
+        let signature = self.sk.sign(&message, NOMOS_DA_DST, b"");
 
         let blob_id = blob.id();
         let blob_hash: [u8; 32] = blob_id
@@ -148,11 +149,12 @@ impl DaVerifier {
 
 #[cfg(test)]
 mod test {
+    use crate::common::blob::DaBlob;
     use crate::common::{hash_column_and_commitment, Chunk, Column};
     use crate::encoder::test::{rand_data, ENCODER};
     use crate::encoder::DaEncoderParams;
     use crate::global::{DOMAIN, GLOBAL_PARAMETERS};
-    use crate::verifier::{DaBlob, DaVerifier};
+    use crate::verifier::DaVerifier;
     use blst::min_sig::SecretKey;
     use kzgrs::{
         bytes_to_polynomial, commit_polynomial, generate_element_proof, BYTES_PER_FIELD_ELEMENT,

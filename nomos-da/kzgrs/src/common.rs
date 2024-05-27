@@ -1,3 +1,5 @@
+use std::fmt;
+
 // std
 // crates
 use crate::{FieldElement, BYTES_PER_FIELD_ELEMENT};
@@ -6,9 +8,34 @@ use ark_ff::Zero;
 use ark_poly::domain::general::GeneralEvaluationDomain;
 use ark_poly::evaluations::univariate::Evaluations;
 use ark_poly::univariate::DensePolynomial;
+use blst::BLST_ERROR;
 use num_bigint::BigUint;
 use thiserror::Error;
 // internal
+
+#[derive(Error, Debug)]
+pub struct BlstError(pub BLST_ERROR);
+
+impl fmt::Display for BlstError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self.0 {
+            BLST_ERROR::BLST_SUCCESS => write!(f, "Operation successful"),
+            BLST_ERROR::BLST_BAD_ENCODING => write!(f, "Bad encoding"),
+            BLST_ERROR::BLST_POINT_NOT_ON_CURVE => write!(f, "Point not on curve"),
+            BLST_ERROR::BLST_POINT_NOT_IN_GROUP => write!(f, "Point not in group"),
+            BLST_ERROR::BLST_AGGR_TYPE_MISMATCH => write!(f, "Aggregate type mismatch"),
+            BLST_ERROR::BLST_VERIFY_FAIL => write!(f, "Verification failed"),
+            BLST_ERROR::BLST_PK_IS_INFINITY => write!(f, "Public key is infinity"),
+            BLST_ERROR::BLST_BAD_SCALAR => write!(f, "Bad scalar value"),
+        }
+    }
+}
+
+impl From<BLST_ERROR> for KzgRsError {
+    fn from(err: BLST_ERROR) -> Self {
+        KzgRsError::BlstError(BlstError(err))
+    }
+}
 
 #[derive(Error, Debug)]
 pub enum KzgRsError {
@@ -19,8 +46,17 @@ pub enum KzgRsError {
     },
     #[error("ChunkSize should be <= 32 (bytes), got {0}")]
     ChunkSizeTooBig(usize),
+    #[error("Not enough attestations, required {required} but received {received}")]
+    NotEnoughAttestations { required: usize, received: usize },
+    #[error("Mismatch between number of attestations ({attestations_count}) and number of signers ({signers_count})")]
+    AttestationSignersMismatch {
+        attestations_count: usize,
+        signers_count: usize,
+    },
     #[error(transparent)]
     PolyCommitError(#[from] ark_poly_commit::Error),
+    #[error("BLST error: {0}")]
+    BlstError(BlstError),
 }
 
 /// Transform chunks of bytes (of size `CHUNK_SIZE`) into `Fr` which are considered evaluations of a
