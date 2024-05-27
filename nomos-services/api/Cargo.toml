@@ -9,11 +9,14 @@ axum = ["dep:axum", "dep:hyper", "dep:tower-http", "utoipa-swagger-ui/axum"]
 
 [dependencies]
 async-trait = "0.1"
+bytes = "1.2"
 overwatch-rs = { git = "https://github.com/logos-co/Overwatch", rev = "2f70806" }
 overwatch-derive = { git = "https://github.com/logos-co/Overwatch", rev = "ac28d01" }
 tracing = "0.1"
 nomos-core = { path = "../../nomos-core" }
 cryptarchia-consensus = { path = "../cryptarchia-consensus" }
+nomos-da-indexer = { path = "../data-availability/indexer", features = ["rocksdb-backend"] }
+nomos-da-verifier = { path = "../data-availability/verifier", features = ["rocksdb-backend", "libp2p"] }
 nomos-network = { path = "../../nomos-services/network" }
 nomos-mempool = { path = "../../nomos-services/mempool", features = [
   "mock",
