@@ -226,9 +226,12 @@ mod tests {
     use rand::{rngs::OsRng, thread_rng, Rng, RngCore};
 
     use crate::{
-        common::{blob::DaBlob, NOMOS_DA_DST},
+        common::{attestation::Attestation, blob::DaBlob, NOMOS_DA_DST},
         dispersal::{aggregate_signatures, verify_aggregate_signature, Metadata},
-        encoder::test::{rand_data, ENCODER},
+        encoder::{
+            test::{rand_data, ENCODER},
+            EncodedData,
+        },
         verifier::DaVerifier,
     };
 
@@ -240,6 +243,30 @@ mod tests {
         let sk = SecretKey::key_gen(&sk_bytes, &[]).unwrap();
         let pk = sk.sk_to_pk();
         (pk, sk)
+    }
+
+    fn attest_encoded_data(
+        encoded_data: &EncodedData,
+        verifiers: &[DaVerifier],
+    ) -> Vec<Attestation> {
+        let mut attestations = Vec::new();
+        for (i, column) in encoded_data.extended_data.columns().enumerate() {
+            let verifier = &verifiers[i];
+            let da_blob = DaBlob {
+                column,
+                column_commitment: encoded_data.column_commitments[i],
+                aggregated_column_commitment: encoded_data.aggregated_column_commitment,
+                aggregated_column_proof: encoded_data.aggregated_column_proofs[i],
+                rows_commitments: encoded_data.row_commitments.clone(),
+                rows_proofs: encoded_data
+                    .rows_proofs
+                    .iter()
+                    .map(|proofs| proofs.get(i).cloned().unwrap())
+                    .collect(),
+            };
+            attestations.push(verifier.verify(da_blob).unwrap());
+        }
+        attestations
     }
 
     #[test]
@@ -266,7 +293,7 @@ mod tests {
     fn test_invalid_signature_aggregation() {
         let (pk1, sk1) = generate_keys();
         let (pk2, sk2) = generate_keys();
-        let (_, sk3) = generate_keys(); // Wrong secret key for pk2
+        let (_, sk3) = generate_keys();
 
         let message = b"Test message";
         let sig1 = sk1.sign(message, NOMOS_DA_DST, &[]);
@@ -275,21 +302,26 @@ mod tests {
 
         let aggregated_signature = aggregate_signatures(vec![sig1, sig2, sig3]).unwrap();
 
-        let public_keys = vec![&pk1, &pk2, &pk2]; // Wrong public key for the third signature
+        let (wrong_pk3, _) = generate_keys(); // Generate another key pair for the "wrong" public key
+
+        let public_keys = vec![&pk1, &pk2, &wrong_pk3]; // Incorrect public key for sig3 to demonstrate failure.
         let messages = vec![message.as_ref(), message.as_ref(), message.as_ref()];
         let result = verify_aggregate_signature(&aggregated_signature, &public_keys, &messages);
 
         assert!(
             !result,
-            "Aggregated signature with an invalid signature should not be valid."
+            "Aggregated signature with a mismatched public key should not be valid."
         );
     }
 
     #[test]
     fn test_encoded_data_verification() {
+        const THRESHOLD: usize = 16;
+
         let encoder = &ENCODER;
         let data = rand_data(8);
         let mut rng = thread_rng();
+
         let sks: Vec<SecretKey> = (0..16)
             .map(|_| {
                 let mut buff = [0u8; 32];
@@ -297,43 +329,120 @@ mod tests {
                 SecretKey::key_gen(&buff, &[]).unwrap()
             })
             .collect();
+
         let verifiers: Vec<DaVerifier> = sks
             .clone()
             .into_iter()
             .enumerate()
             .map(|(index, sk)| DaVerifier { sk, index })
             .collect();
+
         let encoded_data = encoder.encode(&data).unwrap();
 
-        let mut attestations = vec![];
-        for (i, column) in encoded_data.extended_data.columns().enumerate() {
-            let verifier = &verifiers[i];
-            let da_blob = DaBlob {
-                column,
-                column_commitment: encoded_data.column_commitments[i],
-                aggregated_column_commitment: encoded_data.aggregated_column_commitment,
-                aggregated_column_proof: encoded_data.aggregated_column_proofs[i],
-                rows_commitments: encoded_data.row_commitments.clone(),
-                rows_proofs: encoded_data
-                    .rows_proofs
-                    .iter()
-                    .map(|proofs| proofs.get(i).cloned().unwrap())
-                    .collect(),
-            };
-            attestations.push(verifier.verify(da_blob).unwrap());
-        }
+        let attestations = attest_encoded_data(&encoded_data, &verifiers);
 
         let signers = bitvec![u8, Lsb0; 1; 16];
         let cert = Certificate::build_certificate(
             &encoded_data,
             &attestations,
             signers,
-            16,
+            THRESHOLD,
             Metadata::default(),
         )
         .unwrap();
 
         let public_keys: Vec<PublicKey> = sks.iter().map(|sk| sk.sk_to_pk()).collect();
         assert!(cert.verify(&public_keys));
+    }
+
+    #[test]
+    fn test_encoded_data_insufficient_verification() {
+        const THRESHOLD: usize = 16;
+
+        let encoder = &ENCODER;
+        let data = rand_data(8);
+        let mut rng = thread_rng();
+
+        let sks: Vec<SecretKey> = (0..16)
+            .map(|_| {
+                let mut buff = [0u8; 32];
+                rng.fill_bytes(&mut buff);
+                SecretKey::key_gen(&buff, &[]).unwrap()
+            })
+            .collect();
+
+        let verifiers: Vec<DaVerifier> = sks
+            .clone()
+            .into_iter()
+            .enumerate()
+            .map(|(index, sk)| DaVerifier { sk, index })
+            .collect();
+
+        let encoded_data = encoder.encode(&data).unwrap();
+
+        let mut attestations = attest_encoded_data(&encoded_data, &verifiers);
+
+        // Imitate missing attestation.
+        attestations.pop();
+
+        let signers = bitvec![u8, Lsb0; 1; 16];
+        let cert_result = Certificate::build_certificate(
+            &encoded_data,
+            &attestations,
+            signers,
+            THRESHOLD,
+            Metadata::default(),
+        );
+
+        // Certificate won't be created because of not reaching required threshold.
+        assert!(cert_result.is_err());
+    }
+
+    #[test]
+    fn test_encoded_data_wrong_pk_verification() {
+        const THRESHOLD: usize = 16;
+
+        let encoder = &ENCODER;
+        let data = rand_data(8);
+        let mut rng = thread_rng();
+
+        let sks: Vec<SecretKey> = (0..16)
+            .map(|_| {
+                let mut buff = [0u8; 32];
+                rng.fill_bytes(&mut buff);
+                SecretKey::key_gen(&buff, &[]).unwrap()
+            })
+            .collect();
+
+        let verifiers: Vec<DaVerifier> = sks
+            .clone()
+            .into_iter()
+            .enumerate()
+            .map(|(index, sk)| DaVerifier { sk, index })
+            .collect();
+
+        let encoded_data = encoder.encode(&data).unwrap();
+
+        let attestations = attest_encoded_data(&encoded_data, &verifiers);
+
+        let signers = bitvec![u8, Lsb0; 1; 16];
+        let cert = Certificate::build_certificate(
+            &encoded_data,
+            &attestations,
+            signers,
+            THRESHOLD,
+            Metadata::default(),
+        )
+        .unwrap();
+
+        let mut public_keys: Vec<PublicKey> = sks.iter().map(|sk| sk.sk_to_pk()).collect();
+
+        // Imitate different set of public keys on the verifier side.
+        let (wrong_pk, _) = generate_keys();
+        public_keys.pop();
+        public_keys.push(wrong_pk);
+
+        // Certificate should fail to be verified.
+        assert!(!cert.verify(&public_keys));
     }
 }
