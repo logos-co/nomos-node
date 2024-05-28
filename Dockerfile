@@ -1,17 +1,13 @@
 # BUILD IMAGE ---------------------------------------------------------
 
-FROM rust:1.76.0-slim-bullseye AS builder
-
-# Using backports for go 1.19
-RUN echo 'deb http://deb.debian.org/debian bullseye-backports main' \
-    >> /etc/apt/sources.list
-
-# Dependecies for publishing documentation.
-RUN apt-get update && apt-get install -yq \
-    git clang 
+FROM rust:1.78.0-slim-bullseye AS builder
 
 WORKDIR /nomos
 COPY . . 
+
+# Install dependencies needed for building RocksDB.
+RUN apt-get update && apt-get install -yq \
+    git clang libssl-dev pkg-config
 
 RUN cargo build --release -p nomos-node
 
