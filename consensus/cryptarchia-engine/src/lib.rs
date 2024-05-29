@@ -21,6 +21,7 @@ pub struct Branches<Id> {
     tips: HashSet<Id>,
 }
 
+#[derive(PartialEq)]
 #[derive(Clone, Debug)]
 pub struct Branch<Id> {
     id: Id,
@@ -220,7 +221,7 @@ where
 
 #[cfg(test)]
 pub mod tests {
-    use super::Cryptarchia;
+    use super::{Cryptarchia};
     use crate::Config;
     use std::hash::{DefaultHasher, Hash, Hasher};
 
@@ -319,5 +320,37 @@ pub mod tests {
         let mut res = [0; 32];
         res[..8].copy_from_slice(&hash.to_be_bytes());
         res
+    }
+
+    #[test]
+    fn test_getters() {
+        let engine = Cryptarchia::from_genesis([0; 32], config());
+        let parent = engine.genesis();
+
+        // Get branch directly from HashMap
+        let branch1 = engine.branches.get(&parent).ok_or("At least one branch should be there");
+
+        let branches = engine.branches();
+
+        // Get branch using getter
+        let branch2 = branches.get(&parent).ok_or("At least one branch should be there");
+
+        assert_eq!(branch1, branch2);
+
+        let b1_id = branch1.expect("id").id();
+        let b2_id = branch2.expect("id").id();
+        assert_eq!(b1_id, b2_id);
+
+        let b1_parent_id = branch1.expect("parent").parent();
+        let b2_parent_id = branch2.expect("parent").parent();
+        assert_eq!(b1_parent_id, b2_parent_id);
+
+        let b1_slot = branch1.expect("slot").slot();
+        let b2_slot = branch2.expect("slot").slot();
+        assert_eq!(b1_slot, b2_slot);
+
+        let b1_length = branch1.expect("length").length();
+        let b2_length = branch2.expect("length").length();
+        assert_eq!(b1_length, b2_length);
     }
 }
