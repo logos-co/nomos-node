@@ -2,19 +2,45 @@ log:
   backend: "Stdout"
   format: "Json"
   level: "info"
-consensus:
-  private_key: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-  fountain_settings: null
-  overlay_settings:
-    nodes: []
-    number_of_committees: 1
-    current_leader: "0x0000000000000000000000000000000000000000000000000000000000000000"
-    leader:
-      cur: 0
-    committee_membership: !Sad
-      entropy: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-    leader_super_majority_threshold: 1
-    super_majority_threshold: 1
+
+cryptarchia:
+  config:
+    epoch_stake_distribution_stabilization: 3
+    epoch_period_nonce_buffer: 3
+    epoch_period_nonce_stabilization: 4
+    consensus_config:
+      security_param: 10
+      active_slot_coeff: 0.9
+  time:
+    slot_duration:
+      secs: 5
+      nanos: 0
+    chain_start_time: [2024, 115, 6, 45, 44, 159214915, 0, 0, 0]
+  coins:
+  genesis_state:
+    lead_commitments:
+    - 20345e93cc65057a391893cbd88d86568efd3073156564797e4a912e4ae1c3ab
+    - 1594ef82f13d0b64284a9134f2f2ed3b30bca26812a69886a3f9ed737f117bd5
+    - 76721421649fbf175aff27470e40f44ade69bac844abcf27215f5c0d79d2ec46
+    - 06f7f2078ba6b24af7c5aae6f24889f6c609195ad796fb11b42ad6e0a3f8c10f
+    spend_commitments:
+    - 20345e93cc65057a391893cbd88d86568efd3073156564797e4a912e4ae1c3ab
+    - 1594ef82f13d0b64284a9134f2f2ed3b30bca26812a69886a3f9ed737f117bd5
+    - 76721421649fbf175aff27470e40f44ade69bac844abcf27215f5c0d79d2ec46
+    - 06f7f2078ba6b24af7c5aae6f24889f6c609195ad796fb11b42ad6e0a3f8c10f
+    nullifiers: []
+    nonce: '0000000000000000000000000000000000000000000000000000000000000000'
+    slot: 0
+    next_epoch_state:
+      epoch: 1
+      nonce: '0000000000000000000000000000000000000000000000000000000000000000'
+      commitments: []
+      total_stake: 4
+    epoch_state:
+      epoch: 0
+      nonce: '0000000000000000000000000000000000000000000000000000000000000000'
+      commitments: []
+      total_stake: 4
 
 network:
   backend:
