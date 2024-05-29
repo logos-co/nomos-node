@@ -8,6 +8,7 @@ use crate::DataAvailability;
 use crate::{Tx, Wire, MB16};
 use clap::{Parser, ValueEnum};
 use color_eyre::eyre::{eyre, Result};
+use cryptarchia_ledger::Coin;
 use hex::FromHex;
 use nomos_api::ApiService;
 use nomos_libp2p::{secp256k1::SecretKey, Multiaddr};
@@ -83,6 +84,27 @@ pub struct CryptarchiaArgs {
 
     #[clap(long = "consensus-slot-duration", env = "CONSENSUS_SLOT_DURATION")]
     slot_duration: Option<u64>,
+
+    #[clap(
+        long = "consensus-coin-sk",
+        env = "CONSENSUS_COIN_SK",
+        requires("coin_nonce")
+    )]
+    coin_secret_key: Option<String>,
+
+    #[clap(
+        long = "consensus-coin-nonce",
+        env = "CONSENSUS_COIN_NONCE",
+        requires("coin_secret_key")
+    )]
+    coin_nonce: Option<String>,
+
+    #[clap(
+        long = "consensus-coin-value",
+        env = "CONSENSUS_COIN_VALUE",
+        requires("coin_secret_key")
+    )]
+    coin_value: Option<u32>,
 }
 
 #[derive(Parser, Debug, Clone)]
@@ -204,6 +226,9 @@ impl Config {
         let CryptarchiaArgs {
             chain_start_time,
             slot_duration,
+            coin_secret_key,
+            coin_nonce,
+            coin_value,
         } = consensus_args;
 
         if let Some(start_time) = chain_start_time {
@@ -213,6 +238,19 @@ impl Config {
 
         if let Some(duration) = slot_duration {
             self.cryptarchia.time.slot_duration = std::time::Duration::from_secs(duration);
+        }
+
+        if let Some(sk) = coin_secret_key {
+            let sk = <[u8; 32]>::from_hex(sk)?;
+
+            let nonce = coin_nonce.expect("Should be available if coin sk provided");
+            let nonce = <[u8; 32]>::from_hex(nonce)?;
+
+            let value = coin_value.expect("Should be available if coin sk provided");
+
+            self.cryptarchia
+                .coins
+                .push(Coin::new(sk, nonce.into(), value.into()));
         }
 
         Ok(self)
