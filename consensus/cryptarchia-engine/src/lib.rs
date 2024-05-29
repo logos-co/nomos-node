@@ -352,5 +352,6 @@ pub mod tests {
         let b1_length = branch1.expect("length").length();
         let b2_length = branch2.expect("length").length();
         assert_eq!(b1_length, b2_length);
+
     }
 }
