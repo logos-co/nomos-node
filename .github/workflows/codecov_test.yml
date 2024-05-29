@@ -1,0 +1,47 @@
+on:
+  push:
+    branches:
+      - chore-cryptarchia-unit-tests-update
+
+name: Test - Codecov
+
+jobs:
+  test:
+    name: Test
+    env:
+      RUSTFLAGS: -C instrument-coverage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          submodules: true
+      - name: Checkout submodules
+        run: git submodule update --init --recursive 
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+          components: llvm-tools-preview
+      - uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --all --no-default-features --features libp2p
+      - uses: actions-rs/cargo@v1
+        continue-on-error: true
+      - run: |
+          cargo install grcov;
+          cargo test --no-default-features --features libp2p
+          mkdir /tmp/cov;
+          grcov . --binary-path ./target/debug/ -s . -t lcov --branch --ignore-not-existing --ignore '../*' --ignore "/*" -o /tmp/cov/tests.lcov;
+        env:
+          SLOW_TEST_ENV: true
+      - uses: actions/upload-artifact@v3
+        if: failure()
+        with:
+          name: integration-test-artifacts
+          path: tests/.tmp*
+      - uses: codecov/codecov-action@v3
+        with:
+          directory: /tmp/cov/
+          name: nomos-node-codecov
