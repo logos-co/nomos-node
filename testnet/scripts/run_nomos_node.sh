@@ -4,10 +4,11 @@ set -e
 
 # Set env variables for nomos-node.
 NET_NODE_KEY=$(/etc/nomos/scripts/register_node.sh)
+CONSENSUS_CHAIN_START=$(date +%s)
 CONSENSUS_COIN_SK=$NET_NODE_KEY
 CONSENSUS_COIN_NONCE=$NET_NODE_KEY
 CONSENSUS_COIN_VALUE=1
-DA_VOTER=$CONSENSUS_PRIV_KEY
+DA_VOTER=$NET_NODE_KEY
 OVERLAY_NODES=$(/etc/nomos/scripts/consensus_node_list.sh)
 
 node_ids=$(etcdctl get "/node/" --prefix --keys-only)
@@ -26,6 +27,7 @@ done
 export CONSENSUS_COIN_SK \
        CONSENSUS_COIN_NONCE \
        CONSENSUS_COIN_VALUE \
+       CONSENSUS_CHAIN_START \
        DA_VOTER \
        OVERLAY_NODES \
        NET_NODE_KEY \
