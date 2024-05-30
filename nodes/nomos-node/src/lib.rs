@@ -5,8 +5,6 @@ mod tx;
 use color_eyre::eyre::Result;
 use full_replication::Certificate;
 use full_replication::{AbsoluteNumber, Attestation, Blob, FullReplication};
-#[cfg(feature = "metrics")]
-use metrics::{backend::map::MapMetricsBackend, types::MetricsData, MetricsService};
 
 use api::AxumBackend;
 use bytes::Bytes;

@@ -1,11 +1,11 @@
 version: '3.7'
 services:
-
   bootstrap:
     container_name: bootstrap
     build:
       context: .
       dockerfile: testnet/Dockerfile
+    image: nomos:latest
     ports:
       - "3000:3000/udp"
       - "18080:18080/tcp"
@@ -20,9 +20,7 @@ services:
 
   libp2p-node-1:
     container_name: libp2p_node_1
-    build:
-      context: .
-      dockerfile: testnet/Dockerfile
+    image: nomos:latest
     volumes:
       - ./testnet:/etc/nomos
     depends_on:
@@ -43,9 +41,7 @@ services:
 
   libp2p-node-2:
     container_name: libp2p_node_2
-    build:
-      context: .
-      dockerfile: testnet/Dockerfile
+    image: nomos:latest
     volumes:
       - ./testnet:/etc/nomos
     depends_on:
@@ -66,9 +62,7 @@ services:
 
   libp2p-node-3:
     container_name: libp2p_node_3
-    build:
-      context: .
-      dockerfile: testnet/Dockerfile
+    image: nomos:latest
     volumes:
       - ./testnet:/etc/nomos
     depends_on:
@@ -89,9 +83,7 @@ services:
 
   chatbot:
     container_name: chatbot
-    build:
-      context: .
-      dockerfile: testnet/Dockerfile
+    image: nomos:latest
     volumes:
       - ./testnet:/etc/nomos
     entrypoint: /etc/nomos/scripts/run_nomos_bot.sh
