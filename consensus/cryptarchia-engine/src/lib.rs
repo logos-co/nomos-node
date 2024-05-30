@@ -21,6 +21,7 @@ pub struct Branches<Id> {
     tips: HashSet<Id>,
 }
 
+#[derive(PartialEq)]
 #[derive(Clone, Debug)]
 pub struct Branch<Id> {
     id: Id,
@@ -46,8 +47,8 @@ impl<Id: Copy> Branch<Id> {
 }
 
 impl<Id> Branches<Id>
-where
-    Id: Eq + std::hash::Hash + Copy,
+    where
+        Id: Eq + std::hash::Hash + Copy,
 {
     pub fn from_genesis(genesis: Id) -> Self {
         let mut branches = HashMap::new();
@@ -139,8 +140,8 @@ pub enum Error<Id> {
 }
 
 impl<Id> Cryptarchia<Id>
-where
-    Id: Eq + std::hash::Hash + Copy,
+    where
+        Id: Eq + std::hash::Hash + Copy,
 {
     pub fn from_genesis(id: Id, config: Config) -> Self {
         Self {
@@ -220,7 +221,7 @@ where
 
 #[cfg(test)]
 pub mod tests {
-    use super::Cryptarchia;
+    use super::{Cryptarchia};
     use crate::Config;
     use std::hash::{DefaultHasher, Hash, Hasher};
 
@@ -297,7 +298,7 @@ pub mod tests {
                 k,
                 engine.config.s()
             )
-            .id,
+                .id,
             long_p
         );
 
@@ -320,4 +321,27 @@ pub mod tests {
         res[..8].copy_from_slice(&hash.to_be_bytes());
         res
     }
+
+    #[test]
+    fn test_getters() {
+        let engine = Cryptarchia::from_genesis([0; 32], config());
+        let parent = engine.genesis();
+
+        // Get branch directly from HashMap
+        let branch1 = engine.branches.get(&parent).ok_or("At least one branch should be there");
+
+        let branches = engine.branches();
+
+        // Get branch using getter
+        let branch2 = branches.get(&parent).ok_or("At least one branch should be there");
+
+        assert_eq!(branch1, branch2);
+        assert_eq!(branch1.expect("id is set").id(), branch2.expect("id is set").id());
+        assert_eq!(branch1.expect("parent is set").parent(), branch2.expect("parent is set").parent());
+        assert_eq!(branch1.expect("slot is set").slot(), branch2.expect("slot is set").slot());
+        assert_eq!(branch1.expect("length is set").length(), branch2.expect("length is set").length());
+
+    }
 }
+
+
