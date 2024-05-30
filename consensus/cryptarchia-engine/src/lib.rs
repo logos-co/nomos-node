@@ -220,7 +220,7 @@ where
 
 #[cfg(test)]
 pub mod tests {
-    use super::Cryptarchia;
+    use super::{Cryptarchia, Slot};
     use crate::Config;
     use std::hash::{DefaultHasher, Hash, Hasher};
 
@@ -356,5 +356,9 @@ pub mod tests {
             branch1.expect("length is set").length(),
             branch2.expect("length is set").length()
         );
+
+        let slot = Slot::genesis();
+
+        assert_eq!(slot + 10u64, Slot::from(10));
     }
 }
