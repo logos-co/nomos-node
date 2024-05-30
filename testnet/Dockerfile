@@ -1,19 +1,19 @@
 # BUILD IMAGE ---------------------------------------------------------
 
-FROM rust:1.76.0-slim-bullseye AS builder
-
-# Dependecies for publishing documentation.
-RUN apt-get update && apt-get install -yq \
-    git clang etcd-client libssl-dev pkg-config
+FROM rust:1.78.0-slim-bullseye AS builder
 
 WORKDIR /nomos
 COPY . . 
+
+# Install dependencies needed for building RocksDB and etcd.
+RUN apt-get update && apt-get install -yq \
+    git clang etcd-client libssl-dev pkg-config
 
 RUN cargo build --release --all --features metrics
 
 # NODE IMAGE ----------------------------------------------------------
 
-FROM bitnami/minideb:bullseye
+FROM bitnami/minideb:latest
 
 LABEL maintainer="augustinas@status.im" \
       source="https://github.com/logos-co/nomos-node" \
