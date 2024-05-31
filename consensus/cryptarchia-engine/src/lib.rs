@@ -341,20 +341,20 @@ pub mod tests {
 
         assert_eq!(branch1, branch2);
         assert_eq!(
-            branch1.expect("id is set").id(),
-            branch2.expect("id is set").id()
+            branch1.expect("id is not set").id(),
+            branch2.expect("id is not set").id()
         );
         assert_eq!(
-            branch1.expect("parent is set").parent(),
-            branch2.expect("parent is set").parent()
+            branch1.expect("parent is not set").parent(),
+            branch2.expect("parent is not set").parent()
         );
         assert_eq!(
-            branch1.expect("slot is set").slot(),
-            branch2.expect("slot is set").slot()
+            branch1.expect("slot is not set").slot(),
+            branch2.expect("slot is not set").slot()
         );
         assert_eq!(
-            branch1.expect("length is set").length(),
-            branch2.expect("length is set").length()
+            branch1.expect("length is not set").length(),
+            branch2.expect("length is not set").length()
         );
 
         let slot = Slot::genesis();
