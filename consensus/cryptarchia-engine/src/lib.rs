@@ -370,7 +370,7 @@ pub mod tests {
             .get(&not_a_parent)
             .ok_or(Error::ParentMissing(not_a_parent))
         {
-            Ok(_) => (),
+            Ok(_) => panic!("Parent should not be related to this branch"),
             Err(e) => {
                 assert_ne!(e, Error::ParentMissing(parent));
             }
