@@ -22,7 +22,7 @@ fn main() {
 
 static GLOBAL_PARAMETERS: Lazy<UniversalParams<Bls12_381>> = Lazy::new(|| {
     let mut rng = rand::thread_rng();
-    KZG10::<Bls12_381, DensePolynomial<Fr>>::setup(1024, true, &mut rng).unwrap()
+    KZG10::<Bls12_381, DensePolynomial<Fr>>::setup(4096, true, &mut rng).unwrap()
 });
 
 fn rand_data_elements(elements_count: usize, chunk_size: usize) -> Vec<u8> {
@@ -34,20 +34,39 @@ fn rand_data_elements(elements_count: usize, chunk_size: usize) -> Vec<u8> {
 const CHUNK_SIZE: usize = 31;
 
 #[allow(non_snake_case)]
-#[divan::bench(args = [10, 100, 1000])]
-fn commit_polynomial_with_element_count(bencher: Bencher, element_count: usize) {
+#[divan::bench(args = [16, 32, 64, 128, 256, 512, 1024, 2048, 4096])]
+fn commit_single_polynomial_with_element_count(bencher: Bencher, element_count: usize) {
     bencher
         .with_inputs(|| {
             let domain = GeneralEvaluationDomain::new(element_count).unwrap();
             let data = rand_data_elements(element_count, CHUNK_SIZE);
             bytes_to_polynomial_unchecked::<CHUNK_SIZE>(&data, domain)
         })
-        .input_counter(move |(_evals, _poly)| BytesCount::new(element_count * CHUNK_SIZE))
+        .input_counter(move |(_evals, _poly)| ItemsCount::new(1usize))
         .bench_refs(|(_evals, poly)| black_box(commit_polynomial(poly, &GLOBAL_PARAMETERS)));
 }
 
 #[allow(non_snake_case)]
-#[divan::bench(args = [1024, 2048, 4096])]
+#[divan::bench(args = [16, 32, 64, 128, 256, 512, 1024, 2048, 4096])]
+fn commit_polynomial_with_element_count_parallelized(bencher: Bencher, element_count: usize) {
+    let threads = 8usize;
+    bencher
+        .with_inputs(|| {
+            let domain = GeneralEvaluationDomain::new(element_count).unwrap();
+            let data = rand_data_elements(element_count, CHUNK_SIZE);
+            bytes_to_polynomial_unchecked::<CHUNK_SIZE>(&data, domain)
+        })
+        .input_counter(move |(_evals, _poly)| ItemsCount::new(threads))
+        .bench_refs(|(_evals, poly)| {
+            let commitments: Vec<_> = (0..threads)
+                .into_par_iter()
+                .map(|_| commit_polynomial(poly, &GLOBAL_PARAMETERS))
+                .collect();
+        });
+}
+
+#[allow(non_snake_case)]
+#[divan::bench(args = [128, 256, 512, 1024, 2048, 4096])]
 fn compute_single_proof(bencher: Bencher, element_count: usize) {
     bencher
         .with_inputs(|| {
@@ -71,7 +90,7 @@ fn compute_single_proof(bencher: Bencher, element_count: usize) {
 }
 
 #[allow(non_snake_case)]
-#[divan::bench(args = [100, 500, 1000], sample_count = 3, sample_size = 5)]
+#[divan::bench(args = [128, 256, 512, 1024], sample_count = 3, sample_size = 5)]
 fn compute_batch_proofs(bencher: Bencher, element_count: usize) {
     bencher
         .with_inputs(|| {
@@ -96,7 +115,7 @@ fn compute_batch_proofs(bencher: Bencher, element_count: usize) {
 // ark libraries already use rayon underneath so no great improvements are probably come up from this.
 // But it should help reusing the same thread pool for all jobs saving a little time.
 #[allow(non_snake_case)]
-#[divan::bench(args = [100, 500, 1000], sample_count = 3, sample_size = 5)]
+#[divan::bench(args = [128, 256, 512, 1024], sample_count = 3, sample_size = 5)]
 fn compute_parallelize_batch_proofs(bencher: Bencher, element_count: usize) {
     bencher
         .with_inputs(|| {
