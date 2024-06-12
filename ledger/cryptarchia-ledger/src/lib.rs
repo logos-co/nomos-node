@@ -386,7 +386,7 @@ impl core::fmt::Debug for LedgerState {
 
 #[cfg(test)]
 pub mod tests {
-    use super::{Coin, EpochState, Ledger, LedgerState};
+    use super::{Coin, EpochState, LeaderProof, Ledger, LedgerState, Nullifier};
     use crate::{crypto::Blake2b, Commitment, Config, LedgerError};
     use blake2::Digest;
     use cryptarchia_engine::Slot;
@@ -740,5 +740,30 @@ pub mod tests {
             ),
             Err(LedgerError::NullifierExists)
         ));
+    }
+
+    #[test]
+    fn test_conversions_for_leader_proof() {
+
+        let commitment = Commitment::from([0u8; 32]);
+        let commitment_bytes: [u8; 32] = commitment.into();
+
+        let _zero_bytes = [0u8; 32];
+        assert!(matches!(commitment_bytes, _zero_bytes));
+
+        let commitment_ref = commitment.as_ref();
+        assert_eq!(commitment_ref, &_zero_bytes);
+
+        let nullifier = Nullifier::from([0u8; 32]);
+        let _nullifier_bytes: [u8; 32] = nullifier.into();
+        assert!(matches!(_nullifier_bytes, _zero_bytes));
+
+        let slot = Slot::genesis();
+        let leader_proof = LeaderProof::dummy(slot);
+
+        assert_eq!(leader_proof.commitment(), &commitment);
+        assert_eq!(leader_proof.evolved_commitment(), &commitment);
+        assert_eq!(leader_proof.nullifier(), &nullifier);
+
     }
 }
