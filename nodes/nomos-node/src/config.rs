@@ -1,5 +1,5 @@
 use std::{
-    net::{IpAddr, SocketAddr},
+    net::{IpAddr, SocketAddr, ToSocketAddrs},
     path::PathBuf,
 };
 
@@ -32,7 +32,7 @@ pub enum LoggerBackendType {
 pub struct LogArgs {
     /// Address for the Gelf backend
     #[clap(long = "log-addr", env = "LOG_ADDR", required_if_eq("backend", "Gelf"))]
-    log_addr: Option<SocketAddr>,
+    log_addr: Option<String>,
 
     /// Directory for the File backend
     #[clap(long = "log-dir", env = "LOG_DIR", required_if_eq("backend", "File"))]
@@ -143,7 +143,11 @@ impl Config {
         if let Some(backend) = backend {
             self.log.backend = match backend {
                 LoggerBackendType::Gelf => LoggerBackend::Gelf {
-                    addr: addr.ok_or_else(|| eyre!("Gelf backend requires an address."))?,
+                    addr: addr
+                        .ok_or_else(|| eyre!("Gelf backend requires an address."))?
+                        .to_socket_addrs()?
+                        .next()
+                        .ok_or_else(|| eyre!("Invalid gelf address"))?,
                 },
                 LoggerBackendType::File => LoggerBackend::File {
                     directory: directory

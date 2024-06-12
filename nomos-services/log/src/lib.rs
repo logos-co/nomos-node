@@ -5,6 +5,8 @@ use std::io::Write;
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
+use std::thread::sleep;
+use std::time::Duration;
 // crates
 use serde::{Deserialize, Serialize};
 use tracing::{error, Level};
@@ -18,6 +20,8 @@ use overwatch_rs::services::{
     state::{NoOperator, NoState},
     ServiceCore, ServiceData,
 };
+
+const GELF_RECONNECT_INTERVAL: u64 = 10;
 
 pub struct Logger {
     service_state: ServiceStateHandle<Self>,
@@ -152,11 +156,20 @@ impl ServiceCore for Logger {
         let config = service_state.settings_reader.get_updated_settings();
         let (non_blocking, _guard) = match config.backend {
             LoggerBackend::Gelf { addr } => {
-                let (layer, mut task) = tracing_gelf::Logger::builder().connect_tcp(addr).unwrap();
-                service_state
-                    .overwatch_handle
-                    .runtime()
-                    .spawn(async move { task.connect().await });
+                let (layer, mut task) = tracing_gelf::Logger::builder()
+                    .connect_tcp(addr)
+                    .expect("Connect to the graylog instance");
+                service_state.overwatch_handle.runtime().spawn(async move {
+                    loop {
+                        if task.connect().await.0.len() == 0 {
+                            break;
+                        } else {
+                            eprintln!("Failed to connect to graylog");
+                            let delay = Duration::from_secs(GELF_RECONNECT_INTERVAL);
+                            sleep(delay);
+                        }
+                    }
+                });
                 #[cfg(test)]
                 ONCE_INIT.call_once(move || {
                     registry_init!(layer, config.format, config.level);
