@@ -14,7 +14,8 @@ members = [
     "nomos-da/reed-solomon",
     "nomos-da/kzg",
     "nomos-da/full-replication",
-    "nomos-cli",
+    # TODO: add it again and reimplement full replication
+    #    "nomos-cli",
     "nomos-utils",
     "nodes/nomos-node",
     "mixnet",

@@ -1,5 +1,5 @@
 pub mod nodes;
-pub use nodes::NomosNode;
+// pub use nodes::NomosNode;
 use once_cell::sync::Lazy;
 
 use std::env;
