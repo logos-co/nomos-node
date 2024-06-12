@@ -3,7 +3,7 @@ use std::marker::PhantomData;
 // crates
 
 // internal
-use crate::da::certificate::{BlobCertificateSelect, Certificate};
+use crate::da::certificate::{vid::VidCertificate, BlobCertificateSelect};
 use crate::utils;
 
 #[derive(Default, Clone, Copy)]
@@ -19,7 +19,7 @@ impl<const SIZE: usize, B> FillSize<SIZE, B> {
     }
 }
 
-impl<const SIZE: usize, C: Certificate> BlobCertificateSelect for FillSize<SIZE, C> {
+impl<const SIZE: usize, C: VidCertificate> BlobCertificateSelect for FillSize<SIZE, C> {
     type Certificate = C;
     type Settings = ();
 
