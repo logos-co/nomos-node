@@ -744,7 +744,6 @@ pub mod tests {
 
     #[test]
     fn test_conversions_for_leader_proof() {
-
         let commitment = Commitment::from([0u8; 32]);
         let commitment_bytes: [u8; 32] = commitment.into();
 
@@ -764,6 +763,5 @@ pub mod tests {
         assert_eq!(leader_proof.commitment(), &commitment);
         assert_eq!(leader_proof.evolved_commitment(), &commitment);
         assert_eq!(leader_proof.nullifier(), &nullifier);
-
     }
 }
