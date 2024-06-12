@@ -1,8 +1,5 @@
 pub mod select;
 
-use bytes::Bytes;
-use std::hash::Hash;
-
 pub trait Certificate {
     type VerificationParameters;
     type Signature;
