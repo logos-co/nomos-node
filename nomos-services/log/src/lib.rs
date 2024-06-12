@@ -5,7 +5,6 @@ use std::io::Write;
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
-use std::thread::sleep;
 use std::time::Duration;
 // crates
 use serde::{Deserialize, Serialize};
@@ -166,7 +165,7 @@ impl ServiceCore for Logger {
                         } else {
                             eprintln!("Failed to connect to graylog");
                             let delay = Duration::from_secs(GELF_RECONNECT_INTERVAL);
-                            sleep(delay);
+                            tokio::time::sleep(delay).await;
                         }
                     }
                 });
