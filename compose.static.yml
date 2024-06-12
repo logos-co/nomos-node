@@ -1,4 +1,5 @@
 version: '3.8'
+
 services:
   bootstrap:
     container_name: bootstrap
@@ -11,6 +12,8 @@ services:
       - "18080:18080/tcp"
     volumes:
       - ./testnet:/etc/nomos
+    depends_on:
+      - graylog
     environment:
       - BOOTSTRAP_NODE_KEY=${DOCKER_COMPOSE_BOOSTRAP_NET_NODE_KEY:-1000000000000000000000000000000000000000000000000000000000000000}
       - LIBP2P_NODE_MASK=${DOCKER_COMPOSE_LIBP2P_NODE_KEY_MASK:-2000000000000000000000000000000000000000000000000000000000000000}
@@ -26,6 +29,7 @@ services:
     depends_on:
       - bootstrap
       - etcd
+      - graylog
     ports:
       - "3001:3000/udp"
       - "18081:18080/tcp"
@@ -47,6 +51,7 @@ services:
     depends_on:
       - bootstrap
       - etcd
+      - graylog
     ports:
       - "3002:3000/udp"
       - "18082:18080/tcp"
@@ -68,6 +73,7 @@ services:
     depends_on:
       - bootstrap
       - etcd
+      - graylog
     ports:
       - "3003:3000/udp"
       - "18083:18080/tcp"
@@ -124,14 +130,14 @@ services:
     depends_on:
       - prometheus
 
+  # Graylog related configuration
+  # More information at https://github.com/Graylog2/docker-compose/blob/main/open-core/docker-compose.yml
   mongodb:
     image: "mongo:5.0"
     volumes:
       - "mongodb_data:/data/db"
     restart: "on-failure"
 
-  # For DataNode setup, graylog starts with a preflight UI, this is a change from just using OpenSearch/Elasticsearch.
-  # Please take a look at the README at the top of this repo or the regular docs for more info.
   datanode:
     image: "${DATANODE_IMAGE:-graylog/graylog-datanode:5.2}"
     hostname: "datanode"
@@ -156,7 +162,6 @@ services:
     restart: "on-failure"
 
   graylog:
-    hostname: "server"
     image: "${GRAYLOG_IMAGE:-graylog/graylog:5.2}"
     depends_on:
       mongodb:
@@ -173,11 +178,12 @@ services:
     - "9000:9000/tcp"   # Server API
     - "12201:12201/tcp" # GELF TCP
     - "12201:12201/udp" # GELF UDP
-
     volumes:
       - "graylog_data:/usr/share/graylog/data/data"
       - "graylog_journal:/usr/share/graylog/data/journal"
+      - ./testnet/monitoring/graylog.conf:/usr/share/graylog/data/config/graylog.conf
     restart: "on-failure"
+
 
 volumes:
   mongodb_data:

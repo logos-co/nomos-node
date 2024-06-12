@@ -161,7 +161,7 @@ impl ServiceCore for Logger {
                     .expect("Connect to the graylog instance");
                 service_state.overwatch_handle.runtime().spawn(async move {
                     loop {
-                        if task.connect().await.0.len() == 0 {
+                        if task.connect().await.0.is_empty() {
                             break;
                         } else {
                             eprintln!("Failed to connect to graylog");
