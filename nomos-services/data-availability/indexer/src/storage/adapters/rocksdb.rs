@@ -61,7 +61,6 @@ where
         let attested_key = key_bytes(DA_ATTESTED_KEY_PREFIX, vid.certificate_id());
         let (reply_tx, reply_rx) = tokio::sync::oneshot::channel();
 
-        // Remove item from attested list as it shouldn't be used again.
         self.storage_relay
             .send(StorageMsg::Load {
                 key: attested_key,
