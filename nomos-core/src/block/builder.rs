@@ -7,8 +7,8 @@ use serde::Serialize;
 // internal
 use crate::block::Block;
 use crate::crypto::Blake2b;
+use crate::da::certificate::vid::VidCertificate;
 use crate::da::certificate::BlobCertificateSelect;
-use crate::da::certificate::Certificate;
 use crate::header::{
     carnot::Builder as CarnotBuilder, cryptarchia::Builder as CryptarchiaBuilder, Header, HeaderId,
 };
@@ -64,7 +64,7 @@ where
 impl<Tx, C, TxSelector, BlobSelector> BlockBuilder<Tx, C, TxSelector, BlobSelector>
 where
     Tx: Transaction + Clone + Eq + Hash + Serialize + DeserializeOwned,
-    C: Certificate + Clone + Eq + Hash + Serialize + DeserializeOwned,
+    C: VidCertificate + Clone + Eq + Hash + Serialize + DeserializeOwned,
     TxSelector: TxSelect<Tx = Tx>,
     BlobSelector: BlobCertificateSelect<Certificate = C>,
 {

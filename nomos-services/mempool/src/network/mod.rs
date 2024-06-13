@@ -15,16 +15,17 @@ use overwatch_rs::services::ServiceData;
 pub trait NetworkAdapter {
     type Backend: NetworkBackend + 'static;
     type Settings: Clone;
-
-    type Item: Send + Sync + 'static;
+    type Payload: Send + Sync + 'static;
     type Key: Send + Sync + 'static;
+
     async fn new(
         settings: Self::Settings,
         network_relay: OutboundRelay<<NetworkService<Self::Backend> as ServiceData>::Message>,
     ) -> Self;
-    async fn transactions_stream(
-        &self,
-    ) -> Box<dyn Stream<Item = (Self::Key, Self::Item)> + Unpin + Send>;
 
-    async fn send(&self, item: Self::Item);
+    async fn payload_stream(
+        &self,
+    ) -> Box<dyn Stream<Item = (Self::Key, Self::Payload)> + Unpin + Send>;
+
+    async fn send(&self, payload: Self::Payload);
 }
