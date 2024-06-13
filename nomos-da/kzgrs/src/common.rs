@@ -142,7 +142,7 @@ mod test {
         bytes.try_fill(&mut rng).unwrap();
         let evals = bytes_to_evaluations::<31>(&bytes, *DOMAIN);
         let (_, poly) = bytes_to_polynomial::<31>(&bytes, *DOMAIN).unwrap();
-        for i in 0..100 {
+        for i in 0..N {
             let eval_point = DOMAIN.element(i);
             let point = poly.evaluate(&eval_point);
             // check point is the same
