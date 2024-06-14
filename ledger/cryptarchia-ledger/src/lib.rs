@@ -390,6 +390,7 @@ pub mod tests {
     use crate::{crypto::Blake2b, Commitment, Config, LedgerError};
     use blake2::Digest;
     use cryptarchia_engine::Slot;
+    use serde_test::{assert_tokens, Configure, Token};
 
     type HeaderId = [u8; 32];
 
@@ -763,5 +764,11 @@ pub mod tests {
         assert_eq!(leader_proof.commitment(), &commitment);
         assert_eq!(leader_proof.evolved_commitment(), &commitment);
         assert_eq!(leader_proof.nullifier(), &nullifier);
+
+        // Test ser/de of compact representation for Nullifier
+        assert_tokens(&nullifier.compact(), &[Token::BorrowedBytes(&[0; 32])]);
+
+        // Test ser/de of compact representation for Commitment
+        assert_tokens(&commitment.compact(), &[Token::BorrowedBytes(&[0; 32])]);
     }
 }
