@@ -254,8 +254,7 @@ impl Node for NomosNode {
         let mut configs = ids
             .into_iter()
             .zip(coins)
-            .enumerate()
-            .map(|(_i, (da_id, coin))| {
+            .map(|(da_id, coin)| {
                 create_node_config(
                     da_id,
                     genesis_state.clone(),
