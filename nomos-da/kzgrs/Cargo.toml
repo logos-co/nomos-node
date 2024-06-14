@@ -20,10 +20,11 @@ num-bigint = "0.4.4"
 thiserror = "1.0.58"
 num-traits = "0.2.18"
 rand = "0.8.5"
+rayon = { version = "1.10", optional = true }
+
 
 [dev-dependencies]
 divan = "0.1"
-rayon = "1.10"
 
 [[bench]]
 name = "kzg"
@@ -33,6 +34,7 @@ harness = false
 default = ["single"]
 single = []
 parallel = [
+    "rayon",
     "ark-ff/parallel",
     "ark-ff/asm",
     "ark-ff/rayon",
