@@ -771,4 +771,31 @@ pub mod tests {
         // Test ser/de of compact representation for Commitment
         assert_tokens(&commitment.compact(), &[Token::BorrowedBytes(&[0; 32])]);
     }
+
+    #[test]
+    fn test_cryptarchia_ledger_error_cases() {
+        let coin = coin(0);
+        let commitment = coin.commitment();
+        let (ledger, genesis) = ledger(&[commitment]);
+
+        let ledger_state = ledger.state(&genesis).unwrap().clone();
+        let ledger_config = ledger.config();
+
+        let slot = Slot::genesis() + 10;
+        let ledger_state2 = ledger_state
+            .update_epoch_state::<HeaderId>(slot, ledger_config)
+            .expect("Ledger needs to move forward");
+
+        let slot2 = Slot::genesis() + 1;
+        let update_epoch_err = ledger_state2
+            .update_epoch_state::<HeaderId>(slot2, ledger_config)
+            .err();
+
+        // Time cannot flow backwards
+        match update_epoch_err {
+            Some(LedgerError::InvalidSlot { parent, block })
+                if parent == slot && block == slot2 => {}
+            _ => panic!("Error does not match the LedgerError::InvalidSlot pattern"),
+        };
+    }
 }
