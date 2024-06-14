@@ -3,24 +3,15 @@ mod config;
 mod tx;
 
 use color_eyre::eyre::Result;
-use full_replication::Certificate;
-use full_replication::{AbsoluteNumber, Attestation, Blob, FullReplication};
+use full_replication::{Certificate, VidCertificate};
 
 use api::AxumBackend;
 use bytes::Bytes;
-pub use config::{Config, CryptarchiaArgs, DaArgs, HttpArgs, LogArgs, MetricsArgs, NetworkArgs};
+pub use config::{Config, CryptarchiaArgs, HttpArgs, LogArgs, MetricsArgs, NetworkArgs};
 use nomos_api::ApiService;
-use nomos_core::{
-    da::{blob, certificate},
-    header::HeaderId,
-    tx::Transaction,
-    wire,
-};
-use nomos_da::{
-    backend::memory_cache::BlobCache, network::adapters::libp2p::Libp2pAdapter as DaNetworkAdapter,
-    DataAvailabilityService,
-};
+use nomos_core::{da::certificate, header::HeaderId, tx::Transaction, wire};
 use nomos_log::Logger;
+use nomos_mempool::da::verify::fullreplication::DaVerificationProvider as MempoolVerificationProvider;
 use nomos_mempool::network::adapters::libp2p::Libp2pAdapter as MempoolNetworkAdapter;
 use nomos_mempool::{backend::mockpool::MockPool, TxMempoolService};
 #[cfg(feature = "metrics")]
@@ -51,44 +42,34 @@ pub const DA_TOPIC: &str = "da";
 const MB16: usize = 1024 * 1024 * 16;
 
 pub type Cryptarchia = cryptarchia_consensus::CryptarchiaConsensus<
-    cryptarchia_consensus::network::adapters::libp2p::LibP2pAdapter<Tx, Certificate>,
+    cryptarchia_consensus::network::adapters::libp2p::LibP2pAdapter<Tx, VidCertificate>,
     MockPool<HeaderId, Tx, <Tx as Transaction>::Hash>,
     MempoolNetworkAdapter<Tx, <Tx as Transaction>::Hash>,
     MockPool<
         HeaderId,
-        Certificate,
-        <<Certificate as certificate::Certificate>::Blob as blob::Blob>::Hash,
+        VidCertificate,
+        <VidCertificate as certificate::vid::VidCertificate>::CertificateId,
     >,
-    MempoolNetworkAdapter<
-        Certificate,
-        <<Certificate as certificate::Certificate>::Blob as blob::Blob>::Hash,
-    >,
+    MempoolNetworkAdapter<Certificate, <Certificate as certificate::Certificate>::Id>,
+    MempoolVerificationProvider,
     FillSizeWithTx<MB16, Tx>,
-    FillSizeWithBlobsCertificate<MB16, Certificate>,
+    FillSizeWithBlobsCertificate<MB16, VidCertificate>,
     RocksBackend<Wire>,
->;
-
-pub type DataAvailability = DataAvailabilityService<
-    FullReplication<AbsoluteNumber<Attestation, Certificate>>,
-    BlobCache<<Blob as nomos_core::da::blob::Blob>::Hash, Blob>,
-    DaNetworkAdapter<Blob, Attestation>,
->;
-
-pub type DaMempool = DaMempoolService<
-    MempoolNetworkAdapter<
-        Certificate,
-        <<Certificate as certificate::Certificate>::Blob as blob::Blob>::Hash,
-    >,
-    MockPool<
-        HeaderId,
-        Certificate,
-        <<Certificate as certificate::Certificate>::Blob as blob::Blob>::Hash,
-    >,
 >;
 
 pub type TxMempool = TxMempoolService<
     MempoolNetworkAdapter<Tx, <Tx as Transaction>::Hash>,
     MockPool<HeaderId, Tx, <Tx as Transaction>::Hash>,
+>;
+
+pub type DaMempool = DaMempoolService<
+    MempoolNetworkAdapter<Certificate, <Certificate as certificate::Certificate>::Id>,
+    MockPool<
+        HeaderId,
+        VidCertificate,
+        <VidCertificate as certificate::vid::VidCertificate>::CertificateId,
+    >,
+    MempoolVerificationProvider,
 >;
 
 #[derive(Services)]
@@ -99,7 +80,6 @@ pub struct Nomos {
     da_mempool: ServiceHandle<DaMempool>,
     cryptarchia: ServiceHandle<Cryptarchia>,
     http: ServiceHandle<ApiService<AxumBackend<Tx, Wire, MB16>>>,
-    da: ServiceHandle<DataAvailability>,
     storage: ServiceHandle<StorageService<RocksBackend<Wire>>>,
     #[cfg(feature = "metrics")]
     metrics: ServiceHandle<Metrics>,

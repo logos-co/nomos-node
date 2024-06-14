@@ -26,7 +26,7 @@ pub struct MockAdapter {
 impl NetworkAdapter for MockAdapter {
     type Backend = Mock;
     type Settings = ();
-    type Item = MockTransaction<MockMessage>;
+    type Payload = MockTransaction<MockMessage>;
     type Key = MockTxId;
 
     async fn new(
@@ -60,9 +60,9 @@ impl NetworkAdapter for MockAdapter {
         Self { network_relay }
     }
 
-    async fn transactions_stream(
+    async fn payload_stream(
         &self,
-    ) -> Box<dyn Stream<Item = (Self::Key, Self::Item)> + Unpin + Send> {
+    ) -> Box<dyn Stream<Item = (Self::Key, Self::Payload)> + Unpin + Send> {
         let (sender, receiver) = tokio::sync::oneshot::channel();
         if let Err((_, e)) = self
             .network_relay
@@ -94,7 +94,7 @@ impl NetworkAdapter for MockAdapter {
         )))
     }
 
-    async fn send(&self, msg: Self::Item) {
+    async fn send(&self, msg: Self::Payload) {
         if let Err((e, _)) = self
             .network_relay
             .send(NetworkMsg::Process(MockBackendMessage::Broadcast {

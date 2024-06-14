@@ -6,19 +6,19 @@ mod ui;
 
 use crate::{
     api::consensus::get_headers_info,
-    da::{
-        disseminate::{
-            DaProtocolChoice, DisseminateApp, DisseminateAppServiceSettings, Settings, Status,
-        },
-        retrieve::get_block_blobs,
-    },
+    //da::{
+    //    disseminate::{
+    //        DaProtocolChoice, DisseminateApp, DisseminateAppServiceSettings, Settings, Status,
+    //    },
+    //    retrieve::get_block_blobs,
+    //},
 };
 use clap::Args;
 use full_replication::{
     AbsoluteNumber, Attestation, Certificate, FullReplication, Settings as DaSettings,
 };
 use futures::{stream, StreamExt};
-use nomos_core::{da::DaProtocol, header::HeaderId, wire};
+use nomos_core::{header::HeaderId, wire};
 use nomos_log::{LoggerBackend, LoggerSettings, SharedWriter};
 use nomos_network::backends::libp2p::Libp2p as NetworkBackend;
 use nomos_network::NetworkService;

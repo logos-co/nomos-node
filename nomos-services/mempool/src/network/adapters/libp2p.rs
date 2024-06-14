@@ -24,7 +24,7 @@ where
 {
     type Backend = Libp2p;
     type Settings = Settings<Key, Item>;
-    type Item = Item;
+    type Payload = Item;
     type Key = Key;
 
     async fn new(
@@ -42,9 +42,9 @@ where
             settings,
         }
     }
-    async fn transactions_stream(
+    async fn payload_stream(
         &self,
-    ) -> Box<dyn Stream<Item = (Self::Key, Self::Item)> + Unpin + Send> {
+    ) -> Box<dyn Stream<Item = (Self::Key, Self::Payload)> + Unpin + Send> {
         let topic_hash = TopicHash::from_raw(self.settings.topic.clone());
         let id = self.settings.id;
         let (sender, receiver) = tokio::sync::oneshot::channel();
