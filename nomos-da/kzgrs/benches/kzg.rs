@@ -6,7 +6,9 @@ use divan::counter::ItemsCount;
 use divan::{black_box, counter::BytesCount, AllocProfiler, Bencher};
 use once_cell::sync::Lazy;
 use rand::RngCore;
+#[cfg(feature = "parallel")]
 use rayon::iter::IntoParallelIterator;
+#[cfg(feature = "parallel")]
 use rayon::iter::ParallelIterator;
 
 use kzgrs::{common::bytes_to_polynomial_unchecked, kzg::*};
@@ -46,6 +48,7 @@ fn commit_single_polynomial_with_element_count(bencher: Bencher, element_count: 
         .bench_refs(|(_evals, poly)| black_box(commit_polynomial(poly, &GLOBAL_PARAMETERS)));
 }
 
+#[cfg(feature = "parallel")]
 #[allow(non_snake_case)]
 #[divan::bench(args = [16, 32, 64, 128, 256, 512, 1024, 2048, 4096])]
 fn commit_polynomial_with_element_count_parallelized(bencher: Bencher, element_count: usize) {
@@ -114,6 +117,7 @@ fn compute_batch_proofs(bencher: Bencher, element_count: usize) {
 // This is a test on how will perform by having a wrapping rayon on top of the proof computation
 // ark libraries already use rayon underneath so no great improvements are probably come up from this.
 // But it should help reusing the same thread pool for all jobs saving a little time.
+#[cfg(feature = "parallel")]
 #[allow(non_snake_case)]
 #[divan::bench(args = [128, 256, 512, 1024], sample_count = 3, sample_size = 5)]
 fn compute_parallelize_batch_proofs(bencher: Bencher, element_count: usize) {

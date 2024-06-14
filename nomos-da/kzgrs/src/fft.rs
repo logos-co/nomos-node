@@ -2,7 +2,7 @@ use ark_bls12_381::{Bls12_381, Fr, G1Affine};
 use ark_ec::pairing::Pairing;
 use ark_ec::{AffineRepr, CurveGroup};
 use ark_ff::{BigInt, BigInteger, FftField, Field, PrimeField};
-#[cfg(parallel)]
+#[cfg(feature = "parallel")]
 use rayon::iter::IntoParallelIterator;
 
 pub fn fft_g1(vals: &[G1Affine], roots_of_unity: &[Fr]) -> Vec<G1Affine> {
@@ -36,22 +36,22 @@ pub fn fft_g1(vals: &[G1Affine], roots_of_unity: &[Fr]) -> Vec<G1Affine> {
     };
 
     let [l, r]: [Vec<G1Affine>; 2] = {
-        #[cfg(parallel)]
+        #[cfg(feature = "parallel")]
         {
             [l, r].into_par_iter().map(|f| f()).collect()
         }
-        #[cfg(not(parallel))]
+        #[cfg(not(feature = "parallel"))]
         {
             [l(), r()]
         }
     };
 
     let y_times_root = {
-        #[cfg(parallel)]
+        #[cfg(feature = "parallel")]
         {
             r.into_par_iter()
         }
-        #[cfg(not(parallel))]
+        #[cfg(not(feature = "parallel"))]
         {
             r.into_iter()
         }
@@ -61,11 +61,11 @@ pub fn fft_g1(vals: &[G1Affine], roots_of_unity: &[Fr]) -> Vec<G1Affine> {
     .map(|(i, y)| (y * roots_of_unity[i % vals.len()]).into_affine());
 
     {
-        #[cfg(parallel)]
+        #[cfg(feature = "parallel")]
         {
             l.into_par_iter()
         }
-        #[cfg(not(parallel))]
+        #[cfg(not(feature = "parallel"))]
         {
             l.into_iter()
         }
@@ -90,11 +90,11 @@ pub fn ifft_g1(vals: &[G1Affine], roots_of_unity: &[Fr]) -> Vec<G1Affine> {
     let mut mod_min_2 = BigInt::new(<Fr as PrimeField>::MODULUS.0);
     mod_min_2.sub_with_borrow(&BigInt::<4>::from(2u64));
     let invlen = Fr::from(vals.len() as u64).pow(mod_min_2).into_bigint();
-    #[cfg(parallel)]
+    #[cfg(feature = "parallel")]
     {
-        fft_g1(vals, roots_of_unity).into_par_iter()
+        fft_g1(vals, roots_of_unity).into_par_iter().collect()
     }
-    #[cfg(not(parallel))]
+    #[cfg(not(feature = "parallel"))]
     { fft_g1(vals, roots_of_unity).into_iter() }
         .map(|g| g.mul_bigint(invlen).into_affine())
         .collect()
