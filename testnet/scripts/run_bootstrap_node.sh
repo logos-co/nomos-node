@@ -25,4 +25,4 @@ echo "CONSENSUS_COIN_VALUE: ${CONSENSUS_COIN_VALUE}"
 echo "DA_VOTER: ${DA_VOTER}"
 echo "OVERLAY_NODES: ${OVERLAY_NODES}"
 
-exec /usr/bin/nomos-node /etc/nomos/bootstrap_config.yaml --with-metrics
+exec /usr/bin/nomos-node /etc/nomos/bootstrap_config.yaml --with-metrics --log-backend gelf --log-addr graylog:12201
