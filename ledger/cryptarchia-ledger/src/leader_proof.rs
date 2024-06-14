@@ -27,12 +27,12 @@ impl LeaderProof {
     }
 
     #[cfg(test)]
-    pub fn dummy(slot: Slot) -> Self {
+    pub fn dummy(slot: Slot, commitment: Commitment, evolved_commitment: Commitment) -> Self {
         Self {
-            commitment: Commitment([0; 32]),
+            commitment,
             nullifier: Nullifier([0; 32]),
             slot,
-            evolved_commitment: Commitment([0; 32]),
+            evolved_commitment,
         }
     }
 

@@ -759,7 +759,7 @@ pub mod tests {
         assert!(matches!(_nullifier_bytes, _zero_bytes));
 
         let slot = Slot::genesis();
-        let leader_proof = LeaderProof::dummy(slot);
+        let leader_proof = LeaderProof::dummy(slot, commitment, Commitment::from([0; 32]));
 
         assert_eq!(leader_proof.commitment(), &commitment);
         assert_eq!(leader_proof.evolved_commitment(), &commitment);
@@ -795,7 +795,25 @@ pub mod tests {
         match update_epoch_err {
             Some(LedgerError::InvalidSlot { parent, block })
                 if parent == slot && block == slot2 => {}
-            _ => panic!("Error does not match the LedgerError::InvalidSlot pattern"),
+            _ => panic!("error does not match the LedgerError::InvalidSlot pattern"),
         };
+
+        let ledger_state = ledger.state(&genesis).unwrap().clone();
+        let actual_slot = ledger_state.slot();
+        let proof = LeaderProof::dummy(actual_slot, commitment, commitment);
+        let epoch_state = ledger_state.epoch_state();
+
+        assert_eq!(ledger_state.can_lead(&commitment), true);
+        assert_eq!(epoch_state.is_eligible_leader(&commitment), true);
+
+        let apply_proof_err = ledger_state
+            .try_apply_proof::<HeaderId>(&proof, ledger_config)
+            .err();
+
+        // Commitment cannot be spent twice
+        assert!(
+            matches!(apply_proof_err, Some(LedgerError::CommitmentExists)),
+            "Error does not match LedgerError::CommitmentExists"
+        );
     }
 }
