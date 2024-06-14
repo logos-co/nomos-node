@@ -30,6 +30,10 @@ divan = "0.1"
 name = "kzg"
 harness = false
 
+[[bench]]
+name = "fft"
+harness = false
+
 [features]
 default = ["single"]
 single = []
