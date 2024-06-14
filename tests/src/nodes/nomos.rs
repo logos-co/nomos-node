@@ -250,11 +250,12 @@ impl Node for NomosNode {
             chain_start_time: OffsetDateTime::now_utc(),
         };
 
-        #[allow(unused_mut)]
+        #[allow(unused_mut, unused_variables)]
         let mut configs = ids
             .into_iter()
             .zip(coins)
-            .map(|(da_id, coin)| {
+            .enumerate()
+            .map(|(i, (da_id, coin))| {
                 create_node_config(
                     da_id,
                     genesis_state.clone(),
@@ -264,7 +265,7 @@ impl Node for NomosNode {
                     #[cfg(feature = "mixnet")]
                     MixnetConfig {
                         mixclient: mixclient_config.clone(),
-                        mixnode: mixnode_configs[_i].clone(),
+                        mixnode: mixnode_configs[i].clone(),
                     },
                 )
             })
