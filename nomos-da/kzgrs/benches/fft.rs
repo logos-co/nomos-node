@@ -25,7 +25,7 @@ fn compute_fft_for_size(bencher: Bencher, size: usize) {
                 .collect();
             (buff, roots_of_unity)
         })
-        .input_counter(|_| ItemsCount::new(size))
+        .input_counter(move |_| ItemsCount::new(size))
         .bench_refs(|(buff, roots_of_unity)| black_box(fft_g1(buff, roots_of_unity)));
 }
 
@@ -47,6 +47,6 @@ fn compute_ifft_for_size(bencher: Bencher, size: usize) {
             let buff = fft_g1(&buff, &roots_of_unity);
             (buff, roots_of_unity)
         })
-        .input_counter(|_| ItemsCount::new(size))
+        .input_counter(move |_| ItemsCount::new(size))
         .bench_refs(|(buff, roots_of_unity)| black_box(ifft_g1(buff, roots_of_unity)));
 }
