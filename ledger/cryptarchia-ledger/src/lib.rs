@@ -803,14 +803,16 @@ pub mod tests {
         let proof = LeaderProof::dummy(actual_slot, commitment, commitment);
         let epoch_state = ledger_state.epoch_state();
 
-        assert_eq!(ledger_state.can_lead(&commitment), true);
-        assert_eq!(epoch_state.is_eligible_leader(&commitment), true);
+        assert!(ledger_state.can_spend(&commitment));
+        assert_eq!(epoch_state.total_stake(), Value::from(1u32));
+        assert_eq!(coin.value(), Value::from(1u32));
+
+        assert!(ledger_state.can_lead(&commitment));
+        assert!(epoch_state.is_eligible_leader(&commitment));
 
         let apply_proof_err = ledger_state
             .try_apply_proof::<HeaderId>(&proof, ledger_config)
             .err();
-
-        assert_eq!(coin.value(), Value::from(1u32));
 
         // Commitment cannot be spent twice
         assert!(
