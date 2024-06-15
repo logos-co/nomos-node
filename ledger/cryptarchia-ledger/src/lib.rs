@@ -386,7 +386,7 @@ impl core::fmt::Debug for LedgerState {
 
 #[cfg(test)]
 pub mod tests {
-    use super::{Coin, EpochState, LeaderProof, Ledger, LedgerState, Nullifier};
+    use super::{Coin, EpochState, LeaderProof, Ledger, LedgerState, Nullifier, Value};
     use crate::{crypto::Blake2b, Commitment, Config, LedgerError};
     use blake2::Digest;
     use cryptarchia_engine::Slot;
@@ -809,6 +809,8 @@ pub mod tests {
         let apply_proof_err = ledger_state
             .try_apply_proof::<HeaderId>(&proof, ledger_config)
             .err();
+
+        assert_eq!(coin.value(), Value::from(1u32));
 
         // Commitment cannot be spent twice
         assert!(
