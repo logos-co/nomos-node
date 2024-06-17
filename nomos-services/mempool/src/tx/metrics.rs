@@ -18,12 +18,12 @@ enum MempoolMsgType {
     MarkInBlock,
 }
 
-impl<BlockId, I, K> From<&MempoolMsg<BlockId, I, K>> for MempoolMsgType
+impl<BlockId, P, I, K> From<&MempoolMsg<BlockId, P, I, K>> for MempoolMsgType
 where
     I: 'static + Debug,
     K: 'static + Debug,
 {
-    fn from(event: &MempoolMsg<BlockId, I, K>) -> Self {
+    fn from(event: &MempoolMsg<BlockId, P, I, K>) -> Self {
         match event {
             MempoolMsg::Add { .. } => MempoolMsgType::Add,
             MempoolMsg::View { .. } => MempoolMsgType::View,
@@ -60,7 +60,7 @@ impl Metrics {
         Self { messages }
     }
 
-    pub(crate) fn record<BlockId, I, K>(&self, msg: &MempoolMsg<BlockId, I, K>)
+    pub(crate) fn record<BlockId, P, I, K>(&self, msg: &MempoolMsg<BlockId, P, I, K>)
     where
         I: 'static + Debug,
         K: 'static + Debug,
