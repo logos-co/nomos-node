@@ -8,8 +8,11 @@ use full_replication::{Certificate, VidCertificate};
 use api::AxumBackend;
 use bytes::Bytes;
 pub use config::{Config, CryptarchiaArgs, HttpArgs, LogArgs, MetricsArgs, NetworkArgs};
+use kzgrs_backend::common::attestation::Attestation;
+use kzgrs_backend::common::blob::DaBlob;
 use nomos_api::ApiService;
 use nomos_core::{da::certificate, header::HeaderId, tx::Transaction, wire};
+use nomos_da_verifier::backend::kzgrs::KzgrsDaVerifier;
 #[cfg(feature = "tracing")]
 use nomos_log::Logger;
 use nomos_mempool::da::verify::fullreplication::DaVerificationProvider as MempoolVerificationProvider;
@@ -81,7 +84,9 @@ pub struct Nomos {
     cl_mempool: ServiceHandle<TxMempool>,
     da_mempool: ServiceHandle<DaMempool>,
     cryptarchia: ServiceHandle<Cryptarchia>,
-    http: ServiceHandle<ApiService<AxumBackend<Tx, Wire, MB16>>>,
+    http: ServiceHandle<
+        ApiService<AxumBackend<Attestation, DaBlob, KzgrsDaVerifier, Tx, Wire, MB16>>,
+    >,
     storage: ServiceHandle<StorageService<RocksBackend<Wire>>>,
     #[cfg(feature = "metrics")]
     metrics: ServiceHandle<Metrics>,

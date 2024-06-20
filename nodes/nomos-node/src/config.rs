@@ -9,7 +9,9 @@ use clap::{Parser, ValueEnum};
 use color_eyre::eyre::{eyre, Result};
 use cryptarchia_ledger::Coin;
 use hex::FromHex;
+use kzgrs_backend::common::{attestation::Attestation, blob::DaBlob};
 use nomos_api::ApiService;
+use nomos_da_verifier::backend::kzgrs::KzgrsDaVerifier;
 use nomos_libp2p::{secp256k1::SecretKey, Multiaddr};
 use nomos_log::{Logger, LoggerBackend, LoggerFormat};
 use nomos_network::backends::libp2p::Libp2p as NetworkBackend;
@@ -116,7 +118,7 @@ pub struct MetricsArgs {
 pub struct Config {
     pub log: <Logger as ServiceData>::Settings,
     pub network: <NetworkService<NetworkBackend> as ServiceData>::Settings,
-    pub http: <ApiService<AxumBackend<Tx, Wire, MB16>> as ServiceData>::Settings,
+    pub http: <ApiService<AxumBackend<Attestation, DaBlob, KzgrsDaVerifier,Tx, Wire, MB16>> as ServiceData>::Settings,
     pub cryptarchia: <crate::Cryptarchia as ServiceData>::Settings,
 }
 

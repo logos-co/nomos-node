@@ -1,3 +1,4 @@
+use std::error::Error;
 use std::{fmt::Debug, hash::Hash};
 
 use axum::{
@@ -10,6 +11,23 @@ use hyper::{
     header::{CONTENT_TYPE, USER_AGENT},
     Body, StatusCode,
 };
+use nomos_api::{
+    http::{cl, consensus, da, libp2p, mempool, metrics, storage},
+    Backend,
+};
+use nomos_core::da::DaVerifier as CoreDaVerifier;
+use nomos_core::{
+    da::{attestation::Attestation, blob::Blob},
+    header::HeaderId,
+    tx::Transaction,
+};
+use nomos_da_verifier::backend::VerifierBackend;
+use nomos_mempool::{
+    network::adapters::libp2p::Libp2pAdapter as MempoolNetworkAdapter,
+    tx::service::openapi::Status, MempoolMetrics,
+};
+use nomos_network::backends::libp2p::Libp2p as NetworkBackend;
+use nomos_storage::backends::StorageSerde;
 use overwatch_rs::overwatch::handle::OverwatchHandle;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use tower_http::{
@@ -18,19 +36,6 @@ use tower_http::{
 };
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
-
-use nomos_core::{header::HeaderId, tx::Transaction};
-use nomos_mempool::{
-    network::adapters::libp2p::Libp2pAdapter as MempoolNetworkAdapter,
-    tx::service::openapi::Status, MempoolMetrics,
-};
-use nomos_network::backends::libp2p::Libp2p as NetworkBackend;
-use nomos_storage::backends::StorageSerde;
-
-use nomos_api::{
-    http::{cl, consensus, libp2p, mempool, metrics, storage},
-    Backend,
-};
 
 /// Configuration for the Http Server
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
@@ -41,8 +46,11 @@ pub struct AxumBackendSettings {
     pub cors_origins: Vec<String>,
 }
 
-pub struct AxumBackend<T, S, const SIZE: usize> {
+pub struct AxumBackend<A, B, VB, T, S, const SIZE: usize> {
     settings: AxumBackendSettings,
+    _attestation: core::marker::PhantomData<A>,
+    _blob: core::marker::PhantomData<B>,
+    _verifier_backend: core::marker::PhantomData<VB>,
     _tx: core::marker::PhantomData<T>,
     _storage_serde: core::marker::PhantomData<S>,
 }
@@ -61,8 +69,14 @@ pub struct AxumBackend<T, S, const SIZE: usize> {
 struct ApiDoc;
 
 #[async_trait::async_trait]
-impl<T, S, const SIZE: usize> Backend for AxumBackend<T, S, SIZE>
+impl<A, B, VB, T, S, const SIZE: usize> Backend for AxumBackend<A, B, VB, T, S, SIZE>
 where
+    A: Attestation + Serialize + DeserializeOwned + Clone + Send + Sync + 'static,
+    B: Blob + Serialize + DeserializeOwned + Clone + Send + Sync + 'static,
+    <B as Blob>::BlobId: AsRef<[u8]> + Send + Sync + 'static,
+    VB: VerifierBackend + CoreDaVerifier<DaBlob = B, Attestation = A> + Send + Sync + 'static,
+    <VB as VerifierBackend>::Settings: Clone,
+    <VB as CoreDaVerifier>::Error: Error,
     T: Transaction
         + Clone
         + Debug
@@ -86,6 +100,9 @@ where
     {
         Ok(Self {
             settings,
+            _attestation: core::marker::PhantomData,
+            _blob: core::marker::PhantomData,
+            _verifier_backend: core::marker::PhantomData,
             _tx: core::marker::PhantomData,
             _storage_serde: core::marker::PhantomData,
         })
@@ -124,6 +141,7 @@ where
                 "/cryptarchia/headers",
                 routing::get(cryptarchia_headers::<T, S, SIZE>),
             )
+            .route("/da/add_blob", routing::post(add_blob::<A, B, VB, S>))
             .route("/network/info", routing::get(libp2p_info))
             .route("/storage/block", routing::post(block::<S, T>))
             .route("/mempool/add/tx", routing::post(add_tx::<T>))
@@ -259,6 +277,30 @@ where
     make_request_and_return_response!(consensus::cryptarchia_headers::<Tx, SS, SIZE>(
         &store, from, to
     ))
+}
+
+#[utoipa::path(
+    post,
+    path = "/da/add_blob",
+    responses(
+        (status = 200, description = "Attestation for DA blob", body = Option<Attestation>),
+        (status = 500, description = "Internal server error", body = String),
+    )
+)]
+async fn add_blob<A, B, VB, SS>(
+    State(handle): State<OverwatchHandle>,
+    Json(blob): Json<B>,
+) -> Response
+where
+    A: Attestation + Serialize + DeserializeOwned + Clone + Send + Sync + 'static,
+    B: Blob + Serialize + DeserializeOwned + Clone + Send + Sync + 'static,
+    <B as Blob>::BlobId: AsRef<[u8]> + Send + Sync + 'static,
+    VB: VerifierBackend + CoreDaVerifier<DaBlob = B, Attestation = A>,
+    <VB as VerifierBackend>::Settings: Clone,
+    <VB as CoreDaVerifier>::Error: Error,
+    SS: StorageSerde + Send + Sync + 'static,
+{
+    make_request_and_return_response!(da::add_blob::<A, B, VB, SS>(&handle, blob))
 }
 
 #[utoipa::path(
