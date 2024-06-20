@@ -22,15 +22,15 @@ fn toeplitz1(global_parameters: &[G1Affine], polynomial_degree: usize) -> Vec<G1
 
 fn toeplitz2(coefficients: &[Fr], extended_vector: &[G1Affine]) -> Vec<G1Affine> {
     debug_assert!(coefficients.len().is_power_of_two());
-    let domain: GeneralEvaluationDomain<Fr> =
-        GeneralEvaluationDomain::new(coefficients.len()).expect("Domain should be able to build");
-    let toeplitz_coefficients_fft = domain.fft(coefficients);
-    // let roots_of_unity = compute_roots_of_unity(coefficients.len());
-    // let toeplitz_coefficients_fft = fft_fr(coefficients, &roots_of_unity);
+    // let domain: GeneralEvaluationDomain<Fr> =
+    //     GeneralEvaluationDomain::new(coefficients.len()).expect("Domain should be able to build");
+    // let toeplitz_coefficients_fft = domain.fft(coefficients);
+    let roots_of_unity = compute_roots_of_unity(coefficients.len());
+    let toeplitz_coefficients_fft = fft_fr(coefficients, &roots_of_unity);
     extended_vector
         .iter()
         .copied()
-        .zip(toeplitz_coefficients_fft.iter())
+        .zip(toeplitz_coefficients_fft)
         .map(|(v, c)| (v * c).into_affine())
         .collect()
 }
@@ -55,29 +55,15 @@ pub fn fk20_batch_generate_elements_proofs(
         .powers_of_g
         .iter()
         .copied()
-        .take(polynomial_degree - 1)
+        .take(polynomial_degree)
         .rev()
-        .chain(std::iter::once(G1Affine::identity() * Fr::ZERO).map(G1Projective::into_affine))
         .collect();
 
     let extended_vector = toeplitz1(&global_parameters, polynomial_degree);
-    let toeplitz_coefficients: Vec<Fr> = std::iter::once(
-        polynomial
-            .coeffs
-            .last()
-            .copied()
-            .expect("Polynomial should not be empty"),
-    )
-    .chain(std::iter::repeat(Fr::ZERO).take(polynomial_degree + 1))
-    .chain(
-        polynomial
-            .coeffs
-            .iter()
-            .skip(1)
-            .take(polynomial_degree - 2)
-            .copied(),
-    )
-    .collect();
+    let toeplitz_coefficients: Vec<Fr> = std::iter::repeat(Fr::ZERO)
+        .take(polynomial_degree)
+        .chain(polynomial.coeffs.iter().copied())
+        .collect();
     let h_extended_vector = toeplitz2(&toeplitz_coefficients, &extended_vector);
     let h_vector = toeplitz3(&h_extended_vector, polynomial_degree);
     fft_g1(&h_vector, &roots_of_unity)
@@ -112,7 +98,7 @@ mod test {
 
     #[test]
     fn test_generate_proofs() {
-        for size in [16usize, 32, 64, 128, 256] {
+        for size in [16, 32, 64, 128, 256] {
             let mut buff: Vec<_> = (0..BYTES_PER_FIELD_ELEMENT * size)
                 .map(|i| (i % 255) as u8)
                 .rev()
