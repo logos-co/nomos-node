@@ -4,6 +4,7 @@ use ark_ec::{AffineRepr, CurveGroup};
 use ark_ff::{BigInt, BigInteger, FftField, Field, PrimeField};
 #[cfg(feature = "parallel")]
 use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
+use std::ops::Neg;
 
 pub fn fft_g1(vals: &[G1Affine], roots_of_unity: &[Fr]) -> Vec<G1Affine> {
     debug_assert_eq!(vals.len(), roots_of_unity.len());
@@ -48,8 +49,8 @@ pub fn fft_g1(vals: &[G1Affine], roots_of_unity: &[Fr]) -> Vec<G1Affine> {
         }
     };
     // Double sized so we can use iterator later on
-    let l: Vec<_> = l.into_iter().cycle().take(original_len).collect();
-    let r: Vec<_> = r.into_iter().cycle().take(original_len).collect();
+    let l = l.into_iter().cycle().take(original_len);
+    let r = r.into_iter().cycle().take(original_len);
 
     let y_times_root = {
         #[cfg(feature = "parallel")]
@@ -62,7 +63,7 @@ pub fn fft_g1(vals: &[G1Affine], roots_of_unity: &[Fr]) -> Vec<G1Affine> {
         }
     }
     .enumerate()
-    .map(|(i, y)| (y * roots_of_unity[i % vals.len()]).into_affine());
+    .map(|(i, y)| (y * roots_of_unity[i % vals.len()]));
 
     {
         #[cfg(feature = "parallel")]
@@ -80,7 +81,7 @@ pub fn fft_g1(vals: &[G1Affine], roots_of_unity: &[Fr]) -> Vec<G1Affine> {
         if i < vals.len() / 2 {
             x + y_times_root
         } else {
-            x - y_times_root
+            x + y_times_root.neg()
         }
         .into_affine()
     })
