@@ -3,7 +3,7 @@ use ark_poly::univariate::DensePolynomial;
 use ark_poly::{EvaluationDomain, GeneralEvaluationDomain};
 use ark_poly_commit::kzg10::{UniversalParams, KZG10};
 use divan::counter::ItemsCount;
-use divan::{black_box, counter::BytesCount, AllocProfiler, Bencher};
+use divan::{black_box, Bencher};
 use once_cell::sync::Lazy;
 use rand::RngCore;
 #[cfg(feature = "parallel")]
@@ -61,7 +61,7 @@ fn commit_polynomial_with_element_count_parallelized(bencher: Bencher, element_c
         })
         .input_counter(move |(_evals, _poly)| ItemsCount::new(threads))
         .bench_refs(|(_evals, poly)| {
-            let commitments: Vec<_> = (0..threads)
+            let _commitments: Vec<_> = (0..threads)
                 .into_par_iter()
                 .map(|_| commit_polynomial(poly, &GLOBAL_PARAMETERS))
                 .collect();

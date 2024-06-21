@@ -1,5 +1,4 @@
 pub mod common;
-pub mod fft;
 pub mod fk20;
 pub mod global_parameters;
 pub mod kzg;

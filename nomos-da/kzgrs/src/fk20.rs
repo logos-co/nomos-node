@@ -1,23 +1,19 @@
-use ark_bls12_381::{Fr, G1Affine, G1Projective};
-use ark_ec::{AffineRepr, CurveGroup};
-use ark_ff::{FftField, Field};
-use ark_poly::{EvaluationDomain, GeneralEvaluationDomain, Polynomial as _};
-use num_traits::Zero;
-
-//use crate::common::compute_roots_of_unity;
-use crate::fft::{fft_fr, fft_g1, ifft_g1};
 use crate::{GlobalParameters, Polynomial, Proof};
-
-
+use ark_bls12_381::{Fr, G1Affine, G1Projective};
+use ark_ec::CurveGroup;
+use ark_ff::Field;
+use ark_poly::{EvaluationDomain, GeneralEvaluationDomain};
+use num_traits::Zero;
 
 fn toeplitz1(global_parameters: &[G1Affine], polynomial_degree: usize) -> Vec<G1Projective> {
     debug_assert_eq!(global_parameters.len(), polynomial_degree);
     debug_assert!(polynomial_degree.is_power_of_two());
-    let domain: GeneralEvaluationDomain<Fr> =
-        GeneralEvaluationDomain::new(polynomial_degree*2).expect("Domain should be able to build");
+    let domain: GeneralEvaluationDomain<Fr> = GeneralEvaluationDomain::new(polynomial_degree * 2)
+        .expect("Domain should be able to build");
     let vector_extended: Vec<G1Projective> = global_parameters
         .iter()
-        .copied().map(|pi| G1Projective::from(pi))
+        .copied()
+        .map(|pi| G1Projective::from(pi))
         .chain(std::iter::repeat_with(G1Projective::zero).take(polynomial_degree))
         .collect();
     domain.fft(&vector_extended)
@@ -27,9 +23,7 @@ fn toeplitz2(coefficients: &[Fr], extended_vector: &[G1Projective]) -> Vec<G1Pro
     debug_assert!(coefficients.len().is_power_of_two());
     let domain: GeneralEvaluationDomain<Fr> =
         GeneralEvaluationDomain::new(coefficients.len()).expect("Domain should be able to build");
-    // let toeplitz_coefficients_fft = domain.fft(coefficients);
-    let roots_of_unity = domain.elements().take(coefficients.len()).collect();
-    let toeplitz_coefficients_fft = fft_fr(coefficients, &roots_of_unity);
+    let toeplitz_coefficients_fft = domain.fft(coefficients);
     extended_vector
         .iter()
         .copied()
@@ -38,7 +32,7 @@ fn toeplitz2(coefficients: &[Fr], extended_vector: &[G1Projective]) -> Vec<G1Pro
         .collect()
 }
 
-fn toeplitz3(h_extended_fft: &[G1Projective], polynomial_degree: usize) -> Vec<G1Projective> {
+fn toeplitz3(h_extended_fft: &[G1Projective]) -> Vec<G1Projective> {
     let domain: GeneralEvaluationDomain<Fr> =
         GeneralEvaluationDomain::new(h_extended_fft.len()).expect("Domain should be able to build");
     domain.ifft(h_extended_fft)
@@ -67,8 +61,9 @@ pub fn fk20_batch_generate_elements_proofs(
         .chain(polynomial.coeffs.iter().copied())
         .collect();
     let h_extended_vector = toeplitz2(&toeplitz_coefficients, &extended_vector);
-    let h_vector = toeplitz3(&h_extended_vector, polynomial_degree);
-    domain.fft(&h_vector)
+    let h_vector = toeplitz3(&h_extended_vector);
+    domain
+        .fft(&h_vector)
         .into_iter()
         .map(|g1| Proof {
             w: g1.into_affine(),
@@ -79,14 +74,12 @@ pub fn fk20_batch_generate_elements_proofs(
 
 #[cfg(test)]
 mod test {
-    use crate::common::compute_roots_of_unity;
-    use crate::fk20::{fk20_batch_generate_elements_proofs};
+    use crate::fk20::fk20_batch_generate_elements_proofs;
     use crate::{
         common::bytes_to_polynomial, kzg::generate_element_proof, GlobalParameters, Proof,
         BYTES_PER_FIELD_ELEMENT,
     };
     use ark_bls12_381::{Bls12_381, Fr};
-    use ark_ff::FftField;
     use ark_poly::univariate::DensePolynomial;
     use ark_poly::{EvaluationDomain, GeneralEvaluationDomain};
     use ark_poly_commit::kzg10::KZG10;
@@ -101,7 +94,7 @@ mod test {
     #[test]
     fn test_generate_proofs() {
         for size in [16, 32, 64, 128, 256] {
-            let mut buff: Vec<_> = (0..BYTES_PER_FIELD_ELEMENT * size)
+            let buff: Vec<_> = (0..BYTES_PER_FIELD_ELEMENT * size)
                 .map(|i| (i % 255) as u8)
                 .rev()
                 .collect();
@@ -109,7 +102,6 @@ mod test {
             let (evals, poly) =
                 bytes_to_polynomial::<BYTES_PER_FIELD_ELEMENT>(&buff, domain).unwrap();
             let polynomial_degree = poly.len();
-            //let roots_of_unity: Vec<Fr> = compute_roots_of_unity(size);
             let slow_proofs: Vec<Proof> = (0..polynomial_degree)
                 .map(|i| {
                     generate_element_proof(i, &poly, &evals, &GLOBAL_PARAMETERS, domain).unwrap()

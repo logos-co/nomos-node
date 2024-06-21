@@ -4,11 +4,11 @@ use std::fmt;
 // crates
 use crate::{FieldElement, BYTES_PER_FIELD_ELEMENT};
 use ark_bls12_381::fr::Fr;
-use ark_ff::{BigInt, FftField, Field, Zero};
+use ark_ff::Zero;
 use ark_poly::domain::general::GeneralEvaluationDomain;
 use ark_poly::evaluations::univariate::Evaluations;
 use ark_poly::univariate::DensePolynomial;
-use ark_poly::{EvaluationDomain, Radix2EvaluationDomain};
+use ark_poly::EvaluationDomain;
 use blst::BLST_ERROR;
 use num_bigint::BigUint;
 use thiserror::Error;
