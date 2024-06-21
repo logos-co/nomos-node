@@ -12,17 +12,9 @@ use std::ops::{Mul, Neg};
 /// `factor` need to be `>1`
 pub fn encode(
     polynomial: &DensePolynomial<Fr>,
-    evaluations: &Evaluations<Fr>,
-    factor: usize,
     domain: GeneralEvaluationDomain<Fr>,
 ) -> Evaluations<Fr> {
-    assert!(factor > 1);
-    Evaluations::from_vec_and_domain(
-        (0..evaluations.evals.len() * factor)
-            .map(|i| polynomial.evaluate(&domain.element(i)))
-            .collect(),
-        domain,
-    )
+    Evaluations::from_vec_and_domain(domain.fft(&polynomial.coeffs), domain)
 }
 
 /// Interpolate points into a polynomial, then evaluate the polynomial in the original evaluations
@@ -40,8 +32,10 @@ pub fn decode(
         .unzip();
     let coeffs = lagrange_interpolate(&points, &roots_of_unity);
     Evaluations::from_vec_and_domain(
-        (0..original_chunks_len)
-            .map(|i| coeffs.evaluate(&domain.element(i)))
+        domain
+            .fft(&coeffs)
+            .into_iter()
+            .take(original_chunks_len)
             .collect(),
         domain,
     )
@@ -107,7 +101,7 @@ mod test {
 
         let (evals, poly) = bytes_to_polynomial::<31>(&bytes, *DOMAIN).unwrap();
 
-        let encoded = encode(&poly, &evals, 2, *DOMAIN);
+        let encoded = encode(&poly, *DOMAIN);
         let mut encoded: Vec<Option<Fr>> = encoded.evals.into_iter().map(Some).collect();
 
         let decoded = decode(10, &encoded, *DOMAIN);
