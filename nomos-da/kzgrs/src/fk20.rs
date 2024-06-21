@@ -13,7 +13,7 @@ fn toeplitz1(global_parameters: &[G1Affine], polynomial_degree: usize) -> Vec<G1
     let vector_extended: Vec<G1Projective> = global_parameters
         .iter()
         .copied()
-        .map(|pi| G1Projective::from(pi))
+        .map(G1Projective::from)
         .chain(std::iter::repeat_with(G1Projective::zero).take(polynomial_degree))
         .collect();
     domain.fft(&vector_extended)
