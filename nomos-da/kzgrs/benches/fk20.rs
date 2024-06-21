@@ -47,7 +47,7 @@ fn compute_fk20_proofs_for_size(bencher: Bencher, size: usize) {
 #[cfg(feature = "parallel")]
 #[divan::bench(args = [16, 32, 64, 128, 256, 512, 1024, 2048, 4096])]
 fn compute_parallel_fk20_proofs_for_size(bencher: Bencher, size: usize) {
-    const THREAD_COUNT: usize = 8;
+    let thread_count: usize = rayon::max_num_threads().min(rayon::current_num_threads());
     bencher
         .with_inputs(|| {
             let buff: Vec<_> = (0..BYTES_PER_FIELD_ELEMENT * size)
@@ -58,9 +58,9 @@ fn compute_parallel_fk20_proofs_for_size(bencher: Bencher, size: usize) {
             let (_, poly) = bytes_to_polynomial::<BYTES_PER_FIELD_ELEMENT>(&buff, domain).unwrap();
             poly
         })
-        .input_counter(move |_| ItemsCount::new(size * THREAD_COUNT))
+        .input_counter(move |_| ItemsCount::new(size * thread_count))
         .bench_refs(|(poly)| {
-            black_box((0..THREAD_COUNT).into_par_iter().for_each(|_| {
+            black_box((0..thread_count).into_par_iter().for_each(|_| {
                 fk20_batch_generate_elements_proofs(poly, &GLOBAL_PARAMETERS);
             }))
         });
