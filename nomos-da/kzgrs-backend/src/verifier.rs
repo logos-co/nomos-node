@@ -134,11 +134,9 @@ impl DaVerifier {
         }
     }
 
-    pub fn verify(
-        &self,
-        blob: DaBlob,
-        rows_domain: PolynomialEvaluationDomain,
-    ) -> Option<Attestation> {
+    pub fn verify(&self, blob: DaBlob, rows_domain_size: usize) -> Option<Attestation> {
+        let rows_domain = PolynomialEvaluationDomain::new(rows_domain_size)
+            .expect("Domain should be able to build");
         let is_column_verified = DaVerifier::verify_column(
             &blob.column,
             &blob.column_commitment,
@@ -176,8 +174,7 @@ mod test {
     use ark_poly::{EvaluationDomain, GeneralEvaluationDomain};
     use blst::min_sig::SecretKey;
     use kzgrs::{
-        bytes_to_polynomial, commit_polynomial, generate_element_proof, PolynomialEvaluationDomain,
-        BYTES_PER_FIELD_ELEMENT,
+        bytes_to_polynomial, commit_polynomial, generate_element_proof, BYTES_PER_FIELD_ELEMENT,
     };
     use rand::{thread_rng, RngCore};
 
@@ -224,7 +221,7 @@ mod test {
     fn test_verify() {
         let encoder = &ENCODER;
         let data = rand_data(32);
-        let domain = PolynomialEvaluationDomain::new(16).unwrap();
+        let domain_size = 16usize;
         let mut rng = thread_rng();
         let sks: Vec<SecretKey> = (0..16)
             .map(|_| {
@@ -254,7 +251,7 @@ mod test {
                     .map(|proofs| proofs.get(i).cloned().unwrap())
                     .collect(),
             };
-            assert!(verifier.verify(da_blob, domain).is_some());
+            assert!(verifier.verify(da_blob, domain_size).is_some());
         }
     }
 }
