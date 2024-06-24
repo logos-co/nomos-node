@@ -1,9 +1,7 @@
 use ark_bls12_381::Fr;
 use ark_ff::{BigInteger, Field, PrimeField};
 use ark_poly::univariate::DensePolynomial;
-use ark_poly::{
-    DenseUVPolynomial, EvaluationDomain, Evaluations, GeneralEvaluationDomain, Polynomial,
-};
+use ark_poly::{DenseUVPolynomial, EvaluationDomain, Evaluations, GeneralEvaluationDomain};
 use num_traits::Zero;
 use std::ops::{Mul, Neg};
 
@@ -99,7 +97,7 @@ mod test {
         let mut rng = thread_rng();
         bytes.try_fill(&mut rng).unwrap();
 
-        let (evals, poly) = bytes_to_polynomial::<31>(&bytes, *DOMAIN).unwrap();
+        let (_evals, poly) = bytes_to_polynomial::<31>(&bytes, *DOMAIN).unwrap();
 
         let encoded = encode(&poly, *DOMAIN);
         let mut encoded: Vec<Option<Fr>> = encoded.evals.into_iter().map(Some).collect();

@@ -1,5 +1,6 @@
 // std
 
+use ark_poly::{EvaluationDomain, GeneralEvaluationDomain};
 // crates
 use blst::min_sig::{PublicKey, SecretKey};
 use itertools::{izip, Itertools};
@@ -16,7 +17,7 @@ use crate::common::{
     attestation::Attestation, build_attestation_message, hash_column_and_commitment, Chunk, Column,
 };
 use crate::encoder::DaEncoderParams;
-use crate::global::{DOMAIN, GLOBAL_PARAMETERS};
+use crate::global::GLOBAL_PARAMETERS;
 
 pub struct DaVerifier {
     // TODO: substitute this for an abstraction to sign things over
@@ -44,9 +45,11 @@ impl DaVerifier {
         aggregated_column_proof: &Proof,
         index: usize,
     ) -> bool {
+        let domain =
+            GeneralEvaluationDomain::new(column.len()).expect("Domain should be able to build");
         // 1. compute commitment for column
         let Ok((_, polynomial)) =
-            bytes_to_polynomial::<BYTES_PER_FIELD_ELEMENT>(column.as_bytes().as_slice(), *DOMAIN)
+            bytes_to_polynomial::<BYTES_PER_FIELD_ELEMENT>(column.as_bytes().as_slice(), domain)
         else {
             return false;
         };
@@ -69,19 +72,27 @@ impl DaVerifier {
             &element,
             aggregated_column_commitment,
             aggregated_column_proof,
-            *DOMAIN,
+            domain,
             &GLOBAL_PARAMETERS,
         )
     }
 
-    fn verify_chunk(chunk: &Chunk, commitment: &Commitment, proof: &Proof, index: usize) -> bool {
+    fn verify_chunk(
+        chunk: &Chunk,
+        commitment: &Commitment,
+        proof: &Proof,
+        index: usize,
+        domain_size: usize,
+    ) -> bool {
+        let domain =
+            GeneralEvaluationDomain::new(domain_size).expect("Domain should be able to build");
         let element = field_element_from_bytes_le(chunk.as_bytes().as_slice());
         verify_element_proof(
             index,
             &element,
             commitment,
             proof,
-            *DOMAIN,
+            domain,
             &GLOBAL_PARAMETERS,
         )
     }
@@ -99,7 +110,7 @@ impl DaVerifier {
             return false;
         }
         for (chunk, commitment, proof) in izip!(chunks, commitments, proofs) {
-            if !DaVerifier::verify_chunk(chunk, commitment, proof, index) {
+            if !DaVerifier::verify_chunk(chunk, commitment, proof, index, chunk.len()) {
                 return false;
             }
         }
@@ -153,8 +164,9 @@ mod test {
     use crate::common::{hash_column_and_commitment, Chunk, Column};
     use crate::encoder::test::{rand_data, ENCODER};
     use crate::encoder::DaEncoderParams;
-    use crate::global::{DOMAIN, GLOBAL_PARAMETERS};
+    use crate::global::GLOBAL_PARAMETERS;
     use crate::verifier::DaVerifier;
+    use ark_poly::{EvaluationDomain, GeneralEvaluationDomain};
     use blst::min_sig::SecretKey;
     use kzgrs::{
         bytes_to_polynomial, commit_polynomial, generate_element_proof, BYTES_PER_FIELD_ELEMENT,
@@ -164,8 +176,9 @@ mod test {
     #[test]
     fn test_verify_column() {
         let column: Column = (0..10).map(|i| Chunk(vec![i; 32])).collect();
+        let domain = GeneralEvaluationDomain::new(32).unwrap();
         let (_, column_poly) =
-            bytes_to_polynomial::<BYTES_PER_FIELD_ELEMENT>(column.as_bytes().as_slice(), *DOMAIN)
+            bytes_to_polynomial::<BYTES_PER_FIELD_ELEMENT>(column.as_bytes().as_slice(), domain)
                 .unwrap();
         let column_commitment = commit_polynomial(&column_poly, &GLOBAL_PARAMETERS).unwrap();
         let (aggregated_evals, aggregated_poly) = bytes_to_polynomial::<
@@ -176,7 +189,7 @@ mod test {
                 &column_commitment,
             )
             .as_slice(),
-            *DOMAIN,
+            domain,
         )
         .unwrap();
         let aggregated_commitment =
@@ -186,7 +199,7 @@ mod test {
             &aggregated_poly,
             &aggregated_evals,
             &GLOBAL_PARAMETERS,
-            *DOMAIN,
+            domain,
         )
         .unwrap();
         assert!(DaVerifier::verify_column(

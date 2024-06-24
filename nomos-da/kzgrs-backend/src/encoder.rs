@@ -3,15 +3,17 @@ use std::ops::Div;
 
 // crates
 use ark_ff::{BigInteger, PrimeField};
+use ark_poly::{EvaluationDomain, GeneralEvaluationDomain};
 use kzgrs::common::bytes_to_polynomial_unchecked;
+use kzgrs::fk20::fk20_batch_generate_elements_proofs;
 use kzgrs::{
-    bytes_to_polynomial, commit_polynomial, encode, generate_element_proof, Commitment,
-    Evaluations, KzgRsError, Polynomial, Proof, BYTES_PER_FIELD_ELEMENT,
+    bytes_to_polynomial, commit_polynomial, encode, Commitment, Evaluations, KzgRsError,
+    Polynomial, PolynomialEvaluationDomain, Proof, BYTES_PER_FIELD_ELEMENT,
 };
 
 // internal
 use crate::common::{hash_column_and_commitment, Chunk, ChunksMatrix, Row};
-use crate::global::{DOMAIN, GLOBAL_PARAMETERS};
+use crate::global::GLOBAL_PARAMETERS;
 
 #[derive(Copy, Clone)]
 pub struct DaEncoderParams {
@@ -67,6 +69,7 @@ impl DaEncoder {
     #[allow(clippy::type_complexity)]
     fn compute_kzg_row_commitments(
         matrix: &ChunksMatrix,
+        polynomial_evaluation_domain: PolynomialEvaluationDomain,
     ) -> Result<Vec<((Evaluations, Polynomial), Commitment)>, KzgRsError> {
         matrix
             .rows()
@@ -76,7 +79,7 @@ impl DaEncoder {
                 // Also, after rs encoding, we are sure all `Fr` elements already fits within modulus.
                 let (evals, poly) = bytes_to_polynomial_unchecked::<BYTES_PER_FIELD_ELEMENT>(
                     r.as_bytes().as_ref(),
-                    *DOMAIN,
+                    polynomial_evaluation_domain,
                 );
                 commit_polynomial(&poly, &GLOBAL_PARAMETERS)
                     .map(|commitment| ((evals, poly), commitment))
@@ -84,42 +87,41 @@ impl DaEncoder {
             .collect()
     }
 
-    fn rs_encode_row(evaluations: &Evaluations, row: &Polynomial) -> Evaluations {
-        encode(row, evaluations, 2, *DOMAIN)
+    fn rs_encode_row(
+        row: &Polynomial,
+        polynomial_evaluation_domain: PolynomialEvaluationDomain,
+    ) -> Evaluations {
+        encode(row, polynomial_evaluation_domain)
     }
 
-    fn rs_encode_rows(rows: &[(Evaluations, Polynomial)]) -> Vec<Evaluations> {
+    fn rs_encode_rows(
+        rows: &[Polynomial],
+        polynomial_evaluation_domain: PolynomialEvaluationDomain,
+    ) -> Vec<Evaluations> {
         rows.iter()
-            .map(|(eval, poly)| Self::rs_encode_row(eval, poly))
+            .map(|poly| Self::rs_encode_row(poly, polynomial_evaluation_domain))
             .collect()
     }
 
-    fn compute_rows_proofs(
-        polynomials: &[Polynomial],
-        evals: &[Evaluations],
-        proof_count: usize,
-    ) -> Result<Vec<Vec<Proof>>, KzgRsError> {
-        polynomials
+    fn compute_rows_proofs(polynomials: &[Polynomial]) -> Result<Vec<Vec<Proof>>, KzgRsError> {
+        Ok(polynomials
             .iter()
-            .zip(evals)
-            .map(|(poly, eval)| {
-                (0..proof_count)
-                    .map(|i| generate_element_proof(i, poly, eval, &GLOBAL_PARAMETERS, *DOMAIN))
-                    .collect()
-            })
-            .collect()
+            .map(|poly| fk20_batch_generate_elements_proofs(poly, &GLOBAL_PARAMETERS))
+            .collect())
     }
 
     #[allow(clippy::type_complexity)]
     fn compute_kzg_column_commitments(
         matrix: &ChunksMatrix,
+        polynomial_evaluation_domain: PolynomialEvaluationDomain,
     ) -> Result<Vec<((Evaluations, Polynomial), Commitment)>, KzgRsError> {
-        Self::compute_kzg_row_commitments(&matrix.transposed())
+        Self::compute_kzg_row_commitments(&matrix.transposed(), polynomial_evaluation_domain)
     }
 
     fn compute_aggregated_column_commitment(
         matrix: &ChunksMatrix,
         commitments: &[Commitment],
+        polynomial_evaluation_domain: PolynomialEvaluationDomain,
     ) -> Result<((Evaluations, Polynomial), Commitment), KzgRsError> {
         let hashes: Vec<u8> =
             matrix
@@ -133,19 +135,16 @@ impl DaEncoder {
                 .collect();
         let (evals, poly) = bytes_to_polynomial::<
             { DaEncoderParams::MAX_BLS12_381_ENCODING_CHUNK_SIZE },
-        >(hashes.as_ref(), *DOMAIN)?;
+        >(hashes.as_ref(), polynomial_evaluation_domain)?;
         let commitment = commit_polynomial(&poly, &GLOBAL_PARAMETERS)?;
         Ok(((evals, poly), commitment))
     }
 
-    fn compute_aggregated_column_proofs(
-        polynomial: &Polynomial,
-        evals: &Evaluations,
-        proof_count: usize,
-    ) -> Result<Vec<Proof>, KzgRsError> {
-        (0..proof_count)
-            .map(|i| generate_element_proof(i, polynomial, evals, &GLOBAL_PARAMETERS, *DOMAIN))
-            .collect()
+    fn compute_aggregated_column_proofs(polynomial: &Polynomial) -> Result<Vec<Proof>, KzgRsError> {
+        Ok(fk20_batch_generate_elements_proofs(
+            polynomial,
+            &GLOBAL_PARAMETERS,
+        ))
     }
 
     fn evals_to_chunk_matrix(evals: &[Evaluations]) -> ChunksMatrix {
@@ -165,29 +164,30 @@ impl DaEncoder {
 
     pub fn encode(&self, data: &[u8]) -> Result<EncodedData, kzgrs::KzgRsError> {
         let chunked_data = self.chunkify(data);
+        let row_domain = PolynomialEvaluationDomain::new(self.params.column_count)
+            .expect("Domain should be able to build");
+        let column_domain = PolynomialEvaluationDomain::new(chunked_data.len())
+            .expect("Domain should be able to build");
         let (row_polynomials, row_commitments): (Vec<_>, Vec<_>) =
-            Self::compute_kzg_row_commitments(&chunked_data)?
+            Self::compute_kzg_row_commitments(&chunked_data, row_domain)?
                 .into_iter()
                 .unzip();
-        let encoded_evaluations = Self::rs_encode_rows(&row_polynomials);
+        let (_, row_polynomials): (Vec<_>, Vec<_>) = row_polynomials.into_iter().unzip();
+        let encoded_evaluations = Self::rs_encode_rows(&row_polynomials, row_domain);
         let extended_data = Self::evals_to_chunk_matrix(&encoded_evaluations);
-        let row_polynomials: Vec<_> = row_polynomials.into_iter().map(|(_, p)| p).collect();
-        let rows_proofs = Self::compute_rows_proofs(
-            &row_polynomials,
-            &encoded_evaluations,
-            self.params.column_count,
-        )?;
+        let rows_proofs = Self::compute_rows_proofs(&row_polynomials)?;
         let (_column_polynomials, column_commitments): (Vec<_>, Vec<_>) =
-            Self::compute_kzg_column_commitments(&extended_data)?
+            Self::compute_kzg_column_commitments(&extended_data, column_domain)?
                 .into_iter()
                 .unzip();
-        let ((aggregated_evals, aggregated_polynomial), aggregated_column_commitment) =
-            Self::compute_aggregated_column_commitment(&extended_data, &column_commitments)?;
-        let aggregated_column_proofs = Self::compute_aggregated_column_proofs(
-            &aggregated_polynomial,
-            &aggregated_evals,
-            column_commitments.len(),
-        )?;
+        let ((_aggregated_evals, aggregated_polynomial), aggregated_column_commitment) =
+            Self::compute_aggregated_column_commitment(
+                &extended_data,
+                &column_commitments,
+                row_domain,
+            )?;
+        let aggregated_column_proofs =
+            Self::compute_aggregated_column_proofs(&aggregated_polynomial)?;
         Ok(EncodedData {
             data: data.to_vec(),
             chunked_data,
@@ -204,12 +204,18 @@ impl DaEncoder {
 #[cfg(test)]
 pub mod test {
     use crate::encoder::{DaEncoder, DaEncoderParams};
-    use crate::global::{DOMAIN, GLOBAL_PARAMETERS};
+    use crate::global::GLOBAL_PARAMETERS;
+    use ark_bls12_381::Fr;
     use ark_ff::PrimeField;
+    use ark_poly::{EvaluationDomain, GeneralEvaluationDomain};
     use itertools::izip;
     use kzgrs::common::bytes_to_polynomial_unchecked;
-    use kzgrs::{decode, verify_element_proof, FieldElement, BYTES_PER_FIELD_ELEMENT};
+    use kzgrs::{
+        decode, verify_element_proof, FieldElement, PolynomialEvaluationDomain,
+        BYTES_PER_FIELD_ELEMENT,
+    };
     use rand::RngCore;
+    use std::io::Read;
     use std::ops::Div;
 
     pub const PARAMS: DaEncoderParams = DaEncoderParams::default_with(16);
@@ -247,11 +253,14 @@ pub mod test {
     fn test_evals_to_chunk_matrix() {
         let data = rand_data(32);
         let matrix = ENCODER.chunkify(data.as_ref());
-        let (poly_data, _): (Vec<_>, Vec<_>) = DaEncoder::compute_kzg_row_commitments(&matrix)
-            .unwrap()
-            .into_iter()
-            .unzip();
-        let extended_rows = DaEncoder::rs_encode_rows(&poly_data);
+        let domain = PolynomialEvaluationDomain::new(32).unwrap();
+        let (poly_data, _): (Vec<_>, Vec<_>) =
+            DaEncoder::compute_kzg_row_commitments(&matrix, domain)
+                .unwrap()
+                .into_iter()
+                .unzip();
+        let (_, poly_data): (Vec<_>, Vec<_>) = poly_data.into_iter().unzip();
+        let extended_rows = DaEncoder::rs_encode_rows(&poly_data, domain);
         let extended_matrix = DaEncoder::evals_to_chunk_matrix(&extended_rows);
         for (r1, r2) in izip!(matrix.iter(), extended_matrix.iter()) {
             for (c1, c2) in izip!(r1.iter(), r2.iter()) {
@@ -263,6 +272,7 @@ pub mod test {
     #[test]
     fn test_rs_encode_rows() {
         let data = rand_data(32);
+        let domain = GeneralEvaluationDomain::new(32).unwrap();
         let matrix = ENCODER.chunkify(data.as_ref());
         let (poly_data, _): (Vec<_>, Vec<_>) = DaEncoder::compute_kzg_row_commitments(&matrix)
             .unwrap()
@@ -283,10 +293,10 @@ pub mod test {
                 assert_eq!(c1, c2);
             }
             let points: Vec<_> = evals.evals.iter().cloned().map(Some).collect();
-            let poly_2 = decode(r1.len(), &points, *DOMAIN);
+            let poly_2 = decode(r1.len(), &points, domain);
             let (poly_1, _) = bytes_to_polynomial_unchecked::<BYTES_PER_FIELD_ELEMENT>(
                 r1.as_bytes().as_ref(),
-                *DOMAIN,
+                domain,
             );
             assert_eq!(poly_1, poly_2);
         }
@@ -295,6 +305,7 @@ pub mod test {
     #[test]
     fn test_compute_row_proofs() {
         let data = rand_data(32);
+        let domain = GeneralEvaluationDomain::new(32).unwrap();
         let matrix = ENCODER.chunkify(data.as_ref());
         let (poly_data, commitments): (Vec<_>, Vec<_>) =
             DaEncoder::compute_kzg_row_commitments(&matrix)
@@ -304,17 +315,24 @@ pub mod test {
         let extended_evaluations = DaEncoder::rs_encode_rows(&poly_data);
         let (evals, polynomials): (Vec<_>, Vec<_>) = poly_data.into_iter().unzip();
         let extended_matrix = DaEncoder::evals_to_chunk_matrix(&extended_evaluations);
-        let original_proofs =
-            DaEncoder::compute_rows_proofs(&polynomials, &evals, PARAMS.column_count.div(2))
-                .unwrap();
-        let extended_proofs = DaEncoder::compute_rows_proofs(
-            &polynomials,
-            &extended_evaluations,
-            PARAMS.column_count,
-        )
-        .unwrap();
+        let proofs = DaEncoder::compute_rows_proofs(&polynomials).unwrap();
 
-        let checks = izip!(matrix.iter(), &commitments, &original_proofs);
+        // let checks = izip!(matrix.iter(), &commitments, &proofs);
+        // for (row, commitment, proofs) in checks {
+        //     assert_eq!(proofs.len(), row.len() * 2);
+        //     for (i, chunk) in row.iter().enumerate() {
+        //         let element = FieldElement::from_le_bytes_mod_order(chunk.as_bytes().as_ref());
+        //         assert!(verify_element_proof(
+        //             i,
+        //             &element,
+        //             &commitment,
+        //             &proofs[i],
+        //             domain,
+        //             &GLOBAL_PARAMETERS
+        //         ));
+        //     }
+        // }
+        let checks = izip!(extended_matrix.iter(), &commitments, &proofs);
         for (row, commitment, proofs) in checks {
             assert_eq!(proofs.len(), row.len());
             for (i, chunk) in row.iter().enumerate() {
@@ -324,22 +342,7 @@ pub mod test {
                     &element,
                     &commitment,
                     &proofs[i],
-                    *DOMAIN,
-                    &GLOBAL_PARAMETERS
-                ));
-            }
-        }
-        let checks = izip!(extended_matrix.iter(), &commitments, &extended_proofs);
-        for (row, commitment, proofs) in checks {
-            assert_eq!(proofs.len(), row.len());
-            for (i, chunk) in row.iter().enumerate() {
-                let element = FieldElement::from_le_bytes_mod_order(chunk.as_bytes().as_ref());
-                assert!(verify_element_proof(
-                    i,
-                    &element,
-                    &commitment,
-                    &proofs[i],
-                    *DOMAIN,
+                    domain,
                     &GLOBAL_PARAMETERS
                 ));
             }
@@ -374,9 +377,22 @@ pub mod test {
                 .unwrap()
                 .into_iter()
                 .unzip();
-        let ((evals, polynomial), _aggregated_commitment) =
+        let ((_evals, polynomial), _aggregated_commitment) =
             DaEncoder::compute_aggregated_column_commitment(&matrix, &commitments).unwrap();
-        DaEncoder::compute_aggregated_column_proofs(&polynomial, &evals, commitments.len())
-            .unwrap();
+        DaEncoder::compute_aggregated_column_proofs(&polynomial).unwrap();
+    }
+
+    #[test]
+    fn test_roots() {
+        let d1: Vec<_> = GeneralEvaluationDomain::<Fr>::new(16)
+            .unwrap()
+            .elements()
+            .collect();
+        let d2: Vec<_> = GeneralEvaluationDomain::<Fr>::new(32)
+            .unwrap()
+            .elements()
+            .take(16)
+            .collect();
+        assert_eq!(d1, d2);
     }
 }

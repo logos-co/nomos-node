@@ -6,6 +6,3 @@ pub static GLOBAL_PARAMETERS: Lazy<GlobalParameters> = Lazy::new(|| {
     let mut rng = rand::thread_rng();
     global_parameters_from_randomness(&mut rng)
 });
-
-pub static DOMAIN: Lazy<PolynomialEvaluationDomain> =
-    Lazy::new(|| PolynomialEvaluationDomain::new(8192).unwrap());
