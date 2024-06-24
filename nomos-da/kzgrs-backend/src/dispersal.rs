@@ -221,8 +221,10 @@ impl AsRef<[u8]> for Index {
 
 #[cfg(test)]
 mod tests {
+    use ark_poly::EvaluationDomain;
     use bitvec::prelude::*;
     use blst::min_sig::{PublicKey, SecretKey};
+    use kzgrs::PolynomialEvaluationDomain;
     use rand::{rngs::OsRng, thread_rng, Rng, RngCore};
 
     use crate::{
@@ -250,6 +252,8 @@ mod tests {
         verifiers: &[DaVerifier],
     ) -> Vec<Attestation> {
         let mut attestations = Vec::new();
+        let domain =
+            PolynomialEvaluationDomain::new(encoded_data.extended_data.0[0].len()).unwrap();
         for (i, column) in encoded_data.extended_data.columns().enumerate() {
             let verifier = &verifiers[i];
             let da_blob = DaBlob {
@@ -264,7 +268,7 @@ mod tests {
                     .map(|proofs| proofs.get(i).cloned().unwrap())
                     .collect(),
             };
-            attestations.push(verifier.verify(da_blob).unwrap());
+            attestations.push(verifier.verify(da_blob, domain).unwrap());
         }
         attestations
     }

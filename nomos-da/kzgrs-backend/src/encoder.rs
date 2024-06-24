@@ -3,7 +3,7 @@ use std::ops::Div;
 
 // crates
 use ark_ff::{BigInteger, PrimeField};
-use ark_poly::{EvaluationDomain, GeneralEvaluationDomain};
+use ark_poly::EvaluationDomain;
 use kzgrs::common::bytes_to_polynomial_unchecked;
 use kzgrs::fk20::fk20_batch_generate_elements_proofs;
 use kzgrs::{
@@ -205,7 +205,6 @@ impl DaEncoder {
 pub mod test {
     use crate::encoder::{DaEncoder, DaEncoderParams};
     use crate::global::GLOBAL_PARAMETERS;
-    use ark_bls12_381::Fr;
     use ark_ff::PrimeField;
     use ark_poly::{EvaluationDomain, GeneralEvaluationDomain};
     use itertools::izip;
@@ -215,10 +214,10 @@ pub mod test {
         BYTES_PER_FIELD_ELEMENT,
     };
     use rand::RngCore;
-    use std::io::Read;
     use std::ops::Div;
 
-    pub const PARAMS: DaEncoderParams = DaEncoderParams::default_with(16);
+    pub const DOMAIN_SIZE: usize = 16;
+    pub const PARAMS: DaEncoderParams = DaEncoderParams::default_with(DOMAIN_SIZE);
     pub const ENCODER: DaEncoder = DaEncoder::new(PARAMS);
 
     pub fn rand_data(elements_count: usize) -> Vec<u8> {
@@ -244,8 +243,9 @@ pub mod test {
     #[test]
     fn test_compute_row_kzg_commitments() {
         let data = rand_data(32);
+        let domain = GeneralEvaluationDomain::new(DOMAIN_SIZE).unwrap();
         let matrix = ENCODER.chunkify(data.as_ref());
-        let commitments_data = DaEncoder::compute_kzg_row_commitments(&matrix).unwrap();
+        let commitments_data = DaEncoder::compute_kzg_row_commitments(&matrix, domain).unwrap();
         assert_eq!(commitments_data.len(), matrix.len());
     }
 
@@ -253,7 +253,7 @@ pub mod test {
     fn test_evals_to_chunk_matrix() {
         let data = rand_data(32);
         let matrix = ENCODER.chunkify(data.as_ref());
-        let domain = PolynomialEvaluationDomain::new(32).unwrap();
+        let domain = PolynomialEvaluationDomain::new(DOMAIN_SIZE).unwrap();
         let (poly_data, _): (Vec<_>, Vec<_>) =
             DaEncoder::compute_kzg_row_commitments(&matrix, domain)
                 .unwrap()
@@ -272,14 +272,15 @@ pub mod test {
     #[test]
     fn test_rs_encode_rows() {
         let data = rand_data(32);
-        let domain = GeneralEvaluationDomain::new(32).unwrap();
+        let domain = GeneralEvaluationDomain::new(DOMAIN_SIZE).unwrap();
         let matrix = ENCODER.chunkify(data.as_ref());
-        let (poly_data, _): (Vec<_>, Vec<_>) = DaEncoder::compute_kzg_row_commitments(&matrix)
-            .unwrap()
-            .into_iter()
-            .unzip();
-        let extended_rows = DaEncoder::rs_encode_rows(&poly_data);
-        let (evals, _): (Vec<_>, Vec<_>) = poly_data.into_iter().unzip();
+        let (poly_data, _): (Vec<_>, Vec<_>) =
+            DaEncoder::compute_kzg_row_commitments(&matrix, domain)
+                .unwrap()
+                .into_iter()
+                .unzip();
+        let (evals, polynomials): (Vec<_>, Vec<_>) = poly_data.into_iter().unzip();
+        let extended_rows = DaEncoder::rs_encode_rows(&polynomials, domain);
         // check encoding went well, original evaluation points vs extended ones
         for (e1, e2) in izip!(evals.iter(), extended_rows.iter()) {
             for (c1, c2) in izip!(&e1.evals, &e2.evals) {
@@ -305,33 +306,33 @@ pub mod test {
     #[test]
     fn test_compute_row_proofs() {
         let data = rand_data(32);
-        let domain = GeneralEvaluationDomain::new(32).unwrap();
+        let domain = GeneralEvaluationDomain::new(DOMAIN_SIZE).unwrap();
         let matrix = ENCODER.chunkify(data.as_ref());
         let (poly_data, commitments): (Vec<_>, Vec<_>) =
-            DaEncoder::compute_kzg_row_commitments(&matrix)
+            DaEncoder::compute_kzg_row_commitments(&matrix, domain)
                 .unwrap()
                 .into_iter()
                 .unzip();
-        let extended_evaluations = DaEncoder::rs_encode_rows(&poly_data);
-        let (evals, polynomials): (Vec<_>, Vec<_>) = poly_data.into_iter().unzip();
+        let (_evals, polynomials): (Vec<_>, Vec<_>) = poly_data.into_iter().unzip();
+        let extended_evaluations = DaEncoder::rs_encode_rows(&polynomials, domain);
         let extended_matrix = DaEncoder::evals_to_chunk_matrix(&extended_evaluations);
         let proofs = DaEncoder::compute_rows_proofs(&polynomials).unwrap();
 
-        // let checks = izip!(matrix.iter(), &commitments, &proofs);
-        // for (row, commitment, proofs) in checks {
-        //     assert_eq!(proofs.len(), row.len() * 2);
-        //     for (i, chunk) in row.iter().enumerate() {
-        //         let element = FieldElement::from_le_bytes_mod_order(chunk.as_bytes().as_ref());
-        //         assert!(verify_element_proof(
-        //             i,
-        //             &element,
-        //             &commitment,
-        //             &proofs[i],
-        //             domain,
-        //             &GLOBAL_PARAMETERS
-        //         ));
-        //     }
-        // }
+        let checks = izip!(matrix.iter(), &commitments, &proofs);
+        for (row, commitment, proofs) in checks {
+            assert_eq!(proofs.len(), row.len() * 2);
+            for (i, chunk) in row.iter().enumerate() {
+                let element = FieldElement::from_le_bytes_mod_order(chunk.as_bytes().as_ref());
+                assert!(verify_element_proof(
+                    i,
+                    &element,
+                    &commitment,
+                    &proofs[i],
+                    domain,
+                    &GLOBAL_PARAMETERS
+                ));
+            }
+        }
         let checks = izip!(extended_matrix.iter(), &commitments, &proofs);
         for (row, commitment, proofs) in checks {
             assert_eq!(proofs.len(), row.len());
@@ -352,8 +353,9 @@ pub mod test {
     #[test]
     fn test_compute_column_kzg_commitments() {
         let data = rand_data(32);
+        let domain = GeneralEvaluationDomain::new(DOMAIN_SIZE).unwrap();
         let matrix = ENCODER.chunkify(data.as_ref());
-        let commitments_data = DaEncoder::compute_kzg_column_commitments(&matrix).unwrap();
+        let commitments_data = DaEncoder::compute_kzg_column_commitments(&matrix, domain).unwrap();
         assert_eq!(commitments_data.len(), matrix.columns().count());
     }
 
@@ -361,38 +363,58 @@ pub mod test {
     fn test_compute_aggregated_column_kzg_commitment() {
         let data = rand_data(32);
         let matrix = ENCODER.chunkify(data.as_ref());
-        let (_, commitments): (Vec<_>, Vec<_>) = DaEncoder::compute_kzg_column_commitments(&matrix)
-            .unwrap()
-            .into_iter()
-            .unzip();
-        let _ = DaEncoder::compute_aggregated_column_commitment(&matrix, &commitments).unwrap();
+        let domain = GeneralEvaluationDomain::new(DOMAIN_SIZE).unwrap();
+        let (_, commitments): (Vec<_>, Vec<_>) =
+            DaEncoder::compute_kzg_column_commitments(&matrix, domain)
+                .unwrap()
+                .into_iter()
+                .unzip();
+        let _ =
+            DaEncoder::compute_aggregated_column_commitment(&matrix, &commitments, domain).unwrap();
     }
 
     #[test]
     fn test_compute_aggregated_column_kzg_proofs() {
         let data = rand_data(32);
         let matrix = ENCODER.chunkify(data.as_ref());
+        let domain = GeneralEvaluationDomain::new(DOMAIN_SIZE).unwrap();
         let (_poly_data, commitments): (Vec<_>, Vec<_>) =
-            DaEncoder::compute_kzg_column_commitments(&matrix)
+            DaEncoder::compute_kzg_column_commitments(&matrix, domain)
                 .unwrap()
                 .into_iter()
                 .unzip();
         let ((_evals, polynomial), _aggregated_commitment) =
-            DaEncoder::compute_aggregated_column_commitment(&matrix, &commitments).unwrap();
+            DaEncoder::compute_aggregated_column_commitment(&matrix, &commitments, domain).unwrap();
         DaEncoder::compute_aggregated_column_proofs(&polynomial).unwrap();
     }
 
     #[test]
-    fn test_roots() {
-        let d1: Vec<_> = GeneralEvaluationDomain::<Fr>::new(16)
-            .unwrap()
-            .elements()
-            .collect();
-        let d2: Vec<_> = GeneralEvaluationDomain::<Fr>::new(32)
-            .unwrap()
-            .elements()
-            .take(16)
-            .collect();
-        assert_eq!(d1, d2);
+    fn test_full_encode_flow() {
+        let data = rand_data(32);
+        let domain = GeneralEvaluationDomain::new(DOMAIN_SIZE).unwrap();
+        let encoding_data = ENCODER.encode(&data).unwrap();
+        assert_eq!(encoding_data.data, data);
+        assert_eq!(encoding_data.row_commitments.len(), 4);
+        assert_eq!(encoding_data.column_commitments.len(), 16);
+        assert_eq!(encoding_data.rows_proofs.len(), 4);
+        assert_eq!(encoding_data.rows_proofs[0].len(), 16);
+        assert_eq!(encoding_data.aggregated_column_proofs.len(), 16);
+        for (row, proofs, commitment) in izip!(
+            encoding_data.extended_data.rows(),
+            encoding_data.rows_proofs,
+            encoding_data.row_commitments
+        ) {
+            for (chunk_idx, chunk) in row.iter().enumerate() {
+                let element = FieldElement::from_le_bytes_mod_order(chunk.as_bytes().as_ref());
+                assert!(verify_element_proof(
+                    chunk_idx,
+                    &element,
+                    &commitment,
+                    &proofs[chunk_idx],
+                    domain,
+                    &GLOBAL_PARAMETERS
+                ));
+            }
+        }
     }
 }

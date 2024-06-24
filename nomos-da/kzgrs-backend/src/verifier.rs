@@ -1,13 +1,13 @@
 // std
 
-use ark_poly::{EvaluationDomain, GeneralEvaluationDomain};
+use ark_poly::EvaluationDomain;
 // crates
 use blst::min_sig::{PublicKey, SecretKey};
 use itertools::{izip, Itertools};
 use kzgrs::common::field_element_from_bytes_le;
 use kzgrs::{
-    bytes_to_polynomial, commit_polynomial, verify_element_proof, Commitment, Proof,
-    BYTES_PER_FIELD_ELEMENT,
+    bytes_to_polynomial, commit_polynomial, verify_element_proof, Commitment,
+    PolynomialEvaluationDomain, Proof, BYTES_PER_FIELD_ELEMENT,
 };
 
 use crate::common::blob::DaBlob;
@@ -44,13 +44,15 @@ impl DaVerifier {
         aggregated_column_commitment: &Commitment,
         aggregated_column_proof: &Proof,
         index: usize,
+        rows_domain: PolynomialEvaluationDomain,
     ) -> bool {
-        let domain =
-            GeneralEvaluationDomain::new(column.len()).expect("Domain should be able to build");
+        let column_domain =
+            PolynomialEvaluationDomain::new(column.len()).expect("Domain should be able to build");
         // 1. compute commitment for column
-        let Ok((_, polynomial)) =
-            bytes_to_polynomial::<BYTES_PER_FIELD_ELEMENT>(column.as_bytes().as_slice(), domain)
-        else {
+        let Ok((_, polynomial)) = bytes_to_polynomial::<BYTES_PER_FIELD_ELEMENT>(
+            column.as_bytes().as_slice(),
+            column_domain,
+        ) else {
             return false;
         };
         let Ok(computed_column_commitment) = commit_polynomial(&polynomial, &GLOBAL_PARAMETERS)
@@ -72,7 +74,7 @@ impl DaVerifier {
             &element,
             aggregated_column_commitment,
             aggregated_column_proof,
-            domain,
+            rows_domain,
             &GLOBAL_PARAMETERS,
         )
     }
@@ -82,10 +84,8 @@ impl DaVerifier {
         commitment: &Commitment,
         proof: &Proof,
         index: usize,
-        domain_size: usize,
+        domain: PolynomialEvaluationDomain,
     ) -> bool {
-        let domain =
-            GeneralEvaluationDomain::new(domain_size).expect("Domain should be able to build");
         let element = field_element_from_bytes_le(chunk.as_bytes().as_slice());
         verify_element_proof(
             index,
@@ -102,6 +102,7 @@ impl DaVerifier {
         commitments: &[Commitment],
         proofs: &[Proof],
         index: usize,
+        domain: PolynomialEvaluationDomain,
     ) -> bool {
         if ![chunks.len(), commitments.len(), proofs.len()]
             .iter()
@@ -110,7 +111,7 @@ impl DaVerifier {
             return false;
         }
         for (chunk, commitment, proof) in izip!(chunks, commitments, proofs) {
-            if !DaVerifier::verify_chunk(chunk, commitment, proof, index, chunk.len()) {
+            if !DaVerifier::verify_chunk(chunk, commitment, proof, index, domain) {
                 return false;
             }
         }
@@ -133,13 +134,18 @@ impl DaVerifier {
         }
     }
 
-    pub fn verify(&self, blob: DaBlob) -> Option<Attestation> {
+    pub fn verify(
+        &self,
+        blob: DaBlob,
+        rows_domain: PolynomialEvaluationDomain,
+    ) -> Option<Attestation> {
         let is_column_verified = DaVerifier::verify_column(
             &blob.column,
             &blob.column_commitment,
             &blob.aggregated_column_commitment,
             &blob.aggregated_column_proof,
             self.index,
+            rows_domain,
         );
         if !is_column_verified {
             return None;
@@ -150,6 +156,7 @@ impl DaVerifier {
             &blob.rows_commitments,
             &blob.rows_proofs,
             self.index,
+            rows_domain,
         );
         if !are_chunks_verified {
             return None;
@@ -169,14 +176,15 @@ mod test {
     use ark_poly::{EvaluationDomain, GeneralEvaluationDomain};
     use blst::min_sig::SecretKey;
     use kzgrs::{
-        bytes_to_polynomial, commit_polynomial, generate_element_proof, BYTES_PER_FIELD_ELEMENT,
+        bytes_to_polynomial, commit_polynomial, generate_element_proof, PolynomialEvaluationDomain,
+        BYTES_PER_FIELD_ELEMENT,
     };
     use rand::{thread_rng, RngCore};
 
     #[test]
     fn test_verify_column() {
         let column: Column = (0..10).map(|i| Chunk(vec![i; 32])).collect();
-        let domain = GeneralEvaluationDomain::new(32).unwrap();
+        let domain = GeneralEvaluationDomain::new(10).unwrap();
         let (_, column_poly) =
             bytes_to_polynomial::<BYTES_PER_FIELD_ELEMENT>(column.as_bytes().as_slice(), domain)
                 .unwrap();
@@ -207,14 +215,16 @@ mod test {
             &column_commitment,
             &aggregated_commitment,
             &column_proof,
-            0
+            0,
+            domain
         ));
     }
 
     #[test]
     fn test_verify() {
         let encoder = &ENCODER;
-        let data = rand_data(8);
+        let data = rand_data(32);
+        let domain = PolynomialEvaluationDomain::new(16).unwrap();
         let mut rng = thread_rng();
         let sks: Vec<SecretKey> = (0..16)
             .map(|_| {
@@ -230,6 +240,7 @@ mod test {
             .collect();
         let encoded_data = encoder.encode(&data).unwrap();
         for (i, column) in encoded_data.extended_data.columns().enumerate() {
+            println!("{i}");
             let verifier = &verifiers[i];
             let da_blob = DaBlob {
                 column,
@@ -243,7 +254,7 @@ mod test {
                     .map(|proofs| proofs.get(i).cloned().unwrap())
                     .collect(),
             };
-            assert!(verifier.verify(da_blob).is_some());
+            assert!(verifier.verify(da_blob, domain).is_some());
         }
     }
 }

@@ -1,5 +1,4 @@
-use ark_poly::EvaluationDomain;
-use kzgrs::{global_parameters_from_randomness, GlobalParameters, PolynomialEvaluationDomain};
+use kzgrs::{global_parameters_from_randomness, GlobalParameters};
 use once_cell::sync::Lazy;
 
 pub static GLOBAL_PARAMETERS: Lazy<GlobalParameters> = Lazy::new(|| {
