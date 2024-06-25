@@ -773,7 +773,7 @@ pub mod tests {
     }
 
     #[test]
-    fn test_cryptarchia_ledger_error_cases() {
+    fn test_update_epoch_state_with_outdated_slot_error() {
         let coin = coin(0);
         let commitment = coin.commitment();
         let (ledger, genesis) = ledger(&[commitment]);
@@ -797,8 +797,17 @@ pub mod tests {
                 if parent == slot && block == slot2 => {}
             _ => panic!("error does not match the LedgerError::InvalidSlot pattern"),
         };
+    }
+
+    #[test]
+    fn test_apply_proof_with_existing_commitment_error() {
+        let coin = coin(0);
+        let commitment = coin.commitment();
+        let (ledger, genesis) = ledger(&[commitment]);
 
         let ledger_state = ledger.state(&genesis).unwrap().clone();
+        let ledger_config = ledger.config();
+
         let actual_slot = ledger_state.slot();
         let proof = LeaderProof::dummy(actual_slot, commitment, commitment);
         let epoch_state = ledger_state.epoch_state();
@@ -814,7 +823,7 @@ pub mod tests {
             .try_apply_proof::<HeaderId>(&proof, ledger_config)
             .err();
 
-        // Commitment cannot be spent twice
+        // Same commitment value from another coin cannot be used again
         assert!(
             matches!(apply_proof_err, Some(LedgerError::CommitmentExists)),
             "Error does not match LedgerError::CommitmentExists"
