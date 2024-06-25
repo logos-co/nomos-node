@@ -1,9 +1,11 @@
+pub mod attestation;
+
+use attestation::Attestation;
+use nomos_core::da::attestation::Attestation as _;
+use nomos_core::da::certificate::metadata::Next;
+use nomos_core::da::certificate::CertificateStrategy;
 // internal
-use nomos_core::da::{
-    attestation::{self, Attestation as _},
-    blob::{self, BlobHasher},
-    certificate, DaProtocol,
-};
+use nomos_core::da::certificate::{self, metadata};
 // std
 use std::collections::HashSet;
 use std::hash::{Hash, Hasher};
@@ -13,43 +15,15 @@ use blake2::{
     Blake2bVar,
 };
 use bytes::Bytes;
-use nomos_core::wire;
 use serde::{Deserialize, Serialize};
+
+#[derive(Copy, Clone, Default, Debug, PartialEq, PartialOrd, Ord, Eq, Serialize, Deserialize)]
+pub struct Index([u8; 8]);
 
 /// Re-export the types for OpenAPI
 #[cfg(feature = "openapi")]
 pub mod openapi {
-    pub use super::{Attestation, Certificate};
-}
-
-#[derive(Debug, Clone)]
-pub struct FullReplication<CertificateStrategy> {
-    voter: Voter,
-    certificate_strategy: CertificateStrategy,
-    output_buffer: Vec<Bytes>,
-    attestations: Vec<Attestation>,
-    output_certificate_buf: Vec<Certificate>,
-}
-
-impl<S> FullReplication<S> {
-    pub fn new(voter: Voter, strategy: S) -> Self {
-        Self {
-            voter,
-            certificate_strategy: strategy,
-            output_buffer: Vec::new(),
-            attestations: Vec::new(),
-            output_certificate_buf: Vec::new(),
-        }
-    }
-}
-
-// TODO: maybe abstract in a general library?
-trait CertificateStrategy {
-    type Attestation: attestation::Attestation;
-    type Certificate: certificate::Certificate;
-
-    fn can_build(&self, attestations: &[Self::Attestation]) -> bool;
-    fn build(&self, attestations: Vec<Self::Attestation>) -> Certificate;
+    pub use super::Certificate;
 }
 
 #[derive(Debug, Clone)]
@@ -78,20 +52,29 @@ pub struct Settings {
 impl CertificateStrategy for AbsoluteNumber<Attestation, Certificate> {
     type Attestation = Attestation;
     type Certificate = Certificate;
+    type Metadata = Certificate;
 
     fn can_build(&self, attestations: &[Self::Attestation]) -> bool {
         attestations.len() >= self.num_attestations
             && attestations
                 .iter()
-                .map(|a| &a.blob)
+                .map(|a| a.blob_hash())
                 .collect::<HashSet<_>>()
                 .len()
                 == 1
     }
 
-    fn build(&self, attestations: Vec<Self::Attestation>) -> Certificate {
+    fn build(
+        &self,
+        attestations: Vec<Self::Attestation>,
+        app_id: [u8; 32],
+        index: Index,
+    ) -> Certificate {
         assert!(self.can_build(&attestations));
-        Certificate { attestations }
+        Certificate {
+            attestations,
+            metadata: Metadata { app_id, index },
+        }
     }
 }
 
@@ -103,46 +86,15 @@ pub struct Blob {
     data: Bytes,
 }
 
-fn hasher(blob: &Blob) -> [u8; 32] {
-    let mut hasher = Blake2bVar::new(32).unwrap();
-    hasher.update(&blob.data);
-    let mut output = [0; 32];
-    hasher.finalize_variable(&mut output).unwrap();
-    output
+#[derive(Default, Debug, Copy, Clone, Serialize, Deserialize, Eq, PartialEq)]
+pub struct Metadata {
+    app_id: [u8; 32],
+    index: Index,
 }
 
-impl blob::Blob for Blob {
-    const HASHER: BlobHasher<Self> = hasher as BlobHasher<Self>;
-    type Hash = [u8; 32];
-
-    fn as_bytes(&self) -> bytes::Bytes {
-        self.data.clone()
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
-pub struct Attestation {
-    blob: [u8; 32],
-    voter: Voter,
-}
-
-impl attestation::Attestation for Attestation {
-    type Blob = Blob;
-    type Hash = [u8; 32];
-
-    fn blob(&self) -> [u8; 32] {
-        self.blob
-    }
-
-    fn hash(&self) -> <Self::Blob as blob::Blob>::Hash {
-        hash([self.blob, self.voter].concat())
-    }
-
-    fn as_bytes(&self) -> Bytes {
-        wire::serialize(self)
-            .expect("Attestation shouldn't fail to be serialized")
-            .into()
+impl Metadata {
+    fn size(&self) -> usize {
+        std::mem::size_of_val(&self.app_id) + std::mem::size_of_val(&self.index)
     }
 }
 
@@ -150,96 +102,130 @@ impl attestation::Attestation for Attestation {
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct Certificate {
     attestations: Vec<Attestation>,
+    metadata: Metadata,
 }
 
 impl Hash for Certificate {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        state.write(certificate::Certificate::as_bytes(self).as_ref());
+        state.write(<Certificate as certificate::Certificate>::id(self).as_ref());
     }
 }
 
-impl certificate::Certificate for Certificate {
-    type Blob = Blob;
-    type Hash = [u8; 32];
+#[derive(Clone, Debug)]
+pub struct CertificateVerificationParameters {
+    pub threshold: usize,
+}
 
-    fn blob(&self) -> <Self::Blob as blob::Blob>::Hash {
-        self.attestations[0].blob
+impl certificate::Certificate for Certificate {
+    type Id = [u8; 32];
+    type Signature = [u8; 32];
+    type VerificationParameters = CertificateVerificationParameters;
+
+    fn signature(&self) -> Self::Signature {
+        let mut attestations = self.attestations.clone();
+        attestations.sort();
+        let mut signatures = Vec::new();
+        for attestation in &attestations {
+            signatures.extend_from_slice(attestation.signature());
+        }
+        hash(signatures)
     }
 
-    fn hash(&self) -> <Self::Blob as blob::Blob>::Hash {
+    fn id(&self) -> Self::Id {
         let mut input = self
             .attestations
             .iter()
-            .map(|a| a.hash())
+            .map(|a| a.signature())
             .collect::<Vec<_>>();
         // sort to make the hash deterministic
         input.sort();
         hash(input.concat())
     }
 
-    fn as_bytes(&self) -> Bytes {
-        wire::serialize(self)
-            .expect("Certificate shouldn't fail to be serialized")
-            .into()
+    fn signers(&self) -> Vec<bool> {
+        unimplemented!()
+    }
+
+    fn verify(&self, params: Self::VerificationParameters) -> bool {
+        self.attestations.len() >= params.threshold
     }
 }
 
-// TODO: add generic impl when the trait for Certificate is expanded
-impl DaProtocol for FullReplication<AbsoluteNumber<Attestation, Certificate>> {
-    type Blob = Blob;
-    type Attestation = Attestation;
-    type Certificate = Certificate;
-    type Settings = Settings;
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
+pub struct VidCertificate {
+    id: [u8; 32],
+    metadata: Metadata,
+}
 
-    fn new(settings: Self::Settings) -> Self {
-        Self::new(
-            settings.voter,
-            AbsoluteNumber::new(settings.num_attestations),
-        )
+impl certificate::vid::VidCertificate for VidCertificate {
+    type CertificateId = [u8; 32];
+
+    fn certificate_id(&self) -> Self::CertificateId {
+        self.id
     }
 
-    fn encode<T: AsRef<[u8]>>(&self, data: T) -> Vec<Self::Blob> {
-        vec![Blob {
-            data: Bytes::copy_from_slice(data.as_ref()),
-        }]
+    fn size(&self) -> usize {
+        std::mem::size_of_val(&self.id) + self.metadata.size()
     }
+}
 
-    fn recv_blob(&mut self, blob: Self::Blob) {
-        self.output_buffer.push(blob.data);
+impl metadata::Metadata for VidCertificate {
+    type AppId = [u8; 32];
+    type Index = Index;
+
+    fn metadata(&self) -> (Self::AppId, Self::Index) {
+        (self.metadata.app_id, self.metadata.index)
     }
+}
 
-    fn extract(&mut self) -> Option<Bytes> {
-        self.output_buffer.pop()
+impl Hash for VidCertificate {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        state.write(
+            <VidCertificate as certificate::vid::VidCertificate>::certificate_id(self).as_ref(),
+        );
     }
+}
 
-    fn attest(&self, blob: &Self::Blob) -> Self::Attestation {
-        Attestation {
-            blob: hasher(blob),
-            voter: self.voter,
+impl From<Certificate> for VidCertificate {
+    fn from(cert: Certificate) -> Self {
+        // To simulate the propery of aggregate committment + row commitment in Nomos Da Protocol,
+        // when full replication certificate is converted into the VID (which should happen after
+        // the verification in the mempool) the id is set to the blob hash to allow identification
+        // of the distributed data accross nomos nodes.
+        let id = cert.attestations[0].blob_hash();
+        Self {
+            id,
+            metadata: cert.metadata,
         }
     }
+}
 
-    fn validate_attestation(&self, blob: &Self::Blob, attestation: &Self::Attestation) -> bool {
-        hasher(blob) == attestation.blob
+impl metadata::Metadata for Certificate {
+    type AppId = [u8; 32];
+    type Index = Index;
+
+    fn metadata(&self) -> (Self::AppId, Self::Index) {
+        (self.metadata.app_id, self.metadata.index)
     }
+}
 
-    fn recv_attestation(&mut self, attestation: Self::Attestation) {
-        self.attestations.push(attestation);
-        if self.certificate_strategy.can_build(&self.attestations) {
-            self.output_certificate_buf.push(
-                self.certificate_strategy
-                    .build(std::mem::take(&mut self.attestations)),
-            );
-        }
+impl From<u64> for Index {
+    fn from(value: u64) -> Self {
+        Self(value.to_be_bytes())
     }
+}
 
-    fn certify_dispersal(&mut self) -> Option<Self::Certificate> {
-        self.output_certificate_buf.pop()
+impl Next for Index {
+    fn next(self) -> Self {
+        let num = u64::from_be_bytes(self.0);
+        let incremented_num = num.wrapping_add(1);
+        Self(incremented_num.to_be_bytes())
     }
+}
 
-    fn validate_certificate(&self, certificate: &Self::Certificate) -> bool {
-        self.certificate_strategy
-            .can_build(&certificate.attestations)
+impl AsRef<[u8]> for Index {
+    fn as_ref(&self) -> &[u8] {
+        self.0.as_ref()
     }
 }
 

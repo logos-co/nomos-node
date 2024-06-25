@@ -31,9 +31,6 @@ nomos-metrics = { path = "../../nomos-services/metrics" }
 nomos-storage = { path = "../../nomos-services/storage", features = ["rocksdb"] }
 cryptarchia-consensus = { path = "../../nomos-services/cryptarchia-consensus", features = ["libp2p"] }
 nomos-libp2p = { path = "../../nomos-libp2p" }
-nomos-da = { path = "../../nomos-services/data-availability", features = [
-  "libp2p",
-] }
 nomos-system-sig = { path = "../../nomos-services/system-sig" }
 tracing-subscriber = "0.3"
 cryptarchia-engine = { path = "../../consensus/cryptarchia-engine" }

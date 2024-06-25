@@ -7,13 +7,16 @@ use cryptarchia_engine::Slot;
 use cryptarchia_ledger::{Coin, LeaderProof, LedgerState};
 use futures::StreamExt;
 use network::{messages::NetworkMessage, NetworkAdapter};
-use nomos_core::da::certificate::{BlobCertificateSelect, Certificate};
+use nomos_core::da::certificate::{
+    metadata::Metadata, vid::VidCertificate, BlobCertificateSelect, Certificate,
+};
 use nomos_core::header::{cryptarchia::Header, HeaderId};
 use nomos_core::tx::{Transaction, TxSelect};
 use nomos_core::{
     block::{builder::BlockBuilder, Block},
     header::cryptarchia::Builder,
 };
+use nomos_mempool::verify::MempoolVerificationProvider;
 use nomos_mempool::{
     backend::MemPool, network::NetworkAdapter as MempoolAdapter, DaMempoolService, MempoolMsg,
     TxMempoolService,
@@ -36,6 +39,8 @@ use tokio::sync::oneshot::Sender;
 use tokio::sync::{broadcast, oneshot};
 use tokio_stream::wrappers::IntervalStream;
 use tracing::{error, instrument};
+
+type MempoolRelay<Payload, Item, Key> = OutboundRelay<MempoolMsg<HeaderId, Payload, Item, Key>>;
 
 // Limit the number of blocks returned by GetHeaders
 const HEADERS_LIMIT: usize = 512;
@@ -128,14 +133,27 @@ impl<Ts, Bs> CryptarchiaSettings<Ts, Bs> {
     }
 }
 
-pub struct CryptarchiaConsensus<A, ClPool, ClPoolAdapter, DaPool, DaPoolAdapter, TxS, BS, Storage>
-where
+pub struct CryptarchiaConsensus<
+    A,
+    ClPool,
+    ClPoolAdapter,
+    DaPool,
+    DaPoolAdapter,
+    DaVerificationProvider,
+    TxS,
+    BS,
+    Storage,
+> where
     A: NetworkAdapter,
-    ClPoolAdapter: MempoolAdapter<Item = ClPool::Item, Key = ClPool::Key>,
+    ClPoolAdapter: MempoolAdapter<Payload = ClPool::Item, Key = ClPool::Key>,
     ClPool: MemPool<BlockId = HeaderId>,
     DaPool: MemPool<BlockId = HeaderId>,
-    DaPoolAdapter: MempoolAdapter<Item = DaPool::Item, Key = DaPool::Key>,
-
+    DaPoolAdapter: MempoolAdapter<Key = DaPool::Key>,
+    DaPoolAdapter::Payload: Certificate + Into<DaPool::Item> + Debug,
+    DaVerificationProvider: MempoolVerificationProvider<
+        Payload = DaPoolAdapter::Payload,
+        Parameters = <DaPoolAdapter::Payload as Certificate>::VerificationParameters,
+    >,
     ClPool::Item: Clone + Eq + Hash + Debug + 'static,
     ClPool::Key: Debug + 'static,
     DaPool::Item: Clone + Eq + Hash + Debug + 'static,
@@ -150,13 +168,24 @@ where
     // when implementing ServiceCore for CryptarchiaConsensus
     network_relay: Relay<NetworkService<A::Backend>>,
     cl_mempool_relay: Relay<TxMempoolService<ClPoolAdapter, ClPool>>,
-    da_mempool_relay: Relay<DaMempoolService<DaPoolAdapter, DaPool>>,
+    da_mempool_relay: Relay<DaMempoolService<DaPoolAdapter, DaPool, DaVerificationProvider>>,
     block_subscription_sender: broadcast::Sender<Block<ClPool::Item, DaPool::Item>>,
     storage_relay: Relay<StorageService<Storage>>,
 }
 
-impl<A, ClPool, ClPoolAdapter, DaPool, DaPoolAdapter, TxS, BS, Storage> ServiceData
-    for CryptarchiaConsensus<A, ClPool, ClPoolAdapter, DaPool, DaPoolAdapter, TxS, BS, Storage>
+impl<A, ClPool, ClPoolAdapter, DaPool, DaPoolAdapter, DaVerificationProvider, TxS, BS, Storage>
+    ServiceData
+    for CryptarchiaConsensus<
+        A,
+        ClPool,
+        ClPoolAdapter,
+        DaPool,
+        DaPoolAdapter,
+        DaVerificationProvider,
+        TxS,
+        BS,
+        Storage,
+    >
 where
     A: NetworkAdapter,
     ClPool: MemPool<BlockId = HeaderId>,
@@ -165,8 +194,13 @@ where
     DaPool: MemPool<BlockId = HeaderId>,
     DaPool::Item: Clone + Eq + Hash + Debug,
     DaPool::Key: Debug,
-    ClPoolAdapter: MempoolAdapter<Item = ClPool::Item, Key = ClPool::Key>,
-    DaPoolAdapter: MempoolAdapter<Item = DaPool::Item, Key = DaPool::Key>,
+    ClPoolAdapter: MempoolAdapter<Payload = ClPool::Item, Key = ClPool::Key>,
+    DaPoolAdapter: MempoolAdapter<Key = DaPool::Key>,
+    DaPoolAdapter::Payload: Certificate + Into<DaPool::Item> + Debug,
+    DaVerificationProvider: MempoolVerificationProvider<
+        Payload = DaPoolAdapter::Payload,
+        Parameters = <DaPoolAdapter::Payload as Certificate>::VerificationParameters,
+    >,
     TxS: TxSelect<Tx = ClPool::Item>,
     BS: BlobCertificateSelect<Certificate = DaPool::Item>,
     Storage: StorageBackend + Send + Sync + 'static,
@@ -179,8 +213,19 @@ where
 }
 
 #[async_trait::async_trait]
-impl<A, ClPool, ClPoolAdapter, DaPool, DaPoolAdapter, TxS, BS, Storage> ServiceCore
-    for CryptarchiaConsensus<A, ClPool, ClPoolAdapter, DaPool, DaPoolAdapter, TxS, BS, Storage>
+impl<A, ClPool, ClPoolAdapter, DaPool, DaPoolAdapter, DaVerificationProvider, TxS, BS, Storage>
+    ServiceCore
+    for CryptarchiaConsensus<
+        A,
+        ClPool,
+        ClPoolAdapter,
+        DaPool,
+        DaPoolAdapter,
+        DaVerificationProvider,
+        TxS,
+        BS,
+        Storage,
+    >
 where
     A: NetworkAdapter<Tx = ClPool::Item, BlobCertificate = DaPool::Item>
         + Clone
@@ -201,7 +246,9 @@ where
         + Send
         + Sync
         + 'static,
-    DaPool::Item: Certificate<Hash = DaPool::Key>
+    // TODO: Change to specific certificate bounds here
+    DaPool::Item: VidCertificate<CertificateId = DaPool::Key>
+        + Metadata
         + Debug
         + Clone
         + Eq
@@ -213,8 +260,16 @@ where
         + 'static,
     ClPool::Key: Debug + Send + Sync,
     DaPool::Key: Debug + Send + Sync,
-    ClPoolAdapter: MempoolAdapter<Item = ClPool::Item, Key = ClPool::Key> + Send + Sync + 'static,
-    DaPoolAdapter: MempoolAdapter<Item = DaPool::Item, Key = DaPool::Key> + Send + Sync + 'static,
+    ClPoolAdapter:
+        MempoolAdapter<Payload = ClPool::Item, Key = ClPool::Key> + Send + Sync + 'static,
+    DaPoolAdapter: MempoolAdapter<Key = DaPool::Key> + Send + Sync + 'static,
+    DaPoolAdapter::Payload: Certificate + Into<DaPool::Item> + Debug,
+    DaVerificationProvider: MempoolVerificationProvider<
+            Payload = DaPoolAdapter::Payload,
+            Parameters = <DaPoolAdapter::Payload as Certificate>::VerificationParameters,
+        > + Send
+        + Sync
+        + 'static,
     TxS: TxSelect<Tx = ClPool::Item> + Clone + Send + Sync + 'static,
     TxS::Settings: Send + Sync + 'static,
     BS: BlobCertificateSelect<Certificate = DaPool::Item> + Clone + Send + Sync + 'static,
@@ -350,8 +405,18 @@ where
     }
 }
 
-impl<A, ClPool, ClPoolAdapter, DaPool, DaPoolAdapter, TxS, BS, Storage>
-    CryptarchiaConsensus<A, ClPool, ClPoolAdapter, DaPool, DaPoolAdapter, TxS, BS, Storage>
+impl<A, ClPool, ClPoolAdapter, DaPool, DaPoolAdapter, DaVerificationProvider, TxS, BS, Storage>
+    CryptarchiaConsensus<
+        A,
+        ClPool,
+        ClPoolAdapter,
+        DaPool,
+        DaPoolAdapter,
+        DaVerificationProvider,
+        TxS,
+        BS,
+        Storage,
+    >
 where
     A: NetworkAdapter + Clone + Send + Sync + 'static,
     ClPool: MemPool<BlockId = HeaderId> + Send + Sync + 'static,
@@ -368,7 +433,8 @@ where
         + Send
         + Sync
         + 'static,
-    DaPool::Item: Certificate<Hash = DaPool::Key>
+    DaPool::Item: VidCertificate<CertificateId = DaPool::Key>
+        + Metadata
         + Debug
         + Clone
         + Eq
@@ -382,8 +448,16 @@ where
     BS: BlobCertificateSelect<Certificate = DaPool::Item> + Clone + Send + Sync + 'static,
     ClPool::Key: Debug + Send + Sync,
     DaPool::Key: Debug + Send + Sync,
-    ClPoolAdapter: MempoolAdapter<Item = ClPool::Item, Key = ClPool::Key> + Send + Sync + 'static,
-    DaPoolAdapter: MempoolAdapter<Item = DaPool::Item, Key = DaPool::Key> + Send + Sync + 'static,
+    ClPoolAdapter:
+        MempoolAdapter<Payload = ClPool::Item, Key = ClPool::Key> + Send + Sync + 'static,
+    DaPoolAdapter: MempoolAdapter<Key = DaPool::Key> + Send + Sync + 'static,
+    DaPoolAdapter::Payload: Certificate + Into<DaPool::Item> + Debug,
+    DaVerificationProvider: MempoolVerificationProvider<
+            Payload = DaPoolAdapter::Payload,
+            Parameters = <DaPoolAdapter::Payload as Certificate>::VerificationParameters,
+        > + Send
+        + Sync
+        + 'static,
     Storage: StorageBackend + Send + Sync + 'static,
 {
     async fn should_stop_service(message: LifecycleMessage) -> bool {
@@ -466,8 +540,12 @@ where
         leader: &mut leadership::Leader,
         block: Block<ClPool::Item, DaPool::Item>,
         storage_relay: OutboundRelay<StorageMsg<Storage>>,
-        cl_mempool_relay: OutboundRelay<MempoolMsg<HeaderId, ClPool::Item, ClPool::Key>>,
-        da_mempool_relay: OutboundRelay<MempoolMsg<HeaderId, DaPool::Item, DaPool::Key>>,
+        cl_mempool_relay: OutboundRelay<
+            MempoolMsg<HeaderId, ClPool::Item, ClPool::Item, ClPool::Key>,
+        >,
+        da_mempool_relay: OutboundRelay<
+            MempoolMsg<HeaderId, DaPoolAdapter::Payload, DaPool::Item, DaPool::Key>,
+        >,
         block_broadcaster: &mut broadcast::Sender<Block<ClPool::Item, DaPool::Item>>,
     ) -> Cryptarchia {
         tracing::debug!("received proposal {:?}", block);
@@ -489,7 +567,12 @@ where
                 )
                 .await;
 
-                mark_in_block(da_mempool_relay, block.blobs().map(Certificate::hash), id).await;
+                mark_in_block(
+                    da_mempool_relay,
+                    block.blobs().map(VidCertificate::certificate_id),
+                    id,
+                )
+                .await;
 
                 // store block
                 let msg = <StorageMsg<_>>::new_store_message(header.id(), block.clone());
@@ -522,8 +605,8 @@ where
         proof: LeaderProof,
         tx_selector: TxS,
         blob_selector: BS,
-        cl_mempool_relay: OutboundRelay<MempoolMsg<HeaderId, ClPool::Item, ClPool::Key>>,
-        da_mempool_relay: OutboundRelay<MempoolMsg<HeaderId, DaPool::Item, DaPool::Key>>,
+        cl_mempool_relay: MempoolRelay<ClPool::Item, ClPool::Item, ClPool::Key>,
+        da_mempool_relay: MempoolRelay<DaPoolAdapter::Payload, DaPool::Item, DaPool::Key>,
     ) -> Option<Block<ClPool::Item, DaPool::Item>> {
         let mut output = None;
         let cl_txs = get_mempool_contents(cl_mempool_relay);
@@ -575,8 +658,8 @@ pub struct CryptarchiaInfo {
     pub height: u64,
 }
 
-async fn get_mempool_contents<Item, Key>(
-    mempool: OutboundRelay<MempoolMsg<HeaderId, Item, Key>>,
+async fn get_mempool_contents<Payload, Item, Key>(
+    mempool: OutboundRelay<MempoolMsg<HeaderId, Payload, Item, Key>>,
 ) -> Result<Box<dyn Iterator<Item = Item> + Send>, tokio::sync::oneshot::error::RecvError> {
     let (reply_channel, rx) = tokio::sync::oneshot::channel();
 
@@ -591,8 +674,8 @@ async fn get_mempool_contents<Item, Key>(
     rx.await
 }
 
-async fn mark_in_block<Item, Key>(
-    mempool: OutboundRelay<MempoolMsg<HeaderId, Item, Key>>,
+async fn mark_in_block<Payload, Item, Key>(
+    mempool: OutboundRelay<MempoolMsg<HeaderId, Payload, Item, Key>>,
     ids: impl Iterator<Item = Key>,
     block: HeaderId,
 ) {

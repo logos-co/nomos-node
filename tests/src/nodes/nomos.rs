@@ -107,7 +107,7 @@ impl NomosNode {
 
     async fn wait_online(&self) {
         loop {
-            let res = self.get("da/metrics").await;
+            let res = self.get("cl/metrics").await;
             if res.is_ok() && res.unwrap().status().is_success() {
                 break;
             }
@@ -250,12 +250,12 @@ impl Node for NomosNode {
             chain_start_time: OffsetDateTime::now_utc(),
         };
 
-        #[allow(unused_mut)]
+        #[allow(unused_mut, unused_variables)]
         let mut configs = ids
             .into_iter()
             .zip(coins)
             .enumerate()
-            .map(|(_i, (da_id, coin))| {
+            .map(|(i, (da_id, coin))| {
                 create_node_config(
                     da_id,
                     genesis_state.clone(),
@@ -265,7 +265,7 @@ impl Node for NomosNode {
                     #[cfg(feature = "mixnet")]
                     MixnetConfig {
                         mixclient: mixclient_config.clone(),
-                        mixnode: mixnode_configs[_i].clone(),
+                        mixnode: mixnode_configs[i].clone(),
                     },
                 )
             })
@@ -343,7 +343,7 @@ fn build_mixnet_topology(mixnode_candidates: &[&Config]) -> MixnetTopology {
 }
 
 fn create_node_config(
-    id: [u8; 32],
+    _id: [u8; 32],
     genesis_state: LedgerState,
     config: cryptarchia_ledger::Config,
     coins: Vec<Coin>,
@@ -374,16 +374,6 @@ fn create_node_config(
                     .parse()
                     .unwrap(),
                 cors_origins: vec![],
-            },
-        },
-        da: nomos_da::Settings {
-            da_protocol: full_replication::Settings {
-                voter: id,
-                num_attestations: 1,
-            },
-            backend: nomos_da::backend::memory_cache::BlobCacheSettings {
-                max_capacity: usize::MAX,
-                evicting_period: Duration::from_secs(60 * 60 * 24), // 1 day
             },
         },
     };

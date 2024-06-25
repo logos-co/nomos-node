@@ -1,6 +1,9 @@
 [workspace]
 members = [
     "nomos-core",
+    "nomos-da/kzgrs",
+    "nomos-da/kzgrs-backend",
+    "nomos-da/storage",
     "nomos-libp2p",
     "nomos-services/api",
     "nomos-services/log",
@@ -9,18 +12,19 @@ members = [
     "nomos-services/cryptarchia-consensus",
     "nomos-services/mempool",
     "nomos-services/metrics",
-    "nomos-services/data-availability",
     "nomos-services/system-sig",
-    "nomos-da/reed-solomon",
-    "nomos-da/kzg",
+    "nomos-services/data-availability/indexer",
+    "nomos-services/data-availability/verifier",
+    "nomos-services/data-availability/tests",
     "nomos-da/full-replication",
-    "nomos-cli",
+    # TODO: add it again and reimplement full replication
+    #    "nomos-cli",
     "nomos-utils",
     "nodes/nomos-node",
     "mixnet",
     "consensus/carnot-engine",
     "consensus/cryptarchia-engine",
     "ledger/cryptarchia-ledger",
-    "tests",
+    "tests"
 ]
 resolver = "2"

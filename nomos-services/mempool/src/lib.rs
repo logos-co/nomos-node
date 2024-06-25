@@ -2,6 +2,7 @@ pub mod backend;
 pub mod da;
 pub mod network;
 pub mod tx;
+pub mod verify;
 
 use backend::Status;
 use overwatch_rs::services::relay::RelayMessage;
@@ -11,9 +12,9 @@ use tokio::sync::oneshot::Sender;
 pub use da::service::{DaMempoolService, DaMempoolSettings};
 pub use tx::service::{TxMempoolService, TxMempoolSettings};
 
-pub enum MempoolMsg<BlockId, Item, Key> {
+pub enum MempoolMsg<BlockId, Payload, Item, Key> {
     Add {
-        item: Item,
+        payload: Payload,
         key: Key,
         reply_channel: Sender<Result<(), ()>>,
     },
@@ -42,9 +43,10 @@ pub enum MempoolMsg<BlockId, Item, Key> {
     },
 }
 
-impl<BlockId, Item, Key> Debug for MempoolMsg<BlockId, Item, Key>
+impl<BlockId, Payload, Item, Key> Debug for MempoolMsg<BlockId, Payload, Item, Key>
 where
     BlockId: Debug,
+    Payload: Debug,
     Item: Debug,
     Key: Debug,
 {
@@ -53,7 +55,7 @@ where
             Self::View { ancestor_hint, .. } => {
                 write!(f, "MempoolMsg::View {{ ancestor_hint: {ancestor_hint:?}}}")
             }
-            Self::Add { item, .. } => write!(f, "MempoolMsg::Add{{item: {item:?}}}"),
+            Self::Add { payload, .. } => write!(f, "MempoolMsg::Add{{payload: {payload:?}}}"),
             Self::Prune { ids } => write!(f, "MempoolMsg::Prune{{ids: {ids:?}}}"),
             Self::MarkInBlock { ids, block } => {
                 write!(
@@ -78,7 +80,7 @@ pub struct MempoolMetrics {
     pub last_item_timestamp: u64,
 }
 
-impl<BlockId: 'static, Item: 'static, Key: 'static> RelayMessage
-    for MempoolMsg<BlockId, Item, Key>
+impl<BlockId: 'static, Payload: 'static, Item: 'static, Key: 'static> RelayMessage
+    for MempoolMsg<BlockId, Payload, Item, Key>
 {
 }

@@ -19,8 +19,7 @@ use tower_http::{
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 
-use full_replication::{Blob, Certificate};
-use nomos_core::{da::blob, header::HeaderId, tx::Transaction};
+use nomos_core::{header::HeaderId, tx::Transaction};
 use nomos_mempool::{
     network::adapters::libp2p::Libp2pAdapter as MempoolNetworkAdapter,
     tx::service::openapi::Status, MempoolMetrics,
@@ -29,7 +28,7 @@ use nomos_network::backends::libp2p::Libp2p as NetworkBackend;
 use nomos_storage::backends::StorageSerde;
 
 use nomos_api::{
-    http::{cl, consensus, da, libp2p, mempool, metrics, storage},
+    http::{cl, consensus, libp2p, mempool, metrics, storage},
     Backend,
 };
 
@@ -51,8 +50,6 @@ pub struct AxumBackend<T, S, const SIZE: usize> {
 #[derive(OpenApi)]
 #[openapi(
     paths(
-        da_metrics,
-        da_status,
     ),
     components(
         schemas(Status<HeaderId>, MempoolMetrics)
@@ -117,9 +114,6 @@ where
             )
             .layer(TraceLayer::new_for_http())
             .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
-            .route("/da/metrics", routing::get(da_metrics))
-            .route("/da/status", routing::post(da_status))
-            .route("/da/blobs", routing::post(da_blobs))
             .route("/cl/metrics", routing::get(cl_metrics::<T>))
             .route("/cl/status", routing::post(cl_status::<T>))
             .route(
@@ -133,7 +127,6 @@ where
             .route("/network/info", routing::get(libp2p_info))
             .route("/storage/block", routing::post(block::<S, T>))
             .route("/mempool/add/tx", routing::post(add_tx::<T>))
-            .route("/mempool/add/cert", routing::post(add_cert))
             .route("/metrics", routing::get(get_metrics))
             .with_state(handle);
 
@@ -156,48 +149,6 @@ macro_rules! make_request_and_return_response {
             )),
         }
     }};
-}
-
-#[utoipa::path(
-    get,
-    path = "/da/metrics",
-    responses(
-        (status = 200, description = "Get the mempool metrics of the da service", body = MempoolMetrics),
-        (status = 500, description = "Internal server error", body = String),
-    )
-)]
-async fn da_metrics(State(handle): State<OverwatchHandle>) -> Response {
-    make_request_and_return_response!(da::da_mempool_metrics(&handle))
-}
-
-#[utoipa::path(
-    post,
-    path = "/da/status",
-    responses(
-        (status = 200, description = "Query the mempool status of the da service", body = Vec<<Blob as blob::Blob>::Hash>),
-        (status = 500, description = "Internal server error", body = String),
-    )
-)]
-async fn da_status(
-    State(handle): State<OverwatchHandle>,
-    Json(items): Json<Vec<<Blob as blob::Blob>::Hash>>,
-) -> Response {
-    make_request_and_return_response!(da::da_mempool_status(&handle, items))
-}
-
-#[utoipa::path(
-    post,
-    path = "/da/blobs",
-    responses(
-        (status = 200, description = "Get pending blobs", body = Vec<Blob>),
-        (status = 500, description = "Internal server error", body = String),
-    )
-)]
-async fn da_blobs(
-    State(handle): State<OverwatchHandle>,
-    Json(items): Json<Vec<<Blob as blob::Blob>::Hash>>,
-) -> Response {
-    make_request_and_return_response!(da::da_blobs(&handle, items))
 }
 
 #[utoipa::path(
@@ -357,30 +308,6 @@ where
         Tx,
         <Tx as Transaction>::Hash,
     >(&handle, tx, Transaction::hash))
-}
-
-#[utoipa::path(
-    post,
-    path = "/mempool/add/cert",
-    responses(
-        (status = 200, description = "Add certificate to the mempool"),
-        (status = 500, description = "Internal server error", body = String),
-    )
-)]
-async fn add_cert(
-    State(handle): State<OverwatchHandle>,
-    Json(cert): Json<Certificate>,
-) -> Response {
-    make_request_and_return_response!(mempool::add_cert::<
-        NetworkBackend,
-        MempoolNetworkAdapter<Certificate, <Blob as blob::Blob>::Hash>,
-        Certificate,
-        <Blob as blob::Blob>::Hash,
-    >(
-        &handle,
-        cert,
-        nomos_core::da::certificate::Certificate::hash
-    ))
 }
 
 #[utoipa::path(

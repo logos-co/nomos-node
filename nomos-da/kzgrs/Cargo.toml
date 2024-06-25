@@ -1,0 +1,53 @@
+[package]
+name = "kzgrs"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+once_cell = "1.19"
+ark-ec = "0.4.2"
+ark-bls12-381 = { version = "0.4.0" }
+ark-bls12-381-ext = "0.4.1"
+ark-ff = { version = "0.4.2" }
+ark-poly = { version = "0.4.2" }
+ark-poly-commit = { version = "0.4.0" }
+ark-serialize = { version = "0.4" }
+blst = "0.3.11"
+derive_more = "0.99"
+num-bigint = "0.4.4"
+thiserror = "1.0.58"
+num-traits = "0.2.18"
+rand = "0.8.5"
+rayon = { version = "1.10", optional = true }
+
+
+[dev-dependencies]
+divan = "0.1"
+
+[[bench]]
+name = "kzg"
+harness = false
+
+[[bench]]
+name = "fft"
+harness = false
+
+[[bench]]
+name = "fk20"
+harness = false
+
+[features]
+default = ["single"]
+single = []
+parallel = [
+    "rayon",
+    "ark-ff/parallel",
+    "ark-ff/asm",
+    "ark-ff/rayon",
+    "ark-poly/parallel",
+    "ark-poly/rayon",
+    "ark-poly-commit/rayon",
+    "ark-poly-commit/parallel"
+]

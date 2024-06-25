@@ -1,17 +1,14 @@
-use full_replication::{Blob, Certificate};
+use full_replication::Certificate;
 #[cfg(feature = "metrics")]
 use nomos_metrics::MetricsSettings;
 use nomos_node::{
-    Config, CryptarchiaArgs, DaArgs, HttpArgs, LogArgs, MetricsArgs, NetworkArgs, Nomos,
+    Config, CryptarchiaArgs, HttpArgs, LogArgs, MetricsArgs, NetworkArgs, Nomos,
     NomosServiceSettings, Tx,
 };
 
 use clap::Parser;
 use color_eyre::eyre::{eyre, Result};
-use nomos_core::{
-    da::{blob, certificate},
-    tx::Transaction,
-};
+use nomos_core::{da::certificate, tx::Transaction};
 
 use nomos_mempool::network::adapters::libp2p::Settings as AdapterSettings;
 
@@ -35,9 +32,6 @@ struct Args {
     http_args: HttpArgs,
     #[clap(flatten)]
     cryptarchia_args: CryptarchiaArgs,
-    /// Overrides da config.
-    #[clap(flatten)]
-    da_args: DaArgs,
     /// Overrides metrics config.
     #[clap(flatten)]
     metrics_args: MetricsArgs,
@@ -46,7 +40,6 @@ struct Args {
 fn main() -> Result<()> {
     let Args {
         config,
-        da_args,
         log_args,
         http_args,
         network_args,
@@ -54,7 +47,6 @@ fn main() -> Result<()> {
         metrics_args,
     } = Args::parse();
     let config = serde_yaml::from_reader::<_, Config>(std::fs::File::open(config)?)?
-        .update_da(da_args)?
         .update_log(log_args)?
         .update_http(http_args)?
         .update_network(network_args)?
@@ -85,14 +77,16 @@ fn main() -> Result<()> {
                 backend: (),
                 network: AdapterSettings {
                     topic: String::from(nomos_node::DA_TOPIC),
-                    id: cert_id,
+                    id: <Certificate as certificate::Certificate>::id,
+                },
+                verification_provider: full_replication::CertificateVerificationParameters {
+                    threshold: 0,
                 },
                 registry: registry.clone(),
             },
             cryptarchia: config.cryptarchia,
             #[cfg(feature = "metrics")]
             metrics: MetricsSettings { registry },
-            da: config.da,
             storage: nomos_storage::backends::rocksdb::RocksBackendSettings {
                 db_path: std::path::PathBuf::from(DEFAULT_DB_PATH),
                 read_only: false,
@@ -105,9 +99,4 @@ fn main() -> Result<()> {
     .map_err(|e| eyre!("Error encountered: {}", e))?;
     app.wait_finished();
     Ok(())
-}
-
-fn cert_id(cert: &Certificate) -> <Blob as blob::Blob>::Hash {
-    use certificate::Certificate;
-    cert.hash()
 }
