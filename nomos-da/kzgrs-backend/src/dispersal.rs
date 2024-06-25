@@ -250,6 +250,7 @@ mod tests {
         verifiers: &[DaVerifier],
     ) -> Vec<Attestation> {
         let mut attestations = Vec::new();
+        let domain_size = encoded_data.extended_data.0[0].len();
         for (i, column) in encoded_data.extended_data.columns().enumerate() {
             let verifier = &verifiers[i];
             let da_blob = DaBlob {
@@ -264,7 +265,7 @@ mod tests {
                     .map(|proofs| proofs.get(i).cloned().unwrap())
                     .collect(),
             };
-            attestations.push(verifier.verify(da_blob).unwrap());
+            attestations.push(verifier.verify(da_blob, domain_size).unwrap());
         }
         attestations
     }
