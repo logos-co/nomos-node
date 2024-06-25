@@ -1,6 +1,6 @@
 # BUILD IMAGE ---------------------------------------------------------
 
-FROM rust:1.78.0-slim-bullseye AS builder
+FROM rust:1.79.0-slim-bullseye AS builder
 
 WORKDIR /nomos
 COPY . . 

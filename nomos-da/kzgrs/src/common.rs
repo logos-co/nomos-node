@@ -8,6 +8,7 @@ use ark_ff::Zero;
 use ark_poly::domain::general::GeneralEvaluationDomain;
 use ark_poly::evaluations::univariate::Evaluations;
 use ark_poly::univariate::DensePolynomial;
+use ark_poly::EvaluationDomain;
 use blst::BLST_ERROR;
 use num_bigint::BigUint;
 use thiserror::Error;
@@ -120,6 +121,11 @@ pub fn bytes_to_polynomial_unchecked<const CHUNK_SIZE: usize>(
 pub fn field_element_from_bytes_le(b: &[u8]) -> FieldElement {
     assert!(b.len() <= BYTES_PER_FIELD_ELEMENT);
     FieldElement::from(BigUint::from_bytes_le(b))
+}
+
+pub fn compute_roots_of_unity(size: usize) -> Vec<Fr> {
+    let domain = GeneralEvaluationDomain::new(size).unwrap();
+    domain.elements().take(size).collect()
 }
 
 #[cfg(test)]
