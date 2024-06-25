@@ -4,6 +4,7 @@ use ark_ec::CurveGroup;
 use ark_ff::Field;
 use ark_poly::{EvaluationDomain, GeneralEvaluationDomain};
 use num_traits::Zero;
+use std::borrow::Cow;
 
 fn toeplitz1(global_parameters: &[G1Affine], polynomial_degree: usize) -> Vec<G1Projective> {
     debug_assert_eq!(global_parameters.len(), polynomial_degree);
@@ -41,21 +42,26 @@ fn toeplitz3(h_extended_fft: &[G1Projective]) -> Vec<G1Projective> {
 pub fn fk20_batch_generate_elements_proofs(
     polynomial: &Polynomial,
     global_parameters: &GlobalParameters,
+    toeplitz1_cache: Option<&Toeplitz1Cache>,
 ) -> Vec<Proof> {
     let polynomial_degree = polynomial.len();
     debug_assert!(polynomial_degree <= global_parameters.powers_of_g.len());
     debug_assert!(polynomial_degree.is_power_of_two());
     let domain: GeneralEvaluationDomain<Fr> =
         GeneralEvaluationDomain::new(polynomial_degree).expect("Domain should be able to build");
-    let global_parameters: Vec<G1Affine> = global_parameters
-        .powers_of_g
-        .iter()
-        .copied()
-        .take(polynomial_degree)
-        .rev()
-        .collect();
 
-    let extended_vector = toeplitz1(&global_parameters, polynomial_degree);
+    let extended_vector = if let Some(Toeplitz1Cache(v)) = toeplitz1_cache {
+        Cow::Borrowed(v)
+    } else {
+        let global_parameters: Vec<G1Affine> = global_parameters
+            .powers_of_g
+            .iter()
+            .copied()
+            .take(polynomial_degree)
+            .rev()
+            .collect();
+        Cow::Owned(toeplitz1(&global_parameters, polynomial_degree))
+    };
     let toeplitz_coefficients: Vec<Fr> = std::iter::repeat(Fr::ZERO)
         .take(polynomial_degree)
         .chain(polynomial.coeffs.iter().copied())
@@ -70,6 +76,21 @@ pub fn fk20_batch_generate_elements_proofs(
             random_v: None,
         })
         .collect()
+}
+
+pub struct Toeplitz1Cache(Vec<G1Projective>);
+
+impl Toeplitz1Cache {
+    pub fn with_size(global_parameters: &GlobalParameters, polynomial_degree: usize) -> Self {
+        let global_parameters: Vec<G1Affine> = global_parameters
+            .powers_of_g
+            .iter()
+            .copied()
+            .take(polynomial_degree)
+            .rev()
+            .collect();
+        Self(toeplitz1(&global_parameters, polynomial_degree))
+    }
 }
 
 #[cfg(test)]
@@ -107,7 +128,7 @@ mod test {
                     generate_element_proof(i, &poly, &evals, &GLOBAL_PARAMETERS, domain).unwrap()
                 })
                 .collect();
-            let fk20_proofs = fk20_batch_generate_elements_proofs(&poly, &GLOBAL_PARAMETERS);
+            let fk20_proofs = fk20_batch_generate_elements_proofs(&poly, &GLOBAL_PARAMETERS, None);
             assert_eq!(slow_proofs, fk20_proofs);
         }
     }
