@@ -21,8 +21,7 @@ pub struct Branches<Id> {
     tips: HashSet<Id>,
 }
 
-#[derive(Clone, Debug)]
-#[cfg_attr(test, derive(PartialEq))]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Branch<Id> {
     id: Id,
     parent: Id,
