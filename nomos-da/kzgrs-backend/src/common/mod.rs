@@ -7,6 +7,8 @@ use serde::{Deserialize, Serialize};
 use std::io::Cursor;
 // crates
 use blake2::digest::{Update, VariableOutput};
+#[cfg(feature = "parallel")]
+use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use sha3::{Digest, Sha3_256};
 // internal
 use kzgrs::Commitment;
@@ -106,6 +108,10 @@ impl ChunksMatrix {
     }
     pub fn rows(&self) -> impl Iterator<Item = &Row> + '_ {
         self.0.iter()
+    }
+    #[cfg(feature = "parallel")]
+    pub fn par_rows(&self) -> impl ParallelIterator<Item = &Row> + '_ {
+        self.0.par_iter()
     }
     pub fn columns(&self) -> impl Iterator<Item = Column> + '_ {
         let size = self.0.first().map(|r| r.0.len()).unwrap_or(0);
