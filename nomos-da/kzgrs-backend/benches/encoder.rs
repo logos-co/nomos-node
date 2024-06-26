@@ -1,6 +1,7 @@
 use divan::counter::BytesCount;
 use divan::Bencher;
 use kzgrs_backend::encoder::{DaEncoder, DaEncoderParams};
+use once_cell::sync::{Lazy, OnceCell};
 use rand::RngCore;
 use std::hint::black_box;
 
@@ -8,8 +9,11 @@ fn main() {
     divan::main()
 }
 
-const PARAMS: DaEncoderParams = DaEncoderParams::default_with(4096);
-const ENCODER: DaEncoder = DaEncoder::new(PARAMS);
+static ENCODER: Lazy<DaEncoder> = Lazy::new(|| {
+    let params = DaEncoderParams::new(4096, true);
+    DaEncoder::new(params)
+});
+
 const KB: usize = 1024;
 
 pub fn rand_data(elements_count: usize) -> Vec<u8> {
