@@ -1,7 +1,7 @@
 use divan::counter::BytesCount;
 use divan::Bencher;
 use kzgrs_backend::encoder::{DaEncoder, DaEncoderParams};
-use once_cell::sync::{Lazy, OnceCell};
+use once_cell::sync::Lazy;
 use rand::RngCore;
 use std::hint::black_box;
 
