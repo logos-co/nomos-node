@@ -10,6 +10,7 @@ use bytes::Bytes;
 pub use config::{Config, CryptarchiaArgs, HttpArgs, LogArgs, MetricsArgs, NetworkArgs};
 use nomos_api::ApiService;
 use nomos_core::{da::certificate, header::HeaderId, tx::Transaction, wire};
+#[cfg(feature = "tracing")]
 use nomos_log::Logger;
 use nomos_mempool::da::verify::fullreplication::DaVerificationProvider as MempoolVerificationProvider;
 use nomos_mempool::network::adapters::libp2p::Libp2pAdapter as MempoolNetworkAdapter;
@@ -74,6 +75,7 @@ pub type DaMempool = DaMempoolService<
 
 #[derive(Services)]
 pub struct Nomos {
+    #[cfg(feature = "tracing")]
     logging: ServiceHandle<Logger>,
     network: ServiceHandle<NetworkService<NetworkBackend>>,
     cl_mempool: ServiceHandle<TxMempool>,
