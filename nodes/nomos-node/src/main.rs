@@ -63,6 +63,7 @@ fn main() -> Result<()> {
     let app = OverwatchRunner::<Nomos>::run(
         NomosServiceSettings {
             network: config.network,
+            #[cfg(feature = "tracing")]
             logging: config.log,
             http: config.http,
             cl_mempool: nomos_mempool::TxMempoolSettings {
