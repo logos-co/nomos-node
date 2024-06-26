@@ -5,7 +5,7 @@ use std::ops::Div;
 use ark_ff::{BigInteger, PrimeField};
 use ark_poly::EvaluationDomain;
 use kzgrs::common::bytes_to_polynomial_unchecked;
-use kzgrs::fk20::fk20_batch_generate_elements_proofs;
+use kzgrs::fk20::{fk20_batch_generate_elements_proofs, Toeplitz1Cache};
 use kzgrs::{
     bytes_to_polynomial, commit_polynomial, encode, Commitment, Evaluations, KzgRsError,
     Polynomial, PolynomialEvaluationDomain, Proof, BYTES_PER_FIELD_ELEMENT,
@@ -17,16 +17,29 @@ use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use crate::common::{hash_column_and_commitment, Chunk, ChunksMatrix, Row};
 use crate::global::GLOBAL_PARAMETERS;
 
-#[derive(Copy, Clone)]
+#[derive(Clone)]
 pub struct DaEncoderParams {
     column_count: usize,
+    toeplitz1cache: Option<Toeplitz1Cache>,
 }
 
 impl DaEncoderParams {
     pub const MAX_BLS12_381_ENCODING_CHUNK_SIZE: usize = 31;
 
+    pub fn new(column_count: usize, with_cache: bool) -> Self {
+        let toeplitz1cache =
+            with_cache.then(|| Toeplitz1Cache::with_size(&GLOBAL_PARAMETERS, column_count));
+        Self {
+            column_count,
+            toeplitz1cache,
+        }
+    }
+
     pub const fn default_with(column_count: usize) -> Self {
-        Self { column_count }
+        Self {
+            column_count,
+            toeplitz1cache: None,
+        }
     }
 }
 
@@ -122,7 +135,10 @@ impl DaEncoder {
         .collect()
     }
 
-    fn compute_rows_proofs(polynomials: &[Polynomial]) -> Result<Vec<Vec<Proof>>, KzgRsError> {
+    fn compute_rows_proofs(
+        polynomials: &[Polynomial],
+        toeplitz1cache: Option<&Toeplitz1Cache>,
+    ) -> Result<Vec<Vec<Proof>>, KzgRsError> {
         Ok({
             #[cfg(not(feature = "parallel"))]
             {
@@ -133,7 +149,7 @@ impl DaEncoder {
                 polynomials.par_iter()
             }
         }
-        .map(|poly| fk20_batch_generate_elements_proofs(poly, &GLOBAL_PARAMETERS))
+        .map(|poly| fk20_batch_generate_elements_proofs(poly, &GLOBAL_PARAMETERS, toeplitz1cache))
         .collect())
     }
 
@@ -167,10 +183,14 @@ impl DaEncoder {
         Ok(((evals, poly), commitment))
     }
 
-    fn compute_aggregated_column_proofs(polynomial: &Polynomial) -> Result<Vec<Proof>, KzgRsError> {
+    fn compute_aggregated_column_proofs(
+        polynomial: &Polynomial,
+        toeplitz1cache: Option<&Toeplitz1Cache>,
+    ) -> Result<Vec<Proof>, KzgRsError> {
         Ok(fk20_batch_generate_elements_proofs(
             polynomial,
             &GLOBAL_PARAMETERS,
+            toeplitz1cache,
         ))
     }
 
@@ -189,7 +209,7 @@ impl DaEncoder {
         )
     }
 
-    pub fn encode(&self, data: &[u8]) -> Result<EncodedData, kzgrs::KzgRsError> {
+    pub fn encode(&self, data: &[u8]) -> Result<EncodedData, KzgRsError> {
         let chunked_data = self.chunkify(data);
         let row_domain = PolynomialEvaluationDomain::new(self.params.column_count)
             .expect("Domain should be able to build");
@@ -202,7 +222,8 @@ impl DaEncoder {
         let (_, row_polynomials): (Vec<_>, Vec<_>) = row_polynomials.into_iter().unzip();
         let encoded_evaluations = Self::rs_encode_rows(&row_polynomials, row_domain);
         let extended_data = Self::evals_to_chunk_matrix(&encoded_evaluations);
-        let rows_proofs = Self::compute_rows_proofs(&row_polynomials)?;
+        let rows_proofs =
+            Self::compute_rows_proofs(&row_polynomials, self.params.toeplitz1cache.as_ref())?;
         let (_column_polynomials, column_commitments): (Vec<_>, Vec<_>) =
             Self::compute_kzg_column_commitments(&extended_data, column_domain)?
                 .into_iter()
@@ -213,8 +234,10 @@ impl DaEncoder {
                 &column_commitments,
                 row_domain,
             )?;
-        let aggregated_column_proofs =
-            Self::compute_aggregated_column_proofs(&aggregated_polynomial)?;
+        let aggregated_column_proofs = Self::compute_aggregated_column_proofs(
+            &aggregated_polynomial,
+            self.params.toeplitz1cache.as_ref(),
+        )?;
         Ok(EncodedData {
             data: data.to_vec(),
             chunked_data,
@@ -258,7 +281,7 @@ pub mod test {
         let params = DaEncoderParams::default_with(2);
         let elements = 10usize;
         let data = rand_data(elements);
-        let encoder = DaEncoder::new(params);
+        let encoder = DaEncoder::new(params.clone());
         let matrix = encoder.chunkify(&data);
         assert_eq!(matrix.len(), elements.div(params.column_count.div(2)));
         for row in matrix.rows() {
@@ -343,7 +366,7 @@ pub mod test {
         let (_evals, polynomials): (Vec<_>, Vec<_>) = poly_data.into_iter().unzip();
         let extended_evaluations = DaEncoder::rs_encode_rows(&polynomials, domain);
         let extended_matrix = DaEncoder::evals_to_chunk_matrix(&extended_evaluations);
-        let proofs = DaEncoder::compute_rows_proofs(&polynomials).unwrap();
+        let proofs = DaEncoder::compute_rows_proofs(&polynomials, None).unwrap();
 
         let checks = izip!(matrix.iter(), &commitments, &proofs);
         for (row, commitment, proofs) in checks {
@@ -412,7 +435,7 @@ pub mod test {
                 .unzip();
         let ((_evals, polynomial), _aggregated_commitment) =
             DaEncoder::compute_aggregated_column_commitment(&matrix, &commitments, domain).unwrap();
-        DaEncoder::compute_aggregated_column_proofs(&polynomial).unwrap();
+        DaEncoder::compute_aggregated_column_proofs(&polynomial, None).unwrap();
     }
 
     #[test]
