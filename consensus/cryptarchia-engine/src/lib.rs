@@ -331,32 +331,22 @@ pub mod tests {
         let branch1 = engine
             .branches
             .get(&parent)
-            .ok_or("At least one branch should be there");
+            .ok_or("At least one branch should be there")
+            .expect("branch1 is not set");
 
         let branches = engine.branches();
 
         // Get branch using getter
         let branch2 = branches
             .get(&parent)
-            .ok_or("At least one branch should be there");
+            .ok_or("At least one branch should be there")
+            .expect("branch2 is not set");
 
         assert_eq!(branch1, branch2);
-        assert_eq!(
-            branch1.expect("id is not set").id(),
-            branch2.expect("id is not set").id()
-        );
-        assert_eq!(
-            branch1.expect("parent is not set").parent(),
-            branch2.expect("parent is not set").parent()
-        );
-        assert_eq!(
-            branch1.expect("slot is not set").slot(),
-            branch2.expect("slot is not set").slot()
-        );
-        assert_eq!(
-            branch1.expect("length is not set").length(),
-            branch2.expect("length is not set").length()
-        );
+        assert_eq!(branch1.id(), branch2.id());
+        assert_eq!(branch1.parent(), branch2.parent());
+        assert_eq!(branch1.slot(), branch2.slot());
+        assert_eq!(branch1.length(), branch2.length());
 
         let slot = Slot::genesis();
 
