@@ -78,6 +78,7 @@ pub fn fk20_batch_generate_elements_proofs(
         .collect()
 }
 
+#[derive(Clone)]
 pub struct Toeplitz1Cache(Vec<G1Projective>);
 
 impl Toeplitz1Cache {
