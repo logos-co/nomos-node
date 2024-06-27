@@ -5,6 +5,7 @@ use ark_ff::Field;
 use ark_poly::{EvaluationDomain, GeneralEvaluationDomain};
 use num_traits::Zero;
 use std::borrow::Cow;
+use std::ops::Mul;
 
 fn toeplitz1(global_parameters: &[G1Affine], polynomial_degree: usize) -> Vec<G1Projective> {
     debug_assert_eq!(global_parameters.len(), polynomial_degree);
@@ -27,9 +28,8 @@ fn toeplitz2(coefficients: &[Fr], extended_vector: &[G1Projective]) -> Vec<G1Pro
     let toeplitz_coefficients_fft = domain.fft(coefficients);
     extended_vector
         .iter()
-        .copied()
         .zip(toeplitz_coefficients_fft)
-        .map(|(v, c)| (v * c))
+        .map(|(v, c)| (v.mul(c)))
         .collect()
 }
 
