@@ -21,7 +21,7 @@ pub struct Branches<Id> {
     tips: HashSet<Id>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Branch<Id> {
     id: Id,
     parent: Id,
@@ -131,6 +131,7 @@ where
 }
 
 #[derive(Debug, Clone, Error)]
+#[cfg_attr(test, derive(PartialEq))]
 pub enum Error<Id> {
     #[error("Parent block: {0:?} is not know to this node")]
     ParentMissing(Id),
@@ -220,7 +221,7 @@ where
 
 #[cfg(test)]
 pub mod tests {
-    use super::Cryptarchia;
+    use super::{Cryptarchia, Slot};
     use crate::Config;
     use std::hash::{DefaultHasher, Hash, Hasher};
 
@@ -319,5 +320,36 @@ pub mod tests {
         let mut res = [0; 32];
         res[..8].copy_from_slice(&hash.to_be_bytes());
         res
+    }
+
+    #[test]
+    fn test_getters() {
+        let engine = Cryptarchia::from_genesis([0; 32], config());
+        let id_0 = engine.genesis();
+
+        // Get branch directly from HashMap
+        let branch1 = engine.branches.get(&id_0).expect("branch1 should be there");
+
+        let branches = engine.branches();
+
+        // Get branch using getter
+        let branch2 = branches.get(&id_0).expect("branch2 should be there");
+
+        assert_eq!(branch1, branch2);
+        assert_eq!(branch1.id(), branch2.id());
+        assert_eq!(branch1.parent(), branch2.parent());
+        assert_eq!(branch1.slot(), branch2.slot());
+        assert_eq!(branch1.length(), branch2.length());
+
+        let slot = Slot::genesis();
+
+        assert_eq!(slot + 10u64, Slot::from(10));
+
+        let id_100 = [100; 32];
+
+        assert!(
+            branches.get(&id_100).is_none(),
+            "id_100 should not be related to this branch"
+        );
     }
 }
