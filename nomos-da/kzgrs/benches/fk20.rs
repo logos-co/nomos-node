@@ -6,7 +6,7 @@ use ark_poly::{EvaluationDomain, GeneralEvaluationDomain};
 use ark_poly_commit::kzg10::KZG10;
 use divan::counter::ItemsCount;
 use divan::Bencher;
-use kzgrs::fk20::fk20_batch_generate_elements_proofs;
+use kzgrs::fk20::{fk20_batch_generate_elements_proofs, Toeplitz1Cache};
 use kzgrs::{bytes_to_polynomial, GlobalParameters, BYTES_PER_FIELD_ELEMENT};
 use once_cell::sync::Lazy;
 use rand::SeedableRng;
@@ -23,7 +23,7 @@ static GLOBAL_PARAMETERS: Lazy<GlobalParameters> = Lazy::new(|| {
     KZG10::<Bls12_381, DensePolynomial<Fr>>::setup(4096, true, &mut rng).unwrap()
 });
 
-#[divan::bench(args = [16, 32, 64, 128, 256, 512, 1024, 2048, 4096])]
+#[divan::bench(args = [16, 32, 64, 128, 256, 512, 1024, 2048, 4096], sample_count = 10, sample_size = 10)]
 fn compute_fk20_proofs_for_size(bencher: Bencher, size: usize) {
     bencher
         .with_inputs(|| {
@@ -40,12 +40,13 @@ fn compute_fk20_proofs_for_size(bencher: Bencher, size: usize) {
             black_box(fk20_batch_generate_elements_proofs(
                 poly,
                 &GLOBAL_PARAMETERS,
+                None,
             ))
         });
 }
 
 #[cfg(feature = "parallel")]
-#[divan::bench(args = [16, 32, 64, 128, 256, 512, 1024, 2048, 4096])]
+#[divan::bench(args = [16, 32, 64, 128, 256, 512, 1024, 2048, 4096], sample_count = 10, sample_size = 10)]
 fn compute_parallel_fk20_proofs_for_size(bencher: Bencher, size: usize) {
     let thread_count: usize = rayon::max_num_threads().min(rayon::current_num_threads());
     bencher
@@ -59,9 +60,55 @@ fn compute_parallel_fk20_proofs_for_size(bencher: Bencher, size: usize) {
             poly
         })
         .input_counter(move |_| ItemsCount::new(size * thread_count))
-        .bench_refs(|(poly)| {
+        .bench_refs(|poly| {
             black_box((0..thread_count).into_par_iter().for_each(|_| {
-                fk20_batch_generate_elements_proofs(poly, &GLOBAL_PARAMETERS);
+                fk20_batch_generate_elements_proofs(poly, &GLOBAL_PARAMETERS, None);
+            }))
+        });
+}
+
+#[divan::bench(args = [16, 32, 64, 128, 256, 512, 1024, 2048, 4096], sample_count = 10, sample_size = 10)]
+fn compute_fk20_proofs_for_size_with_cache(bencher: Bencher, size: usize) {
+    bencher
+        .with_inputs(|| {
+            let buff: Vec<_> = (0..BYTES_PER_FIELD_ELEMENT * size)
+                .map(|i| (i % 255) as u8)
+                .rev()
+                .collect();
+            let domain = GeneralEvaluationDomain::new(size).unwrap();
+            let (_, poly) = bytes_to_polynomial::<BYTES_PER_FIELD_ELEMENT>(&buff, domain).unwrap();
+            let cache = Toeplitz1Cache::with_size(&GLOBAL_PARAMETERS, size);
+            (poly, cache)
+        })
+        .input_counter(move |_| ItemsCount::new(size))
+        .bench_refs(|(poly, cache)| {
+            black_box(fk20_batch_generate_elements_proofs(
+                &poly,
+                &GLOBAL_PARAMETERS,
+                Some(cache),
+            ))
+        });
+}
+
+#[cfg(feature = "parallel")]
+#[divan::bench(args = [16, 32, 64, 128, 256, 512, 1024, 2048, 4096], sample_count = 10, sample_size = 10)]
+fn compute_parallel_fk20_proofs_for_size_with_cache(bencher: Bencher, size: usize) {
+    let thread_count: usize = rayon::max_num_threads().min(rayon::current_num_threads());
+    bencher
+        .with_inputs(|| {
+            let buff: Vec<_> = (0..BYTES_PER_FIELD_ELEMENT * size)
+                .map(|i| (i % 255) as u8)
+                .rev()
+                .collect();
+            let domain = GeneralEvaluationDomain::new(size).unwrap();
+            let (_, poly) = bytes_to_polynomial::<BYTES_PER_FIELD_ELEMENT>(&buff, domain).unwrap();
+            let cache = Toeplitz1Cache::with_size(&GLOBAL_PARAMETERS, size);
+            (poly, cache)
+        })
+        .input_counter(move |_| ItemsCount::new(size * thread_count))
+        .bench_refs(|(poly, cache)| {
+            black_box((0..thread_count).into_par_iter().for_each(|_| {
+                fk20_batch_generate_elements_proofs(&poly, &GLOBAL_PARAMETERS, Some(cache));
             }))
         });
 }
