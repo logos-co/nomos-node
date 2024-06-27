@@ -221,7 +221,7 @@ where
 
 #[cfg(test)]
 pub mod tests {
-    use super::{Cryptarchia, Error, Slot};
+    use super::{Cryptarchia, Slot};
     use crate::Config;
     use std::hash::{DefaultHasher, Hash, Hasher};
 
@@ -325,21 +325,21 @@ pub mod tests {
     #[test]
     fn test_getters() {
         let engine = Cryptarchia::from_genesis([0; 32], config());
-        let parent = engine.genesis();
+        let id_0 = engine.genesis();
 
         // Get branch directly from HashMap
         let branch1 = engine
             .branches
-            .get(&parent)
-            .ok_or("At least one branch should be there")
+            .get(&id_0)
+            .ok_or("at least one branch should be there")
             .expect("branch1 is not set");
 
         let branches = engine.branches();
 
         // Get branch using getter
         let branch2 = branches
-            .get(&parent)
-            .ok_or("At least one branch should be there")
+            .get(&id_0)
+            .ok_or("at least one branch should be there")
             .expect("branch2 is not set");
 
         assert_eq!(branch1, branch2);
@@ -352,16 +352,11 @@ pub mod tests {
 
         assert_eq!(slot + 10u64, Slot::from(10));
 
-        let not_a_parent = [100; 32];
+        let id_100 = [100; 32];
 
-        _ = match branches
-            .get(&not_a_parent)
-            .ok_or(Error::ParentMissing(not_a_parent))
-        {
-            Ok(_) => panic!("Parent should not be related to this branch"),
-            Err(e) => {
-                assert_ne!(e, Error::ParentMissing(parent));
-            }
-        };
+        assert!(
+            branches.get(&id_100).is_none(),
+            "id_100 should not be related to this branch"
+        );
     }
 }
