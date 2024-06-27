@@ -352,8 +352,7 @@ pub mod tests {
 
         assert_eq!(slot + 10u64, Slot::from(10));
 
-        let strange_engine = Cryptarchia::from_genesis([100; 32], config());
-        let not_a_parent = strange_engine.genesis();
+        let not_a_parent = [100; 32];
 
         _ = match branches
             .get(&not_a_parent)
