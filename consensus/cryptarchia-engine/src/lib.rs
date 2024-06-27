@@ -328,19 +328,12 @@ pub mod tests {
         let id_0 = engine.genesis();
 
         // Get branch directly from HashMap
-        let branch1 = engine
-            .branches
-            .get(&id_0)
-            .ok_or("at least one branch should be there")
-            .expect("branch1 is not set");
+        let branch1 = engine.branches.get(&id_0).expect("branch1 should be there");
 
         let branches = engine.branches();
 
         // Get branch using getter
-        let branch2 = branches
-            .get(&id_0)
-            .ok_or("at least one branch should be there")
-            .expect("branch2 is not set");
+        let branch2 = branches.get(&id_0).expect("branch2 should be there");
 
         assert_eq!(branch1, branch2);
         assert_eq!(branch1.id(), branch2.id());
