@@ -386,10 +386,11 @@ impl core::fmt::Debug for LedgerState {
 
 #[cfg(test)]
 pub mod tests {
-    use super::{Coin, EpochState, Ledger, LedgerState};
+    use super::{Coin, EpochState, LeaderProof, Ledger, LedgerState, Nullifier, Value};
     use crate::{crypto::Blake2b, Commitment, Config, LedgerError};
     use blake2::Digest;
     use cryptarchia_engine::Slot;
+    use serde_test::{assert_tokens, Configure, Token};
 
     type HeaderId = [u8; 32];
 
@@ -740,5 +741,92 @@ pub mod tests {
             ),
             Err(LedgerError::NullifierExists)
         ));
+    }
+
+    #[test]
+    fn test_conversions_for_leader_proof() {
+        let commitment = Commitment::from([0u8; 32]);
+        let commitment_bytes: [u8; 32] = commitment.into();
+
+        let _zero_bytes = [0u8; 32];
+        assert!(matches!(commitment_bytes, _zero_bytes));
+
+        let commitment_ref = commitment.as_ref();
+        assert_eq!(commitment_ref, &_zero_bytes);
+
+        let nullifier = Nullifier::from([0u8; 32]);
+        let _nullifier_bytes: [u8; 32] = nullifier.into();
+        assert!(matches!(_nullifier_bytes, _zero_bytes));
+
+        let slot = Slot::genesis();
+        let leader_proof = LeaderProof::dummy(slot, commitment, Commitment::from([0; 32]));
+
+        assert_eq!(leader_proof.commitment(), &commitment);
+        assert_eq!(leader_proof.evolved_commitment(), &commitment);
+        assert_eq!(leader_proof.nullifier(), &nullifier);
+
+        // Test ser/de of compact representation for Nullifier
+        assert_tokens(&nullifier.compact(), &[Token::BorrowedBytes(&[0; 32])]);
+
+        // Test ser/de of compact representation for Commitment
+        assert_tokens(&commitment.compact(), &[Token::BorrowedBytes(&[0; 32])]);
+    }
+
+    #[test]
+    fn test_update_epoch_state_with_outdated_slot_error() {
+        let coin = coin(0);
+        let commitment = coin.commitment();
+        let (ledger, genesis) = ledger(&[commitment]);
+
+        let ledger_state = ledger.state(&genesis).unwrap().clone();
+        let ledger_config = ledger.config();
+
+        let slot = Slot::genesis() + 10;
+        let ledger_state2 = ledger_state
+            .update_epoch_state::<HeaderId>(slot, ledger_config)
+            .expect("Ledger needs to move forward");
+
+        let slot2 = Slot::genesis() + 1;
+        let update_epoch_err = ledger_state2
+            .update_epoch_state::<HeaderId>(slot2, ledger_config)
+            .err();
+
+        // Time cannot flow backwards
+        match update_epoch_err {
+            Some(LedgerError::InvalidSlot { parent, block })
+                if parent == slot && block == slot2 => {}
+            _ => panic!("error does not match the LedgerError::InvalidSlot pattern"),
+        };
+    }
+
+    #[test]
+    fn test_apply_proof_with_existing_commitment_error() {
+        let coin = coin(0);
+        let commitment = coin.commitment();
+        let (ledger, genesis) = ledger(&[commitment]);
+
+        let ledger_state = ledger.state(&genesis).unwrap().clone();
+        let ledger_config = ledger.config();
+
+        let actual_slot = ledger_state.slot();
+        let proof = LeaderProof::dummy(actual_slot, commitment, commitment);
+        let epoch_state = ledger_state.epoch_state();
+
+        assert!(ledger_state.can_spend(&commitment));
+        assert_eq!(epoch_state.total_stake(), Value::from(1u32));
+        assert_eq!(coin.value(), Value::from(1u32));
+
+        assert!(ledger_state.can_lead(&commitment));
+        assert!(epoch_state.is_eligible_leader(&commitment));
+
+        let apply_proof_err = ledger_state
+            .try_apply_proof::<HeaderId>(&proof, ledger_config)
+            .err();
+
+        // Same commitment value from another coin cannot be used again
+        assert!(
+            matches!(apply_proof_err, Some(LedgerError::CommitmentExists)),
+            "Error does not match LedgerError::CommitmentExists"
+        );
     }
 }
