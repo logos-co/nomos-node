@@ -467,4 +467,31 @@ pub mod test {
             }
         }
     }
+
+    #[test]
+    fn profile_full_encode_flow() {
+        // use ~1MB worth of data
+        let data = rand_data(1024 * 1024 / DaEncoderParams::MAX_BLS12_381_ENCODING_CHUNK_SIZE);
+        let domain = GeneralEvaluationDomain::new(4096).unwrap();
+        let encoder = DaEncoder::new(DaEncoderParams::new(4096, true));
+
+        let guard = pprof::ProfilerGuardBuilder::default()
+            .frequency(1000)
+            .blocklist(&["libc", "libgcc", "pthread", "vdso"])
+            .build()
+            .unwrap();
+        let encoding_data = encoder.encode(&data).unwrap();
+        match guard.report().build() {
+            Ok(report) => {
+                let mut file = std::fs::File::create("encode-profile.pb").unwrap();
+                let profile = report.pprof().unwrap();
+
+                let mut content = Vec::new();
+                profile.encode(&mut content).unwrap();
+                std::io::Write::write_all(&mut file, &content).unwrap();
+                println!("report: {}", &report);
+            }
+            Err(_) => {}
+        };
+    }
 }
