@@ -33,10 +33,12 @@ fn toeplitz2(coefficients: &[Fr], extended_vector: &[G1Projective]) -> Vec<G1Pro
         .collect()
 }
 
-fn toeplitz3(h_extended_fft: &[G1Projective]) -> Vec<G1Projective> {
+fn toeplitz3(mut h_extended_fft: Vec<G1Projective>) -> Vec<G1Projective> {
     let domain: GeneralEvaluationDomain<Fr> =
         GeneralEvaluationDomain::new(h_extended_fft.len()).expect("Domain should be able to build");
-    domain.ifft(h_extended_fft)
+
+    domain.ifft_in_place(&mut h_extended_fft);
+    h_extended_fft
 }
 
 pub fn fk20_batch_generate_elements_proofs(
@@ -67,7 +69,7 @@ pub fn fk20_batch_generate_elements_proofs(
         .chain(polynomial.coeffs.iter().copied())
         .collect();
     let h_extended_vector = toeplitz2(&toeplitz_coefficients, &extended_vector);
-    let h_vector = toeplitz3(&h_extended_vector);
+    let h_vector = toeplitz3(h_extended_vector);
     domain
         .fft(&h_vector)
         .into_iter()
