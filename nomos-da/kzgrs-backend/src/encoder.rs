@@ -263,6 +263,7 @@ pub mod test {
         decode, verify_element_proof, FieldElement, PolynomialEvaluationDomain,
         BYTES_PER_FIELD_ELEMENT,
     };
+    use pprof::protos::Message;
     use rand::RngCore;
     use std::ops::Div;
 
@@ -472,7 +473,7 @@ pub mod test {
     fn profile_full_encode_flow() {
         // use ~1MB worth of data
         let data = rand_data(1024 * 1024 / DaEncoderParams::MAX_BLS12_381_ENCODING_CHUNK_SIZE);
-        let domain = GeneralEvaluationDomain::new(4096).unwrap();
+        let domain = PolynomialEvaluationDomain::new(4096).unwrap();
         let encoder = DaEncoder::new(DaEncoderParams::new(4096, true));
 
         let guard = pprof::ProfilerGuardBuilder::default()
@@ -487,9 +488,9 @@ pub mod test {
                 let profile = report.pprof().unwrap();
 
                 let mut content = Vec::new();
-                profile.encode(&mut content).unwrap();
+                profile.write_to_vec(&mut content).unwrap();
                 std::io::Write::write_all(&mut file, &content).unwrap();
-                println!("report: {}", &report);
+                println!("report: {:?}", &report);
             }
             Err(_) => {}
         };
