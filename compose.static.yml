@@ -23,6 +23,9 @@ services:
 
   libp2p-node-1:
     container_name: libp2p_node_1
+    build:
+      context: .
+      dockerfile: testnet/Dockerfile
     image: nomos:latest
     volumes:
       - ./testnet:/etc/nomos
@@ -45,6 +48,9 @@ services:
 
   libp2p-node-2:
     container_name: libp2p_node_2
+    build:
+      context: .
+      dockerfile: testnet/Dockerfile
     image: nomos:latest
     volumes:
       - ./testnet:/etc/nomos
@@ -67,6 +73,9 @@ services:
 
   libp2p-node-3:
     container_name: libp2p_node_3
+    build:
+      context: .
+      dockerfile: testnet/Dockerfile
     image: nomos:latest
     volumes:
       - ./testnet:/etc/nomos
@@ -89,6 +98,9 @@ services:
 
   chatbot:
     container_name: chatbot
+    build:
+      context: .
+      dockerfile: testnet/Dockerfile
     image: nomos:latest
     volumes:
       - ./testnet:/etc/nomos
