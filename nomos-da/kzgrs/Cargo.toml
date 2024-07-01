@@ -49,5 +49,8 @@ parallel = [
     "ark-poly/parallel",
     "ark-poly/rayon",
     "ark-poly-commit/rayon",
-    "ark-poly-commit/parallel"
+    "ark-poly-commit/parallel",
+    "ark-ec/parallel",
+    "ark-ec/rayon",
+    "ark-bls12-381-ext/parallel"
 ]
