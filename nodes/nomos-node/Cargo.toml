@@ -15,11 +15,13 @@ chrono = "0.4"
 futures = "0.3"
 http = "0.2.9"
 hex = "0.4.3"
+kzgrs-backend = { path = "../../nomos-da/kzgrs-backend" }
 overwatch-rs = { git = "https://github.com/logos-co/Overwatch", rev = "2f70806" }
 overwatch-derive = { git = "https://github.com/logos-co/Overwatch", rev = "ac28d01" }
 tracing = "0.1"
 multiaddr = "0.18"
 nomos-core = { path = "../../nomos-core" }
+nomos-da-verifier = { path = "../../nomos-services/data-availability/verifier", features = ["rocksdb-backend", "libp2p"] }
 nomos-network = { path = "../../nomos-services/network", features = ["libp2p"] }
 nomos-api = { path = "../../nomos-services/api" }
 nomos-log = { path = "../../nomos-services/log" }

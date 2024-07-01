@@ -1,4 +1,4 @@
-use full_replication::Certificate;
+use kzgrs_backend::dispersal::Certificate;
 #[cfg(feature = "metrics")]
 use nomos_metrics::MetricsSettings;
 use nomos_node::{
@@ -80,9 +80,10 @@ fn main() -> Result<()> {
                     topic: String::from(nomos_node::DA_TOPIC),
                     id: <Certificate as certificate::Certificate>::id,
                 },
-                verification_provider: full_replication::CertificateVerificationParameters {
-                    threshold: 0,
-                },
+                verification_provider:
+                    kzgrs_backend::dispersal::CertificateVerificationParameters {
+                        nodes_public_keys: Default::default(),
+                    },
                 registry: registry.clone(),
             },
             cryptarchia: config.cryptarchia,

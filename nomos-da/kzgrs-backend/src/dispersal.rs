@@ -8,22 +8,34 @@ use blst::BLST_ERROR;
 use kzgrs::{Commitment, KzgRsError};
 use nomos_core::da::certificate::metadata::Next;
 use nomos_core::da::certificate::{self, metadata};
+use serde::{Deserialize, Serialize};
 
 // internal
 use crate::common::{attestation::Attestation, build_attestation_message, NOMOS_DA_DST};
+use crate::common::{
+    deserialize_canonical, deserialize_vec_canonical, serialize_canonical, serialize_vec_canonical,
+};
 use crate::encoder::EncodedData;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct Certificate {
     aggregated_signatures: Signature,
     signers: BitVec<u8>,
+    #[serde(
+        serialize_with = "serialize_canonical",
+        deserialize_with = "deserialize_canonical"
+    )]
     aggregated_column_commitment: Commitment,
+    #[serde(
+        serialize_with = "serialize_vec_canonical",
+        deserialize_with = "deserialize_vec_canonical"
+    )]
     row_commitments: Vec<Commitment>,
     metadata: Metadata,
 }
 
 impl Certificate {
-    pub fn id(&self) -> Vec<u8> {
+    pub fn id(&self) -> [u8; 32] {
         build_attestation_message(&self.aggregated_column_commitment, &self.row_commitments)
     }
 
@@ -90,6 +102,12 @@ impl Certificate {
     }
 }
 
+impl Hash for Certificate {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        state.write(<Certificate as certificate::Certificate>::id(self).as_ref());
+    }
+}
+
 fn aggregate_signatures(signatures: Vec<Signature>) -> Result<Signature, BLST_ERROR> {
     let refs: Vec<&Signature> = signatures.iter().collect();
     AggregateSignature::aggregate(&refs, true).map(|agg_sig| agg_sig.to_signature())
@@ -111,7 +129,7 @@ pub struct CertificateVerificationParameters {
 
 impl certificate::Certificate for Certificate {
     type Signature = Signature;
-    type Id = Vec<u8>;
+    type Id = [u8; 32];
     type VerificationParameters = CertificateVerificationParameters;
 
     fn signers(&self) -> Vec<bool> {
@@ -131,10 +149,10 @@ impl certificate::Certificate for Certificate {
     }
 }
 
-#[derive(Copy, Clone, Default, Debug, Ord, PartialOrd, PartialEq, Eq)]
+#[derive(Copy, Clone, Default, Debug, PartialEq, PartialOrd, Ord, Eq, Serialize, Deserialize)]
 pub struct Index([u8; 8]);
 
-#[derive(Default, Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Default, Debug, Copy, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub struct Metadata {
     app_id: [u8; 32],
     index: Index,
@@ -146,17 +164,17 @@ impl Metadata {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub struct VidCertificate {
-    id: Vec<u8>,
+    id: [u8; 32],
     metadata: Metadata,
 }
 
 impl certificate::vid::VidCertificate for VidCertificate {
-    type CertificateId = Vec<u8>;
+    type CertificateId = [u8; 32];
 
     fn certificate_id(&self) -> Self::CertificateId {
-        self.id.clone()
+        self.id
     }
 
     fn size(&self) -> usize {

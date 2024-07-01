@@ -17,6 +17,7 @@ cryptarchia-engine = { path = "../consensus/cryptarchia-engine", features = ["se
 cryptarchia-ledger = { path = "../ledger/cryptarchia-ledger", features = ["serde"] }
 nomos-mempool = { path = "../nomos-services/mempool", features = ["mock", "libp2p"] }
 full-replication = { path = "../nomos-da/full-replication" }
+kzgrs-backend = { path = "../nomos-da/kzgrs-backend" }
 rand = "0.8"
 once_cell = "1"
 secp256k1 = { version = "0.26", features = ["rand"] }

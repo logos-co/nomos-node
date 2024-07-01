@@ -2,8 +2,9 @@ pub mod attestation;
 pub mod blob;
 
 // std
-use ark_serialize::CanonicalSerialize;
-use serde::{Deserialize, Serialize};
+use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
+use serde::ser::SerializeSeq;
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::io::Cursor;
 // crates
 use blake2::digest::{Update, VariableOutput};
@@ -156,7 +157,7 @@ pub fn hash_column_and_commitment<const HASH_SIZE: usize>(
 pub fn build_attestation_message(
     aggregated_column_commitment: &Commitment,
     rows_commitments: &[Commitment],
-) -> Vec<u8> {
+) -> [u8; 32] {
     let mut hasher = Sha3_256::new();
     Digest::update(
         &mut hasher,
@@ -165,7 +166,7 @@ pub fn build_attestation_message(
     for c in rows_commitments {
         Digest::update(&mut hasher, commitment_to_bytes(c));
     }
-    hasher.finalize().to_vec()
+    hasher.finalize().into()
 }
 
 pub fn commitment_to_bytes(commitment: &Commitment) -> Vec<u8> {
@@ -174,4 +175,57 @@ pub fn commitment_to_bytes(commitment: &Commitment) -> Vec<u8> {
         .serialize_uncompressed(&mut buff)
         .expect("Serialization of commitment should work");
     buff.into_inner()
+}
+
+pub fn serialize_canonical<S, T>(value: &T, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+    T: CanonicalSerialize,
+{
+    let mut bytes = Vec::new();
+    value
+        .serialize_compressed(&mut bytes)
+        .map_err(serde::ser::Error::custom)?;
+    serializer.serialize_bytes(&bytes)
+}
+
+pub fn deserialize_canonical<'de, D, T>(deserializer: D) -> Result<T, D::Error>
+where
+    D: Deserializer<'de>,
+    T: CanonicalDeserialize,
+{
+    let bytes: Vec<u8> = serde::Deserialize::deserialize(deserializer)?;
+    let mut cursor = Cursor::new(bytes);
+    T::deserialize_compressed(&mut cursor).map_err(serde::de::Error::custom)
+}
+
+pub fn serialize_vec_canonical<S, T>(values: &[T], serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+    T: CanonicalSerialize,
+{
+    let mut container = serializer.serialize_seq(Some(values.len()))?;
+    for value in values {
+        let mut bytes = Vec::new();
+        value
+            .serialize_compressed(&mut bytes)
+            .map_err(serde::ser::Error::custom)?;
+        container.serialize_element(&bytes)?;
+    }
+    container.end()
+}
+
+pub fn deserialize_vec_canonical<'de, D, T>(deserializer: D) -> Result<Vec<T>, D::Error>
+where
+    D: Deserializer<'de>,
+    T: CanonicalDeserialize,
+{
+    let bytes_vecs: Vec<Vec<u8>> = Deserialize::deserialize(deserializer)?;
+    bytes_vecs
+        .iter()
+        .map(|bytes| {
+            let mut cursor = Cursor::new(bytes);
+            T::deserialize_compressed(&mut cursor).map_err(serde::de::Error::custom)
+        })
+        .collect()
 }

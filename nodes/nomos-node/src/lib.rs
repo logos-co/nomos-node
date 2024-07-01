@@ -3,16 +3,19 @@ mod config;
 mod tx;
 
 use color_eyre::eyre::Result;
-use full_replication::{Certificate, VidCertificate};
+use kzgrs_backend::dispersal::{Certificate, VidCertificate};
 
 use api::AxumBackend;
 use bytes::Bytes;
 pub use config::{Config, CryptarchiaArgs, HttpArgs, LogArgs, MetricsArgs, NetworkArgs};
+use kzgrs_backend::common::attestation::Attestation;
+use kzgrs_backend::common::blob::DaBlob;
 use nomos_api::ApiService;
 use nomos_core::{da::certificate, header::HeaderId, tx::Transaction, wire};
+use nomos_da_verifier::backend::kzgrs::KzgrsDaVerifier;
 #[cfg(feature = "tracing")]
 use nomos_log::Logger;
-use nomos_mempool::da::verify::fullreplication::DaVerificationProvider as MempoolVerificationProvider;
+use nomos_mempool::da::verify::kzgrs::DaVerificationProvider as MempoolVerificationProvider;
 use nomos_mempool::network::adapters::libp2p::Libp2pAdapter as MempoolNetworkAdapter;
 use nomos_mempool::{backend::mockpool::MockPool, TxMempoolService};
 #[cfg(feature = "metrics")]
@@ -37,6 +40,20 @@ use overwatch_rs::services::handle::ServiceHandle;
 use serde::{de::DeserializeOwned, Serialize};
 
 pub use tx::Tx;
+
+pub type NomosApiService = ApiService<
+    AxumBackend<
+        Attestation,
+        DaBlob,
+        Certificate,
+        VidCertificate,
+        MempoolVerificationProvider,
+        KzgrsDaVerifier,
+        Tx,
+        Wire,
+        MB16,
+    >,
+>;
 
 pub const CL_TOPIC: &str = "cl";
 pub const DA_TOPIC: &str = "da";
@@ -81,7 +98,7 @@ pub struct Nomos {
     cl_mempool: ServiceHandle<TxMempool>,
     da_mempool: ServiceHandle<DaMempool>,
     cryptarchia: ServiceHandle<Cryptarchia>,
-    http: ServiceHandle<ApiService<AxumBackend<Tx, Wire, MB16>>>,
+    http: ServiceHandle<NomosApiService>,
     storage: ServiceHandle<StorageService<RocksBackend<Wire>>>,
     #[cfg(feature = "metrics")]
     metrics: ServiceHandle<Metrics>,
