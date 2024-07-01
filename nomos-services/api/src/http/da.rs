@@ -17,8 +17,8 @@ use nomos_da_verifier::network::adapters::libp2p::Libp2pAdapter;
 use nomos_da_verifier::storage::adapters::rocksdb::RocksAdapter as VerifierStorageAdapter;
 use nomos_da_verifier::{DaVerifierMsg, DaVerifierService};
 use nomos_mempool::backend::mockpool::MockPool;
-use nomos_mempool::da::verify::kzgrs::DaVerificationProvider as MempoolVerificationProvider;
 use nomos_mempool::network::adapters::libp2p::Libp2pAdapter as MempoolNetworkAdapter;
+use nomos_mempool::verify::MempoolVerificationProvider;
 use nomos_storage::backends::rocksdb::RocksBackend;
 use nomos_storage::backends::StorageSerde;
 use overwatch_rs::overwatch::handle::OverwatchHandle;
@@ -30,30 +30,20 @@ use std::fmt::Debug;
 use std::hash::Hash;
 use tokio::sync::oneshot;
 
-pub type DaIndexer<Tx, SS, const SIZE: usize> = DataIndexerService<
+pub type DaIndexer<Tx, C, V, VP, SS, const SIZE: usize> = DataIndexerService<
     // Indexer specific.
     Bytes,
-    IndexerStorageAdapter<SS, kzgrs_backend::dispersal::VidCertificate>,
-    CryptarchiaConsensusAdapter<Tx, kzgrs_backend::dispersal::VidCertificate>,
+    IndexerStorageAdapter<SS, V>,
+    CryptarchiaConsensusAdapter<Tx, V>,
     // Cryptarchia specific, should be the same as in `Cryptarchia` type above.
-    cryptarchia_consensus::network::adapters::libp2p::LibP2pAdapter<
-        Tx,
-        kzgrs_backend::dispersal::VidCertificate,
-    >,
+    cryptarchia_consensus::network::adapters::libp2p::LibP2pAdapter<Tx, V>,
     MockPool<HeaderId, Tx, <Tx as Transaction>::Hash>,
     MempoolNetworkAdapter<Tx, <Tx as Transaction>::Hash>,
-    MockPool<
-        HeaderId,
-        kzgrs_backend::dispersal::VidCertificate,
-        <kzgrs_backend::dispersal::VidCertificate as certificate::vid::VidCertificate>::CertificateId,
-    >,
-    MempoolNetworkAdapter<
-        kzgrs_backend::dispersal::Certificate,
-        <kzgrs_backend::dispersal::Certificate as certificate::Certificate>::Id,
-    >,
-    MempoolVerificationProvider,
+    MockPool<HeaderId, V, [u8; 32]>,
+    MempoolNetworkAdapter<C, <C as certificate::Certificate>::Id>,
+    VP,
     FillSizeWithTx<SIZE, Tx>,
-    FillSizeWithBlobsCertificate<SIZE, kzgrs_backend::dispersal::VidCertificate>,
+    FillSizeWithBlobsCertificate<SIZE, V>,
     RocksBackend<SS>,
 >;
 
@@ -86,17 +76,11 @@ where
     Ok(receiver.await?)
 }
 
-pub async fn get_range<Tx, SS, const SIZE: usize>(
+pub async fn get_range<Tx, C, V, VP, SS, const SIZE: usize>(
     handle: &OverwatchHandle,
-    app_id: <kzgrs_backend::dispersal::VidCertificate as Metadata>::AppId,
-    range: Range<<kzgrs_backend::dispersal::VidCertificate as Metadata>::Index>,
-) -> Result<
-    Vec<(
-        <kzgrs_backend::dispersal::VidCertificate as Metadata>::Index,
-        Option<Bytes>,
-    )>,
-    DynError,
->
+    app_id: <V as Metadata>::AppId,
+    range: Range<<V as Metadata>::Index>,
+) -> Result<Vec<(<V as Metadata>::Index, Option<Bytes>)>, DynError>
 where
     Tx: Transaction
         + Eq
@@ -109,9 +93,41 @@ where
         + Sync
         + 'static,
     <Tx as Transaction>::Hash: std::cmp::Ord + Debug + Send + Sync + 'static,
+    C: certificate::Certificate<Id = [u8; 32]>
+        + Clone
+        + Debug
+        + Serialize
+        + DeserializeOwned
+        + Send
+        + Sync
+        + 'static,
+    <C as certificate::Certificate>::Id: Clone + Send + Sync,
+    V: certificate::vid::VidCertificate<CertificateId = [u8; 32]>
+        + From<C>
+        + Eq
+        + Debug
+        + Metadata
+        + Hash
+        + Clone
+        + Serialize
+        + DeserializeOwned
+        + Send
+        + Sync
+        + 'static,
+    <V as certificate::vid::VidCertificate>::CertificateId: Debug + Clone + Ord + Hash,
+    <V as Metadata>::AppId: AsRef<[u8]> + Serialize + Clone + Send + Sync,
+    <V as Metadata>::Index:
+        AsRef<[u8]> + Serialize + DeserializeOwned + Clone + PartialOrd + Send + Sync,
+    VP: MempoolVerificationProvider<
+        Payload = C,
+        Parameters = <C as certificate::Certificate>::VerificationParameters,
+    >,
     SS: StorageSerde + Send + Sync + 'static,
 {
-    let relay = handle.relay::<DaIndexer<Tx, SS, SIZE>>().connect().await?;
+    let relay = handle
+        .relay::<DaIndexer<Tx, C, V, VP, SS, SIZE>>()
+        .connect()
+        .await?;
     let (sender, receiver) = oneshot::channel();
     relay
         .send(DaMsg::GetRange {

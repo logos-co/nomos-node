@@ -102,6 +102,12 @@ impl Certificate {
     }
 }
 
+impl Hash for Certificate {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        state.write(<Certificate as certificate::Certificate>::id(self).as_ref());
+    }
+}
+
 fn aggregate_signatures(signatures: Vec<Signature>) -> Result<Signature, BLST_ERROR> {
     let refs: Vec<&Signature> = signatures.iter().collect();
     AggregateSignature::aggregate(&refs, true).map(|agg_sig| agg_sig.to_signature())
