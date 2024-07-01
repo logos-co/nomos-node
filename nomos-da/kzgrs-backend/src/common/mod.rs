@@ -157,7 +157,7 @@ pub fn hash_column_and_commitment<const HASH_SIZE: usize>(
 pub fn build_attestation_message(
     aggregated_column_commitment: &Commitment,
     rows_commitments: &[Commitment],
-) -> Vec<u8> {
+) -> [u8; 32] {
     let mut hasher = Sha3_256::new();
     Digest::update(
         &mut hasher,
@@ -166,7 +166,7 @@ pub fn build_attestation_message(
     for c in rows_commitments {
         Digest::update(&mut hasher, commitment_to_bytes(c));
     }
-    hasher.finalize().to_vec()
+    hasher.finalize().into()
 }
 
 pub fn commitment_to_bytes(commitment: &Commitment) -> Vec<u8> {

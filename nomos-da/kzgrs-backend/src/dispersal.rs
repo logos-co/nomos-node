@@ -35,7 +35,7 @@ pub struct Certificate {
 }
 
 impl Certificate {
-    pub fn id(&self) -> Vec<u8> {
+    pub fn id(&self) -> [u8; 32] {
         build_attestation_message(&self.aggregated_column_commitment, &self.row_commitments)
     }
 
@@ -123,7 +123,7 @@ pub struct CertificateVerificationParameters {
 
 impl certificate::Certificate for Certificate {
     type Signature = Signature;
-    type Id = Vec<u8>;
+    type Id = [u8; 32];
     type VerificationParameters = CertificateVerificationParameters;
 
     fn signers(&self) -> Vec<bool> {
@@ -160,15 +160,15 @@ impl Metadata {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub struct VidCertificate {
-    id: Vec<u8>,
+    id: [u8; 32],
     metadata: Metadata,
 }
 
 impl certificate::vid::VidCertificate for VidCertificate {
-    type CertificateId = Vec<u8>;
+    type CertificateId = [u8; 32];
 
     fn certificate_id(&self) -> Self::CertificateId {
-        self.id.clone()
+        self.id
     }
 
     fn size(&self) -> usize {

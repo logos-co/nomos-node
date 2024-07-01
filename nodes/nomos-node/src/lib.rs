@@ -41,6 +41,9 @@ use serde::{de::DeserializeOwned, Serialize};
 
 pub use tx::Tx;
 
+pub type NomosApiService =
+    ApiService<AxumBackend<Attestation, DaBlob, KzgrsDaVerifier, Tx, Wire, MB16>>;
+
 pub const CL_TOPIC: &str = "cl";
 pub const DA_TOPIC: &str = "da";
 const MB16: usize = 1024 * 1024 * 16;
@@ -84,9 +87,7 @@ pub struct Nomos {
     cl_mempool: ServiceHandle<TxMempool>,
     da_mempool: ServiceHandle<DaMempool>,
     cryptarchia: ServiceHandle<Cryptarchia>,
-    http: ServiceHandle<
-        ApiService<AxumBackend<Attestation, DaBlob, KzgrsDaVerifier, Tx, Wire, MB16>>,
-    >,
+    http: ServiceHandle<NomosApiService>,
     storage: ServiceHandle<StorageService<RocksBackend<Wire>>>,
     #[cfg(feature = "metrics")]
     metrics: ServiceHandle<Metrics>,

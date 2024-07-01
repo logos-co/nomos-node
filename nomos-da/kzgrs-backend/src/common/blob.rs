@@ -44,7 +44,7 @@ pub struct DaBlob {
 
 impl DaBlob {
     pub fn id(&self) -> Vec<u8> {
-        build_attestation_message(&self.aggregated_column_commitment, &self.rows_commitments)
+        build_attestation_message(&self.aggregated_column_commitment, &self.rows_commitments).into()
     }
 
     pub fn column_id(&self) -> Vec<u8> {
@@ -58,6 +58,6 @@ impl blob::Blob for DaBlob {
     type BlobId = Vec<u8>;
 
     fn id(&self) -> Self::BlobId {
-        build_attestation_message(&self.aggregated_column_commitment, &self.rows_commitments)
+        build_attestation_message(&self.aggregated_column_commitment, &self.rows_commitments).into()
     }
 }
