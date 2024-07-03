@@ -7,7 +7,7 @@ use super::{create_tempdir, persist_tempdir, LOGS_PREFIX};
 use crate::{adjust_timeout, get_available_port, ConsensusConfig, Node};
 use cryptarchia_consensus::{CryptarchiaInfo, CryptarchiaSettings, TimeConfig};
 use cryptarchia_ledger::{Coin, LedgerState};
-use full_replication::Certificate;
+use kzgrs_backend::dispersal::Certificate;
 #[cfg(feature = "mixnet")]
 use mixnet::{
     address::NodeAddress,

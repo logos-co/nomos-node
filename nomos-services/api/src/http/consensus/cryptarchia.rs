@@ -9,7 +9,7 @@ use cryptarchia_consensus::{
     network::adapters::libp2p::LibP2pAdapter as ConsensusNetworkAdapter, ConsensusMsg,
     CryptarchiaConsensus, CryptarchiaInfo,
 };
-use full_replication::{Certificate, VidCertificate};
+use kzgrs_backend::dispersal::{Certificate, VidCertificate};
 use nomos_core::{
     da::certificate::{self, select::FillSize as FillSizeWithBlobsCertificate},
     header::HeaderId,
@@ -17,7 +17,7 @@ use nomos_core::{
 };
 use nomos_mempool::{
     backend::mockpool::MockPool,
-    da::verify::fullreplication::DaVerificationProvider as MempoolVerificationProvider,
+    da::verify::kzgrs::DaVerificationProvider as MempoolVerificationProvider,
     network::adapters::libp2p::Libp2pAdapter as MempoolNetworkAdapter,
 };
 use nomos_storage::backends::{rocksdb::RocksBackend, StorageSerde};
