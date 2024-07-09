@@ -8,7 +8,8 @@ use cryptarchia_ledger::{Coin, LeaderProof, LedgerState};
 use futures::StreamExt;
 use network::{messages::NetworkMessage, NetworkAdapter};
 use nomos_core::da::certificate::{
-    metadata::Metadata, vid::VidCertificate, BlobCertificateSelect, Certificate,
+    metadata::Metadata as CertificateMetadata, vid::VidCertificate, BlobCertificateSelect,
+    Certificate,
 };
 use nomos_core::header::{cryptarchia::Header, HeaderId};
 use nomos_core::tx::{Transaction, TxSelect};
@@ -38,12 +39,14 @@ pub use time::Config as TimeConfig;
 use tokio::sync::oneshot::Sender;
 use tokio::sync::{broadcast, oneshot};
 use tokio_stream::wrappers::IntervalStream;
-use tracing::{error, instrument};
+use tracing::{error, instrument, span, Level};
+use tracing_futures::Instrument;
 
 type MempoolRelay<Payload, Item, Key> = OutboundRelay<MempoolMsg<HeaderId, Payload, Item, Key>>;
 
 // Limit the number of blocks returned by GetHeaders
 const HEADERS_LIMIT: usize = 512;
+const CRYPTARCHIA_ID: ServiceId = "Cryptarchia";
 
 #[derive(Debug, Clone, Error)]
 pub enum Error {
@@ -205,7 +208,7 @@ where
     BS: BlobCertificateSelect<Certificate = DaPool::Item>,
     Storage: StorageBackend + Send + Sync + 'static,
 {
-    const SERVICE_ID: ServiceId = "Cryptarchia";
+    const SERVICE_ID: ServiceId = CRYPTARCHIA_ID;
     type Settings = CryptarchiaSettings<TxS::Settings, BS::Settings>;
     type State = NoState<Self::Settings>;
     type StateOperator = NoOperator<Self::State>;
@@ -248,7 +251,7 @@ where
         + 'static,
     // TODO: Change to specific certificate bounds here
     DaPool::Item: VidCertificate<CertificateId = DaPool::Key>
-        + Metadata
+        + CertificateMetadata
         + Debug
         + Clone
         + Eq
@@ -349,8 +352,10 @@ where
         let mut slot_timer = IntervalStream::new(timer.slot_interval());
 
         let mut lifecycle_stream = self.service_state.lifecycle_handle.message_stream();
-        loop {
-            tokio::select! {
+
+        async {
+            loop {
+                tokio::select! {
                     Some(block) = incoming_blocks.next() => {
                         cryptarchia = Self::process_block(
                             cryptarchia,
@@ -399,8 +404,12 @@ where
                             break;
                         }
                     }
+                }
             }
-        }
+        // it sucks to use "Cryptarchia" when we have the Self::SERVICE_ID.
+        // Somehow it just do not let refer to the type to reference it.
+        // Probably related to too many generics.
+        }.instrument(span!(Level::TRACE, CRYPTARCHIA_ID)).await;
         Ok(())
     }
 }
@@ -434,7 +443,7 @@ where
         + Sync
         + 'static,
     DaPool::Item: VidCertificate<CertificateId = DaPool::Key>
-        + Metadata
+        + CertificateMetadata
         + Debug
         + Clone
         + Eq
