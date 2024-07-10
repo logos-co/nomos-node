@@ -134,7 +134,7 @@ impl DaVerifier {
         }
     }
 
-    pub fn verify(&self, blob: DaBlob, rows_domain_size: usize) -> Option<Attestation> {
+    pub fn verify(&self, blob: &DaBlob, rows_domain_size: usize) -> Option<Attestation> {
         let rows_domain = PolynomialEvaluationDomain::new(rows_domain_size)
             .expect("Domain should be able to build");
         let is_column_verified = DaVerifier::verify_column(
@@ -251,7 +251,7 @@ mod test {
                     .map(|proofs| proofs.get(i).cloned().unwrap())
                     .collect(),
             };
-            assert!(verifier.verify(da_blob, domain_size).is_some());
+            assert!(verifier.verify(&da_blob, domain_size).is_some());
         }
     }
 }
