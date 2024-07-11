@@ -48,7 +48,7 @@ impl DaVerifier for KzgrsDaVerifier {
         // TODO: Prepare the domain depending the size, if fixed, so fixed domain, if not it needs
         // to come with some metadata.
         let domain_size = 2usize;
-        match self.verifier.verify(blob, domain_size) {
+        match self.verifier.verify(&blob, domain_size) {
             Some(attestation) => Ok(attestation),
             None => Err(KzgrsDaVerifierError::VerificationError),
         }
