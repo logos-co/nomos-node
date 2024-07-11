@@ -26,8 +26,8 @@ nomos-network = { path = "../../nomos-services/network", features = ["libp2p"] }
 nomos-api = { path = "../../nomos-services/api" }
 nomos-log = { path = "../../nomos-services/log" }
 nomos-mempool = { path = "../../nomos-services/mempool", features = [
-  "mock",
-  "libp2p",
+    "mock",
+    "libp2p",
 ] }
 nomos-metrics = { path = "../../nomos-services/metrics" }
 nomos-storage = { path = "../../nomos-services/storage", features = ["rocksdb"] }
@@ -43,6 +43,7 @@ serde_yaml = "0.9"
 color-eyre = "0.6.0"
 serde = "1"
 full-replication = { path = "../../nomos-da/full-replication" }
+uuid = { version = "1.10", features = ["v4"] }
 # openapi related dependencies
 utoipa = "4.0"
 utoipa-swagger-ui = { version = "4.0" }

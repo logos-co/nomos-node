@@ -13,6 +13,8 @@ use nomos_core::{da::certificate, tx::Transaction};
 use nomos_mempool::network::adapters::libp2p::Settings as AdapterSettings;
 
 use overwatch_rs::overwatch::*;
+use tracing::{span, Level};
+use uuid::Uuid;
 
 const DEFAULT_DB_PATH: &str = "./db";
 
@@ -59,7 +61,13 @@ fn main() -> Result<()> {
                 .then(nomos_metrics::NomosRegistry::default)
         })
         .flatten();
-
+    #[cfg(debug_assertions)]
+    let debug_span = {
+        let debug_id = Uuid::new_v4();
+        span!(Level::DEBUG, "Nomos", debug_id = debug_id.to_string())
+    };
+    #[cfg(debug_assertions)]
+    let _guard = debug_span.enter();
     let app = OverwatchRunner::<Nomos>::run(
         NomosServiceSettings {
             network: config.network,
