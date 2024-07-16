@@ -258,7 +258,7 @@ fn test_indexer() {
     while !performed_rx.load(SeqCst) {
         std::thread::sleep(std::time::Duration::from_millis(200));
     }
-    //assert!(is_success_rx.load(SeqCst));
+    assert!(is_success_rx.load(SeqCst));
 
     let (app_id2, index2) = vid.metadata();
 
