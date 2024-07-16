@@ -1,4 +1,4 @@
-use full_replication::Certificate;
+use kzgrs_backend::dispersal::Certificate;
 #[cfg(feature = "metrics")]
 use nomos_metrics::MetricsSettings;
 use nomos_node::{
@@ -13,6 +13,8 @@ use nomos_core::{da::certificate, tx::Transaction};
 use nomos_mempool::network::adapters::libp2p::Settings as AdapterSettings;
 
 use overwatch_rs::overwatch::*;
+use tracing::{span, Level};
+use uuid::Uuid;
 
 const DEFAULT_DB_PATH: &str = "./db";
 
@@ -59,7 +61,13 @@ fn main() -> Result<()> {
                 .then(nomos_metrics::NomosRegistry::default)
         })
         .flatten();
-
+    #[cfg(debug_assertions)]
+    let debug_span = {
+        let debug_id = Uuid::new_v4();
+        span!(Level::DEBUG, "Nomos", debug_id = debug_id.to_string())
+    };
+    #[cfg(debug_assertions)]
+    let _guard = debug_span.enter();
     let app = OverwatchRunner::<Nomos>::run(
         NomosServiceSettings {
             network: config.network,
@@ -80,9 +88,10 @@ fn main() -> Result<()> {
                     topic: String::from(nomos_node::DA_TOPIC),
                     id: <Certificate as certificate::Certificate>::id,
                 },
-                verification_provider: full_replication::CertificateVerificationParameters {
-                    threshold: 0,
-                },
+                verification_provider:
+                    kzgrs_backend::dispersal::CertificateVerificationParameters {
+                        nodes_public_keys: Default::default(),
+                    },
                 registry: registry.clone(),
             },
             cryptarchia: config.cryptarchia,
