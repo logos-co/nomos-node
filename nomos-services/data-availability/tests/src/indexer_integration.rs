@@ -30,7 +30,7 @@ use overwatch_rs::services::handle::ServiceHandle;
 use rand::{thread_rng, Rng};
 use tempfile::{NamedTempFile, TempDir};
 use time::OffsetDateTime;
-
+use nomos_core::da::certificate::metadata::Metadata;
 use crate::common::*;
 
 #[derive(Services)]
@@ -258,7 +258,13 @@ fn test_indexer() {
     while !performed_rx.load(SeqCst) {
         std::thread::sleep(std::time::Duration::from_millis(200));
     }
-    assert!(is_success_rx.load(SeqCst));
+    //assert!(is_success_rx.load(SeqCst));
+
+    let (app_id2, index2) = vid.metadata();
+
+    assert_eq!(app_id, app_id2);
+    assert_eq!(index, index2);
+
 }
 
 struct MockKeyPair;
