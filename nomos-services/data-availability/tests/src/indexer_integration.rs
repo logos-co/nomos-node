@@ -4,11 +4,13 @@ use std::sync::atomic::Ordering::SeqCst;
 use std::sync::Arc;
 use std::time::Duration;
 
+use crate::common::*;
 use bytes::Bytes;
 use cryptarchia_consensus::TimeConfig;
 use cryptarchia_ledger::{Coin, LedgerState};
 use full_replication::attestation::Attestation;
 use full_replication::{Certificate, VidCertificate};
+use nomos_core::da::certificate::metadata::Metadata;
 use nomos_core::da::certificate::vid::VidCertificate as _;
 use nomos_core::da::certificate::Certificate as _;
 use nomos_core::da::certificate::CertificateStrategy;
@@ -30,8 +32,6 @@ use overwatch_rs::services::handle::ServiceHandle;
 use rand::{thread_rng, Rng};
 use tempfile::{NamedTempFile, TempDir};
 use time::OffsetDateTime;
-use nomos_core::da::certificate::metadata::Metadata;
-use crate::common::*;
 
 #[derive(Services)]
 struct IndexerNode {
@@ -264,7 +264,6 @@ fn test_indexer() {
 
     assert_eq!(app_id, app_id2);
     assert_eq!(index, index2);
-
 }
 
 struct MockKeyPair;
