@@ -4,7 +4,7 @@ on:
     branches:
       - chore-cryptarchia-unit-tests-update
 
-name: Codecov
+name: My Codecov
 
 jobs:
   test:
