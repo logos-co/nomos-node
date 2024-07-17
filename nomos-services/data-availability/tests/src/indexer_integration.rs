@@ -189,6 +189,15 @@ fn test_indexer() {
     let vid: VidCertificate = cert.clone().into();
     let range = 0.into()..1.into(); // get idx 0 and 1.
 
+    // Test generate signature for Certificate
+    let _sig = cert.signature();
+
+    // Test get Metadata for Certificate
+    let (app_id2, index2) = cert.metadata();
+
+    assert_eq!(app_id, app_id2);
+    assert_eq!(index, index2);
+
     // Mock attestation step where blob is persisted in nodes blob storage.
     let rt = tokio::runtime::Runtime::new().unwrap();
     rt.block_on(write_blob(
@@ -260,10 +269,6 @@ fn test_indexer() {
     }
     assert!(is_success_rx.load(SeqCst));
 
-    let (app_id2, index2) = vid.metadata();
-
-    assert_eq!(app_id, app_id2);
-    assert_eq!(index, index2);
 }
 
 struct MockKeyPair;
