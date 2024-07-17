@@ -32,6 +32,7 @@ use overwatch_rs::services::handle::ServiceHandle;
 use rand::{thread_rng, Rng};
 use tempfile::{NamedTempFile, TempDir};
 use time::OffsetDateTime;
+use nomos_core::da::attestation::Attestation as TraitAttestation;
 
 #[derive(Services)]
 struct IndexerNode {
@@ -184,10 +185,13 @@ fn test_indexer() {
 
     let attestation = Attestation::new_signed(blob_hash, ids[0], &MockKeyPair);
     let certificate_strategy = full_replication::AbsoluteNumber::new(1);
-    let cert = certificate_strategy.build(vec![attestation], app_id, index);
+    let cert = certificate_strategy.build(vec![attestation.clone()], app_id, index);
     let cert_id = cert.id();
     let vid: VidCertificate = cert.clone().into();
     let range = 0.into()..1.into(); // get idx 0 and 1.
+
+    // Test generate hash for Attestation
+    let _hash = attestation.hash();
 
     // Test generate signature for Certificate
     let _sig = cert.signature();
