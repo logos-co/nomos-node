@@ -34,6 +34,11 @@ use tempfile::{NamedTempFile, TempDir};
 use time::OffsetDateTime;
 use nomos_core::da::attestation::Attestation as TraitAttestation;
 
+use blake2::{
+    digest::{Update, VariableOutput},
+    Blake2bVar,
+};
+
 #[derive(Services)]
 struct IndexerNode {
     network: ServiceHandle<NetworkService<NetworkBackend>>,
@@ -191,7 +196,14 @@ fn test_indexer() {
     let range = 0.into()..1.into(); // get idx 0 and 1.
 
     // Test generate hash for Attestation
-    let _hash = attestation.hash();
+    let hash2 = attestation.hash();
+
+    let mut hasher = Blake2bVar::new(32).unwrap();
+    hasher.update([blob_hash, ids[0]].concat().as_ref());
+    let mut output = [0; 32];
+    hasher.finalize_variable(&mut output).unwrap();
+
+    assert_eq!(hash2, output);
 
     // Test generate signature for Certificate
     let _sig = cert.signature();
