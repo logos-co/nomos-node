@@ -1,3 +1,4 @@
+use std::hash::{DefaultHasher, Hash};
 use std::path::PathBuf;
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering::SeqCst;
@@ -230,6 +231,10 @@ fn test_indexer() {
 
     assert_eq!(app_id2, app_id);
     assert_eq!(index2, index);
+
+    // Test generate hash for Certificate with default Hasher
+    let mut default_hasher = DefaultHasher::new();
+    let _hash3 = <Certificate as Hash>::hash(&cert, &mut default_hasher);
 
     // Mock attestation step where blob is persisted in nodes blob storage.
     let rt = tokio::runtime::Runtime::new().unwrap();
