@@ -5,6 +5,10 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use crate::common::*;
+use blake2::{
+    digest::{Update, VariableOutput},
+    Blake2bVar,
+};
 use bytes::Bytes;
 use cryptarchia_consensus::TimeConfig;
 use cryptarchia_ledger::{Coin, LedgerState};
@@ -106,207 +110,199 @@ fn new_node(
     .unwrap()
 }
 
+fn hash(item: impl AsRef<[u8]>) -> [u8; 32] {
+    let mut hasher = Blake2bVar::new(32).unwrap();
+    hasher.update(item.as_ref());
+    let mut output = [0; 32];
+    hasher.finalize_variable(&mut output).unwrap();
+    output
+}
+
+fn signature(attestation: &Attestation) -> [u8; 32] {
+    let mut attestations = vec![attestation];
+    attestations.sort();
+    let mut signatures = Vec::new();
+    for attestation in &attestations {
+        signatures.extend_from_slice(attestation.signature());
+    }
+    hash(signatures)
+}
+
 // TODO: When verifier is implemented this test should be removed and a new one
 // performed in integration tests crate using the real node.
 
-#[cfg(test)]
-pub mod tests {
-    use super::*;
-    use blake2::{
-        digest::{Update, VariableOutput},
-        Blake2bVar,
+#[test]
+fn test_indexer() {
+    let performed_tx = Arc::new(AtomicBool::new(false));
+    let performed_rx = performed_tx.clone();
+    let is_success_tx = Arc::new(AtomicBool::new(false));
+    let is_success_rx = is_success_tx.clone();
+
+    let mut ids = vec![[0; 32]; 2];
+    for id in &mut ids {
+        thread_rng().fill(id);
+    }
+
+    let coins = ids
+        .iter()
+        .map(|&id| Coin::new(id, id.into(), 1.into()))
+        .collect::<Vec<_>>();
+    let genesis_state = LedgerState::from_commitments(
+        coins.iter().map(|c| c.commitment()),
+        (ids.len() as u32).into(),
+    );
+    let ledger_config = cryptarchia_ledger::Config {
+        epoch_stake_distribution_stabilization: 3,
+        epoch_period_nonce_buffer: 3,
+        epoch_period_nonce_stabilization: 4,
+        consensus_config: cryptarchia_engine::Config {
+            security_param: 10,
+            active_slot_coeff: 0.9,
+        },
+    };
+    let time_config = TimeConfig {
+        slot_duration: Duration::from_secs(1),
+        chain_start_time: OffsetDateTime::now_utc(),
     };
 
-    fn hash(item: impl AsRef<[u8]>) -> [u8; 32] {
-        let mut hasher = Blake2bVar::new(32).unwrap();
-        hasher.update(item.as_ref());
-        let mut output = [0; 32];
-        hasher.finalize_variable(&mut output).unwrap();
-        output
-    }
+    let swarm_config1 = SwarmConfig {
+        port: 7771,
+        ..Default::default()
+    };
+    let swarm_config2 = SwarmConfig {
+        port: 7772,
+        ..Default::default()
+    };
 
-    fn signature(attestation: &Attestation) -> [u8; 32] {
-        let mut attestations = vec![attestation];
-        attestations.sort();
-        let mut signatures = Vec::new();
-        for attestation in &attestations {
-            signatures.extend_from_slice(attestation.signature());
-        }
-        hash(signatures)
-    }
+    let blobs_dir = TempDir::new().unwrap().path().to_path_buf();
 
-    #[test]
-    fn test_indexer() {
-        let performed_tx = Arc::new(AtomicBool::new(false));
-        let performed_rx = performed_tx.clone();
-        let is_success_tx = Arc::new(AtomicBool::new(false));
-        let is_success_rx = is_success_tx.clone();
+    let node1 = new_node(
+        &coins[0],
+        &ledger_config,
+        &genesis_state,
+        &time_config,
+        &swarm_config1,
+        NamedTempFile::new().unwrap().path().to_path_buf(),
+        &blobs_dir,
+        vec![node_address(&swarm_config2)],
+    );
 
-        let mut ids = vec![[0; 32]; 2];
-        for id in &mut ids {
-            thread_rng().fill(id);
-        }
+    let _node2 = new_node(
+        &coins[1],
+        &ledger_config,
+        &genesis_state,
+        &time_config,
+        &swarm_config2,
+        NamedTempFile::new().unwrap().path().to_path_buf(),
+        &blobs_dir,
+        vec![node_address(&swarm_config1)],
+    );
 
-        let coins = ids
-            .iter()
-            .map(|&id| Coin::new(id, id.into(), 1.into()))
-            .collect::<Vec<_>>();
-        let genesis_state = LedgerState::from_commitments(
-            coins.iter().map(|c| c.commitment()),
-            (ids.len() as u32).into(),
-        );
-        let ledger_config = cryptarchia_ledger::Config {
-            epoch_stake_distribution_stabilization: 3,
-            epoch_period_nonce_buffer: 3,
-            epoch_period_nonce_stabilization: 4,
-            consensus_config: cryptarchia_engine::Config {
-                security_param: 10,
-                active_slot_coeff: 0.9,
-            },
-        };
-        let time_config = TimeConfig {
-            slot_duration: Duration::from_secs(1),
-            chain_start_time: OffsetDateTime::now_utc(),
-        };
+    let mempool = node1.handle().relay::<DaMempool>();
+    let storage = node1.handle().relay::<StorageService<RocksBackend<Wire>>>();
+    let indexer = node1.handle().relay::<DaIndexer>();
 
-        let swarm_config1 = SwarmConfig {
-            port: 7771,
-            ..Default::default()
-        };
-        let swarm_config2 = SwarmConfig {
-            port: 7772,
-            ..Default::default()
-        };
+    let blob_hash = [9u8; 32];
+    let app_id = [7u8; 32];
+    let index = 0.into();
 
-        let blobs_dir = TempDir::new().unwrap().path().to_path_buf();
+    let attestation = Attestation::new_signed(blob_hash, ids[0], &MockKeyPair);
+    let certificate_strategy = full_replication::AbsoluteNumber::new(1);
+    let cert = certificate_strategy.build(vec![attestation.clone()], app_id, index);
+    let cert_id = cert.id();
+    let vid: VidCertificate = cert.clone().into();
+    let range = 0.into()..1.into(); // get idx 0 and 1.
 
-        let node1 = new_node(
-            &coins[0],
-            &ledger_config,
-            &genesis_state,
-            &time_config,
-            &swarm_config1,
-            NamedTempFile::new().unwrap().path().to_path_buf(),
-            &blobs_dir,
-            vec![node_address(&swarm_config2)],
-        );
+    // Test generate hash for Attestation
+    let hash2 = attestation.hash();
+    let expected_hash = hash([blob_hash, ids[0]].concat());
 
-        let _node2 = new_node(
-            &coins[1],
-            &ledger_config,
-            &genesis_state,
-            &time_config,
-            &swarm_config2,
-            NamedTempFile::new().unwrap().path().to_path_buf(),
-            &blobs_dir,
-            vec![node_address(&swarm_config1)],
-        );
+    assert_eq!(hash2, expected_hash);
 
-        let mempool = node1.handle().relay::<DaMempool>();
-        let storage = node1.handle().relay::<StorageService<RocksBackend<Wire>>>();
-        let indexer = node1.handle().relay::<DaIndexer>();
+    // Test generate signature for Certificate
+    let sig2 = cert.signature();
+    let expected_signature = signature(&attestation);
 
-        let blob_hash = [9u8; 32];
-        let app_id = [7u8; 32];
-        let index = 0.into();
+    assert_eq!(sig2, expected_signature);
 
-        let attestation = Attestation::new_signed(blob_hash, ids[0], &MockKeyPair);
-        let certificate_strategy = full_replication::AbsoluteNumber::new(1);
-        let cert = certificate_strategy.build(vec![attestation.clone()], app_id, index);
-        let cert_id = cert.id();
-        let vid: VidCertificate = cert.clone().into();
-        let range = 0.into()..1.into(); // get idx 0 and 1.
+    // Test get Metadata for Certificate
+    let (app_id2, index2) = cert.metadata();
 
-        // Test generate hash for Attestation
-        let hash2 = attestation.hash();
-        let expected_hash = hash([blob_hash, ids[0]].concat());
+    assert_eq!(app_id2, app_id);
+    assert_eq!(index2, index);
 
-        assert_eq!(hash2, expected_hash);
+    // Mock attestation step where blob is persisted in nodes blob storage.
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    rt.block_on(write_blob(
+        blobs_dir,
+        vid.certificate_id().as_ref(),
+        b"blob",
+    ))
+    .unwrap();
 
-        // Test generate signature for Certificate
-        let sig2 = cert.signature();
-        let expected_signature = signature(&attestation);
+    node1.spawn(async move {
+        let mempool_outbound = mempool.connect().await.unwrap();
+        let storage_outbound = storage.connect().await.unwrap();
+        let indexer_outbound = indexer.connect().await.unwrap();
 
-        assert_eq!(sig2, expected_signature);
+        // Mock attested blob by writting directly into the da storage.
+        let mut attested_key = Vec::from(b"da/attested/" as &[u8]);
+        attested_key.extend_from_slice(&blob_hash);
 
-        // Test get Metadata for Certificate
-        let (app_id2, index2) = cert.metadata();
+        storage_outbound
+            .send(nomos_storage::StorageMsg::Store {
+                key: attested_key.into(),
+                value: Bytes::new(),
+            })
+            .await
+            .unwrap();
 
-        assert_eq!(app_id2, app_id);
-        assert_eq!(index2, index);
+        // Put cert into the mempool.
+        let (mempool_tx, mempool_rx) = tokio::sync::oneshot::channel();
+        mempool_outbound
+            .send(nomos_mempool::MempoolMsg::Add {
+                payload: cert,
+                key: cert_id,
+                reply_channel: mempool_tx,
+            })
+            .await
+            .unwrap();
+        let _ = mempool_rx.await.unwrap();
 
-        // Mock attestation step where blob is persisted in nodes blob storage.
-        let rt = tokio::runtime::Runtime::new().unwrap();
-        rt.block_on(write_blob(
-            blobs_dir,
-            vid.certificate_id().as_ref(),
-            b"blob",
-        ))
-        .unwrap();
+        // Wait for block in the network.
+        tokio::time::sleep(Duration::from_secs(2)).await;
 
-        node1.spawn(async move {
-            let mempool_outbound = mempool.connect().await.unwrap();
-            let storage_outbound = storage.connect().await.unwrap();
-            let indexer_outbound = indexer.connect().await.unwrap();
+        // Request range of vids from indexer.
+        let (indexer_tx, indexer_rx) = tokio::sync::oneshot::channel();
+        indexer_outbound
+            .send(nomos_da_indexer::DaMsg::GetRange {
+                app_id,
+                range,
+                reply_channel: indexer_tx,
+            })
+            .await
+            .unwrap();
+        let mut app_id_blobs = indexer_rx.await.unwrap();
 
-            // Mock attested blob by writting directly into the da storage.
-            let mut attested_key = Vec::from(b"da/attested/" as &[u8]);
-            attested_key.extend_from_slice(&blob_hash);
-
-            storage_outbound
-                .send(nomos_storage::StorageMsg::Store {
-                    key: attested_key.into(),
-                    value: Bytes::new(),
-                })
-                .await
-                .unwrap();
-
-            // Put cert into the mempool.
-            let (mempool_tx, mempool_rx) = tokio::sync::oneshot::channel();
-            mempool_outbound
-                .send(nomos_mempool::MempoolMsg::Add {
-                    payload: cert,
-                    key: cert_id,
-                    reply_channel: mempool_tx,
-                })
-                .await
-                .unwrap();
-            let _ = mempool_rx.await.unwrap();
-
-            // Wait for block in the network.
-            tokio::time::sleep(Duration::from_secs(2)).await;
-
-            // Request range of vids from indexer.
-            let (indexer_tx, indexer_rx) = tokio::sync::oneshot::channel();
-            indexer_outbound
-                .send(nomos_da_indexer::DaMsg::GetRange {
-                    app_id,
-                    range,
-                    reply_channel: indexer_tx,
-                })
-                .await
-                .unwrap();
-            let mut app_id_blobs = indexer_rx.await.unwrap();
-
-            // Since we've only attested to certificate at idx 0, the first
-            // item should have "some" data, other indexes should be None.
-            app_id_blobs.sort_by(|(a, _), (b, _)| a.partial_cmp(b).unwrap());
-            let app_id_blobs = app_id_blobs.iter().map(|(_, b)| b).collect::<Vec<_>>();
-            if let Some(blob) = app_id_blobs[0] {
-                if **blob == *b"blob" && app_id_blobs[1].is_none() {
-                    is_success_tx.store(true, SeqCst);
-                }
+        // Since we've only attested to certificate at idx 0, the first
+        // item should have "some" data, other indexes should be None.
+        app_id_blobs.sort_by(|(a, _), (b, _)| a.partial_cmp(b).unwrap());
+        let app_id_blobs = app_id_blobs.iter().map(|(_, b)| b).collect::<Vec<_>>();
+        if let Some(blob) = app_id_blobs[0] {
+            if **blob == *b"blob" && app_id_blobs[1].is_none() {
+                is_success_tx.store(true, SeqCst);
             }
-
-            performed_tx.store(true, SeqCst);
-        });
-
-        while !performed_rx.load(SeqCst) {
-            std::thread::sleep(std::time::Duration::from_millis(200));
         }
-        assert!(is_success_rx.load(SeqCst));
+
+        performed_tx.store(true, SeqCst);
+    });
+
+    while !performed_rx.load(SeqCst) {
+        std::thread::sleep(std::time::Duration::from_millis(200));
     }
+    assert!(is_success_rx.load(SeqCst));
 }
+
 struct MockKeyPair;
 
 impl Signer for MockKeyPair {
