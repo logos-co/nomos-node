@@ -130,10 +130,11 @@ pub fn compute_roots_of_unity(size: usize) -> Vec<Fr> {
 
 #[cfg(test)]
 mod test {
-    use super::{bytes_to_evaluations, bytes_to_polynomial, KzgRsError};
+    use super::{bytes_to_evaluations, bytes_to_polynomial, BlstError, KzgRsError};
     use ark_bls12_381::fr::Fr;
     use ark_ff::{BigInteger, PrimeField};
     use ark_poly::{EvaluationDomain, GeneralEvaluationDomain, Polynomial};
+    use blst::BLST_ERROR;
     use once_cell::sync::Lazy;
     use rand::{thread_rng, Fill};
 
@@ -178,5 +179,46 @@ mod test {
                 current_size: 12
             })
         ));
+    }
+
+    #[test]
+    fn blst_error_conversions() {
+        assert_eq!(
+            format!("{}", BlstError(BLST_ERROR::BLST_SUCCESS)),
+            "Operation successful"
+        );
+        assert_eq!(
+            format!("{}", BlstError(BLST_ERROR::BLST_BAD_ENCODING)),
+            "Bad encoding"
+        );
+        assert_eq!(
+            format!("{}", BlstError(BLST_ERROR::BLST_POINT_NOT_ON_CURVE)),
+            "Point not on curve"
+        );
+        assert_eq!(
+            format!("{}", BlstError(BLST_ERROR::BLST_POINT_NOT_IN_GROUP)),
+            "Point not in group"
+        );
+        assert_eq!(
+            format!("{}", BlstError(BLST_ERROR::BLST_AGGR_TYPE_MISMATCH)),
+            "Aggregate type mismatch"
+        );
+        assert_eq!(
+            format!("{}", BlstError(BLST_ERROR::BLST_VERIFY_FAIL)),
+            "Verification failed"
+        );
+        assert_eq!(
+            format!("{}", BlstError(BLST_ERROR::BLST_PK_IS_INFINITY)),
+            "Public key is infinity"
+        );
+        assert_eq!(
+            format!("{}", BlstError(BLST_ERROR::BLST_BAD_SCALAR)),
+            "Bad scalar value"
+        );
+
+        assert_eq!(
+            format!("{}", KzgRsError::from(BLST_ERROR::BLST_SUCCESS)),
+            "BLST error: Operation successful"
+        );
     }
 }
