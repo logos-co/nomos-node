@@ -130,7 +130,9 @@ pub fn compute_roots_of_unity(size: usize) -> Vec<Fr> {
 
 #[cfg(test)]
 mod test {
-    use super::{bytes_to_evaluations, bytes_to_polynomial, BlstError, KzgRsError};
+    use super::{
+        bytes_to_evaluations, bytes_to_polynomial, compute_roots_of_unity, BlstError, KzgRsError,
+    };
     use ark_bls12_381::fr::Fr;
     use ark_ff::{BigInteger, PrimeField};
     use ark_poly::{EvaluationDomain, GeneralEvaluationDomain, Polynomial};
@@ -220,5 +222,15 @@ mod test {
             format!("{}", KzgRsError::from(BLST_ERROR::BLST_SUCCESS)),
             "BLST error: Operation successful"
         );
+    }
+
+    #[test]
+    fn test_compute_roots_of_unity() {
+        let roots = compute_roots_of_unity(10);
+
+        let domain: GeneralEvaluationDomain<Fr> = GeneralEvaluationDomain::new(10).unwrap();
+        let frs: Vec<Fr> = domain.elements().take(10).collect();
+
+        assert_eq!(roots, frs);
     }
 }
