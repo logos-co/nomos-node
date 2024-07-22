@@ -29,6 +29,9 @@ tracing = "0.1"
 time = "0.3"
 rand = "0.8"
 
+[dev-dependencies]
+blake2 = { version = "0.10" }
+
 [features]
 default = []
 libp2p = []

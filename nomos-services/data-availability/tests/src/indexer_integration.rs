@@ -1,14 +1,22 @@
+use std::hash::{DefaultHasher, Hash};
 use std::path::PathBuf;
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering::SeqCst;
 use std::sync::Arc;
 use std::time::Duration;
 
+use crate::common::*;
+use blake2::{
+    digest::{Update, VariableOutput},
+    Blake2bVar,
+};
 use bytes::Bytes;
 use cryptarchia_consensus::TimeConfig;
 use cryptarchia_ledger::{Coin, LedgerState};
 use full_replication::attestation::Attestation;
 use full_replication::{Certificate, VidCertificate};
+use nomos_core::da::attestation::Attestation as TraitAttestation;
+use nomos_core::da::certificate::metadata::Metadata;
 use nomos_core::da::certificate::vid::VidCertificate as _;
 use nomos_core::da::certificate::Certificate as _;
 use nomos_core::da::certificate::CertificateStrategy;
@@ -30,8 +38,6 @@ use overwatch_rs::services::handle::ServiceHandle;
 use rand::{thread_rng, Rng};
 use tempfile::{NamedTempFile, TempDir};
 use time::OffsetDateTime;
-
-use crate::common::*;
 
 #[derive(Services)]
 struct IndexerNode {
@@ -105,8 +111,27 @@ fn new_node(
     .unwrap()
 }
 
+fn hash(item: impl AsRef<[u8]>) -> [u8; 32] {
+    let mut hasher = Blake2bVar::new(32).unwrap();
+    hasher.update(item.as_ref());
+    let mut output = [0; 32];
+    hasher.finalize_variable(&mut output).unwrap();
+    output
+}
+
+fn signature(attestation: &Attestation) -> [u8; 32] {
+    let mut attestations = vec![attestation];
+    attestations.sort();
+    let mut signatures = Vec::new();
+    for attestation in &attestations {
+        signatures.extend_from_slice(attestation.signature());
+    }
+    hash(signatures)
+}
+
 // TODO: When verifier is implemented this test should be removed and a new one
 // performed in integration tests crate using the real node.
+
 #[test]
 fn test_indexer() {
     let performed_tx = Arc::new(AtomicBool::new(false));
@@ -184,10 +209,32 @@ fn test_indexer() {
 
     let attestation = Attestation::new_signed(blob_hash, ids[0], &MockKeyPair);
     let certificate_strategy = full_replication::AbsoluteNumber::new(1);
-    let cert = certificate_strategy.build(vec![attestation], app_id, index);
+    let cert = certificate_strategy.build(vec![attestation.clone()], app_id, index);
     let cert_id = cert.id();
     let vid: VidCertificate = cert.clone().into();
     let range = 0.into()..1.into(); // get idx 0 and 1.
+
+    // Test generate hash for Attestation
+    let hash2 = attestation.hash();
+    let expected_hash = hash([blob_hash, ids[0]].concat());
+
+    assert_eq!(hash2, expected_hash);
+
+    // Test generate signature for Certificate
+    let sig2 = cert.signature();
+    let expected_signature = signature(&attestation);
+
+    assert_eq!(sig2, expected_signature);
+
+    // Test get Metadata for Certificate
+    let (app_id2, index2) = cert.metadata();
+
+    assert_eq!(app_id2, app_id);
+    assert_eq!(index2, index);
+
+    // Test generate hash for Certificate with default Hasher
+    let mut default_hasher = DefaultHasher::new();
+    let _hash3 = <Certificate as Hash>::hash(&cert, &mut default_hasher);
 
     // Mock attestation step where blob is persisted in nodes blob storage.
     let rt = tokio::runtime::Runtime::new().unwrap();
