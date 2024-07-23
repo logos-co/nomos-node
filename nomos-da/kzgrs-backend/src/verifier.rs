@@ -159,7 +159,7 @@ impl DaVerifier {
         if !are_chunks_verified {
             return None;
         }
-        Some(self.build_attestation(&blob))
+        Some(self.build_attestation(blob))
     }
 }
 
