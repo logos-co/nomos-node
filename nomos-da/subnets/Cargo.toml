@@ -1,0 +1,10 @@
+[package]
+name = "nomos-da-subnets"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+prost = "0.13.1"
+
+[build-dependencies]
+prost-build = "0.13.1"

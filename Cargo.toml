@@ -4,6 +4,7 @@ members = [
     "nomos-da/kzgrs",
     "nomos-da/kzgrs-backend",
     "nomos-da/storage",
+    "nomos-da/subnets",
     "nomos-libp2p",
     "nomos-services/api",
     "nomos-services/log",
