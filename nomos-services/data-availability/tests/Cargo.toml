@@ -24,6 +24,7 @@ nomos-libp2p = { path = "../../../nomos-libp2p" }
 overwatch-rs = { git = "https://github.com/logos-co/Overwatch", rev = "2f70806" }
 overwatch-derive = { git = "https://github.com/logos-co/Overwatch", rev = "ac28d01" }
 tokio = { version = "1", features = ["sync"] }
+tokio-stream = "0.1.15"
 tempfile = "3.6"
 tracing = "0.1"
 time = "0.3"
