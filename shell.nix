@@ -20,7 +20,7 @@ pkgs.mkShell {
     rust-bin.stable."1.79.0".default
     clang_14
     llvmPackages_14.libclang
-    openssl
+    openssl.dev
   ];
   shellHook = ''
     export LIBCLANG_PATH="${pkgs.llvmPackages_14.libclang.lib}/lib";

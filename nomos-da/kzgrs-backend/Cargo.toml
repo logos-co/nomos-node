@@ -39,3 +39,6 @@ parallel = [
 name = "encoder"
 harness = false
 
+[[bench]]
+name = "verifier"
+harness = false

@@ -283,7 +283,7 @@ mod tests {
                     .map(|proofs| proofs.get(i).cloned().unwrap())
                     .collect(),
             };
-            attestations.push(verifier.verify(da_blob, domain_size).unwrap());
+            attestations.push(verifier.verify(&da_blob, domain_size).unwrap());
         }
         attestations
     }

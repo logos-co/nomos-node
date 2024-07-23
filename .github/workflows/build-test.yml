@@ -21,6 +21,7 @@ jobs:
       - uses: actions/checkout@v2
         with:
           submodules: true
+      - uses: arduino/setup-protoc@v3
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
@@ -44,6 +45,7 @@ jobs:
       - uses: actions/checkout@v2
         with:
           submodules: true
+      - uses: arduino/setup-protoc@v3
       # Setup Rust toolchain with GNU for Windows
       - name: Setup Rust with GNU toolchain (Windows)
         if: matrix.os == 'windows-latest'
@@ -100,6 +102,7 @@ jobs:
       - uses: actions/checkout@v2
         with:
           submodules: true
+      - uses: arduino/setup-protoc@v3
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
