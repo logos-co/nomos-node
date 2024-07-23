@@ -174,8 +174,10 @@ mod test {
     use ark_poly::{EvaluationDomain, GeneralEvaluationDomain};
     use blst::min_sig::SecretKey;
     use kzgrs::{
-        bytes_to_polynomial, commit_polynomial, generate_element_proof, BYTES_PER_FIELD_ELEMENT,
+        bytes_to_polynomial, commit_polynomial, generate_element_proof,
+        global_parameters_from_randomness, GlobalParameters, BYTES_PER_FIELD_ELEMENT,
     };
+    use once_cell::sync::Lazy;
     use rand::{thread_rng, RngCore};
 
     #[test]
@@ -208,6 +210,78 @@ mod test {
         )
         .unwrap();
         assert!(DaVerifier::verify_column(
+            &column,
+            &column_commitment,
+            &aggregated_commitment,
+            &column_proof,
+            0,
+            domain
+        ));
+    }
+
+    #[test]
+    fn test_verify_column_error_cases() {
+        // Test bytes_to_polynomial() returned error
+        let column: Column = (0..10).map(|i| Chunk(vec![i; 32])).collect();
+        let domain = GeneralEvaluationDomain::new(10).unwrap();
+        let (_, column_poly) =
+            bytes_to_polynomial::<BYTES_PER_FIELD_ELEMENT>(column.as_bytes().as_slice(), domain)
+                .unwrap();
+        let column_commitment = commit_polynomial(&column_poly, &GLOBAL_PARAMETERS).unwrap();
+        let (aggregated_evals, aggregated_poly) = bytes_to_polynomial::<
+            { DaEncoderParams::MAX_BLS12_381_ENCODING_CHUNK_SIZE },
+        >(
+            hash_column_and_commitment::<{ DaEncoderParams::MAX_BLS12_381_ENCODING_CHUNK_SIZE }>(
+                &column,
+                &column_commitment,
+            )
+            .as_slice(),
+            domain,
+        )
+        .unwrap();
+        let aggregated_commitment =
+            commit_polynomial(&aggregated_poly, &GLOBAL_PARAMETERS).unwrap();
+        let column_proof = generate_element_proof(
+            0,
+            &aggregated_poly,
+            &aggregated_evals,
+            &GLOBAL_PARAMETERS,
+            domain,
+        )
+        .unwrap();
+
+        let column2: Column = (0..10)
+            .flat_map(|i| {
+                if i % 2 == 0 {
+                    vec![Chunk(vec![i; 16])]
+                } else {
+                    vec![Chunk(vec![i; 32])]
+                }
+            })
+            .collect();
+
+        assert!(bytes_to_polynomial::<BYTES_PER_FIELD_ELEMENT>(
+            column2.as_bytes().as_slice(),
+            domain
+        )
+        .is_err());
+
+        assert!(!DaVerifier::verify_column(
+            &column2,
+            &column_commitment,
+            &aggregated_commitment,
+            &column_proof,
+            0,
+            domain
+        ));
+
+        // Test alter GLOBAL_PARAMETERS so that computed_column_commitment != column_commitment
+        pub static GLOBAL_PARAMETERS: Lazy<GlobalParameters> = Lazy::new(|| {
+            let mut rng = rand::thread_rng();
+            global_parameters_from_randomness(&mut rng)
+        });
+
+        assert!(!DaVerifier::verify_column(
             &column,
             &column_commitment,
             &aggregated_commitment,
