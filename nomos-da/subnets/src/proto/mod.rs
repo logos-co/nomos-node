@@ -46,15 +46,13 @@ mod tests {
     use crate::proto::{dispersal, pack_message, unpack_from_reader};
 
     #[tokio::test]
-    async fn test_pack_and_unpack_from_reader() {
+    async fn pack_and_unpack_from_reader() {
         let blob = dispersal::Blob {
             blob_id: vec![0; 32],
             data: vec![1; 32],
         };
-        let req = dispersal::DispersalReq { blob: Some(blob) };
-        let message = dispersal::DispersalMessage {
-            message_type: Some(dispersal::dispersal_message::MessageType::DispersalReq(req)),
-        };
+        let message: dispersal::DispersalMessage =
+            dispersal::DispersalReq { blob: Some(blob) }.into();
 
         let packed = pack_message(&message).unwrap();
 
