@@ -171,23 +171,44 @@ mod test {
     use crate::encoder::DaEncoderParams;
     use crate::global::GLOBAL_PARAMETERS;
     use crate::verifier::DaVerifier;
+    use ark_bls12_381::Fr;
     use ark_poly::{EvaluationDomain, GeneralEvaluationDomain};
     use blst::min_sig::SecretKey;
     use kzgrs::{
         bytes_to_polynomial, commit_polynomial, generate_element_proof,
-        global_parameters_from_randomness, GlobalParameters, BYTES_PER_FIELD_ELEMENT,
+        global_parameters_from_randomness, Commitment, GlobalParameters, Proof,
+        BYTES_PER_FIELD_ELEMENT,
     };
     use once_cell::sync::Lazy;
     use rand::{thread_rng, RngCore};
 
-    #[test]
-    fn test_verify_column() {
+    pub struct ColumnVerifyData {
+        pub column: Column,
+        pub column_commitment: Commitment,
+        pub aggregated_commitment: Commitment,
+        pub column_proof: Proof,
+        pub domain: GeneralEvaluationDomain<Fr>,
+    }
+
+    fn prepare_column(
+        with_new_global_params: bool,
+    ) -> Result<ColumnVerifyData, Box<dyn std::error::Error>> {
+        pub static NEW_GLOBAL_PARAMETERS: Lazy<GlobalParameters> = Lazy::new(|| {
+            let mut rng = rand::thread_rng();
+            global_parameters_from_randomness(&mut rng)
+        });
+
+        let mut global_params = &GLOBAL_PARAMETERS;
+        if with_new_global_params {
+            global_params = &NEW_GLOBAL_PARAMETERS;
+        }
+
         let column: Column = (0..10).map(|i| Chunk(vec![i; 32])).collect();
         let domain = GeneralEvaluationDomain::new(10).unwrap();
         let (_, column_poly) =
-            bytes_to_polynomial::<BYTES_PER_FIELD_ELEMENT>(column.as_bytes().as_slice(), domain)
-                .unwrap();
-        let column_commitment = commit_polynomial(&column_poly, &GLOBAL_PARAMETERS).unwrap();
+            bytes_to_polynomial::<BYTES_PER_FIELD_ELEMENT>(column.as_bytes().as_slice(), domain)?;
+        let column_commitment = commit_polynomial(&column_poly, global_params)?;
+
         let (aggregated_evals, aggregated_poly) = bytes_to_polynomial::<
             { DaEncoderParams::MAX_BLS12_381_ENCODING_CHUNK_SIZE },
         >(
@@ -197,58 +218,45 @@ mod test {
             )
             .as_slice(),
             domain,
-        )
-        .unwrap();
-        let aggregated_commitment =
-            commit_polynomial(&aggregated_poly, &GLOBAL_PARAMETERS).unwrap();
+        )?;
+
+        let aggregated_commitment = commit_polynomial(&aggregated_poly, global_params)?;
+
         let column_proof = generate_element_proof(
             0,
             &aggregated_poly,
             &aggregated_evals,
-            &GLOBAL_PARAMETERS,
+            &global_params,
             domain,
-        )
-        .unwrap();
+        )?;
+
+        Ok(ColumnVerifyData {
+            column,
+            column_commitment,
+            aggregated_commitment,
+            column_proof,
+            domain,
+        })
+    }
+
+    #[test]
+    fn test_verify_column() {
+        let column_data = prepare_column(false).unwrap();
+
         assert!(DaVerifier::verify_column(
-            &column,
-            &column_commitment,
-            &aggregated_commitment,
-            &column_proof,
+            &column_data.column,
+            &column_data.column_commitment,
+            &column_data.aggregated_commitment,
+            &column_data.column_proof,
             0,
-            domain
+            column_data.domain
         ));
     }
 
     #[test]
     fn test_verify_column_error_cases() {
         // Test bytes_to_polynomial() returned error
-        let column: Column = (0..10).map(|i| Chunk(vec![i; 32])).collect();
-        let domain = GeneralEvaluationDomain::new(10).unwrap();
-        let (_, column_poly) =
-            bytes_to_polynomial::<BYTES_PER_FIELD_ELEMENT>(column.as_bytes().as_slice(), domain)
-                .unwrap();
-        let column_commitment = commit_polynomial(&column_poly, &GLOBAL_PARAMETERS).unwrap();
-        let (aggregated_evals, aggregated_poly) = bytes_to_polynomial::<
-            { DaEncoderParams::MAX_BLS12_381_ENCODING_CHUNK_SIZE },
-        >(
-            hash_column_and_commitment::<{ DaEncoderParams::MAX_BLS12_381_ENCODING_CHUNK_SIZE }>(
-                &column,
-                &column_commitment,
-            )
-            .as_slice(),
-            domain,
-        )
-        .unwrap();
-        let aggregated_commitment =
-            commit_polynomial(&aggregated_poly, &GLOBAL_PARAMETERS).unwrap();
-        let column_proof = generate_element_proof(
-            0,
-            &aggregated_poly,
-            &aggregated_evals,
-            &GLOBAL_PARAMETERS,
-            domain,
-        )
-        .unwrap();
+        let column_data = prepare_column(false).unwrap();
 
         let column2: Column = (0..10)
             .flat_map(|i| {
@@ -262,32 +270,29 @@ mod test {
 
         assert!(bytes_to_polynomial::<BYTES_PER_FIELD_ELEMENT>(
             column2.as_bytes().as_slice(),
-            domain
+            column_data.domain
         )
         .is_err());
 
         assert!(!DaVerifier::verify_column(
             &column2,
-            &column_commitment,
-            &aggregated_commitment,
-            &column_proof,
+            &column_data.column_commitment,
+            &column_data.aggregated_commitment,
+            &column_data.column_proof,
             0,
-            domain
+            column_data.domain
         ));
 
         // Test alter GLOBAL_PARAMETERS so that computed_column_commitment != column_commitment
-        pub static GLOBAL_PARAMETERS: Lazy<GlobalParameters> = Lazy::new(|| {
-            let mut rng = rand::thread_rng();
-            global_parameters_from_randomness(&mut rng)
-        });
+        let column_data2 = prepare_column(true).unwrap();
 
         assert!(!DaVerifier::verify_column(
-            &column,
-            &column_commitment,
-            &aggregated_commitment,
-            &column_proof,
+            &column_data2.column,
+            &column_data2.column_commitment,
+            &column_data2.aggregated_commitment,
+            &column_data2.column_proof,
             0,
-            domain
+            column_data2.domain
         ));
     }
 
