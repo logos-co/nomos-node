@@ -58,8 +58,6 @@ pub struct BroadcastHandler {
     outbound: Option<OutboundState>,
     // pending messages not propagated in the connection
     outgoing_messages: HashSet<DaMessage>,
-    // pending errors on outgoing message
-    pending_errors: Vec<Error>,
 }
 
 impl BroadcastHandler {
@@ -68,7 +66,6 @@ impl BroadcastHandler {
             inbound: None,
             outbound: None,
             outgoing_messages: Default::default(),
-            pending_errors: vec![],
         }
     }
 }
