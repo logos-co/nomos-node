@@ -1,16 +1,17 @@
+// std
 use std::hash::{DefaultHasher, Hash};
 use std::path::PathBuf;
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering::SeqCst;
 use std::sync::Arc;
 use std::time::Duration;
-
-use crate::common::*;
+// crates
 use blake2::{
     digest::{Update, VariableOutput},
     Blake2bVar,
 };
 use bytes::Bytes;
+use cryptarchia_consensus::ConsensusMsg;
 use cryptarchia_consensus::TimeConfig;
 use cryptarchia_ledger::{Coin, LedgerState};
 use full_replication::attestation::Attestation;
@@ -38,6 +39,9 @@ use overwatch_rs::services::handle::ServiceHandle;
 use rand::{thread_rng, Rng};
 use tempfile::{NamedTempFile, TempDir};
 use time::OffsetDateTime;
+use tokio_stream::{wrappers::BroadcastStream, StreamExt};
+// internal
+use crate::common::*;
 
 #[derive(Services)]
 struct IndexerNode {
@@ -202,6 +206,7 @@ fn test_indexer() {
     let mempool = node1.handle().relay::<DaMempool>();
     let storage = node1.handle().relay::<StorageService<RocksBackend<Wire>>>();
     let indexer = node1.handle().relay::<DaIndexer>();
+    let consensus = node1.handle().relay::<Cryptarchia>();
 
     let blob_hash = [9u8; 32];
     let app_id = [7u8; 32];
@@ -249,6 +254,19 @@ fn test_indexer() {
         let mempool_outbound = mempool.connect().await.unwrap();
         let storage_outbound = storage.connect().await.unwrap();
         let indexer_outbound = indexer.connect().await.unwrap();
+        let consensus_outbound = consensus.connect().await.unwrap();
+
+        let (sender, receiver) = tokio::sync::oneshot::channel();
+        consensus_outbound
+            .send(ConsensusMsg::BlockSubscribe { sender })
+            .await
+            .unwrap();
+        let broadcast_receiver = receiver.await.unwrap();
+        let mut broadcast_receiver =
+            BroadcastStream::new(broadcast_receiver).filter_map(|result| match result {
+                Ok(block) => Some(block),
+                Err(_) => None,
+            });
 
         // Mock attested blob by writting directly into the da storage.
         let mut attested_key = Vec::from(b"da/attested/" as &[u8]);
@@ -275,7 +293,24 @@ fn test_indexer() {
         let _ = mempool_rx.await.unwrap();
 
         // Wait for block in the network.
-        tokio::time::sleep(Duration::from_secs(2)).await;
+        let timeout = tokio::time::sleep(Duration::from_secs(10));
+        tokio::pin!(timeout);
+
+        loop {
+            tokio::select! {
+                Some(block) = broadcast_receiver.next() => {
+                    if block.blobs().any(|v| *v == vid) {
+                        break;
+                    }
+                }
+                _ = &mut timeout => {
+                    break;
+                }
+            }
+        }
+
+        // Give time for services to process and store data.
+        tokio::time::sleep(Duration::from_secs(1)).await;
 
         // Request range of vids from indexer.
         let (indexer_tx, indexer_rx) = tokio::sync::oneshot::channel();

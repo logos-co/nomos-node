@@ -22,7 +22,6 @@ hex = "0.4.3"
 log = "0.4.19"
 thiserror = "1.0.40"
 tracing = "0.1"
-rustls = { version = "=0.23.10", default-features = false } # https://github.com/libp2p/rust-libp2p/issues/5487
 
 [dev-dependencies]
 rand = "0.8.5"
