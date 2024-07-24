@@ -6,6 +6,7 @@ use prost::Message;
 
 pub mod broadcast;
 pub mod dispersal;
+pub mod sampling;
 
 const MAX_MSG_LEN_BYTES: usize = 2;
 
@@ -44,15 +45,23 @@ where
     M::decode(Bytes::from(data)).map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))
 }
 
-// Macro to implement From trait for DispersalMessage
+/// Macro to implement From trait for Wrapper Messages.
+///
+/// Usage:
+/// ```ignore
+/// impl_from_for_message!(
+///   WrapperMessage,    // impl From<Req> for WrappedMessage {
+///   Req => WrappedReq, //   .. return WrappedMsg::MessageType::WrappedReq(Req);
+/// );
+/// ```
 #[macro_export]
-macro_rules! impl_from_for_dispersal_message {
-    ($($type:ty => $variant:ident),+ $(,)?) => {
+macro_rules! impl_from_for_message {
+    ($message:path, $($type:path => $variant:ident),+ $(,)?) => {
         $(
-            impl From<$type> for DispersalMessage {
+            impl From<$type> for $message {
                 fn from(msg: $type) -> Self {
-                    DispersalMessage {
-                        message_type: Some(dispersal_message::MessageType::$variant(msg)),
+                    $message {
+                        message_type: Some(message::MessageType::$variant(msg)),
                     }
                 }
             }
@@ -72,13 +81,12 @@ mod tests {
             blob_id: vec![0; 32],
             data: vec![1; 32],
         };
-        let message: dispersal::DispersalMessage =
-            dispersal::DispersalReq { blob: Some(blob) }.into();
+        let message: dispersal::Message = dispersal::DispersalReq { blob: Some(blob) }.into();
 
         let packed = pack_message(&message).unwrap();
 
         let mut reader = BufReader::new(&packed[..]);
-        let unpacked: dispersal::DispersalMessage = unpack_from_reader(&mut reader).await.unwrap();
+        let unpacked: dispersal::Message = unpack_from_reader(&mut reader).await.unwrap();
 
         assert_eq!(message, unpacked);
     }

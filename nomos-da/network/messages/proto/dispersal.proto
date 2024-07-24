@@ -31,7 +31,7 @@ message DispersalRes {
 
 // WRAPPER MESSAGE
 
-message DispersalMessage {
+message Message {
     oneof message_type {
         DispersalReq dispersal_req = 1;
         DispersalRes dispersal_res = 2;

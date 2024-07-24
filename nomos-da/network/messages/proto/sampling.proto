@@ -30,7 +30,7 @@ message SampleRes {
 
 // WRAPPER MESSAGE
 
-message SamplingMessage {
+message Message {
     oneof message_type {
         SampleReq sample_req = 1;
         SampleRes sample_res = 2;
