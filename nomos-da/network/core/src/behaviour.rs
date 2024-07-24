@@ -73,7 +73,7 @@ where
         Ok(DaNetworkHandler::new())
     }
 
-    fn on_swarm_event(&mut self, event: FromSwarm) {
+    fn on_swarm_event(&mut self, _event: FromSwarm) {
         todo!()
     }
 
@@ -96,7 +96,7 @@ where
 
     fn poll(
         &mut self,
-        cx: &mut Context<'_>,
+        _cx: &mut Context<'_>,
     ) -> Poll<ToSwarm<Self::ToSwarm, THandlerInEvent<Self>>> {
         if let Some(event) = self.handler_events.pop_back() {
             Poll::Ready(ToSwarm::GenerateEvent(event))
