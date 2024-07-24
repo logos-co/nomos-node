@@ -58,6 +58,18 @@ pub struct DaNetworkHandler {
 }
 
 impl DaNetworkHandler {
+    pub fn new() -> Self {
+        Self {
+            inbound: None,
+            outbound: None,
+            incoming_messages: Default::default(),
+            outgoing_messages: Default::default(),
+            pending_errors: vec![],
+        }
+    }
+}
+
+impl DaNetworkHandler {
     fn send_pending_messages(
         &mut self,
         mut stream: Stream,
