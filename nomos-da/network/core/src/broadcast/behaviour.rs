@@ -1,4 +1,4 @@
-use std::collections::{BTreeSet, VecDeque};
+use std::collections::VecDeque;
 use std::task::{Context, Poll};
 
 use libp2p::{Multiaddr, PeerId};
@@ -12,19 +12,19 @@ use subnetworks_assignations::MembershipHandler;
 
 use super::handler::{BroadcastHandler, DaMessage, HandlerEventToBehaviour};
 
-pub type SubnetworksSize = u16;
 pub type SubnetworkId = u16;
 
 pub enum BroadcastEvent {
     IncomingMessage { peer_id: PeerId, message: DaMessage },
 }
 
-///
+/// Nomos DA broadcas network behaviour
+/// This item handles the logic of the nomos da subnetworks broadcasting
+/// DA subnetworks are a logical distribution of subsets.
+/// A node just connects and accepts connections to other nodes that are in the same subsets.
+/// A node forwards messages to all connected peers which are member of the addressed `SubnetworkId`.
 pub struct BroadcastBehaviour<Membership> {
     local_peer_id: PeerId,
-    nodes: BTreeSet<PeerId>,
-    subnetworks_size: SubnetworksSize,
-    subscribed_subnetworks: BTreeSet<SubnetworkId>,
     membership: Membership,
     handler_events: VecDeque<BroadcastEvent>,
 }
