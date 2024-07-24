@@ -10,24 +10,26 @@ use libp2p::swarm::{
 
 use subnetworks_assignations::MembershipHandler;
 
-use crate::handler::{DaMessage, DaNetworkHandler, HandlerEventToBehaviour};
+use super::handler::{BroadcastHandler, DaMessage, HandlerEventToBehaviour};
 
 pub type SubnetworksSize = u16;
 pub type SubnetworkId = u16;
 
-pub enum NomosDaEvent {
+pub enum BroadcastEvent {
     IncomingMessage { peer_id: PeerId, message: DaMessage },
 }
-pub struct NomosDaNetworkBehaviour<Membership> {
+
+///
+pub struct BroadcastBehaviour<Membership> {
     local_peer_id: PeerId,
     nodes: BTreeSet<PeerId>,
     subnetworks_size: SubnetworksSize,
     subscribed_subnetworks: BTreeSet<SubnetworkId>,
     membership: Membership,
-    handler_events: VecDeque<NomosDaEvent>,
+    handler_events: VecDeque<BroadcastEvent>,
 }
 
-impl<M> NomosDaNetworkBehaviour<M>
+impl<M> BroadcastBehaviour<M>
 where
     M: MembershipHandler<NetworkId = SubnetworkId, Id = PeerId>,
 {
@@ -40,12 +42,12 @@ where
     }
 }
 
-impl<M> NetworkBehaviour for NomosDaNetworkBehaviour<M>
+impl<M> NetworkBehaviour for BroadcastBehaviour<M>
 where
     M: MembershipHandler<NetworkId = SubnetworkId, Id = PeerId> + 'static,
 {
-    type ConnectionHandler = DaNetworkHandler;
-    type ToSwarm = NomosDaEvent;
+    type ConnectionHandler = BroadcastHandler;
+    type ToSwarm = BroadcastEvent;
 
     fn handle_established_inbound_connection(
         &mut self,
@@ -60,7 +62,7 @@ where
                 "Peer is not a member of our subnetwork",
             ));
         }
-        Ok(DaNetworkHandler::new())
+        Ok(BroadcastHandler::new())
     }
 
     fn handle_established_outbound_connection(
@@ -70,7 +72,7 @@ where
         _addr: &Multiaddr,
         _role_override: Endpoint,
     ) -> Result<THandler<Self>, ConnectionDenied> {
-        Ok(DaNetworkHandler::new())
+        Ok(BroadcastHandler::new())
     }
 
     fn on_swarm_event(&mut self, _event: FromSwarm) {
@@ -86,7 +88,7 @@ where
         match event {
             HandlerEventToBehaviour::IncomingMessage { message } => {
                 self.handler_events
-                    .push_back(NomosDaEvent::IncomingMessage { message, peer_id });
+                    .push_back(BroadcastEvent::IncomingMessage { message, peer_id });
             }
             HandlerEventToBehaviour::OutgoingMessageError { .. } => {
                 todo!("Retry or report?")

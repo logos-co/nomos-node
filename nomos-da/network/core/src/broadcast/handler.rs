@@ -26,15 +26,15 @@ pub enum BehaviourEventToHandler {
     OutgoingMessage { message: DaMessage },
 }
 
-pub(crate) struct DaNetworkHandlerConfig {}
+pub(crate) struct BroadcastHandlerConfig {}
 
-impl DaNetworkHandlerConfig {
+impl BroadcastHandlerConfig {
     pub fn new() -> Self {
         Self {}
     }
 }
 
-impl Default for DaNetworkHandlerConfig {
+impl Default for BroadcastHandlerConfig {
     fn default() -> Self {
         Self::new()
     }
@@ -44,32 +44,29 @@ enum OutboundState {
     Idle(Stream),
     Sending(future::BoxFuture<'static, Result<Stream, Error>>),
 }
-pub struct DaNetworkHandler {
+pub struct BroadcastHandler {
     // incoming messages stream
     inbound: Option<Stream>,
     // outgoing messages stream
     outbound: Option<OutboundState>,
-    // pending messages not notified to behaviour
-    incoming_messages: HashSet<DaMessage>,
     // pending messages not propagated in the connection
     outgoing_messages: HashSet<DaMessage>,
     // pending errors on outgoing message
     pending_errors: Vec<Error>,
 }
 
-impl DaNetworkHandler {
+impl BroadcastHandler {
     pub fn new() -> Self {
         Self {
             inbound: None,
             outbound: None,
-            incoming_messages: Default::default(),
             outgoing_messages: Default::default(),
             pending_errors: vec![],
         }
     }
 }
 
-impl DaNetworkHandler {
+impl BroadcastHandler {
     fn send_pending_messages(
         &mut self,
         mut stream: Stream,
@@ -132,7 +129,7 @@ impl DaNetworkHandler {
         Ok(())
     }
 }
-impl ConnectionHandler for DaNetworkHandler {
+impl ConnectionHandler for BroadcastHandler {
     type FromBehaviour = BehaviourEventToHandler;
     type ToBehaviour = HandlerEventToBehaviour;
     type InboundProtocol = ReadyUpgrade<StreamProtocol>;

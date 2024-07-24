@@ -1,3 +1,4 @@
-mod behaviour;
-mod handler;
+mod broadcast;
+mod dispersal;
 mod protocol;
+mod sampling;
