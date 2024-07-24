@@ -1,4 +1,4 @@
-use crate::{impl_from_for_dispersal_message, proto::common};
+use crate::{common, impl_from_for_dispersal_message};
 
 include!(concat!(env!("OUT_DIR"), "/nomos.da.v1.dispersal.rs"));
 
@@ -10,7 +10,7 @@ impl_from_for_dispersal_message!(
 
 #[cfg(test)]
 mod tests {
-    use crate::proto::{common, dispersal};
+    use crate::{common, dispersal};
 
     #[test]
     fn dispersal_message() {

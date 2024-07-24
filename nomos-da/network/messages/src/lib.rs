@@ -64,7 +64,7 @@ macro_rules! impl_from_for_dispersal_message {
 mod tests {
     use futures::io::BufReader;
 
-    use crate::proto::{common, dispersal, pack_message, unpack_from_reader};
+    use crate::{common, dispersal, pack_message, unpack_from_reader};
 
     #[tokio::test]
     async fn pack_and_unpack_from_reader() {
