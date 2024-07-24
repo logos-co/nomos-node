@@ -39,6 +39,21 @@ where
     M::decode(Bytes::from(data)).map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))
 }
 
+// Macro to implement From trait for DispersalMessage
+macro_rules! impl_from_for_dispersal_message {
+    ($($type:ty => $variant:ident),+ $(,)?) => {
+        $(
+            impl From<$type> for DispersalMessage {
+                fn from(msg: $type) -> Self {
+                    DispersalMessage {
+                        message_type: Some(dispersal_message::MessageType::$variant(msg)),
+                    }
+                }
+            }
+        )+
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use futures::io::BufReader;

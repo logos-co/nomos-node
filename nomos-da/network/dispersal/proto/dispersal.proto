@@ -2,10 +2,7 @@ syntax = "proto3";
 
 package nomos.da.dispersal.v1;
 
-message Blob {
-    bytes blob_id = 1;
-    bytes data = 2;
-}
+import "common.proto"
 
 // DISPERSAL
 
@@ -32,56 +29,12 @@ message DispersalRes {
     }
 }
 
-// SAMPLING
-
-message SampleErr {
-    bytes blob_id = 1;
-
-    enum SampleErrType {
-        NOT_FOUND = 0;
-    }
-
-    SampleErrType err_type = 2;
-    string err_description = 3;
-}
-
-message SampleReq {
-    bytes blob_id = 1;
-}
-
-message SampleRes {
-    oneof message_type {
-        Blob blob = 1;
-        SampleErr err = 2;
-    }
-}
-
-// SESSION CONTROL
-
-message CloseMsg {
-    enum CloseReason {
-        GRACEFUL_SHUTDOWN = 0;
-        SUBNET_CHANGE = 1;
-        SUBNET_SAMPLE_FAIL = 2;
-    }
-
-    CloseReason reason = 1;
-}
-
-message SessionReq {
-    oneof message_type {
-        CloseMsg close_msg = 1;
-    }
-}
-
 // WRAPPER MESSAGE
 
 message DispersalMessage {
     oneof message_type {
         DispersalReq dispersal_req = 1;
         DispersalRes dispersal_res = 2;
-        SampleReq sample_req = 3;
-        SampleRes sample_res = 4;
-        SessionReq session_req = 5;
+        SessionReq session_req = 3;
     }
 }

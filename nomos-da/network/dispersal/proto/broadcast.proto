@@ -1,0 +1,20 @@
+syntax = "proto3";
+
+package nomos.da.broadcast.v1;
+
+import "common.proto"
+
+// BROADCAST
+
+message BroadcastReq {
+    Blob blob = 1;
+}
+
+// WRAPPER MESSAGE
+
+message BroadcastMessage {
+    oneof message_type {
+        BroadcastReq broadcast_req = 1;
+        SessionReq session_req = 2;
+    }
+}
