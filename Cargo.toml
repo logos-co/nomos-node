@@ -28,5 +28,5 @@ members = [
     "consensus/cryptarchia-engine",
     "ledger/cryptarchia-ledger",
     "tests"
-]
+, "nomos-da/network/subnetworks-assignations"]
 resolver = "2"
