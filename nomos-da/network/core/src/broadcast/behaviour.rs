@@ -14,6 +14,7 @@ use super::handler::{BroadcastHandler, DaMessage, HandlerEventToBehaviour};
 
 pub type SubnetworkId = u16;
 
+/// Nomos DA BroadcastEvents to be bubble up to logic layers
 pub enum BroadcastEvent {
     IncomingMessage { peer_id: PeerId, message: DaMessage },
 }
@@ -24,8 +25,12 @@ pub enum BroadcastEvent {
 /// A node just connects and accepts connections to other nodes that are in the same subsets.
 /// A node forwards messages to all connected peers which are member of the addressed `SubnetworkId`.
 pub struct BroadcastBehaviour<Membership> {
+    /// Local peer Id, related to the libp2p public key
     local_peer_id: PeerId,
+    /// Membership handler, membership handles the subsets logics on who is where in the
+    /// nomos DA subnetworks
     membership: Membership,
+    /// Queue of need to be processed events
     handler_events: VecDeque<BroadcastEvent>,
 }
 
@@ -33,6 +38,8 @@ impl<M> BroadcastBehaviour<M>
 where
     M: MembershipHandler<NetworkId = SubnetworkId, Id = PeerId>,
 {
+    /// Check if some peer membership lies in at least a single subnetwork that the local peer is a
+    /// member too.
     fn is_neighbour(&self, peer_id: &PeerId) -> bool {
         self.membership
             .membership(&self.local_peer_id)

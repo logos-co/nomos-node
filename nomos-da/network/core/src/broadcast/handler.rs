@@ -15,17 +15,20 @@ use crate::protocol::PROTOCOL_NAME;
 // TODO: Hook real DA protocol message
 pub type DaMessage = [u8; 1];
 
+/// Events that bubbles up from the `BroadcastHandler` to the `NetworkBehaviour`
 #[derive(Debug)]
 pub enum HandlerEventToBehaviour {
     IncomingMessage { message: DaMessage },
     OutgoingMessageError { error: Error },
 }
 
+/// Events that bubbles up from the `NetworkBehaviour` to the `BroadcastHandler`
 #[derive(Debug)]
 pub enum BehaviourEventToHandler {
     OutgoingMessage { message: DaMessage },
 }
 
+/// Broadcast configuration
 pub(crate) struct BroadcastHandlerConfig {}
 
 impl BroadcastHandlerConfig {
@@ -40,10 +43,14 @@ impl Default for BroadcastHandlerConfig {
     }
 }
 
+/// State handling for outgoing broadcast messages
 enum OutboundState {
     Idle(Stream),
     Sending(future::BoxFuture<'static, Result<Stream, Error>>),
 }
+
+/// Broadcasting handler for the broadcast protocol
+/// Forwards and read messages
 pub struct BroadcastHandler {
     // incoming messages stream
     inbound: Option<Stream>,
