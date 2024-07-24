@@ -79,7 +79,7 @@ impl BroadcastHandler {
         std::mem::swap(&mut self.outgoing_messages, &mut pending_messages);
         async {
             for message in pending_messages {
-                stream.write(&message).await?;
+                stream.write_all(&message).await?;
             }
             stream.flush().await?;
             Ok(stream)

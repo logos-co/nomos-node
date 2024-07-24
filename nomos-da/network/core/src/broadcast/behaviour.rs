@@ -43,7 +43,7 @@ where
     fn is_neighbour(&self, peer_id: &PeerId) -> bool {
         self.membership
             .membership(&self.local_peer_id)
-            .intersection(&self.membership.membership(&peer_id))
+            .intersection(&self.membership.membership(peer_id))
             .count()
             > 0
     }
