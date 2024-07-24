@@ -4,9 +4,14 @@ use bytes::Bytes;
 use futures::AsyncReadExt;
 use prost::Message;
 
+pub mod broadcast;
 pub mod dispersal;
 
 const MAX_MSG_LEN_BYTES: usize = 2;
+
+pub mod common {
+    include!(concat!(env!("OUT_DIR"), "/nomos.da.v1.common.rs"));
+}
 
 pub fn pack_message(message: &impl Message) -> Result<Vec<u8>, io::Error> {
     let data_len = message.encoded_len();
@@ -40,6 +45,7 @@ where
 }
 
 // Macro to implement From trait for DispersalMessage
+#[macro_export]
 macro_rules! impl_from_for_dispersal_message {
     ($($type:ty => $variant:ident),+ $(,)?) => {
         $(
@@ -58,11 +64,11 @@ macro_rules! impl_from_for_dispersal_message {
 mod tests {
     use futures::io::BufReader;
 
-    use crate::proto::{dispersal, pack_message, unpack_from_reader};
+    use crate::proto::{common, dispersal, pack_message, unpack_from_reader};
 
     #[tokio::test]
     async fn pack_and_unpack_from_reader() {
-        let blob = dispersal::Blob {
+        let blob = common::Blob {
             blob_id: vec![0; 32],
             data: vec![1; 32],
         };

@@ -1,8 +1,8 @@
 syntax = "proto3";
 
-package nomos.da.dispersal.v1;
+package nomos.da.v1.dispersal;
 
-import "common.proto"
+import "common.proto";
 
 // DISPERSAL
 
@@ -19,7 +19,7 @@ message DispersalErr {
 }
 
 message DispersalReq {
-    Blob blob = 1;
+    common.Blob blob = 1;
 }
 
 message DispersalRes {
@@ -35,6 +35,6 @@ message DispersalMessage {
     oneof message_type {
         DispersalReq dispersal_req = 1;
         DispersalRes dispersal_res = 2;
-        SessionReq session_req = 3;
+        common.SessionReq session_req = 3;
     }
 }

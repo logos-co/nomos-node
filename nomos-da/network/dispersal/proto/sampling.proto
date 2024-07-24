@@ -1,8 +1,8 @@
 syntax = "proto3";
 
-package nomos.da.sampling.v1;
+package nomos.da.v1.sampling;
 
-import "common.proto"
+import "common.proto";
 
 // SAMPLING
 
@@ -23,7 +23,7 @@ message SampleReq {
 
 message SampleRes {
     oneof message_type {
-        Blob blob = 1;
+        common.Blob blob = 1;
         SampleErr err = 2;
     }
 }

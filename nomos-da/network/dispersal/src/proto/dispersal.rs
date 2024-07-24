@@ -1,18 +1,20 @@
-include!(concat!(env!("OUT_DIR"), "/nomos.da.dispersal.v1.rs"));
+use crate::{impl_from_for_dispersal_message, proto::common};
+
+include!(concat!(env!("OUT_DIR"), "/nomos.da.v1.dispersal.rs"));
 
 impl_from_for_dispersal_message!(
     DispersalReq => DispersalReq,
     DispersalRes => DispersalRes,
-    SessionReq => SessionReq,
+    common::SessionReq => SessionReq,
 );
 
 #[cfg(test)]
 mod tests {
-    use crate::proto::dispersal;
+    use crate::proto::{common, dispersal};
 
     #[test]
     fn dispersal_message() {
-        let blob = dispersal::Blob {
+        let blob = common::Blob {
             blob_id: vec![0; 32],
             data: vec![1; 32],
         };

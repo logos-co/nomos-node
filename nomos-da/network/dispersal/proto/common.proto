@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package nomos.da.common.v1;
+package nomos.da.v1.common;
 
 message Blob {
     bytes blob_id = 1;
