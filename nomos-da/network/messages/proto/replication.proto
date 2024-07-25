@@ -1,12 +1,12 @@
 syntax = "proto3";
 
-package nomos.da.v1.broadcast;
+package nomos.da.v1.replication;
 
 import "common.proto";
 
-// BROADCAST
+// REPLICATION
 
-message BroadcastReq {
+message ReplicationReq {
     common.Blob blob = 1;
 }
 
@@ -14,7 +14,7 @@ message BroadcastReq {
 
 message Message {
     oneof message_type {
-        BroadcastReq broadcast_req = 1;
+        ReplicationReq replication_req = 1;
         common.SessionReq session_req = 2;
     }
 }

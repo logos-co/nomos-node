@@ -4,8 +4,8 @@ use bytes::Bytes;
 use futures::AsyncReadExt;
 use prost::Message;
 
-pub mod broadcast;
 pub mod dispersal;
+pub mod replication;
 pub mod sampling;
 
 const MAX_MSG_LEN_BYTES: usize = 2;
