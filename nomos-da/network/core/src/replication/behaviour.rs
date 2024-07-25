@@ -1,12 +1,13 @@
-use std::collections::{HashMap, VecDeque};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::task::{Context, Poll};
 
-use libp2p::{Multiaddr, PeerId};
+use indexmap::IndexSet;
 use libp2p::core::Endpoint;
 use libp2p::swarm::{
     ConnectionDenied, ConnectionId, FromSwarm, NetworkBehaviour, NotifyHandler, THandler,
     THandlerInEvent, THandlerOutEvent, ToSwarm,
 };
+use libp2p::{Multiaddr, PeerId};
 use tracing::error;
 
 use subnetworks_assignations::MembershipHandler;
@@ -40,6 +41,9 @@ pub struct ReplicationBehaviour<Membership> {
     connected: HashMap<PeerId, ConnectionId>,
     /// Outgoing event queue
     outgoing_events: VecDeque<SwarmEvent>,
+    /// Seen messages cache holds a record of seen messages, messages will be removed from this
+    /// set after some time to keep it
+    seen_message_cache: IndexSet<DaMessage>,
 }
 
 impl<M> ReplicationBehaviour<M>
@@ -56,10 +60,25 @@ where
             > 0
     }
 
-    pub fn send_message(&mut self, subnetwork_id: &SubnetworkId, message: DaMessage) {
+    fn no_loopback_member_peers_of(&self, subnetwork: &SubnetworkId) -> HashSet<PeerId> {
+        let mut peers = self.membership.members_of(subnetwork);
+        // no loopback
+        peers.remove(&self.local_peer_id);
+        peers
+    }
+
+    fn replicate_message(&mut self, message: DaMessage) {
+        if self.seen_message_cache.contains(&message) {
+            return;
+        }
+        self.seen_message_cache.insert(message.clone());
+        self.send_message(message)
+    }
+
+    pub fn send_message(&mut self, message: DaMessage) {
         // push a message in the queue for every single peer connected that is a member of the
         // selected subnetwork_id
-        let peers = self.membership.members_of(subnetwork_id);
+        let peers = self.no_loopback_member_peers_of(&message.subnetwork_id);
         self.connected
             .iter()
             .filter(|(peer_id, _connection_id)| peers.contains(peer_id))
@@ -67,7 +86,9 @@ where
                 self.outgoing_events.push_back(SwarmEvent::NotifyHandler {
                     peer_id: *peer_id,
                     handler: NotifyHandler::One(*connection_id),
-                    event: BehaviourEventToHandler::OutgoingMessage { message },
+                    event: BehaviourEventToHandler::OutgoingMessage {
+                        message: message.clone(),
+                    },
                 })
             });
     }
@@ -106,9 +127,7 @@ where
         Ok(ReplicationHandler::new())
     }
 
-    fn on_swarm_event(&mut self, _event: FromSwarm) {
-        todo!()
-    }
+    fn on_swarm_event(&mut self, _event: FromSwarm) {}
 
     fn on_connection_handler_event(
         &mut self,
@@ -118,6 +137,7 @@ where
     ) {
         match event {
             HandlerEventToBehaviour::IncomingMessage { message } => {
+                self.replicate_message(message.clone());
                 self.outgoing_events.push_back(ToSwarm::GenerateEvent(
                     ReplicationEvent::IncomingMessage { message, peer_id },
                 ));

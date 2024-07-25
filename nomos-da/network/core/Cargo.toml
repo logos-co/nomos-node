@@ -7,4 +7,5 @@ edition = "2021"
 libp2p = "0.53"
 futures = "0.3"
 tracing = "0.1"
+indexmap = "2.2"
 subnetworks-assignations = { path = "../subnetworks-assignations" }

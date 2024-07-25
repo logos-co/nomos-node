@@ -11,9 +11,14 @@ use libp2p::{Stream, StreamProtocol};
 use tracing::debug;
 
 use crate::protocol::PROTOCOL_NAME;
+use crate::replication::behaviour::SubnetworkId;
 
 // TODO: Hook real DA protocol message
-pub type DaMessage = [u8; 1];
+#[derive(Clone, Debug, Eq, PartialEq, Hash)]
+pub struct DaMessage {
+    pub blob: Vec<u8>,
+    pub subnetwork_id: SubnetworkId,
+}
 
 /// Events that bubbles up from the `BroadcastHandler` to the `NetworkBehaviour`
 #[derive(Debug)]
@@ -85,7 +90,9 @@ impl ReplicationHandler {
         std::mem::swap(&mut self.outgoing_messages, &mut pending_messages);
         async {
             for message in pending_messages {
-                stream.write_all(&message).await?;
+                // TODO: serialize the message not send the blob_bytes
+                // This will change when hooking up real messages
+                stream.write_all(&message.blob).await?;
             }
             stream.flush().await?;
             Ok(stream)
@@ -97,12 +104,16 @@ impl ReplicationHandler {
         cx: &mut Context<'_>,
     ) -> Option<Result<DaMessage, Error>> {
         self.inbound.as_mut().map(|stream| {
-            let mut buff = DaMessage::default();
+            // TODO: pipe out deserialization from messages
+            let mut buff = [0; 1];
+            let mut read = stream.read_exact(&mut buff);
             loop {
-                let mut read = stream.read_exact(&mut buff);
                 match read.poll_unpin(cx) {
                     Poll::Ready(Ok(_)) => {
-                        return Ok(buff);
+                        return Ok(DaMessage {
+                            blob: buff.to_vec(),
+                            subnetwork_id: 0,
+                        });
                     }
                     Poll::Ready(Err(e)) => {
                         return Err(e);
