@@ -8,4 +8,5 @@ pub trait MembershipHandler {
     fn is_member_of(&self, id: &Self::Id, network_id: &Self::NetworkId) -> bool {
         self.membership(id).contains(network_id)
     }
+    fn members_of(&self, network_id: &Self::NetworkId) -> HashSet<Self::Id>;
 }

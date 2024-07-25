@@ -1,20 +1,26 @@
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
 use std::task::{Context, Poll};
 
 use libp2p::{Multiaddr, PeerId};
 use libp2p::core::Endpoint;
 use libp2p::swarm::{
-    ConnectionDenied, ConnectionId, FromSwarm, NetworkBehaviour, THandler, THandlerInEvent,
-    THandlerOutEvent, ToSwarm,
+    ConnectionDenied, ConnectionId, FromSwarm, NetworkBehaviour, NotifyHandler, THandler,
+    THandlerInEvent, THandlerOutEvent, ToSwarm,
 };
+use tracing::error;
 
 use subnetworks_assignations::MembershipHandler;
 
-use super::handler::{DaMessage, HandlerEventToBehaviour, ReplicationHandler};
+use super::handler::{
+    BehaviourEventToHandler, DaMessage, HandlerEventToBehaviour, ReplicationHandler,
+};
 
 pub type SubnetworkId = u16;
 
+type SwarmEvent = ToSwarm<ReplicationEvent, BehaviourEventToHandler>;
+
 /// Nomos DA BroadcastEvents to be bubble up to logic layers
+#[allow(dead_code)] // todo: remove when used in tests
 pub enum ReplicationEvent {
     IncomingMessage { peer_id: PeerId, message: DaMessage },
 }
@@ -30,8 +36,10 @@ pub struct ReplicationBehaviour<Membership> {
     /// Membership handler, membership handles the subsets logics on who is where in the
     /// nomos DA subnetworks
     membership: Membership,
-    /// Queue of need to be processed events
-    handler_events: VecDeque<ReplicationEvent>,
+    /// Relation of connected peers of replication subnetworks
+    connected: HashMap<PeerId, ConnectionId>,
+    /// Outgoing event queue
+    outgoing: VecDeque<SwarmEvent>,
 }
 
 impl<M> ReplicationBehaviour<M>
@@ -46,6 +54,22 @@ where
             .intersection(&self.membership.membership(peer_id))
             .count()
             > 0
+    }
+
+    fn send_message(&mut self, subnetwork_id: &SubnetworkId, message: DaMessage) {
+        // push a message in the queue for every single peer connected that is a member of the
+        // selected subnetwork_id
+        let peers = self.membership.members_of(subnetwork_id);
+        self.connected
+            .iter()
+            .filter(|(peer_id, _connection_id)| peers.contains(peer_id))
+            .for_each(|(peer_id, connection_id)| {
+                self.outgoing.push_back(SwarmEvent::NotifyHandler {
+                    peer_id: *peer_id,
+                    handler: NotifyHandler::One(*connection_id),
+                    event: BehaviourEventToHandler::OutgoingMessage { message },
+                })
+            });
     }
 }
 
@@ -94,11 +118,13 @@ where
     ) {
         match event {
             HandlerEventToBehaviour::IncomingMessage { message } => {
-                self.handler_events
-                    .push_back(ReplicationEvent::IncomingMessage { message, peer_id });
+                self.outgoing.push_back(ToSwarm::GenerateEvent(
+                    ReplicationEvent::IncomingMessage { message, peer_id },
+                ));
             }
-            HandlerEventToBehaviour::OutgoingMessageError { .. } => {
-                todo!("Retry or report?")
+            HandlerEventToBehaviour::OutgoingMessageError { error } => {
+                error!("Couldn't send message due to {error}");
+                todo!("Retry?")
             }
         }
     }
@@ -107,8 +133,8 @@ where
         &mut self,
         _cx: &mut Context<'_>,
     ) -> Poll<ToSwarm<Self::ToSwarm, THandlerInEvent<Self>>> {
-        if let Some(event) = self.handler_events.pop_back() {
-            Poll::Ready(ToSwarm::GenerateEvent(event))
+        if let Some(event) = self.outgoing.pop_front() {
+            Poll::Ready(event)
         } else {
             Poll::Pending
         }
