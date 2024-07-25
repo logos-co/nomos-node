@@ -1,0 +1,20 @@
+syntax = "proto3";
+
+package nomos.da.v1.replication;
+
+import "common.proto";
+
+// REPLICATION
+
+message ReplicationReq {
+    common.Blob blob = 1;
+}
+
+// WRAPPER MESSAGE
+
+message Message {
+    oneof message_type {
+        ReplicationReq replication_req = 1;
+        common.SessionReq session_req = 2;
+    }
+}
