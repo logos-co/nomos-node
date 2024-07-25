@@ -239,10 +239,6 @@ impl AsRef<[u8]> for Index {
 
 #[cfg(test)]
 mod tests {
-    use bitvec::prelude::*;
-    use blst::min_sig::{PublicKey, SecretKey};
-    use rand::{rngs::OsRng, thread_rng, Rng, RngCore};
-
     use crate::{
         common::{attestation::Attestation, blob::DaBlob, NOMOS_DA_DST},
         dispersal::{aggregate_signatures, verify_aggregate_signature, Metadata},
@@ -252,6 +248,10 @@ mod tests {
         },
         verifier::DaVerifier,
     };
+    use bitvec::prelude::*;
+    use blst::min_sig::{PublicKey, SecretKey};
+    use kzgrs::KzgRsError;
+    use rand::{rngs::OsRng, thread_rng, Rng, RngCore};
 
     use super::Certificate;
 
@@ -364,7 +364,7 @@ mod tests {
         let cert = Certificate::build_certificate(
             &encoded_data,
             &attestations,
-            signers,
+            signers.clone(),
             THRESHOLD,
             Metadata::default(),
         )
@@ -372,6 +372,40 @@ mod tests {
 
         let public_keys: Vec<PublicKey> = sks.iter().map(|sk| sk.sk_to_pk()).collect();
         assert!(cert.verify(&public_keys));
+
+        // Test AttestationSignersMismatch error case
+        let new_attestations = [attestations.clone(), attestations.clone()].concat();
+
+        let cert_result = Certificate::build_certificate(
+            &encoded_data,
+            &new_attestations,
+            signers.clone(),
+            THRESHOLD,
+            Metadata::default(),
+        );
+
+        match cert_result {
+            Err(KzgRsError::AttestationSignersMismatch {
+                attestations_count,
+                signers_count,
+            }) if attestations_count == 32 && signers_count == 16 => {}
+            _ => panic!("error does not match the KzgRsError::AttestationSignersMismatch pattern"),
+        };
+
+        // Test NotEnoughAttestations error case
+        let cert_result = Certificate::build_certificate(
+            &encoded_data,
+            &attestations,
+            signers,
+            2 * THRESHOLD,
+            Metadata::default(),
+        );
+
+        match cert_result {
+            Err(KzgRsError::NotEnoughAttestations { required, received })
+                if required == 32 && received == 16 => {}
+            _ => panic!("error does not match the KzgRsError::NotEnoughAttestations pattern"),
+        };
     }
 
     #[test]
