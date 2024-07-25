@@ -7,7 +7,7 @@ COPY . .
 
 # Install dependencies needed for building RocksDB.
 RUN apt-get update && apt-get install -yq \
-    git clang libssl-dev pkg-config
+    git clang libssl-dev pkg-config protobuf-compiler
 
 RUN cargo build --release -p nomos-node
 

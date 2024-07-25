@@ -7,7 +7,7 @@ COPY . .
 
 # Install dependencies needed for building RocksDB and etcd.
 RUN apt-get update && apt-get install -yq \
-    git clang etcd-client libssl-dev pkg-config
+    git clang etcd-client libssl-dev pkg-config protobuf-compiler
 
 RUN cargo build --release --all --features metrics
 

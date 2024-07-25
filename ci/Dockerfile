@@ -11,7 +11,7 @@ RUN echo 'deb http://deb.debian.org/debian bullseye-backports main' \
 # Dependecies for publishing documentation.
 RUN apt-get update && apt-get install -yq \
     libssl-dev openssh-client git python3-pip clang \
-    pkg-config
+    pkg-config protobuf-compiler
 
 RUN pip install ghp-import
 RUN rustup component add rustfmt clippy
