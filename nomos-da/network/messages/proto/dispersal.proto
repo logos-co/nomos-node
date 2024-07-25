@@ -7,34 +7,35 @@ import "common.proto";
 // DISPERSAL
 
 message DispersalErr {
-    bytes blob_id = 1;
+  bytes blob_id = 1;
 
-    enum DispersalErrType {
-        CHUNK_SIZE = 0;
-        VERIFICATION = 1;
-    }
+  enum DispersalErrType {
+    CHUNK_SIZE = 0;
+    VERIFICATION = 1;
+  }
 
-    DispersalErrType err_type = 2;
-    string err_description = 3;
+  DispersalErrType err_type = 2;
+  string err_description = 3;
 }
 
 message DispersalReq {
-    common.Blob blob = 1;
+  common.Blob blob = 1;
+  uint32 subnetwork_id = 2;
 }
 
 message DispersalRes {
-    oneof message_type {
-        bytes blob_id = 1;
-        DispersalErr err = 2;
-    }
+  oneof message_type {
+    bytes blob_id = 1;
+    DispersalErr err = 2;
+  }
 }
 
 // WRAPPER MESSAGE
 
 message Message {
-    oneof message_type {
-        DispersalReq dispersal_req = 1;
-        DispersalRes dispersal_res = 2;
-        common.SessionReq session_req = 3;
-    }
+  oneof message_type {
+    DispersalReq dispersal_req = 1;
+    DispersalRes dispersal_res = 2;
+    common.SessionReq session_req = 3;
+  }
 }

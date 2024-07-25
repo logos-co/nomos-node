@@ -1,0 +1,12 @@
+[package]
+name = "nomos-da-core"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+libp2p = "0.53"
+futures = "0.3"
+tracing = "0.1"
+indexmap = "2.2"
+subnetworks-assignations = { path = "../subnetworks-assignations" }
+nomos-da-messages = { path = "../messages" }
