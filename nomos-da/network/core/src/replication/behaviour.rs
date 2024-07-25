@@ -10,12 +10,12 @@ use libp2p::swarm::{
 
 use subnetworks_assignations::MembershipHandler;
 
-use super::handler::{BroadcastHandler, DaMessage, HandlerEventToBehaviour};
+use super::handler::{DaMessage, HandlerEventToBehaviour, ReplicationHandler};
 
 pub type SubnetworkId = u16;
 
 /// Nomos DA BroadcastEvents to be bubble up to logic layers
-pub enum BroadcastEvent {
+pub enum ReplicationEvent {
     IncomingMessage { peer_id: PeerId, message: DaMessage },
 }
 
@@ -24,17 +24,17 @@ pub enum BroadcastEvent {
 /// DA subnetworks are a logical distribution of subsets.
 /// A node just connects and accepts connections to other nodes that are in the same subsets.
 /// A node forwards messages to all connected peers which are member of the addressed `SubnetworkId`.
-pub struct BroadcastBehaviour<Membership> {
+pub struct ReplicationBehaviour<Membership> {
     /// Local peer Id, related to the libp2p public key
     local_peer_id: PeerId,
     /// Membership handler, membership handles the subsets logics on who is where in the
     /// nomos DA subnetworks
     membership: Membership,
     /// Queue of need to be processed events
-    handler_events: VecDeque<BroadcastEvent>,
+    handler_events: VecDeque<ReplicationEvent>,
 }
 
-impl<M> BroadcastBehaviour<M>
+impl<M> ReplicationBehaviour<M>
 where
     M: MembershipHandler<NetworkId = SubnetworkId, Id = PeerId>,
 {
@@ -49,12 +49,12 @@ where
     }
 }
 
-impl<M> NetworkBehaviour for BroadcastBehaviour<M>
+impl<M> NetworkBehaviour for ReplicationBehaviour<M>
 where
     M: MembershipHandler<NetworkId = SubnetworkId, Id = PeerId> + 'static,
 {
-    type ConnectionHandler = BroadcastHandler;
-    type ToSwarm = BroadcastEvent;
+    type ConnectionHandler = ReplicationHandler;
+    type ToSwarm = ReplicationEvent;
 
     fn handle_established_inbound_connection(
         &mut self,
@@ -69,7 +69,7 @@ where
                 "Peer is not a member of our subnetwork",
             ));
         }
-        Ok(BroadcastHandler::new())
+        Ok(ReplicationHandler::new())
     }
 
     fn handle_established_outbound_connection(
@@ -79,7 +79,7 @@ where
         _addr: &Multiaddr,
         _role_override: Endpoint,
     ) -> Result<THandler<Self>, ConnectionDenied> {
-        Ok(BroadcastHandler::new())
+        Ok(ReplicationHandler::new())
     }
 
     fn on_swarm_event(&mut self, _event: FromSwarm) {
@@ -95,7 +95,7 @@ where
         match event {
             HandlerEventToBehaviour::IncomingMessage { message } => {
                 self.handler_events
-                    .push_back(BroadcastEvent::IncomingMessage { message, peer_id });
+                    .push_back(ReplicationEvent::IncomingMessage { message, peer_id });
             }
             HandlerEventToBehaviour::OutgoingMessageError { .. } => {
                 todo!("Retry or report?")

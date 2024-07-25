@@ -29,15 +29,15 @@ pub enum BehaviourEventToHandler {
 }
 
 /// Broadcast configuration
-pub(crate) struct BroadcastHandlerConfig {}
+pub(crate) struct ReplicationHandlerConfig {}
 
-impl BroadcastHandlerConfig {
+impl ReplicationHandlerConfig {
     pub fn new() -> Self {
         Self {}
     }
 }
 
-impl Default for BroadcastHandlerConfig {
+impl Default for ReplicationHandlerConfig {
     fn default() -> Self {
         Self::new()
     }
@@ -51,7 +51,7 @@ enum OutboundState {
 
 /// Broadcasting handler for the broadcast protocol
 /// Forwards and read messages
-pub struct BroadcastHandler {
+pub struct ReplicationHandler {
     // incoming messages stream
     inbound: Option<Stream>,
     // outgoing messages stream
@@ -60,7 +60,7 @@ pub struct BroadcastHandler {
     outgoing_messages: HashSet<DaMessage>,
 }
 
-impl BroadcastHandler {
+impl ReplicationHandler {
     pub fn new() -> Self {
         Self {
             inbound: None,
@@ -70,7 +70,7 @@ impl BroadcastHandler {
     }
 }
 
-impl BroadcastHandler {
+impl ReplicationHandler {
     fn send_pending_messages(
         &mut self,
         mut stream: Stream,
@@ -133,7 +133,7 @@ impl BroadcastHandler {
         Ok(())
     }
 }
-impl ConnectionHandler for BroadcastHandler {
+impl ConnectionHandler for ReplicationHandler {
     type FromBehaviour = BehaviourEventToHandler;
     type ToBehaviour = HandlerEventToBehaviour;
     type InboundProtocol = ReadyUpgrade<StreamProtocol>;
