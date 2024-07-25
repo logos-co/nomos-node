@@ -19,7 +19,10 @@ mod tests {
             blob_id: vec![0; 32],
             data: vec![1; 32],
         };
-        let req = dispersal::DispersalReq { blob: Some(blob) };
+        let req = dispersal::DispersalReq {
+            blob: Some(blob),
+            subnetwork_id: 0,
+        };
 
         assert_eq!(req.blob.unwrap().blob_id, vec![0; 32]);
     }
