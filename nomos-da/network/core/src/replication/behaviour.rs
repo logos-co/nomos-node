@@ -1,12 +1,12 @@
 use std::collections::{HashMap, VecDeque};
 use std::task::{Context, Poll};
 
+use libp2p::{Multiaddr, PeerId};
 use libp2p::core::Endpoint;
 use libp2p::swarm::{
     ConnectionDenied, ConnectionId, FromSwarm, NetworkBehaviour, NotifyHandler, THandler,
     THandlerInEvent, THandlerOutEvent, ToSwarm,
 };
-use libp2p::{Multiaddr, PeerId};
 use tracing::error;
 
 use subnetworks_assignations::MembershipHandler;
@@ -39,7 +39,7 @@ pub struct ReplicationBehaviour<Membership> {
     /// Relation of connected peers of replication subnetworks
     connected: HashMap<PeerId, ConnectionId>,
     /// Outgoing event queue
-    outgoing: VecDeque<SwarmEvent>,
+    outgoing_events: VecDeque<SwarmEvent>,
 }
 
 impl<M> ReplicationBehaviour<M>
@@ -64,7 +64,7 @@ where
             .iter()
             .filter(|(peer_id, _connection_id)| peers.contains(peer_id))
             .for_each(|(peer_id, connection_id)| {
-                self.outgoing.push_back(SwarmEvent::NotifyHandler {
+                self.outgoing_events.push_back(SwarmEvent::NotifyHandler {
                     peer_id: *peer_id,
                     handler: NotifyHandler::One(*connection_id),
                     event: BehaviourEventToHandler::OutgoingMessage { message },
@@ -118,7 +118,7 @@ where
     ) {
         match event {
             HandlerEventToBehaviour::IncomingMessage { message } => {
-                self.outgoing.push_back(ToSwarm::GenerateEvent(
+                self.outgoing_events.push_back(ToSwarm::GenerateEvent(
                     ReplicationEvent::IncomingMessage { message, peer_id },
                 ));
             }
@@ -133,7 +133,7 @@ where
         &mut self,
         _cx: &mut Context<'_>,
     ) -> Poll<ToSwarm<Self::ToSwarm, THandlerInEvent<Self>>> {
-        if let Some(event) = self.outgoing.pop_front() {
+        if let Some(event) = self.outgoing_events.pop_front() {
             Poll::Ready(event)
         } else {
             Poll::Pending
