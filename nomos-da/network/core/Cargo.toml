@@ -9,3 +9,4 @@ futures = "0.3"
 tracing = "0.1"
 indexmap = "2.2"
 subnetworks-assignations = { path = "../subnetworks-assignations" }
+nomos-da-messages = { path = "../messages" }

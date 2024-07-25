@@ -1,24 +1,19 @@
-use std::collections::HashSet;
 use std::io::Error;
 use std::task::{Context, Poll};
 
-use futures::prelude::*;
 use futures::Future;
-use libp2p::core::upgrade::ReadyUpgrade;
-use libp2p::swarm::handler::{ConnectionEvent, FullyNegotiatedInbound, FullyNegotiatedOutbound};
-use libp2p::swarm::{ConnectionHandler, ConnectionHandlerEvent, SubstreamProtocol};
+use futures::prelude::*;
 use libp2p::{Stream, StreamProtocol};
+use libp2p::core::upgrade::ReadyUpgrade;
+use libp2p::swarm::{ConnectionHandler, ConnectionHandlerEvent, SubstreamProtocol};
+use libp2p::swarm::handler::{ConnectionEvent, FullyNegotiatedInbound, FullyNegotiatedOutbound};
 use tracing::debug;
 
-use crate::protocol::PROTOCOL_NAME;
-use crate::replication::behaviour::SubnetworkId;
+use nomos_da_messages::{pack_message, unpack_from_reader};
 
-// TODO: Hook real DA protocol message
-#[derive(Clone, Debug, Eq, PartialEq, Hash)]
-pub struct DaMessage {
-    pub blob: Vec<u8>,
-    pub subnetwork_id: SubnetworkId,
-}
+use crate::protocol::PROTOCOL_NAME;
+
+pub type DaMessage = nomos_da_messages::replication::ReplicationReq;
 
 /// Events that bubbles up from the `BroadcastHandler` to the `NetworkBehaviour`
 #[derive(Debug)]
@@ -62,7 +57,7 @@ pub struct ReplicationHandler {
     // outgoing messages stream
     outbound: Option<OutboundState>,
     // pending messages not propagated in the connection
-    outgoing_messages: HashSet<DaMessage>,
+    outgoing_messages: Vec<DaMessage>,
 }
 
 impl ReplicationHandler {
@@ -86,13 +81,11 @@ impl ReplicationHandler {
         &mut self,
         mut stream: Stream,
     ) -> impl Future<Output = Result<Stream, Error>> {
-        let mut pending_messages = HashSet::new();
+        let mut pending_messages = Vec::new();
         std::mem::swap(&mut self.outgoing_messages, &mut pending_messages);
         async {
             for message in pending_messages {
-                // TODO: serialize the message not send the blob_bytes
-                // This will change when hooking up real messages
-                stream.write_all(&message.blob).await?;
+                stream.write_all(&pack_message(&message)?).await?;
             }
             stream.flush().await?;
             Ok(stream)
@@ -104,16 +97,11 @@ impl ReplicationHandler {
         cx: &mut Context<'_>,
     ) -> Option<Result<DaMessage, Error>> {
         self.inbound.as_mut().map(|stream| {
-            // TODO: pipe out deserialization from messages
-            let mut buff = [0; 1];
-            let mut read = stream.read_exact(&mut buff);
+            let mut read = std::pin::pin!(unpack_from_reader(stream));
             loop {
                 match read.poll_unpin(cx) {
-                    Poll::Ready(Ok(_)) => {
-                        return Ok(DaMessage {
-                            blob: buff.to_vec(),
-                            subnetwork_id: 0,
-                        });
+                    Poll::Ready(Ok(message)) => {
+                        return Ok(message);
                     }
                     Poll::Ready(Err(e)) => {
                         return Err(e);
@@ -190,7 +178,7 @@ impl ConnectionHandler for ReplicationHandler {
     fn on_behaviour_event(&mut self, event: Self::FromBehaviour) {
         match event {
             BehaviourEventToHandler::OutgoingMessage { message } => {
-                self.outgoing_messages.insert(message);
+                self.outgoing_messages.push(message);
             }
         }
     }

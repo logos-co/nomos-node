@@ -2,12 +2,12 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use std::task::{Context, Poll};
 
 use indexmap::IndexSet;
+use libp2p::{Multiaddr, PeerId};
 use libp2p::core::Endpoint;
 use libp2p::swarm::{
     ConnectionDenied, ConnectionId, FromSwarm, NetworkBehaviour, NotifyHandler, THandler,
     THandlerInEvent, THandlerOutEvent, ToSwarm,
 };
-use libp2p::{Multiaddr, PeerId};
 use tracing::error;
 
 use subnetworks_assignations::MembershipHandler;
@@ -16,7 +16,7 @@ use super::handler::{
     BehaviourEventToHandler, DaMessage, HandlerEventToBehaviour, ReplicationHandler,
 };
 
-pub type SubnetworkId = u16;
+pub type SubnetworkId = u32;
 
 type SwarmEvent = ToSwarm<ReplicationEvent, BehaviourEventToHandler>;
 
@@ -43,7 +43,7 @@ pub struct ReplicationBehaviour<Membership> {
     outgoing_events: VecDeque<SwarmEvent>,
     /// Seen messages cache holds a record of seen messages, messages will be removed from this
     /// set after some time to keep it
-    seen_message_cache: IndexSet<DaMessage>,
+    seen_message_cache: IndexSet<(Vec<u8>, SubnetworkId)>,
 }
 
 impl<M> ReplicationBehaviour<M>
@@ -68,10 +68,14 @@ where
     }
 
     fn replicate_message(&mut self, message: DaMessage) {
-        if self.seen_message_cache.contains(&message) {
+        let message_id = (
+            message.blob.as_ref().unwrap().blob_id.clone(),
+            message.subnetwork_id,
+        );
+        if self.seen_message_cache.contains(&message_id) {
             return;
         }
-        self.seen_message_cache.insert(message.clone());
+        self.seen_message_cache.insert(message_id);
         self.send_message(message)
     }
 
