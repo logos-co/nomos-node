@@ -2,21 +2,21 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use std::task::{Context, Poll};
 
 use indexmap::IndexSet;
+use libp2p::{Multiaddr, PeerId};
 use libp2p::core::Endpoint;
 use libp2p::swarm::{
     ConnectionDenied, ConnectionId, FromSwarm, NetworkBehaviour, NotifyHandler, THandler,
     THandlerInEvent, THandlerOutEvent, ToSwarm,
 };
-use libp2p::{Multiaddr, PeerId};
 use tracing::error;
 
 use subnetworks_assignations::MembershipHandler;
 
+use crate::SubnetworkId;
+
 use super::handler::{
     BehaviourEventToHandler, DaMessage, HandlerEventToBehaviour, ReplicationHandler,
 };
-
-pub type SubnetworkId = u32;
 
 type SwarmEvent = ToSwarm<ReplicationEvent, BehaviourEventToHandler>;
 

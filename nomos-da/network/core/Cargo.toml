@@ -1,5 +1,5 @@
 [package]
-name = "nomos-da-core"
+name = "nomos-da-network-core"
 version = "0.1.0"
 edition = "2021"
 
