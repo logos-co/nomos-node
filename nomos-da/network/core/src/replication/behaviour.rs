@@ -1,12 +1,12 @@
 use std::collections::{HashMap, VecDeque};
 use std::task::{Context, Poll};
 
-use libp2p::{Multiaddr, PeerId};
 use libp2p::core::Endpoint;
 use libp2p::swarm::{
     ConnectionDenied, ConnectionId, FromSwarm, NetworkBehaviour, NotifyHandler, THandler,
     THandlerInEvent, THandlerOutEvent, ToSwarm,
 };
+use libp2p::{Multiaddr, PeerId};
 use tracing::error;
 
 use subnetworks_assignations::MembershipHandler;
