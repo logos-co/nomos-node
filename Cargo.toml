@@ -6,6 +6,7 @@ members = [
     "nomos-da/storage",
     "nomos-da/network/core",
     "nomos-da/network/messages",
+    "nomos-da/network/subnetworks-assignations",
     "nomos-libp2p",
     "nomos-services/api",
     "nomos-services/log",
@@ -28,5 +29,5 @@ members = [
     "consensus/cryptarchia-engine",
     "ledger/cryptarchia-ledger",
     "tests"
-, "nomos-da/network/subnetworks-assignations"]
+]
 resolver = "2"

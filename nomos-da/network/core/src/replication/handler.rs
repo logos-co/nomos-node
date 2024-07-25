@@ -70,6 +70,12 @@ impl ReplicationHandler {
     }
 }
 
+impl Default for ReplicationHandler {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ReplicationHandler {
     fn send_pending_messages(
         &mut self,

@@ -1,4 +1,4 @@
-mod dispersal;
-mod protocol;
-mod replication;
-mod sampling;
+pub mod dispersal;
+pub mod protocol;
+pub mod replication;
+pub mod sampling;

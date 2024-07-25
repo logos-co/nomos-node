@@ -56,7 +56,7 @@ where
             > 0
     }
 
-    fn send_message(&mut self, subnetwork_id: &SubnetworkId, message: DaMessage) {
+    pub fn send_message(&mut self, subnetwork_id: &SubnetworkId, message: DaMessage) {
         // push a message in the queue for every single peer connected that is a member of the
         // selected subnetwork_id
         let peers = self.membership.members_of(subnetwork_id);
