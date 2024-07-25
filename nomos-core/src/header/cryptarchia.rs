@@ -5,6 +5,7 @@ use cryptarchia_engine::Slot;
 use cryptarchia_ledger::LeaderProof;
 use serde::{Deserialize, Serialize};
 
+#[allow(dead_code)]
 #[derive(Clone, Debug, Eq, PartialEq, Copy)]
 pub struct Nonce([u8; 32]);
 
