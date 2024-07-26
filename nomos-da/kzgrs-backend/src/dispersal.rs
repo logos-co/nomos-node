@@ -239,6 +239,8 @@ impl AsRef<[u8]> for Index {
 
 #[cfg(test)]
 mod tests {
+    use super::{Certificate, CertificateVerificationParameters};
+    use crate::common::build_attestation_message;
     use crate::{
         common::{attestation::Attestation, blob::DaBlob, NOMOS_DA_DST},
         dispersal::{aggregate_signatures, verify_aggregate_signature, Metadata},
@@ -251,9 +253,9 @@ mod tests {
     use bitvec::prelude::*;
     use blst::min_sig::{PublicKey, SecretKey};
     use kzgrs::KzgRsError;
+    use nomos_core::da::certificate::Certificate as TraitCertificate;
     use rand::{rngs::OsRng, thread_rng, Rng, RngCore};
-
-    use super::Certificate;
+    use std::hash::{DefaultHasher, Hash};
 
     fn generate_keys() -> (PublicKey, SecretKey) {
         let mut rng = OsRng;
@@ -497,5 +499,71 @@ mod tests {
 
         // Certificate should fail to be verified.
         assert!(!cert.verify(&public_keys));
+    }
+
+    #[test]
+    fn test_certificate_methods() {
+        const THRESHOLD: usize = 16;
+
+        let encoder = &ENCODER;
+        let data = rand_data(8);
+        let mut rng = thread_rng();
+
+        let sks: Vec<SecretKey> = (0..16)
+            .map(|_| {
+                let mut buff = [0u8; 32];
+                rng.fill_bytes(&mut buff);
+                SecretKey::key_gen(&buff, &[]).unwrap()
+            })
+            .collect();
+
+        let verifiers: Vec<DaVerifier> = sks
+            .clone()
+            .into_iter()
+            .enumerate()
+            .map(|(index, sk)| DaVerifier { sk, index })
+            .collect();
+
+        let encoded_data = encoder.encode(&data).unwrap();
+
+        let attestations = attest_encoded_data(&encoded_data, &verifiers);
+
+        let signers = bitvec![u8, Lsb0; 1; 16];
+        let cert = Certificate::build_certificate(
+            &encoded_data,
+            &attestations,
+            signers.clone(),
+            THRESHOLD,
+            Metadata::default(),
+        )
+        .unwrap();
+
+        let public_keys: Vec<PublicKey> = sks.iter().map(|sk| sk.sk_to_pk()).collect();
+        assert!(cert.verify(&public_keys));
+
+        // Test generate hash for Certificate
+        let mut default_hasher = DefaultHasher::new();
+        let _hash = <Certificate as Hash>::hash(&cert, &mut default_hasher);
+
+        // Test get signers
+        let signers2 = cert.signers();
+        let signers: Vec<bool> = signers.iter().map(|b| *b).collect();
+        assert_eq!(signers2, signers);
+
+        // Test get signature
+        let signature2 = cert.signature();
+        assert_eq!(signature2, cert.aggregated_signatures);
+
+        // Test get id
+        assert_eq!(
+            cert.id(),
+            build_attestation_message(&cert.aggregated_column_commitment, &cert.row_commitments)
+        );
+
+        // Test verify
+        let params = CertificateVerificationParameters {
+            nodes_public_keys: public_keys,
+        };
+        assert!(<Certificate as TraitCertificate>::verify(&cert, params));
     }
 }
