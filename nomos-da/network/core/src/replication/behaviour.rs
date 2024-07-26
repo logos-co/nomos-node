@@ -12,11 +12,11 @@ use tracing::error;
 
 use subnetworks_assignations::MembershipHandler;
 
+use crate::SubnetworkId;
+
 use super::handler::{
     BehaviourEventToHandler, DaMessage, HandlerEventToBehaviour, ReplicationHandler,
 };
-
-pub type SubnetworkId = u32;
 
 type SwarmEvent = ToSwarm<ReplicationEvent, BehaviourEventToHandler>;
 
