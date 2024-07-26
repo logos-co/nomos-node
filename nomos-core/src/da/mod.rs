@@ -8,7 +8,9 @@ pub mod certificate;
 
 pub trait DaEncoder {
     type EncodedData;
-    fn encode(b: &[u8]) -> Result<Self::EncodedData, impl Error>;
+    type Error;
+
+    fn encode(&self, b: &[u8]) -> Result<Self::EncodedData, Self::Error>;
 }
 
 pub trait DaVerifier {

@@ -208,8 +208,13 @@ impl DaEncoder {
                 .collect(),
         )
     }
+}
 
-    pub fn encode(&self, data: &[u8]) -> Result<EncodedData, KzgRsError> {
+impl nomos_core::da::DaEncoder for DaEncoder {
+    type EncodedData = EncodedData;
+    type Error = KzgRsError;
+
+    fn encode(&self, data: &[u8]) -> Result<Self::EncodedData, Self::Error> {
         let chunked_data = self.chunkify(data);
         let row_domain = PolynomialEvaluationDomain::new(self.params.column_count)
             .expect("Domain should be able to build");
@@ -263,6 +268,7 @@ pub mod test {
         decode, verify_element_proof, FieldElement, PolynomialEvaluationDomain,
         BYTES_PER_FIELD_ELEMENT,
     };
+    use nomos_core::da::DaEncoder as _;
     use rand::RngCore;
     use std::ops::Div;
 

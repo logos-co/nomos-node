@@ -176,6 +176,7 @@ mod test {
     use kzgrs::{
         bytes_to_polynomial, commit_polynomial, generate_element_proof, BYTES_PER_FIELD_ELEMENT,
     };
+    use nomos_core::da::DaEncoder as _;
     use rand::{thread_rng, RngCore};
 
     #[test]

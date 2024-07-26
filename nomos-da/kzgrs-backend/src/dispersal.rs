@@ -241,6 +241,7 @@ impl AsRef<[u8]> for Index {
 mod tests {
     use bitvec::prelude::*;
     use blst::min_sig::{PublicKey, SecretKey};
+    use nomos_core::da::DaEncoder as _;
     use rand::{rngs::OsRng, thread_rng, Rng, RngCore};
 
     use crate::{
