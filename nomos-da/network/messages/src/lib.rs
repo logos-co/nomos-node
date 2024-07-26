@@ -81,7 +81,11 @@ mod tests {
             blob_id: vec![0; 32],
             data: vec![1; 32],
         };
-        let message: dispersal::Message = dispersal::DispersalReq { blob: Some(blob) }.into();
+        let message: dispersal::Message = dispersal::DispersalReq {
+            blob: Some(blob),
+            subnetwork_id: 0,
+        }
+        .into();
 
         let packed = pack_message(&message).unwrap();
 

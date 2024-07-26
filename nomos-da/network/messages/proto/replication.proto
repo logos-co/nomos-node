@@ -7,14 +7,15 @@ import "common.proto";
 // REPLICATION
 
 message ReplicationReq {
-    common.Blob blob = 1;
+  common.Blob blob = 1;
+  uint32 subnetwork_id = 2;
 }
 
 // WRAPPER MESSAGE
 
 message Message {
-    oneof message_type {
-        ReplicationReq replication_req = 1;
-        common.SessionReq session_req = 2;
-    }
+  oneof message_type {
+    ReplicationReq replication_req = 1;
+    common.SessionReq session_req = 2;
+  }
 }
