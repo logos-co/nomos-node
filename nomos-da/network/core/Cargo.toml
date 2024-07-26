@@ -4,9 +4,18 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-libp2p = "0.53"
+libp2p = { version = "0.53" }
 futures = "0.3"
 tracing = "0.1"
 indexmap = "2.2"
 subnetworks-assignations = { path = "../subnetworks-assignations" }
 nomos-da-messages = { path = "../messages" }
+tracing-subscriber = "0.3.18"
+void = "1.0.2"
+either = "1.13.0"
+
+[dev-dependencies]
+tokio = { version = "1.39", features = ["macros", "rt", "time"] }
+libp2p = { version = "0.53", features = ["ed25519", "ping", "macros", "tokio", "tcp", "yamux", "tls"] }
+
+

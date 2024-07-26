@@ -1,12 +1,12 @@
 use std::io::Error;
 use std::task::{Context, Poll};
 
-use futures::prelude::*;
 use futures::Future;
-use libp2p::core::upgrade::ReadyUpgrade;
-use libp2p::swarm::handler::{ConnectionEvent, FullyNegotiatedInbound, FullyNegotiatedOutbound};
-use libp2p::swarm::{ConnectionHandler, ConnectionHandlerEvent, SubstreamProtocol};
+use futures::prelude::*;
 use libp2p::{Stream, StreamProtocol};
+use libp2p::core::upgrade::ReadyUpgrade;
+use libp2p::swarm::{ConnectionHandler, ConnectionHandlerEvent, SubstreamProtocol};
+use libp2p::swarm::handler::{ConnectionEvent, FullyNegotiatedInbound, FullyNegotiatedOutbound};
 use tracing::debug;
 
 use nomos_da_messages::{pack_message, unpack_from_reader};
@@ -81,6 +81,7 @@ impl ReplicationHandler {
         &mut self,
         mut stream: Stream,
     ) -> impl Future<Output = Result<Stream, Error>> {
+        println!("Sending messages {:?}", self.outgoing_messages);
         let mut pending_messages = Vec::new();
         std::mem::swap(&mut self.outgoing_messages, &mut pending_messages);
         async {
@@ -96,6 +97,7 @@ impl ReplicationHandler {
         &mut self,
         cx: &mut Context<'_>,
     ) -> Option<Result<DaMessage, Error>> {
+        println!("have inbound: {:?}", self.inbound.is_some());
         self.inbound.as_mut().map(|stream| {
             let mut read = std::pin::pin!(unpack_from_reader(stream));
             loop {
@@ -106,7 +108,9 @@ impl ReplicationHandler {
                     Poll::Ready(Err(e)) => {
                         return Err(e);
                     }
-                    Poll::Pending => {}
+                    Poll::Pending => {
+                        println!("Polling pending message ++++");
+                    }
                 }
             }
         })
@@ -114,9 +118,11 @@ impl ReplicationHandler {
 
     fn poll_pending_outgoing_messages(&mut self, cx: &mut Context<'_>) -> Result<(), Error> {
         loop {
+            println!("have outbound: {:?}", self.outbound.is_some());
             // Propagate incoming messages
             match self.outbound.take() {
                 Some(OutboundState::Idle(stream)) => {
+                    println!("Sending messages");
                     self.outbound = Some(OutboundState::Sending(
                         self.send_pending_messages(stream).boxed(),
                     ));
@@ -124,10 +130,14 @@ impl ReplicationHandler {
                 }
                 Some(OutboundState::Sending(mut future)) => match future.poll_unpin(cx) {
                     Poll::Ready(Ok(stream)) => {
+                        println!("Sent messages");
                         self.outbound = Some(OutboundState::Idle(stream));
                         break;
                     }
-                    Poll::Ready(Err(e)) => return Err(e),
+                    Poll::Ready(Err(e)) => {
+                        println!("{e:?}");
+                        return Err(e);
+                    }
                     Poll::Pending => {}
                 },
                 _ => {
@@ -149,6 +159,9 @@ impl ConnectionHandler for ReplicationHandler {
     fn listen_protocol(&self) -> SubstreamProtocol<Self::InboundProtocol, Self::InboundOpenInfo> {
         SubstreamProtocol::new(ReadyUpgrade::new(PROTOCOL_NAME), ())
     }
+    fn connection_keep_alive(&self) -> bool {
+        true
+    }
 
     fn poll(
         &mut self,
@@ -156,11 +169,14 @@ impl ConnectionHandler for ReplicationHandler {
     ) -> Poll<
         ConnectionHandlerEvent<Self::OutboundProtocol, Self::OutboundOpenInfo, Self::ToBehaviour>,
     > {
+        println!("Polling outgoing messages");
         if let Err(error) = self.poll_pending_outgoing_messages(cx) {
+            println!("{error:?}");
             return Poll::Ready(ConnectionHandlerEvent::NotifyBehaviour(
                 HandlerEventToBehaviour::OutgoingMessageError { error },
             ));
         }
+        println!("Polling incoming messages");
         match self.poll_pending_incoming_messages(cx) {
             None => {}
             Some(Ok(message)) => {
