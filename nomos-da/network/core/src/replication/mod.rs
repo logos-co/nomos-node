@@ -4,11 +4,16 @@ pub mod handler;
 #[cfg(test)]
 mod test {
     use std::collections::HashSet;
+    use std::time::Duration;
 
     use futures::StreamExt;
-    use libp2p::{Multiaddr, PeerId, Swarm};
+    use libp2p::{Multiaddr, PeerId, Swarm, Transport, yamux};
+    use libp2p::core::transport::MemoryTransport;
+    use libp2p::core::upgrade::Version;
     use libp2p::identity::Keypair;
     use libp2p::swarm::SwarmEvent;
+    use tracing_subscriber::EnvFilter;
+    use tracing_subscriber::fmt::TestWriter;
 
     use nomos_da_messages::common::Blob;
     use subnetworks_assignations::MembershipHandler;
@@ -61,11 +66,15 @@ mod test {
         ) -> Swarm<ReplicationBehaviour<AllNeighbours>> {
             libp2p::SwarmBuilder::with_existing_identity(key)
                 .with_tokio()
-                .with_tcp(
-                    libp2p::tcp::Config::default(),
-                    libp2p::tls::Config::new,
-                    libp2p::yamux::Config::default,
-                )
+                .with_other_transport(|keypair| {
+                    let transport = MemoryTransport::default();
+                    transport
+                        .upgrade(Version::V1)
+                        .authenticate(libp2p::plaintext::Config::new(keypair))
+                        .multiplex(yamux::Config::default())
+                        .timeout(Duration::from_secs(10))
+                        .boxed()
+                })
                 .unwrap()
                 .with_behaviour(|key| {
                     ReplicationBehaviour::new(
@@ -79,6 +88,11 @@ mod test {
                 })
                 .build()
         }
+        let _ = tracing_subscriber::fmt()
+            .with_env_filter(EnvFilter::from_default_env())
+            .compact()
+            .with_writer(TestWriter::default())
+            .try_init();
         let k1 = libp2p::identity::Keypair::generate_ed25519();
         let k2 = libp2p::identity::Keypair::generate_ed25519();
 
@@ -93,7 +107,7 @@ mod test {
         let mut swarm_1 = get_swarm(k1, neighbours.clone());
         let mut swarm_2 = get_swarm(k2, neighbours);
 
-        let addr: Multiaddr = "/ip4/127.0.0.1/tcp/4444".parse().unwrap();
+        let addr: Multiaddr = "/memory/6907198695372201009".parse().unwrap();
         let addr2 = addr.clone();
         let task_1 = async move {
             swarm_1.listen_on(addr).unwrap();
@@ -113,10 +127,7 @@ mod test {
 
         let task_2 = async move {
             swarm_2.dial(addr2).unwrap();
-            swarm_2.behaviour_mut().send_message(DaMessage {
-                blob: Some(Blob::default()),
-                subnetwork_id: 0,
-            });
+            let mut i = 0usize;
             loop {
                 match swarm_2.select_next_some().await {
                     SwarmEvent::NewListenAddr { address, .. } => {
@@ -127,6 +138,14 @@ mod test {
                         println!("2 - Swarmevent: {event:?}");
                     }
                 }
+                swarm_2.behaviour_mut().send_message(DaMessage {
+                    blob: Some(Blob {
+                        blob_id: vec![],
+                        data: format!("Hello {i}").into_bytes(),
+                    }),
+                    subnetwork_id: 0,
+                });
+                i += 1;
             }
         };
         let join2 = tokio::spawn(task_2);

@@ -136,7 +136,7 @@ where
         }
         println!("{}, Connected to {peer_id}", self.local_peer_id);
         self.connected.insert(peer_id, connection_id);
-        Ok(Either::Left(ReplicationHandler::new()))
+        Ok(Either::Left(ReplicationHandler::new(self.local_peer_id)))
     }
 
     fn handle_established_outbound_connection(
@@ -148,7 +148,7 @@ where
     ) -> Result<THandler<Self>, ConnectionDenied> {
         println!("{}, Connected to {peer_id}", self.local_peer_id);
         self.connected.insert(peer_id, connection_id);
-        Ok(Either::Left(ReplicationHandler::new()))
+        Ok(Either::Left(ReplicationHandler::new(self.local_peer_id)))
     }
 
     fn on_swarm_event(&mut self, _event: FromSwarm) {}
