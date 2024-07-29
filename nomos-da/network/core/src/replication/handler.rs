@@ -45,6 +45,7 @@ impl Default for ReplicationHandlerConfig {
 
 /// State handling for outgoing broadcast messages
 enum OutboundState {
+    OpenStream,
     Idle(Stream),
     Sending(future::BoxFuture<'static, Result<Stream, Error>>),
 }
@@ -122,10 +123,18 @@ impl ReplicationHandler {
         loop {
             // Propagate incoming messages
             match self.outbound.take() {
+                Some(OutboundState::OpenStream) => {
+                    self.outbound = Some(OutboundState::OpenStream);
+                    break;
+                }
                 Some(OutboundState::Idle(stream)) => {
-                    self.outbound = Some(OutboundState::Sending(
-                        self.send_pending_messages(stream).boxed(),
-                    ));
+                    if !self.outgoing_messages.is_empty() {
+                        self.outbound = Some(OutboundState::Sending(
+                            self.send_pending_messages(stream).boxed(),
+                        ));
+                    } else {
+                        self.outbound = Some(OutboundState::Idle(stream));
+                    }
                     break;
                 }
                 Some(OutboundState::Sending(mut future)) => match future.poll_unpin(cx) {
@@ -140,6 +149,7 @@ impl ReplicationHandler {
                     Poll::Pending => {}
                 },
                 None => {
+                    self.outbound = Some(OutboundState::OpenStream);
                     return Ok(Some(ConnectionHandlerEvent::OutboundSubstreamRequest {
                         protocol: <Self as ConnectionHandler>::listen_protocol(self),
                     }));
@@ -213,6 +223,7 @@ impl ConnectionHandler for ReplicationHandler {
             Self::OutboundOpenInfo,
         >,
     ) {
+        let is_outbound = event.is_outbound();
         match event {
             ConnectionEvent::FullyNegotiatedInbound(FullyNegotiatedInbound {
                 protocol: stream,
@@ -225,6 +236,12 @@ impl ConnectionHandler for ReplicationHandler {
                 info: _,
             }) => {
                 self.outbound = Some(OutboundState::Idle(stream));
+            }
+            ConnectionEvent::DialUpgradeError(error) => {
+                println!("Dial error: [{error:?}]");
+                if is_outbound {
+                    self.outbound = None;
+                }
             }
             other => {
                 println!("Other event = [{other:?}]");
