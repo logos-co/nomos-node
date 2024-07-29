@@ -8,7 +8,7 @@ use libp2p::{PeerId, Stream, StreamProtocol};
 use libp2p::core::upgrade::ReadyUpgrade;
 use libp2p::swarm::{ConnectionHandler, ConnectionHandlerEvent, SubstreamProtocol};
 use libp2p::swarm::handler::{ConnectionEvent, FullyNegotiatedInbound, FullyNegotiatedOutbound};
-use tracing::debug;
+use tracing::{debug, error};
 
 use nomos_da_messages::{pack_message, unpack_from_reader};
 
@@ -153,7 +153,7 @@ impl ReplicationHandler {
                         break;
                     }
                     Poll::Ready(Err(e)) => {
-                        println!("{e:?}");
+                        error!("{e:?}");
                         return Err(e);
                     }
                     Poll::Pending => {}
@@ -193,7 +193,7 @@ impl ConnectionHandler for ReplicationHandler {
                 return Poll::Ready(event);
             }
             Err(error) => {
-                println!("{error:?}");
+                error!("{error:?}");
                 return Poll::Ready(ConnectionHandlerEvent::NotifyBehaviour(
                     HandlerEventToBehaviour::OutgoingMessageError { error },
                 ));
@@ -237,24 +237,24 @@ impl ConnectionHandler for ReplicationHandler {
                 protocol: stream,
                 info: _,
             }) => {
-                println!("{} - Got inbound stream", self.local_peer_id);
+                debug!("{} - Got inbound stream", self.local_peer_id);
                 self.inbound = Some(self.read_message(stream).boxed());
             }
             ConnectionEvent::FullyNegotiatedOutbound(FullyNegotiatedOutbound {
                 protocol: stream,
                 info: _,
             }) => {
-                println!("{} - Got outbound stream", self.local_peer_id);
+                debug!("{} - Got outbound stream", self.local_peer_id);
                 self.outbound = Some(OutboundState::Idle(stream));
             }
             ConnectionEvent::DialUpgradeError(error) => {
-                println!("{} - Dial error: [{error:?}]", self.local_peer_id);
+                debug!("{} - Dial error: [{error:?}]", self.local_peer_id);
                 if is_outbound {
                     self.outbound = None;
                 }
             }
             other => {
-                println!(
+                debug!(
                     "{} - Connection event event = [{other:?}]",
                     self.local_peer_id
                 );

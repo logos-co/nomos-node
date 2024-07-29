@@ -13,6 +13,7 @@ nomos-da-messages = { path = "../messages" }
 tracing-subscriber = "0.3.18"
 void = "1.0.2"
 either = "1.13.0"
+log = "0.4"
 
 [dev-dependencies]
 tokio = { version = "1.39", features = ["macros", "rt-multi-thread", "time"] }

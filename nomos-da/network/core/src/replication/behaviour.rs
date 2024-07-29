@@ -9,7 +9,7 @@ use libp2p::swarm::{
     ConnectionDenied, ConnectionId, FromSwarm, NetworkBehaviour, NotifyHandler, THandler,
     THandlerInEvent, THandlerOutEvent, ToSwarm,
 };
-use tracing::error;
+use log::{error, trace};
 
 use subnetworks_assignations::MembershipHandler;
 
@@ -131,10 +131,10 @@ where
         _remote_addr: &Multiaddr,
     ) -> Result<THandler<Self>, ConnectionDenied> {
         if !self.is_neighbour(&peer_id) {
-            println!("refusing connection to {peer_id}");
+            trace!("refusing connection to {peer_id}");
             return Ok(Either::Right(libp2p::swarm::dummy::ConnectionHandler));
         }
-        println!("{}, Connected to {peer_id}", self.local_peer_id);
+        trace!("{}, Connected to {peer_id}", self.local_peer_id);
         self.connected.insert(peer_id, connection_id);
         Ok(Either::Left(ReplicationHandler::new(self.local_peer_id)))
     }
@@ -146,7 +146,7 @@ where
         _addr: &Multiaddr,
         _role_override: Endpoint,
     ) -> Result<THandler<Self>, ConnectionDenied> {
-        println!("{}, Connected to {peer_id}", self.local_peer_id);
+        trace!("{}, Connected to {peer_id}", self.local_peer_id);
         self.connected.insert(peer_id, connection_id);
         Ok(Either::Left(ReplicationHandler::new(self.local_peer_id)))
     }

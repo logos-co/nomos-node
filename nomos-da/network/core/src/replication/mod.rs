@@ -12,6 +12,7 @@ mod test {
     use libp2p::core::upgrade::Version;
     use libp2p::identity::Keypair;
     use libp2p::swarm::SwarmEvent;
+    use tracing::trace;
     use tracing_subscriber::EnvFilter;
     use tracing_subscriber::fmt::TestWriter;
 
@@ -114,11 +115,11 @@ mod test {
             loop {
                 match swarm_1.select_next_some().await {
                     SwarmEvent::NewListenAddr { address, .. } => {
-                        println!("1 - Listening on {address:?}")
+                        trace!("1 - Listening on {address:?}")
                     }
-                    SwarmEvent::Behaviour(event) => println!("1 - {event:?}"),
+                    SwarmEvent::Behaviour(event) => trace!("1 - {event:?}"),
                     event => {
-                        println!("1 - Swarmevent: {event:?}");
+                        trace!("1 - Swarmevent: {event:?}");
                     }
                 }
             }
@@ -131,11 +132,11 @@ mod test {
             loop {
                 match swarm_2.select_next_some().await {
                     SwarmEvent::NewListenAddr { address, .. } => {
-                        println!("2 - Listening on {address:?}")
+                        trace!("2 - Listening on {address:?}")
                     }
-                    SwarmEvent::Behaviour(event) => println!("2 - {event:?}"),
+                    SwarmEvent::Behaviour(event) => trace!("2 - {event:?}"),
                     event => {
-                        println!("2 - Swarmevent: {event:?}");
+                        trace!("2 - Swarmevent: {event:?}");
                     }
                 }
                 swarm_2.behaviour_mut().send_message(DaMessage {
