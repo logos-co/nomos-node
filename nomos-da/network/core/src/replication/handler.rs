@@ -81,7 +81,6 @@ impl ReplicationHandler {
         &mut self,
         mut stream: Stream,
     ) -> impl Future<Output = Result<Stream, Error>> {
-        println!("Sending messages {:?}", self.outgoing_messages);
         let mut pending_messages = Vec::new();
         std::mem::swap(&mut self.outgoing_messages, &mut pending_messages);
         async {
@@ -97,7 +96,6 @@ impl ReplicationHandler {
         &mut self,
         cx: &mut Context<'_>,
     ) -> Option<Result<DaMessage, Error>> {
-        println!("have inbound: {:?}", self.inbound.is_some());
         self.inbound.as_mut().map(|stream| {
             let mut read = std::pin::pin!(unpack_from_reader(stream));
             loop {
@@ -108,21 +106,23 @@ impl ReplicationHandler {
                     Poll::Ready(Err(e)) => {
                         return Err(e);
                     }
-                    Poll::Pending => {
-                        println!("Polling pending message ++++");
-                    }
+                    Poll::Pending => {}
                 }
             }
         })
     }
 
-    fn poll_pending_outgoing_messages(&mut self, cx: &mut Context<'_>) -> Result<(), Error> {
+    fn poll_pending_outgoing_messages(
+        &mut self,
+        cx: &mut Context<'_>,
+    ) -> Result<
+        Option<ConnectionHandlerEvent<ReadyUpgrade<StreamProtocol>, (), HandlerEventToBehaviour>>,
+        Error,
+    > {
         loop {
-            println!("have outbound: {:?}", self.outbound.is_some());
             // Propagate incoming messages
             match self.outbound.take() {
                 Some(OutboundState::Idle(stream)) => {
-                    println!("Sending messages");
                     self.outbound = Some(OutboundState::Sending(
                         self.send_pending_messages(stream).boxed(),
                     ));
@@ -130,7 +130,6 @@ impl ReplicationHandler {
                 }
                 Some(OutboundState::Sending(mut future)) => match future.poll_unpin(cx) {
                     Poll::Ready(Ok(stream)) => {
-                        println!("Sent messages");
                         self.outbound = Some(OutboundState::Idle(stream));
                         break;
                     }
@@ -140,12 +139,14 @@ impl ReplicationHandler {
                     }
                     Poll::Pending => {}
                 },
-                _ => {
-                    break;
+                None => {
+                    return Ok(Some(ConnectionHandlerEvent::OutboundSubstreamRequest {
+                        protocol: <Self as ConnectionHandler>::listen_protocol(self),
+                    }));
                 }
             }
         }
-        Ok(())
+        Ok(None)
     }
 }
 impl ConnectionHandler for ReplicationHandler {
@@ -169,14 +170,18 @@ impl ConnectionHandler for ReplicationHandler {
     ) -> Poll<
         ConnectionHandlerEvent<Self::OutboundProtocol, Self::OutboundOpenInfo, Self::ToBehaviour>,
     > {
-        println!("Polling outgoing messages");
-        if let Err(error) = self.poll_pending_outgoing_messages(cx) {
-            println!("{error:?}");
-            return Poll::Ready(ConnectionHandlerEvent::NotifyBehaviour(
-                HandlerEventToBehaviour::OutgoingMessageError { error },
-            ));
-        }
-        println!("Polling incoming messages");
+        match self.poll_pending_outgoing_messages(cx) {
+            Ok(Some(event)) => {
+                return Poll::Ready(event);
+            }
+            Err(error) => {
+                println!("{error:?}");
+                return Poll::Ready(ConnectionHandlerEvent::NotifyBehaviour(
+                    HandlerEventToBehaviour::OutgoingMessageError { error },
+                ));
+            }
+            _ => {}
+        };
         match self.poll_pending_incoming_messages(cx) {
             None => {}
             Some(Ok(message)) => {
@@ -221,12 +226,9 @@ impl ConnectionHandler for ReplicationHandler {
             }) => {
                 self.outbound = Some(OutboundState::Idle(stream));
             }
-            ConnectionEvent::AddressChange(_) => {}
-            ConnectionEvent::DialUpgradeError(_) => {}
-            ConnectionEvent::ListenUpgradeError(_) => {}
-            ConnectionEvent::LocalProtocolsChange(_) => {}
-            ConnectionEvent::RemoteProtocolsChange(_) => {}
-            _ => {}
+            other => {
+                println!("Other event = [{other:?}]");
+            }
         }
     }
 }

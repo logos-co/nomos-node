@@ -4,7 +4,6 @@ pub mod handler;
 #[cfg(test)]
 mod test {
     use std::collections::HashSet;
-    use std::time::Duration;
 
     use futures::StreamExt;
     use libp2p::{Multiaddr, PeerId, Swarm};
@@ -114,7 +113,10 @@ mod test {
 
         let task_2 = async move {
             swarm_2.dial(addr2).unwrap();
-            tokio::time::sleep(Duration::from_secs(1)).await;
+            swarm_2.behaviour_mut().send_message(DaMessage {
+                blob: Some(Blob::default()),
+                subnetwork_id: 0,
+            });
             loop {
                 match swarm_2.select_next_some().await {
                     SwarmEvent::NewListenAddr { address, .. } => {
@@ -125,10 +127,6 @@ mod test {
                         println!("2 - Swarmevent: {event:?}");
                     }
                 }
-                swarm_2.behaviour_mut().send_message(DaMessage {
-                    blob: Some(Blob::default()),
-                    subnetwork_id: 0,
-                });
             }
         };
         let join2 = tokio::spawn(task_2);
