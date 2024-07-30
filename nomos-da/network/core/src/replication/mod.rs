@@ -12,6 +12,7 @@ mod test {
     use libp2p::core::upgrade::Version;
     use libp2p::identity::Keypair;
     use libp2p::swarm::SwarmEvent;
+    use log::info;
     use tracing::trace;
     use tracing_subscriber::EnvFilter;
     use tracing_subscriber::fmt::TestWriter;
@@ -119,7 +120,7 @@ mod test {
                     }
                     SwarmEvent::Behaviour(event) => trace!("1 - {event:?}"),
                     event => {
-                        trace!("1 - Swarmevent: {event:?}");
+                        info!("1 - Swarmevent: {event:?}");
                     }
                 }
             }
@@ -136,7 +137,7 @@ mod test {
                     }
                     SwarmEvent::Behaviour(event) => trace!("2 - {event:?}"),
                     event => {
-                        trace!("2 - Swarmevent: {event:?}");
+                        info!("2 - Swarmevent: {event:?}");
                     }
                 }
                 swarm_2.behaviour_mut().send_message(DaMessage {
