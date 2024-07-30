@@ -9,7 +9,7 @@ use libp2p::swarm::{
     ConnectionDenied, ConnectionId, FromSwarm, NetworkBehaviour, NotifyHandler, THandler,
     THandlerInEvent, THandlerOutEvent, ToSwarm,
 };
-use log::{error, trace};
+use log::{error, info, trace};
 
 use subnetworks_assignations::MembershipHandler;
 

@@ -10,6 +10,7 @@ use libp2p::swarm::{ConnectionHandler, ConnectionHandlerEvent, SubstreamProtocol
 use libp2p::swarm::handler::{ConnectionEvent, FullyNegotiatedInbound, FullyNegotiatedOutbound};
 use log::{info, trace};
 use tracing::{debug, error};
+use tracing::field::debug;
 
 use nomos_da_messages::{pack_message, unpack_from_reader};
 use nomos_da_messages::common::Blob;
@@ -81,51 +82,47 @@ impl ReplicationHandler {
         &mut self,
         mut stream: Stream,
     ) -> impl Future<Output = Result<Stream, Error>> {
-        // let mut pending_messages = Vec::new();
-        // std::mem::swap(&mut self.outgoing_messages, &mut pending_messages);
+        debug!("Sending messages");
+        let mut pending_messages = Vec::new();
+        std::mem::swap(&mut self.outgoing_messages, &mut pending_messages);
+        async {
+            debug!("Writing {} messages", pending_messages.len());
+            for message in pending_messages {
+                let bytes = pack_message(&message)?;
+                stream.write_all(&bytes).await?;
+            }
+            stream.flush().await?;
+            Ok(stream)
+        }
         // async {
-        //     for message in pending_messages {
-        //         stream.write_all(&pack_message(&message)?).await?;
-        //     }
+        //     stream.write_all(b"FOOBAR").await?;
         //     stream.flush().await?;
         //     Ok(stream)
         // }
-        info!("launched sending pending messages");
-        let pid = self.local_peer_id;
-        async move {
-            info!("{} - sending", pid);
-            stream.write_all(b"FOOBAR").await?;
-            stream.flush().await?;
-            info!("finished sending messages");
-            Ok(stream)
-        }
     }
 
     fn read_message(
         &mut self,
         mut stream: Stream,
     ) -> impl Future<Output = Result<(DaMessage, Stream), Error>> {
-        // async move {
-        //     let msg: DaMessage = unpack_from_reader(&mut stream).await?;
-        //     Ok((msg, stream))
-        // }
-        info!("launched receiving messages");
-        let mut msg = b"FOOBAR".to_owned();
         async move {
-            info!("reading messages");
-            stream.read(msg.as_mut_slice()).await?;
-            info!("finished reading messages");
-            Ok((
-                DaMessage {
-                    blob: Some(Blob {
-                        blob_id: msg.to_vec(),
-                        data: msg.to_vec(),
-                    }),
-                    subnetwork_id: 0,
-                },
-                stream,
-            ))
+            let msg: DaMessage = unpack_from_reader(&mut stream).await?;
+            Ok((msg, stream))
         }
+        // async move {
+        //     let mut buff = b"FOOBAR".to_vec();
+        //     stream.read_exact(&mut buff).await?;
+        //     Ok((
+        //         DaMessage {
+        //             blob: Some(Blob {
+        //                 blob_id: buff.to_vec(),
+        //                 data: buff,
+        //             }),
+        //             subnetwork_id: 0,
+        //         },
+        //         stream,
+        //     ))
+        // }
     }
 
     fn poll_pending_incoming_messages(
@@ -137,13 +134,11 @@ impl ReplicationHandler {
                 let mut read = std::pin::pin!(&mut fut);
                 match read.poll_unpin(cx) {
                     Poll::Ready(Ok((message, stream))) => {
-                        info!("got incoming  message");
                         self.inbound = Some(self.read_message(stream).boxed());
                         Some(Ok(message))
                     }
                     Poll::Ready(Err(e)) => Some(Err(e)),
                     Poll::Pending => {
-                        info!("Keep reading messages");
                         self.inbound = Some(fut);
                         None
                     }
@@ -163,32 +158,26 @@ impl ReplicationHandler {
         // Propagate incoming messages
         match self.outbound.take() {
             Some(OutboundState::OpenStream) => {
-                info!("outbound waiting for stream");
                 self.outbound = Some(OutboundState::OpenStream);
             }
-            Some(OutboundState::Idle(stream)) => {
+            Some(OutboundState::Idle(stream)) if !self.outgoing_messages.is_empty() => {
                 self.outbound = Some(OutboundState::Sending(
                     self.send_pending_messages(stream).boxed(),
                 ));
-                // if !self.outgoing_messages.is_empty() {
-                //     self.outbound = Some(OutboundState::Sending(
-                //         self.send_pending_messages(stream).boxed(),
-                //     ));
-                // } else {
-                //     info!("outbound idle, no messages to send");
-                //     self.outbound = Some(OutboundState::Idle(stream));
-                // }
+            }
+            Some(OutboundState::Idle(stream)) => {
+                self.outbound = Some(OutboundState::Idle(stream));
             }
             Some(OutboundState::Sending(mut future)) => match future.poll_unpin(cx) {
                 Poll::Ready(Ok(stream)) => {
-                    info!("finished writing messages");
+                    info!("Finished sending messages");
                     self.outbound = Some(OutboundState::Idle(stream));
                 }
                 Poll::Ready(Err(e)) => {
                     error!("{e:?}");
                 }
                 Poll::Pending => {
-                    info!("Keep writing messages");
+                    self.outbound = Some(OutboundState::Sending(future));
                 }
             },
             None => {
@@ -225,7 +214,7 @@ impl ConnectionHandler for ReplicationHandler {
                 return Poll::Ready(event);
             }
             Err(error) => {
-                error!("{error:?}");
+                error!("Outgoing message error: {error:?}");
                 return Poll::Ready(ConnectionHandlerEvent::NotifyBehaviour(
                     HandlerEventToBehaviour::OutgoingMessageError { error },
                 ));
@@ -249,6 +238,7 @@ impl ConnectionHandler for ReplicationHandler {
     fn on_behaviour_event(&mut self, event: Self::FromBehaviour) {
         match event {
             BehaviourEventToHandler::OutgoingMessage { message } => {
+                info!("Received outgoing message");
                 self.outgoing_messages.push(message);
             }
         }
@@ -269,28 +259,22 @@ impl ConnectionHandler for ReplicationHandler {
                 protocol: stream,
                 info: _,
             }) => {
-                info!("{} - Got inbound stream", self.local_peer_id);
+                debug!("Received inbound stream");
                 self.inbound = Some(self.read_message(stream).boxed());
             }
             ConnectionEvent::FullyNegotiatedOutbound(FullyNegotiatedOutbound {
                 protocol: stream,
                 info: _,
             }) => {
-                info!("{} - Got outbound stream", self.local_peer_id);
+                debug!("Received outbound stream");
                 self.outbound = Some(OutboundState::Idle(stream));
             }
             ConnectionEvent::DialUpgradeError(error) => {
-                info!("{} - Dial error: [{error:?}]", self.local_peer_id);
                 if is_outbound {
                     self.outbound = None;
                 }
             }
-            other => {
-                info!(
-                    "{} - Connection event event = [{other:?}]",
-                    self.local_peer_id
-                );
-            }
+            _ => {}
         }
     }
 }
