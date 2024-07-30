@@ -103,10 +103,11 @@ mod test {
         let mut swarm_1 = get_swarm(k1, neighbours.clone());
         let mut swarm_2 = get_swarm(k2, neighbours);
 
-        let addr: Multiaddr = "/ip4/127.0.0.1/udp/4444/quic-v1".parse().unwrap();
+        let addr: Multiaddr = "/ip4/127.0.0.1/udp/6060/quic-v1".parse().unwrap();
+        swarm_1.listen_on(addr.clone()).unwrap();
+        // let addr = swarm_1.external_addresses().next().unwrap();
         let addr2 = addr.clone();
         let task_1 = async move {
-            swarm_1.listen_on(addr).unwrap();
             swarm_1
                 .for_each(|event| async {
                     match event {
@@ -121,7 +122,6 @@ mod test {
                 })
                 .await;
         };
-        let join1 = tokio::spawn(task_1);
 
         let task_2 = async move {
             swarm_2.dial(addr2).unwrap();
@@ -140,8 +140,15 @@ mod test {
                 })
                 .await;
         };
-        let join2 = tokio::spawn(task_2);
-        join1.await.unwrap();
-        join2.await.unwrap();
+        loop {
+            tokio::select! {
+                _ = task_1 => {
+                    break;
+                }
+                _ = task_2 => {
+                    break;
+                }
+            };
+        }
     }
 }

@@ -94,7 +94,8 @@ impl ReplicationHandler {
         let pid = self.local_peer_id;
         async move {
             info!("{} - sending", pid);
-            stream.write_all(b"Hello world").await?;
+            stream.write_all(b"FOOBAR").await?;
+            stream.flush().await?;
             info!("finished sending messages");
             Ok(stream)
         }
@@ -109,7 +110,7 @@ impl ReplicationHandler {
         //     Ok((msg, stream))
         // }
         info!("launched receiving messages");
-        let mut msg = b"Hello world".to_owned();
+        let mut msg = b"FOOBAR".to_owned();
         async move {
             info!("reading messages");
             stream.read(msg.as_mut_slice()).await?;
@@ -136,7 +137,7 @@ impl ReplicationHandler {
                 let mut read = std::pin::pin!(&mut fut);
                 match read.poll_unpin(cx) {
                     Poll::Ready(Ok((message, stream))) => {
-                        info!("finished reading messages");
+                        info!("got incoming  message");
                         self.inbound = Some(self.read_message(stream).boxed());
                         Some(Ok(message))
                     }
