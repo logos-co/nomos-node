@@ -113,42 +113,38 @@ mod test {
         let addr2 = addr.clone();
         let task_1 = async move {
             swarm_1.listen_on(addr).unwrap();
-            loop {
-                match swarm_1.select_next_some().await {
-                    SwarmEvent::NewListenAddr { address, .. } => {
-                        trace!("1 - Listening on {address:?}")
+            swarm_1
+                .for_each(|event| async {
+                    match event {
+                        SwarmEvent::NewListenAddr { address, .. } => {
+                            trace!("1 - Listening on {address:?}")
+                        }
+                        SwarmEvent::Behaviour(event) => trace!("1 - {event:?}"),
+                        event => {
+                            info!("1 - Swarmevent: {event:?}");
+                        }
                     }
-                    SwarmEvent::Behaviour(event) => trace!("1 - {event:?}"),
-                    event => {
-                        info!("1 - Swarmevent: {event:?}");
-                    }
-                }
-            }
+                })
+                .await;
         };
         let join1 = tokio::spawn(task_1);
 
         let task_2 = async move {
             swarm_2.dial(addr2).unwrap();
-            let mut i = 0usize;
-            loop {
-                match swarm_2.select_next_some().await {
-                    SwarmEvent::NewListenAddr { address, .. } => {
-                        trace!("2 - Listening on {address:?}")
+            swarm_2
+                .enumerate()
+                .for_each(|(i, event)| async {
+                    match event {
+                        SwarmEvent::NewListenAddr { address, .. } => {
+                            trace!("2 - Listening on {address:?}")
+                        }
+                        SwarmEvent::Behaviour(event) => trace!("2 - {event:?}"),
+                        event => {
+                            info!("2 - Swarmevent: {event:?}");
+                        }
                     }
-                    SwarmEvent::Behaviour(event) => trace!("2 - {event:?}"),
-                    event => {
-                        info!("2 - Swarmevent: {event:?}");
-                    }
-                }
-                swarm_2.behaviour_mut().send_message(DaMessage {
-                    blob: Some(Blob {
-                        blob_id: vec![],
-                        data: format!("Hello {i}").into_bytes(),
-                    }),
-                    subnetwork_id: 0,
-                });
-                i += 1;
-            }
+                })
+                .await;
         };
         let join2 = tokio::spawn(task_2);
         let (r1, r2) = tokio::join!(join1, join2);
