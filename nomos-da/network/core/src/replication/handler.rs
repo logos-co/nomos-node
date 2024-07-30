@@ -91,9 +91,13 @@ impl ReplicationHandler {
         //     Ok(stream)
         // }
         trace!("launched sending pending messages");
-        async {
+        let pid = self.local_peer_id;
+        async move {
             trace!("Sending pending messages");
-            stream.write_all(b"Hello world").await?;
+            for i in (0..10) {
+                trace!("{} - sending {i}", pid);
+                stream.write_all(b"Hello world").await?;
+            }
             trace!("finished sending messages");
             Ok(stream)
         }
@@ -172,14 +176,14 @@ impl ReplicationHandler {
             }
             Some(OutboundState::Sending(mut future)) => match future.poll_unpin(cx) {
                 Poll::Ready(Ok(stream)) => {
-                    trace!("finished writting messages");
+                    trace!("finished writing messages");
                     self.outbound = Some(OutboundState::Idle(stream));
                 }
                 Poll::Ready(Err(e)) => {
                     error!("{e:?}");
                 }
                 Poll::Pending => {
-                    trace!("Keep writting messages");
+                    trace!("Keep writing messages");
                 }
             },
             None => {
