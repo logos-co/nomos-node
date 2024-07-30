@@ -8,7 +8,7 @@ use libp2p::{PeerId, Stream, StreamProtocol};
 use libp2p::core::upgrade::ReadyUpgrade;
 use libp2p::swarm::{ConnectionHandler, ConnectionHandlerEvent, SubstreamProtocol};
 use libp2p::swarm::handler::{ConnectionEvent, FullyNegotiatedInbound, FullyNegotiatedOutbound};
-use log::trace;
+use log::{info, trace};
 use tracing::{debug, error};
 
 use nomos_da_messages::{pack_message, unpack_from_reader};
@@ -90,15 +90,12 @@ impl ReplicationHandler {
         //     stream.flush().await?;
         //     Ok(stream)
         // }
-        trace!("launched sending pending messages");
+        info!("launched sending pending messages");
         let pid = self.local_peer_id;
         async move {
-            trace!("Sending pending messages");
-            for i in (0..10) {
-                trace!("{} - sending {i}", pid);
-                stream.write_all(b"Hello world").await?;
-            }
-            trace!("finished sending messages");
+            info!("{} - sending", pid);
+            stream.write_all(b"Hello world").await?;
+            info!("finished sending messages");
             Ok(stream)
         }
     }
@@ -111,12 +108,12 @@ impl ReplicationHandler {
         //     let msg: DaMessage = unpack_from_reader(&mut stream).await?;
         //     Ok((msg, stream))
         // }
-        trace!("launched receiving messages");
+        info!("launched receiving messages");
         let mut msg = b"Hello world".to_owned();
         async move {
-            trace!("reading messages");
+            info!("reading messages");
             stream.read(msg.as_mut_slice()).await?;
-            trace!("finished reading messages");
+            info!("finished reading messages");
             Ok((
                 DaMessage {
                     blob: Some(Blob {
@@ -139,11 +136,13 @@ impl ReplicationHandler {
                 let mut read = std::pin::pin!(&mut fut);
                 match read.poll_unpin(cx) {
                     Poll::Ready(Ok((message, stream))) => {
+                        info!("finished reading messages");
                         self.inbound = Some(self.read_message(stream).boxed());
                         Some(Ok(message))
                     }
                     Poll::Ready(Err(e)) => Some(Err(e)),
                     Poll::Pending => {
+                        info!("Keep reading messages");
                         self.inbound = Some(fut);
                         None
                     }
@@ -163,27 +162,32 @@ impl ReplicationHandler {
         // Propagate incoming messages
         match self.outbound.take() {
             Some(OutboundState::OpenStream) => {
+                info!("outbound waiting for stream");
                 self.outbound = Some(OutboundState::OpenStream);
             }
             Some(OutboundState::Idle(stream)) => {
-                if !self.outgoing_messages.is_empty() {
-                    self.outbound = Some(OutboundState::Sending(
-                        self.send_pending_messages(stream).boxed(),
-                    ));
-                } else {
-                    self.outbound = Some(OutboundState::Idle(stream));
-                }
+                self.outbound = Some(OutboundState::Sending(
+                    self.send_pending_messages(stream).boxed(),
+                ));
+                // if !self.outgoing_messages.is_empty() {
+                //     self.outbound = Some(OutboundState::Sending(
+                //         self.send_pending_messages(stream).boxed(),
+                //     ));
+                // } else {
+                //     info!("outbound idle, no messages to send");
+                //     self.outbound = Some(OutboundState::Idle(stream));
+                // }
             }
             Some(OutboundState::Sending(mut future)) => match future.poll_unpin(cx) {
                 Poll::Ready(Ok(stream)) => {
-                    trace!("finished writing messages");
+                    info!("finished writing messages");
                     self.outbound = Some(OutboundState::Idle(stream));
                 }
                 Poll::Ready(Err(e)) => {
                     error!("{e:?}");
                 }
                 Poll::Pending => {
-                    trace!("Keep writing messages");
+                    info!("Keep writing messages");
                 }
             },
             None => {
@@ -264,24 +268,24 @@ impl ConnectionHandler for ReplicationHandler {
                 protocol: stream,
                 info: _,
             }) => {
-                debug!("{} - Got inbound stream", self.local_peer_id);
+                info!("{} - Got inbound stream", self.local_peer_id);
                 self.inbound = Some(self.read_message(stream).boxed());
             }
             ConnectionEvent::FullyNegotiatedOutbound(FullyNegotiatedOutbound {
                 protocol: stream,
                 info: _,
             }) => {
-                debug!("{} - Got outbound stream", self.local_peer_id);
+                info!("{} - Got outbound stream", self.local_peer_id);
                 self.outbound = Some(OutboundState::Idle(stream));
             }
             ConnectionEvent::DialUpgradeError(error) => {
-                debug!("{} - Dial error: [{error:?}]", self.local_peer_id);
+                info!("{} - Dial error: [{error:?}]", self.local_peer_id);
                 if is_outbound {
                     self.outbound = None;
                 }
             }
             other => {
-                debug!(
+                info!(
                     "{} - Connection event event = [{other:?}]",
                     self.local_peer_id
                 );

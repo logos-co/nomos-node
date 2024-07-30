@@ -170,7 +170,6 @@ where
                     ReplicationEvent::IncomingMessage { message, peer_id },
                 ));
             }
-
             HandlerEventToBehaviour::OutgoingMessageError { error } => {
                 error!("Couldn't send message due to {error}");
                 todo!("Retry?")

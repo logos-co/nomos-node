@@ -113,7 +113,7 @@ mod test {
                         SwarmEvent::NewListenAddr { address, .. } => {
                             trace!("1 - Listening on {address:?}")
                         }
-                        SwarmEvent::Behaviour(event) => trace!("1 - {event:?}"),
+                        SwarmEvent::Behaviour(event) => info!("1 - {event:?}"),
                         event => {
                             info!("1 - Swarmevent: {event:?}");
                         }
@@ -132,7 +132,7 @@ mod test {
                         SwarmEvent::NewListenAddr { address, .. } => {
                             trace!("2 - Listening on {address:?}")
                         }
-                        SwarmEvent::Behaviour(event) => trace!("2 - {event:?}"),
+                        SwarmEvent::Behaviour(event) => info!("2 - {event:?}"),
                         event => {
                             info!("2 - Swarmevent: {event:?}");
                         }
@@ -141,8 +141,7 @@ mod test {
                 .await;
         };
         let join2 = tokio::spawn(task_2);
-        let (r1, r2) = tokio::join!(join1, join2);
-        r1.unwrap();
-        r2.unwrap();
+        join1.await.unwrap();
+        join2.await.unwrap();
     }
 }
