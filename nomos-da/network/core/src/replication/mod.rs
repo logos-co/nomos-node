@@ -7,7 +7,7 @@ mod test {
     use std::time::Duration;
 
     use futures::StreamExt;
-    use libp2p::{Multiaddr, PeerId, Swarm, Transport, yamux};
+    use libp2p::{Multiaddr, PeerId, quic, Swarm, Transport, yamux};
     use libp2p::core::transport::MemoryTransport;
     use libp2p::core::upgrade::Version;
     use libp2p::identity::Keypair;
@@ -69,13 +69,7 @@ mod test {
             libp2p::SwarmBuilder::with_existing_identity(key)
                 .with_tokio()
                 .with_other_transport(|keypair| {
-                    let transport = MemoryTransport::default();
-                    transport
-                        .upgrade(Version::V1)
-                        .authenticate(libp2p::plaintext::Config::new(keypair))
-                        .multiplex(yamux::Config::default())
-                        .timeout(Duration::from_secs(10))
-                        .boxed()
+                    quic::tokio::Transport::new(quic::Config::new(keypair))
                 })
                 .unwrap()
                 .with_behaviour(|key| {
@@ -109,7 +103,7 @@ mod test {
         let mut swarm_1 = get_swarm(k1, neighbours.clone());
         let mut swarm_2 = get_swarm(k2, neighbours);
 
-        let addr: Multiaddr = "/memory/6907198695372201009".parse().unwrap();
+        let addr: Multiaddr = "/ip4/127.0.0.1/udp/4444/quic-v1".parse().unwrap();
         let addr2 = addr.clone();
         let task_1 = async move {
             swarm_1.listen_on(addr).unwrap();
