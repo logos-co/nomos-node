@@ -26,7 +26,7 @@ fn verify<const SIZE: usize>(bencher: Bencher, column_size: usize) {
 
             let encoder = DaEncoder::new(params);
             let data = rand_data(SIZE * MB / DaEncoderParams::MAX_BLS12_381_ENCODING_CHUNK_SIZE);
-            let encoded_data = encoder.encode(&data).unwrap();
+            let encoded_data = nomos_core::da::DaEncoder::encode(&encoder, &data).unwrap();
             let mut buff = [0u8; 32];
             let mut rng = thread_rng();
             rng.fill_bytes(&mut buff);

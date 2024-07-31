@@ -1,6 +1,6 @@
+pub mod info;
 pub mod metadata;
 pub mod select;
-pub mod vid;
 
 pub trait Blob {
     type BlobId;
@@ -9,7 +9,7 @@ pub trait Blob {
 }
 
 pub trait BlobSelect {
-    type BlobId: vid::DispersedBlobData;
+    type BlobId: info::DispersedBlobInfo;
     type Settings: Clone;
 
     fn new(settings: Self::Settings) -> Self;

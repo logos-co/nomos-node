@@ -1,6 +1,6 @@
 use super::metadata::Metadata;
 
-pub trait DispersedBlobData: Metadata {
+pub trait DispersedBlobInfo: Metadata {
     type BlobId;
 
     fn blob_id(&self) -> Self::BlobId;

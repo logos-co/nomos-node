@@ -382,7 +382,7 @@ pub mod test {
                 assert!(verify_element_proof(
                     i,
                     &element,
-                    &commitment,
+                    commitment,
                     &proofs[i],
                     domain,
                     &GLOBAL_PARAMETERS
@@ -397,7 +397,7 @@ pub mod test {
                 assert!(verify_element_proof(
                     i,
                     &element,
-                    &commitment,
+                    commitment,
                     &proofs[i],
                     domain,
                     &GLOBAL_PARAMETERS

@@ -3,7 +3,7 @@ use std::marker::PhantomData;
 // crates
 
 // internal
-use crate::da::blob::{vid::DispersedBlobData, BlobSelect};
+use crate::da::blob::{info::DispersedBlobInfo, BlobSelect};
 use crate::utils;
 
 #[derive(Default, Clone, Copy)]
@@ -19,7 +19,7 @@ impl<const SIZE: usize, B> FillSize<SIZE, B> {
     }
 }
 
-impl<const SIZE: usize, B: DispersedBlobData> BlobSelect for FillSize<SIZE, B> {
+impl<const SIZE: usize, B: DispersedBlobInfo> BlobSelect for FillSize<SIZE, B> {
     type BlobId = B;
 
     type Settings = ();
