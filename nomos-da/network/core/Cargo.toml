@@ -17,6 +17,6 @@ log = "0.4"
 
 [dev-dependencies]
 tokio = { version = "1.39", features = ["macros", "rt-multi-thread", "time"] }
-libp2p = { version = "0.53", features = ["ed25519", "ping", "macros", "tokio", "tcp", "yamux", "tls", "plaintext", "quic"] }
+libp2p = { version = "0.53", features = ["ed25519", "ping", "macros", "tokio", "quic"] }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
