@@ -33,6 +33,10 @@ mod test {
             [0].into_iter().collect()
         }
 
+        fn is_allowed(&self, id: &Self::Id) -> bool {
+            true
+        }
+
         fn members_of(&self, _network_id: &Self::NetworkId) -> HashSet<Self::Id> {
             self.neighbours.clone()
         }
