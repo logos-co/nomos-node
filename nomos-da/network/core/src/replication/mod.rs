@@ -7,12 +7,12 @@ mod test {
     use std::time::Duration;
 
     use futures::StreamExt;
-    use libp2p::{Multiaddr, PeerId, quic, Swarm};
     use libp2p::identity::Keypair;
     use libp2p::swarm::SwarmEvent;
+    use libp2p::{quic, Multiaddr, PeerId, Swarm};
     use log::info;
-    use tracing_subscriber::EnvFilter;
     use tracing_subscriber::fmt::TestWriter;
+    use tracing_subscriber::EnvFilter;
 
     use nomos_da_messages::common::Blob;
     use subnetworks_assignations::MembershipHandler;

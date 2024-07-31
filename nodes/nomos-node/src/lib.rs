@@ -18,10 +18,10 @@ pub use nomos_core::{
 use nomos_da_verifier::backend::kzgrs::KzgrsDaVerifier;
 #[cfg(feature = "tracing")]
 use nomos_log::Logger;
-use nomos_mempool::{backend::mockpool::MockPool, TxMempoolService};
 use nomos_mempool::da::service::DaMempoolService;
 use nomos_mempool::da::verify::kzgrs::DaVerificationProvider as MempoolVerificationProvider;
 use nomos_mempool::network::adapters::libp2p::Libp2pAdapter as MempoolNetworkAdapter;
+use nomos_mempool::{backend::mockpool::MockPool, TxMempoolService};
 #[cfg(feature = "metrics")]
 use nomos_metrics::Metrics;
 use nomos_network::backends::libp2p::Libp2p as NetworkBackend;

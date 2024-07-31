@@ -6,10 +6,10 @@ use futures::Future;
 // crates
 use futures::future::BoxFuture;
 use futures::prelude::*;
-use libp2p::{Stream, StreamProtocol};
 use libp2p::core::upgrade::ReadyUpgrade;
-use libp2p::swarm::{ConnectionHandler, ConnectionHandlerEvent, SubstreamProtocol};
 use libp2p::swarm::handler::{ConnectionEvent, FullyNegotiatedInbound, FullyNegotiatedOutbound};
+use libp2p::swarm::{ConnectionHandler, ConnectionHandlerEvent, SubstreamProtocol};
+use libp2p::{Stream, StreamProtocol};
 use log::trace;
 use tracing::error;
 
