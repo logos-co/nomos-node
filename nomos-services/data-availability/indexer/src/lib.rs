@@ -10,12 +10,9 @@ use cryptarchia_consensus::network::NetworkAdapter;
 use cryptarchia_consensus::CryptarchiaConsensus;
 use futures::StreamExt;
 use nomos_core::block::Block;
-use nomos_core::da::certificate::metadata::Metadata;
-use nomos_core::da::certificate::vid::VidCertificate;
-use nomos_core::da::certificate::{BlobCertificateSelect, Certificate};
+use nomos_core::da::blob::{info::DispersedBlobInfo, metadata::Metadata, BlobSelect};
 use nomos_core::header::HeaderId;
 use nomos_core::tx::{Transaction, TxSelect};
-use nomos_mempool::verify::MempoolVerificationProvider;
 use nomos_mempool::{backend::MemPool, network::NetworkAdapter as MempoolAdapter};
 use nomos_storage::backends::StorageBackend;
 use nomos_storage::StorageService;
@@ -31,29 +28,8 @@ use storage::DaStorageAdapter;
 use tokio::sync::oneshot::Sender;
 use tracing::error;
 
-pub type ConsensusRelay<
-    A,
-    ClPool,
-    ClPoolAdapter,
-    DaPool,
-    DaPoolAdapter,
-    DaVerificationProvider,
-    TxS,
-    BS,
-    Storage,
-> = Relay<
-    CryptarchiaConsensus<
-        A,
-        ClPool,
-        ClPoolAdapter,
-        DaPool,
-        DaPoolAdapter,
-        DaVerificationProvider,
-        TxS,
-        BS,
-        Storage,
-    >,
->;
+pub type ConsensusRelay<A, ClPool, ClPoolAdapter, DaPool, DaPoolAdapter, TxS, BS, Storage> =
+    Relay<CryptarchiaConsensus<A, ClPool, ClPoolAdapter, DaPool, DaPoolAdapter, TxS, BS, Storage>>;
 
 pub struct DataIndexerService<
     B,
@@ -64,7 +40,6 @@ pub struct DataIndexerService<
     ClPoolAdapter,
     DaPool,
     DaPoolAdapter,
-    DaVerificationProvider,
     TxS,
     BS,
     ConsensusStorage,
@@ -75,34 +50,21 @@ pub struct DataIndexerService<
     ClPool: MemPool<BlockId = HeaderId>,
     DaPool: MemPool<BlockId = HeaderId>,
     DaPoolAdapter: MempoolAdapter<Key = DaPool::Key>,
-    DaPoolAdapter::Payload: Certificate + Into<DaPool::Item> + Debug,
-    DaVerificationProvider: MempoolVerificationProvider<
-        Payload = DaPoolAdapter::Payload,
-        Parameters = <DaPoolAdapter::Payload as Certificate>::VerificationParameters,
-    >,
+    DaPoolAdapter::Payload: DispersedBlobInfo + Into<DaPool::Item> + Debug,
     ClPool::Item: Clone + Eq + Hash + Debug + 'static,
     ClPool::Key: Debug + 'static,
     DaPool::Item: Metadata + Clone + Eq + Hash + Debug + 'static,
     DaPool::Key: Debug + 'static,
     A::Backend: 'static,
     TxS: TxSelect<Tx = ClPool::Item>,
-    BS: BlobCertificateSelect<Certificate = DaPool::Item>,
-    DaStorage: DaStorageAdapter<VID = DaPool::Item, Blob = B>,
+    BS: BlobSelect<BlobId = DaPool::Item>,
+    DaStorage: DaStorageAdapter<Info = DaPool::Item, Blob = B>,
     ConsensusStorage: StorageBackend + Send + Sync + 'static,
 {
     service_state: ServiceStateHandle<Self>,
     storage_relay: Relay<StorageService<DaStorage::Backend>>,
-    consensus_relay: ConsensusRelay<
-        A,
-        ClPool,
-        ClPoolAdapter,
-        DaPool,
-        DaPoolAdapter,
-        DaVerificationProvider,
-        TxS,
-        BS,
-        ConsensusStorage,
-    >,
+    consensus_relay:
+        ConsensusRelay<A, ClPool, ClPoolAdapter, DaPool, DaPoolAdapter, TxS, BS, ConsensusStorage>,
 }
 
 pub enum DaMsg<B, V: Metadata> {
@@ -140,7 +102,6 @@ impl<
         ClPoolAdapter,
         DaPool,
         DaPoolAdapter,
-        DaVerificationProvider,
         TxS,
         BS,
         ConsensusStorage,
@@ -154,7 +115,6 @@ impl<
         ClPoolAdapter,
         DaPool,
         DaPoolAdapter,
-        DaVerificationProvider,
         TxS,
         BS,
         ConsensusStorage,
@@ -166,19 +126,15 @@ where
     ClPool: MemPool<BlockId = HeaderId>,
     DaPool: MemPool<BlockId = HeaderId>,
     DaPoolAdapter: MempoolAdapter<Key = DaPool::Key>,
-    DaPoolAdapter::Payload: Certificate + Into<DaPool::Item> + Debug,
-    DaVerificationProvider: MempoolVerificationProvider<
-        Payload = DaPoolAdapter::Payload,
-        Parameters = <DaPoolAdapter::Payload as Certificate>::VerificationParameters,
-    >,
+    DaPoolAdapter::Payload: DispersedBlobInfo + Into<DaPool::Item> + Debug,
     ClPool::Item: Clone + Eq + Hash + Debug + 'static,
     ClPool::Key: Debug + 'static,
     DaPool::Item: Metadata + Clone + Eq + Hash + Debug + 'static,
     DaPool::Key: Debug + 'static,
     A::Backend: 'static,
     TxS: TxSelect<Tx = ClPool::Item>,
-    BS: BlobCertificateSelect<Certificate = DaPool::Item>,
-    DaStorage: DaStorageAdapter<VID = DaPool::Item, Blob = B>,
+    BS: BlobSelect<BlobId = DaPool::Item>,
+    DaStorage: DaStorageAdapter<Info = DaPool::Item, Blob = B>,
     ConsensusStorage: StorageBackend + Send + Sync + 'static,
 {
     const SERVICE_ID: ServiceId = "DaIndexer";
@@ -197,7 +153,6 @@ impl<
         ClPoolAdapter,
         DaPool,
         DaPoolAdapter,
-        DaVerificationProvider,
         TxS,
         BS,
         ConsensusStorage,
@@ -211,7 +166,6 @@ impl<
         ClPoolAdapter,
         DaPool,
         DaPoolAdapter,
-        DaVerificationProvider,
         TxS,
         BS,
         ConsensusStorage,
@@ -223,11 +177,7 @@ where
     ClPool: MemPool<BlockId = HeaderId>,
     DaPool: MemPool<BlockId = HeaderId>,
     DaPoolAdapter: MempoolAdapter<Key = DaPool::Key>,
-    DaPoolAdapter::Payload: Certificate + Into<DaPool::Item> + Debug,
-    DaVerificationProvider: MempoolVerificationProvider<
-        Payload = DaPoolAdapter::Payload,
-        Parameters = <DaPoolAdapter::Payload as Certificate>::VerificationParameters,
-    >,
+    DaPoolAdapter::Payload: DispersedBlobInfo + Into<DaPool::Item> + Debug,
     ClPool::Item: Clone + Eq + Hash + Debug + 'static,
     ClPool::Key: Debug + 'static,
     DaPool::Item: Metadata + Clone + Eq + Hash + Debug + 'static,
@@ -235,8 +185,8 @@ where
     <DaPool::Item as Metadata>::Index: Send + Sync,
     A::Backend: 'static,
     TxS: TxSelect<Tx = ClPool::Item>,
-    BS: BlobCertificateSelect<Certificate = DaPool::Item>,
-    DaStorage: DaStorageAdapter<VID = DaPool::Item, Blob = B>,
+    BS: BlobSelect<BlobId = DaPool::Item>,
+    DaStorage: DaStorageAdapter<Info = DaPool::Item, Blob = B>,
     ConsensusStorage: StorageBackend + Send + Sync + 'static,
 {
     async fn handle_new_block(
@@ -296,7 +246,6 @@ impl<
         ClPoolAdapter,
         DaPool,
         DaPoolAdapter,
-        DaVerificationProvider,
         TxS,
         BS,
         ConsensusStorage,
@@ -310,7 +259,6 @@ impl<
         ClPoolAdapter,
         DaPool,
         DaPoolAdapter,
-        DaVerificationProvider,
         TxS,
         BS,
         ConsensusStorage,
@@ -322,11 +270,7 @@ where
     ClPool: MemPool<BlockId = HeaderId>,
     DaPool: MemPool<BlockId = HeaderId>,
     DaPoolAdapter: MempoolAdapter<Key = DaPool::Key>,
-    DaPoolAdapter::Payload: Certificate + Into<DaPool::Item> + Debug,
-    DaVerificationProvider: MempoolVerificationProvider<
-        Payload = DaPoolAdapter::Payload,
-        Parameters = <DaPoolAdapter::Payload as Certificate>::VerificationParameters,
-    >,
+    DaPoolAdapter::Payload: DispersedBlobInfo + Into<DaPool::Item> + Debug,
     ClPool::Key: Debug + 'static,
     DaPool::Key: Debug + 'static,
     ClPool::Item: Transaction<Hash = ClPool::Key>
@@ -339,7 +283,7 @@ where
         + Send
         + Sync
         + 'static,
-    DaPool::Item: VidCertificate<CertificateId = DaPool::Key>
+    DaPool::Item: DispersedBlobInfo<BlobId = DaPool::Key>
         + Metadata
         + Debug
         + Clone
@@ -355,8 +299,8 @@ where
 
     A::Backend: 'static,
     TxS: TxSelect<Tx = ClPool::Item>,
-    BS: BlobCertificateSelect<Certificate = DaPool::Item>,
-    DaStorage: DaStorageAdapter<VID = DaPool::Item, Blob = B> + Send + Sync + 'static,
+    BS: BlobSelect<BlobId = DaPool::Item>,
+    DaStorage: DaStorageAdapter<Info = DaPool::Item, Blob = B> + Send + Sync + 'static,
     DaStorage::Settings: Clone + Send + Sync + 'static,
     ConsensusStorage: StorageBackend + Send + Sync + 'static,
     Consensus: ConsensusAdapter<Tx = ClPool::Item, Cert = DaPool::Item> + Send + Sync,
