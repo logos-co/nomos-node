@@ -1,16 +1,16 @@
 // std
 use std::collections::{HashMap, HashSet, VecDeque};
-use std::task::{Context, Poll};
+use std::task::{Context, Poll, Waker};
 
 // crates
 use either::Either;
 use indexmap::IndexSet;
+use libp2p::{Multiaddr, PeerId};
 use libp2p::core::Endpoint;
 use libp2p::swarm::{
     ConnectionDenied, ConnectionId, FromSwarm, NetworkBehaviour, NotifyHandler, THandler,
     THandlerInEvent, THandlerOutEvent, ToSwarm,
 };
-use libp2p::{Multiaddr, PeerId};
 use log::{error, trace};
 
 use subnetworks_assignations::MembershipHandler;
@@ -49,6 +49,8 @@ pub struct ReplicationBehaviour<Membership> {
     /// Seen messages cache holds a record of seen messages, messages will be removed from this
     /// set after some time to keep it
     seen_message_cache: IndexSet<(Vec<u8>, SubnetworkId)>,
+    /// Waker that handles polling
+    waker: Option<Waker>,
 }
 
 impl<Membership> ReplicationBehaviour<Membership> {
@@ -59,6 +61,7 @@ impl<Membership> ReplicationBehaviour<Membership> {
             connected: Default::default(),
             outgoing_events: Default::default(),
             seen_message_cache: Default::default(),
+            waker: None,
         }
     }
 }
@@ -115,6 +118,13 @@ where
                     message: message.clone(),
                 }),
             })
+        }
+        self.try_wake();
+    }
+
+    pub fn try_wake(&mut self) {
+        if let Some(waker) = self.waker.take() {
+            waker.wake();
         }
     }
 }
@@ -178,6 +188,7 @@ where
                 todo!("Retry?")
             }
         }
+        self.try_wake();
     }
 
     fn poll(
@@ -187,8 +198,7 @@ where
         if let Some(event) = self.outgoing_events.pop_front() {
             Poll::Ready(event)
         } else {
-            // poll whenever the executor wants to
-            cx.waker().wake_by_ref();
+            self.waker = Some(cx.waker().clone());
             Poll::Pending
         }
     }
