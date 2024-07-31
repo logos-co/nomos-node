@@ -1,7 +1,9 @@
+// std
 use std::io::Error;
 use std::task::{Context, Poll};
 
 use futures::Future;
+// crates
 use futures::future::BoxFuture;
 use futures::prelude::*;
 use libp2p::{Stream, StreamProtocol};
@@ -11,6 +13,7 @@ use libp2p::swarm::handler::{ConnectionEvent, FullyNegotiatedInbound, FullyNegot
 use log::trace;
 use tracing::error;
 
+// internal
 use nomos_da_messages::{pack_message, unpack_from_reader};
 
 use crate::protocol::PROTOCOL_NAME;
@@ -216,8 +219,7 @@ impl ConnectionHandler for ReplicationHandler {
             _ => {}
         }
         // poll again whenever the executor wants to
-        let waker = cx.waker().clone();
-        waker.wake();
+        cx.waker().wake_by_ref();
         Poll::Pending
     }
 

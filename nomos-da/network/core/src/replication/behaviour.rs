@@ -1,6 +1,8 @@
+// std
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::task::{Context, Poll};
 
+// crates
 use either::Either;
 use indexmap::IndexSet;
 use libp2p::{Multiaddr, PeerId};
@@ -15,6 +17,7 @@ use subnetworks_assignations::MembershipHandler;
 
 use crate::SubnetworkId;
 
+// internal
 use super::handler::{
     BehaviourEventToHandler, DaMessage, HandlerEventToBehaviour, ReplicationHandler,
 };
