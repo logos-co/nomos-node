@@ -5,12 +5,12 @@ use std::task::{Context, Poll, Waker};
 // crates
 use either::Either;
 use indexmap::IndexSet;
+use libp2p::{Multiaddr, PeerId};
 use libp2p::core::Endpoint;
 use libp2p::swarm::{
     ConnectionDenied, ConnectionId, FromSwarm, NetworkBehaviour, NotifyHandler, THandler,
     THandlerInEvent, THandlerOutEvent, ToSwarm,
 };
-use libp2p::{Multiaddr, PeerId};
 use log::{error, trace};
 
 use subnetworks_assignations::MembershipHandler;
