@@ -3,7 +3,7 @@ use std::marker::PhantomData;
 // crates
 
 // internal
-use crate::da::certificate::{vid::VidCertificate, BlobCertificateSelect};
+use crate::da::blob::{vid::DispersedBlobData, BlobSelect};
 use crate::utils;
 
 #[derive(Default, Clone, Copy)]
@@ -19,8 +19,8 @@ impl<const SIZE: usize, B> FillSize<SIZE, B> {
     }
 }
 
-impl<const SIZE: usize, C: VidCertificate> BlobCertificateSelect for FillSize<SIZE, C> {
-    type Certificate = C;
+impl<const SIZE: usize, B: DispersedBlobData> BlobSelect for FillSize<SIZE, B> {
+    type BlobId = B;
 
     type Settings = ();
 
@@ -28,13 +28,10 @@ impl<const SIZE: usize, C: VidCertificate> BlobCertificateSelect for FillSize<SI
         FillSize::new()
     }
 
-    fn select_blob_from<'i, I: Iterator<Item = Self::Certificate> + 'i>(
+    fn select_blob_from<'i, I: Iterator<Item = Self::BlobId> + 'i>(
         &self,
         certificates: I,
-    ) -> impl Iterator<Item = Self::Certificate> + 'i {
-        utils::select::select_from_till_fill_size::<SIZE, Self::Certificate>(
-            |c| c.size(),
-            certificates,
-        )
+    ) -> impl Iterator<Item = Self::BlobId> + 'i {
+        utils::select::select_from_till_fill_size::<SIZE, Self::BlobId>(|c| c.size(), certificates)
     }
 }
