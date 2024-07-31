@@ -7,9 +7,8 @@ use cryptarchia_engine::Slot;
 use cryptarchia_ledger::{Coin, LeaderProof, LedgerState};
 use futures::StreamExt;
 use network::{messages::NetworkMessage, NetworkAdapter};
-use nomos_core::da::certificate::{
-    metadata::Metadata as CertificateMetadata, vid::VidCertificate, BlobCertificateSelect,
-    Certificate,
+use nomos_core::da::blob::{
+    info::DispersedBlobInfo, metadata::Metadata as BlobMetadata, BlobSelect,
 };
 use nomos_core::header::{cryptarchia::Header, HeaderId};
 use nomos_core::tx::{Transaction, TxSelect};
@@ -17,7 +16,6 @@ use nomos_core::{
     block::{builder::BlockBuilder, Block},
     header::cryptarchia::Builder,
 };
-use nomos_mempool::verify::MempoolVerificationProvider;
 use nomos_mempool::{
     backend::MemPool, network::NetworkAdapter as MempoolAdapter, DaMempoolService, MempoolMsg,
     TxMempoolService,
@@ -136,34 +134,21 @@ impl<Ts, Bs> CryptarchiaSettings<Ts, Bs> {
     }
 }
 
-pub struct CryptarchiaConsensus<
-    A,
-    ClPool,
-    ClPoolAdapter,
-    DaPool,
-    DaPoolAdapter,
-    DaVerificationProvider,
-    TxS,
-    BS,
-    Storage,
-> where
+pub struct CryptarchiaConsensus<A, ClPool, ClPoolAdapter, DaPool, DaPoolAdapter, TxS, BS, Storage>
+where
     A: NetworkAdapter,
     ClPoolAdapter: MempoolAdapter<Payload = ClPool::Item, Key = ClPool::Key>,
     ClPool: MemPool<BlockId = HeaderId>,
     DaPool: MemPool<BlockId = HeaderId>,
     DaPoolAdapter: MempoolAdapter<Key = DaPool::Key>,
-    DaPoolAdapter::Payload: Certificate + Into<DaPool::Item> + Debug,
-    DaVerificationProvider: MempoolVerificationProvider<
-        Payload = DaPoolAdapter::Payload,
-        Parameters = <DaPoolAdapter::Payload as Certificate>::VerificationParameters,
-    >,
+    DaPoolAdapter::Payload: DispersedBlobInfo + Into<DaPool::Item> + Debug,
     ClPool::Item: Clone + Eq + Hash + Debug + 'static,
     ClPool::Key: Debug + 'static,
     DaPool::Item: Clone + Eq + Hash + Debug + 'static,
     DaPool::Key: Debug + 'static,
     A::Backend: 'static,
     TxS: TxSelect<Tx = ClPool::Item>,
-    BS: BlobCertificateSelect<Certificate = DaPool::Item>,
+    BS: BlobSelect<BlobId = DaPool::Item>,
     Storage: StorageBackend + Send + Sync + 'static,
 {
     service_state: ServiceStateHandle<Self>,
@@ -171,24 +156,13 @@ pub struct CryptarchiaConsensus<
     // when implementing ServiceCore for CryptarchiaConsensus
     network_relay: Relay<NetworkService<A::Backend>>,
     cl_mempool_relay: Relay<TxMempoolService<ClPoolAdapter, ClPool>>,
-    da_mempool_relay: Relay<DaMempoolService<DaPoolAdapter, DaPool, DaVerificationProvider>>,
+    da_mempool_relay: Relay<DaMempoolService<DaPoolAdapter, DaPool>>,
     block_subscription_sender: broadcast::Sender<Block<ClPool::Item, DaPool::Item>>,
     storage_relay: Relay<StorageService<Storage>>,
 }
 
-impl<A, ClPool, ClPoolAdapter, DaPool, DaPoolAdapter, DaVerificationProvider, TxS, BS, Storage>
-    ServiceData
-    for CryptarchiaConsensus<
-        A,
-        ClPool,
-        ClPoolAdapter,
-        DaPool,
-        DaPoolAdapter,
-        DaVerificationProvider,
-        TxS,
-        BS,
-        Storage,
-    >
+impl<A, ClPool, ClPoolAdapter, DaPool, DaPoolAdapter, TxS, BS, Storage> ServiceData
+    for CryptarchiaConsensus<A, ClPool, ClPoolAdapter, DaPool, DaPoolAdapter, TxS, BS, Storage>
 where
     A: NetworkAdapter,
     ClPool: MemPool<BlockId = HeaderId>,
@@ -199,13 +173,9 @@ where
     DaPool::Key: Debug,
     ClPoolAdapter: MempoolAdapter<Payload = ClPool::Item, Key = ClPool::Key>,
     DaPoolAdapter: MempoolAdapter<Key = DaPool::Key>,
-    DaPoolAdapter::Payload: Certificate + Into<DaPool::Item> + Debug,
-    DaVerificationProvider: MempoolVerificationProvider<
-        Payload = DaPoolAdapter::Payload,
-        Parameters = <DaPoolAdapter::Payload as Certificate>::VerificationParameters,
-    >,
+    DaPoolAdapter::Payload: DispersedBlobInfo + Into<DaPool::Item> + Debug,
     TxS: TxSelect<Tx = ClPool::Item>,
-    BS: BlobCertificateSelect<Certificate = DaPool::Item>,
+    BS: BlobSelect<BlobId = DaPool::Item>,
     Storage: StorageBackend + Send + Sync + 'static,
 {
     const SERVICE_ID: ServiceId = CRYPTARCHIA_ID;
@@ -216,19 +186,8 @@ where
 }
 
 #[async_trait::async_trait]
-impl<A, ClPool, ClPoolAdapter, DaPool, DaPoolAdapter, DaVerificationProvider, TxS, BS, Storage>
-    ServiceCore
-    for CryptarchiaConsensus<
-        A,
-        ClPool,
-        ClPoolAdapter,
-        DaPool,
-        DaPoolAdapter,
-        DaVerificationProvider,
-        TxS,
-        BS,
-        Storage,
-    >
+impl<A, ClPool, ClPoolAdapter, DaPool, DaPoolAdapter, TxS, BS, Storage> ServiceCore
+    for CryptarchiaConsensus<A, ClPool, ClPoolAdapter, DaPool, DaPoolAdapter, TxS, BS, Storage>
 where
     A: NetworkAdapter<Tx = ClPool::Item, BlobCertificate = DaPool::Item>
         + Clone
@@ -250,8 +209,8 @@ where
         + Sync
         + 'static,
     // TODO: Change to specific certificate bounds here
-    DaPool::Item: VidCertificate<CertificateId = DaPool::Key>
-        + CertificateMetadata
+    DaPool::Item: DispersedBlobInfo<BlobId = DaPool::Key>
+        + BlobMetadata
         + Debug
         + Clone
         + Eq
@@ -266,16 +225,10 @@ where
     ClPoolAdapter:
         MempoolAdapter<Payload = ClPool::Item, Key = ClPool::Key> + Send + Sync + 'static,
     DaPoolAdapter: MempoolAdapter<Key = DaPool::Key> + Send + Sync + 'static,
-    DaPoolAdapter::Payload: Certificate + Into<DaPool::Item> + Debug,
-    DaVerificationProvider: MempoolVerificationProvider<
-            Payload = DaPoolAdapter::Payload,
-            Parameters = <DaPoolAdapter::Payload as Certificate>::VerificationParameters,
-        > + Send
-        + Sync
-        + 'static,
+    DaPoolAdapter::Payload: DispersedBlobInfo + Into<DaPool::Item> + Debug,
     TxS: TxSelect<Tx = ClPool::Item> + Clone + Send + Sync + 'static,
     TxS::Settings: Send + Sync + 'static,
-    BS: BlobCertificateSelect<Certificate = DaPool::Item> + Clone + Send + Sync + 'static,
+    BS: BlobSelect<BlobId = DaPool::Item> + Clone + Send + Sync + 'static,
     BS::Settings: Send + Sync + 'static,
     Storage: StorageBackend + Send + Sync + 'static,
 {
@@ -414,18 +367,8 @@ where
     }
 }
 
-impl<A, ClPool, ClPoolAdapter, DaPool, DaPoolAdapter, DaVerificationProvider, TxS, BS, Storage>
-    CryptarchiaConsensus<
-        A,
-        ClPool,
-        ClPoolAdapter,
-        DaPool,
-        DaPoolAdapter,
-        DaVerificationProvider,
-        TxS,
-        BS,
-        Storage,
-    >
+impl<A, ClPool, ClPoolAdapter, DaPool, DaPoolAdapter, TxS, BS, Storage>
+    CryptarchiaConsensus<A, ClPool, ClPoolAdapter, DaPool, DaPoolAdapter, TxS, BS, Storage>
 where
     A: NetworkAdapter + Clone + Send + Sync + 'static,
     ClPool: MemPool<BlockId = HeaderId> + Send + Sync + 'static,
@@ -442,8 +385,8 @@ where
         + Send
         + Sync
         + 'static,
-    DaPool::Item: VidCertificate<CertificateId = DaPool::Key>
-        + CertificateMetadata
+    DaPool::Item: DispersedBlobInfo<BlobId = DaPool::Key>
+        + BlobMetadata
         + Debug
         + Clone
         + Eq
@@ -454,19 +397,13 @@ where
         + Sync
         + 'static,
     TxS: TxSelect<Tx = ClPool::Item> + Clone + Send + Sync + 'static,
-    BS: BlobCertificateSelect<Certificate = DaPool::Item> + Clone + Send + Sync + 'static,
+    BS: BlobSelect<BlobId = DaPool::Item> + Clone + Send + Sync + 'static,
     ClPool::Key: Debug + Send + Sync,
     DaPool::Key: Debug + Send + Sync,
     ClPoolAdapter:
         MempoolAdapter<Payload = ClPool::Item, Key = ClPool::Key> + Send + Sync + 'static,
     DaPoolAdapter: MempoolAdapter<Key = DaPool::Key> + Send + Sync + 'static,
-    DaPoolAdapter::Payload: Certificate + Into<DaPool::Item> + Debug,
-    DaVerificationProvider: MempoolVerificationProvider<
-            Payload = DaPoolAdapter::Payload,
-            Parameters = <DaPoolAdapter::Payload as Certificate>::VerificationParameters,
-        > + Send
-        + Sync
-        + 'static,
+    DaPoolAdapter::Payload: DispersedBlobInfo + Into<DaPool::Item> + Debug,
     Storage: StorageBackend + Send + Sync + 'static,
 {
     async fn should_stop_service(message: LifecycleMessage) -> bool {
@@ -578,7 +515,7 @@ where
 
                 mark_in_block(
                     da_mempool_relay,
-                    block.blobs().map(VidCertificate::certificate_id),
+                    block.blobs().map(DispersedBlobInfo::blob_id),
                     id,
                 )
                 .await;
