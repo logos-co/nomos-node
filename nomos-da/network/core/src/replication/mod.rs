@@ -39,7 +39,7 @@ mod test {
     }
 
     #[tokio::test]
-    async fn test_close_connection() {
+    async fn test_connects_and_receives_replication_messages() {
         fn get_swarm(
             key: Keypair,
             all_neighbours: AllNeighbours,
@@ -154,6 +154,6 @@ mod test {
             _ = join2 => {
                 panic!("task two should not finish before 1");
             }
-        };
+        }
     }
 }
