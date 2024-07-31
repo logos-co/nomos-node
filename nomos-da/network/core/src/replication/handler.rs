@@ -4,16 +4,14 @@ use std::task::{Context, Poll};
 use futures::Future;
 use futures::future::BoxFuture;
 use futures::prelude::*;
-use libp2p::{PeerId, Stream, StreamProtocol};
+use libp2p::{Stream, StreamProtocol};
 use libp2p::core::upgrade::ReadyUpgrade;
 use libp2p::swarm::{ConnectionHandler, ConnectionHandlerEvent, SubstreamProtocol};
 use libp2p::swarm::handler::{ConnectionEvent, FullyNegotiatedInbound, FullyNegotiatedOutbound};
-use log::{info, trace};
-use tracing::{debug, error};
-use tracing::field::debug;
+use log::trace;
+use tracing::error;
 
 use nomos_da_messages::{pack_message, unpack_from_reader};
-use nomos_da_messages::common::Blob;
 
 use crate::protocol::PROTOCOL_NAME;
 
@@ -57,7 +55,6 @@ enum OutboundState {
 /// Broadcasting handler for the broadcast protocol
 /// Forwards and read messages
 pub struct ReplicationHandler {
-    local_peer_id: PeerId,
     // incoming messages stream
     inbound: Option<BoxFuture<'static, Result<(DaMessage, Stream), Error>>>,
     // outgoing messages stream
@@ -67,13 +64,18 @@ pub struct ReplicationHandler {
 }
 
 impl ReplicationHandler {
-    pub fn new(local_peer_id: PeerId) -> Self {
+    pub fn new() -> Self {
         Self {
-            local_peer_id,
             inbound: None,
             outbound: None,
             outgoing_messages: Default::default(),
         }
+    }
+}
+
+impl Default for ReplicationHandler {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -82,47 +84,29 @@ impl ReplicationHandler {
         &mut self,
         mut stream: Stream,
     ) -> impl Future<Output = Result<Stream, Error>> {
-        debug!("Sending messages");
+        trace!("Sending messages");
         let mut pending_messages = Vec::new();
         std::mem::swap(&mut self.outgoing_messages, &mut pending_messages);
         async {
-            debug!("Writing {} messages", pending_messages.len());
+            trace!("Writing {} messages", pending_messages.len());
             for message in pending_messages {
                 let bytes = pack_message(&message)?;
                 stream.write_all(&bytes).await?;
+                stream.flush().await?;
             }
-            stream.flush().await?;
             Ok(stream)
         }
-        // async {
-        //     stream.write_all(b"FOOBAR").await?;
-        //     stream.flush().await?;
-        //     Ok(stream)
-        // }
     }
 
     fn read_message(
         &mut self,
         mut stream: Stream,
     ) -> impl Future<Output = Result<(DaMessage, Stream), Error>> {
+        trace!("Reading messages");
         async move {
             let msg: DaMessage = unpack_from_reader(&mut stream).await?;
             Ok((msg, stream))
         }
-        // async move {
-        //     let mut buff = b"FOOBAR".to_vec();
-        //     stream.read_exact(&mut buff).await?;
-        //     Ok((
-        //         DaMessage {
-        //             blob: Some(Blob {
-        //                 blob_id: buff.to_vec(),
-        //                 data: buff,
-        //             }),
-        //             subnetwork_id: 0,
-        //         },
-        //         stream,
-        //     ))
-        // }
     }
 
     fn poll_pending_incoming_messages(
@@ -130,8 +114,8 @@ impl ReplicationHandler {
         cx: &mut Context<'_>,
     ) -> Option<Result<DaMessage, Error>> {
         match self.inbound.take() {
-            Some(mut fut) => {
-                let mut read = std::pin::pin!(&mut fut);
+            Some(mut future) => {
+                let mut read = std::pin::pin!(&mut future);
                 match read.poll_unpin(cx) {
                     Poll::Ready(Ok((message, stream))) => {
                         self.inbound = Some(self.read_message(stream).boxed());
@@ -139,7 +123,7 @@ impl ReplicationHandler {
                     }
                     Poll::Ready(Err(e)) => Some(Err(e)),
                     Poll::Pending => {
-                        self.inbound = Some(fut);
+                        self.inbound = Some(future);
                         None
                     }
                 }
@@ -170,7 +154,6 @@ impl ReplicationHandler {
             }
             Some(OutboundState::Sending(mut future)) => match future.poll_unpin(cx) {
                 Poll::Ready(Ok(stream)) => {
-                    info!("Finished sending messages");
                     self.outbound = Some(OutboundState::Idle(stream));
                 }
                 Poll::Ready(Err(e)) => {
@@ -222,23 +205,26 @@ impl ConnectionHandler for ReplicationHandler {
             _ => {}
         };
         match self.poll_pending_incoming_messages(cx) {
-            None => {}
             Some(Ok(message)) => {
                 return Poll::Ready(ConnectionHandlerEvent::NotifyBehaviour(
                     HandlerEventToBehaviour::IncomingMessage { message },
                 ));
             }
             Some(Err(e)) => {
-                debug!("Incoming DA message error {e}");
+                error!("Incoming DA message error {e}");
             }
+            _ => {}
         }
+        // poll again whenever the executor wants to
+        let waker = cx.waker().clone();
+        waker.wake();
         Poll::Pending
     }
 
     fn on_behaviour_event(&mut self, event: Self::FromBehaviour) {
         match event {
             BehaviourEventToHandler::OutgoingMessage { message } => {
-                info!("Received outgoing message");
+                trace!("Received outgoing message");
                 self.outgoing_messages.push(message);
             }
         }
@@ -259,17 +245,18 @@ impl ConnectionHandler for ReplicationHandler {
                 protocol: stream,
                 info: _,
             }) => {
-                debug!("Received inbound stream");
+                trace!("Received inbound stream");
                 self.inbound = Some(self.read_message(stream).boxed());
             }
             ConnectionEvent::FullyNegotiatedOutbound(FullyNegotiatedOutbound {
                 protocol: stream,
                 info: _,
             }) => {
-                debug!("Received outbound stream");
+                trace!("Received outbound stream");
                 self.outbound = Some(OutboundState::Idle(stream));
             }
             ConnectionEvent::DialUpgradeError(error) => {
+                trace!("Upgrage error: {error:?}");
                 if is_outbound {
                     self.outbound = None;
                 }

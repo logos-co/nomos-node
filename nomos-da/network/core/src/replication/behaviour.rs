@@ -9,7 +9,7 @@ use libp2p::swarm::{
     ConnectionDenied, ConnectionId, FromSwarm, NetworkBehaviour, NotifyHandler, THandler,
     THandlerInEvent, THandlerOutEvent, ToSwarm,
 };
-use log::{error, info, trace};
+use log::{error, trace};
 
 use subnetworks_assignations::MembershipHandler;
 
@@ -136,7 +136,7 @@ where
         }
         trace!("{}, Connected to {peer_id}", self.local_peer_id);
         self.connected.insert(peer_id, connection_id);
-        Ok(Either::Left(ReplicationHandler::new(self.local_peer_id)))
+        Ok(Either::Left(ReplicationHandler::new()))
     }
 
     fn handle_established_outbound_connection(
@@ -148,7 +148,7 @@ where
     ) -> Result<THandler<Self>, ConnectionDenied> {
         trace!("{}, Connected to {peer_id}", self.local_peer_id);
         self.connected.insert(peer_id, connection_id);
-        Ok(Either::Left(ReplicationHandler::new(self.local_peer_id)))
+        Ok(Either::Left(ReplicationHandler::new()))
     }
 
     fn on_swarm_event(&mut self, _event: FromSwarm) {}
@@ -179,11 +179,13 @@ where
 
     fn poll(
         &mut self,
-        _cx: &mut Context<'_>,
+        cx: &mut Context<'_>,
     ) -> Poll<ToSwarm<Self::ToSwarm, THandlerInEvent<Self>>> {
         if let Some(event) = self.outgoing_events.pop_front() {
             Poll::Ready(event)
         } else {
+            // poll whenever the executor wants to
+            cx.waker().wake_by_ref();
             Poll::Pending
         }
     }
