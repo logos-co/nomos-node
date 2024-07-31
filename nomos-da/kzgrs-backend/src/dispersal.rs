@@ -239,7 +239,7 @@ impl AsRef<[u8]> for Index {
 
 #[cfg(test)]
 mod tests {
-    use super::{Certificate, CertificateVerificationParameters};
+    use super::{Certificate, CertificateVerificationParameters, Index, VidCertificate};
     use crate::common::build_attestation_message;
     use crate::{
         common::{attestation::Attestation, blob::DaBlob, NOMOS_DA_DST},
@@ -253,6 +253,8 @@ mod tests {
     use bitvec::prelude::*;
     use blst::min_sig::{PublicKey, SecretKey};
     use kzgrs::KzgRsError;
+    use nomos_core::da::certificate::metadata::{Metadata as TraitMetadata, Next};
+    use nomos_core::da::certificate::vid::VidCertificate as TraitVidCertificate;
     use nomos_core::da::certificate::Certificate as TraitCertificate;
     use rand::{rngs::OsRng, thread_rng, Rng, RngCore};
     use std::hash::{DefaultHasher, Hash};
@@ -565,5 +567,44 @@ mod tests {
             nodes_public_keys: public_keys,
         };
         assert!(<Certificate as TraitCertificate>::verify(&cert, params));
+
+        // Check metadata size
+        let metadata_size2 = cert.metadata.size();
+        let metadata = Metadata::default();
+        let metadata_size =
+            std::mem::size_of_val(&metadata.app_id) + std::mem::size_of_val(&metadata.index);
+        assert_eq!(metadata_size2, metadata_size);
+
+        // Create VidCertificate
+        let vid_cert = VidCertificate::from(cert.clone());
+
+        // Test generate hash for VidCertificate
+        let mut default_hasher = DefaultHasher::new();
+        let _hash = <VidCertificate as Hash>::hash(&vid_cert, &mut default_hasher);
+
+        // Test get id
+        assert_eq!(vid_cert.certificate_id(), vid_cert.id);
+
+        // Check VidCertificate size
+        let vid_cert_size2 = vid_cert.size();
+        let vid_cert_size = std::mem::size_of_val(&vid_cert.id) + metadata_size;
+        assert_eq!(vid_cert_size2, vid_cert_size);
+
+        // Test get metadata for VidCertificate
+        let (vid_app_id2, vid_index2) = vid_cert.metadata();
+        let orig_app_id = cert.metadata.app_id;
+        let orig_index = cert.metadata.index;
+        assert_eq!(vid_app_id2, orig_app_id);
+        assert_eq!(vid_index2, orig_index);
+
+        // Create Index and test get next Index method
+        let index = Index::from(32u64);
+        let next_index2 = index.next();
+
+        let num = u64::from_be_bytes(index.0);
+        let incremented_num = num.wrapping_add(1);
+        let next_index = Index(incremented_num.to_be_bytes());
+
+        assert_eq!(next_index2.as_ref(), next_index.as_ref());
     }
 }
