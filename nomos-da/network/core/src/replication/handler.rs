@@ -16,7 +16,7 @@ use tracing::error;
 // internal
 use nomos_da_messages::{pack_message, unpack_from_reader};
 
-use crate::protocol::PROTOCOL_NAME;
+use crate::protocol::REPLICATION_PROTOCOL;
 
 pub type DaMessage = nomos_da_messages::replication::ReplicationReq;
 
@@ -185,7 +185,7 @@ impl ConnectionHandler for ReplicationHandler {
     type OutboundOpenInfo = ();
 
     fn listen_protocol(&self) -> SubstreamProtocol<Self::InboundProtocol, Self::InboundOpenInfo> {
-        SubstreamProtocol::new(ReadyUpgrade::new(PROTOCOL_NAME), ())
+        SubstreamProtocol::new(ReadyUpgrade::new(REPLICATION_PROTOCOL), ())
     }
 
     fn poll(
