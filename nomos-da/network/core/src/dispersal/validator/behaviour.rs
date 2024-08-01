@@ -1,9 +1,9 @@
-use std::io::Error;
-use crate::protocol::PROTOCOL_NAME;
-use crate::replication::handler::DaMessage;
+use crate::protocol::DISPERSAL_PROTOCOL;
+use crate::SubnetworkId;
 use either::Either;
+use futures::future::BoxFuture;
 use futures::stream::FuturesUnordered;
-use futures::StreamExt;
+use futures::{AsyncWriteExt, FutureExt, StreamExt};
 use libp2p::core::Endpoint;
 use libp2p::swarm::{
     ConnectionDenied, ConnectionId, FromSwarm, NetworkBehaviour, THandler, THandlerInEvent,
@@ -11,55 +11,56 @@ use libp2p::swarm::{
 };
 use libp2p::{Multiaddr, PeerId, Stream};
 use libp2p_stream::IncomingStreams;
+use log::debug;
+use nomos_da_messages::dispersal::dispersal_res::MessageType;
+use nomos_da_messages::dispersal::{DispersalReq, DispersalRes};
+use nomos_da_messages::{pack_message, unpack_from_reader};
+use std::io::Error;
 use std::task::{Context, Poll};
 use subnetworks_assignations::MembershipHandler;
 
-pub enum DispersalEvent {}
+pub enum DispersalEvent {
+    IncomingMessage { message: DispersalReq },
+}
 pub struct DispersalValidatorBehaviour<Membership> {
     stream_behaviour: libp2p_stream::Behaviour,
-    stream_control: libp2p_stream::Control,
     incoming_streams: IncomingStreams,
-    tasks: FuturesUnordered<DaMessage>,
+    tasks: FuturesUnordered<BoxFuture<'static, Result<(DispersalReq, Stream), Error>>>,
     membership: Membership,
 }
 
 impl<Membership: MembershipHandler> DispersalValidatorBehaviour<Membership> {
     pub fn new(membership: Membership) -> Self {
-        let mut stream_behaviour = libp2p_stream::Behaviour::new();
+        let stream_behaviour = libp2p_stream::Behaviour::new();
         let mut stream_control = stream_behaviour.new_control();
         let incoming_streams = stream_control
-            .accept(PROTOCOL_NAME)
+            .accept(DISPERSAL_PROTOCOL)
             .expect("Just a single accept to protocol is valid");
         let tasks = FuturesUnordered::new();
         Self {
             stream_behaviour,
-            stream_control,
             incoming_streams,
             tasks,
             membership,
         }
     }
 
-    async fn handle_new_stream(stream: Stream) -> Result<(DaMessage, Stream), Error> {
-        stream.
-    }
-
-    async fn on_poll(&mut self) {
-        let Self {
-            incoming_streams,
-            tasks,
-            ..
-        } = &mut self;
-        tokio::select! {
-            new_stream = incoming_streams => {
-                tasks.push(self.handle_stream(new_stream));
-            }
-            stream_event =
-        }
+    async fn handle_new_stream(mut stream: Stream) -> Result<(DispersalReq, Stream), Error> {
+        let message: DispersalReq = unpack_from_reader(&mut stream).await?;
+        let blob_id = message.blob.clone().unwrap().blob_id;
+        let response = DispersalRes {
+            message_type: Some(MessageType::BlobId(blob_id)),
+        };
+        let message_bytes = pack_message(&response)?;
+        stream.write_all(&message_bytes).await?;
+        stream.flush().await?;
+        Ok((message, stream))
     }
 }
 
-impl<M: MembershipHandler> NetworkBehaviour for DispersalValidatorBehaviour<M> {
+impl<M: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'static> NetworkBehaviour
+    for DispersalValidatorBehaviour<M>
+{
     type ConnectionHandler = Either<
         <libp2p_stream::Behaviour as NetworkBehaviour>::ConnectionHandler,
         libp2p::swarm::dummy::ConnectionHandler,
@@ -112,6 +113,26 @@ impl<M: MembershipHandler> NetworkBehaviour for DispersalValidatorBehaviour<M> {
         &mut self,
         cx: &mut Context<'_>,
     ) -> Poll<ToSwarm<Self::ToSwarm, THandlerInEvent<Self>>> {
-        unimplemented!()
+        let Self {
+            incoming_streams,
+            tasks,
+            ..
+        } = self;
+        match tasks.poll_next_unpin(cx) {
+            Poll::Ready(Some(Ok((message, stream)))) => {
+                tasks.push(Self::handle_new_stream(stream).boxed());
+                return Poll::Ready(ToSwarm::GenerateEvent(DispersalEvent::IncomingMessage {
+                    message,
+                }));
+            }
+            Poll::Ready(Some(Err(error))) => {
+                debug!("Error on dispersal stream {error:?}");
+            }
+            _ => {}
+        }
+        if let Poll::Ready(Some((_peer_id, stream))) = incoming_streams.poll_next_unpin(cx) {
+            tasks.push(Self::handle_new_stream(stream).boxed());
+        }
+        Poll::Pending
     }
 }
