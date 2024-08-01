@@ -33,7 +33,7 @@ mod test {
             [0].into_iter().collect()
         }
 
-        fn is_allowed(&self, id: &Self::Id) -> bool {
+        fn is_allowed(&self, _id: &Self::Id) -> bool {
             true
         }
 
