@@ -6,10 +6,6 @@ use std::sync::atomic::Ordering::SeqCst;
 use std::sync::Arc;
 use std::time::Duration;
 // crates
-use blake2::{
-    digest::{Update, VariableOutput},
-    Blake2bVar,
-};
 use bytes::Bytes;
 use cryptarchia_consensus::ConsensusMsg;
 use cryptarchia_consensus::TimeConfig;
@@ -17,7 +13,6 @@ use cryptarchia_ledger::{Coin, LedgerState};
 use full_replication::{BlobInfo, Metadata};
 use nomos_core::da::blob::info::DispersedBlobInfo;
 use nomos_core::da::blob::metadata::Metadata as _;
-use nomos_core::da::Signer;
 use nomos_core::tx::Transaction;
 use nomos_da_indexer::storage::adapters::rocksdb::RocksAdapterSettings;
 use nomos_da_indexer::IndexerSettings;
@@ -299,12 +294,4 @@ fn test_indexer() {
         std::thread::sleep(std::time::Duration::from_millis(200));
     }
     assert!(is_success_rx.load(SeqCst));
-}
-
-struct MockKeyPair;
-
-impl Signer for MockKeyPair {
-    fn sign(&self, _message: &[u8]) -> Vec<u8> {
-        vec![]
-    }
 }
