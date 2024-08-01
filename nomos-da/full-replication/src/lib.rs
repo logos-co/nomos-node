@@ -1,4 +1,5 @@
 // std
+use std::hash::{Hash, Hasher};
 // crates
 use bytes::Bytes;
 use nomos_core::da::blob::info::DispersedBlobInfo;
@@ -40,6 +41,12 @@ impl Metadata {
 pub struct BlobInfo {
     id: [u8; 32],
     metadata: Metadata,
+}
+
+impl Hash for BlobInfo {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        state.write(<BlobInfo as DispersedBlobInfo>::blob_id(self).as_ref());
+    }
 }
 
 impl DispersedBlobInfo for BlobInfo {

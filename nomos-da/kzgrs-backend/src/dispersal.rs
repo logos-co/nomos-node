@@ -1,4 +1,5 @@
 // std
+use std::hash::{Hash, Hasher};
 // crates
 use nomos_core::da::blob::{self, metadata::Next};
 use serde::{Deserialize, Serialize};
@@ -19,6 +20,12 @@ impl blob::info::DispersedBlobInfo for BlobInfo {
 
     fn size(&self) -> usize {
         std::mem::size_of_val(&self.id) + self.metadata.size()
+    }
+}
+
+impl Hash for BlobInfo {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        state.write(<BlobInfo as blob::info::DispersedBlobInfo>::blob_id(self).as_ref());
     }
 }
 

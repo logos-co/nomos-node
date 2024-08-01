@@ -69,7 +69,7 @@ pub struct DataIndexerService<
 
 pub enum DaMsg<B, V: Metadata> {
     AddIndex {
-        vid: V,
+        info: V,
     },
     GetRange {
         app_id: <V as Metadata>::AppId,
@@ -193,8 +193,8 @@ where
         storage_adapter: &DaStorage,
         block: Block<ClPool::Item, DaPool::Item>,
     ) -> Result<(), DynError> {
-        for vid in block.blobs() {
-            storage_adapter.add_index(vid).await?;
+        for info in block.blobs() {
+            storage_adapter.add_index(info).await?;
         }
         Ok(())
     }
@@ -204,7 +204,7 @@ where
         msg: DaMsg<B, DaPool::Item>,
     ) -> Result<(), DynError> {
         match msg {
-            DaMsg::AddIndex { vid } => storage_adapter.add_index(&vid).await,
+            DaMsg::AddIndex { info } => storage_adapter.add_index(&info).await,
             DaMsg::GetRange {
                 app_id,
                 range,

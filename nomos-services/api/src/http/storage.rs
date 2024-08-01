@@ -8,7 +8,7 @@ use nomos_storage::{
 pub async fn block_req<S, Tx>(
     handle: &overwatch_rs::overwatch::handle::OverwatchHandle,
     id: HeaderId,
-) -> Result<Option<Block<Tx, full_replication::Certificate>>, super::DynError>
+) -> Result<Option<Block<Tx, full_replication::BlobInfo>>, super::DynError>
 where
     Tx: serde::Serialize + serde::de::DeserializeOwned + Clone + Eq + core::hash::Hash,
     S: StorageSerde + Send + Sync + 'static,
