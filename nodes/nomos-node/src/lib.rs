@@ -10,10 +10,14 @@ pub use config::{Config, CryptarchiaArgs, HttpArgs, LogArgs, MetricsArgs, Networ
 use kzgrs_backend::common::blob::DaBlob;
 use nomos_api::ApiService;
 use nomos_core::da::blob::info::DispersedBlobInfo;
+pub use nomos_core::{
+    da::blob::select::FillSize as FillSizeWithBlobs, tx::select::FillSize as FillSizeWithTx,
+};
 use nomos_core::{header::HeaderId, tx::Transaction, wire};
 use nomos_da_verifier::backend::kzgrs::KzgrsDaVerifier;
 #[cfg(feature = "tracing")]
 use nomos_log::Logger;
+use nomos_mempool::da::service::DaMempoolService;
 use nomos_mempool::network::adapters::libp2p::Libp2pAdapter as MempoolNetworkAdapter;
 use nomos_mempool::{backend::mockpool::MockPool, TxMempoolService};
 #[cfg(feature = "metrics")]
@@ -24,11 +28,6 @@ use nomos_storage::{
     backends::{rocksdb::RocksBackend, StorageSerde},
     StorageService,
 };
-
-pub use nomos_core::{
-    da::blob::select::FillSize as FillSizeWithBlobs, tx::select::FillSize as FillSizeWithTx,
-};
-use nomos_mempool::da::service::DaMempoolService;
 use nomos_system_sig::SystemSig;
 pub use tx::Tx;
 

@@ -73,12 +73,12 @@ where
         storage_adapter: &S,
         blob: &Backend::DaBlob,
     ) -> Result<(), DynError> {
-        if let Some(attestation) = storage_adapter.get_attestation(blob).await? {
-            Ok(attestation)
+        if storage_adapter.get_attestation(blob).await?.is_some() {
+            Ok(())
         } else {
-            let attestation = verifier.verify(blob)?;
-            storage_adapter.add_blob(blob, &attestation).await?;
-            Ok(attestation)
+            verifier.verify(blob)?;
+            storage_adapter.add_blob(blob, &()).await?;
+            Ok(())
         }
     }
 

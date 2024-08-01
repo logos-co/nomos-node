@@ -46,7 +46,7 @@ impl DaVerifier for KzgrsDaVerifier {
         let domain_size = 2usize;
         self.verifier
             .verify(&blob, domain_size)
-            .then(|| ())
+            .then_some(())
             .ok_or(KzgrsDaVerifierError::VerificationError)
     }
 }

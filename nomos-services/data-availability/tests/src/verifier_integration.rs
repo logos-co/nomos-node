@@ -281,7 +281,7 @@ fn test_verifier() {
                 .unwrap();
         }
 
-        // Create cert
+        // Wait for response from the verifier.
         let a1 = node1_reply_rx.await.unwrap();
         let a2 = node2_reply_rx.await.unwrap();
 
@@ -289,7 +289,6 @@ fn test_verifier() {
             is_success_tx.store(true, SeqCst);
         }
 
-        // TODO: Create cert and check indexer integration.
         performed_tx.store(true, SeqCst);
     });
 

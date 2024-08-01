@@ -189,23 +189,23 @@ fn test_indexer() {
 
     let range = 0.into()..1.into(); // get idx 0 and 1.
     let meta = Metadata::new(app_id, index);
-    let cert = BlobInfo::new(blob_hash, meta);
+    let blob_info = BlobInfo::new(blob_hash, meta);
 
     // Test get Metadata for Certificate
-    let (app_id2, index2) = cert.metadata();
+    let (app_id2, index2) = blob_info.metadata();
 
     assert_eq!(app_id2, app_id);
     assert_eq!(index2, index);
 
     // Test generate hash for Certificate with default Hasher
     let mut default_hasher = DefaultHasher::new();
-    let _hash3 = <BlobInfo as Hash>::hash(&cert, &mut default_hasher);
+    let _hash3 = <BlobInfo as Hash>::hash(&blob_info, &mut default_hasher);
 
-    let vid = cert.clone();
+    let expected_blob_info = blob_info.clone();
 
     // Mock attestation step where blob is persisted in nodes blob storage.
     let rt = tokio::runtime::Runtime::new().unwrap();
-    rt.block_on(write_blob(blobs_dir, cert.blob_id().as_ref(), b"blob"))
+    rt.block_on(write_blob(blobs_dir, blob_info.blob_id().as_ref(), b"blob"))
         .unwrap();
 
     node1.spawn(async move {
@@ -238,11 +238,11 @@ fn test_indexer() {
             .await
             .unwrap();
 
-        // Put cert into the mempool.
+        // Put blob_info into the mempool.
         let (mempool_tx, mempool_rx) = tokio::sync::oneshot::channel();
         mempool_outbound
             .send(nomos_mempool::MempoolMsg::Add {
-                payload: cert,
+                payload: blob_info,
                 key: blob_hash,
                 reply_channel: mempool_tx,
             })
@@ -257,7 +257,7 @@ fn test_indexer() {
         loop {
             tokio::select! {
                 Some(block) = broadcast_receiver.next() => {
-                    if block.blobs().any(|v| *v == vid) {
+                    if block.blobs().any(|b| *b == expected_blob_info) {
                         break;
                     }
                 }
@@ -270,7 +270,7 @@ fn test_indexer() {
         // Give time for services to process and store data.
         tokio::time::sleep(Duration::from_secs(1)).await;
 
-        // Request range of vids from indexer.
+        // Request range of blobs from indexer.
         let (indexer_tx, indexer_rx) = tokio::sync::oneshot::channel();
         indexer_outbound
             .send(nomos_da_indexer::DaMsg::GetRange {
@@ -282,7 +282,7 @@ fn test_indexer() {
             .unwrap();
         let mut app_id_blobs = indexer_rx.await.unwrap();
 
-        // Since we've only attested to certificate at idx 0, the first
+        // Since we've only attested to blob_info at idx 0, the first
         // item should have "some" data, other indexes should be None.
         app_id_blobs.sort_by(|(a, _), (b, _)| a.partial_cmp(b).unwrap());
         let app_id_blobs = app_id_blobs.iter().map(|(_, b)| b).collect::<Vec<_>>();
