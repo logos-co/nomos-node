@@ -14,15 +14,11 @@ use bytes::Bytes;
 use cryptarchia_consensus::ConsensusMsg;
 use cryptarchia_consensus::TimeConfig;
 use cryptarchia_ledger::{Coin, LedgerState};
-use full_replication::attestation::Attestation;
-use full_replication::{Certificate, VidCertificate};
-use nomos_core::da::attestation::Attestation as TraitAttestation;
-use nomos_core::da::certificate::metadata::Metadata;
-use nomos_core::da::certificate::vid::VidCertificate as _;
-use nomos_core::da::certificate::Certificate as _;
-use nomos_core::da::certificate::CertificateStrategy;
+use full_replication::{BlobInfo, Metadata};
+use nomos_core::da::blob::info::DispersedBlobInfo;
+use nomos_core::da::blob::metadata::Metadata as _;
 use nomos_core::da::Signer;
-use nomos_core::{da::certificate, tx::Transaction};
+use nomos_core::tx::Transaction;
 use nomos_da_indexer::storage::adapters::rocksdb::RocksAdapterSettings;
 use nomos_da_indexer::IndexerSettings;
 use nomos_da_storage::fs::write_blob;
@@ -83,10 +79,7 @@ fn new_node(
                 backend: (),
                 network: AdapterSettings {
                     topic: String::from(nomos_node::DA_TOPIC),
-                    id: <Certificate as certificate::Certificate>::id,
-                },
-                verification_provider: full_replication::CertificateVerificationParameters {
-                    threshold: 0,
+                    id: <BlobInfo as DispersedBlobInfo>::blob_id,
                 },
                 registry: None,
             },
@@ -113,24 +106,6 @@ fn new_node(
     )
     .map_err(|e| eprintln!("Error encountered: {}", e))
     .unwrap()
-}
-
-fn hash(item: impl AsRef<[u8]>) -> [u8; 32] {
-    let mut hasher = Blake2bVar::new(32).unwrap();
-    hasher.update(item.as_ref());
-    let mut output = [0; 32];
-    hasher.finalize_variable(&mut output).unwrap();
-    output
-}
-
-fn signature(attestation: &Attestation) -> [u8; 32] {
-    let mut attestations = vec![attestation];
-    attestations.sort();
-    let mut signatures = Vec::new();
-    for attestation in &attestations {
-        signatures.extend_from_slice(attestation.signature());
-    }
-    hash(signatures)
 }
 
 // TODO: When verifier is implemented this test should be removed and a new one
@@ -212,24 +187,9 @@ fn test_indexer() {
     let app_id = [7u8; 32];
     let index = 0.into();
 
-    let attestation = Attestation::new_signed(blob_hash, ids[0], &MockKeyPair);
-    let certificate_strategy = full_replication::AbsoluteNumber::new(1);
-    let cert = certificate_strategy.build(vec![attestation.clone()], app_id, index);
-    let cert_id = cert.id();
-    let vid: VidCertificate = cert.clone().into();
     let range = 0.into()..1.into(); // get idx 0 and 1.
-
-    // Test generate hash for Attestation
-    let hash2 = attestation.hash();
-    let expected_hash = hash([blob_hash, ids[0]].concat());
-
-    assert_eq!(hash2, expected_hash);
-
-    // Test generate signature for Certificate
-    let sig2 = cert.signature();
-    let expected_signature = signature(&attestation);
-
-    assert_eq!(sig2, expected_signature);
+    let meta = Metadata::new(app_id, index);
+    let cert = BlobInfo::new(blob_hash, meta);
 
     // Test get Metadata for Certificate
     let (app_id2, index2) = cert.metadata();
@@ -239,16 +199,14 @@ fn test_indexer() {
 
     // Test generate hash for Certificate with default Hasher
     let mut default_hasher = DefaultHasher::new();
-    let _hash3 = <Certificate as Hash>::hash(&cert, &mut default_hasher);
+    let _hash3 = <BlobInfo as Hash>::hash(&cert, &mut default_hasher);
+
+    let vid = cert.clone();
 
     // Mock attestation step where blob is persisted in nodes blob storage.
     let rt = tokio::runtime::Runtime::new().unwrap();
-    rt.block_on(write_blob(
-        blobs_dir,
-        vid.certificate_id().as_ref(),
-        b"blob",
-    ))
-    .unwrap();
+    rt.block_on(write_blob(blobs_dir, cert.blob_id().as_ref(), b"blob"))
+        .unwrap();
 
     node1.spawn(async move {
         let mempool_outbound = mempool.connect().await.unwrap();
@@ -285,7 +243,7 @@ fn test_indexer() {
         mempool_outbound
             .send(nomos_mempool::MempoolMsg::Add {
                 payload: cert,
-                key: cert_id,
+                key: blob_hash,
                 reply_channel: mempool_tx,
             })
             .await

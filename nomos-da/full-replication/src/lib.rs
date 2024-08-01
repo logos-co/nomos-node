@@ -31,6 +31,10 @@ pub struct Metadata {
 }
 
 impl Metadata {
+    pub fn new(app_id: [u8; 32], index: Index) -> Self {
+        Self { app_id, index }
+    }
+
     fn size(&self) -> usize {
         std::mem::size_of_val(&self.app_id) + std::mem::size_of_val(&self.index)
     }
@@ -41,6 +45,12 @@ impl Metadata {
 pub struct BlobInfo {
     id: [u8; 32],
     metadata: Metadata,
+}
+
+impl BlobInfo {
+    pub fn new(id: [u8; 32], metadata: Metadata) -> Self {
+        Self { id, metadata }
+    }
 }
 
 impl Hash for BlobInfo {
