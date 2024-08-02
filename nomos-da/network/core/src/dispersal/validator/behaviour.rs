@@ -89,7 +89,7 @@ impl<M: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'static> Netw
         _addr: &Multiaddr,
         _role_override: Endpoint,
     ) -> Result<THandler<Self>, ConnectionDenied> {
-        unreachable!()
+        Ok(Either::Right(libp2p::swarm::dummy::ConnectionHandler))
     }
 
     fn on_swarm_event(&mut self, event: FromSwarm) {
