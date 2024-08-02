@@ -1,11 +1,9 @@
-use crate::dispersal::executor::behaviour::DispersalExecutorEvent::Void;
-use crate::dispersal::validator::behaviour::DispersalEvent;
 use crate::protocol::DISPERSAL_PROTOCOL;
 use crate::SubnetworkId;
 use either::Either;
 use futures::future::BoxFuture;
 use futures::stream::FuturesUnordered;
-use futures::{AsyncWriteExt, FutureExt, StreamExt};
+use futures::{FutureExt, StreamExt};
 use kzgrs_backend::common::blob::DaBlob;
 use libp2p::core::Endpoint;
 use libp2p::swarm::{
@@ -14,30 +12,20 @@ use libp2p::swarm::{
 };
 use libp2p::{Multiaddr, PeerId, Stream};
 use libp2p_stream::IncomingStreams;
-use log::{debug, error};
-use nomos_da_messages::dispersal::dispersal_res::MessageType;
-use nomos_da_messages::dispersal::{DispersalReq, DispersalRes};
-use nomos_da_messages::{pack_message, unpack_from_reader};
-use std::collections::{BTreeSet, HashMap, HashSet, VecDeque};
+use std::collections::{HashMap, VecDeque};
 use std::future::Future;
 use std::io::Error;
-use std::process::Output;
 use std::task::{Context, Poll};
 use subnetworks_assignations::MembershipHandler;
 use tokio::sync::mpsc;
+use tokio_stream::wrappers::UnboundedReceiverStream;
 
+type BlobId = [u8; 32];
 pub enum DispersalExecutorEvent {
     DispersalSuccess {
         blob_id: Vec<u8>,
         subnetwork_id: SubnetworkId,
     },
-    Void,
-}
-
-impl From<()> for DispersalExecutorEvent {
-    fn from(_value: ()) -> Self {
-        Self::Void
-    }
 }
 
 struct DispersalStream {
@@ -48,12 +36,12 @@ struct DispersalStream {
 pub struct DispersalExecutorBehaviour<Membership> {
     stream_behaviour: libp2p_stream::Behaviour,
     incoming_streams: IncomingStreams,
-    tasks: FuturesUnordered<BoxFuture<'static, Result<(DispersalRes, DispersalStream), Error>>>,
+    tasks: FuturesUnordered<BoxFuture<'static, Result<(BlobId, DispersalStream), Error>>>,
     membership: Membership,
     to_disperse: HashMap<PeerId, VecDeque<DaBlob>>,
     connected_subnetworks: HashMap<PeerId, ConnectionId>,
-    success_events_receiver: Box<dyn futures::Stream<Item = ([u8; 32], SubnetworkId)>>,
-    success_events_sender: mpsc::UnboundedSender<([u8; 32], SubnetworkId)>,
+    success_events_receiver: UnboundedReceiverStream<(BlobId, SubnetworkId)>,
+    success_events_sender: mpsc::UnboundedSender<(BlobId, SubnetworkId)>,
 }
 
 impl<Membership: MembershipHandler> DispersalExecutorBehaviour<Membership> {
@@ -67,8 +55,8 @@ impl<Membership: MembershipHandler> DispersalExecutorBehaviour<Membership> {
         let to_disperse = HashMap::new();
         let connected_subnetworks = HashMap::new();
         let (success_events_sender, success_events_receiver) =
-            mpsc::unbounded_channel::<([u8; 32], SubnetworkId)>();
-        let success_events_receiver = success_events_receiver.to_stream();
+            mpsc::unbounded_channel::<(BlobId, SubnetworkId)>();
+        let success_events_receiver = UnboundedReceiverStream::from(success_events_receiver);
         Self {
             stream_behaviour,
             incoming_streams,
@@ -81,26 +69,26 @@ impl<Membership: MembershipHandler> DispersalExecutorBehaviour<Membership> {
         }
     }
     fn handle_dispersal_stream(
-        &mut self,
         stream: DispersalStream,
-    ) -> impl Future<Output = Result<[u8; 32], Error>> {
+    ) -> impl Future<Output = Result<(BlobId, DispersalStream), Error>> {
+        async { Ok(([0; 32], stream)) }
     }
 }
 
 impl<Membership: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId>>
     DispersalExecutorBehaviour<Membership>
 {
-    pub fn disperse_blob(&mut self, subnetwork_id: &SubnetworkId, blob: DaBlob) {
+    pub fn disperse_blob(&mut self, subnetwork_id: SubnetworkId, blob: DaBlob) {
         let Self {
             membership,
             connected_subnetworks,
             to_disperse,
             ..
         } = self;
-        let peers = membership
-            .members_of(&subnetwork_id)
+        let members = membership.members_of(&subnetwork_id);
+        let peers = members
             .iter()
-            .filter(|peer_id| connected_subnetworks.contains_key(*peer_id));
+            .filter(|peer_id| connected_subnetworks.contains_key(peer_id));
         for peer in peers {
             to_disperse
                 .entry(*peer)
@@ -169,23 +157,20 @@ impl<M: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'static> Netw
             success_events_receiver,
             ..
         } = self;
-        match success_events_receiver.poll_unpin(cx) {
-            Poll::Ready(Some(Ok((blob_id, subnetwork_id)))) => {
-                return Poll::Ready(ToSwarm::GenerateEvent(
-                    DispersalExecutorEvent::DispersalSuccess {
-                        blob_id,
-                        subnetwork_id,
-                    },
-                ));
-            }
-            Poll::Ready(Some(Err(error))) => {
-                error!("Error dispersing: {error:?}")
-            }
-            _ => {}
+        if let Poll::Ready(Some((blob_id, subnetwork_id))) =
+            success_events_receiver.next().poll_unpin(cx)
+        {
+            return Poll::Ready(ToSwarm::GenerateEvent(
+                DispersalExecutorEvent::DispersalSuccess {
+                    blob_id: blob_id.to_vec(),
+                    subnetwork_id,
+                },
+            ));
         }
         if let Poll::Ready(Some((peer_id, stream))) = incoming_streams.poll_next_unpin(cx) {
             let stream = DispersalStream { stream, peer_id };
-            tasks.push(self.handle_dispersal_stream(stream).boxed());
+            let fut = Self::handle_dispersal_stream(stream).boxed();
+            tasks.push(fut);
         }
         // Deal with connection as the underlying behaviour would do
         match self.stream_behaviour.poll(cx) {
