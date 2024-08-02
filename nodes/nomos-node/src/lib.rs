@@ -1,45 +1,41 @@
-pub mod api;
-mod config;
-mod tx;
-
+use bytes::Bytes;
 use color_eyre::eyre::Result;
-use kzgrs_backend::dispersal::{Certificate, VidCertificate};
+use overwatch_derive::*;
+use overwatch_rs::services::handle::ServiceHandle;
+use serde::{de::DeserializeOwned, Serialize};
 
 use api::AxumBackend;
-use bytes::Bytes;
 pub use config::{Config, CryptarchiaArgs, HttpArgs, LogArgs, MetricsArgs, NetworkArgs};
 use kzgrs_backend::common::attestation::Attestation;
 use kzgrs_backend::common::blob::DaBlob;
+use kzgrs_backend::dispersal::{Certificate, VidCertificate};
 use nomos_api::ApiService;
 use nomos_core::{da::certificate, header::HeaderId, tx::Transaction, wire};
+pub use nomos_core::{
+    da::certificate::select::FillSize as FillSizeWithBlobsCertificate,
+    tx::select::FillSize as FillSizeWithTx,
+};
 use nomos_da_verifier::backend::kzgrs::KzgrsDaVerifier;
 #[cfg(feature = "tracing")]
 use nomos_log::Logger;
+use nomos_mempool::da::service::DaMempoolService;
 use nomos_mempool::da::verify::kzgrs::DaVerificationProvider as MempoolVerificationProvider;
 use nomos_mempool::network::adapters::libp2p::Libp2pAdapter as MempoolNetworkAdapter;
 use nomos_mempool::{backend::mockpool::MockPool, TxMempoolService};
 #[cfg(feature = "metrics")]
 use nomos_metrics::Metrics;
 use nomos_network::backends::libp2p::Libp2p as NetworkBackend;
+use nomos_network::NetworkService;
 use nomos_storage::{
     backends::{rocksdb::RocksBackend, StorageSerde},
     StorageService,
 };
-
-#[cfg(feature = "carnot")]
-use carnot_engine::overlay::{RandomBeaconState, RoundRobin, TreeOverlay};
-pub use nomos_core::{
-    da::certificate::select::FillSize as FillSizeWithBlobsCertificate,
-    tx::select::FillSize as FillSizeWithTx,
-};
-use nomos_mempool::da::service::DaMempoolService;
-use nomos_network::NetworkService;
 use nomos_system_sig::SystemSig;
-use overwatch_derive::*;
-use overwatch_rs::services::handle::ServiceHandle;
-use serde::{de::DeserializeOwned, Serialize};
-
 pub use tx::Tx;
+
+pub mod api;
+mod config;
+mod tx;
 
 pub type NomosApiService = ApiService<
     AxumBackend<
