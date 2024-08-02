@@ -11,10 +11,12 @@ tracing = "0.1"
 indexmap = "2.2"
 subnetworks-assignations = { path = "../subnetworks-assignations" }
 nomos-da-messages = { path = "../messages" }
+kzgrs-backend = { path = "../../kzgrs-backend" }
 tracing-subscriber = "0.3.18"
 void = "1.0.2"
 either = "1.13.0"
 log = "0.4"
+tokio = { version = "1.39" }
 
 [dev-dependencies]
 tokio = { version = "1.39", features = ["macros", "rt-multi-thread", "time"] }
