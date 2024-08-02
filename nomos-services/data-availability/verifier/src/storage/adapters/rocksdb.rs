@@ -2,7 +2,7 @@
 use serde::{de::DeserializeOwned, Serialize};
 use std::{marker::PhantomData, path::PathBuf};
 // crates
-use nomos_core::da::{attestation::Attestation, blob::Blob};
+use nomos_core::da::blob::Blob;
 use nomos_da_storage::{
     fs::write_blob,
     rocksdb::{key_bytes, DA_ATTESTED_KEY_PREFIX},
@@ -31,7 +31,7 @@ where
 #[async_trait::async_trait]
 impl<A, B, S> DaStorageAdapter for RocksAdapter<A, B, S>
 where
-    A: Attestation + Serialize + DeserializeOwned + Clone + Send + Sync,
+    A: Serialize + DeserializeOwned + Clone + Send + Sync,
     B: Blob + Serialize + Clone + Send + Sync + 'static,
     B::BlobId: AsRef<[u8]> + Send + Sync + 'static,
     S: StorageSerde + Send + Sync + 'static,

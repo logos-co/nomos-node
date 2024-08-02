@@ -16,15 +16,11 @@ use nomos_api::{
     http::{cl, consensus, da, libp2p, mempool, metrics, storage},
     Backend,
 };
-use nomos_core::da::certificate::metadata::Metadata;
-use nomos_core::da::{certificate, DaVerifier as CoreDaVerifier};
-use nomos_core::{
-    da::{attestation::Attestation, blob::Blob},
-    header::HeaderId,
-    tx::Transaction,
-};
+use nomos_core::da::blob::info::DispersedBlobInfo;
+use nomos_core::da::blob::metadata::Metadata;
+use nomos_core::da::DaVerifier as CoreDaVerifier;
+use nomos_core::{da::blob::Blob, header::HeaderId, tx::Transaction};
 use nomos_da_verifier::backend::VerifierBackend;
-use nomos_mempool::verify::MempoolVerificationProvider;
 use nomos_mempool::{
     network::adapters::libp2p::Libp2pAdapter as MempoolNetworkAdapter,
     tx::service::openapi::Status, MempoolMetrics,
@@ -49,13 +45,12 @@ pub struct AxumBackendSettings {
     pub cors_origins: Vec<String>,
 }
 
-pub struct AxumBackend<A, B, C, V, VP, VB, T, S, const SIZE: usize> {
+pub struct AxumBackend<A, B, C, V, VB, T, S, const SIZE: usize> {
     settings: AxumBackendSettings,
     _attestation: core::marker::PhantomData<A>,
     _blob: core::marker::PhantomData<B>,
     _certificate: core::marker::PhantomData<C>,
     _vid: core::marker::PhantomData<V>,
-    _params_provider: core::marker::PhantomData<VP>,
     _verifier_backend: core::marker::PhantomData<VB>,
     _tx: core::marker::PhantomData<T>,
     _storage_serde: core::marker::PhantomData<S>,
@@ -75,13 +70,12 @@ pub struct AxumBackend<A, B, C, V, VP, VB, T, S, const SIZE: usize> {
 struct ApiDoc;
 
 #[async_trait::async_trait]
-impl<A, B, C, V, VP, VB, T, S, const SIZE: usize> Backend
-    for AxumBackend<A, B, C, V, VP, VB, T, S, SIZE>
+impl<A, B, C, V, VB, T, S, const SIZE: usize> Backend for AxumBackend<A, B, C, V, VB, T, S, SIZE>
 where
-    A: Attestation + Serialize + DeserializeOwned + Clone + Send + Sync + 'static,
+    A: Serialize + DeserializeOwned + Clone + Send + Sync + 'static,
     B: Blob + Serialize + DeserializeOwned + Clone + Send + Sync + 'static,
     <B as Blob>::BlobId: AsRef<[u8]> + Send + Sync + 'static,
-    C: certificate::Certificate<Id = [u8; 32]>
+    C: DispersedBlobInfo<BlobId = [u8; 32]>
         + Clone
         + Debug
         + Serialize
@@ -89,8 +83,8 @@ where
         + Send
         + Sync
         + 'static,
-    <C as certificate::Certificate>::Id: Clone + Send + Sync,
-    V: certificate::vid::VidCertificate<CertificateId = [u8; 32]>
+    <C as DispersedBlobInfo>::BlobId: Clone + Send + Sync,
+    V: DispersedBlobInfo<BlobId = [u8; 32]>
         + From<C>
         + Eq
         + Debug
@@ -102,17 +96,11 @@ where
         + Send
         + Sync
         + 'static,
-    <V as certificate::vid::VidCertificate>::CertificateId: Debug + Clone + Ord + Hash,
+    <V as DispersedBlobInfo>::BlobId: Debug + Clone + Ord + Hash,
     <V as Metadata>::AppId: AsRef<[u8]> + Clone + Serialize + DeserializeOwned + Send + Sync,
     <V as Metadata>::Index:
         AsRef<[u8]> + Clone + Serialize + DeserializeOwned + PartialOrd + Send + Sync,
-    VP: MempoolVerificationProvider<
-            Payload = C,
-            Parameters = <C as certificate::Certificate>::VerificationParameters,
-        > + Send
-        + Sync
-        + 'static,
-    VB: VerifierBackend + CoreDaVerifier<DaBlob = B, Attestation = A> + Send + Sync + 'static,
+    VB: VerifierBackend + CoreDaVerifier<DaBlob = B> + Send + Sync + 'static,
     <VB as VerifierBackend>::Settings: Clone,
     <VB as CoreDaVerifier>::Error: Error,
     T: Transaction
@@ -142,7 +130,6 @@ where
             _blob: core::marker::PhantomData,
             _certificate: core::marker::PhantomData,
             _vid: core::marker::PhantomData,
-            _params_provider: core::marker::PhantomData,
             _verifier_backend: core::marker::PhantomData,
             _tx: core::marker::PhantomData,
             _storage_serde: core::marker::PhantomData,
@@ -185,7 +172,7 @@ where
             .route("/da/add_blob", routing::post(add_blob::<A, B, VB, S>))
             .route(
                 "/da/get_range",
-                routing::post(get_range::<T, C, V, VP, S, SIZE>),
+                routing::post(get_range::<T, C, V, S, SIZE>),
             )
             .route("/network/info", routing::get(libp2p_info))
             .route("/storage/block", routing::post(block::<S, T>))
@@ -337,10 +324,10 @@ async fn add_blob<A, B, VB, SS>(
     Json(blob): Json<B>,
 ) -> Response
 where
-    A: Attestation + Serialize + DeserializeOwned + Clone + Send + Sync + 'static,
+    A: Serialize + DeserializeOwned + Clone + Send + Sync + 'static,
     B: Blob + Serialize + DeserializeOwned + Clone + Send + Sync + 'static,
     <B as Blob>::BlobId: AsRef<[u8]> + Send + Sync + 'static,
-    VB: VerifierBackend + CoreDaVerifier<DaBlob = B, Attestation = A>,
+    VB: VerifierBackend + CoreDaVerifier<DaBlob = B>,
     <VB as VerifierBackend>::Settings: Clone,
     <VB as CoreDaVerifier>::Error: Error,
     SS: StorageSerde + Send + Sync + 'static,
@@ -366,7 +353,7 @@ where
         (status = 500, description = "Internal server error", body = String),
     )
 )]
-async fn get_range<Tx, C, V, VP, SS, const SIZE: usize>(
+async fn get_range<Tx, C, V, SS, const SIZE: usize>(
     State(handle): State<OverwatchHandle>,
     Json(GetRangeReq { app_id, range }): Json<GetRangeReq<V>>,
 ) -> Response
@@ -382,7 +369,7 @@ where
         + Sync
         + 'static,
     <Tx as Transaction>::Hash: std::cmp::Ord + Debug + Send + Sync + 'static,
-    C: certificate::Certificate<Id = [u8; 32]>
+    C: DispersedBlobInfo<BlobId = [u8; 32]>
         + Clone
         + Debug
         + Serialize
@@ -390,8 +377,8 @@ where
         + Send
         + Sync
         + 'static,
-    <C as certificate::Certificate>::Id: Clone + Send + Sync,
-    V: certificate::vid::VidCertificate<CertificateId = [u8; 32]>
+    <C as DispersedBlobInfo>::BlobId: Clone + Send + Sync,
+    V: DispersedBlobInfo<BlobId = [u8; 32]>
         + From<C>
         + Eq
         + Debug
@@ -403,19 +390,13 @@ where
         + Send
         + Sync
         + 'static,
-    <V as certificate::vid::VidCertificate>::CertificateId: Debug + Clone + Ord + Hash,
+    <V as DispersedBlobInfo>::BlobId: Debug + Clone + Ord + Hash,
     <V as Metadata>::AppId: AsRef<[u8]> + Clone + Serialize + DeserializeOwned + Send + Sync,
     <V as Metadata>::Index:
         AsRef<[u8]> + Clone + Serialize + DeserializeOwned + PartialOrd + Send + Sync,
-    VP: MempoolVerificationProvider<
-        Payload = C,
-        Parameters = <C as certificate::Certificate>::VerificationParameters,
-    >,
     SS: StorageSerde + Send + Sync + 'static,
 {
-    make_request_and_return_response!(da::get_range::<Tx, C, V, VP, SS, SIZE>(
-        &handle, app_id, range
-    ))
+    make_request_and_return_response!(da::get_range::<Tx, C, V, SS, SIZE>(&handle, app_id, range))
 }
 
 #[utoipa::path(
@@ -434,7 +415,7 @@ async fn libp2p_info(State(handle): State<OverwatchHandle>) -> Response {
     get,
     path = "/storage/block",
     responses(
-        (status = 200, description = "Get the block by block id", body = Block<Tx, kzgrs_backend::dispersal::Certificate>),
+        (status = 200, description = "Get the block by block id", body = Block<Tx, kzgrs_backend::dispersal::BlobInfo>),
         (status = 500, description = "Internal server error", body = String),
     )
 )]

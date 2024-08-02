@@ -7,8 +7,7 @@ use serde::Serialize;
 // internal
 use crate::block::Block;
 use crate::crypto::Blake2b;
-use crate::da::certificate::vid::VidCertificate;
-use crate::da::certificate::BlobCertificateSelect;
+use crate::da::blob::{info::DispersedBlobInfo, BlobSelect};
 use crate::header::{
     carnot::Builder as CarnotBuilder, cryptarchia::Builder as CryptarchiaBuilder, Header, HeaderId,
 };
@@ -61,12 +60,12 @@ where
     }
 }
 
-impl<Tx, C, TxSelector, BlobSelector> BlockBuilder<Tx, C, TxSelector, BlobSelector>
+impl<Tx, B, TxSelector, BlobSelector> BlockBuilder<Tx, B, TxSelector, BlobSelector>
 where
     Tx: Transaction + Clone + Eq + Hash + Serialize + DeserializeOwned,
-    C: VidCertificate + Clone + Eq + Hash + Serialize + DeserializeOwned,
+    B: DispersedBlobInfo + Clone + Eq + Hash + Serialize + DeserializeOwned,
     TxSelector: TxSelect<Tx = Tx>,
-    BlobSelector: BlobCertificateSelect<Certificate = C>,
+    BlobSelector: BlobSelect<BlobId = B>,
 {
     pub fn new(tx_selector: TxSelector, blob_selector: BlobSelector) -> Self {
         Self {
@@ -103,14 +102,14 @@ where
     #[must_use]
     pub fn with_blobs_certificates(
         mut self,
-        blobs_certificates: impl Iterator<Item = C> + 'static,
+        blobs_certificates: impl Iterator<Item = B> + 'static,
     ) -> Self {
         self.blobs = Some(Box::new(blobs_certificates));
         self
     }
 
     #[allow(clippy::result_large_err)]
-    pub fn build(self) -> Result<Block<Tx, C>, String> {
+    pub fn build(self) -> Result<Block<Tx, B>, String> {
         if let Self {
             tx_selector,
             blob_selector,

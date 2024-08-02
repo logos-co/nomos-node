@@ -3,7 +3,7 @@ pub mod adapters;
 use std::ops::Range;
 
 use futures::Stream;
-use nomos_core::da::certificate::{metadata::Metadata, vid::VidCertificate};
+use nomos_core::da::blob::{info::DispersedBlobInfo, metadata::Metadata};
 use nomos_storage::{backends::StorageBackend, StorageService};
 use overwatch_rs::{
     services::{relay::OutboundRelay, ServiceData},
@@ -16,17 +16,17 @@ pub trait DaStorageAdapter {
     type Settings: Clone;
 
     type Blob;
-    type VID: VidCertificate;
+    type Info: DispersedBlobInfo;
 
     async fn new(
         config: Self::Settings,
         storage_relay: OutboundRelay<<StorageService<Self::Backend> as ServiceData>::Message>,
     ) -> Self;
 
-    async fn add_index(&self, vid: &Self::VID) -> Result<(), DynError>;
+    async fn add_index(&self, vid: &Self::Info) -> Result<(), DynError>;
     async fn get_range_stream(
         &self,
-        app_id: <Self::VID as Metadata>::AppId,
-        range: Range<<Self::VID as Metadata>::Index>,
-    ) -> Box<dyn Stream<Item = (<Self::VID as Metadata>::Index, Option<Self::Blob>)> + Unpin + Send>;
+        app_id: <Self::Info as Metadata>::AppId,
+        range: Range<<Self::Info as Metadata>::Index>,
+    ) -> Box<dyn Stream<Item = (<Self::Info as Metadata>::Index, Option<Self::Blob>)> + Unpin + Send>;
 }

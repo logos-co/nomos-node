@@ -1,9 +1,7 @@
 use bytes::Bytes;
 use core::ops::Range;
-use nomos_core::da::attestation::Attestation;
-use nomos_core::da::blob::Blob;
-use nomos_core::da::certificate::metadata::Metadata;
-use nomos_core::da::certificate::{self, select::FillSize as FillSizeWithBlobsCertificate};
+use nomos_core::da::blob::info::DispersedBlobInfo;
+use nomos_core::da::blob::{metadata::Metadata, select::FillSize as FillSizeWithBlobs, Blob};
 use nomos_core::da::DaVerifier as CoreDaVerifier;
 use nomos_core::header::HeaderId;
 use nomos_core::tx::{select::FillSize as FillSizeWithTx, Transaction};
@@ -18,7 +16,6 @@ use nomos_da_verifier::storage::adapters::rocksdb::RocksAdapter as VerifierStora
 use nomos_da_verifier::{DaVerifierMsg, DaVerifierService};
 use nomos_mempool::backend::mockpool::MockPool;
 use nomos_mempool::network::adapters::libp2p::Libp2pAdapter as MempoolNetworkAdapter;
-use nomos_mempool::verify::MempoolVerificationProvider;
 use nomos_storage::backends::rocksdb::RocksBackend;
 use nomos_storage::backends::StorageSerde;
 use overwatch_rs::overwatch::handle::OverwatchHandle;
@@ -30,7 +27,7 @@ use std::fmt::Debug;
 use std::hash::Hash;
 use tokio::sync::oneshot;
 
-pub type DaIndexer<Tx, C, V, VP, SS, const SIZE: usize> = DataIndexerService<
+pub type DaIndexer<Tx, C, V, SS, const SIZE: usize> = DataIndexerService<
     // Indexer specific.
     Bytes,
     IndexerStorageAdapter<SS, V>,
@@ -40,10 +37,9 @@ pub type DaIndexer<Tx, C, V, VP, SS, const SIZE: usize> = DataIndexerService<
     MockPool<HeaderId, Tx, <Tx as Transaction>::Hash>,
     MempoolNetworkAdapter<Tx, <Tx as Transaction>::Hash>,
     MockPool<HeaderId, V, [u8; 32]>,
-    MempoolNetworkAdapter<C, <C as certificate::Certificate>::Id>,
-    VP,
+    MempoolNetworkAdapter<C, <C as DispersedBlobInfo>::BlobId>,
     FillSizeWithTx<SIZE, Tx>,
-    FillSizeWithBlobsCertificate<SIZE, V>,
+    FillSizeWithBlobs<SIZE, V>,
     RocksBackend<SS>,
 >;
 
@@ -53,12 +49,12 @@ pub type DaVerifier<A, B, VB, SS> =
 pub async fn add_blob<A, B, VB, SS>(
     handle: &OverwatchHandle,
     blob: B,
-) -> Result<Option<A>, DynError>
+) -> Result<Option<()>, DynError>
 where
-    A: Attestation + Serialize + DeserializeOwned + Clone + Send + Sync + 'static,
+    A: Serialize + DeserializeOwned + Clone + Send + Sync + 'static,
     B: Blob + Serialize + DeserializeOwned + Clone + Send + Sync + 'static,
     <B as Blob>::BlobId: AsRef<[u8]> + Send + Sync + 'static,
-    VB: VerifierBackend + CoreDaVerifier<DaBlob = B, Attestation = A>,
+    VB: VerifierBackend + CoreDaVerifier<DaBlob = B>,
     <VB as VerifierBackend>::Settings: Clone,
     <VB as CoreDaVerifier>::Error: Error,
     SS: StorageSerde + Send + Sync + 'static,
@@ -76,7 +72,7 @@ where
     Ok(receiver.await?)
 }
 
-pub async fn get_range<Tx, C, V, VP, SS, const SIZE: usize>(
+pub async fn get_range<Tx, C, V, SS, const SIZE: usize>(
     handle: &OverwatchHandle,
     app_id: <V as Metadata>::AppId,
     range: Range<<V as Metadata>::Index>,
@@ -93,7 +89,7 @@ where
         + Sync
         + 'static,
     <Tx as Transaction>::Hash: std::cmp::Ord + Debug + Send + Sync + 'static,
-    C: certificate::Certificate<Id = [u8; 32]>
+    C: DispersedBlobInfo<BlobId = [u8; 32]>
         + Clone
         + Debug
         + Serialize
@@ -101,8 +97,8 @@ where
         + Send
         + Sync
         + 'static,
-    <C as certificate::Certificate>::Id: Clone + Send + Sync,
-    V: certificate::vid::VidCertificate<CertificateId = [u8; 32]>
+    <C as DispersedBlobInfo>::BlobId: Clone + Send + Sync,
+    V: DispersedBlobInfo<BlobId = [u8; 32]>
         + From<C>
         + Eq
         + Debug
@@ -114,18 +110,14 @@ where
         + Send
         + Sync
         + 'static,
-    <V as certificate::vid::VidCertificate>::CertificateId: Debug + Clone + Ord + Hash,
+    <V as DispersedBlobInfo>::BlobId: Debug + Clone + Ord + Hash,
     <V as Metadata>::AppId: AsRef<[u8]> + Serialize + Clone + Send + Sync,
     <V as Metadata>::Index:
         AsRef<[u8]> + Serialize + DeserializeOwned + Clone + PartialOrd + Send + Sync,
-    VP: MempoolVerificationProvider<
-        Payload = C,
-        Parameters = <C as certificate::Certificate>::VerificationParameters,
-    >,
     SS: StorageSerde + Send + Sync + 'static,
 {
     let relay = handle
-        .relay::<DaIndexer<Tx, C, V, VP, SS, SIZE>>()
+        .relay::<DaIndexer<Tx, C, V, SS, SIZE>>()
         .connect()
         .await?;
     let (sender, receiver) = oneshot::channel();

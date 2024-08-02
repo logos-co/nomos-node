@@ -9,32 +9,25 @@ use cryptarchia_consensus::{
     network::adapters::libp2p::LibP2pAdapter as ConsensusNetworkAdapter, ConsensusMsg,
     CryptarchiaConsensus, CryptarchiaInfo,
 };
-use kzgrs_backend::dispersal::{Certificate, VidCertificate};
+use kzgrs_backend::dispersal::BlobInfo;
 use nomos_core::{
-    da::certificate::{self, select::FillSize as FillSizeWithBlobsCertificate},
+    da::blob::{self, select::FillSize as FillSizeWithBlobs},
     header::HeaderId,
     tx::{select::FillSize as FillSizeWithTx, Transaction},
 };
 use nomos_mempool::{
-    backend::mockpool::MockPool,
-    da::verify::kzgrs::DaVerificationProvider as MempoolVerificationProvider,
-    network::adapters::libp2p::Libp2pAdapter as MempoolNetworkAdapter,
+    backend::mockpool::MockPool, network::adapters::libp2p::Libp2pAdapter as MempoolNetworkAdapter,
 };
 use nomos_storage::backends::{rocksdb::RocksBackend, StorageSerde};
 
 pub type Cryptarchia<Tx, SS, const SIZE: usize> = CryptarchiaConsensus<
-    ConsensusNetworkAdapter<Tx, Certificate>,
+    ConsensusNetworkAdapter<Tx, BlobInfo>,
     MockPool<HeaderId, Tx, <Tx as Transaction>::Hash>,
     MempoolNetworkAdapter<Tx, <Tx as Transaction>::Hash>,
-    MockPool<
-        HeaderId,
-        VidCertificate,
-        <VidCertificate as certificate::vid::VidCertificate>::CertificateId,
-    >,
-    MempoolNetworkAdapter<Certificate, <Certificate as certificate::Certificate>::Id>,
-    MempoolVerificationProvider,
+    MockPool<HeaderId, BlobInfo, <BlobInfo as blob::info::DispersedBlobInfo>::BlobId>,
+    MempoolNetworkAdapter<BlobInfo, <BlobInfo as blob::info::DispersedBlobInfo>::BlobId>,
     FillSizeWithTx<SIZE, Tx>,
-    FillSizeWithBlobsCertificate<SIZE, VidCertificate>,
+    FillSizeWithBlobs<SIZE, BlobInfo>,
     RocksBackend<SS>,
 >;
 

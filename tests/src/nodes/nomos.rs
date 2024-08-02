@@ -7,7 +7,7 @@ use super::{create_tempdir, persist_tempdir, LOGS_PREFIX};
 use crate::{adjust_timeout, get_available_port, ConsensusConfig, Node};
 use cryptarchia_consensus::{CryptarchiaInfo, CryptarchiaSettings, TimeConfig};
 use cryptarchia_ledger::{Coin, LedgerState};
-use kzgrs_backend::dispersal::Certificate;
+use kzgrs_backend::dispersal::BlobInfo;
 #[cfg(feature = "mixnet")]
 use mixnet::{
     address::NodeAddress,
@@ -115,7 +115,7 @@ impl NomosNode {
         }
     }
 
-    pub async fn get_block(&self, id: HeaderId) -> Option<Block<Tx, Certificate>> {
+    pub async fn get_block(&self, id: HeaderId) -> Option<Block<Tx, BlobInfo>> {
         CLIENT
             .post(&format!("http://{}/{}", self.addr, STORAGE_BLOCKS_API))
             .header("Content-Type", "application/json")
@@ -123,7 +123,7 @@ impl NomosNode {
             .send()
             .await
             .unwrap()
-            .json::<Option<Block<Tx, Certificate>>>()
+            .json::<Option<Block<Tx, BlobInfo>>>()
             .await
             .unwrap()
     }

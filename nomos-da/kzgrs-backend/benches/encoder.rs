@@ -26,5 +26,5 @@ fn encode<const SIZE: usize>(bencher: Bencher, column_size: usize) {
             )
         })
         .input_counter(|(_, buff)| BytesCount::new(buff.len()))
-        .bench_refs(|(encoder, buff)| black_box(encoder.encode(buff)));
+        .bench_refs(|(encoder, buff)| black_box(nomos_core::da::DaEncoder::encode(encoder, buff)));
 }

@@ -11,11 +11,8 @@ use kzgrs::{
 };
 
 use crate::common::blob::DaBlob;
-use crate::common::NOMOS_DA_DST;
 // internal
-use crate::common::{
-    attestation::Attestation, build_attestation_message, hash_column_and_commitment, Chunk, Column,
-};
+use crate::common::{hash_column_and_commitment, Chunk, Column};
 use crate::encoder::DaEncoderParams;
 use crate::global::GLOBAL_PARAMETERS;
 
@@ -118,23 +115,7 @@ impl DaVerifier {
         true
     }
 
-    fn build_attestation(&self, blob: &DaBlob) -> Attestation {
-        let message =
-            build_attestation_message(&blob.aggregated_column_commitment, &blob.rows_commitments);
-        let signature = self.sk.sign(&message, NOMOS_DA_DST, b"");
-
-        let blob_id = blob.id();
-        let blob_hash: [u8; 32] = blob_id
-            .try_into()
-            .expect("Blob ID must be exactly 32 bytes long");
-
-        Attestation {
-            signature: signature.to_bytes().to_vec(),
-            blob_hash,
-        }
-    }
-
-    pub fn verify(&self, blob: &DaBlob, rows_domain_size: usize) -> Option<Attestation> {
+    pub fn verify(&self, blob: &DaBlob, rows_domain_size: usize) -> bool {
         let rows_domain = PolynomialEvaluationDomain::new(rows_domain_size)
             .expect("Domain should be able to build");
         let is_column_verified = DaVerifier::verify_column(
@@ -146,7 +127,7 @@ impl DaVerifier {
             rows_domain,
         );
         if !is_column_verified {
-            return None;
+            return false;
         }
 
         let are_chunks_verified = DaVerifier::verify_chunks(
@@ -157,9 +138,9 @@ impl DaVerifier {
             rows_domain,
         );
         if !are_chunks_verified {
-            return None;
+            return false;
         }
-        Some(self.build_attestation(blob))
+        true
     }
 }
 
@@ -176,6 +157,7 @@ mod test {
     use kzgrs::{
         bytes_to_polynomial, commit_polynomial, generate_element_proof, BYTES_PER_FIELD_ELEMENT,
     };
+    use nomos_core::da::DaEncoder as _;
     use rand::{thread_rng, RngCore};
 
     #[test]
@@ -251,7 +233,7 @@ mod test {
                     .map(|proofs| proofs.get(i).cloned().unwrap())
                     .collect(),
             };
-            assert!(verifier.verify(&da_blob, domain_size).is_some());
+            assert!(verifier.verify(&da_blob, domain_size));
         }
     }
 }

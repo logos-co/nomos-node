@@ -6,23 +6,14 @@ use std::sync::atomic::Ordering::SeqCst;
 use std::sync::Arc;
 use std::time::Duration;
 // crates
-use blake2::{
-    digest::{Update, VariableOutput},
-    Blake2bVar,
-};
 use bytes::Bytes;
 use cryptarchia_consensus::ConsensusMsg;
 use cryptarchia_consensus::TimeConfig;
 use cryptarchia_ledger::{Coin, LedgerState};
-use full_replication::attestation::Attestation;
-use full_replication::{Certificate, VidCertificate};
-use nomos_core::da::attestation::Attestation as TraitAttestation;
-use nomos_core::da::certificate::metadata::Metadata;
-use nomos_core::da::certificate::vid::VidCertificate as _;
-use nomos_core::da::certificate::Certificate as _;
-use nomos_core::da::certificate::CertificateStrategy;
-use nomos_core::da::Signer;
-use nomos_core::{da::certificate, tx::Transaction};
+use full_replication::{BlobInfo, Metadata};
+use nomos_core::da::blob::info::DispersedBlobInfo;
+use nomos_core::da::blob::metadata::Metadata as _;
+use nomos_core::tx::Transaction;
 use nomos_da_indexer::storage::adapters::rocksdb::RocksAdapterSettings;
 use nomos_da_indexer::IndexerSettings;
 use nomos_da_storage::fs::write_blob;
@@ -83,10 +74,7 @@ fn new_node(
                 backend: (),
                 network: AdapterSettings {
                     topic: String::from(nomos_node::DA_TOPIC),
-                    id: <Certificate as certificate::Certificate>::id,
-                },
-                verification_provider: full_replication::CertificateVerificationParameters {
-                    threshold: 0,
+                    id: <BlobInfo as DispersedBlobInfo>::blob_id,
                 },
                 registry: None,
             },
@@ -113,24 +101,6 @@ fn new_node(
     )
     .map_err(|e| eprintln!("Error encountered: {}", e))
     .unwrap()
-}
-
-fn hash(item: impl AsRef<[u8]>) -> [u8; 32] {
-    let mut hasher = Blake2bVar::new(32).unwrap();
-    hasher.update(item.as_ref());
-    let mut output = [0; 32];
-    hasher.finalize_variable(&mut output).unwrap();
-    output
-}
-
-fn signature(attestation: &Attestation) -> [u8; 32] {
-    let mut attestations = vec![attestation];
-    attestations.sort();
-    let mut signatures = Vec::new();
-    for attestation in &attestations {
-        signatures.extend_from_slice(attestation.signature());
-    }
-    hash(signatures)
 }
 
 // TODO: When verifier is implemented this test should be removed and a new one
@@ -212,43 +182,26 @@ fn test_indexer() {
     let app_id = [7u8; 32];
     let index = 0.into();
 
-    let attestation = Attestation::new_signed(blob_hash, ids[0], &MockKeyPair);
-    let certificate_strategy = full_replication::AbsoluteNumber::new(1);
-    let cert = certificate_strategy.build(vec![attestation.clone()], app_id, index);
-    let cert_id = cert.id();
-    let vid: VidCertificate = cert.clone().into();
     let range = 0.into()..1.into(); // get idx 0 and 1.
-
-    // Test generate hash for Attestation
-    let hash2 = attestation.hash();
-    let expected_hash = hash([blob_hash, ids[0]].concat());
-
-    assert_eq!(hash2, expected_hash);
-
-    // Test generate signature for Certificate
-    let sig2 = cert.signature();
-    let expected_signature = signature(&attestation);
-
-    assert_eq!(sig2, expected_signature);
+    let meta = Metadata::new(app_id, index);
+    let blob_info = BlobInfo::new(blob_hash, meta);
 
     // Test get Metadata for Certificate
-    let (app_id2, index2) = cert.metadata();
+    let (app_id2, index2) = blob_info.metadata();
 
     assert_eq!(app_id2, app_id);
     assert_eq!(index2, index);
 
     // Test generate hash for Certificate with default Hasher
     let mut default_hasher = DefaultHasher::new();
-    let _hash3 = <Certificate as Hash>::hash(&cert, &mut default_hasher);
+    let _hash3 = <BlobInfo as Hash>::hash(&blob_info, &mut default_hasher);
+
+    let expected_blob_info = blob_info.clone();
 
     // Mock attestation step where blob is persisted in nodes blob storage.
     let rt = tokio::runtime::Runtime::new().unwrap();
-    rt.block_on(write_blob(
-        blobs_dir,
-        vid.certificate_id().as_ref(),
-        b"blob",
-    ))
-    .unwrap();
+    rt.block_on(write_blob(blobs_dir, blob_info.blob_id().as_ref(), b"blob"))
+        .unwrap();
 
     node1.spawn(async move {
         let mempool_outbound = mempool.connect().await.unwrap();
@@ -280,12 +233,12 @@ fn test_indexer() {
             .await
             .unwrap();
 
-        // Put cert into the mempool.
+        // Put blob_info into the mempool.
         let (mempool_tx, mempool_rx) = tokio::sync::oneshot::channel();
         mempool_outbound
             .send(nomos_mempool::MempoolMsg::Add {
-                payload: cert,
-                key: cert_id,
+                payload: blob_info,
+                key: blob_hash,
                 reply_channel: mempool_tx,
             })
             .await
@@ -299,7 +252,7 @@ fn test_indexer() {
         loop {
             tokio::select! {
                 Some(block) = broadcast_receiver.next() => {
-                    if block.blobs().any(|v| *v == vid) {
+                    if block.blobs().any(|b| *b == expected_blob_info) {
                         break;
                     }
                 }
@@ -312,7 +265,7 @@ fn test_indexer() {
         // Give time for services to process and store data.
         tokio::time::sleep(Duration::from_secs(1)).await;
 
-        // Request range of vids from indexer.
+        // Request range of blobs from indexer.
         let (indexer_tx, indexer_rx) = tokio::sync::oneshot::channel();
         indexer_outbound
             .send(nomos_da_indexer::DaMsg::GetRange {
@@ -324,7 +277,7 @@ fn test_indexer() {
             .unwrap();
         let mut app_id_blobs = indexer_rx.await.unwrap();
 
-        // Since we've only attested to certificate at idx 0, the first
+        // Since we've only attested to blob_info at idx 0, the first
         // item should have "some" data, other indexes should be None.
         app_id_blobs.sort_by(|(a, _), (b, _)| a.partial_cmp(b).unwrap());
         let app_id_blobs = app_id_blobs.iter().map(|(_, b)| b).collect::<Vec<_>>();
@@ -341,12 +294,4 @@ fn test_indexer() {
         std::thread::sleep(std::time::Duration::from_millis(200));
     }
     assert!(is_success_rx.load(SeqCst));
-}
-
-struct MockKeyPair;
-
-impl Signer for MockKeyPair {
-    fn sign(&self, _message: &[u8]) -> Vec<u8> {
-        vec![]
-    }
 }

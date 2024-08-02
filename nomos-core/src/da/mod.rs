@@ -1,29 +1,27 @@
-use std::error::Error;
 // crates
 // internal
 
-pub mod attestation;
 pub mod blob;
-pub mod certificate;
 
 pub trait DaEncoder {
     type EncodedData;
-    fn encode(b: &[u8]) -> Result<Self::EncodedData, impl Error>;
+    type Error;
+
+    fn encode(&self, b: &[u8]) -> Result<Self::EncodedData, Self::Error>;
 }
 
 pub trait DaVerifier {
     type DaBlob;
-    type Attestation;
     type Error;
 
-    fn verify(&self, blob: &Self::DaBlob) -> Result<Self::Attestation, Self::Error>;
+    fn verify(&self, blob: &Self::DaBlob) -> Result<(), Self::Error>;
 }
 
 pub trait DaDispersal {
     type EncodedData;
-    type Certificate;
+    type Error;
 
-    fn disperse(&self, encoded_data: Self::EncodedData) -> Result<Self::Certificate, impl Error>;
+    fn disperse(&self, encoded_data: Self::EncodedData) -> Result<(), Self::Error>;
 }
 
 pub trait Signer {
