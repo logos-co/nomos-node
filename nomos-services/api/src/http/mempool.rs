@@ -1,8 +1,8 @@
 use core::{fmt::Debug, hash::Hash};
-use nomos_core::{da::certificate::Certificate, header::HeaderId};
+use nomos_core::{da::blob::info::DispersedBlobInfo, header::HeaderId};
 use nomos_mempool::{
-    backend::mockpool::MockPool, network::NetworkAdapter, verify::MempoolVerificationProvider,
-    DaMempoolService, MempoolMsg, TxMempoolService,
+    backend::mockpool::MockPool, network::NetworkAdapter, DaMempoolService, MempoolMsg,
+    TxMempoolService,
 };
 use nomos_network::backends::NetworkBackend;
 use tokio::sync::oneshot;
@@ -49,17 +49,13 @@ pub async fn add_cert<N, A, V, Item, Key>(
 where
     N: NetworkBackend,
     A: NetworkAdapter<Backend = N, Key = Key> + Send + Sync + 'static,
-    A::Payload: Certificate + Into<Item> + Debug,
+    A::Payload: DispersedBlobInfo + Into<Item> + Debug,
     A::Settings: Send + Sync,
-    V: MempoolVerificationProvider<
-        Payload = A::Payload,
-        Parameters = <A::Payload as Certificate>::VerificationParameters,
-    >,
     Item: Clone + Debug + Send + Sync + 'static + Hash,
     Key: Clone + Debug + Ord + Hash + 'static,
 {
     let relay = handle
-        .relay::<DaMempoolService<A, MockPool<HeaderId, Item, Key>, V>>()
+        .relay::<DaMempoolService<A, MockPool<HeaderId, Item, Key>>>()
         .connect()
         .await?;
     let (sender, receiver) = oneshot::channel();

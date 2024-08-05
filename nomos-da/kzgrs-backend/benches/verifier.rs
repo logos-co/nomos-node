@@ -4,6 +4,7 @@ use divan::Bencher;
 use kzgrs_backend::common::blob::DaBlob;
 use kzgrs_backend::encoder::{DaEncoder, DaEncoderParams};
 use kzgrs_backend::verifier::DaVerifier;
+use nomos_core::da::DaEncoder as _;
 use rand::{thread_rng, RngCore};
 use std::hint::black_box;
 

@@ -3,9 +3,9 @@ use std::{marker::PhantomData, ops::Range};
 
 use bytes::Bytes;
 use futures::{stream::FuturesUnordered, Stream};
-use nomos_core::da::certificate::{
+use nomos_core::da::blob::{
+    info::DispersedBlobInfo,
     metadata::{Metadata, Next},
-    vid::VidCertificate,
 };
 use nomos_da_storage::fs::load_blob;
 use nomos_da_storage::rocksdb::{key_bytes, DA_ATTESTED_KEY_PREFIX, DA_VID_KEY_PREFIX};
@@ -20,27 +20,27 @@ use overwatch_rs::{
 
 use crate::storage::DaStorageAdapter;
 
-pub struct RocksAdapter<S, V>
+pub struct RocksAdapter<S, B>
 where
     S: StorageSerde + Send + Sync + 'static,
-    V: VidCertificate + Metadata + Send + Sync,
+    B: DispersedBlobInfo + Metadata + Send + Sync,
 {
     settings: RocksAdapterSettings,
     storage_relay: OutboundRelay<StorageMsg<RocksBackend<S>>>,
-    _vid: PhantomData<V>,
+    _vid: PhantomData<B>,
 }
 
 #[async_trait::async_trait]
-impl<S, V> DaStorageAdapter for RocksAdapter<S, V>
+impl<S, B> DaStorageAdapter for RocksAdapter<S, B>
 where
     S: StorageSerde + Send + Sync + 'static,
-    V: VidCertificate<CertificateId = [u8; 32]> + Metadata + Send + Sync,
-    V::Index: AsRef<[u8]> + Next + Clone + PartialOrd + Send + Sync + 'static,
-    V::AppId: AsRef<[u8]> + Clone + Send + Sync + 'static,
+    B: DispersedBlobInfo<BlobId = [u8; 32]> + Metadata + Send + Sync,
+    B::Index: AsRef<[u8]> + Next + Clone + PartialOrd + Send + Sync + 'static,
+    B::AppId: AsRef<[u8]> + Clone + Send + Sync + 'static,
 {
     type Backend = RocksBackend<S>;
     type Blob = Bytes;
-    type VID = V;
+    type Info = B;
     type Settings = RocksAdapterSettings;
 
     async fn new(
@@ -54,11 +54,11 @@ where
         }
     }
 
-    async fn add_index(&self, vid: &Self::VID) -> Result<(), DynError> {
-        let (app_id, idx) = vid.metadata();
+    async fn add_index(&self, info: &Self::Info) -> Result<(), DynError> {
+        let (app_id, idx) = info.metadata();
 
-        // Check if VID in a block is something that the node've seen before.
-        let attested_key = key_bytes(DA_ATTESTED_KEY_PREFIX, vid.certificate_id());
+        // Check if Info in a block is something that the node've seen before.
+        let attested_key = key_bytes(DA_ATTESTED_KEY_PREFIX, info.blob_id());
         let (reply_tx, reply_rx) = tokio::sync::oneshot::channel();
 
         self.storage_relay
@@ -69,7 +69,7 @@ where
             .await
             .expect("Failed to send load request to storage relay");
 
-        // If node haven't attested this vid, return early.
+        // If node haven't attested this info, return early.
         if reply_rx.await?.is_none() {
             return Ok(());
         }
@@ -79,8 +79,8 @@ where
             [app_id.clone().as_ref(), idx.as_ref()].concat(),
         );
 
-        // We are only persisting the id part of VID, the metadata can be derived from the key.
-        let value = Bytes::from(vid.certificate_id().to_vec());
+        // We are only persisting the id part of Info, the metadata can be derived from the key.
+        let value = Bytes::from(info.blob_id().to_vec());
 
         self.storage_relay
             .send(StorageMsg::Store {
@@ -93,9 +93,9 @@ where
 
     async fn get_range_stream(
         &self,
-        app_id: <Self::VID as Metadata>::AppId,
-        index_range: Range<<Self::VID as Metadata>::Index>,
-    ) -> Box<dyn Stream<Item = (<Self::VID as Metadata>::Index, Option<Bytes>)> + Unpin + Send>
+        app_id: <Self::Info as Metadata>::AppId,
+        index_range: Range<<Self::Info as Metadata>::Index>,
+    ) -> Box<dyn Stream<Item = (<Self::Info as Metadata>::Index, Option<Bytes>)> + Unpin + Send>
     {
         let futures = FuturesUnordered::new();
 

@@ -1,77 +1,55 @@
-pub mod api;
-mod config;
-mod tx;
-
+use bytes::Bytes;
 use color_eyre::eyre::Result;
-use kzgrs_backend::dispersal::{Certificate, VidCertificate};
+use kzgrs_backend::dispersal::BlobInfo;
+use overwatch_derive::*;
+use overwatch_rs::services::handle::ServiceHandle;
+use serde::{de::DeserializeOwned, Serialize};
 
 use api::AxumBackend;
-use bytes::Bytes;
 pub use config::{Config, CryptarchiaArgs, HttpArgs, LogArgs, MetricsArgs, NetworkArgs};
-use kzgrs_backend::common::attestation::Attestation;
 use kzgrs_backend::common::blob::DaBlob;
 use nomos_api::ApiService;
-use nomos_core::{da::certificate, header::HeaderId, tx::Transaction, wire};
+use nomos_core::da::blob::info::DispersedBlobInfo;
+pub use nomos_core::{
+    da::blob::select::FillSize as FillSizeWithBlobs, tx::select::FillSize as FillSizeWithTx,
+};
+use nomos_core::{header::HeaderId, tx::Transaction, wire};
 use nomos_da_verifier::backend::kzgrs::KzgrsDaVerifier;
 #[cfg(feature = "tracing")]
 use nomos_log::Logger;
-use nomos_mempool::da::verify::kzgrs::DaVerificationProvider as MempoolVerificationProvider;
+use nomos_mempool::da::service::DaMempoolService;
 use nomos_mempool::network::adapters::libp2p::Libp2pAdapter as MempoolNetworkAdapter;
 use nomos_mempool::{backend::mockpool::MockPool, TxMempoolService};
 #[cfg(feature = "metrics")]
 use nomos_metrics::Metrics;
 use nomos_network::backends::libp2p::Libp2p as NetworkBackend;
+use nomos_network::NetworkService;
 use nomos_storage::{
     backends::{rocksdb::RocksBackend, StorageSerde},
     StorageService,
 };
-
-#[cfg(feature = "carnot")]
-use carnot_engine::overlay::{RandomBeaconState, RoundRobin, TreeOverlay};
-pub use nomos_core::{
-    da::certificate::select::FillSize as FillSizeWithBlobsCertificate,
-    tx::select::FillSize as FillSizeWithTx,
-};
-use nomos_mempool::da::service::DaMempoolService;
-use nomos_network::NetworkService;
 use nomos_system_sig::SystemSig;
-use overwatch_derive::*;
-use overwatch_rs::services::handle::ServiceHandle;
-use serde::{de::DeserializeOwned, Serialize};
-
 pub use tx::Tx;
 
-pub type NomosApiService = ApiService<
-    AxumBackend<
-        Attestation,
-        DaBlob,
-        Certificate,
-        VidCertificate,
-        MempoolVerificationProvider,
-        KzgrsDaVerifier,
-        Tx,
-        Wire,
-        MB16,
-    >,
->;
+pub mod api;
+mod config;
+mod tx;
+
+pub type NomosApiService =
+    ApiService<AxumBackend<(), DaBlob, BlobInfo, BlobInfo, KzgrsDaVerifier, Tx, Wire, MB16>>;
 
 pub const CL_TOPIC: &str = "cl";
 pub const DA_TOPIC: &str = "da";
 const MB16: usize = 1024 * 1024 * 16;
 
 pub type Cryptarchia = cryptarchia_consensus::CryptarchiaConsensus<
-    cryptarchia_consensus::network::adapters::libp2p::LibP2pAdapter<Tx, VidCertificate>,
+    cryptarchia_consensus::network::adapters::libp2p::LibP2pAdapter<Tx, BlobInfo>,
     MockPool<HeaderId, Tx, <Tx as Transaction>::Hash>,
     MempoolNetworkAdapter<Tx, <Tx as Transaction>::Hash>,
-    MockPool<
-        HeaderId,
-        VidCertificate,
-        <VidCertificate as certificate::vid::VidCertificate>::CertificateId,
-    >,
-    MempoolNetworkAdapter<Certificate, <Certificate as certificate::Certificate>::Id>,
-    MempoolVerificationProvider,
+    MockPool<HeaderId, BlobInfo, <BlobInfo as DispersedBlobInfo>::BlobId>,
+    MempoolNetworkAdapter<BlobInfo, <BlobInfo as DispersedBlobInfo>::BlobId>,
     FillSizeWithTx<MB16, Tx>,
-    FillSizeWithBlobsCertificate<MB16, VidCertificate>,
+    FillSizeWithBlobs<MB16, BlobInfo>,
     RocksBackend<Wire>,
 >;
 
@@ -81,13 +59,8 @@ pub type TxMempool = TxMempoolService<
 >;
 
 pub type DaMempool = DaMempoolService<
-    MempoolNetworkAdapter<Certificate, <Certificate as certificate::Certificate>::Id>,
-    MockPool<
-        HeaderId,
-        VidCertificate,
-        <VidCertificate as certificate::vid::VidCertificate>::CertificateId,
-    >,
-    MempoolVerificationProvider,
+    MempoolNetworkAdapter<BlobInfo, <BlobInfo as DispersedBlobInfo>::BlobId>,
+    MockPool<HeaderId, BlobInfo, <BlobInfo as DispersedBlobInfo>::BlobId>,
 >;
 
 #[derive(Services)]

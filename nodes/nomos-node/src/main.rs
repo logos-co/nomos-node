@@ -1,4 +1,4 @@
-use kzgrs_backend::dispersal::Certificate;
+use kzgrs_backend::dispersal::BlobInfo;
 #[cfg(feature = "metrics")]
 use nomos_metrics::MetricsSettings;
 use nomos_node::{
@@ -8,7 +8,7 @@ use nomos_node::{
 
 use clap::Parser;
 use color_eyre::eyre::{eyre, Result};
-use nomos_core::{da::certificate, tx::Transaction};
+use nomos_core::{da::blob::info::DispersedBlobInfo, tx::Transaction};
 
 use nomos_mempool::network::adapters::libp2p::Settings as AdapterSettings;
 
@@ -86,12 +86,8 @@ fn main() -> Result<()> {
                 backend: (),
                 network: AdapterSettings {
                     topic: String::from(nomos_node::DA_TOPIC),
-                    id: <Certificate as certificate::Certificate>::id,
+                    id: <BlobInfo as DispersedBlobInfo>::blob_id,
                 },
-                verification_provider:
-                    kzgrs_backend::dispersal::CertificateVerificationParameters {
-                        nodes_public_keys: Default::default(),
-                    },
                 registry: registry.clone(),
             },
             cryptarchia: config.cryptarchia,

@@ -47,7 +47,6 @@ where
     Backend: VerifierBackend,
     Backend::Settings: Clone,
     Backend::DaBlob: 'static,
-    Backend::Attestation: 'static,
     Backend::Error: Error,
     N: NetworkAdapter,
     N::Settings: Clone,
@@ -63,26 +62,23 @@ impl<Backend, N, S> DaVerifierService<Backend, N, S>
 where
     Backend: VerifierBackend + Send + 'static,
     Backend::DaBlob: Debug + Send,
-    Backend::Attestation: Debug + Send,
     Backend::Error: Error + Send + Sync,
     Backend::Settings: Clone,
-    N: NetworkAdapter<Blob = Backend::DaBlob, Attestation = Backend::Attestation> + Send + 'static,
+    N: NetworkAdapter<Blob = Backend::DaBlob, Attestation = ()> + Send + 'static,
     N::Settings: Clone,
-    S: DaStorageAdapter<Blob = Backend::DaBlob, Attestation = Backend::Attestation>
-        + Send
-        + 'static,
+    S: DaStorageAdapter<Blob = Backend::DaBlob, Attestation = ()> + Send + 'static,
 {
     async fn handle_new_blob(
         verifier: &Backend,
         storage_adapter: &S,
         blob: &Backend::DaBlob,
-    ) -> Result<Backend::Attestation, DynError> {
-        if let Some(attestation) = storage_adapter.get_attestation(blob).await? {
-            Ok(attestation)
+    ) -> Result<(), DynError> {
+        if storage_adapter.get_attestation(blob).await?.is_some() {
+            Ok(())
         } else {
-            let attestation = verifier.verify(blob)?;
-            storage_adapter.add_blob(blob, &attestation).await?;
-            Ok(attestation)
+            verifier.verify(blob)?;
+            storage_adapter.add_blob(blob, &()).await?;
+            Ok(())
         }
     }
 
@@ -116,7 +112,7 @@ where
     type Settings = DaVerifierServiceSettings<Backend::Settings, N::Settings, S::Settings>;
     type State = NoState<Self::Settings>;
     type StateOperator = NoOperator<Self::State>;
-    type Message = DaVerifierMsg<Backend::DaBlob, Backend::Attestation>;
+    type Message = DaVerifierMsg<Backend::DaBlob, ()>;
 }
 
 #[async_trait::async_trait]
@@ -125,17 +121,10 @@ where
     Backend: VerifierBackend + Send + Sync + 'static,
     Backend::Settings: Clone + Send + Sync + 'static,
     Backend::DaBlob: Debug + Send + Sync + 'static,
-    Backend::Attestation: Debug + Send + Sync + 'static,
     Backend::Error: Error + Send + Sync + 'static,
-    N: NetworkAdapter<Blob = Backend::DaBlob, Attestation = Backend::Attestation>
-        + Send
-        + Sync
-        + 'static,
+    N: NetworkAdapter<Blob = Backend::DaBlob, Attestation = ()> + Send + Sync + 'static,
     N::Settings: Clone + Send + Sync + 'static,
-    S: DaStorageAdapter<Blob = Backend::DaBlob, Attestation = Backend::Attestation>
-        + Send
-        + Sync
-        + 'static,
+    S: DaStorageAdapter<Blob = Backend::DaBlob, Attestation = ()> + Send + Sync + 'static,
     S::Settings: Clone + Send + Sync + 'static,
 {
     fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, DynError> {

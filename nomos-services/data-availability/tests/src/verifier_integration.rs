@@ -1,15 +1,17 @@
+// std
 use std::path::PathBuf;
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering::SeqCst;
 use std::sync::Arc;
 use std::time::Duration;
-
+// crates
 use cryptarchia_consensus::TimeConfig;
 use cryptarchia_ledger::{Coin, LedgerState};
-use full_replication::Certificate;
+use full_replication::BlobInfo;
 use kzgrs_backend::common::blob::DaBlob;
 use kzgrs_backend::encoder::{DaEncoder, DaEncoderParams};
-use nomos_core::{da::certificate, tx::Transaction};
+use nomos_core::da::{blob::info::DispersedBlobInfo, DaEncoder as _};
+use nomos_core::tx::Transaction;
 use nomos_da_indexer::storage::adapters::rocksdb::RocksAdapterSettings as IndexerStorageSettings;
 use nomos_da_indexer::IndexerSettings;
 use nomos_da_verifier::backend::kzgrs::KzgrsDaVerifierSettings;
@@ -28,7 +30,7 @@ use overwatch_rs::services::handle::ServiceHandle;
 use rand::{thread_rng, Rng, RngCore};
 use tempfile::{NamedTempFile, TempDir};
 use time::OffsetDateTime;
-
+// internal
 use crate::common::*;
 
 // Client node is only created for asyncroniously interact with nodes in the test.
@@ -97,10 +99,7 @@ fn new_node(
                 backend: (),
                 network: AdapterSettings {
                     topic: String::from(nomos_node::DA_TOPIC),
-                    id: <Certificate as certificate::Certificate>::id,
-                },
-                verification_provider: full_replication::CertificateVerificationParameters {
-                    threshold: 0,
+                    id: <BlobInfo as DispersedBlobInfo>::blob_id,
                 },
                 registry: None,
             },
@@ -282,7 +281,7 @@ fn test_verifier() {
                 .unwrap();
         }
 
-        // Create cert
+        // Wait for response from the verifier.
         let a1 = node1_reply_rx.await.unwrap();
         let a2 = node2_reply_rx.await.unwrap();
 
@@ -290,7 +289,6 @@ fn test_verifier() {
             is_success_tx.store(true, SeqCst);
         }
 
-        // TODO: Create cert and check indexer integration.
         performed_tx.store(true, SeqCst);
     });
 
