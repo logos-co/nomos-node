@@ -1,7 +1,7 @@
 on:
   push:
     branches:
-      - my-codeconv
+      - my-codecov
 
 name: My Codecov 3
 
