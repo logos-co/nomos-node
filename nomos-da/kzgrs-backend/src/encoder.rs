@@ -258,7 +258,6 @@ impl nomos_core::da::DaEncoder for DaEncoder {
 
 #[cfg(test)]
 pub mod test {
-    use crate::common::ChunksMatrix;
     use crate::encoder::{DaEncoder, DaEncoderParams};
     use crate::global::GLOBAL_PARAMETERS;
     use ark_ff::PrimeField;
@@ -285,23 +284,16 @@ pub mod test {
 
     #[test]
     fn test_chunkify() {
-        fn check_matrix(matrix: &ChunksMatrix, params: &DaEncoderParams, elements: usize) {
-            assert_eq!(matrix.len(), elements.div(params.column_count.div(2)));
-            for row in matrix.rows() {
-                assert_eq!(row.len(), params.column_count.div(2));
-                assert_eq!(row.0[0].len(), BYTES_PER_FIELD_ELEMENT);
-            }
-        }
-
         let params = DaEncoderParams::default_with(2);
         let elements = 10usize;
         let data = rand_data(elements);
         let encoder = DaEncoder::new(params.clone());
         let matrix = encoder.chunkify(&data);
-        check_matrix(&matrix, &params, elements);
-
-        let params_new = DaEncoderParams::new(2, false);
-        check_matrix(&matrix, &params_new, elements);
+        assert_eq!(matrix.len(), elements.div(params.column_count.div(2)));
+        for row in matrix.rows() {
+            assert_eq!(row.len(), params.column_count.div(2));
+            assert_eq!(row.0[0].len(), BYTES_PER_FIELD_ELEMENT);
+        }
     }
 
     #[test]
