@@ -1,10 +1,11 @@
-use crate::protocol::DISPERSAL_PROTOCOL;
-use crate::SubnetworkId;
+// std
+use std::collections::{HashMap, VecDeque};
+use std::task::{Context, Poll};
+// crates
 use either::Either;
 use futures::future::BoxFuture;
 use futures::stream::FuturesUnordered;
 use futures::{AsyncWriteExt, FutureExt, StreamExt};
-use kzgrs_backend::common::blob::DaBlob;
 use libp2p::core::Endpoint;
 use libp2p::swarm::{
     ConnectionDenied, ConnectionId, FromSwarm, NetworkBehaviour, THandler, THandlerInEvent,
@@ -12,14 +13,16 @@ use libp2p::swarm::{
 };
 use libp2p::{Multiaddr, PeerId, Stream};
 use libp2p_stream::IncomingStreams;
+use thiserror::Error;
+// internal
+use crate::protocol::DISPERSAL_PROTOCOL;
+use crate::SubnetworkId;
+use kzgrs_backend::common::blob::DaBlob;
 use nomos_da_messages::common::Blob;
 use nomos_da_messages::dispersal::dispersal_res::MessageType;
 use nomos_da_messages::dispersal::{DispersalErr, DispersalReq, DispersalRes};
 use nomos_da_messages::{pack_message, unpack_from_reader};
-use std::collections::{HashMap, VecDeque};
-use std::task::{Context, Poll};
 use subnetworks_assignations::MembershipHandler;
-use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum DispersalError {
@@ -82,12 +85,19 @@ type StreamHandlerFutureSuccess = (BlobId, SubnetworkId, DispersalRes, Dispersal
 type StreamHandlerFuture = BoxFuture<'static, Result<StreamHandlerFutureSuccess, DispersalError>>;
 
 pub struct DispersalExecutorBehaviour<Membership> {
+    /// Underlying stream behaviour
     stream_behaviour: libp2p_stream::Behaviour,
+    /// Hook to newly connected streams
     incoming_streams: IncomingStreams,
+    /// Pending running tasks (one task per stream)
     tasks: FuturesUnordered<StreamHandlerFuture>,
+    /// Streams which didn't have any pending task
     idle_streams: HashMap<PeerId, DispersalStream>,
+    /// Subnetworks membership information
     membership: Membership,
+    /// Pending blobs that need to be dispersed by PeerId
     to_disperse: HashMap<PeerId, VecDeque<(SubnetworkId, DaBlob)>>,
+    /// Already connected peers connection Ids
     connected_subnetworks: HashMap<PeerId, ConnectionId>,
 }
 
@@ -112,7 +122,7 @@ impl<Membership: MembershipHandler> DispersalExecutorBehaviour<Membership> {
             idle_streams,
         }
     }
-    async fn handle_dispersal_stream(
+    async fn stream_disperse(
         mut stream: DispersalStream,
         message: DaBlob,
         subnetwork_id: SubnetworkId,
@@ -157,6 +167,23 @@ impl<Membership: MembershipHandler> DispersalExecutorBehaviour<Membership> {
         Ok((blob_id.try_into().unwrap(), subnetwork_id, response, stream))
     }
 
+    fn handle_stream(
+        tasks: &mut FuturesUnordered<StreamHandlerFuture>,
+        to_disperse: &mut HashMap<PeerId, VecDeque<(SubnetworkId, DaBlob)>>,
+        idle_streams: &mut HashMap<PeerId, DispersalStream>,
+        stream: DispersalStream,
+    ) {
+        if let Some((subnetwork_id, next_request)) =
+            Self::next_request(&stream.peer_id, to_disperse)
+        {
+            let fut = Self::stream_disperse(stream, next_request, subnetwork_id).boxed();
+            tasks.push(fut);
+        } else {
+            // There is no pending request, so just idle the stream
+            idle_streams.insert(stream.peer_id, stream);
+        };
+    }
+
     fn next_request(
         peer_id: &PeerId,
         to_disperse: &mut HashMap<PeerId, VecDeque<(SubnetworkId, DaBlob)>>,
@@ -185,10 +212,11 @@ impl<Membership: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'sta
         // internal decision of the executor itself.
         for peer in peers {
             if let Some(stream) = self.idle_streams.remove(peer) {
-                let fut =
-                    Self::handle_dispersal_stream(stream, blob.clone(), subnetwork_id).boxed();
+                // push a task if the stream is inmediately available
+                let fut = Self::stream_disperse(stream, blob.clone(), subnetwork_id).boxed();
                 self.tasks.push(fut);
             } else {
+                // otherwise queue the blob
                 to_disperse
                     .entry(*peer)
                     .or_default()
@@ -257,13 +285,16 @@ impl<M: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'static> Netw
             idle_streams,
             ..
         } = self;
+        // poll new connections
         if let Poll::Ready(Some((peer_id, stream))) = incoming_streams.poll_next_unpin(cx) {
             let stream = DispersalStream { stream, peer_id };
             Self::handle_stream(tasks, to_disperse, idle_streams, stream);
         }
+        // poll pending tasks
         if let Poll::Ready(Some(future_result)) = tasks.poll_next_unpin(cx) {
             match future_result {
                 Ok((blob_id, subnetwork_id, dispersal_response, stream)) => {
+                    // return an error if there was an error on the other side of the wire
                     if let DispersalRes {
                         message_type: Some(MessageType::Err(error)),
                     } = dispersal_response
@@ -277,6 +308,7 @@ impl<M: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'static> Netw
                             },
                         ));
                     }
+                    // handle the free stream then return the success
                     Self::handle_stream(tasks, to_disperse, idle_streams, stream);
                     return Poll::Ready(ToSwarm::GenerateEvent(
                         DispersalExecutorEvent::DispersalSuccess {
@@ -285,6 +317,7 @@ impl<M: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'static> Netw
                         },
                     ));
                 }
+                // Something went up on our side of the wire, bubble it up
                 Err(error) => {
                     return Poll::Ready(ToSwarm::GenerateEvent(
                         DispersalExecutorEvent::DispersalError { error },
@@ -298,26 +331,5 @@ impl<M: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'static> Netw
             Poll::Pending => Poll::Pending,
             _ => unreachable!(),
         }
-    }
-}
-
-impl<M: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'static>
-    DispersalExecutorBehaviour<M>
-{
-    fn handle_stream(
-        tasks: &mut FuturesUnordered<StreamHandlerFuture>,
-        to_disperse: &mut HashMap<PeerId, VecDeque<(SubnetworkId, DaBlob)>>,
-        idle_streams: &mut HashMap<PeerId, DispersalStream>,
-        stream: DispersalStream,
-    ) {
-        if let Some((subnetwork_id, next_request)) =
-            Self::next_request(&stream.peer_id, to_disperse)
-        {
-            let fut = Self::handle_dispersal_stream(stream, next_request, subnetwork_id).boxed();
-            tasks.push(fut);
-        } else {
-            // There is no pending request, so just idle the stream
-            idle_streams.insert(stream.peer_id, stream);
-        };
     }
 }
