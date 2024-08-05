@@ -98,7 +98,7 @@ impl Toeplitz1Cache {
 
 #[cfg(test)]
 mod test {
-    use crate::fk20::fk20_batch_generate_elements_proofs;
+    use crate::fk20::{fk20_batch_generate_elements_proofs, Toeplitz1Cache};
     use crate::{
         common::bytes_to_polynomial, kzg::generate_element_proof, GlobalParameters, Proof,
         BYTES_PER_FIELD_ELEMENT,
@@ -132,6 +132,12 @@ mod test {
                 })
                 .collect();
             let fk20_proofs = fk20_batch_generate_elements_proofs(&poly, &GLOBAL_PARAMETERS, None);
+            assert_eq!(slow_proofs, fk20_proofs);
+
+            // Test variant with Toeplitz1Cache param
+            let tc = Toeplitz1Cache::with_size(&GLOBAL_PARAMETERS.clone(), size);
+            let fk20_proofs =
+                fk20_batch_generate_elements_proofs(&poly, &GLOBAL_PARAMETERS, Some(&tc));
             assert_eq!(slow_proofs, fk20_proofs);
         }
     }
