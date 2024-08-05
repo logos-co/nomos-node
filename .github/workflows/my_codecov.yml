@@ -3,7 +3,7 @@ on:
     branches:
       - my-codeconv
 
-name: My Codecov 2
+name: My Codecov 3
 
 jobs:
   test:
