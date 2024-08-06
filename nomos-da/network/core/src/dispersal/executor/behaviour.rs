@@ -12,7 +12,7 @@ use libp2p::swarm::{
     THandlerOutEvent, ToSwarm,
 };
 use libp2p::{Multiaddr, PeerId, Stream};
-use libp2p_stream::IncomingStreams;
+use libp2p_stream::OpenStreamError;
 use thiserror::Error;
 // internal
 use crate::protocol::DISPERSAL_PROTOCOL;
@@ -43,25 +43,32 @@ pub enum DispersalError {
         subnetwork_id: SubnetworkId,
         error: DispersalErr,
     },
+    #[error("Error dialing peer [{peer_id}]: {error}")]
+    OpenStreamError {
+        peer_id: PeerId,
+        error: OpenStreamError,
+    },
 }
 
 impl DispersalError {
-    pub fn blob_id(&self) -> BlobId {
+    pub fn blob_id(&self) -> Option<BlobId> {
         match self {
-            DispersalError::Io { blob_id, .. } => *blob_id,
-            DispersalError::Serialization { blob_id, .. } => *blob_id,
+            DispersalError::Io { blob_id, .. } => Some(*blob_id),
+            DispersalError::Serialization { blob_id, .. } => Some(*blob_id),
             DispersalError::Protocol {
                 error: DispersalErr { blob_id, .. },
                 ..
-            } => blob_id.clone().try_into().unwrap(),
+            } => Some(blob_id.clone().try_into().unwrap()),
+            DispersalError::OpenStreamError { .. } => None,
         }
     }
 
-    pub fn subnetwork_id(&self) -> SubnetworkId {
+    pub fn subnetwork_id(&self) -> Option<SubnetworkId> {
         match self {
-            DispersalError::Io { subnetwork_id, .. } => *subnetwork_id,
-            DispersalError::Serialization { subnetwork_id, .. } => *subnetwork_id,
-            DispersalError::Protocol { subnetwork_id, .. } => *subnetwork_id,
+            DispersalError::Io { subnetwork_id, .. } => Some(*subnetwork_id),
+            DispersalError::Serialization { subnetwork_id, .. } => Some(*subnetwork_id),
+            DispersalError::Protocol { subnetwork_id, .. } => Some(*subnetwork_id),
+            DispersalError::OpenStreamError { .. } => None,
         }
     }
 }
@@ -87,8 +94,6 @@ type StreamHandlerFuture = BoxFuture<'static, Result<StreamHandlerFutureSuccess,
 pub struct DispersalExecutorBehaviour<Membership> {
     /// Underlying stream behaviour
     stream_behaviour: libp2p_stream::Behaviour,
-    /// Hook to newly connected streams
-    incoming_streams: IncomingStreams,
     /// Pending running tasks (one task per stream)
     tasks: FuturesUnordered<StreamHandlerFuture>,
     /// Streams which didn't have any pending task
@@ -104,23 +109,40 @@ pub struct DispersalExecutorBehaviour<Membership> {
 impl<Membership: MembershipHandler + 'static> DispersalExecutorBehaviour<Membership> {
     pub fn new(membership: Membership) -> Self {
         let stream_behaviour = libp2p_stream::Behaviour::new();
-        let mut stream_control = stream_behaviour.new_control();
-        let incoming_streams = stream_control
-            .accept(DISPERSAL_PROTOCOL)
-            .expect("Just a single accept to protocol is valid");
         let tasks = FuturesUnordered::new();
         let to_disperse = HashMap::new();
         let connected_subnetworks = HashMap::new();
         let idle_streams = HashMap::new();
         Self {
             stream_behaviour,
-            incoming_streams,
             tasks,
             membership,
             to_disperse,
             connected_subnetworks,
             idle_streams,
         }
+    }
+
+    pub async fn open_stream(&mut self, peer_id: PeerId) -> Result<(), DispersalError> {
+        let stream = self
+            .stream_behaviour
+            .new_control()
+            .open_stream(peer_id, DISPERSAL_PROTOCOL)
+            .await
+            .map_err(|error| DispersalError::OpenStreamError { peer_id, error })?;
+        let Self {
+            tasks,
+            to_disperse,
+            idle_streams,
+            ..
+        } = self;
+        Self::handle_stream(
+            tasks,
+            to_disperse,
+            idle_streams,
+            DispersalStream { stream, peer_id },
+        );
+        Ok(())
     }
     async fn stream_disperse(
         mut stream: DispersalStream,
@@ -279,17 +301,11 @@ impl<M: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'static> Netw
         cx: &mut Context<'_>,
     ) -> Poll<ToSwarm<Self::ToSwarm, THandlerInEvent<Self>>> {
         let Self {
-            incoming_streams,
             tasks,
             to_disperse,
             idle_streams,
             ..
         } = self;
-        // poll new connections
-        if let Poll::Ready(Some((peer_id, stream))) = incoming_streams.poll_next_unpin(cx) {
-            let stream = DispersalStream { stream, peer_id };
-            Self::handle_stream(tasks, to_disperse, idle_streams, stream);
-        }
         // poll pending tasks
         if let Poll::Ready(Some(future_result)) = tasks.poll_next_unpin(cx) {
             match future_result {
