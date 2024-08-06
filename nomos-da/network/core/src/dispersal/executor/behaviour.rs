@@ -101,7 +101,7 @@ pub struct DispersalExecutorBehaviour<Membership> {
     connected_subnetworks: HashMap<PeerId, ConnectionId>,
 }
 
-impl<Membership: MembershipHandler> DispersalExecutorBehaviour<Membership> {
+impl<Membership: MembershipHandler + 'static> DispersalExecutorBehaviour<Membership> {
     pub fn new(membership: Membership) -> Self {
         let stream_behaviour = libp2p_stream::Behaviour::new();
         let mut stream_control = stream_behaviour.new_control();
