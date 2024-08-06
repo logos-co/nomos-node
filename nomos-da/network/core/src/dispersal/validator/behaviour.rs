@@ -19,6 +19,7 @@ use std::io::Error;
 use std::task::{Context, Poll};
 use subnetworks_assignations::MembershipHandler;
 
+#[derive(Debug)]
 pub enum DispersalEvent {
     IncomingMessage { message: DispersalReq },
 }

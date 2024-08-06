@@ -73,6 +73,8 @@ impl DispersalError {
     }
 }
 type BlobId = [u8; 32];
+
+#[derive(Debug)]
 pub enum DispersalExecutorEvent {
     DispersalSuccess {
         blob_id: BlobId,
