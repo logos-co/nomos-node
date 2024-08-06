@@ -171,26 +171,28 @@ pub mod test {
                 .accept(StreamProtocol::new("/foo"))
                 .unwrap();
             // advance
-            trace!("Advancing");
+            debug!("1 Advancing");
             while let Some(event) = s1.next().await {
                 debug!("{event:?}");
             }
             let Some((p, mut s)) = incoming_streams.next().await else {
                 panic!("No incoming stream");
             };
-            trace!("Got a stream");
-            loop {
-                let mut buff = b"foobar".to_vec();
-                tokio::select! {
-                    _ = s.read_exact(&mut buff) => {
-                        debug!("{}", String::from_utf8_lossy(buff.as_ref()));
-                        break;
-                    }
-                    event = s1.select_next_some() => {
-                        debug!("{event:?}");
-                    }
-                }
-            }
+            debug!("1 Got a stream");
+            let mut buff = b"foobar".to_vec();
+            s.read_exact(&mut buff).await;
+            debug!("{}", String::from_utf8_lossy(buff.as_ref()));
+            // loop {
+            //     tokio::select! {
+            //         _ = s.read_exact(&mut buff) => {
+            //             debug!("{}", String::from_utf8_lossy(buff.as_ref()));
+            //             break;
+            //         }
+            //         event = s1.select_next_some() => {
+            //             debug!("{event:?}");
+            //         }
+            //     }
+            // }
         };
         let j1 = tokio::spawn(t1);
         let (sender, mut receiver) = tokio::sync::oneshot::channel();
@@ -209,7 +211,8 @@ pub mod test {
                 debug!("2 writes");
                 s.write_all(b"FooBar").await.unwrap();
                 s.flush().await.unwrap();
-                tokio::time::sleep(Duration::from_secs(1)).await;
+                debug!("2 finish writing");
+                tokio::time::sleep(Duration::from_secs(5)).await;
             });
             debug!("2 Advancing");
             loop {
