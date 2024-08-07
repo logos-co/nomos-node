@@ -12,7 +12,7 @@ use libp2p::swarm::{
     THandlerOutEvent, ToSwarm,
 };
 use libp2p::{Multiaddr, PeerId, Stream};
-use libp2p_stream::OpenStreamError;
+use libp2p_stream::{Control, OpenStreamError};
 use thiserror::Error;
 use tokio::sync::mpsc;
 use tokio::sync::mpsc::UnboundedSender;
@@ -134,13 +134,7 @@ where
         let control = stream_behaviour.new_control();
         let pending_out_streams = UnboundedReceiverStream::new(receiver)
             .zip(futures::stream::repeat(control))
-            .then(|(peer_id, mut control)| async move {
-                let stream = control
-                    .open_stream(peer_id, DISPERSAL_PROTOCOL)
-                    .await
-                    .map_err(|error| DispersalError::OpenStreamError { peer_id, error })?;
-                Ok(DispersalStream { stream, peer_id })
-            })
+            .then(|(peer_id, control)| Self::open_stream(peer_id, control))
             .boxed();
 
         let (pending_blobs_sender, receiver) = mpsc::unbounded_channel();
@@ -158,6 +152,17 @@ where
             pending_blobs_sender,
             pending_blobs_stream,
         }
+    }
+
+    async fn open_stream(
+        peer_id: PeerId,
+        mut control: Control,
+    ) -> Result<DispersalStream, DispersalError> {
+        let stream = control
+            .open_stream(peer_id, DISPERSAL_PROTOCOL)
+            .await
+            .map_err(|error| DispersalError::OpenStreamError { peer_id, error })?;
+        Ok(DispersalStream { stream, peer_id })
     }
 
     pub fn open_stream_sender(&self) -> UnboundedSender<PeerId> {

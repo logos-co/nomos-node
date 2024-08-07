@@ -3,28 +3,17 @@ pub mod validator;
 
 #[cfg(test)]
 pub mod test {
-    use crate::dispersal::executor::behaviour::{
-        DispersalExecutorBehaviour, DispersalExecutorEvent,
-    };
+    use crate::dispersal::executor::behaviour::DispersalExecutorBehaviour;
     use crate::dispersal::validator::behaviour::{DispersalEvent, DispersalValidatorBehaviour};
     use crate::test_utils::AllNeighbours;
-    use futures::{AsyncReadExt, AsyncWriteExt, StreamExt};
+    use futures::StreamExt;
     use kzgrs_backend::common::blob::DaBlob;
     use kzgrs_backend::common::Column;
     use libp2p::identity::Keypair;
-    use libp2p::quic::tokio::Provider;
-    use libp2p::quic::Config;
     use libp2p::swarm::SwarmEvent;
-    use libp2p::{
-        noise, ping, quic, tcp, yamux, Multiaddr, PeerId, StreamProtocol, Swarm, SwarmBuilder,
-    };
-    use log::{debug, error, info, trace};
-    use std::pin::pin;
-    use std::string::String;
-    use std::time::Duration;
+    use libp2p::{quic, Multiaddr, PeerId};
+    use log::info;
     use subnetworks_assignations::MembershipHandler;
-    use tracing::field::debug;
-    use tracing::instrument::WithSubscriber;
     use tracing_subscriber::fmt::TestWriter;
     use tracing_subscriber::EnvFilter;
 
@@ -107,8 +96,8 @@ pub mod test {
             res
         };
         let join_validator = tokio::spawn(validator_task);
-        let mut executor_open_stream_sender = executor.behaviour().open_stream_sender();
-        let mut executor_disperse_blob_sender = executor.behaviour().blobs_sender();
+        let executor_open_stream_sender = executor.behaviour().open_stream_sender();
+        let executor_disperse_blob_sender = executor.behaviour().blobs_sender();
         let (sender, mut receiver) = tokio::sync::oneshot::channel();
         let executor_poll = async move {
             executor.dial(addr2).unwrap();
