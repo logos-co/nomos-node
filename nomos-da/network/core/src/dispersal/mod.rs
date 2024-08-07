@@ -12,7 +12,7 @@ pub mod test {
     use libp2p::identity::Keypair;
     use libp2p::swarm::SwarmEvent;
     use libp2p::{quic, Multiaddr, PeerId, StreamProtocol, Swarm, SwarmBuilder};
-    use log::{debug, trace};
+    use log::{debug, error, trace};
     use std::string::String;
     use std::time::Duration;
     use subnetworks_assignations::MembershipHandler;
@@ -140,8 +140,7 @@ pub mod test {
 
         let mut s1: Swarm<libp2p_stream::Behaviour> = SwarmBuilder::with_new_identity()
             .with_tokio()
-            .with_other_transport(|keypair| quic::tokio::Transport::new(quic::Config::new(keypair)))
-            .unwrap()
+            .with_quic()
             .with_behaviour(|_| libp2p_stream::Behaviour::new())
             .unwrap()
             .with_swarm_config(|cfg| {
@@ -151,8 +150,7 @@ pub mod test {
 
         let mut s2: Swarm<libp2p_stream::Behaviour> = SwarmBuilder::with_new_identity()
             .with_tokio()
-            .with_other_transport(|keypair| quic::tokio::Transport::new(quic::Config::new(keypair)))
-            .unwrap()
+            .with_quic()
             .with_behaviour(|_| libp2p_stream::Behaviour::new())
             .unwrap()
             .with_swarm_config(|cfg| {
@@ -160,7 +158,7 @@ pub mod test {
             })
             .build();
 
-        let addr: Multiaddr = "/ip4/127.0.0.1/udp/3030/quic-v1".parse().unwrap();
+        let addr: Multiaddr = "/ip4/127.0.0.1/udp/3050/quic-v1".parse().unwrap();
         let addr2 = addr.clone();
         let peer = s1.local_peer_id().clone();
         let t1 = async move {
@@ -172,16 +170,17 @@ pub mod test {
                 .unwrap();
             // advance
             debug!("1 Advancing");
-            while let Some(event) = s1.next().await {
-                debug!("{event:?}");
-            }
+            // while let Some(event) = s1.next().await {
+            //     debug!("{event:?}");
+            // }
+            debug!("1 waits for stream");
             let Some((p, mut s)) = incoming_streams.next().await else {
-                panic!("No incoming stream");
+                panic!("1 No incoming stream");
             };
             debug!("1 Got a stream");
             let mut buff = b"foobar".to_vec();
             s.read_exact(&mut buff).await;
-            debug!("{}", String::from_utf8_lossy(buff.as_ref()));
+            debug!("1 received: {}", String::from_utf8_lossy(buff.as_ref()));
             // loop {
             //     tokio::select! {
             //         _ = s.read_exact(&mut buff) => {
