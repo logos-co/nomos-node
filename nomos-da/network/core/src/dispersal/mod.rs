@@ -10,9 +10,14 @@ pub mod test {
     use kzgrs_backend::common::blob::DaBlob;
     use kzgrs_backend::common::Column;
     use libp2p::identity::Keypair;
+    use libp2p::quic::tokio::Provider;
+    use libp2p::quic::Config;
     use libp2p::swarm::SwarmEvent;
-    use libp2p::{quic, Multiaddr, PeerId, StreamProtocol, Swarm, SwarmBuilder};
+    use libp2p::{
+        noise, ping, quic, tcp, yamux, Multiaddr, PeerId, StreamProtocol, Swarm, SwarmBuilder,
+    };
     use log::{debug, error, trace};
+    use std::pin::pin;
     use std::string::String;
     use std::time::Duration;
     use subnetworks_assignations::MembershipHandler;
@@ -137,30 +142,48 @@ pub mod test {
             .with_env_filter(EnvFilter::from_default_env())
             .with_writer(TestWriter::default())
             .try_init();
+        let k1 = libp2p::identity::Keypair::generate_ed25519();
+        let k2 = libp2p::identity::Keypair::generate_ed25519();
 
-        let mut s1: Swarm<libp2p_stream::Behaviour> = SwarmBuilder::with_new_identity()
-            .with_tokio()
-            .with_quic()
-            .with_behaviour(|_| libp2p_stream::Behaviour::new())
+        let mut s1: Swarm<libp2p_stream::Behaviour> =
+            SwarmBuilder::with_existing_identity(k1.clone())
+                .with_tokio()
+                .with_tcp(
+                    tcp::Config::default(),
+                    noise::Config::new,
+                    yamux::Config::default,
+                )
+                .unwrap()
+                .with_behaviour(|_| libp2p_stream::Behaviour::new())
+                .unwrap()
+                .with_swarm_config(|cfg| {
+                    cfg.with_idle_connection_timeout(std::time::Duration::from_secs(u64::MAX))
+                })
+                .build();
+
+        let mut s2: Swarm<libp2p_stream::Behaviour> =
+            SwarmBuilder::with_existing_identity(k2.clone())
+                .with_tokio()
+                .with_tcp(
+                    tcp::Config::default(),
+                    noise::Config::new,
+                    yamux::Config::default,
+                )
+                .unwrap()
+                .with_behaviour(|_| libp2p_stream::Behaviour::new())
+                .unwrap()
+                .with_swarm_config(|cfg| {
+                    cfg.with_idle_connection_timeout(std::time::Duration::from_secs(u64::MAX))
+                })
+                .build();
+
+        let peer = PeerId::from_public_key(&k1.public());
+        let addr: Multiaddr = "/ip4/127.0.0.1/tcp/3050"
+            .parse::<Multiaddr>()
             .unwrap()
-            .with_swarm_config(|cfg| {
-                cfg.with_idle_connection_timeout(std::time::Duration::from_secs(u64::MAX))
-            })
-            .build();
-
-        let mut s2: Swarm<libp2p_stream::Behaviour> = SwarmBuilder::with_new_identity()
-            .with_tokio()
-            .with_quic()
-            .with_behaviour(|_| libp2p_stream::Behaviour::new())
-            .unwrap()
-            .with_swarm_config(|cfg| {
-                cfg.with_idle_connection_timeout(std::time::Duration::from_secs(u64::MAX))
-            })
-            .build();
-
-        let addr: Multiaddr = "/ip4/127.0.0.1/udp/3050/quic-v1".parse().unwrap();
+            .with_p2p(peer)
+            .unwrap();
         let addr2 = addr.clone();
-        let peer = s1.local_peer_id().clone();
         let t1 = async move {
             s1.listen_on(addr).unwrap();
             let mut incoming_streams = s1
@@ -179,7 +202,7 @@ pub mod test {
             };
             debug!("1 Got a stream");
             let mut buff = b"foobar".to_vec();
-            s.read_exact(&mut buff).await;
+            s.read_exact(&mut buff).await.unwrap();
             debug!("1 received: {}", String::from_utf8_lossy(buff.as_ref()));
             // loop {
             //     tokio::select! {
@@ -196,12 +219,12 @@ pub mod test {
         let j1 = tokio::spawn(t1);
         let (sender, mut receiver) = tokio::sync::oneshot::channel();
         let j2 = tokio::spawn(async move {
-            tokio::time::sleep(Duration::from_secs(1)).await;
+            tokio::time::sleep(Duration::from_secs(2)).await;
             debug!("2 dialing");
             s2.dial(addr2.clone()).unwrap();
             let mut control = s2.behaviour().new_control();
             let mut w = tokio::spawn(async move {
-                tokio::time::sleep(Duration::from_secs(1)).await;
+                tokio::time::sleep(Duration::from_secs(2)).await;
                 debug!("2 open stream");
                 let mut s = control
                     .open_stream(peer, StreamProtocol::new("/foo"))
@@ -232,5 +255,32 @@ pub mod test {
         j1.await.unwrap();
         sender.send(()).unwrap();
         j2.await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_listen() {
+        let _ = tracing_subscriber::fmt()
+            .with_env_filter(EnvFilter::from_default_env())
+            .with_writer(TestWriter::default())
+            .try_init();
+        let k1 = libp2p::identity::Keypair::generate_ed25519();
+        let k2 = libp2p::identity::Keypair::generate_ed25519();
+
+        let mut s1: Swarm<_> = SwarmBuilder::with_existing_identity(k1.clone())
+            .with_tokio()
+            .with_other_transport(|key| quic::GenTransport::<Provider>::new(Config::new(key)))
+            .unwrap()
+            .with_behaviour(|_| ping::Behaviour::new(ping::Config::default()))
+            .unwrap()
+            .with_swarm_config(|cfg| {
+                cfg.with_idle_connection_timeout(std::time::Duration::from_secs(u64::MAX))
+            })
+            .build();
+
+        let peer = PeerId::from_public_key(&k1.public());
+        let addr: Multiaddr = "/ip4/0.0.0.0/udp/0/quic-v1".parse::<Multiaddr>().unwrap();
+
+        s1.listen_on(addr).unwrap();
+        tokio::time::sleep(Duration::from_secs(10)).await;
     }
 }
