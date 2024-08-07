@@ -4,7 +4,7 @@ use std::task::{Context, Poll};
 // crates
 use either::Either;
 use futures::future::BoxFuture;
-use futures::stream::FuturesUnordered;
+use futures::stream::{BoxStream, FuturesUnordered};
 use futures::{AsyncWriteExt, FutureExt, StreamExt};
 use libp2p::core::Endpoint;
 use libp2p::swarm::{
@@ -14,6 +14,9 @@ use libp2p::swarm::{
 use libp2p::{Multiaddr, PeerId, Stream};
 use libp2p_stream::OpenStreamError;
 use thiserror::Error;
+use tokio::sync::mpsc;
+use tokio::sync::mpsc::UnboundedSender;
+use tokio_stream::wrappers::UnboundedReceiverStream;
 // internal
 use crate::protocol::DISPERSAL_PROTOCOL;
 use crate::SubnetworkId;
@@ -106,6 +109,9 @@ pub struct DispersalExecutorBehaviour<Membership> {
     to_disperse: HashMap<PeerId, VecDeque<(SubnetworkId, DaBlob)>>,
     /// Already connected peers connection Ids
     connected_subnetworks: HashMap<PeerId, ConnectionId>,
+    /// Pending outgoing streams to peers
+    pending_out_streams_sender: UnboundedSender<PeerId>,
+    pending_out_streams: BoxStream<'static, Result<DispersalStream, DispersalError>>,
 }
 
 impl<Membership: MembershipHandler + 'static> DispersalExecutorBehaviour<Membership> {
@@ -115,6 +121,18 @@ impl<Membership: MembershipHandler + 'static> DispersalExecutorBehaviour<Members
         let to_disperse = HashMap::new();
         let connected_subnetworks = HashMap::new();
         let idle_streams = HashMap::new();
+        let (pending_out_streams_sender, receiver) = mpsc::unbounded_channel();
+        let control = stream_behaviour.new_control();
+        let pending_out_streams = UnboundedReceiverStream::new(receiver)
+            .zip(futures::stream::repeat(control))
+            .then(|(peer_id, mut control)| async move {
+                let stream = control
+                    .open_stream(peer_id, DISPERSAL_PROTOCOL)
+                    .await
+                    .map_err(|error| DispersalError::OpenStreamError { peer_id, error })?;
+                Ok(DispersalStream { stream, peer_id })
+            })
+            .boxed();
         Self {
             stream_behaviour,
             tasks,
@@ -122,30 +140,15 @@ impl<Membership: MembershipHandler + 'static> DispersalExecutorBehaviour<Members
             to_disperse,
             connected_subnetworks,
             idle_streams,
+            pending_out_streams_sender,
+            pending_out_streams,
         }
     }
 
-    pub async fn open_stream(&mut self, peer_id: PeerId) -> Result<(), DispersalError> {
-        let stream = self
-            .stream_behaviour
-            .new_control()
-            .open_stream(peer_id, DISPERSAL_PROTOCOL)
-            .await
-            .map_err(|error| DispersalError::OpenStreamError { peer_id, error })?;
-        let Self {
-            tasks,
-            to_disperse,
-            idle_streams,
-            ..
-        } = self;
-        Self::handle_stream(
-            tasks,
-            to_disperse,
-            idle_streams,
-            DispersalStream { stream, peer_id },
-        );
-        Ok(())
+    fn open_stream_sender(&self) -> UnboundedSender<PeerId> {
+        self.pending_out_streams_sender.clone()
     }
+
     async fn stream_disperse(
         mut stream: DispersalStream,
         message: DaBlob,
@@ -306,8 +309,22 @@ impl<M: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'static> Netw
             tasks,
             to_disperse,
             idle_streams,
+            pending_out_streams,
             ..
         } = self;
+        // poll pending streams
+        if let Poll::Ready(Some(res)) = pending_out_streams.poll_next_unpin(cx) {
+            match res {
+                Ok(stream) => {
+                    Self::handle_stream(tasks, to_disperse, idle_streams, stream);
+                }
+                Err(error) => {
+                    return Poll::Ready(ToSwarm::GenerateEvent(
+                        DispersalExecutorEvent::DispersalError { error },
+                    ));
+                }
+            }
+        }
         // poll pending tasks
         if let Poll::Ready(Some(future_result)) = tasks.poll_next_unpin(cx) {
             match future_result {
