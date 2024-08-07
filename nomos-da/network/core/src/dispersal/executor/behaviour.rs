@@ -96,7 +96,7 @@ struct DispersalStream {
 type StreamHandlerFutureSuccess = (BlobId, SubnetworkId, DispersalRes, DispersalStream);
 type StreamHandlerFuture = BoxFuture<'static, Result<StreamHandlerFutureSuccess, DispersalError>>;
 
-pub struct DispersalExecutorBehaviour<Membership> {
+pub struct DispersalExecutorBehaviour<Membership: MembershipHandler> {
     /// Underlying stream behaviour
     stream_behaviour: libp2p_stream::Behaviour,
     /// Pending running tasks (one task per stream)
@@ -106,15 +106,24 @@ pub struct DispersalExecutorBehaviour<Membership> {
     /// Subnetworks membership information
     membership: Membership,
     /// Pending blobs that need to be dispersed by PeerId
-    to_disperse: HashMap<PeerId, VecDeque<(SubnetworkId, DaBlob)>>,
+    to_disperse: HashMap<PeerId, VecDeque<(Membership::NetworkId, DaBlob)>>,
     /// Already connected peers connection Ids
     connected_subnetworks: HashMap<PeerId, ConnectionId>,
-    /// Pending outgoing streams to peers
+    /// Sender hook of peers to open streams channel
     pending_out_streams_sender: UnboundedSender<PeerId>,
+    /// Pending to open streams
     pending_out_streams: BoxStream<'static, Result<DispersalStream, DispersalError>>,
+    /// Dispersal hook of pending blobs channel
+    pending_blobs_sender: UnboundedSender<(Membership::NetworkId, DaBlob)>,
+    /// Pending blobs stream
+    pending_blobs_stream: BoxStream<'static, (Membership::NetworkId, DaBlob)>,
 }
 
-impl<Membership: MembershipHandler + 'static> DispersalExecutorBehaviour<Membership> {
+impl<Membership> DispersalExecutorBehaviour<Membership>
+where
+    Membership: MembershipHandler + 'static,
+    Membership::NetworkId: Send,
+{
     pub fn new(membership: Membership) -> Self {
         let stream_behaviour = libp2p_stream::Behaviour::new();
         let tasks = FuturesUnordered::new();
@@ -133,6 +142,10 @@ impl<Membership: MembershipHandler + 'static> DispersalExecutorBehaviour<Members
                 Ok(DispersalStream { stream, peer_id })
             })
             .boxed();
+
+        let (pending_blobs_sender, receiver) = mpsc::unbounded_channel();
+        let pending_blobs_stream = UnboundedReceiverStream::new(receiver).boxed();
+
         Self {
             stream_behaviour,
             tasks,
@@ -142,11 +155,17 @@ impl<Membership: MembershipHandler + 'static> DispersalExecutorBehaviour<Members
             idle_streams,
             pending_out_streams_sender,
             pending_out_streams,
+            pending_blobs_sender,
+            pending_blobs_stream,
         }
     }
 
-    fn open_stream_sender(&self) -> UnboundedSender<PeerId> {
+    pub fn open_stream_sender(&self) -> UnboundedSender<PeerId> {
         self.pending_out_streams_sender.clone()
+    }
+
+    pub fn blobs_sender(&self) -> UnboundedSender<(Membership::NetworkId, DaBlob)> {
+        self.pending_blobs_sender.clone()
     }
 
     async fn stream_disperse(
@@ -224,13 +243,15 @@ impl<Membership: MembershipHandler + 'static> DispersalExecutorBehaviour<Members
 impl<Membership: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'static>
     DispersalExecutorBehaviour<Membership>
 {
-    pub fn disperse_blob(&mut self, subnetwork_id: SubnetworkId, blob: DaBlob) {
-        let Self {
-            membership,
-            connected_subnetworks,
-            to_disperse,
-            ..
-        } = self;
+    fn disperse_blob(
+        tasks: &mut FuturesUnordered<StreamHandlerFuture>,
+        idle_streams: &mut HashMap<Membership::Id, DispersalStream>,
+        membership: &mut Membership,
+        connected_subnetworks: &mut HashMap<PeerId, ConnectionId>,
+        to_disperse: &mut HashMap<PeerId, VecDeque<(Membership::NetworkId, DaBlob)>>,
+        subnetwork_id: SubnetworkId,
+        blob: DaBlob,
+    ) {
         let members = membership.members_of(&subnetwork_id);
         let peers = members
             .iter()
@@ -238,10 +259,10 @@ impl<Membership: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'sta
         // We may be connected to more than a single node. Usually will be one, but that is an
         // internal decision of the executor itself.
         for peer in peers {
-            if let Some(stream) = self.idle_streams.remove(peer) {
+            if let Some(stream) = idle_streams.remove(peer) {
                 // push a task if the stream is inmediately available
                 let fut = Self::stream_disperse(stream, blob.clone(), subnetwork_id).boxed();
-                self.tasks.push(fut);
+                tasks.push(fut);
             } else {
                 // otherwise queue the blob
                 to_disperse
@@ -310,8 +331,23 @@ impl<M: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'static> Netw
             to_disperse,
             idle_streams,
             pending_out_streams,
+            pending_blobs_stream,
+            membership,
+            connected_subnetworks,
             ..
         } = self;
+        // poll pending blobs
+        if let Poll::Ready(Some((subnetwork_id, blob))) = pending_blobs_stream.poll_next_unpin(cx) {
+            Self::disperse_blob(
+                tasks,
+                idle_streams,
+                membership,
+                connected_subnetworks,
+                to_disperse,
+                subnetwork_id,
+                blob,
+            );
+        }
         // poll pending streams
         if let Poll::Ready(Some(res)) = pending_out_streams.poll_next_unpin(cx) {
             match res {
