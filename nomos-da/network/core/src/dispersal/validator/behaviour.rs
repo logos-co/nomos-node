@@ -11,7 +11,7 @@ use libp2p::swarm::{
 };
 use libp2p::{Multiaddr, PeerId, Stream};
 use libp2p_stream::IncomingStreams;
-use log::debug;
+use log::{debug, info};
 use nomos_da_messages::dispersal::dispersal_res::MessageType;
 use nomos_da_messages::dispersal::{DispersalReq, DispersalRes};
 use nomos_da_messages::{pack_message, unpack_from_reader};
@@ -47,14 +47,18 @@ impl<Membership: MembershipHandler> DispersalValidatorBehaviour<Membership> {
     }
 
     async fn handle_new_stream(mut stream: Stream) -> Result<(DispersalReq, Stream), Error> {
+        info!("Validator stream reading");
         let message: DispersalReq = unpack_from_reader(&mut stream).await?;
+        info!("Validator stream read");
         let blob_id = message.blob.clone().unwrap().blob_id;
         let response = DispersalRes {
             message_type: Some(MessageType::BlobId(blob_id)),
         };
         let message_bytes = pack_message(&response)?;
         stream.write_all(&message_bytes).await?;
+        info!("Validator stream wrote");
         stream.flush().await?;
+        info!("Validator stream flushed");
         Ok((message, stream))
     }
 }
@@ -134,6 +138,8 @@ impl<M: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'static> Netw
         if let Poll::Ready(Some((_peer_id, stream))) = incoming_streams.poll_next_unpin(cx) {
             tasks.push(Self::handle_new_stream(stream).boxed());
         }
+        // TODO: probably must be smarter when to wake this
+        cx.waker().wake_by_ref();
         Poll::Pending
     }
 }

@@ -13,6 +13,7 @@ use libp2p::swarm::{
 };
 use libp2p::{Multiaddr, PeerId, Stream};
 use libp2p_stream::{Control, OpenStreamError};
+use log::info;
 use thiserror::Error;
 use tokio::sync::mpsc;
 use tokio::sync::mpsc::UnboundedSender;
@@ -191,6 +192,7 @@ where
             }),
             subnetwork_id,
         };
+        info!("Executor stream writing");
         stream
             .stream
             .write_all(&pack_message(&message).map_err(|error| DispersalError::Io {
@@ -204,6 +206,17 @@ where
                 blob_id: blob_id.clone().try_into().unwrap(),
                 subnetwork_id,
             })?;
+        info!("Executor stream wrote");
+        stream
+            .stream
+            .flush()
+            .await
+            .map_err(|error| DispersalError::Io {
+                error,
+                blob_id: blob_id.clone().try_into().unwrap(),
+                subnetwork_id,
+            })?;
+        info!("Executor stream flushed");
         let response: DispersalRes =
             unpack_from_reader(&mut stream.stream)
                 .await
@@ -212,6 +225,7 @@ where
                     blob_id: blob_id.clone().try_into().unwrap(),
                     subnetwork_id,
                 })?;
+        info!("Executor stream read");
         // Safety: blob_id should always be a 32bytes hash, currently is abstracted into a `Vec<u8>`
         // but probably we should have a `[u8; 32]` wrapped in a custom type `BlobId`
         // TODO: use blob_id when changing types to [u8; 32]
@@ -265,7 +279,7 @@ impl<Membership: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'sta
         // internal decision of the executor itself.
         for peer in peers {
             if let Some(stream) = idle_streams.remove(peer) {
-                // push a task if the stream is inmediately available
+                // push a task if the stream is immediately available
                 let fut = Self::stream_disperse(stream, blob.clone(), subnetwork_id).boxed();
                 tasks.push(fut);
             } else {
@@ -305,6 +319,7 @@ impl<M: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'static> Netw
         addr: &Multiaddr,
         role_override: Endpoint,
     ) -> Result<THandler<Self>, ConnectionDenied> {
+        self.connected_subnetworks.insert(peer, connection_id);
         self.stream_behaviour
             .handle_established_outbound_connection(connection_id, peer, addr, role_override)
             .map(Either::Left)
@@ -341,6 +356,41 @@ impl<M: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'static> Netw
             connected_subnetworks,
             ..
         } = self;
+        // poll pending tasks
+        if let Poll::Ready(Some(future_result)) = tasks.poll_next_unpin(cx) {
+            match future_result {
+                Ok((blob_id, subnetwork_id, dispersal_response, stream)) => {
+                    // handle the free stream then return the success
+                    Self::handle_stream(tasks, to_disperse, idle_streams, stream);
+                    // return an error if there was an error on the other side of the wire
+                    if let DispersalRes {
+                        message_type: Some(MessageType::Err(error)),
+                    } = dispersal_response
+                    {
+                        return Poll::Ready(ToSwarm::GenerateEvent(
+                            DispersalExecutorEvent::DispersalError {
+                                error: DispersalError::Protocol {
+                                    subnetwork_id,
+                                    error,
+                                },
+                            },
+                        ));
+                    }
+                    return Poll::Ready(ToSwarm::GenerateEvent(
+                        DispersalExecutorEvent::DispersalSuccess {
+                            blob_id,
+                            subnetwork_id,
+                        },
+                    ));
+                }
+                // Something went up on our side of the wire, bubble it up
+                Err(error) => {
+                    return Poll::Ready(ToSwarm::GenerateEvent(
+                        DispersalExecutorEvent::DispersalError { error },
+                    ))
+                }
+            }
+        }
         // poll pending blobs
         if let Poll::Ready(Some((subnetwork_id, blob))) = pending_blobs_stream.poll_next_unpin(cx) {
             Self::disperse_blob(
@@ -366,45 +416,14 @@ impl<M: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'static> Netw
                 }
             }
         }
-        // poll pending tasks
-        if let Poll::Ready(Some(future_result)) = tasks.poll_next_unpin(cx) {
-            match future_result {
-                Ok((blob_id, subnetwork_id, dispersal_response, stream)) => {
-                    // return an error if there was an error on the other side of the wire
-                    if let DispersalRes {
-                        message_type: Some(MessageType::Err(error)),
-                    } = dispersal_response
-                    {
-                        return Poll::Ready(ToSwarm::GenerateEvent(
-                            DispersalExecutorEvent::DispersalError {
-                                error: DispersalError::Protocol {
-                                    subnetwork_id,
-                                    error,
-                                },
-                            },
-                        ));
-                    }
-                    // handle the free stream then return the success
-                    Self::handle_stream(tasks, to_disperse, idle_streams, stream);
-                    return Poll::Ready(ToSwarm::GenerateEvent(
-                        DispersalExecutorEvent::DispersalSuccess {
-                            blob_id,
-                            subnetwork_id,
-                        },
-                    ));
-                }
-                // Something went up on our side of the wire, bubble it up
-                Err(error) => {
-                    return Poll::Ready(ToSwarm::GenerateEvent(
-                        DispersalExecutorEvent::DispersalError { error },
-                    ))
-                }
-            }
-        }
         // Deal with connection as the underlying behaviour would do
         match self.stream_behaviour.poll(cx) {
             Poll::Ready(ToSwarm::Dial { opts }) => Poll::Ready(ToSwarm::Dial { opts }),
-            Poll::Pending => Poll::Pending,
+            Poll::Pending => {
+                // TODO: probably must be smarter when to wake this
+                cx.waker().wake_by_ref();
+                Poll::Pending
+            }
             _ => unreachable!(),
         }
     }
