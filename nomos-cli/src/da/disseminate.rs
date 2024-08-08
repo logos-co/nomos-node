@@ -1,10 +1,9 @@
-use crate::api::mempool::send_certificate;
 use clap::{Args, ValueEnum};
-use full_replication::{AbsoluteNumber, Attestation, Certificate, FullReplication, Voter};
-use futures::StreamExt;
-use hex::FromHex;
-use nomos_core::wire;
-use nomos_da::network::{adapters::libp2p::Libp2pAdapter as DaNetworkAdapter, NetworkAdapter};
+use kzgrs_backend::encoder::EncodedData as KzgEncodedData;
+use nomos_core::{
+    da::{DaDispersal, DaEncoder},
+    wire,
+};
 use nomos_log::Logger;
 use nomos_network::backends::libp2p::Libp2p as NetworkBackend;
 use nomos_network::NetworkService;
@@ -19,31 +18,28 @@ use overwatch_rs::{
     DynError,
 };
 use reqwest::Url;
-use serde::Serialize;
 use std::{
-    error::Error,
     path::PathBuf,
     sync::{mpsc::Sender, Arc},
     time::Duration,
 };
 use tokio::sync::{mpsc::UnboundedReceiver, Mutex};
 
-pub async fn disseminate_and_wait<D, B, N, A, C>(
-    mut da: D,
+pub async fn disseminate_and_wait<E, D>(
+    encoder: &E,
+    disperal: &D,
     data: Box<[u8]>,
-    adapter: N,
     status_updates: Sender<Status>,
     node_addr: Option<&Url>,
     output: Option<&PathBuf>,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>>
 where
-    D: DaProtocol<Blob = B, Attestation = A, Certificate = C>,
-    N: NetworkAdapter<Blob = B, Attestation = A> + Send + Sync,
-    C: Serialize,
+    E: DaEncoder<EncodedData = KzgEncodedData>,
+    D: DaDispersal<EncodedData = KzgEncodedData>,
 {
     // 1) Building blob
     status_updates.send(Status::Encoding)?;
-    let blobs = da.encode(data);
+    let blobs = encoder.encode(&data);
 
     // 2) Send blob to network
     status_updates.send(Status::Disseminating)?;
@@ -52,31 +48,31 @@ where
         .map_err(|e| e as Box<dyn std::error::Error + Sync + Send>)?;
 
     // 3) Collect attestations and create proof
-    status_updates.send(Status::WaitingAttestations)?;
-    let mut attestations = adapter.attestation_stream().await;
-    let cert: C = loop {
-        da.recv_attestation(attestations.next().await.unwrap());
+    // status_updates.send(Status::WaitingAttestations)?;
+    // let mut attestations = adapter.attestation_stream().await;
+    // let cert: C = loop {
+    //     da.recv_attestation(attestations.next().await.unwrap());
 
-        if let Some(certificate) = da.certify_dispersal() {
-            status_updates.send(Status::CreatingCert)?;
-            break certificate;
-        }
-    };
+    //     if let Some(certificate) = da.certify_dispersal() {
+    //         status_updates.send(Status::CreatingCert)?;
+    //         break certificate;
+    //     }
+    // };
 
-    if let Some(output) = output {
-        status_updates.send(Status::SavingCert)?;
-        std::fs::write(output, wire::serialize(&cert)?)?;
-    }
+    // if let Some(output) = output {
+    //     status_updates.send(Status::SavingCert)?;
+    //     std::fs::write(output, wire::serialize(&cert)?)?;
+    // }
 
-    if let Some(node) = node_addr {
-        status_updates.send(Status::SendingCert)?;
-        let res = send_certificate(node, &cert).await?;
+    // if let Some(node) = node_addr {
+    //     status_updates.send(Status::SendingCert)?;
+    //     let res = send_certificate(node, &cert).await?;
 
-        if !res.status().is_success() {
-            tracing::error!("ERROR: {:?}", res);
-            return Err(format!("Failed to send certificate to node: {}", res.status()).into());
-        }
-    }
+    //     if !res.status().is_success() {
+    //         tracing::error!("ERROR: {:?}", res);
+    //         return Err(format!("Failed to send certificate to node: {}", res.status()).into());
+    //     }
+    // }
 
     status_updates.send(Status::Done)?;
     Ok(())
@@ -122,7 +118,7 @@ pub struct Settings {
     // This is wrapped in an Arc just to make the struct Clone
     pub payload: Arc<Mutex<UnboundedReceiver<Box<[u8]>>>>,
     pub timeout: Duration,
-    pub da_protocol: DaProtocolChoice,
+    //    pub da_protocol: DaProtocolChoice,
     pub status_updates: Sender<Status>,
     pub node_addr: Option<Url>,
     pub output: Option<std::path::PathBuf>,
@@ -151,28 +147,21 @@ impl ServiceCore for DisseminateService {
         let Settings {
             payload,
             timeout,
-            da_protocol,
             status_updates,
             node_addr,
             output,
         } = service_state.settings_reader.get_updated_settings();
 
-        let da_protocol: FullReplication<_> = da_protocol.try_into()?;
-
-        let network_relay = service_state
-            .overwatch_handle
-            .relay::<NetworkService<NetworkBackend>>()
-            .connect()
-            .await
-            .expect("Relay connection with NetworkService should succeed");
+        let params = kzgrs_backend::encoder::DaEncoderParams::new(4096, true);
+        let da_encoder = kzgrs_backend::encoder::DaEncoder::new(params);
+        // let da_dispersal = kzgrs_backend::encoder::DaDispersal::new(params);
 
         while let Some(data) = payload.lock().await.recv().await {
             match tokio::time::timeout(
                 timeout,
                 disseminate_and_wait(
-                    da_protocol.clone(),
+                    &da_encoder,
                     data,
-                    DaNetworkAdapter::new(network_relay.clone()).await,
                     status_updates.clone(),
                     node_addr.as_ref(),
                     output.as_ref(),
@@ -206,57 +195,57 @@ impl ServiceCore for DisseminateService {
 // protocols, but only the one chosen will be used.
 // We can enforce only sensible combinations of protocol/settings
 // are specified by using special clap directives
-#[derive(Clone, Debug, Args, Default)]
-pub struct DaProtocolChoice {
-    #[clap(long, default_value = "full-replication")]
-    pub da_protocol: Protocol,
-    #[clap(flatten)]
-    pub settings: ProtocolSettings,
-}
+// #[derive(Clone, Debug, Args, Default)]
+// pub struct DaProtocolChoice {
+//     #[clap(long, default_value = "full-replication")]
+//     pub da_protocol: Protocol,
+//     #[clap(flatten)]
+//     pub settings: ProtocolSettings,
+// }
 
-impl TryFrom<DaProtocolChoice> for FullReplication<AbsoluteNumber<Attestation, Certificate>> {
-    type Error = &'static str;
-    fn try_from(value: DaProtocolChoice) -> Result<Self, Self::Error> {
-        match (value.da_protocol, value.settings) {
-            (Protocol::FullReplication, ProtocolSettings { full_replication }) => {
-                Ok(FullReplication::new(
-                    full_replication.voter,
-                    AbsoluteNumber::new(full_replication.num_attestations),
-                ))
-            }
-        }
-    }
-}
+// impl TryFrom<DaProtocolChoice> for FullReplication<AbsoluteNumber<Attestation, Certificate>> {
+//     type Error = &'static str;
+//     fn try_from(value: DaProtocolChoice) -> Result<Self, Self::Error> {
+//         match (value.da_protocol, value.settings) {
+//             (Protocol::FullReplication, ProtocolSettings { full_replication }) => {
+//                 Ok(FullReplication::new(
+//                     full_replication.voter,
+//                     AbsoluteNumber::new(full_replication.num_attestations),
+//                 ))
+//             }
+//         }
+//     }
+// }
 
-#[derive(Clone, Debug, Args, Default)]
-pub struct ProtocolSettings {
-    #[clap(flatten)]
-    pub full_replication: FullReplicationSettings,
-}
+// #[derive(Clone, Debug, Args, Default)]
+// pub struct ProtocolSettings {
+//     #[clap(flatten)]
+//     pub full_replication: FullReplicationSettings,
+// }
+//
+// #[derive(Clone, Debug, ValueEnum, Default)]
+// pub enum Protocol {
+//     #[default]
+//     FullReplication,
+// }
+//
+// impl Default for FullReplicationSettings {
+//     fn default() -> Self {
+//         Self {
+//             voter: [0; 32],
+//             num_attestations: 1,
+//         }
+//     }
+// }
 
-#[derive(Clone, Debug, ValueEnum, Default)]
-pub enum Protocol {
-    #[default]
-    FullReplication,
-}
-
-impl Default for FullReplicationSettings {
-    fn default() -> Self {
-        Self {
-            voter: [0; 32],
-            num_attestations: 1,
-        }
-    }
-}
-
-#[derive(Debug, Clone, Args)]
-pub struct FullReplicationSettings {
-    #[clap(long, value_parser = parse_key, default_value = "0000000000000000000000000000000000000000000000000000000000000000")]
-    pub voter: Voter,
-    #[clap(long, default_value = "1")]
-    pub num_attestations: usize,
-}
-
-fn parse_key(s: &str) -> Result<Voter, Box<dyn Error + Send + Sync + 'static>> {
-    Ok(<[u8; 32]>::from_hex(s)?)
-}
+// #[derive(Debug, Clone, Args)]
+// pub struct FullReplicationSettings {
+//     #[clap(long, value_parser = parse_key, default_value = "0000000000000000000000000000000000000000000000000000000000000000")]
+//     pub voter: Voter,
+//     #[clap(long, default_value = "1")]
+//     pub num_attestations: usize,
+// }
+//
+// fn parse_key(s: &str) -> Result<Voter, Box<dyn Error + Send + Sync + 'static>> {
+//     Ok(<[u8; 32]>::from_hex(s)?)
+// }

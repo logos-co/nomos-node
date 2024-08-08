@@ -1,6 +1,4 @@
-use crate::da::disseminate::{
-    DaProtocolChoice, DisseminateApp, DisseminateAppServiceSettings, Settings, Status,
-};
+use crate::da::disseminate::{DisseminateApp, DisseminateAppServiceSettings, Settings, Status};
 use clap::Args;
 use nomos_log::{LoggerBackend, LoggerSettings};
 use nomos_network::backends::libp2p::Libp2p as NetworkBackend;
@@ -19,8 +17,8 @@ pub struct Disseminate {
     #[clap(short, long)]
     pub network_config: PathBuf,
     /// The data availability protocol to use. Defaults to full replication.
-    #[clap(flatten)]
-    pub da_protocol: DaProtocolChoice,
+    // #[clap(flatten)]
+    // pub da_protocol: DaProtocolChoice,
     /// Timeout in seconds. Defaults to 120 seconds.
     #[clap(short, long, default_value = "120")]
     pub timeout: u64,
@@ -55,7 +53,6 @@ impl Disseminate {
         };
 
         let timeout = Duration::from_secs(self.timeout);
-        let da_protocol = self.da_protocol.clone();
         let node_addr = self.node_addr.clone();
         let output = self.output.clone();
         let (payload_sender, payload_rx) = tokio::sync::mpsc::unbounded_channel();
@@ -67,7 +64,6 @@ impl Disseminate {
                     send_blob: Settings {
                         payload: Arc::new(Mutex::new(payload_rx)),
                         timeout,
-                        da_protocol,
                         status_updates,
                         node_addr,
                         output,

@@ -20,8 +20,7 @@ members = [
     "nomos-services/data-availability/verifier",
     "nomos-services/data-availability/tests",
     "nomos-da/full-replication",
-    # TODO: add it again and reimplement full replication
-    #    "nomos-cli",
+    "nomos-cli",
     "nomos-utils",
     "nodes/nomos-node",
     "mixnet",
