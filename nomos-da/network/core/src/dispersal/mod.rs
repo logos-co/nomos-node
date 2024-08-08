@@ -76,7 +76,7 @@ pub mod test {
         let mut validator = validator_swarm(k2, neighbours);
 
         let msg_count = 10usize;
-        let addr: Multiaddr = "/ip4/127.0.0.1/udp/5053/quic-v1".parse().unwrap();
+        let addr: Multiaddr = "/ip4/127.0.0.1/udp/5063/quic-v1".parse().unwrap();
         let addr2 = addr.clone().with_p2p(validator_peer).unwrap();
 
         let validator_task = async move {
