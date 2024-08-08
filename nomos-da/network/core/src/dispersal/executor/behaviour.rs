@@ -13,7 +13,6 @@ use libp2p::swarm::{
 };
 use libp2p::{Multiaddr, PeerId, Stream};
 use libp2p_stream::{Control, OpenStreamError};
-use log::info;
 use thiserror::Error;
 use tokio::sync::mpsc;
 use tokio::sync::mpsc::UnboundedSender;
@@ -80,13 +79,13 @@ type BlobId = [u8; 32];
 
 #[derive(Debug)]
 pub enum DispersalExecutorEvent {
+    /// A blob successfully arrived its destination
     DispersalSuccess {
         blob_id: BlobId,
         subnetwork_id: SubnetworkId,
     },
-    DispersalError {
-        error: DispersalError,
-    },
+    /// Something went wrong delivering the blob
+    DispersalError { error: DispersalError },
 }
 
 struct DispersalStream {
@@ -97,6 +96,10 @@ struct DispersalStream {
 type StreamHandlerFutureSuccess = (BlobId, SubnetworkId, DispersalRes, DispersalStream);
 type StreamHandlerFuture = BoxFuture<'static, Result<StreamHandlerFutureSuccess, DispersalError>>;
 
+/// Executor dispersal protocol
+/// Do not handle incoming connections, just accepts outgoing ones.
+/// It takes care of sending blobs to different subnetworks.
+/// Bubbles up events with the success or error when dispersing
 pub struct DispersalExecutorBehaviour<Membership: MembershipHandler> {
     /// Underlying stream behaviour
     stream_behaviour: libp2p_stream::Behaviour,
@@ -155,6 +158,7 @@ where
         }
     }
 
+    /// Open a new stream from the underlying control to the provided peer
     async fn open_stream(
         peer_id: PeerId,
         mut control: Control,
@@ -166,14 +170,18 @@ where
         Ok(DispersalStream { stream, peer_id })
     }
 
+    /// Get a hook to the sender channel of open stream events
     pub fn open_stream_sender(&self) -> UnboundedSender<PeerId> {
         self.pending_out_streams_sender.clone()
     }
 
+    /// Get a hook to the sender channel of the blobs dispersal events
     pub fn blobs_sender(&self) -> UnboundedSender<(Membership::NetworkId, DaBlob)> {
         self.pending_blobs_sender.clone()
     }
 
+    /// Task for handling streams, one message at a time
+    /// Writes the blob to the stream and waits for an acknowledgment response
     async fn stream_disperse(
         mut stream: DispersalStream,
         message: DaBlob,
@@ -192,7 +200,6 @@ where
             }),
             subnetwork_id,
         };
-        info!("Executor stream writing");
         stream
             .stream
             .write_all(&pack_message(&message).map_err(|error| DispersalError::Io {
@@ -206,7 +213,6 @@ where
                 blob_id: blob_id.clone().try_into().unwrap(),
                 subnetwork_id,
             })?;
-        info!("Executor stream wrote");
         stream
             .stream
             .flush()
@@ -216,7 +222,6 @@ where
                 blob_id: blob_id.clone().try_into().unwrap(),
                 subnetwork_id,
             })?;
-        info!("Executor stream flushed");
         let response: DispersalRes =
             unpack_from_reader(&mut stream.stream)
                 .await
@@ -225,13 +230,14 @@ where
                     blob_id: blob_id.clone().try_into().unwrap(),
                     subnetwork_id,
                 })?;
-        info!("Executor stream read");
         // Safety: blob_id should always be a 32bytes hash, currently is abstracted into a `Vec<u8>`
         // but probably we should have a `[u8; 32]` wrapped in a custom type `BlobId`
         // TODO: use blob_id when changing types to [u8; 32]
         Ok((blob_id.try_into().unwrap(), subnetwork_id, response, stream))
     }
 
+    /// Run when a stream gets free, if there is a pending task for the stream it will get scheduled to run
+    /// otherwise it is parked as idle.
     fn handle_stream(
         tasks: &mut FuturesUnordered<StreamHandlerFuture>,
         to_disperse: &mut HashMap<PeerId, VecDeque<(SubnetworkId, DaBlob)>>,
@@ -249,6 +255,7 @@ where
         };
     }
 
+    /// Get a pending request if its available
     fn next_request(
         peer_id: &PeerId,
         to_disperse: &mut HashMap<PeerId, VecDeque<(SubnetworkId, DaBlob)>>,
@@ -262,6 +269,8 @@ where
 impl<Membership: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'static>
     DispersalExecutorBehaviour<Membership>
 {
+    /// Schedule a new task for sending the blob, if stream is not available queue messages for later
+    /// processing.
     fn disperse_blob(
         tasks: &mut FuturesUnordered<StreamHandlerFuture>,
         idle_streams: &mut HashMap<Membership::Id, DispersalStream>,
