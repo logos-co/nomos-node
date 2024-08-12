@@ -39,13 +39,16 @@ pub async fn disseminate_and_wait<E, D>(
 where
     E: DaEncoder<EncodedData = KzgEncodedData>,
     D: DaDispersal<EncodedData = KzgEncodedData>,
+    <E as nomos_core::da::DaEncoder>::Error: std::error::Error + Send + Sync + 'static,
+    <D as nomos_core::da::DaDispersal>::Error: std::error::Error + Send + Sync + 'static,
 {
     // 1) Building blob
     status_updates.send(Status::Encoding)?;
-    let blobs = encoder.encode(&data);
+    let encoded_data = encoder.encode(&data).map_err(Box::new)?;
 
     // 2) Send blob to network
     status_updates.send(Status::Disseminating)?;
+    disperal.disperse(encoded_data).await.map_err(Box::new)?;
     // futures::future::try_join_all(blobs.into_iter().map(|blob| adapter.send_blob(blob)))
     //     .await
     //     .map_err(|e| e as Box<dyn std::error::Error + Sync + Send>)?;
