@@ -1,8 +1,8 @@
 use crate::da::disseminate::{DisseminateApp, DisseminateAppServiceSettings, Settings, Status};
 use clap::Args;
+use nomos_da_network_service::backends::mock::executor::MockExecutorBackend as NetworkBackend;
+use nomos_da_network_service::NetworkService;
 use nomos_log::{LoggerBackend, LoggerSettings};
-use nomos_network::backends::libp2p::Libp2p as NetworkBackend;
-use nomos_network::NetworkService;
 use overwatch_rs::{overwatch::OverwatchRunner, services::ServiceData};
 use reqwest::Url;
 use std::{path::PathBuf, sync::Arc, time::Duration};

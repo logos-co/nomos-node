@@ -4,14 +4,15 @@ use nomos_core::{
     da::{DaDispersal, DaEncoder},
     wire,
 };
+use nomos_da_network_service::{
+    backends::mock::executor::MockExecutorBackend as NetworkBackend, NetworkService,
+};
 use nomos_log::Logger;
-use nomos_network::backends::libp2p::Libp2p as NetworkBackend;
-use nomos_network::NetworkService;
 use overwatch_derive::*;
 use overwatch_rs::{
     services::{
         handle::{ServiceHandle, ServiceStateHandle},
-        relay::NoMessage,
+        relay::{NoMessage, OutboundRelay, Relay},
         state::*,
         ServiceCore, ServiceData, ServiceId,
     },
@@ -24,6 +25,8 @@ use std::{
     time::Duration,
 };
 use tokio::sync::{mpsc::UnboundedReceiver, Mutex};
+
+use super::network::adapters::mock::MockExecutorDispersalAdapter;
 
 pub async fn disseminate_and_wait<E, D>(
     encoder: &E,
@@ -43,9 +46,9 @@ where
 
     // 2) Send blob to network
     status_updates.send(Status::Disseminating)?;
-    futures::future::try_join_all(blobs.into_iter().map(|blob| adapter.send_blob(blob)))
-        .await
-        .map_err(|e| e as Box<dyn std::error::Error + Sync + Send>)?;
+    // futures::future::try_join_all(blobs.into_iter().map(|blob| adapter.send_blob(blob)))
+    //     .await
+    //     .map_err(|e| e as Box<dyn std::error::Error + Sync + Send>)?;
 
     // 3) Collect attestations and create proof
     // status_updates.send(Status::WaitingAttestations)?;
@@ -152,15 +155,24 @@ impl ServiceCore for DisseminateService {
             output,
         } = service_state.settings_reader.get_updated_settings();
 
+        let network_relay: Relay<NetworkService<NetworkBackend>> =
+            service_state.overwatch_handle.relay();
+        let network_relay: OutboundRelay<_> = network_relay
+            .connect()
+            .await
+            .expect("Relay connection with NetworkService should succeed");
+
         let params = kzgrs_backend::encoder::DaEncoderParams::new(4096, true);
         let da_encoder = kzgrs_backend::encoder::DaEncoder::new(params);
-        // let da_dispersal = kzgrs_backend::encoder::DaDispersal::new(params);
+
+        let da_dispersal = MockExecutorDispersalAdapter::new(network_relay);
 
         while let Some(data) = payload.lock().await.recv().await {
             match tokio::time::timeout(
                 timeout,
                 disseminate_and_wait(
                     &da_encoder,
+                    &da_dispersal,
                     data,
                     status_updates.clone(),
                     node_addr.as_ref(),

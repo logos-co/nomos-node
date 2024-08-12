@@ -17,6 +17,7 @@ members = [
     "nomos-services/metrics",
     "nomos-services/system-sig",
     "nomos-services/data-availability/indexer",
+    "nomos-services/data-availability/network",
     "nomos-services/data-availability/verifier",
     "nomos-services/data-availability/tests",
     "nomos-da/full-replication",
