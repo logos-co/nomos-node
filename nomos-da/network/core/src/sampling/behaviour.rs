@@ -36,6 +36,7 @@ pub enum SampleError {
     OpenStream(#[from] libp2p_stream::OpenStreamError),
 }
 
+#[derive(Debug)]
 pub enum SamplingEvent {
     IncomingSample {
         request_receiver: oneshot::Receiver<SampleReq>,
@@ -46,7 +47,8 @@ pub enum SamplingEvent {
 }
 
 pub struct SamplingBehaviour<Membership: MembershipHandler> {
-    behaviour: libp2p_stream::Behaviour,
+    peer_id: PeerId,
+    stream_behaviour: libp2p_stream::Behaviour,
     stream_control: libp2p_stream::Control,
     /// Already connected peers connection Ids
     connected_subnetworks: HashMap<PeerId, ConnectionId>,
@@ -59,7 +61,7 @@ pub struct SamplingBehaviour<Membership: MembershipHandler> {
 }
 
 impl<Membership: MembershipHandler> SamplingBehaviour<Membership> {
-    pub fn new(membership: Membership) -> Self {
+    pub fn new(peer_id: PeerId, membership: Membership) -> Self {
         let behaviour = libp2p_stream::Behaviour::new();
         let mut stream_control = behaviour.new_control();
         let incoming_streams = stream_control
@@ -70,7 +72,8 @@ impl<Membership: MembershipHandler> SamplingBehaviour<Membership> {
             tokio::sync::mpsc::unbounded_channel::<(Membership::NetworkId, BlobId)>();
         let outgoing_samples = UnboundedReceiverStream::new(outgoing_receiver);
         Self {
-            behaviour,
+            peer_id,
+            stream_behaviour: behaviour,
             stream_control,
             connected_subnetworks,
             incoming_streams,
@@ -122,19 +125,31 @@ where
     Membership: MembershipHandler<NetworkId = SubnetworkId, Id = PeerId>,
 {
     fn handle_sample_request(
+        peer_id: &PeerId,
         subnetwork_id: SubnetworkId,
         blob_id: BlobId,
         membership: &Membership,
         control: &mut Control,
-    ) -> impl Future<Output = Result<SampleRes, SampleError>> {
+        stream: Option<Stream>,
+    ) -> impl Future<Output = Result<(SampleRes, Stream), SampleError>> {
         // TODO: somehow we need to hook either peer selection (which can come from outside).
-        let Some(peer) = membership.members_of(&subnetwork_id).iter().copied().next() else {
+        let Some(peer) = membership
+            .members_of(&subnetwork_id)
+            .iter()
+            .filter(|&id| id != peer_id) // filter out ourselves
+            .copied()
+            .next()
+        else {
             unreachable!();
         };
         // TODO: check on possible backpressure issues
         let mut control = control.clone();
         async move {
-            let mut stream = control.open_stream(peer, SAMPLING_PROTOCOL).await?;
+            let mut stream = if let Some(stream) = stream {
+                stream
+            } else {
+                control.open_stream(peer, SAMPLING_PROTOCOL).await?
+            };
             let request = SampleReq {
                 blob_id: blob_id.to_vec(),
             };
@@ -146,7 +161,7 @@ where
             let response: SampleRes = unpack_from_reader(&mut stream)
                 .await
                 .map_err(SampleError::IO)?;
-            Ok(response)
+            Ok((response, stream))
         }
     }
 }
@@ -172,7 +187,7 @@ where
             return Ok(Either::Right(libp2p::swarm::dummy::ConnectionHandler));
         }
         self.connected_subnetworks.insert(peer, connection_id);
-        self.behaviour
+        self.stream_behaviour
             .handle_established_inbound_connection(connection_id, peer, local_addr, remote_addr)
             .map(Either::Left)
     }
@@ -184,13 +199,13 @@ where
         addr: &Multiaddr,
         role_override: Endpoint,
     ) -> Result<THandler<Self>, ConnectionDenied> {
-        self.behaviour
+        self.stream_behaviour
             .handle_established_outbound_connection(connection_id, peer, addr, role_override)
             .map(Either::Left)
     }
 
     fn on_swarm_event(&mut self, event: FromSwarm) {
-        self.behaviour.on_swarm_event(event)
+        self.stream_behaviour.on_swarm_event(event)
     }
 
     fn on_connection_handler_event(
@@ -202,7 +217,7 @@ where
         let Either::Left(event) = event else {
             unreachable!()
         };
-        self.behaviour
+        self.stream_behaviour
             .on_connection_handler_event(peer_id, connection_id, event)
     }
 
@@ -211,6 +226,7 @@ where
         cx: &mut Context<'_>,
     ) -> Poll<ToSwarm<Self::ToSwarm, THandlerInEvent<Self>>> {
         let Self {
+            peer_id,
             stream_control,
             incoming_streams,
             outgoing_samples,
@@ -232,8 +248,13 @@ where
         }
         // poll outgoing streams
         if let Poll::Ready(Some((subnetwork_id, blob_id))) = outgoing_samples.poll_next_unpin(cx) {
-            let fut =
-                Self::handle_sample_request(subnetwork_id, blob_id, membership, stream_control);
+            let fut = Self::handle_sample_request(
+                peer_id,
+                subnetwork_id,
+                blob_id,
+                membership,
+                stream_control,
+            );
             outgoing_tasks.push(fut.boxed());
         }
         if let Poll::Ready(Some(Err(e))) = incoming_tasks.poll_next_unpin(cx) {
@@ -246,8 +267,16 @@ where
             };
             return Poll::Ready(ToSwarm::GenerateEvent(event));
         }
-        // TODO: handle this smarter
-        cx.waker().wake_by_ref();
-        Poll::Pending
+
+        // Deal with connection as the underlying behaviour would do
+        match self.stream_behaviour.poll(cx) {
+            Poll::Ready(ToSwarm::Dial { opts }) => Poll::Ready(ToSwarm::Dial { opts }),
+            Poll::Pending => {
+                // TODO: probably must be smarter when to wake this
+                cx.waker().wake_by_ref();
+                Poll::Pending
+            }
+            _ => unreachable!(),
+        }
     }
 }
