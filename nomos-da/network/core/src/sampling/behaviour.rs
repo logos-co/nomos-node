@@ -1,15 +1,17 @@
 use crate::protocol::SAMPLING_PROTOCOL;
+use crate::sampling::protocol::{SamplingProtocolRequest, SamplingProtocolResponse};
 use crate::SubnetworkId;
 use either::Either;
 use futures::future::BoxFuture;
 use futures::stream::FuturesUnordered;
 use futures::{AsyncWriteExt, FutureExt, StreamExt};
+use libp2p::core::upgrade::ReadyUpgrade;
 use libp2p::core::Endpoint;
 use libp2p::swarm::{
-    ConnectionDenied, ConnectionId, FromSwarm, NetworkBehaviour, THandler, THandlerInEvent,
-    THandlerOutEvent, ToSwarm,
+    ConnectionDenied, ConnectionId, FromSwarm, NetworkBehaviour, OneShotHandler, THandler,
+    THandlerInEvent, THandlerOutEvent, ToSwarm,
 };
-use libp2p::{Multiaddr, PeerId, Stream};
+use libp2p::{Multiaddr, PeerId, Stream, StreamProtocol};
 use libp2p_stream::{Control, IncomingStreams};
 use log::error;
 use nomos_da_messages::sampling::{SampleReq, SampleRes};
@@ -46,13 +48,34 @@ pub enum SamplingEvent {
     SampleError(SampleError),
 }
 
+#[derive(Debug)]
+enum SamplingProtocolEvent {
+    IncomingSample(SamplingProtocolResponse),
+    SampleResponse(SampleRes),
+}
+
+impl From<SamplingProtocolRequest> for SamplingProtocolEvent {
+    fn from(SamplingProtocolRequest(value): SamplingProtocolRequest) -> Self {
+        Self::IncomingSample(value)
+    }
+}
+
+impl From<SamplingProtocolResponse> for SamplingProtocolEvent {
+    fn from(value: SamplingProtocolResponse) -> Self {
+        Self::IncomingSample(value)
+    }
+}
+
+impl From<()> for SamplingProtocolEvent {
+    fn from(value: ()) -> Self {
+        unreachable!()
+    }
+}
+
 pub struct SamplingBehaviour<Membership: MembershipHandler> {
     peer_id: PeerId,
-    stream_behaviour: libp2p_stream::Behaviour,
-    stream_control: libp2p_stream::Control,
     /// Already connected peers connection Ids
     connected_subnetworks: HashMap<PeerId, ConnectionId>,
-    incoming_streams: IncomingStreams,
     outgoing_sender: UnboundedSender<(Membership::NetworkId, BlobId)>,
     outgoing_samples: UnboundedReceiverStream<(Membership::NetworkId, BlobId)>,
     membership: Membership,
@@ -62,21 +85,13 @@ pub struct SamplingBehaviour<Membership: MembershipHandler> {
 
 impl<Membership: MembershipHandler> SamplingBehaviour<Membership> {
     pub fn new(peer_id: PeerId, membership: Membership) -> Self {
-        let behaviour = libp2p_stream::Behaviour::new();
-        let mut stream_control = behaviour.new_control();
-        let incoming_streams = stream_control
-            .accept(SAMPLING_PROTOCOL)
-            .expect("Just a single accept to protocol is valid");
         let connected_subnetworks = HashMap::new();
         let (outgoing_sender, outgoing_receiver) =
             tokio::sync::mpsc::unbounded_channel::<(Membership::NetworkId, BlobId)>();
         let outgoing_samples = UnboundedReceiverStream::new(outgoing_receiver);
         Self {
             peer_id,
-            stream_behaviour: behaviour,
-            stream_control,
             connected_subnetworks,
-            incoming_streams,
             membership,
             outgoing_sender,
             outgoing_samples,
@@ -171,7 +186,7 @@ where
     Membership: MembershipHandler<NetworkId = SubnetworkId, Id = PeerId> + 'static,
 {
     type ConnectionHandler = Either<
-        <libp2p_stream::Behaviour as NetworkBehaviour>::ConnectionHandler,
+        OneShotHandler<SamplingProtocolRequest, SamplingProtocolResponse, SamplingProtocolEvent>,
         libp2p::swarm::dummy::ConnectionHandler,
     >;
     type ToSwarm = SamplingEvent;
@@ -187,26 +202,20 @@ where
             return Ok(Either::Right(libp2p::swarm::dummy::ConnectionHandler));
         }
         self.connected_subnetworks.insert(peer, connection_id);
-        self.stream_behaviour
-            .handle_established_inbound_connection(connection_id, peer, local_addr, remote_addr)
-            .map(Either::Left)
+        Ok(Either::Left(OneShotHandler::default()))
     }
 
     fn handle_established_outbound_connection(
         &mut self,
-        connection_id: ConnectionId,
-        peer: PeerId,
-        addr: &Multiaddr,
-        role_override: Endpoint,
+        _connection_id: ConnectionId,
+        _peer: PeerId,
+        _addr: &Multiaddr,
+        _role_override: Endpoint,
     ) -> Result<THandler<Self>, ConnectionDenied> {
-        self.stream_behaviour
-            .handle_established_outbound_connection(connection_id, peer, addr, role_override)
-            .map(Either::Left)
+        Ok(Either::Left(OneShotHandler::default()))
     }
 
-    fn on_swarm_event(&mut self, event: FromSwarm) {
-        self.stream_behaviour.on_swarm_event(event)
-    }
+    fn on_swarm_event(&mut self, event: FromSwarm) {}
 
     fn on_connection_handler_event(
         &mut self,
@@ -217,66 +226,50 @@ where
         let Either::Left(event) = event else {
             unreachable!()
         };
-        self.stream_behaviour
-            .on_connection_handler_event(peer_id, connection_id, event)
     }
 
     fn poll(
         &mut self,
         cx: &mut Context<'_>,
     ) -> Poll<ToSwarm<Self::ToSwarm, THandlerInEvent<Self>>> {
-        let Self {
-            peer_id,
-            stream_control,
-            incoming_streams,
-            outgoing_samples,
-            membership,
-            outgoing_tasks,
-            incoming_tasks,
-            ..
-        } = self;
-        // poll incoming streams
-        // dispersal streams are considered one shot, they are dropped after completion
-        if let Poll::Ready(Some((_peer, stream))) = incoming_streams.poll_next_unpin(cx) {
-            let (request_receiver, response_sender, fut) = Self::handle_incoming_stream(stream);
-            let event = ToSwarm::GenerateEvent(SamplingEvent::IncomingSample {
-                request_receiver,
-                response_sender,
-            });
-            incoming_tasks.push(fut.boxed());
-            return Poll::Ready(event);
-        }
-        // poll outgoing streams
-        if let Poll::Ready(Some((subnetwork_id, blob_id))) = outgoing_samples.poll_next_unpin(cx) {
-            let fut = Self::handle_sample_request(
-                peer_id,
-                subnetwork_id,
-                blob_id,
-                membership,
-                stream_control,
-            );
-            outgoing_tasks.push(fut.boxed());
-        }
-        if let Poll::Ready(Some(Err(e))) = incoming_tasks.poll_next_unpin(cx) {
-            error!("Sample response error: {e}");
-        }
-        if let Poll::Ready(Some(res)) = outgoing_tasks.poll_next_unpin(cx) {
-            let event = match res {
-                Ok(response) => SamplingEvent::SampleResponse(response),
-                Err(error) => SamplingEvent::SampleError(error),
-            };
-            return Poll::Ready(ToSwarm::GenerateEvent(event));
-        }
-
-        // Deal with connection as the underlying behaviour would do
-        match self.stream_behaviour.poll(cx) {
-            Poll::Ready(ToSwarm::Dial { opts }) => Poll::Ready(ToSwarm::Dial { opts }),
-            Poll::Pending => {
-                // TODO: probably must be smarter when to wake this
-                cx.waker().wake_by_ref();
-                Poll::Pending
-            }
-            _ => unreachable!(),
-        }
+        //     let Self {
+        //         peer_id,
+        //         incoming_streams,
+        //         outgoing_samples,
+        //         membership,
+        //         outgoing_tasks,
+        //         incoming_tasks,
+        //         ..
+        //     } = self;
+        //     // poll incoming streams
+        //     // dispersal streams are considered one shot, they are dropped after completion
+        //     if let Poll::Ready(Some((_peer, stream))) = incoming_streams.poll_next_unpin(cx) {
+        //         let (request_receiver, response_sender, fut) = Self::handle_incoming_stream(stream);
+        //         let event = ToSwarm::GenerateEvent(SamplingEvent::IncomingSample {
+        //             request_receiver,
+        //             response_sender,
+        //         });
+        //         incoming_tasks.push(fut.boxed());
+        //         return Poll::Ready(event);
+        //     }
+        //     // poll outgoing streams
+        //     if let Poll::Ready(Some((subnetwork_id, blob_id))) = outgoing_samples.poll_next_unpin(cx) {
+        //         let fut = Self::handle_sample_request(peer_id, subnetwork_id, blob_id, membership);
+        //         outgoing_tasks.push(fut.boxed());
+        //     }
+        //     if let Poll::Ready(Some(Err(e))) = incoming_tasks.poll_next_unpin(cx) {
+        //         error!("Sample response error: {e}");
+        //     }
+        //     if let Poll::Ready(Some(res)) = outgoing_tasks.poll_next_unpin(cx) {
+        //         let event = match res {
+        //             Ok(response) => SamplingEvent::SampleResponse(response),
+        //             Err(error) => SamplingEvent::SampleError(error),
+        //         };
+        //         return Poll::Ready(ToSwarm::GenerateEvent(event));
+        //     }
+        //
+        //     cx.waker().wake_by_ref();
+        //     Poll::Pending
+        Poll::Pending
     }
 }
