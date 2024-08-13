@@ -1,5 +1,4 @@
 pub mod behaviour;
-mod protocol;
 
 #[cfg(test)]
 mod test {
@@ -27,9 +26,7 @@ mod test {
             .with_tokio()
             .with_other_transport(|key| quic::tokio::Transport::new(quic::Config::new(key)))
             .unwrap()
-            .with_behaviour(|key| {
-                SamplingBehaviour::new(PeerId::from_public_key(&key.public()), membership)
-            })
+            .with_behaviour(|_key| SamplingBehaviour::new(membership))
             .unwrap()
             .with_swarm_config(|cfg| {
                 cfg.with_idle_connection_timeout(Duration::from_secs(u64::MAX))
@@ -83,17 +80,17 @@ mod test {
                 match swarm.next().await {
                     None => {}
                     Some(SwarmEvent::Behaviour(SamplingEvent::IncomingSample {
-                        request_receiver,
+                        request,
                         response_sender,
                     })) => {
-                        req.push(request_receiver.await.unwrap());
+                        req.push(request);
                         response_sender
                             .send(SampleRes { message_type: None })
                             .unwrap()
                     }
-                    Some(SwarmEvent::Behaviour(SamplingEvent::SampleResponse(response))) => {
-                        res.push(response);
-                    }
+                    // Some(SwarmEvent::Behaviour(SamplingEvent::SampleResponse(response))) => {
+                    //     res.push(response);
+                    // }
                     Some(event) => {
                         debug!("{event:?}");
                     }
