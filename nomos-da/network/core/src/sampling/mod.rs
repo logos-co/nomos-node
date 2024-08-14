@@ -7,7 +7,7 @@ mod test {
     use crate::SubnetworkId;
     use futures::StreamExt;
     use libp2p::identity::Keypair;
-    use libp2p::swarm::{SwarmEvent, ToSwarm};
+    use libp2p::swarm::SwarmEvent;
     use libp2p::{quic, Multiaddr, PeerId, Swarm, SwarmBuilder};
     use log::debug;
     use nomos_da_messages::sampling::{SampleReq, SampleRes};
@@ -64,8 +64,8 @@ mod test {
         let mut p1 = sampling_swarm(k1.clone(), neighbours.clone());
         let mut p2 = sampling_swarm(k2.clone(), neighbours);
 
-        let mut request_sender_1 = p1.behaviour().sample_request_channel();
-        let mut request_sender_2 = p2.behaviour().sample_request_channel();
+        let request_sender_1 = p1.behaviour().sample_request_channel();
+        let request_sender_2 = p2.behaviour().sample_request_channel();
         const MSG_COUNT: usize = 10;
         async fn test_sampling_swarm(
             mut swarm: Swarm<
@@ -73,24 +73,26 @@ mod test {
                     impl MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'static,
                 >,
             >,
-        ) -> (Vec<SampleReq>, Vec<SampleRes>) {
+        ) -> (Vec<SampleReq>, Vec<[u8; 32]>) {
             let mut req = vec![];
             let mut res = vec![];
             loop {
                 match swarm.next().await {
                     None => {}
                     Some(SwarmEvent::Behaviour(SamplingEvent::IncomingSample {
-                        request,
+                        request_receiver,
                         response_sender,
                     })) => {
-                        req.push(request);
+                        req.push(request_receiver.await.unwrap());
                         response_sender
                             .send(SampleRes { message_type: None })
                             .unwrap()
                     }
-                    // Some(SwarmEvent::Behaviour(SamplingEvent::SampleResponse(response))) => {
-                    //     res.push(response);
-                    // }
+                    Some(SwarmEvent::Behaviour(SamplingEvent::SamplingSuccess {
+                        blob_id, ..
+                    })) => {
+                        res.push(blob_id);
+                    }
                     Some(event) => {
                         debug!("{event:?}");
                     }
