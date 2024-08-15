@@ -6,11 +6,14 @@ mod test {
     use crate::test_utils::AllNeighbours;
     use crate::SubnetworkId;
     use futures::StreamExt;
+    use kzgrs_backend::common::blob::DaBlob;
+    use kzgrs_backend::common::Column;
     use libp2p::identity::Keypair;
     use libp2p::swarm::SwarmEvent;
     use libp2p::{quic, Multiaddr, PeerId, Swarm, SwarmBuilder};
     use log::debug;
-    use nomos_da_messages::sampling::{SampleReq, SampleRes};
+    use nomos_da_messages::common::Blob;
+    use nomos_da_messages::sampling::SampleRes;
     use std::time::Duration;
     use subnetworks_assignations::MembershipHandler;
     use tracing_subscriber::fmt::TestWriter;
@@ -26,7 +29,9 @@ mod test {
             .with_tokio()
             .with_other_transport(|key| quic::tokio::Transport::new(quic::Config::new(key)))
             .unwrap()
-            .with_behaviour(|_key| SamplingBehaviour::new(membership))
+            .with_behaviour(|key| {
+                SamplingBehaviour::new(PeerId::from_public_key(&key.public()), membership)
+            })
             .unwrap()
             .with_swarm_config(|cfg| {
                 cfg.with_idle_connection_timeout(Duration::from_secs(u64::MAX))
@@ -73,8 +78,7 @@ mod test {
                     impl MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'static,
                 >,
             >,
-        ) -> (Vec<SampleReq>, Vec<[u8; 32]>) {
-            let mut req = vec![];
+        ) -> Vec<[u8; 32]> {
             let mut res = vec![];
             loop {
                 match swarm.next().await {
@@ -83,29 +87,51 @@ mod test {
                         request_receiver,
                         response_sender,
                     })) => {
-                        req.push(request_receiver.await.unwrap());
+                        debug!("Received request");
+                        // spawn here because otherwise we block polling
+                        tokio::spawn(request_receiver);
                         response_sender
-                            .send(SampleRes { message_type: None })
+                            .send(SampleRes {
+                                message_type: Some(
+                                    nomos_da_messages::sampling::sample_res::MessageType::Blob(
+                                        Blob {
+                                            blob_id: vec![],
+                                            data: bincode::serialize(&DaBlob {
+                                                column: Column(vec![]),
+                                                column_commitment: Default::default(),
+                                                aggregated_column_commitment: Default::default(),
+                                                aggregated_column_proof: Default::default(),
+                                                rows_commitments: vec![],
+                                                rows_proofs: vec![],
+                                            })
+                                            .unwrap(),
+                                        },
+                                    ),
+                                ),
+                            })
                             .unwrap()
                     }
                     Some(SwarmEvent::Behaviour(SamplingEvent::SamplingSuccess {
                         blob_id, ..
                     })) => {
+                        debug!("Received response");
                         res.push(blob_id);
+                    }
+                    Some(SwarmEvent::Behaviour(SamplingEvent::SamplingError { error })) => {
+                        debug!("Error during sampling: {error}");
                     }
                     Some(event) => {
                         debug!("{event:?}");
                     }
                 }
-                if (req.len(), res.len()) == (MSG_COUNT, MSG_COUNT) {
-                    break (req, res);
+                if res.len() == MSG_COUNT {
+                    break res;
                 }
             }
         }
         let _p1_address = p1_address.clone();
         let _p2_address = p2_address.clone();
-        p1.add_peer_address(PeerId::from_public_key(&k2.public()), _p2_address.clone());
-        p2.add_peer_address(PeerId::from_public_key(&k1.public()), _p1_address.clone());
+
         let t1 = tokio::spawn(async move {
             p1.listen_on(p1_address).unwrap();
             tokio::time::sleep(Duration::from_secs(1)).await;
@@ -119,14 +145,13 @@ mod test {
             test_sampling_swarm(p2).await
         });
         tokio::time::sleep(Duration::from_secs(2)).await;
-        for _ in 0..MSG_COUNT {
-            request_sender_1.send((0, [0; 32])).unwrap();
-            request_sender_2.send((0, [0; 32])).unwrap();
+        for i in 0..MSG_COUNT {
+            request_sender_1.send((0, [i as u8; 32])).unwrap();
+            request_sender_2.send((0, [i as u8; 32])).unwrap();
         }
 
-        let (req1, res1) = t1.await.unwrap();
-        let (req2, res2) = t2.await.unwrap();
-        assert_eq!(req1, req2);
+        let res1 = t1.await.unwrap();
+        let res2 = t2.await.unwrap();
         assert_eq!(res1, res2);
     }
 }
