@@ -72,6 +72,8 @@ impl SamplingError {
     }
 }
 
+/// Inner type representation of a Blob ID
+// TODO: Use a proper type that is common to the codebase
 type BlobId = [u8; 32];
 
 #[derive(Debug)]
@@ -91,11 +93,13 @@ pub enum SamplingEvent {
     },
 }
 
+/// Auxiliary struct that binds a stream with the corresponding `PeerId`
 struct SampleStream {
     stream: Stream,
     peer_id: PeerId,
 }
 
+/// Auxiliary struct that binds where to send a request and the pair channel to listen for a response
 struct ResponseChannel {
     request_sender: Sender<SampleReq>,
     response_receiver: Receiver<SampleRes>,
@@ -105,10 +109,8 @@ type StreamHandlerFutureSuccess = (BlobId, SubnetworkId, SampleRes, SampleStream
 type OutgoingStreamHandlerFuture =
     BoxFuture<'static, Result<StreamHandlerFutureSuccess, SamplingError>>;
 type IncomingStreamHandlerFuture = BoxFuture<'static, Result<SampleStream, SamplingError>>;
-/// Executor dispersal protocol
-/// Do not handle incoming connections, just accepts outgoing ones.
-/// It takes care of sending blobs to different subnetworks.
-/// Bubbles up events with the success or error when dispersing
+/// Executor sampling protocol
+/// Takes care of sending and replying sampling requests
 pub struct SamplingBehaviour<Membership: MembershipHandler> {
     peer_id: PeerId,
     /// Underlying stream behaviour
@@ -117,9 +119,9 @@ pub struct SamplingBehaviour<Membership: MembershipHandler> {
     incoming_streams: IncomingStreams,
     /// Underlying stream control
     control: Control,
-    /// Pending running tasks (one task per stream)
+    /// Pending outgoing running tasks (one task per stream)
     outgoing_tasks: FuturesUnordered<OutgoingStreamHandlerFuture>,
-    /// Pending running tasks (one task per stream)
+    /// Pending incoming running tasks (one task per stream)
     incoming_tasks: FuturesUnordered<IncomingStreamHandlerFuture>,
     /// Subnetworks membership information
     membership: Membership,
@@ -227,7 +229,7 @@ where
         Ok((blob_id, subnetwork_id, response, stream))
     }
 
-    /// Get a pending request if its available
+    /// Get a pending outgoing request if its available
     fn next_request(
         peer_id: &PeerId,
         to_sample: &mut HashMap<PeerId, VecDeque<(SubnetworkId, BlobId)>>,
@@ -237,7 +239,7 @@ where
             .and_then(|queue| queue.pop_front())
     }
 
-    /// Handler outgoing stream
+    /// Handle outgoing stream
     /// Schedule a new task if its available or drop the stream if not
     fn handle_outgoing_stream(
         outgoing_tasks: &mut FuturesUnordered<OutgoingStreamHandlerFuture>,
@@ -264,6 +266,8 @@ where
         }
     }
 
+    /// Handler incoming streams
+    /// Pull a request from the stream and replies if possible
     async fn handle_incoming_stream(
         mut stream: SampleStream,
         channel: ResponseChannel,
@@ -312,6 +316,9 @@ where
         Ok(stream)
     }
 
+    /// Schedule an incoming stream to be replied
+    /// Creates the necessary channels so requests can be replied from outside of this behaviour
+    /// from whoever that takes the channels
     fn schedule_incoming_stream_task(
         incoming_tasks: &mut FuturesUnordered<IncomingStreamHandlerFuture>,
         sample_stream: SampleStream,
@@ -373,6 +380,7 @@ impl<Membership: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'sta
         }
     }
 
+    /// Auxiliary method that transforms a sample response into an event
     fn handle_sample_response(
         blob_id: BlobId,
         subnetwork_id: SubnetworkId,
