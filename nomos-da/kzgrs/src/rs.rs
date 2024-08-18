@@ -100,18 +100,19 @@ mod test {
         let (_evals, poly) = bytes_to_polynomial::<31>(&bytes, *DOMAIN).unwrap();
 
         let encoded = encode(&poly, *DOMAIN);
-        let mut encoded: Vec<Option<Fr>> = encoded.evals.into_iter().map(Some).collect();
+        let mut encoded_evals: Vec<Option<Fr>> = encoded.evals.into_iter().map(Some).collect();
 
-        let decoded = decode(10, &encoded, *DOMAIN);
+        let decoded = decode(10, &encoded_evals, *DOMAIN);
         let decoded_bytes = points_to_bytes::<31>(&decoded.evals);
         assert_eq!(decoded_bytes, bytes);
 
         // check with missing pieces
 
-        for i in (1..encoded.len()).step_by(2) {
-            encoded[i] = None;
+        for i in (1..encoded_evals.len()).step_by(2) {
+            encoded_evals[i] = None;
         }
 
+        let decoded = decode(10, &encoded_evals, *DOMAIN);
         let decoded_bytes = points_to_bytes::<31>(&decoded.evals);
         assert_eq!(decoded_bytes, bytes);
     }
