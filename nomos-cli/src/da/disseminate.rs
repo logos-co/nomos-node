@@ -33,12 +33,11 @@ use tokio::sync::{mpsc::UnboundedReceiver, Mutex};
 use super::network::adapters::mock::MockExecutorDispersalAdapter;
 use crate::api::mempool::send_blob_info;
 
-const APP_ID: &[u8; 32] = b"1234567890abcdef1234567890abcdef";
-
 pub async fn disseminate_and_wait<E, D>(
     encoder: &E,
     disperal: &D,
     data: Box<[u8]>,
+    metadata: Metadata,
     status_updates: Sender<Status>,
     node_addr: Option<&Url>,
     output: Option<&PathBuf>,
@@ -62,8 +61,7 @@ where
     disperal.disperse(encoded_data).await.map_err(Box::new)?;
 
     // 3) Build blob info.
-    let meta = Metadata::new(*APP_ID, 0.into());
-    let blob_info = BlobInfo::new(blob_hash, meta);
+    let blob_info = BlobInfo::new(blob_hash, metadata);
 
     if let Some(output) = output {
         status_updates.send(Status::SavingBlobInfo)?;
@@ -126,6 +124,7 @@ pub struct Settings {
     pub payload: Arc<Mutex<UnboundedReceiver<Box<[u8]>>>>,
     pub timeout: Duration,
     pub kzgrs_settings: KzgrsSettings,
+    pub metadata: Metadata,
     pub status_updates: Sender<Status>,
     pub node_addr: Option<Url>,
     pub output: Option<std::path::PathBuf>,
@@ -155,6 +154,7 @@ impl ServiceCore for DisseminateService {
             payload,
             timeout,
             kzgrs_settings,
+            metadata,
             status_updates,
             node_addr,
             output,
@@ -182,6 +182,7 @@ impl ServiceCore for DisseminateService {
                     &da_encoder,
                     &da_dispersal,
                     data,
+                    metadata,
                     status_updates.clone(),
                     node_addr.as_ref(),
                     output.as_ref(),

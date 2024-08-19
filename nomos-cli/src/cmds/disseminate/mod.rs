@@ -2,6 +2,7 @@ use crate::da::disseminate::{
     DisseminateApp, DisseminateAppServiceSettings, KzgrsSettings, Settings, Status,
 };
 use clap::Args;
+use kzgrs_backend::dispersal::Metadata;
 use nomos_da_network_service::backends::mock::executor::MockExecutorBackend as NetworkBackend;
 use nomos_da_network_service::NetworkService;
 use nomos_log::{LoggerBackend, LoggerSettings};
@@ -25,6 +26,10 @@ pub struct Disseminate {
     /// for block inclusion, if present.
     #[clap(long)]
     pub node_addr: Option<Url>,
+    #[clap(long)]
+    pub app_id: String,
+    #[clap(long)]
+    pub index: u64,
     /// File to write the certificate to, if present.
     #[clap(long)]
     pub output: Option<PathBuf>,
@@ -51,6 +56,10 @@ impl Disseminate {
             file_bytes.into_boxed_slice()
         };
 
+        let app_id: [u8; 32] = hex::decode(&self.app_id)?
+            .try_into()
+            .map_err(|_| "Invalid app_id")?;
+        let metadata = Metadata::new(app_id, self.index.into());
         let timeout = Duration::from_secs(self.timeout);
         let node_addr = self.node_addr.clone();
         let output = self.output.clone();
@@ -64,6 +73,7 @@ impl Disseminate {
                         payload: Arc::new(Mutex::new(payload_rx)),
                         timeout,
                         kzgrs_settings: KzgrsSettings::default(),
+                        metadata,
                         status_updates,
                         node_addr,
                         output,
