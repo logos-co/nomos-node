@@ -1,4 +1,4 @@
-use clap::{Args, ValueEnum};
+use clap::Args;
 use kzgrs_backend::{
     common::build_attestation_message,
     dispersal::{BlobInfo, Metadata},
@@ -125,7 +125,7 @@ pub struct Settings {
     // This is wrapped in an Arc just to make the struct Clone
     pub payload: Arc<Mutex<UnboundedReceiver<Box<[u8]>>>>,
     pub timeout: Duration,
-    //    pub da_protocol: DaProtocolChoice,
+    pub kzgrs_settings: KzgrsSettings,
     pub status_updates: Sender<Status>,
     pub node_addr: Option<Url>,
     pub output: Option<std::path::PathBuf>,
@@ -154,6 +154,7 @@ impl ServiceCore for DisseminateService {
         let Settings {
             payload,
             timeout,
+            kzgrs_settings,
             status_updates,
             node_addr,
             output,
@@ -166,7 +167,10 @@ impl ServiceCore for DisseminateService {
             .await
             .expect("Relay connection with NetworkService should succeed");
 
-        let params = kzgrs_backend::encoder::DaEncoderParams::new(4096, true);
+        let params = kzgrs_backend::encoder::DaEncoderParams::new(
+            kzgrs_settings.num_columns,
+            kzgrs_settings.with_cache,
+        );
         let da_encoder = kzgrs_backend::encoder::DaEncoder::new(params);
 
         let da_dispersal = MockExecutorDispersalAdapter::new(network_relay);
@@ -204,64 +208,17 @@ impl ServiceCore for DisseminateService {
     }
 }
 
-// This format is for clap args convenience, I could not
-// find a way to use enums directly without having to implement
-// parsing by hand.
-// The `settings` field will hold the settings for all possible
-// protocols, but only the one chosen will be used.
-// We can enforce only sensible combinations of protocol/settings
-// are specified by using special clap directives
-// #[derive(Clone, Debug, Args, Default)]
-// pub struct DaProtocolChoice {
-//     #[clap(long, default_value = "full-replication")]
-//     pub da_protocol: Protocol,
-//     #[clap(flatten)]
-//     pub settings: ProtocolSettings,
-// }
+#[derive(Debug, Clone, Args)]
+pub struct KzgrsSettings {
+    num_columns: usize,
+    with_cache: bool,
+}
 
-// impl TryFrom<DaProtocolChoice> for FullReplication<AbsoluteNumber<Attestation, Certificate>> {
-//     type Error = &'static str;
-//     fn try_from(value: DaProtocolChoice) -> Result<Self, Self::Error> {
-//         match (value.da_protocol, value.settings) {
-//             (Protocol::FullReplication, ProtocolSettings { full_replication }) => {
-//                 Ok(FullReplication::new(
-//                     full_replication.voter,
-//                     AbsoluteNumber::new(full_replication.num_attestations),
-//                 ))
-//             }
-//         }
-//     }
-// }
-
-// #[derive(Clone, Debug, Args, Default)]
-// pub struct ProtocolSettings {
-//     #[clap(flatten)]
-//     pub full_replication: FullReplicationSettings,
-// }
-//
-// #[derive(Clone, Debug, ValueEnum, Default)]
-// pub enum Protocol {
-//     #[default]
-//     FullReplication,
-// }
-//
-// impl Default for FullReplicationSettings {
-//     fn default() -> Self {
-//         Self {
-//             voter: [0; 32],
-//             num_attestations: 1,
-//         }
-//     }
-// }
-
-// #[derive(Debug, Clone, Args)]
-// pub struct FullReplicationSettings {
-//     #[clap(long, value_parser = parse_key, default_value = "0000000000000000000000000000000000000000000000000000000000000000")]
-//     pub voter: Voter,
-//     #[clap(long, default_value = "1")]
-//     pub num_attestations: usize,
-// }
-//
-// fn parse_key(s: &str) -> Result<Voter, Box<dyn Error + Send + Sync + 'static>> {
-//     Ok(<[u8; 32]>::from_hex(s)?)
-// }
+impl Default for KzgrsSettings {
+    fn default() -> Self {
+        Self {
+            num_columns: 4096,
+            with_cache: true,
+        }
+    }
+}

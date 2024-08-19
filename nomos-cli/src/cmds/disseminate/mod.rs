@@ -1,4 +1,6 @@
-use crate::da::disseminate::{DisseminateApp, DisseminateAppServiceSettings, Settings, Status};
+use crate::da::disseminate::{
+    DisseminateApp, DisseminateAppServiceSettings, KzgrsSettings, Settings, Status,
+};
 use clap::Args;
 use nomos_da_network_service::backends::mock::executor::MockExecutorBackend as NetworkBackend;
 use nomos_da_network_service::NetworkService;
@@ -64,6 +66,7 @@ impl Disseminate {
                     send_blob: Settings {
                         payload: Arc::new(Mutex::new(payload_rx)),
                         timeout,
+                        kzgrs_settings: KzgrsSettings::default(),
                         status_updates,
                         node_addr,
                         output,
