@@ -1,30 +1,50 @@
+// std
+// crates
+use futures::StreamExt;
+use libp2p::identity::Keypair;
+use libp2p::swarm::SwarmEvent;
+use libp2p::{PeerId, Swarm, SwarmBuilder};
+use log::debug;
+use tokio::sync::mpsc::{unbounded_channel, UnboundedSender};
+use tokio_stream::wrappers::UnboundedReceiverStream;
+// internal
 use crate::behaviour::validator::{ValidatorBehaviour, ValidatorBehaviourEvent};
 use crate::protocols::{
     dispersal::validator::behaviour::DispersalEvent, replication::behaviour::ReplicationEvent,
     sampling::behaviour::SamplingEvent,
 };
 use crate::SubnetworkId;
-use futures::StreamExt;
-use libp2p::identity::Keypair;
-use libp2p::swarm::SwarmEvent;
-use libp2p::{PeerId, Swarm, SwarmBuilder};
-use log::debug;
 use subnetworks_assignations::MembershipHandler;
+
+pub struct ValidatorEventsStream {
+    pub sampling_events_receiver: UnboundedReceiverStream<SamplingEvent>,
+}
 
 pub struct ValidatorSwarm<
     Membership: MembershipHandler<NetworkId = SubnetworkId, Id = PeerId> + 'static,
 > {
     swarm: Swarm<ValidatorBehaviour<Membership>>,
+    sampling_events_sender: UnboundedSender<SamplingEvent>,
 }
 
 impl<Membership> ValidatorSwarm<Membership>
 where
     Membership: MembershipHandler<NetworkId = SubnetworkId, Id = PeerId> + Clone + Send,
 {
-    pub fn build_swarm(
-        key: Keypair,
-        membership: Membership,
-    ) -> Swarm<ValidatorBehaviour<Membership>> {
+    pub fn new(key: Keypair, membership: Membership) -> (Self, ValidatorEventsStream) {
+        let (sampling_events_sender, sampling_events_receiver) = unbounded_channel();
+        let sampling_events_receiver = UnboundedReceiverStream::new(sampling_events_receiver);
+        (
+            Self {
+                swarm: Self::build_swarm(key, membership),
+                sampling_events_sender,
+            },
+            ValidatorEventsStream {
+                sampling_events_receiver,
+            },
+        )
+    }
+    fn build_swarm(key: Keypair, membership: Membership) -> Swarm<ValidatorBehaviour<Membership>> {
         SwarmBuilder::with_existing_identity(key)
             .with_tokio()
             .with_quic()
@@ -33,15 +53,19 @@ where
             .build()
     }
 
-    async fn handle_sampling_event(&mut self, _event: SamplingEvent) {
-        unimplemented!()
+    async fn handle_sampling_event(&mut self, event: SamplingEvent) {
+        if let Err(e) = self.sampling_events_sender.send(event) {
+            debug!("Error distributing sampling message internally: {e:?}");
+        }
     }
 
     async fn handle_dispersal_event(&mut self, _event: DispersalEvent) {
+        // TODO: hook incoming dispersal events => to replication
         unimplemented!()
     }
 
     async fn handle_replication_event(&mut self, _event: ReplicationEvent) {
+        // TODO: Hook incoming blobs from replication protocol
         unimplemented!()
     }
 
