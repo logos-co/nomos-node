@@ -2,7 +2,7 @@ pub mod behaviour;
 
 #[cfg(test)]
 mod test {
-    use crate::sampling::behaviour::{SamplingBehaviour, SamplingEvent};
+    use crate::protocols::sampling::behaviour::{SamplingBehaviour, SamplingEvent};
     use crate::test_utils::AllNeighbours;
     use crate::SubnetworkId;
     use futures::StreamExt;

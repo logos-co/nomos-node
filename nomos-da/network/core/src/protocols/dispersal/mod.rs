@@ -3,8 +3,10 @@ pub mod validator;
 
 #[cfg(test)]
 pub mod test {
-    use crate::dispersal::executor::behaviour::DispersalExecutorBehaviour;
-    use crate::dispersal::validator::behaviour::{DispersalEvent, DispersalValidatorBehaviour};
+    use crate::protocols::dispersal::executor::behaviour::DispersalExecutorBehaviour;
+    use crate::protocols::dispersal::validator::behaviour::{
+        DispersalEvent, DispersalValidatorBehaviour,
+    };
     use crate::test_utils::AllNeighbours;
     use futures::StreamExt;
     use kzgrs_backend::common::blob::DaBlob;
