@@ -1,6 +1,6 @@
 use clap::Args;
 use kzgrs_backend::{
-    common::build_attestation_message,
+    common::build_blob_id,
     dispersal::{BlobInfo, Metadata},
     encoder::EncodedData as KzgEncodedData,
 };
@@ -52,7 +52,7 @@ where
     // 1) Building blob
     status_updates.send(Status::Encoding)?;
     let encoded_data = encoder.encode(&data).map_err(Box::new)?;
-    let blob_hash = build_attestation_message(
+    let blob_hash = build_blob_id(
         &encoded_data.aggregated_column_commitment,
         &encoded_data.row_commitments,
     );

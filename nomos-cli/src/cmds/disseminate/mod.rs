@@ -18,9 +18,6 @@ pub struct Disseminate {
     /// Path to the network config file
     #[clap(short, long)]
     pub network_config: PathBuf,
-    /// The data availability protocol to use. Defaults to full replication.
-    // #[clap(flatten)]
-    // pub da_protocol: DaProtocolChoice,
     /// Timeout in seconds. Defaults to 120 seconds.
     #[clap(short, long, default_value = "120")]
     pub timeout: u64,

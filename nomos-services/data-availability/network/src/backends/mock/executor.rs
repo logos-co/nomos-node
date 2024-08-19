@@ -1,4 +1,4 @@
-use kzgrs_backend::common::{blob::DaBlob, build_attestation_message};
+use kzgrs_backend::common::{blob::DaBlob, build_blob_id};
 use overwatch_rs::{overwatch::handle::OverwatchHandle, services::state::NoState};
 use serde::{Deserialize, Serialize};
 use tokio::sync::{
@@ -83,10 +83,8 @@ impl NetworkBackend for MockExecutorBackend {
                 blob,
                 subnetwork_id,
             } => {
-                let blob_id = build_attestation_message(
-                    &blob.aggregated_column_commitment,
-                    &blob.rows_commitments,
-                );
+                let blob_id =
+                    build_blob_id(&blob.aggregated_column_commitment, &blob.rows_commitments);
 
                 let success_message = DisperseMessage::DispersalSuccess {
                     blob_id,

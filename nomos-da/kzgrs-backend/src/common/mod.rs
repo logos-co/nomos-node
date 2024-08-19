@@ -153,7 +153,7 @@ pub fn hash_column_and_commitment<const HASH_SIZE: usize>(
         .unwrap_or_else(|_| panic!("Size is guaranteed by constant {HASH_SIZE:?}"))
 }
 
-pub fn build_attestation_message(
+pub fn build_blob_id(
     aggregated_column_commitment: &Commitment,
     rows_commitments: &[Commitment],
 ) -> [u8; 32] {
