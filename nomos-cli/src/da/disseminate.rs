@@ -1,5 +1,9 @@
 use clap::{Args, ValueEnum};
-use kzgrs_backend::encoder::EncodedData as KzgEncodedData;
+use kzgrs_backend::{
+    common::build_attestation_message,
+    dispersal::{BlobInfo, Metadata},
+    encoder::EncodedData as KzgEncodedData,
+};
 use nomos_core::{
     da::{DaDispersal, DaEncoder},
     wire,
@@ -27,6 +31,9 @@ use std::{
 use tokio::sync::{mpsc::UnboundedReceiver, Mutex};
 
 use super::network::adapters::mock::MockExecutorDispersalAdapter;
+use crate::api::mempool::send_blob_info;
+
+const APP_ID: &[u8; 32] = b"1234567890abcdef1234567890abcdef";
 
 pub async fn disseminate_and_wait<E, D>(
     encoder: &E,
@@ -45,40 +52,34 @@ where
     // 1) Building blob
     status_updates.send(Status::Encoding)?;
     let encoded_data = encoder.encode(&data).map_err(Box::new)?;
+    let blob_hash = build_attestation_message(
+        &encoded_data.aggregated_column_commitment,
+        &encoded_data.row_commitments,
+    );
 
     // 2) Send blob to network
     status_updates.send(Status::Disseminating)?;
     disperal.disperse(encoded_data).await.map_err(Box::new)?;
-    // futures::future::try_join_all(blobs.into_iter().map(|blob| adapter.send_blob(blob)))
-    //     .await
-    //     .map_err(|e| e as Box<dyn std::error::Error + Sync + Send>)?;
 
-    // 3) Collect attestations and create proof
-    // status_updates.send(Status::WaitingAttestations)?;
-    // let mut attestations = adapter.attestation_stream().await;
-    // let cert: C = loop {
-    //     da.recv_attestation(attestations.next().await.unwrap());
+    // 3) Build blob info.
+    let meta = Metadata::new(*APP_ID, 0.into());
+    let blob_info = BlobInfo::new(blob_hash, meta);
 
-    //     if let Some(certificate) = da.certify_dispersal() {
-    //         status_updates.send(Status::CreatingCert)?;
-    //         break certificate;
-    //     }
-    // };
+    if let Some(output) = output {
+        status_updates.send(Status::SavingBlobInfo)?;
+        std::fs::write(output, wire::serialize(&blob_info)?)?;
+    }
 
-    // if let Some(output) = output {
-    //     status_updates.send(Status::SavingCert)?;
-    //     std::fs::write(output, wire::serialize(&cert)?)?;
-    // }
+    // 4) Send blob info to the mempool.
+    if let Some(node) = node_addr {
+        status_updates.send(Status::SendingBlobInfo)?;
+        let res = send_blob_info(node, &blob_info).await?;
 
-    // if let Some(node) = node_addr {
-    //     status_updates.send(Status::SendingCert)?;
-    //     let res = send_certificate(node, &cert).await?;
-
-    //     if !res.status().is_success() {
-    //         tracing::error!("ERROR: {:?}", res);
-    //         return Err(format!("Failed to send certificate to node: {}", res.status()).into());
-    //     }
-    // }
+        if !res.status().is_success() {
+            tracing::error!("ERROR: {:?}", res);
+            return Err(format!("Failed to send certificate to node: {}", res.status()).into());
+        }
+    }
 
     status_updates.send(Status::Done)?;
     Ok(())
@@ -89,8 +90,8 @@ pub enum Status {
     Disseminating,
     WaitingAttestations,
     CreatingCert,
-    SavingCert,
-    SendingCert,
+    SavingBlobInfo,
+    SendingBlobInfo,
     Done,
     Err(Box<dyn std::error::Error + Send + Sync>),
 }
@@ -102,8 +103,8 @@ impl std::fmt::Display for Status {
             Self::Disseminating => write!(f, "Sending blob(s) to the network"),
             Self::WaitingAttestations => write!(f, "Waiting for attestations"),
             Self::CreatingCert => write!(f, "Creating certificate"),
-            Self::SavingCert => write!(f, "Saving certificate to file"),
-            Self::SendingCert => write!(f, "Sending certificate to node"),
+            Self::SavingBlobInfo => write!(f, "Saving blob info to file"),
+            Self::SendingBlobInfo => write!(f, "Sending blob info to node"),
             Self::Done => write!(f, ""),
             Self::Err(e) => write!(f, "Error: {e}"),
         }
