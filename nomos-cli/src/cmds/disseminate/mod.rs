@@ -1,10 +1,11 @@
 use crate::da::disseminate::{
-    DaProtocolChoice, DisseminateApp, DisseminateAppServiceSettings, Settings, Status,
+    DisseminateApp, DisseminateAppServiceSettings, KzgrsSettings, Settings, Status,
 };
 use clap::Args;
+use kzgrs_backend::dispersal::Metadata;
+use nomos_da_network_service::backends::mock::executor::MockExecutorBackend as NetworkBackend;
+use nomos_da_network_service::NetworkService;
 use nomos_log::{LoggerBackend, LoggerSettings};
-use nomos_network::backends::libp2p::Libp2p as NetworkBackend;
-use nomos_network::NetworkService;
 use overwatch_rs::{overwatch::OverwatchRunner, services::ServiceData};
 use reqwest::Url;
 use std::{path::PathBuf, sync::Arc, time::Duration};
@@ -18,9 +19,6 @@ pub struct Disseminate {
     /// Path to the network config file
     #[clap(short, long)]
     pub network_config: PathBuf,
-    /// The data availability protocol to use. Defaults to full replication.
-    #[clap(flatten)]
-    pub da_protocol: DaProtocolChoice,
     /// Timeout in seconds. Defaults to 120 seconds.
     #[clap(short, long, default_value = "120")]
     pub timeout: u64,
@@ -28,6 +26,10 @@ pub struct Disseminate {
     /// for block inclusion, if present.
     #[clap(long)]
     pub node_addr: Option<Url>,
+    #[clap(long)]
+    pub app_id: String,
+    #[clap(long)]
+    pub index: u64,
     /// File to write the certificate to, if present.
     #[clap(long)]
     pub output: Option<PathBuf>,
@@ -54,8 +56,11 @@ impl Disseminate {
             file_bytes.into_boxed_slice()
         };
 
+        let app_id: [u8; 32] = hex::decode(&self.app_id)?
+            .try_into()
+            .map_err(|_| "Invalid app_id")?;
+        let metadata = Metadata::new(app_id, self.index.into());
         let timeout = Duration::from_secs(self.timeout);
-        let da_protocol = self.da_protocol.clone();
         let node_addr = self.node_addr.clone();
         let output = self.output.clone();
         let (payload_sender, payload_rx) = tokio::sync::mpsc::unbounded_channel();
@@ -67,7 +72,8 @@ impl Disseminate {
                     send_blob: Settings {
                         payload: Arc::new(Mutex::new(payload_rx)),
                         timeout,
-                        da_protocol,
+                        kzgrs_settings: KzgrsSettings::default(),
+                        metadata,
                         status_updates,
                         node_addr,
                         output,

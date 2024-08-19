@@ -1,6 +1,6 @@
 pub mod api;
 pub mod cmds;
-// pub mod da;
+pub mod da;
 
 use clap::Parser;
 use cmds::Command;

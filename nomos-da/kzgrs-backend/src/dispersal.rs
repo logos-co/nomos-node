@@ -11,6 +11,12 @@ pub struct BlobInfo {
     metadata: Metadata,
 }
 
+impl BlobInfo {
+    pub fn new(id: [u8; 32], metadata: Metadata) -> Self {
+        Self { id, metadata }
+    }
+}
+
 impl blob::info::DispersedBlobInfo for BlobInfo {
     type BlobId = [u8; 32];
 
@@ -48,6 +54,10 @@ pub struct Metadata {
 }
 
 impl Metadata {
+    pub fn new(app_id: [u8; 32], index: Index) -> Self {
+        Self { app_id, index }
+    }
+
     pub fn size(&self) -> usize {
         std::mem::size_of_val(&self.app_id) + std::mem::size_of_val(&self.index)
     }

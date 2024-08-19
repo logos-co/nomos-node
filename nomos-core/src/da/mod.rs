@@ -17,11 +17,12 @@ pub trait DaVerifier {
     fn verify(&self, blob: &Self::DaBlob) -> Result<(), Self::Error>;
 }
 
+#[async_trait::async_trait]
 pub trait DaDispersal {
     type EncodedData;
     type Error;
 
-    fn disperse(&self, encoded_data: Self::EncodedData) -> Result<(), Self::Error>;
+    async fn disperse(&self, encoded_data: Self::EncodedData) -> Result<(), Self::Error>;
 }
 
 pub trait Signer {

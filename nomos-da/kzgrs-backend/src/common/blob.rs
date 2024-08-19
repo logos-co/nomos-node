@@ -5,7 +5,7 @@ use nomos_core::da::blob;
 use serde::{Deserialize, Serialize};
 use sha3::{Digest, Sha3_256};
 // internal
-use super::build_attestation_message;
+use super::build_blob_id;
 use crate::common::Column;
 use crate::common::Commitment;
 use crate::common::{
@@ -44,7 +44,7 @@ pub struct DaBlob {
 
 impl DaBlob {
     pub fn id(&self) -> Vec<u8> {
-        build_attestation_message(&self.aggregated_column_commitment, &self.rows_commitments).into()
+        build_blob_id(&self.aggregated_column_commitment, &self.rows_commitments).into()
     }
 
     pub fn column_id(&self) -> Vec<u8> {
@@ -58,6 +58,6 @@ impl blob::Blob for DaBlob {
     type BlobId = Vec<u8>;
 
     fn id(&self) -> Self::BlobId {
-        build_attestation_message(&self.aggregated_column_commitment, &self.rows_commitments).into()
+        build_blob_id(&self.aggregated_column_commitment, &self.rows_commitments).into()
     }
 }
