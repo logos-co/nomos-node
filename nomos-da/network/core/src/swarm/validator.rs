@@ -1,4 +1,7 @@
 use crate::behaviour::validator::{ValidatorBehaviour, ValidatorBehaviourEvent};
+use crate::dispersal::validator::behaviour::DispersalEvent;
+use crate::replication::behaviour::ReplicationEvent;
+use crate::sampling::behaviour::SamplingEvent;
 use crate::SubnetworkId;
 use futures::StreamExt;
 use libp2p::identity::Keypair;
@@ -29,16 +32,28 @@ where
             .build()
     }
 
+    async fn handle_sampling_event(&mut self, event: SamplingEvent) {
+        unimplemented!()
+    }
+
+    async fn handle_dispersal_event(&mut self, event: DispersalEvent) {
+        unimplemented!()
+    }
+
+    async fn handle_replication_event(&mut self, event: ReplicationEvent) {
+        unimplemented!()
+    }
+
     async fn handle_behaviour_event(&mut self, event: ValidatorBehaviourEvent<Membership>) {
         match event {
-            ValidatorBehaviourEvent::Sampling(_) => {
-                unimplemented!()
+            ValidatorBehaviourEvent::Sampling(event) => {
+                self.handle_sampling_event(event).await;
             }
-            ValidatorBehaviourEvent::Dispersal(_) => {
-                unimplemented!()
+            ValidatorBehaviourEvent::Dispersal(event) => {
+                self.handle_dispersal_event(event).await;
             }
-            ValidatorBehaviourEvent::Replication(_) => {
-                unimplemented!()
+            ValidatorBehaviourEvent::Replication(event) => {
+                self.handle_replication_event(event).await;
             }
         }
     }
