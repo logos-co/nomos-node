@@ -1,7 +1,7 @@
-pub mod dispersal;
+pub mod behaviour;
 pub mod protocol;
-pub mod replication;
-pub mod sampling;
+pub mod protocols;
+pub mod swarm;
 #[cfg(test)]
 pub mod test_utils;
 

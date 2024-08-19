@@ -47,6 +47,10 @@ impl<Membership: MembershipHandler> DispersalValidatorBehaviour<Membership> {
         }
     }
 
+    pub fn update_membership(&mut self, membership: Membership) {
+        self.membership = membership;
+    }
+
     /// Stream handling messages task.
     /// This task handles a single message receive. Then it writes up the acknowledgment into the same
     /// stream as response and finish.

@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-libp2p = { version = "0.53" }
+libp2p = { version = "0.53", features = ["macros"] }
 libp2p-stream = "0.1.0-alpha"
 futures = "0.3"
 tracing = "0.1"

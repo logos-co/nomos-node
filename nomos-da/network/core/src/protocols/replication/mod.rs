@@ -3,20 +3,19 @@ pub mod handler;
 
 #[cfg(test)]
 mod test {
-    use std::time::Duration;
-
     use futures::StreamExt;
     use libp2p::identity::Keypair;
     use libp2p::swarm::SwarmEvent;
     use libp2p::{quic, Multiaddr, PeerId, Swarm};
     use log::info;
+    use std::time::Duration;
     use tracing_subscriber::fmt::TestWriter;
     use tracing_subscriber::EnvFilter;
 
     use nomos_da_messages::common::Blob;
 
-    use crate::replication::behaviour::{ReplicationBehaviour, ReplicationEvent};
-    use crate::replication::handler::DaMessage;
+    use crate::protocols::replication::behaviour::{ReplicationBehaviour, ReplicationEvent};
+    use crate::protocols::replication::handler::DaMessage;
     use crate::test_utils::AllNeighbours;
 
     #[tokio::test]
