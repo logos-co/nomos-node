@@ -6,8 +6,9 @@ use libp2p::PeerId;
 use libp2p::swarm::NetworkBehaviour;
 // internal
 use crate::{
-    dispersal::validator::behaviour::DispersalValidatorBehaviour,
-    replication::behaviour::ReplicationBehaviour, sampling::behaviour::SamplingBehaviour,
+    protocols::dispersal::validator::behaviour::DispersalValidatorBehaviour,
+    protocols::replication::behaviour::ReplicationBehaviour,
+    protocols::sampling::behaviour::SamplingBehaviour,
 };
 use subnetworks_assignations::MembershipHandler;
 
