@@ -3,9 +3,12 @@ use std::{marker::PhantomData, ops::Range};
 
 use bytes::Bytes;
 use futures::{stream::FuturesUnordered, Stream};
-use nomos_core::da::blob::{
-    info::DispersedBlobInfo,
-    metadata::{Metadata, Next},
+use nomos_core::da::{
+    blob::{
+        info::DispersedBlobInfo,
+        metadata::{Metadata, Next},
+    },
+    BlobId,
 };
 use nomos_da_storage::fs::load_blob;
 use nomos_da_storage::rocksdb::{key_bytes, DA_VERIFIED_KEY_PREFIX, DA_VID_KEY_PREFIX};
@@ -34,7 +37,7 @@ where
 impl<S, B> DaStorageAdapter for RocksAdapter<S, B>
 where
     S: StorageSerde + Send + Sync + 'static,
-    B: DispersedBlobInfo<BlobId = [u8; 32]> + Metadata + Send + Sync,
+    B: DispersedBlobInfo<BlobId = BlobId> + Metadata + Send + Sync,
     B::Index: AsRef<[u8]> + Next + Clone + PartialOrd + Send + Sync + 'static,
     B::AppId: AsRef<[u8]> + Clone + Send + Sync + 'static,
 {

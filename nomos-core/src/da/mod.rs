@@ -2,7 +2,7 @@
 // internal
 
 pub mod blob;
-pub type BlobId = u32;
+pub type BlobId = [u8; 32];
 
 pub trait DaEncoder {
     type EncodedData;

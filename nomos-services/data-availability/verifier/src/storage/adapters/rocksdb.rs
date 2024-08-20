@@ -60,16 +60,17 @@ where
         attestation: &Self::Attestation,
     ) -> Result<(), DynError> {
         let blob_bytes = S::serialize(blob);
+        let blob_idx = create_blob_idx(blob.id().as_ref(), blob.column_idx().as_ref());
 
         write_blob(
             self.settings.blob_storage_directory.clone(),
-            blob.id().as_ref(),
+            &blob_idx,
             &blob_bytes,
         )
         .await?;
 
         // Mark blob as attested for lateer use in Indexer and attestation cache.
-        let blob_key = key_bytes(DA_VERIFIED_KEY_PREFIX, blob.id().as_ref());
+        let blob_key = key_bytes(DA_VERIFIED_KEY_PREFIX, blob_idx);
         self.storage_relay
             .send(StorageMsg::Store {
                 key: blob_key,
@@ -83,7 +84,9 @@ where
         &self,
         blob: &Self::Blob,
     ) -> Result<Option<Self::Attestation>, DynError> {
-        let key = key_bytes(DA_VERIFIED_KEY_PREFIX, blob.id().as_ref());
+        let blob_idx = create_blob_idx(blob.id().as_ref(), blob.column_idx().as_ref());
+
+        let key = key_bytes(DA_VERIFIED_KEY_PREFIX, blob_idx);
         let (reply_channel, reply_rx) = tokio::sync::oneshot::channel();
         self.storage_relay
             .send(StorageMsg::Load { key, reply_channel })
@@ -103,6 +106,14 @@ where
             })
             .map_err(|_| "".into())
     }
+}
+
+fn create_blob_idx(blob_id: &[u8], column_idx: &[u8]) -> [u8; 34] {
+    let mut blob_idx = [0u8; 34];
+    blob_idx[..blob_id.len()].copy_from_slice(blob_id);
+    blob_idx[blob_id.len()..].copy_from_slice(column_idx);
+
+    blob_idx
 }
 
 #[derive(Debug, Clone)]
