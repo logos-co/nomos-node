@@ -105,6 +105,9 @@ mod tests {
             let verifier = &verifiers[i];
             let da_blob = DaBlob {
                 column,
+                column_idx: i
+                    .try_into()
+                    .expect("Column index shouldn't overflow the target type"),
                 column_commitment: encoded_data.column_commitments[i],
                 aggregated_column_commitment: encoded_data.aggregated_column_commitment,
                 aggregated_column_proof: encoded_data.aggregated_column_proofs[i],

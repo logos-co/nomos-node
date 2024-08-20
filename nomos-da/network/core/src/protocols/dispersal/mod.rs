@@ -127,6 +127,7 @@ pub mod test {
                 .send((
                     0,
                     DaBlob {
+                        column_idx: 0,
                         column: Column(vec![]),
                         column_commitment: Default::default(),
                         aggregated_column_commitment: Default::default(),
