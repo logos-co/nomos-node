@@ -97,6 +97,7 @@ mod test {
                                         Blob {
                                             blob_id: vec![],
                                             data: bincode::serialize(&DaBlob {
+                                                column_idx: 0,
                                                 column: Column(vec![]),
                                                 column_commitment: Default::default(),
                                                 aggregated_column_commitment: Default::default(),

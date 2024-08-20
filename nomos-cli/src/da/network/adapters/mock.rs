@@ -45,6 +45,9 @@ impl DaDispersal for MockExecutorDispersalAdapter {
         for (i, column) in encoded_data.extended_data.columns().enumerate() {
             let blob = DaBlob {
                 column: column.clone(),
+                column_idx: i
+                    .try_into()
+                    .expect("Column index shouldn't overflow the target type"),
                 column_commitment: encoded_data.column_commitments[i],
                 aggregated_column_commitment: encoded_data.aggregated_column_commitment,
                 aggregated_column_proof: encoded_data.aggregated_column_proofs[i],

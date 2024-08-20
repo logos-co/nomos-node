@@ -19,6 +19,7 @@ pub struct Row(pub Vec<Chunk>);
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Column(pub Vec<Chunk>);
 pub struct ChunksMatrix(pub Vec<Row>);
+pub type ColumnIndex = u16;
 
 pub const NOMOS_DA_DST: &[u8] = b"NOMOS_DA_AVAIL";
 
