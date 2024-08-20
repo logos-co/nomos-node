@@ -75,6 +75,7 @@ where
     A: Serialize + DeserializeOwned + Clone + Send + Sync + 'static,
     B: Blob + Serialize + DeserializeOwned + Clone + Send + Sync + 'static,
     <B as Blob>::BlobId: AsRef<[u8]> + Send + Sync + 'static,
+    <B as Blob>::ColumnIndex: AsRef<[u8]> + Send + Sync + 'static,
     C: DispersedBlobInfo<BlobId = [u8; 32]>
         + Clone
         + Debug
@@ -327,6 +328,7 @@ where
     A: Serialize + DeserializeOwned + Clone + Send + Sync + 'static,
     B: Blob + Serialize + DeserializeOwned + Clone + Send + Sync + 'static,
     <B as Blob>::BlobId: AsRef<[u8]> + Send + Sync + 'static,
+    <B as Blob>::ColumnIndex: AsRef<[u8]> + Send + Sync + 'static,
     VB: VerifierBackend + CoreDaVerifier<DaBlob = B>,
     <VB as VerifierBackend>::Settings: Clone,
     <VB as CoreDaVerifier>::Error: Error,

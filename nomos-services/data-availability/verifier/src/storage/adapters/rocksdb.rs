@@ -5,7 +5,7 @@ use std::{marker::PhantomData, path::PathBuf};
 use nomos_core::da::blob::Blob;
 use nomos_da_storage::{
     fs::write_blob,
-    rocksdb::{key_bytes, DA_ATTESTED_KEY_PREFIX},
+    rocksdb::{key_bytes, DA_VERIFIED_KEY_PREFIX},
 };
 use nomos_storage::{
     backends::{rocksdb::RocksBackend, StorageSerde},
@@ -34,6 +34,7 @@ where
     A: Serialize + DeserializeOwned + Clone + Send + Sync,
     B: Blob + Serialize + Clone + Send + Sync + 'static,
     B::BlobId: AsRef<[u8]> + Send + Sync + 'static,
+    B::ColumnIndex: AsRef<[u8]> + Send + Sync + 'static,
     S: StorageSerde + Send + Sync + 'static,
 {
     type Backend = RocksBackend<S>;
@@ -68,7 +69,7 @@ where
         .await?;
 
         // Mark blob as attested for lateer use in Indexer and attestation cache.
-        let blob_key = key_bytes(DA_ATTESTED_KEY_PREFIX, blob.id().as_ref());
+        let blob_key = key_bytes(DA_VERIFIED_KEY_PREFIX, blob.id().as_ref());
         self.storage_relay
             .send(StorageMsg::Store {
                 key: blob_key,
@@ -82,13 +83,10 @@ where
         &self,
         blob: &Self::Blob,
     ) -> Result<Option<Self::Attestation>, DynError> {
-        let attestation_key = key_bytes(DA_ATTESTED_KEY_PREFIX, blob.id().as_ref());
-        let (reply_tx, reply_rx) = tokio::sync::oneshot::channel();
+        let key = key_bytes(DA_VERIFIED_KEY_PREFIX, blob.id().as_ref());
+        let (reply_channel, reply_rx) = tokio::sync::oneshot::channel();
         self.storage_relay
-            .send(StorageMsg::Load {
-                key: attestation_key,
-                reply_channel: reply_tx,
-            })
+            .send(StorageMsg::Load { key, reply_channel })
             .await
             .expect("Failed to send load request to storage relay");
 

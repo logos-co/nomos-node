@@ -57,9 +57,14 @@ impl DaBlob {
 }
 
 impl blob::Blob for DaBlob {
-    type BlobId = Vec<u8>;
+    type BlobId = [u8; 32];
+    type ColumnIndex = [u8; 2];
 
     fn id(&self) -> Self::BlobId {
-        build_blob_id(&self.aggregated_column_commitment, &self.rows_commitments).into()
+        build_blob_id(&self.aggregated_column_commitment, &self.rows_commitments)
+    }
+
+    fn column_idx(&self) -> Self::ColumnIndex {
+        self.column_idx.to_be_bytes()
     }
 }

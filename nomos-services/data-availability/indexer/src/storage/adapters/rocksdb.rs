@@ -8,7 +8,7 @@ use nomos_core::da::blob::{
     metadata::{Metadata, Next},
 };
 use nomos_da_storage::fs::load_blob;
-use nomos_da_storage::rocksdb::{key_bytes, DA_ATTESTED_KEY_PREFIX, DA_VID_KEY_PREFIX};
+use nomos_da_storage::rocksdb::{key_bytes, DA_VERIFIED_KEY_PREFIX, DA_VID_KEY_PREFIX};
 use nomos_storage::{
     backends::{rocksdb::RocksBackend, StorageSerde},
     StorageMsg, StorageService,
@@ -58,7 +58,7 @@ where
         let (app_id, idx) = info.metadata();
 
         // Check if Info in a block is something that the node've seen before.
-        let attested_key = key_bytes(DA_ATTESTED_KEY_PREFIX, info.blob_id());
+        let attested_key = key_bytes(DA_VERIFIED_KEY_PREFIX, info.blob_id());
         let (reply_tx, reply_rx) = tokio::sync::oneshot::channel();
 
         self.storage_relay

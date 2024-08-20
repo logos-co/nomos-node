@@ -17,6 +17,7 @@ use nomos_core::tx::Transaction;
 use nomos_da_indexer::storage::adapters::rocksdb::RocksAdapterSettings;
 use nomos_da_indexer::IndexerSettings;
 use nomos_da_storage::fs::write_blob;
+use nomos_da_storage::rocksdb::DA_VERIFIED_KEY_PREFIX;
 use nomos_libp2p::{Multiaddr, SwarmConfig};
 use nomos_mempool::network::adapters::libp2p::Settings as AdapterSettings;
 use nomos_mempool::{DaMempoolSettings, TxMempoolSettings};
@@ -31,6 +32,7 @@ use rand::{thread_rng, Rng};
 use tempfile::{NamedTempFile, TempDir};
 use time::OffsetDateTime;
 use tokio_stream::{wrappers::BroadcastStream, StreamExt};
+
 // internal
 use crate::common::*;
 
@@ -222,7 +224,7 @@ fn test_indexer() {
             });
 
         // Mock attested blob by writting directly into the da storage.
-        let mut attested_key = Vec::from(b"da/attested/" as &[u8]);
+        let mut attested_key = Vec::from(DA_VERIFIED_KEY_PREFIX.as_bytes());
         attested_key.extend_from_slice(&blob_hash);
 
         storage_outbound

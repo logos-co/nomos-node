@@ -2,9 +2,12 @@ pub mod backend;
 pub mod network;
 pub mod storage;
 
+use kzgrs_backend::common::ColumnIndex;
+use nomos_core::da::BlobId;
 // std
 use nomos_storage::StorageService;
 use overwatch_rs::services::life_cycle::LifecycleMessage;
+use std::collections::HashSet;
 use std::error::Error;
 use std::fmt::{Debug, Formatter};
 use storage::DaStorageAdapter;
@@ -28,6 +31,11 @@ pub enum DaVerifierMsg<B, A> {
         blob: B,
         reply_channel: Sender<Option<A>>,
     },
+    GetBlob {
+        blob_id: BlobId,
+        columns: HashSet<ColumnIndex>,
+        reply_channel: Sender<Vec<B>>,
+    },
 }
 
 impl<B: 'static, A: 'static> Debug for DaVerifierMsg<B, A> {
@@ -35,6 +43,9 @@ impl<B: 'static, A: 'static> Debug for DaVerifierMsg<B, A> {
         match self {
             DaVerifierMsg::AddBlob { .. } => {
                 write!(f, "DaVerifierMsg::AddBlob")
+            }
+            DaVerifierMsg::GetBlob { .. } => {
+                write!(f, "DaVerifierMsg::GetBlob")
             }
         }
     }
@@ -179,18 +190,24 @@ where
                         }
                     }
                     Some(msg) = service_state.inbound_relay.recv() => {
-                        let DaVerifierMsg::AddBlob { blob, reply_channel } = msg;
-                        match Self::handle_new_blob(&verifier, &storage_adapter, &blob).await {
-                            Ok(attestation) => if let Err(err) = reply_channel.send(Some(attestation)) {
-                                error!("Error replying attestation {err:?}");
-                            },
-                            Err(err) => {
-                                error!("Error handling blob {blob:?} due to {err:?}");
-                                if let Err(err) = reply_channel.send(None) {
-                                    error!("Error replying attestation {err:?}");
-                                }
-                            },
-                        };
+                        match msg {
+                            DaVerifierMsg::AddBlob { blob, reply_channel } => {
+                                match Self::handle_new_blob(&verifier, &storage_adapter, &blob).await {
+                                    Ok(attestation) => if let Err(err) = reply_channel.send(Some(attestation)) {
+                                        error!("Error replying attestation {err:?}");
+                                    },
+                                    Err(err) => {
+                                        error!("Error handling blob {blob:?} due to {err:?}");
+                                        if let Err(err) = reply_channel.send(None) {
+                                            error!("Error replying attestation {err:?}");
+                                        }
+                                    },
+                                };
+                            }
+                            DaVerifierMsg::GetBlob{blob_id, columns, reply_channel} => {
+                                todo!()
+                            }
+                        }
                     }
                     Some(msg) = lifecycle_stream.next() => {
                         if Self::should_stop_service(msg).await {
