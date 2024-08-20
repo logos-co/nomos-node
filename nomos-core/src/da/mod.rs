@@ -1,9 +1,9 @@
+pub mod blob;
+
 // crates
 // internal
-
 use blob::Blob;
 
-pub mod blob;
 pub type BlobId = [u8; 32];
 
 pub trait DaEncoder {

@@ -54,6 +54,10 @@ impl<SerdeOp: StorageSerde + Send + Sync + 'static> StorageBackend for MockStora
         Ok(self.inner.get(key).cloned())
     }
 
+    async fn load_prefix(&mut self, _key: &[u8]) -> Result<Option<Bytes>, Self::Error> {
+        unimplemented!()
+    }
+
     async fn remove(&mut self, key: &[u8]) -> Result<Option<Bytes>, Self::Error> {
         Ok(self.inner.remove(key))
     }

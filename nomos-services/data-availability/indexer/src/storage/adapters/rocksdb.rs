@@ -3,13 +3,11 @@ use std::{marker::PhantomData, ops::Range};
 
 use bytes::Bytes;
 use futures::{stream::FuturesUnordered, Stream};
-use nomos_core::da::{
-    blob::{
-        info::DispersedBlobInfo,
-        metadata::{Metadata, Next},
-    },
-    BlobId,
+use nomos_core::da::blob::{
+    info::DispersedBlobInfo,
+    metadata::{Metadata, Next},
 };
+use nomos_core::da::BlobId;
 use nomos_da_storage::fs::load_blob;
 use nomos_da_storage::rocksdb::{key_bytes, DA_VERIFIED_KEY_PREFIX, DA_VID_KEY_PREFIX};
 use nomos_storage::{
@@ -65,15 +63,15 @@ where
         let (reply_tx, reply_rx) = tokio::sync::oneshot::channel();
 
         self.storage_relay
-            .send(StorageMsg::Load {
-                key: attested_key,
+            .send(StorageMsg::LoadPrefix {
+                prefix: attested_key,
                 reply_channel: reply_tx,
             })
             .await
             .expect("Failed to send load request to storage relay");
 
         // If node haven't attested this info, return early.
-        if reply_rx.await?.is_none() {
+        if reply_rx.await?.is_empty() {
             return Ok(());
         }
 
@@ -98,8 +96,7 @@ where
         &self,
         app_id: <Self::Info as Metadata>::AppId,
         index_range: Range<<Self::Info as Metadata>::Index>,
-    ) -> Box<dyn Stream<Item = (<Self::Info as Metadata>::Index, Option<Bytes>)> + Unpin + Send>
-    {
+    ) -> Box<dyn Stream<Item = (<Self::Info as Metadata>::Index, Vec<Bytes>)> + Unpin + Send> {
         let futures = FuturesUnordered::new();
 
         // TODO: Using while loop here until `Step` trait is stable.
@@ -130,10 +127,10 @@ where
             futures.push(async move {
                 match reply_rx.await {
                     Ok(Some(id)) => (idx, load_blob(settings.blob_storage_directory, &id).await),
-                    Ok(None) => (idx, None),
+                    Ok(None) => (idx, Vec::new()),
                     Err(_) => {
                         tracing::error!("Failed to receive storage response");
-                        (idx, None)
+                        (idx, Vec::new())
                     }
                 }
             });

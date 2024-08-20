@@ -74,7 +74,7 @@ pub enum DaMsg<B, V: Metadata> {
     GetRange {
         app_id: <V as Metadata>::AppId,
         range: Range<<V as Metadata>::Index>,
-        reply_channel: Sender<Vec<(<V as Metadata>::Index, Option<B>)>>,
+        reply_channel: Sender<Vec<(<V as Metadata>::Index, Vec<B>)>>,
     },
 }
 

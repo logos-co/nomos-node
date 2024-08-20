@@ -77,7 +77,7 @@ pub async fn get_range<Tx, C, V, SS, const SIZE: usize>(
     handle: &OverwatchHandle,
     app_id: <V as Metadata>::AppId,
     range: Range<<V as Metadata>::Index>,
-) -> Result<Vec<(<V as Metadata>::Index, Option<Bytes>)>, DynError>
+) -> Result<Vec<(<V as Metadata>::Index, Vec<Bytes>)>, DynError>
 where
     Tx: Transaction
         + Eq
