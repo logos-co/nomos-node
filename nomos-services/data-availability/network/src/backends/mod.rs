@@ -1,8 +1,10 @@
+pub mod libp2p;
 pub mod mock;
 
 use super::*;
+use futures::Stream;
 use overwatch_rs::{overwatch::handle::OverwatchHandle, services::state::ServiceState};
-use tokio::sync::broadcast::Receiver;
+use std::pin::Pin;
 
 #[async_trait::async_trait]
 pub trait NetworkBackend {
@@ -14,5 +16,8 @@ pub trait NetworkBackend {
 
     fn new(config: Self::Settings, overwatch_handle: OverwatchHandle) -> Self;
     async fn process(&self, msg: Self::Message);
-    async fn subscribe(&mut self, event: Self::EventKind) -> Receiver<Self::NetworkEvent>;
+    async fn subscribe(
+        &mut self,
+        event: Self::EventKind,
+    ) -> Pin<Box<dyn Stream<Item = Self::NetworkEvent> + Send>>;
 }

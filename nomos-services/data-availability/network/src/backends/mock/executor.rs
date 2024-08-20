@@ -1,10 +1,13 @@
+use futures::{Stream, StreamExt};
 use kzgrs_backend::common::{blob::DaBlob, build_blob_id};
 use overwatch_rs::{overwatch::handle::OverwatchHandle, services::state::NoState};
 use serde::{Deserialize, Serialize};
+use std::pin::Pin;
 use tokio::sync::{
     broadcast::{self, Receiver},
     mpsc,
 };
+use tokio_stream::wrappers::BroadcastStream;
 
 use crate::backends::NetworkBackend;
 
@@ -96,9 +99,15 @@ impl NetworkBackend for MockExecutorBackend {
         }
     }
 
-    async fn subscribe(&mut self, kind: Self::EventKind) -> Receiver<Self::NetworkEvent> {
+    async fn subscribe(
+        &mut self,
+        kind: Self::EventKind,
+    ) -> Pin<Box<dyn Stream<Item = Self::NetworkEvent> + Send>> {
         match kind {
-            EventKind::Dispersal | EventKind::Sample => self.events_tx.subscribe(),
+            EventKind::Dispersal | EventKind::Sample => Box::pin(
+                BroadcastStream::new(self.events_tx.subscribe())
+                    .filter_map(|event| async { event.ok() }),
+            ),
         }
     }
 }

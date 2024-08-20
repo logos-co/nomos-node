@@ -53,6 +53,14 @@ where
             .build()
     }
 
+    pub fn protocol_swarm(&self) -> &Swarm<ValidatorBehaviour<Membership>> {
+        &self.swarm
+    }
+
+    pub fn protocol_swarm_mut(&mut self) -> &mut Swarm<ValidatorBehaviour<Membership>> {
+        &mut self.swarm
+    }
+
     async fn handle_sampling_event(&mut self, event: SamplingEvent) {
         if let Err(e) = self.sampling_events_sender.send(event) {
             debug!("Error distributing sampling message internally: {e:?}");
@@ -83,33 +91,32 @@ where
         }
     }
 
-    pub async fn step(&mut self) {
-        tokio::select! {
-            Some(event) = self.swarm.next() => {
+    pub async fn run(mut self) {
+        loop {
+            if let Some(event) = self.swarm.next().await {
                 match event {
                     SwarmEvent::Behaviour(behaviour_event) => {
                         self.handle_behaviour_event(behaviour_event).await;
-                    },
-                    SwarmEvent::ConnectionEstablished{ .. } => {}
-                    SwarmEvent::ConnectionClosed{ .. } => {}
-                    SwarmEvent::IncomingConnection{ .. } => {}
-                    SwarmEvent::IncomingConnectionError{ .. } => {}
-                    SwarmEvent::OutgoingConnectionError{ .. } => {}
-                    SwarmEvent::NewListenAddr{ .. } => {}
-                    SwarmEvent::ExpiredListenAddr{ .. } => {}
-                    SwarmEvent::ListenerClosed{ .. } => {}
-                    SwarmEvent::ListenerError{ .. } => {}
-                    SwarmEvent::Dialing{ .. } => {}
-                    SwarmEvent::NewExternalAddrCandidate{ .. } => {}
-                    SwarmEvent::ExternalAddrConfirmed{ .. } => {}
-                    SwarmEvent::ExternalAddrExpired{ .. } => {}
-                    SwarmEvent::NewExternalAddrOfPeer{ .. } => {}
+                    }
+                    SwarmEvent::ConnectionEstablished { .. } => {}
+                    SwarmEvent::ConnectionClosed { .. } => {}
+                    SwarmEvent::IncomingConnection { .. } => {}
+                    SwarmEvent::IncomingConnectionError { .. } => {}
+                    SwarmEvent::OutgoingConnectionError { .. } => {}
+                    SwarmEvent::NewListenAddr { .. } => {}
+                    SwarmEvent::ExpiredListenAddr { .. } => {}
+                    SwarmEvent::ListenerClosed { .. } => {}
+                    SwarmEvent::ListenerError { .. } => {}
+                    SwarmEvent::Dialing { .. } => {}
+                    SwarmEvent::NewExternalAddrCandidate { .. } => {}
+                    SwarmEvent::ExternalAddrConfirmed { .. } => {}
+                    SwarmEvent::ExternalAddrExpired { .. } => {}
+                    SwarmEvent::NewExternalAddrOfPeer { .. } => {}
                     event => {
                         debug!("Unsupported validator swarm event: {event:?}");
                     }
                 }
             }
-
         }
     }
 }
