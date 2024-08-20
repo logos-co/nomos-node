@@ -1,6 +1,8 @@
 // crates
 // internal
 
+use blob::Blob;
+
 pub mod blob;
 pub type BlobId = [u8; 32];
 
@@ -12,7 +14,7 @@ pub trait DaEncoder {
 }
 
 pub trait DaVerifier {
-    type DaBlob;
+    type DaBlob: Blob;
     type Error;
 
     fn verify(&self, blob: &Self::DaBlob) -> Result<(), Self::Error>;

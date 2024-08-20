@@ -202,8 +202,13 @@ fn test_indexer() {
 
     // Mock attestation step where blob is persisted in nodes blob storage.
     let rt = tokio::runtime::Runtime::new().unwrap();
-    rt.block_on(write_blob(blobs_dir, blob_info.blob_id().as_ref(), b"blob"))
-        .unwrap();
+    rt.block_on(write_blob(
+        blobs_dir,
+        blob_info.blob_id().as_ref(),
+        index.as_ref(),
+        b"blob",
+    ))
+    .unwrap();
 
     node1.spawn(async move {
         let mempool_outbound = mempool.connect().await.unwrap();
@@ -226,6 +231,7 @@ fn test_indexer() {
         // Mock attested blob by writting directly into the da storage.
         let mut attested_key = Vec::from(DA_VERIFIED_KEY_PREFIX.as_bytes());
         attested_key.extend_from_slice(&blob_hash);
+        attested_key.extend_from_slice(index.as_ref());
 
         storage_outbound
             .send(nomos_storage::StorageMsg::Store {

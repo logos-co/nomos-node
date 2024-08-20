@@ -35,13 +35,16 @@ pub async fn load_blob(base_dir: PathBuf, blob_id: &[u8]) -> Option<Bytes> {
 
 pub async fn write_blob(
     base_dir: PathBuf,
-    blob_idx: &[u8],
+    blob_id: &[u8],
+    column_idx: &[u8],
     data: &[u8],
 ) -> Result<(), std::io::Error> {
-    let blob_idx = hex::encode(blob_idx);
+    let blob_id = hex::encode(blob_id);
+    let column_file = hex::encode(column_idx);
 
     let mut path = base_dir;
-    path.push(blob_idx);
+    path.push(blob_id);
+    path.push(column_file);
 
     if let Some(parent) = path.parent() {
         tokio::fs::create_dir_all(parent).await?;

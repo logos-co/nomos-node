@@ -64,7 +64,8 @@ where
 
         write_blob(
             self.settings.blob_storage_directory.clone(),
-            &blob_idx,
+            blob.id().as_ref(),
+            blob.column_idx().as_ref(),
             &blob_bytes,
         )
         .await?;
@@ -80,12 +81,10 @@ where
             .map_err(|(e, _)| e.into())
     }
 
-    async fn get_attestation(
+    async fn get_blob(
         &self,
-        blob: &Self::Blob,
+        blob_idx: <Self::Blob as Blob>::BlobId,
     ) -> Result<Option<Self::Attestation>, DynError> {
-        let blob_idx = create_blob_idx(blob.id().as_ref(), blob.column_idx().as_ref());
-
         let key = key_bytes(DA_VERIFIED_KEY_PREFIX, blob_idx);
         let (reply_channel, reply_rx) = tokio::sync::oneshot::channel();
         self.storage_relay
