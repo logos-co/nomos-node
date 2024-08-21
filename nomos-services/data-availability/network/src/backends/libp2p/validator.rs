@@ -193,15 +193,15 @@ async fn handle_validator_events_stream(
         tokio::select! {
             Some(sampling_event) = StreamExt::next(&mut sampling_events_receiver) => {
                 match sampling_event {
-                    sampling::behaviour::SamplingEvent::SamplingSuccess{blob_id, blob , ..} => {
+                    sampling::behaviour::SamplingEvent::SamplingSuccess{ blob_id, blob , .. } => {
                         if let Err(e) = sampling_broadcast_sender.send(SamplingEvent::SamplingSuccess {blob_id, blob}){
                             error!("Error in internal broadcast of sampling success: {e:?}");
                         }
                     }
-                    sampling::behaviour::SamplingEvent::IncomingSample{ ..  } => {
+                    sampling::behaviour::SamplingEvent::IncomingSample{ .. } => {
                         unimplemented!("Handle request/response from Sampling service");
                     }
-                    sampling::behaviour::SamplingEvent::SamplingError{error  } => {
+                    sampling::behaviour::SamplingEvent::SamplingError{ error  } => {
                         if let Err(e) = sampling_broadcast_sender.send(SamplingEvent::SamplingError {error}) {
                             error!{"Error in internal broadcast of sampling error: {e:?}"};
                         }
