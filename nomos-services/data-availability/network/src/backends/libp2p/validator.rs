@@ -187,9 +187,9 @@ async fn handle_validator_events_stream(
     } = events_streams;
     #[allow(clippy::never_loop)]
     loop {
-        /// WARNING: `StreamExt::next` is cancellation safe.
-        /// If adding more branches check if such methods are within the cancellation safe set:
-        /// https://docs.rs/tokio/latest/tokio/macro.select.html#cancellation-safety
+        // WARNING: `StreamExt::next` is cancellation safe.
+        // If adding more branches check if such methods are within the cancellation safe set:
+        // https://docs.rs/tokio/latest/tokio/macro.select.html#cancellation-safety
         tokio::select! {
             Some(sampling_event) = StreamExt::next(&mut sampling_events_receiver) => {
                 match sampling_event {
