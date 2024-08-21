@@ -6,7 +6,6 @@ use std::pin::Pin;
 // crates
 use async_trait::async_trait;
 use backends::NetworkBackend;
-use futures::stream::BoxStream;
 use futures::{Stream, StreamExt};
 use overwatch_rs::services::life_cycle::LifecycleMessage;
 use overwatch_rs::services::{
@@ -16,7 +15,6 @@ use overwatch_rs::services::{
     ServiceCore, ServiceData, ServiceId,
 };
 use serde::{Deserialize, Serialize};
-use tokio::sync::broadcast;
 use tokio::sync::oneshot;
 use tracing::error;
 // internal
@@ -33,7 +31,7 @@ impl<B: NetworkBackend> Debug for DaNetworkMsg<B> {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Self::Process(msg) => write!(fmt, "DaNetworkMsg::Process({msg:?})"),
-            Self::Subscribe { kind, sender } => {
+            Self::Subscribe { kind, .. } => {
                 write!(fmt, "DaNetworkMsg::Subscribe{{ kind: {kind:?}}}")
             }
         }

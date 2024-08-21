@@ -1,5 +1,4 @@
 use crate::backends::NetworkBackend;
-use futures::stream::BoxStream;
 use futures::{Stream, StreamExt};
 use kzgrs_backend::common::blob::DaBlob;
 use libp2p::identity::Keypair;
@@ -46,25 +45,23 @@ pub enum SamplingEvent {
     SamplingError { error: SamplingError },
 }
 
-#[derive(Debug, Clone)]
-pub enum VerifyingEvent {
-    Dispersal {},
-    Replication {},
-}
-
 #[derive(Debug)]
 pub enum DaNetworkEvent {
     Sampling(SamplingEvent),
-    Verifying(VerifyingEvent),
+    Verifying(Box<DaBlob>),
 }
 
 pub struct DaNetworkValidatorBackend<Membership> {
+    // TODO: this join handles should be cancelable tasks. We should add an stop method for
+    // the `NetworkBackend` trait so if the service is stopped the backend can gracefully handle open
+    // sub-tasks as well.
+    #[allow(dead_code)]
     task: JoinHandle<()>,
+    #[allow(dead_code)]
     replies_task: JoinHandle<()>,
     sampling_request_channel: UnboundedSender<(SubnetworkId, BlobId)>,
     sampling_broadcast_receiver: broadcast::Receiver<SamplingEvent>,
-    verifying_broadcast_sender: broadcast::Sender<VerifyingEvent>,
-    verifying_broadcast_receiver: broadcast::Receiver<VerifyingEvent>,
+    verifying_broadcast_receiver: broadcast::Receiver<DaBlob>,
     _membership: PhantomData<Membership>,
 }
 
@@ -103,8 +100,7 @@ where
     type NetworkEvent = DaNetworkEvent;
 
     fn new(config: Self::Settings, overwatch_handle: OverwatchHandle) -> Self {
-        let (mut validator_swarm, events_streams) =
-            ValidatorSwarm::new(config.key, config.membership);
+        let (validator_swarm, events_streams) = ValidatorSwarm::new(config.key, config.membership);
         let sampling_request_channel = validator_swarm
             .protocol_swarm()
             .behaviour()
@@ -114,21 +110,21 @@ where
         let task = overwatch_handle.runtime().spawn(validator_swarm.run());
         let (sampling_broadcast_sender, sampling_broadcast_receiver) =
             broadcast::channel(BROADCAST_CHANNEL_SIZE);
+        let (verifying_broadcast_sender, verifying_broadcast_receiver) =
+            broadcast::channel(BROADCAST_CHANNEL_SIZE);
         let replies_task = overwatch_handle
             .runtime()
             .spawn(handle_validator_events_stream(
                 events_streams,
                 sampling_broadcast_sender,
+                verifying_broadcast_sender,
             ));
 
-        let (verifying_broadcast_sender, verifying_broadcast_receiver) =
-            broadcast::channel(BROADCAST_CHANNEL_SIZE);
         Self {
             task,
             replies_task,
             sampling_request_channel,
             sampling_broadcast_receiver,
-            verifying_broadcast_sender,
             verifying_broadcast_receiver,
             _membership: Default::default(),
         }
@@ -158,7 +154,7 @@ where
             DaNetworkEventKind::Verifying => Box::pin(
                 BroadcastStream::new(self.verifying_broadcast_receiver.resubscribe())
                     .filter_map(|event| async { event.ok() })
-                    .map(Self::NetworkEvent::Verifying),
+                    .map(|blob| Self::NetworkEvent::Verifying(Box::new(blob))),
             ),
         }
     }
@@ -167,21 +163,23 @@ where
 async fn handle_validator_events_stream(
     events_streams: ValidatorEventsStream,
     sampling_broadcast_sender: broadcast::Sender<SamplingEvent>,
+    validation_broadcast_sender: broadcast::Sender<DaBlob>,
 ) {
     let ValidatorEventsStream {
         mut sampling_events_receiver,
+        mut validation_events_receiver,
     } = events_streams;
     #[allow(clippy::never_loop)]
     loop {
         tokio::select! {
             Some(sampling_event) = StreamExt::next(&mut sampling_events_receiver) => {
                 match sampling_event {
-                    sampling::behaviour::SamplingEvent::SamplingSuccess{blob_id,subnetwork_id,blob  } => {
+                    sampling::behaviour::SamplingEvent::SamplingSuccess{blob_id, blob , ..} => {
                         if let Err(e) = sampling_broadcast_sender.send(SamplingEvent::SamplingSuccess {blob_id, blob}){
                             error!("Error in internal broadcast of sampling success: {e:?}");
                         }
                     }
-                    sampling::behaviour::SamplingEvent::IncomingSample{request_receiver,response_sender  } => {
+                    sampling::behaviour::SamplingEvent::IncomingSample{ ..  } => {
                         unimplemented!("Handle request/response from Sampling service");
                     }
                     sampling::behaviour::SamplingEvent::SamplingError{error  } => {
@@ -189,6 +187,11 @@ async fn handle_validator_events_stream(
                             error!{"Error in internal broadcast of sampling error: {e:?}"};
                         }
                     }}
+            }
+            Some(da_blob) = StreamExt::next(&mut validation_events_receiver)=> {
+                if let Err(error) = validation_broadcast_sender.send(da_blob) {
+                    error!("Error in internal broadcast of validation for blob: {:?}", error.0);
+                }
             }
         }
     }

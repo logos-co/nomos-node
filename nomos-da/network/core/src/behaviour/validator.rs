@@ -60,4 +60,16 @@ where
     pub fn replication_behaviour(&self) -> &ReplicationBehaviour<Membership> {
         &self.replication
     }
+
+    pub fn sampling_behaviour_mut(&mut self) -> &mut SamplingBehaviour<Membership> {
+        &mut self.sampling
+    }
+
+    pub fn dispersal_behaviour_mut(&mut self) -> &mut DispersalValidatorBehaviour<Membership> {
+        &mut self.dispersal
+    }
+
+    pub fn replication_behaviour_mut(&mut self) -> &mut ReplicationBehaviour<Membership> {
+        &mut self.replication
+    }
 }

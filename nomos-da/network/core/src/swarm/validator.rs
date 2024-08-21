@@ -1,10 +1,12 @@
 // std
 // crates
 use futures::StreamExt;
+use kzgrs_backend::common::blob::DaBlob;
 use libp2p::identity::Keypair;
 use libp2p::swarm::SwarmEvent;
 use libp2p::{PeerId, Swarm, SwarmBuilder};
-use log::debug;
+use log::{debug, error};
+use nomos_da_messages::replication::ReplicationReq;
 use tokio::sync::mpsc::{unbounded_channel, UnboundedSender};
 use tokio_stream::wrappers::UnboundedReceiverStream;
 // internal
@@ -18,6 +20,7 @@ use subnetworks_assignations::MembershipHandler;
 
 pub struct ValidatorEventsStream {
     pub sampling_events_receiver: UnboundedReceiverStream<SamplingEvent>,
+    pub validation_events_receiver: UnboundedReceiverStream<DaBlob>,
 }
 
 pub struct ValidatorSwarm<
@@ -25,6 +28,7 @@ pub struct ValidatorSwarm<
 > {
     swarm: Swarm<ValidatorBehaviour<Membership>>,
     sampling_events_sender: UnboundedSender<SamplingEvent>,
+    validation_events_sender: UnboundedSender<DaBlob>,
 }
 
 impl<Membership> ValidatorSwarm<Membership>
@@ -33,14 +37,19 @@ where
 {
     pub fn new(key: Keypair, membership: Membership) -> (Self, ValidatorEventsStream) {
         let (sampling_events_sender, sampling_events_receiver) = unbounded_channel();
+        let (validation_events_sender, validation_events_receiver) = unbounded_channel();
+
         let sampling_events_receiver = UnboundedReceiverStream::new(sampling_events_receiver);
+        let validation_events_receiver = UnboundedReceiverStream::new(validation_events_receiver);
         (
             Self {
                 swarm: Self::build_swarm(key, membership),
                 sampling_events_sender,
+                validation_events_sender,
             },
             ValidatorEventsStream {
                 sampling_events_receiver,
+                validation_events_receiver,
             },
         )
     }
@@ -67,15 +76,34 @@ where
         }
     }
 
-    async fn handle_dispersal_event(&mut self, _event: DispersalEvent) {
-        // TODO: hook incoming dispersal events => to replication
-        unimplemented!()
+    async fn handle_dispersal_event(&mut self, event: DispersalEvent) {
+        match event {
+            // Send message for replication
+            DispersalEvent::IncomingMessage { message } => {
+                if let Ok(blob) = bincode::deserialize::<DaBlob>(
+                    message
+                        .blob
+                        .as_ref()
+                        .expect("Message blob should not be empty")
+                        .data
+                        .as_slice(),
+                ) {
+                    if let Err(e) = self.validation_events_sender.send(blob) {
+                        error!("Error sending blob to validation: {e:?}");
+                    }
+                }
+                self.swarm
+                    .behaviour_mut()
+                    .replication_behaviour_mut()
+                    .send_message(ReplicationReq {
+                        blob: message.blob,
+                        subnetwork_id: message.subnetwork_id,
+                    });
+            }
+        }
     }
 
-    async fn handle_replication_event(&mut self, _event: ReplicationEvent) {
-        // TODO: Hook incoming blobs from replication protocol
-        unimplemented!()
-    }
+    async fn handle_replication_event(&mut self, _event: ReplicationEvent) {}
 
     async fn handle_behaviour_event(&mut self, event: ValidatorBehaviourEvent<Membership>) {
         match event {

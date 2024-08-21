@@ -4,7 +4,7 @@ use overwatch_rs::{overwatch::handle::OverwatchHandle, services::state::NoState}
 use serde::{Deserialize, Serialize};
 use std::pin::Pin;
 use tokio::sync::{
-    broadcast::{self, Receiver},
+    broadcast::{self},
     mpsc,
 };
 use tokio_stream::wrappers::BroadcastStream;

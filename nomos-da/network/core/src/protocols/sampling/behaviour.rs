@@ -1,7 +1,6 @@
 // std
 use bincode::ErrorKind;
 use std::collections::{HashMap, HashSet, VecDeque};
-use std::error::Error;
 use std::task::{Context, Poll};
 // crates
 use either::Either;
@@ -122,7 +121,7 @@ impl Clone for SamplingError {
             },
             SamplingError::ResponseChannel { error, peer_id } => SamplingError::ResponseChannel {
                 peer_id: *peer_id,
-                error: error.clone(),
+                error: *error,
             },
         }
     }
@@ -131,7 +130,7 @@ impl Clone for SamplingError {
 fn clone_deserialize_error(error: &bincode::Error) -> bincode::Error {
     Box::new(match error.as_ref() {
         ErrorKind::Io(error) => ErrorKind::Io(std::io::Error::new(error.kind(), error.to_string())),
-        ErrorKind::InvalidUtf8Encoding(error) => ErrorKind::InvalidUtf8Encoding(error.clone()),
+        ErrorKind::InvalidUtf8Encoding(error) => ErrorKind::InvalidUtf8Encoding(*error),
         ErrorKind::InvalidBoolEncoding(bool) => ErrorKind::InvalidBoolEncoding(*bool),
         ErrorKind::InvalidCharEncoding => ErrorKind::InvalidCharEncoding,
         ErrorKind::InvalidTagEncoding(tag) => ErrorKind::InvalidTagEncoding(*tag),
