@@ -45,6 +45,7 @@ pub trait StorageBackend: Sized {
     fn new(config: Self::Settings) -> Result<Self, Self::Error>;
     async fn store(&mut self, key: Bytes, value: Bytes) -> Result<(), Self::Error>;
     async fn load(&mut self, key: &[u8]) -> Result<Option<Bytes>, Self::Error>;
+    /// Loads all values whose keys start with the given prefix.
     async fn load_prefix(&mut self, prefix: &[u8]) -> Result<Vec<Bytes>, Self::Error>;
     async fn remove(&mut self, key: &[u8]) -> Result<Option<Bytes>, Self::Error>;
     /// Execute a transaction in the current backend
