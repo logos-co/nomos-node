@@ -1,9 +1,12 @@
 use crate::backends::NetworkBackend;
 use futures::stream::BoxStream;
 use futures::{Stream, StreamExt};
+use kzgrs_backend::common::blob::DaBlob;
 use libp2p::identity::Keypair;
 use libp2p::PeerId;
 use log::error;
+use nomos_da_network_core::protocols::sampling;
+use nomos_da_network_core::protocols::sampling::behaviour::SamplingError;
 use nomos_da_network_core::swarm::validator::{ValidatorEventsStream, ValidatorSwarm};
 use nomos_da_network_core::SubnetworkId;
 use overwatch_rs::overwatch::handle::OverwatchHandle;
@@ -39,8 +42,8 @@ pub enum DaNetworkEventKind {
 
 #[derive(Debug, Clone)]
 pub enum SamplingEvent {
-    SamplingSuccess {},
-    SamplingError {},
+    SamplingSuccess { blob_id: BlobId, blob: Box<DaBlob> },
+    SamplingError { error: SamplingError },
 }
 
 #[derive(Debug, Clone)]
@@ -59,7 +62,6 @@ pub struct DaNetworkValidatorBackend<Membership> {
     task: JoinHandle<()>,
     replies_task: JoinHandle<()>,
     sampling_request_channel: UnboundedSender<(SubnetworkId, BlobId)>,
-    sampling_broadcast_sender: broadcast::Sender<SamplingEvent>,
     sampling_broadcast_receiver: broadcast::Receiver<SamplingEvent>,
     verifying_broadcast_sender: broadcast::Sender<VerifyingEvent>,
     verifying_broadcast_receiver: broadcast::Receiver<VerifyingEvent>,
@@ -110,18 +112,21 @@ where
             .sample_request_channel();
 
         let task = overwatch_handle.runtime().spawn(validator_swarm.run());
-        let replies_task = overwatch_handle
-            .runtime()
-            .spawn(handle_validator_events_stream(events_streams));
         let (sampling_broadcast_sender, sampling_broadcast_receiver) =
             broadcast::channel(BROADCAST_CHANNEL_SIZE);
+        let replies_task = overwatch_handle
+            .runtime()
+            .spawn(handle_validator_events_stream(
+                events_streams,
+                sampling_broadcast_sender,
+            ));
+
         let (verifying_broadcast_sender, verifying_broadcast_receiver) =
             broadcast::channel(BROADCAST_CHANNEL_SIZE);
         Self {
             task,
             replies_task,
             sampling_request_channel,
-            sampling_broadcast_sender,
             sampling_broadcast_receiver,
             verifying_broadcast_sender,
             verifying_broadcast_receiver,
@@ -159,7 +164,10 @@ where
     }
 }
 
-async fn handle_validator_events_stream(events_streams: ValidatorEventsStream) {
+async fn handle_validator_events_stream(
+    events_streams: ValidatorEventsStream,
+    sampling_broadcast_sender: broadcast::Sender<SamplingEvent>,
+) {
     let ValidatorEventsStream {
         mut sampling_events_receiver,
     } = events_streams;
@@ -167,7 +175,20 @@ async fn handle_validator_events_stream(events_streams: ValidatorEventsStream) {
     loop {
         tokio::select! {
             Some(sampling_event) = StreamExt::next(&mut sampling_events_receiver) => {
-                unimplemented!()
+                match sampling_event {
+                    sampling::behaviour::SamplingEvent::SamplingSuccess{blob_id,subnetwork_id,blob  } => {
+                        if let Err(e) = sampling_broadcast_sender.send(SamplingEvent::SamplingSuccess {blob_id, blob}){
+                            error!("Error in internal broadcast of sampling success: {e:?}");
+                        }
+                    }
+                    sampling::behaviour::SamplingEvent::IncomingSample{request_receiver,response_sender  } => {
+                        unimplemented!("Handle request/response from Sampling service");
+                    }
+                    sampling::behaviour::SamplingEvent::SamplingError{error  } => {
+                        if let Err(e) = sampling_broadcast_sender.send(SamplingEvent::SamplingError {error}) {
+                            error!{"Error in internal broadcast of sampling error: {e:?}"};
+                        }
+                    }}
             }
         }
     }

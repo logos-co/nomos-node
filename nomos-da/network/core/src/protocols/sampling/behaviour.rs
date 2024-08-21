@@ -1,5 +1,7 @@
 // std
+use bincode::ErrorKind;
 use std::collections::{HashMap, HashSet, VecDeque};
+use std::error::Error;
 use std::task::{Context, Poll};
 // crates
 use either::Either;
@@ -70,6 +72,74 @@ impl SamplingError {
             SamplingError::ResponseChannel { peer_id, .. } => peer_id,
         }
     }
+}
+
+impl Clone for SamplingError {
+    fn clone(&self) -> Self {
+        match self {
+            SamplingError::Io { peer_id, error } => SamplingError::Io {
+                peer_id: *peer_id,
+                error: std::io::Error::new(error.kind(), error.to_string()),
+            },
+            SamplingError::Protocol {
+                subnetwork_id,
+                peer_id,
+                error,
+            } => SamplingError::Protocol {
+                subnetwork_id: *subnetwork_id,
+                peer_id: *peer_id,
+                error: error.clone(),
+            },
+            SamplingError::OpenStream { peer_id, error } => SamplingError::OpenStream {
+                peer_id: *peer_id,
+                error: match error {
+                    OpenStreamError::UnsupportedProtocol(protocol) => {
+                        OpenStreamError::UnsupportedProtocol(protocol.clone())
+                    }
+                    OpenStreamError::Io(error) => {
+                        OpenStreamError::Io(std::io::Error::new(error.kind(), error.to_string()))
+                    }
+                    err => OpenStreamError::Io(std::io::Error::new(
+                        std::io::ErrorKind::Other,
+                        err.to_string(),
+                    )),
+                },
+            },
+            SamplingError::Deserialize {
+                blob_id,
+                subnetwork_id,
+                peer_id,
+                error,
+            } => SamplingError::Deserialize {
+                blob_id: *blob_id,
+                subnetwork_id: *subnetwork_id,
+                peer_id: *peer_id,
+                error: clone_deserialize_error(error),
+            },
+            SamplingError::RequestChannel { request, peer_id } => SamplingError::RequestChannel {
+                request: request.clone(),
+                peer_id: *peer_id,
+            },
+            SamplingError::ResponseChannel { error, peer_id } => SamplingError::ResponseChannel {
+                peer_id: *peer_id,
+                error: error.clone(),
+            },
+        }
+    }
+}
+
+fn clone_deserialize_error(error: &bincode::Error) -> bincode::Error {
+    Box::new(match error.as_ref() {
+        ErrorKind::Io(error) => ErrorKind::Io(std::io::Error::new(error.kind(), error.to_string())),
+        ErrorKind::InvalidUtf8Encoding(error) => ErrorKind::InvalidUtf8Encoding(error.clone()),
+        ErrorKind::InvalidBoolEncoding(bool) => ErrorKind::InvalidBoolEncoding(*bool),
+        ErrorKind::InvalidCharEncoding => ErrorKind::InvalidCharEncoding,
+        ErrorKind::InvalidTagEncoding(tag) => ErrorKind::InvalidTagEncoding(*tag),
+        ErrorKind::DeserializeAnyNotSupported => ErrorKind::DeserializeAnyNotSupported,
+        ErrorKind::SizeLimit => ErrorKind::SizeLimit,
+        ErrorKind::SequenceMustHaveLength => ErrorKind::SequenceMustHaveLength,
+        ErrorKind::Custom(custom) => ErrorKind::Custom(custom.clone()),
+    })
 }
 
 /// Inner type representation of a Blob ID
