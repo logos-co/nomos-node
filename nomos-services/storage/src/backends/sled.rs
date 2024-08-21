@@ -75,6 +75,10 @@ impl<SerdeOp: StorageSerde + Send + Sync + 'static> StorageBackend for SledBacke
         Ok(self.sled.get(key)?.map(|ivec| ivec.to_vec().into()))
     }
 
+    async fn load_prefix(&mut self, _key: &[u8]) -> Result<Option<Bytes>, Self::Error> {
+        unimplemented!()
+    }
+
     async fn remove(&mut self, key: &[u8]) -> Result<Option<Bytes>, Self::Error> {
         Ok(self.sled.remove(key)?.map(|ivec| ivec.to_vec().into()))
     }

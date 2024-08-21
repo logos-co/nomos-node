@@ -17,6 +17,7 @@ use nomos_core::tx::Transaction;
 use nomos_da_indexer::storage::adapters::rocksdb::RocksAdapterSettings;
 use nomos_da_indexer::IndexerSettings;
 use nomos_da_storage::fs::write_blob;
+use nomos_da_storage::rocksdb::DA_VERIFIED_KEY_PREFIX;
 use nomos_libp2p::{Multiaddr, SwarmConfig};
 use nomos_mempool::network::adapters::libp2p::Settings as AdapterSettings;
 use nomos_mempool::{DaMempoolSettings, TxMempoolSettings};
@@ -197,11 +198,17 @@ fn test_indexer() {
     let _hash3 = <BlobInfo as Hash>::hash(&blob_info, &mut default_hasher);
 
     let expected_blob_info = blob_info.clone();
+    let col_idx = (0 as u16).to_be_bytes();
 
     // Mock attestation step where blob is persisted in nodes blob storage.
     let rt = tokio::runtime::Runtime::new().unwrap();
-    rt.block_on(write_blob(blobs_dir, blob_info.blob_id().as_ref(), b"blob"))
-        .unwrap();
+    rt.block_on(write_blob(
+        blobs_dir,
+        blob_info.blob_id().as_ref(),
+        &col_idx,
+        b"blob",
+    ))
+    .unwrap();
 
     node1.spawn(async move {
         let mempool_outbound = mempool.connect().await.unwrap();
@@ -222,8 +229,9 @@ fn test_indexer() {
             });
 
         // Mock attested blob by writting directly into the da storage.
-        let mut attested_key = Vec::from(b"da/attested/" as &[u8]);
+        let mut attested_key = Vec::from(DA_VERIFIED_KEY_PREFIX.as_bytes());
         attested_key.extend_from_slice(&blob_hash);
+        attested_key.extend_from_slice(&col_idx);
 
         storage_outbound
             .send(nomos_storage::StorageMsg::Store {
@@ -281,10 +289,12 @@ fn test_indexer() {
         // item should have "some" data, other indexes should be None.
         app_id_blobs.sort_by(|(a, _), (b, _)| a.partial_cmp(b).unwrap());
         let app_id_blobs = app_id_blobs.iter().map(|(_, b)| b).collect::<Vec<_>>();
-        if let Some(blob) = app_id_blobs[0] {
-            if **blob == *b"blob" && app_id_blobs[1].is_none() {
-                is_success_tx.store(true, SeqCst);
-            }
+
+        // When Indexer is asked for app_id at index, it will return all blobs that it has for that
+        // blob_id.
+        let columns = app_id_blobs[0];
+        if !columns.is_empty() && *columns[0] == *b"blob" && app_id_blobs[1].is_empty() {
+            is_success_tx.store(true, SeqCst);
         }
 
         performed_tx.store(true, SeqCst);

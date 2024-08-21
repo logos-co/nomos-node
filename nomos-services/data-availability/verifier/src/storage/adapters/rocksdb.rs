@@ -5,7 +5,7 @@ use std::{marker::PhantomData, path::PathBuf};
 use nomos_core::da::blob::Blob;
 use nomos_da_storage::{
     fs::write_blob,
-    rocksdb::{key_bytes, DA_ATTESTED_KEY_PREFIX},
+    rocksdb::{key_bytes, DA_VERIFIED_KEY_PREFIX},
 };
 use nomos_storage::{
     backends::{rocksdb::RocksBackend, StorageSerde},
@@ -34,6 +34,7 @@ where
     A: Serialize + DeserializeOwned + Clone + Send + Sync,
     B: Blob + Serialize + Clone + Send + Sync + 'static,
     B::BlobId: AsRef<[u8]> + Send + Sync + 'static,
+    B::ColumnIndex: AsRef<[u8]> + Send + Sync + 'static,
     S: StorageSerde + Send + Sync + 'static,
 {
     type Backend = RocksBackend<S>;
@@ -59,16 +60,18 @@ where
         attestation: &Self::Attestation,
     ) -> Result<(), DynError> {
         let blob_bytes = S::serialize(blob);
+        let blob_idx = create_blob_idx(blob.id().as_ref(), blob.column_idx().as_ref());
 
         write_blob(
             self.settings.blob_storage_directory.clone(),
             blob.id().as_ref(),
+            blob.column_idx().as_ref(),
             &blob_bytes,
         )
         .await?;
 
         // Mark blob as attested for lateer use in Indexer and attestation cache.
-        let blob_key = key_bytes(DA_ATTESTED_KEY_PREFIX, blob.id().as_ref());
+        let blob_key = key_bytes(DA_VERIFIED_KEY_PREFIX, blob_idx);
         self.storage_relay
             .send(StorageMsg::Store {
                 key: blob_key,
@@ -78,17 +81,14 @@ where
             .map_err(|(e, _)| e.into())
     }
 
-    async fn get_attestation(
+    async fn get_blob(
         &self,
-        blob: &Self::Blob,
+        blob_idx: <Self::Blob as Blob>::BlobId,
     ) -> Result<Option<Self::Attestation>, DynError> {
-        let attestation_key = key_bytes(DA_ATTESTED_KEY_PREFIX, blob.id().as_ref());
-        let (reply_tx, reply_rx) = tokio::sync::oneshot::channel();
+        let key = key_bytes(DA_VERIFIED_KEY_PREFIX, blob_idx);
+        let (reply_channel, reply_rx) = tokio::sync::oneshot::channel();
         self.storage_relay
-            .send(StorageMsg::Load {
-                key: attestation_key,
-                reply_channel: reply_tx,
-            })
+            .send(StorageMsg::Load { key, reply_channel })
             .await
             .expect("Failed to send load request to storage relay");
 
@@ -105,6 +105,16 @@ where
             })
             .map_err(|_| "".into())
     }
+}
+
+// Combines a 32-byte blob ID (`[u8; 32]`) with a 2-byte column index
+// (`u16` represented as `[u8; 2]`).
+fn create_blob_idx(blob_id: &[u8], column_idx: &[u8]) -> [u8; 34] {
+    let mut blob_idx = [0u8; 34];
+    blob_idx[..blob_id.len()].copy_from_slice(blob_id);
+    blob_idx[blob_id.len()..].copy_from_slice(column_idx);
+
+    blob_idx
 }
 
 #[derive(Debug, Clone)]

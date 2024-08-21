@@ -4,8 +4,10 @@ pub mod select;
 
 pub trait Blob {
     type BlobId;
+    type ColumnIndex;
 
     fn id(&self) -> Self::BlobId;
+    fn column_idx(&self) -> Self::ColumnIndex;
 }
 
 pub trait BlobSelect {

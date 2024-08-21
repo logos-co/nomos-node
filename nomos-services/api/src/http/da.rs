@@ -54,6 +54,7 @@ where
     A: Serialize + DeserializeOwned + Clone + Send + Sync + 'static,
     B: Blob + Serialize + DeserializeOwned + Clone + Send + Sync + 'static,
     <B as Blob>::BlobId: AsRef<[u8]> + Send + Sync + 'static,
+    <B as Blob>::ColumnIndex: AsRef<[u8]> + Send + Sync + 'static,
     VB: VerifierBackend + CoreDaVerifier<DaBlob = B>,
     <VB as VerifierBackend>::Settings: Clone,
     <VB as CoreDaVerifier>::Error: Error,
@@ -76,7 +77,7 @@ pub async fn get_range<Tx, C, V, SS, const SIZE: usize>(
     handle: &OverwatchHandle,
     app_id: <V as Metadata>::AppId,
     range: Range<<V as Metadata>::Index>,
-) -> Result<Vec<(<V as Metadata>::Index, Option<Bytes>)>, DynError>
+) -> Result<Vec<(<V as Metadata>::Index, Vec<Bytes>)>, DynError>
 where
     Tx: Transaction
         + Eq
