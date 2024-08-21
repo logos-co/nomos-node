@@ -122,6 +122,7 @@ where
     pub async fn run(mut self) {
         loop {
             if let Some(event) = self.swarm.next().await {
+                debug!("Da swarm event received: {event:?}");
                 match event {
                     SwarmEvent::Behaviour(behaviour_event) => {
                         self.handle_behaviour_event(behaviour_event).await;

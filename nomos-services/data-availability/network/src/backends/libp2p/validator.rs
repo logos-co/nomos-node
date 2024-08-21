@@ -28,7 +28,7 @@ const BROADCAST_CHANNEL_SIZE: usize = 128;
 /// Message that the backend replies to
 #[derive(Debug)]
 pub enum DaNetworkMessage {
-    /// Quickstart a network sapling
+    /// Kickstart a network sapling
     RequestSample {
         subnetwork_id: ColumnIdx,
         blob_id: BlobId,
