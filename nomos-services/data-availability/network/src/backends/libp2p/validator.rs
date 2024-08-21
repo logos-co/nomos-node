@@ -25,32 +25,44 @@ type ColumnIdx = u32;
 
 const BROADCAST_CHANNEL_SIZE: usize = 128;
 
+/// Message that the backend replies to
 #[derive(Debug)]
 pub enum DaNetworkMessage {
+    /// Quickstart a network sapling
     RequestSample {
         subnetwork_id: ColumnIdx,
         blob_id: BlobId,
     },
 }
 
+/// Events types to subscribe to
+/// * Sampling: Incoming sampling events [success/fail]
+/// * Incoming blobs to be verified
 #[derive(Debug)]
 pub enum DaNetworkEventKind {
     Sampling,
     Verifying,
 }
 
+/// Sampling events coming from da network
 #[derive(Debug, Clone)]
 pub enum SamplingEvent {
+    /// A success sampling
     SamplingSuccess { blob_id: BlobId, blob: Box<DaBlob> },
+    /// A failed sampling error
     SamplingError { error: SamplingError },
 }
 
+/// DA network incoming events
 #[derive(Debug)]
 pub enum DaNetworkEvent {
     Sampling(SamplingEvent),
     Verifying(Box<DaBlob>),
 }
 
+/// DA network backend for validators
+/// Internally uses a libp2p swarm composed of the [`ValidatorBehaviour`]
+/// It forwards network messages to the corresponding subscription channels/streams
 pub struct DaNetworkValidatorBackend<Membership> {
     // TODO: this join handles should be cancelable tasks. We should add an stop method for
     // the `NetworkBackend` trait so if the service is stopped the backend can gracefully handle open
@@ -67,11 +79,14 @@ pub struct DaNetworkValidatorBackend<Membership> {
 
 #[derive(Clone, Debug)]
 pub struct DaNetworkValidatorBackendSettings<Membership> {
+    /// Identification key
     key: Keypair,
+    /// Membership of DA network PoV set
     membership: Membership,
 }
 
 impl<Membership> DaNetworkValidatorBackend<Membership> {
+    /// Send the sampling request to the underlying sampling behaviour
     async fn handle_sample_request(&self, subnetwork_id: SubnetworkId, blob_id: BlobId) {
         if let Err(SendError((subnetwork_id, blob_id))) =
             self.sampling_request_channel.send((subnetwork_id, blob_id))
@@ -160,6 +175,7 @@ where
     }
 }
 
+/// Task that handles forwarding of events to the subscriptions channels/stream
 async fn handle_validator_events_stream(
     events_streams: ValidatorEventsStream,
     sampling_broadcast_sender: broadcast::Sender<SamplingEvent>,
@@ -171,6 +187,9 @@ async fn handle_validator_events_stream(
     } = events_streams;
     #[allow(clippy::never_loop)]
     loop {
+        /// WARNING: `StreamExt::next` is cancellation safe.
+        /// If adding more branches check if such methods are within the cancellation safe set:
+        /// https://docs.rs/tokio/latest/tokio/macro.select.html#cancellation-safety
         tokio::select! {
             Some(sampling_event) = StreamExt::next(&mut sampling_events_receiver) => {
                 match sampling_event {
