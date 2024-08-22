@@ -64,6 +64,10 @@ impl<Membership> ReplicationBehaviour<Membership> {
             waker: None,
         }
     }
+
+    pub fn update_membership(&mut self, membership: Membership) {
+        self.membership = membership;
+    }
 }
 
 impl<M> ReplicationBehaviour<M>

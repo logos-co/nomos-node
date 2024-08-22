@@ -3,40 +3,20 @@ pub mod handler;
 
 #[cfg(test)]
 mod test {
-    use std::collections::HashSet;
-    use std::time::Duration;
-
     use futures::StreamExt;
     use libp2p::identity::Keypair;
     use libp2p::swarm::SwarmEvent;
     use libp2p::{quic, Multiaddr, PeerId, Swarm};
     use log::info;
+    use std::time::Duration;
     use tracing_subscriber::fmt::TestWriter;
     use tracing_subscriber::EnvFilter;
 
     use nomos_da_messages::common::Blob;
-    use subnetworks_assignations::MembershipHandler;
 
-    use crate::replication::behaviour::{ReplicationBehaviour, ReplicationEvent};
-    use crate::replication::handler::DaMessage;
-
-    #[derive(Clone)]
-    struct AllNeighbours {
-        neighbours: HashSet<PeerId>,
-    }
-
-    impl MembershipHandler for AllNeighbours {
-        type NetworkId = u32;
-        type Id = PeerId;
-
-        fn membership(&self, _self_id: &Self::Id) -> HashSet<Self::NetworkId> {
-            [0].into_iter().collect()
-        }
-
-        fn members_of(&self, _network_id: &Self::NetworkId) -> HashSet<Self::Id> {
-            self.neighbours.clone()
-        }
-    }
+    use crate::protocols::replication::behaviour::{ReplicationBehaviour, ReplicationEvent};
+    use crate::protocols::replication::handler::DaMessage;
+    use crate::test_utils::AllNeighbours;
 
     #[tokio::test]
     async fn test_connects_and_receives_replication_messages() {

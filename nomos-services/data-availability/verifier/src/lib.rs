@@ -2,6 +2,7 @@ pub mod backend;
 pub mod network;
 pub mod storage;
 
+use nomos_core::da::blob::Blob;
 // std
 use nomos_storage::StorageService;
 use overwatch_rs::services::life_cycle::LifecycleMessage;
@@ -73,7 +74,7 @@ where
         storage_adapter: &S,
         blob: &Backend::DaBlob,
     ) -> Result<(), DynError> {
-        if storage_adapter.get_attestation(blob).await?.is_some() {
+        if storage_adapter.get_blob(blob.id()).await?.is_some() {
             Ok(())
         } else {
             verifier.verify(blob)?;
@@ -179,19 +180,19 @@ where
                         }
                     }
                     Some(msg) = service_state.inbound_relay.recv() => {
-                        let DaVerifierMsg::AddBlob { blob, reply_channel } = msg;
-                        match Self::handle_new_blob(&verifier, &storage_adapter, &blob).await {
-                            Ok(attestation) => if let Err(err) = reply_channel.send(Some(attestation)) {
-                                error!("Error replying attestation {err:?}");
-                            },
-                            Err(err) => {
-                                error!("Error handling blob {blob:?} due to {err:?}");
-                                if let Err(err) = reply_channel.send(None) {
+                            let DaVerifierMsg::AddBlob { blob, reply_channel } = msg;
+                            match Self::handle_new_blob(&verifier, &storage_adapter, &blob).await {
+                                Ok(attestation) => if let Err(err) = reply_channel.send(Some(attestation)) {
                                     error!("Error replying attestation {err:?}");
-                                }
-                            },
-                        };
-                    }
+                                },
+                                Err(err) => {
+                                    error!("Error handling blob {blob:?} due to {err:?}");
+                                    if let Err(err) = reply_channel.send(None) {
+                                        error!("Error replying attestation {err:?}");
+                                    }
+                                },
+                            };
+                        }
                     Some(msg) = lifecycle_stream.next() => {
                         if Self::should_stop_service(msg).await {
                             break;

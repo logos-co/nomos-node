@@ -2,14 +2,14 @@ use super::CLIENT;
 use reqwest::{Error, Response, Url};
 use serde::Serialize;
 
-pub async fn send_certificate<C>(node: &Url, cert: &C) -> Result<Response, Error>
+pub async fn send_blob_info<I>(node: &Url, info: &I) -> Result<Response, Error>
 where
-    C: Serialize,
+    I: Serialize,
 {
     const NODE_CERT_PATH: &str = "mempool/add/cert";
     CLIENT
         .post(node.join(NODE_CERT_PATH).unwrap())
-        .json(cert)
+        .json(info)
         .send()
         .await
 }

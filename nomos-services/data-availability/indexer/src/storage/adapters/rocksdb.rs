@@ -7,8 +7,9 @@ use nomos_core::da::blob::{
     info::DispersedBlobInfo,
     metadata::{Metadata, Next},
 };
+use nomos_core::da::BlobId;
 use nomos_da_storage::fs::load_blob;
-use nomos_da_storage::rocksdb::{key_bytes, DA_ATTESTED_KEY_PREFIX, DA_VID_KEY_PREFIX};
+use nomos_da_storage::rocksdb::{key_bytes, DA_VERIFIED_KEY_PREFIX, DA_VID_KEY_PREFIX};
 use nomos_storage::{
     backends::{rocksdb::RocksBackend, StorageSerde},
     StorageMsg, StorageService,
@@ -34,7 +35,7 @@ where
 impl<S, B> DaStorageAdapter for RocksAdapter<S, B>
 where
     S: StorageSerde + Send + Sync + 'static,
-    B: DispersedBlobInfo<BlobId = [u8; 32]> + Metadata + Send + Sync,
+    B: DispersedBlobInfo<BlobId = BlobId> + Metadata + Send + Sync,
     B::Index: AsRef<[u8]> + Next + Clone + PartialOrd + Send + Sync + 'static,
     B::AppId: AsRef<[u8]> + Clone + Send + Sync + 'static,
 {
@@ -58,19 +59,19 @@ where
         let (app_id, idx) = info.metadata();
 
         // Check if Info in a block is something that the node've seen before.
-        let attested_key = key_bytes(DA_ATTESTED_KEY_PREFIX, info.blob_id());
+        let attested_key = key_bytes(DA_VERIFIED_KEY_PREFIX, info.blob_id());
         let (reply_tx, reply_rx) = tokio::sync::oneshot::channel();
 
         self.storage_relay
-            .send(StorageMsg::Load {
-                key: attested_key,
+            .send(StorageMsg::LoadPrefix {
+                prefix: attested_key,
                 reply_channel: reply_tx,
             })
             .await
             .expect("Failed to send load request to storage relay");
 
         // If node haven't attested this info, return early.
-        if reply_rx.await?.is_none() {
+        if reply_rx.await?.is_empty() {
             return Ok(());
         }
 
@@ -95,8 +96,7 @@ where
         &self,
         app_id: <Self::Info as Metadata>::AppId,
         index_range: Range<<Self::Info as Metadata>::Index>,
-    ) -> Box<dyn Stream<Item = (<Self::Info as Metadata>::Index, Option<Bytes>)> + Unpin + Send>
-    {
+    ) -> Box<dyn Stream<Item = (<Self::Info as Metadata>::Index, Vec<Bytes>)> + Unpin + Send> {
         let futures = FuturesUnordered::new();
 
         // TODO: Using while loop here until `Step` trait is stable.
@@ -127,10 +127,10 @@ where
             futures.push(async move {
                 match reply_rx.await {
                     Ok(Some(id)) => (idx, load_blob(settings.blob_storage_directory, &id).await),
-                    Ok(None) => (idx, None),
+                    Ok(None) => (idx, Vec::new()),
                     Err(_) => {
                         tracing::error!("Failed to receive storage response");
-                        (idx, None)
+                        (idx, Vec::new())
                     }
                 }
             });

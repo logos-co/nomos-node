@@ -1,10 +1,9 @@
 use full_replication::Blob;
-use nomos_core::da::certificate::Certificate;
 use nomos_core::header::HeaderId;
 use reqwest::Url;
 use thiserror::Error;
 
-use crate::api::{da::get_blobs, storage::get_block_contents};
+use crate::api::storage::get_block_contents;
 
 #[derive(Error, Debug)]
 pub enum Error {

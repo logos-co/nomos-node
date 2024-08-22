@@ -117,6 +117,22 @@ impl<SerdeOp: StorageSerde + Send + Sync + 'static> StorageBackend for RocksBack
         self.rocks.get(key).map(|opt| opt.map(|ivec| ivec.into()))
     }
 
+    async fn load_prefix(&mut self, prefix: &[u8]) -> Result<Vec<Bytes>, Self::Error> {
+        let mut values = Vec::new();
+        let iter = self.rocks.prefix_iterator(prefix);
+
+        for item in iter {
+            match item {
+                Ok((_key, value)) => {
+                    values.push(Bytes::from(value.to_vec()));
+                }
+                Err(e) => return Err(e), // Return the error if one occurs
+            }
+        }
+
+        Ok(values)
+    }
+
     async fn remove(&mut self, key: &[u8]) -> Result<Option<Bytes>, Self::Error> {
         self.load(key).await.and_then(|val| {
             if val.is_some() {

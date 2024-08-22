@@ -5,7 +5,8 @@ use nomos_core::da::blob;
 use serde::{Deserialize, Serialize};
 use sha3::{Digest, Sha3_256};
 // internal
-use super::build_attestation_message;
+use super::build_blob_id;
+use super::ColumnIndex;
 use crate::common::Column;
 use crate::common::Commitment;
 use crate::common::{
@@ -15,6 +16,7 @@ use crate::common::{
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DaBlob {
     pub column: Column,
+    pub column_idx: ColumnIndex,
     #[serde(
         serialize_with = "serialize_canonical",
         deserialize_with = "deserialize_canonical"
@@ -44,7 +46,7 @@ pub struct DaBlob {
 
 impl DaBlob {
     pub fn id(&self) -> Vec<u8> {
-        build_attestation_message(&self.aggregated_column_commitment, &self.rows_commitments).into()
+        build_blob_id(&self.aggregated_column_commitment, &self.rows_commitments).into()
     }
 
     pub fn column_id(&self) -> Vec<u8> {
@@ -55,9 +57,14 @@ impl DaBlob {
 }
 
 impl blob::Blob for DaBlob {
-    type BlobId = Vec<u8>;
+    type BlobId = [u8; 32];
+    type ColumnIndex = [u8; 2];
 
     fn id(&self) -> Self::BlobId {
-        build_attestation_message(&self.aggregated_column_commitment, &self.rows_commitments).into()
+        build_blob_id(&self.aggregated_column_commitment, &self.rows_commitments)
+    }
+
+    fn column_idx(&self) -> Self::ColumnIndex {
+        self.column_idx.to_be_bytes()
     }
 }

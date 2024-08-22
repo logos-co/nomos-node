@@ -25,6 +25,10 @@ pub enum StorageMsg<Backend: StorageBackend> {
         key: Bytes,
         reply_channel: tokio::sync::oneshot::Sender<Option<Bytes>>,
     },
+    LoadPrefix {
+        prefix: Bytes,
+        reply_channel: tokio::sync::oneshot::Sender<Vec<Bytes>>,
+    },
     Store {
         key: Bytes,
         value: Bytes,
@@ -139,6 +143,9 @@ impl<Backend: StorageBackend> Debug for StorageMsg<Backend> {
             StorageMsg::Load { key, .. } => {
                 write!(f, "Load {{ {key:?} }}")
             }
+            StorageMsg::LoadPrefix { prefix, .. } => {
+                write!(f, "LoadPrefix {{ {prefix:?} }}")
+            }
             StorageMsg::Store { key, value } => {
                 write!(f, "Store {{ {key:?}, {value:?}}}")
             }
@@ -189,6 +196,10 @@ impl<Backend: StorageBackend + Send + Sync + 'static> StorageService<Backend> {
             StorageMsg::Load { key, reply_channel } => {
                 Self::handle_load(backend, key, reply_channel).await
             }
+            StorageMsg::LoadPrefix {
+                prefix,
+                reply_channel,
+            } => Self::handle_load_prefix(backend, prefix, reply_channel).await,
             StorageMsg::Store { key, value } => Self::handle_store(backend, key, value).await,
             StorageMsg::Remove { key, reply_channel } => {
                 Self::handle_remove(backend, key, reply_channel).await
@@ -217,6 +228,24 @@ impl<Backend: StorageBackend + Send + Sync + 'static> StorageService<Backend> {
             .map_err(|_| StorageServiceError::ReplyError {
                 operation: "Load".to_string(),
                 key,
+            })
+    }
+
+    /// Handle load prefix message
+    async fn handle_load_prefix(
+        backend: &mut Backend,
+        prefix: Bytes,
+        reply_channel: tokio::sync::oneshot::Sender<Vec<Bytes>>,
+    ) -> Result<(), StorageServiceError<Backend>> {
+        let result: Vec<Bytes> = backend
+            .load_prefix(&prefix)
+            .await
+            .map_err(StorageServiceError::BackendError)?;
+        reply_channel
+            .send(result)
+            .map_err(|_| StorageServiceError::ReplyError {
+                operation: "LoadPrefix".to_string(),
+                key: prefix,
             })
     }
 
