@@ -2,6 +2,7 @@ on:
   push:
     branches:
       - my-codecov
+      - master
 
 name: My Codecov 3
 
