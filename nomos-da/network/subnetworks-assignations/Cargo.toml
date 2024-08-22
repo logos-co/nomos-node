@@ -4,3 +4,8 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+libp2p-identity = { version = "0.2", features = ["peerid"] }
+
+
+[dev-dependencies]
+libp2p-identity = { version = "0.2", features = ["rand"] }
