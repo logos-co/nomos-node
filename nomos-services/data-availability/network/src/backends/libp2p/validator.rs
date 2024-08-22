@@ -2,7 +2,7 @@ use crate::backends::NetworkBackend;
 use futures::{Stream, StreamExt};
 use kzgrs_backend::common::blob::DaBlob;
 use libp2p::identity::Keypair;
-use libp2p::PeerId;
+use libp2p::{Multiaddr, PeerId};
 use log::error;
 use nomos_da_network_core::protocols::sampling;
 use nomos_da_network_core::protocols::sampling::behaviour::SamplingError;
@@ -83,6 +83,7 @@ pub struct DaNetworkValidatorBackendSettings<Membership> {
     key: Keypair,
     /// Membership of DA network PoV set
     membership: Membership,
+    listening_address: Multiaddr,
 }
 
 impl<Membership> DaNetworkValidatorBackend<Membership> {
@@ -115,13 +116,21 @@ where
     type NetworkEvent = DaNetworkEvent;
 
     fn new(config: Self::Settings, overwatch_handle: OverwatchHandle) -> Self {
-        let (validator_swarm, events_streams) = ValidatorSwarm::new(config.key, config.membership);
+        let (mut validator_swarm, events_streams) =
+            ValidatorSwarm::new(config.key, config.membership);
         let sampling_request_channel = validator_swarm
             .protocol_swarm()
             .behaviour()
             .sampling_behaviour()
             .sample_request_channel();
-
+        let address = config.listening_address;
+        // put swarm to listen at the specified configuration address
+        validator_swarm
+            .protocol_swarm_mut()
+            .listen_on(address.clone())
+            .unwrap_or_else(|e| {
+                panic!("Error listening on DA network with address {address}: {e}")
+            });
         let task = overwatch_handle.runtime().spawn(validator_swarm.run());
         let (sampling_broadcast_sender, sampling_broadcast_receiver) =
             broadcast::channel(BROADCAST_CHANNEL_SIZE);
