@@ -8,9 +8,7 @@ use nomos_core::{
     da::{DaDispersal, DaEncoder},
     wire,
 };
-use nomos_da_network_service::{
-    backends::mock::executor::MockExecutorBackend as NetworkBackend, NetworkService,
-};
+use nomos_da_network_service::NetworkService;
 use nomos_log::Logger;
 use overwatch_derive::*;
 use overwatch_rs::{
@@ -30,7 +28,7 @@ use std::{
 };
 use tokio::sync::{mpsc::UnboundedReceiver, Mutex};
 
-use super::network::adapters::mock::MockExecutorDispersalAdapter;
+use super::network::{adapters::mock::MockExecutorDispersalAdapter, backend::ExecutorBackend};
 use crate::api::mempool::send_blob_info;
 
 pub async fn disseminate_and_wait<E, D>(
@@ -113,7 +111,7 @@ impl std::fmt::Display for Status {
 // an overwatch app
 #[derive(Services)]
 pub struct DisseminateApp {
-    network: ServiceHandle<NetworkService<NetworkBackend>>,
+    network: ServiceHandle<NetworkService<ExecutorBackend<MockMembership>>>,
     send_blob: ServiceHandle<DisseminateService>,
     logger: ServiceHandle<Logger>,
 }
@@ -160,7 +158,7 @@ impl ServiceCore for DisseminateService {
             output,
         } = service_state.settings_reader.get_updated_settings();
 
-        let network_relay: Relay<NetworkService<NetworkBackend>> =
+        let network_relay: Relay<NetworkService<ExecutorBackend>> =
             service_state.overwatch_handle.relay();
         let network_relay: OutboundRelay<_> = network_relay
             .connect()
@@ -172,7 +170,6 @@ impl ServiceCore for DisseminateService {
             kzgrs_settings.with_cache,
         );
         let da_encoder = kzgrs_backend::encoder::DaEncoder::new(params);
-
         let da_dispersal = MockExecutorDispersalAdapter::new(network_relay);
 
         while let Some(data) = payload.lock().await.recv().await {

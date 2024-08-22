@@ -13,6 +13,7 @@ use libp2p::swarm::{
 };
 use libp2p::{Multiaddr, PeerId, Stream};
 use libp2p_stream::{Control, OpenStreamError};
+use nomos_core::da::BlobId;
 use thiserror::Error;
 use tokio::sync::mpsc;
 use tokio::sync::mpsc::UnboundedSender;
@@ -75,7 +76,75 @@ impl DispersalError {
         }
     }
 }
-type BlobId = [u8; 32];
+
+impl Clone for DispersalError {
+    fn clone(&self) -> Self {
+        match self {
+            DispersalError::Io {
+                error,
+                blob_id,
+                subnetwork_id,
+            } => DispersalError::Io {
+                error: std::io::Error::new(error.kind(), error.to_string()),
+                blob_id: *blob_id,
+                subnetwork_id: *subnetwork_id,
+            },
+            DispersalError::Serialization {
+                error,
+                blob_id,
+                subnetwork_id,
+            } => DispersalError::Serialization {
+                error: clone_deserialize_error(error),
+                blob_id: *blob_id,
+                subnetwork_id: *subnetwork_id,
+            },
+            DispersalError::Protocol {
+                subnetwork_id,
+                error,
+            } => DispersalError::Protocol {
+                subnetwork_id: *subnetwork_id,
+                error: error.clone(),
+            },
+            DispersalError::OpenStreamError { peer_id, error } => DispersalError::OpenStreamError {
+                peer_id: *peer_id,
+                error: match error {
+                    OpenStreamError::UnsupportedProtocol(protocol) => {
+                        OpenStreamError::UnsupportedProtocol(protocol.clone())
+                    }
+                    OpenStreamError::Io(error) => {
+                        OpenStreamError::Io(std::io::Error::new(error.kind(), error.to_string()))
+                    }
+                    err => OpenStreamError::Io(std::io::Error::new(
+                        std::io::ErrorKind::Other,
+                        err.to_string(),
+                    )),
+                },
+            },
+        }
+    }
+}
+
+fn clone_deserialize_error(error: &bincode::Error) -> bincode::Error {
+    Box::new(match error.as_ref() {
+        bincode::ErrorKind::Io(error) => {
+            bincode::ErrorKind::Io(std::io::Error::new(error.kind(), error.to_string()))
+        }
+        bincode::ErrorKind::InvalidUtf8Encoding(error) => {
+            bincode::ErrorKind::InvalidUtf8Encoding(*error)
+        }
+        bincode::ErrorKind::InvalidBoolEncoding(bool) => {
+            bincode::ErrorKind::InvalidBoolEncoding(*bool)
+        }
+        bincode::ErrorKind::InvalidCharEncoding => bincode::ErrorKind::InvalidCharEncoding,
+        bincode::ErrorKind::InvalidTagEncoding(tag) => bincode::ErrorKind::InvalidTagEncoding(*tag),
+        bincode::ErrorKind::DeserializeAnyNotSupported => {
+            bincode::ErrorKind::DeserializeAnyNotSupported
+        }
+        bincode::ErrorKind::SizeLimit => bincode::ErrorKind::SizeLimit,
+        bincode::ErrorKind::SequenceMustHaveLength => bincode::ErrorKind::SequenceMustHaveLength,
+        bincode::ErrorKind::Custom(custom) => bincode::ErrorKind::Custom(custom.clone()),
+    })
+}
 
 #[derive(Debug)]
 pub enum DispersalExecutorEvent {
