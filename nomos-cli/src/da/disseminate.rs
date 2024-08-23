@@ -28,16 +28,9 @@ use overwatch_rs::{
     DynError,
 };
 use reqwest::Url;
-use subnetworks_assignations::versions::v1::FillFromNodeList;
 use tokio::sync::{mpsc::UnboundedReceiver, Mutex};
 // internal
-use super::{
-    network::{
-        adapters::{libp2p::Libp2pExecutorDispersalAdapter, mock::MockExecutorDispersalAdapter},
-        backend::ExecutorBackend,
-    },
-    NetworkBackend,
-};
+use super::{network::adapters::libp2p::Libp2pExecutorDispersalAdapter, NetworkBackend};
 use crate::api::mempool::send_blob_info;
 
 pub async fn disseminate_and_wait<E, D>(

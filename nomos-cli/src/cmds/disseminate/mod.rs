@@ -7,12 +7,10 @@ use nomos_da_network_service::NetworkService;
 use nomos_log::{LoggerBackend, LoggerSettings};
 use overwatch_rs::{overwatch::OverwatchRunner, services::ServiceData};
 use reqwest::Url;
-use subnetworks_assignations::versions::v1::FillFromNodeList;
 use tokio::sync::Mutex;
 // internal
 use crate::da::{
     disseminate::{DisseminateApp, DisseminateAppServiceSettings, KzgrsSettings, Settings, Status},
-    network::backend::ExecutorBackend,
     NetworkBackend,
 };
 

@@ -1,15 +1,9 @@
-use std::collections::HashMap;
-use std::fmt;
-use std::marker::PhantomData;
-
 // std
 // crates
 use kzgrs_backend::common::blob::DaBlob;
-use kzgrs_backend::encoder::EncodedData as KzgEncodedData;
 use libp2p::futures::StreamExt;
-use libp2p::Multiaddr;
 use libp2p::{identity::Keypair, swarm::SwarmEvent, PeerId, Swarm};
-use nomos_core::da::{BlobId, DaDispersal};
+use nomos_core::da::BlobId;
 use nomos_da_network_core::protocols::dispersal::executor::behaviour::{
     DispersalError, DispersalExecutorEvent,
 };
@@ -37,7 +31,6 @@ where
     Membership: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'static,
 {
     swarm: Swarm<DispersalExecutorBehaviour<Membership>>,
-    open_stream_sender: UnboundedSender<PeerId>,
     dispersal_broadcast_sender: UnboundedSender<DispersalEvent>,
 }
 
@@ -51,10 +44,8 @@ where
         dispersal_broadcast_sender: UnboundedSender<DispersalEvent>,
     ) -> Self {
         let swarm = Self::build_swarm(key, membership);
-        let open_stream_sender = swarm.behaviour().open_stream_sender();
         Self {
             swarm,
-            open_stream_sender,
             dispersal_broadcast_sender,
         }
     }

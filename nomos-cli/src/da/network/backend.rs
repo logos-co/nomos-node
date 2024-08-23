@@ -5,15 +5,8 @@ use std::pin::Pin;
 // crates
 use futures::{Stream, StreamExt};
 use kzgrs_backend::common::blob::DaBlob;
-use libp2p::identity::Keypair;
 use libp2p::PeerId;
 use log::error;
-use nomos_da_network_core::protocols::dispersal::executor::behaviour::{
-    DispersalError, DispersalExecutorEvent,
-};
-use nomos_da_network_core::protocols::sampling;
-use nomos_da_network_core::protocols::sampling::behaviour::SamplingError;
-use nomos_da_network_core::swarm::validator::{ValidatorEventsStream, ValidatorSwarm};
 use nomos_da_network_core::SubnetworkId;
 use nomos_da_network_service::backends::NetworkBackend;
 use nomos_libp2p::{secp256k1, secret_key_serde};
@@ -29,9 +22,6 @@ use tokio_stream::wrappers::{BroadcastStream, UnboundedReceiverStream};
 // internal
 use super::swarm::{DispersalEvent, ExecutorSwarm};
 
-type BlobId = [u8; 32];
-type ColumnIdx = u16;
-
 const BROADCAST_CHANNEL_SIZE: usize = 128;
 
 /// Message that the backend replies to
@@ -39,7 +29,7 @@ const BROADCAST_CHANNEL_SIZE: usize = 128;
 pub enum Command {
     /// Disperse a blob to a subnetwork.
     Disperse {
-        subnetwork_id: ColumnIdx,
+        subnetwork_id: SubnetworkId,
         blob: DaBlob,
     },
 }
