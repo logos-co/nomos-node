@@ -1,11 +1,12 @@
 // std
+use std::collections::HashMap;
 use std::fmt::Debug;
 use std::marker::PhantomData;
 use std::pin::Pin;
 // crates
 use futures::{Stream, StreamExt};
 use kzgrs_backend::common::blob::DaBlob;
-use libp2p::PeerId;
+use libp2p::{Multiaddr, PeerId};
 use log::error;
 use nomos_da_network_core::SubnetworkId;
 use nomos_da_network_service::backends::NetworkBackend;
@@ -57,6 +58,7 @@ pub struct ExecutorBackendSettings<Membership> {
     pub node_key: secp256k1::SecretKey,
     /// Membership of DA network PoV set
     membership: Membership,
+    node_addrs: HashMap<PeerId, Multiaddr>,
 }
 
 impl<Membership> ExecutorBackend<Membership> {
@@ -96,6 +98,12 @@ where
         let mut executor_swarm =
             ExecutorSwarm::new(keypair, config.membership, dispersal_events_sender);
         let dispersal_request_sender = executor_swarm.blobs_sender();
+
+        for (_, addr) in config.node_addrs {
+            executor_swarm
+                .dial(addr)
+                .expect("Should schedule the dials");
+        }
 
         let task = overwatch_handle
             .runtime()
