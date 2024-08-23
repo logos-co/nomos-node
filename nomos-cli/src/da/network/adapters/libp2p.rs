@@ -63,7 +63,7 @@ impl DaDispersal for Libp2pExecutorDispersalAdapter {
             self.network_relay
                 .send(DaNetworkMsg::Process(Command::Disperse {
                     blob,
-                    subnetwork_id: i as u32,
+                    subnetwork_id: i as u16,
                 }))
                 .await
                 .map_err(|(e, _)| e.to_string())?

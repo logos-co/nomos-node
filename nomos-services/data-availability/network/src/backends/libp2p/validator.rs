@@ -21,7 +21,7 @@ use tokio::task::JoinHandle;
 use tokio_stream::wrappers::BroadcastStream;
 
 type BlobId = [u8; 32];
-type ColumnIdx = u32;
+type ColumnIdx = u16;
 
 const BROADCAST_CHANNEL_SIZE: usize = 128;
 

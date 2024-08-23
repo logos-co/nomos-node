@@ -94,7 +94,10 @@ where
     fn replicate_message(&mut self, message: DaMessage) {
         let message_id = (
             message.blob.as_ref().unwrap().blob_id.clone(),
-            message.subnetwork_id,
+            message
+                .subnetwork_id
+                .try_into()
+                .expect("Subnetwork ID should be u16"),
         );
         if self.seen_message_cache.contains(&message_id) {
             return;
@@ -106,7 +109,12 @@ where
     pub fn send_message(&mut self, message: DaMessage) {
         // push a message in the queue for every single peer connected that is a member of the
         // selected subnetwork_id
-        let peers = self.no_loopback_member_peers_of(&message.subnetwork_id);
+        let peers = self.no_loopback_member_peers_of(
+            &message
+                .subnetwork_id
+                .try_into()
+                .expect("Subnetwork ID should be u16"),
+        );
 
         let connected_peers: Vec<_> = self
             .connected

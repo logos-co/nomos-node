@@ -5,4 +5,4 @@ pub mod swarm;
 #[cfg(test)]
 pub mod test_utils;
 
-pub type SubnetworkId = u32;
+pub type SubnetworkId = u16;

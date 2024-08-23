@@ -59,7 +59,7 @@ where
         }
     }
 
-    pub fn blobs_sender(&self) -> UnboundedSender<(u32, DaBlob)> {
+    pub fn blobs_sender(&self) -> UnboundedSender<(SubnetworkId, DaBlob)> {
         self.swarm.behaviour().blobs_sender()
     }
 

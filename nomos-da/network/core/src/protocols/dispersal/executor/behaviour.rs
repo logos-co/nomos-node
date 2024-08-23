@@ -267,7 +267,7 @@ where
                 blob_id: blob_id.clone(),
                 data: blob,
             }),
-            subnetwork_id,
+            subnetwork_id: subnetwork_id.into(),
         };
         stream
             .stream

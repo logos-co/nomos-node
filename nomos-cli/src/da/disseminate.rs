@@ -28,6 +28,7 @@ use overwatch_rs::{
     DynError,
 };
 use reqwest::Url;
+use subnetworks_assignations::versions::v1::FillFromNodeList;
 use tokio::sync::{mpsc::UnboundedReceiver, Mutex};
 // internal
 use super::network::{
@@ -36,7 +37,7 @@ use super::network::{
 };
 use crate::api::mempool::send_blob_info;
 
-type NetworkBackend = ExecutorBackend<todo!()>;
+type NetworkBackend = ExecutorBackend<FillFromNodeList>;
 
 pub async fn disseminate_and_wait<E, D>(
     encoder: &E,
