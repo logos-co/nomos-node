@@ -1,3 +1,10 @@
+// std
+use std::{
+    path::PathBuf,
+    sync::{mpsc::Sender, Arc},
+    time::Duration,
+};
+// crates
 use clap::Args;
 use kzgrs_backend::{
     common::build_blob_id,
@@ -21,15 +28,15 @@ use overwatch_rs::{
     DynError,
 };
 use reqwest::Url;
-use std::{
-    path::PathBuf,
-    sync::{mpsc::Sender, Arc},
-    time::Duration,
-};
 use tokio::sync::{mpsc::UnboundedReceiver, Mutex};
-
-use super::network::{adapters::mock::MockExecutorDispersalAdapter, backend::ExecutorBackend};
+// internal
+use super::network::{
+    adapters::{libp2p::Libp2pExecutorDispersalAdapter, mock::MockExecutorDispersalAdapter},
+    backend::ExecutorBackend,
+};
 use crate::api::mempool::send_blob_info;
+
+type NetworkBackend = ExecutorBackend<todo!()>;
 
 pub async fn disseminate_and_wait<E, D>(
     encoder: &E,
@@ -111,7 +118,7 @@ impl std::fmt::Display for Status {
 // an overwatch app
 #[derive(Services)]
 pub struct DisseminateApp {
-    network: ServiceHandle<NetworkService<ExecutorBackend<MockMembership>>>,
+    network: ServiceHandle<NetworkService<NetworkBackend>>,
     send_blob: ServiceHandle<DisseminateService>,
     logger: ServiceHandle<Logger>,
 }
@@ -158,7 +165,7 @@ impl ServiceCore for DisseminateService {
             output,
         } = service_state.settings_reader.get_updated_settings();
 
-        let network_relay: Relay<NetworkService<ExecutorBackend>> =
+        let network_relay: Relay<NetworkService<NetworkBackend>> =
             service_state.overwatch_handle.relay();
         let network_relay: OutboundRelay<_> = network_relay
             .connect()
@@ -170,7 +177,7 @@ impl ServiceCore for DisseminateService {
             kzgrs_settings.with_cache,
         );
         let da_encoder = kzgrs_backend::encoder::DaEncoder::new(params);
-        let da_dispersal = MockExecutorDispersalAdapter::new(network_relay);
+        let da_dispersal = Libp2pExecutorDispersalAdapter::new(network_relay);
 
         while let Some(data) = payload.lock().await.recv().await {
             match tokio::time::timeout(

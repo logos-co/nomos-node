@@ -34,7 +34,7 @@ const BROADCAST_CHANNEL_SIZE: usize = 128;
 
 /// Message that the backend replies to
 #[derive(Debug)]
-pub enum DaNetworkMessage {
+pub enum Command {
     /// Disperse a blob to a subnetwork.
     Disperse {
         subnetwork_id: ColumnIdx,
@@ -103,7 +103,7 @@ where
 {
     type Settings = ExecutorBackendSettings<Membership>;
     type State = NoState<Self::Settings>;
-    type Message = DaNetworkMessage;
+    type Message = Command;
     type EventKind = ();
     type NetworkEvent = DispersalEvent;
 
@@ -136,7 +136,7 @@ where
 
     async fn process(&self, msg: Self::Message) {
         match msg {
-            DaNetworkMessage::Disperse {
+            Command::Disperse {
                 subnetwork_id,
                 blob,
             } => {
