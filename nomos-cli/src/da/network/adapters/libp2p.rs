@@ -1,25 +1,18 @@
 // std
-use std::fmt;
 // crates
 use kzgrs_backend::{common::blob::DaBlob, encoder::EncodedData as KzgEncodedData};
 use nomos_core::da::DaDispersal;
 use nomos_da_network_service::{DaNetworkMsg, NetworkService};
 use overwatch_rs::services::{relay::OutboundRelay, ServiceData};
+use thiserror::Error;
 // internal
 use crate::da::{network::backend::Command, NetworkBackend};
 
 type Relay<T> = OutboundRelay<<NetworkService<T> as ServiceData>::Message>;
 
-#[derive(Debug)]
+#[derive(Debug, Error)]
+#[error("{0}")]
 pub struct DispersalError(String);
-
-impl fmt::Display for DispersalError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
-
-impl std::error::Error for DispersalError {}
 
 impl From<String> for DispersalError {
     fn from(s: String) -> Self {
