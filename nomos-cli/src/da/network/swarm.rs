@@ -2,7 +2,6 @@
 // crates
 use kzgrs_backend::common::blob::DaBlob;
 use libp2p::futures::StreamExt;
-use libp2p::swarm::ConnectionId;
 use libp2p::Multiaddr;
 use libp2p::{identity::Keypair, swarm::SwarmEvent, PeerId, Swarm};
 use nomos_core::da::BlobId;
@@ -12,7 +11,7 @@ use nomos_da_network_core::protocols::dispersal::executor::behaviour::{
 use nomos_da_network_core::{
     protocols::dispersal::executor::behaviour::DispersalExecutorBehaviour, SubnetworkId,
 };
-use nomos_libp2p::{DialError, DialOpts};
+use nomos_libp2p::DialError;
 use subnetworks_assignations::MembershipHandler;
 use tokio::sync::mpsc::UnboundedSender;
 use tracing::{debug, error};
@@ -69,13 +68,9 @@ where
             .build()
     }
 
-    pub fn dial(&mut self, addr: Multiaddr) -> Result<ConnectionId, DialError> {
-        let opt = DialOpts::from(addr.clone());
-        let connection_id = opt.connection_id();
-
-        tracing::debug!("attempting to dial {addr}. connection_id:{connection_id:?}",);
-        self.swarm.dial(opt)?;
-        Ok(connection_id)
+    pub fn dial(&mut self, addr: Multiaddr) -> Result<(), DialError> {
+        self.swarm.dial(addr)?;
+        Ok(())
     }
 
     pub async fn run(&mut self) {
