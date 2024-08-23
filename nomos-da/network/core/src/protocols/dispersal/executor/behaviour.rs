@@ -6,6 +6,7 @@ use either::Either;
 use futures::future::BoxFuture;
 use futures::stream::{BoxStream, FuturesUnordered};
 use futures::{AsyncWriteExt, FutureExt, StreamExt};
+use kzgrs_backend::common::blob::DaBlob;
 use libp2p::core::Endpoint;
 use libp2p::swarm::{
     ConnectionDenied, ConnectionId, FromSwarm, NetworkBehaviour, THandler, THandlerInEvent,
@@ -14,19 +15,19 @@ use libp2p::swarm::{
 use libp2p::{Multiaddr, PeerId, Stream};
 use libp2p_stream::{Control, OpenStreamError};
 use nomos_core::da::BlobId;
+use nomos_da_messages::common::Blob;
+use nomos_da_messages::dispersal::dispersal_res::MessageType;
+use nomos_da_messages::dispersal::{DispersalErr, DispersalReq, DispersalRes};
+use nomos_da_messages::{pack_message, unpack_from_reader};
+use subnetworks_assignations::MembershipHandler;
 use thiserror::Error;
 use tokio::sync::mpsc;
 use tokio::sync::mpsc::UnboundedSender;
 use tokio_stream::wrappers::UnboundedReceiverStream;
 // internal
 use crate::protocol::DISPERSAL_PROTOCOL;
+use crate::protocols::clone_deserialize_error;
 use crate::SubnetworkId;
-use kzgrs_backend::common::blob::DaBlob;
-use nomos_da_messages::common::Blob;
-use nomos_da_messages::dispersal::dispersal_res::MessageType;
-use nomos_da_messages::dispersal::{DispersalErr, DispersalReq, DispersalRes};
-use nomos_da_messages::{pack_message, unpack_from_reader};
-use subnetworks_assignations::MembershipHandler;
 
 #[derive(Debug, Error)]
 pub enum DispersalError {
@@ -122,28 +123,6 @@ impl Clone for DispersalError {
             },
         }
     }
-}
-
-fn clone_deserialize_error(error: &bincode::Error) -> bincode::Error {
-    Box::new(match error.as_ref() {
-        bincode::ErrorKind::Io(error) => {
-            bincode::ErrorKind::Io(std::io::Error::new(error.kind(), error.to_string()))
-        }
-        bincode::ErrorKind::InvalidUtf8Encoding(error) => {
-            bincode::ErrorKind::InvalidUtf8Encoding(*error)
-        }
-        bincode::ErrorKind::InvalidBoolEncoding(bool) => {
-            bincode::ErrorKind::InvalidBoolEncoding(*bool)
-        }
-        bincode::ErrorKind::InvalidCharEncoding => bincode::ErrorKind::InvalidCharEncoding,
-        bincode::ErrorKind::InvalidTagEncoding(tag) => bincode::ErrorKind::InvalidTagEncoding(*tag),
-        bincode::ErrorKind::DeserializeAnyNotSupported => {
-            bincode::ErrorKind::DeserializeAnyNotSupported
-        }
-        bincode::ErrorKind::SizeLimit => bincode::ErrorKind::SizeLimit,
-        bincode::ErrorKind::SequenceMustHaveLength => bincode::ErrorKind::SequenceMustHaveLength,
-        bincode::ErrorKind::Custom(custom) => bincode::ErrorKind::Custom(custom.clone()),
-    })
 }
 
 #[derive(Debug)]

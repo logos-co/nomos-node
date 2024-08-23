@@ -1,5 +1,4 @@
 // std
-use bincode::ErrorKind;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::task::{Context, Poll};
 // crates
@@ -9,6 +8,7 @@ use futures::channel::oneshot::{Canceled, Receiver, Sender};
 use futures::future::BoxFuture;
 use futures::stream::{BoxStream, FuturesUnordered};
 use futures::{AsyncWriteExt, FutureExt, StreamExt};
+use kzgrs_backend::common::blob::DaBlob;
 use libp2p::core::Endpoint;
 use libp2p::swarm::{
     ConnectionDenied, ConnectionId, FromSwarm, NetworkBehaviour, THandler, THandlerInEvent,
@@ -16,6 +16,9 @@ use libp2p::swarm::{
 };
 use libp2p::{Multiaddr, PeerId, Stream};
 use libp2p_stream::{Control, IncomingStreams, OpenStreamError};
+use nomos_da_messages::sampling::{sample_res, SampleErr, SampleReq, SampleRes};
+use nomos_da_messages::{pack_message, unpack_from_reader};
+use subnetworks_assignations::MembershipHandler;
 use thiserror::Error;
 use tokio::sync::mpsc;
 use tokio::sync::mpsc::UnboundedSender;
@@ -23,11 +26,8 @@ use tokio_stream::wrappers::UnboundedReceiverStream;
 use tracing::error;
 // internal
 use crate::protocol::SAMPLING_PROTOCOL;
+use crate::protocols::clone_deserialize_error;
 use crate::SubnetworkId;
-use kzgrs_backend::common::blob::DaBlob;
-use nomos_da_messages::sampling::{sample_res, SampleErr, SampleReq, SampleRes};
-use nomos_da_messages::{pack_message, unpack_from_reader};
-use subnetworks_assignations::MembershipHandler;
 
 #[derive(Debug, Error)]
 pub enum SamplingError {
@@ -125,20 +125,6 @@ impl Clone for SamplingError {
             },
         }
     }
-}
-
-fn clone_deserialize_error(error: &bincode::Error) -> bincode::Error {
-    Box::new(match error.as_ref() {
-        ErrorKind::Io(error) => ErrorKind::Io(std::io::Error::new(error.kind(), error.to_string())),
-        ErrorKind::InvalidUtf8Encoding(error) => ErrorKind::InvalidUtf8Encoding(*error),
-        ErrorKind::InvalidBoolEncoding(bool) => ErrorKind::InvalidBoolEncoding(*bool),
-        ErrorKind::InvalidCharEncoding => ErrorKind::InvalidCharEncoding,
-        ErrorKind::InvalidTagEncoding(tag) => ErrorKind::InvalidTagEncoding(*tag),
-        ErrorKind::DeserializeAnyNotSupported => ErrorKind::DeserializeAnyNotSupported,
-        ErrorKind::SizeLimit => ErrorKind::SizeLimit,
-        ErrorKind::SequenceMustHaveLength => ErrorKind::SequenceMustHaveLength,
-        ErrorKind::Custom(custom) => ErrorKind::Custom(custom.clone()),
-    })
 }
 
 /// Inner type representation of a Blob ID
