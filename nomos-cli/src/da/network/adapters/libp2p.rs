@@ -1,3 +1,4 @@
+use futures::future::join_all;
 // std
 // crates
 use kzgrs_backend::{common::blob::DaBlob, encoder::EncodedData as KzgEncodedData};
@@ -36,6 +37,8 @@ impl DaDispersal for Libp2pExecutorDispersalAdapter {
     type Error = DispersalError;
 
     async fn disperse(&self, encoded_data: Self::EncodedData) -> Result<(), Self::Error> {
+        let mut tasks = Vec::new();
+
         for (i, column) in encoded_data.extended_data.columns().enumerate() {
             let blob = DaBlob {
                 column: column.clone(),
@@ -53,14 +56,23 @@ impl DaDispersal for Libp2pExecutorDispersalAdapter {
                     .collect(),
             };
 
-            self.network_relay
-                .send(DaNetworkMsg::Process(Command::Disperse {
-                    blob,
-                    subnetwork_id: i as u32,
-                }))
-                .await
-                .map_err(|(e, _)| e.to_string())?
+            let relay = self.network_relay.clone();
+            let command = DaNetworkMsg::Process(Command::Disperse {
+                blob,
+                subnetwork_id: i as u32,
+            });
+
+            let task = async move { relay.send(command).await.map_err(|(e, _)| e.to_string()) };
+
+            tasks.push(task);
         }
+
+        let results: Vec<Result<(), String>> = join_all(tasks).await;
+
+        for result in results {
+            result?;
+        }
+
         Ok(())
     }
 }
