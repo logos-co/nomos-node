@@ -42,7 +42,7 @@ pub enum Command {
     },
 }
 
-/// Sampling events coming from da network
+/// Dispersal events coming from da network
 #[derive(Debug, Clone)]
 pub enum DispersalEvent {
     /// A success dispersal
