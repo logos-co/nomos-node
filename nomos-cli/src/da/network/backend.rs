@@ -16,8 +16,10 @@ use nomos_da_network_core::protocols::sampling::behaviour::SamplingError;
 use nomos_da_network_core::swarm::validator::{ValidatorEventsStream, ValidatorSwarm};
 use nomos_da_network_core::SubnetworkId;
 use nomos_da_network_service::backends::NetworkBackend;
+use nomos_libp2p::{secp256k1, secret_key_serde};
 use overwatch_rs::overwatch::handle::OverwatchHandle;
 use overwatch_rs::services::state::NoState;
+use serde::{Deserialize, Serialize};
 use subnetworks_assignations::MembershipHandler;
 use tokio::sync::broadcast;
 use tokio::sync::mpsc::error::SendError;
@@ -25,7 +27,7 @@ use tokio::sync::mpsc::{unbounded_channel, UnboundedSender};
 use tokio::task::JoinHandle;
 use tokio_stream::wrappers::{BroadcastStream, UnboundedReceiverStream};
 // internal
-use super::swarm::ExecutorSwarm;
+use super::swarm::{DispersalEvent, ExecutorSwarm};
 
 type BlobId = [u8; 32];
 type ColumnIdx = u16;
@@ -40,18 +42,6 @@ pub enum Command {
         subnetwork_id: ColumnIdx,
         blob: DaBlob,
     },
-}
-
-/// Dispersal events coming from da network
-#[derive(Debug, Clone)]
-pub enum DispersalEvent {
-    /// A success dispersal
-    DispersalSuccess {
-        blob_id: BlobId,
-        subnetwork_id: ColumnIdx,
-    },
-    /// A failed dispersal error
-    DispersalError { error: DispersalError },
 }
 
 /// DA network backend for nomos cli as an executor.
@@ -70,10 +60,11 @@ pub struct ExecutorBackend<Membership> {
     _membership: PhantomData<Membership>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ExecutorBackendSettings<Membership> {
-    /// Identification key
-    key: Keypair,
+    // Identification Secp256k1 private key in Hex format (`0x123...abc`). Default random.
+    #[serde(with = "secret_key_serde", default = "secp256k1::SecretKey::generate")]
+    pub node_key: secp256k1::SecretKey,
     /// Membership of DA network PoV set
     membership: Membership,
 }
@@ -109,14 +100,19 @@ where
 
     fn new(config: Self::Settings, overwatch_handle: OverwatchHandle) -> Self {
         let (dispersal_events_sender, dispersal_events_receiver) = unbounded_channel();
-        let executor_swarm =
-            ExecutorSwarm::new(config.key, config.membership, dispersal_events_sender);
 
-        let task = overwatch_handle.runtime().spawn(executor_swarm.run());
+        let keypair =
+            libp2p::identity::Keypair::from(secp256k1::Keypair::from(config.node_key.clone()));
+        let mut executor_swarm =
+            ExecutorSwarm::new(keypair, config.membership, dispersal_events_sender);
+        let dispersal_request_sender = executor_swarm.blobs_sender();
+
+        let task = overwatch_handle
+            .runtime()
+            .spawn(async move { executor_swarm.run().await });
         let (dispersal_broadcast_sender, dispersal_broadcast_receiver) =
             broadcast::channel(BROADCAST_CHANNEL_SIZE);
-        let dispersal_request_sender = executor_swarm.blobs_sender();
-        let dispersal_events_receiver = UnboundedReceiverStream::new(sampling_events_receiver);
+        let dispersal_events_receiver = UnboundedReceiverStream::new(dispersal_events_receiver);
 
         let replies_task = overwatch_handle
             .runtime()
@@ -158,29 +154,12 @@ where
 
 /// Task that handles forwarding of events to the subscriptions channels/stream
 async fn handle_dispersal_events_stream(
-    mut events_stream: UnboundedReceiverStream<DispersalExecutorEvent>,
+    mut events_stream: UnboundedReceiverStream<DispersalEvent>,
     dispersal_broadcast_sender: broadcast::Sender<DispersalEvent>,
 ) {
     while let Some(dispersal_event) = events_stream.next().await {
-        match dispersal_event {
-            DispersalExecutorEvent::DispersalSuccess {
-                blob_id,
-                subnetwork_id,
-            } => {
-                if let Err(e) = dispersal_broadcast_sender.send(DispersalEvent::DispersalSuccess {
-                    blob_id,
-                    subnetwork_id,
-                }) {
-                    error!("Error in internal broadcast of dispersal success: {e:?}");
-                }
-            }
-            DispersalExecutorEvent::DispersalError { error } => {
-                if let Err(e) =
-                    dispersal_broadcast_sender.send(DispersalEvent::DispersalError { error })
-                {
-                    error! {"Error in internal broadcast of sampling error: {e:?}"};
-                }
-            }
+        if let Err(e) = dispersal_broadcast_sender.send(dispersal_event) {
+            error!("Error in internal broadcast of dispersal event: {e:?}");
         }
     }
 }

@@ -1,18 +1,20 @@
-use crate::da::{
-    disseminate::{DisseminateApp, DisseminateAppServiceSettings, KzgrsSettings, Settings, Status},
-    network::backend::ExecutorBackend,
-};
+// std
+use std::{path::PathBuf, sync::Arc, time::Duration};
+// crates
 use clap::Args;
 use kzgrs_backend::dispersal::Metadata;
 use nomos_da_network_service::NetworkService;
 use nomos_log::{LoggerBackend, LoggerSettings};
 use overwatch_rs::{overwatch::OverwatchRunner, services::ServiceData};
 use reqwest::Url;
-use std::{path::PathBuf, sync::Arc, time::Duration};
 use subnetworks_assignations::versions::v1::FillFromNodeList;
 use tokio::sync::Mutex;
-
-type NetworkBackend = ExecutorBackend<FillFromNodeList>;
+// internal
+use crate::da::{
+    disseminate::{DisseminateApp, DisseminateAppServiceSettings, KzgrsSettings, Settings, Status},
+    network::backend::ExecutorBackend,
+    NetworkBackend,
+};
 
 #[derive(Args, Debug, Default)]
 pub struct Disseminate {

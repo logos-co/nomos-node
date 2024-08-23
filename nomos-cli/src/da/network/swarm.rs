@@ -21,7 +21,7 @@ use tokio::sync::mpsc::UnboundedSender;
 use tracing::{debug, error};
 // internal
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum DispersalEvent {
     /// A blob successfully arrived its destination
     DispersalSuccess {

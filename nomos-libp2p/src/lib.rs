@@ -6,7 +6,7 @@ use std::task::{Context, Poll};
 
 use std::time::Duration;
 
-pub use config::SwarmConfig;
+pub use config::{secret_key_serde, SwarmConfig};
 pub use libp2p;
 
 use blake2::digest::{consts::U32, Digest};

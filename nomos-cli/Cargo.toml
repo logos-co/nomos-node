@@ -24,7 +24,7 @@ cryptarchia-consensus = { path = "../nomos-services/cryptarchia-consensus" }
 kzgrs-backend = { path = "../nomos-da/kzgrs-backend" }
 nomos-log = { path = "../nomos-services/log" }
 nomos-libp2p = { path = "../nomos-libp2p" }
-libp2p = { version = "0.53", features = ["macros"] }
+libp2p = { version = "0.53", features = ["macros", "serde"] }
 nomos-core = { path = "../nomos-core" }
 nomos-node = { path = "../nodes/nomos-node" }
 nomos-da-network-core = { path = "../nomos-da/network/core" }

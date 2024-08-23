@@ -6,7 +6,7 @@ use nomos_core::da::DaDispersal;
 use nomos_da_network_service::{DaNetworkMsg, NetworkService};
 use overwatch_rs::services::{relay::OutboundRelay, ServiceData};
 // internal
-use crate::da::network::backend::{Command, ExecutorBackend};
+use crate::da::{network::backend::Command, NetworkBackend};
 
 type Relay<T> = OutboundRelay<<NetworkService<T> as ServiceData>::Message>;
 
@@ -28,11 +28,11 @@ impl From<String> for DispersalError {
 }
 
 pub struct Libp2pExecutorDispersalAdapter {
-    network_relay: Relay<ExecutorBackend<M>>,
+    network_relay: Relay<NetworkBackend>,
 }
 
 impl Libp2pExecutorDispersalAdapter {
-    pub fn new(network_relay: Relay<ExecutorBackend<M>>) -> Self {
+    pub fn new(network_relay: Relay<NetworkBackend>) -> Self {
         Self { network_relay }
     }
 }
