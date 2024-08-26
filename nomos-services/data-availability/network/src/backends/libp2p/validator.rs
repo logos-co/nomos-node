@@ -4,6 +4,7 @@ use kzgrs_backend::common::blob::DaBlob;
 use libp2p::identity::Keypair;
 use libp2p::{Multiaddr, PeerId};
 use log::error;
+use nomos_da_network_core::address_book::AddressBook;
 use nomos_core::da::BlobId;
 use nomos_da_network_core::protocols::sampling;
 use nomos_da_network_core::protocols::sampling::behaviour::SamplingError;
@@ -81,6 +82,7 @@ pub struct DaNetworkValidatorBackendSettings<Membership> {
     key: Keypair,
     /// Membership of DA network PoV set
     membership: Membership,
+    addresses: AddressBook,
     listening_address: Multiaddr,
 }
 
@@ -115,7 +117,7 @@ where
 
     fn new(config: Self::Settings, overwatch_handle: OverwatchHandle) -> Self {
         let (mut validator_swarm, events_streams) =
-            ValidatorSwarm::new(config.key, config.membership);
+            ValidatorSwarm::new(config.key, config.membership, config.addresses);
         let sampling_request_channel = validator_swarm
             .protocol_swarm()
             .behaviour()

@@ -5,7 +5,7 @@ use std::sync::Arc;
 /// Store for known peer addresses
 /// It is a simple wrapper around a `HashMap` at the moment.
 /// But it should be abstracted here to keep addresses in sync among different libp2p protocols
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct AddressBook(Arc<HashMap<PeerId, Multiaddr>>);
 
 impl AddressBook {
