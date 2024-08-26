@@ -1,3 +1,10 @@
+// std
+use std::{
+    path::PathBuf,
+    sync::{mpsc::Sender, Arc},
+    time::Duration,
+};
+// crates
 use clap::Args;
 use kzgrs_backend::{
     common::build_blob_id,
@@ -8,9 +15,7 @@ use nomos_core::{
     da::{DaDispersal, DaEncoder},
     wire,
 };
-use nomos_da_network_service::{
-    backends::mock::executor::MockExecutorBackend as NetworkBackend, NetworkService,
-};
+use nomos_da_network_service::NetworkService;
 use nomos_log::Logger;
 use overwatch_derive::*;
 use overwatch_rs::{
@@ -23,14 +28,9 @@ use overwatch_rs::{
     DynError,
 };
 use reqwest::Url;
-use std::{
-    path::PathBuf,
-    sync::{mpsc::Sender, Arc},
-    time::Duration,
-};
 use tokio::sync::{mpsc::UnboundedReceiver, Mutex};
-
-use super::network::adapters::mock::MockExecutorDispersalAdapter;
+// internal
+use super::{network::adapters::libp2p::Libp2pExecutorDispersalAdapter, NetworkBackend};
 use crate::api::mempool::send_blob_info;
 
 pub async fn disseminate_and_wait<E, D>(
@@ -172,8 +172,7 @@ impl ServiceCore for DisseminateService {
             kzgrs_settings.with_cache,
         );
         let da_encoder = kzgrs_backend::encoder::DaEncoder::new(params);
-
-        let da_dispersal = MockExecutorDispersalAdapter::new(network_relay);
+        let da_dispersal = Libp2pExecutorDispersalAdapter::new(network_relay);
 
         while let Some(data) = payload.lock().await.recv().await {
             match tokio::time::timeout(

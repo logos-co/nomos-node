@@ -6,6 +6,7 @@ use either::Either;
 use futures::future::BoxFuture;
 use futures::stream::{BoxStream, FuturesUnordered};
 use futures::{AsyncWriteExt, FutureExt, StreamExt};
+use kzgrs_backend::common::blob::DaBlob;
 use libp2p::core::Endpoint;
 use libp2p::swarm::{
     ConnectionDenied, ConnectionId, FromSwarm, NetworkBehaviour, THandler, THandlerInEvent,
@@ -13,19 +14,20 @@ use libp2p::swarm::{
 };
 use libp2p::{Multiaddr, PeerId, Stream};
 use libp2p_stream::{Control, OpenStreamError};
+use nomos_core::da::BlobId;
+use nomos_da_messages::common::Blob;
+use nomos_da_messages::dispersal::dispersal_res::MessageType;
+use nomos_da_messages::dispersal::{DispersalErr, DispersalReq, DispersalRes};
+use nomos_da_messages::{pack_message, unpack_from_reader};
+use subnetworks_assignations::MembershipHandler;
 use thiserror::Error;
 use tokio::sync::mpsc;
 use tokio::sync::mpsc::UnboundedSender;
 use tokio_stream::wrappers::UnboundedReceiverStream;
 // internal
 use crate::protocol::DISPERSAL_PROTOCOL;
+use crate::protocols::clone_deserialize_error;
 use crate::SubnetworkId;
-use kzgrs_backend::common::blob::DaBlob;
-use nomos_da_messages::common::Blob;
-use nomos_da_messages::dispersal::dispersal_res::MessageType;
-use nomos_da_messages::dispersal::{DispersalErr, DispersalReq, DispersalRes};
-use nomos_da_messages::{pack_message, unpack_from_reader};
-use subnetworks_assignations::MembershipHandler;
 
 #[derive(Debug, Error)]
 pub enum DispersalError {
@@ -75,7 +77,53 @@ impl DispersalError {
         }
     }
 }
-type BlobId = [u8; 32];
+
+impl Clone for DispersalError {
+    fn clone(&self) -> Self {
+        match self {
+            DispersalError::Io {
+                error,
+                blob_id,
+                subnetwork_id,
+            } => DispersalError::Io {
+                error: std::io::Error::new(error.kind(), error.to_string()),
+                blob_id: *blob_id,
+                subnetwork_id: *subnetwork_id,
+            },
+            DispersalError::Serialization {
+                error,
+                blob_id,
+                subnetwork_id,
+            } => DispersalError::Serialization {
+                error: clone_deserialize_error(error),
+                blob_id: *blob_id,
+                subnetwork_id: *subnetwork_id,
+            },
+            DispersalError::Protocol {
+                subnetwork_id,
+                error,
+            } => DispersalError::Protocol {
+                subnetwork_id: *subnetwork_id,
+                error: error.clone(),
+            },
+            DispersalError::OpenStreamError { peer_id, error } => DispersalError::OpenStreamError {
+                peer_id: *peer_id,
+                error: match error {
+                    OpenStreamError::UnsupportedProtocol(protocol) => {
+                        OpenStreamError::UnsupportedProtocol(protocol.clone())
+                    }
+                    OpenStreamError::Io(error) => {
+                        OpenStreamError::Io(std::io::Error::new(error.kind(), error.to_string()))
+                    }
+                    err => OpenStreamError::Io(std::io::Error::new(
+                        std::io::ErrorKind::Other,
+                        err.to_string(),
+                    )),
+                },
+            },
+        }
+    }
+}
 
 #[derive(Debug)]
 pub enum DispersalExecutorEvent {

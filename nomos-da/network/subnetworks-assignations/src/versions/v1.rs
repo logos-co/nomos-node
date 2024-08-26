@@ -1,8 +1,10 @@
 use crate::MembershipHandler;
 use libp2p_identity::PeerId;
+use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 
 /// Fill a `N` sized set of "subnetworks" from a list of peer ids members
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FillFromNodeList {
     pub assignations: Vec<HashSet<PeerId>>,
     pub subnetwork_size: usize,
@@ -40,7 +42,7 @@ impl FillFromNodeList {
 }
 
 impl MembershipHandler for FillFromNodeList {
-    type NetworkId = u16;
+    type NetworkId = u32;
     type Id = PeerId;
 
     fn membership(&self, id: &Self::Id) -> HashSet<Self::NetworkId> {
