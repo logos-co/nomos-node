@@ -1,29 +1,43 @@
 use crate::MembershipHandler;
 use libp2p_identity::PeerId;
-use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 
-/// Fill a `N` sized set of "subnetworks" from a list of peer ids members
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct FillFromNodeList {
+pub struct FillWithOriginalReplication {
     pub assignations: Vec<HashSet<PeerId>>,
     pub subnetwork_size: usize,
     pub dispersal_factor: usize,
+    pub original_replication: usize,
+    pub pivot: u16,
 }
 
-impl FillFromNodeList {
-    pub fn new(peers: &[PeerId], subnetwork_size: usize, dispersal_factor: usize) -> Self {
+impl FillWithOriginalReplication {
+    pub fn new(
+        peers: &[PeerId],
+        subnetwork_size: usize,
+        dispersal_factor: usize,
+        original_replication: usize,
+        pivot: u16,
+    ) -> Self {
         Self {
-            assignations: Self::fill(peers, subnetwork_size, dispersal_factor),
+            assignations: Self::fill(
+                peers,
+                subnetwork_size,
+                dispersal_factor,
+                original_replication,
+                pivot,
+            ),
             subnetwork_size,
             dispersal_factor,
+            original_replication,
+            pivot,
         }
     }
-
     fn fill(
         peers: &[PeerId],
         subnetwork_size: usize,
-        replication_factor: usize,
+        dispersal_factor: usize,
+        original_replication: usize,
+        pivot: u16,
     ) -> Vec<HashSet<PeerId>> {
         assert!(!peers.is_empty());
         // sort list to make it deterministic
@@ -32,8 +46,15 @@ impl FillFromNodeList {
         // take n peers and fill a subnetwork until all subnetworks are filled
         let mut cycle = peers.into_iter().cycle();
         (0..subnetwork_size)
-            .map(|_| {
-                (0..replication_factor)
+            .map(|subnetwork| {
+                (0..{
+                    // choose factor depending on if it is in the original size of the encoding or not
+                    if subnetwork < pivot as usize {
+                        original_replication
+                    } else {
+                        dispersal_factor
+                    }
+                })
                     .map(|_| cycle.next().unwrap())
                     .collect()
             })
@@ -41,8 +62,8 @@ impl FillFromNodeList {
     }
 }
 
-impl MembershipHandler for FillFromNodeList {
-    type NetworkId = u32;
+impl MembershipHandler for FillWithOriginalReplication {
+    type NetworkId = u16;
     type Id = PeerId;
 
     fn membership(&self, id: &Self::Id) -> HashSet<Self::NetworkId> {
@@ -73,17 +94,28 @@ impl MembershipHandler for FillFromNodeList {
 
 #[cfg(test)]
 mod test {
-    use crate::versions::v1::FillFromNodeList;
+    use crate::versions::v2::FillWithOriginalReplication;
     use libp2p_identity::PeerId;
 
     #[test]
-    fn test_distribution_fill_from_node_list() {
+    fn test_distribution_fill_with_original_replication_from_node_list() {
         let nodes: Vec<_> = std::iter::repeat_with(PeerId::random).take(100).collect();
         let dispersal_factor = 2;
         let subnetwork_size = 1024;
-        let distribution = FillFromNodeList::new(&nodes, subnetwork_size, dispersal_factor);
+        let original_replication = 10;
+        let pivot = 512;
+        let distribution = FillWithOriginalReplication::new(
+            &nodes,
+            subnetwork_size,
+            dispersal_factor,
+            original_replication,
+            pivot,
+        );
         assert_eq!(distribution.assignations.len(), subnetwork_size);
-        for subnetwork in &distribution.assignations {
+        for subnetwork in &distribution.assignations[..pivot as usize] {
+            assert_eq!(subnetwork.len(), original_replication);
+        }
+        for subnetwork in &distribution.assignations[pivot as usize..] {
             assert_eq!(subnetwork.len(), dispersal_factor);
         }
     }
