@@ -34,7 +34,6 @@ where
         + Sync
         + 'static,
 {
-    settings: DaNetworkSamplingSettings,
     network_relay: OutboundRelay<
         <NetworkService<DaNetworkValidatorBackend<Membership>> as ServiceData>::Message,
     >,
@@ -54,13 +53,9 @@ where
     type Settings = DaNetworkSamplingSettings;
 
     async fn new(
-        settings: Self::Settings,
         network_relay: OutboundRelay<<NetworkService<Self::Backend> as ServiceData>::Message>,
     ) -> Self {
-        Self {
-            settings,
-            network_relay,
-        }
+        Self { network_relay }
     }
 
     async fn start_sampling(

@@ -17,7 +17,6 @@ pub trait NetworkAdapter {
     type Settings: Clone;
 
     async fn new(
-        settings: Self::Settings,
         network_relay: OutboundRelay<<NetworkService<Self::Backend> as ServiceData>::Message>,
     ) -> Self;
 

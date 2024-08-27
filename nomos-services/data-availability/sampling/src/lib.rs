@@ -169,13 +169,10 @@ where
             mut service_state,
             mut sampler,
         } = self;
-        let DaSamplingServiceSettings {
-            network_adapter_settings,
-            ..
-        } = service_state.settings_reader.get_updated_settings();
+        let DaSamplingServiceSettings { .. } = service_state.settings_reader.get_updated_settings();
 
         let network_relay = network_relay.connect().await?;
-        let mut network_adapter = N::new(network_adapter_settings, network_relay).await;
+        let mut network_adapter = N::new(network_relay).await;
 
         let mut sampling_message_stream = network_adapter.listen_to_sampling_messages().await?;
 
