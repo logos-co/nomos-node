@@ -90,6 +90,7 @@ fn main() -> Result<()> {
                 },
                 registry: registry.clone(),
             },
+            da_network: config.da_network,
             cryptarchia: config.cryptarchia,
             #[cfg(feature = "metrics")]
             metrics: MetricsSettings { registry },

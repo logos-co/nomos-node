@@ -1,20 +1,25 @@
+// std
 use std::{
     net::{IpAddr, SocketAddr, ToSocketAddrs},
     path::PathBuf,
 };
-
-use crate::NomosApiService;
+// crates
 use clap::{Parser, ValueEnum};
 use color_eyre::eyre::{eyre, Result};
 use cryptarchia_ledger::Coin;
 use hex::FromHex;
+use nomos_da_network_service::backends::libp2p::validator::DaNetworkValidatorBackend;
+use nomos_da_network_service::NetworkService as DaNetworkService;
 use nomos_libp2p::{secp256k1::SecretKey, Multiaddr};
 use nomos_log::{Logger, LoggerBackend, LoggerFormat};
 use nomos_network::backends::libp2p::Libp2p as NetworkBackend;
 use nomos_network::NetworkService;
 use overwatch_rs::services::ServiceData;
 use serde::{Deserialize, Serialize};
+use subnetworks_assignations::versions::v1::FillFromNodeList;
 use tracing::Level;
+// internal
+use crate::NomosApiService;
 
 #[derive(ValueEnum, Clone, Debug, Default)]
 pub enum LoggerBackendType {
@@ -114,6 +119,8 @@ pub struct MetricsArgs {
 pub struct Config {
     pub log: <Logger as ServiceData>::Settings,
     pub network: <NetworkService<NetworkBackend> as ServiceData>::Settings,
+    pub da_network:
+        <DaNetworkService<DaNetworkValidatorBackend<FillFromNodeList>> as ServiceData>::Settings,
     pub http: <NomosApiService as ServiceData>::Settings,
     pub cryptarchia: <crate::Cryptarchia as ServiceData>::Settings,
 }

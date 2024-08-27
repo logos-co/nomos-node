@@ -1,19 +1,23 @@
+pub mod api;
+mod config;
+mod tx;
+
+// std
+// crates
+use api::AxumBackend;
 use bytes::Bytes;
 use color_eyre::eyre::Result;
-use kzgrs_backend::dispersal::BlobInfo;
-use overwatch_derive::*;
-use overwatch_rs::services::handle::ServiceHandle;
-use serde::{de::DeserializeOwned, Serialize};
-
-use api::AxumBackend;
 pub use config::{Config, CryptarchiaArgs, HttpArgs, LogArgs, MetricsArgs, NetworkArgs};
 use kzgrs_backend::common::blob::DaBlob;
+use kzgrs_backend::dispersal::BlobInfo;
 use nomos_api::ApiService;
 use nomos_core::da::blob::info::DispersedBlobInfo;
 pub use nomos_core::{
     da::blob::select::FillSize as FillSizeWithBlobs, tx::select::FillSize as FillSizeWithTx,
 };
 use nomos_core::{header::HeaderId, tx::Transaction, wire};
+use nomos_da_network_service::backends::libp2p::validator::DaNetworkValidatorBackend;
+use nomos_da_network_service::NetworkService as DaNetworkService;
 use nomos_da_verifier::backend::kzgrs::KzgrsDaVerifier;
 #[cfg(feature = "tracing")]
 use nomos_log::Logger;
@@ -29,11 +33,12 @@ use nomos_storage::{
     StorageService,
 };
 use nomos_system_sig::SystemSig;
+use overwatch_derive::*;
+use overwatch_rs::services::handle::ServiceHandle;
+use serde::{de::DeserializeOwned, Serialize};
+use subnetworks_assignations::versions::v1::FillFromNodeList;
+// internal
 pub use tx::Tx;
-
-pub mod api;
-mod config;
-mod tx;
 
 pub type NomosApiService =
     ApiService<AxumBackend<(), DaBlob, BlobInfo, BlobInfo, KzgrsDaVerifier, Tx, Wire, MB16>>;
@@ -68,6 +73,7 @@ pub struct Nomos {
     #[cfg(feature = "tracing")]
     logging: ServiceHandle<Logger>,
     network: ServiceHandle<NetworkService<NetworkBackend>>,
+    da_network: ServiceHandle<DaNetworkService<DaNetworkValidatorBackend<FillFromNodeList>>>,
     cl_mempool: ServiceHandle<TxMempool>,
     da_mempool: ServiceHandle<DaMempool>,
     cryptarchia: ServiceHandle<Cryptarchia>,
