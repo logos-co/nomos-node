@@ -2,10 +2,11 @@ pub mod backends;
 
 // std
 use std::fmt::{self, Debug};
+use std::pin::Pin;
 // crates
 use async_trait::async_trait;
 use backends::NetworkBackend;
-use futures::StreamExt;
+use futures::{Stream, StreamExt};
 use overwatch_rs::services::life_cycle::LifecycleMessage;
 use overwatch_rs::services::{
     handle::ServiceStateHandle,
@@ -14,7 +15,6 @@ use overwatch_rs::services::{
     ServiceCore, ServiceData, ServiceId,
 };
 use serde::{Deserialize, Serialize};
-use tokio::sync::broadcast;
 use tokio::sync::oneshot;
 use tracing::error;
 // internal
@@ -23,7 +23,7 @@ pub enum DaNetworkMsg<B: NetworkBackend> {
     Process(B::Message),
     Subscribe {
         kind: B::EventKind,
-        sender: oneshot::Sender<broadcast::Receiver<B::NetworkEvent>>,
+        sender: oneshot::Sender<Pin<Box<dyn Stream<Item = B::NetworkEvent> + Send>>>,
     },
 }
 
@@ -31,10 +31,9 @@ impl<B: NetworkBackend> Debug for DaNetworkMsg<B> {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Self::Process(msg) => write!(fmt, "DaNetworkMsg::Process({msg:?})"),
-            Self::Subscribe { kind, sender } => write!(
-                fmt,
-                "DaNetworkMsg::Subscribe{{ kind: {kind:?}, sender: {sender:?}}}"
-            ),
+            Self::Subscribe { kind, .. } => {
+                write!(fmt, "DaNetworkMsg::Subscribe{{ kind: {kind:?}}}")
+            }
         }
     }
 }
@@ -52,7 +51,7 @@ impl<B: NetworkBackend> Debug for NetworkConfig<B> {
     }
 }
 
-pub struct NetworkService<B: NetworkBackend + 'static> {
+pub struct NetworkService<B: NetworkBackend + Send + 'static> {
     backend: B,
     service_state: ServiceStateHandle<Self>,
 }
@@ -61,7 +60,7 @@ pub struct NetworkState<B: NetworkBackend> {
     _backend: B::State,
 }
 
-impl<B: NetworkBackend + 'static> ServiceData for NetworkService<B> {
+impl<B: NetworkBackend + 'static + Send> ServiceData for NetworkService<B> {
     const SERVICE_ID: ServiceId = "DaNetwork";
     type Settings = NetworkConfig<B>;
     type State = NetworkState<B>;

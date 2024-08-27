@@ -8,6 +8,7 @@ use futures::channel::oneshot::{Canceled, Receiver, Sender};
 use futures::future::BoxFuture;
 use futures::stream::{BoxStream, FuturesUnordered};
 use futures::{AsyncWriteExt, FutureExt, StreamExt};
+use kzgrs_backend::common::blob::DaBlob;
 use libp2p::core::Endpoint;
 use libp2p::swarm::{
     ConnectionDenied, ConnectionId, FromSwarm, NetworkBehaviour, THandler, THandlerInEvent,
@@ -15,6 +16,9 @@ use libp2p::swarm::{
 };
 use libp2p::{Multiaddr, PeerId, Stream};
 use libp2p_stream::{Control, IncomingStreams, OpenStreamError};
+use nomos_da_messages::sampling::{sample_res, SampleErr, SampleReq, SampleRes};
+use nomos_da_messages::{pack_message, unpack_from_reader};
+use subnetworks_assignations::MembershipHandler;
 use thiserror::Error;
 use tokio::sync::mpsc;
 use tokio::sync::mpsc::UnboundedSender;
@@ -22,11 +26,8 @@ use tokio_stream::wrappers::UnboundedReceiverStream;
 use tracing::error;
 // internal
 use crate::protocol::SAMPLING_PROTOCOL;
+use crate::protocols::clone_deserialize_error;
 use crate::SubnetworkId;
-use kzgrs_backend::common::blob::DaBlob;
-use nomos_da_messages::sampling::{sample_res, SampleErr, SampleReq, SampleRes};
-use nomos_da_messages::{pack_message, unpack_from_reader};
-use subnetworks_assignations::MembershipHandler;
 
 #[derive(Debug, Error)]
 pub enum SamplingError {
@@ -68,6 +69,60 @@ impl SamplingError {
             SamplingError::Deserialize { peer_id, .. } => peer_id,
             SamplingError::RequestChannel { peer_id, .. } => peer_id,
             SamplingError::ResponseChannel { peer_id, .. } => peer_id,
+        }
+    }
+}
+
+impl Clone for SamplingError {
+    fn clone(&self) -> Self {
+        match self {
+            SamplingError::Io { peer_id, error } => SamplingError::Io {
+                peer_id: *peer_id,
+                error: std::io::Error::new(error.kind(), error.to_string()),
+            },
+            SamplingError::Protocol {
+                subnetwork_id,
+                peer_id,
+                error,
+            } => SamplingError::Protocol {
+                subnetwork_id: *subnetwork_id,
+                peer_id: *peer_id,
+                error: error.clone(),
+            },
+            SamplingError::OpenStream { peer_id, error } => SamplingError::OpenStream {
+                peer_id: *peer_id,
+                error: match error {
+                    OpenStreamError::UnsupportedProtocol(protocol) => {
+                        OpenStreamError::UnsupportedProtocol(protocol.clone())
+                    }
+                    OpenStreamError::Io(error) => {
+                        OpenStreamError::Io(std::io::Error::new(error.kind(), error.to_string()))
+                    }
+                    err => OpenStreamError::Io(std::io::Error::new(
+                        std::io::ErrorKind::Other,
+                        err.to_string(),
+                    )),
+                },
+            },
+            SamplingError::Deserialize {
+                blob_id,
+                subnetwork_id,
+                peer_id,
+                error,
+            } => SamplingError::Deserialize {
+                blob_id: *blob_id,
+                subnetwork_id: *subnetwork_id,
+                peer_id: *peer_id,
+                error: clone_deserialize_error(error),
+            },
+            SamplingError::RequestChannel { request, peer_id } => SamplingError::RequestChannel {
+                request: request.clone(),
+                peer_id: *peer_id,
+            },
+            SamplingError::ResponseChannel { error, peer_id } => SamplingError::ResponseChannel {
+                peer_id: *peer_id,
+                error: *error,
+            },
         }
     }
 }

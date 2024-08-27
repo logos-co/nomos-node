@@ -142,7 +142,7 @@ impl From<GossipsubConfigDef> for gossipsub::Config {
     }
 }
 
-mod secret_key_serde {
+pub mod secret_key_serde {
     use libp2p::identity::secp256k1;
     use serde::de::Error;
     use serde::{Deserialize, Deserializer, Serialize, Serializer};
