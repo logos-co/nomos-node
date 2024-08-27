@@ -172,7 +172,7 @@ where
         let network_relay = network_relay.connect().await?;
         let mut network_adapter = N::new(network_adapter_settings, network_relay).await;
 
-        let mut sampling_message_stream = network_adapter.listen_to_sampling_messages().await;
+        let mut sampling_message_stream = network_adapter.listen_to_sampling_messages().await?;
 
         let mut lifecycle_stream = service_state.lifecycle_handle.message_stream();
         async {
