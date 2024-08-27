@@ -24,7 +24,7 @@ pub trait NetworkAdapter {
     async fn start_sampling(
         &mut self,
         blob_id: BlobId,
-        subnets: &Vec<SubnetworkId>,
+        subnets: &[SubnetworkId],
     ) -> Result<(), DynError>;
     async fn listen_to_sampling_messages(
         &self,

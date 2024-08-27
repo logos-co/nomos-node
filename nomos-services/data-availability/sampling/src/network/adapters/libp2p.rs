@@ -66,14 +66,14 @@ where
     async fn start_sampling(
         &mut self,
         blob_id: BlobId,
-        subnets: &Vec<SubnetworkId>,
+        subnets: &[SubnetworkId],
     ) -> Result<(), DynError> {
-        for id in subnets.iter() {
-            let subnetwork_id = id.clone();
+        for id in subnets {
+            let subnetwork_id = id;
             self.network_relay
                 .send(DaNetworkMsg::Process(DaNetworkMessage::RequestSample {
                     blob_id,
-                    subnetwork_id,
+                    subnetwork_id: *subnetwork_id,
                 }))
                 .await
                 .expect("RequestSample message should have been sent")
