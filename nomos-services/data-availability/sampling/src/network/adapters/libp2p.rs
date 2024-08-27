@@ -1,14 +1,22 @@
 // std
 use futures::Stream;
 use overwatch_rs::DynError;
+use rand::Rng;
+use std::collections::HashMap;
+use std::fmt::{Debug, Formatter};
 use std::marker::PhantomData;
+use std::Display;
+
 // crates
 
 // internal
 use crate::network::NetworkAdapter;
+use crate::DaSamplingServiceSettings;
+use nomos_core::da::BlobId;
 use nomos_core::wire;
-use nomos_network::backends::libp2p::{Command, Event, EventKind, Libp2p, Message, TopicHash};
-use nomos_network::{NetworkMsg, NetworkService};
+use nomos_da_network_service::backends::libp2p::validator::{DaNetworkMessage, SamplingEvent};
+use nomos_da_network_service::backends::NetworkBackend;
+use nomos_da_network_service::{DaNetworkMsg, NetworkService};
 use overwatch_rs::services::relay::OutboundRelay;
 use overwatch_rs::services::ServiceData;
 use serde::de::DeserializeOwned;
@@ -17,85 +25,110 @@ use tokio_stream::wrappers::BroadcastStream;
 use tokio_stream::StreamExt;
 use tracing::debug;
 
-pub const NOMOS_DA_SAMPLING: &str = "NomosDaSampling";
-
-pub struct Libp2pAdapter<B> {
-    network_relay: OutboundRelay<<NetworkService<Libp2p> as ServiceData>::Message>,
-    _blob: PhantomData<B>,
+#[derive(Debug)]
+pub enum SamplingError {
+    NoSuchPendingBlobId,
 }
 
-impl<B> Libp2pAdapter<B>
-where
-    B: Serialize + DeserializeOwned + Send + Sync + 'static,
-{
-    async fn stream_for<E: DeserializeOwned>(&self) -> Box<dyn Stream<Item = E> + Unpin + Send> {
-        let topic_hash = TopicHash::from_raw(NOMOS_DA_TOPIC);
-        let (sender, receiver) = tokio::sync::oneshot::channel();
-        self.network_relay
-            .send(NetworkMsg::Subscribe {
-                kind: EventKind::Message,
-                sender,
-            })
-            .await
-            .expect("Network backend should be ready");
-        let receiver = receiver.await.unwrap();
-        Box::new(Box::pin(BroadcastStream::new(receiver).filter_map(
-            move |msg| match msg {
-                Ok(Event::Message(Message { topic, data, .. })) if topic == topic_hash => {
-                    match wire::deserialize::<E>(&data) {
-                        Ok(msg) => Some(msg),
-                        Err(e) => {
-                            debug!("Unrecognized message: {e}");
-                            None
-                        }
-                    }
-                }
-                _ => None,
-            },
-        )))
-    }
+pub enum SamplingTracking {
+    SamplingCompleted,
+    SamplingInProcess,
+}
 
-    async fn send<E: Serialize>(&self, data: E) -> Result<(), DynError> {
-        let message = wire::serialize(&data)?.into_boxed_slice();
-        self.network_relay
-            .send(NetworkMsg::Process(Command::Broadcast {
-                topic: NOMOS_DA_TOPIC.to_string(),
-                message,
-            }))
-            .await
-            .map_err(|(e, _)| Box::new(e) as DynError)
+impl fmt::Display for SamplingError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            SamplingError::NoSuchPendingBlobId => {
+                write!(f, "This blob ID has not been triggered for sampling")
+            }
+        }
     }
+}
+
+impl std::error::Error for SamplingError {}
+
+pub struct DaNetworkSamplingSettings {
+    pub num_samples: u16,
+    pub subnet_size: u16,
+}
+
+pub struct SamplingContext {
+    blob_id: BlobId,
+    subnets: Vec<u16>,
+}
+
+pub struct Libp2pAdapter {
+    settings: DaNetworkSamplingSettings,
+    network_relay: OutboundRelay<<NetworkService<NetworkBackend> as ServiceData>::Message>,
+    pending_sampling: HashMap<BlobId, SamplingContext>,
 }
 
 #[async_trait::async_trait]
-impl<B> NetworkAdapter for Libp2pAdapter<B>
-where
-    B: Serialize + DeserializeOwned + Send + Sync + 'static,
-{
-    type Backend = Libp2p;
-    type Settings = ();
-    type Blob = B;
+impl<B> NetworkAdapter for Libp2pAdapter {
+    type Backend = NetworkBackend;
+    type Settings = DaNetworkSamplingSettings;
 
     async fn new(
-        _settings: Self::Settings,
+        settings: Self::Settings,
         network_relay: OutboundRelay<<NetworkService<Self::Backend> as ServiceData>::Message>,
     ) -> Self {
-        network_relay
-            .send(NetworkMsg::Process(Command::Subscribe(
-                NOMOS_DA_TOPIC.to_string(),
-            )))
+        let instance = Self {
+            settings: settings,
+            pending_sampling: HashMap::new(),
+            network_relay,
+        };
+        instance.listen_to_sampling_messages();
+        instance
+    }
+
+    async fn start_sampling(&self, blob_id: BlobId) -> Result<(), DynError> {
+        let mut rng = rand::thread_rng();
+        let ctx: SamplingContext = SamplingContext {
+            blob_id: (blob_id),
+            subnets: (),
+        };
+        for i in self.settings.num_samples {
+            let subnetwork_id = rng.gen_range(0..self.settings.subnet_size);
+            ctx.subnets.push(subnetwork_id);
+            self.network_relay
+                .send(DaNetworkMessage::RequestSample {
+                    blob_id,
+                    subnetwork_id,
+                })
+                .await
+                .expect("RequestSample message should have been sent")?
+        }
+        self.pending_sampling[blob_id] = ctx;
+        Ok(())
+    }
+
+    async fn listen_to_sampling_messages(
+        &self,
+    ) -> Box<dyn Stream<Item = SamplingEvent> + Unpin + Send> {
+        self.network_relay
+            .send(DaNetworkMsg::Subscribe(SamplingEvent))
             .await
             .expect("Network backend should be ready");
-        Self {
-            network_relay,
-            _blob: Default::default(),
+    }
+
+    async fn handle_sampling_event(
+        &self,
+        success: bool,
+        blob_id: BlobId,
+        subnet_id: u16,
+    ) -> Result<(SamplingTracking), DynError> {
+        if !self.pending_sampling.contains_key(&blob_id) {
+            return Err(SamplingError::NoSuchPendingBlobId);
+        }
+        match success {
+            True => {
+                self.pending_sampling[blob_id].push(subnet_id);
+                if self.pending_sampling[blob_id].len() == self.settings.num_samples {
+                    Ok((SamplingTracking::SamplingCompleted));
+                }
+                Ok((SamplingTracking::SamplingInProcess))
+            }
+            False => {}
         }
     }
-
-    // who sends the messages?
-    async fn start_sampling(&self) -> Box<dyn Stream<Item = Self::Blob> + Unpin + Send> {
-        self.stream_for::<Self::Blob>().await
-    }
-
-    // listen to sample messages?
 }

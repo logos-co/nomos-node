@@ -1,51 +1,67 @@
 // std
-use core::fmt;
+use std::collections::BTreeSet;
+use std::fmt::Debug;
 // crates
-use kzgrs_backend::common::blob::DaBlob;
-use nomos_core::da::DaSampler;
+//
 // internal
-use super::SamplingBackend;
+use super::DaSamplingServiceBackend;
+use super::NetworkAdapter;
+use nomos_core::da::blob::Blob;
+use nomos_core::da::BlobId;
+use nomos_da_network_service::backends::NetworkBackend;
+use overwatch_rs::services::state::ServiceState;
 
-#[derive(Debug)]
-pub enum SamplingError {
-    RequestedColumnNotFound,
-    RequestedRowNotFound,
-    RowColumnCombinationNotFound,
+pub struct KzgrsDaSampler<Backend, S>
+where
+    Backend: NetworkBackend + 'static,
+    Backend::Settings: Clone + Debug + Send + Sync + 'static,
+    Backend::State: ServiceState<Settings = Backend::Settings> + Clone + Send + Sync,
+    Backend::Message: Debug + Send + Sync + 'static,
+    Backend::EventKind: Debug + Send + Sync + 'static,
+    Backend::NetworkEvent: Debug + Send + Sync + 'static,
+    S: Clone,
+{
+    settings: KzgrsDaSamplerSettings,
+    validated_blobs: BTreeSet<BlobId>,
+    network_adapter: NetworkAdapter<Backend = Backend, Settings = Clone>,
 }
 
-impl fmt::Display for SamplingError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match *self {
-            SamplingError::RequestedColumnNotFound => write!(f, "Requested column not found"),
-            SamplingError::RequestedRowNotFound => write!(f, "Requested row not found"),
-            SamplingError::RowColumnCombinationNotFound => {
-                write!(f, "Requested row/column combination not found")
-            }
+impl<Backend, S> DaSamplingServiceBackend<Backend, S> for KzgrsDaSampler<Backend, S>
+where
+    Backend: NetworkBackend + 'static,
+    Backend::Settings: Clone + Debug + Send + Sync + 'static,
+    Backend::State: ServiceState<Settings = Backend::Settings> + Clone + Send + Sync,
+    Backend::Message: Debug + Send + Sync + 'static,
+    Backend::EventKind: Debug + Send + Sync + 'static,
+    Backend::NetworkEvent: Debug + Send + Sync + 'static,
+    S: Clone,
+{
+    type Settings = KzgrsDaSamplerSettings;
+    type BlobId = BlobId;
+    type Blob = Blob;
+
+    fn new(
+        settings: Self::Settings,
+        network_adapter: NetworkAdapter<Backend = Backend, Settings = Clone>,
+    ) -> Self {
+        let bt: BTreeSet<BlobId> = BTreeSet::new();
+        Self {
+            settings: settings,
+            validated_blobs: bt,
+            network_adapter: network_adapter,
         }
     }
-}
 
-impl std::error::Error for SamplingError {}
-
-pub struct KzgrsDaSampler {
-    settings: KzgrsDaSamplerSettings,
-}
-
-impl SamplingBackend for KzgrsDaSampler {
-    type Settings = KzgrsDaSamplerSettings;
-
-    fn new(settings: Self::Settings) -> Self {
-        Self { settings: settings }
+    fn trigger_sampling(&self, blob_id: BlobId) {
+        self.network_adapter.start_sampling(blob_id);
     }
-}
 
-impl DaSampler for KzgrsDaSampler {
-    type DaBlob = DaBlob;
-    type DaRow = u16;
-    type DaCol = u16;
+    fn get_validated_blobs(&self) -> BTreeSet<BlobId> {
+        self.validated_blobs.clone()
+    }
 
-    fn sample(&self, blob: &Self::DaBlob, col: &Self::DaCol, row: &Self::DaRow) {
-        for i in self.settings.num_samples {}
+    fn mark_blob_validated(&self, blob_id: BlobId) {
+        self.validated_blobs.insert(blob_id);
     }
 }
 
