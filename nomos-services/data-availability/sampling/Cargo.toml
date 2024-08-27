@@ -21,6 +21,9 @@ tokio = { version = "1", features = ["sync", "macros"] }
 tokio-stream = "0.1.15"
 tracing = "0.1"
 thiserror = "1.0.63"
+rand = "0.8.5"
+rand_chacha = "0.3.1"
 
 [features]
+default = ["libp2p"]
 libp2p = []

@@ -20,7 +20,7 @@ pub trait NetworkAdapter {
         network_relay: OutboundRelay<<NetworkService<Self::Backend> as ServiceData>::Message>,
     ) -> Self;
 
-    async fn start_sampling(&self, blob_id: BlobId) -> Result<(), DynError>;
+    async fn start_sampling(&mut self, blob_id: BlobId) -> Result<(), DynError>;
     async fn listen_to_sampling_messages(
         &self,
     ) -> Result<Pin<Box<dyn Stream<Item = SamplingEvent> + Send>>, DynError>;

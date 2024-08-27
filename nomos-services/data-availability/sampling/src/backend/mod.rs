@@ -1,15 +1,10 @@
 pub mod kzgrs;
 
 // std
-use async_trait::async_trait;
 use std::collections::BTreeSet;
 // crates
 //
 // internal
-use crate::network::NetworkAdapter;
-use nomos_core::da::BlobId;
-use nomos_da_network_service::backends::NetworkBackend;
-use overwatch_rs::services::state::ServiceState;
 
 #[async_trait::async_trait]
 pub trait DaSamplingServiceBackend {
