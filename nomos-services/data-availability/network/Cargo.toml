@@ -9,6 +9,7 @@ futures = "0.3"
 kzgrs-backend = { path = "../../../nomos-da/kzgrs-backend" }
 overwatch-rs = { git = "https://github.com/logos-co/Overwatch", rev = "2f70806" }
 nomos-core = { path = "../../../nomos-core" }
+nomos-libp2p = { path = "../../../nomos-libp2p" }
 nomos-da-network-core = { path = "../../../nomos-da/network/core" }
 subnetworks-assignations = { path = "../../../nomos-da/network/subnetworks-assignations" }
 libp2p = { version = "0.54", features = ["ed25519"] }

@@ -1,6 +1,7 @@
 // std
 use std::net::SocketAddr;
 use std::process::{Child, Command, Stdio};
+use std::str::FromStr;
 use std::time::Duration;
 // internal
 use super::{create_tempdir, persist_tempdir, LOGS_PREFIX};
@@ -16,6 +17,9 @@ use mixnet::{
     topology::{MixNodeInfo, MixnetTopology},
 };
 use nomos_core::{block::Block, header::HeaderId};
+use nomos_da_network_service::backends::libp2p::validator::DaNetworkValidatorBackendSettings;
+use nomos_da_network_service::NetworkConfig as DaNetworkConfig;
+use nomos_libp2p::{Multiaddr, SwarmConfig};
 use nomos_log::{LoggerBackend, LoggerFormat};
 use nomos_mempool::MempoolMetrics;
 #[cfg(feature = "mixnet")]
@@ -350,10 +354,11 @@ fn create_node_config(
     time: TimeConfig,
     #[cfg(feature = "mixnet")] mixnet_config: MixnetConfig,
 ) -> Config {
+    let swarm_config: SwarmConfig = Default::default();
     let mut config = Config {
         network: NetworkConfig {
             backend: Libp2pConfig {
-                inner: Default::default(),
+                inner: swarm_config.clone(),
                 initial_peers: vec![],
                 #[cfg(feature = "mixnet")]
                 mixnet: mixnet_config,
@@ -366,6 +371,14 @@ fn create_node_config(
             time,
             transaction_selector_settings: (),
             blob_selector_settings: (),
+        },
+        da_network: DaNetworkConfig {
+            backend: DaNetworkValidatorBackendSettings {
+                node_key: swarm_config.node_key,
+                listening_address: Multiaddr::from_str("/ip4/127.0.0.1/udp/0/quic-v1").unwrap(),
+                addresses: Default::default(),
+                membership: Default::default(),
+            },
         },
         log: Default::default(),
         http: nomos_api::ApiServiceSettings {

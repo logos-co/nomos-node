@@ -10,7 +10,7 @@ use libp2p::{Multiaddr, PeerId};
 use log::error;
 use nomos_da_network_core::SubnetworkId;
 use nomos_da_network_service::backends::NetworkBackend;
-use nomos_libp2p::{secp256k1, secret_key_serde};
+use nomos_libp2p::{ed25519, secret_key_serde};
 use overwatch_rs::overwatch::handle::OverwatchHandle;
 use overwatch_rs::services::state::NoState;
 use serde::{Deserialize, Serialize};
@@ -54,8 +54,8 @@ pub struct ExecutorBackend<Membership> {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ExecutorBackendSettings<Membership> {
     // Identification Secp256k1 private key in Hex format (`0x123...abc`). Default random.
-    #[serde(with = "secret_key_serde", default = "secp256k1::SecretKey::generate")]
-    pub node_key: secp256k1::SecretKey,
+    #[serde(with = "secret_key_serde", default = "ed25519::SecretKey::generate")]
+    pub node_key: ed25519::SecretKey,
     /// Membership of DA network PoV set
     membership: Membership,
     node_addrs: HashMap<PeerId, Multiaddr>,
@@ -94,7 +94,7 @@ where
         let (dispersal_events_sender, dispersal_events_receiver) = unbounded_channel();
 
         let keypair =
-            libp2p::identity::Keypair::from(secp256k1::Keypair::from(config.node_key.clone()));
+            libp2p::identity::Keypair::from(ed25519::Keypair::from(config.node_key.clone()));
         let mut executor_swarm =
             ExecutorSwarm::new(keypair, config.membership, dispersal_events_sender);
         let dispersal_request_sender = executor_swarm.blobs_sender();
