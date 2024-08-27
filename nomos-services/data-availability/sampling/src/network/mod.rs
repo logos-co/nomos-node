@@ -11,7 +11,7 @@ use overwatch_rs::DynError;
 
 #[async_trait::async_trait]
 pub trait NetworkAdapter {
-    type Backend: NetworkBackend + 'static;
+    type Backend: NetworkBackend + Send + 'static;
     type Settings: Clone;
 
     async fn new(
@@ -23,10 +23,4 @@ pub trait NetworkAdapter {
     async fn listen_to_sampling_messages(
         &self,
     ) -> Box<dyn Stream<Item = SamplingEvent> + Unpin + Send>;
-    async fn handle_sampling_event(
-        &self,
-        success: bool,
-        blob_id: BlobId,
-        subnet_id: u16,
-    ) -> Result<(), DynError>;
 }
