@@ -4,6 +4,7 @@ use kzgrs_backend::common::blob::DaBlob;
 use libp2p::identity::Keypair;
 use libp2p::{Multiaddr, PeerId};
 use log::error;
+use nomos_core::da::BlobId;
 use nomos_da_network_core::protocols::sampling;
 use nomos_da_network_core::protocols::sampling::behaviour::SamplingError;
 use nomos_da_network_core::swarm::validator::{ValidatorEventsStream, ValidatorSwarm};
@@ -20,9 +21,6 @@ use tokio::sync::mpsc::UnboundedSender;
 use tokio::task::JoinHandle;
 use tokio_stream::wrappers::BroadcastStream;
 
-type BlobId = [u8; 32];
-type ColumnIdx = u32;
-
 const BROADCAST_CHANNEL_SIZE: usize = 128;
 
 /// Message that the backend replies to
@@ -30,7 +28,7 @@ const BROADCAST_CHANNEL_SIZE: usize = 128;
 pub enum DaNetworkMessage {
     /// Kickstart a network sapling
     RequestSample {
-        subnetwork_id: ColumnIdx,
+        subnetwork_id: SubnetworkId,
         blob_id: BlobId,
     },
 }
