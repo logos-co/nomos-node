@@ -1,10 +1,10 @@
 pub mod backend;
 pub mod network;
 
-use std::collections::BTreeSet;
 // std
-use overwatch_rs::services::life_cycle::LifecycleMessage;
+use std::collections::BTreeSet;
 use std::fmt::Debug;
+
 // crates
 use tokio_stream::StreamExt;
 use tracing::{error, span, Instrument, Level};
@@ -16,6 +16,7 @@ use nomos_core::da::BlobId;
 use nomos_da_network_service::backends::libp2p::validator::SamplingEvent;
 use nomos_da_network_service::NetworkService;
 use overwatch_rs::services::handle::ServiceStateHandle;
+use overwatch_rs::services::life_cycle::LifecycleMessage;
 use overwatch_rs::services::relay::{Relay, RelayMessage};
 use overwatch_rs::services::state::{NoOperator, NoState};
 use overwatch_rs::services::{ServiceCore, ServiceData, ServiceId};
@@ -88,7 +89,11 @@ where
     ) {
         match msg {
             DaSamplingServiceMsg::TriggerSampling { blob_id } => {
-                if let Err(e) = network_adapter.start_sampling(blob_id).await {
+                let sampling_subnets = sampler.init_sampling(blob_id).await;
+                if let Err(e) = network_adapter
+                    .start_sampling(blob_id, &sampling_subnets)
+                    .await
+                {
                     error!("Error sampling for BlobId: {blob_id:?}: {e}");
                 }
             }

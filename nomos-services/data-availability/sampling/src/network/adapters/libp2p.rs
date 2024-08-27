@@ -1,10 +1,6 @@
 // std
-use std::collections::HashMap;
 use std::fmt::Debug;
 use std::pin::Pin;
-
-use rand::prelude::*;
-use rand_chacha::ChaCha20Rng;
 
 // crates
 use futures::{Stream, StreamExt};
@@ -29,11 +25,6 @@ pub struct DaNetworkSamplingSettings {
     pub subnet_size: SubnetworkId,
 }
 
-pub struct SamplingContext {
-    blob_id: BlobId,
-    subnets: Vec<SubnetworkId>,
-}
-
 pub struct Libp2pAdapter<Membership>
 where
     Membership: MembershipHandler<NetworkId = SubnetworkId, Id = PeerId>
@@ -47,10 +38,6 @@ where
     network_relay: OutboundRelay<
         <NetworkService<DaNetworkValidatorBackend<Membership>> as ServiceData>::Message,
     >,
-    pending_sampling: HashMap<BlobId, SamplingContext>,
-    // TODO: is there a better place for this? Do we need to have this even globally?
-    // Do we already have some source of randomness already?
-    rng: ChaCha20Rng,
 }
 
 #[async_trait::async_trait]
@@ -73,19 +60,16 @@ where
         Self {
             settings,
             network_relay,
-            pending_sampling: HashMap::new(),
-            rng: ChaCha20Rng::from_entropy(),
         }
     }
 
-    async fn start_sampling(&mut self, blob_id: BlobId) -> Result<(), DynError> {
-        let mut ctx: SamplingContext = SamplingContext {
-            blob_id: (blob_id),
-            subnets: vec![],
-        };
-        for _i in 1..self.settings.num_samples {
-            let subnetwork_id = self.rng.gen_range(0..self.settings.subnet_size);
-            ctx.subnets.push(subnetwork_id);
+    async fn start_sampling(
+        &mut self,
+        blob_id: BlobId,
+        subnets: &Vec<SubnetworkId>,
+    ) -> Result<(), DynError> {
+        for id in subnets.iter() {
+            let subnetwork_id = id.clone();
             self.network_relay
                 .send(DaNetworkMsg::Process(DaNetworkMessage::RequestSample {
                     blob_id,
@@ -94,8 +78,6 @@ where
                 .await
                 .expect("RequestSample message should have been sent")
         }
-        // TODO: needs to be updated after handling the event in the backend
-        self.pending_sampling.insert(blob_id, ctx);
         Ok(())
     }
 

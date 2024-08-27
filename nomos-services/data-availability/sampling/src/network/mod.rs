@@ -2,6 +2,7 @@ pub mod adapters;
 
 use futures::Stream;
 use nomos_core::da::BlobId;
+use nomos_da_network_core::SubnetworkId;
 use nomos_da_network_service::backends::libp2p::validator::SamplingEvent;
 use nomos_da_network_service::backends::NetworkBackend;
 use nomos_da_network_service::NetworkService;
@@ -20,7 +21,11 @@ pub trait NetworkAdapter {
         network_relay: OutboundRelay<<NetworkService<Self::Backend> as ServiceData>::Message>,
     ) -> Self;
 
-    async fn start_sampling(&mut self, blob_id: BlobId) -> Result<(), DynError>;
+    async fn start_sampling(
+        &mut self,
+        blob_id: BlobId,
+        subnets: &Vec<SubnetworkId>,
+    ) -> Result<(), DynError>;
     async fn listen_to_sampling_messages(
         &self,
     ) -> Result<Pin<Box<dyn Stream<Item = SamplingEvent> + Send>>, DynError>;
