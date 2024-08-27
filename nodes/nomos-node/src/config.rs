@@ -10,7 +10,7 @@ use cryptarchia_ledger::Coin;
 use hex::FromHex;
 use nomos_da_network_service::backends::libp2p::validator::DaNetworkValidatorBackend;
 use nomos_da_network_service::NetworkService as DaNetworkService;
-use nomos_libp2p::{secp256k1::SecretKey, Multiaddr};
+use nomos_libp2p::{ed25519::SecretKey, Multiaddr};
 use nomos_log::{Logger, LoggerBackend, LoggerFormat};
 use nomos_network::backends::libp2p::Libp2p as NetworkBackend;
 use nomos_network::NetworkService;

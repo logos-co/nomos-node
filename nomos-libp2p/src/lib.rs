@@ -16,7 +16,7 @@ use libp2p::swarm::ConnectionId;
 pub use libp2p::{
     core::upgrade,
     gossipsub::{self, PublishError, SubscriptionError},
-    identity::{self, secp256k1},
+    identity::{self, ed25519},
     swarm::{dial_opts::DialOpts, DialError, NetworkBehaviour, SwarmEvent},
     PeerId, SwarmBuilder, Transport,
 };
@@ -67,7 +67,7 @@ impl Swarm {
     // TODO: define error types
     pub fn build(config: &SwarmConfig) -> Result<Self, Box<dyn Error>> {
         let keypair =
-            libp2p::identity::Keypair::from(secp256k1::Keypair::from(config.node_key.clone()));
+            libp2p::identity::Keypair::from(ed25519::Keypair::from(config.node_key.clone()));
         let peer_id = PeerId::from(keypair.public());
         tracing::info!("libp2p peer_id:{}", peer_id);
 

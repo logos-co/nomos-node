@@ -1,7 +1,7 @@
 use crate::backends::NetworkBackend;
 use futures::{Stream, StreamExt};
 use kzgrs_backend::common::blob::DaBlob;
-use libp2p::identity::secp256k1;
+use libp2p::identity::ed25519;
 use libp2p::{Multiaddr, PeerId};
 use log::error;
 use nomos_core::da::BlobId;
@@ -80,8 +80,8 @@ pub struct DaNetworkValidatorBackend<Membership> {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct DaNetworkValidatorBackendSettings<Membership> {
     // Identification Secp256k1 private key in Hex format (`0x123...abc`). Default random.
-    #[serde(with = "secret_key_serde", default = "secp256k1::SecretKey::generate")]
-    pub node_key: secp256k1::SecretKey,
+    #[serde(with = "secret_key_serde", default = "ed25519::SecretKey::generate")]
+    pub node_key: ed25519::SecretKey,
     /// Membership of DA network PoV set
     pub membership: Membership,
     pub addresses: Vec<(PeerId, Multiaddr)>,
@@ -119,7 +119,7 @@ where
 
     fn new(config: Self::Settings, overwatch_handle: OverwatchHandle) -> Self {
         let keypair =
-            libp2p::identity::Keypair::from(secp256k1::Keypair::from(config.node_key.clone()));
+            libp2p::identity::Keypair::from(ed25519::Keypair::from(config.node_key.clone()));
         let (mut validator_swarm, events_streams) = ValidatorSwarm::new(
             keypair,
             config.membership,
