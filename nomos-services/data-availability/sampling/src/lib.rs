@@ -1,48 +1,56 @@
 pub mod backend;
 pub mod network;
 
+use std::collections::BTreeSet;
 // std
 use overwatch_rs::services::life_cycle::LifecycleMessage;
-use std::fmt::{Debug, Formatter};
+use std::fmt::Debug;
 // crates
 use tokio_stream::StreamExt;
 use tracing::{error, span, Instrument, Level};
 // internal
 use backend::DaSamplingServiceBackend;
+use kzgrs_backend::common::blob::DaBlob;
 use network::NetworkAdapter;
+use nomos_core::da::BlobId;
 use nomos_da_network_service::backends::libp2p::validator::SamplingEvent;
-use nomos_da_network_service::backends::NetworkBackend;
 use nomos_da_network_service::NetworkService;
 use overwatch_rs::services::handle::ServiceStateHandle;
 use overwatch_rs::services::relay::{Relay, RelayMessage};
 use overwatch_rs::services::state::{NoOperator, NoState};
 use overwatch_rs::services::{ServiceCore, ServiceData, ServiceId};
 use overwatch_rs::DynError;
+use tokio::sync::oneshot;
 
 const DA_SAMPLING_TAG: ServiceId = "DA-Sampling";
-pub enum DaSamplingServiceMsg<B, BI> {
-    BlobSamplingCompletedSuccess { blob: B, blob_id: BI },
-    BlobSamplingCompletedFailure { blob: B, blob_id: BI },
+
+#[derive(Debug)]
+pub enum DaSamplingServiceMsg<BlobId> {
+    TriggerSampling {
+        blob_id: BlobId,
+    },
+    GetValidatedBlobs {
+        reply_channel: oneshot::Sender<BTreeSet<BlobId>>,
+    },
+    MarkInBlock {
+        blobs_id: Vec<BlobId>,
+    },
 }
 
-impl<B: 'static, A: 'static> Debug for DaSamplingServiceMsg<B, A> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self {
-            DaSamplingServiceMsg::BlobSamplingCompletedSuccess { .. } => {
-                write!(f, "DaSamplingServiceMsg::BlobSamplingCompletedSuccess")
-            }
-            DaSamplingServiceMsg::BlobSamplingCompletedFailure { .. } => {
-                write!(f, "DaSamplingServiceMsg::BlobSamplingCompletedFailure")
-            }
-        }
-    }
+#[derive(Debug, Clone)]
+pub struct DaSamplingServiceSettings<BackendSettings, NetworkSettings> {
+    pub sampling_settings: BackendSettings,
+    pub network_adapter_settings: NetworkSettings,
 }
 
-impl<B: 'static, A: 'static> RelayMessage for DaSamplingServiceMsg<B, A> {}
+impl<B: 'static> RelayMessage for DaSamplingServiceMsg<B> {}
 
 pub struct DaSamplingService<Backend, N, S>
 where
-    Backend: DaSamplingServiceBackend<Backend, S> + NetworkBackend,
+    Backend: DaSamplingServiceBackend + Send,
+    Backend::Settings: Clone,
+    Backend::Blob: Debug + 'static,
+    Backend::BlobId: Debug + 'static,
     N: NetworkAdapter,
     N::Settings: Clone,
 {
@@ -53,31 +61,11 @@ where
 
 impl<Backend, N, S> DaSamplingService<Backend, N, S>
 where
-    Backend: DaSamplingServiceBackend + Send + 'static,
+    Backend: DaSamplingServiceBackend<BlobId = BlobId, Blob = DaBlob> + Send + 'static,
     Backend::Settings: Clone,
     N: NetworkAdapter + Send + 'static,
     N::Settings: Clone,
 {
-    async fn handle_new_sample_response(
-        sampler: &Backend,
-        network_adapter: &N,
-        evt: &SamplingEvent,
-    ) -> Result<(), DynError> {
-        match evt {
-            SamplingEvent::SamplingSuccess => {
-                let &SamplingEvent::SamplingSuccess { blob_id, blob } = evt;
-                network_adapter.handle_sampling_event(true, blob_id, 99)?
-            }
-
-            SamplingEvent::SamplingError => {
-                let &SamplingEvent::SamplingError { error } = evt;
-                // TODO!!! how to get the blob_id and the subnet_id from the sample error?
-                // we need that (I think) to update the network adapter's state
-                network_adapter.handle_sampling_event(false, 42, 42)?
-            }
-        }
-    }
-
     async fn should_stop_service(message: LifecycleMessage) -> bool {
         match message {
             LifecycleMessage::Shutdown(sender) => {
@@ -92,12 +80,48 @@ where
             LifecycleMessage::Kill => true,
         }
     }
+
+    async fn handle_service_message(
+        msg: <Self as ServiceData>::Message,
+        network_adapter: &mut N,
+        sampler: &mut Backend,
+    ) {
+        match msg {
+            DaSamplingServiceMsg::TriggerSampling { blob_id } => {
+                if let Err(e) = network_adapter.start_sampling(blob_id).await {
+                    error!("Error sampling for BlobId: {blob_id:?}: {e}");
+                }
+            }
+            DaSamplingServiceMsg::GetValidatedBlobs { reply_channel } => {
+                let validated_blobs = sampler.get_validated_blobs().await;
+                if let Err(_e) = reply_channel.send(validated_blobs) {
+                    error!("Error repliying validated blobs request");
+                }
+            }
+            DaSamplingServiceMsg::MarkInBlock { blobs_id } => {
+                sampler.mark_in_block(&blobs_id).await;
+            }
+        }
+    }
+
+    async fn handle_sampling_message(event: SamplingEvent, sampler: &mut Backend) {
+        match event {
+            SamplingEvent::SamplingSuccess { blob_id, blob } => {
+                sampler.handle_sampling_success(blob_id, *blob).await;
+            }
+            SamplingEvent::SamplingError { error } => {
+                error!("Error while sampling: {error}");
+            }
+        }
+    }
 }
 
 impl<Backend, N, S> ServiceData for DaSamplingService<Backend, N, S>
 where
-    Backend: DaSamplingServiceBackend<Backend, S>,
+    Backend: DaSamplingServiceBackend + Send,
     Backend::Settings: Clone,
+    Backend::Blob: Debug + 'static,
+    Backend::BlobId: Debug + 'static,
     N: NetworkAdapter,
     N::Settings: Clone,
 {
@@ -105,29 +129,28 @@ where
     type Settings = DaSamplingServiceSettings<Backend::Settings, N::Settings>;
     type State = NoState<Self::Settings>;
     type StateOperator = NoOperator<Self::State>;
-    //type Message = DaSamplingServiceMsg<Backend::Blob, Backend::BlobId>;
-    type Message = SamplingEvent;
+    type Message = DaSamplingServiceMsg<Backend::BlobId>;
 }
 
 #[async_trait::async_trait]
 impl<Backend, N, S> ServiceCore for DaSamplingService<Backend, N, S>
 where
-    Backend: DaSamplingServiceBackend + Send + Sync + 'static,
+    Backend: DaSamplingServiceBackend<BlobId = BlobId, Blob = DaBlob> + Send + Sync + 'static,
     Backend::Settings: Clone + Send + Sync + 'static,
     N: NetworkAdapter + Send + Sync + 'static,
     N::Settings: Clone + Send + Sync + 'static,
 {
     fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, DynError> {
         let DaSamplingServiceSettings {
-            sampling_settings,
-            network_adapter_settings,
+            sampling_settings, ..
         } = service_state.settings_reader.get_updated_settings();
+
         let network_relay = service_state.overwatch_handle.relay();
-        let network_adapter = NetworkAdapter::new(network_adapter_settings, network_relay);
+
         Ok(Self {
             network_relay,
             service_state,
-            sampler: Backend::new(sampling_settings, network_adapter),
+            sampler: Backend::new(sampling_settings),
         })
     }
 
@@ -139,29 +162,28 @@ where
         let Self {
             network_relay,
             mut service_state,
-            sampler,
+            mut sampler,
         } = self;
-
         let DaSamplingServiceSettings {
-            sampling_settings,
             network_adapter_settings,
+            ..
         } = service_state.settings_reader.get_updated_settings();
 
         let network_relay = network_relay.connect().await?;
-        let network_adapter = N::new(network_adapter_settings, network_relay).await;
+        let mut network_adapter = N::new(network_adapter_settings, network_relay).await;
+
+        let mut sampling_message_stream = network_adapter.listen_to_sampling_messages().await?;
 
         let mut lifecycle_stream = service_state.lifecycle_handle.message_stream();
         async {
             loop {
                 tokio::select! {
-                    Some(msg) = service_state.inbound_relay.recv() => {
-                            match Self::handle_new_sample_response(&sampler, &network_adapter, &msg).await {
-                                Ok(()) => {}, // what should happen here?
-                                Err(err) => {
-                                    error!("Error handling new sampling event, due to {err:?}");
-                                },
-                            };
-                        }
+                    Some(service_message) = service_state.inbound_relay.recv() => {
+                        Self::handle_service_message(service_message, &mut network_adapter, &mut sampler).await;
+                    }
+                    Some(sampling_message) = sampling_message_stream.next() => {
+                        Self::handle_sampling_message(sampling_message, &mut sampler).await;
+                    }
                     Some(msg) = lifecycle_stream.next() => {
                         if Self::should_stop_service(msg).await {
                             break;
@@ -169,14 +191,10 @@ where
                     }
                 }
             }
-        }.instrument(span!(Level::TRACE, DA_SAMPLING_TAG)).await;
+        }
+        .instrument(span!(Level::TRACE, DA_SAMPLING_TAG))
+        .await;
 
         Ok(())
     }
-}
-
-#[derive(Debug, Clone)]
-pub struct DaSamplingServiceSettings<BackendSettings, NetworkSettings> {
-    pub sampling_settings: BackendSettings,
-    pub network_adapter_settings: NetworkSettings,
 }
