@@ -5,6 +5,7 @@ use libp2p::PeerId;
 // crates
 use libp2p::swarm::NetworkBehaviour;
 // internal
+use crate::address_book::AddressBook;
 use crate::{
     protocols::dispersal::validator::behaviour::DispersalValidatorBehaviour,
     protocols::replication::behaviour::ReplicationBehaviour,
@@ -33,10 +34,10 @@ where
     Membership: MembershipHandler + Clone + Send + 'static,
     <Membership as MembershipHandler>::NetworkId: Send,
 {
-    pub fn new(key: &Keypair, membership: Membership) -> Self {
+    pub fn new(key: &Keypair, membership: Membership, addresses: AddressBook) -> Self {
         let peer_id = PeerId::from_public_key(&key.public());
         Self {
-            sampling: SamplingBehaviour::new(peer_id, membership.clone()),
+            sampling: SamplingBehaviour::new(peer_id, membership.clone(), addresses),
             dispersal: DispersalValidatorBehaviour::new(membership.clone()),
             replication: ReplicationBehaviour::new(peer_id, membership),
         }
