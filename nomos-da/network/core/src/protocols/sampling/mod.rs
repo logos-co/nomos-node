@@ -2,6 +2,7 @@ pub mod behaviour;
 
 #[cfg(test)]
 mod test {
+    use crate::address_book::AddressBook;
     use crate::protocols::sampling::behaviour::{SamplingBehaviour, SamplingEvent};
     use crate::test_utils::AllNeighbours;
     use crate::SubnetworkId;
@@ -22,6 +23,7 @@ mod test {
     pub fn sampling_swarm(
         key: Keypair,
         membership: impl MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'static,
+        addresses: AddressBook,
     ) -> Swarm<
         SamplingBehaviour<impl MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'static>,
     > {
@@ -30,7 +32,11 @@ mod test {
             .with_other_transport(|key| quic::tokio::Transport::new(quic::Config::new(key)))
             .unwrap()
             .with_behaviour(|key| {
-                SamplingBehaviour::new(PeerId::from_public_key(&key.public()), membership)
+                SamplingBehaviour::new(
+                    PeerId::from_public_key(&key.public()),
+                    membership,
+                    addresses,
+                )
             })
             .unwrap()
             .with_swarm_config(|cfg| {
@@ -66,8 +72,14 @@ mod test {
             .unwrap()
             .with_p2p(PeerId::from_public_key(&k2.public()))
             .unwrap();
-        let mut p1 = sampling_swarm(k1.clone(), neighbours.clone());
-        let mut p2 = sampling_swarm(k2.clone(), neighbours);
+        let p1_addresses = vec![(PeerId::from_public_key(&k2.public()), p2_address.clone())];
+        let p2_addresses = vec![(PeerId::from_public_key(&k1.public()), p1_address.clone())];
+        let mut p1 = sampling_swarm(
+            k1.clone(),
+            neighbours.clone(),
+            p1_addresses.into_iter().collect(),
+        );
+        let mut p2 = sampling_swarm(k2.clone(), neighbours, p2_addresses.into_iter().collect());
 
         let request_sender_1 = p1.behaviour().sample_request_channel();
         let request_sender_2 = p2.behaviour().sample_request_channel();
@@ -136,13 +148,11 @@ mod test {
         let t1 = tokio::spawn(async move {
             p1.listen_on(p1_address).unwrap();
             tokio::time::sleep(Duration::from_secs(1)).await;
-            p1.dial(_p2_address).unwrap();
             test_sampling_swarm(p1).await
         });
         let t2 = tokio::spawn(async move {
             p2.listen_on(p2_address).unwrap();
             tokio::time::sleep(Duration::from_secs(1)).await;
-            p2.dial(_p1_address).unwrap();
             test_sampling_swarm(p2).await
         });
         tokio::time::sleep(Duration::from_secs(2)).await;

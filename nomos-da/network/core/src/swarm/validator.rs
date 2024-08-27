@@ -10,6 +10,7 @@ use nomos_da_messages::replication::ReplicationReq;
 use tokio::sync::mpsc::{unbounded_channel, UnboundedSender};
 use tokio_stream::wrappers::UnboundedReceiverStream;
 // internal
+use crate::address_book::AddressBook;
 use crate::behaviour::validator::{ValidatorBehaviour, ValidatorBehaviourEvent};
 use crate::protocols::{
     dispersal::validator::behaviour::DispersalEvent, replication::behaviour::ReplicationEvent,
@@ -35,7 +36,11 @@ impl<Membership> ValidatorSwarm<Membership>
 where
     Membership: MembershipHandler<NetworkId = SubnetworkId, Id = PeerId> + Clone + Send,
 {
-    pub fn new(key: Keypair, membership: Membership) -> (Self, ValidatorEventsStream) {
+    pub fn new(
+        key: Keypair,
+        membership: Membership,
+        addresses: AddressBook,
+    ) -> (Self, ValidatorEventsStream) {
         let (sampling_events_sender, sampling_events_receiver) = unbounded_channel();
         let (validation_events_sender, validation_events_receiver) = unbounded_channel();
 
@@ -43,7 +48,7 @@ where
         let validation_events_receiver = UnboundedReceiverStream::new(validation_events_receiver);
         (
             Self {
-                swarm: Self::build_swarm(key, membership),
+                swarm: Self::build_swarm(key, membership, addresses),
                 sampling_events_sender,
                 validation_events_sender,
             },
@@ -53,11 +58,15 @@ where
             },
         )
     }
-    fn build_swarm(key: Keypair, membership: Membership) -> Swarm<ValidatorBehaviour<Membership>> {
+    fn build_swarm(
+        key: Keypair,
+        membership: Membership,
+        addresses: AddressBook,
+    ) -> Swarm<ValidatorBehaviour<Membership>> {
         SwarmBuilder::with_existing_identity(key)
             .with_tokio()
             .with_quic()
-            .with_behaviour(|key| ValidatorBehaviour::new(key, membership))
+            .with_behaviour(|key| ValidatorBehaviour::new(key, membership, addresses))
             .expect("Validator behaviour should build")
             .build()
     }
