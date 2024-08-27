@@ -1,5 +1,3 @@
-pub mod kzgrs;
-
 // std
 use std::collections::BTreeSet;
 
