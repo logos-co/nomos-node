@@ -157,8 +157,8 @@ mod test {
     use blst::min_sig::SecretKey;
     use kzgrs::{
         bytes_to_polynomial, commit_polynomial, generate_element_proof,
-        global_parameters_from_randomness, Commitment, GlobalParameters, Proof,
-        BYTES_PER_FIELD_ELEMENT,
+        global_parameters_from_randomness, Commitment, GlobalParameters,
+        PolynomialEvaluationDomain, Proof, BYTES_PER_FIELD_ELEMENT,
     };
     use nomos_core::da::DaEncoder as _;
     use once_cell::sync::Lazy;
@@ -276,6 +276,79 @@ mod test {
             0,
             column_data2.domain
         ));
+    }
+
+    #[test]
+    fn test_verify_chunks_error_cases() {
+        let encoder = &ENCODER;
+        let data = rand_data(32);
+        let domain_size = 16usize;
+        let rows_domain = PolynomialEvaluationDomain::new(domain_size).unwrap();
+        let encoded_data = encoder.encode(&data).unwrap();
+        let column = encoded_data.extended_data.columns().next().unwrap();
+        let index = 0usize;
+
+        let da_blob = DaBlob {
+            column,
+            column_idx: index.try_into().unwrap(),
+            column_commitment: encoded_data.column_commitments[index],
+            aggregated_column_commitment: encoded_data.aggregated_column_commitment,
+            aggregated_column_proof: encoded_data.aggregated_column_proofs[index],
+            rows_commitments: encoded_data.row_commitments.clone(),
+            rows_proofs: encoded_data
+                .rows_proofs
+                .iter()
+                .map(|proofs| proofs.get(index).cloned().unwrap())
+                .collect(),
+        };
+        // Happy case
+        let chunks_verified = DaVerifier::verify_chunks(
+            da_blob.column.as_ref(),
+            &da_blob.rows_commitments,
+            &da_blob.rows_proofs,
+            index,
+            rows_domain,
+        );
+        assert!(chunks_verified);
+
+        // Modified chunks
+        let mut column_w_missing_chunk = da_blob.column.as_ref().to_vec();
+        column_w_missing_chunk.pop();
+        let chunks_not_verified = !DaVerifier::verify_chunks(
+            column_w_missing_chunk.as_ref(),
+            &da_blob.rows_commitments,
+            &da_blob.rows_proofs,
+            index,
+            rows_domain,
+        );
+        assert!(chunks_not_verified);
+
+        // Modified proofs
+        let mut modified_proofs = da_blob.rows_proofs.to_vec();
+        let proofs_len = modified_proofs.len();
+        modified_proofs.swap(0, proofs_len - 1);
+        let chunks_not_verified = !DaVerifier::verify_chunks(
+            da_blob.column.as_ref(),
+            &da_blob.rows_commitments,
+            &modified_proofs,
+            index,
+            rows_domain,
+        );
+        assert!(chunks_not_verified);
+
+        // Modified commitments
+        let mut modified_commitments = da_blob.rows_commitments.to_vec();
+        let commitments_len = modified_proofs.len();
+        modified_commitments.swap(0, commitments_len - 1);
+
+        let chunks_not_verified = !DaVerifier::verify_chunks(
+            da_blob.column.as_ref(),
+            &modified_commitments,
+            &da_blob.rows_proofs,
+            index,
+            rows_domain,
+        );
+        assert!(chunks_not_verified);
     }
 
     #[test]
