@@ -6,8 +6,9 @@ use std::time::Duration;
 // internal
 use super::{create_tempdir, persist_tempdir, LOGS_PREFIX};
 use crate::{adjust_timeout, get_available_port, ConsensusConfig, Node};
+use cl::{InputWitness, NoteWitness, NullifierSecret};
 use cryptarchia_consensus::{CryptarchiaInfo, CryptarchiaSettings, TimeConfig};
-use cryptarchia_ledger::{Coin, LedgerState};
+use cryptarchia_ledger::LedgerState;
 use kzgrs_backend::dispersal::BlobInfo;
 #[cfg(feature = "mixnet")]
 use mixnet::{
@@ -16,7 +17,7 @@ use mixnet::{
     node::MixNodeConfig,
     topology::{MixNodeInfo, MixnetTopology},
 };
-use nomos_core::{block::Block, header::HeaderId};
+use nomos_core::{block::Block, header::HeaderId, staking::NMO_UNIT};
 use nomos_da_network_service::backends::libp2p::validator::DaNetworkValidatorBackendSettings;
 use nomos_da_network_service::NetworkConfig as DaNetworkConfig;
 use nomos_libp2p::{Multiaddr, SwarmConfig};
@@ -231,13 +232,20 @@ impl Node for NomosNode {
         #[cfg(feature = "mixnet")]
         let (mixclient_config, mixnode_configs) = create_mixnet_config(&ids);
 
-        let coins = ids
+        let notes = ids
             .iter()
-            .map(|&id| Coin::new(id, id.into(), 1.into()))
+            .map(|&id| {
+                let mut sk = [0; 16];
+                sk.copy_from_slice(&id[0..16]);
+                InputWitness::new(
+                    NoteWitness::basic(1, NMO_UNIT, &mut thread_rng()),
+                    NullifierSecret(sk),
+                )
+            })
             .collect::<Vec<_>>();
         // no commitments for now, proofs are not checked anyway
         let genesis_state = LedgerState::from_commitments(
-            coins.iter().map(|c| c.commitment()),
+            notes.iter().map(|n| n.note_commitment()),
             (ids.len() as u32).into(),
         );
         let ledger_config = cryptarchia_ledger::Config {
@@ -257,7 +265,7 @@ impl Node for NomosNode {
         #[allow(unused_mut, unused_variables)]
         let mut configs = ids
             .into_iter()
-            .zip(coins)
+            .zip(notes)
             .enumerate()
             .map(|(i, (da_id, coin))| {
                 create_node_config(
@@ -350,7 +358,7 @@ fn create_node_config(
     _id: [u8; 32],
     genesis_state: LedgerState,
     config: cryptarchia_ledger::Config,
-    coins: Vec<Coin>,
+    notes: Vec<InputWitness>,
     time: TimeConfig,
     #[cfg(feature = "mixnet")] mixnet_config: MixnetConfig,
 ) -> Config {
@@ -365,7 +373,7 @@ fn create_node_config(
             },
         },
         cryptarchia: CryptarchiaSettings {
-            coins,
+            notes,
             config,
             genesis_state,
             time,

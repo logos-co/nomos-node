@@ -29,6 +29,7 @@ members = [
     "consensus/carnot-engine",
     "consensus/cryptarchia-engine",
     "ledger/cryptarchia-ledger",
-    "tests"
+    "cl/cl",
+    "tests",
 ]
 resolver = "2"

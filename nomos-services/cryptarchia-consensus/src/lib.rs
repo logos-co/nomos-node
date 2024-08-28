@@ -2,9 +2,13 @@ mod leadership;
 pub mod network;
 mod time;
 
+use cl::InputWitness;
 use core::fmt::Debug;
 use cryptarchia_engine::Slot;
-use cryptarchia_ledger::{Coin, LeaderProof, LedgerState};
+use cryptarchia_ledger::{
+    leader_proof::{LeaderProof, Risc0LeaderProof},
+    LedgerState,
+};
 use futures::StreamExt;
 use network::{messages::NetworkMessage, NetworkAdapter};
 use nomos_core::da::blob::{
@@ -64,6 +68,12 @@ impl Cryptarchia {
         self.consensus.tip()
     }
 
+    fn tip_state(&self) -> &LedgerState {
+        self.ledger
+            .state(&self.tip())
+            .expect("tip state not available")
+    }
+
     fn genesis(&self) -> HeaderId {
         self.consensus.genesis()
     }
@@ -77,10 +87,12 @@ impl Cryptarchia {
             parent,
             slot,
             header.leader_proof(),
-            header
-                .orphaned_proofs()
-                .iter()
-                .map(|imported_header| (imported_header.id(), *imported_header.leader_proof())),
+            header.orphaned_proofs().iter().map(|imported_header| {
+                (
+                    imported_header.id(),
+                    imported_header.leader_proof().to_orphan_proof(),
+                )
+            }),
         )?;
         let consensus = self.consensus.receive_block(id, parent, slot)?;
 
@@ -110,7 +122,7 @@ pub struct CryptarchiaSettings<Ts, Bs> {
     pub config: cryptarchia_ledger::Config,
     pub genesis_state: LedgerState,
     pub time: TimeConfig,
-    pub coins: Vec<Coin>,
+    pub notes: Vec<InputWitness>,
 }
 
 impl<Ts, Bs> CryptarchiaSettings<Ts, Bs> {
@@ -121,7 +133,7 @@ impl<Ts, Bs> CryptarchiaSettings<Ts, Bs> {
         config: cryptarchia_ledger::Config,
         genesis_state: LedgerState,
         time: TimeConfig,
-        coins: Vec<Coin>,
+        notes: Vec<InputWitness>,
     ) -> Self {
         Self {
             transaction_selector_settings,
@@ -129,7 +141,7 @@ impl<Ts, Bs> CryptarchiaSettings<Ts, Bs> {
             config,
             genesis_state,
             time,
-            coins,
+            notes,
         }
     }
 }
@@ -279,7 +291,7 @@ where
             transaction_selector_settings,
             blob_selector_settings,
             time,
-            coins,
+            notes,
         } = self.service_state.settings_reader.get_updated_settings();
 
         let genesis_id = HeaderId::from([0; 32]);
@@ -299,7 +311,7 @@ where
         let blob_selector = BS::new(blob_selector_settings);
 
         let mut incoming_blocks = adapter.blocks_stream().await;
-        let mut leader = leadership::Leader::new(genesis_id, coins, config);
+        let mut leader = leadership::Leader::new(genesis_id, notes, config);
         let timer = time::Timer::new(time);
 
         let mut slot_timer = IntervalStream::new(timer.slot_interval());
@@ -325,17 +337,19 @@ where
                     _ = slot_timer.next() => {
                         let slot = timer.current_slot();
                         let parent = cryptarchia.tip();
+                        let note_tree = cryptarchia.tip_state().lead_commitments();
                         tracing::debug!("ticking for slot {}", u64::from(slot));
 
                         let Some(epoch_state) = cryptarchia.epoch_state_for_slot(slot) else {
                             tracing::error!("trying to propose a block for slot {} but epoch state is not available", u64::from(slot));
                             continue;
                         };
-                        if let Some(proof) = leader.build_proof_for(epoch_state, slot, parent) {
+                        if let Some(proof) = leader.build_proof_for(note_tree, epoch_state, slot, parent) {
                             tracing::debug!("proposing block...");
                             // TODO: spawn as a separate task?
                             let block = Self::propose_block(
                                 parent,
+                                slot,
                                 proof,
                                 tx_selector.clone(),
                                 blob_selector.clone(),
@@ -503,7 +517,7 @@ where
         match cryptarchia.try_apply_header(header) {
             Ok(new_state) => {
                 // update leader
-                leader.follow_chain(header.parent(), id, *header.leader_proof().commitment());
+                leader.follow_chain(header.parent(), id, header.leader_proof().nullifier());
 
                 // remove included content from mempool
                 mark_in_block(
@@ -548,7 +562,8 @@ where
     )]
     async fn propose_block(
         parent: HeaderId,
-        proof: LeaderProof,
+        slot: Slot,
+        proof: Risc0LeaderProof,
         tx_selector: TxS,
         blob_selector: BS,
         cl_mempool_relay: MempoolRelay<ClPool::Item, ClPool::Item, ClPool::Key>,
@@ -561,7 +576,7 @@ where
         match futures::join!(cl_txs, da_certs) {
             (Ok(cl_txs), Ok(da_certs)) => {
                 let Ok(block) = BlockBuilder::new(tx_selector, blob_selector)
-                    .with_cryptarchia_builder(Builder::new(parent, proof))
+                    .with_cryptarchia_builder(Builder::new(parent, slot, proof))
                     .with_transactions(cl_txs)
                     .with_blobs_certificates(da_certs)
                     .build()

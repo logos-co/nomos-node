@@ -4,10 +4,11 @@ use std::{
     path::PathBuf,
 };
 // crates
+use cl::{InputWitness, NoteWitness, NullifierSecret};
 use clap::{Parser, ValueEnum};
 use color_eyre::eyre::{eyre, Result};
-use cryptarchia_ledger::Coin;
 use hex::FromHex;
+use nomos_core::staking::NMO_UNIT;
 use nomos_da_network_service::backends::libp2p::validator::DaNetworkValidatorBackend;
 use nomos_da_network_service::NetworkService as DaNetworkService;
 use nomos_libp2p::{ed25519::SecretKey, Multiaddr};
@@ -88,25 +89,18 @@ pub struct CryptarchiaArgs {
     slot_duration: Option<u64>,
 
     #[clap(
-        long = "consensus-coin-sk",
-        env = "CONSENSUS_COIN_SK",
-        requires("coin_nonce")
+        long = "consensus-note-sk",
+        env = "CONSENSUS_NOTE_SK",
+        requires("note_value")
     )]
-    coin_secret_key: Option<String>,
+    note_secret_key: Option<String>,
 
     #[clap(
-        long = "consensus-coin-nonce",
-        env = "CONSENSUS_COIN_NONCE",
-        requires("coin_secret_key")
+        long = "consensus-note-value",
+        env = "CONSENSUS_NOTE_VALUE",
+        requires("note_secret_key")
     )]
-    coin_nonce: Option<String>,
-
-    #[clap(
-        long = "consensus-coin-value",
-        env = "CONSENSUS_COIN_VALUE",
-        requires("coin_secret_key")
-    )]
-    coin_value: Option<u32>,
+    note_value: Option<u32>,
 }
 
 #[derive(Parser, Debug, Clone)]
@@ -227,9 +221,8 @@ impl Config {
         let CryptarchiaArgs {
             chain_start_time,
             slot_duration,
-            coin_secret_key,
-            coin_nonce,
-            coin_value,
+            note_secret_key,
+            note_value,
         } = consensus_args;
 
         if let Some(start_time) = chain_start_time {
@@ -241,17 +234,15 @@ impl Config {
             self.cryptarchia.time.slot_duration = std::time::Duration::from_secs(duration);
         }
 
-        if let Some(sk) = coin_secret_key {
-            let sk = <[u8; 32]>::from_hex(sk)?;
+        if let Some(sk) = note_secret_key {
+            let sk = <[u8; 16]>::from_hex(sk)?;
 
-            let nonce = coin_nonce.expect("Should be available if coin sk provided");
-            let nonce = <[u8; 32]>::from_hex(nonce)?;
+            let value = note_value.expect("Should be available if coin sk provided");
 
-            let value = coin_value.expect("Should be available if coin sk provided");
-
-            self.cryptarchia
-                .coins
-                .push(Coin::new(sk, nonce.into(), value.into()));
+            self.cryptarchia.notes.push(InputWitness::new(
+                NoteWitness::basic(value as u64, NMO_UNIT, &mut rand::thread_rng()),
+                NullifierSecret::from_bytes(sk),
+            ));
         }
 
         Ok(self)
