@@ -8,7 +8,7 @@ use cryptarchia_ledger::{Coin, LeaderProof, LedgerState};
 use futures::StreamExt;
 use network::{messages::NetworkMessage, NetworkAdapter};
 use nomos_core::da::blob::{
-    info::DispersedBlobInfo, metadata::Metadata as BlobMetadata, BlobSelect,
+    info::DispersedBlobInfo, metadata::Metadata as BlobMetadata, Blob, BlobSelect,
 };
 use nomos_core::header::{cryptarchia::Header, HeaderId};
 use nomos_core::tx::{Transaction, TxSelect};
@@ -409,6 +409,7 @@ where
                             storage_relay.clone(),
                             cl_mempool_relay.clone(),
                             da_mempool_relay.clone(),
+                            sampling_relay.clone(),
                             &mut self.block_subscription_sender
                         )
                         .await;
@@ -601,7 +602,14 @@ where
     #[allow(clippy::type_complexity, clippy::too_many_arguments)]
     #[instrument(
         level = "debug",
-        skip(cryptarchia, storage_relay, cl_mempool_relay, da_mempool_relay, leader)
+        skip(
+            cryptarchia,
+            storage_relay,
+            cl_mempool_relay,
+            da_mempool_relay,
+            sampling_relay,
+            leader
+        )
     )]
     async fn process_block(
         mut cryptarchia: Cryptarchia,
@@ -614,6 +622,7 @@ where
         da_mempool_relay: OutboundRelay<
             MempoolMsg<HeaderId, DaPoolAdapter::Payload, DaPool::Item, DaPool::Key>,
         >,
+        sampling_relay: SamplingRelay<DaPool::Key>,
         block_broadcaster: &mut broadcast::Sender<Block<ClPool::Item, DaPool::Item>>,
     ) -> Cryptarchia {
         tracing::debug!("received proposal {:?}", block);
@@ -634,11 +643,16 @@ where
                     id,
                 )
                 .await;
-
                 mark_in_block(
                     da_mempool_relay,
                     block.blobs().map(DispersedBlobInfo::blob_id),
                     id,
+                )
+                .await;
+
+                mark_blob_in_block(
+                    sampling_relay,
+                    block.blobs().map(DispersedBlobInfo::blob_id).collect(),
                 )
                 .await;
 
@@ -772,6 +786,18 @@ async fn mark_in_block<Payload, Item, Key>(
         })
         .await
         .unwrap_or_else(|(e, _)| tracing::error!("Could not mark items in block: {e}"))
+}
+
+async fn mark_blob_in_block<BlobId: Debug>(
+    sampling_relay: SamplingRelay<BlobId>,
+    blobs_id: Vec<BlobId>,
+) {
+    if let Err((e, DaSamplingServiceMsg::MarkInBlock { blobs_id })) = sampling_relay
+        .send(DaSamplingServiceMsg::MarkInBlock { blobs_id })
+        .await
+    {
+        error!("Error marking in block for blobs ids: {blobs_id:?}");
+    }
 }
 
 async fn get_sampled_blobs<BlobId>(
