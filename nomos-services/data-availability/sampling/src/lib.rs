@@ -115,6 +115,11 @@ where
                 sampler.handle_sampling_success(blob_id, *blob).await;
             }
             SamplingEvent::SamplingError { error } => {
+                // TODO: in most of these error cases we can't get the blob_id from the error
+                // Shouldn't the error contain that?
+                // We can of course stop tracking that blob_id in the backend via timeout,
+                // which we want to have anyways, but could it be nicer to remove it here too,
+                // by calling the handler_sampling_error method?
                 error!("Error while sampling: {error}");
             }
         }
