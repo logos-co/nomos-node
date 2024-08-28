@@ -8,7 +8,7 @@ use cryptarchia_ledger::{Coin, LeaderProof, LedgerState};
 use futures::StreamExt;
 use network::{messages::NetworkMessage, NetworkAdapter};
 use nomos_core::da::blob::{
-    info::DispersedBlobInfo, metadata::Metadata as BlobMetadata, Blob, BlobSelect,
+    info::DispersedBlobInfo, metadata::Metadata as BlobMetadata, BlobSelect,
 };
 use nomos_core::header::{cryptarchia::Header, HeaderId};
 use nomos_core::tx::{Transaction, TxSelect};
@@ -631,6 +631,18 @@ where
 
         let header = block.header().cryptarchia();
         let id = header.id();
+        let sampled_blobs = match get_sampled_blobs(sampling_relay.clone()).await {
+            Ok(sampled_blobs) => sampled_blobs,
+            Err(error) => {
+                error!("Unable to retrieved sampled blobs: {error}");
+                return cryptarchia;
+            }
+        };
+        if !Self::validate_block(&block, &sampled_blobs) {
+            error!("Invalid block: {block:?}");
+            return cryptarchia;
+        }
+
         match cryptarchia.try_apply_header(header) {
             Ok(new_state) => {
                 // update leader
@@ -730,6 +742,16 @@ where
         }
         output
     }
+
+    fn validate_block(
+        block: &Block<ClPool::Item, DaPool::Item>,
+        sampled_blobs_ids: &BTreeSet<DaPool::Key>,
+    ) -> bool {
+        let validated_blobs = block
+            .blobs()
+            .all(|blob| sampled_blobs_ids.contains(&blob.blob_id()));
+        validated_blobs
+    }
 }
 
 #[derive(Debug)]
@@ -792,7 +814,7 @@ async fn mark_blob_in_block<BlobId: Debug>(
     sampling_relay: SamplingRelay<BlobId>,
     blobs_id: Vec<BlobId>,
 ) {
-    if let Err((e, DaSamplingServiceMsg::MarkInBlock { blobs_id })) = sampling_relay
+    if let Err((_e, DaSamplingServiceMsg::MarkInBlock { blobs_id })) = sampling_relay
         .send(DaSamplingServiceMsg::MarkInBlock { blobs_id })
         .await
     {
