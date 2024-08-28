@@ -47,7 +47,7 @@ pub struct DaSamplingServiceSettings<BackendSettings, NetworkSettings> {
 
 impl<B: 'static> RelayMessage for DaSamplingServiceMsg<B> {}
 
-pub struct DaSamplingService<Backend, N, S, R>
+pub struct DaSamplingService<Backend, N, R>
 where
     R: SeedableRng + RngCore,
     Backend: DaSamplingServiceBackend<R> + Send,
@@ -62,7 +62,7 @@ where
     sampler: Backend,
 }
 
-impl<Backend, N, S, R> DaSamplingService<Backend, N, S, R>
+impl<Backend, N, R> DaSamplingService<Backend, N, R>
 where
     R: SeedableRng + RngCore,
     Backend: DaSamplingServiceBackend<R, BlobId = BlobId, Blob = DaBlob> + Send + 'static,
@@ -132,7 +132,7 @@ where
     }
 }
 
-impl<Backend, N, S, R> ServiceData for DaSamplingService<Backend, N, S, R>
+impl<Backend, N, R> ServiceData for DaSamplingService<Backend, N, R>
 where
     R: SeedableRng + RngCore,
     Backend: DaSamplingServiceBackend<R> + Send,
@@ -150,7 +150,7 @@ where
 }
 
 #[async_trait::async_trait]
-impl<Backend, N, S, R> ServiceCore for DaSamplingService<Backend, N, S, R>
+impl<Backend, N, R> ServiceCore for DaSamplingService<Backend, N, R>
 where
     R: SeedableRng + RngCore,
     Backend: DaSamplingServiceBackend<R, BlobId = BlobId, Blob = DaBlob> + Send + Sync + 'static,
@@ -189,7 +189,7 @@ where
         let mut network_adapter = N::new(network_relay).await;
 
         let mut sampling_message_stream = network_adapter.listen_to_sampling_messages().await?;
-        let mut next_prune_tick = sampler.prune_interval().await;
+        let mut next_prune_tick = sampler.prune_interval();
 
         let mut lifecycle_stream = service_state.lifecycle_handle.message_stream();
         async {

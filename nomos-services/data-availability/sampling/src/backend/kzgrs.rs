@@ -25,20 +25,20 @@ pub struct SamplingContext {
 }
 
 #[derive(Debug, Clone)]
-pub struct KzgrsDaSamplerSettings {
+pub struct KzgrsSamplingBackendSettings {
     pub num_samples: u16,
     pub old_blobs_check_interval: Duration,
     pub blobs_validity_duration: Duration,
 }
 
-pub struct KzgrsDaSampler<R: Rng> {
-    settings: KzgrsDaSamplerSettings,
+pub struct KzgrsSamplingBackend<R: Rng> {
+    settings: KzgrsSamplingBackendSettings,
     validated_blobs: BTreeSet<BlobId>,
     pending_sampling_blobs: HashMap<BlobId, SamplingContext>,
     rng: R,
 }
 
-impl<R: Rng> KzgrsDaSampler<R> {
+impl<R: Rng> KzgrsSamplingBackend<R> {
     fn prune_by_time(&mut self) {
         self.pending_sampling_blobs.retain(|_blob_id, context| {
             context.started.elapsed() < self.settings.blobs_validity_duration
@@ -47,8 +47,8 @@ impl<R: Rng> KzgrsDaSampler<R> {
 }
 
 #[async_trait::async_trait]
-impl<R: Rng + Sync + Send> DaSamplingServiceBackend<R> for KzgrsDaSampler<R> {
-    type Settings = KzgrsDaSamplerSettings;
+impl<R: Rng + Sync + Send> DaSamplingServiceBackend<R> for KzgrsSamplingBackend<R> {
+    type Settings = KzgrsSamplingBackendSettings;
     type BlobId = BlobId;
     type Blob = DaBlob;
 
@@ -62,7 +62,7 @@ impl<R: Rng + Sync + Send> DaSamplingServiceBackend<R> for KzgrsDaSampler<R> {
         }
     }
 
-    async fn prune_interval(&self) -> Interval {
+    fn prune_interval(&self) -> Interval {
         time::interval(self.settings.old_blobs_check_interval)
     }
 
@@ -142,20 +142,20 @@ mod test {
     use rand::rngs::StdRng;
 
     use crate::backend::kzgrs::{
-        DaSamplingServiceBackend, KzgrsDaSampler, KzgrsDaSamplerSettings, SamplingContext,
-        SamplingState,
+        DaSamplingServiceBackend, KzgrsSamplingBackend, KzgrsSamplingBackendSettings,
+        SamplingContext, SamplingState,
     };
     use kzgrs_backend::common::{blob::DaBlob, Column};
     use nomos_core::da::BlobId;
 
-    fn create_sampler(subnet_num: usize) -> KzgrsDaSampler<StdRng> {
-        let settings = KzgrsDaSamplerSettings {
+    fn create_sampler(subnet_num: usize) -> KzgrsSamplingBackend<StdRng> {
+        let settings = KzgrsSamplingBackendSettings {
             num_samples: subnet_num as u16,
             old_blobs_check_interval: Duration::from_millis(20),
             blobs_validity_duration: Duration::from_millis(10),
         };
         let rng = StdRng::from_entropy();
-        KzgrsDaSampler::new(settings, rng)
+        KzgrsSamplingBackend::new(settings, rng)
     }
 
     #[tokio::test]

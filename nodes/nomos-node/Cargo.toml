@@ -22,6 +22,7 @@ overwatch-derive = { git = "https://github.com/logos-co/Overwatch", rev = "ac28d
 tracing = "0.1"
 multiaddr = "0.18"
 nomos-core = { path = "../../nomos-core" }
+nomos-da-sampling = { path = "../../nomos-services/data-availability/sampling" }
 nomos-da-verifier = { path = "../../nomos-services/data-availability/verifier", features = ["rocksdb-backend", "libp2p"] }
 nomos-da-indexer = { path = "../../nomos-services/data-availability/indexer", features = ["rocksdb-backend"] }
 nomos-da-network-service = { path = "../../nomos-services/data-availability/network" }
@@ -40,6 +41,7 @@ nomos-system-sig = { path = "../../nomos-services/system-sig" }
 tracing-subscriber = "0.3"
 cryptarchia-engine = { path = "../../consensus/cryptarchia-engine" }
 cryptarchia-ledger = { path = "../../ledger/cryptarchia-ledger" }
+rand_chacha = "0.3"
 tokio = { version = "1.24", features = ["sync"] }
 serde_json = "1.0"
 serde_yaml = "0.9"
