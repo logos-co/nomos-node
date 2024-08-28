@@ -42,6 +42,10 @@ time = "0.3"
 name = "test_cryptarchia_happy_path"
 path = "src/tests/cryptarchia/happy.rs"
 
+[[test]]
+name = "test_cli"
+path = "src/tests/cli.rs"
+
 [features]
 mixnet = ["nomos-network/mixnet"]
 metrics = ["nomos-node/metrics"]
