@@ -17,7 +17,7 @@ use nomos_core::{
     header::cryptarchia::Builder,
 };
 use nomos_da_sampling::backend::DaSamplingServiceBackend;
-use nomos_da_sampling::DaSamplingService;
+use nomos_da_sampling::{DaSamplingService, DaSamplingServiceMsg};
 use nomos_mempool::{
     backend::MemPool, network::NetworkAdapter as MempoolAdapter, DaMempoolService, MempoolMsg,
     TxMempoolService,
@@ -32,8 +32,10 @@ use overwatch_rs::services::{
     ServiceCore, ServiceData, ServiceId,
 };
 use rand::{RngCore, SeedableRng};
+use overwatch_rs::DynError;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_with::serde_as;
+use std::collections::BTreeSet;
 use std::hash::Hash;
 use thiserror::Error;
 pub use time::Config as TimeConfig;
@@ -44,6 +46,7 @@ use tracing::{error, instrument, span, Level};
 use tracing_futures::Instrument;
 
 type MempoolRelay<Payload, Item, Key> = OutboundRelay<MempoolMsg<HeaderId, Payload, Item, Key>>;
+type SamplingRelay<BlobId> = OutboundRelay<DaSamplingServiceMsg<BlobId>>;
 
 // Limit the number of blocks returned by GetHeaders
 const HEADERS_LIMIT: usize = 512;
@@ -271,7 +274,7 @@ where
         + 'static,
     ClPool: MemPool<BlockId = HeaderId> + Send + Sync + 'static,
     ClPool::Settings: Send + Sync + 'static,
-    DaPool: MemPool<BlockId = HeaderId> + Send + Sync + 'static,
+    DaPool: MemPool<BlockId = HeaderId, Key = SamplingBackend::BlobId> + Send + Sync + 'static,
     DaPool::Settings: Send + Sync + 'static,
     ClPool::Item: Transaction<Hash = ClPool::Key>
         + Debug
@@ -296,7 +299,6 @@ where
         + Sync
         + 'static,
     ClPool::Key: Debug + Send + Sync,
-    DaPool::Key: Debug + Send + Sync,
     ClPoolAdapter:
         MempoolAdapter<Payload = ClPool::Item, Key = ClPool::Key> + Send + Sync + 'static,
     DaPoolAdapter: MempoolAdapter<Key = DaPool::Key> + Send + Sync + 'static,
@@ -309,8 +311,9 @@ where
     SamplingRng: SeedableRng + RngCore,
     SamplingBackend: DaSamplingServiceBackend<SamplingRng> + Send,
     SamplingBackend::Settings: Clone,
-    SamplingBackend::Blob: Debug + 'static,
-    SamplingBackend::BlobId: Debug + 'static,
+    SamplingBackend::Blob: Debug + Send + 'static,
+    SamplingBackend::BlobId: Debug + Ord + Send + Sync + 'static,
+
     SamplingNetworkAdapter: nomos_da_sampling::network::NetworkAdapter,
 {
     fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, overwatch_rs::DynError> {
@@ -355,6 +358,12 @@ where
             .connect()
             .await
             .expect("Relay connection with StorageService should succeed");
+
+        let sampling_relay: OutboundRelay<_> = self
+            .sampling_relay
+            .connect()
+            .await
+            .expect("Relay connection with SamplingService should succeed");
 
         let CryptarchiaSettings {
             config,
@@ -424,6 +433,7 @@ where
                                 blob_selector.clone(),
                                 cl_mempool_relay.clone(),
                                 da_mempool_relay.clone(),
+                                sampling_relay.clone(),
                             ).await;
 
                             if let Some(block) = block {
@@ -480,8 +490,6 @@ where
     A: NetworkAdapter + Clone + Send + Sync + 'static,
     ClPool: MemPool<BlockId = HeaderId> + Send + Sync + 'static,
     ClPool::Settings: Send + Sync + 'static,
-    DaPool: MemPool<BlockId = HeaderId> + Send + Sync + 'static,
-    DaPool::Settings: Send + Sync + 'static,
     ClPool::Item: Transaction<Hash = ClPool::Key>
         + Debug
         + Clone
@@ -503,10 +511,11 @@ where
         + Send
         + Sync
         + 'static,
+    DaPool: MemPool<BlockId = HeaderId, Key = SamplingBackend::BlobId> + Send + Sync + 'static,
+    DaPool::Settings: Send + Sync + 'static,
     TxS: TxSelect<Tx = ClPool::Item> + Clone + Send + Sync + 'static,
     BS: BlobSelect<BlobId = DaPool::Item> + Clone + Send + Sync + 'static,
     ClPool::Key: Debug + Send + Sync,
-    DaPool::Key: Debug + Send + Sync,
     ClPoolAdapter:
         MempoolAdapter<Payload = ClPool::Item, Key = ClPool::Key> + Send + Sync + 'static,
     DaPoolAdapter: MempoolAdapter<Key = DaPool::Key> + Send + Sync + 'static,
@@ -516,7 +525,7 @@ where
     SamplingBackend: DaSamplingServiceBackend<SamplingRng> + Send,
     SamplingBackend::Settings: Clone,
     SamplingBackend::Blob: Debug + 'static,
-    SamplingBackend::BlobId: Debug + 'static,
+    SamplingBackend::BlobId: Debug + Ord + Send + Sync + 'static,
     SamplingNetworkAdapter: nomos_da_sampling::network::NetworkAdapter,
 {
     async fn should_stop_service(message: LifecycleMessage) -> bool {
@@ -657,7 +666,13 @@ where
 
     #[instrument(
         level = "debug",
-        skip(cl_mempool_relay, da_mempool_relay, tx_selector, blob_selector)
+        skip(
+            cl_mempool_relay,
+            da_mempool_relay,
+            sampling_relay,
+            tx_selector,
+            blob_selector
+        )
     )]
     async fn propose_block(
         parent: HeaderId,
@@ -666,17 +681,20 @@ where
         blob_selector: BS,
         cl_mempool_relay: MempoolRelay<ClPool::Item, ClPool::Item, ClPool::Key>,
         da_mempool_relay: MempoolRelay<DaPoolAdapter::Payload, DaPool::Item, DaPool::Key>,
+        sampling_relay: SamplingRelay<SamplingBackend::BlobId>,
     ) -> Option<Block<ClPool::Item, DaPool::Item>> {
         let mut output = None;
         let cl_txs = get_mempool_contents(cl_mempool_relay);
         let da_certs = get_mempool_contents(da_mempool_relay);
-
-        match futures::join!(cl_txs, da_certs) {
-            (Ok(cl_txs), Ok(da_certs)) => {
+        let blobs_ids = get_sampled_blobs(sampling_relay);
+        match futures::join!(cl_txs, da_certs, blobs_ids) {
+            (Ok(cl_txs), Ok(da_blobs_info), Ok(blobs_ids)) => {
                 let Ok(block) = BlockBuilder::new(tx_selector, blob_selector)
                     .with_cryptarchia_builder(Builder::new(parent, proof))
                     .with_transactions(cl_txs)
-                    .with_blobs_certificates(da_certs)
+                    .with_blobs_info(
+                        da_blobs_info.filter(move |info| blobs_ids.contains(&info.blob_id())),
+                    )
                     .build()
                 else {
                     panic!("Proposal block should always succeed to be built")
@@ -684,8 +702,17 @@ where
                 tracing::debug!("proposed block with id {:?}", block.header().id());
                 output = Some(block);
             }
-            (Err(_), _) => tracing::error!("Could not fetch block cl transactions"),
-            (_, Err(_)) => tracing::error!("Could not fetch block da certificates"),
+            (tx_error, da_certificate_error, blobs_error) => {
+                if let Err(_tx_error) = tx_error {
+                    tracing::error!("Could not fetch block cl transactions");
+                }
+                if let Err(_da_certificate_error) = da_certificate_error {
+                    tracing::error!("Could not fetch block da certificates");
+                }
+                if let Err(_blobs_error) = blobs_error {
+                    tracing::error!("Could not fetch block da blobs");
+                }
+            }
         }
         output
     }
@@ -745,4 +772,17 @@ async fn mark_in_block<Payload, Item, Key>(
         })
         .await
         .unwrap_or_else(|(e, _)| tracing::error!("Could not mark items in block: {e}"))
+}
+
+async fn get_sampled_blobs<BlobId>(
+    sampling_relay: SamplingRelay<BlobId>,
+) -> Result<BTreeSet<BlobId>, DynError> {
+    let (sender, receiver) = oneshot::channel();
+    sampling_relay
+        .send(DaSamplingServiceMsg::GetValidatedBlobs {
+            reply_channel: sender,
+        })
+        .await
+        .map_err(|(error, _)| Box::new(error) as DynError)?;
+    receiver.await.map_err(|error| Box::new(error) as DynError)
 }
