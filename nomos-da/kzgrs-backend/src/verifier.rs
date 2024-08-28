@@ -311,9 +311,10 @@ mod test {
         );
         assert!(chunks_verified);
 
-        // Modified chunks
+        // Chunks altered
         let mut column_w_missing_chunk = da_blob.column.as_ref().to_vec();
         column_w_missing_chunk.pop();
+
         let chunks_not_verified = !DaVerifier::verify_chunks(
             column_w_missing_chunk.as_ref(),
             &da_blob.rows_commitments,
@@ -323,10 +324,10 @@ mod test {
         );
         assert!(chunks_not_verified);
 
-        // Modified proofs
+        // Proofs altered
         let mut modified_proofs = da_blob.rows_proofs.to_vec();
-        let proofs_len = modified_proofs.len();
-        modified_proofs.swap(0, proofs_len - 1);
+        modified_proofs.swap(0, 1);
+
         let chunks_not_verified = !DaVerifier::verify_chunks(
             da_blob.column.as_ref(),
             &da_blob.rows_commitments,
@@ -336,10 +337,9 @@ mod test {
         );
         assert!(chunks_not_verified);
 
-        // Modified commitments
+        // Commitments altered
         let mut modified_commitments = da_blob.rows_commitments.to_vec();
-        let commitments_len = modified_proofs.len();
-        modified_commitments.swap(0, commitments_len - 1);
+        modified_commitments.swap(0, 1);
 
         let chunks_not_verified = !DaVerifier::verify_chunks(
             da_blob.column.as_ref(),
