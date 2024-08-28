@@ -163,6 +163,7 @@ mod test {
     use nomos_core::da::DaEncoder as _;
     use once_cell::sync::Lazy;
     use rand::{thread_rng, RngCore};
+    use sha3::{Digest, Sha3_256};
 
     pub struct ColumnVerifyData {
         pub column: Column,
@@ -349,6 +350,13 @@ mod test {
             rows_domain,
         );
         assert!(chunks_not_verified);
+
+        // Check column_id getter
+        let c_id = da_blob.column_id();
+
+        let mut hasher = Sha3_256::new();
+        hasher.update(da_blob.column.as_bytes());
+        assert_eq!(c_id, hasher.finalize().as_slice().to_vec());
     }
 
     #[test]
