@@ -28,6 +28,8 @@ fn run_disseminate(disseminate: &Disseminate) {
         .arg(&disseminate.app_id)
         .arg("--index")
         .arg(disseminate.index.to_string())
+        .arg("--columns")
+        .arg(disseminate.columns.to_string())
         .arg("--node-addr")
         .arg(disseminate.node_addr.as_ref().unwrap().as_str());
 
@@ -83,6 +85,7 @@ async fn disseminate(config: &mut Disseminate) {
     );
     config.app_id = "fd3384e132ad02a56c78f45547ee40038dc79002b90d29ed90e08eee762ae715".to_string();
     config.index = 0;
+    config.columns = 32;
 
     run_disseminate(&config);
 }

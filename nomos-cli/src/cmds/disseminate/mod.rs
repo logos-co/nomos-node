@@ -29,10 +29,18 @@ pub struct Disseminate {
     /// for block inclusion, if present.
     #[clap(long)]
     pub node_addr: Option<Url>,
+    // Application ID for dispersed data.
     #[clap(long)]
     pub app_id: String,
+    // Index for the Blob associated with Application ID.
     #[clap(long)]
     pub index: u64,
+    // Use Kzg RS cache.
+    #[clap(long)]
+    pub with_cache: bool,
+    // Number of columns to use for encoding.
+    #[clap(long, default_value = "4096")]
+    pub columns: usize,
     /// File to write the certificate to, if present.
     #[clap(long)]
     pub output: Option<PathBuf>,
@@ -70,6 +78,8 @@ impl Disseminate {
         let timeout = Duration::from_secs(self.timeout);
         let node_addr = self.node_addr.clone();
         let output = self.output.clone();
+        let num_columns = self.columns;
+        let with_cache = self.with_cache;
         let (payload_sender, payload_rx) = tokio::sync::mpsc::unbounded_channel();
         payload_sender.send(bytes.into_boxed_slice()).unwrap();
         std::thread::spawn(move || {
@@ -80,8 +90,8 @@ impl Disseminate {
                         payload: Arc::new(Mutex::new(payload_rx)),
                         timeout,
                         kzgrs_settings: KzgrsSettings {
-                            num_columns: 32,
-                            with_cache: false,
+                            num_columns,
+                            with_cache,
                         },
                         metadata,
                         status_updates,
