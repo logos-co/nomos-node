@@ -6,7 +6,7 @@ use std::time::{Duration, Instant};
 // crates
 use rand::distributions::Standard;
 use rand::prelude::*;
-use rand_chacha::ChaCha20Rng;
+use rand::SeedableRng;
 
 use kzgrs_backend::common::blob::DaBlob;
 
@@ -28,16 +28,16 @@ pub struct KzgrsDaSamplerSettings {
     pub blobs_validity_duration: Duration,
 }
 
-pub struct KzgrsDaSampler {
+pub struct KzgrsDaSampler<R: Rng> {
     settings: KzgrsDaSamplerSettings,
     validated_blobs: BTreeSet<BlobId>,
     pending_sampling_blobs: HashMap<BlobId, SamplingContext>,
     // TODO: is there a better place for this? Do we need to have this even globally?
     // Do we already have some source of randomness already?
-    rng: ChaCha20Rng,
+    rng: R,
 }
 
-impl KzgrsDaSampler {
+impl<R: Rng> KzgrsDaSampler<R> {
     fn prune_by_time(&mut self) {
         self.pending_sampling_blobs.retain(|_blob_id, context| {
             context.started.elapsed() < self.settings.old_blobs_check_duration
@@ -46,18 +46,18 @@ impl KzgrsDaSampler {
 }
 
 #[async_trait::async_trait]
-impl DaSamplingServiceBackend for KzgrsDaSampler {
+impl<R: Rng + Sync + Send> DaSamplingServiceBackend<R> for KzgrsDaSampler<R> {
     type Settings = KzgrsDaSamplerSettings;
     type BlobId = BlobId;
     type Blob = DaBlob;
 
-    fn new(settings: Self::Settings) -> Self {
+    fn new(settings: Self::Settings, rng: R) -> Self {
         let bt: BTreeSet<BlobId> = BTreeSet::new();
         Self {
             settings,
             validated_blobs: bt,
             pending_sampling_blobs: HashMap::new(),
-            rng: ChaCha20Rng::from_entropy(),
+            rng: rng,
         }
     }
 
