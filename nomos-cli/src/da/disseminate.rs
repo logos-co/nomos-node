@@ -75,7 +75,7 @@ where
 
         if !res.status().is_success() {
             tracing::error!("ERROR: {:?}", res);
-            return Err(format!("Failed to send certificate to node: {}", res.status()).into());
+            return Err(format!("Failed to send blob info to node: {}", res.status()).into());
         }
     }
 
