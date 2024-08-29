@@ -20,4 +20,5 @@ pub trait DaSamplingServiceBackend {
     async fn handle_sampling_success(&mut self, blob_id: Self::BlobId, blob: Self::Blob);
     async fn handle_sampling_error(&mut self, blob_id: Self::BlobId);
     async fn init_sampling(&mut self, blob_id: Self::BlobId) -> Vec<SubnetworkId>;
+    fn prune(&mut self);
 }

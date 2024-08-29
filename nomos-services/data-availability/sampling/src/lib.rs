@@ -197,6 +197,8 @@ where
                         }
                     }
                 }
+                // cleanup not on time samples
+                sampler.prune();
             }
         }
         .instrument(span!(Level::TRACE, DA_SAMPLING_TAG))
