@@ -7,9 +7,6 @@ use std::fmt::Debug;
 
 // crates
 use rand::prelude::*;
-use rand::Rng;
-use rand_chacha::rand_core::CryptoRngCore;
-use rand_chacha::ChaCha20Rng;
 use tokio_stream::StreamExt;
 use tracing::{error, span, Instrument, Level};
 // internal
@@ -52,7 +49,7 @@ impl<B: 'static> RelayMessage for DaSamplingServiceMsg<B> {}
 
 pub struct DaSamplingService<Backend, N, S, R>
 where
-    R: Rng,
+    R: SeedableRng + RngCore,
     Backend: DaSamplingServiceBackend<R> + Send,
     Backend::Settings: Clone,
     Backend::Blob: Debug + 'static,
@@ -67,7 +64,7 @@ where
 
 impl<Backend, N, S, R> DaSamplingService<Backend, N, S, R>
 where
-    R: Rng,
+    R: SeedableRng + RngCore,
     Backend: DaSamplingServiceBackend<R, BlobId = BlobId, Blob = DaBlob> + Send + 'static,
     Backend::Settings: Clone,
     N: NetworkAdapter + Send + 'static,
@@ -134,7 +131,7 @@ where
 
 impl<Backend, N, S, R> ServiceData for DaSamplingService<Backend, N, S, R>
 where
-    R: Rng,
+    R: SeedableRng + RngCore,
     Backend: DaSamplingServiceBackend<R> + Send,
     Backend::Settings: Clone,
     Backend::Blob: Debug + 'static,
@@ -152,7 +149,7 @@ where
 #[async_trait::async_trait]
 impl<Backend, N, S, R> ServiceCore for DaSamplingService<Backend, N, S, R>
 where
-    R: Rng,
+    R: SeedableRng + RngCore,
     Backend: DaSamplingServiceBackend<R, BlobId = BlobId, Blob = DaBlob> + Send + Sync + 'static,
     Backend::Settings: Clone + Send + Sync + 'static,
     N: NetworkAdapter + Send + Sync + 'static,
@@ -164,7 +161,7 @@ where
         } = service_state.settings_reader.get_updated_settings();
 
         let network_relay = service_state.overwatch_handle.relay();
-        let rng: R = ChaCha20Rng::from_entropy();
+        let rng = R::from_entropy();
 
         Ok(Self {
             network_relay,
