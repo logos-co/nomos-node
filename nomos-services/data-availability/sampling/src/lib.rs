@@ -111,7 +111,7 @@ where
                 }
             }
             DaSamplingServiceMsg::MarkInBlock { blobs_id } => {
-                sampler.mark_in_block(&blobs_id).await;
+                sampler.mark_completed(&blobs_id).await;
             }
         }
     }
