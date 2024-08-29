@@ -6,7 +6,6 @@ use std::time::{Duration, Instant};
 // crates
 use rand::distributions::Standard;
 use rand::prelude::*;
-use rand::SeedableRng;
 
 use kzgrs_backend::common::blob::DaBlob;
 
@@ -57,7 +56,7 @@ impl<R: Rng + Sync + Send> DaSamplingServiceBackend<R> for KzgrsDaSampler<R> {
             settings,
             validated_blobs: bt,
             pending_sampling_blobs: HashMap::new(),
-            rng: rng,
+            rng,
         }
     }
 

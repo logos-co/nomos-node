@@ -7,8 +7,6 @@ use std::fmt::Debug;
 
 // crates
 use rand::prelude::*;
-use rand_chacha::rand_core::CryptoRngCore;
-use rand_chacha::ChaCha20Rng;
 use tokio_stream::StreamExt;
 use tracing::{error, span, Instrument, Level};
 // internal
