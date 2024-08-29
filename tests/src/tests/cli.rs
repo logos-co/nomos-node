@@ -43,13 +43,12 @@ fn run_disseminate(disseminate: &Disseminate) {
 }
 
 async fn disseminate(config: &mut Disseminate) {
-    let node_configs = NomosNode::node_configs(SpawnConfig::chain_happy(2));
-    let first_node = NomosNode::spawn(node_configs[0].clone()).await;
+    let nodes = NomosNode::spawn_nodes(SpawnConfig::star_happy(2)).await;
 
-    let node_addrs: HashMap<PeerId, Multiaddr> = node_configs
+    let node_addrs: HashMap<PeerId, Multiaddr> = nodes
         .iter()
-        .map(|c| {
-            let libp2p_config = &c.network.backend.inner;
+        .map(|n| {
+            let libp2p_config = &n.config().network.backend.inner;
             let keypair = libp2p::identity::Keypair::from(ed25519::Keypair::from(
                 libp2p_config.node_key.clone(),
             ));
@@ -78,7 +77,7 @@ async fn disseminate(config: &mut Disseminate) {
     config.node_addr = Some(
         format!(
             "http://{}",
-            first_node.config().http.backend_settings.address.clone()
+            nodes[0].config().http.backend_settings.address.clone()
         )
         .parse()
         .unwrap(),
