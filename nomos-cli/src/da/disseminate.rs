@@ -210,8 +210,8 @@ impl ServiceCore for DisseminateService {
 
 #[derive(Debug, Clone, Args)]
 pub struct KzgrsSettings {
-    num_columns: usize,
-    with_cache: bool,
+    pub num_columns: usize,
+    pub with_cache: bool,
 }
 
 impl Default for KzgrsSettings {

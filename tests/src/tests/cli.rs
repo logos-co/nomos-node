@@ -1,10 +1,8 @@
-use mixnet::crypto::public_key_from;
 use nomos_cli::cmds::disseminate::Disseminate;
 use nomos_cli::da::network::backend::ExecutorBackend;
 use nomos_cli::da::network::backend::ExecutorBackendSettings;
 use nomos_da_network_service::NetworkConfig;
 use nomos_libp2p::ed25519;
-use nomos_libp2p::ed25519::PublicKey;
 use nomos_libp2p::libp2p;
 use nomos_libp2p::libp2p::multiaddr::multiaddr;
 use nomos_libp2p::Multiaddr;
@@ -49,19 +47,19 @@ async fn disseminate(config: &mut Disseminate) {
     let node_addrs: HashMap<PeerId, Multiaddr> = node_configs
         .iter()
         .map(|c| {
-            let libp2p_config = &config.network.backend.inner;
+            let libp2p_config = &c.network.backend.inner;
             let keypair = libp2p::identity::Keypair::from(ed25519::Keypair::from(
                 libp2p_config.node_key.clone(),
             ));
             let peer_id = PeerId::from(keypair.public());
-
             let address = multiaddr!(Ip4(libp2p_config.host), Udp(libp2p_config.port), QuicV1);
+            (peer_id, address)
         })
         .collect();
 
-    let peer_ids: Vec<PeerId> = node_addrs.keys().cloned().collect();
+    let peer_ids: Vec<nomos_libp2p::PeerId> = node_addrs.keys().cloned().collect();
 
-    let da_network_config = NetworkConfig {
+    let da_network_config: NetworkConfig<ExecutorBackend<FillFromNodeList>> = NetworkConfig {
         backend: ExecutorBackendSettings {
             node_key: ed25519::SecretKey::generate(),
             membership: FillFromNodeList::new(&peer_ids, 2, 1),

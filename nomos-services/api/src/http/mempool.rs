@@ -41,7 +41,7 @@ where
     }
 }
 
-pub async fn add_cert<N, A, V, Item, Key>(
+pub async fn add_blob_info<N, A, Item, Key>(
     handle: &overwatch_rs::overwatch::handle::OverwatchHandle,
     item: A::Payload,
     converter: impl Fn(&A::Payload) -> Key,
