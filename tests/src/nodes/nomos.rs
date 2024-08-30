@@ -17,8 +17,13 @@ use mixnet::{
     topology::{MixNodeInfo, MixnetTopology},
 };
 use nomos_core::{block::Block, header::HeaderId};
+use nomos_da_indexer::storage::adapters::rocksdb::RocksAdapterSettings as IndexerStorageAdapterSettings;
+use nomos_da_indexer::IndexerSettings;
 use nomos_da_network_service::backends::libp2p::validator::DaNetworkValidatorBackendSettings;
 use nomos_da_network_service::NetworkConfig as DaNetworkConfig;
+use nomos_da_verifier::backend::kzgrs::KzgrsDaVerifierSettings;
+use nomos_da_verifier::storage::adapters::rocksdb::RocksAdapterSettings as VerifierStorageAdapterSettings;
+use nomos_da_verifier::DaVerifierServiceSettings;
 use nomos_libp2p::{Multiaddr, SwarmConfig};
 use nomos_log::{LoggerBackend, LoggerFormat};
 use nomos_mempool::MempoolMetrics;
@@ -378,6 +383,21 @@ fn create_node_config(
                 listening_address: Multiaddr::from_str("/ip4/127.0.0.1/udp/0/quic-v1").unwrap(),
                 addresses: Default::default(),
                 membership: Default::default(),
+            },
+        },
+        da_indexer: IndexerSettings {
+            storage: IndexerStorageAdapterSettings {
+                blob_storage_directory: "./".into(),
+            },
+        },
+        da_verifier: DaVerifierServiceSettings {
+            verifier_settings: KzgrsDaVerifierSettings {
+                sk: Default::default(),
+                nodes_public_keys: Default::default(),
+            },
+            network_adapter_settings: (),
+            storage_adapter_settings: VerifierStorageAdapterSettings {
+                blob_storage_directory: "./".into(),
             },
         },
         log: Default::default(),

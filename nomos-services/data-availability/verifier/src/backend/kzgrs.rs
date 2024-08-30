@@ -4,6 +4,7 @@ use core::fmt;
 use blst::{min_sig::PublicKey, min_sig::SecretKey};
 use kzgrs_backend::{common::blob::DaBlob, verifier::DaVerifier as NomosKzgrsVerifier};
 use nomos_core::da::DaVerifier;
+use serde::{Deserialize, Serialize};
 // internal
 use super::VerifierBackend;
 
@@ -52,7 +53,7 @@ impl DaVerifier for KzgrsDaVerifier {
 }
 
 // TODO: `sk` and `nodes_public_keys` need to be fetched from the params provider service.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct KzgrsDaVerifierSettings {
     pub sk: SecretKey,
     pub nodes_public_keys: Vec<PublicKey>,

@@ -17,6 +17,8 @@ cryptarchia-engine = { path = "../consensus/cryptarchia-engine", features = ["se
 cryptarchia-ledger = { path = "../ledger/cryptarchia-ledger", features = ["serde"] }
 nomos-mempool = { path = "../nomos-services/mempool", features = ["mock", "libp2p"] }
 nomos-da-network-service = { path = "../nomos-services/data-availability/network" }
+nomos-da-indexer = { path = "../nomos-services/data-availability/indexer" }
+nomos-da-verifier = { path = "../nomos-services/data-availability/verifier" }
 subnetworks-assignations = { path = "../nomos-da/network/subnetworks-assignations" }
 full-replication = { path = "../nomos-da/full-replication" }
 kzgrs-backend = { path = "../nomos-da/kzgrs-backend" }

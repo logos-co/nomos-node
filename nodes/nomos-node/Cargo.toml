@@ -23,6 +23,7 @@ tracing = "0.1"
 multiaddr = "0.18"
 nomos-core = { path = "../../nomos-core" }
 nomos-da-verifier = { path = "../../nomos-services/data-availability/verifier", features = ["rocksdb-backend", "libp2p"] }
+nomos-da-indexer = { path = "../../nomos-services/data-availability/indexer", features = ["rocksdb-backend"] }
 nomos-da-network-service = { path = "../../nomos-services/data-availability/network" }
 nomos-network = { path = "../../nomos-services/network", features = ["libp2p"] }
 nomos-api = { path = "../../nomos-services/api" }

@@ -1,6 +1,7 @@
+// std
 use std::path::PathBuf;
 use std::{marker::PhantomData, ops::Range};
-
+// crates
 use bytes::Bytes;
 use futures::{stream::FuturesUnordered, Stream};
 use nomos_core::da::blob::{
@@ -18,7 +19,8 @@ use overwatch_rs::{
     services::{relay::OutboundRelay, ServiceData},
     DynError,
 };
-
+use serde::{Deserialize, Serialize};
+// internal
 use crate::storage::DaStorageAdapter;
 
 pub struct RocksAdapter<S, B>
@@ -142,7 +144,7 @@ where
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RocksAdapterSettings {
     pub blob_storage_directory: PathBuf,
 }
