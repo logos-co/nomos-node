@@ -91,6 +91,8 @@ fn main() -> Result<()> {
                 registry: registry.clone(),
             },
             da_network: config.da_network,
+            da_indexer: config.da_indexer,
+            da_verifier: config.da_verifier,
             cryptarchia: config.cryptarchia,
             #[cfg(feature = "metrics")]
             metrics: MetricsSettings { registry },

@@ -16,9 +16,15 @@ pub use nomos_core::{
     da::blob::select::FillSize as FillSizeWithBlobs, tx::select::FillSize as FillSizeWithTx,
 };
 use nomos_core::{header::HeaderId, tx::Transaction, wire};
+use nomos_da_indexer::consensus::adapters::cryptarchia::CryptarchiaConsensusAdapter;
+use nomos_da_indexer::storage::adapters::rocksdb::RocksAdapter as IndexerStorageAdapter;
+use nomos_da_indexer::DataIndexerService;
 use nomos_da_network_service::backends::libp2p::validator::DaNetworkValidatorBackend;
 use nomos_da_network_service::NetworkService as DaNetworkService;
 use nomos_da_verifier::backend::kzgrs::KzgrsDaVerifier;
+use nomos_da_verifier::network::adapters::libp2p::Libp2pAdapter as VerifierNetworkAdapter;
+use nomos_da_verifier::storage::adapters::rocksdb::RocksAdapter as VerifierStorageAdapter;
+use nomos_da_verifier::DaVerifierService;
 #[cfg(feature = "tracing")]
 use nomos_log::Logger;
 use nomos_mempool::da::service::DaMempoolService;
@@ -68,11 +74,35 @@ pub type DaMempool = DaMempoolService<
     MockPool<HeaderId, BlobInfo, <BlobInfo as DispersedBlobInfo>::BlobId>,
 >;
 
+pub type DaIndexer = DataIndexerService<
+    // Indexer specific.
+    Bytes,
+    IndexerStorageAdapter<Wire, BlobInfo>,
+    CryptarchiaConsensusAdapter<Tx, BlobInfo>,
+    // Cryptarchia specific, should be the same as in `Cryptarchia` type above.
+    cryptarchia_consensus::network::adapters::libp2p::LibP2pAdapter<Tx, BlobInfo>,
+    MockPool<HeaderId, Tx, <Tx as Transaction>::Hash>,
+    MempoolNetworkAdapter<Tx, <Tx as Transaction>::Hash>,
+    MockPool<HeaderId, BlobInfo, <BlobInfo as DispersedBlobInfo>::BlobId>,
+    MempoolNetworkAdapter<BlobInfo, <BlobInfo as DispersedBlobInfo>::BlobId>,
+    FillSizeWithTx<MB16, Tx>,
+    FillSizeWithBlobs<MB16, BlobInfo>,
+    RocksBackend<Wire>,
+>;
+
+pub type DaVerifier = DaVerifierService<
+    KzgrsDaVerifier,
+    VerifierNetworkAdapter<DaBlob, ()>,
+    VerifierStorageAdapter<(), DaBlob, Wire>,
+>;
+
 #[derive(Services)]
 pub struct Nomos {
     #[cfg(feature = "tracing")]
     logging: ServiceHandle<Logger>,
     network: ServiceHandle<NetworkService<NetworkBackend>>,
+    da_indexer: ServiceHandle<DaIndexer>,
+    da_verifier: ServiceHandle<DaVerifier>,
     da_network: ServiceHandle<DaNetworkService<DaNetworkValidatorBackend<FillFromNodeList>>>,
     cl_mempool: ServiceHandle<TxMempool>,
     da_mempool: ServiceHandle<DaMempool>,
