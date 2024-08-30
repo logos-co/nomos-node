@@ -6,6 +6,7 @@ use std::time::Duration;
 // internal
 use super::{create_tempdir, persist_tempdir, LOGS_PREFIX};
 use crate::{adjust_timeout, get_available_port, ConsensusConfig, Node};
+use blst::min_sig::SecretKey;
 use cryptarchia_consensus::{CryptarchiaInfo, CryptarchiaSettings, TimeConfig};
 use cryptarchia_ledger::{Coin, LedgerState};
 use kzgrs_backend::dispersal::BlobInfo;
@@ -33,7 +34,7 @@ use nomos_network::{backends::libp2p::Libp2pConfig, NetworkConfig};
 use nomos_node::{api::AxumBackendSettings, Config, Tx};
 // crates
 use once_cell::sync::Lazy;
-use rand::{thread_rng, Rng};
+use rand::{thread_rng, Rng, RngCore};
 use reqwest::{Client, Url};
 use tempfile::NamedTempFile;
 use time::OffsetDateTime;
@@ -360,6 +361,15 @@ fn create_node_config(
     #[cfg(feature = "mixnet")] mixnet_config: MixnetConfig,
 ) -> Config {
     let swarm_config: SwarmConfig = Default::default();
+
+    let mut rng = rand::thread_rng();
+    let mut buff = [0u8; 32];
+    rng.fill_bytes(&mut buff);
+
+    let verifier_sk = SecretKey::key_gen(&buff, &[]).unwrap();
+    let verifier_pk_bytes = verifier_sk.sk_to_pk().to_bytes();
+    let verifier_sk_bytes = verifier_sk.to_bytes();
+
     let mut config = Config {
         network: NetworkConfig {
             backend: Libp2pConfig {
@@ -392,8 +402,8 @@ fn create_node_config(
         },
         da_verifier: DaVerifierServiceSettings {
             verifier_settings: KzgrsDaVerifierSettings {
-                sk: Default::default(),
-                nodes_public_keys: Default::default(),
+                sk: hex::encode(verifier_sk_bytes),
+                nodes_public_keys: vec![hex::encode(verifier_pk_bytes)],
             },
             network_adapter_settings: (),
             storage_adapter_settings: VerifierStorageAdapterSettings {
