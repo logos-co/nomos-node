@@ -10,6 +10,7 @@ use futures::stream::{BoxStream, FuturesUnordered};
 use futures::{AsyncWriteExt, FutureExt, StreamExt};
 use kzgrs_backend::common::blob::DaBlob;
 use libp2p::core::Endpoint;
+use libp2p::swarm::dial_opts::DialOpts;
 use libp2p::swarm::{
     ConnectionDenied, ConnectionId, FromSwarm, NetworkBehaviour, THandler, THandlerInEvent,
     THandlerOutEvent, ToSwarm,
@@ -25,6 +26,7 @@ use tokio::sync::mpsc::UnboundedSender;
 use tokio_stream::wrappers::UnboundedReceiverStream;
 use tracing::error;
 // internal
+use crate::address_book::AddressBook;
 use crate::protocol::SAMPLING_PROTOCOL;
 use crate::protocols::clone_deserialize_error;
 use crate::SubnetworkId;
@@ -167,7 +169,10 @@ type IncomingStreamHandlerFuture = BoxFuture<'static, Result<SampleStream, Sampl
 /// Executor sampling protocol
 /// Takes care of sending and replying sampling requests
 pub struct SamplingBehaviour<Membership: MembershipHandler> {
+    /// Self peer id
     peer_id: PeerId,
+    /// Addresses of known peers in the DA network
+    addresses: AddressBook,
     /// Underlying stream behaviour
     stream_behaviour: libp2p_stream::Behaviour,
     /// Incoming sample request streams
@@ -195,7 +200,7 @@ where
     Membership: MembershipHandler + 'static,
     Membership::NetworkId: Send,
 {
-    pub fn new(peer_id: PeerId, membership: Membership) -> Self {
+    pub fn new(peer_id: PeerId, membership: Membership, addresses: AddressBook) -> Self {
         let stream_behaviour = libp2p_stream::Behaviour::new();
         let mut control = stream_behaviour.new_control();
 
@@ -213,6 +218,7 @@ where
         let connected_peers = HashSet::new();
         Self {
             peer_id,
+            addresses,
             stream_behaviour,
             incoming_streams,
             control,
@@ -639,7 +645,18 @@ impl<M: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'static> Netw
         }
         // Deal with connection as the underlying behaviour would do
         match self.stream_behaviour.poll(cx) {
-            Poll::Ready(ToSwarm::Dial { opts }) => Poll::Ready(ToSwarm::Dial { opts }),
+            Poll::Ready(ToSwarm::Dial { mut opts }) => {
+                // attach known peer address if possible
+                if let Some(address) = opts
+                    .get_peer_id()
+                    .and_then(|peer_id: PeerId| self.addresses.get_address(&peer_id))
+                {
+                    opts = DialOpts::peer_id(opts.get_peer_id().unwrap())
+                        .addresses(vec![address.clone()])
+                        .build();
+                }
+                Poll::Ready(ToSwarm::Dial { opts })
+            }
             Poll::Pending => {
                 // TODO: probably must be smarter when to wake this
                 cx.waker().wake_by_ref();

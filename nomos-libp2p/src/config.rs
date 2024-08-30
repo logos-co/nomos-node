@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use libp2p::{gossipsub, identity::secp256k1};
+use libp2p::{gossipsub, identity::ed25519};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -10,8 +10,8 @@ pub struct SwarmConfig {
     // TCP listening port. Use 0 for random
     pub port: u16,
     // Secp256k1 private key in Hex format (`0x123...abc`). Default random
-    #[serde(with = "secret_key_serde", default = "secp256k1::SecretKey::generate")]
-    pub node_key: secp256k1::SecretKey,
+    #[serde(with = "secret_key_serde", default = "ed25519::SecretKey::generate")]
+    pub node_key: ed25519::SecretKey,
     // Gossipsub config
     #[serde(with = "GossipsubConfigDef", default = "gossipsub::Config::default")]
     pub gossipsub_config: gossipsub::Config,
@@ -22,7 +22,7 @@ impl Default for SwarmConfig {
         Self {
             host: std::net::Ipv4Addr::new(0, 0, 0, 0),
             port: 60000,
-            node_key: secp256k1::SecretKey::generate(),
+            node_key: ed25519::SecretKey::generate(),
             gossipsub_config: gossipsub::Config::default(),
         }
     }
@@ -143,25 +143,25 @@ impl From<GossipsubConfigDef> for gossipsub::Config {
 }
 
 pub mod secret_key_serde {
-    use libp2p::identity::secp256k1;
+    use libp2p::identity::ed25519;
     use serde::de::Error;
     use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-    pub fn serialize<S>(key: &secp256k1::SecretKey, serializer: S) -> Result<S::Ok, S::Error>
+    pub fn serialize<S>(key: &ed25519::SecretKey, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
-        let hex_str = hex::encode(key.to_bytes());
+        let hex_str = hex::encode(key.as_ref());
         hex_str.serialize(serializer)
     }
 
-    pub fn deserialize<'de, D>(deserializer: D) -> Result<secp256k1::SecretKey, D::Error>
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<ed25519::SecretKey, D::Error>
     where
         D: Deserializer<'de>,
     {
         let hex_str = String::deserialize(deserializer)?;
         let mut key_bytes = hex::decode(hex_str).map_err(|e| D::Error::custom(format!("{e}")))?;
-        secp256k1::SecretKey::try_from_bytes(key_bytes.as_mut_slice())
+        ed25519::SecretKey::try_from_bytes(key_bytes.as_mut_slice())
             .map_err(|e| D::Error::custom(format!("{e}")))
     }
 }
@@ -180,6 +180,6 @@ mod tests {
         let deserialized: SwarmConfig = serde_json::from_str(serialized.as_str()).unwrap();
         assert_eq!(deserialized.host, config.host);
         assert_eq!(deserialized.port, config.port);
-        assert_eq!(deserialized.node_key.to_bytes(), config.node_key.to_bytes());
+        assert_eq!(deserialized.node_key.as_ref(), config.node_key.as_ref());
     }
 }

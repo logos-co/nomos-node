@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-libp2p = { version = "0.53", features = ["macros"] }
+libp2p = { version = "0.53", features = ["macros", "tokio", "quic"] }
 libp2p-stream = "0.1.0-alpha"
 futures = "0.3"
 tracing = "0.1"
@@ -25,6 +25,6 @@ thiserror = "1.0"
 
 [dev-dependencies]
 tokio = { version = "1.39", features = ["macros", "rt-multi-thread", "time"] }
-libp2p = { version = "0.53", features = ["ed25519", "ping", "macros", "tokio", "quic", "tcp", "yamux", "noise"] }
+libp2p = { version = "0.53", features = ["ed25519", "ping", "macros", "quic", "tcp", "yamux", "noise"] }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 

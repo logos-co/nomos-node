@@ -1,3 +1,4 @@
+pub mod address_book;
 pub mod behaviour;
 pub mod protocol;
 pub mod protocols;

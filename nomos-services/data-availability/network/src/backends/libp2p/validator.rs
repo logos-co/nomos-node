@@ -1,7 +1,7 @@
 use crate::backends::NetworkBackend;
 use futures::{Stream, StreamExt};
 use kzgrs_backend::common::blob::DaBlob;
-use libp2p::identity::Keypair;
+use libp2p::identity::ed25519;
 use libp2p::{Multiaddr, PeerId};
 use log::error;
 use nomos_core::da::BlobId;
@@ -9,8 +9,10 @@ use nomos_da_network_core::protocols::sampling;
 use nomos_da_network_core::protocols::sampling::behaviour::SamplingError;
 use nomos_da_network_core::swarm::validator::{ValidatorEventsStream, ValidatorSwarm};
 use nomos_da_network_core::SubnetworkId;
+use nomos_libp2p::secret_key_serde;
 use overwatch_rs::overwatch::handle::OverwatchHandle;
 use overwatch_rs::services::state::NoState;
+use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 use std::marker::PhantomData;
 use std::pin::Pin;
@@ -75,13 +77,15 @@ pub struct DaNetworkValidatorBackend<Membership> {
     _membership: PhantomData<Membership>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct DaNetworkValidatorBackendSettings<Membership> {
-    /// Identification key
-    key: Keypair,
+    // Identification Secp256k1 private key in Hex format (`0x123...abc`). Default random.
+    #[serde(with = "secret_key_serde", default = "ed25519::SecretKey::generate")]
+    pub node_key: ed25519::SecretKey,
     /// Membership of DA network PoV set
-    membership: Membership,
-    listening_address: Multiaddr,
+    pub membership: Membership,
+    pub addresses: Vec<(PeerId, Multiaddr)>,
+    pub listening_address: Multiaddr,
 }
 
 impl<Membership> DaNetworkValidatorBackend<Membership> {
@@ -114,8 +118,13 @@ where
     type NetworkEvent = DaNetworkEvent;
 
     fn new(config: Self::Settings, overwatch_handle: OverwatchHandle) -> Self {
-        let (mut validator_swarm, events_streams) =
-            ValidatorSwarm::new(config.key, config.membership);
+        let keypair =
+            libp2p::identity::Keypair::from(ed25519::Keypair::from(config.node_key.clone()));
+        let (mut validator_swarm, events_streams) = ValidatorSwarm::new(
+            keypair,
+            config.membership,
+            config.addresses.into_iter().collect(),
+        );
         let sampling_request_channel = validator_swarm
             .protocol_swarm()
             .behaviour()
