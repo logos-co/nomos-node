@@ -186,6 +186,7 @@ where
         let mut network_adapter = N::new(network_relay).await;
 
         let mut sampling_message_stream = network_adapter.listen_to_sampling_messages().await?;
+        let mut next_prune_tick = sampler.next_prune_interval().await;
 
         let mut lifecycle_stream = service_state.lifecycle_handle.message_stream();
         async {
@@ -193,20 +194,20 @@ where
                 tokio::select! {
                     Some(service_message) = service_state.inbound_relay.recv() => {
                         Self::handle_service_message(service_message, &mut network_adapter, &mut sampler).await;
-                        // cleanup not on time samples
-                        sampler.prune();
                     }
                     Some(sampling_message) = sampling_message_stream.next() => {
                         Self::handle_sampling_message(sampling_message, &mut sampler).await;
-                        // cleanup not on time samples
-                        sampler.prune();
                     }
-
                     Some(msg) = lifecycle_stream.next() => {
                         if Self::should_stop_service(msg).await {
                             break;
                         }
                     }
+                    // cleanup not on time samples
+                    _ = next_prune_tick.tick() => {
+                        sampler.prune();
+                    }
+
                 }
             }
         }
