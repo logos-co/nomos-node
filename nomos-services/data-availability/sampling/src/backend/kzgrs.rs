@@ -82,7 +82,7 @@ impl<R: Rng + Sync + Send> DaSamplingServiceBackend<R> for KzgrsDaSampler<R> {
             tracing::info!(
                 "subnet {} for blob id {} has been successfully sampled",
                 blob.column_idx,
-                hex::encode(&blob_id)
+                hex::encode(blob_id)
             );
             ctx.subnets.insert(blob.column_idx as SubnetworkId);
 
@@ -91,7 +91,7 @@ impl<R: Rng + Sync + Send> DaSamplingServiceBackend<R> for KzgrsDaSampler<R> {
                 self.validated_blobs.insert(blob_id);
                 tracing::info!(
                     "blob_id {} has been successfully sampled",
-                    hex::encode(&blob_id)
+                    hex::encode(blob_id)
                 );
                 // cleanup from pending samplings
                 self.pending_sampling_blobs.remove(&blob_id);
