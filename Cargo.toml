@@ -30,6 +30,7 @@ members = [
     "consensus/cryptarchia-engine",
     "ledger/cryptarchia-ledger",
     "cl/cl",
+    "proof_of_leadership/proof_statements",
     "tests",
 ]
 exclude = ["proof_of_leadership/risc0/risc0_proofs"]
