@@ -29,7 +29,7 @@ members = [
     "consensus/carnot-engine",
     "consensus/cryptarchia-engine",
     "ledger/cryptarchia-ledger",
-    "proof_of_leadership/proof_statements",
+    "cl/cl",
     "tests",
 ]
 exclude = ["proof_of_leadership/risc0/risc0_proofs"]

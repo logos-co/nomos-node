@@ -4,8 +4,8 @@ use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum Error {
-    #[error("risc0 failed to serde")]
-    Risc0Serde(#[from] risc0_zkvm::serde::Error),
+    #[error("failed to produce proof")]
+    ProofError(#[from] anyhow::Error),
 }
 
 pub fn prove(leader_public: LeaderPublic, leader_private: LeaderPrivate) -> Result<Receipt, Error> {
@@ -102,7 +102,7 @@ mod test {
             input_cm_path: cl::merkle::path(leaves, 0),
         };
 
-        let proof = prove(expected_public_inputs, private_inputs);
+        let proof = prove(expected_public_inputs, private_inputs).unwrap();
         assert!(proof
             .verify(nomos_pol_risc0_proofs::PROOF_OF_LEADERSHIP_ID)
             .is_ok());
