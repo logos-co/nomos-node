@@ -24,6 +24,10 @@ pub use libp2p_stream;
 use libp2p_stream::Control;
 pub use multiaddr::{multiaddr, Multiaddr, Protocol};
 
+// TODO: Risc0 proofs are HUGE (220 Kb) and it's the only reason we need to have this
+// limit so large. Remove this once we transition to smaller proofs.
+const DATA_LIMIT: usize = 1 << 18; // Do not serialize/deserialize more than 256 KiB
+
 /// Wraps [`libp2p::Swarm`], and config it for use within Nomos.
 pub struct Swarm {
     // A core libp2p swarm
@@ -43,6 +47,7 @@ impl Behaviour {
             gossipsub::ConfigBuilder::from(gossipsub_config)
                 .validation_mode(gossipsub::ValidationMode::None)
                 .message_id_fn(compute_message_id)
+                .max_transmit_size(DATA_LIMIT)
                 .build()?,
         )?;
         Ok(Self {
