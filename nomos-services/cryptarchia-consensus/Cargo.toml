@@ -10,7 +10,9 @@ async-trait = "0.1"
 bytes = "1.3"
 chrono = "0.4"
 cryptarchia-engine = { path = "../../consensus/cryptarchia-engine", features = ["serde"] }
-cryptarchia-ledger = { path = "../../ledger/cryptarchia-ledger", features = ["serde"] }
+cryptarchia-ledger = { path = "../../ledger/cryptarchia-ledger", features = ["serde", "risc0_proof"] }
+leader_proof_statements = { path = "../../proof_of_leadership/proof_statements" }
+cl = { path = "../../cl/cl" }
 futures = "0.3"
 nomos-network = { path = "../network" }
 nomos-mempool = { path = "../mempool" }
