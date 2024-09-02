@@ -135,13 +135,13 @@ fn new_node(
     .unwrap()
 }
 
-fn generate_keys() -> (blst::min_sig::SecretKey, blst::min_sig::PublicKey) {
+fn generate_hex_keys() -> (String, String) {
     let mut rng = rand::thread_rng();
     let sk_bytes: [u8; 32] = rng.gen();
     let sk = blst::min_sig::SecretKey::key_gen(&sk_bytes, &[]).unwrap();
 
     let pk = sk.sk_to_pk();
-    (sk, pk)
+    (hex::encode(sk.to_bytes()), hex::encode(pk.to_bytes()))
 }
 
 pub fn rand_data(elements_count: usize) -> Vec<u8> {
@@ -198,8 +198,8 @@ fn test_verifier() {
 
     let blobs_dir = TempDir::new().unwrap().path().to_path_buf();
 
-    let (node1_sk, node1_pk) = generate_keys();
-    let (node2_sk, node2_pk) = generate_keys();
+    let (node1_sk, node1_pk) = generate_hex_keys();
+    let (node2_sk, node2_pk) = generate_hex_keys();
 
     let client_zone = new_client(NamedTempFile::new().unwrap().path().to_path_buf());
 
@@ -213,8 +213,8 @@ fn test_verifier() {
         &blobs_dir,
         vec![node_address(&swarm_config2)],
         KzgrsDaVerifierSettings {
-            sk: node1_sk,
-            nodes_public_keys: vec![node1_pk, node2_pk],
+            sk: node1_sk.clone(),
+            nodes_public_keys: vec![node1_pk.clone(), node2_pk.clone()],
         },
     );
 

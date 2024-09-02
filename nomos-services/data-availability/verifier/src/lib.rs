@@ -6,6 +6,7 @@ use nomos_core::da::blob::Blob;
 // std
 use nomos_storage::StorageService;
 use overwatch_rs::services::life_cycle::LifecycleMessage;
+use serde::{Deserialize, Serialize};
 use std::error::Error;
 use std::fmt::{Debug, Formatter};
 use storage::DaStorageAdapter;
@@ -206,7 +207,7 @@ where
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DaVerifierServiceSettings<BackendSettings, NetworkSettings, StorageSettings> {
     pub verifier_settings: BackendSettings,
     pub network_adapter_settings: NetworkSettings,

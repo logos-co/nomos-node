@@ -57,8 +57,8 @@ pub struct ExecutorBackendSettings<Membership> {
     #[serde(with = "secret_key_serde", default = "ed25519::SecretKey::generate")]
     pub node_key: ed25519::SecretKey,
     /// Membership of DA network PoV set
-    membership: Membership,
-    node_addrs: HashMap<PeerId, Multiaddr>,
+    pub membership: Membership,
+    pub node_addrs: HashMap<PeerId, Multiaddr>,
 }
 
 impl<Membership> ExecutorBackend<Membership> {

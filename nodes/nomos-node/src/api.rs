@@ -1,7 +1,8 @@
+// std
 use std::error::Error;
 use std::ops::Range;
 use std::{fmt::Debug, hash::Hash};
-
+// crates
 use axum::{
     extract::{Query, State},
     http::HeaderValue,
@@ -35,6 +36,7 @@ use tower_http::{
 };
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
+// internal
 
 /// Configuration for the Http Server
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
@@ -178,6 +180,7 @@ where
             .route("/network/info", routing::get(libp2p_info))
             .route("/storage/block", routing::post(block::<S, T>))
             .route("/mempool/add/tx", routing::post(add_tx::<T>))
+            .route("/mempool/add/blobinfo", routing::post(add_blob_info::<V>))
             .route("/metrics", routing::get(get_metrics))
             .with_state(handle);
 
@@ -448,6 +451,38 @@ where
         Tx,
         <Tx as Transaction>::Hash,
     >(&handle, tx, Transaction::hash))
+}
+
+#[utoipa::path(
+    post,
+    path = "/mempool/add/blobinfo",
+    responses(
+        (status = 200, description = "Add blob info to the mempool"),
+        (status = 500, description = "Internal server error", body = String),
+    )
+)]
+async fn add_blob_info<B>(
+    State(handle): State<OverwatchHandle>,
+    Json(blob_info): Json<B>,
+) -> Response
+where
+    B: DispersedBlobInfo
+        + Clone
+        + Debug
+        + Hash
+        + Serialize
+        + DeserializeOwned
+        + Send
+        + Sync
+        + 'static,
+    <B as DispersedBlobInfo>::BlobId: std::cmp::Ord + Clone + Debug + Hash + Send + Sync + 'static,
+{
+    make_request_and_return_response!(mempool::add_blob_info::<
+        NetworkBackend,
+        MempoolNetworkAdapter<B, <B as DispersedBlobInfo>::BlobId>,
+        B,
+        <B as DispersedBlobInfo>::BlobId,
+    >(&handle, blob_info, DispersedBlobInfo::blob_id))
 }
 
 #[utoipa::path(
