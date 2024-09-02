@@ -66,7 +66,7 @@ where
     Backend::DaBlob: Debug + Send,
     Backend::Error: Error + Send + Sync,
     Backend::Settings: Clone,
-    N: NetworkAdapter<Blob = Box<Backend::DaBlob>> + Send + 'static,
+    N: NetworkAdapter<Blob = Backend::DaBlob> + Send + 'static,
     N::Settings: Clone,
     S: DaStorageAdapter<Blob = Backend::DaBlob, Attestation = ()> + Send + 'static,
 {
@@ -124,7 +124,7 @@ where
     Backend::Settings: Clone + Send + Sync + 'static,
     Backend::DaBlob: Debug + Send + Sync + 'static,
     Backend::Error: Error + Send + Sync + 'static,
-    N: NetworkAdapter<Blob = Box<Backend::DaBlob>> + Send + Sync + 'static,
+    N: NetworkAdapter<Blob = Backend::DaBlob> + Send + Sync + 'static,
     N::Settings: Clone + Send + Sync + 'static,
     S: DaStorageAdapter<Blob = Backend::DaBlob, Attestation = ()> + Send + Sync + 'static,
     S::Settings: Clone + Send + Sync + 'static,

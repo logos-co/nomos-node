@@ -33,36 +33,6 @@ where
     _membership: PhantomData<M>,
 }
 
-impl<M> Libp2pAdapter<M>
-where
-    M: MembershipHandler<NetworkId = SubnetworkId, Id = PeerId>
-        + Clone
-        + Debug
-        + Send
-        + Sync
-        + 'static,
-{
-    async fn stream_for(&self) -> Box<dyn Stream<Item = Box<DaBlob>> + Unpin + Send> {
-        let (sender, receiver) = tokio::sync::oneshot::channel();
-        self.network_relay
-            .send(nomos_da_network_service::DaNetworkMsg::Subscribe {
-                kind: DaNetworkEventKind::Verifying,
-                sender,
-            })
-            .await
-            .expect("Network backend should be ready");
-
-        let receiver = receiver.await.expect("Blob stream should be received");
-
-        let stream = receiver.filter_map(move |msg| match msg {
-            DaNetworkEvent::Verifying(blob) => Some(blob),
-            _ => None,
-        });
-
-        Box::new(Box::pin(stream))
-    }
-}
-
 #[async_trait::async_trait]
 impl<M> NetworkAdapter for Libp2pAdapter<M>
 where
@@ -75,7 +45,7 @@ where
 {
     type Backend = DaNetworkValidatorBackend<M>;
     type Settings = ();
-    type Blob = Box<DaBlob>;
+    type Blob = DaBlob;
 
     async fn new(
         _settings: Self::Settings,
@@ -88,6 +58,22 @@ where
     }
 
     async fn blob_stream(&self) -> Box<dyn Stream<Item = Self::Blob> + Unpin + Send> {
-        self.stream_for().await
+        let (sender, receiver) = tokio::sync::oneshot::channel();
+        self.network_relay
+            .send(nomos_da_network_service::DaNetworkMsg::Subscribe {
+                kind: DaNetworkEventKind::Verifying,
+                sender,
+            })
+            .await
+            .expect("Network backend should be ready");
+
+        let receiver = receiver.await.expect("Blob stream should be received");
+
+        let stream = receiver.filter_map(move |msg| match msg {
+            DaNetworkEvent::Verifying(blob) => Some(*blob),
+            _ => None,
+        });
+
+        Box::new(Box::pin(stream))
     }
 }

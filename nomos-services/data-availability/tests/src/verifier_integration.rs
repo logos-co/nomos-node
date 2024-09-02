@@ -292,13 +292,12 @@ fn test_verifier() {
                     .collect(),
             };
 
-            verifier
+            let res = verifier
                 .send(nomos_da_verifier::DaVerifierMsg::AddBlob {
                     blob: da_blob,
                     reply_channel: reply_tx,
                 })
-                .await
-                .unwrap();
+                .await;
         }
 
         // Wait for response from the verifier.
