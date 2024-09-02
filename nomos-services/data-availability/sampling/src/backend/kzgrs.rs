@@ -4,6 +4,7 @@ use std::fmt::Debug;
 use std::time::{Duration, Instant};
 
 // crates
+use hex;
 use rand::distributions::Standard;
 use rand::prelude::*;
 use tokio::time;
@@ -13,12 +14,9 @@ use kzgrs_backend::common::blob::DaBlob;
 
 //
 // internal
-use super::DaSamplingServiceBackend;
+use crate::{backend::TrackingState, DaSamplingServiceBackend};
 use nomos_core::da::BlobId;
 use nomos_da_network_core::SubnetworkId;
-
-const NON_TRIGGERED_ERR: &str =
-    "We should not receive a sampling success from a non triggered blobId";
 
 #[derive(Clone)]
 pub struct SamplingContext {
@@ -48,8 +46,6 @@ impl<R: Rng> KzgrsDaSampler<R> {
     }
 }
 
-// TODO there is no logging at all here. Should we not do some logging?
-// Or can we assume that it is done on an upeer level by the clients?
 #[async_trait::async_trait]
 impl<R: Rng + Sync + Send> DaSamplingServiceBackend<R> for KzgrsDaSampler<R> {
     type Settings = KzgrsDaSamplerSettings;
@@ -66,7 +62,7 @@ impl<R: Rng + Sync + Send> DaSamplingServiceBackend<R> for KzgrsDaSampler<R> {
         }
     }
 
-    async fn next_prune_interval(&self) -> Interval {
+    async fn prune_interval(&self) -> Interval {
         time::interval(self.settings.old_blobs_check_interval)
     }
 
@@ -83,25 +79,23 @@ impl<R: Rng + Sync + Send> DaSamplingServiceBackend<R> for KzgrsDaSampler<R> {
 
     async fn handle_sampling_success(&mut self, blob_id: Self::BlobId, blob: Self::Blob) {
         if let Some(ctx) = self.pending_sampling_blobs.get_mut(&blob_id) {
+            tracing::info!(
+                "subnet {} for blob id {} has been successfully sampled",
+                blob.column_idx,
+                hex::encode(&blob_id)
+            );
             ctx.subnets.insert(blob.column_idx as SubnetworkId);
 
-            println!("{}", self.settings.num_samples);
-            println!("{}", ctx.subnets.len());
-            match ctx.subnets.len() {
-                // sampling of this blob_id terminated successfully
-                len if len == self.settings.num_samples as usize => {
-                    self.validated_blobs.insert(blob_id);
-                    // cleanup from pending samplings
-                    self.pending_sampling_blobs.remove(&blob_id);
-                }
-                len if len > self.settings.num_samples as usize => {
-                    unreachable!("{}", "more subnets than expected after sampling success!");
-                }
-                // do nothing if smaller
-                _ => {}
+            // sampling of this blob_id terminated successfully
+            if ctx.subnets.len() == self.settings.num_samples as usize {
+                self.validated_blobs.insert(blob_id);
+                tracing::info!(
+                    "blob_id {} has been successfully sampled",
+                    hex::encode(&blob_id)
+                );
+                // cleanup from pending samplings
+                self.pending_sampling_blobs.remove(&blob_id);
             }
-        } else {
-            unreachable!("{}", NON_TRIGGERED_ERR);
         }
     }
 
@@ -113,10 +107,14 @@ impl<R: Rng + Sync + Send> DaSamplingServiceBackend<R> for KzgrsDaSampler<R> {
         self.validated_blobs.remove(&blob_id);
     }
 
-    // TODO: This also would be an error which should never happen, but what if a client starts
-    // init_sampling of a blob which is already pending? Or worse, which already is validated?
-    // Should we not therefore return an error here?
-    async fn init_sampling(&mut self, blob_id: Self::BlobId) -> Vec<SubnetworkId> {
+    async fn init_sampling(&mut self, blob_id: Self::BlobId) -> TrackingState {
+        if self.pending_sampling_blobs.contains_key(&blob_id) {
+            return TrackingState::Tracking;
+        }
+        if self.validated_blobs.contains(&blob_id) {
+            return TrackingState::Terminated;
+        }
+
         let subnets: Vec<SubnetworkId> = Standard
             .sample_iter(&mut self.rng)
             .take(self.settings.num_samples as usize)
@@ -126,7 +124,7 @@ impl<R: Rng + Sync + Send> DaSamplingServiceBackend<R> for KzgrsDaSampler<R> {
             started: Instant::now(),
         };
         self.pending_sampling_blobs.insert(blob_id, ctx);
-        subnets
+        TrackingState::Init(subnets)
     }
 
     fn prune(&mut self) {
@@ -145,10 +143,10 @@ mod test {
 
     use crate::backend::kzgrs::{
         DaSamplingServiceBackend, KzgrsDaSampler, KzgrsDaSamplerSettings, SamplingContext,
+        TrackingState,
     };
     use kzgrs_backend::common::{blob::DaBlob, Column};
     use nomos_core::da::BlobId;
-    use nomos_da_network_core::SubnetworkId;
 
     fn create_sampler(subnet_num: usize) -> KzgrsDaSampler<StdRng> {
         let settings = KzgrsDaSamplerSettings {
@@ -189,13 +187,17 @@ mod test {
         assert!(sampler.get_validated_blobs().await.is_empty());
 
         // start sampling for b1
-        let subnets_to_sample: Vec<SubnetworkId> = sampler.init_sampling(b1).await;
+        let TrackingState::Init(subnets_to_sample) = sampler.init_sampling(b1).await else {
+            panic!("unexpected return value")
+        };
         assert!(subnets_to_sample.len() == subnet_num);
         assert!(sampler.validated_blobs.is_empty());
         assert!(sampler.pending_sampling_blobs.len() == 1);
 
         // start sampling for b2
-        let subnets_to_sample2: Vec<SubnetworkId> = sampler.init_sampling(b2).await;
+        let TrackingState::Init(subnets_to_sample2) = sampler.init_sampling(b2).await else {
+            panic!("unexpected return value")
+        };
         assert!(subnets_to_sample2.len() == subnet_num);
         assert!(sampler.validated_blobs.is_empty());
         assert!(sampler.pending_sampling_blobs.len() == 2);
@@ -302,37 +304,6 @@ mod test {
         sampler.mark_in_block(&[b1]).await;
         assert!(sampler.validated_blobs.is_empty());
         assert!(sampler.pending_sampling_blobs.is_empty());
-    }
-
-    #[tokio::test]
-    async fn test_panic() {
-        // a bit of an overkill for a test but adds coverage:
-        // tests that trying to handle success for a blob
-        // which hasn't been initated for sampling first,
-        // should panic
-        use futures::FutureExt;
-        use std::panic::AssertUnwindSafe;
-
-        let mut sampler = create_sampler(42);
-
-        let b: BlobId = sampler.rng.gen();
-        let blob = DaBlob {
-            column_idx: 42,
-            column: Column(vec![]),
-            column_commitment: Default::default(),
-            aggregated_column_commitment: Default::default(),
-            aggregated_column_proof: Default::default(),
-            rows_commitments: vec![],
-            rows_proofs: vec![],
-        };
-
-        let should_panic = async {
-            AssertUnwindSafe(sampler.handle_sampling_success(b, blob)).await;
-            // needed to avoid "may not be safely transferred across an unwind boundary" errors
-            drop(sampler);
-        };
-        let should_panic_result = should_panic.catch_unwind().await;
-        assert!(should_panic_result.is_err());
     }
 
     #[tokio::test]

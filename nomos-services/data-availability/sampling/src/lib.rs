@@ -10,7 +10,7 @@ use rand::prelude::*;
 use tokio_stream::StreamExt;
 use tracing::{error, span, Instrument, Level};
 // internal
-use backend::DaSamplingServiceBackend;
+use backend::{DaSamplingServiceBackend, TrackingState};
 use kzgrs_backend::common::blob::DaBlob;
 use network::NetworkAdapter;
 use nomos_core::da::BlobId;
@@ -92,12 +92,14 @@ where
     ) {
         match msg {
             DaSamplingServiceMsg::TriggerSampling { blob_id } => {
-                let sampling_subnets = sampler.init_sampling(blob_id).await;
-                if let Err(e) = network_adapter
-                    .start_sampling(blob_id, &sampling_subnets)
-                    .await
+                if let TrackingState::Init(sampling_subnets) = sampler.init_sampling(blob_id).await
                 {
-                    error!("Error sampling for BlobId: {blob_id:?}: {e}");
+                    if let Err(e) = network_adapter
+                        .start_sampling(blob_id, &sampling_subnets)
+                        .await
+                    {
+                        error!("Error sampling for BlobId: {blob_id:?}: {e}");
+                    }
                 }
             }
             DaSamplingServiceMsg::GetValidatedBlobs { reply_channel } => {
@@ -118,11 +120,10 @@ where
                 sampler.handle_sampling_success(blob_id, *blob).await;
             }
             SamplingEvent::SamplingError { error } => {
-                // TODO: in most of these error cases we can't get the blob_id from the error
-                // Shouldn't the error contain that?
-                // We can of course stop tracking that blob_id in the backend via timeout,
-                // which we want to have anyways, but could it be nicer to remove it here too,
-                // by calling the handler_sampling_error method?
+                if let Some(blob_id) = error.blob_id() {
+                    sampler.handle_sampling_error(*blob_id).await;
+                    return;
+                }
                 error!("Error while sampling: {error}");
             }
         }
@@ -186,7 +187,7 @@ where
         let mut network_adapter = N::new(network_relay).await;
 
         let mut sampling_message_stream = network_adapter.listen_to_sampling_messages().await?;
-        let mut next_prune_tick = sampler.next_prune_interval().await;
+        let mut next_prune_tick = sampler.prune_interval().await;
 
         let mut lifecycle_stream = service_state.lifecycle_handle.message_stream();
         async {

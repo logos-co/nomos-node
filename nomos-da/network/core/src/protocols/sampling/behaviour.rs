@@ -73,6 +73,13 @@ impl SamplingError {
             SamplingError::ResponseChannel { peer_id, .. } => peer_id,
         }
     }
+
+    pub fn blob_id(&self) -> Option<&BlobId> {
+        match self {
+            SamplingError::Deserialize { blob_id, .. } => Some(blob_id),
+            _ => None,
+        }
+    }
 }
 
 impl Clone for SamplingError {
