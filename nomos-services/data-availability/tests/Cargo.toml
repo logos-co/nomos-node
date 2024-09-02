@@ -15,6 +15,7 @@ kzgrs-backend = { path = "../../../nomos-da/kzgrs-backend" }
 nomos-core = { path = "../../../nomos-core" }
 nomos-da-indexer = { path = "../indexer", features = ["rocksdb-backend"] }
 nomos-da-verifier = { path = "../verifier", features = ["rocksdb-backend", "libp2p"] }
+nomos-da-sampling = { path = "../sampling" }
 nomos-da-storage = { path = "../../../nomos-da/storage" }
 nomos-node = { path = "../../../nodes/nomos-node" }
 nomos-mempool = { path = "../../../nomos-services/mempool" }
@@ -30,6 +31,7 @@ tempfile = "3.6"
 tracing = "0.1"
 time = "0.3"
 rand = "0.8"
+subnetworks-assignations = { path = "../../../nomos-da/network/subnetworks-assignations" }
 
 [dev-dependencies]
 blake2 = { version = "0.10" }
