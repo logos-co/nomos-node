@@ -22,6 +22,8 @@ use nomos_da_indexer::DataIndexerService;
 use nomos_da_network_service::backends::libp2p::validator::DaNetworkValidatorBackend;
 use nomos_da_network_service::NetworkService as DaNetworkService;
 use nomos_da_sampling::backend::kzgrs::KzgrsSamplingBackend;
+use nomos_da_sampling::network::adapters::libp2p::Libp2pAdapter as SamplingLibp2pAdapter;
+use nomos_da_sampling::DaSamplingService;
 use nomos_da_verifier::backend::kzgrs::KzgrsDaVerifier;
 use nomos_da_verifier::network::adapters::libp2p::Libp2pAdapter as VerifierNetworkAdapter;
 use nomos_da_verifier::storage::adapters::rocksdb::RocksAdapter as VerifierStorageAdapter;
@@ -112,6 +114,9 @@ pub type DaIndexer = DataIndexerService<
     ChaCha20Rng,
 >;
 
+pub type DaSampling =
+    DaSamplingService<KzgrsSamplingBackend<ChaCha20Rng>, SamplingLibp2pAdapter<FillWithOriginalReplication>, ChaCha20Rng>;
+
 pub type DaVerifier = DaVerifierService<
     KzgrsDaVerifier,
     VerifierNetworkAdapter<DaBlob, ()>,
@@ -125,6 +130,7 @@ pub struct Nomos {
     network: ServiceHandle<NetworkService<NetworkBackend>>,
     da_indexer: ServiceHandle<DaIndexer>,
     da_verifier: ServiceHandle<DaVerifier>,
+    da_sampling: ServiceHandle<DaSampling>,
     da_network: ServiceHandle<DaNetworkService<DaNetworkValidatorBackend<FillFromNodeList>>>,
     cl_mempool: ServiceHandle<TxMempool>,
     da_mempool: ServiceHandle<DaMempool>,

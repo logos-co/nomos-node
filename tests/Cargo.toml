@@ -20,6 +20,7 @@ nomos-mempool = { path = "../nomos-services/mempool", features = ["mock", "libp2
 nomos-da-network-service = { path = "../nomos-services/data-availability/network" }
 nomos-da-indexer = { path = "../nomos-services/data-availability/indexer" }
 nomos-da-verifier = { path = "../nomos-services/data-availability/verifier" }
+nomos-da-sampling = { path = "../nomos-services/data-availability/sampling" }
 subnetworks-assignations = { path = "../nomos-da/network/subnetworks-assignations" }
 full-replication = { path = "../nomos-da/full-replication" }
 hex = "0.4.3"

@@ -22,6 +22,7 @@ use overwatch_rs::services::relay::{Relay, RelayMessage};
 use overwatch_rs::services::state::{NoOperator, NoState};
 use overwatch_rs::services::{ServiceCore, ServiceData, ServiceId};
 use overwatch_rs::DynError;
+use serde::{Deserialize, Serialize};
 use tokio::sync::oneshot;
 
 const DA_SAMPLING_TAG: ServiceId = "DA-Sampling";
@@ -39,7 +40,7 @@ pub enum DaSamplingServiceMsg<BlobId> {
     },
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DaSamplingServiceSettings<BackendSettings, NetworkSettings> {
     pub sampling_settings: BackendSettings,
     pub network_adapter_settings: NetworkSettings,
