@@ -344,7 +344,7 @@ where
                             tracing::error!("trying to propose a block for slot {} but epoch state is not available", u64::from(slot));
                             continue;
                         };
-                        if let Some(proof) = leader.build_proof_for(note_tree, epoch_state, slot, parent) {
+                        if let Some(proof) = leader.build_proof_for(note_tree, epoch_state, slot, parent).await {
                             tracing::debug!("proposing block...");
                             // TODO: spawn as a separate task?
                             let block = Self::propose_block(

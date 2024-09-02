@@ -258,7 +258,7 @@ impl Node for NomosNode {
             },
         };
         let time_config = TimeConfig {
-            slot_duration: Duration::from_secs(1),
+            slot_duration: Duration::from_secs(30),
             chain_start_time: OffsetDateTime::now_utc(),
         };
 

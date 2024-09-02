@@ -24,7 +24,7 @@ type BincodeOptions = WithOtherTrailing<
     RejectTrailing,
 >;
 
-const DATA_LIMIT: u64 = 2048; // Do not serialize/deserialize more than 2Kb
+const DATA_LIMIT: u64 = 1 << 19; // Do not serialize/deserialize more than 16Kb
 static OPTIONS: Lazy<BincodeOptions> = Lazy::new(|| {
     bincode::DefaultOptions::new()
         .with_little_endian()

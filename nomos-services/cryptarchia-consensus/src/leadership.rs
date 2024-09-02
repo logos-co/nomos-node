@@ -38,7 +38,7 @@ impl Leader {
         }
     }
 
-    pub fn build_proof_for(
+    pub async fn build_proof_for(
         &self,
         note_tree: &NoteTree,
         epoch_state: &EpochState,
@@ -47,9 +47,19 @@ impl Leader {
     ) -> Option<Risc0LeaderProof> {
         let notes = self.notes.get(&parent)?;
         for note in notes {
-            let cm_root = [0; 32];
+            let Some(index) = note_tree
+                .commitments()
+                .iter()
+                .position(|cm| cm == &note.note_commitment())
+            else {
+                continue;
+            };
+
+            let input_cm_path = note_tree
+                .witness(index)
+                .expect("Note was found in the tree");
             let public_inputs = LeaderPublic::new(
-                cm_root,
+                note_tree.root(),
                 *epoch_state.nonce(),
                 slot.into(),
                 self.config.consensus_config.active_slot_coeff,
@@ -64,20 +74,20 @@ impl Leader {
                     note.note.value,
                     epoch_state.total_stake()
                 );
-                let index = note_tree
-                    .commitments()
-                    .iter()
-                    .position(|cm| cm == &note.note_commitment())?;
-                let input_cm_path = note_tree
-                    .witness(index)
-                    .expect("Note was found in the tree");
-                return Some(Risc0LeaderProof::build(
-                    public_inputs,
-                    LeaderPrivate {
-                        input: *note,
-                        input_cm_path,
-                    },
-                ));
+                let input = *note;
+                return Some(
+                    tokio::task::spawn_blocking(move || {
+                        Risc0LeaderProof::build(
+                            public_inputs,
+                            LeaderPrivate {
+                                input,
+                                input_cm_path,
+                            },
+                        )
+                    })
+                    .await
+                    .ok()?,
+                );
             }
         }
 

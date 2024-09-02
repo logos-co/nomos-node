@@ -43,6 +43,7 @@ impl Behaviour {
             gossipsub::ConfigBuilder::from(gossipsub_config)
                 .validation_mode(gossipsub::ValidationMode::None)
                 .message_id_fn(compute_message_id)
+                .max_transmit_size(1 << 19)
                 .build()?,
         )?;
         Ok(Self {
