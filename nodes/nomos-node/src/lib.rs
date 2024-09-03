@@ -114,8 +114,11 @@ pub type DaIndexer = DataIndexerService<
     ChaCha20Rng,
 >;
 
-pub type DaSampling =
-    DaSamplingService<KzgrsSamplingBackend<ChaCha20Rng>, SamplingLibp2pAdapter<FillWithOriginalReplication>, ChaCha20Rng>;
+pub type DaSampling = DaSamplingService<
+    KzgrsSamplingBackend<ChaCha20Rng>,
+    SamplingLibp2pAdapter<FillWithOriginalReplication>,
+    ChaCha20Rng,
+>;
 
 pub type DaVerifier = DaVerifierService<
     KzgrsDaVerifier,

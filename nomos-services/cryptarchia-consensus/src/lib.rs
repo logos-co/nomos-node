@@ -31,8 +31,8 @@ use overwatch_rs::services::{
     state::{NoOperator, NoState},
     ServiceCore, ServiceData, ServiceId,
 };
-use rand::{RngCore, SeedableRng};
 use overwatch_rs::DynError;
+use rand::{RngCore, SeedableRng};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_with::serde_as;
 use std::collections::BTreeSet;
