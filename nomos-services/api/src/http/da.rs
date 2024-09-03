@@ -10,11 +10,13 @@ use nomos_da_indexer::DaMsg;
 use nomos_da_indexer::{
     consensus::adapters::cryptarchia::CryptarchiaConsensusAdapter, DataIndexerService,
 };
+use nomos_da_network_core::SubnetworkId;
 use nomos_da_sampling::backend::DaSamplingServiceBackend;
 use nomos_da_verifier::backend::VerifierBackend;
 use nomos_da_verifier::network::adapters::libp2p::Libp2pAdapter;
 use nomos_da_verifier::storage::adapters::rocksdb::RocksAdapter as VerifierStorageAdapter;
 use nomos_da_verifier::{DaVerifierMsg, DaVerifierService};
+use nomos_libp2p::PeerId;
 use nomos_mempool::backend::mockpool::MockPool;
 use nomos_mempool::network::adapters::libp2p::Libp2pAdapter as MempoolNetworkAdapter;
 use nomos_storage::backends::rocksdb::RocksBackend;
@@ -27,6 +29,7 @@ use serde::Serialize;
 use std::error::Error;
 use std::fmt::Debug;
 use std::hash::Hash;
+use subnetworks_assignations::MembershipHandler;
 use tokio::sync::oneshot;
 
 pub type DaIndexer<
@@ -57,10 +60,10 @@ pub type DaIndexer<
     SamplingRng,
 >;
 
-pub type DaVerifier<A, B, VB, SS> =
-    DaVerifierService<VB, Libp2pAdapter<B, A>, VerifierStorageAdapter<A, B, SS>>;
+pub type DaVerifier<A, B, M, VB, SS> =
+    DaVerifierService<VB, Libp2pAdapter<M>, VerifierStorageAdapter<A, B, SS>>;
 
-pub async fn add_blob<A, B, VB, SS>(
+pub async fn add_blob<A, B, M, VB, SS>(
     handle: &OverwatchHandle,
     blob: B,
 ) -> Result<Option<()>, DynError>
@@ -69,12 +72,21 @@ where
     B: Blob + Serialize + DeserializeOwned + Clone + Send + Sync + 'static,
     <B as Blob>::BlobId: AsRef<[u8]> + Send + Sync + 'static,
     <B as Blob>::ColumnIndex: AsRef<[u8]> + Send + Sync + 'static,
+    M: MembershipHandler<NetworkId = SubnetworkId, Id = PeerId>
+        + Clone
+        + Debug
+        + Send
+        + Sync
+        + 'static,
     VB: VerifierBackend + CoreDaVerifier<DaBlob = B>,
     <VB as VerifierBackend>::Settings: Clone,
     <VB as CoreDaVerifier>::Error: Error,
     SS: StorageSerde + Send + Sync + 'static,
 {
-    let relay = handle.relay::<DaVerifier<A, B, VB, SS>>().connect().await?;
+    let relay = handle
+        .relay::<DaVerifier<A, B, M, VB, SS>>()
+        .connect()
+        .await?;
     let (sender, receiver) = oneshot::channel();
     relay
         .send(DaVerifierMsg::AddBlob {

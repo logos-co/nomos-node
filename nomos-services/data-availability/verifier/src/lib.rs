@@ -17,7 +17,7 @@ use tracing::{error, span, Instrument, Level};
 // internal
 use backend::VerifierBackend;
 use network::NetworkAdapter;
-use nomos_network::NetworkService;
+use nomos_da_network_service::NetworkService;
 use overwatch_rs::services::handle::ServiceStateHandle;
 use overwatch_rs::services::relay::{Relay, RelayMessage};
 use overwatch_rs::services::state::{NoOperator, NoState};
@@ -66,7 +66,7 @@ where
     Backend::DaBlob: Debug + Send,
     Backend::Error: Error + Send + Sync,
     Backend::Settings: Clone,
-    N: NetworkAdapter<Blob = Backend::DaBlob, Attestation = ()> + Send + 'static,
+    N: NetworkAdapter<Blob = Box<Backend::DaBlob>> + Send + 'static,
     N::Settings: Clone,
     S: DaStorageAdapter<Blob = Backend::DaBlob, Attestation = ()> + Send + 'static,
 {
@@ -124,7 +124,7 @@ where
     Backend::Settings: Clone + Send + Sync + 'static,
     Backend::DaBlob: Debug + Send + Sync + 'static,
     Backend::Error: Error + Send + Sync + 'static,
-    N: NetworkAdapter<Blob = Backend::DaBlob, Attestation = ()> + Send + Sync + 'static,
+    N: NetworkAdapter<Blob = Box<Backend::DaBlob>> + Send + Sync + 'static,
     N::Settings: Clone + Send + Sync + 'static,
     S: DaStorageAdapter<Blob = Backend::DaBlob, Attestation = ()> + Send + Sync + 'static,
     S::Settings: Clone + Send + Sync + 'static,
@@ -173,11 +173,8 @@ where
             loop {
                 tokio::select! {
                     Some(blob) = blob_stream.next() => {
-                        match Self::handle_new_blob(&verifier,&storage_adapter, &blob).await {
-                            Ok(attestation) => if let Err(err) = network_adapter.send_attestation(attestation).await {
-                                error!("Error replying attestation {err:?}");
-                            },
-                            Err(err) => error!("Error handling blob {blob:?} due to {err:?}"),
+                        if let Err(err) =  Self::handle_new_blob(&verifier,&storage_adapter, &blob).await {
+                            error!("Error handling blob {blob:?} due to {err:?}");
                         }
                     }
                     Some(msg) = service_state.inbound_relay.recv() => {

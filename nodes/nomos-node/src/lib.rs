@@ -58,6 +58,7 @@ pub type NomosApiService = ApiService<
         (),
         DaBlob,
         BlobInfo,
+        NomosDaMembership,
         BlobInfo,
         KzgrsDaVerifier,
         Tx,
@@ -124,7 +125,7 @@ pub type DaSampling = DaSamplingService<
 
 pub type DaVerifier = DaVerifierService<
     KzgrsDaVerifier,
-    VerifierNetworkAdapter<DaBlob, ()>,
+    VerifierNetworkAdapter<FillFromNodeList>,
     VerifierStorageAdapter<(), DaBlob, Wire>,
 >;
 
