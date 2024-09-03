@@ -505,8 +505,8 @@ pub mod test {
                 PeerId::from_public_key(&k1.public()),
                 PeerId::from_public_key(&k2.public()),
             ]
-                .into_iter()
-                .collect(),
+            .into_iter()
+            .collect(),
         };
         let mut executor = DispersalExecutorBehaviour::new(neighbours.clone());
         let chunk = Chunk(Vec::with_capacity(10));
@@ -532,8 +532,8 @@ pub mod test {
                 blob.clone(),
                 network_id,
             )
-                .await
-                .is_ok();
+            .await
+            .is_ok();
 
             assert!(dispersed);
         };
