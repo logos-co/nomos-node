@@ -14,7 +14,7 @@ use kzgrs_backend::common::blob::DaBlob;
 
 //
 // internal
-use crate::{backend::TrackingState, DaSamplingServiceBackend};
+use crate::{backend::SamplingState, DaSamplingServiceBackend};
 use nomos_core::da::BlobId;
 use nomos_da_network_core::SubnetworkId;
 
@@ -107,12 +107,12 @@ impl<R: Rng + Sync + Send> DaSamplingServiceBackend<R> for KzgrsDaSampler<R> {
         self.validated_blobs.remove(&blob_id);
     }
 
-    async fn init_sampling(&mut self, blob_id: Self::BlobId) -> TrackingState {
+    async fn init_sampling(&mut self, blob_id: Self::BlobId) -> SamplingState {
         if self.pending_sampling_blobs.contains_key(&blob_id) {
-            return TrackingState::Tracking;
+            return SamplingState::Tracking;
         }
         if self.validated_blobs.contains(&blob_id) {
-            return TrackingState::Terminated;
+            return SamplingState::Terminated;
         }
 
         let subnets: Vec<SubnetworkId> = Standard
@@ -124,7 +124,7 @@ impl<R: Rng + Sync + Send> DaSamplingServiceBackend<R> for KzgrsDaSampler<R> {
             started: Instant::now(),
         };
         self.pending_sampling_blobs.insert(blob_id, ctx);
-        TrackingState::Init(subnets)
+        SamplingState::Init(subnets)
     }
 
     fn prune(&mut self) {
@@ -143,7 +143,7 @@ mod test {
 
     use crate::backend::kzgrs::{
         DaSamplingServiceBackend, KzgrsDaSampler, KzgrsDaSamplerSettings, SamplingContext,
-        TrackingState,
+        SamplingState,
     };
     use kzgrs_backend::common::{blob::DaBlob, Column};
     use nomos_core::da::BlobId;
@@ -187,7 +187,7 @@ mod test {
         assert!(sampler.get_validated_blobs().await.is_empty());
 
         // start sampling for b1
-        let TrackingState::Init(subnets_to_sample) = sampler.init_sampling(b1).await else {
+        let SamplingState::Init(subnets_to_sample) = sampler.init_sampling(b1).await else {
             panic!("unexpected return value")
         };
         assert!(subnets_to_sample.len() == subnet_num);
@@ -195,7 +195,7 @@ mod test {
         assert!(sampler.pending_sampling_blobs.len() == 1);
 
         // start sampling for b2
-        let TrackingState::Init(subnets_to_sample2) = sampler.init_sampling(b2).await else {
+        let SamplingState::Init(subnets_to_sample2) = sampler.init_sampling(b2).await else {
             panic!("unexpected return value")
         };
         assert!(subnets_to_sample2.len() == subnet_num);

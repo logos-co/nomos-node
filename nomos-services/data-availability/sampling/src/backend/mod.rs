@@ -10,7 +10,7 @@ use tokio::time::Interval;
 // internal
 use nomos_da_network_core::SubnetworkId;
 
-pub enum TrackingState {
+pub enum SamplingState {
     Init(Vec<SubnetworkId>),
     Tracking,
     Terminated,
@@ -27,7 +27,7 @@ pub trait DaSamplingServiceBackend<R: Rng> {
     async fn mark_in_block(&mut self, blobs_ids: &[Self::BlobId]);
     async fn handle_sampling_success(&mut self, blob_id: Self::BlobId, blob: Self::Blob);
     async fn handle_sampling_error(&mut self, blob_id: Self::BlobId);
-    async fn init_sampling(&mut self, blob_id: Self::BlobId) -> TrackingState;
+    async fn init_sampling(&mut self, blob_id: Self::BlobId) -> SamplingState;
     async fn prune_interval(&self) -> Interval;
     fn prune(&mut self);
 }

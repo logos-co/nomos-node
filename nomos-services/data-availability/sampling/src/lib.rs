@@ -10,7 +10,7 @@ use rand::prelude::*;
 use tokio_stream::StreamExt;
 use tracing::{error, span, Instrument, Level};
 // internal
-use backend::{DaSamplingServiceBackend, TrackingState};
+use backend::{DaSamplingServiceBackend, SamplingState};
 use kzgrs_backend::common::blob::DaBlob;
 use network::NetworkAdapter;
 use nomos_core::da::BlobId;
@@ -92,7 +92,7 @@ where
     ) {
         match msg {
             DaSamplingServiceMsg::TriggerSampling { blob_id } => {
-                if let TrackingState::Init(sampling_subnets) = sampler.init_sampling(blob_id).await
+                if let SamplingState::Init(sampling_subnets) = sampler.init_sampling(blob_id).await
                 {
                     if let Err(e) = network_adapter
                         .start_sampling(blob_id, &sampling_subnets)
