@@ -21,8 +21,10 @@ use nomos_core::da::blob::info::DispersedBlobInfo;
 use nomos_core::da::blob::metadata::Metadata;
 use nomos_core::da::DaVerifier as CoreDaVerifier;
 use nomos_core::{da::blob::Blob, header::HeaderId, tx::Transaction};
+use nomos_da_network_core::SubnetworkId;
 use nomos_da_sampling::backend::DaSamplingServiceBackend;
 use nomos_da_verifier::backend::VerifierBackend;
+use nomos_libp2p::PeerId;
 use nomos_mempool::{
     network::adapters::libp2p::Libp2pAdapter as MempoolNetworkAdapter,
     tx::service::openapi::Status, MempoolMetrics,
@@ -32,6 +34,7 @@ use nomos_storage::backends::StorageSerde;
 use overwatch_rs::overwatch::handle::OverwatchHandle;
 use rand::{RngCore, SeedableRng};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use subnetworks_assignations::MembershipHandler;
 use tower_http::{
     cors::{Any, CorsLayer},
     trace::TraceLayer,
@@ -53,6 +56,7 @@ pub struct AxumBackend<
     A,
     B,
     C,
+    M,
     V,
     VB,
     T,
@@ -66,6 +70,7 @@ pub struct AxumBackend<
     _attestation: core::marker::PhantomData<A>,
     _blob: core::marker::PhantomData<B>,
     _certificate: core::marker::PhantomData<C>,
+    _membership: core::marker::PhantomData<M>,
     _vid: core::marker::PhantomData<V>,
     _verifier_backend: core::marker::PhantomData<VB>,
     _tx: core::marker::PhantomData<T>,
@@ -93,6 +98,7 @@ impl<
         A,
         B,
         C,
+        M,
         V,
         VB,
         T,
@@ -106,6 +112,7 @@ impl<
         A,
         B,
         C,
+        M,
         V,
         VB,
         T,
@@ -129,6 +136,12 @@ where
         + Sync
         + 'static,
     <C as DispersedBlobInfo>::BlobId: Clone + Send + Sync,
+    M: MembershipHandler<NetworkId = SubnetworkId, Id = PeerId>
+        + Clone
+        + Debug
+        + Send
+        + Sync
+        + 'static,
     V: DispersedBlobInfo<BlobId = [u8; 32]>
         + From<C>
         + Eq
@@ -180,6 +193,7 @@ where
             _attestation: core::marker::PhantomData,
             _blob: core::marker::PhantomData,
             _certificate: core::marker::PhantomData,
+            _membership: core::marker::PhantomData,
             _vid: core::marker::PhantomData,
             _verifier_backend: core::marker::PhantomData,
             _tx: core::marker::PhantomData,
@@ -241,7 +255,7 @@ where
                     >,
                 ),
             )
-            .route("/da/add_blob", routing::post(add_blob::<A, B, VB, S>))
+            .route("/da/add_blob", routing::post(add_blob::<A, B, M, VB, S>))
             .route(
                 "/da/get_range",
                 routing::post(
@@ -441,7 +455,7 @@ where
         (status = 500, description = "Internal server error", body = String),
     )
 )]
-async fn add_blob<A, B, VB, SS>(
+async fn add_blob<A, B, M, VB, SS>(
     State(handle): State<OverwatchHandle>,
     Json(blob): Json<B>,
 ) -> Response
@@ -450,12 +464,18 @@ where
     B: Blob + Serialize + DeserializeOwned + Clone + Send + Sync + 'static,
     <B as Blob>::BlobId: AsRef<[u8]> + Send + Sync + 'static,
     <B as Blob>::ColumnIndex: AsRef<[u8]> + Send + Sync + 'static,
+    M: MembershipHandler<NetworkId = SubnetworkId, Id = PeerId>
+        + Clone
+        + Debug
+        + Send
+        + Sync
+        + 'static,
     VB: VerifierBackend + CoreDaVerifier<DaBlob = B>,
     <VB as VerifierBackend>::Settings: Clone,
     <VB as CoreDaVerifier>::Error: Error,
     SS: StorageSerde + Send + Sync + 'static,
 {
-    make_request_and_return_response!(da::add_blob::<A, B, VB, SS>(&handle, blob))
+    make_request_and_return_response!(da::add_blob::<A, B, M, VB, SS>(&handle, blob))
 }
 
 #[derive(Serialize, Deserialize)]

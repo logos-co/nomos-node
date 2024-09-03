@@ -5,6 +5,7 @@ use nomos_core::{da::blob::info::DispersedBlobInfo, header::HeaderId, tx::Transa
 use nomos_da_indexer::consensus::adapters::cryptarchia::CryptarchiaConsensusAdapter;
 use nomos_da_indexer::storage::adapters::rocksdb::RocksAdapter as IndexerStorageAdapter;
 use nomos_da_indexer::DataIndexerService;
+use nomos_da_sampling::DaSamplingService;
 use nomos_da_sampling::{
     backend::kzgrs::KzgrsSamplingBackend,
     network::adapters::libp2p::Libp2pAdapter as SamplingLibp2pAdapter,
@@ -18,13 +19,16 @@ use nomos_mempool::network::adapters::libp2p::Libp2pAdapter as MempoolNetworkAda
 use nomos_mempool::{backend::mockpool::MockPool, TxMempoolService};
 use nomos_storage::backends::rocksdb::RocksBackend;
 use rand_chacha::ChaCha20Rng;
-use subnetworks_assignations::versions::v2::FillWithOriginalReplication;
+use subnetworks_assignations::versions::v1::FillFromNodeList;
 
 pub use nomos_core::{
     da::blob::select::FillSize as FillSizeWithBlobs, tx::select::FillSize as FillSizeWithTx,
 };
 use nomos_mempool::da::service::DaMempoolService;
 use nomos_node::{Tx, Wire};
+
+/// Membership used by the DA Network service.
+pub type NomosDaMembership = FillFromNodeList;
 
 pub(crate) type Cryptarchia = cryptarchia_consensus::CryptarchiaConsensus<
     cryptarchia_consensus::network::adapters::libp2p::LibP2pAdapter<Tx, BlobInfo>,
@@ -36,7 +40,13 @@ pub(crate) type Cryptarchia = cryptarchia_consensus::CryptarchiaConsensus<
     FillSizeWithBlobs<MB16, BlobInfo>,
     RocksBackend<Wire>,
     KzgrsSamplingBackend<ChaCha20Rng>,
-    SamplingLibp2pAdapter<FillWithOriginalReplication>,
+    SamplingLibp2pAdapter<NomosDaMembership>,
+    ChaCha20Rng,
+>;
+
+pub type DaSampling = DaSamplingService<
+    KzgrsSamplingBackend<ChaCha20Rng>,
+    SamplingLibp2pAdapter<NomosDaMembership>,
     ChaCha20Rng,
 >;
 
@@ -55,7 +65,7 @@ pub(crate) type DaIndexer = DataIndexerService<
     FillSizeWithBlobs<MB16, BlobInfo>,
     RocksBackend<Wire>,
     KzgrsSamplingBackend<ChaCha20Rng>,
-    SamplingLibp2pAdapter<FillWithOriginalReplication>,
+    SamplingLibp2pAdapter<NomosDaMembership>,
     ChaCha20Rng,
 >;
 
@@ -71,7 +81,7 @@ pub(crate) type DaMempool = DaMempoolService<
 
 pub(crate) type DaVerifier = DaVerifierService<
     KzgrsDaVerifier,
-    Libp2pAdapter<DaBlob, ()>,
+    Libp2pAdapter<NomosDaMembership>,
     VerifierStorageAdapter<(), DaBlob, Wire>,
 >;
 
