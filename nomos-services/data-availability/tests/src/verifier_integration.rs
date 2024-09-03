@@ -5,14 +5,14 @@ use std::sync::atomic::Ordering::SeqCst;
 use std::sync::Arc;
 use std::time::Duration;
 // crates
-use cl::InputWitness;
+use cl::{InputWitness, NoteWitness, NullifierSecret};
 use cryptarchia_consensus::TimeConfig;
 use cryptarchia_ledger::LedgerState;
 use full_replication::BlobInfo;
 use kzgrs_backend::common::blob::DaBlob;
 use kzgrs_backend::encoder::{DaEncoder, DaEncoderParams};
 use nomos_core::da::{blob::info::DispersedBlobInfo, DaEncoder as _};
-use nomos_core::tx::Transaction;
+use nomos_core::{staking::NMO_UNIT, tx::Transaction};
 use nomos_da_indexer::storage::adapters::rocksdb::RocksAdapterSettings as IndexerStorageSettings;
 use nomos_da_indexer::IndexerSettings;
 use nomos_da_network_service::backends::libp2p::validator::{
@@ -253,7 +253,7 @@ fn test_verifier() {
     let client_zone = new_client(NamedTempFile::new().unwrap().path().to_path_buf());
 
     let node1 = new_node(
-        &coins[0],
+        &notes[0],
         &ledger_config,
         &genesis_state,
         &time_config,
@@ -268,7 +268,7 @@ fn test_verifier() {
     );
 
     let node2 = new_node(
-        &coins[1],
+        &notes[1],
         &ledger_config,
         &genesis_state,
         &time_config,

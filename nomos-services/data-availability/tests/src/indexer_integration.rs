@@ -7,14 +7,14 @@ use std::sync::Arc;
 use std::time::Duration;
 // crates
 use bytes::Bytes;
-use cl::InputWitness;
+use cl::{InputWitness, NoteWitness, NullifierSecret};
 use cryptarchia_consensus::ConsensusMsg;
 use cryptarchia_consensus::TimeConfig;
 use cryptarchia_ledger::LedgerState;
 use full_replication::{BlobInfo, Metadata};
 use nomos_core::da::blob::info::DispersedBlobInfo;
 use nomos_core::da::blob::metadata::Metadata as _;
-use nomos_core::tx::Transaction;
+use nomos_core::{staking::NMO_UNIT, tx::Transaction};
 use nomos_da_indexer::storage::adapters::rocksdb::RocksAdapterSettings;
 use nomos_da_indexer::IndexerSettings;
 use nomos_da_network_service::backends::libp2p::validator::{
@@ -182,7 +182,7 @@ fn test_indexer() {
     let blobs_dir = TempDir::new().unwrap().path().to_path_buf();
 
     let node1 = new_node(
-        &coins[0],
+        &notes[0],
         &ledger_config,
         &genesis_state,
         &time_config,
@@ -193,7 +193,7 @@ fn test_indexer() {
     );
 
     let _node2 = new_node(
-        &coins[1],
+        &notes[1],
         &ledger_config,
         &genesis_state,
         &time_config,
