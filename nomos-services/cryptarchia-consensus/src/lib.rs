@@ -726,6 +726,7 @@ where
         cryptarchia
     }
 
+    #[allow(clippy::too_many_arguments)]
     #[instrument(
         level = "debug",
         skip(
