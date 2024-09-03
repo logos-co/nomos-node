@@ -14,6 +14,9 @@ use nomos_core::da::{blob::info::DispersedBlobInfo, DaEncoder as _};
 use nomos_core::tx::Transaction;
 use nomos_da_indexer::storage::adapters::rocksdb::RocksAdapterSettings as IndexerStorageSettings;
 use nomos_da_indexer::IndexerSettings;
+use nomos_da_sampling::backend::kzgrs::KzgrsSamplingBackendSettings;
+use nomos_da_sampling::network::adapters::libp2p::DaNetworkSamplingSettings;
+use nomos_da_sampling::DaSamplingServiceSettings;
 use nomos_da_verifier::backend::kzgrs::KzgrsDaVerifierSettings;
 use nomos_da_verifier::storage::adapters::rocksdb::RocksAdapterSettings as VerifierStorageSettings;
 use nomos_da_verifier::DaVerifierServiceSettings;
@@ -49,6 +52,7 @@ struct VerifierNode {
     cryptarchia: ServiceHandle<Cryptarchia>,
     indexer: ServiceHandle<DaIndexer>,
     verifier: ServiceHandle<DaVerifier>,
+    da_sampling: ServiceHandle<DaSampling>,
 }
 
 // Client node is just an empty overwatch service to spawn a task that could communicate with other
@@ -126,6 +130,19 @@ fn new_node(
                 network_adapter_settings: (),
                 storage_adapter_settings: VerifierStorageSettings {
                     blob_storage_directory: blobs_dir.clone(),
+                },
+            },
+            da_sampling: DaSamplingServiceSettings {
+                // TODO: setup this properly!
+                sampling_settings: KzgrsSamplingBackendSettings {
+                    num_samples: 0,
+                    // Sampling service period can't be zero.
+                    old_blobs_check_interval: Duration::from_secs(1),
+                    blobs_validity_duration: Duration::from_secs(1),
+                },
+                network_adapter_settings: DaNetworkSamplingSettings {
+                    num_samples: 0,
+                    subnet_size: 0,
                 },
             },
         },

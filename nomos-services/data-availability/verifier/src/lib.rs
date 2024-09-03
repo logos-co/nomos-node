@@ -178,19 +178,19 @@ where
                         }
                     }
                     Some(msg) = service_state.inbound_relay.recv() => {
-                            let DaVerifierMsg::AddBlob { blob, reply_channel } = msg;
-                            match Self::handle_new_blob(&verifier, &storage_adapter, &blob).await {
-                                Ok(attestation) => if let Err(err) = reply_channel.send(Some(attestation)) {
+                        let DaVerifierMsg::AddBlob { blob, reply_channel } = msg;
+                        match Self::handle_new_blob(&verifier, &storage_adapter, &blob).await {
+                            Ok(attestation) => if let Err(err) = reply_channel.send(Some(attestation)) {
+                                error!("Error replying attestation {err:?}");
+                            },
+                            Err(err) => {
+                                error!("Error handling blob {blob:?} due to {err:?}");
+                                if let Err(err) = reply_channel.send(None) {
                                     error!("Error replying attestation {err:?}");
-                                },
-                                Err(err) => {
-                                    error!("Error handling blob {blob:?} due to {err:?}");
-                                    if let Err(err) = reply_channel.send(None) {
-                                        error!("Error replying attestation {err:?}");
-                                    }
-                                },
-                            };
-                        }
+                                }
+                            },
+                        };
+                    }
                     Some(msg) = lifecycle_stream.next() => {
                         if Self::should_stop_service(msg).await {
                             break;
