@@ -424,7 +424,11 @@ fn create_node_config(
         },
         da_sampling: DaSamplingServiceSettings {
             // TODO: setup this properly!
-            sampling_settings: KzgrsSamplingBackendSettings {},
+            sampling_settings: KzgrsSamplingBackendSettings {
+                num_samples: 0,
+                old_blobs_check_interval: Default::default(),
+                blobs_validity_duration: Default::default(),
+            },
             network_adapter_settings: DaNetworkSamplingSettings {
                 num_samples: 0,
                 subnet_size: 0,

@@ -17,6 +17,7 @@ use nomos_libp2p::{Multiaddr, Swarm, SwarmConfig};
 use nomos_mempool::network::adapters::libp2p::Libp2pAdapter as MempoolNetworkAdapter;
 use nomos_mempool::{backend::mockpool::MockPool, TxMempoolService};
 use nomos_storage::backends::rocksdb::RocksBackend;
+use rand_chacha::ChaCha20Rng;
 use subnetworks_assignations::versions::v2::FillWithOriginalReplication;
 
 pub use nomos_core::{
@@ -34,8 +35,9 @@ pub(crate) type Cryptarchia = cryptarchia_consensus::CryptarchiaConsensus<
     FillSizeWithTx<MB16, Tx>,
     FillSizeWithBlobs<MB16, BlobInfo>,
     RocksBackend<Wire>,
-    KzgrsSamplingBackend,
+    KzgrsSamplingBackend<ChaCha20Rng>,
     SamplingLibp2pAdapter<FillWithOriginalReplication>,
+    ChaCha20Rng,
 >;
 
 pub(crate) type DaIndexer = DataIndexerService<
@@ -52,8 +54,9 @@ pub(crate) type DaIndexer = DataIndexerService<
     FillSizeWithTx<MB16, Tx>,
     FillSizeWithBlobs<MB16, BlobInfo>,
     RocksBackend<Wire>,
-    KzgrsSamplingBackend,
+    KzgrsSamplingBackend<ChaCha20Rng>,
     SamplingLibp2pAdapter<FillWithOriginalReplication>,
+    ChaCha20Rng,
 >;
 
 pub(crate) type TxMempool = TxMempoolService<

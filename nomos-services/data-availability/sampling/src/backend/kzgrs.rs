@@ -7,6 +7,7 @@ use std::time::{Duration, Instant};
 use hex;
 use rand::distributions::Standard;
 use rand::prelude::*;
+use serde::{Deserialize, Serialize};
 use tokio::time;
 use tokio::time::Interval;
 
@@ -24,7 +25,7 @@ pub struct SamplingContext {
     started: Instant,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct KzgrsSamplingBackendSettings {
     pub num_samples: u16,
     pub old_blobs_check_interval: Duration,
@@ -70,7 +71,7 @@ impl<R: Rng + Sync + Send> DaSamplingServiceBackend<R> for KzgrsSamplingBackend<
         self.validated_blobs.clone()
     }
 
-    async fn mark_in_block(&mut self, blobs_ids: &[Self::BlobId]) {
+    async fn mark_completed(&mut self, blobs_ids: &[Self::BlobId]) {
         for id in blobs_ids {
             self.pending_sampling_blobs.remove(id);
             self.validated_blobs.remove(id);
@@ -204,7 +205,7 @@ mod test {
 
         // mark in block for both
         // collections should be reset
-        sampler.mark_in_block(&[b1, b2]).await;
+        sampler.mark_completed(&[b1, b2]).await;
         assert!(sampler.pending_sampling_blobs.is_empty());
         assert!(sampler.validated_blobs.is_empty());
 
@@ -301,7 +302,7 @@ mod test {
 
         // run mark_in_block for the same blob
         // should return empty for everything
-        sampler.mark_in_block(&[b1]).await;
+        sampler.mark_completed(&[b1]).await;
         assert!(sampler.validated_blobs.is_empty());
         assert!(sampler.pending_sampling_blobs.is_empty());
     }

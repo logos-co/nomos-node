@@ -9,7 +9,6 @@ use axum::{
     response::{IntoResponse, Response},
     routing, Json, Router, Server,
 };
-use blake2::digest::crypto_common::rand_core::{RngCore, SeedableRng};
 use hyper::{
     header::{CONTENT_TYPE, USER_AGENT},
     Body, StatusCode,
@@ -31,6 +30,7 @@ use nomos_mempool::{
 use nomos_network::backends::libp2p::Libp2p as NetworkBackend;
 use nomos_storage::backends::StorageSerde;
 use overwatch_rs::overwatch::handle::OverwatchHandle;
+use rand::{RngCore, SeedableRng};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use tower_http::{
     cors::{Any, CorsLayer},
