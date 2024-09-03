@@ -14,12 +14,18 @@ use nomos_core::da::{blob::info::DispersedBlobInfo, DaEncoder as _};
 use nomos_core::tx::Transaction;
 use nomos_da_indexer::storage::adapters::rocksdb::RocksAdapterSettings as IndexerStorageSettings;
 use nomos_da_indexer::IndexerSettings;
+use nomos_da_network_service::backends::libp2p::validator::{
+    DaNetworkValidatorBackend, DaNetworkValidatorBackendSettings,
+};
+use nomos_da_network_service::NetworkConfig as DaNetworkConfig;
+use nomos_da_network_service::NetworkService as DaNetworkService;
 use nomos_da_sampling::backend::kzgrs::KzgrsSamplingBackendSettings;
 use nomos_da_sampling::network::adapters::libp2p::DaNetworkSamplingSettings;
 use nomos_da_sampling::DaSamplingServiceSettings;
 use nomos_da_verifier::backend::kzgrs::KzgrsDaVerifierSettings;
 use nomos_da_verifier::storage::adapters::rocksdb::RocksAdapterSettings as VerifierStorageSettings;
 use nomos_da_verifier::DaVerifierServiceSettings;
+use nomos_libp2p::{ed25519, identity, PeerId};
 use nomos_libp2p::{Multiaddr, SwarmConfig};
 use nomos_mempool::network::adapters::libp2p::Settings as AdapterSettings;
 use nomos_mempool::{DaMempoolSettings, TxMempoolSettings};
@@ -31,6 +37,7 @@ use overwatch_derive::*;
 use overwatch_rs::overwatch::{Overwatch, OverwatchRunner};
 use overwatch_rs::services::handle::ServiceHandle;
 use rand::{thread_rng, Rng, RngCore};
+use subnetworks_assignations::versions::v1::FillFromNodeList;
 use tempfile::{NamedTempFile, TempDir};
 use time::OffsetDateTime;
 // internal
@@ -46,6 +53,7 @@ struct ClientNode {
 #[derive(Services)]
 struct VerifierNode {
     network: ServiceHandle<NetworkService<NetworkBackend>>,
+    da_network: ServiceHandle<DaNetworkService<DaNetworkValidatorBackend<FillFromNodeList>>>,
     cl_mempool: ServiceHandle<TxMempool>,
     da_mempool: ServiceHandle<DaMempool>,
     storage: ServiceHandle<StorageService<RocksBackend<Wire>>>,
@@ -89,6 +97,18 @@ fn new_node(
                 backend: Libp2pConfig {
                     inner: swarm_config.clone(),
                     initial_peers,
+                },
+            },
+            da_network: DaNetworkConfig {
+                backend: DaNetworkValidatorBackendSettings {
+                    node_key: ed25519::SecretKey::generate(),
+                    membership: FillFromNodeList::new(
+                        &[PeerId::from(identity::Keypair::generate_ed25519().public())],
+                        2,
+                        1,
+                    ),
+                    addresses: Default::default(),
+                    listening_address: "/ip4/127.0.0.1/udp/0/quic-v1".parse::<Multiaddr>().unwrap(),
                 },
             },
             cl_mempool: TxMempoolSettings {
@@ -292,12 +312,13 @@ fn test_verifier() {
                     .collect(),
             };
 
-            let res = verifier
+            verifier
                 .send(nomos_da_verifier::DaVerifierMsg::AddBlob {
                     blob: da_blob,
                     reply_channel: reply_tx,
                 })
-                .await;
+                .await
+                .unwrap();
         }
 
         // Wait for response from the verifier.
