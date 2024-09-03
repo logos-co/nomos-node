@@ -16,6 +16,7 @@ nomos-core = { path = "../../../nomos-core" }
 nomos-da-indexer = { path = "../indexer", features = ["rocksdb-backend"] }
 nomos-da-verifier = { path = "../verifier", features = ["rocksdb-backend", "libp2p"] }
 nomos-da-sampling = { path = "../sampling" }
+nomos-da-network-service = { path = "../network" }
 nomos-da-storage = { path = "../../../nomos-da/storage" }
 nomos-node = { path = "../../../nodes/nomos-node" }
 nomos-mempool = { path = "../../../nomos-services/mempool" }
