@@ -47,9 +47,11 @@ use overwatch_rs::services::handle::ServiceHandle;
 use rand_chacha::ChaCha20Rng;
 use serde::{de::DeserializeOwned, Serialize};
 use subnetworks_assignations::versions::v1::FillFromNodeList;
-use subnetworks_assignations::versions::v2::FillWithOriginalReplication;
 // internal
 pub use tx::Tx;
+
+/// Membership used by the DA Network service.
+pub type NomosDaMembership = FillFromNodeList;
 
 pub type NomosApiService = ApiService<
     AxumBackend<
@@ -61,7 +63,7 @@ pub type NomosApiService = ApiService<
         Tx,
         Wire,
         KzgrsSamplingBackend<ChaCha20Rng>,
-        nomos_da_sampling::network::adapters::libp2p::Libp2pAdapter<FillWithOriginalReplication>,
+        nomos_da_sampling::network::adapters::libp2p::Libp2pAdapter<NomosDaMembership>,
         ChaCha20Rng,
         MB16,
     >,
@@ -81,7 +83,7 @@ pub type Cryptarchia = cryptarchia_consensus::CryptarchiaConsensus<
     FillSizeWithBlobs<MB16, BlobInfo>,
     RocksBackend<Wire>,
     KzgrsSamplingBackend<ChaCha20Rng>,
-    nomos_da_sampling::network::adapters::libp2p::Libp2pAdapter<FillWithOriginalReplication>,
+    nomos_da_sampling::network::adapters::libp2p::Libp2pAdapter<NomosDaMembership>,
     ChaCha20Rng,
 >;
 
@@ -110,13 +112,13 @@ pub type DaIndexer = DataIndexerService<
     FillSizeWithBlobs<MB16, BlobInfo>,
     RocksBackend<Wire>,
     KzgrsSamplingBackend<ChaCha20Rng>,
-    nomos_da_sampling::network::adapters::libp2p::Libp2pAdapter<FillFromNodeList>,
+    nomos_da_sampling::network::adapters::libp2p::Libp2pAdapter<NomosDaMembership>,
     ChaCha20Rng,
 >;
 
 pub type DaSampling = DaSamplingService<
     KzgrsSamplingBackend<ChaCha20Rng>,
-    SamplingLibp2pAdapter<FillWithOriginalReplication>,
+    SamplingLibp2pAdapter<NomosDaMembership>,
     ChaCha20Rng,
 >;
 
@@ -134,7 +136,7 @@ pub struct Nomos {
     da_indexer: ServiceHandle<DaIndexer>,
     da_verifier: ServiceHandle<DaVerifier>,
     da_sampling: ServiceHandle<DaSampling>,
-    da_network: ServiceHandle<DaNetworkService<DaNetworkValidatorBackend<FillFromNodeList>>>,
+    da_network: ServiceHandle<DaNetworkService<DaNetworkValidatorBackend<NomosDaMembership>>>,
     cl_mempool: ServiceHandle<TxMempool>,
     da_mempool: ServiceHandle<DaMempool>,
     cryptarchia: ServiceHandle<Cryptarchia>,
