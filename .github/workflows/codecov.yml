@@ -29,6 +29,8 @@ jobs:
           components: llvm-tools-preview
       - name: Install risc0
         run: cargo install cargo-risczero && cargo risczero install
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - uses: actions-rs/cargo@v1
         with:
           command: build

@@ -31,6 +31,8 @@ jobs:
           override: true
       - name: Install risc0
         run: cargo install cargo-risczero && cargo risczero install
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - uses: actions-rs/cargo@v1
         with:
           command: check
@@ -74,6 +76,8 @@ jobs:
         uses: ./.github/actions/mingw-env
       - name: Install risc0
         run: cargo install cargo-risczero && cargo risczero install
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Cargo build
         uses: actions-rs/cargo@v1
         with:
@@ -114,6 +118,8 @@ jobs:
           override: true
       - name: Install risc0
         run: cargo install cargo-risczero && cargo risczero install
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Cargo test
         uses: actions-rs/cargo@v1
         with:
@@ -143,7 +149,8 @@ jobs:
 
       - name: Install risc0
         run: cargo install cargo-risczero && cargo risczero install
-
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Run cargo fmt
         uses: actions-rs/cargo@v1
         with:
