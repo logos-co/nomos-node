@@ -70,6 +70,8 @@ jobs:
       - name: Setup build environment (Windows)
         if: matrix.os == 'windows-latest'
         uses: ./.github/actions/mingw-env
+      - name: Install risc0
+        run: cargo install cargo-risczero && cargo risczero install
       - name: Cargo build
         uses: actions-rs/cargo@v1
         with:
