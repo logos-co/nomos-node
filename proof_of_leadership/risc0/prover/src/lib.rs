@@ -61,11 +61,6 @@ mod test {
     }
 
     #[test]
-    fn failure() {
-        assert!(false);
-    }
-
-    #[test]
     fn test_leader_prover() {
         let mut rng = thread_rng();
 
