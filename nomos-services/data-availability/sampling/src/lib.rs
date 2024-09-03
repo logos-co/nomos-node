@@ -98,6 +98,8 @@ where
                         .start_sampling(blob_id, &sampling_subnets)
                         .await
                     {
+                        // we can short circuit the failure from beginning
+                        sampler.handle_sampling_error(blob_id).await;
                         error!("Error sampling for BlobId: {blob_id:?}: {e}");
                     }
                 }
