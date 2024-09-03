@@ -27,6 +27,8 @@ jobs:
           toolchain: stable
           override: true
           components: llvm-tools-preview
+      - name: Install risc0
+        run: cargo install cargo-risczero && cargo risczero install
       - uses: actions-rs/cargo@v1
         with:
           command: build

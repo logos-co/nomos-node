@@ -5,8 +5,9 @@ use std::sync::atomic::Ordering::SeqCst;
 use std::sync::Arc;
 use std::time::Duration;
 // crates
+use cl::InputWitness;
 use cryptarchia_consensus::TimeConfig;
-use cryptarchia_ledger::{Coin, LedgerState};
+use cryptarchia_ledger::LedgerState;
 use full_replication::BlobInfo;
 use kzgrs_backend::common::blob::DaBlob;
 use kzgrs_backend::encoder::{DaEncoder, DaEncoderParams};
@@ -82,7 +83,7 @@ fn new_client(db_path: PathBuf) -> Overwatch {
 }
 
 fn new_node(
-    coin: &Coin,
+    note: &InputWitness,
     ledger_config: &cryptarchia_ledger::Config,
     genesis_state: &LedgerState,
     time_config: &TimeConfig,
@@ -144,7 +145,7 @@ fn new_node(
                 config: ledger_config.clone(),
                 genesis_state: genesis_state.clone(),
                 time: time_config.clone(),
-                coins: vec![coin.clone()],
+                notes: vec![note.clone()],
             },
             verifier: DaVerifierServiceSettings {
                 verifier_settings,
@@ -206,12 +207,19 @@ fn test_verifier() {
         thread_rng().fill(id);
     }
 
-    let coins = ids
+    let notes = ids
         .iter()
-        .map(|&id| Coin::new(id, id.into(), 1.into()))
+        .map(|&id| {
+            let mut sk = [0; 16];
+            sk.copy_from_slice(&id[0..16]);
+            InputWitness::new(
+                NoteWitness::basic(1, NMO_UNIT, &mut thread_rng()),
+                NullifierSecret(sk),
+            )
+        })
         .collect::<Vec<_>>();
     let genesis_state = LedgerState::from_commitments(
-        coins.iter().map(|c| c.commitment()),
+        notes.iter().map(|n| n.note_commitment()),
         (ids.len() as u32).into(),
     );
     let ledger_config = cryptarchia_ledger::Config {
