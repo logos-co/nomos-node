@@ -485,3 +485,57 @@ impl<M: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'static> Netw
         }
     }
 }
+
+#[cfg(test)]
+pub mod test {
+    use crate::protocols::dispersal::executor::behaviour::DispersalExecutorBehaviour;
+    use crate::test_utils::AllNeighbours;
+    use crate::SubnetworkId;
+    use kzgrs_backend::common::blob::DaBlob;
+    use kzgrs_backend::common::{Chunk, Column};
+    use libp2p::PeerId;
+
+    #[tokio::test]
+    async fn test_stream_disperse_error_cases() {
+        let k1 = libp2p::identity::Keypair::generate_ed25519();
+        let k2 = libp2p::identity::Keypair::generate_ed25519();
+        let _validator_peer = PeerId::from_public_key(&k2.public());
+        let neighbours = AllNeighbours {
+            neighbours: [
+                PeerId::from_public_key(&k1.public()),
+                PeerId::from_public_key(&k2.public()),
+            ]
+                .into_iter()
+                .collect(),
+        };
+        let mut executor = DispersalExecutorBehaviour::new(neighbours.clone());
+        let chunk = Chunk(Vec::with_capacity(10));
+        let chunks: Vec<Chunk> = (0..100).map(|_| chunk.clone()).collect();
+        let column = Column(chunks.clone());
+        let blob = DaBlob {
+            column_idx: 0,
+            column,
+            column_commitment: Default::default(),
+            aggregated_column_commitment: Default::default(),
+            aggregated_column_proof: Default::default(),
+            rows_commitments: vec![],
+            rows_proofs: vec![],
+        };
+
+        if let Some(stream) = executor
+            .idle_streams
+            .remove(&PeerId::from_public_key(&k1.public()))
+        {
+            let network_id = SubnetworkId::from(0u32);
+            let dispersed = DispersalExecutorBehaviour::<AllNeighbours>::stream_disperse(
+                stream,
+                blob.clone(),
+                network_id,
+            )
+                .await
+                .is_ok();
+
+            assert!(dispersed);
+        };
+    }
+}
