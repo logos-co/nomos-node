@@ -10,6 +10,7 @@ use nomos_da_indexer::DaMsg;
 use nomos_da_indexer::{
     consensus::adapters::cryptarchia::CryptarchiaConsensusAdapter, DataIndexerService,
 };
+use nomos_da_sampling::backend::DaSamplingServiceBackend;
 use nomos_da_verifier::backend::VerifierBackend;
 use nomos_da_verifier::network::adapters::libp2p::Libp2pAdapter;
 use nomos_da_verifier::storage::adapters::rocksdb::RocksAdapter as VerifierStorageAdapter;
@@ -20,6 +21,7 @@ use nomos_storage::backends::rocksdb::RocksBackend;
 use nomos_storage::backends::StorageSerde;
 use overwatch_rs::overwatch::handle::OverwatchHandle;
 use overwatch_rs::DynError;
+use rand::{RngCore, SeedableRng};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use std::error::Error;
@@ -27,7 +29,16 @@ use std::fmt::Debug;
 use std::hash::Hash;
 use tokio::sync::oneshot;
 
-pub type DaIndexer<Tx, C, V, SS, const SIZE: usize> = DataIndexerService<
+pub type DaIndexer<
+    Tx,
+    C,
+    V,
+    SS,
+    SamplingBackend,
+    SamplingNetworkAdapter,
+    SamplingRng,
+    const SIZE: usize,
+> = DataIndexerService<
     // Indexer specific.
     Bytes,
     IndexerStorageAdapter<SS, V>,
@@ -41,6 +52,9 @@ pub type DaIndexer<Tx, C, V, SS, const SIZE: usize> = DataIndexerService<
     FillSizeWithTx<SIZE, Tx>,
     FillSizeWithBlobs<SIZE, V>,
     RocksBackend<SS>,
+    SamplingBackend,
+    SamplingNetworkAdapter,
+    SamplingRng,
 >;
 
 pub type DaVerifier<A, B, VB, SS> =
@@ -73,7 +87,16 @@ where
     Ok(receiver.await?)
 }
 
-pub async fn get_range<Tx, C, V, SS, const SIZE: usize>(
+pub async fn get_range<
+    Tx,
+    C,
+    V,
+    SS,
+    SamplingBackend,
+    SamplingNetworkAdapter,
+    SamplingRng,
+    const SIZE: usize,
+>(
     handle: &OverwatchHandle,
     app_id: <V as Metadata>::AppId,
     range: Range<<V as Metadata>::Index>,
@@ -116,9 +139,15 @@ where
     <V as Metadata>::Index:
         AsRef<[u8]> + Serialize + DeserializeOwned + Clone + PartialOrd + Send + Sync,
     SS: StorageSerde + Send + Sync + 'static,
+    SamplingRng: SeedableRng + RngCore,
+    SamplingBackend: DaSamplingServiceBackend<SamplingRng> + Send,
+    SamplingBackend::Settings: Clone,
+    SamplingBackend::Blob: Debug + 'static,
+    SamplingBackend::BlobId: Debug + 'static,
+    SamplingNetworkAdapter: nomos_da_sampling::network::NetworkAdapter,
 {
     let relay = handle
-        .relay::<DaIndexer<Tx, C, V, SS, SIZE>>()
+        .relay::<DaIndexer<Tx, C, V, SS, SamplingBackend, SamplingNetworkAdapter, SamplingRng, SIZE>>()
         .connect()
         .await?;
     let (sender, receiver) = oneshot::channel();

@@ -17,9 +17,10 @@ use nomos_da_network_service::{DaNetworkMsg, NetworkService};
 use overwatch_rs::services::relay::OutboundRelay;
 use overwatch_rs::services::ServiceData;
 use overwatch_rs::DynError;
+use serde::{Deserialize, Serialize};
 use subnetworks_assignations::MembershipHandler;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DaNetworkSamplingSettings {
     pub num_samples: u16,
     pub subnet_size: SubnetworkId,

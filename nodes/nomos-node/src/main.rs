@@ -92,6 +92,7 @@ fn main() -> Result<()> {
             },
             da_network: config.da_network,
             da_indexer: config.da_indexer,
+            da_sampling: config.da_sampling,
             da_verifier: config.da_verifier,
             cryptarchia: config.cryptarchia,
             #[cfg(feature = "metrics")]
