@@ -152,22 +152,45 @@ mod test {
     use crate::encoder::DaEncoderParams;
     use crate::global::GLOBAL_PARAMETERS;
     use crate::verifier::DaVerifier;
+    use ark_bls12_381::Fr;
     use ark_poly::{EvaluationDomain, GeneralEvaluationDomain};
     use blst::min_sig::SecretKey;
     use kzgrs::{
-        bytes_to_polynomial, commit_polynomial, generate_element_proof, BYTES_PER_FIELD_ELEMENT,
+        bytes_to_polynomial, commit_polynomial, generate_element_proof,
+        global_parameters_from_randomness, Commitment, GlobalParameters,
+        PolynomialEvaluationDomain, Proof, BYTES_PER_FIELD_ELEMENT,
     };
     use nomos_core::da::DaEncoder as _;
+    use once_cell::sync::Lazy;
     use rand::{thread_rng, RngCore};
 
-    #[test]
-    fn test_verify_column() {
+    pub struct ColumnVerifyData {
+        pub column: Column,
+        pub column_commitment: Commitment,
+        pub aggregated_commitment: Commitment,
+        pub column_proof: Proof,
+        pub domain: GeneralEvaluationDomain<Fr>,
+    }
+
+    fn prepare_column(
+        with_new_global_params: bool,
+    ) -> Result<ColumnVerifyData, Box<dyn std::error::Error>> {
+        pub static NEW_GLOBAL_PARAMETERS: Lazy<GlobalParameters> = Lazy::new(|| {
+            let mut rng = rand::thread_rng();
+            global_parameters_from_randomness(&mut rng)
+        });
+
+        let mut global_params = &GLOBAL_PARAMETERS;
+        if with_new_global_params {
+            global_params = &NEW_GLOBAL_PARAMETERS;
+        }
+
         let column: Column = (0..10).map(|i| Chunk(vec![i; 32])).collect();
         let domain = GeneralEvaluationDomain::new(10).unwrap();
         let (_, column_poly) =
-            bytes_to_polynomial::<BYTES_PER_FIELD_ELEMENT>(column.as_bytes().as_slice(), domain)
-                .unwrap();
-        let column_commitment = commit_polynomial(&column_poly, &GLOBAL_PARAMETERS).unwrap();
+            bytes_to_polynomial::<BYTES_PER_FIELD_ELEMENT>(column.as_bytes().as_slice(), domain)?;
+        let column_commitment = commit_polynomial(&column_poly, global_params)?;
+
         let (aggregated_evals, aggregated_poly) = bytes_to_polynomial::<
             { DaEncoderParams::MAX_BLS12_381_ENCODING_CHUNK_SIZE },
         >(
@@ -177,26 +200,155 @@ mod test {
             )
             .as_slice(),
             domain,
-        )
-        .unwrap();
-        let aggregated_commitment =
-            commit_polynomial(&aggregated_poly, &GLOBAL_PARAMETERS).unwrap();
+        )?;
+
+        let aggregated_commitment = commit_polynomial(&aggregated_poly, global_params)?;
+
         let column_proof = generate_element_proof(
             0,
             &aggregated_poly,
             &aggregated_evals,
-            &GLOBAL_PARAMETERS,
+            &global_params,
             domain,
-        )
-        .unwrap();
+        )?;
+
+        Ok(ColumnVerifyData {
+            column,
+            column_commitment,
+            aggregated_commitment,
+            column_proof,
+            domain,
+        })
+    }
+
+    #[test]
+    fn test_verify_column() {
+        let column_data = prepare_column(false).unwrap();
+
         assert!(DaVerifier::verify_column(
-            &column,
-            &column_commitment,
-            &aggregated_commitment,
-            &column_proof,
+            &column_data.column,
+            &column_data.column_commitment,
+            &column_data.aggregated_commitment,
+            &column_data.column_proof,
             0,
-            domain
+            column_data.domain
         ));
+    }
+
+    #[test]
+    fn test_verify_column_error_cases() {
+        // Test bytes_to_polynomial() returned error
+        let column_data = prepare_column(false).unwrap();
+
+        let column2: Column = (0..10)
+            .flat_map(|i| {
+                if i % 2 == 0 {
+                    vec![Chunk(vec![i; 16])]
+                } else {
+                    vec![Chunk(vec![i; 32])]
+                }
+            })
+            .collect();
+
+        assert!(bytes_to_polynomial::<BYTES_PER_FIELD_ELEMENT>(
+            column2.as_bytes().as_slice(),
+            column_data.domain
+        )
+        .is_err());
+
+        assert!(!DaVerifier::verify_column(
+            &column2,
+            &column_data.column_commitment,
+            &column_data.aggregated_commitment,
+            &column_data.column_proof,
+            0,
+            column_data.domain
+        ));
+
+        // Test alter GLOBAL_PARAMETERS so that computed_column_commitment != column_commitment
+        let column_data2 = prepare_column(true).unwrap();
+
+        assert!(!DaVerifier::verify_column(
+            &column_data2.column,
+            &column_data2.column_commitment,
+            &column_data2.aggregated_commitment,
+            &column_data2.column_proof,
+            0,
+            column_data2.domain
+        ));
+    }
+
+    #[test]
+    fn test_verify_chunks_error_cases() {
+        let encoder = &ENCODER;
+        let data = rand_data(32);
+        let domain_size = 16usize;
+        let rows_domain = PolynomialEvaluationDomain::new(domain_size).unwrap();
+        let encoded_data = encoder.encode(&data).unwrap();
+        let column = encoded_data.extended_data.columns().next().unwrap();
+        let index = 0usize;
+
+        let da_blob = DaBlob {
+            column,
+            column_idx: index.try_into().unwrap(),
+            column_commitment: encoded_data.column_commitments[index],
+            aggregated_column_commitment: encoded_data.aggregated_column_commitment,
+            aggregated_column_proof: encoded_data.aggregated_column_proofs[index],
+            rows_commitments: encoded_data.row_commitments.clone(),
+            rows_proofs: encoded_data
+                .rows_proofs
+                .iter()
+                .map(|proofs| proofs.get(index).cloned().unwrap())
+                .collect(),
+        };
+        // Happy case
+        let chunks_verified = DaVerifier::verify_chunks(
+            da_blob.column.as_ref(),
+            &da_blob.rows_commitments,
+            &da_blob.rows_proofs,
+            index,
+            rows_domain,
+        );
+        assert!(chunks_verified);
+
+        // Chunks altered
+        let mut column_w_missing_chunk = da_blob.column.as_ref().to_vec();
+        column_w_missing_chunk.pop();
+
+        let chunks_not_verified = !DaVerifier::verify_chunks(
+            column_w_missing_chunk.as_ref(),
+            &da_blob.rows_commitments,
+            &da_blob.rows_proofs,
+            index,
+            rows_domain,
+        );
+        assert!(chunks_not_verified);
+
+        // Proofs altered
+        let mut modified_proofs = da_blob.rows_proofs.to_vec();
+        modified_proofs.swap(0, 1);
+
+        let chunks_not_verified = !DaVerifier::verify_chunks(
+            da_blob.column.as_ref(),
+            &da_blob.rows_commitments,
+            &modified_proofs,
+            index,
+            rows_domain,
+        );
+        assert!(chunks_not_verified);
+
+        // Commitments altered
+        let mut modified_commitments = da_blob.rows_commitments.to_vec();
+        modified_commitments.swap(0, 1);
+
+        let chunks_not_verified = !DaVerifier::verify_chunks(
+            da_blob.column.as_ref(),
+            &modified_commitments,
+            &da_blob.rows_proofs,
+            index,
+            rows_domain,
+        );
+        assert!(chunks_not_verified);
     }
 
     #[test]
