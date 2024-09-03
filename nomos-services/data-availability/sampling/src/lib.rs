@@ -6,10 +6,11 @@ use std::collections::BTreeSet;
 use std::fmt::Debug;
 
 // crates
+use rand::prelude::*;
 use tokio_stream::StreamExt;
 use tracing::{error, span, Instrument, Level};
 // internal
-use backend::DaSamplingServiceBackend;
+use backend::{DaSamplingServiceBackend, SamplingState};
 use kzgrs_backend::common::blob::DaBlob;
 use network::NetworkAdapter;
 use nomos_core::da::BlobId;
@@ -46,9 +47,10 @@ pub struct DaSamplingServiceSettings<BackendSettings, NetworkSettings> {
 
 impl<B: 'static> RelayMessage for DaSamplingServiceMsg<B> {}
 
-pub struct DaSamplingService<Backend, N, S>
+pub struct DaSamplingService<Backend, N, S, R>
 where
-    Backend: DaSamplingServiceBackend + Send,
+    R: SeedableRng + RngCore,
+    Backend: DaSamplingServiceBackend<R> + Send,
     Backend::Settings: Clone,
     Backend::Blob: Debug + 'static,
     Backend::BlobId: Debug + 'static,
@@ -60,9 +62,10 @@ where
     sampler: Backend,
 }
 
-impl<Backend, N, S> DaSamplingService<Backend, N, S>
+impl<Backend, N, S, R> DaSamplingService<Backend, N, S, R>
 where
-    Backend: DaSamplingServiceBackend<BlobId = BlobId, Blob = DaBlob> + Send + 'static,
+    R: SeedableRng + RngCore,
+    Backend: DaSamplingServiceBackend<R, BlobId = BlobId, Blob = DaBlob> + Send + 'static,
     Backend::Settings: Clone,
     N: NetworkAdapter + Send + 'static,
     N::Settings: Clone,
@@ -89,12 +92,16 @@ where
     ) {
         match msg {
             DaSamplingServiceMsg::TriggerSampling { blob_id } => {
-                let sampling_subnets = sampler.init_sampling(blob_id).await;
-                if let Err(e) = network_adapter
-                    .start_sampling(blob_id, &sampling_subnets)
-                    .await
+                if let SamplingState::Init(sampling_subnets) = sampler.init_sampling(blob_id).await
                 {
-                    error!("Error sampling for BlobId: {blob_id:?}: {e}");
+                    if let Err(e) = network_adapter
+                        .start_sampling(blob_id, &sampling_subnets)
+                        .await
+                    {
+                        // we can short circuit the failure from beginning
+                        sampler.handle_sampling_error(blob_id).await;
+                        error!("Error sampling for BlobId: {blob_id:?}: {e}");
+                    }
                 }
             }
             DaSamplingServiceMsg::GetValidatedBlobs { reply_channel } => {
@@ -115,15 +122,20 @@ where
                 sampler.handle_sampling_success(blob_id, *blob).await;
             }
             SamplingEvent::SamplingError { error } => {
+                if let Some(blob_id) = error.blob_id() {
+                    sampler.handle_sampling_error(*blob_id).await;
+                    return;
+                }
                 error!("Error while sampling: {error}");
             }
         }
     }
 }
 
-impl<Backend, N, S> ServiceData for DaSamplingService<Backend, N, S>
+impl<Backend, N, S, R> ServiceData for DaSamplingService<Backend, N, S, R>
 where
-    Backend: DaSamplingServiceBackend + Send,
+    R: SeedableRng + RngCore,
+    Backend: DaSamplingServiceBackend<R> + Send,
     Backend::Settings: Clone,
     Backend::Blob: Debug + 'static,
     Backend::BlobId: Debug + 'static,
@@ -138,9 +150,10 @@ where
 }
 
 #[async_trait::async_trait]
-impl<Backend, N, S> ServiceCore for DaSamplingService<Backend, N, S>
+impl<Backend, N, S, R> ServiceCore for DaSamplingService<Backend, N, S, R>
 where
-    Backend: DaSamplingServiceBackend<BlobId = BlobId, Blob = DaBlob> + Send + Sync + 'static,
+    R: SeedableRng + RngCore,
+    Backend: DaSamplingServiceBackend<R, BlobId = BlobId, Blob = DaBlob> + Send + Sync + 'static,
     Backend::Settings: Clone + Send + Sync + 'static,
     N: NetworkAdapter + Send + Sync + 'static,
     N::Settings: Clone + Send + Sync + 'static,
@@ -151,11 +164,12 @@ where
         } = service_state.settings_reader.get_updated_settings();
 
         let network_relay = service_state.overwatch_handle.relay();
+        let rng = R::from_entropy();
 
         Ok(Self {
             network_relay,
             service_state,
-            sampler: Backend::new(sampling_settings),
+            sampler: Backend::new(sampling_settings, rng),
         })
     }
 
@@ -175,6 +189,7 @@ where
         let mut network_adapter = N::new(network_relay).await;
 
         let mut sampling_message_stream = network_adapter.listen_to_sampling_messages().await?;
+        let mut next_prune_tick = sampler.prune_interval().await;
 
         let mut lifecycle_stream = service_state.lifecycle_handle.message_stream();
         async {
@@ -191,6 +206,11 @@ where
                             break;
                         }
                     }
+                    // cleanup not on time samples
+                    _ = next_prune_tick.tick() => {
+                        sampler.prune();
+                    }
+
                 }
             }
         }
