@@ -109,7 +109,7 @@ jobs:
           toolchain: stable
           override: true
       - name: Install risc0
-        run: cargo install cargo-risczero
+        run: cargo install cargo-risczero && cargo risczero install
       - name: Cargo test
         uses: actions-rs/cargo@v1
         with:
