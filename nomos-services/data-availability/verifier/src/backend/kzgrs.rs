@@ -4,6 +4,7 @@ use core::fmt;
 use blst::{min_sig::PublicKey, min_sig::SecretKey};
 use kzgrs_backend::{common::blob::DaBlob, verifier::DaVerifier as NomosKzgrsVerifier};
 use nomos_core::da::DaVerifier;
+use serde::{Deserialize, Serialize};
 // internal
 use super::VerifierBackend;
 
@@ -30,7 +31,22 @@ impl VerifierBackend for KzgrsDaVerifier {
     type Settings = KzgrsDaVerifierSettings;
 
     fn new(settings: Self::Settings) -> Self {
-        let verifier = NomosKzgrsVerifier::new(settings.sk, &settings.nodes_public_keys);
+        let bytes = hex::decode(settings.sk).expect("Secret key string should decode to bytes");
+        let secret_key =
+            SecretKey::from_bytes(&bytes).expect("Secret key should be reconstructed from bytes");
+
+        let nodes_public_keys = settings
+            .nodes_public_keys
+            .iter()
+            .map(|pk_hex| {
+                let pk_bytes =
+                    hex::decode(pk_hex).expect("Public key string should decode to bytes");
+                PublicKey::from_bytes(&pk_bytes)
+                    .expect("Public key should be reconstructed from bytes")
+            })
+            .collect::<Vec<PublicKey>>();
+
+        let verifier = NomosKzgrsVerifier::new(secret_key, &nodes_public_keys);
         Self { verifier }
     }
 }
@@ -52,8 +68,8 @@ impl DaVerifier for KzgrsDaVerifier {
 }
 
 // TODO: `sk` and `nodes_public_keys` need to be fetched from the params provider service.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct KzgrsDaVerifierSettings {
-    pub sk: SecretKey,
-    pub nodes_public_keys: Vec<PublicKey>,
+    pub sk: String,
+    pub nodes_public_keys: Vec<String>,
 }

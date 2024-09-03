@@ -23,7 +23,7 @@ use overwatch_rs::services::state::{NoOperator, NoState};
 use overwatch_rs::services::{ServiceCore, ServiceData, ServiceId};
 use overwatch_rs::DynError;
 use serde::de::DeserializeOwned;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use storage::DaStorageAdapter;
 use tokio::sync::oneshot::Sender;
 use tracing::error;
@@ -363,7 +363,7 @@ where
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct IndexerSettings<S> {
     pub storage: S,
 }

@@ -10,6 +10,7 @@ cryptarchia-consensus = { path = "../../../nomos-services/cryptarchia-consensus"
 cryptarchia-engine = { path = "../../../consensus/cryptarchia-engine", features = ["serde"] }
 cryptarchia-ledger = { path = "../../../ledger/cryptarchia-ledger", features = ["serde"] }
 full-replication = { path = "../../../nomos-da/full-replication" }
+hex = "0.4.3"
 kzgrs-backend = { path = "../../../nomos-da/kzgrs-backend" }
 nomos-core = { path = "../../../nomos-core" }
 nomos-da-indexer = { path = "../indexer", features = ["rocksdb-backend"] }
