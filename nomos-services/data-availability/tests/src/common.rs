@@ -74,9 +74,12 @@ pub(crate) type TxMempool = TxMempoolService<
     MockPool<HeaderId, Tx, <Tx as Transaction>::Hash>,
 >;
 
-pub(crate) type DaMempool = DaMempoolService<
+pub type DaMempool = DaMempoolService<
     MempoolNetworkAdapter<BlobInfo, <BlobInfo as DispersedBlobInfo>::BlobId>,
     MockPool<HeaderId, BlobInfo, <BlobInfo as DispersedBlobInfo>::BlobId>,
+    KzgrsSamplingBackend<ChaCha20Rng>,
+    nomos_da_sampling::network::adapters::libp2p::Libp2pAdapter<NomosDaMembership>,
+    ChaCha20Rng,
 >;
 
 pub(crate) type DaVerifier = DaVerifierService<
