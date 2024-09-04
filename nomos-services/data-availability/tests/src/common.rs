@@ -5,6 +5,10 @@ use nomos_core::{da::blob::info::DispersedBlobInfo, header::HeaderId, tx::Transa
 use nomos_da_indexer::consensus::adapters::cryptarchia::CryptarchiaConsensusAdapter;
 use nomos_da_indexer::storage::adapters::rocksdb::RocksAdapter as IndexerStorageAdapter;
 use nomos_da_indexer::DataIndexerService;
+use nomos_da_sampling::{
+    backend::kzgrs::KzgrsDaSampler,
+    network::adapters::libp2p::Libp2pAdapter as SamplingLibp2pAdapter,
+};
 use nomos_da_verifier::backend::kzgrs::KzgrsDaVerifier;
 use nomos_da_verifier::network::adapters::libp2p::Libp2pAdapter;
 use nomos_da_verifier::storage::adapters::rocksdb::RocksAdapter as VerifierStorageAdapter;
@@ -13,6 +17,8 @@ use nomos_libp2p::{Multiaddr, Swarm, SwarmConfig};
 use nomos_mempool::network::adapters::libp2p::Libp2pAdapter as MempoolNetworkAdapter;
 use nomos_mempool::{backend::mockpool::MockPool, TxMempoolService};
 use nomos_storage::backends::rocksdb::RocksBackend;
+use rand_chacha::ChaCha20Rng;
+use subnetworks_assignations::versions::v1::FillFromNodeList;
 
 pub use nomos_core::{
     da::blob::select::FillSize as FillSizeWithBlobs, tx::select::FillSize as FillSizeWithTx,
@@ -26,6 +32,9 @@ pub(crate) type Cryptarchia = cryptarchia_consensus::CryptarchiaConsensus<
     MempoolNetworkAdapter<Tx, <Tx as Transaction>::Hash>,
     MockPool<HeaderId, BlobInfo, <BlobInfo as DispersedBlobInfo>::BlobId>,
     MempoolNetworkAdapter<BlobInfo, <BlobInfo as DispersedBlobInfo>::BlobId>,
+    KzgrsDaSampler<ChaCha20Rng>,
+    SamplingLibp2pAdapter<FillFromNodeList>,
+    ChaCha20Rng,
     FillSizeWithTx<MB16, Tx>,
     FillSizeWithBlobs<MB16, BlobInfo>,
     RocksBackend<Wire>,
@@ -42,6 +51,9 @@ pub(crate) type DaIndexer = DataIndexerService<
     MempoolNetworkAdapter<Tx, <Tx as Transaction>::Hash>,
     MockPool<HeaderId, BlobInfo, <BlobInfo as DispersedBlobInfo>::BlobId>,
     MempoolNetworkAdapter<BlobInfo, <BlobInfo as DispersedBlobInfo>::BlobId>,
+    KzgrsDaSampler<ChaCha20Rng>,
+    SamplingLibp2pAdapter<FillFromNodeList>,
+    ChaCha20Rng,
     FillSizeWithTx<MB16, Tx>,
     FillSizeWithBlobs<MB16, BlobInfo>,
     RocksBackend<Wire>,
@@ -55,6 +67,9 @@ pub(crate) type TxMempool = TxMempoolService<
 pub(crate) type DaMempool = DaMempoolService<
     MempoolNetworkAdapter<BlobInfo, <BlobInfo as DispersedBlobInfo>::BlobId>,
     MockPool<HeaderId, BlobInfo, <BlobInfo as DispersedBlobInfo>::BlobId>,
+    KzgrsDaSampler<ChaCha20Rng>,
+    SamplingLibp2pAdapter<FillFromNodeList>,
+    ChaCha20Rng,
 >;
 
 pub(crate) type DaVerifier = DaVerifierService<

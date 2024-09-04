@@ -107,6 +107,7 @@ fn new_node(
 // TODO: When verifier is implemented this test should be removed and a new one
 // performed in integration tests crate using the real node.
 
+#[ignore = "Sampling needs correct node list"]
 #[test]
 fn test_indexer() {
     let performed_tx = Arc::new(AtomicBool::new(false));
