@@ -29,10 +29,11 @@ jobs:
           profile: minimal
           toolchain: stable
           override: true
-      - name: Install risc0
-        run: cargo install cargo-risczero && cargo risczero install
+      - uses: cargo-bins/cargo-binstall@main
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Install risc0
+        run: cargo binstall -y cargo-risczero && cargo risczero install
       - uses: actions-rs/cargo@v1
         with:
           command: check
@@ -74,10 +75,11 @@ jobs:
       - name: Setup build environment (Windows)
         if: matrix.os == 'windows-latest'
         uses: ./.github/actions/mingw-env
-      - name: Install risc0
-        run: cargo install cargo-risczero && cargo risczero install
+      - uses: cargo-bins/cargo-binstall@main
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Install risc0
+        run: cargo binstall -y cargo-risczero && cargo risczero install
       - name: Cargo build (Other OSes)
         uses: actions-rs/cargo@v1
         with:
@@ -138,10 +140,11 @@ jobs:
           override: true
           components: rustfmt, clippy
 
-      - name: Install risc0
-        run: cargo install cargo-risczero && cargo risczero install
+      - uses: cargo-bins/cargo-binstall@main
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Install risc0
+        run: cargo binstall -y cargo-risczero && cargo risczero install
       - name: Run cargo fmt
         uses: actions-rs/cargo@v1
         with:
