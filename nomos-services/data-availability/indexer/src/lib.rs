@@ -13,6 +13,9 @@ use nomos_core::block::Block;
 use nomos_core::da::blob::{info::DispersedBlobInfo, metadata::Metadata, BlobSelect};
 use nomos_core::header::HeaderId;
 use nomos_core::tx::{Transaction, TxSelect};
+use nomos_da_sampling::{
+    backend::DaSamplingServiceBackend, network::NetworkAdapter as DaSamplingNetworkAdapter,
+};
 use nomos_mempool::{backend::MemPool, network::NetworkAdapter as MempoolAdapter};
 use nomos_storage::backends::StorageBackend;
 use nomos_storage::StorageService;
@@ -22,14 +25,40 @@ use overwatch_rs::services::relay::{Relay, RelayMessage};
 use overwatch_rs::services::state::{NoOperator, NoState};
 use overwatch_rs::services::{ServiceCore, ServiceData, ServiceId};
 use overwatch_rs::DynError;
+use rand::{RngCore, SeedableRng};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use storage::DaStorageAdapter;
 use tokio::sync::oneshot::Sender;
 use tracing::error;
 
-pub type ConsensusRelay<A, ClPool, ClPoolAdapter, DaPool, DaPoolAdapter, TxS, BS, Storage> =
-    Relay<CryptarchiaConsensus<A, ClPool, ClPoolAdapter, DaPool, DaPoolAdapter, TxS, BS, Storage>>;
+pub type ConsensusRelay<
+    A,
+    ClPool,
+    ClPoolAdapter,
+    DaPool,
+    DaPoolAdapter,
+    SamplingBackend,
+    SamplingAdapter,
+    R,
+    TxS,
+    BS,
+    Storage,
+> = Relay<
+    CryptarchiaConsensus<
+        A,
+        ClPool,
+        ClPoolAdapter,
+        DaPool,
+        DaPoolAdapter,
+        SamplingBackend,
+        SamplingAdapter,
+        R,
+        TxS,
+        BS,
+        Storage,
+    >,
+>;
 
 pub struct DataIndexerService<
     B,
@@ -40,6 +69,9 @@ pub struct DataIndexerService<
     ClPoolAdapter,
     DaPool,
     DaPoolAdapter,
+    SamplingBackend,
+    SamplingAdapter,
+    R,
     TxS,
     BS,
     ConsensusStorage,
@@ -60,11 +92,29 @@ pub struct DataIndexerService<
     BS: BlobSelect<BlobId = DaPool::Item>,
     DaStorage: DaStorageAdapter<Info = DaPool::Item, Blob = B>,
     ConsensusStorage: StorageBackend + Send + Sync + 'static,
+    SamplingBackend: DaSamplingServiceBackend<R, BlobId = DaPool::Key> + Send,
+    <SamplingBackend as DaSamplingServiceBackend<R>>::BlobId:
+        DispersedBlobInfo<BlobId = DaPool::Key> + Debug,
+    <SamplingBackend as DaSamplingServiceBackend<R>>::Blob: Debug + 'static,
+    SamplingBackend::Settings: Clone,
+    SamplingAdapter: DaSamplingNetworkAdapter,
+    R: SeedableRng + RngCore,
 {
     service_state: ServiceStateHandle<Self>,
     storage_relay: Relay<StorageService<DaStorage::Backend>>,
-    consensus_relay:
-        ConsensusRelay<A, ClPool, ClPoolAdapter, DaPool, DaPoolAdapter, TxS, BS, ConsensusStorage>,
+    consensus_relay: ConsensusRelay<
+        A,
+        ClPool,
+        ClPoolAdapter,
+        DaPool,
+        DaPoolAdapter,
+        SamplingBackend,
+        SamplingAdapter,
+        R,
+        TxS,
+        BS,
+        ConsensusStorage,
+    >,
 }
 
 pub enum DaMsg<B, V: Metadata> {
@@ -102,6 +152,9 @@ impl<
         ClPoolAdapter,
         DaPool,
         DaPoolAdapter,
+        SamplingBackend,
+        SamplingAdapter,
+        R,
         TxS,
         BS,
         ConsensusStorage,
@@ -115,6 +168,9 @@ impl<
         ClPoolAdapter,
         DaPool,
         DaPoolAdapter,
+        SamplingBackend,
+        SamplingAdapter,
+        R,
         TxS,
         BS,
         ConsensusStorage,
@@ -136,6 +192,13 @@ where
     BS: BlobSelect<BlobId = DaPool::Item>,
     DaStorage: DaStorageAdapter<Info = DaPool::Item, Blob = B>,
     ConsensusStorage: StorageBackend + Send + Sync + 'static,
+    SamplingBackend: DaSamplingServiceBackend<R, BlobId = DaPool::Key> + Send,
+    <SamplingBackend as DaSamplingServiceBackend<R>>::BlobId:
+        DispersedBlobInfo<BlobId = DaPool::Key> + Debug,
+    <SamplingBackend as DaSamplingServiceBackend<R>>::Blob: Debug,
+    SamplingBackend::Settings: Clone,
+    SamplingAdapter: DaSamplingNetworkAdapter,
+    R: SeedableRng + RngCore,
 {
     const SERVICE_ID: ServiceId = "DaIndexer";
     type Settings = IndexerSettings<DaStorage::Settings>;
@@ -153,6 +216,9 @@ impl<
         ClPoolAdapter,
         DaPool,
         DaPoolAdapter,
+        SamplingBackend,
+        SamplingAdapter,
+        R,
         TxS,
         BS,
         ConsensusStorage,
@@ -166,6 +232,9 @@ impl<
         ClPoolAdapter,
         DaPool,
         DaPoolAdapter,
+        SamplingBackend,
+        SamplingAdapter,
+        R,
         TxS,
         BS,
         ConsensusStorage,
@@ -188,6 +257,13 @@ where
     BS: BlobSelect<BlobId = DaPool::Item>,
     DaStorage: DaStorageAdapter<Info = DaPool::Item, Blob = B>,
     ConsensusStorage: StorageBackend + Send + Sync + 'static,
+    SamplingBackend: DaSamplingServiceBackend<R, BlobId = DaPool::Key> + Send,
+    <SamplingBackend as DaSamplingServiceBackend<R>>::BlobId:
+        DispersedBlobInfo<BlobId = DaPool::Key> + Debug,
+    <SamplingBackend as DaSamplingServiceBackend<R>>::Blob: Debug,
+    SamplingBackend::Settings: Clone,
+    SamplingAdapter: DaSamplingNetworkAdapter,
+    R: SeedableRng + RngCore,
 {
     async fn handle_new_block(
         storage_adapter: &DaStorage,
@@ -246,6 +322,9 @@ impl<
         ClPoolAdapter,
         DaPool,
         DaPoolAdapter,
+        SamplingBackend,
+        SamplingAdapter,
+        R,
         TxS,
         BS,
         ConsensusStorage,
@@ -259,6 +338,9 @@ impl<
         ClPoolAdapter,
         DaPool,
         DaPoolAdapter,
+        SamplingBackend,
+        SamplingAdapter,
+        R,
         TxS,
         BS,
         ConsensusStorage,
@@ -304,6 +386,13 @@ where
     DaStorage::Settings: Clone + Send + Sync + 'static,
     ConsensusStorage: StorageBackend + Send + Sync + 'static,
     Consensus: ConsensusAdapter<Tx = ClPool::Item, Cert = DaPool::Item> + Send + Sync,
+    SamplingBackend: DaSamplingServiceBackend<R, BlobId = DaPool::Key> + Send,
+    <SamplingBackend as DaSamplingServiceBackend<R>>::BlobId:
+        DispersedBlobInfo<BlobId = DaPool::Key> + Debug,
+    <SamplingBackend as DaSamplingServiceBackend<R>>::Blob: Debug,
+    SamplingBackend::Settings: Clone,
+    SamplingAdapter: DaSamplingNetworkAdapter,
+    R: SeedableRng + RngCore,
 {
     fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, DynError> {
         let consensus_relay = service_state.overwatch_handle.relay();
