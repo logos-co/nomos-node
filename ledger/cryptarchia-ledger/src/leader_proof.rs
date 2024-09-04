@@ -37,7 +37,7 @@ mod risc0 {
         risc0_receipt: risc0_zkvm::Receipt,
     }
 
-    #[cfg(feature="prove")]
+    #[cfg(feature = "prove")]
     impl Risc0LeaderProof {
         pub fn build(
             public_inputs: LeaderPublic,
