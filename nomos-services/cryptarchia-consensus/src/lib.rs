@@ -166,8 +166,7 @@ pub struct CryptarchiaConsensus<
     BS: BlobSelect<BlobId = DaPool::Item>,
     Storage: StorageBackend + Send + Sync + 'static,
     SamplingBackend: DaSamplingServiceBackend<R, BlobId = DaPool::Key> + Send,
-    <SamplingBackend as DaSamplingServiceBackend<R>>::BlobId:
-        DispersedBlobInfo<BlobId = DaPool::Key> + Debug,
+    <SamplingBackend as DaSamplingServiceBackend<R>>::BlobId: Debug,
     <SamplingBackend as DaSamplingServiceBackend<R>>::Blob: Debug + 'static,
     SamplingBackend::Settings: Clone,
     SamplingAdapter: DaSamplingNetworkAdapter,
@@ -225,8 +224,7 @@ where
     BS: BlobSelect<BlobId = DaPool::Item>,
     Storage: StorageBackend + Send + Sync + 'static,
     SamplingBackend: DaSamplingServiceBackend<R, BlobId = DaPool::Key> + Send,
-    <SamplingBackend as DaSamplingServiceBackend<R>>::BlobId:
-        DispersedBlobInfo<BlobId = DaPool::Key> + Debug,
+    <SamplingBackend as DaSamplingServiceBackend<R>>::BlobId: Debug,
     <SamplingBackend as DaSamplingServiceBackend<R>>::Blob: Debug,
     SamplingBackend::Settings: Clone,
     SamplingAdapter: DaSamplingNetworkAdapter,
@@ -310,8 +308,7 @@ where
     BS::Settings: Send + Sync + 'static,
     Storage: StorageBackend + Send + Sync + 'static,
     SamplingBackend: DaSamplingServiceBackend<R, BlobId = DaPool::Key> + Send,
-    <SamplingBackend as DaSamplingServiceBackend<R>>::BlobId:
-        DispersedBlobInfo<BlobId = DaPool::Key> + Debug,
+    <SamplingBackend as DaSamplingServiceBackend<R>>::BlobId: Debug,
     <SamplingBackend as DaSamplingServiceBackend<R>>::Blob: Debug,
     SamplingBackend::Settings: Clone,
     SamplingAdapter: DaSamplingNetworkAdapter,
@@ -515,8 +512,7 @@ where
     DaPoolAdapter::Payload: DispersedBlobInfo + Into<DaPool::Item> + Debug,
     Storage: StorageBackend + Send + Sync + 'static,
     SamplingBackend: DaSamplingServiceBackend<R, BlobId = DaPool::Key> + Send,
-    <SamplingBackend as DaSamplingServiceBackend<R>>::BlobId:
-        DispersedBlobInfo<BlobId = DaPool::Key> + Debug,
+    <SamplingBackend as DaSamplingServiceBackend<R>>::BlobId: Debug,
     <SamplingBackend as DaSamplingServiceBackend<R>>::Blob: Debug,
     SamplingBackend::Settings: Clone,
     SamplingAdapter: DaSamplingNetworkAdapter,

@@ -93,8 +93,7 @@ pub struct DataIndexerService<
     DaStorage: DaStorageAdapter<Info = DaPool::Item, Blob = B>,
     ConsensusStorage: StorageBackend + Send + Sync + 'static,
     SamplingBackend: DaSamplingServiceBackend<R, BlobId = DaPool::Key> + Send,
-    <SamplingBackend as DaSamplingServiceBackend<R>>::BlobId:
-        DispersedBlobInfo<BlobId = DaPool::Key> + Debug,
+    <SamplingBackend as DaSamplingServiceBackend<R>>::BlobId: Debug,
     <SamplingBackend as DaSamplingServiceBackend<R>>::Blob: Debug + 'static,
     SamplingBackend::Settings: Clone,
     SamplingAdapter: DaSamplingNetworkAdapter,
@@ -193,8 +192,7 @@ where
     DaStorage: DaStorageAdapter<Info = DaPool::Item, Blob = B>,
     ConsensusStorage: StorageBackend + Send + Sync + 'static,
     SamplingBackend: DaSamplingServiceBackend<R, BlobId = DaPool::Key> + Send,
-    <SamplingBackend as DaSamplingServiceBackend<R>>::BlobId:
-        DispersedBlobInfo<BlobId = DaPool::Key> + Debug,
+    <SamplingBackend as DaSamplingServiceBackend<R>>::BlobId: Debug,
     <SamplingBackend as DaSamplingServiceBackend<R>>::Blob: Debug,
     SamplingBackend::Settings: Clone,
     SamplingAdapter: DaSamplingNetworkAdapter,
@@ -258,8 +256,7 @@ where
     DaStorage: DaStorageAdapter<Info = DaPool::Item, Blob = B>,
     ConsensusStorage: StorageBackend + Send + Sync + 'static,
     SamplingBackend: DaSamplingServiceBackend<R, BlobId = DaPool::Key> + Send,
-    <SamplingBackend as DaSamplingServiceBackend<R>>::BlobId:
-        DispersedBlobInfo<BlobId = DaPool::Key> + Debug,
+    <SamplingBackend as DaSamplingServiceBackend<R>>::BlobId: Debug,
     <SamplingBackend as DaSamplingServiceBackend<R>>::Blob: Debug,
     SamplingBackend::Settings: Clone,
     SamplingAdapter: DaSamplingNetworkAdapter,
@@ -387,8 +384,7 @@ where
     ConsensusStorage: StorageBackend + Send + Sync + 'static,
     Consensus: ConsensusAdapter<Tx = ClPool::Item, Cert = DaPool::Item> + Send + Sync,
     SamplingBackend: DaSamplingServiceBackend<R, BlobId = DaPool::Key> + Send,
-    <SamplingBackend as DaSamplingServiceBackend<R>>::BlobId:
-        DispersedBlobInfo<BlobId = DaPool::Key> + Debug,
+    <SamplingBackend as DaSamplingServiceBackend<R>>::BlobId: Debug,
     <SamplingBackend as DaSamplingServiceBackend<R>>::Blob: Debug,
     SamplingBackend::Settings: Clone,
     SamplingAdapter: DaSamplingNetworkAdapter,

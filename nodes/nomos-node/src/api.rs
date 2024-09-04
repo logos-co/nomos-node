@@ -13,13 +13,14 @@ use hyper::{
     header::{CONTENT_TYPE, USER_AGENT},
     Body, StatusCode,
 };
+use kzgrs_backend::dispersal::BlobInfo;
 use nomos_api::{
     http::{cl, consensus, da, libp2p, mempool, metrics, storage},
     Backend,
 };
 use nomos_core::da::blob::info::DispersedBlobInfo;
 use nomos_core::da::blob::metadata::Metadata;
-use nomos_core::da::DaVerifier as CoreDaVerifier;
+use nomos_core::da::{BlobId, DaVerifier as CoreDaVerifier};
 use nomos_core::{da::blob::Blob, header::HeaderId, tx::Transaction};
 use nomos_da_verifier::backend::VerifierBackend;
 use nomos_mempool::{
@@ -29,6 +30,7 @@ use nomos_mempool::{
 use nomos_network::backends::libp2p::Libp2p as NetworkBackend;
 use nomos_storage::backends::StorageSerde;
 use overwatch_rs::overwatch::handle::OverwatchHandle;
+use rand_chacha::rand_core::{RngCore, SeedableRng};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use tower_http::{
     cors::{Any, CorsLayer},
@@ -47,7 +49,7 @@ pub struct AxumBackendSettings {
     pub cors_origins: Vec<String>,
 }
 
-pub struct AxumBackend<A, B, C, V, VB, T, S, const SIZE: usize> {
+pub struct AxumBackend<A, B, C, V, VB, T, S, R, const SIZE: usize> {
     settings: AxumBackendSettings,
     _attestation: core::marker::PhantomData<A>,
     _blob: core::marker::PhantomData<B>,
@@ -56,6 +58,7 @@ pub struct AxumBackend<A, B, C, V, VB, T, S, const SIZE: usize> {
     _verifier_backend: core::marker::PhantomData<VB>,
     _tx: core::marker::PhantomData<T>,
     _storage_serde: core::marker::PhantomData<S>,
+    _rand: core::marker::PhantomData<R>,
 }
 
 #[derive(OpenApi)]
@@ -72,7 +75,8 @@ pub struct AxumBackend<A, B, C, V, VB, T, S, const SIZE: usize> {
 struct ApiDoc;
 
 #[async_trait::async_trait]
-impl<A, B, C, V, VB, T, S, const SIZE: usize> Backend for AxumBackend<A, B, C, V, VB, T, S, SIZE>
+impl<A, B, C, V, VB, T, S, R, const SIZE: usize> Backend
+    for AxumBackend<A, B, C, V, VB, T, S, R, SIZE>
 where
     A: Serialize + DeserializeOwned + Clone + Send + Sync + 'static,
     B: Blob + Serialize + DeserializeOwned + Clone + Send + Sync + 'static,
@@ -119,6 +123,7 @@ where
     <T as nomos_core::tx::Transaction>::Hash:
         Serialize + for<'de> Deserialize<'de> + std::cmp::Ord + Debug + Send + Sync + 'static,
     S: StorageSerde + Send + Sync + 'static,
+    R: SeedableRng + RngCore + Send + Sync + 'static,
 {
     type Error = hyper::Error;
     type Settings = AxumBackendSettings;
@@ -136,6 +141,7 @@ where
             _verifier_backend: core::marker::PhantomData,
             _tx: core::marker::PhantomData,
             _storage_serde: core::marker::PhantomData,
+            _rand: core::marker::PhantomData,
         })
     }
 
@@ -166,21 +172,21 @@ where
             .route("/cl/status", routing::post(cl_status::<T>))
             .route(
                 "/cryptarchia/info",
-                routing::get(cryptarchia_info::<T, S, SIZE>),
+                routing::get(cryptarchia_info::<T, S, R, SIZE>),
             )
             .route(
                 "/cryptarchia/headers",
-                routing::get(cryptarchia_headers::<T, S, SIZE>),
+                routing::get(cryptarchia_headers::<T, S, R, SIZE>),
             )
             .route("/da/add_blob", routing::post(add_blob::<A, B, VB, S>))
             .route(
                 "/da/get_range",
-                routing::post(get_range::<T, C, V, S, SIZE>),
+                routing::post(get_range::<T, C, V, S, R, SIZE>),
             )
             .route("/network/info", routing::get(libp2p_info))
             .route("/storage/block", routing::post(block::<S, T>))
             .route("/mempool/add/tx", routing::post(add_tx::<T>))
-            .route("/mempool/add/blobinfo", routing::post(add_blob_info::<V>))
+            .route("/mempool/add/blobinfo", routing::post(add_blob_info::<R>))
             .route("/metrics", routing::get(get_metrics))
             .with_state(handle);
 
@@ -263,7 +269,7 @@ struct QueryParams {
         (status = 500, description = "Internal server error", body = String),
     )
 )]
-async fn cryptarchia_info<Tx, SS, const SIZE: usize>(
+async fn cryptarchia_info<Tx, SS, R, const SIZE: usize>(
     State(handle): State<OverwatchHandle>,
 ) -> Response
 where
@@ -279,8 +285,9 @@ where
         + 'static,
     <Tx as Transaction>::Hash: std::cmp::Ord + Debug + Send + Sync + 'static,
     SS: StorageSerde + Send + Sync + 'static,
+    R: SeedableRng + RngCore + Send + Sync + 'static,
 {
-    make_request_and_return_response!(consensus::cryptarchia_info::<Tx, SS, SIZE>(&handle))
+    make_request_and_return_response!(consensus::cryptarchia_info::<Tx, SS, R, SIZE>(&handle))
 }
 
 #[utoipa::path(
@@ -291,7 +298,7 @@ where
         (status = 500, description = "Internal server error", body = String),
     )
 )]
-async fn cryptarchia_headers<Tx, SS, const SIZE: usize>(
+async fn cryptarchia_headers<Tx, SS, R, const SIZE: usize>(
     State(store): State<OverwatchHandle>,
     Query(query): Query<QueryParams>,
 ) -> Response
@@ -308,9 +315,10 @@ where
         + 'static,
     <Tx as Transaction>::Hash: std::cmp::Ord + Debug + Send + Sync + 'static,
     SS: StorageSerde + Send + Sync + 'static,
+    R: SeedableRng + RngCore + Send + Sync + 'static,
 {
     let QueryParams { from, to } = query;
-    make_request_and_return_response!(consensus::cryptarchia_headers::<Tx, SS, SIZE>(
+    make_request_and_return_response!(consensus::cryptarchia_headers::<Tx, SS, R, SIZE>(
         &store, from, to
     ))
 }
@@ -358,7 +366,7 @@ where
         (status = 500, description = "Internal server error", body = String),
     )
 )]
-async fn get_range<Tx, C, V, SS, const SIZE: usize>(
+async fn get_range<Tx, C, V, SS, R, const SIZE: usize>(
     State(handle): State<OverwatchHandle>,
     Json(GetRangeReq { app_id, range }): Json<GetRangeReq<V>>,
 ) -> Response
@@ -400,8 +408,11 @@ where
     <V as Metadata>::Index:
         AsRef<[u8]> + Clone + Serialize + DeserializeOwned + PartialOrd + Send + Sync,
     SS: StorageSerde + Send + Sync + 'static,
+    R: SeedableRng + RngCore + Send + Sync + 'static,
 {
-    make_request_and_return_response!(da::get_range::<Tx, C, V, SS, SIZE>(&handle, app_id, range))
+    make_request_and_return_response!(da::get_range::<Tx, C, V, SS, R, SIZE>(
+        &handle, app_id, range
+    ))
 }
 
 #[utoipa::path(
@@ -461,28 +472,23 @@ where
         (status = 500, description = "Internal server error", body = String),
     )
 )]
-async fn add_blob_info<B>(
+async fn add_blob_info<R>(
     State(handle): State<OverwatchHandle>,
-    Json(blob_info): Json<B>,
+    Json(blob_info): Json<BlobInfo>,
 ) -> Response
 where
-    B: DispersedBlobInfo
-        + Clone
-        + Debug
-        + Hash
-        + Serialize
-        + DeserializeOwned
-        + Send
-        + Sync
-        + 'static,
-    <B as DispersedBlobInfo>::BlobId: std::cmp::Ord + Clone + Debug + Hash + Send + Sync + 'static,
+    R: SeedableRng + RngCore + Send + Sync + 'static,
 {
     make_request_and_return_response!(mempool::add_blob_info::<
         NetworkBackend,
-        MempoolNetworkAdapter<B, <B as DispersedBlobInfo>::BlobId>,
-        B,
-        <B as DispersedBlobInfo>::BlobId,
-    >(&handle, blob_info, DispersedBlobInfo::blob_id))
+        MempoolNetworkAdapter<BlobInfo, BlobId>,
+        BlobInfo,
+        R,
+    >(
+        &handle,
+        blob_info,
+        <BlobInfo as DispersedBlobInfo>::blob_id
+    ))
 }
 
 #[utoipa::path(

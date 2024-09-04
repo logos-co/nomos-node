@@ -21,6 +21,10 @@ use nomos_da_indexer::storage::adapters::rocksdb::RocksAdapter as IndexerStorage
 use nomos_da_indexer::DataIndexerService;
 use nomos_da_network_service::backends::libp2p::validator::DaNetworkValidatorBackend;
 use nomos_da_network_service::NetworkService as DaNetworkService;
+use nomos_da_sampling::{
+    backend::kzgrs::KzgrsDaSampler,
+    network::adapters::libp2p::Libp2pAdapter as SamplingLibp2pAdapter,
+};
 use nomos_da_verifier::backend::kzgrs::KzgrsDaVerifier;
 use nomos_da_verifier::network::adapters::libp2p::Libp2pAdapter as VerifierNetworkAdapter;
 use nomos_da_verifier::storage::adapters::rocksdb::RocksAdapter as VerifierStorageAdapter;
@@ -41,13 +45,15 @@ use nomos_storage::{
 use nomos_system_sig::SystemSig;
 use overwatch_derive::*;
 use overwatch_rs::services::handle::ServiceHandle;
+use rand_chacha::ChaCha20Rng;
 use serde::{de::DeserializeOwned, Serialize};
 use subnetworks_assignations::versions::v1::FillFromNodeList;
 // internal
 pub use tx::Tx;
 
-pub type NomosApiService =
-    ApiService<AxumBackend<(), DaBlob, BlobInfo, BlobInfo, KzgrsDaVerifier, Tx, Wire, MB16>>;
+pub type NomosApiService = ApiService<
+    AxumBackend<(), DaBlob, BlobInfo, BlobInfo, KzgrsDaVerifier, Tx, Wire, ChaCha20Rng, MB16>,
+>;
 
 pub const CL_TOPIC: &str = "cl";
 pub const DA_TOPIC: &str = "da";
@@ -59,6 +65,9 @@ pub type Cryptarchia = cryptarchia_consensus::CryptarchiaConsensus<
     MempoolNetworkAdapter<Tx, <Tx as Transaction>::Hash>,
     MockPool<HeaderId, BlobInfo, <BlobInfo as DispersedBlobInfo>::BlobId>,
     MempoolNetworkAdapter<BlobInfo, <BlobInfo as DispersedBlobInfo>::BlobId>,
+    KzgrsDaSampler<ChaCha20Rng>,
+    SamplingLibp2pAdapter<FillFromNodeList>,
+    ChaCha20Rng,
     FillSizeWithTx<MB16, Tx>,
     FillSizeWithBlobs<MB16, BlobInfo>,
     RocksBackend<Wire>,
@@ -72,6 +81,9 @@ pub type TxMempool = TxMempoolService<
 pub type DaMempool = DaMempoolService<
     MempoolNetworkAdapter<BlobInfo, <BlobInfo as DispersedBlobInfo>::BlobId>,
     MockPool<HeaderId, BlobInfo, <BlobInfo as DispersedBlobInfo>::BlobId>,
+    KzgrsDaSampler<ChaCha20Rng>,
+    SamplingLibp2pAdapter<FillFromNodeList>,
+    ChaCha20Rng,
 >;
 
 pub type DaIndexer = DataIndexerService<
@@ -85,6 +97,9 @@ pub type DaIndexer = DataIndexerService<
     MempoolNetworkAdapter<Tx, <Tx as Transaction>::Hash>,
     MockPool<HeaderId, BlobInfo, <BlobInfo as DispersedBlobInfo>::BlobId>,
     MempoolNetworkAdapter<BlobInfo, <BlobInfo as DispersedBlobInfo>::BlobId>,
+    KzgrsDaSampler<ChaCha20Rng>,
+    SamplingLibp2pAdapter<FillFromNodeList>,
+    ChaCha20Rng,
     FillSizeWithTx<MB16, Tx>,
     FillSizeWithBlobs<MB16, BlobInfo>,
     RocksBackend<Wire>,
