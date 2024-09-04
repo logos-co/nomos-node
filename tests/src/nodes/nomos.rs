@@ -48,6 +48,8 @@ const CRYPTARCHIA_INFO_API: &str = "cryptarchia/info";
 const GET_HEADERS_INFO: &str = "cryptarchia/headers";
 const NOMOS_BIN: &str = "../target/debug/nomos-node";
 const STORAGE_BLOCKS_API: &str = "storage/block";
+const DEFAULT_SLOT_TIME: u64 = 30;
+const CONSENSUS_SLOT_TIME_VAR: &str = "CONSENSUS_SLOT_TIME";
 #[cfg(feature = "mixnet")]
 const NUM_MIXNODE_CANDIDATES: usize = 2;
 
@@ -266,8 +268,11 @@ impl Node for NomosNode {
                 active_slot_coeff: consensus.active_slot_coeff,
             },
         };
+        let slot_duration = std::env::var(CONSENSUS_SLOT_TIME_VAR)
+            .map(|s| <u64>::from_str(&s).unwrap())
+            .unwrap_or(DEFAULT_SLOT_TIME);
         let time_config = TimeConfig {
-            slot_duration: Duration::from_secs(30),
+            slot_duration: Duration::from_secs(slot_duration),
             chain_start_time: OffsetDateTime::now_utc(),
         };
 

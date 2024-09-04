@@ -28,7 +28,7 @@ jobs:
           override: true
           components: llvm-tools-preview
       - name: Install risc0
-        run: cargo install cargo-risczero && cargo risczero install
+        run: curl -L https://risczero.com/install | bash && ~/.risc0/bin/rzup
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - uses: actions-rs/cargo@v1

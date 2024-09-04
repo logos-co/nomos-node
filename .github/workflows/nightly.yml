@@ -32,11 +32,18 @@ jobs:
         with:
           command: build
           args: --all --no-default-features --features ${{ matrix.feature }}
-      - name: Cargo test
+      - name: Integration tests
         uses: actions-rs/cargo@v1
+        env:
+          CONSENSUS_SLOT_TIME: 260 # cpu only proving on ci machines is quite slow
         with:
           command: test
           args: --manifest-path tests/Cargo.toml --no-default-features --features ${{ matrix.feature }},prove
+      - name: Ignored tests
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: --all --ignored
       - uses: actions/upload-artifact@v3
         if: failure()
         with:
