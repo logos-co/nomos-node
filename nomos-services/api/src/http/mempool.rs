@@ -1,10 +1,14 @@
 use core::{fmt::Debug, hash::Hash};
 use nomos_core::{da::blob::info::DispersedBlobInfo, header::HeaderId};
+use nomos_da_sampling::{
+    backend::DaSamplingServiceBackend, network::NetworkAdapter as DaSamplingNetworkAdapter,
+};
 use nomos_mempool::{
     backend::mockpool::MockPool, network::NetworkAdapter, DaMempoolService, MempoolMsg,
     TxMempoolService,
 };
 use nomos_network::backends::NetworkBackend;
+use rand::{RngCore, SeedableRng};
 use tokio::sync::oneshot;
 
 pub async fn add_tx<N, A, Item, Key>(
@@ -41,7 +45,7 @@ where
     }
 }
 
-pub async fn add_blob_info<N, A, Item, Key>(
+pub async fn add_blob_info<N, A, Item, Key, SamplingBackend, SamplingAdapter, SamplingRng>(
     handle: &overwatch_rs::overwatch::handle::OverwatchHandle,
     item: A::Payload,
     converter: impl Fn(&A::Payload) -> Key,
@@ -53,9 +57,21 @@ where
     A::Settings: Send + Sync,
     Item: Clone + Debug + Send + Sync + 'static + Hash,
     Key: Clone + Debug + Ord + Hash + 'static,
+    SamplingBackend: DaSamplingServiceBackend<SamplingRng, BlobId = Key> + Send,
+    SamplingBackend::BlobId: Debug,
+    SamplingBackend::Blob: Debug + 'static,
+    SamplingBackend::Settings: Clone,
+    SamplingAdapter: DaSamplingNetworkAdapter + Send,
+    SamplingRng: SeedableRng + RngCore + Send,
 {
     let relay = handle
-        .relay::<DaMempoolService<A, MockPool<HeaderId, Item, Key>>>()
+        .relay::<DaMempoolService<
+            A,
+            MockPool<HeaderId, Item, Key>,
+            SamplingBackend,
+            SamplingAdapter,
+            SamplingRng,
+        >>()
         .connect()
         .await?;
     let (sender, receiver) = oneshot::channel();

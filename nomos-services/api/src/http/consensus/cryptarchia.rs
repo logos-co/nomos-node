@@ -12,7 +12,10 @@ use cryptarchia_consensus::{
 };
 use kzgrs_backend::dispersal::BlobInfo;
 use nomos_core::{
-    da::blob::{self, select::FillSize as FillSizeWithBlobs},
+    da::{
+        blob::{self, select::FillSize as FillSizeWithBlobs},
+        BlobId,
+    },
     header::HeaderId,
     tx::{select::FillSize as FillSizeWithTx, Transaction},
 };
@@ -67,7 +70,7 @@ where
     <Tx as Transaction>::Hash: std::cmp::Ord + Debug + Send + Sync + 'static,
     SS: StorageSerde + Send + Sync + 'static,
     SamplingRng: SeedableRng + RngCore,
-    SamplingBackend: DaSamplingServiceBackend<SamplingRng> + Send,
+    SamplingBackend: DaSamplingServiceBackend<SamplingRng, BlobId = BlobId> + Send,
     SamplingBackend::Settings: Clone,
     SamplingBackend::Blob: Debug + 'static,
     SamplingBackend::BlobId: Debug + 'static,
@@ -112,7 +115,7 @@ where
     <Tx as Transaction>::Hash: std::cmp::Ord + Debug + Send + Sync + 'static,
     SS: StorageSerde + Send + Sync + 'static,
     SamplingRng: SeedableRng + RngCore,
-    SamplingBackend: DaSamplingServiceBackend<SamplingRng> + Send,
+    SamplingBackend: DaSamplingServiceBackend<SamplingRng, BlobId = BlobId> + Send,
     SamplingBackend::Settings: Clone,
     SamplingBackend::Blob: Debug + 'static,
     SamplingBackend::BlobId: Debug + 'static,
