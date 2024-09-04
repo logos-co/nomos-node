@@ -1,7 +1,9 @@
 use crate::MembershipHandler;
 use libp2p_identity::PeerId;
+use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 
+#[derive(Default, Debug, Clone, Serialize, Deserialize)]
 pub struct FillWithOriginalReplication {
     pub assignations: Vec<HashSet<PeerId>>,
     pub subnetwork_size: usize,
@@ -63,7 +65,7 @@ impl FillWithOriginalReplication {
 }
 
 impl MembershipHandler for FillWithOriginalReplication {
-    type NetworkId = u16;
+    type NetworkId = u32;
     type Id = PeerId;
 
     fn membership(&self, id: &Self::Id) -> HashSet<Self::NetworkId> {

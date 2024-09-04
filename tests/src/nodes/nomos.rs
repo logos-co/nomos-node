@@ -33,6 +33,9 @@ use nomos_network::backends::libp2p::mixnet::MixnetConfig;
 use nomos_network::{backends::libp2p::Libp2pConfig, NetworkConfig};
 use nomos_node::{api::AxumBackendSettings, Config, Tx};
 // crates
+use nomos_da_sampling::backend::kzgrs::KzgrsSamplingBackendSettings;
+use nomos_da_sampling::network::adapters::libp2p::DaNetworkSamplingSettings;
+use nomos_da_sampling::DaSamplingServiceSettings;
 use once_cell::sync::Lazy;
 use rand::{thread_rng, Rng, RngCore};
 use reqwest::{Client, Url};
@@ -417,6 +420,19 @@ fn create_node_config(
                     .parse()
                     .unwrap(),
                 cors_origins: vec![],
+            },
+        },
+        da_sampling: DaSamplingServiceSettings {
+            // TODO: setup this properly!
+            sampling_settings: KzgrsSamplingBackendSettings {
+                num_samples: 0,
+                // Sampling service period can't be zero.
+                old_blobs_check_interval: Duration::from_secs(1),
+                blobs_validity_duration: Duration::from_secs(1),
+            },
+            network_adapter_settings: DaNetworkSamplingSettings {
+                num_samples: 0,
+                subnet_size: 0,
             },
         },
     };

@@ -22,6 +22,7 @@ use overwatch_rs::services::relay::{Relay, RelayMessage};
 use overwatch_rs::services::state::{NoOperator, NoState};
 use overwatch_rs::services::{ServiceCore, ServiceData, ServiceId};
 use overwatch_rs::DynError;
+use serde::{Deserialize, Serialize};
 use tokio::sync::oneshot;
 
 const DA_SAMPLING_TAG: ServiceId = "DA-Sampling";
@@ -39,7 +40,7 @@ pub enum DaSamplingServiceMsg<BlobId> {
     },
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DaSamplingServiceSettings<BackendSettings, NetworkSettings> {
     pub sampling_settings: BackendSettings,
     pub network_adapter_settings: NetworkSettings,
@@ -47,7 +48,7 @@ pub struct DaSamplingServiceSettings<BackendSettings, NetworkSettings> {
 
 impl<B: 'static> RelayMessage for DaSamplingServiceMsg<B> {}
 
-pub struct DaSamplingService<Backend, N, S, R>
+pub struct DaSamplingService<Backend, N, R>
 where
     R: SeedableRng + RngCore,
     Backend: DaSamplingServiceBackend<R> + Send,
@@ -62,7 +63,7 @@ where
     sampler: Backend,
 }
 
-impl<Backend, N, S, R> DaSamplingService<Backend, N, S, R>
+impl<Backend, N, R> DaSamplingService<Backend, N, R>
 where
     R: SeedableRng + RngCore,
     Backend: DaSamplingServiceBackend<R, BlobId = BlobId, Blob = DaBlob> + Send + 'static,
@@ -111,7 +112,7 @@ where
                 }
             }
             DaSamplingServiceMsg::MarkInBlock { blobs_id } => {
-                sampler.mark_in_block(&blobs_id).await;
+                sampler.mark_completed(&blobs_id).await;
             }
         }
     }
@@ -132,7 +133,7 @@ where
     }
 }
 
-impl<Backend, N, S, R> ServiceData for DaSamplingService<Backend, N, S, R>
+impl<Backend, N, R> ServiceData for DaSamplingService<Backend, N, R>
 where
     R: SeedableRng + RngCore,
     Backend: DaSamplingServiceBackend<R> + Send,
@@ -150,7 +151,7 @@ where
 }
 
 #[async_trait::async_trait]
-impl<Backend, N, S, R> ServiceCore for DaSamplingService<Backend, N, S, R>
+impl<Backend, N, R> ServiceCore for DaSamplingService<Backend, N, R>
 where
     R: SeedableRng + RngCore,
     Backend: DaSamplingServiceBackend<R, BlobId = BlobId, Blob = DaBlob> + Send + Sync + 'static,
@@ -189,7 +190,7 @@ where
         let mut network_adapter = N::new(network_relay).await;
 
         let mut sampling_message_stream = network_adapter.listen_to_sampling_messages().await?;
-        let mut next_prune_tick = sampler.prune_interval().await;
+        let mut next_prune_tick = sampler.prune_interval();
 
         let mut lifecycle_stream = service_state.lifecycle_handle.message_stream();
         async {

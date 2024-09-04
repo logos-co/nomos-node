@@ -21,6 +21,9 @@ use nomos_da_indexer::storage::adapters::rocksdb::RocksAdapter as IndexerStorage
 use nomos_da_indexer::DataIndexerService;
 use nomos_da_network_service::backends::libp2p::validator::DaNetworkValidatorBackend;
 use nomos_da_network_service::NetworkService as DaNetworkService;
+use nomos_da_sampling::backend::kzgrs::KzgrsSamplingBackend;
+use nomos_da_sampling::network::adapters::libp2p::Libp2pAdapter as SamplingLibp2pAdapter;
+use nomos_da_sampling::DaSamplingService;
 use nomos_da_verifier::backend::kzgrs::KzgrsDaVerifier;
 use nomos_da_verifier::network::adapters::libp2p::Libp2pAdapter as VerifierNetworkAdapter;
 use nomos_da_verifier::storage::adapters::rocksdb::RocksAdapter as VerifierStorageAdapter;
@@ -41,13 +44,31 @@ use nomos_storage::{
 use nomos_system_sig::SystemSig;
 use overwatch_derive::*;
 use overwatch_rs::services::handle::ServiceHandle;
+use rand_chacha::ChaCha20Rng;
 use serde::{de::DeserializeOwned, Serialize};
 use subnetworks_assignations::versions::v1::FillFromNodeList;
 // internal
 pub use tx::Tx;
 
-pub type NomosApiService =
-    ApiService<AxumBackend<(), DaBlob, BlobInfo, BlobInfo, KzgrsDaVerifier, Tx, Wire, MB16>>;
+/// Membership used by the DA Network service.
+pub type NomosDaMembership = FillFromNodeList;
+
+pub type NomosApiService = ApiService<
+    AxumBackend<
+        (),
+        DaBlob,
+        BlobInfo,
+        NomosDaMembership,
+        BlobInfo,
+        KzgrsDaVerifier,
+        Tx,
+        Wire,
+        KzgrsSamplingBackend<ChaCha20Rng>,
+        nomos_da_sampling::network::adapters::libp2p::Libp2pAdapter<NomosDaMembership>,
+        ChaCha20Rng,
+        MB16,
+    >,
+>;
 
 pub const CL_TOPIC: &str = "cl";
 pub const DA_TOPIC: &str = "da";
@@ -62,6 +83,9 @@ pub type Cryptarchia = cryptarchia_consensus::CryptarchiaConsensus<
     FillSizeWithTx<MB16, Tx>,
     FillSizeWithBlobs<MB16, BlobInfo>,
     RocksBackend<Wire>,
+    KzgrsSamplingBackend<ChaCha20Rng>,
+    nomos_da_sampling::network::adapters::libp2p::Libp2pAdapter<NomosDaMembership>,
+    ChaCha20Rng,
 >;
 
 pub type TxMempool = TxMempoolService<
@@ -88,11 +112,20 @@ pub type DaIndexer = DataIndexerService<
     FillSizeWithTx<MB16, Tx>,
     FillSizeWithBlobs<MB16, BlobInfo>,
     RocksBackend<Wire>,
+    KzgrsSamplingBackend<ChaCha20Rng>,
+    nomos_da_sampling::network::adapters::libp2p::Libp2pAdapter<NomosDaMembership>,
+    ChaCha20Rng,
+>;
+
+pub type DaSampling = DaSamplingService<
+    KzgrsSamplingBackend<ChaCha20Rng>,
+    SamplingLibp2pAdapter<NomosDaMembership>,
+    ChaCha20Rng,
 >;
 
 pub type DaVerifier = DaVerifierService<
     KzgrsDaVerifier,
-    VerifierNetworkAdapter<DaBlob, ()>,
+    VerifierNetworkAdapter<FillFromNodeList>,
     VerifierStorageAdapter<(), DaBlob, Wire>,
 >;
 
@@ -103,7 +136,8 @@ pub struct Nomos {
     network: ServiceHandle<NetworkService<NetworkBackend>>,
     da_indexer: ServiceHandle<DaIndexer>,
     da_verifier: ServiceHandle<DaVerifier>,
-    da_network: ServiceHandle<DaNetworkService<DaNetworkValidatorBackend<FillFromNodeList>>>,
+    da_sampling: ServiceHandle<DaSampling>,
+    da_network: ServiceHandle<DaNetworkService<DaNetworkValidatorBackend<NomosDaMembership>>>,
     cl_mempool: ServiceHandle<TxMempool>,
     da_mempool: ServiceHandle<DaMempool>,
     cryptarchia: ServiceHandle<Cryptarchia>,

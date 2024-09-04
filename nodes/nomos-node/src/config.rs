@@ -123,6 +123,7 @@ pub struct Config {
         <DaNetworkService<DaNetworkValidatorBackend<FillFromNodeList>> as ServiceData>::Settings,
     pub da_indexer: <crate::DaIndexer as ServiceData>::Settings,
     pub da_verifier: <crate::DaVerifier as ServiceData>::Settings,
+    pub da_sampling: <crate::DaSampling as ServiceData>::Settings,
     pub http: <NomosApiService as ServiceData>::Settings,
     pub cryptarchia: <crate::Cryptarchia as ServiceData>::Settings,
 }

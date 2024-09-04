@@ -15,6 +15,8 @@ kzgrs-backend = { path = "../../../nomos-da/kzgrs-backend" }
 nomos-core = { path = "../../../nomos-core" }
 nomos-da-indexer = { path = "../indexer", features = ["rocksdb-backend"] }
 nomos-da-verifier = { path = "../verifier", features = ["rocksdb-backend", "libp2p"] }
+nomos-da-sampling = { path = "../sampling" }
+nomos-da-network-service = { path = "../network" }
 nomos-da-storage = { path = "../../../nomos-da/storage" }
 nomos-node = { path = "../../../nodes/nomos-node" }
 nomos-mempool = { path = "../../../nomos-services/mempool" }
@@ -24,12 +26,14 @@ nomos-network = { path = "../../network", features = ["mock"] }
 nomos-libp2p = { path = "../../../nomos-libp2p" }
 overwatch-rs = { git = "https://github.com/logos-co/Overwatch", rev = "2f70806" }
 overwatch-derive = { git = "https://github.com/logos-co/Overwatch", rev = "ac28d01" }
+rand = "0.8"
+rand_chacha = "0.3"
+subnetworks-assignations = { path = "../../../nomos-da/network/subnetworks-assignations" }
 tokio = { version = "1", features = ["sync"] }
 tokio-stream = "0.1.15"
 tempfile = "3.6"
 tracing = "0.1"
 time = "0.3"
-rand = "0.8"
 
 [dev-dependencies]
 blake2 = { version = "0.10" }

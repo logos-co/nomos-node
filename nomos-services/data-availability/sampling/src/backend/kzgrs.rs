@@ -7,6 +7,7 @@ use std::time::{Duration, Instant};
 use hex;
 use rand::distributions::Standard;
 use rand::prelude::*;
+use serde::{Deserialize, Serialize};
 use tokio::time;
 use tokio::time::Interval;
 
@@ -24,21 +25,21 @@ pub struct SamplingContext {
     started: Instant,
 }
 
-#[derive(Debug, Clone)]
-pub struct KzgrsDaSamplerSettings {
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct KzgrsSamplingBackendSettings {
     pub num_samples: u16,
     pub old_blobs_check_interval: Duration,
     pub blobs_validity_duration: Duration,
 }
 
-pub struct KzgrsDaSampler<R: Rng> {
-    settings: KzgrsDaSamplerSettings,
+pub struct KzgrsSamplingBackend<R: Rng> {
+    settings: KzgrsSamplingBackendSettings,
     validated_blobs: BTreeSet<BlobId>,
     pending_sampling_blobs: HashMap<BlobId, SamplingContext>,
     rng: R,
 }
 
-impl<R: Rng> KzgrsDaSampler<R> {
+impl<R: Rng> KzgrsSamplingBackend<R> {
     fn prune_by_time(&mut self) {
         self.pending_sampling_blobs.retain(|_blob_id, context| {
             context.started.elapsed() < self.settings.blobs_validity_duration
@@ -47,8 +48,8 @@ impl<R: Rng> KzgrsDaSampler<R> {
 }
 
 #[async_trait::async_trait]
-impl<R: Rng + Sync + Send> DaSamplingServiceBackend<R> for KzgrsDaSampler<R> {
-    type Settings = KzgrsDaSamplerSettings;
+impl<R: Rng + Sync + Send> DaSamplingServiceBackend<R> for KzgrsSamplingBackend<R> {
+    type Settings = KzgrsSamplingBackendSettings;
     type BlobId = BlobId;
     type Blob = DaBlob;
 
@@ -62,7 +63,7 @@ impl<R: Rng + Sync + Send> DaSamplingServiceBackend<R> for KzgrsDaSampler<R> {
         }
     }
 
-    async fn prune_interval(&self) -> Interval {
+    fn prune_interval(&self) -> Interval {
         time::interval(self.settings.old_blobs_check_interval)
     }
 
@@ -70,7 +71,7 @@ impl<R: Rng + Sync + Send> DaSamplingServiceBackend<R> for KzgrsDaSampler<R> {
         self.validated_blobs.clone()
     }
 
-    async fn mark_in_block(&mut self, blobs_ids: &[Self::BlobId]) {
+    async fn mark_completed(&mut self, blobs_ids: &[Self::BlobId]) {
         for id in blobs_ids {
             self.pending_sampling_blobs.remove(id);
             self.validated_blobs.remove(id);
@@ -142,20 +143,20 @@ mod test {
     use rand::rngs::StdRng;
 
     use crate::backend::kzgrs::{
-        DaSamplingServiceBackend, KzgrsDaSampler, KzgrsDaSamplerSettings, SamplingContext,
-        SamplingState,
+        DaSamplingServiceBackend, KzgrsSamplingBackend, KzgrsSamplingBackendSettings,
+        SamplingContext, SamplingState,
     };
     use kzgrs_backend::common::{blob::DaBlob, Column};
     use nomos_core::da::BlobId;
 
-    fn create_sampler(subnet_num: usize) -> KzgrsDaSampler<StdRng> {
-        let settings = KzgrsDaSamplerSettings {
+    fn create_sampler(subnet_num: usize) -> KzgrsSamplingBackend<StdRng> {
+        let settings = KzgrsSamplingBackendSettings {
             num_samples: subnet_num as u16,
             old_blobs_check_interval: Duration::from_millis(20),
             blobs_validity_duration: Duration::from_millis(10),
         };
         let rng = StdRng::from_entropy();
-        KzgrsDaSampler::new(settings, rng)
+        KzgrsSamplingBackend::new(settings, rng)
     }
 
     #[tokio::test]
@@ -204,7 +205,7 @@ mod test {
 
         // mark in block for both
         // collections should be reset
-        sampler.mark_in_block(&[b1, b2]).await;
+        sampler.mark_completed(&[b1, b2]).await;
         assert!(sampler.pending_sampling_blobs.is_empty());
         assert!(sampler.validated_blobs.is_empty());
 
@@ -301,7 +302,7 @@ mod test {
 
         // run mark_in_block for the same blob
         // should return empty for everything
-        sampler.mark_in_block(&[b1]).await;
+        sampler.mark_completed(&[b1]).await;
         assert!(sampler.validated_blobs.is_empty());
         assert!(sampler.pending_sampling_blobs.is_empty());
     }
