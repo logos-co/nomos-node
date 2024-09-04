@@ -78,13 +78,18 @@ jobs:
         run: cargo install cargo-risczero && cargo risczero install
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Cargo build
+      - name: Cargo build (Other OSes)
         uses: actions-rs/cargo@v1
         with:
           command: build
           args: --all --no-default-features --features ${{ matrix.feature }}
-      - name: Cargo test (Other OSes)
-        if: matrix.os != 'windows-latest'
+      - name: Cargo build (MacOS)
+        uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --all --no-default-features --features ${{ matrix.feature }},metal
+      - name: Cargo test (Ubuntu)
+        if: matrix.os == 'ubuntu-latest'
         uses: actions-rs/cargo@v1
         with:
           command: test
@@ -98,12 +103,15 @@ jobs:
         with:
           command: test
           args: --all --no-default-features --features ${{ matrix.feature }}
-      - name: Accelerated consensus tests
+      - name: Cargo Test (MacOs)
         if: matrix.os == 'macos-latest' # need metal acceleration
         uses: actions-rs/cargo@v1
+        env:
+          CONSENSUS_SLOT_TIME: 15
         with:
           command: test
-          args: --manifest-path tests/Cargo.toml --no-default-features --features ${{ matrix.feature }},prove,metal
+          args: --all --include-ignored --no-default-features --features ${{ matrix.feature }},prove,metal
+          
       - uses: actions/upload-artifact@v3
         if: failure()
         with:
