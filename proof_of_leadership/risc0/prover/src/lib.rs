@@ -97,10 +97,15 @@ mod test {
             input_cm_path: cl::merkle::path(leaves, 0),
         };
 
+        let start = std::time::Instant::now();
         let proof = prove(expected_public_inputs, private_inputs).unwrap();
+        println!("Prover time: {:.2?}", start.elapsed());
+        let start = std::time::Instant::now();
         assert!(proof
             .verify(nomos_pol_risc0_proofs::PROOF_OF_LEADERSHIP_ID)
             .is_ok());
+        println!("Verifier time: {:.2?}", start.elapsed());
         assert_eq!(expected_public_inputs, proof.journal.decode().unwrap());
+        assert!(false);
     }
 }
