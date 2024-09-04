@@ -96,6 +96,9 @@ pub type TxMempool = TxMempoolService<
 pub type DaMempool = DaMempoolService<
     MempoolNetworkAdapter<BlobInfo, <BlobInfo as DispersedBlobInfo>::BlobId>,
     MockPool<HeaderId, BlobInfo, <BlobInfo as DispersedBlobInfo>::BlobId>,
+    KzgrsSamplingBackend<ChaCha20Rng>,
+    nomos_da_sampling::network::adapters::libp2p::Libp2pAdapter<NomosDaMembership>,
+    ChaCha20Rng,
 >;
 
 pub type DaIndexer = DataIndexerService<
