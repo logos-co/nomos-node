@@ -27,13 +27,21 @@ jobs:
           toolchain: stable
           override: true
           components: llvm-tools-preview
+      - uses: cargo-bins/cargo-binstall@main
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Install risc0
+        run: |
+          cargo binstall -y cargo-risczero
+          cargo risczero install
       - uses: actions-rs/cargo@v1
         with:
           command: build
           args: --all --no-default-features --features libp2p
       - uses: actions-rs/cargo@v1
         continue-on-error: true
-      - run: |
+      - name: Install grcov
+        run: |
           cargo install grcov;
           cargo test --no-default-features --features libp2p
           mkdir /tmp/cov;
