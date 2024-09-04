@@ -82,13 +82,13 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: build
-          args: --all --release --no-default-features --features ${{ matrix.feature }}
+          args: --all --no-default-features --features ${{ matrix.feature }}
       - name: Cargo test (Other OSes)
         if: matrix.os != 'windows-latest'
         uses: actions-rs/cargo@v1
         with:
           command: test
-          args: --all --release --no-default-features --features ${{ matrix.feature }}
+          args: --all --no-default-features --features ${{ matrix.feature }}
       - name: Cargo test (Windows)
         if: matrix.os == 'windows-latest'
         uses: actions-rs/cargo@v1
@@ -97,7 +97,7 @@ jobs:
           SLOW_TEST_ENV: true
         with:
           command: test
-          args: --all --release --no-default-features --features ${{ matrix.feature }}
+          args: --all --no-default-features --features ${{ matrix.feature }}
       - uses: actions/upload-artifact@v3
         if: failure()
         with:
