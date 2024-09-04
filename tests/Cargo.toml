@@ -47,6 +47,7 @@ time = "0.3"
 [[test]]
 name = "test_cryptarchia_happy_path"
 path = "src/tests/cryptarchia/happy.rs"
+required-features = ["prove"]
 
 [[test]]
 name = "test_cli"
@@ -55,3 +56,4 @@ path = "src/tests/cli.rs"
 [features]
 mixnet = ["nomos-network/mixnet"]
 metrics = ["nomos-node/metrics"]
+prove = []

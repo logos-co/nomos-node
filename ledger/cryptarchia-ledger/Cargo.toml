@@ -25,4 +25,5 @@ nomos-utils = { path = "../../nomos-utils", optional = true }
 
 [features]
 serde = ["dep:serde", "nomos-utils/serde", "rpds/serde"]
-risc0_proof = ["risc0-zkvm", "nomos_pol_risc0_proofs", "nomos_pol_prover"]
+risc0_proof = ["risc0-zkvm", "nomos_pol_risc0_proofs"]
+prove = ["nomos_pol_prover"]
