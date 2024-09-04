@@ -98,34 +98,17 @@ jobs:
         with:
           command: test
           args: --all --no-default-features --features ${{ matrix.feature }}
+      - name: Accelerated consensus tests
+        if: matrix.os == 'macos-latest' # need metal acceleration
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: --manifest-path tests/Cargo.toml --no-default-features --features ${{ matrix.feature }},prove,metal
       - uses: actions/upload-artifact@v3
         if: failure()
         with:
           name: integration-test-artifacts
           path: tests/.tmp*
-    
-  risc0:
-    name: Risc0 tests
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-        with:
-          submodules: true
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-          override: true
-      - name: Install risc0
-        run: cargo install cargo-risczero && cargo risczero install
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Cargo test
-        uses: actions-rs/cargo@v1
-        with:
-          command: test
-          args: --manifest-path proof_of_leadership/risc0/prover/Cargo.toml
-      
 
   lints:
     name: Rust lints

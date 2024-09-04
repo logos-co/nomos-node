@@ -29,8 +29,6 @@ pub struct OrphanProof {
 #[cfg(feature = "risc0_proof")]
 mod risc0 {
     use super::*;
-    use leader_proof_statements::LeaderPrivate;
-    use nomos_pol_prover::prove;
     use serde::{de::Error, Deserialize, Deserializer, Serialize, Serializer};
 
     #[derive(Debug, Clone)]
@@ -39,12 +37,13 @@ mod risc0 {
         risc0_receipt: risc0_zkvm::Receipt,
     }
 
+    #[cfg(feature="prove")]
     impl Risc0LeaderProof {
         pub fn build(
             public_inputs: LeaderPublic,
-            private_inputs: LeaderPrivate,
+            private_inputs: leader_proof_statements::LeaderPrivate,
         ) -> Result<Self, nomos_pol_prover::Error> {
-            let risc0_receipt = prove(public_inputs, private_inputs)?;
+            let risc0_receipt = nomos_pol_prover::prove(public_inputs, private_inputs)?;
             Ok(Self {
                 public_inputs,
                 risc0_receipt,
