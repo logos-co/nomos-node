@@ -18,7 +18,7 @@ nomos-core = { path = "../../nomos-core" }
 full-replication = { path = "../../nomos-da/full-replication" }
 kzgrs-backend = { path = "../../nomos-da/kzgrs-backend" }
 overwatch-rs = { git = "https://github.com/logos-co/Overwatch", rev = "2f70806" }
-rand = { version = "0.8", optional = true }
+rand = "0.8"
 serde = { version = "1.0", features = ["derive"] }
 thiserror = "1.0"
 tracing = "0.1"
@@ -37,7 +37,7 @@ blake2 = "0.10"
 
 [features]
 default = []
-mock = ["linked-hash-map", "nomos-network/mock", "rand", "nomos-core/mock"]
+mock = ["linked-hash-map", "nomos-network/mock", "nomos-core/mock"]
 libp2p = ["nomos-network/libp2p"]
 metrics = []
 

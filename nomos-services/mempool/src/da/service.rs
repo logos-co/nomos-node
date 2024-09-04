@@ -18,7 +18,6 @@ use crate::backend::MemPool;
 use crate::network::NetworkAdapter;
 use crate::{MempoolMetrics, MempoolMsg};
 use nomos_core::da::blob::info::DispersedBlobInfo;
-use nomos_core::da::BlobId;
 use nomos_da_sampling::{
     backend::DaSamplingServiceBackend, network::NetworkAdapter as DaSamplingNetworkAdapter,
     DaSamplingService, DaSamplingServiceMsg,
@@ -43,9 +42,9 @@ where
     P::Item: Debug + 'static,
     P::Key: Debug + 'static,
     P::BlockId: Debug + 'static,
-    DB: DaSamplingServiceBackend<R> + Send,
+    DB: DaSamplingServiceBackend<R, BlobId = P::Key> + Send,
     DB::Blob: Debug + 'static,
-    DB::BlobId: DispersedBlobInfo + Debug + 'static,
+    DB::BlobId: DispersedBlobInfo<BlobId = P::Key> + Debug + 'static,
     DB::Settings: Clone,
     DN: DaSamplingNetworkAdapter,
     R: SeedableRng + RngCore,
@@ -68,9 +67,9 @@ where
     P::Item: Debug + 'static,
     P::Key: Debug + 'static,
     P::BlockId: Debug + 'static,
-    DB: DaSamplingServiceBackend<R> + Send,
+    DB: DaSamplingServiceBackend<R, BlobId = P::Key> + Send,
     DB::Blob: Debug + 'static,
-    DB::BlobId: DispersedBlobInfo + Debug + 'static,
+    DB::BlobId: DispersedBlobInfo<BlobId = P::Key> + Debug + 'static,
     DB::Settings: Clone,
     DN: DaSamplingNetworkAdapter,
     R: SeedableRng + RngCore,
@@ -98,9 +97,9 @@ where
     P::BlockId: Send + Debug + 'static,
     N::Payload: DispersedBlobInfo + Into<P::Item> + Clone + Debug + Send + 'static,
     N: NetworkAdapter<Key = P::Key> + Send + Sync + 'static,
-    DB: DaSamplingServiceBackend<R> + Debug + Send,
+    DB: DaSamplingServiceBackend<R, BlobId = P::Key> + Debug + Send,
     DB::Blob: Debug + 'static,
-    DB::BlobId: DispersedBlobInfo + Debug + 'static,
+    DB::BlobId: DispersedBlobInfo<BlobId = P::Key> + Clone + Debug + 'static,
     DB::Settings: Clone,
     DN: DaSamplingNetworkAdapter,
     R: SeedableRng + RngCore,
@@ -140,10 +139,7 @@ where
             .await
             .expect("Relay connection with NetworkService should succeed");
 
-        //let mut sampling_relay: OutboundRelay<
-        //    DaSamplingServiceMsg<<N::Payload as DispersedBlobInfo>::BlobId>,
-        // > = sampling_relay
-        let mut sampling_relay: OutboundRelay<_> = sampling_relay
+        let sampling_relay: OutboundRelay<_> = sampling_relay
             .connect()
             .await
             .expect("Relay connection with SamplingService should succeed");
@@ -166,35 +162,7 @@ where
                     Self::handle_mempool_message(msg, &mut pool, &mut network_relay, &mut service_state).await;
                 }
                 Some((key, item)) = network_items.next() => {
-                    // never mind my lots of attempts at making this work...
-
-                    //let blob_id:<<N as NetworkAdapter>::Payload as DispersedBlobInfo>::BlobId =  item.blob_id();
-                    //let blob_id:<N::Payload as DispersedBlobInfo>::BlobId =  item.blob_id();
-                    //let blob_id:DB::BlobId =  item.blob_id();
-                    //
-                    let blob_id:BlobId =  item.blob_id();
-                    // looks like these types aren't compatible
-                    //
-                    // I tried assigning the sampling Backend's BlobId to this one but couldn't
-                    // make it work either
-                    //
-                    // so I wonder if this means we need to change the type of `network_items`,
-                    // or if we need to change the type of the DaSamplingServiceBackend::BlobId completely,
-                    // but the best solution should be to use the same type always I guess -
-                    // not sure how though, looks like that could result in quite some
-                    // refactoring...
-                    //
-                    // or we want to convert to/from these
-                    // types (I don't think so...)
-
-                    //let blob_id:<N::Payload as DispersedBlobInfo>::BlobId =  item.blob_id();
-                    //let blob_id:BlobId =  item.blob_id();
-                    //let msg:DaSamplingServiceMsg<DB::BlobId> = DaSamplingServiceMsg::TriggerSampling{blob_id: blob_id};
-                    //let msg:DaSamplingServiceMsg<DB::BlobId as DispersedBlobInfo::BlobId> = DaSamplingServiceMsg::TriggerSampling{blob_id: blob_id};
-                    //let msg:DaSamplingServiceMsg<DispersedBlobInfo::BlobId> = DaSamplingServiceMsg::TriggerSampling{blob_id: blob_id};
-                    //let msg:DaSamplingServiceMsg<<full_replication::BlobInfo as DispersedBlobInfo>::BlobId> = DaSamplingServiceMsg::TriggerSampling{blob_id: blob_id};
-                    let msg:DaSamplingServiceMsg<DB::BlobId> = DaSamplingServiceMsg::TriggerSampling{blob_id: blob_id};
-                    sampling_relay.send(msg);
+                    sampling_relay.send(DaSamplingServiceMsg::TriggerSampling{blob_id: key.clone()}).await.expect("Sampling trigger message should be sent");
                     pool.add_item(key, item).unwrap_or_else(|e| {
                         tracing::debug!("could not add item to the pool due to: {}", e)
                     });
@@ -220,9 +188,9 @@ where
     P::BlockId: Debug + Send + 'static,
     N::Payload: DispersedBlobInfo + Into<P::Item> + Debug + Clone + Send + 'static,
     N: NetworkAdapter<Key = P::Key> + Send + Sync + 'static,
-    DB: DaSamplingServiceBackend<R> + Send,
+    DB: DaSamplingServiceBackend<R, BlobId = P::Key> + Send,
     DB::Blob: Debug + 'static,
-    DB::BlobId: DispersedBlobInfo + Debug + 'static,
+    DB::BlobId: DispersedBlobInfo<BlobId = P::Key> + Debug + 'static,
     DB::Settings: Clone,
     DN: DaSamplingNetworkAdapter,
     R: SeedableRng + RngCore,
