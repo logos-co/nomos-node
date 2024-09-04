@@ -16,6 +16,9 @@ use nomos_core::{
     block::{builder::BlockBuilder, Block},
     header::cryptarchia::Builder,
 };
+use nomos_da_sampling::{
+    backend::DaSamplingServiceBackend, network::NetworkAdapter as DaSamplingNetworkAdapter,
+};
 use nomos_mempool::{
     backend::MemPool, network::NetworkAdapter as MempoolAdapter, DaMempoolService, MempoolMsg,
     TxMempoolService,
@@ -29,6 +32,7 @@ use overwatch_rs::services::{
     state::{NoOperator, NoState},
     ServiceCore, ServiceData, ServiceId,
 };
+use rand::{RngCore, SeedableRng};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_with::serde_as;
 use std::hash::Hash;
@@ -134,8 +138,19 @@ impl<Ts, Bs> CryptarchiaSettings<Ts, Bs> {
     }
 }
 
-pub struct CryptarchiaConsensus<A, ClPool, ClPoolAdapter, DaPool, DaPoolAdapter, TxS, BS, Storage>
-where
+pub struct CryptarchiaConsensus<
+    A,
+    ClPool,
+    ClPoolAdapter,
+    DaPool,
+    DaPoolAdapter,
+    SamplingBackend,
+    SamplingAdapter,
+    R,
+    TxS,
+    BS,
+    Storage,
+> where
     A: NetworkAdapter,
     ClPoolAdapter: MempoolAdapter<Payload = ClPool::Item, Key = ClPool::Key>,
     ClPool: MemPool<BlockId = HeaderId>,
@@ -150,19 +165,51 @@ where
     TxS: TxSelect<Tx = ClPool::Item>,
     BS: BlobSelect<BlobId = DaPool::Item>,
     Storage: StorageBackend + Send + Sync + 'static,
+    SamplingBackend: DaSamplingServiceBackend<R, BlobId = DaPool::Key> + Send,
+    <SamplingBackend as DaSamplingServiceBackend<R>>::BlobId:
+        DispersedBlobInfo<BlobId = DaPool::Key> + Debug,
+    <SamplingBackend as DaSamplingServiceBackend<R>>::Blob: Debug + 'static,
+    SamplingBackend::Settings: Clone,
+    SamplingAdapter: DaSamplingNetworkAdapter,
+    R: SeedableRng + RngCore,
 {
     service_state: ServiceStateHandle<Self>,
     // underlying networking backend. We need this so we can relay and check the types properly
     // when implementing ServiceCore for CryptarchiaConsensus
     network_relay: Relay<NetworkService<A::Backend>>,
     cl_mempool_relay: Relay<TxMempoolService<ClPoolAdapter, ClPool>>,
-    da_mempool_relay: Relay<DaMempoolService<DaPoolAdapter, DaPool>>,
+    da_mempool_relay:
+        Relay<DaMempoolService<DaPoolAdapter, DaPool, SamplingBackend, SamplingAdapter, R>>,
     block_subscription_sender: broadcast::Sender<Block<ClPool::Item, DaPool::Item>>,
     storage_relay: Relay<StorageService<Storage>>,
 }
 
-impl<A, ClPool, ClPoolAdapter, DaPool, DaPoolAdapter, TxS, BS, Storage> ServiceData
-    for CryptarchiaConsensus<A, ClPool, ClPoolAdapter, DaPool, DaPoolAdapter, TxS, BS, Storage>
+impl<
+        A,
+        ClPool,
+        ClPoolAdapter,
+        DaPool,
+        DaPoolAdapter,
+        SamplingBackend,
+        SamplingAdapter,
+        R,
+        TxS,
+        BS,
+        Storage,
+    > ServiceData
+    for CryptarchiaConsensus<
+        A,
+        ClPool,
+        ClPoolAdapter,
+        DaPool,
+        DaPoolAdapter,
+        SamplingBackend,
+        SamplingAdapter,
+        R,
+        TxS,
+        BS,
+        Storage,
+    >
 where
     A: NetworkAdapter,
     ClPool: MemPool<BlockId = HeaderId>,
@@ -177,6 +224,13 @@ where
     TxS: TxSelect<Tx = ClPool::Item>,
     BS: BlobSelect<BlobId = DaPool::Item>,
     Storage: StorageBackend + Send + Sync + 'static,
+    SamplingBackend: DaSamplingServiceBackend<R, BlobId = DaPool::Key> + Send,
+    <SamplingBackend as DaSamplingServiceBackend<R>>::BlobId:
+        DispersedBlobInfo<BlobId = DaPool::Key> + Debug,
+    <SamplingBackend as DaSamplingServiceBackend<R>>::Blob: Debug,
+    SamplingBackend::Settings: Clone,
+    SamplingAdapter: DaSamplingNetworkAdapter,
+    R: SeedableRng + RngCore,
 {
     const SERVICE_ID: ServiceId = CRYPTARCHIA_ID;
     type Settings = CryptarchiaSettings<TxS::Settings, BS::Settings>;
@@ -186,8 +240,32 @@ where
 }
 
 #[async_trait::async_trait]
-impl<A, ClPool, ClPoolAdapter, DaPool, DaPoolAdapter, TxS, BS, Storage> ServiceCore
-    for CryptarchiaConsensus<A, ClPool, ClPoolAdapter, DaPool, DaPoolAdapter, TxS, BS, Storage>
+impl<
+        A,
+        ClPool,
+        ClPoolAdapter,
+        DaPool,
+        DaPoolAdapter,
+        SamplingBackend,
+        SamplingAdapter,
+        R,
+        TxS,
+        BS,
+        Storage,
+    > ServiceCore
+    for CryptarchiaConsensus<
+        A,
+        ClPool,
+        ClPoolAdapter,
+        DaPool,
+        DaPoolAdapter,
+        SamplingBackend,
+        SamplingAdapter,
+        R,
+        TxS,
+        BS,
+        Storage,
+    >
 where
     A: NetworkAdapter<Tx = ClPool::Item, BlobCertificate = DaPool::Item>
         + Clone
@@ -231,6 +309,13 @@ where
     BS: BlobSelect<BlobId = DaPool::Item> + Clone + Send + Sync + 'static,
     BS::Settings: Send + Sync + 'static,
     Storage: StorageBackend + Send + Sync + 'static,
+    SamplingBackend: DaSamplingServiceBackend<R, BlobId = DaPool::Key> + Send,
+    <SamplingBackend as DaSamplingServiceBackend<R>>::BlobId:
+        DispersedBlobInfo<BlobId = DaPool::Key> + Debug,
+    <SamplingBackend as DaSamplingServiceBackend<R>>::Blob: Debug,
+    SamplingBackend::Settings: Clone,
+    SamplingAdapter: DaSamplingNetworkAdapter,
+    R: SeedableRng + RngCore,
 {
     fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, overwatch_rs::DynError> {
         let network_relay = service_state.overwatch_handle.relay();
@@ -367,8 +452,32 @@ where
     }
 }
 
-impl<A, ClPool, ClPoolAdapter, DaPool, DaPoolAdapter, TxS, BS, Storage>
-    CryptarchiaConsensus<A, ClPool, ClPoolAdapter, DaPool, DaPoolAdapter, TxS, BS, Storage>
+impl<
+        A,
+        ClPool,
+        ClPoolAdapter,
+        DaPool,
+        DaPoolAdapter,
+        SamplingBackend,
+        SamplingAdapter,
+        R,
+        TxS,
+        BS,
+        Storage,
+    >
+    CryptarchiaConsensus<
+        A,
+        ClPool,
+        ClPoolAdapter,
+        DaPool,
+        DaPoolAdapter,
+        SamplingBackend,
+        SamplingAdapter,
+        R,
+        TxS,
+        BS,
+        Storage,
+    >
 where
     A: NetworkAdapter + Clone + Send + Sync + 'static,
     ClPool: MemPool<BlockId = HeaderId> + Send + Sync + 'static,
@@ -405,6 +514,13 @@ where
     DaPoolAdapter: MempoolAdapter<Key = DaPool::Key> + Send + Sync + 'static,
     DaPoolAdapter::Payload: DispersedBlobInfo + Into<DaPool::Item> + Debug,
     Storage: StorageBackend + Send + Sync + 'static,
+    SamplingBackend: DaSamplingServiceBackend<R, BlobId = DaPool::Key> + Send,
+    <SamplingBackend as DaSamplingServiceBackend<R>>::BlobId:
+        DispersedBlobInfo<BlobId = DaPool::Key> + Debug,
+    <SamplingBackend as DaSamplingServiceBackend<R>>::Blob: Debug,
+    SamplingBackend::Settings: Clone,
+    SamplingAdapter: DaSamplingNetworkAdapter,
+    R: SeedableRng + RngCore,
 {
     async fn should_stop_service(message: LifecycleMessage) -> bool {
         match message {

@@ -14,6 +14,7 @@ cryptarchia-ledger = { path = "../../ledger/cryptarchia-ledger", features = ["se
 futures = "0.3"
 nomos-network = { path = "../network" }
 nomos-mempool = { path = "../mempool" }
+nomos-da-sampling = { path = "../data-availability/sampling" }
 nomos-core = { path = "../../nomos-core" }
 overwatch-rs = { git = "https://github.com/logos-co/Overwatch", rev = "2f70806" }
 nomos-storage = { path = "../storage" }

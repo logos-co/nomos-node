@@ -33,7 +33,7 @@ use overwatch_rs::services::{
 };
 use tracing::error;
 
-pub struct DaMempoolService<N, P, DB, DN, DS, R>
+pub struct DaMempoolService<N, P, DB, DN, R>
 where
     N: NetworkAdapter<Key = P::Key>,
     N::Payload: DispersedBlobInfo + Into<P::Item> + Debug + 'static,
@@ -51,14 +51,14 @@ where
 {
     service_state: ServiceStateHandle<Self>,
     network_relay: Relay<NetworkService<N::Backend>>,
-    sampling_relay: Relay<DaSamplingService<DB, DN, DS, R>>,
+    sampling_relay: Relay<DaSamplingService<DB, DN, R>>,
     pool: P,
     // TODO: Add again after metrics refactor
     // #[cfg(feature = "metrics")]
     // metrics: Option<Metrics>,
 }
 
-impl<N, P, DB, DN, DS, R> ServiceData for DaMempoolService<N, P, DB, DN, DS, R>
+impl<N, P, DB, DN, R> ServiceData for DaMempoolService<N, P, DB, DN, R>
 where
     N: NetworkAdapter<Key = P::Key>,
     N::Payload: DispersedBlobInfo + Debug + Into<P::Item> + 'static,
@@ -87,7 +87,7 @@ where
 }
 
 #[async_trait::async_trait]
-impl<N, P, DB, DN, DS, R> ServiceCore for DaMempoolService<N, P, DB, DN, DS, R>
+impl<N, P, DB, DN, R> ServiceCore for DaMempoolService<N, P, DB, DN, R>
 where
     P: MemPool + Send + 'static,
     P::Settings: Clone + Send + Sync + 'static,
@@ -178,7 +178,7 @@ where
     }
 }
 
-impl<N, P, DB, DN, DS, R> DaMempoolService<N, P, DB, DN, DS, R>
+impl<N, P, DB, DN, R> DaMempoolService<N, P, DB, DN, R>
 where
     P: MemPool + Send + 'static,
     P::Settings: Clone + Send + Sync + 'static,
