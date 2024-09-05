@@ -45,7 +45,7 @@ jobs:
       fail-fast: false # all OSes should be tested even if one fails (default: true)
       matrix:
         feature: [ libp2p, "libp2p,mixnet" ]
-        os: [ ubuntu-latest, macos-latest ] # drop windows for now as risc0 does not support it
+        os: [ ubuntu-latest, macos-latest-xlarge ] # drop windows for now as risc0 does not support it
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v2
@@ -79,13 +79,13 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Cargo build (Other OSes)
-        if: matrix.os != 'macos-latest'
+        if: matrix.os != 'macos-latest-xlarge'
         uses: actions-rs/cargo@v1
         with:
           command: build
           args: --all --no-default-features --features ${{ matrix.feature }}
       - name: Cargo build (MacOS)
-        if: matrix.os == 'macos-latest'
+        if: matrix.os == 'macos-latest-xlarge'
         uses: actions-rs/cargo@v1
         with:
           command: build
@@ -106,7 +106,7 @@ jobs:
           command: test
           args: --all --no-default-features --features ${{ matrix.feature }}
       - name: Cargo Test (MacOs)
-        if: matrix.os == 'macos-latest' # need metal acceleration
+        if: matrix.os == 'macos-latest-xlarge' # need metal acceleration
         uses: actions-rs/cargo@v1
         env:
           CONSENSUS_SLOT_TIME: 15
