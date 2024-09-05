@@ -61,7 +61,6 @@ mod test {
     }
 
     #[test]
-    #[ignore]
     fn test_leader_prover() {
         let mut rng = thread_rng();
 

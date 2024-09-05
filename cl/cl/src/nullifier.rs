@@ -88,6 +88,23 @@ mod test {
 
     use super::*;
 
+    #[ignore = "nullifier test vectors not stable yet"]
+    #[test]
+    fn test_nullifier_commitment_vectors() {
+        assert_eq!(
+            NullifierSecret([0u8; 16]).commit().hex(),
+            "384318f9864fe57647bac344e2afdc500a672dedb29d2dc63b004e940e4b382a"
+        );
+        assert_eq!(
+            NullifierSecret([1u8; 16]).commit().hex(),
+            "0fd667e6bb39fbdc35d6265726154b839638ea90bcf4e736953ccf27ca5f870b"
+        );
+        assert_eq!(
+            NullifierSecret([u8::MAX; 16]).commit().hex(),
+            "1cb78e487eb0b3116389311fdde84cd3f619a4d7f487b29bf5a002eed3784d75"
+        );
+    }
+
     #[test]
     fn test_nullifier_same_sk_different_nonce() {
         let mut rng = rand::thread_rng();
