@@ -75,7 +75,7 @@ where
 
         if !res.status().is_success() {
             tracing::error!("ERROR: {:?}", res);
-            return Err(format!("Failed to send certificate to node: {}", res.status()).into());
+            return Err(format!("Failed to send blob info to node: {}", res.status()).into());
         }
     }
 
@@ -210,8 +210,8 @@ impl ServiceCore for DisseminateService {
 
 #[derive(Debug, Clone, Args)]
 pub struct KzgrsSettings {
-    num_columns: usize,
-    with_cache: bool,
+    pub num_columns: usize,
+    pub with_cache: bool,
 }
 
 impl Default for KzgrsSettings {

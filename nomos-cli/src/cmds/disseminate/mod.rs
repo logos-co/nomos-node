@@ -29,10 +29,18 @@ pub struct Disseminate {
     /// for block inclusion, if present.
     #[clap(long)]
     pub node_addr: Option<Url>,
+    // Application ID for dispersed data.
     #[clap(long)]
     pub app_id: String,
+    // Index for the Blob associated with Application ID.
     #[clap(long)]
     pub index: u64,
+    // Use Kzg RS cache.
+    #[clap(long)]
+    pub with_cache: bool,
+    // Number of columns to use for encoding.
+    #[clap(long, default_value = "4096")]
+    pub columns: usize,
     /// File to write the certificate to, if present.
     #[clap(long)]
     pub output: Option<PathBuf>,
@@ -51,13 +59,17 @@ impl Disseminate {
         >(std::fs::File::open(&self.network_config)?)?;
         let (status_updates, rx) = std::sync::mpsc::channel();
 
-        let bytes: Box<[u8]> = if let Some(data) = &self.data {
-            data.clone().as_bytes().into()
+        let mut bytes: Vec<u8> = if let Some(data) = &self.data {
+            data.clone().into_bytes()
         } else {
             let file_path = self.file.as_ref().unwrap();
-            let file_bytes = std::fs::read(file_path)?;
-            file_bytes.into_boxed_slice()
+            std::fs::read(file_path)?
         };
+
+        let remainder = bytes.len() % 31;
+        if remainder != 0 {
+            bytes.resize(bytes.len() + (31 - remainder), 0);
+        }
 
         let app_id: [u8; 32] = hex::decode(&self.app_id)?
             .try_into()
@@ -66,8 +78,10 @@ impl Disseminate {
         let timeout = Duration::from_secs(self.timeout);
         let node_addr = self.node_addr.clone();
         let output = self.output.clone();
+        let num_columns = self.columns;
+        let with_cache = self.with_cache;
         let (payload_sender, payload_rx) = tokio::sync::mpsc::unbounded_channel();
-        payload_sender.send(bytes).unwrap();
+        payload_sender.send(bytes.into_boxed_slice()).unwrap();
         std::thread::spawn(move || {
             OverwatchRunner::<DisseminateApp>::run(
                 DisseminateAppServiceSettings {
@@ -75,7 +89,10 @@ impl Disseminate {
                     send_blob: Settings {
                         payload: Arc::new(Mutex::new(payload_rx)),
                         timeout,
-                        kzgrs_settings: KzgrsSettings::default(),
+                        kzgrs_settings: KzgrsSettings {
+                            num_columns,
+                            with_cache,
+                        },
                         metadata,
                         status_updates,
                         node_addr,

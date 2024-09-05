@@ -1,7 +1,8 @@
+// std
 use std::error::Error;
 use std::ops::Range;
 use std::{fmt::Debug, hash::Hash};
-
+// crates
 use axum::{
     extract::{Query, State},
     http::HeaderValue,
@@ -18,9 +19,12 @@ use nomos_api::{
 };
 use nomos_core::da::blob::info::DispersedBlobInfo;
 use nomos_core::da::blob::metadata::Metadata;
-use nomos_core::da::DaVerifier as CoreDaVerifier;
+use nomos_core::da::{BlobId, DaVerifier as CoreDaVerifier};
 use nomos_core::{da::blob::Blob, header::HeaderId, tx::Transaction};
+use nomos_da_network_core::SubnetworkId;
+use nomos_da_sampling::backend::DaSamplingServiceBackend;
 use nomos_da_verifier::backend::VerifierBackend;
+use nomos_libp2p::PeerId;
 use nomos_mempool::{
     network::adapters::libp2p::Libp2pAdapter as MempoolNetworkAdapter,
     tx::service::openapi::Status, MempoolMetrics,
@@ -28,13 +32,16 @@ use nomos_mempool::{
 use nomos_network::backends::libp2p::Libp2p as NetworkBackend;
 use nomos_storage::backends::StorageSerde;
 use overwatch_rs::overwatch::handle::OverwatchHandle;
+use rand::{RngCore, SeedableRng};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use subnetworks_assignations::MembershipHandler;
 use tower_http::{
     cors::{Any, CorsLayer},
     trace::TraceLayer,
 };
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
+// internal
 
 /// Configuration for the Http Server
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
@@ -45,15 +52,32 @@ pub struct AxumBackendSettings {
     pub cors_origins: Vec<String>,
 }
 
-pub struct AxumBackend<A, B, C, V, VB, T, S, const SIZE: usize> {
+pub struct AxumBackend<
+    A,
+    B,
+    C,
+    M,
+    V,
+    VB,
+    T,
+    S,
+    SamplingBackend,
+    SamplingNetworkAdapter,
+    SamplingRng,
+    const SIZE: usize,
+> {
     settings: AxumBackendSettings,
     _attestation: core::marker::PhantomData<A>,
     _blob: core::marker::PhantomData<B>,
     _certificate: core::marker::PhantomData<C>,
+    _membership: core::marker::PhantomData<M>,
     _vid: core::marker::PhantomData<V>,
     _verifier_backend: core::marker::PhantomData<VB>,
     _tx: core::marker::PhantomData<T>,
     _storage_serde: core::marker::PhantomData<S>,
+    _sampling_backend: core::marker::PhantomData<SamplingBackend>,
+    _sampling_network_adapter: core::marker::PhantomData<SamplingNetworkAdapter>,
+    _sampling_rng: core::marker::PhantomData<SamplingRng>,
 }
 
 #[derive(OpenApi)]
@@ -70,7 +94,34 @@ pub struct AxumBackend<A, B, C, V, VB, T, S, const SIZE: usize> {
 struct ApiDoc;
 
 #[async_trait::async_trait]
-impl<A, B, C, V, VB, T, S, const SIZE: usize> Backend for AxumBackend<A, B, C, V, VB, T, S, SIZE>
+impl<
+        A,
+        B,
+        C,
+        M,
+        V,
+        VB,
+        T,
+        S,
+        SamplingBackend,
+        SamplingNetworkAdapter,
+        SamplingRng,
+        const SIZE: usize,
+    > Backend
+    for AxumBackend<
+        A,
+        B,
+        C,
+        M,
+        V,
+        VB,
+        T,
+        S,
+        SamplingBackend,
+        SamplingNetworkAdapter,
+        SamplingRng,
+        SIZE,
+    >
 where
     A: Serialize + DeserializeOwned + Clone + Send + Sync + 'static,
     B: Blob + Serialize + DeserializeOwned + Clone + Send + Sync + 'static,
@@ -85,6 +136,12 @@ where
         + Sync
         + 'static,
     <C as DispersedBlobInfo>::BlobId: Clone + Send + Sync,
+    M: MembershipHandler<NetworkId = SubnetworkId, Id = PeerId>
+        + Clone
+        + Debug
+        + Send
+        + Sync
+        + 'static,
     V: DispersedBlobInfo<BlobId = [u8; 32]>
         + From<C>
         + Eq
@@ -117,6 +174,14 @@ where
     <T as nomos_core::tx::Transaction>::Hash:
         Serialize + for<'de> Deserialize<'de> + std::cmp::Ord + Debug + Send + Sync + 'static,
     S: StorageSerde + Send + Sync + 'static,
+    SamplingRng: SeedableRng + RngCore + Send + 'static,
+    SamplingBackend: DaSamplingServiceBackend<SamplingRng, BlobId = <V as DispersedBlobInfo>::BlobId>
+        + Send
+        + 'static,
+    SamplingBackend::Settings: Clone,
+    SamplingBackend::Blob: Debug + 'static,
+    SamplingBackend::BlobId: Debug + 'static,
+    SamplingNetworkAdapter: nomos_da_sampling::network::NetworkAdapter + Send + 'static,
 {
     type Error = hyper::Error;
     type Settings = AxumBackendSettings;
@@ -130,10 +195,14 @@ where
             _attestation: core::marker::PhantomData,
             _blob: core::marker::PhantomData,
             _certificate: core::marker::PhantomData,
+            _membership: core::marker::PhantomData,
             _vid: core::marker::PhantomData,
             _verifier_backend: core::marker::PhantomData,
             _tx: core::marker::PhantomData,
             _storage_serde: core::marker::PhantomData,
+            _sampling_backend: core::marker::PhantomData,
+            _sampling_network_adapter: core::marker::PhantomData,
+            _sampling_rng: core::marker::PhantomData,
         })
     }
 
@@ -164,20 +233,55 @@ where
             .route("/cl/status", routing::post(cl_status::<T>))
             .route(
                 "/cryptarchia/info",
-                routing::get(cryptarchia_info::<T, S, SIZE>),
+                routing::get(
+                    cryptarchia_info::<
+                        T,
+                        S,
+                        SamplingBackend,
+                        SamplingNetworkAdapter,
+                        SamplingRng,
+                        SIZE,
+                    >,
+                ),
             )
             .route(
                 "/cryptarchia/headers",
-                routing::get(cryptarchia_headers::<T, S, SIZE>),
+                routing::get(
+                    cryptarchia_headers::<
+                        T,
+                        S,
+                        SamplingBackend,
+                        SamplingNetworkAdapter,
+                        SamplingRng,
+                        SIZE,
+                    >,
+                ),
             )
-            .route("/da/add_blob", routing::post(add_blob::<A, B, VB, S>))
+            .route("/da/add_blob", routing::post(add_blob::<A, B, M, VB, S>))
             .route(
                 "/da/get_range",
-                routing::post(get_range::<T, C, V, S, SIZE>),
+                routing::post(
+                    get_range::<
+                        T,
+                        C,
+                        V,
+                        S,
+                        SamplingBackend,
+                        SamplingNetworkAdapter,
+                        SamplingRng,
+                        SIZE,
+                    >,
+                ),
             )
             .route("/network/info", routing::get(libp2p_info))
             .route("/storage/block", routing::post(block::<S, T>))
             .route("/mempool/add/tx", routing::post(add_tx::<T>))
+            .route(
+                "/mempool/add/blobinfo",
+                routing::post(
+                    add_blob_info::<V, SamplingBackend, SamplingNetworkAdapter, SamplingRng>,
+                ),
+            )
             .route("/metrics", routing::get(get_metrics))
             .with_state(handle);
 
@@ -260,7 +364,14 @@ struct QueryParams {
         (status = 500, description = "Internal server error", body = String),
     )
 )]
-async fn cryptarchia_info<Tx, SS, const SIZE: usize>(
+async fn cryptarchia_info<
+    Tx,
+    SS,
+    SamplingBackend,
+    SamplingNetworkAdapter,
+    SamplingRng,
+    const SIZE: usize,
+>(
     State(handle): State<OverwatchHandle>,
 ) -> Response
 where
@@ -276,8 +387,21 @@ where
         + 'static,
     <Tx as Transaction>::Hash: std::cmp::Ord + Debug + Send + Sync + 'static,
     SS: StorageSerde + Send + Sync + 'static,
+    SamplingRng: SeedableRng + RngCore,
+    SamplingBackend: DaSamplingServiceBackend<SamplingRng, BlobId = BlobId> + Send,
+    SamplingBackend::Settings: Clone,
+    SamplingBackend::Blob: Debug + 'static,
+    SamplingBackend::BlobId: Debug + 'static,
+    SamplingNetworkAdapter: nomos_da_sampling::network::NetworkAdapter,
 {
-    make_request_and_return_response!(consensus::cryptarchia_info::<Tx, SS, SIZE>(&handle))
+    make_request_and_return_response!(consensus::cryptarchia_info::<
+        Tx,
+        SS,
+        SamplingBackend,
+        SamplingNetworkAdapter,
+        SamplingRng,
+        SIZE,
+    >(&handle))
 }
 
 #[utoipa::path(
@@ -288,7 +412,14 @@ where
         (status = 500, description = "Internal server error", body = String),
     )
 )]
-async fn cryptarchia_headers<Tx, SS, const SIZE: usize>(
+async fn cryptarchia_headers<
+    Tx,
+    SS,
+    SamplingBackend,
+    SamplingNetworkAdapter,
+    SamplingRng,
+    const SIZE: usize,
+>(
     State(store): State<OverwatchHandle>,
     Query(query): Query<QueryParams>,
 ) -> Response
@@ -305,11 +436,22 @@ where
         + 'static,
     <Tx as Transaction>::Hash: std::cmp::Ord + Debug + Send + Sync + 'static,
     SS: StorageSerde + Send + Sync + 'static,
+    SamplingRng: SeedableRng + RngCore,
+    SamplingBackend: DaSamplingServiceBackend<SamplingRng, BlobId = BlobId> + Send,
+    SamplingBackend::Settings: Clone,
+    SamplingBackend::Blob: Debug + 'static,
+    SamplingBackend::BlobId: Debug + 'static,
+    SamplingNetworkAdapter: nomos_da_sampling::network::NetworkAdapter,
 {
     let QueryParams { from, to } = query;
-    make_request_and_return_response!(consensus::cryptarchia_headers::<Tx, SS, SIZE>(
-        &store, from, to
-    ))
+    make_request_and_return_response!(consensus::cryptarchia_headers::<
+        Tx,
+        SS,
+        SamplingBackend,
+        SamplingNetworkAdapter,
+        SamplingRng,
+        SIZE,
+    >(&store, from, to))
 }
 
 #[utoipa::path(
@@ -320,7 +462,7 @@ where
         (status = 500, description = "Internal server error", body = String),
     )
 )]
-async fn add_blob<A, B, VB, SS>(
+async fn add_blob<A, B, M, VB, SS>(
     State(handle): State<OverwatchHandle>,
     Json(blob): Json<B>,
 ) -> Response
@@ -329,12 +471,18 @@ where
     B: Blob + Serialize + DeserializeOwned + Clone + Send + Sync + 'static,
     <B as Blob>::BlobId: AsRef<[u8]> + Send + Sync + 'static,
     <B as Blob>::ColumnIndex: AsRef<[u8]> + Send + Sync + 'static,
+    M: MembershipHandler<NetworkId = SubnetworkId, Id = PeerId>
+        + Clone
+        + Debug
+        + Send
+        + Sync
+        + 'static,
     VB: VerifierBackend + CoreDaVerifier<DaBlob = B>,
     <VB as VerifierBackend>::Settings: Clone,
     <VB as CoreDaVerifier>::Error: Error,
     SS: StorageSerde + Send + Sync + 'static,
 {
-    make_request_and_return_response!(da::add_blob::<A, B, VB, SS>(&handle, blob))
+    make_request_and_return_response!(da::add_blob::<A, B, M, VB, SS>(&handle, blob))
 }
 
 #[derive(Serialize, Deserialize)]
@@ -355,7 +503,16 @@ where
         (status = 500, description = "Internal server error", body = String),
     )
 )]
-async fn get_range<Tx, C, V, SS, const SIZE: usize>(
+async fn get_range<
+    Tx,
+    C,
+    V,
+    SS,
+    SamplingBackend,
+    SamplingNetworkAdapter,
+    SamplingRng,
+    const SIZE: usize,
+>(
     State(handle): State<OverwatchHandle>,
     Json(GetRangeReq { app_id, range }): Json<GetRangeReq<V>>,
 ) -> Response
@@ -397,8 +554,24 @@ where
     <V as Metadata>::Index:
         AsRef<[u8]> + Clone + Serialize + DeserializeOwned + PartialOrd + Send + Sync,
     SS: StorageSerde + Send + Sync + 'static,
+    SamplingRng: SeedableRng + RngCore,
+    SamplingBackend:
+        DaSamplingServiceBackend<SamplingRng, BlobId = <V as DispersedBlobInfo>::BlobId> + Send,
+    SamplingBackend::Settings: Clone,
+    SamplingBackend::Blob: Debug + 'static,
+    SamplingBackend::BlobId: Debug + 'static,
+    SamplingNetworkAdapter: nomos_da_sampling::network::NetworkAdapter,
 {
-    make_request_and_return_response!(da::get_range::<Tx, C, V, SS, SIZE>(&handle, app_id, range))
+    make_request_and_return_response!(da::get_range::<
+        Tx,
+        C,
+        V,
+        SS,
+        SamplingBackend,
+        SamplingNetworkAdapter,
+        SamplingRng,
+        SIZE,
+    >(&handle, app_id, range))
 }
 
 #[utoipa::path(
@@ -448,6 +621,49 @@ where
         Tx,
         <Tx as Transaction>::Hash,
     >(&handle, tx, Transaction::hash))
+}
+
+#[utoipa::path(
+    post,
+    path = "/mempool/add/blobinfo",
+    responses(
+        (status = 200, description = "Add blob info to the mempool"),
+        (status = 500, description = "Internal server error", body = String),
+    )
+)]
+async fn add_blob_info<B, SamplingBackend, SamplingAdapter, SamplingRng>(
+    State(handle): State<OverwatchHandle>,
+    Json(blob_info): Json<B>,
+) -> Response
+where
+    B: DispersedBlobInfo
+        + Clone
+        + Debug
+        + Hash
+        + Serialize
+        + DeserializeOwned
+        + Send
+        + Sync
+        + 'static,
+    <B as DispersedBlobInfo>::BlobId: std::cmp::Ord + Clone + Debug + Hash + Send + Sync + 'static,
+    SamplingBackend: DaSamplingServiceBackend<SamplingRng, BlobId = <B as DispersedBlobInfo>::BlobId>
+        + Send
+        + 'static,
+    SamplingBackend::Settings: Clone,
+    SamplingBackend::Blob: Debug + 'static,
+    SamplingBackend::BlobId: Debug + 'static,
+    SamplingAdapter: nomos_da_sampling::network::NetworkAdapter + Send + 'static,
+    SamplingRng: SeedableRng + RngCore + Send + 'static,
+{
+    make_request_and_return_response!(mempool::add_blob_info::<
+        NetworkBackend,
+        MempoolNetworkAdapter<B, <B as DispersedBlobInfo>::BlobId>,
+        B,
+        <B as DispersedBlobInfo>::BlobId,
+        SamplingBackend,
+        SamplingAdapter,
+        SamplingRng,
+    >(&handle, blob_info, DispersedBlobInfo::blob_id))
 }
 
 #[utoipa::path(

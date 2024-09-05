@@ -17,18 +17,22 @@ nomos-core = { path = "../../nomos-core" }
 cryptarchia-consensus = { path = "../cryptarchia-consensus" }
 nomos-network = { path = "../../nomos-services/network" }
 nomos-mempool = { path = "../../nomos-services/mempool", features = [
-  "mock",
-  "libp2p",
-  "openapi",
+    "mock",
+    "libp2p",
+    "openapi",
 ] }
 nomos-metrics = { path = "../../nomos-services/metrics" }
 nomos-da-indexer = { path = "../data-availability/indexer", features = ["rocksdb-backend"] }
+nomos-da-sampling = { path = "../data-availability/sampling" }
 nomos-da-verifier = { path = "../data-availability/verifier", features = ["rocksdb-backend", "libp2p"] }
 nomos-storage = { path = "../../nomos-services/storage", features = ["rocksdb"] }
 nomos-libp2p = { path = "../../nomos-libp2p" }
 full-replication = { path = "../../nomos-da/full-replication" }
 kzgrs-backend = { path = "../../nomos-da/kzgrs-backend" }
+rand = "0.8"
 serde = { version = "1", features = ["derive"] }
+subnetworks-assignations = { path = "../../nomos-da/network/subnetworks-assignations" }
+nomos-da-network-core = { path = "../../nomos-da/network/core" }
 tokio = { version = "1.33", default-features = false, features = ["sync"] }
 
 

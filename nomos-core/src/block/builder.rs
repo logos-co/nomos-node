@@ -100,7 +100,7 @@ where
     }
 
     #[must_use]
-    pub fn with_blobs_certificates(
+    pub fn with_blobs_info(
         mut self,
         blobs_certificates: impl Iterator<Item = B> + 'static,
     ) -> Self {

@@ -1,5 +1,5 @@
 // std
-use serde::{de::DeserializeOwned, Serialize};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::{marker::PhantomData, path::PathBuf};
 // crates
 use nomos_core::da::blob::Blob;
@@ -117,7 +117,7 @@ fn create_blob_idx(blob_id: &[u8], column_idx: &[u8]) -> [u8; 34] {
     blob_idx
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RocksAdapterSettings {
     pub blob_storage_directory: PathBuf,
 }

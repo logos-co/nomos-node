@@ -1,19 +1,17 @@
 pub mod adapters;
 
 use futures::Stream;
-use nomos_network::backends::NetworkBackend;
-use nomos_network::NetworkService;
+use nomos_da_network_service::backends::NetworkBackend;
+use nomos_da_network_service::NetworkService;
 use overwatch_rs::services::relay::OutboundRelay;
 use overwatch_rs::services::ServiceData;
-use overwatch_rs::DynError;
 
 #[async_trait::async_trait]
 pub trait NetworkAdapter {
-    type Backend: NetworkBackend + 'static;
+    type Backend: NetworkBackend + Send + 'static;
     type Settings;
 
     type Blob;
-    type Attestation;
 
     async fn new(
         settings: Self::Settings,
@@ -21,5 +19,4 @@ pub trait NetworkAdapter {
     ) -> Self;
 
     async fn blob_stream(&self) -> Box<dyn Stream<Item = Self::Blob> + Unpin + Send>;
-    async fn send_attestation(&self, attestation: Self::Attestation) -> Result<(), DynError>;
 }

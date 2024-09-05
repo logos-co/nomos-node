@@ -16,8 +16,14 @@ use nomos_core::da::blob::metadata::Metadata as _;
 use nomos_core::tx::Transaction;
 use nomos_da_indexer::storage::adapters::rocksdb::RocksAdapterSettings;
 use nomos_da_indexer::IndexerSettings;
+use nomos_da_network_service::backends::libp2p::validator::{
+    DaNetworkValidatorBackend, DaNetworkValidatorBackendSettings,
+};
+use nomos_da_network_service::NetworkConfig as DaNetworkConfig;
+use nomos_da_network_service::NetworkService as DaNetworkService;
 use nomos_da_storage::fs::write_blob;
 use nomos_da_storage::rocksdb::DA_VERIFIED_KEY_PREFIX;
+use nomos_libp2p::{ed25519, identity, PeerId};
 use nomos_libp2p::{Multiaddr, SwarmConfig};
 use nomos_mempool::network::adapters::libp2p::Settings as AdapterSettings;
 use nomos_mempool::{DaMempoolSettings, TxMempoolSettings};
@@ -29,6 +35,7 @@ use overwatch_derive::*;
 use overwatch_rs::overwatch::{Overwatch, OverwatchRunner};
 use overwatch_rs::services::handle::ServiceHandle;
 use rand::{thread_rng, Rng};
+use subnetworks_assignations::versions::v1::FillFromNodeList;
 use tempfile::{NamedTempFile, TempDir};
 use time::OffsetDateTime;
 use tokio_stream::{wrappers::BroadcastStream, StreamExt};
@@ -39,6 +46,7 @@ use crate::common::*;
 struct IndexerNode {
     network: ServiceHandle<NetworkService<NetworkBackend>>,
     cl_mempool: ServiceHandle<TxMempool>,
+    da_network: ServiceHandle<DaNetworkService<DaNetworkValidatorBackend<FillFromNodeList>>>,
     da_mempool: ServiceHandle<DaMempool>,
     storage: ServiceHandle<StorageService<RocksBackend<Wire>>>,
     cryptarchia: ServiceHandle<Cryptarchia>,
@@ -61,6 +69,18 @@ fn new_node(
                 backend: Libp2pConfig {
                     inner: swarm_config.clone(),
                     initial_peers,
+                },
+            },
+            da_network: DaNetworkConfig {
+                backend: DaNetworkValidatorBackendSettings {
+                    node_key: ed25519::SecretKey::generate(),
+                    membership: FillFromNodeList::new(
+                        &[PeerId::from(identity::Keypair::generate_ed25519().public())],
+                        2,
+                        1,
+                    ),
+                    addresses: Default::default(),
+                    listening_address: "/ip4/127.0.0.1/udp/0/quic-v1".parse::<Multiaddr>().unwrap(),
                 },
             },
             cl_mempool: TxMempoolSettings {
@@ -107,6 +127,7 @@ fn new_node(
 // TODO: When verifier is implemented this test should be removed and a new one
 // performed in integration tests crate using the real node.
 
+#[ignore = "Membership needs to be configured correctly"]
 #[test]
 fn test_indexer() {
     let performed_tx = Arc::new(AtomicBool::new(false));

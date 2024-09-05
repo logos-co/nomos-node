@@ -1,107 +1,79 @@
 // std
-use futures::Stream;
-use overwatch_rs::DynError;
+use std::fmt::Debug;
 use std::marker::PhantomData;
 // crates
-
-// internal
-use crate::network::NetworkAdapter;
-use nomos_core::wire;
-use nomos_network::backends::libp2p::{Command, Event, EventKind, Libp2p, Message, TopicHash};
-use nomos_network::{NetworkMsg, NetworkService};
+use futures::Stream;
+use kzgrs_backend::common::blob::DaBlob;
+use libp2p::PeerId;
+use nomos_da_network_core::SubnetworkId;
+use nomos_da_network_service::backends::libp2p::validator::{
+    DaNetworkEvent, DaNetworkEventKind, DaNetworkValidatorBackend,
+};
+use nomos_da_network_service::NetworkService;
 use overwatch_rs::services::relay::OutboundRelay;
 use overwatch_rs::services::ServiceData;
-use serde::de::DeserializeOwned;
-use serde::Serialize;
-use tokio_stream::wrappers::BroadcastStream;
+use subnetworks_assignations::MembershipHandler;
 use tokio_stream::StreamExt;
-use tracing::debug;
+// internal
+use crate::network::NetworkAdapter;
 
 pub const NOMOS_DA_TOPIC: &str = "NomosDa";
 
-pub struct Libp2pAdapter<B, A> {
-    network_relay: OutboundRelay<<NetworkService<Libp2p> as ServiceData>::Message>,
-    _blob: PhantomData<B>,
-    _attestation: PhantomData<A>,
-}
-
-impl<B, A> Libp2pAdapter<B, A>
+pub struct Libp2pAdapter<M>
 where
-    B: Serialize + DeserializeOwned + Send + Sync + 'static,
-    A: Serialize + DeserializeOwned + Send + Sync + 'static,
+    M: MembershipHandler<NetworkId = SubnetworkId, Id = PeerId>
+        + Clone
+        + Debug
+        + Send
+        + Sync
+        + 'static,
 {
-    async fn stream_for<E: DeserializeOwned>(&self) -> Box<dyn Stream<Item = E> + Unpin + Send> {
-        let topic_hash = TopicHash::from_raw(NOMOS_DA_TOPIC);
-        let (sender, receiver) = tokio::sync::oneshot::channel();
-        self.network_relay
-            .send(NetworkMsg::Subscribe {
-                kind: EventKind::Message,
-                sender,
-            })
-            .await
-            .expect("Network backend should be ready");
-        let receiver = receiver.await.unwrap();
-        Box::new(Box::pin(BroadcastStream::new(receiver).filter_map(
-            move |msg| match msg {
-                Ok(Event::Message(Message { topic, data, .. })) if topic == topic_hash => {
-                    match wire::deserialize::<E>(&data) {
-                        Ok(msg) => Some(msg),
-                        Err(e) => {
-                            debug!("Unrecognized message: {e}");
-                            None
-                        }
-                    }
-                }
-                _ => None,
-            },
-        )))
-    }
-
-    async fn send<E: Serialize>(&self, data: E) -> Result<(), DynError> {
-        let message = wire::serialize(&data)?.into_boxed_slice();
-        self.network_relay
-            .send(NetworkMsg::Process(Command::Broadcast {
-                topic: NOMOS_DA_TOPIC.to_string(),
-                message,
-            }))
-            .await
-            .map_err(|(e, _)| Box::new(e) as DynError)
-    }
+    network_relay:
+        OutboundRelay<<NetworkService<DaNetworkValidatorBackend<M>> as ServiceData>::Message>,
+    _membership: PhantomData<M>,
 }
 
 #[async_trait::async_trait]
-impl<B, A> NetworkAdapter for Libp2pAdapter<B, A>
+impl<M> NetworkAdapter for Libp2pAdapter<M>
 where
-    B: Serialize + DeserializeOwned + Send + Sync + 'static,
-    A: Serialize + DeserializeOwned + Send + Sync + 'static,
+    M: MembershipHandler<NetworkId = SubnetworkId, Id = PeerId>
+        + Clone
+        + Debug
+        + Send
+        + Sync
+        + 'static,
 {
-    type Backend = Libp2p;
+    type Backend = DaNetworkValidatorBackend<M>;
     type Settings = ();
-    type Blob = B;
-    type Attestation = A;
+    type Blob = DaBlob;
 
     async fn new(
         _settings: Self::Settings,
         network_relay: OutboundRelay<<NetworkService<Self::Backend> as ServiceData>::Message>,
     ) -> Self {
-        network_relay
-            .send(NetworkMsg::Process(Command::Subscribe(
-                NOMOS_DA_TOPIC.to_string(),
-            )))
-            .await
-            .expect("Network backend should be ready");
         Self {
             network_relay,
-            _blob: Default::default(),
-            _attestation: Default::default(),
+            _membership: Default::default(),
         }
     }
 
     async fn blob_stream(&self) -> Box<dyn Stream<Item = Self::Blob> + Unpin + Send> {
-        self.stream_for::<Self::Blob>().await
-    }
+        let (sender, receiver) = tokio::sync::oneshot::channel();
+        self.network_relay
+            .send(nomos_da_network_service::DaNetworkMsg::Subscribe {
+                kind: DaNetworkEventKind::Verifying,
+                sender,
+            })
+            .await
+            .expect("Network backend should be ready");
 
-    async fn send_attestation(&self, attestation: Self::Attestation) -> Result<(), DynError> {
-        self.send(attestation).await
+        let receiver = receiver.await.expect("Blob stream should be received");
+
+        let stream = receiver.filter_map(move |msg| match msg {
+            DaNetworkEvent::Verifying(blob) => Some(*blob),
+            _ => None,
+        });
+
+        Box::new(Box::pin(stream))
     }
 }

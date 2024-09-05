@@ -14,9 +14,18 @@ use nomos_core::da::{blob::info::DispersedBlobInfo, DaEncoder as _};
 use nomos_core::tx::Transaction;
 use nomos_da_indexer::storage::adapters::rocksdb::RocksAdapterSettings as IndexerStorageSettings;
 use nomos_da_indexer::IndexerSettings;
+use nomos_da_network_service::backends::libp2p::validator::{
+    DaNetworkValidatorBackend, DaNetworkValidatorBackendSettings,
+};
+use nomos_da_network_service::NetworkConfig as DaNetworkConfig;
+use nomos_da_network_service::NetworkService as DaNetworkService;
+use nomos_da_sampling::backend::kzgrs::KzgrsSamplingBackendSettings;
+use nomos_da_sampling::network::adapters::libp2p::DaNetworkSamplingSettings;
+use nomos_da_sampling::DaSamplingServiceSettings;
 use nomos_da_verifier::backend::kzgrs::KzgrsDaVerifierSettings;
 use nomos_da_verifier::storage::adapters::rocksdb::RocksAdapterSettings as VerifierStorageSettings;
 use nomos_da_verifier::DaVerifierServiceSettings;
+use nomos_libp2p::{ed25519, identity, PeerId};
 use nomos_libp2p::{Multiaddr, SwarmConfig};
 use nomos_mempool::network::adapters::libp2p::Settings as AdapterSettings;
 use nomos_mempool::{DaMempoolSettings, TxMempoolSettings};
@@ -28,6 +37,7 @@ use overwatch_derive::*;
 use overwatch_rs::overwatch::{Overwatch, OverwatchRunner};
 use overwatch_rs::services::handle::ServiceHandle;
 use rand::{thread_rng, Rng, RngCore};
+use subnetworks_assignations::versions::v1::FillFromNodeList;
 use tempfile::{NamedTempFile, TempDir};
 use time::OffsetDateTime;
 // internal
@@ -43,12 +53,14 @@ struct ClientNode {
 #[derive(Services)]
 struct VerifierNode {
     network: ServiceHandle<NetworkService<NetworkBackend>>,
+    da_network: ServiceHandle<DaNetworkService<DaNetworkValidatorBackend<FillFromNodeList>>>,
     cl_mempool: ServiceHandle<TxMempool>,
     da_mempool: ServiceHandle<DaMempool>,
     storage: ServiceHandle<StorageService<RocksBackend<Wire>>>,
     cryptarchia: ServiceHandle<Cryptarchia>,
     indexer: ServiceHandle<DaIndexer>,
     verifier: ServiceHandle<DaVerifier>,
+    da_sampling: ServiceHandle<DaSampling>,
 }
 
 // Client node is just an empty overwatch service to spawn a task that could communicate with other
@@ -85,6 +97,18 @@ fn new_node(
                 backend: Libp2pConfig {
                     inner: swarm_config.clone(),
                     initial_peers,
+                },
+            },
+            da_network: DaNetworkConfig {
+                backend: DaNetworkValidatorBackendSettings {
+                    node_key: ed25519::SecretKey::generate(),
+                    membership: FillFromNodeList::new(
+                        &[PeerId::from(identity::Keypair::generate_ed25519().public())],
+                        2,
+                        1,
+                    ),
+                    addresses: Default::default(),
+                    listening_address: "/ip4/127.0.0.1/udp/0/quic-v1".parse::<Multiaddr>().unwrap(),
                 },
             },
             cl_mempool: TxMempoolSettings {
@@ -128,6 +152,19 @@ fn new_node(
                     blob_storage_directory: blobs_dir.clone(),
                 },
             },
+            da_sampling: DaSamplingServiceSettings {
+                // TODO: setup this properly!
+                sampling_settings: KzgrsSamplingBackendSettings {
+                    num_samples: 0,
+                    // Sampling service period can't be zero.
+                    old_blobs_check_interval: Duration::from_secs(1),
+                    blobs_validity_duration: Duration::from_secs(1),
+                },
+                network_adapter_settings: DaNetworkSamplingSettings {
+                    num_samples: 0,
+                    subnet_size: 0,
+                },
+            },
         },
         None,
     )
@@ -135,13 +172,13 @@ fn new_node(
     .unwrap()
 }
 
-fn generate_keys() -> (blst::min_sig::SecretKey, blst::min_sig::PublicKey) {
+fn generate_hex_keys() -> (String, String) {
     let mut rng = rand::thread_rng();
     let sk_bytes: [u8; 32] = rng.gen();
     let sk = blst::min_sig::SecretKey::key_gen(&sk_bytes, &[]).unwrap();
 
     let pk = sk.sk_to_pk();
-    (sk, pk)
+    (hex::encode(sk.to_bytes()), hex::encode(pk.to_bytes()))
 }
 
 pub fn rand_data(elements_count: usize) -> Vec<u8> {
@@ -198,8 +235,8 @@ fn test_verifier() {
 
     let blobs_dir = TempDir::new().unwrap().path().to_path_buf();
 
-    let (node1_sk, node1_pk) = generate_keys();
-    let (node2_sk, node2_pk) = generate_keys();
+    let (node1_sk, node1_pk) = generate_hex_keys();
+    let (node2_sk, node2_pk) = generate_hex_keys();
 
     let client_zone = new_client(NamedTempFile::new().unwrap().path().to_path_buf());
 
@@ -213,8 +250,8 @@ fn test_verifier() {
         &blobs_dir,
         vec![node_address(&swarm_config2)],
         KzgrsDaVerifierSettings {
-            sk: node1_sk,
-            nodes_public_keys: vec![node1_pk, node2_pk],
+            sk: node1_sk.clone(),
+            nodes_public_keys: vec![node1_pk.clone(), node2_pk.clone()],
         },
     );
 
