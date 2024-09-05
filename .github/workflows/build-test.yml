@@ -79,11 +79,13 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Cargo build (Other OSes)
+        if: matrix.os != 'macos-latest'
         uses: actions-rs/cargo@v1
         with:
           command: build
           args: --all --no-default-features --features ${{ matrix.feature }}
       - name: Cargo build (MacOS)
+        if: matrix.os == 'macos-latest'
         uses: actions-rs/cargo@v1
         with:
           command: build
@@ -110,8 +112,7 @@ jobs:
           CONSENSUS_SLOT_TIME: 15
         with:
           command: test
-          args: --all --include-ignored --no-default-features --features ${{ matrix.feature }},prove,metal
-          
+          args: --all --no-default-features --features ${{ matrix.feature }},prove,metal -- --include-ignored 
       - uses: actions/upload-artifact@v3
         if: failure()
         with:
