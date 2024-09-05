@@ -127,7 +127,7 @@ fn new_node(
 // TODO: When verifier is implemented this test should be removed and a new one
 // performed in integration tests crate using the real node.
 
-#[ignore = "Sampling needs to be started in mempool"]
+#[ignore = "Membership needs to be configured correctly"]
 #[test]
 fn test_indexer() {
     let performed_tx = Arc::new(AtomicBool::new(false));

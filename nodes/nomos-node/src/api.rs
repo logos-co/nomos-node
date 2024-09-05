@@ -19,7 +19,7 @@ use nomos_api::{
 };
 use nomos_core::da::blob::info::DispersedBlobInfo;
 use nomos_core::da::blob::metadata::Metadata;
-use nomos_core::da::DaVerifier as CoreDaVerifier;
+use nomos_core::da::{BlobId, DaVerifier as CoreDaVerifier};
 use nomos_core::{da::blob::Blob, header::HeaderId, tx::Transaction};
 use nomos_da_network_core::SubnetworkId;
 use nomos_da_sampling::backend::DaSamplingServiceBackend;
@@ -175,7 +175,9 @@ where
         Serialize + for<'de> Deserialize<'de> + std::cmp::Ord + Debug + Send + Sync + 'static,
     S: StorageSerde + Send + Sync + 'static,
     SamplingRng: SeedableRng + RngCore + Send + 'static,
-    SamplingBackend: DaSamplingServiceBackend<SamplingRng> + Send + 'static,
+    SamplingBackend: DaSamplingServiceBackend<SamplingRng, BlobId = <V as DispersedBlobInfo>::BlobId>
+        + Send
+        + 'static,
     SamplingBackend::Settings: Clone,
     SamplingBackend::Blob: Debug + 'static,
     SamplingBackend::BlobId: Debug + 'static,
@@ -274,7 +276,12 @@ where
             .route("/network/info", routing::get(libp2p_info))
             .route("/storage/block", routing::post(block::<S, T>))
             .route("/mempool/add/tx", routing::post(add_tx::<T>))
-            .route("/mempool/add/blobinfo", routing::post(add_blob_info::<V>))
+            .route(
+                "/mempool/add/blobinfo",
+                routing::post(
+                    add_blob_info::<V, SamplingBackend, SamplingNetworkAdapter, SamplingRng>,
+                ),
+            )
             .route("/metrics", routing::get(get_metrics))
             .with_state(handle);
 
@@ -381,7 +388,7 @@ where
     <Tx as Transaction>::Hash: std::cmp::Ord + Debug + Send + Sync + 'static,
     SS: StorageSerde + Send + Sync + 'static,
     SamplingRng: SeedableRng + RngCore,
-    SamplingBackend: DaSamplingServiceBackend<SamplingRng> + Send,
+    SamplingBackend: DaSamplingServiceBackend<SamplingRng, BlobId = BlobId> + Send,
     SamplingBackend::Settings: Clone,
     SamplingBackend::Blob: Debug + 'static,
     SamplingBackend::BlobId: Debug + 'static,
@@ -430,7 +437,7 @@ where
     <Tx as Transaction>::Hash: std::cmp::Ord + Debug + Send + Sync + 'static,
     SS: StorageSerde + Send + Sync + 'static,
     SamplingRng: SeedableRng + RngCore,
-    SamplingBackend: DaSamplingServiceBackend<SamplingRng> + Send,
+    SamplingBackend: DaSamplingServiceBackend<SamplingRng, BlobId = BlobId> + Send,
     SamplingBackend::Settings: Clone,
     SamplingBackend::Blob: Debug + 'static,
     SamplingBackend::BlobId: Debug + 'static,
@@ -548,7 +555,8 @@ where
         AsRef<[u8]> + Clone + Serialize + DeserializeOwned + PartialOrd + Send + Sync,
     SS: StorageSerde + Send + Sync + 'static,
     SamplingRng: SeedableRng + RngCore,
-    SamplingBackend: DaSamplingServiceBackend<SamplingRng> + Send,
+    SamplingBackend:
+        DaSamplingServiceBackend<SamplingRng, BlobId = <V as DispersedBlobInfo>::BlobId> + Send,
     SamplingBackend::Settings: Clone,
     SamplingBackend::Blob: Debug + 'static,
     SamplingBackend::BlobId: Debug + 'static,
@@ -623,7 +631,7 @@ where
         (status = 500, description = "Internal server error", body = String),
     )
 )]
-async fn add_blob_info<B>(
+async fn add_blob_info<B, SamplingBackend, SamplingAdapter, SamplingRng>(
     State(handle): State<OverwatchHandle>,
     Json(blob_info): Json<B>,
 ) -> Response
@@ -638,12 +646,23 @@ where
         + Sync
         + 'static,
     <B as DispersedBlobInfo>::BlobId: std::cmp::Ord + Clone + Debug + Hash + Send + Sync + 'static,
+    SamplingBackend: DaSamplingServiceBackend<SamplingRng, BlobId = <B as DispersedBlobInfo>::BlobId>
+        + Send
+        + 'static,
+    SamplingBackend::Settings: Clone,
+    SamplingBackend::Blob: Debug + 'static,
+    SamplingBackend::BlobId: Debug + 'static,
+    SamplingAdapter: nomos_da_sampling::network::NetworkAdapter + Send + 'static,
+    SamplingRng: SeedableRng + RngCore + Send + 'static,
 {
     make_request_and_return_response!(mempool::add_blob_info::<
         NetworkBackend,
         MempoolNetworkAdapter<B, <B as DispersedBlobInfo>::BlobId>,
         B,
         <B as DispersedBlobInfo>::BlobId,
+        SamplingBackend,
+        SamplingAdapter,
+        SamplingRng,
     >(&handle, blob_info, DispersedBlobInfo::blob_id))
 }
 

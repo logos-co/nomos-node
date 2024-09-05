@@ -12,12 +12,17 @@ use std::fmt::Debug;
 // #[cfg(feature = "metrics")]
 // use super::metrics::Metrics;
 use futures::StreamExt;
-use nomos_core::da::blob::info::DispersedBlobInfo;
-use nomos_metrics::NomosRegistry;
+use rand::{RngCore, SeedableRng};
 // internal
 use crate::backend::MemPool;
 use crate::network::NetworkAdapter;
 use crate::{MempoolMetrics, MempoolMsg};
+use nomos_core::da::blob::info::DispersedBlobInfo;
+use nomos_da_sampling::{
+    backend::DaSamplingServiceBackend, network::NetworkAdapter as DaSamplingNetworkAdapter,
+    DaSamplingService, DaSamplingServiceMsg,
+};
+use nomos_metrics::NomosRegistry;
 use nomos_network::{NetworkMsg, NetworkService};
 use overwatch_rs::services::life_cycle::LifecycleMessage;
 use overwatch_rs::services::{
@@ -28,7 +33,7 @@ use overwatch_rs::services::{
 };
 use tracing::error;
 
-pub struct DaMempoolService<N, P>
+pub struct DaMempoolService<N, P, DB, DN, R>
 where
     N: NetworkAdapter<Key = P::Key>,
     N::Payload: DispersedBlobInfo + Into<P::Item> + Debug + 'static,
@@ -37,16 +42,23 @@ where
     P::Item: Debug + 'static,
     P::Key: Debug + 'static,
     P::BlockId: Debug + 'static,
+    DB: DaSamplingServiceBackend<R, BlobId = P::Key> + Send,
+    DB::Blob: Debug + 'static,
+    DB::BlobId: Debug + 'static,
+    DB::Settings: Clone,
+    DN: DaSamplingNetworkAdapter,
+    R: SeedableRng + RngCore,
 {
     service_state: ServiceStateHandle<Self>,
     network_relay: Relay<NetworkService<N::Backend>>,
+    sampling_relay: Relay<DaSamplingService<DB, DN, R>>,
     pool: P,
     // TODO: Add again after metrics refactor
     // #[cfg(feature = "metrics")]
     // metrics: Option<Metrics>,
 }
 
-impl<N, P> ServiceData for DaMempoolService<N, P>
+impl<N, P, DB, DN, R> ServiceData for DaMempoolService<N, P, DB, DN, R>
 where
     N: NetworkAdapter<Key = P::Key>,
     N::Payload: DispersedBlobInfo + Debug + Into<P::Item> + 'static,
@@ -55,6 +67,12 @@ where
     P::Item: Debug + 'static,
     P::Key: Debug + 'static,
     P::BlockId: Debug + 'static,
+    DB: DaSamplingServiceBackend<R, BlobId = P::Key> + Send,
+    DB::Blob: Debug + 'static,
+    DB::BlobId: Debug + 'static,
+    DB::Settings: Clone,
+    DN: DaSamplingNetworkAdapter,
+    R: SeedableRng + RngCore,
 {
     const SERVICE_ID: ServiceId = "mempool-da";
     type Settings = DaMempoolSettings<P::Settings, N::Settings>;
@@ -69,19 +87,26 @@ where
 }
 
 #[async_trait::async_trait]
-impl<N, P> ServiceCore for DaMempoolService<N, P>
+impl<N, P, DB, DN, R> ServiceCore for DaMempoolService<N, P, DB, DN, R>
 where
     P: MemPool + Send + 'static,
     P::Settings: Clone + Send + Sync + 'static,
     N::Settings: Clone + Send + Sync + 'static,
     P::Item: Clone + Debug + Send + Sync + 'static,
-    P::Key: Debug + Send + Sync + 'static,
+    P::Key: Clone + Debug + Send + Sync + 'static,
     P::BlockId: Send + Debug + 'static,
     N::Payload: DispersedBlobInfo + Into<P::Item> + Clone + Debug + Send + 'static,
     N: NetworkAdapter<Key = P::Key> + Send + Sync + 'static,
+    DB: DaSamplingServiceBackend<R, BlobId = P::Key> + Send,
+    DB::Blob: Debug + 'static,
+    DB::BlobId: Debug + 'static,
+    DB::Settings: Clone,
+    DN: DaSamplingNetworkAdapter,
+    R: SeedableRng + RngCore,
 {
     fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, overwatch_rs::DynError> {
         let network_relay = service_state.overwatch_handle.relay();
+        let sampling_relay = service_state.overwatch_handle.relay();
         let settings = service_state.settings_reader.get_updated_settings();
 
         // TODO: Refactor metrics to be reusable then replug it again
@@ -93,6 +118,7 @@ where
         Ok(Self {
             service_state,
             network_relay,
+            sampling_relay,
             pool: P::new(settings.backend),
             // #[cfg(feature = "metrics")]
             // metrics,
@@ -103,6 +129,7 @@ where
         let Self {
             mut service_state,
             network_relay,
+            sampling_relay,
             mut pool,
             ..
         } = self;
@@ -111,6 +138,11 @@ where
             .connect()
             .await
             .expect("Relay connection with NetworkService should succeed");
+
+        let sampling_relay: OutboundRelay<_> = sampling_relay
+            .connect()
+            .await
+            .expect("Relay connection with SamplingService should succeed");
 
         let adapter = N::new(
             service_state.settings_reader.get_updated_settings().network,
@@ -130,7 +162,7 @@ where
                     Self::handle_mempool_message(msg, &mut pool, &mut network_relay, &mut service_state).await;
                 }
                 Some((key, item)) = network_items.next() => {
-                    // TODO: Inform intrested parties (DA Sampling) about new blob.
+                    sampling_relay.send(DaSamplingServiceMsg::TriggerSampling{blob_id: key.clone()}).await.expect("Sampling trigger message needs to be sent");
                     pool.add_item(key, item).unwrap_or_else(|e| {
                         tracing::debug!("could not add item to the pool due to: {}", e)
                     });
@@ -146,7 +178,7 @@ where
     }
 }
 
-impl<N, P> DaMempoolService<N, P>
+impl<N, P, DB, DN, R> DaMempoolService<N, P, DB, DN, R>
 where
     P: MemPool + Send + 'static,
     P::Settings: Clone + Send + Sync + 'static,
@@ -156,6 +188,12 @@ where
     P::BlockId: Debug + Send + 'static,
     N::Payload: DispersedBlobInfo + Into<P::Item> + Debug + Clone + Send + 'static,
     N: NetworkAdapter<Key = P::Key> + Send + Sync + 'static,
+    DB: DaSamplingServiceBackend<R, BlobId = P::Key> + Send,
+    DB::Blob: Debug + 'static,
+    DB::BlobId: Debug + 'static,
+    DB::Settings: Clone,
+    DN: DaSamplingNetworkAdapter,
+    R: SeedableRng + RngCore,
 {
     async fn should_stop_service(message: LifecycleMessage) -> bool {
         match message {

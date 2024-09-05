@@ -2,7 +2,7 @@ use bytes::Bytes;
 use core::ops::Range;
 use nomos_core::da::blob::info::DispersedBlobInfo;
 use nomos_core::da::blob::{metadata::Metadata, select::FillSize as FillSizeWithBlobs, Blob};
-use nomos_core::da::DaVerifier as CoreDaVerifier;
+use nomos_core::da::{BlobId, DaVerifier as CoreDaVerifier};
 use nomos_core::header::HeaderId;
 use nomos_core::tx::{select::FillSize as FillSizeWithTx, Transaction};
 use nomos_da_indexer::storage::adapters::rocksdb::RocksAdapter as IndexerStorageAdapter;
@@ -152,7 +152,7 @@ where
         AsRef<[u8]> + Serialize + DeserializeOwned + Clone + PartialOrd + Send + Sync,
     SS: StorageSerde + Send + Sync + 'static,
     SamplingRng: SeedableRng + RngCore,
-    SamplingBackend: DaSamplingServiceBackend<SamplingRng> + Send,
+    SamplingBackend: DaSamplingServiceBackend<SamplingRng, BlobId = BlobId> + Send,
     SamplingBackend::Settings: Clone,
     SamplingBackend::Blob: Debug + 'static,
     SamplingBackend::BlobId: Debug + 'static,
