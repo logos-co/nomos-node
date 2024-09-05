@@ -13,6 +13,7 @@ libp2p-identity = { version = "0.2" }
 nomos-core = { path = "../../../nomos-core" }
 nomos-da-network-core = { path = "../../../nomos-da/network/core" }
 nomos-da-network-service = { path = "../../../nomos-services/data-availability/network" }
+nomos-da-verifier = { path = "../verifier" }
 nomos-storage = { path = "../../../nomos-services/storage" }
 overwatch-rs = { git = "https://github.com/logos-co/Overwatch", rev = "2f70806" }
 overwatch-derive = { git = "https://github.com/logos-co/Overwatch", rev = "ac28d01" }
