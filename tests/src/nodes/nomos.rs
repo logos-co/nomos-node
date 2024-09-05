@@ -440,6 +440,7 @@ fn create_node_config(
             // TODO: setup this properly!
             sampling_settings: KzgrsSamplingBackendSettings {
                 num_samples: 0,
+                num_subnets: 2,
                 // Sampling service period can't be zero.
                 old_blobs_check_interval: Duration::from_secs(1),
                 blobs_validity_duration: Duration::from_secs(1),

@@ -31,7 +31,6 @@ use crate::common::*;
 // TODO: When verifier is implemented this test should be removed and a new one
 // performed in integration tests crate using the real node.
 
-#[ignore = "Membership needs to be configured correctly"]
 #[test]
 fn test_indexer() {
     let performed_tx = Arc::new(AtomicBool::new(false));
@@ -85,7 +84,7 @@ fn test_indexer() {
     let blobs_dir = TempDir::new().unwrap().path().to_path_buf();
 
     let (node1_sk, node1_pk) = generate_hex_keys();
-    let (node2_sk, node2_pk) = generate_hex_keys();
+    let (_node2_sk, node2_pk) = generate_hex_keys();
 
     let node1 = new_node(
         &notes[0],

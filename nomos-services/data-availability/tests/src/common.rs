@@ -234,14 +234,15 @@ pub fn new_node(
             da_sampling: DaSamplingServiceSettings {
                 // TODO: setup this properly!
                 sampling_settings: KzgrsSamplingBackendSettings {
-                    num_samples: 0,
+                    num_samples: 1,
+                    num_subnets: 32,
                     // Sampling service period can't be zero.
                     old_blobs_check_interval: Duration::from_secs(1),
                     blobs_validity_duration: Duration::from_secs(1),
                 },
                 network_adapter_settings: DaNetworkSamplingSettings {
-                    num_samples: 0,
-                    subnet_size: 0,
+                    num_samples: 1,
+                    subnet_size: 1,
                 },
             },
         },
