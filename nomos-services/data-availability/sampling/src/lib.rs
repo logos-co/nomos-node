@@ -129,6 +129,10 @@ where
                 }
                 error!("Error while sampling: {error}");
             }
+            SamplingEvent::SamplingRequest {
+                blob_id,
+                response_sender,
+            } => todo!(),
         }
     }
 }

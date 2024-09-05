@@ -17,8 +17,6 @@ use tokio_stream::StreamExt;
 // internal
 use crate::network::NetworkAdapter;
 
-pub const NOMOS_DA_TOPIC: &str = "NomosDa";
-
 pub struct Libp2pAdapter<M>
 where
     M: MembershipHandler<NetworkId = SubnetworkId, Id = PeerId>
