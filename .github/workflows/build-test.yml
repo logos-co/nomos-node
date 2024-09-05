@@ -113,7 +113,7 @@ jobs:
     strategy:
       fail-fast: false # all OSes should be tested even if one fails (default: true)
       matrix:
-        feature: [ libp2p, "libp2p,mixnet" ]
+        feature: [ prove, "prove,mixnet" ]
         os: [ ubuntu-latest, macos-latest ] # drop windows for now as risc0 does not support it
     runs-on: ${{ matrix.os }}
     steps:
@@ -145,7 +145,7 @@ jobs:
           CONSENSUS_SLOT_TIME: 270
         with:
           command: test
-          args: --manifest-path tests/Cargo.toml --features ${{ matrix.feature }},prove
+          args: --manifest-path tests/Cargo.toml --features ${{ matrix.feature }}
       - uses: actions/upload-artifact@v3
         if: failure()
         with:
