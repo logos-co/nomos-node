@@ -129,3 +129,71 @@ where
         }
     }
 }
+
+#[cfg(test)]
+pub mod test {
+    use crate::da::network::swarm::ExecutorSwarm;
+    use crate::test_utils::AllNeighbours;
+    use futures::StreamExt;
+    use libp2p::identity::Keypair;
+    use libp2p::PeerId;
+    use nomos_da_network_core::address_book::AddressBook;
+    use nomos_da_network_core::swarm::validator::ValidatorSwarm;
+    use nomos_libp2p::Multiaddr;
+    use overwatch_rs::overwatch::handle::OverwatchHandle;
+    use tokio::sync::mpsc::unbounded_channel;
+    use tokio::sync::{broadcast, mpsc};
+    use tokio_stream::wrappers::UnboundedReceiverStream;
+
+    #[tokio::test]
+    async fn test_dispersal_with_swarms() {
+        let k1 = Keypair::generate_ed25519();
+        let k2 = Keypair::generate_ed25519();
+        let executor_peer = PeerId::from_public_key(&k1.public());
+        let validator_peer = PeerId::from_public_key(&k2.public());
+        let neighbours = AllNeighbours {
+            neighbours: [
+                PeerId::from_public_key(&k1.public()),
+                PeerId::from_public_key(&k2.public()),
+            ]
+            .into_iter()
+            .collect(),
+        };
+
+        let addr: Multiaddr = "/ip4/127.0.0.1/udp/5063/quic-v1".parse().unwrap();
+        let addr2 = addr.clone().with_p2p(validator_peer).unwrap();
+
+        let addr_book = AddressBook::from_iter(vec![(executor_peer, addr.clone())]);
+
+        let (dispersal_events_sender, dispersal_events_receiver) = unbounded_channel();
+
+        let mut executor_swarm =
+            ExecutorSwarm::new(k1, neighbours.clone(), dispersal_events_sender);
+
+        let dispersal_request_sender = executor_swarm.blobs_sender();
+
+        let (mut validator_swarm, events_streams) =
+            ValidatorSwarm::new(k2, neighbours.clone(), addr_book);
+
+        executor_swarm
+            .dial(addr)
+            .expect("Should schedule the dials");
+
+        let ov_handle = OverwatchHandle::new(tokio::runtime::Handle::current(), mpsc::channel(1).0);
+
+        let task = ov_handle
+            .runtime()
+            .spawn(async move { executor_swarm.run().await });
+        let (dispersal_broadcast_sender, dispersal_broadcast_receiver) =
+            broadcast::channel(128usize);
+        let mut dispersal_events_receiver = UnboundedReceiverStream::new(dispersal_events_receiver);
+
+        let replies_task = ov_handle.runtime().spawn(async move {
+            while let Some(dispersal_event) = dispersal_events_receiver.next().await {
+                if let Err(e) = dispersal_broadcast_sender.send(dispersal_event) {
+                    println!("Error in internal broadcast of dispersal event: {e:?}");
+                }
+            }
+        });
+    }
+}
