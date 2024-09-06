@@ -8,6 +8,7 @@ use cryptarchia_ledger::Coin;
 use cryptarchia_ledger::LedgerState;
 use kzgrs_backend::common::blob::DaBlob;
 use kzgrs_backend::dispersal::BlobInfo;
+use kzgrs_backend::encoder::DaEncoder;
 use kzgrs_backend::encoder::DaEncoderParams;
 use libp2p::identity::{
     ed25519::{self, Keypair as Ed25519Keypair},
@@ -67,6 +68,9 @@ type IntegrationRng = TestRng;
 
 /// Membership used by the DA Network service.
 pub type NomosDaMembership = FillFromNodeList;
+
+pub const PARAMS: DaEncoderParams = DaEncoderParams::default_with(2);
+pub const ENCODER: DaEncoder = DaEncoder::new(PARAMS);
 
 pub const SK1: &str = "aca2c52f5928a53de79679daf390b0903eeccd9671b4350d49948d84334874806afe68536da9e076205a2af0af350e6c50851a040e3057b6544a29f5689ccd31";
 pub const SK2: &str = "f9dc26eea8bc56d9a4c59841b438665b998ce5e42f49f832df5b770a725c2daafee53b33539127321f6f5085e42902bd380e82d18a7aff6404e632b842106785";
@@ -242,8 +246,8 @@ pub fn new_node(
                     num_samples: da_network_settings.num_samples,
                     num_subnets: da_network_settings.num_subnets,
                     // Sampling service period can't be zero.
-                    old_blobs_check_interval: Duration::from_secs(5),
-                    blobs_validity_duration: Duration::from_secs(5),
+                    old_blobs_check_interval: Duration::from_secs(1),
+                    blobs_validity_duration: Duration::from_secs(15),
                 },
                 network_adapter_settings: (),
                 storage_adapter_settings: SamplingStorageSettings {

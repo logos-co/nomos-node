@@ -11,10 +11,7 @@ use std::{
 use cl::{InputWitness, NoteWitness, NullifierSecret};
 use cryptarchia_consensus::TimeConfig;
 use cryptarchia_ledger::{Coin, LedgerState};
-use kzgrs_backend::{
-    common::blob::DaBlob,
-    encoder::{DaEncoder, DaEncoderParams},
-};
+use kzgrs_backend::common::blob::DaBlob;
 use nomos_core::da::DaEncoder as _;
 use nomos_da_verifier::backend::kzgrs::KzgrsDaVerifierSettings;
 use nomos_libp2p::Multiaddr;
@@ -24,9 +21,6 @@ use tempfile::{NamedTempFile, TempDir};
 use time::OffsetDateTime;
 // internal
 use crate::common::*;
-
-pub const PARAMS: DaEncoderParams = DaEncoderParams::default_with(2);
-pub const ENCODER: DaEncoder = DaEncoder::new(PARAMS);
 
 #[test]
 fn test_verifier() {

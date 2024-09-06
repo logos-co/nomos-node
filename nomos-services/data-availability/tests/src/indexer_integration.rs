@@ -1,6 +1,5 @@
 // std
 use std::{
-    hash::{DefaultHasher, Hash},
     str::FromStr,
     sync::{
         atomic::{AtomicBool, Ordering::SeqCst},
@@ -12,15 +11,22 @@ use std::{
 use bytes::Bytes;
 use cryptarchia_consensus::{ConsensusMsg, TimeConfig};
 use cryptarchia_ledger::{Coin, LedgerState};
-use kzgrs_backend::dispersal::{BlobInfo, Metadata};
-use nomos_core::da::blob::info::DispersedBlobInfo;
+use kzgrs_backend::{
+    common::blob::DaBlob,
+    dispersal::{BlobInfo, Metadata},
+};
 use nomos_core::da::blob::metadata::Metadata as _;
+use nomos_core::da::blob::Blob;
+use nomos_core::da::DaEncoder as _;
 use nomos_da_storage::rocksdb::DA_VERIFIED_KEY_PREFIX;
 use nomos_da_storage::{fs::write_blob, rocksdb::key_bytes};
 use nomos_da_verifier::backend::kzgrs::KzgrsDaVerifierSettings;
 use nomos_libp2p::{Multiaddr, SwarmConfig};
 use nomos_node::Wire;
-use nomos_storage::{backends::rocksdb::RocksBackend, StorageService};
+use nomos_storage::{
+    backends::{rocksdb::RocksBackend, StorageSerde},
+    StorageService,
+};
 use rand::{thread_rng, Rng};
 use tempfile::{NamedTempFile, TempDir};
 use time::OffsetDateTime;
@@ -154,12 +160,55 @@ fn test_indexer() {
     // Node2 relays.
     let node2_storage = node2.handle().relay::<StorageService<RocksBackend<Wire>>>();
 
-    let blob_hash = [9u8; 32];
+    let encoder = &ENCODER;
+    let data = rand_data(10);
+
+    let encoded_data = encoder.encode(&data).unwrap();
+    let columns: Vec<_> = encoded_data.extended_data.columns().collect();
+
+    // Mock attestation step where blob is persisted in nodes blob storage.
+    let rt = tokio::runtime::Runtime::new().unwrap();
+
+    let mut blobs = vec![];
+    for (i, column) in columns.iter().enumerate() {
+        let da_blob = DaBlob {
+            column: column.clone(),
+            column_idx: i
+                .try_into()
+                .expect("Column index shouldn't overflow the target type"),
+            column_commitment: encoded_data.column_commitments[i],
+            aggregated_column_commitment: encoded_data.aggregated_column_commitment,
+            aggregated_column_proof: encoded_data.aggregated_column_proofs[i],
+            rows_commitments: encoded_data.row_commitments.clone(),
+            rows_proofs: encoded_data
+                .rows_proofs
+                .iter()
+                .map(|proofs| proofs.get(i).cloned().unwrap())
+                .collect(),
+        };
+
+        rt.block_on(write_blob(
+            blobs_dir.clone(),
+            da_blob.id().as_ref(),
+            da_blob.column_idx().as_ref(),
+            &Wire::serialize(da_blob.clone()),
+        ))
+        .unwrap();
+
+        blobs.push(da_blob);
+    }
+
+    // Test generate hash for Certificate with default Hasher
+    // let mut default_hasher = DefaultHasher::new();
+    // let _hash3 = <BlobInfo as Hash>::hash(&blob_info, &mut default_hasher);
+
     let app_id = [7u8; 32];
     let index = 0.into();
 
     let range = 0.into()..1.into(); // get idx 0 and 1.
     let meta = Metadata::new(app_id, index);
+
+    let blob_hash = <DaBlob as Blob>::id(&blobs[0]);
     let blob_info = BlobInfo::new(blob_hash, meta);
 
     // Test get Metadata for Certificate
@@ -168,29 +217,8 @@ fn test_indexer() {
     assert_eq!(app_id2, app_id);
     assert_eq!(index2, index);
 
-    // Test generate hash for Certificate with default Hasher
-    let mut default_hasher = DefaultHasher::new();
-    let _hash3 = <BlobInfo as Hash>::hash(&blob_info, &mut default_hasher);
-
     let expected_blob_info = blob_info.clone();
-
-    // Mock attestation step where blob is persisted in nodes blob storage.
-    let rt = tokio::runtime::Runtime::new().unwrap();
-    rt.block_on(write_blob(
-        blobs_dir.clone(),
-        blob_info.blob_id().as_ref(),
-        &(0 as u16).to_be_bytes(),
-        b"blob",
-    ))
-    .unwrap();
-
-    rt.block_on(write_blob(
-        blobs_dir,
-        blob_info.blob_id().as_ref(),
-        &(1 as u16).to_be_bytes(),
-        b"blob",
-    ))
-    .unwrap();
+    let blob_0_bytes = Wire::serialize(blobs[0].clone());
 
     node2.spawn(async move {
         let storage_outbound = node2_storage.connect().await.unwrap();
@@ -249,7 +277,7 @@ fn test_indexer() {
         let _ = mempool_rx.await.unwrap();
 
         // Wait for block in the network.
-        let timeout = tokio::time::sleep(Duration::from_secs(10));
+        let timeout = tokio::time::sleep(Duration::from_secs(20));
         tokio::pin!(timeout);
 
         loop {
@@ -266,7 +294,7 @@ fn test_indexer() {
         }
 
         // Give time for services to process and store data.
-        tokio::time::sleep(Duration::from_secs(1)).await;
+        tokio::time::sleep(Duration::from_secs(5)).await;
 
         // Request range of blobs from indexer.
         let (indexer_tx, indexer_rx) = tokio::sync::oneshot::channel();
@@ -288,7 +316,8 @@ fn test_indexer() {
         // When Indexer is asked for app_id at index, it will return all blobs that it has for that
         // blob_id.
         let columns = app_id_blobs[0];
-        if !columns.is_empty() && *columns[0] == *b"blob" && app_id_blobs[1].is_empty() {
+        if !columns.is_empty() && columns[0] == blob_0_bytes.as_ref() && app_id_blobs[1].is_empty()
+        {
             is_success_tx.store(true, SeqCst);
         }
 

@@ -417,12 +417,9 @@ where
         // TODO: Could it be that the SampleRes is sent as a new stream?
         let request: SampleReq = unpack_from_reader(&mut stream.stream)
             .await
-            .map_err(|error| {
-                println!(">>> Unpacking SampleRes maybe?");
-                SamplingError::Io {
-                    peer_id: stream.peer_id,
-                    error,
-                }
+            .map_err(|error| SamplingError::Io {
+                peer_id: stream.peer_id,
+                error,
             })?;
         let request = BehaviourSampleReq::try_from(request).map_err(|blob_id| {
             SamplingError::InvalidBlobId {

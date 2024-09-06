@@ -86,7 +86,6 @@ where
             .map(|stream| {
                 tokio_stream::StreamExt::filter_map(stream, |event| match event {
                     DaNetworkEvent::Sampling(event) => {
-                        println!(">>>>>> SAMPLE EV {event:?}");
                         Some(event)
                     }
                     DaNetworkEvent::Verifying(_) => {
