@@ -51,12 +51,13 @@ mod test {
     use sha2::{Digest, Sha256};
     use std::ops::{Mul, Neg};
     use ark_ec::pairing::Pairing;
+    use crypto_bigint::{U256};
 
     const BLOB_SIZE: usize = 32;
 
     static GLOBAL_PARAMETERS: Lazy<UniversalParams<Bls12_381>> = Lazy::new(|| {
         let mut rng = rand::thread_rng();
-        KZG10::<Bls12_381, DensePolynomial<Fr>>::setup(32, true, &mut rng).unwrap()
+        KZG10::<Bls12_381, DensePolynomial<Fr>>::setup(BLOB_SIZE, true, &mut rng).unwrap()
     });
 
     #[test]
@@ -70,6 +71,10 @@ mod test {
         let mut bls_coefficients = vec![];
         for i in 0..BLOB_SIZE {
             bls_coefficients.push(Fr::from_be_bytes_mod_order(&coefficients[i]));
+        }
+        let mut u256_coefficients = vec![];
+        for i in 0..BLOB_SIZE {
+            u256_coefficients.push(U256::from_be_slice(&coefficients[i]));
         }
 
         let mut da_commitment = Vec::new();
@@ -102,11 +107,11 @@ mod test {
 
         let expected_public_inputs = EquivalencePublic::new(
             da_commitment.clone(),
-            y_0.into_bigint().to_bytes_be().try_into().unwrap()
+            U256::from_be_slice(&y_0.into_bigint().to_bytes_be().as_slice()),
         );
 
         let private_inputs = EquivalencePrivate::new(
-            coefficients.clone()
+            u256_coefficients,
         );
 
         // Zone STF

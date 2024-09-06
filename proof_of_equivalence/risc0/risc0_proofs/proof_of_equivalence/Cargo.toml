@@ -12,9 +12,6 @@ cl = { path = "../../../../cl/cl" }
 equivalence_proof_statements = { path = "../../../proof_statements" }
 sha2 = "0.10"
 crypto-bigint = "0.5.5"
-ark-bls12-381 = "0.4.0"
-ark-ff = "0.4.0"
-ark-poly = "0.4.0"
 
 
 [patch.crates-io]

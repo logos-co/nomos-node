@@ -1,15 +1,16 @@
 use serde::{Deserialize, Serialize};
+use crypto_bigint::U256;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct EquivalencePublic {
     pub da_commitment: Vec<u8>,
-    pub y_0: [u8; 32]
+    pub y_0: U256
 }
 
 impl EquivalencePublic {
     pub fn new(
         da_commitment: Vec<u8>,
-        y_0: [u8; 32]
+        y_0: U256
     ) -> Self {
         Self {
             da_commitment,
@@ -20,12 +21,12 @@ impl EquivalencePublic {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct EquivalencePrivate {
-    pub coefficients: Vec<[u8; 32]>
+    pub coefficients: Vec<U256>
 }
 
 impl EquivalencePrivate {
     pub fn new(
-        coefficients: Vec<[u8; 32]>,
+        coefficients: Vec<U256>,
     ) -> Self {
         Self {
             coefficients,

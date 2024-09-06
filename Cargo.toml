@@ -32,5 +32,7 @@ members = [
     "cl/cl",
     "tests",
 ]
-exclude = ["proof_of_leadership/risc0/risc0_proofs"]
+exclude = ["proof_of_leadership/risc0/risc0_proofs",
+"proof_of_leadership/proof_statements",
+"proof_of_equivalence/proof_statements"]
 resolver = "2"
