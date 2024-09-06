@@ -19,6 +19,7 @@ message SampleErr {
 
 message SampleReq {
     bytes blob_id = 1;
+    uint32 column_idx = 2;
 }
 
 message SampleRes {

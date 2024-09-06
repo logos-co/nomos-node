@@ -1,6 +1,7 @@
 use crate::backends::NetworkBackend;
 use futures::{Stream, StreamExt};
 use kzgrs_backend::common::blob::DaBlob;
+use kzgrs_backend::common::ColumnIndex;
 use libp2p::identity::ed25519;
 use libp2p::{Multiaddr, PeerId};
 use log::error;
@@ -54,6 +55,7 @@ pub enum SamplingEvent {
     /// Incoming sampling request
     SamplingRequest {
         blob_id: BlobId,
+        column_idx: ColumnIndex,
         response_sender: mpsc::Sender<Option<DaBlob>>,
     },
     /// A failed sampling error
@@ -222,11 +224,11 @@ async fn handle_validator_events_stream(
                         }
                     }
                     sampling::behaviour::SamplingEvent::IncomingSample{request_receiver, response_sender} => {
-                        if let Ok(BehaviourSampleReq { blob_id }) = request_receiver.await {
+                        if let Ok(BehaviourSampleReq { blob_id, column_idx }) = request_receiver.await {
                             let (sampling_response_sender, mut sampling_response_receiver) = mpsc::channel(1);
 
                             if let Err(e) = sampling_broadcast_sender
-                                .send(SamplingEvent::SamplingRequest { blob_id, response_sender: sampling_response_sender })
+                                .send(SamplingEvent::SamplingRequest { blob_id, column_idx, response_sender: sampling_response_sender })
                             {
                                 error!("Error in internal broadcast of sampling request: {e:?}");
                                 sampling_response_receiver.close()

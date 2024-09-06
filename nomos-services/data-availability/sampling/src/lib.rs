@@ -142,20 +142,23 @@ where
             }
             SamplingEvent::SamplingRequest {
                 blob_id,
+                column_idx,
                 response_sender,
-            } => match storage_adapter.get_blob(blob_id).await {
-                Ok(maybe_blob) => {
-                    if response_sender.send(maybe_blob).await.is_err() {
-                        error!("Error sending sampling response");
-                    }
+            } => {
+                let maybe_blob = storage_adapter
+                    .get_blob(blob_id, column_idx)
+                    .await
+                    .map_err(|error| {
+                        error!("Failed to get blob from storage adapter: {error}");
+                        None::<Backend::Blob>
+                    })
+                    .ok()
+                    .flatten();
+
+                if response_sender.send(maybe_blob).await.is_err() {
+                    error!("Error sending sampling response");
                 }
-                Err(error) => {
-                    error!("Failed to get blob from storage adapter: {error}");
-                    if response_sender.send(None).await.is_err() {
-                        error!("Error sending sampling response");
-                    }
-                }
-            },
+            }
         }
     }
 }

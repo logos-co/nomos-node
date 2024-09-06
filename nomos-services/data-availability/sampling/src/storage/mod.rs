@@ -1,5 +1,6 @@
 pub mod adapters;
 
+use kzgrs_backend::common::ColumnIndex;
 use nomos_core::da::blob::Blob;
 use nomos_storage::{backends::StorageBackend, StorageService};
 use overwatch_rs::{
@@ -21,5 +22,6 @@ pub trait DaStorageAdapter {
     async fn get_blob(
         &self,
         blob_id: <Self::Blob as Blob>::BlobId,
+        column_idx: ColumnIndex,
     ) -> Result<Option<Self::Blob>, DynError>;
 }

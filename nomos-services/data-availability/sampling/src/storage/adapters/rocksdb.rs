@@ -1,5 +1,6 @@
+use kzgrs_backend::common::ColumnIndex;
 // std
-use serde::{Deserialize, Serialize};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::{marker::PhantomData, path::PathBuf};
 // crates
 use nomos_core::da::blob::Blob;
@@ -27,8 +28,8 @@ where
 impl<B, S> DaStorageAdapter for RocksAdapter<B, S>
 where
     S: StorageSerde + Send + Sync + 'static,
-    B: Blob + Clone + Send + Sync + 'static,
-    B::BlobId: Send,
+    B: Blob + DeserializeOwned + Clone + Send + Sync + 'static,
+    B::BlobId: AsRef<[u8]> + Send,
 {
     type Backend = RocksBackend<S>;
     type Blob = B;
@@ -48,6 +49,7 @@ where
     async fn get_blob(
         &self,
         _blob_id: <Self::Blob as Blob>::BlobId,
+        _column_idx: ColumnIndex,
     ) -> Result<Option<Self::Blob>, DynError> {
         todo!()
     }
