@@ -70,8 +70,7 @@ where
                 blob_id.as_ref(),
                 &column_idx.to_be_bytes(),
             )
-            .await
-            .unwrap();
+            .await?;
             Ok(S::deserialize(blob_bytes)
                 .map(|blob| Some(blob))
                 .unwrap_or_default())
