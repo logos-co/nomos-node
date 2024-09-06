@@ -152,6 +152,7 @@ pub struct CryptarchiaConsensus<
     SamplingBackend,
     SamplingNetworkAdapter,
     SamplingRng,
+    SamplingStorage,
 > where
     A: NetworkAdapter,
     ClPoolAdapter: MempoolAdapter<Payload = ClPool::Item, Key = ClPool::Key>,
@@ -173,6 +174,7 @@ pub struct CryptarchiaConsensus<
     SamplingBackend::Blob: Debug + 'static,
     SamplingBackend::BlobId: Debug + 'static,
     SamplingNetworkAdapter: nomos_da_sampling::network::NetworkAdapter,
+    SamplingStorage: nomos_da_sampling::storage::DaStorageAdapter,
 {
     service_state: ServiceStateHandle<Self>,
     // underlying networking backend. We need this so we can relay and check the types properly
@@ -186,9 +188,12 @@ pub struct CryptarchiaConsensus<
             SamplingBackend,
             SamplingNetworkAdapter,
             SamplingRng,
+            SamplingStorage,
         >,
     >,
-    sampling_relay: Relay<DaSamplingService<SamplingBackend, SamplingNetworkAdapter, SamplingRng>>,
+    sampling_relay: Relay<
+        DaSamplingService<SamplingBackend, SamplingNetworkAdapter, SamplingRng, SamplingStorage>,
+    >,
     block_subscription_sender: broadcast::Sender<Block<ClPool::Item, DaPool::Item>>,
     storage_relay: Relay<StorageService<Storage>>,
 }
@@ -205,6 +210,7 @@ impl<
         SamplingBackend,
         SamplingNetworkAdapter,
         SamplingRng,
+        SamplingStorage,
     > ServiceData
     for CryptarchiaConsensus<
         A,
@@ -218,6 +224,7 @@ impl<
         SamplingBackend,
         SamplingNetworkAdapter,
         SamplingRng,
+        SamplingStorage,
     >
 where
     A: NetworkAdapter,
@@ -239,6 +246,7 @@ where
     SamplingBackend::Blob: Debug + 'static,
     SamplingBackend::BlobId: Debug + 'static,
     SamplingNetworkAdapter: nomos_da_sampling::network::NetworkAdapter,
+    SamplingStorage: nomos_da_sampling::storage::DaStorageAdapter,
 {
     const SERVICE_ID: ServiceId = CRYPTARCHIA_ID;
     type Settings = CryptarchiaSettings<TxS::Settings, BS::Settings>;
@@ -260,6 +268,7 @@ impl<
         SamplingBackend,
         SamplingNetworkAdapter,
         SamplingRng,
+        SamplingStorage,
     > ServiceCore
     for CryptarchiaConsensus<
         A,
@@ -273,6 +282,7 @@ impl<
         SamplingBackend,
         SamplingNetworkAdapter,
         SamplingRng,
+        SamplingStorage,
     >
 where
     A: NetworkAdapter<Tx = ClPool::Item, BlobCertificate = DaPool::Item>
@@ -323,6 +333,7 @@ where
     SamplingBackend::BlobId: Debug + Ord + Send + Sync + 'static,
 
     SamplingNetworkAdapter: nomos_da_sampling::network::NetworkAdapter,
+    SamplingStorage: nomos_da_sampling::storage::DaStorageAdapter,
 {
     fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, overwatch_rs::DynError> {
         let network_relay = service_state.overwatch_handle.relay();
@@ -481,6 +492,7 @@ impl<
         SamplingBackend,
         SamplingNetworkAdapter,
         SamplingRng,
+        SamplingStorage,
     >
     CryptarchiaConsensus<
         A,
@@ -494,6 +506,7 @@ impl<
         SamplingBackend,
         SamplingNetworkAdapter,
         SamplingRng,
+        SamplingStorage,
     >
 where
     A: NetworkAdapter + Clone + Send + Sync + 'static,
@@ -536,6 +549,7 @@ where
     SamplingBackend::Blob: Debug + 'static,
     SamplingBackend::BlobId: Debug + Ord + Send + Sync + 'static,
     SamplingNetworkAdapter: nomos_da_sampling::network::NetworkAdapter,
+    SamplingStorage: nomos_da_sampling::storage::DaStorageAdapter,
 {
     async fn should_stop_service(message: LifecycleMessage) -> bool {
         match message {

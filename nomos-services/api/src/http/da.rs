@@ -40,6 +40,7 @@ pub type DaIndexer<
     SamplingBackend,
     SamplingNetworkAdapter,
     SamplingRng,
+    SamplingStorage,
     const SIZE: usize,
 > = DataIndexerService<
     // Indexer specific.
@@ -58,6 +59,7 @@ pub type DaIndexer<
     SamplingBackend,
     SamplingNetworkAdapter,
     SamplingRng,
+    SamplingStorage,
 >;
 
 pub type DaVerifier<A, B, M, VB, SS> =
@@ -107,6 +109,7 @@ pub async fn get_range<
     SamplingBackend,
     SamplingNetworkAdapter,
     SamplingRng,
+    SamplingStorage,
     const SIZE: usize,
 >(
     handle: &OverwatchHandle,
@@ -157,9 +160,20 @@ where
     SamplingBackend::Blob: Debug + 'static,
     SamplingBackend::BlobId: Debug + 'static,
     SamplingNetworkAdapter: nomos_da_sampling::network::NetworkAdapter,
+    SamplingStorage: nomos_da_sampling::storage::DaStorageAdapter,
 {
     let relay = handle
-        .relay::<DaIndexer<Tx, C, V, SS, SamplingBackend, SamplingNetworkAdapter, SamplingRng, SIZE>>()
+        .relay::<DaIndexer<
+            Tx,
+            C,
+            V,
+            SS,
+            SamplingBackend,
+            SamplingNetworkAdapter,
+            SamplingRng,
+            SamplingStorage,
+            SIZE,
+        >>()
         .connect()
         .await?;
     let (sender, receiver) = oneshot::channel();
