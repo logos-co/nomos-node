@@ -56,7 +56,7 @@ mod test {
 
     static GLOBAL_PARAMETERS: Lazy<UniversalParams<Bls12_381>> = Lazy::new(|| {
         let mut rng = rand::thread_rng();
-        KZG10::<Bls12_381, DensePolynomial<Fr>>::setup(64, true, &mut rng).unwrap()
+        KZG10::<Bls12_381, DensePolynomial<Fr>>::setup(32, true, &mut rng).unwrap()
     });
 
     #[test]
@@ -80,9 +80,6 @@ mod test {
         //recover x_0
         let mut hasher = Sha256::new();
         hasher.update(da_commitment.clone());
-        for i in 0..coefficients.clone().len() {
-            hasher.update(coefficients[i].clone());
-        }
         let x_0 = Fr::from_be_bytes_mod_order(&hasher.finalize());
 
         let y_0 = bls_polynomial.evaluate(&x_0); // EVAL OF x0
