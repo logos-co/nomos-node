@@ -9,6 +9,7 @@ use futures::future::BoxFuture;
 use futures::stream::{BoxStream, FuturesUnordered};
 use futures::{AsyncWriteExt, FutureExt, StreamExt};
 use kzgrs_backend::common::blob::DaBlob;
+use kzgrs_backend::common::ColumnIndex;
 use libp2p::core::Endpoint;
 use libp2p::swarm::dial_opts::DialOpts;
 use libp2p::swarm::{
@@ -158,6 +159,7 @@ impl Clone for SamplingError {
 #[derive(Debug, Clone)]
 pub struct BehaviourSampleReq {
     pub blob_id: BlobId,
+    pub column_idx: ColumnIndex,
 }
 
 impl TryFrom<SampleReq> for BehaviourSampleReq {
@@ -165,7 +167,12 @@ impl TryFrom<SampleReq> for BehaviourSampleReq {
 
     fn try_from(req: SampleReq) -> Result<Self, Self::Error> {
         let blob_id: BlobId = req.blob_id.try_into()?;
-        Ok(Self { blob_id })
+        let column_idx = req.column_idx as u16; // TODO: This doesn't handle the overflow.
+
+        Ok(Self {
+            blob_id,
+            column_idx,
+        })
     }
 }
 
@@ -386,6 +393,7 @@ where
         if let Some((subnetwork_id, blob_id)) = Self::next_request(&peer, to_sample) {
             let sample_request = SampleReq {
                 blob_id: blob_id.to_vec(),
+                column_idx: subnetwork_id,
             };
             outgoing_tasks
                 .push(Self::stream_sample(stream, sample_request, subnetwork_id, blob_id).boxed());
@@ -510,6 +518,7 @@ impl<Membership: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'sta
             let control = control.clone();
             let sample_request = SampleReq {
                 blob_id: blob_id.to_vec(),
+                column_idx: subnetwork_id,
             };
             let with_dial_task: OutgoingStreamHandlerFuture = async move {
                 let stream = Self::open_stream(peer, control).await?;
