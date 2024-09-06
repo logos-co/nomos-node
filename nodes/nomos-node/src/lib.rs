@@ -23,6 +23,7 @@ use nomos_da_network_service::backends::libp2p::validator::DaNetworkValidatorBac
 use nomos_da_network_service::NetworkService as DaNetworkService;
 use nomos_da_sampling::backend::kzgrs::KzgrsSamplingBackend;
 use nomos_da_sampling::network::adapters::libp2p::Libp2pAdapter as SamplingLibp2pAdapter;
+use nomos_da_sampling::storage::adapters::rocksdb::RocksAdapter as SamplingStorageAdapter;
 use nomos_da_sampling::DaSamplingService;
 use nomos_da_verifier::backend::kzgrs::KzgrsDaVerifier;
 use nomos_da_verifier::network::adapters::libp2p::Libp2pAdapter as VerifierNetworkAdapter;
@@ -66,6 +67,7 @@ pub type NomosApiService = ApiService<
         KzgrsSamplingBackend<ChaCha20Rng>,
         nomos_da_sampling::network::adapters::libp2p::Libp2pAdapter<NomosDaMembership>,
         ChaCha20Rng,
+        SamplingStorageAdapter<DaBlob, Wire>,
         MB16,
     >,
 >;
@@ -86,6 +88,7 @@ pub type Cryptarchia = cryptarchia_consensus::CryptarchiaConsensus<
     KzgrsSamplingBackend<ChaCha20Rng>,
     nomos_da_sampling::network::adapters::libp2p::Libp2pAdapter<NomosDaMembership>,
     ChaCha20Rng,
+    SamplingStorageAdapter<DaBlob, Wire>,
 >;
 
 pub type TxMempool = TxMempoolService<
@@ -99,6 +102,7 @@ pub type DaMempool = DaMempoolService<
     KzgrsSamplingBackend<ChaCha20Rng>,
     nomos_da_sampling::network::adapters::libp2p::Libp2pAdapter<NomosDaMembership>,
     ChaCha20Rng,
+    SamplingStorageAdapter<DaBlob, Wire>,
 >;
 
 pub type DaIndexer = DataIndexerService<
@@ -118,12 +122,14 @@ pub type DaIndexer = DataIndexerService<
     KzgrsSamplingBackend<ChaCha20Rng>,
     nomos_da_sampling::network::adapters::libp2p::Libp2pAdapter<NomosDaMembership>,
     ChaCha20Rng,
+    SamplingStorageAdapter<DaBlob, Wire>,
 >;
 
 pub type DaSampling = DaSamplingService<
     KzgrsSamplingBackend<ChaCha20Rng>,
     SamplingLibp2pAdapter<NomosDaMembership>,
     ChaCha20Rng,
+    SamplingStorageAdapter<DaBlob, Wire>,
 >;
 
 pub type DaVerifier = DaVerifierService<

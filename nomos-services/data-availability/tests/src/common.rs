@@ -5,6 +5,7 @@ use nomos_core::{da::blob::info::DispersedBlobInfo, header::HeaderId, tx::Transa
 use nomos_da_indexer::consensus::adapters::cryptarchia::CryptarchiaConsensusAdapter;
 use nomos_da_indexer::storage::adapters::rocksdb::RocksAdapter as IndexerStorageAdapter;
 use nomos_da_indexer::DataIndexerService;
+use nomos_da_sampling::storage::adapters::rocksdb::RocksAdapter as SamplingStorageAdapter;
 use nomos_da_sampling::DaSamplingService;
 use nomos_da_sampling::{
     backend::kzgrs::KzgrsSamplingBackend,
@@ -42,12 +43,14 @@ pub(crate) type Cryptarchia = cryptarchia_consensus::CryptarchiaConsensus<
     KzgrsSamplingBackend<ChaCha20Rng>,
     SamplingLibp2pAdapter<NomosDaMembership>,
     ChaCha20Rng,
+    SamplingStorageAdapter<DaBlob, Wire>,
 >;
 
 pub type DaSampling = DaSamplingService<
     KzgrsSamplingBackend<ChaCha20Rng>,
     SamplingLibp2pAdapter<NomosDaMembership>,
     ChaCha20Rng,
+    SamplingStorageAdapter<DaBlob, Wire>,
 >;
 
 pub(crate) type DaIndexer = DataIndexerService<
@@ -67,6 +70,7 @@ pub(crate) type DaIndexer = DataIndexerService<
     KzgrsSamplingBackend<ChaCha20Rng>,
     SamplingLibp2pAdapter<NomosDaMembership>,
     ChaCha20Rng,
+    SamplingStorageAdapter<DaBlob, Wire>,
 >;
 
 pub(crate) type TxMempool = TxMempoolService<
@@ -80,6 +84,7 @@ pub type DaMempool = DaMempoolService<
     KzgrsSamplingBackend<ChaCha20Rng>,
     nomos_da_sampling::network::adapters::libp2p::Libp2pAdapter<NomosDaMembership>,
     ChaCha20Rng,
+    SamplingStorageAdapter<DaBlob, Wire>,
 >;
 
 pub(crate) type DaVerifier = DaVerifierService<
