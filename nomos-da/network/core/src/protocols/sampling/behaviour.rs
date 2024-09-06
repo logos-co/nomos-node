@@ -65,6 +65,8 @@ pub enum SamplingError {
     },
     #[error("Malformed blob id: {blob_id:?}")]
     InvalidBlobId { peer_id: PeerId, blob_id: Vec<u8> },
+    #[error("Blob not found: {blob_id:?}")]
+    BlobNotFound { peer_id: PeerId, blob_id: Vec<u8> },
     #[error("Canceled response: {error}")]
     ResponseChannel { error: Canceled, peer_id: PeerId },
 }
@@ -79,6 +81,7 @@ impl SamplingError {
             SamplingError::RequestChannel { peer_id, .. } => peer_id,
             SamplingError::ResponseChannel { peer_id, .. } => peer_id,
             SamplingError::InvalidBlobId { peer_id, .. } => peer_id,
+            SamplingError::BlobNotFound { peer_id, .. } => peer_id,
         }
     }
 
@@ -144,6 +147,10 @@ impl Clone for SamplingError {
                 peer_id: *peer_id,
                 blob_id: blob_id.clone(),
             },
+            SamplingError::BlobNotFound { blob_id, peer_id } => SamplingError::BlobNotFound {
+                peer_id: *peer_id,
+                blob_id: blob_id.clone(),
+            },
         }
     }
 }
@@ -169,32 +176,28 @@ pub enum BehaviourSampleRes {
         subnetwork_id: SubnetworkId,
         blob: Box<DaBlob>,
     },
-    SamplingError {
-        error: SamplingError,
+    SampleNotFound {
+        blob_id: BlobId,
     },
 }
 
 impl From<BehaviourSampleRes> for SampleRes {
     fn from(res: BehaviourSampleRes) -> Self {
         match res {
-            // Handle the success case by consuming the fields
             BehaviourSampleRes::SamplingSuccess { blob, blob_id, .. } => SampleRes {
                 message_type: Some(sample_res::MessageType::Blob(common::Blob {
                     blob_id: blob_id.to_vec(),
-                    data: bincode::serialize(&blob).unwrap(),
+                    data: bincode::serialize(&blob)
+                        .expect("Blob from service should be serializable"),
                 })),
             },
-            // Handle the error case by consuming the error
-            BehaviourSampleRes::SamplingError { error } => {
-                let blob_id = error.blob_id().map(|id| id.to_vec()).unwrap_or(vec![0; 32]);
-                SampleRes {
-                    message_type: Some(sample_res::MessageType::Err(SampleErr {
-                        blob_id,
-                        err_type: SampleErrType::NotFound.into(),
-                        err_description: error.to_string(),
-                    })),
-                }
-            }
+            BehaviourSampleRes::SampleNotFound { blob_id } => SampleRes {
+                message_type: Some(sample_res::MessageType::Err(SampleErr {
+                    blob_id: blob_id.into(),
+                    err_type: SampleErrType::NotFound.into(),
+                    err_description: "Sample not found".to_string(),
+                })),
+            },
         }
     }
 }

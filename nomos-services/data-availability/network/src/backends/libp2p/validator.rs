@@ -54,7 +54,7 @@ pub enum SamplingEvent {
     /// Incoming sampling request
     SamplingRequest {
         blob_id: BlobId,
-        response_sender: mpsc::Sender<DaBlob>,
+        response_sender: mpsc::Sender<Option<DaBlob>>,
     },
     /// A failed sampling error
     SamplingError { error: SamplingError },
@@ -232,17 +232,24 @@ async fn handle_validator_events_stream(
                                 sampling_response_receiver.close()
                             }
 
-                            if let Some(blob) = sampling_response_receiver.recv().await {
-                                if response_sender
-                                    .send(BehaviourSampleRes::SamplingSuccess {
+                            if let Some(maybe_blob) = sampling_response_receiver.recv().await {
+                                let result = match maybe_blob {
+                                    Some(blob) => BehaviourSampleRes::SamplingSuccess {
                                         blob_id,
                                         subnetwork_id: blob.column_idx as u32,
                                         blob: Box::new(blob),
-                                    })
-                                    .is_err()
-                                {
+                                    },
+                                    None => BehaviourSampleRes::SampleNotFound { blob_id },
+                                };
+
+                                if response_sender.send(result).is_err() {
                                     error!("Error sending sampling success response");
                                 }
+                            } else if response_sender
+                                .send(BehaviourSampleRes::SampleNotFound { blob_id })
+                                .is_err()
+                            {
+                                error!("Error sending sampling success response");
                             }
                         }
                     }
