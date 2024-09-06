@@ -25,7 +25,7 @@ pub struct EquivalencePrivate {
 
 impl EquivalencePrivate {
     pub fn new(
-        coefficients: Vec<Fr>,
+        coefficients: Vec<[u8; 32]>,
     ) -> Self {
         Self {
             coefficients,
