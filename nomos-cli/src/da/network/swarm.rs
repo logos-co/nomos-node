@@ -134,19 +134,26 @@ where
 pub mod test {
     use crate::da::network::swarm::ExecutorSwarm;
     use crate::test_utils::AllNeighbours;
-    use futures::StreamExt;
+    use kzgrs_backend::common::blob::DaBlob;
+    use kzgrs_backend::common::Column;
     use libp2p::identity::Keypair;
     use libp2p::PeerId;
     use nomos_da_network_core::address_book::AddressBook;
     use nomos_da_network_core::swarm::validator::ValidatorSwarm;
     use nomos_libp2p::Multiaddr;
-    use overwatch_rs::overwatch::handle::OverwatchHandle;
+    use std::time::Duration;
+    use tokio::sync::mpsc::error::SendError;
     use tokio::sync::mpsc::unbounded_channel;
-    use tokio::sync::{broadcast, mpsc};
-    use tokio_stream::wrappers::UnboundedReceiverStream;
+    use tracing_subscriber::fmt::TestWriter;
+    use tracing_subscriber::EnvFilter;
 
     #[tokio::test]
     async fn test_dispersal_with_swarms() {
+        let _ = tracing_subscriber::fmt()
+            .with_env_filter(EnvFilter::from_default_env())
+            .compact()
+            .with_writer(TestWriter::default())
+            .try_init();
         let k1 = Keypair::generate_ed25519();
         let k2 = Keypair::generate_ed25519();
         let executor_peer = PeerId::from_public_key(&k1.public());
@@ -162,38 +169,53 @@ pub mod test {
 
         let addr: Multiaddr = "/ip4/127.0.0.1/udp/5063/quic-v1".parse().unwrap();
         let addr2 = addr.clone().with_p2p(validator_peer).unwrap();
+        let addr2_book = AddressBook::from_iter(vec![(executor_peer, addr2.clone())]);
 
-        let addr_book = AddressBook::from_iter(vec![(executor_peer, addr.clone())]);
+        let (dispersal_broadcast_sender, dispersal_broadcast_receiver) = unbounded_channel();
 
-        let (dispersal_events_sender, dispersal_events_receiver) = unbounded_channel();
+        let mut executor =
+            ExecutorSwarm::new(k1, neighbours.clone(), dispersal_broadcast_sender.clone());
+        let (mut validator, events_stream) =
+            ValidatorSwarm::new(k2, neighbours.clone(), addr2_book);
 
-        let mut executor_swarm =
-            ExecutorSwarm::new(k1, neighbours.clone(), dispersal_events_sender);
+        let join_validator = tokio::spawn(async move { validator.run().await });
+        tokio::time::sleep(Duration::from_secs(1)).await;
+        executor.dial(addr2).unwrap();
+        tokio::time::sleep(Duration::from_secs(1)).await;
 
-        let dispersal_request_sender = executor_swarm.blobs_sender();
+        let executor_open_stream_sender = executor.swarm.behaviour().open_stream_sender();
+        let executor_disperse_blob_sender = executor.swarm.behaviour().blobs_sender();
+        let (sender, mut receiver) = tokio::sync::oneshot::channel();
 
-        let (mut validator_swarm, events_streams) =
-            ValidatorSwarm::new(k2, neighbours.clone(), addr_book);
+        let blobs_sender = executor.blobs_sender();
 
-        executor_swarm
-            .dial(addr)
-            .expect("Should schedule the dials");
+        tokio::time::sleep(Duration::from_secs(1)).await;
 
-        let ov_handle = OverwatchHandle::new(tokio::runtime::Handle::current(), mpsc::channel(1).0);
+        println!("Sending blob...");
 
-        let task = ov_handle
-            .runtime()
-            .spawn(async move { executor_swarm.run().await });
-        let (dispersal_broadcast_sender, dispersal_broadcast_receiver) =
-            broadcast::channel(128usize);
-        let mut dispersal_events_receiver = UnboundedReceiverStream::new(dispersal_events_receiver);
+        if let Err(SendError((subnetwork_id, blob_id))) = blobs_sender.send((
+            0,
+            DaBlob {
+                column_idx: 0,
+                column: Column(vec![]),
+                column_commitment: Default::default(),
+                aggregated_column_commitment: Default::default(),
+                aggregated_column_proof: Default::default(),
+                rows_commitments: vec![],
+                rows_proofs: vec![],
+            },
+        )) {
+            println!(
+                "Error requesting sample for subnetwork id : {subnetwork_id}, blob_id: {blob_id:?}"
+            );
+        }
 
-        let replies_task = ov_handle.runtime().spawn(async move {
-            while let Some(dispersal_event) = dispersal_events_receiver.next().await {
-                if let Err(e) = dispersal_broadcast_sender.send(dispersal_event) {
-                    println!("Error in internal broadcast of dispersal event: {e:?}");
-                }
-            }
-        });
+        println!("Blob sent.");
+
+        let executor_task = tokio::spawn(async move { executor.run().await });
+
+        join_validator.await.unwrap();
+        sender.send(()).unwrap();
+        executor_task.await.unwrap();
     }
 }
