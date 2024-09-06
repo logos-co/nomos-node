@@ -9,6 +9,10 @@ use cryptarchia_ledger::LedgerState;
 use kzgrs_backend::common::blob::DaBlob;
 use kzgrs_backend::dispersal::BlobInfo;
 use kzgrs_backend::encoder::DaEncoderParams;
+use libp2p::identity::{
+    ed25519::{self, Keypair as Ed25519Keypair},
+    Keypair, PeerId,
+};
 use nomos_core::{da::blob::info::DispersedBlobInfo, header::HeaderId, tx::Transaction};
 pub use nomos_core::{
     da::blob::select::FillSize as FillSizeWithBlobs, tx::select::FillSize as FillSizeWithTx,
@@ -24,8 +28,8 @@ use nomos_da_network_service::backends::libp2p::validator::{
 use nomos_da_network_service::NetworkConfig as DaNetworkConfig;
 use nomos_da_network_service::NetworkService as DaNetworkService;
 use nomos_da_sampling::backend::kzgrs::KzgrsSamplingBackendSettings;
-use nomos_da_sampling::network::adapters::libp2p::DaNetworkSamplingSettings;
 use nomos_da_sampling::storage::adapters::rocksdb::RocksAdapter as SamplingStorageAdapter;
+use nomos_da_sampling::storage::adapters::rocksdb::RocksAdapterSettings as SamplingStorageSettings;
 use nomos_da_sampling::DaSamplingService;
 use nomos_da_sampling::DaSamplingServiceSettings;
 use nomos_da_sampling::{
@@ -39,7 +43,6 @@ use nomos_da_verifier::storage::adapters::rocksdb::RocksAdapter as VerifierStora
 use nomos_da_verifier::storage::adapters::rocksdb::RocksAdapterSettings as VerifierStorageSettings;
 use nomos_da_verifier::DaVerifierService;
 use nomos_da_verifier::DaVerifierServiceSettings;
-use nomos_libp2p::{ed25519, identity, PeerId};
 use nomos_libp2p::{Multiaddr, Swarm, SwarmConfig};
 use nomos_mempool::da::service::DaMempoolService;
 use nomos_mempool::network::adapters::libp2p::Libp2pAdapter as MempoolNetworkAdapter;
@@ -127,25 +130,6 @@ pub(crate) type DaVerifier = DaVerifierService<
 
 pub(crate) const MB16: usize = 1024 * 1024 * 16;
 
-pub fn node_address(config: &SwarmConfig) -> Multiaddr {
-    Swarm::multiaddr(std::net::Ipv4Addr::new(127, 0, 0, 1), config.port)
-}
-
-pub fn generate_hex_keys() -> (String, String) {
-    let mut rng = rand::thread_rng();
-    let sk_bytes: [u8; 32] = rng.gen();
-    let sk = blst::min_sig::SecretKey::key_gen(&sk_bytes, &[]).unwrap();
-
-    let pk = sk.sk_to_pk();
-    (hex::encode(sk.to_bytes()), hex::encode(pk.to_bytes()))
-}
-
-pub fn rand_data(elements_count: usize) -> Vec<u8> {
-    let mut buff = vec![0; elements_count * DaEncoderParams::MAX_BLS12_381_ENCODING_CHUNK_SIZE];
-    rand::thread_rng().fill_bytes(&mut buff);
-    buff
-}
-
 #[derive(Services)]
 pub struct TestNode {
     network: ServiceHandle<NetworkService<NetworkBackend>>,
@@ -159,6 +143,15 @@ pub struct TestNode {
     da_sampling: ServiceHandle<DaSampling>,
 }
 
+pub struct TestDaNetworkSettings {
+    pub peer_addresses: Vec<(PeerId, Multiaddr)>,
+    pub listening_address: Multiaddr,
+    pub num_subnets: u16,
+    pub num_samples: u16,
+    pub nodes_per_subnet: u16,
+    pub node_key: ed25519::SecretKey,
+}
+
 pub fn new_node(
     coin: &Coin,
     ledger_config: &cryptarchia_ledger::Config,
@@ -169,6 +162,7 @@ pub fn new_node(
     blobs_dir: &PathBuf,
     initial_peers: Vec<Multiaddr>,
     verifier_settings: KzgrsDaVerifierSettings,
+    da_network_settings: TestDaNetworkSettings,
 ) -> Overwatch {
     OverwatchRunner::<TestNode>::run(
         TestNodeServiceSettings {
@@ -180,14 +174,18 @@ pub fn new_node(
             },
             da_network: DaNetworkConfig {
                 backend: DaNetworkValidatorBackendSettings {
-                    node_key: ed25519::SecretKey::generate(),
+                    node_key: da_network_settings.node_key,
                     membership: FillFromNodeList::new(
-                        &[PeerId::from(identity::Keypair::generate_ed25519().public())],
-                        2,
-                        1,
+                        &da_network_settings
+                            .peer_addresses
+                            .iter()
+                            .map(|(peer_id, _)| peer_id.clone())
+                            .collect::<Vec<PeerId>>(),
+                        da_network_settings.num_subnets.into(),
+                        da_network_settings.nodes_per_subnet.into(),
                     ),
-                    addresses: Default::default(),
-                    listening_address: "/ip4/127.0.0.1/udp/0/quic-v1".parse::<Multiaddr>().unwrap(),
+                    addresses: da_network_settings.peer_addresses,
+                    listening_address: da_network_settings.listening_address,
                 },
             },
             cl_mempool: TxMempoolSettings {
@@ -234,15 +232,15 @@ pub fn new_node(
             da_sampling: DaSamplingServiceSettings {
                 // TODO: setup this properly!
                 sampling_settings: KzgrsSamplingBackendSettings {
-                    num_samples: 1,
-                    num_subnets: 32,
+                    num_samples: da_network_settings.num_samples,
+                    num_subnets: da_network_settings.num_subnets,
                     // Sampling service period can't be zero.
-                    old_blobs_check_interval: Duration::from_secs(1),
-                    blobs_validity_duration: Duration::from_secs(1),
+                    old_blobs_check_interval: Duration::from_secs(5),
+                    blobs_validity_duration: Duration::from_secs(5),
                 },
-                network_adapter_settings: DaNetworkSamplingSettings {
-                    num_samples: 1,
-                    subnet_size: 1,
+                network_adapter_settings: (),
+                storage_adapter_settings: SamplingStorageSettings {
+                    blob_storage_directory: blobs_dir.clone(),
                 },
             },
         },
@@ -274,4 +272,32 @@ pub fn new_client(db_path: PathBuf) -> Overwatch {
     )
     .map_err(|e| eprintln!("Error encountered: {}", e))
     .unwrap()
+}
+
+pub fn node_address(config: &SwarmConfig) -> Multiaddr {
+    Swarm::multiaddr(std::net::Ipv4Addr::new(127, 0, 0, 1), config.port)
+}
+
+pub fn generate_blst_hex_keys() -> (String, String) {
+    let mut rng = rand::thread_rng();
+    let sk_bytes: [u8; 32] = rng.gen();
+    let sk = blst::min_sig::SecretKey::key_gen(&sk_bytes, &[]).unwrap();
+
+    let pk = sk.sk_to_pk();
+    (hex::encode(sk.to_bytes()), hex::encode(pk.to_bytes()))
+}
+
+pub fn generate_ed25519_sk_peerid() -> (ed25519::SecretKey, PeerId) {
+    let ed25519_keypair = Ed25519Keypair::generate();
+    let secret_key = ed25519_keypair.secret().clone();
+    let libp2p_keypair: Keypair = ed25519_keypair.into();
+    let peer_id = PeerId::from_public_key(&libp2p_keypair.public());
+
+    (secret_key, peer_id)
+}
+
+pub fn rand_data(elements_count: usize) -> Vec<u8> {
+    let mut buff = vec![0; elements_count * DaEncoderParams::MAX_BLS12_381_ENCODING_CHUNK_SIZE];
+    rand::thread_rng().fill_bytes(&mut buff);
+    buff
 }

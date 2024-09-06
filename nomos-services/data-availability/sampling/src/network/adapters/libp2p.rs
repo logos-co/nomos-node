@@ -17,14 +17,7 @@ use nomos_da_network_service::{DaNetworkMsg, NetworkService};
 use overwatch_rs::services::relay::OutboundRelay;
 use overwatch_rs::services::ServiceData;
 use overwatch_rs::DynError;
-use serde::{Deserialize, Serialize};
 use subnetworks_assignations::MembershipHandler;
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DaNetworkSamplingSettings {
-    pub num_samples: u16,
-    pub subnet_size: SubnetworkId,
-}
 
 pub struct Libp2pAdapter<Membership>
 where
@@ -51,7 +44,7 @@ where
         + 'static,
 {
     type Backend = DaNetworkValidatorBackend<Membership>;
-    type Settings = DaNetworkSamplingSettings;
+    type Settings = ();
 
     async fn new(
         network_relay: OutboundRelay<<NetworkService<Self::Backend> as ServiceData>::Message>,

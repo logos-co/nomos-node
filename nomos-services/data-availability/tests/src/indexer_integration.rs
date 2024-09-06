@@ -1,6 +1,7 @@
 // std
 use std::{
     hash::{DefaultHasher, Hash},
+    str::FromStr,
     sync::{
         atomic::{AtomicBool, Ordering::SeqCst},
         Arc,
@@ -17,7 +18,7 @@ use nomos_core::da::blob::metadata::Metadata as _;
 use nomos_da_storage::fs::write_blob;
 use nomos_da_storage::rocksdb::DA_VERIFIED_KEY_PREFIX;
 use nomos_da_verifier::backend::kzgrs::KzgrsDaVerifierSettings;
-use nomos_libp2p::SwarmConfig;
+use nomos_libp2p::{Multiaddr, SwarmConfig};
 use nomos_node::Wire;
 use nomos_storage::{backends::rocksdb::RocksBackend, StorageService};
 use rand::{thread_rng, Rng};
@@ -83,8 +84,20 @@ fn test_indexer() {
 
     let blobs_dir = TempDir::new().unwrap().path().to_path_buf();
 
-    let (node1_sk, node1_pk) = generate_hex_keys();
-    let (_node2_sk, node2_pk) = generate_hex_keys();
+    let (node1_sk, node1_pk) = generate_blst_hex_keys();
+    let (node2_sk, node2_pk) = generate_blst_hex_keys();
+
+    let (peer_sk_1, peer_id_1) = generate_ed25519_sk_peerid();
+    let (peer_sk_2, peer_id_2) = generate_ed25519_sk_peerid();
+
+    let addr_1 = Multiaddr::from_str("/ip4/127.0.0.1/udp/8780/quic-v1").unwrap();
+    let addr_2 = Multiaddr::from_str("/ip4/127.0.0.1/udp/8781/quic-v1").unwrap();
+
+    let peer_addresses = vec![(peer_id_1, addr_1.clone()), (peer_id_2, addr_2.clone())];
+
+    let num_samples = 1;
+    let num_subnets = 2;
+    let nodes_per_subnet = 1;
 
     let node1 = new_node(
         &notes[0],
@@ -99,6 +112,14 @@ fn test_indexer() {
             sk: node1_sk.clone(),
             nodes_public_keys: vec![node1_pk.clone(), node2_pk.clone()],
         },
+        TestDaNetworkSettings {
+            peer_addresses: peer_addresses.clone(),
+            listening_address: addr_1,
+            num_subnets,
+            num_samples,
+            nodes_per_subnet,
+            node_key: peer_sk_1,
+        },
     );
 
     let _node2 = new_node(
@@ -111,8 +132,16 @@ fn test_indexer() {
         &blobs_dir,
         vec![node_address(&swarm_config1)],
         KzgrsDaVerifierSettings {
-            sk: node1_sk.clone(),
+            sk: node2_sk.clone(),
             nodes_public_keys: vec![node1_pk.clone(), node2_pk.clone()],
+        },
+        TestDaNetworkSettings {
+            peer_addresses,
+            listening_address: addr_2,
+            num_subnets,
+            num_samples,
+            nodes_per_subnet,
+            node_key: peer_sk_2,
         },
     );
 
