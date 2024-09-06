@@ -17,8 +17,10 @@ use libp2p::swarm::{
 };
 use libp2p::{Multiaddr, PeerId, Stream};
 use libp2p_stream::{Control, IncomingStreams, OpenStreamError};
+use nomos_core::da::BlobId;
+use nomos_da_messages::sampling::sample_err::SampleErrType;
 use nomos_da_messages::sampling::{sample_res, SampleErr, SampleReq, SampleRes};
-use nomos_da_messages::{pack_message, unpack_from_reader};
+use nomos_da_messages::{common, pack_message, unpack_from_reader};
 use subnetworks_assignations::MembershipHandler;
 use thiserror::Error;
 use tokio::sync::mpsc;
@@ -57,7 +59,14 @@ pub enum SamplingError {
         error: bincode::Error,
     },
     #[error("Error sending request: {request:?}")]
-    RequestChannel { request: SampleReq, peer_id: PeerId },
+    RequestChannel {
+        request: BehaviourSampleReq,
+        peer_id: PeerId,
+    },
+    #[error("Malformed blob id: {blob_id:?}")]
+    InvalidBlobId { peer_id: PeerId, blob_id: Vec<u8> },
+    #[error("Blob not found: {blob_id:?}")]
+    BlobNotFound { peer_id: PeerId, blob_id: Vec<u8> },
     #[error("Canceled response: {error}")]
     ResponseChannel { error: Canceled, peer_id: PeerId },
 }
@@ -71,6 +80,8 @@ impl SamplingError {
             SamplingError::Deserialize { peer_id, .. } => peer_id,
             SamplingError::RequestChannel { peer_id, .. } => peer_id,
             SamplingError::ResponseChannel { peer_id, .. } => peer_id,
+            SamplingError::InvalidBlobId { peer_id, .. } => peer_id,
+            SamplingError::BlobNotFound { peer_id, .. } => peer_id,
         }
     }
 
@@ -132,13 +143,64 @@ impl Clone for SamplingError {
                 peer_id: *peer_id,
                 error: *error,
             },
+            SamplingError::InvalidBlobId { blob_id, peer_id } => SamplingError::InvalidBlobId {
+                peer_id: *peer_id,
+                blob_id: blob_id.clone(),
+            },
+            SamplingError::BlobNotFound { blob_id, peer_id } => SamplingError::BlobNotFound {
+                peer_id: *peer_id,
+                blob_id: blob_id.clone(),
+            },
         }
     }
 }
 
-/// Inner type representation of a Blob ID
-// TODO: Use a proper type that is common to the codebase
-type BlobId = [u8; 32];
+#[derive(Debug, Clone)]
+pub struct BehaviourSampleReq {
+    pub blob_id: BlobId,
+}
+
+impl TryFrom<SampleReq> for BehaviourSampleReq {
+    type Error = Vec<u8>;
+
+    fn try_from(req: SampleReq) -> Result<Self, Self::Error> {
+        let blob_id: BlobId = req.blob_id.try_into()?;
+        Ok(Self { blob_id })
+    }
+}
+
+#[derive(Debug)]
+pub enum BehaviourSampleRes {
+    SamplingSuccess {
+        blob_id: BlobId,
+        subnetwork_id: SubnetworkId,
+        blob: Box<DaBlob>,
+    },
+    SampleNotFound {
+        blob_id: BlobId,
+    },
+}
+
+impl From<BehaviourSampleRes> for SampleRes {
+    fn from(res: BehaviourSampleRes) -> Self {
+        match res {
+            BehaviourSampleRes::SamplingSuccess { blob, blob_id, .. } => SampleRes {
+                message_type: Some(sample_res::MessageType::Blob(common::Blob {
+                    blob_id: blob_id.to_vec(),
+                    data: bincode::serialize(&blob)
+                        .expect("Blob from service should be serializable"),
+                })),
+            },
+            BehaviourSampleRes::SampleNotFound { blob_id } => SampleRes {
+                message_type: Some(sample_res::MessageType::Err(SampleErr {
+                    blob_id: blob_id.into(),
+                    err_type: SampleErrType::NotFound.into(),
+                    err_description: "Sample not found".to_string(),
+                })),
+            },
+        }
+    }
+}
 
 #[derive(Debug)]
 pub enum SamplingEvent {
@@ -149,8 +211,8 @@ pub enum SamplingEvent {
         blob: Box<DaBlob>,
     },
     IncomingSample {
-        request_receiver: Receiver<SampleReq>,
-        response_sender: Sender<SampleRes>,
+        request_receiver: Receiver<BehaviourSampleReq>,
+        response_sender: Sender<BehaviourSampleRes>,
     },
     SamplingError {
         error: SamplingError,
@@ -165,8 +227,8 @@ struct SampleStream {
 
 /// Auxiliary struct that binds where to send a request and the pair channel to listen for a response
 struct ResponseChannel {
-    request_sender: Sender<SampleReq>,
-    response_receiver: Receiver<SampleRes>,
+    request_sender: Sender<BehaviourSampleReq>,
+    response_receiver: Receiver<BehaviourSampleRes>,
 }
 
 type StreamHandlerFutureSuccess = (BlobId, SubnetworkId, SampleRes, SampleStream);
@@ -350,6 +412,12 @@ where
                 peer_id: stream.peer_id,
                 error,
             })?;
+        let request = BehaviourSampleReq::try_from(request).map_err(|blob_id| {
+            SamplingError::InvalidBlobId {
+                peer_id: stream.peer_id,
+                blob_id,
+            }
+        })?;
         channel
             .request_sender
             .send(request)
@@ -357,14 +425,14 @@ where
                 request,
                 peer_id: stream.peer_id,
             })?;
-        let response =
-            channel
-                .response_receiver
-                .await
-                .map_err(|error| SamplingError::ResponseChannel {
-                    error,
-                    peer_id: stream.peer_id,
-                })?;
+        let response: SampleRes = channel
+            .response_receiver
+            .await
+            .map_err(|error| SamplingError::ResponseChannel {
+                error,
+                peer_id: stream.peer_id,
+            })?
+            .into();
         let bytes = pack_message(&response).map_err(|error| SamplingError::Io {
             peer_id: stream.peer_id,
             error,
@@ -394,7 +462,7 @@ where
     fn schedule_incoming_stream_task(
         incoming_tasks: &mut FuturesUnordered<IncomingStreamHandlerFuture>,
         sample_stream: SampleStream,
-    ) -> (Receiver<SampleReq>, Sender<SampleRes>) {
+    ) -> (Receiver<BehaviourSampleReq>, Sender<BehaviourSampleRes>) {
         let (request_sender, request_receiver) = oneshot::channel();
         let (response_sender, response_receiver) = oneshot::channel();
         let channel = ResponseChannel {

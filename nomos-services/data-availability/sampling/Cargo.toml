@@ -13,6 +13,7 @@ libp2p-identity = { version = "0.2" }
 nomos-core = { path = "../../../nomos-core" }
 nomos-da-network-core = { path = "../../../nomos-da/network/core" }
 nomos-da-network-service = { path = "../../../nomos-services/data-availability/network" }
+nomos-da-storage = { path = "../../../nomos-da/storage" }
 nomos-storage = { path = "../../../nomos-services/storage" }
 overwatch-rs = { git = "https://github.com/logos-co/Overwatch", rev = "2f70806" }
 overwatch-derive = { git = "https://github.com/logos-co/Overwatch", rev = "ac28d01" }
@@ -28,3 +29,4 @@ rand_chacha = "0.3.1"
 [features]
 default = ["libp2p"]
 libp2p = []
+rocksdb-backend = ["nomos-storage/rocksdb-backend"]

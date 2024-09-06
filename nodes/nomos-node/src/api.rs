@@ -64,6 +64,7 @@ pub struct AxumBackend<
     SamplingBackend,
     SamplingNetworkAdapter,
     SamplingRng,
+    SamplingStorage,
     const SIZE: usize,
 > {
     settings: AxumBackendSettings,
@@ -78,6 +79,7 @@ pub struct AxumBackend<
     _sampling_backend: core::marker::PhantomData<SamplingBackend>,
     _sampling_network_adapter: core::marker::PhantomData<SamplingNetworkAdapter>,
     _sampling_rng: core::marker::PhantomData<SamplingRng>,
+    _sampling_storage: core::marker::PhantomData<SamplingStorage>,
 }
 
 #[derive(OpenApi)]
@@ -106,6 +108,7 @@ impl<
         SamplingBackend,
         SamplingNetworkAdapter,
         SamplingRng,
+        SamplingStorage,
         const SIZE: usize,
     > Backend
     for AxumBackend<
@@ -120,6 +123,7 @@ impl<
         SamplingBackend,
         SamplingNetworkAdapter,
         SamplingRng,
+        SamplingStorage,
         SIZE,
     >
 where
@@ -182,6 +186,7 @@ where
     SamplingBackend::Blob: Debug + 'static,
     SamplingBackend::BlobId: Debug + 'static,
     SamplingNetworkAdapter: nomos_da_sampling::network::NetworkAdapter + Send + 'static,
+    SamplingStorage: nomos_da_sampling::storage::DaStorageAdapter + Send + 'static,
 {
     type Error = hyper::Error;
     type Settings = AxumBackendSettings;
@@ -203,6 +208,7 @@ where
             _sampling_backend: core::marker::PhantomData,
             _sampling_network_adapter: core::marker::PhantomData,
             _sampling_rng: core::marker::PhantomData,
+            _sampling_storage: core::marker::PhantomData,
         })
     }
 
@@ -240,6 +246,7 @@ where
                         SamplingBackend,
                         SamplingNetworkAdapter,
                         SamplingRng,
+                        SamplingStorage,
                         SIZE,
                     >,
                 ),
@@ -253,6 +260,7 @@ where
                         SamplingBackend,
                         SamplingNetworkAdapter,
                         SamplingRng,
+                        SamplingStorage,
                         SIZE,
                     >,
                 ),
@@ -269,6 +277,7 @@ where
                         SamplingBackend,
                         SamplingNetworkAdapter,
                         SamplingRng,
+                        SamplingStorage,
                         SIZE,
                     >,
                 ),
@@ -279,7 +288,13 @@ where
             .route(
                 "/mempool/add/blobinfo",
                 routing::post(
-                    add_blob_info::<V, SamplingBackend, SamplingNetworkAdapter, SamplingRng>,
+                    add_blob_info::<
+                        V,
+                        SamplingBackend,
+                        SamplingNetworkAdapter,
+                        SamplingRng,
+                        SamplingStorage,
+                    >,
                 ),
             )
             .route("/metrics", routing::get(get_metrics))
@@ -370,6 +385,7 @@ async fn cryptarchia_info<
     SamplingBackend,
     SamplingNetworkAdapter,
     SamplingRng,
+    SamplingStorage,
     const SIZE: usize,
 >(
     State(handle): State<OverwatchHandle>,
@@ -393,6 +409,7 @@ where
     SamplingBackend::Blob: Debug + 'static,
     SamplingBackend::BlobId: Debug + 'static,
     SamplingNetworkAdapter: nomos_da_sampling::network::NetworkAdapter,
+    SamplingStorage: nomos_da_sampling::storage::DaStorageAdapter,
 {
     make_request_and_return_response!(consensus::cryptarchia_info::<
         Tx,
@@ -400,6 +417,7 @@ where
         SamplingBackend,
         SamplingNetworkAdapter,
         SamplingRng,
+        SamplingStorage,
         SIZE,
     >(&handle))
 }
@@ -418,6 +436,7 @@ async fn cryptarchia_headers<
     SamplingBackend,
     SamplingNetworkAdapter,
     SamplingRng,
+    SamplingStorage,
     const SIZE: usize,
 >(
     State(store): State<OverwatchHandle>,
@@ -442,6 +461,7 @@ where
     SamplingBackend::Blob: Debug + 'static,
     SamplingBackend::BlobId: Debug + 'static,
     SamplingNetworkAdapter: nomos_da_sampling::network::NetworkAdapter,
+    SamplingStorage: nomos_da_sampling::storage::DaStorageAdapter,
 {
     let QueryParams { from, to } = query;
     make_request_and_return_response!(consensus::cryptarchia_headers::<
@@ -450,6 +470,7 @@ where
         SamplingBackend,
         SamplingNetworkAdapter,
         SamplingRng,
+        SamplingStorage,
         SIZE,
     >(&store, from, to))
 }
@@ -511,6 +532,7 @@ async fn get_range<
     SamplingBackend,
     SamplingNetworkAdapter,
     SamplingRng,
+    SamplingStorage,
     const SIZE: usize,
 >(
     State(handle): State<OverwatchHandle>,
@@ -561,6 +583,7 @@ where
     SamplingBackend::Blob: Debug + 'static,
     SamplingBackend::BlobId: Debug + 'static,
     SamplingNetworkAdapter: nomos_da_sampling::network::NetworkAdapter,
+    SamplingStorage: nomos_da_sampling::storage::DaStorageAdapter,
 {
     make_request_and_return_response!(da::get_range::<
         Tx,
@@ -570,6 +593,7 @@ where
         SamplingBackend,
         SamplingNetworkAdapter,
         SamplingRng,
+        SamplingStorage,
         SIZE,
     >(&handle, app_id, range))
 }
@@ -631,7 +655,7 @@ where
         (status = 500, description = "Internal server error", body = String),
     )
 )]
-async fn add_blob_info<B, SamplingBackend, SamplingAdapter, SamplingRng>(
+async fn add_blob_info<B, SamplingBackend, SamplingAdapter, SamplingRng, SamplingStorage>(
     State(handle): State<OverwatchHandle>,
     Json(blob_info): Json<B>,
 ) -> Response
@@ -654,6 +678,7 @@ where
     SamplingBackend::BlobId: Debug + 'static,
     SamplingAdapter: nomos_da_sampling::network::NetworkAdapter + Send + 'static,
     SamplingRng: SeedableRng + RngCore + Send + 'static,
+    SamplingStorage: nomos_da_sampling::storage::DaStorageAdapter,
 {
     make_request_and_return_response!(mempool::add_blob_info::<
         NetworkBackend,
@@ -663,6 +688,7 @@ where
         SamplingBackend,
         SamplingAdapter,
         SamplingRng,
+        SamplingStorage,
     >(&handle, blob_info, DispersedBlobInfo::blob_id))
 }
 

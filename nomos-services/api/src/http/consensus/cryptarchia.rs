@@ -31,6 +31,7 @@ pub type Cryptarchia<
     SamplingBackend,
     SamplingNetworkAdapter,
     SamplingRng,
+    SamplingStorage,
     const SIZE: usize,
 > = CryptarchiaConsensus<
     ConsensusNetworkAdapter<Tx, BlobInfo>,
@@ -44,6 +45,7 @@ pub type Cryptarchia<
     SamplingBackend,
     SamplingNetworkAdapter,
     SamplingRng,
+    SamplingStorage,
 >;
 
 pub async fn cryptarchia_info<
@@ -52,6 +54,7 @@ pub async fn cryptarchia_info<
     SamplingBackend,
     SamplingNetworkAdapter,
     SamplingRng,
+    SamplingStorage,
     const SIZE: usize,
 >(
     handle: &OverwatchHandle,
@@ -75,9 +78,18 @@ where
     SamplingBackend::Blob: Debug + 'static,
     SamplingBackend::BlobId: Debug + 'static,
     SamplingNetworkAdapter: nomos_da_sampling::network::NetworkAdapter,
+    SamplingStorage: nomos_da_sampling::storage::DaStorageAdapter,
 {
     let relay = handle
-        .relay::<Cryptarchia<Tx, SS, SamplingBackend, SamplingNetworkAdapter, SamplingRng, SIZE>>()
+        .relay::<Cryptarchia<
+            Tx,
+            SS,
+            SamplingBackend,
+            SamplingNetworkAdapter,
+            SamplingRng,
+            SamplingStorage,
+            SIZE,
+        >>()
         .connect()
         .await?;
     let (sender, receiver) = oneshot::channel();
@@ -95,6 +107,7 @@ pub async fn cryptarchia_headers<
     SamplingBackend,
     SamplingNetworkAdapter,
     SamplingRng,
+    SamplingStorage,
     const SIZE: usize,
 >(
     handle: &OverwatchHandle,
@@ -120,9 +133,18 @@ where
     SamplingBackend::Blob: Debug + 'static,
     SamplingBackend::BlobId: Debug + 'static,
     SamplingNetworkAdapter: nomos_da_sampling::network::NetworkAdapter,
+    SamplingStorage: nomos_da_sampling::storage::DaStorageAdapter,
 {
     let relay = handle
-        .relay::<Cryptarchia<Tx, SS, SamplingBackend, SamplingNetworkAdapter, SamplingRng, SIZE>>()
+        .relay::<Cryptarchia<
+            Tx,
+            SS,
+            SamplingBackend,
+            SamplingNetworkAdapter,
+            SamplingRng,
+            SamplingStorage,
+            SIZE,
+        >>()
         .connect()
         .await?;
     let (sender, receiver) = oneshot::channel();

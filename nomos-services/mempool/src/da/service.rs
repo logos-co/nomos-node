@@ -12,6 +12,7 @@ use std::fmt::Debug;
 // #[cfg(feature = "metrics")]
 // use super::metrics::Metrics;
 use futures::StreamExt;
+use nomos_da_sampling::storage::DaStorageAdapter;
 use rand::{RngCore, SeedableRng};
 // internal
 use crate::backend::MemPool;
@@ -33,7 +34,7 @@ use overwatch_rs::services::{
 };
 use tracing::error;
 
-pub struct DaMempoolService<N, P, DB, DN, R>
+pub struct DaMempoolService<N, P, DB, DN, R, SamplingStorage>
 where
     N: NetworkAdapter<Key = P::Key>,
     N::Payload: DispersedBlobInfo + Into<P::Item> + Debug + 'static,
@@ -47,18 +48,19 @@ where
     DB::BlobId: Debug + 'static,
     DB::Settings: Clone,
     DN: DaSamplingNetworkAdapter,
+    SamplingStorage: DaStorageAdapter,
     R: SeedableRng + RngCore,
 {
     service_state: ServiceStateHandle<Self>,
     network_relay: Relay<NetworkService<N::Backend>>,
-    sampling_relay: Relay<DaSamplingService<DB, DN, R>>,
+    sampling_relay: Relay<DaSamplingService<DB, DN, R, SamplingStorage>>,
     pool: P,
     // TODO: Add again after metrics refactor
     // #[cfg(feature = "metrics")]
     // metrics: Option<Metrics>,
 }
 
-impl<N, P, DB, DN, R> ServiceData for DaMempoolService<N, P, DB, DN, R>
+impl<N, P, DB, DN, R, DaStorage> ServiceData for DaMempoolService<N, P, DB, DN, R, DaStorage>
 where
     N: NetworkAdapter<Key = P::Key>,
     N::Payload: DispersedBlobInfo + Debug + Into<P::Item> + 'static,
@@ -72,6 +74,7 @@ where
     DB::BlobId: Debug + 'static,
     DB::Settings: Clone,
     DN: DaSamplingNetworkAdapter,
+    DaStorage: DaStorageAdapter,
     R: SeedableRng + RngCore,
 {
     const SERVICE_ID: ServiceId = "mempool-da";
@@ -87,7 +90,7 @@ where
 }
 
 #[async_trait::async_trait]
-impl<N, P, DB, DN, R> ServiceCore for DaMempoolService<N, P, DB, DN, R>
+impl<N, P, DB, DN, R, DaStorage> ServiceCore for DaMempoolService<N, P, DB, DN, R, DaStorage>
 where
     P: MemPool + Send + 'static,
     P::Settings: Clone + Send + Sync + 'static,
@@ -102,6 +105,7 @@ where
     DB::BlobId: Debug + 'static,
     DB::Settings: Clone,
     DN: DaSamplingNetworkAdapter,
+    DaStorage: DaStorageAdapter,
     R: SeedableRng + RngCore,
 {
     fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, overwatch_rs::DynError> {
@@ -178,7 +182,7 @@ where
     }
 }
 
-impl<N, P, DB, DN, R> DaMempoolService<N, P, DB, DN, R>
+impl<N, P, DB, DN, R, DaStorage> DaMempoolService<N, P, DB, DN, R, DaStorage>
 where
     P: MemPool + Send + 'static,
     P::Settings: Clone + Send + Sync + 'static,
@@ -193,6 +197,7 @@ where
     DB::BlobId: Debug + 'static,
     DB::Settings: Clone,
     DN: DaSamplingNetworkAdapter,
+    DaStorage: DaStorageAdapter,
     R: SeedableRng + RngCore,
 {
     async fn should_stop_service(message: LifecycleMessage) -> bool {
