@@ -1,12 +1,15 @@
 use crate::backends::NetworkBackend;
 use futures::{Stream, StreamExt};
 use kzgrs_backend::common::blob::DaBlob;
+use kzgrs_backend::common::ColumnIndex;
 use libp2p::identity::ed25519;
 use libp2p::{Multiaddr, PeerId};
 use log::error;
 use nomos_core::da::BlobId;
 use nomos_da_network_core::protocols::sampling;
-use nomos_da_network_core::protocols::sampling::behaviour::SamplingError;
+use nomos_da_network_core::protocols::sampling::behaviour::{
+    BehaviourSampleReq, BehaviourSampleRes, SamplingError,
+};
 use nomos_da_network_core::swarm::validator::{ValidatorEventsStream, ValidatorSwarm};
 use nomos_da_network_core::SubnetworkId;
 use nomos_libp2p::secret_key_serde;
@@ -17,9 +20,9 @@ use std::fmt::Debug;
 use std::marker::PhantomData;
 use std::pin::Pin;
 use subnetworks_assignations::MembershipHandler;
-use tokio::sync::broadcast;
 use tokio::sync::mpsc::error::SendError;
 use tokio::sync::mpsc::UnboundedSender;
+use tokio::sync::{broadcast, mpsc};
 use tokio::task::JoinHandle;
 use tokio_stream::wrappers::BroadcastStream;
 
@@ -49,6 +52,12 @@ pub enum DaNetworkEventKind {
 pub enum SamplingEvent {
     /// A success sampling
     SamplingSuccess { blob_id: BlobId, blob: Box<DaBlob> },
+    /// Incoming sampling request
+    SamplingRequest {
+        blob_id: BlobId,
+        column_idx: ColumnIndex,
+        response_sender: mpsc::Sender<Option<DaBlob>>,
+    },
     /// A failed sampling error
     SamplingError { error: SamplingError },
 }
@@ -214,8 +223,37 @@ async fn handle_validator_events_stream(
                             error!("Error in internal broadcast of sampling success: {e:?}");
                         }
                     }
-                    sampling::behaviour::SamplingEvent::IncomingSample{ .. } => {
-                        unimplemented!("Handle request/response from Sampling service");
+                    sampling::behaviour::SamplingEvent::IncomingSample{request_receiver, response_sender} => {
+                        if let Ok(BehaviourSampleReq { blob_id, column_idx }) = request_receiver.await {
+                            let (sampling_response_sender, mut sampling_response_receiver) = mpsc::channel(1);
+
+                            if let Err(e) = sampling_broadcast_sender
+                                .send(SamplingEvent::SamplingRequest { blob_id, column_idx, response_sender: sampling_response_sender })
+                            {
+                                error!("Error in internal broadcast of sampling request: {e:?}");
+                                sampling_response_receiver.close()
+                            }
+
+                            if let Some(maybe_blob) = sampling_response_receiver.recv().await {
+                                let result = match maybe_blob {
+                                    Some(blob) => BehaviourSampleRes::SamplingSuccess {
+                                        blob_id,
+                                        subnetwork_id: blob.column_idx as u32,
+                                        blob: Box::new(blob),
+                                    },
+                                    None => BehaviourSampleRes::SampleNotFound { blob_id },
+                                };
+
+                                if response_sender.send(result).is_err() {
+                                    error!("Error sending sampling success response");
+                                }
+                            } else if response_sender
+                                .send(BehaviourSampleRes::SampleNotFound { blob_id })
+                                .is_err()
+                            {
+                                error!("Error sending sampling success response");
+                            }
+                        }
                     }
                     sampling::behaviour::SamplingEvent::SamplingError{ error  } => {
                         if let Err(e) = sampling_broadcast_sender.send(SamplingEvent::SamplingError {error}) {

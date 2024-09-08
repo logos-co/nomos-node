@@ -10,7 +10,7 @@ use tokio::{
 
 // TODO: Rocksdb has a feature called BlobDB that handles largo blob storing, but further
 // investigation needs to be done to see if rust wrapper supports it.
-pub async fn load_blob(base_dir: PathBuf, blob_id: &[u8]) -> Vec<Bytes> {
+pub async fn load_blobs(base_dir: PathBuf, blob_id: &[u8]) -> Vec<Bytes> {
     let blob_id = hex::encode(blob_id);
 
     let mut path = base_dir;
@@ -45,6 +45,26 @@ pub async fn load_blob(base_dir: PathBuf, blob_id: &[u8]) -> Vec<Bytes> {
     }
 
     blobs
+}
+
+pub async fn load_blob(
+    base_dir: PathBuf,
+    blob_id: &[u8],
+    column_idx: &[u8],
+) -> Result<Bytes, std::io::Error> {
+    let blob_id = hex::encode(blob_id);
+    let column_file = hex::encode(column_idx);
+
+    let mut path = base_dir;
+    path.push(blob_id);
+    path.push(column_file);
+
+    let mut file = tokio::fs::File::open(path).await?;
+
+    let mut data = Vec::new();
+    file.read_to_end(&mut data).await?;
+
+    Ok(Bytes::from(data))
 }
 
 pub async fn write_blob(

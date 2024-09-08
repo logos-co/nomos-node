@@ -3,7 +3,9 @@ pub mod behaviour;
 #[cfg(test)]
 mod test {
     use crate::address_book::AddressBook;
-    use crate::protocols::sampling::behaviour::{SamplingBehaviour, SamplingEvent};
+    use crate::protocols::sampling::behaviour::{
+        BehaviourSampleRes, SamplingBehaviour, SamplingEvent,
+    };
     use crate::test_utils::AllNeighbours;
     use crate::SubnetworkId;
     use futures::StreamExt;
@@ -13,8 +15,6 @@ mod test {
     use libp2p::swarm::SwarmEvent;
     use libp2p::{quic, Multiaddr, PeerId, Swarm, SwarmBuilder};
     use log::debug;
-    use nomos_da_messages::common::Blob;
-    use nomos_da_messages::sampling::SampleRes;
     use std::time::Duration;
     use subnetworks_assignations::MembershipHandler;
     use tracing_subscriber::fmt::TestWriter;
@@ -103,24 +103,18 @@ mod test {
                         // spawn here because otherwise we block polling
                         tokio::spawn(request_receiver);
                         response_sender
-                            .send(SampleRes {
-                                message_type: Some(
-                                    nomos_da_messages::sampling::sample_res::MessageType::Blob(
-                                        Blob {
-                                            blob_id: vec![],
-                                            data: bincode::serialize(&DaBlob {
-                                                column_idx: 0,
-                                                column: Column(vec![]),
-                                                column_commitment: Default::default(),
-                                                aggregated_column_commitment: Default::default(),
-                                                aggregated_column_proof: Default::default(),
-                                                rows_commitments: vec![],
-                                                rows_proofs: vec![],
-                                            })
-                                            .unwrap(),
-                                        },
-                                    ),
-                                ),
+                            .send(BehaviourSampleRes::SamplingSuccess {
+                                blob_id: Default::default(),
+                                subnetwork_id: Default::default(),
+                                blob: Box::new(DaBlob {
+                                    column: Column(vec![]),
+                                    column_idx: 0,
+                                    column_commitment: Default::default(),
+                                    aggregated_column_commitment: Default::default(),
+                                    aggregated_column_proof: Default::default(),
+                                    rows_commitments: vec![],
+                                    rows_proofs: vec![],
+                                }),
                             })
                             .unwrap()
                     }

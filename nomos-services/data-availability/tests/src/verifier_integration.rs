@@ -21,6 +21,7 @@ use nomos_da_network_service::NetworkConfig as DaNetworkConfig;
 use nomos_da_network_service::NetworkService as DaNetworkService;
 use nomos_da_sampling::backend::kzgrs::KzgrsSamplingBackendSettings;
 use nomos_da_sampling::network::adapters::libp2p::DaNetworkSamplingSettings;
+use nomos_da_sampling::storage::adapters::rocksdb::RocksAdapterSettings as SamplingStorageSettings;
 use nomos_da_sampling::DaSamplingServiceSettings;
 use nomos_da_verifier::backend::kzgrs::KzgrsDaVerifierSettings;
 use nomos_da_verifier::storage::adapters::rocksdb::RocksAdapterSettings as VerifierStorageSettings;
@@ -163,6 +164,9 @@ fn new_node(
                 network_adapter_settings: DaNetworkSamplingSettings {
                     num_samples: 0,
                     subnet_size: 0,
+                },
+                storage_adapter_settings: SamplingStorageSettings {
+                    blob_storage_directory: blobs_dir.clone(),
                 },
             },
         },
