@@ -22,6 +22,7 @@ use nomos_da_indexer::storage::adapters::rocksdb::RocksAdapterSettings as Indexe
 use nomos_da_indexer::IndexerSettings;
 use nomos_da_network_service::backends::libp2p::validator::DaNetworkValidatorBackendSettings;
 use nomos_da_network_service::NetworkConfig as DaNetworkConfig;
+use nomos_da_sampling::storage::adapters::rocksdb::RocksAdapterSettings as SamplingStorageAdapterSettings;
 use nomos_da_verifier::backend::kzgrs::KzgrsDaVerifierSettings;
 use nomos_da_verifier::storage::adapters::rocksdb::RocksAdapterSettings as VerifierStorageAdapterSettings;
 use nomos_da_verifier::DaVerifierServiceSettings;
@@ -130,7 +131,7 @@ impl NomosNode {
 
     pub async fn get_block(&self, id: HeaderId) -> Option<Block<Tx, BlobInfo>> {
         CLIENT
-            .post(&format!("http://{}/{}", self.addr, STORAGE_BLOCKS_API))
+            .post(format!("http://{}/{}", self.addr, STORAGE_BLOCKS_API))
             .header("Content-Type", "application/json")
             .body(serde_json::to_string(&id).unwrap())
             .send()
@@ -433,6 +434,9 @@ fn create_node_config(
             network_adapter_settings: DaNetworkSamplingSettings {
                 num_samples: 0,
                 subnet_size: 0,
+            },
+            storage_adapter_settings: SamplingStorageAdapterSettings {
+                blob_storage_directory: "./".into(),
             },
         },
     };

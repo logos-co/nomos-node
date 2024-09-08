@@ -42,6 +42,7 @@ pub type ConsensusRelay<
     SamplingBackend,
     SamplingNetworkAdapter,
     SamplingRng,
+    SamplingStorage,
 > = Relay<
     CryptarchiaConsensus<
         A,
@@ -55,6 +56,7 @@ pub type ConsensusRelay<
         SamplingBackend,
         SamplingNetworkAdapter,
         SamplingRng,
+        SamplingStorage,
     >,
 >;
 
@@ -73,6 +75,7 @@ pub struct DataIndexerService<
     SamplingBackend,
     SamplingNetworkAdapter,
     SamplingRng,
+    SamplingStorage,
 > where
     B: 'static,
     A: NetworkAdapter,
@@ -96,6 +99,7 @@ pub struct DataIndexerService<
     SamplingBackend::Blob: Debug + 'static,
     SamplingBackend::BlobId: Debug + 'static,
     SamplingNetworkAdapter: nomos_da_sampling::network::NetworkAdapter,
+    SamplingStorage: nomos_da_sampling::storage::DaStorageAdapter,
 {
     service_state: ServiceStateHandle<Self>,
     storage_relay: Relay<StorageService<DaStorage::Backend>>,
@@ -111,6 +115,7 @@ pub struct DataIndexerService<
         SamplingBackend,
         SamplingNetworkAdapter,
         SamplingRng,
+        SamplingStorage,
     >,
 }
 
@@ -155,6 +160,7 @@ impl<
         SamplingBackend,
         SamplingNetworkAdapter,
         SamplingRng,
+        SamplingStorage,
     > ServiceData
     for DataIndexerService<
         B,
@@ -171,6 +177,7 @@ impl<
         SamplingBackend,
         SamplingNetworkAdapter,
         SamplingRng,
+        SamplingStorage,
     >
 where
     B: 'static,
@@ -195,6 +202,7 @@ where
     SamplingBackend::Blob: Debug + 'static,
     SamplingBackend::BlobId: Debug + 'static,
     SamplingNetworkAdapter: nomos_da_sampling::network::NetworkAdapter,
+    SamplingStorage: nomos_da_sampling::storage::DaStorageAdapter,
 {
     const SERVICE_ID: ServiceId = "DaIndexer";
     type Settings = IndexerSettings<DaStorage::Settings>;
@@ -218,6 +226,7 @@ impl<
         SamplingBackend,
         SamplingNetworkAdapter,
         SamplingRng,
+        SamplingStorage,
     >
     DataIndexerService<
         B,
@@ -234,6 +243,7 @@ impl<
         SamplingBackend,
         SamplingNetworkAdapter,
         SamplingRng,
+        SamplingStorage,
     >
 where
     B: Send + Sync + 'static,
@@ -259,6 +269,7 @@ where
     SamplingBackend::Blob: Debug + 'static,
     SamplingBackend::BlobId: Debug + 'static,
     SamplingNetworkAdapter: nomos_da_sampling::network::NetworkAdapter,
+    SamplingStorage: nomos_da_sampling::storage::DaStorageAdapter,
 {
     async fn handle_new_block(
         storage_adapter: &DaStorage,
@@ -323,6 +334,7 @@ impl<
         SamplingBackend,
         SamplingNetworkAdapter,
         SamplingRng,
+        SamplingStorage,
     > ServiceCore
     for DataIndexerService<
         B,
@@ -339,6 +351,7 @@ impl<
         SamplingBackend,
         SamplingNetworkAdapter,
         SamplingRng,
+        SamplingStorage,
     >
 where
     B: Debug + Send + Sync,
@@ -387,6 +400,7 @@ where
     SamplingBackend::Blob: Debug + 'static,
     SamplingBackend::BlobId: Debug + 'static,
     SamplingNetworkAdapter: nomos_da_sampling::network::NetworkAdapter,
+    SamplingStorage: nomos_da_sampling::storage::DaStorageAdapter,
 {
     fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, DynError> {
         let consensus_relay = service_state.overwatch_handle.relay();

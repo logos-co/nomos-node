@@ -45,7 +45,16 @@ where
     }
 }
 
-pub async fn add_blob_info<N, A, Item, Key, SamplingBackend, SamplingAdapter, SamplingRng>(
+pub async fn add_blob_info<
+    N,
+    A,
+    Item,
+    Key,
+    SamplingBackend,
+    SamplingAdapter,
+    SamplingRng,
+    SamplingStorage,
+>(
     handle: &overwatch_rs::overwatch::handle::OverwatchHandle,
     item: A::Payload,
     converter: impl Fn(&A::Payload) -> Key,
@@ -63,6 +72,7 @@ where
     SamplingBackend::Settings: Clone,
     SamplingAdapter: DaSamplingNetworkAdapter + Send,
     SamplingRng: SeedableRng + RngCore + Send,
+    SamplingStorage: nomos_da_sampling::storage::DaStorageAdapter,
 {
     let relay = handle
         .relay::<DaMempoolService<
@@ -71,6 +81,7 @@ where
             SamplingBackend,
             SamplingAdapter,
             SamplingRng,
+            SamplingStorage,
         >>()
         .connect()
         .await?;

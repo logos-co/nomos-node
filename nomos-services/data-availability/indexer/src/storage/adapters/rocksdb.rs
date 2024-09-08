@@ -9,7 +9,7 @@ use nomos_core::da::blob::{
     metadata::{Metadata, Next},
 };
 use nomos_core::da::BlobId;
-use nomos_da_storage::fs::load_blob;
+use nomos_da_storage::fs::load_blobs;
 use nomos_da_storage::rocksdb::{key_bytes, DA_VERIFIED_KEY_PREFIX, DA_VID_KEY_PREFIX};
 use nomos_storage::{
     backends::{rocksdb::RocksBackend, StorageSerde},
@@ -128,7 +128,7 @@ where
 
             futures.push(async move {
                 match reply_rx.await {
-                    Ok(Some(id)) => (idx, load_blob(settings.blob_storage_directory, &id).await),
+                    Ok(Some(id)) => (idx, load_blobs(settings.blob_storage_directory, &id).await),
                     Ok(None) => (idx, Vec::new()),
                     Err(_) => {
                         tracing::error!("Failed to receive storage response");
