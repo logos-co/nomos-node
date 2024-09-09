@@ -6,7 +6,7 @@ use tests::{adjust_timeout, nodes::NomosNode, Node, SpawnConfig};
 // how many times more than the expected time to produce a predefined number of blocks we wait before timing out
 const TIMEOUT_MULTIPLIER: f64 = 3.0;
 // how long we let the chain grow before checking the block at tip - k is the same in all chains
-const CHAIN_LENGTH_MULTIPLIER: u32 = 1;
+const CHAIN_LENGTH_MULTIPLIER: u32 = 2;
 
 async fn happy_test(nodes: &[NomosNode]) {
     let config = nodes[0].config();

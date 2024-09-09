@@ -92,69 +92,26 @@ jobs:
       - name: Cargo test (Other OSes)
         if: matrix.os != 'windows-latest'
         uses: actions-rs/cargo@v1
+        env:
+          RISC0_DEV_MODE: true
         with:
           command: test
-          args: --all --no-default-features --features ${{ matrix.feature }} --exclude tests
+          args: --all --no-default-features --features ${{ matrix.feature }}
       - name: Cargo test (Windows)
         if: matrix.os == 'windows-latest'
         uses: actions-rs/cargo@v1
         env:
           # Because Windows runners in Github Actions tend to be slow.
           SLOW_TEST_ENV: true
+          RISC0_DEV_MODE: true
         with:
           command: test
-          args: --workspace --no-default-features --features ${{ matrix.feature }} --exclude tests
+          args: --no-default-features --features ${{ matrix.feature }}
       - uses: actions/upload-artifact@v3
         if: failure()
         with:
           name: integration-test-artifacts
           path: tests/.tmp*
-
-  integration:
-    name: Integration tests
-    strategy:
-      fail-fast: false # all OSes should be tested even if one fails (default: true)
-      matrix:
-        feature: [ prove, "prove,mixnet" ]
-        os: [ ubuntu-latest, macos-latest ] # drop windows for now as risc0 does not support it
-    runs-on: ${{ matrix.os }}
-    steps:
-      - uses: actions/checkout@v2
-        with:
-          submodules: true
-      - uses: arduino/setup-protoc@v3
-        with:
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Setup Rust toolchain (Other OSes)
-        uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-          override: true
-      - uses: cargo-bins/cargo-binstall@main
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Install risc0
-        run: cargo binstall -y cargo-risczero && cargo risczero install
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Cargo build
-        uses: actions-rs/cargo@v1
-        with:
-          command: build
-          args: --all --no-default-features --features ${{ matrix.feature }}
-      - name: Cargo test
-        uses: actions-rs/cargo@v1
-        env:
-          CONSENSUS_SLOT_TIME: 520 # one proof takes about 240s, but multiple leaders share the same hardware
-        with:
-          command: test
-          args: --manifest-path tests/Cargo.toml --features ${{ matrix.feature }}
-      - uses: actions/upload-artifact@v3
-        if: failure()
-        with:
-          name: integration-test-artifacts
-          path: nomos-node/tests/.tmp*
 
   lints:
     name: Rust lints
