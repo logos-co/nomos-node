@@ -1,6 +1,7 @@
 use equivalence_proof_statements::{EquivalencePrivate, EquivalencePublic};
 use risc0_zkvm::Receipt;
 use thiserror::Error;
+use crypto_bigint::{Encoding};
 
 #[derive(Error, Debug)]
 pub enum Error {
@@ -8,12 +9,18 @@ pub enum Error {
     ProofError(#[from] anyhow::Error),
 }
 
-pub fn prove(equivalence_public: EquivalencePublic, equivalence_private: EquivalencePrivate) -> Result<Receipt, Error> {
+pub fn prove(equivalence_public: EquivalencePublic,equivalence_private: EquivalencePrivate) -> Result<Receipt, Error> {
+
+    let mut buffer : Vec<u8> = vec![];
+    buffer.append(&mut Vec::from(equivalence_public.da_commitment));
+    buffer.append(&mut Vec::from(equivalence_public.y_0.to_be_bytes()));
+    for i in 0..equivalence_private.coefficients.len() {
+        buffer.append(&mut Vec::from(equivalence_private.coefficients[i].to_be_bytes()));
+    }
+
+
     let env = risc0_zkvm::ExecutorEnv::builder()
-        .write(&equivalence_public)
-        .unwrap()
-        .write(&equivalence_private)
-        .unwrap()
+        .write_slice(&buffer)
         .build()
         .unwrap();
 
