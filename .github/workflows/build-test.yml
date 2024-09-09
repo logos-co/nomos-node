@@ -146,7 +146,7 @@ jobs:
       - name: Cargo test
         uses: actions-rs/cargo@v1
         env:
-          CONSENSUS_SLOT_TIME: 270
+          CONSENSUS_SLOT_TIME: 520 # one proof takes about 240s, but multiple leaders share the same hardware
         with:
           command: test
           args: --manifest-path tests/Cargo.toml --features ${{ matrix.feature }}
@@ -154,7 +154,7 @@ jobs:
         if: failure()
         with:
           name: integration-test-artifacts
-          path: tests/.tmp*
+          path: nomos-node/tests/.tmp*
 
   lints:
     name: Rust lints
