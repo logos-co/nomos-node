@@ -41,7 +41,7 @@ jobs:
       - uses: actions-rs/cargo@v1
         continue-on-error: true
       - run: |
-          cargo install grcov;
+          cargo binstall -y grcov;
           cargo test --no-default-features --features libp2p
           mkdir /tmp/cov;
           grcov . --binary-path ./target/debug/ -s . -t lcov --branch --ignore-not-existing --ignore '../*' --ignore "/*" -o /tmp/cov/tests.lcov;
