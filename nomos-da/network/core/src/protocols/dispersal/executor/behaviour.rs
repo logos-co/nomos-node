@@ -485,4 +485,3 @@ impl<M: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'static> Netw
         }
     }
 }
-
