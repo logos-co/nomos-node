@@ -94,6 +94,7 @@ jobs:
         uses: actions-rs/cargo@v1
         env:
           RISC0_DEV_MODE: true
+          CONSENSUS_SLOT_TIME: 5
         with:
           command: test
           args: --all --no-default-features --features ${{ matrix.feature }}
@@ -104,6 +105,7 @@ jobs:
           # Because Windows runners in Github Actions tend to be slow.
           SLOW_TEST_ENV: true
           RISC0_DEV_MODE: true
+          CONSENSUS_SLOT_TIME: 5
         with:
           command: test
           args: --no-default-features --features ${{ matrix.feature }}

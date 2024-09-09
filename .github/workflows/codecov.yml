@@ -47,6 +47,7 @@ jobs:
           grcov . --binary-path ./target/debug/ -s . -t lcov --branch --ignore-not-existing --ignore '../*' --ignore "/*" -o /tmp/cov/tests.lcov;
         env:
           SLOW_TEST_ENV: true
+          RISC0_DEV_MODE: true
       - uses: actions/upload-artifact@v3
         if: failure()
         with:
