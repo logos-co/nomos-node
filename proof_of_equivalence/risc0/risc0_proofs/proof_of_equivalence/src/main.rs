@@ -19,6 +19,18 @@ fn mul_mod(a: U256, b: U256) -> U256 {
     a.mul(&b).retrieve()
 }
 
+
+
+fn horner(coefficients: Vec<u8>, point: U256, modulus: U256) -> U256 {
+    let mut evaluation = U256::from_be_slice(&coefficients[coefficients.len()-32..coefficients.len()].to_vec());
+    for i in 1..BLOB_SIZE {
+        let mul = mul_mod(evaluation, point);
+        evaluation = U256::from_be_slice(&coefficients[coefficients.len() - 32*(i+1)..coefficients.len() - i*32].to_vec()).add_mod(&mul, &modulus);
+    }
+    evaluation
+}
+
+
 fn main() {
     let start_start = env::cycle_count();
 
@@ -53,12 +65,10 @@ fn main() {
     eprintln!("evaluation point conversion from u8: {}", end - start);
 
     let start = env::cycle_count();
-    //load coefficient and evaluate polynomial with Horner method
-    let mut evaluation = U256::from_be_slice(&inputs[SCALAR_SIZE+COMMITMENT_SIZE+32*(BLOB_SIZE-1)..SCALAR_SIZE+COMMITMENT_SIZE+32*BLOB_SIZE].to_vec());
-    for i in 1..BLOB_SIZE {
-        let mul = mul_mod(evaluation, bls_point);
-        evaluation = U256::from_be_slice(&inputs[SCALAR_SIZE+COMMITMENT_SIZE+32*(BLOB_SIZE-1-i)..SCALAR_SIZE+COMMITMENT_SIZE+32*(BLOB_SIZE-i)].to_vec()).add_mod(&mul, &modulus);
-    }
+    //load coefficient and evaluate polynomial with Horner's method
+    let evaluation = horner(inputs[COMMITMENT_SIZE+SCALAR_SIZE..COMMITMENT_SIZE+SCALAR_SIZE+BLOB_SIZE*32].to_vec(),bls_point, modulus);
+
+
     let end = env::cycle_count();
     eprintln!("point evaluation: {}", end - start);
 
@@ -73,7 +83,6 @@ fn main() {
     env::commit(&y_0);
     let end_end = env::cycle_count();
     eprintln!("public input: {}", end_end - start);
-
     eprintln!("total: {}", end_end - start_start);
 
 }
