@@ -2,9 +2,9 @@
 use equivalence_proof_statements::{EquivalencePrivate, EquivalencePublic};
 use risc0_zkvm::guest::env;
 use sha2::{Digest, Sha256};
-use crypto_bigint::{U256, impl_modulus, const_residue, modular::constant_mod::ResidueParams};
+use crypto_bigint::{U256, impl_modulus, const_residue, modular::constant_mod::ResidueParams, Encoding};
 
-const BLOB_SIZE: usize = 32;
+const BLOB_SIZE: usize = 2048;
 
 impl_modulus!(
     Fr,
@@ -19,7 +19,7 @@ fn mul_mod(a: U256, b: U256) -> U256 {
 }
 
 fn main() {
-    let start = env::cycle_count();
+    let start_start = env::cycle_count();
     let public_inputs: EquivalencePublic = env::read();
 
     let EquivalencePrivate {
@@ -27,7 +27,7 @@ fn main() {
     } = env::read();
     let private_inputs = EquivalencePrivate { coefficients };
     let end = env::cycle_count();
-    eprintln!("inputs load: {}", end - start);
+    eprintln!("inputs load: {}", end - start_start);
 
     let start = env::cycle_count();
     // BLS scalar field modulus
@@ -39,6 +39,9 @@ fn main() {
     let start = env::cycle_count();
     let mut hasher = Sha256::new();
     hasher.update(public_inputs.da_commitment.clone());
+    for i in 0..BLOB_SIZE {
+        hasher.update(private_inputs.coefficients[i].to_be_bytes());
+    }
     let x_0 : [u8; 32] = hasher.finalize().into();
     let end = env::cycle_count();
     eprintln!("draw random point: {}", end - start);
@@ -67,7 +70,9 @@ fn main() {
 
     let start = env::cycle_count();
     env::commit(&public_inputs);
-    let end = env::cycle_count();
-    eprintln!("public input: {}", end - start);
+    let end_end = env::cycle_count();
+    eprintln!("public input: {}", end_end - start);
+
+    eprintln!("total: {}", end_end - start_start);
 
 }

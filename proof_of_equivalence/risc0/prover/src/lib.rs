@@ -53,7 +53,7 @@ mod test {
     use ark_ec::pairing::Pairing;
     use crypto_bigint::{U256};
 
-    const BLOB_SIZE: usize = 32;
+    const BLOB_SIZE: usize = 2048;
 
     static GLOBAL_PARAMETERS: Lazy<UniversalParams<Bls12_381>> = Lazy::new(|| {
         let mut rng = rand::thread_rng();
@@ -85,6 +85,9 @@ mod test {
         //recover x_0
         let mut hasher = Sha256::new();
         hasher.update(da_commitment.clone());
+        for i in 0..BLOB_SIZE {
+            hasher.update(coefficients[i]);
+        }
         let x_0 = Fr::from_be_bytes_mod_order(&hasher.finalize());
 
         let y_0 = bls_polynomial.evaluate(&x_0); // EVAL OF x0
