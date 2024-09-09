@@ -132,18 +132,24 @@ where
 
 #[cfg(test)]
 pub mod test {
-    use crate::da::network::swarm::ExecutorSwarm;
+    use crate::da::network::swarm::{DispersalEvent, ExecutorSwarm};
     use crate::test_utils::AllNeighbours;
     use kzgrs_backend::common::blob::DaBlob;
     use kzgrs_backend::common::Column;
     use libp2p::identity::Keypair;
+    use libp2p::swarm::SwarmEvent;
     use libp2p::PeerId;
+    use log::info;
     use nomos_da_network_core::address_book::AddressBook;
-    use nomos_da_network_core::swarm::validator::ValidatorSwarm;
+    use nomos_da_network_core::protocols::sampling;
+    use nomos_da_network_core::swarm::validator::{ValidatorEventsStream, ValidatorSwarm};
+    use nomos_da_network_service::backends::libp2p::validator::SamplingEvent;
     use nomos_libp2p::Multiaddr;
     use std::time::Duration;
+    use tokio::sync::broadcast;
     use tokio::sync::mpsc::error::SendError;
     use tokio::sync::mpsc::unbounded_channel;
+    use tokio_stream::StreamExt;
     use tracing_subscriber::fmt::TestWriter;
     use tracing_subscriber::EnvFilter;
 
@@ -178,7 +184,14 @@ pub mod test {
         let (mut validator, events_stream) =
             ValidatorSwarm::new(k2, neighbours.clone(), addr2_book);
 
-        let join_validator = tokio::spawn(async move { validator.run().await });
+        let validator_task = async move {
+            let validator_swarm = validator.protocol_swarm_mut();
+            validator_swarm.listen_on(addr).unwrap();
+
+            validator.run().await;
+        };
+
+        let join_validator = tokio::spawn(validator_task);
         tokio::time::sleep(Duration::from_secs(1)).await;
         executor.dial(addr2).unwrap();
         tokio::time::sleep(Duration::from_secs(1)).await;
@@ -186,35 +199,38 @@ pub mod test {
         let executor_open_stream_sender = executor.swarm.behaviour().open_stream_sender();
         let executor_disperse_blob_sender = executor.swarm.behaviour().blobs_sender();
         let (sender, mut receiver) = tokio::sync::oneshot::channel();
-
-        let blobs_sender = executor.blobs_sender();
-
+        let executor_poll = async move {
+            loop {
+                tokio::select! {
+                    Some(event) = executor.swarm.next() => {
+                        info!("Executor event: {event:?}");
+                    }
+                    _ = &mut receiver => {
+                        break;
+                    }
+                }
+            }
+        };
+        let executor_task = tokio::spawn(executor_poll);
+        executor_open_stream_sender.send(validator_peer).unwrap();
         tokio::time::sleep(Duration::from_secs(1)).await;
 
         println!("Sending blob...");
+        executor_disperse_blob_sender
+            .send((
+                0,
+                DaBlob {
+                    column_idx: 0,
+                    column: Column(vec![]),
+                    column_commitment: Default::default(),
+                    aggregated_column_commitment: Default::default(),
+                    aggregated_column_proof: Default::default(),
+                    rows_commitments: vec![],
+                    rows_proofs: vec![],
+                },
+            ))
+            .unwrap();
 
-        if let Err(SendError((subnetwork_id, blob_id))) = blobs_sender.send((
-            0,
-            DaBlob {
-                column_idx: 0,
-                column: Column(vec![]),
-                column_commitment: Default::default(),
-                aggregated_column_commitment: Default::default(),
-                aggregated_column_proof: Default::default(),
-                rows_commitments: vec![],
-                rows_proofs: vec![],
-            },
-        )) {
-            println!(
-                "Error requesting sample for subnetwork id : {subnetwork_id}, blob_id: {blob_id:?}"
-            );
-        }
-
-        println!("Blob sent.");
-
-        let executor_task = tokio::spawn(async move { executor.run().await });
-
-        join_validator.await.unwrap();
         sender.send(()).unwrap();
         executor_task.await.unwrap();
     }
