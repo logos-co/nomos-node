@@ -132,34 +132,20 @@ where
 
 #[cfg(test)]
 pub mod test {
-    use crate::da::network::swarm::{DispersalEvent, ExecutorSwarm};
+    use crate::da::network::swarm::ExecutorSwarm;
     use crate::test_utils::AllNeighbours;
     use kzgrs_backend::common::blob::DaBlob;
     use kzgrs_backend::common::Column;
     use libp2p::identity::Keypair;
-    use libp2p::swarm::SwarmEvent;
     use libp2p::PeerId;
-    use log::info;
     use nomos_da_network_core::address_book::AddressBook;
-    use nomos_da_network_core::protocols::sampling;
-    use nomos_da_network_core::swarm::validator::{ValidatorEventsStream, ValidatorSwarm};
-    use nomos_da_network_service::backends::libp2p::validator::SamplingEvent;
+    use nomos_da_network_core::swarm::validator::ValidatorSwarm;
     use nomos_libp2p::Multiaddr;
     use std::time::Duration;
-    use tokio::sync::broadcast;
-    use tokio::sync::mpsc::error::SendError;
     use tokio::sync::mpsc::unbounded_channel;
-    use tokio_stream::StreamExt;
-    use tracing_subscriber::fmt::TestWriter;
-    use tracing_subscriber::EnvFilter;
 
     #[tokio::test]
     async fn test_dispersal_with_swarms() {
-        let _ = tracing_subscriber::fmt()
-            .with_env_filter(EnvFilter::from_default_env())
-            .compact()
-            .with_writer(TestWriter::default())
-            .try_init();
         let k1 = Keypair::generate_ed25519();
         let k2 = Keypair::generate_ed25519();
         let executor_peer = PeerId::from_public_key(&k1.public());
@@ -177,43 +163,25 @@ pub mod test {
         let addr2 = addr.clone().with_p2p(validator_peer).unwrap();
         let addr2_book = AddressBook::from_iter(vec![(executor_peer, addr2.clone())]);
 
-        let (dispersal_broadcast_sender, dispersal_broadcast_receiver) = unbounded_channel();
+        let (dispersal_broadcast_sender, _) = unbounded_channel();
 
         let mut executor =
             ExecutorSwarm::new(k1, neighbours.clone(), dispersal_broadcast_sender.clone());
-        let (mut validator, events_stream) =
+        let (mut validator, _) =
             ValidatorSwarm::new(k2, neighbours.clone(), addr2_book);
 
-        let validator_task = async move {
+        tokio::spawn(async move {
             let validator_swarm = validator.protocol_swarm_mut();
             validator_swarm.listen_on(addr).unwrap();
 
             validator.run().await;
-        };
+        });
 
-        let join_validator = tokio::spawn(validator_task);
         tokio::time::sleep(Duration::from_secs(1)).await;
         executor.dial(addr2).unwrap();
         tokio::time::sleep(Duration::from_secs(1)).await;
 
-        let executor_open_stream_sender = executor.swarm.behaviour().open_stream_sender();
         let executor_disperse_blob_sender = executor.swarm.behaviour().blobs_sender();
-        let (sender, mut receiver) = tokio::sync::oneshot::channel();
-        let executor_poll = async move {
-            loop {
-                tokio::select! {
-                    Some(event) = executor.swarm.next() => {
-                        info!("Executor event: {event:?}");
-                    }
-                    _ = &mut receiver => {
-                        break;
-                    }
-                }
-            }
-        };
-        let executor_task = tokio::spawn(executor_poll);
-        executor_open_stream_sender.send(validator_peer).unwrap();
-        tokio::time::sleep(Duration::from_secs(1)).await;
 
         println!("Sending blob...");
         executor_disperse_blob_sender
@@ -231,7 +199,7 @@ pub mod test {
             ))
             .unwrap();
 
-        sender.send(()).unwrap();
-        executor_task.await.unwrap();
+        let executor_task = tokio::spawn(async move {executor.run().await;});
+        assert!(executor_task.await.is_ok());
     }
 }
