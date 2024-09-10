@@ -167,8 +167,7 @@ pub mod test {
 
         let mut executor =
             ExecutorSwarm::new(k1, neighbours.clone(), dispersal_broadcast_sender.clone());
-        let (mut validator, _) =
-            ValidatorSwarm::new(k2, neighbours.clone(), addr2_book);
+        let (mut validator, _) = ValidatorSwarm::new(k2, neighbours.clone(), addr2_book);
 
         tokio::spawn(async move {
             let validator_swarm = validator.protocol_swarm_mut();
@@ -199,7 +198,9 @@ pub mod test {
             ))
             .unwrap();
 
-        let executor_task = tokio::spawn(async move {executor.run().await;});
+        let executor_task = tokio::spawn(async move {
+            executor.run().await;
+        });
         assert!(executor_task.await.is_ok());
     }
 }
