@@ -7,8 +7,9 @@ use std::time::Duration;
 use super::{create_tempdir, persist_tempdir, LOGS_PREFIX};
 use crate::{adjust_timeout, get_available_port, ConsensusConfig, Node};
 use blst::min_sig::SecretKey;
+use cl::{InputWitness, NoteWitness, NullifierSecret};
 use cryptarchia_consensus::{CryptarchiaInfo, CryptarchiaSettings, TimeConfig};
-use cryptarchia_ledger::{Coin, LedgerState};
+use cryptarchia_ledger::LedgerState;
 use kzgrs_backend::dispersal::BlobInfo;
 #[cfg(feature = "mixnet")]
 use mixnet::{
@@ -17,7 +18,7 @@ use mixnet::{
     node::MixNodeConfig,
     topology::{MixNodeInfo, MixnetTopology},
 };
-use nomos_core::{block::Block, header::HeaderId};
+use nomos_core::{block::Block, header::HeaderId, staking::NMO_UNIT};
 use nomos_da_indexer::storage::adapters::rocksdb::RocksAdapterSettings as IndexerStorageAdapterSettings;
 use nomos_da_indexer::IndexerSettings;
 use nomos_da_network_service::backends::libp2p::validator::DaNetworkValidatorBackendSettings;
@@ -48,6 +49,8 @@ const CRYPTARCHIA_INFO_API: &str = "cryptarchia/info";
 const GET_HEADERS_INFO: &str = "cryptarchia/headers";
 const NOMOS_BIN: &str = "../target/debug/nomos-node";
 const STORAGE_BLOCKS_API: &str = "storage/block";
+const DEFAULT_SLOT_TIME: u64 = 2;
+const CONSENSUS_SLOT_TIME_VAR: &str = "CONSENSUS_SLOT_TIME";
 #[cfg(feature = "mixnet")]
 const NUM_MIXNODE_CANDIDATES: usize = 2;
 
@@ -241,13 +244,20 @@ impl Node for NomosNode {
         #[cfg(feature = "mixnet")]
         let (mixclient_config, mixnode_configs) = create_mixnet_config(&ids);
 
-        let coins = ids
+        let notes = ids
             .iter()
-            .map(|&id| Coin::new(id, id.into(), 1.into()))
+            .map(|&id| {
+                let mut sk = [0; 16];
+                sk.copy_from_slice(&id[0..16]);
+                InputWitness::new(
+                    NoteWitness::basic(1, NMO_UNIT, &mut thread_rng()),
+                    NullifierSecret(sk),
+                )
+            })
             .collect::<Vec<_>>();
         // no commitments for now, proofs are not checked anyway
         let genesis_state = LedgerState::from_commitments(
-            coins.iter().map(|c| c.commitment()),
+            notes.iter().map(|n| n.note_commitment()),
             (ids.len() as u32).into(),
         );
         let ledger_config = cryptarchia_ledger::Config {
@@ -259,15 +269,18 @@ impl Node for NomosNode {
                 active_slot_coeff: consensus.active_slot_coeff,
             },
         };
+        let slot_duration = std::env::var(CONSENSUS_SLOT_TIME_VAR)
+            .map(|s| <u64>::from_str(&s).unwrap())
+            .unwrap_or(DEFAULT_SLOT_TIME);
         let time_config = TimeConfig {
-            slot_duration: Duration::from_secs(1),
+            slot_duration: Duration::from_secs(slot_duration),
             chain_start_time: OffsetDateTime::now_utc(),
         };
 
         #[allow(unused_mut, unused_variables)]
         let mut configs = ids
             .into_iter()
-            .zip(coins)
+            .zip(notes)
             .enumerate()
             .map(|(i, (da_id, coin))| {
                 create_node_config(
@@ -360,7 +373,7 @@ fn create_node_config(
     _id: [u8; 32],
     genesis_state: LedgerState,
     config: cryptarchia_ledger::Config,
-    coins: Vec<Coin>,
+    notes: Vec<InputWitness>,
     time: TimeConfig,
     #[cfg(feature = "mixnet")] mixnet_config: MixnetConfig,
 ) -> Config {
@@ -384,7 +397,7 @@ fn create_node_config(
             },
         },
         cryptarchia: CryptarchiaSettings {
-            coins,
+            notes,
             config,
             genesis_state,
             time,

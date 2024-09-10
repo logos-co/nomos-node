@@ -1,37 +1,36 @@
-mod coin;
 mod config;
 mod crypto;
-mod leader_proof;
-mod nonce;
-mod utils;
+pub mod leader_proof;
+mod notetree;
 
 use blake2::Digest;
 use cryptarchia_engine::{Epoch, Slot};
 use crypto::Blake2b;
+use leader_proof::OrphanProof;
+use leader_proof_statements::LeaderPublic;
+use rpds::HashTrieSetSync;
 use std::{collections::HashMap, hash::Hash};
 use thiserror::Error;
 
-type HashTrieSet<T> = rpds::HashTrieSetSync<T>;
+use cl::{balance::Value, note::NoteCommitment, nullifier::Nullifier};
 
-pub use coin::{Coin, Value};
 pub use config::Config;
-pub use leader_proof::*;
-pub use nonce::*;
+pub use notetree::NoteTree;
 
 #[derive(Clone, Debug, Error)]
 pub enum LedgerError<Id> {
-    #[error("Commitment not found in the ledger state")]
-    CommitmentNotFound,
     #[error("Nullifier already exists in the ledger state")]
-    NullifierExists,
-    #[error("Commitment already exists in the ledger state")]
-    CommitmentExists,
+    DoubleSpend(Nullifier),
     #[error("Invalid block slot {block:?} for parent slot {parent:?}")]
     InvalidSlot { parent: Slot, block: Slot },
     #[error("Parent block not found: {0:?}")]
     ParentNotFound(Id),
     #[error("Orphan block missing: {0:?}. Importing leader proofs requires the block to be validated first")]
     OrphanMissing(Id),
+    #[error("Invalid leader proof")]
+    InvalidProof,
+    #[error("Invalid leader proof root")]
+    InvalidRoot,
 }
 
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -40,10 +39,10 @@ pub struct EpochState {
     // The epoch this snapshot is for
     epoch: Epoch,
     // value of the ledger nonce after 'epoch_period_nonce_buffer' slots from the beginning of the epoch
-    nonce: Nonce,
+    nonce: [u8; 32],
     // stake distribution snapshot taken at the beginning of the epoch
-    // (in practice, this is equivalent to the coins the are spendable at the beginning of the epoch)
-    commitments: HashTrieSet<Commitment>,
+    // (in practice, this is equivalent to the notes the are spendable at the beginning of the epoch)
+    commitments: NoteTree,
     total_stake: Value,
 }
 
@@ -58,7 +57,7 @@ impl EpochState {
 
         let stake_snapshot_slot = config.stake_distribution_snapshot(self.epoch);
         let commitments = if ledger.slot < stake_snapshot_slot {
-            ledger.lead_commitments.clone()
+            ledger.spend_commitments.clone()
         } else {
             self.commitments
         };
@@ -70,12 +69,12 @@ impl EpochState {
         }
     }
 
-    fn is_eligible_leader(&self, commitment: &Commitment) -> bool {
-        self.commitments.contains(commitment)
-    }
-
     pub fn epoch(&self) -> Epoch {
         self.epoch
+    }
+
+    pub fn nonce(&self) -> &[u8; 32] {
+        &self.nonce
     }
 
     pub fn total_stake(&self) -> Value {
@@ -101,21 +100,26 @@ where
     }
 
     #[must_use = "this returns the result of the operation, without modifying the original"]
-    pub fn try_update(
+    pub fn try_update<LeaderProof>(
         &self,
         id: Id,
         parent_id: Id,
         slot: Slot,
         proof: &LeaderProof,
         // (update corresponding to the leader proof, leader proof)
-        orphan_proofs: impl IntoIterator<Item = (Id, LeaderProof)>,
-    ) -> Result<Self, LedgerError<Id>> {
+        orphan_proofs: impl IntoIterator<Item = (Id, OrphanProof)>,
+    ) -> Result<Self, LedgerError<Id>>
+    where
+        LeaderProof: leader_proof::LeaderProof,
+    {
         let parent_state = self
             .states
             .get(&parent_id)
             .ok_or(LedgerError::ParentNotFound(parent_id))?;
         let config = self.config.clone();
 
+        // TODO: remove this extra logic, we can simply check the proof is valid and the root is a valid one
+        // just like we do anyway
         // Oprhan proofs need to be:
         // * locally valid for the block they were originally in
         // * not in conflict with the current ledger state
@@ -152,13 +156,13 @@ where
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone, Eq, PartialEq)]
 pub struct LedgerState {
-    // commitments to coins that can be used to propose new blocks
-    lead_commitments: HashTrieSet<Commitment>,
-    // commitments to coins that can be spent, this is a superset of lead_commitments
-    spend_commitments: HashTrieSet<Commitment>,
-    nullifiers: HashTrieSet<Nullifier>,
+    // commitments to notes that can be used to propose new blocks
+    lead_commitments: NoteTree,
+    // commitments to notes that can be spent, this is a superset of lead_commitments
+    spend_commitments: NoteTree,
+    nullifiers: HashTrieSetSync<Nullifier>,
     // randomness contribution
-    nonce: Nonce,
+    nonce: [u8; 32],
     slot: Slot,
     // rolling snapshot of the state for the next epoch, used for epoch transitions
     next_epoch_state: EpochState,
@@ -166,16 +170,22 @@ pub struct LedgerState {
 }
 
 impl LedgerState {
-    fn try_update<Id>(
+    fn try_update<LeaderProof, Id>(
         self,
         slot: Slot,
         proof: &LeaderProof,
-        orphan_proofs: &[LeaderProof],
+        orphan_proofs: &[OrphanProof],
         config: &Config,
-    ) -> Result<Self, LedgerError<Id>> {
-        // TODO: import leader proofs
-        self.update_epoch_state(slot, config)?
-            .try_apply_leadership(proof, orphan_proofs, config)
+    ) -> Result<Self, LedgerError<Id>>
+    where
+        LeaderProof: leader_proof::LeaderProof,
+    {
+        self.update_epoch_state(slot, config)?.try_apply_leadership(
+            slot,
+            proof,
+            orphan_proofs,
+            config,
+        )
     }
 
     fn update_epoch_state<Id>(self, slot: Slot, config: &Config) -> Result<Self, LedgerError<Id>> {
@@ -247,31 +257,27 @@ impl LedgerState {
         }
     }
 
-    fn try_apply_proof<Id>(
+    fn try_apply_proof_outputs<Id>(
         self,
-        proof: &LeaderProof,
-        config: &Config,
+        cm_root: [u8; 32],
+        nullifier: Nullifier,
+        evolved_commitment: NoteCommitment,
     ) -> Result<Self, LedgerError<Id>> {
-        assert_eq!(config.epoch(proof.slot()), self.epoch_state.epoch);
-        // The leadership coin either has to be in the state snapshot or be derived from
-        // a coin that is in the state snapshot (i.e. be in the lead coins commitments)
-        if !self.can_lead(proof.commitment())
-            && !self.epoch_state.is_eligible_leader(proof.commitment())
+        // The leadership note either has to be in the state snapshot or be derived from
+        // a note that is in the state snapshot (i.e. be in the lead coins commitments)
+        if !self.lead_commitments.is_valid_root(&cm_root)
+            && !self.epoch_state.commitments.is_valid_root(&cm_root)
         {
-            return Err(LedgerError::CommitmentNotFound);
+            return Err(LedgerError::InvalidRoot);
         }
 
-        if self.is_nullified(proof.nullifier()) {
-            return Err(LedgerError::NullifierExists);
+        if self.is_nullified(&nullifier) {
+            return Err(LedgerError::DoubleSpend(nullifier));
         }
 
-        if self.is_committed(proof.evolved_commitment()) {
-            return Err(LedgerError::CommitmentExists);
-        }
-
-        let lead_commitments = self.lead_commitments.insert(*proof.evolved_commitment());
-        let spend_commitments = self.spend_commitments.insert(*proof.evolved_commitment());
-        let nullifiers = self.nullifiers.insert(*proof.nullifier());
+        let lead_commitments = self.lead_commitments.insert(evolved_commitment);
+        let spend_commitments = self.spend_commitments.insert(evolved_commitment);
+        let nullifiers = self.nullifiers.insert(nullifier);
 
         Ok(Self {
             lead_commitments,
@@ -281,72 +287,99 @@ impl LedgerState {
         })
     }
 
-    fn try_apply_leadership<Id>(
-        mut self,
+    fn try_apply_proof<LeaderProof, Id>(
+        self,
+        slot: Slot,
         proof: &LeaderProof,
-        orphan_proofs: &[LeaderProof],
         config: &Config,
-    ) -> Result<Self, LedgerError<Id>> {
-        for proof in orphan_proofs {
-            self = self.try_apply_proof(proof, config)?;
+    ) -> Result<Self, LedgerError<Id>>
+    where
+        LeaderProof: leader_proof::LeaderProof,
+    {
+        assert_eq!(config.epoch(slot), self.epoch_state.epoch);
+        let public_inputs = LeaderPublic::new(
+            proof.merke_root(),
+            self.epoch_state.nonce,
+            slot.into(),
+            config.consensus_config.active_slot_coeff,
+            self.epoch_state.total_stake,
+            proof.nullifier(),
+            proof.evolved_commitment(),
+        );
+        if !proof.verify(&public_inputs) {
+            return Err(LedgerError::InvalidProof);
         }
 
-        self = self.try_apply_proof(proof, config)?.update_nonce(proof);
+        self.try_apply_proof_outputs(
+            proof.merke_root(),
+            proof.nullifier(),
+            proof.evolved_commitment(),
+        )
+    }
+
+    fn try_apply_leadership<LeaderProof, Id>(
+        mut self,
+        slot: Slot,
+        proof: &LeaderProof,
+        orphan_proofs: &[OrphanProof],
+        config: &Config,
+    ) -> Result<Self, LedgerError<Id>>
+    where
+        LeaderProof: leader_proof::LeaderProof,
+    {
+        for OrphanProof {
+            nullifier,
+            commitment,
+            cm_root,
+        } in orphan_proofs
+        {
+            self = self.try_apply_proof_outputs(*cm_root, *nullifier, *commitment)?;
+        }
+
+        self = self
+            .try_apply_proof(slot, proof, config)?
+            .update_nonce(proof.nullifier(), slot);
 
         Ok(self)
-    }
-
-    pub fn can_spend(&self, commitment: &Commitment) -> bool {
-        self.spend_commitments.contains(commitment)
-    }
-
-    pub fn can_lead(&self, commitment: &Commitment) -> bool {
-        self.lead_commitments.contains(commitment)
     }
 
     pub fn is_nullified(&self, nullifier: &Nullifier) -> bool {
         self.nullifiers.contains(nullifier)
     }
 
-    pub fn is_committed(&self, commitment: &Commitment) -> bool {
-        // spendable coins are a superset of coins that can lead, so it's sufficient to check only one set
-        self.spend_commitments.contains(commitment)
-    }
-
-    fn update_nonce(self, proof: &LeaderProof) -> Self {
+    fn update_nonce(self, nullifier: Nullifier, slot: Slot) -> Self {
         Self {
             nonce: <[u8; 32]>::from(
                 Blake2b::new_with_prefix("epoch-nonce".as_bytes())
-                    .chain_update(<[u8; 32]>::from(self.nonce))
-                    .chain_update(proof.nullifier())
-                    .chain_update(proof.slot().to_be_bytes())
+                    .chain_update(self.nonce)
+                    .chain_update(nullifier.as_bytes())
+                    .chain_update(slot.to_be_bytes())
                     .finalize(),
-            )
-            .into(),
+            ),
             ..self
         }
     }
 
     pub fn from_commitments(
-        commitments: impl IntoIterator<Item = Commitment>,
+        commitments: impl IntoIterator<Item = NoteCommitment>,
         total_stake: Value,
     ) -> Self {
-        let commitments = commitments.into_iter().collect::<HashTrieSet<_>>();
+        let commitments = commitments.into_iter().collect::<NoteTree>();
         Self {
             lead_commitments: commitments.clone(),
             spend_commitments: commitments,
             nullifiers: Default::default(),
-            nonce: [0; 32].into(),
+            nonce: [0; 32],
             slot: 0.into(),
             next_epoch_state: EpochState {
                 epoch: 1.into(),
-                nonce: [0; 32].into(),
+                nonce: [0; 32],
                 commitments: Default::default(),
                 total_stake,
             },
             epoch_state: EpochState {
                 epoch: 0.into(),
-                nonce: [0; 32].into(),
+                nonce: [0; 32],
                 commitments: Default::default(),
                 total_stake,
             },
@@ -364,19 +397,17 @@ impl LedgerState {
     pub fn next_epoch_state(&self) -> &EpochState {
         &self.next_epoch_state
     }
+
+    pub fn lead_commitments(&self) -> &NoteTree {
+        &self.lead_commitments
+    }
 }
 
 impl core::fmt::Debug for LedgerState {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("LedgerState")
-            .field(
-                "lead_commitment",
-                &self.lead_commitments.iter().collect::<Vec<_>>(),
-            )
-            .field(
-                "spend_commitments",
-                &self.spend_commitments.iter().collect::<Vec<_>>(),
-            )
+            .field("lead_commitment", &self.lead_commitments.root())
+            .field("spend_commitments", &self.spend_commitments.root())
             .field("nullifiers", &self.nullifiers.iter().collect::<Vec<_>>())
             .field("nonce", &self.nonce)
             .field("slot", &self.slot)
@@ -386,56 +417,147 @@ impl core::fmt::Debug for LedgerState {
 
 #[cfg(test)]
 pub mod tests {
-    use super::{Coin, EpochState, LeaderProof, Ledger, LedgerState, Nullifier, Value};
-    use crate::{crypto::Blake2b, Commitment, Config, LedgerError};
+    use super::*;
+    use crate::{crypto::Blake2b, leader_proof::LeaderProof, Config, LedgerError};
     use blake2::Digest;
+    use cl::{note::NoteWitness, InputWitness as Note, NullifierSecret};
     use cryptarchia_engine::Slot;
-    use serde_test::{assert_tokens, Configure, Token};
+    use rand::thread_rng;
 
     type HeaderId = [u8; 32];
 
-    fn coin(id: u64) -> Coin {
-        let mut sk = [0; 32];
-        sk[..8].copy_from_slice(&id.to_be_bytes());
-        Coin::new(sk, [0; 32].into(), 1.into())
+    fn note(sk: u8) -> Note {
+        Note::new(
+            NoteWitness::basic(0, [0; 32], &mut thread_rng()),
+            NullifierSecret::from_bytes([sk as u8; 16]),
+        )
+    }
+
+    struct DummyProof {
+        cm_root: [u8; 32],
+        nullifier: Nullifier,
+        commitment: NoteCommitment,
+    }
+
+    impl LeaderProof for DummyProof {
+        fn nullifier(&self) -> Nullifier {
+            self.nullifier
+        }
+
+        fn evolved_commitment(&self) -> NoteCommitment {
+            self.commitment
+        }
+
+        fn verify(&self, public_inputs: &LeaderPublic) -> bool {
+            self.cm_root == public_inputs.cm_root
+        }
+
+        fn merke_root(&self) -> [u8; 32] {
+            self.cm_root
+        }
+    }
+
+    fn evolve(note: Note) -> Note {
+        Note::new(
+            NoteWitness {
+                nonce: note.evolved_nonce(b"test"),
+                ..note.note
+            },
+            note.nf_sk,
+        )
     }
 
     fn update_ledger(
         ledger: &mut Ledger<HeaderId>,
         parent: HeaderId,
         slot: impl Into<Slot>,
-        coin: Coin,
+        note: Note,
     ) -> Result<HeaderId, LedgerError<HeaderId>> {
-        update_orphans(ledger, parent, slot, coin, vec![])
+        update_orphans(ledger, parent, slot, note, vec![])
     }
 
-    fn make_id(parent: HeaderId, slot: impl Into<Slot>, coin: Coin) -> HeaderId {
+    fn make_id(parent: HeaderId, slot: impl Into<Slot>, note: Note) -> HeaderId {
         Blake2b::new()
             .chain_update(parent)
             .chain_update(slot.into().to_be_bytes())
-            .chain_update(coin.vrf([0; 32].into(), 0.into()))
+            .chain_update(note.note_commitment().as_bytes())
             .finalize()
             .into()
+    }
+
+    // produce a proof for a note and included orphan proofs
+    fn generate_proofs(
+        ledger_state: &LedgerState,
+        note: Note,
+        orphans: Vec<(HeaderId, Note)>,
+    ) -> (DummyProof, Vec<(HeaderId, OrphanProof)>) {
+        // inefficient implementation, but it's just a test
+        fn contains(note_tree: &NoteTree, note: &Note) -> bool {
+            note_tree
+                .commitments()
+                .iter()
+                .find(|n| n == &&note.note_commitment())
+                .is_some()
+        }
+
+        fn proof(note: Note, cm_root: [u8; 32]) -> DummyProof {
+            DummyProof {
+                cm_root,
+                nullifier: note.nullifier(),
+                commitment: evolve(note).note_commitment(),
+            }
+        }
+
+        fn get_cm_root(note: Note, trees: &[&NoteTree]) -> [u8; 32] {
+            for tree in trees {
+                if contains(tree, &note) {
+                    return tree.root();
+                }
+            }
+            [0; 32]
+        }
+
+        // for each proof, the root used is either the lead commitment root or the snapshot root if they contain the note,
+        // or a [0; 32] root if the node is not among the allowed commitments
+        // Note that the lead commitment root is evolved as the orphan proofs are produce, just like a node would update it
+        // after processing orphan proofs
+        let mut lead_comms = ledger_state.lead_commitments().clone();
+        let snapshot_comms = &ledger_state.epoch_state().commitments;
+        let (ids, imported_note): (Vec<_>, Vec<_>) = orphans.into_iter().unzip();
+        let orphans = imported_note
+            .into_iter()
+            .map(|note| {
+                let cm_root = get_cm_root(note, &[&lead_comms, snapshot_comms]);
+                lead_comms = lead_comms.insert(evolve(note).note_commitment());
+                proof(note, cm_root).to_orphan_proof()
+            })
+            .zip(ids)
+            .map(|(orphan, id)| (id, orphan))
+            .collect::<Vec<_>>();
+
+        let cm_root = get_cm_root(note, &[&lead_comms, snapshot_comms]);
+        let proof = proof(note, cm_root);
+
+        (proof, orphans)
     }
 
     fn update_orphans(
         ledger: &mut Ledger<HeaderId>,
         parent: HeaderId,
         slot: impl Into<Slot>,
-        coin: Coin,
-        orphans: Vec<(HeaderId, (u64, Coin))>,
+        note: Note,
+        orphans: Vec<(HeaderId, Note)>,
     ) -> Result<HeaderId, LedgerError<HeaderId>> {
         let slot = slot.into();
-        let id = make_id(parent, slot, coin);
-        *ledger = ledger.try_update(
-            id,
-            parent,
-            slot,
-            &coin.to_proof(slot),
-            orphans
-                .into_iter()
-                .map(|(id, (slot, coin))| (id, coin.to_proof(slot.into()))),
-        )?;
+        let ledger_state = ledger
+            .state(&parent)
+            .unwrap()
+            .clone()
+            .update_epoch_state::<HeaderId>(slot, ledger.config())
+            .unwrap();
+        let id = make_id(parent, slot, note);
+        let (proof, orphan_proofs) = generate_proofs(&ledger_state, note, orphans);
+        *ledger = ledger.try_update(id, parent, slot, &proof, orphan_proofs)?;
         Ok(id)
     }
 
@@ -451,7 +573,7 @@ pub mod tests {
         }
     }
 
-    pub fn genesis_state(commitments: &[Commitment]) -> LedgerState {
+    pub fn genesis_state(commitments: &[NoteCommitment]) -> LedgerState {
         LedgerState {
             lead_commitments: commitments.iter().cloned().collect(),
             spend_commitments: commitments.iter().cloned().collect(),
@@ -462,109 +584,114 @@ pub mod tests {
                 epoch: 1.into(),
                 nonce: [0; 32].into(),
                 commitments: commitments.iter().cloned().collect(),
-                total_stake: 1.into(),
+                total_stake: 1,
             },
             epoch_state: EpochState {
                 epoch: 0.into(),
                 nonce: [0; 32].into(),
                 commitments: commitments.iter().cloned().collect(),
-                total_stake: 1.into(),
+                total_stake: 1,
             },
         }
     }
 
-    fn ledger(commitments: &[Commitment]) -> (Ledger<HeaderId>, HeaderId) {
+    fn ledger(commitments: &[NoteCommitment]) -> (Ledger<HeaderId>, HeaderId) {
         let genesis_state = genesis_state(commitments);
-
         (
             Ledger::from_genesis([0; 32], genesis_state, config()),
             [0; 32],
         )
     }
 
-    fn apply_and_add_coin(
+    fn apply_and_add_note(
         ledger: &mut Ledger<HeaderId>,
         parent: HeaderId,
         slot: impl Into<Slot>,
-        coin_proof: Coin,
-        coin_add: Coin,
+        note_proof: Note,
+        note_add: Note,
     ) -> HeaderId {
-        let id = update_ledger(ledger, parent, slot, coin_proof).unwrap();
+        let id = update_ledger(ledger, parent, slot, note_proof).unwrap();
         // we still don't have transactions, so the only way to add a commitment to spendable commitments and
         // test epoch snapshotting is by doing this manually
         let mut block_state = ledger.states[&id].clone();
-        block_state.spend_commitments = block_state.spend_commitments.insert(coin_add.commitment());
+        block_state.spend_commitments = block_state
+            .spend_commitments
+            .insert(note_add.note_commitment());
         ledger.states.insert(id, block_state);
         id
     }
 
     #[test]
-    fn test_ledger_state_prevents_coin_reuse() {
-        let coin = coin(0);
-        let (mut ledger, genesis) = ledger(&[coin.commitment()]);
+    fn test_ledger_state_prevents_note_reuse() {
+        let note = note(0);
+        let (mut ledger, genesis) = ledger(&[note.note_commitment()]);
 
-        let h = update_ledger(&mut ledger, genesis, 1, coin).unwrap();
+        let h = update_ledger(&mut ledger, genesis, 1, note).unwrap();
 
-        // reusing the same coin should be prevented
+        // reusing the same note should be prevented
         assert!(matches!(
-            update_ledger(&mut ledger, h, 2, coin),
-            Err(LedgerError::NullifierExists),
+            update_ledger(&mut ledger, h, 2, note),
+            Err(LedgerError::DoubleSpend(_)),
         ));
     }
 
     #[test]
-    fn test_ledger_state_uncommited_coin() {
-        let coin = coin(0);
+    fn test_ledger_state_uncommited_note() {
+        let note = note(0);
         let (mut ledger, genesis) = ledger(&[]);
         assert!(matches!(
-            update_ledger(&mut ledger, genesis, 1, coin),
-            Err(LedgerError::CommitmentNotFound),
+            update_ledger(&mut ledger, genesis, 1, note),
+            Err(LedgerError::InvalidRoot),
         ));
     }
 
     #[test]
     fn test_ledger_state_is_properly_updated_on_reorg() {
-        let coin_1 = coin(0);
-        let coin_2 = coin(1);
-        let coin_3 = coin(2);
+        let note_1 = note(0);
+        let note_2 = note(1);
+        let note_3 = note(2);
 
         let (mut ledger, genesis) = ledger(&[
-            coin_1.commitment(),
-            coin_2.commitment(),
-            coin_3.commitment(),
+            note_1.note_commitment(),
+            note_2.note_commitment(),
+            note_3.note_commitment(),
         ]);
 
-        // coin_1 & coin_2 both concurrently win slot 0
+        // note_1 & note_2 both concurrently win slot 0
 
-        update_ledger(&mut ledger, genesis, 1, coin_1).unwrap();
-        let h = update_ledger(&mut ledger, genesis, 1, coin_2).unwrap();
+        update_ledger(&mut ledger, genesis, 1, note_1).unwrap();
+        let h = update_ledger(&mut ledger, genesis, 1, note_2).unwrap();
 
-        // then coin_3 wins slot 1 and chooses to extend from block_2
-        let h_3 = update_ledger(&mut ledger, h, 2, coin_3).unwrap();
-        // coin 1 is not spent in the chain that ends with block_3
-        assert!(!ledger.states[&h_3].is_nullified(&coin_1.nullifier()));
+        // then note_3 wins slot 1 and chooses to extend from block_2
+        let h_3 = update_ledger(&mut ledger, h, 2, note_3).unwrap();
+        // note 1 is not spent in the chain that ends with block_3
+        assert!(!ledger.states[&h_3].is_nullified(&note_1.nullifier()));
     }
 
     #[test]
     fn test_epoch_transition() {
-        let coins = (0..4).map(coin).collect::<Vec<_>>();
-        let coin_4 = coin(4);
-        let coin_5 = coin(5);
-        let (mut ledger, genesis) =
-            ledger(&coins.iter().map(|c| c.commitment()).collect::<Vec<_>>());
+        let notes = (0..4).map(note).collect::<Vec<_>>();
+        let note_4 = note(4);
+        let note_5 = note(5);
+        let (mut ledger, genesis) = ledger(
+            &notes
+                .iter()
+                .map(|c| c.note_commitment())
+                .collect::<Vec<_>>(),
+        );
 
         // An epoch will be 10 slots long, with stake distribution snapshot taken at the start of the epoch
         // and nonce snapshot before slot 7
 
-        let h_1 = update_ledger(&mut ledger, genesis, 1, coins[0]).unwrap();
+        let h_1 = update_ledger(&mut ledger, genesis, 1, notes[0]).unwrap();
         assert_eq!(ledger.states[&h_1].epoch_state.epoch, 0.into());
 
-        let h_2 = update_ledger(&mut ledger, h_1, 6, coins[1]).unwrap();
+        let h_2 = update_ledger(&mut ledger, h_1, 6, notes[1]).unwrap();
 
-        let h_3 = apply_and_add_coin(&mut ledger, h_2, 9, coins[2], coin_4);
+        let h_3 = apply_and_add_note(&mut ledger, h_2, 9, notes[2], note_4);
 
         // test epoch jump
-        let h_4 = update_ledger(&mut ledger, h_3, 20, coins[3]).unwrap();
+        let h_4 = update_ledger(&mut ledger, h_3, 20, notes[3]).unwrap();
         // nonce for epoch 2 should be taken at the end of slot 16, but in our case the last block is at slot 9
         assert_eq!(
             ledger.states[&h_4].epoch_state.nonce,
@@ -577,13 +704,14 @@ pub mod tests {
         );
 
         // nonce for epoch 1 should be taken at the end of slot 6
-        let h_5 = apply_and_add_coin(&mut ledger, h_3, 10, coins[3], coin_5);
+        update_ledger(&mut ledger, h_3, 10, notes[3]).unwrap();
+        let h_5 = apply_and_add_note(&mut ledger, h_3, 10, notes[3], note_5);
         assert_eq!(
             ledger.states[&h_5].epoch_state.nonce,
             ledger.states[&h_2].nonce,
         );
 
-        let h_6 = update_ledger(&mut ledger, h_5, 20, coins[3].evolve()).unwrap();
+        let h_6 = update_ledger(&mut ledger, h_5, 20, evolve(notes[3])).unwrap();
         // stake distribution snapshot should be taken at the end of slot 9, check that changes in slot 10
         // are ignored
         assert_eq!(
@@ -593,96 +721,96 @@ pub mod tests {
     }
 
     #[test]
-    fn test_evolved_coin_is_eligible_for_leadership() {
-        let coin = coin(0);
-        let (mut ledger, genesis) = ledger(&[coin.commitment()]);
+    fn test_evolved_note_is_eligible_for_leadership() {
+        let note = note(0);
+        let (mut ledger, genesis) = ledger(&[note.note_commitment()]);
 
-        let h = update_ledger(&mut ledger, genesis, 1, coin).unwrap();
+        let h = update_ledger(&mut ledger, genesis, 1, note).unwrap();
 
-        // reusing the same coin should be prevented
+        // reusing the same note should be prevented
         assert!(matches!(
-            update_ledger(&mut ledger, h, 2, coin),
-            Err(LedgerError::NullifierExists),
+            update_ledger(&mut ledger, h, 2, note),
+            Err(LedgerError::DoubleSpend(_)),
         ));
 
-        // the evolved coin is not elibile before block 2 as it has not appeared on the ledger yet
+        // the evolved note is not elibile before block 2 as it has not appeared on the ledger yet
         assert!(matches!(
-            update_ledger(&mut ledger, genesis, 2, coin.evolve()),
-            Err(LedgerError::CommitmentNotFound),
+            update_ledger(&mut ledger, genesis, 2, evolve(note)),
+            Err(LedgerError::InvalidRoot),
         ));
 
-        // the evolved coin is eligible after coin 1 is spent
-        assert!(update_ledger(&mut ledger, h, 2, coin.evolve()).is_ok());
+        // the evolved note is eligible after note 1 is spent
+        assert!(update_ledger(&mut ledger, h, 2, evolve(note)).is_ok());
     }
 
     #[test]
-    fn test_new_coins_becoming_eligible_after_stake_distribution_stabilizes() {
-        let coin_1 = coin(1);
-        let coin = coin(0);
+    fn test_new_notes_becoming_eligible_after_stake_distribution_stabilizes() {
+        let note_1 = note(1);
+        let note = note(0);
 
-        let (mut ledger, genesis) = ledger(&[coin.commitment()]);
+        let (mut ledger, genesis) = ledger(&[note.note_commitment()]);
 
         // EPOCH 0
-        // mint a new coin to be used for leader elections in upcoming epochs
-        let h_0_1 = apply_and_add_coin(&mut ledger, genesis, 1, coin, coin_1);
+        // mint a new note to be used for leader elections in upcoming epochs
+        let h_0_1 = apply_and_add_note(&mut ledger, genesis, 1, note, note_1);
 
-        // the new coin is not yet eligible for leader elections
+        // the new note is not yet eligible for leader elections
         assert!(matches!(
-            update_ledger(&mut ledger, h_0_1, 2, coin_1),
-            Err(LedgerError::CommitmentNotFound),
+            update_ledger(&mut ledger, h_0_1, 2, note_1),
+            Err(LedgerError::InvalidRoot),
         ));
 
-        // // but the evolved coin can
-        let h_0_2 = update_ledger(&mut ledger, h_0_1, 2, coin.evolve()).unwrap();
+        // // but the evolved note can
+        let h_0_2 = update_ledger(&mut ledger, h_0_1, 2, evolve(note)).unwrap();
 
         // EPOCH 1
         for i in 10..20 {
-            // the newly minted coin is still not eligible in the following epoch since the
+            // the newly minted note is still not eligible in the following epoch since the
             // stake distribution snapshot is taken at the beginning of the previous epoch
             assert!(matches!(
-                update_ledger(&mut ledger, h_0_2, i, coin_1),
-                Err(LedgerError::CommitmentNotFound),
+                update_ledger(&mut ledger, h_0_2, i, note_1),
+                Err(LedgerError::InvalidRoot),
             ));
         }
 
         // EPOCH 2
-        // the coin is finally eligible 2 epochs after it was first minted
-        let h_2_0 = update_ledger(&mut ledger, h_0_2, 20, coin_1).unwrap();
+        // the note is finally eligible 2 epochs after it was first minted
+        let h_2_0 = update_ledger(&mut ledger, h_0_2, 20, note_1).unwrap();
 
-        // and now the minted coin can freely use the evolved coin for subsequent blocks
-        update_ledger(&mut ledger, h_2_0, 21, coin_1.evolve()).unwrap();
+        // and now the minted note can freely use the evolved note for subsequent blocks
+        update_ledger(&mut ledger, h_2_0, 21, evolve(note_1)).unwrap();
     }
 
     #[test]
     fn test_orphan_proof_import() {
-        let coin = coin(0);
-        let (mut ledger, genesis) = ledger(&[coin.commitment()]);
+        let note = note(0);
+        let (mut ledger, genesis) = ledger(&[note.note_commitment()]);
 
-        let coin_new = coin.evolve();
-        let coin_new_new = coin_new.evolve();
+        let note_new = evolve(note);
+        let note_new_new = evolve(note_new);
 
-        // produce a fork where the coin has been spent twice
-        let fork_1 = make_id(genesis, 1, coin);
-        let fork_2 = make_id(fork_1, 2, coin_new);
+        // produce a fork where the note has been spent twice
+        let fork_1 = make_id(genesis, 1, note);
+        let fork_2 = make_id(fork_1, 2, note_new);
 
-        // neither of the evolved coins should be usable right away in another branch
+        // neither of the evolved notes should be usable right away in another branch
         assert!(matches!(
-            update_ledger(&mut ledger, genesis, 1, coin_new),
-            Err(LedgerError::CommitmentNotFound)
+            update_ledger(&mut ledger, genesis, 1, note_new),
+            Err(LedgerError::InvalidRoot)
         ));
         assert!(matches!(
-            update_ledger(&mut ledger, genesis, 1, coin_new_new),
-            Err(LedgerError::CommitmentNotFound)
+            update_ledger(&mut ledger, genesis, 1, note_new_new),
+            Err(LedgerError::InvalidRoot)
         ));
 
         // they also should not be accepted if the fork from where they have been imported has not been seen already
         assert!(matches!(
-            update_orphans(&mut ledger, genesis, 1, coin_new, vec![(fork_1, (1, coin))]),
+            update_orphans(&mut ledger, genesis, 1, note_new, vec![(fork_1, note)]),
             Err(LedgerError::OrphanMissing(_))
         ));
 
         // now the first block of the fork is seen (and accepted)
-        let h_1 = update_ledger(&mut ledger, genesis, 1, coin).unwrap();
+        let h_1 = update_ledger(&mut ledger, genesis, 1, note).unwrap();
         assert_eq!(h_1, fork_1);
 
         // and it can now be imported in another branch (note this does not validate it's for an earlier slot)
@@ -690,92 +818,63 @@ pub mod tests {
             &mut ledger.clone(),
             genesis,
             1,
-            coin_new,
-            vec![(fork_1, (1, coin))],
+            note_new,
+            vec![(fork_1, note)],
         )
         .unwrap();
-        // but the next coin is still not accepted since the second block using the evolved coin has not been seen yet
+        // but the next note is still not accepted since the second block using the evolved note has not been seen yet
         assert!(matches!(
             update_orphans(
                 &mut ledger.clone(),
                 genesis,
                 1,
-                coin_new_new,
-                vec![(fork_1, (1, coin)), (fork_2, (2, coin_new))],
+                note_new_new,
+                vec![(fork_1, note), (fork_2, note_new)],
             ),
             Err(LedgerError::OrphanMissing(_))
         ));
 
-        // now the second block of the fork is seen as well and the coin evolved twice can be used in another branch
-        let h_2 = update_ledger(&mut ledger, h_1, 2, coin_new).unwrap();
+        // now the second block of the fork is seen as well and the note evolved twice can be used in another branch
+        let h_2 = update_ledger(&mut ledger, h_1, 2, note_new).unwrap();
         assert_eq!(h_2, fork_2);
         update_orphans(
             &mut ledger.clone(),
             genesis,
             1,
-            coin_new_new,
-            vec![(fork_1, (1, coin)), (fork_2, (2, coin_new))],
+            note_new_new,
+            vec![(fork_1, note), (fork_2, note_new)],
         )
         .unwrap();
-        // but we can't import just the second proof because it's using an evolved coin that has not been seen yet
+        // but we can't import just the second proof because it's using an evolved note that has not been seen yet
         assert!(matches!(
             update_orphans(
                 &mut ledger.clone(),
                 genesis,
                 1,
-                coin_new_new,
-                vec![(fork_2, (2, coin_new))],
+                note_new_new,
+                vec![(fork_2, note_new)],
             ),
-            Err(LedgerError::CommitmentNotFound)
+            Err(LedgerError::InvalidRoot)
         ));
 
-        // an imported proof that uses a coin that was already used in the base branch should not be allowed
-        let header_1 = update_ledger(&mut ledger, genesis, 1, coin).unwrap();
+        // an imported proof that uses a note that was already used in the base branch should not be allowed
+        let header_1 = update_ledger(&mut ledger, genesis, 1, note).unwrap();
         assert!(matches!(
             update_orphans(
                 &mut ledger,
                 header_1,
                 2,
-                coin_new_new,
-                vec![(fork_1, (1, coin)), (fork_2, (2, coin_new))],
+                note_new_new,
+                vec![(fork_1, note), (fork_2, note_new)],
             ),
-            Err(LedgerError::NullifierExists)
+            Err(LedgerError::DoubleSpend(_))
         ));
     }
 
     #[test]
-    fn test_conversions_for_leader_proof() {
-        let commitment = Commitment::from([0u8; 32]);
-        let commitment_bytes: [u8; 32] = commitment.into();
-
-        let _zero_bytes = [0u8; 32];
-        assert!(matches!(commitment_bytes, _zero_bytes));
-
-        let commitment_ref = commitment.as_ref();
-        assert_eq!(commitment_ref, &_zero_bytes);
-
-        let nullifier = Nullifier::from([0u8; 32]);
-        let _nullifier_bytes: [u8; 32] = nullifier.into();
-        assert!(matches!(_nullifier_bytes, _zero_bytes));
-
-        let slot = Slot::genesis();
-        let leader_proof = LeaderProof::dummy(slot, commitment, Commitment::from([0; 32]));
-
-        assert_eq!(leader_proof.commitment(), &commitment);
-        assert_eq!(leader_proof.evolved_commitment(), &commitment);
-        assert_eq!(leader_proof.nullifier(), &nullifier);
-
-        // Test ser/de of compact representation for Nullifier
-        assert_tokens(&nullifier.compact(), &[Token::BorrowedBytes(&[0; 32])]);
-
-        // Test ser/de of compact representation for Commitment
-        assert_tokens(&commitment.compact(), &[Token::BorrowedBytes(&[0; 32])]);
-    }
-
-    #[test]
     fn test_update_epoch_state_with_outdated_slot_error() {
-        let coin = coin(0);
-        let commitment = coin.commitment();
+        let note = note(0);
+        let commitment = note.note_commitment();
         let (ledger, genesis) = ledger(&[commitment]);
 
         let ledger_state = ledger.state(&genesis).unwrap().clone();
@@ -797,36 +896,5 @@ pub mod tests {
                 if parent == slot && block == slot2 => {}
             _ => panic!("error does not match the LedgerError::InvalidSlot pattern"),
         };
-    }
-
-    #[test]
-    fn test_apply_proof_with_existing_commitment_error() {
-        let coin = coin(0);
-        let commitment = coin.commitment();
-        let (ledger, genesis) = ledger(&[commitment]);
-
-        let ledger_state = ledger.state(&genesis).unwrap().clone();
-        let ledger_config = ledger.config();
-
-        let actual_slot = ledger_state.slot();
-        let proof = LeaderProof::dummy(actual_slot, commitment, commitment);
-        let epoch_state = ledger_state.epoch_state();
-
-        assert!(ledger_state.can_spend(&commitment));
-        assert_eq!(epoch_state.total_stake(), Value::from(1u32));
-        assert_eq!(coin.value(), Value::from(1u32));
-
-        assert!(ledger_state.can_lead(&commitment));
-        assert!(epoch_state.is_eligible_leader(&commitment));
-
-        let apply_proof_err = ledger_state
-            .try_apply_proof::<HeaderId>(&proof, ledger_config)
-            .err();
-
-        // Same commitment value from another coin cannot be used again
-        assert!(
-            matches!(apply_proof_err, Some(LedgerError::CommitmentExists)),
-            "Error does not match LedgerError::CommitmentExists"
-        );
     }
 }

@@ -13,7 +13,7 @@ pub struct ContentId([u8; 32]);
 
 // This lint is a false positive?
 #[allow(clippy::large_enum_variant)]
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum Header {
     Cryptarchia(cryptarchia::Header),
     Carnot(carnot::Header),
