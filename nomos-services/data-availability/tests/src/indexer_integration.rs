@@ -33,7 +33,7 @@ use nomos_node::{Tx, Wire};
 use nomos_storage::{backends::rocksdb::RocksBackend, StorageService};
 use overwatch_derive::*;
 use overwatch_rs::overwatch::{Overwatch, OverwatchRunner};
-use overwatch_rs::services::handle::ServiceHandle;
+use overwatch_rs::services::{handle::ServiceHandle, ServiceData};
 use rand::{thread_rng, Rng};
 use subnetworks_assignations::versions::v1::FillFromNodeList;
 use tempfile::{NamedTempFile, TempDir};
@@ -41,6 +41,7 @@ use time::OffsetDateTime;
 use tokio_stream::{wrappers::BroadcastStream, StreamExt};
 // internal
 use crate::common::*;
+use crate::service_wrapper::ServiceWrapper;
 
 #[derive(Services)]
 struct IndexerNode {
@@ -195,6 +196,8 @@ fn test_indexer() {
         vec![node_address(&swarm_config1)],
     );
 
+    let wrapper1 = ServiceWrapper::new(node1.handle());
+
     let mempool = node1.handle().relay::<DaMempool>();
     let storage = node1.handle().relay::<StorageService<RocksBackend<Wire>>>();
     let indexer = node1.handle().relay::<DaIndexer>();
@@ -236,6 +239,11 @@ fn test_indexer() {
         let storage_outbound = storage.connect().await.unwrap();
         let indexer_outbound = indexer.connect().await.unwrap();
         let consensus_outbound = consensus.connect().await.unwrap();
+
+        wrapper1.wrap(mempool_outbound);
+        wrapper1.wrap(&storage_outbound);
+        wrapper1.wrap(&indexer_outbound);
+        wrapper1.wrap(&consensus_outbound);
 
         let (sender, receiver) = tokio::sync::oneshot::channel();
         consensus_outbound

@@ -1,30 +1,25 @@
 use overwatch_rs::{
-    overwatch::{handle::OverwatchHandle, OverwatchRunner, Services},
-    services::ServiceData,
+    overwatch::{handle::OverwatchHandle, Services},
+    services::{
+        relay::{AnyMessage, OutboundRelay},
+        ServiceData,
+    },
 };
 
-pub struct ServiceWrapper<S> {
-    ow_handle: OverwatchHandle,
-    wrapped_services: Vec<S>,
+pub struct ServiceWrapper<'a> {
+    ow_handle: &'a OverwatchHandle,
+    wrapped_services: Vec<&'a OutboundRelay<ServiceData::Message>>,
 }
 
-impl<S: Services> ServiceWrapper<S>
-where
-    S: Services + Send,
-{
-    fn new(settings: S::Settings, relays: Vec<ServiceData>) -> Self {
-        let ow = OverwatchRunner::<S>::run(settings, None)
-            .map_err(|e| eprintln!("Error encountered: {}", e))
-            .unwrap();
-        let handle = ow.handle();
-        let mut services = vec![];
-        for s in relays.iter() {
-            let relay = handle.relay::<s>();
-            services.push(relay);
-        }
+impl<'a> ServiceWrapper<'a> {
+    pub fn new(handle: &'a OverwatchHandle) -> Self {
         Self {
             ow_handle: handle,
-            wrapped_services: services,
+            wrapped_services: vec![],
         }
+    }
+
+    pub async fn wrap(&mut self, relay: &'a OutboundRelay<ServiceData::Message>) {
+        self.wrapped_services.push(relay);
     }
 }
