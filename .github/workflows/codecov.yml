@@ -42,7 +42,7 @@ jobs:
         continue-on-error: true
       - run: |
           mkdir bcp
-          cp ./target/debug/{nomos-cli, nomos-node, rocks} bcp/
+          cp ./target/debug/{nomos-cli,nomos-node,rocks} bcp/
           cargo clean
           mkdir -p target/debug
           cp bcp/* ./target/debug/
