@@ -39,14 +39,13 @@ jobs:
           command: build
           args: --all --no-default-features --features libp2p
       - uses: actions-rs/cargo@v1
-        run: |
+        continue-on-error: true
+      - run: |
           mkdir bcp
           cp ./target/debug/{nomos-cli, nomos-node, rocks} bcp/
           cargo clean
           mkdir -p target/debug
           cp bcp/* ./target/debug/
-      - uses: actions-rs/cargo@v1
-        continue-on-error: true
       - run: |
           cargo binstall -y grcov;
           cargo test --no-default-features --features libp2p
