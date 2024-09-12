@@ -36,6 +36,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - run: |
           cargo binstall -y grcov;
+          cargo build --all --no-default-features --features libp2p
           cargo test --no-default-features --features libp2p
           mkdir /tmp/cov;
           grcov . --binary-path ./target/debug/ -s . -t lcov --branch --ignore-not-existing --ignore '../*' --ignore "/*" -o /tmp/cov/tests.lcov;
