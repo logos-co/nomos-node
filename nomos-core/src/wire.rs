@@ -24,7 +24,9 @@ type BincodeOptions = WithOtherTrailing<
     RejectTrailing,
 >;
 
-const DATA_LIMIT: u64 = 2048; // Do not serialize/deserialize more than 2Kb
+// TODO: Risc0 proofs are HUGE (220 Kb) and it's the only reason we need to have this
+// limit so large. Remove this once we transition to smaller proofs.
+const DATA_LIMIT: u64 = 1 << 18; // Do not serialize/deserialize more than 256 KiB
 static OPTIONS: Lazy<BincodeOptions> = Lazy::new(|| {
     bincode::DefaultOptions::new()
         .with_little_endian()
