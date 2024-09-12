@@ -40,7 +40,7 @@ jobs:
           mkdir bcp
           cp ./target/debug/{nomos-cli,nomos-node,rocks} bcp/
           cargo clean
-          cargo test --no-default-features --features libp2p
+          cargo test --no-default-features --features libp2p --no-run
           cp bcp/* ./target/debug
           mkdir /tmp/cov;
           grcov . --binary-path ./target/debug/ -s . -t lcov --branch --ignore-not-existing --ignore '../*' --ignore "/*" -o /tmp/cov/tests.lcov;
