@@ -51,6 +51,7 @@ jobs:
       - name: Run grcov
         run: |
           cargo install grcov;
+          df -h
           cargo test --no-default-features --features libp2p
           mkdir /tmp/cov;
           grcov . --binary-path ./target/debug/ -s . -t lcov --branch --ignore-not-existing --ignore '../*' --ignore "/*" -o /tmp/cov/tests.lcov;
