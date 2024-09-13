@@ -9,6 +9,7 @@ bytes = "1.2"
 cryptarchia-consensus = { path = "../../../nomos-services/cryptarchia-consensus" }
 cryptarchia-engine = { path = "../../../consensus/cryptarchia-engine", features = ["serde"] }
 cryptarchia-ledger = { path = "../../../ledger/cryptarchia-ledger", features = ["serde"] }
+cl = { path = "../../../cl/cl" }
 full-replication = { path = "../../../nomos-da/full-replication" }
 hex = "0.4.3"
 kzgrs-backend = { path = "../../../nomos-da/kzgrs-backend" }

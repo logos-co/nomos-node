@@ -10,10 +10,20 @@ blake2 = "0.10"
 rpds = "1"
 thiserror = "1"
 serde = { version = "1.0", features = ["derive"], optional = true }
-serde_test = "1.0.176"
 # TODO: we only need types definition from this crate
 cryptarchia-engine = { path = "../../consensus/cryptarchia-engine" }
+cl = { path = "../../cl/cl" }
+risc0-zkvm = { version = "1.0", optional = true }
+leader_proof_statements = { path = "../../proof_of_leadership/proof_statements" }
+nomos_pol_risc0_proofs = { path = "../../proof_of_leadership/risc0/risc0_proofs", optional = true }
+nomos_pol_prover = { path = "../../proof_of_leadership/risc0/prover", optional = true }
+rand = "0.8.5"
+rand_core = "0.6.0"
+sha2 = "0.10"
+
 nomos-utils = { path = "../../nomos-utils", optional = true }
 
 [features]
 serde = ["dep:serde", "nomos-utils/serde", "rpds/serde"]
+risc0_proof = ["risc0-zkvm", "nomos_pol_risc0_proofs"]
+prove = ["nomos_pol_prover"]

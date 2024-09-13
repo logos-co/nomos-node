@@ -42,8 +42,8 @@ nomos-system-sig = { path = "../../nomos-services/system-sig" }
 tracing-subscriber = "0.3"
 cryptarchia-engine = { path = "../../consensus/cryptarchia-engine" }
 cryptarchia-ledger = { path = "../../ledger/cryptarchia-ledger" }
-rand = "0.8"
 rand_chacha = "0.3"
+cl = { path = "../../cl/cl" }
 tokio = { version = "1.24", features = ["sync"] }
 serde_json = "1.0"
 serde_yaml = "0.9"
@@ -59,6 +59,7 @@ axum = { version = "0.6" }
 hyper = { version = "0.14", features = ["full"] }
 tower-http = { version = "0.4", features = ["cors", "trace"] }
 time = "0.3"
+rand = "0.8"
 
 [features]
 default = ["tracing"]

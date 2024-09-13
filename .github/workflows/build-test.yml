@@ -29,6 +29,13 @@ jobs:
           profile: minimal
           toolchain: stable
           override: true
+      - uses: cargo-bins/cargo-binstall@main
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Install risc0
+        run: cargo binstall -y cargo-risczero && cargo risczero install
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - uses: actions-rs/cargo@v1
         with:
           command: check
@@ -41,7 +48,7 @@ jobs:
       fail-fast: false # all OSes should be tested even if one fails (default: true)
       matrix:
         feature: [ libp2p, "libp2p,mixnet" ]
-        os: [ ubuntu-latest, windows-latest, macos-latest ]
+        os: [ ubuntu-latest, macos-latest ] # drop windows for now as risc0 does not support it
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v2
@@ -70,6 +77,13 @@ jobs:
       - name: Setup build environment (Windows)
         if: matrix.os == 'windows-latest'
         uses: ./.github/actions/mingw-env
+      - uses: cargo-bins/cargo-binstall@main
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Install risc0
+        run: cargo binstall -y cargo-risczero && cargo risczero install
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Cargo build
         uses: actions-rs/cargo@v1
         with:
@@ -78,6 +92,9 @@ jobs:
       - name: Cargo test (Other OSes)
         if: matrix.os != 'windows-latest'
         uses: actions-rs/cargo@v1
+        env:
+          RISC0_DEV_MODE: true
+          CONSENSUS_SLOT_TIME: 5
         with:
           command: test
           args: --all --no-default-features --features ${{ matrix.feature }}
@@ -87,35 +104,16 @@ jobs:
         env:
           # Because Windows runners in Github Actions tend to be slow.
           SLOW_TEST_ENV: true
+          RISC0_DEV_MODE: true
+          CONSENSUS_SLOT_TIME: 5
         with:
           command: test
-          args: --all --no-default-features --features ${{ matrix.feature }}
+          args: --no-default-features --features ${{ matrix.feature }}
       - uses: actions/upload-artifact@v3
         if: failure()
         with:
           name: integration-test-artifacts
           path: tests/.tmp*
-    
-  risc0:
-    name: Risc0 tests
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-        with:
-          submodules: true
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-          override: true
-      - name: Install risc0
-        run: cargo install cargo-risczero && cargo risczero install
-      - name: Cargo test
-        uses: actions-rs/cargo@v1
-        with:
-          command: test
-          args: --manifest-path proof_of_leadership/risc0/prover/Cargo.toml
-      
 
   lints:
     name: Rust lints
@@ -136,7 +134,13 @@ jobs:
           toolchain: stable
           override: true
           components: rustfmt, clippy
-
+      - uses: cargo-bins/cargo-binstall@main
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Install risc0
+        run: cargo binstall -y cargo-risczero && cargo risczero install
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Run cargo fmt
         uses: actions-rs/cargo@v1
         with:
