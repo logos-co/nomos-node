@@ -40,7 +40,7 @@ jobs:
           command: build
           args: --all --no-default-features --features libp2p
       - uses: actions-rs/cargo@v1
-        run: |
+      - run: |
           mkdir bcp
           cp ./target/debug/{nomos-cli, nomos-node, rocks} bcp/
           cargo clean
