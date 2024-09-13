@@ -42,6 +42,8 @@ jobs:
       - name: Prepare artifacts
         run: |
           mkdir bcp
+          ls -la ./target/debug
+          ls -la ./target/
           cp ./target/debug/{nomos-cli, nomos-node, rocks} bcp/
           cargo clean
           mkdir -p target/debug
