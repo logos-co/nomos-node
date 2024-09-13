@@ -35,24 +35,12 @@ jobs:
         run: cargo binstall -y cargo-risczero && cargo risczero install
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - uses: actions-rs/cargo@v1
-        with:
-          command: build
-          args: --all --no-default-features --features libp2p
-      - name: Prepare artifacts
-        run: |
-          mkdir bcp
-          cp ./target/debug/nomos-cli bcp/
-          cp ./target/debug/nomos-node bcp/
-          cp ./target/debug/rocks bcp/
-          cargo clean
-          mkdir -p target/debug
-          cp bcp/* ./target/debug/
-      - name: Run grcov
-        run: |
-          cargo install grcov;
-          df -h
-          cargo test --no-default-features --features libp2p
+      - run: |
+          cargo binstall -y grcov;
+          cargo build --no-default-features --features libp2p
+          rm -rf target/debug/{build,incremental,deps}
+          cargo test --no-default-features --features libp2p --no-run
+          rm -rf target/debug/{build,incremental,deps}
           mkdir /tmp/cov;
           grcov . --binary-path ./target/debug/ -s . -t lcov --branch --ignore-not-existing --ignore '../*' --ignore "/*" -o /tmp/cov/tests.lcov;
         env:
