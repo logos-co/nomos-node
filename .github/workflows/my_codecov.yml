@@ -37,9 +37,10 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - run: |
           cargo binstall -y grcov;
-          cargo test --no-default-features --features libp2p --no-run
+          rustup component add llvm-tools-preview
+          CARGO_INCREMENTAL=0 RUSTFLAGS='-Cinstrument-coverage' LLVM_PROFILE_FILE='cargo-test-%p-%m.profraw' cargo test --no-default-features --features libp2p 
           mkdir /tmp/cov;
-          grcov . --binary-path ./target/debug/ -s . -t lcov --branch --ignore-not-existing --ignore '../*' --ignore "/*" -o /tmp/cov/tests.lcov;
+          grcov . --binary-path ./target/debug/deps/ -s . -t lcov --branch --ignore-not-existing --ignore '../*' --ignore "/*" -o /tmp/cov/tests.lcov;
         env:
           SLOW_TEST_ENV: true
       - uses: actions/upload-artifact@v3
