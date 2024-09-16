@@ -38,6 +38,11 @@ jobs:
         run: cargo binstall -y cargo-risczero && cargo risczero install
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Cargo build
+        uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --all --no-default-features --features ${{ matrix.feature }}
       - name: Run tests
         uses: actions-rs/cargo@v1
         env:
