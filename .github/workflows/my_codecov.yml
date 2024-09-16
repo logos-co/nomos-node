@@ -8,8 +8,7 @@ on:
 name: My Codecov 3
 
 jobs:
-  test:
-    name: Test
+  tests:
     strategy:
       fail-fast: false
       matrix:
@@ -47,6 +46,21 @@ jobs:
         with:
           command: test
           args: --all --no-default-features --features ${{ matrix.feature }}
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-data
+          path: ./target/debug
+
+  coverage:
+    needs: tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: test-data
+          path: ./target/debug
       - name: Run Grcov
         run: |
           cargo binstall -y grcov;
