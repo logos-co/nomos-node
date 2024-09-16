@@ -40,6 +40,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Cargo build
         uses: actions-rs/cargo@v1
+        env:
+          CARGO_INCREMENTAL: 0
         with:
           command: build
           args: --all --no-default-features --features ${{ matrix.feature }}
@@ -48,6 +50,7 @@ jobs:
         env:
           RISC0_DEV_MODE: true
           CONSENSUS_SLOT_TIME: 5
+          CARGO_INCREMENTAL: 0
         with:
           command: test
           args: --all --no-default-features --features ${{ matrix.feature }}
