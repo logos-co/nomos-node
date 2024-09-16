@@ -99,15 +99,22 @@ where
             ExecutorSwarm::new(keypair, config.membership, dispersal_events_sender);
         let dispersal_request_sender = executor_swarm.blobs_sender();
 
-        for (_, addr) in config.node_addrs {
+        for (_, addr) in &config.node_addrs {
             executor_swarm
-                .dial(addr)
+                .dial(addr.clone())
                 .expect("Should schedule the dials");
         }
+
+        let executor_open_stream_sender = executor_swarm.open_stream_sender();
 
         let task = overwatch_handle
             .runtime()
             .spawn(async move { executor_swarm.run().await });
+
+        for (peer_id, _) in &config.node_addrs {
+            executor_open_stream_sender.send(*peer_id).unwrap();
+        }
+
         let (dispersal_broadcast_sender, dispersal_broadcast_receiver) =
             broadcast::channel(BROADCAST_CHANNEL_SIZE);
         let dispersal_events_receiver = UnboundedReceiverStream::new(dispersal_events_receiver);

@@ -406,7 +406,11 @@ fn create_node_config(
         da_network: DaNetworkConfig {
             backend: DaNetworkValidatorBackendSettings {
                 node_key: swarm_config.node_key,
-                listening_address: Multiaddr::from_str("/ip4/127.0.0.1/udp/0/quic-v1").unwrap(),
+                listening_address: Multiaddr::from_str(&format!(
+                    "/ip4/127.0.0.1/udp/{}/quic-v1",
+                    get_available_port(),
+                ))
+                .unwrap(),
                 addresses: Default::default(),
                 membership: Default::default(),
             },

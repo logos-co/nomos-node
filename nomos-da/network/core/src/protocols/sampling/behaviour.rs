@@ -414,7 +414,6 @@ where
         mut stream: SampleStream,
         channel: ResponseChannel,
     ) -> Result<SampleStream, SamplingError> {
-        // TODO: Could it be that the SampleRes is sent as a new stream?
         let request: SampleReq = unpack_from_reader(&mut stream.stream)
             .await
             .map_err(|error| SamplingError::Io {

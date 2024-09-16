@@ -1,4 +1,5 @@
 // std
+use std::time::Duration;
 // crates
 use futures::StreamExt;
 use kzgrs_backend::common::blob::DaBlob;
@@ -68,6 +69,9 @@ where
             .with_quic()
             .with_behaviour(|key| ValidatorBehaviour::new(key, membership, addresses))
             .expect("Validator behaviour should build")
+            .with_swarm_config(|cfg| {
+                cfg.with_idle_connection_timeout(Duration::from_secs(u64::MAX))
+            })
             .build()
     }
 

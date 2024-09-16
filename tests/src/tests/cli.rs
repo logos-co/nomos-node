@@ -4,7 +4,6 @@ use nomos_cli::da::network::backend::ExecutorBackendSettings;
 use nomos_da_network_service::NetworkConfig;
 use nomos_libp2p::ed25519;
 use nomos_libp2p::libp2p;
-use nomos_libp2p::libp2p::multiaddr::multiaddr;
 use nomos_libp2p::Multiaddr;
 use nomos_libp2p::PeerId;
 use std::collections::HashMap;
@@ -53,7 +52,14 @@ async fn disseminate(config: &mut Disseminate) {
                 libp2p_config.node_key.clone(),
             ));
             let peer_id = PeerId::from(keypair.public());
-            let address = multiaddr!(Ip4(libp2p_config.host), Udp(libp2p_config.port), QuicV1);
+            let address = n
+                .config()
+                .da_network
+                .backend
+                .listening_address
+                .clone()
+                .with_p2p(peer_id)
+                .unwrap();
             (peer_id, address)
         })
         .collect();
@@ -63,7 +69,7 @@ async fn disseminate(config: &mut Disseminate) {
     let da_network_config: NetworkConfig<ExecutorBackend<FillFromNodeList>> = NetworkConfig {
         backend: ExecutorBackendSettings {
             node_key: ed25519::SecretKey::generate(),
-            membership: FillFromNodeList::new(&peer_ids, 2, 1),
+            membership: FillFromNodeList::new(&peer_ids, 2, 2),
             node_addrs,
         },
     };
@@ -84,7 +90,7 @@ async fn disseminate(config: &mut Disseminate) {
     );
     config.app_id = "fd3384e132ad02a56c78f45547ee40038dc79002b90d29ed90e08eee762ae715".to_string();
     config.index = 0;
-    config.columns = 32;
+    config.columns = 2;
 
     run_disseminate(&config);
 }
