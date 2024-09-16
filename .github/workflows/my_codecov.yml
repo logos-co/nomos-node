@@ -70,12 +70,9 @@ jobs:
           merge-multiple: true
       - name: Run Grcov
         run: |
-          ls -la ./target/debug
-          pwd
-          ls -la .
           cargo install grcov;
           mkdir /tmp/cov;
-          grcov . --binary-path ./target/debug/ -s . -t lcov --branch --ignore-not-existing --ignore '../*' --ignore "/*" -o /tmp/cov/tests.lcov;
+          grcov . --binary-path ./ -s . -t lcov --branch --ignore-not-existing --ignore '../*' --ignore "/*" -o /tmp/cov/tests.lcov;
       - uses: actions/upload-artifact@v3
         if: failure()
         with:
