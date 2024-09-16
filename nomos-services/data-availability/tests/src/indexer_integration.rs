@@ -35,6 +35,8 @@ use tokio_stream::StreamExt;
 // internal
 use crate::common::*;
 
+const INDEXER_TEST_MAX_SECONDS: u64 = 60;
+
 // TODO: When verifier is implemented this test should be removed and a new one
 // performed in integration tests crate using the real node.
 
@@ -277,7 +279,7 @@ fn test_indexer() {
         let _ = mempool_rx.await.unwrap();
 
         // Wait for block in the network.
-        let timeout = tokio::time::sleep(Duration::from_secs(20));
+        let timeout = tokio::time::sleep(Duration::from_secs(INDEXER_TEST_MAX_SECONDS));
         tokio::pin!(timeout);
 
         loop {
