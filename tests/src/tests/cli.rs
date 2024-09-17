@@ -3,7 +3,6 @@ use nomos_cli::da::network::backend::ExecutorBackend;
 use nomos_cli::da::network::backend::ExecutorBackendSettings;
 use nomos_da_network_service::NetworkConfig;
 use nomos_libp2p::ed25519;
-use nomos_libp2p::libp2p;
 use nomos_libp2p::Multiaddr;
 use nomos_libp2p::PeerId;
 use std::collections::HashMap;
@@ -42,34 +41,37 @@ fn run_disseminate(disseminate: &Disseminate) {
 }
 
 async fn disseminate(config: &mut Disseminate) {
-    let nodes = NomosNode::spawn_nodes(SpawnConfig::star_happy(2)).await;
+    let node_key = ed25519::SecretKey::generate();
+    let peer_id = PeerId::from_public_key(
+        &nomos_libp2p::ed25519::Keypair::from(node_key.clone())
+            .public()
+            .into(),
+    );
 
-    let node_addrs: HashMap<PeerId, Multiaddr> = nodes
-        .iter()
-        .map(|n| {
-            let libp2p_config = &n.config().network.backend.inner;
-            let keypair = libp2p::identity::Keypair::from(ed25519::Keypair::from(
-                libp2p_config.node_key.clone(),
-            ));
-            let peer_id = PeerId::from(keypair.public());
-            let address = n
-                .config()
-                .da_network
-                .backend
-                .listening_address
-                .clone()
-                .with_p2p(peer_id)
-                .unwrap();
-            (peer_id, address)
-        })
+    let nodes = NomosNode::spawn_nodes(SpawnConfig::star_happy(
+        2,
+        tests::DaConfig {
+            executor_peer_ids: vec![peer_id],
+            ..Default::default()
+        },
+    ))
+    .await;
+
+    let first_config = nodes[0].config();
+    let node_addrs: HashMap<PeerId, Multiaddr> = first_config
+        .da_network
+        .backend
+        .addresses
+        .clone()
+        .into_iter()
         .collect();
 
-    let peer_ids: Vec<nomos_libp2p::PeerId> = node_addrs.keys().cloned().collect();
+    let membership = first_config.da_network.backend.membership.clone();
 
     let da_network_config: NetworkConfig<ExecutorBackend<FillFromNodeList>> = NetworkConfig {
         backend: ExecutorBackendSettings {
-            node_key: ed25519::SecretKey::generate(),
-            membership: FillFromNodeList::new(&peer_ids, 2, 2),
+            node_key,
+            membership,
             node_addrs,
         },
     };

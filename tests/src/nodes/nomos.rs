@@ -5,7 +5,7 @@ use std::str::FromStr;
 use std::time::Duration;
 // internal
 use super::{create_tempdir, persist_tempdir, LOGS_PREFIX};
-use crate::{adjust_timeout, get_available_port, ConsensusConfig, Node};
+use crate::{adjust_timeout, get_available_port, ConsensusConfig, DaConfig, Node};
 use blst::min_sig::SecretKey;
 use cl::{InputWitness, NoteWitness, NullifierSecret};
 use cryptarchia_consensus::{CryptarchiaInfo, CryptarchiaSettings, TimeConfig};
@@ -27,7 +27,7 @@ use nomos_da_sampling::storage::adapters::rocksdb::RocksAdapterSettings as Sampl
 use nomos_da_verifier::backend::kzgrs::KzgrsDaVerifierSettings;
 use nomos_da_verifier::storage::adapters::rocksdb::RocksAdapterSettings as VerifierStorageAdapterSettings;
 use nomos_da_verifier::DaVerifierServiceSettings;
-use nomos_libp2p::{Multiaddr, SwarmConfig};
+use nomos_libp2p::{Multiaddr, PeerId, SwarmConfig};
 use nomos_log::{LoggerBackend, LoggerFormat};
 use nomos_mempool::MempoolMetrics;
 #[cfg(feature = "mixnet")]
@@ -38,8 +38,9 @@ use nomos_node::{api::AxumBackendSettings, Config, Tx};
 use nomos_da_sampling::backend::kzgrs::KzgrsSamplingBackendSettings;
 use nomos_da_sampling::DaSamplingServiceSettings;
 use once_cell::sync::Lazy;
-use rand::{thread_rng, Rng, RngCore};
+use rand::{thread_rng, Rng};
 use reqwest::{Client, Url};
+use subnetworks_assignations::versions::v1::FillFromNodeList;
 use tempfile::NamedTempFile;
 use time::OffsetDateTime;
 
@@ -230,7 +231,7 @@ impl Node for NomosNode {
     /// so the leader can receive votes from all other nodes that will be subsequently spawned.
     /// If not, the leader will miss votes from nodes spawned before itself.
     /// This issue will be resolved by devising the block catch-up mechanism in the future.
-    fn create_node_configs(consensus: ConsensusConfig) -> Vec<Config> {
+    fn create_node_configs(consensus: ConsensusConfig, da: DaConfig) -> Vec<Config> {
         // we use the same random bytes for:
         // * da id
         // * coin sk
@@ -288,6 +289,7 @@ impl Node for NomosNode {
                     ledger_config.clone(),
                     vec![coin],
                     time_config.clone(),
+                    da.clone(),
                     #[cfg(feature = "mixnet")]
                     MixnetConfig {
                         mixclient: mixclient_config.clone(),
@@ -296,6 +298,17 @@ impl Node for NomosNode {
                 )
             })
             .collect::<Vec<_>>();
+
+        // Build DA memberships and address lists.
+        let peer_addresses = build_da_peer_list(&configs);
+        let mut peer_ids = peer_addresses.iter().map(|(p, _)| *p).collect::<Vec<_>>();
+        peer_ids.extend(da.executor_peer_ids);
+
+        for config in &mut configs {
+            config.da_network.backend.membership =
+                FillFromNodeList::new(&peer_ids, da.subnetwork_size, da.dispersal_factor);
+            config.da_network.backend.addresses = peer_addresses.clone();
+        }
 
         #[cfg(feature = "mixnet")]
         {
@@ -368,21 +381,38 @@ fn build_mixnet_topology(mixnode_candidates: &[&Config]) -> MixnetTopology {
     MixnetTopology::new(candidates, num_layers, 1, [1u8; 32]).unwrap()
 }
 
+fn secret_key_to_peer_id(node_key: nomos_libp2p::ed25519::SecretKey) -> PeerId {
+    PeerId::from_public_key(
+        &nomos_libp2p::ed25519::Keypair::from(node_key)
+            .public()
+            .into(),
+    )
+}
+
+fn build_da_peer_list(configs: &[Config]) -> Vec<(PeerId, Multiaddr)> {
+    configs
+        .iter()
+        .map(|c| {
+            (
+                secret_key_to_peer_id(c.da_network.backend.node_key.clone()),
+                c.da_network.backend.listening_address.clone(),
+            )
+        })
+        .collect()
+}
+
 fn create_node_config(
-    _id: [u8; 32],
+    id: [u8; 32],
     genesis_state: LedgerState,
     config: cryptarchia_ledger::Config,
     notes: Vec<InputWitness>,
     time: TimeConfig,
+    da_config: DaConfig,
     #[cfg(feature = "mixnet")] mixnet_config: MixnetConfig,
 ) -> Config {
     let swarm_config: SwarmConfig = Default::default();
 
-    let mut rng = rand::thread_rng();
-    let mut buff = [0u8; 32];
-    rng.fill_bytes(&mut buff);
-
-    let verifier_sk = SecretKey::key_gen(&buff, &[]).unwrap();
+    let verifier_sk = SecretKey::key_gen(&id, &[]).unwrap();
     let verifier_pk_bytes = verifier_sk.sk_to_pk().to_bytes();
     let verifier_sk_bytes = verifier_sk.to_bytes();
 
@@ -440,13 +470,11 @@ fn create_node_config(
             },
         },
         da_sampling: DaSamplingServiceSettings {
-            // TODO: setup this properly!
             sampling_settings: KzgrsSamplingBackendSettings {
-                num_samples: 0,
-                num_subnets: 2,
-                // Sampling service period can't be zero.
-                old_blobs_check_interval: Duration::from_secs(1),
-                blobs_validity_duration: Duration::from_secs(1),
+                num_samples: da_config.num_samples,
+                num_subnets: da_config.num_subnets,
+                old_blobs_check_interval: da_config.old_blobs_check_interval,
+                blobs_validity_duration: da_config.blobs_validity_duration,
             },
             storage_adapter_settings: SamplingStorageAdapterSettings {
                 blob_storage_directory: "./".into(),
