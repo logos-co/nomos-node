@@ -40,6 +40,6 @@ time = "0.3"
 blake2 = { version = "0.10" }
 
 [features]
-default = []
+default = ["libp2p"]
 libp2p = []
 mixnet = []

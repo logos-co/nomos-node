@@ -1,129 +1,32 @@
 // std
-use std::hash::{DefaultHasher, Hash};
-use std::path::PathBuf;
-use std::sync::atomic::AtomicBool;
-use std::sync::atomic::Ordering::SeqCst;
-use std::sync::Arc;
-use std::time::Duration;
+use std::{
+    hash::{DefaultHasher, Hash},
+    sync::{
+        atomic::{AtomicBool, Ordering::SeqCst},
+        Arc,
+    },
+    time::Duration,
+};
 // crates
 use bytes::Bytes;
-use cl::{InputWitness, NoteWitness, NullifierSecret};
-use cryptarchia_consensus::ConsensusMsg;
-use cryptarchia_consensus::TimeConfig;
-use cryptarchia_ledger::LedgerState;
-use full_replication::{BlobInfo, Metadata};
+use cryptarchia_consensus::{ConsensusMsg, TimeConfig};
+use cryptarchia_ledger::{Coin, LedgerState};
+use kzgrs_backend::dispersal::{BlobInfo, Metadata};
 use nomos_core::da::blob::info::DispersedBlobInfo;
 use nomos_core::da::blob::metadata::Metadata as _;
-use nomos_core::{staking::NMO_UNIT, tx::Transaction};
-use nomos_da_indexer::storage::adapters::rocksdb::RocksAdapterSettings;
-use nomos_da_indexer::IndexerSettings;
-use nomos_da_network_service::backends::libp2p::validator::{
-    DaNetworkValidatorBackend, DaNetworkValidatorBackendSettings,
-};
-use nomos_da_network_service::NetworkConfig as DaNetworkConfig;
-use nomos_da_network_service::NetworkService as DaNetworkService;
 use nomos_da_storage::fs::write_blob;
 use nomos_da_storage::rocksdb::DA_VERIFIED_KEY_PREFIX;
-use nomos_libp2p::{ed25519, identity, PeerId};
-use nomos_libp2p::{Multiaddr, SwarmConfig};
-use nomos_mempool::network::adapters::libp2p::Settings as AdapterSettings;
-use nomos_mempool::{DaMempoolSettings, TxMempoolSettings};
-use nomos_network::backends::libp2p::{Libp2p as NetworkBackend, Libp2pConfig};
-use nomos_network::{NetworkConfig, NetworkService};
-use nomos_node::{Tx, Wire};
+use nomos_da_verifier::backend::kzgrs::KzgrsDaVerifierSettings;
+use nomos_libp2p::SwarmConfig;
+use nomos_node::Wire;
 use nomos_storage::{backends::rocksdb::RocksBackend, StorageService};
-use overwatch_derive::*;
-use overwatch_rs::overwatch::{Overwatch, OverwatchRunner};
-use overwatch_rs::services::handle::ServiceHandle;
 use rand::{thread_rng, Rng};
-use subnetworks_assignations::versions::v1::FillFromNodeList;
 use tempfile::{NamedTempFile, TempDir};
 use time::OffsetDateTime;
-use tokio_stream::{wrappers::BroadcastStream, StreamExt};
+use tokio_stream::wrappers::BroadcastStream;
+use tokio_stream::StreamExt;
 // internal
 use crate::common::*;
-
-#[derive(Services)]
-struct IndexerNode {
-    network: ServiceHandle<NetworkService<NetworkBackend>>,
-    cl_mempool: ServiceHandle<TxMempool>,
-    da_network: ServiceHandle<DaNetworkService<DaNetworkValidatorBackend<FillFromNodeList>>>,
-    da_mempool: ServiceHandle<DaMempool>,
-    storage: ServiceHandle<StorageService<RocksBackend<Wire>>>,
-    cryptarchia: ServiceHandle<Cryptarchia>,
-    indexer: ServiceHandle<DaIndexer>,
-}
-
-fn new_node(
-    note: &InputWitness,
-    ledger_config: &cryptarchia_ledger::Config,
-    genesis_state: &LedgerState,
-    time_config: &TimeConfig,
-    swarm_config: &SwarmConfig,
-    db_path: PathBuf,
-    blobs_dir: &PathBuf,
-    initial_peers: Vec<Multiaddr>,
-) -> Overwatch {
-    OverwatchRunner::<IndexerNode>::run(
-        IndexerNodeServiceSettings {
-            network: NetworkConfig {
-                backend: Libp2pConfig {
-                    inner: swarm_config.clone(),
-                    initial_peers,
-                },
-            },
-            da_network: DaNetworkConfig {
-                backend: DaNetworkValidatorBackendSettings {
-                    node_key: ed25519::SecretKey::generate(),
-                    membership: FillFromNodeList::new(
-                        &[PeerId::from(identity::Keypair::generate_ed25519().public())],
-                        2,
-                        1,
-                    ),
-                    addresses: Default::default(),
-                    listening_address: "/ip4/127.0.0.1/udp/0/quic-v1".parse::<Multiaddr>().unwrap(),
-                },
-            },
-            cl_mempool: TxMempoolSettings {
-                backend: (),
-                network: AdapterSettings {
-                    topic: String::from(nomos_node::CL_TOPIC),
-                    id: <Tx as Transaction>::hash,
-                },
-                registry: None,
-            },
-            da_mempool: DaMempoolSettings {
-                backend: (),
-                network: AdapterSettings {
-                    topic: String::from(nomos_node::DA_TOPIC),
-                    id: <BlobInfo as DispersedBlobInfo>::blob_id,
-                },
-                registry: None,
-            },
-            storage: nomos_storage::backends::rocksdb::RocksBackendSettings {
-                db_path,
-                read_only: false,
-                column_family: Some("blocks".into()),
-            },
-            indexer: IndexerSettings {
-                storage: RocksAdapterSettings {
-                    blob_storage_directory: blobs_dir.clone(),
-                },
-            },
-            cryptarchia: cryptarchia_consensus::CryptarchiaSettings {
-                transaction_selector_settings: (),
-                blob_selector_settings: (),
-                config: ledger_config.clone(),
-                genesis_state: genesis_state.clone(),
-                time: time_config.clone(),
-                notes: vec![note.clone()],
-            },
-        },
-        None,
-    )
-    .map_err(|e| eprintln!("Error encountered: {}", e))
-    .unwrap()
-}
 
 // TODO: When verifier is implemented this test should be removed and a new one
 // performed in integration tests crate using the real node.
@@ -181,6 +84,9 @@ fn test_indexer() {
 
     let blobs_dir = TempDir::new().unwrap().path().to_path_buf();
 
+    let (node1_sk, node1_pk) = generate_hex_keys();
+    let (node2_sk, node2_pk) = generate_hex_keys();
+
     let node1 = new_node(
         &notes[0],
         &ledger_config,
@@ -190,6 +96,10 @@ fn test_indexer() {
         NamedTempFile::new().unwrap().path().to_path_buf(),
         &blobs_dir,
         vec![node_address(&swarm_config2)],
+        KzgrsDaVerifierSettings {
+            sk: node1_sk.clone(),
+            nodes_public_keys: vec![node1_pk.clone(), node2_pk.clone()],
+        },
     );
 
     let _node2 = new_node(
@@ -201,6 +111,10 @@ fn test_indexer() {
         NamedTempFile::new().unwrap().path().to_path_buf(),
         &blobs_dir,
         vec![node_address(&swarm_config1)],
+        KzgrsDaVerifierSettings {
+            sk: node1_sk.clone(),
+            nodes_public_keys: vec![node1_pk.clone(), node2_pk.clone()],
+        },
     );
 
     let mempool = node1.handle().relay::<DaMempool>();
