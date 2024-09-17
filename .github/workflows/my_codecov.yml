@@ -10,8 +10,9 @@ name: My Codecov 3
 jobs:
   tests:
     env:
-      RUSTFLAGS: -C instrument-coverage
       CARGO_INCREMENTAL: 0
+      RUSTFLAGS: "-C instrument-coverage"
+      LLVM_PROFILE_FILE: "nomos-node-%p-%m.profraw"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
