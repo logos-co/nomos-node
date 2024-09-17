@@ -15,8 +15,8 @@ use cryptarchia_ledger::{Coin, LedgerState};
 use kzgrs_backend::dispersal::{BlobInfo, Metadata};
 use nomos_core::da::blob::info::DispersedBlobInfo;
 use nomos_core::da::blob::metadata::Metadata as _;
-use nomos_da_storage::fs::write_blob;
 use nomos_da_storage::rocksdb::DA_VERIFIED_KEY_PREFIX;
+use nomos_da_storage::{fs::write_blob, rocksdb::key_bytes};
 use nomos_da_verifier::backend::kzgrs::KzgrsDaVerifierSettings;
 use nomos_libp2p::{Multiaddr, SwarmConfig};
 use nomos_node::Wire;
@@ -87,8 +87,8 @@ fn test_indexer() {
     let (node1_sk, node1_pk) = generate_blst_hex_keys();
     let (node2_sk, node2_pk) = generate_blst_hex_keys();
 
-    let (peer_sk_1, peer_id_1) = generate_ed25519_sk_peerid();
-    let (peer_sk_2, peer_id_2) = generate_ed25519_sk_peerid();
+    let (peer_sk_1, peer_id_1) = create_ed25519_sk_peerid(SK1);
+    let (peer_sk_2, peer_id_2) = create_ed25519_sk_peerid(SK2);
 
     let addr_1 = Multiaddr::from_str("/ip4/127.0.0.1/udp/8780/quic-v1").unwrap();
     let addr_2 = Multiaddr::from_str("/ip4/127.0.0.1/udp/8781/quic-v1").unwrap();
@@ -97,7 +97,7 @@ fn test_indexer() {
 
     let num_samples = 1;
     let num_subnets = 2;
-    let nodes_per_subnet = 1;
+    let nodes_per_subnet = 2;
 
     let node1 = new_node(
         &notes[0],
@@ -122,7 +122,7 @@ fn test_indexer() {
         },
     );
 
-    let _node2 = new_node(
+    let node2 = new_node(
         &notes[1],
         &ledger_config,
         &genesis_state,
@@ -145,10 +145,14 @@ fn test_indexer() {
         },
     );
 
-    let mempool = node1.handle().relay::<DaMempool>();
-    let storage = node1.handle().relay::<StorageService<RocksBackend<Wire>>>();
-    let indexer = node1.handle().relay::<DaIndexer>();
-    let consensus = node1.handle().relay::<Cryptarchia>();
+    // Node1 relays.
+    let node1_mempool = node1.handle().relay::<DaMempool>();
+    let node1_storage = node1.handle().relay::<StorageService<RocksBackend<Wire>>>();
+    let node1_indexer = node1.handle().relay::<DaIndexer>();
+    let node1_consensus = node1.handle().relay::<Cryptarchia>();
+
+    // Node2 relays.
+    let node2_storage = node2.handle().relay::<StorageService<RocksBackend<Wire>>>();
 
     let blob_hash = [9u8; 32];
     let app_id = [7u8; 32];
@@ -169,23 +173,45 @@ fn test_indexer() {
     let _hash3 = <BlobInfo as Hash>::hash(&blob_info, &mut default_hasher);
 
     let expected_blob_info = blob_info.clone();
-    let col_idx = (0 as u16).to_be_bytes();
 
     // Mock attestation step where blob is persisted in nodes blob storage.
     let rt = tokio::runtime::Runtime::new().unwrap();
     rt.block_on(write_blob(
-        blobs_dir,
+        blobs_dir.clone(),
         blob_info.blob_id().as_ref(),
-        &col_idx,
+        &(0 as u16).to_be_bytes(),
         b"blob",
     ))
     .unwrap();
 
+    rt.block_on(write_blob(
+        blobs_dir,
+        blob_info.blob_id().as_ref(),
+        &(1 as u16).to_be_bytes(),
+        b"blob",
+    ))
+    .unwrap();
+
+    node2.spawn(async move {
+        let storage_outbound = node2_storage.connect().await.unwrap();
+
+        // Mock attested blob by writting directly into the da storage.
+        let attested_key = key_bytes(DA_VERIFIED_KEY_PREFIX, blob_hash);
+
+        storage_outbound
+            .send(nomos_storage::StorageMsg::Store {
+                key: attested_key.into(),
+                value: Bytes::new(),
+            })
+            .await
+            .unwrap();
+    });
+
     node1.spawn(async move {
-        let mempool_outbound = mempool.connect().await.unwrap();
-        let storage_outbound = storage.connect().await.unwrap();
-        let indexer_outbound = indexer.connect().await.unwrap();
-        let consensus_outbound = consensus.connect().await.unwrap();
+        let mempool_outbound = node1_mempool.connect().await.unwrap();
+        let storage_outbound = node1_storage.connect().await.unwrap();
+        let indexer_outbound = node1_indexer.connect().await.unwrap();
+        let consensus_outbound = node1_consensus.connect().await.unwrap();
 
         let (sender, receiver) = tokio::sync::oneshot::channel();
         consensus_outbound
@@ -200,9 +226,7 @@ fn test_indexer() {
             });
 
         // Mock attested blob by writting directly into the da storage.
-        let mut attested_key = Vec::from(DA_VERIFIED_KEY_PREFIX.as_bytes());
-        attested_key.extend_from_slice(&blob_hash);
-        attested_key.extend_from_slice(&col_idx);
+        let attested_key = key_bytes(DA_VERIFIED_KEY_PREFIX, blob_hash);
 
         storage_outbound
             .send(nomos_storage::StorageMsg::Store {

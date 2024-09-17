@@ -32,7 +32,7 @@ where
 impl<B, S> DaStorageAdapter for RocksAdapter<B, S>
 where
     S: StorageSerde + Send + Sync + 'static,
-    B: Blob + DeserializeOwned + Clone + Send + Sync + 'static,
+    B: Blob + DeserializeOwned +  Clone + Send + Sync + 'static,
     B::BlobId: AsRef<[u8]> + Send,
 {
     type Backend = RocksBackend<S>;

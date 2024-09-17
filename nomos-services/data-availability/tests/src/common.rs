@@ -1,4 +1,4 @@
-// stad
+// std
 use std::path::PathBuf;
 use std::time::Duration;
 // crates
@@ -59,12 +59,17 @@ use overwatch_derive::*;
 use overwatch_rs::overwatch::{Overwatch, OverwatchRunner};
 use overwatch_rs::services::handle::ServiceHandle;
 use rand::{Rng, RngCore};
-use rand_chacha::ChaCha20Rng;
 use subnetworks_assignations::versions::v1::FillFromNodeList;
 // internal
+use crate::rng::TestRng;
+
+type IntegrationRng = TestRng;
 
 /// Membership used by the DA Network service.
 pub type NomosDaMembership = FillFromNodeList;
+
+pub const SK1: &str = "aca2c52f5928a53de79679daf390b0903eeccd9671b4350d49948d84334874806afe68536da9e076205a2af0af350e6c50851a040e3057b6544a29f5689ccd31";
+pub const SK2: &str = "f9dc26eea8bc56d9a4c59841b438665b998ce5e42f49f832df5b770a725c2daafee53b33539127321f6f5085e42902bd380e82d18a7aff6404e632b842106785";
 
 pub(crate) type Cryptarchia = cryptarchia_consensus::CryptarchiaConsensus<
     cryptarchia_consensus::network::adapters::libp2p::LibP2pAdapter<Tx, BlobInfo>,
@@ -75,16 +80,16 @@ pub(crate) type Cryptarchia = cryptarchia_consensus::CryptarchiaConsensus<
     FillSizeWithTx<MB16, Tx>,
     FillSizeWithBlobs<MB16, BlobInfo>,
     RocksBackend<Wire>,
-    KzgrsSamplingBackend<ChaCha20Rng>,
+    KzgrsSamplingBackend<IntegrationRng>,
     SamplingLibp2pAdapter<NomosDaMembership>,
-    ChaCha20Rng,
+    IntegrationRng,
     SamplingStorageAdapter<DaBlob, Wire>,
 >;
 
 pub type DaSampling = DaSamplingService<
-    KzgrsSamplingBackend<ChaCha20Rng>,
+    KzgrsSamplingBackend<IntegrationRng>,
     SamplingLibp2pAdapter<NomosDaMembership>,
-    ChaCha20Rng,
+    IntegrationRng,
     SamplingStorageAdapter<DaBlob, Wire>,
 >;
 
@@ -102,9 +107,9 @@ pub(crate) type DaIndexer = DataIndexerService<
     FillSizeWithTx<MB16, Tx>,
     FillSizeWithBlobs<MB16, BlobInfo>,
     RocksBackend<Wire>,
-    KzgrsSamplingBackend<ChaCha20Rng>,
+    KzgrsSamplingBackend<IntegrationRng>,
     SamplingLibp2pAdapter<NomosDaMembership>,
-    ChaCha20Rng,
+    IntegrationRng,
     SamplingStorageAdapter<DaBlob, Wire>,
 >;
 
@@ -116,9 +121,9 @@ pub(crate) type TxMempool = TxMempoolService<
 pub type DaMempool = DaMempoolService<
     MempoolNetworkAdapter<BlobInfo, <BlobInfo as DispersedBlobInfo>::BlobId>,
     MockPool<HeaderId, BlobInfo, <BlobInfo as DispersedBlobInfo>::BlobId>,
-    KzgrsSamplingBackend<ChaCha20Rng>,
+    KzgrsSamplingBackend<IntegrationRng>,
     nomos_da_sampling::network::adapters::libp2p::Libp2pAdapter<NomosDaMembership>,
-    ChaCha20Rng,
+    IntegrationRng,
     SamplingStorageAdapter<DaBlob, Wire>,
 >;
 
@@ -132,6 +137,7 @@ pub(crate) const MB16: usize = 1024 * 1024 * 16;
 
 #[derive(Services)]
 pub struct TestNode {
+    //logging: ServiceHandle<Logger>,
     network: ServiceHandle<NetworkService<NetworkBackend>>,
     cl_mempool: ServiceHandle<TxMempool>,
     da_network: ServiceHandle<DaNetworkService<DaNetworkValidatorBackend<FillFromNodeList>>>,
@@ -166,6 +172,7 @@ pub fn new_node(
 ) -> Overwatch {
     OverwatchRunner::<TestNode>::run(
         TestNodeServiceSettings {
+            //logging: Default::default(),
             network: NetworkConfig {
                 backend: Libp2pConfig {
                     inner: swarm_config.clone(),
@@ -287,8 +294,22 @@ pub fn generate_blst_hex_keys() -> (String, String) {
     (hex::encode(sk.to_bytes()), hex::encode(pk.to_bytes()))
 }
 
+pub fn create_ed25519_sk_peerid(key: &str) -> (ed25519::SecretKey, PeerId) {
+    let mut b = hex::decode(key).unwrap();
+    let ed25519_keypair = Ed25519Keypair::try_from_bytes(&mut b).unwrap();
+    let kp = ed25519_keypair.to_bytes();
+    println!("sk > {}", hex::encode(kp));
+    let secret_key = ed25519_keypair.secret().clone();
+    let libp2p_keypair: Keypair = ed25519_keypair.into();
+    let peer_id = PeerId::from_public_key(&libp2p_keypair.public());
+
+    (secret_key, peer_id)
+}
+
 pub fn generate_ed25519_sk_peerid() -> (ed25519::SecretKey, PeerId) {
     let ed25519_keypair = Ed25519Keypair::generate();
+    let kp = ed25519_keypair.to_bytes();
+    println!("sk > {}", hex::encode(kp));
     let secret_key = ed25519_keypair.secret().clone();
     let libp2p_keypair: Keypair = ed25519_keypair.into();
     let peer_id = PeerId::from_public_key(&libp2p_keypair.public());
