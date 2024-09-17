@@ -57,8 +57,10 @@ jobs:
         with:
           name: test-data-${{ matrix.feature }}
           path: ./target/debug
-      - name: Delete original target dir
-        run: rm -rf ./target
+      - name: Cleanup target dir
+        uses: actions-rs/cargo@v1
+        with:
+          command: clean
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
