@@ -57,21 +57,17 @@ jobs:
         with:
           name: test-data-${{ matrix.feature }}
           path: ./target/debug
-      - name: Cleanup target dir
-        uses: actions-rs/cargo@v1
-        with:
-          command: clean
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
-          path: ./target/debug
+          path: /tmp/target/debug
           pattern: test-data-*
           merge-multiple: true
       - name: Run Grcov
         run: |
           cargo install grcov;
           mkdir /tmp/cov;
-          grcov . --binary-path ./target/debug -s . -t lcov --branch --ignore-not-existing --ignore '../*' --ignore "/*" -o /tmp/cov/tests.lcov;
+          grcov . --binary-path /tmp/target/debug -s . -t lcov --branch --ignore-not-existing --ignore '../*' --ignore "/*" -o /tmp/cov/tests.lcov;
       - uses: actions/upload-artifact@v3
         if: failure()
         with:
