@@ -35,6 +35,7 @@ fn verify<const SIZE: usize>(bencher: Bencher, column_size: usize) {
             let verifier = DaVerifier::new(sk.clone(), &[sk.sk_to_pk()]);
             let da_blob = DaBlob {
                 column: encoded_data.extended_data.columns().next().unwrap(),
+                column_idx: 0,
                 column_commitment: encoded_data
                     .column_commitments
                     .iter()
@@ -58,5 +59,5 @@ fn verify<const SIZE: usize>(bencher: Bencher, column_size: usize) {
             (verifier, da_blob)
         })
         .input_counter(|_| BytesCount::new(SIZE))
-        .bench_refs(|(verifier, blob)| black_box(verifier.verify(blob, column_size).unwrap()));
+        .bench_refs(|(verifier, blob)| black_box(verifier.verify(blob, column_size)));
 }
