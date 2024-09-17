@@ -8,7 +8,7 @@ on:
 name: My Codecov 3
 
 jobs:
-  tests:
+  test:
     env:
       CARGO_INCREMENTAL: 0
       RUSTFLAGS: "-C instrument-coverage"
@@ -51,7 +51,7 @@ jobs:
           args: --all --no-default-features --features libp2p
       - name: Run Grcov
         run: |
-          cargo install grcov;
+          cargo binstall -y grcov;
           mkdir /tmp/cov;
           grcov . --binary-path ./target/debug -s . -t lcov --branch --ignore-not-existing --ignore '../*' --ignore "/*" -o /tmp/cov/tests.lcov;
       - uses: actions/upload-artifact@v3
