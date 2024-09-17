@@ -9,15 +9,16 @@ use std::{
 };
 // crates
 use bytes::Bytes;
+use cl::{InputWitness, NoteWitness, NullifierSecret};
 use cryptarchia_consensus::{ConsensusMsg, TimeConfig};
-use cryptarchia_ledger::{Coin, LedgerState};
+use cryptarchia_ledger::LedgerState;
 use kzgrs_backend::{
     common::blob::DaBlob,
     dispersal::{BlobInfo, Metadata},
 };
-use nomos_core::da::blob::metadata::Metadata as _;
 use nomos_core::da::blob::Blob;
 use nomos_core::da::DaEncoder as _;
+use nomos_core::{da::blob::metadata::Metadata as _, staking::NMO_UNIT};
 use nomos_da_storage::rocksdb::DA_VERIFIED_KEY_PREFIX;
 use nomos_da_storage::{fs::write_blob, rocksdb::key_bytes};
 use nomos_da_verifier::backend::kzgrs::KzgrsDaVerifierSettings;

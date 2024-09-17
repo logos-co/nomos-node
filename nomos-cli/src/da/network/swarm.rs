@@ -81,10 +81,15 @@ where
         Ok(())
     }
 
+    pub fn local_peer_id(&self) -> &PeerId {
+        self.swarm.local_peer_id()
+    }
+
     pub async fn run(&mut self) {
         loop {
             tokio::select! {
                 Some(event) = self.swarm.next() => {
+                    debug!("Executor received an event: {event:?}");
                     match event {
                         SwarmEvent::Behaviour(behaviour_event) => {
                             self.handle_dispersal_event(behaviour_event).await;

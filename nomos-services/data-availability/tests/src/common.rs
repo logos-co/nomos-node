@@ -3,8 +3,8 @@ use std::path::PathBuf;
 use std::time::Duration;
 // crates
 use bytes::Bytes;
+use cl::InputWitness;
 use cryptarchia_consensus::TimeConfig;
-use cryptarchia_ledger::Coin;
 use cryptarchia_ledger::LedgerState;
 use kzgrs_backend::common::blob::DaBlob;
 use kzgrs_backend::dispersal::BlobInfo;
@@ -163,7 +163,7 @@ pub struct TestDaNetworkSettings {
 }
 
 pub fn new_node(
-    coin: &Coin,
+    note: &InputWitness,
     ledger_config: &cryptarchia_ledger::Config,
     genesis_state: &LedgerState,
     time_config: &TimeConfig,
@@ -231,7 +231,7 @@ pub fn new_node(
                 config: ledger_config.clone(),
                 genesis_state: genesis_state.clone(),
                 time: time_config.clone(),
-                coins: vec![coin.clone()],
+                notes: vec![note.clone()],
             },
             verifier: DaVerifierServiceSettings {
                 verifier_settings,

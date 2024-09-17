@@ -10,9 +10,9 @@ use std::{
 // crates
 use cl::{InputWitness, NoteWitness, NullifierSecret};
 use cryptarchia_consensus::TimeConfig;
-use cryptarchia_ledger::{Coin, LedgerState};
+use cryptarchia_ledger::LedgerState;
 use kzgrs_backend::common::blob::DaBlob;
-use nomos_core::da::DaEncoder as _;
+use nomos_core::{da::DaEncoder as _, staking::NMO_UNIT};
 use nomos_da_verifier::backend::kzgrs::KzgrsDaVerifierSettings;
 use nomos_libp2p::Multiaddr;
 use nomos_libp2p::SwarmConfig;

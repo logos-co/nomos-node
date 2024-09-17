@@ -1,5 +1,5 @@
 // std
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fmt::Debug;
 use std::marker::PhantomData;
 use std::pin::Pin;
@@ -59,6 +59,7 @@ pub struct ExecutorBackendSettings<Membership> {
     /// Membership of DA network PoV set
     pub membership: Membership,
     pub node_addrs: HashMap<PeerId, Multiaddr>,
+    pub num_subnets: u16,
 }
 
 impl<Membership> ExecutorBackend<Membership> {
@@ -96,13 +97,31 @@ where
         let keypair =
             libp2p::identity::Keypair::from(ed25519::Keypair::from(config.node_key.clone()));
         let mut executor_swarm =
-            ExecutorSwarm::new(keypair, config.membership, dispersal_events_sender);
+            ExecutorSwarm::new(keypair, config.membership.clone(), dispersal_events_sender);
         let dispersal_request_sender = executor_swarm.blobs_sender();
 
-        for (_, addr) in &config.node_addrs {
+        let mut connected_peers = HashSet::new();
+
+        let local_peer_id = *executor_swarm.local_peer_id();
+        for subnetwork_id in 0..config.num_subnets {
+            // Connect to one peer in a subnet.
+            let mut members = config.membership.members_of(&(subnetwork_id as u32));
+            members.remove(&local_peer_id);
+            let peer_id = *members
+                .iter()
+                .next()
+                .expect("Subnet should have at least one node which is not the nomos_cli");
+
+            let addr = config
+                .node_addrs
+                .get(&peer_id)
+                .expect("Peer address should be in the list");
+
             executor_swarm
                 .dial(addr.clone())
                 .expect("Should schedule the dials");
+
+            connected_peers.insert(peer_id);
         }
 
         let executor_open_stream_sender = executor_swarm.open_stream_sender();
@@ -111,7 +130,7 @@ where
             .runtime()
             .spawn(async move { executor_swarm.run().await });
 
-        for (peer_id, _) in &config.node_addrs {
+        for peer_id in connected_peers.iter() {
             executor_open_stream_sender.send(*peer_id).unwrap();
         }
 
