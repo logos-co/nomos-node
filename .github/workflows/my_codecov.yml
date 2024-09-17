@@ -52,6 +52,19 @@ jobs:
         with:
           command: test
           args: --all --no-default-features --features ${{ matrix.feature }}
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-data-${{ matrix.feature }}
+          path: ./target/debug
+      - name: Delete original target dir
+        run: rm -rf ./target
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ./target/debug
+          pattern: test-data-*
+          merge-multiple: true
       - name: Run Grcov
         run: |
           cargo install grcov;
@@ -67,4 +80,5 @@ jobs:
           directory: /tmp/cov/
           name: nomos-node-codecov
           token: ${{ secrets.CODECOV_TOKEN }}
+
 
