@@ -8,9 +8,10 @@ name: Codecov
 
 jobs:
   test:
-    name: Test
     env:
-      RUSTFLAGS: -C instrument-coverage
+      CARGO_INCREMENTAL: 0
+      RUSTFLAGS: "-C instrument-coverage"
+      LLVM_PROFILE_FILE: "nomos-node-%p-%m.profraw"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -20,7 +21,7 @@ jobs:
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
       - name: Checkout submodules
-        run: git submodule update --init --recursive 
+        run: git submodule update --init --recursive
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
@@ -34,17 +35,24 @@ jobs:
         run: cargo binstall -y cargo-risczero && cargo risczero install
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - run: |
-          cargo binstall -y grcov;
-          cargo build --no-default-features --features libp2p
-          rm -rf target/debug/{build,incremental,deps}
-          cargo test --no-default-features --features libp2p --no-run
-          rm -rf target/debug/{build,incremental,deps}
-          mkdir /tmp/cov;
-          grcov . --binary-path ./target/debug/ -s . -t lcov --branch --ignore-not-existing --ignore '../*' --ignore "/*" -o /tmp/cov/tests.lcov;
+      - name: Cargo build
+        uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --all --no-default-features --features libp2p
+      - name: Run tests
+        uses: actions-rs/cargo@v1
         env:
-          SLOW_TEST_ENV: true
           RISC0_DEV_MODE: true
+          CONSENSUS_SLOT_TIME: 5
+        with:
+          command: test
+          args: --all --no-default-features --features libp2p
+      - name: Run Grcov
+        run: |
+          cargo install grcov;
+          mkdir /tmp/cov;
+          grcov . --binary-path ./target/debug -s . -t lcov --branch --ignore-not-existing --ignore '../*' --ignore "/*" -o /tmp/cov/tests.lcov;
       - uses: actions/upload-artifact@v3
         if: failure()
         with:
