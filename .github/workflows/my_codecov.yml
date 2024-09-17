@@ -9,10 +9,6 @@ name: My Codecov 3
 
 jobs:
   tests:
-    strategy:
-      fail-fast: false
-      matrix:
-        feature: [ libp2p ]
     env:
       RUSTFLAGS: -C instrument-coverage
       CARGO_INCREMENTAL: 0
@@ -43,7 +39,7 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: build
-          args: --all --no-default-features --features ${{ matrix.feature }}
+          args: --all --no-default-features --features libp2p
       - name: Run tests
         uses: actions-rs/cargo@v1
         env:
@@ -51,23 +47,12 @@ jobs:
           CONSENSUS_SLOT_TIME: 5
         with:
           command: test
-          args: --all --no-default-features --features ${{ matrix.feature }}
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: test-data-${{ matrix.feature }}
-          path: ./target/debug
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: /tmp/target/debug
-          pattern: test-data-*
-          merge-multiple: true
+          args: --all --no-default-features --features libp2p
       - name: Run Grcov
         run: |
           cargo install grcov;
           mkdir /tmp/cov;
-          grcov . --binary-path /tmp/target/debug -s . -t lcov --branch --ignore-not-existing --ignore '../*' --ignore "/*" -o /tmp/cov/tests.lcov;
+          grcov . --binary-path ./target/debug -s . -t lcov --branch --ignore-not-existing --ignore '../*' --ignore "/*" -o /tmp/cov/tests.lcov;
       - uses: actions/upload-artifact@v3
         if: failure()
         with:
