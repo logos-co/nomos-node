@@ -116,12 +116,8 @@ impl<R: Rng + Sync + Send> DaSamplingServiceBackend<R> for KzgrsSamplingBackend<
             return SamplingState::Terminated;
         }
 
-        let subnets: Vec<SubnetworkId> = (0..self.settings.num_samples)
-            .map(|_| {
-                self.rng
-                    .gen_range(0..self.settings.num_subnets as SubnetworkId)
-            })
-            .collect();
+        let subnets: Vec<SubnetworkId> = (0..self.settings.num_subnets as SubnetworkId)
+            .choose_multiple(&mut self.rng, self.settings.num_samples.into());
 
         let ctx: SamplingContext = SamplingContext {
             subnets: HashSet::new(),
@@ -166,12 +162,27 @@ mod test {
     #[tokio::test]
     async fn test_init_sampling_subnet_range() {
         let number_of_subnets = 42;
-        let mut backend = create_sampler(42, number_of_subnets);
+        let num_samples = 50; // Testing with more samples than subnets to check the limit
+        let mut backend = create_sampler(num_samples, number_of_subnets);
 
         let blob_id = BlobId::default();
         let state = backend.init_sampling(blob_id).await;
 
         if let SamplingState::Init(subnets) = state {
+            let unique_subnet_ids: HashSet<_> = subnets.iter().cloned().collect();
+
+            assert_eq!(
+                unique_subnet_ids.len(),
+                subnets.len(),
+                "Subnet IDs are not unique"
+            );
+
+            assert_eq!(
+                subnets.len(),
+                number_of_subnets.min(num_samples),
+                "Incorrect number of subnet IDs selected"
+            );
+
             for subnet_id in subnets {
                 assert!(
                     (subnet_id as usize) < number_of_subnets,
