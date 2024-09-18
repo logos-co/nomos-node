@@ -15,6 +15,7 @@ use tests::Node;
 use tests::SpawnConfig;
 
 const CLI_BIN: &str = "../target/debug/nomos-cli";
+const APP_ID: &str = "fd3384e132ad02a56c78f45547ee40038dc79002b90d29ed90e08eee762ae715";
 
 use std::process::Command;
 
@@ -43,16 +44,7 @@ fn run_disseminate(disseminate: &Disseminate) {
     c.status().expect("failed to execute nomos cli");
 }
 
-async fn disseminate(config: &mut Disseminate) {
-    let nodes = NomosNode::spawn_nodes(SpawnConfig::star_happy(
-        2,
-        tests::DaConfig {
-            dispersal_factor: 2,
-            ..Default::default()
-        },
-    ))
-    .await;
-
+async fn disseminate(nodes: &Vec<NomosNode>, config: &mut Disseminate) {
     // Nomos Cli is acting as the first node when dispersing the data by using the key associated
     // with that Nomos Node.
     let first_config = nodes[0].config();
@@ -92,7 +84,6 @@ async fn disseminate(config: &mut Disseminate) {
     let config_path = file.path().to_owned();
     serde_yaml::to_writer(&mut file, &da_network_config).unwrap();
 
-    config.timeout = 180;
     config.network_config = config_path;
     config.node_addr = Some(
         format!(
@@ -102,9 +93,6 @@ async fn disseminate(config: &mut Disseminate) {
         .parse()
         .unwrap(),
     );
-    config.app_id = "fd3384e132ad02a56c78f45547ee40038dc79002b90d29ed90e08eee762ae715".to_string();
-    config.index = 0;
-    config.columns = 2;
 
     run_disseminate(&config);
 }
@@ -113,9 +101,23 @@ async fn disseminate(config: &mut Disseminate) {
 async fn disseminate_blob() {
     let mut config = Disseminate {
         data: Some("hello world".to_string()),
+        timeout: 180,
+        app_id: APP_ID.into(),
+        index: 0,
+        columns: 2,
         ..Default::default()
     };
-    disseminate(&mut config).await;
+
+    let nodes = NomosNode::spawn_nodes(SpawnConfig::star_happy(
+        2,
+        tests::DaConfig {
+            dispersal_factor: 2,
+            ..Default::default()
+        },
+    ))
+    .await;
+
+    disseminate(&nodes, &mut config).await;
 }
 
 #[tokio::test]
@@ -127,9 +129,23 @@ async fn disseminate_big_blob() {
             .collect::<Vec<_>>()
             .join("")
             .into(),
+        timeout: 180,
+        app_id: APP_ID.into(),
+        index: 0,
+        columns: 2,
         ..Default::default()
     };
-    disseminate(&mut config).await;
+
+    let nodes = NomosNode::spawn_nodes(SpawnConfig::star_happy(
+        2,
+        tests::DaConfig {
+            dispersal_factor: 2,
+            ..Default::default()
+        },
+    ))
+    .await;
+
+    disseminate(&nodes, &mut config).await;
 }
 
 #[tokio::test]
@@ -139,7 +155,21 @@ async fn disseminate_blob_from_file() {
 
     let mut config = Disseminate {
         file: Some(file.path().to_path_buf()),
+        timeout: 180,
+        app_id: APP_ID.into(),
+        index: 0,
+        columns: 2,
         ..Default::default()
     };
-    disseminate(&mut config).await;
+
+    let nodes = NomosNode::spawn_nodes(SpawnConfig::star_happy(
+        4,
+        tests::DaConfig {
+            dispersal_factor: 2,
+            ..Default::default()
+        },
+    ))
+    .await;
+
+    disseminate(&nodes, &mut config).await;
 }
