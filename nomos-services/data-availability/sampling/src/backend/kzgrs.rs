@@ -5,7 +5,6 @@ use std::time::{Duration, Instant};
 
 // crates
 use hex;
-use rand::distributions::Standard;
 use rand::prelude::*;
 use serde::{Deserialize, Serialize};
 use tokio::time;
@@ -28,6 +27,7 @@ pub struct SamplingContext {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct KzgrsSamplingBackendSettings {
     pub num_samples: u16,
+    pub num_subnets: u16,
     pub old_blobs_check_interval: Duration,
     pub blobs_validity_duration: Duration,
 }
@@ -116,10 +116,9 @@ impl<R: Rng + Sync + Send> DaSamplingServiceBackend<R> for KzgrsSamplingBackend<
             return SamplingState::Terminated;
         }
 
-        let subnets: Vec<SubnetworkId> = Standard
-            .sample_iter(&mut self.rng)
-            .take(self.settings.num_samples as usize)
-            .collect();
+        let subnets: Vec<SubnetworkId> = (0..self.settings.num_subnets as SubnetworkId)
+            .choose_multiple(&mut self.rng, self.settings.num_samples.into());
+
         let ctx: SamplingContext = SamplingContext {
             subnets: HashSet::new(),
             started: Instant::now(),
@@ -149,9 +148,10 @@ mod test {
     use kzgrs_backend::common::{blob::DaBlob, Column};
     use nomos_core::da::BlobId;
 
-    fn create_sampler(subnet_num: usize) -> KzgrsSamplingBackend<StdRng> {
+    fn create_sampler(num_samples: usize, num_subnets: usize) -> KzgrsSamplingBackend<StdRng> {
         let settings = KzgrsSamplingBackendSettings {
-            num_samples: subnet_num as u16,
+            num_samples: num_samples as u16,
+            num_subnets: num_subnets as u16,
             old_blobs_check_interval: Duration::from_millis(20),
             blobs_validity_duration: Duration::from_millis(10),
         };
@@ -160,12 +160,45 @@ mod test {
     }
 
     #[tokio::test]
+    async fn test_init_sampling_subnet_range() {
+        let number_of_subnets = 42;
+        let num_samples = 50; // Testing with more samples than subnets to check the limit
+        let mut backend = create_sampler(num_samples, number_of_subnets);
+
+        let blob_id = BlobId::default();
+        let state = backend.init_sampling(blob_id).await;
+
+        if let SamplingState::Init(subnets) = state {
+            let unique_subnet_ids: HashSet<_> = subnets.iter().cloned().collect();
+
+            assert_eq!(
+                unique_subnet_ids.len(),
+                subnets.len(),
+                "Subnet IDs are not unique"
+            );
+
+            assert_eq!(
+                subnets.len(),
+                number_of_subnets.min(num_samples),
+                "Incorrect number of subnet IDs selected"
+            );
+
+            for subnet_id in subnets {
+                assert!(
+                    (subnet_id as usize) < number_of_subnets,
+                    "Subnet ID is out of range"
+                );
+            }
+        }
+    }
+
+    #[tokio::test]
     async fn test_sampler() {
         // fictitious number of subnets
         let subnet_num: usize = 42;
 
         // create a sampler instance
-        let sampler = &mut create_sampler(subnet_num);
+        let sampler = &mut create_sampler(subnet_num, 42);
 
         // create some blobs and blob_ids
         let b1: BlobId = sampler.rng.gen();
@@ -309,7 +342,7 @@ mod test {
 
     #[tokio::test]
     async fn test_pruning() {
-        let mut sampler = create_sampler(42);
+        let mut sampler = create_sampler(42, 42);
 
         // create some sampling contexes
         // first set will go through as in time

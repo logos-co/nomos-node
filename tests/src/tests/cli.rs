@@ -4,7 +4,6 @@ use nomos_cli::da::network::backend::ExecutorBackendSettings;
 use nomos_da_network_service::NetworkConfig;
 use nomos_libp2p::ed25519;
 use nomos_libp2p::libp2p;
-use nomos_libp2p::libp2p::multiaddr::multiaddr;
 use nomos_libp2p::Multiaddr;
 use nomos_libp2p::PeerId;
 use std::collections::HashMap;
@@ -16,6 +15,7 @@ use tests::Node;
 use tests::SpawnConfig;
 
 const CLI_BIN: &str = "../target/debug/nomos-cli";
+const APP_ID: &str = "fd3384e132ad02a56c78f45547ee40038dc79002b90d29ed90e08eee762ae715";
 
 use std::process::Command;
 
@@ -30,6 +30,8 @@ fn run_disseminate(disseminate: &Disseminate) {
         .arg(disseminate.index.to_string())
         .arg("--columns")
         .arg(disseminate.columns.to_string())
+        .arg("--timeout")
+        .arg(disseminate.timeout.to_string())
         .arg("--node-addr")
         .arg(disseminate.node_addr.as_ref().unwrap().as_str());
 
@@ -42,9 +44,11 @@ fn run_disseminate(disseminate: &Disseminate) {
     c.status().expect("failed to execute nomos cli");
 }
 
-async fn disseminate(config: &mut Disseminate) {
-    let nodes = NomosNode::spawn_nodes(SpawnConfig::star_happy(2)).await;
-
+async fn disseminate(nodes: &Vec<NomosNode>, config: &mut Disseminate) {
+    // Nomos Cli is acting as the first node when dispersing the data by using the key associated
+    // with that Nomos Node.
+    let first_config = nodes[0].config();
+    let node_key = first_config.da_network.backend.node_key.clone();
     let node_addrs: HashMap<PeerId, Multiaddr> = nodes
         .iter()
         .map(|n| {
@@ -53,18 +57,26 @@ async fn disseminate(config: &mut Disseminate) {
                 libp2p_config.node_key.clone(),
             ));
             let peer_id = PeerId::from(keypair.public());
-            let address = multiaddr!(Ip4(libp2p_config.host), Udp(libp2p_config.port), QuicV1);
+            let address = n
+                .config()
+                .da_network
+                .backend
+                .listening_address
+                .clone()
+                .with_p2p(peer_id)
+                .unwrap();
             (peer_id, address)
         })
         .collect();
-
-    let peer_ids: Vec<nomos_libp2p::PeerId> = node_addrs.keys().cloned().collect();
+    let membership = first_config.da_network.backend.membership.clone();
+    let num_subnets = first_config.da_sampling.sampling_settings.num_subnets;
 
     let da_network_config: NetworkConfig<ExecutorBackend<FillFromNodeList>> = NetworkConfig {
         backend: ExecutorBackendSettings {
-            node_key: ed25519::SecretKey::generate(),
-            membership: FillFromNodeList::new(&peer_ids, 2, 1),
+            node_key,
+            membership,
             node_addrs,
+            num_subnets,
         },
     };
 
@@ -72,7 +84,6 @@ async fn disseminate(config: &mut Disseminate) {
     let config_path = file.path().to_owned();
     serde_yaml::to_writer(&mut file, &da_network_config).unwrap();
 
-    config.timeout = 20;
     config.network_config = config_path;
     config.node_addr = Some(
         format!(
@@ -82,9 +93,6 @@ async fn disseminate(config: &mut Disseminate) {
         .parse()
         .unwrap(),
     );
-    config.app_id = "fd3384e132ad02a56c78f45547ee40038dc79002b90d29ed90e08eee762ae715".to_string();
-    config.index = 0;
-    config.columns = 32;
 
     run_disseminate(&config);
 }
@@ -93,9 +101,23 @@ async fn disseminate(config: &mut Disseminate) {
 async fn disseminate_blob() {
     let mut config = Disseminate {
         data: Some("hello world".to_string()),
+        timeout: 180,
+        app_id: APP_ID.into(),
+        index: 0,
+        columns: 2,
         ..Default::default()
     };
-    disseminate(&mut config).await;
+
+    let nodes = NomosNode::spawn_nodes(SpawnConfig::star_happy(
+        2,
+        tests::DaConfig {
+            dispersal_factor: 2,
+            ..Default::default()
+        },
+    ))
+    .await;
+
+    disseminate(&nodes, &mut config).await;
 }
 
 #[tokio::test]
@@ -107,9 +129,23 @@ async fn disseminate_big_blob() {
             .collect::<Vec<_>>()
             .join("")
             .into(),
+        timeout: 180,
+        app_id: APP_ID.into(),
+        index: 0,
+        columns: 2,
         ..Default::default()
     };
-    disseminate(&mut config).await;
+
+    let nodes = NomosNode::spawn_nodes(SpawnConfig::star_happy(
+        2,
+        tests::DaConfig {
+            dispersal_factor: 2,
+            ..Default::default()
+        },
+    ))
+    .await;
+
+    disseminate(&nodes, &mut config).await;
 }
 
 #[tokio::test]
@@ -119,7 +155,21 @@ async fn disseminate_blob_from_file() {
 
     let mut config = Disseminate {
         file: Some(file.path().to_path_buf()),
+        timeout: 180,
+        app_id: APP_ID.into(),
+        index: 0,
+        columns: 2,
         ..Default::default()
     };
-    disseminate(&mut config).await;
+
+    let nodes = NomosNode::spawn_nodes(SpawnConfig::star_happy(
+        4,
+        tests::DaConfig {
+            dispersal_factor: 2,
+            ..Default::default()
+        },
+    ))
+    .await;
+
+    disseminate(&nodes, &mut config).await;
 }
