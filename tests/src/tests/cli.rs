@@ -29,6 +29,8 @@ fn run_disseminate(disseminate: &Disseminate) {
         .arg(disseminate.index.to_string())
         .arg("--columns")
         .arg(disseminate.columns.to_string())
+        .arg("--timeout")
+        .arg(disseminate.timeout.to_string())
         .arg("--node-addr")
         .arg(disseminate.node_addr.as_ref().unwrap().as_str());
 
@@ -43,9 +45,9 @@ fn run_disseminate(disseminate: &Disseminate) {
 
 async fn disseminate(config: &mut Disseminate) {
     let nodes = NomosNode::spawn_nodes(SpawnConfig::star_happy(
-        4,
+        2,
         tests::DaConfig {
-            dispersal_factor: 4,
+            dispersal_factor: 2,
             ..Default::default()
         },
     ))
@@ -90,7 +92,7 @@ async fn disseminate(config: &mut Disseminate) {
     let config_path = file.path().to_owned();
     serde_yaml::to_writer(&mut file, &da_network_config).unwrap();
 
-    config.timeout = 20;
+    config.timeout = 180;
     config.network_config = config_path;
     config.node_addr = Some(
         format!(
