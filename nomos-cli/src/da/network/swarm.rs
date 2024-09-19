@@ -1,4 +1,5 @@
 // std
+use std::time::Duration;
 // crates
 use kzgrs_backend::common::blob::DaBlob;
 use libp2p::futures::StreamExt;
@@ -56,6 +57,10 @@ where
         self.swarm.behaviour().blobs_sender()
     }
 
+    pub fn open_stream_sender(&self) -> UnboundedSender<PeerId> {
+        self.swarm.behaviour().open_stream_sender()
+    }
+
     fn build_swarm(
         key: Keypair,
         membership: Membership,
@@ -65,6 +70,9 @@ where
             .with_quic()
             .with_behaviour(|_key| DispersalExecutorBehaviour::new(membership))
             .expect("Validator behaviour should build")
+            .with_swarm_config(|cfg| {
+                cfg.with_idle_connection_timeout(Duration::from_secs(u64::MAX))
+            })
             .build()
     }
 
@@ -73,29 +81,36 @@ where
         Ok(())
     }
 
+    pub fn local_peer_id(&self) -> &PeerId {
+        self.swarm.local_peer_id()
+    }
+
     pub async fn run(&mut self) {
-        tokio::select! {
-            Some(event) = self.swarm.next() => {
-                match event {
-                    SwarmEvent::Behaviour(behaviour_event) => {
-                        self.handle_dispersal_event(behaviour_event).await;
-                    },
-                    SwarmEvent::ConnectionEstablished{ .. } => {}
-                    SwarmEvent::ConnectionClosed{ .. } => {}
-                    SwarmEvent::IncomingConnection{ .. } => {}
-                    SwarmEvent::IncomingConnectionError{ .. } => {}
-                    SwarmEvent::OutgoingConnectionError{ .. } => {}
-                    SwarmEvent::NewListenAddr{ .. } => {}
-                    SwarmEvent::ExpiredListenAddr{ .. } => {}
-                    SwarmEvent::ListenerClosed{ .. } => {}
-                    SwarmEvent::ListenerError{ .. } => {}
-                    SwarmEvent::Dialing{ .. } => {}
-                    SwarmEvent::NewExternalAddrCandidate{ .. } => {}
-                    SwarmEvent::ExternalAddrConfirmed{ .. } => {}
-                    SwarmEvent::ExternalAddrExpired{ .. } => {}
-                    SwarmEvent::NewExternalAddrOfPeer{ .. } => {}
-                    event => {
-                        debug!("Unsupported validator swarm event: {event:?}");
+        loop {
+            tokio::select! {
+                Some(event) = self.swarm.next() => {
+                    debug!("Executor received an event: {event:?}");
+                    match event {
+                        SwarmEvent::Behaviour(behaviour_event) => {
+                            self.handle_dispersal_event(behaviour_event).await;
+                        },
+                        SwarmEvent::ConnectionEstablished{ .. } => {}
+                        SwarmEvent::ConnectionClosed{ .. } => {}
+                        SwarmEvent::IncomingConnection{ .. } => {}
+                        SwarmEvent::IncomingConnectionError{ .. } => {}
+                        SwarmEvent::OutgoingConnectionError{ .. } => {}
+                        SwarmEvent::NewListenAddr{ .. } => {}
+                        SwarmEvent::ExpiredListenAddr{ .. } => {}
+                        SwarmEvent::ListenerClosed{ .. } => {}
+                        SwarmEvent::ListenerError{ .. } => {}
+                        SwarmEvent::Dialing{ .. } => {}
+                        SwarmEvent::NewExternalAddrCandidate{ .. } => {}
+                        SwarmEvent::ExternalAddrConfirmed{ .. } => {}
+                        SwarmEvent::ExternalAddrExpired{ .. } => {}
+                        SwarmEvent::NewExternalAddrOfPeer{ .. } => {}
+                        event => {
+                            debug!("Unsupported validator swarm event: {event:?}");
+                        }
                     }
                 }
             }

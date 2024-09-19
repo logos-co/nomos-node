@@ -1,199 +1,26 @@
 // std
-use std::path::PathBuf;
-use std::sync::atomic::AtomicBool;
-use std::sync::atomic::Ordering::SeqCst;
-use std::sync::Arc;
-use std::time::Duration;
+use std::{
+    str::FromStr,
+    sync::{
+        atomic::{AtomicBool, Ordering::SeqCst},
+        Arc,
+    },
+    time::Duration,
+};
 // crates
 use cl::{InputWitness, NoteWitness, NullifierSecret};
 use cryptarchia_consensus::TimeConfig;
 use cryptarchia_ledger::LedgerState;
-use full_replication::BlobInfo;
 use kzgrs_backend::common::blob::DaBlob;
-use kzgrs_backend::encoder::{DaEncoder, DaEncoderParams};
-use nomos_core::da::{blob::info::DispersedBlobInfo, DaEncoder as _};
-use nomos_core::{staking::NMO_UNIT, tx::Transaction};
-use nomos_da_indexer::storage::adapters::rocksdb::RocksAdapterSettings as IndexerStorageSettings;
-use nomos_da_indexer::IndexerSettings;
-use nomos_da_network_service::backends::libp2p::validator::{
-    DaNetworkValidatorBackend, DaNetworkValidatorBackendSettings,
-};
-use nomos_da_network_service::NetworkConfig as DaNetworkConfig;
-use nomos_da_network_service::NetworkService as DaNetworkService;
-use nomos_da_sampling::backend::kzgrs::KzgrsSamplingBackendSettings;
-use nomos_da_sampling::network::adapters::libp2p::DaNetworkSamplingSettings;
-use nomos_da_sampling::storage::adapters::rocksdb::RocksAdapterSettings as SamplingStorageSettings;
-use nomos_da_sampling::DaSamplingServiceSettings;
+use nomos_core::{da::DaEncoder as _, staking::NMO_UNIT};
 use nomos_da_verifier::backend::kzgrs::KzgrsDaVerifierSettings;
-use nomos_da_verifier::storage::adapters::rocksdb::RocksAdapterSettings as VerifierStorageSettings;
-use nomos_da_verifier::DaVerifierServiceSettings;
-use nomos_libp2p::{ed25519, identity, PeerId};
-use nomos_libp2p::{Multiaddr, SwarmConfig};
-use nomos_mempool::network::adapters::libp2p::Settings as AdapterSettings;
-use nomos_mempool::{DaMempoolSettings, TxMempoolSettings};
-use nomos_network::backends::libp2p::{Libp2p as NetworkBackend, Libp2pConfig};
-use nomos_network::{NetworkConfig, NetworkService};
-use nomos_node::{Tx, Wire};
-use nomos_storage::{backends::rocksdb::RocksBackend, StorageService};
-use overwatch_derive::*;
-use overwatch_rs::overwatch::{Overwatch, OverwatchRunner};
-use overwatch_rs::services::handle::ServiceHandle;
-use rand::{thread_rng, Rng, RngCore};
-use subnetworks_assignations::versions::v1::FillFromNodeList;
+use nomos_libp2p::Multiaddr;
+use nomos_libp2p::SwarmConfig;
+use rand::{thread_rng, Rng};
 use tempfile::{NamedTempFile, TempDir};
 use time::OffsetDateTime;
 // internal
 use crate::common::*;
-
-// Client node is only created for asyncroniously interact with nodes in the test.
-// The services defined in it are not used.
-#[derive(Services)]
-struct ClientNode {
-    storage: ServiceHandle<StorageService<RocksBackend<Wire>>>,
-}
-
-#[derive(Services)]
-struct VerifierNode {
-    network: ServiceHandle<NetworkService<NetworkBackend>>,
-    da_network: ServiceHandle<DaNetworkService<DaNetworkValidatorBackend<FillFromNodeList>>>,
-    cl_mempool: ServiceHandle<TxMempool>,
-    da_mempool: ServiceHandle<DaMempool>,
-    storage: ServiceHandle<StorageService<RocksBackend<Wire>>>,
-    cryptarchia: ServiceHandle<Cryptarchia>,
-    indexer: ServiceHandle<DaIndexer>,
-    verifier: ServiceHandle<DaVerifier>,
-    da_sampling: ServiceHandle<DaSampling>,
-}
-
-// Client node is just an empty overwatch service to spawn a task that could communicate with other
-// nodes and manage the data availability cycle during tests.
-fn new_client(db_path: PathBuf) -> Overwatch {
-    OverwatchRunner::<ClientNode>::run(
-        ClientNodeServiceSettings {
-            storage: nomos_storage::backends::rocksdb::RocksBackendSettings {
-                db_path,
-                read_only: false,
-                column_family: None,
-            },
-        },
-        None,
-    )
-    .map_err(|e| eprintln!("Error encountered: {}", e))
-    .unwrap()
-}
-
-fn new_node(
-    note: &InputWitness,
-    ledger_config: &cryptarchia_ledger::Config,
-    genesis_state: &LedgerState,
-    time_config: &TimeConfig,
-    swarm_config: &SwarmConfig,
-    db_path: PathBuf,
-    blobs_dir: &PathBuf,
-    initial_peers: Vec<Multiaddr>,
-    verifier_settings: KzgrsDaVerifierSettings,
-) -> Overwatch {
-    OverwatchRunner::<VerifierNode>::run(
-        VerifierNodeServiceSettings {
-            network: NetworkConfig {
-                backend: Libp2pConfig {
-                    inner: swarm_config.clone(),
-                    initial_peers,
-                },
-            },
-            da_network: DaNetworkConfig {
-                backend: DaNetworkValidatorBackendSettings {
-                    node_key: ed25519::SecretKey::generate(),
-                    membership: FillFromNodeList::new(
-                        &[PeerId::from(identity::Keypair::generate_ed25519().public())],
-                        2,
-                        1,
-                    ),
-                    addresses: Default::default(),
-                    listening_address: "/ip4/127.0.0.1/udp/0/quic-v1".parse::<Multiaddr>().unwrap(),
-                },
-            },
-            cl_mempool: TxMempoolSettings {
-                backend: (),
-                network: AdapterSettings {
-                    topic: String::from(nomos_node::CL_TOPIC),
-                    id: <Tx as Transaction>::hash,
-                },
-                registry: None,
-            },
-            da_mempool: DaMempoolSettings {
-                backend: (),
-                network: AdapterSettings {
-                    topic: String::from(nomos_node::DA_TOPIC),
-                    id: <BlobInfo as DispersedBlobInfo>::blob_id,
-                },
-                registry: None,
-            },
-            storage: nomos_storage::backends::rocksdb::RocksBackendSettings {
-                db_path,
-                read_only: false,
-                column_family: Some("blocks".into()),
-            },
-            indexer: IndexerSettings {
-                storage: IndexerStorageSettings {
-                    blob_storage_directory: blobs_dir.clone(),
-                },
-            },
-            cryptarchia: cryptarchia_consensus::CryptarchiaSettings {
-                transaction_selector_settings: (),
-                blob_selector_settings: (),
-                config: ledger_config.clone(),
-                genesis_state: genesis_state.clone(),
-                time: time_config.clone(),
-                notes: vec![note.clone()],
-            },
-            verifier: DaVerifierServiceSettings {
-                verifier_settings,
-                network_adapter_settings: (),
-                storage_adapter_settings: VerifierStorageSettings {
-                    blob_storage_directory: blobs_dir.clone(),
-                },
-            },
-            da_sampling: DaSamplingServiceSettings {
-                // TODO: setup this properly!
-                sampling_settings: KzgrsSamplingBackendSettings {
-                    num_samples: 0,
-                    // Sampling service period can't be zero.
-                    old_blobs_check_interval: Duration::from_secs(1),
-                    blobs_validity_duration: Duration::from_secs(1),
-                },
-                network_adapter_settings: DaNetworkSamplingSettings {
-                    num_samples: 0,
-                    subnet_size: 0,
-                },
-                storage_adapter_settings: SamplingStorageSettings {
-                    blob_storage_directory: blobs_dir.clone(),
-                },
-            },
-        },
-        None,
-    )
-    .map_err(|e| eprintln!("Error encountered: {}", e))
-    .unwrap()
-}
-
-fn generate_hex_keys() -> (String, String) {
-    let mut rng = rand::thread_rng();
-    let sk_bytes: [u8; 32] = rng.gen();
-    let sk = blst::min_sig::SecretKey::key_gen(&sk_bytes, &[]).unwrap();
-
-    let pk = sk.sk_to_pk();
-    (hex::encode(sk.to_bytes()), hex::encode(pk.to_bytes()))
-}
-
-pub fn rand_data(elements_count: usize) -> Vec<u8> {
-    let mut buff = vec![0; elements_count * DaEncoderParams::MAX_BLS12_381_ENCODING_CHUNK_SIZE];
-    rand::thread_rng().fill_bytes(&mut buff);
-    buff
-}
-
-pub const PARAMS: DaEncoderParams = DaEncoderParams::default_with(2);
-pub const ENCODER: DaEncoder = DaEncoder::new(PARAMS);
 
 #[test]
 fn test_verifier() {
@@ -247,10 +74,22 @@ fn test_verifier() {
 
     let blobs_dir = TempDir::new().unwrap().path().to_path_buf();
 
-    let (node1_sk, node1_pk) = generate_hex_keys();
-    let (node2_sk, node2_pk) = generate_hex_keys();
+    let (node1_sk, node1_pk) = generate_blst_hex_keys();
+    let (node2_sk, node2_pk) = generate_blst_hex_keys();
 
     let client_zone = new_client(NamedTempFile::new().unwrap().path().to_path_buf());
+
+    let (peer_sk_1, peer_id_1) = generate_ed25519_sk_peerid();
+    let (peer_sk_2, peer_id_2) = generate_ed25519_sk_peerid();
+
+    let addr_1 = Multiaddr::from_str("/ip4/127.0.0.1/udp/8880/quic-v1").unwrap();
+    let addr_2 = Multiaddr::from_str("/ip4/127.0.0.1/udp/8881/quic-v1").unwrap();
+
+    let peer_addresses = vec![(peer_id_1, addr_1.clone()), (peer_id_2, addr_2.clone())];
+
+    let num_samples = 1;
+    let num_subnets = 2;
+    let nodes_per_subnet = 1;
 
     let node1 = new_node(
         &notes[0],
@@ -264,6 +103,14 @@ fn test_verifier() {
         KzgrsDaVerifierSettings {
             sk: node1_sk.clone(),
             nodes_public_keys: vec![node1_pk.clone(), node2_pk.clone()],
+        },
+        TestDaNetworkSettings {
+            peer_addresses: peer_addresses.clone(),
+            listening_address: addr_1,
+            num_subnets,
+            num_samples,
+            nodes_per_subnet,
+            node_key: peer_sk_1,
         },
     );
 
@@ -279,6 +126,14 @@ fn test_verifier() {
         KzgrsDaVerifierSettings {
             sk: node2_sk,
             nodes_public_keys: vec![node1_pk, node2_pk],
+        },
+        TestDaNetworkSettings {
+            peer_addresses,
+            listening_address: addr_2,
+            num_subnets,
+            num_samples,
+            nodes_per_subnet,
+            node_key: peer_sk_2,
         },
     );
 

@@ -25,6 +25,7 @@ nomos-storage = { path = "../../../nomos-services/storage", features = ["rocksdb
 nomos-log = { path = "../../log" }
 nomos-network = { path = "../../network", features = ["mock"] }
 nomos-libp2p = { path = "../../../nomos-libp2p" }
+libp2p = { version = "0.53.2", features = ["ed25519"] }
 overwatch-rs = { git = "https://github.com/logos-co/Overwatch", rev = "2f70806" }
 overwatch-derive = { git = "https://github.com/logos-co/Overwatch", rev = "ac28d01" }
 rand = "0.8"
@@ -40,6 +41,6 @@ time = "0.3"
 blake2 = { version = "0.10" }
 
 [features]
-default = []
+default = ["libp2p"]
 libp2p = []
 mixnet = []
