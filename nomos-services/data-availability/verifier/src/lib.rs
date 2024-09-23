@@ -2,27 +2,27 @@ pub mod backend;
 pub mod network;
 pub mod storage;
 
-use nomos_core::da::blob::Blob;
 // std
-use nomos_storage::StorageService;
-use overwatch_rs::services::life_cycle::LifecycleMessage;
-use serde::{Deserialize, Serialize};
 use std::error::Error;
 use std::fmt::{Debug, Formatter};
-use storage::DaStorageAdapter;
-use tokio::sync::oneshot::Sender;
 // crates
+use nomos_core::da::blob::Blob;
+use nomos_da_network_service::NetworkService;
+use nomos_storage::StorageService;
+use overwatch_rs::services::handle::ServiceStateHandle;
+use overwatch_rs::services::life_cycle::LifecycleMessage;
+use overwatch_rs::services::relay::{Relay, RelayMessage};
+use overwatch_rs::services::state::{NoOperator, NoState};
+use overwatch_rs::services::{ServiceCore, ServiceData, ServiceId};
+use overwatch_rs::DynError;
+use serde::{Deserialize, Serialize};
+use tokio::sync::oneshot::Sender;
 use tokio_stream::StreamExt;
 use tracing::{error, span, Instrument, Level};
 // internal
 use backend::VerifierBackend;
 use network::NetworkAdapter;
-use nomos_da_network_service::NetworkService;
-use overwatch_rs::services::handle::ServiceStateHandle;
-use overwatch_rs::services::relay::{Relay, RelayMessage};
-use overwatch_rs::services::state::{NoOperator, NoState};
-use overwatch_rs::services::{ServiceCore, ServiceData, ServiceId};
-use overwatch_rs::DynError;
+use storage::DaStorageAdapter;
 
 const DA_VERIFIER_TAG: ServiceId = "DA-Verifier";
 pub enum DaVerifierMsg<B, A> {

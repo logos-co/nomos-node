@@ -1,7 +1,8 @@
 // std
 use core::fmt;
+use std::collections::HashSet;
 // crates
-use blst::{min_sig::PublicKey, min_sig::SecretKey};
+use blst::min_sig::SecretKey;
 use kzgrs_backend::{common::blob::DaBlob, verifier::DaVerifier as NomosKzgrsVerifier};
 use nomos_core::da::DaVerifier;
 use serde::{Deserialize, Serialize};
@@ -35,18 +36,7 @@ impl VerifierBackend for KzgrsDaVerifier {
         let secret_key =
             SecretKey::from_bytes(&bytes).expect("Secret key should be reconstructed from bytes");
 
-        let nodes_public_keys = settings
-            .nodes_public_keys
-            .iter()
-            .map(|pk_hex| {
-                let pk_bytes =
-                    hex::decode(pk_hex).expect("Public key string should decode to bytes");
-                PublicKey::from_bytes(&pk_bytes)
-                    .expect("Public key should be reconstructed from bytes")
-            })
-            .collect::<Vec<PublicKey>>();
-
-        let verifier = NomosKzgrsVerifier::new(secret_key, &nodes_public_keys);
+        let verifier = NomosKzgrsVerifier::new(secret_key, settings.index);
         Self { verifier }
     }
 }
@@ -71,5 +61,5 @@ impl DaVerifier for KzgrsDaVerifier {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct KzgrsDaVerifierSettings {
     pub sk: String,
-    pub nodes_public_keys: Vec<String>,
+    pub index: HashSet<u32>,
 }
