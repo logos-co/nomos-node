@@ -150,23 +150,23 @@ where
 pub mod test {
     use crate::da::network::swarm::ExecutorSwarm;
     use crate::test_utils::AllNeighbours;
+    use futures::StreamExt;
     use kzgrs_backend::common::blob::DaBlob;
     use kzgrs_backend::common::Column;
     use libp2p::identity::Keypair;
     use libp2p::PeerId;
+    use log::info;
     use nomos_da_network_core::address_book::AddressBook;
+    use nomos_da_network_core::behaviour::validator::ValidatorBehaviourEvent;
+    use nomos_da_network_core::protocols::dispersal::validator::behaviour::DispersalEvent;
     use nomos_da_network_core::swarm::validator::ValidatorSwarm;
     use nomos_libp2p::{Multiaddr, SwarmEvent};
     use std::time::Duration;
-    use futures::StreamExt;
-    use log::info;
     use tokio::sync::broadcast;
     use tokio::sync::mpsc::unbounded_channel;
     use tokio_stream::wrappers::UnboundedReceiverStream;
-    use tracing_subscriber::EnvFilter;
     use tracing_subscriber::fmt::TestWriter;
-    use nomos_da_network_core::behaviour::validator::ValidatorBehaviourEvent;
-    use nomos_da_network_core::protocols::dispersal::validator::behaviour::DispersalEvent;
+    use tracing_subscriber::EnvFilter;
 
     #[tokio::test]
     async fn test_dispersal_with_swarms() {
@@ -245,7 +245,6 @@ pub mod test {
         };
 
         let executor_task = tokio::spawn(executor_poll);
-
 
         let mut dispersal_events_receiver = UnboundedReceiverStream::new(dispersal_events_receiver);
 
