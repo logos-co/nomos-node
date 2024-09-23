@@ -165,7 +165,7 @@ impl Default for DaConfig {
             num_samples: 1,
             num_subnets: 2,
             old_blobs_check_interval: Duration::from_secs(5),
-            blobs_validity_duration: Duration::from_secs(15),
+            blobs_validity_duration: Duration::from_secs(u64::MAX),
         }
     }
 }

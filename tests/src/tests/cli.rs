@@ -8,6 +8,7 @@ use nomos_libp2p::Multiaddr;
 use nomos_libp2p::PeerId;
 use std::collections::HashMap;
 use std::io::Write;
+use std::time::Duration;
 use subnetworks_assignations::versions::v1::FillFromNodeList;
 use tempfile::NamedTempFile;
 use tests::nodes::NomosNode;
@@ -98,9 +99,9 @@ async fn disseminate(nodes: &Vec<NomosNode>, config: &mut Disseminate) {
 }
 
 #[tokio::test]
-async fn disseminate_blob() {
+async fn disseminate_and_retrieve() {
     let mut config = Disseminate {
-        data: Some("hello world".to_string()),
+        data: Some("o".to_string()),
         timeout: 180,
         app_id: APP_ID.into(),
         index: 0,
@@ -118,6 +119,14 @@ async fn disseminate_blob() {
     .await;
 
     disseminate(&nodes, &mut config).await;
+    tokio::time::sleep(Duration::from_secs(50)).await;
+    let app_id = hex::decode(APP_ID).unwrap();
+    nodes[0]
+        .get_indexer_range(
+            app_id.try_into().unwrap(),
+            0u64.to_be_bytes()..1u64.to_be_bytes(),
+        )
+        .await;
 }
 
 #[tokio::test]
@@ -158,14 +167,16 @@ async fn disseminate_blob_from_file() {
         timeout: 180,
         app_id: APP_ID.into(),
         index: 0,
-        columns: 2,
+        columns: 4,
         ..Default::default()
     };
 
     let nodes = NomosNode::spawn_nodes(SpawnConfig::star_happy(
-        4,
+        8,
         tests::DaConfig {
             dispersal_factor: 2,
+            subnetwork_size: 4,
+            num_subnets: 4,
             ..Default::default()
         },
     ))
