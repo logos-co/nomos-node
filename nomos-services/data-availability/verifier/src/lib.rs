@@ -75,7 +75,11 @@ where
         storage_adapter: &S,
         blob: &Backend::DaBlob,
     ) -> Result<(), DynError> {
-        if storage_adapter.get_blob(blob.id()).await?.is_some() {
+        if storage_adapter
+            .get_blob(blob.id(), blob.column_idx())
+            .await?
+            .is_some()
+        {
             Ok(())
         } else {
             verifier.verify(blob)?;

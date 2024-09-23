@@ -33,6 +33,7 @@ use tokio::sync::{mpsc::UnboundedReceiver, Mutex};
 use super::{network::adapters::libp2p::Libp2pExecutorDispersalAdapter, NetworkBackend};
 use crate::api::mempool::send_blob_info;
 
+#[allow(clippy::too_many_arguments)]
 pub async fn disseminate_and_wait<E, D>(
     encoder: &E,
     disperal: &D,
@@ -133,6 +134,7 @@ pub struct Settings {
     pub node_addr: Option<Url>,
     pub wait_until_disseminated: Duration,
     pub output: Option<std::path::PathBuf>,
+    pub global_params_path: String,
 }
 
 pub struct DisseminateService {
@@ -164,6 +166,7 @@ impl ServiceCore for DisseminateService {
             node_addr,
             wait_until_disseminated,
             output,
+            global_params_path,
         } = service_state.settings_reader.get_updated_settings();
 
         let network_relay: Relay<NetworkService<NetworkBackend>> =
@@ -173,9 +176,13 @@ impl ServiceCore for DisseminateService {
             .await
             .expect("Relay connection with NetworkService should succeed");
 
+        let global_params = kzgrs_backend::global::global_parameters_from_file(&global_params_path)
+            .expect("Global parameters should be loaded from file");
+
         let params = kzgrs_backend::encoder::DaEncoderParams::new(
             kzgrs_settings.num_columns,
             kzgrs_settings.with_cache,
+            global_params,
         );
         let da_encoder = kzgrs_backend::encoder::DaEncoder::new(params);
         let da_dispersal = Libp2pExecutorDispersalAdapter::new(network_relay);

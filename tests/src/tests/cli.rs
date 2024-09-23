@@ -14,6 +14,7 @@ use tempfile::NamedTempFile;
 use tests::nodes::NomosNode;
 use tests::Node;
 use tests::SpawnConfig;
+use tests::GLOBAL_PARAMS_PATH;
 
 const CLI_BIN: &str = "../target/debug/nomos-cli";
 const APP_ID: &str = "fd3384e132ad02a56c78f45547ee40038dc79002b90d29ed90e08eee762ae715";
@@ -33,8 +34,12 @@ fn run_disseminate(disseminate: &Disseminate) {
         .arg(disseminate.columns.to_string())
         .arg("--timeout")
         .arg(disseminate.timeout.to_string())
+        .arg("--wait-until-disseminated")
+        .arg(disseminate.wait_until_disseminated.to_string())
         .arg("--node-addr")
-        .arg(disseminate.node_addr.as_ref().unwrap().as_str());
+        .arg(disseminate.node_addr.as_ref().unwrap().as_str())
+        .arg("--global-params-path")
+        .arg(GLOBAL_PARAMS_PATH.to_string());
 
     match (&disseminate.data, &disseminate.file) {
         (Some(data), None) => c.args(["--data", &data]),
@@ -101,8 +106,9 @@ async fn disseminate(nodes: &Vec<NomosNode>, config: &mut Disseminate) {
 #[tokio::test]
 async fn disseminate_and_retrieve() {
     let mut config = Disseminate {
-        data: Some("o".to_string()),
+        data: Some("hello world".to_string()),
         timeout: 180,
+        wait_until_disseminated: 20,
         app_id: APP_ID.into(),
         index: 0,
         columns: 2,
@@ -113,13 +119,19 @@ async fn disseminate_and_retrieve() {
         2,
         tests::DaConfig {
             dispersal_factor: 2,
+            subnetwork_size: 2,
+            num_subnets: 2,
             ..Default::default()
+        },
+        tests::TestConfig {
+            wait_online_secs: 50,
         },
     ))
     .await;
 
     disseminate(&nodes, &mut config).await;
-    tokio::time::sleep(Duration::from_secs(50)).await;
+
+    tokio::time::sleep(Duration::from_secs(10)).await;
     let app_id = hex::decode(APP_ID).unwrap();
     nodes[0]
         .get_indexer_range(
@@ -129,6 +141,7 @@ async fn disseminate_and_retrieve() {
         .await;
 }
 
+#[ignore = "long running test"]
 #[tokio::test]
 async fn disseminate_big_blob() {
     const MSG_SIZE: usize = 1024;
@@ -151,12 +164,16 @@ async fn disseminate_big_blob() {
             dispersal_factor: 2,
             ..Default::default()
         },
+        tests::TestConfig {
+            wait_online_secs: 50,
+        },
     ))
     .await;
 
     disseminate(&nodes, &mut config).await;
 }
 
+#[ignore = "long running test"]
 #[tokio::test]
 async fn disseminate_blob_from_file() {
     let mut file = NamedTempFile::new().unwrap();
@@ -165,6 +182,7 @@ async fn disseminate_blob_from_file() {
     let mut config = Disseminate {
         file: Some(file.path().to_path_buf()),
         timeout: 180,
+        wait_until_disseminated: 10,
         app_id: APP_ID.into(),
         index: 0,
         columns: 4,
@@ -172,15 +190,27 @@ async fn disseminate_blob_from_file() {
     };
 
     let nodes = NomosNode::spawn_nodes(SpawnConfig::star_happy(
-        8,
+        4,
         tests::DaConfig {
             dispersal_factor: 2,
             subnetwork_size: 4,
             num_subnets: 4,
             ..Default::default()
         },
+        tests::TestConfig {
+            wait_online_secs: 120,
+        },
     ))
     .await;
 
     disseminate(&nodes, &mut config).await;
+
+    tokio::time::sleep(Duration::from_secs(20)).await;
+    let app_id = hex::decode(APP_ID).unwrap();
+    nodes[0]
+        .get_indexer_range(
+            app_id.try_into().unwrap(),
+            0u64.to_be_bytes()..1u64.to_be_bytes(),
+        )
+        .await;
 }

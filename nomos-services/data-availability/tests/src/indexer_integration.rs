@@ -120,6 +120,7 @@ fn test_indexer() {
         KzgrsDaVerifierSettings {
             sk: node1_sk.clone(),
             index: [0].into(),
+            global_params_path: GLOBAL_PARAMS_PATH.into(),
         },
         TestDaNetworkSettings {
             peer_addresses: peer_addresses.clone(),
@@ -143,6 +144,7 @@ fn test_indexer() {
         KzgrsDaVerifierSettings {
             sk: node2_sk.clone(),
             index: [1].into(),
+            global_params_path: GLOBAL_PARAMS_PATH.into(),
         },
         TestDaNetworkSettings {
             peer_addresses,
@@ -214,6 +216,17 @@ fn test_indexer() {
     let blob_hash = <DaBlob as Blob>::id(&blobs[0]);
     let blob_info = BlobInfo::new(blob_hash, meta);
 
+    let mut node_1_blob_0_idx = Vec::new();
+    node_1_blob_0_idx.extend_from_slice(&blob_hash);
+    node_1_blob_0_idx.extend_from_slice(&0u16.to_be_bytes());
+
+    let mut node_1_blob_1_idx = Vec::new();
+    node_1_blob_1_idx.extend_from_slice(&blob_hash);
+    node_1_blob_1_idx.extend_from_slice(&1u16.to_be_bytes());
+
+    let node_2_blob_0_idx = node_1_blob_0_idx.clone();
+    let node_2_blob_1_idx = node_1_blob_1_idx.clone();
+
     // Test get Metadata for Certificate
     let (app_id2, index2) = blob_info.metadata();
 
@@ -226,12 +239,17 @@ fn test_indexer() {
     node2.spawn(async move {
         let storage_outbound = node2_storage.connect().await.unwrap();
 
-        // Mock attested blob by writting directly into the da storage.
-        let attested_key = key_bytes(DA_VERIFIED_KEY_PREFIX, blob_hash);
-
+        // Mock both attested blobs by writting directly into the da storage.
         storage_outbound
             .send(nomos_storage::StorageMsg::Store {
-                key: attested_key.into(),
+                key: key_bytes(DA_VERIFIED_KEY_PREFIX, node_2_blob_0_idx).into(),
+                value: Bytes::new(),
+            })
+            .await
+            .unwrap();
+        storage_outbound
+            .send(nomos_storage::StorageMsg::Store {
+                key: key_bytes(DA_VERIFIED_KEY_PREFIX, node_2_blob_1_idx).into(),
                 value: Bytes::new(),
             })
             .await
@@ -256,12 +274,17 @@ fn test_indexer() {
                 Err(_) => None,
             });
 
-        // Mock attested blob by writting directly into the da storage.
-        let attested_key = key_bytes(DA_VERIFIED_KEY_PREFIX, blob_hash);
-
+        // Mock both attested blobs by writting directly into the da storage.
         storage_outbound
             .send(nomos_storage::StorageMsg::Store {
-                key: attested_key.into(),
+                key: key_bytes(DA_VERIFIED_KEY_PREFIX, node_1_blob_0_idx).into(),
+                value: Bytes::new(),
+            })
+            .await
+            .unwrap();
+        storage_outbound
+            .send(nomos_storage::StorageMsg::Store {
+                key: key_bytes(DA_VERIFIED_KEY_PREFIX, node_1_blob_1_idx).into(),
                 value: Bytes::new(),
             })
             .await

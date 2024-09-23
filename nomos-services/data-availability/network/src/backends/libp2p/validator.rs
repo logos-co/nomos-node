@@ -16,6 +16,7 @@ use nomos_libp2p::secret_key_serde;
 use overwatch_rs::overwatch::handle::OverwatchHandle;
 use overwatch_rs::services::state::NoState;
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 use std::fmt::Debug;
 use std::marker::PhantomData;
 use std::pin::Pin;
@@ -150,6 +151,7 @@ where
 
         // Dial peers in the same subnetworks (Node might participate in multiple).
         let local_peer_id = *validator_swarm.local_peer_id();
+        let mut connected_peers = HashSet::new();
 
         config
             .membership
@@ -162,12 +164,15 @@ where
                     .addresses
                     .iter()
                     .find(|(p, _)| p == &peer)
-                    .map(|(_, addr)| addr.clone())
+                    .map(|(_, addr)| (peer, addr.clone()))
             })
-            .for_each(|addr| {
-                validator_swarm
-                    .dial(addr)
-                    .expect("Node should be able to dial peer in a subnet");
+            .for_each(|(peer, addr)| {
+                // Only dial if we haven't already connected to this peer.
+                if connected_peers.insert(peer) {
+                    validator_swarm
+                        .dial(addr)
+                        .expect("Node should be able to dial peer in a subnet");
+                }
             });
 
         let task = overwatch_handle.runtime().spawn(validator_swarm.run());

@@ -4,9 +4,7 @@ use std::ops::Range;
 use std::process::{Child, Command, Stdio};
 use std::str::FromStr;
 use std::time::Duration;
-// internal
-use super::{create_tempdir, persist_tempdir, LOGS_PREFIX};
-use crate::{adjust_timeout, get_available_port, ConsensusConfig, DaConfig, Node};
+// crates
 use blst::min_sig::SecretKey;
 use cl::{InputWitness, NoteWitness, NullifierSecret};
 use cryptarchia_consensus::{CryptarchiaInfo, CryptarchiaSettings, TimeConfig};
@@ -24,7 +22,9 @@ use nomos_da_indexer::storage::adapters::rocksdb::RocksAdapterSettings as Indexe
 use nomos_da_indexer::IndexerSettings;
 use nomos_da_network_service::backends::libp2p::validator::DaNetworkValidatorBackendSettings;
 use nomos_da_network_service::NetworkConfig as DaNetworkConfig;
+use nomos_da_sampling::backend::kzgrs::KzgrsSamplingBackendSettings;
 use nomos_da_sampling::storage::adapters::rocksdb::RocksAdapterSettings as SamplingStorageAdapterSettings;
+use nomos_da_sampling::DaSamplingServiceSettings;
 use nomos_da_verifier::backend::kzgrs::KzgrsDaVerifierSettings;
 use nomos_da_verifier::storage::adapters::rocksdb::RocksAdapterSettings as VerifierStorageAdapterSettings;
 use nomos_da_verifier::DaVerifierServiceSettings;
@@ -35,9 +35,6 @@ use nomos_mempool::MempoolMetrics;
 use nomos_network::backends::libp2p::mixnet::MixnetConfig;
 use nomos_network::{backends::libp2p::Libp2pConfig, NetworkConfig};
 use nomos_node::{api::AxumBackendSettings, Config, Tx};
-// crates
-use nomos_da_sampling::backend::kzgrs::KzgrsSamplingBackendSettings;
-use nomos_da_sampling::DaSamplingServiceSettings;
 use nomos_storage::backends::rocksdb::RocksBackendSettings;
 use once_cell::sync::Lazy;
 use rand::{thread_rng, Rng};
@@ -47,6 +44,9 @@ use subnetworks_assignations::versions::v1::FillFromNodeList;
 use subnetworks_assignations::MembershipHandler;
 use tempfile::NamedTempFile;
 use time::OffsetDateTime;
+// internal
+use super::{create_tempdir, persist_tempdir, LOGS_PREFIX};
+use crate::{adjust_timeout, get_available_port, ConsensusConfig, DaConfig, Node, TestConfig};
 
 static CLIENT: Lazy<Client> = Lazy::new(Client::new);
 const CRYPTARCHIA_INFO_API: &str = "cryptarchia/info";
@@ -86,6 +86,7 @@ impl NomosNode {
         let dir = create_tempdir().unwrap();
         let mut file = NamedTempFile::new().unwrap();
         let config_path = file.path().to_owned();
+        let wait_online_secs = config.wait_online_secs;
 
         // setup logging so that we can intercept it later in testing
         config.log.backend = LoggerBackend::File {
@@ -118,9 +119,10 @@ impl NomosNode {
             _tempdir: dir,
             config,
         };
-        tokio::time::timeout(adjust_timeout(Duration::from_secs(10)), async {
-            node.wait_online().await
-        })
+        tokio::time::timeout(
+            adjust_timeout(Duration::from_secs(wait_online_secs)),
+            async { node.wait_online().await },
+        )
         .await
         .unwrap();
 
@@ -262,7 +264,11 @@ impl Node for NomosNode {
     /// so the leader can receive votes from all other nodes that will be subsequently spawned.
     /// If not, the leader will miss votes from nodes spawned before itself.
     /// This issue will be resolved by devising the block catch-up mechanism in the future.
-    fn create_node_configs(consensus: ConsensusConfig, da: DaConfig) -> Vec<Config> {
+    fn create_node_configs(
+        consensus: ConsensusConfig,
+        da: DaConfig,
+        test: TestConfig,
+    ) -> Vec<Config> {
         // we use the same random bytes for:
         // * da id
         // * coin sk
@@ -321,6 +327,7 @@ impl Node for NomosNode {
                     vec![coin],
                     time_config.clone(),
                     da.clone(),
+                    test.wait_online_secs,
                     #[cfg(feature = "mixnet")]
                     MixnetConfig {
                         mixclient: mixclient_config.clone(),
@@ -442,6 +449,7 @@ fn build_da_peer_list(configs: &[Config]) -> Vec<(PeerId, Multiaddr)> {
         .collect()
 }
 
+#[allow(clippy::too_many_arguments)]
 fn create_node_config(
     id: [u8; 32],
     genesis_state: LedgerState,
@@ -449,6 +457,7 @@ fn create_node_config(
     notes: Vec<InputWitness>,
     time: TimeConfig,
     da_config: DaConfig,
+    wait_online_secs: u64,
     #[cfg(feature = "mixnet")] mixnet_config: MixnetConfig,
 ) -> Config {
     let swarm_config: SwarmConfig = Default::default();
@@ -494,6 +503,7 @@ fn create_node_config(
             verifier_settings: KzgrsDaVerifierSettings {
                 sk: hex::encode(verifier_sk_bytes),
                 index: Default::default(),
+                global_params_path: da_config.global_params_path,
             },
             network_adapter_settings: (),
             storage_adapter_settings: VerifierStorageAdapterSettings {
@@ -526,6 +536,7 @@ fn create_node_config(
             read_only: false,
             column_family: Some("blocks".into()),
         },
+        wait_online_secs,
     };
 
     config.network.backend.inner.port = get_available_port();

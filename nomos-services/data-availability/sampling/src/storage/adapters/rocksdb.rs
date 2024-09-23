@@ -55,10 +55,13 @@ where
         blob_id: <Self::Blob as Blob>::BlobId,
         column_idx: ColumnIndex,
     ) -> Result<Option<Self::Blob>, DynError> {
+        let column_idx = column_idx.to_be_bytes();
+        let blob_idx = create_blob_idx(blob_id.as_ref(), &column_idx);
+
         let (reply_tx, reply_rx) = tokio::sync::oneshot::channel();
         self.storage_relay
             .send(StorageMsg::Load {
-                key: key_bytes(DA_VERIFIED_KEY_PREFIX, &blob_id),
+                key: key_bytes(DA_VERIFIED_KEY_PREFIX, blob_idx),
                 reply_channel: reply_tx,
             })
             .await
@@ -68,7 +71,7 @@ where
             let blob_bytes = load_blob(
                 self.settings.blob_storage_directory.clone(),
                 blob_id.as_ref(),
-                &column_idx.to_be_bytes(),
+                &column_idx,
             )
             .await?;
             Ok(S::deserialize(blob_bytes)
@@ -83,4 +86,14 @@ where
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RocksAdapterSettings {
     pub blob_storage_directory: PathBuf,
+}
+
+// Combines a 32-byte blob ID (`[u8; 32]`) with a 2-byte column index
+// (`u16` represented as `[u8; 2]`).
+fn create_blob_idx(blob_id: &[u8], column_idx: &[u8]) -> [u8; 34] {
+    let mut blob_idx = [0u8; 34];
+    blob_idx[..blob_id.len()].copy_from_slice(blob_id);
+    blob_idx[blob_id.len()..].copy_from_slice(column_idx);
+
+    blob_idx
 }

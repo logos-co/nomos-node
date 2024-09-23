@@ -1,36 +1,38 @@
 // std
-
 use std::collections::HashSet;
-
-use ark_poly::EvaluationDomain;
 // crates
+use ark_poly::EvaluationDomain;
 use blst::min_sig::SecretKey;
 use itertools::{izip, Itertools};
 use kzgrs::common::field_element_from_bytes_le;
 use kzgrs::{
-    bytes_to_polynomial, commit_polynomial, verify_element_proof, Commitment,
+    bytes_to_polynomial, commit_polynomial, verify_element_proof, Commitment, GlobalParameters,
     PolynomialEvaluationDomain, Proof, BYTES_PER_FIELD_ELEMENT,
 };
 use nomos_core::da::blob::Blob;
-
-use crate::common::blob::DaBlob;
 // internal
+use crate::common::blob::DaBlob;
 use crate::common::{hash_column_and_commitment, Chunk, Column};
 use crate::encoder::DaEncoderParams;
-use crate::global::GLOBAL_PARAMETERS;
 
 pub struct DaVerifier {
     // TODO: substitute this for an abstraction to sign things over
     pub sk: SecretKey,
     pub index: HashSet<u32>,
+    global_parameters: GlobalParameters,
 }
 
 impl DaVerifier {
-    pub fn new(sk: SecretKey, index: HashSet<u32>) -> Self {
-        Self { sk, index }
+    pub fn new(sk: SecretKey, index: HashSet<u32>, global_parameters: GlobalParameters) -> Self {
+        Self {
+            sk,
+            index,
+            global_parameters,
+        }
     }
 
     fn verify_column(
+        global_parameters: &GlobalParameters,
         column: &Column,
         column_commitment: &Commitment,
         aggregated_column_commitment: &Commitment,
@@ -47,7 +49,7 @@ impl DaVerifier {
         ) else {
             return false;
         };
-        let Ok(computed_column_commitment) = commit_polynomial(&polynomial, &GLOBAL_PARAMETERS)
+        let Ok(computed_column_commitment) = commit_polynomial(&polynomial, global_parameters)
         else {
             return false;
         };
@@ -67,11 +69,12 @@ impl DaVerifier {
             aggregated_column_commitment,
             aggregated_column_proof,
             rows_domain,
-            &GLOBAL_PARAMETERS,
+            global_parameters,
         )
     }
 
     fn verify_chunk(
+        global_parameters: &GlobalParameters,
         chunk: &Chunk,
         commitment: &Commitment,
         proof: &Proof,
@@ -85,11 +88,12 @@ impl DaVerifier {
             commitment,
             proof,
             domain,
-            &GLOBAL_PARAMETERS,
+            global_parameters,
         )
     }
 
     fn verify_chunks(
+        global_parameters: &GlobalParameters,
         chunks: &[Chunk],
         commitments: &[Commitment],
         proofs: &[Proof],
@@ -103,7 +107,8 @@ impl DaVerifier {
             return false;
         }
         for (chunk, commitment, proof) in izip!(chunks, commitments, proofs) {
-            if !DaVerifier::verify_chunk(chunk, commitment, proof, index, domain) {
+            if !DaVerifier::verify_chunk(global_parameters, chunk, commitment, proof, index, domain)
+            {
                 return false;
             }
         }
@@ -117,6 +122,7 @@ impl DaVerifier {
         let index = self.index.get(blob_col_idx).unwrap();
 
         let is_column_verified = DaVerifier::verify_column(
+            &self.global_parameters,
             &blob.column,
             &blob.column_commitment,
             &blob.aggregated_column_commitment,
@@ -129,6 +135,7 @@ impl DaVerifier {
         }
 
         let are_chunks_verified = DaVerifier::verify_chunks(
+            &self.global_parameters,
             blob.column.as_ref(),
             &blob.rows_commitments,
             &blob.rows_proofs,
@@ -158,7 +165,7 @@ mod test {
         global_parameters_from_randomness, Commitment, GlobalParameters,
         PolynomialEvaluationDomain, Proof, BYTES_PER_FIELD_ELEMENT,
     };
-    use nomos_core::da::DaEncoder as _;
+    use nomos_core::da::DaEncoder;
     use once_cell::sync::Lazy;
     use rand::{thread_rng, RngCore};
 
@@ -224,6 +231,7 @@ mod test {
         let column_data = prepare_column(false).unwrap();
 
         assert!(DaVerifier::verify_column(
+            &GLOBAL_PARAMETERS,
             &column_data.column,
             &column_data.column_commitment,
             &column_data.aggregated_commitment,
@@ -255,6 +263,7 @@ mod test {
         .is_err());
 
         assert!(!DaVerifier::verify_column(
+            &GLOBAL_PARAMETERS,
             &column2,
             &column_data.column_commitment,
             &column_data.aggregated_commitment,
@@ -267,6 +276,7 @@ mod test {
         let column_data2 = prepare_column(true).unwrap();
 
         assert!(!DaVerifier::verify_column(
+            &GLOBAL_PARAMETERS,
             &column_data2.column,
             &column_data2.column_commitment,
             &column_data2.aggregated_commitment,
@@ -301,6 +311,7 @@ mod test {
         };
         // Happy case
         let chunks_verified = DaVerifier::verify_chunks(
+            &GLOBAL_PARAMETERS,
             da_blob.column.as_ref(),
             &da_blob.rows_commitments,
             &da_blob.rows_proofs,
@@ -314,6 +325,7 @@ mod test {
         column_w_missing_chunk.pop();
 
         let chunks_not_verified = !DaVerifier::verify_chunks(
+            &GLOBAL_PARAMETERS,
             column_w_missing_chunk.as_ref(),
             &da_blob.rows_commitments,
             &da_blob.rows_proofs,
@@ -327,6 +339,7 @@ mod test {
         modified_proofs.swap(0, 1);
 
         let chunks_not_verified = !DaVerifier::verify_chunks(
+            &GLOBAL_PARAMETERS,
             da_blob.column.as_ref(),
             &da_blob.rows_commitments,
             &modified_proofs,
@@ -340,6 +353,7 @@ mod test {
         modified_commitments.swap(0, 1);
 
         let chunks_not_verified = !DaVerifier::verify_chunks(
+            &GLOBAL_PARAMETERS,
             da_blob.column.as_ref(),
             &modified_commitments,
             &da_blob.rows_proofs,
@@ -365,9 +379,8 @@ mod test {
         let verifiers: Vec<DaVerifier> = sks
             .into_iter()
             .enumerate()
-            .map(|(index, sk)| DaVerifier {
-                sk,
-                index: [index as u32].into(),
+            .map(|(index, sk)| {
+                DaVerifier::new(sk, [index as u32].into(), GLOBAL_PARAMETERS.clone())
             })
             .collect();
         let encoded_data = encoder.encode(&data).unwrap();

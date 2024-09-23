@@ -103,6 +103,7 @@ fn test_verifier() {
         KzgrsDaVerifierSettings {
             sk: node1_sk.clone(),
             index: [0].into(),
+            global_params_path: GLOBAL_PARAMS_PATH.into(),
         },
         TestDaNetworkSettings {
             peer_addresses: peer_addresses.clone(),
@@ -126,6 +127,7 @@ fn test_verifier() {
         KzgrsDaVerifierSettings {
             sk: node2_sk,
             index: [1].into(),
+            global_params_path: GLOBAL_PARAMS_PATH.into(),
         },
         TestDaNetworkSettings {
             peer_addresses,
@@ -155,7 +157,10 @@ fn test_verifier() {
 
         // Encode data
         let encoder = &ENCODER;
-        let data = rand_data(10);
+        let data = vec![
+            49u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8,
+            0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8,
+        ];
 
         let encoded_data = encoder.encode(&data).unwrap();
         let columns: Vec<_> = encoded_data.extended_data.columns().collect();

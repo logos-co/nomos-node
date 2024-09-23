@@ -17,6 +17,16 @@ use rand::{thread_rng, Rng};
 static NET_PORT: Lazy<Mutex<u16>> = Lazy::new(|| Mutex::new(thread_rng().gen_range(8000..10000)));
 static IS_SLOW_TEST_ENV: Lazy<bool> =
     Lazy::new(|| env::var("SLOW_TEST_ENV").is_ok_and(|s| s == "true"));
+pub static GLOBAL_PARAMS_PATH: Lazy<String> = Lazy::new(|| {
+    let relative_path = "./kzgrs/kzgrs_test_params";
+    let current_dir = env::current_dir().expect("Failed to get current directory");
+    current_dir
+        .join(relative_path)
+        .canonicalize()
+        .expect("Failed to resolve absolute path")
+        .to_string_lossy()
+        .to_string()
+});
 
 pub fn get_available_port() -> u16 {
     let mut port = NET_PORT.lock().unwrap();
@@ -49,8 +59,12 @@ pub trait Node: Sized {
     }
     fn node_configs(config: SpawnConfig) -> Vec<Config> {
         match config {
-            SpawnConfig::Star { consensus, da } => {
-                let mut configs = Self::create_node_configs(consensus, da);
+            SpawnConfig::Star {
+                consensus,
+                da,
+                test,
+            } => {
+                let mut configs = Self::create_node_configs(consensus, da, test);
                 let next_leader_config = configs.remove(0);
                 let first_node_addr = node_address(&next_leader_config);
                 let mut node_configs = vec![next_leader_config];
@@ -64,8 +78,12 @@ pub trait Node: Sized {
                 }
                 node_configs
             }
-            SpawnConfig::Chain { consensus, da } => {
-                let mut configs = Self::create_node_configs(consensus, da);
+            SpawnConfig::Chain {
+                consensus,
+                da,
+                test,
+            } => {
+                let mut configs = Self::create_node_configs(consensus, da, test);
                 let next_leader_config = configs.remove(0);
                 let mut prev_node_addr = node_address(&next_leader_config);
                 let mut node_configs = vec![next_leader_config];
@@ -79,7 +97,11 @@ pub trait Node: Sized {
             }
         }
     }
-    fn create_node_configs(consensus: ConsensusConfig, da: DaConfig) -> Vec<Config>;
+    fn create_node_configs(
+        consensus: ConsensusConfig,
+        da: DaConfig,
+        test: TestConfig,
+    ) -> Vec<Config>;
     async fn consensus_info(&self) -> Self::ConsensusInfo;
     fn stop(&mut self);
 }
@@ -90,17 +112,19 @@ pub enum SpawnConfig {
     Star {
         consensus: ConsensusConfig,
         da: DaConfig,
+        test: TestConfig,
     },
     // Chain topology: Every node is chained to the node next to it.
     Chain {
         consensus: ConsensusConfig,
         da: DaConfig,
+        test: TestConfig,
     },
 }
 
 impl SpawnConfig {
     // Returns a SpawnConfig::Chain with proper configurations for happy-path tests
-    pub fn chain_happy(n_participants: usize, da: DaConfig) -> Self {
+    pub fn chain_happy(n_participants: usize, da: DaConfig, test: TestConfig) -> Self {
         Self::Chain {
             consensus: ConsensusConfig {
                 n_participants,
@@ -112,10 +136,11 @@ impl SpawnConfig {
                 active_slot_coeff: 0.9,
             },
             da,
+            test,
         }
     }
 
-    pub fn star_happy(n_participants: usize, da: DaConfig) -> Self {
+    pub fn star_happy(n_participants: usize, da: DaConfig, test: TestConfig) -> Self {
         Self::Star {
             consensus: ConsensusConfig {
                 n_participants,
@@ -127,6 +152,7 @@ impl SpawnConfig {
                 active_slot_coeff: 0.9,
             },
             da,
+            test,
         }
     }
 }
@@ -154,6 +180,7 @@ pub struct DaConfig {
     pub num_subnets: u16,
     pub old_blobs_check_interval: Duration,
     pub blobs_validity_duration: Duration,
+    pub global_params_path: String,
 }
 
 impl Default for DaConfig {
@@ -166,6 +193,20 @@ impl Default for DaConfig {
             num_subnets: 2,
             old_blobs_check_interval: Duration::from_secs(5),
             blobs_validity_duration: Duration::from_secs(u64::MAX),
+            global_params_path: GLOBAL_PARAMS_PATH.to_string(),
+        }
+    }
+}
+
+#[derive(Clone)]
+pub struct TestConfig {
+    pub wait_online_secs: u64,
+}
+
+impl Default for TestConfig {
+    fn default() -> Self {
+        Self {
+            wait_online_secs: 30,
         }
     }
 }
