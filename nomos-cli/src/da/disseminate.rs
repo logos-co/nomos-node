@@ -40,6 +40,7 @@ pub async fn disseminate_and_wait<E, D>(
     metadata: Metadata,
     status_updates: Sender<Status>,
     node_addr: Option<&Url>,
+    wait_until_disseminated: Duration,
     output: Option<&PathBuf>,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>>
 where
@@ -67,6 +68,9 @@ where
         status_updates.send(Status::SavingBlobInfo)?;
         std::fs::write(output, wire::serialize(&blob_info)?)?;
     }
+
+    // Wait for blobs be replicated in da network.
+    tokio::time::sleep(wait_until_disseminated).await;
 
     // 4) Send blob info to the mempool.
     if let Some(node) = node_addr {
@@ -127,6 +131,7 @@ pub struct Settings {
     pub metadata: Metadata,
     pub status_updates: Sender<Status>,
     pub node_addr: Option<Url>,
+    pub wait_until_disseminated: Duration,
     pub output: Option<std::path::PathBuf>,
 }
 
@@ -157,6 +162,7 @@ impl ServiceCore for DisseminateService {
             metadata,
             status_updates,
             node_addr,
+            wait_until_disseminated,
             output,
         } = service_state.settings_reader.get_updated_settings();
 
@@ -184,6 +190,7 @@ impl ServiceCore for DisseminateService {
                     metadata,
                     status_updates.clone(),
                     node_addr.as_ref(),
+                    wait_until_disseminated,
                     output.as_ref(),
                 ),
             )
