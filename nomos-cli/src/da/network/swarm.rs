@@ -118,6 +118,7 @@ where
     }
 
     async fn handle_dispersal_event(&mut self, event: DispersalExecutorEvent) {
+        println!("handle_dispersal_event called");
         match event {
             DispersalExecutorEvent::DispersalSuccess {
                 blob_id,
@@ -155,12 +156,25 @@ pub mod test {
     use libp2p::PeerId;
     use nomos_da_network_core::address_book::AddressBook;
     use nomos_da_network_core::swarm::validator::ValidatorSwarm;
-    use nomos_libp2p::Multiaddr;
+    use nomos_libp2p::{Multiaddr, SwarmEvent};
     use std::time::Duration;
+    use futures::StreamExt;
+    use log::info;
+    use tokio::sync::broadcast;
     use tokio::sync::mpsc::unbounded_channel;
+    use tokio_stream::wrappers::UnboundedReceiverStream;
+    use tracing_subscriber::EnvFilter;
+    use tracing_subscriber::fmt::TestWriter;
+    use nomos_da_network_core::behaviour::validator::ValidatorBehaviourEvent;
+    use nomos_da_network_core::protocols::dispersal::validator::behaviour::DispersalEvent;
 
     #[tokio::test]
     async fn test_dispersal_with_swarms() {
+        let _ = tracing_subscriber::fmt()
+            .with_env_filter(EnvFilter::from_default_env())
+            .compact()
+            .with_writer(TestWriter::default())
+            .try_init();
         let k1 = Keypair::generate_ed25519();
         let k2 = Keypair::generate_ed25519();
         let executor_peer = PeerId::from_public_key(&k1.public());
@@ -177,25 +191,75 @@ pub mod test {
         let addr: Multiaddr = "/ip4/127.0.0.1/udp/5063/quic-v1".parse().unwrap();
         let addr2 = addr.clone().with_p2p(validator_peer).unwrap();
         let addr2_book = AddressBook::from_iter(vec![(executor_peer, addr2.clone())]);
+        let (dispersal_events_sender, dispersal_events_receiver) = unbounded_channel();
 
-        let (dispersal_broadcast_sender, _) = unbounded_channel();
+        let (dispersal_broadcast_sender, dispersal_broadcast_receiver) =
+            broadcast::channel(128usize);
 
         let mut executor =
-            ExecutorSwarm::new(k1, neighbours.clone(), dispersal_broadcast_sender.clone());
+            ExecutorSwarm::new(k1, neighbours.clone(), dispersal_events_sender.clone());
         let (mut validator, _) = ValidatorSwarm::new(k2, neighbours.clone(), addr2_book);
 
-        tokio::spawn(async move {
+        let msg_count = 1usize;
+        let validator_task = async move {
             let validator_swarm = validator.protocol_swarm_mut();
             validator_swarm.listen_on(addr).unwrap();
 
-            validator.run().await;
-        });
+            let mut res = vec![];
+            loop {
+                match validator_swarm.select_next_some().await {
+                    SwarmEvent::Behaviour(ValidatorBehaviourEvent::Dispersal(event)) => {
+                        res.push(event);
+                    }
+                    event => {
+                        info!("Validator event: {event:?}");
+                    }
+                }
+                if res.len() == msg_count {
+                    break;
+                }
+            }
+            res
+        };
+        let join_validator = tokio::spawn(validator_task);
 
         tokio::time::sleep(Duration::from_secs(1)).await;
         executor.dial(addr2).unwrap();
         tokio::time::sleep(Duration::from_secs(1)).await;
 
-        let executor_disperse_blob_sender = executor.swarm.behaviour().blobs_sender();
+        let executor_open_stream_sender = executor.open_stream_sender();
+        let executor_disperse_blob_sender = executor.blobs_sender();
+        let (sender, mut receiver) = tokio::sync::oneshot::channel();
+
+        let executor_poll = async move {
+            loop {
+                tokio::select! {
+                    Some(event) = executor.swarm.next() => {
+                        println!("My executor event: {event:?}");
+                    }
+                    _ = &mut receiver => {
+                        break;
+                    }
+                }
+            }
+        };
+
+        let executor_task = tokio::spawn(executor_poll);
+
+
+        let mut dispersal_events_receiver = UnboundedReceiverStream::new(dispersal_events_receiver);
+
+        let replies_poll = async move {
+            while let Some(dispersal_event) = dispersal_events_receiver.next().await {
+                if let Err(e) = dispersal_broadcast_sender.send(dispersal_event) {
+                    println!("Error in internal broadcast of dispersal event: {e:?}");
+                }
+            }
+        };
+
+        let replies_task = tokio::spawn(replies_poll);
+
+        executor_open_stream_sender.send(validator_peer).unwrap();
 
         println!("Sending blob...");
         executor_disperse_blob_sender
@@ -213,9 +277,9 @@ pub mod test {
             ))
             .unwrap();
 
-        let executor_task = tokio::spawn(async move {
-            executor.run().await;
-        });
-        assert!(executor_task.await.is_ok());
+        assert_eq!(join_validator.await.unwrap().len(), msg_count);
+        sender.send(()).unwrap();
+        executor_task.await.unwrap();
+        replies_task.await.unwrap();
     }
 }
