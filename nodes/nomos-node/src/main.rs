@@ -16,8 +16,6 @@ use overwatch_rs::overwatch::*;
 use tracing::{span, Level};
 use uuid::Uuid;
 
-const DEFAULT_DB_PATH: &str = "./db";
-
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 struct Args {
@@ -97,11 +95,7 @@ fn main() -> Result<()> {
             cryptarchia: config.cryptarchia,
             #[cfg(feature = "metrics")]
             metrics: MetricsSettings { registry },
-            storage: nomos_storage::backends::rocksdb::RocksBackendSettings {
-                db_path: std::path::PathBuf::from(DEFAULT_DB_PATH),
-                read_only: false,
-                column_family: Some("blocks".into()),
-            },
+            storage: config.storage,
             system_sig: (),
         },
         None,
