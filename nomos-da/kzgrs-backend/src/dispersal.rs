@@ -141,7 +141,10 @@ mod tests {
             .clone()
             .into_iter()
             .enumerate()
-            .map(|(index, sk)| DaVerifier { sk, index })
+            .map(|(index, sk)| DaVerifier {
+                sk,
+                index: [index as u32].into(),
+            })
             .collect();
 
         let encoded_data = encoder.encode(&data).unwrap();

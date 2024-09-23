@@ -1,14 +1,17 @@
 // std
 
+use std::collections::HashSet;
+
 use ark_poly::EvaluationDomain;
 // crates
-use blst::min_sig::{PublicKey, SecretKey};
+use blst::min_sig::SecretKey;
 use itertools::{izip, Itertools};
 use kzgrs::common::field_element_from_bytes_le;
 use kzgrs::{
     bytes_to_polynomial, commit_polynomial, verify_element_proof, Commitment,
     PolynomialEvaluationDomain, Proof, BYTES_PER_FIELD_ELEMENT,
 };
+use nomos_core::da::blob::Blob;
 
 use crate::common::blob::DaBlob;
 // internal
@@ -19,19 +22,11 @@ use crate::global::GLOBAL_PARAMETERS;
 pub struct DaVerifier {
     // TODO: substitute this for an abstraction to sign things over
     pub sk: SecretKey,
-    pub index: usize,
+    pub index: HashSet<u32>,
 }
 
 impl DaVerifier {
-    pub fn new(sk: SecretKey, nodes_public_keys: &[PublicKey]) -> Self {
-        // TODO: `is_sorted` is experimental, and by contract `nodes_public_keys` should be shorted
-        // but not sure how we could enforce it here without re-sorting anyway.
-        // assert!(nodes_public_keys.is_sorted());
-        let self_pk = sk.sk_to_pk();
-        let (index, _) = nodes_public_keys
-            .iter()
-            .find_position(|&pk| pk == &self_pk)
-            .expect("Self pk should be registered");
+    pub fn new(sk: SecretKey, index: HashSet<u32>) -> Self {
         Self { sk, index }
     }
 
@@ -118,12 +113,15 @@ impl DaVerifier {
     pub fn verify(&self, blob: &DaBlob, rows_domain_size: usize) -> bool {
         let rows_domain = PolynomialEvaluationDomain::new(rows_domain_size)
             .expect("Domain should be able to build");
+        let blob_col_idx = &u16::from_be_bytes(blob.column_idx()).into();
+        let index = self.index.get(blob_col_idx).unwrap();
+
         let is_column_verified = DaVerifier::verify_column(
             &blob.column,
             &blob.column_commitment,
             &blob.aggregated_column_commitment,
             &blob.aggregated_column_proof,
-            self.index,
+            *index as usize,
             rows_domain,
         );
         if !is_column_verified {
@@ -134,7 +132,7 @@ impl DaVerifier {
             blob.column.as_ref(),
             &blob.rows_commitments,
             &blob.rows_proofs,
-            self.index,
+            *index as usize,
             rows_domain,
         );
         if !are_chunks_verified {
@@ -367,7 +365,10 @@ mod test {
         let verifiers: Vec<DaVerifier> = sks
             .into_iter()
             .enumerate()
-            .map(|(index, sk)| DaVerifier { sk, index })
+            .map(|(index, sk)| DaVerifier {
+                sk,
+                index: [index as u32].into(),
+            })
             .collect();
         let encoded_data = encoder.encode(&data).unwrap();
         for (i, column) in encoded_data.extended_data.columns().enumerate() {
