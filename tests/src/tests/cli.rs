@@ -106,8 +106,8 @@ async fn disseminate(nodes: &Vec<NomosNode>, config: &mut Disseminate) {
 async fn disseminate_and_retrieve() {
     let mut config = Disseminate {
         data: Some("hello world".to_string()),
-        timeout: 180,
-        wait_until_disseminated: 40,
+        timeout: 60,
+        wait_until_disseminated: 5,
         app_id: APP_ID.into(),
         index: 0,
         columns: 2,

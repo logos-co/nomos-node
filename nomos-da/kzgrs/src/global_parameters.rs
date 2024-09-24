@@ -18,6 +18,7 @@ pub fn global_parameters_from_file(file_path: &str) -> Result<GlobalParameters, 
     let mut serialized_data = Vec::new();
     file.read_to_end(&mut serialized_data)?;
 
-    let params = UniversalParams::<Bls12_381>::deserialize_uncompressed(&*serialized_data)?;
+    let params =
+        UniversalParams::<Bls12_381>::deserialize_uncompressed_unchecked(&*serialized_data)?;
     Ok(params)
 }

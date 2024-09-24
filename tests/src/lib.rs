@@ -206,7 +206,7 @@ pub struct TestConfig {
 impl Default for TestConfig {
     fn default() -> Self {
         Self {
-            wait_online_secs: 30,
+            wait_online_secs: 10,
         }
     }
 }
