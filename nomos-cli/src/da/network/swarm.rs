@@ -118,7 +118,6 @@ where
     }
 
     async fn handle_dispersal_event(&mut self, event: DispersalExecutorEvent) {
-        debug!("handle_dispersal_event called");
         match event {
             DispersalExecutorEvent::DispersalSuccess {
                 blob_id,
@@ -157,14 +156,13 @@ pub mod test {
     use libp2p::PeerId;
     use nomos_da_network_core::address_book::AddressBook;
     use nomos_da_network_core::behaviour::validator::ValidatorBehaviourEvent;
-    use nomos_da_network_core::protocols::dispersal::validator::behaviour::DispersalEvent;
-    use nomos_da_network_core::swarm::validator::{ValidatorEventsStream, ValidatorSwarm};
+    use nomos_da_network_core::protocols::dispersal::executor::behaviour::DispersalExecutorEvent;
+    use nomos_da_network_core::swarm::validator::ValidatorSwarm;
     use nomos_libp2p::{Multiaddr, SwarmEvent};
     use std::time::Duration;
-    use tokio::sync::broadcast;
     use tokio::sync::mpsc::unbounded_channel;
-    use tokio_stream::wrappers::UnboundedReceiverStream;
-    use tracing::{debug, error, info};
+    use tokio::time;
+    use tracing::{error, info};
     use tracing_subscriber::fmt::TestWriter;
     use tracing_subscriber::EnvFilter;
 
@@ -191,16 +189,12 @@ pub mod test {
         let addr: Multiaddr = "/ip4/127.0.0.1/udp/5063/quic-v1".parse().unwrap();
         let addr2 = addr.clone().with_p2p(validator_peer).unwrap();
         let addr2_book = AddressBook::from_iter(vec![(executor_peer, addr2.clone())]);
-        let (dispersal_events_sender, dispersal_events_receiver) = unbounded_channel();
+        let (dispersal_events_sender, _) = unbounded_channel();
 
-        let (dispersal_broadcast_sender, dispersal_broadcast_receiver) =
-            broadcast::channel(128usize);
+        let mut executor = ExecutorSwarm::new(k1, neighbours.clone(), dispersal_events_sender);
+        let (mut validator, _) = ValidatorSwarm::new(k2, neighbours.clone(), addr2_book);
 
-        let mut executor =
-            ExecutorSwarm::new(k1, neighbours.clone(), dispersal_events_sender);
-        let (mut validator, validator_events_streams) = ValidatorSwarm::new(k2, neighbours.clone(), addr2_book);
-
-        let msg_count = 1usize;
+        let msg_count = 10usize;
         let validator_task = async move {
             let validator_swarm = validator.protocol_swarm_mut();
             validator_swarm.listen_on(addr).unwrap();
@@ -216,6 +210,7 @@ pub mod test {
                     }
                 }
                 if res.len() == msg_count {
+                    tokio::time::sleep(Duration::from_secs(1)).await;
                     break;
                 }
             }
@@ -223,64 +218,57 @@ pub mod test {
         };
         let join_validator = tokio::spawn(validator_task);
 
-        tokio::time::sleep(Duration::from_secs(1)).await;
         executor.dial(addr2).unwrap();
-        tokio::time::sleep(Duration::from_secs(1)).await;
 
         let executor_open_stream_sender = executor.open_stream_sender();
         let executor_disperse_blob_sender = executor.blobs_sender();
-        let (sender, mut receiver) = tokio::sync::oneshot::channel();
 
         let executor_poll = async move {
+            let mut res = vec![];
             loop {
                 tokio::select! {
                     Some(event) = executor.swarm.next() => {
-                        info!("My executor event: {event:?}");
+                        info!("Executor event: {event:?}");
+                        if let SwarmEvent::Behaviour(DispersalExecutorEvent::DispersalSuccess{blob_id, subnetwork_id: _}) = event {
+                            res.push(blob_id);
+                        }
                     }
-                    _ = &mut receiver => {
+
+                    _ = time::sleep(Duration::from_secs(2)) => {
+                        if res.len() < msg_count {error!("Executor timeout reached");}
                         break;
                     }
                 }
             }
+            res
         };
 
         let executor_task = tokio::spawn(executor_poll);
 
-        let mut dispersal_events_receiver = UnboundedReceiverStream::new(dispersal_events_receiver);
-
-        let replies_poll = async move {
-            while let Some(dispersal_event) = dispersal_events_receiver.next().await {
-                if let Err(e) = dispersal_broadcast_sender.send(dispersal_event) {
-                    error!("Error in internal broadcast of dispersal event: {e:?}");
-                }
-            }
-        };
-
-        let replies_task = tokio::spawn(replies_poll);
-
         executor_open_stream_sender.send(validator_peer).unwrap();
+        tokio::time::sleep(Duration::from_secs(1)).await;
 
-        debug!("Sending blob...");
-        executor_disperse_blob_sender
-            .send((
-                0,
-                DaBlob {
-                    column_idx: 0,
-                    column: Column(vec![]),
-                    column_commitment: Default::default(),
-                    aggregated_column_commitment: Default::default(),
-                    aggregated_column_proof: Default::default(),
-                    rows_commitments: vec![],
-                    rows_proofs: vec![],
-                },
-            ))
-            .unwrap();
+        for i in 0..msg_count {
+            info!("Sending blob {i}...");
+            executor_disperse_blob_sender
+                .send((
+                    0,
+                    DaBlob {
+                        column_idx: 0,
+                        column: Column(vec![]),
+                        column_commitment: Default::default(),
+                        aggregated_column_commitment: Default::default(),
+                        aggregated_column_proof: Default::default(),
+                        rows_commitments: vec![],
+                        rows_proofs: vec![],
+                    },
+                ))
+                .unwrap();
+        }
 
-        debug!("Blob sent...");
-
-        assert_eq!(join_validator.await.unwrap().len(), msg_count);
-        sender.send(()).unwrap();
-        executor_task.await.unwrap();
-        replies_task.await.unwrap();
+        assert_eq!(
+            executor_task.await.unwrap().len(),
+            join_validator.await.unwrap().len()
+        );
     }
 }
