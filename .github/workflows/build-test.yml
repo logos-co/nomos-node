@@ -93,6 +93,7 @@ jobs:
         if: matrix.os != 'windows-latest'
         uses: actions-rs/cargo@v1
         env:
+          SLOW_TEST_ENV: true
           RISC0_DEV_MODE: true
           CONSENSUS_SLOT_TIME: 5
         with:
