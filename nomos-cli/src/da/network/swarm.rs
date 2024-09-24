@@ -229,7 +229,7 @@ pub mod test {
                 tokio::select! {
                     Some(event) = executor.swarm.next() => {
                         info!("Executor event: {event:?}");
-                        if let SwarmEvent::Behaviour(DispersalExecutorEvent::DispersalSuccess{blob_id, subnetwork_id: _}) = event {
+                        if let SwarmEvent::Behaviour(DispersalExecutorEvent::DispersalSuccess{blob_id, ..}) = event {
                             res.push(blob_id);
                         }
                     }
