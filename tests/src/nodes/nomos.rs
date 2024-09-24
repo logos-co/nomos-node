@@ -182,19 +182,21 @@ impl NomosNode {
         }
     }
 
-    pub async fn get_indexer_range(&self, app_id: [u8; 32], range: Range<[u8; 8]>) {
-        let _res = CLIENT
+    pub async fn get_indexer_range(
+        &self,
+        app_id: [u8; 32],
+        range: Range<[u8; 8]>,
+    ) -> Vec<([u8; 8], Vec<Vec<u8>>)> {
+        CLIENT
             .post(format!("http://{}/{}", self.addr, INDEXER_RANGE_API))
             .header("Content-Type", "application/json")
             .body(serde_json::to_string(&GetRangeReq { app_id, range }).unwrap())
             .send()
             .await
             .unwrap()
-            .json::<serde_json::Value>()
+            .json::<Vec<([u8; 8], Vec<Vec<u8>>)>>()
             .await
-            .unwrap();
-
-        println!(">> {_res:?}");
+            .unwrap()
     }
 
     // not async so that we can use this in `Drop`

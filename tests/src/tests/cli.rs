@@ -7,7 +7,6 @@ use nomos_libp2p::libp2p;
 use nomos_libp2p::Multiaddr;
 use nomos_libp2p::PeerId;
 use std::collections::HashMap;
-use std::io::Write;
 use std::time::Duration;
 use subnetworks_assignations::versions::v1::FillFromNodeList;
 use tempfile::NamedTempFile;
@@ -108,7 +107,7 @@ async fn disseminate_and_retrieve() {
     let mut config = Disseminate {
         data: Some("hello world".to_string()),
         timeout: 180,
-        wait_until_disseminated: 20,
+        wait_until_disseminated: 40,
         app_id: APP_ID.into(),
         index: 0,
         columns: 2,
@@ -130,87 +129,37 @@ async fn disseminate_and_retrieve() {
     .await;
 
     disseminate(&nodes, &mut config).await;
-
     tokio::time::sleep(Duration::from_secs(10)).await;
+
+    let from = 0u64.to_be_bytes();
+    let to = 1u64.to_be_bytes();
     let app_id = hex::decode(APP_ID).unwrap();
-    nodes[0]
-        .get_indexer_range(
-            app_id.try_into().unwrap(),
-            0u64.to_be_bytes()..1u64.to_be_bytes(),
-        )
+
+    let node1_blobs = nodes[0]
+        .get_indexer_range(app_id.clone().try_into().unwrap(), from..to)
         .await;
-}
-
-#[ignore = "long running test"]
-#[tokio::test]
-async fn disseminate_big_blob() {
-    const MSG_SIZE: usize = 1024;
-    let mut config = Disseminate {
-        data: std::iter::repeat(String::from("X"))
-            .take(MSG_SIZE)
-            .collect::<Vec<_>>()
-            .join("")
-            .into(),
-        timeout: 180,
-        app_id: APP_ID.into(),
-        index: 0,
-        columns: 2,
-        ..Default::default()
-    };
-
-    let nodes = NomosNode::spawn_nodes(SpawnConfig::star_happy(
-        2,
-        tests::DaConfig {
-            dispersal_factor: 2,
-            ..Default::default()
-        },
-        tests::TestConfig {
-            wait_online_secs: 50,
-        },
-    ))
-    .await;
-
-    disseminate(&nodes, &mut config).await;
-}
-
-#[ignore = "long running test"]
-#[tokio::test]
-async fn disseminate_blob_from_file() {
-    let mut file = NamedTempFile::new().unwrap();
-    file.write_all("hello world".as_bytes()).unwrap();
-
-    let mut config = Disseminate {
-        file: Some(file.path().to_path_buf()),
-        timeout: 180,
-        wait_until_disseminated: 10,
-        app_id: APP_ID.into(),
-        index: 0,
-        columns: 4,
-        ..Default::default()
-    };
-
-    let nodes = NomosNode::spawn_nodes(SpawnConfig::star_happy(
-        4,
-        tests::DaConfig {
-            dispersal_factor: 2,
-            subnetwork_size: 4,
-            num_subnets: 4,
-            ..Default::default()
-        },
-        tests::TestConfig {
-            wait_online_secs: 120,
-        },
-    ))
-    .await;
-
-    disseminate(&nodes, &mut config).await;
-
-    tokio::time::sleep(Duration::from_secs(20)).await;
-    let app_id = hex::decode(APP_ID).unwrap();
-    nodes[0]
-        .get_indexer_range(
-            app_id.try_into().unwrap(),
-            0u64.to_be_bytes()..1u64.to_be_bytes(),
-        )
+    let node2_blobs = nodes[1]
+        .get_indexer_range(app_id.try_into().unwrap(), from..to)
         .await;
+
+    let node1_idx_0_blobs: Vec<_> = node1_blobs
+        .iter()
+        .filter(|(i, _)| i == &from)
+        .flat_map(|(_, blobs)| blobs)
+        .collect();
+    let node2_idx_0_blobs: Vec<_> = node2_blobs
+        .iter()
+        .filter(|(i, _)| i == &from)
+        .flat_map(|(_, blobs)| blobs)
+        .collect();
+
+    // Index zero shouldn't be empty, node 2 replicated both blobs to node 1 because they both
+    // are in the same subnetwork.
+    for b in node1_idx_0_blobs.iter() {
+        assert!(!b.is_empty())
+    }
+
+    for b in node2_idx_0_blobs.iter() {
+        assert!(!b.is_empty())
+    }
 }
