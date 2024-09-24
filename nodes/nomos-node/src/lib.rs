@@ -9,18 +9,18 @@ use bytes::Bytes;
 use color_eyre::eyre::Result;
 pub use config::{Config, CryptarchiaArgs, HttpArgs, LogArgs, MetricsArgs, NetworkArgs};
 use kzgrs_backend::common::blob::DaBlob;
-use kzgrs_backend::dispersal::BlobInfo;
+pub use kzgrs_backend::dispersal::BlobInfo;
 use nomos_api::ApiService;
-use nomos_core::da::blob::info::DispersedBlobInfo;
+pub use nomos_core::da::blob::info::DispersedBlobInfo;
 pub use nomos_core::{
     da::blob::select::FillSize as FillSizeWithBlobs, tx::select::FillSize as FillSizeWithTx,
 };
-use nomos_core::{header::HeaderId, tx::Transaction, wire};
+pub use nomos_core::{header::HeaderId, tx::Transaction, wire};
 use nomos_da_indexer::consensus::adapters::cryptarchia::CryptarchiaConsensusAdapter;
 use nomos_da_indexer::storage::adapters::rocksdb::RocksAdapter as IndexerStorageAdapter;
 use nomos_da_indexer::DataIndexerService;
-use nomos_da_network_service::backends::libp2p::validator::DaNetworkValidatorBackend;
-use nomos_da_network_service::NetworkService as DaNetworkService;
+pub use nomos_da_network_service::backends::libp2p::validator::DaNetworkValidatorBackend;
+pub use nomos_da_network_service::NetworkService as DaNetworkService;
 use nomos_da_sampling::backend::kzgrs::KzgrsSamplingBackend;
 use nomos_da_sampling::network::adapters::libp2p::Libp2pAdapter as SamplingLibp2pAdapter;
 use nomos_da_sampling::storage::adapters::rocksdb::RocksAdapter as SamplingStorageAdapter;
@@ -30,19 +30,26 @@ use nomos_da_verifier::network::adapters::libp2p::Libp2pAdapter as VerifierNetwo
 use nomos_da_verifier::storage::adapters::rocksdb::RocksAdapter as VerifierStorageAdapter;
 use nomos_da_verifier::DaVerifierService;
 #[cfg(feature = "tracing")]
-use nomos_log::Logger;
-use nomos_mempool::da::service::DaMempoolService;
-use nomos_mempool::network::adapters::libp2p::Libp2pAdapter as MempoolNetworkAdapter;
+pub use nomos_log::Logger;
+pub use nomos_mempool::da::service::{DaMempoolService, DaMempoolSettings};
+pub use nomos_mempool::network::adapters::libp2p::{
+    Libp2pAdapter as MempoolNetworkAdapter, Settings as MempoolAdapterSettings,
+};
+pub use nomos_mempool::TxMempoolSettings;
 use nomos_mempool::{backend::mockpool::MockPool, TxMempoolService};
+pub use nomos_metrics::NomosRegistry;
 #[cfg(feature = "metrics")]
-use nomos_metrics::Metrics;
-use nomos_network::backends::libp2p::Libp2p as NetworkBackend;
-use nomos_network::NetworkService;
-use nomos_storage::{
-    backends::{rocksdb::RocksBackend, StorageSerde},
+pub use nomos_metrics::{Metrics, MetricsSettings};
+pub use nomos_network::backends::libp2p::Libp2p as NetworkBackend;
+pub use nomos_network::NetworkService;
+pub use nomos_storage::{
+    backends::{
+        rocksdb::{RocksBackend, RocksBackendSettings},
+        StorageSerde,
+    },
     StorageService,
 };
-use nomos_system_sig::SystemSig;
+pub use nomos_system_sig::SystemSig;
 use overwatch_derive::*;
 use overwatch_rs::services::handle::ServiceHandle;
 use rand_chacha::ChaCha20Rng;
