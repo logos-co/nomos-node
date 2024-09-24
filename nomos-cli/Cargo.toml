@@ -9,7 +9,7 @@ description = "Cli app to interact with Nomos nodes and perform various tasks"
 [dependencies]
 fraction = "0.13"
 tracing = "0.1"
-tracing-subscriber = "0.3"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 async-trait = "0.1"
 clap = { version = "4", features = ["derive"] }
 serde_yaml = "0.9"
