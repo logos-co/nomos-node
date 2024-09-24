@@ -17,7 +17,7 @@ mod test {
     use nomos_mix_message::{new_message, MSG_SIZE};
     use tokio::select;
 
-    use crate::{error::Error, Behaviour, Event};
+    use crate::{behaviour::Config, error::Error, Behaviour, Event};
 
     /// Check that an wrapped message is forwarded through mix nodes and unwrapped successfully.
     #[tokio::test]
@@ -127,7 +127,13 @@ mod test {
     }
 
     fn new_swarm(key: Keypair) -> Swarm<Behaviour> {
-        new_swarm_with_behaviour(key, Behaviour::new())
+        new_swarm_with_behaviour(
+            key,
+            Behaviour::new(Config {
+                transmission_rate: 1.0,
+                duplicate_cache_lifespan: 60,
+            }),
+        )
     }
 
     fn new_swarm_without_mix(key: Keypair) -> Swarm<dummy::Behaviour> {

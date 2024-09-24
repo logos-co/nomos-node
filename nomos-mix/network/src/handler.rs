@@ -18,6 +18,8 @@ use libp2p::{
 use nomos_mix_message::{is_noise, MSG_SIZE, NOISE};
 use nomos_mix_queue::{NonMixQueue, Queue};
 
+use crate::behaviour::Config;
+
 const PROTOCOL_NAME: StreamProtocol = StreamProtocol::new("/nomos/mix/0.1.0");
 
 /// A [`ConnectionHandler`] that handles the mix protocol.
@@ -44,8 +46,9 @@ enum OutboundSubstreamState {
 }
 
 impl MixConnectionHandler {
-    pub fn new() -> Self {
-        let interval = Duration::from_secs(1);
+    pub fn new(config: &Config) -> Self {
+        let interval_sec = 1.0 / config.transmission_rate;
+        let interval = Duration::from_millis((interval_sec * 1000.0) as u64);
         Self {
             inbound_substream: None,
             outbound_substream: None,

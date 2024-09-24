@@ -21,6 +21,7 @@ use crate::{
 
 /// A [`NetworkBehaviour`] that forwards messages between mix nodes.
 pub struct Behaviour {
+    config: Config,
     /// Peers that support the mix protocol, and their connection IDs
     negotiated_peers: HashMap<PeerId, HashSet<ConnectionId>>,
     /// Queue of events to yield to the swarm.
@@ -33,6 +34,12 @@ pub struct Behaviour {
 }
 
 #[derive(Debug)]
+pub struct Config {
+    pub transmission_rate: f64,
+    pub duplicate_cache_lifespan: u64,
+}
+
+#[derive(Debug)]
 pub enum Event {
     /// A fully unwrapped message received from one of the peers.
     FullyUnwrappedMessage(Vec<u8>),
@@ -40,12 +47,14 @@ pub enum Event {
 }
 
 impl Behaviour {
-    pub fn new() -> Self {
+    pub fn new(config: Config) -> Self {
+        let duplicate_cache = TimedCache::with_lifespan(config.duplicate_cache_lifespan);
         Self {
+            config,
             negotiated_peers: HashMap::new(),
             events: VecDeque::new(),
             waker: None,
-            duplicate_cache: TimedCache::with_lifespan(60),
+            duplicate_cache,
         }
     }
 
@@ -144,7 +153,7 @@ impl NetworkBehaviour for Behaviour {
         _: &Multiaddr,
         _: &Multiaddr,
     ) -> Result<THandler<Self>, ConnectionDenied> {
-        Ok(MixConnectionHandler::new())
+        Ok(MixConnectionHandler::new(&self.config))
     }
 
     fn handle_established_outbound_connection(
@@ -154,7 +163,7 @@ impl NetworkBehaviour for Behaviour {
         _: &Multiaddr,
         _: Endpoint,
     ) -> Result<THandler<Self>, ConnectionDenied> {
-        Ok(MixConnectionHandler::new())
+        Ok(MixConnectionHandler::new(&self.config))
     }
 
     /// Informs the behaviour about an event from the [`Swarm`].
