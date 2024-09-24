@@ -1,6 +1,6 @@
 use std::{
     collections::{HashMap, HashSet, VecDeque},
-    task::{Context, Poll},
+    task::{Context, Poll, Waker},
 };
 
 use cached::{Cached, TimedCache};
@@ -25,6 +25,8 @@ pub struct Behaviour {
     negotiated_peers: HashMap<PeerId, HashSet<ConnectionId>>,
     /// Queue of events to yield to the swarm.
     events: VecDeque<ToSwarm<Event, FromBehaviour>>,
+    /// Waker that handles polling
+    waker: Option<Waker>,
     /// An LRU time cache for storing seen messages (based on their ID). This cache prevents
     /// duplicates from being propagated on the network.
     duplicate_cache: TimedCache<Vec<u8>, ()>,
@@ -42,6 +44,7 @@ impl Behaviour {
         Self {
             negotiated_peers: HashMap::new(),
             events: VecDeque::new(),
+            waker: None,
             duplicate_cache: TimedCache::with_lifespan(60),
         }
     }
@@ -93,6 +96,7 @@ impl Behaviour {
             });
         }
 
+        self.try_wake();
         Ok(())
     }
 
@@ -119,6 +123,12 @@ impl Behaviour {
             if connections.is_empty() {
                 self.negotiated_peers.remove(peer_id);
             }
+        }
+    }
+
+    fn try_wake(&mut self) {
+        if let Some(waker) = self.waker.take() {
+            waker.wake();
         }
     }
 }
@@ -218,13 +228,19 @@ impl NetworkBehaviour for Behaviour {
                     })));
             }
         }
+
+        self.try_wake();
     }
 
     /// Polls for things that swarm should do.
-    fn poll(&mut self, _: &mut Context<'_>) -> Poll<ToSwarm<Self::ToSwarm, THandlerInEvent<Self>>> {
+    fn poll(
+        &mut self,
+        cx: &mut Context<'_>,
+    ) -> Poll<ToSwarm<Self::ToSwarm, THandlerInEvent<Self>>> {
         if let Some(event) = self.events.pop_front() {
             Poll::Ready(event)
         } else {
+            self.waker = Some(cx.waker().clone());
             Poll::Pending
         }
     }

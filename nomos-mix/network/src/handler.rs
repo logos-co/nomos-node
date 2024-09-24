@@ -1,7 +1,7 @@
 use std::{
     collections::VecDeque,
     io,
-    task::{Context, Poll},
+    task::{Context, Poll, Waker},
     time::Duration,
 };
 
@@ -28,6 +28,7 @@ pub struct MixConnectionHandler {
     timer: Delay,
     queue: Box<dyn Queue<Vec<u8>> + Send>,
     pending_events_to_behaviour: VecDeque<ToBehaviour>,
+    waker: Option<Waker>,
 }
 
 type MsgSendFuture = BoxFuture<'static, Result<Stream, io::Error>>;
@@ -52,6 +53,13 @@ impl MixConnectionHandler {
             timer: Delay::new(interval),
             queue: Box::new(NonMixQueue::new(NOISE.to_vec())),
             pending_events_to_behaviour: VecDeque::new(),
+            waker: None,
+        }
+    }
+
+    fn try_wake(&mut self) {
+        if let Some(waker) = self.waker.take() {
+            waker.wake();
         }
     }
 }
@@ -125,6 +133,7 @@ impl ConnectionHandler for MixConnectionHandler {
                 // If the request to open a new outbound substream is still being processed, wait more.
                 Some(OutboundSubstreamState::PendingOpenSubstream) => {
                     self.outbound_substream = Some(OutboundSubstreamState::PendingOpenSubstream);
+                    self.waker = Some(cx.waker().clone());
                     return Poll::Pending;
                 }
                 // If the substream is idle, and if it's time to send a message, send it.
@@ -139,6 +148,7 @@ impl ConnectionHandler for MixConnectionHandler {
                     }
                     Poll::Pending => {
                         self.outbound_substream = Some(OutboundSubstreamState::Idle(stream));
+                        self.waker = Some(cx.waker().clone());
                         return Poll::Pending;
                     }
                 },
@@ -159,6 +169,7 @@ impl ConnectionHandler for MixConnectionHandler {
                         Poll::Pending => {
                             self.outbound_substream =
                                 Some(OutboundSubstreamState::PendingSend(msg_send_fut));
+                            self.waker = Some(cx.waker().clone());
                             return Poll::Pending;
                         }
                     }
@@ -233,6 +244,8 @@ impl ConnectionHandler for MixConnectionHandler {
                 tracing::debug!("Ignoring connection event: {:?}", event)
             }
         }
+
+        self.try_wake();
     }
 }
 
