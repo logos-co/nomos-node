@@ -1,0 +1,20 @@
+[package]
+name = "nomos-executor"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+color-eyre = "0.6.0"
+nomos-node = { path = "../nomos-node" }
+overwatch-rs = { git = "https://github.com/logos-co/Overwatch", rev = "2f70806" }
+overwatch-derive = { git = "https://github.com/logos-co/Overwatch", rev = "ac28d01" }
+clap = { version = "4.5.13", features = ["derive"] }
+tracing = "0.1.40"
+uuid = { version = "1.10.0", features = ["v4"] }
+serde_yaml = "0.9.34+deprecated"
+
+[features]
+default = ["tracing"]
+mixnet = ["nomos-node/mixnet"]
+metrics = ["nomos-node/metrics"]
+tracing = ["nomos-node/tracing"]

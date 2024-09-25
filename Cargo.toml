@@ -28,6 +28,7 @@ members = [
     "nomos-cli",
     "nomos-utils",
     "nodes/nomos-node",
+    "nodes/nomos-executor",
     "mixnet",
     "consensus/carnot-engine",
     "consensus/cryptarchia-engine",
