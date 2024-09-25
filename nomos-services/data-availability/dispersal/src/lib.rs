@@ -6,7 +6,7 @@ use overwatch_rs::services::handle::{ServiceHandle, ServiceStateHandle};
 use overwatch_rs::DynError;
 use std::marker::PhantomData;
 // internal
-use overwatch_rs::services::relay::RelayMessage;
+use overwatch_rs::services::relay::{Relay, RelayMessage};
 use overwatch_rs::services::state::{NoOperator, NoState};
 use overwatch_rs::services::{ServiceCore, ServiceData, ServiceId};
 use tokio::sync::oneshot;
@@ -32,7 +32,8 @@ pub enum DaDispersalMsg {
 impl RelayMessage for DaDispersalMsg {}
 
 pub struct DispersalService<Backend> {
-    service_handle: ServiceHandle<Self>,
+    service_state: ServiceStateHandle<Self>,
+    network_relay: Relay<DaNetworkService<>>
     _backend: PhantomData<Backend>,
 }
 
@@ -50,10 +51,11 @@ where
     Backend: Send,
 {
     fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, DynError> {
-        todo!()
+        Ok(Self {
+            service_state,
+            _backend: Default::default(),
+        })
     }
 
-    async fn run(self) -> Result<(), DynError> {
-        todo!()
-    }
+    async fn run(self) -> Result<(), DynError> {}
 }

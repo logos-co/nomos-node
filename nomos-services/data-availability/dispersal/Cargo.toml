@@ -6,6 +6,7 @@ edition = "2021"
 [dependencies]
 async-trait = "0.1"
 nomos-core = { path = "../../../nomos-core" }
+nomos-da-network-service = { path = "../../../nomos-services/data-availability/network" }
 kzgrs-backend = { path = "../../../nomos-da/kzgrs-backend" }
 overwatch-rs = { git = "https://github.com/logos-co/Overwatch", rev = "2f70806" }
 tokio = "1.40"

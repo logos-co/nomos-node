@@ -5,13 +5,14 @@ mod kzgrs;
 
 #[async_trait::async_trait]
 trait DispersalBackend {
+    type Settings;
     type Encoder: DaEncoder;
     type Dispersal: DaDispersal<EncodedData = <Self::Encoder as DaEncoder>::EncodedData>;
     type BlobId;
 
     type Error;
 
-    fn init(overwatch_handle: OverwatchHandle) -> Self;
+    fn init(config: Self::Settings, overwatch_handle: OverwatchHandle) -> Self;
     async fn encode(
         data: Vec<u8>,
     ) -> Result<<Self::Encoder as DaEncoder>::EncodedData, Self::Error>;
