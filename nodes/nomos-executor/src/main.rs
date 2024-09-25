@@ -4,6 +4,7 @@ use nomos_node::{MetricsSettings, NomosRegistry};
 
 use clap::Parser;
 use color_eyre::eyre::{eyre, Result};
+use nomos_executor::{NomosExecutor, NomosExecutorServiceSettings};
 use overwatch_rs::overwatch::*;
 use tracing::{span, Level};
 use uuid::Uuid;
@@ -57,8 +58,8 @@ fn main() -> Result<()> {
     };
     #[cfg(debug_assertions)]
     let _guard = debug_span.enter();
-    let app = OverwatchRunner::<Nomos>::run(
-        NomosServiceSettings {
+    let app = OverwatchRunner::<NomosExecutor>::run(
+        NomosExecutorServiceSettings {
             network: config.network,
             #[cfg(feature = "tracing")]
             logging: config.log,
