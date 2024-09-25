@@ -16,7 +16,8 @@ use subnetworks_assignations::MembershipHandler;
 
 /// Aggregated `NetworkBehaviour` composed of:
 /// * Sampling
-/// * Dispersal
+/// * Executor dispersal
+/// * Validator dispersal
 /// * Replication
 ///     WARNING: Order of internal protocols matters as the first one will be polled first until return
 ///     a `Poll::Pending`.
