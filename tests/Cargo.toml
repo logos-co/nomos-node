@@ -22,6 +22,7 @@ nomos-da-network-service = { path = "../nomos-services/data-availability/network
 nomos-da-indexer = { path = "../nomos-services/data-availability/indexer" }
 nomos-da-verifier = { path = "../nomos-services/data-availability/verifier" }
 nomos-da-sampling = { path = "../nomos-services/data-availability/sampling" }
+nomos-storage = { path = "../nomos-services/storage" }
 subnetworks-assignations = { path = "../nomos-da/network/subnetworks-assignations" }
 full-replication = { path = "../nomos-da/full-replication" }
 hex = "0.4.3"

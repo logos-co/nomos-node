@@ -74,8 +74,8 @@ fn test_verifier() {
 
     let blobs_dir = TempDir::new().unwrap().path().to_path_buf();
 
-    let (node1_sk, node1_pk) = generate_blst_hex_keys();
-    let (node2_sk, node2_pk) = generate_blst_hex_keys();
+    let (node1_sk, _) = generate_blst_hex_keys();
+    let (node2_sk, _) = generate_blst_hex_keys();
 
     let client_zone = new_client(NamedTempFile::new().unwrap().path().to_path_buf());
 
@@ -102,7 +102,8 @@ fn test_verifier() {
         vec![node_address(&swarm_config2)],
         KzgrsDaVerifierSettings {
             sk: node1_sk.clone(),
-            nodes_public_keys: vec![node1_pk.clone(), node2_pk.clone()],
+            index: [0].into(),
+            global_params_path: GLOBAL_PARAMS_PATH.into(),
         },
         TestDaNetworkSettings {
             peer_addresses: peer_addresses.clone(),
@@ -125,7 +126,8 @@ fn test_verifier() {
         vec![node_address(&swarm_config1)],
         KzgrsDaVerifierSettings {
             sk: node2_sk,
-            nodes_public_keys: vec![node1_pk, node2_pk],
+            index: [1].into(),
+            global_params_path: GLOBAL_PARAMS_PATH.into(),
         },
         TestDaNetworkSettings {
             peer_addresses,
@@ -155,7 +157,10 @@ fn test_verifier() {
 
         // Encode data
         let encoder = &ENCODER;
-        let data = rand_data(10);
+        let data = vec![
+            49u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8,
+            0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8,
+        ];
 
         let encoded_data = encoder.encode(&data).unwrap();
         let columns: Vec<_> = encoded_data.extended_data.columns().collect();

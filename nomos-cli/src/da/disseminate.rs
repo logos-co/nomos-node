@@ -33,6 +33,7 @@ use tokio::sync::{mpsc::UnboundedReceiver, Mutex};
 use super::{network::adapters::libp2p::Libp2pExecutorDispersalAdapter, NetworkBackend};
 use crate::api::mempool::send_blob_info;
 
+#[allow(clippy::too_many_arguments)]
 pub async fn disseminate_and_wait<E, D>(
     encoder: &E,
     disperal: &D,
@@ -40,6 +41,7 @@ pub async fn disseminate_and_wait<E, D>(
     metadata: Metadata,
     status_updates: Sender<Status>,
     node_addr: Option<&Url>,
+    wait_until_disseminated: Duration,
     output: Option<&PathBuf>,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>>
 where
@@ -67,6 +69,9 @@ where
         status_updates.send(Status::SavingBlobInfo)?;
         std::fs::write(output, wire::serialize(&blob_info)?)?;
     }
+
+    // Wait for blobs be replicated in da network.
+    tokio::time::sleep(wait_until_disseminated).await;
 
     // 4) Send blob info to the mempool.
     if let Some(node) = node_addr {
@@ -127,7 +132,9 @@ pub struct Settings {
     pub metadata: Metadata,
     pub status_updates: Sender<Status>,
     pub node_addr: Option<Url>,
+    pub wait_until_disseminated: Duration,
     pub output: Option<std::path::PathBuf>,
+    pub global_params_path: String,
 }
 
 pub struct DisseminateService {
@@ -157,7 +164,9 @@ impl ServiceCore for DisseminateService {
             metadata,
             status_updates,
             node_addr,
+            wait_until_disseminated,
             output,
+            global_params_path,
         } = service_state.settings_reader.get_updated_settings();
 
         let network_relay: Relay<NetworkService<NetworkBackend>> =
@@ -167,9 +176,13 @@ impl ServiceCore for DisseminateService {
             .await
             .expect("Relay connection with NetworkService should succeed");
 
+        let global_params = kzgrs_backend::global::global_parameters_from_file(&global_params_path)
+            .expect("Global parameters should be loaded from file");
+
         let params = kzgrs_backend::encoder::DaEncoderParams::new(
             kzgrs_settings.num_columns,
             kzgrs_settings.with_cache,
+            global_params,
         );
         let da_encoder = kzgrs_backend::encoder::DaEncoder::new(params);
         let da_dispersal = Libp2pExecutorDispersalAdapter::new(network_relay);
@@ -184,6 +197,7 @@ impl ServiceCore for DisseminateService {
                     metadata,
                     status_updates.clone(),
                     node_addr.as_ref(),
+                    wait_until_disseminated,
                     output.as_ref(),
                 ),
             )

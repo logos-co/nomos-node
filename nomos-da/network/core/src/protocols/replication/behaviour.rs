@@ -7,8 +7,8 @@ use either::Either;
 use indexmap::IndexSet;
 use libp2p::core::Endpoint;
 use libp2p::swarm::{
-    ConnectionDenied, ConnectionId, FromSwarm, NetworkBehaviour, NotifyHandler, THandler,
-    THandlerInEvent, THandlerOutEvent, ToSwarm,
+    ConnectionClosed, ConnectionDenied, ConnectionId, FromSwarm, NetworkBehaviour, NotifyHandler,
+    THandler, THandlerInEvent, THandlerOutEvent, ToSwarm,
 };
 use libp2p::{Multiaddr, PeerId};
 use log::{error, trace};
@@ -43,7 +43,10 @@ pub struct ReplicationBehaviour<Membership> {
     /// nomos DA subnetworks
     membership: Membership,
     /// Relation of connected peers of replication subnetworks
-    connected: HashMap<PeerId, ConnectionId>,
+    ///
+    /// **TODO**: Node needs only one connection per peer for Nomos DA network communications.
+    /// Allowing multiple connections from the same peer id is only temporal and will be removed!
+    connected: HashMap<PeerId, HashSet<ConnectionId>>,
     /// Outgoing event queue
     outgoing_events: VecDeque<SwarmEvent>,
     /// Seen messages cache holds a record of seen messages, messages will be removed from this
@@ -114,14 +117,16 @@ where
             .filter(|(peer_id, _connection_id)| peers.contains(peer_id))
             .collect();
 
-        for (peer_id, connection_id) in connected_peers {
-            self.outgoing_events.push_back(SwarmEvent::NotifyHandler {
-                peer_id: *peer_id,
-                handler: NotifyHandler::One(*connection_id),
-                event: Either::Left(BehaviourEventToHandler::OutgoingMessage {
-                    message: message.clone(),
-                }),
-            })
+        for (peer_id, connection_ids) in connected_peers {
+            for connection_id in connection_ids.iter() {
+                self.outgoing_events.push_back(SwarmEvent::NotifyHandler {
+                    peer_id: *peer_id,
+                    handler: NotifyHandler::One(*connection_id),
+                    event: Either::Left(BehaviourEventToHandler::OutgoingMessage {
+                        message: message.clone(),
+                    }),
+                })
+            }
         }
         self.try_wake();
     }
@@ -152,7 +157,10 @@ where
             return Ok(Either::Right(libp2p::swarm::dummy::ConnectionHandler));
         }
         trace!("{}, Connected to {peer_id}", self.local_peer_id);
-        self.connected.insert(peer_id, connection_id);
+        self.connected
+            .entry(peer_id)
+            .or_default()
+            .insert(connection_id);
         Ok(Either::Left(ReplicationHandler::new()))
     }
 
@@ -164,11 +172,28 @@ where
         _role_override: Endpoint,
     ) -> Result<THandler<Self>, ConnectionDenied> {
         trace!("{}, Connected to {peer_id}", self.local_peer_id);
-        self.connected.insert(peer_id, connection_id);
+        self.connected
+            .entry(peer_id)
+            .or_default()
+            .insert(connection_id);
         Ok(Either::Left(ReplicationHandler::new()))
     }
 
-    fn on_swarm_event(&mut self, _event: FromSwarm) {}
+    fn on_swarm_event(&mut self, event: FromSwarm) {
+        if let FromSwarm::ConnectionClosed(ConnectionClosed {
+            peer_id,
+            connection_id,
+            ..
+        }) = event
+        {
+            if let Some(connections) = self.connected.get_mut(&peer_id) {
+                connections.remove(&connection_id);
+                if connections.is_empty() {
+                    self.connected.remove(&peer_id);
+                }
+            }
+        }
+    }
 
     fn on_connection_handler_event(
         &mut self,

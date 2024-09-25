@@ -6,11 +6,12 @@ use async_trait::async_trait;
 use bytes::Bytes;
 pub use rocksdb::Error;
 use rocksdb::{Options, DB};
+use serde::{Deserialize, Serialize};
 // internal
 use super::{StorageBackend, StorageSerde, StorageTransaction};
 
 /// Rocks backend setting
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct RocksBackendSettings {
     /// File path to the db file
     pub db_path: PathBuf,

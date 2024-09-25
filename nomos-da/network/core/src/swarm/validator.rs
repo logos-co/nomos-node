@@ -4,8 +4,8 @@ use std::time::Duration;
 use futures::StreamExt;
 use kzgrs_backend::common::blob::DaBlob;
 use libp2p::identity::Keypair;
-use libp2p::swarm::SwarmEvent;
-use libp2p::{PeerId, Swarm, SwarmBuilder};
+use libp2p::swarm::{DialError, SwarmEvent};
+use libp2p::{Multiaddr, PeerId, Swarm, SwarmBuilder};
 use log::{debug, error};
 use nomos_da_messages::replication::ReplicationReq;
 use tokio::sync::mpsc::{unbounded_channel, UnboundedSender};
@@ -75,6 +75,15 @@ where
             .build()
     }
 
+    pub fn dial(&mut self, addr: Multiaddr) -> Result<(), DialError> {
+        self.swarm.dial(addr)?;
+        Ok(())
+    }
+
+    pub fn local_peer_id(&self) -> &PeerId {
+        self.swarm.local_peer_id()
+    }
+
     pub fn protocol_swarm(&self) -> &Swarm<ValidatorBehaviour<Membership>> {
         &self.swarm
     }
@@ -116,7 +125,21 @@ where
         }
     }
 
-    async fn handle_replication_event(&mut self, _event: ReplicationEvent) {}
+    async fn handle_replication_event(&mut self, event: ReplicationEvent) {
+        let ReplicationEvent::IncomingMessage { message, .. } = event;
+        if let Ok(blob) = bincode::deserialize::<DaBlob>(
+            message
+                .blob
+                .as_ref()
+                .expect("Message blob should not be empty")
+                .data
+                .as_slice(),
+        ) {
+            if let Err(e) = self.validation_events_sender.send(blob) {
+                error!("Error sending blob to validation: {e:?}");
+            }
+        }
+    }
 
     async fn handle_behaviour_event(&mut self, event: ValidatorBehaviourEvent<Membership>) {
         match event {

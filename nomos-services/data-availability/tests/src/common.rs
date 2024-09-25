@@ -56,6 +56,7 @@ use nomos_network::NetworkService;
 use nomos_node::{Tx, Wire};
 use nomos_storage::backends::rocksdb::RocksBackend;
 use nomos_storage::StorageService;
+use once_cell::sync::Lazy;
 use overwatch_derive::*;
 use overwatch_rs::overwatch::{Overwatch, OverwatchRunner};
 use overwatch_rs::services::handle::ServiceHandle;
@@ -69,11 +70,17 @@ type IntegrationRng = TestRng;
 /// Membership used by the DA Network service.
 pub type NomosDaMembership = FillFromNodeList;
 
-pub const PARAMS: DaEncoderParams = DaEncoderParams::default_with(2);
-pub const ENCODER: DaEncoder = DaEncoder::new(PARAMS);
+pub const GLOBAL_PARAMS_PATH: &str = "../../../tests/kzgrs/kzgrs_test_params";
 
 pub const SK1: &str = "aca2c52f5928a53de79679daf390b0903eeccd9671b4350d49948d84334874806afe68536da9e076205a2af0af350e6c50851a040e3057b6544a29f5689ccd31";
 pub const SK2: &str = "f9dc26eea8bc56d9a4c59841b438665b998ce5e42f49f832df5b770a725c2daafee53b33539127321f6f5085e42902bd380e82d18a7aff6404e632b842106785";
+
+pub static PARAMS: Lazy<DaEncoderParams> = Lazy::new(|| {
+    let global_parameters =
+        kzgrs_backend::global::global_parameters_from_file(GLOBAL_PARAMS_PATH).unwrap();
+    DaEncoderParams::new(2, false, global_parameters)
+});
+pub static ENCODER: Lazy<DaEncoder> = Lazy::new(|| DaEncoder::new(PARAMS.clone()));
 
 pub(crate) type Cryptarchia = cryptarchia_consensus::CryptarchiaConsensus<
     cryptarchia_consensus::network::adapters::libp2p::LibP2pAdapter<Tx, BlobInfo>,
@@ -246,8 +253,8 @@ pub fn new_node(
                     num_samples: da_network_settings.num_samples,
                     num_subnets: da_network_settings.num_subnets,
                     // Sampling service period can't be zero.
-                    old_blobs_check_interval: Duration::from_secs(1),
-                    blobs_validity_duration: Duration::from_secs(15),
+                    old_blobs_check_interval: Duration::from_secs(5),
+                    blobs_validity_duration: Duration::from_secs(u64::MAX),
                 },
                 network_adapter_settings: (),
                 storage_adapter_settings: SamplingStorageSettings {

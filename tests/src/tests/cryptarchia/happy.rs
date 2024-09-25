@@ -52,6 +52,11 @@ async fn happy_test(nodes: &[NomosNode]) {
 
 #[tokio::test]
 async fn two_nodes_happy() {
-    let nodes = NomosNode::spawn_nodes(SpawnConfig::star_happy(2, Default::default())).await;
+    let nodes = NomosNode::spawn_nodes(SpawnConfig::star_happy(
+        2,
+        Default::default(),
+        Default::default(),
+    ))
+    .await;
     happy_test(&nodes).await;
 }

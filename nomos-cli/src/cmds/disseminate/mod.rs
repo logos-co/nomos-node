@@ -41,12 +41,18 @@ pub struct Disseminate {
     // Number of columns to use for encoding.
     #[clap(long, default_value = "4096")]
     pub columns: usize,
+    // Duration in seconds to wait before publishing blob info.
+    #[clap(short, long, default_value = "5")]
+    pub wait_until_disseminated: u64,
     /// File to write the certificate to, if present.
     #[clap(long)]
     pub output: Option<PathBuf>,
     /// File to disseminate
     #[clap(short, long)]
     pub file: Option<PathBuf>,
+    // Path to the KzgRs global parameters.
+    #[clap(long)]
+    pub global_params_path: String,
 }
 
 impl Disseminate {
@@ -80,8 +86,11 @@ impl Disseminate {
         let output = self.output.clone();
         let num_columns = self.columns;
         let with_cache = self.with_cache;
+        let wait_until_disseminated = Duration::from_secs(self.wait_until_disseminated);
+        let global_params_path = self.global_params_path.clone();
         let (payload_sender, payload_rx) = tokio::sync::mpsc::unbounded_channel();
         payload_sender.send(bytes.into_boxed_slice()).unwrap();
+
         std::thread::spawn(move || {
             OverwatchRunner::<DisseminateApp>::run(
                 DisseminateAppServiceSettings {
@@ -96,7 +105,9 @@ impl Disseminate {
                         metadata,
                         status_updates,
                         node_addr,
+                        wait_until_disseminated,
                         output,
+                        global_params_path,
                     },
                     logger: LoggerSettings {
                         backend: LoggerBackend::None,
