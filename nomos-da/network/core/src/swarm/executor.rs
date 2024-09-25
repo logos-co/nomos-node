@@ -11,9 +11,12 @@ use tokio::sync::mpsc::{unbounded_channel, UnboundedSender};
 use tokio_stream::wrappers::UnboundedReceiverStream;
 // internal
 use crate::address_book::AddressBook;
-use crate::behaviour::validator::{ValidatorBehaviour, ValidatorBehaviourEvent};
+use crate::behaviour::executor::{ExecutorBehaviour, ExecutorBehaviourEvent};
 use crate::protocols::{
-    dispersal::validator::behaviour::DispersalEvent, replication::behaviour::ReplicationEvent,
+    dispersal::{
+        executor::behaviour::DispersalExecutorEvent, validator::behaviour::DispersalEvent,
+    },
+    replication::behaviour::ReplicationEvent,
     sampling::behaviour::SamplingEvent,
 };
 use crate::swarm::common::{
@@ -22,20 +25,22 @@ use crate::swarm::common::{
 use crate::SubnetworkId;
 use subnetworks_assignations::MembershipHandler;
 
-pub struct ValidatorEventsStream {
+pub struct ExecutorEventsStream {
     pub sampling_events_receiver: UnboundedReceiverStream<SamplingEvent>,
     pub validation_events_receiver: UnboundedReceiverStream<DaBlob>,
+    pub dispersal_events_receiver: UnboundedReceiverStream<DispersalExecutorEvent>,
 }
 
-pub struct ValidatorSwarm<
+pub struct ExecutorSwarm<
     Membership: MembershipHandler<NetworkId = SubnetworkId, Id = PeerId> + 'static,
 > {
-    swarm: Swarm<ValidatorBehaviour<Membership>>,
+    swarm: Swarm<ExecutorBehaviour<Membership>>,
     sampling_events_sender: UnboundedSender<SamplingEvent>,
     validation_events_sender: UnboundedSender<DaBlob>,
+    dispersal_events_sender: UnboundedSender<DispersalExecutorEvent>,
 }
 
-impl<Membership> ValidatorSwarm<Membership>
+impl<Membership> ExecutorSwarm<Membership>
 where
     Membership: MembershipHandler<NetworkId = SubnetworkId, Id = PeerId> + Clone + Send,
 {
@@ -43,21 +48,24 @@ where
         key: Keypair,
         membership: Membership,
         addresses: AddressBook,
-    ) -> (Self, ValidatorEventsStream) {
+    ) -> (Self, ExecutorEventsStream) {
         let (sampling_events_sender, sampling_events_receiver) = unbounded_channel();
         let (validation_events_sender, validation_events_receiver) = unbounded_channel();
-
+        let (dispersal_events_sender, dispersal_events_receiver) = unbounded_channel();
         let sampling_events_receiver = UnboundedReceiverStream::new(sampling_events_receiver);
         let validation_events_receiver = UnboundedReceiverStream::new(validation_events_receiver);
+        let dispersal_events_receiver = UnboundedReceiverStream::new(dispersal_events_receiver);
         (
             Self {
                 swarm: Self::build_swarm(key, membership, addresses),
                 sampling_events_sender,
                 validation_events_sender,
+                dispersal_events_sender,
             },
-            ValidatorEventsStream {
+            ExecutorEventsStream {
                 sampling_events_receiver,
                 validation_events_receiver,
+                dispersal_events_receiver,
             },
         )
     }
@@ -65,11 +73,11 @@ where
         key: Keypair,
         membership: Membership,
         addresses: AddressBook,
-    ) -> Swarm<ValidatorBehaviour<Membership>> {
+    ) -> Swarm<ExecutorBehaviour<Membership>> {
         SwarmBuilder::with_existing_identity(key)
             .with_tokio()
             .with_quic()
-            .with_behaviour(|key| ValidatorBehaviour::new(key, membership, addresses))
+            .with_behaviour(|key| ExecutorBehaviour::new(key, membership, addresses))
             .expect("Validator behaviour should build")
             .with_swarm_config(|cfg| {
                 cfg.with_idle_connection_timeout(Duration::from_secs(u64::MAX))
@@ -86,11 +94,11 @@ where
         self.swarm.local_peer_id()
     }
 
-    pub fn protocol_swarm(&self) -> &Swarm<ValidatorBehaviour<Membership>> {
+    pub fn protocol_swarm(&self) -> &Swarm<ExecutorBehaviour<Membership>> {
         &self.swarm
     }
 
-    pub fn protocol_swarm_mut(&mut self) -> &mut Swarm<ValidatorBehaviour<Membership>> {
+    pub fn protocol_swarm_mut(&mut self) -> &mut Swarm<ExecutorBehaviour<Membership>> {
         &mut self.swarm
     }
 
@@ -98,7 +106,13 @@ where
         handle_sampling_event::<Membership>(&mut self.sampling_events_sender, event).await
     }
 
-    async fn handle_dispersal_event(&mut self, event: DispersalEvent) {
+    async fn handle_executor_dispersal_event(&mut self, event: DispersalExecutorEvent) {
+        if let Err(e) = self.dispersal_events_sender.send(event) {
+            debug!("Error distributing sampling message internally: {e:?}");
+        }
+    }
+
+    async fn handle_validator_dispersal_event(&mut self, event: DispersalEvent) {
         handle_validator_dispersal_event(
             &mut self.validation_events_sender,
             self.swarm.behaviour_mut().replication_behaviour_mut(),
@@ -111,15 +125,18 @@ where
         handle_replication_event(&mut self.validation_events_sender, event).await
     }
 
-    async fn handle_behaviour_event(&mut self, event: ValidatorBehaviourEvent<Membership>) {
+    async fn handle_behaviour_event(&mut self, event: ExecutorBehaviourEvent<Membership>) {
         match event {
-            ValidatorBehaviourEvent::Sampling(event) => {
+            ExecutorBehaviourEvent::Sampling(event) => {
                 self.handle_sampling_event(event).await;
             }
-            ValidatorBehaviourEvent::Dispersal(event) => {
-                self.handle_dispersal_event(event).await;
+            ExecutorBehaviourEvent::ExecutorDispersal(event) => {
+                self.handle_executor_dispersal_event(event).await;
             }
-            ValidatorBehaviourEvent::Replication(event) => {
+            ExecutorBehaviourEvent::ValidatorDispersal(event) => {
+                self.handle_validator_dispersal_event(event).await;
+            }
+            ExecutorBehaviourEvent::Replication(event) => {
                 self.handle_replication_event(event).await;
             }
         }
