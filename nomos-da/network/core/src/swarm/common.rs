@@ -39,12 +39,10 @@ pub async fn handle_validator_dispersal_event<Membership>(
     }
 }
 
-pub async fn handle_sampling_event<Membership>(
+pub async fn handle_sampling_event(
     sampling_events_sender: &mut UnboundedSender<SamplingEvent>,
     event: SamplingEvent,
-) where
-    Membership: MembershipHandler<NetworkId = SubnetworkId, Id = PeerId>,
-{
+) {
     if let Err(e) = sampling_events_sender.send(event) {
         debug!("Error distributing sampling message internally: {e:?}");
     }

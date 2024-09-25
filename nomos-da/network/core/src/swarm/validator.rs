@@ -95,7 +95,7 @@ where
     }
 
     async fn handle_sampling_event(&mut self, event: SamplingEvent) {
-        handle_sampling_event::<Membership>(&mut self.sampling_events_sender, event).await
+        handle_sampling_event(&mut self.sampling_events_sender, event).await
     }
 
     async fn handle_dispersal_event(&mut self, event: DispersalEvent) {
