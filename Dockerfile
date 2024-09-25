@@ -9,6 +9,10 @@ COPY . .
 RUN apt-get update && apt-get install -yq \
     git clang libssl-dev pkg-config protobuf-compiler
 
+RUN cargo install cargo-binstall
+RUN cargo binstall -y cargo-risczero
+RUN cargo risczero install
+
 RUN cargo build --release -p nomos-node
 
 # NODE IMAGE ----------------------------------------------------------
