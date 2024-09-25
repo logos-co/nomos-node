@@ -9,6 +9,10 @@ COPY . .
 RUN apt-get update && apt-get install -yq \
     git clang etcd-client libssl-dev pkg-config protobuf-compiler
 
+RUN cargo install cargo-binstall
+RUN cargo binstall -y cargo-risczero
+RUN cargo risczero install
+
 RUN cargo build --release --all --features metrics
 
 # NODE IMAGE ----------------------------------------------------------

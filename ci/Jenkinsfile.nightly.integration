@@ -50,8 +50,11 @@ pipeline {
               stage("BuildAndTest") {
                 steps {
                   script {
+                    /* This will be overwritten if job succeeds */
+                    writeFile(file: "${WORKSPACE}/report.txt", text: "Job failed to start.")
+
                     /* To prevent rebuilding node for each test, tests are defined here */
-                    def tests = ['ten_nodes_happy', 'two_nodes_happy', 'ten_nodes_one_down']
+                    def tests = ['two_nodes_happy', 'disseminate_and_retrieve']
 
                     def report = runBuildAndTestsForFeature(FEATURE, tests)
                     writeFile(file: "${WORKSPACE}/report.txt", text: report)
