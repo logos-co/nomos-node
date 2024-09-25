@@ -8,6 +8,7 @@ use libp2p::swarm::NetworkBehaviour;
 use crate::address_book::AddressBook;
 use crate::{
     protocols::dispersal::executor::behaviour::DispersalExecutorBehaviour,
+    protocols::dispersal::validator::behaviour::DispersalValidatorBehaviour,
     protocols::replication::behaviour::ReplicationBehaviour,
     protocols::sampling::behaviour::SamplingBehaviour,
 };
@@ -25,7 +26,8 @@ use subnetworks_assignations::MembershipHandler;
 #[derive(NetworkBehaviour)]
 pub struct ExecutorBehaviour<Membership: MembershipHandler> {
     sampling: SamplingBehaviour<Membership>,
-    dispersal: DispersalExecutorBehaviour<Membership>,
+    executor_dispersal: DispersalExecutorBehaviour<Membership>,
+    validator_dispersal: DispersalValidatorBehaviour<Membership>,
     replication: ReplicationBehaviour<Membership>,
 }
 
@@ -38,7 +40,8 @@ where
         let peer_id = PeerId::from_public_key(&key.public());
         Self {
             sampling: SamplingBehaviour::new(peer_id, membership.clone(), addresses),
-            dispersal: DispersalExecutorBehaviour::new(membership.clone()),
+            executor_dispersal: DispersalExecutorBehaviour::new(membership.clone()),
+            validator_dispersal: DispersalValidatorBehaviour::new(membership.clone()),
             replication: ReplicationBehaviour::new(peer_id, membership),
         }
     }
@@ -46,7 +49,8 @@ where
     pub fn update_membership(&mut self, membership: Membership) {
         // TODO: share membership
         self.sampling.update_membership(membership.clone());
-        self.dispersal.update_membership(membership.clone());
+        self.executor_dispersal
+            .update_membership(membership.clone());
         self.replication.update_membership(membership);
     }
 
@@ -54,8 +58,12 @@ where
         &self.sampling
     }
 
-    pub fn dispersal_behaviour(&self) -> &DispersalExecutorBehaviour<Membership> {
-        &self.dispersal
+    pub fn dispersal_executor_behaviour(&self) -> &DispersalExecutorBehaviour<Membership> {
+        &self.executor_dispersal
+    }
+
+    pub fn dispersal_validator_behaviour(&self) -> &DispersalValidatorBehaviour<Membership> {
+        &self.validator_dispersal
     }
 
     pub fn replication_behaviour(&self) -> &ReplicationBehaviour<Membership> {
@@ -66,8 +74,16 @@ where
         &mut self.sampling
     }
 
-    pub fn dispersal_behaviour_mut(&mut self) -> &mut DispersalExecutorBehaviour<Membership> {
-        &mut self.dispersal
+    pub fn dispersal_executor_behaviour_mut(
+        &mut self,
+    ) -> &mut DispersalExecutorBehaviour<Membership> {
+        &mut self.executor_dispersal
+    }
+
+    pub fn dispersal_validator_behaviour_mut(
+        &mut self,
+    ) -> &mut DispersalValidatorBehaviour<Membership> {
+        &mut self.validator_dispersal
     }
 
     pub fn replication_behaviour_mut(&mut self) -> &mut ReplicationBehaviour<Membership> {
