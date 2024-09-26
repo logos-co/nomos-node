@@ -1,12 +1,15 @@
+use std::io;
 // std
 use std::time::Duration;
 // crates
 use futures::StreamExt;
 use kzgrs_backend::common::blob::DaBlob;
+use libp2p::core::transport::ListenerId;
 use libp2p::identity::Keypair;
 use libp2p::swarm::{DialError, SwarmEvent};
-use libp2p::{Multiaddr, PeerId, Swarm, SwarmBuilder};
+use libp2p::{Multiaddr, PeerId, Swarm, SwarmBuilder, TransportError};
 use log::debug;
+use nomos_core::da::BlobId;
 use tokio::sync::mpsc::{unbounded_channel, UnboundedSender};
 use tokio_stream::wrappers::UnboundedReceiverStream;
 // internal
@@ -80,6 +83,20 @@ where
     pub fn dial(&mut self, addr: Multiaddr) -> Result<(), DialError> {
         self.swarm.dial(addr)?;
         Ok(())
+    }
+
+    pub fn listen_on(
+        &mut self,
+        address: Multiaddr,
+    ) -> Result<ListenerId, TransportError<io::Error>> {
+        self.swarm.listen_on(address)
+    }
+
+    pub fn sample_request_channel(&mut self) -> UnboundedSender<(Membership::NetworkId, BlobId)> {
+        self.swarm
+            .behaviour()
+            .sampling_behaviour()
+            .sample_request_channel()
     }
 
     pub fn local_peer_id(&self) -> &PeerId {
