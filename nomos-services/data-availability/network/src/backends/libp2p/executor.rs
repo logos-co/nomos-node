@@ -6,7 +6,6 @@ use futures::{Stream, StreamExt};
 use kzgrs_backend::common::blob::DaBlob;
 use libp2p::identity::ed25519;
 use libp2p::{Multiaddr, PeerId};
-use log::error;
 use nomos_core::da::BlobId;
 use nomos_da_network_core::swarm::validator::ValidatorSwarm;
 use nomos_da_network_core::SubnetworkId;
@@ -20,7 +19,6 @@ use std::marker::PhantomData;
 use std::pin::Pin;
 use subnetworks_assignations::MembershipHandler;
 use tokio::sync::broadcast;
-use tokio::sync::mpsc::error::SendError;
 use tokio::sync::mpsc::UnboundedSender;
 use tokio::task::JoinHandle;
 use tokio_stream::wrappers::BroadcastStream;
@@ -56,7 +54,7 @@ pub enum DaNetworkEvent {
 /// DA network backend for validators
 /// Internally uses a libp2p swarm composed of the [`ValidatorBehaviour`]
 /// It forwards network messages to the corresponding subscription channels/streams
-pub struct DaNetworkValidatorBackend<Membership> {
+pub struct DaNetworkExecutorBackend<Membership> {
     // TODO: this join handles should be cancelable tasks. We should add an stop method for
     // the `NetworkBackend` trait so if the service is stopped the backend can gracefully handle open
     // sub-tasks as well.
@@ -71,7 +69,7 @@ pub struct DaNetworkValidatorBackend<Membership> {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct DaNetworkValidatorBackendSettings<Membership> {
+pub struct DaNetworkExecutorBackendSettings<Membership> {
     // Identification Secp256k1 private key in Hex format (`0x123...abc`). Default random.
     #[serde(with = "secret_key_serde", default = "ed25519::SecretKey::generate")]
     pub node_key: ed25519::SecretKey,
@@ -82,7 +80,7 @@ pub struct DaNetworkValidatorBackendSettings<Membership> {
 }
 
 #[async_trait::async_trait]
-impl<Membership> NetworkBackend for DaNetworkValidatorBackend<Membership>
+impl<Membership> NetworkBackend for DaNetworkExecutorBackend<Membership>
 where
     Membership: MembershipHandler<NetworkId = SubnetworkId, Id = PeerId>
         + Clone
@@ -91,7 +89,7 @@ where
         + Sync
         + 'static,
 {
-    type Settings = DaNetworkValidatorBackendSettings<Membership>;
+    type Settings = DaNetworkExecutorBackendSettings<Membership>;
     type State = NoState<Self::Settings>;
     type Message = DaNetworkMessage;
     type EventKind = DaNetworkEventKind;

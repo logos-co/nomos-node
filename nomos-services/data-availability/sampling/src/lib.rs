@@ -9,7 +9,7 @@ use std::fmt::Debug;
 use kzgrs_backend::common::blob::DaBlob;
 use network::NetworkAdapter;
 use nomos_core::da::BlobId;
-use nomos_da_network_service::backends::libp2p::validator::SamplingEvent;
+use nomos_da_network_service::backends::libp2p::common::SamplingEvent;
 use nomos_da_network_service::NetworkService;
 use nomos_storage::StorageService;
 use overwatch_rs::services::handle::ServiceStateHandle;
