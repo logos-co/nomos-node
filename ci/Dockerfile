@@ -14,7 +14,13 @@ RUN rustup component add rustfmt clippy
 
 # Jenkins user needs a specific UID/GID to work.
 RUN groupadd -g 1001 jenkins \
- && useradd -u 1001 -g jenkins jenkins
+    && useradd -u 1001 -g jenkins jenkins
+
+# Create necessary directories and assign correct permissions
+RUN mkdir -p /home/jenkins/.local/share/cargo-risczero/toolchains \
+    && chown -R jenkins:jenkins /home/jenkins/.local \
+    && mkdir -p /home/jenkins/.cargo \
+    && chown -R jenkins:jenkins /home/jenkins/.cargo
 
 USER jenkins
 
