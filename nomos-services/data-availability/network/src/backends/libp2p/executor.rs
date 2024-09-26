@@ -14,6 +14,7 @@ use nomos_da_network_core::SubnetworkId;
 use nomos_libp2p::ed25519;
 use overwatch_rs::overwatch::handle::OverwatchHandle;
 use overwatch_rs::services::state::NoState;
+use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 use std::marker::PhantomData;
 use std::pin::Pin;
@@ -55,6 +56,12 @@ pub enum DaNetworkEvent {
     Dispersal(DispersalExecutorEvent),
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct DaNetworkExecutorBackendSettings<Membership> {
+    pub validator_settings: DaNetworkBackendSettings<Membership>,
+    pub num_subnets: u16,
+}
+
 /// DA network backend for validators
 /// Internally uses a libp2p swarm composed of the [`ValidatorBehaviour`]
 /// It forwards network messages to the corresponding subscription channels/streams
@@ -89,21 +96,27 @@ where
         + Sync
         + 'static,
 {
-    type Settings = DaNetworkBackendSettings<Membership>;
+    type Settings = DaNetworkExecutorBackendSettings<Membership>;
     type State = NoState<Self::Settings>;
     type Message = DaNetworkMessage;
     type EventKind = DaNetworkEventKind;
     type NetworkEvent = DaNetworkEvent;
 
     fn new(config: Self::Settings, overwatch_handle: OverwatchHandle) -> Self {
-        let keypair =
-            libp2p::identity::Keypair::from(ed25519::Keypair::from(config.node_key.clone()));
+        let keypair = libp2p::identity::Keypair::from(ed25519::Keypair::from(
+            config.validator_settings.node_key.clone(),
+        ));
         let (mut executor_swarm, executor_events_stream) = ExecutorSwarm::new(
             keypair,
-            config.membership.clone(),
-            config.addresses.clone().into_iter().collect(),
+            config.validator_settings.membership.clone(),
+            config
+                .validator_settings
+                .addresses
+                .clone()
+                .into_iter()
+                .collect(),
         );
-        let address = config.listening_address;
+        let address = config.validator_settings.listening_address;
         // put swarm to listen at the specified configuration address
         executor_swarm
             .protocol_swarm_mut()
@@ -115,8 +128,8 @@ where
         let local_peer_id = *executor_swarm.local_peer_id();
 
         dial_peers(
-            config.membership.clone(),
-            config.addresses,
+            config.validator_settings.membership.clone(),
+            config.validator_settings.addresses,
             executor_swarm.protocol_swarm_mut(),
             local_peer_id,
         );
