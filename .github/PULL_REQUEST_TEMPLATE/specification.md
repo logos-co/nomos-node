@@ -1,33 +1,47 @@
-## What does this implement?
+## 1. What does this PR implement?
 
-// Please check on this template details
-here: https://www.notion.so/Specification-hardening-0cd6547233fa43a1a03d6e360de9eb2b
+> [!NOTE]  
+> Review  
+>
+the [Specification to Implementation Process document](https://www.notion.so/Specification-to-Implementation-Process-0cd6547233fa43a1a03d6e360de9eb2b).
 
-## Link to the specification document that this PR implements or modifies
+## 2. Does the code have enough context to be clearly understood?
 
-// Please add a link to the specific block if it exists
+> [!IMPORTANT]  
+> Add a link to the specification document, pointing at the specific section.  
+> Any implementation detail that could be considered idiosyncratic and not direct from the specification, should be  
+> explained.  
+> Always consider what someone new would need to know for the code to make sense, and add this context to it.
 
-## Is the specification accurate?
+## 3. Who are the specification authors and who is accountable for this PR?
 
-// Explain what was missing
-// Propose a change to be made to the specification
+> [!IMPORTANT]  
+> Ping the original specification author(s) and add them as reviewers, alongside any other from the engineering team.  
+> You are accountable for the PR and its rapid resolution, so make sure anyone involved is aware and actively
+> advancing  
+> the review.
 
-## Does this implementation change anything from the specification?
+## 4. Is the specification accurate and complete?
 
-// Explain why it couldn't work as per the specification
-// Explain what is the main issue
-// Explain how does it work as your proposed modification/solution and what was modified
-// Propose the change that should be added/modified from the specification
+> [!IMPORTANT]
+> * If not, engage in a conversation directly with the authors, prompting any updates in the document.
+> * You are accountable of this process, and the specification author needs to give priority to unblocking you.
 
-## Contacts
+## 5. Does the implementation introduce changes in the specification?
 
-// Ping the original specification author
-Specification author/s: // Ping the original specification author
+> [!IMPORTANT]
+> * Contact the specification author(s) and engage in the necessary conversation to agree on the proposed  
+    modification/solutions.
+> * Ensure the new changes are on par with the implementation at the end of the process.
+> * The PR should not be merged until parity between implementation and specifications has been reached.
 
 ## Checklist
 
-* [ ] Description added
-* [ ] Specification link added
-* [ ] Accurate report added
-* [ ] Specification modifications report added
-* [ ] Main contact/s added
+> [!WARNING]  
+> Do not merge the PR if any of the following is missing:
+
+* [ ] 1. Description added.
+* [ ] 2. Context and links to Specification document(s) added.
+* [ ] 3. Main contact(s) (developers and specification authors) added
+* [ ] 4. Implementation and Specification are 100% in sync including changes. This is critical.
+* [ ] 5. Link PR to a specific milestone.
