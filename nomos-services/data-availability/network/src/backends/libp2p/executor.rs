@@ -1,13 +1,15 @@
 use crate::backends::libp2p::common::{
-    handle_sample_request, initialize_backend, DaNetworkBackendSettings, InitializedBackendData,
-    SamplingEvent,
+    dial_peers, handle_sample_request, handle_validator_events_stream, DaNetworkBackendSettings,
+    SamplingEvent, BROADCAST_CHANNEL_SIZE,
 };
 use crate::backends::NetworkBackend;
 use futures::{Stream, StreamExt};
 use kzgrs_backend::common::blob::DaBlob;
 use libp2p::PeerId;
 use nomos_core::da::BlobId;
+use nomos_da_network_core::swarm::executor::ExecutorSwarm;
 use nomos_da_network_core::SubnetworkId;
+use nomos_libp2p::ed25519;
 use overwatch_rs::overwatch::handle::OverwatchHandle;
 use overwatch_rs::services::state::NoState;
 use std::fmt::Debug;
@@ -79,13 +81,49 @@ where
     type NetworkEvent = DaNetworkEvent;
 
     fn new(config: Self::Settings, overwatch_handle: OverwatchHandle) -> Self {
-        let InitializedBackendData {
-            task,
-            replies_task,
-            sampling_request_channel,
-            sampling_broadcast_receiver,
-            verifying_broadcast_receiver,
-        } = initialize_backend(config, overwatch_handle);
+        let keypair =
+            libp2p::identity::Keypair::from(ed25519::Keypair::from(config.node_key.clone()));
+        let (mut executor_swarm, executor_events_stream) = ExecutorSwarm::new(
+            keypair,
+            config.membership.clone(),
+            config.addresses.clone().into_iter().collect(),
+        );
+        let address = config.listening_address;
+        // put swarm to listen at the specified configuration address
+        executor_swarm
+            .protocol_swarm_mut()
+            .listen_on(address.clone())
+            .unwrap_or_else(|e| {
+                panic!("Error listening on DA network with address {address}: {e}")
+            });
+        // Dial peers in the same subnetworks (Node might participate in multiple).
+        let local_peer_id = *executor_swarm.local_peer_id();
+
+        dial_peers(
+            config.membership.clone(),
+            config.addresses,
+            executor_swarm.protocol_swarm_mut(),
+            local_peer_id,
+        );
+
+        let sampling_request_channel = executor_swarm
+            .protocol_swarm()
+            .behaviour()
+            .sampling_behaviour()
+            .sample_request_channel();
+
+        let task = overwatch_handle.runtime().spawn(executor_swarm.run());
+        let (sampling_broadcast_sender, sampling_broadcast_receiver) =
+            broadcast::channel(BROADCAST_CHANNEL_SIZE);
+        let (verifying_broadcast_sender, verifying_broadcast_receiver) =
+            broadcast::channel(BROADCAST_CHANNEL_SIZE);
+        let replies_task = overwatch_handle
+            .runtime()
+            .spawn(handle_validator_events_stream(
+                executor_events_stream.validator_events_stream,
+                sampling_broadcast_sender,
+                verifying_broadcast_sender,
+            ));
 
         Self {
             task,
