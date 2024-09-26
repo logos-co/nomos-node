@@ -20,7 +20,6 @@ use subnetworks_assignations::MembershipHandler;
 use tokio::sync::mpsc::error::SendError;
 use tokio::sync::mpsc::UnboundedSender;
 use tokio::sync::{broadcast, mpsc};
-use tokio::task::JoinHandle;
 
 pub(crate) const BROADCAST_CHANNEL_SIZE: usize = 128;
 
@@ -48,14 +47,6 @@ pub enum SamplingEvent {
     },
     /// A failed sampling error
     SamplingError { error: SamplingError },
-}
-
-pub(crate) struct InitializedBackendData {
-    pub task: JoinHandle<()>,
-    pub replies_task: JoinHandle<()>,
-    pub sampling_request_channel: UnboundedSender<(SubnetworkId, BlobId)>,
-    pub sampling_broadcast_receiver: broadcast::Receiver<SamplingEvent>,
-    pub verifying_broadcast_receiver: broadcast::Receiver<DaBlob>,
 }
 
 pub(crate) fn dial_peers<Membership, Behaviour>(

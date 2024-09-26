@@ -106,11 +106,7 @@ where
             local_peer_id,
         );
 
-        let sampling_request_channel = validator_swarm
-            .protocol_swarm()
-            .behaviour()
-            .sampling_behaviour()
-            .sample_request_channel();
+        let sampling_request_channel = validator_swarm.sample_request_channel();
 
         let task = overwatch_handle.runtime().spawn(validator_swarm.run());
         let (sampling_broadcast_sender, sampling_broadcast_receiver) =

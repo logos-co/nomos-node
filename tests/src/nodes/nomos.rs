@@ -20,7 +20,7 @@ use mixnet::{
 use nomos_core::{block::Block, header::HeaderId, staking::NMO_UNIT};
 use nomos_da_indexer::storage::adapters::rocksdb::RocksAdapterSettings as IndexerStorageAdapterSettings;
 use nomos_da_indexer::IndexerSettings;
-use nomos_da_network_service::backends::libp2p::validator::DaNetworkValidatorBackendSettings;
+use nomos_da_network_service::backends::libp2p::common::DaNetworkBackendSettings;
 use nomos_da_network_service::NetworkConfig as DaNetworkConfig;
 use nomos_da_sampling::backend::kzgrs::KzgrsSamplingBackendSettings;
 use nomos_da_sampling::storage::adapters::rocksdb::RocksAdapterSettings as SamplingStorageAdapterSettings;
@@ -485,7 +485,7 @@ fn create_node_config(
             blob_selector_settings: (),
         },
         da_network: DaNetworkConfig {
-            backend: DaNetworkValidatorBackendSettings {
+            backend: DaNetworkBackendSettings {
                 node_key: swarm_config.node_key,
                 listening_address: Multiaddr::from_str(&format!(
                     "/ip4/127.0.0.1/udp/{}/quic-v1",
