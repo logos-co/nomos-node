@@ -19,7 +19,9 @@ pipeline {
 
   environment {
     RUST_BACKTRACE = 1
+    /* Use increased slot time in Nomos consensus */
     CONSENSUS_SLOT_TIME = 5
+    /* Run Nomos tests in risc0 development mode */
     RISC0_DEV_MODE = true
   }
 
