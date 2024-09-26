@@ -15,3 +15,9 @@ RUN rustup component add rustfmt clippy
 # Jenkins user needs a specific UID/GID to work.
 RUN groupadd -g 1001 jenkins \
  && useradd -u 1001 -g jenkins jenkins
+
+USER jenkins
+
+RUN cargo install cargo-binstall
+RUN cargo binstall -y cargo-risczero
+RUN cargo risczero install
