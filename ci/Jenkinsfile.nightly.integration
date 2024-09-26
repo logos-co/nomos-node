@@ -18,10 +18,9 @@ pipeline {
   }
 
   environment {
-    /* Avoid cache poisoning by other jobs. */
-    GOCACHE = "${env.WORKSPACE_TMP}/go-build"
-    GOPATH  = "${env.WORKSPACE_TMP}/go"
     RUST_BACKTRACE = 1
+    CONSENSUS_SLOT_TIME = 5
+    RISC0_DEV_MODE = true
   }
 
   options {
