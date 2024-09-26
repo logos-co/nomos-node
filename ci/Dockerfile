@@ -1,4 +1,4 @@
-FROM rust:1.80.0-slim-bullseye
+FROM rust:1.80.0-slim-bookworm
 
 LABEL maintainer="augustinas@status.im" \
       source="https://github.com/logos-co/nomos-node" \
@@ -6,10 +6,9 @@ LABEL maintainer="augustinas@status.im" \
 
 # Dependecies for publishing documentation.
 RUN apt-get update && apt-get install -yq \
-    libssl-dev openssh-client git python3-pip clang \
-    pkg-config protobuf-compiler
+    libssl-dev openssh-client git gcc g++ \ 
+    clang pkg-config protobuf-compiler
 
-RUN pip install ghp-import
 RUN rustup component add rustfmt clippy
 
 # Jenkins user needs a specific UID/GID to work.
