@@ -351,7 +351,7 @@ impl Node for NomosNode {
             let subnetwork_ids = membership.membership(&local_peer_id);
             config.da_verifier.verifier_settings.index = subnetwork_ids;
             config.da_network.backend.membership = membership;
-            config.da_network.backend.addresses = peer_addresses.clone();
+            config.da_network.backend.addresses = peer_addresses.iter().cloned().collect();
         }
 
         #[cfg(feature = "mixnet")]
