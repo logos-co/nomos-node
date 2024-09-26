@@ -12,10 +12,6 @@ RUN apt-get update && apt-get install -yq \
 RUN pip install ghp-import
 RUN rustup component add rustfmt clippy
 
-RUN cargo install cargo-binstall
-RUN cargo binstall -y cargo-risczero
-RUN cargo risczero install
-
 # Jenkins user needs a specific UID/GID to work.
 RUN groupadd -g 1001 jenkins \
  && useradd -u 1001 -g jenkins jenkins
