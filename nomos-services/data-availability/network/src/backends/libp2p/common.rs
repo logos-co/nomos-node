@@ -14,7 +14,7 @@ use nomos_da_network_core::SubnetworkId;
 use nomos_libp2p::secret_key_serde;
 use nomos_libp2p::{ed25519, Multiaddr, PeerId};
 use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::fmt::Debug;
 use subnetworks_assignations::MembershipHandler;
 use tokio::sync::mpsc::error::SendError;
@@ -30,7 +30,7 @@ pub struct DaNetworkBackendSettings<Membership> {
     pub node_key: ed25519::SecretKey,
     /// Membership of DA network PoV set
     pub membership: Membership,
-    pub addresses: Vec<(PeerId, Multiaddr)>,
+    pub addresses: HashMap<PeerId, Multiaddr>,
     pub listening_address: Multiaddr,
 }
 
@@ -50,8 +50,8 @@ pub enum SamplingEvent {
 }
 
 pub(crate) fn dial_peers<Membership, Behaviour>(
-    membership: Membership,
-    addresses: Vec<(PeerId, Multiaddr)>,
+    membership: &Membership,
+    addresses: &HashMap<PeerId, Multiaddr>,
     swarm: &mut Swarm<Behaviour>,
     local_peer_id: PeerId,
 ) where
@@ -69,12 +69,7 @@ pub(crate) fn dial_peers<Membership, Behaviour>(
         .iter()
         .flat_map(|subnet| membership.members_of(subnet))
         .filter(|peer| peer != &local_peer_id)
-        .filter_map(|peer| {
-            addresses
-                .iter()
-                .find(|(p, _)| p == &peer)
-                .map(|(_, addr)| (peer, addr.clone()))
-        })
+        .filter_map(|peer| addresses.get(&peer).map(|addr| (peer, addr.clone())))
         .for_each(|(peer, addr)| {
             // Only dial if we haven't already connected to this peer.
             if connected_peers.insert(peer) {

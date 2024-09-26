@@ -100,8 +100,8 @@ where
         let local_peer_id = *validator_swarm.local_peer_id();
 
         dial_peers(
-            config.membership.clone(),
-            config.addresses,
+            &config.membership,
+            &config.addresses,
             validator_swarm.protocol_swarm_mut(),
             local_peer_id,
         );

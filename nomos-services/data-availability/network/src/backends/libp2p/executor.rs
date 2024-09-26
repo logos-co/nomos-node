@@ -15,6 +15,7 @@ use nomos_libp2p::ed25519;
 use overwatch_rs::overwatch::handle::OverwatchHandle;
 use overwatch_rs::services::state::NoState;
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 use std::fmt::Debug;
 use std::marker::PhantomData;
 use std::pin::Pin;
@@ -116,7 +117,7 @@ where
                 .into_iter()
                 .collect(),
         );
-        let address = config.validator_settings.listening_address;
+        let address = config.validator_settings.listening_address.clone();
         // put swarm to listen at the specified configuration address
         executor_swarm
             .protocol_swarm_mut()
@@ -128,17 +129,26 @@ where
         let local_peer_id = *executor_swarm.local_peer_id();
 
         dial_peers(
-            config.validator_settings.membership.clone(),
-            config.validator_settings.addresses,
+            &config.validator_settings.membership,
+            &config.validator_settings.addresses,
             executor_swarm.protocol_swarm_mut(),
             local_peer_id,
         );
 
+        let dispersal_peers = dial_dispersal_peers(&mut executor_swarm, &config);
+
         let sampling_request_channel = executor_swarm.sample_request_channel();
 
         let dispersal_blobs_sender = executor_swarm.dispersal_blobs_channel();
+        let executor_open_stream_sender = executor_swarm.dispersal_open_stream_sender();
 
         let task = overwatch_handle.runtime().spawn(executor_swarm.run());
+
+        // open streams to dispersal peers
+        for peer_id in dispersal_peers.iter() {
+            executor_open_stream_sender.send(*peer_id).unwrap();
+        }
+
         let (sampling_broadcast_sender, sampling_broadcast_receiver) =
             broadcast::channel(BROADCAST_CHANNEL_SIZE);
         let (verifying_broadcast_sender, verifying_broadcast_receiver) =
@@ -226,4 +236,50 @@ async fn handle_executor_dispersal_events_stream(
             error!("Error forwarding internal dispersal executor event: {e}");
         }
     }
+}
+
+fn dial_dispersal_peers<Membership>(
+    executor_swarm: &mut ExecutorSwarm<Membership>,
+    config: &DaNetworkExecutorBackendSettings<Membership>,
+) -> HashSet<PeerId>
+where
+    Membership: MembershipHandler<NetworkId = SubnetworkId, Id = PeerId>
+        + Clone
+        + Debug
+        + Send
+        + Sync
+        + 'static,
+{
+    let mut connected_peers = HashSet::new();
+
+    let local_peer_id = *executor_swarm.local_peer_id();
+
+    for subnetwork_id in 0..config.num_subnets {
+        // Connect to one peer in a subnet.
+        let mut members = config
+            .validator_settings
+            .membership
+            .members_of(&(subnetwork_id as u32));
+
+        members.remove(&local_peer_id);
+        let peer_id = members
+            .iter()
+            .next()
+            .copied()
+            .expect("Subnet should have at least one node which is not this executor");
+
+        let addr = config
+            .validator_settings
+            .addresses
+            .get(&peer_id)
+            .expect("Peer address should be in the list")
+            .clone();
+
+        executor_swarm
+            .dial(addr)
+            .expect("Should schedule the dials");
+
+        connected_peers.insert(peer_id);
+    }
+    connected_peers
 }
