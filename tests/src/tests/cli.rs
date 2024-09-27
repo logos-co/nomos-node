@@ -18,6 +18,7 @@ use tests::GLOBAL_PARAMS_PATH;
 const CLI_BIN: &str = "../target/debug/nomos-cli";
 const APP_ID: &str = "fd3384e132ad02a56c78f45547ee40038dc79002b90d29ed90e08eee762ae715";
 
+use nomos_core::da::DaEncoder;
 use std::process::Command;
 
 fn run_disseminate(disseminate: &Disseminate) {
@@ -104,6 +105,8 @@ async fn disseminate(nodes: &Vec<NomosNode>, config: &mut Disseminate) {
 
 #[tokio::test]
 async fn disseminate_and_retrieve() {
+    tracing::subscriber::set_global_default(tracing_subscriber::FmtSubscriber::new())
+        .expect("setting tracing default failed");
     let mut config = Disseminate {
         data: Some("hello world".to_string()),
         timeout: 60,
@@ -153,13 +156,34 @@ async fn disseminate_and_retrieve() {
         .flat_map(|(_, blobs)| blobs)
         .collect();
 
+    // Encode test data
+    let mut bytes: Vec<u8> = config.data.unwrap().into_bytes();
+
+    let remainder = bytes.len() % 31;
+    if remainder != 0 {
+        bytes.resize(bytes.len() + (31 - remainder), 0);
+    }
+    let global_params =
+        kzgrs_backend::global::global_parameters_from_file(&GLOBAL_PARAMS_PATH.to_string())
+            .expect("Global parameters should be loaded from file");
+
+    let params = kzgrs_backend::encoder::DaEncoderParams::new(
+        config.columns.clone(),
+        config.with_cache,
+        global_params,
+    );
+    let da_encoder = kzgrs_backend::encoder::DaEncoder::new(params);
+    let encoded_data = da_encoder.encode(&bytes).unwrap();
+
     // Index zero shouldn't be empty, node 2 replicated both blobs to node 1 because they both
     // are in the same subnetwork.
     for b in node1_idx_0_blobs.iter() {
-        assert!(!b.is_empty())
+        assert!(!b.is_empty());
+        assert_eq!(**b, encoded_data.data);
     }
 
     for b in node2_idx_0_blobs.iter() {
-        assert!(!b.is_empty())
+        assert!(!b.is_empty());
+        assert_eq!(**b, encoded_data.data);
     }
 }
