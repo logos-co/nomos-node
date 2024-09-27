@@ -7,7 +7,7 @@ COPY . .
 
 # Install dependencies needed for building RocksDB and etcd.
 RUN apt-get update && apt-get install -yq \
-    git gcc g++ clang etcd-client libssl-dev \
+    git gcc g++ clang libssl-dev \
     pkg-config protobuf-compiler
 
 RUN cargo install cargo-binstall
@@ -29,7 +29,7 @@ EXPOSE 3000 8080 9000 60000
 
 COPY --from=builder /nomos/target/release/nomos-node /usr/bin/nomos-node
 COPY --from=builder /nomos/target/release/nomos-cli /usr/bin/nomos-cli
-COPY --from=builder /usr/bin/etcdctl /usr/bin/etcdctl
-COPY nodes/nomos-node/config.yaml /etc/nomos/config.yaml
+COPY --from=builder /nomos/target/release/cfgsync-server /usr/bin/cfgsync-server
+COPY --from=builder /nomos/target/release/cfgsync-client /usr/bin/cfgsync-client
 
 ENTRYPOINT ["/usr/bin/nomos-node"]
