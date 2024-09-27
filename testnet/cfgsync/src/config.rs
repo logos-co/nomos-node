@@ -6,6 +6,9 @@ use nomos_node::Config as NodeConfig;
 use tests::{nodes::nomos::secret_key_to_peer_id, ConsensusConfig, DaConfig, Node, NomosNode};
 // internal
 
+const DEFAULT_NETWORK_PORT: u16 = 3000;
+const DEFAULT_DA_NETWORK_PORT: u16 = 3300;
+
 #[derive(Eq, PartialEq, Hash, Clone)]
 pub enum HostKind {
     Nomos,
@@ -17,6 +20,17 @@ pub struct Host {
     pub ip: Ipv4Addr,
     pub network_port: u16,
     pub da_network_port: u16,
+}
+
+impl Host {
+    pub fn default_node_from_ip(ip: Ipv4Addr) -> Self {
+        Self {
+            kind: HostKind::Nomos,
+            ip,
+            network_port: DEFAULT_NETWORK_PORT,
+            da_network_port: DEFAULT_DA_NETWORK_PORT,
+        }
+    }
 }
 
 pub fn create_node_configs(
@@ -144,11 +158,11 @@ mod cfgsync_tests {
                 })
                 .unwrap();
 
-            assert_eq!(host.ip, network_ip);
-            assert_eq!(host.network_port, network_port);
+            assert_eq!(network_ip, host.ip);
+            assert_eq!(network_port, host.network_port);
 
-            assert_eq!(host.ip, da_network_ip);
-            assert_eq!(host.da_network_port, da_network_port);
+            assert_eq!(da_network_ip, host.ip);
+            assert_eq!(da_network_port, host.da_network_port);
         }
     }
 }

@@ -4,6 +4,13 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-tests = { path = "../../tests" }
+axum = { version = "0.6" }
+clap = { version = "4", features = ["derive"] }
 nomos-libp2p = { path = "../../nomos-libp2p" }
 nomos-node = { path = "../../nodes/nomos-node" }
+reqwest = { version = "0.11", features = ["json"] }
+tests = { path = "../../tests" }
+tokio = { version = "1.24", features = ["rt-multi-thread"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+serde_yaml = "0.9"
