@@ -1,0 +1,9 @@
+[package]
+name = "cfgsync"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+tests = { path = "../../tests" }
+nomos-libp2p = { path = "../../nomos-libp2p" }
+nomos-node = { path = "../../nodes/nomos-node" }

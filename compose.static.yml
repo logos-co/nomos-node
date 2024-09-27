@@ -96,16 +96,6 @@ services:
       - NET_INITIAL_PEERS=${DOCKER_COMPOSE_NET_INITIAL_PEERS:-/dns/bootstrap/udp/3000/quic-v1}
     entrypoint: /etc/nomos/scripts/run_nomos_node.sh
 
-  chatbot:
-    container_name: chatbot
-    build:
-      context: .
-      dockerfile: testnet/Dockerfile
-    image: nomos:latest
-    volumes:
-      - ./testnet:/etc/nomos
-    entrypoint: /etc/nomos/scripts/run_nomos_bot.sh
-
   etcd:
     container_name: etcd
     image: quay.io/coreos/etcd:v3.4.15
