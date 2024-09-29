@@ -14,6 +14,10 @@ jobs:
       RUSTFLAGS: "-C instrument-coverage"
     runs-on: ubuntu-latest
     steps:
+      - name: Maximize build space
+        uses: AdityaGarg8/remove-unwanted-software@v4.1
+        with:
+          remove-android: 'true'
       - uses: actions/checkout@v3
         with:
           submodules: true
@@ -41,7 +45,7 @@ jobs:
           CONSENSUS_SLOT_TIME: 5
         with:
           command: test
-          args: --release --all --no-default-features --features libp2p
+          args: --all --no-default-features --features libp2p
       - name: Run Grcov
         run: |
           cargo binstall -y grcov;
