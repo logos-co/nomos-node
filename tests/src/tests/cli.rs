@@ -20,6 +20,7 @@ const APP_ID: &str = "fd3384e132ad02a56c78f45547ee40038dc79002b90d29ed90e08eee76
 
 use nomos_core::da::DaEncoder;
 use std::process::Command;
+use nomos_core::wire;
 
 fn run_disseminate(disseminate: &Disseminate) {
     let mut binding = Command::new(CLI_BIN);
