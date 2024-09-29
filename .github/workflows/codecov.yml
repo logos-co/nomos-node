@@ -2,8 +2,6 @@ on:
   schedule:
     - cron:  '0 3 * * *'
   workflow_dispatch:
-  push:
-    branches: [ fix-coverage-workflow-disk-space ]
 
 name: Codecov
 
