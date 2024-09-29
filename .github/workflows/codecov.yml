@@ -12,12 +12,14 @@ jobs:
     env:
       CARGO_INCREMENTAL: 0
       RUSTFLAGS: "-C instrument-coverage"
+      LLVM_PROFILE_FILE: "nomos-node-%p-%m.profraw"
     runs-on: ubuntu-latest
     steps:
       - name: Maximize build space
         uses: AdityaGarg8/remove-unwanted-software@v4.1
         with:
           remove-android: 'true'
+          remove-dotnet: 'true'
       - uses: actions/checkout@v3
         with:
           submodules: true
@@ -26,6 +28,12 @@ jobs:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
       - name: Checkout submodules
         run: git submodule update --init --recursive
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+          components: llvm-tools-preview
       - uses: cargo-bins/cargo-binstall@main
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
