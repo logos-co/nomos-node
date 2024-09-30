@@ -54,7 +54,8 @@ pub(crate) fn dial_validator_subnetwork_peers<Membership, Behaviour>(
     addresses: &HashMap<PeerId, Multiaddr>,
     swarm: &mut Swarm<Behaviour>,
     local_peer_id: PeerId,
-) where
+) -> HashSet<PeerId>
+where
     Membership: MembershipHandler<NetworkId = SubnetworkId, Id = PeerId>
         + Clone
         + Debug
@@ -78,6 +79,7 @@ pub(crate) fn dial_validator_subnetwork_peers<Membership, Behaviour>(
                     .expect("Node should be able to dial peer in a subnet");
             }
         });
+    connected_peers
 }
 
 /// Task that handles forwarding of events to the subscriptions channels/stream

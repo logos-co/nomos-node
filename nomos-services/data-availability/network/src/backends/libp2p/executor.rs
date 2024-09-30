@@ -128,14 +128,18 @@ where
         // Dial peers in the same subnetworks (Node might participate in multiple).
         let local_peer_id = *executor_swarm.local_peer_id();
 
-        dial_validator_subnetwork_peers(
+        let validator_subnetworks_connected_peers = dial_validator_subnetwork_peers(
             &config.validator_settings.membership,
             &config.validator_settings.addresses,
             executor_swarm.protocol_swarm_mut(),
             local_peer_id,
         );
 
-        let dispersal_peers = dial_dispersal_peers(&mut executor_swarm, &config);
+        let dispersal_peers = dial_dispersal_peers(
+            &mut executor_swarm,
+            &config,
+            &validator_subnetworks_connected_peers,
+        );
 
         let sampling_request_channel = executor_swarm.sample_request_channel();
 
@@ -241,6 +245,7 @@ async fn handle_executor_dispersal_events_stream(
 fn dial_dispersal_peers<Membership>(
     executor_swarm: &mut ExecutorSwarm<Membership>,
     config: &DaNetworkExecutorBackendSettings<Membership>,
+    validator_connected_peers: &HashSet<PeerId>,
 ) -> HashSet<PeerId>
 where
     Membership: MembershipHandler<NetworkId = SubnetworkId, Id = PeerId>
@@ -253,21 +258,33 @@ where
     let mut connected_peers = HashSet::new();
 
     let local_peer_id = *executor_swarm.local_peer_id();
+    let membership = &config.validator_settings.membership;
 
-    for subnetwork_id in 0..config.num_subnets {
-        // Connect to one peer in a subnet.
-        let mut members = config
-            .validator_settings
-            .membership
-            .members_of(&(subnetwork_id as u32));
+    // filter out which subnetworks we already have connections with
+    let connected_subnetworks: HashSet<SubnetworkId> = (0..config.num_subnets as u32)
+        .filter(|subnetwork_id| {
+            !membership
+                .members_of(subnetwork_id)
+                .is_disjoint(validator_connected_peers)
+        })
+        .collect();
 
-        members.remove(&local_peer_id);
-        let peer_id = members
-            .iter()
-            .next()
-            .copied()
-            .expect("Subnet should have at least one node which is not this executor");
+    let already_connected_peers: HashSet<PeerId> = membership
+        .members()
+        .intersection(validator_connected_peers)
+        .copied()
+        .collect();
 
+    // select dispersal peers from the subnetworks we are not connected yet
+    let selected_dispersal_peers = select_dispersal_peers(
+        &local_peer_id,
+        config,
+        &connected_subnetworks,
+        //
+        &HashSet::new(),
+    );
+
+    for peer_id in selected_dispersal_peers {
         let addr = config
             .validator_settings
             .addresses
@@ -281,5 +298,38 @@ where
 
         connected_peers.insert(peer_id);
     }
+
+    // add peers from the subnetwork we are connected with
     connected_peers
+        .union(&already_connected_peers)
+        .copied()
+        .collect()
+}
+
+/// Use selection as per the base [specification](https://www.notion.so/NomosDA-Network-Specification-c6664294d630470ba20aefb21a218f8c?pvs=4#10e8f96fb65c803f9ed9d5a91df3ac83)
+fn select_dispersal_peers<Membership>(
+    local_peer_id: &PeerId,
+    config: &DaNetworkExecutorBackendSettings<Membership>,
+    filtered_subnetworks: &HashSet<SubnetworkId>,
+    filtered_peers: &HashSet<PeerId>,
+) -> HashSet<PeerId>
+where
+    Membership: MembershipHandler<NetworkId = SubnetworkId, Id = PeerId>
+        + Clone
+        + Debug
+        + Send
+        + Sync
+        + 'static,
+{
+    let membership = &config.validator_settings.membership;
+    (0..config.num_subnets as u32)
+        .filter(|subnetwork_id| !filtered_subnetworks.contains(subnetwork_id))
+        .filter_map(|subnetwork_id| {
+            membership
+                .members_of(&subnetwork_id)
+                .difference(filtered_peers)
+                .find(|&id| id != local_peer_id)
+                .copied()
+        })
+        .collect()
 }
