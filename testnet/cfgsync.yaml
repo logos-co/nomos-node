@@ -13,4 +13,4 @@ num_samples: 1
 num_subnets: 2
 old_blobs_check_interval_secs: 5
 blobs_validity_duration_secs: 60
-global_params_path: "/etc/nomos/kzgrs_test_params"
+global_params_path: "/kzgrs_test_params"

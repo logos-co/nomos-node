@@ -3,7 +3,7 @@ use std::{collections::HashMap, net::Ipv4Addr, str::FromStr};
 // crates
 use nomos_libp2p::{Multiaddr, PeerId};
 use nomos_node::Config as NodeConfig;
-use tests::{nodes::nomos::secret_key_to_peer_id, ConsensusConfig, DaConfig, Node, NomosNode};
+use tests::{ConsensusConfig, DaConfig, Node, NomosNode};
 // internal
 
 const DEFAULT_NETWORK_PORT: u16 = 3000;
@@ -46,26 +46,26 @@ pub fn create_node_configs(
     let host_network_init_peers = update_network_init_peers(hosts.clone());
     let host_da_peer_addresses = update_da_peer_addresses(hosts.clone(), peer_addresses);
 
-    let new_peer_addresses: Vec<(PeerId, Multiaddr)> = host_da_peer_addresses
+    let new_peer_addresses: HashMap<PeerId, Multiaddr> = host_da_peer_addresses
         .clone()
         .into_iter()
         .map(|(peer_id, (multiaddr, _))| (peer_id, multiaddr))
         .collect();
 
     for (config, host) in configs.iter_mut().zip(hosts.into_iter()) {
-        // Same node key is used for network and da_network.
-        let peer_id = secret_key_to_peer_id(config.da_network.backend.node_key.clone());
-
         config.da_network.backend.addresses = new_peer_addresses.clone();
-        if let Some((multiaddr, _)) = host_da_peer_addresses.get(&peer_id) {
-            // Libp2p network config.
-            config.network.backend.inner.host = host.ip;
-            config.network.backend.inner.port = host.network_port;
-            config.network.backend.initial_peers = host_network_init_peers.clone();
 
-            // DA Libp2p network config.
-            config.da_network.backend.listening_address = multiaddr.clone();
-        }
+        // Libp2p network config.
+        config.network.backend.inner.host = Ipv4Addr::from_str("0.0.0.0").unwrap();
+        config.network.backend.inner.port = host.network_port;
+        config.network.backend.initial_peers = host_network_init_peers.clone();
+
+        // DA Libp2p network config.
+        config.da_network.backend.listening_address = Multiaddr::from_str(&format!(
+            "/ip4/0.0.0.0/udp/{}/quic-v1",
+            host.da_network_port,
+        ))
+        .unwrap();
 
         configured_hosts.insert(host.clone(), config.clone());
     }
@@ -82,7 +82,7 @@ fn update_network_init_peers(hosts: Vec<Host>) -> Vec<Multiaddr> {
 
 fn update_da_peer_addresses(
     hosts: Vec<Host>,
-    peer_addresses: Vec<(PeerId, Multiaddr)>,
+    peer_addresses: HashMap<PeerId, Multiaddr>,
 ) -> HashMap<PeerId, (Multiaddr, Ipv4Addr)> {
     peer_addresses
         .into_iter()
@@ -139,17 +139,9 @@ mod cfgsync_tests {
         );
 
         for (host, config) in configs.iter() {
-            let network_ip = config.network.backend.inner.host;
             let network_port = config.network.backend.inner.port;
 
             let da_network_addr = config.da_network.backend.listening_address.clone();
-            let da_network_ip: Ipv4Addr = da_network_addr
-                .iter()
-                .find_map(|protocol| match protocol {
-                    Protocol::Ip4(ipv4) => Some(ipv4),
-                    _ => None,
-                })
-                .unwrap();
             let da_network_port = da_network_addr
                 .iter()
                 .find_map(|protocol| match protocol {
@@ -158,10 +150,7 @@ mod cfgsync_tests {
                 })
                 .unwrap();
 
-            assert_eq!(network_ip, host.ip);
             assert_eq!(network_port, host.network_port);
-
-            assert_eq!(da_network_ip, host.ip);
             assert_eq!(da_network_port, host.da_network_port);
         }
     }

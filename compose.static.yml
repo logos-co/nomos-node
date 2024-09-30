@@ -23,7 +23,7 @@ services:
       - "18080:18080/tcp"
     volumes:
       - ./testnet:/etc/nomos
-      - ./tests/kzgrs/kzgrs_test_params:/etc/nomos/kzgrs_test_params:z
+      - ./tests/kzgrs/kzgrs_test_params:/kzgrs_test_params:z
     depends_on:
       - cfgsync
       - graylog
@@ -37,7 +37,7 @@ services:
     image: nomos:latest
     volumes:
       - ./testnet:/etc/nomos
-      - ./tests/kzgrs/kzgrs_test_params:/etc/nomos/kzgrs_test_params:z
+      - ./tests/kzgrs/kzgrs_test_params:/kzgrs_test_params:z
     depends_on:
       - cfgsync
       - graylog
@@ -54,7 +54,7 @@ services:
     image: nomos:latest
     volumes:
       - ./testnet:/etc/nomos
-      - ./tests/kzgrs/kzgrs_test_params:/etc/nomos/kzgrs_test_params:z
+      - ./tests/kzgrs/kzgrs_test_params:/kzgrs_test_params:z
     depends_on:
       - cfgsync
       - graylog
@@ -71,7 +71,7 @@ services:
     image: nomos:latest
     volumes:
       - ./testnet:/etc/nomos
-      - ./tests/kzgrs/kzgrs_test_params:/etc/nomos/kzgrs_test_params:z
+      - ./tests/kzgrs/kzgrs_test_params:/kzgrs_test_params:z
     depends_on:
       - cfgsync
       - graylog

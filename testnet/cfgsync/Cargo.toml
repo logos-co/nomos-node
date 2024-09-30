@@ -8,7 +8,7 @@ axum = { version = "0.6" }
 clap = { version = "4", features = ["derive"] }
 nomos-libp2p = { path = "../../nomos-libp2p" }
 nomos-node = { path = "../../nodes/nomos-node" }
-reqwest = { version = "0.11", features = ["json"] }
+reqwest = { version = "0.11", features = ["json", "rustls-tls"] }
 tests = { path = "../../tests" }
 tokio = { version = "1.24", features = ["rt-multi-thread"] }
 serde = { version = "1", features = ["derive"] }

@@ -423,7 +423,7 @@ fn build_mixnet_topology(mixnode_candidates: &[&Config]) -> MixnetTopology {
     MixnetTopology::new(candidates, num_layers, 1, [1u8; 32]).unwrap()
 }
 
-pub fn secret_key_to_peer_id(node_key: nomos_libp2p::ed25519::SecretKey) -> PeerId {
+fn secret_key_to_peer_id(node_key: nomos_libp2p::ed25519::SecretKey) -> PeerId {
     PeerId::from_public_key(
         &nomos_libp2p::ed25519::Keypair::from(node_key)
             .public()
@@ -477,7 +477,7 @@ fn create_node_config(
             blob_selector_settings: (),
         },
         da_network: DaNetworkConfig {
-            backend: DaNetworkValidatorBackendSettings {
+            backend: DaNetworkBackendSettings {
                 node_key,
                 listening_address: Multiaddr::from_str(&format!(
                     "/ip4/127.0.0.1/udp/{}/quic-v1",

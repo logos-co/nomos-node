@@ -1,6 +1,6 @@
 # BUILD IMAGE ---------------------------------------------------------
 
-FROM rust:1.80.0-slim-bookworm AS builder
+FROM rust:1.81.0-slim-bookworm AS builder
 
 WORKDIR /nomos
 COPY . . 
@@ -18,14 +18,16 @@ RUN cargo build --release --all --features metrics
 
 # NODE IMAGE ----------------------------------------------------------
 
-FROM bitnami/minideb:latest
+FROM bitnami/minideb:bookworm
 
 LABEL maintainer="augustinas@status.im" \
       source="https://github.com/logos-co/nomos-node" \
       description="Nomos testnet image"
 
 # nomos default ports
-EXPOSE 3000 8080 9000 60000	
+EXPOSE 3000 8080 9000 60000
+
+RUN apt-get update && apt-get install -y libssl3
 
 COPY --from=builder /nomos/target/release/nomos-node /usr/bin/nomos-node
 COPY --from=builder /nomos/target/release/nomos-cli /usr/bin/nomos-cli
