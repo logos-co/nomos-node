@@ -49,7 +49,7 @@ pub enum SamplingEvent {
     SamplingError { error: SamplingError },
 }
 
-pub(crate) fn dial_peers<Membership, Behaviour>(
+pub(crate) fn dial_validator_subnetwork_peers<Membership, Behaviour>(
     membership: &Membership,
     addresses: &HashMap<PeerId, Multiaddr>,
     swarm: &mut Swarm<Behaviour>,

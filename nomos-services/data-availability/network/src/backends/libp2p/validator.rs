@@ -1,6 +1,6 @@
 use crate::backends::libp2p::common::{
-    dial_peers, handle_sample_request, handle_validator_events_stream, DaNetworkBackendSettings,
-    SamplingEvent, BROADCAST_CHANNEL_SIZE,
+    dial_validator_subnetwork_peers, handle_sample_request, handle_validator_events_stream,
+    DaNetworkBackendSettings, SamplingEvent, BROADCAST_CHANNEL_SIZE,
 };
 use crate::backends::NetworkBackend;
 use futures::{Stream, StreamExt};
@@ -99,7 +99,7 @@ where
         // Dial peers in the same subnetworks (Node might participate in multiple).
         let local_peer_id = *validator_swarm.local_peer_id();
 
-        dial_peers(
+        dial_validator_subnetwork_peers(
             &config.membership,
             &config.addresses,
             validator_swarm.protocol_swarm_mut(),
