@@ -3,6 +3,9 @@ on:
     - cron:  '0 3 * * *'
   workflow_dispatch:
 
+  push:
+    branches: [ fix-coverage-workflow-disk-space ]
+
 name: Codecov
 
 jobs:
@@ -13,11 +16,8 @@ jobs:
       LLVM_PROFILE_FILE: "nomos-node-%p-%m.profraw"
     runs-on: ubuntu-latest
     steps:
-      - name: Maximize build space
-        uses: AdityaGarg8/remove-unwanted-software@v4.1
-        with:
-          remove-android: 'true'
-          remove-dotnet: 'true'
+      - name: Remove unwanted software
+        uses: ./.github/actions/prune-vm
       - uses: actions/checkout@v3
         with:
           submodules: true
