@@ -16,11 +16,11 @@ jobs:
       LLVM_PROFILE_FILE: "nomos-node-%p-%m.profraw"
     runs-on: ubuntu-latest
     steps:
-      - name: Remove unwanted software
-        uses: ./.github/actions/prune-vm
       - uses: actions/checkout@v3
         with:
           submodules: true
+      - name: Remove unwanted software
+        uses: ./.github/actions/prune-vm
       - uses: arduino/setup-protoc@v3
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
