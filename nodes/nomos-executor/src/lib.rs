@@ -1,9 +1,11 @@
 mod api;
+pub mod config;
 
 // std
 // crates
 use kzgrs_backend::common::blob::DaBlob;
 use nomos_api::ApiService;
+use nomos_da_network_service::backends::libp2p::executor::DaNetworkExecutorBackend;
 use nomos_da_sampling::backend::kzgrs::KzgrsSamplingBackend;
 use nomos_da_sampling::storage::adapters::rocksdb::RocksAdapter as SamplingStorageAdapter;
 use nomos_da_verifier::backend::kzgrs::KzgrsDaVerifier;
@@ -40,11 +42,11 @@ pub struct NomosExecutor {
     da_indexer: ServiceHandle<DaIndexer>,
     da_verifier: ServiceHandle<DaVerifier>,
     da_sampling: ServiceHandle<DaSampling>,
-    da_network: ServiceHandle<DaNetworkService<DaNetworkValidatorBackend<NomosDaMembership>>>,
+    da_network: ServiceHandle<DaNetworkService<DaNetworkExecutorBackend<NomosDaMembership>>>,
     cl_mempool: ServiceHandle<TxMempool>,
     da_mempool: ServiceHandle<DaMempool>,
     cryptarchia: ServiceHandle<Cryptarchia>,
-    http: ServiceHandle<NomosApiService>,
+    http: ServiceHandle<ExecutorApiService>,
     storage: ServiceHandle<StorageService<RocksBackend<Wire>>>,
     #[cfg(feature = "metrics")]
     metrics: ServiceHandle<Metrics>,
