@@ -69,6 +69,10 @@ impl MembershipHandler for FillFromNodeList {
     fn members_of(&self, network_id: &Self::NetworkId) -> HashSet<Self::Id> {
         self.assignations[*network_id as usize].clone()
     }
+
+    fn members(&self) -> HashSet<Self::Id> {
+        self.assignations.iter().flatten().copied().collect()
+    }
 }
 
 #[cfg(test)]

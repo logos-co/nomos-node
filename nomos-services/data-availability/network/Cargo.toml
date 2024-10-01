@@ -12,7 +12,7 @@ nomos-core = { path = "../../../nomos-core" }
 nomos-libp2p = { path = "../../../nomos-libp2p" }
 nomos-da-network-core = { path = "../../../nomos-da/network/core" }
 subnetworks-assignations = { path = "../../../nomos-da/network/subnetworks-assignations" }
-libp2p = { version = "0.54", features = ["ed25519"] }
+libp2p = { version = "0.53", features = ["ed25519"] }
 serde = { version = "1.0", features = ["derive"] }
 tokio = { version = "1", features = ["macros", "sync"] }
 tokio-stream = "0.1"

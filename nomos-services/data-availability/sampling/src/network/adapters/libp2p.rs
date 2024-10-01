@@ -10,8 +10,9 @@ use tokio::sync::oneshot;
 use crate::network::NetworkAdapter;
 use nomos_core::da::BlobId;
 use nomos_da_network_core::SubnetworkId;
-use nomos_da_network_service::backends::libp2p::validator::{
-    DaNetworkEvent, DaNetworkEventKind, DaNetworkMessage, DaNetworkValidatorBackend, SamplingEvent,
+use nomos_da_network_service::backends::libp2p::{
+    common::SamplingEvent,
+    validator::{DaNetworkEvent, DaNetworkEventKind, DaNetworkMessage, DaNetworkValidatorBackend},
 };
 use nomos_da_network_service::{DaNetworkMsg, NetworkService};
 use overwatch_rs::services::relay::OutboundRelay;

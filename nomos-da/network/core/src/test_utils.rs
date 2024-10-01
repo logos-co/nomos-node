@@ -22,4 +22,8 @@ impl MembershipHandler for AllNeighbours {
     fn members_of(&self, _network_id: &Self::NetworkId) -> HashSet<Self::Id> {
         self.neighbours.clone()
     }
+
+    fn members(&self) -> HashSet<Self::Id> {
+        self.neighbours.clone()
+    }
 }
