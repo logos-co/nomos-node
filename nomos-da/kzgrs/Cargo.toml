@@ -22,7 +22,6 @@ num-traits = "0.2.18"
 rand = "0.8.5"
 rayon = { version = "1.10", optional = true }
 
-
 [dev-dependencies]
 divan = "0.1"
 
@@ -39,7 +38,7 @@ name = "fk20"
 harness = false
 
 [features]
-default = ["single"]
+default = ["single", "rayon"]
 single = []
 parallel = [
     "rayon",
