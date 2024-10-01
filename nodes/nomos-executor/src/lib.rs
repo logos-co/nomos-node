@@ -1,6 +1,36 @@
+mod api;
+
+// std
+// crates
+use kzgrs_backend::common::blob::DaBlob;
+use nomos_api::ApiService;
+use nomos_da_sampling::backend::kzgrs::KzgrsSamplingBackend;
+use nomos_da_sampling::storage::adapters::rocksdb::RocksAdapter as SamplingStorageAdapter;
+use nomos_da_verifier::backend::kzgrs::KzgrsDaVerifier;
 use nomos_node::*;
 use overwatch_derive::Services;
 use overwatch_rs::services::handle::ServiceHandle;
+use rand_chacha::ChaCha20Rng;
+// internal
+use api::backend::AxumBackend;
+
+pub type ExecutorApiService = ApiService<
+    AxumBackend<
+        (),
+        DaBlob,
+        BlobInfo,
+        NomosDaMembership,
+        BlobInfo,
+        KzgrsDaVerifier,
+        Tx,
+        Wire,
+        KzgrsSamplingBackend<ChaCha20Rng>,
+        nomos_da_sampling::network::adapters::libp2p::Libp2pAdapter<NomosDaMembership>,
+        ChaCha20Rng,
+        SamplingStorageAdapter<DaBlob, Wire>,
+        MB16,
+    >,
+>;
 
 #[derive(Services)]
 pub struct NomosExecutor {

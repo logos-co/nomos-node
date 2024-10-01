@@ -81,7 +81,7 @@ pub type NomosApiService = ApiService<
 
 pub const CL_TOPIC: &str = "cl";
 pub const DA_TOPIC: &str = "da";
-const MB16: usize = 1024 * 1024 * 16;
+pub const MB16: usize = 1024 * 1024 * 16;
 
 pub type Cryptarchia = cryptarchia_consensus::CryptarchiaConsensus<
     cryptarchia_consensus::network::adapters::libp2p::LibP2pAdapter<Tx, BlobInfo>,

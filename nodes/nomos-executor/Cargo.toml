@@ -4,14 +4,36 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+async-trait = "0.1"
+axum = { version = "0.6" }
+clap = { version = "4.5.13", features = ["derive"] }
 color-eyre = "0.6.0"
+hyper = { version = "0.14", features = ["full"] }
+kzgrs-backend = { path = "../../nomos-da/kzgrs-backend" }
+nomos-api = { path = "../../nomos-services/api" }
+nomos-core = { path = "../../nomos-core" }
+nomos-da-network-core = { path = "../../nomos-da/network/core" }
+nomos-da-sampling = { path = "../../nomos-services/data-availability/sampling", features = ["rocksdb-backend"] }
+nomos-da-verifier = { path = "../../nomos-services/data-availability/verifier", features = ["rocksdb-backend", "libp2p"] }
+nomos-libp2p = { path = "../../nomos-libp2p" }
+nomos-mempool = { path = "../../nomos-services/mempool", features = [
+    "mock",
+    "libp2p",
+] }
 nomos-node = { path = "../nomos-node" }
+nomos-storage = { path = "../../nomos-services/storage", features = ["rocksdb"] }
 overwatch-rs = { git = "https://github.com/logos-co/Overwatch", rev = "2f70806" }
 overwatch-derive = { git = "https://github.com/logos-co/Overwatch", rev = "ac28d01" }
-clap = { version = "4.5.13", features = ["derive"] }
+rand = "0.8"
+rand_chacha = "0.3"
+serde = "1"
+serde_yaml = "0.9"
+subnetworks-assignations = { path = "../../nomos-da/network/subnetworks-assignations" }
+tower-http = { version = "0.4", features = ["cors", "trace"] }
 tracing = "0.1.40"
+utoipa = "4.0"
+utoipa-swagger-ui = { version = "4.0" }
 uuid = { version = "1.10.0", features = ["v4"] }
-serde_yaml = "0.9.34+deprecated"
 
 [features]
 default = ["tracing"]
