@@ -4,7 +4,7 @@ mod tx;
 
 // std
 // crates
-use api::AxumBackend;
+use api::backend::AxumBackend;
 use bytes::Bytes;
 use color_eyre::eyre::Result;
 pub use config::{Config, CryptarchiaArgs, HttpArgs, LogArgs, MetricsArgs, NetworkArgs};
