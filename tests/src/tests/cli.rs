@@ -18,9 +18,11 @@ use tests::GLOBAL_PARAMS_PATH;
 const CLI_BIN: &str = "../target/debug/nomos-cli";
 const APP_ID: &str = "fd3384e132ad02a56c78f45547ee40038dc79002b90d29ed90e08eee762ae715";
 
+use kzgrs_backend::common::blob::DaBlob;
 use nomos_core::da::DaEncoder;
+use nomos_node::Wire;
+use nomos_storage::backends::StorageSerde;
 use std::process::Command;
-use nomos_core::wire;
 
 fn run_disseminate(disseminate: &Disseminate) {
     let mut binding = Command::new(CLI_BIN);
@@ -176,15 +178,31 @@ async fn disseminate_and_retrieve() {
     let da_encoder = kzgrs_backend::encoder::DaEncoder::new(params);
     let encoded_data = da_encoder.encode(&bytes).unwrap();
 
+    let blob = DaBlob {
+        column: encoded_data.extended_data.columns().next().unwrap(),
+        column_idx: 0,
+        column_commitment: encoded_data.column_commitments[0],
+        aggregated_column_commitment: encoded_data.aggregated_column_commitment,
+        aggregated_column_proof: encoded_data.aggregated_column_proofs[0],
+        rows_commitments: encoded_data.row_commitments.clone(),
+        rows_proofs: encoded_data
+            .rows_proofs
+            .iter()
+            .map(|proofs| proofs.get(0).cloned().unwrap())
+            .collect(),
+    };
+
+    let s_b = Wire::serialize(blob);
+
     // Index zero shouldn't be empty, node 2 replicated both blobs to node 1 because they both
     // are in the same subnetwork.
     for b in node1_idx_0_blobs.iter() {
         assert!(!b.is_empty());
-        assert_eq!(**b, encoded_data.data);
+        assert_eq!(**b, s_b);
     }
 
     for b in node2_idx_0_blobs.iter() {
         assert!(!b.is_empty());
-        assert_eq!(**b, encoded_data.data);
+        assert_eq!(**b, s_b);
     }
 }
