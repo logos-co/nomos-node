@@ -64,7 +64,7 @@ pub struct DaNetworkExecutorBackendSettings<Membership> {
 }
 
 /// DA network backend for validators
-/// Internally uses a libp2p swarm composed of the [`ValidatorBehaviour`]
+/// Internally uses a libp2p swarm composed of the [`ExecutorBehaviour`]
 /// It forwards network messages to the corresponding subscription channels/streams
 pub struct DaNetworkExecutorBackend<Membership>
 where
