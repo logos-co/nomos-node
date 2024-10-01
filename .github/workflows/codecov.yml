@@ -11,7 +11,7 @@ jobs:
       CARGO_INCREMENTAL: 0
       RUSTFLAGS: "-C instrument-coverage"
       LLVM_PROFILE_FILE: "nomos-node-%p-%m.profraw"
-    runs-on: ubuntu-latest
+    runs-on: ['self-hosted','ubuntu-22.04']
     steps:
       - uses: actions/checkout@v3
         with:
