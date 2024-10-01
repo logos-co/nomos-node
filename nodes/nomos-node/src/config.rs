@@ -15,12 +15,13 @@ use nomos_libp2p::{ed25519::SecretKey, Multiaddr};
 use nomos_log::{Logger, LoggerBackend, LoggerFormat};
 use nomos_network::backends::libp2p::Libp2p as NetworkBackend;
 use nomos_network::NetworkService;
+use nomos_storage::backends::rocksdb::RocksBackend;
 use overwatch_rs::services::ServiceData;
 use serde::{Deserialize, Serialize};
 use subnetworks_assignations::versions::v1::FillFromNodeList;
 use tracing::Level;
 // internal
-use crate::NomosApiService;
+use crate::{NomosApiService, Wire};
 
 #[derive(ValueEnum, Clone, Debug, Default)]
 pub enum LoggerBackendType {
@@ -120,6 +121,8 @@ pub struct Config {
     pub da_sampling: <crate::DaSampling as ServiceData>::Settings,
     pub http: <NomosApiService as ServiceData>::Settings,
     pub cryptarchia: <crate::Cryptarchia as ServiceData>::Settings,
+    pub storage: <crate::StorageService<RocksBackend<Wire>> as ServiceData>::Settings,
+    pub wait_online_secs: u64,
 }
 
 impl Config {

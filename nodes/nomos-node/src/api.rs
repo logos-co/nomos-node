@@ -520,7 +520,7 @@ where
     post,
     path = "/da/get_range",
     responses(
-        (status = 200, description = "Range of blobs", body = Vec<([u8;8], Option<DaBlob>)>),
+        (status = 200, description = "Range of blobs", body = Vec<([u8;8], Vec<DaBlob>)>),
         (status = 500, description = "Internal server error", body = String),
     )
 )]

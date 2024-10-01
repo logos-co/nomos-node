@@ -12,7 +12,7 @@ use ark_poly_commit::sonic_pc::UniversalParams;
 use std::mem;
 
 pub use common::{bytes_to_evaluations, bytes_to_polynomial, KzgRsError};
-pub use global_parameters::global_parameters_from_randomness;
+pub use global_parameters::{global_parameters_from_file, global_parameters_from_randomness};
 pub use kzg::{commit_polynomial, generate_element_proof, verify_element_proof};
 pub use rs::{decode, encode};
 

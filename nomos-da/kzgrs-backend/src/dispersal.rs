@@ -95,6 +95,7 @@ mod tests {
             test::{rand_data, ENCODER},
             EncodedData,
         },
+        global::GLOBAL_PARAMETERS,
         verifier::DaVerifier,
     };
 
@@ -141,7 +142,9 @@ mod tests {
             .clone()
             .into_iter()
             .enumerate()
-            .map(|(index, sk)| DaVerifier { sk, index })
+            .map(|(index, sk)| {
+                DaVerifier::new(sk, [index as u32].into(), GLOBAL_PARAMETERS.clone())
+            })
             .collect();
 
         let encoded_data = encoder.encode(&data).unwrap();

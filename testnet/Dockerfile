@@ -1,13 +1,18 @@
 # BUILD IMAGE ---------------------------------------------------------
 
-FROM rust:1.80.0-slim-bullseye AS builder
+FROM rust:1.80.0-slim-bookworm AS builder
 
 WORKDIR /nomos
 COPY . . 
 
 # Install dependencies needed for building RocksDB and etcd.
 RUN apt-get update && apt-get install -yq \
-    git clang etcd-client libssl-dev pkg-config protobuf-compiler
+    git gcc g++ clang etcd-client libssl-dev \
+    pkg-config protobuf-compiler
+
+RUN cargo install cargo-binstall
+RUN cargo binstall -y cargo-risczero
+RUN cargo risczero install
 
 RUN cargo build --release --all --features metrics
 

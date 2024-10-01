@@ -1,0 +1,18 @@
+[package]
+name = "nomos-mix-network"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+cached = "0.53.1"
+futures = "0.3.30"
+futures-timer = "3.0.3"
+libp2p = "0.53"
+tracing = "0.1"
+nomos-mix-message = { path = "../message" }
+nomos-mix-queue = { path = "../queue" }
+
+[dev-dependencies]
+tokio = { version = "1.39", features = ["macros", "rt-multi-thread", "time"] }
+libp2p = { version = "0.53", features = ["ed25519", "tokio", "quic"] }
+tracing-subscriber = "0.3.18"

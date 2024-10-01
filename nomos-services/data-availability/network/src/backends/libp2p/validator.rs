@@ -16,6 +16,7 @@ use nomos_libp2p::secret_key_serde;
 use overwatch_rs::overwatch::handle::OverwatchHandle;
 use overwatch_rs::services::state::NoState;
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 use std::fmt::Debug;
 use std::marker::PhantomData;
 use std::pin::Pin;
@@ -131,8 +132,8 @@ where
             libp2p::identity::Keypair::from(ed25519::Keypair::from(config.node_key.clone()));
         let (mut validator_swarm, events_streams) = ValidatorSwarm::new(
             keypair,
-            config.membership,
-            config.addresses.into_iter().collect(),
+            config.membership.clone(),
+            config.addresses.clone().into_iter().collect(),
         );
         let sampling_request_channel = validator_swarm
             .protocol_swarm()
@@ -147,6 +148,33 @@ where
             .unwrap_or_else(|e| {
                 panic!("Error listening on DA network with address {address}: {e}")
             });
+
+        // Dial peers in the same subnetworks (Node might participate in multiple).
+        let local_peer_id = *validator_swarm.local_peer_id();
+        let mut connected_peers = HashSet::new();
+
+        config
+            .membership
+            .membership(&local_peer_id)
+            .iter()
+            .flat_map(|subnet| config.membership.members_of(subnet))
+            .filter(|peer| peer != &local_peer_id)
+            .filter_map(|peer| {
+                config
+                    .addresses
+                    .iter()
+                    .find(|(p, _)| p == &peer)
+                    .map(|(_, addr)| (peer, addr.clone()))
+            })
+            .for_each(|(peer, addr)| {
+                // Only dial if we haven't already connected to this peer.
+                if connected_peers.insert(peer) {
+                    validator_swarm
+                        .dial(addr)
+                        .expect("Node should be able to dial peer in a subnet");
+                }
+            });
+
         let task = overwatch_handle.runtime().spawn(validator_swarm.run());
         let (sampling_broadcast_sender, sampling_broadcast_receiver) =
             broadcast::channel(BROADCAST_CHANNEL_SIZE);

@@ -206,6 +206,10 @@ where
         }
     }
 
+    pub fn update_membership(&mut self, membership: Membership) {
+        self.membership = membership;
+    }
+
     /// Open a new stream from the underlying control to the provided peer
     async fn open_stream(
         peer_id: PeerId,
