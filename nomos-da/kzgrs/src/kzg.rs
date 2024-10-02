@@ -24,7 +24,7 @@ pub fn commit_polynomial(
         .map(|(commitment, _)| commitment)
 }
 
-/// Compute a quotient polynomial 'q' that satisfies `q(x) = (f(x)-v)/(x-u)`
+/// Compute a witness polynomial in that satisfies `witness(x) = (f(x)-v)/(x-u)`
 pub fn generate_element_proof(
     element_index: usize,
     polynomial: &DensePolynomial<Fr>,
@@ -33,11 +33,13 @@ pub fn generate_element_proof(
     domain: GeneralEvaluationDomain<Fr>,
 ) -> Result<Proof<Bls12_381>, KzgRsError> {
     let u = domain.element(element_index);
+    // Instead of evaluating over the polynomial, we can reuse the evaluation points from the rs encoding
+    // let v = polynomial.evaluate(&u);
     let v = evaluations.evals[element_index];
     let f_x_v = polynomial + &DensePolynomial::<Fr>::from_coefficients_vec(vec![-v]);
     let x_u = DensePolynomial::<Fr>::from_coefficients_vec(vec![-u, Fr::one()]);
-    let quotient_polynomial: DensePolynomial<_> = &f_x_v / &x_u;
-    let proof = commit_polynomial(&quotient_polynomial, global_parameters)?;
+    let witness_polynomial: DensePolynomial<_> = &f_x_v / &x_u;
+    let proof = commit_polynomial(&witness_polynomial, global_parameters)?;
     let proof = Proof {
         w: proof.0,
         random_v: None,
@@ -64,7 +66,6 @@ pub fn verify_element_proof(
 }
 
 #[cfg(test)]
-#[cfg(feature = "rayon")]
 mod test {
     use crate::common::{bytes_to_evaluations, bytes_to_polynomial};
     use crate::kzg::{commit_polynomial, generate_element_proof, verify_element_proof};
@@ -74,6 +75,9 @@ mod test {
     use ark_poly_commit::kzg10::{UniversalParams, KZG10};
     use once_cell::sync::Lazy;
     use rand::{thread_rng, Fill};
+
+    // Import rayon only if parallel feature is enabled
+    #[cfg(feature = "parallel")]
     use rayon::prelude::*;
 
     const COEFFICIENTS_SIZE: usize = 16;
@@ -89,11 +93,13 @@ mod test {
 
     static DOMAIN: Lazy<GeneralEvaluationDomain<Fr>> =
         Lazy::new(|| GeneralEvaluationDomain::new(COEFFICIENTS_SIZE).unwrap());
-
     #[test]
     fn test_poly_commit() {
         let poly = DensePolynomial::from_coefficients_vec((0..10).map(|i| Fr::from(i)).collect());
-        assert!(matches!(commit_polynomial(&poly, &GLOBAL_PARAMETERS), Ok(_)));
+        assert!(matches!(
+            commit_polynomial(&poly, &GLOBAL_PARAMETERS),
+            Ok(_)
+        ));
     }
 
     #[test]
@@ -107,23 +113,18 @@ mod test {
         let proofs: Vec<_> = (0..10)
             .map(|i| generate_element_proof(i, &poly, &eval, &GLOBAL_PARAMETERS, *DOMAIN).unwrap())
             .collect();
-
-        evaluations
-        .par_iter()
-        .zip(proofs.par_iter())
-        .enumerate() 
-        .for_each(|(i, (element, proof))| {
-            for ii in 0..10{
-                if ii == i { // verifying works 
-                    assert!(verify_element_proof(
-                        ii,
-                        element,
-                        &commitment,
-                        proof,
-                        *DOMAIN,
-                        &GLOBAL_PARAMETERS
-                    ));
-                } else {// Verification should fail for other indices
+        for (i, (element, proof)) in evaluations.iter().zip(proofs.iter()).enumerate() {
+            // verifying works
+            assert!(verify_element_proof(
+                i,
+                element,
+                &commitment,
+                proof,
+                *DOMAIN,
+                &GLOBAL_PARAMETERS
+            ));
+            // verification fails for other items
+            for ii in i + 1..10 {
                 assert!(!verify_element_proof(
                     ii,
                     element,
@@ -133,8 +134,49 @@ mod test {
                     &GLOBAL_PARAMETERS
                 ));
             }
-            }
-        });
+        }
     }
-    
+
+    #[test]
+    #[cfg(feature = "parallel")]
+    fn parallelized_generate_proof_and_validate() {
+        let mut bytes: [u8; 310] = [0; 310];
+        let mut rng = thread_rng();
+        bytes.try_fill(&mut rng).unwrap();
+        let (eval, poly) = bytes_to_polynomial::<31>(&bytes, *DOMAIN).unwrap();
+        let commitment = commit_polynomial(&poly, &GLOBAL_PARAMETERS).unwrap();
+        let proofs: Vec<_> = (0..10)
+            .map(|i| generate_element_proof(i, &poly, &eval, &GLOBAL_PARAMETERS, *DOMAIN).unwrap())
+            .collect();
+
+        eval.evals
+            .par_iter()
+            .zip(proofs.par_iter())
+            .enumerate()
+            .for_each(|(i, (element, proof))| {
+                for ii in 0..10 {
+                    if ii == i {
+                        // verifying works
+                        assert!(verify_element_proof(
+                            ii,
+                            element,
+                            &commitment,
+                            proof,
+                            *DOMAIN,
+                            &GLOBAL_PARAMETERS
+                        ));
+                    } else {
+                        // Verification should fail for other indices
+                        assert!(!verify_element_proof(
+                            ii,
+                            element,
+                            &commitment,
+                            proof,
+                            *DOMAIN,
+                            &GLOBAL_PARAMETERS
+                        ));
+                    }
+                }
+            });
+    }
 }
