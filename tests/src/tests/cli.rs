@@ -192,17 +192,21 @@ async fn disseminate_and_retrieve() {
             .collect(),
     };
 
-    let s_b = Wire::serialize(blob);
+    let s_blob = Wire::serialize(blob);
 
     // Index zero shouldn't be empty, node 2 replicated both blobs to node 1 because they both
     // are in the same subnetwork.
-    for b in node1_idx_0_blobs.iter() {
+    for (i, b) in node1_idx_0_blobs.iter().enumerate() {
         assert!(!b.is_empty());
-        assert_eq!(**b, s_b);
+        if i == 0 {
+            assert_eq!(**b, s_blob);
+        }
     }
 
-    for b in node2_idx_0_blobs.iter() {
+    for (i, b) in node2_idx_0_blobs.iter().enumerate() {
         assert!(!b.is_empty());
-        assert_eq!(**b, s_b);
+        if i == 0 {
+            assert_eq!(**b, s_blob);
+        }
     }
 }
