@@ -125,7 +125,7 @@ impl Clone for DispersalError {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum DispersalExecutorEvent {
     /// A blob successfully arrived its destination
     DispersalSuccess {

@@ -1,4 +1,5 @@
 // std
+use nomos_da_network_service::backends::libp2p::common::DaNetworkBackendSettings;
 use std::path::PathBuf;
 use std::time::Duration;
 // crates
@@ -23,9 +24,7 @@ use nomos_da_indexer::storage::adapters::rocksdb::RocksAdapter as IndexerStorage
 use nomos_da_indexer::storage::adapters::rocksdb::RocksAdapterSettings as IndexerStorageSettings;
 use nomos_da_indexer::DataIndexerService;
 use nomos_da_indexer::IndexerSettings;
-use nomos_da_network_service::backends::libp2p::validator::{
-    DaNetworkValidatorBackend, DaNetworkValidatorBackendSettings,
-};
+use nomos_da_network_service::backends::libp2p::validator::DaNetworkValidatorBackend;
 use nomos_da_network_service::NetworkConfig as DaNetworkConfig;
 use nomos_da_network_service::NetworkService as DaNetworkService;
 use nomos_da_sampling::backend::kzgrs::KzgrsSamplingBackendSettings;
@@ -191,7 +190,7 @@ pub fn new_node(
                 },
             },
             da_network: DaNetworkConfig {
-                backend: DaNetworkValidatorBackendSettings {
+                backend: DaNetworkBackendSettings {
                     node_key: da_network_settings.node_key,
                     membership: FillFromNodeList::new(
                         &da_network_settings
@@ -202,7 +201,7 @@ pub fn new_node(
                         da_network_settings.num_subnets.into(),
                         da_network_settings.nodes_per_subnet.into(),
                     ),
-                    addresses: da_network_settings.peer_addresses,
+                    addresses: da_network_settings.peer_addresses.into_iter().collect(),
                     listening_address: da_network_settings.listening_address,
                 },
             },

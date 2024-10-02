@@ -3,7 +3,7 @@ pub mod adapters;
 use futures::Stream;
 use nomos_core::da::BlobId;
 use nomos_da_network_core::SubnetworkId;
-use nomos_da_network_service::backends::libp2p::validator::SamplingEvent;
+use nomos_da_network_service::backends::libp2p::common::SamplingEvent;
 use nomos_da_network_service::backends::NetworkBackend;
 use nomos_da_network_service::NetworkService;
 use overwatch_rs::services::relay::OutboundRelay;
