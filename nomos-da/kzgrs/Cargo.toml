@@ -25,6 +25,7 @@ rayon = { version = "1.10", optional = true }
 
 [dev-dependencies]
 divan = "0.1"
+rayon = "1.10"
 
 [[bench]]
 name = "kzg"
