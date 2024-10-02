@@ -75,9 +75,6 @@ mod test {
     use ark_poly_commit::kzg10::{UniversalParams, KZG10};
     use once_cell::sync::Lazy;
     use rand::{thread_rng, Fill};
-
-    // Import rayon only if parallel feature is enabled
-    #[cfg(feature = "parallel")]
     use rayon::prelude::*;
 
     const COEFFICIENTS_SIZE: usize = 16;
@@ -138,7 +135,6 @@ mod test {
     }
 
     #[test]
-    #[cfg(feature = "parallel")]
     fn parallelized_generate_proof_and_validate() {
         let mut bytes: [u8; 310] = [0; 310];
         let mut rng = thread_rng();
@@ -154,7 +150,7 @@ mod test {
             .zip(proofs.par_iter())
             .enumerate()
             .for_each(|(i, (element, proof))| {
-                for ii in 0..10 {
+                for ii in i..10 {
                     if ii == i {
                         // verifying works
                         assert!(verify_element_proof(
