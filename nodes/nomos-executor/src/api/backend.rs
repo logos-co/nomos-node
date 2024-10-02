@@ -41,14 +41,14 @@ pub struct AxumBackendSettings {
 }
 
 pub struct AxumBackend<
-    A,
-    B,
-    C,
-    M,
-    V,
-    VB,
-    T,
-    S,
+    DaAttestation,
+    DaBlob,
+    DaBlobInfo,
+    Memebership,
+    DaVerifiedBlobInfo,
+    DaVerifierBackend,
+    Tx,
+    DaStorageSerializer,
     SamplingBackend,
     SamplingNetworkAdapter,
     SamplingRng,
@@ -56,14 +56,14 @@ pub struct AxumBackend<
     const SIZE: usize,
 > {
     settings: AxumBackendSettings,
-    _attestation: core::marker::PhantomData<A>,
-    _blob: core::marker::PhantomData<B>,
-    _certificate: core::marker::PhantomData<C>,
-    _membership: core::marker::PhantomData<M>,
-    _vid: core::marker::PhantomData<V>,
-    _verifier_backend: core::marker::PhantomData<VB>,
-    _tx: core::marker::PhantomData<T>,
-    _storage_serde: core::marker::PhantomData<S>,
+    _attestation: core::marker::PhantomData<DaAttestation>,
+    _blob: core::marker::PhantomData<DaBlob>,
+    _certificate: core::marker::PhantomData<DaBlobInfo>,
+    _membership: core::marker::PhantomData<Memebership>,
+    _vid: core::marker::PhantomData<DaVerifiedBlobInfo>,
+    _verifier_backend: core::marker::PhantomData<DaVerifierBackend>,
+    _tx: core::marker::PhantomData<Tx>,
+    _storage_serde: core::marker::PhantomData<DaStorageSerializer>,
     _sampling_backend: core::marker::PhantomData<SamplingBackend>,
     _sampling_network_adapter: core::marker::PhantomData<SamplingNetworkAdapter>,
     _sampling_rng: core::marker::PhantomData<SamplingRng>,
@@ -85,14 +85,14 @@ struct ApiDoc;
 
 #[async_trait::async_trait]
 impl<
-        A,
-        B,
-        C,
-        M,
-        V,
-        VB,
-        T,
-        S,
+        DaAttestation,
+        DaBlob,
+        DaBlobInfo,
+        Membership,
+        DaVerifiedBlobInfo,
+        DaVerifierBackend,
+        Tx,
+        DaStorageSerializer,
         SamplingBackend,
         SamplingNetworkAdapter,
         SamplingRng,
@@ -100,14 +100,14 @@ impl<
         const SIZE: usize,
     > Backend
     for AxumBackend<
-        A,
-        B,
-        C,
-        M,
-        V,
-        VB,
-        T,
-        S,
+        DaAttestation,
+        DaBlob,
+        DaBlobInfo,
+        Membership,
+        DaVerifiedBlobInfo,
+        DaVerifierBackend,
+        Tx,
+        DaStorageSerializer,
         SamplingBackend,
         SamplingNetworkAdapter,
         SamplingRng,
@@ -115,11 +115,11 @@ impl<
         SIZE,
     >
 where
-    A: Serialize + DeserializeOwned + Clone + Send + Sync + 'static,
-    B: Blob + Serialize + DeserializeOwned + Clone + Send + Sync + 'static,
-    <B as Blob>::BlobId: AsRef<[u8]> + Send + Sync + 'static,
-    <B as Blob>::ColumnIndex: AsRef<[u8]> + Send + Sync + 'static,
-    C: DispersedBlobInfo<BlobId = [u8; 32]>
+    DaAttestation: Serialize + DeserializeOwned + Clone + Send + Sync + 'static,
+    DaBlob: Blob + Serialize + DeserializeOwned + Clone + Send + Sync + 'static,
+    <DaBlob as Blob>::BlobId: AsRef<[u8]> + Send + Sync + 'static,
+    <DaBlob as Blob>::ColumnIndex: AsRef<[u8]> + Send + Sync + 'static,
+    DaBlobInfo: DispersedBlobInfo<BlobId = [u8; 32]>
         + Clone
         + Debug
         + Serialize
@@ -127,15 +127,15 @@ where
         + Send
         + Sync
         + 'static,
-    <C as DispersedBlobInfo>::BlobId: Clone + Send + Sync,
-    M: MembershipHandler<NetworkId = SubnetworkId, Id = PeerId>
+    <DaBlobInfo as DispersedBlobInfo>::BlobId: Clone + Send + Sync,
+    Membership: MembershipHandler<NetworkId = SubnetworkId, Id = PeerId>
         + Clone
         + Debug
         + Send
         + Sync
         + 'static,
-    V: DispersedBlobInfo<BlobId = [u8; 32]>
-        + From<C>
+    DaVerifiedBlobInfo: DispersedBlobInfo<BlobId = [u8; 32]>
+        + From<DaBlobInfo>
         + Eq
         + Debug
         + Metadata
@@ -146,14 +146,15 @@ where
         + Send
         + Sync
         + 'static,
-    <V as DispersedBlobInfo>::BlobId: Debug + Clone + Ord + Hash,
-    <V as Metadata>::AppId: AsRef<[u8]> + Clone + Serialize + DeserializeOwned + Send + Sync,
-    <V as Metadata>::Index:
+    <DaVerifiedBlobInfo as DispersedBlobInfo>::BlobId: Debug + Clone + Ord + Hash,
+    <DaVerifiedBlobInfo as Metadata>::AppId:
+        AsRef<[u8]> + Clone + Serialize + DeserializeOwned + Send + Sync,
+    <DaVerifiedBlobInfo as Metadata>::Index:
         AsRef<[u8]> + Clone + Serialize + DeserializeOwned + PartialOrd + Send + Sync,
-    VB: VerifierBackend + CoreDaVerifier<DaBlob = B> + Send + Sync + 'static,
-    <VB as VerifierBackend>::Settings: Clone,
-    <VB as CoreDaVerifier>::Error: Error,
-    T: Transaction
+    DaVerifierBackend: VerifierBackend + CoreDaVerifier<DaBlob = DaBlob> + Send + Sync + 'static,
+    <DaVerifierBackend as VerifierBackend>::Settings: Clone,
+    <DaVerifierBackend as CoreDaVerifier>::Error: Error,
+    Tx: Transaction
         + Clone
         + Debug
         + Eq
@@ -163,12 +164,14 @@ where
         + Send
         + Sync
         + 'static,
-    <T as nomos_core::tx::Transaction>::Hash:
+    <Tx as nomos_core::tx::Transaction>::Hash:
         Serialize + for<'de> Deserialize<'de> + std::cmp::Ord + Debug + Send + Sync + 'static,
-    S: StorageSerde + Send + Sync + 'static,
+    DaStorageSerializer: StorageSerde + Send + Sync + 'static,
     SamplingRng: SeedableRng + RngCore + Send + 'static,
-    SamplingBackend: DaSamplingServiceBackend<SamplingRng, BlobId = <V as DispersedBlobInfo>::BlobId>
-        + Send
+    SamplingBackend: DaSamplingServiceBackend<
+            SamplingRng,
+            BlobId = <DaVerifiedBlobInfo as DispersedBlobInfo>::BlobId,
+        > + Send
         + 'static,
     SamplingBackend::Settings: Clone,
     SamplingBackend::Blob: Debug + 'static,
@@ -223,14 +226,14 @@ where
             )
             .layer(TraceLayer::new_for_http())
             .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
-            .route("/cl/metrics", routing::get(cl_metrics::<T>))
-            .route("/cl/status", routing::post(cl_status::<T>))
+            .route("/cl/metrics", routing::get(cl_metrics::<Tx>))
+            .route("/cl/status", routing::post(cl_status::<Tx>))
             .route(
                 "/cryptarchia/info",
                 routing::get(
                     cryptarchia_info::<
-                        T,
-                        S,
+                        Tx,
+                        DaStorageSerializer,
                         SamplingBackend,
                         SamplingNetworkAdapter,
                         SamplingRng,
@@ -243,8 +246,8 @@ where
                 "/cryptarchia/headers",
                 routing::get(
                     cryptarchia_headers::<
-                        T,
-                        S,
+                        Tx,
+                        DaStorageSerializer,
                         SamplingBackend,
                         SamplingNetworkAdapter,
                         SamplingRng,
@@ -253,15 +256,26 @@ where
                     >,
                 ),
             )
-            .route("/da/add_blob", routing::post(add_blob::<A, B, M, VB, S>))
+            .route(
+                "/da/add_blob",
+                routing::post(
+                    add_blob::<
+                        DaAttestation,
+                        DaBlob,
+                        Membership,
+                        DaVerifierBackend,
+                        DaStorageSerializer,
+                    >,
+                ),
+            )
             .route(
                 "/da/get_range",
                 routing::post(
                     get_range::<
-                        T,
-                        C,
-                        V,
-                        S,
+                        Tx,
+                        DaBlobInfo,
+                        DaVerifiedBlobInfo,
+                        DaStorageSerializer,
                         SamplingBackend,
                         SamplingNetworkAdapter,
                         SamplingRng,
@@ -271,13 +285,16 @@ where
                 ),
             )
             .route("/network/info", routing::get(libp2p_info))
-            .route("/storage/block", routing::post(block::<S, T>))
-            .route("/mempool/add/tx", routing::post(add_tx::<T>))
+            .route(
+                "/storage/block",
+                routing::post(block::<DaStorageSerializer, Tx>),
+            )
+            .route("/mempool/add/tx", routing::post(add_tx::<Tx>))
             .route(
                 "/mempool/add/blobinfo",
                 routing::post(
                     add_blob_info::<
-                        V,
+                        DaVerifiedBlobInfo,
                         SamplingBackend,
                         SamplingNetworkAdapter,
                         SamplingRng,
