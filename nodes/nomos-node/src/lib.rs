@@ -1,10 +1,10 @@
 pub mod api;
-mod config;
+pub mod config;
 mod tx;
 
 // std
 // crates
-use api::AxumBackend;
+use api::backend::AxumBackend;
 use bytes::Bytes;
 use color_eyre::eyre::Result;
 pub use config::{Config, CryptarchiaArgs, HttpArgs, LogArgs, MetricsArgs, NetworkArgs};
@@ -81,7 +81,7 @@ pub type NomosApiService = ApiService<
 
 pub const CL_TOPIC: &str = "cl";
 pub const DA_TOPIC: &str = "da";
-const MB16: usize = 1024 * 1024 * 16;
+pub const MB16: usize = 1024 * 1024 * 16;
 
 pub type Cryptarchia = cryptarchia_consensus::CryptarchiaConsensus<
     cryptarchia_consensus::network::adapters::libp2p::LibP2pAdapter<Tx, BlobInfo>,
