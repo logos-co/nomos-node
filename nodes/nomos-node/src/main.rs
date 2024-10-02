@@ -47,10 +47,7 @@ fn main() -> Result<()> {
         metrics_args,
     } = Args::parse();
     let config = serde_yaml::from_reader::<_, Config>(std::fs::File::open(config)?)?
-        .update_log(log_args)?
-        .update_http(http_args)?
-        .update_network(network_args)?
-        .update_cryptarchia_consensus(cryptarchia_args)?;
+        .update_from_args(log_args, network_args, http_args, cryptarchia_args)?;
 
     let registry = cfg!(feature = "metrics")
         .then(|| {
