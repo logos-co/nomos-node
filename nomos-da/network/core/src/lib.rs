@@ -7,3 +7,4 @@ pub mod swarm;
 pub mod test_utils;
 
 pub type SubnetworkId = u32;
+pub use libp2p::PeerId;

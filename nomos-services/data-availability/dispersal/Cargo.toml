@@ -5,7 +5,10 @@ edition = "2021"
 
 [dependencies]
 async-trait = "0.1"
+futures = "0.3"
 nomos-core = { path = "../../../nomos-core" }
+nomos-da-network-core = { path = "../../../nomos-da/network/core" }
+subnetworks-assignations = { path = "../../../nomos-da/network/subnetworks-assignations" }
 nomos-da-network-service = { path = "../../../nomos-services/data-availability/network" }
 kzgrs-backend = { path = "../../../nomos-da/kzgrs-backend" }
 overwatch-rs = { git = "https://github.com/logos-co/Overwatch", rev = "2f70806" }
