@@ -35,6 +35,7 @@ members = [
     "ledger/cryptarchia-ledger",
     "cl/cl",
     "proof_of_leadership/proof_statements",
+    "testnet/cfgsync",
     "tests",
 ]
 exclude = ["proof_of_leadership/risc0/risc0_proofs"]

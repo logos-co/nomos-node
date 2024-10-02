@@ -46,7 +46,7 @@ use tempfile::NamedTempFile;
 use time::OffsetDateTime;
 // internal
 use super::{create_tempdir, persist_tempdir, LOGS_PREFIX};
-use crate::{adjust_timeout, get_available_port, ConsensusConfig, DaConfig, Node, TestConfig};
+use crate::{adjust_timeout, get_available_port, ConsensusConfig, DaConfig, Node};
 
 static CLIENT: Lazy<Client> = Lazy::new(Client::new);
 const CRYPTARCHIA_INFO_API: &str = "cryptarchia/info";
@@ -86,7 +86,6 @@ impl NomosNode {
         let dir = create_tempdir().unwrap();
         let mut file = NamedTempFile::new().unwrap();
         let config_path = file.path().to_owned();
-        let wait_online_secs = config.wait_online_secs;
 
         // setup logging so that we can intercept it later in testing
         config.log.backend = LoggerBackend::File {
@@ -119,10 +118,9 @@ impl NomosNode {
             _tempdir: dir,
             config,
         };
-        tokio::time::timeout(
-            adjust_timeout(Duration::from_secs(wait_online_secs)),
-            async { node.wait_online().await },
-        )
+        tokio::time::timeout(adjust_timeout(Duration::from_secs(10)), async {
+            node.wait_online().await
+        })
         .await
         .unwrap();
 
@@ -266,11 +264,7 @@ impl Node for NomosNode {
     /// so the leader can receive votes from all other nodes that will be subsequently spawned.
     /// If not, the leader will miss votes from nodes spawned before itself.
     /// This issue will be resolved by devising the block catch-up mechanism in the future.
-    fn create_node_configs(
-        consensus: ConsensusConfig,
-        da: DaConfig,
-        test: TestConfig,
-    ) -> Vec<Config> {
+    fn create_node_configs(consensus: ConsensusConfig, da: DaConfig) -> Vec<Config> {
         // we use the same random bytes for:
         // * da id
         // * coin sk
@@ -329,7 +323,6 @@ impl Node for NomosNode {
                     vec![coin],
                     time_config.clone(),
                     da.clone(),
-                    test.wait_online_secs,
                     #[cfg(feature = "mixnet")]
                     MixnetConfig {
                         mixclient: mixclient_config.clone(),
@@ -341,8 +334,7 @@ impl Node for NomosNode {
 
         // Build DA memberships and address lists.
         let peer_addresses = build_da_peer_list(&configs);
-        let mut peer_ids = peer_addresses.iter().map(|(p, _)| *p).collect::<Vec<_>>();
-        peer_ids.extend(da.executor_peer_ids);
+        let peer_ids = peer_addresses.iter().map(|(p, _)| *p).collect::<Vec<_>>();
 
         for config in &mut configs {
             let membership =
@@ -459,10 +451,10 @@ fn create_node_config(
     notes: Vec<InputWitness>,
     time: TimeConfig,
     da_config: DaConfig,
-    wait_online_secs: u64,
     #[cfg(feature = "mixnet")] mixnet_config: MixnetConfig,
 ) -> Config {
     let swarm_config: SwarmConfig = Default::default();
+    let node_key = swarm_config.node_key.clone();
 
     let verifier_sk = SecretKey::key_gen(&id, &[]).unwrap();
     let verifier_sk_bytes = verifier_sk.to_bytes();
@@ -470,7 +462,7 @@ fn create_node_config(
     let mut config = Config {
         network: NetworkConfig {
             backend: Libp2pConfig {
-                inner: swarm_config.clone(),
+                inner: swarm_config,
                 initial_peers: vec![],
                 #[cfg(feature = "mixnet")]
                 mixnet: mixnet_config,
@@ -486,7 +478,7 @@ fn create_node_config(
         },
         da_network: DaNetworkConfig {
             backend: DaNetworkBackendSettings {
-                node_key: swarm_config.node_key,
+                node_key,
                 listening_address: Multiaddr::from_str(&format!(
                     "/ip4/127.0.0.1/udp/{}/quic-v1",
                     get_available_port(),
@@ -538,7 +530,6 @@ fn create_node_config(
             read_only: false,
             column_family: Some("blocks".into()),
         },
-        wait_online_secs,
     };
 
     config.network.backend.inner.port = get_available_port();

@@ -122,7 +122,6 @@ pub struct Config {
     pub http: <NomosApiService as ServiceData>::Settings,
     pub cryptarchia: <crate::Cryptarchia as ServiceData>::Settings,
     pub storage: <crate::StorageService<RocksBackend<Wire>> as ServiceData>::Settings,
-    pub wait_online_secs: u64,
 }
 
 impl Config {
