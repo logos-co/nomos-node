@@ -75,8 +75,8 @@ mod test {
     use ark_poly_commit::kzg10::{UniversalParams, KZG10};
     use once_cell::sync::Lazy;
     use rand::{thread_rng, Fill};
+    use rayon::iter::{IndexedParallelIterator, ParallelIterator};
     use rayon::prelude::IntoParallelRefIterator;
-    use rayon::iter::{IndexedParallelIterator,ParallelIterator};
 
     const COEFFICIENTS_SIZE: usize = 16;
     static GLOBAL_PARAMETERS: Lazy<UniversalParams<Bls12_381>> = Lazy::new(|| {
