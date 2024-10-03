@@ -9,6 +9,7 @@ futures = "0.3"
 itertools = "0.13"
 nomos-core = { path = "../../../nomos-core" }
 nomos-da-network-core = { path = "../../../nomos-da/network/core" }
+nomos-mempool = { path = "../../mempool", features = ["libp2p"] }
 subnetworks-assignations = { path = "../../../nomos-da/network/subnetworks-assignations" }
 nomos-da-network-service = { path = "../../../nomos-services/data-availability/network" }
 kzgrs-backend = { path = "../../../nomos-da/kzgrs-backend" }
