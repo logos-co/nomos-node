@@ -2,7 +2,7 @@ use crate::adapters::network::DispersalNetworkAdapter;
 use futures::stream::BoxStream;
 use futures::{Stream, StreamExt};
 use kzgrs_backend::common::blob::DaBlob;
-use nomos_core::da::BlobId;
+use nomos_core::da::{BlobId, DaDispersal};
 use nomos_da_network_core::protocols::dispersal::executor::behaviour::DispersalExecutorEvent;
 use nomos_da_network_core::{PeerId, SubnetworkId};
 use nomos_da_network_service::backends::libp2p::executor::{
