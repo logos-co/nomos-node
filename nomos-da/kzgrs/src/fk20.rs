@@ -99,6 +99,7 @@ impl Toeplitz1Cache {
 #[cfg(test)]
 mod test {
     use crate::fk20::{fk20_batch_generate_elements_proofs, Toeplitz1Cache};
+    use crate::Evaluations;
     use crate::{
         common::bytes_to_polynomial, kzg::generate_element_proof, GlobalParameters, Proof,
         BYTES_PER_FIELD_ELEMENT,
@@ -109,48 +110,66 @@ mod test {
     use ark_poly_commit::kzg10::KZG10;
     use once_cell::sync::Lazy;
     use rand::SeedableRng;
-    use rayon::iter::{IndexedParallelIterator, ParallelIterator};
-    use rayon::prelude::IntoParallelRefIterator;
 
     static GLOBAL_PARAMETERS: Lazy<GlobalParameters> = Lazy::new(|| {
         let mut rng = rand::rngs::StdRng::seed_from_u64(1987);
         KZG10::<Bls12_381, DensePolynomial<Fr>>::setup(4096, true, &mut rng).unwrap()
     });
 
-    async fn run_fn_async<F, Fut>(task: F)
-    where
-        F: FnOnce() -> Fut,
-        Fut: std::future::Future<Output = Vec<Proof>>>
-    {
-        let res = task().await;
-        res
+    // Async function for generating slow proofs
+    async fn generate_slow_proofs(
+        polynomial_degree: usize,
+        poly: &DensePolynomial<Fr>,
+        evals: &Evaluations,
+        domain: &GeneralEvaluationDomain<Fr>,
+    ) -> Vec<Proof> {
+        (0..polynomial_degree)
+            .map(|i| generate_element_proof(i, poly, evals, &GLOBAL_PARAMETERS, *domain).unwrap())
+            .collect()
     }
 
-    #[test]
-    fn test_generate_proofs() {
+    // Async function for generating fk20 proofs
+    async fn generate_fk20_proofs(polynomial: &DensePolynomial<Fr>) -> Vec<Proof> {
+        fk20_batch_generate_elements_proofs(polynomial, &GLOBAL_PARAMETERS, None)
+    }
+
+    // Async function for generating fk20 proofs with Toeplitz1Cache
+    async fn generate_fk20_proofs_with_cache(
+        polynomial: &DensePolynomial<Fr>,
+        polynomial_degree: usize,
+    ) -> Vec<Proof> {
+        let tc = Toeplitz1Cache::with_size(&GLOBAL_PARAMETERS, polynomial_degree);
+        fk20_batch_generate_elements_proofs(polynomial, &GLOBAL_PARAMETERS, Some(&tc))
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 3)]
+    async fn test_generate_proofs() {
         let sizes = [16, 32, 64, 128, 256];
-        for size in sizes{
+        for &size in &sizes {
+            // Prepare the input buffer
             let buff: Vec<_> = (0..BYTES_PER_FIELD_ELEMENT * size)
                 .map(|i| (i % 255) as u8)
                 .rev()
                 .collect();
+
+            // Create evaluation domain
             let domain = GeneralEvaluationDomain::new(size).unwrap();
+
+            // Convert bytes to polynomial
             let (evals, poly) =
                 bytes_to_polynomial::<BYTES_PER_FIELD_ELEMENT>(&buff, domain).unwrap();
             let polynomial_degree = poly.len();
-            let slow_proofs: Vec<Proof> = (0..polynomial_degree)
-                .map(|i| {
-                    generate_element_proof(i, &poly, &evals, &GLOBAL_PARAMETERS, domain).unwrap()
-                })
-                .collect(); //I want slow proofs to be called asyncly
-            let fk20_proofs = fk20_batch_generate_elements_proofs(&poly, &GLOBAL_PARAMETERS, None);
-            assert_eq!(slow_proofs, fk20_proofs); //I want fast proofs to be called asyncly
 
-            // Test variant with Toeplitz1Cache param
-            let tc = Toeplitz1Cache::with_size(&GLOBAL_PARAMETERS.clone(), size);
-            let fk20_proofs_with_toplcache =
-                fk20_batch_generate_elements_proofs(&poly, &GLOBAL_PARAMETERS, Some(&tc));
-            assert_eq!(slow_proofs, fk20_proofs_with_toplcache); //I want fk20 proofs to be called asyncly
+            // Use tokio::join! to run them concurrently
+            let (slow_proofs, fk20_proofs, fk20_proofs_with_toplcache) = tokio::join!(
+                generate_slow_proofs(polynomial_degree, &poly, &evals, &domain),
+                generate_fk20_proofs(&poly),
+                generate_fk20_proofs_with_cache(&poly, polynomial_degree),
+            );
+
+            // Assertions
+            assert_eq!(slow_proofs, fk20_proofs);
+            assert_eq!(slow_proofs, fk20_proofs_with_toplcache);
         }
     }
 }
