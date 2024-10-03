@@ -128,9 +128,6 @@ async fn disseminate_and_retrieve() {
             num_subnets: 2,
             ..Default::default()
         },
-        tests::TestConfig {
-            wait_online_secs: 50,
-        },
     ))
     .await;
 
