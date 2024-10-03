@@ -151,23 +151,17 @@ mod test {
                 .map(|i| (i % 255) as u8)
                 .rev()
                 .collect();
-
-            // Create evaluation domain
             let domain = GeneralEvaluationDomain::new(size).unwrap();
-
-            // Convert bytes to polynomial
             let (evals, poly) =
                 bytes_to_polynomial::<BYTES_PER_FIELD_ELEMENT>(&buff, domain).unwrap();
             let polynomial_degree = poly.len();
 
-            // Use tokio::join! to run them concurrently
             let (slow_proofs, fk20_proofs, fk20_proofs_with_toplcache) = tokio::join!(
                 generate_slow_proofs(polynomial_degree, &poly, &evals, &domain),
                 generate_fk20_proofs(&poly),
                 generate_fk20_proofs_with_cache(&poly, polynomial_degree),
             );
 
-            // Assertions
             assert_eq!(slow_proofs, fk20_proofs);
             assert_eq!(slow_proofs, fk20_proofs_with_toplcache);
         }
