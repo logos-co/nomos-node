@@ -6,6 +6,7 @@ edition = "2021"
 [dependencies]
 async-trait = "0.1"
 futures = "0.3"
+itertools = "0.13"
 nomos-core = { path = "../../../nomos-core" }
 nomos-da-network-core = { path = "../../../nomos-da/network/core" }
 subnetworks-assignations = { path = "../../../nomos-da/network/subnetworks-assignations" }
