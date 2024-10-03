@@ -1,8 +1,7 @@
 pub mod libp2p;
 use futures::Stream;
 use kzgrs_backend::common::blob::DaBlob;
-use nomos_core::da::{BlobId, DaDispersal};
-use nomos_da_network_core::PeerId;
+use nomos_core::da::BlobId;
 use overwatch_rs::services::relay::OutboundRelay;
 use overwatch_rs::services::ServiceData;
 use overwatch_rs::DynError;

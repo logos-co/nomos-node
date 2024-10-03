@@ -7,31 +7,24 @@ use tokio::sync::oneshot;
 use crate::adapters::network::DispersalNetworkAdapter;
 use crate::backend::DispersalBackend;
 use nomos_da_network_core::{PeerId, SubnetworkId};
-use nomos_da_network_service::backends::libp2p::executor::DaNetworkExecutorBackend;
-use nomos_da_network_service::NetworkService;
 use overwatch_rs::services::handle::ServiceStateHandle;
 use overwatch_rs::services::relay::{Relay, RelayMessage};
 use overwatch_rs::services::state::{NoOperator, NoState};
 use overwatch_rs::services::{ServiceCore, ServiceData, ServiceId};
 use overwatch_rs::DynError;
 use subnetworks_assignations::MembershipHandler;
+use tracing::log::error;
 
 mod adapters;
 pub mod backend;
 
 const DA_DISPERSAL_TAG: ServiceId = "DA-Encoder";
 
-#[derive(Debug, thiserror::Error)]
-pub enum Error {
-    #[error("Foo bar {0}")]
-    Encoding(String),
-}
-
 #[derive(Debug)]
 pub enum DaDispersalMsg {
     Disperse {
         blob: Vec<u8>,
-        reply_channel: oneshot::Sender<Result<(), Error>>,
+        reply_channel: oneshot::Sender<Result<(), DynError>>,
     },
 }
 
@@ -90,7 +83,7 @@ where
         + Send
         + Sync
         + 'static,
-    Backend: DispersalBackend<Adapter = NetworkAdapter> + Send,
+    Backend: DispersalBackend<Adapter = NetworkAdapter> + Send + Sync,
     Backend::Settings: Clone + Send + Sync,
     NetworkAdapter: DispersalNetworkAdapter<SubnetworkId = Membership::NetworkId> + Send,
 {
@@ -107,7 +100,7 @@ where
     async fn run(self) -> Result<(), DynError> {
         let Self {
             network_relay,
-            mut service_state,
+            service_state,
             ..
         } = self;
         let DispersalServiceSettings {
@@ -116,9 +109,19 @@ where
         let network_relay = network_relay.connect().await?;
         let network_adapter = NetworkAdapter::new(network_relay);
         let backend = Backend::init(backend_settings, network_adapter);
-        // let dispersal_events_stream = network_adapter.dispersal_events_stream().await?;
-        let mut inbound_relay = &mut service_state.inbound_relay;
-        while let Some(incoming_message) = inbound_relay.recv().await {}
+        let mut inbound_relay = service_state.inbound_relay;
+        while let Some(dispersal_msg) = inbound_relay.recv().await {
+            match dispersal_msg {
+                DaDispersalMsg::Disperse {
+                    blob,
+                    reply_channel,
+                } => {
+                    if let Err(Err(e)) = reply_channel.send(backend.process_dispersal(blob).await) {
+                        error!("Error forwarding dispersal response: {e}");
+                    }
+                }
+            }
+        }
         Ok(())
     }
 }

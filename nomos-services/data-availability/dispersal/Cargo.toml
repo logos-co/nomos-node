@@ -14,3 +14,4 @@ kzgrs-backend = { path = "../../../nomos-da/kzgrs-backend" }
 overwatch-rs = { git = "https://github.com/logos-co/Overwatch", rev = "2f70806" }
 tokio = "1.40"
 thiserror = "1.0"
+tracing = "0.1"
