@@ -1,6 +1,4 @@
-use ark_bls12_381::{Bls12_381, Fr, G1Affine, G1Projective};
-use ark_ec::AffineRepr;
-use ark_ff::BigInt;
+use ark_bls12_381::{Bls12_381, Fr};
 use ark_poly::univariate::DensePolynomial;
 use ark_poly::{EvaluationDomain, GeneralEvaluationDomain};
 use ark_poly_commit::kzg10::KZG10;
@@ -36,7 +34,7 @@ fn compute_fk20_proofs_for_size(bencher: Bencher, size: usize) {
             poly
         })
         .input_counter(move |_| ItemsCount::new(size))
-        .bench_refs(|(poly)| {
+        .bench_refs(|poly| {
             black_box(fk20_batch_generate_elements_proofs(
                 poly,
                 &GLOBAL_PARAMETERS,
