@@ -109,15 +109,27 @@ mod test {
     use ark_poly_commit::kzg10::KZG10;
     use once_cell::sync::Lazy;
     use rand::SeedableRng;
+    use rayon::iter::{IndexedParallelIterator, ParallelIterator};
+    use rayon::prelude::IntoParallelRefIterator;
 
     static GLOBAL_PARAMETERS: Lazy<GlobalParameters> = Lazy::new(|| {
         let mut rng = rand::rngs::StdRng::seed_from_u64(1987);
         KZG10::<Bls12_381, DensePolynomial<Fr>>::setup(4096, true, &mut rng).unwrap()
     });
 
+    async fn run_fn_async<F, Fut>(task: F)
+    where
+        F: FnOnce() -> Fut,
+        Fut: std::future::Future<Output = Vec<Proof>>>
+    {
+        let res = task().await;
+        res
+    }
+
     #[test]
     fn test_generate_proofs() {
-        for size in [16, 32, 64, 128, 256] {
+        let sizes = [16, 32, 64, 128, 256];
+        for size in sizes{
             let buff: Vec<_> = (0..BYTES_PER_FIELD_ELEMENT * size)
                 .map(|i| (i % 255) as u8)
                 .rev()
@@ -130,15 +142,15 @@ mod test {
                 .map(|i| {
                     generate_element_proof(i, &poly, &evals, &GLOBAL_PARAMETERS, domain).unwrap()
                 })
-                .collect();
+                .collect(); //I want slow proofs to be called asyncly
             let fk20_proofs = fk20_batch_generate_elements_proofs(&poly, &GLOBAL_PARAMETERS, None);
-            assert_eq!(slow_proofs, fk20_proofs);
+            assert_eq!(slow_proofs, fk20_proofs); //I want fast proofs to be called asyncly
 
             // Test variant with Toeplitz1Cache param
             let tc = Toeplitz1Cache::with_size(&GLOBAL_PARAMETERS.clone(), size);
-            let fk20_proofs =
+            let fk20_proofs_with_toplcache =
                 fk20_batch_generate_elements_proofs(&poly, &GLOBAL_PARAMETERS, Some(&tc));
-            assert_eq!(slow_proofs, fk20_proofs);
+            assert_eq!(slow_proofs, fk20_proofs_with_toplcache); //I want fk20 proofs to be called asyncly
         }
     }
 }
