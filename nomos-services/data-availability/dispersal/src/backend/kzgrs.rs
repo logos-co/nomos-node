@@ -18,18 +18,7 @@ pub struct DispersalKZGRSBackendSettings {
 pub struct DispersalKZGRSBackend<NetworkAdapter> {
     settings: DispersalKZGRSBackendSettings,
     adapter: Arc<NetworkAdapter>,
-}
-
-struct DaBlobsIterator {
-    encoded_data: EncodedData,
-}
-
-impl Iterator for DaBlobsIterator {
-    type Item = DaBlob;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        todo!()
-    }
+    encoder: Arc<encoder::DaEncoder>,
 }
 
 pub struct DispersalFromAdapter<Adapter> {
@@ -68,7 +57,7 @@ where
             })
             .take(encoded_size)
             .collect();
-
+        // timeout when collecting positive responses
         tokio::time::timeout(self.timeout, valid_responses)
             .await
             .map_err(|e| Box::new(e) as DynError)?;
@@ -89,9 +78,11 @@ where
     type BlobId = BlobId;
 
     fn init(settings: Self::Settings, adapter: Self::Adapter) -> Self {
+        let encoder = Self::Encoder::new(settings.encoder_settings.clone());
         Self {
             settings,
             adapter: Arc::new(adapter),
+            encoder: Arc::new(encoder),
         }
     }
 
@@ -99,14 +90,26 @@ where
         &self,
         data: Vec<u8>,
     ) -> Result<(Self::BlobId, <Self::Encoder as DaEncoder>::EncodedData), DynError> {
-        todo!()
+        let encoder = Arc::clone(&self.encoder);
+        let heavy_task = tokio::task::spawn_blocking(move || encoder.encode(&data));
+        let encoded_data = heavy_task.await??;
+        let blob_id = build_blob_id(
+            &encoded_data.aggregated_column_commitment,
+            &encoded_data.row_commitments,
+        );
+        Ok((blob_id, encoded_data))
     }
 
     async fn disperse(
         &self,
         encoded_data: <Self::Encoder as DaEncoder>::EncodedData,
     ) -> Result<(), DynError> {
-        todo!()
+        DispersalFromAdapter {
+            adapter: Arc::clone(&self.adapter),
+            timeout: self.settings.dispersal_timeout,
+        }
+        .disperse(encoded_data)
+        .await
     }
 
     async fn publish_to_mempool(&self, blob_id: Self::BlobId) -> Result<(), DynError> {
@@ -128,7 +131,7 @@ fn encoded_data_to_da_blobs(encoded_data: EncodedData) -> impl Iterator<Item = D
         aggregated_column_proofs,
         ..
     } = encoded_data;
-    let mut iter = izip!(
+    let iter = izip!(
         // transpose and unwrap the types as we need to have ownership of it
         extended_data.transposed().0.into_iter().map(|r| r.0),
         column_commitments.into_iter(),
