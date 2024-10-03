@@ -1,26 +1,22 @@
 // std
-
-// crates
-
-use futures::Stream;
-use overwatch_rs::services::handle::ServiceStateHandle;
-use overwatch_rs::DynError;
 use std::fmt::Debug;
 use std::marker::PhantomData;
-use std::pin::Pin;
+// crates
+use tokio::sync::oneshot;
 // internal
+use crate::adapters::network::DispersalNetworkAdapter;
+use crate::backend::DispersalBackend;
 use nomos_da_network_core::{PeerId, SubnetworkId};
-use nomos_da_network_service::backends::libp2p::executor::{
-    DaNetworkEvent, DaNetworkEventKind, DaNetworkExecutorBackend,
-};
-use nomos_da_network_service::{DaNetworkMsg, NetworkService};
-use overwatch_rs::services::relay::{OutboundRelay, Relay, RelayMessage};
+use nomos_da_network_service::backends::libp2p::executor::DaNetworkExecutorBackend;
+use nomos_da_network_service::NetworkService;
+use overwatch_rs::services::handle::ServiceStateHandle;
+use overwatch_rs::services::relay::{Relay, RelayMessage};
 use overwatch_rs::services::state::{NoOperator, NoState};
 use overwatch_rs::services::{ServiceCore, ServiceData, ServiceId};
+use overwatch_rs::DynError;
 use subnetworks_assignations::MembershipHandler;
-use tokio::sync::oneshot;
-use tokio::sync::oneshot::error::RecvError;
 
+mod adapters;
 pub mod backend;
 
 const DA_DISPERSAL_TAG: ServiceId = "DA-Encoder";
@@ -41,21 +37,12 @@ pub enum DaDispersalMsg {
 
 impl RelayMessage for DaDispersalMsg {}
 
-pub struct DispersalService<Backend, Membership>
-where
-    Membership: MembershipHandler<NetworkId = SubnetworkId, Id = PeerId>
-        + Clone
-        + Debug
-        + Send
-        + Sync
-        + 'static,
-{
-    service_state: ServiceStateHandle<Self>,
-    network_relay: Relay<NetworkService<DaNetworkExecutorBackend<Membership>>>,
-    _backend: PhantomData<Backend>,
+#[derive(Clone)]
+pub struct DispersalServiceSettings<BackendSettings> {
+    backend: BackendSettings,
 }
 
-impl<Backend, Membership> ServiceData for DispersalService<Backend, Membership>
+pub struct DispersalService<Backend, NetworkAdapter, Membership>
 where
     Membership: MembershipHandler<NetworkId = SubnetworkId, Id = PeerId>
         + Clone
@@ -63,67 +50,75 @@ where
         + Send
         + Sync
         + 'static,
+    Backend: DispersalBackend<Adapter = NetworkAdapter>,
+    Backend::Settings: Clone,
+    NetworkAdapter: DispersalNetworkAdapter,
+{
+    service_state: ServiceStateHandle<Self>,
+    network_relay: Relay<NetworkAdapter::NetworkService>,
+    _backend: PhantomData<Backend>,
+    _network_adapter: PhantomData<NetworkAdapter>,
+}
+
+impl<Backend, NetworkAdapter, Membership> ServiceData
+    for DispersalService<Backend, NetworkAdapter, Membership>
+where
+    Membership: MembershipHandler<NetworkId = SubnetworkId, Id = PeerId>
+        + Clone
+        + Debug
+        + Send
+        + Sync
+        + 'static,
+    Backend: DispersalBackend<Adapter = NetworkAdapter>,
+    Backend::Settings: Clone,
+    NetworkAdapter: DispersalNetworkAdapter,
 {
     const SERVICE_ID: ServiceId = DA_DISPERSAL_TAG;
-    type Settings = ();
+    type Settings = DispersalServiceSettings<Backend::Settings>;
     type State = NoState<Self::Settings>;
     type StateOperator = NoOperator<Self::State>;
     type Message = DaDispersalMsg;
 }
 
 #[async_trait::async_trait]
-impl<Backend, Membership> ServiceCore for DispersalService<Backend, Membership>
+impl<Backend, NetworkAdapter, Membership> ServiceCore
+    for DispersalService<Backend, NetworkAdapter, Membership>
 where
-    Backend: Send,
     Membership: MembershipHandler<NetworkId = SubnetworkId, Id = PeerId>
         + Clone
         + Debug
         + Send
         + Sync
         + 'static,
+    Backend: DispersalBackend<Adapter = NetworkAdapter> + Send,
+    Backend::Settings: Clone + Send + Sync,
+    NetworkAdapter: DispersalNetworkAdapter<SubnetworkId = Membership::NetworkId> + Send,
 {
     fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, DynError> {
-        let network_relay = service_state
-            .overwatch_handle
-            .relay::<NetworkService<DaNetworkExecutorBackend<Membership>>>();
+        let network_relay = service_state.overwatch_handle.relay();
         Ok(Self {
             service_state,
             network_relay,
             _backend: Default::default(),
+            _network_adapter: Default::default(),
         })
     }
 
     async fn run(self) -> Result<(), DynError> {
-        let Self { network_relay, .. } = self;
+        let Self {
+            network_relay,
+            mut service_state,
+            ..
+        } = self;
+        let DispersalServiceSettings {
+            backend: backend_settings,
+        } = service_state.settings_reader.get_updated_settings();
         let network_relay = network_relay.connect().await?;
-        let dispersal_events_stream = dispersal_events_subscribe_stream(network_relay).await?;
-        // loop {
-        //     tokio::select! {
-        //
-        //     }
-        // }
+        let network_adapter = NetworkAdapter::new(network_relay);
+        let backend = Backend::init(backend_settings, network_adapter);
+        // let dispersal_events_stream = network_adapter.dispersal_events_stream().await?;
+        let mut inbound_relay = &mut service_state.inbound_relay;
+        while let Some(incoming_message) = inbound_relay.recv().await {}
         Ok(())
     }
-}
-
-async fn dispersal_events_subscribe_stream<Membership>(
-    network_relay: OutboundRelay<DaNetworkMsg<DaNetworkExecutorBackend<Membership>>>,
-) -> Result<Pin<Box<dyn Stream<Item = DaNetworkEvent> + Send>>, DynError>
-where
-    Membership: MembershipHandler<NetworkId = SubnetworkId, Id = PeerId>
-        + Clone
-        + Debug
-        + Send
-        + Sync
-        + 'static,
-{
-    let (sender, receiver) = oneshot::channel();
-    network_relay
-        .send(DaNetworkMsg::Subscribe {
-            kind: DaNetworkEventKind::Dispersal,
-            sender,
-        })
-        .await
-        .map_err(|(e, _)| Box::new(e) as DynError)?;
-    receiver.await.map_err(|e| Box::new(e) as DynError)
 }

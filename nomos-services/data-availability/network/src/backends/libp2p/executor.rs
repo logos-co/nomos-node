@@ -27,7 +27,7 @@ use tokio_stream::wrappers::{BroadcastStream, UnboundedReceiverStream};
 
 /// Message that the backend replies to
 #[derive(Debug)]
-pub enum DaNetworkMessage {
+pub enum ExecutorDaNetworkMessage {
     /// Kickstart a network sapling
     RequestSample {
         subnetwork_id: SubnetworkId,
@@ -99,7 +99,7 @@ where
 {
     type Settings = DaNetworkExecutorBackendSettings<Membership>;
     type State = NoState<Self::Settings>;
-    type Message = DaNetworkMessage;
+    type Message = ExecutorDaNetworkMessage;
     type EventKind = DaNetworkEventKind;
     type NetworkEvent = DaNetworkEvent;
 
@@ -190,13 +190,13 @@ where
 
     async fn process(&self, msg: Self::Message) {
         match msg {
-            DaNetworkMessage::RequestSample {
+            ExecutorDaNetworkMessage::RequestSample {
                 subnetwork_id,
                 blob_id,
             } => {
                 handle_sample_request(&self.sampling_request_channel, subnetwork_id, blob_id).await;
             }
-            DaNetworkMessage::RequestDispersal {
+            ExecutorDaNetworkMessage::RequestDispersal {
                 subnetwork_id,
                 da_blob,
             } => {
