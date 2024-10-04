@@ -103,6 +103,7 @@ where
         data: Vec<u8>,
     ) -> Result<(Self::BlobId, <Self::Encoder as DaEncoder>::EncodedData), DynError> {
         let encoder = Arc::clone(&self.encoder);
+        // this is a REALLY heavy task, so we should try not to block the thread here
         let heavy_task = tokio::task::spawn_blocking(move || encoder.encode(&data));
         let encoded_data = heavy_task.await??;
         let blob_id = build_blob_id(
