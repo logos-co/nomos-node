@@ -180,6 +180,9 @@ pub fn update_log(log: &mut <Logger as ServiceData>::Settings, log_args: LogArgs
     if let Some(level_str) = level {
         log.level = match level_str.as_str() {
             "DEBUG" => Level::DEBUG,
+            "INFO" => Level::INFO,
+            "ERROR" => Level::ERROR,
+            "WARN" => Level::WARN,
             _ => return Err(eyre!("Invalid log level provided.")),
         };
     }
