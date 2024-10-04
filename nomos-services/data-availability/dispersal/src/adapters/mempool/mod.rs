@@ -1,9 +1,9 @@
-use nomos_core::da::BlobId;
 use overwatch_rs::services::relay::OutboundRelay;
 use overwatch_rs::services::ServiceData;
 use overwatch_rs::DynError;
 
-pub trait MempoolAdapter {
+#[async_trait::async_trait]
+pub trait DaMempoolAdapter {
     type MempoolService: ServiceData;
     type BlobId;
 

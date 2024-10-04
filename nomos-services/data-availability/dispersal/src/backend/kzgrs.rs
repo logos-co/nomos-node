@@ -1,3 +1,4 @@
+use crate::adapters::mempool::DaMempoolAdapter;
 use crate::adapters::network::DispersalNetworkAdapter;
 use crate::backend::DispersalBackend;
 use futures::StreamExt;
@@ -15,9 +16,10 @@ pub struct DispersalKZGRSBackendSettings {
     encoder_settings: encoder::DaEncoderParams,
     dispersal_timeout: Duration,
 }
-pub struct DispersalKZGRSBackend<NetworkAdapter> {
+pub struct DispersalKZGRSBackend<NetworkAdapter, MempoolAdapter> {
     settings: DispersalKZGRSBackendSettings,
-    adapter: Arc<NetworkAdapter>,
+    network_adapter: Arc<NetworkAdapter>,
+    mempool_adapter: MempoolAdapter,
     encoder: Arc<encoder::DaEncoder>,
 }
 
@@ -26,6 +28,8 @@ pub struct DispersalFromAdapter<Adapter> {
     timeout: Duration,
 }
 
+// remove if solved, this occurs in the timeout method below (out of our handling)
+#[allow(dependency_on_unit_never_type_fallback)]
 #[async_trait::async_trait]
 impl<Adapter> DaDispersal for DispersalFromAdapter<Adapter>
 where
@@ -66,22 +70,30 @@ where
 }
 
 #[async_trait::async_trait]
-impl<NetworkAdapter> DispersalBackend for DispersalKZGRSBackend<NetworkAdapter>
+impl<NetworkAdapter, MempoolAdapter> DispersalBackend
+    for DispersalKZGRSBackend<NetworkAdapter, MempoolAdapter>
 where
     NetworkAdapter: DispersalNetworkAdapter + Send + Sync,
     NetworkAdapter::SubnetworkId: From<usize> + Send + Sync,
+    MempoolAdapter: DaMempoolAdapter<BlobId = BlobId> + Send + Sync,
 {
     type Settings = DispersalKZGRSBackendSettings;
     type Encoder = encoder::DaEncoder;
     type Dispersal = DispersalFromAdapter<NetworkAdapter>;
-    type Adapter = NetworkAdapter;
+    type NetworkAdapter = NetworkAdapter;
+    type MempoolAdapter = MempoolAdapter;
     type BlobId = BlobId;
 
-    fn init(settings: Self::Settings, adapter: Self::Adapter) -> Self {
+    fn init(
+        settings: Self::Settings,
+        network_adapter: Self::NetworkAdapter,
+        mempool_adapter: Self::MempoolAdapter,
+    ) -> Self {
         let encoder = Self::Encoder::new(settings.encoder_settings.clone());
         Self {
             settings,
-            adapter: Arc::new(adapter),
+            network_adapter: Arc::new(network_adapter),
+            mempool_adapter,
             encoder: Arc::new(encoder),
         }
     }
@@ -105,7 +117,7 @@ where
         encoded_data: <Self::Encoder as DaEncoder>::EncodedData,
     ) -> Result<(), DynError> {
         DispersalFromAdapter {
-            adapter: Arc::clone(&self.adapter),
+            adapter: Arc::clone(&self.network_adapter),
             timeout: self.settings.dispersal_timeout,
         }
         .disperse(encoded_data)
@@ -113,11 +125,7 @@ where
     }
 
     async fn publish_to_mempool(&self, blob_id: Self::BlobId) -> Result<(), DynError> {
-        todo!()
-    }
-
-    async fn process_dispersal(&self, data: Vec<u8>) -> Result<(), DynError> {
-        todo!()
+        self.mempool_adapter.post_blob_id(blob_id).await
     }
 }
 
@@ -147,7 +155,7 @@ fn encoded_data_to_da_blobs(encoded_data: EncodedData) -> impl Iterator<Item = D
             rows_commitments: row_commitments.clone(),
             rows_proofs: rows_proofs
                 .iter()
-                .map(|proofs| proofs[column_idx].clone())
+                .map(|proofs| proofs[column_idx])
                 .collect(),
         },
     )

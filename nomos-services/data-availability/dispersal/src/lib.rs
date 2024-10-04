@@ -4,6 +4,7 @@ use std::marker::PhantomData;
 // crates
 use tokio::sync::oneshot;
 // internal
+use crate::adapters::mempool::DaMempoolAdapter;
 use crate::adapters::network::DispersalNetworkAdapter;
 use crate::backend::DispersalBackend;
 use nomos_da_network_core::{PeerId, SubnetworkId};
@@ -35,7 +36,7 @@ pub struct DispersalServiceSettings<BackendSettings> {
     backend: BackendSettings,
 }
 
-pub struct DispersalService<Backend, NetworkAdapter, Membership>
+pub struct DispersalService<Backend, NetworkAdapter, MempoolAdapter, Membership>
 where
     Membership: MembershipHandler<NetworkId = SubnetworkId, Id = PeerId>
         + Clone
@@ -43,18 +44,19 @@ where
         + Send
         + Sync
         + 'static,
-    Backend: DispersalBackend<Adapter = NetworkAdapter>,
+    Backend: DispersalBackend<NetworkAdapter = NetworkAdapter>,
     Backend::Settings: Clone,
     NetworkAdapter: DispersalNetworkAdapter,
+    MempoolAdapter: DaMempoolAdapter,
 {
     service_state: ServiceStateHandle<Self>,
     network_relay: Relay<NetworkAdapter::NetworkService>,
+    mempool_relay: Relay<MempoolAdapter::MempoolService>,
     _backend: PhantomData<Backend>,
-    _network_adapter: PhantomData<NetworkAdapter>,
 }
 
-impl<Backend, NetworkAdapter, Membership> ServiceData
-    for DispersalService<Backend, NetworkAdapter, Membership>
+impl<Backend, NetworkAdapter, MempoolAdapter, Membership> ServiceData
+    for DispersalService<Backend, NetworkAdapter, MempoolAdapter, Membership>
 where
     Membership: MembershipHandler<NetworkId = SubnetworkId, Id = PeerId>
         + Clone
@@ -62,9 +64,10 @@ where
         + Send
         + Sync
         + 'static,
-    Backend: DispersalBackend<Adapter = NetworkAdapter>,
+    Backend: DispersalBackend<NetworkAdapter = NetworkAdapter>,
     Backend::Settings: Clone,
     NetworkAdapter: DispersalNetworkAdapter,
+    MempoolAdapter: DaMempoolAdapter,
 {
     const SERVICE_ID: ServiceId = DA_DISPERSAL_TAG;
     type Settings = DispersalServiceSettings<Backend::Settings>;
@@ -74,8 +77,8 @@ where
 }
 
 #[async_trait::async_trait]
-impl<Backend, NetworkAdapter, Membership> ServiceCore
-    for DispersalService<Backend, NetworkAdapter, Membership>
+impl<Backend, NetworkAdapter, MempoolAdapter, Membership> ServiceCore
+    for DispersalService<Backend, NetworkAdapter, MempoolAdapter, Membership>
 where
     Membership: MembershipHandler<NetworkId = SubnetworkId, Id = PeerId>
         + Clone
@@ -83,23 +86,28 @@ where
         + Send
         + Sync
         + 'static,
-    Backend: DispersalBackend<Adapter = NetworkAdapter> + Send + Sync,
+    Backend: DispersalBackend<NetworkAdapter = NetworkAdapter, MempoolAdapter = MempoolAdapter>
+        + Send
+        + Sync,
     Backend::Settings: Clone + Send + Sync,
     NetworkAdapter: DispersalNetworkAdapter<SubnetworkId = Membership::NetworkId> + Send,
+    MempoolAdapter: DaMempoolAdapter,
 {
     fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, DynError> {
         let network_relay = service_state.overwatch_handle.relay();
+        let mempool_relay = service_state.overwatch_handle.relay();
         Ok(Self {
             service_state,
             network_relay,
+            mempool_relay,
             _backend: Default::default(),
-            _network_adapter: Default::default(),
         })
     }
 
     async fn run(self) -> Result<(), DynError> {
         let Self {
             network_relay,
+            mempool_relay,
             service_state,
             ..
         } = self;
@@ -108,7 +116,9 @@ where
         } = service_state.settings_reader.get_updated_settings();
         let network_relay = network_relay.connect().await?;
         let network_adapter = NetworkAdapter::new(network_relay);
-        let backend = Backend::init(backend_settings, network_adapter);
+        let mempool_relay = mempool_relay.connect().await?;
+        let mempool_adapter = MempoolAdapter::new(mempool_relay);
+        let backend = Backend::init(backend_settings, network_adapter, mempool_adapter);
         let mut inbound_relay = service_state.inbound_relay;
         while let Some(dispersal_msg) = inbound_relay.recv().await {
             match dispersal_msg {

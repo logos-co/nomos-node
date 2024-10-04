@@ -1,2 +1,2 @@
-mod mempool;
+pub mod mempool;
 pub mod network;

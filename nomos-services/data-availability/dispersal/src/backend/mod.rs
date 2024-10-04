@@ -1,4 +1,5 @@
-use crate::adapters::network::DispersalNetworkAdapter;
+use crate::adapters::{mempool::DaMempoolAdapter, network::DispersalNetworkAdapter};
+
 use nomos_core::da::{DaDispersal, DaEncoder};
 use overwatch_rs::DynError;
 
@@ -9,10 +10,15 @@ pub trait DispersalBackend {
     type Settings;
     type Encoder: DaEncoder;
     type Dispersal: DaDispersal<EncodedData = <Self::Encoder as DaEncoder>::EncodedData>;
-    type Adapter: DispersalNetworkAdapter;
+    type NetworkAdapter: DispersalNetworkAdapter;
+    type MempoolAdapter: DaMempoolAdapter;
     type BlobId: Send;
 
-    fn init(config: Self::Settings, adapter: Self::Adapter) -> Self;
+    fn init(
+        config: Self::Settings,
+        network_adapter: Self::NetworkAdapter,
+        mempool_adapter: Self::MempoolAdapter,
+    ) -> Self;
     async fn encode(
         &self,
         data: Vec<u8>,
