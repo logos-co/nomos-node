@@ -109,49 +109,42 @@ mod test {
     use ark_poly_commit::kzg10::KZG10;
     use once_cell::sync::Lazy;
     use rand::SeedableRng;
-    use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
-    use rayon::prelude::IntoParallelRefIterator;
 
     static GLOBAL_PARAMETERS: Lazy<GlobalParameters> = Lazy::new(|| {
         let mut rng = rand::rngs::StdRng::seed_from_u64(1987);
         KZG10::<Bls12_381, DensePolynomial<Fr>>::setup(4096, true, &mut rng).unwrap()
     });
 
+    static BUFF: Lazy<Vec<u8>> = Lazy::new(|| {
+        (0..BYTES_PER_FIELD_ELEMENT * 256)
+            .map(|i| (i % 255) as u8)
+            .rev()
+            .collect()
+    });
+
     #[test]
-    fn test_generate_proofs_optimized() {
-        [16, 32, 64, 128, 256].par_iter().for_each(|&size| {
-            // Create the FFT domain and the Toeplitz1 cache in parallel
-            let (domain, toeplitz_cache) = rayon::join(
-                || GeneralEvaluationDomain::new(size).expect("Domain should be able to build"),
-                || Toeplitz1Cache::with_size(&GLOBAL_PARAMETERS, size),
-            );
-    
-            // Generate a buffer with deterministic data in parallel
-            let buffer: Vec<u8> = (0..BYTES_PER_FIELD_ELEMENT * size)
-                .into_par_iter()
-                .map(|i| (i % 255) as u8)
-                .rev()
+    fn test_generate_proofs() {
+        for size in [16, 32, 64, 128, 256] {
+            let domain = GeneralEvaluationDomain::new(size).unwrap();
+            let (evals, poly) = bytes_to_polynomial::<BYTES_PER_FIELD_ELEMENT>(
+                &BUFF[0..BYTES_PER_FIELD_ELEMENT * size],
+                domain,
+            )
+            .unwrap();
+            let polynomial_degree = poly.len();
+            let slow_proofs: Vec<Proof> = (0..polynomial_degree)
+                .map(|i| {
+                    generate_element_proof(i, &poly, &evals, &GLOBAL_PARAMETERS, domain).unwrap()
+                })
                 .collect();
-    
-            // Convert the buffer into polynomial evaluations and the polynomial itself
-            let (evals, polynomial) =
-                bytes_to_polynomial::<BYTES_PER_FIELD_ELEMENT>(&buffer, domain).unwrap();
-    
-            // Generate proofs sequentially for the polynomial to use as a baseline for comparison
-            let slow_proofs: Vec<Proof> = (0..polynomial.len())
-                .into_par_iter()
-                .map(|i| generate_element_proof(i, &polynomial, &evals, &GLOBAL_PARAMETERS, domain).unwrap())
-                .collect();
-    
-            // Test the optimized FK20 proof generation without caching
-            let fk20_proofs = fk20_batch_generate_elements_proofs(&polynomial, &GLOBAL_PARAMETERS, None);
-            assert_eq!(slow_proofs, fk20_proofs, "Proofs without caching did not match");
-    
-            // Test the optimized FK20 proof generation with caching
-            let fk20_proofs_with_cache =
-                fk20_batch_generate_elements_proofs(&polynomial, &GLOBAL_PARAMETERS, Some(&toeplitz_cache));
-            assert_eq!(slow_proofs, fk20_proofs_with_cache, "Proofs with caching did not match");
-        });
+            let fk20_proofs = fk20_batch_generate_elements_proofs(&poly, &GLOBAL_PARAMETERS, None);
+            assert_eq!(slow_proofs, fk20_proofs);
+
+            // Test variant with Toeplitz1Cache param
+            let tc = Toeplitz1Cache::with_size(&GLOBAL_PARAMETERS.clone(), size);
+            let fk20_proofs =
+                fk20_batch_generate_elements_proofs(&poly, &GLOBAL_PARAMETERS, Some(&tc));
+            assert_eq!(slow_proofs, fk20_proofs);
+        }
     }
-    
 }
