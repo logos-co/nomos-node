@@ -115,19 +115,23 @@ mod test {
         KZG10::<Bls12_381, DensePolynomial<Fr>>::setup(4096, true, &mut rng).unwrap()
     });
 
-    static BUFF: Lazy<Vec<u8>> = Lazy::new(|| {
-        (0..BYTES_PER_FIELD_ELEMENT * 256)
-            .map(|i| (i % 255) as u8)
-            .rev()
-            .collect()
-    });
+    const SIZE: usize = BYTES_PER_FIELD_ELEMENT * 256;
 
     #[test]
     fn test_generate_proofs() {
+        let buff: [u8; SIZE] = {
+            let mut arr = [0u8; SIZE];
+            let mut i = SIZE;
+            while i > 0 {
+                i -= 1;
+                arr[i] = (i % 255) as u8;
+            }
+            arr
+        };
         for size in [16, 32, 64, 128, 256] {
             let domain = GeneralEvaluationDomain::new(size).unwrap();
             let (evals, poly) = bytes_to_polynomial::<BYTES_PER_FIELD_ELEMENT>(
-                &BUFF[0..BYTES_PER_FIELD_ELEMENT * size],
+                &buff[0..BYTES_PER_FIELD_ELEMENT * size],
                 domain,
             )
             .unwrap();
