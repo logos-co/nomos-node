@@ -20,6 +20,7 @@ members = [
     "nomos-services/data-availability/network",
     "nomos-services/data-availability/sampling",
     "nomos-services/data-availability/verifier",
+    "nomos-services/data-availability/dispersal",
     "nomos-services/data-availability/tests",
     "nomos-da/full-replication",
     "nomos-mix/message",
