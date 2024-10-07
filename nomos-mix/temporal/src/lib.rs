@@ -6,34 +6,36 @@ pub trait Queue<T> {
     fn push(&mut self, data: T);
 
     /// Pop a message from the queue.
-    ///
-    /// The returned message is either the real message pushed before or a noise message.
-    fn pop(&mut self) -> T;
+    fn pop(&mut self) -> Option<T>;
 }
 
 /// A regular queue that does not mix the order of messages.
 ///
 /// This queue returns a noise message if the queue is empty.
-pub struct NonMixQueue<T: Clone> {
+pub struct NonMixQueue<T> {
     queue: VecDeque<T>,
-    noise: T,
 }
 
-impl<T: Clone> NonMixQueue<T> {
-    pub fn new(noise: T) -> Self {
+impl<T> NonMixQueue<T> {
+    pub fn new() -> Self {
         Self {
             queue: VecDeque::new(),
-            noise,
         }
     }
 }
 
-impl<T: Clone> Queue<T> for NonMixQueue<T> {
+impl<T> Default for NonMixQueue<T> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<T> Queue<T> for NonMixQueue<T> {
     fn push(&mut self, data: T) {
         self.queue.push_back(data);
     }
 
-    fn pop(&mut self) -> T {
-        self.queue.pop_front().unwrap_or(self.noise.clone())
+    fn pop(&mut self) -> Option<T> {
+        self.queue.pop_front()
     }
 }

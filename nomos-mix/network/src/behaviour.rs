@@ -68,30 +68,18 @@ impl Behaviour {
     /// Fully unwrapped messages are returned as the [`MixBehaviourEvent::FullyUnwrappedMessage`].
     pub fn publish(&mut self, message: Vec<u8>) -> Result<(), Error> {
         self.duplicate_cache.cache_set(message_id(&message), ());
-        self.forward_message(message, None)
+        self.forward_crypto_mixed_message(&message)
     }
 
-    /// Forwards a message to all connected peers except the one that was received from.
+    /// Forwards a received message to all connected peers except the one that was received from.
     ///
     /// Returns [`Error::NoPeers`] if there are no connected peers that support the mix protocol.
     fn forward_message(
         &mut self,
-        message: Vec<u8>,
+        message: &[u8],
         propagation_source: Option<PeerId>,
     ) -> Result<(), Error> {
-        let peer_ids = self
-            .negotiated_peers
-            .keys()
-            .filter(|&peer_id| {
-                if let Some(propagation_source) = propagation_source {
-                    *peer_id != propagation_source
-                } else {
-                    true
-                }
-            })
-            .cloned()
-            .collect::<Vec<_>>();
-
+        let peer_ids = self.get_peers_to_forward(propagation_source);
         if peer_ids.is_empty() {
             return Err(Error::NoPeers);
         }
@@ -101,12 +89,51 @@ impl Behaviour {
             self.events.push_back(ToSwarm::NotifyHandler {
                 peer_id,
                 handler: NotifyHandler::Any,
-                event: FromBehaviour::Message(message.clone()),
+                event: FromBehaviour::Message(message.to_vec()),
             });
         }
 
         self.try_wake();
         Ok(())
+    }
+
+    /// Forwards a cryptographically mixed message to all connected peers except the one that was received from.
+    ///
+    /// Returns [`Error::NoPeers`] if there are no connected peers that support the mix protocol.
+    fn forward_crypto_mixed_message(&mut self, message: &[u8]) -> Result<(), Error> {
+        let peer_ids = self.get_peers_to_forward(None);
+        if peer_ids.is_empty() {
+            return Err(Error::NoPeers);
+        }
+
+        for peer_id in peer_ids.into_iter() {
+            tracing::debug!(
+                "Registering event for peer {:?} to schedule sending an unwrapped msg",
+                peer_id
+            );
+            self.events.push_back(ToSwarm::NotifyHandler {
+                peer_id,
+                handler: NotifyHandler::Any,
+                event: FromBehaviour::CryptoMixedMessage(message.to_vec()),
+            });
+        }
+
+        self.try_wake();
+        Ok(())
+    }
+
+    fn get_peers_to_forward(&self, propagation_source: Option<PeerId>) -> Vec<PeerId> {
+        self.negotiated_peers
+            .keys()
+            .filter(|&peer_id| {
+                if let Some(propagation_source) = propagation_source {
+                    *peer_id != propagation_source
+                } else {
+                    true
+                }
+            })
+            .cloned()
+            .collect::<Vec<_>>()
     }
 
     fn add_negotiated_peer(&mut self, peer_id: PeerId, connection_id: ConnectionId) -> bool {
@@ -197,6 +224,13 @@ impl NetworkBehaviour for Behaviour {
                     return;
                 }
 
+                // We forward the message even if it can be unwrapped by this node.
+                // If not, the peers of this node may be able to infer that this node is a mixnode that has the capability to unwrap this message,
+                // based on the fact that this node simply emits noise without forwarding the expected data message.
+                if let Err(e) = self.forward_message(&message, Some(peer_id)) {
+                    tracing::error!("Failed to forward message: {:?}", e);
+                }
+
                 // Try to unwrap the message.
                 match unwrap_message(&message) {
                     Ok((unwrapped_msg, fully_unwrapped)) => {
@@ -204,15 +238,12 @@ impl NetworkBehaviour for Behaviour {
                             self.events.push_back(ToSwarm::GenerateEvent(
                                 Event::FullyUnwrappedMessage(unwrapped_msg),
                             ));
-                        } else if let Err(e) = self.forward_message(unwrapped_msg, None) {
-                            tracing::error!("Failed to forward message: {:?}", e);
+                        } else if let Err(e) = self.forward_crypto_mixed_message(&unwrapped_msg) {
+                            tracing::error!("Failed to forward unwrapped message: {:?}", e);
                         }
                     }
                     Err(nomos_mix_message::Error::MsgUnwrapNotAllowed) => {
-                        // Forward the received message as it is.
-                        if let Err(e) = self.forward_message(message, Some(peer_id)) {
-                            tracing::error!("Failed to forward message: {:?}", e);
-                        }
+                        tracing::debug!("Message unwrap not allowed by this node");
                     }
                     Err(e) => {
                         tracing::error!("Failed to unwrap message: {:?}", e);

@@ -16,7 +16,6 @@ use libp2p::{
     Stream, StreamProtocol,
 };
 use nomos_mix_message::{is_noise, MSG_SIZE, NOISE};
-use nomos_mix_queue::{NonMixQueue, Queue};
 
 use crate::behaviour::Config;
 
@@ -28,7 +27,8 @@ pub struct MixConnectionHandler {
     outbound_substream: Option<OutboundSubstreamState>,
     interval: Duration, // TODO: use absolute time
     timer: Delay,
-    queue: Box<dyn Queue<Vec<u8>> + Send>,
+    persistent_transmission_queue: VecDeque<Vec<u8>>,
+    temporal_mix_queue: Box<dyn nomos_mix_temporal::Queue<Vec<u8>> + Send>,
     pending_events_to_behaviour: VecDeque<ToBehaviour>,
     waker: Option<Waker>,
 }
@@ -54,7 +54,8 @@ impl MixConnectionHandler {
             outbound_substream: None,
             interval,
             timer: Delay::new(interval),
-            queue: Box::new(NonMixQueue::new(NOISE.to_vec())),
+            persistent_transmission_queue: VecDeque::new(),
+            temporal_mix_queue: Box::new(nomos_mix_temporal::NonMixQueue::new()),
             pending_events_to_behaviour: VecDeque::new(),
             waker: None,
         }
@@ -71,6 +72,8 @@ impl MixConnectionHandler {
 pub enum FromBehaviour {
     /// A message to be sent to the connection.
     Message(Vec<u8>),
+    /// A message (generated or unwrapped by Cryptographic Mix) to be sent to the connection.
+    CryptoMixedMessage(Vec<u8>),
 }
 
 #[derive(Debug)]
@@ -142,7 +145,19 @@ impl ConnectionHandler for MixConnectionHandler {
                 // If the substream is idle, and if it's time to send a message, send it.
                 Some(OutboundSubstreamState::Idle(stream)) => match self.timer.poll_unpin(cx) {
                     Poll::Ready(_) => {
-                        let msg = self.queue.pop();
+                        // Try to move a message from the temporal mix queue to the persistent transmission queue.
+                        // The temporal mix queue may return None with some probability.
+                        if let Some(temporal_mixed_msg) = self.temporal_mix_queue.pop() {
+                            self.persistent_transmission_queue
+                                .push_back(temporal_mixed_msg);
+                        }
+
+                        // Send the first msg in the persistent transmission queue.
+                        // Send a noise message if the queue is empty.
+                        let msg = self
+                            .persistent_transmission_queue
+                            .pop_front()
+                            .unwrap_or(NOISE.to_vec());
                         tracing::debug!("Sending message to outbound stream: {:?}", msg);
                         self.outbound_substream = Some(OutboundSubstreamState::PendingSend(
                             send_msg(stream, msg).boxed(),
@@ -191,9 +206,16 @@ impl ConnectionHandler for MixConnectionHandler {
     fn on_behaviour_event(&mut self, event: Self::FromBehaviour) {
         match event {
             FromBehaviour::Message(msg) => {
-                self.queue.push(msg);
+                // Bypassing temporal_mix_queue, which is only for CryptoMixedMessage.
+                self.persistent_transmission_queue.push_back(msg);
+            }
+            FromBehaviour::CryptoMixedMessage(msg) => {
+                // A message, which was unwrapped by Cryptographic Mix, should be mixed by Temporal Mix before sending.
+                self.temporal_mix_queue.push(msg);
             }
         }
+
+        self.try_wake();
     }
 
     fn on_connection_event(

@@ -1,5 +1,5 @@
 [package]
-name = "nomos-mix-queue"
+name = "nomos-mix-temporal"
 version = "0.1.0"
 edition = "2021"
 

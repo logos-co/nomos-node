@@ -10,7 +10,7 @@ futures-timer = "3.0.3"
 libp2p = "0.53"
 tracing = "0.1"
 nomos-mix-message = { path = "../message" }
-nomos-mix-queue = { path = "../queue" }
+nomos-mix-temporal = { path = "../temporal" }
 
 [dev-dependencies]
 tokio = { version = "1.39", features = ["macros", "rt-multi-thread", "time"] }

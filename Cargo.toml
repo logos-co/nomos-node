@@ -25,7 +25,7 @@ members = [
     "nomos-da/full-replication",
     "nomos-mix/message",
     "nomos-mix/network",
-    "nomos-mix/queue",
+    "nomos-mix/temporal",
     "nomos-cli",
     "nomos-utils",
     "nodes/nomos-node",
