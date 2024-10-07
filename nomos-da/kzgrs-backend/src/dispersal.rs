@@ -63,6 +63,15 @@ impl Metadata {
     }
 }
 
+impl blob::metadata::Metadata for Metadata {
+    type AppId = [u8; 32];
+    type Index = Index;
+
+    fn metadata(&self) -> (Self::AppId, Self::Index) {
+        (self.app_id, self.index)
+    }
+}
+
 impl From<u64> for Index {
     fn from(value: u64) -> Self {
         Self(value.to_be_bytes())

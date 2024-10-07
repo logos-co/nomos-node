@@ -1,16 +1,19 @@
-use crate::adapters::mempool::DaMempoolAdapter;
-use crate::adapters::network::DispersalNetworkAdapter;
-use crate::backend::DispersalBackend;
+// std
+use std::sync::Arc;
+use std::time::Duration;
+// crates
 use futures::StreamExt;
 use itertools::izip;
 use kzgrs_backend::common::blob::DaBlob;
 use kzgrs_backend::common::{build_blob_id, Column, ColumnIndex};
-use kzgrs_backend::encoder;
 use kzgrs_backend::encoder::EncodedData;
+use kzgrs_backend::{dispersal, encoder};
 use nomos_core::da::{BlobId, DaDispersal, DaEncoder};
 use overwatch_rs::DynError;
-use std::sync::Arc;
-use std::time::Duration;
+// internal
+use crate::adapters::mempool::DaMempoolAdapter;
+use crate::adapters::network::DispersalNetworkAdapter;
+use crate::backend::DispersalBackend;
 
 pub struct DispersalKZGRSBackendSettings {
     encoder_settings: encoder::DaEncoderParams,
@@ -75,13 +78,14 @@ impl<NetworkAdapter, MempoolAdapter> DispersalBackend
 where
     NetworkAdapter: DispersalNetworkAdapter + Send + Sync,
     NetworkAdapter::SubnetworkId: From<usize> + Send + Sync,
-    MempoolAdapter: DaMempoolAdapter<BlobId = BlobId> + Send + Sync,
+    MempoolAdapter: DaMempoolAdapter<BlobId = BlobId, Metadata = dispersal::Metadata> + Send + Sync,
 {
     type Settings = DispersalKZGRSBackendSettings;
     type Encoder = encoder::DaEncoder;
     type Dispersal = DispersalFromAdapter<NetworkAdapter>;
     type NetworkAdapter = NetworkAdapter;
     type MempoolAdapter = MempoolAdapter;
+    type Metadata = dispersal::Metadata;
     type BlobId = BlobId;
 
     fn init(
@@ -125,8 +129,12 @@ where
         .await
     }
 
-    async fn publish_to_mempool(&self, blob_id: Self::BlobId) -> Result<(), DynError> {
-        self.mempool_adapter.post_blob_id(blob_id).await
+    async fn publish_to_mempool(
+        &self,
+        blob_id: Self::BlobId,
+        metadata: Self::Metadata,
+    ) -> Result<(), DynError> {
+        self.mempool_adapter.post_blob_id(blob_id, metadata).await
     }
 }
 
