@@ -4,20 +4,20 @@ use std::time::Duration;
 // crates
 use futures::StreamExt;
 use itertools::izip;
+// internal
+use crate::adapters::mempool::DaMempoolAdapter;
+use crate::adapters::network::DispersalNetworkAdapter;
+use crate::backend::DispersalBackend;
 use kzgrs_backend::common::blob::DaBlob;
 use kzgrs_backend::common::{build_blob_id, Column, ColumnIndex};
 use kzgrs_backend::encoder::EncodedData;
 use kzgrs_backend::{dispersal, encoder};
 use nomos_core::da::{BlobId, DaDispersal, DaEncoder};
 use overwatch_rs::DynError;
-// internal
-use crate::adapters::mempool::DaMempoolAdapter;
-use crate::adapters::network::DispersalNetworkAdapter;
-use crate::backend::DispersalBackend;
 
 pub struct DispersalKZGRSBackendSettings {
-    encoder_settings: encoder::DaEncoderParams,
-    dispersal_timeout: Duration,
+    pub encoder_settings: encoder::DaEncoderParams,
+    pub dispersal_timeout: Duration,
 }
 pub struct DispersalKZGRSBackend<NetworkAdapter, MempoolAdapter> {
     settings: DispersalKZGRSBackendSettings,
