@@ -41,6 +41,5 @@ uuid = { version = "1.10.0", features = ["v4"] }
 
 [features]
 default = ["tracing"]
-mixnet = ["nomos-node/mixnet"]
 metrics = ["nomos-node/metrics"]
 tracing = ["nomos-node/tracing"]
