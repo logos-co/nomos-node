@@ -12,7 +12,7 @@ name: PR check
 jobs:
   check:
     name: Check
-    runs-on: ubuntu-latest
+    runs-on: ['self-hosted']
     strategy:
       fail-fast: true
       matrix:
@@ -48,7 +48,7 @@ jobs:
       fail-fast: false # all OSes should be tested even if one fails (default: true)
       matrix:
         feature: [ libp2p, "libp2p,mixnet" ]
-        os: [ ubuntu-latest, macos-latest ] # drop windows for now as risc0 does not support it
+        os: [ self-hosted, macos-latest ] # drop windows for now as risc0 does not support it
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v2
@@ -120,7 +120,7 @@ jobs:
 
   lints:
     name: Rust lints
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     strategy:
       matrix:
         feature: [ libp2p, "libp2p,mixnet" ]
