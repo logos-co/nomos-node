@@ -47,19 +47,6 @@ network:
     port: 3000
     node_key: 40fb62acf1604000c1b8d3bd0880e43eb2f6ae52029fde75d992ba0fed6e01c3
     initial_peers: []
-    mixnet:
-      mixclient:
-        topology:
-          mixnode_candidates:
-          - address: 127.0.0.1:3000
-            public_key: [110, 177, 93, 41, 184, 16, 49, 126, 195, 57, 202, 199, 160, 161, 47, 195, 221, 40, 143, 151, 38, 250, 22, 82, 40, 83, 91, 3, 200, 239, 155, 67]
-          num_layers: 1
-          num_mixnodes_per_layer: 1
-        emission_rate_per_min: 600.0
-        redundancy: 1
-      mixnode:
-        encryption_private_key: [183, 50, 199, 33, 53, 46, 43, 123, 6, 173, 255, 66, 183, 156, 146, 221, 80, 102, 22, 155, 216, 234, 28, 99, 107, 231, 99, 27, 250, 17, 36, 108]
-        delay_rate_per_min: 60000.0
 
 http:
   backend_settings:
