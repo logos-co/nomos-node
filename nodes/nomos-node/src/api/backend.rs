@@ -2,6 +2,7 @@
 use std::error::Error;
 use std::{fmt::Debug, hash::Hash};
 // crates
+use crate::api::paths;
 use axum::{http::HeaderValue, routing, Router, Server};
 use hyper::header::{CONTENT_TYPE, USER_AGENT};
 use nomos_api::Backend;
@@ -226,10 +227,10 @@ where
             )
             .layer(TraceLayer::new_for_http())
             .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
-            .route("/cl/metrics", routing::get(cl_metrics::<Tx>))
-            .route("/cl/status", routing::post(cl_status::<Tx>))
+            .route(paths::CL_METRICS, routing::get(cl_metrics::<Tx>))
+            .route(paths::CL_STATUS, routing::post(cl_status::<Tx>))
             .route(
-                "/cryptarchia/info",
+                paths::CRYPTARCHIA_INFO,
                 routing::get(
                     cryptarchia_info::<
                         Tx,
@@ -243,7 +244,7 @@ where
                 ),
             )
             .route(
-                "/cryptarchia/headers",
+                paths::CRYOTARCHIA_HEADERS,
                 routing::get(
                     cryptarchia_headers::<
                         Tx,
@@ -257,7 +258,7 @@ where
                 ),
             )
             .route(
-                "/da/add_blob",
+                paths::DA_ADD_BLOB,
                 routing::post(
                     add_blob::<
                         DaAttestation,
@@ -269,7 +270,7 @@ where
                 ),
             )
             .route(
-                "/da/get_range",
+                paths::DA_GET_RANGE,
                 routing::post(
                     get_range::<
                         Tx,
@@ -284,14 +285,14 @@ where
                     >,
                 ),
             )
-            .route("/network/info", routing::get(libp2p_info))
+            .route(paths::NETWORK_INFO, routing::get(libp2p_info))
             .route(
-                "/storage/block",
+                paths::STORAGE_BLOCK,
                 routing::post(block::<DaStorageSerializer, Tx>),
             )
-            .route("/mempool/add/tx", routing::post(add_tx::<Tx>))
+            .route(paths::MEMPOOL_ADD_TX, routing::post(add_tx::<Tx>))
             .route(
-                "/mempool/add/blobinfo",
+                paths::MEMPOOL_ADD_BLOB_INFO,
                 routing::post(
                     add_blob_info::<
                         DaVerifiedBlobInfo,
@@ -302,7 +303,7 @@ where
                     >,
                 ),
             )
-            .route("/metrics", routing::get(get_metrics))
+            .route(paths::METRICS, routing::get(get_metrics))
             .with_state(handle);
 
         Server::bind(&self.settings.address)
