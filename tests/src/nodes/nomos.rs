@@ -34,7 +34,9 @@ use nomos_mempool::MempoolMetrics;
 #[cfg(feature = "mixnet")]
 use nomos_network::backends::libp2p::mixnet::MixnetConfig;
 use nomos_network::{backends::libp2p::Libp2pConfig, NetworkConfig};
-use nomos_node::api::paths::{CRYOTARCHIA_HEADERS, CRYPTARCHIA_INFO, DA_GET_RANGE, STORAGE_BLOCK};
+use nomos_node::api::paths::{
+    CL_METRICS, CRYOTARCHIA_HEADERS, CRYPTARCHIA_INFO, DA_GET_RANGE, STORAGE_BLOCK,
+};
 use nomos_node::{api::backend::AxumBackendSettings, Config, Tx};
 use nomos_storage::backends::rocksdb::RocksBackendSettings;
 use once_cell::sync::Lazy;
@@ -137,7 +139,7 @@ impl NomosNode {
 
     async fn wait_online(&self) {
         loop {
-            let res = self.get("cl/metrics").await;
+            let res = self.get(CL_METRICS).await;
             if res.is_ok() && res.unwrap().status().is_success() {
                 break;
             }
@@ -163,7 +165,7 @@ impl NomosNode {
             Pool::Cl => "cl",
             Pool::Da => "da",
         };
-        let addr = format!("{}/metrics", discr);
+        let addr = format!("/{}/metrics", discr);
         let res = self
             .get(&addr)
             .await
