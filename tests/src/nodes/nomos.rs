@@ -34,6 +34,7 @@ use nomos_mempool::MempoolMetrics;
 #[cfg(feature = "mixnet")]
 use nomos_network::backends::libp2p::mixnet::MixnetConfig;
 use nomos_network::{backends::libp2p::Libp2pConfig, NetworkConfig};
+use nomos_node::api::paths::{CRYOTARCHIA_HEADERS, CRYPTARCHIA_INFO, DA_GET_RANGE, STORAGE_BLOCK};
 use nomos_node::{api::backend::AxumBackendSettings, Config, Tx};
 use nomos_storage::backends::rocksdb::RocksBackendSettings;
 use once_cell::sync::Lazy;
@@ -49,11 +50,7 @@ use super::{create_tempdir, persist_tempdir, LOGS_PREFIX};
 use crate::{adjust_timeout, get_available_port, ConsensusConfig, DaConfig, Node};
 
 static CLIENT: Lazy<Client> = Lazy::new(Client::new);
-const CRYPTARCHIA_INFO_API: &str = "cryptarchia/info";
-const GET_HEADERS_INFO: &str = "cryptarchia/headers";
 const NOMOS_BIN: &str = "../target/debug/nomos-node";
-const STORAGE_BLOCKS_API: &str = "storage/block";
-const INDEXER_RANGE_API: &str = "da/get_range";
 const DEFAULT_SLOT_TIME: u64 = 2;
 const CONSENSUS_SLOT_TIME_VAR: &str = "CONSENSUS_SLOT_TIME";
 #[cfg(feature = "mixnet")]
@@ -129,7 +126,7 @@ impl NomosNode {
 
     async fn get(&self, path: &str) -> reqwest::Result<reqwest::Response> {
         CLIENT
-            .get(format!("http://{}/{}", self.addr, path))
+            .get(format!("http://{}{}", self.addr, path))
             .send()
             .await
     }
@@ -150,7 +147,7 @@ impl NomosNode {
 
     pub async fn get_block(&self, id: HeaderId) -> Option<Block<Tx, BlobInfo>> {
         CLIENT
-            .post(format!("http://{}/{}", self.addr, STORAGE_BLOCKS_API))
+            .post(format!("http://{}{}", self.addr, STORAGE_BLOCK))
             .header("Content-Type", "application/json")
             .body(serde_json::to_string(&id).unwrap())
             .send()
@@ -186,7 +183,7 @@ impl NomosNode {
         range: Range<[u8; 8]>,
     ) -> Vec<([u8; 8], Vec<Vec<u8>>)> {
         CLIENT
-            .post(format!("http://{}/{}", self.addr, INDEXER_RANGE_API))
+            .post(format!("http://{}{}", self.addr, DA_GET_RANGE))
             .header("Content-Type", "application/json")
             .body(serde_json::to_string(&GetRangeReq { app_id, range }).unwrap())
             .send()
@@ -224,7 +221,7 @@ impl NomosNode {
     }
 
     pub async fn get_headers(&self, from: Option<HeaderId>, to: Option<HeaderId>) -> Vec<HeaderId> {
-        let mut req = CLIENT.get(format!("http://{}/{}", self.addr, GET_HEADERS_INFO));
+        let mut req = CLIENT.get(format!("http://{}{}", self.addr, CRYOTARCHIA_HEADERS));
 
         if let Some(from) = from {
             req = req.query(&[("from", from)]);
@@ -251,7 +248,7 @@ impl Node for NomosNode {
     }
 
     async fn consensus_info(&self) -> Self::ConsensusInfo {
-        let res = self.get(CRYPTARCHIA_INFO_API).await;
+        let res = self.get(CRYPTARCHIA_INFO).await;
         println!("{:?}", res);
         res.unwrap().json().await.unwrap()
     }
