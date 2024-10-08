@@ -3,6 +3,7 @@ use divan::counter::BytesCount;
 use divan::Bencher;
 use kzgrs_backend::common::blob::DaBlob;
 use kzgrs_backend::encoder::{DaEncoder, DaEncoderParams};
+use kzgrs_backend::global::GLOBAL_PARAMETERS;
 use kzgrs_backend::verifier::DaVerifier;
 use nomos_core::da::DaEncoder as _;
 use rand::{thread_rng, RngCore};
@@ -23,7 +24,7 @@ pub fn rand_data(elements_count: usize) -> Vec<u8> {
 fn verify<const SIZE: usize>(bencher: Bencher, column_size: usize) {
     bencher
         .with_inputs(|| {
-            let params = DaEncoderParams::new(column_size, true);
+            let params = DaEncoderParams::new(column_size, true, GLOBAL_PARAMETERS.clone());
 
             let encoder = DaEncoder::new(params);
             let data = rand_data(SIZE * MB / DaEncoderParams::MAX_BLS12_381_ENCODING_CHUNK_SIZE);
@@ -32,7 +33,11 @@ fn verify<const SIZE: usize>(bencher: Bencher, column_size: usize) {
             let mut rng = thread_rng();
             rng.fill_bytes(&mut buff);
             let sk = SecretKey::key_gen(&buff, &[]).unwrap();
-            let verifier = DaVerifier::new(sk.clone(), &[sk.sk_to_pk()]);
+            let verifier = DaVerifier::new(
+                sk.clone(),
+                (0..column_size as u32).collect(),
+                GLOBAL_PARAMETERS.clone(),
+            );
             let da_blob = DaBlob {
                 column: encoded_data.extended_data.columns().next().unwrap(),
                 column_idx: 0,
