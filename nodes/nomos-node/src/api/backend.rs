@@ -244,7 +244,7 @@ where
                 ),
             )
             .route(
-                paths::CRYOTARCHIA_HEADERS,
+                paths::CRYPTARCHIA_HEADERS,
                 routing::get(
                     cryptarchia_headers::<
                         Tx,

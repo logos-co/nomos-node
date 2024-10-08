@@ -63,6 +63,7 @@ pub struct AxumBackend<
     const SIZE: usize,
 > {
     settings: AxumBackendSettings,
+    #[allow(clippy::type_complexity)]
     _phantom: core::marker::PhantomData<(
         DaAttestation,
         DaBlob,
@@ -267,7 +268,7 @@ where
                 ),
             )
             .route(
-                paths::CRYOTARCHIA_HEADERS,
+                paths::CRYPTARCHIA_HEADERS,
                 routing::get(
                     cryptarchia_headers::<
                         Tx,

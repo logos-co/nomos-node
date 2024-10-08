@@ -35,7 +35,7 @@ use nomos_mempool::MempoolMetrics;
 use nomos_network::backends::libp2p::mixnet::MixnetConfig;
 use nomos_network::{backends::libp2p::Libp2pConfig, NetworkConfig};
 use nomos_node::api::paths::{
-    CL_METRICS, CRYOTARCHIA_HEADERS, CRYPTARCHIA_INFO, DA_GET_RANGE, STORAGE_BLOCK,
+    CL_METRICS, CRYPTARCHIA_HEADERS, CRYPTARCHIA_INFO, DA_GET_RANGE, STORAGE_BLOCK,
 };
 use nomos_node::{api::backend::AxumBackendSettings, Config, Tx};
 use nomos_storage::backends::rocksdb::RocksBackendSettings;
@@ -223,7 +223,7 @@ impl NomosNode {
     }
 
     pub async fn get_headers(&self, from: Option<HeaderId>, to: Option<HeaderId>) -> Vec<HeaderId> {
-        let mut req = CLIENT.get(format!("http://{}{}", self.addr, CRYOTARCHIA_HEADERS));
+        let mut req = CLIENT.get(format!("http://{}{}", self.addr, CRYPTARCHIA_HEADERS));
 
         if let Some(from) = from {
             req = req.query(&[("from", from)]);
