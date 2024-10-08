@@ -3,10 +3,12 @@ use std::fmt::Debug;
 use std::marker::PhantomData;
 // crates
 use tokio::sync::oneshot;
+use tracing::log::error;
 // internal
 use crate::adapters::mempool::DaMempoolAdapter;
 use crate::adapters::network::DispersalNetworkAdapter;
 use crate::backend::DispersalBackend;
+use nomos_core::da::blob::metadata;
 use nomos_da_network_core::{PeerId, SubnetworkId};
 use overwatch_rs::services::handle::ServiceStateHandle;
 use overwatch_rs::services::relay::{Relay, RelayMessage};
@@ -14,7 +16,6 @@ use overwatch_rs::services::state::{NoOperator, NoState};
 use overwatch_rs::services::{ServiceCore, ServiceData, ServiceId};
 use overwatch_rs::DynError;
 use subnetworks_assignations::MembershipHandler;
-use tracing::log::error;
 
 mod adapters;
 pub mod backend;
@@ -22,21 +23,22 @@ pub mod backend;
 const DA_DISPERSAL_TAG: ServiceId = "DA-Encoder";
 
 #[derive(Debug)]
-pub enum DaDispersalMsg {
+pub enum DaDispersalMsg<Metadata> {
     Disperse {
         blob: Vec<u8>,
+        metadata: Metadata,
         reply_channel: oneshot::Sender<Result<(), DynError>>,
     },
 }
 
-impl RelayMessage for DaDispersalMsg {}
+impl<Metadata: 'static> RelayMessage for DaDispersalMsg<Metadata> {}
 
 #[derive(Clone)]
 pub struct DispersalServiceSettings<BackendSettings> {
-    backend: BackendSettings,
+    pub backend: BackendSettings,
 }
 
-pub struct DispersalService<Backend, NetworkAdapter, MempoolAdapter, Membership>
+pub struct DispersalService<Backend, NetworkAdapter, MempoolAdapter, Membership, Metadata>
 where
     Membership: MembershipHandler<NetworkId = SubnetworkId, Id = PeerId>
         + Clone
@@ -44,10 +46,11 @@ where
         + Send
         + Sync
         + 'static,
-    Backend: DispersalBackend<NetworkAdapter = NetworkAdapter>,
+    Backend: DispersalBackend<NetworkAdapter = NetworkAdapter, Metadata = Metadata>,
     Backend::Settings: Clone,
     NetworkAdapter: DispersalNetworkAdapter,
     MempoolAdapter: DaMempoolAdapter,
+    Metadata: metadata::Metadata + Debug + 'static,
 {
     service_state: ServiceStateHandle<Self>,
     network_relay: Relay<NetworkAdapter::NetworkService>,
@@ -55,8 +58,8 @@ where
     _backend: PhantomData<Backend>,
 }
 
-impl<Backend, NetworkAdapter, MempoolAdapter, Membership> ServiceData
-    for DispersalService<Backend, NetworkAdapter, MempoolAdapter, Membership>
+impl<Backend, NetworkAdapter, MempoolAdapter, Membership, Metadata> ServiceData
+    for DispersalService<Backend, NetworkAdapter, MempoolAdapter, Membership, Metadata>
 where
     Membership: MembershipHandler<NetworkId = SubnetworkId, Id = PeerId>
         + Clone
@@ -64,21 +67,22 @@ where
         + Send
         + Sync
         + 'static,
-    Backend: DispersalBackend<NetworkAdapter = NetworkAdapter>,
+    Backend: DispersalBackend<NetworkAdapter = NetworkAdapter, Metadata = Metadata>,
     Backend::Settings: Clone,
     NetworkAdapter: DispersalNetworkAdapter,
     MempoolAdapter: DaMempoolAdapter,
+    Metadata: metadata::Metadata + Debug + 'static,
 {
     const SERVICE_ID: ServiceId = DA_DISPERSAL_TAG;
     type Settings = DispersalServiceSettings<Backend::Settings>;
     type State = NoState<Self::Settings>;
     type StateOperator = NoOperator<Self::State>;
-    type Message = DaDispersalMsg;
+    type Message = DaDispersalMsg<Metadata>;
 }
 
 #[async_trait::async_trait]
-impl<Backend, NetworkAdapter, MempoolAdapter, Membership> ServiceCore
-    for DispersalService<Backend, NetworkAdapter, MempoolAdapter, Membership>
+impl<Backend, NetworkAdapter, MempoolAdapter, Membership, Metadata> ServiceCore
+    for DispersalService<Backend, NetworkAdapter, MempoolAdapter, Membership, Metadata>
 where
     Membership: MembershipHandler<NetworkId = SubnetworkId, Id = PeerId>
         + Clone
@@ -86,12 +90,16 @@ where
         + Send
         + Sync
         + 'static,
-    Backend: DispersalBackend<NetworkAdapter = NetworkAdapter, MempoolAdapter = MempoolAdapter>
-        + Send
+    Backend: DispersalBackend<
+            NetworkAdapter = NetworkAdapter,
+            MempoolAdapter = MempoolAdapter,
+            Metadata = Metadata,
+        > + Send
         + Sync,
     Backend::Settings: Clone + Send + Sync,
     NetworkAdapter: DispersalNetworkAdapter<SubnetworkId = Membership::NetworkId> + Send,
     MempoolAdapter: DaMempoolAdapter,
+    Metadata: metadata::Metadata + Debug + Send + 'static,
 {
     fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, DynError> {
         let network_relay = service_state.overwatch_handle.relay();
@@ -124,9 +132,12 @@ where
             match dispersal_msg {
                 DaDispersalMsg::Disperse {
                     blob,
+                    metadata,
                     reply_channel,
                 } => {
-                    if let Err(Err(e)) = reply_channel.send(backend.process_dispersal(blob).await) {
+                    if let Err(Err(e)) =
+                        reply_channel.send(backend.process_dispersal(blob, metadata).await)
+                    {
                         error!("Error forwarding dispersal response: {e}");
                     }
                 }

@@ -9,11 +9,13 @@ futures = "0.3"
 itertools = "0.13"
 nomos-core = { path = "../../../nomos-core" }
 nomos-da-network-core = { path = "../../../nomos-da/network/core" }
-nomos-mempool = { path = "../../mempool", features = ["libp2p"] }
-subnetworks-assignations = { path = "../../../nomos-da/network/subnetworks-assignations" }
 nomos-da-network-service = { path = "../../../nomos-services/data-availability/network" }
+nomos-da-sampling = { path = "../sampling" }
+nomos-mempool = { path = "../../mempool", features = ["libp2p"] }
 kzgrs-backend = { path = "../../../nomos-da/kzgrs-backend" }
 overwatch-rs = { git = "https://github.com/logos-co/Overwatch", rev = "2f70806" }
+rand = "0.8"
+subnetworks-assignations = { path = "../../../nomos-da/network/subnetworks-assignations" }
 tokio = "1.40"
 thiserror = "1.0"
 tracing = "0.1"

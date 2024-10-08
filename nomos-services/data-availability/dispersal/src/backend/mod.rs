@@ -1,6 +1,6 @@
 use crate::adapters::{mempool::DaMempoolAdapter, network::DispersalNetworkAdapter};
 
-use nomos_core::da::{DaDispersal, DaEncoder};
+use nomos_core::da::{blob::metadata, DaDispersal, DaEncoder};
 use overwatch_rs::DynError;
 
 pub mod kzgrs;
@@ -12,6 +12,7 @@ pub trait DispersalBackend {
     type Dispersal: DaDispersal<EncodedData = <Self::Encoder as DaEncoder>::EncodedData>;
     type NetworkAdapter: DispersalNetworkAdapter;
     type MempoolAdapter: DaMempoolAdapter;
+    type Metadata: metadata::Metadata + Send;
     type BlobId: Send;
 
     fn init(
@@ -28,12 +29,20 @@ pub trait DispersalBackend {
         encoded_data: <Self::Encoder as DaEncoder>::EncodedData,
     ) -> Result<(), DynError>;
 
-    async fn publish_to_mempool(&self, blob_id: Self::BlobId) -> Result<(), DynError>;
+    async fn publish_to_mempool(
+        &self,
+        blob_id: Self::BlobId,
+        metadata: Self::Metadata,
+    ) -> Result<(), DynError>;
 
-    async fn process_dispersal(&self, data: Vec<u8>) -> Result<(), DynError> {
+    async fn process_dispersal(
+        &self,
+        data: Vec<u8>,
+        metadata: Self::Metadata,
+    ) -> Result<(), DynError> {
         let (blob_id, encoded_data) = self.encode(data).await?;
         self.disperse(encoded_data).await?;
-        self.publish_to_mempool(blob_id).await?;
+        self.publish_to_mempool(blob_id, metadata).await?;
         Ok(())
     }
 }
