@@ -1,4 +1,4 @@
-mod api;
+pub mod api;
 pub mod config;
 
 // std

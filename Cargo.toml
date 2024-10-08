@@ -38,6 +38,7 @@ members = [
     "proof_of_leadership/proof_statements",
     "testnet/cfgsync",
     "tests",
+    "clients/executor-http-client",
 ]
 exclude = ["proof_of_leadership/risc0/risc0_proofs"]
 resolver = "2"

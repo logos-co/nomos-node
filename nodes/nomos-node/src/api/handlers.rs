@@ -201,7 +201,7 @@ where
     post,
     path = "/da/add_blob",
     responses(
-        (status = 200, description = "Attestation for DA blob", body = Option<Attestation>),
+        (status = 200, description = "Blob to be published received"),
         (status = 500, description = "Internal server error", body = String),
     )
 )]
