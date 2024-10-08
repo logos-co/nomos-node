@@ -4,19 +4,28 @@ use std::time::Duration;
 // crates
 use futures::StreamExt;
 use itertools::izip;
+use serde::{Deserialize, Serialize};
 // internal
 use crate::adapters::mempool::DaMempoolAdapter;
 use crate::adapters::network::DispersalNetworkAdapter;
 use crate::backend::DispersalBackend;
 use kzgrs_backend::common::blob::DaBlob;
 use kzgrs_backend::common::{build_blob_id, Column, ColumnIndex};
-use kzgrs_backend::encoder::EncodedData;
+use kzgrs_backend::encoder::{DaEncoderParams, EncodedData};
 use kzgrs_backend::{dispersal, encoder};
 use nomos_core::da::{BlobId, DaDispersal, DaEncoder};
 use overwatch_rs::DynError;
 
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct EncoderSettings {
+    pub num_columns: usize,
+    pub with_cache: bool,
+    pub global_params_path: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct DispersalKZGRSBackendSettings {
-    pub encoder_settings: encoder::DaEncoderParams,
+    pub encoder_settings: EncoderSettings,
     pub dispersal_timeout: Duration,
 }
 pub struct DispersalKZGRSBackend<NetworkAdapter, MempoolAdapter> {
@@ -37,7 +46,7 @@ pub struct DispersalFromAdapter<Adapter> {
 impl<Adapter> DaDispersal for DispersalFromAdapter<Adapter>
 where
     Adapter: DispersalNetworkAdapter + Send + Sync,
-    Adapter::SubnetworkId: From<usize> + Send + Sync,
+    Adapter::SubnetworkId: From<u32> + Send + Sync,
 {
     type EncodedData = EncodedData;
     type Error = DynError;
@@ -52,7 +61,9 @@ where
 
         let reponses_stream = adapter.dispersal_events_stream().await?;
         for (subnetwork_id, blob) in encoded_data_to_da_blobs(encoded_data).enumerate() {
-            adapter.disperse(subnetwork_id.into(), blob).await?;
+            adapter
+                .disperse((subnetwork_id as u32).into(), blob)
+                .await?;
         }
 
         let valid_responses = reponses_stream
@@ -77,7 +88,7 @@ impl<NetworkAdapter, MempoolAdapter> DispersalBackend
     for DispersalKZGRSBackend<NetworkAdapter, MempoolAdapter>
 where
     NetworkAdapter: DispersalNetworkAdapter + Send + Sync,
-    NetworkAdapter::SubnetworkId: From<usize> + Send + Sync,
+    NetworkAdapter::SubnetworkId: From<u32> + Send + Sync,
     MempoolAdapter: DaMempoolAdapter<BlobId = BlobId, Metadata = dispersal::Metadata> + Send + Sync,
 {
     type Settings = DispersalKZGRSBackendSettings;
@@ -93,7 +104,16 @@ where
         network_adapter: Self::NetworkAdapter,
         mempool_adapter: Self::MempoolAdapter,
     ) -> Self {
-        let encoder = Self::Encoder::new(settings.encoder_settings.clone());
+        let encoder_settings = &settings.encoder_settings;
+        let global_params = kzgrs_backend::global::global_parameters_from_file(
+            &encoder_settings.global_params_path,
+        )
+        .expect("Global encoder params should be available");
+        let encoder = Self::Encoder::new(DaEncoderParams::new(
+            encoder_settings.num_columns,
+            encoder_settings.with_cache,
+            global_params,
+        ));
         Self {
             settings,
             network_adapter: Arc::new(network_adapter),

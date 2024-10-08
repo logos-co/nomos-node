@@ -12,6 +12,7 @@ hyper = { version = "0.14", features = ["full"] }
 kzgrs-backend = { path = "../../nomos-da/kzgrs-backend" }
 nomos-api = { path = "../../nomos-services/api" }
 nomos-core = { path = "../../nomos-core" }
+nomos-da-dispersal = { path = "../../nomos-services/data-availability/dispersal" }
 nomos-da-network-core = { path = "../../nomos-da/network/core" }
 nomos-da-network-service = { path = "../../nomos-services/data-availability/network" }
 nomos-da-sampling = { path = "../../nomos-services/data-availability/sampling", features = ["rocksdb-backend"] }

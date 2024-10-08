@@ -19,6 +19,7 @@ use crate::ExecutorApiService;
 pub struct Config {
     pub log: <Logger as ServiceData>::Settings,
     pub network: <NetworkService<NetworkBackend> as ServiceData>::Settings,
+    pub da_dispersal: <crate::DaDispersal as ServiceData>::Settings,
     pub da_network:
         <DaNetworkService<DaNetworkExecutorBackend<FillFromNodeList>> as ServiceData>::Settings,
     pub da_indexer: <crate::DaIndexer as ServiceData>::Settings,

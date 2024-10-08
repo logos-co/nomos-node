@@ -2,6 +2,7 @@
 use std::fmt::Debug;
 use std::marker::PhantomData;
 // crates
+use serde::{Deserialize, Serialize};
 use tokio::sync::oneshot;
 use tracing::log::error;
 // internal
@@ -17,7 +18,7 @@ use overwatch_rs::services::{ServiceCore, ServiceData, ServiceId};
 use overwatch_rs::DynError;
 use subnetworks_assignations::MembershipHandler;
 
-mod adapters;
+pub mod adapters;
 pub mod backend;
 
 const DA_DISPERSAL_TAG: ServiceId = "DA-Encoder";
@@ -33,7 +34,7 @@ pub enum DaDispersalMsg<Metadata> {
 
 impl<Metadata: 'static> RelayMessage for DaDispersalMsg<Metadata> {}
 
-#[derive(Clone)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct DispersalServiceSettings<BackendSettings> {
     pub backend: BackendSettings,
 }
