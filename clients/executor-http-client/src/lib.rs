@@ -1,5 +1,10 @@
-use nomos_executor::api::paths;
+// std
+// crates
 use reqwest::{Client, ClientBuilder, StatusCode, Url};
+use serde::Serialize;
+// internal
+use nomos_core::da::blob::Blob;
+use nomos_executor::api::paths;
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
@@ -36,12 +41,21 @@ impl ExecutorHttpClient {
         }
     }
 
-    pub async fn add_blob(&self) -> Result<(), Error> {
+    pub async fn add_blob<DaBlob>(&self, blob: DaBlob) -> Result<(), Error>
+    where
+        DaBlob: Blob + Serialize,
+    {
         let url = self
             .executor_address
             .join(paths::DA_ADD_BLOB)
             .expect("Url should build properly");
-        let response = self.client.post(url).send().await.map_err(Error::Request)?;
+        let response = self
+            .client
+            .post(url)
+            .json(&blob)
+            .send()
+            .await
+            .map_err(Error::Request)?;
         match response.status() {
             StatusCode::OK => Ok(()),
             StatusCode::INTERNAL_SERVER_ERROR => Err(Error::Server(

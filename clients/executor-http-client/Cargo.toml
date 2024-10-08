@@ -4,6 +4,8 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+nomos-core = { path = "../../nomos-core" }
 nomos-executor = { path = "../../nodes/nomos-executor" }
 reqwest = "0.12"
+serde = "1.0"
 thiserror = "1.0"
