@@ -1,9 +1,7 @@
 // std
 // crates
 use reqwest::{Client, ClientBuilder, StatusCode, Url};
-use serde::Serialize;
 // internal
-use nomos_core::da::blob::Blob;
 use nomos_executor::api::paths;
 
 #[derive(thiserror::Error, Debug)]
@@ -41,10 +39,8 @@ impl ExecutorHttpClient {
         }
     }
 
-    pub async fn add_blob<DaBlob>(&self, blob: DaBlob) -> Result<(), Error>
-    where
-        DaBlob: Blob + Serialize,
-    {
+    /// Send a `Blob` to be dispersed
+    pub async fn publish_blob(&self, blob: Vec<u8>) -> Result<(), Error> {
         let url = self
             .executor_address
             .join(paths::DA_ADD_BLOB)
@@ -52,7 +48,7 @@ impl ExecutorHttpClient {
         let response = self
             .client
             .post(url)
-            .json(&blob)
+            .body(blob)
             .send()
             .await
             .map_err(Error::Request)?;
