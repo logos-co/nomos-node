@@ -1,0 +1,9 @@
+[package]
+name = "executor-http-client"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+nomos-executor = { path = "../../nodes/nomos-executor" }
+reqwest = "0.12"
+thiserror = "1.0"
