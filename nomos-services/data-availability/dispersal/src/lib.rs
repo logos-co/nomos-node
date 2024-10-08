@@ -26,7 +26,7 @@ const DA_DISPERSAL_TAG: ServiceId = "DA-Encoder";
 #[derive(Debug)]
 pub enum DaDispersalMsg<Metadata> {
     Disperse {
-        blob: Vec<u8>,
+        data: Vec<u8>,
         metadata: Metadata,
         reply_channel: oneshot::Sender<Result<(), DynError>>,
     },
@@ -132,12 +132,12 @@ where
         while let Some(dispersal_msg) = inbound_relay.recv().await {
             match dispersal_msg {
                 DaDispersalMsg::Disperse {
-                    blob,
+                    data,
                     metadata,
                     reply_channel,
                 } => {
                     if let Err(Err(e)) =
-                        reply_channel.send(backend.process_dispersal(blob, metadata).await)
+                        reply_channel.send(backend.process_dispersal(data, metadata).await)
                     {
                         error!("Error forwarding dispersal response: {e}");
                     }

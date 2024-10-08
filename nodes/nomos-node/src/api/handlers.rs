@@ -10,6 +10,9 @@ use axum::{
     Json,
 };
 use hyper::{header::CONTENT_TYPE, Body, StatusCode};
+use rand::{RngCore, SeedableRng};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
+// internal
 use nomos_api::http::{cl, consensus, da, libp2p, mempool, metrics, storage};
 use nomos_core::da::blob::info::DispersedBlobInfo;
 use nomos_core::da::blob::metadata::Metadata;
@@ -23,11 +26,9 @@ use nomos_mempool::network::adapters::libp2p::Libp2pAdapter as MempoolNetworkAda
 use nomos_network::backends::libp2p::Libp2p as NetworkBackend;
 use nomos_storage::backends::StorageSerde;
 use overwatch_rs::overwatch::handle::OverwatchHandle;
-use rand::{RngCore, SeedableRng};
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use subnetworks_assignations::MembershipHandler;
-// internal
 
+#[macro_export]
 macro_rules! make_request_and_return_response {
     ($cond:expr) => {{
         match $cond.await {

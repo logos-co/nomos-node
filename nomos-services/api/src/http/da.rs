@@ -1,10 +1,14 @@
 use bytes::Bytes;
 use core::ops::Range;
 use nomos_core::da::blob::info::DispersedBlobInfo;
-use nomos_core::da::blob::{metadata::Metadata, select::FillSize as FillSizeWithBlobs, Blob};
+use nomos_core::da::blob::{metadata, select::FillSize as FillSizeWithBlobs, Blob};
 use nomos_core::da::{BlobId, DaVerifier as CoreDaVerifier};
 use nomos_core::header::HeaderId;
 use nomos_core::tx::{select::FillSize as FillSizeWithTx, Transaction};
+use nomos_da_dispersal::adapters::mempool::DaMempoolAdapter;
+use nomos_da_dispersal::adapters::network::DispersalNetworkAdapter;
+use nomos_da_dispersal::backend::DispersalBackend;
+use nomos_da_dispersal::{DaDispersalMsg, DispersalService};
 use nomos_da_indexer::storage::adapters::rocksdb::RocksAdapter as IndexerStorageAdapter;
 use nomos_da_indexer::DaMsg;
 use nomos_da_indexer::{
@@ -62,8 +66,15 @@ pub type DaIndexer<
     SamplingStorage,
 >;
 
-pub type DaVerifier<A, B, M, VB, SS> =
-    DaVerifierService<VB, Libp2pAdapter<M>, VerifierStorageAdapter<A, B, SS>>;
+pub type DaVerifier<Attestation, Blob, Membership, VerifierBackend, StorageSerializer> =
+    DaVerifierService<
+        VerifierBackend,
+        Libp2pAdapter<Membership>,
+        VerifierStorageAdapter<Attestation, Blob, StorageSerializer>,
+    >;
+
+pub type DaDispersal<Backend, NetworkAdapter, MempoolAdapter, Membership, Metadata> =
+    DispersalService<Backend, NetworkAdapter, MempoolAdapter, Membership, Metadata>;
 
 pub async fn add_blob<A, B, M, VB, SS>(
     handle: &OverwatchHandle,
@@ -113,9 +124,9 @@ pub async fn get_range<
     const SIZE: usize,
 >(
     handle: &OverwatchHandle,
-    app_id: <V as Metadata>::AppId,
-    range: Range<<V as Metadata>::Index>,
-) -> Result<Vec<(<V as Metadata>::Index, Vec<Bytes>)>, DynError>
+    app_id: <V as metadata::Metadata>::AppId,
+    range: Range<<V as metadata::Metadata>::Index>,
+) -> Result<Vec<(<V as metadata::Metadata>::Index, Vec<Bytes>)>, DynError>
 where
     Tx: Transaction
         + Eq
@@ -141,7 +152,7 @@ where
         + From<C>
         + Eq
         + Debug
-        + Metadata
+        + metadata::Metadata
         + Hash
         + Clone
         + Serialize
@@ -150,8 +161,8 @@ where
         + Sync
         + 'static,
     <V as DispersedBlobInfo>::BlobId: Debug + Clone + Ord + Hash,
-    <V as Metadata>::AppId: AsRef<[u8]> + Serialize + Clone + Send + Sync,
-    <V as Metadata>::Index:
+    <V as metadata::Metadata>::AppId: AsRef<[u8]> + Serialize + Clone + Send + Sync,
+    <V as metadata::Metadata>::Index:
         AsRef<[u8]> + Serialize + DeserializeOwned + Clone + PartialOrd + Send + Sync,
     SS: StorageSerde + Send + Sync + 'static,
     SamplingRng: SeedableRng + RngCore,
@@ -187,4 +198,44 @@ where
         .map_err(|(e, _)| e)?;
 
     Ok(receiver.await?)
+}
+
+pub async fn disperse_data<Backend, NetworkAdapter, MempoolAdapter, Membership, Metadata>(
+    handle: &OverwatchHandle,
+    data: Vec<u8>,
+    metadata: Metadata,
+) -> Result<(), DynError>
+where
+    Membership: MembershipHandler<NetworkId = SubnetworkId, Id = PeerId>
+        + Clone
+        + Debug
+        + Send
+        + Sync
+        + 'static,
+    Backend: DispersalBackend<
+            NetworkAdapter = NetworkAdapter,
+            MempoolAdapter = MempoolAdapter,
+            Metadata = Metadata,
+        > + Send
+        + Sync,
+    Backend::Settings: Clone + Send + Sync,
+    NetworkAdapter: DispersalNetworkAdapter<SubnetworkId = Membership::NetworkId> + Send,
+    MempoolAdapter: DaMempoolAdapter,
+    Metadata: metadata::Metadata + Debug + Send + 'static,
+{
+    let relay = handle
+        .relay::<DaDispersal<Backend, NetworkAdapter, MempoolAdapter, Membership, Metadata>>()
+        .connect()
+        .await?;
+    let (sender, receiver) = oneshot::channel();
+    relay
+        .send(DaDispersalMsg::Disperse {
+            data,
+            metadata,
+            reply_channel: sender,
+        })
+        .await
+        .map_err(|(e, _)| e)?;
+
+    Ok(receiver.await??)
 }
