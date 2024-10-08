@@ -1,6 +1,7 @@
 use divan::counter::BytesCount;
 use divan::Bencher;
 use kzgrs_backend::encoder::{DaEncoder, DaEncoderParams};
+use kzgrs_backend::global::GLOBAL_PARAMETERS;
 use rand::RngCore;
 use std::hint::black_box;
 
@@ -19,7 +20,7 @@ pub fn rand_data(elements_count: usize) -> Vec<u8> {
 fn encode<const SIZE: usize>(bencher: Bencher, column_size: usize) {
     bencher
         .with_inputs(|| {
-            let params = DaEncoderParams::new(column_size, true, /* ark_poly_commit::kzg10::data_structures::UniversalParams<ark_ec::models::bls12::Bls12<ark_bls12_381::curves::Config>> */);
+            let params = DaEncoderParams::new(column_size, true, GLOBAL_PARAMETERS.clone());
             (
                 DaEncoder::new(params),
                 rand_data(SIZE * MB / DaEncoderParams::MAX_BLS12_381_ENCODING_CHUNK_SIZE),

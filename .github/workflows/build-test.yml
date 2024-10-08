@@ -12,7 +12,7 @@ name: PR check
 jobs:
   check:
     name: Check
-    runs-on: ['self-hosted']
+    runs-on: [ 'self-hosted' ]
     strategy:
       fail-fast: true
       matrix:
@@ -112,6 +112,15 @@ jobs:
         with:
           command: test
           args: --no-default-features --features ${{ matrix.feature }}
+      - name: Cargo bench (no-run)
+        if: matrix.os != 'windows-latest'
+        uses: actions-rs/cargo@v1
+        env:
+          RISC0_DEV_MODE: true
+          CONSENSUS_SLOT_TIME: 5
+        with:
+          command: bench
+          args: --no-run
       - uses: actions/upload-artifact@v3
         if: failure()
         with:
