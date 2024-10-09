@@ -26,7 +26,7 @@ pub struct Config {
     pub da_verifier: <crate::DaVerifier as ServiceData>::Settings,
     pub da_sampling: <crate::DaSampling as ServiceData>::Settings,
     pub http: <ExecutorApiService as ServiceData>::Settings,
-    pub cryptarchia: <crate::Cryptarchia as ServiceData>::Settings,
+    pub cryptarchia: <crate::ExecutorCryptarchia as ServiceData>::Settings,
     pub storage: <crate::StorageService<RocksBackend<Wire>> as ServiceData>::Settings,
     pub wait_online_secs: u64,
 }

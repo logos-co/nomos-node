@@ -60,6 +60,9 @@ pub type DaDispersal = DispersalService<
     kzgrs_backend::dispersal::Metadata,
 >;
 
+pub type ExecutorCryptarchia =
+    Cryptarchia<nomos_da_sampling::network::adapters::executor::Libp2pAdapter<NomosDaMembership>>;
+
 #[derive(Services)]
 pub struct NomosExecutor {
     #[cfg(feature = "tracing")]
@@ -72,7 +75,7 @@ pub struct NomosExecutor {
     da_network: ServiceHandle<DaNetworkService<DaNetworkExecutorBackend<NomosDaMembership>>>,
     cl_mempool: ServiceHandle<TxMempool>,
     da_mempool: ServiceHandle<DaMempool>,
-    cryptarchia: ServiceHandle<Cryptarchia>,
+    cryptarchia: ServiceHandle<ExecutorCryptarchia>,
     http: ServiceHandle<ExecutorApiService>,
     storage: ServiceHandle<StorageService<RocksBackend<Wire>>>,
     #[cfg(feature = "metrics")]

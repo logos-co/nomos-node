@@ -83,7 +83,7 @@ pub const CL_TOPIC: &str = "cl";
 pub const DA_TOPIC: &str = "da";
 pub const MB16: usize = 1024 * 1024 * 16;
 
-pub type Cryptarchia = cryptarchia_consensus::CryptarchiaConsensus<
+pub type Cryptarchia<SamplingAdapter> = cryptarchia_consensus::CryptarchiaConsensus<
     cryptarchia_consensus::network::adapters::libp2p::LibP2pAdapter<Tx, BlobInfo>,
     MockPool<HeaderId, Tx, <Tx as Transaction>::Hash>,
     MempoolNetworkAdapter<Tx, <Tx as Transaction>::Hash>,
@@ -93,10 +93,13 @@ pub type Cryptarchia = cryptarchia_consensus::CryptarchiaConsensus<
     FillSizeWithBlobs<MB16, BlobInfo>,
     RocksBackend<Wire>,
     KzgrsSamplingBackend<ChaCha20Rng>,
-    nomos_da_sampling::network::adapters::validator::Libp2pAdapter<NomosDaMembership>,
+    SamplingAdapter,
     ChaCha20Rng,
     SamplingStorageAdapter<DaBlob, Wire>,
 >;
+
+pub type NodeCryptarchia =
+    Cryptarchia<nomos_da_sampling::network::adapters::validator::Libp2pAdapter<NomosDaMembership>>;
 
 pub type TxMempool = TxMempoolService<
     MempoolNetworkAdapter<Tx, <Tx as Transaction>::Hash>,
@@ -156,7 +159,7 @@ pub struct Nomos {
     da_network: ServiceHandle<DaNetworkService<DaNetworkValidatorBackend<NomosDaMembership>>>,
     cl_mempool: ServiceHandle<TxMempool>,
     da_mempool: ServiceHandle<DaMempool>,
-    cryptarchia: ServiceHandle<Cryptarchia>,
+    cryptarchia: ServiceHandle<NodeCryptarchia>,
     http: ServiceHandle<NomosApiService>,
     storage: ServiceHandle<StorageService<RocksBackend<Wire>>>,
     #[cfg(feature = "metrics")]
