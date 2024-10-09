@@ -22,6 +22,7 @@ nomos-mempool = { path = "../../nomos-services/mempool", features = [
     "openapi",
 ] }
 nomos-metrics = { path = "../../nomos-services/metrics" }
+nomos-da-dispersal = { path = "../data-availability/dispersal" }
 nomos-da-indexer = { path = "../data-availability/indexer", features = ["rocksdb-backend"] }
 nomos-da-sampling = { path = "../data-availability/sampling" }
 nomos-da-verifier = { path = "../data-availability/verifier", features = ["rocksdb-backend", "libp2p"] }

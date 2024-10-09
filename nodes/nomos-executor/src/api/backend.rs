@@ -6,7 +6,6 @@ use axum::{http::HeaderValue, routing, Router, Server};
 use hyper::header::{CONTENT_TYPE, USER_AGENT};
 use rand::{RngCore, SeedableRng};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use subnetworks_assignations::MembershipHandler;
 use tower_http::{
     cors::{Any, CorsLayer},
     trace::TraceLayer,
@@ -14,12 +13,14 @@ use tower_http::{
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 // internal
+use super::handlers::disperse_data;
 use crate::api::paths;
 use nomos_api::Backend;
 use nomos_core::da::blob::info::DispersedBlobInfo;
-use nomos_core::da::blob::metadata::Metadata;
+use nomos_core::da::blob::metadata;
 use nomos_core::da::DaVerifier as CoreDaVerifier;
 use nomos_core::{da::blob::Blob, header::HeaderId, tx::Transaction};
+use nomos_da_dispersal::adapters::mempool::DaMempoolAdapter;
 use nomos_da_network_core::SubnetworkId;
 use nomos_da_sampling::backend::DaSamplingServiceBackend;
 use nomos_da_verifier::backend::VerifierBackend;
@@ -31,6 +32,7 @@ use nomos_node::api::handlers::{
 };
 use nomos_storage::backends::StorageSerde;
 use overwatch_rs::overwatch::handle::OverwatchHandle;
+use subnetworks_assignations::MembershipHandler;
 
 /// Configuration for the Http Server
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
@@ -50,6 +52,10 @@ pub struct AxumBackend<
     DaVerifierBackend,
     Tx,
     DaStorageSerializer,
+    DispersalBackend,
+    DispersalNetworkAdapter,
+    DispersalMempoolAdapter,
+    Metadata,
     SamplingBackend,
     SamplingNetworkAdapter,
     SamplingRng,
@@ -57,18 +63,25 @@ pub struct AxumBackend<
     const SIZE: usize,
 > {
     settings: AxumBackendSettings,
-    _attestation: core::marker::PhantomData<DaAttestation>,
-    _blob: core::marker::PhantomData<DaBlob>,
-    _certificate: core::marker::PhantomData<DaBlobInfo>,
-    _membership: core::marker::PhantomData<Memebership>,
-    _vid: core::marker::PhantomData<DaVerifiedBlobInfo>,
-    _verifier_backend: core::marker::PhantomData<DaVerifierBackend>,
-    _tx: core::marker::PhantomData<Tx>,
-    _storage_serde: core::marker::PhantomData<DaStorageSerializer>,
-    _sampling_backend: core::marker::PhantomData<SamplingBackend>,
-    _sampling_network_adapter: core::marker::PhantomData<SamplingNetworkAdapter>,
-    _sampling_rng: core::marker::PhantomData<SamplingRng>,
-    _sampling_storage: core::marker::PhantomData<SamplingStorage>,
+    #[allow(clippy::type_complexity)]
+    _phantom: core::marker::PhantomData<(
+        DaAttestation,
+        DaBlob,
+        DaBlobInfo,
+        Memebership,
+        DaVerifiedBlobInfo,
+        DaVerifierBackend,
+        Tx,
+        DaStorageSerializer,
+        DispersalBackend,
+        DispersalNetworkAdapter,
+        DispersalMempoolAdapter,
+        Metadata,
+        SamplingBackend,
+        SamplingNetworkAdapter,
+        SamplingRng,
+        SamplingStorage,
+    )>,
 }
 
 #[derive(OpenApi)]
@@ -94,6 +107,10 @@ impl<
         DaVerifierBackend,
         Tx,
         DaStorageSerializer,
+        DispersalBackend,
+        DispersalNetworkAdapter,
+        DispersalMempoolAdapter,
+        Metadata,
         SamplingBackend,
         SamplingNetworkAdapter,
         SamplingRng,
@@ -109,6 +126,10 @@ impl<
         DaVerifierBackend,
         Tx,
         DaStorageSerializer,
+        DispersalBackend,
+        DispersalNetworkAdapter,
+        DispersalMempoolAdapter,
+        Metadata,
         SamplingBackend,
         SamplingNetworkAdapter,
         SamplingRng,
@@ -139,7 +160,7 @@ where
         + From<DaBlobInfo>
         + Eq
         + Debug
-        + Metadata
+        + metadata::Metadata
         + Hash
         + Clone
         + Serialize
@@ -148,9 +169,9 @@ where
         + Sync
         + 'static,
     <DaVerifiedBlobInfo as DispersedBlobInfo>::BlobId: Debug + Clone + Ord + Hash,
-    <DaVerifiedBlobInfo as Metadata>::AppId:
+    <DaVerifiedBlobInfo as metadata::Metadata>::AppId:
         AsRef<[u8]> + Clone + Serialize + DeserializeOwned + Send + Sync,
-    <DaVerifiedBlobInfo as Metadata>::Index:
+    <DaVerifiedBlobInfo as metadata::Metadata>::Index:
         AsRef<[u8]> + Clone + Serialize + DeserializeOwned + PartialOrd + Send + Sync,
     DaVerifierBackend: VerifierBackend + CoreDaVerifier<DaBlob = DaBlob> + Send + Sync + 'static,
     <DaVerifierBackend as VerifierBackend>::Settings: Clone,
@@ -168,6 +189,20 @@ where
     <Tx as nomos_core::tx::Transaction>::Hash:
         Serialize + for<'de> Deserialize<'de> + std::cmp::Ord + Debug + Send + Sync + 'static,
     DaStorageSerializer: StorageSerde + Send + Sync + 'static,
+    DispersalBackend: nomos_da_dispersal::backend::DispersalBackend<
+            NetworkAdapter = DispersalNetworkAdapter,
+            MempoolAdapter = DispersalMempoolAdapter,
+            Metadata = Metadata,
+        > + Send
+        + Sync
+        + 'static,
+    DispersalBackend::Settings: Clone + Send + Sync,
+    DispersalNetworkAdapter: nomos_da_dispersal::adapters::network::DispersalNetworkAdapter<
+            SubnetworkId = Membership::NetworkId,
+        > + Send
+        + 'static,
+    DispersalMempoolAdapter: DaMempoolAdapter + Send + 'static,
+    Metadata: DeserializeOwned + metadata::Metadata + Debug + Send + 'static,
     SamplingRng: SeedableRng + RngCore + Send + 'static,
     SamplingBackend: DaSamplingServiceBackend<
             SamplingRng,
@@ -189,18 +224,7 @@ where
     {
         Ok(Self {
             settings,
-            _attestation: core::marker::PhantomData,
-            _blob: core::marker::PhantomData,
-            _certificate: core::marker::PhantomData,
-            _membership: core::marker::PhantomData,
-            _vid: core::marker::PhantomData,
-            _verifier_backend: core::marker::PhantomData,
-            _tx: core::marker::PhantomData,
-            _storage_serde: core::marker::PhantomData,
-            _sampling_backend: core::marker::PhantomData,
-            _sampling_network_adapter: core::marker::PhantomData,
-            _sampling_rng: core::marker::PhantomData,
-            _sampling_storage: core::marker::PhantomData,
+            _phantom: core::marker::PhantomData,
         })
     }
 
@@ -244,7 +268,7 @@ where
                 ),
             )
             .route(
-                paths::CRYOTARCHIA_HEADERS,
+                paths::CRYPTARCHIA_HEADERS,
                 routing::get(
                     cryptarchia_headers::<
                         Tx,
@@ -304,6 +328,18 @@ where
                 ),
             )
             .route(paths::METRICS, routing::get(get_metrics))
+            .route(
+                paths::DISPERSE_DATA,
+                routing::post(
+                    disperse_data::<
+                        DispersalBackend,
+                        DispersalNetworkAdapter,
+                        DispersalMempoolAdapter,
+                        Membership,
+                        Metadata,
+                    >,
+                ),
+            )
             .with_state(handle);
 
         Server::bind(&self.settings.address)

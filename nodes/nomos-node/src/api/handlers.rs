@@ -10,6 +10,10 @@ use axum::{
     Json,
 };
 use hyper::{header::CONTENT_TYPE, Body, StatusCode};
+use rand::{RngCore, SeedableRng};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
+// internal
+use super::paths;
 use nomos_api::http::{cl, consensus, da, libp2p, mempool, metrics, storage};
 use nomos_core::da::blob::info::DispersedBlobInfo;
 use nomos_core::da::blob::metadata::Metadata;
@@ -23,11 +27,9 @@ use nomos_mempool::network::adapters::libp2p::Libp2pAdapter as MempoolNetworkAda
 use nomos_network::backends::libp2p::Libp2p as NetworkBackend;
 use nomos_storage::backends::StorageSerde;
 use overwatch_rs::overwatch::handle::OverwatchHandle;
-use rand::{RngCore, SeedableRng};
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use subnetworks_assignations::MembershipHandler;
-// internal
 
+#[macro_export]
 macro_rules! make_request_and_return_response {
     ($cond:expr) => {{
         match $cond.await {
@@ -45,7 +47,7 @@ macro_rules! make_request_and_return_response {
 
 #[utoipa::path(
     get,
-    path = "/cl/metrics",
+    path = paths::CL_METRICS,
     responses(
         (status = 200, description = "Get the mempool metrics of the cl service", body = MempoolMetrics),
         (status = 500, description = "Internal server error", body = String),
@@ -69,7 +71,7 @@ where
 
 #[utoipa::path(
     post,
-    path = "/cl/status",
+    path = paths::CL_STATUS,
     responses(
         (status = 200, description = "Query the mempool status of the cl service", body = Vec<<T as Transaction>::Hash>),
         (status = 500, description = "Internal server error", body = String),
@@ -95,7 +97,7 @@ pub struct CryptarchiaInfoQuery {
 
 #[utoipa::path(
     get,
-    path = "/cryptarchia/info",
+    path = paths::CRYPTARCHIA_INFO,
     responses(
         (status = 200, description = "Query consensus information", body = nomos_consensus::CryptarchiaInfo),
         (status = 500, description = "Internal server error", body = String),
@@ -146,7 +148,7 @@ where
 
 #[utoipa::path(
     get,
-    path = "/cryptarchia/headers",
+    path = paths::CRYPTARCHIA_HEADERS,
     responses(
         (status = 200, description = "Query header ids", body = Vec<HeaderId>),
         (status = 500, description = "Internal server error", body = String),
@@ -199,7 +201,7 @@ where
 
 #[utoipa::path(
     post,
-    path = "/da/add_blob",
+    path = paths::DA_ADD_BLOB,
     responses(
         (status = 200, description = "Blob to be published received"),
         (status = 500, description = "Internal server error", body = String),
@@ -240,7 +242,7 @@ where
 
 #[utoipa::path(
     post,
-    path = "/da/get_range",
+    path = paths::DA_GET_RANGE,
     responses(
         (status = 200, description = "Range of blobs", body = Vec<([u8;8], Vec<DaBlob>)>),
         (status = 500, description = "Internal server error", body = String),
@@ -322,7 +324,7 @@ where
 
 #[utoipa::path(
     get,
-    path = "/network/info",
+    path = paths::NETWORK_INFO,
     responses(
         (status = 200, description = "Query the network information", body = nomos_network::backends::libp2p::Libp2pInfo),
         (status = 500, description = "Internal server error", body = String),
@@ -334,7 +336,7 @@ pub async fn libp2p_info(State(handle): State<OverwatchHandle>) -> Response {
 
 #[utoipa::path(
     get,
-    path = "/storage/block",
+    path = paths::STORAGE_BLOCK,
     responses(
         (status = 200, description = "Get the block by block id", body = Block<Tx, kzgrs_backend::dispersal::BlobInfo>),
         (status = 500, description = "Internal server error", body = String),
@@ -353,7 +355,7 @@ where
 
 #[utoipa::path(
     post,
-    path = "/mempool/add/tx",
+    path = paths::MEMPOOL_ADD_TX,
     responses(
         (status = 200, description = "Add transaction to the mempool"),
         (status = 500, description = "Internal server error", body = String),
@@ -374,7 +376,7 @@ where
 
 #[utoipa::path(
     post,
-    path = "/mempool/add/blobinfo",
+    path = paths::MEMPOOL_ADD_BLOB_INFO,
     responses(
         (status = 200, description = "Add blob info to the mempool"),
         (status = 500, description = "Internal server error", body = String),
@@ -419,7 +421,7 @@ where
 
 #[utoipa::path(
     get,
-    path = "/metrics",
+    path = paths::METRICS,
     responses(
         (status = 200, description = "Get all metrics"),
         (status = 500, description = "Internal server error", body = String),
