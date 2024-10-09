@@ -36,7 +36,7 @@ pub type ExecutorApiService = ApiService<
         DispersalMempoolAdapter,
         kzgrs_backend::dispersal::Metadata,
         KzgrsSamplingBackend<ChaCha20Rng>,
-        nomos_da_sampling::network::adapters::common::Libp2pAdapter<NomosDaMembership>,
+        nomos_da_sampling::network::adapters::executor::Libp2pAdapter<NomosDaMembership>,
         ChaCha20Rng,
         SamplingStorageAdapter<DaBlob, Wire>,
         MB16,
@@ -47,7 +47,7 @@ pub type DispersalMempoolAdapter = KzgrsMempoolAdapter<
     MempoolNetworkAdapter<BlobInfo, <BlobInfo as DispersedBlobInfo>::BlobId>,
     MockPool<HeaderId, BlobInfo, <BlobInfo as DispersedBlobInfo>::BlobId>,
     KzgrsSamplingBackend<ChaCha20Rng>,
-    nomos_da_sampling::network::adapters::common::Libp2pAdapter<NomosDaMembership>,
+    nomos_da_sampling::network::adapters::executor::Libp2pAdapter<NomosDaMembership>,
     ChaCha20Rng,
     SamplingStorageAdapter<DaBlob, Wire>,
 >;
