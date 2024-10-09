@@ -34,7 +34,7 @@ use nomos_da_sampling::DaSamplingService;
 use nomos_da_sampling::DaSamplingServiceSettings;
 use nomos_da_sampling::{
     backend::kzgrs::KzgrsSamplingBackend,
-    network::adapters::libp2p::Libp2pAdapter as SamplingLibp2pAdapter,
+    network::adapters::common::Libp2pAdapter as SamplingLibp2pAdapter,
 };
 use nomos_da_verifier::backend::kzgrs::KzgrsDaVerifier;
 use nomos_da_verifier::backend::kzgrs::KzgrsDaVerifierSettings;
@@ -132,7 +132,7 @@ pub type DaMempool = DaMempoolService<
     MempoolNetworkAdapter<BlobInfo, <BlobInfo as DispersedBlobInfo>::BlobId>,
     MockPool<HeaderId, BlobInfo, <BlobInfo as DispersedBlobInfo>::BlobId>,
     KzgrsSamplingBackend<IntegrationRng>,
-    nomos_da_sampling::network::adapters::libp2p::Libp2pAdapter<NomosDaMembership>,
+    nomos_da_sampling::network::adapters::common::Libp2pAdapter<NomosDaMembership>,
     IntegrationRng,
     SamplingStorageAdapter<DaBlob, Wire>,
 >;

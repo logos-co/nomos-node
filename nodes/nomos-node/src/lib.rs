@@ -22,7 +22,7 @@ use nomos_da_indexer::DataIndexerService;
 pub use nomos_da_network_service::backends::libp2p::validator::DaNetworkValidatorBackend;
 pub use nomos_da_network_service::NetworkService as DaNetworkService;
 use nomos_da_sampling::backend::kzgrs::KzgrsSamplingBackend;
-use nomos_da_sampling::network::adapters::libp2p::Libp2pAdapter as SamplingLibp2pAdapter;
+use nomos_da_sampling::network::adapters::common::Libp2pAdapter as SamplingLibp2pAdapter;
 use nomos_da_sampling::storage::adapters::rocksdb::RocksAdapter as SamplingStorageAdapter;
 use nomos_da_sampling::DaSamplingService;
 use nomos_da_verifier::backend::kzgrs::KzgrsDaVerifier;
@@ -72,7 +72,7 @@ pub type NomosApiService = ApiService<
         Tx,
         Wire,
         KzgrsSamplingBackend<ChaCha20Rng>,
-        nomos_da_sampling::network::adapters::libp2p::Libp2pAdapter<NomosDaMembership>,
+        nomos_da_sampling::network::adapters::common::Libp2pAdapter<NomosDaMembership>,
         ChaCha20Rng,
         SamplingStorageAdapter<DaBlob, Wire>,
         MB16,
@@ -93,7 +93,7 @@ pub type Cryptarchia = cryptarchia_consensus::CryptarchiaConsensus<
     FillSizeWithBlobs<MB16, BlobInfo>,
     RocksBackend<Wire>,
     KzgrsSamplingBackend<ChaCha20Rng>,
-    nomos_da_sampling::network::adapters::libp2p::Libp2pAdapter<NomosDaMembership>,
+    nomos_da_sampling::network::adapters::common::Libp2pAdapter<NomosDaMembership>,
     ChaCha20Rng,
     SamplingStorageAdapter<DaBlob, Wire>,
 >;
@@ -107,7 +107,7 @@ pub type DaMempool = DaMempoolService<
     MempoolNetworkAdapter<BlobInfo, <BlobInfo as DispersedBlobInfo>::BlobId>,
     MockPool<HeaderId, BlobInfo, <BlobInfo as DispersedBlobInfo>::BlobId>,
     KzgrsSamplingBackend<ChaCha20Rng>,
-    nomos_da_sampling::network::adapters::libp2p::Libp2pAdapter<NomosDaMembership>,
+    nomos_da_sampling::network::adapters::common::Libp2pAdapter<NomosDaMembership>,
     ChaCha20Rng,
     SamplingStorageAdapter<DaBlob, Wire>,
 >;
@@ -127,7 +127,7 @@ pub type DaIndexer = DataIndexerService<
     FillSizeWithBlobs<MB16, BlobInfo>,
     RocksBackend<Wire>,
     KzgrsSamplingBackend<ChaCha20Rng>,
-    nomos_da_sampling::network::adapters::libp2p::Libp2pAdapter<NomosDaMembership>,
+    nomos_da_sampling::network::adapters::common::Libp2pAdapter<NomosDaMembership>,
     ChaCha20Rng,
     SamplingStorageAdapter<DaBlob, Wire>,
 >;
