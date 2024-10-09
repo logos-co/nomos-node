@@ -138,12 +138,14 @@ pub type DaIndexer<SamplingAdapter> = DataIndexerService<
 pub type NodeDaIndexer =
     DaIndexer<nomos_da_sampling::network::adapters::validator::Libp2pAdapter<NomosDaMembership>>;
 
-pub type DaSampling = DaSamplingService<
+pub type DaSampling<SamplingAdapter> = DaSamplingService<
     KzgrsSamplingBackend<ChaCha20Rng>,
-    SamplingLibp2pAdapter<NomosDaMembership>,
+    SamplingAdapter,
     ChaCha20Rng,
     SamplingStorageAdapter<DaBlob, Wire>,
 >;
+
+pub type NodeDaSampling = DaSampling<SamplingLibp2pAdapter<NomosDaMembership>>;
 
 pub type DaVerifier = DaVerifierService<
     KzgrsDaVerifier,
@@ -158,7 +160,7 @@ pub struct Nomos {
     network: ServiceHandle<NetworkService<NetworkBackend>>,
     da_indexer: ServiceHandle<NodeDaIndexer>,
     da_verifier: ServiceHandle<DaVerifier>,
-    da_sampling: ServiceHandle<DaSampling>,
+    da_sampling: ServiceHandle<NodeDaSampling>,
     da_network: ServiceHandle<DaNetworkService<DaNetworkValidatorBackend<NomosDaMembership>>>,
     cl_mempool: ServiceHandle<TxMempool>,
     da_mempool: ServiceHandle<DaMempool>,

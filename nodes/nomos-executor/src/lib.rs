@@ -66,6 +66,9 @@ pub type ExecutorCryptarchia =
 pub type ExecutorDaIndexer =
     DaIndexer<nomos_da_sampling::network::adapters::executor::Libp2pAdapter<NomosDaMembership>>;
 
+pub type ExecutorDaSampling =
+    DaSampling<nomos_da_sampling::network::adapters::executor::Libp2pAdapter<NomosDaMembership>>;
+
 #[derive(Services)]
 pub struct NomosExecutor {
     #[cfg(feature = "tracing")]
@@ -74,7 +77,7 @@ pub struct NomosExecutor {
     da_dispersal: ServiceHandle<DaDispersal>,
     da_indexer: ServiceHandle<ExecutorDaIndexer>,
     da_verifier: ServiceHandle<DaVerifier>,
-    da_sampling: ServiceHandle<DaSampling>,
+    da_sampling: ServiceHandle<ExecutorDaSampling>,
     da_network: ServiceHandle<DaNetworkService<DaNetworkExecutorBackend<NomosDaMembership>>>,
     cl_mempool: ServiceHandle<TxMempool>,
     da_mempool: ServiceHandle<DaMempool>,
