@@ -21,7 +21,7 @@ use serde::{Deserialize, Serialize};
 use subnetworks_assignations::versions::v1::FillFromNodeList;
 use tracing::Level;
 // internal
-use crate::{NomosApiService, Wire};
+use crate::{NomosApiService, NomosDaMembership, Wire};
 
 #[derive(ValueEnum, Clone, Debug, Default)]
 pub enum LoggerBackendType {
@@ -120,7 +120,9 @@ pub struct Config {
     pub da_verifier: <crate::DaVerifier as ServiceData>::Settings,
     pub da_sampling: <crate::DaSampling as ServiceData>::Settings,
     pub http: <NomosApiService as ServiceData>::Settings,
-    pub cryptarchia: <crate::Cryptarchia as ServiceData>::Settings,
+    pub cryptarchia: <crate::Cryptarchia<
+        nomos_da_sampling::network::adapters::validator::Libp2pAdapter<NomosDaMembership>,
+    > as ServiceData>::Settings,
     pub storage: <crate::StorageService<RocksBackend<Wire>> as ServiceData>::Settings,
 }
 
@@ -245,7 +247,7 @@ pub fn update_http(
 }
 
 pub fn update_cryptarchia_consensus(
-    cryptarchia: &mut <crate::Cryptarchia as ServiceData>::Settings,
+    cryptarchia: &mut <crate::NodeCryptarchia as ServiceData>::Settings,
     consensus_args: CryptarchiaArgs,
 ) -> Result<()> {
     let CryptarchiaArgs {

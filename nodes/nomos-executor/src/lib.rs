@@ -36,7 +36,7 @@ pub type ExecutorApiService = ApiService<
         DispersalMempoolAdapter,
         kzgrs_backend::dispersal::Metadata,
         KzgrsSamplingBackend<ChaCha20Rng>,
-        nomos_da_sampling::network::adapters::libp2p::Libp2pAdapter<NomosDaMembership>,
+        nomos_da_sampling::network::adapters::executor::Libp2pAdapter<NomosDaMembership>,
         ChaCha20Rng,
         SamplingStorageAdapter<DaBlob, Wire>,
         MB16,
@@ -47,7 +47,7 @@ pub type DispersalMempoolAdapter = KzgrsMempoolAdapter<
     MempoolNetworkAdapter<BlobInfo, <BlobInfo as DispersedBlobInfo>::BlobId>,
     MockPool<HeaderId, BlobInfo, <BlobInfo as DispersedBlobInfo>::BlobId>,
     KzgrsSamplingBackend<ChaCha20Rng>,
-    nomos_da_sampling::network::adapters::libp2p::Libp2pAdapter<NomosDaMembership>,
+    nomos_da_sampling::network::adapters::executor::Libp2pAdapter<NomosDaMembership>,
     ChaCha20Rng,
     SamplingStorageAdapter<DaBlob, Wire>,
 >;
@@ -59,6 +59,9 @@ pub type DaDispersal = DispersalService<
     NomosDaMembership,
     kzgrs_backend::dispersal::Metadata,
 >;
+
+pub type ExecutorCryptarchia =
+    Cryptarchia<nomos_da_sampling::network::adapters::executor::Libp2pAdapter<NomosDaMembership>>;
 
 #[derive(Services)]
 pub struct NomosExecutor {
@@ -72,7 +75,7 @@ pub struct NomosExecutor {
     da_network: ServiceHandle<DaNetworkService<DaNetworkExecutorBackend<NomosDaMembership>>>,
     cl_mempool: ServiceHandle<TxMempool>,
     da_mempool: ServiceHandle<DaMempool>,
-    cryptarchia: ServiceHandle<Cryptarchia>,
+    cryptarchia: ServiceHandle<ExecutorCryptarchia>,
     http: ServiceHandle<ExecutorApiService>,
     storage: ServiceHandle<StorageService<RocksBackend<Wire>>>,
     #[cfg(feature = "metrics")]
