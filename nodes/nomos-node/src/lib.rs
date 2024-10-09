@@ -115,7 +115,7 @@ pub type DaMempool = DaMempoolService<
     SamplingStorageAdapter<DaBlob, Wire>,
 >;
 
-pub type DaIndexer = DataIndexerService<
+pub type DaIndexer<SamplingAdapter> = DataIndexerService<
     // Indexer specific.
     Bytes,
     IndexerStorageAdapter<Wire, BlobInfo>,
@@ -130,10 +130,13 @@ pub type DaIndexer = DataIndexerService<
     FillSizeWithBlobs<MB16, BlobInfo>,
     RocksBackend<Wire>,
     KzgrsSamplingBackend<ChaCha20Rng>,
-    nomos_da_sampling::network::adapters::validator::Libp2pAdapter<NomosDaMembership>,
+    SamplingAdapter,
     ChaCha20Rng,
     SamplingStorageAdapter<DaBlob, Wire>,
 >;
+
+pub type NodeDaIndexer =
+    DaIndexer<nomos_da_sampling::network::adapters::validator::Libp2pAdapter<NomosDaMembership>>;
 
 pub type DaSampling = DaSamplingService<
     KzgrsSamplingBackend<ChaCha20Rng>,
@@ -153,7 +156,7 @@ pub struct Nomos {
     #[cfg(feature = "tracing")]
     logging: ServiceHandle<Logger>,
     network: ServiceHandle<NetworkService<NetworkBackend>>,
-    da_indexer: ServiceHandle<DaIndexer>,
+    da_indexer: ServiceHandle<NodeDaIndexer>,
     da_verifier: ServiceHandle<DaVerifier>,
     da_sampling: ServiceHandle<DaSampling>,
     da_network: ServiceHandle<DaNetworkService<DaNetworkValidatorBackend<NomosDaMembership>>>,

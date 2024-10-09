@@ -22,7 +22,7 @@ pub struct Config {
     pub da_dispersal: <crate::DaDispersal as ServiceData>::Settings,
     pub da_network:
         <DaNetworkService<DaNetworkExecutorBackend<FillFromNodeList>> as ServiceData>::Settings,
-    pub da_indexer: <crate::DaIndexer as ServiceData>::Settings,
+    pub da_indexer: <crate::ExecutorDaIndexer as ServiceData>::Settings,
     pub da_verifier: <crate::DaVerifier as ServiceData>::Settings,
     pub da_sampling: <crate::DaSampling as ServiceData>::Settings,
     pub http: <ExecutorApiService as ServiceData>::Settings,

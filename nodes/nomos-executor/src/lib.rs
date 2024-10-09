@@ -63,13 +63,16 @@ pub type DaDispersal = DispersalService<
 pub type ExecutorCryptarchia =
     Cryptarchia<nomos_da_sampling::network::adapters::executor::Libp2pAdapter<NomosDaMembership>>;
 
+pub type ExecutorDaIndexer =
+    DaIndexer<nomos_da_sampling::network::adapters::executor::Libp2pAdapter<NomosDaMembership>>;
+
 #[derive(Services)]
 pub struct NomosExecutor {
     #[cfg(feature = "tracing")]
     logging: ServiceHandle<Logger>,
     network: ServiceHandle<NetworkService<NetworkBackend>>,
     da_dispersal: ServiceHandle<DaDispersal>,
-    da_indexer: ServiceHandle<DaIndexer>,
+    da_indexer: ServiceHandle<ExecutorDaIndexer>,
     da_verifier: ServiceHandle<DaVerifier>,
     da_sampling: ServiceHandle<DaSampling>,
     da_network: ServiceHandle<DaNetworkService<DaNetworkExecutorBackend<NomosDaMembership>>>,
