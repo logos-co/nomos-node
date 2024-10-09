@@ -17,7 +17,7 @@ use nomos_da_indexer::{
 use nomos_da_network_core::SubnetworkId;
 use nomos_da_sampling::backend::DaSamplingServiceBackend;
 use nomos_da_verifier::backend::VerifierBackend;
-use nomos_da_verifier::network::adapters::libp2p::Libp2pAdapter;
+use nomos_da_verifier::network::adapters::validator::Libp2pAdapter;
 use nomos_da_verifier::storage::adapters::rocksdb::RocksAdapter as VerifierStorageAdapter;
 use nomos_da_verifier::{DaVerifierMsg, DaVerifierService};
 use nomos_libp2p::PeerId;

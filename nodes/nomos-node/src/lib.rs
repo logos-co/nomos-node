@@ -26,7 +26,7 @@ use nomos_da_sampling::network::adapters::validator::Libp2pAdapter as SamplingLi
 use nomos_da_sampling::storage::adapters::rocksdb::RocksAdapter as SamplingStorageAdapter;
 use nomos_da_sampling::DaSamplingService;
 use nomos_da_verifier::backend::kzgrs::KzgrsDaVerifier;
-use nomos_da_verifier::network::adapters::libp2p::Libp2pAdapter as VerifierNetworkAdapter;
+use nomos_da_verifier::network::adapters::validator::Libp2pAdapter as VerifierNetworkAdapter;
 use nomos_da_verifier::storage::adapters::rocksdb::RocksAdapter as VerifierStorageAdapter;
 use nomos_da_verifier::DaVerifierService;
 #[cfg(feature = "tracing")]

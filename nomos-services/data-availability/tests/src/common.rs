@@ -38,7 +38,7 @@ use nomos_da_sampling::{
 };
 use nomos_da_verifier::backend::kzgrs::KzgrsDaVerifier;
 use nomos_da_verifier::backend::kzgrs::KzgrsDaVerifierSettings;
-use nomos_da_verifier::network::adapters::libp2p::Libp2pAdapter;
+use nomos_da_verifier::network::adapters::validator::Libp2pAdapter;
 use nomos_da_verifier::storage::adapters::rocksdb::RocksAdapter as VerifierStorageAdapter;
 use nomos_da_verifier::storage::adapters::rocksdb::RocksAdapterSettings as VerifierStorageSettings;
 use nomos_da_verifier::DaVerifierService;
