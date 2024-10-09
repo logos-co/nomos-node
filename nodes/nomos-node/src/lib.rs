@@ -147,11 +147,10 @@ pub type DaSampling<SamplingAdapter> = DaSamplingService<
 
 pub type NodeDaSampling = DaSampling<SamplingLibp2pAdapter<NomosDaMembership>>;
 
-pub type DaVerifier = DaVerifierService<
-    KzgrsDaVerifier,
-    VerifierNetworkAdapter<FillFromNodeList>,
-    VerifierStorageAdapter<(), DaBlob, Wire>,
->;
+pub type DaVerifier<VerifierAdapter> =
+    DaVerifierService<KzgrsDaVerifier, VerifierAdapter, VerifierStorageAdapter<(), DaBlob, Wire>>;
+
+pub type NodeDaVerifier = DaVerifier<VerifierNetworkAdapter<FillFromNodeList>>;
 
 #[derive(Services)]
 pub struct Nomos {
@@ -159,7 +158,7 @@ pub struct Nomos {
     logging: ServiceHandle<Logger>,
     network: ServiceHandle<NetworkService<NetworkBackend>>,
     da_indexer: ServiceHandle<NodeDaIndexer>,
-    da_verifier: ServiceHandle<DaVerifier>,
+    da_verifier: ServiceHandle<NodeDaVerifier>,
     da_sampling: ServiceHandle<NodeDaSampling>,
     da_network: ServiceHandle<DaNetworkService<DaNetworkValidatorBackend<NomosDaMembership>>>,
     cl_mempool: ServiceHandle<TxMempool>,

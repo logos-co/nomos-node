@@ -1,5 +1,5 @@
 #[cfg(feature = "libp2p")]
 pub mod common;
-mod executor;
+pub mod executor;
 #[cfg(feature = "libp2p")]
 pub mod validator;

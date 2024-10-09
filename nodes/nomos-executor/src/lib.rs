@@ -16,6 +16,7 @@ use nomos_da_network_service::backends::libp2p::executor::DaNetworkExecutorBacke
 use nomos_da_sampling::backend::kzgrs::KzgrsSamplingBackend;
 use nomos_da_sampling::storage::adapters::rocksdb::RocksAdapter as SamplingStorageAdapter;
 use nomos_da_verifier::backend::kzgrs::KzgrsDaVerifier;
+use nomos_da_verifier::network::adapters::executor::Libp2pAdapter as VerifierNetworkAdapter;
 use nomos_mempool::backend::mockpool::MockPool;
 use nomos_node::*;
 use overwatch_derive::Services;
@@ -69,6 +70,8 @@ pub type ExecutorDaIndexer =
 pub type ExecutorDaSampling =
     DaSampling<nomos_da_sampling::network::adapters::executor::Libp2pAdapter<NomosDaMembership>>;
 
+pub type ExecutorDaVerifier = DaVerifier<VerifierNetworkAdapter<NomosDaMembership>>;
+
 #[derive(Services)]
 pub struct NomosExecutor {
     #[cfg(feature = "tracing")]
@@ -76,7 +79,7 @@ pub struct NomosExecutor {
     network: ServiceHandle<NetworkService<NetworkBackend>>,
     da_dispersal: ServiceHandle<DaDispersal>,
     da_indexer: ServiceHandle<ExecutorDaIndexer>,
-    da_verifier: ServiceHandle<DaVerifier>,
+    da_verifier: ServiceHandle<ExecutorDaVerifier>,
     da_sampling: ServiceHandle<ExecutorDaSampling>,
     da_network: ServiceHandle<DaNetworkService<DaNetworkExecutorBackend<NomosDaMembership>>>,
     cl_mempool: ServiceHandle<TxMempool>,
