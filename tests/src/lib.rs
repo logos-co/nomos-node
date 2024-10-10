@@ -1,5 +1,4 @@
 pub mod nodes;
-pub use nodes::NomosNode;
 use once_cell::sync::Lazy;
 
 // std
@@ -12,7 +11,7 @@ use std::{fmt::Debug, sync::Mutex};
 //crates
 use nomos_executor::config::Config as ExecutorConfig;
 use nomos_libp2p::{Multiaddr, Swarm};
-use nomos_node::Config;
+use nomos_node::Config as ValidatorConfig;
 use rand::{thread_rng, Rng};
 
 static NET_PORT: Lazy<Mutex<u16>> = Lazy::new(|| Mutex::new(thread_rng().gen_range(8000..10000)));
@@ -49,8 +48,9 @@ pub fn adjust_timeout(d: Duration) -> Duration {
 
 #[async_trait::async_trait]
 pub trait Node: Sized {
+    type Config;
     type ConsensusInfo: Debug + Clone + PartialEq;
-    async fn spawn(mut config: ExecutorConfig) -> Self;
+    async fn spawn(config: Self::Config) -> Self;
     async fn spawn_nodes(config: SpawnConfig) -> Vec<Self> {
         let mut nodes = Vec::new();
         for conf in Self::node_configs(config) {
@@ -58,39 +58,8 @@ pub trait Node: Sized {
         }
         nodes
     }
-    fn node_configs(config: SpawnConfig) -> Vec<ExecutorConfig> {
-        match config {
-            SpawnConfig::Star { consensus, da } => {
-                let mut configs = Self::create_node_configs(consensus, da);
-                let next_leader_config = configs.remove(0);
-                let first_node_addr = node_address(&next_leader_config);
-                let mut node_configs = vec![next_leader_config];
-                for mut conf in configs {
-                    conf.network
-                        .backend
-                        .initial_peers
-                        .push(first_node_addr.clone());
-
-                    node_configs.push(conf);
-                }
-                node_configs
-            }
-            SpawnConfig::Chain { consensus, da } => {
-                let mut configs = Self::create_node_configs(consensus, da);
-                let next_leader_config = configs.remove(0);
-                let mut prev_node_addr = node_address(&next_leader_config);
-                let mut node_configs = vec![next_leader_config];
-                for mut conf in configs {
-                    conf.network.backend.initial_peers.push(prev_node_addr);
-                    prev_node_addr = node_address(&conf);
-
-                    node_configs.push(conf);
-                }
-                node_configs
-            }
-        }
-    }
-    fn create_node_configs(consensus: ConsensusConfig, da: DaConfig) -> Vec<ExecutorConfig>;
+    fn node_configs(config: SpawnConfig) -> Vec<Self::Config>;
+    fn create_node_configs(consensus: ConsensusConfig, da: DaConfig) -> Vec<Self::Config>;
     async fn consensus_info(&self) -> Self::ConsensusInfo;
     fn stop(&mut self);
 }
@@ -142,7 +111,7 @@ impl SpawnConfig {
     }
 }
 
-fn node_address(config: &ExecutorConfig) -> Multiaddr {
+fn node_address(config: &ValidatorConfig) -> Multiaddr {
     Swarm::multiaddr(
         std::net::Ipv4Addr::new(127, 0, 0, 1),
         config.network.backend.inner.port,
