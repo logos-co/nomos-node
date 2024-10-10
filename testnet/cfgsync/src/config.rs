@@ -2,8 +2,8 @@
 use std::{collections::HashMap, net::Ipv4Addr, str::FromStr};
 // crates
 use nomos_libp2p::{Multiaddr, PeerId};
-use nomos_node::Config as NodeConfig;
-use tests::{ConsensusConfig, DaConfig, Node, NomosNode};
+use nomos_node::Config as ValidatorConfig;
+use tests::{nodes::TestNode, ConsensusConfig, DaConfig, Node};
 // internal
 
 const DEFAULT_NETWORK_PORT: u16 = 3000;
@@ -37,8 +37,8 @@ pub fn create_node_configs(
     consensus: ConsensusConfig,
     da: DaConfig,
     hosts: Vec<Host>,
-) -> HashMap<Host, NodeConfig> {
-    let mut configs = NomosNode::create_node_configs(consensus, da);
+) -> HashMap<Host, ValidatorConfig> {
+    let mut configs = TestNode::<ValidatorConfig>::create_node_configs(consensus, da);
     let mut configured_hosts = HashMap::new();
 
     // Rebuild DA address lists.
