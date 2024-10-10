@@ -48,7 +48,7 @@ pub fn adjust_timeout(d: Duration) -> Duration {
 
 #[async_trait::async_trait]
 pub trait Node: Sized {
-    type Config;
+    type Config: Send;
     type ConsensusInfo: Debug + Clone + PartialEq;
     async fn spawn(config: Self::Config) -> Self;
     async fn spawn_nodes(config: SpawnConfig) -> Vec<Self> {
@@ -111,11 +111,8 @@ impl SpawnConfig {
     }
 }
 
-fn node_address(config: &ValidatorConfig) -> Multiaddr {
-    Swarm::multiaddr(
-        std::net::Ipv4Addr::new(127, 0, 0, 1),
-        config.network.backend.inner.port,
-    )
+fn node_address_from_port(port: u16) -> Multiaddr {
+    Swarm::multiaddr(std::net::Ipv4Addr::new(127, 0, 0, 1), port)
 }
 
 #[derive(Clone)]

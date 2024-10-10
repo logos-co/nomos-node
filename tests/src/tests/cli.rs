@@ -1,20 +1,11 @@
 use executor_http_client::ExecutorHttpClient;
 use nomos_cli::cmds::disseminate::Disseminate;
-use nomos_cli::da::network::backend::ExecutorBackend;
-use nomos_cli::da::network::backend::ExecutorBackendSettings;
-use nomos_da_dispersal::adapters::mempool::kzgrs;
-use nomos_da_network_service::NetworkConfig;
-use nomos_libp2p::ed25519;
-use nomos_libp2p::libp2p;
-use nomos_libp2p::Multiaddr;
-use nomos_libp2p::PeerId;
+
+use nomos_executor::config::Config as ExecutorConfig;
 use reqwest::ClientBuilder;
 use reqwest::Url;
-use std::collections::HashMap;
 use std::time::Duration;
-use subnetworks_assignations::versions::v1::FillFromNodeList;
-use tempfile::NamedTempFile;
-use tests::nodes::NomosNode;
+use tests::nodes::TestNode;
 use tests::Node;
 use tests::SpawnConfig;
 use tests::GLOBAL_PARAMS_PATH;
@@ -53,7 +44,7 @@ fn run_disseminate(disseminate: &Disseminate) {
     c.status().expect("failed to execute nomos cli");
 }
 
-async fn disseminate(nodes: &Vec<NomosNode>, config: &mut Disseminate) {
+async fn disseminate(nodes: &Vec<TestNode<ExecutorConfig>>, config: &mut Disseminate) {
     // Nomos Cli is acting as the first node when dispersing the data by using the key associated
     // with that Nomos Node.
     let first_config = nodes[0].config();
@@ -88,7 +79,7 @@ async fn disseminate_and_retrieve() {
         ..Default::default()
     };
 
-    let nodes = NomosNode::spawn_nodes(SpawnConfig::star_happy(
+    let nodes = TestNode::<ExecutorConfig>::spawn_nodes(SpawnConfig::star_happy(
         2,
         tests::DaConfig {
             dispersal_factor: 2,

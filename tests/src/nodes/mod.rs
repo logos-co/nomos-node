@@ -1,5 +1,5 @@
 pub mod nomos;
-pub use nomos::NomosNode;
+pub use nomos::TestNode;
 
 use nomos_da_network_service::{
     backends::libp2p::executor::DaNetworkExecutorBackendSettings, NetworkConfig,
@@ -32,6 +32,7 @@ fn persist_tempdir(tempdir: &mut TempDir, label: &str) -> std::io::Result<()> {
     Ok(())
 }
 
+#[derive(Clone)]
 pub struct ExecutorSettings {
     pub da_dispersal: <nomos_executor::DaDispersal as ServiceData>::Settings,
     pub num_subnets: u16,

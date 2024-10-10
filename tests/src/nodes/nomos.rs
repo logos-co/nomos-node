@@ -25,7 +25,6 @@ use nomos_da_dispersal::DispersalServiceSettings;
 use nomos_da_indexer::storage::adapters::rocksdb::RocksAdapterSettings as IndexerStorageAdapterSettings;
 use nomos_da_indexer::IndexerSettings;
 use nomos_da_network_service::backends::libp2p::common::DaNetworkBackendSettings;
-use nomos_da_network_service::backends::libp2p::executor::DaNetworkExecutorBackendSettings;
 use nomos_da_network_service::backends::libp2p::validator::DaNetworkValidatorBackend;
 use nomos_da_network_service::NetworkConfig as DaNetworkConfig;
 use nomos_da_sampling::backend::kzgrs::KzgrsSamplingBackendSettings;
@@ -34,18 +33,19 @@ use nomos_da_sampling::DaSamplingServiceSettings;
 use nomos_da_verifier::backend::kzgrs::KzgrsDaVerifierSettings;
 use nomos_da_verifier::storage::adapters::rocksdb::RocksAdapterSettings as VerifierStorageAdapterSettings;
 use nomos_da_verifier::DaVerifierServiceSettings;
-use nomos_executor::api::backend::AxumBackendSettings;
 use nomos_executor::config::Config as ExecutorConfig;
 use nomos_libp2p::{Multiaddr, PeerId, SwarmConfig};
 use nomos_log::{LoggerBackend, LoggerFormat};
 use nomos_mempool::MempoolMetrics;
 #[cfg(feature = "mixnet")]
 use nomos_network::backends::libp2p::mixnet::MixnetConfig;
+use nomos_network::backends::NetworkBackend;
 use nomos_network::{backends::libp2p::Libp2pConfig, NetworkConfig};
+use nomos_node::api::backend::AxumBackendSettings;
 use nomos_node::api::paths::{
     CL_METRICS, CRYPTARCHIA_HEADERS, CRYPTARCHIA_INFO, DA_GET_RANGE, STORAGE_BLOCK,
 };
-use nomos_node::{Config, Config as ValidatorConfig, Tx};
+use nomos_node::{Config as ValidatorConfig, NomosDaMembership, Tx};
 use nomos_storage::backends::rocksdb::RocksBackendSettings;
 use once_cell::sync::Lazy;
 use rand::{thread_rng, Rng};
@@ -56,9 +56,13 @@ use subnetworks_assignations::MembershipHandler;
 use tempfile::NamedTempFile;
 use time::OffsetDateTime;
 // internal
-use super::{create_tempdir, persist_tempdir, LOGS_PREFIX};
+use super::{
+    create_tempdir, executor_config_from_node_config, persist_tempdir, ExecutorSettings,
+    LOGS_PREFIX,
+};
 use crate::{
-    adjust_timeout, get_available_port, node_address, ConsensusConfig, DaConfig, Node, SpawnConfig,
+    adjust_timeout, get_available_port, node_address_from_port, ConsensusConfig, DaConfig, Node,
+    SpawnConfig,
 };
 
 static CLIENT: Lazy<Client> = Lazy::new(Client::new);
@@ -311,7 +315,7 @@ impl<Config> TestNode<Config> {
 #[async_trait::async_trait]
 impl Node for TestNode<ValidatorConfig> {
     type ConsensusInfo = CryptarchiaInfo;
-    type Config = Config;
+    type Config = ValidatorConfig;
 
     async fn spawn(config: Self::Config) -> Self {
         Self::spawn_inner(config).await
@@ -331,113 +335,14 @@ impl Node for TestNode<ValidatorConfig> {
     /// so the leader can receive votes from all other nodes that will be subsequently spawned.
     /// If not, the leader will miss votes from nodes spawned before itself.
     /// This issue will be resolved by devising the block catch-up mechanism in the future.
-    fn create_node_configs(consensus: ConsensusConfig, da: DaConfig) -> Vec<Self::Config> {
-        // we use the same random bytes for:
-        // * da id
-        // * coin sk
-        // * coin nonce
-        let mut ids = vec![[0; 32]; consensus.n_participants];
-        for id in &mut ids {
-            thread_rng().fill(id);
-        }
-
-        #[cfg(feature = "mixnet")]
-        let (mixclient_config, mixnode_configs) = create_mixnet_config(&ids);
-
-        let notes = ids
-            .iter()
-            .map(|&id| {
-                let mut sk = [0; 16];
-                sk.copy_from_slice(&id[0..16]);
-                InputWitness::new(
-                    NoteWitness::basic(1, NMO_UNIT, &mut thread_rng()),
-                    NullifierSecret(sk),
-                )
-            })
-            .collect::<Vec<_>>();
-        // no commitments for now, proofs are not checked anyway
-        let genesis_state = LedgerState::from_commitments(
-            notes.iter().map(|n| n.note_commitment()),
-            (ids.len() as u32).into(),
-        );
-        let ledger_config = cryptarchia_ledger::Config {
-            epoch_stake_distribution_stabilization: 3,
-            epoch_period_nonce_buffer: 3,
-            epoch_period_nonce_stabilization: 4,
-            consensus_config: cryptarchia_engine::Config {
-                security_param: consensus.security_param,
-                active_slot_coeff: consensus.active_slot_coeff,
-            },
-        };
-        let slot_duration = std::env::var(CONSENSUS_SLOT_TIME_VAR)
-            .map(|s| <u64>::from_str(&s).unwrap())
-            .unwrap_or(DEFAULT_SLOT_TIME);
-        let time_config = TimeConfig {
-            slot_duration: Duration::from_secs(slot_duration),
-            chain_start_time: OffsetDateTime::now_utc(),
-        };
-
-        #[allow(unused_mut, unused_variables)]
-        let mut configs = ids
-            .into_iter()
-            .zip(notes)
-            .enumerate()
-            .map(|(i, (da_id, coin))| {
-                create_node_config(
-                    da_id,
-                    genesis_state.clone(),
-                    ledger_config.clone(),
-                    vec![coin],
-                    time_config.clone(),
-                    da.clone(),
-                    #[cfg(feature = "mixnet")]
-                    MixnetConfig {
-                        mixclient: mixclient_config.clone(),
-                        mixnode: mixnode_configs[i].clone(),
-                    },
-                )
-            })
-            .collect::<Vec<_>>();
-
-        // Build DA memberships and address lists.
-        let peer_addresses = build_da_peer_list(&configs);
-        let peer_ids = peer_addresses.iter().map(|(p, _)| *p).collect::<Vec<_>>();
-
-        for config in &mut configs {
-            let membership =
-                FillFromNodeList::new(&peer_ids, da.subnetwork_size, da.dispersal_factor);
-            let local_peer_id = secret_key_to_peer_id(config.da_network.backend.node_key.clone());
-            let subnetwork_ids = membership.membership(&local_peer_id);
-            config.da_verifier.verifier_settings.index = subnetwork_ids;
-            config.da_network.backend.membership = membership;
-            config.da_network.backend.addresses = peer_addresses.iter().cloned().collect();
-        }
-
-        #[cfg(feature = "mixnet")]
-        {
-            // Build a topology using only a subset of nodes.
-            let mixnode_candidates = configs
-                .iter()
-                .take(NUM_MIXNODE_CANDIDATES)
-                .collect::<Vec<_>>();
-            let topology = build_mixnet_topology(&mixnode_candidates);
-
-            // Set the topology to all configs
-            for config in &mut configs {
-                config.network.backend.mixnet.mixclient.topology = topology.clone();
-            }
-            configs
-        }
-        #[cfg(not(feature = "mixnet"))]
-        configs
-    }
 
     fn node_configs(config: SpawnConfig) -> Vec<Self::Config> {
         match config {
             SpawnConfig::Star { consensus, da } => {
                 let mut configs = Self::create_node_configs(consensus, da);
                 let next_leader_config = configs.remove(0);
-                let first_node_addr = node_address(&next_leader_config);
+                let first_node_addr =
+                    node_address_from_port(next_leader_config.network.backend.inner.port);
                 let mut node_configs = vec![next_leader_config];
                 for mut conf in configs {
                     conf.network
@@ -452,17 +357,103 @@ impl Node for TestNode<ValidatorConfig> {
             SpawnConfig::Chain { consensus, da } => {
                 let mut configs = Self::create_node_configs(consensus, da);
                 let next_leader_config = configs.remove(0);
-                let mut prev_node_addr = node_address(&next_leader_config);
+                let mut prev_node_addr =
+                    node_address_from_port(next_leader_config.network.backend.inner.port);
                 let mut node_configs = vec![next_leader_config];
                 for mut conf in configs {
                     conf.network.backend.initial_peers.push(prev_node_addr);
-                    prev_node_addr = node_address(&conf);
+                    prev_node_addr = node_address_from_port(conf.network.backend.inner.port);
 
                     node_configs.push(conf);
                 }
                 node_configs
             }
         }
+    }
+
+    fn create_node_configs(consensus: ConsensusConfig, da: DaConfig) -> Vec<Self::Config> {
+        __create_node_configs(consensus, da)
+    }
+}
+
+#[async_trait::async_trait]
+impl Node for TestNode<ExecutorConfig> {
+    type ConsensusInfo = CryptarchiaInfo;
+    type Config = ExecutorConfig;
+
+    async fn spawn(config: Self::Config) -> Self {
+        Self::spawn_inner(config).await
+    }
+
+    async fn consensus_info(&self) -> Self::ConsensusInfo {
+        let res = self.get(CRYPTARCHIA_INFO).await;
+        println!("{:?}", res);
+        res.unwrap().json().await.unwrap()
+    }
+
+    fn stop(&mut self) {
+        self.child.kill().unwrap();
+    }
+
+    /// Depending on the network topology, the next leader must be spawned first,
+    /// so the leader can receive votes from all other nodes that will be subsequently spawned.
+    /// If not, the leader will miss votes from nodes spawned before itself.
+    /// This issue will be resolved by devising the block catch-up mechanism in the future.
+
+    fn node_configs(config: SpawnConfig) -> Vec<Self::Config> {
+        match config {
+            SpawnConfig::Star { consensus, da } => {
+                let mut configs = Self::create_node_configs(consensus, da);
+                let next_leader_config = configs.remove(0);
+                let first_node_addr =
+                    node_address_from_port(next_leader_config.network.backend.inner.port);
+                let mut node_configs = vec![next_leader_config];
+                for mut conf in configs {
+                    conf.network
+                        .backend
+                        .initial_peers
+                        .push(first_node_addr.clone());
+
+                    node_configs.push(conf);
+                }
+                node_configs
+            }
+            SpawnConfig::Chain { consensus, da } => {
+                let mut configs = Self::create_node_configs(consensus, da);
+                let next_leader_config = configs.remove(0);
+                let mut prev_node_addr =
+                    node_address_from_port(next_leader_config.network.backend.inner.port);
+                let mut node_configs = vec![next_leader_config];
+                for mut conf in configs {
+                    conf.network.backend.initial_peers.push(prev_node_addr);
+                    prev_node_addr = node_address_from_port(conf.network.backend.inner.port);
+
+                    node_configs.push(conf);
+                }
+                node_configs
+            }
+        }
+    }
+
+    fn create_node_configs(consensus: ConsensusConfig, da: DaConfig) -> Vec<Self::Config> {
+        let validator_config = __create_node_configs(consensus, da.clone());
+        let executor_settings = ExecutorSettings {
+            da_dispersal: DispersalServiceSettings {
+                backend: DispersalKZGRSBackendSettings {
+                    encoder_settings: EncoderSettings {
+                        num_columns: da.num_subnets as usize,
+                        with_cache: false,
+                        global_params_path: da.global_params_path,
+                    },
+                    dispersal_timeout: Duration::from_secs(u64::MAX),
+                },
+            },
+            num_subnets: 0,
+        };
+        validator_config
+            .into_iter()
+            .map(move |c| executor_config_from_node_config(c, executor_settings.clone()))
+            .collect()
     }
 }
 
@@ -549,6 +540,106 @@ fn build_da_peer_list(configs: &[ValidatorConfig]) -> Vec<(PeerId, Multiaddr)> {
         .collect()
 }
 
+fn __create_node_configs(consensus: ConsensusConfig, da: DaConfig) -> Vec<ValidatorConfig> {
+    // we use the same random bytes for:
+    // * da id
+    // * coin sk
+    // * coin nonce
+    let mut ids = vec![[0; 32]; consensus.n_participants];
+    for id in &mut ids {
+        thread_rng().fill(id);
+    }
+
+    #[cfg(feature = "mixnet")]
+    let (mixclient_config, mixnode_configs) = create_mixnet_config(&ids);
+
+    let notes = ids
+        .iter()
+        .map(|&id| {
+            let mut sk = [0; 16];
+            sk.copy_from_slice(&id[0..16]);
+            InputWitness::new(
+                NoteWitness::basic(1, NMO_UNIT, &mut thread_rng()),
+                NullifierSecret(sk),
+            )
+        })
+        .collect::<Vec<_>>();
+    // no commitments for now, proofs are not checked anyway
+    let genesis_state = LedgerState::from_commitments(
+        notes.iter().map(|n| n.note_commitment()),
+        (ids.len() as u32).into(),
+    );
+    let ledger_config = cryptarchia_ledger::Config {
+        epoch_stake_distribution_stabilization: 3,
+        epoch_period_nonce_buffer: 3,
+        epoch_period_nonce_stabilization: 4,
+        consensus_config: cryptarchia_engine::Config {
+            security_param: consensus.security_param,
+            active_slot_coeff: consensus.active_slot_coeff,
+        },
+    };
+    let slot_duration = std::env::var(CONSENSUS_SLOT_TIME_VAR)
+        .map(|s| <u64>::from_str(&s).unwrap())
+        .unwrap_or(DEFAULT_SLOT_TIME);
+    let time_config = TimeConfig {
+        slot_duration: Duration::from_secs(slot_duration),
+        chain_start_time: OffsetDateTime::now_utc(),
+    };
+
+    #[allow(unused_mut, unused_variables)]
+    let mut configs = ids
+        .into_iter()
+        .zip(notes)
+        .enumerate()
+        .map(|(i, (da_id, coin))| {
+            create_node_config(
+                da_id,
+                genesis_state.clone(),
+                ledger_config.clone(),
+                vec![coin],
+                time_config.clone(),
+                da.clone(),
+                #[cfg(feature = "mixnet")]
+                MixnetConfig {
+                    mixclient: mixclient_config.clone(),
+                    mixnode: mixnode_configs[i].clone(),
+                },
+            )
+        })
+        .collect::<Vec<_>>();
+
+    // Build DA memberships and address lists.
+    let peer_addresses = build_da_peer_list(&configs);
+    let peer_ids = peer_addresses.iter().map(|(p, _)| *p).collect::<Vec<_>>();
+
+    for config in &mut configs {
+        let membership = FillFromNodeList::new(&peer_ids, da.subnetwork_size, da.dispersal_factor);
+        let local_peer_id = secret_key_to_peer_id(config.da_network.backend.node_key.clone());
+        let subnetwork_ids = membership.membership(&local_peer_id);
+        config.da_verifier.verifier_settings.index = subnetwork_ids;
+        config.da_network.backend.membership = membership;
+        config.da_network.backend.addresses = peer_addresses.iter().cloned().collect();
+    }
+
+    #[cfg(feature = "mixnet")]
+    {
+        // Build a topology using only a subset of nodes.
+        let mixnode_candidates = configs
+            .iter()
+            .take(NUM_MIXNODE_CANDIDATES)
+            .collect::<Vec<_>>();
+        let topology = build_mixnet_topology(&mixnode_candidates);
+
+        // Set the topology to all configs
+        for config in &mut configs {
+            config.network.backend.mixnet.mixclient.topology = topology.clone();
+        }
+        configs
+    }
+    #[cfg(not(feature = "mixnet"))]
+    configs
+}
+
 #[allow(clippy::too_many_arguments)]
 fn create_node_config(
     id: [u8; 32],
@@ -583,7 +674,7 @@ fn create_node_config(
             blob_selector_settings: (),
         },
         da_network: DaNetworkConfig {
-            backend: DaNetworkValidatorBackend::Settings {
+            backend: DaNetworkBackendSettings {
                 node_key,
                 membership: Default::default(),
                 addresses: Default::default(),
