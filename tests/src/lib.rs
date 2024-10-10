@@ -10,6 +10,7 @@ use std::time::Duration;
 use std::{fmt::Debug, sync::Mutex};
 
 //crates
+use nomos_executor::config::Config as ExecutorConfig;
 use nomos_libp2p::{Multiaddr, Swarm};
 use nomos_node::Config;
 use rand::{thread_rng, Rng};
@@ -49,7 +50,7 @@ pub fn adjust_timeout(d: Duration) -> Duration {
 #[async_trait::async_trait]
 pub trait Node: Sized {
     type ConsensusInfo: Debug + Clone + PartialEq;
-    async fn spawn(mut config: Config) -> Self;
+    async fn spawn(mut config: ExecutorConfig) -> Self;
     async fn spawn_nodes(config: SpawnConfig) -> Vec<Self> {
         let mut nodes = Vec::new();
         for conf in Self::node_configs(config) {
@@ -57,7 +58,7 @@ pub trait Node: Sized {
         }
         nodes
     }
-    fn node_configs(config: SpawnConfig) -> Vec<Config> {
+    fn node_configs(config: SpawnConfig) -> Vec<ExecutorConfig> {
         match config {
             SpawnConfig::Star { consensus, da } => {
                 let mut configs = Self::create_node_configs(consensus, da);
@@ -89,7 +90,7 @@ pub trait Node: Sized {
             }
         }
     }
-    fn create_node_configs(consensus: ConsensusConfig, da: DaConfig) -> Vec<Config>;
+    fn create_node_configs(consensus: ConsensusConfig, da: DaConfig) -> Vec<ExecutorConfig>;
     async fn consensus_info(&self) -> Self::ConsensusInfo;
     fn stop(&mut self);
 }
@@ -141,7 +142,7 @@ impl SpawnConfig {
     }
 }
 
-fn node_address(config: &Config) -> Multiaddr {
+fn node_address(config: &ExecutorConfig) -> Multiaddr {
     Swarm::multiaddr(
         std::net::Ipv4Addr::new(127, 0, 0, 1),
         config.network.backend.inner.port,
