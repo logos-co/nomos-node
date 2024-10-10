@@ -2,7 +2,8 @@
 // crates
 use reqwest::{Client, ClientBuilder, StatusCode, Url};
 // internal
-use nomos_executor::api::paths;
+use nomos_executor::api::{handlers::DispersalRequest, paths};
+use serde::Serialize;
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
@@ -40,15 +41,20 @@ impl ExecutorHttpClient {
     }
 
     /// Send a `Blob` to be dispersed
-    pub async fn publish_blob(&self, blob: Vec<u8>) -> Result<(), Error> {
+    pub async fn publish_blob<Metadata: Serialize>(
+        &self,
+        data: Vec<u8>,
+        metadata: Metadata,
+    ) -> Result<(), Error> {
+        let req = DispersalRequest { data, metadata };
         let url = self
             .executor_address
-            .join(paths::DA_ADD_BLOB)
+            .join(paths::DISPERSE_DATA)
             .expect("Url should build properly");
         let response = self
             .client
             .post(url)
-            .body(blob)
+            .json(&req)
             .send()
             .await
             .map_err(Error::Request)?;
