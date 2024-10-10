@@ -69,18 +69,33 @@ pub enum SpawnConfig {
     // Star topology: Every node is initially connected to a single node.
     Star {
         consensus: ConsensusConfig,
+        n_executors: usize,
         da: DaConfig,
     },
     // Chain topology: Every node is chained to the node next to it.
     Chain {
         consensus: ConsensusConfig,
+        n_executors: usize,
         da: DaConfig,
     },
 }
 
 impl SpawnConfig {
+    pub fn n_executors(&self) -> usize {
+        match self {
+            SpawnConfig::Star { n_executors, .. } => *n_executors,
+            SpawnConfig::Chain { n_executors, .. } => *n_executors,
+        }
+    }
+
+    pub fn da_config(&self) -> DaConfig {
+        match self {
+            SpawnConfig::Star { da, .. } => da.clone(),
+            SpawnConfig::Chain { da, .. } => da.clone(),
+        }
+    }
     // Returns a SpawnConfig::Chain with proper configurations for happy-path tests
-    pub fn chain_happy(n_participants: usize, da: DaConfig) -> Self {
+    pub fn chain_happy(n_participants: usize, number_of_executors: usize, da: DaConfig) -> Self {
         Self::Chain {
             consensus: ConsensusConfig {
                 n_participants,
@@ -91,11 +106,12 @@ impl SpawnConfig {
                 // a block should be produced (on average) every slot
                 active_slot_coeff: 0.9,
             },
+            n_executors: number_of_executors,
             da,
         }
     }
 
-    pub fn star_happy(n_participants: usize, da: DaConfig) -> Self {
+    pub fn star_happy(n_participants: usize, number_of_executors: usize, da: DaConfig) -> Self {
         Self::Star {
             consensus: ConsensusConfig {
                 n_participants,
@@ -106,6 +122,7 @@ impl SpawnConfig {
                 // a block should be produced (on average) every slot
                 active_slot_coeff: 0.9,
             },
+            n_executors: number_of_executors,
             da,
         }
     }

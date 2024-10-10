@@ -54,7 +54,7 @@ async fn happy_test(nodes: &[TestNode<ValidatorConfig>]) {
 #[tokio::test]
 async fn two_nodes_happy() {
     let nodes =
-        TestNode::<ValidatorConfig>::spawn_nodes(SpawnConfig::star_happy(2, Default::default()))
+        TestNode::<ValidatorConfig>::spawn_nodes(SpawnConfig::star_happy(2, 0, Default::default()))
             .await;
     happy_test(&nodes).await;
 }

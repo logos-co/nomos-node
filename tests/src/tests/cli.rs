@@ -14,6 +14,7 @@ const CLI_BIN: &str = "../target/debug/nomos-cli";
 const APP_ID: &str = "fd3384e132ad02a56c78f45547ee40038dc79002b90d29ed90e08eee762ae715";
 
 use std::process::Command;
+use tests::nodes::nomos::{NetworkNode, NetworkNodeConfig};
 
 fn run_disseminate(disseminate: &Disseminate) {
     let mut binding = Command::new(CLI_BIN);
@@ -44,7 +45,7 @@ fn run_disseminate(disseminate: &Disseminate) {
     c.status().expect("failed to execute nomos cli");
 }
 
-async fn disseminate(nodes: &Vec<TestNode<ExecutorConfig>>, config: &mut Disseminate) {
+async fn disseminate(nodes: &Vec<NetworkNode>, config: &mut Disseminate) {
     // Nomos Cli is acting as the first node when dispersing the data by using the key associated
     // with that Nomos Node.
     let first_config = nodes[0].config();
@@ -53,11 +54,11 @@ async fn disseminate(nodes: &Vec<TestNode<ExecutorConfig>>, config: &mut Dissemi
         .build()
         .expect("Client from default settings should be able to build");
 
-    let exec_url = Url::parse(&format!(
-        "http://{}",
-        first_config.http.backend_settings.address
-    ))
-    .unwrap();
+    let backend_address = match first_config {
+        NetworkNodeConfig::Validator(cfg) => cfg.http.backend_settings.address,
+        NetworkNodeConfig::Executor(cfg) => cfg.http.backend_settings.address,
+    };
+    let exec_url = Url::parse(&format!("http://{}", backend_address)).unwrap();
     let client = ExecutorHttpClient::new(client, exec_url);
 
     let data = [1u8; 31];
@@ -79,8 +80,9 @@ async fn disseminate_and_retrieve() {
         ..Default::default()
     };
 
-    let nodes = TestNode::<ExecutorConfig>::spawn_nodes(SpawnConfig::star_happy(
+    let nodes = NetworkNode::spawn_nodes(SpawnConfig::star_happy(
         2,
+        1,
         tests::DaConfig {
             dispersal_factor: 2,
             subnetwork_size: 2,
