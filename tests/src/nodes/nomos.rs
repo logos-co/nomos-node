@@ -589,7 +589,7 @@ fn create_mixnet_config(ids: &[[u8; 32]]) -> (MixClientConfig, Vec<MixNodeConfig
 }
 
 #[cfg(feature = "mixnet")]
-fn build_mixnet_topology(mixnode_candidates: &[&Config]) -> MixnetTopology {
+fn build_mixnet_topology(mixnode_candidates: &[&ValidatorConfig]) -> MixnetTopology {
     use mixnet::crypto::public_key_from;
     use std::net::{IpAddr, Ipv4Addr};
 
