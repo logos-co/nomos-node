@@ -1,51 +1,15 @@
 use executor_http_client::ExecutorHttpClient;
-use nomos_cli::cmds::disseminate::Disseminate;
 
-use nomos_executor::config::Config as ExecutorConfig;
 use reqwest::ClientBuilder;
 use reqwest::Url;
 use std::time::Duration;
-use tests::nodes::TestNode;
+use tests::nodes::nomos::{NetworkNode, NetworkNodeConfig};
 use tests::Node;
 use tests::SpawnConfig;
-use tests::GLOBAL_PARAMS_PATH;
 
-const CLI_BIN: &str = "../target/debug/nomos-cli";
 const APP_ID: &str = "fd3384e132ad02a56c78f45547ee40038dc79002b90d29ed90e08eee762ae715";
 
-use std::process::Command;
-use tests::nodes::nomos::{NetworkNode, NetworkNodeConfig};
-
-fn run_disseminate(disseminate: &Disseminate) {
-    let mut binding = Command::new(CLI_BIN);
-    let c = binding
-        .args(["disseminate", "--network-config"])
-        .arg(disseminate.network_config.as_os_str())
-        .arg("--app-id")
-        .arg(&disseminate.app_id)
-        .arg("--index")
-        .arg(disseminate.index.to_string())
-        .arg("--columns")
-        .arg(disseminate.columns.to_string())
-        .arg("--timeout")
-        .arg(disseminate.timeout.to_string())
-        .arg("--wait-until-disseminated")
-        .arg(disseminate.wait_until_disseminated.to_string())
-        .arg("--node-addr")
-        .arg(disseminate.node_addr.as_ref().unwrap().as_str())
-        .arg("--global-params-path")
-        .arg(GLOBAL_PARAMS_PATH.to_string());
-
-    match (&disseminate.data, &disseminate.file) {
-        (Some(data), None) => c.args(["--data", &data]),
-        (None, Some(file)) => c.args(["--file", file.as_os_str().to_str().unwrap()]),
-        (_, _) => panic!("Either data or file needs to be provided, but not both"),
-    };
-
-    c.status().expect("failed to execute nomos cli");
-}
-
-async fn disseminate(nodes: &Vec<NetworkNode>, config: &mut Disseminate) {
+async fn disseminate(nodes: &Vec<NetworkNode>) {
     // Nomos Cli is acting as the first node when dispersing the data by using the key associated
     // with that Nomos Node.
     let first_config = nodes[0].config();
@@ -70,16 +34,6 @@ async fn disseminate(nodes: &Vec<NetworkNode>, config: &mut Disseminate) {
 
 #[tokio::test]
 async fn disseminate_and_retrieve() {
-    let mut config = Disseminate {
-        data: Some("hello world".to_string()),
-        timeout: 60,
-        wait_until_disseminated: 5,
-        app_id: APP_ID.into(),
-        index: 0,
-        columns: 2,
-        ..Default::default()
-    };
-
     let nodes = NetworkNode::spawn_nodes(SpawnConfig::star_happy(
         2,
         1,
@@ -93,7 +47,7 @@ async fn disseminate_and_retrieve() {
     .await;
 
     tokio::time::sleep(Duration::from_secs(15)).await;
-    disseminate(&nodes, &mut config).await;
+    disseminate(&nodes).await;
     tokio::time::sleep(Duration::from_secs(20)).await;
 
     let from = 0u64.to_be_bytes();
