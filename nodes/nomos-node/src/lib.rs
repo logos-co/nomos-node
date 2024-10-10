@@ -26,7 +26,7 @@ use nomos_da_sampling::network::adapters::validator::Libp2pAdapter as SamplingLi
 use nomos_da_sampling::storage::adapters::rocksdb::RocksAdapter as SamplingStorageAdapter;
 use nomos_da_sampling::DaSamplingService;
 use nomos_da_verifier::backend::kzgrs::KzgrsDaVerifier;
-use nomos_da_verifier::network::adapters::libp2p::Libp2pAdapter as VerifierNetworkAdapter;
+use nomos_da_verifier::network::adapters::validator::Libp2pAdapter as VerifierNetworkAdapter;
 use nomos_da_verifier::storage::adapters::rocksdb::RocksAdapter as VerifierStorageAdapter;
 use nomos_da_verifier::DaVerifierService;
 #[cfg(feature = "tracing")]
@@ -115,7 +115,7 @@ pub type DaMempool = DaMempoolService<
     SamplingStorageAdapter<DaBlob, Wire>,
 >;
 
-pub type DaIndexer = DataIndexerService<
+pub type DaIndexer<SamplingAdapter> = DataIndexerService<
     // Indexer specific.
     Bytes,
     IndexerStorageAdapter<Wire, BlobInfo>,
@@ -130,32 +130,36 @@ pub type DaIndexer = DataIndexerService<
     FillSizeWithBlobs<MB16, BlobInfo>,
     RocksBackend<Wire>,
     KzgrsSamplingBackend<ChaCha20Rng>,
-    nomos_da_sampling::network::adapters::validator::Libp2pAdapter<NomosDaMembership>,
+    SamplingAdapter,
     ChaCha20Rng,
     SamplingStorageAdapter<DaBlob, Wire>,
 >;
 
-pub type DaSampling = DaSamplingService<
+pub type NodeDaIndexer =
+    DaIndexer<nomos_da_sampling::network::adapters::validator::Libp2pAdapter<NomosDaMembership>>;
+
+pub type DaSampling<SamplingAdapter> = DaSamplingService<
     KzgrsSamplingBackend<ChaCha20Rng>,
-    SamplingLibp2pAdapter<NomosDaMembership>,
+    SamplingAdapter,
     ChaCha20Rng,
     SamplingStorageAdapter<DaBlob, Wire>,
 >;
 
-pub type DaVerifier = DaVerifierService<
-    KzgrsDaVerifier,
-    VerifierNetworkAdapter<FillFromNodeList>,
-    VerifierStorageAdapter<(), DaBlob, Wire>,
->;
+pub type NodeDaSampling = DaSampling<SamplingLibp2pAdapter<NomosDaMembership>>;
+
+pub type DaVerifier<VerifierAdapter> =
+    DaVerifierService<KzgrsDaVerifier, VerifierAdapter, VerifierStorageAdapter<(), DaBlob, Wire>>;
+
+pub type NodeDaVerifier = DaVerifier<VerifierNetworkAdapter<FillFromNodeList>>;
 
 #[derive(Services)]
 pub struct Nomos {
     #[cfg(feature = "tracing")]
     logging: ServiceHandle<Logger>,
     network: ServiceHandle<NetworkService<NetworkBackend>>,
-    da_indexer: ServiceHandle<DaIndexer>,
-    da_verifier: ServiceHandle<DaVerifier>,
-    da_sampling: ServiceHandle<DaSampling>,
+    da_indexer: ServiceHandle<NodeDaIndexer>,
+    da_verifier: ServiceHandle<NodeDaVerifier>,
+    da_sampling: ServiceHandle<NodeDaSampling>,
     da_network: ServiceHandle<DaNetworkService<DaNetworkValidatorBackend<NomosDaMembership>>>,
     cl_mempool: ServiceHandle<TxMempool>,
     da_mempool: ServiceHandle<DaMempool>,
