@@ -147,3 +147,118 @@ impl<M: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'static> Netw
         Poll::Pending
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use futures::task::ArcWake;
+    use libp2p::{identity, PeerId};
+    use std::collections::{HashMap, HashSet};
+    use std::sync::Arc;
+
+    #[derive(Clone, Debug)]
+    struct MockMembershipHandler {
+        membership: HashMap<PeerId, HashSet<SubnetworkId>>,
+    }
+
+    impl MembershipHandler for MockMembershipHandler {
+        type NetworkId = SubnetworkId;
+        type Id = PeerId;
+
+        fn membership(&self, peer_id: &PeerId) -> HashSet<Self::NetworkId> {
+            self.membership.get(peer_id).cloned().unwrap_or_default()
+        }
+
+        fn members_of(&self, subnetwork: &Self::NetworkId) -> HashSet<Self::Id> {
+            self.membership
+                .iter()
+                .filter_map(|(id, nets)| {
+                    if nets.contains(subnetwork) {
+                        Some(*id)
+                    } else {
+                        None
+                    }
+                })
+                .collect()
+        }
+
+        fn is_allowed(&self, _id: &Self::Id) -> bool {
+            unimplemented!()
+        }
+
+        fn members(&self) -> HashSet<Self::Id> {
+            HashSet::from(self.membership.keys().cloned().collect())
+        }
+    }
+
+    struct TestWaker;
+
+    impl ArcWake for TestWaker {
+        fn wake_by_ref(_arc_self: &Arc<Self>) {}
+    }
+
+    fn get_peer_from_membership(ids: &HashSet<PeerId>, idx: usize) -> PeerId {
+        let mut peer_id_vec: Vec<_> = ids.into_iter().collect();
+        peer_id_vec.sort();
+        **peer_id_vec.iter().nth(idx).unwrap()
+    }
+    fn create_validation_behaviours(
+        num_instances: usize,
+        subnet_id: u32,
+        membership: &mut HashMap<PeerId, HashSet<SubnetworkId>>,
+    ) -> Vec<DispersalValidatorBehaviour<MockMembershipHandler>> {
+        let mut behaviours = Vec::new();
+
+        let mut peer_ids = Vec::new();
+        for _ in 0..num_instances {
+            let keypair = identity::Keypair::generate_ed25519();
+            let peer_id = PeerId::from(keypair.public());
+            peer_ids.push(peer_id);
+        }
+
+        for peer_id in &peer_ids {
+            membership.insert(*peer_id, HashSet::from([subnet_id]));
+        }
+
+        let membership_handler = MockMembershipHandler {
+            membership: HashMap::default(), // This will be updated after all behaviours are added.
+        };
+
+        for peer_id in peer_ids {
+            let behaviour = DispersalValidatorBehaviour::new(membership_handler.clone());
+            behaviours.push(behaviour);
+        }
+
+        behaviours
+    }
+
+    fn establish_connection(
+        behaviours: &mut [DispersalValidatorBehaviour<MockMembershipHandler>],
+        i: usize,
+        j: usize,
+        connection_id: ConnectionId,
+    ) {
+        let mut members: Vec<_> = behaviours[i].membership.members().into_iter().collect();
+        members.sort();
+        let peer_id_i = members[i];
+        let peer_id_j = members[j];
+
+        behaviours[i]
+            .handle_established_outbound_connection(
+                connection_id,
+                peer_id_j,
+                &Multiaddr::empty(),
+                Endpoint::Dialer,
+            )
+            .unwrap();
+
+        behaviours[j]
+            .handle_established_inbound_connection(
+                connection_id,
+                peer_id_i,
+                &Multiaddr::empty(),
+                &Multiaddr::empty(),
+            )
+            .unwrap();
+    }
+}
