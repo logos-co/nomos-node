@@ -6,28 +6,32 @@ use either::Either;
 use futures::future::BoxFuture;
 use futures::stream::{BoxStream, FuturesUnordered};
 use futures::{AsyncWriteExt, FutureExt, StreamExt};
-use kzgrs_backend::common::blob::DaBlob;
 use libp2p::core::Endpoint;
+use libp2p::swarm::behaviour::{ConnectionClosed, ConnectionEstablished};
+use libp2p::swarm::dial_opts::DialOpts;
 use libp2p::swarm::{
-    ConnectionDenied, ConnectionId, FromSwarm, NetworkBehaviour, THandler, THandlerInEvent,
-    THandlerOutEvent, ToSwarm,
+    ConnectionDenied, ConnectionId, DialFailure, FromSwarm, NetworkBehaviour, THandler,
+    THandlerInEvent, THandlerOutEvent, ToSwarm,
 };
 use libp2p::{Multiaddr, PeerId, Stream};
 use libp2p_stream::{Control, OpenStreamError};
+use thiserror::Error;
+use tokio::sync::mpsc;
+use tokio::sync::mpsc::UnboundedSender;
+use tokio_stream::wrappers::UnboundedReceiverStream;
+use tracing::error;
+// internal
+use crate::address_book::AddressBook;
+use crate::protocol::DISPERSAL_PROTOCOL;
+use crate::protocols::clone_deserialize_error;
+use crate::SubnetworkId;
+use kzgrs_backend::common::blob::DaBlob;
 use nomos_core::da::BlobId;
 use nomos_da_messages::common::Blob;
 use nomos_da_messages::dispersal::dispersal_res::MessageType;
 use nomos_da_messages::dispersal::{DispersalErr, DispersalReq, DispersalRes};
 use nomos_da_messages::{pack_message, unpack_from_reader};
 use subnetworks_assignations::MembershipHandler;
-use thiserror::Error;
-use tokio::sync::mpsc;
-use tokio::sync::mpsc::UnboundedSender;
-use tokio_stream::wrappers::UnboundedReceiverStream;
-// internal
-use crate::protocol::DISPERSAL_PROTOCOL;
-use crate::protocols::clone_deserialize_error;
-use crate::SubnetworkId;
 
 #[derive(Debug, Error)]
 pub enum DispersalError {
@@ -157,6 +161,8 @@ pub struct DispersalExecutorBehaviour<Membership: MembershipHandler> {
     idle_streams: HashMap<PeerId, DispersalStream>,
     /// Subnetworks membership information
     membership: Membership,
+    /// Addresses of known peers in the DA network
+    addresses: AddressBook,
     /// Pending blobs that need to be dispersed by PeerId
     to_disperse: HashMap<PeerId, VecDeque<(Membership::NetworkId, DaBlob)>>,
     /// Already connected peers connection Ids
@@ -176,7 +182,7 @@ where
     Membership: MembershipHandler + 'static,
     Membership::NetworkId: Send,
 {
-    pub fn new(membership: Membership) -> Self {
+    pub fn new(membership: Membership, addresses: AddressBook) -> Self {
         let stream_behaviour = libp2p_stream::Behaviour::new();
         let tasks = FuturesUnordered::new();
         let to_disperse = HashMap::new();
@@ -196,6 +202,7 @@ where
             stream_behaviour,
             tasks,
             membership,
+            addresses,
             to_disperse,
             connected_subnetworks,
             idle_streams,
@@ -326,8 +333,8 @@ impl<Membership: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'sta
     fn disperse_blob(
         tasks: &mut FuturesUnordered<StreamHandlerFuture>,
         idle_streams: &mut HashMap<Membership::Id, DispersalStream>,
-        membership: &mut Membership,
-        connected_subnetworks: &mut HashMap<PeerId, ConnectionId>,
+        membership: &Membership,
+        connected_subnetworks: &HashMap<PeerId, ConnectionId>,
         to_disperse: &mut HashMap<PeerId, VecDeque<(Membership::NetworkId, DaBlob)>>,
         subnetwork_id: SubnetworkId,
         blob: DaBlob,
@@ -336,6 +343,7 @@ impl<Membership: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'sta
         let peers = members
             .iter()
             .filter(|peer_id| connected_subnetworks.contains_key(peer_id));
+
         // We may be connected to more than a single node. Usually will be one, but that is an
         // internal decision of the executor itself.
         for peer in peers {
@@ -351,6 +359,28 @@ impl<Membership: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'sta
                     .push_back((subnetwork_id, blob.clone()));
             }
         }
+    }
+
+    fn prune_blobs_for_peer(&mut self, peer_id: PeerId) -> Vec<DaBlob> {
+        self.to_disperse
+            .remove(&peer_id)
+            .unwrap_or_default()
+            .into_iter()
+            .map(|(_, blob)| blob)
+            .collect()
+    }
+
+    fn handle_connection_established(&mut self, peer_id: PeerId, connection_id: ConnectionId) {
+        self.connected_subnetworks.insert(peer_id, connection_id);
+    }
+
+    fn handle_connection_closed(&mut self, peer_id: PeerId) {
+        self.connected_subnetworks.remove(&peer_id);
+        let pending_blobs = self.prune_blobs_for_peer(peer_id);
+    }
+
+    fn handle_dial_failure(&mut self, peer_id: Option<PeerId>) {
+        todo!()
     }
 }
 
@@ -380,14 +410,29 @@ impl<M: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'static> Netw
         addr: &Multiaddr,
         role_override: Endpoint,
     ) -> Result<THandler<Self>, ConnectionDenied> {
-        self.connected_subnetworks.insert(peer, connection_id);
         self.stream_behaviour
             .handle_established_outbound_connection(connection_id, peer, addr, role_override)
             .map(Either::Left)
     }
 
     fn on_swarm_event(&mut self, event: FromSwarm) {
-        self.stream_behaviour.on_swarm_event(event)
+        self.stream_behaviour.on_swarm_event(event);
+        match event {
+            FromSwarm::ConnectionEstablished(ConnectionEstablished {
+                peer_id,
+                connection_id,
+                ..
+            }) => {
+                self.handle_connection_established(peer_id, connection_id);
+            }
+            FromSwarm::ConnectionClosed(ConnectionClosed { peer_id, .. }) => {
+                self.handle_connection_closed(peer_id);
+            }
+            FromSwarm::DialFailure(DialFailure { peer_id, .. }) => {
+                self.handle_dial_failure(peer_id);
+            }
+            _ => {}
+        }
     }
 
     fn on_connection_handler_event(
@@ -414,6 +459,7 @@ impl<M: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'static> Netw
             pending_out_streams,
             pending_blobs_stream,
             membership,
+            addresses,
             connected_subnetworks,
             ..
         } = self;
@@ -479,7 +525,18 @@ impl<M: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'static> Netw
         }
         // Deal with connection as the underlying behaviour would do
         match self.stream_behaviour.poll(cx) {
-            Poll::Ready(ToSwarm::Dial { opts }) => Poll::Ready(ToSwarm::Dial { opts }),
+            Poll::Ready(ToSwarm::Dial { mut opts }) => {
+                // attach known peer address if possible
+                if let Some(address) = opts
+                    .get_peer_id()
+                    .and_then(|peer_id: PeerId| addresses.get_address(&peer_id))
+                {
+                    opts = DialOpts::peer_id(opts.get_peer_id().unwrap())
+                        .addresses(vec![address.clone()])
+                        .build();
+                }
+                Poll::Ready(ToSwarm::Dial { opts })
+            }
             Poll::Pending => {
                 // TODO: probably must be smarter when to wake this
                 cx.waker().wake_by_ref();

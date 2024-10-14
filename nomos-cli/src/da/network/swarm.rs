@@ -65,15 +65,16 @@ where
         key: Keypair,
         membership: Membership,
     ) -> Swarm<DispersalExecutorBehaviour<Membership>> {
-        libp2p::SwarmBuilder::with_existing_identity(key)
-            .with_tokio()
-            .with_quic()
-            .with_behaviour(|_key| DispersalExecutorBehaviour::new(membership))
-            .expect("Validator behaviour should build")
-            .with_swarm_config(|cfg| {
-                cfg.with_idle_connection_timeout(Duration::from_secs(u64::MAX))
-            })
-            .build()
+        todo!();
+        // libp2p::SwarmBuilder::with_existing_identity(key)
+        //     .with_tokio()
+        //     .with_quic()
+        //     .with_behaviour(|_key| DispersalExecutorBehaviour::new(membership))
+        //     .expect("Validator behaviour should build")
+        //     .with_swarm_config(|cfg| {
+        //         cfg.with_idle_connection_timeout(Duration::from_secs(u64::MAX))
+        //     })
+        //     .build()
     }
 
     pub fn dial(&mut self, addr: Multiaddr) -> Result<(), DialError> {

@@ -40,8 +40,11 @@ where
     pub fn new(key: &Keypair, membership: Membership, addresses: AddressBook) -> Self {
         let peer_id = PeerId::from_public_key(&key.public());
         Self {
-            sampling: SamplingBehaviour::new(peer_id, membership.clone(), addresses),
-            executor_dispersal: DispersalExecutorBehaviour::new(membership.clone()),
+            sampling: SamplingBehaviour::new(peer_id, membership.clone(), addresses.clone()),
+            executor_dispersal: DispersalExecutorBehaviour::new(
+                membership.clone(),
+                addresses.clone(),
+            ),
             validator_dispersal: DispersalValidatorBehaviour::new(membership.clone()),
             replication: ReplicationBehaviour::new(peer_id, membership),
         }
