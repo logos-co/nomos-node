@@ -21,9 +21,10 @@ use nomos_da_sampling::DaSamplingServiceSettings;
 use nomos_da_verifier::backend::kzgrs::KzgrsDaVerifierSettings;
 use nomos_da_verifier::storage::adapters::rocksdb::RocksAdapterSettings as VerifierStorageAdapterSettings;
 use nomos_da_verifier::DaVerifierServiceSettings;
-use nomos_libp2p::{Multiaddr, PeerId, SwarmConfig};
+use nomos_libp2p::{ed25519, Multiaddr, PeerId, SwarmConfig};
 use nomos_log::{LoggerBackend, LoggerFormat};
 use nomos_mempool::MempoolMetrics;
+use nomos_mix_service::backends::libp2p::Libp2pNetworkBackendSettings;
 use nomos_network::{backends::libp2p::Libp2pConfig, NetworkConfig};
 use nomos_node::api::paths::{
     CL_METRICS, CRYPTARCHIA_HEADERS, CRYPTARCHIA_INFO, DA_GET_RANGE, STORAGE_BLOCK,
@@ -312,6 +313,12 @@ impl Node for NomosNode {
             })
             .collect::<Vec<_>>();
 
+        // Build Mix membership
+        let mix_addresses = build_mix_peer_list(&configs);
+        for config in &mut configs {
+            config.mix.backend.membership = mix_addresses.clone();
+        }
+
         // Build DA memberships and address lists.
         let peer_addresses = build_da_peer_list(&configs);
         let peer_ids = peer_addresses.iter().map(|(p, _)| *p).collect::<Vec<_>>();
@@ -361,6 +368,21 @@ fn build_da_peer_list(configs: &[Config]) -> Vec<(PeerId, Multiaddr)> {
         .collect()
 }
 
+fn build_mix_peer_list(configs: &[Config]) -> Vec<Multiaddr> {
+    configs
+        .iter()
+        .map(|c| {
+            let peer_id = secret_key_to_peer_id(c.mix.backend.node_key.clone());
+            c.mix
+                .backend
+                .listening_address
+                .clone()
+                .with_p2p(peer_id)
+                .unwrap_or_else(|orig_addr| orig_addr)
+        })
+        .collect()
+}
+
 #[allow(clippy::too_many_arguments)]
 fn create_node_config(
     id: [u8; 32],
@@ -381,6 +403,19 @@ fn create_node_config(
             backend: Libp2pConfig {
                 inner: swarm_config,
                 initial_peers: vec![],
+            },
+        },
+        mix: nomos_mix_service::NetworkConfig {
+            backend: Libp2pNetworkBackendSettings {
+                listening_address: Multiaddr::from_str(&format!(
+                    "/ip4/127.0.0.1/udp/{}/quic-v1",
+                    get_available_port(),
+                ))
+                .unwrap(),
+                node_key: ed25519::SecretKey::generate(),
+                membership: Vec::new(),
+                peering_degree: 1,
+                num_mix_layers: 1,
             },
         },
         cryptarchia: CryptarchiaSettings {

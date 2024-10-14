@@ -32,6 +32,7 @@ use tracing::error;
 
 pub type ConsensusRelay<
     A,
+    MixNetworkAdapter,
     ClPool,
     ClPoolAdapter,
     DaPool,
@@ -46,6 +47,7 @@ pub type ConsensusRelay<
 > = Relay<
     CryptarchiaConsensus<
         A,
+        MixNetworkAdapter,
         ClPool,
         ClPoolAdapter,
         DaPool,
@@ -65,6 +67,7 @@ pub struct DataIndexerService<
     DaStorage,
     Consensus,
     A,
+    MixNetworkAdapter,
     ClPool,
     ClPoolAdapter,
     DaPool,
@@ -79,6 +82,7 @@ pub struct DataIndexerService<
 > where
     B: 'static,
     A: NetworkAdapter,
+    MixNetworkAdapter: cryptarchia_consensus::mix::NetworkAdapter,
     ClPoolAdapter: MempoolAdapter<Payload = ClPool::Item, Key = ClPool::Key>,
     ClPool: MemPool<BlockId = HeaderId>,
     DaPool: MemPool<BlockId = HeaderId>,
@@ -105,6 +109,7 @@ pub struct DataIndexerService<
     storage_relay: Relay<StorageService<DaStorage::Backend>>,
     consensus_relay: ConsensusRelay<
         A,
+        MixNetworkAdapter,
         ClPool,
         ClPoolAdapter,
         DaPool,
@@ -150,6 +155,7 @@ impl<
         DaStorage,
         Consensus,
         A,
+        MixNetworkAdapter,
         ClPool,
         ClPoolAdapter,
         DaPool,
@@ -167,6 +173,7 @@ impl<
         DaStorage,
         Consensus,
         A,
+        MixNetworkAdapter,
         ClPool,
         ClPoolAdapter,
         DaPool,
@@ -182,6 +189,7 @@ impl<
 where
     B: 'static,
     A: NetworkAdapter,
+    MixNetworkAdapter: cryptarchia_consensus::mix::NetworkAdapter,
     ClPoolAdapter: MempoolAdapter<Payload = ClPool::Item, Key = ClPool::Key>,
     ClPool: MemPool<BlockId = HeaderId>,
     DaPool: MemPool<BlockId = HeaderId>,
@@ -216,6 +224,7 @@ impl<
         DaStorage,
         Consensus,
         A,
+        MixNetworkAdapter,
         ClPool,
         ClPoolAdapter,
         DaPool,
@@ -233,6 +242,7 @@ impl<
         DaStorage,
         Consensus,
         A,
+        MixNetworkAdapter,
         ClPool,
         ClPoolAdapter,
         DaPool,
@@ -248,6 +258,7 @@ impl<
 where
     B: Send + Sync + 'static,
     A: NetworkAdapter,
+    MixNetworkAdapter: cryptarchia_consensus::mix::NetworkAdapter,
     ClPoolAdapter: MempoolAdapter<Payload = ClPool::Item, Key = ClPool::Key>,
     ClPool: MemPool<BlockId = HeaderId>,
     DaPool: MemPool<BlockId = HeaderId>,
@@ -324,6 +335,7 @@ impl<
         DaStorage,
         Consensus,
         A,
+        MixNetworkAdapter,
         ClPool,
         ClPoolAdapter,
         DaPool,
@@ -341,6 +353,7 @@ impl<
         DaStorage,
         Consensus,
         A,
+        MixNetworkAdapter,
         ClPool,
         ClPoolAdapter,
         DaPool,
@@ -356,6 +369,7 @@ impl<
 where
     B: Debug + Send + Sync,
     A: NetworkAdapter,
+    MixNetworkAdapter: cryptarchia_consensus::mix::NetworkAdapter,
     ClPoolAdapter: MempoolAdapter<Payload = ClPool::Item, Key = ClPool::Key>,
     ClPool: MemPool<BlockId = HeaderId>,
     DaPool: MemPool<BlockId = HeaderId>,

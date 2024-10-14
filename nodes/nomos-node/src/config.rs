@@ -13,6 +13,8 @@ use nomos_da_network_service::backends::libp2p::validator::DaNetworkValidatorBac
 use nomos_da_network_service::NetworkService as DaNetworkService;
 use nomos_libp2p::{ed25519::SecretKey, Multiaddr};
 use nomos_log::{Logger, LoggerBackend, LoggerFormat};
+use nomos_mix_service::backends::libp2p::Libp2pNetworkBackend as MixNetworkBackend;
+use nomos_mix_service::NetworkService as MixNetworkService;
 use nomos_network::backends::libp2p::Libp2p as NetworkBackend;
 use nomos_network::NetworkService;
 use nomos_storage::backends::rocksdb::RocksBackend;
@@ -73,6 +75,24 @@ pub struct NetworkArgs {
 }
 
 #[derive(Parser, Debug, Clone)]
+pub struct MixArgs {
+    #[clap(long = "mix-addr", env = "MIX_ADDR")]
+    mix_addr: Option<Multiaddr>,
+
+    #[clap(long = "mix-node-key", env = "MIX_NODE_KEY")]
+    mix_node_key: Option<String>,
+
+    #[clap(long = "mix-membership", env = "MIX_MEMBERSHIP", num_args = 1.., value_delimiter = ',')]
+    pub mix_membership: Option<Vec<Multiaddr>>,
+
+    #[clap(long = "mix-peering-degree", env = "MIX_PEERING_DEGREE")]
+    mix_peering_degree: Option<usize>,
+
+    #[clap(long = "mix-num-mix-layers", env = "MIX_NUM_MIX_LAYERS")]
+    mix_num_mix_layers: Option<usize>,
+}
+
+#[derive(Parser, Debug, Clone)]
 pub struct HttpArgs {
     #[clap(long = "http-host", env = "HTTP_HOST")]
     pub http_addr: Option<SocketAddr>,
@@ -114,6 +134,7 @@ pub struct MetricsArgs {
 pub struct Config {
     pub log: <Logger as ServiceData>::Settings,
     pub network: <NetworkService<NetworkBackend> as ServiceData>::Settings,
+    pub mix: <MixNetworkService<MixNetworkBackend> as ServiceData>::Settings,
     pub da_network:
         <DaNetworkService<DaNetworkValidatorBackend<FillFromNodeList>> as ServiceData>::Settings,
     pub da_indexer: <crate::NodeDaIndexer as ServiceData>::Settings,
@@ -131,11 +152,13 @@ impl Config {
         mut self,
         log_args: LogArgs,
         network_args: NetworkArgs,
+        mix_args: MixArgs,
         http_args: HttpArgs,
         cryptarchia_args: CryptarchiaArgs,
     ) -> Result<Self> {
         update_log(&mut self.log, log_args)?;
         update_network(&mut self.network, network_args)?;
+        update_mix(&mut self.mix, mix_args)?;
         update_http(&mut self.http, http_args)?;
         update_cryptarchia_consensus(&mut self.cryptarchia, cryptarchia_args)?;
         Ok(self)
@@ -219,6 +242,42 @@ pub fn update_network(
 
     if let Some(peers) = initial_peers {
         network.backend.initial_peers = peers;
+    }
+
+    Ok(())
+}
+
+pub fn update_mix(
+    network: &mut <MixNetworkService<MixNetworkBackend> as ServiceData>::Settings,
+    mix_args: MixArgs,
+) -> Result<()> {
+    let MixArgs {
+        mix_addr,
+        mix_node_key,
+        mix_membership,
+        mix_peering_degree,
+        mix_num_mix_layers,
+    } = mix_args;
+
+    if let Some(addr) = mix_addr {
+        network.backend.listening_address = addr;
+    }
+
+    if let Some(node_key) = mix_node_key {
+        let mut key_bytes = hex::decode(node_key)?;
+        network.backend.node_key = SecretKey::try_from_bytes(key_bytes.as_mut_slice())?;
+    }
+
+    if let Some(membership) = mix_membership {
+        network.backend.membership = membership;
+    }
+
+    if let Some(peering_degree) = mix_peering_degree {
+        network.backend.peering_degree = peering_degree;
+    }
+
+    if let Some(num_mix_layers) = mix_num_mix_layers {
+        network.backend.num_mix_layers = num_mix_layers;
     }
 
     Ok(())

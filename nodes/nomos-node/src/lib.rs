@@ -40,6 +40,8 @@ use nomos_mempool::{backend::mockpool::MockPool, TxMempoolService};
 pub use nomos_metrics::NomosRegistry;
 #[cfg(feature = "metrics")]
 pub use nomos_metrics::{Metrics, MetricsSettings};
+pub use nomos_mix_service::backends::libp2p::Libp2pNetworkBackend as MixNetworkBackend;
+pub use nomos_mix_service::NetworkService as MixNetworkService;
 pub use nomos_network::backends::libp2p::Libp2p as NetworkBackend;
 pub use nomos_network::NetworkService;
 pub use nomos_storage::{
@@ -85,6 +87,7 @@ pub const MB16: usize = 1024 * 1024 * 16;
 
 pub type Cryptarchia<SamplingAdapter> = cryptarchia_consensus::CryptarchiaConsensus<
     cryptarchia_consensus::network::adapters::libp2p::LibP2pAdapter<Tx, BlobInfo>,
+    cryptarchia_consensus::mix::adapters::libp2p::LibP2pAdapter,
     MockPool<HeaderId, Tx, <Tx as Transaction>::Hash>,
     MempoolNetworkAdapter<Tx, <Tx as Transaction>::Hash>,
     MockPool<HeaderId, BlobInfo, <BlobInfo as DispersedBlobInfo>::BlobId>,
@@ -122,6 +125,7 @@ pub type DaIndexer<SamplingAdapter> = DataIndexerService<
     CryptarchiaConsensusAdapter<Tx, BlobInfo>,
     // Cryptarchia specific, should be the same as in `Cryptarchia` type above.
     cryptarchia_consensus::network::adapters::libp2p::LibP2pAdapter<Tx, BlobInfo>,
+    cryptarchia_consensus::mix::adapters::libp2p::LibP2pAdapter,
     MockPool<HeaderId, Tx, <Tx as Transaction>::Hash>,
     MempoolNetworkAdapter<Tx, <Tx as Transaction>::Hash>,
     MockPool<HeaderId, BlobInfo, <BlobInfo as DispersedBlobInfo>::BlobId>,
@@ -157,6 +161,7 @@ pub struct Nomos {
     #[cfg(feature = "tracing")]
     logging: ServiceHandle<Logger>,
     network: ServiceHandle<NetworkService<NetworkBackend>>,
+    mix: ServiceHandle<MixNetworkService<MixNetworkBackend>>,
     da_indexer: ServiceHandle<NodeDaIndexer>,
     da_verifier: ServiceHandle<NodeDaVerifier>,
     da_sampling: ServiceHandle<NodeDaSampling>,
