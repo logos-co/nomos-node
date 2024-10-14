@@ -107,6 +107,7 @@ pub struct DataIndexerService<
 {
     service_state: ServiceStateHandle<Self>,
     storage_relay: Relay<StorageService<DaStorage::Backend>>,
+    #[allow(clippy::type_complexity)]
     consensus_relay: ConsensusRelay<
         A,
         MixNetworkAdapter,
