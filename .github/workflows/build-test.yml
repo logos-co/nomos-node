@@ -45,10 +45,14 @@ jobs:
     name: Test Suite
     if: ${{ !startsWith(github.event.pull_request.title, '[WIP]') && !contains(github.event.label.name,  'DO NOT MERGE') }}
     strategy:
-      fail-fast: false # all OSes should be tested even if one fails (default: true)
+      fail-fast: false # all OSes should be tested even if one fails
       matrix:
-        feature: [ libp2p, "libp2p,mixnet" ]
-        os: [ self-hosted, macos-latest ] # drop windows for now as risc0 does not support it
+        feature: 
+          - libp2p
+          - "libp2p,mixnet"
+        os: # drop windows for now as risc0 does not support it
+          - [self-hosted, Linux]
+          - [self-hosted, macOS]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v2
