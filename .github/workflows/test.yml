@@ -1,0 +1,39 @@
+name: Dummy Workflow for macOS ARM64
+
+on:
+  push:
+    branches:
+      - test-github-actions
+  pull_request:
+    branches:
+      - test-github-actions
+
+jobs:
+  build:
+    name: Build on Self-hosted macOS ARM64
+    runs-on: 
+      - self-hosted
+      - macOS
+      - ARM64
+      - macOS-15.0
+      - Xcode-16.0
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+      
+      - name: Print Runner Info
+        run: |
+          echo "Running on self-hosted macOS ARM64 with macOS-15.0 and Xcode-16.0"
+          uname -a
+          sw_vers
+          xcodebuild -version
+          
+      - name: Dummy Build Step
+        run: echo "This is a dummy build step for demonstration purposes."
+
+      - name: Run Tests
+        run: echo "Running tests..."
+
+      - name: Dummy Cleanup
+        run: echo "Cleanup complete."
