@@ -187,7 +187,11 @@ mod tests {
         }
 
         fn members(&self) -> HashSet<Self::Id> {
-            HashSet::from(self.membership.keys().cloned().collect())
+            let mut members = HashSet::new();
+            for id in self.membership.keys() {
+                members.insert(*id);
+            }
+            members
         }
     }
 
@@ -197,11 +201,6 @@ mod tests {
         fn wake_by_ref(_arc_self: &Arc<Self>) {}
     }
 
-    fn get_peer_from_membership(ids: &HashSet<PeerId>, idx: usize) -> PeerId {
-        let mut peer_id_vec: Vec<_> = ids.into_iter().collect();
-        peer_id_vec.sort();
-        **peer_id_vec.iter().nth(idx).unwrap()
-    }
     fn create_validation_behaviours(
         num_instances: usize,
         subnet_id: u32,
@@ -224,7 +223,7 @@ mod tests {
             membership: HashMap::default(), // This will be updated after all behaviours are added.
         };
 
-        for peer_id in peer_ids {
+        for _ in peer_ids {
             let behaviour = DispersalValidatorBehaviour::new(membership_handler.clone());
             behaviours.push(behaviour);
         }
@@ -238,7 +237,7 @@ mod tests {
         j: usize,
         connection_id: ConnectionId,
     ) {
-        let mut members: Vec<_> = behaviours[i].membership.members().into_iter().collect();
+        let mut members: Vec<PeerId> = behaviours[i].membership.members().into_iter().collect();
         members.sort();
         let peer_id_i = members[i];
         let peer_id_j = members[j];
