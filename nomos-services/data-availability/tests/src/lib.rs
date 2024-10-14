@@ -6,17 +6,14 @@
 
 #[cfg(test)]
 #[cfg(feature = "libp2p")]
-#[cfg(not(feature = "mixnet"))]
 mod common;
 
 #[cfg(test)]
 #[cfg(feature = "libp2p")]
-#[cfg(not(feature = "mixnet"))]
 mod indexer_integration;
 
 #[cfg(test)]
 #[cfg(feature = "libp2p")]
-#[cfg(not(feature = "mixnet"))]
 mod verifier_integration;
 
 #[cfg(test)]
