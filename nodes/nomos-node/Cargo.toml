@@ -63,6 +63,5 @@ rand = "0.8"
 
 [features]
 default = ["tracing"]
-mixnet = ["nomos-network/mixnet"]
 metrics = []
 tracing = []
