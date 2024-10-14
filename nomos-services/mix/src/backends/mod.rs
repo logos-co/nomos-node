@@ -1,6 +1,9 @@
 #[cfg(feature = "libp2p")]
 pub mod libp2p;
 
+#[cfg(feature = "mock")]
+pub mod mock;
+
 use std::fmt::Debug;
 
 use overwatch_rs::{overwatch::handle::OverwatchHandle, services::state::ServiceState};
