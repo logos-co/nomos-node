@@ -16,6 +16,7 @@ cl = { path = "../../cl/cl" }
 futures = "0.3"
 nomos-da-sampling = { path = "../data-availability/sampling" }
 nomos-network = { path = "../network" }
+nomos-mix-service = { path = "../mix" }
 nomos-mempool = { path = "../mempool" }
 nomos-core = { path = "../../nomos-core" }
 overwatch-rs = { git = "https://github.com/logos-co/Overwatch", rev = "2f70806" }

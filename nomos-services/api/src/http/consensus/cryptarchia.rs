@@ -7,6 +7,7 @@ use tokio::sync::oneshot;
 
 use crate::http::DynError;
 use cryptarchia_consensus::{
+    mix::adapters::libp2p::LibP2pAdapter as MixNetworkAdapter,
     network::adapters::libp2p::LibP2pAdapter as ConsensusNetworkAdapter, ConsensusMsg,
     CryptarchiaConsensus, CryptarchiaInfo,
 };
@@ -35,6 +36,7 @@ pub type Cryptarchia<
     const SIZE: usize,
 > = CryptarchiaConsensus<
     ConsensusNetworkAdapter<Tx, BlobInfo>,
+    MixNetworkAdapter,
     MockPool<HeaderId, Tx, <Tx as Transaction>::Hash>,
     MempoolNetworkAdapter<Tx, <Tx as Transaction>::Hash>,
     MockPool<HeaderId, BlobInfo, <BlobInfo as blob::info::DispersedBlobInfo>::BlobId>,
