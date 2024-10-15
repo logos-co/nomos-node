@@ -1,5 +1,5 @@
 // std
-use std::collections::{HashMap, VecDeque};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::task::{Context, Poll};
 // crates
 use either::Either;
@@ -153,6 +153,8 @@ type StreamHandlerFuture = BoxFuture<'static, Result<StreamHandlerFutureSuccess,
 /// It takes care of sending blobs to different subnetworks.
 /// Bubbles up events with the success or error when dispersing
 pub struct DispersalExecutorBehaviour<Membership: MembershipHandler> {
+    /// Self id
+    local_peer_id: PeerId,
     /// Underlying stream behaviour
     stream_behaviour: libp2p_stream::Behaviour,
     /// Pending running tasks (one task per stream)
@@ -165,6 +167,8 @@ pub struct DispersalExecutorBehaviour<Membership: MembershipHandler> {
     addresses: AddressBook,
     /// Pending blobs that need to be dispersed by PeerId
     to_disperse: HashMap<PeerId, VecDeque<(Membership::NetworkId, DaBlob)>>,
+    /// Pending blobs from disconnected networks
+    disconnected_pending_blobs: HashMap<Membership::NetworkId, VecDeque<DaBlob>>,
     /// Already connected peers connection Ids
     connected_subnetworks: HashMap<PeerId, ConnectionId>,
     /// Sender hook of peers to open streams channel
@@ -182,7 +186,7 @@ where
     Membership: MembershipHandler + 'static,
     Membership::NetworkId: Send,
 {
-    pub fn new(membership: Membership, addresses: AddressBook) -> Self {
+    pub fn new(local_peer_id: PeerId, membership: Membership, addresses: AddressBook) -> Self {
         let stream_behaviour = libp2p_stream::Behaviour::new();
         let tasks = FuturesUnordered::new();
         let to_disperse = HashMap::new();
@@ -197,13 +201,15 @@ where
 
         let (pending_blobs_sender, receiver) = mpsc::unbounded_channel();
         let pending_blobs_stream = UnboundedReceiverStream::new(receiver).boxed();
-
+        let disconnected_pending_blobs = HashMap::new();
         Self {
+            local_peer_id,
             stream_behaviour,
             tasks,
             membership,
             addresses,
             to_disperse,
+            disconnected_pending_blobs,
             connected_subnetworks,
             idle_streams,
             pending_out_streams_sender,
@@ -361,13 +367,78 @@ impl<Membership: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'sta
         }
     }
 
-    fn prune_blobs_for_peer(&mut self, peer_id: PeerId) -> Vec<DaBlob> {
-        self.to_disperse
-            .remove(&peer_id)
-            .unwrap_or_default()
-            .into_iter()
-            .map(|(_, blob)| blob)
-            .collect()
+    fn reschedule_blobs_for_peer_stream(
+        stream: &DispersalStream,
+        membership: &Membership,
+        to_disperse: &mut HashMap<PeerId, VecDeque<(SubnetworkId, DaBlob)>>,
+        disconnected_pending_blobs: &mut HashMap<SubnetworkId, VecDeque<DaBlob>>,
+    ) {
+        let peer_id = stream.peer_id;
+        let subnetworks = membership.membership(&peer_id);
+        let entry = to_disperse.entry(peer_id).or_default();
+        for subnetwork in subnetworks {
+            if let Some(blobs) = disconnected_pending_blobs.remove(&subnetwork) {
+                entry.extend(blobs.into_iter().map(|blob| (subnetwork, blob)));
+            }
+        }
+    }
+
+    fn filter_peers_for_subnetworks<'s>(
+        &'s self,
+        peer_id: PeerId,
+        subnetworks: impl Iterator<Item = SubnetworkId> + 's,
+    ) -> impl Iterator<Item = HashSet<PeerId>> + 's {
+        subnetworks.map(move |subnetwork_id| {
+            self.membership
+                .members_of(&subnetwork_id)
+                .iter()
+                .filter(|&&peer| peer != peer_id && peer != self.local_peer_id)
+                .copied()
+                .collect::<HashSet<_>>()
+        })
+    }
+
+    fn find_subnetworks_candidates_excluding_peer(
+        &self,
+        peer_id: PeerId,
+        subnetworks: &HashSet<SubnetworkId>,
+    ) -> HashSet<PeerId> {
+        let mut peers: HashSet<PeerId> = self
+            .filter_peers_for_subnetworks(peer_id, subnetworks.iter().copied())
+            .reduce(|h1, h2| h1.intersection(&h2).copied().collect())
+            .unwrap_or_default();
+        // we didn't find a single shared peer for all subnetworks, so we take the smallest subset
+        if peers.is_empty() {
+            peers = self
+                .filter_peers_for_subnetworks(peer_id, subnetworks.iter().copied())
+                .reduce(|h1, h2| h1.union(&h2).copied().collect())
+                .unwrap_or_default();
+        }
+        peers
+    }
+    fn open_streams_for_disconnected_subnetworks_selected_peer(&mut self, peer_id: PeerId) {
+        let subnetworks = self.membership.membership(&peer_id);
+        // open stream will result in dialing if we are not yet connected to the peer
+        for peer in self.find_subnetworks_candidates_excluding_peer(peer_id, &subnetworks) {
+            if let Err(e) = self.pending_out_streams_sender.send(peer) {
+                error!("Error requesting stream for peer {peer_id}: {e}");
+            }
+        }
+    }
+
+    fn prune_blobs_for_peer(&mut self, peer_id: PeerId) -> VecDeque<(SubnetworkId, DaBlob)> {
+        self.to_disperse.remove(&peer_id).unwrap_or_default()
+    }
+
+    fn recover_blobs_for_disconnected_subnetworks(&mut self, peer_id: PeerId) {
+        // push missing blobs into pending ones
+        let disconnected_pending_blobs = self.prune_blobs_for_peer(peer_id);
+        for (subnetwork_id, blob) in disconnected_pending_blobs {
+            self.disconnected_pending_blobs
+                .entry(subnetwork_id)
+                .or_default()
+                .push_back(blob);
+        }
     }
 
     fn handle_connection_established(&mut self, peer_id: PeerId, connection_id: ConnectionId) {
@@ -375,11 +446,14 @@ impl<Membership: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'sta
     }
 
     fn handle_connection_closed(&mut self, peer_id: PeerId) {
-        self.connected_subnetworks.remove(&peer_id);
-        let pending_blobs = self.prune_blobs_for_peer(peer_id);
+        if self.connected_subnetworks.remove(&peer_id).is_some() {
+            // mangle pending blobs for disconnected subnetworks from peer
+            self.recover_blobs_for_disconnected_subnetworks(peer_id);
+            self.open_streams_for_disconnected_subnetworks_selected_peer(peer_id);
+        }
     }
 
-    fn handle_dial_failure(&mut self, peer_id: Option<PeerId>) {
+    fn handle_dial_failure(&mut self, _peer_id: Option<PeerId>) {
         todo!()
     }
 }
@@ -455,6 +529,7 @@ impl<M: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'static> Netw
         let Self {
             tasks,
             to_disperse,
+            disconnected_pending_blobs,
             idle_streams,
             pending_out_streams,
             pending_blobs_stream,
@@ -514,6 +589,12 @@ impl<M: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'static> Netw
         if let Poll::Ready(Some(res)) = pending_out_streams.poll_next_unpin(cx) {
             match res {
                 Ok(stream) => {
+                    Self::reschedule_blobs_for_peer_stream(
+                        &stream,
+                        membership,
+                        to_disperse,
+                        disconnected_pending_blobs,
+                    );
                     Self::handle_stream(tasks, to_disperse, idle_streams, stream);
                 }
                 Err(error) => {

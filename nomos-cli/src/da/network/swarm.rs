@@ -1,5 +1,4 @@
 // std
-use std::time::Duration;
 // crates
 use kzgrs_backend::common::blob::DaBlob;
 use libp2p::futures::StreamExt;
@@ -62,10 +61,10 @@ where
     }
 
     fn build_swarm(
-        key: Keypair,
-        membership: Membership,
+        _key: Keypair,
+        _membership: Membership,
     ) -> Swarm<DispersalExecutorBehaviour<Membership>> {
-        todo!();
+        todo!("CLI will be removed");
         // libp2p::SwarmBuilder::with_existing_identity(key)
         //     .with_tokio()
         //     .with_quic()
