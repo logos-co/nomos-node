@@ -10,8 +10,8 @@ use libp2p::core::Endpoint;
 use libp2p::swarm::behaviour::{ConnectionClosed, ConnectionEstablished};
 use libp2p::swarm::dial_opts::DialOpts;
 use libp2p::swarm::{
-    ConnectionDenied, ConnectionId, DialFailure, FromSwarm, NetworkBehaviour, THandler,
-    THandlerInEvent, THandlerOutEvent, ToSwarm,
+    ConnectionDenied, ConnectionId, FromSwarm, NetworkBehaviour, THandler, THandlerInEvent,
+    THandlerOutEvent, ToSwarm,
 };
 use libp2p::{Multiaddr, PeerId, Stream};
 use libp2p_stream::{Control, OpenStreamError};
@@ -452,10 +452,6 @@ impl<Membership: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'sta
             self.open_streams_for_disconnected_subnetworks_selected_peer(peer_id);
         }
     }
-
-    fn handle_dial_failure(&mut self, _peer_id: Option<PeerId>) {
-        todo!()
-    }
 }
 
 impl<M: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'static> NetworkBehaviour
@@ -501,9 +497,6 @@ impl<M: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'static> Netw
             }
             FromSwarm::ConnectionClosed(ConnectionClosed { peer_id, .. }) => {
                 self.handle_connection_closed(peer_id);
-            }
-            FromSwarm::DialFailure(DialFailure { peer_id, .. }) => {
-                self.handle_dial_failure(peer_id);
             }
             _ => {}
         }

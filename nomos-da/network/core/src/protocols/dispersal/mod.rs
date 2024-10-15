@@ -3,6 +3,7 @@ pub mod validator;
 
 #[cfg(test)]
 pub mod test {
+    use crate::address_book::AddressBook;
     use crate::protocols::dispersal::executor::behaviour::DispersalExecutorBehaviour;
     use crate::protocols::dispersal::validator::behaviour::{
         DispersalEvent, DispersalValidatorBehaviour,
@@ -21,16 +22,20 @@ pub mod test {
     use tracing_subscriber::EnvFilter;
 
     pub fn executor_swarm(
+        addressbook: AddressBook,
         key: Keypair,
         membership: impl MembershipHandler<NetworkId = u32, Id = PeerId> + 'static,
     ) -> libp2p::Swarm<
         DispersalExecutorBehaviour<impl MembershipHandler<NetworkId = u32, Id = PeerId>>,
     > {
+        let peer_id = PeerId::from_public_key(&key.public());
         libp2p::SwarmBuilder::with_existing_identity(key)
             .with_tokio()
             .with_other_transport(|keypair| quic::tokio::Transport::new(quic::Config::new(keypair)))
             .unwrap()
-            .with_behaviour(|_key| DispersalExecutorBehaviour::new(membership))
+            .with_behaviour(|_key| {
+                DispersalExecutorBehaviour::new(peer_id, membership, addressbook)
+            })
             .unwrap()
             .with_swarm_config(|cfg| {
                 cfg.with_idle_connection_timeout(std::time::Duration::from_secs(u64::MAX))
@@ -74,12 +79,14 @@ pub mod test {
             .into_iter()
             .collect(),
         };
-        let mut executor = executor_swarm(k1, neighbours.clone());
+        let addr: Multiaddr = "/ip4/127.0.0.1/udp/5063/quic-v1".parse().unwrap();
+        let addr2 = addr.clone().with_p2p(validator_peer).unwrap();
+        let addressbook =
+            AddressBook::from_iter([(PeerId::from_public_key(&k2.public()), addr2.clone())]);
+        let mut executor = executor_swarm(addressbook, k1, neighbours.clone());
         let mut validator = validator_swarm(k2, neighbours);
 
         let msg_count = 10usize;
-        let addr: Multiaddr = "/ip4/127.0.0.1/udp/5063/quic-v1".parse().unwrap();
-        let addr2 = addr.clone().with_p2p(validator_peer).unwrap();
 
         let validator_task = async move {
             validator.listen_on(addr).unwrap();
