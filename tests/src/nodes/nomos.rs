@@ -10,13 +10,6 @@ use cl::{InputWitness, NoteWitness, NullifierSecret};
 use cryptarchia_consensus::{CryptarchiaInfo, CryptarchiaSettings, TimeConfig};
 use cryptarchia_ledger::LedgerState;
 use kzgrs_backend::dispersal::BlobInfo;
-#[cfg(feature = "mixnet")]
-use mixnet::{
-    address::NodeAddress,
-    client::MixClientConfig,
-    node::MixNodeConfig,
-    topology::{MixNodeInfo, MixnetTopology},
-};
 use nomos_core::{block::Block, header::HeaderId, staking::NMO_UNIT};
 use nomos_da_indexer::storage::adapters::rocksdb::RocksAdapterSettings as IndexerStorageAdapterSettings;
 use nomos_da_indexer::IndexerSettings;
@@ -31,8 +24,6 @@ use nomos_da_verifier::DaVerifierServiceSettings;
 use nomos_libp2p::{Multiaddr, PeerId, SwarmConfig};
 use nomos_log::{LoggerBackend, LoggerFormat};
 use nomos_mempool::MempoolMetrics;
-#[cfg(feature = "mixnet")]
-use nomos_network::backends::libp2p::mixnet::MixnetConfig;
 use nomos_network::{backends::libp2p::Libp2pConfig, NetworkConfig};
 use nomos_node::api::paths::{
     CL_METRICS, CRYPTARCHIA_HEADERS, CRYPTARCHIA_INFO, DA_GET_RANGE, STORAGE_BLOCK,
@@ -55,8 +46,6 @@ static CLIENT: Lazy<Client> = Lazy::new(Client::new);
 const NOMOS_BIN: &str = "../target/debug/nomos-node";
 const DEFAULT_SLOT_TIME: u64 = 2;
 const CONSENSUS_SLOT_TIME_VAR: &str = "CONSENSUS_SLOT_TIME";
-#[cfg(feature = "mixnet")]
-const NUM_MIXNODE_CANDIDATES: usize = 2;
 
 pub struct NomosNode {
     addr: SocketAddr,
@@ -273,9 +262,6 @@ impl Node for NomosNode {
             thread_rng().fill(id);
         }
 
-        #[cfg(feature = "mixnet")]
-        let (mixclient_config, mixnode_configs) = create_mixnet_config(&ids);
-
         let notes = ids
             .iter()
             .map(|&id| {
@@ -322,11 +308,6 @@ impl Node for NomosNode {
                     vec![coin],
                     time_config.clone(),
                     da.clone(),
-                    #[cfg(feature = "mixnet")]
-                    MixnetConfig {
-                        mixclient: mixclient_config.clone(),
-                        mixnode: mixnode_configs[i].clone(),
-                    },
                 )
             })
             .collect::<Vec<_>>();
@@ -345,22 +326,6 @@ impl Node for NomosNode {
             config.da_network.backend.addresses = peer_addresses.iter().cloned().collect();
         }
 
-        #[cfg(feature = "mixnet")]
-        {
-            // Build a topology using only a subset of nodes.
-            let mixnode_candidates = configs
-                .iter()
-                .take(NUM_MIXNODE_CANDIDATES)
-                .collect::<Vec<_>>();
-            let topology = build_mixnet_topology(&mixnode_candidates);
-
-            // Set the topology to all configs
-            for config in &mut configs {
-                config.network.backend.mixnet.mixclient.topology = topology.clone();
-            }
-            configs
-        }
-        #[cfg(not(feature = "mixnet"))]
         configs
     }
 }
@@ -374,52 +339,6 @@ pub enum Pool {
 struct GetRangeReq {
     pub app_id: [u8; 32],
     pub range: Range<[u8; 8]>,
-}
-
-#[cfg(feature = "mixnet")]
-fn create_mixnet_config(ids: &[[u8; 32]]) -> (MixClientConfig, Vec<MixNodeConfig>) {
-    use std::num::NonZeroU8;
-
-    let mixnode_configs: Vec<MixNodeConfig> = ids
-        .iter()
-        .map(|id| MixNodeConfig {
-            encryption_private_key: *id,
-            delay_rate_per_min: 100000000.0,
-        })
-        .collect();
-    // Build an empty topology because it will be constructed with meaningful node infos later
-    let topology = MixnetTopology::new(Vec::new(), 0, 0, [1u8; 32]).unwrap();
-
-    (
-        MixClientConfig {
-            topology,
-            emission_rate_per_min: 120.0,
-            redundancy: NonZeroU8::new(1).unwrap(),
-        },
-        mixnode_configs,
-    )
-}
-
-#[cfg(feature = "mixnet")]
-fn build_mixnet_topology(mixnode_candidates: &[&Config]) -> MixnetTopology {
-    use mixnet::crypto::public_key_from;
-    use std::net::{IpAddr, Ipv4Addr};
-
-    let candidates = mixnode_candidates
-        .iter()
-        .map(|config| {
-            MixNodeInfo::new(
-                NodeAddress::from(SocketAddr::new(
-                    IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
-                    config.network.backend.inner.port,
-                )),
-                public_key_from(config.network.backend.mixnet.mixnode.encryption_private_key),
-            )
-            .unwrap()
-        })
-        .collect::<Vec<_>>();
-    let num_layers = candidates.len();
-    MixnetTopology::new(candidates, num_layers, 1, [1u8; 32]).unwrap()
 }
 
 fn secret_key_to_peer_id(node_key: nomos_libp2p::ed25519::SecretKey) -> PeerId {
@@ -450,7 +369,6 @@ fn create_node_config(
     notes: Vec<InputWitness>,
     time: TimeConfig,
     da_config: DaConfig,
-    #[cfg(feature = "mixnet")] mixnet_config: MixnetConfig,
 ) -> Config {
     let swarm_config: SwarmConfig = Default::default();
     let node_key = swarm_config.node_key.clone();
@@ -463,8 +381,6 @@ fn create_node_config(
             backend: Libp2pConfig {
                 inner: swarm_config,
                 initial_peers: vec![],
-                #[cfg(feature = "mixnet")]
-                mixnet: mixnet_config,
             },
         },
         cryptarchia: CryptarchiaSettings {

@@ -221,8 +221,6 @@ pub fn update_network(
         network.backend.initial_peers = peers;
     }
 
-    // TODO: configure mixclient and mixnode if the mixnet feature is enabled
-
     Ok(())
 }
 

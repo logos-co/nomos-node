@@ -16,7 +16,7 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        feature: [ libp2p, "libp2p,mixnet" ]
+        feature: [ libp2p ]
     steps:
       - uses: actions/checkout@v2
         with:
@@ -47,7 +47,7 @@ jobs:
     strategy:
       fail-fast: false # all OSes should be tested even if one fails (default: true)
       matrix:
-        feature: [ libp2p, "libp2p,mixnet" ]
+        feature: [ libp2p ]
         os: [ self-hosted, macos-latest ] # drop windows for now as risc0 does not support it
     runs-on: ${{ matrix.os }}
     steps:
@@ -132,7 +132,7 @@ jobs:
     runs-on: self-hosted
     strategy:
       matrix:
-        feature: [ libp2p, "libp2p,mixnet" ]
+        feature: [ libp2p ]
     steps:
       - uses: actions/checkout@v2
         with:
