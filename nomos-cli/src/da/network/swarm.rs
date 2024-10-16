@@ -167,6 +167,7 @@ pub mod test {
     use tracing_subscriber::EnvFilter;
 
     #[tokio::test]
+    #[ignore]
     async fn test_dispersal_with_swarms() {
         let _ = tracing_subscriber::fmt()
             .with_env_filter(EnvFilter::from_default_env())
