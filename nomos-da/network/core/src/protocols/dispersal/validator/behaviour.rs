@@ -183,7 +183,10 @@ mod tests {
         }
 
         fn is_allowed(&self, _id: &Self::Id) -> bool {
-            unimplemented!()
+            if self.membership.contains_key(_id) {
+                return true;
+            }
+            false
         }
 
         fn members(&self) -> HashSet<Self::Id> {
@@ -259,5 +262,49 @@ mod tests {
                 &Multiaddr::empty(),
             )
             .unwrap();
+    }
+
+    #[test]
+    fn test_handle_established_inbound_connection() {
+        let mut allowed_peers = HashMap::new();
+        allowed_peers.insert(PeerId::random(), HashSet::from([0, 1]));
+        let membership = MockMembershipHandler {
+            membership: allowed_peers,
+        };
+        let mut behaviour = DispersalValidatorBehaviour::new(membership);
+
+        let allowed_peer = *behaviour.membership.members().iter().next().unwrap();
+        let disallowed_peer = PeerId::random();
+        let local_addr = "/ip4/127.0.0.1/tcp/8080".parse().unwrap();
+        let remote_addr = "/ip4/127.0.0.1/tcp/8081".parse().unwrap();
+
+        let result = behaviour.handle_established_inbound_connection(
+            ConnectionId::new_unchecked(0),
+            allowed_peer,
+            &local_addr,
+            &remote_addr,
+        );
+        assert!(matches!(result, Ok(Either::Left(_))));
+
+        let result = behaviour.handle_established_inbound_connection(
+            ConnectionId::new_unchecked(1),
+            disallowed_peer,
+            &local_addr,
+            &remote_addr,
+        );
+        assert!(matches!(result, Ok(Either::Right(_))));
+    }
+
+    #[test]
+    fn test_poll() {
+        let membership = MockMembershipHandler {
+            membership: HashMap::new(),
+        };
+        let mut behaviour = DispersalValidatorBehaviour::new(membership);
+
+        let mut cx = std::task::Context::from_waker(futures::task::noop_waker_ref());
+        let poll_result = behaviour.poll(&mut cx);
+
+        assert!(matches!(poll_result, Poll::Pending));
     }
 }
