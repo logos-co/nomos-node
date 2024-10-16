@@ -16,7 +16,6 @@ pub mod test {
     use libp2p::swarm::SwarmEvent;
     use libp2p::{quic, Multiaddr, PeerId};
     use log::info;
-    use std::time::Duration;
     use subnetworks_assignations::MembershipHandler;
     use tracing_subscriber::fmt::TestWriter;
     use tracing_subscriber::EnvFilter;
@@ -107,10 +106,6 @@ pub mod test {
             res
         };
         let join_validator = tokio::spawn(validator_task);
-        tokio::time::sleep(Duration::from_secs(1)).await;
-        executor.dial(addr2).unwrap();
-        tokio::time::sleep(Duration::from_secs(1)).await;
-        let executor_open_stream_sender = executor.behaviour().open_stream_sender();
         let executor_disperse_blob_sender = executor.behaviour().blobs_sender();
         let (sender, mut receiver) = tokio::sync::oneshot::channel();
         let executor_poll = async move {
@@ -126,8 +121,6 @@ pub mod test {
             }
         };
         let executor_task = tokio::spawn(executor_poll);
-        executor_open_stream_sender.send(validator_peer).unwrap();
-        tokio::time::sleep(Duration::from_secs(1)).await;
         for i in 0..10 {
             info!("Sending blob: {i}");
             executor_disperse_blob_sender

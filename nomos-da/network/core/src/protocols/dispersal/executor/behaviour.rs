@@ -15,6 +15,8 @@ use libp2p::swarm::{
 };
 use libp2p::{Multiaddr, PeerId, Stream};
 use libp2p_stream::{Control, OpenStreamError};
+use rand::prelude::IteratorRandom;
+use rand::SeedableRng;
 use thiserror::Error;
 use tokio::sync::mpsc;
 use tokio::sync::mpsc::UnboundedSender;
@@ -170,7 +172,9 @@ pub struct DispersalExecutorBehaviour<Membership: MembershipHandler> {
     /// Pending blobs from disconnected networks
     disconnected_pending_blobs: HashMap<Membership::NetworkId, VecDeque<DaBlob>>,
     /// Already connected peers connection Ids
-    connected_subnetworks: HashMap<PeerId, ConnectionId>,
+    connected_peers: HashMap<PeerId, ConnectionId>,
+    /// Subnetwork working streams
+    subnetwork_open_streams: HashSet<SubnetworkId>,
     /// Sender hook of peers to open streams channel
     pending_out_streams_sender: UnboundedSender<PeerId>,
     /// Pending to open streams
@@ -190,7 +194,8 @@ where
         let stream_behaviour = libp2p_stream::Behaviour::new();
         let tasks = FuturesUnordered::new();
         let to_disperse = HashMap::new();
-        let connected_subnetworks = HashMap::new();
+        let connected_peers = HashMap::new();
+        let subnetwork_open_streams = HashSet::new();
         let idle_streams = HashMap::new();
         let (pending_out_streams_sender, receiver) = mpsc::unbounded_channel();
         let control = stream_behaviour.new_control();
@@ -202,6 +207,7 @@ where
         let (pending_blobs_sender, receiver) = mpsc::unbounded_channel();
         let pending_blobs_stream = UnboundedReceiverStream::new(receiver).boxed();
         let disconnected_pending_blobs = HashMap::new();
+
         Self {
             local_peer_id,
             stream_behaviour,
@@ -210,7 +216,8 @@ where
             addresses,
             to_disperse,
             disconnected_pending_blobs,
-            connected_subnetworks,
+            connected_peers,
+            subnetwork_open_streams,
             idle_streams,
             pending_out_streams_sender,
             pending_out_streams,
@@ -340,7 +347,7 @@ impl<Membership: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'sta
         tasks: &mut FuturesUnordered<StreamHandlerFuture>,
         idle_streams: &mut HashMap<Membership::Id, DispersalStream>,
         membership: &Membership,
-        connected_subnetworks: &HashMap<PeerId, ConnectionId>,
+        connected_peers: &HashMap<PeerId, ConnectionId>,
         to_disperse: &mut HashMap<PeerId, VecDeque<(Membership::NetworkId, DaBlob)>>,
         subnetwork_id: SubnetworkId,
         blob: DaBlob,
@@ -348,7 +355,7 @@ impl<Membership: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'sta
         let members = membership.members_of(&subnetwork_id);
         let peers = members
             .iter()
-            .filter(|peer_id| connected_subnetworks.contains_key(peer_id));
+            .filter(|peer_id| connected_peers.contains_key(peer_id));
 
         // We may be connected to more than a single node. Usually will be one, but that is an
         // internal decision of the executor itself.
@@ -441,12 +448,37 @@ impl<Membership: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'sta
         }
     }
 
+    fn try_ensure_stream_from_missing_subnetwork(
+        local_peer_id: &PeerId,
+        pending_out_streams_sender: &mut UnboundedSender<PeerId>,
+        membership: &Membership,
+        subnetwork_id: &SubnetworkId,
+    ) {
+        let mut rng = rand_chacha::ChaCha20Rng::from_entropy();
+        // chose a random peer that is not us
+        let peer = membership
+            .members_of(subnetwork_id)
+            .iter()
+            .filter(|&peer| peer != local_peer_id)
+            .choose(&mut rng)
+            .copied();
+        // if we have any, try to connect
+        if let Some(peer) = peer {
+            if let Err(e) = pending_out_streams_sender.send(peer) {
+                error!("Error requesting stream for peer {peer}: {e}");
+            }
+        }
+    }
+
     fn handle_connection_established(&mut self, peer_id: PeerId, connection_id: ConnectionId) {
-        self.connected_subnetworks.insert(peer_id, connection_id);
+        self.connected_peers.insert(peer_id, connection_id);
     }
 
     fn handle_connection_closed(&mut self, peer_id: PeerId) {
-        if self.connected_subnetworks.remove(&peer_id).is_some() {
+        let peer_subnetworks = self.membership.membership(&peer_id);
+        self.subnetwork_open_streams
+            .retain(|subnetwork_id| !peer_subnetworks.contains(subnetwork_id));
+        if self.connected_peers.remove(&peer_id).is_some() {
             // mangle pending blobs for disconnected subnetworks from peer
             self.recover_blobs_for_disconnected_subnetworks(peer_id);
             self.open_streams_for_disconnected_subnetworks_selected_peer(peer_id);
@@ -520,15 +552,18 @@ impl<M: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'static> Netw
         cx: &mut Context<'_>,
     ) -> Poll<ToSwarm<Self::ToSwarm, THandlerInEvent<Self>>> {
         let Self {
+            local_peer_id,
             tasks,
             to_disperse,
             disconnected_pending_blobs,
             idle_streams,
             pending_out_streams,
+            pending_out_streams_sender,
             pending_blobs_stream,
             membership,
             addresses,
-            connected_subnetworks,
+            connected_peers,
+            subnetwork_open_streams,
             ..
         } = self;
         // poll pending tasks
@@ -568,20 +603,32 @@ impl<M: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'static> Netw
         }
         // poll pending blobs
         if let Poll::Ready(Some((subnetwork_id, blob))) = pending_blobs_stream.poll_next_unpin(cx) {
-            Self::disperse_blob(
-                tasks,
-                idle_streams,
-                membership,
-                connected_subnetworks,
-                to_disperse,
-                subnetwork_id,
-                blob,
-            );
+            if subnetwork_open_streams.contains(&subnetwork_id) {
+                Self::disperse_blob(
+                    tasks,
+                    idle_streams,
+                    membership,
+                    connected_peers,
+                    to_disperse,
+                    subnetwork_id,
+                    blob,
+                );
+            } else {
+                let entry = disconnected_pending_blobs.entry(subnetwork_id).or_default();
+                entry.push_back(blob);
+                Self::try_ensure_stream_from_missing_subnetwork(
+                    local_peer_id,
+                    pending_out_streams_sender,
+                    membership,
+                    &subnetwork_id,
+                );
+            }
         }
         // poll pending streams
         if let Poll::Ready(Some(res)) = pending_out_streams.poll_next_unpin(cx) {
             match res {
                 Ok(stream) => {
+                    subnetwork_open_streams.extend(membership.membership(&stream.peer_id));
                     Self::reschedule_blobs_for_peer_stream(
                         &stream,
                         membership,
