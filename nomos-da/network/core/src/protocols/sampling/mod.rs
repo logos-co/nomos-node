@@ -120,6 +120,7 @@ mod test {
                         response_sender,
                     })) => {
                         debug!("Received request");
+                        // spawn here because otherwise we block polling
                         tokio::spawn(request_receiver);
                         response_sender
                             .send(BehaviourSampleRes::SamplingSuccess {
