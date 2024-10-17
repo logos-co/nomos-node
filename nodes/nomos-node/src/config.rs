@@ -14,6 +14,7 @@ use nomos_da_network_service::NetworkService as DaNetworkService;
 use nomos_libp2p::{ed25519::SecretKey, Multiaddr};
 use nomos_log::{Logger, LoggerBackend, LoggerFormat};
 use nomos_mix_service::backends::libp2p::Libp2pMixBackend as MixBackend;
+use nomos_mix_service::network::libp2p::Libp2pAdapter as MixNetworkAdapter;
 use nomos_mix_service::MixService;
 use nomos_network::backends::libp2p::Libp2p as NetworkBackend;
 use nomos_network::NetworkService;
@@ -136,7 +137,7 @@ pub struct MetricsArgs {
 pub struct Config {
     pub log: <Logger as ServiceData>::Settings,
     pub network: <NetworkService<NetworkBackend> as ServiceData>::Settings,
-    pub mix: <MixService<MixBackend> as ServiceData>::Settings,
+    pub mix: <MixService<MixBackend, MixNetworkAdapter> as ServiceData>::Settings,
     pub da_network:
         <DaNetworkService<DaNetworkValidatorBackend<FillFromNodeList>> as ServiceData>::Settings,
     pub da_indexer: <crate::NodeDaIndexer as ServiceData>::Settings,
@@ -250,7 +251,7 @@ pub fn update_network(
 }
 
 pub fn update_mix(
-    network: &mut <MixService<MixBackend> as ServiceData>::Settings,
+    mix: &mut <MixService<MixBackend, MixNetworkAdapter> as ServiceData>::Settings,
     mix_args: MixArgs,
 ) -> Result<()> {
     let MixArgs {
@@ -262,24 +263,24 @@ pub fn update_mix(
     } = mix_args;
 
     if let Some(addr) = mix_addr {
-        network.backend.listening_address = addr;
+        mix.backend.listening_address = addr;
     }
 
     if let Some(node_key) = mix_node_key {
         let mut key_bytes = hex::decode(node_key)?;
-        network.backend.node_key = SecretKey::try_from_bytes(key_bytes.as_mut_slice())?;
+        mix.backend.node_key = SecretKey::try_from_bytes(key_bytes.as_mut_slice())?;
     }
 
     if let Some(membership) = mix_membership {
-        network.backend.membership = membership;
+        mix.backend.membership = membership;
     }
 
     if let Some(peering_degree) = mix_peering_degree {
-        network.backend.peering_degree = peering_degree;
+        mix.backend.peering_degree = peering_degree;
     }
 
     if let Some(num_mix_layers) = mix_num_mix_layers {
-        network.backend.num_mix_layers = num_mix_layers;
+        mix.backend.num_mix_layers = num_mix_layers;
     }
 
     Ok(())
