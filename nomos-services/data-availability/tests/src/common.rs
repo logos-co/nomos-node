@@ -52,8 +52,7 @@ use nomos_mempool::{DaMempoolSettings, TxMempoolSettings};
 use nomos_mix_service::backends::libp2p::{
     Libp2pMixBackend as MixBackend, Libp2pMixBackendSettings,
 };
-use nomos_mix_service::MixConfig;
-use nomos_mix_service::MixService;
+use nomos_mix_service::{MixConfig, MixService};
 use nomos_network::backends::libp2p::{Libp2p as NetworkBackend, Libp2pConfig};
 use nomos_network::NetworkConfig;
 use nomos_network::NetworkService;
@@ -88,7 +87,11 @@ pub static ENCODER: Lazy<DaEncoder> = Lazy::new(|| DaEncoder::new(PARAMS.clone()
 
 pub(crate) type Cryptarchia = cryptarchia_consensus::CryptarchiaConsensus<
     cryptarchia_consensus::network::adapters::libp2p::LibP2pAdapter<Tx, BlobInfo>,
-    cryptarchia_consensus::mix::adapters::libp2p::LibP2pAdapter,
+    cryptarchia_consensus::mix::adapters::libp2p::LibP2pAdapter<
+        nomos_mix_service::network::libp2p::Libp2pAdapter,
+        Tx,
+        BlobInfo,
+    >,
     MockPool<HeaderId, Tx, <Tx as Transaction>::Hash>,
     MempoolNetworkAdapter<Tx, <Tx as Transaction>::Hash>,
     MockPool<HeaderId, BlobInfo, <BlobInfo as DispersedBlobInfo>::BlobId>,
@@ -116,7 +119,11 @@ pub(crate) type DaIndexer = DataIndexerService<
     CryptarchiaConsensusAdapter<Tx, BlobInfo>,
     // Cryptarchia specific, should be the same as in `Cryptarchia` type above.
     cryptarchia_consensus::network::adapters::libp2p::LibP2pAdapter<Tx, BlobInfo>,
-    cryptarchia_consensus::mix::adapters::libp2p::LibP2pAdapter,
+    cryptarchia_consensus::mix::adapters::libp2p::LibP2pAdapter<
+        nomos_mix_service::network::libp2p::Libp2pAdapter,
+        Tx,
+        BlobInfo,
+    >,
     MockPool<HeaderId, Tx, <Tx as Transaction>::Hash>,
     MempoolNetworkAdapter<Tx, <Tx as Transaction>::Hash>,
     MockPool<HeaderId, BlobInfo, <BlobInfo as DispersedBlobInfo>::BlobId>,
@@ -156,7 +163,7 @@ pub(crate) const MB16: usize = 1024 * 1024 * 16;
 pub struct TestNode {
     //logging: ServiceHandle<Logger>,
     network: ServiceHandle<NetworkService<NetworkBackend>>,
-    mix: ServiceHandle<MixService<MixBackend>>,
+    mix: ServiceHandle<MixService<MixBackend, nomos_mix_service::network::libp2p::Libp2pAdapter>>,
     cl_mempool: ServiceHandle<TxMempool>,
     da_network: ServiceHandle<DaNetworkService<DaNetworkValidatorBackend<FillFromNodeList>>>,
     da_mempool: ServiceHandle<DaMempool>,
@@ -250,6 +257,17 @@ pub fn new_node(
                 genesis_state: genesis_state.clone(),
                 time: time_config.clone(),
                 notes: vec![note.clone()],
+                network_adapter_settings:
+                    cryptarchia_consensus::network::adapters::libp2p::LibP2pAdapterSettings {
+                        topic: String::from(nomos_node::CONSENSUS_TOPIC),
+                    },
+                mix_adapter_settings:
+                    cryptarchia_consensus::mix::adapters::libp2p::LibP2pAdapterSettings {
+                        broadcast_settings:
+                            nomos_mix_service::network::libp2p::Libp2pBroadcastSettings {
+                                topic: String::from(nomos_node::CONSENSUS_TOPIC),
+                            },
+                    },
             },
             verifier: DaVerifierServiceSettings {
                 verifier_settings,

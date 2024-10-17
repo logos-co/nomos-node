@@ -1,19 +1,21 @@
 // std
 use std::hash::Hash;
 // crates
-use serde::{de::DeserializeOwned, Serialize};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use tokio::sync::broadcast::error::RecvError;
 use tokio_stream::{wrappers::BroadcastStream, StreamExt};
 // internal
-use crate::network::{messages::NetworkMessage, BoxedStream, NetworkAdapter};
-use nomos_core::{block::Block, wire};
+use crate::{
+    messages::NetworkMessage,
+    network::{BoxedStream, NetworkAdapter},
+};
+use nomos_core::block::Block;
 use nomos_network::{
     backends::libp2p::{Command, Event, EventKind, Libp2p},
     NetworkMsg, NetworkService,
 };
 use overwatch_rs::services::{relay::OutboundRelay, ServiceData};
 
-const TOPIC: &str = "/cryptarchia/proto";
 const BUFFER_SIZE: usize = 64;
 type Relay<T> = OutboundRelay<<NetworkService<T> as ServiceData>::Message>;
 
@@ -23,8 +25,14 @@ where
     Tx: Clone + Eq + Hash,
     BlobCert: Clone + Eq + Hash,
 {
-    network_relay: OutboundRelay<<NetworkService<Libp2p> as ServiceData>::Message>,
+    // TODO: This field will be used once we implement https://github.com/logos-co/nomos-node/issues/827
+    _network_relay: OutboundRelay<<NetworkService<Libp2p> as ServiceData>::Message>,
     blocks: tokio::sync::broadcast::Sender<Block<Tx, BlobCert>>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LibP2pAdapterSettings {
+    pub topic: String,
 }
 
 impl<Tx, BlobCert> LibP2pAdapter<Tx, BlobCert>
@@ -49,12 +57,13 @@ where
     BlobCert: Serialize + DeserializeOwned + Clone + Eq + Hash + Send + 'static,
 {
     type Backend = Libp2p;
+    type Settings = LibP2pAdapterSettings;
     type Tx = Tx;
     type BlobCertificate = BlobCert;
 
-    async fn new(network_relay: Relay<Libp2p>) -> Self {
+    async fn new(settings: Self::Settings, network_relay: Relay<Libp2p>) -> Self {
         let relay = network_relay.clone();
-        Self::subscribe(&relay, TOPIC).await;
+        Self::subscribe(&relay, settings.topic.as_str()).await;
         let blocks = tokio::sync::broadcast::Sender::new(BUFFER_SIZE);
         let blocks_sender = blocks.clone();
         tracing::debug!("Starting up...");
@@ -99,25 +108,12 @@ where
             }
         });
         Self {
-            network_relay,
+            _network_relay: network_relay,
             blocks,
         }
     }
 
     async fn blocks_stream(&self) -> BoxedStream<Block<Self::Tx, Self::BlobCertificate>> {
         Box::new(BroadcastStream::new(self.blocks.subscribe()).filter_map(Result::ok))
-    }
-
-    async fn broadcast(&self, message: NetworkMessage<Self::Tx, Self::BlobCertificate>) {
-        if let Err((e, message)) = self
-            .network_relay
-            .send(NetworkMsg::Process(Command::Broadcast {
-                message: wire::serialize(&message).unwrap().into_boxed_slice(),
-                topic: TOPIC.into(),
-            }))
-            .await
-        {
-            tracing::error!("error broadcasting {message:?}: {e}");
-        };
     }
 }

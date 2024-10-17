@@ -4,6 +4,7 @@ use color_eyre::eyre::Result;
 use nomos_da_network_service::backends::libp2p::executor::DaNetworkExecutorBackend;
 use nomos_da_network_service::NetworkService as DaNetworkService;
 use nomos_mix_service::backends::libp2p::Libp2pMixBackend as MixBackend;
+use nomos_mix_service::network::libp2p::Libp2pAdapter as MixNetworkAdapter;
 use nomos_mix_service::MixService;
 use nomos_network::backends::libp2p::Libp2p as NetworkBackend;
 use nomos_node::{
@@ -21,7 +22,7 @@ use crate::ExecutorApiService;
 pub struct Config {
     pub log: <Logger as ServiceData>::Settings,
     pub network: <NetworkService<NetworkBackend> as ServiceData>::Settings,
-    pub mix: <MixService<MixBackend> as ServiceData>::Settings,
+    pub mix: <MixService<MixBackend, MixNetworkAdapter> as ServiceData>::Settings,
     pub da_dispersal: <crate::DaDispersal as ServiceData>::Settings,
     pub da_network:
         <DaNetworkService<DaNetworkExecutorBackend<FillFromNodeList>> as ServiceData>::Settings,
