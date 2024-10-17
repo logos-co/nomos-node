@@ -1,5 +1,4 @@
 // std
-use std::time::Duration;
 // crates
 use kzgrs_backend::common::blob::DaBlob;
 use libp2p::futures::StreamExt;
@@ -62,18 +61,19 @@ where
     }
 
     fn build_swarm(
-        key: Keypair,
-        membership: Membership,
+        _key: Keypair,
+        _membership: Membership,
     ) -> Swarm<DispersalExecutorBehaviour<Membership>> {
-        libp2p::SwarmBuilder::with_existing_identity(key)
-            .with_tokio()
-            .with_quic()
-            .with_behaviour(|_key| DispersalExecutorBehaviour::new(membership))
-            .expect("Validator behaviour should build")
-            .with_swarm_config(|cfg| {
-                cfg.with_idle_connection_timeout(Duration::from_secs(u64::MAX))
-            })
-            .build()
+        todo!("CLI will be removed");
+        // libp2p::SwarmBuilder::with_existing_identity(key)
+        //     .with_tokio()
+        //     .with_quic()
+        //     .with_behaviour(|_key| DispersalExecutorBehaviour::new(membership))
+        //     .expect("Validator behaviour should build")
+        //     .with_swarm_config(|cfg| {
+        //         cfg.with_idle_connection_timeout(Duration::from_secs(u64::MAX))
+        //     })
+        //     .build()
     }
 
     pub fn dial(&mut self, addr: Multiaddr) -> Result<(), DialError> {
@@ -167,6 +167,7 @@ pub mod test {
     use tracing_subscriber::EnvFilter;
 
     #[tokio::test]
+    #[ignore]
     async fn test_dispersal_with_swarms() {
         let _ = tracing_subscriber::fmt()
             .with_env_filter(EnvFilter::from_default_env())
