@@ -2,7 +2,7 @@ mod behaviour;
 mod error;
 mod handler;
 
-pub use behaviour::{Behaviour, Event};
+pub use behaviour::{Behaviour, Config, Event};
 
 #[cfg(test)]
 mod test {
