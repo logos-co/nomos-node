@@ -24,8 +24,8 @@ use super::MixBackend;
 pub struct Libp2pMixBackend {
     #[allow(dead_code)]
     task: JoinHandle<()>,
-    swarm_msgs_tx: mpsc::Sender<MixSwarmMessage>,
-    fully_unwrapped_messages_sender: broadcast::Sender<Vec<u8>>,
+    swarm_message_sender: mpsc::Sender<MixSwarmMessage>,
+    fully_unwrapped_message_sender: broadcast::Sender<Vec<u8>>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -46,16 +46,16 @@ impl MixBackend for Libp2pMixBackend {
     type Settings = Libp2pMixBackendSettings;
 
     fn new(config: Self::Settings, overwatch_handle: OverwatchHandle) -> Self {
-        let (swarm_msgs_tx, swarm_msgs_rx) = mpsc::channel(CHANNEL_SIZE);
-        let (fully_unwrapped_messages_sender, _) = broadcast::channel(CHANNEL_SIZE);
+        let (swarm_message_sender, swarm_message_receiver) = mpsc::channel(CHANNEL_SIZE);
+        let (fully_unwrapped_message_sender, _) = broadcast::channel(CHANNEL_SIZE);
 
         let keypair = Keypair::from(ed25519::Keypair::from(config.node_key.clone()));
         let local_peer_id = keypair.public().to_peer_id();
         let mut swarm = MixSwarm::new(
             keypair,
             config.num_mix_layers,
-            swarm_msgs_rx,
-            fully_unwrapped_messages_sender.clone(),
+            swarm_message_receiver,
+            fully_unwrapped_message_sender.clone(),
         );
 
         swarm
@@ -88,13 +88,17 @@ impl MixBackend for Libp2pMixBackend {
 
         Self {
             task,
-            swarm_msgs_tx,
-            fully_unwrapped_messages_sender,
+            swarm_message_sender,
+            fully_unwrapped_message_sender,
         }
     }
 
     async fn mix(&self, msg: Vec<u8>) {
-        if let Err(e) = self.swarm_msgs_tx.send(MixSwarmMessage::Mix(msg)).await {
+        if let Err(e) = self
+            .swarm_message_sender
+            .send(MixSwarmMessage::Mix(msg))
+            .await
+        {
             tracing::error!("Failed to send message to MixSwarm: {e}");
         }
     }
@@ -103,7 +107,7 @@ impl MixBackend for Libp2pMixBackend {
         &mut self,
     ) -> Pin<Box<dyn Stream<Item = Vec<u8>> + Send>> {
         Box::pin(
-            BroadcastStream::new(self.fully_unwrapped_messages_sender.subscribe())
+            BroadcastStream::new(self.fully_unwrapped_message_sender.subscribe())
                 .filter_map(|event| async { event.ok() }),
         )
     }
@@ -112,7 +116,7 @@ impl MixBackend for Libp2pMixBackend {
 struct MixSwarm {
     swarm: Swarm<nomos_mix_network::Behaviour>,
     num_mix_layers: usize,
-    msgs_rx: mpsc::Receiver<MixSwarmMessage>,
+    swarm_messages_receiver: mpsc::Receiver<MixSwarmMessage>,
     fully_unwrapped_messages_sender: broadcast::Sender<Vec<u8>>,
 }
 
@@ -125,7 +129,7 @@ impl MixSwarm {
     fn new(
         keypair: Keypair,
         num_mix_layers: usize,
-        msgs_rx: mpsc::Receiver<MixSwarmMessage>,
+        swarm_messages_receiver: mpsc::Receiver<MixSwarmMessage>,
         fully_unwrapped_messages_sender: broadcast::Sender<Vec<u8>>,
     ) -> Self {
         let swarm = SwarmBuilder::with_existing_identity(keypair)
@@ -146,7 +150,7 @@ impl MixSwarm {
         Self {
             swarm,
             num_mix_layers,
-            msgs_rx,
+            swarm_messages_receiver,
             fully_unwrapped_messages_sender,
         }
     }
@@ -162,8 +166,8 @@ impl MixSwarm {
     async fn run(&mut self) {
         loop {
             tokio::select! {
-                Some(msg) = self.msgs_rx.recv() => {
-                    self.handle_msg(msg).await;
+                Some(msg) = self.swarm_messages_receiver.recv() => {
+                    self.handle_swarm_message(msg).await;
                 }
                 Some(event) = self.swarm.next() => {
                     self.handle_event(event);
@@ -172,7 +176,7 @@ impl MixSwarm {
         }
     }
 
-    async fn handle_msg(&mut self, msg: MixSwarmMessage) {
+    async fn handle_swarm_message(&mut self, msg: MixSwarmMessage) {
         match msg {
             MixSwarmMessage::Mix(msg) => {
                 tracing::debug!("Wrap msg and send it to mix network: {msg:?}");
