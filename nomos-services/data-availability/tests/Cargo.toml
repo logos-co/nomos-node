@@ -44,4 +44,3 @@ blake2 = { version = "0.10" }
 [features]
 default = ["libp2p"]
 libp2p = []
-mixnet = []

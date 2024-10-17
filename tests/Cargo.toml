@@ -9,7 +9,6 @@ blst = { version = "0.3.11" }
 nomos-node = { path = "../nodes/nomos-node", default-features = false }
 nomos-network = { path = "../nomos-services/network", features = ["libp2p"] }
 cryptarchia-consensus = { path = "../nomos-services/cryptarchia-consensus" }
-mixnet = { path = "../mixnet" }
 nomos-log = { path = "../nomos-services/log" }
 nomos-api = { path = "../nomos-services/api" }
 overwatch-rs = { git = "https://github.com/logos-co/Overwatch", rev = "2f70806" }
@@ -54,5 +53,4 @@ name = "test_cli"
 path = "src/tests/cli.rs"
 
 [features]
-mixnet = ["nomos-network/mixnet"]
 metrics = ["nomos-node/metrics"]
