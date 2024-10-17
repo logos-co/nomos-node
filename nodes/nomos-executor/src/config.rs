@@ -3,9 +3,11 @@
 use color_eyre::eyre::Result;
 use nomos_da_network_service::backends::libp2p::executor::DaNetworkExecutorBackend;
 use nomos_da_network_service::NetworkService as DaNetworkService;
+use nomos_mix_service::backends::libp2p::Libp2pNetworkBackend as MixNetworkBackend;
+use nomos_mix_service::NetworkService as MixNetworkService;
 use nomos_network::backends::libp2p::Libp2p as NetworkBackend;
 use nomos_node::{
-    config::{update_cryptarchia_consensus, update_log, update_network},
+    config::{update_cryptarchia_consensus, update_log, update_mix, update_network, MixArgs},
     CryptarchiaArgs, HttpArgs, LogArgs, Logger, NetworkArgs, NetworkService, Wire,
 };
 use nomos_storage::backends::rocksdb::RocksBackend;
@@ -19,6 +21,7 @@ use crate::ExecutorApiService;
 pub struct Config {
     pub log: <Logger as ServiceData>::Settings,
     pub network: <NetworkService<NetworkBackend> as ServiceData>::Settings,
+    pub mix: <MixNetworkService<MixNetworkBackend> as ServiceData>::Settings,
     pub da_dispersal: <crate::DaDispersal as ServiceData>::Settings,
     pub da_network:
         <DaNetworkService<DaNetworkExecutorBackend<FillFromNodeList>> as ServiceData>::Settings,
@@ -35,11 +38,13 @@ impl Config {
         mut self,
         log_args: LogArgs,
         network_args: NetworkArgs,
+        mix_args: MixArgs,
         http_args: HttpArgs,
         cryptarchia_args: CryptarchiaArgs,
     ) -> Result<Self> {
         update_log(&mut self.log, log_args)?;
         update_network(&mut self.network, network_args)?;
+        update_mix(&mut self.mix, mix_args)?;
         update_http(&mut self.http, http_args)?;
         update_cryptarchia_consensus(&mut self.cryptarchia, cryptarchia_args)?;
         Ok(self)
