@@ -151,13 +151,17 @@ impl<M: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'static> Netw
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::protocols::dispersal::executor::behaviour::DispersalError;
     use crate::protocols::replication::handler::DaMessage;
+    use futures::stream::BoxStream;
     use futures::task::ArcWake;
     use libp2p::{identity, PeerId};
-    use libp2p_stream::OpenStreamError;
+    use libp2p_stream::Control;
     use nomos_da_messages::common::Blob;
     use std::collections::{HashMap, HashSet};
     use std::sync::Arc;
+    use tokio::sync::mpsc;
+    use tokio_stream::wrappers::UnboundedReceiverStream;
 
     #[derive(Clone, Debug)]
     struct MockMembershipHandler {
@@ -237,12 +241,12 @@ mod tests {
         behaviours
     }
 
-    async fn establish_connection(
+    fn establish_connection(
         behaviours: &mut [DispersalValidatorBehaviour<MockMembershipHandler>],
         i: usize,
         j: usize,
         connection_id: ConnectionId,
-    ) -> Result<Stream, OpenStreamError> {
+    ) -> BoxStream<DaMessage> {
         let mut members: Vec<PeerId> = behaviours[i].membership.members().into_iter().collect();
         members.sort();
         let peer_id_i = members[i];
@@ -267,11 +271,23 @@ mod tests {
             .unwrap();
 
         let mut stream_control = behaviours[i].stream_behaviour.new_control();
-        let stream = stream_control
-            .open_stream(peer_id_j, DISPERSAL_PROTOCOL)
-            .await
-            .expect("open stream");
+        let (pending_out_streams_sender, receiver) = mpsc::unbounded_channel::<PeerId>();
+        let pending_out_streams = UnboundedReceiverStream::new(receiver)
+            .zip(futures::stream::repeat(stream_control))
+            .then(|(peer_id, control)| open_stream(peer_id_j, control))
+            .boxed();
 
+        let (pending_blobs_sender, receiver) = mpsc::unbounded_channel::<DaMessage>();
+        let pending_blobs_stream = UnboundedReceiverStream::new(receiver).boxed();
+
+        pending_blobs_stream
+    }
+
+    async fn open_stream(peer_id: PeerId, mut control: Control) -> Result<Stream, DispersalError> {
+        let stream = control
+            .open_stream(peer_id, DISPERSAL_PROTOCOL)
+            .await
+            .map_err(|error| DispersalError::OpenStreamError { peer_id, error })?;
         Ok(stream)
     }
 
@@ -339,15 +355,6 @@ mod tests {
             behaviour.update_membership(membership_handler);
         }
 
-        // Simulate peer connections.
-        for (i, j) in (0..num_instances).flat_map(|i| (i + 1..num_instances).map(move |j| (i, j))) {
-            let connection_id = ConnectionId::new_unchecked(i);
-            let stream = establish_connection(&mut all_behaviours, i, j, connection_id)
-                .await
-                .unwrap();
-        }
-
-        // Simulate sending a message from the first behavior.
         let message = DaMessage {
             blob: Some(Blob {
                 blob_id: vec![1, 2, 3],
@@ -355,5 +362,11 @@ mod tests {
             }),
             subnetwork_id: 0,
         };
+
+        // Simulate peer connections.
+        for (i, j) in (0..num_instances).flat_map(|i| (i + 1..num_instances).map(move |j| (i, j))) {
+            let connection_id = ConnectionId::new_unchecked(i);
+            let stream_sender = establish_connection(&mut all_behaviours, i, j, connection_id);
+        }
     }
 }
