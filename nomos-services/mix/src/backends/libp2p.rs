@@ -1,7 +1,7 @@
-use std::{io, time::Duration};
+use std::{io, pin::Pin, time::Duration};
 
 use async_trait::async_trait;
-use futures::StreamExt;
+use futures::{Stream, StreamExt};
 use libp2p::{
     core::transport::ListenerId,
     identity::{ed25519, Keypair},
@@ -16,6 +16,7 @@ use tokio::{
     sync::{broadcast, mpsc},
     task::JoinHandle,
 };
+use tokio_stream::wrappers::BroadcastStream;
 
 use super::NetworkBackend;
 
@@ -112,9 +113,12 @@ impl NetworkBackend for Libp2pNetworkBackend {
     async fn subscribe(
         &mut self,
         kind: Self::EventKind,
-    ) -> broadcast::Receiver<Self::NetworkEvent> {
+    ) -> Pin<Box<dyn Stream<Item = Self::NetworkEvent> + Send>> {
         match kind {
-            Libp2pNetworkBackendEventKind::FullyMixedMessage => self.events_tx.subscribe(),
+            Libp2pNetworkBackendEventKind::FullyMixedMessage => Box::pin(
+                BroadcastStream::new(self.events_tx.subscribe())
+                    .filter_map(|event| async { event.ok() }),
+            ),
         }
     }
 }

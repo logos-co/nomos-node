@@ -1,10 +1,13 @@
 pub mod backends;
 
-use std::fmt::{self, Debug};
+use std::{
+    fmt::{self, Debug},
+    pin::Pin,
+};
 
 use async_trait::async_trait;
 use backends::NetworkBackend;
-use futures::StreamExt;
+use futures::{Stream, StreamExt};
 use overwatch_rs::services::{
     handle::ServiceStateHandle,
     life_cycle::LifecycleMessage,
@@ -13,7 +16,7 @@ use overwatch_rs::services::{
     ServiceCore, ServiceData, ServiceId,
 };
 use serde::{Deserialize, Serialize};
-use tokio::sync::{broadcast, oneshot};
+use tokio::sync::oneshot;
 
 pub struct NetworkService<B: NetworkBackend + 'static> {
     backend: B,
@@ -155,7 +158,7 @@ pub enum NetworkMsg<B: NetworkBackend> {
     Process(B::Message),
     Subscribe {
         kind: B::EventKind,
-        sender: oneshot::Sender<broadcast::Receiver<B::NetworkEvent>>,
+        sender: oneshot::Sender<Pin<Box<dyn Stream<Item = B::NetworkEvent> + Send>>>,
     },
 }
 
@@ -163,10 +166,7 @@ impl<B: NetworkBackend> Debug for NetworkMsg<B> {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Self::Process(msg) => write!(fmt, "NetworkMsg::Process({msg:?})"),
-            Self::Subscribe { kind, sender } => write!(
-                fmt,
-                "NetworkMsg::Subscribe{{ kind: {kind:?}, sender: {sender:?}}}"
-            ),
+            Self::Subscribe { kind, .. } => write!(fmt, "NetworkMsg::Subscribe{{ kind: {kind:?}}}"),
         }
     }
 }

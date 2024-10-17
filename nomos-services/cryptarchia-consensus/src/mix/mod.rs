@@ -1,13 +1,13 @@
 pub mod adapters;
 
+use std::pin::Pin;
+
 // crates
 use futures::Stream;
 use nomos_mix_service::{backends::NetworkBackend, NetworkService};
 // internal
-use overwatch_rs::services::relay::OutboundRelay;
 use overwatch_rs::services::ServiceData;
-
-type BoxedStream<T> = Box<dyn Stream<Item = T> + Send + Sync + Unpin>;
+use overwatch_rs::{services::relay::OutboundRelay, DynError};
 
 #[async_trait::async_trait]
 pub trait NetworkAdapter {
@@ -16,5 +16,7 @@ pub trait NetworkAdapter {
         network_relay: OutboundRelay<<NetworkService<Self::Backend> as ServiceData>::Message>,
     ) -> Self;
     async fn mix(&self, message: Vec<u8>);
-    async fn mixed_messages_stream(&self) -> BoxedStream<Vec<u8>>;
+    async fn mixed_messages_stream(
+        &self,
+    ) -> Result<Pin<Box<dyn Stream<Item = Vec<u8>> + Send>>, DynError>;
 }

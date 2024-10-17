@@ -1,3 +1,6 @@
+use std::pin::Pin;
+
+use futures::{Stream, StreamExt};
 use nomos_mix_service::{
     backends::libp2p::{
         Libp2pNetworkBackend, Libp2pNetworkBackendEvent, Libp2pNetworkBackendEventKind,
@@ -5,18 +8,16 @@ use nomos_mix_service::{
     },
     NetworkMsg, NetworkService,
 };
-use overwatch_rs::services::{relay::OutboundRelay, ServiceData};
-use tokio::sync::broadcast::{self, error::RecvError};
-use tokio_stream::{wrappers::BroadcastStream, StreamExt};
+use overwatch_rs::{
+    services::{relay::OutboundRelay, ServiceData},
+    DynError,
+};
 
-use crate::mix::{BoxedStream, NetworkAdapter};
-
-const BUFFER_SIZE: usize = 64;
+use crate::mix::NetworkAdapter;
 
 #[derive(Clone)]
 pub struct LibP2pAdapter {
     network_relay: OutboundRelay<<NetworkService<Libp2pNetworkBackend> as ServiceData>::Message>,
-    mixed_msgs: broadcast::Sender<Vec<u8>>,
 }
 
 #[async_trait::async_trait]
@@ -26,47 +27,12 @@ impl NetworkAdapter for LibP2pAdapter {
     async fn new(
         network_relay: OutboundRelay<<NetworkService<Self::Backend> as ServiceData>::Message>,
     ) -> Self {
-        let relay = network_relay.clone();
-        let mixed_msgs = broadcast::Sender::new(BUFFER_SIZE);
-        let mixed_msgs_sender = mixed_msgs.clone();
         // this wait seems to be helpful in some cases since we give the time
         // to the network to establish connections before we start sending messages
         // TODO: Remove this once we have the status system to await for service readiness
         tokio::time::sleep(std::time::Duration::from_secs(1)).await;
 
-        tokio::spawn(async move {
-            let (sender, receiver) = tokio::sync::oneshot::channel();
-            if let Err((e, _)) = relay
-                .send(NetworkMsg::Subscribe {
-                    kind: Libp2pNetworkBackendEventKind::FullyMixedMessage,
-                    sender,
-                })
-                .await
-            {
-                tracing::error!("error subscribing to incoming mixed msgs: {e}");
-            }
-
-            let mut incoming_mixed_msgs = receiver.await.unwrap();
-            loop {
-                match incoming_mixed_msgs.recv().await {
-                    Ok(Libp2pNetworkBackendEvent::FullyMixedMessage(msg)) => {
-                        tracing::debug!("received a fully mixed message");
-                        if let Err(e) = mixed_msgs_sender.send(msg) {
-                            tracing::error!("error sending mixed message to consensus: {e}");
-                        }
-                    }
-                    Err(RecvError::Lagged(n)) => {
-                        tracing::error!("lagged messages: {n}")
-                    }
-                    Err(RecvError::Closed) => unreachable!(),
-                }
-            }
-        });
-
-        Self {
-            network_relay,
-            mixed_msgs,
-        }
+        Self { network_relay }
     }
 
     async fn mix(&self, message: Vec<u8>) {
@@ -81,7 +47,25 @@ impl NetworkAdapter for LibP2pAdapter {
         }
     }
 
-    async fn mixed_messages_stream(&self) -> BoxedStream<Vec<u8>> {
-        Box::new(BroadcastStream::new(self.mixed_msgs.subscribe()).filter_map(Result::ok))
+    async fn mixed_messages_stream(
+        &self,
+    ) -> Result<Pin<Box<dyn Stream<Item = Vec<u8>> + Send>>, DynError> {
+        let (stream_sender, stream_receiver) = tokio::sync::oneshot::channel();
+        self.network_relay
+            .send(NetworkMsg::Subscribe {
+                kind: Libp2pNetworkBackendEventKind::FullyMixedMessage,
+                sender: stream_sender,
+            })
+            .await
+            .map_err(|(error, _)| error)?;
+        stream_receiver
+            .await
+            .map(|stream| {
+                tokio_stream::StreamExt::filter_map(stream, |event| match event {
+                    Libp2pNetworkBackendEvent::FullyMixedMessage(msg) => Some(msg),
+                })
+                .boxed()
+            })
+            .map_err(|error| Box::new(error) as DynError)
     }
 }

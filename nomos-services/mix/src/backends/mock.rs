@@ -1,5 +1,9 @@
+use std::pin::Pin;
+
+use futures::{Stream, StreamExt};
 use overwatch_rs::{overwatch::handle::OverwatchHandle, services::state::NoState};
 use tokio::sync::broadcast;
+use tokio_stream::wrappers::BroadcastStream;
 
 use crate::backends::NetworkBackend;
 
@@ -52,9 +56,12 @@ impl NetworkBackend for Mock {
     async fn subscribe(
         &mut self,
         kind: Self::EventKind,
-    ) -> broadcast::Receiver<Self::NetworkEvent> {
+    ) -> Pin<Box<dyn Stream<Item = Self::NetworkEvent> + Send>> {
         match kind {
-            MockEventKind::FullyMixedMessage => self.events_tx.subscribe(),
+            MockEventKind::FullyMixedMessage => Box::pin(
+                BroadcastStream::new(self.events_tx.subscribe())
+                    .filter_map(|event| async { event.ok() }),
+            ),
         }
     }
 }
