@@ -16,7 +16,6 @@ use tokio::{
     sync::{broadcast, mpsc},
     task::JoinHandle,
 };
-use tokio_stream::wrappers::BroadcastStream;
 
 use super::NetworkBackend;
 
@@ -30,6 +29,7 @@ pub struct Libp2pNetworkBackend {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Libp2pNetworkBackendSettings {
     pub listening_address: Multiaddr,
+    // A key for deriving PeerId and establishing secure connections (TLS 1.3 by QUIC)
     #[serde(with = "secret_key_serde", default = "ed25519::SecretKey::generate")]
     pub node_key: ed25519::SecretKey,
     pub membership: Vec<Multiaddr>,
@@ -77,6 +77,7 @@ impl NetworkBackend for Libp2pNetworkBackend {
             });
 
         // Randomly select peering_degree number of peers, and dial to them
+        // TODO: Consider moving the peer seelction to the nomos_mix_network::Behaviour
         config
             .membership
             .iter()
@@ -219,10 +220,11 @@ impl MixSwarm {
 }
 
 fn extract_peer_id(multiaddr: &Multiaddr) -> Option<PeerId> {
-    for protocol in multiaddr.iter() {
+    multiaddr.iter().find_map(|protocol| {
         if let Protocol::P2p(peer_id) = protocol {
-            return Some(peer_id);
+            Some(peer_id)
+        } else {
+            None
         }
-    }
-    None
+    })
 }
