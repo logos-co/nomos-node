@@ -16,6 +16,7 @@ use tokio::{
     sync::{broadcast, mpsc},
     task::JoinHandle,
 };
+use tokio_stream::wrappers::BroadcastStream;
 
 use super::NetworkBackend;
 
