@@ -1,9 +1,6 @@
 #[cfg(feature = "libp2p")]
 pub mod libp2p;
 
-#[cfg(feature = "mock")]
-pub mod mock;
-
 use std::{fmt::Debug, pin::Pin};
 
 use futures::Stream;

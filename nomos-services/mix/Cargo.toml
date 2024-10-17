@@ -20,4 +20,3 @@ tracing = "0.1"
 [features]
 default = []
 libp2p = ["nomos-libp2p"]
-mock = []
