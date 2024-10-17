@@ -15,6 +15,11 @@ mod test {
     use libp2p::swarm::SwarmEvent;
     use libp2p::{quic, Multiaddr, PeerId, Swarm, SwarmBuilder};
     use log::debug;
+    use std::borrow::Cow;
+    use std::sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    };
     use std::time::Duration;
     use subnetworks_assignations::MembershipHandler;
     use tracing_subscriber::fmt::TestWriter;
@@ -53,46 +58,61 @@ mod test {
             .try_init();
         let k1 = Keypair::generate_ed25519();
         let k2 = Keypair::generate_ed25519();
-        let neighbours = AllNeighbours {
-            neighbours: [
-                PeerId::from_public_key(&k1.public()),
-                PeerId::from_public_key(&k2.public()),
-            ]
-            .into_iter()
-            .collect(),
-        };
+        let _peer_id1 = PeerId::from_public_key(&k1.public());
+        let peer_id1: Cow<'_, PeerId> = Cow::Borrowed(&_peer_id1);
+        let _peer_id2 = PeerId::from_public_key(&k2.public());
+        let peer_id2: Cow<'_, PeerId> = Cow::Borrowed(&_peer_id2);
 
+        let neighbours = AllNeighbours {
+            neighbours: [peer_id1.clone().into_owned(), peer_id2.clone().into_owned()]
+                .into_iter()
+                .collect(),
+        };
         let p1_address = "/ip4/127.0.0.1/udp/5080/quic-v1"
             .parse::<Multiaddr>()
             .unwrap()
-            .with_p2p(PeerId::from_public_key(&k1.public()))
+            .with_p2p(peer_id1.clone().into_owned())
             .unwrap();
         let p2_address = "/ip4/127.0.0.1/udp/5081/quic-v1"
             .parse::<Multiaddr>()
             .unwrap()
-            .with_p2p(PeerId::from_public_key(&k2.public()))
+            .with_p2p(peer_id2.clone().into_owned())
             .unwrap();
-        let p1_addresses = vec![(PeerId::from_public_key(&k2.public()), p2_address.clone())];
-        let p2_addresses = vec![(PeerId::from_public_key(&k1.public()), p1_address.clone())];
+
+        let p1_addresses = vec![(peer_id2.into_owned(), p2_address.clone())];
+        let p2_addresses = vec![(peer_id1.into_owned(), p1_address.clone())];
         let mut p1 = sampling_swarm(
             k1.clone(),
             neighbours.clone(),
             p1_addresses.into_iter().collect(),
         );
         let mut p2 = sampling_swarm(k2.clone(), neighbours, p2_addresses.into_iter().collect());
-
         let request_sender_1 = p1.behaviour().sample_request_channel();
         let request_sender_2 = p2.behaviour().sample_request_channel();
         const MSG_COUNT: usize = 10;
+        let done1 = Arc::new(AtomicBool::new(false));
+        let done2 = Arc::new(AtomicBool::new(false));
+
+        let done1_clone_t1 = Arc::clone(&done1);
+        let done2_clone_t1 = Arc::clone(&done2);
+        let done1_clone_t2 = Arc::clone(&done1);
+        let done2_clone_t2 = Arc::clone(&done2);
+
         async fn test_sampling_swarm(
+            label: &str,
             mut swarm: Swarm<
                 SamplingBehaviour<
                     impl MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'static,
                 >,
             >,
+            done1: Arc<AtomicBool>,
+            done2: Arc<AtomicBool>,
         ) -> Vec<[u8; 32]> {
-            let mut res = vec![];
+            let mut res = Vec::with_capacity(MSG_COUNT);
             loop {
+                if done1.load(Ordering::Relaxed) && done2.load(Ordering::Relaxed) {
+                    break res;
+                }
                 match swarm.next().await {
                     None => {}
                     Some(SwarmEvent::Behaviour(SamplingEvent::IncomingSample {
@@ -131,30 +151,34 @@ mod test {
                         debug!("{event:?}");
                     }
                 }
-                if res.len() == MSG_COUNT {
-                    break res;
+                if res.len() == MSG_COUNT && label == "leading" {
+                    done1.store(true, Ordering::Relaxed);
+                } else if res.len() == MSG_COUNT && label == "trailing" {
+                    done2.store(true, Ordering::Relaxed);
                 }
             }
         }
+
         let _p1_address = p1_address.clone();
         let _p2_address = p2_address.clone();
-
         let t1 = tokio::spawn(async move {
             p1.listen_on(p1_address).unwrap();
             tokio::time::sleep(Duration::from_secs(1)).await;
-            test_sampling_swarm(p1).await
+            test_sampling_swarm("leading", p1, done1_clone_t1, done2_clone_t1).await
         });
+
         let t2 = tokio::spawn(async move {
             p2.listen_on(p2_address).unwrap();
             tokio::time::sleep(Duration::from_secs(1)).await;
-            test_sampling_swarm(p2).await
+            test_sampling_swarm("trailing", p2, done1_clone_t2, done2_clone_t2).await
         });
+
         tokio::time::sleep(Duration::from_secs(2)).await;
         for i in 0..MSG_COUNT {
+            // sending subnetwork_id and blob_id to initiate sampling request
             request_sender_1.send((0, [i as u8; 32])).unwrap();
             request_sender_2.send((0, [i as u8; 32])).unwrap();
         }
-
         let res1 = t1.await.unwrap();
         let res2 = t2.await.unwrap();
         assert_eq!(res1, res2);
