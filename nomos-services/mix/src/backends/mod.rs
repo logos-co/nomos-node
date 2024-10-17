@@ -7,7 +7,7 @@ use futures::Stream;
 use overwatch_rs::{overwatch::handle::OverwatchHandle, services::state::ServiceState};
 
 #[async_trait::async_trait]
-pub trait NetworkBackend {
+pub trait MixBackend {
     type Settings: Clone + Debug + Send + Sync + 'static;
     type State: ServiceState<Settings = Self::Settings> + Clone + Send + Sync;
     type Message: Debug + Send + Sync + 'static;

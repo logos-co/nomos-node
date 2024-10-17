@@ -6,7 +6,7 @@ use std::{
 };
 
 use async_trait::async_trait;
-use backends::NetworkBackend;
+use backends::MixBackend;
 use futures::{Stream, StreamExt};
 use overwatch_rs::services::{
     handle::ServiceStateHandle,
@@ -18,28 +18,28 @@ use overwatch_rs::services::{
 use serde::{Deserialize, Serialize};
 use tokio::sync::oneshot;
 
-pub struct NetworkService<B: NetworkBackend + 'static> {
+pub struct MixService<B: MixBackend + 'static> {
     backend: B,
     service_state: ServiceStateHandle<Self>,
 }
 
-impl<B: NetworkBackend + 'static> ServiceData for NetworkService<B> {
-    const SERVICE_ID: ServiceId = "MixNetwork";
-    type Settings = NetworkConfig<B>;
+impl<B: MixBackend + 'static> ServiceData for MixService<B> {
+    const SERVICE_ID: ServiceId = "Mix";
+    type Settings = MixConfig<B>;
     type State = NetworkState<B>;
     type StateOperator = NoOperator<Self::State>;
-    type Message = NetworkMsg<B>;
+    type Message = MixServiceMsg<B>;
 }
 
 #[async_trait]
-impl<B> ServiceCore for NetworkService<B>
+impl<B> ServiceCore for MixService<B>
 where
-    B: NetworkBackend + Send + 'static,
+    B: MixBackend + Send + 'static,
     B::State: Send + Sync,
 {
     fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, overwatch_rs::DynError> {
         Ok(Self {
-            backend: <B as NetworkBackend>::new(
+            backend: <B as MixBackend>::new(
                 service_state.settings_reader.get_updated_settings().backend,
                 service_state.overwatch_handle.clone(),
             ),
@@ -61,7 +61,7 @@ where
         loop {
             tokio::select! {
                 Some(msg) = inbound_relay.recv() => {
-                    Self::handle_network_service_message(msg, &mut backend).await;
+                    Self::handle_service_message(msg, &mut backend).await;
                 }
                 Some(msg) = lifecycle_stream.next() => {
                     if Self::should_stop_service(msg).await {
@@ -74,20 +74,20 @@ where
     }
 }
 
-impl<B> NetworkService<B>
+impl<B> MixService<B>
 where
-    B: NetworkBackend + Send + 'static,
+    B: MixBackend + Send + 'static,
     B::State: Send + Sync,
 {
-    async fn handle_network_service_message(msg: NetworkMsg<B>, backend: &mut B) {
+    async fn handle_service_message(msg: MixServiceMsg<B>, backend: &mut B) {
         match msg {
-            NetworkMsg::Process(msg) => {
+            MixServiceMsg::Process(msg) => {
                 // split sending in two steps to help the compiler understand we do not
                 // need to hold an instance of &I (which is not send) across an await point
                 let _send = backend.process(msg);
                 _send.await
             }
-            NetworkMsg::Subscribe { kind, sender } => sender
+            MixServiceMsg::Subscribe { kind, sender } => sender
                 .send(backend.subscribe(kind).await)
                 .unwrap_or_else(|_| {
                     tracing::warn!(
@@ -115,29 +115,29 @@ where
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct NetworkConfig<B: NetworkBackend> {
+pub struct MixConfig<B: MixBackend> {
     pub backend: B::Settings,
 }
 
-impl<B: NetworkBackend> Debug for NetworkConfig<B> {
+impl<B: MixBackend> Debug for MixConfig<B> {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        write!(fmt, "NetworkConfig {{ backend: {:?}}}", self.backend)
+        write!(fmt, "MixConfig {{ backend: {:?}}}", self.backend)
     }
 }
 
-impl<B: NetworkBackend> Clone for NetworkConfig<B> {
+impl<B: MixBackend> Clone for MixConfig<B> {
     fn clone(&self) -> Self {
-        NetworkConfig {
+        MixConfig {
             backend: self.backend.clone(),
         }
     }
 }
 
-pub struct NetworkState<B: NetworkBackend> {
+pub struct NetworkState<B: MixBackend> {
     _backend: B::State,
 }
 
-impl<B: NetworkBackend> Clone for NetworkState<B> {
+impl<B: MixBackend> Clone for NetworkState<B> {
     fn clone(&self) -> Self {
         NetworkState {
             _backend: self._backend.clone(),
@@ -145,8 +145,8 @@ impl<B: NetworkBackend> Clone for NetworkState<B> {
     }
 }
 
-impl<B: NetworkBackend> ServiceState for NetworkState<B> {
-    type Settings = NetworkConfig<B>;
+impl<B: MixBackend> ServiceState for NetworkState<B> {
+    type Settings = MixConfig<B>;
     type Error = <B::State as ServiceState>::Error;
 
     fn from_settings(settings: &Self::Settings) -> Result<Self, Self::Error> {
@@ -154,7 +154,7 @@ impl<B: NetworkBackend> ServiceState for NetworkState<B> {
     }
 }
 
-pub enum NetworkMsg<B: NetworkBackend> {
+pub enum MixServiceMsg<B: MixBackend> {
     Process(B::Message),
     Subscribe {
         kind: B::EventKind,
@@ -162,7 +162,7 @@ pub enum NetworkMsg<B: NetworkBackend> {
     },
 }
 
-impl<B: NetworkBackend> Debug for NetworkMsg<B> {
+impl<B: MixBackend> Debug for MixServiceMsg<B> {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Self::Process(msg) => write!(fmt, "NetworkMsg::Process({msg:?})"),
@@ -171,4 +171,4 @@ impl<B: NetworkBackend> Debug for NetworkMsg<B> {
     }
 }
 
-impl<T: NetworkBackend + 'static> RelayMessage for NetworkMsg<T> {}
+impl<T: MixBackend + 'static> RelayMessage for MixServiceMsg<T> {}

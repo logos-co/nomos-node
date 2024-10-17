@@ -18,17 +18,17 @@ use tokio::{
 };
 use tokio_stream::wrappers::BroadcastStream;
 
-use super::NetworkBackend;
+use super::MixBackend;
 
-pub struct Libp2pNetworkBackend {
+pub struct Libp2pMixBackend {
     #[allow(dead_code)]
     task: JoinHandle<()>,
-    msgs_tx: mpsc::Sender<Libp2pNetworkBackendMessage>,
-    events_tx: broadcast::Sender<Libp2pNetworkBackendEvent>,
+    msgs_tx: mpsc::Sender<Libp2pMixBackendMessage>,
+    events_tx: broadcast::Sender<Libp2pMixBackendEvent>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct Libp2pNetworkBackendSettings {
+pub struct Libp2pMixBackendSettings {
     pub listening_address: Multiaddr,
     // A key for deriving PeerId and establishing secure connections (TLS 1.3 by QUIC)
     #[serde(with = "secret_key_serde", default = "ed25519::SecretKey::generate")]
@@ -39,29 +39,29 @@ pub struct Libp2pNetworkBackendSettings {
 }
 
 #[derive(Debug)]
-pub enum Libp2pNetworkBackendMessage {
+pub enum Libp2pMixBackendMessage {
     Mix(Vec<u8>),
 }
 
 #[derive(Debug)]
-pub enum Libp2pNetworkBackendEventKind {
+pub enum Libp2pMixBackendEventKind {
     FullyMixedMessage,
 }
 
 #[derive(Debug, Clone)]
-pub enum Libp2pNetworkBackendEvent {
+pub enum Libp2pMixBackendEvent {
     FullyMixedMessage(Vec<u8>),
 }
 
 const CHANNEL_SIZE: usize = 64;
 
 #[async_trait]
-impl NetworkBackend for Libp2pNetworkBackend {
-    type Settings = Libp2pNetworkBackendSettings;
+impl MixBackend for Libp2pMixBackend {
+    type Settings = Libp2pMixBackendSettings;
     type State = NoState<Self::Settings>;
-    type Message = Libp2pNetworkBackendMessage;
-    type EventKind = Libp2pNetworkBackendEventKind;
-    type NetworkEvent = Libp2pNetworkBackendEvent;
+    type Message = Libp2pMixBackendMessage;
+    type EventKind = Libp2pMixBackendEventKind;
+    type NetworkEvent = Libp2pMixBackendEvent;
 
     fn new(config: Self::Settings, overwatch_handle: OverwatchHandle) -> Self {
         let (msgs_tx, msgs_rx) = mpsc::channel(CHANNEL_SIZE);
@@ -117,7 +117,7 @@ impl NetworkBackend for Libp2pNetworkBackend {
         kind: Self::EventKind,
     ) -> Pin<Box<dyn Stream<Item = Self::NetworkEvent> + Send>> {
         match kind {
-            Libp2pNetworkBackendEventKind::FullyMixedMessage => Box::pin(
+            Libp2pMixBackendEventKind::FullyMixedMessage => Box::pin(
                 BroadcastStream::new(self.events_tx.subscribe())
                     .filter_map(|event| async { event.ok() }),
             ),
@@ -128,16 +128,16 @@ impl NetworkBackend for Libp2pNetworkBackend {
 struct MixSwarm {
     swarm: Swarm<nomos_mix_network::Behaviour>,
     num_mix_layers: usize,
-    msgs_rx: mpsc::Receiver<Libp2pNetworkBackendMessage>,
-    events_tx: broadcast::Sender<Libp2pNetworkBackendEvent>,
+    msgs_rx: mpsc::Receiver<Libp2pMixBackendMessage>,
+    events_tx: broadcast::Sender<Libp2pMixBackendEvent>,
 }
 
 impl MixSwarm {
     fn new(
         keypair: Keypair,
         num_mix_layers: usize,
-        msgs_rx: mpsc::Receiver<Libp2pNetworkBackendMessage>,
-        events_tx: broadcast::Sender<Libp2pNetworkBackendEvent>,
+        msgs_rx: mpsc::Receiver<Libp2pMixBackendMessage>,
+        events_tx: broadcast::Sender<Libp2pMixBackendEvent>,
     ) -> Self {
         let swarm = SwarmBuilder::with_existing_identity(keypair)
             .with_tokio()
@@ -183,9 +183,9 @@ impl MixSwarm {
         }
     }
 
-    async fn handle_msg(&mut self, msg: Libp2pNetworkBackendMessage) {
+    async fn handle_msg(&mut self, msg: Libp2pMixBackendMessage) {
         match msg {
-            Libp2pNetworkBackendMessage::Mix(msg) => {
+            Libp2pMixBackendMessage::Mix(msg) => {
                 tracing::debug!("Wrap msg and send it to mix network: {msg:?}");
                 match nomos_mix_message::new_message(&msg, self.num_mix_layers.try_into().unwrap())
                 {
@@ -207,7 +207,7 @@ impl MixSwarm {
             SwarmEvent::Behaviour(nomos_mix_network::Event::FullyUnwrappedMessage(msg)) => {
                 tracing::debug!("Received fully unwrapped message: {msg:?}");
                 self.events_tx
-                    .send(Libp2pNetworkBackendEvent::FullyMixedMessage(msg))
+                    .send(Libp2pMixBackendEvent::FullyMixedMessage(msg))
                     .unwrap();
             }
             SwarmEvent::Behaviour(nomos_mix_network::Event::Error(e)) => {

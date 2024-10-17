@@ -3,29 +3,28 @@ use std::pin::Pin;
 use futures::{Stream, StreamExt};
 use nomos_mix_service::{
     backends::libp2p::{
-        Libp2pNetworkBackend, Libp2pNetworkBackendEvent, Libp2pNetworkBackendEventKind,
-        Libp2pNetworkBackendMessage,
+        Libp2pMixBackend, Libp2pMixBackendEvent, Libp2pMixBackendEventKind, Libp2pMixBackendMessage,
     },
-    NetworkMsg, NetworkService,
+    MixService, MixServiceMsg,
 };
 use overwatch_rs::{
     services::{relay::OutboundRelay, ServiceData},
     DynError,
 };
 
-use crate::mix::NetworkAdapter;
+use crate::mix::MixAdapter;
 
 #[derive(Clone)]
 pub struct LibP2pAdapter {
-    network_relay: OutboundRelay<<NetworkService<Libp2pNetworkBackend> as ServiceData>::Message>,
+    network_relay: OutboundRelay<<MixService<Libp2pMixBackend> as ServiceData>::Message>,
 }
 
 #[async_trait::async_trait]
-impl NetworkAdapter for LibP2pAdapter {
-    type Backend = Libp2pNetworkBackend;
+impl MixAdapter for LibP2pAdapter {
+    type Backend = Libp2pMixBackend;
 
     async fn new(
-        network_relay: OutboundRelay<<NetworkService<Self::Backend> as ServiceData>::Message>,
+        network_relay: OutboundRelay<<MixService<Self::Backend> as ServiceData>::Message>,
     ) -> Self {
         // this wait seems to be helpful in some cases since we give the time
         // to the network to establish connections before we start sending messages
@@ -38,7 +37,7 @@ impl NetworkAdapter for LibP2pAdapter {
     async fn mix(&self, message: Vec<u8>) {
         if let Err((e, msg)) = self
             .network_relay
-            .send(NetworkMsg::Process(Libp2pNetworkBackendMessage::Mix(
+            .send(MixServiceMsg::Process(Libp2pMixBackendMessage::Mix(
                 message,
             )))
             .await
@@ -52,8 +51,8 @@ impl NetworkAdapter for LibP2pAdapter {
     ) -> Result<Pin<Box<dyn Stream<Item = Vec<u8>> + Send>>, DynError> {
         let (stream_sender, stream_receiver) = tokio::sync::oneshot::channel();
         self.network_relay
-            .send(NetworkMsg::Subscribe {
-                kind: Libp2pNetworkBackendEventKind::FullyMixedMessage,
+            .send(MixServiceMsg::Subscribe {
+                kind: Libp2pMixBackendEventKind::FullyMixedMessage,
                 sender: stream_sender,
             })
             .await
@@ -62,7 +61,7 @@ impl NetworkAdapter for LibP2pAdapter {
             .await
             .map(|stream| {
                 tokio_stream::StreamExt::filter_map(stream, |event| match event {
-                    Libp2pNetworkBackendEvent::FullyMixedMessage(msg) => Some(msg),
+                    Libp2pMixBackendEvent::FullyMixedMessage(msg) => Some(msg),
                 })
                 .boxed()
             })

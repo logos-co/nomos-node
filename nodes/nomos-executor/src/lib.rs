@@ -18,8 +18,8 @@ use nomos_da_sampling::storage::adapters::rocksdb::RocksAdapter as SamplingStora
 use nomos_da_verifier::backend::kzgrs::KzgrsDaVerifier;
 use nomos_da_verifier::network::adapters::executor::Libp2pAdapter as VerifierNetworkAdapter;
 use nomos_mempool::backend::mockpool::MockPool;
-use nomos_mix_service::backends::libp2p::Libp2pNetworkBackend as MixNetworkBackend;
-use nomos_mix_service::NetworkService as MixNetworkService;
+use nomos_mix_service::backends::libp2p::Libp2pMixBackend as MixBackend;
+use nomos_mix_service::MixService;
 use nomos_node::*;
 use overwatch_derive::Services;
 use overwatch_rs::services::handle::ServiceHandle;
@@ -79,7 +79,7 @@ pub struct NomosExecutor {
     #[cfg(feature = "tracing")]
     logging: ServiceHandle<Logger>,
     network: ServiceHandle<NetworkService<NetworkBackend>>,
-    mix: ServiceHandle<MixNetworkService<MixNetworkBackend>>,
+    mix: ServiceHandle<MixService<MixBackend>>,
     da_dispersal: ServiceHandle<DaDispersal>,
     da_indexer: ServiceHandle<ExecutorDaIndexer>,
     da_verifier: ServiceHandle<ExecutorDaVerifier>,

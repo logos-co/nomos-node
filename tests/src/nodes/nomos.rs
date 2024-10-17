@@ -24,7 +24,7 @@ use nomos_da_verifier::DaVerifierServiceSettings;
 use nomos_libp2p::{ed25519, Multiaddr, PeerId, SwarmConfig};
 use nomos_log::{LoggerBackend, LoggerFormat};
 use nomos_mempool::MempoolMetrics;
-use nomos_mix_service::backends::libp2p::Libp2pNetworkBackendSettings;
+use nomos_mix_service::backends::libp2p::Libp2pMixBackendSettings;
 use nomos_network::{backends::libp2p::Libp2pConfig, NetworkConfig};
 use nomos_node::api::paths::{
     CL_METRICS, CRYPTARCHIA_HEADERS, CRYPTARCHIA_INFO, DA_GET_RANGE, STORAGE_BLOCK,
@@ -405,8 +405,8 @@ fn create_node_config(
                 initial_peers: vec![],
             },
         },
-        mix: nomos_mix_service::NetworkConfig {
-            backend: Libp2pNetworkBackendSettings {
+        mix: nomos_mix_service::MixConfig {
+            backend: Libp2pMixBackendSettings {
                 listening_address: Multiaddr::from_str(&format!(
                     "/ip4/127.0.0.1/udp/{}/quic-v1",
                     get_available_port(),

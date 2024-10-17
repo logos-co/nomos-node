@@ -13,8 +13,8 @@ use nomos_da_network_service::backends::libp2p::validator::DaNetworkValidatorBac
 use nomos_da_network_service::NetworkService as DaNetworkService;
 use nomos_libp2p::{ed25519::SecretKey, Multiaddr};
 use nomos_log::{Logger, LoggerBackend, LoggerFormat};
-use nomos_mix_service::backends::libp2p::Libp2pNetworkBackend as MixNetworkBackend;
-use nomos_mix_service::NetworkService as MixNetworkService;
+use nomos_mix_service::backends::libp2p::Libp2pMixBackend as MixBackend;
+use nomos_mix_service::MixService;
 use nomos_network::backends::libp2p::Libp2p as NetworkBackend;
 use nomos_network::NetworkService;
 use nomos_storage::backends::rocksdb::RocksBackend;
@@ -136,7 +136,7 @@ pub struct MetricsArgs {
 pub struct Config {
     pub log: <Logger as ServiceData>::Settings,
     pub network: <NetworkService<NetworkBackend> as ServiceData>::Settings,
-    pub mix: <MixNetworkService<MixNetworkBackend> as ServiceData>::Settings,
+    pub mix: <MixService<MixBackend> as ServiceData>::Settings,
     pub da_network:
         <DaNetworkService<DaNetworkValidatorBackend<FillFromNodeList>> as ServiceData>::Settings,
     pub da_indexer: <crate::NodeDaIndexer as ServiceData>::Settings,
@@ -250,7 +250,7 @@ pub fn update_network(
 }
 
 pub fn update_mix(
-    network: &mut <MixNetworkService<MixNetworkBackend> as ServiceData>::Settings,
+    network: &mut <MixService<MixBackend> as ServiceData>::Settings,
     mix_args: MixArgs,
 ) -> Result<()> {
     let MixArgs {

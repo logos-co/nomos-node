@@ -50,10 +50,10 @@ use nomos_mempool::network::adapters::libp2p::Settings as AdapterSettings;
 use nomos_mempool::{backend::mockpool::MockPool, TxMempoolService};
 use nomos_mempool::{DaMempoolSettings, TxMempoolSettings};
 use nomos_mix_service::backends::libp2p::{
-    Libp2pNetworkBackend as MixNetworkBackend, Libp2pNetworkBackendSettings,
+    Libp2pMixBackend as MixBackend, Libp2pMixBackendSettings,
 };
-use nomos_mix_service::NetworkConfig as MixNetworkConfig;
-use nomos_mix_service::NetworkService as MixNetworkService;
+use nomos_mix_service::MixConfig;
+use nomos_mix_service::MixService;
 use nomos_network::backends::libp2p::{Libp2p as NetworkBackend, Libp2pConfig};
 use nomos_network::NetworkConfig;
 use nomos_network::NetworkService;
@@ -156,7 +156,7 @@ pub(crate) const MB16: usize = 1024 * 1024 * 16;
 pub struct TestNode {
     //logging: ServiceHandle<Logger>,
     network: ServiceHandle<NetworkService<NetworkBackend>>,
-    mix: ServiceHandle<MixNetworkService<MixNetworkBackend>>,
+    mix: ServiceHandle<MixService<MixBackend>>,
     cl_mempool: ServiceHandle<TxMempool>,
     da_network: ServiceHandle<DaNetworkService<DaNetworkValidatorBackend<FillFromNodeList>>>,
     da_mempool: ServiceHandle<DaMempool>,
@@ -182,7 +182,7 @@ pub fn new_node(
     genesis_state: &LedgerState,
     time_config: &TimeConfig,
     swarm_config: &SwarmConfig,
-    mix_config: &Libp2pNetworkBackendSettings,
+    mix_config: &Libp2pMixBackendSettings,
     db_path: PathBuf,
     blobs_dir: &PathBuf,
     initial_peers: Vec<Multiaddr>,
@@ -198,7 +198,7 @@ pub fn new_node(
                     initial_peers,
                 },
             },
-            mix: MixNetworkConfig {
+            mix: MixConfig {
                 backend: mix_config.clone(),
             },
             da_network: DaNetworkConfig {
@@ -279,10 +279,10 @@ pub fn new_node(
     .unwrap()
 }
 
-pub fn new_mix_configs(listening_addresses: Vec<Multiaddr>) -> Vec<Libp2pNetworkBackendSettings> {
+pub fn new_mix_configs(listening_addresses: Vec<Multiaddr>) -> Vec<Libp2pMixBackendSettings> {
     let mut configs = listening_addresses
         .iter()
-        .map(|listening_address| Libp2pNetworkBackendSettings {
+        .map(|listening_address| Libp2pMixBackendSettings {
             listening_address: listening_address.clone(),
             node_key: ed25519::SecretKey::generate(),
             membership: Vec::new(),

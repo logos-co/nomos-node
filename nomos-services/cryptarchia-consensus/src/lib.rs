@@ -156,7 +156,7 @@ impl<Ts, Bs> CryptarchiaSettings<Ts, Bs> {
 
 pub struct CryptarchiaConsensus<
     A,
-    MixNetworkAdapter,
+    MixAdapter,
     ClPool,
     ClPoolAdapter,
     DaPool,
@@ -170,7 +170,7 @@ pub struct CryptarchiaConsensus<
     SamplingStorage,
 > where
     A: NetworkAdapter,
-    MixNetworkAdapter: mix::NetworkAdapter,
+    MixAdapter: mix::MixAdapter,
     ClPoolAdapter: MempoolAdapter<Payload = ClPool::Item, Key = ClPool::Key>,
     ClPool: MemPool<BlockId = HeaderId>,
     DaPool: MemPool<BlockId = HeaderId>,
@@ -196,7 +196,7 @@ pub struct CryptarchiaConsensus<
     // underlying networking backend. We need this so we can relay and check the types properly
     // when implementing ServiceCore for CryptarchiaConsensus
     network_relay: Relay<NetworkService<A::Backend>>,
-    mix_network_relay: Relay<nomos_mix_service::NetworkService<MixNetworkAdapter::Backend>>,
+    mix_network_relay: Relay<nomos_mix_service::MixService<MixAdapter::Backend>>,
     cl_mempool_relay: Relay<TxMempoolService<ClPoolAdapter, ClPool>>,
     da_mempool_relay: Relay<
         DaMempoolService<
@@ -217,7 +217,7 @@ pub struct CryptarchiaConsensus<
 
 impl<
         A,
-        MixNetworkAdapter,
+        MixAdapter,
         ClPool,
         ClPoolAdapter,
         DaPool,
@@ -232,7 +232,7 @@ impl<
     > ServiceData
     for CryptarchiaConsensus<
         A,
-        MixNetworkAdapter,
+        MixAdapter,
         ClPool,
         ClPoolAdapter,
         DaPool,
@@ -247,7 +247,7 @@ impl<
     >
 where
     A: NetworkAdapter,
-    MixNetworkAdapter: mix::NetworkAdapter,
+    MixAdapter: mix::MixAdapter,
     ClPool: MemPool<BlockId = HeaderId>,
     ClPool::Item: Clone + Eq + Hash + Debug,
     ClPool::Key: Debug,
@@ -278,7 +278,7 @@ where
 #[async_trait::async_trait]
 impl<
         A,
-        MixNetworkAdapter,
+        MixAdapter,
         ClPool,
         ClPoolAdapter,
         DaPool,
@@ -293,7 +293,7 @@ impl<
     > ServiceCore
     for CryptarchiaConsensus<
         A,
-        MixNetworkAdapter,
+        MixAdapter,
         ClPool,
         ClPoolAdapter,
         DaPool,
@@ -312,7 +312,7 @@ where
         + Send
         + Sync
         + 'static,
-    MixNetworkAdapter: mix::NetworkAdapter + Clone + Send + Sync + 'static,
+    MixAdapter: mix::MixAdapter + Clone + Send + Sync + 'static,
     ClPool: MemPool<BlockId = HeaderId> + Send + Sync + 'static,
     ClPool::Settings: Send + Sync + 'static,
     DaPool: MemPool<BlockId = HeaderId, Key = SamplingBackend::BlobId> + Send + Sync + 'static,
@@ -447,7 +447,7 @@ where
 
         let mut slot_timer = IntervalStream::new(timer.slot_interval());
 
-        let mix_network_adapter = MixNetworkAdapter::new(mix_network_relay).await;
+        let mix_network_adapter = MixAdapter::new(mix_network_relay).await;
         let mut incoming_mixed_msgs = mix_network_adapter.mixed_messages_stream().await?;
 
         let mut lifecycle_stream = self.service_state.lifecycle_handle.message_stream();
@@ -531,7 +531,7 @@ where
 
 impl<
         A,
-        MixNetworkAdapter,
+        MixAdapter,
         ClPool,
         ClPoolAdapter,
         DaPool,
@@ -546,7 +546,7 @@ impl<
     >
     CryptarchiaConsensus<
         A,
-        MixNetworkAdapter,
+        MixAdapter,
         ClPool,
         ClPoolAdapter,
         DaPool,
@@ -561,7 +561,7 @@ impl<
     >
 where
     A: NetworkAdapter + Clone + Send + Sync + 'static,
-    MixNetworkAdapter: mix::NetworkAdapter + Clone + Send + Sync + 'static,
+    MixAdapter: mix::MixAdapter + Clone + Send + Sync + 'static,
     ClPool: MemPool<BlockId = HeaderId> + Send + Sync + 'static,
     ClPool::Settings: Send + Sync + 'static,
     ClPool::Item: Transaction<Hash = ClPool::Key>
