@@ -421,7 +421,7 @@ where
         let tx_selector = TxS::new(transaction_selector_settings);
         let blob_selector = BS::new(blob_selector_settings);
 
-        let mut incoming_blocks = adapter.blocks_stream().await;
+        let mut incoming_blocks = adapter.blocks_stream().await?;
         let mut leader = leadership::Leader::new(genesis_id, notes, config);
         let timer = time::Timer::new(time);
 
