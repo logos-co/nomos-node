@@ -48,6 +48,15 @@ network:
     node_key: 40fb62acf1604000c1b8d3bd0880e43eb2f6ae52029fde75d992ba0fed6e01c3
     initial_peers: []
 
+mix:
+  backend:
+    listening_address: /ip4/0.0.0.0/udp/3001/quic-v1
+    node_key: 40fb62acf1604000c1b8d3bd0880e43eb2f6ae52029fde75d992ba0fed6e01c3
+    membership:
+    - /ip4/0.0.0.0/udp/3001/quic-v1/p2p/12D3KooWMj7KgmbDJ7RSXeFhFimvqddSXzA5XWDTwvdEJYfuoPhM
+    peering_degree: 1
+    num_mix_layers: 1
+
 http:
   backend_settings:
     address: 0.0.0.0:8080

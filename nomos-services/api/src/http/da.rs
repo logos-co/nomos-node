@@ -53,6 +53,7 @@ pub type DaIndexer<
     CryptarchiaConsensusAdapter<Tx, V>,
     // Cryptarchia specific, should be the same as in `Cryptarchia` type above.
     cryptarchia_consensus::network::adapters::libp2p::LibP2pAdapter<Tx, V>,
+    cryptarchia_consensus::mix::adapters::libp2p::LibP2pAdapter,
     MockPool<HeaderId, Tx, <Tx as Transaction>::Hash>,
     MempoolNetworkAdapter<Tx, <Tx as Transaction>::Hash>,
     MockPool<HeaderId, V, [u8; 32]>,

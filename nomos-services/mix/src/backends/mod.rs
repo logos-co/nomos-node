@@ -1,13 +1,13 @@
 #[cfg(feature = "libp2p")]
 pub mod libp2p;
 
-use std::fmt::Debug;
+use std::{fmt::Debug, pin::Pin};
 
+use futures::Stream;
 use overwatch_rs::{overwatch::handle::OverwatchHandle, services::state::ServiceState};
-use tokio::sync::broadcast::Receiver;
 
 #[async_trait::async_trait]
-pub trait NetworkBackend {
+pub trait MixBackend {
     type Settings: Clone + Debug + Send + Sync + 'static;
     type State: ServiceState<Settings = Self::Settings> + Clone + Send + Sync;
     type Message: Debug + Send + Sync + 'static;
@@ -16,5 +16,8 @@ pub trait NetworkBackend {
 
     fn new(config: Self::Settings, overwatch_handle: OverwatchHandle) -> Self;
     async fn process(&self, msg: Self::Message);
-    async fn subscribe(&mut self, event: Self::EventKind) -> Receiver<Self::NetworkEvent>;
+    async fn subscribe(
+        &mut self,
+        event: Self::EventKind,
+    ) -> Pin<Box<dyn Stream<Item = Self::NetworkEvent> + Send>>;
 }
