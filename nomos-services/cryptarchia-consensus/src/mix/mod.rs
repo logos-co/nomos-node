@@ -16,5 +16,5 @@ pub trait NetworkAdapter {
         network_relay: OutboundRelay<<NetworkService<Self::Backend> as ServiceData>::Message>,
     ) -> Self;
     async fn mix(&self, message: Vec<u8>);
-    async fn mixed_msgs_stream(&self) -> BoxedStream<Vec<u8>>;
+    async fn mixed_messages_stream(&self) -> BoxedStream<Vec<u8>>;
 }

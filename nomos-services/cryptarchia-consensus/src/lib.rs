@@ -448,7 +448,7 @@ where
         let mut slot_timer = IntervalStream::new(timer.slot_interval());
 
         let mix_network_adapter = MixNetworkAdapter::new(mix_network_relay).await;
-        let mut incoming_mixed_msgs = mix_network_adapter.mixed_msgs_stream().await;
+        let mut incoming_mixed_msgs = mix_network_adapter.mixed_messages_stream().await;
 
         let mut lifecycle_stream = self.service_state.lifecycle_handle.message_stream();
 

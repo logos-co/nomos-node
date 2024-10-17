@@ -67,6 +67,7 @@ pub struct NetworkArgs {
     #[clap(long = "net-port", env = "NET_PORT")]
     port: Option<usize>,
 
+    // TODO: Use either the raw bytes or the key type directly to delegate error handling to clap
     #[clap(long = "net-node-key", env = "NET_NODE_KEY")]
     node_key: Option<String>,
 
@@ -79,6 +80,7 @@ pub struct MixArgs {
     #[clap(long = "mix-addr", env = "MIX_ADDR")]
     mix_addr: Option<Multiaddr>,
 
+    // TODO: Use either the raw bytes or the key type directly to delegate error handling to clap
     #[clap(long = "mix-node-key", env = "MIX_NODE_KEY")]
     mix_node_key: Option<String>,
 

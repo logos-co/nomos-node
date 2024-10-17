@@ -72,7 +72,7 @@ impl NetworkAdapter for MockAdapter {
         }
     }
 
-    async fn mixed_msgs_stream(&self) -> BoxedStream<Vec<u8>> {
+    async fn mixed_messages_stream(&self) -> BoxedStream<Vec<u8>> {
         Box::new(BroadcastStream::new(self.mixed_msgs.subscribe()).filter_map(Result::ok))
     }
 }

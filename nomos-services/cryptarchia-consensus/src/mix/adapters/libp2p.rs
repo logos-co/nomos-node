@@ -31,6 +31,7 @@ impl NetworkAdapter for LibP2pAdapter {
         let mixed_msgs_sender = mixed_msgs.clone();
         // this wait seems to be helpful in some cases since we give the time
         // to the network to establish connections before we start sending messages
+        // TODO: Remove this once we have the status system to await for service readiness
         tokio::time::sleep(std::time::Duration::from_secs(1)).await;
 
         tokio::spawn(async move {
@@ -80,7 +81,7 @@ impl NetworkAdapter for LibP2pAdapter {
         }
     }
 
-    async fn mixed_msgs_stream(&self) -> BoxedStream<Vec<u8>> {
+    async fn mixed_messages_stream(&self) -> BoxedStream<Vec<u8>> {
         Box::new(BroadcastStream::new(self.mixed_msgs.subscribe()).filter_map(Result::ok))
     }
 }
