@@ -151,8 +151,11 @@ impl<M: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'static> Netw
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::protocols::replication::handler::DaMessage;
     use futures::task::ArcWake;
     use libp2p::{identity, PeerId};
+    use libp2p_stream::OpenStreamError;
+    use nomos_da_messages::common::Blob;
     use std::collections::{HashMap, HashSet};
     use std::sync::Arc;
 
@@ -234,12 +237,12 @@ mod tests {
         behaviours
     }
 
-    fn establish_connection(
+    async fn establish_connection(
         behaviours: &mut [DispersalValidatorBehaviour<MockMembershipHandler>],
         i: usize,
         j: usize,
         connection_id: ConnectionId,
-    ) {
+    ) -> Result<Stream, OpenStreamError> {
         let mut members: Vec<PeerId> = behaviours[i].membership.members().into_iter().collect();
         members.sort();
         let peer_id_i = members[i];
@@ -262,6 +265,14 @@ mod tests {
                 &Multiaddr::empty(),
             )
             .unwrap();
+
+        let mut stream_control = behaviours[i].stream_behaviour.new_control();
+        let stream = stream_control
+            .open_stream(peer_id_j, DISPERSAL_PROTOCOL)
+            .await
+            .expect("open stream");
+
+        Ok(stream)
     }
 
     #[test]
@@ -306,5 +317,43 @@ mod tests {
         let poll_result = behaviour.poll(&mut cx);
 
         assert!(matches!(poll_result, Poll::Pending));
+    }
+
+    #[tokio::test]
+    async fn test_validation_behaviour() {
+        let num_instances = 20;
+        let mut membership = HashMap::default();
+
+        let subnet_0_behaviours =
+            create_validation_behaviours(num_instances / 2, 0, &mut membership);
+        let subnet_1_behaviours =
+            create_validation_behaviours(num_instances / 2, 1, &mut membership);
+
+        let mut all_behaviours = subnet_0_behaviours;
+        all_behaviours.extend(subnet_1_behaviours);
+
+        for behaviour in all_behaviours.iter_mut() {
+            let membership_handler = MockMembershipHandler {
+                membership: membership.clone(),
+            };
+            behaviour.update_membership(membership_handler);
+        }
+
+        // Simulate peer connections.
+        for (i, j) in (0..num_instances).flat_map(|i| (i + 1..num_instances).map(move |j| (i, j))) {
+            let connection_id = ConnectionId::new_unchecked(i);
+            let stream = establish_connection(&mut all_behaviours, i, j, connection_id)
+                .await
+                .unwrap();
+        }
+
+        // Simulate sending a message from the first behavior.
+        let message = DaMessage {
+            blob: Some(Blob {
+                blob_id: vec![1, 2, 3],
+                data: vec![4, 5, 6],
+            }),
+            subnetwork_id: 0,
+        };
     }
 }
