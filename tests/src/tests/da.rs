@@ -10,8 +10,6 @@ use tests::topology::TopologyConfig;
 const APP_ID: &str = "fd3384e132ad02a56c78f45547ee40038dc79002b90d29ed90e08eee762ae715";
 
 async fn disseminate(executor: &Executor) {
-    // Nomos Cli is acting as the first node when dispersing the data by using the key associated
-    // with that Nomos Node.
     let executor_config = executor.config();
 
     let client = ClientBuilder::new()
@@ -61,8 +59,8 @@ async fn disseminate_and_retrieve() {
         .flat_map(|(_, blobs)| blobs)
         .collect();
 
-    // Index zero shouldn't be empty, node 2 replicated both blobs to node 1 because they both
-    // are in the same subnetwork.)
+    // Index zero shouldn't be empty, validator replicated both blobs to executor because they both
+    // are in the same subnetwork.
     assert!(executor_idx_0_blobs.len() == 2);
     assert!(validator_idx_0_blobs.len() == 2);
     for b in executor_idx_0_blobs.iter() {

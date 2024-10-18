@@ -11,6 +11,7 @@ use time::OffsetDateTime;
 const DEFAULT_SLOT_TIME: u64 = 2;
 const CONSENSUS_SLOT_TIME_VAR: &str = "CONSENSUS_SLOT_TIME";
 
+#[derive(Clone)]
 pub struct ConsensusParams {
     pub n_participants: usize,
     pub security_param: u32,

@@ -24,6 +24,7 @@ pub static GLOBAL_PARAMS_PATH: Lazy<String> = Lazy::new(|| {
         .to_string()
 });
 
+#[derive(Clone)]
 pub struct DaParams {
     pub subnetwork_size: usize,
     pub dispersal_factor: usize,
@@ -77,7 +78,7 @@ pub fn create_da_configs(ids: &[[u8; 32]], da_params: DaParams) -> Vec<GeneralDa
         node_keys.push(node_key.clone());
 
         let peer_id = secret_key_to_peer_id(node_key);
-        peer_ids.push(peer_id.clone());
+        peer_ids.push(peer_id);
 
         let listening_address = Multiaddr::from_str(&format!(
             "/ip4/127.0.0.1/udp/{}/quic-v1",
@@ -102,7 +103,7 @@ pub fn create_da_configs(ids: &[[u8; 32]], da_params: DaParams) -> Vec<GeneralDa
             let blob_storage_directory = PathBuf::from(format!("/tmp/blob_storage_{}", i));
             let verifier_sk = blst::min_sig::SecretKey::key_gen(id, &[]).unwrap();
             let verifier_sk_bytes = verifier_sk.to_bytes();
-            let peer_id = peer_ids[i].clone();
+            let peer_id = peer_ids[i];
 
             let subnetwork_ids = membership.membership(&peer_id);
 
@@ -133,8 +134,8 @@ fn build_da_peer_list(
         .iter()
         .zip(listening_addresses.iter())
         .map(|(peer_id, listening_address)| {
-            let p2p_addr = listening_address.clone().with_p2p(peer_id.clone()).unwrap();
-            (peer_id.clone(), p2p_addr)
+            let p2p_addr = listening_address.clone().with_p2p(*peer_id).unwrap();
+            (*peer_id, p2p_addr)
         })
         .collect()
 }

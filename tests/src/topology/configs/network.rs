@@ -31,11 +31,11 @@ pub fn create_network_configs(
             let node_key = ed25519::SecretKey::try_from_bytes(&mut node_key_bytes)
                 .expect("Failed to generate secret key from bytes");
 
-            let mut swarm_config: SwarmConfig = Default::default();
-            swarm_config.node_key = node_key;
-            swarm_config.port = get_available_port();
-
-            swarm_config
+            SwarmConfig {
+                node_key,
+                port: get_available_port(),
+                ..Default::default()
+            }
         })
         .collect();
 

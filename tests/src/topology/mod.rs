@@ -3,13 +3,14 @@ pub mod configs;
 use configs::{
     da::{create_da_configs, DaParams},
     network::{create_network_configs, NetworkParams},
+    GeneralConfig,
 };
 use rand::{thread_rng, Rng};
 
 use crate::{
     nodes::{
         executor::{create_executor_config, Executor},
-        validator::{create_validator_config, ValidatorNode},
+        validator::{create_validator_config, Validator},
     },
     topology::configs::consensus::{create_consensus_configs, ConsensusParams},
 };
@@ -50,7 +51,7 @@ impl TopologyConfig {
 }
 
 pub struct Topology {
-    validators: Vec<ValidatorNode>,
+    validators: Vec<Validator>,
     executors: Vec<Executor>,
 }
 
@@ -74,21 +75,21 @@ impl Topology {
 
         let mut validators = Vec::new();
         for i in 0..config.n_validators {
-            let config = create_validator_config(
-                consensus_configs[i].to_owned(),
-                da_configs[i].to_owned(),
-                network_configs[i].to_owned(),
-            );
-            validators.push(ValidatorNode::spawn(config).await)
+            let config = create_validator_config(GeneralConfig {
+                consensus_config: consensus_configs[i].to_owned(),
+                da_config: da_configs[i].to_owned(),
+                network_config: network_configs[i].to_owned(),
+            });
+            validators.push(Validator::spawn(config).await)
         }
 
         let mut executors = Vec::new();
-        for i in config.n_validators..config.n_validators + config.n_executors {
-            let config = create_executor_config(
-                consensus_configs[i].to_owned(),
-                da_configs[i].to_owned(),
-                network_configs[i].to_owned(),
-            );
+        for i in config.n_validators..n_participants {
+            let config = create_executor_config(GeneralConfig {
+                consensus_config: consensus_configs[i].to_owned(),
+                da_config: da_configs[i].to_owned(),
+                network_config: network_configs[i].to_owned(),
+            });
             executors.push(Executor::spawn(config).await)
         }
 
@@ -98,7 +99,7 @@ impl Topology {
         }
     }
 
-    pub fn validators(&self) -> &[ValidatorNode] {
+    pub fn validators(&self) -> &[Validator] {
         &self.validators
     }
 

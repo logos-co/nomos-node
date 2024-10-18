@@ -25,9 +25,7 @@ use reqwest::Url;
 use tempfile::NamedTempFile;
 
 use crate::nodes::LOGS_PREFIX;
-use crate::topology::configs::consensus::GeneralConsensusConfig;
-use crate::topology::configs::da::GeneralDaConfig;
-use crate::topology::configs::network::GeneralNetworkConfig;
+use crate::topology::configs::GeneralConfig;
 use crate::{adjust_timeout, get_available_port};
 
 use super::{create_tempdir, persist_tempdir, GetRangeReq, CLIENT};
@@ -39,14 +37,14 @@ pub enum Pool {
     Cl,
 }
 
-pub struct ValidatorNode {
+pub struct Validator {
     addr: SocketAddr,
     tempdir: tempfile::TempDir,
     child: Child,
     config: Config,
 }
 
-impl Drop for ValidatorNode {
+impl Drop for Validator {
     fn drop(&mut self) {
         if std::thread::panicking() {
             if let Err(e) = persist_tempdir(&mut self.tempdir, "nomos-node") {
@@ -60,7 +58,7 @@ impl Drop for ValidatorNode {
     }
 }
 
-impl ValidatorNode {
+impl Validator {
     pub async fn spawn(mut config: Config) -> Self {
         let dir = create_tempdir().unwrap();
         let mut file = NamedTempFile::new().unwrap();
@@ -227,32 +225,28 @@ impl ValidatorNode {
     }
 }
 
-pub fn create_validator_config(
-    consensus_config: GeneralConsensusConfig,
-    da_config: GeneralDaConfig,
-    network_config: GeneralNetworkConfig,
-) -> Config {
+pub fn create_validator_config(config: GeneralConfig) -> Config {
     Config {
         network: NetworkConfig {
             backend: Libp2pConfig {
-                inner: network_config.swarm_config,
-                initial_peers: network_config.initial_peers,
+                inner: config.network_config.swarm_config,
+                initial_peers: config.network_config.initial_peers,
             },
         },
         cryptarchia: CryptarchiaSettings {
-            notes: consensus_config.notes,
-            config: consensus_config.ledger_config,
-            genesis_state: consensus_config.genesis_state,
-            time: consensus_config.time,
+            notes: config.consensus_config.notes,
+            config: config.consensus_config.ledger_config,
+            genesis_state: config.consensus_config.genesis_state,
+            time: config.consensus_config.time,
             transaction_selector_settings: (),
             blob_selector_settings: (),
         },
         da_network: DaNetworkConfig {
             backend: DaNetworkBackendSettings {
-                node_key: da_config.node_key,
-                membership: da_config.membership,
-                addresses: da_config.addresses,
-                listening_address: da_config.listening_address,
+                node_key: config.da_config.node_key,
+                membership: config.da_config.membership,
+                addresses: config.da_config.addresses,
+                listening_address: config.da_config.listening_address,
             },
         },
         da_indexer: IndexerSettings {
@@ -262,9 +256,9 @@ pub fn create_validator_config(
         },
         da_verifier: DaVerifierServiceSettings {
             verifier_settings: KzgrsDaVerifierSettings {
-                sk: da_config.verifier_sk,
-                index: da_config.verifier_index,
-                global_params_path: da_config.global_params_path,
+                sk: config.da_config.verifier_sk,
+                index: config.da_config.verifier_index,
+                global_params_path: config.da_config.global_params_path,
             },
             network_adapter_settings: (),
             storage_adapter_settings: VerifierStorageAdapterSettings {
@@ -282,10 +276,10 @@ pub fn create_validator_config(
         },
         da_sampling: DaSamplingServiceSettings {
             sampling_settings: KzgrsSamplingBackendSettings {
-                num_samples: da_config.num_samples,
-                num_subnets: da_config.num_subnets,
-                old_blobs_check_interval: da_config.old_blobs_check_interval,
-                blobs_validity_duration: da_config.blobs_validity_duration,
+                num_samples: config.da_config.num_samples,
+                num_subnets: config.da_config.num_subnets,
+                old_blobs_check_interval: config.da_config.old_blobs_check_interval,
+                blobs_validity_duration: config.da_config.blobs_validity_duration,
             },
             storage_adapter_settings: SamplingStorageAdapterSettings {
                 blob_storage_directory: "./".into(),
