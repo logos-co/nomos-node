@@ -6,6 +6,7 @@ use std::hash::Hash;
 // crates
 use futures::Stream;
 use nomos_core::block::Block;
+use overwatch_rs::DynError;
 // internal
 use crate::network::messages::NetworkMessage;
 use nomos_network::backends::NetworkBackend;
@@ -24,6 +25,8 @@ pub trait NetworkAdapter {
     async fn new(
         network_relay: OutboundRelay<<NetworkService<Self::Backend> as ServiceData>::Message>,
     ) -> Self;
-    async fn blocks_stream(&self) -> BoxedStream<Block<Self::Tx, Self::BlobCertificate>>;
+    async fn blocks_stream(
+        &self,
+    ) -> Result<BoxedStream<Block<Self::Tx, Self::BlobCertificate>>, DynError>;
     async fn broadcast(&self, message: NetworkMessage<Self::Tx, Self::BlobCertificate>);
 }
