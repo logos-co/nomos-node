@@ -630,9 +630,7 @@ impl<M: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'static> Netw
         connection_id: ConnectionId,
         event: THandlerOutEvent<Self>,
     ) {
-        let Either::Left(event) = event else {
-            unreachable!()
-        };
+        let Either::Left(event) = event;
         self.stream_behaviour
             .on_connection_handler_event(peer_id, connection_id, event)
     }
