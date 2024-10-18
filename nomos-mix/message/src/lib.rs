@@ -4,7 +4,7 @@ pub use error::Error;
 
 use sha2::{Digest, Sha256};
 
-pub const MSG_SIZE: usize = 1024;
+pub const MSG_SIZE: usize = 2048;
 pub const NOISE: [u8; MSG_SIZE] = [0; MSG_SIZE];
 
 /// A mock implementation of the Sphinx encoding.
