@@ -196,7 +196,7 @@ pub struct CryptarchiaConsensus<
     // underlying networking backend. We need this so we can relay and check the types properly
     // when implementing ServiceCore for CryptarchiaConsensus
     network_relay: Relay<NetworkService<A::Backend>>,
-    mix_network_relay: Relay<nomos_mix_service::MixService<MixAdapter::Backend>>,
+    mix_relay: Relay<nomos_mix_service::MixService<MixAdapter::Backend>>,
     cl_mempool_relay: Relay<TxMempoolService<ClPoolAdapter, ClPool>>,
     da_mempool_relay: Relay<
         DaMempoolService<
@@ -360,7 +360,7 @@ where
 {
     fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, overwatch_rs::DynError> {
         let network_relay = service_state.overwatch_handle.relay();
-        let mix_network_relay = service_state.overwatch_handle.relay();
+        let mix_relay = service_state.overwatch_handle.relay();
         let cl_mempool_relay = service_state.overwatch_handle.relay();
         let da_mempool_relay = service_state.overwatch_handle.relay();
         let storage_relay = service_state.overwatch_handle.relay();
@@ -369,7 +369,7 @@ where
         Ok(Self {
             service_state,
             network_relay,
-            mix_network_relay,
+            mix_relay,
             cl_mempool_relay,
             da_mempool_relay,
             block_subscription_sender,
@@ -385,11 +385,11 @@ where
             .await
             .expect("Relay connection with NetworkService should succeed");
 
-        let mix_network_relay: OutboundRelay<_> = self
-            .mix_network_relay
+        let mix_relay: OutboundRelay<_> = self
+            .mix_relay
             .connect()
             .await
-            .expect("Relay connection with nomos_mix_service::NetworkService should succeed");
+            .expect("Relay connection with nomos_mix_service::MixService should succeed");
 
         let cl_mempool_relay: OutboundRelay<_> = self
             .cl_mempool_relay
@@ -437,18 +437,18 @@ where
             ),
         };
 
-        let adapter = A::new(network_relay).await;
+        let network_adapter = A::new(network_relay).await;
         let tx_selector = TxS::new(transaction_selector_settings);
         let blob_selector = BS::new(blob_selector_settings);
 
-        let mut incoming_blocks = adapter.blocks_stream().await;
+        let mut incoming_blocks = network_adapter.blocks_stream().await;
         let mut leader = leadership::Leader::new(genesis_id, notes, config);
         let timer = time::Timer::new(time);
 
         let mut slot_timer = IntervalStream::new(timer.slot_interval());
 
-        let mix_network_adapter = MixAdapter::new(mix_network_relay).await;
-        let mut incoming_mixed_msgs = mix_network_adapter.mixed_messages_stream().await?;
+        let mix_adapter = MixAdapter::new(mix_relay).await;
+        let mut incoming_mixed_msgs = mix_adapter.mixed_messages_stream().await?;
 
         let mut lifecycle_stream = self.service_state.lifecycle_handle.message_stream();
 
@@ -472,7 +472,7 @@ where
                     Some(mixed_msg) = incoming_mixed_msgs.next() => {
                         match wire::deserialize::<Block<ClPool::Item, DaPool::Item>>(&mixed_msg) {
                             Ok(block) => {
-                                adapter.broadcast(NetworkMessage::Block(block)).await;
+                                network_adapter.broadcast(NetworkMessage::Block(block)).await;
                             },
                             Err(e) => {
                                 tracing::error!("Error deserializing mixed message: {e}");
@@ -506,7 +506,7 @@ where
 
                             if let Some(block) = block {
                                 let msg = wire::serialize(&block).unwrap();
-                                mix_network_adapter.mix(msg).await;
+                                mix_adapter.mix(msg).await;
                             }
                         }
                     }
