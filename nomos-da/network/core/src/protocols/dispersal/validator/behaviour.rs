@@ -151,24 +151,26 @@ impl<M: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'static> Netw
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::protocols::dispersal::executor::behaviour::DispersalError;
+    use crate::protocols::dispersal::executor::behaviour::{
+        DispersalError, DispersalExecutorBehaviour,
+    };
     use crate::protocols::replication::handler::DaMessage;
-    use futures::stream::BoxStream;
     use futures::task::ArcWake;
-    use libp2p::{identity, PeerId};
+    use libp2p::identity::Keypair;
+    use libp2p::{identity, quic, PeerId};
     use libp2p_stream::Control;
     use nomos_da_messages::common::Blob;
     use std::collections::{HashMap, HashSet};
     use std::sync::Arc;
-    use tokio::sync::mpsc;
-    use tokio_stream::wrappers::UnboundedReceiverStream;
+    use tracing_subscriber::fmt::TestWriter;
+    use tracing_subscriber::EnvFilter;
 
     #[derive(Clone, Debug)]
-    struct MockMembershipHandler {
-        membership: HashMap<PeerId, HashSet<SubnetworkId>>,
+    struct Neighbourhood {
+        pub membership: HashMap<PeerId, HashSet<SubnetworkId>>,
     }
 
-    impl MembershipHandler for MockMembershipHandler {
+    impl MembershipHandler for Neighbourhood {
         type NetworkId = SubnetworkId;
         type Id = PeerId;
 
@@ -211,12 +213,44 @@ mod tests {
         fn wake_by_ref(_arc_self: &Arc<Self>) {}
     }
 
-    fn create_validation_behaviours(
-        num_instances: usize,
-        subnet_id: u32,
-        membership: &mut HashMap<PeerId, HashSet<SubnetworkId>>,
-    ) -> Vec<DispersalValidatorBehaviour<MockMembershipHandler>> {
-        let mut behaviours = Vec::new();
+    pub fn executor_swarm(
+        key: Keypair,
+        membership: impl MembershipHandler<NetworkId = u32, Id = PeerId> + 'static,
+    ) -> libp2p::Swarm<
+        DispersalExecutorBehaviour<impl MembershipHandler<NetworkId = u32, Id = PeerId>>,
+    > {
+        libp2p::SwarmBuilder::with_existing_identity(key)
+            .with_tokio()
+            .with_other_transport(|keypair| quic::tokio::Transport::new(quic::Config::new(keypair)))
+            .unwrap()
+            .with_behaviour(|_key| DispersalExecutorBehaviour::new(membership))
+            .unwrap()
+            .with_swarm_config(|cfg| {
+                cfg.with_idle_connection_timeout(std::time::Duration::from_secs(u64::MAX))
+            })
+            .build()
+    }
+
+    pub fn validator_swarm(
+        key: Keypair,
+        membership: impl MembershipHandler<NetworkId = u32, Id = PeerId> + 'static,
+    ) -> libp2p::Swarm<
+        DispersalValidatorBehaviour<impl MembershipHandler<NetworkId = u32, Id = PeerId>>,
+    > {
+        libp2p::SwarmBuilder::with_existing_identity(key)
+            .with_tokio()
+            .with_other_transport(|keypair| quic::tokio::Transport::new(quic::Config::new(keypair)))
+            .unwrap()
+            .with_behaviour(|_key| DispersalValidatorBehaviour::new(membership))
+            .unwrap()
+            .with_swarm_config(|cfg| {
+                cfg.with_idle_connection_timeout(std::time::Duration::from_secs(u64::MAX))
+            })
+            .build()
+    }
+
+    fn create_validation_membership(num_instances: usize, subnet_id: u32) -> Neighbourhood {
+        let mut membership = HashMap::default();
 
         let mut peer_ids = Vec::new();
         for _ in 0..num_instances {
@@ -229,58 +263,7 @@ mod tests {
             membership.insert(*peer_id, HashSet::from([subnet_id]));
         }
 
-        let membership_handler = MockMembershipHandler {
-            membership: HashMap::default(), // This will be updated after all behaviours are added.
-        };
-
-        for _ in peer_ids {
-            let behaviour = DispersalValidatorBehaviour::new(membership_handler.clone());
-            behaviours.push(behaviour);
-        }
-
-        behaviours
-    }
-
-    fn establish_connection(
-        behaviours: &mut [DispersalValidatorBehaviour<MockMembershipHandler>],
-        i: usize,
-        j: usize,
-        connection_id: ConnectionId,
-    ) -> BoxStream<DaMessage> {
-        let mut members: Vec<PeerId> = behaviours[i].membership.members().into_iter().collect();
-        members.sort();
-        let peer_id_i = members[i];
-        let peer_id_j = members[j];
-
-        behaviours[i]
-            .handle_established_outbound_connection(
-                connection_id,
-                peer_id_j,
-                &Multiaddr::empty(),
-                Endpoint::Dialer,
-            )
-            .unwrap();
-
-        behaviours[j]
-            .handle_established_inbound_connection(
-                connection_id,
-                peer_id_i,
-                &Multiaddr::empty(),
-                &Multiaddr::empty(),
-            )
-            .unwrap();
-
-        let mut stream_control = behaviours[i].stream_behaviour.new_control();
-        let (pending_out_streams_sender, receiver) = mpsc::unbounded_channel::<PeerId>();
-        let pending_out_streams = UnboundedReceiverStream::new(receiver)
-            .zip(futures::stream::repeat(stream_control))
-            .then(|(peer_id, control)| open_stream(peer_id_j, control))
-            .boxed();
-
-        let (pending_blobs_sender, receiver) = mpsc::unbounded_channel::<DaMessage>();
-        let pending_blobs_stream = UnboundedReceiverStream::new(receiver).boxed();
-
-        pending_blobs_stream
+        Neighbourhood { membership }
     }
 
     async fn open_stream(peer_id: PeerId, mut control: Control) -> Result<Stream, DispersalError> {
@@ -295,7 +278,7 @@ mod tests {
     fn test_handle_established_inbound_connection() {
         let mut allowed_peers = HashMap::new();
         allowed_peers.insert(PeerId::random(), HashSet::from([0, 1]));
-        let membership = MockMembershipHandler {
+        let membership = Neighbourhood {
             membership: allowed_peers,
         };
         let mut behaviour = DispersalValidatorBehaviour::new(membership);
@@ -324,7 +307,7 @@ mod tests {
 
     #[test]
     fn test_poll() {
-        let membership = MockMembershipHandler {
+        let membership = Neighbourhood {
             membership: HashMap::new(),
         };
         let mut behaviour = DispersalValidatorBehaviour::new(membership);
@@ -337,23 +320,27 @@ mod tests {
 
     #[tokio::test]
     async fn test_validation_behaviour() {
+        let _ = tracing_subscriber::fmt()
+            .with_env_filter(EnvFilter::from_default_env())
+            .compact()
+            .with_writer(TestWriter::default())
+            .try_init();
+        let k1 = libp2p::identity::Keypair::generate_ed25519();
+        let k2 = libp2p::identity::Keypair::generate_ed25519();
+        let validator_peer = PeerId::from_public_key(&k2.public());
+
         let num_instances = 20;
-        let mut membership = HashMap::default();
 
-        let subnet_0_behaviours =
-            create_validation_behaviours(num_instances / 2, 0, &mut membership);
-        let subnet_1_behaviours =
-            create_validation_behaviours(num_instances / 2, 1, &mut membership);
+        let subnet_0_membership = create_validation_membership(num_instances / 2, 0);
+        let subnet_1_membership = create_validation_membership(num_instances / 2, 1);
 
-        let mut all_behaviours = subnet_0_behaviours;
-        all_behaviours.extend(subnet_1_behaviours);
+        let mut all_neighbours = subnet_0_membership;
+        all_neighbours
+            .membership
+            .extend(subnet_1_membership.membership);
 
-        for behaviour in all_behaviours.iter_mut() {
-            let membership_handler = MockMembershipHandler {
-                membership: membership.clone(),
-            };
-            behaviour.update_membership(membership_handler);
-        }
+        let mut executor = executor_swarm(k1, all_neighbours.clone());
+        let mut validator = validator_swarm(k2, all_neighbours);
 
         let message = DaMessage {
             blob: Some(Blob {
@@ -362,11 +349,5 @@ mod tests {
             }),
             subnetwork_id: 0,
         };
-
-        // Simulate peer connections.
-        for (i, j) in (0..num_instances).flat_map(|i| (i + 1..num_instances).map(move |j| (i, j))) {
-            let connection_id = ConnectionId::new_unchecked(i);
-            let stream_sender = establish_connection(&mut all_behaviours, i, j, connection_id);
-        }
     }
 }
