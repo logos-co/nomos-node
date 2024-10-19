@@ -18,6 +18,7 @@ use nomos_da_indexer::storage::adapters::rocksdb::RocksAdapterSettings as Indexe
 use nomos_da_indexer::IndexerSettings;
 use nomos_da_network_service::backends::libp2p::common::DaNetworkBackendSettings;
 use nomos_da_network_service::backends::libp2p::executor::DaNetworkExecutorBackendSettings;
+use nomos_da_network_service::backends::libp2p::validator::DaNetworkValidatorBackend;
 use nomos_da_network_service::NetworkConfig as DaNetworkConfig;
 use nomos_da_sampling::backend::kzgrs::KzgrsSamplingBackendSettings;
 use nomos_da_sampling::storage::adapters::rocksdb::RocksAdapterSettings as SamplingStorageAdapterSettings;
@@ -34,7 +35,7 @@ use nomos_network::{backends::libp2p::Libp2pConfig, NetworkConfig};
 use nomos_node::api::paths::{
     CL_METRICS, CRYPTARCHIA_HEADERS, CRYPTARCHIA_INFO, DA_GET_RANGE, STORAGE_BLOCK,
 };
-use nomos_node::{Config, Tx};
+use nomos_node::{Config, Config as ValidatorConfig, Tx};
 use nomos_storage::backends::rocksdb::RocksBackendSettings;
 use once_cell::sync::Lazy;
 use rand::{thread_rng, Rng};
@@ -46,21 +47,22 @@ use tempfile::NamedTempFile;
 use time::OffsetDateTime;
 // internal
 use super::{create_tempdir, persist_tempdir, LOGS_PREFIX};
-use crate::{adjust_timeout, get_available_port, ConsensusConfig, DaConfig, Node};
+use crate::{
+    adjust_timeout, get_available_port, node_address, ConsensusConfig, DaConfig, Node, SpawnConfig,
+};
 
 static CLIENT: Lazy<Client> = Lazy::new(Client::new);
-const NOMOS_BIN: &str = "../target/debug/nomos-executor";
 const DEFAULT_SLOT_TIME: u64 = 2;
 const CONSENSUS_SLOT_TIME_VAR: &str = "CONSENSUS_SLOT_TIME";
 
-pub struct NomosNode {
+pub struct TestNode<Config> {
     addr: SocketAddr,
     _tempdir: tempfile::TempDir,
     child: Child,
-    config: ExecutorConfig,
+    config: Config,
 }
 
-impl Drop for NomosNode {
+impl<Config> Drop for TestNode<Config> {
     fn drop(&mut self) {
         if std::thread::panicking() {
             if let Err(e) = persist_tempdir(&mut self._tempdir, "nomos-node") {
@@ -73,7 +75,8 @@ impl Drop for NomosNode {
         }
     }
 }
-impl NomosNode {
+impl TestNode<ExecutorConfig> {
+    const BIN_PATH: &'static str = "../target/debug/nomos-executor";
     pub async fn spawn_inner(mut config: ExecutorConfig) -> Self {
         // Waku stores the messages in a db file in the current dir, we need a different
         // directory for each node to avoid conflicts
@@ -102,7 +105,7 @@ impl NomosNode {
         config.da_indexer.storage.blob_storage_directory = dir.path().to_owned();
 
         serde_yaml::to_writer(&mut file, &config).unwrap();
-        let child = Command::new(std::env::current_dir().unwrap().join(NOMOS_BIN))
+        let child = Command::new(std::env::current_dir().unwrap().join(Self::BIN_PATH))
             .arg(&config_path)
             .current_dir(dir.path())
             .stdout(Stdio::inherit())
@@ -122,7 +125,62 @@ impl NomosNode {
 
         node
     }
+}
 
+impl TestNode<ValidatorConfig> {
+    const BIN_PATH: &'static str = "../target/debug/nomos-node";
+
+    pub async fn spawn_inner(mut config: ValidatorConfig) -> Self {
+        // Waku stores the messages in a db file in the current dir, we need a different
+        // directory for each node to avoid conflicts
+        let dir = create_tempdir().unwrap();
+        let mut file = NamedTempFile::new().unwrap();
+        let config_path = file.path().to_owned();
+
+        // setup logging so that we can intercept it later in testing
+        //config.log.backend = LoggerBackend::File {
+        //    directory: dir.path().to_owned(),
+        //    prefix: Some(LOGS_PREFIX.into()),
+        //};
+        //config.log.format = LoggerFormat::Json;
+        config.log.backend = LoggerBackend::Stdout;
+        config.log.level = tracing::Level::INFO;
+
+        config.storage.db_path = dir.path().join("db");
+        config
+            .da_sampling
+            .storage_adapter_settings
+            .blob_storage_directory = dir.path().to_owned();
+        config
+            .da_verifier
+            .storage_adapter_settings
+            .blob_storage_directory = dir.path().to_owned();
+        config.da_indexer.storage.blob_storage_directory = dir.path().to_owned();
+
+        serde_yaml::to_writer(&mut file, &config).unwrap();
+        let child = Command::new(std::env::current_dir().unwrap().join(Self::BIN_PATH))
+            .arg(&config_path)
+            .current_dir(dir.path())
+            .stdout(Stdio::inherit())
+            .spawn()
+            .unwrap();
+        let node = Self {
+            addr: config.http.backend_settings.address,
+            child,
+            _tempdir: dir,
+            config,
+        };
+        tokio::time::timeout(adjust_timeout(Duration::from_secs(10)), async {
+            node.wait_online().await
+        })
+        .await
+        .unwrap();
+
+        node
+    }
+}
+
+impl<Config> TestNode<Config> {
     async fn get(&self, path: &str) -> reqwest::Result<reqwest::Response> {
         CLIENT
             .get(format!("http://{}{}", self.addr, path))
@@ -215,7 +273,7 @@ impl NomosNode {
             .collect::<String>()
     }
 
-    pub fn config(&self) -> &ExecutorConfig {
+    pub fn config(&self) -> &Config {
         &self.config
     }
 
@@ -239,10 +297,11 @@ impl NomosNode {
 }
 
 #[async_trait::async_trait]
-impl Node for NomosNode {
+impl Node for TestNode<ValidatorConfig> {
     type ConsensusInfo = CryptarchiaInfo;
+    type Config = Config;
 
-    async fn spawn(config: ExecutorConfig) -> Self {
+    async fn spawn(config: Self::Config) -> Self {
         Self::spawn_inner(config).await
     }
 
@@ -260,7 +319,7 @@ impl Node for NomosNode {
     /// so the leader can receive votes from all other nodes that will be subsequently spawned.
     /// If not, the leader will miss votes from nodes spawned before itself.
     /// This issue will be resolved by devising the block catch-up mechanism in the future.
-    fn create_node_configs(consensus: ConsensusConfig, da: DaConfig) -> Vec<ExecutorConfig> {
+    fn create_node_configs(consensus: ConsensusConfig, da: DaConfig) -> Vec<Self::Config> {
         // we use the same random bytes for:
         // * da id
         // * coin sk
@@ -327,22 +386,47 @@ impl Node for NomosNode {
         for config in &mut configs {
             let membership =
                 FillFromNodeList::new(&peer_ids, da.subnetwork_size, da.dispersal_factor);
-            let local_peer_id = secret_key_to_peer_id(
-                config
-                    .da_network
-                    .backend
-                    .validator_settings
-                    .node_key
-                    .clone(),
-            );
+            let local_peer_id = secret_key_to_peer_id(config.da_network.backend.node_key.clone());
             let subnetwork_ids = membership.membership(&local_peer_id);
             config.da_verifier.verifier_settings.index = subnetwork_ids;
-            config.da_network.backend.validator_settings.membership = membership;
-            config.da_network.backend.validator_settings.addresses =
-                peer_addresses.iter().cloned().collect();
+            config.da_network.backend.membership = membership;
+            config.da_network.backend.addresses = peer_addresses.iter().cloned().collect();
         }
 
         configs
+    }
+
+    fn node_configs(config: SpawnConfig) -> Vec<Self::Config> {
+        match config {
+            SpawnConfig::Star { consensus, da } => {
+                let mut configs = Self::create_node_configs(consensus, da);
+                let next_leader_config = configs.remove(0);
+                let first_node_addr = node_address(&next_leader_config);
+                let mut node_configs = vec![next_leader_config];
+                for mut conf in configs {
+                    conf.network
+                        .backend
+                        .initial_peers
+                        .push(first_node_addr.clone());
+
+                    node_configs.push(conf);
+                }
+                node_configs
+            }
+            SpawnConfig::Chain { consensus, da } => {
+                let mut configs = Self::create_node_configs(consensus, da);
+                let next_leader_config = configs.remove(0);
+                let mut prev_node_addr = node_address(&next_leader_config);
+                let mut node_configs = vec![next_leader_config];
+                for mut conf in configs {
+                    conf.network.backend.initial_peers.push(prev_node_addr);
+                    prev_node_addr = node_address(&conf);
+
+                    node_configs.push(conf);
+                }
+                node_configs
+            }
+        }
     }
 }
 
@@ -365,17 +449,15 @@ fn secret_key_to_peer_id(node_key: nomos_libp2p::ed25519::SecretKey) -> PeerId {
     )
 }
 
-fn build_da_peer_list(configs: &[ExecutorConfig]) -> Vec<(PeerId, Multiaddr)> {
+fn build_da_peer_list(configs: &[ValidatorConfig]) -> Vec<(PeerId, Multiaddr)> {
     configs
         .iter()
         .map(|c| {
-            let peer_id =
-                secret_key_to_peer_id(c.da_network.backend.validator_settings.node_key.clone());
+            let peer_id = secret_key_to_peer_id(c.da_network.backend.node_key.clone());
             (
                 peer_id,
                 c.da_network
                     .backend
-                    .validator_settings
                     .listening_address
                     .clone()
                     .with_p2p(peer_id)
@@ -393,14 +475,14 @@ fn create_node_config(
     notes: Vec<InputWitness>,
     time: TimeConfig,
     da_config: DaConfig,
-) -> ExecutorConfig {
+) -> ValidatorConfig {
     let swarm_config: SwarmConfig = Default::default();
     let node_key = swarm_config.node_key.clone();
 
     let verifier_sk = SecretKey::key_gen(&id, &[]).unwrap();
     let verifier_sk_bytes = verifier_sk.to_bytes();
 
-    let mut config = ExecutorConfig {
+    let mut config = ValidatorConfig {
         network: NetworkConfig {
             backend: Libp2pConfig {
                 inner: swarm_config,
@@ -415,29 +497,16 @@ fn create_node_config(
             transaction_selector_settings: (),
             blob_selector_settings: (),
         },
-        da_dispersal: DispersalServiceSettings {
-            backend: DispersalKZGRSBackendSettings {
-                encoder_settings: EncoderSettings {
-                    num_columns: da_config.num_subnets as usize,
-                    with_cache: false,
-                    global_params_path: da_config.global_params_path.clone(),
-                },
-                dispersal_timeout: Duration::from_secs(10),
-            },
-        },
         da_network: DaNetworkConfig {
-            backend: DaNetworkExecutorBackendSettings {
-                validator_settings: DaNetworkBackendSettings {
-                    node_key,
-                    listening_address: Multiaddr::from_str(&format!(
-                        "/ip4/127.0.0.1/udp/{}/quic-v1",
-                        get_available_port(),
-                    ))
-                    .unwrap(),
-                    addresses: Default::default(),
-                    membership: Default::default(),
-                },
-                num_subnets: da_config.num_subnets as u16,
+            backend: DaNetworkValidatorBackend::Settings {
+                node_key,
+                membership: Default::default(),
+                addresses: Default::default(),
+                listening_address: Multiaddr::from_str(&format!(
+                    "/ip4/127.0.0.1/udp/{}/quic-v1",
+                    get_available_port(),
+                ))
+                .unwrap(),
             },
         },
         da_indexer: IndexerSettings {
