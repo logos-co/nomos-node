@@ -5,7 +5,6 @@ pub mod storage;
 // std
 use std::collections::BTreeSet;
 use std::fmt::Debug;
-use std::time::Duration;
 // crates
 use kzgrs_backend::common::blob::DaBlob;
 use network::NetworkAdapter;

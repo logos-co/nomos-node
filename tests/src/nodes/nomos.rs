@@ -1,4 +1,3 @@
-use std::fs::File;
 // std
 use std::net::SocketAddr;
 use std::ops::Range;
@@ -18,14 +17,12 @@ use mixnet::{
     node::MixNodeConfig,
     topology::{MixNodeInfo, MixnetTopology},
 };
-use nomos_core::da::DaDispersal;
 use nomos_core::{block::Block, header::HeaderId, staking::NMO_UNIT};
 use nomos_da_dispersal::backend::kzgrs::{DispersalKZGRSBackendSettings, EncoderSettings};
 use nomos_da_dispersal::DispersalServiceSettings;
 use nomos_da_indexer::storage::adapters::rocksdb::RocksAdapterSettings as IndexerStorageAdapterSettings;
 use nomos_da_indexer::IndexerSettings;
 use nomos_da_network_service::backends::libp2p::common::DaNetworkBackendSettings;
-use nomos_da_network_service::backends::libp2p::validator::DaNetworkValidatorBackend;
 use nomos_da_network_service::NetworkConfig as DaNetworkConfig;
 use nomos_da_sampling::backend::kzgrs::KzgrsSamplingBackendSettings;
 use nomos_da_sampling::storage::adapters::rocksdb::RocksAdapterSettings as SamplingStorageAdapterSettings;
@@ -35,17 +32,16 @@ use nomos_da_verifier::storage::adapters::rocksdb::RocksAdapterSettings as Verif
 use nomos_da_verifier::DaVerifierServiceSettings;
 use nomos_executor::config::Config as ExecutorConfig;
 use nomos_libp2p::{Multiaddr, PeerId, SwarmConfig};
-use nomos_log::{LoggerBackend, LoggerFormat};
+use nomos_log::LoggerBackend;
 use nomos_mempool::MempoolMetrics;
 #[cfg(feature = "mixnet")]
 use nomos_network::backends::libp2p::mixnet::MixnetConfig;
-use nomos_network::backends::NetworkBackend;
 use nomos_network::{backends::libp2p::Libp2pConfig, NetworkConfig};
 use nomos_node::api::backend::AxumBackendSettings;
 use nomos_node::api::paths::{
     CL_METRICS, CRYPTARCHIA_HEADERS, CRYPTARCHIA_INFO, DA_GET_RANGE, STORAGE_BLOCK,
 };
-use nomos_node::{Config as ValidatorConfig, NomosDaMembership, Tx};
+use nomos_node::{Config as ValidatorConfig, Tx};
 use nomos_storage::backends::rocksdb::RocksBackendSettings;
 use once_cell::sync::Lazy;
 use rand::{thread_rng, Rng};
@@ -338,7 +334,7 @@ impl Node for TestNode<ValidatorConfig> {
 
     fn node_configs(config: SpawnConfig) -> Vec<Self::Config> {
         match config {
-            SpawnConfig::Star { consensus, da } => {
+            SpawnConfig::Star { consensus, da, .. } => {
                 let mut configs = Self::create_node_configs(consensus, da);
                 let next_leader_config = configs.remove(0);
                 let first_node_addr =
@@ -354,7 +350,7 @@ impl Node for TestNode<ValidatorConfig> {
                 }
                 node_configs
             }
-            SpawnConfig::Chain { consensus, da } => {
+            SpawnConfig::Chain { consensus, da, .. } => {
                 let mut configs = Self::create_node_configs(consensus, da);
                 let next_leader_config = configs.remove(0);
                 let mut prev_node_addr =
@@ -402,7 +398,7 @@ impl Node for TestNode<ExecutorConfig> {
 
     fn node_configs(config: SpawnConfig) -> Vec<Self::Config> {
         match config {
-            SpawnConfig::Star { consensus, da } => {
+            SpawnConfig::Star { consensus, da, .. } => {
                 let mut configs = Self::create_node_configs(consensus, da);
                 let next_leader_config = configs.remove(0);
                 let first_node_addr =
@@ -418,7 +414,7 @@ impl Node for TestNode<ExecutorConfig> {
                 }
                 node_configs
             }
-            SpawnConfig::Chain { consensus, da } => {
+            SpawnConfig::Chain { consensus, da, .. } => {
                 let mut configs = Self::create_node_configs(consensus, da);
                 let next_leader_config = configs.remove(0);
                 let mut prev_node_addr =
@@ -448,12 +444,112 @@ impl Node for TestNode<ExecutorConfig> {
                     dispersal_timeout: Duration::from_secs(u64::MAX),
                 },
             },
-            num_subnets: 0,
+            num_subnets: da.num_subnets,
         };
         validator_config
             .into_iter()
             .map(move |c| executor_config_from_node_config(c, executor_settings.clone()))
             .collect()
+    }
+}
+
+pub enum NetworkNode {
+    Validator(TestNode<ValidatorConfig>),
+    Executor(TestNode<ExecutorConfig>),
+}
+
+pub enum NetworkNodeConfig {
+    Validator(ValidatorConfig),
+    Executor(ExecutorConfig),
+}
+
+impl NetworkNode {
+    pub fn config(&self) -> NetworkNodeConfig {
+        match self {
+            NetworkNode::Validator(node) => NetworkNodeConfig::Validator(node.config().clone()),
+            NetworkNode::Executor(node) => NetworkNodeConfig::Executor(node.config.clone()),
+        }
+    }
+
+    pub async fn get_indexer_range(
+        &self,
+        app_id: [u8; 32],
+        range: Range<[u8; 8]>,
+    ) -> Vec<([u8; 8], Vec<Vec<u8>>)> {
+        match self {
+            NetworkNode::Validator(node) => node.get_indexer_range(app_id, range).await,
+            NetworkNode::Executor(node) => node.get_indexer_range(app_id, range).await,
+        }
+    }
+}
+
+#[async_trait::async_trait]
+impl Node for NetworkNode {
+    type Config = NetworkNodeConfig;
+    type ConsensusInfo = CryptarchiaInfo;
+
+    async fn spawn(config: Self::Config) -> Self {
+        match config {
+            NetworkNodeConfig::Validator(config) => {
+                NetworkNode::Validator(TestNode::<ValidatorConfig>::spawn(config).await)
+            }
+            NetworkNodeConfig::Executor(config) => {
+                NetworkNode::Executor(TestNode::<ExecutorConfig>::spawn(config).await)
+            }
+        }
+    }
+
+    fn node_configs(config: SpawnConfig) -> Vec<Self::Config> {
+        let n_executors = config.n_executors();
+        let da = config.da_config();
+        let validator_configs = <TestNode<ValidatorConfig> as Node>::node_configs(config);
+        let (executor_configs, validator_configs) = validator_configs.split_at(n_executors);
+        let executor_settings = ExecutorSettings {
+            da_dispersal: DispersalServiceSettings {
+                backend: DispersalKZGRSBackendSettings {
+                    encoder_settings: EncoderSettings {
+                        num_columns: da.num_subnets as usize,
+                        with_cache: false,
+                        global_params_path: da.global_params_path,
+                    },
+                    dispersal_timeout: Duration::from_secs(u64::MAX),
+                },
+            },
+            num_subnets: da.num_subnets,
+        };
+        let validator_configs = validator_configs
+            .iter()
+            .cloned()
+            .map(NetworkNodeConfig::Validator);
+        let executor_configs = executor_configs
+            .iter()
+            .cloned()
+            .map(move |validatorconfig| {
+                executor_config_from_node_config(validatorconfig, executor_settings.clone())
+            })
+            .map(NetworkNodeConfig::Executor);
+        executor_configs.chain(validator_configs).collect()
+    }
+
+    fn create_node_configs(_consensus: ConsensusConfig, _da: DaConfig) -> Vec<Self::Config> {
+        unreachable!()
+    }
+
+    async fn consensus_info(&self) -> Self::ConsensusInfo {
+        let res = match self {
+            NetworkNode::Validator(node) => node.get(CRYPTARCHIA_INFO).await,
+            NetworkNode::Executor(node) => node.get(CRYPTARCHIA_INFO).await,
+        };
+        println!("{:?}", res);
+        res.unwrap().json().await.unwrap()
+    }
+
+    fn stop(&mut self) {
+        let child = match self {
+            NetworkNode::Validator(TestNode { child, .. }) => child,
+            NetworkNode::Executor(TestNode { child, .. }) => child,
+        };
+        child.kill().unwrap();
     }
 }
 
