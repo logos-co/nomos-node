@@ -1,4 +1,5 @@
 pub mod nodes;
+pub use nodes::NomosNode;
 use once_cell::sync::Lazy;
 
 // std
@@ -9,7 +10,9 @@ use std::time::Duration;
 use std::{fmt::Debug, sync::Mutex};
 
 //crates
+use nomos_executor::config::Config as ExecutorConfig;
 use nomos_libp2p::{Multiaddr, Swarm};
+use nomos_node::Config;
 use rand::{thread_rng, Rng};
 
 static NET_PORT: Lazy<Mutex<u16>> = Lazy::new(|| Mutex::new(thread_rng().gen_range(8000..10000)));
@@ -46,9 +49,8 @@ pub fn adjust_timeout(d: Duration) -> Duration {
 
 #[async_trait::async_trait]
 pub trait Node: Sized {
-    type Config: Send;
     type ConsensusInfo: Debug + Clone + PartialEq;
-    async fn spawn(config: Self::Config) -> Self;
+    async fn spawn(mut config: ExecutorConfig) -> Self;
     async fn spawn_nodes(config: SpawnConfig) -> Vec<Self> {
         let mut nodes = Vec::new();
         for conf in Self::node_configs(config) {
@@ -56,8 +58,39 @@ pub trait Node: Sized {
         }
         nodes
     }
-    fn node_configs(config: SpawnConfig) -> Vec<Self::Config>;
-    fn create_node_configs(consensus: ConsensusConfig, da: DaConfig) -> Vec<Self::Config>;
+    fn node_configs(config: SpawnConfig) -> Vec<ExecutorConfig> {
+        match config {
+            SpawnConfig::Star { consensus, da } => {
+                let mut configs = Self::create_node_configs(consensus, da);
+                let next_leader_config = configs.remove(0);
+                let first_node_addr = node_address(&next_leader_config);
+                let mut node_configs = vec![next_leader_config];
+                for mut conf in configs {
+                    conf.network
+                        .backend
+                        .initial_peers
+                        .push(first_node_addr.clone());
+
+                    node_configs.push(conf);
+                }
+                node_configs
+            }
+            SpawnConfig::Chain { consensus, da } => {
+                let mut configs = Self::create_node_configs(consensus, da);
+                let next_leader_config = configs.remove(0);
+                let mut prev_node_addr = node_address(&next_leader_config);
+                let mut node_configs = vec![next_leader_config];
+                for mut conf in configs {
+                    conf.network.backend.initial_peers.push(prev_node_addr);
+                    prev_node_addr = node_address(&conf);
+
+                    node_configs.push(conf);
+                }
+                node_configs
+            }
+        }
+    }
+    fn create_node_configs(consensus: ConsensusConfig, da: DaConfig) -> Vec<ExecutorConfig>;
     async fn consensus_info(&self) -> Self::ConsensusInfo;
     fn stop(&mut self);
 }
@@ -67,33 +100,18 @@ pub enum SpawnConfig {
     // Star topology: Every node is initially connected to a single node.
     Star {
         consensus: ConsensusConfig,
-        n_executors: usize,
         da: DaConfig,
     },
     // Chain topology: Every node is chained to the node next to it.
     Chain {
         consensus: ConsensusConfig,
-        n_executors: usize,
         da: DaConfig,
     },
 }
 
 impl SpawnConfig {
-    pub fn n_executors(&self) -> usize {
-        match self {
-            SpawnConfig::Star { n_executors, .. } => *n_executors,
-            SpawnConfig::Chain { n_executors, .. } => *n_executors,
-        }
-    }
-
-    pub fn da_config(&self) -> DaConfig {
-        match self {
-            SpawnConfig::Star { da, .. } => da.clone(),
-            SpawnConfig::Chain { da, .. } => da.clone(),
-        }
-    }
     // Returns a SpawnConfig::Chain with proper configurations for happy-path tests
-    pub fn chain_happy(n_participants: usize, number_of_executors: usize, da: DaConfig) -> Self {
+    pub fn chain_happy(n_participants: usize, da: DaConfig) -> Self {
         Self::Chain {
             consensus: ConsensusConfig {
                 n_participants,
@@ -104,12 +122,11 @@ impl SpawnConfig {
                 // a block should be produced (on average) every slot
                 active_slot_coeff: 0.9,
             },
-            n_executors: number_of_executors,
             da,
         }
     }
 
-    pub fn star_happy(n_participants: usize, number_of_executors: usize, da: DaConfig) -> Self {
+    pub fn star_happy(n_participants: usize, da: DaConfig) -> Self {
         Self::Star {
             consensus: ConsensusConfig {
                 n_participants,
@@ -120,14 +137,16 @@ impl SpawnConfig {
                 // a block should be produced (on average) every slot
                 active_slot_coeff: 0.9,
             },
-            n_executors: number_of_executors,
             da,
         }
     }
 }
 
-fn node_address_from_port(port: u16) -> Multiaddr {
-    Swarm::multiaddr(std::net::Ipv4Addr::new(127, 0, 0, 1), port)
+fn node_address(config: &ExecutorConfig) -> Multiaddr {
+    Swarm::multiaddr(
+        std::net::Ipv4Addr::new(127, 0, 0, 1),
+        config.network.backend.inner.port,
+    )
 }
 
 #[derive(Clone)]
