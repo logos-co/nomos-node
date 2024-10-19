@@ -9,9 +9,7 @@ use std::time::Duration;
 use std::{fmt::Debug, sync::Mutex};
 
 //crates
-use nomos_executor::config::Config as ExecutorConfig;
 use nomos_libp2p::{Multiaddr, Swarm};
-use nomos_node::Config as ValidatorConfig;
 use rand::{thread_rng, Rng};
 
 static NET_PORT: Lazy<Mutex<u16>> = Lazy::new(|| Mutex::new(thread_rng().gen_range(8000..10000)));

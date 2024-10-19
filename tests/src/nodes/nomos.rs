@@ -1,4 +1,3 @@
-use std::fs::File;
 // std
 use std::net::SocketAddr;
 use std::ops::Range;
@@ -11,13 +10,22 @@ use cl::{InputWitness, NoteWitness, NullifierSecret};
 use cryptarchia_consensus::{CryptarchiaInfo, CryptarchiaSettings, TimeConfig};
 use cryptarchia_ledger::LedgerState;
 use kzgrs_backend::dispersal::BlobInfo;
+<<<<<<< HEAD
+=======
+#[cfg(feature = "mixnet")]
+use mixnet::{
+    address::NodeAddress,
+    client::MixClientConfig,
+    node::MixNodeConfig,
+    topology::{MixNodeInfo, MixnetTopology},
+};
+>>>>>>> 6060387c (Clippy happy)
 use nomos_core::{block::Block, header::HeaderId, staking::NMO_UNIT};
 use nomos_da_dispersal::backend::kzgrs::{DispersalKZGRSBackendSettings, EncoderSettings};
 use nomos_da_dispersal::DispersalServiceSettings;
 use nomos_da_indexer::storage::adapters::rocksdb::RocksAdapterSettings as IndexerStorageAdapterSettings;
 use nomos_da_indexer::IndexerSettings;
 use nomos_da_network_service::backends::libp2p::common::DaNetworkBackendSettings;
-use nomos_da_network_service::backends::libp2p::validator::DaNetworkValidatorBackend;
 use nomos_da_network_service::NetworkConfig as DaNetworkConfig;
 use nomos_da_sampling::backend::kzgrs::KzgrsSamplingBackendSettings;
 use nomos_da_sampling::storage::adapters::rocksdb::RocksAdapterSettings as SamplingStorageAdapterSettings;
@@ -27,20 +35,23 @@ use nomos_da_verifier::storage::adapters::rocksdb::RocksAdapterSettings as Verif
 use nomos_da_verifier::DaVerifierServiceSettings;
 use nomos_executor::config::Config as ExecutorConfig;
 use nomos_libp2p::{Multiaddr, PeerId, SwarmConfig};
-use nomos_log::{LoggerBackend, LoggerFormat};
+use nomos_log::LoggerBackend;
 use nomos_mempool::MempoolMetrics;
 <<<<<<< HEAD
 =======
 #[cfg(feature = "mixnet")]
 use nomos_network::backends::libp2p::mixnet::MixnetConfig;
+<<<<<<< HEAD
 use nomos_network::backends::NetworkBackend;
 >>>>>>> fb646a0e (Fill in missing gaps in test)
+=======
+>>>>>>> 6060387c (Clippy happy)
 use nomos_network::{backends::libp2p::Libp2pConfig, NetworkConfig};
 use nomos_node::api::backend::AxumBackendSettings;
 use nomos_node::api::paths::{
     CL_METRICS, CRYPTARCHIA_HEADERS, CRYPTARCHIA_INFO, DA_GET_RANGE, STORAGE_BLOCK,
 };
-use nomos_node::{Config as ValidatorConfig, NomosDaMembership, Tx};
+use nomos_node::{Config as ValidatorConfig, Tx};
 use nomos_storage::backends::rocksdb::RocksBackendSettings;
 use once_cell::sync::Lazy;
 use rand::{thread_rng, Rng};
@@ -474,11 +485,7 @@ impl Node for TestNode<ExecutorConfig> {
 
     fn node_configs(config: SpawnConfig) -> Vec<Self::Config> {
         match config {
-            SpawnConfig::Star {
-                consensus,
-                da,
-                n_executors,
-            } => {
+            SpawnConfig::Star { consensus, da, .. } => {
                 let mut configs = Self::create_node_configs(consensus, da);
                 let next_leader_config = configs.remove(0);
                 let first_node_addr =
@@ -494,11 +501,7 @@ impl Node for TestNode<ExecutorConfig> {
                 }
                 node_configs
             }
-            SpawnConfig::Chain {
-                consensus,
-                da,
-                n_executors,
-            } => {
+            SpawnConfig::Chain { consensus, da, .. } => {
                 let mut configs = Self::create_node_configs(consensus, da);
                 let next_leader_config = configs.remove(0);
                 let mut prev_node_addr =
@@ -615,7 +618,7 @@ impl Node for NetworkNode {
         executor_configs.chain(validator_configs).collect()
     }
 
-    fn create_node_configs(consensus: ConsensusConfig, da: DaConfig) -> Vec<Self::Config> {
+    fn create_node_configs(_consensus: ConsensusConfig, _da: DaConfig) -> Vec<Self::Config> {
         unreachable!()
     }
 
