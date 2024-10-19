@@ -1,4 +1,4 @@
-FROM rust:1.80.0-slim-bookworm
+FROM rust:1.82.0-slim-bookworm
 
 LABEL maintainer="augustinas@status.im" \
       source="https://github.com/logos-co/nomos-node" \
