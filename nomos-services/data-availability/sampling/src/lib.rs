@@ -5,6 +5,7 @@ pub mod storage;
 // std
 use std::collections::BTreeSet;
 use std::fmt::Debug;
+use std::time::Duration;
 // crates
 use kzgrs_backend::common::blob::DaBlob;
 use network::NetworkAdapter;
@@ -100,6 +101,7 @@ where
     ) {
         match msg {
             DaSamplingServiceMsg::TriggerSampling { blob_id } => {
+                tokio::time::sleep(Duration::from_secs(1)).await;
                 if let SamplingState::Init(sampling_subnets) = sampler.init_sampling(blob_id).await
                 {
                     if let Err(e) = network_adapter

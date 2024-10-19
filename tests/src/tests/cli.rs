@@ -1,11 +1,15 @@
+use executor_http_client::ExecutorHttpClient;
 use nomos_cli::cmds::disseminate::Disseminate;
 use nomos_cli::da::network::backend::ExecutorBackend;
 use nomos_cli::da::network::backend::ExecutorBackendSettings;
+use nomos_da_dispersal::adapters::mempool::kzgrs;
 use nomos_da_network_service::NetworkConfig;
 use nomos_libp2p::ed25519;
 use nomos_libp2p::libp2p;
 use nomos_libp2p::Multiaddr;
 use nomos_libp2p::PeerId;
+use reqwest::ClientBuilder;
+use reqwest::Url;
 use std::collections::HashMap;
 use std::time::Duration;
 use subnetworks_assignations::versions::v1::FillFromNodeList;
@@ -53,53 +57,23 @@ async fn disseminate(nodes: &Vec<NomosNode>, config: &mut Disseminate) {
     // Nomos Cli is acting as the first node when dispersing the data by using the key associated
     // with that Nomos Node.
     let first_config = nodes[0].config();
-    let node_key = first_config.da_network.backend.node_key.clone();
-    let node_addrs: HashMap<PeerId, Multiaddr> = nodes
-        .iter()
-        .map(|n| {
-            let libp2p_config = &n.config().network.backend.inner;
-            let keypair = libp2p::identity::Keypair::from(ed25519::Keypair::from(
-                libp2p_config.node_key.clone(),
-            ));
-            let peer_id = PeerId::from(keypair.public());
-            let address = n
-                .config()
-                .da_network
-                .backend
-                .listening_address
-                .clone()
-                .with_p2p(peer_id)
-                .unwrap();
-            (peer_id, address)
-        })
-        .collect();
-    let membership = first_config.da_network.backend.membership.clone();
-    let num_subnets = first_config.da_sampling.sampling_settings.num_subnets;
 
-    let da_network_config: NetworkConfig<ExecutorBackend<FillFromNodeList>> = NetworkConfig {
-        backend: ExecutorBackendSettings {
-            node_key,
-            membership,
-            node_addrs,
-            num_subnets,
-        },
-    };
+    let client = ClientBuilder::new()
+        .build()
+        .expect("Client from default settings should be able to build");
 
-    let mut file = NamedTempFile::new().unwrap();
-    let config_path = file.path().to_owned();
-    serde_yaml::to_writer(&mut file, &da_network_config).unwrap();
+    let exec_url = Url::parse(&format!(
+        "http://{}",
+        first_config.http.backend_settings.address
+    ))
+    .unwrap();
+    let client = ExecutorHttpClient::new(client, exec_url);
 
-    config.network_config = config_path;
-    config.node_addr = Some(
-        format!(
-            "http://{}",
-            nodes[0].config().http.backend_settings.address.clone()
-        )
-        .parse()
-        .unwrap(),
-    );
+    let data = [1u8; 31];
 
-    run_disseminate(&config);
+    let app_id = hex::decode(APP_ID).unwrap();
+    let metadata = kzgrs_backend::dispersal::Metadata::new(app_id.try_into().unwrap(), 0u64.into());
+    client.publish_blob(data.to_vec(), metadata).await.unwrap();
 }
 
 #[tokio::test]
@@ -125,8 +99,9 @@ async fn disseminate_and_retrieve() {
     ))
     .await;
 
+    tokio::time::sleep(Duration::from_secs(15)).await;
     disseminate(&nodes, &mut config).await;
-    tokio::time::sleep(Duration::from_secs(10)).await;
+    tokio::time::sleep(Duration::from_secs(20)).await;
 
     let from = 0u64.to_be_bytes();
     let to = 1u64.to_be_bytes();
@@ -151,7 +126,11 @@ async fn disseminate_and_retrieve() {
         .collect();
 
     // Index zero shouldn't be empty, node 2 replicated both blobs to node 1 because they both
-    // are in the same subnetwork.
+    // are in the same subnetwork.)
+    println!(">>> first node: {node1_idx_0_blobs:?}");
+    println!(">>> second node: {node2_idx_0_blobs:?}");
+    assert!(node1_idx_0_blobs.len() == 2);
+    assert!(node2_idx_0_blobs.len() == 2);
     for b in node1_idx_0_blobs.iter() {
         assert!(!b.is_empty())
     }
