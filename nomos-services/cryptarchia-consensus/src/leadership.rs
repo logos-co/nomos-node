@@ -1,14 +1,14 @@
 use cl::{input::InputWitness, note::NoteWitness, nullifier::Nullifier};
 use cryptarchia_engine::Slot;
-use cryptarchia_ledger::{leader_proof::Risc0LeaderProof, Config, EpochState, NoteTree};
 use leader_proof_statements::{LeaderPrivate, LeaderPublic};
 use nomos_core::header::HeaderId;
+use nomos_ledger::{leader_proof::Risc0LeaderProof, Config, EpochState, NoteTree};
 use std::collections::HashMap;
 
 pub struct Leader {
     // for each block, the indexes in the note tree of the notes we control
     notes: HashMap<HeaderId, Vec<InputWitness>>,
-    config: cryptarchia_ledger::Config,
+    config: nomos_ledger::Config,
 }
 
 impl Leader {

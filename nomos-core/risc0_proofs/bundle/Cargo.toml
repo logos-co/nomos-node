@@ -1,0 +1,17 @@
+[package]
+name = "bundle"
+version = "0.1.0"
+edition = "2021"
+
+[workspace]
+
+[dependencies]
+risc0-zkvm = { version = "1.0", default-features = false, features = ['std'] }
+serde = { version = "1.0", features = ["derive"] }
+cl = { path = "../../cl" }
+nomos_proof_statements = { path = "../../proof_statements" }
+
+
+[patch.crates-io]
+# add RISC Zero accelerator support for all downstream usages of the following crates.
+sha2 = { git = "https://github.com/risc0/RustCrypto-hashes", tag = "sha2-v0.10.8-risczero.0" }

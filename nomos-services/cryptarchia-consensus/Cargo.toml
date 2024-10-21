@@ -10,15 +10,15 @@ async-trait = "0.1"
 bytes = "1.3"
 chrono = "0.4"
 cryptarchia-engine = { path = "../../consensus/cryptarchia-engine", features = ["serde"] }
-cryptarchia-ledger = { path = "../../ledger/cryptarchia-ledger", features = ["serde", "risc0_proof", "prove"] }
+nomos-ledger = { path = "../../ledger/nomos-ledger", features = ["serde", "risc0_proof", "prove"] }
 leader_proof_statements = { path = "../../proof_of_leadership/proof_statements" }
-cl = { path = "../../cl/cl" }
+cl = { path = "../../nomos-core/cl" }
 futures = "0.3"
 nomos-da-sampling = { path = "../data-availability/sampling" }
 nomos-network = { path = "../network" }
 nomos-mix-service = { path = "../mix" }
 nomos-mempool = { path = "../mempool" }
-nomos-core = { path = "../../nomos-core" }
+nomos-core = { path = "../../nomos-core/chain-defs" }
 overwatch-rs = { git = "https://github.com/logos-co/Overwatch", rev = "2f70806" }
 nomos-storage = { path = "../storage" }
 rand_chacha = "0.3"

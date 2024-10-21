@@ -9,7 +9,7 @@ edition = "2021"
 async-trait = "0.1"
 bytes = "1.2"
 futures = "0.3"
-nomos-core = { path = "../../../nomos-core" }
+nomos-core = { path = "../../../nomos-core/chain-defs" }
 nomos-da-storage = { path = "../../../nomos-da/storage" }
 nomos-da-sampling = { path = "../sampling" }
 nomos-storage = { path = "../../../nomos-services/storage" }

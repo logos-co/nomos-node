@@ -11,7 +11,6 @@ use std::{
 use bytes::Bytes;
 use cl::{InputWitness, NoteWitness, NullifierSecret};
 use cryptarchia_consensus::{ConsensusMsg, TimeConfig};
-use cryptarchia_ledger::LedgerState;
 use kzgrs_backend::{
     common::blob::DaBlob,
     dispersal::{BlobInfo, Metadata},
@@ -22,6 +21,7 @@ use nomos_core::{da::blob::metadata::Metadata as _, staking::NMO_UNIT};
 use nomos_da_storage::rocksdb::DA_VERIFIED_KEY_PREFIX;
 use nomos_da_storage::{fs::write_blob, rocksdb::key_bytes};
 use nomos_da_verifier::backend::kzgrs::KzgrsDaVerifierSettings;
+use nomos_ledger::LedgerState;
 use nomos_libp2p::{Multiaddr, SwarmConfig};
 use nomos_node::Wire;
 use nomos_storage::{
@@ -68,7 +68,7 @@ fn test_indexer() {
         notes.iter().map(|n| n.note_commitment()),
         (ids.len() as u32).into(),
     );
-    let ledger_config = cryptarchia_ledger::Config {
+    let ledger_config = nomos_ledger::Config {
         epoch_stake_distribution_stabilization: 3,
         epoch_period_nonce_buffer: 3,
         epoch_period_nonce_stabilization: 4,

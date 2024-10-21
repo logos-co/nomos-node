@@ -1,6 +1,7 @@
 [workspace]
 members = [
-    "nomos-core",
+    "nomos-core/chain-defs",
+    "nomos-core/cl",
     "nomos-da/kzgrs",
     "nomos-da/kzgrs-backend",
     "nomos-da/storage",
@@ -33,12 +34,12 @@ members = [
     "nodes/nomos-executor",
     "consensus/carnot-engine",
     "consensus/cryptarchia-engine",
-    "ledger/cryptarchia-ledger",
-    "cl/cl",
+    "ledger/nomos-ledger",
+    "nomos-core/cl",
     "proof_of_leadership/proof_statements",
     "testnet/cfgsync",
     "tests",
     "clients/executor-http-client",
 ]
-exclude = ["proof_of_leadership/risc0/risc0_proofs"]
+exclude = ["proof_of_leadership/risc0/risc0_proofs", "nomos-core/risc0_proofs"]
 resolver = "2"

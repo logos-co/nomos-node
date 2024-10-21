@@ -3,8 +3,8 @@ use std::time::Duration;
 
 use cl::{InputWitness, NoteWitness, NullifierSecret};
 use cryptarchia_consensus::TimeConfig;
-use cryptarchia_ledger::LedgerState;
 use nomos_core::staking::NMO_UNIT;
+use nomos_ledger::LedgerState;
 use rand::thread_rng;
 use time::OffsetDateTime;
 
@@ -37,7 +37,7 @@ impl ConsensusParams {
 #[derive(Clone)]
 pub struct GeneralConsensusConfig {
     pub notes: Vec<InputWitness>,
-    pub ledger_config: cryptarchia_ledger::Config,
+    pub ledger_config: nomos_ledger::Config,
     pub genesis_state: LedgerState,
     pub time: TimeConfig,
 }
@@ -63,7 +63,7 @@ pub fn create_consensus_configs(
         notes.iter().map(|n| n.note_commitment()),
         (ids.len() as u32).into(),
     );
-    let ledger_config = cryptarchia_ledger::Config {
+    let ledger_config = nomos_ledger::Config {
         epoch_stake_distribution_stabilization: 3,
         epoch_period_nonce_buffer: 3,
         epoch_period_nonce_stabilization: 4,
