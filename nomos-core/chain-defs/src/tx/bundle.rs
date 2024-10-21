@@ -38,7 +38,7 @@ impl Bundle {
         let start_t = std::time::Instant::now();
 
         let opts = risc0_zkvm::ProverOpts::groth16();
-        let prove_info = prover.prove_with_opts(env, nomos_cl_risc0_proofs::BUNDLE_ELF, &opts)?;
+        let prove_info = prover.prove_with_opts(env, nomos_risc0_proofs::BUNDLE_ELF, &opts)?;
 
         tracing::trace!(
             "STARK 'bundle' prover time: {:.2?}, total_cycles: {}",
@@ -81,7 +81,7 @@ impl<'de> Deserialize<'de> for Bundle {
         let (bundle, proof) = <(cl::Bundle, risc0_zkvm::Receipt)>::deserialize(deserializer)?;
 
         proof
-            .verify(nomos_cl_risc0_proofs::BUNDLE_ID)
+            .verify(nomos_risc0_proofs::BUNDLE_ID)
             .map_err(D::Error::custom)?;
 
         let bundle_public: BundlePublic = proof.journal.decode().map_err(D::Error::custom)?;

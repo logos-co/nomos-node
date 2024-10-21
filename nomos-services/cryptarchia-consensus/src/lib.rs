@@ -12,7 +12,7 @@ use network::NetworkAdapter;
 use nomos_core::da::blob::{
     info::DispersedBlobInfo, metadata::Metadata as BlobMetadata, BlobSelect,
 };
-use nomos_core::header::{Header, HeaderId};
+use nomos_core::header::{leader_proof::Risc0LeaderProof, Header, HeaderId};
 use nomos_core::tx::{Transaction, TxSelect};
 use nomos_core::{
     block::{builder::BlockBuilder, Block},
@@ -20,10 +20,7 @@ use nomos_core::{
 };
 use nomos_da_sampling::backend::DaSamplingServiceBackend;
 use nomos_da_sampling::{DaSamplingService, DaSamplingServiceMsg};
-use nomos_ledger::{
-    leader_proof::{LeaderProof, Risc0LeaderProof},
-    LedgerState,
-};
+use nomos_ledger::{leader_proof::LeaderProof, LedgerState};
 use nomos_mempool::{
     backend::MemPool, network::NetworkAdapter as MempoolAdapter, DaMempoolService, MempoolMsg,
     TxMempoolService,

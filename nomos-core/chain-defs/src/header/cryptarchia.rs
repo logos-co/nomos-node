@@ -1,20 +1,10 @@
-// std
-// crates
-use blake2::Digest;
-use serde::{Deserialize, Serialize};
-// internal
+use super::leader_proof::Risc0LeaderProof;
+use super::{ContentId, HeaderId};
 use crate::crypto::Blake2b;
-use crate::utils::{display_hex_bytes_newtype, serde_bytes_newtype};
+use blake2::Digest;
 use cryptarchia_engine::Slot;
-use leader_proof::Risc0LeaderProof;
 use nomos_ledger::leader_proof::LeaderProof;
-
-pub mod leader_proof;
-#[derive(Clone, Debug, Eq, PartialEq, Copy, Hash, PartialOrd, Ord)]
-pub struct HeaderId([u8; 32]);
-
-#[derive(Clone, Debug, Eq, PartialEq, Copy, Hash)]
-pub struct ContentId([u8; 32]);
+use serde::{Deserialize, Serialize};
 
 #[allow(dead_code)]
 #[derive(Clone, Debug, Eq, PartialEq, Copy)]
@@ -126,43 +116,4 @@ impl Builder {
             orphaned_leader_proofs: self.orphaned_leader_proofs,
         }
     }
-}
-
-impl From<[u8; 32]> for HeaderId {
-    fn from(id: [u8; 32]) -> Self {
-        Self(id)
-    }
-}
-
-impl From<HeaderId> for [u8; 32] {
-    fn from(id: HeaderId) -> Self {
-        id.0
-    }
-}
-
-impl From<[u8; 32]> for ContentId {
-    fn from(id: [u8; 32]) -> Self {
-        Self(id)
-    }
-}
-
-impl From<ContentId> for [u8; 32] {
-    fn from(id: ContentId) -> Self {
-        id.0
-    }
-}
-
-display_hex_bytes_newtype!(HeaderId);
-display_hex_bytes_newtype!(ContentId);
-
-serde_bytes_newtype!(HeaderId, 32);
-serde_bytes_newtype!(ContentId, 32);
-
-#[test]
-fn test_serde() {
-    assert_eq!(
-        crate::wire::deserialize::<HeaderId>(&crate::wire::serialize(&HeaderId([0; 32])).unwrap())
-            .unwrap(),
-        HeaderId([0; 32])
-    );
 }

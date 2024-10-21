@@ -1,7 +1,7 @@
 use cl::balance::Unit;
 /// Proof of Leadership
 use cl::merkle;
-use leader_proof_statements::{LeaderPrivate, LeaderPublic};
+use nomos_proof_statements::leadership::{LeaderPrivate, LeaderPublic};
 use risc0_zkvm::guest::env;
 
 // derive-unit(NOMOS_NMO)
