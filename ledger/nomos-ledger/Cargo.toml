@@ -14,9 +14,7 @@ serde = { version = "1.0", features = ["derive"], optional = true }
 cryptarchia-engine = { path = "../../consensus/cryptarchia-engine" }
 cl = { path = "../../nomos-core/cl" }
 risc0-zkvm = { version = "1.1", optional = true }
-leader_proof_statements = { path = "../../proof_of_leadership/proof_statements" }
-nomos_pol_risc0_proofs = { path = "../../proof_of_leadership/risc0/risc0_proofs", optional = true }
-nomos_pol_prover = { path = "../../proof_of_leadership/risc0/prover", optional = true }
+nomos_proof_statements = { path = "../../nomos-core/proof_statements" }
 rand = "0.8.5"
 rand_core = "0.6.0"
 sha2 = "0.10"
@@ -25,5 +23,3 @@ nomos-utils = { path = "../../nomos-utils", optional = true }
 
 [features]
 serde = ["dep:serde", "nomos-utils/serde", "rpds/serde"]
-risc0_proof = ["risc0-zkvm", "nomos_pol_risc0_proofs"]
-prove = ["nomos_pol_prover"]

@@ -4,9 +4,10 @@ use blake2::Digest;
 use serde::{Deserialize, Serialize};
 // internal
 use crate::crypto::Blake2b;
+use crate::proofs::leader_proof::Risc0LeaderProof;
 use crate::utils::{display_hex_bytes_newtype, serde_bytes_newtype};
 use cryptarchia_engine::Slot;
-use nomos_ledger::leader_proof::{LeaderProof, Risc0LeaderProof};
+use nomos_ledger::leader_proof::LeaderProof;
 
 #[derive(Clone, Debug, Eq, PartialEq, Copy, Hash, PartialOrd, Ord)]
 pub struct HeaderId([u8; 32]);

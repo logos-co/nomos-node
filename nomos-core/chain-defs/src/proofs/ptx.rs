@@ -32,7 +32,7 @@ impl PtxProof {
         let start_t = std::time::Instant::now();
 
         let opts = risc0_zkvm::ProverOpts::groth16();
-        let prove_info = prover.prove_with_opts(env, nomos_cl_risc0_proofs::PTX_ELF, &opts)?;
+        let prove_info = prover.prove_with_opts(env, nomos_risc0_proofs::PTX_ELF, &opts)?;
 
         tracing::trace!(
             "STARK 'ptx' prover time: {:.2?}, total_cycles: {}",
@@ -62,7 +62,7 @@ impl<'de> Deserialize<'de> for PtxProof {
     {
         let proof = risc0_zkvm::Receipt::deserialize(deserializer)?;
         proof
-            .verify(nomos_cl_risc0_proofs::PTX_ID)
+            .verify(nomos_risc0_proofs::PTX_ID)
             .map_err(serde::de::Error::custom)?;
 
         Ok(Self { proof })
