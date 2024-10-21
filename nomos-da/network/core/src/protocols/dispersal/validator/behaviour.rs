@@ -152,9 +152,7 @@ impl<M: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'static> Netw
 mod tests {
     use super::*;
     use crate::address_book::AddressBook;
-    use crate::protocols::dispersal::executor::behaviour::{
-        DispersalExecutorBehaviour,
-    };
+    use crate::protocols::dispersal::executor::behaviour::DispersalExecutorBehaviour;
     use crate::protocols::replication::handler::DaMessage;
     use futures::task::ArcWake;
     use libp2p::identity::Keypair;
