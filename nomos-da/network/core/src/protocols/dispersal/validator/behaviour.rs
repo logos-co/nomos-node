@@ -151,14 +151,14 @@ impl<M: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'static> Netw
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::address_book::AddressBook;
     use crate::protocols::dispersal::executor::behaviour::{
-        DispersalError, DispersalExecutorBehaviour,
+        DispersalExecutorBehaviour,
     };
     use crate::protocols::replication::handler::DaMessage;
     use futures::task::ArcWake;
     use libp2p::identity::Keypair;
     use libp2p::{identity, quic, PeerId};
-    use libp2p_stream::Control;
     use nomos_da_messages::common::Blob;
     use std::collections::{HashMap, HashSet};
     use std::sync::Arc;
@@ -214,7 +214,9 @@ mod tests {
     }
 
     pub fn executor_swarm(
+        addressbook: AddressBook,
         key: Keypair,
+        peer_id: PeerId,
         membership: impl MembershipHandler<NetworkId = u32, Id = PeerId> + 'static,
     ) -> libp2p::Swarm<
         DispersalExecutorBehaviour<impl MembershipHandler<NetworkId = u32, Id = PeerId>>,
@@ -223,7 +225,9 @@ mod tests {
             .with_tokio()
             .with_other_transport(|keypair| quic::tokio::Transport::new(quic::Config::new(keypair)))
             .unwrap()
-            .with_behaviour(|_key| DispersalExecutorBehaviour::new(membership))
+            .with_behaviour(|_key| {
+                DispersalExecutorBehaviour::new(peer_id, membership, addressbook)
+            })
             .unwrap()
             .with_swarm_config(|cfg| {
                 cfg.with_idle_connection_timeout(std::time::Duration::from_secs(u64::MAX))
@@ -249,29 +253,35 @@ mod tests {
             .build()
     }
 
-    fn create_validation_membership(num_instances: usize, subnet_id: u32) -> Neighbourhood {
-        let mut membership = HashMap::default();
+    fn prepare_swarm_config(num_instances: usize) -> Vec<(Keypair, PeerId, AddressBook)> {
+        let mut configs = Vec::with_capacity(num_instances);
 
-        let mut peer_ids = Vec::new();
         for _ in 0..num_instances {
             let keypair = identity::Keypair::generate_ed25519();
             let peer_id = PeerId::from(keypair.public());
-            peer_ids.push(peer_id);
-        }
 
-        for peer_id in &peer_ids {
-            membership.insert(*peer_id, HashSet::from([subnet_id]));
+            let addr: Multiaddr = "/ip4/127.0.0.1/udp/5063/quic-v1".parse().unwrap();
+            let addressbook = AddressBook::from_iter([(
+                PeerId::from_public_key(&keypair.public()),
+                addr.clone(),
+            )]);
+            configs.push((keypair, peer_id, addressbook));
+        }
+        configs
+    }
+
+    fn create_membership(
+        num_instances: usize,
+        subnet_id: u32,
+        peer_ids: &[PeerId],
+    ) -> Neighbourhood {
+        let mut membership = HashMap::default();
+
+        for i in 0..num_instances {
+            membership.insert(peer_ids[i], HashSet::from([subnet_id]));
         }
 
         Neighbourhood { membership }
-    }
-
-    async fn open_stream(peer_id: PeerId, mut control: Control) -> Result<Stream, DispersalError> {
-        let stream = control
-            .open_stream(peer_id, DISPERSAL_PROTOCOL)
-            .await
-            .map_err(|error| DispersalError::OpenStreamError { peer_id, error })?;
-        Ok(stream)
     }
 
     #[test]
@@ -325,22 +335,39 @@ mod tests {
             .compact()
             .with_writer(TestWriter::default())
             .try_init();
-        let k1 = libp2p::identity::Keypair::generate_ed25519();
-        let k2 = libp2p::identity::Keypair::generate_ed25519();
-        let validator_peer = PeerId::from_public_key(&k2.public());
 
         let num_instances = 20;
 
-        let subnet_0_membership = create_validation_membership(num_instances / 2, 0);
-        let subnet_1_membership = create_validation_membership(num_instances / 2, 1);
+        let subnet_0_config = prepare_swarm_config(num_instances / 2);
+        let subnet_0_ids = subnet_0_config
+            .iter()
+            .map(|(_, peer_id, _)| peer_id.clone())
+            .collect::<Vec<_>>();
+        let subnet_1_config = prepare_swarm_config(num_instances / 2);
+        let subnet_1_ids = subnet_1_config
+            .iter()
+            .map(|(_, peer_id, _)| peer_id.clone())
+            .collect::<Vec<_>>();
+
+        let subnet_0_membership = create_membership(num_instances / 2, 1, &subnet_0_ids);
+        let subnet_1_membership = create_membership(num_instances / 2, 1, &subnet_1_ids);
 
         let mut all_neighbours = subnet_0_membership;
         all_neighbours
             .membership
             .extend(subnet_1_membership.membership);
 
-        let mut executor = executor_swarm(k1, all_neighbours.clone());
-        let mut validator = validator_swarm(k2, all_neighbours);
+        // create swarms
+        let mut executors_swarms: Vec<_> = vec![];
+        let mut validator_swarms: Vec<_> = vec![];
+        for i in 0..num_instances / 2 {
+            let cfg_0 = subnet_0_config[i].clone();
+            let cfg_1 = subnet_1_config[i].clone();
+            let executor = executor_swarm(cfg_0.2, cfg_0.0, cfg_0.1, all_neighbours.clone());
+            let validator = validator_swarm(cfg_1.0, all_neighbours.clone());
+            executors_swarms.push(executor);
+            validator_swarms.push(validator);
+        }
 
         let message = DaMessage {
             blob: Some(Blob {
