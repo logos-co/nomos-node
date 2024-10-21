@@ -8,6 +8,7 @@ cached = "0.53.1"
 futures = "0.3.30"
 futures-timer = "3.0.3"
 libp2p = "0.53"
+libp2p-stream = "0.1.0-alpha"
 tracing = "0.1"
 nomos-mix-message = { path = "../message" }
 nomos-mix-queue = { path = "../queue" }
