@@ -12,7 +12,10 @@ use crate::{
         executor::{create_executor_config, Executor},
         validator::{create_validator_config, Validator},
     },
-    topology::configs::consensus::{create_consensus_configs, ConsensusParams},
+    topology::configs::{
+        consensus::{create_consensus_configs, ConsensusParams},
+        mix::create_mix_configs,
+    },
 };
 
 pub struct TopologyConfig {
@@ -72,6 +75,7 @@ impl Topology {
         let consensus_configs = create_consensus_configs(&ids, config.consensus_params);
         let da_configs = create_da_configs(&ids, config.da_params);
         let network_configs = create_network_configs(&ids, config.network_params);
+        let mix_configs = create_mix_configs(&ids);
 
         let mut validators = Vec::new();
         for i in 0..config.n_validators {
@@ -79,6 +83,7 @@ impl Topology {
                 consensus_config: consensus_configs[i].to_owned(),
                 da_config: da_configs[i].to_owned(),
                 network_config: network_configs[i].to_owned(),
+                mix_config: mix_configs[i].to_owned(),
             });
             validators.push(Validator::spawn(config).await)
         }
@@ -89,6 +94,7 @@ impl Topology {
                 consensus_config: consensus_configs[i].to_owned(),
                 da_config: da_configs[i].to_owned(),
                 network_config: network_configs[i].to_owned(),
+                mix_config: mix_configs[i].to_owned(),
             });
             executors.push(Executor::spawn(config).await)
         }

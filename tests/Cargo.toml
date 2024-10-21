@@ -10,6 +10,7 @@ executor-http-client = { path = "../clients/executor-http-client" }
 nomos-node = { path = "../nodes/nomos-node", default-features = false }
 nomos-executor = { path = "../nodes/nomos-executor", default-features = false }
 nomos-network = { path = "../nomos-services/network", features = ["libp2p"] }
+nomos-mix-service = { path = "../nomos-services/mix", features = ["libp2p"] }
 cryptarchia-consensus = { path = "../nomos-services/cryptarchia-consensus" }
 nomos-log = { path = "../nomos-services/log" }
 nomos-api = { path = "../nomos-services/api" }

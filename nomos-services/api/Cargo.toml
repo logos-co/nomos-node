@@ -16,6 +16,7 @@ tracing = "0.1"
 nomos-core = { path = "../../nomos-core" }
 cryptarchia-consensus = { path = "../cryptarchia-consensus" }
 nomos-network = { path = "../../nomos-services/network" }
+nomos-mix-service = { path = "../../nomos-services/mix", features = ["libp2p"] }
 nomos-mempool = { path = "../../nomos-services/mempool", features = [
     "mock",
     "libp2p",

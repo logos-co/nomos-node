@@ -233,6 +233,9 @@ pub fn create_validator_config(config: GeneralConfig) -> Config {
                 initial_peers: config.network_config.initial_peers,
             },
         },
+        mix: nomos_mix_service::MixConfig {
+            backend: config.mix_config.backend,
+        },
         cryptarchia: CryptarchiaSettings {
             notes: config.consensus_config.notes,
             config: config.consensus_config.ledger_config,
@@ -240,6 +243,17 @@ pub fn create_validator_config(config: GeneralConfig) -> Config {
             time: config.consensus_config.time,
             transaction_selector_settings: (),
             blob_selector_settings: (),
+            network_adapter_settings:
+                cryptarchia_consensus::network::adapters::libp2p::LibP2pAdapterSettings {
+                    topic: String::from(nomos_node::CONSENSUS_TOPIC),
+                },
+            mix_adapter_settings:
+                cryptarchia_consensus::mix::adapters::libp2p::LibP2pAdapterSettings {
+                    broadcast_settings:
+                        nomos_mix_service::network::libp2p::Libp2pBroadcastSettings {
+                            topic: String::from(nomos_node::CONSENSUS_TOPIC),
+                        },
+                },
         },
         da_network: DaNetworkConfig {
             backend: DaNetworkBackendSettings {

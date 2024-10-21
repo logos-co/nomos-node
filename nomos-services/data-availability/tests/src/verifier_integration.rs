@@ -71,6 +71,10 @@ fn test_verifier() {
         port: 7774,
         ..Default::default()
     };
+    let mix_configs = new_mix_configs(vec![
+        Multiaddr::from_str("/ip4/127.0.0.1/udp/7783/quic-v1").unwrap(),
+        Multiaddr::from_str("/ip4/127.0.0.1/udp/7784/quic-v1").unwrap(),
+    ]);
 
     let blobs_dir = TempDir::new().unwrap().path().to_path_buf();
 
@@ -97,6 +101,7 @@ fn test_verifier() {
         &genesis_state,
         &time_config,
         &swarm_config1,
+        &mix_configs[0],
         NamedTempFile::new().unwrap().path().to_path_buf(),
         &blobs_dir,
         vec![node_address(&swarm_config2)],
@@ -121,6 +126,7 @@ fn test_verifier() {
         &genesis_state,
         &time_config,
         &swarm_config2,
+        &mix_configs[1],
         NamedTempFile::new().unwrap().path().to_path_buf(),
         &blobs_dir,
         vec![node_address(&swarm_config1)],
