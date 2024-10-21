@@ -1,14 +1,18 @@
+// std
+use std::collections::HashMap;
+// crates
+use serde::{Deserialize, Serialize};
+// internal
 use cl::{
     note::NoteWitness,
     nullifier::{Nullifier, NullifierSecret},
     InputWitness,
 };
 use cryptarchia_engine::Slot;
-use leader_proof_statements::{LeaderPrivate, LeaderPublic};
 use nomos_core::header::HeaderId;
-use nomos_ledger::{leader_proof::Risc0LeaderProof, Config, EpochState, NoteTree};
-use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use nomos_core::proofs::leader_proof::Risc0LeaderProof;
+use nomos_ledger::{Config, EpochState, NoteTree};
+use nomos_proof_statements::leadership::{LeaderPrivate, LeaderPublic};
 
 pub struct Leader {
     // for each block, the indexes in the note tree of the notes we control
@@ -101,7 +105,11 @@ impl Leader {
                 );
                 let input = note.clone();
                 let res = tokio::task::spawn_blocking(move || {
-                    Risc0LeaderProof::build(public_inputs, LeaderPrivate { input })
+                    Risc0LeaderProof::prove(
+                        public_inputs,
+                        LeaderPrivate { input },
+                        risc0_zkvm::default_prover().as_ref(),
+                    )
                 })
                 .await;
                 match res {

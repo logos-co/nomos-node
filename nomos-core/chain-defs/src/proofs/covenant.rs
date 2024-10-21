@@ -38,7 +38,7 @@ impl CovenantProof {
     }
 
     pub fn nop_constraint() -> Covenant {
-        risc0_covenant(nomos_cl_risc0_proofs::COVENANT_NOP_ID)
+        risc0_covenant(nomos_risc0_proofs::COVENANT_NOP_ID)
     }
 
     pub fn prove_nop(
@@ -54,7 +54,7 @@ impl CovenantProof {
 
         let opts = risc0_zkvm::ProverOpts::groth16();
         let prove_info =
-            prover.prove_with_opts(env, nomos_cl_risc0_proofs::COVENANT_NOP_ELF, &opts)?;
+            prover.prove_with_opts(env, nomos_risc0_proofs::COVENANT_NOP_ELF, &opts)?;
 
         tracing::trace!(
             "STARK 'constraint-nop' prover time: {:.2?}, total_cycles: {}",
@@ -63,7 +63,7 @@ impl CovenantProof {
         );
 
         Ok(Self {
-            risc0_id: nomos_cl_risc0_proofs::COVENANT_NOP_ID,
+            risc0_id: nomos_risc0_proofs::COVENANT_NOP_ID,
             proof: prove_info.receipt,
         })
     }

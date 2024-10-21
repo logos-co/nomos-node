@@ -7,7 +7,7 @@ use blake2::Digest;
 use cryptarchia_engine::{Epoch, Slot};
 use crypto::Blake2b;
 use leader_proof::OrphanProof;
-use leader_proof_statements::LeaderPublic;
+use nomos_proof_statements::leadership::LeaderPublic;
 use rpds::HashTrieSetSync;
 use std::{collections::HashMap, hash::Hash};
 use thiserror::Error;
