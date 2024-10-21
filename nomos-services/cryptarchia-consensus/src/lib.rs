@@ -1,4 +1,5 @@
 mod leadership;
+mod messages;
 pub mod mix;
 pub mod network;
 mod time;
@@ -11,16 +12,15 @@ use cryptarchia_ledger::{
     LedgerState,
 };
 use futures::StreamExt;
-use network::{messages::NetworkMessage, NetworkAdapter};
+use network::NetworkAdapter;
+use nomos_core::da::blob::{
+    info::DispersedBlobInfo, metadata::Metadata as BlobMetadata, BlobSelect,
+};
 use nomos_core::header::{cryptarchia::Header, HeaderId};
 use nomos_core::tx::{Transaction, TxSelect};
 use nomos_core::{
     block::{builder::BlockBuilder, Block},
     header::cryptarchia::Builder,
-};
-use nomos_core::{
-    da::blob::{info::DispersedBlobInfo, metadata::Metadata as BlobMetadata, BlobSelect},
-    wire,
 };
 use nomos_da_sampling::backend::DaSamplingServiceBackend;
 use nomos_da_sampling::{DaSamplingService, DaSamplingServiceMsg};
@@ -122,7 +122,7 @@ impl Cryptarchia {
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
-pub struct CryptarchiaSettings<Ts, Bs> {
+pub struct CryptarchiaSettings<Ts, Bs, NetworkAdapterSettings, MixAdapterSettings> {
     #[serde(default)]
     pub transaction_selector_settings: Ts,
     #[serde(default)]
@@ -131,27 +131,8 @@ pub struct CryptarchiaSettings<Ts, Bs> {
     pub genesis_state: LedgerState,
     pub time: TimeConfig,
     pub notes: Vec<InputWitness>,
-}
-
-impl<Ts, Bs> CryptarchiaSettings<Ts, Bs> {
-    #[inline]
-    pub const fn new(
-        transaction_selector_settings: Ts,
-        blob_selector_settings: Bs,
-        config: cryptarchia_ledger::Config,
-        genesis_state: LedgerState,
-        time: TimeConfig,
-        notes: Vec<InputWitness>,
-    ) -> Self {
-        Self {
-            transaction_selector_settings,
-            blob_selector_settings,
-            config,
-            genesis_state,
-            time,
-            notes,
-        }
-    }
+    pub network_adapter_settings: NetworkAdapterSettings,
+    pub mix_adapter_settings: MixAdapterSettings,
 }
 
 pub struct CryptarchiaConsensus<
@@ -196,7 +177,7 @@ pub struct CryptarchiaConsensus<
     // underlying networking backend. We need this so we can relay and check the types properly
     // when implementing ServiceCore for CryptarchiaConsensus
     network_relay: Relay<NetworkService<A::Backend>>,
-    mix_relay: Relay<nomos_mix_service::MixService<MixAdapter::Backend>>,
+    mix_relay: Relay<nomos_mix_service::MixService<MixAdapter::Backend, MixAdapter::Network>>,
     cl_mempool_relay: Relay<TxMempoolService<ClPoolAdapter, ClPool>>,
     da_mempool_relay: Relay<
         DaMempoolService<
@@ -269,7 +250,8 @@ where
     SamplingStorage: nomos_da_sampling::storage::DaStorageAdapter,
 {
     const SERVICE_ID: ServiceId = CRYPTARCHIA_ID;
-    type Settings = CryptarchiaSettings<TxS::Settings, BS::Settings>;
+    type Settings =
+        CryptarchiaSettings<TxS::Settings, BS::Settings, A::Settings, MixAdapter::Settings>;
     type State = NoState<Self::Settings>;
     type StateOperator = NoOperator<Self::State>;
     type Message = ConsensusMsg<Block<ClPool::Item, DaPool::Item>>;
@@ -312,7 +294,13 @@ where
         + Send
         + Sync
         + 'static,
-    MixAdapter: mix::MixAdapter + Clone + Send + Sync + 'static,
+    A::Settings: Send + Sync + 'static,
+    MixAdapter: mix::MixAdapter<Tx = ClPool::Item, BlobCertificate = DaPool::Item>
+        + Clone
+        + Send
+        + Sync
+        + 'static,
+    MixAdapter::Settings: Send + Sync + 'static,
     ClPool: MemPool<BlockId = HeaderId> + Send + Sync + 'static,
     ClPool::Settings: Send + Sync + 'static,
     DaPool: MemPool<BlockId = HeaderId, Key = SamplingBackend::BlobId> + Send + Sync + 'static,
@@ -422,6 +410,8 @@ where
             blob_selector_settings,
             time,
             notes,
+            network_adapter_settings,
+            mix_adapter_settings,
         } = self.service_state.settings_reader.get_updated_settings();
 
         let genesis_id = HeaderId::from([0; 32]);
@@ -437,7 +427,7 @@ where
             ),
         };
 
-        let network_adapter = A::new(network_relay).await;
+        let network_adapter = A::new(network_adapter_settings, network_relay).await;
         let tx_selector = TxS::new(transaction_selector_settings);
         let blob_selector = BS::new(blob_selector_settings);
 
@@ -447,8 +437,7 @@ where
 
         let mut slot_timer = IntervalStream::new(timer.slot_interval());
 
-        let mix_adapter = MixAdapter::new(mix_relay).await;
-        let mut incoming_mixed_msgs = mix_adapter.mixed_messages_stream().await?;
+        let mix_adapter = MixAdapter::new(mix_adapter_settings, mix_relay).await;
 
         let mut lifecycle_stream = self.service_state.lifecycle_handle.message_stream();
 
@@ -467,17 +456,6 @@ where
                             &mut self.block_subscription_sender
                         )
                         .await;
-                    }
-
-                    Some(mixed_msg) = incoming_mixed_msgs.next() => {
-                        match wire::deserialize::<Block<ClPool::Item, DaPool::Item>>(&mixed_msg) {
-                            Ok(block) => {
-                                network_adapter.broadcast(NetworkMessage::Block(block)).await;
-                            },
-                            Err(e) => {
-                                tracing::error!("Error deserializing mixed message: {e}");
-                            },
-                        }
                     }
 
                     _ = slot_timer.next() => {
@@ -505,8 +483,7 @@ where
                             ).await;
 
                             if let Some(block) = block {
-                                let msg = wire::serialize(&block).unwrap();
-                                mix_adapter.mix(msg).await;
+                                mix_adapter.mix(block).await;
                             }
                         }
                     }

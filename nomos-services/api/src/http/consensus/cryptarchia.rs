@@ -24,6 +24,7 @@ use nomos_da_sampling::backend::DaSamplingServiceBackend;
 use nomos_mempool::{
     backend::mockpool::MockPool, network::adapters::libp2p::Libp2pAdapter as MempoolNetworkAdapter,
 };
+use nomos_mix_service::network::libp2p::Libp2pAdapter as MixNetworkAdapter;
 use nomos_storage::backends::{rocksdb::RocksBackend, StorageSerde};
 
 pub type Cryptarchia<
@@ -36,7 +37,7 @@ pub type Cryptarchia<
     const SIZE: usize,
 > = CryptarchiaConsensus<
     ConsensusNetworkAdapter<Tx, BlobInfo>,
-    MixAdapter,
+    MixAdapter<MixNetworkAdapter, Tx, BlobInfo>,
     MockPool<HeaderId, Tx, <Tx as Transaction>::Hash>,
     MempoolNetworkAdapter<Tx, <Tx as Transaction>::Hash>,
     MockPool<HeaderId, BlobInfo, <BlobInfo as blob::info::DispersedBlobInfo>::BlobId>,

@@ -19,6 +19,7 @@ use nomos_da_verifier::backend::kzgrs::KzgrsDaVerifier;
 use nomos_da_verifier::network::adapters::executor::Libp2pAdapter as VerifierNetworkAdapter;
 use nomos_mempool::backend::mockpool::MockPool;
 use nomos_mix_service::backends::libp2p::Libp2pMixBackend as MixBackend;
+use nomos_mix_service::network::libp2p::Libp2pAdapter as MixNetworkAdapter;
 use nomos_mix_service::MixService;
 use nomos_node::*;
 use overwatch_derive::Services;
@@ -79,7 +80,7 @@ pub struct NomosExecutor {
     #[cfg(feature = "tracing")]
     logging: ServiceHandle<Logger>,
     network: ServiceHandle<NetworkService<NetworkBackend>>,
-    mix: ServiceHandle<MixService<MixBackend>>,
+    mix: ServiceHandle<MixService<MixBackend, MixNetworkAdapter>>,
     da_dispersal: ServiceHandle<DaDispersal>,
     da_indexer: ServiceHandle<ExecutorDaIndexer>,
     da_verifier: ServiceHandle<ExecutorDaVerifier>,
