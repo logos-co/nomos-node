@@ -11,7 +11,7 @@ futures = "0.3"
 hex = "0.4.3"
 kzgrs-backend = { path = "../../../nomos-da/kzgrs-backend" }
 libp2p = { version = "0.54", features = ["ed25519"] }
-nomos-core = { path = "../../../nomos-core" }
+nomos-core = { path = "../../../nomos-core/chain-defs" }
 nomos-da-storage = { path = "../../../nomos-da/storage" }
 nomos-da-network-core = { path = "../../../nomos-da/network/core" }
 nomos-da-network-service = { path = "../../../nomos-services/data-availability/network" }

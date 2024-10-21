@@ -7,10 +7,6 @@ mod time;
 use cl::InputWitness;
 use core::fmt::Debug;
 use cryptarchia_engine::Slot;
-use cryptarchia_ledger::{
-    leader_proof::{LeaderProof, Risc0LeaderProof},
-    LedgerState,
-};
 use futures::StreamExt;
 use network::NetworkAdapter;
 use nomos_core::da::blob::{
@@ -24,6 +20,10 @@ use nomos_core::{
 };
 use nomos_da_sampling::backend::DaSamplingServiceBackend;
 use nomos_da_sampling::{DaSamplingService, DaSamplingServiceMsg};
+use nomos_ledger::{
+    leader_proof::{LeaderProof, Risc0LeaderProof},
+    LedgerState,
+};
 use nomos_mempool::{
     backend::MemPool, network::NetworkAdapter as MempoolAdapter, DaMempoolService, MempoolMsg,
     TxMempoolService,
@@ -61,13 +61,13 @@ const CRYPTARCHIA_ID: ServiceId = "Cryptarchia";
 #[derive(Debug, Clone, Error)]
 pub enum Error {
     #[error("Ledger error: {0}")]
-    Ledger(#[from] cryptarchia_ledger::LedgerError<HeaderId>),
+    Ledger(#[from] nomos_ledger::LedgerError<HeaderId>),
     #[error("Consensus error: {0}")]
     Consensus(#[from] cryptarchia_engine::Error<HeaderId>),
 }
 
 struct Cryptarchia {
-    ledger: cryptarchia_ledger::Ledger<HeaderId>,
+    ledger: nomos_ledger::Ledger<HeaderId>,
     consensus: cryptarchia_engine::Cryptarchia<HeaderId>,
 }
 
@@ -107,7 +107,7 @@ impl Cryptarchia {
         Ok(Self { ledger, consensus })
     }
 
-    fn epoch_state_for_slot(&self, slot: Slot) -> Option<&cryptarchia_ledger::EpochState> {
+    fn epoch_state_for_slot(&self, slot: Slot) -> Option<&nomos_ledger::EpochState> {
         let tip = self.tip();
         let state = self.ledger.state(&tip).expect("no state for tip");
         let requested_epoch = self.ledger.config().epoch(slot);
@@ -127,7 +127,7 @@ pub struct CryptarchiaSettings<Ts, Bs, NetworkAdapterSettings, MixAdapterSetting
     pub transaction_selector_settings: Ts,
     #[serde(default)]
     pub blob_selector_settings: Bs,
-    pub config: cryptarchia_ledger::Config,
+    pub config: nomos_ledger::Config,
     pub genesis_state: LedgerState,
     pub time: TimeConfig,
     pub notes: Vec<InputWitness>,
@@ -420,7 +420,7 @@ where
                 genesis_id,
                 config.consensus_config.clone(),
             ),
-            ledger: <cryptarchia_ledger::Ledger<_>>::from_genesis(
+            ledger: <nomos_ledger::Ledger<_>>::from_genesis(
                 genesis_id,
                 genesis_state,
                 config.clone(),
@@ -731,7 +731,7 @@ where
 
                 cryptarchia = new_state;
             }
-            Err(Error::Ledger(cryptarchia_ledger::LedgerError::ParentNotFound(parent)))
+            Err(Error::Ledger(nomos_ledger::LedgerError::ParentNotFound(parent)))
             | Err(Error::Consensus(cryptarchia_engine::Error::ParentMissing(parent))) => {
                 tracing::debug!("missing parent {:?}", parent);
                 // TODO: request parent block
@@ -769,14 +769,16 @@ where
         let blobs_ids = get_sampled_blobs(sampling_relay);
         match futures::join!(cl_txs, da_certs, blobs_ids) {
             (Ok(cl_txs), Ok(da_blobs_info), Ok(blobs_ids)) => {
-                let Ok(block) = BlockBuilder::new(tx_selector, blob_selector)
-                    .with_cryptarchia_builder(Builder::new(parent, slot, proof))
-                    .with_transactions(cl_txs)
-                    .with_blobs_info(
-                        da_blobs_info.filter(move |info| blobs_ids.contains(&info.blob_id())),
-                    )
-                    .build()
-                else {
+                let Ok(block) = BlockBuilder::new(
+                    tx_selector,
+                    blob_selector,
+                    Builder::new(parent, slot, proof),
+                )
+                .with_transactions(cl_txs)
+                .with_blobs_info(
+                    da_blobs_info.filter(move |info| blobs_ids.contains(&info.blob_id())),
+                )
+                .build() else {
                     panic!("Proposal block should always succeed to be built")
                 };
                 tracing::debug!("proposed block with id {:?}", block.header().id());
