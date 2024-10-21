@@ -12,11 +12,11 @@ use network::NetworkAdapter;
 use nomos_core::da::blob::{
     info::DispersedBlobInfo, metadata::Metadata as BlobMetadata, BlobSelect,
 };
-use nomos_core::header::{cryptarchia::Header, HeaderId};
+use nomos_core::header::{Header, HeaderId};
 use nomos_core::tx::{Transaction, TxSelect};
 use nomos_core::{
     block::{builder::BlockBuilder, Block},
-    header::cryptarchia::Builder,
+    header::Builder,
 };
 use nomos_da_sampling::backend::DaSamplingServiceBackend;
 use nomos_da_sampling::{DaSamplingService, DaSamplingServiceMsg};
@@ -680,7 +680,7 @@ where
 
         // TODO: filter on time?
 
-        let header = block.header().cryptarchia();
+        let header = block.header();
         let id = header.id();
         let sampled_blobs = match get_sampled_blobs(sampling_relay.clone()).await {
             Ok(sampled_blobs) => sampled_blobs,

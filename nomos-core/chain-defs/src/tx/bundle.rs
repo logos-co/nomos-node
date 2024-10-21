@@ -32,17 +32,13 @@ impl Bundle {
         };
 
         let env = risc0_zkvm::ExecutorEnv::builder()
-            .write(&bundle_private)
-            .unwrap()
-            .build()
-            .unwrap();
+            .write(&bundle_private)?
+            .build()?;
 
         let start_t = std::time::Instant::now();
 
         let opts = risc0_zkvm::ProverOpts::groth16();
-        let prove_info = prover
-            .prove_with_opts(env, nomos_cl_risc0_proofs::BUNDLE_ELF, &opts)
-            .map_err(Error::Risc0ProofFailed)?;
+        let prove_info = prover.prove_with_opts(env, nomos_cl_risc0_proofs::BUNDLE_ELF, &opts)?;
 
         tracing::trace!(
             "STARK 'bundle' prover time: {:.2?}, total_cycles: {}",

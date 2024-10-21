@@ -7,7 +7,7 @@ use bytes::Bytes;
 use thiserror::Error;
 // internal
 
-mod bundle;
+pub mod bundle;
 #[cfg(feature = "mock")]
 pub mod mock;
 pub mod select;
@@ -52,5 +52,5 @@ impl Transaction for Tx {
 #[derive(Debug, Error)]
 pub enum Error {
     #[error("risc0 failed to prove execution of the zkvm")]
-    Risc0ProofFailed(anyhow::Error),
+    Risc0ProofFailed(#[from] anyhow::Error),
 }

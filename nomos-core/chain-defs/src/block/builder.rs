@@ -8,7 +8,7 @@ use serde::Serialize;
 use crate::block::Block;
 use crate::crypto::Blake2b;
 use crate::da::blob::{info::DispersedBlobInfo, BlobSelect};
-use crate::header::{cryptarchia::Builder as CryptarchiaBuilder, Header};
+use crate::header::Builder;
 use crate::tx::{Transaction, TxSelect};
 use crate::wire;
 use blake2::digest::Digest;
@@ -29,7 +29,7 @@ use blake2::digest::Digest;
 pub struct BlockBuilder<Tx, Blob, TxSelector, BlobSelector> {
     tx_selector: TxSelector,
     blob_selector: BlobSelector,
-    cryptarchia_header_builder: CryptarchiaBuilder,
+    header_builder: Builder,
     txs: Option<Box<dyn Iterator<Item = Tx>>>,
     blobs: Option<Box<dyn Iterator<Item = Blob>>>,
 }
@@ -44,12 +44,12 @@ where
     pub fn new(
         tx_selector: TxSelector,
         blob_selector: BlobSelector,
-        cryptarchia_header_builder: CryptarchiaBuilder,
+        header_builder: Builder,
     ) -> Self {
         Self {
             tx_selector,
             blob_selector,
-            cryptarchia_header_builder,
+            header_builder,
             txs: None,
             blobs: None,
         }
@@ -75,7 +75,7 @@ where
         if let Self {
             tx_selector,
             blob_selector,
-            cryptarchia_header_builder: cryptarchia_builder,
+            header_builder,
             txs: Some(txs),
             blobs: Some(blobs),
         } = self
@@ -95,7 +95,7 @@ where
             })?;
             let content_id = <[u8; 32]>::from(Blake2b::digest(&serialized_content)).into();
 
-            let header = Header::Cryptarchia(cryptarchia_builder.build(content_id, content_size));
+            let header = header_builder.build(content_id, content_size);
 
             Ok(Block {
                 header,
