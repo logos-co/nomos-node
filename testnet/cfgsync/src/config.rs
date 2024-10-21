@@ -1,11 +1,12 @@
 // std
 use std::{collections::HashMap, net::Ipv4Addr, str::FromStr};
 // crates
-use nomos_libp2p::{Multiaddr, PeerId};
+use nomos_libp2p::{Multiaddr, PeerId, Protocol};
 use rand::{thread_rng, Rng};
 use tests::topology::configs::{
     consensus::{create_consensus_configs, ConsensusParams},
     da::{create_da_configs, DaParams},
+    mix::create_mix_configs,
     network::create_network_configs,
     GeneralConfig,
 };
@@ -13,6 +14,7 @@ use tests::topology::configs::{
 
 const DEFAULT_LIBP2P_NETWORK_PORT: u16 = 3000;
 const DEFAULT_DA_NETWORK_PORT: u16 = 3300;
+const DEFAULT_MIX_PORT: u16 = 3400;
 
 #[derive(Eq, PartialEq, Hash, Clone)]
 pub enum HostKind {
@@ -26,6 +28,7 @@ pub struct Host {
     pub ip: Ipv4Addr,
     pub network_port: u16,
     pub da_network_port: u16,
+    pub mix_port: u16,
 }
 
 impl Host {
@@ -35,6 +38,7 @@ impl Host {
             ip,
             network_port: DEFAULT_LIBP2P_NETWORK_PORT,
             da_network_port: DEFAULT_DA_NETWORK_PORT,
+            mix_port: DEFAULT_MIX_PORT,
         }
     }
 
@@ -44,6 +48,7 @@ impl Host {
             ip,
             network_port: DEFAULT_LIBP2P_NETWORK_PORT,
             da_network_port: DEFAULT_DA_NETWORK_PORT,
+            mix_port: DEFAULT_MIX_PORT,
         }
     }
 }
@@ -61,12 +66,15 @@ pub fn create_node_configs(
     let consensus_configs = create_consensus_configs(&ids, consensus_params);
     let da_configs = create_da_configs(&ids, da_params);
     let network_configs = create_network_configs(&ids, Default::default());
+    let mix_configs = create_mix_configs(&ids);
     let mut configured_hosts = HashMap::new();
 
     // Rebuild DA address lists.
     let peer_addresses = da_configs[0].addresses.clone();
     let host_network_init_peers = update_network_init_peers(hosts.clone());
     let host_da_peer_addresses = update_da_peer_addresses(hosts.clone(), peer_addresses);
+    let host_mix_membership =
+        update_mix_membership(hosts.clone(), mix_configs[0].backend.membership.clone());
 
     let new_peer_addresses: HashMap<PeerId, Multiaddr> = host_da_peer_addresses
         .clone()
@@ -92,12 +100,19 @@ pub fn create_node_configs(
         network_config.swarm_config.port = host.network_port;
         network_config.initial_peers = host_network_init_peers.clone();
 
+        // Mix config.
+        let mut mix_config = mix_configs[i].to_owned();
+        mix_config.backend.listening_address =
+            Multiaddr::from_str(&format!("/ip4/0.0.0.0/udp/{}/quic-v1", host.mix_port)).unwrap();
+        mix_config.backend.membership = host_mix_membership.clone();
+
         configured_hosts.insert(
             host.clone(),
             GeneralConfig {
                 consensus_config,
                 da_config,
                 network_config,
+                mix_config,
             },
         );
     }
@@ -131,12 +146,38 @@ fn update_da_peer_addresses(
         .collect()
 }
 
+fn update_mix_membership(hosts: Vec<Host>, membership: Vec<Multiaddr>) -> Vec<Multiaddr> {
+    membership
+        .into_iter()
+        .zip(hosts)
+        .map(|(addr, host)| {
+            Multiaddr::from_str(&format!(
+                "/ip4/{}/udp/{}/quic-v1/p2p/{}",
+                host.ip,
+                host.mix_port,
+                extract_peer_id(&addr).unwrap(),
+            ))
+            .unwrap()
+        })
+        .collect()
+}
+
+fn extract_peer_id(multiaddr: &Multiaddr) -> Option<PeerId> {
+    multiaddr.iter().find_map(|protocol| {
+        if let Protocol::P2p(peer_id) = protocol {
+            Some(peer_id)
+        } else {
+            None
+        }
+    })
+}
+
 #[cfg(test)]
 mod cfgsync_tests {
     use std::str::FromStr;
     use std::{net::Ipv4Addr, time::Duration};
 
-    use nomos_libp2p::Protocol;
+    use nomos_libp2p::{Multiaddr, Protocol};
     use tests::topology::configs::consensus::ConsensusParams;
     use tests::topology::configs::da::DaParams;
 
@@ -150,6 +191,7 @@ mod cfgsync_tests {
                 ip: Ipv4Addr::from_str(&format!("10.1.1.{i}")).unwrap(),
                 network_port: 3000,
                 da_network_port: 4044,
+                mix_port: 5000,
             })
             .collect();
 
@@ -173,18 +215,22 @@ mod cfgsync_tests {
 
         for (host, config) in configs.iter() {
             let network_port = config.network_config.swarm_config.port;
-
-            let da_network_addr = config.da_config.listening_address.clone();
-            let da_network_port = da_network_addr
-                .iter()
-                .find_map(|protocol| match protocol {
-                    Protocol::Udp(port) => Some(port),
-                    _ => None,
-                })
-                .unwrap();
+            let da_network_port = extract_port(&config.da_config.listening_address);
+            let mix_port = extract_port(&config.mix_config.backend.listening_address);
 
             assert_eq!(network_port, host.network_port);
             assert_eq!(da_network_port, host.da_network_port);
+            assert_eq!(mix_port, host.mix_port);
         }
+    }
+
+    fn extract_port(multiaddr: &Multiaddr) -> u16 {
+        multiaddr
+            .iter()
+            .find_map(|protocol| match protocol {
+                Protocol::Udp(port) => Some(port),
+                _ => None,
+            })
+            .unwrap()
     }
 }

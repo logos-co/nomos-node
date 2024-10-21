@@ -11,7 +11,7 @@ use nomos_node::NomosDaMembership;
 use once_cell::sync::Lazy;
 use subnetworks_assignations::MembershipHandler;
 
-use crate::get_available_port;
+use crate::{get_available_port, secret_key_to_peer_id};
 
 pub static GLOBAL_PARAMS_PATH: Lazy<String> = Lazy::new(|| {
     let relative_path = "./kzgrs/kzgrs_test_params";
@@ -138,12 +138,4 @@ fn build_da_peer_list(
             (*peer_id, p2p_addr)
         })
         .collect()
-}
-
-fn secret_key_to_peer_id(node_key: nomos_libp2p::ed25519::SecretKey) -> PeerId {
-    PeerId::from_public_key(
-        &nomos_libp2p::ed25519::Keypair::from(node_key)
-            .public()
-            .into(),
-    )
 }

@@ -233,6 +233,9 @@ pub fn create_validator_config(config: GeneralConfig) -> Config {
                 initial_peers: config.network_config.initial_peers,
             },
         },
+        mix: nomos_mix_service::MixConfig {
+            backend: config.mix_config.backend,
+        },
         cryptarchia: CryptarchiaSettings {
             notes: config.consensus_config.notes,
             config: config.consensus_config.ledger_config,

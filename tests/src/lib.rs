@@ -9,7 +9,7 @@ use std::sync::Mutex;
 use std::time::Duration;
 
 //crates
-use nomos_libp2p::{Multiaddr, Swarm};
+use nomos_libp2p::{Multiaddr, PeerId, Swarm};
 use once_cell::sync::Lazy;
 use rand::{thread_rng, Rng};
 
@@ -47,4 +47,12 @@ pub fn adjust_timeout(d: Duration) -> Duration {
 
 fn node_address_from_port(port: u16) -> Multiaddr {
     Swarm::multiaddr(std::net::Ipv4Addr::new(127, 0, 0, 1), port)
+}
+
+fn secret_key_to_peer_id(node_key: nomos_libp2p::ed25519::SecretKey) -> PeerId {
+    PeerId::from_public_key(
+        &nomos_libp2p::ed25519::Keypair::from(node_key)
+            .public()
+            .into(),
+    )
 }
