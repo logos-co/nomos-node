@@ -3,10 +3,13 @@ use overwatch_rs::DynError;
 use std::hash::Hash;
 use std::marker::PhantomData;
 // crates
-use serde::{de::DeserializeOwned, Serialize};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use tokio_stream::{wrappers::BroadcastStream, StreamExt};
 // internal
-use crate::network::{messages::NetworkMessage, BoxedStream, NetworkAdapter};
+use crate::{
+    messages::NetworkMessage,
+    network::{BoxedStream, NetworkAdapter},
+};
 use nomos_core::{block::Block, wire};
 use nomos_network::{
     backends::libp2p::{Command, Event, EventKind, Libp2p},
@@ -15,7 +18,6 @@ use nomos_network::{
 use overwatch_rs::services::{relay::OutboundRelay, ServiceData};
 use tokio_stream::wrappers::errors::BroadcastStreamRecvError;
 
-const TOPIC: &str = "/cryptarchia/proto";
 type Relay<T> = OutboundRelay<<NetworkService<T> as ServiceData>::Message>;
 
 #[derive(Clone)]
@@ -27,6 +29,11 @@ where
     network_relay: OutboundRelay<<NetworkService<Libp2p> as ServiceData>::Message>,
     _phantom_tx: PhantomData<Tx>,
     _blob_cert: PhantomData<BlobCert>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LibP2pAdapterSettings {
+    pub topic: String,
 }
 
 impl<Tx, BlobCert> LibP2pAdapter<Tx, BlobCert>
@@ -51,12 +58,13 @@ where
     BlobCert: Serialize + DeserializeOwned + Clone + Eq + Hash + Send + Sync + 'static,
 {
     type Backend = Libp2p;
+    type Settings = LibP2pAdapterSettings;
     type Tx = Tx;
     type BlobCertificate = BlobCert;
 
-    async fn new(network_relay: Relay<Libp2p>) -> Self {
+    async fn new(settings: Self::Settings, network_relay: Relay<Libp2p>) -> Self {
         let relay = network_relay.clone();
-        Self::subscribe(&relay, TOPIC).await;
+        Self::subscribe(&relay, settings.topic.as_str()).await;
         tracing::debug!("Starting up...");
         // this wait seems to be helpful in some cases since we give the time
         // to the network to establish connections before we start sending messages
@@ -105,18 +113,5 @@ where
                 }
             }),
         ))
-    }
-
-    async fn broadcast(&self, message: NetworkMessage<Self::Tx, Self::BlobCertificate>) {
-        if let Err((e, message)) = self
-            .network_relay
-            .send(NetworkMsg::Process(Command::Broadcast {
-                message: wire::serialize(&message).unwrap().into_boxed_slice(),
-                topic: TOPIC.into(),
-            }))
-            .await
-        {
-            tracing::error!("error broadcasting {message:?}: {e}");
-        };
     }
 }

@@ -28,6 +28,7 @@ nomos-da-verifier = { path = "../../nomos-services/data-availability/verifier", 
 nomos-da-indexer = { path = "../../nomos-services/data-availability/indexer", features = ["rocksdb-backend"] }
 nomos-da-network-service = { path = "../../nomos-services/data-availability/network" }
 nomos-network = { path = "../../nomos-services/network", features = ["libp2p"] }
+nomos-mix-service = { path = "../../nomos-services/mix", features = ["libp2p"] }
 nomos-api = { path = "../../nomos-services/api" }
 nomos-log = { path = "../../nomos-services/log" }
 nomos-mempool = { path = "../../nomos-services/mempool", features = [
