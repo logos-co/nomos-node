@@ -18,7 +18,7 @@ where
     BlobCert: Clone + Eq + Hash,
 {
     settings: LibP2pAdapterSettings<Network::BroadcastSettings>,
-    network_relay: OutboundRelay<<MixService<Libp2pMixBackend, Network> as ServiceData>::Message>,
+    mix_relay: OutboundRelay<<MixService<Libp2pMixBackend, Network> as ServiceData>::Message>,
     _tx: PhantomData<Tx>,
     _blob_cert: PhantomData<BlobCert>,
 }
@@ -39,7 +39,7 @@ where
 
     async fn new(
         settings: Self::Settings,
-        network_relay: OutboundRelay<
+        mix_relay: OutboundRelay<
             <MixService<Self::Backend, Self::Network> as ServiceData>::Message,
         >,
     ) -> Self {
@@ -50,7 +50,7 @@ where
 
         Self {
             settings,
-            network_relay,
+            mix_relay,
             _tx: PhantomData,
             _blob_cert: PhantomData,
         }
@@ -58,7 +58,7 @@ where
 
     async fn mix(&self, block: Block<Self::Tx, Self::BlobCertificate>) {
         if let Err((e, msg)) = self
-            .network_relay
+            .mix_relay
             .send(ServiceMessage::Mix(nomos_mix_service::NetworkMessage {
                 message: wire::serialize(&NetworkMessage::Block(block)).unwrap(),
                 broadcast_settings: self.settings.broadcast_settings.clone(),

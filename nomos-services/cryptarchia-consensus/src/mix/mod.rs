@@ -21,7 +21,7 @@ pub trait MixAdapter {
     type BlobCertificate: Serialize + DeserializeOwned + Clone + Eq + Hash + 'static;
     async fn new(
         settings: Self::Settings,
-        network_relay: OutboundRelay<
+        mix_relay: OutboundRelay<
             <MixService<Self::Backend, Self::Network> as ServiceData>::Message,
         >,
     ) -> Self;
