@@ -19,7 +19,6 @@ jobs:
         with:
           submodules: true
       - name: Remove unwanted software
-        if: matrix.os == 'ubuntu-latest'
         uses: ./.github/actions/prune-vm
       - uses: arduino/setup-protoc@v3
         with:
