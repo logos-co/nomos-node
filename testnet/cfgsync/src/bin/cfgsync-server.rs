@@ -12,7 +12,10 @@ use cfgsync::config::Host;
 use cfgsync::repo::{ConfigRepo, RepoResponse};
 use clap::Parser;
 use serde::{Deserialize, Serialize};
-use tests::{ConsensusConfig, DaConfig};
+use tests::nodes::executor::create_executor_config;
+use tests::nodes::validator::create_validator_config;
+use tests::topology::configs::consensus::ConsensusParams;
+use tests::topology::configs::da::DaParams;
 use tokio::sync::oneshot::channel;
 // internal
 
@@ -50,16 +53,16 @@ impl CfgSyncConfig {
             .map_err(|err| format!("Failed to parse config file: {}", err))
     }
 
-    fn to_consensus_config(&self) -> ConsensusConfig {
-        ConsensusConfig {
+    fn to_consensus_params(&self) -> ConsensusParams {
+        ConsensusParams {
             n_participants: self.n_hosts,
             security_param: self.security_param,
             active_slot_coeff: self.active_slot_coeff,
         }
     }
 
-    fn to_da_config(&self) -> DaConfig {
-        DaConfig {
+    fn to_da_params(&self) -> DaParams {
+        DaParams {
             subnetwork_size: self.subnetwork_size,
             dispersal_factor: self.dispersal_factor,
             num_samples: self.num_samples,
@@ -76,21 +79,43 @@ struct ClientIp {
     ip: Ipv4Addr,
 }
 
-async fn node_config(
+async fn validator_config(
     State(config_repo): State<Arc<ConfigRepo>>,
     Json(payload): Json<ClientIp>,
 ) -> impl IntoResponse {
     let ClientIp { ip } = payload;
 
     let (reply_tx, reply_rx) = channel();
-    config_repo.register(Host::default_node_from_ip(ip), reply_tx);
+    config_repo.register(Host::default_validator_from_ip(ip), reply_tx);
 
     match reply_rx.await {
         Ok(config_response) => match config_response {
-            RepoResponse::Config(config) => (StatusCode::OK, Json(config)).into_response(),
-            RepoResponse::Timeout => {
-                (StatusCode::REQUEST_TIMEOUT, Json(RepoResponse::Timeout)).into_response()
+            RepoResponse::Config(config) => {
+                let config = create_validator_config(*config);
+                (StatusCode::OK, Json(config)).into_response()
             }
+            RepoResponse::Timeout => (StatusCode::REQUEST_TIMEOUT).into_response(),
+        },
+        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, "Error receiving config").into_response(),
+    }
+}
+
+async fn executor_config(
+    State(config_repo): State<Arc<ConfigRepo>>,
+    Json(payload): Json<ClientIp>,
+) -> impl IntoResponse {
+    let ClientIp { ip } = payload;
+
+    let (reply_tx, reply_rx) = channel();
+    config_repo.register(Host::default_executor_from_ip(ip), reply_tx);
+
+    match reply_rx.await {
+        Ok(config_response) => match config_response {
+            RepoResponse::Config(config) => {
+                let config = create_executor_config(*config);
+                (StatusCode::OK, Json(config)).into_response()
+            }
+            RepoResponse::Timeout => (StatusCode::REQUEST_TIMEOUT).into_response(),
         },
         Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, "Error receiving config").into_response(),
     }
@@ -104,8 +129,8 @@ async fn main() {
         eprintln!("{}", err);
         process::exit(1);
     });
-    let consensus_config = config.to_consensus_config();
-    let da_config = config.to_da_config();
+    let consensus_config = config.to_consensus_params();
+    let da_config = config.to_da_params();
 
     let config_repo = ConfigRepo::new(
         config.n_hosts,
@@ -114,7 +139,8 @@ async fn main() {
         Duration::from_secs(config.timeout),
     );
     let app = Router::new()
-        .route("/node", post(node_config))
+        .route("/validator", post(validator_config))
+        .route("/executor", post(executor_config))
         .with_state(config_repo.clone());
 
     println!("Server running on http://0.0.0.0:{}", config.port);

@@ -49,6 +49,10 @@ use nomos_mempool::network::adapters::libp2p::Libp2pAdapter as MempoolNetworkAda
 use nomos_mempool::network::adapters::libp2p::Settings as AdapterSettings;
 use nomos_mempool::{backend::mockpool::MockPool, TxMempoolService};
 use nomos_mempool::{DaMempoolSettings, TxMempoolSettings};
+use nomos_mix_service::backends::libp2p::{
+    Libp2pMixBackend as MixBackend, Libp2pMixBackendSettings,
+};
+use nomos_mix_service::{MixConfig, MixService};
 use nomos_network::backends::libp2p::{Libp2p as NetworkBackend, Libp2pConfig};
 use nomos_network::NetworkConfig;
 use nomos_network::NetworkService;
@@ -83,6 +87,11 @@ pub static ENCODER: Lazy<DaEncoder> = Lazy::new(|| DaEncoder::new(PARAMS.clone()
 
 pub(crate) type Cryptarchia = cryptarchia_consensus::CryptarchiaConsensus<
     cryptarchia_consensus::network::adapters::libp2p::LibP2pAdapter<Tx, BlobInfo>,
+    cryptarchia_consensus::mix::adapters::libp2p::LibP2pAdapter<
+        nomos_mix_service::network::libp2p::Libp2pAdapter,
+        Tx,
+        BlobInfo,
+    >,
     MockPool<HeaderId, Tx, <Tx as Transaction>::Hash>,
     MempoolNetworkAdapter<Tx, <Tx as Transaction>::Hash>,
     MockPool<HeaderId, BlobInfo, <BlobInfo as DispersedBlobInfo>::BlobId>,
@@ -110,6 +119,11 @@ pub(crate) type DaIndexer = DataIndexerService<
     CryptarchiaConsensusAdapter<Tx, BlobInfo>,
     // Cryptarchia specific, should be the same as in `Cryptarchia` type above.
     cryptarchia_consensus::network::adapters::libp2p::LibP2pAdapter<Tx, BlobInfo>,
+    cryptarchia_consensus::mix::adapters::libp2p::LibP2pAdapter<
+        nomos_mix_service::network::libp2p::Libp2pAdapter,
+        Tx,
+        BlobInfo,
+    >,
     MockPool<HeaderId, Tx, <Tx as Transaction>::Hash>,
     MempoolNetworkAdapter<Tx, <Tx as Transaction>::Hash>,
     MockPool<HeaderId, BlobInfo, <BlobInfo as DispersedBlobInfo>::BlobId>,
@@ -149,6 +163,7 @@ pub(crate) const MB16: usize = 1024 * 1024 * 16;
 pub struct TestNode {
     //logging: ServiceHandle<Logger>,
     network: ServiceHandle<NetworkService<NetworkBackend>>,
+    mix: ServiceHandle<MixService<MixBackend, nomos_mix_service::network::libp2p::Libp2pAdapter>>,
     cl_mempool: ServiceHandle<TxMempool>,
     da_network: ServiceHandle<DaNetworkService<DaNetworkValidatorBackend<FillFromNodeList>>>,
     da_mempool: ServiceHandle<DaMempool>,
@@ -174,6 +189,7 @@ pub fn new_node(
     genesis_state: &LedgerState,
     time_config: &TimeConfig,
     swarm_config: &SwarmConfig,
+    mix_config: &Libp2pMixBackendSettings,
     db_path: PathBuf,
     blobs_dir: &PathBuf,
     initial_peers: Vec<Multiaddr>,
@@ -188,6 +204,9 @@ pub fn new_node(
                     inner: swarm_config.clone(),
                     initial_peers,
                 },
+            },
+            mix: MixConfig {
+                backend: mix_config.clone(),
             },
             da_network: DaNetworkConfig {
                 backend: DaNetworkBackendSettings {
@@ -238,6 +257,17 @@ pub fn new_node(
                 genesis_state: genesis_state.clone(),
                 time: time_config.clone(),
                 notes: vec![note.clone()],
+                network_adapter_settings:
+                    cryptarchia_consensus::network::adapters::libp2p::LibP2pAdapterSettings {
+                        topic: String::from(nomos_node::CONSENSUS_TOPIC),
+                    },
+                mix_adapter_settings:
+                    cryptarchia_consensus::mix::adapters::libp2p::LibP2pAdapterSettings {
+                        broadcast_settings:
+                            nomos_mix_service::network::libp2p::Libp2pBroadcastSettings {
+                                topic: String::from(nomos_node::CONSENSUS_TOPIC),
+                            },
+                    },
             },
             verifier: DaVerifierServiceSettings {
                 verifier_settings,
@@ -265,6 +295,38 @@ pub fn new_node(
     )
     .map_err(|e| eprintln!("Error encountered: {}", e))
     .unwrap()
+}
+
+pub fn new_mix_configs(listening_addresses: Vec<Multiaddr>) -> Vec<Libp2pMixBackendSettings> {
+    let mut configs = listening_addresses
+        .iter()
+        .map(|listening_address| Libp2pMixBackendSettings {
+            listening_address: listening_address.clone(),
+            node_key: ed25519::SecretKey::generate(),
+            membership: Vec::new(),
+            peering_degree: 1,
+            num_mix_layers: 1,
+        })
+        .collect::<Vec<_>>();
+
+    let membership = configs
+        .iter()
+        .map(|c| {
+            let peer_id = PeerId::from_public_key(
+                &ed25519::Keypair::from(c.node_key.clone()).public().into(),
+            );
+            c.listening_address
+                .clone()
+                .with_p2p(peer_id)
+                .unwrap_or_else(|orig_addr| orig_addr)
+        })
+        .collect::<Vec<_>>();
+
+    configs
+        .iter_mut()
+        .for_each(|c| c.membership = membership.clone());
+
+    configs
 }
 
 // Client node is only created for asyncroniously interact with nodes in the test.

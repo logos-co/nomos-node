@@ -1,14 +1,18 @@
 use futures::stream::{self, StreamExt};
 use std::collections::HashSet;
 use std::time::Duration;
-use tests::{adjust_timeout, nodes::NomosNode, Node, SpawnConfig};
+use tests::{
+    adjust_timeout,
+    topology::{Topology, TopologyConfig},
+};
 
 // how many times more than the expected time to produce a predefined number of blocks we wait before timing out
 const TIMEOUT_MULTIPLIER: f64 = 3.0;
 // how long we let the chain grow before checking the block at tip - k is the same in all chains
 const CHAIN_LENGTH_MULTIPLIER: u32 = 2;
 
-async fn happy_test(nodes: &[NomosNode]) {
+async fn happy_test(topology: &Topology) {
+    let nodes = topology.validators();
     let config = nodes[0].config();
     let security_param = config.cryptarchia.config.consensus_config.security_param;
     let n_blocks = security_param * CHAIN_LENGTH_MULTIPLIER;
@@ -52,6 +56,6 @@ async fn happy_test(nodes: &[NomosNode]) {
 
 #[tokio::test]
 async fn two_nodes_happy() {
-    let nodes = NomosNode::spawn_nodes(SpawnConfig::star_happy(2, Default::default())).await;
-    happy_test(&nodes).await;
+    let topology = Topology::spawn(TopologyConfig::two_validators()).await;
+    happy_test(&topology).await;
 }
