@@ -1,7 +1,8 @@
 // std
 use std::{env, fs, net::Ipv4Addr, process};
 // crates
-use nomos_node::Config as NodeConfig;
+use nomos_executor::config::Config as ExecutorConfig;
+use nomos_node::Config as ValidatorConfig;
 use reqwest::Client;
 use serde::{de::DeserializeOwned, Serialize};
 // internal
@@ -57,9 +58,22 @@ async fn main() {
     let server_addr = env::var("CFG_SERVER_ADDR").unwrap_or("http://127.0.0.1:4400".to_string());
     let ip = parse_ip(env::var("CFG_HOST_IP").unwrap_or_else(|_| "127.0.0.1".to_string()));
 
-    let node_config_endpoint = format!("{}/node", server_addr);
+    let host_kind = env::var("CFG_HOST_KIND").unwrap_or_else(|_| "validator".to_string());
 
-    if let Err(err) = get_config::<NodeConfig>(ip, &node_config_endpoint, &config_file_path).await {
+    let node_config_endpoint = match host_kind.as_str() {
+        "executor" => format!("{}/executor", server_addr),
+        _ => format!("{}/validator", server_addr),
+    };
+
+    let config_result = match host_kind.as_str() {
+        "executor" => {
+            get_config::<ExecutorConfig>(ip, &node_config_endpoint, &config_file_path).await
+        }
+        _ => get_config::<ValidatorConfig>(ip, &node_config_endpoint, &config_file_path).await,
+    };
+
+    // Handle error if the config request fails
+    if let Err(err) = config_result {
         eprintln!("Error: {}", err);
         process::exit(1);
     }
