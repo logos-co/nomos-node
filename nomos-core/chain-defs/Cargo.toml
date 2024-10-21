@@ -14,8 +14,8 @@ blake2 = { version = "0.10" }
 bytes = "1.3"
 carnot-engine = { path = "../../consensus/carnot-engine", features = ["serde"]}
 cryptarchia-engine = { path = "../../consensus/cryptarchia-engine", features = ["serde"]}
-nomos-ledger = { path = "../../ledger/nomos-ledger", features = ["serde", "risc0_proof"]}
-nomos_cl_risc0_proofs = { path = "../risc0_proofs" }
+nomos-ledger = { path = "../../ledger/nomos-ledger", features = ["serde"]}
+nomos_risc0_proofs = { path = "../risc0_proofs" }
 nomos_proof_statements = { path = "../proof_statements" }
 cl =  { path = "../cl" }
 futures = "0.3"

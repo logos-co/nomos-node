@@ -1,8 +1,9 @@
 use cl::{input::InputWitness, note::NoteWitness, nullifier::Nullifier};
 use cryptarchia_engine::Slot;
-use leader_proof_statements::{LeaderPrivate, LeaderPublic};
+use nomos_core::header::leader_proof::Risc0LeaderProof;
 use nomos_core::header::HeaderId;
-use nomos_ledger::{leader_proof::Risc0LeaderProof, Config, EpochState, NoteTree};
+use nomos_ledger::{Config, EpochState, NoteTree};
+use nomos_proof_statements::leadership::{LeaderPrivate, LeaderPublic};
 use std::collections::HashMap;
 
 pub struct Leader {
@@ -76,12 +77,13 @@ impl Leader {
                 );
                 let input = *note;
                 let res = tokio::task::spawn_blocking(move || {
-                    Risc0LeaderProof::build(
+                    Risc0LeaderProof::prove(
                         public_inputs,
                         LeaderPrivate {
                             input,
                             input_cm_path,
                         },
+                        risc0_zkvm::default_prover().as_ref(),
                     )
                 })
                 .await;
