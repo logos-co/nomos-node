@@ -23,8 +23,6 @@ jobs:
       - uses: arduino/setup-protoc@v3
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Checkout submodules
-        run: git submodule update --init --recursive
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
