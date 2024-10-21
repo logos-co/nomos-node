@@ -3,41 +3,40 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 // crates
-use nomos_node::Config as NodeConfig;
-use serde::{Deserialize, Serialize};
-use tests::{ConsensusConfig, DaConfig};
+use tests::topology::configs::consensus::ConsensusParams;
+use tests::topology::configs::da::DaParams;
+use tests::topology::configs::GeneralConfig;
 use tokio::sync::oneshot::Sender;
 use tokio::time::timeout;
 // internal
 
 use crate::config::{create_node_configs, Host};
 
-#[derive(Serialize, Deserialize)]
 pub enum RepoResponse {
-    Config(NodeConfig),
+    Config(Box<GeneralConfig>),
     Timeout,
 }
 
 pub struct ConfigRepo {
     waiting_hosts: Mutex<HashMap<Host, Sender<RepoResponse>>>,
     n_hosts: usize,
-    consensus_config: ConsensusConfig,
-    da_config: DaConfig,
+    consensus_params: ConsensusParams,
+    da_params: DaParams,
     timeout_duration: Duration,
 }
 
 impl ConfigRepo {
     pub fn new(
         n_hosts: usize,
-        consensus_config: ConsensusConfig,
-        da_config: DaConfig,
+        consensus_params: ConsensusParams,
+        da_params: DaParams,
         timeout_duration: Duration,
     ) -> Arc<Self> {
         let repo = Arc::new(Self {
             waiting_hosts: Mutex::new(HashMap::new()),
             n_hosts,
-            consensus_config,
-            da_config,
+            consensus_params,
+            da_params,
             timeout_duration,
         });
 
@@ -69,14 +68,14 @@ impl ConfigRepo {
                     .collect();
 
                 let configs = create_node_configs(
-                    self.consensus_config.clone(),
-                    self.da_config.clone(),
+                    self.consensus_params.clone(),
+                    self.da_params.clone(),
                     hosts,
                 );
 
                 for (host, sender) in waiting_hosts.drain() {
                     let config = configs.get(&host).expect("host should have a config");
-                    let _ = sender.send(RepoResponse::Config(config.to_owned()));
+                    let _ = sender.send(RepoResponse::Config(Box::new(config.to_owned())));
                 }
             }
             Err(_) => {

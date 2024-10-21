@@ -1,4 +1,5 @@
 use crate::adapters::{mempool::DaMempoolAdapter, network::DispersalNetworkAdapter};
+use std::time::Duration;
 
 use nomos_core::da::{blob::metadata, DaDispersal, DaEncoder};
 use overwatch_rs::DynError;
@@ -42,6 +43,8 @@ pub trait DispersalBackend {
     ) -> Result<(), DynError> {
         let (blob_id, encoded_data) = self.encode(data).await?;
         self.disperse(encoded_data).await?;
+        // let disperse and replication happen before pushing to mempool
+        tokio::time::sleep(Duration::from_secs(1)).await;
         self.publish_to_mempool(blob_id, metadata).await?;
         Ok(())
     }
