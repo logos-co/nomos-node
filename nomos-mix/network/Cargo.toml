@@ -13,6 +13,6 @@ nomos-mix-message = { path = "../message" }
 nomos-mix-queue = { path = "../queue" }
 
 [dev-dependencies]
-tokio = { version = "1.39", features = ["macros", "rt-multi-thread", "time"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "time"] }
 libp2p = { version = "0.53", features = ["ed25519", "tokio", "quic"] }
 tracing-subscriber = "0.3.18"

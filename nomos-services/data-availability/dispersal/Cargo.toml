@@ -17,6 +17,6 @@ overwatch-rs = { git = "https://github.com/logos-co/Overwatch", rev = "2f70806" 
 rand = "0.8"
 serde = { version = "1.0", features = ["derive"] }
 subnetworks-assignations = { path = "../../../nomos-da/network/subnetworks-assignations" }
-tokio = "1.40"
+tokio = "1"
 thiserror = "1.0"
 tracing = "0.1"
