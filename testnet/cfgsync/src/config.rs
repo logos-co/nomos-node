@@ -4,6 +4,7 @@ use std::{collections::HashMap, net::Ipv4Addr, str::FromStr};
 use nomos_libp2p::{Multiaddr, PeerId, Protocol};
 use rand::{thread_rng, Rng};
 use tests::topology::configs::{
+    api::GeneralApiConfig,
     consensus::{create_consensus_configs, ConsensusParams},
     da::{create_da_configs, DaParams},
     mix::create_mix_configs,
@@ -15,6 +16,7 @@ use tests::topology::configs::{
 const DEFAULT_LIBP2P_NETWORK_PORT: u16 = 3000;
 const DEFAULT_DA_NETWORK_PORT: u16 = 3300;
 const DEFAULT_MIX_PORT: u16 = 3400;
+const DEFAULT_API_PORT: u16 = 18080;
 
 #[derive(Eq, PartialEq, Hash, Clone)]
 pub enum HostKind {
@@ -67,6 +69,12 @@ pub fn create_node_configs(
     let da_configs = create_da_configs(&ids, da_params);
     let network_configs = create_network_configs(&ids, Default::default());
     let mix_configs = create_mix_configs(&ids);
+    let api_configs = ids
+        .iter()
+        .map(|_| GeneralApiConfig {
+            address: format!("0.0.0.0:{DEFAULT_API_PORT}").parse().unwrap(),
+        })
+        .collect::<Vec<_>>();
     let mut configured_hosts = HashMap::new();
 
     // Rebuild DA address lists.
@@ -84,6 +92,7 @@ pub fn create_node_configs(
 
     for (i, host) in hosts.into_iter().enumerate() {
         let consensus_config = consensus_configs[i].to_owned();
+        let api_config = api_configs[i].to_owned();
 
         // DA Libp2p network config.
         let mut da_config = da_configs[i].to_owned();
@@ -113,6 +122,7 @@ pub fn create_node_configs(
                 da_config,
                 network_config,
                 mix_config,
+                api_config,
             },
         );
     }
