@@ -3,50 +3,52 @@
 /// Partial transactions, as the name suggests, are transactions
 /// which on their own may not balance (i.e. \sum inputs != \sum outputs)
 use crate::{
-    note::{Constraint, NoteWitness},
+    merkle,
+    note::{Covenant, NoteWitness},
     nullifier::{Nullifier, NullifierSecret},
     Nonce,
 };
 use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Input {
     pub nullifier: Nullifier,
-    pub constraint: Constraint,
+    pub covenant: Covenant,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct InputWitness {
     pub note: NoteWitness,
     pub nf_sk: NullifierSecret,
+    pub cm_path: Vec<crate::merkle::PathNode>,
 }
 
 impl InputWitness {
-    pub fn new(note: NoteWitness, nf_sk: NullifierSecret) -> Self {
-        Self { note, nf_sk }
+    pub fn new(note: NoteWitness, nf_sk: NullifierSecret, cm_path: Vec<merkle::PathNode>) -> Self {
+        Self {
+            note,
+            nf_sk,
+            cm_path,
+        }
     }
 
-    pub fn from_output(output: crate::OutputWitness, nf_sk: NullifierSecret) -> Self {
+    pub fn from_output(
+        output: crate::OutputWitness,
+        nf_sk: NullifierSecret,
+        cm_path: Vec<merkle::PathNode>,
+    ) -> Self {
         assert_eq!(nf_sk.commit(), output.nf_pk);
-        Self::new(output.note, nf_sk)
+        Self::new(output.note, nf_sk, cm_path)
     }
 
-    pub fn public(output: crate::OutputWitness) -> Self {
+    pub fn public(output: crate::OutputWitness, cm_path: Vec<merkle::PathNode>) -> Self {
         let nf_sk = NullifierSecret::zero();
         assert_eq!(nf_sk.commit(), output.nf_pk); // ensure the output was a public UTXO
-        Self::new(output.note, nf_sk)
+        Self::new(output.note, nf_sk, cm_path)
     }
 
     pub fn evolved_nonce(&self, domain: &[u8]) -> Nonce {
-        let mut hasher = Sha256::new();
-        hasher.update(b"NOMOS_COIN_EVOLVE");
-        hasher.update(domain);
-        hasher.update(self.nf_sk.0);
-        hasher.update(self.note.commit(self.nf_sk.commit()).0);
-
-        let nonce_bytes: [u8; 32] = hasher.finalize().into();
-        Nonce::from_bytes(nonce_bytes)
+        self.note.evolved_nonce(self.nf_sk, domain)
     }
 
     pub fn evolve_output(&self, domain: &[u8]) -> crate::OutputWitness {
@@ -66,7 +68,7 @@ impl InputWitness {
     pub fn commit(&self) -> Input {
         Input {
             nullifier: self.nullifier(),
-            constraint: self.note.constraint,
+            covenant: self.note.covenant,
         }
     }
 
@@ -79,7 +81,7 @@ impl Input {
     pub fn to_bytes(&self) -> [u8; 64] {
         let mut bytes = [0u8; 64];
         bytes[..32].copy_from_slice(self.nullifier.as_bytes());
-        bytes[32..64].copy_from_slice(&self.constraint.0);
+        bytes[32..64].copy_from_slice(&self.covenant.0);
         bytes
     }
 }
