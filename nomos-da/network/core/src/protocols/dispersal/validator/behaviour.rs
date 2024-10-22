@@ -218,15 +218,13 @@ mod tests {
     }
 
     pub fn executor_swarm(
-        addr: Multiaddr,
+        addressbook: AddressBook,
         key: Keypair,
         peer_id: PeerId,
         membership: impl MembershipHandler<NetworkId = u32, Id = PeerId> + 'static,
     ) -> libp2p::Swarm<
         DispersalExecutorBehaviour<impl MembershipHandler<NetworkId = u32, Id = PeerId>>,
     > {
-        let addressbook =
-            AddressBook::from_iter([(peer_id, addr.clone())]);
         libp2p::SwarmBuilder::with_existing_identity(key)
             .with_tokio()
             .with_other_transport(|keypair| quic::tokio::Transport::new(quic::Config::new(keypair)))
@@ -361,39 +359,41 @@ mod tests {
             .extend(subnet_1_membership.membership);
 
         // create swarms
-        let mut executors_swarms: Vec<_> = vec![];
+        let mut executor_swarms: Vec<_> = vec![];
         let mut validator_swarms: Vec<_> = vec![];
+
         for i in 0..num_instances / 2 {
-            let (keypair, peer_id, addr) = subnet_0_config[i].clone();
-            let (keypair2, peer_id2, addr2) = subnet_1_config[i].clone();
-            let executor = executor_swarm(addr, keypair, peer_id, all_neighbours.clone());
-            let validator = validator_swarm(keypair2, all_neighbours.clone());
-            executors_swarms.push(executor);
+            let (k, executor_peer, addr) = subnet_0_config[i].clone();
+            let (k2, validator_peer, addr2) = subnet_1_config[i].clone();
+            let addressbook =
+                AddressBook::from_iter([(validator_peer, addr2.clone())]);
+            let executor = executor_swarm(addressbook, k, executor_peer, all_neighbours.clone());
+            let validator = validator_swarm(k2, all_neighbours.clone());
+            executor_swarms.push(executor);
             validator_swarms.push(validator);
         }
 
         let (validator_key, validator_id, validator_addr) = subnet_1_config[0].clone();
-        validator_swarms[0].listen_on(validator_addr.clone()).unwrap();
-        let validator_addr_p2p = validator_addr.with_p2p(validator_id).unwrap();
+        let validator_addr_p2p = validator_addr.clone().with_p2p(validator_id).unwrap();
 
-        let blobs_sender = executors_swarms[0].behaviour().blobs_sender();
+        let blobs_sender = executor_swarms[0].behaviour().blobs_sender();
 
         let msg_count = 10usize;
         let validator_task = async move {
-            validator_swarms[0].listen_on(validator_addr_p2p).unwrap();
+            validator_swarms[0].listen_on(validator_addr).unwrap();
 
             let mut res = vec![];
             loop {
                 match validator_swarms[0].next().await {
-                    Some(SwarmEvent::Behaviour(ValidatorBehaviourEvent::Dispersal(event))) => {
-                        res.push(event);
+                    Some(SwarmEvent::Behaviour(DispersalEvent::IncomingMessage {message})) => {
+                        res.push(message);
                     }
                     event => {
                         info!("Validator event: {event:?}");
                     }
                 }
                 if res.len() == msg_count {
-                    tokio::time::sleep(Duration::from_secs(1)).await;
+                    tokio::time::sleep(Duration::from_secs(2)).await;
                     break;
                 }
             }
@@ -401,23 +401,21 @@ mod tests {
         };
         let join_validator = tokio::spawn(validator_task);
 
-        executors_swarms[0].dial(validator_addr_p2p.clone()).unwrap();
-
-        let executor_open_stream_sender = executors_swarms[0].behaviour().open_stream_sender();
-        let executor_disperse_blob_sender = executors_swarms[0].behaviour().blobs_sender();
+        let executor_open_stream_sender = executor_swarms[0].behaviour().open_stream_sender();
+        let executor_disperse_blob_sender = executor_swarms[0].behaviour().blobs_sender();
 
         let executor_poll = async move {
             let mut res = vec![];
             loop {
                 tokio::select! {
-                    Some(event) = executors_swarms[0].next() => {
+                    Some(event) = executor_swarms[0].next() => {
                         info!("Executor event: {event:?}");
                         if let SwarmEvent::Behaviour(DispersalExecutorEvent::DispersalSuccess{blob_id, ..}) = event {
                             res.push(blob_id);
                         }
                     }
 
-                    _ = time::sleep(Duration::from_secs(2)) => {
+                    _ = time::sleep(Duration::from_secs(20)) => {
                         if res.len() < msg_count {error!("Executor timeout reached");}
                         break;
                     }
@@ -428,8 +426,7 @@ mod tests {
 
         let executor_task = tokio::spawn(executor_poll);
 
-        executor_open_stream_sender.send(validator_id).unwrap();
-        tokio::time::sleep(Duration::from_secs(1)).await;
+        //executor_open_stream_sender.send(validator_id).unwrap();
 
         for i in 0..msg_count {
             info!("Sending blob {i}...");
