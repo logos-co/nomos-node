@@ -30,6 +30,7 @@ EXPOSE 3000 8080 9000 60000
 RUN apt-get update && apt-get install -y libssl3
 
 COPY --from=builder /nomos/target/release/nomos-node /usr/bin/nomos-node
+COPY --from=builder /nomos/target/release/nomos-executor /usr/bin/nomos-executor
 COPY --from=builder /nomos/target/release/nomos-cli /usr/bin/nomos-cli
 COPY --from=builder /nomos/target/release/cfgsync-server /usr/bin/cfgsync-server
 COPY --from=builder /nomos/target/release/cfgsync-client /usr/bin/cfgsync-client
