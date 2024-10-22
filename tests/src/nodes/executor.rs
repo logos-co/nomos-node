@@ -21,6 +21,9 @@ use nomos_da_verifier::DaVerifierServiceSettings;
 use nomos_executor::api::backend::AxumBackendSettings;
 use nomos_executor::config::Config;
 use nomos_log::{LoggerBackend, LoggerFormat};
+use nomos_mix::processor::{
+    CryptographicProcessorSettings, ProcessorSettings, TemporalProcessorSettings,
+};
 use nomos_network::{backends::libp2p::Libp2pConfig, NetworkConfig};
 use nomos_node::api::paths::{CL_METRICS, DA_GET_RANGE};
 use nomos_node::RocksBackendSettings;
@@ -150,6 +153,13 @@ pub fn create_executor_config(config: GeneralConfig) -> Config {
         },
         mix: nomos_mix_service::MixConfig {
             backend: config.mix_config.backend,
+            persistent_transmission: Default::default(),
+            processor: ProcessorSettings {
+                cryptographic_processor: CryptographicProcessorSettings { num_mix_layers: 1 },
+                temporal_processor: TemporalProcessorSettings {
+                    max_delay_seconds: 2,
+                },
+            },
         },
         cryptarchia: CryptarchiaSettings {
             notes: config.consensus_config.notes,
