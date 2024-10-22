@@ -150,16 +150,24 @@ impl<M: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'static> Netw
 mod tests {
     use super::*;
     use crate::address_book::AddressBook;
-    use crate::protocols::dispersal::executor::behaviour::DispersalExecutorBehaviour;
+    use crate::protocols::dispersal::executor::behaviour::{DispersalExecutorBehaviour, DispersalExecutorEvent};
     use crate::protocols::replication::handler::DaMessage;
     use futures::task::ArcWake;
     use libp2p::identity::Keypair;
-    use libp2p::{identity, quic, PeerId};
+    use libp2p::{identity, quic, PeerId, Swarm};
     use nomos_da_messages::common::Blob;
     use std::collections::{HashMap, HashSet};
     use std::sync::Arc;
+    use std::time::Duration;
+    use libp2p::swarm::SwarmEvent;
+    use tokio::time;
+    use tracing::{error, info};
     use tracing_subscriber::fmt::TestWriter;
     use tracing_subscriber::EnvFilter;
+    use kzgrs_backend::common::blob::DaBlob;
+    use kzgrs_backend::common::Column;
+    use crate::behaviour::validator::ValidatorBehaviourEvent;
+    use crate::protocols::sampling::behaviour::{SamplingBehaviour, SamplingEvent};
 
     #[derive(Clone, Debug)]
     struct Neighbourhood {
@@ -210,13 +218,15 @@ mod tests {
     }
 
     pub fn executor_swarm(
-        addressbook: AddressBook,
+        addr: Multiaddr,
         key: Keypair,
         peer_id: PeerId,
         membership: impl MembershipHandler<NetworkId = u32, Id = PeerId> + 'static,
     ) -> libp2p::Swarm<
         DispersalExecutorBehaviour<impl MembershipHandler<NetworkId = u32, Id = PeerId>>,
     > {
+        let addressbook =
+            AddressBook::from_iter([(peer_id, addr.clone())]);
         libp2p::SwarmBuilder::with_existing_identity(key)
             .with_tokio()
             .with_other_transport(|keypair| quic::tokio::Transport::new(quic::Config::new(keypair)))
@@ -249,19 +259,16 @@ mod tests {
             .build()
     }
 
-    fn prepare_swarm_config(num_instances: usize) -> Vec<(Keypair, PeerId, AddressBook)> {
+    fn prepare_swarm_config(num_instances: usize) -> Vec<(Keypair, PeerId, Multiaddr)> {
         let mut configs = Vec::with_capacity(num_instances);
 
-        for _ in 0..num_instances {
+        for i in 0..num_instances {
             let keypair = identity::Keypair::generate_ed25519();
             let peer_id = PeerId::from(keypair.public());
+            let port = 5100 + i;
+            let addr: Multiaddr = format!("/ip4/127.0.0.1/udp/{port}/quic-v1").parse().unwrap();
 
-            let addr: Multiaddr = "/ip4/127.0.0.1/udp/5063/quic-v1".parse().unwrap();
-            let addressbook = AddressBook::from_iter([(
-                PeerId::from_public_key(&keypair.public()),
-                addr.clone(),
-            )]);
-            configs.push((keypair, peer_id, addressbook));
+            configs.push((keypair, peer_id, addr));
         }
         configs
     }
@@ -332,7 +339,7 @@ mod tests {
             .with_writer(TestWriter::default())
             .try_init();
 
-        let num_instances = 20;
+        let num_instances = 2;
 
         let subnet_0_config = prepare_swarm_config(num_instances / 2);
         let subnet_0_ids = subnet_0_config
@@ -357,20 +364,94 @@ mod tests {
         let mut executors_swarms: Vec<_> = vec![];
         let mut validator_swarms: Vec<_> = vec![];
         for i in 0..num_instances / 2 {
-            let cfg_0 = subnet_0_config[i].clone();
-            let cfg_1 = subnet_1_config[i].clone();
-            let executor = executor_swarm(cfg_0.2, cfg_0.0, cfg_0.1, all_neighbours.clone());
-            let validator = validator_swarm(cfg_1.0, all_neighbours.clone());
+            let (keypair, peer_id, addr) = subnet_0_config[i].clone();
+            let (keypair2, peer_id2, addr2) = subnet_1_config[i].clone();
+            let executor = executor_swarm(addr, keypair, peer_id, all_neighbours.clone());
+            let validator = validator_swarm(keypair2, all_neighbours.clone());
             executors_swarms.push(executor);
             validator_swarms.push(validator);
         }
 
-        let message = DaMessage {
-            blob: Some(Blob {
-                blob_id: vec![1, 2, 3],
-                data: vec![4, 5, 6],
-            }),
-            subnetwork_id: 0,
+        let (validator_key, validator_id, validator_addr) = subnet_1_config[0].clone();
+        validator_swarms[0].listen_on(validator_addr.clone()).unwrap();
+        let validator_addr_p2p = validator_addr.with_p2p(validator_id).unwrap();
+
+        let blobs_sender = executors_swarms[0].behaviour().blobs_sender();
+
+        let msg_count = 10usize;
+        let validator_task = async move {
+            validator_swarms[0].listen_on(validator_addr_p2p).unwrap();
+
+            let mut res = vec![];
+            loop {
+                match validator_swarms[0].next().await {
+                    Some(SwarmEvent::Behaviour(ValidatorBehaviourEvent::Dispersal(event))) => {
+                        res.push(event);
+                    }
+                    event => {
+                        info!("Validator event: {event:?}");
+                    }
+                }
+                if res.len() == msg_count {
+                    tokio::time::sleep(Duration::from_secs(1)).await;
+                    break;
+                }
+            }
+            res
         };
+        let join_validator = tokio::spawn(validator_task);
+
+        executors_swarms[0].dial(validator_addr_p2p.clone()).unwrap();
+
+        let executor_open_stream_sender = executors_swarms[0].behaviour().open_stream_sender();
+        let executor_disperse_blob_sender = executors_swarms[0].behaviour().blobs_sender();
+
+        let executor_poll = async move {
+            let mut res = vec![];
+            loop {
+                tokio::select! {
+                    Some(event) = executors_swarms[0].next() => {
+                        info!("Executor event: {event:?}");
+                        if let SwarmEvent::Behaviour(DispersalExecutorEvent::DispersalSuccess{blob_id, ..}) = event {
+                            res.push(blob_id);
+                        }
+                    }
+
+                    _ = time::sleep(Duration::from_secs(2)) => {
+                        if res.len() < msg_count {error!("Executor timeout reached");}
+                        break;
+                    }
+                }
+            }
+            res
+        };
+
+        let executor_task = tokio::spawn(executor_poll);
+
+        executor_open_stream_sender.send(validator_id).unwrap();
+        tokio::time::sleep(Duration::from_secs(1)).await;
+
+        for i in 0..msg_count {
+            info!("Sending blob {i}...");
+            executor_disperse_blob_sender
+                .send((
+                    0,
+                    DaBlob {
+                        column_idx: 0,
+                        column: Column(vec![]),
+                        column_commitment: Default::default(),
+                        aggregated_column_commitment: Default::default(),
+                        aggregated_column_proof: Default::default(),
+                        rows_commitments: vec![],
+                        rows_proofs: vec![],
+                    },
+                ))
+                .unwrap();
+        }
+
+        assert_eq!(
+            executor_task.await.unwrap().len(),
+            join_validator.await.unwrap().len()
+        );
     }
 }
