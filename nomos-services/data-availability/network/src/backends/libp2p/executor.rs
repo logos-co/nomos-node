@@ -19,6 +19,7 @@ use std::collections::HashSet;
 use std::fmt::Debug;
 use std::marker::PhantomData;
 use std::pin::Pin;
+use std::time::Duration;
 use subnetworks_assignations::MembershipHandler;
 use tokio::sync::broadcast;
 use tokio::sync::mpsc::UnboundedSender;
@@ -148,6 +149,7 @@ where
 
         let task = overwatch_handle.runtime().spawn(executor_swarm.run());
 
+        std::thread::sleep(Duration::from_secs(1));
         // open streams to dispersal peers
         for peer_id in dispersal_peers.iter() {
             executor_open_stream_sender.send(*peer_id).unwrap();
