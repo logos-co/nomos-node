@@ -1,5 +1,4 @@
 // std
-use futures::StreamExt;
 use std::fmt::{Debug, Formatter};
 use std::io::Write;
 use std::net::SocketAddr;
@@ -7,11 +6,10 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 // crates
-use serde::{Deserialize, Serialize};
-use tracing::{error, Level};
-use tracing_appender::non_blocking::WorkerGuard;
-use tracing_subscriber::{filter::LevelFilter, prelude::*};
-// internal
+use futures::StreamExt;
+use opentelemetry::{global, trace::TracerProvider as _};
+use opentelemetry_otlp::WithExportConfig;
+use opentelemetry_sdk::trace::{BatchConfig, Sampler};
 use overwatch_rs::services::life_cycle::LifecycleMessage;
 use overwatch_rs::services::{
     handle::ServiceStateHandle,
@@ -19,6 +17,15 @@ use overwatch_rs::services::{
     state::{NoOperator, NoState},
     ServiceCore, ServiceData,
 };
+use serde::{Deserialize, Serialize};
+use tracing::{error, Level};
+use tracing_appender::non_blocking::WorkerGuard;
+use tracing_loki::url::Url;
+use tracing_opentelemetry::OpenTelemetryLayer;
+use tracing_subscriber::filter::LevelFilter;
+use tracing_subscriber::layer::SubscriberExt;
+use tracing_subscriber::util::SubscriberInitExt;
+// internal
 
 const GELF_RECONNECT_INTERVAL: u64 = 10;
 
@@ -74,6 +81,9 @@ pub enum LoggerBackend {
     File {
         directory: PathBuf,
         prefix: Option<PathBuf>,
+    },
+    Otel {
+        endpoint: String,
     },
     Stdout,
     Stderr,
@@ -187,6 +197,46 @@ impl ServiceCore for Logger {
                     prefix.unwrap_or_else(|| PathBuf::from("nomos.log")),
                 );
                 tracing_appender::non_blocking(file_appender)
+            }
+            LoggerBackend::Otel { ref endpoint } => {
+                let otel_exporter = opentelemetry_otlp::new_exporter()
+                    .tonic()
+                    .with_endpoint(endpoint);
+                let tracer_provider = opentelemetry_otlp::new_pipeline()
+                    .tracing()
+                    .with_trace_config(opentelemetry_sdk::trace::Config::default().with_sampler(
+                        Sampler::ParentBased(Box::new(Sampler::TraceIdRatioBased(1.0))),
+                    ))
+                    .with_batch_config(BatchConfig::default())
+                    .with_exporter(otel_exporter)
+                    .install_batch(opentelemetry_sdk::runtime::Tokio)?;
+
+                global::set_tracer_provider(tracer_provider.clone());
+                let tracer: opentelemetry_sdk::trace::Tracer =
+                    tracer_provider.tracer("BasicTracer");
+
+                let otel_layer = OpenTelemetryLayer::new(tracer);
+
+                let (loki_layer, task) = tracing_loki::layer(
+                    Url::parse("http://127.0.0.1:3100").unwrap(),
+                    vec![("host".into(), "mine".into())].into_iter().collect(),
+                    vec![].into_iter().collect(),
+                )?;
+
+                // The background task needs to be spawned so the logs actually get
+                // delivered.
+                tokio::spawn(task);
+
+                tracing_subscriber::registry()
+                    .with(LevelFilter::from(Level::INFO))
+                    .with(otel_layer)
+                    .with(loki_layer)
+                    .init();
+
+                return Ok(Self {
+                    service_state,
+                    worker_guard: None,
+                });
             }
             LoggerBackend::Stdout => tracing_appender::non_blocking(std::io::stdout()),
             LoggerBackend::Stderr => tracing_appender::non_blocking(std::io::stderr()),
