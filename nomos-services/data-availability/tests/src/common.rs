@@ -305,7 +305,6 @@ pub fn new_mix_configs(listening_addresses: Vec<Multiaddr>) -> Vec<Libp2pMixBack
             node_key: ed25519::SecretKey::generate(),
             membership: Vec::new(),
             peering_degree: 1,
-            num_mix_layers: 1,
         })
         .collect::<Vec<_>>();
 

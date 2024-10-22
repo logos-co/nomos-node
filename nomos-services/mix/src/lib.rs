@@ -8,6 +8,7 @@ use backends::MixBackend;
 use futures::StreamExt;
 use network::NetworkAdapter;
 use nomos_core::wire;
+use nomos_mix_message::{new_message, unwrap_message};
 use nomos_network::NetworkService;
 use overwatch_rs::services::{
     handle::ServiceStateHandle,
@@ -80,16 +81,21 @@ where
         let network_relay = network_relay.connect().await?;
         let network_adapter = Network::new(network_relay);
 
-        // A channel to listen to fully unwrapped messages returned from the [`MixBackend`]
-        // if this node is the last node that can unwrap the data message.
-        let mut fully_unwrapped_messages_receiver = backend.listen_to_fully_unwrapped_messages();
+        // TODO: Spawn PersistentTransmission (Tier 1)
+        // TODO: Spawn Processor (Tier 2) and connect it to PersistentTransmission
+
+        // A channel to listen to messages received from the [`MixBackend`]
+        let mut incoming_message_stream = backend.listen_to_incoming_messages();
 
         let mut lifecycle_stream = service_state.lifecycle_handle.message_stream();
         loop {
             tokio::select! {
-                Some(msg) = fully_unwrapped_messages_receiver.next() => {
-                    tracing::debug!("Received fully unwrapped message from mix backend. Broadcasting it to the network service..");
-                    // Deserialize the received message to get the topic for broadcasting
+                Some(msg) = incoming_message_stream.next() => {
+                    // TODO: The following logic is wrong and temporary.
+                    //   Here we're unwrapping the message and broadcasting it,
+                    //   but the message should be handled by Processor and PersistentTransmission.
+                    let (msg, fully_unwrapped) = unwrap_message(&msg).unwrap();
+                    assert!(fully_unwrapped);
                     match wire::deserialize::<NetworkMessage<Network::BroadcastSettings>>(&msg) {
                         Ok(msg) => {
                             network_adapter.broadcast(msg.message, msg.broadcast_settings).await;
@@ -127,7 +133,11 @@ where
             ServiceMessage::Mix(msg) => {
                 // split sending in two steps to help the compiler understand we do not
                 // need to hold an instance of &I (which is not send) across an await point
-                let _send = backend.mix(wire::serialize(&msg).unwrap());
+                // TODO: The following logic is wrong and temporary.
+                //   Here we're wrapping the message here and publishing the message immediately,
+                //   but the message should be handled by Processor and PersistentTransmission.
+                let wrapped_msg = new_message(&wire::serialize(&msg).unwrap(), 1).unwrap();
+                let _send = backend.publish(wrapped_msg);
                 _send.await
             }
         }

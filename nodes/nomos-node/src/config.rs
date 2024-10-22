@@ -279,8 +279,8 @@ pub fn update_mix(
         mix.backend.peering_degree = peering_degree;
     }
 
-    if let Some(num_mix_layers) = mix_num_mix_layers {
-        mix.backend.num_mix_layers = num_mix_layers;
+    if let Some(_num_mix_layers) = mix_num_mix_layers {
+        // TODO: Set num_mix_layers to the proper module setting
     }
 
     Ok(())
