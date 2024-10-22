@@ -45,7 +45,7 @@ cryptarchia-engine = { path = "../../consensus/cryptarchia-engine" }
 nomos-ledger = { path = "../../ledger/nomos-ledger" }
 rand_chacha = "0.3"
 cl = { path = "../../nomos-core/cl" }
-tokio = { version = "1.24", features = ["sync"] }
+tokio = { version = "1", features = ["sync"] }
 serde_json = "1.0"
 serde_yaml = "0.9"
 color-eyre = "0.6.0"

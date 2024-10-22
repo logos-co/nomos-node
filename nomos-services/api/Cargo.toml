@@ -35,7 +35,7 @@ rand = "0.8"
 serde = { version = "1", features = ["derive"] }
 subnetworks-assignations = { path = "../../nomos-da/network/subnetworks-assignations" }
 nomos-da-network-core = { path = "../../nomos-da/network/core" }
-tokio = { version = "1.33", default-features = false, features = ["sync"] }
+tokio = { version = "1", default-features = false, features = ["sync"] }
 
 
 # axum related dependencies
