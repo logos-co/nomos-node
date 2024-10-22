@@ -74,7 +74,7 @@ services:
     ports:
       - "3003:3000/udp"
       - "18083:18080/tcp"
-    entrypoint: /etc/nomos/scripts/run_nomos_node.sh
+    entrypoint: /etc/nomos/scripts/run_nomos_executor.sh
 
   prometheus:
     container_name: prometheus

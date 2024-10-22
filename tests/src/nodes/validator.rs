@@ -24,9 +24,9 @@ use nomos_node::{BlobInfo, HeaderId, Tx};
 use reqwest::Url;
 use tempfile::NamedTempFile;
 
+use crate::adjust_timeout;
 use crate::nodes::LOGS_PREFIX;
 use crate::topology::configs::GeneralConfig;
-use crate::{adjust_timeout, get_available_port};
 
 use super::{create_tempdir, persist_tempdir, GetRangeReq, CLIENT};
 
@@ -282,9 +282,7 @@ pub fn create_validator_config(config: GeneralConfig) -> Config {
         log: Default::default(),
         http: nomos_api::ApiServiceSettings {
             backend_settings: AxumBackendSettings {
-                address: format!("127.0.0.1:{}", get_available_port())
-                    .parse()
-                    .unwrap(),
+                address: config.api_config.address,
                 cors_origins: vec![],
             },
         },
