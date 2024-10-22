@@ -12,7 +12,7 @@ tracing = "0.1"
 indexmap = "2.2"
 subnetworks-assignations = { path = "../subnetworks-assignations" }
 nomos-da-messages = { path = "../messages" }
-nomos-core = { path = "../../../nomos-core" }
+nomos-core = { path = "../../../nomos-core/chain-defs" }
 kzgrs-backend = { path = "../../kzgrs-backend" }
 tracing-subscriber = "0.3.18"
 void = "1.0.2"

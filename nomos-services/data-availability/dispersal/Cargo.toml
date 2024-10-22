@@ -7,7 +7,7 @@ edition = "2021"
 async-trait = "0.1"
 futures = "0.3"
 itertools = "0.13"
-nomos-core = { path = "../../../nomos-core" }
+nomos-core = { path = "../../../nomos-core/chain-defs" }
 nomos-da-network-core = { path = "../../../nomos-da/network/core" }
 nomos-da-network-service = { path = "../../../nomos-services/data-availability/network" }
 nomos-da-sampling = { path = "../sampling" }

@@ -8,12 +8,12 @@ blst = "0.3.11"
 bytes = "1.2"
 cryptarchia-consensus = { path = "../../../nomos-services/cryptarchia-consensus" }
 cryptarchia-engine = { path = "../../../consensus/cryptarchia-engine", features = ["serde"] }
-cryptarchia-ledger = { path = "../../../ledger/cryptarchia-ledger", features = ["serde"] }
-cl = { path = "../../../cl/cl" }
+nomos-ledger = { path = "../../../ledger/nomos-ledger", features = ["serde"] }
+cl = { path = "../../../nomos-core/cl" }
 full-replication = { path = "../../../nomos-da/full-replication" }
 hex = "0.4.3"
 kzgrs-backend = { path = "../../../nomos-da/kzgrs-backend" }
-nomos-core = { path = "../../../nomos-core" }
+nomos-core = { path = "../../../nomos-core/chain-defs" }
 nomos-da-indexer = { path = "../indexer", features = ["rocksdb-backend"] }
 nomos-da-verifier = { path = "../verifier", features = ["rocksdb-backend", "libp2p"] }
 nomos-da-sampling = { path = "../sampling" }
