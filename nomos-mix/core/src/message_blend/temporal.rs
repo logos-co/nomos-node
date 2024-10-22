@@ -31,7 +31,6 @@ pub struct TemporalProcessorSettings {
 }
 
 impl<M> TemporalProcessor<M> {
-    #[allow(dead_code)] // TODO: Remove this macro once this module is integrated
     pub fn new(settings: TemporalProcessorSettings) -> Self {
         let lottery_interval = Self::lottery_interval(settings.max_delay_seconds);
         Self {
@@ -65,7 +64,6 @@ impl<M> TemporalProcessor<M> {
     }
 
     /// Schedule a message to be released later.
-    #[allow(dead_code)] // TODO: Remove this macro once this module is integrated
     pub fn push_message(&mut self, message: M) {
         self.queue.push_back(message);
     }
