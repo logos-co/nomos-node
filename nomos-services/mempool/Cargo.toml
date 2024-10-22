@@ -14,7 +14,7 @@ nomos-metrics = { path = "../../nomos-services/metrics" }
 nomos-network = { path = "../network" }
 nomos-da-network-core = { path = "../../nomos-da/network/core" }
 nomos-da-sampling = { path = "../../nomos-services/data-availability/sampling/" }
-nomos-core = { path = "../../nomos-core" }
+nomos-core = { path = "../../nomos-core/chain-defs" }
 full-replication = { path = "../../nomos-da/full-replication" }
 kzgrs-backend = { path = "../../nomos-da/kzgrs-backend" }
 overwatch-rs = { git = "https://github.com/logos-co/Overwatch", rev = "2f70806" }
