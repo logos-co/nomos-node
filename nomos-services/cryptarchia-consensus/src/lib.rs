@@ -769,7 +769,7 @@ where
         let blobs_ids = get_sampled_blobs(sampling_relay);
         match futures::join!(cl_txs, da_certs, blobs_ids) {
             (Ok(cl_txs), Ok(da_blobs_info), Ok(blobs_ids)) => {
-                let Ok(block) = BlockBuilder::new(
+                let block = BlockBuilder::new(
                     tx_selector,
                     blob_selector,
                     Builder::new(parent, slot, proof),
@@ -778,9 +778,8 @@ where
                 .with_blobs_info(
                     da_blobs_info.filter(move |info| blobs_ids.contains(&info.blob_id())),
                 )
-                .build() else {
-                    panic!("Proposal block should always succeed to be built")
-                };
+                .build()
+                .expect("Proposal block should always succeed to be built");
                 tracing::debug!("proposed block with id {:?}", block.header().id());
                 output = Some(block);
             }

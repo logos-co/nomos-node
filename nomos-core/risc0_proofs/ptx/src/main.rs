@@ -1,4 +1,3 @@
-/// Input Proof
 use cl::merkle;
 use nomos_proof_statements::ptx::{PtxPrivate, PtxPublic};
 use risc0_zkvm::guest::env;
