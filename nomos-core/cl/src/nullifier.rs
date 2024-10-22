@@ -84,7 +84,7 @@ impl Nullifier {
 
 #[cfg(test)]
 mod test {
-    use crate::{note::derive_unit, Constraint, Nonce, NoteWitness};
+    use crate::{note::derive_unit, Covenant, Nonce, NoteWitness};
 
     use super::*;
 
@@ -112,7 +112,7 @@ mod test {
         let note_1 = NoteWitness {
             value: 1,
             unit: derive_unit("NMO"),
-            constraint: Constraint::from_vk(&[]),
+            covenant: Covenant::from_vk(&[]),
             state: [0u8; 32],
             nonce: Nonce::random(&mut rng),
         };
@@ -140,7 +140,7 @@ mod test {
         let note_1 = NoteWitness {
             value: 1,
             unit: derive_unit("NMO"),
-            constraint: Constraint::from_vk(&[]),
+            covenant: Covenant::from_vk(&[]),
             state: [0u8; 32],
             nonce,
         };

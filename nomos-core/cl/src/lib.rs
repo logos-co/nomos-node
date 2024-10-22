@@ -11,7 +11,7 @@ pub mod partial_tx;
 pub use balance::{Balance, BalanceWitness};
 pub use bundle::{Bundle, BundleWitness};
 pub use input::{Input, InputWitness};
-pub use note::{Constraint, Nonce, NoteCommitment, NoteWitness};
+pub use note::{Covenant, Nonce, NoteCommitment, NoteWitness};
 pub use nullifier::{Nullifier, NullifierCommitment, NullifierSecret};
 pub use output::{Output, OutputWitness};
 pub use partial_tx::{

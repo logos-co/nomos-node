@@ -166,7 +166,7 @@ pub fn create_executor_config(config: GeneralConfig) -> Config {
             },
         },
         cryptarchia: CryptarchiaSettings {
-            notes: config.consensus_config.notes,
+            leader_config: config.consensus_config.leader_config,
             config: config.consensus_config.ledger_config,
             genesis_state: config.consensus_config.genesis_state,
             time: config.consensus_config.time,

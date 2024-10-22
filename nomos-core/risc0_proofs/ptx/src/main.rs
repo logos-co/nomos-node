@@ -3,17 +3,12 @@ use nomos_proof_statements::ptx::{PtxPrivate, PtxPublic};
 use risc0_zkvm::guest::env;
 
 fn main() {
-    let PtxPrivate {
-        ptx,
-        input_cm_paths,
-        cm_root,
-    } = env::read();
+    let PtxPrivate { ptx, cm_root } = env::read();
 
-    assert_eq!(ptx.inputs.len(), input_cm_paths.len());
-    for (input, cm_path) in ptx.inputs.iter().zip(input_cm_paths) {
+    for input in ptx.inputs.iter() {
         let note_cm = input.note_commitment();
         let cm_leaf = merkle::leaf(note_cm.as_bytes());
-        assert_eq!(cm_root, merkle::path_root(cm_leaf, &cm_path));
+        assert_eq!(cm_root, merkle::path_root(cm_leaf, &input.cm_path));
     }
 
     for output in ptx.outputs.iter() {

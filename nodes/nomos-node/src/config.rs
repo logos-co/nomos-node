@@ -4,7 +4,7 @@ use std::{
     path::PathBuf,
 };
 // crates
-use cl::{InputWitness, NoteWitness, NullifierSecret};
+use cl::{NoteWitness, NullifierSecret};
 use clap::{Parser, ValueEnum};
 use color_eyre::eyre::{eyre, Result};
 use hex::FromHex;
@@ -317,15 +317,17 @@ pub fn update_cryptarchia_consensus(
         cryptarchia.time.slot_duration = std::time::Duration::from_secs(duration);
     }
 
+    if let Some(value) = note_value {
+        cryptarchia.leader_config.notes.push(NoteWitness::basic(
+            value as u64,
+            NMO_UNIT,
+            &mut rand::thread_rng(),
+        ));
+    }
+
     if let Some(sk) = note_secret_key {
         let sk = <[u8; 16]>::from_hex(sk)?;
-
-        let value = note_value.expect("Should be available if coin sk provided");
-
-        cryptarchia.notes.push(InputWitness::new(
-            NoteWitness::basic(value as u64, NMO_UNIT, &mut rand::thread_rng()),
-            NullifierSecret::from_bytes(sk),
-        ));
+        cryptarchia.leader_config.nf_sk = NullifierSecret::from_bytes(sk);
     }
 
     Ok(())
