@@ -43,6 +43,10 @@ struct CfgSyncConfig {
     old_blobs_check_interval_secs: u64,
     blobs_validity_duration_secs: u64,
     global_params_path: String,
+
+    // Tracing params
+    trace_endpoint: String,
+    log_endpoint: String,
 }
 
 impl CfgSyncConfig {

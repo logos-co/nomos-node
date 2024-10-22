@@ -14,3 +14,7 @@ num_subnets: 2
 old_blobs_check_interval_secs: 5
 blobs_validity_duration_secs: 60
 global_params_path: "/kzgrs_test_params"
+
+# Tracing params
+trace_endpoint: "http://tempo:4317"
+log_endpoint: "http://loki:3100"

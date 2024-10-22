@@ -83,7 +83,8 @@ pub enum LoggerBackend {
         prefix: Option<PathBuf>,
     },
     Otel {
-        endpoint: String,
+        trace_endpoint: String,
+        log_endpoint: String,
     },
     Stdout,
     Stderr,
@@ -198,10 +199,10 @@ impl ServiceCore for Logger {
                 );
                 tracing_appender::non_blocking(file_appender)
             }
-            LoggerBackend::Otel { ref endpoint } => {
+            LoggerBackend::Otel { ref trace_endpoint, ref log_endpoint } => {
                 let otel_exporter = opentelemetry_otlp::new_exporter()
                     .tonic()
-                    .with_endpoint(endpoint);
+                    .with_endpoint(trace_endpoint);
                 let tracer_provider = opentelemetry_otlp::new_pipeline()
                     .tracing()
                     .with_trace_config(opentelemetry_sdk::trace::Config::default().with_sampler(
@@ -218,7 +219,7 @@ impl ServiceCore for Logger {
                 let otel_layer = OpenTelemetryLayer::new(tracer);
 
                 let (loki_layer, task) = tracing_loki::layer(
-                    Url::parse("http://127.0.0.1:3100").unwrap(),
+                    Url::parse(log_endpoint).unwrap(),
                     vec![("host".into(), "mine".into())].into_iter().collect(),
                     vec![].into_iter().collect(),
                 )?;
