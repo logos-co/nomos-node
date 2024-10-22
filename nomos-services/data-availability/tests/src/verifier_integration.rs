@@ -10,10 +10,10 @@ use std::{
 // crates
 use cl::{InputWitness, NoteWitness, NullifierSecret};
 use cryptarchia_consensus::TimeConfig;
-use cryptarchia_ledger::LedgerState;
 use kzgrs_backend::common::blob::DaBlob;
 use nomos_core::{da::DaEncoder as _, staking::NMO_UNIT};
 use nomos_da_verifier::backend::kzgrs::KzgrsDaVerifierSettings;
+use nomos_ledger::LedgerState;
 use nomos_libp2p::Multiaddr;
 use nomos_libp2p::SwarmConfig;
 use rand::{thread_rng, Rng};
@@ -49,7 +49,7 @@ fn test_verifier() {
         notes.iter().map(|n| n.note_commitment()),
         (ids.len() as u32).into(),
     );
-    let ledger_config = cryptarchia_ledger::Config {
+    let ledger_config = nomos_ledger::Config {
         epoch_stake_distribution_stabilization: 3,
         epoch_period_nonce_buffer: 3,
         epoch_period_nonce_stabilization: 4,
