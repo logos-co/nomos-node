@@ -1,5 +1,12 @@
+use std::time::Duration;
+
+use nomos_mix_message::DROP_MESSAGE;
+use rand::Rng;
 use serde::{Deserialize, Serialize};
-use tokio::sync::mpsc;
+use tokio::{
+    sync::mpsc::{self, error::TryRecvError},
+    time,
+};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct PersistentTransmissionSettings {
@@ -26,13 +33,45 @@ impl Default for PersistentTransmissionSettings {
 /// * `schedule_receiver` - The channel for scheduled messages
 /// * `emission_sender` - The channel to emit messages
 pub async fn persistent_transmission(
-    _settings: PersistentTransmissionSettings,
-    mut schedule_receiver: mpsc::UnboundedReceiver<Vec<u8>>,
+    settings: PersistentTransmissionSettings,
+    schedule_receiver: mpsc::UnboundedReceiver<Vec<u8>>,
     emission_sender: mpsc::UnboundedSender<Vec<u8>>,
 ) {
-    // TODO: This is a mock implementation.
-    //   The actual implementation must use emission frequency and emits drop messages.
-    while let Some(message) = schedule_receiver.recv().await {
-        emission_sender.send(message).unwrap();
+    let mut schedule_receiver = schedule_receiver;
+    let mut interval = time::interval(Duration::from_secs_f64(
+        1.0 / settings.max_emission_frequency,
+    ));
+
+    loop {
+        interval.tick().await;
+
+        // Emit the first one of the scheduled messages.
+        // If there is no scheduled message, emit a drop message with probability.
+        match schedule_receiver.try_recv() {
+            Ok(msg) => {
+                if let Err(e) = emission_sender.send(msg) {
+                    tracing::error!("Failed to send message to the transmission channel: {e:?}");
+                }
+            }
+            Err(TryRecvError::Empty) => {
+                // Flip a coin with drop_message_probability.
+                // If the coin is head, emit the drop message.
+                if coin_flip(settings.drop_message_probability) {
+                    if let Err(e) = emission_sender.send(DROP_MESSAGE.to_vec()) {
+                        tracing::error!(
+                            "Failed to send drop message to the transmission channel: {e:?}"
+                        );
+                    }
+                }
+            }
+            Err(TryRecvError::Disconnected) => {
+                tracing::error!("The schedule channel has been closed");
+                break;
+            }
+        }
     }
+}
+
+fn coin_flip(probability: f64) -> bool {
+    rand::thread_rng().gen::<f64>() < probability
 }
