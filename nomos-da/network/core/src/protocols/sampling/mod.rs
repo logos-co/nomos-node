@@ -15,7 +15,6 @@ mod test {
     use libp2p::swarm::SwarmEvent;
     use libp2p::{quic, Multiaddr, PeerId, Swarm, SwarmBuilder};
     use log::debug;
-    use std::borrow::Cow;
     use std::sync::{
         atomic::{AtomicBool, Ordering},
         Arc,
@@ -58,29 +57,27 @@ mod test {
             .try_init();
         let k1 = Keypair::generate_ed25519();
         let k2 = Keypair::generate_ed25519();
-        let _peer_id1 = PeerId::from_public_key(&k1.public());
-        let peer_id1: Cow<'_, PeerId> = Cow::Borrowed(&_peer_id1);
-        let _peer_id2 = PeerId::from_public_key(&k2.public());
-        let peer_id2: Cow<'_, PeerId> = Cow::Borrowed(&_peer_id2);
-
         let neighbours = AllNeighbours {
-            neighbours: [peer_id1.clone().into_owned(), peer_id2.clone().into_owned()]
-                .into_iter()
-                .collect(),
+            neighbours: [
+                PeerId::from_public_key(&k1.public()),
+                PeerId::from_public_key(&k2.public()),
+            ]
+            .into_iter()
+            .collect(),
         };
+
         let p1_address = "/ip4/127.0.0.1/udp/5080/quic-v1"
             .parse::<Multiaddr>()
             .unwrap()
-            .with_p2p(peer_id1.clone().into_owned())
+            .with_p2p(PeerId::from_public_key(&k1.public()))
             .unwrap();
         let p2_address = "/ip4/127.0.0.1/udp/5081/quic-v1"
             .parse::<Multiaddr>()
             .unwrap()
-            .with_p2p(peer_id2.clone().into_owned())
+            .with_p2p(PeerId::from_public_key(&k2.public()))
             .unwrap();
-
-        let p1_addresses = vec![(peer_id2.into_owned(), p2_address.clone())];
-        let p2_addresses = vec![(peer_id1.into_owned(), p1_address.clone())];
+        let p1_addresses = vec![(PeerId::from_public_key(&k2.public()), p2_address.clone())];
+        let p2_addresses = vec![(PeerId::from_public_key(&k1.public()), p1_address.clone())];
         let mut p1 = sampling_swarm(
             k1.clone(),
             neighbours.clone(),
@@ -151,9 +148,9 @@ mod test {
                         debug!("{event:?}");
                     }
                 }
-                if res.len() == MSG_COUNT && label == "leading" {
+                if res.len() == MSG_COUNT && label == "peer1" {
                     done1.store(true, Ordering::Relaxed);
-                } else if res.len() == MSG_COUNT && label == "trailing" {
+                } else if res.len() == MSG_COUNT && label == "peer2" {
                     done2.store(true, Ordering::Relaxed);
                 }
             }
@@ -164,13 +161,13 @@ mod test {
         let t1 = tokio::spawn(async move {
             p1.listen_on(p1_address).unwrap();
             tokio::time::sleep(Duration::from_secs(1)).await;
-            test_sampling_swarm("leading", p1, done1_clone_t1, done2_clone_t1).await
+            test_sampling_swarm("peer1", p1, done1_clone_t1, done2_clone_t1).await
         });
 
         let t2 = tokio::spawn(async move {
             p2.listen_on(p2_address).unwrap();
             tokio::time::sleep(Duration::from_secs(1)).await;
-            test_sampling_swarm("trailing", p2, done1_clone_t2, done2_clone_t2).await
+            test_sampling_swarm("peer2", p2, done1_clone_t2, done2_clone_t2).await
         });
 
         tokio::time::sleep(Duration::from_secs(2)).await;
