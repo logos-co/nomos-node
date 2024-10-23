@@ -363,8 +363,8 @@ mod tests {
                 .map(|(_, peer_id, addr)| (peer_id.clone(), addr.clone().with_p2p(peer_id.clone()).unwrap())),
         );
 
-        let subnet_0_membership = create_membership(num_instances / 2, 1, &subnet_0_ids);
-        let subnet_1_membership = create_membership(num_instances / 2, 1, &subnet_1_ids);
+        let subnet_0_membership = create_membership(num_instances / 2, 0, &subnet_0_ids);
+        let subnet_1_membership = create_membership(num_instances / 2, 0, &subnet_1_ids);
 
         let mut all_neighbours = subnet_0_membership;
         all_neighbours
@@ -410,10 +410,7 @@ mod tests {
         };
         let join_validator = tokio::spawn(validator_task);
 
-        //executor_swarms[0].dial(validator_addr_p2p).unwrap();
-
         let executor_disperse_blob_sender = executor_swarms[0].behaviour().blobs_sender();
-        let executor_open_stream_sender = executor_swarms[0].behaviour().open_stream_sender();
 
         let executor_poll = async move {
             let mut res = vec![];
@@ -426,7 +423,7 @@ mod tests {
                         }
                     }
 
-                    _ = time::sleep(Duration::from_secs(20)) => {
+                    _ = time::sleep(Duration::from_secs(1)) => {
                         if res.len() < msg_count {error!("Executor timeout reached");}
                         break;
                     }
@@ -436,8 +433,6 @@ mod tests {
         };
 
         let executor_task = tokio::spawn(executor_poll);
-
-        //executor_open_stream_sender.send(validator_id).unwrap();
 
         for i in 0..msg_count {
             info!("Sending blob {i}...");
