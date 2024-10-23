@@ -6,6 +6,7 @@ edition = "2021"
 [dependencies]
 nomos-core = { path = "../../nomos-core/chain-defs" }
 nomos-executor = { path = "../../nodes/nomos-executor" }
+nomos-node = { path = "../../nodes/nomos-node" }
 reqwest = "0.12"
 serde = "1.0"
 thiserror = "1.0"

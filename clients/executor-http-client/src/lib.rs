@@ -1,13 +1,11 @@
 // std
+use nomos_node::api::handlers::GetRangeReq;
 use std::ops::Range;
 // crates
 use reqwest::{Client, ClientBuilder, StatusCode, Url};
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{de::DeserializeOwned, Serialize};
 // internal
-use nomos_core::da::blob::{
-    self,
-    metadata::{self, Metadata},
-};
+use nomos_core::da::blob::{self, metadata};
 use nomos_executor::api::{handlers::DispersalRequest, paths};
 
 #[derive(thiserror::Error, Debug)]
@@ -22,16 +20,6 @@ pub enum Error {
 pub struct ExecutorHttpClient {
     client: Client,
     executor_address: Url,
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct GetRangeReq<M: metadata::Metadata>
-where
-    <M as Metadata>::AppId: Serialize + DeserializeOwned,
-    <M as Metadata>::Index: Serialize + DeserializeOwned,
-{
-    app_id: <M as Metadata>::AppId,
-    range: Range<<M as Metadata>::Index>,
 }
 
 impl Default for ExecutorHttpClient {
