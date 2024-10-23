@@ -7,36 +7,36 @@ pub use temporal::TemporalProcessorSettings;
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
 
-use crate::processor::crypto::CryptographicProcessor;
+use crate::message_blend::crypto::CryptographicProcessor;
 
-#[derive(Clone, Debug, Serialize, Deserialize, Default)]
-pub struct ProcessorSettings {
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct MessageBlendSettings {
     pub cryptographic_processor: CryptographicProcessorSettings,
     pub temporal_processor: TemporalProcessorSettings,
 }
 
-/// [`Processor`] implements "Message Router" defined in the Tier-2 spec.
+/// [`MessageBlend`] handles the entire Tier-2 spec.
 /// - Wraps new messages using [`CryptographicProcessor`]
 /// - Unwraps incoming messages received from network using [`CryptographicProcessor`]
-/// - Pushes unwrapped messages to [`TemporalProcessor`] to delay them
-/// - Releases messages returned by [`TemporalProcessor`]
-pub struct Processor {
+/// - Pushes unwrapped messages to [`TemporalProcessor`]
+/// - Releases messages returned by [`TemporalProcessor`] to the proper channel
+pub struct MessageBlend {
     /// To receive new messages originated from this node
     new_message_receiver: mpsc::UnboundedReceiver<Vec<u8>>,
-    /// To receive incoming messages from received the network
+    /// To receive incoming messages from the network
     inbound_message_receiver: mpsc::UnboundedReceiver<Vec<u8>>,
     /// To release messages that are successfully processed but still wrapped
     outbound_message_sender: mpsc::UnboundedSender<Vec<u8>>,
     /// To release fully unwrapped messages
     fully_unwrapped_message_sender: mpsc::UnboundedSender<Vec<u8>>,
-    /// To wrap and unwrap messages
+    /// Processor
     cryptographic_processor: CryptographicProcessor,
     // TODO: Add TemporalProcessor
 }
 
-impl Processor {
+impl MessageBlend {
     pub fn new(
-        settings: ProcessorSettings,
+        settings: MessageBlendSettings,
         new_message_receiver: mpsc::UnboundedReceiver<Vec<u8>>,
         inbound_message_receiver: mpsc::UnboundedReceiver<Vec<u8>>,
         outbound_message_sender: mpsc::UnboundedSender<Vec<u8>>,

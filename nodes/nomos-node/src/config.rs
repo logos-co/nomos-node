@@ -280,7 +280,7 @@ pub fn update_mix(
     }
 
     if let Some(num_mix_layers) = mix_num_mix_layers {
-        mix.processor.cryptographic_processor.num_mix_layers = num_mix_layers;
+        mix.message_blend.cryptographic_processor.num_mix_layers = num_mix_layers;
     }
 
     Ok(())

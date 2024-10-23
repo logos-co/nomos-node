@@ -12,12 +12,6 @@ pub struct CryptographicProcessorSettings {
     pub num_mix_layers: usize,
 }
 
-impl Default for CryptographicProcessorSettings {
-    fn default() -> Self {
-        Self { num_mix_layers: 1 }
-    }
-}
-
 impl CryptographicProcessor {
     pub fn new(settings: CryptographicProcessorSettings) -> Self {
         Self { settings }

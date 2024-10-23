@@ -9,8 +9,8 @@ use futures::StreamExt;
 use network::NetworkAdapter;
 use nomos_core::wire;
 use nomos_mix::{
+    message_blend::{MessageBlend, MessageBlendSettings},
     persistent_transmission::{persistent_transmission, PersistentTransmissionSettings},
-    processor::{Processor, ProcessorSettings},
 };
 use nomos_network::NetworkService;
 use overwatch_rs::services::{
@@ -99,17 +99,17 @@ where
             .await;
         });
 
-        // Spawn Message Processor and connect it to Persistent Transmission
+        // Spawn Message Blend and connect it to Persistent Transmission
         let (new_message_sender, new_message_receiver) = mpsc::unbounded_channel();
         let (processor_inbound_sender, processor_inbound_receiver) = mpsc::unbounded_channel();
         let (fully_unwrapped_message_sender, mut fully_unwrapped_message_receiver) =
             mpsc::unbounded_channel();
         tokio::spawn(async move {
-            Processor::new(
-                mix_config.processor,
+            MessageBlend::new(
+                mix_config.message_blend,
                 new_message_receiver,
                 processor_inbound_receiver,
-                // Connect the outputs of Processor to Persistent Transmission
+                // Connect the outputs of Message Blend to Persistent Transmission
                 transmission_schedule_sender,
                 fully_unwrapped_message_sender,
             )
@@ -199,7 +199,7 @@ where
 pub struct MixConfig<BackendSettings> {
     pub backend: BackendSettings,
     pub persistent_transmission: PersistentTransmissionSettings,
-    pub processor: ProcessorSettings,
+    pub message_blend: MessageBlendSettings,
 }
 
 /// A message that is handled by [`MixService`].
