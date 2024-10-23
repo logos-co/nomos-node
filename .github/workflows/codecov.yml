@@ -1,8 +1,7 @@
 on:
   schedule:
     - cron:  '0 3 * * *'
-  push:
-    branches: [ fix-code-coverage-on-self-hosted ]
+
   workflow_dispatch:
 
 name: Codecov
