@@ -8,6 +8,7 @@ use cl::{InputWitness, NoteWitness, NullifierSecret};
 use clap::{Parser, ValueEnum};
 use color_eyre::eyre::{eyre, Result};
 use hex::FromHex;
+use nomos_tracing::logging::{gelf::GelfConfig, local::FileConfig};
 use serde::{Deserialize, Serialize};
 use tracing::Level;
 // internal
@@ -22,12 +23,12 @@ use nomos_mix_service::MixService;
 use nomos_network::backends::libp2p::Libp2p as NetworkBackend;
 use nomos_network::NetworkService;
 use nomos_storage::backends::rocksdb::RocksBackend;
-use nomos_tracing_service::{Logger, LoggerBackend, LoggerFormat};
+use nomos_tracing_service::{LoggerLayer, Tracing};
 use overwatch_rs::services::ServiceData;
 use subnetworks_assignations::versions::v1::FillFromNodeList;
 
 #[derive(ValueEnum, Clone, Debug, Default)]
-pub enum LoggerBackendType {
+pub enum LoggerLayerType {
     Gelf,
     File,
     #[default]
@@ -51,10 +52,7 @@ pub struct LogArgs {
 
     /// Backend type
     #[clap(long = "log-backend", env = "LOG_BACKEND", value_enum)]
-    backend: Option<LoggerBackendType>,
-
-    #[clap(long = "log-format", env = "LOG_FORMAT")]
-    format: Option<String>,
+    backend: Option<LoggerLayerType>,
 
     #[clap(long = "log-level", env = "LOG_LEVEL")]
     level: Option<String>,
@@ -135,7 +133,7 @@ pub struct MetricsArgs {
 
 #[derive(Deserialize, Debug, Clone, Serialize)]
 pub struct Config {
-    pub log: <Logger as ServiceData>::Settings,
+    pub log: <Tracing as ServiceData>::Settings,
     pub network: <NetworkService<NetworkBackend> as ServiceData>::Settings,
     pub mix: <MixService<MixBackend, MixNetworkAdapter> as ServiceData>::Settings,
     pub da_network:
@@ -168,43 +166,34 @@ impl Config {
     }
 }
 
-pub fn update_log(log: &mut <Logger as ServiceData>::Settings, log_args: LogArgs) -> Result<()> {
+pub fn update_log(log: &mut <Tracing as ServiceData>::Settings, log_args: LogArgs) -> Result<()> {
     let LogArgs {
         backend,
         log_addr: addr,
         directory,
         prefix,
-        format,
         level,
     } = log_args;
 
     // Override the file config with the one from env variables.
     if let Some(backend) = backend {
-        log.backend = match backend {
-            LoggerBackendType::Gelf => LoggerBackend::Gelf {
+        log.logger = match backend {
+            LoggerLayerType::Gelf => LoggerLayer::Gelf(GelfConfig {
                 addr: addr
                     .ok_or_else(|| eyre!("Gelf backend requires an address."))?
                     .to_socket_addrs()?
                     .next()
                     .ok_or_else(|| eyre!("Invalid gelf address"))?,
-            },
-            LoggerBackendType::File => LoggerBackend::File {
+            }),
+            LoggerLayerType::File => LoggerLayer::File(FileConfig {
                 directory: directory.ok_or_else(|| eyre!("File backend requires a directory."))?,
                 prefix,
-            },
-            LoggerBackendType::Stdout => LoggerBackend::Stdout,
-            LoggerBackendType::Stderr => LoggerBackend::Stderr,
+            }),
+            LoggerLayerType::Stdout => LoggerLayer::Stdout,
+            LoggerLayerType::Stderr => LoggerLayer::Stderr,
         }
     };
 
-    // Update parts of the config.
-    if let Some(format_str) = format {
-        log.format = match format_str.as_str() {
-            "Json" => LoggerFormat::Json,
-            "Plain" => LoggerFormat::Plain,
-            _ => return Err(eyre!("Invalid log format provided.")),
-        };
-    }
     if let Some(level_str) = level {
         log.level = match level_str.as_str() {
             "DEBUG" => Level::DEBUG,

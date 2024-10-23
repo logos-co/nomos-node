@@ -9,13 +9,13 @@ const GELF_RECONNECT_INTERVAL: u64 = 10;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct GelfConfig {
-    addr: SocketAddr,
+    pub addr: SocketAddr,
 }
 
 pub fn create_gelf_layer(
     config: GelfConfig,
     handle: &Handle,
-) -> Result<tracing_gelf::Logger, Box<dyn Error>> {
+) -> Result<tracing_gelf::Logger, Box<dyn Error + Send + Sync>> {
     let (layer, mut task) = tracing_gelf::Logger::builder()
         .connect_tcp(config.addr)
         .expect("Connect to the graylog instance");

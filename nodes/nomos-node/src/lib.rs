@@ -52,7 +52,7 @@ pub use nomos_storage::{
 };
 pub use nomos_system_sig::SystemSig;
 #[cfg(feature = "tracing")]
-pub use nomos_tracing_service::Logger;
+pub use nomos_tracing_service::Tracing;
 use overwatch_derive::*;
 use overwatch_rs::services::handle::ServiceHandle;
 use rand_chacha::ChaCha20Rng;
@@ -161,7 +161,7 @@ pub type NodeDaVerifier = DaVerifier<VerifierNetworkAdapter<FillFromNodeList>>;
 #[derive(Services)]
 pub struct Nomos {
     #[cfg(feature = "tracing")]
-    logging: ServiceHandle<Logger>,
+    logging: ServiceHandle<Tracing>,
     network: ServiceHandle<NetworkService<NetworkBackend>>,
     mix: ServiceHandle<MixService<MixBackend, MixNetworkAdapter>>,
     da_indexer: ServiceHandle<NodeDaIndexer>,

@@ -8,6 +8,7 @@ edition = "2021"
 [dependencies]
 async-trait = "0.1"
 futures = "0.3"
+nomos-tracing = { path = "../../nomos-tracing" }
 opentelemetry = { version = "0.25" }
 opentelemetry-otlp = "0.25"
 opentelemetry_sdk = { version = "0.25", features = ["rt-tokio"] }

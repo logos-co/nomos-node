@@ -14,11 +14,12 @@ use url::Url;
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct OtlpTracingConfig {
     pub endpoint: Url,
+    pub sample_ratio: f64,
 }
 
 pub fn create_otlp_tracing_layer<S>(
     config: OtlpTracingConfig,
-) -> Result<OpenTelemetryLayer<S, Tracer>, Box<dyn Error>>
+) -> Result<OpenTelemetryLayer<S, Tracer>, Box<dyn Error + Send + Sync>>
 where
     S: Subscriber + for<'span> LookupSpan<'span>,
 {
@@ -28,14 +29,14 @@ where
     let tracer_provider = opentelemetry_otlp::new_pipeline()
         .tracing()
         .with_trace_config(opentelemetry_sdk::trace::Config::default().with_sampler(
-            Sampler::ParentBased(Box::new(Sampler::TraceIdRatioBased(1.0))),
+            Sampler::ParentBased(Box::new(Sampler::TraceIdRatioBased(config.sample_ratio))),
         ))
         .with_batch_config(BatchConfig::default())
         .with_exporter(otel_exporter)
         .install_batch(opentelemetry_sdk::runtime::Tokio)?;
 
     global::set_tracer_provider(tracer_provider.clone());
-    let tracer: opentelemetry_sdk::trace::Tracer = tracer_provider.tracer("BasicTracer");
+    let tracer: opentelemetry_sdk::trace::Tracer = tracer_provider.tracer("NomosTracer");
 
     Ok(OpenTelemetryLayer::new(tracer))
 }

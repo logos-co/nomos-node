@@ -15,7 +15,7 @@ pub struct LokiConfig {
 pub fn create_loki_layer(
     config: LokiConfig,
     handle: &Handle,
-) -> Result<tracing_loki::Layer, Box<dyn Error>> {
+) -> Result<tracing_loki::Layer, Box<dyn Error + Send + Sync>> {
     let (loki_layer, task) = tracing_loki::layer(
         config.endpoint,
         vec![("host".into(), config.host_identifier)]
