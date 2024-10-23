@@ -150,24 +150,26 @@ impl<M: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'static> Netw
 mod tests {
     use super::*;
     use crate::address_book::AddressBook;
-    use crate::protocols::dispersal::executor::behaviour::{DispersalExecutorBehaviour, DispersalExecutorEvent};
+    use crate::behaviour::validator::ValidatorBehaviourEvent;
+    use crate::protocols::dispersal::executor::behaviour::{
+        DispersalExecutorBehaviour, DispersalExecutorEvent,
+    };
     use crate::protocols::replication::handler::DaMessage;
+    use crate::protocols::sampling::behaviour::{SamplingBehaviour, SamplingEvent};
     use futures::task::ArcWake;
+    use kzgrs_backend::common::blob::DaBlob;
+    use kzgrs_backend::common::Column;
     use libp2p::identity::Keypair;
+    use libp2p::swarm::SwarmEvent;
     use libp2p::{identity, quic, PeerId, Swarm};
     use nomos_da_messages::common::Blob;
     use std::collections::{HashMap, HashSet};
     use std::sync::Arc;
     use std::time::Duration;
-    use libp2p::swarm::SwarmEvent;
     use tokio::time;
     use tracing::{error, info};
     use tracing_subscriber::fmt::TestWriter;
     use tracing_subscriber::EnvFilter;
-    use kzgrs_backend::common::blob::DaBlob;
-    use kzgrs_backend::common::Column;
-    use crate::behaviour::validator::ValidatorBehaviourEvent;
-    use crate::protocols::sampling::behaviour::{SamplingBehaviour, SamplingEvent};
 
     #[derive(Clone, Debug)]
     struct Neighbourhood {
@@ -225,6 +227,8 @@ mod tests {
     ) -> libp2p::Swarm<
         DispersalExecutorBehaviour<impl MembershipHandler<NetworkId = u32, Id = PeerId>>,
     > {
+        info!("Creating executor_swarm with peerID {}", peer_id);
+
         libp2p::SwarmBuilder::with_existing_identity(key)
             .with_tokio()
             .with_other_transport(|keypair| quic::tokio::Transport::new(quic::Config::new(keypair)))
@@ -264,7 +268,9 @@ mod tests {
             let keypair = identity::Keypair::generate_ed25519();
             let peer_id = PeerId::from(keypair.public());
             let port = 5100 + i;
-            let addr: Multiaddr = format!("/ip4/127.0.0.1/udp/{port}/quic-v1").parse().unwrap();
+            let addr: Multiaddr = format!("/ip4/127.0.0.1/udp/{port}/quic-v1")
+                .parse()
+                .unwrap();
 
             configs.push((keypair, peer_id, addr));
         }
@@ -344,11 +350,18 @@ mod tests {
             .iter()
             .map(|(_, peer_id, _)| peer_id.clone())
             .collect::<Vec<_>>();
+
         let subnet_1_config = prepare_swarm_config(num_instances / 2);
         let subnet_1_ids = subnet_1_config
             .iter()
             .map(|(_, peer_id, _)| peer_id.clone())
             .collect::<Vec<_>>();
+
+        let addressbook = AddressBook::from_iter(
+            subnet_1_config
+                .iter()
+                .map(|(_, peer_id, addr)| (peer_id.clone(), addr.clone().with_p2p(peer_id.clone()).unwrap())),
+        );
 
         let subnet_0_membership = create_membership(num_instances / 2, 1, &subnet_0_ids);
         let subnet_1_membership = create_membership(num_instances / 2, 1, &subnet_1_ids);
@@ -365,18 +378,14 @@ mod tests {
         for i in 0..num_instances / 2 {
             let (k, executor_peer, addr) = subnet_0_config[i].clone();
             let (k2, validator_peer, addr2) = subnet_1_config[i].clone();
-            let addressbook =
-                AddressBook::from_iter([(validator_peer, addr2.clone())]);
-            let executor = executor_swarm(addressbook, k, executor_peer, all_neighbours.clone());
+            let executor = executor_swarm(addressbook.clone(), k, executor_peer, all_neighbours.clone());
             let validator = validator_swarm(k2, all_neighbours.clone());
             executor_swarms.push(executor);
             validator_swarms.push(validator);
         }
 
         let (validator_key, validator_id, validator_addr) = subnet_1_config[0].clone();
-        let validator_addr_p2p = validator_addr.clone().with_p2p(validator_id).unwrap();
-
-        let blobs_sender = executor_swarms[0].behaviour().blobs_sender();
+        let validator_addr_p2p =  validator_addr.clone().with_p2p(validator_id.clone()).unwrap();
 
         let msg_count = 10usize;
         let validator_task = async move {
@@ -385,7 +394,7 @@ mod tests {
             let mut res = vec![];
             loop {
                 match validator_swarms[0].next().await {
-                    Some(SwarmEvent::Behaviour(DispersalEvent::IncomingMessage {message})) => {
+                    Some(SwarmEvent::Behaviour(DispersalEvent::IncomingMessage { message })) => {
                         res.push(message);
                     }
                     event => {
@@ -401,8 +410,10 @@ mod tests {
         };
         let join_validator = tokio::spawn(validator_task);
 
-        let executor_open_stream_sender = executor_swarms[0].behaviour().open_stream_sender();
+        //executor_swarms[0].dial(validator_addr_p2p).unwrap();
+
         let executor_disperse_blob_sender = executor_swarms[0].behaviour().blobs_sender();
+        let executor_open_stream_sender = executor_swarms[0].behaviour().open_stream_sender();
 
         let executor_poll = async move {
             let mut res = vec![];
