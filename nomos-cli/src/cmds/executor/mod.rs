@@ -1,9 +1,14 @@
+// std
 use std::path::PathBuf;
-
+// crates
 use clap::Args;
-use executor_http_client::ExecutorHttpClient;
-use kzgrs_backend::dispersal::Metadata;
 use reqwest::Url;
+// internal
+use executor_http_client::ExecutorHttpClient;
+use kzgrs_backend::{
+    common::blob::DaBlob,
+    dispersal::{Index, Metadata},
+};
 
 #[derive(Args, Debug)]
 pub struct Disseminate {
@@ -60,6 +65,68 @@ impl Disseminate {
         while let Ok(update) = res_receiver.recv() {
             match update {
                 Ok(_) => tracing::info!("Data successfully disseminated."),
+                Err(e) => {
+                    tracing::error!("Error disseminating data: {e}");
+                    return Err(e.into());
+                }
+            }
+        }
+
+        tracing::info!("Done");
+        Ok(())
+    }
+}
+
+#[derive(Args, Debug)]
+pub struct Retrieve {
+    /// Application ID of data in Indexer.
+    #[clap(long)]
+    pub app_id: String,
+    ///  Retrieve from this Index associated with Application ID.
+    #[clap(long)]
+    pub from: u64,
+    /// Retrieve to this Index associated with Application ID.
+    #[clap(long)]
+    pub to: u64,
+    /// Node address to retrieve appid blobs.
+    #[clap(long)]
+    pub addr: Url,
+}
+
+impl Retrieve {
+    pub fn run(&self) -> Result<(), Box<dyn std::error::Error>> {
+        tracing::subscriber::set_global_default(tracing_subscriber::FmtSubscriber::new())
+            .expect("setting tracing default failed");
+
+        let client = ExecutorHttpClient::new(reqwest::Client::new(), self.addr.clone());
+        let app_id: [u8; 32] = hex::decode(&self.app_id)?
+            .try_into()
+            .map_err(|_| "Invalid app_id")?;
+        let from: Index = self.from.into();
+        let to: Index = self.to.into();
+
+        let (res_sender, res_receiver) = std::sync::mpsc::channel();
+        tokio::spawn(async move {
+            let res = client
+                .get_app_data_range_from_node::<DaBlob, kzgrs_backend::dispersal::Metadata>(
+                    app_id,
+                    from..to,
+                )
+                .await
+                .map_err(|err| format!("Failed to retrieve data form appid {app_id:?}: {err:?}",));
+            res_sender.send(res).unwrap();
+        });
+
+        while let Ok(update) = res_receiver.recv() {
+            match update {
+                Ok(app_blobs) => {
+                    for (index, blobs) in app_blobs.iter() {
+                        tracing::info!("Index {:?} has {:} blobs", (index), blobs.len());
+                        for blob in blobs.iter() {
+                            tracing::info!("Index {:?}; Blob: {blob:?}", index.to_u64());
+                        }
+                    }
+                }
                 Err(e) => {
                     tracing::error!("Error disseminating data: {e}");
                     return Err(e.into());
