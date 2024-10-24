@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use nomos_mix_message::DROP_MESSAGE;
-use rand::Rng;
+use rand::{distributions::Uniform, prelude::Distribution, rngs::SmallRng, Rng, SeedableRng};
 use serde::{Deserialize, Serialize};
 use tokio::{
     sync::mpsc::{self, error::TryRecvError},
@@ -41,6 +41,8 @@ pub async fn persistent_transmission(
     let mut interval = time::interval(Duration::from_secs_f64(
         1.0 / settings.max_emission_frequency,
     ));
+    let mut coin =
+        Coin::<_>::new(SmallRng::from_entropy(), settings.drop_message_probability).unwrap();
 
     loop {
         interval.tick().await;
@@ -54,9 +56,8 @@ pub async fn persistent_transmission(
                 }
             }
             Err(TryRecvError::Empty) => {
-                // Flip a coin with drop_message_probability.
                 // If the coin is head, emit the drop message.
-                if coin_flip(settings.drop_message_probability) {
+                if coin.flip() {
                     if let Err(e) = emission_sender.send(DROP_MESSAGE.to_vec()) {
                         tracing::error!(
                             "Failed to send drop message to the transmission channel: {e:?}"
@@ -72,8 +73,33 @@ pub async fn persistent_transmission(
     }
 }
 
-fn coin_flip(probability: f64) -> bool {
-    rand::thread_rng().gen::<f64>() < probability
+struct Coin<R: Rng> {
+    rng: R,
+    distribution: Uniform<f64>,
+    probability: f64,
+}
+
+impl<R: Rng> Coin<R> {
+    fn new(rng: R, probability: f64) -> Result<Self, CoinError> {
+        if !(0.0..=1.0).contains(&probability) {
+            return Err(CoinError::InvalidProbability);
+        }
+        Ok(Self {
+            rng,
+            distribution: Uniform::from(0.0..1.0),
+            probability,
+        })
+    }
+
+    // Flip the coin based on the given probability.
+    fn flip(&mut self) -> bool {
+        self.distribution.sample(&mut self.rng) < self.probability
+    }
+}
+
+#[derive(Debug)]
+enum CoinError {
+    InvalidProbability,
 }
 
 #[cfg(test)]
