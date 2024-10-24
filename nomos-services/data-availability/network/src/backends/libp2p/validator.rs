@@ -3,6 +3,7 @@ use crate::backends::libp2p::common::{
     DaNetworkBackendSettings, SamplingEvent, BROADCAST_CHANNEL_SIZE,
 };
 use crate::backends::NetworkBackend;
+use futures::future::{AbortHandle, Abortable, Aborted};
 use futures::{Stream, StreamExt};
 use kzgrs_backend::common::blob::DaBlob;
 use libp2p::PeerId;
@@ -51,13 +52,8 @@ pub enum DaNetworkEvent {
 /// Internally uses a libp2p swarm composed of the [`ValidatorBehaviour`]
 /// It forwards network messages to the corresponding subscription channels/streams
 pub struct DaNetworkValidatorBackend<Membership> {
-    // TODO: this join handles should be cancelable tasks. We should add an stop method for
-    // the `NetworkBackend` trait so if the service is stopped the backend can gracefully handle open
-    // sub-tasks as well.
-    #[allow(dead_code)]
-    task: JoinHandle<()>,
-    #[allow(dead_code)]
-    replies_task: JoinHandle<()>,
+    task: (AbortHandle, JoinHandle<Result<(), Aborted>>),
+    replies_task: (AbortHandle, JoinHandle<Result<(), Aborted>>),
     sampling_request_channel: UnboundedSender<(SubnetworkId, BlobId)>,
     sampling_broadcast_receiver: broadcast::Receiver<SamplingEvent>,
     verifying_broadcast_receiver: broadcast::Receiver<DaBlob>,
@@ -108,18 +104,29 @@ where
 
         let sampling_request_channel = validator_swarm.sample_request_channel();
 
-        let task = overwatch_handle.runtime().spawn(validator_swarm.run());
+        let (task_abort_handle, abort_registration) = AbortHandle::new_pair();
+        let task = (
+            task_abort_handle,
+            overwatch_handle
+                .runtime()
+                .spawn(Abortable::new(validator_swarm.run(), abort_registration)),
+        );
         let (sampling_broadcast_sender, sampling_broadcast_receiver) =
             broadcast::channel(BROADCAST_CHANNEL_SIZE);
         let (verifying_broadcast_sender, verifying_broadcast_receiver) =
             broadcast::channel(BROADCAST_CHANNEL_SIZE);
-        let replies_task = overwatch_handle
-            .runtime()
-            .spawn(handle_validator_events_stream(
-                validator_events_stream,
-                sampling_broadcast_sender,
-                verifying_broadcast_sender,
-            ));
+        let (replies_task_abort_handle, replies_task_abort_registration) = AbortHandle::new_pair();
+        let replies_task = (
+            replies_task_abort_handle,
+            overwatch_handle.runtime().spawn(Abortable::new(
+                handle_validator_events_stream(
+                    validator_events_stream,
+                    sampling_broadcast_sender,
+                    verifying_broadcast_sender,
+                ),
+                replies_task_abort_registration,
+            )),
+        );
 
         Self {
             task,
@@ -129,6 +136,16 @@ where
             verifying_broadcast_receiver,
             _membership: Default::default(),
         }
+    }
+
+    fn shutdown(&mut self) {
+        let Self {
+            task: (task_handle, _),
+            replies_task: (replies_handle, _),
+            ..
+        } = self;
+        task_handle.abort();
+        replies_handle.abort();
     }
 
     async fn process(&self, msg: Self::Message) {

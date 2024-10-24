@@ -102,6 +102,7 @@ where
                 }
                 Some(msg) = lifecycle_stream.next() => {
                     if Self::should_stop_service(msg).await {
+                        backend.shutdown();
                         break;
                     }
                 }
