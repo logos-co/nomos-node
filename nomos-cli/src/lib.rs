@@ -1,9 +1,4 @@
-pub mod api;
 pub mod cmds;
-pub mod da;
-
-#[cfg(test)]
-pub mod test_utils;
 
 use clap::Parser;
 use cmds::Command;
