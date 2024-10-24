@@ -28,7 +28,6 @@ pub fn create_mix_configs(ids: &[[u8; 32]]) -> Vec<GeneralMixConfig> {
                     node_key,
                     membership: Vec::new(),
                     peering_degree: 1,
-                    num_mix_layers: 1,
                 },
             }
         })

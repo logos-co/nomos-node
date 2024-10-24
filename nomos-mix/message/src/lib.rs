@@ -5,7 +5,7 @@ pub use error::Error;
 use sha2::{Digest, Sha256};
 
 pub const MSG_SIZE: usize = 2048;
-pub const NOISE: [u8; MSG_SIZE] = [0; MSG_SIZE];
+pub const DROP_MESSAGE: [u8; MSG_SIZE] = [0; MSG_SIZE];
 
 /// A mock implementation of the Sphinx encoding.
 ///
@@ -55,7 +55,7 @@ pub fn unwrap_message(message: &[u8]) -> Result<(Vec<u8>, bool), Error> {
     }
 }
 
-/// Check if the message is a noise message.
-pub fn is_noise(message: &[u8]) -> bool {
-    message == NOISE
+/// Check if the message is a drop message.
+pub fn is_drop_message(message: &[u8]) -> bool {
+    message == DROP_MESSAGE
 }

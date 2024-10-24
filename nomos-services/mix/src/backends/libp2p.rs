@@ -25,7 +25,7 @@ pub struct Libp2pMixBackend {
     #[allow(dead_code)]
     task: JoinHandle<()>,
     swarm_message_sender: mpsc::Sender<MixSwarmMessage>,
-    fully_unwrapped_message_sender: broadcast::Sender<Vec<u8>>,
+    incoming_message_sender: broadcast::Sender<Vec<u8>>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -36,7 +36,6 @@ pub struct Libp2pMixBackendSettings {
     pub node_key: ed25519::SecretKey,
     pub membership: Vec<Multiaddr>,
     pub peering_degree: usize,
-    pub num_mix_layers: usize,
 }
 
 const CHANNEL_SIZE: usize = 64;
@@ -47,15 +46,14 @@ impl MixBackend for Libp2pMixBackend {
 
     fn new(config: Self::Settings, overwatch_handle: OverwatchHandle) -> Self {
         let (swarm_message_sender, swarm_message_receiver) = mpsc::channel(CHANNEL_SIZE);
-        let (fully_unwrapped_message_sender, _) = broadcast::channel(CHANNEL_SIZE);
+        let (incoming_message_sender, _) = broadcast::channel(CHANNEL_SIZE);
 
         let keypair = Keypair::from(ed25519::Keypair::from(config.node_key.clone()));
         let local_peer_id = keypair.public().to_peer_id();
         let mut swarm = MixSwarm::new(
             keypair,
-            config.num_mix_layers,
             swarm_message_receiver,
-            fully_unwrapped_message_sender.clone(),
+            incoming_message_sender.clone(),
         );
 
         swarm
@@ -89,25 +87,23 @@ impl MixBackend for Libp2pMixBackend {
         Self {
             task,
             swarm_message_sender,
-            fully_unwrapped_message_sender,
+            incoming_message_sender,
         }
     }
 
-    async fn mix(&self, msg: Vec<u8>) {
+    async fn publish(&self, msg: Vec<u8>) {
         if let Err(e) = self
             .swarm_message_sender
-            .send(MixSwarmMessage::Mix(msg))
+            .send(MixSwarmMessage::Publish(msg))
             .await
         {
             tracing::error!("Failed to send message to MixSwarm: {e}");
         }
     }
 
-    fn listen_to_fully_unwrapped_messages(
-        &mut self,
-    ) -> Pin<Box<dyn Stream<Item = Vec<u8>> + Send>> {
+    fn listen_to_incoming_messages(&mut self) -> Pin<Box<dyn Stream<Item = Vec<u8>> + Send>> {
         Box::pin(
-            BroadcastStream::new(self.fully_unwrapped_message_sender.subscribe())
+            BroadcastStream::new(self.incoming_message_sender.subscribe())
                 .filter_map(|event| async { event.ok() }),
         )
     }
@@ -115,29 +111,26 @@ impl MixBackend for Libp2pMixBackend {
 
 struct MixSwarm {
     swarm: Swarm<nomos_mix_network::Behaviour>,
-    num_mix_layers: usize,
     swarm_messages_receiver: mpsc::Receiver<MixSwarmMessage>,
-    fully_unwrapped_messages_sender: broadcast::Sender<Vec<u8>>,
+    incoming_message_sender: broadcast::Sender<Vec<u8>>,
 }
 
 #[derive(Debug)]
 pub enum MixSwarmMessage {
-    Mix(Vec<u8>),
+    Publish(Vec<u8>),
 }
 
 impl MixSwarm {
     fn new(
         keypair: Keypair,
-        num_mix_layers: usize,
         swarm_messages_receiver: mpsc::Receiver<MixSwarmMessage>,
-        fully_unwrapped_messages_sender: broadcast::Sender<Vec<u8>>,
+        incoming_message_sender: broadcast::Sender<Vec<u8>>,
     ) -> Self {
         let swarm = SwarmBuilder::with_existing_identity(keypair)
             .with_tokio()
             .with_quic()
             .with_behaviour(|_| {
                 nomos_mix_network::Behaviour::new(nomos_mix_network::Config {
-                    transmission_rate: 1.0,
                     duplicate_cache_lifespan: 60,
                 })
             })
@@ -149,9 +142,8 @@ impl MixSwarm {
 
         Self {
             swarm,
-            num_mix_layers,
             swarm_messages_receiver,
-            fully_unwrapped_messages_sender,
+            incoming_message_sender,
         }
     }
 
@@ -178,18 +170,9 @@ impl MixSwarm {
 
     async fn handle_swarm_message(&mut self, msg: MixSwarmMessage) {
         match msg {
-            MixSwarmMessage::Mix(msg) => {
-                tracing::debug!("Wrap msg and send it to mix network: {msg:?}");
-                match nomos_mix_message::new_message(&msg, self.num_mix_layers.try_into().unwrap())
-                {
-                    Ok(wrapped_msg) => {
-                        if let Err(e) = self.swarm.behaviour_mut().publish(wrapped_msg) {
-                            tracing::error!("Failed to publish message to mix network: {e:?}");
-                        }
-                    }
-                    Err(e) => {
-                        tracing::error!("Failed to wrap message: {e:?}");
-                    }
+            MixSwarmMessage::Publish(msg) => {
+                if let Err(e) = self.swarm.behaviour_mut().publish(msg) {
+                    tracing::error!("Failed to publish message to mix network: {e:?}");
                 }
             }
         }
@@ -197,9 +180,9 @@ impl MixSwarm {
 
     fn handle_event(&mut self, event: SwarmEvent<nomos_mix_network::Event>) {
         match event {
-            SwarmEvent::Behaviour(nomos_mix_network::Event::FullyUnwrappedMessage(msg)) => {
-                tracing::debug!("Received fully unwrapped message: {msg:?}");
-                self.fully_unwrapped_messages_sender.send(msg).unwrap();
+            SwarmEvent::Behaviour(nomos_mix_network::Event::Message(msg)) => {
+                tracing::debug!("Received message from a peer: {msg:?}");
+                self.incoming_message_sender.send(msg).unwrap();
             }
             SwarmEvent::Behaviour(nomos_mix_network::Event::Error(e)) => {
                 tracing::error!("Received error from mix network: {e:?}");
