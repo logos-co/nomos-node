@@ -1,6 +1,7 @@
 on:
   schedule:
     - cron:  '0 3 * * *'
+
   workflow_dispatch:
 
 name: Codecov
@@ -11,18 +12,14 @@ jobs:
       CARGO_INCREMENTAL: 0
       RUSTFLAGS: "-C instrument-coverage"
       LLVM_PROFILE_FILE: "nomos-node-%p-%m.profraw"
-    runs-on: ['self-hosted','ubuntu-22.04']
+    runs-on: ['ubuntu-22.04']
     steps:
       - uses: actions/checkout@v3
         with:
           submodules: true
-      - name: Remove unwanted software
-        uses: ./.github/actions/prune-vm
       - uses: arduino/setup-protoc@v3
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Checkout submodules
-        run: git submodule update --init --recursive
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal

@@ -211,7 +211,7 @@ impl NetworkBehaviour for Behaviour {
                 }
 
                 // Notify the swarm about the received message,
-                // so that it can be processed by the Tier 2 module.
+                // so that it can be processed by the core protocol module.
                 self.events
                     .push_back(ToSwarm::GenerateEvent(Event::Message(message)));
             }

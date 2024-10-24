@@ -8,7 +8,7 @@ async-trait = "0.1"
 futures = "0.3"
 libp2p = { version = "0.53", features = ["ed25519"] }
 nomos-libp2p = { path = "../../nomos-libp2p", optional = true }
-nomos-core = { path = "../../nomos-core" }
+nomos-core = { path = "../../nomos-core/chain-defs" }
 nomos-mix-network = { path = "../../nomos-mix/network" }
 nomos-mix-message = { path = "../../nomos-mix/message" }
 nomos-network = { path = "../network" }

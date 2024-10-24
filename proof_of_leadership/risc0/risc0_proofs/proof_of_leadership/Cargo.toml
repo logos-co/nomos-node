@@ -8,7 +8,7 @@ edition = "2021"
 [dependencies]
 risc0-zkvm = { version = "1.0", default-features = false, features = ['std'] }
 serde = { version = "1.0", features = ["derive"] }
-cl = { path = "../../../../cl/cl" }
+cl = { path = "../../../../nomos-core/cl" }
 leader_proof_statements = { path = "../../../proof_statements" }
 sha2 = "0.10"
 crypto-bigint = "0.5.5"
