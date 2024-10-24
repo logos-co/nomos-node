@@ -1,11 +1,8 @@
 // std
-use nomos_node::api::handlers::GetRangeReq;
-use std::ops::Range;
 // crates
 use reqwest::{Client, ClientBuilder, StatusCode, Url};
-use serde::{de::DeserializeOwned, Serialize};
+use serde::Serialize;
 // internal
-use nomos_core::da::blob::{self, metadata};
 use nomos_executor::api::{handlers::DispersalRequest, paths};
 
 #[derive(thiserror::Error, Debug)]
@@ -68,35 +65,5 @@ impl ExecutorHttpClient {
             )),
             _ => unreachable!("As per the documentation it can only return 200 or 500 responses"),
         }
-    }
-
-    pub async fn get_app_data_range_from_node<Blob, Metadata>(
-        &self,
-        app_id: Metadata::AppId,
-        range: Range<Metadata::Index>,
-    ) -> Result<Vec<(Metadata::Index, Vec<Blob>)>, Error>
-    where
-        Blob: blob::Blob + DeserializeOwned,
-        Metadata: metadata::Metadata + Serialize,
-        <Metadata as metadata::Metadata>::Index: Serialize + DeserializeOwned,
-        <Metadata as metadata::Metadata>::AppId: Serialize + DeserializeOwned,
-    {
-        let url = self
-            .executor_address
-            .join(paths::DA_GET_RANGE)
-            .expect("Url should build properly");
-        let req = &GetRangeReq::<Metadata> { app_id, range };
-
-        Ok(self
-            .client
-            .post(url)
-            .header("Content-Type", "application/json")
-            .json(&req)
-            .send()
-            .await
-            .unwrap()
-            .json::<Vec<(Metadata::Index, Vec<Blob>)>>()
-            .await
-            .unwrap())
     }
 }
