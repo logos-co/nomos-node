@@ -1,7 +1,6 @@
 use serde::{Deserialize, Serialize};
 
 use crate::{partial_tx::PartialTx, BalanceWitness, PartialTxWitness};
-
 /// The transaction bundle is a collection of partial transactions.
 /// The goal in bundling transactions is to produce a set of partial transactions
 /// that balance each other.
@@ -68,10 +67,10 @@ mod test {
         let nf_c = NullifierSecret::random(&mut rng);
 
         let nmo_10_utxo = OutputWitness::new(NoteWitness::basic(10, nmo, &mut rng), nf_a.commit());
-        let nmo_10_in = InputWitness::from_output(nmo_10_utxo, nf_a);
+        let nmo_10_in = InputWitness::from_output(nmo_10_utxo, nf_a, vec![]);
 
         let eth_23_utxo = OutputWitness::new(NoteWitness::basic(23, eth, &mut rng), nf_b.commit());
-        let eth_23_in = InputWitness::from_output(eth_23_utxo, nf_b);
+        let eth_23_in = InputWitness::from_output(eth_23_utxo, nf_b, vec![]);
 
         let crv_4840_out =
             OutputWitness::new(NoteWitness::basic(4840, crv, &mut rng), nf_c.commit());
@@ -108,7 +107,7 @@ mod test {
             ]
         );
 
-        let crv_4840_in = InputWitness::from_output(crv_4840_out, nf_c);
+        let crv_4840_in = InputWitness::from_output(crv_4840_out, nf_c, vec![]);
         let nmo_10_out = OutputWitness::new(
             NoteWitness::basic(10, nmo, &mut rng),
             NullifierSecret::random(&mut rng).commit(), // transferring to a random owner

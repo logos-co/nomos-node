@@ -2,19 +2,19 @@ use rand::RngCore;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
-use crate::{balance::Unit, nullifier::NullifierCommitment};
+use crate::{balance::Unit, nullifier::NullifierCommitment, NullifierSecret};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
-pub struct Constraint(pub [u8; 32]);
+pub struct Covenant(pub [u8; 32]);
 
-impl Constraint {
-    pub fn from_vk(constraint_vk: &[u8]) -> Self {
+impl Covenant {
+    pub fn from_vk(covenant_vk: &[u8]) -> Self {
         let mut hasher = Sha256::new();
-        hasher.update(b"NOMOS_CL_CONSTRAINT_COMMIT");
-        hasher.update(constraint_vk);
-        let constraint_cm: [u8; 32] = hasher.finalize().into();
+        hasher.update(b"NOMOS_CL_COVENANT_COMMIT");
+        hasher.update(covenant_vk);
+        let covenant_cm: [u8; 32] = hasher.finalize().into();
 
-        Self(constraint_cm)
+        Self(covenant_cm)
     }
 }
 
@@ -39,36 +39,41 @@ impl NoteCommitment {
 pub struct NoteWitness {
     pub value: u64,
     pub unit: Unit,
-    pub constraint: Constraint,
+    pub covenant: Covenant,
     pub state: [u8; 32],
     pub nonce: Nonce,
 }
 
 impl NoteWitness {
-    pub fn new(
-        value: u64,
-        unit: Unit,
-        constraint: Constraint,
-        state: [u8; 32],
-        nonce: Nonce,
-    ) -> Self {
+    pub fn new(value: u64, unit: Unit, covenant: Covenant, state: [u8; 32], nonce: Nonce) -> Self {
         Self {
             value,
             unit,
-            constraint,
+            covenant,
             state,
             nonce,
         }
     }
 
     pub fn basic(value: u64, unit: Unit, rng: impl RngCore) -> Self {
-        let constraint = Constraint([0u8; 32]);
+        let covenant = Covenant([0u8; 32]);
         let nonce = Nonce::random(rng);
-        Self::new(value, unit, constraint, [0u8; 32], nonce)
+        Self::new(value, unit, covenant, [0u8; 32], nonce)
     }
 
-    pub fn stateless(value: u64, unit: Unit, constraint: Constraint, rng: impl RngCore) -> Self {
-        Self::new(value, unit, constraint, [0u8; 32], Nonce::random(rng))
+    pub fn stateless(value: u64, unit: Unit, covenant: Covenant, rng: impl RngCore) -> Self {
+        Self::new(value, unit, covenant, [0u8; 32], Nonce::random(rng))
+    }
+
+    pub fn evolved_nonce(&self, nf_sk: NullifierSecret, domain: &[u8]) -> Nonce {
+        let mut hasher = Sha256::new();
+        hasher.update(b"NOMOS_COIN_EVOLVE");
+        hasher.update(domain);
+        hasher.update(nf_sk.0);
+        hasher.update(self.commit(nf_sk.commit()).0);
+
+        let nonce_bytes: [u8; 32] = hasher.finalize().into();
+        Nonce::from_bytes(nonce_bytes)
     }
 
     pub fn commit(&self, nf_pk: NullifierCommitment) -> NoteCommitment {
@@ -84,7 +89,7 @@ impl NoteWitness {
         hasher.update(self.state);
 
         // COMMIT TO CONSTRAINT
-        hasher.update(self.constraint.0);
+        hasher.update(self.covenant.0);
 
         // COMMIT TO NONCE
         hasher.update(self.nonce.as_bytes());
@@ -142,7 +147,7 @@ mod test {
                 ..reference_note
             },
             NoteWitness {
-                constraint: Constraint::from_vk(&[1u8; 32]),
+                covenant: Covenant::from_vk(&[1u8; 32]),
                 ..reference_note
             },
             NoteWitness {

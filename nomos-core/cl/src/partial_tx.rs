@@ -77,7 +77,7 @@ impl PartialTxWitness {
         let input_merkle_leaves = merkle::padded_leaves::<MAX_INPUTS>(&input_bytes);
 
         let path = merkle::path(input_merkle_leaves, idx);
-        let input = self.inputs[idx];
+        let input = self.inputs[idx].clone();
         PartialTxInputWitness { input, path }
     }
 
@@ -168,10 +168,10 @@ mod test {
         let nf_c = NullifierSecret::random(&mut rng);
 
         let nmo_10_utxo = OutputWitness::new(NoteWitness::basic(10, nmo, &mut rng), nf_a.commit());
-        let nmo_10 = InputWitness::from_output(nmo_10_utxo, nf_a);
+        let nmo_10 = InputWitness::from_output(nmo_10_utxo, nf_a, vec![]);
 
         let eth_23_utxo = OutputWitness::new(NoteWitness::basic(23, eth, &mut rng), nf_b.commit());
-        let eth_23 = InputWitness::from_output(eth_23_utxo, nf_b);
+        let eth_23 = InputWitness::from_output(eth_23_utxo, nf_b, vec![]);
 
         let crv_4840 = OutputWitness::new(NoteWitness::basic(4840, crv, &mut rng), nf_c.commit());
 

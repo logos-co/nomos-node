@@ -1,8 +1,8 @@
 use std::str::FromStr;
 use std::time::Duration;
 
-use cl::{InputWitness, NoteWitness, NullifierSecret};
-use cryptarchia_consensus::TimeConfig;
+use cl::{NoteWitness, NullifierSecret};
+use cryptarchia_consensus::{LeaderConfig, TimeConfig};
 use nomos_core::staking::NMO_UNIT;
 use nomos_ledger::LedgerState;
 use rand::thread_rng;
@@ -36,7 +36,7 @@ impl ConsensusParams {
 /// specific service or services configuration.
 #[derive(Clone)]
 pub struct GeneralConsensusConfig {
-    pub notes: Vec<InputWitness>,
+    pub leader_config: LeaderConfig,
     pub ledger_config: nomos_ledger::Config,
     pub genesis_state: LedgerState,
     pub time: TimeConfig,
@@ -46,21 +46,22 @@ pub fn create_consensus_configs(
     ids: &[[u8; 32]],
     consensus_params: ConsensusParams,
 ) -> Vec<GeneralConsensusConfig> {
-    let notes = ids
+    let notes = (0..ids.len())
+        .map(|_| NoteWitness::basic(1, NMO_UNIT, &mut thread_rng()))
+        .collect::<Vec<_>>();
+
+    let sks = ids
         .iter()
         .map(|&id| {
             let mut sk = [0; 16];
             sk.copy_from_slice(&id[0..16]);
-            InputWitness::new(
-                NoteWitness::basic(1, NMO_UNIT, &mut thread_rng()),
-                NullifierSecret(sk),
-            )
+            NullifierSecret(sk)
         })
         .collect::<Vec<_>>();
 
     // no commitments for now, proofs are not checked anyway
     let genesis_state = LedgerState::from_commitments(
-        notes.iter().map(|n| n.note_commitment()),
+        notes.iter().zip(&sks).map(|(n, sk)| n.commit(sk.commit())),
         (ids.len() as u32).into(),
     );
     let ledger_config = nomos_ledger::Config {
@@ -82,8 +83,12 @@ pub fn create_consensus_configs(
 
     notes
         .into_iter()
-        .map(|note| GeneralConsensusConfig {
-            notes: vec![note],
+        .zip(sks)
+        .map(|(note, nf_sk)| GeneralConsensusConfig {
+            leader_config: LeaderConfig {
+                notes: vec![note],
+                nf_sk,
+            },
             ledger_config: ledger_config.clone(),
             genesis_state: genesis_state.clone(),
             time: time_config.clone(),
