@@ -80,6 +80,10 @@ impl NetworkBackend for MockExecutorBackend {
         }
     }
 
+    fn shutdown(&mut self) {
+
+    }
+
     async fn process(&self, msg: Self::Message) {
         match msg {
             Command::Disperse {
