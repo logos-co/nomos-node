@@ -10,7 +10,7 @@ members = [
     "nomos-da/network/subnetworks-assignations",
     "nomos-libp2p",
     "nomos-services/api",
-    "nomos-services/log",
+    "nomos-services/tracing",
     "nomos-services/network",
     "nomos-services/storage",
     "nomos-services/cryptarchia-consensus",

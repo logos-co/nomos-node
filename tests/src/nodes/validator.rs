@@ -13,7 +13,6 @@ use nomos_da_sampling::storage::adapters::rocksdb::RocksAdapterSettings as Sampl
 use nomos_da_sampling::{backend::kzgrs::KzgrsSamplingBackendSettings, DaSamplingServiceSettings};
 use nomos_da_verifier::storage::adapters::rocksdb::RocksAdapterSettings as VerifierStorageAdapterSettings;
 use nomos_da_verifier::{backend::kzgrs::KzgrsDaVerifierSettings, DaVerifierServiceSettings};
-use nomos_log::{LoggerBackend, LoggerFormat};
 use nomos_mempool::MempoolMetrics;
 use nomos_network::{backends::libp2p::Libp2pConfig, NetworkConfig};
 use nomos_node::api::paths::{
@@ -21,6 +20,7 @@ use nomos_node::api::paths::{
 };
 use nomos_node::{api::backend::AxumBackendSettings, Config, RocksBackendSettings};
 use nomos_node::{BlobInfo, HeaderId, Tx};
+use nomos_tracing_service::{LoggerBackend, LoggerFormat};
 use reqwest::Url;
 use tempfile::NamedTempFile;
 

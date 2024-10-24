@@ -8,7 +8,6 @@ axum = { version = "0.6" }
 clap = { version = "4", features = ["derive"] }
 nomos-executor = { path = "../../nodes/nomos-executor" }
 nomos-libp2p = { path = "../../nomos-libp2p" }
-nomos-log = { path = "../../nomos-services/log" }
 nomos-node = { path = "../../nodes/nomos-node" }
 rand = "0.8"
 reqwest = { version = "0.11", features = ["json", "rustls-tls"] }

@@ -2,11 +2,11 @@ use nomos_core::{
     header::HeaderId,
     tx::mock::{MockTransaction, MockTxId},
 };
-use nomos_log::{Logger, LoggerSettings};
 use nomos_network::{
     backends::mock::{Mock, MockBackendMessage, MockConfig, MockMessage},
     NetworkConfig, NetworkMsg, NetworkService,
 };
+use nomos_tracing_service::{Logger, LoggerSettings};
 use overwatch_derive::*;
 use overwatch_rs::{overwatch::OverwatchRunner, services::handle::ServiceHandle};
 

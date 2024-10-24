@@ -8,23 +8,23 @@ use cl::{InputWitness, NoteWitness, NullifierSecret};
 use clap::{Parser, ValueEnum};
 use color_eyre::eyre::{eyre, Result};
 use hex::FromHex;
+use serde::{Deserialize, Serialize};
+use tracing::Level;
+// internal
+use crate::{NomosApiService, NomosDaMembership, Wire};
 use nomos_core::staking::NMO_UNIT;
 use nomos_da_network_service::backends::libp2p::validator::DaNetworkValidatorBackend;
 use nomos_da_network_service::NetworkService as DaNetworkService;
 use nomos_libp2p::{ed25519::SecretKey, Multiaddr};
-use nomos_log::{Logger, LoggerBackend, LoggerFormat};
 use nomos_mix_service::backends::libp2p::Libp2pMixBackend as MixBackend;
 use nomos_mix_service::network::libp2p::Libp2pAdapter as MixNetworkAdapter;
 use nomos_mix_service::MixService;
 use nomos_network::backends::libp2p::Libp2p as NetworkBackend;
 use nomos_network::NetworkService;
 use nomos_storage::backends::rocksdb::RocksBackend;
+use nomos_tracing_service::{Logger, LoggerBackend, LoggerFormat};
 use overwatch_rs::services::ServiceData;
-use serde::{Deserialize, Serialize};
 use subnetworks_assignations::versions::v1::FillFromNodeList;
-use tracing::Level;
-// internal
-use crate::{NomosApiService, NomosDaMembership, Wire};
 
 #[derive(ValueEnum, Clone, Debug, Default)]
 pub enum LoggerBackendType {

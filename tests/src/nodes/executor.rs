@@ -20,10 +20,10 @@ use nomos_da_verifier::storage::adapters::rocksdb::RocksAdapterSettings as Verif
 use nomos_da_verifier::DaVerifierServiceSettings;
 use nomos_executor::api::backend::AxumBackendSettings;
 use nomos_executor::config::Config;
-use nomos_log::{LoggerBackend, LoggerFormat};
 use nomos_network::{backends::libp2p::Libp2pConfig, NetworkConfig};
 use nomos_node::api::paths::{CL_METRICS, DA_GET_RANGE};
 use nomos_node::RocksBackendSettings;
+use nomos_tracing_service::{LoggerBackend, LoggerFormat};
 use tempfile::NamedTempFile;
 
 use crate::adjust_timeout;
