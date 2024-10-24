@@ -3,6 +3,7 @@ pub mod configs;
 use configs::{
     da::{create_da_configs, DaParams},
     network::{create_network_configs, NetworkParams},
+    tracing::create_tracing_configs,
     GeneralConfig,
 };
 use rand::{thread_rng, Rng};
@@ -78,6 +79,7 @@ impl Topology {
         let network_configs = create_network_configs(&ids, config.network_params);
         let mix_configs = create_mix_configs(&ids);
         let api_configs = create_api_configs(&ids);
+        let tracing_configs = create_tracing_configs(&ids);
 
         let mut validators = Vec::new();
         for i in 0..config.n_validators {
@@ -87,6 +89,7 @@ impl Topology {
                 network_config: network_configs[i].to_owned(),
                 mix_config: mix_configs[i].to_owned(),
                 api_config: api_configs[i].to_owned(),
+                tracing_config: tracing_configs[i].to_owned(),
             });
             validators.push(Validator::spawn(config).await)
         }
@@ -99,6 +102,7 @@ impl Topology {
                 network_config: network_configs[i].to_owned(),
                 mix_config: mix_configs[i].to_owned(),
                 api_config: api_configs[i].to_owned(),
+                tracing_config: tracing_configs[i].to_owned(),
             });
             executors.push(Executor::spawn(config).await)
         }

@@ -161,7 +161,7 @@ pub type NodeDaVerifier = DaVerifier<VerifierNetworkAdapter<FillFromNodeList>>;
 #[derive(Services)]
 pub struct Nomos {
     #[cfg(feature = "tracing")]
-    logging: ServiceHandle<Tracing>,
+    tracing: ServiceHandle<Tracing>,
     network: ServiceHandle<NetworkService<NetworkBackend>>,
     mix: ServiceHandle<MixService<MixBackend, MixNetworkAdapter>>,
     da_indexer: ServiceHandle<NodeDaIndexer>,

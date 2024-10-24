@@ -133,7 +133,7 @@ pub struct MetricsArgs {
 
 #[derive(Deserialize, Debug, Clone, Serialize)]
 pub struct Config {
-    pub log: <Tracing as ServiceData>::Settings,
+    pub tracing: <Tracing as ServiceData>::Settings,
     pub network: <NetworkService<NetworkBackend> as ServiceData>::Settings,
     pub mix: <MixService<MixBackend, MixNetworkAdapter> as ServiceData>::Settings,
     pub da_network:
@@ -157,7 +157,7 @@ impl Config {
         http_args: HttpArgs,
         cryptarchia_args: CryptarchiaArgs,
     ) -> Result<Self> {
-        update_log(&mut self.log, log_args)?;
+        update_tracing(&mut self.tracing, log_args)?;
         update_network(&mut self.network, network_args)?;
         update_mix(&mut self.mix, mix_args)?;
         update_http(&mut self.http, http_args)?;
@@ -166,18 +166,21 @@ impl Config {
     }
 }
 
-pub fn update_log(log: &mut <Tracing as ServiceData>::Settings, log_args: LogArgs) -> Result<()> {
+pub fn update_tracing(
+    tracing: &mut <Tracing as ServiceData>::Settings,
+    tracing_args: LogArgs,
+) -> Result<()> {
     let LogArgs {
         backend,
         log_addr: addr,
         directory,
         prefix,
         level,
-    } = log_args;
+    } = tracing_args;
 
     // Override the file config with the one from env variables.
     if let Some(backend) = backend {
-        log.logger = match backend {
+        tracing.logger = match backend {
             LoggerLayerType::Gelf => LoggerLayer::Gelf(GelfConfig {
                 addr: addr
                     .ok_or_else(|| eyre!("Gelf backend requires an address."))?
@@ -195,7 +198,7 @@ pub fn update_log(log: &mut <Tracing as ServiceData>::Settings, log_args: LogArg
     };
 
     if let Some(level_str) = level {
-        log.level = match level_str.as_str() {
+        tracing.level = match level_str.as_str() {
             "DEBUG" => Level::DEBUG,
             "INFO" => Level::INFO,
             "ERROR" => Level::ERROR,

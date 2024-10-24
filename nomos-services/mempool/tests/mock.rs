@@ -6,7 +6,7 @@ use nomos_network::{
     backends::mock::{Mock, MockBackendMessage, MockConfig, MockMessage},
     NetworkConfig, NetworkMsg, NetworkService,
 };
-use nomos_tracing_service::{Logger, LoggerSettings};
+use nomos_tracing_service::{Tracing, TracingSettings};
 use overwatch_derive::*;
 use overwatch_rs::{overwatch::OverwatchRunner, services::handle::ServiceHandle};
 
@@ -18,7 +18,7 @@ use nomos_mempool::{
 
 #[derive(Services)]
 struct MockPoolNode {
-    logging: ServiceHandle<Logger>,
+    logging: ServiceHandle<Tracing>,
     network: ServiceHandle<NetworkService<Mock>>,
     mockpool: ServiceHandle<
         TxMempoolService<MockAdapter, MockPool<HeaderId, MockTransaction<MockMessage>, MockTxId>>,
@@ -66,7 +66,7 @@ fn test_mockmempool() {
                 network: (),
                 registry: None,
             },
-            logging: LoggerSettings::default(),
+            logging: TracingSettings::default(),
         },
         None,
     )

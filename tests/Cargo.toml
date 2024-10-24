@@ -12,6 +12,7 @@ nomos-executor = { path = "../nodes/nomos-executor", default-features = false }
 nomos-network = { path = "../nomos-services/network", features = ["libp2p"] }
 nomos-mix-service = { path = "../nomos-services/mix", features = ["libp2p"] }
 cryptarchia-consensus = { path = "../nomos-services/cryptarchia-consensus" }
+nomos-tracing = { path = "../nomos-tracing" }
 nomos-tracing-service = { path = "../nomos-services/tracing" }
 nomos-api = { path = "../nomos-services/api" }
 overwatch-rs = { git = "https://github.com/logos-co/Overwatch", rev = "2f70806" }
