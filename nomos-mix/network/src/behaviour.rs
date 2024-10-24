@@ -197,7 +197,14 @@ impl NetworkBehaviour for Behaviour {
                     return;
                 }
 
+                // Forward the message immediately to the rest of connected peers
+                // without any processing for the fast propagation.
+                if let Err(e) = self.forward_message(message.clone(), Some(peer_id)) {
+                    tracing::error!("Failed to forward message: {e:?}");
+                }
+
                 // Try to unwrap the message.
+                // TODO: Abstract as Tier 2: Cryptographic Processor & Temporal Processor
                 match unwrap_message(&message) {
                     Ok((unwrapped_msg, fully_unwrapped)) => {
                         if fully_unwrapped {
@@ -209,10 +216,7 @@ impl NetworkBehaviour for Behaviour {
                         }
                     }
                     Err(nomos_mix_message::Error::MsgUnwrapNotAllowed) => {
-                        // Forward the received message as it is.
-                        if let Err(e) = self.forward_message(message, Some(peer_id)) {
-                            tracing::error!("Failed to forward message: {:?}", e);
-                        }
+                        tracing::debug!("Message cannot be unwrapped by this node");
                     }
                     Err(e) => {
                         tracing::error!("Failed to unwrap message: {:?}", e);
