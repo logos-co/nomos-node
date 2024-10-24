@@ -80,9 +80,7 @@ impl NetworkBackend for MockExecutorBackend {
         }
     }
 
-    fn shutdown(&mut self) {
-
-    }
+    fn shutdown(&mut self) {}
 
     async fn process(&self, msg: Self::Message) {
         match msg {
