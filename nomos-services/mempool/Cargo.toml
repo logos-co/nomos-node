@@ -29,7 +29,7 @@ utoipa = { version = "4.0", optional = true }
 serde_json = { version = "1", optional = true }
 
 [dev-dependencies]
-nomos-log = { path = "../log" }
+nomos-tracing-service = { path = "../tracing" }
 overwatch-derive = { git = "https://github.com/logos-co/Overwatch", rev = "ac28d01" }
 tokio = { version = "1", features = ["full"] }
 blake2 = "0.10"

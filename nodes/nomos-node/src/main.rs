@@ -78,7 +78,7 @@ fn main() -> Result<()> {
             network: config.network,
             mix: config.mix,
             #[cfg(feature = "tracing")]
-            logging: config.log,
+            tracing: config.tracing,
             http: config.http,
             cl_mempool: nomos_mempool::TxMempoolSettings {
                 backend: (),

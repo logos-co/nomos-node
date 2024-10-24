@@ -30,7 +30,8 @@ nomos-da-network-service = { path = "../../nomos-services/data-availability/netw
 nomos-network = { path = "../../nomos-services/network", features = ["libp2p"] }
 nomos-mix-service = { path = "../../nomos-services/mix", features = ["libp2p"] }
 nomos-api = { path = "../../nomos-services/api" }
-nomos-log = { path = "../../nomos-services/log" }
+nomos-tracing = { path = "../../nomos-tracing" }
+nomos-tracing-service = { path = "../../nomos-services/tracing" }
 nomos-mempool = { path = "../../nomos-services/mempool", features = [
     "mock",
     "libp2p",
