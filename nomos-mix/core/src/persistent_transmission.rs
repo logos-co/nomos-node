@@ -31,7 +31,7 @@ impl Default for PersistentTransmissionSettings {
 /// # Arguments
 ///
 /// * `settings` - The settings for the persistent transmission
-/// * `schedule_receiver` - The channel for scheduled messages
+/// * `schedule_receiver` - The channel for messages scheduled (from Tier 2 currently)
 /// * `emission_sender` - The channel to emit messages
 pub async fn persistent_transmission(
     settings: PersistentTransmissionSettings,
