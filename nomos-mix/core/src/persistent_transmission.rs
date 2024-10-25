@@ -1,7 +1,8 @@
 use std::time::Duration;
 
 use nomos_mix_message::DROP_MESSAGE;
-use rand::{distributions::Uniform, prelude::Distribution, rngs::SmallRng, Rng, SeedableRng};
+use rand::{distributions::Uniform, prelude::Distribution, Rng, SeedableRng};
+use rand_chacha::ChaCha12Rng;
 use serde::{Deserialize, Serialize};
 use tokio::{
     sync::mpsc::{self, error::TryRecvError},
@@ -41,8 +42,11 @@ pub async fn persistent_transmission(
     let mut interval = time::interval(Duration::from_secs_f64(
         1.0 / settings.max_emission_frequency,
     ));
-    let mut coin =
-        Coin::<_>::new(SmallRng::from_entropy(), settings.drop_message_probability).unwrap();
+    let mut coin = Coin::<_>::new(
+        ChaCha12Rng::from_entropy(),
+        settings.drop_message_probability,
+    )
+    .unwrap();
 
     loop {
         interval.tick().await;
