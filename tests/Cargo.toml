@@ -60,3 +60,4 @@ path = "src/tests/da.rs"
 
 [features]
 metrics = ["nomos-node/metrics"]
+debug = []
