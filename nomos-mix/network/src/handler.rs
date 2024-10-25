@@ -2,11 +2,9 @@ use std::{
     collections::VecDeque,
     io,
     task::{Context, Poll, Waker},
-    time::Duration,
 };
 
 use futures::{future::BoxFuture, AsyncReadExt, AsyncWriteExt, FutureExt};
-use futures_timer::Delay;
 use libp2p::{
     core::upgrade::ReadyUpgrade,
     swarm::{
@@ -15,20 +13,19 @@ use libp2p::{
     },
     Stream, StreamProtocol,
 };
-use nomos_mix_message::{is_noise, MSG_SIZE, NOISE};
-use nomos_mix_queue::{NonMixQueue, Queue};
+use nomos_mix_message::MSG_SIZE;
 
 use crate::behaviour::Config;
 
 const PROTOCOL_NAME: StreamProtocol = StreamProtocol::new("/nomos/mix/0.1.0");
 
+// TODO: Consider replacing this struct with libp2p_stream ConnectionHandler
+//       because we don't implement persistent emission in the per-connection level anymore.
 /// A [`ConnectionHandler`] that handles the mix protocol.
 pub struct MixConnectionHandler {
     inbound_substream: Option<MsgRecvFuture>,
     outbound_substream: Option<OutboundSubstreamState>,
-    interval: Duration, // TODO: use absolute time
-    timer: Delay,
-    queue: Box<dyn Queue<Vec<u8>> + Send>,
+    outbound_msgs: VecDeque<Vec<u8>>,
     pending_events_to_behaviour: VecDeque<ToBehaviour>,
     waker: Option<Waker>,
 }
@@ -46,15 +43,11 @@ enum OutboundSubstreamState {
 }
 
 impl MixConnectionHandler {
-    pub fn new(config: &Config) -> Self {
-        let interval_sec = 1.0 / config.transmission_rate;
-        let interval = Duration::from_millis((interval_sec * 1000.0) as u64);
+    pub fn new(_config: &Config) -> Self {
         Self {
             inbound_substream: None,
             outbound_substream: None,
-            interval,
-            timer: Delay::new(interval),
-            queue: Box::new(NonMixQueue::new(NOISE.to_vec())),
+            outbound_msgs: VecDeque::new(),
             pending_events_to_behaviour: VecDeque::new(),
             waker: None,
         }
@@ -109,17 +102,17 @@ impl ConnectionHandler for MixConnectionHandler {
         }
 
         // Process inbound stream
+        // TODO: Measure message frequencies and compare them to the desired frequencies
+        //       for connection maintenance defined in the Tier 1 spec.
         tracing::debug!("Processing inbound stream");
         if let Some(msg_recv_fut) = self.inbound_substream.as_mut() {
             match msg_recv_fut.poll_unpin(cx) {
                 Poll::Ready(Ok((stream, msg))) => {
                     tracing::debug!("Received message from inbound stream. Notifying behaviour...");
                     self.inbound_substream = Some(recv_msg(stream).boxed());
-                    if !is_noise(&msg) {
-                        return Poll::Ready(ConnectionHandlerEvent::NotifyBehaviour(
-                            ToBehaviour::Message(msg),
-                        ));
-                    }
+                    return Poll::Ready(ConnectionHandlerEvent::NotifyBehaviour(
+                        ToBehaviour::Message(msg),
+                    ));
                 }
                 Poll::Ready(Err(e)) => {
                     tracing::error!("Failed to receive message from inbound stream: {:?}", e);
@@ -140,21 +133,22 @@ impl ConnectionHandler for MixConnectionHandler {
                     return Poll::Pending;
                 }
                 // If the substream is idle, and if it's time to send a message, send it.
-                Some(OutboundSubstreamState::Idle(stream)) => match self.timer.poll_unpin(cx) {
-                    Poll::Ready(_) => {
-                        let msg = self.queue.pop();
-                        tracing::debug!("Sending message to outbound stream: {:?}", msg);
-                        self.outbound_substream = Some(OutboundSubstreamState::PendingSend(
-                            send_msg(stream, msg).boxed(),
-                        ));
-                        self.timer.reset(self.interval);
+                Some(OutboundSubstreamState::Idle(stream)) => {
+                    match self.outbound_msgs.pop_front() {
+                        Some(msg) => {
+                            tracing::debug!("Sending message to outbound stream: {:?}", msg);
+                            self.outbound_substream = Some(OutboundSubstreamState::PendingSend(
+                                send_msg(stream, msg).boxed(),
+                            ));
+                        }
+                        None => {
+                            tracing::debug!("Nothing to send to outbound stream");
+                            self.outbound_substream = Some(OutboundSubstreamState::Idle(stream));
+                            self.waker = Some(cx.waker().clone());
+                            return Poll::Pending;
+                        }
                     }
-                    Poll::Pending => {
-                        self.outbound_substream = Some(OutboundSubstreamState::Idle(stream));
-                        self.waker = Some(cx.waker().clone());
-                        return Poll::Pending;
-                    }
-                },
+                }
                 // If a message is being sent, check if it's done.
                 Some(OutboundSubstreamState::PendingSend(mut msg_send_fut)) => {
                     match msg_send_fut.poll_unpin(cx) {
@@ -191,7 +185,7 @@ impl ConnectionHandler for MixConnectionHandler {
     fn on_behaviour_event(&mut self, event: Self::FromBehaviour) {
         match event {
             FromBehaviour::Message(msg) => {
-                self.queue.push(msg);
+                self.outbound_msgs.push_back(msg);
             }
         }
     }

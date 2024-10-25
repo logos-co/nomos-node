@@ -20,10 +20,11 @@ use nomos_da_verifier::storage::adapters::rocksdb::RocksAdapterSettings as Verif
 use nomos_da_verifier::DaVerifierServiceSettings;
 use nomos_executor::api::backend::AxumBackendSettings;
 use nomos_executor::config::Config;
-use nomos_log::{LoggerBackend, LoggerFormat};
 use nomos_network::{backends::libp2p::Libp2pConfig, NetworkConfig};
 use nomos_node::api::paths::{CL_METRICS, DA_GET_RANGE};
 use nomos_node::RocksBackendSettings;
+use nomos_tracing::logging::local::FileConfig;
+use nomos_tracing_service::LoggerLayer;
 use tempfile::NamedTempFile;
 
 use crate::adjust_timeout;
@@ -62,11 +63,10 @@ impl Executor {
         let config_path = file.path().to_owned();
 
         // setup logging so that we can intercept it later in testing
-        config.log.backend = LoggerBackend::File {
+        config.tracing.logger = LoggerLayer::File(FileConfig {
             directory: dir.path().to_owned(),
             prefix: Some(LOGS_PREFIX.into()),
-        };
-        config.log.format = LoggerFormat::Json;
+        });
 
         config.storage.db_path = dir.path().join("db");
         config
@@ -197,7 +197,7 @@ pub fn create_executor_config(config: GeneralConfig) -> Config {
                 blob_storage_directory: "./".into(),
             },
         },
-        log: Default::default(),
+        tracing: config.tracing_config.tracing_settings,
         http: nomos_api::ApiServiceSettings {
             backend_settings: AxumBackendSettings {
                 address: config.api_config.address,

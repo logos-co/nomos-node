@@ -8,8 +8,8 @@ use nomos_mix_service::network::libp2p::Libp2pAdapter as MixNetworkAdapter;
 use nomos_mix_service::MixService;
 use nomos_network::backends::libp2p::Libp2p as NetworkBackend;
 use nomos_node::{
-    config::{update_cryptarchia_consensus, update_log, update_mix, update_network, MixArgs},
-    CryptarchiaArgs, HttpArgs, LogArgs, Logger, NetworkArgs, NetworkService, Wire,
+    config::{update_cryptarchia_consensus, update_mix, update_network, update_tracing, MixArgs},
+    CryptarchiaArgs, HttpArgs, LogArgs, NetworkArgs, NetworkService, Tracing, Wire,
 };
 use nomos_storage::backends::rocksdb::RocksBackend;
 use overwatch_rs::services::ServiceData;
@@ -20,7 +20,7 @@ use crate::ExecutorApiService;
 
 #[derive(Deserialize, Debug, Clone, Serialize)]
 pub struct Config {
-    pub log: <Logger as ServiceData>::Settings,
+    pub tracing: <Tracing as ServiceData>::Settings,
     pub network: <NetworkService<NetworkBackend> as ServiceData>::Settings,
     pub mix: <MixService<MixBackend, MixNetworkAdapter> as ServiceData>::Settings,
     pub da_dispersal: <crate::DaDispersal as ServiceData>::Settings,
@@ -43,7 +43,7 @@ impl Config {
         http_args: HttpArgs,
         cryptarchia_args: CryptarchiaArgs,
     ) -> Result<Self> {
-        update_log(&mut self.log, log_args)?;
+        update_tracing(&mut self.tracing, log_args)?;
         update_network(&mut self.network, network_args)?;
         update_mix(&mut self.mix, mix_args)?;
         update_http(&mut self.http, http_args)?;

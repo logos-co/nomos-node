@@ -1,17 +1,12 @@
 // std
-use futures::StreamExt;
 use std::fmt::{Debug, Formatter};
 use std::io::Write;
-use std::net::SocketAddr;
-use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
-use std::time::Duration;
 // crates
-use serde::{Deserialize, Serialize};
-use tracing::{error, Level};
-use tracing_appender::non_blocking::WorkerGuard;
-use tracing_subscriber::{filter::LevelFilter, prelude::*};
-// internal
+use futures::StreamExt;
+use nomos_tracing::logging::gelf::{create_gelf_layer, GelfConfig};
+use nomos_tracing::logging::local::{create_file_layer, create_writer_layer, FileConfig};
+use nomos_tracing::logging::loki::{create_loki_layer, LokiConfig};
 use overwatch_rs::services::life_cycle::LifecycleMessage;
 use overwatch_rs::services::{
     handle::ServiceStateHandle,
@@ -19,12 +14,18 @@ use overwatch_rs::services::{
     state::{NoOperator, NoState},
     ServiceCore, ServiceData,
 };
+use serde::{Deserialize, Serialize};
+use tracing::{error, Level};
+use tracing_appender::non_blocking::WorkerGuard;
+use tracing_subscriber::filter::LevelFilter;
+use tracing_subscriber::layer::SubscriberExt;
+use tracing_subscriber::util::SubscriberInitExt;
+// internal
+use nomos_tracing::tracing::otlp::{create_otlp_tracing_layer, OtlpTracingConfig};
 
-const GELF_RECONNECT_INTERVAL: u64 = 10;
-
-pub struct Logger {
+pub struct Tracing {
     service_state: ServiceStateHandle<Self>,
-    worker_guard: Option<WorkerGuard>,
+    logger_guard: Option<WorkerGuard>,
 }
 
 /// This is a wrapper around a writer to allow cloning which is
@@ -67,14 +68,10 @@ impl Debug for SharedWriter {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub enum LoggerBackend {
-    Gelf {
-        addr: SocketAddr,
-    },
-    File {
-        directory: PathBuf,
-        prefix: Option<PathBuf>,
-    },
+pub enum LoggerLayer {
+    Gelf(GelfConfig),
+    File(FileConfig),
+    Loki(LokiConfig),
     Stdout,
     Stderr,
     #[serde(skip)]
@@ -84,68 +81,50 @@ pub enum LoggerBackend {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct LoggerSettings {
-    pub backend: LoggerBackend,
-    pub format: LoggerFormat,
+pub enum TracingLayer {
+    Otlp(OtlpTracingConfig),
+    None,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct TracingSettings {
+    pub logger: LoggerLayer,
+    pub tracing: TracingLayer,
     #[serde(with = "serde_level")]
     pub level: Level,
 }
 
-impl Default for LoggerSettings {
+impl Default for TracingSettings {
     fn default() -> Self {
         Self {
-            backend: LoggerBackend::Stdout,
-            format: LoggerFormat::Json,
+            logger: LoggerLayer::Stdout,
+            tracing: TracingLayer::None,
             level: Level::DEBUG,
         }
     }
 }
 
-impl LoggerSettings {
+impl TracingSettings {
     #[inline]
-    pub const fn new(backend: LoggerBackend, format: LoggerFormat, level: Level) -> Self {
+    pub const fn new(logger: LoggerLayer, tracing: TracingLayer, level: Level) -> Self {
         Self {
-            backend,
-            format,
+            logger,
+            tracing,
             level,
         }
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub enum LoggerFormat {
-    Json,
-    Plain,
-}
-
-impl ServiceData for Logger {
-    const SERVICE_ID: &'static str = "Logger";
-    type Settings = LoggerSettings;
+impl ServiceData for Tracing {
+    const SERVICE_ID: &'static str = "Tracing";
+    type Settings = TracingSettings;
     type State = NoState<Self::Settings>;
     type StateOperator = NoOperator<Self::State>;
     type Message = NoMessage;
 }
 
-// a macro and not a function because it's a bit of a type
-// mess with `Layer<S>`
-macro_rules! registry_init {
-    ($layer:expr, $format:expr, $level:expr) => {
-        if let LoggerFormat::Json = $format {
-            tracing_subscriber::registry()
-                .with(LevelFilter::from($level))
-                .with($layer)
-                .init();
-        } else {
-            tracing_subscriber::registry()
-                .with(LevelFilter::from($level))
-                .with($layer)
-                .init();
-        }
-    };
-}
-
 #[async_trait::async_trait]
-impl ServiceCore for Logger {
+impl ServiceCore for Tracing {
     fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, overwatch_rs::DynError> {
         #[cfg(test)]
         use std::sync::Once;
@@ -153,72 +132,79 @@ impl ServiceCore for Logger {
         static ONCE_INIT: Once = Once::new();
 
         let config = service_state.settings_reader.get_updated_settings();
-        let (non_blocking, _guard) = match config.backend {
-            LoggerBackend::Gelf { addr } => {
-                let (layer, mut task) = tracing_gelf::Logger::builder()
-                    .connect_tcp(addr)
-                    .expect("Connect to the graylog instance");
-                service_state.overwatch_handle.runtime().spawn(async move {
-                    loop {
-                        if task.connect().await.0.is_empty() {
-                            break;
-                        } else {
-                            eprintln!("Failed to connect to graylog");
-                            let delay = Duration::from_secs(GELF_RECONNECT_INTERVAL);
-                            tokio::time::sleep(delay).await;
-                        }
-                    }
-                });
-                #[cfg(test)]
-                ONCE_INIT.call_once(move || {
-                    registry_init!(layer, config.format, config.level);
-                });
-                #[cfg(not(test))]
-                registry_init!(layer, config.format, config.level);
+        let mut layers: Vec<Box<dyn tracing_subscriber::Layer<_> + Send + Sync>> = vec![];
 
-                return Ok(Self {
-                    service_state,
-                    worker_guard: None,
-                });
+        let (logger_layer, logger_guard): (
+            Box<dyn tracing_subscriber::Layer<_> + Send + Sync>,
+            Option<WorkerGuard>,
+        ) = match config.logger {
+            LoggerLayer::Gelf(config) => {
+                let gelf_layer =
+                    create_gelf_layer(config, service_state.overwatch_handle.runtime())?;
+                (Box::new(gelf_layer), None)
             }
-            LoggerBackend::File { directory, prefix } => {
-                let file_appender = tracing_appender::rolling::hourly(
-                    directory,
-                    prefix.unwrap_or_else(|| PathBuf::from("nomos.log")),
-                );
-                tracing_appender::non_blocking(file_appender)
+            LoggerLayer::File(config) => {
+                let (layer, guard) = create_file_layer(config);
+                (Box::new(layer), Some(guard))
             }
-            LoggerBackend::Stdout => tracing_appender::non_blocking(std::io::stdout()),
-            LoggerBackend::Stderr => tracing_appender::non_blocking(std::io::stderr()),
-            LoggerBackend::Writer(writer) => tracing_appender::non_blocking(writer),
-            LoggerBackend::None => {
-                return Ok(Self {
-                    service_state,
-                    worker_guard: None,
-                })
+            LoggerLayer::Loki(config) => {
+                let loki_layer =
+                    create_loki_layer(config, service_state.overwatch_handle.runtime())?;
+                (Box::new(loki_layer), None)
             }
+            LoggerLayer::Stdout => {
+                let (layer, guard) = create_writer_layer(std::io::stdout());
+                (Box::new(layer), Some(guard))
+            }
+            LoggerLayer::Stderr => {
+                let (layer, guard) = create_writer_layer(std::io::stderr());
+                (Box::new(layer), Some(guard))
+            }
+            LoggerLayer::Writer(writer) => {
+                let (layer, guard) = create_writer_layer(writer);
+                (Box::new(layer), Some(guard))
+            }
+            LoggerLayer::None => (Box::new(tracing_subscriber::fmt::Layer::new()), None),
         };
 
-        let layer = tracing_subscriber::fmt::Layer::new()
-            .with_level(true)
-            .with_writer(non_blocking);
+        layers.push(logger_layer);
+
+        if let TracingLayer::Otlp(config) = config.tracing {
+            let tracing_layer = create_otlp_tracing_layer(config)?;
+            layers.push(Box::new(tracing_layer));
+        }
+
+        // If no layers are created, tracing subscriber is not required.
+        if layers.is_empty() {
+            return Ok(Self {
+                service_state,
+                logger_guard: None,
+            });
+        }
+
         #[cfg(test)]
         ONCE_INIT.call_once(move || {
-            registry_init!(layer, config.format, config.level);
+            tracing_subscriber::registry()
+                .with(LevelFilter::from(config.level))
+                .with(layers)
+                .init();
         });
         #[cfg(not(test))]
-        registry_init!(layer, config.format, config.level);
+        tracing_subscriber::registry()
+            .with(LevelFilter::from(config.level))
+            .with(layers)
+            .init();
 
         Ok(Self {
             service_state,
-            worker_guard: Some(_guard),
+            logger_guard,
         })
     }
 
     async fn run(self) -> Result<(), overwatch_rs::DynError> {
         let Self {
             service_state,
-            worker_guard,
+            logger_guard,
         } = self;
         // keep the handle alive without stressing the runtime
         let mut lifecycle_stream = service_state.lifecycle_handle.message_stream();
@@ -227,7 +213,7 @@ impl ServiceCore for Logger {
                 match msg {
                     LifecycleMessage::Shutdown(sender) => {
                         // flush pending logs before signaling message processing
-                        drop(worker_guard);
+                        drop(logger_guard);
                         if sender.send(()).is_err() {
                             error!(
                                 "Error sending successful shutdown signal from service {}",

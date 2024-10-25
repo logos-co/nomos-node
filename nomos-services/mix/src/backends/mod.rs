@@ -12,9 +12,8 @@ pub trait MixBackend {
     type Settings: Clone + Debug + Send + Sync + 'static;
 
     fn new(config: Self::Settings, overwatch_handle: OverwatchHandle) -> Self;
-    async fn mix(&self, msg: Vec<u8>);
-    /// Listen to fully unwrapped messages returned from the mix network
-    /// if this node is the last node that can unwrap the data message.
-    fn listen_to_fully_unwrapped_messages(&mut self)
-        -> Pin<Box<dyn Stream<Item = Vec<u8>> + Send>>;
+    /// Publish a message to the mix network.
+    async fn publish(&self, msg: Vec<u8>);
+    /// Listen to messages received from the mix network.
+    fn listen_to_incoming_messages(&mut self) -> Pin<Box<dyn Stream<Item = Vec<u8>> + Send>>;
 }

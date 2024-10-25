@@ -22,7 +22,6 @@ nomos-da-storage = { path = "../../../nomos-da/storage" }
 nomos-node = { path = "../../../nodes/nomos-node" }
 nomos-mempool = { path = "../../../nomos-services/mempool" }
 nomos-storage = { path = "../../../nomos-services/storage", features = ["rocksdb-backend"] }
-nomos-log = { path = "../../log" }
 nomos-network = { path = "../../network", features = ["mock"] }
 nomos-mix-service = { path = "../../mix" }
 nomos-libp2p = { path = "../../../nomos-libp2p" }
