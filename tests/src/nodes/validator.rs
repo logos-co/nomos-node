@@ -23,8 +23,6 @@ use nomos_node::api::paths::{
 };
 use nomos_node::{api::backend::AxumBackendSettings, Config, RocksBackendSettings};
 use nomos_node::{BlobInfo, HeaderId, Tx};
-use nomos_tracing::logging::local::FileConfig;
-use nomos_tracing_service::LoggerLayer;
 use reqwest::Url;
 use tempfile::NamedTempFile;
 
@@ -68,11 +66,17 @@ impl Validator {
         let mut file = NamedTempFile::new().unwrap();
         let config_path = file.path().to_owned();
 
-        // setup logging so that we can intercept it later in testing
-        config.tracing.logger = LoggerLayer::File(FileConfig {
-            directory: dir.path().to_owned(),
-            prefix: Some(LOGS_PREFIX.into()),
-        });
+        #[cfg(not(feature = "debug"))]
+        {
+            use nomos_tracing::logging::local::FileConfig;
+            use nomos_tracing_service::LoggerLayer;
+
+            // setup logging so that we can intercept it later in testing
+            config.tracing.logger = LoggerLayer::File(FileConfig {
+                directory: dir.path().to_owned(),
+                prefix: Some(LOGS_PREFIX.into()),
+            });
+        }
 
         config.storage.db_path = dir.path().join("db");
         config
