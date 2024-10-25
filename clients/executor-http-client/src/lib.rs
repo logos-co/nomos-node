@@ -1,9 +1,9 @@
 // std
 // crates
 use reqwest::{Client, ClientBuilder, StatusCode, Url};
+use serde::Serialize;
 // internal
 use nomos_executor::api::{handlers::DispersalRequest, paths};
-use serde::Serialize;
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {

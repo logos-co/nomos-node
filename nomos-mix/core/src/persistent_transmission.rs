@@ -1,7 +1,8 @@
 use std::time::Duration;
 
 use nomos_mix_message::DROP_MESSAGE;
-use rand::Rng;
+use rand::{distributions::Uniform, prelude::Distribution, Rng, SeedableRng};
+use rand_chacha::ChaCha12Rng;
 use serde::{Deserialize, Serialize};
 use tokio::{
     sync::mpsc::{self, error::TryRecvError},
@@ -30,7 +31,7 @@ impl Default for PersistentTransmissionSettings {
 /// # Arguments
 ///
 /// * `settings` - The settings for the persistent transmission
-/// * `schedule_receiver` - The channel for scheduled messages
+/// * `schedule_receiver` - The channel for messages scheduled (from Tier 2 currently)
 /// * `emission_sender` - The channel to emit messages
 pub async fn persistent_transmission(
     settings: PersistentTransmissionSettings,
@@ -41,6 +42,11 @@ pub async fn persistent_transmission(
     let mut interval = time::interval(Duration::from_secs_f64(
         1.0 / settings.max_emission_frequency,
     ));
+    let mut coin = Coin::<_>::new(
+        ChaCha12Rng::from_entropy(),
+        settings.drop_message_probability,
+    )
+    .unwrap();
 
     loop {
         interval.tick().await;
@@ -54,9 +60,8 @@ pub async fn persistent_transmission(
                 }
             }
             Err(TryRecvError::Empty) => {
-                // Flip a coin with drop_message_probability.
                 // If the coin is head, emit the drop message.
-                if coin_flip(settings.drop_message_probability) {
+                if coin.flip() {
                     if let Err(e) = emission_sender.send(DROP_MESSAGE.to_vec()) {
                         tracing::error!(
                             "Failed to send drop message to the transmission channel: {e:?}"
@@ -72,6 +77,115 @@ pub async fn persistent_transmission(
     }
 }
 
-fn coin_flip(probability: f64) -> bool {
-    rand::thread_rng().gen::<f64>() < probability
+struct Coin<R: Rng> {
+    rng: R,
+    distribution: Uniform<f64>,
+    probability: f64,
+}
+
+impl<R: Rng> Coin<R> {
+    fn new(rng: R, probability: f64) -> Result<Self, CoinError> {
+        if !(0.0..=1.0).contains(&probability) {
+            return Err(CoinError::InvalidProbability);
+        }
+        Ok(Self {
+            rng,
+            distribution: Uniform::from(0.0..1.0),
+            probability,
+        })
+    }
+
+    // Flip the coin based on the given probability.
+    fn flip(&mut self) -> bool {
+        self.distribution.sample(&mut self.rng) < self.probability
+    }
+}
+
+#[derive(Debug)]
+enum CoinError {
+    InvalidProbability,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    macro_rules! assert_interval {
+        ($last_time:expr, $lower_bound:expr, $upper_bound:expr) => {
+            let now = time::Instant::now();
+            let interval = now.duration_since(*$last_time);
+
+            assert!(
+                interval >= $lower_bound,
+                "interval {:?} is too short. lower_bound: {:?}",
+                interval,
+                $lower_bound,
+            );
+            assert!(
+                interval <= $upper_bound,
+                "interval {:?} is too long. upper_bound: {:?}",
+                interval,
+                $upper_bound,
+            );
+
+            *$last_time = now;
+        };
+    }
+
+    #[tokio::test]
+    async fn test_persistent_transmission() {
+        let (schedule_sender, schedule_receiver) = mpsc::unbounded_channel();
+        let (emission_sender, mut emission_receiver) = mpsc::unbounded_channel();
+
+        let settings = PersistentTransmissionSettings {
+            max_emission_frequency: 1.0,
+            // Set to always emit drop messages if no scheduled messages for easy testing
+            drop_message_probability: 1.0,
+        };
+
+        // Prepare the expected emission interval with torelance
+        let expected_emission_interval =
+            Duration::from_secs_f64(1.0 / settings.max_emission_frequency);
+        let torelance = expected_emission_interval / 10; // 10% torelance
+        let lower_bound = expected_emission_interval - torelance;
+        let upper_bound = expected_emission_interval + torelance;
+
+        // Start the persistent transmission and schedule messages
+        tokio::spawn(persistent_transmission(
+            settings,
+            schedule_receiver,
+            emission_sender,
+        ));
+        // Messages must be scheduled in non-blocking manner.
+        schedule_sender.send(vec![1]).unwrap();
+        schedule_sender.send(vec![2]).unwrap();
+        schedule_sender.send(vec![3]).unwrap();
+
+        // Check if expected messages are emitted with the expected interval
+        assert_eq!(emission_receiver.recv().await.unwrap(), vec![1]);
+        let mut last_time = time::Instant::now();
+
+        assert_eq!(emission_receiver.recv().await.unwrap(), vec![2]);
+        assert_interval!(&mut last_time, lower_bound, upper_bound);
+
+        assert_eq!(emission_receiver.recv().await.unwrap(), vec![3]);
+        assert_interval!(&mut last_time, lower_bound, upper_bound);
+
+        assert_eq!(
+            emission_receiver.recv().await.unwrap(),
+            DROP_MESSAGE.to_vec()
+        );
+        assert_interval!(&mut last_time, lower_bound, upper_bound);
+
+        assert_eq!(
+            emission_receiver.recv().await.unwrap(),
+            DROP_MESSAGE.to_vec()
+        );
+        assert_interval!(&mut last_time, lower_bound, upper_bound);
+
+        // Schedule a new message and check if it is emitted at the next interval
+        schedule_sender.send(vec![4]).unwrap();
+        assert_eq!(emission_receiver.recv().await.unwrap(), vec![4]);
+        assert_interval!(&mut last_time, lower_bound, upper_bound);
+    }
 }

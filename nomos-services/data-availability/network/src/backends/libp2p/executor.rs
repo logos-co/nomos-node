@@ -3,7 +3,11 @@ use crate::backends::libp2p::common::{
     DaNetworkBackendSettings, SamplingEvent, BROADCAST_CHANNEL_SIZE,
 };
 use crate::backends::NetworkBackend;
-use futures::{Stream, StreamExt};
+use futures::future::Aborted;
+use futures::{
+    stream::{AbortHandle, Abortable},
+    Stream, StreamExt,
+};
 use kzgrs_backend::common::blob::DaBlob;
 use libp2p::PeerId;
 use log::error;
@@ -71,15 +75,9 @@ pub struct DaNetworkExecutorBackend<Membership>
 where
     Membership: MembershipHandler,
 {
-    // TODO: this join handles should be cancelable tasks. We should add an stop method for
-    // the `NetworkBackend` trait so if the service is stopped the backend can gracefully handle open
-    // sub-tasks as well.
-    #[allow(dead_code)]
-    task: JoinHandle<()>,
-    #[allow(dead_code)]
-    verifier_replies_task: JoinHandle<()>,
-    #[allow(dead_code)]
-    executor_replies_task: JoinHandle<()>,
+    task: (AbortHandle, JoinHandle<Result<(), Aborted>>),
+    verifier_replies_task: (AbortHandle, JoinHandle<Result<(), Aborted>>),
+    executor_replies_task: (AbortHandle, JoinHandle<Result<(), Aborted>>),
     sampling_request_channel: UnboundedSender<(SubnetworkId, BlobId)>,
     sampling_broadcast_receiver: broadcast::Receiver<SamplingEvent>,
     verifying_broadcast_receiver: broadcast::Receiver<DaBlob>,
@@ -147,7 +145,13 @@ where
         let dispersal_blobs_sender = executor_swarm.dispersal_blobs_channel();
         let executor_open_stream_sender = executor_swarm.dispersal_open_stream_sender();
 
-        let task = overwatch_handle.runtime().spawn(executor_swarm.run());
+        let (task_abort_handle, abort_registration) = AbortHandle::new_pair();
+        let task = (
+            task_abort_handle,
+            overwatch_handle
+                .runtime()
+                .spawn(Abortable::new(executor_swarm.run(), abort_registration)),
+        );
 
         std::thread::sleep(Duration::from_secs(1));
         // open streams to dispersal peers
@@ -161,21 +165,32 @@ where
             broadcast::channel(BROADCAST_CHANNEL_SIZE);
         let (dispersal_broadcast_sender, dispersal_broadcast_receiver) =
             broadcast::channel(BROADCAST_CHANNEL_SIZE);
-        let verifier_replies_task =
-            overwatch_handle
-                .runtime()
-                .spawn(handle_validator_events_stream(
+        let (verifier_replies_task_abort_handle, verifier_replies_task_abort_registration) =
+            AbortHandle::new_pair();
+        let verifier_replies_task = (
+            verifier_replies_task_abort_handle,
+            overwatch_handle.runtime().spawn(Abortable::new(
+                handle_validator_events_stream(
                     executor_events_stream.validator_events_stream,
                     sampling_broadcast_sender,
                     verifying_broadcast_sender,
-                ));
-        let executor_replies_task =
-            overwatch_handle
-                .runtime()
-                .spawn(handle_executor_dispersal_events_stream(
+                ),
+                verifier_replies_task_abort_registration,
+            )),
+        );
+        let (executor_replies_task_abort_handle, executor_replies_task_abort_registration) =
+            AbortHandle::new_pair();
+
+        let executor_replies_task = (
+            executor_replies_task_abort_handle,
+            overwatch_handle.runtime().spawn(Abortable::new(
+                handle_executor_dispersal_events_stream(
                     executor_events_stream.dispersal_events_receiver,
                     dispersal_broadcast_sender,
-                ));
+                ),
+                executor_replies_task_abort_registration,
+            )),
+        );
 
         Self {
             task,
@@ -188,6 +203,18 @@ where
             dispersal_blobs_sender,
             _membership: Default::default(),
         }
+    }
+
+    fn shutdown(&mut self) {
+        let Self {
+            task: (task_handle, _),
+            verifier_replies_task: (verifier_handle, _),
+            executor_replies_task: (executor_handle, _),
+            ..
+        } = self;
+        task_handle.abort();
+        verifier_handle.abort();
+        executor_handle.abort();
     }
 
     async fn process(&self, msg: Self::Message) {

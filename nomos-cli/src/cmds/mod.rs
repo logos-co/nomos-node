@@ -1,21 +1,23 @@
-use clap::Subcommand;
+pub mod executor;
+pub mod validator;
 
-// pub mod chat;
-pub mod disseminate;
+// std
+// crates
+use clap::Subcommand;
+// internal
 
 #[derive(Debug, Subcommand)]
 pub enum Command {
-    /// Send a blob to the network and collect attestations to create a DA proof
-    Disseminate(disseminate::Disseminate),
-    // /// (Almost) Instant messaging protocol on top of the Nomos network
-    // Chat(chat::NomosChat),
+    /// Send data to the executor for encoding and dispersal.
+    Disseminate(executor::Disseminate),
+    Retrieve(validator::Retrieve),
 }
 
 impl Command {
-    pub fn run(&self) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn run(self) -> Result<(), Box<dyn std::error::Error>> {
         match self {
             Command::Disseminate(cmd) => cmd.run(),
-            // Command::Chat(cmd) => cmd.run(),
+            Command::Retrieve(cmd) => cmd.run(),
         }?;
         Ok(())
     }

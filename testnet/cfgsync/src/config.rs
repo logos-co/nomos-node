@@ -2,19 +2,26 @@
 use std::{collections::HashMap, net::Ipv4Addr, str::FromStr};
 // crates
 use nomos_libp2p::{Multiaddr, PeerId, Protocol};
+use nomos_tracing::{logging::loki::LokiConfig, tracing::otlp::OtlpTracingConfig};
+use nomos_tracing_service::{LoggerLayer, TracingSettings};
 use rand::{thread_rng, Rng};
 use tests::topology::configs::{
+    api::GeneralApiConfig,
     consensus::{create_consensus_configs, ConsensusParams},
     da::{create_da_configs, DaParams},
     mix::create_mix_configs,
     network::create_network_configs,
+    tracing::GeneralTracingConfig,
     GeneralConfig,
 };
+use tracing::Level;
 // internal
+use crate::TracingParams;
 
 const DEFAULT_LIBP2P_NETWORK_PORT: u16 = 3000;
 const DEFAULT_DA_NETWORK_PORT: u16 = 3300;
 const DEFAULT_MIX_PORT: u16 = 3400;
+const DEFAULT_API_PORT: u16 = 18080;
 
 #[derive(Eq, PartialEq, Hash, Clone)]
 pub enum HostKind {
@@ -26,26 +33,29 @@ pub enum HostKind {
 pub struct Host {
     pub kind: HostKind,
     pub ip: Ipv4Addr,
+    pub identifier: String,
     pub network_port: u16,
     pub da_network_port: u16,
     pub mix_port: u16,
 }
 
 impl Host {
-    pub fn default_validator_from_ip(ip: Ipv4Addr) -> Self {
+    pub fn default_validator_from_ip(ip: Ipv4Addr, identifier: String) -> Self {
         Self {
             kind: HostKind::Validator,
             ip,
+            identifier,
             network_port: DEFAULT_LIBP2P_NETWORK_PORT,
             da_network_port: DEFAULT_DA_NETWORK_PORT,
             mix_port: DEFAULT_MIX_PORT,
         }
     }
 
-    pub fn default_executor_from_ip(ip: Ipv4Addr) -> Self {
+    pub fn default_executor_from_ip(ip: Ipv4Addr, identifier: String) -> Self {
         Self {
             kind: HostKind::Executor,
             ip,
+            identifier,
             network_port: DEFAULT_LIBP2P_NETWORK_PORT,
             da_network_port: DEFAULT_DA_NETWORK_PORT,
             mix_port: DEFAULT_MIX_PORT,
@@ -56,6 +66,7 @@ impl Host {
 pub fn create_node_configs(
     consensus_params: ConsensusParams,
     da_params: DaParams,
+    tracing_params: TracingParams,
     hosts: Vec<Host>,
 ) -> HashMap<Host, GeneralConfig> {
     let mut ids = vec![[0; 32]; consensus_params.n_participants];
@@ -67,6 +78,12 @@ pub fn create_node_configs(
     let da_configs = create_da_configs(&ids, da_params);
     let network_configs = create_network_configs(&ids, Default::default());
     let mix_configs = create_mix_configs(&ids);
+    let api_configs = ids
+        .iter()
+        .map(|_| GeneralApiConfig {
+            address: format!("0.0.0.0:{DEFAULT_API_PORT}").parse().unwrap(),
+        })
+        .collect::<Vec<_>>();
     let mut configured_hosts = HashMap::new();
 
     // Rebuild DA address lists.
@@ -84,6 +101,7 @@ pub fn create_node_configs(
 
     for (i, host) in hosts.into_iter().enumerate() {
         let consensus_config = consensus_configs[i].to_owned();
+        let api_config = api_configs[i].to_owned();
 
         // DA Libp2p network config.
         let mut da_config = da_configs[i].to_owned();
@@ -106,6 +124,10 @@ pub fn create_node_configs(
             Multiaddr::from_str(&format!("/ip4/0.0.0.0/udp/{}/quic-v1", host.mix_port)).unwrap();
         mix_config.backend.membership = host_mix_membership.clone();
 
+        // Tracing config.
+        let tracing_config =
+            tracing_config_for_grafana(tracing_params.clone(), host.identifier.clone());
+
         configured_hosts.insert(
             host.clone(),
             GeneralConfig {
@@ -113,6 +135,8 @@ pub fn create_node_configs(
                 da_config,
                 network_config,
                 mix_config,
+                api_config,
+                tracing_config,
             },
         );
     }
@@ -172,6 +196,22 @@ fn extract_peer_id(multiaddr: &Multiaddr) -> Option<PeerId> {
     })
 }
 
+fn tracing_config_for_grafana(params: TracingParams, identifier: String) -> GeneralTracingConfig {
+    GeneralTracingConfig {
+        tracing_settings: TracingSettings {
+            logger: LoggerLayer::Loki(LokiConfig {
+                endpoint: params.loki_endpoint,
+                host_identifier: identifier,
+            }),
+            tracing: nomos_tracing_service::TracingLayer::Otlp(OtlpTracingConfig {
+                endpoint: params.tempo_endpoint,
+                sample_ratio: 1.0,
+            }),
+            level: Level::INFO,
+        },
+    }
+}
+
 #[cfg(test)]
 mod cfgsync_tests {
     use std::str::FromStr;
@@ -181,6 +221,8 @@ mod cfgsync_tests {
     use tests::topology::configs::consensus::ConsensusParams;
     use tests::topology::configs::da::DaParams;
 
+    use crate::TracingParams;
+
     use super::{create_node_configs, Host, HostKind};
 
     #[test]
@@ -189,6 +231,7 @@ mod cfgsync_tests {
             .map(|i| Host {
                 kind: HostKind::Validator,
                 ip: Ipv4Addr::from_str(&format!("10.1.1.{i}")).unwrap(),
+                identifier: "node".into(),
                 network_port: 3000,
                 da_network_port: 4044,
                 mix_port: 5000,
@@ -209,6 +252,10 @@ mod cfgsync_tests {
                 old_blobs_check_interval: Duration::from_secs(5),
                 blobs_validity_duration: Duration::from_secs(u64::MAX),
                 global_params_path: "".into(),
+            },
+            TracingParams {
+                tempo_endpoint: "http://test.com".try_into().unwrap(),
+                loki_endpoint: "http://test.com".try_into().unwrap(),
             },
             hosts,
         );

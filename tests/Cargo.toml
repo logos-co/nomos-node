@@ -13,13 +13,14 @@ nomos-network = { path = "../nomos-services/network", features = ["libp2p"] }
 nomos-mix-service = { path = "../nomos-services/mix", features = ["libp2p"] }
 nomos-mix = { path = "../nomos-mix/core" }
 cryptarchia-consensus = { path = "../nomos-services/cryptarchia-consensus" }
-nomos-log = { path = "../nomos-services/log" }
+nomos-tracing = { path = "../nomos-tracing" }
+nomos-tracing-service = { path = "../nomos-services/tracing" }
 nomos-api = { path = "../nomos-services/api" }
 overwatch-rs = { git = "https://github.com/logos-co/Overwatch", rev = "2f70806" }
-nomos-core = { path = "../nomos-core" }
+nomos-core = { path = "../nomos-core/chain-defs" }
 cryptarchia-engine = { path = "../consensus/cryptarchia-engine", features = ["serde"] }
-cryptarchia-ledger = { path = "../ledger/cryptarchia-ledger", features = ["serde"] }
-cl = { path = "../cl/cl" }
+nomos-ledger = { path = "../ledger/nomos-ledger", features = ["serde"] }
+cl = { path = "../nomos-core/cl" }
 nomos-mempool = { path = "../nomos-services/mempool", features = ["mock", "libp2p"] }
 nomos-da-network-service = { path = "../nomos-services/data-availability/network" }
 nomos-da-dispersal = { path = "../nomos-services/data-availability/dispersal" }
