@@ -36,17 +36,28 @@ impl GeneralTracingConfig {
 }
 
 pub fn create_tracing_configs(ids: &[[u8; 32]]) -> Vec<GeneralTracingConfig> {
+    #[cfg(feature = "debug")]
+    {
+        create_debug_configs(ids)
+    }
+
+    #[cfg(not(feature = "debug"))]
+    {
+        create_default_configs(ids)
+    }
+}
+
+#[allow(dead_code)]
+fn create_debug_configs(ids: &[[u8; 32]]) -> Vec<GeneralTracingConfig> {
     ids.iter()
         .enumerate()
-        .map(|(_i, _)| {
-            #[cfg(feature = "debug")]
-            {
-                GeneralTracingConfig::local_debug_tracing(_i)
-            }
-            #[cfg(not(feature = "debug"))]
-            {
-                GeneralTracingConfig::default()
-            }
-        })
+        .map(|(i, _)| GeneralTracingConfig::local_debug_tracing(i))
+        .collect()
+}
+
+#[allow(dead_code)]
+fn create_default_configs(ids: &[[u8; 32]]) -> Vec<GeneralTracingConfig> {
+    ids.iter()
+        .map(|_| GeneralTracingConfig::default())
         .collect()
 }
