@@ -25,7 +25,6 @@ members = [
     "nomos-services/data-availability/dispersal",
     "nomos-services/data-availability/tests",
     "nomos-services/mix",
-    "nomos-da/full-replication",
     "nomos-mix/core",
     "nomos-mix/message",
     "nomos-mix/network",
