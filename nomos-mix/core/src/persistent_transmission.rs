@@ -1,9 +1,13 @@
-use std::time::Duration;
-
+use futures::Stream;
 use nomos_mix_message::DROP_MESSAGE;
 use rand::{distributions::Uniform, prelude::Distribution, Rng, SeedableRng};
 use rand_chacha::ChaCha12Rng;
 use serde::{Deserialize, Serialize};
+use std::collections::VecDeque;
+use std::pin::{pin, Pin};
+use std::task::{Context, Poll};
+use std::time::Duration;
+use tokio::time::Interval;
 use tokio::{
     sync::mpsc::{self, error::TryRecvError},
     time,
@@ -25,6 +29,87 @@ impl Default for PersistentTransmissionSettings {
         }
     }
 }
+
+pub struct PersistentTransmissionStream<S>
+where
+    S: Stream,
+{
+    interval: Interval,
+    coin: Coin<ChaCha12Rng>,
+    queue: VecDeque<S::Item>,
+    stream: Box<S>,
+}
+
+impl<S> PersistentTransmissionStream<S>
+where
+    S: Stream,
+{
+    pub fn new(
+        settings: PersistentTransmissionSettings,
+        stream: S,
+    ) -> PersistentTransmissionStream<S> {
+        let interval = time::interval(Duration::from_secs_f64(
+            1.0 / settings.max_emission_frequency,
+        ));
+        let coin = Coin::<_>::new(
+            ChaCha12Rng::from_entropy(),
+            settings.drop_message_probability,
+        )
+        .unwrap();
+        let stream = Box::new(stream);
+        Self {
+            interval,
+            coin,
+            queue: Default::default(),
+            stream,
+        }
+    }
+}
+
+impl<S> Stream for PersistentTransmissionStream<S>
+where
+    S: Stream<Item = Vec<u8>> + Unpin,
+{
+    type Item = S::Item;
+
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        let Self {
+            ref mut interval,
+            ref mut queue,
+            ref mut stream,
+            ref mut coin,
+            ..
+        } = self.get_mut();
+        if pin!(interval).poll_tick(cx).is_ready() {
+            match queue.pop_front() {
+                item @ Some(_) => return Poll::Ready(item),
+                None => {
+                    if coin.flip() {
+                        return Poll::Ready(Some(DROP_MESSAGE.to_vec()));
+                    }
+                }
+            };
+        };
+        if let Poll::Ready(Some(item)) = pin!(stream).poll_next(cx) {
+            queue.push_back(item);
+        }
+        Poll::Pending
+    }
+}
+
+pub trait PersistentTransmission: Stream {
+    fn persistent_transmission(
+        self,
+        settings: PersistentTransmissionSettings,
+    ) -> PersistentTransmissionStream<Self>
+    where
+        Self: Sized + Unpin,
+    {
+        PersistentTransmissionStream::new(settings, self)
+    }
+}
+
+impl<S> PersistentTransmission for S where S: Stream {}
 
 /// Transmit scheduled messages with a persistent rate to the transmission channel.
 ///
@@ -187,5 +272,16 @@ mod tests {
         schedule_sender.send(vec![4]).unwrap();
         assert_eq!(emission_receiver.recv().await.unwrap(), vec![4]);
         assert_interval!(&mut last_time, lower_bound, upper_bound);
+    }
+
+    #[tokio::test]
+    async fn test_persistent_transmission_stream() {
+        let stream = futures::stream::iter((1u8..10).map(|i| vec![i; 32]));
+        let settings = PersistentTransmissionSettings {
+            max_emission_frequency: 1.0,
+            // Set to always emit drop messages if no scheduled messages for easy testing
+            drop_message_probability: 1.0,
+        };
+        let persistent_transmission_stream = stream.persistent_transmission(settings);
     }
 }
