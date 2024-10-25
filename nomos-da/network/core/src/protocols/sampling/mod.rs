@@ -172,7 +172,7 @@ mod test {
 
         tokio::time::sleep(Duration::from_secs(2)).await;
         for i in 0..MSG_COUNT {
-            // sending subnetwork_id and blob_id to initiate sampling request
+            // sending Column_idx and blob_id to initiate sampling request
             request_sender_1.send((0, [i as u8; 32])).unwrap();
             request_sender_2.send((0, [i as u8; 32])).unwrap();
         }
