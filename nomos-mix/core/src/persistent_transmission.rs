@@ -194,6 +194,7 @@ enum CoinError {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use futures::StreamExt;
 
     macro_rules! assert_interval {
         ($last_time:expr, $lower_bound:expr, $upper_bound:expr) => {
@@ -276,12 +277,63 @@ mod tests {
 
     #[tokio::test]
     async fn test_persistent_transmission_stream() {
-        let stream = futures::stream::iter((1u8..10).map(|i| vec![i; 32]));
+        let (schedule_sender, schedule_receiver) = mpsc::unbounded_channel();
+        let stream = tokio_stream::wrappers::UnboundedReceiverStream::new(schedule_receiver);
         let settings = PersistentTransmissionSettings {
             max_emission_frequency: 1.0,
             // Set to always emit drop messages if no scheduled messages for easy testing
             drop_message_probability: 1.0,
         };
-        let persistent_transmission_stream = stream.persistent_transmission(settings);
+        // Prepare the expected emission interval with torelance
+        let expected_emission_interval =
+            Duration::from_secs_f64(1.0 / settings.max_emission_frequency);
+        let torelance = expected_emission_interval / 10; // 10% torelance
+        let lower_bound = expected_emission_interval - torelance;
+        let upper_bound = expected_emission_interval + torelance;
+        // prepare stream
+        let mut persistent_transmission_stream = stream.persistent_transmission(settings).boxed();
+        // Messages must be scheduled in non-blocking manner.
+        schedule_sender.send(vec![1]).unwrap();
+        schedule_sender.send(vec![2]).unwrap();
+        schedule_sender.send(vec![3]).unwrap();
+
+        // Check if expected messages are emitted with the expected interval
+        assert_eq!(
+            persistent_transmission_stream.next().await.unwrap(),
+            vec![1]
+        );
+        let mut last_time = time::Instant::now();
+
+        assert_eq!(
+            persistent_transmission_stream.next().await.unwrap(),
+            vec![2]
+        );
+        assert_interval!(&mut last_time, lower_bound, upper_bound);
+
+        assert_eq!(
+            persistent_transmission_stream.next().await.unwrap(),
+            vec![3]
+        );
+        assert_interval!(&mut last_time, lower_bound, upper_bound);
+
+        assert_eq!(
+            persistent_transmission_stream.next().await.unwrap(),
+            DROP_MESSAGE.to_vec()
+        );
+        assert_interval!(&mut last_time, lower_bound, upper_bound);
+
+        assert_eq!(
+            persistent_transmission_stream.next().await.unwrap(),
+            DROP_MESSAGE.to_vec()
+        );
+        assert_interval!(&mut last_time, lower_bound, upper_bound);
+
+        // Schedule a new message and check if it is emitted at the next interval
+        schedule_sender.send(vec![4]).unwrap();
+        assert_eq!(
+            persistent_transmission_stream.next().await.unwrap(),
+            vec![4]
+        );
+        assert_interval!(&mut last_time, lower_bound, upper_bound);
     }
 }
