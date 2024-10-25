@@ -29,8 +29,6 @@ use nomos_da_verifier::backend::kzgrs::KzgrsDaVerifier;
 use nomos_da_verifier::network::adapters::validator::Libp2pAdapter as VerifierNetworkAdapter;
 use nomos_da_verifier::storage::adapters::rocksdb::RocksAdapter as VerifierStorageAdapter;
 use nomos_da_verifier::DaVerifierService;
-#[cfg(feature = "tracing")]
-pub use nomos_log::Logger;
 pub use nomos_mempool::da::service::{DaMempoolService, DaMempoolSettings};
 pub use nomos_mempool::network::adapters::libp2p::{
     Libp2pAdapter as MempoolNetworkAdapter, Settings as MempoolAdapterSettings,
@@ -53,6 +51,8 @@ pub use nomos_storage::{
     StorageService,
 };
 pub use nomos_system_sig::SystemSig;
+#[cfg(feature = "tracing")]
+pub use nomos_tracing_service::Tracing;
 use overwatch_derive::*;
 use overwatch_rs::services::handle::ServiceHandle;
 use rand_chacha::ChaCha20Rng;
@@ -161,7 +161,7 @@ pub type NodeDaVerifier = DaVerifier<VerifierNetworkAdapter<FillFromNodeList>>;
 #[derive(Services)]
 pub struct Nomos {
     #[cfg(feature = "tracing")]
-    logging: ServiceHandle<Logger>,
+    tracing: ServiceHandle<Tracing>,
     network: ServiceHandle<NetworkService<NetworkBackend>>,
     mix: ServiceHandle<MixService<MixBackend, MixNetworkAdapter>>,
     da_indexer: ServiceHandle<NodeDaIndexer>,

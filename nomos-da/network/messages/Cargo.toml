@@ -12,4 +12,4 @@ prost = "0.13.1"
 prost-build = "0.13.1"
 
 [dev-dependencies]
-tokio = { version = "1.38.1", features = ["rt", "macros"] }
+tokio = { version = "1", features = ["rt", "macros"] }

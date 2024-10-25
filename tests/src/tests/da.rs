@@ -1,5 +1,8 @@
 use executor_http_client::ExecutorHttpClient;
 
+use kzgrs_backend::common::blob::DaBlob;
+use kzgrs_backend::reconstruction::reconstruct_without_missing_data;
+use nomos_core::wire;
 use reqwest::ClientBuilder;
 use reqwest::Url;
 use std::time::Duration;
@@ -9,7 +12,7 @@ use tests::topology::TopologyConfig;
 
 const APP_ID: &str = "fd3384e132ad02a56c78f45547ee40038dc79002b90d29ed90e08eee762ae715";
 
-async fn disseminate(executor: &Executor) {
+async fn disseminate(executor: &Executor, data: &[u8]) {
     let executor_config = executor.config();
 
     let client = ClientBuilder::new()
@@ -19,8 +22,6 @@ async fn disseminate(executor: &Executor) {
     let backend_address = executor_config.http.backend_settings.address;
     let exec_url = Url::parse(&format!("http://{}", backend_address)).unwrap();
     let client = ExecutorHttpClient::new(client, exec_url);
-
-    let data = [1u8; 31];
 
     let app_id = hex::decode(APP_ID).unwrap();
     let metadata = kzgrs_backend::dispersal::Metadata::new(app_id.try_into().unwrap(), 0u64.into());
@@ -32,9 +33,10 @@ async fn disseminate_and_retrieve() {
     let topology = Topology::spawn(TopologyConfig::validator_and_executor()).await;
     let executor = &topology.executors()[0];
     let validator = &topology.validators()[0];
+    let data = [1u8; 31];
 
     tokio::time::sleep(Duration::from_secs(15)).await;
-    disseminate(executor).await;
+    disseminate(executor, &data).await;
     tokio::time::sleep(Duration::from_secs(20)).await;
 
     let from = 0u64.to_be_bytes();
@@ -70,4 +72,35 @@ async fn disseminate_and_retrieve() {
     for b in validator_idx_0_blobs.iter() {
         assert!(!b.is_empty())
     }
+}
+
+#[tokio::test]
+async fn disseminate_retrieve_reconstruct() {
+    let topology = Topology::spawn(TopologyConfig::validator_and_executor()).await;
+    let executor = &topology.executors()[0];
+    let data = [1u8; 31];
+
+    tokio::time::sleep(Duration::from_secs(15)).await;
+    disseminate(executor, &data).await;
+    tokio::time::sleep(Duration::from_secs(20)).await;
+
+    let from = 0u64.to_be_bytes();
+    let to = 1u64.to_be_bytes();
+    let app_id = hex::decode(APP_ID).unwrap();
+
+    let executor_blobs = executor
+        .get_indexer_range(app_id.clone().try_into().unwrap(), from..to)
+        .await;
+
+    let executor_idx_0_blobs: Vec<_> = executor_blobs
+        .iter()
+        .filter(|(i, _)| i == &from)
+        .flat_map(|(_, blobs)| blobs)
+        .map(|blob| wire::deserialize::<DaBlob>(blob).unwrap())
+        .collect();
+
+    // Reconstruction is performed from the one of the two blobs.
+    let blobs = vec![executor_idx_0_blobs[0].clone()];
+    let reconstructed = reconstruct_without_missing_data(&blobs);
+    assert_eq!(reconstructed, data);
 }

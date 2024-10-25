@@ -50,6 +50,12 @@ impl blob::metadata::Metadata for BlobInfo {
 #[derive(Copy, Clone, Default, Debug, PartialEq, PartialOrd, Ord, Eq, Serialize, Deserialize)]
 pub struct Index([u8; 8]);
 
+impl Index {
+    pub fn to_u64(self) -> u64 {
+        u64::from_be_bytes(self.0)
+    }
+}
+
 #[derive(Default, Debug, Copy, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub struct Metadata {
     app_id: [u8; 32],
