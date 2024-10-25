@@ -9,7 +9,6 @@ use std::time::Duration;
 use bytes::Bytes;
 use cl::InputWitness;
 use cryptarchia_consensus::TimeConfig;
-use cryptarchia_ledger::LedgerState;
 use kzgrs_backend::common::blob::DaBlob;
 use kzgrs_backend::dispersal::BlobInfo;
 use kzgrs_backend::encoder::DaEncoder;
@@ -46,6 +45,7 @@ use nomos_da_verifier::storage::adapters::rocksdb::RocksAdapter as VerifierStora
 use nomos_da_verifier::storage::adapters::rocksdb::RocksAdapterSettings as VerifierStorageSettings;
 use nomos_da_verifier::DaVerifierService;
 use nomos_da_verifier::DaVerifierServiceSettings;
+use nomos_ledger::LedgerState;
 use nomos_libp2p::{Multiaddr, Swarm, SwarmConfig};
 use nomos_mempool::da::service::DaMempoolService;
 use nomos_mempool::network::adapters::libp2p::Libp2pAdapter as MempoolNetworkAdapter;
@@ -188,7 +188,7 @@ pub struct TestDaNetworkSettings {
 
 pub fn new_node(
     note: &InputWitness,
-    ledger_config: &cryptarchia_ledger::Config,
+    ledger_config: &nomos_ledger::Config,
     genesis_state: &LedgerState,
     time_config: &TimeConfig,
     swarm_config: &SwarmConfig,

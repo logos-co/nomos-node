@@ -28,9 +28,9 @@ use nomos_node::MempoolNetworkAdapter;
 use nomos_node::Metrics;
 use nomos_node::NetworkBackend;
 use nomos_node::{
-    BlobInfo, Cryptarchia, DaIndexer, DaMempool, DaNetworkService, DaSampling, DaVerifier, Logger,
-    NetworkService, NomosDaMembership, RocksBackend, StorageService, SystemSig, Tx, TxMempool,
-    Wire, MB16,
+    BlobInfo, Cryptarchia, DaIndexer, DaMempool, DaNetworkService, DaSampling, DaVerifier,
+    NetworkService, NomosDaMembership, RocksBackend, StorageService, SystemSig, Tracing, Tx,
+    TxMempool, Wire, MB16,
 };
 use overwatch_derive::Services;
 use overwatch_rs::services::handle::ServiceHandle;
@@ -88,7 +88,7 @@ pub type ExecutorDaVerifier = DaVerifier<VerifierNetworkAdapter<NomosDaMembershi
 #[derive(Services)]
 pub struct NomosExecutor {
     #[cfg(feature = "tracing")]
-    logging: ServiceHandle<Logger>,
+    tracing: ServiceHandle<Tracing>,
     network: ServiceHandle<NetworkService<NetworkBackend>>,
     mix: ServiceHandle<MixService<MixBackend, MixNetworkAdapter>>,
     da_dispersal: ServiceHandle<DaDispersal>,

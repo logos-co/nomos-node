@@ -236,8 +236,8 @@ where
     <V as Metadata>::AppId: Serialize + DeserializeOwned,
     <V as Metadata>::Index: Serialize + DeserializeOwned,
 {
-    app_id: <V as Metadata>::AppId,
-    range: Range<<V as Metadata>::Index>,
+    pub app_id: <V as Metadata>::AppId,
+    pub range: Range<<V as Metadata>::Index>,
 }
 
 #[utoipa::path(

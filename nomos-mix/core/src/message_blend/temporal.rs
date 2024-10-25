@@ -14,7 +14,7 @@ use tokio::time;
 /// between incoming and outgoing messages from a node.
 ///
 /// See the [`Stream`] implementation below for more details on how it works.
-pub struct TemporalProcessor<M> {
+pub(crate) struct TemporalProcessor<M> {
     settings: TemporalProcessorSettings,
     // All scheduled messages
     queue: VecDeque<M>,
@@ -31,7 +31,7 @@ pub struct TemporalProcessorSettings {
 }
 
 impl<M> TemporalProcessor<M> {
-    pub fn new(settings: TemporalProcessorSettings) -> Self {
+    pub(crate) fn new(settings: TemporalProcessorSettings) -> Self {
         let lottery_interval = Self::lottery_interval(settings.max_delay_seconds);
         Self {
             settings,
@@ -64,7 +64,7 @@ impl<M> TemporalProcessor<M> {
     }
 
     /// Schedule a message to be released later.
-    pub fn push_message(&mut self, message: M) {
+    pub(crate) fn push_message(&mut self, message: M) {
         self.queue.push_back(message);
     }
 }

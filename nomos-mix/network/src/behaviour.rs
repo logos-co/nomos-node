@@ -88,18 +88,10 @@ impl Behaviour {
         message: Vec<u8>,
         excluded_peer: Option<PeerId>,
     ) -> Result<(), Error> {
-        let peer_ids = self
-            .negotiated_peers
-            .keys()
-            .filter(|&peer_id| {
-                if let Some(excluded_peer) = excluded_peer {
-                    *peer_id != excluded_peer
-                } else {
-                    true
-                }
-            })
-            .cloned()
-            .collect::<Vec<_>>();
+        let mut peer_ids: HashSet<_> = self.negotiated_peers.keys().collect();
+        if let Some(peer) = &excluded_peer {
+            peer_ids.remove(peer);
+        }
 
         if peer_ids.is_empty() {
             return Err(Error::NoPeers);
@@ -108,7 +100,7 @@ impl Behaviour {
         for peer_id in peer_ids.into_iter() {
             tracing::debug!("Registering event for peer {:?} to send msg", peer_id);
             self.events.push_back(ToSwarm::NotifyHandler {
-                peer_id,
+                peer_id: *peer_id,
                 handler: NotifyHandler::Any,
                 event: FromBehaviour::Message(message.clone()),
             });
@@ -219,7 +211,7 @@ impl NetworkBehaviour for Behaviour {
                 }
 
                 // Notify the swarm about the received message,
-                // so that it can be processed by the Tier 2 module.
+                // so that it can be processed by the core protocol module.
                 self.events
                     .push_back(ToSwarm::GenerateEvent(Event::Message(message)));
             }
