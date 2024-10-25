@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 
 /// [`CryptographicProcessor`] is responsible for wrapping and unwrapping messages
 /// for the message indistinguishability.
-pub struct CryptographicProcessor {
+pub(crate) struct CryptographicProcessor {
     settings: CryptographicProcessorSettings,
 }
 
@@ -13,17 +13,17 @@ pub struct CryptographicProcessorSettings {
 }
 
 impl CryptographicProcessor {
-    pub fn new(settings: CryptographicProcessorSettings) -> Self {
+    pub(crate) fn new(settings: CryptographicProcessorSettings) -> Self {
         Self { settings }
     }
 
-    pub fn wrap_message(&self, message: &[u8]) -> Result<Vec<u8>, nomos_mix_message::Error> {
+    pub(crate) fn wrap_message(&self, message: &[u8]) -> Result<Vec<u8>, nomos_mix_message::Error> {
         // TODO: Use the actual Sphinx encoding instead of mock.
         // TODO: Select `num_mix_layers` random nodes from the membership.
         new_message(message, self.settings.num_mix_layers.try_into().unwrap())
     }
 
-    pub fn unwrap_message(
+    pub(crate) fn unwrap_message(
         &self,
         message: &[u8],
     ) -> Result<(Vec<u8>, bool), nomos_mix_message::Error> {
