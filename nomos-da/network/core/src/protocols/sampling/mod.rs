@@ -6,7 +6,7 @@ mod test {
     use crate::protocols::sampling::behaviour::{
         BehaviourSampleRes, SamplingBehaviour, SamplingEvent,
     };
-    use crate::test_utils::AllNeighbours;
+    use crate::test_utils::{AllNeighbours, ConnectionClosingHandshake};
     use crate::SubnetworkId;
     use futures::StreamExt;
     use kzgrs_backend::common::blob::DaBlob;
@@ -15,10 +15,6 @@ mod test {
     use libp2p::swarm::SwarmEvent;
     use libp2p::{quic, Multiaddr, PeerId, Swarm, SwarmBuilder};
     use log::debug;
-    use std::sync::{
-        atomic::{AtomicBool, Ordering},
-        Arc,
-    };
     use std::time::Duration;
     use subnetworks_assignations::MembershipHandler;
     use tracing_subscriber::fmt::TestWriter;
@@ -87,28 +83,28 @@ mod test {
         let request_sender_1 = p1.behaviour().sample_request_channel();
         let request_sender_2 = p2.behaviour().sample_request_channel();
         const MSG_COUNT: usize = 10;
-        let done1 = Arc::new(AtomicBool::new(false));
-        let done2 = Arc::new(AtomicBool::new(false));
-
-        let done1_clone_t1 = Arc::clone(&done1);
-        let done2_clone_t1 = Arc::clone(&done2);
-        let done1_clone_t2 = Arc::clone(&done1);
-        let done2_clone_t2 = Arc::clone(&done2);
+        let channel1 = ConnectionClosingHandshake::new();
+        let channel2 = ConnectionClosingHandshake::new();
 
         async fn test_sampling_swarm(
-            label: &str,
+            channel1: ConnectionClosingHandshake,
+            channel2: ConnectionClosingHandshake,
             mut swarm: Swarm<
                 SamplingBehaviour<
                     impl MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'static,
                 >,
             >,
-            done1: Arc<AtomicBool>,
-            done2: Arc<AtomicBool>,
         ) -> Vec<[u8; 32]> {
             let mut res = Vec::with_capacity(MSG_COUNT);
             loop {
-                if done1.load(Ordering::Relaxed) && done2.load(Ordering::Relaxed) {
-                    break res;
+                if let Some(message1) = channel1.receive() {
+                    debug!("Received response: {message1}");
+                    if let Some(message2) = channel2.receive() {
+                        debug!("Received message: {message2}");
+                        if message1 && message2 {
+                            break res;
+                        }
+                    }
                 }
                 match swarm.next().await {
                     None => {}
@@ -148,26 +144,23 @@ mod test {
                         debug!("{event:?}");
                     }
                 }
-                if res.len() == MSG_COUNT && label == "peer1" {
-                    done1.store(true, Ordering::Relaxed);
-                } else if res.len() == MSG_COUNT && label == "peer2" {
-                    done2.store(true, Ordering::Relaxed);
-                }
+                channel1.send();
+                channel2.send();
             }
         }
-
-        let _p1_address = p1_address.clone();
-        let _p2_address = p2_address.clone();
+        let clone1 = channel1.clone();
+        let clone2 = channel2.clone();
         let t1 = tokio::spawn(async move {
             p1.listen_on(p1_address).unwrap();
             tokio::time::sleep(Duration::from_secs(1)).await;
-            test_sampling_swarm("peer1", p1, done1_clone_t1, done2_clone_t1).await
+            test_sampling_swarm(clone1, clone2, p1).await
         });
-
+        let clone1 = channel1.clone();
+        let clone2 = channel2.clone();
         let t2 = tokio::spawn(async move {
             p2.listen_on(p2_address).unwrap();
             tokio::time::sleep(Duration::from_secs(1)).await;
-            test_sampling_swarm("peer2", p2, done1_clone_t2, done2_clone_t2).await
+            test_sampling_swarm(clone1, clone2, p2).await
         });
 
         tokio::time::sleep(Duration::from_secs(2)).await;
@@ -176,6 +169,9 @@ mod test {
             request_sender_1.send((0, [i as u8; 32])).unwrap();
             request_sender_2.send((0, [i as u8; 32])).unwrap();
         }
+        tokio::time::sleep(Duration::from_secs(2)).await;
+        channel1.set_done();
+        channel2.set_done();
         let res1 = t1.await.unwrap();
         let res2 = t2.await.unwrap();
         assert_eq!(res1, res2);
