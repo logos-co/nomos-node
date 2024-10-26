@@ -150,18 +150,15 @@ impl<M: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'static> Netw
 mod tests {
     use super::*;
     use crate::address_book::AddressBook;
-    use crate::behaviour::validator::ValidatorBehaviourEvent;
     use crate::protocols::dispersal::executor::behaviour::{
         DispersalExecutorBehaviour, DispersalExecutorEvent,
     };
-    use crate::protocols::replication::handler::DaMessage;
-    use crate::protocols::sampling::behaviour::{SamplingBehaviour, SamplingEvent};
-    use futures::task::{waker_ref, ArcWake};
+    use futures::task::ArcWake;
     use kzgrs_backend::common::blob::DaBlob;
     use kzgrs_backend::common::Column;
     use libp2p::identity::Keypair;
     use libp2p::swarm::SwarmEvent;
-    use libp2p::{identity, quic, PeerId, Swarm};
+    use libp2p::{identity, quic, PeerId};
     use nomos_da_messages::common::Blob;
     use std::collections::{HashMap, HashSet};
     use std::sync::Arc;
@@ -414,7 +411,7 @@ mod tests {
                         }
                     }
 
-                    _ = time::sleep(Duration::from_secs(10)) => {
+                    _ = time::sleep(Duration::from_secs(2)) => {
                         if res.len() < msg_count {error!("Executor timeout reached");}
                         break;
                     }
@@ -445,36 +442,34 @@ mod tests {
 
         tokio::time::sleep(Duration::from_secs(1)).await;
 
-        // let mut res = vec![];
-        // loop {
-        //     match validator_swarms[0].next().await {
-        //         Some(SwarmEvent::Behaviour(DispersalEvent::IncomingMessage { message })) => {
-        //             res.push(message);
-        //         }
-        //         event => {
-        //             info!("Validator event: {event:?}");
-        //         }
-        //     }
-        //     if res.len() == msg_count {
-        //         tokio::time::sleep(Duration::from_secs(2)).await;
-        //         break;
-        //     }
-        // }
-
-        let waker = Arc::new(TestWaker);
-        let waker_ref = waker_ref(&waker);
-        let mut cx = Context::from_waker(&waker_ref);
-
-        let mut res = vec![];
+        let mut msg_counter = 0;
         loop {
-            match validator_behaviour.poll(&mut cx) {
-                event => {
-                    info!("Validator collected event: {event:?}");
-                    res.push(event);
-                }
-            }
+            match validator_swarms[0].next().await {
+                Some(SwarmEvent::Behaviour(DispersalEvent::IncomingMessage { message })) => {
+                    info!("Validator received blob: {message:?}");
 
-            if res.len() == msg_count {
+                    // Check data has structure and content as expected
+                    match message.blob {
+                        Some(Blob { blob_id, data }) => {
+                            let deserialized_blob: DaBlob = bincode::deserialize(&data).unwrap();
+                            assert_eq!(blob_id, deserialized_blob.id());
+                            msg_counter += 1;
+                        }
+                        None => {}
+                    }
+                    match message.subnetwork_id {
+                        subnet_id => {
+                            assert_eq!(subnet_id, 0);
+                        }
+                    }
+                }
+                Some(event) => {
+                    info!("Validator received event: {event:?}");
+                }
+
+                _ => {}
+            }
+            if msg_counter == msg_count {
                 tokio::time::sleep(Duration::from_secs(2)).await;
                 break;
             }
