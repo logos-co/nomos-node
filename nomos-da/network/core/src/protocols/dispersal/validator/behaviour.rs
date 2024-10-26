@@ -258,13 +258,16 @@ mod tests {
             .build()
     }
 
-    fn prepare_swarm_config(num_instances: usize) -> Vec<(Keypair, PeerId, Multiaddr)> {
+    fn prepare_swarm_config(
+        num_instances: usize,
+        group_id: usize,
+    ) -> Vec<(Keypair, PeerId, Multiaddr)> {
         let mut configs = Vec::with_capacity(num_instances);
 
         for i in 0..num_instances {
             let keypair = identity::Keypair::generate_ed25519();
             let peer_id = PeerId::from(keypair.public());
-            let port = 5100 + i;
+            let port = 5100 + group_id * num_instances + i;
             let addr: Multiaddr = format!("/ip4/127.0.0.1/udp/{port}/quic-v1")
                 .parse()
                 .unwrap();
@@ -340,30 +343,50 @@ mod tests {
             .with_writer(TestWriter::default())
             .try_init();
 
-        let num_instances = 2;
+        let all_instances = 20;
 
-        let subnet_0_config = prepare_swarm_config(num_instances / 2);
-        let subnet_0_ids = subnet_0_config
+        let executor_0_config = prepare_swarm_config(all_instances / 4, 0);
+        let validator_0_config = prepare_swarm_config(all_instances / 4, 1);
+
+        let executor_1_config = prepare_swarm_config(all_instances / 4, 2);
+        let validator_1_config = prepare_swarm_config(all_instances / 4, 3);
+
+        let subnet_0_ids = executor_0_config
             .iter()
             .map(|(_, peer_id, _)| peer_id.clone())
+            .chain(
+                validator_0_config
+                    .iter()
+                    .map(|(_, peer_id, _)| peer_id.clone()),
+            )
             .collect::<Vec<_>>();
 
-        let subnet_1_config = prepare_swarm_config(num_instances / 2);
-        let subnet_1_ids = subnet_1_config
+        let subnet_1_ids = executor_1_config
             .iter()
             .map(|(_, peer_id, _)| peer_id.clone())
+            .chain(
+                validator_1_config
+                    .iter()
+                    .map(|(_, peer_id, _)| peer_id.clone()),
+            )
             .collect::<Vec<_>>();
 
-        let addressbook =
-            AddressBook::from_iter(subnet_1_config.iter().map(|(_, peer_id, addr)| {
-                (
-                    peer_id.clone(),
-                    addr.clone().with_p2p(peer_id.clone()).unwrap(),
-                )
-            }));
+        let to_p2p_address = |(_, peer_id, addr): &(_, PeerId, Multiaddr)| {
+            (
+                peer_id.clone(),
+                addr.clone().with_p2p(peer_id.clone()).unwrap(),
+            )
+        };
 
-        let subnet_0_membership = create_membership(num_instances / 2, 0, &subnet_0_ids);
-        let subnet_1_membership = create_membership(num_instances / 2, 0, &subnet_1_ids);
+        let validator_addressbook = AddressBook::from_iter(
+            validator_0_config
+                .iter()
+                .map(to_p2p_address)
+                .chain(validator_1_config.iter().map(to_p2p_address)),
+        );
+
+        let subnet_0_membership = create_membership(all_instances / 2, 0, &subnet_0_ids);
+        let subnet_1_membership = create_membership(all_instances / 2, 0, &subnet_1_ids);
 
         let mut all_neighbours = subnet_0_membership;
         all_neighbours
@@ -374,11 +397,11 @@ mod tests {
         let mut executor_swarms: Vec<_> = vec![];
         let mut validator_swarms: Vec<_> = vec![];
 
-        for i in 0..num_instances / 2 {
-            let (k, executor_peer, addr) = subnet_0_config[i].clone();
-            let (k2, validator_peer, addr2) = subnet_1_config[i].clone();
+        for i in 0..all_instances / 2 {
+            let (k, executor_peer, addr) = executor_0_config[i].clone();
+            let (k2, validator_peer, addr2) = validator_0_config[i].clone();
             let executor = executor_swarm(
-                addressbook.clone(),
+                validator_addressbook.clone(),
                 k,
                 executor_peer,
                 all_neighbours.clone(),
@@ -388,7 +411,7 @@ mod tests {
             validator_swarms.push(validator);
         }
 
-        let (validator_key, validator_id, validator_addr) = subnet_1_config[0].clone();
+        let (validator_key, validator_id, validator_addr) = validator_0_config[0].clone();
         let validator_addr_p2p = validator_addr
             .clone()
             .with_p2p(validator_id.clone())
