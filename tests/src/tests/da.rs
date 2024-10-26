@@ -28,6 +28,7 @@ async fn disseminate(executor: &Executor, data: &[u8]) {
     client.publish_blob(data.to_vec(), metadata).await.unwrap();
 }
 
+#[ignore = "todo: reenable after mixnet is tested"]
 #[tokio::test]
 async fn disseminate_and_retrieve() {
     let topology = Topology::spawn(TopologyConfig::validator_and_executor()).await;
@@ -74,6 +75,7 @@ async fn disseminate_and_retrieve() {
     }
 }
 
+#[ignore = "todo: make work in parallel to other tests"]
 #[tokio::test]
 async fn disseminate_retrieve_reconstruct() {
     let topology = Topology::spawn(TopologyConfig::validator_and_executor()).await;

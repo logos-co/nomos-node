@@ -4,6 +4,7 @@ use std::io::Write;
 use std::sync::{Arc, Mutex};
 // crates
 use futures::StreamExt;
+use nomos_tracing::filter::envfilter::{create_envfilter_layer, EnvFilterConfig};
 use nomos_tracing::logging::gelf::{create_gelf_layer, GelfConfig};
 use nomos_tracing::logging::local::{create_file_layer, create_writer_layer, FileConfig};
 use nomos_tracing::logging::loki::{create_loki_layer, LokiConfig};
@@ -87,9 +88,16 @@ pub enum TracingLayer {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+pub enum FilterLayer {
+    EnvFilter(EnvFilterConfig),
+    None,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct TracingSettings {
     pub logger: LoggerLayer,
     pub tracing: TracingLayer,
+    pub filter: FilterLayer,
     #[serde(with = "serde_level")]
     pub level: Level,
 }
@@ -99,6 +107,7 @@ impl Default for TracingSettings {
         Self {
             logger: LoggerLayer::Stdout,
             tracing: TracingLayer::None,
+            filter: FilterLayer::None,
             level: Level::DEBUG,
         }
     }
@@ -106,10 +115,16 @@ impl Default for TracingSettings {
 
 impl TracingSettings {
     #[inline]
-    pub const fn new(logger: LoggerLayer, tracing: TracingLayer, level: Level) -> Self {
+    pub const fn new(
+        logger: LoggerLayer,
+        tracing: TracingLayer,
+        filter: FilterLayer,
+        level: Level,
+    ) -> Self {
         Self {
             logger,
             tracing,
+            filter,
             level,
         }
     }
@@ -172,6 +187,11 @@ impl ServiceCore for Tracing {
         if let TracingLayer::Otlp(config) = config.tracing {
             let tracing_layer = create_otlp_tracing_layer(config)?;
             layers.push(Box::new(tracing_layer));
+        }
+
+        if let FilterLayer::EnvFilter(config) = config.filter {
+            let filter_layer = create_envfilter_layer(config)?;
+            layers.push(Box::new(filter_layer));
         }
 
         // If no layers are created, tracing subscriber is not required.

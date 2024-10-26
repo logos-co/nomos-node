@@ -3,7 +3,7 @@ use std::{collections::HashMap, net::Ipv4Addr, str::FromStr};
 // crates
 use nomos_libp2p::{Multiaddr, PeerId, Protocol};
 use nomos_tracing::{logging::loki::LokiConfig, tracing::otlp::OtlpTracingConfig};
-use nomos_tracing_service::{LoggerLayer, TracingSettings};
+use nomos_tracing_service::{FilterLayer, LoggerLayer, TracingSettings};
 use rand::{thread_rng, Rng};
 use tests::topology::configs::{
     api::GeneralApiConfig,
@@ -207,6 +207,7 @@ fn tracing_config_for_grafana(params: TracingParams, identifier: String) -> Gene
                 endpoint: params.tempo_endpoint,
                 sample_ratio: 1.0,
             }),
+            filter: FilterLayer::None,
             level: Level::INFO,
         },
     }
