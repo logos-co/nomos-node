@@ -150,19 +150,24 @@ impl<M: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'static> Netw
 mod tests {
     use super::*;
     use crate::address_book::AddressBook;
+    use crate::behaviour::executor::ExecutorBehaviour;
     use crate::protocols::dispersal::executor::behaviour::{
         DispersalExecutorBehaviour, DispersalExecutorEvent,
     };
+    use crate::protocols::sampling::behaviour::SamplingBehaviour;
     use futures::task::ArcWake;
     use kzgrs_backend::common::blob::DaBlob;
     use kzgrs_backend::common::Column;
     use libp2p::identity::Keypair;
     use libp2p::swarm::SwarmEvent;
-    use libp2p::{identity, quic, PeerId};
+    use libp2p::{identity, quic, PeerId, Swarm};
     use nomos_da_messages::common::Blob;
     use std::collections::{HashMap, HashSet};
+    use std::mem;
     use std::sync::Arc;
     use std::time::Duration;
+    use futures::future::join_all;
+    use tokio::sync::mpsc::UnboundedSender;
     use tokio::time;
     use tracing::{error, info};
     use tracing_subscriber::fmt::TestWriter;
@@ -394,110 +399,188 @@ mod tests {
             .extend(subnet_1_membership.membership);
 
         // create swarms
-        let mut executor_swarms: Vec<_> = vec![];
-        let mut validator_swarms: Vec<_> = vec![];
+        let mut executor_0_swarms: Vec<_> = vec![];
+        let mut validator_0_swarms: Vec<_> = vec![];
+        let mut executor_1_swarms: Vec<_> = vec![];
+        let mut validator_1_swarms: Vec<_> = vec![];
 
-        for i in 0..all_instances / 2 {
+        for i in 0..all_instances / 4 {
             let (k, executor_peer, addr) = executor_0_config[i].clone();
-            let (k2, validator_peer, addr2) = validator_0_config[i].clone();
-            let executor = executor_swarm(
+            let (k2, _, addr2) = validator_0_config[i].clone();
+            let (k3, executor_peer2, addr3) = executor_1_config[i].clone();
+            let (k4, _, addr4) = validator_1_config[i].clone();
+
+            let executor_0 = executor_swarm(
                 validator_addressbook.clone(),
                 k,
                 executor_peer,
                 all_neighbours.clone(),
             );
-            let validator = validator_swarm(k2, all_neighbours.clone());
-            executor_swarms.push(executor);
-            validator_swarms.push(validator);
+            let validator_0 = validator_swarm(k2, all_neighbours.clone());
+            executor_0_swarms.push(executor_0);
+            validator_0_swarms.push(validator_0);
+
+            let executor_1 = executor_swarm(
+                validator_addressbook.clone(),
+                k3,
+                executor_peer2,
+                all_neighbours.clone(),
+            );
+            let validator_1 = validator_swarm(k4, all_neighbours.clone());
+            executor_1_swarms.push(executor_1);
+            validator_1_swarms.push(validator_1);
         }
 
-        let (validator_key, validator_id, validator_addr) = validator_0_config[0].clone();
-        let validator_addr_p2p = validator_addr
-            .clone()
-            .with_p2p(validator_id.clone())
-            .unwrap();
+        // Let validator swarms to listen
+        for i in 0..all_instances / 4 {
+            let (_, peer_id, addr) = validator_0_config[i].clone();
+            let validator_0_addr = addr.clone().with_p2p(peer_id).unwrap();
+            validator_0_swarms[i].listen_on(validator_0_addr).unwrap();
 
-        validator_swarms[0].listen_on(validator_addr).unwrap();
+            let (_, peer_id, addr) = validator_1_config[i].clone();
+            let validator_1_addr = addr.clone().with_p2p(peer_id).unwrap();
+            validator_1_swarms[i].listen_on(validator_1_addr).unwrap();
+        }
 
-        let validator_behaviour = validator_swarms[0].behaviour_mut();
-        let executor_disperse_blob_sender = executor_swarms[0].behaviour().blobs_sender();
+        tokio::time::sleep(Duration::from_secs(5)).await;
 
-        let msg_count = 10usize;
-        let executor_poll = async move {
-            let mut res = vec![];
+        let mut message_senders: Vec<UnboundedSender<(u32, DaBlob)>> = Vec::new();
+
+        for i in 0..all_instances / 4 {
+            let blob_sender_0 = executor_0_swarms[i].behaviour().blobs_sender();
+            let blob_sender_1 = executor_1_swarms[i].behaviour().blobs_sender();
+            message_senders.extend(vec![blob_sender_0, blob_sender_1]);
+        }
+
+        async fn run_executor_swarm(
+            mut swarm: Swarm<DispersalExecutorBehaviour<impl MembershipHandler<NetworkId=u32, Id=PeerId> + Sized + 'static>>
+        ) {
+            let mut msg_counter = 0;
             loop {
                 tokio::select! {
-                    Some(event) = executor_swarms[0].next() => {
+                    Some(event) = swarm.next() => {
                         info!("Executor event: {event:?}");
                         if let SwarmEvent::Behaviour(DispersalExecutorEvent::DispersalSuccess{blob_id, ..}) = event {
-                            res.push(blob_id);
+                            msg_counter += 1;
                         }
                     }
 
                     _ = time::sleep(Duration::from_secs(2)) => {
-                        if res.len() < msg_count {error!("Executor timeout reached");}
+                        if msg_counter < 10 {error!("Executor timeout reached");}
                         break;
                     }
                 }
             }
-            res
-        };
-
-        let executor_task = tokio::spawn(executor_poll);
-
-        for i in 0..msg_count {
-            info!("Sending blob {i}...");
-            executor_disperse_blob_sender
-                .send((
-                    0,
-                    DaBlob {
-                        column_idx: 0,
-                        column: Column(vec![]),
-                        column_commitment: Default::default(),
-                        aggregated_column_commitment: Default::default(),
-                        aggregated_column_proof: Default::default(),
-                        rows_commitments: vec![],
-                        rows_proofs: vec![],
-                    },
-                ))
-                .unwrap();
         }
 
-        tokio::time::sleep(Duration::from_secs(1)).await;
+        async fn run_validator_swarm(
+            mut swarm: Swarm<DispersalValidatorBehaviour<impl MembershipHandler<NetworkId=u32, Id=PeerId> + Sized + 'static>>
+        ) {
+            let mut msg_counter = 0;
+            loop {
+                match swarm.next().await {
+                    Some(SwarmEvent::Behaviour(DispersalEvent::IncomingMessage { message })) => {
+                        info!("Validator received blob: {message:?}");
 
-        let mut msg_counter = 0;
-        loop {
-            match validator_swarms[0].next().await {
-                Some(SwarmEvent::Behaviour(DispersalEvent::IncomingMessage { message })) => {
-                    info!("Validator received blob: {message:?}");
-
-                    // Check data has structure and content as expected
-                    match message.blob {
-                        Some(Blob { blob_id, data }) => {
-                            let deserialized_blob: DaBlob = bincode::deserialize(&data).unwrap();
-                            assert_eq!(blob_id, deserialized_blob.id());
-                            msg_counter += 1;
+                        // Check data has structure and content as expected
+                        match message.blob {
+                            Some(Blob { blob_id, data }) => {
+                                let deserialized_blob: DaBlob = bincode::deserialize(&data).unwrap();
+                                assert_eq!(blob_id, deserialized_blob.id());
+                                msg_counter += 1;
+                            }
+                            None => {}
                         }
-                        None => {}
-                    }
-                    match message.subnetwork_id {
-                        subnet_id => {
-                            assert_eq!(subnet_id, 0);
+                        match message.subnetwork_id {
+                            subnet_id => {
+                                assert_eq!(subnet_id, 0);
+                            }
                         }
                     }
-                }
-                Some(event) => {
-                    info!("Validator received event: {event:?}");
-                }
+                    Some(event) => {
+                        info!("Validator received event: {event:?}");
+                    }
 
-                _ => {}
+                    _ => {}
+                }
+                if msg_counter == 10 {
+                    tokio::time::sleep(Duration::from_secs(2)).await;
+                    break;
+                }
             }
-            if msg_counter == msg_count {
-                tokio::time::sleep(Duration::from_secs(2)).await;
-                break;
+
+        }
+
+        async fn send_dispersal_messages(
+            disperse_blob_sender: UnboundedSender<(u32, DaBlob)>
+        ) {
+            for i in 0..10 {
+                info!("Sending blob {i}...");
+                disperse_blob_sender
+                    .send((
+                        0,
+                        DaBlob {
+                            column_idx: 0,
+                            column: Column(vec![]),
+                            column_commitment: Default::default(),
+                            aggregated_column_commitment: Default::default(),
+                            aggregated_column_proof: Default::default(),
+                            rows_commitments: vec![],
+                            rows_proofs: vec![],
+                        },
+                    ))
+                    .unwrap();
             }
         }
 
-        executor_task.await.unwrap();
+        let mut executor_tasks = vec![];
+
+        // Spawn executors
+        for i in (0..all_instances / 4).rev() {
+            let swarm = executor_0_swarms.remove(i);
+            let executor_poll = async {
+                run_executor_swarm(swarm);
+            };
+
+            let executor_task = tokio::spawn(executor_poll);
+            executor_tasks.push(executor_task);
+
+            let swarm = executor_1_swarms.remove(i);
+            let executor_poll = async {
+                run_executor_swarm(swarm);
+            };
+
+            let executor_task = tokio::spawn(executor_poll);
+            executor_tasks.push(executor_task);
+        }
+
+        // Send messages
+        for i in (0..all_instances / 2).rev() {
+            let sender = message_senders.remove(i);
+            let send_messages_task = async {
+                send_dispersal_messages(sender);
+            };
+            tokio::spawn(send_messages_task);
+        }
+
+        // Spawn validators
+        for i in (0..all_instances / 4).rev() {
+            let swarm = validator_0_swarms.remove(i);
+            let validator_poll = async {
+                run_validator_swarm(swarm);
+            };
+            tokio::spawn(validator_poll);
+
+            let swarm = validator_1_swarms.remove(i);
+            let validator_poll = async {
+                run_validator_swarm(swarm);
+            };
+            tokio::spawn(validator_poll);
+        }
+
+
+
+
+        join_all(executor_tasks).await;
     }
 }
