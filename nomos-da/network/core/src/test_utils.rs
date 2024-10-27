@@ -31,6 +31,7 @@ impl MembershipHandler for AllNeighbours {
 use crossbeam_channel::{bounded, Receiver, Sender};
 use std::sync::{Arc, Mutex};
 
+#[derive(Debug)]
 /// A special-purpose multi-producer, multi-consumer(MPMC) channel to relay messages indicating whether the associated stream should be closed or not. This channel is intended to be used on sampling, dispersal and replication protocol tests to ensure graceful shutdown of streams after event has completed.
 pub struct ConnectionClosingHandshake {
     pub sender: Sender<bool>,
@@ -39,8 +40,8 @@ pub struct ConnectionClosingHandshake {
 }
 
 impl ConnectionClosingHandshake {
-    pub fn new() -> Self {
-        let (sender, receiver) = bounded(0);
+    pub fn new(size: usize) -> Self {
+        let (sender, receiver) = bounded(size);
         Self {
             sender,
             receiver,
@@ -54,7 +55,7 @@ impl ConnectionClosingHandshake {
     }
 
     pub fn receive(&self) -> Option<bool> {
-        self.receiver.recv().ok()
+        self.receiver.try_recv().ok()
     }
 
     pub fn set_done(&self) {
@@ -81,37 +82,40 @@ mod tests {
 
     #[test]
     fn test_connection_closing_handshake_with_concurrent_loops() {
-        let handshake = ConnectionClosingHandshake::new();
+        let handshake = ConnectionClosingHandshake::new(1);
         let num_ongoing_messages = 5;
         let handshake_for_ongoing = handshake.clone();
 
         let ongoing_thread = thread::spawn(move || {
             for _ in 0..num_ongoing_messages {
                 handshake_for_ongoing.send();
-                thread::sleep(Duration::from_millis(10)); // Short delay between sends
             }
         });
 
         let handshake_for_done = handshake.clone();
         let done_thread = thread::spawn(move || {
             // Wait briefly before setting done to allow some "Ongoing" messages to be sent.
-            thread::sleep(Duration::from_millis(55));
+            thread::sleep(Duration::from_millis(5));
             handshake_for_done.set_done();
             handshake_for_done.send();
         });
-        for i in 0..=num_ongoing_messages {
-            let message = handshake.receive().unwrap();
-            if i < num_ongoing_messages {
-                assert_eq!(
-                    message, false,
-                    "Expected 'Ongoing' (false) message at index {}",
-                    i
-                );
-            } else {
-                assert_eq!(
-                    message, true,
-                    "Expected 'Finished' (true) message after all 'Ongoing' messages"
-                );
+        let mut i = 0;
+        loop {
+            if let Some(message) = handshake.receive() {
+                if i != 5 {
+                    assert_eq!(
+                        message, false,
+                        "Expected 'Ongoing' (false) message at index {}",
+                        i
+                    );
+                    i += 1;
+                } else {
+                    assert_eq!(
+                        message, true,
+                        "Expected 'Finished' (true) message after all 'Ongoing' messages"
+                    );
+                    break;
+                }
             }
         }
         ongoing_thread.join().unwrap();
