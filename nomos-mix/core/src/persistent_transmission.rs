@@ -96,7 +96,7 @@ where
     }
 }
 
-pub trait PersistentTransmission: Stream {
+pub trait PersistentTransmissionExt: Stream {
     fn persistent_transmission(
         self,
         settings: PersistentTransmissionSettings,
@@ -108,7 +108,7 @@ pub trait PersistentTransmission: Stream {
     }
 }
 
-impl<S> PersistentTransmission for S where S: Stream {}
+impl<S> PersistentTransmissionExt for S where S: Stream {}
 
 /// Transmit scheduled messages with a persistent rate to the transmission channel.
 ///
@@ -290,7 +290,7 @@ mod tests {
         let lower_bound = expected_emission_interval - torelance;
         let upper_bound = expected_emission_interval + torelance;
         // prepare stream
-        let mut persistent_transmission_stream = stream.persistent_transmission(settings).boxed();
+        let mut persistent_transmission_stream = stream.persistent_transmission(settings);
         // Messages must be scheduled in non-blocking manner.
         schedule_sender.send(vec![1]).unwrap();
         schedule_sender.send(vec![2]).unwrap();
