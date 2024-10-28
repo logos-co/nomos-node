@@ -479,8 +479,9 @@ mod tests {
         ) -> (usize, usize) {
             let (mut msg_0_counter, mut msg_1_counter) = (0, 0);
             loop {
-                match swarm.next().await {
-                    Some(SwarmEvent::Behaviour(DispersalEvent::IncomingMessage { message })) => {
+                tokio::select! {
+                    Some(event) = swarm.next() => {
+                    if let SwarmEvent::Behaviour(DispersalEvent::IncomingMessage { message }) = event {
                         info!("Validator received blob: {message:?}");
 
                         // Check data has structure and content as expected
@@ -498,17 +499,17 @@ mod tests {
                             None => {}
                         }
                     }
-                    Some(event) => {
-                        info!("Validator received event: {event:?}");
                     }
 
-                    _ => {}
-                }
-                if msg_0_counter == MESSAGES_TO_SEND || msg_1_counter == MESSAGES_TO_SEND {
-                    tokio::time::sleep(Duration::from_secs(5)).await;
-                    return (msg_0_counter, msg_1_counter)
+                    _ = time::sleep(Duration::from_secs(2)) => {
+                        if msg_0_counter <= MESSAGES_TO_SEND && msg_1_counter <= MESSAGES_TO_SEND {
+                            error!("Validator timeout reached");
+                        }
+                        break;
+                    }
                 }
             }
+            (msg_0_counter, msg_1_counter)
         }
 
         async fn send_dispersal_messages(
@@ -544,7 +545,10 @@ mod tests {
             let swarm = executor_1_swarms.remove(i);
             let executor_1_poll = async { run_executor_swarm(swarm).await };
 
-            executor_tasks.extend(vec![tokio::spawn(executor_0_poll), tokio::spawn(executor_1_poll)]);
+            executor_tasks.extend(vec![
+                tokio::spawn(executor_0_poll),
+                tokio::spawn(executor_1_poll),
+            ]);
         }
 
         // Send messages from all executors
@@ -561,23 +565,30 @@ mod tests {
         // Spawn validators
         for i in (0..ALL_INSTANCES / 4).rev() {
             let swarm = validator_0_swarms.remove(i);
-            let validator_0_poll = async {
-                run_validator_swarm(swarm).await;
-            };
+            let validator_0_poll = async { run_validator_swarm(swarm).await };
 
             let swarm = validator_1_swarms.remove(i);
-            let validator_1_poll = async {
-                run_validator_swarm(swarm).await;
-            };
+            let validator_1_poll = async { run_validator_swarm(swarm).await };
 
-            validator_tasks.extend(vec![tokio::spawn(validator_0_poll), tokio::spawn(validator_1_poll)]);
+            executor_tasks.extend(vec![
+                tokio::spawn(validator_0_poll),
+                tokio::spawn(validator_1_poll),
+            ]);
         }
 
         tokio::time::sleep(Duration::from_secs(10)).await;
 
         for task in executor_tasks {
-            info!("Executor task received: {:?} message dispersal success", task.await.unwrap());
+            info!(
+                "Executor task received: {:?} messages dispersal success",
+                task.await.unwrap()
+            );
+        }
 
+        for task in validator_tasks {
+            let result = task.await.unwrap();
+            info!("Validator received {:?} messages from subnet 0", result.0);
+            info!("Validator received {:?} messages from subnet 1\n", result.1);
         }
     }
 }
