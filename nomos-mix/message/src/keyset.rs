@@ -14,9 +14,9 @@ pub const KEYSET_LENGTH: usize =
 #[derive(Clone)]
 pub struct KeySet {
     /// A key to encrypt/decrypt packet header using AES128-CTR.
-    pub stream_cipher_key: [u8; STREAM_CIPHER_KEY_SIZE],
+    pub _stream_cipher_key: [u8; STREAM_CIPHER_KEY_SIZE],
     /// A key to calculate HMAC of the encrypted packet header.
-    pub header_integrity_hmac_key: [u8; INTEGRITY_MAC_KEY_SIZE],
+    pub _header_integrity_hmac_key: [u8; INTEGRITY_MAC_KEY_SIZE],
     /// A key to encrypt payload using Lioness.
     pub payload_lioness_key: [u8; lioness::RAW_KEY_SIZE],
     /// To derive the new ephemeral public key to be shared to the next recipient.
@@ -48,8 +48,8 @@ impl KeySet {
         ephemeral_private_key.copy_from_slice(&expanded_key[i..i + STATIC_SECRET_SIZE]);
 
         Self {
-            stream_cipher_key,
-            header_integrity_hmac_key,
+            _stream_cipher_key: stream_cipher_key,
+            _header_integrity_hmac_key: header_integrity_hmac_key,
             payload_lioness_key,
             ephemeral_private_key: StaticSecret::from(ephemeral_private_key),
         }
@@ -74,12 +74,11 @@ impl KeySet {
     /// To allow each recipient to derive its shared secret and [`KeySet`],
     /// the naive way may be including all ephemeral public keys
     /// for each recipient in the packet header.
-    /// But, this approach makes the packet size proportional to the number of recipients.
-    ///
     /// Instead, this method uses the accumulated DH operations
     /// to allow each recipient to derive the new ephemeral public key for the next recipient.
+    /// Doing so, only one ephemeral public key is needed to be included in the packet header.
     ///
-    /// The public key of the initial private key should be shared to the first recipient.
+    /// The public key of the initial ephemeral private key should be shared to the first recipient.
     ///
     /// Example:
     /// As a packet builder:
@@ -137,10 +136,12 @@ impl KeySet {
     /// This is the operation symmetric to the one of accumulated DH operations
     /// performed in the [`KeySet::derive_all`].
     pub fn derive_next_ephemeral_public_key(
+        &self,
         shared_ephemeral_pubkey: &x25519_dalek::PublicKey,
-        derived_ephemeral_privkey: &x25519_dalek::StaticSecret,
     ) -> x25519_dalek::PublicKey {
-        let new_shared_secert = derived_ephemeral_privkey.diffie_hellman(shared_ephemeral_pubkey);
+        let new_shared_secert = self
+            .ephemeral_private_key
+            .diffie_hellman(shared_ephemeral_pubkey);
         x25519_dalek::PublicKey::from(new_shared_secert.to_bytes())
     }
 }
@@ -152,8 +153,8 @@ mod tests {
     // For the security reasons, implement PartialEq and Debug for KeySet only for testing.
     impl PartialEq for KeySet {
         fn eq(&self, other: &Self) -> bool {
-            self.stream_cipher_key == other.stream_cipher_key
-                && self.header_integrity_hmac_key == other.header_integrity_hmac_key
+            self._stream_cipher_key == other._stream_cipher_key
+                && self._header_integrity_hmac_key == other._header_integrity_hmac_key
                 && self.payload_lioness_key == other.payload_lioness_key
                 && self.ephemeral_private_key.to_bytes() == other.ephemeral_private_key.to_bytes()
         }
@@ -162,8 +163,11 @@ mod tests {
     impl std::fmt::Debug for KeySet {
         fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
             f.debug_struct("KeySet")
-                .field("stream_cipher_key", &self.stream_cipher_key)
-                .field("header_integrity_hmac_key", &self.header_integrity_hmac_key)
+                .field("stream_cipher_key", &self._stream_cipher_key)
+                .field(
+                    "header_integrity_hmac_key",
+                    &self._header_integrity_hmac_key,
+                )
                 .field("payload_lioness_key", &self.payload_lioness_key)
                 .field(
                     "ephemeral_private_key",
@@ -197,10 +201,7 @@ mod tests {
         let shared_secret = recipient_privkeys[0].diffie_hellman(&ephemeral_pubkey);
         let keyset = KeySet::derive(shared_secret.as_bytes());
         // Derive the next ephemeral public key
-        let ephemeral_pubkey = KeySet::derive_next_ephemeral_public_key(
-            &ephemeral_pubkey,
-            &keyset.ephemeral_private_key,
-        );
+        let ephemeral_pubkey = keyset.derive_next_ephemeral_public_key(&ephemeral_pubkey);
         keysets_by_recipients.push(keyset);
 
         // The recipient 2 derives the shared secret by DH key exchange and derives the [`KeySet`].
@@ -237,10 +238,7 @@ mod tests {
         let shared_secret = x25519_dalek::StaticSecret::random().diffie_hellman(&ephemeral_pubkey);
         let keyset = KeySet::derive(shared_secret.as_bytes());
         // Derive the next ephemeral public key
-        let ephemeral_pubkey = KeySet::derive_next_ephemeral_public_key(
-            &ephemeral_pubkey,
-            &keyset.ephemeral_private_key,
-        );
+        let ephemeral_pubkey = keyset.derive_next_ephemeral_public_key(&ephemeral_pubkey);
         keysets_by_recipients.push(keyset);
 
         // The recipient 2 derives the shared secret with a wrong private key
