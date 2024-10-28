@@ -1,4 +1,5 @@
 mod error;
+pub mod keyset;
 
 pub use error::Error;
 
