@@ -6,14 +6,22 @@ use crate::{
     Error,
 };
 
+/// A packet that contains a header and a payload.
+/// The header and payload are encrypted for the selected recipients.
+/// This packet can be serialized and sent over the network.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Packet {
     header: Header,
+    // This crate doesn't limit the payload size.
+    // Users must choose the appropriate constant size and implement padding.
     payload: Vec<u8>,
 }
 
+/// The packet header
 #[derive(Debug, Serialize, Deserialize)]
 struct Header {
+    /// The ephemeral public key for a recipient to derive the shared secret
+    /// which can be used to decrypt the header and payload.
     ephemeral_public_key: x25519_dalek::PublicKey,
     // TODO: Length-preserved layered encryption on RoutingInfo
     routing_info: RoutingInfo,
