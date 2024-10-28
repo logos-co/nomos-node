@@ -570,7 +570,7 @@ mod tests {
             let swarm = validator_1_swarms.remove(i);
             let validator_1_poll = async { run_validator_swarm(swarm).await };
 
-            executor_tasks.extend(vec![
+            validator_tasks.extend(vec![
                 tokio::spawn(validator_0_poll),
                 tokio::spawn(validator_1_poll),
             ]);
