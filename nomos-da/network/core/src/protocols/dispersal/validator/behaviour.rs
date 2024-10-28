@@ -386,14 +386,14 @@ mod tests {
         );
 
         let subnet_0_membership = create_membership(ALL_INSTANCES / 2, 0, &subnet_0_ids);
-        let subnet_1_membership = create_membership(ALL_INSTANCES / 2, 0, &subnet_1_ids);
+        let subnet_1_membership = create_membership(ALL_INSTANCES / 2, 1, &subnet_1_ids);
 
         let mut all_neighbours = subnet_0_membership;
         all_neighbours
             .membership
             .extend(subnet_1_membership.membership);
 
-        // create swarms
+        // Create swarms
         let mut executor_0_swarms: Vec<_> = vec![];
         let mut validator_0_swarms: Vec<_> = vec![];
         let mut executor_1_swarms: Vec<_> = vec![];
@@ -481,24 +481,24 @@ mod tests {
             loop {
                 tokio::select! {
                     Some(event) = swarm.next() => {
-                    if let SwarmEvent::Behaviour(DispersalEvent::IncomingMessage { message }) = event {
-                        info!("Validator received blob: {message:?}");
+                        if let SwarmEvent::Behaviour(DispersalEvent::IncomingMessage { message }) = event {
+                            info!("Validator received blob: {message:?}");
 
-                        // Check data has structure and content as expected
-                        match message.blob {
-                            Some(Blob { blob_id, data }) => {
-                                let deserialized_blob: DaBlob =
-                                    bincode::deserialize(&data).unwrap();
-                                assert_eq!(blob_id, deserialized_blob.id());
-                                if message.subnetwork_id == 0 {
-                                    msg_0_counter += 1;
-                                } else {
-                                    msg_1_counter += 1;
+                            // Check data has structure and content as expected
+                            match message.blob {
+                                Some(Blob { blob_id, data }) => {
+                                    let deserialized_blob: DaBlob =
+                                        bincode::deserialize(&data).unwrap();
+                                    assert_eq!(blob_id, deserialized_blob.id());
+                                    if message.subnetwork_id == 0 {
+                                        msg_0_counter += 1;
+                                    } else {
+                                        msg_1_counter += 1;
+                                    }
                                 }
+                                None => {}
                             }
-                            None => {}
                         }
-                    }
                     }
 
                     _ = time::sleep(Duration::from_secs(2)) => {
