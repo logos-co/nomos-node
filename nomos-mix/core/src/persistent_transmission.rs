@@ -37,7 +37,7 @@ where
     interval: Interval,
     coin: Coin<ChaCha12Rng>,
     queue: VecDeque<S::Item>,
-    stream: Box<S>,
+    stream: S,
 }
 
 impl<S> PersistentTransmissionStream<S>
@@ -56,7 +56,6 @@ where
             settings.drop_message_probability,
         )
         .unwrap();
-        let stream = Box::new(stream);
         Self {
             interval,
             coin,
