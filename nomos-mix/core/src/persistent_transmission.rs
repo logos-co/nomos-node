@@ -3,7 +3,6 @@ use nomos_mix_message::DROP_MESSAGE;
 use rand::{distributions::Uniform, prelude::Distribution, Rng, SeedableRng};
 use rand_chacha::ChaCha12Rng;
 use serde::{Deserialize, Serialize};
-use std::collections::VecDeque;
 use std::pin::{pin, Pin};
 use std::task::{Context, Poll};
 use std::time::Duration;
@@ -36,8 +35,7 @@ where
 {
     interval: Interval,
     coin: Coin<ChaCha12Rng>,
-    queue: VecDeque<S::Item>,
-    stream: Box<S>,
+    stream: S,
 }
 
 impl<S> PersistentTransmissionStream<S>
@@ -56,11 +54,9 @@ where
             settings.drop_message_probability,
         )
         .unwrap();
-        let stream = Box::new(stream);
         Self {
             interval,
             coin,
-            queue: Default::default(),
             stream,
         }
     }
@@ -75,29 +71,24 @@ where
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let Self {
             ref mut interval,
-            ref mut queue,
             ref mut stream,
             ref mut coin,
             ..
         } = self.get_mut();
-        if pin!(interval).poll_tick(cx).is_ready() {
-            match queue.pop_front() {
-                item @ Some(_) => return Poll::Ready(item),
-                None => {
-                    if coin.flip() {
-                        return Poll::Ready(Some(DROP_MESSAGE.to_vec()));
-                    }
-                }
-            };
-        };
-        if let Poll::Ready(Some(item)) = pin!(stream).poll_next(cx) {
-            queue.push_back(item);
+        if pin!(interval).poll_tick(cx).is_pending() {
+            return Poll::Pending;
         }
-        Poll::Pending
+        if let Poll::Ready(Some(item)) = pin!(stream).poll_next(cx) {
+            Poll::Ready(Some(item))
+        } else if coin.flip() {
+            Poll::Ready(Some(DROP_MESSAGE.to_vec()))
+        } else {
+            Poll::Pending
+        }
     }
 }
 
-pub trait PersistentTransmission: Stream {
+pub trait PersistentTransmissionExt: Stream {
     fn persistent_transmission(
         self,
         settings: PersistentTransmissionSettings,
@@ -109,7 +100,7 @@ pub trait PersistentTransmission: Stream {
     }
 }
 
-impl<S> PersistentTransmission for S where S: Stream {}
+impl<S> PersistentTransmissionExt for S where S: Stream {}
 
 /// Transmit scheduled messages with a persistent rate to the transmission channel.
 ///
@@ -291,7 +282,7 @@ mod tests {
         let lower_bound = expected_emission_interval - torelance;
         let upper_bound = expected_emission_interval + torelance;
         // prepare stream
-        let mut persistent_transmission_stream = stream.persistent_transmission(settings).boxed();
+        let mut persistent_transmission_stream = stream.persistent_transmission(settings);
         // Messages must be scheduled in non-blocking manner.
         schedule_sender.send(vec![1]).unwrap();
         schedule_sender.send(vec![2]).unwrap();
