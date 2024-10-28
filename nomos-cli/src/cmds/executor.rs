@@ -1,5 +1,6 @@
 // std
 use std::path::PathBuf;
+use std::sync::mpsc::Sender;
 // crates
 use clap::Args;
 use reqwest::Url;
@@ -54,13 +55,7 @@ impl Disseminate {
         let metadata = Metadata::new(app_id, self.index.into());
 
         let (res_sender, res_receiver) = std::sync::mpsc::channel();
-        tokio::spawn(async move {
-            let res = client
-                .publish_blob(bytes, metadata)
-                .await
-                .map_err(|err| format!("Failed to publish blob: {:?}", err));
-            res_sender.send(res).unwrap();
-        });
+        std::thread::spawn(move || disperse_data(res_sender, client, bytes, metadata));
 
         match res_receiver.recv() {
             Ok(update) => match update {
@@ -79,4 +74,18 @@ impl Disseminate {
         tracing::info!("Done");
         Ok(())
     }
+}
+
+#[tokio::main]
+async fn disperse_data(
+    res_sender: Sender<Result<(), String>>,
+    client: ExecutorHttpClient,
+    bytes: Vec<u8>,
+    metadata: Metadata,
+) {
+    let res = client
+        .publish_blob(bytes, metadata)
+        .await
+        .map_err(|err| format!("Failed to publish blob: {:?}", err));
+    res_sender.send(res).unwrap();
 }
