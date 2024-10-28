@@ -1,5 +1,8 @@
 // std
 use nomos_da_network_service::backends::libp2p::common::DaNetworkBackendSettings;
+use nomos_mix::message_blend::{
+    CryptographicProcessorSettings, MessageBlendSettings, TemporalProcessorSettings,
+};
 use std::path::PathBuf;
 use std::time::Duration;
 // crates
@@ -207,6 +210,13 @@ pub fn new_node(
             },
             mix: MixConfig {
                 backend: mix_config.clone(),
+                persistent_transmission: Default::default(),
+                message_blend: MessageBlendSettings {
+                    cryptographic_processor: CryptographicProcessorSettings { num_mix_layers: 1 },
+                    temporal_processor: TemporalProcessorSettings {
+                        max_delay_seconds: 2,
+                    },
+                },
             },
             da_network: DaNetworkConfig {
                 backend: DaNetworkBackendSettings {
