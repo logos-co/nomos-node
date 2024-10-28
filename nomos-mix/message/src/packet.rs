@@ -29,7 +29,9 @@ struct Header {
 
 #[derive(Debug, Serialize, Deserialize)]
 struct RoutingInfo {
-    // TODO: Change this to bool, after implementing the length-preserved layered encryption
+    // TODO: Change this to `is_final_layer: bool`
+    // by implementing the length-preserved layered encryption.
+    // It's not good to expose the info that how many layers remain to the intermediate recipients.
     remaining_layers: u8,
     // TODO:: Add the following fields
     // header_integrity_hamc
