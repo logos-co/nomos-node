@@ -29,14 +29,12 @@ impl MembershipHandler for AllNeighbours {
 }
 
 use crossbeam_channel::{bounded, Receiver, Sender};
-use std::sync::{Arc, Mutex};
 
 #[derive(Debug)]
 /// A special-purpose multi-producer, multi-consumer(MPMC) channel to relay messages indicating whether the associated stream should be closed or not. This channel is intended to be used on sampling, dispersal and replication protocol tests to ensure graceful shutdown of streams after event has completed.
 pub struct ConnectionClosingChannel {
     pub sender: Sender<bool>,
     pub receiver: Receiver<bool>,
-    pub done: Arc<Mutex<bool>>,
 }
 
 impl ConnectionClosingChannel {
@@ -45,22 +43,15 @@ impl ConnectionClosingChannel {
         Self {
             sender,
             receiver,
-            done: Arc::new(Mutex::new(false)),
         }
     }
 
-    pub fn send(&self) {
-        let message = *self.done.lock().unwrap();
+    pub fn send(&self, message: bool) {
         self.sender.send(message).unwrap();
     }
 
     pub fn receive(&self) -> Option<bool> {
         self.receiver.try_recv().ok()
-    }
-
-    pub fn set_done(&self) {
-        let mut guard = self.done.lock().unwrap();
-        *guard = true;
     }
 }
 
@@ -69,7 +60,6 @@ impl Clone for ConnectionClosingChannel {
         Self {
             sender: self.sender.clone(),
             receiver: self.receiver.clone(),
-            done: Arc::clone(&self.done),
         }
     }
 }
@@ -88,7 +78,7 @@ mod tests {
 
         let ongoing_thread = thread::spawn(move || {
             for _ in 0..num_ongoing_messages {
-                handshake_for_ongoing.send();
+                handshake_for_ongoing.send(false);
             }
         });
 
@@ -96,8 +86,7 @@ mod tests {
         let done_thread = thread::spawn(move || {
             // Wait briefly before setting done to allow some "Ongoing" messages to be sent.
             thread::sleep(Duration::from_millis(5));
-            handshake_for_done.set_done();
-            handshake_for_done.send();
+            handshake_for_done.send(true);
         });
         let mut i = 0;
         loop {
