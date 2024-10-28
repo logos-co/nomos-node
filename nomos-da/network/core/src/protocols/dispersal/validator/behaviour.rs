@@ -165,7 +165,7 @@ mod tests {
     use std::time::Duration;
     use tokio::sync::mpsc::UnboundedSender;
     use tokio::time;
-    use tracing::{error, info};
+    use tracing::{error, warn};
     use tracing_subscriber::fmt::TestWriter;
     use tracing_subscriber::EnvFilter;
 
@@ -344,12 +344,13 @@ mod tests {
 
         const ALL_INSTANCES: usize = 20;
         const MESSAGES_TO_SEND: usize = 10;
+        const GROUPS: usize = 4;
 
-        let executor_0_config = prepare_swarm_config(ALL_INSTANCES / 4, 0);
-        let validator_0_config = prepare_swarm_config(ALL_INSTANCES / 4, 1);
+        let executor_0_config = prepare_swarm_config(ALL_INSTANCES / GROUPS, 0);
+        let validator_0_config = prepare_swarm_config(ALL_INSTANCES / GROUPS, 1);
 
-        let executor_1_config = prepare_swarm_config(ALL_INSTANCES / 4, 2);
-        let validator_1_config = prepare_swarm_config(ALL_INSTANCES / 4, 3);
+        let executor_1_config = prepare_swarm_config(ALL_INSTANCES / GROUPS, 2);
+        let validator_1_config = prepare_swarm_config(ALL_INSTANCES / GROUPS, 3);
 
         let subnet_0_ids = executor_0_config
             .iter()
@@ -399,7 +400,7 @@ mod tests {
         let mut executor_1_swarms: Vec<_> = vec![];
         let mut validator_1_swarms: Vec<_> = vec![];
 
-        for i in 0..ALL_INSTANCES / 4 {
+        for i in 0..ALL_INSTANCES / GROUPS {
             let (k, executor_peer, _) = executor_0_config[i].clone();
             let (k2, _, _) = validator_0_config[i].clone();
             let (k3, executor_peer2, _) = executor_1_config[i].clone();
@@ -427,7 +428,7 @@ mod tests {
         }
 
         // Let validator swarms to listen
-        for i in 0..ALL_INSTANCES / 4 {
+        for i in 0..ALL_INSTANCES / GROUPS {
             let (_, _, mut addr) = validator_0_config[i].clone();
             validator_0_swarms[i].listen_on(addr).unwrap();
 
@@ -438,7 +439,7 @@ mod tests {
         // Collect blob message senders from executors
         let mut message_senders: Vec<UnboundedSender<(u32, DaBlob)>> = Vec::new();
 
-        for i in 0..ALL_INSTANCES / 4 {
+        for i in 0..ALL_INSTANCES / GROUPS {
             let blob_sender_0 = executor_0_swarms[i].behaviour().blobs_sender();
             let blob_sender_1 = executor_1_swarms[i].behaviour().blobs_sender();
             message_senders.extend(vec![blob_sender_0, blob_sender_1]);
@@ -455,14 +456,14 @@ mod tests {
             loop {
                 tokio::select! {
                     Some(event) = swarm.next() => {
-                        info!("Executor event: {event:?}");
+                        debug!("Executor event: {event:?}");
                         if let SwarmEvent::Behaviour(DispersalExecutorEvent::DispersalSuccess{..}) = event {
                             msg_counter += 1;
                         }
                     }
 
-                    _ = time::sleep(Duration::from_secs(2)) => {
-                        if msg_counter < MESSAGES_TO_SEND {error!("Executor timeout reached");}
+                    _ = time::sleep(Duration::from_secs(3)) => {
+                        if msg_counter < MESSAGES_TO_SEND { error!("Executor timeout reached"); }
                         break;
                     }
                 }
@@ -482,7 +483,7 @@ mod tests {
                 tokio::select! {
                     Some(event) = swarm.next() => {
                         if let SwarmEvent::Behaviour(DispersalEvent::IncomingMessage { message }) = event {
-                            info!("Validator received blob: {message:?}");
+                            debug!("Validator received blob: {message:?}");
 
                             // Check data has structure and content as expected
                             match message.blob {
@@ -503,7 +504,7 @@ mod tests {
 
                     _ = time::sleep(Duration::from_secs(2)) => {
                         if msg_0_counter <= MESSAGES_TO_SEND && msg_1_counter <= MESSAGES_TO_SEND {
-                            error!("Validator timeout reached");
+                            warn!("Validator timeout reached");
                         }
                         break;
                     }
@@ -517,7 +518,7 @@ mod tests {
             subnet_id: u32,
         ) {
             for i in 0..MESSAGES_TO_SEND {
-                info!("Sending blob {i} to subnet {subnet_id} ...");
+                debug!("Sending blob {i} to subnet {subnet_id} ...");
                 disperse_blob_sender
                     .send((
                         subnet_id,
@@ -538,7 +539,7 @@ mod tests {
         let mut executor_tasks = vec![];
 
         // Spawn executors
-        for i in (0..ALL_INSTANCES / 4).rev() {
+        for i in (0..ALL_INSTANCES / GROUPS).rev() {
             let swarm = executor_0_swarms.remove(i);
             let executor_0_poll = async { run_executor_swarm(swarm).await };
 
@@ -563,7 +564,7 @@ mod tests {
         let mut validator_tasks = vec![];
 
         // Spawn validators
-        for i in (0..ALL_INSTANCES / 4).rev() {
+        for i in (0..ALL_INSTANCES / GROUPS).rev() {
             let swarm = validator_0_swarms.remove(i);
             let validator_0_poll = async { run_validator_swarm(swarm).await };
 
@@ -576,19 +577,48 @@ mod tests {
             ]);
         }
 
-        tokio::time::sleep(Duration::from_secs(10)).await;
+        let mut dispersal_success_counter = 0usize;
+        let mut dispersal_request_counter = (0usize, 0usize);
 
         for task in executor_tasks {
-            info!(
+            let dispersed = task.await.unwrap();
+            debug!(
                 "Executor task received: {:?} messages dispersal success",
-                task.await.unwrap()
+                dispersed
             );
+            dispersal_success_counter += dispersed;
         }
 
         for task in validator_tasks {
-            let result = task.await.unwrap();
-            info!("Validator received {:?} messages from subnet 0", result.0);
-            info!("Validator received {:?} messages from subnet 1\n", result.1);
+            let requested = task.await.unwrap();
+            debug!(
+                "Validator received {:?} messages from subnet 0",
+                requested.0
+            );
+            debug!(
+                "Validator received {:?} messages from subnet 1\n",
+                requested.1
+            );
+            dispersal_request_counter = (
+                dispersal_request_counter.0 + requested.0,
+                dispersal_request_counter.1 + requested.1,
+            );
         }
+
+        // Count all dispersed and confirmed messages
+        assert_eq!(
+            dispersal_success_counter,
+            MESSAGES_TO_SEND * (ALL_INSTANCES / GROUPS) * 2
+        );
+
+        // Count all received per subnet
+        assert_eq!(
+            dispersal_request_counter.0,
+            MESSAGES_TO_SEND * (ALL_INSTANCES / GROUPS)
+        );
+        assert_eq!(
+            dispersal_request_counter.1,
+            MESSAGES_TO_SEND * (ALL_INSTANCES / GROUPS)
+        );
     }
 }
