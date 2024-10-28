@@ -3,7 +3,6 @@ use nomos_mix_message::DROP_MESSAGE;
 use rand::{distributions::Uniform, prelude::Distribution, Rng, SeedableRng};
 use rand_chacha::ChaCha12Rng;
 use serde::{Deserialize, Serialize};
-use std::collections::VecDeque;
 use std::pin::{pin, Pin};
 use std::task::{Context, Poll};
 use std::time::Duration;
@@ -36,7 +35,6 @@ where
 {
     interval: Interval,
     coin: Coin<ChaCha12Rng>,
-    queue: VecDeque<S::Item>,
     stream: S,
 }
 
@@ -59,7 +57,6 @@ where
         Self {
             interval,
             coin,
-            queue: Default::default(),
             stream,
         }
     }
@@ -74,25 +71,20 @@ where
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let Self {
             ref mut interval,
-            ref mut queue,
             ref mut stream,
             ref mut coin,
             ..
         } = self.get_mut();
-        if pin!(interval).poll_tick(cx).is_ready() {
-            match queue.pop_front() {
-                item @ Some(_) => return Poll::Ready(item),
-                None => {
-                    if coin.flip() {
-                        return Poll::Ready(Some(DROP_MESSAGE.to_vec()));
-                    }
-                }
-            };
-        };
-        if let Poll::Ready(Some(item)) = pin!(stream).poll_next(cx) {
-            queue.push_back(item);
+        if pin!(interval).poll_tick(cx).is_pending() {
+            return Poll::Pending;
         }
-        Poll::Pending
+        if let Poll::Ready(Some(item)) = pin!(stream).poll_next(cx) {
+            Poll::Ready(Some(item))
+        } else if coin.flip() {
+            Poll::Ready(Some(DROP_MESSAGE.to_vec()))
+        } else {
+            Poll::Pending
+        }
     }
 }
 
