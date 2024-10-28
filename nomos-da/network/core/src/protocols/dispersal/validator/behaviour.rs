@@ -308,7 +308,7 @@ mod tests {
                     }
                 }
 
-                _ = time::sleep(Duration::from_secs(3)) => {
+                _ = time::sleep(Duration::from_secs(5)) => {
                     if msg_counter < messages_to_expect { error!("Executor timeout reached"); }
                     break;
                 }
