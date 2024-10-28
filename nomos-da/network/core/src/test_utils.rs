@@ -33,13 +33,13 @@ use std::sync::{Arc, Mutex};
 
 #[derive(Debug)]
 /// A special-purpose multi-producer, multi-consumer(MPMC) channel to relay messages indicating whether the associated stream should be closed or not. This channel is intended to be used on sampling, dispersal and replication protocol tests to ensure graceful shutdown of streams after event has completed.
-pub struct ConnectionClosingHandshake {
+pub struct ConnectionClosingChannel {
     pub sender: Sender<bool>,
     pub receiver: Receiver<bool>,
     pub done: Arc<Mutex<bool>>,
 }
 
-impl ConnectionClosingHandshake {
+impl ConnectionClosingChannel {
     pub fn new(size: usize) -> Self {
         let (sender, receiver) = bounded(size);
         Self {
@@ -64,7 +64,7 @@ impl ConnectionClosingHandshake {
     }
 }
 
-impl Clone for ConnectionClosingHandshake {
+impl Clone for ConnectionClosingChannel {
     fn clone(&self) -> Self {
         Self {
             sender: self.sender.clone(),
@@ -82,7 +82,7 @@ mod tests {
 
     #[test]
     fn test_connection_closing_handshake_with_concurrent_loops() {
-        let handshake = ConnectionClosingHandshake::new(1);
+        let handshake = ConnectionClosingChannel::new(1);
         let num_ongoing_messages = 5;
         let handshake_for_ongoing = handshake.clone();
 
