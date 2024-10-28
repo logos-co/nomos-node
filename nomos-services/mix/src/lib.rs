@@ -8,7 +8,10 @@ use backends::MixBackend;
 use futures::StreamExt;
 use network::NetworkAdapter;
 use nomos_core::wire;
-use nomos_mix_message::{new_message, unwrap_message};
+use nomos_mix::{
+    message_blend::{MessageBlend, MessageBlendSettings},
+    persistent_transmission::{persistent_transmission, PersistentTransmissionSettings},
+};
 use nomos_network::NetworkService;
 use overwatch_rs::services::{
     handle::ServiceStateHandle,
@@ -18,6 +21,7 @@ use overwatch_rs::services::{
     ServiceCore, ServiceData, ServiceId,
 };
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use tokio::sync::mpsc;
 
 /// A mix service that sends messages to the mix network
 /// and broadcasts fully unwrapped messages through the [`NetworkService`].
@@ -77,12 +81,41 @@ where
             mut backend,
             network_relay,
         } = self;
+        let mix_config = service_state.settings_reader.get_updated_settings();
 
         let network_relay = network_relay.connect().await?;
         let network_adapter = Network::new(network_relay);
 
-        // TODO: Spawn PersistentTransmission (Tier 1)
-        // TODO: Spawn Processor (Tier 2) and connect it to PersistentTransmission
+        // Spawn Persistent Transmission
+        let (transmission_schedule_sender, transmission_schedule_receiver) =
+            mpsc::unbounded_channel();
+        let (emission_sender, mut emission_receiver) = mpsc::unbounded_channel();
+        tokio::spawn(async move {
+            persistent_transmission(
+                mix_config.persistent_transmission,
+                transmission_schedule_receiver,
+                emission_sender,
+            )
+            .await;
+        });
+
+        // Spawn Message Blend and connect it to Persistent Transmission
+        let (new_message_sender, new_message_receiver) = mpsc::unbounded_channel();
+        let (processor_inbound_sender, processor_inbound_receiver) = mpsc::unbounded_channel();
+        let (fully_unwrapped_message_sender, mut fully_unwrapped_message_receiver) =
+            mpsc::unbounded_channel();
+        tokio::spawn(async move {
+            MessageBlend::new(
+                mix_config.message_blend,
+                new_message_receiver,
+                processor_inbound_receiver,
+                // Connect the outputs of Message Blend to Persistent Transmission
+                transmission_schedule_sender,
+                fully_unwrapped_message_sender,
+            )
+            .run()
+            .await;
+        });
 
         // A channel to listen to messages received from the [`MixBackend`]
         let mut incoming_message_stream = backend.listen_to_incoming_messages();
@@ -91,11 +124,17 @@ where
         loop {
             tokio::select! {
                 Some(msg) = incoming_message_stream.next() => {
-                    // TODO: The following logic is wrong and temporary.
-                    //   Here we're unwrapping the message and broadcasting it,
-                    //   but the message should be handled by Processor and PersistentTransmission.
-                    let (msg, fully_unwrapped) = unwrap_message(&msg).unwrap();
-                    assert!(fully_unwrapped);
+                    tracing::debug!("Received message from mix backend. Sending it to Processor");
+                    if let Err(e) = processor_inbound_sender.send(msg) {
+                        tracing::error!("Failed to send incoming message to processor: {e:?}");
+                    }
+                }
+                Some(msg) = emission_receiver.recv() => {
+                    tracing::debug!("Emitting message to mix network");
+                    backend.publish(msg).await;
+                }
+                Some(msg) = fully_unwrapped_message_receiver.recv() => {
+                    tracing::debug!("Broadcasting fully unwrapped message");
                     match wire::deserialize::<NetworkMessage<Network::BroadcastSettings>>(&msg) {
                         Ok(msg) => {
                             network_adapter.broadcast(msg.message, msg.broadcast_settings).await;
@@ -104,7 +143,7 @@ where
                     }
                 }
                 Some(msg) = service_state.inbound_relay.recv() => {
-                    Self::handle_service_message(msg, &mut backend).await;
+                    Self::handle_service_message(msg, &new_message_sender);
                 }
                 Some(msg) = lifecycle_stream.next() => {
                     if Self::should_stop_service(msg).await {
@@ -125,20 +164,16 @@ where
     Network: NetworkAdapter,
     Network::BroadcastSettings: Clone + Debug + Serialize + DeserializeOwned,
 {
-    async fn handle_service_message(
+    fn handle_service_message(
         msg: ServiceMessage<Network::BroadcastSettings>,
-        backend: &mut Backend,
+        new_message_sender: &mpsc::UnboundedSender<Vec<u8>>,
     ) {
         match msg {
             ServiceMessage::Mix(msg) => {
-                // split sending in two steps to help the compiler understand we do not
-                // need to hold an instance of &I (which is not send) across an await point
-                // TODO: The following logic is wrong and temporary.
-                //   Here we're wrapping the message here and publishing the message immediately,
-                //   but the message should be handled by Processor and PersistentTransmission.
-                let wrapped_msg = new_message(&wire::serialize(&msg).unwrap(), 1).unwrap();
-                let _send = backend.publish(wrapped_msg);
-                _send.await
+                // Serialize the new message and send it to the Processor
+                if let Err(e) = new_message_sender.send(wire::serialize(&msg).unwrap()) {
+                    tracing::error!("Failed to send a new message to processor: {e:?}");
+                }
             }
         }
     }
@@ -163,6 +198,8 @@ where
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct MixConfig<BackendSettings> {
     pub backend: BackendSettings,
+    pub persistent_transmission: PersistentTransmissionSettings,
+    pub message_blend: MessageBlendSettings,
 }
 
 /// A message that is handled by [`MixService`].
