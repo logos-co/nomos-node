@@ -308,7 +308,7 @@ mod tests {
                     }
                 }
 
-                _ = time::sleep(Duration::from_secs(5)) => {
+                _ = time::sleep(Duration::from_secs(6)) => {
                     if msg_counter < messages_to_expect { error!("Executor timeout reached"); }
                     break;
                 }
@@ -404,22 +404,14 @@ mod tests {
 
         let subnet_0_ids = executor_0_config
             .iter()
+            .chain(validator_0_config.iter())
             .map(|(_, peer_id, _)| peer_id.clone())
-            .chain(
-                validator_0_config
-                    .iter()
-                    .map(|(_, peer_id, _)| peer_id.clone()),
-            )
             .collect::<Vec<_>>();
 
         let subnet_1_ids = executor_1_config
             .iter()
+            .chain(validator_1_config.iter())
             .map(|(_, peer_id, _)| peer_id.clone())
-            .chain(
-                validator_1_config
-                    .iter()
-                    .map(|(_, peer_id, _)| peer_id.clone()),
-            )
             .collect::<Vec<_>>();
 
         let to_p2p_address = |(_, peer_id, addr): &(_, PeerId, Multiaddr)| {
@@ -538,7 +530,6 @@ mod tests {
         }
 
         let mut dispersal_success_counter = 0usize;
-        let mut dispersal_request_counter = (0usize, 0usize);
 
         for task in executor_tasks {
             let dispersed = task.await.unwrap();
@@ -548,6 +539,8 @@ mod tests {
             );
             dispersal_success_counter += dispersed;
         }
+
+        let mut dispersal_request_counter = (0usize, 0usize);
 
         for task in validator_tasks {
             let requested = task.await.unwrap();
@@ -565,13 +558,13 @@ mod tests {
             );
         }
 
-        // Count all dispersed and confirmed messages
+        // Check dispersed and confirmed equal to sent messages
         assert_eq!(
             dispersal_success_counter,
             MESSAGES_TO_SEND * (ALL_INSTANCES / GROUPS) * 2
         );
 
-        // Count all received per subnet
+        // Check received per subnet are half of all messages sent
         assert_eq!(
             dispersal_request_counter.0,
             MESSAGES_TO_SEND * (ALL_INSTANCES / GROUPS)
