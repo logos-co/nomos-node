@@ -308,7 +308,7 @@ mod tests {
                     }
                 }
 
-                _ = time::sleep(Duration::from_secs(6)) => {
+                _ = time::sleep(Duration::from_secs(3)) => {
                     if msg_counter < messages_to_expect { error!("Executor timeout reached"); }
                     break;
                 }
@@ -349,7 +349,7 @@ mod tests {
                     }
                 }
 
-                _ = time::sleep(Duration::from_secs(2)) => {
+                _ = time::sleep(Duration::from_secs(3)) => {
                     if msg_0_counter < messages_to_expect && msg_1_counter < messages_to_expect {
                         warn!("Validator timeout reached");
                     }
