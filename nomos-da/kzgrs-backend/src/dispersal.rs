@@ -1,24 +1,27 @@
 // std
 use std::hash::{Hash, Hasher};
 // crates
-use nomos_core::da::blob::{self, metadata::Next};
+use nomos_core::da::{
+    blob::{self, metadata::Next},
+    BlobId,
+};
 use serde::{Deserialize, Serialize};
 // internal
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub struct BlobInfo {
-    id: [u8; 32],
+    id: BlobId,
     metadata: Metadata,
 }
 
 impl BlobInfo {
-    pub fn new(id: [u8; 32], metadata: Metadata) -> Self {
+    pub fn new(id: BlobId, metadata: Metadata) -> Self {
         Self { id, metadata }
     }
 }
 
 impl blob::info::DispersedBlobInfo for BlobInfo {
-    type BlobId = [u8; 32];
+    type BlobId = BlobId;
 
     fn blob_id(&self) -> Self::BlobId {
         self.id
@@ -47,6 +50,12 @@ impl blob::metadata::Metadata for BlobInfo {
 #[derive(Copy, Clone, Default, Debug, PartialEq, PartialOrd, Ord, Eq, Serialize, Deserialize)]
 pub struct Index([u8; 8]);
 
+impl Index {
+    pub fn to_u64(self) -> u64 {
+        u64::from_be_bytes(self.0)
+    }
+}
+
 #[derive(Default, Debug, Copy, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub struct Metadata {
     app_id: [u8; 32],
@@ -60,6 +69,15 @@ impl Metadata {
 
     pub fn size(&self) -> usize {
         std::mem::size_of_val(&self.app_id) + std::mem::size_of_val(&self.index)
+    }
+}
+
+impl blob::metadata::Metadata for Metadata {
+    type AppId = [u8; 32];
+    type Index = Index;
+
+    fn metadata(&self) -> (Self::AppId, Self::Index) {
+        (self.app_id, self.index)
     }
 }
 

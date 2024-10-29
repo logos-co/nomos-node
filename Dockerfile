@@ -1,6 +1,6 @@
 # BUILD IMAGE ---------------------------------------------------------
 
-FROM rust:1.80.0-slim-bookworm AS builder
+FROM rust:1.82.0-slim-bookworm AS builder
 
 WORKDIR /nomos
 COPY . . 

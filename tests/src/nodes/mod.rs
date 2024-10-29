@@ -1,9 +1,15 @@
-pub mod nomos;
-pub use nomos::NomosNode;
+pub mod executor;
+pub mod validator;
 
+use std::ops::Range;
+
+use once_cell::sync::Lazy;
+use reqwest::Client;
+use serde::{Deserialize, Serialize};
 use tempfile::TempDir;
 
 const LOGS_PREFIX: &str = "__logs";
+static CLIENT: Lazy<Client> = Lazy::new(Client::new);
 
 fn create_tempdir() -> std::io::Result<TempDir> {
     // It's easier to use the current location instead of OS-default tempfile location
@@ -23,4 +29,10 @@ fn persist_tempdir(tempdir: &mut TempDir, label: &str) -> std::io::Result<()> {
     // a bit confusing but `into_path` persists the directory
     let _ = dir.into_path();
     Ok(())
+}
+
+#[derive(Serialize, Deserialize)]
+struct GetRangeReq {
+    pub app_id: [u8; 32],
+    pub range: Range<[u8; 8]>,
 }

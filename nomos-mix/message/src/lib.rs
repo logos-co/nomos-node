@@ -1,12 +1,15 @@
 mod error;
+pub mod packet;
 
 pub use error::Error;
 
 use sha2::{Digest, Sha256};
 
-pub const MSG_SIZE: usize = 1024;
-pub const NOISE: [u8; MSG_SIZE] = [0; MSG_SIZE];
+pub const MSG_SIZE: usize = 2048;
+pub const DROP_MESSAGE: [u8; MSG_SIZE] = [0; MSG_SIZE];
 
+// TODO: Remove all the mock below once the actual implementation is integrated to the system.
+//
 /// A mock implementation of the Sphinx encoding.
 ///
 /// The length of the encoded message is fixed to [`MSG_SIZE`] bytes.
@@ -55,7 +58,7 @@ pub fn unwrap_message(message: &[u8]) -> Result<(Vec<u8>, bool), Error> {
     }
 }
 
-/// Check if the message is a noise message.
-pub fn is_noise(message: &[u8]) -> bool {
-    message == NOISE
+/// Check if the message is a drop message.
+pub fn is_drop_message(message: &[u8]) -> bool {
+    message == DROP_MESSAGE
 }

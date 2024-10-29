@@ -1,6 +1,7 @@
 on:
   schedule:
     - cron:  '0 3 * * *'
+
   workflow_dispatch:
 
 name: Codecov
@@ -11,18 +12,14 @@ jobs:
       CARGO_INCREMENTAL: 0
       RUSTFLAGS: "-C instrument-coverage"
       LLVM_PROFILE_FILE: "nomos-node-%p-%m.profraw"
-    runs-on: ubuntu-latest
+    runs-on: ['self-hosted']
     steps:
       - uses: actions/checkout@v3
         with:
           submodules: true
-      - name: Remove unwanted software
-        uses: ./.github/actions/prune-vm
       - uses: arduino/setup-protoc@v3
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Checkout submodules
-        run: git submodule update --init --recursive
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
@@ -52,8 +49,8 @@ jobs:
       - name: Run Grcov
         run: |
           cargo binstall -y grcov;
-          mkdir /tmp/cov;
-          grcov . --binary-path ./target/debug -s . -t lcov --branch --ignore-not-existing --ignore '../*' --ignore "/*" -o /tmp/cov/tests.lcov;
+          mkdir /tmp/coverage;
+          grcov . --binary-path ./target/debug -s . -t lcov --branch --ignore-not-existing --ignore '../*' --ignore "/*" -o /tmp/coverage/tests.lcov;
       - uses: actions/upload-artifact@v3
         if: failure()
         with:
@@ -61,5 +58,5 @@ jobs:
           path: tests/.tmp*
       - uses: codecov/codecov-action@v3
         with:
-          directory: /tmp/cov/
+          directory: /tmp/coverage/
           name: nomos-node-codecov

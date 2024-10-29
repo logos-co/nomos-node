@@ -1,13 +1,20 @@
-use nomos_node::*;
-#[cfg(feature = "metrics")]
-use nomos_node::{MetricsSettings, NomosRegistry};
-
+// std
+// crates
 use clap::Parser;
 use color_eyre::eyre::{eyre, Result};
+use nomos_executor::config::Config as ExecutorConfig;
 use nomos_executor::{NomosExecutor, NomosExecutorServiceSettings};
+#[cfg(feature = "metrics")]
+use nomos_node::MetricsSettings;
+use nomos_node::{
+    config::MixArgs, BlobInfo, CryptarchiaArgs, DaMempoolSettings, DispersedBlobInfo, HttpArgs,
+    LogArgs, MempoolAdapterSettings, MetricsArgs, NetworkArgs, Transaction, Tx, TxMempoolSettings,
+    CL_TOPIC, DA_TOPIC,
+};
 use overwatch_rs::overwatch::*;
 use tracing::{span, Level};
 use uuid::Uuid;
+// internal
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -20,6 +27,9 @@ struct Args {
     /// Overrides network config.
     #[clap(flatten)]
     network_args: NetworkArgs,
+    /// Overrides mix config.
+    #[clap(flatten)]
+    mix_args: MixArgs,
     /// Overrides http config.
     #[clap(flatten)]
     http_args: HttpArgs,
@@ -36,17 +46,25 @@ fn main() -> Result<()> {
         log_args,
         http_args,
         network_args,
+        mix_args,
         cryptarchia_args,
         metrics_args,
     } = Args::parse();
-    let config = serde_yaml::from_reader::<_, Config>(std::fs::File::open(config)?)?
-        .update_log(log_args)?
-        .update_http(http_args)?
-        .update_network(network_args)?
-        .update_cryptarchia_consensus(cryptarchia_args)?;
+    let config = serde_yaml::from_reader::<_, ExecutorConfig>(std::fs::File::open(config)?)?
+        .update_from_args(
+            log_args,
+            network_args,
+            mix_args,
+            http_args,
+            cryptarchia_args,
+        )?;
 
     let registry = cfg!(feature = "metrics")
-        .then(|| metrics_args.with_metrics.then(NomosRegistry::default))
+        .then(|| {
+            metrics_args
+                .with_metrics
+                .then(nomos_metrics::NomosRegistry::default)
+        })
         .flatten();
 
     #[cfg(debug_assertions)]
@@ -59,8 +77,9 @@ fn main() -> Result<()> {
     let app = OverwatchRunner::<NomosExecutor>::run(
         NomosExecutorServiceSettings {
             network: config.network,
+            mix: config.mix,
             #[cfg(feature = "tracing")]
-            logging: config.log,
+            tracing: config.tracing,
             http: config.http,
             cl_mempool: TxMempoolSettings {
                 backend: (),
@@ -78,6 +97,7 @@ fn main() -> Result<()> {
                 },
                 registry: registry.clone(),
             },
+            da_dispersal: config.da_dispersal,
             da_network: config.da_network,
             da_indexer: config.da_indexer,
             da_sampling: config.da_sampling,

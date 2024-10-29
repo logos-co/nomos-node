@@ -1,9 +1,0 @@
-backend:
-  host: 0.0.0.0
-  port: 3019
-  log_level: "fatal"
-  # Node key needs to be unique for every client.
-  node_key: "0000000000000000000000000000000000000000000000000000000000001444"
-  discV5BootstrapNodes: []
-  initial_peers: ["/dns/testnet.nomos.tech/tcp/3000"]
-  relayTopics: []

@@ -1,8 +1,19 @@
 version: '3.8'
 
 services:
-  bootstrap:
-    container_name: bootstrap
+
+  cfgsync:
+    container_name: cfgsync
+    build:
+      context: .
+      dockerfile: testnet/Dockerfile
+    image: nomos:latest
+    volumes:
+      - ./testnet:/etc/nomos
+    entrypoint: /etc/nomos/scripts/run_cfgsync.sh
+
+  nomos-node-0:
+    container_name: nomos_node_0
     build:
       context: .
       dockerfile: testnet/Dockerfile
@@ -12,115 +23,64 @@ services:
       - "18080:18080/tcp"
     volumes:
       - ./testnet:/etc/nomos
+      - ./tests/kzgrs/kzgrs_test_params:/kzgrs_test_params:z
     depends_on:
-      - graylog
-    environment:
-      - BOOTSTRAP_NODE_KEY=${DOCKER_COMPOSE_BOOSTRAP_NET_NODE_KEY:-1000000000000000000000000000000000000000000000000000000000000000}
-      - LIBP2P_NODE_MASK=${DOCKER_COMPOSE_LIBP2P_NODE_KEY_MASK:-2000000000000000000000000000000000000000000000000000000000000000}
-      - LIBP2P_REPLICAS=3
-      - OVERLAY_NODES=${DOCKER_COMPOSE_OVERLAY_NODES:-1000000000000000000000000000000000000000000000000000000000000000}
-    entrypoint: /etc/nomos/scripts/run_bootstrap_node.sh
+      - cfgsync
+    entrypoint: /etc/nomos/scripts/run_nomos_node.sh
 
-  libp2p-node-1:
-    container_name: libp2p_node_1
+  nomos-node-1:
+    container_name: nomos_node_1
     build:
       context: .
       dockerfile: testnet/Dockerfile
     image: nomos:latest
     volumes:
       - ./testnet:/etc/nomos
+      - ./tests/kzgrs/kzgrs_test_params:/kzgrs_test_params:z
     depends_on:
-      - bootstrap
-      - etcd
-      - graylog
+      - cfgsync
     ports:
       - "3001:3000/udp"
       - "18081:18080/tcp"
-    environment:
-      - LIBP2P_REPLICAS=3
-      - ETCDCTL_ENDPOINTS=${DOCKER_COMPOSE_ETCDCTL_ENDPOINTS:-etcd:2379}
-      - ETCDCTL_API=${DOCKER_COMPOSE_ETCDCTL_API:-3}
-      - LIBP2P_NODE_MASK=${DOCKER_COMPOSE_LIBP2P_NODE_KEY_MASK:-2000000000000000000000000000000000000000000000000000000000000000}
-      - OVERLAY_NODES=${DOCKER_COMPOSE_OVERLAY_NODES:-1000000000000000000000000000000000000000000000000000000000000000}
-      - OVERLAY_SUPER_MAJORITY_THRESHOLD=${DOCKER_COMPOSE_SUPER_MAJORITY_THRESHOLD:-1}
-      - NET_INITIAL_PEERS=${DOCKER_COMPOSE_NET_INITIAL_PEERS:-/dns/bootstrap/udp/3000/quic-v1}
     entrypoint: /etc/nomos/scripts/run_nomos_node.sh
 
-  libp2p-node-2:
-    container_name: libp2p_node_2
+  nomos-node-2:
+    container_name: nomos_node_2
     build:
       context: .
       dockerfile: testnet/Dockerfile
     image: nomos:latest
     volumes:
       - ./testnet:/etc/nomos
+      - ./tests/kzgrs/kzgrs_test_params:/kzgrs_test_params:z
     depends_on:
-      - bootstrap
-      - etcd
-      - graylog
+      - cfgsync
     ports:
       - "3002:3000/udp"
       - "18082:18080/tcp"
-    environment:
-      - LIBP2P_REPLICAS=3
-      - ETCDCTL_ENDPOINTS=${DOCKER_COMPOSE_ETCDCTL_ENDPOINTS:-etcd:2379}
-      - ETCDCTL_API=${DOCKER_COMPOSE_ETCDCTL_API:-3}
-      - LIBP2P_NODE_MASK=${DOCKER_COMPOSE_LIBP2P_NODE_KEY_MASK:-2000000000000000000000000000000000000000000000000000000000000000}
-      - OVERLAY_NODES=${DOCKER_COMPOSE_OVERLAY_NODES:-1000000000000000000000000000000000000000000000000000000000000000}
-      - OVERLAY_SUPER_MAJORITY_THRESHOLD=${DOCKER_COMPOSE_SUPER_MAJORITY_THRESHOLD:-1}
-      - NET_INITIAL_PEERS=${DOCKER_COMPOSE_NET_INITIAL_PEERS:-/dns/bootstrap/udp/3000/quic-v1}
     entrypoint: /etc/nomos/scripts/run_nomos_node.sh
 
-  libp2p-node-3:
-    container_name: libp2p_node_3
+  nomos-node-3:
+    container_name: nomos_node_3
     build:
       context: .
       dockerfile: testnet/Dockerfile
     image: nomos:latest
     volumes:
       - ./testnet:/etc/nomos
+      - ./tests/kzgrs/kzgrs_test_params:/kzgrs_test_params:z
     depends_on:
-      - bootstrap
-      - etcd
-      - graylog
+      - cfgsync
     ports:
       - "3003:3000/udp"
       - "18083:18080/tcp"
-    environment:
-      - LIBP2P_REPLICAS=3
-      - ETCDCTL_ENDPOINTS=${DOCKER_COMPOSE_ETCDCTL_ENDPOINTS:-etcd:2379}
-      - ETCDCTL_API=${DOCKER_COMPOSE_ETCDCTL_API:-3}
-      - LIBP2P_NODE_MASK=${DOCKER_COMPOSE_LIBP2P_NODE_KEY_MASK:-2000000000000000000000000000000000000000000000000000000000000000}
-      - OVERLAY_NODES=${DOCKER_COMPOSE_OVERLAY_NODES:-1000000000000000000000000000000000000000000000000000000000000000}
-      - OVERLAY_SUPER_MAJORITY_THRESHOLD=${DOCKER_COMPOSE_SUPER_MAJORITY_THRESHOLD:-1}
-      - NET_INITIAL_PEERS=${DOCKER_COMPOSE_NET_INITIAL_PEERS:-/dns/bootstrap/udp/3000/quic-v1}
-    entrypoint: /etc/nomos/scripts/run_nomos_node.sh
-
-  chatbot:
-    container_name: chatbot
-    build:
-      context: .
-      dockerfile: testnet/Dockerfile
-    image: nomos:latest
-    volumes:
-      - ./testnet:/etc/nomos
-    entrypoint: /etc/nomos/scripts/run_nomos_bot.sh
-
-  etcd:
-    container_name: etcd
-    image: quay.io/coreos/etcd:v3.4.15
-    ports:
-      - "2379:2379/tcp"
-    command:
-      - /usr/local/bin/etcd
-      - --advertise-client-urls=http://etcd:2379
-      - --listen-client-urls=http://0.0.0.0:2379
+    entrypoint: /etc/nomos/scripts/run_nomos_executor.sh
 
   prometheus:
     container_name: prometheus
     image: prom/prometheus:latest
     volumes:
-      - ./testnet/monitoring/prometheus-config.yml:/etc/prometheus/prometheus.yml:z
+      - ./testnet/monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:z
     command:
       - --config.file=/etc/prometheus/prometheus.yml
       - --storage.tsdb.retention.time=7d
@@ -131,6 +91,11 @@ services:
   grafana:
     container_name: grafana
     image: grafana/grafana:latest
+    environment:
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+      - GF_AUTH_DISABLE_LOGIN_FORM=true
+      - GF_FEATURE_TOGGLES_ENABLE=traceqlEditor traceQLStreaming metricsSummary
     env_file:
       - ./testnet/monitoring/grafana/plugins.env
     volumes:
@@ -142,63 +107,44 @@ services:
     depends_on:
       - prometheus
 
-  # Graylog related configuration
-  # More information at https://github.com/Graylog2/docker-compose/blob/main/open-core/docker-compose.yml
-  mongodb:
-    image: "mongo:5.0"
-    volumes:
-      - "mongodb_data:/data/db"
-    restart: "on-failure"
-
-  datanode:
-    image: "${DATANODE_IMAGE:-graylog/graylog-datanode:5.2}"
-    hostname: "datanode"
-    environment:
-      GRAYLOG_DATANODE_NODE_ID_FILE: "/var/lib/graylog-datanode/node-id"
-      GRAYLOG_DATANODE_PASSWORD_SECRET: "${GRAYLOG_PASSWORD_SECRET:?Please configure GRAYLOG_PASSWORD_SECRET in the .env file}"
-      GRAYLOG_DATANODE_ROOT_PASSWORD_SHA2: "${GRAYLOG_ROOT_PASSWORD_SHA2:?Please configure GRAYLOG_ROOT_PASSWORD_SHA2 in the .env file}"
-      GRAYLOG_DATANODE_MONGODB_URI: "mongodb://mongodb:27017/graylog"
-    ulimits:
-      memlock:
-        hard: -1
-        soft: -1
-      nofile:
-        soft: 65536
-        hard: 65536
+  loki:
+    image: grafana/loki:2.9.2
     ports:
-      - "8999:8999/tcp"   # DataNode API
-      - "9200:9200/tcp"
-      - "9300:9300/tcp"
-    volumes:
-      - "graylog-datanode:/var/lib/graylog-datanode"
-    restart: "on-failure"
+      - "3100:3100"
+    command: -config.file=/etc/loki/local-config.yaml
 
-  graylog:
-    image: "${GRAYLOG_IMAGE:-graylog/graylog:5.2}"
+  # Tempo runs as unpriviliged user, volumes need to be chowned before running.
+  tempo-init:
+    image: &tempoImage grafana/tempo:latest
+    user: root
+    entrypoint:
+      - "chown"
+      - "10001:10001"
+      - "/var/tempo"
+    volumes:
+      - tempo-data:/var/tempo
+
+  memcached:
+    image: memcached:1.6.29
+    container_name: memcached
+    ports:
+      - "11211:11211"
+    environment:
+      - MEMCACHED_MAX_MEMORY=64m
+      - MEMCACHED_THREADS=4
+
+  tempo:
+    image: *tempoImage
+    container_name: tempo
+    command: [ "-config.file=/etc/tempo.yaml" ]
+    volumes:
+      - ./testnet/monitoring/tempo.yaml:/etc/tempo.yaml:z
+      - tempo-data:/var/tempo
+    ports:
+      - "4317:4317"  # otlp grpc
     depends_on:
-      mongodb:
-        condition: "service_started"
-    entrypoint: "/usr/bin/tini --  /docker-entrypoint.sh"
-    environment:
-      GRAYLOG_NODE_ID_FILE: "/usr/share/graylog/data/data/node-id"
-      GRAYLOG_PASSWORD_SECRET: "${GRAYLOG_PASSWORD_SECRET:?Please configure GRAYLOG_PASSWORD_SECRET in the .env file}"
-      GRAYLOG_ROOT_PASSWORD_SHA2: "${GRAYLOG_ROOT_PASSWORD_SHA2:?Please configure GRAYLOG_ROOT_PASSWORD_SHA2 in the .env file}"
-      GRAYLOG_HTTP_BIND_ADDRESS: "0.0.0.0:9000"
-      GRAYLOG_HTTP_EXTERNAL_URI: "http://localhost:9000/"
-      GRAYLOG_MONGODB_URI: "mongodb://mongodb:27017/graylog"
-    ports:
-    - "9000:9000/tcp"   # Server API
-    - "12201:12201/tcp" # GELF TCP
-    - "12201:12201/udp" # GELF UDP
-    volumes:
-      - "graylog_data:/usr/share/graylog/data/data"
-      - "graylog_journal:/usr/share/graylog/data/journal"
-      - ./testnet/monitoring/graylog.conf:/usr/share/graylog/data/config/graylog.conf
-    restart: "on-failure"
-
+      - tempo-init
+      - memcached
 
 volumes:
-  mongodb_data:
-  graylog-datanode:
-  graylog_data:
-  graylog_journal:
+  tempo-data:

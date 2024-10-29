@@ -25,12 +25,12 @@ use crate::protocols::{
 use crate::swarm::common::{
     handle_replication_event, handle_sampling_event, handle_validator_dispersal_event,
 };
+use crate::swarm::validator::ValidatorEventsStream;
 use crate::SubnetworkId;
 use subnetworks_assignations::MembershipHandler;
 
 pub struct ExecutorEventsStream {
-    pub sampling_events_receiver: UnboundedReceiverStream<SamplingEvent>,
-    pub validation_events_receiver: UnboundedReceiverStream<DaBlob>,
+    pub validator_events_stream: ValidatorEventsStream,
     pub dispersal_events_receiver: UnboundedReceiverStream<DispersalExecutorEvent>,
 }
 
@@ -66,8 +66,10 @@ where
                 dispersal_events_sender,
             },
             ExecutorEventsStream {
-                sampling_events_receiver,
-                validation_events_receiver,
+                validator_events_stream: ValidatorEventsStream {
+                    sampling_events_receiver,
+                    validation_events_receiver,
+                },
                 dispersal_events_receiver,
             },
         )
@@ -176,7 +178,7 @@ where
     pub async fn run(mut self) {
         loop {
             if let Some(event) = self.swarm.next().await {
-                debug!("Da swarm event received: {event:?}");
+                tracing::info!("Da swarm event received: {event:?}");
                 match event {
                     SwarmEvent::Behaviour(behaviour_event) => {
                         self.handle_behaviour_event(behaviour_event).await;

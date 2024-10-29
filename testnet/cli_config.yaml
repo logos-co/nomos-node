@@ -1,8 +1,0 @@
-backend:
-  host: 0.0.0.0
-  port: 4007
-  log_level: "fatal"
-  node_key: "0000000000000000000000000000000000000000000000000000000000000667"
-  discV5BootstrapNodes: []
-  initial_peers: ["/dns/bootstrap/udp/3000/quic-v1"]
-  relayTopics: []

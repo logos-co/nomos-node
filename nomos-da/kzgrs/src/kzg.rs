@@ -67,7 +67,7 @@ pub fn verify_element_proof(
 
 #[cfg(test)]
 mod test {
-    use crate::common::{bytes_to_evaluations, bytes_to_polynomial};
+    use crate::common::bytes_to_polynomial;
     use crate::kzg::{commit_polynomial, generate_element_proof, verify_element_proof};
     use ark_bls12_381::{Bls12_381, Fr};
     use ark_poly::univariate::DensePolynomial;
@@ -75,6 +75,8 @@ mod test {
     use ark_poly_commit::kzg10::{UniversalParams, KZG10};
     use once_cell::sync::Lazy;
     use rand::{thread_rng, Fill};
+    use rayon::iter::{IndexedParallelIterator, ParallelIterator};
+    use rayon::prelude::IntoParallelRefIterator;
 
     const COEFFICIENTS_SIZE: usize = 16;
     static GLOBAL_PARAMETERS: Lazy<UniversalParams<Bls12_381>> = Lazy::new(|| {
@@ -103,33 +105,40 @@ mod test {
         let mut bytes: [u8; 310] = [0; 310];
         let mut rng = thread_rng();
         bytes.try_fill(&mut rng).unwrap();
-        let evaluations = bytes_to_evaluations::<31>(&bytes, *DOMAIN).evals;
         let (eval, poly) = bytes_to_polynomial::<31>(&bytes, *DOMAIN).unwrap();
         let commitment = commit_polynomial(&poly, &GLOBAL_PARAMETERS).unwrap();
         let proofs: Vec<_> = (0..10)
             .map(|i| generate_element_proof(i, &poly, &eval, &GLOBAL_PARAMETERS, *DOMAIN).unwrap())
             .collect();
-        for (i, (element, proof)) in evaluations.iter().zip(proofs.iter()).enumerate() {
-            // verifying works
-            assert!(verify_element_proof(
-                i,
-                element,
-                &commitment,
-                proof,
-                *DOMAIN,
-                &GLOBAL_PARAMETERS
-            ));
-            // verification fails for other items
-            for ii in i + 1..10 {
-                assert!(!verify_element_proof(
-                    ii,
-                    element,
-                    &commitment,
-                    proof,
-                    *DOMAIN,
-                    &GLOBAL_PARAMETERS
-                ));
-            }
-        }
+
+        eval.evals
+            .par_iter()
+            .zip(proofs.par_iter())
+            .enumerate()
+            .for_each(|(i, (element, proof))| {
+                for ii in i..10 {
+                    if ii == i {
+                        // verifying works
+                        assert!(verify_element_proof(
+                            ii,
+                            element,
+                            &commitment,
+                            proof,
+                            *DOMAIN,
+                            &GLOBAL_PARAMETERS
+                        ));
+                    } else {
+                        // Verification should fail for other points
+                        assert!(!verify_element_proof(
+                            ii,
+                            element,
+                            &commitment,
+                            proof,
+                            *DOMAIN,
+                            &GLOBAL_PARAMETERS
+                        ));
+                    }
+                }
+            });
     }
 }

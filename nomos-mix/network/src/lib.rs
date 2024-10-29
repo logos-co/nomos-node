@@ -2,7 +2,7 @@ mod behaviour;
 mod error;
 mod handler;
 
-pub use behaviour::{Behaviour, Event};
+pub use behaviour::{Behaviour, Config, Event};
 
 #[cfg(test)]
 mod test {
@@ -14,12 +14,12 @@ mod test {
         swarm::{dummy, NetworkBehaviour, SwarmEvent},
         Multiaddr, PeerId, Swarm, SwarmBuilder,
     };
-    use nomos_mix_message::{new_message, MSG_SIZE};
+    use nomos_mix_message::MSG_SIZE;
     use tokio::select;
 
     use crate::{behaviour::Config, error::Error, Behaviour, Event};
 
-    /// Check that an wrapped message is forwarded through mix nodes and unwrapped successfully.
+    /// Check that a published messsage arrives in the peers successfully.
     #[tokio::test]
     async fn behaviour() {
         let k1 = libp2p::identity::Keypair::generate_ed25519();
@@ -33,23 +33,17 @@ mod test {
         let addr: Multiaddr = "/ip4/127.0.0.1/udp/5073/quic-v1".parse().unwrap();
         let addr_with_peer_id = addr.clone().with_p2p(peer_id1).unwrap();
 
-        // Spawn swarm1
-        tokio::spawn(async move {
-            swarm1.listen_on(addr).unwrap();
-            loop {
-                swarm1.select_next_some().await;
-            }
-        });
+        // Swarm1 listens on the address.
+        swarm1.listen_on(addr).unwrap();
 
         // Dial to swarm1 from swarm2
         tokio::time::sleep(Duration::from_secs(1)).await;
         swarm2.dial(addr_with_peer_id).unwrap();
         tokio::time::sleep(Duration::from_secs(1)).await;
 
-        // Prepare a task for swarm2 to publish a two-layer wrapped message,
-        // receive an one-layer unwrapped message from swarm1,
-        // and return a fully unwrapped message.
+        // Swamr2 publishes a message.
         let task = async {
+            let msg = vec![1; MSG_SIZE];
             let mut msg_published = false;
             let mut publish_try_interval = tokio::time::interval(Duration::from_secs(1));
             loop {
@@ -58,18 +52,18 @@ mod test {
                     // (It will fail until swarm2 is connected to swarm1 successfully.)
                     _ = publish_try_interval.tick() => {
                         if !msg_published {
-                            // Prepare a message wrapped in two layers
-                            let msg = new_message(&[1; MSG_SIZE - 1], 2).unwrap();
-                            msg_published = swarm2.behaviour_mut().publish(msg).is_ok();
+                            msg_published = swarm2.behaviour_mut().publish(msg.clone()).is_ok();
                         }
                     }
-                    // Proceed swarm2
-                    event = swarm2.select_next_some() => {
-                        if let SwarmEvent::Behaviour(Event::FullyUnwrappedMessage(message)) = event {
-                            println!("SWARM2 FULLY_UNWRAPPED_MESSAGE: {:?}", message);
+                    // Proceed swarm1
+                    event = swarm1.select_next_some() => {
+                        if let SwarmEvent::Behaviour(Event::Message(received_msg)) = event {
+                            assert_eq!(received_msg, msg);
                             break;
                         };
                     }
+                    // Proceed swarm2
+                    _ = swarm2.select_next_some() => {}
                 }
             }
         };
@@ -94,13 +88,8 @@ mod test {
         let addr: Multiaddr = "/ip4/127.0.0.1/udp/5074/quic-v1".parse().unwrap();
         let addr_with_peer_id = addr.clone().with_p2p(peer_id1).unwrap();
 
-        // Spawn swarm1
-        tokio::spawn(async move {
-            swarm1.listen_on(addr).unwrap();
-            loop {
-                swarm1.select_next_some().await;
-            }
-        });
+        // Swarm1 listens on the address.
+        swarm1.listen_on(addr).unwrap();
 
         // Dial to swarm1 from swarm2
         tokio::time::sleep(Duration::from_secs(1)).await;
@@ -109,18 +98,19 @@ mod test {
 
         // Expect all publish attempts to fail with [`Error::NoPeers`]
         // because swarm2 doesn't have any peers that support the mix protocol.
+        let msg = vec![1; MSG_SIZE];
         let mut publish_try_interval = tokio::time::interval(Duration::from_secs(1));
         let mut publish_try_count = 0;
         loop {
             select! {
                 _ = publish_try_interval.tick() => {
-                    let msg = new_message(&[10; MSG_SIZE - 1], 1).unwrap();
-                    assert!(matches!(swarm2.behaviour_mut().publish(msg), Err(Error::NoPeers)));
+                    assert!(matches!(swarm2.behaviour_mut().publish(msg.clone()), Err(Error::NoPeers)));
                     publish_try_count += 1;
                     if publish_try_count >= 10 {
                         break;
                     }
                 }
+                _ = swarm1.select_next_some() => {}
                 _ = swarm2.select_next_some() => {}
             }
         }
@@ -130,7 +120,6 @@ mod test {
         new_swarm_with_behaviour(
             key,
             Behaviour::new(Config {
-                transmission_rate: 1.0,
                 duplicate_cache_lifespan: 60,
             }),
         )

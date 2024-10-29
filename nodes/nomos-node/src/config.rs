@@ -8,23 +8,27 @@ use cl::{InputWitness, NoteWitness, NullifierSecret};
 use clap::{Parser, ValueEnum};
 use color_eyre::eyre::{eyre, Result};
 use hex::FromHex;
+use nomos_tracing::logging::{gelf::GelfConfig, local::FileConfig};
+use serde::{Deserialize, Serialize};
+use tracing::Level;
+// internal
+use crate::{NomosApiService, NomosDaMembership, Wire};
 use nomos_core::staking::NMO_UNIT;
 use nomos_da_network_service::backends::libp2p::validator::DaNetworkValidatorBackend;
 use nomos_da_network_service::NetworkService as DaNetworkService;
 use nomos_libp2p::{ed25519::SecretKey, Multiaddr};
-use nomos_log::{Logger, LoggerBackend, LoggerFormat};
+use nomos_mix_service::backends::libp2p::Libp2pMixBackend as MixBackend;
+use nomos_mix_service::network::libp2p::Libp2pAdapter as MixNetworkAdapter;
+use nomos_mix_service::MixService;
 use nomos_network::backends::libp2p::Libp2p as NetworkBackend;
 use nomos_network::NetworkService;
 use nomos_storage::backends::rocksdb::RocksBackend;
+use nomos_tracing_service::{LoggerLayer, Tracing};
 use overwatch_rs::services::ServiceData;
-use serde::{Deserialize, Serialize};
 use subnetworks_assignations::versions::v1::FillFromNodeList;
-use tracing::Level;
-// internal
-use crate::{NomosApiService, Wire};
 
 #[derive(ValueEnum, Clone, Debug, Default)]
-pub enum LoggerBackendType {
+pub enum LoggerLayerType {
     Gelf,
     File,
     #[default]
@@ -48,10 +52,7 @@ pub struct LogArgs {
 
     /// Backend type
     #[clap(long = "log-backend", env = "LOG_BACKEND", value_enum)]
-    backend: Option<LoggerBackendType>,
-
-    #[clap(long = "log-format", env = "LOG_FORMAT")]
-    format: Option<String>,
+    backend: Option<LoggerLayerType>,
 
     #[clap(long = "log-level", env = "LOG_LEVEL")]
     level: Option<String>,
@@ -65,6 +66,7 @@ pub struct NetworkArgs {
     #[clap(long = "net-port", env = "NET_PORT")]
     port: Option<usize>,
 
+    // TODO: Use either the raw bytes or the key type directly to delegate error handling to clap
     #[clap(long = "net-node-key", env = "NET_NODE_KEY")]
     node_key: Option<String>,
 
@@ -73,9 +75,28 @@ pub struct NetworkArgs {
 }
 
 #[derive(Parser, Debug, Clone)]
+pub struct MixArgs {
+    #[clap(long = "mix-addr", env = "MIX_ADDR")]
+    mix_addr: Option<Multiaddr>,
+
+    // TODO: Use either the raw bytes or the key type directly to delegate error handling to clap
+    #[clap(long = "mix-node-key", env = "MIX_NODE_KEY")]
+    mix_node_key: Option<String>,
+
+    #[clap(long = "mix-membership", env = "MIX_MEMBERSHIP", num_args = 1.., value_delimiter = ',')]
+    pub mix_membership: Option<Vec<Multiaddr>>,
+
+    #[clap(long = "mix-peering-degree", env = "MIX_PEERING_DEGREE")]
+    mix_peering_degree: Option<usize>,
+
+    #[clap(long = "mix-num-mix-layers", env = "MIX_NUM_MIX_LAYERS")]
+    mix_num_mix_layers: Option<usize>,
+}
+
+#[derive(Parser, Debug, Clone)]
 pub struct HttpArgs {
     #[clap(long = "http-host", env = "HTTP_HOST")]
-    http_addr: Option<SocketAddr>,
+    pub http_addr: Option<SocketAddr>,
 
     #[clap(long = "http-cors-origin", env = "HTTP_CORS_ORIGIN")]
     pub cors_origins: Option<Vec<String>>,
@@ -112,145 +133,200 @@ pub struct MetricsArgs {
 
 #[derive(Deserialize, Debug, Clone, Serialize)]
 pub struct Config {
-    pub log: <Logger as ServiceData>::Settings,
+    pub tracing: <Tracing as ServiceData>::Settings,
     pub network: <NetworkService<NetworkBackend> as ServiceData>::Settings,
+    pub mix: <MixService<MixBackend, MixNetworkAdapter> as ServiceData>::Settings,
     pub da_network:
         <DaNetworkService<DaNetworkValidatorBackend<FillFromNodeList>> as ServiceData>::Settings,
-    pub da_indexer: <crate::DaIndexer as ServiceData>::Settings,
-    pub da_verifier: <crate::DaVerifier as ServiceData>::Settings,
-    pub da_sampling: <crate::DaSampling as ServiceData>::Settings,
+    pub da_indexer: <crate::NodeDaIndexer as ServiceData>::Settings,
+    pub da_verifier: <crate::NodeDaVerifier as ServiceData>::Settings,
+    pub da_sampling: <crate::NodeDaSampling as ServiceData>::Settings,
     pub http: <NomosApiService as ServiceData>::Settings,
-    pub cryptarchia: <crate::Cryptarchia as ServiceData>::Settings,
+    pub cryptarchia: <crate::Cryptarchia<
+        nomos_da_sampling::network::adapters::validator::Libp2pAdapter<NomosDaMembership>,
+    > as ServiceData>::Settings,
     pub storage: <crate::StorageService<RocksBackend<Wire>> as ServiceData>::Settings,
-    pub wait_online_secs: u64,
 }
 
 impl Config {
-    pub fn update_log(mut self, log_args: LogArgs) -> Result<Self> {
-        let LogArgs {
-            backend,
-            log_addr: addr,
-            directory,
-            prefix,
-            format,
-            level,
-        } = log_args;
+    pub fn update_from_args(
+        mut self,
+        log_args: LogArgs,
+        network_args: NetworkArgs,
+        mix_args: MixArgs,
+        http_args: HttpArgs,
+        cryptarchia_args: CryptarchiaArgs,
+    ) -> Result<Self> {
+        update_tracing(&mut self.tracing, log_args)?;
+        update_network(&mut self.network, network_args)?;
+        update_mix(&mut self.mix, mix_args)?;
+        update_http(&mut self.http, http_args)?;
+        update_cryptarchia_consensus(&mut self.cryptarchia, cryptarchia_args)?;
+        Ok(self)
+    }
+}
 
-        // Override the file config with the one from env variables.
-        if let Some(backend) = backend {
-            self.log.backend = match backend {
-                LoggerBackendType::Gelf => LoggerBackend::Gelf {
-                    addr: addr
-                        .ok_or_else(|| eyre!("Gelf backend requires an address."))?
-                        .to_socket_addrs()?
-                        .next()
-                        .ok_or_else(|| eyre!("Invalid gelf address"))?,
-                },
-                LoggerBackendType::File => LoggerBackend::File {
-                    directory: directory
-                        .ok_or_else(|| eyre!("File backend requires a directory."))?,
-                    prefix,
-                },
-                LoggerBackendType::Stdout => LoggerBackend::Stdout,
-                LoggerBackendType::Stderr => LoggerBackend::Stderr,
-            }
+pub fn update_tracing(
+    tracing: &mut <Tracing as ServiceData>::Settings,
+    tracing_args: LogArgs,
+) -> Result<()> {
+    let LogArgs {
+        backend,
+        log_addr: addr,
+        directory,
+        prefix,
+        level,
+    } = tracing_args;
+
+    // Override the file config with the one from env variables.
+    if let Some(backend) = backend {
+        tracing.logger = match backend {
+            LoggerLayerType::Gelf => LoggerLayer::Gelf(GelfConfig {
+                addr: addr
+                    .ok_or_else(|| eyre!("Gelf backend requires an address."))?
+                    .to_socket_addrs()?
+                    .next()
+                    .ok_or_else(|| eyre!("Invalid gelf address"))?,
+            }),
+            LoggerLayerType::File => LoggerLayer::File(FileConfig {
+                directory: directory.ok_or_else(|| eyre!("File backend requires a directory."))?,
+                prefix,
+            }),
+            LoggerLayerType::Stdout => LoggerLayer::Stdout,
+            LoggerLayerType::Stderr => LoggerLayer::Stderr,
+        }
+    };
+
+    if let Some(level_str) = level {
+        tracing.level = match level_str.as_str() {
+            "DEBUG" => Level::DEBUG,
+            "INFO" => Level::INFO,
+            "ERROR" => Level::ERROR,
+            "WARN" => Level::WARN,
+            _ => return Err(eyre!("Invalid log level provided.")),
         };
+    }
+    Ok(())
+}
 
-        // Update parts of the config.
-        if let Some(format_str) = format {
-            self.log.format = match format_str.as_str() {
-                "Json" => LoggerFormat::Json,
-                "Plain" => LoggerFormat::Plain,
-                _ => return Err(eyre!("Invalid log format provided.")),
-            };
-        }
-        if let Some(level_str) = level {
-            self.log.level = match level_str.as_str() {
-                "DEBUG" => Level::DEBUG,
-                _ => return Err(eyre!("Invalid log level provided.")),
-            };
-        }
-        Ok(self)
+pub fn update_network(
+    network: &mut <NetworkService<NetworkBackend> as ServiceData>::Settings,
+    network_args: NetworkArgs,
+) -> Result<()> {
+    let NetworkArgs {
+        host,
+        port,
+        node_key,
+        initial_peers,
+    } = network_args;
+
+    if let Some(IpAddr::V4(h)) = host {
+        network.backend.inner.host = h;
+    } else if host.is_some() {
+        return Err(eyre!("Unsupported ip version"));
     }
 
-    pub fn update_network(mut self, network_args: NetworkArgs) -> Result<Self> {
-        let NetworkArgs {
-            host,
-            port,
-            node_key,
-            initial_peers,
-        } = network_args;
-
-        if let Some(IpAddr::V4(h)) = host {
-            self.network.backend.inner.host = h;
-        } else if host.is_some() {
-            return Err(eyre!("Unsupported ip version"));
-        }
-
-        if let Some(port) = port {
-            self.network.backend.inner.port = port as u16;
-        }
-
-        if let Some(node_key) = node_key {
-            let mut key_bytes = hex::decode(node_key)?;
-            self.network.backend.inner.node_key =
-                SecretKey::try_from_bytes(key_bytes.as_mut_slice())?;
-        }
-
-        if let Some(peers) = initial_peers {
-            self.network.backend.initial_peers = peers;
-        }
-
-        // TODO: configure mixclient and mixnode if the mixnet feature is enabled
-
-        Ok(self)
+    if let Some(port) = port {
+        network.backend.inner.port = port as u16;
     }
 
-    pub fn update_http(mut self, http_args: HttpArgs) -> Result<Self> {
-        let HttpArgs {
-            http_addr,
-            cors_origins,
-        } = http_args;
-
-        if let Some(addr) = http_addr {
-            self.http.backend_settings.address = addr;
-        }
-
-        if let Some(cors) = cors_origins {
-            self.http.backend_settings.cors_origins = cors;
-        }
-
-        Ok(self)
+    if let Some(node_key) = node_key {
+        let mut key_bytes = hex::decode(node_key)?;
+        network.backend.inner.node_key = SecretKey::try_from_bytes(key_bytes.as_mut_slice())?;
     }
 
-    pub fn update_cryptarchia_consensus(mut self, consensus_args: CryptarchiaArgs) -> Result<Self> {
-        let CryptarchiaArgs {
-            chain_start_time,
-            slot_duration,
-            note_secret_key,
-            note_value,
-        } = consensus_args;
-
-        if let Some(start_time) = chain_start_time {
-            self.cryptarchia.time.chain_start_time =
-                time::OffsetDateTime::from_unix_timestamp(start_time)?;
-        }
-
-        if let Some(duration) = slot_duration {
-            self.cryptarchia.time.slot_duration = std::time::Duration::from_secs(duration);
-        }
-
-        if let Some(sk) = note_secret_key {
-            let sk = <[u8; 16]>::from_hex(sk)?;
-
-            let value = note_value.expect("Should be available if coin sk provided");
-
-            self.cryptarchia.notes.push(InputWitness::new(
-                NoteWitness::basic(value as u64, NMO_UNIT, &mut rand::thread_rng()),
-                NullifierSecret::from_bytes(sk),
-            ));
-        }
-
-        Ok(self)
+    if let Some(peers) = initial_peers {
+        network.backend.initial_peers = peers;
     }
+
+    Ok(())
+}
+
+pub fn update_mix(
+    mix: &mut <MixService<MixBackend, MixNetworkAdapter> as ServiceData>::Settings,
+    mix_args: MixArgs,
+) -> Result<()> {
+    let MixArgs {
+        mix_addr,
+        mix_node_key,
+        mix_membership,
+        mix_peering_degree,
+        mix_num_mix_layers,
+    } = mix_args;
+
+    if let Some(addr) = mix_addr {
+        mix.backend.listening_address = addr;
+    }
+
+    if let Some(node_key) = mix_node_key {
+        let mut key_bytes = hex::decode(node_key)?;
+        mix.backend.node_key = SecretKey::try_from_bytes(key_bytes.as_mut_slice())?;
+    }
+
+    if let Some(membership) = mix_membership {
+        mix.backend.membership = membership;
+    }
+
+    if let Some(peering_degree) = mix_peering_degree {
+        mix.backend.peering_degree = peering_degree;
+    }
+
+    if let Some(num_mix_layers) = mix_num_mix_layers {
+        mix.message_blend.cryptographic_processor.num_mix_layers = num_mix_layers;
+    }
+
+    Ok(())
+}
+
+pub fn update_http(
+    http: &mut <NomosApiService as ServiceData>::Settings,
+    http_args: HttpArgs,
+) -> Result<()> {
+    let HttpArgs {
+        http_addr,
+        cors_origins,
+    } = http_args;
+
+    if let Some(addr) = http_addr {
+        http.backend_settings.address = addr;
+    }
+
+    if let Some(cors) = cors_origins {
+        http.backend_settings.cors_origins = cors;
+    }
+
+    Ok(())
+}
+
+pub fn update_cryptarchia_consensus(
+    cryptarchia: &mut <crate::NodeCryptarchia as ServiceData>::Settings,
+    consensus_args: CryptarchiaArgs,
+) -> Result<()> {
+    let CryptarchiaArgs {
+        chain_start_time,
+        slot_duration,
+        note_secret_key,
+        note_value,
+    } = consensus_args;
+
+    if let Some(start_time) = chain_start_time {
+        cryptarchia.time.chain_start_time = time::OffsetDateTime::from_unix_timestamp(start_time)?;
+    }
+
+    if let Some(duration) = slot_duration {
+        cryptarchia.time.slot_duration = std::time::Duration::from_secs(duration);
+    }
+
+    if let Some(sk) = note_secret_key {
+        let sk = <[u8; 16]>::from_hex(sk)?;
+
+        let value = note_value.expect("Should be available if coin sk provided");
+
+        cryptarchia.notes.push(InputWitness::new(
+            NoteWitness::basic(value as u64, NMO_UNIT, &mut rand::thread_rng()),
+            NullifierSecret::from_bytes(sk),
+        ));
+    }
+
+    Ok(())
 }

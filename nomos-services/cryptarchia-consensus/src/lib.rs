@@ -1,27 +1,29 @@
 mod leadership;
+mod messages;
+pub mod mix;
 pub mod network;
 mod time;
 
 use cl::InputWitness;
 use core::fmt::Debug;
 use cryptarchia_engine::Slot;
-use cryptarchia_ledger::{
-    leader_proof::{LeaderProof, Risc0LeaderProof},
-    LedgerState,
-};
 use futures::StreamExt;
-use network::{messages::NetworkMessage, NetworkAdapter};
+use network::NetworkAdapter;
 use nomos_core::da::blob::{
     info::DispersedBlobInfo, metadata::Metadata as BlobMetadata, BlobSelect,
 };
-use nomos_core::header::{cryptarchia::Header, HeaderId};
+use nomos_core::header::{Header, HeaderId};
 use nomos_core::tx::{Transaction, TxSelect};
 use nomos_core::{
     block::{builder::BlockBuilder, Block},
-    header::cryptarchia::Builder,
+    header::Builder,
 };
 use nomos_da_sampling::backend::DaSamplingServiceBackend;
 use nomos_da_sampling::{DaSamplingService, DaSamplingServiceMsg};
+use nomos_ledger::{
+    leader_proof::{LeaderProof, Risc0LeaderProof},
+    LedgerState,
+};
 use nomos_mempool::{
     backend::MemPool, network::NetworkAdapter as MempoolAdapter, DaMempoolService, MempoolMsg,
     TxMempoolService,
@@ -59,13 +61,13 @@ const CRYPTARCHIA_ID: ServiceId = "Cryptarchia";
 #[derive(Debug, Clone, Error)]
 pub enum Error {
     #[error("Ledger error: {0}")]
-    Ledger(#[from] cryptarchia_ledger::LedgerError<HeaderId>),
+    Ledger(#[from] nomos_ledger::LedgerError<HeaderId>),
     #[error("Consensus error: {0}")]
     Consensus(#[from] cryptarchia_engine::Error<HeaderId>),
 }
 
 struct Cryptarchia {
-    ledger: cryptarchia_ledger::Ledger<HeaderId>,
+    ledger: nomos_ledger::Ledger<HeaderId>,
     consensus: cryptarchia_engine::Cryptarchia<HeaderId>,
 }
 
@@ -105,7 +107,7 @@ impl Cryptarchia {
         Ok(Self { ledger, consensus })
     }
 
-    fn epoch_state_for_slot(&self, slot: Slot) -> Option<&cryptarchia_ledger::EpochState> {
+    fn epoch_state_for_slot(&self, slot: Slot) -> Option<&nomos_ledger::EpochState> {
         let tip = self.tip();
         let state = self.ledger.state(&tip).expect("no state for tip");
         let requested_epoch = self.ledger.config().epoch(slot);
@@ -120,40 +122,22 @@ impl Cryptarchia {
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
-pub struct CryptarchiaSettings<Ts, Bs> {
+pub struct CryptarchiaSettings<Ts, Bs, NetworkAdapterSettings, MixAdapterSettings> {
     #[serde(default)]
     pub transaction_selector_settings: Ts,
     #[serde(default)]
     pub blob_selector_settings: Bs,
-    pub config: cryptarchia_ledger::Config,
+    pub config: nomos_ledger::Config,
     pub genesis_state: LedgerState,
     pub time: TimeConfig,
     pub notes: Vec<InputWitness>,
-}
-
-impl<Ts, Bs> CryptarchiaSettings<Ts, Bs> {
-    #[inline]
-    pub const fn new(
-        transaction_selector_settings: Ts,
-        blob_selector_settings: Bs,
-        config: cryptarchia_ledger::Config,
-        genesis_state: LedgerState,
-        time: TimeConfig,
-        notes: Vec<InputWitness>,
-    ) -> Self {
-        Self {
-            transaction_selector_settings,
-            blob_selector_settings,
-            config,
-            genesis_state,
-            time,
-            notes,
-        }
-    }
+    pub network_adapter_settings: NetworkAdapterSettings,
+    pub mix_adapter_settings: MixAdapterSettings,
 }
 
 pub struct CryptarchiaConsensus<
     A,
+    MixAdapter,
     ClPool,
     ClPoolAdapter,
     DaPool,
@@ -167,6 +151,7 @@ pub struct CryptarchiaConsensus<
     SamplingStorage,
 > where
     A: NetworkAdapter,
+    MixAdapter: mix::MixAdapter,
     ClPoolAdapter: MempoolAdapter<Payload = ClPool::Item, Key = ClPool::Key>,
     ClPool: MemPool<BlockId = HeaderId>,
     DaPool: MemPool<BlockId = HeaderId>,
@@ -192,6 +177,7 @@ pub struct CryptarchiaConsensus<
     // underlying networking backend. We need this so we can relay and check the types properly
     // when implementing ServiceCore for CryptarchiaConsensus
     network_relay: Relay<NetworkService<A::Backend>>,
+    mix_relay: Relay<nomos_mix_service::MixService<MixAdapter::Backend, MixAdapter::Network>>,
     cl_mempool_relay: Relay<TxMempoolService<ClPoolAdapter, ClPool>>,
     da_mempool_relay: Relay<
         DaMempoolService<
@@ -212,6 +198,7 @@ pub struct CryptarchiaConsensus<
 
 impl<
         A,
+        MixAdapter,
         ClPool,
         ClPoolAdapter,
         DaPool,
@@ -226,6 +213,7 @@ impl<
     > ServiceData
     for CryptarchiaConsensus<
         A,
+        MixAdapter,
         ClPool,
         ClPoolAdapter,
         DaPool,
@@ -240,6 +228,7 @@ impl<
     >
 where
     A: NetworkAdapter,
+    MixAdapter: mix::MixAdapter,
     ClPool: MemPool<BlockId = HeaderId>,
     ClPool::Item: Clone + Eq + Hash + Debug,
     ClPool::Key: Debug,
@@ -261,7 +250,8 @@ where
     SamplingStorage: nomos_da_sampling::storage::DaStorageAdapter,
 {
     const SERVICE_ID: ServiceId = CRYPTARCHIA_ID;
-    type Settings = CryptarchiaSettings<TxS::Settings, BS::Settings>;
+    type Settings =
+        CryptarchiaSettings<TxS::Settings, BS::Settings, A::Settings, MixAdapter::Settings>;
     type State = NoState<Self::Settings>;
     type StateOperator = NoOperator<Self::State>;
     type Message = ConsensusMsg<Block<ClPool::Item, DaPool::Item>>;
@@ -270,6 +260,7 @@ where
 #[async_trait::async_trait]
 impl<
         A,
+        MixAdapter,
         ClPool,
         ClPoolAdapter,
         DaPool,
@@ -284,6 +275,7 @@ impl<
     > ServiceCore
     for CryptarchiaConsensus<
         A,
+        MixAdapter,
         ClPool,
         ClPoolAdapter,
         DaPool,
@@ -302,6 +294,13 @@ where
         + Send
         + Sync
         + 'static,
+    A::Settings: Send + Sync + 'static,
+    MixAdapter: mix::MixAdapter<Tx = ClPool::Item, BlobCertificate = DaPool::Item>
+        + Clone
+        + Send
+        + Sync
+        + 'static,
+    MixAdapter::Settings: Send + Sync + 'static,
     ClPool: MemPool<BlockId = HeaderId> + Send + Sync + 'static,
     ClPool::Settings: Send + Sync + 'static,
     DaPool: MemPool<BlockId = HeaderId, Key = SamplingBackend::BlobId> + Send + Sync + 'static,
@@ -349,6 +348,7 @@ where
 {
     fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, overwatch_rs::DynError> {
         let network_relay = service_state.overwatch_handle.relay();
+        let mix_relay = service_state.overwatch_handle.relay();
         let cl_mempool_relay = service_state.overwatch_handle.relay();
         let da_mempool_relay = service_state.overwatch_handle.relay();
         let storage_relay = service_state.overwatch_handle.relay();
@@ -357,6 +357,7 @@ where
         Ok(Self {
             service_state,
             network_relay,
+            mix_relay,
             cl_mempool_relay,
             da_mempool_relay,
             block_subscription_sender,
@@ -371,6 +372,12 @@ where
             .connect()
             .await
             .expect("Relay connection with NetworkService should succeed");
+
+        let mix_relay: OutboundRelay<_> = self
+            .mix_relay
+            .connect()
+            .await
+            .expect("Relay connection with nomos_mix_service::MixService should succeed");
 
         let cl_mempool_relay: OutboundRelay<_> = self
             .cl_mempool_relay
@@ -403,6 +410,8 @@ where
             blob_selector_settings,
             time,
             notes,
+            network_adapter_settings,
+            mix_adapter_settings,
         } = self.service_state.settings_reader.get_updated_settings();
 
         let genesis_id = HeaderId::from([0; 32]);
@@ -411,21 +420,24 @@ where
                 genesis_id,
                 config.consensus_config.clone(),
             ),
-            ledger: <cryptarchia_ledger::Ledger<_>>::from_genesis(
+            ledger: <nomos_ledger::Ledger<_>>::from_genesis(
                 genesis_id,
                 genesis_state,
                 config.clone(),
             ),
         };
-        let adapter = A::new(network_relay).await;
+
+        let network_adapter = A::new(network_adapter_settings, network_relay).await;
         let tx_selector = TxS::new(transaction_selector_settings);
         let blob_selector = BS::new(blob_selector_settings);
 
-        let mut incoming_blocks = adapter.blocks_stream().await;
+        let mut incoming_blocks = network_adapter.blocks_stream().await?;
         let mut leader = leadership::Leader::new(genesis_id, notes, config);
         let timer = time::Timer::new(time);
 
         let mut slot_timer = IntervalStream::new(timer.slot_interval());
+
+        let mix_adapter = MixAdapter::new(mix_adapter_settings, mix_relay).await;
 
         let mut lifecycle_stream = self.service_state.lifecycle_handle.message_stream();
 
@@ -471,7 +483,7 @@ where
                             ).await;
 
                             if let Some(block) = block {
-                                adapter.broadcast(NetworkMessage::Block(block)).await;
+                                mix_adapter.mix(block).await;
                             }
                         }
                     }
@@ -496,6 +508,7 @@ where
 
 impl<
         A,
+        MixAdapter,
         ClPool,
         ClPoolAdapter,
         DaPool,
@@ -510,6 +523,7 @@ impl<
     >
     CryptarchiaConsensus<
         A,
+        MixAdapter,
         ClPool,
         ClPoolAdapter,
         DaPool,
@@ -524,6 +538,7 @@ impl<
     >
 where
     A: NetworkAdapter + Clone + Send + Sync + 'static,
+    MixAdapter: mix::MixAdapter + Clone + Send + Sync + 'static,
     ClPool: MemPool<BlockId = HeaderId> + Send + Sync + 'static,
     ClPool::Settings: Send + Sync + 'static,
     ClPool::Item: Transaction<Hash = ClPool::Key>
@@ -665,7 +680,7 @@ where
 
         // TODO: filter on time?
 
-        let header = block.header().cryptarchia();
+        let header = block.header();
         let id = header.id();
         let sampled_blobs = match get_sampled_blobs(sampling_relay.clone()).await {
             Ok(sampled_blobs) => sampled_blobs,
@@ -716,7 +731,7 @@ where
 
                 cryptarchia = new_state;
             }
-            Err(Error::Ledger(cryptarchia_ledger::LedgerError::ParentNotFound(parent)))
+            Err(Error::Ledger(nomos_ledger::LedgerError::ParentNotFound(parent)))
             | Err(Error::Consensus(cryptarchia_engine::Error::ParentMissing(parent))) => {
                 tracing::debug!("missing parent {:?}", parent);
                 // TODO: request parent block
@@ -754,16 +769,17 @@ where
         let blobs_ids = get_sampled_blobs(sampling_relay);
         match futures::join!(cl_txs, da_certs, blobs_ids) {
             (Ok(cl_txs), Ok(da_blobs_info), Ok(blobs_ids)) => {
-                let Ok(block) = BlockBuilder::new(tx_selector, blob_selector)
-                    .with_cryptarchia_builder(Builder::new(parent, slot, proof))
-                    .with_transactions(cl_txs)
-                    .with_blobs_info(
-                        da_blobs_info.filter(move |info| blobs_ids.contains(&info.blob_id())),
-                    )
-                    .build()
-                else {
-                    panic!("Proposal block should always succeed to be built")
-                };
+                let block = BlockBuilder::new(
+                    tx_selector,
+                    blob_selector,
+                    Builder::new(parent, slot, proof),
+                )
+                .with_transactions(cl_txs)
+                .with_blobs_info(
+                    da_blobs_info.filter(move |info| blobs_ids.contains(&info.blob_id())),
+                )
+                .build()
+                .expect("Proposal block should always succeed to be built");
                 tracing::debug!("proposed block with id {:?}", block.header().id());
                 output = Some(block);
             }

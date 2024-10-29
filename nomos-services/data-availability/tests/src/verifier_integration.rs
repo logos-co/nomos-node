@@ -10,10 +10,10 @@ use std::{
 // crates
 use cl::{InputWitness, NoteWitness, NullifierSecret};
 use cryptarchia_consensus::TimeConfig;
-use cryptarchia_ledger::LedgerState;
 use kzgrs_backend::common::blob::DaBlob;
 use nomos_core::{da::DaEncoder as _, staking::NMO_UNIT};
 use nomos_da_verifier::backend::kzgrs::KzgrsDaVerifierSettings;
+use nomos_ledger::LedgerState;
 use nomos_libp2p::Multiaddr;
 use nomos_libp2p::SwarmConfig;
 use rand::{thread_rng, Rng};
@@ -49,7 +49,7 @@ fn test_verifier() {
         notes.iter().map(|n| n.note_commitment()),
         (ids.len() as u32).into(),
     );
-    let ledger_config = cryptarchia_ledger::Config {
+    let ledger_config = nomos_ledger::Config {
         epoch_stake_distribution_stabilization: 3,
         epoch_period_nonce_buffer: 3,
         epoch_period_nonce_stabilization: 4,
@@ -71,6 +71,10 @@ fn test_verifier() {
         port: 7774,
         ..Default::default()
     };
+    let mix_configs = new_mix_configs(vec![
+        Multiaddr::from_str("/ip4/127.0.0.1/udp/7783/quic-v1").unwrap(),
+        Multiaddr::from_str("/ip4/127.0.0.1/udp/7784/quic-v1").unwrap(),
+    ]);
 
     let blobs_dir = TempDir::new().unwrap().path().to_path_buf();
 
@@ -97,6 +101,7 @@ fn test_verifier() {
         &genesis_state,
         &time_config,
         &swarm_config1,
+        &mix_configs[0],
         NamedTempFile::new().unwrap().path().to_path_buf(),
         &blobs_dir,
         vec![node_address(&swarm_config2)],
@@ -121,6 +126,7 @@ fn test_verifier() {
         &genesis_state,
         &time_config,
         &swarm_config2,
+        &mix_configs[1],
         NamedTempFile::new().unwrap().path().to_path_buf(),
         &blobs_dir,
         vec![node_address(&swarm_config1)],

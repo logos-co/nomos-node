@@ -2,7 +2,7 @@ use kzgrs_backend::dispersal::BlobInfo;
 #[cfg(feature = "metrics")]
 use nomos_metrics::MetricsSettings;
 use nomos_node::{
-    Config, CryptarchiaArgs, HttpArgs, LogArgs, MetricsArgs, NetworkArgs, Nomos,
+    config::MixArgs, Config, CryptarchiaArgs, HttpArgs, LogArgs, MetricsArgs, NetworkArgs, Nomos,
     NomosServiceSettings, Tx,
 };
 
@@ -27,6 +27,9 @@ struct Args {
     /// Overrides network config.
     #[clap(flatten)]
     network_args: NetworkArgs,
+    /// Overrides mix config.
+    #[clap(flatten)]
+    mix_args: MixArgs,
     /// Overrides http config.
     #[clap(flatten)]
     http_args: HttpArgs,
@@ -43,14 +46,18 @@ fn main() -> Result<()> {
         log_args,
         http_args,
         network_args,
+        mix_args,
         cryptarchia_args,
         metrics_args,
     } = Args::parse();
     let config = serde_yaml::from_reader::<_, Config>(std::fs::File::open(config)?)?
-        .update_log(log_args)?
-        .update_http(http_args)?
-        .update_network(network_args)?
-        .update_cryptarchia_consensus(cryptarchia_args)?;
+        .update_from_args(
+            log_args,
+            network_args,
+            mix_args,
+            http_args,
+            cryptarchia_args,
+        )?;
 
     let registry = cfg!(feature = "metrics")
         .then(|| {
@@ -69,8 +76,9 @@ fn main() -> Result<()> {
     let app = OverwatchRunner::<Nomos>::run(
         NomosServiceSettings {
             network: config.network,
+            mix: config.mix,
             #[cfg(feature = "tracing")]
-            logging: config.log,
+            tracing: config.tracing,
             http: config.http,
             cl_mempool: nomos_mempool::TxMempoolSettings {
                 backend: (),

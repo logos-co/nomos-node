@@ -12,14 +12,16 @@ use libp2p::{
     },
     Multiaddr, PeerId,
 };
-use nomos_mix_message::{message_id, unwrap_message};
+use nomos_mix_message::{is_drop_message, message_id};
 
 use crate::{
     error::Error,
     handler::{FromBehaviour, MixConnectionHandler, ToBehaviour},
 };
 
-/// A [`NetworkBehaviour`] that forwards messages between mix nodes.
+/// A [`NetworkBehaviour`]:
+/// - forwards messages to all connected peers with deduplication.
+/// - receives messages from all connected peers.
 pub struct Behaviour {
     config: Config,
     /// Peers that support the mix protocol, and their connection IDs
@@ -35,14 +37,13 @@ pub struct Behaviour {
 
 #[derive(Debug)]
 pub struct Config {
-    pub transmission_rate: f64,
     pub duplicate_cache_lifespan: u64,
 }
 
 #[derive(Debug)]
 pub enum Event {
-    /// A fully unwrapped message received from one of the peers.
-    FullyUnwrappedMessage(Vec<u8>),
+    /// A message received from one of the peers.
+    Message(Vec<u8>),
     Error(Error),
 }
 
@@ -58,39 +59,39 @@ impl Behaviour {
         }
     }
 
-    /// Publishs a message through the mix network.
-    ///
-    /// This function expects that the message was already encoded for the cryptographic mixing
-    /// (e.g. Sphinx encoding).
-    ///
-    /// The message is forward to all connected peers,
-    /// so that it can arrive in the mix node who can unwrap it one layer.
-    /// Fully unwrapped messages are returned as the [`MixBehaviourEvent::FullyUnwrappedMessage`].
+    /// Publish a message (data or drop) to all connected peers
     pub fn publish(&mut self, message: Vec<u8>) -> Result<(), Error> {
-        self.duplicate_cache.cache_set(message_id(&message), ());
-        self.forward_message(message, None)
+        if is_drop_message(&message) {
+            // Bypass deduplication for the drop message
+            return self.forward_message(message, None);
+        }
+
+        let msg_id = message_id(&message);
+        // If the message was already seen, don't forward it again
+        if self.duplicate_cache.cache_get(&msg_id).is_some() {
+            return Ok(());
+        }
+
+        let result = self.forward_message(message, None);
+        // Add the message to the cache only if the forwarding was successfully triggered
+        if result.is_ok() {
+            self.duplicate_cache.cache_set(msg_id, ());
+        }
+        result
     }
 
-    /// Forwards a message to all connected peers except the one that was received from.
+    /// Forwards a message to all connected peers except the excluded peer.
     ///
     /// Returns [`Error::NoPeers`] if there are no connected peers that support the mix protocol.
     fn forward_message(
         &mut self,
         message: Vec<u8>,
-        propagation_source: Option<PeerId>,
+        excluded_peer: Option<PeerId>,
     ) -> Result<(), Error> {
-        let peer_ids = self
-            .negotiated_peers
-            .keys()
-            .filter(|&peer_id| {
-                if let Some(propagation_source) = propagation_source {
-                    *peer_id != propagation_source
-                } else {
-                    true
-                }
-            })
-            .cloned()
-            .collect::<Vec<_>>();
+        let mut peer_ids: HashSet<_> = self.negotiated_peers.keys().collect();
+        if let Some(peer) = &excluded_peer {
+            peer_ids.remove(peer);
+        }
 
         if peer_ids.is_empty() {
             return Err(Error::NoPeers);
@@ -99,7 +100,7 @@ impl Behaviour {
         for peer_id in peer_ids.into_iter() {
             tracing::debug!("Registering event for peer {:?} to send msg", peer_id);
             self.events.push_back(ToSwarm::NotifyHandler {
-                peer_id,
+                peer_id: *peer_id,
                 handler: NotifyHandler::Any,
                 event: FromBehaviour::Message(message.clone()),
             });
@@ -189,6 +190,12 @@ impl NetworkBehaviour for Behaviour {
         match event {
             // A message was forwarded from the peer.
             ToBehaviour::Message(message) => {
+                // Ignore drop message
+                if is_drop_message(&message) {
+                    return;
+                }
+
+                // Add the message to the cache. If it was already seen, ignore it.
                 if self
                     .duplicate_cache
                     .cache_set(message_id(&message), ())
@@ -197,27 +204,16 @@ impl NetworkBehaviour for Behaviour {
                     return;
                 }
 
-                // Try to unwrap the message.
-                match unwrap_message(&message) {
-                    Ok((unwrapped_msg, fully_unwrapped)) => {
-                        if fully_unwrapped {
-                            self.events.push_back(ToSwarm::GenerateEvent(
-                                Event::FullyUnwrappedMessage(unwrapped_msg),
-                            ));
-                        } else if let Err(e) = self.forward_message(unwrapped_msg, None) {
-                            tracing::error!("Failed to forward message: {:?}", e);
-                        }
-                    }
-                    Err(nomos_mix_message::Error::MsgUnwrapNotAllowed) => {
-                        // Forward the received message as it is.
-                        if let Err(e) = self.forward_message(message, Some(peer_id)) {
-                            tracing::error!("Failed to forward message: {:?}", e);
-                        }
-                    }
-                    Err(e) => {
-                        tracing::error!("Failed to unwrap message: {:?}", e);
-                    }
+                // Forward the message immediately to the rest of connected peers
+                // without any processing for the fast propagation.
+                if let Err(e) = self.forward_message(message.clone(), Some(peer_id)) {
+                    tracing::error!("Failed to forward message: {e:?}");
                 }
+
+                // Notify the swarm about the received message,
+                // so that it can be processed by the core protocol module.
+                self.events
+                    .push_back(ToSwarm::GenerateEvent(Event::Message(message)));
             }
             // The connection was fully negotiated by the peer,
             // which means that the peer supports the mix protocol.

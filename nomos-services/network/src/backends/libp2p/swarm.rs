@@ -1,16 +1,7 @@
-use std::{
-    collections::{hash_map::Entry, HashMap},
-    time::Duration,
-};
+use std::{collections::HashMap, time::Duration};
 
-use futures::AsyncWriteExt;
-#[cfg(feature = "mixnet")]
-use nomos_libp2p::libp2p_stream::IncomingStreams;
 use nomos_libp2p::{
-    gossipsub,
-    libp2p::{swarm::ConnectionId, Stream, StreamProtocol},
-    libp2p_stream::{Control, OpenStreamError},
-    BehaviourEvent, Multiaddr, PeerId, Swarm, SwarmEvent,
+    gossipsub, libp2p::swarm::ConnectionId, BehaviourEvent, Multiaddr, PeerId, Swarm, SwarmEvent,
 };
 use tokio::sync::{broadcast, mpsc, oneshot};
 use tokio_stream::StreamExt;
@@ -24,8 +15,6 @@ use super::{
 
 pub struct SwarmHandler {
     pub swarm: Swarm,
-    stream_control: Control,
-    streams: HashMap<PeerId, Stream>,
     pub pending_dials: HashMap<ConnectionId, Dial>,
     pub commands_tx: mpsc::Sender<Command>,
     pub commands_rx: mpsc::Receiver<Command>,
@@ -53,15 +42,12 @@ impl SwarmHandler {
         events_tx: broadcast::Sender<Event>,
     ) -> Self {
         let swarm = Swarm::build(&config.inner).unwrap();
-        let stream_control = swarm.stream_control();
 
         // Keep the dialing history since swarm.connect doesn't return the result synchronously
         let pending_dials = HashMap::<ConnectionId, Dial>::new();
 
         Self {
             swarm,
-            stream_control,
-            streams: HashMap::new(),
             pending_dials,
             commands_tx,
             commands_rx,
@@ -173,24 +159,6 @@ impl SwarmHandler {
             } => {
                 self.broadcast_and_retry(topic, message, retry_count).await;
             }
-            Command::StreamSend {
-                peer_id,
-                protocol,
-                data,
-            } => {
-                tracing::debug!("StreamSend to {peer_id}");
-                match self.open_stream(peer_id, protocol).await {
-                    Ok(stream) => {
-                        if let Err(e) = stream.write_all(&data).await {
-                            tracing::error!("failed to write to the stream with ${peer_id}: {e}");
-                            self.close_stream(&peer_id).await;
-                        }
-                    }
-                    Err(e) => {
-                        tracing::error!("failed to open stream with {peer_id}: {e}");
-                    }
-                }
-            }
         }
     }
 
@@ -286,27 +254,5 @@ impl SwarmHandler {
 
     fn exp_backoff(retry: usize) -> Duration {
         std::time::Duration::from_secs(BACKOFF.pow(retry as u32))
-    }
-
-    #[cfg(feature = "mixnet")]
-    pub fn incoming_streams(&mut self, protocol: StreamProtocol) -> IncomingStreams {
-        self.stream_control.accept(protocol).unwrap()
-    }
-
-    async fn open_stream(
-        &mut self,
-        peer_id: PeerId,
-        protocol: StreamProtocol,
-    ) -> Result<&mut Stream, OpenStreamError> {
-        if let Entry::Vacant(entry) = self.streams.entry(peer_id) {
-            entry.insert(self.stream_control.open_stream(peer_id, protocol).await?);
-        }
-        Ok(self.streams.get_mut(&peer_id).unwrap())
-    }
-
-    async fn close_stream(&mut self, peer_id: &PeerId) {
-        if let Some(mut stream) = self.streams.remove(peer_id) {
-            let _ = stream.close().await;
-        }
     }
 }

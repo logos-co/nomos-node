@@ -1,0 +1,21 @@
+[package]
+name = "cfgsync"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+axum = { version = "0.6" }
+clap = { version = "4", features = ["derive"] }
+nomos-executor = { path = "../../nodes/nomos-executor" }
+nomos-libp2p = { path = "../../nomos-libp2p" }
+nomos-node = { path = "../../nodes/nomos-node" }
+nomos-tracing = { path = "../../nomos-tracing" }
+nomos-tracing-service = { path = "../../nomos-services/tracing" }
+rand = "0.8"
+reqwest = { version = "0.11", features = ["json", "rustls-tls"] }
+tests = { path = "../../tests" }
+tokio = { version = "1", features = ["rt-multi-thread"] }
+tracing = "0.1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+serde_yaml = "0.9"
