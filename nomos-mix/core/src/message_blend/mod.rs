@@ -233,3 +233,5 @@ pub trait MessageBlendExt: Stream<Item = MessageBlendStreamIncomingMessage> {
         MessageBlendStream::new(self, message_blend_settings)
     }
 }
+
+impl<T> MessageBlendExt for T where T: Stream<Item = MessageBlendStreamIncomingMessage> {}
