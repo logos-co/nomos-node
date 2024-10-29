@@ -18,6 +18,3 @@ sim_config.json
 
 # Integration test temp dirs
 tests/.tmp*
-
-# vscode config folder
-.vscode/
