@@ -8,7 +8,7 @@ const G1_SIZE: usize = 32;
 
 
 fn main() {
-
+    let start_start = env::cycle_count();
     let verification_key: ark_groth16::PreparedVerifyingKey<Bn254> = ark_groth16::verifier::prepare_verifying_key(&ark_groth16::VerifyingKey {
         alpha_g1: ark_bn254::G1Affine::new(
             Fq::from_str(
@@ -109,16 +109,14 @@ fn main() {
                 )
             ]
     });
-    eprintln!("DONE");
+    let end = env::cycle_count();
+    eprintln!("load verification key: {}", end - start_start);
 
-    let start_start = env::cycle_count();
+    let start = env::cycle_count();
 
     let mut inputs = vec![0u8; 8 * G1_SIZE + 32];
     env::read_slice(&mut inputs);
-    let end = env::cycle_count();
-    eprintln!("input load: {}", end - start_start);
 
-    let start = env::cycle_count();
     let proof: Proof<Bn254> = Proof {
         a: ark_bn254::G1Affine::new(
             Fq::from_le_bytes_mod_order(&inputs[0..G1_SIZE]),
@@ -140,15 +138,14 @@ fn main() {
         ),
     };
     let end = env::cycle_count();
-    eprintln!("proof : {:?}",proof);
-    eprintln!("proof conversion: {}", end - start);
+    eprintln!("proof load: {}", end - start);
 
     let start = env::cycle_count();
     let public_input = vec![Fr::from_le_bytes_mod_order(
         &inputs[8 * G1_SIZE..8 * G1_SIZE + 32],
     )];
     let end = env::cycle_count();
-    eprintln!("public input conversion: {}", end - start);
+    eprintln!("public input load: {}", end - start);
 
     let start = env::cycle_count();
     // BLS scalar field modulus
