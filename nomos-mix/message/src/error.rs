@@ -1,10 +1,14 @@
-#[derive(Debug)]
+#[derive(thiserror::Error, Debug)]
 pub enum Error {
-    /// Invalid mix message format
+    #[error("Invalid mix message format")]
     InvalidMixMessage,
-    /// Payload size is too large
+    #[error("Payload is too large")]
     PayloadTooLarge,
-    /// Unwrapping a message is not allowed
-    /// (e.g. the message cannot be unwrapped using the private key provided)
+    #[error("Too many recipients")]
+    TooManyRecipients,
+    #[error("Sphinx packet error: {0}")]
+    SphinxPacketError(#[from] sphinx_packet::Error),
+    #[error("Unwrapping a message is not allowed to this node")]
+    /// e.g. the message cannot be unwrapped using the private key provided
     MsgUnwrapNotAllowed,
 }
