@@ -1,6 +1,8 @@
 mod error;
+mod layered_cipher;
 pub mod mock;
 pub mod packet;
+mod routing;
 
 pub use error::Error;
 
@@ -24,4 +26,27 @@ pub trait MixMessage {
     fn is_drop_message(message: &[u8]) -> bool {
         message == Self::DROP_MESSAGE
     }
+}
+
+pub(crate) fn concat_bytes(bytes_list: &[&[u8]]) -> Vec<u8> {
+    let mut buf = Vec::with_capacity(bytes_list.iter().map(|bytes| bytes.len()).sum());
+    bytes_list
+        .iter()
+        .for_each(|bytes| buf.extend_from_slice(bytes));
+    buf
+}
+
+pub(crate) fn parse_bytes<'a>(data: &'a [u8], sizes: &[usize]) -> Result<Vec<&'a [u8]>, String> {
+    let mut i = 0;
+    sizes
+        .iter()
+        .map(|&size| {
+            if i + size > data.len() {
+                return Err("The sum of sizes exceeds the length of the input slice".to_string());
+            }
+            let slice = &data[i..i + size];
+            i += size;
+            Ok(slice)
+        })
+        .collect()
 }
