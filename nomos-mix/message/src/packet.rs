@@ -1,11 +1,10 @@
-use crate::Error;
-use serde::{Deserialize, Serialize};
-use sphinx_packet::constants::NODE_ADDRESS_LENGTH;
+use crate::{routing::EncryptedRoutingInfo, Error};
+use sphinx_packet::{constants::NODE_ADDRESS_LENGTH, header::keys::RoutingKeys, payload::Payload};
 
 /// A packet that contains a header and a payload.
 /// The header and payload are encrypted for the selected recipients.
 /// This packet can be serialized and sent over the network.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug)]
 pub struct Packet {
     header: Header,
     // This crate doesn't limit the payload size.
@@ -14,35 +13,28 @@ pub struct Packet {
 }
 
 /// The packet header
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug)]
 struct Header {
     /// The ephemeral public key for a recipient to derive the shared secret
     /// which can be used to decrypt the header and payload.
     ephemeral_public_key: x25519_dalek::PublicKey,
-    // TODO: Length-preserved layered encryption on RoutingInfo
-    routing_info: RoutingInfo,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct RoutingInfo {
-    // TODO: Change this to `is_final_layer: bool`
-    // by implementing the length-preserved layered encryption.
-    // It's not good to expose the info that how many layers remain to the intermediate recipients.
-    remaining_layers: u8,
-    // TODO:: Add the following fields
-    // header_integrity_hamc
-    // additional data (e.g. incentivization)
+    encrypted_routing_info: EncryptedRoutingInfo,
 }
 
 impl Packet {
     pub fn build(
         recipient_pubkeys: &[x25519_dalek::PublicKey],
+        max_layers: usize,
         payload: &[u8],
         payload_size: usize,
     ) -> Result<Self, Error> {
         // Derive `[sphinx_packet::header::keys::KeyMaterial]` for all recipients.
         let ephemeral_privkey = x25519_dalek::StaticSecret::random();
         let key_material = Self::derive_key_material(recipient_pubkeys, &ephemeral_privkey);
+
+        // Build the encrypted routing information.
+        let encrypted_routing_info =
+            EncryptedRoutingInfo::new(&key_material.routing_keys, max_layers);
 
         // Encrypt the payload for all recipients.
         let payload_keys = key_material
@@ -59,16 +51,13 @@ impl Packet {
         Ok(Packet {
             header: Header {
                 ephemeral_public_key: x25519_dalek::PublicKey::from(&ephemeral_privkey),
-                routing_info: RoutingInfo {
-                    remaining_layers: u8::try_from(recipient_pubkeys.len())
-                        .map_err(|_| Error::TooManyRecipients)?,
-                },
+                encrypted_routing_info,
             },
             payload: payload.into_bytes(),
         })
     }
 
-    fn derive_key_material(
+    pub(crate) fn derive_key_material(
         recipient_pubkeys: &[x25519_dalek::PublicKey],
         ephemeral_privkey: &x25519_dalek::StaticSecret,
     ) -> sphinx_packet::header::keys::KeyMaterial {
@@ -90,6 +79,7 @@ impl Packet {
     pub fn unpack(
         &self,
         private_key: &x25519_dalek::StaticSecret,
+        max_layers: usize,
     ) -> Result<UnpackedPacket, Error> {
         // Derive the routing keys for the recipient
         let routing_keys = sphinx_packet::header::SphinxHeader::compute_routing_keys(
@@ -97,29 +87,48 @@ impl Packet {
             private_key,
         );
 
+        // Verify the integrity of the header. This fails if a wrong key is used.
+        self.header
+            .encrypted_routing_info
+            .verify_integrity(routing_keys.header_integrity_hmac_key)?;
+
         // Decrypt one layer of encryption on the payload
         let payload = sphinx_packet::payload::Payload::from_bytes(&self.payload)?;
         let payload = payload.unwrap(&routing_keys.payload_key)?;
 
-        // If this is the last layer of encryption, return the decrypted payload.
-        if self.header.routing_info.remaining_layers == 1 {
-            return Ok(UnpackedPacket::FullyUnpacked(payload.recover_plaintext()?));
+        // Unpack the routing information
+        let unpacked_routing_info = self
+            .header
+            .encrypted_routing_info
+            .unpack(&routing_keys.stream_cipher_key, max_layers)?;
+        match unpacked_routing_info {
+            // Packet should be forwarded to the next recipient
+            Some(next_encrypted_routing_info) => Ok(UnpackedPacket::ToForward(
+                self.build_next_packet(&routing_keys, next_encrypted_routing_info, payload),
+            )),
+            // This layer is the last, return the decrypted payload
+            None => Ok(UnpackedPacket::FullyUnpacked(payload.recover_plaintext()?)),
         }
+    }
 
+    fn build_next_packet(
+        &self,
+        routing_keys: &RoutingKeys,
+        next_encrypted_routing_info: EncryptedRoutingInfo,
+        payload: Payload,
+    ) -> Packet {
         // Derive the new ephemeral public key for the next recipient
         let next_ephemeral_pubkey = Self::derive_next_ephemeral_public_key(
             &self.header.ephemeral_public_key,
             &routing_keys.blinding_factor,
         );
-        Ok(UnpackedPacket::ToForward(Packet {
+        Packet {
             header: Header {
                 ephemeral_public_key: next_ephemeral_pubkey,
-                routing_info: RoutingInfo {
-                    remaining_layers: self.header.routing_info.remaining_layers - 1,
-                },
+                encrypted_routing_info: next_encrypted_routing_info,
             },
             payload: payload.into_bytes(),
-        }))
+        }
     }
 
     /// Derive the next ephemeral public key for the next recipient.
@@ -135,6 +144,38 @@ impl Packet {
         let new_shared_secret = blinding_factor.diffie_hellman(cur_ephemeral_pubkey);
         x25519_dalek::PublicKey::from(new_shared_secret.to_bytes())
     }
+
+    pub fn to_bytes(&self) -> Vec<u8> {
+        let mut bytes = Vec::new();
+        bytes.extend_from_slice(&self.header.ephemeral_public_key.to_bytes());
+        bytes.extend_from_slice(&self.header.encrypted_routing_info.to_bytes());
+        bytes.extend_from_slice(&self.payload);
+        bytes
+    }
+
+    pub fn from_bytes(data: &[u8], max_layers: usize) -> Result<Self, Error> {
+        let mut i = 0;
+        let public_key_bytes: [u8; 32] = data[i..i + 32].try_into().unwrap();
+        let ephemeral_public_key = x25519_dalek::PublicKey::from(public_key_bytes);
+        i += 32;
+
+        let encrypted_routing_info_size = EncryptedRoutingInfo::size(max_layers);
+        let encrypted_routing_info = EncryptedRoutingInfo::from_bytes(
+            &data[i..i + encrypted_routing_info_size],
+            max_layers,
+        )?;
+        i += encrypted_routing_info_size;
+
+        let payload = data[i..].to_vec();
+
+        Ok(Packet {
+            header: Header {
+                ephemeral_public_key,
+                encrypted_routing_info,
+            },
+            payload,
+        })
+    }
 }
 
 pub enum UnpackedPacket {
@@ -144,14 +185,12 @@ pub enum UnpackedPacket {
 
 #[cfg(test)]
 mod tests {
-    use nomos_core::wire;
-
     use super::*;
 
     #[test]
     fn unpack() {
         // Prepare keys of two recipients
-        let recipient_privkeys = (0..2)
+        let recipient_privkeys = (0..3)
             .map(|_| x25519_dalek::StaticSecret::random())
             .collect::<Vec<_>>();
         let recipient_pubkeys = recipient_privkeys
@@ -160,18 +199,26 @@ mod tests {
             .collect::<Vec<_>>();
 
         // Build a packet
+        let max_layers = 5;
         let payload = [10u8; 512];
-        let packet = Packet::build(&recipient_pubkeys, &payload, 1024).unwrap();
+        let packet = Packet::build(&recipient_pubkeys, max_layers, &payload, 1024).unwrap();
 
         // The 1st recipient unpacks the packet
-        let packet = match packet.unpack(&recipient_privkeys[0]).unwrap() {
+        let packet = match packet.unpack(&recipient_privkeys[0], max_layers).unwrap() {
             UnpackedPacket::ToForward(packet) => packet,
             UnpackedPacket::FullyUnpacked(_) => {
                 panic!("The unpacked packet should be the ToFoward type");
             }
         };
         // The 2nd recipient unpacks the packet
-        match packet.unpack(&recipient_privkeys[1]).unwrap() {
+        let packet = match packet.unpack(&recipient_privkeys[1], max_layers).unwrap() {
+            UnpackedPacket::ToForward(packet) => packet,
+            UnpackedPacket::FullyUnpacked(_) => {
+                panic!("The unpacked packet should be the ToFoward type");
+            }
+        };
+        // The last recipient unpacks the packet
+        match packet.unpack(&recipient_privkeys[2], max_layers).unwrap() {
             UnpackedPacket::ToForward(_) => {
                 panic!("The unpacked packet should be the FullyUnpacked type");
             }
@@ -185,34 +232,25 @@ mod tests {
     #[test]
     fn unpack_with_wrong_keys() {
         // Build a packet with two public keys
+        let max_layers = 5;
         let payload = [10u8; 512];
         let packet = Packet::build(
             &(0..2)
                 .map(|_| x25519_dalek::PublicKey::from(&x25519_dalek::StaticSecret::random()))
                 .collect::<Vec<_>>(),
+            max_layers,
             &payload,
             1024,
         )
         .unwrap();
 
-        // The 1st recipient unpacks the packet with an wrong key
-        let packet = match packet
-            .unpack(&x25519_dalek::StaticSecret::random())
-            .unwrap()
-        {
-            UnpackedPacket::ToForward(packet) => packet,
-            UnpackedPacket::FullyUnpacked(_) => {
-                panic!("The unpacked packet should be the ToFoward type");
-            }
-        };
-        // The 2nd recipient unpacks the packet with an wrong key
         assert!(packet
-            .unpack(&x25519_dalek::StaticSecret::random())
+            .unpack(&x25519_dalek::StaticSecret::random(), max_layers)
             .is_err());
     }
 
     #[test]
-    fn consistent_size_serialization() {
+    fn consistent_size_after_unpack() {
         // Prepare keys of two recipients
         let recipient_privkeys = (0..2)
             .map(|_| x25519_dalek::StaticSecret::random())
@@ -223,28 +261,46 @@ mod tests {
             .collect::<Vec<_>>();
 
         // Build a packet
+        let max_layers = 5;
         let payload = [10u8; 512];
-        let packet = Packet::build(&recipient_pubkeys, &payload, 1024).unwrap();
+        let packet = Packet::build(&recipient_pubkeys, max_layers, &payload, 1024).unwrap();
 
         // Calculate the expected packet size
         let pubkey_size = 32;
-        let routing_info_size = 1;
-        let payload_length_enconding_size = 8;
         let payload_size = 1024;
-        let packet_size =
-            pubkey_size + routing_info_size + payload_length_enconding_size + payload_size;
+        let packet_size = pubkey_size + EncryptedRoutingInfo::size(max_layers) + payload_size;
 
         // The serialized packet size must be the same as the expected size.
-        assert_eq!(wire::serialize(&packet).unwrap().len(), packet_size);
+        assert_eq!(packet.to_bytes().len(), packet_size);
 
         // The unpacked packet size must be the same as the original packet size.
-        match packet.unpack(&recipient_privkeys[0]).unwrap() {
+        match packet.unpack(&recipient_privkeys[0], max_layers).unwrap() {
             UnpackedPacket::ToForward(packet) => {
-                assert_eq!(wire::serialize(&packet).unwrap().len(), packet_size);
+                assert_eq!(packet.to_bytes().len(), packet_size);
             }
             UnpackedPacket::FullyUnpacked(_) => {
                 panic!("The unpacked packet should be the ToFoward type");
             }
         }
+    }
+
+    #[test]
+    fn consistent_size_with_any_num_layers() {
+        let max_layers = 5;
+        let payload = [10u8; 512];
+
+        // Build a packet with 2 recipients
+        let recipient_pubkeys = (0..2)
+            .map(|_| x25519_dalek::PublicKey::from(&x25519_dalek::StaticSecret::random()))
+            .collect::<Vec<_>>();
+        let packet1 = Packet::build(&recipient_pubkeys, max_layers, &payload, 1024).unwrap();
+
+        // Build a packet with 3 recipients
+        let recipient_pubkeys = (0..3)
+            .map(|_| x25519_dalek::PublicKey::from(&x25519_dalek::StaticSecret::random()))
+            .collect::<Vec<_>>();
+        let packet2 = Packet::build(&recipient_pubkeys, max_layers, &payload, 1024).unwrap();
+
+        assert_eq!(packet1.to_bytes().len(), packet2.to_bytes().len());
     }
 }
