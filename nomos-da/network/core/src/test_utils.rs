@@ -59,4 +59,3 @@ impl Clone for Indicator {
         }
     }
 }
-

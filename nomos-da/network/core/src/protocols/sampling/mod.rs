@@ -99,7 +99,8 @@ mod test {
             loop {
                 if res.len() == MSG_COUNT {
                     own_channel.send(true); // Indicate the peer that sampling is finished from this side
-                    if let Some(true) = peer_channel.receive() { // Break out only when peer has also finished sampling
+                    if let Some(true) = peer_channel.receive() {
+                        // Break out only when peer has also finished sampling
                         break res;
                     }
                 }
