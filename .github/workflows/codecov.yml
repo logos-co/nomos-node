@@ -4,9 +4,6 @@ on:
 
   workflow_dispatch:
 
-  push:
-    branches: [ fix-codecov-workflow-dir-rename ]
-
 name: Codecov
 
 jobs:
