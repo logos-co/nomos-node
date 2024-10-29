@@ -331,6 +331,7 @@ mod tests {
         messages_to_expect: usize,
     ) -> (usize, usize) {
         let (mut msg_0_counter, mut msg_1_counter) = (0, 0);
+
         loop {
             tokio::select! {
                 Some(event) = swarm.next() => {
@@ -357,6 +358,9 @@ mod tests {
                 _ = time::sleep(Duration::from_secs(4)) => {
                     if msg_0_counter < messages_to_expect && msg_1_counter < messages_to_expect {
                         warn!("Validator timeout reached");
+                        if !swarm.behaviour_mut().tasks.is_empty() {
+                            continue;
+                        }
                     }
                     break;
                 }
