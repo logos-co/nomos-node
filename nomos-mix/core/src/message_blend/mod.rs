@@ -2,6 +2,7 @@ mod crypto;
 mod temporal;
 
 pub use crypto::CryptographicProcessorSettings;
+use futures::stream::BoxStream;
 use futures::{Stream, StreamExt};
 use std::pin::Pin;
 use std::task::{Context, Poll};
@@ -9,9 +10,10 @@ pub use temporal::TemporalProcessorSettings;
 
 use crate::message_blend::temporal::TemporalProcessorExt;
 use crate::message_blend::{crypto::CryptographicProcessor, temporal::TemporalProcessor};
-use nomos_mix_message::Error;
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
+use tokio::sync::mpsc::UnboundedSender;
+use tokio_stream::wrappers::UnboundedReceiverStream;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct MessageBlendSettings {
@@ -126,80 +128,108 @@ struct TemporalProcessableMessage {
 
 pub enum MessageBlendStreamIncomingMessage {
     Local(Vec<u8>),
-    Incoming(Vec<u8>),
+    Inbound(Vec<u8>),
 }
 
 pub enum MessageBlendStreamOutgoingMessage {
     FullyUnwrapped(Vec<u8>),
-    Processed(Vec<u8>),
+    Outbound(Vec<u8>),
 }
 
 pub struct MessageBlendStream<S> {
     input_stream: S,
-    settings: MessageBlendSettings,
+    output_stream: BoxStream<'static, MessageBlendStreamOutgoingMessage>,
+    bypass_sender: UnboundedSender<MessageBlendStreamOutgoingMessage>,
+    temporal_sender: UnboundedSender<MessageBlendStreamOutgoingMessage>,
+    cryptographic_processor: CryptographicProcessor,
 }
 
 impl<S> MessageBlendStream<S>
 where
-    S: Stream<Item = MessageBlendStreamOutgoingMessage>,
+    S: Stream<Item = MessageBlendStreamIncomingMessage>,
 {
-    pub fn new(
-        input_stream: impl Stream<Item = MessageBlendStreamIncomingMessage>,
-        settings: MessageBlendSettings,
-    ) -> Self {
+    pub fn new(input_stream: S, settings: MessageBlendSettings) -> Self {
         let cryptographic_processor = CryptographicProcessor::new(settings.cryptographic_processor);
-        let input_stream = input_stream
-            .filter_map(|message| async move {
-                match message {
-                    MessageBlendStreamIncomingMessage::Local(message) => {
-                        match cryptographic_processor.wrap_message(&message) {
-                            Ok(m) => Some(m),
-                            Err(e) => {
-                                tracing::error!("Failed to wrap message: {:?}", e);
-                                None
-                            }
-                        }
-                    }
-                    MessageBlendStreamIncomingMessage::Incoming(message) => {
-                        match cryptographic_processor.unwrap_message(&message) {
-                            Ok((unwrapped_message, fully_unwrapped)) => {
-                                self.temporal_processor
-                                    .push_message(TemporalProcessableMessage {
-                                        message: unwrapped_message,
-                                        fully_unwrapped,
-                                    });
-                            }
-                            Err(nomos_mix_message::Error::MsgUnwrapNotAllowed) => {
-                                tracing::debug!("Message cannot be unwrapped by this node");
-                            }
-                            Err(e) => {
-                                tracing::error!("Failed to unwrap message: {:?}", e);
-                            }
-                        }
-                    }
-                }
-            })
-            .to_temporal_stream(settings.temporal_processor);
+        let (bypass_sender, bypass_receiver) = mpsc::unbounded_channel();
+        let (temporal_sender, temporal_receiver) = mpsc::unbounded_channel();
+        let output_stream = tokio_stream::StreamExt::merge(
+            UnboundedReceiverStream::new(bypass_receiver),
+            UnboundedReceiverStream::new(temporal_receiver)
+                .to_temporal_stream(settings.temporal_processor),
+        )
+        .boxed();
         Self {
             input_stream,
-            settings,
+            output_stream,
+            bypass_sender,
+            temporal_sender,
+            cryptographic_processor,
+        }
+    }
+
+    fn process_new_message(self: &mut Pin<&mut Self>, message: Vec<u8>) {
+        match self.cryptographic_processor.wrap_message(&message) {
+            Ok(wrapped_message) => {
+                if let Err(e) = self
+                    .bypass_sender
+                    .send(MessageBlendStreamOutgoingMessage::Outbound(wrapped_message))
+                {
+                    tracing::error!("Failed to send message to the outbound channel: {e:?}");
+                }
+            }
+            Err(e) => {
+                tracing::error!("Failed to wrap message: {:?}", e);
+            }
+        }
+    }
+
+    fn process_incoming_message(self: &mut Pin<&mut Self>, message: Vec<u8>) {
+        match self.cryptographic_processor.unwrap_message(&message) {
+            Ok((unwrapped_message, fully_unwrapped)) => {
+                let message = if fully_unwrapped {
+                    MessageBlendStreamOutgoingMessage::FullyUnwrapped(unwrapped_message)
+                } else {
+                    MessageBlendStreamOutgoingMessage::Outbound(unwrapped_message)
+                };
+                if let Err(e) = self.temporal_sender.send(message) {
+                    tracing::error!("Failed to send message to the outbound channel: {e:?}");
+                }
+            }
+            Err(nomos_mix_message::Error::MsgUnwrapNotAllowed) => {
+                tracing::debug!("Message cannot be unwrapped by this node");
+            }
+            Err(e) => {
+                tracing::error!("Failed to unwrap message: {:?}", e);
+            }
         }
     }
 }
 
 impl<S> Stream for MessageBlendStream<S>
 where
-    S: Stream<Item = MessageBlendStreamOutgoingMessage> + Unpin,
+    S: Stream<Item = MessageBlendStreamIncomingMessage> + Unpin,
 {
-    type Item = S::Item;
+    type Item = MessageBlendStreamOutgoingMessage;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        self.input_stream.poll_next_unpin(cx)
+        match self.input_stream.poll_next_unpin(cx) {
+            Poll::Ready(Some(MessageBlendStreamIncomingMessage::Local(message))) => {
+                self.process_new_message(message);
+            }
+            Poll::Ready(Some(MessageBlendStreamIncomingMessage::Inbound(message))) => {
+                self.process_incoming_message(message);
+            }
+            _ => {}
+        }
+        self.output_stream.poll_next_unpin(cx)
     }
 }
 
 pub trait MessageBlendExt: Stream<Item = MessageBlendStreamIncomingMessage> {
-    fn blend(self, message_blend_settings: MessageBlendSettings) -> MessageBlendStream<Self> {
+    fn blend(self, message_blend_settings: MessageBlendSettings) -> MessageBlendStream<Self>
+    where
+        Self: Sized,
+    {
         MessageBlendStream::new(self, message_blend_settings)
     }
 }

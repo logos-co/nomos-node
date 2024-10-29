@@ -6,6 +6,7 @@ edition = "2021"
 [dependencies]
 cached = "0.53"
 tokio = { version = "1", features = ["time", "sync", "macros"] }
+tokio-stream = "0.1"
 tracing = "0.1"
 rand = "0.8"
 serde = { version = "1.0", features = ["derive"] }
@@ -16,4 +17,3 @@ rand_chacha = "0.3"
 
 [dev-dependencies]
 tokio = { version = "1", features = ["rt-multi-thread"] }
-tokio-stream = "0.1"
