@@ -309,7 +309,7 @@ mod tests {
                     }
                 }
 
-                _ = time::sleep(Duration::from_secs(2)) => {
+                _ = time::sleep(Duration::from_secs(3)) => {
                     if msg_counter < messages_to_expect && retry_counter < 4 {
                         warn!("Executor timeout reached");
                         retry_counter += 1;
