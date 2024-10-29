@@ -6,7 +6,7 @@ mod test {
     use crate::protocols::sampling::behaviour::{
         BehaviourSampleRes, SamplingBehaviour, SamplingEvent,
     };
-    use crate::test_utils::{AllNeighbours, ConnectionClosingHandshake};
+    use crate::test_utils::{AllNeighbours, Indicator};
     use crate::SubnetworkId;
     use futures::StreamExt;
     use kzgrs_backend::common::blob::DaBlob;
@@ -83,12 +83,12 @@ mod test {
         let request_sender_1 = p1.behaviour().sample_request_channel();
         let request_sender_2 = p2.behaviour().sample_request_channel();
         const MSG_COUNT: usize = 10;
-        let channel1 = ConnectionClosingHandshake::new();
-        let channel2 = ConnectionClosingHandshake::new();
+        let channel1 = Indicator::new(MSG_COUNT);
+        let channel2 = Indicator::new(MSG_COUNT);
 
         async fn test_sampling_swarm(
-            channel1: ConnectionClosingHandshake,
-            channel2: ConnectionClosingHandshake,
+            own_channel: Indicator,
+            peer_channel: Indicator,
             mut swarm: Swarm<
                 SamplingBehaviour<
                     impl MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'static,
@@ -97,13 +97,10 @@ mod test {
         ) -> Vec<[u8; 32]> {
             let mut res = Vec::with_capacity(MSG_COUNT);
             loop {
-                if let Some(message1) = channel1.receive() {
-                    debug!("Received response: {message1}");
-                    if let Some(message2) = channel2.receive() {
-                        debug!("Received message: {message2}");
-                        if message1 && message2 {
-                            break res;
-                        }
+                if res.len() == MSG_COUNT {
+                    own_channel.send(true); // Indicate the peer that sampling is finished from this side
+                    if let Some(true) = peer_channel.receive() { // Break out only when peer has also finished sampling
+                        break res;
                     }
                 }
                 match swarm.next().await {
@@ -144,10 +141,9 @@ mod test {
                         debug!("{event:?}");
                     }
                 }
-                channel1.send();
-                channel2.send();
             }
         }
+
         let clone1 = channel1.clone();
         let clone2 = channel2.clone();
         let t1 = tokio::spawn(async move {
@@ -160,7 +156,7 @@ mod test {
         let t2 = tokio::spawn(async move {
             p2.listen_on(p2_address).unwrap();
             tokio::time::sleep(Duration::from_secs(1)).await;
-            test_sampling_swarm(clone1, clone2, p2).await
+            test_sampling_swarm(clone2, clone1, p2).await
         });
 
         tokio::time::sleep(Duration::from_secs(2)).await;
@@ -169,9 +165,6 @@ mod test {
             request_sender_1.send((0, [i as u8; 32])).unwrap();
             request_sender_2.send((0, [i as u8; 32])).unwrap();
         }
-        tokio::time::sleep(Duration::from_secs(2)).await;
-        channel1.set_done();
-        channel2.set_done();
         let res1 = t1.await.unwrap();
         let res2 = t2.await.unwrap();
         assert_eq!(res1, res2);
