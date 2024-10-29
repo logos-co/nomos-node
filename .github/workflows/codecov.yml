@@ -4,6 +4,9 @@ on:
 
   workflow_dispatch:
 
+  push:
+    branches: [ fix-codecov-workflow-dir-rename ]
+
 name: Codecov
 
 jobs:
@@ -49,8 +52,8 @@ jobs:
       - name: Run Grcov
         run: |
           cargo binstall -y grcov;
-          mkdir /tmp/cov;
-          grcov . --binary-path ./target/debug -s . -t lcov --branch --ignore-not-existing --ignore '../*' --ignore "/*" -o /tmp/cov/tests.lcov;
+          mkdir /tmp/coverage;
+          grcov . --binary-path ./target/debug -s . -t lcov --branch --ignore-not-existing --ignore '../*' --ignore "/*" -o /tmp/coverage/tests.lcov;
       - uses: actions/upload-artifact@v3
         if: failure()
         with:
@@ -58,5 +61,5 @@ jobs:
           path: tests/.tmp*
       - uses: codecov/codecov-action@v3
         with:
-          directory: /tmp/cov/
+          directory: /tmp/coverage/
           name: nomos-node-codecov
