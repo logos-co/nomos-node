@@ -2,13 +2,16 @@ mod crypto;
 mod temporal;
 
 pub use crypto::CryptographicProcessorSettings;
-use futures::StreamExt;
+use futures::{Stream, StreamExt};
+use std::pin::Pin;
+use std::task::{Context, Poll};
 pub use temporal::TemporalProcessorSettings;
 
+use crate::message_blend::temporal::TemporalProcessorExt;
+use crate::message_blend::{crypto::CryptographicProcessor, temporal::TemporalProcessor};
+use nomos_mix_message::Error;
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
-
-use crate::message_blend::{crypto::CryptographicProcessor, temporal::TemporalProcessor};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct MessageBlendSettings {
@@ -119,4 +122,84 @@ impl MessageBlend {
 struct TemporalProcessableMessage {
     message: Vec<u8>,
     fully_unwrapped: bool,
+}
+
+pub enum MessageBlendStreamIncomingMessage {
+    Local(Vec<u8>),
+    Incoming(Vec<u8>),
+}
+
+pub enum MessageBlendStreamOutgoingMessage {
+    FullyUnwrapped(Vec<u8>),
+    Processed(Vec<u8>),
+}
+
+pub struct MessageBlendStream<S> {
+    input_stream: S,
+    settings: MessageBlendSettings,
+}
+
+impl<S> MessageBlendStream<S>
+where
+    S: Stream<Item = MessageBlendStreamOutgoingMessage>,
+{
+    pub fn new(
+        input_stream: impl Stream<Item = MessageBlendStreamIncomingMessage>,
+        settings: MessageBlendSettings,
+    ) -> Self {
+        let cryptographic_processor = CryptographicProcessor::new(settings.cryptographic_processor);
+        let input_stream = input_stream
+            .filter_map(|message| async move {
+                match message {
+                    MessageBlendStreamIncomingMessage::Local(message) => {
+                        match cryptographic_processor.wrap_message(&message) {
+                            Ok(m) => Some(m),
+                            Err(e) => {
+                                tracing::error!("Failed to wrap message: {:?}", e);
+                                None
+                            }
+                        }
+                    }
+                    MessageBlendStreamIncomingMessage::Incoming(message) => {
+                        match cryptographic_processor.unwrap_message(&message) {
+                            Ok((unwrapped_message, fully_unwrapped)) => {
+                                self.temporal_processor
+                                    .push_message(TemporalProcessableMessage {
+                                        message: unwrapped_message,
+                                        fully_unwrapped,
+                                    });
+                            }
+                            Err(nomos_mix_message::Error::MsgUnwrapNotAllowed) => {
+                                tracing::debug!("Message cannot be unwrapped by this node");
+                            }
+                            Err(e) => {
+                                tracing::error!("Failed to unwrap message: {:?}", e);
+                            }
+                        }
+                    }
+                }
+            })
+            .to_temporal_stream(settings.temporal_processor);
+        Self {
+            input_stream,
+            settings,
+        }
+    }
+}
+
+impl<S> Stream for MessageBlendStream<S>
+where
+    S: Stream<Item = MessageBlendStreamOutgoingMessage> + Unpin,
+{
+    type Item = S::Item;
+
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        self.input_stream.poll_next_unpin(cx)
+    }
+}
+
+pub trait MessageBlendExt: Stream<Item = MessageBlendStreamIncomingMessage> {
+    fn blend(self, message_blend_settings: MessageBlendSettings) -> MessageBlendStream<Self> {
+        MessageBlendStream::new(self, message_blend_settings)
+    }
 }

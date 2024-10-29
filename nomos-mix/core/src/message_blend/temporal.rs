@@ -25,7 +25,7 @@ pub(crate) struct TemporalProcessor<M> {
     release_timer: Option<Pin<Box<time::Sleep>>>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 pub struct TemporalProcessorSettings {
     pub max_delay_seconds: u64,
 }
