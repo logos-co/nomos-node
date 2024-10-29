@@ -712,7 +712,7 @@ pub mod tests {
     #[test]
     fn test_evolved_note_is_eligible_for_leadership() {
         let note = note();
-        let (mut ledger, genesis) = ledger(&[note.commit(NF_SK.commit())]);
+        let (mut ledger, genesis) = ledger(&[commit(note)]);
 
         let h = update_ledger(&mut ledger, genesis, 1, note).unwrap();
 
