@@ -316,7 +316,6 @@ mod tests {
                     break;
                 }
             }
-
         }
         msg_counter
     }
