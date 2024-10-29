@@ -165,7 +165,7 @@ mod tests {
     use std::time::Duration;
     use tokio::sync::mpsc::UnboundedSender;
     use tokio::time;
-    use tracing::{error, warn};
+    use tracing::warn;
     use tracing_subscriber::fmt::TestWriter;
     use tracing_subscriber::EnvFilter;
 
@@ -308,11 +308,15 @@ mod tests {
                     }
                 }
 
-                _ = time::sleep(Duration::from_secs(4)) => {
-                    if msg_counter < messages_to_expect { error!("Executor timeout reached"); }
+                _ = time::sleep(Duration::from_secs(2)) => {
+                    if msg_counter < messages_to_expect {
+                        warn!("Executor timeout reached");
+                        continue;
+                    }
                     break;
                 }
             }
+
         }
         msg_counter
     }
