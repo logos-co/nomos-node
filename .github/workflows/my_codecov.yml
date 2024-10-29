@@ -23,8 +23,6 @@ jobs:
       - uses: arduino/setup-protoc@v3
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Checkout submodules
-        run: git submodule update --init --recursive
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
@@ -54,8 +52,8 @@ jobs:
       - name: Run Grcov
         run: |
           cargo binstall -y grcov;
-          mkdir /tmp/cov;
-          grcov . --binary-path ./target/debug -s . -t lcov --branch --ignore-not-existing --ignore '../*' --ignore "/*" -o /tmp/cov/tests.lcov;
+          mkdir /tmp/coverage;
+          grcov . --binary-path ./target/debug -s . -t lcov --branch --ignore-not-existing --ignore '../*' --ignore "/*" -o /tmp/coverage/tests.lcov;
       - uses: actions/upload-artifact@v3
         if: failure()
         with:
