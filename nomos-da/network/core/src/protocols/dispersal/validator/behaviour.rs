@@ -299,6 +299,7 @@ mod tests {
         messages_to_expect: usize,
     ) -> usize {
         let mut msg_counter = 0;
+        let mut retry_counter = 0;
         loop {
             tokio::select! {
                 Some(event) = swarm.next() => {
@@ -309,7 +310,7 @@ mod tests {
                 }
 
                 _ = time::sleep(Duration::from_secs(2)) => {
-                    if msg_counter < messages_to_expect {
+                    if msg_counter < messages_to_expect && retry_counter < 3 {
                         warn!("Executor timeout reached");
                         continue;
                     }
