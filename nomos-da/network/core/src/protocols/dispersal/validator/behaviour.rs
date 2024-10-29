@@ -283,8 +283,8 @@ mod tests {
     ) -> Neighbourhood {
         let mut membership = HashMap::default();
 
-        for i in 0..num_instances {
-            membership.insert(peer_ids[i], HashSet::from([subnet_id]));
+        for peer_id in peer_ids.iter().take(num_instances) {
+            membership.insert(*peer_id, HashSet::from([subnet_id]));
         }
 
         Neighbourhood { membership }
@@ -330,19 +330,16 @@ mod tests {
                         debug!("Validator received blob: {message:?}");
 
                         // Check data has structure and content as expected
-                        match message.blob {
-                            Some(Blob { blob_id, data }) => {
-                                let deserialized_blob: DaBlob =
-                                    bincode::deserialize(&data).unwrap();
-                                assert_eq!(blob_id, deserialized_blob.id());
-                                if message.subnetwork_id == 0 {
-                                    msg_0_counter += 1;
-                                } else {
-                                    msg_1_counter += 1;
-                                }
-                            }
-                            None => {}
-                        }
+                        if let Some(Blob { blob_id, data }) = message.blob {
+                             let deserialized_blob: DaBlob =
+                                 bincode::deserialize(&data).unwrap();
+                             assert_eq!(blob_id, deserialized_blob.id());
+                             if message.subnetwork_id == 0 {
+                                 msg_0_counter += 1;
+                             } else {
+                                 msg_1_counter += 1;
+                             }
+                         }
                     }
                 }
 
@@ -405,20 +402,17 @@ mod tests {
         let subnet_0_ids = executor_0_config
             .iter()
             .chain(validator_0_config.iter())
-            .map(|(_, peer_id, _)| peer_id.clone())
+            .map(|(_, peer_id, _)| *peer_id)
             .collect::<Vec<_>>();
 
         let subnet_1_ids = executor_1_config
             .iter()
             .chain(validator_1_config.iter())
-            .map(|(_, peer_id, _)| peer_id.clone())
+            .map(|(_, peer_id, _)| *peer_id)
             .collect::<Vec<_>>();
 
         let to_p2p_address = |(_, peer_id, addr): &(_, PeerId, Multiaddr)| {
-            (
-                peer_id.clone(),
-                addr.clone().with_p2p(peer_id.clone()).unwrap(),
-            )
+            (*peer_id, addr.clone().with_p2p(*peer_id).unwrap())
         };
 
         let validator_addressbook = AddressBook::from_iter(
