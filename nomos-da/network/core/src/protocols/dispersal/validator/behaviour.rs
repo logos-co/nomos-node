@@ -299,26 +299,17 @@ mod tests {
         messages_to_expect: usize,
     ) -> usize {
         let mut msg_counter = 0;
-        let mut retry_counter = 0;
-        loop {
-            tokio::select! {
-                Some(event) = swarm.next() => {
-                    debug!("Executor event: {event:?}");
-                    if let SwarmEvent::Behaviour(DispersalExecutorEvent::DispersalSuccess{..}) = event {
-                        msg_counter += 1;
-                    }
-                }
+        while let Some(event) = swarm.next().await {
+            debug!("Executor event: {event:?}");
+            if let SwarmEvent::Behaviour(DispersalExecutorEvent::DispersalSuccess { .. }) = event {
+                msg_counter += 1;
+            }
 
-                _ = time::sleep(Duration::from_secs(3)) => {
-                    if msg_counter < messages_to_expect && retry_counter < 4 {
-                        warn!("Executor timeout reached");
-                        retry_counter += 1;
-                        continue;
-                    }
-                    break;
-                }
+            if msg_counter >= messages_to_expect {
+                break;
             }
         }
+
         msg_counter
     }
 
