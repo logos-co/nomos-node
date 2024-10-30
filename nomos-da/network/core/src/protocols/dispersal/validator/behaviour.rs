@@ -164,6 +164,7 @@ mod tests {
     use std::sync::Arc;
     use std::time::Duration;
     use tokio::sync::mpsc::UnboundedSender;
+    use tokio::sync::watch;
     use tokio::time;
     use tracing::warn;
     use tracing_subscriber::fmt::TestWriter;
@@ -266,7 +267,7 @@ mod tests {
         for i in 0..num_instances {
             let keypair = identity::Keypair::generate_ed25519();
             let peer_id = PeerId::from(keypair.public());
-            let port = 5100 + group_id * num_instances + i;
+            let port = 5200 + group_id * num_instances + i;
             let addr: Multiaddr = format!("/ip4/127.0.0.1/udp/{port}/quic-v1")
                 .parse()
                 .unwrap();
@@ -297,19 +298,29 @@ mod tests {
             >,
         >,
         messages_to_expect: usize,
+        mut terminator_rx: watch::Receiver<bool>,
     ) -> usize {
         let mut msg_counter = 0;
-        while let Some(event) = swarm.next().await {
-            debug!("Executor event: {event:?}");
-            if let SwarmEvent::Behaviour(DispersalExecutorEvent::DispersalSuccess { .. }) = event {
-                msg_counter += 1;
-            }
+        loop {
+            tokio::select! {
+                Some(event) = swarm.next() => {
+                    debug!("Executor event: {event:?}");
+                    if let SwarmEvent::Behaviour(DispersalExecutorEvent::DispersalSuccess{..}) = event {
+                        msg_counter += 1;
+                    }
+                    if msg_counter >= messages_to_expect {
+                        break;
+                    }
+                }
 
-            if msg_counter >= messages_to_expect {
-                break;
+                _ = terminator_rx.changed() => {
+                    if *terminator_rx.borrow() {
+                        warn!("Executor terminated");
+                        break;
+                    }
+                }
             }
         }
-
         msg_counter
     }
 
@@ -342,11 +353,8 @@ mod tests {
                     }
                 }
 
-                _ = time::sleep(Duration::from_secs(4)) => {
+                _ = time::sleep(Duration::from_secs(2)) => {
                     warn!("Validator timeout reached");
-                    if !swarm.behaviour_mut().tasks.is_empty() {
-                        continue;
-                    }
                     break;
                 }
             }
@@ -479,14 +487,19 @@ mod tests {
         }
 
         let mut executor_tasks = vec![];
+        let (terminator_tx, terminator_rx) = watch::channel::<bool>(false);
 
         // Spawn executors
         for i in (0..ALL_INSTANCES / GROUPS).rev() {
+            let (terminator_0, terminator_1) = (terminator_rx.clone(), terminator_rx.clone());
+
             let swarm = executor_0_swarms.remove(i);
-            let executor_0_poll = async { run_executor_swarm(swarm, MESSAGES_TO_SEND).await };
+            let executor_0_poll =
+                async move { run_executor_swarm(swarm, MESSAGES_TO_SEND, terminator_0).await };
 
             let swarm = executor_1_swarms.remove(i);
-            let executor_1_poll = async { run_executor_swarm(swarm, MESSAGES_TO_SEND).await };
+            let executor_1_poll =
+                async move { run_executor_swarm(swarm, MESSAGES_TO_SEND, terminator_1).await };
 
             executor_tasks.extend(vec![
                 tokio::spawn(executor_0_poll),
@@ -520,17 +533,6 @@ mod tests {
             ]);
         }
 
-        let mut dispersal_success_counter = 0usize;
-
-        for task in executor_tasks {
-            let dispersed = task.await.unwrap();
-            debug!(
-                "Executor task received: {:?} messages dispersal success",
-                dispersed
-            );
-            dispersal_success_counter += dispersed;
-        }
-
         let mut dispersal_request_counter = (0usize, 0usize);
 
         for task in validator_tasks {
@@ -547,6 +549,20 @@ mod tests {
                 dispersal_request_counter.0 + requested.0,
                 dispersal_request_counter.1 + requested.1,
             );
+        }
+
+        // Terminate any remaining executors
+        terminator_tx.send(true).unwrap();
+
+        let mut dispersal_success_counter = 0usize;
+
+        for task in executor_tasks {
+            let dispersed = task.await.unwrap();
+            debug!(
+                "Executor task received: {:?} messages dispersal success",
+                dispersed
+            );
+            dispersal_success_counter += dispersed;
         }
 
         // Check dispersed and confirmed equal to sent messages
