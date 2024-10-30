@@ -48,6 +48,7 @@ jobs:
           args: --all --no-default-features --features libp2p
       - name: Run Grcov
         run: |
+          rm -rf /tmp/coverage 
           cargo binstall -y grcov;
           mkdir /tmp/coverage;
           grcov . --binary-path ./target/debug -s . -t lcov --branch --ignore-not-existing --ignore '../*' --ignore "/*" -o /tmp/coverage/tests.lcov;

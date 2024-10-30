@@ -90,5 +90,4 @@ fn ticket(input: &cl::InputWitness, epoch_nonce: [u8; 32], slot: u64) -> U256 {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct LeaderPrivate {
     pub input: cl::InputWitness,
-    pub input_cm_path: Vec<cl::merkle::PathNode>,
 }

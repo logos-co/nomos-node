@@ -2,17 +2,23 @@
 //crates
 use bytes::{Bytes, BytesMut};
 use risc0_zkvm::Prover;
-use serde::{de::Error as _, Deserialize, Deserializer, Serialize, Serializer};
 //internal
 use super::Error;
-use crate::wire;
-use nomos_proof_statements::bundle::{BundlePrivate, BundlePublic};
-
+use crate::{
+    proofs::{balance::BalanceProof, covenant::CovenantProof, ptx::PtxProof},
+    wire,
+};
 #[derive(Debug, Clone)]
 pub struct Bundle {
+    cm_roots: Vec<[u8; 32]>,
     bundle: cl::Bundle,
-    //TODO: this can be pruned once validated
-    proof: risc0_zkvm::Receipt,
+    //TODO: these can be pruned once validated
+    // prove knowledge of input notes and well-formedness of outputs
+    ptx_proofs: Vec<PtxProof>,
+    // prove covenant constraints (one for each input)
+    covenant_proofs: Vec<Vec<CovenantProof>>,
+    // prove bundle balance
+    balance_proof: BalanceProof,
 }
 
 impl Bundle {
@@ -20,37 +26,41 @@ impl Bundle {
         &self.bundle
     }
 
-    pub fn prove(bundle_witness: &cl::BundleWitness, prover: &dyn Prover) -> Result<Self, Error> {
-        // need to show that bundle is balanced.
-        // i.e. the sum of ptx balances is 0
-        let bundle_private = BundlePrivate {
-            balances: bundle_witness
-                .partial_witnesses()
+    pub fn cm_roots(&self) -> &[[u8; 32]] {
+        &self.cm_roots
+    }
+
+    /// Requires a x86 machine with docker installed or RISC0_DEV_MODE=1
+    pub fn prove(
+        bundle_witness: &cl::BundleWitness,
+        cm_root: [u8; 32],
+        covenant_proofs: Vec<Vec<CovenantProof>>,
+        prover: &dyn Prover,
+    ) -> Result<Self, Error> {
+        if bundle_witness.partial_witnesses().len() != covenant_proofs.len()
+            || covenant_proofs
                 .iter()
-                .map(|ptx| ptx.balance())
-                .collect(),
-        };
+                .zip(bundle_witness.partial_witnesses())
+                .any(|(covenant_proofs, ptx)| covenant_proofs.len() != ptx.inputs.len())
+        {
+            return Err(Error::InvalidWitness);
+        }
 
-        let env = risc0_zkvm::ExecutorEnv::builder()
-            .write(&bundle_private)?
-            .build()?;
+        let ptx_proofs = bundle_witness
+            .partial_witnesses()
+            .iter()
+            .map(|ptx| PtxProof::prove(ptx, cm_root, prover))
+            .collect::<Result<Vec<_>, _>>()?;
 
-        let start_t = std::time::Instant::now();
-
-        let opts = risc0_zkvm::ProverOpts::groth16();
-        let prove_info = prover.prove_with_opts(env, nomos_cl_risc0_proofs::BUNDLE_ELF, &opts)?;
-
-        tracing::trace!(
-            "STARK 'bundle' prover time: {:.2?}, total_cycles: {}",
-            start_t.elapsed(),
-            prove_info.stats.total_cycles
-        );
-
-        let receipt = prove_info.receipt;
+        let balance_proof = BalanceProof::prove(bundle_witness, prover)?;
+        let bundle = bundle_witness.commit();
 
         Ok(Self {
-            bundle: bundle_witness.commit(),
-            proof: receipt,
+            cm_roots: vec![cm_root],
+            bundle,
+            ptx_proofs,
+            covenant_proofs,
+            balance_proof,
         })
     }
 
@@ -63,35 +73,96 @@ impl Bundle {
     }
 }
 
-impl Serialize for Bundle {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        (&self.bundle, &self.proof).serialize(serializer)
+mod serde {
+    use crate::proofs::{balance::BalanceProof, covenant::CovenantProof, ptx::PtxProof};
+
+    use super::Bundle;
+    use nomos_proof_statements::{bundle::BundlePublic, ptx::PtxPublic};
+    use serde::{de::Error as _, Deserialize, Deserializer, Serialize, Serializer};
+    use std::collections::HashSet;
+
+    #[derive(Serialize, Deserialize)]
+    struct BundleInner {
+        ptx_proofs: Vec<PtxProof>,
+        covenant_proofs: Vec<Vec<CovenantProof>>,
+        balance_proof: BalanceProof,
     }
-}
 
-impl<'de> Deserialize<'de> for Bundle {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        // TODO: limit number of bites serialized
-        let (bundle, proof) = <(cl::Bundle, risc0_zkvm::Receipt)>::deserialize(deserializer)?;
-
-        proof
-            .verify(nomos_cl_risc0_proofs::BUNDLE_ID)
-            .map_err(D::Error::custom)?;
-
-        let bundle_public: BundlePublic = proof.journal.decode().map_err(D::Error::custom)?;
-        if Vec::from_iter(bundle.partial_txs().iter().map(|ptx| ptx.balance))
-            != bundle_public.balances
+    impl Serialize for Bundle {
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
         {
-            return Err(D::Error::custom("Bundle balance mismatch"));
+            // TODO: make zero copy
+            BundleInner {
+                ptx_proofs: self.ptx_proofs.clone(),
+                covenant_proofs: self.covenant_proofs.clone(),
+                balance_proof: self.balance_proof.clone(),
+            }
+            .serialize(serializer)
         }
+    }
 
-        Ok(Self { bundle, proof })
+    impl<'de> Deserialize<'de> for Bundle {
+        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: Deserializer<'de>,
+        {
+            let BundleInner {
+                ptx_proofs,
+                covenant_proofs,
+                balance_proof,
+            } = BundleInner::deserialize(deserializer)?;
+
+            // public inputs are reconstructed from proof statements
+            let mut cm_roots: HashSet<[u8; 32]> = HashSet::new();
+            let mut ptxs = Vec::new();
+
+            if ptx_proofs.len() != covenant_proofs.len() {
+                return Err(D::Error::custom("Invalid number of covenant proofs"));
+            }
+
+            for (ptx_proof, covenant_proofs) in ptx_proofs.iter().zip(&covenant_proofs) {
+                let PtxPublic { ptx, cm_root } =
+                    ptx_proof.public_inputs().map_err(D::Error::custom)?;
+
+                for (covenant_proof, input) in covenant_proofs.iter().zip(ptx.inputs.iter()) {
+                    let covenant_public =
+                        covenant_proof.public_inputs().map_err(D::Error::custom)?;
+                    if covenant_public.ptx_root != ptx.root()
+                        || covenant_public.nf != input.nullifier
+                    {
+                        return Err(D::Error::custom("Invalid covenant proof public inputs"));
+                    }
+                    if covenant_proof.covenant() != input.covenant {
+                        return Err(D::Error::custom("Invalid covenant proof"));
+                    }
+                }
+
+                ptxs.push(ptx);
+                cm_roots.insert(cm_root);
+            }
+
+            let balances = ptxs.iter().map(|ptx| ptx.balance).collect();
+            let bundle_public = BundlePublic { balances };
+            if bundle_public != balance_proof.public_inputs().map_err(D::Error::custom)? {
+                return Err(D::Error::custom(format!(
+                    "Invalid balance proof public inputs {:?} != {:?}",
+                    bundle_public,
+                    balance_proof.public_inputs().map_err(D::Error::custom)?
+                )));
+            }
+
+            let bundle = cl::Bundle::new(ptxs);
+
+            Ok(Self {
+                bundle,
+                balance_proof,
+                ptx_proofs,
+                covenant_proofs,
+                cm_roots: cm_roots.into_iter().collect(),
+            })
+        }
     }
 }
 
@@ -115,7 +186,10 @@ mod test {
         let recipient_nf_pk = cl::NullifierSecret::random(&mut rng).commit();
 
         // Assume the sender has received an unspent output from somewhere
-        let utxo = receive_utxo(cl::NoteWitness::basic(10, nmo, &mut rng), sender_nf_pk);
+        let mut utxo = receive_utxo(cl::NoteWitness::basic(10, nmo, &mut rng), sender_nf_pk);
+        utxo.note.covenant = CovenantProof::nop_constraint();
+        // a little hack: if we only have one note we can put it as the merkle root
+        let cm_root = cl::merkle::leaf(&utxo.commit_note().0);
 
         // and wants to send 8 NMO to some recipient and return 2 NMO to itself.
         let recipient_output =
@@ -124,17 +198,23 @@ mod test {
             cl::OutputWitness::new(cl::NoteWitness::basic(2, nmo, &mut rng), sender_nf_pk);
 
         let ptx_witness = cl::PartialTxWitness {
-            inputs: vec![cl::InputWitness::from_output(utxo, sender_nf_sk)],
+            inputs: vec![cl::InputWitness::from_output(utxo, sender_nf_sk, vec![])],
             outputs: vec![recipient_output, change_output],
             balance_blinding: BalanceWitness::random_blinding(&mut rng),
         };
 
-        let bundle = cl::BundleWitness::new(vec![ptx_witness]);
-
         // ATTENTION: building a valid proof requires a x86 machine with docker installed
         // if you don't have one, you can run this test with RISC0_DEV_MODE=1 or skip the test
         let prover = risc0_zkvm::default_prover();
-        let bundle = super::Bundle::prove(&bundle, prover.as_ref()).unwrap();
+        let no_op = CovenantProof::prove_nop(
+            ptx_witness.inputs[0].nullifier(),
+            ptx_witness.commit().root(),
+            prover.as_ref(),
+        )
+        .unwrap();
+        let bundle = cl::BundleWitness::new(vec![ptx_witness]);
+        let bundle =
+            super::Bundle::prove(&bundle, cm_root, vec![vec![no_op]], prover.as_ref()).unwrap();
 
         assert_eq!(
             wire::serialize(&bundle).unwrap(),

@@ -24,7 +24,7 @@ fn test_simple_transfer() {
         cl::OutputWitness::new(cl::NoteWitness::basic(2, nmo, &mut rng), sender_nf_pk);
 
     let ptx_witness = cl::PartialTxWitness {
-        inputs: vec![cl::InputWitness::from_output(utxo, sender_nf_sk)],
+        inputs: vec![cl::InputWitness::from_output(utxo, sender_nf_sk, vec![])],
         outputs: vec![recipient_output, change_output],
         balance_blinding: BalanceWitness::random_blinding(&mut rng),
     };

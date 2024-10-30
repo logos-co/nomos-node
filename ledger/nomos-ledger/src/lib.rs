@@ -7,7 +7,7 @@ use blake2::Digest;
 use cryptarchia_engine::{Epoch, Slot};
 use crypto::Blake2b;
 use leader_proof::OrphanProof;
-use leader_proof_statements::LeaderPublic;
+use nomos_proof_statements::leadership::LeaderPublic;
 use rpds::HashTrieSetSync;
 use std::{collections::HashMap, hash::Hash};
 use thiserror::Error;
@@ -420,17 +420,16 @@ pub mod tests {
     use super::*;
     use crate::{crypto::Blake2b, leader_proof::LeaderProof, Config, LedgerError};
     use blake2::Digest;
-    use cl::{note::NoteWitness, InputWitness as Note, NullifierSecret};
+    use cl::{note::NoteWitness as Note, NullifierSecret};
     use cryptarchia_engine::Slot;
     use rand::thread_rng;
 
     type HeaderId = [u8; 32];
 
-    fn note(sk: u8) -> Note {
-        Note::new(
-            NoteWitness::basic(0, [0; 32], &mut thread_rng()),
-            NullifierSecret::from_bytes([sk as u8; 16]),
-        )
+    const NF_SK: NullifierSecret = NullifierSecret([0; 16]);
+
+    fn note() -> Note {
+        Note::basic(0, [0; 32], &mut thread_rng())
     }
 
     struct DummyProof {
@@ -457,14 +456,15 @@ pub mod tests {
         }
     }
 
+    fn commit(note: Note) -> NoteCommitment {
+        note.commit(NF_SK.commit())
+    }
+
     fn evolve(note: Note) -> Note {
-        Note::new(
-            NoteWitness {
-                nonce: note.evolved_nonce(b"test"),
-                ..note.note
-            },
-            note.nf_sk,
-        )
+        Note {
+            nonce: note.evolved_nonce(NF_SK, b"test"),
+            ..note
+        }
     }
 
     fn update_ledger(
@@ -480,7 +480,7 @@ pub mod tests {
         Blake2b::new()
             .chain_update(parent)
             .chain_update(slot.into().to_be_bytes())
-            .chain_update(note.note_commitment().as_bytes())
+            .chain_update(commit(note).as_bytes())
             .finalize()
             .into()
     }
@@ -496,15 +496,15 @@ pub mod tests {
             note_tree
                 .commitments()
                 .iter()
-                .find(|n| n == &&note.note_commitment())
+                .find(|n| n == &&commit(*note))
                 .is_some()
         }
 
         fn proof(note: Note, cm_root: [u8; 32]) -> DummyProof {
             DummyProof {
                 cm_root,
-                nullifier: note.nullifier(),
-                commitment: evolve(note).note_commitment(),
+                nullifier: Nullifier::new(NF_SK, commit(note)),
+                commitment: commit(evolve(note)),
             }
         }
 
@@ -528,7 +528,7 @@ pub mod tests {
             .into_iter()
             .map(|note| {
                 let cm_root = get_cm_root(note, &[&lead_comms, snapshot_comms]);
-                lead_comms = lead_comms.insert(evolve(note).note_commitment());
+                lead_comms = lead_comms.insert(evolve(note).commit(NF_SK.commit()));
                 proof(note, cm_root).to_orphan_proof()
             })
             .zip(ids)
@@ -614,17 +614,15 @@ pub mod tests {
         // we still don't have transactions, so the only way to add a commitment to spendable commitments and
         // test epoch snapshotting is by doing this manually
         let mut block_state = ledger.states[&id].clone();
-        block_state.spend_commitments = block_state
-            .spend_commitments
-            .insert(note_add.note_commitment());
+        block_state.spend_commitments = block_state.spend_commitments.insert(commit(note_add));
         ledger.states.insert(id, block_state);
         id
     }
 
     #[test]
     fn test_ledger_state_prevents_note_reuse() {
-        let note = note(0);
-        let (mut ledger, genesis) = ledger(&[note.note_commitment()]);
+        let note = note();
+        let (mut ledger, genesis) = ledger(&[commit(note)]);
 
         let h = update_ledger(&mut ledger, genesis, 1, note).unwrap();
 
@@ -637,7 +635,7 @@ pub mod tests {
 
     #[test]
     fn test_ledger_state_uncommited_note() {
-        let note = note(0);
+        let note = note();
         let (mut ledger, genesis) = ledger(&[]);
         assert!(matches!(
             update_ledger(&mut ledger, genesis, 1, note),
@@ -647,15 +645,11 @@ pub mod tests {
 
     #[test]
     fn test_ledger_state_is_properly_updated_on_reorg() {
-        let note_1 = note(0);
-        let note_2 = note(1);
-        let note_3 = note(2);
+        let note_1 = note();
+        let note_2 = note();
+        let note_3 = note();
 
-        let (mut ledger, genesis) = ledger(&[
-            note_1.note_commitment(),
-            note_2.note_commitment(),
-            note_3.note_commitment(),
-        ]);
+        let (mut ledger, genesis) = ledger(&[commit(note_1), commit(note_2), commit(note_3)]);
 
         // note_1 & note_2 both concurrently win slot 0
 
@@ -665,20 +659,15 @@ pub mod tests {
         // then note_3 wins slot 1 and chooses to extend from block_2
         let h_3 = update_ledger(&mut ledger, h, 2, note_3).unwrap();
         // note 1 is not spent in the chain that ends with block_3
-        assert!(!ledger.states[&h_3].is_nullified(&note_1.nullifier()));
+        assert!(!ledger.states[&h_3].is_nullified(&Nullifier::new(NF_SK, commit(note_1))));
     }
 
     #[test]
     fn test_epoch_transition() {
-        let notes = (0..4).map(note).collect::<Vec<_>>();
-        let note_4 = note(4);
-        let note_5 = note(5);
-        let (mut ledger, genesis) = ledger(
-            &notes
-                .iter()
-                .map(|c| c.note_commitment())
-                .collect::<Vec<_>>(),
-        );
+        let notes = (0..4).map(|_| note()).collect::<Vec<_>>();
+        let note_4 = note();
+        let note_5 = note();
+        let (mut ledger, genesis) = ledger(&notes.iter().copied().map(commit).collect::<Vec<_>>());
 
         // An epoch will be 10 slots long, with stake distribution snapshot taken at the start of the epoch
         // and nonce snapshot before slot 7
@@ -722,8 +711,8 @@ pub mod tests {
 
     #[test]
     fn test_evolved_note_is_eligible_for_leadership() {
-        let note = note(0);
-        let (mut ledger, genesis) = ledger(&[note.note_commitment()]);
+        let note = note();
+        let (mut ledger, genesis) = ledger(&[commit(note)]);
 
         let h = update_ledger(&mut ledger, genesis, 1, note).unwrap();
 
@@ -745,10 +734,10 @@ pub mod tests {
 
     #[test]
     fn test_new_notes_becoming_eligible_after_stake_distribution_stabilizes() {
-        let note_1 = note(1);
-        let note = note(0);
+        let note_1 = note();
+        let note = note();
 
-        let (mut ledger, genesis) = ledger(&[note.note_commitment()]);
+        let (mut ledger, genesis) = ledger(&[commit(note)]);
 
         // EPOCH 0
         // mint a new note to be used for leader elections in upcoming epochs
@@ -783,8 +772,8 @@ pub mod tests {
 
     #[test]
     fn test_orphan_proof_import() {
-        let note = note(0);
-        let (mut ledger, genesis) = ledger(&[note.note_commitment()]);
+        let note = note();
+        let (mut ledger, genesis) = ledger(&[commit(note)]);
 
         let note_new = evolve(note);
         let note_new_new = evolve(note_new);
@@ -873,8 +862,8 @@ pub mod tests {
 
     #[test]
     fn test_update_epoch_state_with_outdated_slot_error() {
-        let note = note(0);
-        let commitment = note.note_commitment();
+        let note = note();
+        let commitment = commit(note);
         let (ledger, genesis) = ledger(&[commitment]);
 
         let ledger_state = ledger.state(&genesis).unwrap().clone();

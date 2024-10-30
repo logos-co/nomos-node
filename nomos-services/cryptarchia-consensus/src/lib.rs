@@ -4,26 +4,23 @@ pub mod mix;
 pub mod network;
 mod time;
 
-use cl::InputWitness;
 use core::fmt::Debug;
 use cryptarchia_engine::Slot;
 use futures::StreamExt;
+pub use leadership::LeaderConfig;
 use network::NetworkAdapter;
 use nomos_core::da::blob::{
     info::DispersedBlobInfo, metadata::Metadata as BlobMetadata, BlobSelect,
 };
-use nomos_core::header::{Header, HeaderId};
-use nomos_core::tx::{Transaction, TxSelect};
 use nomos_core::{
     block::{builder::BlockBuilder, Block},
-    header::Builder,
+    header::{Builder, Header, HeaderId},
+    proofs::leader_proof::Risc0LeaderProof,
+    tx::{Transaction, TxSelect},
 };
 use nomos_da_sampling::backend::DaSamplingServiceBackend;
 use nomos_da_sampling::{DaSamplingService, DaSamplingServiceMsg};
-use nomos_ledger::{
-    leader_proof::{LeaderProof, Risc0LeaderProof},
-    LedgerState,
-};
+use nomos_ledger::{leader_proof::LeaderProof, LedgerState};
 use nomos_mempool::{
     backend::MemPool, network::NetworkAdapter as MempoolAdapter, DaMempoolService, MempoolMsg,
     TxMempoolService,
@@ -130,7 +127,7 @@ pub struct CryptarchiaSettings<Ts, Bs, NetworkAdapterSettings, MixAdapterSetting
     pub config: nomos_ledger::Config,
     pub genesis_state: LedgerState,
     pub time: TimeConfig,
-    pub notes: Vec<InputWitness>,
+    pub leader_config: LeaderConfig,
     pub network_adapter_settings: NetworkAdapterSettings,
     pub mix_adapter_settings: MixAdapterSettings,
 }
@@ -409,7 +406,7 @@ where
             transaction_selector_settings,
             blob_selector_settings,
             time,
-            notes,
+            leader_config,
             network_adapter_settings,
             mix_adapter_settings,
         } = self.service_state.settings_reader.get_updated_settings();
@@ -432,7 +429,7 @@ where
         let blob_selector = BS::new(blob_selector_settings);
 
         let mut incoming_blocks = network_adapter.blocks_stream().await?;
-        let mut leader = leadership::Leader::new(genesis_id, notes, config);
+        let mut leader = leadership::Leader::new(genesis_id, leader_config, config);
         let timer = time::Timer::new(time);
 
         let mut slot_timer = IntervalStream::new(timer.slot_interval());

@@ -1,7 +1,7 @@
 use cl::balance::Unit;
 /// Proof of Leadership
 use cl::merkle;
-use leader_proof_statements::{LeaderPrivate, LeaderPublic};
+use nomos_proof_statements::leadership::{LeaderPrivate, LeaderPublic};
 use risc0_zkvm::guest::env;
 
 // derive-unit(NOMOS_NMO)
@@ -13,10 +13,7 @@ pub const NMO_UNIT: Unit = [
 fn main() {
     let public_inputs: LeaderPublic = env::read();
 
-    let LeaderPrivate {
-        input,
-        input_cm_path,
-    } = env::read();
+    let LeaderPrivate { input } = env::read();
 
     // Lottery checks
     assert!(public_inputs.check_winning(&input));
@@ -25,7 +22,7 @@ fn main() {
     assert_eq!(input.note.unit, NMO_UNIT);
     let note_cm = input.note_commitment();
     let note_cm_leaf = merkle::leaf(note_cm.as_bytes());
-    let note_cm_root = merkle::path_root(note_cm_leaf, &input_cm_path);
+    let note_cm_root = merkle::path_root(note_cm_leaf, &input.cm_path);
     assert_eq!(note_cm_root, public_inputs.cm_root);
 
     // Public input constraints
