@@ -83,12 +83,12 @@ mod test {
         let request_sender_1 = p1.behaviour().sample_request_channel();
         let request_sender_2 = p2.behaviour().sample_request_channel();
         const MSG_COUNT: usize = 10;
-        let channel1 = Indicator::new(MSG_COUNT);
-        let channel2 = Indicator::new(MSG_COUNT);
+        let i1 = Indicator::new(MSG_COUNT);
+        let i2: Indicator = Indicator::new(MSG_COUNT);
 
         async fn test_sampling_swarm(
-            own_channel: Indicator,
-            peer_channel: Indicator,
+            own_indicator: Indicator,
+            peer_indicator: Indicator,
             mut swarm: Swarm<
                 SamplingBehaviour<
                     impl MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'static,
@@ -98,8 +98,8 @@ mod test {
             let mut res = Vec::with_capacity(MSG_COUNT);
             loop {
                 if res.len() == MSG_COUNT {
-                    own_channel.send(true); // Indicate the peer that sampling is finished from this side
-                    if let Some(true) = peer_channel.receive() {
+                    own_indicator.send(true); // Indicate the peer that sampling is finished from this side
+                    if let Some(true) = peer_indicator.receive() {
                         // Break out only when peer has also finished sampling
                         break res;
                     }
@@ -145,15 +145,15 @@ mod test {
             }
         }
 
-        let clone1 = channel1.clone();
-        let clone2 = channel2.clone();
+        let clone1 = i1.clone();
+        let clone2 = i2.clone();
         let t1 = tokio::spawn(async move {
             p1.listen_on(p1_address).unwrap();
             tokio::time::sleep(Duration::from_secs(1)).await;
             test_sampling_swarm(clone1, clone2, p1).await
         });
-        let clone1 = channel1.clone();
-        let clone2 = channel2.clone();
+        let clone1 = i1.clone();
+        let clone2 = i2.clone();
         let t2 = tokio::spawn(async move {
             p2.listen_on(p2_address).unwrap();
             tokio::time::sleep(Duration::from_secs(1)).await;
