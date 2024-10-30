@@ -84,7 +84,7 @@ mod test {
         let request_sender_2 = p2.behaviour().sample_request_channel();
         const MSG_COUNT: usize = 10;
         let i1 = Indicator::new(MSG_COUNT);
-        let i2: Indicator = Indicator::new(MSG_COUNT);
+        let i2 = Indicator::new(MSG_COUNT);
 
         async fn test_sampling_swarm(
             own_indicator: Indicator,
