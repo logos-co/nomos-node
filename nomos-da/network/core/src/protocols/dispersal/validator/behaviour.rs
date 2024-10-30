@@ -153,7 +153,6 @@ mod tests {
     use crate::protocols::dispersal::executor::behaviour::{
         DispersalExecutorBehaviour, DispersalExecutorEvent,
     };
-    use futures::task::ArcWake;
     use kzgrs_backend::common::blob::DaBlob;
     use kzgrs_backend::common::Column;
     use libp2p::identity::Keypair;
@@ -161,7 +160,6 @@ mod tests {
     use libp2p::{identity, quic, PeerId, Swarm};
     use nomos_da_messages::common::Blob;
     use std::collections::{HashMap, HashSet};
-    use std::sync::Arc;
     use std::time::Duration;
     use tokio::sync::mpsc::UnboundedSender;
     use tokio::sync::watch;
@@ -209,7 +207,7 @@ mod tests {
         }
     }
 
-    pub fn executor_swarm(
+    fn executor_swarm(
         addressbook: AddressBook,
         key: Keypair,
         peer_id: PeerId,
@@ -231,7 +229,7 @@ mod tests {
             .build()
     }
 
-    pub fn validator_swarm(
+    fn validator_swarm(
         key: Keypair,
         membership: impl MembershipHandler<NetworkId = u32, Id = PeerId> + 'static,
     ) -> libp2p::Swarm<
@@ -289,26 +287,22 @@ mod tests {
             >,
         >,
         messages_to_expect: usize,
-        mut terminator_rx: watch::Receiver<bool>,
+        mut terminator_rx: watch::Receiver<()>,
     ) -> usize {
         let mut msg_counter = 0;
-        loop {
+
+        while msg_counter < messages_to_expect {
             tokio::select! {
-                Some(event) = swarm.next() => {
+                event = swarm.select_next_some() => {
                     debug!("Executor event: {event:?}");
                     if let SwarmEvent::Behaviour(DispersalExecutorEvent::DispersalSuccess{..}) = event {
                         msg_counter += 1;
                     }
-                    if msg_counter >= messages_to_expect {
-                        break;
-                    }
                 }
 
                 _ = terminator_rx.changed() => {
-                    if *terminator_rx.borrow() {
-                        warn!("Executor terminated");
-                        break;
-                    }
+                    warn!("Executor terminated");
+                    break;
                 }
             }
         }
@@ -326,7 +320,7 @@ mod tests {
 
         loop {
             tokio::select! {
-                Some(event) = swarm.next() => {
+                event = swarm.select_next_some() => {
                     if let SwarmEvent::Behaviour(DispersalEvent::IncomingMessage { message }) = event {
                         debug!("Validator received blob: {message:?}");
 
@@ -478,7 +472,7 @@ mod tests {
         }
 
         let mut executor_tasks = vec![];
-        let (terminator_tx, terminator_rx) = watch::channel::<bool>(false);
+        let (terminator_tx, terminator_rx) = watch::channel::<()>(());
 
         // Spawn executors
         for i in (0..ALL_INSTANCES / GROUPS).rev() {
@@ -543,7 +537,7 @@ mod tests {
         }
 
         // Terminate any remaining executors
-        terminator_tx.send(true).unwrap();
+        terminator_tx.send(()).unwrap();
 
         let mut dispersal_success_counter = 0usize;
 
