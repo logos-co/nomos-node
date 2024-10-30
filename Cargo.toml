@@ -37,7 +37,6 @@ members = [
     "consensus/cryptarchia-engine",
     "ledger/nomos-ledger",
     "nomos-core/cl",
-    "proof_of_leadership/proof_statements",
     "testnet/cfgsync",
     "tests",
     "clients/executor-http-client",
