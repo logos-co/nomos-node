@@ -268,14 +268,18 @@ mod tests {
 
     fn create_membership(
         num_instances: usize,
-        subnet_id: u32,
+        subnets: usize,
         peer_ids: &[PeerId],
     ) -> Neighbourhood {
-        let mut membership = HashMap::default();
-
-        for peer_id in peer_ids.iter().take(num_instances) {
-            membership.insert(*peer_id, HashSet::from([subnet_id]));
-        }
+        let membership = peer_ids
+            .iter()
+            .take(num_instances)
+            .enumerate()
+            .map(|(i, &peer_id)| {
+                let subnet_id = (i * subnets / num_instances) as SubnetworkId;
+                (peer_id, HashSet::from([subnet_id]))
+            })
+            .collect();
 
         Neighbourhood { membership }
     }
@@ -389,14 +393,10 @@ mod tests {
         let executor_1_config = prepare_swarm_config(ALL_INSTANCES / GROUPS, 2);
         let validator_1_config = prepare_swarm_config(ALL_INSTANCES / GROUPS, 3);
 
-        let subnet_0_ids = executor_0_config
+        let all_ids = executor_0_config
             .iter()
             .chain(validator_0_config.iter())
-            .map(|(_, peer_id, _)| *peer_id)
-            .collect::<Vec<_>>();
-
-        let subnet_1_ids = executor_1_config
-            .iter()
+            .chain(executor_1_config.iter())
             .chain(validator_1_config.iter())
             .map(|(_, peer_id, _)| *peer_id)
             .collect::<Vec<_>>();
@@ -412,13 +412,7 @@ mod tests {
                 .chain(validator_1_config.iter().map(to_p2p_address)),
         );
 
-        let subnet_0_membership = create_membership(ALL_INSTANCES / 2, 0, &subnet_0_ids);
-        let subnet_1_membership = create_membership(ALL_INSTANCES / 2, 1, &subnet_1_ids);
-
-        let mut all_neighbours = subnet_0_membership;
-        all_neighbours
-            .membership
-            .extend(subnet_1_membership.membership);
+        let neighbours = create_membership(ALL_INSTANCES, 2, &all_ids);
 
         // Create swarms
         let mut executor_0_swarms: Vec<_> = vec![];
@@ -436,9 +430,9 @@ mod tests {
                 validator_addressbook.clone(),
                 k,
                 executor_peer,
-                all_neighbours.clone(),
+                neighbours.clone(),
             );
-            let validator_0 = validator_swarm(k2, all_neighbours.clone());
+            let validator_0 = validator_swarm(k2, neighbours.clone());
             executor_0_swarms.push(executor_0);
             validator_0_swarms.push(validator_0);
 
@@ -446,9 +440,9 @@ mod tests {
                 validator_addressbook.clone(),
                 k3,
                 executor_peer2,
-                all_neighbours.clone(),
+                neighbours.clone(),
             );
-            let validator_1 = validator_swarm(k4, all_neighbours.clone());
+            let validator_1 = validator_swarm(k4, neighbours.clone());
             executor_1_swarms.push(executor_1);
             validator_1_swarms.push(validator_1);
         }
