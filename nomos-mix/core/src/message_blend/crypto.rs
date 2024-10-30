@@ -3,11 +3,12 @@ use serde::{Deserialize, Serialize};
 
 /// [`CryptographicProcessor`] is responsible for wrapping and unwrapping messages
 /// for the message indistinguishability.
+#[derive(Clone, Copy, Debug)]
 pub(crate) struct CryptographicProcessor {
     settings: CryptographicProcessorSettings,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 pub struct CryptographicProcessorSettings {
     pub num_mix_layers: usize,
 }
