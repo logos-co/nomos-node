@@ -4,10 +4,6 @@ on:
 
   workflow_dispatch:
 
-  push:
-    branches: [ fix-codecov-workflow-output-dir-cleanup ]
-
-
 name: Codecov
 
 jobs:
