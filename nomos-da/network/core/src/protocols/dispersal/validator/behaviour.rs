@@ -212,12 +212,6 @@ mod tests {
         }
     }
 
-    struct TestWaker;
-
-    impl ArcWake for TestWaker {
-        fn wake_by_ref(_arc_self: &Arc<Self>) {}
-    }
-
     pub fn executor_swarm(
         addressbook: AddressBook,
         key: Keypair,
