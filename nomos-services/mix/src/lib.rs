@@ -8,9 +8,10 @@ use backends::MixBackend;
 use futures::StreamExt;
 use network::NetworkAdapter;
 use nomos_core::wire;
-use nomos_mix::{
-    message_blend::{MessageBlend, MessageBlendSettings},
-    persistent_transmission::{persistent_transmission, PersistentTransmissionSettings},
+use nomos_mix::message_blend::persistent_transmission::PersistentTransmissionSettings;
+use nomos_mix::message_blend::{MessageBlendExt, MessageBlendSettings};
+use nomos_mix::message_blend::{
+    MessageBlendStreamIncomingMessage, MessageBlendStreamOutgoingMessage,
 };
 use nomos_network::NetworkService;
 use overwatch_rs::services::{
@@ -77,7 +78,7 @@ where
 
     async fn run(mut self) -> Result<(), overwatch_rs::DynError> {
         let Self {
-            mut service_state,
+            service_state,
             mut backend,
             network_relay,
         } = self;
@@ -86,64 +87,44 @@ where
         let network_relay = network_relay.connect().await?;
         let network_adapter = Network::new(network_relay);
 
-        // Spawn Persistent Transmission
-        let (transmission_schedule_sender, transmission_schedule_receiver) =
-            mpsc::unbounded_channel();
-        let (emission_sender, mut emission_receiver) = mpsc::unbounded_channel();
-        tokio::spawn(async move {
-            persistent_transmission(
-                mix_config.persistent_transmission,
-                transmission_schedule_receiver,
-                emission_sender,
-            )
-            .await;
-        });
-
         // Spawn Message Blend and connect it to Persistent Transmission
-        let (new_message_sender, new_message_receiver) = mpsc::unbounded_channel();
-        let (processor_inbound_sender, processor_inbound_receiver) = mpsc::unbounded_channel();
-        let (fully_unwrapped_message_sender, mut fully_unwrapped_message_receiver) =
-            mpsc::unbounded_channel();
-        tokio::spawn(async move {
-            MessageBlend::new(
-                mix_config.message_blend,
-                new_message_receiver,
-                processor_inbound_receiver,
-                // Connect the outputs of Message Blend to Persistent Transmission
-                transmission_schedule_sender,
-                fully_unwrapped_message_sender,
-            )
-            .run()
-            .await;
-        });
-
         // A channel to listen to messages received from the [`MixBackend`]
-        let mut incoming_message_stream = backend.listen_to_incoming_messages();
+        let incoming_message_stream = backend
+            .listen_to_incoming_messages()
+            .map(MessageBlendStreamIncomingMessage::Inbound);
+        let inbound_relay = service_state
+            .inbound_relay
+            .map(|ServiceMessage::Mix(message)| {
+                MessageBlendStreamIncomingMessage::Local(
+                    wire::serialize(&message)
+                        .expect("Message from internal services should not fail to serialize"),
+                )
+            });
+        let mut incoming_blend_stream =
+            tokio_stream::StreamExt::merge(incoming_message_stream, inbound_relay)
+                .blend(mix_config.message_blend);
 
         let mut lifecycle_stream = service_state.lifecycle_handle.message_stream();
         loop {
             tokio::select! {
-                Some(msg) = incoming_message_stream.next() => {
-                    tracing::debug!("Received message from mix backend. Sending it to Processor");
-                    if let Err(e) = processor_inbound_sender.send(msg) {
-                        tracing::error!("Failed to send incoming message to processor: {e:?}");
+                // Already processed temporal message, publish to mixnet
+                Some(msg) = incoming_blend_stream.next() => {
+                    match msg {
+                        MessageBlendStreamOutgoingMessage::Outbound(msg) => {
+                            backend.publish(msg).await;
+                        }
+                        MessageBlendStreamOutgoingMessage::FullyUnwrapped(msg) => {
+                            tracing::debug!("Broadcasting fully unwrapped message");
+                            match wire::deserialize::<NetworkMessage<Network::BroadcastSettings>>(&msg) {
+                                Ok(msg) => {
+                                    network_adapter.broadcast(msg.message, msg.broadcast_settings).await;
+                                },
+                                _ => {
+                                    tracing::error!("unrecognized message from mix backend");
+                                }
+                            }
+                        }
                     }
-                }
-                Some(msg) = emission_receiver.recv() => {
-                    tracing::debug!("Emitting message to mix network");
-                    backend.publish(msg).await;
-                }
-                Some(msg) = fully_unwrapped_message_receiver.recv() => {
-                    tracing::debug!("Broadcasting fully unwrapped message");
-                    match wire::deserialize::<NetworkMessage<Network::BroadcastSettings>>(&msg) {
-                        Ok(msg) => {
-                            network_adapter.broadcast(msg.message, msg.broadcast_settings).await;
-                        },
-                        _ => tracing::error!("unrecognized message from mix backend")
-                    }
-                }
-                Some(msg) = service_state.inbound_relay.recv() => {
-                    Self::handle_service_message(msg, &new_message_sender);
                 }
                 Some(msg) = lifecycle_stream.next() => {
                     if Self::should_stop_service(msg).await {
@@ -164,20 +145,6 @@ where
     Network: NetworkAdapter,
     Network::BroadcastSettings: Clone + Debug + Serialize + DeserializeOwned,
 {
-    fn handle_service_message(
-        msg: ServiceMessage<Network::BroadcastSettings>,
-        new_message_sender: &mpsc::UnboundedSender<Vec<u8>>,
-    ) {
-        match msg {
-            ServiceMessage::Mix(msg) => {
-                // Serialize the new message and send it to the Processor
-                if let Err(e) = new_message_sender.send(wire::serialize(&msg).unwrap()) {
-                    tracing::error!("Failed to send a new message to processor: {e:?}");
-                }
-            }
-        }
-    }
-
     async fn should_stop_service(msg: LifecycleMessage) -> bool {
         match msg {
             LifecycleMessage::Kill => true,
