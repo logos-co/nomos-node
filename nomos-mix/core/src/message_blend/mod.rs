@@ -62,7 +62,7 @@ where
                 .persistent_transmission(settings.persistent_transmission)
                 .map(MessageBlendStreamOutgoingMessage::Outbound),
             UnboundedReceiverStream::new(temporal_receiver)
-                .to_temporal_stream(settings.temporal_processor),
+                .temporal_stream(settings.temporal_processor),
         )
         .boxed();
         Self {
