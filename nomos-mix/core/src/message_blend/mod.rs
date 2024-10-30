@@ -36,11 +36,11 @@ pub enum MessageBlendStreamOutgoingMessage {
     Outbound(Vec<u8>),
 }
 
-/// [`MessageBlend`] handles the entire Tier-2 spec.
+/// [`MessageBlendStream`] handles the entire mixing tiers process
 /// - Wraps new messages using [`CryptographicProcessor`]
 /// - Unwraps incoming messages received from network using [`CryptographicProcessor`]
 /// - Pushes unwrapped messages to [`TemporalProcessor`]
-/// - Releases messages returned by [`TemporalProcessor`] to the proper channel
+/// - Generates persistent rate messages with [`PersistentTransmissionStream`]
 pub struct MessageBlendStream<S> {
     input_stream: S,
     output_stream: BoxStream<'static, MessageBlendStreamOutgoingMessage>,

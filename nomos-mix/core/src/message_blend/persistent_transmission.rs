@@ -133,6 +133,7 @@ enum CoinError {
 mod tests {
     use super::*;
     use futures::StreamExt;
+    use tokio::sync::mpsc;
 
     macro_rules! assert_interval {
         ($last_time:expr, $lower_bound:expr, $upper_bound:expr) => {
@@ -154,63 +155,6 @@ mod tests {
 
             *$last_time = now;
         };
-    }
-
-    #[tokio::test]
-    async fn test_persistent_transmission() {
-        let (schedule_sender, schedule_receiver) = mpsc::unbounded_channel();
-        let (emission_sender, mut emission_receiver) = mpsc::unbounded_channel();
-
-        let settings = PersistentTransmissionSettings {
-            max_emission_frequency: 1.0,
-            // Set to always emit drop messages if no scheduled messages for easy testing
-            drop_message_probability: 1.0,
-        };
-
-        // Prepare the expected emission interval with torelance
-        let expected_emission_interval =
-            Duration::from_secs_f64(1.0 / settings.max_emission_frequency);
-        let torelance = expected_emission_interval / 10; // 10% torelance
-        let lower_bound = expected_emission_interval - torelance;
-        let upper_bound = expected_emission_interval + torelance;
-
-        // Start the persistent transmission and schedule messages
-        tokio::spawn(persistent_transmission(
-            settings,
-            schedule_receiver,
-            emission_sender,
-        ));
-        // Messages must be scheduled in non-blocking manner.
-        schedule_sender.send(vec![1]).unwrap();
-        schedule_sender.send(vec![2]).unwrap();
-        schedule_sender.send(vec![3]).unwrap();
-
-        // Check if expected messages are emitted with the expected interval
-        assert_eq!(emission_receiver.recv().await.unwrap(), vec![1]);
-        let mut last_time = time::Instant::now();
-
-        assert_eq!(emission_receiver.recv().await.unwrap(), vec![2]);
-        assert_interval!(&mut last_time, lower_bound, upper_bound);
-
-        assert_eq!(emission_receiver.recv().await.unwrap(), vec![3]);
-        assert_interval!(&mut last_time, lower_bound, upper_bound);
-
-        assert_eq!(
-            emission_receiver.recv().await.unwrap(),
-            DROP_MESSAGE.to_vec()
-        );
-        assert_interval!(&mut last_time, lower_bound, upper_bound);
-
-        assert_eq!(
-            emission_receiver.recv().await.unwrap(),
-            DROP_MESSAGE.to_vec()
-        );
-        assert_interval!(&mut last_time, lower_bound, upper_bound);
-
-        // Schedule a new message and check if it is emitted at the next interval
-        schedule_sender.send(vec![4]).unwrap();
-        assert_eq!(emission_receiver.recv().await.unwrap(), vec![4]);
-        assert_interval!(&mut last_time, lower_bound, upper_bound);
     }
 
     #[tokio::test]

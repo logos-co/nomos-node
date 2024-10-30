@@ -211,12 +211,12 @@ pub fn new_node(
             },
             mix: MixConfig {
                 backend: mix_config.clone(),
-                persistent_transmission: Default::default(),
                 message_blend: MessageBlendSettings {
                     cryptographic_processor: CryptographicProcessorSettings { num_mix_layers: 1 },
                     temporal_processor: TemporalProcessorSettings {
                         max_delay_seconds: 2,
                     },
+                    persistent_transmission: Default::default(),
                 },
             },
             da_network: DaNetworkConfig {
