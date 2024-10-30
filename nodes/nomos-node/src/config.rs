@@ -4,7 +4,7 @@ use std::{
     path::PathBuf,
 };
 // crates
-use cl::{InputWitness, NoteWitness, NullifierSecret};
+use cl::{Nonce, NoteWitness, NullifierSecret};
 use clap::{Parser, ValueEnum};
 use color_eyre::eyre::{eyre, Result};
 use hex::FromHex;
@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 use tracing::Level;
 // internal
 use crate::{NomosApiService, NomosDaMembership, Wire};
-use nomos_core::staking::NMO_UNIT;
+use nomos_core::{proofs::covenant::CovenantProof, staking::NMO_UNIT};
 use nomos_da_network_service::backends::libp2p::validator::DaNetworkValidatorBackend;
 use nomos_da_network_service::NetworkService as DaNetworkService;
 use nomos_libp2p::{ed25519::SecretKey, Multiaddr};
@@ -123,6 +123,13 @@ pub struct CryptarchiaArgs {
         requires("note_secret_key")
     )]
     note_value: Option<u32>,
+
+    #[clap(
+        long = "consensus-note-nonce",
+        env = "CONSENSUS_NOTE_NONCE",
+        requires("note_value")
+    )]
+    note_nonce: Option<String>,
 }
 
 #[derive(Parser, Debug, Clone)]
@@ -307,6 +314,7 @@ pub fn update_cryptarchia_consensus(
         slot_duration,
         note_secret_key,
         note_value,
+        note_nonce,
     } = consensus_args;
 
     if let Some(start_time) = chain_start_time {
@@ -317,15 +325,20 @@ pub fn update_cryptarchia_consensus(
         cryptarchia.time.slot_duration = std::time::Duration::from_secs(duration);
     }
 
+    if let (Some(value), Some(nonce)) = (note_value, note_nonce) {
+        let nonce = Nonce::from_bytes(<[u8; 32]>::from_hex(nonce)?);
+        cryptarchia.leader_config.notes.push(NoteWitness::new(
+            value as u64,
+            NMO_UNIT,
+            CovenantProof::nop_constraint(),
+            [0; 32],
+            nonce,
+        ));
+    }
+
     if let Some(sk) = note_secret_key {
         let sk = <[u8; 16]>::from_hex(sk)?;
-
-        let value = note_value.expect("Should be available if coin sk provided");
-
-        cryptarchia.notes.push(InputWitness::new(
-            NoteWitness::basic(value as u64, NMO_UNIT, &mut rand::thread_rng()),
-            NullifierSecret::from_bytes(sk),
-        ));
+        cryptarchia.leader_config.nf_sk = NullifierSecret::from_bytes(sk);
     }
 
     Ok(())

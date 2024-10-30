@@ -4,10 +4,10 @@ pub mod mix;
 pub mod network;
 mod time;
 
-use cl::InputWitness;
 use core::fmt::Debug;
 use cryptarchia_engine::Slot;
 use futures::StreamExt;
+pub use leadership::LeaderConfig;
 use network::NetworkAdapter;
 use nomos_core::da::blob::{
     info::DispersedBlobInfo, metadata::Metadata as BlobMetadata, BlobSelect,
@@ -130,7 +130,7 @@ pub struct CryptarchiaSettings<Ts, Bs, NetworkAdapterSettings, MixAdapterSetting
     pub config: nomos_ledger::Config,
     pub genesis_state: LedgerState,
     pub time: TimeConfig,
-    pub notes: Vec<InputWitness>,
+    pub leader_config: LeaderConfig,
     pub network_adapter_settings: NetworkAdapterSettings,
     pub mix_adapter_settings: MixAdapterSettings,
 }
@@ -409,7 +409,7 @@ where
             transaction_selector_settings,
             blob_selector_settings,
             time,
-            notes,
+            leader_config,
             network_adapter_settings,
             mix_adapter_settings,
         } = self.service_state.settings_reader.get_updated_settings();
@@ -432,7 +432,7 @@ where
         let blob_selector = BS::new(blob_selector_settings);
 
         let mut incoming_blocks = network_adapter.blocks_stream().await?;
-        let mut leader = leadership::Leader::new(genesis_id, notes, config);
+        let mut leader = leadership::Leader::new(genesis_id, leader_config, config);
         let timer = time::Timer::new(time);
 
         let mut slot_timer = IntervalStream::new(timer.slot_interval());

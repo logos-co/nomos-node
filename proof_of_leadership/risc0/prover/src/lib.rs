@@ -40,7 +40,7 @@ pub fn prove(leader_public: LeaderPublic, leader_private: LeaderPrivate) -> Resu
 #[cfg(test)]
 mod test {
     use super::*;
-    use cl::{note::NoteWitness, nullifier::NullifierSecret};
+    use cl::{note::NoteWitness, nullifier::NullifierSecret, InputWitness};
     use rand::thread_rng;
 
     const MAX_NOTE_COMMS: usize = 1 << 8;
@@ -64,18 +64,23 @@ mod test {
     fn test_leader_prover() {
         let mut rng = thread_rng();
 
-        let input = cl::InputWitness {
-            note: NoteWitness::basic(32, NMO_UNIT, &mut rng),
-            nf_sk: NullifierSecret::random(&mut rng),
-        };
+        let nf_sk = NullifierSecret::random(&mut rng);
+        let note = NoteWitness::basic(32, NMO_UNIT, &mut rng);
 
-        let notes = vec![input.note_commitment()];
+        let notes = vec![note.commit(nf_sk.commit())];
         let epoch_nonce = [0u8; 32];
         let slot = 0;
         let active_slot_coefficient = 0.05;
         let total_stake = 1000;
 
         let leaves = note_commitment_leaves(&notes);
+
+        let input = InputWitness {
+            note,
+            nf_sk,
+            cm_path: cl::merkle::path(leaves, 0),
+        };
+
         let mut expected_public_inputs = LeaderPublic::new(
             cl::merkle::root(leaves),
             epoch_nonce,
@@ -92,10 +97,7 @@ mod test {
 
         println!("slot={}", expected_public_inputs.slot);
 
-        let private_inputs = LeaderPrivate {
-            input: input.clone(),
-            input_cm_path: cl::merkle::path(leaves, 0),
-        };
+        let private_inputs = LeaderPrivate { input };
 
         let proof = prove(expected_public_inputs, private_inputs).unwrap();
         assert!(proof

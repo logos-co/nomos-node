@@ -8,8 +8,8 @@ use std::{
     time::Duration,
 };
 // crates
-use cl::{InputWitness, NoteWitness, NullifierSecret};
-use cryptarchia_consensus::TimeConfig;
+use cl::{NoteWitness, NullifierSecret};
+use cryptarchia_consensus::{LeaderConfig, TimeConfig};
 use kzgrs_backend::common::blob::DaBlob;
 use nomos_core::{da::DaEncoder as _, staking::NMO_UNIT};
 use nomos_da_verifier::backend::kzgrs::KzgrsDaVerifierSettings;
@@ -33,22 +33,21 @@ fn test_verifier() {
     for id in &mut ids {
         thread_rng().fill(id);
     }
-
-    let notes = ids
+    let sks = ids
         .iter()
         .map(|&id| {
             let mut sk = [0; 16];
             sk.copy_from_slice(&id[0..16]);
-            InputWitness::new(
-                NoteWitness::basic(1, NMO_UNIT, &mut thread_rng()),
-                NullifierSecret(sk),
-            )
+            NullifierSecret(sk)
         })
         .collect::<Vec<_>>();
-    let genesis_state = LedgerState::from_commitments(
-        notes.iter().map(|n| n.note_commitment()),
-        (ids.len() as u32).into(),
-    );
+
+    let notes = (0..ids.len())
+        .map(|_| NoteWitness::basic(1, NMO_UNIT, &mut thread_rng()))
+        .collect::<Vec<_>>();
+
+    let commitments = notes.iter().zip(&sks).map(|(n, sk)| n.commit(sk.commit()));
+    let genesis_state = LedgerState::from_commitments(commitments, (ids.len() as u32).into());
     let ledger_config = nomos_ledger::Config {
         epoch_stake_distribution_stabilization: 3,
         epoch_period_nonce_buffer: 3,
@@ -96,7 +95,10 @@ fn test_verifier() {
     let nodes_per_subnet = 1;
 
     let node1 = new_node(
-        &notes[0],
+        &LeaderConfig {
+            notes: vec![notes[0].clone()],
+            nf_sk: sks[0],
+        },
         &ledger_config,
         &genesis_state,
         &time_config,
@@ -121,7 +123,10 @@ fn test_verifier() {
     );
 
     let node2 = new_node(
-        &notes[1],
+        &LeaderConfig {
+            notes: vec![notes[1].clone()],
+            nf_sk: sks[1],
+        },
         &ledger_config,
         &genesis_state,
         &time_config,

@@ -1,20 +1,38 @@
-use cl::{input::InputWitness, note::NoteWitness, nullifier::Nullifier};
+use cl::{
+    note::NoteWitness,
+    nullifier::{Nullifier, NullifierSecret},
+    InputWitness,
+};
 use cryptarchia_engine::Slot;
 use leader_proof_statements::{LeaderPrivate, LeaderPublic};
 use nomos_core::header::HeaderId;
 use nomos_ledger::{leader_proof::Risc0LeaderProof, Config, EpochState, NoteTree};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 pub struct Leader {
     // for each block, the indexes in the note tree of the notes we control
-    notes: HashMap<HeaderId, Vec<InputWitness>>,
+    notes: HashMap<HeaderId, Vec<NoteWitness>>,
+    nf_sk: NullifierSecret,
     config: nomos_ledger::Config,
 }
 
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct LeaderConfig {
+    pub notes: Vec<NoteWitness>,
+    // this is common to every note
+    pub nf_sk: NullifierSecret,
+}
+
 impl Leader {
-    pub fn new(genesis: HeaderId, notes: Vec<InputWitness>, config: Config) -> Self {
+    pub fn new(
+        genesis: HeaderId,
+        LeaderConfig { notes, nf_sk }: LeaderConfig,
+        config: Config,
+    ) -> Self {
         Leader {
             notes: HashMap::from([(genesis, notes)]),
+            nf_sk,
             config,
         }
     }
@@ -27,8 +45,9 @@ impl Leader {
             let notes = notes
                 .iter()
                 .map(|note| {
-                    if note.nullifier() == to_evolve {
-                        evolve(note)
+                    let note_cm = note.commit(self.nf_sk.commit());
+                    if Nullifier::new(self.nf_sk, note_cm) == to_evolve {
+                        evolve(note, self.nf_sk)
                     } else {
                         *note
                     }
@@ -47,10 +66,11 @@ impl Leader {
     ) -> Option<Risc0LeaderProof> {
         let notes = self.notes.get(&parent)?;
         for note in notes {
+            let note_commit = note.commit(self.nf_sk.commit());
             let Some(index) = note_tree
                 .commitments()
                 .iter()
-                .position(|cm| cm == &note.note_commitment())
+                .position(|cm| cm == &note_commit)
             else {
                 continue;
             };
@@ -58,31 +78,30 @@ impl Leader {
             let input_cm_path = note_tree
                 .witness(index)
                 .expect("Note was found in the tree");
+            let note = InputWitness {
+                note: *note,
+                nf_sk: self.nf_sk,
+                cm_path: input_cm_path,
+            };
             let public_inputs = LeaderPublic::new(
                 note_tree.root(),
                 *epoch_state.nonce(),
                 slot.into(),
                 self.config.consensus_config.active_slot_coeff,
                 epoch_state.total_stake(),
-                note.nullifier(),
+                Nullifier::new(self.nf_sk, note_commit),
                 note.evolve_output(b"NOMOS_POL").commit_note(),
             );
-            if public_inputs.check_winning(note) {
+            if public_inputs.check_winning(&note) {
                 tracing::debug!(
                     "leader for slot {:?}, {:?}/{:?}",
                     slot,
                     note.note.value,
                     epoch_state.total_stake()
                 );
-                let input = *note;
+                let input = note.clone();
                 let res = tokio::task::spawn_blocking(move || {
-                    Risc0LeaderProof::build(
-                        public_inputs,
-                        LeaderPrivate {
-                            input,
-                            input_cm_path,
-                        },
-                    )
+                    Risc0LeaderProof::build(public_inputs, LeaderPrivate { input })
                 })
                 .await;
                 match res {
@@ -101,12 +120,9 @@ impl Leader {
     }
 }
 
-fn evolve(note: &InputWitness) -> InputWitness {
-    InputWitness {
-        note: NoteWitness {
-            nonce: note.evolved_nonce(b"NOMOS_POL"),
-            ..note.note
-        },
-        nf_sk: note.nf_sk,
+fn evolve(note: &NoteWitness, nf_sk: NullifierSecret) -> NoteWitness {
+    NoteWitness {
+        nonce: note.evolved_nonce(nf_sk, b"NOMOS_POL"),
+        ..*note
     }
 }

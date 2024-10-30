@@ -51,6 +51,8 @@ impl Transaction for Tx {
 
 #[derive(Debug, Error)]
 pub enum Error {
-    #[error("risc0 failed to prove execution of the zkvm")]
+    #[error("Risc0 failed to prove execution of the zkvm")]
     Risc0ProofFailed(#[from] anyhow::Error),
+    #[error("Invalid witness")]
+    InvalidWitness,
 }

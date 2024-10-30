@@ -1,3 +1,4 @@
+use cryptarchia_consensus::LeaderConfig;
 // std
 use nomos_da_network_service::backends::libp2p::common::DaNetworkBackendSettings;
 use nomos_mix::message_blend::{
@@ -187,7 +188,7 @@ pub struct TestDaNetworkSettings {
 }
 
 pub fn new_node(
-    note: &InputWitness,
+    leader_config: &LeaderConfig,
     ledger_config: &nomos_ledger::Config,
     genesis_state: &LedgerState,
     time_config: &TimeConfig,
@@ -266,7 +267,7 @@ pub fn new_node(
                 config: ledger_config.clone(),
                 genesis_state: genesis_state.clone(),
                 time: time_config.clone(),
-                notes: vec![note.clone()],
+                leader_config: leader_config.clone(),
                 network_adapter_settings:
                     cryptarchia_consensus::network::adapters::libp2p::LibP2pAdapterSettings {
                         topic: String::from(nomos_node::CONSENSUS_TOPIC),
