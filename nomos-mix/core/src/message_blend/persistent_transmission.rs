@@ -6,11 +6,8 @@ use serde::{Deserialize, Serialize};
 use std::pin::{pin, Pin};
 use std::task::{Context, Poll};
 use std::time::Duration;
+use tokio::time;
 use tokio::time::Interval;
-use tokio::{
-    sync::mpsc::{self, error::TryRecvError},
-    time,
-};
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 pub struct PersistentTransmissionSettings {

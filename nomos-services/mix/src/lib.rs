@@ -8,7 +8,6 @@ use backends::MixBackend;
 use futures::StreamExt;
 use network::NetworkAdapter;
 use nomos_core::wire;
-use nomos_mix::message_blend::persistent_transmission::PersistentTransmissionSettings;
 use nomos_mix::message_blend::{MessageBlendExt, MessageBlendSettings};
 use nomos_mix::message_blend::{
     MessageBlendStreamIncomingMessage, MessageBlendStreamOutgoingMessage,
@@ -22,7 +21,6 @@ use overwatch_rs::services::{
     ServiceCore, ServiceData, ServiceId,
 };
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use tokio::sync::mpsc;
 
 /// A mix service that sends messages to the mix network
 /// and broadcasts fully unwrapped messages through the [`NetworkService`].
@@ -165,7 +163,6 @@ where
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct MixConfig<BackendSettings> {
     pub backend: BackendSettings,
-    pub persistent_transmission: PersistentTransmissionSettings,
     pub message_blend: MessageBlendSettings,
 }
 

@@ -3,6 +3,8 @@ use std::process::{Command, Stdio};
 use std::time::Duration;
 use std::{net::SocketAddr, process::Child};
 
+use crate::adjust_timeout;
+use crate::topology::configs::GeneralConfig;
 use cryptarchia_consensus::CryptarchiaSettings;
 use nomos_da_dispersal::backend::kzgrs::{DispersalKZGRSBackendSettings, EncoderSettings};
 use nomos_da_dispersal::DispersalServiceSettings;
@@ -27,9 +29,6 @@ use nomos_network::{backends::libp2p::Libp2pConfig, NetworkConfig};
 use nomos_node::api::paths::{CL_METRICS, DA_GET_RANGE};
 use nomos_node::RocksBackendSettings;
 use tempfile::NamedTempFile;
-
-use crate::adjust_timeout;
-use crate::topology::configs::GeneralConfig;
 
 use super::{create_tempdir, persist_tempdir, GetRangeReq, CLIENT};
 
@@ -157,12 +156,12 @@ pub fn create_executor_config(config: GeneralConfig) -> Config {
         },
         mix: nomos_mix_service::MixConfig {
             backend: config.mix_config.backend,
-            persistent_transmission: Default::default(),
             message_blend: MessageBlendSettings {
                 cryptographic_processor: CryptographicProcessorSettings { num_mix_layers: 1 },
                 temporal_processor: TemporalProcessorSettings {
                     max_delay_seconds: 2,
                 },
+                persistent_transmission: Default::default(),
             },
         },
         cryptarchia: CryptarchiaSettings {

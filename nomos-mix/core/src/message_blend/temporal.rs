@@ -120,7 +120,6 @@ where
         self.processor.poll_next_unpin(cx)
     }
 }
-#[allow(dead_code)] // TODO: Remove when integrating into blend
 pub trait TemporalProcessorExt: Stream {
     fn temporal_stream(self, settings: TemporalProcessorSettings) -> TemporalStream<Self>
     where
