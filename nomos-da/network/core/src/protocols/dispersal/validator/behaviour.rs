@@ -197,10 +197,7 @@ mod tests {
         }
 
         fn is_allowed(&self, _id: &Self::Id) -> bool {
-            if self.membership.contains_key(_id) {
-                return true;
-            }
-            false
+            self.membership.contains_key(_id)
         }
 
         fn members(&self) -> HashSet<Self::Id> {
