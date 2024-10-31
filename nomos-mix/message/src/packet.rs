@@ -110,7 +110,7 @@ impl Packet {
                 payload,
             ))),
             FINAL_HOP => Ok(UnpackedPacket::FullyUnpacked(payload.recover_plaintext()?)),
-            _ => return Err(Error::InvalidRoutingFlag(routing_info.flag)),
+            _ => Err(Error::InvalidRoutingFlag(routing_info.flag)),
         }
     }
 
