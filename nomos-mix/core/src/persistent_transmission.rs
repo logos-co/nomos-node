@@ -64,7 +64,7 @@ impl<S> Stream for PersistentTransmissionStream<S>
 where
     S: Stream<Item = Vec<u8>> + Unpin,
 {
-    type Item = S::Item;
+    type Item = Vec<u8>;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let Self {

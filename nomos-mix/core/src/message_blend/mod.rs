@@ -50,22 +50,6 @@ where
         }
     }
 
-    // fn process_new_message(self: &mut Pin<&mut Self>, message: Vec<u8>) {
-    //     match self.cryptographic_processor.wrap_message(&message) {
-    //         Ok(wrapped_message) => {
-    //             if let Err(e) = self
-    //                 .bypass_sender
-    //                 .send(MixOutgoingMessage::Outbound(wrapped_message))
-    //             {
-    //                 tracing::error!("Failed to send message to the outbound channel: {e:?}");
-    //             }
-    //         }
-    //         Err(e) => {
-    //             tracing::error!("Failed to wrap message: {:?}", e);
-    //         }
-    //     }
-    // }
-
     fn process_incoming_message(self: &mut Pin<&mut Self>, message: Vec<u8>) {
         match self.cryptographic_processor.unwrap_message(&message) {
             Ok((unwrapped_message, fully_unwrapped)) => {
@@ -95,7 +79,7 @@ where
     type Item = MixOutgoingMessage;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        if let Some(message) = self.input_stream.poll_next_unpin(cx) {
+        if let Poll::Ready(Some(message)) = self.input_stream.poll_next_unpin(cx) {
             self.process_incoming_message(message);
         }
         self.output_stream.poll_next_unpin(cx)
@@ -105,7 +89,7 @@ where
 pub trait MessageBlendExt: Stream<Item = Vec<u8>> {
     fn blend(self, message_blend_settings: MessageBlendSettings) -> MessageBlendStream<Self>
     where
-        Self: Sized,
+        Self: Sized + Unpin,
     {
         MessageBlendStream::new(self, message_blend_settings)
     }

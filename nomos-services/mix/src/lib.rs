@@ -3,16 +3,16 @@ pub mod network;
 
 use async_trait::async_trait;
 use backends::MixBackend;
-use futures::stream::Map;
-use futures::{Stream, StreamExt};
+use futures::StreamExt;
 use network::NetworkAdapter;
 use nomos_core::wire;
-use nomos_mix::message_blend::{MessageBlendExt, MessageBlendSettings, MessageBlendStream};
-use nomos_mix::message_blend::{
-    MessageBlendStreamIncomingMessage, MixOutgoingMessage,
+use nomos_mix::message_blend::crypto::CryptographicProcessor;
+use nomos_mix::message_blend::{MessageBlendExt, MessageBlendSettings};
+use nomos_mix::persistent_transmission::{
+    PersistentTransmissionExt, PersistentTransmissionSettings,
 };
+use nomos_mix::MixOutgoingMessage;
 use nomos_network::NetworkService;
-use overwatch_rs::services::relay::InboundRelay;
 use overwatch_rs::services::{
     handle::ServiceStateHandle,
     life_cycle::LifecycleMessage,
@@ -22,8 +22,8 @@ use overwatch_rs::services::{
 };
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::fmt::Debug;
-use std::pin::Pin;
-use tokio_stream::adapters::Merge;
+use tokio::sync::mpsc;
+use tokio_stream::wrappers::UnboundedReceiverStream;
 
 /// A mix service that sends messages to the mix network
 /// and broadcasts fully unwrapped messages through the [`NetworkService`].
@@ -84,21 +84,43 @@ where
             network_relay,
         } = self;
         let mix_config = service_state.settings_reader.get_updated_settings();
-
+        let cryptographic_processor =
+            CryptographicProcessor::new(mix_config.message_blend.cryptographic_processor);
         let network_relay = network_relay.connect().await?;
         let network_adapter = Network::new(network_relay);
 
-        let incoming_blend_stream =
-            Self::build_mix_streams(&service_state, &mut backend, mix_config);
+        // tier 1 persistent transmission
+        let (persistent_sender, persistent_receiver) = mpsc::unbounded_channel();
+        let mut persistent_transmission_messages =
+            UnboundedReceiverStream::new(persistent_receiver)
+                .persistent_transmission(mix_config.persistent_transmission);
+
+        // tier 2 blend
+        let mut blend_messages = backend
+            .listen_to_incoming_messages()
+            .blend(mix_config.message_blend);
+
+        // local messages, are bypassed and send immediately
+        let mut local_messages = service_state
+            .inbound_relay
+            .map(|ServiceMessage::Mix(message)| {
+                wire::serialize(&message)
+                    .expect("Message from internal services should not fail to serialize")
+            });
 
         let mut lifecycle_stream = service_state.lifecycle_handle.message_stream();
         loop {
             tokio::select! {
-                // Already processed temporal message, publish to mixnet
-                Some(msg) = incoming_blend_stream.next() => {
+                Some(msg) = persistent_transmission_messages.next() => {
+                    backend.publish(msg).await;
+                }
+                // Already processed blend messages
+                Some(msg) = blend_messages.next() => {
                     match msg {
                         MixOutgoingMessage::Outbound(msg) => {
-                            backend.publish(msg).await;
+                            if let Err(e) = persistent_sender.send(msg) {
+                                tracing::error!("Error sending message to persistent stream: {e}");
+                            }
                         }
                         MixOutgoingMessage::FullyUnwrapped(msg) => {
                             tracing::debug!("Broadcasting fully unwrapped message");
@@ -110,6 +132,16 @@ where
                                     tracing::error!("unrecognized message from mix backend");
                                 }
                             }
+                        }
+                    }
+                }
+                Some(msg) = local_messages.next() => {
+                    match cryptographic_processor.wrap_message(&msg) {
+                        Ok(wrapped_message) => {
+                            backend.publish(wrapped_message).await;
+                        }
+                        Err(e) => {
+                            tracing::error!("Failed to wrap message: {:?}", e);
                         }
                     }
                 }
@@ -147,37 +179,13 @@ where
             }
         }
     }
-
-    fn build_mix_streams(
-        service_state: &ServiceStateHandle<MixService<Backend, Network>>,
-        backend: &mut Backend,
-        mix_config: MixConfig<<Backend as MixBackend>::Settings>,
-    ) -> impl Stream<Item =MixOutgoingMessage> {
-        // Spawn Message Blend and connect it to Persistent Transmission
-        // A channel to listen to messages received from the [`MixBackend`]
-        let incoming_message_stream = backend
-            .listen_to_incoming_messages()
-            .map(MessageBlendStreamIncomingMessage::Inbound);
-        let inbound_relay = service_state
-            .inbound_relay
-            .map(|ServiceMessage::Mix(message)| {
-                MessageBlendStreamIncomingMessage::Local(
-                    wire::serialize(&message)
-                        .expect("Message from internal services should not fail to serialize"),
-                )
-            });
-        let mut incoming_blend_stream =
-            tokio_stream::StreamExt::merge(incoming_message_stream, inbound_relay)
-                .blend(mix_config.message_blend);
-        let (fully_unwrapped, outbound) = incoming_blend_stream.right_stream()
-        incoming_blend_stream
-    }
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct MixConfig<BackendSettings> {
     pub backend: BackendSettings,
     pub message_blend: MessageBlendSettings,
+    pub persistent_transmission: PersistentTransmissionSettings,
 }
 
 /// A message that is handled by [`MixService`].
