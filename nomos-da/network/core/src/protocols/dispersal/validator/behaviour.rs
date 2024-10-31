@@ -408,9 +408,7 @@ mod tests {
         let addressbook = AddressBook::from_iter(
             executor_0_config
                 .iter()
-                .chain(validator_0_config.iter())
                 .chain(executor_1_config.iter())
-                .chain(validator_1_config.iter())
                 .map(to_p2p_address),
         );
 
