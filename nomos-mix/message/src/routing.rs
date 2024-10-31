@@ -9,7 +9,9 @@ use sphinx_packet::{
 
 use crate::{
     concat_bytes,
-    layered_cipher::{ConsistentLengthLayeredCipher, EncryptionParam, Key},
+    layered_cipher::{
+        ConsistentLengthLayeredCipher, ConsistentLengthLayeredCipherData, EncryptionParam, Key,
+    },
     parse_bytes, Error,
 };
 
@@ -25,18 +27,20 @@ impl RoutingInformation {
         Self { flag }
     }
 
-    pub fn to_bytes(&self) -> Vec<u8> {
-        vec![self.flag]
-    }
-
     pub fn from_bytes(data: &[u8]) -> Result<Self, Error> {
         if data.len() != Self::size() {
             return Err(Error::InvalidEncryptedRoutingInfoLength(data.len()));
         }
         Ok(Self { flag: data[0] })
     }
+}
 
-    pub fn size() -> usize {
+impl ConsistentLengthLayeredCipherData for RoutingInformation {
+    fn to_bytes(&self) -> Vec<u8> {
+        vec![self.flag]
+    }
+
+    fn size() -> usize {
         std::mem::size_of::<RoutingFlag>()
     }
 }
@@ -65,8 +69,8 @@ impl EncryptedRoutingInformation {
                 } else {
                     FORWARD_HOP
                 };
-                EncryptionParam {
-                    data: RoutingInformation::new(flag).to_bytes(),
+                EncryptionParam::<RoutingInformation> {
+                    data: RoutingInformation::new(flag),
                     key: Self::layered_cipher_key(k),
                 }
             })
@@ -102,8 +106,8 @@ impl EncryptedRoutingInformation {
         ))
     }
 
-    fn layered_cipher(max_layers: usize) -> ConsistentLengthLayeredCipher {
-        ConsistentLengthLayeredCipher::new(max_layers, RoutingInformation::size())
+    fn layered_cipher(max_layers: usize) -> ConsistentLengthLayeredCipher<RoutingInformation> {
+        ConsistentLengthLayeredCipher::<RoutingInformation>::new(max_layers)
     }
 
     fn layered_cipher_key(routing_key: &RoutingKeys) -> Key {
