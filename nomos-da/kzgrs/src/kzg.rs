@@ -17,14 +17,11 @@ pub fn commit_polynomial(
     global_parameters: &UniversalParams<Bls12_381>,
 ) -> Result<Commitment<Bls12_381>, KzgRsError> {
     // Set the hiding bound to the security parameter
-    let hiding_bound = Some(128);
+    let hiding_bound = 128;
     let mut rng = OsRng;
 
-    // Determine the degree of the blinding polynomial
-    let hiding_degree = hiding_bound.unwrap_or(0);
-
     // Ensure that powers_of_gamma_g has enough powers for the hiding bound
-    if global_parameters.powers_of_gamma_g.len() < hiding_degree + 1 {
+    if global_parameters.powers_of_gamma_g.len() < hiding_bound + 1 {
         return Err(KzgRsError::HidingBoundTooLarge);
     }
 
@@ -41,9 +38,14 @@ pub fn commit_polynomial(
         powers_of_gamma_g: Cow::Borrowed(&powers_of_gamma_g),
     };
 
-    KZG10::commit(&roots_of_unity, polynomial, hiding_bound, Some(&mut rng))
-        .map_err(KzgRsError::PolyCommitError)
-        .map(|(commitment, _)| commitment)
+    KZG10::commit(
+        &roots_of_unity,
+        polynomial,
+        Some(hiding_bound),
+        Some(&mut rng),
+    )
+    .map_err(KzgRsError::PolyCommitError)
+    .map(|(commitment, _)| commitment)
 }
 
 /// Compute a witness polynomial in that satisfies `witness(x) = (f(x)-v)/(x-u)`
