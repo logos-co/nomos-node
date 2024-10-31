@@ -405,11 +405,13 @@ mod tests {
             (*peer_id, addr.clone().with_p2p(*peer_id).unwrap())
         };
 
-        let validator_addressbook = AddressBook::from_iter(
-            validator_0_config
+        let addressbook = AddressBook::from_iter(
+            executor_0_config
                 .iter()
-                .map(to_p2p_address)
-                .chain(validator_1_config.iter().map(to_p2p_address)),
+                .chain(validator_0_config.iter())
+                .chain(executor_1_config.iter())
+                .chain(validator_1_config.iter())
+                .map(to_p2p_address),
         );
 
         let neighbours = create_membership(ALL_INSTANCES, 2, &all_ids);
@@ -426,22 +428,14 @@ mod tests {
             let (k3, executor_peer2, _) = executor_1_config[i].clone();
             let (k4, _, _) = validator_1_config[i].clone();
 
-            let executor_0 = executor_swarm(
-                validator_addressbook.clone(),
-                k,
-                executor_peer,
-                neighbours.clone(),
-            );
+            let executor_0 =
+                executor_swarm(addressbook.clone(), k, executor_peer, neighbours.clone());
             let validator_0 = validator_swarm(k2, neighbours.clone());
             executor_0_swarms.push(executor_0);
             validator_0_swarms.push(validator_0);
 
-            let executor_1 = executor_swarm(
-                validator_addressbook.clone(),
-                k3,
-                executor_peer2,
-                neighbours.clone(),
-            );
+            let executor_1 =
+                executor_swarm(addressbook.clone(), k3, executor_peer2, neighbours.clone());
             let validator_1 = validator_swarm(k4, neighbours.clone());
             executor_1_swarms.push(executor_1);
             validator_1_swarms.push(validator_1);
