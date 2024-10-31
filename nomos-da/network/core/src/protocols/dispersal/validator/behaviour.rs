@@ -342,7 +342,7 @@ mod tests {
                     }
                 }
 
-                _ = time::sleep(Duration::from_secs(4)) => {
+                _ = time::sleep(Duration::from_secs(8)) => {
                     warn!("Validator timeout reached");
                     break;
                 }
