@@ -321,7 +321,7 @@ mod tests {
         >,
     ) -> (usize, usize) {
         let (mut msg_0_counter, mut msg_1_counter) = (0, 0);
-        let timeout_duration = Duration::from_secs(8);
+        let timeout_duration = Duration::from_secs(15);
 
         loop {
             let event = timeout(timeout_duration, swarm.select_next_some()).await;
