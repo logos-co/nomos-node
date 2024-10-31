@@ -6,6 +6,7 @@ use ark_poly::univariate::DensePolynomial;
 use ark_poly::{DenseUVPolynomial, EvaluationDomain, GeneralEvaluationDomain};
 use ark_poly_commit::kzg10::{Commitment, Powers, Proof, UniversalParams, KZG10};
 use num_traits::{One, Zero};
+use rand::rngs::OsRng;
 use std::borrow::Cow;
 use std::ops::{Mul, Neg};
 
@@ -15,11 +16,32 @@ pub fn commit_polynomial(
     polynomial: &DensePolynomial<Fr>,
     global_parameters: &UniversalParams<Bls12_381>,
 ) -> Result<Commitment<Bls12_381>, KzgRsError> {
+    // Set the hiding bound to the security parameter
+    let hiding_bound = Some(128);
+    let mut rng = OsRng;
+
+    // Determine the degree of the blinding polynomial
+    let hiding_degree = hiding_bound.unwrap_or(0);
+
+    // Ensure that powers_of_gamma_g has enough powers for the hiding bound
+    if global_parameters.powers_of_gamma_g.len() < hiding_degree + 1 {
+        return Err(KzgRsError::HidingBoundTooLarge);
+    }
+
+    // Convert from B-tree map
+    let powers_of_gamma_g: Vec<_> = global_parameters
+        .powers_of_gamma_g
+        .values()
+        .cloned()
+        .collect();
+
+    // Initialize Powers with sufficient powers_of_gamma_g
     let roots_of_unity = Powers {
         powers_of_g: Cow::Borrowed(&global_parameters.powers_of_g),
-        powers_of_gamma_g: Cow::Owned(vec![]),
+        powers_of_gamma_g: Cow::Borrowed(&powers_of_gamma_g),
     };
-    KZG10::commit(&roots_of_unity, polynomial, None, None)
+
+    KZG10::commit(&roots_of_unity, polynomial, hiding_bound, Some(&mut rng))
         .map_err(KzgRsError::PolyCommitError)
         .map(|(commitment, _)| commitment)
 }
