@@ -405,10 +405,12 @@ mod tests {
             (*peer_id, addr.clone().with_p2p(*peer_id).unwrap())
         };
 
+        // Including only validators in the addressbook is for testing purposes only.
+        // In real-world scenarios, the addressbook should include all types of swarms.
         let addressbook = AddressBook::from_iter(
-            executor_0_config
+            validator_0_config
                 .iter()
-                .chain(executor_1_config.iter())
+                .chain(validator_1_config.iter())
                 .map(to_p2p_address),
         );
 
