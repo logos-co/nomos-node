@@ -163,7 +163,7 @@ mod tests {
     use std::time::Duration;
     use tokio::sync::mpsc::UnboundedSender;
     use tokio::sync::watch;
-    use tokio::time;
+    use tokio::time::timeout;
     use tracing::warn;
     use tracing_subscriber::fmt::TestWriter;
     use tracing_subscriber::EnvFilter;
@@ -321,33 +321,37 @@ mod tests {
         >,
     ) -> (usize, usize) {
         let (mut msg_0_counter, mut msg_1_counter) = (0, 0);
+        let timeout_duration = Duration::from_secs(8);
 
         loop {
-            tokio::select! {
-                event = swarm.select_next_some() => {
-                    if let SwarmEvent::Behaviour(DispersalEvent::IncomingMessage { message }) = event {
+            let event = timeout(timeout_duration, swarm.select_next_some()).await;
+
+            match event {
+                Ok(event) => {
+                    if let SwarmEvent::Behaviour(DispersalEvent::IncomingMessage { message }) =
+                        event
+                    {
                         debug!("Validator received blob: {message:?}");
 
                         // Check data has structure and content as expected
                         if let Some(Blob { blob_id, data }) = message.blob {
-                             let deserialized_blob: DaBlob =
-                                 bincode::deserialize(&data).unwrap();
-                             assert_eq!(blob_id, deserialized_blob.id());
-                             if message.subnetwork_id == 0 {
-                                 msg_0_counter += 1;
-                             } else {
-                                 msg_1_counter += 1;
-                             }
-                         }
+                            let deserialized_blob: DaBlob = bincode::deserialize(&data).unwrap();
+                            assert_eq!(blob_id, deserialized_blob.id());
+                            if message.subnetwork_id == 0 {
+                                msg_0_counter += 1;
+                            } else {
+                                msg_1_counter += 1;
+                            }
+                        }
                     }
                 }
-
-                _ = time::sleep(Duration::from_secs(8)) => {
+                Err(_) => {
                     warn!("Validator timeout reached");
                     break;
                 }
             }
         }
+
         (msg_0_counter, msg_1_counter)
     }
 
