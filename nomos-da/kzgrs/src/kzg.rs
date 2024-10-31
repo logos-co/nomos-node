@@ -5,7 +5,7 @@ use ark_ec::pairing::Pairing;
 use ark_poly::univariate::DensePolynomial;
 use ark_poly::{DenseUVPolynomial, EvaluationDomain, GeneralEvaluationDomain};
 use ark_poly_commit::kzg10::{Commitment, Powers, Proof, UniversalParams, KZG10};
-use num_traits::One;
+use num_traits::{One, Zero};
 use std::borrow::Cow;
 use std::ops::{Mul, Neg};
 
@@ -38,6 +38,9 @@ pub fn generate_element_proof(
     let v = evaluations.evals[element_index];
     let f_x_v = polynomial + &DensePolynomial::<Fr>::from_coefficients_vec(vec![-v]);
     let x_u = DensePolynomial::<Fr>::from_coefficients_vec(vec![-u, Fr::one()]);
+    if x_u.is_zero() || x_u.is_empty() {
+        return Err(KzgRsError::DivisionByZeroPolynomial);
+    }
     let witness_polynomial: DensePolynomial<_> = &f_x_v / &x_u;
     let proof = commit_polynomial(&witness_polynomial, global_parameters)?;
     let proof = Proof {
