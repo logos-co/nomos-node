@@ -1,3 +1,5 @@
+use std::collections::VecDeque;
+use crate::MixOutgoingMessage;
 use futures::Stream;
 use nomos_mix_message::DROP_MESSAGE;
 use rand::{distributions::Uniform, prelude::Distribution, Rng, SeedableRng};

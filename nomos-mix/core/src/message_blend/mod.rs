@@ -1,5 +1,5 @@
-mod crypto;
-mod temporal;
+pub mod crypto;
+pub mod temporal;
 
 pub use crypto::CryptographicProcessorSettings;
 use futures::stream::BoxStream;
@@ -22,62 +22,49 @@ pub struct MessageBlendSettings {
     pub temporal_processor: TemporalProcessorSettings,
 }
 
-pub enum MessageBlendStreamIncomingMessage {
-    Local(Vec<u8>),
-    Inbound(Vec<u8>),
-}
-
 /// [`MessageBlendStream`] handles the entire mixing tiers process
-/// - Wraps new messages using [`CryptographicProcessor`]
 /// - Unwraps incoming messages received from network using [`CryptographicProcessor`]
 /// - Pushes unwrapped messages to [`TemporalProcessor`]
-/// - Generates persistent rate messages with [`PersistentTransmissionStream`]
 pub struct MessageBlendStream<S> {
     input_stream: S,
     output_stream: BoxStream<'static, MixOutgoingMessage>,
-    bypass_sender: UnboundedSender<MixOutgoingMessage>,
     temporal_sender: UnboundedSender<MixOutgoingMessage>,
     cryptographic_processor: CryptographicProcessor,
 }
 
 impl<S> MessageBlendStream<S>
 where
-    S: Stream<Item = MessageBlendStreamIncomingMessage>,
+    S: Stream<Item = Vec<u8>>,
 {
     pub fn new(input_stream: S, settings: MessageBlendSettings) -> Self {
         let cryptographic_processor = CryptographicProcessor::new(settings.cryptographic_processor);
-        let (bypass_sender, bypass_receiver) = mpsc::unbounded_channel();
         let (temporal_sender, temporal_receiver) = mpsc::unbounded_channel();
-        let output_stream = tokio_stream::StreamExt::merge(
-            UnboundedReceiverStream::new(bypass_receiver),
-            UnboundedReceiverStream::new(temporal_receiver)
-                .temporal_stream(settings.temporal_processor),
-        )
-        .boxed();
+        let output_stream = UnboundedReceiverStream::new(temporal_receiver)
+            .temporal_stream(settings.temporal_processor)
+            .boxed();
         Self {
             input_stream,
             output_stream,
-            bypass_sender,
             temporal_sender,
             cryptographic_processor,
         }
     }
 
-    fn process_new_message(self: &mut Pin<&mut Self>, message: Vec<u8>) {
-        match self.cryptographic_processor.wrap_message(&message) {
-            Ok(wrapped_message) => {
-                if let Err(e) = self
-                    .bypass_sender
-                    .send(MixOutgoingMessage::Outbound(wrapped_message))
-                {
-                    tracing::error!("Failed to send message to the outbound channel: {e:?}");
-                }
-            }
-            Err(e) => {
-                tracing::error!("Failed to wrap message: {:?}", e);
-            }
-        }
-    }
+    // fn process_new_message(self: &mut Pin<&mut Self>, message: Vec<u8>) {
+    //     match self.cryptographic_processor.wrap_message(&message) {
+    //         Ok(wrapped_message) => {
+    //             if let Err(e) = self
+    //                 .bypass_sender
+    //                 .send(MixOutgoingMessage::Outbound(wrapped_message))
+    //             {
+    //                 tracing::error!("Failed to send message to the outbound channel: {e:?}");
+    //             }
+    //         }
+    //         Err(e) => {
+    //             tracing::error!("Failed to wrap message: {:?}", e);
+    //         }
+    //     }
+    // }
 
     fn process_incoming_message(self: &mut Pin<&mut Self>, message: Vec<u8>) {
         match self.cryptographic_processor.unwrap_message(&message) {
@@ -103,25 +90,19 @@ where
 
 impl<S> Stream for MessageBlendStream<S>
 where
-    S: Stream<Item = MessageBlendStreamIncomingMessage> + Unpin,
+    S: Stream<Item = Vec<u8>> + Unpin,
 {
     type Item = MixOutgoingMessage;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        match self.input_stream.poll_next_unpin(cx) {
-            Poll::Ready(Some(MessageBlendStreamIncomingMessage::Local(message))) => {
-                self.process_new_message(message);
-            }
-            Poll::Ready(Some(MessageBlendStreamIncomingMessage::Inbound(message))) => {
-                self.process_incoming_message(message);
-            }
-            _ => {}
+        if let Some(message) = self.input_stream.poll_next_unpin(cx) {
+            self.process_incoming_message(message);
         }
         self.output_stream.poll_next_unpin(cx)
     }
 }
 
-pub trait MessageBlendExt: Stream<Item = MessageBlendStreamIncomingMessage> {
+pub trait MessageBlendExt: Stream<Item = Vec<u8>> {
     fn blend(self, message_blend_settings: MessageBlendSettings) -> MessageBlendStream<Self>
     where
         Self: Sized,
@@ -130,4 +111,4 @@ pub trait MessageBlendExt: Stream<Item = MessageBlendStreamIncomingMessage> {
     }
 }
 
-impl<T> MessageBlendExt for T where T: Stream<Item = MessageBlendStreamIncomingMessage> {}
+impl<T> MessageBlendExt for T where T: Stream<Item = Vec<u8>> {}
