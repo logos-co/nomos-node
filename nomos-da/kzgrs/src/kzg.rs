@@ -33,14 +33,14 @@ pub fn generate_element_proof(
     domain: GeneralEvaluationDomain<Fr>,
 ) -> Result<Proof<Bls12_381>, KzgRsError> {
     let u = domain.element(element_index);
+    if u.is_zero() {
+        return Err(KzgRsError::DivisionByZeroPolynomial);
+    };
     // Instead of evaluating over the polynomial, we can reuse the evaluation points from the rs encoding
     // let v = polynomial.evaluate(&u);
     let v = evaluations.evals[element_index];
     let f_x_v = polynomial + &DensePolynomial::<Fr>::from_coefficients_vec(vec![-v]);
     let x_u = DensePolynomial::<Fr>::from_coefficients_vec(vec![-u, Fr::one()]);
-    if x_u.is_zero() || x_u.is_empty() {
-        return Err(KzgRsError::DivisionByZeroPolynomial);
-    }
     let witness_polynomial: DensePolynomial<_> = &f_x_v / &x_u;
     let proof = commit_polynomial(&witness_polynomial, global_parameters)?;
     let proof = Proof {
