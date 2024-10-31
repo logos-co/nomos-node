@@ -1,18 +1,18 @@
 pub mod backends;
 pub mod network;
 
-use std::fmt::Debug;
-
 use async_trait::async_trait;
 use backends::MixBackend;
-use futures::StreamExt;
+use futures::stream::Map;
+use futures::{Stream, StreamExt};
 use network::NetworkAdapter;
 use nomos_core::wire;
-use nomos_mix::message_blend::{MessageBlendExt, MessageBlendSettings};
+use nomos_mix::message_blend::{MessageBlendExt, MessageBlendSettings, MessageBlendStream};
 use nomos_mix::message_blend::{
-    MessageBlendStreamIncomingMessage, MessageBlendStreamOutgoingMessage,
+    MessageBlendStreamIncomingMessage, MixOutgoingMessage,
 };
 use nomos_network::NetworkService;
+use overwatch_rs::services::relay::InboundRelay;
 use overwatch_rs::services::{
     handle::ServiceStateHandle,
     life_cycle::LifecycleMessage,
@@ -21,6 +21,9 @@ use overwatch_rs::services::{
     ServiceCore, ServiceData, ServiceId,
 };
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use std::fmt::Debug;
+use std::pin::Pin;
+use tokio_stream::adapters::Merge;
 
 /// A mix service that sends messages to the mix network
 /// and broadcasts fully unwrapped messages through the [`NetworkService`].
@@ -85,22 +88,8 @@ where
         let network_relay = network_relay.connect().await?;
         let network_adapter = Network::new(network_relay);
 
-        // Spawn Message Blend and connect it to Persistent Transmission
-        // A channel to listen to messages received from the [`MixBackend`]
-        let incoming_message_stream = backend
-            .listen_to_incoming_messages()
-            .map(MessageBlendStreamIncomingMessage::Inbound);
-        let inbound_relay = service_state
-            .inbound_relay
-            .map(|ServiceMessage::Mix(message)| {
-                MessageBlendStreamIncomingMessage::Local(
-                    wire::serialize(&message)
-                        .expect("Message from internal services should not fail to serialize"),
-                )
-            });
-        let mut incoming_blend_stream =
-            tokio_stream::StreamExt::merge(incoming_message_stream, inbound_relay)
-                .blend(mix_config.message_blend);
+        let incoming_blend_stream =
+            Self::build_mix_streams(&service_state, &mut backend, mix_config);
 
         let mut lifecycle_stream = service_state.lifecycle_handle.message_stream();
         loop {
@@ -108,10 +97,10 @@ where
                 // Already processed temporal message, publish to mixnet
                 Some(msg) = incoming_blend_stream.next() => {
                     match msg {
-                        MessageBlendStreamOutgoingMessage::Outbound(msg) => {
+                        MixOutgoingMessage::Outbound(msg) => {
                             backend.publish(msg).await;
                         }
-                        MessageBlendStreamOutgoingMessage::FullyUnwrapped(msg) => {
+                        MixOutgoingMessage::FullyUnwrapped(msg) => {
                             tracing::debug!("Broadcasting fully unwrapped message");
                             match wire::deserialize::<NetworkMessage<Network::BroadcastSettings>>(&msg) {
                                 Ok(msg) => {
@@ -157,6 +146,31 @@ where
                 true
             }
         }
+    }
+
+    fn build_mix_streams(
+        service_state: &ServiceStateHandle<MixService<Backend, Network>>,
+        backend: &mut Backend,
+        mix_config: MixConfig<<Backend as MixBackend>::Settings>,
+    ) -> impl Stream<Item =MixOutgoingMessage> {
+        // Spawn Message Blend and connect it to Persistent Transmission
+        // A channel to listen to messages received from the [`MixBackend`]
+        let incoming_message_stream = backend
+            .listen_to_incoming_messages()
+            .map(MessageBlendStreamIncomingMessage::Inbound);
+        let inbound_relay = service_state
+            .inbound_relay
+            .map(|ServiceMessage::Mix(message)| {
+                MessageBlendStreamIncomingMessage::Local(
+                    wire::serialize(&message)
+                        .expect("Message from internal services should not fail to serialize"),
+                )
+            });
+        let mut incoming_blend_stream =
+            tokio_stream::StreamExt::merge(incoming_message_stream, inbound_relay)
+                .blend(mix_config.message_blend);
+        let (fully_unwrapped, outbound) = incoming_blend_stream.right_stream()
+        incoming_blend_stream
     }
 }
 

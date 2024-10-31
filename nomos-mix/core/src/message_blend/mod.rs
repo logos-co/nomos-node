@@ -1,5 +1,4 @@
 mod crypto;
-pub mod persistent_transmission;
 mod temporal;
 
 pub use crypto::CryptographicProcessorSettings;
@@ -10,10 +9,8 @@ use std::task::{Context, Poll};
 pub use temporal::TemporalProcessorSettings;
 
 use crate::message_blend::crypto::CryptographicProcessor;
-use crate::message_blend::persistent_transmission::{
-    PersistentTransmissionExt, PersistentTransmissionSettings,
-};
 use crate::message_blend::temporal::TemporalProcessorExt;
+use crate::MixOutgoingMessage;
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
 use tokio::sync::mpsc::UnboundedSender;
@@ -23,17 +20,11 @@ use tokio_stream::wrappers::UnboundedReceiverStream;
 pub struct MessageBlendSettings {
     pub cryptographic_processor: CryptographicProcessorSettings,
     pub temporal_processor: TemporalProcessorSettings,
-    pub persistent_transmission: PersistentTransmissionSettings,
 }
 
 pub enum MessageBlendStreamIncomingMessage {
     Local(Vec<u8>),
     Inbound(Vec<u8>),
-}
-
-pub enum MessageBlendStreamOutgoingMessage {
-    FullyUnwrapped(Vec<u8>),
-    Outbound(Vec<u8>),
 }
 
 /// [`MessageBlendStream`] handles the entire mixing tiers process
@@ -43,9 +34,9 @@ pub enum MessageBlendStreamOutgoingMessage {
 /// - Generates persistent rate messages with [`PersistentTransmissionStream`]
 pub struct MessageBlendStream<S> {
     input_stream: S,
-    output_stream: BoxStream<'static, MessageBlendStreamOutgoingMessage>,
-    bypass_sender: UnboundedSender<Vec<u8>>,
-    temporal_sender: UnboundedSender<MessageBlendStreamOutgoingMessage>,
+    output_stream: BoxStream<'static, MixOutgoingMessage>,
+    bypass_sender: UnboundedSender<MixOutgoingMessage>,
+    temporal_sender: UnboundedSender<MixOutgoingMessage>,
     cryptographic_processor: CryptographicProcessor,
 }
 
@@ -58,9 +49,7 @@ where
         let (bypass_sender, bypass_receiver) = mpsc::unbounded_channel();
         let (temporal_sender, temporal_receiver) = mpsc::unbounded_channel();
         let output_stream = tokio_stream::StreamExt::merge(
-            UnboundedReceiverStream::new(bypass_receiver)
-                .persistent_transmission(settings.persistent_transmission)
-                .map(MessageBlendStreamOutgoingMessage::Outbound),
+            UnboundedReceiverStream::new(bypass_receiver),
             UnboundedReceiverStream::new(temporal_receiver)
                 .temporal_stream(settings.temporal_processor),
         )
@@ -77,7 +66,10 @@ where
     fn process_new_message(self: &mut Pin<&mut Self>, message: Vec<u8>) {
         match self.cryptographic_processor.wrap_message(&message) {
             Ok(wrapped_message) => {
-                if let Err(e) = self.bypass_sender.send(wrapped_message) {
+                if let Err(e) = self
+                    .bypass_sender
+                    .send(MixOutgoingMessage::Outbound(wrapped_message))
+                {
                     tracing::error!("Failed to send message to the outbound channel: {e:?}");
                 }
             }
@@ -91,9 +83,9 @@ where
         match self.cryptographic_processor.unwrap_message(&message) {
             Ok((unwrapped_message, fully_unwrapped)) => {
                 let message = if fully_unwrapped {
-                    MessageBlendStreamOutgoingMessage::FullyUnwrapped(unwrapped_message)
+                    MixOutgoingMessage::FullyUnwrapped(unwrapped_message)
                 } else {
-                    MessageBlendStreamOutgoingMessage::Outbound(unwrapped_message)
+                    MixOutgoingMessage::Outbound(unwrapped_message)
                 };
                 if let Err(e) = self.temporal_sender.send(message) {
                     tracing::error!("Failed to send message to the outbound channel: {e:?}");
@@ -113,7 +105,7 @@ impl<S> Stream for MessageBlendStream<S>
 where
     S: Stream<Item = MessageBlendStreamIncomingMessage> + Unpin,
 {
-    type Item = MessageBlendStreamOutgoingMessage;
+    type Item = MixOutgoingMessage;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         match self.input_stream.poll_next_unpin(cx) {
