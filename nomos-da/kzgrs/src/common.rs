@@ -59,7 +59,7 @@ pub enum KzgRsError {
     #[error("BLST error: {0}")]
     BlstError(BlstError),
     #[error("Denominator polynomial cannot be zero")]
-    DivisionByZeroPolynomial
+    DivisionByZeroPolynomial,
 }
 
 /// Transform chunks of bytes (of size `CHUNK_SIZE`) into `Fr` which are considered evaluations of a
