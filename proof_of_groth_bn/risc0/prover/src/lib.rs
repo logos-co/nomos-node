@@ -8,9 +8,13 @@ use ark_serialize::CanonicalSerialize;
 use serde::{Deserialize, Serialize};
 use risc0_zkvm::sha::{Digest, Digestible};
 
-const PROOF: &str = include_str!("../data/proof.json");
-const PUBLIC: &str = include_str!("../data/public.json");
 const VERIFICATION_KEY: &str = include_str!("../data/verification_key.json");
+const PROOF1: &str = include_str!("../data/proof_1.json");
+const PUBLIC1: &str = include_str!("../data/public_1.json");
+const PROOF2: &str = include_str!("../data/proof_2.json");
+const PUBLIC2: &str = include_str!("../data/public_2.json");
+const PROOF3: &str = include_str!("../data/proof_3.json");
+const PUBLIC3: &str = include_str!("../data/public_3.json");
 
 #[derive(Error, Debug)]
 pub enum Error {
@@ -50,9 +54,9 @@ pub struct PublicInputsJson {
 
 pub fn prove() -> Result<Receipt, Error> {
 
-    let proof_json: ProofJson = serde_json::from_str(PROOF).unwrap();
+    let proof_json: ProofJson = serde_json::from_str(PROOF1).unwrap();
     let public_inputs_json = PublicInputsJson {
-        values: serde_json::from_str(PUBLIC).unwrap(),
+        values: serde_json::from_str(PUBLIC1).unwrap(),
     };
     let verifying_key_json: VerifyingKeyJson = serde_json::from_str(VERIFICATION_KEY).unwrap();
 
@@ -206,6 +210,136 @@ pub fn prove() -> Result<Receipt, Error> {
     let mut buffer: Vec<u8> = vec![];
     buffer.append(&mut vec_verif_key);
     eprintln!("buffer size {}",buffer.len());
+    buffer.append(&mut vec_proof);
+    eprintln!("buffer size {}",buffer.len());
+    buffer.append(&mut vec_public);
+    eprintln!("buffer size {}",buffer.len());
+
+    let proof_json: ProofJson = serde_json::from_str(PROOF2).unwrap();
+    let public_inputs_json = PublicInputsJson {
+        values: serde_json::from_str(PUBLIC2).unwrap(),
+    };
+
+    let proof: Proof<Bn254> = Proof {
+        a: ark_bn254::G1Affine::new(
+            Fq::from_str(
+                &proof_json.pi_a[0]
+            )
+                .unwrap(),
+            Fq::from_str(
+                &proof_json.pi_a[1]
+            )
+                .unwrap(),
+        ),
+        b: ark_bn254::G2Affine::new(
+            Fq2::new(
+                Fq::from_str(
+                    &proof_json.pi_b[0][0]
+                )
+                    .unwrap(),
+                Fq::from_str(
+                    &proof_json.pi_b[0][1]
+                )
+                    .unwrap(),
+            ),
+            Fq2::new(
+                Fq::from_str(
+                    &proof_json.pi_b[1][0]
+                )
+                    .unwrap(),
+                Fq::from_str(
+                    &proof_json.pi_b[1][1]
+                )
+                    .unwrap(),
+            ),
+        ),
+        c: ark_bn254::G1Affine::new(
+            Fq::from_str(
+                &proof_json.pi_c[0]
+            )
+                .unwrap(),
+            Fq::from_str(
+                &proof_json.pi_c[1]
+            )
+                .unwrap(),
+        ),
+    };
+    let mut vec_proof: Vec<u8> = vec![];
+    proof.serialize_uncompressed(&mut vec_proof).unwrap();
+
+
+    let public: Vec<Fr> = public_inputs_json.values.iter().map(|x| Fr::from_str(
+        &x,
+    )
+        .unwrap()    ).collect();
+    let mut vec_public: Vec<u8> = vec![];
+    public.serialize_uncompressed(&mut vec_public).unwrap();
+
+    buffer.append(&mut vec_proof);
+    eprintln!("buffer size {}",buffer.len());
+    buffer.append(&mut vec_public);
+    eprintln!("buffer size {}",buffer.len());
+
+    let proof_json: ProofJson = serde_json::from_str(PROOF3).unwrap();
+    let public_inputs_json = PublicInputsJson {
+        values: serde_json::from_str(PUBLIC3).unwrap(),
+    };
+
+    let proof: Proof<Bn254> = Proof {
+        a: ark_bn254::G1Affine::new(
+            Fq::from_str(
+                &proof_json.pi_a[0]
+            )
+                .unwrap(),
+            Fq::from_str(
+                &proof_json.pi_a[1]
+            )
+                .unwrap(),
+        ),
+        b: ark_bn254::G2Affine::new(
+            Fq2::new(
+                Fq::from_str(
+                    &proof_json.pi_b[0][0]
+                )
+                    .unwrap(),
+                Fq::from_str(
+                    &proof_json.pi_b[0][1]
+                )
+                    .unwrap(),
+            ),
+            Fq2::new(
+                Fq::from_str(
+                    &proof_json.pi_b[1][0]
+                )
+                    .unwrap(),
+                Fq::from_str(
+                    &proof_json.pi_b[1][1]
+                )
+                    .unwrap(),
+            ),
+        ),
+        c: ark_bn254::G1Affine::new(
+            Fq::from_str(
+                &proof_json.pi_c[0]
+            )
+                .unwrap(),
+            Fq::from_str(
+                &proof_json.pi_c[1]
+            )
+                .unwrap(),
+        ),
+    };
+    let mut vec_proof: Vec<u8> = vec![];
+    proof.serialize_uncompressed(&mut vec_proof).unwrap();
+
+
+    let public: Vec<Fr> = public_inputs_json.values.iter().map(|x| Fr::from_str(
+        &x,
+    )
+        .unwrap()    ).collect();
+    let mut vec_public: Vec<u8> = vec![];
+    public.serialize_uncompressed(&mut vec_public).unwrap();
+
     buffer.append(&mut vec_proof);
     eprintln!("buffer size {}",buffer.len());
     buffer.append(&mut vec_public);
