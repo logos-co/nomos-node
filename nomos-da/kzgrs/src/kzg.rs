@@ -2,6 +2,7 @@ use crate::common::KzgRsError;
 use crate::Evaluations;
 use ark_bls12_381::{Bls12_381, Fr};
 use ark_ec::pairing::Pairing;
+use ark_ff::UniformRand;
 use ark_poly::univariate::DensePolynomial;
 use ark_poly::{DenseUVPolynomial, EvaluationDomain, GeneralEvaluationDomain};
 use ark_poly_commit::kzg10::{Commitment, Powers, Proof, UniversalParams, KZG10};
@@ -60,16 +61,30 @@ pub fn generate_element_proof(
     if u.is_zero() {
         return Err(KzgRsError::DivisionByZeroPolynomial);
     };
+
     // Instead of evaluating over the polynomial, we can reuse the evaluation points from the rs encoding
     // let v = polynomial.evaluate(&u);
     let v = evaluations.evals[element_index];
-    let f_x_v = polynomial + &DensePolynomial::<Fr>::from_coefficients_vec(vec![-v]);
+
+    // Generate randomness for v (random_v)
+    let mut rng = OsRng;
+    let random_v = Fr::rand(&mut rng);
+
+    // Compute the randomized v' = v + random_v
+    let v_prime = v + &random_v;
+
+    // Compute f(x) - v' (adjusted for randomness)
+    let f_x_v = polynomial + &DensePolynomial::<Fr>::from_coefficients_vec(vec![-v_prime]);
+
+    // Compute x - u
     let x_u = DensePolynomial::<Fr>::from_coefficients_vec(vec![-u, Fr::one()]);
+
+    // Compute the witness polynomial: (f(x) - v') / (x - u)
     let witness_polynomial: DensePolynomial<_> = &f_x_v / &x_u;
     let proof = commit_polynomial(&witness_polynomial, global_parameters)?;
     let proof = Proof {
         w: proof.0,
-        random_v: None,
+        random_v: Some(random_v),
     };
     Ok(proof)
 }
