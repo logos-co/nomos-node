@@ -71,7 +71,7 @@ pub fn generate_element_proof(
     let random_v = Fr::rand(&mut rng);
 
     // Compute the randomized v' = v + random_v
-    let v_prime = v + &random_v;
+    let v_prime = v + random_v;
 
     // Compute f(x) - v' (adjusted for randomness)
     let f_x_v = polynomial + &DensePolynomial::<Fr>::from_coefficients_vec(vec![-v_prime]);
