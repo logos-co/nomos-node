@@ -138,7 +138,9 @@ where
                 Some(msg) = local_messages.next() => {
                     match cryptographic_processor.wrap_message(&msg) {
                         Ok(wrapped_message) => {
-                            backend.publish(wrapped_message).await;
+                            if let Err(e) = persistent_sender.send(wrapped_message) {
+                                tracing::error!("Error sending message to persistent stream: {e}");
+                            }
                         }
                         Err(e) => {
                             tracing::error!("Failed to wrap message: {:?}", e);
