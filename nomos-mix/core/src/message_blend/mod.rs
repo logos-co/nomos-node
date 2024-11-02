@@ -3,12 +3,17 @@ mod temporal;
 
 pub use crypto::CryptographicProcessorSettings;
 use futures::StreamExt;
+use nomos_mix_message::MessageBuilder;
 pub use temporal::TemporalProcessorSettings;
 
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
 
-use crate::message_blend::{crypto::CryptographicProcessor, temporal::TemporalProcessor};
+use crate::{
+    error::Error,
+    membership::Membership,
+    message_blend::{crypto::CryptographicProcessor, temporal::TemporalProcessor},
+};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct MessageBlendSettings {
@@ -38,6 +43,8 @@ pub struct MessageBlend {
 impl MessageBlend {
     pub fn new(
         settings: MessageBlendSettings,
+        message_builder: MessageBuilder,
+        membership: Membership,
         new_message_receiver: mpsc::UnboundedReceiver<Vec<u8>>,
         inbound_message_receiver: mpsc::UnboundedReceiver<Vec<u8>>,
         outbound_message_sender: mpsc::UnboundedSender<Vec<u8>>,
@@ -48,7 +55,11 @@ impl MessageBlend {
             inbound_message_receiver,
             outbound_message_sender,
             fully_unwrapped_message_sender,
-            cryptographic_processor: CryptographicProcessor::new(settings.cryptographic_processor),
+            cryptographic_processor: CryptographicProcessor::new(
+                settings.cryptographic_processor,
+                message_builder,
+                membership,
+            ),
             temporal_processor: TemporalProcessor::<_>::new(settings.temporal_processor),
         }
     }
@@ -93,7 +104,7 @@ impl MessageBlend {
                         fully_unwrapped,
                     });
             }
-            Err(nomos_mix_message::Error::MsgUnwrapNotAllowed) => {
+            Err(Error::MixMessageError(nomos_mix_message::Error::MsgUnwrapNotAllowed)) => {
                 tracing::debug!("Message cannot be unwrapped by this node");
             }
             Err(e) => {

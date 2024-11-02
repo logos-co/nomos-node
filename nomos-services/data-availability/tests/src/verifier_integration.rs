@@ -70,7 +70,7 @@ fn test_verifier() {
         port: 7774,
         ..Default::default()
     };
-    let mix_configs = new_mix_configs(vec![
+    let (mix_configs, mix_membership) = new_mix_configs(vec![
         Multiaddr::from_str("/ip4/127.0.0.1/udp/7783/quic-v1").unwrap(),
         Multiaddr::from_str("/ip4/127.0.0.1/udp/7784/quic-v1").unwrap(),
     ]);
@@ -103,7 +103,9 @@ fn test_verifier() {
         &genesis_state,
         &time_config,
         &swarm_config1,
-        &mix_configs[0],
+        &mix_configs[0].0,
+        &mix_configs[0].1,
+        mix_membership.clone(),
         NamedTempFile::new().unwrap().path().to_path_buf(),
         &blobs_dir,
         vec![node_address(&swarm_config2)],
@@ -131,7 +133,9 @@ fn test_verifier() {
         &genesis_state,
         &time_config,
         &swarm_config2,
-        &mix_configs[1],
+        &mix_configs[1].0,
+        &mix_configs[1].1,
+        mix_membership.clone(),
         NamedTempFile::new().unwrap().path().to_path_buf(),
         &blobs_dir,
         vec![node_address(&swarm_config1)],

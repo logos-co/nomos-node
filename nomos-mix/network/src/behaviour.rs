@@ -12,7 +12,8 @@ use libp2p::{
     },
     Multiaddr, PeerId,
 };
-use nomos_mix_message::{is_drop_message, message_id};
+use nomos_mix_message::MessageBuilder;
+use sha2::{Digest, Sha256};
 
 use crate::{
     error::Error,
@@ -61,12 +62,12 @@ impl Behaviour {
 
     /// Publish a message (data or drop) to all connected peers
     pub fn publish(&mut self, message: Vec<u8>) -> Result<(), Error> {
-        if is_drop_message(&message) {
+        if MessageBuilder::is_drop_message(&message) {
             // Bypass deduplication for the drop message
             return self.forward_message(message, None);
         }
 
-        let msg_id = message_id(&message);
+        let msg_id = Self::message_id(&message);
         // If the message was already seen, don't forward it again
         if self.duplicate_cache.cache_get(&msg_id).is_some() {
             return Ok(());
@@ -108,6 +109,12 @@ impl Behaviour {
 
         self.try_wake();
         Ok(())
+    }
+
+    fn message_id(message: &[u8]) -> Vec<u8> {
+        let mut hasher = Sha256::new();
+        hasher.update(message);
+        hasher.finalize().to_vec()
     }
 
     fn add_negotiated_peer(&mut self, peer_id: PeerId, connection_id: ConnectionId) -> bool {
@@ -191,14 +198,14 @@ impl NetworkBehaviour for Behaviour {
             // A message was forwarded from the peer.
             ToBehaviour::Message(message) => {
                 // Ignore drop message
-                if is_drop_message(&message) {
+                if MessageBuilder::is_drop_message(&message) {
                     return;
                 }
 
                 // Add the message to the cache. If it was already seen, ignore it.
                 if self
                     .duplicate_cache
-                    .cache_set(message_id(&message), ())
+                    .cache_set(Self::message_id(&message), ())
                     .is_some()
                 {
                     return;

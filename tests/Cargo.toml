@@ -50,6 +50,7 @@ criterion = { version = "0.5", features = ["async_tokio"] }
 nomos-cli = { path = "../nomos-cli" }
 time = "0.3"
 tracing = "0.1"
+x25519-dalek = { version = "2.0.1", features = ["getrandom", "static_secrets"] }
 
 [[test]]
 name = "test_cryptarchia_happy_path"

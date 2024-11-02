@@ -5,64 +5,104 @@ mod routing;
 
 pub use error::Error;
 
-use sha2::{Digest, Sha256};
+use packet::{Packet, UnpackedPacket};
 
-pub const MSG_SIZE: usize = 2048;
-pub const DROP_MESSAGE: [u8; MSG_SIZE] = [0; MSG_SIZE];
-
-// TODO: Remove all the mock below once the actual implementation is integrated to the system.
-//
-/// A mock implementation of the Sphinx encoding.
-///
-/// The length of the encoded message is fixed to [`MSG_SIZE`] bytes.
-/// The first byte of the encoded message is the number of remaining layers to be unwrapped.
-/// The remaining bytes are the payload that is zero-padded to the end.
-pub fn new_message(payload: &[u8], num_layers: u8) -> Result<Vec<u8>, Error> {
-    if payload.len() > MSG_SIZE - 1 {
-        return Err(Error::PayloadTooLarge);
-    }
-
-    let mut message: Vec<u8> = Vec::with_capacity(MSG_SIZE);
-    message.push(num_layers);
-    message.extend(payload);
-    message.extend(std::iter::repeat(0).take(MSG_SIZE - message.len()));
-    Ok(message)
+pub struct MessageBuilder {
+    max_layers: usize,
+    max_payload_size: usize,
+    drop_message: Vec<u8>,
 }
 
-/// SHA-256 hash of the message
-pub fn message_id(message: &[u8]) -> Vec<u8> {
-    let mut hasher = Sha256::new();
-    hasher.update(message);
-    hasher.finalize().to_vec()
+#[repr(u8)]
+pub enum MessageFlag {
+    Drop = 0x00,
+    Data = 0x01,
 }
 
-/// Unwrap the message one layer.
-///
-/// This function returns the unwrapped message and a boolean indicating whether the message was fully unwrapped.
-/// (False if the message still has layers to be unwrapped, true otherwise)
-///
-/// If the input message was already fully unwrapped, or if ititss format is invalid,
-/// this function returns `[Error::InvalidMixMessage]`.
-pub fn unwrap_message(message: &[u8]) -> Result<(Vec<u8>, bool), Error> {
-    if message.is_empty() {
-        return Err(Error::InvalidMixMessage);
+impl MessageBuilder {
+    pub fn new(max_layers: usize, max_payload_size: usize) -> Result<Self, Error> {
+        Ok(Self {
+            max_layers,
+            max_payload_size,
+            drop_message: Self::new_drop_message(max_layers, max_payload_size)?,
+        })
     }
 
-    match message[0] {
-        0 => Err(Error::InvalidMixMessage),
-        1 => Ok((message[1..].to_vec(), true)),
-        n => {
-            let mut unwrapped: Vec<u8> = Vec::with_capacity(message.len());
-            unwrapped.push(n - 1);
-            unwrapped.extend(&message[1..]);
-            Ok((unwrapped, false))
+    pub fn new_message(
+        &self,
+        recipient_pubkeys: Vec<[u8; 32]>,
+        payload: &[u8],
+    ) -> Result<Vec<u8>, Error> {
+        let recipient_pubkeys = recipient_pubkeys
+            .into_iter()
+            .map(x25519_dalek::PublicKey::from)
+            .collect::<Vec<_>>();
+        let packet = Packet::build(
+            &recipient_pubkeys,
+            self.max_layers,
+            payload,
+            self.max_payload_size,
+        )?;
+        Ok(Self::concat_flag(MessageFlag::Data, &packet.to_bytes()))
+    }
+
+    fn new_drop_message(max_layers: usize, max_payload_size: usize) -> Result<Vec<u8>, Error> {
+        let dummy_packet = Packet::build(
+            &[x25519_dalek::PublicKey::from(
+                &x25519_dalek::EphemeralSecret::random(),
+            )],
+            max_layers,
+            &[0u8; 1],
+            max_payload_size,
+        )?;
+        Ok(Self::concat_flag(
+            MessageFlag::Drop,
+            &dummy_packet.to_bytes(),
+        ))
+    }
+
+    pub fn drop_message(&self) -> Vec<u8> {
+        self.drop_message.clone()
+    }
+
+    pub fn is_drop_message(message: &[u8]) -> bool {
+        Self::check_flag(MessageFlag::Drop, message).is_ok()
+    }
+
+    pub fn unpack_message(
+        &self,
+        message: &[u8],
+        private_key: [u8; 32],
+    ) -> Result<(Vec<u8>, bool), Error> {
+        let message = Self::check_flag(MessageFlag::Data, message)?;
+        let packet = Packet::from_bytes(message, self.max_layers)?;
+        let private_key = x25519_dalek::StaticSecret::from(private_key);
+        Ok(match packet.unpack(&private_key, self.max_layers)? {
+            UnpackedPacket::ToForward(m) => {
+                (Self::concat_flag(MessageFlag::Data, &m.to_bytes()), false)
+            }
+            UnpackedPacket::FullyUnpacked(m) => (m, true),
+        })
+    }
+
+    pub fn message_size(&self) -> usize {
+        self.drop_message.len()
+    }
+
+    fn concat_flag(flag: MessageFlag, bytes: &[u8]) -> Vec<u8> {
+        concat_bytes(&[&[flag as u8], bytes])
+    }
+
+    fn check_flag(flag: MessageFlag, message: &[u8]) -> Result<&[u8], Error> {
+        if message.first() != Some(&(flag as u8)) {
+            return Err(Error::InvalidMixMessage);
+        }
+        if message.len() == 1 {
+            Ok(&[])
+        } else {
+            Ok(&message[1..])
         }
     }
-}
-
-/// Check if the message is a drop message.
-pub fn is_drop_message(message: &[u8]) -> bool {
-    message == DROP_MESSAGE
 }
 
 pub(crate) fn concat_bytes(bytes_list: &[&[u8]]) -> Vec<u8> {
@@ -86,4 +126,21 @@ pub(crate) fn parse_bytes<'a>(data: &'a [u8], sizes: &[usize]) -> Result<Vec<&'a
             Ok(slice)
         })
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn message_builder() {
+        let builder = MessageBuilder::new(5, 2048).unwrap();
+
+        let drop_message = builder.drop_message();
+        assert_eq!(drop_message.len(), builder.message_size());
+
+        let data_message = builder.new_message(vec![[1u8; 32]], &[10u8; 100]).unwrap();
+        assert!(data_message != drop_message);
+        assert_eq!(data_message.len(), builder.message_size());
+    }
 }

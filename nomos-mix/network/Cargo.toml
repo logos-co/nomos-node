@@ -9,6 +9,7 @@ futures = "0.3.30"
 futures-timer = "3.0.3"
 libp2p = "0.53"
 tracing = "0.1"
+sha2 = "0.10"
 nomos-mix = { path = "../core" }
 nomos-mix-message = { path = "../message" }
 

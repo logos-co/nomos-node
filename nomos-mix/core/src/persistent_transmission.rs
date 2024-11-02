@@ -1,5 +1,4 @@
 use futures::Stream;
-use nomos_mix_message::DROP_MESSAGE;
 use rand::{distributions::Uniform, prelude::Distribution, Rng, SeedableRng};
 use rand_chacha::ChaCha12Rng;
 use serde::{Deserialize, Serialize};
@@ -35,6 +34,7 @@ where
 {
     interval: Interval,
     coin: Coin<ChaCha12Rng>,
+    drop_message: Vec<u8>,
     stream: S,
 }
 
@@ -44,6 +44,7 @@ where
 {
     pub fn new(
         settings: PersistentTransmissionSettings,
+        drop_message: Vec<u8>,
         stream: S,
     ) -> PersistentTransmissionStream<S> {
         let interval = time::interval(Duration::from_secs_f64(
@@ -57,6 +58,7 @@ where
         Self {
             interval,
             coin,
+            drop_message,
             stream,
         }
     }
@@ -73,6 +75,7 @@ where
             ref mut interval,
             ref mut stream,
             ref mut coin,
+            ref drop_message,
             ..
         } = self.get_mut();
         if pin!(interval).poll_tick(cx).is_pending() {
@@ -81,7 +84,7 @@ where
         if let Poll::Ready(Some(item)) = pin!(stream).poll_next(cx) {
             Poll::Ready(Some(item))
         } else if coin.flip() {
-            Poll::Ready(Some(DROP_MESSAGE.to_vec()))
+            Poll::Ready(Some(drop_message.clone()))
         } else {
             Poll::Pending
         }
@@ -92,11 +95,12 @@ pub trait PersistentTransmissionExt: Stream {
     fn persistent_transmission(
         self,
         settings: PersistentTransmissionSettings,
+        drop_message: Vec<u8>,
     ) -> PersistentTransmissionStream<Self>
     where
         Self: Sized + Unpin,
     {
-        PersistentTransmissionStream::new(settings, self)
+        PersistentTransmissionStream::new(settings, drop_message, self)
     }
 }
 
@@ -111,6 +115,7 @@ impl<S> PersistentTransmissionExt for S where S: Stream {}
 /// * `emission_sender` - The channel to emit messages
 pub async fn persistent_transmission(
     settings: PersistentTransmissionSettings,
+    drop_message: Vec<u8>,
     schedule_receiver: mpsc::UnboundedReceiver<Vec<u8>>,
     emission_sender: mpsc::UnboundedSender<Vec<u8>>,
 ) {
@@ -138,7 +143,7 @@ pub async fn persistent_transmission(
             Err(TryRecvError::Empty) => {
                 // If the coin is head, emit the drop message.
                 if coin.flip() {
-                    if let Err(e) = emission_sender.send(DROP_MESSAGE.to_vec()) {
+                    if let Err(e) = emission_sender.send(drop_message.clone()) {
                         tracing::error!(
                             "Failed to send drop message to the transmission channel: {e:?}"
                         );
@@ -228,8 +233,10 @@ mod tests {
         let upper_bound = expected_emission_interval + torelance;
 
         // Start the persistent transmission and schedule messages
+        let drop_message = vec![0];
         tokio::spawn(persistent_transmission(
             settings,
+            drop_message.clone(),
             schedule_receiver,
             emission_sender,
         ));
@@ -248,16 +255,10 @@ mod tests {
         assert_eq!(emission_receiver.recv().await.unwrap(), vec![3]);
         assert_interval!(&mut last_time, lower_bound, upper_bound);
 
-        assert_eq!(
-            emission_receiver.recv().await.unwrap(),
-            DROP_MESSAGE.to_vec()
-        );
+        assert_eq!(emission_receiver.recv().await.unwrap(), drop_message);
         assert_interval!(&mut last_time, lower_bound, upper_bound);
 
-        assert_eq!(
-            emission_receiver.recv().await.unwrap(),
-            DROP_MESSAGE.to_vec()
-        );
+        assert_eq!(emission_receiver.recv().await.unwrap(), drop_message);
         assert_interval!(&mut last_time, lower_bound, upper_bound);
 
         // Schedule a new message and check if it is emitted at the next interval
@@ -282,7 +283,9 @@ mod tests {
         let lower_bound = expected_emission_interval - torelance;
         let upper_bound = expected_emission_interval + torelance;
         // prepare stream
-        let mut persistent_transmission_stream = stream.persistent_transmission(settings);
+        let drop_message = vec![0];
+        let mut persistent_transmission_stream =
+            stream.persistent_transmission(settings, drop_message.clone());
         // Messages must be scheduled in non-blocking manner.
         schedule_sender.send(vec![1]).unwrap();
         schedule_sender.send(vec![2]).unwrap();
@@ -309,13 +312,13 @@ mod tests {
 
         assert_eq!(
             persistent_transmission_stream.next().await.unwrap(),
-            DROP_MESSAGE.to_vec()
+            drop_message
         );
         assert_interval!(&mut last_time, lower_bound, upper_bound);
 
         assert_eq!(
             persistent_transmission_stream.next().await.unwrap(),
-            DROP_MESSAGE.to_vec()
+            drop_message
         );
         assert_interval!(&mut last_time, lower_bound, upper_bound);
 

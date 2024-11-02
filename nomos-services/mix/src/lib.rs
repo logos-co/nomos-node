@@ -9,9 +9,11 @@ use futures::StreamExt;
 use network::NetworkAdapter;
 use nomos_core::wire;
 use nomos_mix::{
-    message_blend::{MessageBlend, MessageBlendSettings},
+    membership::{Membership, Node},
+    message_blend::{CryptographicProcessorSettings, MessageBlend, MessageBlendSettings},
     persistent_transmission::{persistent_transmission, PersistentTransmissionSettings},
 };
+use nomos_mix_message::MessageBuilder;
 use nomos_network::NetworkService;
 use overwatch_rs::services::{
     handle::ServiceStateHandle,
@@ -38,6 +40,7 @@ where
     backend: Backend,
     service_state: ServiceStateHandle<Self>,
     network_relay: Relay<NetworkService<Network::Backend>>,
+    membership: Membership,
 }
 
 impl<Backend, Network> ServiceData for MixService<Backend, Network>
@@ -64,14 +67,18 @@ where
         Clone + Debug + Serialize + DeserializeOwned + Send + Sync + 'static,
 {
     fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, overwatch_rs::DynError> {
+        let mix_config = service_state.settings_reader.get_updated_settings();
+        let membership = mix_config.membership();
         let network_relay = service_state.overwatch_handle.relay();
         Ok(Self {
             backend: <Backend as MixBackend>::new(
                 service_state.settings_reader.get_updated_settings().backend,
                 service_state.overwatch_handle.clone(),
+                membership.clone(),
             ),
             service_state,
             network_relay,
+            membership,
         })
     }
 
@@ -80,19 +87,30 @@ where
             mut service_state,
             mut backend,
             network_relay,
+            membership,
         } = self;
         let mix_config = service_state.settings_reader.get_updated_settings();
 
         let network_relay = network_relay.connect().await?;
         let network_adapter = Network::new(network_relay);
 
+        // Create message builder used in all tiers.
+        let CryptographicProcessorSettings {
+            max_num_mix_layers,
+            max_payload_size,
+            ..
+        } = mix_config.message_blend.cryptographic_processor;
+        let message_builder = MessageBuilder::new(max_num_mix_layers, max_payload_size).unwrap();
+
         // Spawn Persistent Transmission
         let (transmission_schedule_sender, transmission_schedule_receiver) =
             mpsc::unbounded_channel();
         let (emission_sender, mut emission_receiver) = mpsc::unbounded_channel();
+        let drop_message = message_builder.drop_message();
         tokio::spawn(async move {
             persistent_transmission(
                 mix_config.persistent_transmission,
+                drop_message,
                 transmission_schedule_receiver,
                 emission_sender,
             )
@@ -107,6 +125,8 @@ where
         tokio::spawn(async move {
             MessageBlend::new(
                 mix_config.message_blend,
+                message_builder,
+                membership.clone(),
                 new_message_receiver,
                 processor_inbound_receiver,
                 // Connect the outputs of Message Blend to Persistent Transmission
@@ -200,6 +220,24 @@ pub struct MixConfig<BackendSettings> {
     pub backend: BackendSettings,
     pub persistent_transmission: PersistentTransmissionSettings,
     pub message_blend: MessageBlendSettings,
+    pub membership: Vec<Node>,
+}
+
+impl<BackendSettings> MixConfig<BackendSettings> {
+    // TODO: This step can be redesigned once we can load membership info from the chain state.
+    fn membership(&self) -> Membership {
+        let local_public_key = x25519_dalek::PublicKey::from(&x25519_dalek::StaticSecret::from(
+            self.message_blend.cryptographic_processor.private_key,
+        ))
+        .to_bytes();
+        let remote_nodes = self
+            .membership
+            .iter()
+            .filter(|node| node.public_key != local_public_key)
+            .cloned()
+            .collect();
+        Membership::new(remote_nodes)
+    }
 }
 
 /// A message that is handled by [`MixService`].

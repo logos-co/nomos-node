@@ -1,6 +1,7 @@
 use cryptarchia_consensus::LeaderConfig;
 // std
 use nomos_da_network_service::backends::libp2p::common::DaNetworkBackendSettings;
+use nomos_mix::membership::Node;
 use nomos_mix::message_blend::{
     CryptographicProcessorSettings, MessageBlendSettings, TemporalProcessorSettings,
 };
@@ -193,7 +194,9 @@ pub fn new_node(
     genesis_state: &LedgerState,
     time_config: &TimeConfig,
     swarm_config: &SwarmConfig,
-    mix_config: &Libp2pMixBackendSettings,
+    mix_backend_settings: &Libp2pMixBackendSettings,
+    mix_private_key: &x25519_dalek::StaticSecret,
+    mix_membership: Vec<Node>,
     db_path: PathBuf,
     blobs_dir: &PathBuf,
     initial_peers: Vec<Multiaddr>,
@@ -210,14 +213,20 @@ pub fn new_node(
                 },
             },
             mix: MixConfig {
-                backend: mix_config.clone(),
+                backend: mix_backend_settings.clone(),
                 persistent_transmission: Default::default(),
                 message_blend: MessageBlendSettings {
-                    cryptographic_processor: CryptographicProcessorSettings { num_mix_layers: 1 },
+                    cryptographic_processor: CryptographicProcessorSettings {
+                        num_mix_layers: 1,
+                        max_num_mix_layers: 1,
+                        max_payload_size: 2048,
+                        private_key: mix_private_key.to_bytes(),
+                    },
                     temporal_processor: TemporalProcessorSettings {
                         max_delay_seconds: 2,
                     },
                 },
+                membership: mix_membership,
             },
             da_network: DaNetworkConfig {
                 backend: DaNetworkBackendSettings {
@@ -308,35 +317,35 @@ pub fn new_node(
     .unwrap()
 }
 
-pub fn new_mix_configs(listening_addresses: Vec<Multiaddr>) -> Vec<Libp2pMixBackendSettings> {
-    let mut configs = listening_addresses
+pub fn new_mix_configs(
+    listening_addresses: Vec<Multiaddr>,
+) -> (
+    Vec<(Libp2pMixBackendSettings, x25519_dalek::StaticSecret)>,
+    Vec<Node>,
+) {
+    let node_settings = listening_addresses
         .iter()
-        .map(|listening_address| Libp2pMixBackendSettings {
-            listening_address: listening_address.clone(),
-            node_key: ed25519::SecretKey::generate(),
-            membership: Vec::new(),
-            peering_degree: 1,
+        .map(|listening_address| {
+            (
+                Libp2pMixBackendSettings {
+                    listening_address: listening_address.clone(),
+                    node_key: ed25519::SecretKey::generate(),
+                    peering_degree: 1,
+                },
+                x25519_dalek::StaticSecret::random(),
+            )
         })
         .collect::<Vec<_>>();
 
-    let membership = configs
+    let membership = node_settings
         .iter()
-        .map(|c| {
-            let peer_id = PeerId::from_public_key(
-                &ed25519::Keypair::from(c.node_key.clone()).public().into(),
-            );
-            c.listening_address
-                .clone()
-                .with_p2p(peer_id)
-                .unwrap_or_else(|orig_addr| orig_addr)
+        .map(|(backend_setting, private_key)| Node {
+            address: backend_setting.listening_address.clone(),
+            public_key: x25519_dalek::PublicKey::from(private_key).to_bytes(),
         })
         .collect::<Vec<_>>();
 
-    configs
-        .iter_mut()
-        .for_each(|c| c.membership = membership.clone());
-
-    configs
+    (node_settings, membership)
 }
 
 // Client node is only created for asyncroniously interact with nodes in the test.

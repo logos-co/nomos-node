@@ -6,11 +6,11 @@ use libp2p::{
     core::transport::ListenerId,
     identity::{ed25519, Keypair},
     swarm::SwarmEvent,
-    Multiaddr, PeerId, Swarm, SwarmBuilder, TransportError,
+    Multiaddr, Swarm, SwarmBuilder, TransportError,
 };
-use nomos_libp2p::{secret_key_serde, DialError, DialOpts, Protocol};
+use nomos_libp2p::{secret_key_serde, DialError, DialOpts};
+use nomos_mix::membership::Membership;
 use overwatch_rs::overwatch::handle::OverwatchHandle;
-use rand::seq::IteratorRandom;
 use serde::{Deserialize, Serialize};
 use tokio::{
     sync::{broadcast, mpsc},
@@ -34,7 +34,6 @@ pub struct Libp2pMixBackendSettings {
     // A key for deriving PeerId and establishing secure connections (TLS 1.3 by QUIC)
     #[serde(with = "secret_key_serde", default = "ed25519::SecretKey::generate")]
     pub node_key: ed25519::SecretKey,
-    pub membership: Vec<Multiaddr>,
     pub peering_degree: usize,
 }
 
@@ -44,12 +43,15 @@ const CHANNEL_SIZE: usize = 64;
 impl MixBackend for Libp2pMixBackend {
     type Settings = Libp2pMixBackendSettings;
 
-    fn new(config: Self::Settings, overwatch_handle: OverwatchHandle) -> Self {
+    fn new(
+        config: Self::Settings,
+        overwatch_handle: OverwatchHandle,
+        membership: Membership,
+    ) -> Self {
         let (swarm_message_sender, swarm_message_receiver) = mpsc::channel(CHANNEL_SIZE);
         let (incoming_message_sender, _) = broadcast::channel(CHANNEL_SIZE);
 
         let keypair = Keypair::from(ed25519::Keypair::from(config.node_key.clone()));
-        let local_peer_id = keypair.public().to_peer_id();
         let mut swarm = MixSwarm::new(
             keypair,
             swarm_message_receiver,
@@ -63,20 +65,12 @@ impl MixBackend for Libp2pMixBackend {
             });
 
         // Randomly select peering_degree number of peers, and dial to them
-        // TODO: Consider moving the peer seelction to the nomos_mix_network::Behaviour
-        config
-            .membership
+        membership
+            .choose_nodes(&mut rand::thread_rng(), config.peering_degree)
             .iter()
-            .filter(|addr| match extract_peer_id(addr) {
-                Some(peer_id) => peer_id != local_peer_id,
-                None => false,
-            })
-            .choose_multiple(&mut rand::thread_rng(), config.peering_degree)
-            .iter()
-            .cloned()
-            .for_each(|addr| {
-                if let Err(e) = swarm.dial(addr.clone()) {
-                    tracing::error!("failed to dial to {:?}: {:?}", addr, e);
+            .for_each(|node| {
+                if let Err(e) = swarm.dial(node.address.clone()) {
+                    tracing::error!("failed to dial to {:?}: {:?}", node.address, e);
                 }
             });
 
@@ -192,14 +186,4 @@ impl MixSwarm {
             }
         }
     }
-}
-
-fn extract_peer_id(multiaddr: &Multiaddr) -> Option<PeerId> {
-    multiaddr.iter().find_map(|protocol| {
-        if let Protocol::P2p(peer_id) = protocol {
-            Some(peer_id)
-        } else {
-            None
-        }
-    })
 }
