@@ -99,7 +99,7 @@ pub fn verify_element_proof(
     global_parameters: &UniversalParams<Bls12_381>,
 ) -> bool {
     let u = domain.element(element_index);
-    let v = element;
+    let v = *element + proof.random_v.unwrap();
     let commitment_check_g1 = commitment.0 + global_parameters.powers_of_g[0].mul(v).neg();
     let proof_check_g2 = global_parameters.beta_h + global_parameters.h.mul(u).neg();
     let lhs = Bls12_381::pairing(commitment_check_g1, global_parameters.h);
