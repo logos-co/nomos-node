@@ -154,11 +154,14 @@ mod tests {
         DispersalExecutorBehaviour, DispersalExecutorEvent,
     };
     use kzgrs_backend::common::blob::DaBlob;
-    use kzgrs_backend::common::Column;
+    use kzgrs_backend::common::ColumnIndex;
+    use kzgrs_backend::encoder::{DaEncoder, DaEncoderParams, EncodedData};
     use libp2p::identity::Keypair;
     use libp2p::swarm::SwarmEvent;
     use libp2p::{identity, quic, PeerId, Swarm};
+    use nomos_core::da::DaEncoder as TraitDaEncoder;
     use nomos_da_messages::common::Blob;
+    use rand::RngCore;
     use std::collections::{HashMap, HashSet};
     use std::time::Duration;
     use tokio::sync::mpsc::UnboundedSender;
@@ -360,21 +363,31 @@ mod tests {
         subnet_id: u32,
         messages_to_send: usize,
     ) {
+        // Generate 16 blobs
+        let mut buff = vec![0; 32 * DaEncoderParams::MAX_BLS12_381_ENCODING_CHUNK_SIZE];
+        rand::thread_rng().fill_bytes(&mut buff);
+        let params = DaEncoderParams::default_with(32);
+        let encoder = DaEncoder::new(params);
+        let encoded_data: EncodedData = encoder.encode(&buff).unwrap();
+        let blobs: Vec<DaBlob> = encoded_data
+            .chunked_data
+            .columns()
+            .enumerate()
+            .map(|(idx, column)| DaBlob {
+                column,
+                column_idx: idx as ColumnIndex,
+                column_commitment: Default::default(),
+                aggregated_column_commitment: Default::default(),
+                aggregated_column_proof: Default::default(),
+                rows_commitments: vec![],
+                rows_proofs: vec![],
+            })
+            .collect();
+
         for i in 0..messages_to_send {
             debug!("Sending blob {i} to subnet {subnet_id} ...");
             disperse_blob_sender
-                .send((
-                    subnet_id,
-                    DaBlob {
-                        column_idx: 0,
-                        column: Column(vec![]),
-                        column_commitment: Default::default(),
-                        aggregated_column_commitment: Default::default(),
-                        aggregated_column_proof: Default::default(),
-                        rows_commitments: vec![],
-                        rows_proofs: vec![],
-                    },
-                ))
+                .send((subnet_id, blobs[i].clone()))
                 .unwrap();
         }
     }
