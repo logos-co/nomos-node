@@ -243,6 +243,7 @@ pub fn create_validator_config(config: GeneralConfig) -> Config {
         mix: nomos_mix_service::MixConfig {
             backend: config.mix_config.backend,
             persistent_transmission: Default::default(),
+
             message_blend: MessageBlendSettings {
                 cryptographic_processor: CryptographicProcessorSettings { num_mix_layers: 1 },
                 temporal_processor: TemporalProcessorSettings {
