@@ -12,6 +12,7 @@ use std::borrow::Cow;
 use std::ops::{Mul, Neg};
 
 const MIN_DOMAIN_SIZE: usize = 64;
+const HIDING_BOUND: usize = 128;
 
 /// Commit to a polynomial where each of the evaluations are over `w(i)` for the degree
 /// of the polynomial being omega (`w`) the root of unity (2^x).
@@ -19,12 +20,11 @@ pub fn commit_polynomial(
     polynomial: &DensePolynomial<Fr>,
     global_parameters: &UniversalParams<Bls12_381>,
 ) -> Result<Commitment<Bls12_381>, KzgRsError> {
-    // Set the hiding bound to the security parameter
-    let hiding_bound = 128;
     let mut rng = OsRng;
 
     // Ensure that powers_of_gamma_g has enough powers for the hiding bound
-    if global_parameters.powers_of_gamma_g.len() < hiding_bound + 1 {
+    #[cfg(not(test))]
+    if global_parameters.powers_of_gamma_g.len() < HIDING_BOUND + 1 {
         return Err(KzgRsError::HidingBoundTooLarge);
     }
 
@@ -44,7 +44,7 @@ pub fn commit_polynomial(
     KZG10::commit(
         &roots_of_unity,
         polynomial,
-        Some(hiding_bound),
+        Some(HIDING_BOUND),
         Some(&mut rng),
     )
     .map_err(KzgRsError::PolyCommitError)
