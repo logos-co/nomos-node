@@ -2,6 +2,7 @@ use std::str::FromStr;
 
 use nomos_libp2p::{ed25519, Multiaddr};
 use nomos_mix::membership::Node;
+use nomos_mix_message::{mock::MockMixMessage, MixMessage};
 use nomos_mix_service::backends::libp2p::Libp2pMixBackendSettings;
 
 use crate::get_available_port;
@@ -10,7 +11,7 @@ use crate::get_available_port;
 pub struct GeneralMixConfig {
     pub backend: Libp2pMixBackendSettings,
     pub private_key: x25519_dalek::StaticSecret,
-    pub membership: Vec<Node>,
+    pub membership: Vec<Node<<MockMixMessage as MixMessage>::PublicKey>>,
 }
 
 pub fn create_mix_configs(ids: &[[u8; 32]]) -> Vec<GeneralMixConfig> {
@@ -45,7 +46,7 @@ pub fn create_mix_configs(ids: &[[u8; 32]]) -> Vec<GeneralMixConfig> {
     configs
 }
 
-fn mix_nodes(configs: &[GeneralMixConfig]) -> Vec<Node> {
+fn mix_nodes(configs: &[GeneralMixConfig]) -> Vec<Node<<MockMixMessage as MixMessage>::PublicKey>> {
     configs
         .iter()
         .map(|config| Node {

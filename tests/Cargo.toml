@@ -12,6 +12,7 @@ nomos-executor = { path = "../nodes/nomos-executor", default-features = false }
 nomos-network = { path = "../nomos-services/network", features = ["libp2p"] }
 nomos-mix-service = { path = "../nomos-services/mix", features = ["libp2p"] }
 nomos-mix = { path = "../nomos-mix/core" }
+nomos-mix-message = { path = "../nomos-mix/message" }
 cryptarchia-consensus = { path = "../nomos-services/cryptarchia-consensus" }
 nomos-tracing = { path = "../nomos-tracing" }
 nomos-tracing-service = { path = "../nomos-services/tracing" }

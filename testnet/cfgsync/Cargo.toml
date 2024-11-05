@@ -10,6 +10,7 @@ nomos-executor = { path = "../../nodes/nomos-executor" }
 nomos-libp2p = { path = "../../nomos-libp2p" }
 nomos-node = { path = "../../nodes/nomos-node" }
 nomos-mix = { path = "../../nomos-mix/core" }
+nomos-mix-message = { path = "../../nomos-mix/message" }
 nomos-tracing = { path = "../../nomos-tracing" }
 nomos-tracing-service = { path = "../../nomos-services/tracing" }
 rand = "0.8"

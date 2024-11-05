@@ -5,6 +5,8 @@ use nomos_mix::membership::Node;
 use nomos_mix::message_blend::{
     CryptographicProcessorSettings, MessageBlendSettings, TemporalProcessorSettings,
 };
+use nomos_mix_message::mock::MockMixMessage;
+use nomos_mix_message::MixMessage;
 use std::path::PathBuf;
 use std::time::Duration;
 // crates
@@ -191,7 +193,7 @@ pub struct TestDaNetworkSettings {
 pub struct TestMixSettings {
     pub backend: Libp2pMixBackendSettings,
     pub private_key: x25519_dalek::StaticSecret,
-    pub membership: Vec<Node>,
+    pub membership: Vec<Node<<MockMixMessage as MixMessage>::PublicKey>>,
 }
 
 pub fn new_node(

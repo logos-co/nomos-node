@@ -148,6 +148,7 @@ enum CoinError {
 mod tests {
     use super::*;
     use futures::StreamExt;
+    use nomos_mix_message::mock::MockMixMessage;
     use tokio::sync::mpsc;
 
     macro_rules! assert_interval {
@@ -188,7 +189,8 @@ mod tests {
         let lower_bound = expected_emission_interval - torelance;
         let upper_bound = expected_emission_interval + torelance;
         // prepare stream
-        let mut persistent_transmission_stream = stream.persistent_transmission(settings);
+        let mut persistent_transmission_stream: PersistentTransmissionStream<_, MockMixMessage> =
+            stream.persistent_transmission(settings);
         // Messages must be scheduled in non-blocking manner.
         schedule_sender.send(vec![1]).unwrap();
         schedule_sender.send(vec![2]).unwrap();
@@ -213,16 +215,14 @@ mod tests {
         );
         assert_interval!(&mut last_time, lower_bound, upper_bound);
 
-        assert_eq!(
-            persistent_transmission_stream.next().await.unwrap(),
-            DROP_MESSAGE.to_vec()
-        );
+        assert!(MockMixMessage::is_drop_message(
+            &persistent_transmission_stream.next().await.unwrap()
+        ));
         assert_interval!(&mut last_time, lower_bound, upper_bound);
 
-        assert_eq!(
-            persistent_transmission_stream.next().await.unwrap(),
-            DROP_MESSAGE.to_vec()
-        );
+        assert!(MockMixMessage::is_drop_message(
+            &persistent_transmission_stream.next().await.unwrap()
+        ));
         assert_interval!(&mut last_time, lower_bound, upper_bound);
 
         // Schedule a new message and check if it is emitted at the next interval

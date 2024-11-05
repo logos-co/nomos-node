@@ -3,22 +3,21 @@ use crate::{Error, MixMessage};
 //
 /// A mock implementation of the Sphinx encoding.
 
-pub type NodeId = [u8; NODE_ID_SIZE];
-const NODE_ID_SIZE: usize = 32;
-const DUMMY_NODE_ID: NodeId = [0; NODE_ID_SIZE];
+const PRIVATE_KEY_SIZE: usize = 32;
+const PUBLIC_KEY_SIZE: usize = 32;
 
 const PADDED_PAYLOAD_SIZE: usize = 2048;
 const PAYLOAD_PADDING_SEPARATOR: u8 = 0x01;
 const PAYLOAD_PADDING_SEPARATOR_SIZE: usize = 1;
 const MAX_LAYERS: usize = 5;
-pub const MESSAGE_SIZE: usize = NODE_ID_SIZE * MAX_LAYERS + PADDED_PAYLOAD_SIZE;
+pub const MESSAGE_SIZE: usize = PUBLIC_KEY_SIZE * MAX_LAYERS + PADDED_PAYLOAD_SIZE;
 
 #[derive(Clone, Debug)]
 pub struct MockMixMessage;
 
 impl MixMessage for MockMixMessage {
-    type PublicKey = [u8; 32];
-    type PrivateKey = [u8; 32];
+    type PublicKey = [u8; PUBLIC_KEY_SIZE];
+    type PrivateKey = [u8; PRIVATE_KEY_SIZE];
     const DROP_MESSAGE: &'static [u8] = &[0; MESSAGE_SIZE];
 
     /// The length of the encoded message is fixed to [`MESSAGE_SIZE`] bytes.
@@ -39,7 +38,7 @@ impl MixMessage for MockMixMessage {
             message.extend(public_key);
         });
         // If there is any remaining layers, fill them with zeros.
-        (0..MAX_LAYERS - public_keys.len()).for_each(|_| message.extend(&DUMMY_NODE_ID));
+        (0..MAX_LAYERS - public_keys.len()).for_each(|_| message.extend(&[0; PUBLIC_KEY_SIZE]));
 
         // Append payload with padding
         message.extend(payload);
@@ -55,8 +54,6 @@ impl MixMessage for MockMixMessage {
         message: &[u8],
         private_key: &Self::PrivateKey,
     ) -> Result<(Vec<u8>, bool), Error> {
-        let public_key_size = std::mem::size_of::<Self::PublicKey>();
-
         if message.len() != MESSAGE_SIZE {
             return Err(Error::InvalidMixMessage);
         }
@@ -64,13 +61,13 @@ impl MixMessage for MockMixMessage {
         let public_key =
             x25519_dalek::PublicKey::from(&x25519_dalek::StaticSecret::from(*private_key))
                 .to_bytes();
-        if message[0..public_key_size] != public_key {
+        if message[0..PUBLIC_KEY_SIZE] != public_key {
             return Err(Error::MsgUnwrapNotAllowed);
         }
 
         // If this is the last layer
-        if message[public_key_size..public_key_size * 2] == DUMMY_NODE_ID {
-            let padded_payload = &message[public_key_size * MAX_LAYERS..];
+        if message[PUBLIC_KEY_SIZE..PUBLIC_KEY_SIZE * 2] == [0; PUBLIC_KEY_SIZE] {
+            let padded_payload = &message[PUBLIC_KEY_SIZE * MAX_LAYERS..];
             // remove the payload padding
             match padded_payload
                 .iter()
@@ -85,36 +82,44 @@ impl MixMessage for MockMixMessage {
         }
 
         let mut new_message: Vec<u8> = Vec::with_capacity(MESSAGE_SIZE);
-        new_message.extend(&message[public_key_size..public_key_size * MAX_LAYERS]);
-        new_message.extend(&DUMMY_NODE_ID);
-        new_message.extend(&message[public_key_size * MAX_LAYERS..]); // padded payload
+        new_message.extend(&message[PUBLIC_KEY_SIZE..PUBLIC_KEY_SIZE * MAX_LAYERS]);
+        new_message.extend(&[0; PUBLIC_KEY_SIZE]);
+        new_message.extend(&message[PUBLIC_KEY_SIZE * MAX_LAYERS..]); // padded payload
         Ok((new_message, false))
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::NODE_ID_SIZE;
-
     use super::*;
 
     #[test]
     fn message() {
-        let node_ids = [[1; NODE_ID_SIZE], [2; NODE_ID_SIZE], [3; NODE_ID_SIZE]];
+        let private_keys = [
+            x25519_dalek::StaticSecret::random(),
+            x25519_dalek::StaticSecret::random(),
+            x25519_dalek::StaticSecret::random(),
+        ];
+        let public_keys = private_keys
+            .iter()
+            .map(|k| x25519_dalek::PublicKey::from(k).to_bytes())
+            .collect::<Vec<_>>();
         let payload = [7; 10];
-        let message = new_message(&payload, &node_ids).unwrap();
+        let message = MockMixMessage::build_message(&payload, &public_keys).unwrap();
         assert_eq!(message.len(), MESSAGE_SIZE);
 
-        let (message, is_fully_unwrapped) = unwrap_message(&message, &node_ids[0]).unwrap();
+        let (message, is_fully_unwrapped) =
+            MockMixMessage::unwrap_message(&message, &private_keys[0].to_bytes()).unwrap();
         assert!(!is_fully_unwrapped);
         assert_eq!(message.len(), MESSAGE_SIZE);
 
-        let (message, is_fully_unwrapped) = unwrap_message(&message, &node_ids[1]).unwrap();
+        let (message, is_fully_unwrapped) =
+            MockMixMessage::unwrap_message(&message, &private_keys[1].to_bytes()).unwrap();
         assert!(!is_fully_unwrapped);
         assert_eq!(message.len(), MESSAGE_SIZE);
 
         let (unwrapped_payload, is_fully_unwrapped) =
-            super::unwrap_message(&message, &node_ids[2]).unwrap();
+            MockMixMessage::unwrap_message(&message, &private_keys[2].to_bytes()).unwrap();
         assert!(is_fully_unwrapped);
         assert_eq!(unwrapped_payload, payload);
     }
