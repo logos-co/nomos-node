@@ -74,7 +74,6 @@ impl MixMessage for MockMixMessage {
                 .rposition(|&x| x == PAYLOAD_PADDING_SEPARATOR)
             {
                 Some(pos) => {
-                    println!("pos: {}", pos);
                     return Ok((padded_payload[0..pos].to_vec(), true));
                 }
                 _ => return Err(Error::InvalidMixMessage),
