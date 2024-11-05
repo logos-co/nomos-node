@@ -20,6 +20,8 @@ use overwatch_rs::services::{
     state::{NoOperator, NoState},
     ServiceCore, ServiceData, ServiceId,
 };
+use rand::SeedableRng;
+use rand_chacha::ChaCha8Rng;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::fmt::Debug;
 use tokio::sync::mpsc;
@@ -98,7 +100,7 @@ where
         // tier 2 blend
         let mut blend_messages = backend
             .listen_to_incoming_messages()
-            .blend(mix_config.message_blend);
+            .blend(mix_config.message_blend, ChaCha8Rng::from_entropy());
 
         // local messages, are bypassed and send immediately
         let mut local_messages = service_state
