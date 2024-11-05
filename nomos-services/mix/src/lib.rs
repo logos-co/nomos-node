@@ -6,6 +6,7 @@ use backends::MixBackend;
 use futures::StreamExt;
 use network::NetworkAdapter;
 use nomos_core::wire;
+use nomos_mix::membership::{Membership, Node};
 use nomos_mix::message_blend::crypto::CryptographicProcessor;
 use nomos_mix::message_blend::{MessageBlendExt, MessageBlendSettings};
 use nomos_mix::persistent_transmission::{
@@ -20,6 +21,8 @@ use overwatch_rs::services::{
     state::{NoOperator, NoState},
     ServiceCore, ServiceData, ServiceId,
 };
+use rand::SeedableRng;
+use rand_chacha::ChaCha12Rng;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::fmt::Debug;
 use tokio::sync::mpsc;
@@ -40,6 +43,7 @@ where
     backend: Backend,
     service_state: ServiceStateHandle<Self>,
     network_relay: Relay<NetworkService<Network::Backend>>,
+    membership: Membership,
 }
 
 impl<Backend, Network> ServiceData for MixService<Backend, Network>
@@ -67,13 +71,18 @@ where
 {
     fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, overwatch_rs::DynError> {
         let network_relay = service_state.overwatch_handle.relay();
+        let mix_config = service_state.settings_reader.get_updated_settings();
+        let membership = mix_config.membership();
         Ok(Self {
             backend: <Backend as MixBackend>::new(
                 service_state.settings_reader.get_updated_settings().backend,
                 service_state.overwatch_handle.clone(),
+                membership.clone(),
+                ChaCha12Rng::from_entropy(),
             ),
             service_state,
             network_relay,
+            membership,
         })
     }
 
@@ -82,10 +91,14 @@ where
             service_state,
             mut backend,
             network_relay,
+            membership,
         } = self;
         let mix_config = service_state.settings_reader.get_updated_settings();
-        let cryptographic_processor =
-            CryptographicProcessor::new(mix_config.message_blend.cryptographic_processor);
+        let mut cryptographic_processor = CryptographicProcessor::new(
+            mix_config.message_blend.cryptographic_processor,
+            membership.clone(),
+            ChaCha12Rng::from_entropy(),
+        );
         let network_relay = network_relay.connect().await?;
         let network_adapter = Network::new(network_relay);
 
@@ -96,9 +109,11 @@ where
                 .persistent_transmission(mix_config.persistent_transmission);
 
         // tier 2 blend
-        let mut blend_messages = backend
-            .listen_to_incoming_messages()
-            .blend(mix_config.message_blend);
+        let mut blend_messages = backend.listen_to_incoming_messages().blend(
+            mix_config.message_blend,
+            membership.clone(),
+            ChaCha12Rng::from_entropy(),
+        );
 
         // local messages, are bypassed and send immediately
         let mut local_messages = service_state
@@ -188,6 +203,17 @@ pub struct MixConfig<BackendSettings> {
     pub backend: BackendSettings,
     pub message_blend: MessageBlendSettings,
     pub persistent_transmission: PersistentTransmissionSettings,
+    pub membership: Vec<Node>,
+}
+
+impl<BackendSettings> MixConfig<BackendSettings> {
+    fn membership(&self) -> Membership {
+        let public_key = x25519_dalek::PublicKey::from(&x25519_dalek::StaticSecret::from(
+            self.message_blend.cryptographic_processor.private_key,
+        ))
+        .to_bytes();
+        Membership::new(self.membership.clone(), &public_key)
+    }
 }
 
 /// A message that is handled by [`MixService`].

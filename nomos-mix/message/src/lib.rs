@@ -13,11 +13,11 @@ pub type NodeId = [u8; NODE_ID_SIZE];
 const NODE_ID_SIZE: usize = 32;
 const DUMMY_NODE_ID: NodeId = [0; NODE_ID_SIZE];
 
-const MAX_PADDED_PAYLOAD_SIZE: usize = 2048;
+const PADDED_PAYLOAD_SIZE: usize = 2048;
 const PAYLOAD_PADDING_SEPARATOR: u8 = 0x01;
 const PAYLOAD_PADDING_SEPARATOR_SIZE: usize = 1;
 const MAX_LAYERS: usize = 5;
-const MESSAGE_SIZE: usize = NODE_ID_SIZE * MAX_LAYERS + MAX_PADDED_PAYLOAD_SIZE;
+pub const MESSAGE_SIZE: usize = NODE_ID_SIZE * MAX_LAYERS + PADDED_PAYLOAD_SIZE;
 pub const DROP_MESSAGE: [u8; MESSAGE_SIZE] = [0; MESSAGE_SIZE];
 
 /// The length of the encoded message is fixed to [`MESSAGE_SIZE`] bytes.
@@ -27,7 +27,7 @@ pub fn new_message(payload: &[u8], node_ids: &[NodeId]) -> Result<Vec<u8>, Error
     if node_ids.is_empty() || node_ids.len() > MAX_LAYERS {
         return Err(Error::InvalidNumberOfLayers);
     }
-    if payload.len() > MAX_PADDED_PAYLOAD_SIZE - PAYLOAD_PADDING_SEPARATOR_SIZE {
+    if payload.len() > PADDED_PAYLOAD_SIZE - PAYLOAD_PADDING_SEPARATOR_SIZE {
         return Err(Error::PayloadTooLarge);
     }
 
@@ -44,7 +44,7 @@ pub fn new_message(payload: &[u8], node_ids: &[NodeId]) -> Result<Vec<u8>, Error
     message.push(PAYLOAD_PADDING_SEPARATOR);
     message.extend(
         std::iter::repeat(0)
-            .take(MAX_PADDED_PAYLOAD_SIZE - payload.len() - PAYLOAD_PADDING_SEPARATOR_SIZE),
+            .take(PADDED_PAYLOAD_SIZE - payload.len() - PAYLOAD_PADDING_SEPARATOR_SIZE),
     );
     Ok(message)
 }
