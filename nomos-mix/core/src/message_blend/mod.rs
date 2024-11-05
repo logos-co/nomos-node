@@ -4,6 +4,8 @@ pub mod temporal;
 pub use crypto::CryptographicProcessorSettings;
 use futures::stream::BoxStream;
 use futures::{Stream, StreamExt};
+use rand::RngCore;
+use std::marker::PhantomData;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 pub use temporal::TemporalProcessorSettings;
@@ -25,28 +27,31 @@ pub struct MessageBlendSettings {
 /// [`MessageBlendStream`] handles the entire mixing tiers process
 /// - Unwraps incoming messages received from network using [`CryptographicProcessor`]
 /// - Pushes unwrapped messages to [`TemporalProcessor`]
-pub struct MessageBlendStream<S> {
+pub struct MessageBlendStream<S, Rng> {
     input_stream: S,
     output_stream: BoxStream<'static, MixOutgoingMessage>,
     temporal_sender: UnboundedSender<MixOutgoingMessage>,
     cryptographic_processor: CryptographicProcessor,
+    _rng: PhantomData<Rng>,
 }
 
-impl<S> MessageBlendStream<S>
+impl<S, Rng> MessageBlendStream<S, Rng>
 where
     S: Stream<Item = Vec<u8>>,
+    Rng: RngCore + Unpin + Send + 'static,
 {
-    pub fn new(input_stream: S, settings: MessageBlendSettings) -> Self {
+    pub fn new(input_stream: S, settings: MessageBlendSettings, rng: Rng) -> Self {
         let cryptographic_processor = CryptographicProcessor::new(settings.cryptographic_processor);
         let (temporal_sender, temporal_receiver) = mpsc::unbounded_channel();
         let output_stream = UnboundedReceiverStream::new(temporal_receiver)
-            .temporal_stream(settings.temporal_processor)
+            .temporal_stream(settings.temporal_processor, rng)
             .boxed();
         Self {
             input_stream,
             output_stream,
             temporal_sender,
             cryptographic_processor,
+            _rng: Default::default(),
         }
     }
 
@@ -72,9 +77,10 @@ where
     }
 }
 
-impl<S> Stream for MessageBlendStream<S>
+impl<S, Rng> Stream for MessageBlendStream<S, Rng>
 where
     S: Stream<Item = Vec<u8>> + Unpin,
+    Rng: RngCore + Unpin + Send + 'static,
 {
     type Item = MixOutgoingMessage;
 
@@ -86,13 +92,25 @@ where
     }
 }
 
-pub trait MessageBlendExt: Stream<Item = Vec<u8>> {
-    fn blend(self, message_blend_settings: MessageBlendSettings) -> MessageBlendStream<Self>
+pub trait MessageBlendExt<Rng>: Stream<Item = Vec<u8>>
+where
+    Rng: RngCore + Send + Unpin + 'static,
+{
+    fn blend(
+        self,
+        message_blend_settings: MessageBlendSettings,
+        rng: Rng,
+    ) -> MessageBlendStream<Self, Rng>
     where
         Self: Sized + Unpin,
     {
-        MessageBlendStream::new(self, message_blend_settings)
+        MessageBlendStream::new(self, message_blend_settings, rng)
     }
 }
 
-impl<T> MessageBlendExt for T where T: Stream<Item = Vec<u8>> {}
+impl<T, Rng> MessageBlendExt<Rng> for T
+where
+    T: Stream<Item = Vec<u8>>,
+    Rng: RngCore + Unpin + Send + 'static,
+{
+}
