@@ -41,14 +41,22 @@ pub fn commit_polynomial(
         powers_of_gamma_g: Cow::Borrowed(&powers_of_gamma_g),
     };
 
-    KZG10::commit(
+    #[cfg(not(test))]
+    let commit_res = KZG10::commit(
         &roots_of_unity,
         polynomial,
         Some(HIDING_BOUND),
         Some(&mut rng),
     )
     .map_err(KzgRsError::PolyCommitError)
-    .map(|(commitment, _)| commitment)
+    .map(|(commitment, _)| commitment);
+
+    #[cfg(test)]
+    let commit_res = KZG10::commit(&roots_of_unity, polynomial, None, Some(&mut rng))
+        .map_err(KzgRsError::PolyCommitError)
+        .map(|(commitment, _)| commitment);
+
+    commit_res
 }
 
 /// Compute a witness polynomial in that satisfies `witness(x) = (f(x)-v)/(x-u)`
