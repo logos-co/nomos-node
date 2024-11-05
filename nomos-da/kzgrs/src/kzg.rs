@@ -11,6 +11,8 @@ use rand::rngs::OsRng;
 use std::borrow::Cow;
 use std::ops::{Mul, Neg};
 
+const MIN_DOMAIN_SIZE: usize = 64;
+
 /// Commit to a polynomial where each of the evaluations are over `w(i)` for the degree
 /// of the polynomial being omega (`w`) the root of unity (2^x).
 pub fn commit_polynomial(
@@ -60,6 +62,11 @@ pub fn generate_element_proof(
     let u = domain.element(element_index);
     if u.is_zero() {
         return Err(KzgRsError::DivisionByZeroPolynomial);
+    };
+
+    #[cfg(not(test))]
+    if domain.size() < MIN_DOMAIN_SIZE {
+        return Err(KzgRsError::DomainSizeTooSmall(domain.size()));
     };
 
     // Instead of evaluating over the polynomial, we can reuse the evaluation points from the rs encoding
