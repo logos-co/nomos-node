@@ -77,7 +77,7 @@ impl MixMessage for MockMixMessage {
                     println!("pos: {}", pos);
                     return Ok((padded_payload[0..pos].to_vec(), true));
                 }
-                None => return Err(Error::InvalidMixMessage),
+                _ => return Err(Error::InvalidMixMessage),
             }
         }
 
