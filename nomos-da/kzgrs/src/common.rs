@@ -63,8 +63,7 @@ pub enum KzgRsError {
     #[error("Powers_of_gamma_g are too large for hiding bound preset")]
     HidingBoundTooLarge,
     #[error("Domain size is too small")]
-    DomainSizeTooSmall(usize)
-
+    DomainSizeTooSmall(usize),
 }
 
 /// Transform chunks of bytes (of size `CHUNK_SIZE`) into `Fr` which are considered evaluations of a
