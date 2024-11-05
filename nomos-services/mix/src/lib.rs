@@ -10,9 +10,10 @@ use nomos_mix::membership::{Membership, Node};
 use nomos_mix::message_blend::crypto::CryptographicProcessor;
 use nomos_mix::message_blend::{MessageBlendExt, MessageBlendSettings};
 use nomos_mix::persistent_transmission::{
-    PersistentTransmissionExt, PersistentTransmissionSettings,
+    PersistentTransmissionExt, PersistentTransmissionSettings, PersistentTransmissionStream,
 };
 use nomos_mix::MixOutgoingMessage;
+use nomos_mix_message::mock::MockMixMessage;
 use nomos_network::NetworkService;
 use overwatch_rs::services::{
     handle::ServiceStateHandle,
@@ -43,7 +44,7 @@ where
     backend: Backend,
     service_state: ServiceStateHandle<Self>,
     network_relay: Relay<NetworkService<Network::Backend>>,
-    membership: Membership,
+    membership: Membership<MockMixMessage>,
 }
 
 impl<Backend, Network> ServiceData for MixService<Backend, Network>
@@ -72,17 +73,16 @@ where
     fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, overwatch_rs::DynError> {
         let network_relay = service_state.overwatch_handle.relay();
         let mix_config = service_state.settings_reader.get_updated_settings();
-        let membership = mix_config.membership();
         Ok(Self {
             backend: <Backend as MixBackend>::new(
                 service_state.settings_reader.get_updated_settings().backend,
                 service_state.overwatch_handle.clone(),
-                membership.clone(),
+                mix_config.membership(),
                 ChaCha12Rng::from_entropy(),
             ),
             service_state,
             network_relay,
-            membership,
+            membership: mix_config.membership(),
         })
     }
 
@@ -95,7 +95,7 @@ where
         } = self;
         let mix_config = service_state.settings_reader.get_updated_settings();
         let mut cryptographic_processor = CryptographicProcessor::new(
-            mix_config.message_blend.cryptographic_processor,
+            mix_config.message_blend.cryptographic_processor.clone(),
             membership.clone(),
             ChaCha12Rng::from_entropy(),
         );
@@ -104,7 +104,7 @@ where
 
         // tier 1 persistent transmission
         let (persistent_sender, persistent_receiver) = mpsc::unbounded_channel();
-        let mut persistent_transmission_messages =
+        let mut persistent_transmission_messages: PersistentTransmissionStream<_, MockMixMessage> =
             UnboundedReceiverStream::new(persistent_receiver)
                 .persistent_transmission(mix_config.persistent_transmission);
 
@@ -201,18 +201,20 @@ where
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct MixConfig<BackendSettings> {
     pub backend: BackendSettings,
-    pub message_blend: MessageBlendSettings,
+    pub message_blend: MessageBlendSettings<MockMixMessage>,
     pub persistent_transmission: PersistentTransmissionSettings,
-    pub membership: Vec<Node>,
+    pub membership: Vec<
+        Node<<nomos_mix_message::mock::MockMixMessage as nomos_mix_message::MixMessage>::PublicKey>,
+    >,
 }
 
 impl<BackendSettings> MixConfig<BackendSettings> {
-    fn membership(&self) -> Membership {
+    fn membership(&self) -> Membership<MockMixMessage> {
         let public_key = x25519_dalek::PublicKey::from(&x25519_dalek::StaticSecret::from(
             self.message_blend.cryptographic_processor.private_key,
         ))
         .to_bytes();
-        Membership::new(self.membership.clone(), &public_key)
+        Membership::new(self.membership.clone(), public_key)
     }
 }
 

@@ -1,5 +1,6 @@
 use std::{io, pin::Pin, time::Duration};
 
+use super::MixBackend;
 use async_trait::async_trait;
 use futures::{Stream, StreamExt};
 use libp2p::{
@@ -10,6 +11,7 @@ use libp2p::{
 };
 use nomos_libp2p::{secret_key_serde, DialError, DialOpts};
 use nomos_mix::membership::Membership;
+use nomos_mix_message::mock::MockMixMessage;
 use overwatch_rs::overwatch::handle::OverwatchHandle;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
@@ -18,8 +20,6 @@ use tokio::{
     task::JoinHandle,
 };
 use tokio_stream::wrappers::BroadcastStream;
-
-use super::MixBackend;
 
 /// A mix backend that uses the libp2p network stack.
 pub struct Libp2pMixBackend {
@@ -47,7 +47,7 @@ impl MixBackend for Libp2pMixBackend {
     fn new<R: Rng>(
         config: Self::Settings,
         overwatch_handle: OverwatchHandle,
-        membership: Membership,
+        membership: Membership<MockMixMessage>,
         mut rng: R,
     ) -> Self {
         let (swarm_message_sender, swarm_message_receiver) = mpsc::channel(CHANNEL_SIZE);
@@ -106,7 +106,7 @@ impl MixBackend for Libp2pMixBackend {
 }
 
 struct MixSwarm {
-    swarm: Swarm<nomos_mix_network::Behaviour>,
+    swarm: Swarm<nomos_mix_network::Behaviour<MockMixMessage>>,
     swarm_messages_receiver: mpsc::Receiver<MixSwarmMessage>,
     incoming_message_sender: broadcast::Sender<Vec<u8>>,
 }

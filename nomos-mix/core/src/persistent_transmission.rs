@@ -1,8 +1,10 @@
 use futures::Stream;
-use nomos_mix_message::DROP_MESSAGE;
+use nomos_mix_message::MixMessage;
 use rand::{distributions::Uniform, prelude::Distribution, Rng, SeedableRng};
 use rand_chacha::ChaCha12Rng;
+use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
+use std::marker::PhantomData;
 use std::pin::{pin, Pin};
 use std::task::{Context, Poll};
 use std::time::Duration;
@@ -27,23 +29,25 @@ impl Default for PersistentTransmissionSettings {
 }
 
 /// Transmit scheduled messages with a persistent rate as a stream.
-pub struct PersistentTransmissionStream<S>
+pub struct PersistentTransmissionStream<S, M>
 where
     S: Stream,
 {
     interval: Interval,
     coin: Coin<ChaCha12Rng>,
     stream: S,
+    _mix_message: PhantomData<M>,
 }
 
-impl<S> PersistentTransmissionStream<S>
+impl<S, M> PersistentTransmissionStream<S, M>
 where
     S: Stream,
+    M: MixMessage,
 {
     pub fn new(
         settings: PersistentTransmissionSettings,
         stream: S,
-    ) -> PersistentTransmissionStream<S> {
+    ) -> PersistentTransmissionStream<S, M> {
         let interval = time::interval(Duration::from_secs_f64(
             1.0 / settings.max_emission_frequency,
         ));
@@ -56,13 +60,15 @@ where
             interval,
             coin,
             stream,
+            _mix_message: Default::default(),
         }
     }
 }
 
-impl<S> Stream for PersistentTransmissionStream<S>
+impl<S, M> Stream for PersistentTransmissionStream<S, M>
 where
     S: Stream<Item = Vec<u8>> + Unpin,
+    M: MixMessage + Unpin,
 {
     type Item = Vec<u8>;
 
@@ -79,18 +85,21 @@ where
         if let Poll::Ready(Some(item)) = pin!(stream).poll_next(cx) {
             Poll::Ready(Some(item))
         } else if coin.flip() {
-            Poll::Ready(Some(DROP_MESSAGE.to_vec()))
+            Poll::Ready(Some(M::DROP_MESSAGE.to_vec()))
         } else {
             Poll::Pending
         }
     }
 }
 
-pub trait PersistentTransmissionExt: Stream {
+pub trait PersistentTransmissionExt<M>: Stream
+where
+    M: MixMessage,
+{
     fn persistent_transmission(
         self,
         settings: PersistentTransmissionSettings,
-    ) -> PersistentTransmissionStream<Self>
+    ) -> PersistentTransmissionStream<Self, M>
     where
         Self: Sized + Unpin,
     {
@@ -98,7 +107,13 @@ pub trait PersistentTransmissionExt: Stream {
     }
 }
 
-impl<S> PersistentTransmissionExt for S where S: Stream {}
+impl<S, M> PersistentTransmissionExt<M> for S
+where
+    S: Stream,
+    M: MixMessage,
+    M::PublicKey: Clone + Serialize + DeserializeOwned,
+{
+}
 
 struct Coin<R: Rng> {
     rng: R,

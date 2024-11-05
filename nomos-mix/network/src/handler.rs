@@ -13,7 +13,6 @@ use libp2p::{
     },
     Stream, StreamProtocol,
 };
-use nomos_mix_message::MESSAGE_SIZE;
 
 use crate::behaviour::Config;
 
@@ -248,7 +247,7 @@ impl ConnectionHandler for MixConnectionHandler {
 
 /// Write a message to the stream
 async fn send_msg(mut stream: Stream, msg: Vec<u8>) -> io::Result<Stream> {
-    let msg_len: u16 = msg.len().try_into().map_err(|e| {
+    let msg_len: u16 = msg.len().try_into().map_err(|_| {
         std::io::Error::new(
             std::io::ErrorKind::InvalidInput,
             format!(
