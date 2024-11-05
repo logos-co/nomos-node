@@ -20,6 +20,8 @@ use overwatch_rs::services::{
     state::{NoOperator, NoState},
     ServiceCore, ServiceData, ServiceId,
 };
+use rand::SeedableRng;
+use rand_chacha::ChaCha12Rng;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::fmt::Debug;
 use tokio::sync::mpsc;
@@ -92,8 +94,10 @@ where
         // tier 1 persistent transmission
         let (persistent_sender, persistent_receiver) = mpsc::unbounded_channel();
         let mut persistent_transmission_messages =
-            UnboundedReceiverStream::new(persistent_receiver)
-                .persistent_transmission(mix_config.persistent_transmission);
+            UnboundedReceiverStream::new(persistent_receiver).persistent_transmission(
+                mix_config.persistent_transmission,
+                ChaCha12Rng::from_entropy(),
+            );
 
         // tier 2 blend
         let mut blend_messages = backend

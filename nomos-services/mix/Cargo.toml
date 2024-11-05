@@ -15,6 +15,7 @@ nomos-mix-message = { path = "../../nomos-mix/message" }
 nomos-network = { path = "../network" }
 overwatch-rs = { git = "https://github.com/logos-co/Overwatch", rev = "2f70806" }
 rand = "0.8.5"
+rand_chacha = "0.3"
 serde = { version = "1.0", features = ["derive"] }
 tokio = { version = "1", features = ["macros", "sync"] }
 tokio-stream = "0.1"
