@@ -102,7 +102,7 @@ where
         // tier 2 blend
         let mut blend_messages = backend
             .listen_to_incoming_messages()
-            .blend(mix_config.message_blend);
+            .blend(mix_config.message_blend, ChaCha12Rng::from_entropy());
 
         // local messages, are bypassed and send immediately
         let mut local_messages = service_state
