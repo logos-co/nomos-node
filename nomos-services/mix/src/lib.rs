@@ -104,14 +104,20 @@ where
 
         // tier 1 persistent transmission
         let (persistent_sender, persistent_receiver) = mpsc::unbounded_channel();
-        let mut persistent_transmission_messages: PersistentTransmissionStream<_, MockMixMessage> =
-            UnboundedReceiverStream::new(persistent_receiver)
-                .persistent_transmission(mix_config.persistent_transmission);
+        let mut persistent_transmission_messages: PersistentTransmissionStream<
+            _,
+            _,
+            MockMixMessage,
+        > = UnboundedReceiverStream::new(persistent_receiver).persistent_transmission(
+            mix_config.persistent_transmission,
+            ChaCha12Rng::from_entropy(),
+        );
 
         // tier 2 blend
         let mut blend_messages = backend.listen_to_incoming_messages().blend(
             mix_config.message_blend,
             membership.clone(),
+            ChaCha12Rng::from_entropy(),
             ChaCha12Rng::from_entropy(),
         );
 

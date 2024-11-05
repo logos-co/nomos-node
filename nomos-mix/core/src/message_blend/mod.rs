@@ -4,7 +4,8 @@ pub mod temporal;
 pub use crypto::CryptographicProcessorSettings;
 use futures::stream::BoxStream;
 use futures::{Stream, StreamExt};
-use rand::Rng;
+use rand::RngCore;
+use std::marker::PhantomData;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 pub use temporal::TemporalProcessorSettings;
@@ -34,22 +35,23 @@ where
 /// [`MessageBlendStream`] handles the entire mixing tiers process
 /// - Unwraps incoming messages received from network using [`CryptographicProcessor`]
 /// - Pushes unwrapped messages to [`TemporalProcessor`]
-pub struct MessageBlendStream<S, R, M>
+pub struct MessageBlendStream<S, Rng, M>
 where
     M: MixMessage,
-    M::PrivateKey: Clone + Serialize + DeserializeOwned + PartialEq,
-    M::PublicKey: Clone + Serialize + DeserializeOwned + PartialEq,
+    M::PrivateKey: Clone,
+    M::PublicKey: Clone,
 {
     input_stream: S,
     output_stream: BoxStream<'static, MixOutgoingMessage>,
     temporal_sender: UnboundedSender<MixOutgoingMessage>,
-    cryptographic_processor: CryptographicProcessor<R, M>,
+    cryptographic_processor: CryptographicProcessor<Rng, M>,
+    _rng: PhantomData<Rng>,
 }
 
-impl<S, R, M> MessageBlendStream<S, R, M>
+impl<S, Rng, M> MessageBlendStream<S, Rng, M>
 where
     S: Stream<Item = Vec<u8>>,
-    R: Rng,
+    Rng: RngCore + Unpin + Send + 'static,
     M: MixMessage,
     M::PrivateKey: Clone + Serialize + DeserializeOwned + PartialEq,
     M::PublicKey: Clone + Serialize + DeserializeOwned + PartialEq,
@@ -58,19 +60,24 @@ where
         input_stream: S,
         settings: MessageBlendSettings<M>,
         membership: Membership<M>,
-        rng: R,
+        cryptographic_processor_rng: Rng,
+        temporal_processor_rng: Rng,
     ) -> Self {
-        let cryptographic_processor =
-            CryptographicProcessor::new(settings.cryptographic_processor, membership, rng);
+        let cryptographic_processor = CryptographicProcessor::new(
+            settings.cryptographic_processor,
+            membership,
+            cryptographic_processor_rng,
+        );
         let (temporal_sender, temporal_receiver) = mpsc::unbounded_channel();
         let output_stream = UnboundedReceiverStream::new(temporal_receiver)
-            .temporal_stream(settings.temporal_processor)
+            .temporal_stream(settings.temporal_processor, temporal_processor_rng)
             .boxed();
         Self {
             input_stream,
             output_stream,
             temporal_sender,
             cryptographic_processor,
+            _rng: Default::default(),
         }
     }
 
@@ -96,10 +103,10 @@ where
     }
 }
 
-impl<S, R, M> Stream for MessageBlendStream<S, R, M>
+impl<S, Rng, M> Stream for MessageBlendStream<S, Rng, M>
 where
     S: Stream<Item = Vec<u8>> + Unpin,
-    R: Rng + Unpin,
+    Rng: RngCore + Unpin + Send + 'static,
     M: MixMessage + Unpin,
     M::PrivateKey: Clone + Serialize + DeserializeOwned + PartialEq + Unpin,
     M::PublicKey: Clone + Serialize + DeserializeOwned + PartialEq + Unpin,
@@ -114,29 +121,37 @@ where
     }
 }
 
-pub trait MessageBlendExt<M>: Stream<Item = Vec<u8>>
+pub trait MessageBlendExt<Rng, M>: Stream<Item = Vec<u8>>
 where
+    Rng: RngCore + Send + Unpin + 'static,
     M: MixMessage,
     M::PrivateKey: Clone + Serialize + DeserializeOwned + PartialEq,
     M::PublicKey: Clone + Serialize + DeserializeOwned + PartialEq,
 {
-    fn blend<R>(
+    fn blend(
         self,
         message_blend_settings: MessageBlendSettings<M>,
         membership: Membership<M>,
-        rng: R,
-    ) -> MessageBlendStream<Self, R, M>
+        cryptographic_processor_rng: Rng,
+        temporal_processor_rng: Rng,
+    ) -> MessageBlendStream<Self, Rng, M>
     where
         Self: Sized + Unpin,
-        R: Rng,
     {
-        MessageBlendStream::new(self, message_blend_settings, membership, rng)
+        MessageBlendStream::new(
+            self,
+            message_blend_settings,
+            membership,
+            cryptographic_processor_rng,
+            temporal_processor_rng,
+        )
     }
 }
 
-impl<T, M> MessageBlendExt<M> for T
+impl<T, Rng, M> MessageBlendExt<Rng, M> for T
 where
     T: Stream<Item = Vec<u8>>,
+    Rng: RngCore + Unpin + Send + 'static,
     M: MixMessage,
     M::PrivateKey: Clone + Serialize + DeserializeOwned + PartialEq,
     M::PublicKey: Clone + Serialize + DeserializeOwned + PartialEq,

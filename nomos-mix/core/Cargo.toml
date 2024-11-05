@@ -19,3 +19,4 @@ x25519-dalek = { version = "2", features = ["getrandom", "static_secrets"] }
 
 [dev-dependencies]
 tokio = { version = "1", features = ["rt-multi-thread"] }
+rand_chacha = "0.3"

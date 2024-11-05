@@ -1,7 +1,6 @@
 use futures::Stream;
 use nomos_mix_message::MixMessage;
-use rand::{distributions::Uniform, prelude::Distribution, Rng, SeedableRng};
-use rand_chacha::ChaCha12Rng;
+use rand::{distributions::Uniform, prelude::Distribution, Rng, RngCore};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use std::marker::PhantomData;
@@ -29,33 +28,32 @@ impl Default for PersistentTransmissionSettings {
 }
 
 /// Transmit scheduled messages with a persistent rate as a stream.
-pub struct PersistentTransmissionStream<S, M>
+pub struct PersistentTransmissionStream<S, Rng, M>
 where
     S: Stream,
+    Rng: RngCore,
 {
     interval: Interval,
-    coin: Coin<ChaCha12Rng>,
+    coin: Coin<Rng>,
     stream: S,
     _mix_message: PhantomData<M>,
 }
 
-impl<S, M> PersistentTransmissionStream<S, M>
+impl<S, Rng, M> PersistentTransmissionStream<S, Rng, M>
 where
     S: Stream,
+    Rng: RngCore,
     M: MixMessage,
 {
     pub fn new(
         settings: PersistentTransmissionSettings,
         stream: S,
-    ) -> PersistentTransmissionStream<S, M> {
+        rng: Rng,
+    ) -> PersistentTransmissionStream<S, Rng, M> {
         let interval = time::interval(Duration::from_secs_f64(
             1.0 / settings.max_emission_frequency,
         ));
-        let coin = Coin::<_>::new(
-            ChaCha12Rng::from_entropy(),
-            settings.drop_message_probability,
-        )
-        .unwrap();
+        let coin = Coin::<Rng>::new(rng, settings.drop_message_probability).unwrap();
         Self {
             interval,
             coin,
@@ -65,9 +63,10 @@ where
     }
 }
 
-impl<S, M> Stream for PersistentTransmissionStream<S, M>
+impl<S, Rng, M> Stream for PersistentTransmissionStream<S, Rng, M>
 where
     S: Stream<Item = Vec<u8>> + Unpin,
+    Rng: RngCore + Unpin,
     M: MixMessage + Unpin,
 {
     type Item = Vec<u8>;
@@ -92,24 +91,27 @@ where
     }
 }
 
-pub trait PersistentTransmissionExt<M>: Stream
+pub trait PersistentTransmissionExt<Rng, M>: Stream
 where
+    Rng: RngCore,
     M: MixMessage,
 {
     fn persistent_transmission(
         self,
         settings: PersistentTransmissionSettings,
-    ) -> PersistentTransmissionStream<Self, M>
+        rng: Rng,
+    ) -> PersistentTransmissionStream<Self, Rng, M>
     where
         Self: Sized + Unpin,
     {
-        PersistentTransmissionStream::new(settings, self)
+        PersistentTransmissionStream::new(settings, self, rng)
     }
 }
 
-impl<S, M> PersistentTransmissionExt<M> for S
+impl<S, Rng, M> PersistentTransmissionExt<Rng, M> for S
 where
     S: Stream,
+    Rng: RngCore,
     M: MixMessage,
     M::PublicKey: Clone + Serialize + DeserializeOwned,
 {
@@ -149,6 +151,8 @@ mod tests {
     use super::*;
     use futures::StreamExt;
     use nomos_mix_message::mock::MockMixMessage;
+    use rand::SeedableRng;
+    use rand_chacha::ChaCha8Rng;
     use tokio::sync::mpsc;
 
     macro_rules! assert_interval {
@@ -189,8 +193,8 @@ mod tests {
         let lower_bound = expected_emission_interval - torelance;
         let upper_bound = expected_emission_interval + torelance;
         // prepare stream
-        let mut persistent_transmission_stream: PersistentTransmissionStream<_, MockMixMessage> =
-            stream.persistent_transmission(settings);
+        let mut persistent_transmission_stream: PersistentTransmissionStream<_, _, MockMixMessage> =
+            stream.persistent_transmission(settings, ChaCha8Rng::from_entropy());
         // Messages must be scheduled in non-blocking manner.
         schedule_sender.send(vec![1]).unwrap();
         schedule_sender.send(vec![2]).unwrap();
