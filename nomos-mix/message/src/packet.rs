@@ -61,7 +61,7 @@ impl Packet {
                 ephemeral_public_key: x25519_dalek::PublicKey::from(&ephemeral_privkey),
                 routing_info: RoutingInfo {
                     remaining_layers: u8::try_from(recipient_pubkeys.len())
-                        .map_err(|_| Error::TooManyRecipients)?,
+                        .map_err(|_| Error::InvalidNumberOfLayers)?,
                 },
             },
             payload: payload.into_bytes(),

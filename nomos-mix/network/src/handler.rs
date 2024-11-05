@@ -13,7 +13,7 @@ use libp2p::{
     },
     Stream, StreamProtocol,
 };
-use nomos_mix_message::MSG_SIZE;
+use nomos_mix_message::MAX_PADDED_PAYLOAD_SIZE;
 
 use crate::behaviour::Config;
 
@@ -256,7 +256,7 @@ async fn send_msg(mut stream: Stream, msg: Vec<u8>) -> io::Result<Stream> {
 /// Read a fixed-length message from the stream
 // TODO: Consider handling variable-length messages
 async fn recv_msg(mut stream: Stream) -> io::Result<(Stream, Vec<u8>)> {
-    let mut buf = vec![0; MSG_SIZE];
+    let mut buf = vec![0; MAX_PADDED_PAYLOAD_SIZE];
     stream.read_exact(&mut buf).await?;
     Ok((stream, buf))
 }
