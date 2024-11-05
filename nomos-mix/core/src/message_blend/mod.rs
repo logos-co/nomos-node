@@ -8,11 +8,11 @@ use rand::RngCore;
 use std::marker::PhantomData;
 use std::pin::Pin;
 use std::task::{Context, Poll};
-pub use temporal::TemporalProcessorSettings;
+pub use temporal::TemporalSchedulerSettings;
 
 use crate::membership::Membership;
 use crate::message_blend::crypto::CryptographicProcessor;
-use crate::message_blend::temporal::TemporalProcessorExt;
+use crate::message_blend::temporal::{TemporalProcessorExt, TemporalScheduler};
 use crate::MixOutgoingMessage;
 use nomos_mix_message::MixMessage;
 use serde::de::DeserializeOwned;
@@ -28,7 +28,7 @@ where
     M::PrivateKey: Serialize + DeserializeOwned,
 {
     pub cryptographic_processor: CryptographicProcessorSettings<M::PrivateKey>,
-    pub temporal_processor: TemporalProcessorSettings,
+    pub temporal_processor: TemporalSchedulerSettings,
 }
 
 /// [`MessageBlendStream`] handles the entire mixing tiers process
@@ -67,7 +67,10 @@ where
         );
         let (temporal_sender, temporal_receiver) = mpsc::unbounded_channel();
         let output_stream = UnboundedReceiverStream::new(temporal_receiver)
-            .temporal_stream(settings.temporal_processor, temporal_processor_rng)
+            .temporal_stream(TemporalScheduler::new(
+                settings.temporal_processor,
+                temporal_processor_rng,
+            ))
             .boxed();
         Self {
             input_stream,

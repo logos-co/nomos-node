@@ -3,7 +3,7 @@ use cryptarchia_consensus::LeaderConfig;
 use nomos_da_network_service::backends::libp2p::common::DaNetworkBackendSettings;
 use nomos_mix::membership::Node;
 use nomos_mix::message_blend::{
-    CryptographicProcessorSettings, MessageBlendSettings, TemporalProcessorSettings,
+    CryptographicProcessorSettings, MessageBlendSettings, TemporalSchedulerSettings,
 };
 use nomos_mix_message::mock::MockMixMessage;
 use nomos_mix_message::MixMessage;
@@ -226,7 +226,7 @@ pub fn new_node(
                         private_key: mix_config.private_key.to_bytes(),
                         num_mix_layers: 1,
                     },
-                    temporal_processor: TemporalProcessorSettings {
+                    temporal_processor: TemporalSchedulerSettings {
                         max_delay_seconds: 2,
                     },
                 },
