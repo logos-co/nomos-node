@@ -153,7 +153,10 @@ mod tests {
     use nomos_mix_message::mock::MockMixMessage;
     use rand::SeedableRng;
     use rand_chacha::ChaCha8Rng;
+    use std::time::Duration;
     use tokio::sync::mpsc;
+    use tokio::time;
+    use tokio_stream::wrappers::IntervalStream;
 
     macro_rules! assert_interval {
         ($last_time:expr, $lower_bound:expr, $upper_bound:expr) => {
@@ -193,8 +196,16 @@ mod tests {
         let lower_bound = expected_emission_interval - torelance;
         let upper_bound = expected_emission_interval + torelance;
         // prepare stream
-        let mut persistent_transmission_stream: PersistentTransmissionStream<_, _, MockMixMessage> =
-            stream.persistent_transmission(settings, ChaCha8Rng::from_entropy());
+        let mut persistent_transmission_stream: PersistentTransmissionStream<
+            _,
+            _,
+            MockMixMessage,
+            _,
+        > = stream.persistent_transmission(
+            settings,
+            ChaCha8Rng::from_entropy(),
+            IntervalStream::new(time::interval(expected_emission_interval)).map(|_| ()),
+        );
         // Messages must be scheduled in non-blocking manner.
         schedule_sender.send(vec![1]).unwrap();
         schedule_sender.send(vec![2]).unwrap();
