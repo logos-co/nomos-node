@@ -122,14 +122,14 @@ where
         );
 
         // tier 2 blend
+        let temporal_scheduler = TemporalScheduler::new(
+            mix_config.message_blend.temporal_processor,
+            ChaCha12Rng::from_entropy(),
+        );
         let mut blend_messages = backend.listen_to_incoming_messages().blend(
             mix_config.message_blend,
             membership.clone(),
-            TemporalScheduler::new(
-                mix_config.message_blend.temporal_processor,
-                temporal_processor_rng,
-            ),
-            ChaCha12Rng::from_entropy(),
+            temporal_scheduler,
             ChaCha12Rng::from_entropy(),
         );
 
