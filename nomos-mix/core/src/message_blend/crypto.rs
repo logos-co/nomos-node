@@ -2,7 +2,6 @@ use crate::membership::Membership;
 use nomos_mix_message::MixMessage;
 use rand::RngCore;
 use serde::{Deserialize, Serialize};
-use std::marker::PhantomData;
 
 /// [`CryptographicProcessor`] is responsible for wrapping and unwrapping messages
 /// for the message indistinguishability.
@@ -13,7 +12,6 @@ where
     settings: CryptographicProcessorSettings<M::PrivateKey>,
     membership: Membership<M>,
     rng: R,
-    _mix_message: PhantomData<M>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -37,7 +35,6 @@ where
             settings,
             membership,
             rng,
-            _mix_message: Default::default(),
         }
     }
 
