@@ -14,7 +14,7 @@ use url::Url;
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct OtlpMetricsConfig {
     pub endpoint: Url,
-    pub host_name: String,
+    pub host_identifier: String,
 }
 
 pub fn create_otlp_metrics_layer<S>(
@@ -25,7 +25,7 @@ where
 {
     let resource = Resource::new(vec![KeyValue::new(
         opentelemetry_semantic_conventions::resource::SERVICE_NAME,
-        config.host_name,
+        config.host_identifier,
     )]);
 
     let export_config = ExportConfig {
