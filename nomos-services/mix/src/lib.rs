@@ -26,8 +26,10 @@ use rand::SeedableRng;
 use rand_chacha::ChaCha12Rng;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::fmt::Debug;
+use std::time::Duration;
 use tokio::sync::mpsc;
-use tokio_stream::wrappers::UnboundedReceiverStream;
+use tokio::time;
+use tokio_stream::wrappers::{IntervalStream, UnboundedReceiverStream};
 
 /// A mix service that sends messages to the mix network
 /// and broadcasts fully unwrapped messages through the [`NetworkService`].
@@ -108,9 +110,14 @@ where
             _,
             _,
             MockMixMessage,
+            _,
         > = UnboundedReceiverStream::new(persistent_receiver).persistent_transmission(
             mix_config.persistent_transmission,
             ChaCha12Rng::from_entropy(),
+            IntervalStream::new(time::interval(Duration::from_secs_f64(
+                1.0 / mix_config.persistent_transmission.max_emission_frequency,
+            )))
+            .map(|_| ()),
         );
 
         // tier 2 blend
