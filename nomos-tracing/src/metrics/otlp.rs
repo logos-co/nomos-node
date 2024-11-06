@@ -1,9 +1,10 @@
 // std
-use opentelemetry_otlp::{ExportConfig, WithExportConfig};
+use opentelemetry_otlp::{ExportConfig, Protocol, WithExportConfig};
 use opentelemetry_sdk::{runtime, Resource};
+use reqwest::Client;
 use std::error::Error;
 // crates
-use opentelemetry::KeyValue;
+use opentelemetry::{global, KeyValue};
 use serde::{Deserialize, Serialize};
 use tracing::Subscriber;
 use tracing_opentelemetry::MetricsLayer;
@@ -30,18 +31,22 @@ where
 
     let export_config = ExportConfig {
         endpoint: config.endpoint.into(),
+        protocol: Protocol::HttpBinary,
         ..ExportConfig::default()
     };
 
-    let provider = opentelemetry_otlp::new_pipeline()
+    let client = Client::new();
+    let meter_provider = opentelemetry_otlp::new_pipeline()
         .metrics(runtime::Tokio)
         .with_exporter(
             opentelemetry_otlp::new_exporter()
                 .http()
+                .with_http_client(client)
                 .with_export_config(export_config),
         )
         .with_resource(resource)
         .build()?;
 
-    Ok(MetricsLayer::new(provider))
+    global::set_meter_provider(meter_provider.clone());
+    Ok(MetricsLayer::new(meter_provider))
 }
