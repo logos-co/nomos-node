@@ -14,10 +14,10 @@ use url::Url;
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct OtlpMetricsConfig {
     pub endpoint: Url,
-    pub service_name: String,
+    pub host_name: String,
 }
 
-pub fn create_otlp_tracing_layer<S>(
+pub fn create_otlp_metrics_layer<S>(
     config: OtlpMetricsConfig,
 ) -> Result<MetricsLayer<S>, Box<dyn Error + Send + Sync>>
 where
@@ -25,13 +25,14 @@ where
 {
     let resource = Resource::new(vec![KeyValue::new(
         opentelemetry_semantic_conventions::resource::SERVICE_NAME,
-        config.service_name,
+        config.host_name,
     )]);
 
     let export_config = ExportConfig {
         endpoint: config.endpoint.into(),
         ..ExportConfig::default()
     };
+
     let provider = opentelemetry_otlp::new_pipeline()
         .metrics(runtime::Tokio)
         .with_exporter(
