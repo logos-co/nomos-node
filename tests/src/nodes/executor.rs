@@ -23,7 +23,7 @@ use nomos_da_verifier::DaVerifierServiceSettings;
 use nomos_executor::api::backend::AxumBackendSettings;
 use nomos_executor::config::Config;
 use nomos_mix::message_blend::{
-    CryptographicProcessorSettings, MessageBlendSettings, TemporalProcessorSettings,
+    CryptographicProcessorSettings, MessageBlendSettings, TemporalSchedulerSettings,
 };
 use nomos_network::{backends::libp2p::Libp2pConfig, NetworkConfig};
 use nomos_node::api::paths::{CL_METRICS, DA_GET_RANGE};
@@ -162,7 +162,7 @@ pub fn create_executor_config(config: GeneralConfig) -> Config {
                     private_key: config.mix_config.private_key.to_bytes(),
                     num_mix_layers: 1,
                 },
-                temporal_processor: TemporalProcessorSettings {
+                temporal_processor: TemporalSchedulerSettings {
                     max_delay_seconds: 2,
                 },
             },
