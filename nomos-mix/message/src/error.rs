@@ -4,8 +4,8 @@ pub enum Error {
     InvalidMixMessage,
     #[error("Payload is too large")]
     PayloadTooLarge,
-    #[error("Too many recipients")]
-    TooManyRecipients,
+    #[error("Invalid number of layers")]
+    InvalidNumberOfLayers,
     #[error("Sphinx packet error: {0}")]
     SphinxPacketError(#[from] sphinx_packet::Error),
     #[error("Unwrapping a message is not allowed to this node")]

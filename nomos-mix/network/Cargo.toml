@@ -11,6 +11,7 @@ libp2p = "0.53"
 tracing = "0.1"
 nomos-mix = { path = "../core" }
 nomos-mix-message = { path = "../message" }
+sha2 = "0.10"
 
 [dev-dependencies]
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "time"] }

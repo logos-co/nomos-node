@@ -158,11 +158,15 @@ pub fn create_executor_config(config: GeneralConfig) -> Config {
             backend: config.mix_config.backend,
             persistent_transmission: Default::default(),
             message_blend: MessageBlendSettings {
-                cryptographic_processor: CryptographicProcessorSettings { num_mix_layers: 1 },
+                cryptographic_processor: CryptographicProcessorSettings {
+                    private_key: config.mix_config.private_key.to_bytes(),
+                    num_mix_layers: 1,
+                },
                 temporal_processor: TemporalProcessorSettings {
                     max_delay_seconds: 2,
                 },
             },
+            membership: config.mix_config.membership,
         },
         cryptarchia: CryptarchiaSettings {
             leader_config: config.consensus_config.leader_config,

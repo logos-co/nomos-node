@@ -1,7 +1,9 @@
 // std
 use std::{collections::HashMap, net::Ipv4Addr, str::FromStr};
 // crates
-use nomos_libp2p::{Multiaddr, PeerId, Protocol};
+use nomos_libp2p::{Multiaddr, PeerId};
+use nomos_mix::membership::Node;
+use nomos_mix_message::{mock::MockMixMessage, MixMessage};
 use nomos_tracing::{logging::loki::LokiConfig, tracing::otlp::OtlpTracingConfig};
 use nomos_tracing_service::{FilterLayer, LoggerLayer, TracingSettings};
 use rand::{thread_rng, Rng};
@@ -91,7 +93,7 @@ pub fn create_node_configs(
     let host_network_init_peers = update_network_init_peers(hosts.clone());
     let host_da_peer_addresses = update_da_peer_addresses(hosts.clone(), peer_addresses);
     let host_mix_membership =
-        update_mix_membership(hosts.clone(), mix_configs[0].backend.membership.clone());
+        update_mix_membership(hosts.clone(), mix_configs[0].membership.clone());
 
     let new_peer_addresses: HashMap<PeerId, Multiaddr> = host_da_peer_addresses
         .clone()
@@ -122,7 +124,7 @@ pub fn create_node_configs(
         let mut mix_config = mix_configs[i].to_owned();
         mix_config.backend.listening_address =
             Multiaddr::from_str(&format!("/ip4/0.0.0.0/udp/{}/quic-v1", host.mix_port)).unwrap();
-        mix_config.backend.membership = host_mix_membership.clone();
+        mix_config.membership = host_mix_membership.clone();
 
         // Tracing config.
         let tracing_config =
@@ -170,30 +172,20 @@ fn update_da_peer_addresses(
         .collect()
 }
 
-fn update_mix_membership(hosts: Vec<Host>, membership: Vec<Multiaddr>) -> Vec<Multiaddr> {
+fn update_mix_membership(
+    hosts: Vec<Host>,
+    membership: Vec<Node<<MockMixMessage as MixMessage>::PublicKey>>,
+) -> Vec<Node<<MockMixMessage as MixMessage>::PublicKey>> {
     membership
         .into_iter()
         .zip(hosts)
-        .map(|(addr, host)| {
-            Multiaddr::from_str(&format!(
-                "/ip4/{}/udp/{}/quic-v1/p2p/{}",
-                host.ip,
-                host.mix_port,
-                extract_peer_id(&addr).unwrap(),
-            ))
-            .unwrap()
+        .map(|(mut node, host)| {
+            node.address =
+                Multiaddr::from_str(&format!("/ip4/{}/udp/{}/quic-v1", host.ip, host.mix_port))
+                    .unwrap();
+            node
         })
         .collect()
-}
-
-fn extract_peer_id(multiaddr: &Multiaddr) -> Option<PeerId> {
-    multiaddr.iter().find_map(|protocol| {
-        if let Protocol::P2p(peer_id) = protocol {
-            Some(peer_id)
-        } else {
-            None
-        }
-    })
 }
 
 fn tracing_config_for_grafana(params: TracingParams, identifier: String) -> GeneralTracingConfig {

@@ -14,7 +14,7 @@ mod test {
         swarm::{dummy, NetworkBehaviour, SwarmEvent},
         Multiaddr, PeerId, Swarm, SwarmBuilder,
     };
-    use nomos_mix_message::MSG_SIZE;
+    use nomos_mix_message::mock::MockMixMessage;
     use tokio::select;
 
     use crate::{behaviour::Config, error::Error, Behaviour, Event};
@@ -43,7 +43,7 @@ mod test {
 
         // Swamr2 publishes a message.
         let task = async {
-            let msg = vec![1; MSG_SIZE];
+            let msg = vec![1; 10];
             let mut msg_published = false;
             let mut publish_try_interval = tokio::time::interval(Duration::from_secs(1));
             loop {
@@ -98,7 +98,7 @@ mod test {
 
         // Expect all publish attempts to fail with [`Error::NoPeers`]
         // because swarm2 doesn't have any peers that support the mix protocol.
-        let msg = vec![1; MSG_SIZE];
+        let msg = vec![1; 10];
         let mut publish_try_interval = tokio::time::interval(Duration::from_secs(1));
         let mut publish_try_count = 0;
         loop {
@@ -116,7 +116,7 @@ mod test {
         }
     }
 
-    fn new_swarm(key: Keypair) -> Swarm<Behaviour> {
+    fn new_swarm(key: Keypair) -> Swarm<Behaviour<MockMixMessage>> {
         new_swarm_with_behaviour(
             key,
             Behaviour::new(Config {
