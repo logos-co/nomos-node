@@ -11,7 +11,6 @@ use std::path::PathBuf;
 use std::time::Duration;
 // crates
 use bytes::Bytes;
-use cl::InputWitness;
 use cryptarchia_consensus::TimeConfig;
 use kzgrs_backend::common::blob::DaBlob;
 use kzgrs_backend::dispersal::BlobInfo;
@@ -254,7 +253,6 @@ pub fn new_node(
                     topic: String::from(nomos_node::CL_TOPIC),
                     id: <Tx as Transaction>::hash,
                 },
-                registry: None,
             },
             da_mempool: DaMempoolSettings {
                 backend: (),
@@ -262,7 +260,6 @@ pub fn new_node(
                     topic: String::from(nomos_node::DA_TOPIC),
                     id: <BlobInfo as DispersedBlobInfo>::blob_id,
                 },
-                registry: None,
             },
             storage: nomos_storage::backends::rocksdb::RocksBackendSettings {
                 db_path,

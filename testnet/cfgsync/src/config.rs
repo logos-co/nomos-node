@@ -257,6 +257,7 @@ mod cfgsync_tests {
             TracingParams {
                 tempo_endpoint: "http://test.com".try_into().unwrap(),
                 loki_endpoint: "http://test.com".try_into().unwrap(),
+                metrics_endpoint: "http://test.com".try_into().unwrap(),
             },
             hosts,
         );

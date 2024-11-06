@@ -111,6 +111,7 @@ where
                     pool.add_item(key, item).unwrap_or_else(|e| {
                         tracing::debug!("could not add item to the pool due to: {}", e)
                     });
+                    tracing::info!(counter.tx_mempool_pending_items = pool.pending_item_count());
                 }
                 Some(msg) = lifecycle_stream.next() =>  {
                     if Self::should_stop_service(msg).await {
