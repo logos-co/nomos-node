@@ -1,7 +1,6 @@
 use crate::membership::Membership;
 use nomos_mix_message::MixMessage;
 use rand::RngCore;
-use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use std::marker::PhantomData;
 
@@ -10,8 +9,6 @@ use std::marker::PhantomData;
 pub struct CryptographicProcessor<R, M>
 where
     M: MixMessage,
-    M::PrivateKey: Clone,
-    M::PublicKey: Clone,
 {
     settings: CryptographicProcessorSettings<M::PrivateKey>,
     membership: Membership<M>,
@@ -20,10 +17,7 @@ where
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct CryptographicProcessorSettings<K>
-where
-    K: Clone,
-{
+pub struct CryptographicProcessorSettings<K> {
     pub private_key: K,
     pub num_mix_layers: usize,
 }
@@ -32,8 +26,7 @@ impl<R, M> CryptographicProcessor<R, M>
 where
     R: RngCore,
     M: MixMessage,
-    M::PrivateKey: Clone + Serialize + DeserializeOwned + PartialEq,
-    M::PublicKey: Clone + Serialize + DeserializeOwned + PartialEq,
+    M::PublicKey: Clone + PartialEq,
 {
     pub fn new(
         settings: CryptographicProcessorSettings<M::PrivateKey>,

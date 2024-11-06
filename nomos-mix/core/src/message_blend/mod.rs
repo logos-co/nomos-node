@@ -25,8 +25,7 @@ use tokio_stream::wrappers::UnboundedReceiverStream;
 pub struct MessageBlendSettings<M>
 where
     M: MixMessage,
-    M::PrivateKey: Clone + Serialize + DeserializeOwned + PartialEq,
-    M::PublicKey: Clone + Serialize + DeserializeOwned + PartialEq,
+    M::PrivateKey: Serialize + DeserializeOwned,
 {
     pub cryptographic_processor: CryptographicProcessorSettings<M::PrivateKey>,
     pub temporal_processor: TemporalProcessorSettings,
@@ -38,8 +37,6 @@ where
 pub struct MessageBlendStream<S, Rng, M>
 where
     M: MixMessage,
-    M::PrivateKey: Clone,
-    M::PublicKey: Clone,
 {
     input_stream: S,
     output_stream: BoxStream<'static, MixOutgoingMessage>,
@@ -53,8 +50,8 @@ where
     S: Stream<Item = Vec<u8>>,
     Rng: RngCore + Unpin + Send + 'static,
     M: MixMessage,
-    M::PrivateKey: Clone + Serialize + DeserializeOwned + PartialEq,
-    M::PublicKey: Clone + Serialize + DeserializeOwned + PartialEq,
+    M::PrivateKey: Serialize + DeserializeOwned,
+    M::PublicKey: Clone + PartialEq,
 {
     pub fn new(
         input_stream: S,
@@ -108,8 +105,8 @@ where
     S: Stream<Item = Vec<u8>> + Unpin,
     Rng: RngCore + Unpin + Send + 'static,
     M: MixMessage + Unpin,
-    M::PrivateKey: Clone + Serialize + DeserializeOwned + PartialEq + Unpin,
-    M::PublicKey: Clone + Serialize + DeserializeOwned + PartialEq + Unpin,
+    M::PrivateKey: Serialize + DeserializeOwned + Unpin,
+    M::PublicKey: Clone + PartialEq + Unpin,
 {
     type Item = MixOutgoingMessage;
 
@@ -125,8 +122,8 @@ pub trait MessageBlendExt<Rng, M>: Stream<Item = Vec<u8>>
 where
     Rng: RngCore + Send + Unpin + 'static,
     M: MixMessage,
-    M::PrivateKey: Clone + Serialize + DeserializeOwned + PartialEq,
-    M::PublicKey: Clone + Serialize + DeserializeOwned + PartialEq,
+    M::PrivateKey: Serialize + DeserializeOwned,
+    M::PublicKey: Clone + PartialEq,
 {
     fn blend(
         self,

@@ -1,23 +1,18 @@
 use multiaddr::Multiaddr;
 use nomos_mix_message::MixMessage;
 use rand::{seq::SliceRandom, Rng};
-use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug)]
 pub struct Membership<M>
 where
     M: MixMessage,
-    M::PublicKey: Clone,
 {
     remote_nodes: Vec<Node<M::PublicKey>>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct Node<K>
-where
-    K: Clone,
-{
+pub struct Node<K> {
     pub address: Multiaddr,
     pub public_key: K,
 }
@@ -25,7 +20,7 @@ where
 impl<M> Membership<M>
 where
     M: MixMessage,
-    M::PublicKey: Clone + Serialize + DeserializeOwned + PartialEq,
+    M::PublicKey: PartialEq,
 {
     pub fn new(mut nodes: Vec<Node<M::PublicKey>>, local_public_key: M::PublicKey) -> Self {
         nodes.retain(|node| node.public_key != local_public_key);
