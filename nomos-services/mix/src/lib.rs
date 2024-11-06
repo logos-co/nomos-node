@@ -8,6 +8,7 @@ use network::NetworkAdapter;
 use nomos_core::wire;
 use nomos_mix::membership::{Membership, Node};
 use nomos_mix::message_blend::crypto::CryptographicProcessor;
+use nomos_mix::message_blend::temporal::TemporalScheduler;
 use nomos_mix::message_blend::{MessageBlendExt, MessageBlendSettings};
 use nomos_mix::persistent_transmission::{
     PersistentTransmissionExt, PersistentTransmissionSettings, PersistentTransmissionStream,
@@ -124,6 +125,10 @@ where
         let mut blend_messages = backend.listen_to_incoming_messages().blend(
             mix_config.message_blend,
             membership.clone(),
+            TemporalScheduler::new(
+                mix_config.message_blend.temporal_processor,
+                temporal_processor_rng,
+            ),
             ChaCha12Rng::from_entropy(),
             ChaCha12Rng::from_entropy(),
         );
