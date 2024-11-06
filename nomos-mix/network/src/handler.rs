@@ -13,7 +13,6 @@ use libp2p::{
     },
     Stream, StreamProtocol,
 };
-use nomos_mix_message::MSG_SIZE;
 
 use crate::behaviour::Config;
 
@@ -248,15 +247,28 @@ impl ConnectionHandler for MixConnectionHandler {
 
 /// Write a message to the stream
 async fn send_msg(mut stream: Stream, msg: Vec<u8>) -> io::Result<Stream> {
+    let msg_len: u16 = msg.len().try_into().map_err(|_| {
+        std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            format!(
+                "Message length is too big. Got {}, expected {}",
+                msg.len(),
+                std::mem::size_of::<u16>()
+            ),
+        )
+    })?;
+    stream.write_all(msg_len.to_be_bytes().as_ref()).await?;
     stream.write_all(&msg).await?;
     stream.flush().await?;
     Ok(stream)
 }
-
-/// Read a fixed-length message from the stream
-// TODO: Consider handling variable-length messages
+/// Read a message from the stream
 async fn recv_msg(mut stream: Stream) -> io::Result<(Stream, Vec<u8>)> {
-    let mut buf = vec![0; MSG_SIZE];
+    let mut msg_len = [0; std::mem::size_of::<u16>()];
+    stream.read_exact(&mut msg_len).await?;
+    let msg_len = u16::from_be_bytes(msg_len) as usize;
+
+    let mut buf = vec![0; msg_len];
     stream.read_exact(&mut buf).await?;
     Ok((stream, buf))
 }

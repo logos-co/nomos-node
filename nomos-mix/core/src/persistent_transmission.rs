@@ -1,7 +1,9 @@
 use futures::Stream;
-use nomos_mix_message::DROP_MESSAGE;
+use nomos_mix_message::MixMessage;
 use rand::{distributions::Uniform, prelude::Distribution, Rng, RngCore};
+use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
+use std::marker::PhantomData;
 use std::pin::{pin, Pin};
 use std::task::{Context, Poll};
 use std::time::Duration;
@@ -26,7 +28,7 @@ impl Default for PersistentTransmissionSettings {
 }
 
 /// Transmit scheduled messages with a persistent rate as a stream.
-pub struct PersistentTransmissionStream<S, Rng>
+pub struct PersistentTransmissionStream<S, Rng, M>
 where
     S: Stream,
     Rng: RngCore,
@@ -34,18 +36,20 @@ where
     interval: Interval,
     coin: Coin<Rng>,
     stream: S,
+    _mix_message: PhantomData<M>,
 }
 
-impl<S, Rng> PersistentTransmissionStream<S, Rng>
+impl<S, Rng, M> PersistentTransmissionStream<S, Rng, M>
 where
     S: Stream,
     Rng: RngCore,
+    M: MixMessage,
 {
     pub fn new(
         settings: PersistentTransmissionSettings,
         stream: S,
         rng: Rng,
-    ) -> PersistentTransmissionStream<S, Rng> {
+    ) -> PersistentTransmissionStream<S, Rng, M> {
         let interval = time::interval(Duration::from_secs_f64(
             1.0 / settings.max_emission_frequency,
         ));
@@ -54,14 +58,16 @@ where
             interval,
             coin,
             stream,
+            _mix_message: Default::default(),
         }
     }
 }
 
-impl<S, Rng> Stream for PersistentTransmissionStream<S, Rng>
+impl<S, Rng, M> Stream for PersistentTransmissionStream<S, Rng, M>
 where
     S: Stream<Item = Vec<u8>> + Unpin,
     Rng: RngCore + Unpin,
+    M: MixMessage + Unpin,
 {
     type Item = Vec<u8>;
 
@@ -78,22 +84,23 @@ where
         if let Poll::Ready(Some(item)) = pin!(stream).poll_next(cx) {
             Poll::Ready(Some(item))
         } else if coin.flip() {
-            Poll::Ready(Some(DROP_MESSAGE.to_vec()))
+            Poll::Ready(Some(M::DROP_MESSAGE.to_vec()))
         } else {
             Poll::Pending
         }
     }
 }
 
-pub trait PersistentTransmissionExt<Rng>: Stream
+pub trait PersistentTransmissionExt<Rng, M>: Stream
 where
     Rng: RngCore,
+    M: MixMessage,
 {
     fn persistent_transmission(
         self,
         settings: PersistentTransmissionSettings,
         rng: Rng,
-    ) -> PersistentTransmissionStream<Self, Rng>
+    ) -> PersistentTransmissionStream<Self, Rng, M>
     where
         Self: Sized + Unpin,
     {
@@ -101,10 +108,12 @@ where
     }
 }
 
-impl<S, Rng> PersistentTransmissionExt<Rng> for S
+impl<S, Rng, M> PersistentTransmissionExt<Rng, M> for S
 where
     S: Stream,
     Rng: RngCore,
+    M: MixMessage,
+    M::PublicKey: Clone + Serialize + DeserializeOwned,
 {
 }
 
@@ -141,6 +150,7 @@ enum CoinError {
 mod tests {
     use super::*;
     use futures::StreamExt;
+    use nomos_mix_message::mock::MockMixMessage;
     use rand::SeedableRng;
     use rand_chacha::ChaCha8Rng;
     use tokio::sync::mpsc;
@@ -183,7 +193,7 @@ mod tests {
         let lower_bound = expected_emission_interval - torelance;
         let upper_bound = expected_emission_interval + torelance;
         // prepare stream
-        let mut persistent_transmission_stream =
+        let mut persistent_transmission_stream: PersistentTransmissionStream<_, _, MockMixMessage> =
             stream.persistent_transmission(settings, ChaCha8Rng::from_entropy());
         // Messages must be scheduled in non-blocking manner.
         schedule_sender.send(vec![1]).unwrap();
@@ -209,16 +219,14 @@ mod tests {
         );
         assert_interval!(&mut last_time, lower_bound, upper_bound);
 
-        assert_eq!(
-            persistent_transmission_stream.next().await.unwrap(),
-            DROP_MESSAGE.to_vec()
-        );
+        assert!(MockMixMessage::is_drop_message(
+            &persistent_transmission_stream.next().await.unwrap()
+        ));
         assert_interval!(&mut last_time, lower_bound, upper_bound);
 
-        assert_eq!(
-            persistent_transmission_stream.next().await.unwrap(),
-            DROP_MESSAGE.to_vec()
-        );
+        assert!(MockMixMessage::is_drop_message(
+            &persistent_transmission_stream.next().await.unwrap()
+        ));
         assert_interval!(&mut last_time, lower_bound, upper_bound);
 
         // Schedule a new message and check if it is emitted at the next interval
