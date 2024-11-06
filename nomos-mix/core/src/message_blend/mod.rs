@@ -2,7 +2,6 @@ pub mod crypto;
 pub mod temporal;
 
 pub use crypto::CryptographicProcessorSettings;
-use futures::stream::BoxStream;
 use futures::{Stream, StreamExt};
 use rand::RngCore;
 use std::marker::PhantomData;
@@ -39,7 +38,7 @@ where
     M: MixMessage,
 {
     input_stream: S,
-    output_stream: BoxStream<'static, MixOutgoingMessage>,
+    output_stream: Pin<Box<dyn Stream<Item = MixOutgoingMessage> + Send + Sync + 'static>>,
     temporal_sender: UnboundedSender<MixOutgoingMessage>,
     cryptographic_processor: CryptographicProcessor<Rng, M>,
     _rng: PhantomData<Rng>,
@@ -53,7 +52,7 @@ where
     M: MixMessage,
     M::PrivateKey: Serialize + DeserializeOwned,
     M::PublicKey: Clone + PartialEq,
-    Scheduler: Stream<Item = ()> + Unpin + Send + 'static,
+    Scheduler: Stream<Item = ()> + Unpin + Send + Sync + 'static,
 {
     pub fn new(
         input_stream: S,
@@ -68,9 +67,8 @@ where
             cryptographic_processor_rng,
         );
         let (temporal_sender, temporal_receiver) = mpsc::unbounded_channel();
-        let output_stream = UnboundedReceiverStream::new(temporal_receiver)
-            .temporal_stream(scheduler)
-            .boxed();
+        let output_stream =
+            Box::pin(UnboundedReceiverStream::new(temporal_receiver).temporal_stream(scheduler));
         Self {
             input_stream,
             output_stream,
@@ -110,7 +108,7 @@ where
     M: MixMessage + Unpin,
     M::PrivateKey: Serialize + DeserializeOwned + Unpin,
     M::PublicKey: Clone + PartialEq + Unpin,
-    Scheduler: Stream<Item = ()> + Unpin + Send + 'static,
+    Scheduler: Stream<Item = ()> + Unpin + Send + Sync + 'static,
 {
     type Item = MixOutgoingMessage;
 
@@ -128,7 +126,7 @@ where
     M: MixMessage,
     M::PrivateKey: Serialize + DeserializeOwned,
     M::PublicKey: Clone + PartialEq,
-    Scheduler: Stream<Item = ()> + Unpin + Send + 'static,
+    Scheduler: Stream<Item = ()> + Unpin + Send + Sync + 'static,
 {
     fn blend(
         self,
@@ -157,6 +155,6 @@ where
     M: MixMessage,
     M::PrivateKey: Clone + Serialize + DeserializeOwned + PartialEq,
     M::PublicKey: Clone + Serialize + DeserializeOwned + PartialEq,
-    S: Stream<Item = ()> + Unpin + Send + 'static,
+    S: Stream<Item = ()> + Unpin + Send + Sync + 'static,
 {
 }
