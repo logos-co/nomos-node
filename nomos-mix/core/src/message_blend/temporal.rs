@@ -22,7 +22,7 @@ pub struct TemporalScheduler<Rng> {
 }
 
 impl<Rng> TemporalScheduler<Rng> {
-    pub(crate) fn new(settings: TemporalSchedulerSettings, rng: Rng) -> Self {
+    pub fn new(settings: TemporalSchedulerSettings, rng: Rng) -> Self {
         let lottery_interval = Self::lottery_interval(settings.max_delay_seconds);
         Self {
             settings,
@@ -89,7 +89,7 @@ where
 /// between incoming and outgoing messages from a node.
 ///
 /// See the [`Stream`] implementation below for more details on how it works.
-pub(crate) struct TemporalProcessor<M, S> {
+pub struct TemporalProcessor<M, S> {
     // All scheduled messages
     queue: VecDeque<M>,
     scheduler: S,
