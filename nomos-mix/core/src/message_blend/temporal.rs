@@ -122,7 +122,9 @@ where
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         if self.scheduler.poll_next_unpin(cx).is_ready() {
-            return Poll::Ready(self.queue.pop_front());
+            if let Some(msg) = self.queue.pop_front() {
+                return Poll::Ready(Some(msg));
+            }
         };
         Poll::Pending
     }
