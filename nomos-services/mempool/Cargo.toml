@@ -10,7 +10,6 @@ async-trait = "0.1"
 bincode = { version = "2.0.0-rc.2", features = ["serde"] }
 futures = "0.3"
 linked-hash-map = { version = "0.5.6", optional = true }
-nomos-metrics = { path = "../../nomos-services/metrics" }
 nomos-network = { path = "../network" }
 nomos-da-network-core = { path = "../../nomos-da/network/core" }
 nomos-da-sampling = { path = "../../nomos-services/data-availability/sampling/" }
@@ -38,7 +37,6 @@ blake2 = "0.10"
 default = []
 mock = ["linked-hash-map", "nomos-network/mock", "nomos-core/mock"]
 libp2p = ["nomos-network/libp2p"]
-metrics = []
 
 # enable to help generate OpenAPI
 openapi = ["dep:utoipa", "serde_json"]
