@@ -37,7 +37,7 @@ where
         .metrics(runtime::Tokio)
         .with_exporter(
             opentelemetry_otlp::new_exporter()
-                .tonic()
+                .http()
                 .with_export_config(export_config),
         )
         .with_resource(resource)
