@@ -8,6 +8,7 @@ use network::NetworkAdapter;
 use nomos_core::wire;
 use nomos_mix::membership::{Membership, Node};
 use nomos_mix::message_blend::crypto::CryptographicProcessor;
+use nomos_mix::message_blend::temporal::TemporalScheduler;
 use nomos_mix::message_blend::{MessageBlendExt, MessageBlendSettings};
 use nomos_mix::persistent_transmission::{
     PersistentTransmissionExt, PersistentTransmissionSettings, PersistentTransmissionStream,
@@ -26,8 +27,10 @@ use rand::SeedableRng;
 use rand_chacha::ChaCha12Rng;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::fmt::Debug;
+use std::time::Duration;
 use tokio::sync::mpsc;
-use tokio_stream::wrappers::UnboundedReceiverStream;
+use tokio::time;
+use tokio_stream::wrappers::{IntervalStream, UnboundedReceiverStream};
 
 /// A mix service that sends messages to the mix network
 /// and broadcasts fully unwrapped messages through the [`NetworkService`].
@@ -108,16 +111,25 @@ where
             _,
             _,
             MockMixMessage,
+            _,
         > = UnboundedReceiverStream::new(persistent_receiver).persistent_transmission(
             mix_config.persistent_transmission,
             ChaCha12Rng::from_entropy(),
+            IntervalStream::new(time::interval(Duration::from_secs_f64(
+                1.0 / mix_config.persistent_transmission.max_emission_frequency,
+            )))
+            .map(|_| ()),
         );
 
         // tier 2 blend
+        let temporal_scheduler = TemporalScheduler::new(
+            mix_config.message_blend.temporal_processor,
+            ChaCha12Rng::from_entropy(),
+        );
         let mut blend_messages = backend.listen_to_incoming_messages().blend(
             mix_config.message_blend,
             membership.clone(),
-            ChaCha12Rng::from_entropy(),
+            temporal_scheduler,
             ChaCha12Rng::from_entropy(),
         );
 
