@@ -8,6 +8,7 @@ use nomos_tracing::filter::envfilter::{create_envfilter_layer, EnvFilterConfig};
 use nomos_tracing::logging::gelf::{create_gelf_layer, GelfConfig};
 use nomos_tracing::logging::local::{create_file_layer, create_writer_layer, FileConfig};
 use nomos_tracing::logging::loki::{create_loki_layer, LokiConfig};
+use nomos_tracing::metrics::otlp::{create_otlp_metrics_layer, OtlpMetricsConfig};
 use overwatch_rs::services::life_cycle::LifecycleMessage;
 use overwatch_rs::services::{
     handle::ServiceStateHandle,
@@ -94,10 +95,17 @@ pub enum FilterLayer {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+pub enum MetricsLayer {
+    Otlp(OtlpMetricsConfig),
+    None,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct TracingSettings {
     pub logger: LoggerLayer,
     pub tracing: TracingLayer,
     pub filter: FilterLayer,
+    pub metrics: MetricsLayer,
     #[serde(with = "serde_level")]
     pub level: Level,
 }
@@ -108,6 +116,7 @@ impl Default for TracingSettings {
             logger: LoggerLayer::Stdout,
             tracing: TracingLayer::None,
             filter: FilterLayer::None,
+            metrics: MetricsLayer::None,
             level: Level::DEBUG,
         }
     }
@@ -119,12 +128,14 @@ impl TracingSettings {
         logger: LoggerLayer,
         tracing: TracingLayer,
         filter: FilterLayer,
+        metrics: MetricsLayer,
         level: Level,
     ) -> Self {
         Self {
             logger,
             tracing,
             filter,
+            metrics,
             level,
         }
     }
@@ -192,6 +203,11 @@ impl ServiceCore for Tracing {
         if let FilterLayer::EnvFilter(config) = config.filter {
             let filter_layer = create_envfilter_layer(config)?;
             layers.push(Box::new(filter_layer));
+        }
+
+        if let MetricsLayer::Otlp(config) = config.metrics {
+            let metrics_layer = create_otlp_metrics_layer(config)?;
+            layers.push(Box::new(metrics_layer));
         }
 
         // If no layers are created, tracing subscriber is not required.

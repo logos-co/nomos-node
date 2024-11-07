@@ -4,8 +4,10 @@ use std::{collections::HashMap, net::Ipv4Addr, str::FromStr};
 use nomos_libp2p::{Multiaddr, PeerId};
 use nomos_mix::membership::Node;
 use nomos_mix_message::{mock::MockMixMessage, MixMessage};
-use nomos_tracing::{logging::loki::LokiConfig, tracing::otlp::OtlpTracingConfig};
-use nomos_tracing_service::{FilterLayer, LoggerLayer, TracingSettings};
+use nomos_tracing::{
+    logging::loki::LokiConfig, metrics::otlp::OtlpMetricsConfig, tracing::otlp::OtlpTracingConfig,
+};
+use nomos_tracing_service::{FilterLayer, LoggerLayer, MetricsLayer, TracingSettings};
 use rand::{thread_rng, Rng};
 use tests::topology::configs::{
     api::GeneralApiConfig,
@@ -193,13 +195,19 @@ fn tracing_config_for_grafana(params: TracingParams, identifier: String) -> Gene
         tracing_settings: TracingSettings {
             logger: LoggerLayer::Loki(LokiConfig {
                 endpoint: params.loki_endpoint,
-                host_identifier: identifier,
+                host_identifier: identifier.clone(),
             }),
             tracing: nomos_tracing_service::TracingLayer::Otlp(OtlpTracingConfig {
                 endpoint: params.tempo_endpoint,
                 sample_ratio: 1.0,
             }),
             filter: FilterLayer::None,
+            metrics: MetricsLayer::Otlp(OtlpMetricsConfig {
+                endpoint: "http://127.0.0.1:9090/api/v1/otlp/v1/metrics"
+                    .try_into()
+                    .unwrap(),
+                host_identifier: identifier,
+            }),
             level: Level::INFO,
         },
     }
@@ -249,6 +257,7 @@ mod cfgsync_tests {
             TracingParams {
                 tempo_endpoint: "http://test.com".try_into().unwrap(),
                 loki_endpoint: "http://test.com".try_into().unwrap(),
+                metrics_endpoint: "http://test.com".try_into().unwrap(),
             },
             hosts,
         );

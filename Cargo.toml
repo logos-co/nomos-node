@@ -16,7 +16,6 @@ members = [
     "nomos-services/storage",
     "nomos-services/cryptarchia-consensus",
     "nomos-services/mempool",
-    "nomos-services/metrics",
     "nomos-services/system-sig",
     "nomos-services/data-availability/indexer",
     "nomos-services/data-availability/network",

@@ -24,8 +24,6 @@ use nomos_mix_service::MixService;
 use nomos_node::DispersedBlobInfo;
 use nomos_node::HeaderId;
 use nomos_node::MempoolNetworkAdapter;
-#[cfg(feature = "metrics")]
-use nomos_node::Metrics;
 use nomos_node::NetworkBackend;
 use nomos_node::{
     BlobInfo, Cryptarchia, DaIndexer, DaMempool, DaNetworkService, DaSampling, DaVerifier,
@@ -101,7 +99,5 @@ pub struct NomosExecutor {
     cryptarchia: ServiceHandle<ExecutorCryptarchia>,
     http: ServiceHandle<ExecutorApiService>,
     storage: ServiceHandle<StorageService<RocksBackend<Wire>>>,
-    #[cfg(feature = "metrics")]
-    metrics: ServiceHandle<Metrics>,
     system_sig: ServiceHandle<SystemSig>,
 }

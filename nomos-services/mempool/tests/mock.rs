@@ -64,7 +64,6 @@ fn test_mockmempool() {
             mockpool: TxMempoolSettings {
                 backend: (),
                 network: (),
-                registry: None,
             },
             logging: TracingSettings::default(),
         },

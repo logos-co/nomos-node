@@ -3,12 +3,3 @@ global:
   evaluation_interval: 15s
   external_labels:
     monitor: "Monitoring"
-
-scrape_configs:
-  - job_name: "nomos"
-    static_configs:
-    - targets:
-      - nomos-node-0:18080
-      - nomos-node-1:18080
-      - nomos-node-2:18080
-      - nomos-node-3:18080

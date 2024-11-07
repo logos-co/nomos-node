@@ -36,7 +36,6 @@ nomos-mempool = { path = "../../nomos-services/mempool", features = [
     "mock",
     "libp2p",
 ] }
-nomos-metrics = { path = "../../nomos-services/metrics" }
 nomos-storage = { path = "../../nomos-services/storage", features = ["rocksdb"] }
 cryptarchia-consensus = { path = "../../nomos-services/cryptarchia-consensus", features = ["libp2p"] }
 nomos-libp2p = { path = "../../nomos-libp2p" }
@@ -65,5 +64,4 @@ rand = "0.8"
 
 [features]
 default = ["tracing"]
-metrics = []
 tracing = []
