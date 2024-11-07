@@ -1,8 +1,6 @@
 use kzgrs_backend::dispersal::BlobInfo;
-#[cfg(feature = "metrics")]
-use nomos_metrics::MetricsSettings;
 use nomos_node::{
-    config::MixArgs, Config, CryptarchiaArgs, HttpArgs, LogArgs, MetricsArgs, NetworkArgs, Nomos,
+    config::MixArgs, Config, CryptarchiaArgs, HttpArgs, LogArgs, NetworkArgs, Nomos,
     NomosServiceSettings, Tx,
 };
 
@@ -35,9 +33,6 @@ struct Args {
     http_args: HttpArgs,
     #[clap(flatten)]
     cryptarchia_args: CryptarchiaArgs,
-    /// Overrides metrics config.
-    #[clap(flatten)]
-    metrics_args: MetricsArgs,
 }
 
 fn main() -> Result<()> {
@@ -48,7 +43,6 @@ fn main() -> Result<()> {
         network_args,
         mix_args,
         cryptarchia_args,
-        metrics_args,
     } = Args::parse();
     let config = serde_yaml::from_reader::<_, Config>(std::fs::File::open(config)?)?
         .update_from_args(
@@ -59,13 +53,6 @@ fn main() -> Result<()> {
             cryptarchia_args,
         )?;
 
-    let registry = cfg!(feature = "metrics")
-        .then(|| {
-            metrics_args
-                .with_metrics
-                .then(nomos_metrics::NomosRegistry::default)
-        })
-        .flatten();
     #[cfg(debug_assertions)]
     let debug_span = {
         let debug_id = Uuid::new_v4();
@@ -86,7 +73,6 @@ fn main() -> Result<()> {
                     topic: String::from(nomos_node::CL_TOPIC),
                     id: <Tx as Transaction>::hash,
                 },
-                registry: registry.clone(),
             },
             da_mempool: nomos_mempool::DaMempoolSettings {
                 backend: (),
@@ -94,15 +80,12 @@ fn main() -> Result<()> {
                     topic: String::from(nomos_node::DA_TOPIC),
                     id: <BlobInfo as DispersedBlobInfo>::blob_id,
                 },
-                registry: registry.clone(),
             },
             da_network: config.da_network,
             da_indexer: config.da_indexer,
             da_sampling: config.da_sampling,
             da_verifier: config.da_verifier,
             cryptarchia: config.cryptarchia,
-            #[cfg(feature = "metrics")]
-            metrics: MetricsSettings { registry },
             storage: config.storage,
             system_sig: (),
         },

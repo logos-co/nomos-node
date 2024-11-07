@@ -7,4 +7,5 @@ pub mod repo;
 pub struct TracingParams {
     pub tempo_endpoint: Url,
     pub loki_endpoint: Url,
+    pub metrics_endpoint: Url,
 }

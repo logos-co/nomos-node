@@ -28,7 +28,7 @@ use nomos_libp2p::PeerId;
 use nomos_mempool::{tx::service::openapi::Status, MempoolMetrics};
 use nomos_node::api::handlers::{
     add_blob, add_blob_info, add_tx, block, cl_metrics, cl_status, cryptarchia_headers,
-    cryptarchia_info, get_metrics, get_range, libp2p_info,
+    cryptarchia_info, get_range, libp2p_info,
 };
 use nomos_storage::backends::StorageSerde;
 use overwatch_rs::overwatch::handle::OverwatchHandle;
@@ -327,7 +327,6 @@ where
                     >,
                 ),
             )
-            .route(paths::METRICS, routing::get(get_metrics))
             .route(
                 paths::DISPERSE_DATA,
                 routing::post(

@@ -129,12 +129,6 @@ pub struct CryptarchiaArgs {
     note_nonce: Option<String>,
 }
 
-#[derive(Parser, Debug, Clone)]
-pub struct MetricsArgs {
-    #[clap(long = "with-metrics", env = "WITH_METRICS")]
-    pub with_metrics: bool,
-}
-
 #[derive(Deserialize, Debug, Clone, Serialize)]
 pub struct Config {
     pub tracing: <Tracing as ServiceData>::Settings,

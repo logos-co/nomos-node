@@ -4,5 +4,4 @@ pub mod consensus;
 pub mod da;
 pub mod libp2p;
 pub mod mempool;
-pub mod metrics;
 pub mod storage;
