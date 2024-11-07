@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+blake2 = "0.10"
 cached = "0.53"
 tokio = { version = "1", features = ["time", "sync", "macros"] }
 tokio-stream = "0.1"
