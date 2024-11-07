@@ -8,12 +8,14 @@ use std::ops::{DerefMut, Div};
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
+#[derive(Copy, Clone)]
 pub struct CoverTrafficSettings {
-    node_id: [u8; 32],
-    number_of_hops: usize,
-    slots_per_epoch: usize,
-    network_size: usize,
+    pub node_id: [u8; 32],
+    pub number_of_hops: usize,
+    pub slots_per_epoch: usize,
+    pub network_size: usize,
 }
+
 pub struct CoverTraffic<EpochStream, SlotStream, Message> {
     winning_probability: f64,
     settings: CoverTrafficSettings,
