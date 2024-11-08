@@ -4,12 +4,10 @@ use clap::Parser;
 use color_eyre::eyre::{eyre, Result};
 use nomos_executor::config::Config as ExecutorConfig;
 use nomos_executor::{NomosExecutor, NomosExecutorServiceSettings};
-#[cfg(feature = "metrics")]
-use nomos_node::MetricsSettings;
 use nomos_node::{
     config::MixArgs, BlobInfo, CryptarchiaArgs, DaMempoolSettings, DispersedBlobInfo, HttpArgs,
-    LogArgs, MempoolAdapterSettings, MetricsArgs, NetworkArgs, Transaction, Tx, TxMempoolSettings,
-    CL_TOPIC, DA_TOPIC,
+    LogArgs, MempoolAdapterSettings, NetworkArgs, Transaction, Tx, TxMempoolSettings, CL_TOPIC,
+    DA_TOPIC,
 };
 use overwatch_rs::overwatch::*;
 use tracing::{span, Level};
@@ -35,9 +33,6 @@ struct Args {
     http_args: HttpArgs,
     #[clap(flatten)]
     cryptarchia_args: CryptarchiaArgs,
-    /// Overrides metrics config.
-    #[clap(flatten)]
-    metrics_args: MetricsArgs,
 }
 
 fn main() -> Result<()> {
@@ -48,7 +43,6 @@ fn main() -> Result<()> {
         network_args,
         mix_args,
         cryptarchia_args,
-        metrics_args,
     } = Args::parse();
     let config = serde_yaml::from_reader::<_, ExecutorConfig>(std::fs::File::open(config)?)?
         .update_from_args(
@@ -58,14 +52,6 @@ fn main() -> Result<()> {
             http_args,
             cryptarchia_args,
         )?;
-
-    let registry = cfg!(feature = "metrics")
-        .then(|| {
-            metrics_args
-                .with_metrics
-                .then(nomos_metrics::NomosRegistry::default)
-        })
-        .flatten();
 
     #[cfg(debug_assertions)]
     let debug_span = {
@@ -87,7 +73,6 @@ fn main() -> Result<()> {
                     topic: String::from(CL_TOPIC),
                     id: <Tx as Transaction>::hash,
                 },
-                registry: registry.clone(),
             },
             da_mempool: DaMempoolSettings {
                 backend: (),
@@ -95,7 +80,6 @@ fn main() -> Result<()> {
                     topic: String::from(DA_TOPIC),
                     id: <BlobInfo as DispersedBlobInfo>::blob_id,
                 },
-                registry: registry.clone(),
             },
             da_dispersal: config.da_dispersal,
             da_network: config.da_network,
@@ -103,8 +87,6 @@ fn main() -> Result<()> {
             da_sampling: config.da_sampling,
             da_verifier: config.da_verifier,
             cryptarchia: config.cryptarchia,
-            #[cfg(feature = "metrics")]
-            metrics: MetricsSettings { registry },
             storage: config.storage,
             system_sig: (),
         },

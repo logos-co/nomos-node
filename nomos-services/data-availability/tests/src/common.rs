@@ -1,14 +1,16 @@
 use cryptarchia_consensus::LeaderConfig;
 // std
 use nomos_da_network_service::backends::libp2p::common::DaNetworkBackendSettings;
+use nomos_mix::membership::Node;
 use nomos_mix::message_blend::{
-    CryptographicProcessorSettings, MessageBlendSettings, TemporalProcessorSettings,
+    CryptographicProcessorSettings, MessageBlendSettings, TemporalSchedulerSettings,
 };
+use nomos_mix_message::mock::MockMixMessage;
+use nomos_mix_message::MixMessage;
 use std::path::PathBuf;
 use std::time::Duration;
 // crates
 use bytes::Bytes;
-use cl::InputWitness;
 use cryptarchia_consensus::TimeConfig;
 use kzgrs_backend::common::blob::DaBlob;
 use kzgrs_backend::dispersal::BlobInfo;
@@ -187,13 +189,19 @@ pub struct TestDaNetworkSettings {
     pub node_key: ed25519::SecretKey,
 }
 
+pub struct TestMixSettings {
+    pub backend: Libp2pMixBackendSettings,
+    pub private_key: x25519_dalek::StaticSecret,
+    pub membership: Vec<Node<<MockMixMessage as MixMessage>::PublicKey>>,
+}
+
 pub fn new_node(
     leader_config: &LeaderConfig,
     ledger_config: &nomos_ledger::Config,
     genesis_state: &LedgerState,
     time_config: &TimeConfig,
     swarm_config: &SwarmConfig,
-    mix_config: &Libp2pMixBackendSettings,
+    mix_config: &TestMixSettings,
     db_path: PathBuf,
     blobs_dir: &PathBuf,
     initial_peers: Vec<Multiaddr>,
@@ -210,14 +218,18 @@ pub fn new_node(
                 },
             },
             mix: MixConfig {
-                backend: mix_config.clone(),
+                backend: mix_config.backend.clone(),
                 persistent_transmission: Default::default(),
                 message_blend: MessageBlendSettings {
-                    cryptographic_processor: CryptographicProcessorSettings { num_mix_layers: 1 },
-                    temporal_processor: TemporalProcessorSettings {
+                    cryptographic_processor: CryptographicProcessorSettings {
+                        private_key: mix_config.private_key.to_bytes(),
+                        num_mix_layers: 1,
+                    },
+                    temporal_processor: TemporalSchedulerSettings {
                         max_delay_seconds: 2,
                     },
                 },
+                membership: mix_config.membership.clone(),
             },
             da_network: DaNetworkConfig {
                 backend: DaNetworkBackendSettings {
@@ -241,7 +253,6 @@ pub fn new_node(
                     topic: String::from(nomos_node::CL_TOPIC),
                     id: <Tx as Transaction>::hash,
                 },
-                registry: None,
             },
             da_mempool: DaMempoolSettings {
                 backend: (),
@@ -249,7 +260,6 @@ pub fn new_node(
                     topic: String::from(nomos_node::DA_TOPIC),
                     id: <BlobInfo as DispersedBlobInfo>::blob_id,
                 },
-                registry: None,
             },
             storage: nomos_storage::backends::rocksdb::RocksBackendSettings {
                 db_path,
@@ -308,35 +318,39 @@ pub fn new_node(
     .unwrap()
 }
 
-pub fn new_mix_configs(listening_addresses: Vec<Multiaddr>) -> Vec<Libp2pMixBackendSettings> {
-    let mut configs = listening_addresses
+pub fn new_mix_configs(listening_addresses: Vec<Multiaddr>) -> Vec<TestMixSettings> {
+    let settings = listening_addresses
         .iter()
-        .map(|listening_address| Libp2pMixBackendSettings {
-            listening_address: listening_address.clone(),
-            node_key: ed25519::SecretKey::generate(),
-            membership: Vec::new(),
-            peering_degree: 1,
+        .map(|listening_address| {
+            (
+                Libp2pMixBackendSettings {
+                    listening_address: listening_address.clone(),
+                    node_key: ed25519::SecretKey::generate(),
+                    peering_degree: 1,
+                },
+                x25519_dalek::StaticSecret::random(),
+            )
         })
         .collect::<Vec<_>>();
 
-    let membership = configs
+    let membership = settings
         .iter()
-        .map(|c| {
-            let peer_id = PeerId::from_public_key(
-                &ed25519::Keypair::from(c.node_key.clone()).public().into(),
-            );
-            c.listening_address
-                .clone()
-                .with_p2p(peer_id)
-                .unwrap_or_else(|orig_addr| orig_addr)
+        .map(|(backend, private_key)| Node {
+            address: backend.listening_address.clone(),
+            // We use private key as a public key because the `MockMixMessage` doesn't differentiate between them.
+            // TODO: Convert private key to public key properly once the real MixMessage is implemented.
+            public_key: private_key.to_bytes(),
         })
         .collect::<Vec<_>>();
 
-    configs
-        .iter_mut()
-        .for_each(|c| c.membership = membership.clone());
-
-    configs
+    settings
+        .into_iter()
+        .map(|(backend, private_key)| TestMixSettings {
+            backend,
+            private_key,
+            membership: membership.clone(),
+        })
+        .collect()
 }
 
 // Client node is only created for asyncroniously interact with nodes in the test.

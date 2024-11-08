@@ -39,6 +39,11 @@ harness = false
 name = "fk20"
 harness = false
 
+
+[[bench]]
+name = "rs"
+harness = false
+
 [features]
 default = ["single"]
 single = []

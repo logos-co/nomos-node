@@ -84,6 +84,7 @@ services:
     command:
       - --config.file=/etc/prometheus/prometheus.yml
       - --storage.tsdb.retention.time=7d
+      - --enable-feature=otlp-write-receiver
     ports:
       - 127.0.0.1:9090:9090
     restart: on-failure

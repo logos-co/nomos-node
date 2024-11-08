@@ -52,10 +52,21 @@ mix:
   backend:
     listening_address: /ip4/0.0.0.0/udp/3001/quic-v1
     node_key: 40fb62acf1604000c1b8d3bd0880e43eb2f6ae52029fde75d992ba0fed6e01c3
-    membership:
-    - /ip4/0.0.0.0/udp/3001/quic-v1/p2p/12D3KooWMj7KgmbDJ7RSXeFhFimvqddSXzA5XWDTwvdEJYfuoPhM
     peering_degree: 1
-    num_mix_layers: 1
+  persistent_transmission:
+    max_emission_frequency: 1
+    drop_message_probability: 0.5
+  message_blend:
+    cryptographic_processor:
+      private_key: [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
+      num_mix_layers: 1
+    temporal_processor:
+      max_delay_seconds: 5
+  membership:
+    - address: /ip4/127.0.0.1/udp/3001/quic-v1
+      public_key: [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
+    - address: /ip4/127.0.0.1/udp/3002/quic-v1
+      public_key: [2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2]
 
 http:
   backend_settings:

@@ -7,7 +7,7 @@ mod tx;
 use api::backend::AxumBackend;
 use bytes::Bytes;
 use color_eyre::eyre::Result;
-pub use config::{Config, CryptarchiaArgs, HttpArgs, LogArgs, MetricsArgs, NetworkArgs};
+pub use config::{Config, CryptarchiaArgs, HttpArgs, LogArgs, NetworkArgs};
 use kzgrs_backend::common::blob::DaBlob;
 pub use kzgrs_backend::dispersal::BlobInfo;
 use nomos_api::ApiService;
@@ -35,9 +35,6 @@ pub use nomos_mempool::network::adapters::libp2p::{
 };
 pub use nomos_mempool::TxMempoolSettings;
 use nomos_mempool::{backend::mockpool::MockPool, TxMempoolService};
-pub use nomos_metrics::NomosRegistry;
-#[cfg(feature = "metrics")]
-pub use nomos_metrics::{Metrics, MetricsSettings};
 pub use nomos_mix_service::backends::libp2p::Libp2pMixBackend as MixBackend;
 pub use nomos_mix_service::network::libp2p::Libp2pAdapter as MixNetworkAdapter;
 pub use nomos_mix_service::MixService;
@@ -173,8 +170,6 @@ pub struct Nomos {
     cryptarchia: ServiceHandle<NodeCryptarchia>,
     http: ServiceHandle<NomosApiService>,
     storage: ServiceHandle<StorageService<RocksBackend<Wire>>>,
-    #[cfg(feature = "metrics")]
-    metrics: ServiceHandle<Metrics>,
     system_sig: ServiceHandle<SystemSig>,
 }
 

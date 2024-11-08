@@ -29,7 +29,7 @@ use utoipa_swagger_ui::SwaggerUi;
 // internal
 use super::handlers::{
     add_blob, add_blob_info, add_tx, block, cl_metrics, cl_status, cryptarchia_headers,
-    cryptarchia_info, get_metrics, get_range, libp2p_info,
+    cryptarchia_info, get_range, libp2p_info,
 };
 
 /// Configuration for the Http Server
@@ -303,7 +303,6 @@ where
                     >,
                 ),
             )
-            .route(paths::METRICS, routing::get(get_metrics))
             .with_state(handle);
 
         Server::bind(&self.settings.address)

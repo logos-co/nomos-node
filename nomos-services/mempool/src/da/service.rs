@@ -8,9 +8,6 @@ pub mod openapi {
 use std::fmt::Debug;
 
 // crates
-// TODO: Add again after metrics refactor
-// #[cfg(feature = "metrics")]
-// use super::metrics::Metrics;
 use futures::StreamExt;
 use nomos_da_sampling::storage::DaStorageAdapter;
 use rand::{RngCore, SeedableRng};
@@ -23,7 +20,6 @@ use nomos_da_sampling::{
     backend::DaSamplingServiceBackend, network::NetworkAdapter as DaSamplingNetworkAdapter,
     DaSamplingService, DaSamplingServiceMsg,
 };
-use nomos_metrics::NomosRegistry;
 use nomos_network::{NetworkMsg, NetworkService};
 use overwatch_rs::services::life_cycle::LifecycleMessage;
 use overwatch_rs::services::{
@@ -55,9 +51,6 @@ where
     network_relay: Relay<NetworkService<N::Backend>>,
     sampling_relay: Relay<DaSamplingService<DB, DN, R, SamplingStorage>>,
     pool: P,
-    // TODO: Add again after metrics refactor
-    // #[cfg(feature = "metrics")]
-    // metrics: Option<Metrics>,
 }
 
 impl<N, P, DB, DN, R, DaStorage> ServiceData for DaMempoolService<N, P, DB, DN, R, DaStorage>
@@ -113,19 +106,11 @@ where
         let sampling_relay = service_state.overwatch_handle.relay();
         let settings = service_state.settings_reader.get_updated_settings();
 
-        // TODO: Refactor metrics to be reusable then replug it again
-        // #[cfg(feature = "metrics")]
-        // let metrics = settings
-        //     .registry
-        //     .map(|reg| Metrics::new(reg, service_state.id()));
-
         Ok(Self {
             service_state,
             network_relay,
             sampling_relay,
             pool: P::new(settings.backend),
-            // #[cfg(feature = "metrics")]
-            // metrics,
         })
     }
 
@@ -160,9 +145,6 @@ where
         loop {
             tokio::select! {
                 Some(msg) = service_state.inbound_relay.recv() => {
-                    // TODO: replug metrics once refactor is done
-                    // #[cfg(feature = "metrics")]
-                    // if let Some(metrics) = &self.metrics { metrics.record(&msg) }
                     Self::handle_mempool_message(msg, &mut pool, &mut network_relay, &mut service_state).await;
                 }
                 Some((key, item)) = network_items.next() => {
@@ -170,6 +152,7 @@ where
                     pool.add_item(key, item).unwrap_or_else(|e| {
                         tracing::debug!("could not add item to the pool due to: {}", e)
                     });
+                    tracing::info!(counter.da_mempool_pending_items = pool.pending_item_count());
                 }
                 Some(msg) = lifecycle_stream.next() =>  {
                     if Self::should_stop_service(msg).await {
@@ -294,5 +277,4 @@ where
 pub struct DaMempoolSettings<B, N> {
     pub backend: B,
     pub network: N,
-    pub registry: Option<NomosRegistry>,
 }
