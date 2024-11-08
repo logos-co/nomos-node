@@ -337,7 +337,9 @@ pub fn new_mix_configs(listening_addresses: Vec<Multiaddr>) -> Vec<TestMixSettin
         .iter()
         .map(|(backend, private_key)| Node {
             address: backend.listening_address.clone(),
-            public_key: x25519_dalek::PublicKey::from(private_key).to_bytes(),
+            // We use private key as a public key because the `MockMixMessage` doesn't differentiate between them.
+            // TODO: Convert private key to public key properly once the real MixMessage is implemented.
+            public_key: private_key.to_bytes(),
         })
         .collect::<Vec<_>>();
 
