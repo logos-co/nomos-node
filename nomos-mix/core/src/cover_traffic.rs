@@ -103,7 +103,7 @@ fn select_slot<Id: Hash + Eq + AsRef<[u8]> + Copy>(
     let i = i.ceil() as usize;
     let mut w = HashSet::new();
     while w.len() != i {
-        w.insert(generate_ticket(node_id, r, slots_per_epoch));
+        w.insert(generate_ticket(node_id, r, i) % slots_per_epoch as u32);
     }
     w
 }
