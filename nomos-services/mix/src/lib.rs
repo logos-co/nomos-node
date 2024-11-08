@@ -228,10 +228,9 @@ pub struct MixConfig<BackendSettings> {
 
 impl<BackendSettings> MixConfig<BackendSettings> {
     fn membership(&self) -> Membership<MockMixMessage> {
-        let public_key = x25519_dalek::PublicKey::from(&x25519_dalek::StaticSecret::from(
-            self.message_blend.cryptographic_processor.private_key,
-        ))
-        .to_bytes();
+        // We use private key as a public key because the `MockMixMessage` doesn't differentiate between them.
+        // TODO: Convert private key to public key properly once the real MixMessage is implemented.
+        let public_key = self.message_blend.cryptographic_processor.private_key;
         Membership::new(self.membership.clone(), public_key)
     }
 }

@@ -51,7 +51,9 @@ fn mix_nodes(configs: &[GeneralMixConfig]) -> Vec<Node<<MockMixMessage as MixMes
         .iter()
         .map(|config| Node {
             address: config.backend.listening_address.clone(),
-            public_key: x25519_dalek::PublicKey::from(&config.private_key).to_bytes(),
+            // We use private key as a public key because the `MockMixMessage` doesn't differentiate between them.
+            // TODO: Convert private key to public key properly once the real MixMessage is implemented.
+            public_key: config.private_key.to_bytes(),
         })
         .collect()
 }
