@@ -12,13 +12,12 @@ use std::task::{Context, Poll};
 #[derive(Copy, Clone, Deserialize)]
 pub struct CoverTrafficSettings {
     pub node_id: [u8; 32],
-    pub number_of_hops: usize,
+    pub winning_probability: f64,
     pub slots_per_epoch: usize,
     pub network_size: usize,
 }
 
 pub struct CoverTraffic<EpochStream, SlotStream, Message> {
-    winning_probability: f64,
     settings: CoverTrafficSettings,
     epoch_stream: EpochStream,
     slot_stream: SlotStream,
@@ -36,9 +35,7 @@ where
         epoch_stream: EpochStream,
         slot_stream: SlotStream,
     ) -> Self {
-        let winning_probability = winning_probability(settings.number_of_hops);
         CoverTraffic {
-            winning_probability,
             settings,
             epoch_stream,
             slot_stream,
@@ -58,7 +55,6 @@ where
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let Self {
-            winning_probability,
             settings,
             epoch_stream,
             slot_stream,
@@ -71,7 +67,7 @@ where
                 epoch,
                 settings.network_size,
                 settings.slots_per_epoch,
-                *winning_probability,
+                settings.winning_probability,
             );
         }
         if let Poll::Ready(Some(slot)) = slot_stream.poll_next_unpin(cx) {
@@ -106,8 +102,4 @@ fn select_slot<Id: Hash + Eq + AsRef<[u8]> + Copy>(
         w.insert(generate_ticket(node_id, r, slots_per_epoch));
     }
     w
-}
-
-fn winning_probability(number_of_hops: usize) -> f64 {
-    1.0 / number_of_hops as f64
 }
