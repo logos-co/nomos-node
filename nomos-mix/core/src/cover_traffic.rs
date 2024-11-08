@@ -1,13 +1,13 @@
 use blake2::Digest;
 use futures::{Stream, StreamExt};
 use nomos_mix_message::MixMessage;
+use serde::Deserialize;
 use std::collections::HashSet;
 use std::hash::Hash;
 use std::marker::PhantomData;
 use std::ops::{DerefMut, Div};
 use std::pin::Pin;
 use std::task::{Context, Poll};
-use serde::Deserialize;
 
 #[derive(Copy, Clone, Deserialize)]
 pub struct CoverTrafficSettings {
@@ -28,8 +28,8 @@ pub struct CoverTraffic<EpochStream, SlotStream, Message> {
 
 impl<EpochStream, SlotStream, Message> CoverTraffic<EpochStream, SlotStream, Message>
 where
-    EpochStream: Stream<Item = usize>,
-    SlotStream: Stream<Item = usize>,
+    EpochStream: Stream<Item = usize> + Send + Sync + Unpin,
+    SlotStream: Stream<Item = usize> + Send + Sync + Unpin,
 {
     pub fn new(
         settings: CoverTrafficSettings,
@@ -50,9 +50,9 @@ where
 
 impl<EpochStream, SlotStream, Message> Stream for CoverTraffic<EpochStream, SlotStream, Message>
 where
-    EpochStream: Stream<Item = usize> + Unpin,
-    SlotStream: Stream<Item = usize> + Unpin,
-    Message: MixMessage + Unpin,
+    EpochStream: Stream<Item = usize> + Send + Sync + Unpin,
+    SlotStream: Stream<Item = usize> + Send + Sync + Unpin,
+    Message: MixMessage + Send + Sync + Unpin,
 {
     type Item = Vec<u8>;
 
