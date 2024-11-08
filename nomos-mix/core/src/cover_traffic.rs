@@ -1,4 +1,4 @@
-use blake2::digest::consts::{U16, U4};
+use blake2::digest::consts::U4;
 use blake2::Digest;
 use futures::{Stream, StreamExt};
 use nomos_mix_message::MixMessage;
@@ -101,7 +101,7 @@ fn select_slot<Id: Hash + Eq + AsRef<[u8]> + Copy>(
     winning_probability: f64,
 ) -> HashSet<u32> {
     let i = (slots_per_epoch as f64).div(network_size as f64) * winning_probability;
-    let mut size = i.ceil() as usize;
+    let size = i.ceil() as usize;
     let mut w = HashSet::new();
     let mut i = 0;
     while w.len() != size {
