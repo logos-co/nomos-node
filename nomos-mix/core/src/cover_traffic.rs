@@ -7,8 +7,9 @@ use std::marker::PhantomData;
 use std::ops::{DerefMut, Div};
 use std::pin::Pin;
 use std::task::{Context, Poll};
+use serde::Deserialize;
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Deserialize)]
 pub struct CoverTrafficSettings {
     pub node_id: [u8; 32],
     pub number_of_hops: usize,
