@@ -27,3 +27,35 @@ impl MembershipHandler for AllNeighbours {
         self.neighbours.clone()
     }
 }
+
+use crossbeam_channel::{bounded, Receiver, Sender};
+
+/// A special-purpose multi-producer, multi-consumer(MPMC) channel to relay messages indicating whether the associated stream should be closed or not.
+pub struct Indicator {
+    pub sender: Sender<bool>,
+    pub receiver: Receiver<bool>,
+}
+
+impl Indicator {
+    pub fn new(size: usize) -> Self {
+        let (sender, receiver) = bounded(size);
+        Self { sender, receiver }
+    }
+
+    pub fn send(&self, message: bool) {
+        self.sender.send(message).unwrap();
+    }
+
+    pub fn receive(&self) -> Option<bool> {
+        self.receiver.try_recv().ok()
+    }
+}
+
+impl Clone for Indicator {
+    fn clone(&self) -> Self {
+        Self {
+            sender: self.sender.clone(),
+            receiver: self.receiver.clone(),
+        }
+    }
+}

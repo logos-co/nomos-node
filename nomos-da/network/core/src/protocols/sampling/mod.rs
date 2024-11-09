@@ -6,7 +6,7 @@ mod test {
     use crate::protocols::sampling::behaviour::{
         BehaviourSampleRes, SamplingBehaviour, SamplingEvent,
     };
-    use crate::test_utils::AllNeighbours;
+    use crate::test_utils::{AllNeighbours, Indicator};
     use crate::SubnetworkId;
     use futures::StreamExt;
     use kzgrs_backend::common::blob::DaBlob;
@@ -80,19 +80,30 @@ mod test {
             p1_addresses.into_iter().collect(),
         );
         let mut p2 = sampling_swarm(k2.clone(), neighbours, p2_addresses.into_iter().collect());
-
         let request_sender_1 = p1.behaviour().sample_request_channel();
         let request_sender_2 = p2.behaviour().sample_request_channel();
         const MSG_COUNT: usize = 10;
+        let i1 = Indicator::new(MSG_COUNT);
+        let i2 = Indicator::new(MSG_COUNT);
+
         async fn test_sampling_swarm(
+            own_indicator: Indicator,
+            peer_indicator: Indicator,
             mut swarm: Swarm<
                 SamplingBehaviour<
                     impl MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'static,
                 >,
             >,
         ) -> Vec<[u8; 32]> {
-            let mut res = vec![];
+            let mut res = Vec::with_capacity(MSG_COUNT);
             loop {
+                if res.len() == MSG_COUNT {
+                    own_indicator.send(true); // Indicate the peer that sampling is finished from this side
+                    if let Some(true) = peer_indicator.receive() {
+                        // Break out only when peer has also finished sampling
+                        break res;
+                    }
+                }
                 match swarm.next().await {
                     None => {}
                     Some(SwarmEvent::Behaviour(SamplingEvent::IncomingSample {
@@ -131,30 +142,30 @@ mod test {
                         debug!("{event:?}");
                     }
                 }
-                if res.len() == MSG_COUNT {
-                    break res;
-                }
             }
         }
-        let _p1_address = p1_address.clone();
-        let _p2_address = p2_address.clone();
 
+        let clone1 = i1.clone();
+        let clone2 = i2.clone();
         let t1 = tokio::spawn(async move {
             p1.listen_on(p1_address).unwrap();
             tokio::time::sleep(Duration::from_secs(1)).await;
-            test_sampling_swarm(p1).await
+            test_sampling_swarm(clone1, clone2, p1).await
         });
+        let clone1 = i1.clone();
+        let clone2 = i2.clone();
         let t2 = tokio::spawn(async move {
             p2.listen_on(p2_address).unwrap();
             tokio::time::sleep(Duration::from_secs(1)).await;
-            test_sampling_swarm(p2).await
+            test_sampling_swarm(clone2, clone1, p2).await
         });
+
         tokio::time::sleep(Duration::from_secs(2)).await;
         for i in 0..MSG_COUNT {
+            // sending Column_idx and blob_id to initiate sampling request
             request_sender_1.send((0, [i as u8; 32])).unwrap();
             request_sender_2.send((0, [i as u8; 32])).unwrap();
         }
-
         let res1 = t1.await.unwrap();
         let res2 = t2.await.unwrap();
         assert_eq!(res1, res2);
