@@ -1,3 +1,4 @@
+use blake2::digest::consts::U4;
 use blake2::Digest;
 use futures::{Stream, StreamExt};
 use nomos_mix_message::MixMessage;
@@ -84,12 +85,12 @@ where
 }
 
 fn generate_ticket<Id: Hash + Eq + AsRef<[u8]>>(node_id: Id, r: usize, slot: usize) -> u32 {
-    let mut hasher = blake2::Blake2b512::new();
+    let mut hasher = blake2::Blake2s::<U4>::new();
     hasher.update(node_id);
     hasher.update(r.to_be_bytes());
     hasher.update(slot.to_be_bytes());
-    let hash = &hasher.finalize()[..];
-    u32::from_be_bytes(hash.try_into().unwrap())
+    let hash: [u8; std::mem::size_of::<u32>()] = hasher.finalize()[..].to_vec().try_into().unwrap();
+    u32::from_be_bytes(hash)
 }
 
 fn select_slot<Id: Hash + Eq + AsRef<[u8]> + Copy>(
@@ -100,14 +101,30 @@ fn select_slot<Id: Hash + Eq + AsRef<[u8]> + Copy>(
     winning_probability: f64,
 ) -> HashSet<u32> {
     let i = (slots_per_epoch as f64).div(network_size as f64) * winning_probability;
-    let i = i.ceil() as usize;
+    let size = i.ceil() as usize;
     let mut w = HashSet::new();
-    while w.len() != i {
-        w.insert(generate_ticket(node_id, r, slots_per_epoch));
+    let mut i = 0;
+    while w.len() != size {
+        w.insert(generate_ticket(node_id, r, i) % slots_per_epoch as u32);
+        i += 1;
     }
     w
 }
 
 fn winning_probability(number_of_hops: usize) -> f64 {
     1.0 / number_of_hops as f64
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::cover_traffic::{generate_ticket, select_slot, winning_probability};
+
+    #[test]
+    fn test_ticket() {
+        generate_ticket(10u32.to_be_bytes(), 1123, 0);
+        for i in (0..1u32) {
+            let slots = select_slot(i.to_be_bytes(), 1234, 100, 21600, winning_probability(1));
+            println!("slots = {slots:?}");
+        }
+    }
 }
