@@ -1,0 +1,1199 @@
+{
+	// Use IntelliSense to learn about possible attributes.
+	// Hover to view descriptions of existing attributes.
+	// For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+	"version": "0.2.0",
+	"configurations": [
+		{
+			"type": "lldb",
+			"request": "launch",
+			"name": "Debug unit tests in library 'nomos_core'",
+			"cargo": {
+				"args": [
+					"test",
+					"--no-run",
+					"--lib",
+					"--package=nomos-core"
+				],
+				"filter": {
+					"name": "nomos_core",
+					"kind": "lib"
+				}
+			},
+			"args": [],
+			"cwd": "${workspaceFolder}"
+		},
+		{
+			"type": "lldb",
+			"request": "launch",
+			"name": "Debug unit tests in library 'carnot_engine'",
+			"cargo": {
+				"args": [
+					"test",
+					"--no-run",
+					"--lib",
+					"--package=carnot-engine"
+				],
+				"filter": {
+					"name": "carnot_engine",
+					"kind": "lib"
+				}
+			},
+			"args": [],
+			"cwd": "${workspaceFolder}"
+		},
+		{
+			"type": "lldb",
+			"request": "launch",
+			"name": "Debug integration test 'fuzz_test'",
+			"cargo": {
+				"args": [
+					"test",
+					"--no-run",
+					"--test=fuzz_test",
+					"--package=carnot-engine"
+				],
+				"filter": {
+					"name": "fuzz_test",
+					"kind": "test"
+				}
+			},
+			"args": [],
+			"cwd": "${workspaceFolder}"
+		},
+		{
+			"type": "lldb",
+			"request": "launch",
+			"name": "Debug unit tests in library 'nomos_utils'",
+			"cargo": {
+				"args": [
+					"test",
+					"--no-run",
+					"--lib",
+					"--package=nomos-utils"
+				],
+				"filter": {
+					"name": "nomos_utils",
+					"kind": "lib"
+				}
+			},
+			"args": [],
+			"cwd": "${workspaceFolder}"
+		},
+		{
+			"type": "lldb",
+			"request": "launch",
+			"name": "Debug unit tests in library 'cl'",
+			"cargo": {
+				"args": [
+					"test",
+					"--no-run",
+					"--lib",
+					"--package=cl"
+				],
+				"filter": {
+					"name": "cl",
+					"kind": "lib"
+				}
+			},
+			"args": [],
+			"cwd": "${workspaceFolder}"
+		},
+		{
+			"type": "lldb",
+			"request": "launch",
+			"name": "Debug integration test 'simple_transfer'",
+			"cargo": {
+				"args": [
+					"test",
+					"--no-run",
+					"--test=simple_transfer",
+					"--package=cl"
+				],
+				"filter": {
+					"name": "simple_transfer",
+					"kind": "test"
+				}
+			},
+			"args": [],
+			"cwd": "${workspaceFolder}"
+		},
+		{
+			"type": "lldb",
+			"request": "launch",
+			"name": "Debug unit tests in library 'cryptarchia_engine'",
+			"cargo": {
+				"args": [
+					"test",
+					"--no-run",
+					"--lib",
+					"--package=cryptarchia-engine"
+				],
+				"filter": {
+					"name": "cryptarchia_engine",
+					"kind": "lib"
+				}
+			},
+			"args": [],
+			"cwd": "${workspaceFolder}"
+		},
+		{
+			"type": "lldb",
+			"request": "launch",
+			"name": "Debug unit tests in library 'nomos_ledger'",
+			"cargo": {
+				"args": [
+					"test",
+					"--no-run",
+					"--lib",
+					"--package=nomos-ledger"
+				],
+				"filter": {
+					"name": "nomos_ledger",
+					"kind": "lib"
+				}
+			},
+			"args": [],
+			"cwd": "${workspaceFolder}"
+		},
+		{
+			"type": "lldb",
+			"request": "launch",
+			"name": "Debug unit tests in library 'nomos_proof_statements'",
+			"cargo": {
+				"args": [
+					"test",
+					"--no-run",
+					"--lib",
+					"--package=nomos_proof_statements"
+				],
+				"filter": {
+					"name": "nomos_proof_statements",
+					"kind": "lib"
+				}
+			},
+			"args": [],
+			"cwd": "${workspaceFolder}"
+		},
+		{
+			"type": "lldb",
+			"request": "launch",
+			"name": "Debug unit tests in library 'full_replication'",
+			"cargo": {
+				"args": [
+					"test",
+					"--no-run",
+					"--lib",
+					"--package=full-replication"
+				],
+				"filter": {
+					"name": "full_replication",
+					"kind": "lib"
+				}
+			},
+			"args": [],
+			"cwd": "${workspaceFolder}"
+		},
+		{
+			"type": "lldb",
+			"request": "launch",
+			"name": "Debug unit tests in library 'kzgrs'",
+			"cargo": {
+				"args": [
+					"test",
+					"--no-run",
+					"--lib",
+					"--package=kzgrs"
+				],
+				"filter": {
+					"name": "kzgrs",
+					"kind": "lib"
+				}
+			},
+			"args": [],
+			"cwd": "${workspaceFolder}"
+		},
+		{
+			"type": "lldb",
+			"request": "launch",
+			"name": "Debug benchmark 'fft'",
+			"cargo": {
+				"args": [
+					"test",
+					"--no-run",
+					"--bench=fft",
+					"--package=kzgrs"
+				],
+				"filter": {
+					"name": "fft",
+					"kind": "bench"
+				}
+			},
+			"args": [],
+			"cwd": "${workspaceFolder}"
+		},
+		{
+			"type": "lldb",
+			"request": "launch",
+			"name": "Debug benchmark 'fk20'",
+			"cargo": {
+				"args": [
+					"test",
+					"--no-run",
+					"--bench=fk20",
+					"--package=kzgrs"
+				],
+				"filter": {
+					"name": "fk20",
+					"kind": "bench"
+				}
+			},
+			"args": [],
+			"cwd": "${workspaceFolder}"
+		},
+		{
+			"type": "lldb",
+			"request": "launch",
+			"name": "Debug benchmark 'kzg'",
+			"cargo": {
+				"args": [
+					"test",
+					"--no-run",
+					"--bench=kzg",
+					"--package=kzgrs"
+				],
+				"filter": {
+					"name": "kzg",
+					"kind": "bench"
+				}
+			},
+			"args": [],
+			"cwd": "${workspaceFolder}"
+		},
+		{
+			"type": "lldb",
+			"request": "launch",
+			"name": "Debug unit tests in library 'kzgrs_backend'",
+			"cargo": {
+				"args": [
+					"test",
+					"--no-run",
+					"--lib",
+					"--package=kzgrs-backend"
+				],
+				"filter": {
+					"name": "kzgrs_backend",
+					"kind": "lib"
+				}
+			},
+			"args": [],
+			"cwd": "${workspaceFolder}"
+		},
+		{
+			"type": "lldb",
+			"request": "launch",
+			"name": "Debug benchmark 'encoder'",
+			"cargo": {
+				"args": [
+					"test",
+					"--no-run",
+					"--bench=encoder",
+					"--package=kzgrs-backend"
+				],
+				"filter": {
+					"name": "encoder",
+					"kind": "bench"
+				}
+			},
+			"args": [],
+			"cwd": "${workspaceFolder}"
+		},
+		{
+			"type": "lldb",
+			"request": "launch",
+			"name": "Debug benchmark 'verifier'",
+			"cargo": {
+				"args": [
+					"test",
+					"--no-run",
+					"--bench=verifier",
+					"--package=kzgrs-backend"
+				],
+				"filter": {
+					"name": "verifier",
+					"kind": "bench"
+				}
+			},
+			"args": [],
+			"cwd": "${workspaceFolder}"
+		},
+		{
+			"type": "lldb",
+			"request": "launch",
+			"name": "Debug unit tests in library 'nomos_da_storage'",
+			"cargo": {
+				"args": [
+					"test",
+					"--no-run",
+					"--lib",
+					"--package=nomos-da-storage"
+				],
+				"filter": {
+					"name": "nomos_da_storage",
+					"kind": "lib"
+				}
+			},
+			"args": [],
+			"cwd": "${workspaceFolder}"
+		},
+		{
+			"type": "lldb",
+			"request": "launch",
+			"name": "Debug unit tests in library 'nomos_da_network_core'",
+			"cargo": {
+				"args": [
+					"test",
+					"--no-run",
+					"--lib",
+					"--package=nomos-da-network-core"
+				],
+				"filter": {
+					"name": "nomos_da_network_core",
+					"kind": "lib"
+				}
+			},
+			"args": [],
+			"cwd": "${workspaceFolder}"
+		},
+		{
+			"type": "lldb",
+			"request": "launch",
+			"name": "Debug unit tests in library 'nomos_da_messages'",
+			"cargo": {
+				"args": [
+					"test",
+					"--no-run",
+					"--lib",
+					"--package=nomos-da-messages"
+				],
+				"filter": {
+					"name": "nomos_da_messages",
+					"kind": "lib"
+				}
+			},
+			"args": [],
+			"cwd": "${workspaceFolder}"
+		},
+		{
+			"type": "lldb",
+			"request": "launch",
+			"name": "Debug unit tests in library 'subnetworks_assignations'",
+			"cargo": {
+				"args": [
+					"test",
+					"--no-run",
+					"--lib",
+					"--package=subnetworks-assignations"
+				],
+				"filter": {
+					"name": "subnetworks_assignations",
+					"kind": "lib"
+				}
+			},
+			"args": [],
+			"cwd": "${workspaceFolder}"
+		},
+		{
+			"type": "lldb",
+			"request": "launch",
+			"name": "Debug unit tests in library 'nomos_libp2p'",
+			"cargo": {
+				"args": [
+					"test",
+					"--no-run",
+					"--lib",
+					"--package=nomos-libp2p"
+				],
+				"filter": {
+					"name": "nomos_libp2p",
+					"kind": "lib"
+				}
+			},
+			"args": [],
+			"cwd": "${workspaceFolder}"
+		},
+		{
+			"type": "lldb",
+			"request": "launch",
+			"name": "Debug unit tests in library 'nomos_api'",
+			"cargo": {
+				"args": [
+					"test",
+					"--no-run",
+					"--lib",
+					"--package=nomos-api"
+				],
+				"filter": {
+					"name": "nomos_api",
+					"kind": "lib"
+				}
+			},
+			"args": [],
+			"cwd": "${workspaceFolder}"
+		},
+		{
+			"type": "lldb",
+			"request": "launch",
+			"name": "Debug integration test 'todo'",
+			"cargo": {
+				"args": [
+					"test",
+					"--no-run",
+					"--test=todo",
+					"--package=nomos-api"
+				],
+				"filter": {
+					"name": "todo",
+					"kind": "test"
+				}
+			},
+			"args": [],
+			"cwd": "${workspaceFolder}"
+		},
+		{
+			"type": "lldb",
+			"request": "launch",
+			"name": "Debug unit tests in library 'cryptarchia_consensus'",
+			"cargo": {
+				"args": [
+					"test",
+					"--no-run",
+					"--lib",
+					"--package=cryptarchia-consensus"
+				],
+				"filter": {
+					"name": "cryptarchia_consensus",
+					"kind": "lib"
+				}
+			},
+			"args": [],
+			"cwd": "${workspaceFolder}"
+		},
+		{
+			"type": "lldb",
+			"request": "launch",
+			"name": "Debug unit tests in library 'nomos_da_sampling'",
+			"cargo": {
+				"args": [
+					"test",
+					"--no-run",
+					"--lib",
+					"--package=nomos-da-sampling"
+				],
+				"filter": {
+					"name": "nomos_da_sampling",
+					"kind": "lib"
+				}
+			},
+			"args": [],
+			"cwd": "${workspaceFolder}"
+		},
+		{
+			"type": "lldb",
+			"request": "launch",
+			"name": "Debug unit tests in library 'nomos_da_network_service'",
+			"cargo": {
+				"args": [
+					"test",
+					"--no-run",
+					"--lib",
+					"--package=nomos-da-network-service"
+				],
+				"filter": {
+					"name": "nomos_da_network_service",
+					"kind": "lib"
+				}
+			},
+			"args": [],
+			"cwd": "${workspaceFolder}"
+		},
+		{
+			"type": "lldb",
+			"request": "launch",
+			"name": "Debug unit tests in library 'nomos_storage'",
+			"cargo": {
+				"args": [
+					"test",
+					"--no-run",
+					"--lib",
+					"--package=nomos-storage"
+				],
+				"filter": {
+					"name": "nomos_storage",
+					"kind": "lib"
+				}
+			},
+			"args": [],
+			"cwd": "${workspaceFolder}"
+		},
+		{
+			"type": "lldb",
+			"request": "launch",
+			"name": "Debug executable 'rocks'",
+			"cargo": {
+				"args": [
+					"build",
+					"--bin=rocks",
+					"--package=nomos-storage"
+				],
+				"filter": {
+					"name": "rocks",
+					"kind": "bin"
+				}
+			},
+			"args": [],
+			"cwd": "${workspaceFolder}"
+		},
+		{
+			"type": "lldb",
+			"request": "launch",
+			"name": "Debug unit tests in executable 'rocks'",
+			"cargo": {
+				"args": [
+					"test",
+					"--no-run",
+					"--bin=rocks",
+					"--package=nomos-storage"
+				],
+				"filter": {
+					"name": "rocks",
+					"kind": "bin"
+				}
+			},
+			"args": [],
+			"cwd": "${workspaceFolder}"
+		},
+		{
+			"type": "lldb",
+			"request": "launch",
+			"name": "Debug unit tests in library 'nomos_mempool'",
+			"cargo": {
+				"args": [
+					"test",
+					"--no-run",
+					"--lib",
+					"--package=nomos-mempool"
+				],
+				"filter": {
+					"name": "nomos_mempool",
+					"kind": "lib"
+				}
+			},
+			"args": [],
+			"cwd": "${workspaceFolder}"
+		},
+		{
+			"type": "lldb",
+			"request": "launch",
+			"name": "Debug integration test 'mock'",
+			"cargo": {
+				"args": [
+					"test",
+					"--no-run",
+					"--test=mock",
+					"--package=nomos-mempool"
+				],
+				"filter": {
+					"name": "mock",
+					"kind": "test"
+				}
+			},
+			"args": [],
+			"cwd": "${workspaceFolder}"
+		},
+		{
+			"type": "lldb",
+			"request": "launch",
+			"name": "Debug unit tests in library 'nomos_metrics'",
+			"cargo": {
+				"args": [
+					"test",
+					"--no-run",
+					"--lib",
+					"--package=nomos-metrics"
+				],
+				"filter": {
+					"name": "nomos_metrics",
+					"kind": "lib"
+				}
+			},
+			"args": [],
+			"cwd": "${workspaceFolder}"
+		},
+		{
+			"type": "lldb",
+			"request": "launch",
+			"name": "Debug unit tests in library 'nomos_network'",
+			"cargo": {
+				"args": [
+					"test",
+					"--no-run",
+					"--lib",
+					"--package=nomos-network"
+				],
+				"filter": {
+					"name": "nomos_network",
+					"kind": "lib"
+				}
+			},
+			"args": [],
+			"cwd": "${workspaceFolder}"
+		},
+		{
+			"type": "lldb",
+			"request": "launch",
+			"name": "Debug unit tests in library 'nomos_tracing_service'",
+			"cargo": {
+				"args": [
+					"test",
+					"--no-run",
+					"--lib",
+					"--package=nomos-tracing-service"
+				],
+				"filter": {
+					"name": "nomos_tracing_service",
+					"kind": "lib"
+				}
+			},
+			"args": [],
+			"cwd": "${workspaceFolder}"
+		},
+		{
+			"type": "lldb",
+			"request": "launch",
+			"name": "Debug unit tests in library 'nomos_tracing'",
+			"cargo": {
+				"args": [
+					"test",
+					"--no-run",
+					"--lib",
+					"--package=nomos-tracing"
+				],
+				"filter": {
+					"name": "nomos_tracing",
+					"kind": "lib"
+				}
+			},
+			"args": [],
+			"cwd": "${workspaceFolder}"
+		},
+		{
+			"type": "lldb",
+			"request": "launch",
+			"name": "Debug unit tests in library 'nomos_mix_service'",
+			"cargo": {
+				"args": [
+					"test",
+					"--no-run",
+					"--lib",
+					"--package=nomos-mix-service"
+				],
+				"filter": {
+					"name": "nomos_mix_service",
+					"kind": "lib"
+				}
+			},
+			"args": [],
+			"cwd": "${workspaceFolder}"
+		},
+		{
+			"type": "lldb",
+			"request": "launch",
+			"name": "Debug unit tests in library 'nomos_mix'",
+			"cargo": {
+				"args": [
+					"test",
+					"--no-run",
+					"--lib",
+					"--package=nomos-mix"
+				],
+				"filter": {
+					"name": "nomos_mix",
+					"kind": "lib"
+				}
+			},
+			"args": [],
+			"cwd": "${workspaceFolder}"
+		},
+		{
+			"type": "lldb",
+			"request": "launch",
+			"name": "Debug unit tests in library 'nomos_mix_message'",
+			"cargo": {
+				"args": [
+					"test",
+					"--no-run",
+					"--lib",
+					"--package=nomos-mix-message"
+				],
+				"filter": {
+					"name": "nomos_mix_message",
+					"kind": "lib"
+				}
+			},
+			"args": [],
+			"cwd": "${workspaceFolder}"
+		},
+		{
+			"type": "lldb",
+			"request": "launch",
+			"name": "Debug unit tests in library 'nomos_mix_network'",
+			"cargo": {
+				"args": [
+					"test",
+					"--no-run",
+					"--lib",
+					"--package=nomos-mix-network"
+				],
+				"filter": {
+					"name": "nomos_mix_network",
+					"kind": "lib"
+				}
+			},
+			"args": [],
+			"cwd": "${workspaceFolder}"
+		},
+		{
+			"type": "lldb",
+			"request": "launch",
+			"name": "Debug unit tests in library 'nomos_da_dispersal'",
+			"cargo": {
+				"args": [
+					"test",
+					"--no-run",
+					"--lib",
+					"--package=nomos-da-dispersal"
+				],
+				"filter": {
+					"name": "nomos_da_dispersal",
+					"kind": "lib"
+				}
+			},
+			"args": [],
+			"cwd": "${workspaceFolder}"
+		},
+		{
+			"type": "lldb",
+			"request": "launch",
+			"name": "Debug unit tests in library 'nomos_da_indexer'",
+			"cargo": {
+				"args": [
+					"test",
+					"--no-run",
+					"--lib",
+					"--package=nomos-da-indexer"
+				],
+				"filter": {
+					"name": "nomos_da_indexer",
+					"kind": "lib"
+				}
+			},
+			"args": [],
+			"cwd": "${workspaceFolder}"
+		},
+		{
+			"type": "lldb",
+			"request": "launch",
+			"name": "Debug unit tests in library 'nomos_da_verifier'",
+			"cargo": {
+				"args": [
+					"test",
+					"--no-run",
+					"--lib",
+					"--package=nomos-da-verifier"
+				],
+				"filter": {
+					"name": "nomos_da_verifier",
+					"kind": "lib"
+				}
+			},
+			"args": [],
+			"cwd": "${workspaceFolder}"
+		},
+		{
+			"type": "lldb",
+			"request": "launch",
+			"name": "Debug unit tests in library 'nomos_system_sig'",
+			"cargo": {
+				"args": [
+					"test",
+					"--no-run",
+					"--lib",
+					"--package=nomos-system-sig"
+				],
+				"filter": {
+					"name": "nomos_system_sig",
+					"kind": "lib"
+				}
+			},
+			"args": [],
+			"cwd": "${workspaceFolder}"
+		},
+		{
+			"type": "lldb",
+			"request": "launch",
+			"name": "Debug unit tests in library 'nomos_da_tests'",
+			"cargo": {
+				"args": [
+					"test",
+					"--no-run",
+					"--lib",
+					"--package=nomos-da-tests"
+				],
+				"filter": {
+					"name": "nomos_da_tests",
+					"kind": "lib"
+				}
+			},
+			"args": [],
+			"cwd": "${workspaceFolder}"
+		},
+		{
+			"type": "lldb",
+			"request": "launch",
+			"name": "Debug unit tests in library 'nomos_node'",
+			"cargo": {
+				"args": [
+					"test",
+					"--no-run",
+					"--lib",
+					"--package=nomos-node"
+				],
+				"filter": {
+					"name": "nomos_node",
+					"kind": "lib"
+				}
+			},
+			"args": [],
+			"cwd": "${workspaceFolder}"
+		},
+		{
+			"type": "lldb",
+			"request": "launch",
+			"name": "Debug executable 'nomos-node'",
+			"cargo": {
+				"args": [
+					"build",
+					"--bin=nomos-node",
+					"--package=nomos-node"
+				],
+				"filter": {
+					"name": "nomos-node",
+					"kind": "bin"
+				}
+			},
+			"args": [],
+			"cwd": "${workspaceFolder}"
+		},
+		{
+			"type": "lldb",
+			"request": "launch",
+			"name": "Debug unit tests in executable 'nomos-node'",
+			"cargo": {
+				"args": [
+					"test",
+					"--no-run",
+					"--bin=nomos-node",
+					"--package=nomos-node"
+				],
+				"filter": {
+					"name": "nomos-node",
+					"kind": "bin"
+				}
+			},
+			"args": [],
+			"cwd": "${workspaceFolder}"
+		},
+		{
+			"type": "lldb",
+			"request": "launch",
+			"name": "Debug unit tests in library 'nomos_cli'",
+			"cargo": {
+				"args": [
+					"test",
+					"--no-run",
+					"--lib",
+					"--package=nomos-cli"
+				],
+				"filter": {
+					"name": "nomos_cli",
+					"kind": "lib"
+				}
+			},
+			"args": [],
+			"cwd": "${workspaceFolder}"
+		},
+		{
+			"type": "lldb",
+			"request": "launch",
+			"name": "Debug executable 'nomos-cli'",
+			"cargo": {
+				"args": [
+					"build",
+					"--bin=nomos-cli",
+					"--package=nomos-cli"
+				],
+				"filter": {
+					"name": "nomos-cli",
+					"kind": "bin"
+				}
+			},
+			"args": [],
+			"cwd": "${workspaceFolder}"
+		},
+		{
+			"type": "lldb",
+			"request": "launch",
+			"name": "Debug unit tests in executable 'nomos-cli'",
+			"cargo": {
+				"args": [
+					"test",
+					"--no-run",
+					"--bin=nomos-cli",
+					"--package=nomos-cli"
+				],
+				"filter": {
+					"name": "nomos-cli",
+					"kind": "bin"
+				}
+			},
+			"args": [],
+			"cwd": "${workspaceFolder}"
+		},
+		{
+			"type": "lldb",
+			"request": "launch",
+			"name": "Debug unit tests in library 'executor_http_client'",
+			"cargo": {
+				"args": [
+					"test",
+					"--no-run",
+					"--lib",
+					"--package=executor-http-client"
+				],
+				"filter": {
+					"name": "executor_http_client",
+					"kind": "lib"
+				}
+			},
+			"args": [],
+			"cwd": "${workspaceFolder}"
+		},
+		{
+			"type": "lldb",
+			"request": "launch",
+			"name": "Debug unit tests in library 'nomos_executor'",
+			"cargo": {
+				"args": [
+					"test",
+					"--no-run",
+					"--lib",
+					"--package=nomos-executor"
+				],
+				"filter": {
+					"name": "nomos_executor",
+					"kind": "lib"
+				}
+			},
+			"args": [],
+			"cwd": "${workspaceFolder}"
+		},
+		{
+			"type": "lldb",
+			"request": "launch",
+			"name": "Debug executable 'nomos-executor'",
+			"cargo": {
+				"args": [
+					"build",
+					"--bin=nomos-executor",
+					"--package=nomos-executor"
+				],
+				"filter": {
+					"name": "nomos-executor",
+					"kind": "bin"
+				}
+			},
+			"args": [],
+			"cwd": "${workspaceFolder}"
+		},
+		{
+			"type": "lldb",
+			"request": "launch",
+			"name": "Debug unit tests in executable 'nomos-executor'",
+			"cargo": {
+				"args": [
+					"test",
+					"--no-run",
+					"--bin=nomos-executor",
+					"--package=nomos-executor"
+				],
+				"filter": {
+					"name": "nomos-executor",
+					"kind": "bin"
+				}
+			},
+			"args": [],
+			"cwd": "${workspaceFolder}"
+		},
+		{
+			"type": "lldb",
+			"request": "launch",
+			"name": "Debug unit tests in library 'cfgsync'",
+			"cargo": {
+				"args": [
+					"test",
+					"--no-run",
+					"--lib",
+					"--package=cfgsync"
+				],
+				"filter": {
+					"name": "cfgsync",
+					"kind": "lib"
+				}
+			},
+			"args": [],
+			"cwd": "${workspaceFolder}"
+		},
+		{
+			"type": "lldb",
+			"request": "launch",
+			"name": "Debug executable 'cfgsync-client'",
+			"cargo": {
+				"args": [
+					"build",
+					"--bin=cfgsync-client",
+					"--package=cfgsync"
+				],
+				"filter": {
+					"name": "cfgsync-client",
+					"kind": "bin"
+				}
+			},
+			"args": [],
+			"cwd": "${workspaceFolder}"
+		},
+		{
+			"type": "lldb",
+			"request": "launch",
+			"name": "Debug unit tests in executable 'cfgsync-client'",
+			"cargo": {
+				"args": [
+					"test",
+					"--no-run",
+					"--bin=cfgsync-client",
+					"--package=cfgsync"
+				],
+				"filter": {
+					"name": "cfgsync-client",
+					"kind": "bin"
+				}
+			},
+			"args": [],
+			"cwd": "${workspaceFolder}"
+		},
+		{
+			"type": "lldb",
+			"request": "launch",
+			"name": "Debug executable 'cfgsync-server'",
+			"cargo": {
+				"args": [
+					"build",
+					"--bin=cfgsync-server",
+					"--package=cfgsync"
+				],
+				"filter": {
+					"name": "cfgsync-server",
+					"kind": "bin"
+				}
+			},
+			"args": [],
+			"cwd": "${workspaceFolder}"
+		},
+		{
+			"type": "lldb",
+			"request": "launch",
+			"name": "Debug unit tests in executable 'cfgsync-server'",
+			"cargo": {
+				"args": [
+					"test",
+					"--no-run",
+					"--bin=cfgsync-server",
+					"--package=cfgsync"
+				],
+				"filter": {
+					"name": "cfgsync-server",
+					"kind": "bin"
+				}
+			},
+			"args": [],
+			"cwd": "${workspaceFolder}"
+		},
+		{
+			"type": "lldb",
+			"request": "launch",
+			"name": "Debug unit tests in library 'tests'",
+			"cargo": {
+				"args": [
+					"test",
+					"--no-run",
+					"--lib",
+					"--package=tests"
+				],
+				"filter": {
+					"name": "tests",
+					"kind": "lib"
+				}
+			},
+			"args": [],
+			"cwd": "${workspaceFolder}"
+		},
+		{
+			"type": "lldb",
+			"request": "launch",
+			"name": "Debug integration test 'test_cryptarchia_happy_path'",
+			"cargo": {
+				"args": [
+					"test",
+					"--no-run",
+					"--test=test_cryptarchia_happy_path",
+					"--package=tests"
+				],
+				"filter": {
+					"name": "test_cryptarchia_happy_path",
+					"kind": "test"
+				}
+			},
+			"args": [],
+			"cwd": "${workspaceFolder}"
+		},
+		{
+			"type": "lldb",
+			"request": "launch",
+			"name": "Debug integration test 'test_da'",
+			"cargo": {
+				"args": [
+					"test",
+					"--no-run",
+					"--test=test_da",
+					"--package=tests"
+				],
+				"filter": {
+					"name": "test_da",
+					"kind": "test"
+				}
+			},
+			"args": [],
+			"cwd": "${workspaceFolder}"
+		}
+	]
+}

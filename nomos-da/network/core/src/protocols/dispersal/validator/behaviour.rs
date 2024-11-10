@@ -163,11 +163,7 @@ mod tests {
     use nomos_da_messages::common::Blob;
     use rand::RngCore;
     use std::collections::{HashMap, HashSet};
-    use std::time::Duration;
     use tokio::sync::mpsc::UnboundedSender;
-    use tokio::sync::watch;
-    use tokio::time::timeout;
-    use tracing::warn;
     use tracing_subscriber::fmt::TestWriter;
     use tracing_subscriber::EnvFilter;
 
@@ -294,26 +290,28 @@ mod tests {
             >,
         >,
         messages_to_expect: usize,
-        mut terminator_rx: watch::Receiver<()>,
-    ) -> usize {
+    ) {
         let mut msg_counter = 0;
 
-        while msg_counter < messages_to_expect {
-            tokio::select! {
-                event = swarm.select_next_some() => {
-                    debug!("Executor event: {event:?}");
-                    if let SwarmEvent::Behaviour(DispersalExecutorEvent::DispersalSuccess{..}) = event {
-                        msg_counter += 1;
-                    }
+        loop {
+            if msg_counter == messages_to_expect {
+                debug!("Breaking Executor");
+                return;
+            }
+            let event = swarm.next().await;
+            debug!("Executor event: {event:?}");
+            match event {
+                Some(SwarmEvent::Behaviour(DispersalExecutorEvent::DispersalSuccess {
+                    ..
+                })) => {
+                    msg_counter += 1;
                 }
-
-                _ = terminator_rx.changed() => {
-                    warn!("Executor terminated");
-                    break;
+                Some(SwarmEvent::Behaviour(DispersalExecutorEvent::DispersalError { error })) => {
+                    debug!("Dispersal Error: {error}");
                 }
+                _ => {}
             }
         }
-        msg_counter
     }
 
     async fn run_validator_swarm(
@@ -322,43 +320,36 @@ mod tests {
                 impl MembershipHandler<NetworkId = u32, Id = PeerId> + Sized + 'static,
             >,
         >,
+        messages_to_expect: usize,
     ) -> (usize, usize) {
         let (mut msg_0_counter, mut msg_1_counter) = (0, 0);
-        let timeout_duration = Duration::from_secs(30);
 
         loop {
-            let event = timeout(timeout_duration, swarm.select_next_some()).await;
+            if msg_0_counter + msg_1_counter == messages_to_expect {
+                debug!("Breaking Validator");
+                return (msg_0_counter, msg_1_counter);
+            }
+            let event = swarm.next().await;
 
-            match event {
-                Ok(event) => {
-                    if let SwarmEvent::Behaviour(DispersalEvent::IncomingMessage { message }) =
-                        event
-                    {
-                        debug!("Validator received blob: {message:?}");
+            if let Some(SwarmEvent::Behaviour(DispersalEvent::IncomingMessage { message })) = event
+            {
+                debug!("Validator received blob: {message:?}");
 
-                        // Check data has structure and content as expected
-                        if let Some(Blob { blob_id, data }) = message.blob {
-                            let deserialized_blob: DaBlob = bincode::deserialize(&data).unwrap();
-                            assert_eq!(blob_id, deserialized_blob.id());
-                            if message.subnetwork_id == 0 {
-                                msg_0_counter += 1;
-                            } else {
-                                msg_1_counter += 1;
-                            }
-                        }
+                // Check data has structure and content as expected
+                if let Some(Blob { blob_id, data }) = message.blob {
+                    let deserialized_blob: DaBlob = bincode::deserialize(&data).unwrap();
+                    assert_eq!(blob_id, deserialized_blob.id());
+                    if message.subnetwork_id == 0 {
+                        msg_0_counter += 1;
+                    } else {
+                        msg_1_counter += 1;
                     }
-                }
-                Err(_) => {
-                    warn!("Validator timeout reached");
-                    break;
                 }
             }
         }
-
-        (msg_0_counter, msg_1_counter)
     }
 
-    async fn send_dispersal_messages(
+    fn send_dispersal_messages(
         disperse_blob_sender: UnboundedSender<(u32, DaBlob)>,
         subnet_id: u32,
         messages_to_send: usize,
@@ -477,19 +468,14 @@ mod tests {
         }
 
         let mut executor_tasks = vec![];
-        let (terminator_tx, terminator_rx) = watch::channel::<()>(());
 
         // Spawn executors
         for i in (0..ALL_INSTANCES / GROUPS).rev() {
-            let (terminator_0, terminator_1) = (terminator_rx.clone(), terminator_rx.clone());
-
             let swarm = executor_0_swarms.remove(i);
-            let executor_0_poll =
-                async move { run_executor_swarm(swarm, MESSAGES_TO_SEND, terminator_0).await };
+            let executor_0_poll = async move { run_executor_swarm(swarm, MESSAGES_TO_SEND).await };
 
             let swarm = executor_1_swarms.remove(i);
-            let executor_1_poll =
-                async move { run_executor_swarm(swarm, MESSAGES_TO_SEND, terminator_1).await };
+            let executor_1_poll = async move { run_executor_swarm(swarm, MESSAGES_TO_SEND).await };
 
             executor_tasks.extend(vec![
                 tokio::spawn(executor_0_poll),
@@ -497,30 +483,31 @@ mod tests {
             ]);
         }
 
-        // Send messages from all executors
-        for i in (0..ALL_INSTANCES / 2).rev() {
-            let sender = message_senders.remove(i);
-            let send_messages_task = async move {
-                send_dispersal_messages(sender, if i % 2 == 0 { 0 } else { 1 }, MESSAGES_TO_SEND)
-                    .await;
-            };
-            tokio::spawn(send_messages_task);
-        }
-
         let mut validator_tasks = vec![];
 
         // Spawn validators
         for i in (0..ALL_INSTANCES / GROUPS).rev() {
             let swarm = validator_0_swarms.remove(i);
-            let validator_0_poll = async { run_validator_swarm(swarm).await };
+            let validator_0_poll = async { run_validator_swarm(swarm, MESSAGES_TO_SEND).await };
 
             let swarm = validator_1_swarms.remove(i);
-            let validator_1_poll = async { run_validator_swarm(swarm).await };
+            let validator_1_poll = async { run_validator_swarm(swarm, MESSAGES_TO_SEND).await };
 
             validator_tasks.extend(vec![
                 tokio::spawn(validator_0_poll),
                 tokio::spawn(validator_1_poll),
             ]);
+        }
+
+        // Send messages from all executors
+        for i in (0..ALL_INSTANCES / 2).rev() {
+            let sender = message_senders.remove(i);
+            send_dispersal_messages(sender, if i % 2 == 0 { 0 } else { 1 }, MESSAGES_TO_SEND);
+        }
+
+        for task in executor_tasks {
+            task.await.unwrap();
+            debug!("Executor task received success",);
         }
 
         let mut dispersal_request_counter = (0usize, 0usize);
@@ -540,26 +527,6 @@ mod tests {
                 dispersal_request_counter.1 + requested.1,
             );
         }
-
-        // Terminate any remaining executors
-        terminator_tx.send(()).unwrap();
-
-        let mut dispersal_success_counter = 0usize;
-
-        for task in executor_tasks {
-            let dispersed = task.await.unwrap();
-            debug!(
-                "Executor task received: {:?} messages dispersal success",
-                dispersed
-            );
-            dispersal_success_counter += dispersed;
-        }
-
-        // Check dispersed and confirmed equal to sent messages
-        assert_eq!(
-            dispersal_success_counter,
-            MESSAGES_TO_SEND * (ALL_INSTANCES / GROUPS) * 2
-        );
 
         // Check received per subnet are half of all messages sent
         assert_eq!(
