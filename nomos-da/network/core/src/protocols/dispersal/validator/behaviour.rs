@@ -326,10 +326,16 @@ mod tests {
         own_indicator: Indicator,
         exec_indicator: Indicator,
         val_indicators: Vec<Indicator>,
+        destroy_indicator: Indicator,
     ) -> (usize, usize) {
         let (mut msg_0_counter, mut msg_1_counter) = (0, 0);
 
         loop {
+            if let Some(true) = destroy_indicator.receive() {
+                debug!("Breaking Validator");
+                exec_indicator.send(true);
+                break;
+            }
             if msg_0_counter == messages_to_expect || msg_1_counter == messages_to_expect {
                 for _ in 0..10 {
                     own_indicator.send(true);
@@ -345,14 +351,15 @@ mod tests {
                     }
                 }
                 if flag {
-                    debug!("Breaking Validator"); 
+                    debug!("Breaking Validator");
                     exec_indicator.send(true);
                     for _ in 0..10 {
-                        own_indicator.send(true);
+                        destroy_indicator.send(true);
                     }
                     break;
                 }
-            } else if let Some(event) = swarm.next().await {
+            }
+            if let Some(event) = swarm.next().await {
                 debug!("Validator event: {event:?}");
 
                 if let SwarmEvent::Behaviour(DispersalEvent::IncomingMessage { message }) = event {
@@ -494,7 +501,11 @@ mod tests {
 
         let mut executor_tasks = vec![];
         let executor_indicator = Indicator::new(MESSAGES_TO_SEND);
-        let validator_indicators = vec![Indicator::new(MESSAGES_TO_SEND); ALL_INSTANCES / 2];
+        let destroy_indicator = Indicator::new(MESSAGES_TO_SEND);
+        let mut validator_indicators = Vec::with_capacity(ALL_INSTANCES / 2);
+        for _ in 0..10 {
+            validator_indicators.push(Indicator::new(MESSAGES_TO_SEND));
+        }
 
         // Spawn executors
         for i in (0..ALL_INSTANCES / GROUPS).rev() {
@@ -518,7 +529,15 @@ mod tests {
         for i in (0..ALL_INSTANCES / GROUPS).rev() {
             let (indicator_0, indicator_1) =
                 (executor_indicator.clone(), executor_indicator.clone());
-            let (clone1, clone2) = (validator_indicators.clone(), validator_indicators.clone());
+            let (des_0, des_1) = (destroy_indicator.clone(), destroy_indicator.clone());
+            let mut clone1 = Vec::with_capacity(ALL_INSTANCES / 2);
+            for i in &validator_indicators {
+                validator_indicators.push(i.clone());
+            }
+            let mut clone2 = Vec::with_capacity(ALL_INSTANCES / 2);
+            for i in &validator_indicators {
+                validator_indicators.push(i.clone());
+            }
             let (own_indicator_0, own_indicator_1) = (
                 validator_indicators[2 * i].clone(),
                 validator_indicators[2 * i + 1].clone(),
@@ -532,6 +551,7 @@ mod tests {
                     own_indicator_0,
                     indicator_0,
                     clone1,
+                    des_0,
                 )
                 .await
             };
@@ -544,6 +564,7 @@ mod tests {
                     own_indicator_1,
                     indicator_1,
                     clone2,
+                    des_1,
                 )
                 .await
             };
