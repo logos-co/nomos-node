@@ -330,8 +330,10 @@ mod tests {
         let (mut msg_0_counter, mut msg_1_counter) = (0, 0);
 
         loop {
-            if msg_0_counter + msg_1_counter == messages_to_expect {
-                own_indicator.send(true);
+            if msg_0_counter == messages_to_expect || msg_1_counter == messages_to_expect {
+                for _ in 0..10 {
+                    own_indicator.send(true);
+                }
                 let mut flag = false;
 
                 for indicator in &val_indicators {
@@ -343,8 +345,11 @@ mod tests {
                     }
                 }
                 if flag {
-                    debug!("Breaking Validator");
+                    debug!("Breaking Validator"); 
                     exec_indicator.send(true);
+                    for _ in 0..10 {
+                        own_indicator.send(true);
+                    }
                     break;
                 }
             } else if let Some(event) = swarm.next().await {
