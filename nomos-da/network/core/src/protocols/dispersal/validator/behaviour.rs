@@ -532,11 +532,11 @@ mod tests {
             let (des_0, des_1) = (destroy_indicator.clone(), destroy_indicator.clone());
             let mut clone1 = Vec::with_capacity(ALL_INSTANCES / 2);
             for i in &validator_indicators {
-                validator_indicators.push(i.clone());
+                clone1.push(i.clone());
             }
             let mut clone2 = Vec::with_capacity(ALL_INSTANCES / 2);
             for i in &validator_indicators {
-                validator_indicators.push(i.clone());
+                clone2.push(i.clone());
             }
             let (own_indicator_0, own_indicator_1) = (
                 validator_indicators[2 * i].clone(),
