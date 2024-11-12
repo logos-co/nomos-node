@@ -358,6 +358,10 @@ mod tests {
                     }
                     break;
                 }
+            } else {
+                for indicator in &val_indicators {
+                    indicator.receive();
+                }
             }
             if let Some(event) = swarm.next().await {
                 debug!("Validator event: {event:?}");
@@ -500,11 +504,11 @@ mod tests {
         }
 
         let mut executor_tasks = vec![];
-        let executor_indicator = Indicator::new(MESSAGES_TO_SEND);
-        let destroy_indicator = Indicator::new(MESSAGES_TO_SEND);
+        let executor_indicator = Indicator::new(MESSAGES_TO_SEND * 20);
+        let destroy_indicator = Indicator::new(MESSAGES_TO_SEND * 20);
         let mut validator_indicators = Vec::with_capacity(ALL_INSTANCES / 2);
         for _ in 0..10 {
-            validator_indicators.push(Indicator::new(MESSAGES_TO_SEND));
+            validator_indicators.push(Indicator::new(MESSAGES_TO_SEND * 20));
         }
 
         // Spawn executors
