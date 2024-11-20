@@ -1,3 +1,5 @@
+use sphinx_packet::header::routing::RoutingFlag;
+
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
     #[error("Sphinx packet error: {0}")]
@@ -5,7 +7,7 @@ pub enum Error {
     #[error("Invalid packet bytes")]
     InvalidPacketBytes,
     #[error("Invalid routing flag: {0}")]
-    InvalidRoutingFlag(u8),
+    InvalidRoutingFlag(RoutingFlag),
     #[error("Invalid routing length: {0} bytes")]
     InvalidEncryptedRoutingInfoLength(usize),
     #[error("ConsistentLengthLayeredEncryptionError: {0}")]
