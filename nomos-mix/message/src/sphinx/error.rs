@@ -6,7 +6,7 @@ pub enum Error {
     InvalidPacketBytes,
     #[error("Invalid routing flag: {0}")]
     InvalidRoutingFlag(u8),
-    #[error("Invalid routing length: {0}")]
+    #[error("Invalid routing length: {0} bytes")]
     InvalidEncryptedRoutingInfoLength(usize),
     #[error("ConsistentLengthLayeredEncryptionError: {0}")]
     ConsistentLengthLayeredEncryptionError(#[from] super::layered_cipher::Error),

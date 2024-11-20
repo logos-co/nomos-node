@@ -44,10 +44,10 @@ type Result<T> = std::result::Result<T, Error>;
 /// the same as the length of the original data.
 /// For example:
 ///   len(encrypt(k0, [data0, encrypt(k1, [data1])])) == len(encrypt(k1, [data1]))
-pub struct ConsistentLengthLayeredCipher<D: ConsistentLengthLayeredCipherData> {
+pub struct ConsistentLengthLayeredCipher<D> {
     /// All encrypted data produced by the cipher has the same size according to the `max_layers`.
     pub max_layers: usize,
-    _phantom_data: PhantomData<D>,
+    _data: PhantomData<D>,
 }
 
 pub trait ConsistentLengthLayeredCipherData {
@@ -77,7 +77,7 @@ impl<D: ConsistentLengthLayeredCipherData> ConsistentLengthLayeredCipher<D> {
     pub fn new(max_layers: usize) -> Self {
         Self {
             max_layers,
-            _phantom_data: Default::default(),
+            _data: Default::default(),
         }
     }
 
@@ -180,14 +180,20 @@ impl<D: ConsistentLengthLayeredCipherData> ConsistentLengthLayeredCipher<D> {
     /// Build as many fillers as the number of keys provided.
     /// Fillers are encrypted in accumulated manner by keys.
     fn build_fillers(&self, params: &[EncryptionParam<D>]) -> Vec<u8> {
+        let single_layer_size = Self::single_layer_size();
+        let mut fillers = vec![0u8; single_layer_size * params.len()];
         params
             .iter()
             .map(|param| &param.key.stream_cipher_key)
-            .fold(Vec::new(), |mut fillers, key| {
-                fillers.extend(vec![0u8; Self::single_layer_size()]);
-                self.apply_streamcipher(&mut fillers, key, StreamCipherOption::FromBack);
-                fillers
-            })
+            .enumerate()
+            .for_each(|(i, key)| {
+                self.apply_streamcipher(
+                    &mut fillers[0..(i + 1) * single_layer_size],
+                    key,
+                    StreamCipherOption::FromBack,
+                )
+            });
+        fillers
     }
 
     /// Unpack one layer of encryption by performing the length-preserved decryption.
