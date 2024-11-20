@@ -28,7 +28,7 @@ impl RoutingInformation {
     }
 
     pub fn from_bytes(data: &[u8]) -> Result<Self, Error> {
-        if data.len() != Self::size() {
+        if data.len() != Self::SIZE {
             return Err(Error::InvalidEncryptedRoutingInfoLength(data.len()));
         }
         Ok(Self { flag: data[0] })
@@ -40,9 +40,7 @@ impl ConsistentLengthLayeredCipherData for RoutingInformation {
         vec![self.flag]
     }
 
-    fn size() -> usize {
-        std::mem::size_of::<RoutingFlag>()
-    }
+    const SIZE: usize = std::mem::size_of::<RoutingFlag>();
 }
 
 /// Encrypted routing information that will be contained in a packet header.
