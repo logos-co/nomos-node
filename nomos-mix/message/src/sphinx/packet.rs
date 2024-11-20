@@ -9,7 +9,7 @@ use sphinx_packet::{
 
 use crate::sphinx::ASYM_KEY_SIZE;
 
-use super::{concat_bytes, error::Error, parse_bytes, routing::EncryptedRoutingInformation};
+use super::{error::Error, parse_bytes, routing::EncryptedRoutingInformation};
 
 /// A packet that contains a header and a payload.
 /// The header and payload are encrypted for the selected recipients.
@@ -152,11 +152,15 @@ impl Packet {
     }
 
     pub fn to_bytes(&self) -> Vec<u8> {
-        concat_bytes(&[
-            &self.header.ephemeral_public_key.to_bytes(),
-            &self.header.encrypted_routing_info.to_bytes(),
+        let ephemeral_public_key = self.header.ephemeral_public_key.to_bytes();
+        let encrypted_routing_info = self.header.encrypted_routing_info.to_bytes();
+        itertools::chain!(
+            &ephemeral_public_key,
+            &encrypted_routing_info,
             &self.payload,
-        ])
+        )
+        .copied()
+        .collect()
     }
 
     pub fn from_bytes(data: &[u8], max_layers: usize) -> Result<Self, Error> {

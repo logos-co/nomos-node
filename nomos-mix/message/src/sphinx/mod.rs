@@ -63,14 +63,6 @@ impl MixMessage for SphinxMessage {
     }
 }
 
-fn concat_bytes(bytes_list: &[&[u8]]) -> Vec<u8> {
-    let mut buf = Vec::with_capacity(bytes_list.iter().map(|bytes| bytes.len()).sum());
-    bytes_list
-        .iter()
-        .for_each(|bytes| buf.extend_from_slice(bytes));
-    buf
-}
-
 fn parse_bytes<'a>(data: &'a [u8], sizes: &[usize]) -> Result<Vec<&'a [u8]>, String> {
     let mut i = 0;
     sizes

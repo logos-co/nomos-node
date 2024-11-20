@@ -8,7 +8,6 @@ use sphinx_packet::{
 };
 
 use super::{
-    concat_bytes,
     error::Error,
     layered_cipher::{
         ConsistentLengthLayeredCipher, ConsistentLengthLayeredCipherData, EncryptionParam, Key,
@@ -119,7 +118,9 @@ impl EncryptedRoutingInformation {
     }
 
     pub fn to_bytes(&self) -> Vec<u8> {
-        concat_bytes(&[self.mac.as_bytes(), &self.encrypted_routing_info])
+        itertools::chain!(self.mac.as_bytes(), &self.encrypted_routing_info)
+            .copied()
+            .collect()
     }
 
     pub fn from_bytes(data: &[u8], max_layers: usize) -> Result<Self, Error> {

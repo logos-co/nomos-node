@@ -13,7 +13,7 @@ use sphinx_packet::{
     },
 };
 
-use super::{concat_bytes, parse_bytes};
+use super::parse_bytes;
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
@@ -118,13 +118,16 @@ impl<D: ConsistentLengthLayeredCipherData> ConsistentLengthLayeredCipher<D> {
         next_encrypted_data: Vec<u8>,
     ) -> Result<(Vec<u8>, HeaderIntegrityMac)> {
         // Concatenate the data with the encrypted subsequent layers and its MAC.
-        let total_data = concat_bytes(&[
-            &param.data.to_bytes(),
+        let data = param.data.to_bytes();
+        let total_data = itertools::chain!(
+            &data,
             next_mac.as_bytes(),
             // Truncate last bytes for the length-preserved decryption later.
             // They will be restored by a filler during the decryption process.
             &next_encrypted_data[..next_encrypted_data.len() - Self::single_layer_size()],
-        ]);
+        )
+        .copied()
+        .collect::<Vec<_>>();
 
         // Encrypt the concatenated bytes, and compute MAC.
         let mut encrypted = total_data;
@@ -160,8 +163,10 @@ impl<D: ConsistentLengthLayeredCipherData> ConsistentLengthLayeredCipher<D> {
         let random_bytes = random_bytes(self.total_size() - D::size() - fillers.len());
 
         // First, concat the data and the random bytes, and encrypt it.
-        let total_data_without_fillers =
-            concat_bytes(&[&last_param.data.to_bytes(), &random_bytes]);
+        let last_data = last_param.data.to_bytes();
+        let total_data_without_fillers = itertools::chain!(&last_data, &random_bytes)
+            .copied()
+            .collect::<Vec<_>>();
         let mut encrypted = total_data_without_fillers;
         self.apply_streamcipher(
             &mut encrypted,
