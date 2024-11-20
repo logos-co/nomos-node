@@ -224,6 +224,7 @@ pub fn new_node(
                     cryptographic_processor: CryptographicProcessorSettings {
                         private_key: mix_config.private_key.to_bytes(),
                         num_mix_layers: 1,
+                        message_settings: (),
                     },
                     temporal_processor: TemporalSchedulerSettings {
                         max_delay_seconds: 2,

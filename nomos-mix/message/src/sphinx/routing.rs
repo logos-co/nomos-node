@@ -7,12 +7,13 @@ use sphinx_packet::{
     },
 };
 
-use crate::{
+use super::{
     concat_bytes,
+    error::Error,
     layered_cipher::{
         ConsistentLengthLayeredCipher, ConsistentLengthLayeredCipherData, EncryptionParam, Key,
     },
-    parse_bytes, Error,
+    parse_bytes,
 };
 
 /// A routing information that will be contained in a packet header

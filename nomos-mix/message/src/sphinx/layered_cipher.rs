@@ -13,14 +13,14 @@ use sphinx_packet::{
     },
 };
 
-use crate::{concat_bytes, parse_bytes};
+use super::{concat_bytes, parse_bytes};
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
-    #[error("Invalid data length")]
-    InvalidDataLength,
-    #[error("Invalid params")]
-    InvalidParams,
+    #[error("Invalid cipher text length")]
+    InvalidCipherTextLength,
+    #[error("Invalid encryption param")]
+    InvalidEncryptionParam,
     #[error("Integrity MAC verification failed")]
     IntegrityMacVerificationFailed,
 }
@@ -96,7 +96,7 @@ impl<D: ConsistentLengthLayeredCipherData> ConsistentLengthLayeredCipher<D> {
     /// Perform the layered encryption.
     pub fn encrypt(&self, params: &[EncryptionParam<D>]) -> Result<(Vec<u8>, HeaderIntegrityMac)> {
         if params.is_empty() || params.len() > self.max_layers {
-            return Err(Error::InvalidParams);
+            return Err(Error::InvalidEncryptionParam);
         }
 
         params
@@ -147,13 +147,16 @@ impl<D: ConsistentLengthLayeredCipherData> ConsistentLengthLayeredCipher<D> {
         &self,
         params: &[EncryptionParam<D>],
     ) -> Result<(Vec<u8>, HeaderIntegrityMac)> {
-        let last_param = params.last().ok_or(Error::InvalidParams)?;
+        let last_param = params.last().ok_or(Error::InvalidEncryptionParam)?;
 
         // Build fillers that will be appended to the last data.
         // The number of fillers must be the same as the number of intermediate layers
-        // that will be decrypted later.
+        // (excluding the last layer) that will be decrypted later.
         let fillers = self.build_fillers(&params[..params.len() - 1]);
-        // Random bytes is used to fill the space between data and fillers.
+        // Header integrity MAC doesn't need to be included in the last layer
+        // because there is no next encrypted layer.
+        // Instead, random bytes are used to fill the space between data and fillers.
+        // The size of random bytes depends on the [`self.max_layers`].
         let random_bytes = random_bytes(self.total_size() - D::size() - fillers.len());
 
         // First, concat the data and the random bytes, and encrypt it.
@@ -195,7 +198,7 @@ impl<D: ConsistentLengthLayeredCipherData> ConsistentLengthLayeredCipher<D> {
         key: &Key,
     ) -> Result<(Vec<u8>, HeaderIntegrityMac, Vec<u8>)> {
         if encrypted_total_data.len() != self.total_size() {
-            return Err(Error::InvalidDataLength);
+            return Err(Error::InvalidCipherTextLength);
         }
         // If a wrong key is used, the decryption should fail.
         if !mac.verify(key.integrity_mac_key, encrypted_total_data) {

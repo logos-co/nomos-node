@@ -4,6 +4,7 @@ pub mod temporal;
 pub use crypto::CryptographicProcessorSettings;
 use futures::{Stream, StreamExt};
 use rand::RngCore;
+use std::fmt::Debug;
 use std::marker::PhantomData;
 use std::pin::Pin;
 use std::task::{Context, Poll};
@@ -25,8 +26,9 @@ pub struct MessageBlendSettings<M>
 where
     M: MixMessage,
     M::PrivateKey: Serialize + DeserializeOwned,
+    M::Settings: Serialize + DeserializeOwned,
 {
-    pub cryptographic_processor: CryptographicProcessorSettings<M::PrivateKey>,
+    pub cryptographic_processor: CryptographicProcessorSettings<M::PrivateKey, M::Settings>,
     pub temporal_processor: TemporalSchedulerSettings,
 }
 
@@ -52,6 +54,8 @@ where
     M: MixMessage,
     M::PrivateKey: Serialize + DeserializeOwned,
     M::PublicKey: Clone + PartialEq,
+    M::Settings: Serialize + DeserializeOwned,
+    M::Error: Debug,
     Scheduler: Stream<Item = ()> + Unpin + Send + Sync + 'static,
 {
     pub fn new(
@@ -91,9 +95,6 @@ where
                     tracing::error!("Failed to send message to the outbound channel: {e:?}");
                 }
             }
-            Err(nomos_mix_message::Error::MsgUnwrapNotAllowed) => {
-                tracing::debug!("Message cannot be unwrapped by this node");
-            }
             Err(e) => {
                 tracing::error!("Failed to unwrap message: {:?}", e);
             }
@@ -108,6 +109,8 @@ where
     M: MixMessage + Unpin,
     M::PrivateKey: Serialize + DeserializeOwned + Unpin,
     M::PublicKey: Clone + PartialEq + Unpin,
+    M::Settings: Serialize + DeserializeOwned + Unpin,
+    M::Error: Debug,
     Scheduler: Stream<Item = ()> + Unpin + Send + Sync + 'static,
 {
     type Item = MixOutgoingMessage;
@@ -126,6 +129,8 @@ where
     M: MixMessage,
     M::PrivateKey: Serialize + DeserializeOwned,
     M::PublicKey: Clone + PartialEq,
+    M::Settings: Serialize + DeserializeOwned,
+    M::Error: Debug,
     Scheduler: Stream<Item = ()> + Unpin + Send + Sync + 'static,
 {
     fn blend(
@@ -155,6 +160,8 @@ where
     M: MixMessage,
     M::PrivateKey: Clone + Serialize + DeserializeOwned + PartialEq,
     M::PublicKey: Clone + Serialize + DeserializeOwned + PartialEq,
+    M::Settings: Clone + Serialize + DeserializeOwned,
+    M::Error: Debug,
     S: Stream<Item = ()> + Unpin + Send + Sync + 'static,
 {
 }

@@ -1,4 +1,3 @@
-use crate::{concat_bytes, parse_bytes, routing::EncryptedRoutingInformation, Error};
 use sphinx_packet::{
     constants::NODE_ADDRESS_LENGTH,
     header::{
@@ -7,6 +6,10 @@ use sphinx_packet::{
     },
     payload::Payload,
 };
+
+use crate::sphinx::ASYM_KEY_SIZE;
+
+use super::{concat_bytes, error::Error, parse_bytes, routing::EncryptedRoutingInformation};
 
 /// A packet that contains a header and a payload.
 /// The header and payload are encrypted for the selected recipients.
@@ -33,7 +36,7 @@ impl Packet {
         recipient_pubkeys: &[x25519_dalek::PublicKey],
         max_layers: usize,
         payload: &[u8],
-        payload_size: usize,
+        max_payload_size: usize,
     ) -> Result<Self, Error> {
         // Derive `[sphinx_packet::header::keys::KeyMaterial]` for all recipients.
         let ephemeral_privkey = x25519_dalek::StaticSecret::random();
@@ -52,7 +55,7 @@ impl Packet {
         let payload = sphinx_packet::payload::Payload::encapsulate_message(
             payload,
             &payload_keys,
-            payload_size,
+            max_payload_size,
         )?;
 
         Ok(Packet {
@@ -157,7 +160,7 @@ impl Packet {
     }
 
     pub fn from_bytes(data: &[u8], max_layers: usize) -> Result<Self, Error> {
-        let ephemeral_public_key_size = 32;
+        let ephemeral_public_key_size = ASYM_KEY_SIZE;
         let encrypted_routing_info_size = EncryptedRoutingInformation::size(max_layers);
         let parsed = parse_bytes(
             data,
@@ -167,7 +170,7 @@ impl Packet {
                 data.len() - ephemeral_public_key_size - encrypted_routing_info_size,
             ],
         )
-        .map_err(|_| Error::InvalidPacket)?;
+        .map_err(|_| Error::InvalidPacketBytes)?;
 
         Ok(Packet {
             header: Header {
@@ -269,13 +272,13 @@ mod tests {
         // Build a packet
         let max_layers = 5;
         let payload = [10u8; 512];
-        let packet = Packet::build(&recipient_pubkeys, max_layers, &payload, 1024).unwrap();
+        let max_payload_size = 1024;
+        let packet =
+            Packet::build(&recipient_pubkeys, max_layers, &payload, max_payload_size).unwrap();
 
         // Calculate the expected packet size
-        let pubkey_size = 32;
-        let payload_size = 1024;
         let packet_size =
-            pubkey_size + EncryptedRoutingInformation::size(max_layers) + payload_size;
+            ASYM_KEY_SIZE + EncryptedRoutingInformation::size(max_layers) + max_payload_size;
 
         // The serialized packet size must be the same as the expected size.
         assert_eq!(packet.to_bytes().len(), packet_size);
