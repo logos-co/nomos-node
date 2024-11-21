@@ -16,7 +16,6 @@ use nomos_da_verifier::backend::kzgrs::KzgrsDaVerifierSettings;
 use nomos_ledger::LedgerState;
 use nomos_libp2p::Multiaddr;
 use nomos_libp2p::SwarmConfig;
-use overwatch_rs::services::life_cycle::LifecycleMessage;
 use rand::{thread_rng, Rng};
 use tempfile::{NamedTempFile, TempDir};
 use time::OffsetDateTime;
@@ -239,7 +238,7 @@ fn test_verifier() {
             reply_channel: node2_reply_tx2,
         };
 
-        assert!(node2_verifier2.send(add_blob_message).await.is_err());
+        node2_verifier2.send(add_blob_message).await.unwrap();
 
         // Wait for response from the verifier.
         let a1 = node1_reply_rx.await.unwrap();
