@@ -16,14 +16,22 @@ use nomos_da_verifier::backend::kzgrs::KzgrsDaVerifierSettings;
 use nomos_ledger::LedgerState;
 use nomos_libp2p::Multiaddr;
 use nomos_libp2p::SwarmConfig;
+use overwatch_rs::services::life_cycle::LifecycleMessage;
 use rand::{thread_rng, Rng};
 use tempfile::{NamedTempFile, TempDir};
 use time::OffsetDateTime;
+use tracing_subscriber::fmt::TestWriter;
+use tracing_subscriber::EnvFilter;
 // internal
 use crate::common::*;
 
 #[test]
 fn test_verifier() {
+    let _ = tracing_subscriber::fmt()
+        .with_env_filter(EnvFilter::from_default_env())
+        .compact()
+        .with_writer(TestWriter::default())
+        .try_init();
     let performed_tx = Arc::new(AtomicBool::new(false));
     let performed_rx = performed_tx.clone();
     let is_success_tx = Arc::new(AtomicBool::new(false));
@@ -151,8 +159,8 @@ fn test_verifier() {
     );
 
     let node1_verifier = node1.handle().relay::<DaVerifier>();
-
     let node2_verifier = node2.handle().relay::<DaVerifier>();
+    let node2_verifier2 = node2.handle().relay::<DaVerifier>();
 
     client_zone.spawn(async move {
         let node1_verifier = node1_verifier.connect().await.unwrap();
@@ -160,6 +168,9 @@ fn test_verifier() {
 
         let node2_verifier = node2_verifier.connect().await.unwrap();
         let (node2_reply_tx, node2_reply_rx) = tokio::sync::oneshot::channel();
+
+        let node2_verifier2 = node2_verifier2.connect().await.unwrap();
+        let (node2_reply_tx2, node2_reply_rx2) = tokio::sync::oneshot::channel::<Option<()>>();
 
         let verifiers = vec![
             (node1_verifier, node1_reply_tx),
@@ -195,14 +206,40 @@ fn test_verifier() {
                     .collect(),
             };
 
-            verifier
-                .send(nomos_da_verifier::DaVerifierMsg::AddBlob {
-                    blob: da_blob,
-                    reply_channel: reply_tx,
-                })
-                .await
-                .unwrap();
+            let add_blob_message = nomos_da_verifier::DaVerifierMsg::AddBlob {
+                blob: da_blob,
+                reply_channel: reply_tx,
+            };
+
+            verifier.send(add_blob_message).await.unwrap();
         }
+
+        drop(node2_reply_rx2);
+
+        let column = &columns[0];
+
+        let da_blob = DaBlob {
+            column: column.clone(),
+            column_idx: 0
+                .try_into()
+                .expect("Column index shouldn't overflow the target type"),
+            column_commitment: encoded_data.column_commitments[0],
+            aggregated_column_commitment: encoded_data.aggregated_column_commitment,
+            aggregated_column_proof: encoded_data.aggregated_column_proofs[0],
+            rows_commitments: encoded_data.row_commitments.clone(),
+            rows_proofs: encoded_data
+                .rows_proofs
+                .iter()
+                .map(|proofs| proofs.get(0).cloned().unwrap())
+                .collect(),
+        };
+
+        let add_blob_message = nomos_da_verifier::DaVerifierMsg::AddBlob {
+            blob: da_blob,
+            reply_channel: node2_reply_tx2,
+        };
+
+        assert!(node2_verifier2.send(add_blob_message).await.is_err());
 
         // Wait for response from the verifier.
         let a1 = node1_reply_rx.await.unwrap();
