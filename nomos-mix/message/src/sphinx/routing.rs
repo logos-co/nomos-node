@@ -53,11 +53,13 @@ pub struct EncryptedRoutingInformation {
     pub encrypted_routing_info: Vec<u8>,
 }
 
+type LayeredCipher = ConsistentLengthLayeredCipher<RoutingInformation>;
+
 impl EncryptedRoutingInformation {
     /// Build all [`RoutingInformation`]s for the provides keys,
     /// and encrypt them using [`ConsistentLengthLayeredCipher`].
     pub fn new(routing_keys: &[RoutingKeys], max_layers: usize) -> Result<Self, Error> {
-        let cipher = Self::layered_cipher(max_layers);
+        let cipher = LayeredCipher::new(max_layers);
         let params = routing_keys
             .iter()
             .enumerate()
@@ -89,7 +91,7 @@ impl EncryptedRoutingInformation {
         routing_key: &RoutingKeys,
         max_layers: usize,
     ) -> Result<(RoutingInformation, Self), Error> {
-        let cipher = Self::layered_cipher(max_layers);
+        let cipher = LayeredCipher::new(max_layers);
         let (routing_info, next_mac, next_encrypted_routing_info) = cipher.unpack(
             &self.mac,
             &self.encrypted_routing_info,
@@ -102,10 +104,6 @@ impl EncryptedRoutingInformation {
                 encrypted_routing_info: next_encrypted_routing_info,
             },
         ))
-    }
-
-    fn layered_cipher(max_layers: usize) -> ConsistentLengthLayeredCipher<RoutingInformation> {
-        ConsistentLengthLayeredCipher::<RoutingInformation>::new(max_layers)
     }
 
     fn layered_cipher_key(routing_key: &RoutingKeys) -> Key {
@@ -126,7 +124,7 @@ impl EncryptedRoutingInformation {
             data,
             &[
                 HEADER_INTEGRITY_MAC_SIZE,
-                Self::layered_cipher(max_layers).total_size(),
+                LayeredCipher::total_size(max_layers),
             ],
         )
         .map_err(|_| Error::InvalidEncryptedRoutingInfoLength(data.len()))?;
@@ -136,7 +134,7 @@ impl EncryptedRoutingInformation {
         })
     }
 
-    pub fn size(max_layers: usize) -> usize {
-        HEADER_INTEGRITY_MAC_SIZE + Self::layered_cipher(max_layers).total_size()
+    pub const fn size(max_layers: usize) -> usize {
+        HEADER_INTEGRITY_MAC_SIZE + LayeredCipher::total_size(max_layers)
     }
 }

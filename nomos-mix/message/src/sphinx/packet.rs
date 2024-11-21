@@ -189,6 +189,10 @@ impl Packet {
             payload: parsed[2].to_vec(),
         })
     }
+
+    pub const fn size(max_layers: usize, max_payload_size: usize) -> usize {
+        ASYM_KEY_SIZE + EncryptedRoutingInformation::size(max_layers) + max_payload_size
+    }
 }
 
 pub enum UnpackedPacket {
@@ -281,8 +285,7 @@ mod tests {
             Packet::build(&recipient_pubkeys, max_layers, &payload, max_payload_size).unwrap();
 
         // Calculate the expected packet size
-        let packet_size =
-            ASYM_KEY_SIZE + EncryptedRoutingInformation::size(max_layers) + max_payload_size;
+        let packet_size = Packet::size(max_layers, max_payload_size);
 
         // The serialized packet size must be the same as the expected size.
         assert_eq!(packet.to_bytes().len(), packet_size);

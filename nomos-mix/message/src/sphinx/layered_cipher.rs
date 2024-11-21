@@ -82,9 +82,9 @@ impl<D: ConsistentLengthLayeredCipherData> ConsistentLengthLayeredCipher<D> {
     }
 
     /// The total size of fully encrypted output that includes all layers.
-    /// This size is determined by [`D::size`] and [`Self::max_layers`].
-    pub fn total_size(&self) -> usize {
-        Self::SINGLE_LAYER_SIZE * self.max_layers
+    /// This size is determined by [`D::size`] and [`max_layers`].
+    pub const fn total_size(max_layers: usize) -> usize {
+        Self::SINGLE_LAYER_SIZE * max_layers
     }
 
     /// The size of a single layer that contains a data and a MAC.
@@ -136,7 +136,7 @@ impl<D: ConsistentLengthLayeredCipherData> ConsistentLengthLayeredCipher<D> {
         );
         let mac = Self::compute_mac(&param.key.integrity_mac_key, &encrypted);
 
-        assert_eq!(encrypted.len(), self.total_size());
+        assert_eq!(encrypted.len(), Self::total_size(self.max_layers));
         Ok((encrypted, mac))
     }
 
@@ -158,7 +158,8 @@ impl<D: ConsistentLengthLayeredCipherData> ConsistentLengthLayeredCipher<D> {
         // because there is no next encrypted layer.
         // Instead, random bytes are used to fill the space between data and fillers.
         // The size of random bytes depends on the [`self.max_layers`].
-        let random_bytes = random_bytes(self.total_size() - D::SIZE - fillers.len());
+        let random_bytes =
+            random_bytes(Self::total_size(self.max_layers) - D::SIZE - fillers.len());
 
         // First, concat the data and the random bytes, and encrypt it.
         let last_data = last_param.data.to_bytes();
@@ -176,7 +177,7 @@ impl<D: ConsistentLengthLayeredCipherData> ConsistentLengthLayeredCipher<D> {
         encrypted.extend(fillers);
         let mac = Self::compute_mac(&last_param.key.integrity_mac_key, &encrypted);
 
-        assert_eq!(encrypted.len(), self.total_size());
+        assert_eq!(encrypted.len(), Self::total_size(self.max_layers));
         Ok((encrypted, mac))
     }
 
@@ -205,7 +206,7 @@ impl<D: ConsistentLengthLayeredCipherData> ConsistentLengthLayeredCipher<D> {
         encrypted_total_data: &[u8],
         key: &Key,
     ) -> Result<(Vec<u8>, HeaderIntegrityMac, Vec<u8>)> {
-        if encrypted_total_data.len() != self.total_size() {
+        if encrypted_total_data.len() != Self::total_size(self.max_layers) {
             return Err(Error::InvalidCipherTextLength);
         }
         // If a wrong key is used, the decryption should fail.
@@ -233,7 +234,11 @@ impl<D: ConsistentLengthLayeredCipherData> ConsistentLengthLayeredCipher<D> {
         // Parse the decrypted data into 3 parts: data, MAC, and the next encrypted data.
         let parsed = parse_bytes(
             &decrypted,
-            &[D::SIZE, HEADER_INTEGRITY_MAC_SIZE, self.total_size()],
+            &[
+                D::SIZE,
+                HEADER_INTEGRITY_MAC_SIZE,
+                Self::total_size(self.max_layers),
+            ],
         )
         .unwrap();
         let data = parsed[0].to_vec();
@@ -246,7 +251,7 @@ impl<D: ConsistentLengthLayeredCipherData> ConsistentLengthLayeredCipher<D> {
         let pseudorandom_bytes = sphinx_packet::crypto::generate_pseudorandom_bytes(
             key,
             &STREAM_CIPHER_INIT_VECTOR,
-            self.total_size() + Self::SINGLE_LAYER_SIZE,
+            Self::total_size(self.max_layers) + Self::SINGLE_LAYER_SIZE,
         );
         let pseudorandom_bytes = match opt {
             StreamCipherOption::FromFront => &pseudorandom_bytes[..data.len()],

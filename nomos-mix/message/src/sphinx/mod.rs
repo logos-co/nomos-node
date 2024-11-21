@@ -20,9 +20,7 @@ impl MixMessage for SphinxMessage {
     type PrivateKey = [u8; ASYM_KEY_SIZE];
     type Error = Error;
 
-    // TODO: Remove DROP_MESSAGE. Currently, an arbitrary size (2048) is used,
-    // but we've decided to remove drop messages from the spec.
-    const DROP_MESSAGE: &'static [u8] = &[0; 2048];
+    const DROP_MESSAGE: &'static [u8] = &[0; Packet::size(MAX_LAYERS, PADDED_PAYLOAD_SIZE)];
 
     fn build_message(
         payload: &[u8],
