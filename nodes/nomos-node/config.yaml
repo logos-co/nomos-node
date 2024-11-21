@@ -60,7 +60,6 @@ mix:
     cryptographic_processor:
       private_key: [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
       num_mix_layers: 1
-      message_settings:
     temporal_processor:
       max_delay_seconds: 5
   membership:

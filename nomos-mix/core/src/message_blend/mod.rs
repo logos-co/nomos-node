@@ -26,9 +26,8 @@ pub struct MessageBlendSettings<M>
 where
     M: MixMessage,
     M::PrivateKey: Serialize + DeserializeOwned,
-    M::Settings: Serialize + DeserializeOwned,
 {
-    pub cryptographic_processor: CryptographicProcessorSettings<M::PrivateKey, M::Settings>,
+    pub cryptographic_processor: CryptographicProcessorSettings<M::PrivateKey>,
     pub temporal_processor: TemporalSchedulerSettings,
 }
 
@@ -54,7 +53,6 @@ where
     M: MixMessage,
     M::PrivateKey: Serialize + DeserializeOwned,
     M::PublicKey: Clone + PartialEq,
-    M::Settings: Serialize + DeserializeOwned,
     M::Error: Debug,
     Scheduler: Stream<Item = ()> + Unpin + Send + Sync + 'static,
 {
@@ -109,7 +107,6 @@ where
     M: MixMessage + Unpin,
     M::PrivateKey: Serialize + DeserializeOwned + Unpin,
     M::PublicKey: Clone + PartialEq + Unpin,
-    M::Settings: Serialize + DeserializeOwned + Unpin,
     M::Error: Debug,
     Scheduler: Stream<Item = ()> + Unpin + Send + Sync + 'static,
 {
@@ -129,7 +126,6 @@ where
     M: MixMessage,
     M::PrivateKey: Serialize + DeserializeOwned,
     M::PublicKey: Clone + PartialEq,
-    M::Settings: Serialize + DeserializeOwned,
     M::Error: Debug,
     Scheduler: Stream<Item = ()> + Unpin + Send + Sync + 'static,
 {
@@ -160,7 +156,6 @@ where
     M: MixMessage,
     M::PrivateKey: Clone + Serialize + DeserializeOwned + PartialEq,
     M::PublicKey: Clone + Serialize + DeserializeOwned + PartialEq,
-    M::Settings: Clone + Serialize + DeserializeOwned,
     M::Error: Debug,
     S: Stream<Item = ()> + Unpin + Send + Sync + 'static,
 {

@@ -6,7 +6,6 @@ edition = "2021"
 [dependencies]
 itertools = "0.13"
 rand_chacha = "0.3"
-serde = { version = "1", features = ["derive"] }
 sha2 = "0.10"
 sphinx-packet = "0.2"
 thiserror = "1.0.65"

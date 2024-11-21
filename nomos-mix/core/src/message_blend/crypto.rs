@@ -9,16 +9,15 @@ pub struct CryptographicProcessor<R, M>
 where
     M: MixMessage,
 {
-    settings: CryptographicProcessorSettings<M::PrivateKey, M::Settings>,
+    settings: CryptographicProcessorSettings<M::PrivateKey>,
     membership: Membership<M>,
     rng: R,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct CryptographicProcessorSettings<K, S> {
+pub struct CryptographicProcessorSettings<K> {
     pub private_key: K,
     pub num_mix_layers: usize,
-    pub message_settings: S,
 }
 
 impl<R, M> CryptographicProcessor<R, M>
@@ -28,7 +27,7 @@ where
     M::PublicKey: Clone + PartialEq,
 {
     pub fn new(
-        settings: CryptographicProcessorSettings<M::PrivateKey, M::Settings>,
+        settings: CryptographicProcessorSettings<M::PrivateKey>,
         membership: Membership<M>,
         rng: R,
     ) -> Self {
@@ -48,14 +47,10 @@ where
             .map(|node| node.public_key.clone())
             .collect::<Vec<_>>();
 
-        M::build_message(message, &public_keys, &self.settings.message_settings)
+        M::build_message(message, &public_keys)
     }
 
     pub fn unwrap_message(&self, message: &[u8]) -> Result<(Vec<u8>, bool), M::Error> {
-        M::unwrap_message(
-            message,
-            &self.settings.private_key,
-            &self.settings.message_settings,
-        )
+        M::unwrap_message(message, &self.settings.private_key)
     }
 }

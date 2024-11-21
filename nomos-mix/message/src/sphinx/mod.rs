@@ -1,6 +1,5 @@
 use error::Error;
 use packet::{Packet, UnpackedPacket};
-use serde::{Deserialize, Serialize};
 
 use crate::MixMessage;
 
@@ -11,18 +10,14 @@ mod routing;
 
 pub struct SphinxMessage;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SphinxMessageSettings {
-    pub max_layers: usize,
-    pub max_payload_size: usize,
-}
-
 const ASYM_KEY_SIZE: usize = 32;
+// TODO: Move these constants to the upper layer (service layer).
+const PADDED_PAYLOAD_SIZE: usize = 2048;
+const MAX_LAYERS: usize = 5;
 
 impl MixMessage for SphinxMessage {
     type PublicKey = [u8; ASYM_KEY_SIZE];
     type PrivateKey = [u8; ASYM_KEY_SIZE];
-    type Settings = SphinxMessageSettings;
     type Error = Error;
 
     // TODO: Remove DROP_MESSAGE. Currently, an arbitrary size (2048) is used,
@@ -32,16 +27,15 @@ impl MixMessage for SphinxMessage {
     fn build_message(
         payload: &[u8],
         public_keys: &[Self::PublicKey],
-        settings: &Self::Settings,
     ) -> Result<Vec<u8>, Self::Error> {
         let packet = Packet::build(
             &public_keys
                 .iter()
                 .map(|k| x25519_dalek::PublicKey::from(*k))
                 .collect::<Vec<_>>(),
-            settings.max_layers,
+            MAX_LAYERS,
             payload,
-            settings.max_payload_size,
+            PADDED_PAYLOAD_SIZE,
         )?;
         Ok(packet.to_bytes())
     }
@@ -49,13 +43,10 @@ impl MixMessage for SphinxMessage {
     fn unwrap_message(
         message: &[u8],
         private_key: &Self::PrivateKey,
-        settings: &Self::Settings,
     ) -> Result<(Vec<u8>, bool), Self::Error> {
-        let packet = Packet::from_bytes(message, settings.max_layers)?;
-        let unpacked_packet = packet.unpack(
-            &x25519_dalek::StaticSecret::from(*private_key),
-            settings.max_layers,
-        )?;
+        let packet = Packet::from_bytes(message, MAX_LAYERS)?;
+        let unpacked_packet =
+            packet.unpack(&x25519_dalek::StaticSecret::from(*private_key), MAX_LAYERS)?;
         match unpacked_packet {
             UnpackedPacket::ToForward(packet) => Ok((packet.to_bytes(), false)),
             UnpackedPacket::FullyUnpacked(payload) => Ok((payload, true)),
