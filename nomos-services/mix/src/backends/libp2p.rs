@@ -106,7 +106,7 @@ impl MixBackend for Libp2pMixBackend {
 }
 
 struct MixSwarm {
-    swarm: Swarm<nomos_mix_network::Behaviour<MockMixMessage>>,
+    swarm: Swarm<nomos_mix_network::Behaviour>,
     swarm_messages_receiver: mpsc::Receiver<MixSwarmMessage>,
     incoming_message_sender: broadcast::Sender<Vec<u8>>,
 }

@@ -1,9 +1,5 @@
 use futures::{Stream, StreamExt};
-use nomos_mix_message::MixMessage;
-use rand::{distributions::Uniform, prelude::Distribution, Rng, RngCore};
-use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
-use std::marker::PhantomData;
 use std::pin::{pin, Pin};
 use std::task::{Context, Poll};
 
@@ -11,59 +7,38 @@ use std::task::{Context, Poll};
 pub struct PersistentTransmissionSettings {
     /// The maximum number of messages that can be emitted per second
     pub max_emission_frequency: f64,
-    /// The probability of emitting a drop message by coin flipping
-    pub drop_message_probability: f64,
 }
 
 impl Default for PersistentTransmissionSettings {
     fn default() -> Self {
         Self {
             max_emission_frequency: 1.0,
-            drop_message_probability: 0.5,
         }
     }
 }
 
 /// Transmit scheduled messages with a persistent rate as a stream.
-pub struct PersistentTransmissionStream<S, Rng, M, Scheduler>
+pub struct PersistentTransmissionStream<S, Scheduler>
 where
     S: Stream,
-    Rng: RngCore,
 {
-    coin: Coin<Rng>,
     stream: S,
     scheduler: Scheduler,
-    _mix_message: PhantomData<M>,
 }
 
-impl<S, Rng, M, Scheduler> PersistentTransmissionStream<S, Rng, M, Scheduler>
+impl<S, Scheduler> PersistentTransmissionStream<S, Scheduler>
 where
     S: Stream,
-    Rng: RngCore,
-    M: MixMessage,
     Scheduler: Stream<Item = ()>,
 {
-    pub fn new(
-        settings: PersistentTransmissionSettings,
-        stream: S,
-        scheduler: Scheduler,
-        rng: Rng,
-    ) -> PersistentTransmissionStream<S, Rng, M, Scheduler> {
-        let coin = Coin::<Rng>::new(rng, settings.drop_message_probability).unwrap();
-        Self {
-            coin,
-            stream,
-            scheduler,
-            _mix_message: Default::default(),
-        }
+    pub fn new(stream: S, scheduler: Scheduler) -> PersistentTransmissionStream<S, Scheduler> {
+        Self { stream, scheduler }
     }
 }
 
-impl<S, Rng, M, Scheduler> Stream for PersistentTransmissionStream<S, Rng, M, Scheduler>
+impl<S, Scheduler> Stream for PersistentTransmissionStream<S, Scheduler>
 where
     S: Stream<Item = Vec<u8>> + Unpin,
-    Rng: RngCore + Unpin,
-    M: MixMessage + Unpin,
     Scheduler: Stream<Item = ()> + Unpin,
 {
     type Item = Vec<u8>;
@@ -72,7 +47,6 @@ where
         let Self {
             ref mut scheduler,
             ref mut stream,
-            ref mut coin,
             ..
         } = self.get_mut();
         if pin!(scheduler).poll_next_unpin(cx).is_pending() {
@@ -80,79 +54,38 @@ where
         }
         if let Poll::Ready(Some(item)) = pin!(stream).poll_next(cx) {
             Poll::Ready(Some(item))
-        } else if coin.flip() {
-            Poll::Ready(Some(M::DROP_MESSAGE.to_vec()))
         } else {
             Poll::Pending
         }
     }
 }
 
-pub trait PersistentTransmissionExt<Rng, M, Scheduler>: Stream
+pub trait PersistentTransmissionExt<Scheduler>: Stream
 where
-    Rng: RngCore,
-    M: MixMessage,
     Scheduler: Stream<Item = ()>,
 {
     fn persistent_transmission(
         self,
-        settings: PersistentTransmissionSettings,
-        rng: Rng,
         scheduler: Scheduler,
-    ) -> PersistentTransmissionStream<Self, Rng, M, Scheduler>
+    ) -> PersistentTransmissionStream<Self, Scheduler>
     where
         Self: Sized + Unpin,
     {
-        PersistentTransmissionStream::new(settings, self, scheduler, rng)
+        PersistentTransmissionStream::new(self, scheduler)
     }
 }
 
-impl<S, Rng, M, Scheduler> PersistentTransmissionExt<Rng, M, Scheduler> for S
+impl<S, Scheduler> PersistentTransmissionExt<Scheduler> for S
 where
     S: Stream,
-    Rng: RngCore,
-    M: MixMessage,
-    M::PublicKey: Clone + Serialize + DeserializeOwned,
     Scheduler: Stream<Item = ()>,
 {
-}
-
-struct Coin<R: Rng> {
-    rng: R,
-    distribution: Uniform<f64>,
-    probability: f64,
-}
-
-impl<R: Rng> Coin<R> {
-    fn new(rng: R, probability: f64) -> Result<Self, CoinError> {
-        if !(0.0..=1.0).contains(&probability) {
-            return Err(CoinError::InvalidProbability);
-        }
-        Ok(Self {
-            rng,
-            distribution: Uniform::from(0.0..1.0),
-            probability,
-        })
-    }
-
-    // Flip the coin based on the given probability.
-    fn flip(&mut self) -> bool {
-        self.distribution.sample(&mut self.rng) < self.probability
-    }
-}
-
-#[derive(Debug)]
-enum CoinError {
-    InvalidProbability,
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use futures::StreamExt;
-    use nomos_mix_message::mock::MockMixMessage;
-    use rand::SeedableRng;
-    use rand_chacha::ChaCha8Rng;
     use std::time::Duration;
     use tokio::sync::mpsc;
     use tokio::time;
@@ -186,8 +119,6 @@ mod tests {
         let stream = tokio_stream::wrappers::UnboundedReceiverStream::new(schedule_receiver);
         let settings = PersistentTransmissionSettings {
             max_emission_frequency: 1.0,
-            // Set to always emit drop messages if no scheduled messages for easy testing
-            drop_message_probability: 1.0,
         };
         // Prepare the expected emission interval with torelance
         let expected_emission_interval =
@@ -196,16 +127,10 @@ mod tests {
         let lower_bound = expected_emission_interval - torelance;
         let upper_bound = expected_emission_interval + torelance;
         // prepare stream
-        let mut persistent_transmission_stream: PersistentTransmissionStream<
-            _,
-            _,
-            MockMixMessage,
-            _,
-        > = stream.persistent_transmission(
-            settings,
-            ChaCha8Rng::from_entropy(),
-            IntervalStream::new(time::interval(expected_emission_interval)).map(|_| ()),
-        );
+        let mut persistent_transmission_stream: PersistentTransmissionStream<_, _> = stream
+            .persistent_transmission(
+                IntervalStream::new(time::interval(expected_emission_interval)).map(|_| ()),
+            );
         // Messages must be scheduled in non-blocking manner.
         schedule_sender.send(vec![1]).unwrap();
         schedule_sender.send(vec![2]).unwrap();
@@ -230,15 +155,17 @@ mod tests {
         );
         assert_interval!(&mut last_time, lower_bound, upper_bound);
 
-        assert!(MockMixMessage::is_drop_message(
-            &persistent_transmission_stream.next().await.unwrap()
-        ));
-        assert_interval!(&mut last_time, lower_bound, upper_bound);
-
-        assert!(MockMixMessage::is_drop_message(
-            &persistent_transmission_stream.next().await.unwrap()
-        ));
-        assert_interval!(&mut last_time, lower_bound, upper_bound);
+        // Check if nothing is emitted when there is no message scheduled
+        let timeout = tokio::time::timeout(
+            expected_emission_interval,
+            persistent_transmission_stream.next(),
+        )
+        .await;
+        assert!(
+            timeout.is_err(),
+            "Timeout must occur because no message is scheduled."
+        );
+        last_time = time::Instant::now();
 
         // Schedule a new message and check if it is emitted at the next interval
         schedule_sender.send(vec![4]).unwrap();

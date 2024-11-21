@@ -7,7 +7,6 @@ pub use error::Error;
 pub trait MixMessage {
     type PublicKey;
     type PrivateKey;
-    const DROP_MESSAGE: &'static [u8];
 
     fn build_message(payload: &[u8], public_keys: &[Self::PublicKey]) -> Result<Vec<u8>, Error>;
     /// Unwrap the message one layer.
@@ -21,7 +20,4 @@ pub trait MixMessage {
         message: &[u8],
         private_key: &Self::PrivateKey,
     ) -> Result<(Vec<u8>, bool), Error>;
-    fn is_drop_message(message: &[u8]) -> bool {
-        message == Self::DROP_MESSAGE
-    }
 }

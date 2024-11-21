@@ -11,9 +11,7 @@ use libp2p::{
     },
     Multiaddr, PeerId,
 };
-use nomos_mix_message::MixMessage;
 use sha2::{Digest, Sha256};
-use std::marker::PhantomData;
 use std::{
     collections::{HashMap, HashSet, VecDeque},
     task::{Context, Poll, Waker},
@@ -22,7 +20,7 @@ use std::{
 /// A [`NetworkBehaviour`]:
 /// - forwards messages to all connected peers with deduplication.
 /// - receives messages from all connected peers.
-pub struct Behaviour<M> {
+pub struct Behaviour {
     config: Config,
     /// Peers that support the mix protocol, and their connection IDs
     negotiated_peers: HashMap<PeerId, HashSet<ConnectionId>>,
@@ -33,7 +31,6 @@ pub struct Behaviour<M> {
     /// An LRU time cache for storing seen messages (based on their ID). This cache prevents
     /// duplicates from being propagated on the network.
     duplicate_cache: TimedCache<Vec<u8>, ()>,
-    _mix_message: PhantomData<M>,
 }
 
 #[derive(Debug)]
@@ -48,10 +45,7 @@ pub enum Event {
     Error(Error),
 }
 
-impl<M> Behaviour<M>
-where
-    M: MixMessage,
-{
+impl Behaviour {
     pub fn new(config: Config) -> Self {
         let duplicate_cache = TimedCache::with_lifespan(config.duplicate_cache_lifespan);
         Self {
@@ -60,17 +54,11 @@ where
             events: VecDeque::new(),
             waker: None,
             duplicate_cache,
-            _mix_message: Default::default(),
         }
     }
 
-    /// Publish a message (data or drop) to all connected peers
+    /// Publish a message to all connected peers
     pub fn publish(&mut self, message: Vec<u8>) -> Result<(), Error> {
-        if M::is_drop_message(&message) {
-            // Bypass deduplication for the drop message
-            return self.forward_message(message, None);
-        }
-
         let msg_id = Self::message_id(&message);
         // If the message was already seen, don't forward it again
         if self.duplicate_cache.cache_get(&msg_id).is_some() {
@@ -155,10 +143,7 @@ where
     }
 }
 
-impl<M> NetworkBehaviour for Behaviour<M>
-where
-    M: MixMessage + 'static,
-{
+impl NetworkBehaviour for Behaviour {
     type ConnectionHandler = MixConnectionHandler;
     type ToSwarm = Event;
 
@@ -205,11 +190,6 @@ where
         match event {
             // A message was forwarded from the peer.
             ToBehaviour::Message(message) => {
-                // Ignore drop message
-                if M::is_drop_message(&message) {
-                    return;
-                }
-
                 // Add the message to the cache. If it was already seen, ignore it.
                 if self
                     .duplicate_cache

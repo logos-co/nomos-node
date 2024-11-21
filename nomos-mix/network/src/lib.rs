@@ -14,7 +14,6 @@ mod test {
         swarm::{dummy, NetworkBehaviour, SwarmEvent},
         Multiaddr, PeerId, Swarm, SwarmBuilder,
     };
-    use nomos_mix_message::mock::MockMixMessage;
     use tokio::select;
 
     use crate::{behaviour::Config, error::Error, Behaviour, Event};
@@ -116,7 +115,7 @@ mod test {
         }
     }
 
-    fn new_swarm(key: Keypair) -> Swarm<Behaviour<MockMixMessage>> {
+    fn new_swarm(key: Keypair) -> Swarm<Behaviour> {
         new_swarm_with_behaviour(
             key,
             Behaviour::new(Config {

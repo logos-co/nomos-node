@@ -107,19 +107,13 @@ where
 
         // tier 1 persistent transmission
         let (persistent_sender, persistent_receiver) = mpsc::unbounded_channel();
-        let mut persistent_transmission_messages: PersistentTransmissionStream<
-            _,
-            _,
-            MockMixMessage,
-            _,
-        > = UnboundedReceiverStream::new(persistent_receiver).persistent_transmission(
-            mix_config.persistent_transmission,
-            ChaCha12Rng::from_entropy(),
-            IntervalStream::new(time::interval(Duration::from_secs_f64(
-                1.0 / mix_config.persistent_transmission.max_emission_frequency,
-            )))
-            .map(|_| ()),
-        );
+        let mut persistent_transmission_messages: PersistentTransmissionStream<_, _> =
+            UnboundedReceiverStream::new(persistent_receiver).persistent_transmission(
+                IntervalStream::new(time::interval(Duration::from_secs_f64(
+                    1.0 / mix_config.persistent_transmission.max_emission_frequency,
+                )))
+                .map(|_| ()),
+            );
 
         // tier 2 blend
         let temporal_scheduler = TemporalScheduler::new(
