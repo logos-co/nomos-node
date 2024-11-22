@@ -36,7 +36,7 @@ fn test_verifier() {
     let is_success_tx = Arc::new(AtomicBool::new(false));
     let is_success_rx = is_success_tx.clone();
 
-    let mut ids = vec![[0; 32]; 2];
+    let mut ids = vec![[0; 32]; 3];
     for id in &mut ids {
         thread_rng().fill(id);
     }
@@ -77,28 +77,42 @@ fn test_verifier() {
         port: 7774,
         ..Default::default()
     };
+
+    let swarm_config3 = SwarmConfig {
+        port: 7775,
+        ..Default::default()
+    };
+
     let mix_configs = new_mix_configs(vec![
         Multiaddr::from_str("/ip4/127.0.0.1/udp/7783/quic-v1").unwrap(),
         Multiaddr::from_str("/ip4/127.0.0.1/udp/7784/quic-v1").unwrap(),
+        Multiaddr::from_str("/ip4/127.0.0.1/udp/7785/quic-v1").unwrap(),
     ]);
 
     let blobs_dir = TempDir::new().unwrap().path().to_path_buf();
 
     let (node1_sk, _) = generate_blst_hex_keys();
     let (node2_sk, _) = generate_blst_hex_keys();
+    let (node3_sk, _) = generate_blst_hex_keys();
 
     let client_zone = new_client(NamedTempFile::new().unwrap().path().to_path_buf());
 
     let (peer_sk_1, peer_id_1) = generate_ed25519_sk_peerid();
     let (peer_sk_2, peer_id_2) = generate_ed25519_sk_peerid();
+    let (peer_sk_3, peer_id_3) = generate_ed25519_sk_peerid();
 
     let addr_1 = Multiaddr::from_str("/ip4/127.0.0.1/udp/8880/quic-v1").unwrap();
     let addr_2 = Multiaddr::from_str("/ip4/127.0.0.1/udp/8881/quic-v1").unwrap();
+    let addr_3 = Multiaddr::from_str("/ip4/127.0.0.1/udp/8882/quic-v1").unwrap();
 
-    let peer_addresses = vec![(peer_id_1, addr_1.clone()), (peer_id_2, addr_2.clone())];
+    let peer_addresses = vec![
+        (peer_id_1, addr_1.clone()),
+        (peer_id_2, addr_2.clone()),
+        (peer_id_3, addr_3.clone()),
+    ];
 
     let num_samples = 1;
-    let num_subnets = 2;
+    let num_subnets = 3;
     let nodes_per_subnet = 1;
 
     let node1 = new_node(
@@ -148,7 +162,7 @@ fn test_verifier() {
             global_params_path: GLOBAL_PARAMS_PATH.into(),
         },
         TestDaNetworkSettings {
-            peer_addresses,
+            peer_addresses: peer_addresses.clone(),
             listening_address: addr_2,
             num_subnets,
             num_samples,
@@ -157,9 +171,37 @@ fn test_verifier() {
         },
     );
 
+    let node3 = new_node(
+        &LeaderConfig {
+            notes: vec![notes[2].clone()],
+            nf_sk: sks[2],
+        },
+        &ledger_config,
+        &genesis_state,
+        &time_config,
+        &swarm_config3,
+        &mix_configs[2],
+        NamedTempFile::new().unwrap().path().to_path_buf(),
+        &blobs_dir,
+        vec![node_address(&swarm_config2)],
+        KzgrsDaVerifierSettings {
+            sk: node3_sk,
+            index: [2].into(),
+            global_params_path: GLOBAL_PARAMS_PATH.into(),
+        },
+        TestDaNetworkSettings {
+            peer_addresses,
+            listening_address: addr_3,
+            num_subnets,
+            num_samples,
+            nodes_per_subnet,
+            node_key: peer_sk_3,
+        },
+    );
+
     let node1_verifier = node1.handle().relay::<DaVerifier>();
     let node2_verifier = node2.handle().relay::<DaVerifier>();
-    let node2_verifier2 = node2.handle().relay::<DaVerifier>();
+    let node3_verifier = node3.handle().relay::<DaVerifier>();
 
     client_zone.spawn(async move {
         let node1_verifier = node1_verifier.connect().await.unwrap();
@@ -168,12 +210,13 @@ fn test_verifier() {
         let node2_verifier = node2_verifier.connect().await.unwrap();
         let (node2_reply_tx, node2_reply_rx) = tokio::sync::oneshot::channel();
 
-        let node2_verifier2 = node2_verifier2.connect().await.unwrap();
-        let (node2_reply_tx2, node2_reply_rx2) = tokio::sync::oneshot::channel::<Option<()>>();
+        let node3_verifier = node3_verifier.connect().await.unwrap();
+        let (node3_reply_tx, node3_reply_rx) = tokio::sync::oneshot::channel::<Option<()>>();
 
         let verifiers = vec![
             (node1_verifier, node1_reply_tx),
             (node2_verifier, node2_reply_tx),
+            (node3_verifier, node3_reply_tx),
         ];
 
         // Encode data
@@ -186,22 +229,25 @@ fn test_verifier() {
         let encoded_data = encoder.encode(&data).unwrap();
         let columns: Vec<_> = encoded_data.extended_data.columns().collect();
 
+        drop(node3_reply_rx);
+
         for (i, (verifier, reply_tx)) in verifiers.into_iter().enumerate() {
-            let column = &columns[i];
+            let index = i % 2;
+            let column = &columns[index];
 
             let da_blob = DaBlob {
                 column: column.clone(),
-                column_idx: i
+                column_idx: index
                     .try_into()
                     .expect("Column index shouldn't overflow the target type"),
-                column_commitment: encoded_data.column_commitments[i],
+                column_commitment: encoded_data.column_commitments[index],
                 aggregated_column_commitment: encoded_data.aggregated_column_commitment,
-                aggregated_column_proof: encoded_data.aggregated_column_proofs[i],
+                aggregated_column_proof: encoded_data.aggregated_column_proofs[index],
                 rows_commitments: encoded_data.row_commitments.clone(),
                 rows_proofs: encoded_data
                     .rows_proofs
                     .iter()
-                    .map(|proofs| proofs.get(i).cloned().unwrap())
+                    .map(|proofs| proofs.get(index).cloned().unwrap())
                     .collect(),
             };
 
@@ -212,33 +258,6 @@ fn test_verifier() {
 
             verifier.send(add_blob_message).await.unwrap();
         }
-
-        drop(node2_reply_rx2);
-
-        let column = &columns[0];
-
-        let da_blob = DaBlob {
-            column: column.clone(),
-            column_idx: 0
-                .try_into()
-                .expect("Column index shouldn't overflow the target type"),
-            column_commitment: encoded_data.column_commitments[0],
-            aggregated_column_commitment: encoded_data.aggregated_column_commitment,
-            aggregated_column_proof: encoded_data.aggregated_column_proofs[0],
-            rows_commitments: encoded_data.row_commitments.clone(),
-            rows_proofs: encoded_data
-                .rows_proofs
-                .iter()
-                .map(|proofs| proofs.get(0).cloned().unwrap())
-                .collect(),
-        };
-
-        let add_blob_message = nomos_da_verifier::DaVerifierMsg::AddBlob {
-            blob: da_blob,
-            reply_channel: node2_reply_tx2,
-        };
-
-        node2_verifier2.send(add_blob_message).await.unwrap();
 
         // Wait for response from the verifier.
         let a1 = node1_reply_rx.await.unwrap();
