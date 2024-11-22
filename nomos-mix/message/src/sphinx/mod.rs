@@ -11,7 +11,6 @@ mod routing;
 pub struct SphinxMessage;
 
 const ASYM_KEY_SIZE: usize = 32;
-// TODO: Move these constants to the upper layer (service layer).
 const PADDED_PAYLOAD_SIZE: usize = 2048;
 const MAX_LAYERS: usize = 5;
 

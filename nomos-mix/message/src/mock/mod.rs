@@ -9,7 +9,6 @@ use crate::MixMessage;
 
 const NODE_ID_SIZE: usize = 32;
 
-// TODO: Move PADDED_PAYLOAD_SIZE and MAX_LAYERS to the upper layer (service layer).
 const PADDED_PAYLOAD_SIZE: usize = 2048;
 const PAYLOAD_PADDING_SEPARATOR: u8 = 0x01;
 const PAYLOAD_PADDING_SEPARATOR_SIZE: usize = 1;
