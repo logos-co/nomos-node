@@ -12,7 +12,7 @@ pub struct SphinxMessage;
 
 const ASYM_KEY_SIZE: usize = 32;
 // TODO: Move these constants to the upper layer (service layer).
-const PADDED_PAYLOAD_SIZE: usize = 2048;
+const MAX_PAYLOAD_SIZE: usize = 2048;
 const MAX_LAYERS: usize = 5;
 
 impl MixMessage for SphinxMessage {
@@ -20,7 +20,7 @@ impl MixMessage for SphinxMessage {
     type PrivateKey = [u8; ASYM_KEY_SIZE];
     type Error = Error;
 
-    const DROP_MESSAGE: &'static [u8] = &[0; Packet::size(MAX_LAYERS, PADDED_PAYLOAD_SIZE)];
+    const DROP_MESSAGE: &'static [u8] = &[0; Packet::size(MAX_LAYERS, MAX_PAYLOAD_SIZE)];
 
     fn build_message(
         payload: &[u8],
@@ -33,7 +33,7 @@ impl MixMessage for SphinxMessage {
                 .collect::<Vec<_>>(),
             MAX_LAYERS,
             payload,
-            PADDED_PAYLOAD_SIZE,
+            MAX_PAYLOAD_SIZE,
         )?;
         Ok(packet.to_bytes())
     }
