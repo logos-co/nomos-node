@@ -12,6 +12,7 @@ where
     settings: CryptographicProcessorSettings<M::PrivateKey>,
     membership: Membership<M>,
     rng: R,
+    mix_message: M,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -28,18 +29,20 @@ where
 {
     pub fn new(
         settings: CryptographicProcessorSettings<M::PrivateKey>,
+        mix_message_settings: M::Settings,
         membership: Membership<M>,
         rng: R,
     ) -> Self {
+        let mix_message = M::new(mix_message_settings);
         Self {
             settings,
             membership,
             rng,
+            mix_message,
         }
     }
 
     pub fn wrap_message(&mut self, message: &[u8]) -> Result<Vec<u8>, M::Error> {
-        // TODO: Use the actual Sphinx encoding instead of mock.
         let public_keys = self
             .membership
             .choose_remote_nodes(&mut self.rng, self.settings.num_mix_layers)
@@ -47,10 +50,11 @@ where
             .map(|node| node.public_key.clone())
             .collect::<Vec<_>>();
 
-        M::build_message(message, &public_keys)
+        self.mix_message.build_message(message, &public_keys)
     }
 
     pub fn unwrap_message(&self, message: &[u8]) -> Result<(Vec<u8>, bool), M::Error> {
-        M::unwrap_message(message, &self.settings.private_key)
+        self.mix_message
+            .unwrap_message(message, &self.settings.private_key)
     }
 }

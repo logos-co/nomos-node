@@ -59,12 +59,14 @@ where
     pub fn new(
         input_stream: S,
         settings: MessageBlendSettings<M>,
+        mix_message_settings: M::Settings,
         membership: Membership<M>,
         scheduler: Scheduler,
         cryptographic_processor_rng: Rng,
     ) -> Self {
         let cryptographic_processor = CryptographicProcessor::new(
             settings.cryptographic_processor,
+            mix_message_settings,
             membership,
             cryptographic_processor_rng,
         );
@@ -132,6 +134,7 @@ where
     fn blend(
         self,
         message_blend_settings: MessageBlendSettings<M>,
+        mix_message_settings: M::Settings,
         membership: Membership<M>,
         scheduler: Scheduler,
         cryptographic_processor_rng: Rng,
@@ -142,6 +145,7 @@ where
         MessageBlendStream::new(
             self,
             message_blend_settings,
+            mix_message_settings,
             membership,
             scheduler,
             cryptographic_processor_rng,
