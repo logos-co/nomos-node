@@ -188,6 +188,7 @@ mod tests {
             max_emission_frequency: 1.0,
             // Set to always emit drop messages if no scheduled messages for easy testing
             drop_message_probability: 1.0,
+            ..Default::default()
         };
         // Prepare the expected emission interval with torelance
         let expected_emission_interval =

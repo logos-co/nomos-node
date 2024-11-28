@@ -330,6 +330,7 @@ pub fn new_mix_configs(listening_addresses: Vec<Multiaddr>) -> Vec<TestMixSettin
                     listening_address: listening_address.clone(),
                     node_key: ed25519::SecretKey::generate(),
                     peering_degree: 1,
+                    conn_maintenance: Default::default(),
                 },
                 x25519_dalek::StaticSecret::random(),
             )

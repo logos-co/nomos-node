@@ -14,8 +14,10 @@ mod test {
         swarm::{dummy, NetworkBehaviour, SwarmEvent},
         Multiaddr, PeerId, Swarm, SwarmBuilder,
     };
+    use nomos_mix::conn_maintenance::ConnectionMaintenanceSettings;
     use nomos_mix_message::mock::MockMixMessage;
     use tokio::select;
+    use tokio_stream::wrappers::IntervalStream;
 
     use crate::{behaviour::Config, error::Error, Behaviour, Event};
 
@@ -116,12 +118,25 @@ mod test {
         }
     }
 
-    fn new_swarm(key: Keypair) -> Swarm<Behaviour<MockMixMessage>> {
+    fn new_swarm(key: Keypair) -> Swarm<Behaviour<MockMixMessage, IntervalStream>> {
+        let conn_maintenance_settings = ConnectionMaintenanceSettings {
+            time_window: Duration::from_secs(60),
+            expected_effective_messages: 1.0,
+            effective_message_tolerance: 0.1,
+            expected_drop_messages: 1.0,
+            drop_message_tolerance: 0.1,
+        };
+        let conn_maintenance_interval =
+            IntervalStream::new(tokio::time::interval(conn_maintenance_settings.time_window));
         new_swarm_with_behaviour(
             key,
-            Behaviour::new(Config {
-                duplicate_cache_lifespan: 60,
-            }),
+            Behaviour::new(
+                Config {
+                    duplicate_cache_lifespan: 60,
+                    conn_maintenance_settings,
+                },
+                conn_maintenance_interval,
+            ),
         )
     }
 
