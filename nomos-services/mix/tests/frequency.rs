@@ -3,6 +3,7 @@ use std::{str::FromStr, thread, time::Duration};
 use libp2p::Multiaddr;
 use nomos_libp2p::{ed25519, Swarm, SwarmConfig};
 use nomos_mix::{
+    conn_maintenance::ConnectionMaintenanceSettings,
     membership::Node,
     message_blend::{
         CryptographicProcessorSettings, MessageBlendSettings, TemporalSchedulerSettings,
@@ -95,7 +96,13 @@ fn new_mix_configs(listening_addresses: Vec<Multiaddr>) -> Vec<TestMixSettings> 
                     listening_address: listening_address.clone(),
                     node_key: ed25519::SecretKey::generate(),
                     peering_degree: 1,
-                    conn_maintenance: Default::default(),
+                    conn_maintenance: ConnectionMaintenanceSettings {
+                        time_window: Duration::from_secs(10),
+                        expected_effective_messages: 5.0,
+                        effective_message_tolerance: 0.1,
+                        expected_drop_messages: 0.0,
+                        drop_message_tolerance: 0.0,
+                    },
                 },
                 x25519_dalek::StaticSecret::random(),
             )

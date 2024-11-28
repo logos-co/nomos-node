@@ -1,5 +1,6 @@
 use std::{
     collections::{HashMap, HashSet},
+    fmt::Debug,
     hash::Hash,
     time::Duration,
 };
@@ -41,7 +42,7 @@ pub struct ConnectionMaintenance<Peer> {
 
 impl<Peer> ConnectionMaintenance<Peer>
 where
-    Peer: Eq + Hash + Clone,
+    Peer: Debug + Eq + Hash + Clone,
 {
     pub fn new(settings: ConnectionMaintenanceSettings) -> Self {
         Self {
@@ -67,6 +68,7 @@ where
         let mut unhealthy_peers = HashSet::new();
 
         self.meters.iter().for_each(|(peer, meter)| {
+            println!("Peer: {:?}, Meter: {:?}", peer, meter);
             if meter.is_malicious(&self.settings) {
                 malicious_peers.insert(peer.clone());
             } else if meter.is_unhealthy(&self.settings) {
@@ -79,6 +81,7 @@ where
     }
 }
 
+#[derive(Debug)]
 struct ConnectionMeter {
     effective_messages: usize,
     drop_messages: usize,

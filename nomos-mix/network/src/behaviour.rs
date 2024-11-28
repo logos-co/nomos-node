@@ -99,8 +99,10 @@ where
         }
 
         let msg_id = Self::message_id(&message);
+        println!("Publishing message with id: {:?}", msg_id);
         // If the message was already seen, don't forward it again
         if self.duplicate_cache.cache_get(&msg_id).is_some() {
+            println!("Skipping duplicate message: {:?}", msg_id);
             return Ok(());
         }
 

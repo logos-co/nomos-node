@@ -158,17 +158,20 @@ where
         loop {
             tokio::select! {
                 Some(msg) = persistent_transmission_messages.next() => {
+                    println!("A message from PTM to the mix network");
                     backend.publish(msg).await;
                 }
                 // Already processed blend messages
                 Some(msg) = blend_messages.next() => {
                     match msg {
                         MixOutgoingMessage::Outbound(msg) => {
+                            println!("A outbound message from blend to PTM");
                             if let Err(e) = persistent_sender.send(msg) {
                                 tracing::error!("Error sending message to persistent stream: {e}");
                             }
                         }
                         MixOutgoingMessage::FullyUnwrapped(msg) => {
+                            println!("A fully unwrapped message from blend to the broadcast network");
                             tracing::debug!("Broadcasting fully unwrapped message");
                             match wire::deserialize::<NetworkMessage<Network::BroadcastSettings>>(&msg) {
                                 Ok(msg) => {
@@ -182,9 +185,11 @@ where
                     }
                 }
                 Some(msg) = cover_traffic.next() => {
+                    println!("A cover traffic to PTM");
                     Self::wrap_and_send_to_persistent_transmission(msg, &mut cryptographic_processor, &persistent_sender);
                 }
                 Some(msg) = local_messages.next() => {
+                    println!("A local traffic to PTM");
                     Self::wrap_and_send_to_persistent_transmission(msg, &mut cryptographic_processor, &persistent_sender);
                 }
                 Some(msg) = lifecycle_stream.next() => {
