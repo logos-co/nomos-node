@@ -5,8 +5,7 @@ use nomos_mix::membership::Node;
 use nomos_mix::message_blend::{
     CryptographicProcessorSettings, MessageBlendSettings, TemporalSchedulerSettings,
 };
-use nomos_mix_message::mock::MockMixMessage;
-use nomos_mix_message::MixMessage;
+use nomos_mix_message::{sphinx::SphinxMessage, MixMessage};
 use std::path::PathBuf;
 use std::time::Duration;
 // crates
@@ -192,7 +191,7 @@ pub struct TestDaNetworkSettings {
 pub struct TestMixSettings {
     pub backend: Libp2pMixBackendSettings,
     pub private_key: x25519_dalek::StaticSecret,
-    pub membership: Vec<Node<<MockMixMessage as MixMessage>::PublicKey>>,
+    pub membership: Vec<Node<<SphinxMessage as MixMessage>::PublicKey>>,
 }
 
 pub fn new_node(
@@ -341,9 +340,10 @@ pub fn new_mix_configs(listening_addresses: Vec<Multiaddr>) -> Vec<TestMixSettin
         .iter()
         .map(|(backend, private_key)| Node {
             address: backend.listening_address.clone(),
-            // We use private key as a public key because the `MockMixMessage` doesn't differentiate between them.
-            // TODO: Convert private key to public key properly once the real MixMessage is implemented.
-            public_key: private_key.to_bytes(),
+            public_key: x25519_dalek::PublicKey::from(&x25519_dalek::StaticSecret::from(
+                private_key.to_bytes(),
+            ))
+            .to_bytes(),
         })
         .collect::<Vec<_>>();
 

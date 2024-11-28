@@ -5,7 +5,7 @@ use std::{fmt::Debug, pin::Pin};
 
 use futures::Stream;
 use nomos_mix::membership::Membership;
-use nomos_mix_message::mock::MockMixMessage;
+use nomos_mix_message::sphinx::SphinxMessage;
 use overwatch_rs::overwatch::handle::OverwatchHandle;
 use rand::Rng;
 
@@ -17,7 +17,7 @@ pub trait MixBackend {
     fn new<R>(
         config: Self::Settings,
         overwatch_handle: OverwatchHandle,
-        membership: Membership<MockMixMessage>,
+        membership: Membership<SphinxMessage>,
         rng: R,
     ) -> Self
     where

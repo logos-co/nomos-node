@@ -17,7 +17,7 @@ use nomos_mix::{
     cover_traffic::{CoverTraffic, CoverTrafficSettings},
     membership::{Membership, Node},
 };
-use nomos_mix_message::{mock::MockMixMessage, MixMessage};
+use nomos_mix_message::{sphinx::SphinxMessage, MixMessage};
 use nomos_network::NetworkService;
 use overwatch_rs::services::{
     handle::ServiceStateHandle,
@@ -50,7 +50,7 @@ where
     backend: Backend,
     service_state: ServiceStateHandle<Self>,
     network_relay: Relay<NetworkService<Network::Backend>>,
-    membership: Membership<MockMixMessage>,
+    membership: Membership<SphinxMessage>,
 }
 
 impl<Backend, Network> ServiceData for MixService<Backend, Network>
@@ -113,7 +113,7 @@ where
         let mut persistent_transmission_messages: PersistentTransmissionStream<
             _,
             _,
-            MockMixMessage,
+            SphinxMessage,
             _,
         > = UnboundedReceiverStream::new(persistent_receiver).persistent_transmission(
             mix_config.persistent_transmission,
@@ -137,7 +137,7 @@ where
         );
 
         // tier 3 cover traffic
-        let mut cover_traffic: CoverTraffic<_, _, MockMixMessage> = CoverTraffic::new(
+        let mut cover_traffic: CoverTraffic<_, _, SphinxMessage> = CoverTraffic::new(
             mix_config.cover_traffic.cover_traffic_settings(
                 &membership,
                 &mix_config.message_blend.cryptographic_processor,
@@ -224,7 +224,7 @@ where
 
     fn wrap_and_send_to_persistent_transmission(
         message: Vec<u8>,
-        cryptographic_processor: &mut CryptographicProcessor<ChaCha12Rng, MockMixMessage>,
+        cryptographic_processor: &mut CryptographicProcessor<ChaCha12Rng, SphinxMessage>,
         persistent_sender: &mpsc::UnboundedSender<Vec<u8>>,
     ) {
         match cryptographic_processor.wrap_message(&message) {
@@ -243,12 +243,10 @@ where
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct MixConfig<BackendSettings> {
     pub backend: BackendSettings,
-    pub message_blend: MessageBlendSettings<MockMixMessage>,
+    pub message_blend: MessageBlendSettings<SphinxMessage>,
     pub persistent_transmission: PersistentTransmissionSettings,
     pub cover_traffic: CoverTrafficExtSettings,
-    pub membership: Vec<
-        Node<<nomos_mix_message::mock::MockMixMessage as nomos_mix_message::MixMessage>::PublicKey>,
-    >,
+    pub membership: Vec<Node<<SphinxMessage as nomos_mix_message::MixMessage>::PublicKey>>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -260,9 +258,9 @@ pub struct CoverTrafficExtSettings {
 impl CoverTrafficExtSettings {
     fn cover_traffic_settings(
         &self,
-        membership: &Membership<MockMixMessage>,
+        membership: &Membership<SphinxMessage>,
         cryptographic_processor_settings: &CryptographicProcessorSettings<
-            <MockMixMessage as MixMessage>::PrivateKey,
+            <SphinxMessage as MixMessage>::PrivateKey,
         >,
     ) -> CoverTrafficSettings {
         CoverTrafficSettings {
@@ -304,10 +302,11 @@ impl CoverTrafficExtSettings {
 }
 
 impl<BackendSettings> MixConfig<BackendSettings> {
-    fn membership(&self) -> Membership<MockMixMessage> {
-        // We use private key as a public key because the `MockMixMessage` doesn't differentiate between them.
-        // TODO: Convert private key to public key properly once the real MixMessage is implemented.
-        let public_key = self.message_blend.cryptographic_processor.private_key;
+    fn membership(&self) -> Membership<SphinxMessage> {
+        let public_key = x25519_dalek::PublicKey::from(&x25519_dalek::StaticSecret::from(
+            self.message_blend.cryptographic_processor.private_key,
+        ))
+        .to_bytes();
         Membership::new(self.membership.clone(), public_key)
     }
 }
