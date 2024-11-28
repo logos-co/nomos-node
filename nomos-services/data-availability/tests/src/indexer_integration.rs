@@ -33,9 +33,7 @@ use tempfile::{NamedTempFile, TempDir};
 use time::OffsetDateTime;
 use tokio_stream::wrappers::BroadcastStream;
 use tokio_stream::StreamExt;
-use tracing::info;
-use tracing_subscriber::fmt::TestWriter;
-use tracing_subscriber::EnvFilter;
+
 // internal
 use crate::common::*;
 
@@ -46,12 +44,6 @@ const INDEXER_TEST_MAX_SECONDS: u64 = 60;
 
 #[test]
 fn test_indexer() {
-    let _ = tracing_subscriber::fmt()
-        .with_env_filter(EnvFilter::from_default_env())
-        .compact()
-        .with_writer(TestWriter::default())
-        .try_init();
-
     let performed_tx = Arc::new(AtomicBool::new(false));
     let performed_rx = performed_tx.clone();
     let is_success_tx = Arc::new(AtomicBool::new(false));
@@ -389,10 +381,12 @@ fn test_indexer() {
             })
             .await
             .unwrap();
-        let mut orphan_app_id_blobs = indexer2_rx.await.unwrap();
+        let orphan_app_id_blobs = indexer2_rx.await.unwrap();
 
-        // Indexer should not return any blobs for orphan app id
-        assert_eq!(orphan_app_id_blobs.len(), 0);
+        // Indexer should not return any blobs for orphan app_id
+        for v in orphan_app_id_blobs {
+            assert!(v.1.is_empty());
+        }
 
         // Mempool should still contain orphan_blob_info
         let (mempool3_tx, mempool3_rx) = tokio::sync::oneshot::channel();
