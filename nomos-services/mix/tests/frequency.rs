@@ -27,16 +27,29 @@ use overwatch_rs::{
     Services,
 };
 
+const NETWORK_SIZE: usize = 3;
+const PEERING_DEGREE: usize = 2;
+
 #[test]
 fn emission_frequency() {
-    let mix_configs = new_mix_configs(vec![
-        Multiaddr::from_str("/ip4/127.0.0.1/udp/9990/quic-v1").unwrap(),
-        Multiaddr::from_str("/ip4/127.0.0.1/udp/9991/quic-v1").unwrap(),
-    ]);
-    let network_backend_configs = new_network_backend_configs(&[9980, 9981]);
+    let mix_configs = new_mix_configs(
+        (0..NETWORK_SIZE)
+            .map(|i| {
+                Multiaddr::from_str(&format!("/ip4/127.0.0.1/udp/{}/quic-v1", 9990 + i)).unwrap()
+            })
+            .collect::<Vec<_>>(),
+    );
+    let network_backend_configs = new_network_backend_configs(
+        &(0..NETWORK_SIZE)
+            .map(|i| 9980 + i as u16)
+            .collect::<Vec<_>>(),
+    );
 
-    let _node1 = new_node(&mix_configs[0], &network_backend_configs[0]);
-    let _node2 = new_node(&mix_configs[1], &network_backend_configs[1]);
+    let _nodes = mix_configs
+        .iter()
+        .zip(&network_backend_configs)
+        .map(|(mix_config, network_backend_config)| new_node(mix_config, network_backend_config))
+        .collect::<Vec<_>>();
 
     thread::sleep(Duration::from_secs(12));
 }
@@ -95,7 +108,7 @@ fn new_mix_configs(listening_addresses: Vec<Multiaddr>) -> Vec<TestMixSettings> 
                 Libp2pMixBackendSettings {
                     listening_address: listening_address.clone(),
                     node_key: ed25519::SecretKey::generate(),
-                    peering_degree: 1,
+                    peering_degree: PEERING_DEGREE,
                     conn_maintenance: ConnectionMaintenanceSettings {
                         time_window: Duration::from_secs(10),
                         expected_effective_messages: 5.0,
