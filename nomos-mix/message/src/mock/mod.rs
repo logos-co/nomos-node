@@ -1,4 +1,8 @@
-use crate::{Error, MixMessage};
+pub mod error;
+
+use error::Error;
+
+use crate::MixMessage;
 // TODO: Remove all the mock below once the actual implementation is integrated to the system.
 //
 /// A mock implementation of the Sphinx encoding.
@@ -17,13 +21,17 @@ pub struct MockMixMessage;
 impl MixMessage for MockMixMessage {
     type PublicKey = [u8; NODE_ID_SIZE];
     type PrivateKey = [u8; NODE_ID_SIZE];
+    type Error = Error;
     const DROP_MESSAGE: &'static [u8] = &[0; MESSAGE_SIZE];
 
     /// The length of the encoded message is fixed to [`MESSAGE_SIZE`] bytes.
     /// The [`MAX_LAYERS`] number of [`NodeId`]s are concatenated in front of the payload.
     /// The payload is zero-padded to the end.
     ///
-    fn build_message(payload: &[u8], public_keys: &[Self::PublicKey]) -> Result<Vec<u8>, Error> {
+    fn build_message(
+        payload: &[u8],
+        public_keys: &[Self::PublicKey],
+    ) -> Result<Vec<u8>, Self::Error> {
         // In this mock, we don't encrypt anything. So, we use public key as just a node ID.
         let node_ids = public_keys;
         if node_ids.is_empty() || node_ids.len() > MAX_LAYERS {
@@ -54,7 +62,7 @@ impl MixMessage for MockMixMessage {
     fn unwrap_message(
         message: &[u8],
         private_key: &Self::PrivateKey,
-    ) -> Result<(Vec<u8>, bool), Error> {
+    ) -> Result<(Vec<u8>, bool), Self::Error> {
         if message.len() != MESSAGE_SIZE {
             return Err(Error::InvalidMixMessage);
         }

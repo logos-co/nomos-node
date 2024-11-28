@@ -38,7 +38,7 @@ where
         }
     }
 
-    pub fn wrap_message(&mut self, message: &[u8]) -> Result<Vec<u8>, nomos_mix_message::Error> {
+    pub fn wrap_message(&mut self, message: &[u8]) -> Result<Vec<u8>, M::Error> {
         // TODO: Use the actual Sphinx encoding instead of mock.
         let public_keys = self
             .membership
@@ -50,10 +50,7 @@ where
         M::build_message(message, &public_keys)
     }
 
-    pub fn unwrap_message(
-        &self,
-        message: &[u8],
-    ) -> Result<(Vec<u8>, bool), nomos_mix_message::Error> {
+    pub fn unwrap_message(&self, message: &[u8]) -> Result<(Vec<u8>, bool), M::Error> {
         M::unwrap_message(message, &self.settings.private_key)
     }
 }
