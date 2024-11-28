@@ -33,6 +33,9 @@ use tempfile::{NamedTempFile, TempDir};
 use time::OffsetDateTime;
 use tokio_stream::wrappers::BroadcastStream;
 use tokio_stream::StreamExt;
+use tracing::info;
+use tracing_subscriber::fmt::TestWriter;
+use tracing_subscriber::EnvFilter;
 // internal
 use crate::common::*;
 
@@ -43,6 +46,12 @@ const INDEXER_TEST_MAX_SECONDS: u64 = 60;
 
 #[test]
 fn test_indexer() {
+    let _ = tracing_subscriber::fmt()
+        .with_env_filter(EnvFilter::from_default_env())
+        .compact()
+        .with_writer(TestWriter::default())
+        .try_init();
+
     let performed_tx = Arc::new(AtomicBool::new(false));
     let performed_rx = performed_tx.clone();
     let is_success_tx = Arc::new(AtomicBool::new(false));
@@ -229,6 +238,18 @@ fn test_indexer() {
     let blob_hash = <DaBlob as Blob>::id(&blobs[0]);
     let blob_info = BlobInfo::new(blob_hash, meta);
 
+    // Create blob metadata without having actual blob stored
+    let orphan_app_id = [10u8; 32];
+    let index = 0.into();
+
+    let orphan_meta2 = Metadata::new(orphan_app_id, index);
+
+    let mut orphan_blob_hash = [0u8; 32];
+    thread_rng().fill(&mut orphan_blob_hash[..]);
+
+    let orphan_blob_info = BlobInfo::new(orphan_blob_hash, orphan_meta2);
+    //////
+
     let mut node_1_blob_0_idx = Vec::new();
     node_1_blob_0_idx.extend_from_slice(&blob_hash);
     node_1_blob_0_idx.extend_from_slice(&0u16.to_be_bytes());
@@ -315,6 +336,19 @@ fn test_indexer() {
             .unwrap();
         let _ = mempool_rx.await.unwrap();
 
+        // Put orphan_blob_info into the mempool .
+        let (mempool2_tx, mempool2_rx) = tokio::sync::oneshot::channel();
+        mempool_outbound
+            .send(nomos_mempool::MempoolMsg::Add {
+                payload: orphan_blob_info,
+                key: blob_hash,
+                reply_channel: mempool2_tx,
+            })
+            .await
+            .unwrap();
+        let orphan_to_mempool = mempool2_rx.await;
+        info!("HERE {:?}", orphan_to_mempool);
+
         // Wait for block in the network.
         let timeout = tokio::time::sleep(Duration::from_secs(INDEXER_TEST_MAX_SECONDS));
         tokio::pin!(timeout);
@@ -346,6 +380,34 @@ fn test_indexer() {
             .await
             .unwrap();
         let mut app_id_blobs = indexer_rx.await.unwrap();
+
+        // Request range of blob from indexer.
+        let (indexer2_tx, indexer2_rx) = tokio::sync::oneshot::channel();
+        indexer_outbound
+            .send(nomos_da_indexer::DaMsg::GetRange {
+                app_id: orphan_app_id,
+                range: 0.into()..2.into(),
+                reply_channel: indexer2_tx,
+            })
+            .await
+            .unwrap();
+        let mut orphan_app_id_blobs = indexer2_rx.await.unwrap();
+
+        // Indexer should not return any blobs for orphan app id
+        //assert!(orphan_app_id_blobs.is_empty());
+
+        // Mempool should still contain orphan_blob_info
+        let (mempool3_tx, mempool3_rx) = tokio::sync::oneshot::channel();
+        mempool_outbound
+            .send(nomos_mempool::MempoolMsg::Status {
+                items: vec![orphan_blob_hash],
+                reply_channel: mempool3_tx,
+            })
+            .await
+            .unwrap();
+        let blocks_with_orphan_blob_hash = mempool3_rx.await.unwrap();
+
+        assert_eq!(blocks_with_orphan_blob_hash.len(), 1);
 
         // Since we've only attested to blob_info at idx 0, the first
         // item should have "some" data, other indexes should be None.
