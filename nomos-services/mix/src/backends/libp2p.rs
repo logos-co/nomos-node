@@ -100,7 +100,7 @@ where
     swarm: Swarm<nomos_mix_network::Behaviour<SphinxMessage, IntervalStream>>,
     swarm_messages_receiver: mpsc::Receiver<MixSwarmMessage>,
     incoming_message_sender: broadcast::Sender<Vec<u8>>,
-    membership: Membership<MockMixMessage>,
+    membership: Membership<SphinxMessage>,
     rng: R,
 }
 
@@ -117,7 +117,7 @@ where
         config: Libp2pMixBackendSettings,
         swarm_messages_receiver: mpsc::Receiver<MixSwarmMessage>,
         incoming_message_sender: broadcast::Sender<Vec<u8>>,
-        membership: Membership<MockMixMessage>,
+        membership: Membership<SphinxMessage>,
         rng: R,
     ) -> Self {
         let keypair = Keypair::from(ed25519::Keypair::from(config.node_key.clone()));
