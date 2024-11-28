@@ -238,18 +238,17 @@ fn test_indexer() {
     let blob_hash = <DaBlob as Blob>::id(&blobs[0]);
     let blob_info = BlobInfo::new(blob_hash, meta);
 
-    // Create blob metadata without having actual blob stored
+    // Create orphan blob metadata - without having actual blob stored
     let orphan_app_id = [10u8; 32];
-    let index = 0.into();
+    let orphan_index = 2.into();
 
-    let orphan_meta2 = Metadata::new(orphan_app_id, index);
-
+    let orphan_meta = Metadata::new(orphan_app_id, orphan_index);
     let mut orphan_blob_hash = [0u8; 32];
     thread_rng().fill(&mut orphan_blob_hash[..]);
 
-    let orphan_blob_info = BlobInfo::new(orphan_blob_hash, orphan_meta2);
-    //////
+    let orphan_blob_info = BlobInfo::new(orphan_blob_hash, orphan_meta);
 
+    // Prepare indexes for blobs
     let mut node_1_blob_0_idx = Vec::new();
     node_1_blob_0_idx.extend_from_slice(&blob_hash);
     node_1_blob_0_idx.extend_from_slice(&0u16.to_be_bytes());
@@ -336,18 +335,17 @@ fn test_indexer() {
             .unwrap();
         let _ = mempool_rx.await.unwrap();
 
-        // Put orphan_blob_info into the mempool .
+        // Put orphan_blob_info into the mempool.
         let (mempool2_tx, mempool2_rx) = tokio::sync::oneshot::channel();
         mempool_outbound
             .send(nomos_mempool::MempoolMsg::Add {
                 payload: orphan_blob_info,
-                key: blob_hash,
+                key: orphan_blob_hash,
                 reply_channel: mempool2_tx,
             })
             .await
             .unwrap();
-        let orphan_to_mempool = mempool2_rx.await;
-        info!("HERE {:?}", orphan_to_mempool);
+        let _ = mempool2_rx.await.unwrap();
 
         // Wait for block in the network.
         let timeout = tokio::time::sleep(Duration::from_secs(INDEXER_TEST_MAX_SECONDS));
@@ -381,7 +379,7 @@ fn test_indexer() {
             .unwrap();
         let mut app_id_blobs = indexer_rx.await.unwrap();
 
-        // Request range of blob from indexer.
+        // Request range of orphan blob from indexer - nothing is expected in return
         let (indexer2_tx, indexer2_rx) = tokio::sync::oneshot::channel();
         indexer_outbound
             .send(nomos_da_indexer::DaMsg::GetRange {
@@ -394,7 +392,7 @@ fn test_indexer() {
         let mut orphan_app_id_blobs = indexer2_rx.await.unwrap();
 
         // Indexer should not return any blobs for orphan app id
-        //assert!(orphan_app_id_blobs.is_empty());
+        assert_eq!(orphan_app_id_blobs.len(), 0);
 
         // Mempool should still contain orphan_blob_info
         let (mempool3_tx, mempool3_rx) = tokio::sync::oneshot::channel();
