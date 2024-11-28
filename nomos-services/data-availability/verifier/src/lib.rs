@@ -18,7 +18,7 @@ use overwatch_rs::DynError;
 use serde::{Deserialize, Serialize};
 use tokio::sync::oneshot::Sender;
 use tokio_stream::StreamExt;
-use tracing::{error, info, span, Instrument, Level};
+use tracing::{error, span, Instrument, Level};
 // internal
 use backend::VerifierBackend;
 use network::NetworkAdapter;
@@ -139,7 +139,6 @@ where
         } = service_state.settings_reader.get_updated_settings();
         let network_relay = service_state.overwatch_handle.relay();
         let storage_relay = service_state.overwatch_handle.relay();
-        info!("HERE VerifierService initialized");
         Ok(Self {
             network_relay,
             storage_relay,
@@ -153,7 +152,6 @@ where
         // Most probably the verifier itself need to be constructed/update for every message with
         // an updated list of the available nodes list, as it needs his own index coming from the
         // position of his bls public key landing in the above-mentioned list.
-        info!("HERE VerifierService running");
         let Self {
             network_relay,
             storage_relay,
@@ -183,17 +181,13 @@ where
                         if let Err(err) =  Self::handle_new_blob(&verifier,&storage_adapter, &blob).await {
                             error!("Error handling blob {blob:?} due to {err:?}");
 
-                        } else {
-                             info!("HERE Handling blob {blob:?}");
                         }
                     }
                     Some(msg) = service_state.inbound_relay.recv() => {
                         let DaVerifierMsg::AddBlob { blob, reply_channel } = msg;
-                        info!("HERE Responding to DaVerifierMsg::AddBlob");
                         match Self::handle_new_blob(&verifier, &storage_adapter, &blob).await {
                             Ok(attestation) => if let Err(err) = reply_channel.send(Some(attestation)) {
                                 error!("Error replying attestation {err:?}");
-                                info!("HERE Err to reply with attestation");
                             },
                             Err(err) => {
                                 error!("Error handling blob {blob:?} due to {err:?}");
@@ -204,7 +198,6 @@ where
                         };
                     }
                     Some(msg) = lifecycle_stream.next() => {
-                        info!("HERE Responding to lifecycle event");
                         if Self::should_stop_service(msg).await {
                             break;
                         }
