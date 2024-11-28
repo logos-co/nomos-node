@@ -8,6 +8,7 @@ mod layered_cipher;
 pub mod packet;
 mod routing;
 
+#[derive(Clone, Debug)]
 pub struct SphinxMessage;
 
 const ASYM_KEY_SIZE: usize = 32;

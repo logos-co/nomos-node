@@ -2,7 +2,7 @@ use std::str::FromStr;
 
 use nomos_libp2p::{ed25519, Multiaddr};
 use nomos_mix::membership::Node;
-use nomos_mix_message::{mock::MockMixMessage, MixMessage};
+use nomos_mix_message::{sphinx::SphinxMessage, MixMessage};
 use nomos_mix_service::backends::libp2p::Libp2pMixBackendSettings;
 
 use crate::get_available_port;
@@ -11,7 +11,7 @@ use crate::get_available_port;
 pub struct GeneralMixConfig {
     pub backend: Libp2pMixBackendSettings,
     pub private_key: x25519_dalek::StaticSecret,
-    pub membership: Vec<Node<<MockMixMessage as MixMessage>::PublicKey>>,
+    pub membership: Vec<Node<<SphinxMessage as MixMessage>::PublicKey>>,
 }
 
 pub fn create_mix_configs(ids: &[[u8; 32]]) -> Vec<GeneralMixConfig> {
@@ -46,14 +46,15 @@ pub fn create_mix_configs(ids: &[[u8; 32]]) -> Vec<GeneralMixConfig> {
     configs
 }
 
-fn mix_nodes(configs: &[GeneralMixConfig]) -> Vec<Node<<MockMixMessage as MixMessage>::PublicKey>> {
+fn mix_nodes(configs: &[GeneralMixConfig]) -> Vec<Node<<SphinxMessage as MixMessage>::PublicKey>> {
     configs
         .iter()
         .map(|config| Node {
             address: config.backend.listening_address.clone(),
-            // We use private key as a public key because the `MockMixMessage` doesn't differentiate between them.
-            // TODO: Convert private key to public key properly once the real MixMessage is implemented.
-            public_key: config.private_key.to_bytes(),
+            public_key: x25519_dalek::PublicKey::from(&x25519_dalek::StaticSecret::from(
+                config.private_key.to_bytes(),
+            ))
+            .to_bytes(),
         })
         .collect()
 }
