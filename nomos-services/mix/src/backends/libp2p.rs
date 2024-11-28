@@ -178,7 +178,9 @@ impl MixSwarm {
         match event {
             SwarmEvent::Behaviour(nomos_mix_network::Event::Message(msg)) => {
                 tracing::debug!("Received message from a peer: {msg:?}");
-                self.incoming_message_sender.send(msg).unwrap();
+                if let Err(e) = self.incoming_message_sender.send(msg) {
+                    tracing::error!("Failed to send incoming message to channel: {e}");
+                }
             }
             SwarmEvent::Behaviour(nomos_mix_network::Event::Error(e)) => {
                 tracing::error!("Received error from mix network: {e:?}");

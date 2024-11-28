@@ -122,7 +122,7 @@ mod tests {
     #[test]
     fn test_ticket() {
         generate_ticket(10u32.to_be_bytes(), 1123, 0);
-        for i in (0..1u32) {
+        for i in 0..1u32 {
             let slots = select_slot(i.to_be_bytes(), 1234, 100, 21600, winning_probability(1));
             println!("slots = {slots:?}");
         }
