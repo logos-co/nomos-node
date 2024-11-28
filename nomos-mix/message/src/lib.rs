@@ -1,15 +1,16 @@
-mod error;
 pub mod mock;
-pub mod packet;
-
-pub use error::Error;
+pub mod sphinx;
 
 pub trait MixMessage {
     type PublicKey;
     type PrivateKey;
+    type Error;
     const DROP_MESSAGE: &'static [u8];
 
-    fn build_message(payload: &[u8], public_keys: &[Self::PublicKey]) -> Result<Vec<u8>, Error>;
+    fn build_message(
+        payload: &[u8],
+        public_keys: &[Self::PublicKey],
+    ) -> Result<Vec<u8>, Self::Error>;
     /// Unwrap the message one layer.
     ///
     /// This function returns the unwrapped message and a boolean indicating whether the message was fully unwrapped.
@@ -20,7 +21,7 @@ pub trait MixMessage {
     fn unwrap_message(
         message: &[u8],
         private_key: &Self::PrivateKey,
-    ) -> Result<(Vec<u8>, bool), Error>;
+    ) -> Result<(Vec<u8>, bool), Self::Error>;
     fn is_drop_message(message: &[u8]) -> bool {
         message == Self::DROP_MESSAGE
     }

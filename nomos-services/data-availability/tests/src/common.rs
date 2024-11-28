@@ -229,6 +229,10 @@ pub fn new_node(
                         max_delay_seconds: 2,
                     },
                 },
+                cover_traffic: nomos_mix_service::CoverTrafficExtSettings {
+                    epoch_duration: Duration::from_secs(432000),
+                    slot_duration: Duration::from_secs(20),
+                },
                 membership: mix_config.membership.clone(),
             },
             da_network: DaNetworkConfig {

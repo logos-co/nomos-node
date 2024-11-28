@@ -6,15 +6,18 @@ use backends::MixBackend;
 use futures::StreamExt;
 use network::NetworkAdapter;
 use nomos_core::wire;
-use nomos_mix::membership::{Membership, Node};
-use nomos_mix::message_blend::crypto::CryptographicProcessor;
 use nomos_mix::message_blend::temporal::TemporalScheduler;
+use nomos_mix::message_blend::{crypto::CryptographicProcessor, CryptographicProcessorSettings};
 use nomos_mix::message_blend::{MessageBlendExt, MessageBlendSettings};
 use nomos_mix::persistent_transmission::{
     PersistentTransmissionExt, PersistentTransmissionSettings, PersistentTransmissionStream,
 };
 use nomos_mix::MixOutgoingMessage;
-use nomos_mix_message::mock::MockMixMessage;
+use nomos_mix::{
+    cover_traffic::{CoverTraffic, CoverTrafficSettings},
+    membership::{Membership, Node},
+};
+use nomos_mix_message::{mock::MockMixMessage, MixMessage};
 use nomos_network::NetworkService;
 use overwatch_rs::services::{
     handle::ServiceStateHandle,
@@ -127,10 +130,20 @@ where
             ChaCha12Rng::from_entropy(),
         );
         let mut blend_messages = backend.listen_to_incoming_messages().blend(
-            mix_config.message_blend,
+            mix_config.message_blend.clone(),
             membership.clone(),
             temporal_scheduler,
             ChaCha12Rng::from_entropy(),
+        );
+
+        // tier 3 cover traffic
+        let mut cover_traffic: CoverTraffic<_, _, MockMixMessage> = CoverTraffic::new(
+            mix_config.cover_traffic.cover_traffic_settings(
+                &membership,
+                &mix_config.message_blend.cryptographic_processor,
+            ),
+            mix_config.cover_traffic.epoch_stream(),
+            mix_config.cover_traffic.slot_stream(),
         );
 
         // local messages, are bypassed and send immediately
@@ -162,23 +175,17 @@ where
                                     network_adapter.broadcast(msg.message, msg.broadcast_settings).await;
                                 },
                                 _ => {
-                                    tracing::error!("unrecognized message from mix backend");
+                                    tracing::debug!("unrecognized message from mix backend");
                                 }
                             }
                         }
                     }
                 }
+                Some(msg) = cover_traffic.next() => {
+                    Self::wrap_and_send_to_persistent_transmission(msg, &mut cryptographic_processor, &persistent_sender);
+                }
                 Some(msg) = local_messages.next() => {
-                    match cryptographic_processor.wrap_message(&msg) {
-                        Ok(wrapped_message) => {
-                            if let Err(e) = persistent_sender.send(wrapped_message) {
-                                tracing::error!("Error sending message to persistent stream: {e}");
-                            }
-                        }
-                        Err(e) => {
-                            tracing::error!("Failed to wrap message: {:?}", e);
-                        }
-                    }
+                    Self::wrap_and_send_to_persistent_transmission(msg, &mut cryptographic_processor, &persistent_sender);
                 }
                 Some(msg) = lifecycle_stream.next() => {
                     if Self::should_stop_service(msg).await {
@@ -214,6 +221,23 @@ where
             }
         }
     }
+
+    fn wrap_and_send_to_persistent_transmission(
+        message: Vec<u8>,
+        cryptographic_processor: &mut CryptographicProcessor<ChaCha12Rng, MockMixMessage>,
+        persistent_sender: &mpsc::UnboundedSender<Vec<u8>>,
+    ) {
+        match cryptographic_processor.wrap_message(&message) {
+            Ok(wrapped_message) => {
+                if let Err(e) = persistent_sender.send(wrapped_message) {
+                    tracing::error!("Error sending message to persistent stream: {e}");
+                }
+            }
+            Err(e) => {
+                tracing::error!("Failed to wrap message: {:?}", e);
+            }
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -221,9 +245,62 @@ pub struct MixConfig<BackendSettings> {
     pub backend: BackendSettings,
     pub message_blend: MessageBlendSettings<MockMixMessage>,
     pub persistent_transmission: PersistentTransmissionSettings,
+    pub cover_traffic: CoverTrafficExtSettings,
     pub membership: Vec<
         Node<<nomos_mix_message::mock::MockMixMessage as nomos_mix_message::MixMessage>::PublicKey>,
     >,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct CoverTrafficExtSettings {
+    pub epoch_duration: Duration,
+    pub slot_duration: Duration,
+}
+
+impl CoverTrafficExtSettings {
+    fn cover_traffic_settings(
+        &self,
+        membership: &Membership<MockMixMessage>,
+        cryptographic_processor_settings: &CryptographicProcessorSettings<
+            <MockMixMessage as MixMessage>::PrivateKey,
+        >,
+    ) -> CoverTrafficSettings {
+        CoverTrafficSettings {
+            node_id: membership.local_node().public_key,
+            number_of_hops: cryptographic_processor_settings.num_mix_layers,
+            slots_per_epoch: self.slots_per_epoch(),
+            network_size: membership.size(),
+        }
+    }
+
+    fn slots_per_epoch(&self) -> usize {
+        (self.epoch_duration.as_secs() as usize)
+            .checked_div(self.slot_duration.as_secs() as usize)
+            .expect("Invalid epoch & slot duration")
+    }
+
+    fn epoch_stream(
+        &self,
+    ) -> futures::stream::Map<
+        futures::stream::Enumerate<IntervalStream>,
+        impl FnMut((usize, time::Instant)) -> usize,
+    > {
+        IntervalStream::new(time::interval(self.epoch_duration))
+            .enumerate()
+            .map(|(i, _)| i)
+    }
+
+    fn slot_stream(
+        &self,
+    ) -> futures::stream::Map<
+        futures::stream::Enumerate<IntervalStream>,
+        impl FnMut((usize, time::Instant)) -> usize,
+    > {
+        let slots_per_epoch = self.slots_per_epoch();
+        IntervalStream::new(time::interval(self.slot_duration))
+            .enumerate()
+            .map(move |(i, _)| i % slots_per_epoch)
+    }
 }
 
 impl<BackendSettings> MixConfig<BackendSettings> {
