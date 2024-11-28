@@ -182,8 +182,9 @@ where
                 connection: libp2p::swarm::CloseConnection::All,
             });
             self.remove_negotiated_peer(&peer_id, None);
-            self.malicious_peers.insert(peer_id);
-            self.schedule_dial();
+            if self.malicious_peers.insert(peer_id) {
+                self.schedule_dial();
+            }
         });
     }
 
