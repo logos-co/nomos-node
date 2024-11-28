@@ -9,11 +9,13 @@ use crate::MixMessage;
 
 const NODE_ID_SIZE: usize = 32;
 
-const PADDED_PAYLOAD_SIZE: usize = 2048;
+// TODO: Move MAX_PAYLOAD_SIZE and MAX_LAYERS to the upper layer (service layer).
+const MAX_PAYLOAD_SIZE: usize = 2048;
 const PAYLOAD_PADDING_SEPARATOR: u8 = 0x01;
 const PAYLOAD_PADDING_SEPARATOR_SIZE: usize = 1;
 const MAX_LAYERS: usize = 5;
-pub const MESSAGE_SIZE: usize = NODE_ID_SIZE * MAX_LAYERS + PADDED_PAYLOAD_SIZE;
+pub const MESSAGE_SIZE: usize =
+    NODE_ID_SIZE * MAX_LAYERS + MAX_PAYLOAD_SIZE + PAYLOAD_PADDING_SEPARATOR_SIZE;
 
 #[derive(Clone, Debug)]
 pub struct MockMixMessage;
@@ -37,7 +39,7 @@ impl MixMessage for MockMixMessage {
         if node_ids.is_empty() || node_ids.len() > MAX_LAYERS {
             return Err(Error::InvalidNumberOfLayers);
         }
-        if payload.len() > PADDED_PAYLOAD_SIZE - PAYLOAD_PADDING_SEPARATOR_SIZE {
+        if payload.len() > MAX_PAYLOAD_SIZE {
             return Err(Error::PayloadTooLarge);
         }
 
@@ -52,10 +54,7 @@ impl MixMessage for MockMixMessage {
         // Append payload with padding
         message.extend(payload);
         message.push(PAYLOAD_PADDING_SEPARATOR);
-        message.extend(
-            std::iter::repeat(0)
-                .take(PADDED_PAYLOAD_SIZE - payload.len() - PAYLOAD_PADDING_SEPARATOR_SIZE),
-        );
+        message.extend(std::iter::repeat(0).take(MAX_PAYLOAD_SIZE - payload.len()));
         Ok(message)
     }
 

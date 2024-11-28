@@ -4,7 +4,7 @@ use sphinx_packet::{
         keys::RoutingKeys,
         routing::{FINAL_HOP, FORWARD_HOP},
     },
-    payload::Payload,
+    payload::{Payload, PAYLOAD_OVERHEAD_SIZE},
 };
 
 use crate::sphinx::ASYM_KEY_SIZE;
@@ -55,7 +55,8 @@ impl Packet {
         let payload = sphinx_packet::payload::Payload::encapsulate_message(
             payload,
             &payload_keys,
-            max_payload_size,
+            // sphinx_packet::payload requires this parameter to include the overhead size.
+            max_payload_size + PAYLOAD_OVERHEAD_SIZE,
         )?;
 
         Ok(Packet {
@@ -191,7 +192,10 @@ impl Packet {
     }
 
     pub const fn size(max_layers: usize, max_payload_size: usize) -> usize {
-        ASYM_KEY_SIZE + EncryptedRoutingInformation::size(max_layers) + max_payload_size
+        ASYM_KEY_SIZE
+            + EncryptedRoutingInformation::size(max_layers)
+            + max_payload_size
+            + PAYLOAD_OVERHEAD_SIZE
     }
 }
 
