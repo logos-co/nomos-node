@@ -1,10 +1,10 @@
 use cryptarchia_consensus::LeaderConfig;
 // std
 use nomos_da_network_service::backends::libp2p::common::DaNetworkBackendSettings;
-use nomos_mix::membership::Node;
 use nomos_mix::message_blend::{
     CryptographicProcessorSettings, MessageBlendSettings, TemporalSchedulerSettings,
 };
+use nomos_mix::{conn_maintenance::ConnectionMaintenanceSettings, membership::Node};
 use nomos_mix_message::{sphinx::SphinxMessage, MixMessage};
 use std::path::PathBuf;
 use std::time::Duration;
@@ -330,6 +330,14 @@ pub fn new_mix_configs(listening_addresses: Vec<Multiaddr>) -> Vec<TestMixSettin
                     listening_address: listening_address.clone(),
                     node_key: ed25519::SecretKey::generate(),
                     peering_degree: 1,
+                    max_peering_degree: 1,
+                    conn_maintenance: Some(ConnectionMaintenanceSettings {
+                        time_window: Duration::from_secs(600),
+                        expected_effective_messages: 600.0,
+                        effective_message_tolerance: 0.1,
+                        expected_drop_messages: 0.0,
+                        drop_message_tolerance: 0.0,
+                    }),
                 },
                 x25519_dalek::StaticSecret::random(),
             )

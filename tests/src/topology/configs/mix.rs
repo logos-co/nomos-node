@@ -31,6 +31,8 @@ pub fn create_mix_configs(ids: &[[u8; 32]]) -> Vec<GeneralMixConfig> {
                     .unwrap(),
                     node_key,
                     peering_degree: 1,
+                    max_peering_degree: 3,
+                    conn_maintenance: None,
                 },
                 private_key: x25519_dalek::StaticSecret::random(),
                 membership: Vec::new(),

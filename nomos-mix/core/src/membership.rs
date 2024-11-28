@@ -1,6 +1,11 @@
+use std::collections::HashSet;
+
 use multiaddr::Multiaddr;
 use nomos_mix_message::MixMessage;
-use rand::{seq::SliceRandom, Rng};
+use rand::{
+    seq::{IteratorRandom, SliceRandom},
+    Rng,
+};
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug)]
@@ -46,6 +51,18 @@ where
         amount: usize,
     ) -> Vec<&Node<M::PublicKey>> {
         self.remote_nodes.choose_multiple(rng, amount).collect()
+    }
+
+    pub fn filter_and_choose_remote_nodes<R: Rng>(
+        &self,
+        rng: &mut R,
+        amount: usize,
+        exclude_addrs: &HashSet<Multiaddr>,
+    ) -> Vec<&Node<M::PublicKey>> {
+        self.remote_nodes
+            .iter()
+            .filter(|node| !exclude_addrs.contains(&node.address))
+            .choose_multiple(rng, amount)
     }
 
     pub fn local_node(&self) -> &Node<M::PublicKey> {

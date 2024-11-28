@@ -21,7 +21,7 @@ pub trait MixBackend {
         rng: R,
     ) -> Self
     where
-        R: Rng;
+        R: Rng + Send + 'static;
     /// Publish a message to the mix network.
     async fn publish(&self, msg: Vec<u8>);
     /// Listen to messages received from the mix network.

@@ -15,5 +15,6 @@ sha2 = "0.10"
 
 [dev-dependencies]
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "time"] }
+tokio-stream = "0.1"
 libp2p = { version = "0.53", features = ["ed25519", "tokio", "quic"] }
 tracing-subscriber = "0.3.18"
