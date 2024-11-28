@@ -173,14 +173,12 @@ where
         let storage_adapter = S::new(storage_adapter_settings, storage_relay).await;
 
         let mut lifecycle_stream = service_state.lifecycle_handle.message_stream();
-
         async {
             loop {
                 tokio::select! {
                     Some(blob) = blob_stream.next() => {
                         if let Err(err) =  Self::handle_new_blob(&verifier,&storage_adapter, &blob).await {
                             error!("Error handling blob {blob:?} due to {err:?}");
-
                         }
                     }
                     Some(msg) = service_state.inbound_relay.recv() => {
