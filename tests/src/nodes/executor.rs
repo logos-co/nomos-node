@@ -166,6 +166,10 @@ pub fn create_executor_config(config: GeneralConfig) -> Config {
                     max_delay_seconds: 2,
                 },
             },
+            cover_traffic: nomos_mix_service::CoverTrafficExtSettings {
+                epoch_duration: Duration::from_secs(432000),
+                slot_duration: Duration::from_secs(20),
+            },
             membership: config.mix_config.membership,
         },
         cryptarchia: CryptarchiaSettings {
