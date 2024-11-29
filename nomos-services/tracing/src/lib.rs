@@ -1,7 +1,10 @@
 // std
-use std::fmt::{Debug, Formatter};
 use std::io::Write;
 use std::sync::{Arc, Mutex};
+use std::{
+    fmt::{Debug, Formatter},
+    sync::Once,
+};
 // crates
 use futures::StreamExt;
 use nomos_tracing::filter::envfilter::{create_envfilter_layer, EnvFilterConfig};
@@ -152,9 +155,6 @@ impl ServiceData for Tracing {
 #[async_trait::async_trait]
 impl ServiceCore for Tracing {
     fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, overwatch_rs::DynError> {
-        #[cfg(test)]
-        use std::sync::Once;
-        #[cfg(test)]
         static ONCE_INIT: Once = Once::new();
 
         let config = service_state.settings_reader.get_updated_settings();
@@ -218,18 +218,12 @@ impl ServiceCore for Tracing {
             });
         }
 
-        #[cfg(test)]
         ONCE_INIT.call_once(move || {
             tracing_subscriber::registry()
                 .with(LevelFilter::from(config.level))
                 .with(layers)
                 .init();
         });
-        #[cfg(not(test))]
-        tracing_subscriber::registry()
-            .with(LevelFilter::from(config.level))
-            .with(layers)
-            .init();
 
         Ok(Self {
             service_state,
