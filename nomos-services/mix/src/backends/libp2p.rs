@@ -35,6 +35,7 @@ pub struct Libp2pMixBackendSettings {
     #[serde(with = "secret_key_serde", default = "ed25519::SecretKey::generate")]
     pub node_key: ed25519::SecretKey,
     pub peering_degree: usize,
+    pub max_peering_degree: usize,
     pub conn_maintenance: ConnectionMaintenanceSettings,
 }
 
@@ -129,6 +130,7 @@ where
                     IntervalStream::new(tokio::time::interval(config.conn_maintenance.time_window));
                 nomos_mix_network::Behaviour::new(
                     nomos_mix_network::Config {
+                        max_peering_degree: config.max_peering_degree,
                         duplicate_cache_lifespan: 60,
                         conn_maintenance_settings: config.conn_maintenance,
                     },
@@ -199,12 +201,20 @@ where
                     tracing::error!("Failed to send incoming message to channel: {e}");
                 }
             }
-            SwarmEvent::Behaviour(nomos_mix_network::Event::EstabalishNewConnection {
+            SwarmEvent::Behaviour(nomos_mix_network::Event::EstabalishNewConnections {
+                amount,
                 excludes,
             }) => {
-                tracing::debug!("Establishing new connection excluding peers: {excludes:?}");
-                if self.dial_to_peers(1, Some(&excludes)) < 1 {
-                    tracing::warn!("Failed to dial to a new peer");
+                tracing::debug!(
+                    "Establishing {amount} new connections excluding peers: {excludes:?}"
+                );
+                let successful_dials = self.dial_to_peers(amount, Some(&excludes));
+                if successful_dials < amount {
+                    tracing::warn!(
+                        "Tried to establish {} new connections, but only {} succeeded",
+                        amount,
+                        successful_dials
+                    );
                 }
             }
             SwarmEvent::Behaviour(nomos_mix_network::Event::Error(e)) => {

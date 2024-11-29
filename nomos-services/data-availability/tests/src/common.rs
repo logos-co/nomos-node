@@ -330,6 +330,7 @@ pub fn new_mix_configs(listening_addresses: Vec<Multiaddr>) -> Vec<TestMixSettin
                     listening_address: listening_address.clone(),
                     node_key: ed25519::SecretKey::generate(),
                     peering_degree: 1,
+                    max_peering_degree: 1,
                     conn_maintenance: ConnectionMaintenanceSettings {
                         time_window: Duration::from_secs(600),
                         expected_effective_messages: 600.0,

@@ -132,6 +132,7 @@ mod test {
             key,
             Behaviour::new(
                 Config {
+                    max_peering_degree: 10,
                     duplicate_cache_lifespan: 60,
                     conn_maintenance_settings,
                 },

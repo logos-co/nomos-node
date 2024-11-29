@@ -29,17 +29,14 @@ pub struct Behaviour<M, Interval> {
     config: Config,
     /// Peers that support the mix protocol, and their connection IDs
     negotiated_peers: HashMap<PeerId, HashSet<ConnectionId>>,
+    /// Connection maintenance
     conn_maintenance: ConnectionMaintenance<PeerId>,
     conn_maintenance_interval: Interval,
-    reconnection_count: usize,
-    max_reconnection_count: usize,
+    /// Peers that should be excluded from connection establishments
+    blacklist_peers: HashSet<PeerId>,
+    /// To maintain address of peers because libp2p API uses only [`PeerId`] when handling
+    /// connection events. But, we need to know [`Multiaddr`] of peers to dial to them.
     peer_addresses: HashMap<PeerId, Multiaddr>,
-    /// Peers that are considered malicious by connection monitoring
-    /// because they sent more messages than the expected rate
-    malicious_peers: HashSet<PeerId>,
-    /// Peers that are considered unhealthy by connection monitoring
-    /// because they sent less messages than the expected rate
-    unhealthy_peers: HashSet<PeerId>,
     /// Queue of events to yield to the swarm.
     events: VecDeque<ToSwarm<Event, FromBehaviour>>,
     /// Waker that handles polling
@@ -52,6 +49,7 @@ pub struct Behaviour<M, Interval> {
 
 #[derive(Debug)]
 pub struct Config {
+    pub max_peering_degree: usize,
     pub duplicate_cache_lifespan: u64,
     pub conn_maintenance_settings: ConnectionMaintenanceSettings,
 }
@@ -60,7 +58,8 @@ pub struct Config {
 pub enum Event {
     /// A message received from one of the peers.
     Message(Vec<u8>),
-    EstabalishNewConnection {
+    EstabalishNewConnections {
+        amount: usize,
         excludes: HashSet<Multiaddr>,
     },
     Error(Error),
@@ -79,11 +78,8 @@ where
             negotiated_peers: HashMap::new(),
             conn_maintenance,
             conn_maintenance_interval,
-            reconnection_count: 0,
-            max_reconnection_count: 5,
             peer_addresses: HashMap::new(),
-            malicious_peers: HashSet::new(),
-            unhealthy_peers: HashSet::new(),
+            blacklist_peers: HashSet::new(),
             events: VecDeque::new(),
             waker: None,
             duplicate_cache,
@@ -154,66 +150,103 @@ where
             .insert(connection_id)
     }
 
-    fn remove_negotiated_peer(&mut self, peer_id: &PeerId, connection_id: Option<&ConnectionId>) {
+    fn remove_negotiated_peer(
+        &mut self,
+        peer_id: &PeerId,
+        connection_id: Option<&ConnectionId>,
+    ) -> bool {
         match connection_id {
-            Some(connection_id) => {
-                if let Some(connections) = self.negotiated_peers.get_mut(peer_id) {
+            Some(connection_id) => match self.negotiated_peers.get_mut(peer_id) {
+                Some(connections) => {
                     tracing::debug!(
                         "Removing from connected_peers: peer:{:?}, connection_id:{:?}",
                         peer_id,
                         connection_id
                     );
-                    connections.remove(connection_id);
+                    let removed = connections.remove(connection_id);
                     if connections.is_empty() {
                         self.negotiated_peers.remove(peer_id);
                     }
+                    removed
                 }
-            }
-            None => {
-                self.negotiated_peers.remove(peer_id);
-            }
+                None => false,
+            },
+            None => self.negotiated_peers.remove(peer_id).is_some(),
         }
     }
 
-    fn add_malicious_peers(&mut self, peers: HashSet<PeerId>) {
-        peers.into_iter().for_each(|peer_id| {
-            self.events.push_back(ToSwarm::CloseConnection {
-                peer_id,
-                connection: libp2p::swarm::CloseConnection::All,
-            });
-            self.remove_negotiated_peer(&peer_id, None);
-            if self.malicious_peers.insert(peer_id) {
-                self.schedule_dial();
-            }
-        });
+    fn is_negotiated_peer(&self, peer_id: &PeerId) -> bool {
+        self.negotiated_peers.contains_key(peer_id)
     }
 
-    fn add_unhealthy_peers(&mut self, peers: HashSet<PeerId>) {
-        peers.into_iter().for_each(|peer_id| {
-            if self.unhealthy_peers.insert(peer_id)
-                && self.reconnection_count < self.max_reconnection_count
-            {
-                self.schedule_dial();
-                self.reconnection_count += 1;
-            }
-        });
+    fn run_conn_maintenance(&mut self) {
+        let (malicious_peers, unhealthy_peers) = self.conn_maintenance.reset();
+        let num_closed_malicious = self.handle_malicious_peers(malicious_peers);
+        let num_connected_unhealthy = self.handle_unhealthy_peers(unhealthy_peers);
+        let mut num_to_dial = num_closed_malicious + num_connected_unhealthy;
+        if num_to_dial + self.negotiated_peers.len() > self.config.max_peering_degree {
+            tracing::warn!(
+                    "Cannot establish {} new connections due to max_peering_degree:{}. connected_peers:{}",
+                    num_to_dial,
+                    self.config.max_peering_degree,
+                    self.negotiated_peers.len(),
+                );
+            num_to_dial = self.config.max_peering_degree - self.negotiated_peers.len();
+        }
+        self.schedule_dials(num_to_dial);
     }
 
-    fn schedule_dial(&mut self) {
-        let mut excludes = HashSet::new();
-        self.malicious_peers.iter().for_each(|peer_id| {
-            if let Some(addr) = self.peer_addresses.get(peer_id) {
-                excludes.insert(addr.clone());
-            }
-        });
-        self.unhealthy_peers.iter().for_each(|peer_id| {
-            if let Some(addr) = self.peer_addresses.get(peer_id) {
-                excludes.insert(addr.clone());
-            }
-        });
+    fn handle_malicious_peers(&mut self, peers: HashSet<PeerId>) -> usize {
+        peers
+            .into_iter()
+            .map(|peer_id| {
+                self.blacklist_peers.insert(peer_id);
+                // Close the connection only if the peer was already connected.
+                if self.remove_negotiated_peer(&peer_id, None) {
+                    self.events.push_back(ToSwarm::CloseConnection {
+                        peer_id,
+                        connection: libp2p::swarm::CloseConnection::All,
+                    });
+                    1
+                } else {
+                    0
+                }
+            })
+            .sum()
+    }
 
+    fn handle_unhealthy_peers(&mut self, peers: HashSet<PeerId>) -> usize {
+        peers
+            .into_iter()
+            .map(|peer_id| {
+                self.blacklist_peers.insert(peer_id);
+                if self.is_negotiated_peer(&peer_id) {
+                    1
+                } else {
+                    0
+                }
+            })
+            .sum()
+    }
+
+    fn schedule_dials(&mut self, amount: usize) {
+        if amount == 0 {
+            return;
+        }
+
+        let excludes = self
+            .blacklist_peers
+            .iter()
+            .filter_map(|peer_id| self.peer_addresses.get(peer_id).cloned())
+            .collect();
+        tracing::info!(
+            "Scheduling {} new dialings: excludes:{:?}",
+            amount,
+            excludes
+        );
         self.events
-            .push_back(ToSwarm::GenerateEvent(Event::EstabalishNewConnection {
+            .push_back(ToSwarm::GenerateEvent(Event::EstabalishNewConnections {
+                amount,
                 excludes,
             }));
     }
@@ -343,13 +376,12 @@ where
         &mut self,
         cx: &mut Context<'_>,
     ) -> Poll<ToSwarm<Self::ToSwarm, THandlerInEvent<Self>>> {
+        // Run connection maintenance if the interval is reached.
         if pin!(&mut self.conn_maintenance_interval)
             .poll_next(cx)
             .is_ready()
         {
-            let (malicious_peers, unhealthy_peers) = self.conn_maintenance.reset();
-            self.add_malicious_peers(malicious_peers);
-            self.add_unhealthy_peers(unhealthy_peers);
+            self.run_conn_maintenance();
         }
 
         if let Some(event) = self.events.pop_front() {
