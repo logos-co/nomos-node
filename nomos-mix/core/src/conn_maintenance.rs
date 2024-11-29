@@ -55,7 +55,6 @@ where
         let mut unhealthy_peers = HashSet::new();
 
         self.meters.iter().for_each(|(peer, meter)| {
-            println!("Peer: {:?}, Meter: {:?}", peer, meter);
             if meter.is_malicious(&self.settings) {
                 malicious_peers.insert(peer.clone());
             } else if meter.is_unhealthy(&self.settings) {
