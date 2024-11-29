@@ -22,7 +22,6 @@ nomos-mempool = { path = "../../nomos-services/mempool", features = [
     "mock",
     "libp2p",
 ] }
-nomos-metrics = { path = "../../nomos-services/metrics" }
 nomos-network = { path = "../../nomos-services/network", features = ["libp2p"] }
 nomos-mix-service = { path = "../../nomos-services/mix", features = ["libp2p"] }
 nomos-node = { path = "../nomos-node" }
@@ -42,5 +41,4 @@ uuid = { version = "1.10.0", features = ["v4"] }
 
 [features]
 default = ["tracing"]
-metrics = ["nomos-node/metrics"]
 tracing = ["nomos-node/tracing"]

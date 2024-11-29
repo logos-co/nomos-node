@@ -83,9 +83,6 @@ pub struct MixArgs {
     #[clap(long = "mix-node-key", env = "MIX_NODE_KEY")]
     mix_node_key: Option<String>,
 
-    #[clap(long = "mix-membership", env = "MIX_MEMBERSHIP", num_args = 1.., value_delimiter = ',')]
-    pub mix_membership: Option<Vec<Multiaddr>>,
-
     #[clap(long = "mix-peering-degree", env = "MIX_PEERING_DEGREE")]
     mix_peering_degree: Option<usize>,
 
@@ -130,12 +127,6 @@ pub struct CryptarchiaArgs {
         requires("note_value")
     )]
     note_nonce: Option<String>,
-}
-
-#[derive(Parser, Debug, Clone)]
-pub struct MetricsArgs {
-    #[clap(long = "with-metrics", env = "WITH_METRICS")]
-    pub with_metrics: bool,
 }
 
 #[derive(Deserialize, Debug, Clone, Serialize)]
@@ -256,7 +247,6 @@ pub fn update_mix(
     let MixArgs {
         mix_addr,
         mix_node_key,
-        mix_membership,
         mix_peering_degree,
         mix_num_mix_layers,
     } = mix_args;
@@ -268,10 +258,6 @@ pub fn update_mix(
     if let Some(node_key) = mix_node_key {
         let mut key_bytes = hex::decode(node_key)?;
         mix.backend.node_key = SecretKey::try_from_bytes(key_bytes.as_mut_slice())?;
-    }
-
-    if let Some(membership) = mix_membership {
-        mix.backend.membership = membership;
     }
 
     if let Some(peering_degree) = mix_peering_degree {

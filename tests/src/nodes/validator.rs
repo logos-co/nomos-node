@@ -15,7 +15,7 @@ use nomos_da_verifier::storage::adapters::rocksdb::RocksAdapterSettings as Verif
 use nomos_da_verifier::{backend::kzgrs::KzgrsDaVerifierSettings, DaVerifierServiceSettings};
 use nomos_mempool::MempoolMetrics;
 use nomos_mix::message_blend::{
-    CryptographicProcessorSettings, MessageBlendSettings, TemporalProcessorSettings,
+    CryptographicProcessorSettings, MessageBlendSettings, TemporalSchedulerSettings,
 };
 use nomos_network::{backends::libp2p::Libp2pConfig, NetworkConfig};
 use nomos_node::api::paths::{
@@ -243,13 +243,20 @@ pub fn create_validator_config(config: GeneralConfig) -> Config {
         mix: nomos_mix_service::MixConfig {
             backend: config.mix_config.backend,
             persistent_transmission: Default::default(),
-
             message_blend: MessageBlendSettings {
-                cryptographic_processor: CryptographicProcessorSettings { num_mix_layers: 1 },
-                temporal_processor: TemporalProcessorSettings {
+                cryptographic_processor: CryptographicProcessorSettings {
+                    private_key: config.mix_config.private_key.to_bytes(),
+                    num_mix_layers: 1,
+                },
+                temporal_processor: TemporalSchedulerSettings {
                     max_delay_seconds: 2,
                 },
             },
+            cover_traffic: nomos_mix_service::CoverTrafficExtSettings {
+                epoch_duration: Duration::from_secs(432000),
+                slot_duration: Duration::from_secs(20),
+            },
+            membership: config.mix_config.membership,
         },
         cryptarchia: CryptarchiaSettings {
             leader_config: config.consensus_config.leader_config,

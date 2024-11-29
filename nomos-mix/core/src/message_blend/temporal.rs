@@ -6,38 +6,29 @@ use std::{
 };
 
 use futures::{Future, Stream, StreamExt};
-use rand::Rng;
+use rand::{Rng, RngCore};
 use serde::{Deserialize, Serialize};
 use tokio::time;
 
-/// [`TemporalProcessor`] delays messages randomly to hide timing correlation
-/// between incoming and outgoing messages from a node.
-///
-/// See the [`Stream`] implementation below for more details on how it works.
-pub(crate) struct TemporalProcessor<M> {
-    settings: TemporalProcessorSettings,
-    // All scheduled messages
-    queue: VecDeque<M>,
+pub struct TemporalScheduler<Rng> {
+    settings: TemporalSchedulerSettings,
     /// Interval in seconds for running the lottery to release a message
     lottery_interval: time::Interval,
     /// To wait a few seconds after running the lottery before releasing the message.
     /// The lottery returns how long to wait before releasing the message.
     release_timer: Option<Pin<Box<time::Sleep>>>,
+    /// local lottery rng
+    rng: Rng,
 }
 
-#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
-pub struct TemporalProcessorSettings {
-    pub max_delay_seconds: u64,
-}
-
-impl<M> TemporalProcessor<M> {
-    pub(crate) fn new(settings: TemporalProcessorSettings) -> Self {
+impl<Rng> TemporalScheduler<Rng> {
+    pub fn new(settings: TemporalSchedulerSettings, rng: Rng) -> Self {
         let lottery_interval = Self::lottery_interval(settings.max_delay_seconds);
         Self {
             settings,
-            queue: VecDeque::new(),
             lottery_interval,
             release_timer: None,
+            rng,
         }
     }
 
@@ -55,25 +46,25 @@ impl<M> TemporalProcessor<M> {
     fn lottery_interval_seconds(max_delay_seconds: u64) -> u64 {
         max_delay_seconds / 2
     }
+}
 
+impl<Rng> TemporalScheduler<Rng>
+where
+    Rng: RngCore,
+{
     /// Run the lottery to determine the delay before releasing a message.
     /// The delay is in [0, `lottery_interval_seconds`).
-    fn run_lottery(&self) -> u64 {
+    fn run_lottery(&mut self) -> u64 {
         let interval = Self::lottery_interval_seconds(self.settings.max_delay_seconds);
-        rand::thread_rng().gen_range(0..interval)
-    }
-
-    /// Schedule a message to be released later.
-    pub(crate) fn push_message(&mut self, message: M) {
-        self.queue.push_back(message);
+        self.rng.gen_range(0..interval)
     }
 }
 
-impl<M> Stream for TemporalProcessor<M>
+impl<Rng> Stream for TemporalScheduler<Rng>
 where
-    M: Unpin,
+    Rng: RngCore + Unpin,
 {
-    type Item = M;
+    type Item = ();
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         // Check whether it's time to run a new lottery to determine the delay.
@@ -87,31 +78,74 @@ where
         if let Some(timer) = self.release_timer.as_mut() {
             if timer.as_mut().poll(cx).is_ready() {
                 self.release_timer.take(); // Reset timer after it's done
-                if let Some(msg) = self.queue.pop_front() {
-                    // Release the 1st message in the queue if it exists.
-                    return Poll::Ready(Some(msg));
-                }
+                return Poll::Ready(Some(()));
             }
         }
-
         Poll::Pending
     }
 }
 
-pub struct TemporalStream<S>
-where
-    S: Stream,
-{
-    processor: TemporalProcessor<S::Item>,
-    wrapped_stream: S,
+/// [`TemporalProcessor`] delays messages randomly to hide timing correlation
+/// between incoming and outgoing messages from a node.
+///
+/// See the [`Stream`] implementation below for more details on how it works.
+pub struct TemporalProcessor<M, S> {
+    // All scheduled messages
+    queue: VecDeque<M>,
+    scheduler: S,
 }
 
-impl<S> Stream for TemporalStream<S>
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+pub struct TemporalSchedulerSettings {
+    pub max_delay_seconds: u64,
+}
+
+impl<M, S> TemporalProcessor<M, S> {
+    pub(crate) fn new(scheduler: S) -> Self {
+        Self {
+            queue: VecDeque::new(),
+            scheduler,
+        }
+    }
+    /// Schedule a message to be released later.
+    pub(crate) fn push_message(&mut self, message: M) {
+        self.queue.push_back(message);
+    }
+}
+
+impl<M, S> Stream for TemporalProcessor<M, S>
 where
-    S: Stream + Unpin,
-    S::Item: Unpin,
+    M: Unpin,
+    S: Stream<Item = ()> + Unpin,
 {
-    type Item = S::Item;
+    type Item = M;
+
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        if self.scheduler.poll_next_unpin(cx).is_ready() {
+            if let Some(msg) = self.queue.pop_front() {
+                return Poll::Ready(Some(msg));
+            }
+        };
+        Poll::Pending
+    }
+}
+
+pub struct TemporalStream<WrappedStream, Scheduler>
+where
+    WrappedStream: Stream,
+    Scheduler: Stream<Item = ()>,
+{
+    processor: TemporalProcessor<WrappedStream::Item, Scheduler>,
+    wrapped_stream: WrappedStream,
+}
+
+impl<WrappedStream, Scheduler> Stream for TemporalStream<WrappedStream, Scheduler>
+where
+    WrappedStream: Stream + Unpin,
+    WrappedStream::Item: Unpin,
+    Scheduler: Stream<Item = ()> + Unpin,
+{
+    type Item = WrappedStream::Item;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         if let Poll::Ready(Some(item)) = self.wrapped_stream.poll_next_unpin(cx) {
@@ -120,16 +154,24 @@ where
         self.processor.poll_next_unpin(cx)
     }
 }
-pub trait TemporalProcessorExt: Stream {
-    fn temporal_stream(self, settings: TemporalProcessorSettings) -> TemporalStream<Self>
+pub trait TemporalProcessorExt<Scheduler>: Stream
+where
+    Scheduler: Stream<Item = ()>,
+{
+    fn temporal_stream(self, scheduler: Scheduler) -> TemporalStream<Self, Scheduler>
     where
         Self: Sized,
     {
         TemporalStream {
-            processor: TemporalProcessor::new(settings),
+            processor: TemporalProcessor::<Self::Item, Scheduler>::new(scheduler),
             wrapped_stream: self,
         }
     }
 }
 
-impl<T> TemporalProcessorExt for T where T: Stream {}
+impl<T, S> TemporalProcessorExt<S> for T
+where
+    T: Stream,
+    S: Stream<Item = ()>,
+{
+}

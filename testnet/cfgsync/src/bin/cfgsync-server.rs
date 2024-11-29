@@ -49,6 +49,7 @@ struct CfgSyncConfig {
     // Tracing params
     tempo_endpoint: Url,
     loki_endpoint: Url,
+    metrics_endpoint: Url,
 }
 
 impl CfgSyncConfig {
@@ -83,6 +84,7 @@ impl CfgSyncConfig {
         TracingParams {
             tempo_endpoint: self.tempo_endpoint.clone(),
             loki_endpoint: self.loki_endpoint.clone(),
+            metrics_endpoint: self.metrics_endpoint.clone(),
         }
     }
 }

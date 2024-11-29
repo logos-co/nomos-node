@@ -12,6 +12,7 @@ nomos-executor = { path = "../nodes/nomos-executor", default-features = false }
 nomos-network = { path = "../nomos-services/network", features = ["libp2p"] }
 nomos-mix-service = { path = "../nomos-services/mix", features = ["libp2p"] }
 nomos-mix = { path = "../nomos-mix/core" }
+nomos-mix-message = { path = "../nomos-mix/message" }
 cryptarchia-consensus = { path = "../nomos-services/cryptarchia-consensus" }
 nomos-tracing = { path = "../nomos-tracing" }
 nomos-tracing-service = { path = "../nomos-services/tracing" }
@@ -50,6 +51,7 @@ criterion = { version = "0.5", features = ["async_tokio"] }
 nomos-cli = { path = "../nomos-cli" }
 time = "0.3"
 tracing = "0.1"
+x25519-dalek = { version = "2", features = ["getrandom", "static_secrets"] }
 
 [[test]]
 name = "test_cryptarchia_happy_path"
@@ -60,5 +62,4 @@ name = "test_da"
 path = "src/tests/da.rs"
 
 [features]
-metrics = ["nomos-node/metrics"]
 debug = []

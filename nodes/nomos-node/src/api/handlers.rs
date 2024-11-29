@@ -5,16 +5,14 @@ use std::{fmt::Debug, hash::Hash};
 // crates
 use axum::{
     extract::{Query, State},
-    http::HeaderValue,
-    response::{IntoResponse, Response},
+    response::Response,
     Json,
 };
-use hyper::{header::CONTENT_TYPE, Body, StatusCode};
 use rand::{RngCore, SeedableRng};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 // internal
 use super::paths;
-use nomos_api::http::{cl, consensus, da, libp2p, mempool, metrics, storage};
+use nomos_api::http::{cl, consensus, da, libp2p, mempool, storage};
 use nomos_core::da::blob::info::DispersedBlobInfo;
 use nomos_core::da::blob::metadata::Metadata;
 use nomos_core::da::{BlobId, DaVerifier as CoreDaVerifier};
@@ -417,30 +415,4 @@ where
         SamplingRng,
         SamplingStorage,
     >(&handle, blob_info, DispersedBlobInfo::blob_id))
-}
-
-#[utoipa::path(
-    get,
-    path = paths::METRICS,
-    responses(
-        (status = 200, description = "Get all metrics"),
-        (status = 500, description = "Internal server error", body = String),
-    )
-)]
-pub async fn get_metrics(State(handle): State<OverwatchHandle>) -> Response {
-    match metrics::gather(&handle).await {
-        Ok(encoded_metrics) => Response::builder()
-            .status(StatusCode::OK)
-            .header(
-                CONTENT_TYPE,
-                HeaderValue::from_static("text/plain; version=0.0.4"),
-            )
-            .body(Body::from(encoded_metrics))
-            .unwrap()
-            .into_response(),
-        Err(e) => axum::response::IntoResponse::into_response((
-            hyper::StatusCode::INTERNAL_SERVER_ERROR,
-            e.to_string(),
-        )),
-    }
 }

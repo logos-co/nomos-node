@@ -11,7 +11,6 @@ Nomos blockchain node mvp
   - http
   - mempool
   - network
-  - metrics
 - `nodes`: Nomos nodes is the collection of nodes that are used to run the Nomos mvp and experimental nodes.
   - `nomos-node`: main implementation of the Nomos mvp node.
   - `mockpool-node`: node with single mempool service, used to measure transaction dissemination.
