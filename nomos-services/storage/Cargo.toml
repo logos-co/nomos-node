@@ -21,7 +21,7 @@ tracing = "0.1"
 [dev-dependencies]
 tokio = { version = "1", features = ["sync", "macros", "time"] }
 tempfile = "3"
-surrealdb = { version = "2.1.2", features = ["kv-mem"] }
+surrealdb = { version = "2", features = ["kv-mem"] }
 
 [features]
 default = []
