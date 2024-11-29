@@ -1,73 +1,171 @@
 use crate::backends::{StorageBackend, StorageSerde, StorageTransaction};
+use async_trait::async_trait;
 use bytes::Bytes;
-use surrealdb::{Error, Surreal};
-use tokio::task::spawn_blocking;
+use serde::{Deserialize, Serialize};
+use std::marker::PhantomData;
+use std::str::from_utf8;
+use surrealdb::engine::any::{connect, Any};
+use surrealdb::Surreal;
+use tokio::runtime::Handle;
+use tokio::task::block_in_place;
 
+#[derive(Debug, Serialize, Deserialize)]
+struct Data {
+    pub data: Bytes,
+}
+
+impl Data {
+    fn new(value: Bytes) -> Self {
+        Self { data: value }
+    }
+
+    fn to_bytes(&self) -> Bytes {
+        self.data.clone()
+    }
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum Error {
+    #[error(transparent)]
+    Surreal(#[from] surrealdb::Error),
+    #[error(transparent)]
+    Utf8(#[from] std::str::Utf8Error),
+}
+
+#[derive(Clone)]
 pub struct SurrealBackendSettings {
     pub db_path: String,
+    pub namespace: String,
+    pub database: String,
+}
+
+impl SurrealBackendSettings {
+    pub fn new(db_path: String, namespace: String, database: String) -> Self {
+        Self {
+            db_path,
+            namespace,
+            database,
+        }
+    }
 }
 
 pub struct SurrealBackendTransaction {}
-
-impl SurrealBackendTransaction {
-    pub fn execute(&self) -> Self::Result {
-        todo!()
-    }
-}
 
 impl StorageTransaction for SurrealBackendTransaction {
     type Result = Result<Option<Bytes>, Error>;
     type Transaction = Self;
 }
 
-pub struct SurrealBackend<Connection: surrealdb::Connection> {
-    db: Surreal<Connection>,
+pub struct SurrealBackend<SerdeOp>
+where
+    SerdeOp: StorageSerde + Send + Sync + 'static,
+{
+    db: Surreal<Any>,
+    _serde_op: PhantomData<SerdeOp>,
 }
 
-impl<Connection: surrealdb::Connection> StorageBackend for SurrealBackend<Connection> {
+#[async_trait]
+impl<SerdeOp> StorageBackend for SurrealBackend<SerdeOp>
+where
+    SerdeOp: StorageSerde + Send + Sync + 'static,
+{
     type Settings = SurrealBackendSettings;
     type Error = Error;
     type Transaction = SurrealBackendTransaction;
-    type SerdeOperator = ();
+    type SerdeOperator = SerdeOp;
 
     fn new(config: Self::Settings) -> Result<Self, Self::Error> {
-        let Self::Settings { db_path } = config;
-        let db = Surreal::new(db_path);
-        spawn_blocking(async {
-            db.connect().await?;
-            Ok(Self { db })
-        })
+        let Self::Settings {
+            db_path,
+            namespace,
+            database,
+        } = config;
+
+        let connect_to_surrealdb = async {
+            let db = connect(db_path).await?;
+            db.use_ns(namespace).use_db(database).await?;
+            Ok(Self {
+                db,
+                _serde_op: Default::default(),
+            })
+        };
+
+        block_in_place(|| Handle::current().block_on(connect_to_surrealdb))
     }
 
     async fn store(&mut self, key: Bytes, value: Bytes) -> Result<(), Self::Error> {
-        let key = String::from(key);
-        let _record = self.db.create(("kv", key)).content(value).await?;
+        let key = from_utf8(&*key)?;
+        let data = Data::new(value);
+        let _record: Option<Data> = self.db.create(("kv", key)).content(data).await?;
         Ok(())
     }
 
     async fn load(&mut self, key: &[u8]) -> Result<Option<Bytes>, Self::Error> {
-        let key = String::from(key);
-        let record = self.db.select(("kv", key)).await?;
-        Ok(record)
+        let key = from_utf8(key)?;
+        let record: Option<Data> = self.db.select(("kv", key)).await?;
+        Ok(record.map(|data| data.to_bytes()))
     }
 
     async fn load_prefix(&mut self, prefix: &[u8]) -> Result<Vec<Bytes>, Self::Error> {
-        let prefix = String::from(prefix);
+        let prefix = from_utf8(prefix)?;
         let query =
             format!("SELECT * FROM kv WHERE string::starts_with(record::id(id), \"{prefix}\")");
         let mut response = self.db.query(query).await?;
-        let records = response.stream(()).map(|record| record.content()).collect();
+        let records: Vec<Data> = response.take(0)?;
+        let records = records.into_iter().map(|data| data.to_bytes()).collect();
         Ok(records)
     }
 
     async fn remove(&mut self, key: &[u8]) -> Result<Option<Bytes>, Self::Error> {
-        Ok(self.db.delete(("kv", key)).await?)
+        let key = from_utf8(key)?;
+        let record: Option<Data> = self.db.delete(("kv", key)).await?;
+        Ok(record.map(|data| data.to_bytes()))
     }
 
     async fn execute(
         &mut self,
-        transaction: Self::Transaction,
+        _transaction: Self::Transaction,
     ) -> Result<<Self::Transaction as StorageTransaction>::Result, Self::Error> {
-        todo!()
+        unimplemented!("SurrealDB does not support transactions yet.")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::backends::testing::NoStorageSerde;
+
+    fn get_test_config() -> SurrealBackendSettings {
+        SurrealBackendSettings::new(
+            String::from("mem://"),
+            String::from("namespace"),
+            String::from("database"),
+        )
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_store_load_remove() -> Result<(), Error> {
+        let key = Bytes::from("my-key");
+        let value = Bytes::from("my-value");
+
+        let mut backend = SurrealBackend::<NoStorageSerde>::new(get_test_config())?;
+
+        let store_result = backend.store(key.clone(), value.clone()).await;
+        assert!(store_result.is_ok(), "{:?}", store_result.err());
+        assert_eq!(store_result?, ());
+
+        let load_result = backend.load(&key).await;
+        assert!(load_result.is_ok(), "{:?}", load_result);
+        assert_eq!(load_result?, Some(value.clone()));
+
+        let remove_result = backend.remove(&key).await;
+        assert!(remove_result.is_ok(), "{:?}", remove_result);
+        assert_eq!(remove_result?, Some(value.clone()));
+
+        let load_result = backend.load(&key).await;
+        assert!(load_result.is_ok(), "{:?}", load_result);
+        assert_eq!(load_result?, None);
+
+        Ok(())
     }
 }
