@@ -9,7 +9,6 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 pub struct ConnectionMaintenanceSettings {
-    /// The time window
     pub time_window: Duration,
     /// The number of effective (data or cover) messages that a peer is expected to send in a given time window.
     /// If the measured count is greater than (expected * (1 + tolerance)), the peer is considered malicious.
@@ -21,18 +20,6 @@ pub struct ConnectionMaintenanceSettings {
     /// If the measured count is less than (expected * (1 - tolerance)), the peer is considered unhealthy.
     pub expected_drop_messages: f32,
     pub drop_message_tolerance: f32,
-}
-
-impl Default for ConnectionMaintenanceSettings {
-    fn default() -> Self {
-        Self {
-            time_window: Duration::from_secs(3600),
-            expected_effective_messages: 0.0,
-            effective_message_tolerance: 0.0,
-            expected_drop_messages: 0.0,
-            drop_message_tolerance: 0.0,
-        }
-    }
 }
 
 pub struct ConnectionMaintenance<Peer> {
