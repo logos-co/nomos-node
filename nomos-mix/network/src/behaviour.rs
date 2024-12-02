@@ -30,8 +30,10 @@ pub struct Behaviour<M, Interval> {
     /// Peers that support the mix protocol, and their connection IDs
     negotiated_peers: HashMap<PeerId, HashSet<ConnectionId>>,
     /// Connection maintenance
-    conn_maintenance: ConnectionMaintenance<PeerId>,
-    conn_maintenance_interval: Interval,
+    /// NOTE: For now, this is optional because this may close too many connections
+    /// until we clearly figure out the optimal parameters.
+    conn_maintenance: Option<ConnectionMaintenance<PeerId>>,
+    conn_maintenance_interval: Option<Interval>,
     /// Peers that should be excluded from connection establishments
     blacklist_peers: HashSet<PeerId>,
     /// To maintain address of peers because libp2p API uses only [`PeerId`] when handling
@@ -51,7 +53,7 @@ pub struct Behaviour<M, Interval> {
 pub struct Config {
     pub max_peering_degree: usize,
     pub duplicate_cache_lifespan: u64,
-    pub conn_maintenance_settings: ConnectionMaintenanceSettings,
+    pub conn_maintenance_settings: Option<ConnectionMaintenanceSettings>,
 }
 
 #[derive(Debug)]
@@ -69,10 +71,15 @@ impl<M, Interval> Behaviour<M, Interval>
 where
     M: MixMessage,
 {
-    pub fn new(config: Config, conn_maintenance_interval: Interval) -> Self {
+    pub fn new(config: Config, conn_maintenance_interval: Option<Interval>) -> Self {
+        assert_eq!(
+            config.conn_maintenance_settings.is_some(),
+            conn_maintenance_interval.is_some()
+        );
+        let conn_maintenance = config
+            .conn_maintenance_settings
+            .map(ConnectionMaintenance::<PeerId>::new);
         let duplicate_cache = TimedCache::with_lifespan(config.duplicate_cache_lifespan);
-        let conn_maintenance =
-            ConnectionMaintenance::<PeerId>::new(config.conn_maintenance_settings);
         Self {
             config,
             negotiated_peers: HashMap::new(),
@@ -180,20 +187,22 @@ where
     }
 
     fn run_conn_maintenance(&mut self) {
-        let (malicious_peers, unhealthy_peers) = self.conn_maintenance.reset();
-        let num_closed_malicious = self.handle_malicious_peers(malicious_peers);
-        let num_connected_unhealthy = self.handle_unhealthy_peers(unhealthy_peers);
-        let mut num_to_dial = num_closed_malicious + num_connected_unhealthy;
-        if num_to_dial + self.negotiated_peers.len() > self.config.max_peering_degree {
-            tracing::warn!(
+        if let Some(conn_maintenance) = self.conn_maintenance.as_mut() {
+            let (malicious_peers, unhealthy_peers) = conn_maintenance.reset();
+            let num_closed_malicious = self.handle_malicious_peers(malicious_peers);
+            let num_connected_unhealthy = self.handle_unhealthy_peers(unhealthy_peers);
+            let mut num_to_dial = num_closed_malicious + num_connected_unhealthy;
+            if num_to_dial + self.negotiated_peers.len() > self.config.max_peering_degree {
+                tracing::warn!(
                     "Cannot establish {} new connections due to max_peering_degree:{}. connected_peers:{}",
                     num_to_dial,
                     self.config.max_peering_degree,
                     self.negotiated_peers.len(),
                 );
-            num_to_dial = self.config.max_peering_degree - self.negotiated_peers.len();
+                num_to_dial = self.config.max_peering_degree - self.negotiated_peers.len();
+            }
+            self.schedule_dials(num_to_dial);
         }
-        self.schedule_dials(num_to_dial);
     }
 
     fn handle_malicious_peers(&mut self, peers: HashSet<PeerId>) -> usize {
@@ -320,14 +329,15 @@ where
             ToBehaviour::Message(message) => {
                 // Ignore drop message
                 if M::is_drop_message(&message) {
-                    self.conn_maintenance.add_drop(peer_id);
+                    if let Some(conn_maintenance) = self.conn_maintenance.as_mut() {
+                        conn_maintenance.add_drop(peer_id);
+                    }
                     return;
                 }
 
-                // TODO: Discuss about the spec again.
-                // Due to immediate forwarding (which bypass Persistent Transmission),
-                // the measured effective messages may be very higher than the expected.
-                self.conn_maintenance.add_effective(peer_id);
+                if let Some(conn_maintenance) = self.conn_maintenance.as_mut() {
+                    conn_maintenance.add_effective(peer_id);
+                }
 
                 // Add the message to the cache. If it was already seen, ignore it.
                 if self
@@ -377,11 +387,10 @@ where
         cx: &mut Context<'_>,
     ) -> Poll<ToSwarm<Self::ToSwarm, THandlerInEvent<Self>>> {
         // Run connection maintenance if the interval is reached.
-        if pin!(&mut self.conn_maintenance_interval)
-            .poll_next(cx)
-            .is_ready()
-        {
-            self.run_conn_maintenance();
+        if let Some(interval) = self.conn_maintenance_interval.as_mut() {
+            if pin!(interval).poll_next(cx).is_ready() {
+                self.run_conn_maintenance();
+            }
         }
 
         if let Some(event) = self.events.pop_front() {

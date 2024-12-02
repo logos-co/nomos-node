@@ -110,13 +110,13 @@ fn new_mix_configs(listening_addresses: Vec<Multiaddr>) -> Vec<TestMixSettings> 
                     node_key: ed25519::SecretKey::generate(),
                     peering_degree: PEERING_DEGREE,
                     max_peering_degree: PEERING_DEGREE + 5,
-                    conn_maintenance: ConnectionMaintenanceSettings {
+                    conn_maintenance: Some(ConnectionMaintenanceSettings {
                         time_window: Duration::from_secs(10),
                         expected_effective_messages: 5.0,
                         effective_message_tolerance: 0.1,
                         expected_drop_messages: 0.0,
                         drop_message_tolerance: 0.0,
-                    },
+                    }),
                 },
                 x25519_dalek::StaticSecret::random(),
             )

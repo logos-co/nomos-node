@@ -36,7 +36,7 @@ pub struct Libp2pMixBackendSettings {
     pub node_key: ed25519::SecretKey,
     pub peering_degree: usize,
     pub max_peering_degree: usize,
-    pub conn_maintenance: ConnectionMaintenanceSettings,
+    pub conn_maintenance: Option<ConnectionMaintenanceSettings>,
 }
 
 const CHANNEL_SIZE: usize = 64;
@@ -126,8 +126,9 @@ where
             .with_tokio()
             .with_quic()
             .with_behaviour(|_| {
-                let conn_maintenance_interval =
-                    IntervalStream::new(tokio::time::interval(config.conn_maintenance.time_window));
+                let conn_maintenance_interval = config.conn_maintenance.map(|settings| {
+                    IntervalStream::new(tokio::time::interval(settings.time_window))
+                });
                 nomos_mix_network::Behaviour::new(
                     nomos_mix_network::Config {
                         max_peering_degree: config.max_peering_degree,

@@ -134,9 +134,9 @@ mod test {
                 Config {
                     max_peering_degree: 10,
                     duplicate_cache_lifespan: 60,
-                    conn_maintenance_settings,
+                    conn_maintenance_settings: Some(conn_maintenance_settings),
                 },
-                conn_maintenance_interval,
+                Some(conn_maintenance_interval),
             ),
         )
     }

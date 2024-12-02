@@ -32,13 +32,13 @@ pub fn create_mix_configs(ids: &[[u8; 32]]) -> Vec<GeneralMixConfig> {
                     node_key,
                     peering_degree: 1,
                     max_peering_degree: 3,
-                    conn_maintenance: ConnectionMaintenanceSettings {
+                    conn_maintenance: Some(ConnectionMaintenanceSettings {
                         time_window: Duration::from_secs(600),
                         expected_effective_messages: 600.0,
                         effective_message_tolerance: 0.1,
                         expected_drop_messages: 0.0,
                         drop_message_tolerance: 0.0,
-                    },
+                    }),
                 },
                 private_key: x25519_dalek::StaticSecret::random(),
                 membership: Vec::new(),
