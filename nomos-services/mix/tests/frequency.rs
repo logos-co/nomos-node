@@ -109,6 +109,7 @@ fn new_mix_configs(listening_addresses: Vec<Multiaddr>) -> Vec<TestMixSettings> 
                     listening_address: listening_address.clone(),
                     node_key: ed25519::SecretKey::generate(),
                     peering_degree: PEERING_DEGREE,
+                    max_peering_degree: PEERING_DEGREE + 5,
                     conn_maintenance: ConnectionMaintenanceSettings {
                         time_window: Duration::from_secs(10),
                         expected_effective_messages: 5.0,
