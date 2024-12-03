@@ -24,6 +24,7 @@ x25519-dalek = { version = "2", features = ["getrandom", "static_secrets"] }
 
 [dev-dependencies]
 x25519-dalek = { version = "2", features = ["getrandom", "static_secrets"] }
+nomos-tracing-service = { path = "../tracing" }
 
 [features]
 default = []

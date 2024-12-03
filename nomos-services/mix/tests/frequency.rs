@@ -21,6 +21,7 @@ use nomos_network::{
     backends::libp2p::{Libp2p, Libp2pConfig},
     NetworkConfig, NetworkService,
 };
+use nomos_tracing_service::Tracing;
 use overwatch_rs::{
     overwatch::{Overwatch, OverwatchRunner},
     services::handle::ServiceHandle,
@@ -81,6 +82,7 @@ fn new_node(mix_config: &TestMixSettings, network_backend_config: &Libp2pConfig)
             network: NetworkConfig {
                 backend: network_backend_config.clone(),
             },
+            tracing: Default::default(),
         },
         None,
     )
@@ -92,6 +94,7 @@ fn new_node(mix_config: &TestMixSettings, network_backend_config: &Libp2pConfig)
 struct TestNode {
     mix: ServiceHandle<MixService<Libp2pMixBackend, Libp2pAdapter>>,
     network: ServiceHandle<NetworkService<Libp2p>>,
+    tracing: ServiceHandle<Tracing>,
 }
 
 struct TestMixSettings {
