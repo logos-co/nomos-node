@@ -15,6 +15,7 @@ use libp2p::swarm::{
 };
 use libp2p::{Multiaddr, PeerId, Stream};
 use libp2p_stream::{Control, OpenStreamError};
+use opentelemetry::{metrics::Counter, KeyValue};
 use rand::prelude::IteratorRandom;
 use rand::SeedableRng;
 use thiserror::Error;
@@ -140,6 +141,14 @@ pub enum DispersalExecutorEvent {
     },
     /// Something went wrong delivering the blob
     DispersalError { error: DispersalError },
+}
+
+impl DispersalExecutorEvent {
+    const EVENT_NAME: &'static str = "dispersal_executor";
+
+    pub fn log_with_counter(&self, counter: &mut Counter<u64>) {
+        counter.add(1, &[KeyValue::new("event", Self::EVENT_NAME)]);
+    }
 }
 
 struct DispersalStream {

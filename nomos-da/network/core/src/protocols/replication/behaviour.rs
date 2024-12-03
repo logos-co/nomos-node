@@ -12,7 +12,7 @@ use libp2p::swarm::{
 };
 use libp2p::{Multiaddr, PeerId};
 use log::{error, trace};
-
+use opentelemetry::{metrics::Counter, KeyValue};
 use subnetworks_assignations::MembershipHandler;
 
 use crate::SubnetworkId;
@@ -29,6 +29,33 @@ type SwarmEvent = ToSwarm<ReplicationEvent, Either<BehaviourEventToHandler, void
 #[derive(Debug)]
 pub enum ReplicationEvent {
     IncomingMessage { peer_id: PeerId, message: DaMessage },
+}
+
+impl ReplicationEvent {
+    const EVENT_NAME: &'static str = "replication";
+
+    fn blob_size(&self) -> Option<usize> {
+        match self {
+            ReplicationEvent::IncomingMessage { message, .. } => {
+                message.blob.as_ref().map(|blob| blob.data.len())
+            }
+        }
+    }
+
+    fn blob_size_str(&self) -> String {
+        self.blob_size()
+            .map_or(String::from("unknown"), |size| size.to_string())
+    }
+
+    pub fn log_with_counter(&self, counter: &mut Counter<u64>) {
+        counter.add(
+            1,
+            &[
+                KeyValue::new("event", Self::EVENT_NAME),
+                KeyValue::new("blob_size", self.blob_size_str()),
+            ],
+        );
+    }
 }
 
 /// Nomos DA broadcas network behaviour
