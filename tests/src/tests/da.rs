@@ -75,7 +75,7 @@ async fn disseminate_and_retrieve() {
     }
 }
 
-#[ignore = "todo: make work in parallel to other tests"]
+//#[ignore = "todo: make work in parallel to other tests"]
 #[tokio::test]
 async fn disseminate_retrieve_reconstruct() {
     let topology = Topology::spawn(TopologyConfig::validator_and_executor()).await;
