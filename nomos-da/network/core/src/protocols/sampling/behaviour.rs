@@ -22,6 +22,8 @@ use nomos_core::da::BlobId;
 use nomos_da_messages::sampling::sample_err::SampleErrType;
 use nomos_da_messages::sampling::{sample_res, SampleErr, SampleReq, SampleRes};
 use nomos_da_messages::{common, pack_message, unpack_from_reader};
+use opentelemetry::metrics::Counter;
+use opentelemetry::KeyValue;
 use subnetworks_assignations::MembershipHandler;
 use thiserror::Error;
 use tokio::sync::mpsc;
@@ -224,6 +226,14 @@ pub enum SamplingEvent {
     SamplingError {
         error: SamplingError,
     },
+}
+
+impl SamplingEvent {
+    const EVENT_NAME: &'static str = "sampling";
+
+    pub fn log_with_counter(&self, counter: &mut Counter<u64>) {
+        counter.add(1, &[KeyValue::new("event", Self::EVENT_NAME)]);
+    }
 }
 
 /// Auxiliary struct that binds a stream with the corresponding `PeerId`

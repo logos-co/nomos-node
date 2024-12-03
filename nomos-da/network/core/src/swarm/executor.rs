@@ -27,7 +27,11 @@ use crate::swarm::common::{
 };
 use crate::swarm::validator::ValidatorEventsStream;
 use crate::SubnetworkId;
+use opentelemetry::{global, Key, KeyValue};
 use subnetworks_assignations::MembershipHandler;
+
+const METER_NAME: &str = "nomos-da/network/swarm/executor";
+const BEHAVIOUR_EVENTS_RECEIVED: &str = "behaviour_events_received";
 
 pub struct ExecutorEventsStream {
     pub validator_events_stream: ValidatorEventsStream,
@@ -159,17 +163,24 @@ where
     }
 
     async fn handle_behaviour_event(&mut self, event: ExecutorBehaviourEvent<Membership>) {
+        let meter = global::meter(METER_NAME);
+        let mut counter = meter.u64_counter(BEHAVIOUR_EVENTS_RECEIVED).build();
+
         match event {
             ExecutorBehaviourEvent::Sampling(event) => {
+                event.log_with_counter(&mut counter);
                 self.handle_sampling_event(event).await;
             }
             ExecutorBehaviourEvent::ExecutorDispersal(event) => {
+                event.log_with_counter(&mut counter);
                 self.handle_executor_dispersal_event(event).await;
             }
             ExecutorBehaviourEvent::ValidatorDispersal(event) => {
+                event.log_with_counter(&mut counter);
                 self.handle_validator_dispersal_event(event).await;
             }
             ExecutorBehaviourEvent::Replication(event) => {
+                event.log_with_counter(&mut counter);
                 self.handle_replication_event(event).await;
             }
         }

@@ -10,6 +10,7 @@ use libp2p::swarm::{DialError, SwarmEvent};
 use libp2p::{Multiaddr, PeerId, Swarm, SwarmBuilder, TransportError};
 use log::debug;
 use nomos_core::da::BlobId;
+use opentelemetry::{global, KeyValue};
 use tokio::sync::mpsc::{unbounded_channel, UnboundedSender};
 use tokio_stream::wrappers::UnboundedReceiverStream;
 // internal
@@ -24,6 +25,9 @@ use crate::swarm::common::{
 };
 use crate::SubnetworkId;
 use subnetworks_assignations::MembershipHandler;
+
+const METER_NAME: &str = "nomos-da/network/swarm/validator";
+const BEHAVIOUR_EVENTS_RECEIVED: &str = "behaviour_events_received";
 
 pub struct ValidatorEventsStream {
     pub sampling_events_receiver: UnboundedReceiverStream<SamplingEvent>,
@@ -129,14 +133,20 @@ where
     }
 
     async fn handle_behaviour_event(&mut self, event: ValidatorBehaviourEvent<Membership>) {
+        let meter = global::meter(METER_NAME);
+        let mut counter = meter.u64_counter(BEHAVIOUR_EVENTS_RECEIVED).build();
+
         match event {
             ValidatorBehaviourEvent::Sampling(event) => {
+                event.log_with_counter(&mut counter);
                 self.handle_sampling_event(event).await;
             }
             ValidatorBehaviourEvent::Dispersal(event) => {
+                event.log_with_counter(&mut counter);
                 self.handle_dispersal_event(event).await;
             }
             ValidatorBehaviourEvent::Replication(event) => {
+                event.log_with_counter(&mut counter);
                 self.handle_replication_event(event).await;
             }
         }
