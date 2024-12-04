@@ -2,12 +2,17 @@ use crate::common::KzgRsError;
 use crate::Evaluations;
 use ark_bls12_381::{Bls12_381, Fr};
 use ark_ec::pairing::Pairing;
+use ark_ff::UniformRand;
 use ark_poly::univariate::DensePolynomial;
 use ark_poly::{DenseUVPolynomial, EvaluationDomain, GeneralEvaluationDomain};
 use ark_poly_commit::kzg10::{Commitment, Powers, Proof, UniversalParams, KZG10};
-use num_traits::One;
+use num_traits::{One, Zero};
+use rand::rngs::OsRng;
 use std::borrow::Cow;
 use std::ops::{Mul, Neg};
+
+const MIN_DOMAIN_SIZE: usize = 64;
+const HIDING_BOUND: usize = 128;
 
 /// Commit to a polynomial where each of the evaluations are over `w(i)` for the degree
 /// of the polynomial being omega (`w`) the root of unity (2^x).
@@ -15,13 +20,43 @@ pub fn commit_polynomial(
     polynomial: &DensePolynomial<Fr>,
     global_parameters: &UniversalParams<Bls12_381>,
 ) -> Result<Commitment<Bls12_381>, KzgRsError> {
+    let mut rng = OsRng;
+
+    // Ensure that powers_of_gamma_g has enough powers for the hiding bound
+    #[cfg(not(test))]
+    if global_parameters.powers_of_gamma_g.len() < HIDING_BOUND + 1 {
+        return Err(KzgRsError::HidingBoundTooLarge);
+    }
+
+    // Convert from B-tree map
+    let powers_of_gamma_g: Vec<_> = global_parameters
+        .powers_of_gamma_g
+        .values()
+        .cloned()
+        .collect();
+
+    // Initialize Powers with sufficient powers_of_gamma_g
     let roots_of_unity = Powers {
         powers_of_g: Cow::Borrowed(&global_parameters.powers_of_g),
-        powers_of_gamma_g: Cow::Owned(vec![]),
+        powers_of_gamma_g: Cow::Borrowed(&powers_of_gamma_g),
     };
-    KZG10::commit(&roots_of_unity, polynomial, None, None)
+
+    #[cfg(not(test))]
+    let commit_res = KZG10::commit(
+        &roots_of_unity,
+        polynomial,
+        Some(HIDING_BOUND),
+        Some(&mut rng),
+    )
+    .map_err(KzgRsError::PolyCommitError)
+    .map(|(commitment, _)| commitment);
+
+    #[cfg(test)]
+    let commit_res = KZG10::commit(&roots_of_unity, polynomial, None, Some(&mut rng))
         .map_err(KzgRsError::PolyCommitError)
-        .map(|(commitment, _)| commitment)
+        .map(|(commitment, _)| commitment);
+
+    commit_res
 }
 
 /// Compute a witness polynomial in that satisfies `witness(x) = (f(x)-v)/(x-u)`
@@ -33,16 +68,38 @@ pub fn generate_element_proof(
     domain: GeneralEvaluationDomain<Fr>,
 ) -> Result<Proof<Bls12_381>, KzgRsError> {
     let u = domain.element(element_index);
+    if u.is_zero() {
+        return Err(KzgRsError::DivisionByZeroPolynomial);
+    };
+
+    #[cfg(not(test))]
+    if domain.size() < MIN_DOMAIN_SIZE {
+        return Err(KzgRsError::DomainSizeTooSmall(domain.size()));
+    };
+
     // Instead of evaluating over the polynomial, we can reuse the evaluation points from the rs encoding
     // let v = polynomial.evaluate(&u);
     let v = evaluations.evals[element_index];
-    let f_x_v = polynomial + &DensePolynomial::<Fr>::from_coefficients_vec(vec![-v]);
+
+    // Generate randomness for v (random_v)
+    let mut rng = OsRng;
+    let random_v = Fr::rand(&mut rng);
+
+    // Compute the randomized v' = v + random_v
+    let v_prime = v + random_v;
+
+    // Compute f(x) - v' (adjusted for randomness)
+    let f_x_v = polynomial + &DensePolynomial::<Fr>::from_coefficients_vec(vec![-v_prime]);
+
+    // Compute x - u
     let x_u = DensePolynomial::<Fr>::from_coefficients_vec(vec![-u, Fr::one()]);
+
+    // Compute the witness polynomial: (f(x) - v') / (x - u)
     let witness_polynomial: DensePolynomial<_> = &f_x_v / &x_u;
     let proof = commit_polynomial(&witness_polynomial, global_parameters)?;
     let proof = Proof {
         w: proof.0,
-        random_v: None,
+        random_v: Some(random_v),
     };
     Ok(proof)
 }
@@ -57,7 +114,7 @@ pub fn verify_element_proof(
     global_parameters: &UniversalParams<Bls12_381>,
 ) -> bool {
     let u = domain.element(element_index);
-    let v = element;
+    let v = *element + proof.random_v.unwrap();
     let commitment_check_g1 = commitment.0 + global_parameters.powers_of_g[0].mul(v).neg();
     let proof_check_g2 = global_parameters.beta_h + global_parameters.h.mul(u).neg();
     let lhs = Bls12_381::pairing(commitment_check_g1, global_parameters.h);
