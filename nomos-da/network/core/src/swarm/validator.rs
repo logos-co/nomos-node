@@ -10,7 +10,7 @@ use libp2p::swarm::{DialError, SwarmEvent};
 use libp2p::{Multiaddr, PeerId, Swarm, SwarmBuilder, TransportError};
 use log::debug;
 use nomos_core::da::BlobId;
-use opentelemetry::{global, KeyValue};
+use opentelemetry::global;
 use tokio::sync::mpsc::{unbounded_channel, UnboundedSender};
 use tokio_stream::wrappers::UnboundedReceiverStream;
 // internal

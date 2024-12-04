@@ -27,7 +27,7 @@ use crate::swarm::common::{
 };
 use crate::swarm::validator::ValidatorEventsStream;
 use crate::SubnetworkId;
-use opentelemetry::{global, Key, KeyValue};
+use opentelemetry::global;
 use subnetworks_assignations::MembershipHandler;
 
 const METER_NAME: &str = "nomos-da/network/swarm/executor";
