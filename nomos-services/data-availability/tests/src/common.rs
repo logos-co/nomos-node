@@ -329,15 +329,11 @@ pub fn new_mix_configs(listening_addresses: Vec<Multiaddr>) -> Vec<TestMixSettin
                 Libp2pMixBackendSettings {
                     listening_address: listening_address.clone(),
                     node_key: ed25519::SecretKey::generate(),
-                    peering_degree: 1,
-                    max_peering_degree: 1,
-                    conn_maintenance: Some(ConnectionMaintenanceSettings {
-                        time_window: Duration::from_secs(600),
-                        expected_effective_messages: 600.0,
-                        effective_message_tolerance: 0.1,
-                        expected_drop_messages: 0.0,
-                        drop_message_tolerance: 0.0,
-                    }),
+                    conn_maintenance: ConnectionMaintenanceSettings {
+                        peering_degree: 1,
+                        max_peering_degree: 1,
+                        monitor: None,
+                    },
                 },
                 x25519_dalek::StaticSecret::random(),
             )
