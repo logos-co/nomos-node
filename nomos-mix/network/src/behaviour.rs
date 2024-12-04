@@ -7,13 +7,18 @@ use futures::Stream;
 use libp2p::{
     core::Endpoint,
     swarm::{
-        ConnectionClosed, ConnectionDenied, ConnectionId, FromSwarm, NetworkBehaviour,
-        NotifyHandler, THandler, THandlerInEvent, THandlerOutEvent, ToSwarm,
+        dial_opts::DialOpts, CloseConnection, ConnectionClosed, ConnectionDenied, ConnectionId,
+        FromSwarm, NetworkBehaviour, NotifyHandler, THandler, THandlerInEvent, THandlerOutEvent,
+        ToSwarm,
     },
     Multiaddr, PeerId,
 };
-use nomos_mix::conn_maintenance::{ConnectionMaintenance, ConnectionMaintenanceSettings};
+use nomos_mix::{
+    conn_maintenance::{ConnectionMaintenance, ConnectionMaintenanceSettings},
+    membership::Membership,
+};
 use nomos_mix_message::MixMessage;
+use rand::RngCore;
 use sha2::{Digest, Sha256};
 use std::marker::PhantomData;
 use std::{
@@ -25,19 +30,15 @@ use std::{
 /// A [`NetworkBehaviour`]:
 /// - forwards messages to all connected peers with deduplication.
 /// - receives messages from all connected peers.
-pub struct Behaviour<M, Interval> {
+pub struct Behaviour<M, R, Interval>
+where
+    M: MixMessage,
+    R: RngCore,
+{
     config: Config<Interval>,
-    /// Peers that support the mix protocol, and their connection IDs
-    negotiated_peers: HashMap<PeerId, HashSet<ConnectionId>>,
     /// Connection maintenance
-    /// NOTE: For now, this is optional because this may close too many connections
-    /// until we clearly figure out the optimal parameters.
-    conn_maintenance: Option<ConnectionMaintenance<PeerId>>,
-    /// Peers that should be excluded from connection establishments
-    blacklist_peers: HashSet<PeerId>,
-    /// To maintain address of peers because libp2p API uses only [`PeerId`] when handling
-    /// connection events. But, we need to know [`Multiaddr`] of peers to dial to them.
-    peer_addresses: HashMap<PeerId, Multiaddr>,
+    conn_maintenance: ConnectionMaintenance<M, R>,
+    peer_address_map: PeerAddressMap,
     /// Queue of events to yield to the swarm.
     events: VecDeque<ToSwarm<Event, FromBehaviour>>,
     /// Waker that handles polling
@@ -50,9 +51,8 @@ pub struct Behaviour<M, Interval> {
 
 #[derive(Debug)]
 pub struct Config<Interval> {
-    pub max_peering_degree: usize,
     pub duplicate_cache_lifespan: u64,
-    pub conn_maintenance_settings: Option<ConnectionMaintenanceSettings>,
+    pub conn_maintenance_settings: ConnectionMaintenanceSettings,
     pub conn_maintenance_interval: Option<Interval>,
 }
 
@@ -60,38 +60,34 @@ pub struct Config<Interval> {
 pub enum Event {
     /// A message received from one of the peers.
     Message(Vec<u8>),
-    /// Request establishing the `[amount]` number of new connections,
-    /// excluding the peers with the given addresses.
-    EstabalishNewConnections {
-        amount: usize,
-        excludes: HashSet<Multiaddr>,
-    },
     Error(Error),
 }
 
-impl<M, Interval> Behaviour<M, Interval>
+impl<M, R, Interval> Behaviour<M, R, Interval>
 where
     M: MixMessage,
+    M::PublicKey: PartialEq,
+    R: RngCore,
 {
-    pub fn new(config: Config<Interval>) -> Self {
-        let Config {
-            conn_maintenance_settings,
-            conn_maintenance_interval,
-            ..
-        } = &config;
-        assert_eq!(
-            conn_maintenance_settings.is_some(),
-            conn_maintenance_interval.is_some()
-        );
-        let conn_maintenance = conn_maintenance_settings.map(ConnectionMaintenance::<PeerId>::new);
+    pub fn new(config: Config<Interval>, membership: Membership<M>, rng: R) -> Self {
+        let mut conn_maintenance =
+            ConnectionMaintenance::<M, R>::new(config.conn_maintenance_settings, membership, rng);
+
+        // Bootstrap connections with initial peers randomly chosen.
+        let peer_addrs: Vec<Multiaddr> = conn_maintenance.bootstrap();
+        let events = peer_addrs
+            .into_iter()
+            .map(|peer_addr| ToSwarm::Dial {
+                opts: DialOpts::from(peer_addr),
+            })
+            .collect::<VecDeque<_>>();
+
         let duplicate_cache = TimedCache::with_lifespan(config.duplicate_cache_lifespan);
         Self {
             config,
-            negotiated_peers: HashMap::new(),
             conn_maintenance,
-            peer_addresses: HashMap::new(),
-            blacklist_peers: HashSet::new(),
-            events: VecDeque::new(),
+            peer_address_map: PeerAddressMap::new(),
+            events,
             waker: None,
             duplicate_cache,
             _mix_message: Default::default(),
@@ -127,7 +123,12 @@ where
         message: Vec<u8>,
         excluded_peer: Option<PeerId>,
     ) -> Result<(), Error> {
-        let mut peer_ids: HashSet<_> = self.negotiated_peers.keys().collect();
+        let mut peer_ids = self
+            .conn_maintenance
+            .connected_peers()
+            .iter()
+            .filter_map(|addr| self.peer_address_map.peer_id(addr))
+            .collect::<HashSet<_>>();
         if let Some(peer) = &excluded_peer {
             peer_ids.remove(peer);
         }
@@ -139,7 +140,7 @@ where
         for peer_id in peer_ids.into_iter() {
             tracing::debug!("Registering event for peer {:?} to send msg", peer_id);
             self.events.push_back(ToSwarm::NotifyHandler {
-                peer_id: *peer_id,
+                peer_id,
                 handler: NotifyHandler::Any,
                 event: FromBehaviour::Message(message.clone()),
             });
@@ -149,139 +150,30 @@ where
         Ok(())
     }
 
-    /// Add a peer to the list of connected peers that have completed negotiations
-    /// to verify [`Behaviour`] support.
-    fn add_negotiated_peer(&mut self, peer_id: PeerId, connection_id: ConnectionId) -> bool {
-        tracing::debug!(
-            "Adding to connected_peers: peer_id:{:?}, connection_id:{:?}",
-            peer_id,
-            connection_id
-        );
-        self.negotiated_peers
-            .entry(peer_id)
-            .or_default()
-            .insert(connection_id)
-    }
-
-    /// Remove a peer from the list of connected peers.
-    /// If the peer (or the connection of the peer) is found and removed, return `false`.
-    /// If not, return `true`.
-    fn remove_negotiated_peer(
-        &mut self,
-        peer_id: &PeerId,
-        connection_id: Option<&ConnectionId>,
-    ) -> bool {
-        match connection_id {
-            Some(connection_id) => match self.negotiated_peers.get_mut(peer_id) {
-                Some(connections) => {
-                    tracing::debug!(
-                        "Removing from connected_peers: peer:{:?}, connection_id:{:?}",
-                        peer_id,
-                        connection_id
-                    );
-                    let removed = connections.remove(connection_id);
-                    if connections.is_empty() {
-                        self.negotiated_peers.remove(peer_id);
-                    }
-                    removed
-                }
-                None => false,
-            },
-            None => self.negotiated_peers.remove(peer_id).is_some(),
-        }
-    }
-
-    fn is_negotiated_peer(&self, peer_id: &PeerId) -> bool {
-        self.negotiated_peers.contains_key(peer_id)
-    }
-
-    /// Handle newly detected malicious and unhealthy peers and schedule new connection establishments.
-    /// This must be called at the end of each time window.
-    fn run_conn_maintenance(&mut self) {
-        if let Some(conn_maintenance) = self.conn_maintenance.as_mut() {
-            let (malicious_peers, unhealthy_peers) = conn_maintenance.reset();
-            let num_closed_malicious = self.handle_malicious_peers(malicious_peers);
-            let num_connected_unhealthy = self.handle_unhealthy_peers(unhealthy_peers);
-            let mut num_to_dial = num_closed_malicious + num_connected_unhealthy;
-            if num_to_dial + self.negotiated_peers.len() > self.config.max_peering_degree {
-                tracing::warn!(
-                    "Cannot establish {} new connections due to max_peering_degree:{}. connected_peers:{}",
-                    num_to_dial,
-                    self.config.max_peering_degree,
-                    self.negotiated_peers.len(),
-                );
-                num_to_dial = self.config.max_peering_degree - self.negotiated_peers.len();
-            }
-            self.schedule_dials(num_to_dial);
-        }
-    }
-
-    /// Add newly detected malicious peers to the blacklist,
-    /// and schedule connection closures if the connections exist.
-    /// This returns the number of connection closures that were actually scheduled.
-    fn handle_malicious_peers(&mut self, peers: HashSet<PeerId>) -> usize {
-        peers
-            .into_iter()
-            .map(|peer_id| {
-                self.blacklist_peers.insert(peer_id);
-                // Close the connection only if the peer was already connected.
-                if self.remove_negotiated_peer(&peer_id, None) {
-                    self.events.push_back(ToSwarm::CloseConnection {
-                        peer_id,
-                        connection: libp2p::swarm::CloseConnection::All,
-                    });
-                    1
-                } else {
-                    0
-                }
-            })
-            .sum()
-    }
-
-    /// Add newly detected unhealthy peers to the blacklist,
-    /// and return the number of connections that actually exist to the unhealthy peers.
-    fn handle_unhealthy_peers(&mut self, peers: HashSet<PeerId>) -> usize {
-        peers
-            .into_iter()
-            .map(|peer_id| {
-                self.blacklist_peers.insert(peer_id);
-                if self.is_negotiated_peer(&peer_id) {
-                    1
-                } else {
-                    0
-                }
-            })
-            .sum()
-    }
-
-    /// Schedule new connection establishments, excluding the blacklisted peers.
-    fn schedule_dials(&mut self, amount: usize) {
-        if amount == 0 {
-            return;
-        }
-
-        let excludes = self
-            .blacklist_peers
-            .iter()
-            .filter_map(|peer_id| self.peer_addresses.get(peer_id).cloned())
-            .collect();
-        tracing::info!(
-            "Scheduling {} new dialings: excludes:{:?}",
-            amount,
-            excludes
-        );
-        self.events
-            .push_back(ToSwarm::GenerateEvent(Event::EstabalishNewConnections {
-                amount,
-                excludes,
-            }));
-    }
-
-    /// SHA-256 hash of the message
     fn message_id(message: &[u8]) -> Vec<u8> {
         let mut hasher = Sha256::new();
         hasher.update(message);
         hasher.finalize().to_vec()
+    }
+
+    fn run_conn_maintenance(&mut self) {
+        let (peers_to_close, peers_to_connect) = self.conn_maintenance.reset();
+
+        // Schedule events to close connections
+        peers_to_close.into_iter().for_each(|addr| {
+            if let Some(peer_id) = self.peer_address_map.peer_id(&addr) {
+                self.events.push_back(ToSwarm::CloseConnection {
+                    peer_id,
+                    connection: CloseConnection::All,
+                });
+            }
+        });
+        // Schedule events to connect to peers
+        peers_to_connect.into_iter().for_each(|addr| {
+            self.events.push_back(ToSwarm::Dial {
+                opts: DialOpts::from(addr),
+            });
+        });
     }
 
     fn try_wake(&mut self) {
@@ -291,9 +183,11 @@ where
     }
 }
 
-impl<M, Interval> NetworkBehaviour for Behaviour<M, Interval>
+impl<M, R, Interval> NetworkBehaviour for Behaviour<M, R, Interval>
 where
     M: MixMessage + 'static,
+    M::PublicKey: PartialEq + 'static,
+    R: RngCore + 'static,
     Interval: Stream + Unpin + 'static,
 {
     type ConnectionHandler = MixConnectionHandler;
@@ -306,8 +200,8 @@ where
         _: &Multiaddr,
         remote_addr: &Multiaddr,
     ) -> Result<THandler<Self>, ConnectionDenied> {
-        // Keep the address of the peer
-        self.peer_addresses.insert(peer_id, remote_addr.clone());
+        // Keep PeerId <> Multiaddr mapping
+        self.peer_address_map.add(peer_id, remote_addr.clone());
         Ok(MixConnectionHandler::new())
     }
 
@@ -318,8 +212,8 @@ where
         addr: &Multiaddr,
         _: Endpoint,
     ) -> Result<THandler<Self>, ConnectionDenied> {
-        // Keep the address of the peer
-        self.peer_addresses.insert(peer_id, addr.clone());
+        // Keep PeerId <> Multiaddr mapping
+        self.peer_address_map.add(peer_id, addr.clone());
         Ok(MixConnectionHandler::new())
     }
 
@@ -327,11 +221,15 @@ where
     fn on_swarm_event(&mut self, event: FromSwarm) {
         if let FromSwarm::ConnectionClosed(ConnectionClosed {
             peer_id,
-            connection_id,
+            remaining_established,
             ..
         }) = event
         {
-            self.remove_negotiated_peer(&peer_id, Some(&connection_id));
+            if remaining_established == 0 {
+                if let Some(addr) = self.peer_address_map.address(&peer_id) {
+                    self.conn_maintenance.remove_connected_peer(addr);
+                }
+            }
         }
     }
 
@@ -348,14 +246,14 @@ where
             ToBehaviour::Message(message) => {
                 // Ignore drop message
                 if M::is_drop_message(&message) {
-                    if let Some(conn_maintenance) = self.conn_maintenance.as_mut() {
-                        conn_maintenance.add_drop(peer_id);
+                    if let Some(addr) = self.peer_address_map.address(&peer_id) {
+                        self.conn_maintenance.record_drop_message(addr);
                     }
                     return;
                 }
 
-                if let Some(conn_maintenance) = self.conn_maintenance.as_mut() {
-                    conn_maintenance.add_effective(peer_id);
+                if let Some(addr) = self.peer_address_map.address(&peer_id) {
+                    self.conn_maintenance.record_effective_message(addr);
                 }
 
                 // Add the message to the cache. If it was already seen, ignore it.
@@ -381,10 +279,14 @@ where
             // The connection was fully negotiated by the peer,
             // which means that the peer supports the mix protocol.
             ToBehaviour::FullyNegotiatedOutbound => {
-                self.add_negotiated_peer(peer_id, connection_id);
+                if let Some(addr) = self.peer_address_map.address(&peer_id) {
+                    self.conn_maintenance.add_connected_peer(addr.clone());
+                }
             }
             ToBehaviour::NegotiationFailed => {
-                self.remove_negotiated_peer(&peer_id, Some(&connection_id));
+                if let Some(addr) = self.peer_address_map.address(&peer_id) {
+                    self.conn_maintenance.remove_connected_peer(addr);
+                }
             }
             ToBehaviour::IOError(error) => {
                 // TODO: Consider removing the peer from the connected_peers and closing the connection
@@ -406,7 +308,7 @@ where
         cx: &mut Context<'_>,
     ) -> Poll<ToSwarm<Self::ToSwarm, THandlerInEvent<Self>>> {
         // Run connection maintenance if the interval is reached.
-        if let Some(interval) = self.config.conn_maintenance_interval.as_mut() {
+        if let Some(interval) = &mut self.config.conn_maintenance_interval {
             if pin!(interval).poll_next(cx).is_ready() {
                 self.run_conn_maintenance();
             }
@@ -418,5 +320,32 @@ where
             self.waker = Some(cx.waker().clone());
             Poll::Pending
         }
+    }
+}
+
+struct PeerAddressMap {
+    peer_to_addr: HashMap<PeerId, Multiaddr>,
+    addr_to_peer: HashMap<Multiaddr, PeerId>,
+}
+
+impl PeerAddressMap {
+    fn new() -> Self {
+        Self {
+            peer_to_addr: HashMap::new(),
+            addr_to_peer: HashMap::new(),
+        }
+    }
+
+    fn add(&mut self, peer_id: PeerId, addr: Multiaddr) {
+        self.peer_to_addr.insert(peer_id, addr.clone());
+        self.addr_to_peer.insert(addr, peer_id);
+    }
+
+    fn peer_id(&self, addr: &Multiaddr) -> Option<PeerId> {
+        self.addr_to_peer.get(addr).copied()
+    }
+
+    fn address(&self, peer_id: &PeerId) -> Option<&Multiaddr> {
+        self.peer_to_addr.get(peer_id)
     }
 }
