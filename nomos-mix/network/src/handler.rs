@@ -57,6 +57,12 @@ impl MixConnectionHandler {
     }
 }
 
+impl Default for MixConnectionHandler {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[derive(Debug)]
 pub enum FromBehaviour {
     /// A message to be sent to the connection.
