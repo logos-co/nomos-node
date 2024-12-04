@@ -3,12 +3,8 @@ pub mod error;
 use error::Error;
 
 use crate::MixMessage;
-// TODO: Remove all the mock below once the actual implementation is integrated to the system.
-//
-/// A mock implementation of the Sphinx encoding.
 
 const NODE_ID_SIZE: usize = 32;
-
 // TODO: Move MAX_PAYLOAD_SIZE and MAX_LAYERS to the upper layer (service layer).
 const MAX_PAYLOAD_SIZE: usize = 2048;
 const PAYLOAD_PADDING_SEPARATOR: u8 = 0x01;
@@ -17,6 +13,7 @@ const MAX_LAYERS: usize = 5;
 pub const MESSAGE_SIZE: usize =
     NODE_ID_SIZE * MAX_LAYERS + MAX_PAYLOAD_SIZE + PAYLOAD_PADDING_SEPARATOR_SIZE;
 
+/// A mock implementation of the Sphinx encoding.
 #[derive(Clone, Debug)]
 pub struct MockMixMessage;
 
