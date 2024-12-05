@@ -842,7 +842,7 @@ where
             &[
                 KeyValue::new("transactions", transactions.clone()),
                 KeyValue::new("blobs", blobs.clone()),
-                KeyValue::new("bytes", Value::I64(content_size as i64)),
+                KeyValue::new("bytes", Value::I64(i64::from(content_size))),
             ],
         );
 
