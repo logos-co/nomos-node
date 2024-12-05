@@ -122,7 +122,13 @@ where
     /// Analyze connection monitors to identify malicious or unhealthy peers,
     /// and return which peers to disconnect from and which new peers to connect with.
     /// Additionally, this function resets and prepares the monitors for the next time window.
-    pub fn reset(&mut self) -> (HashSet<Multiaddr>, HashSet<Multiaddr>) {
+    pub fn reset(
+        &mut self,
+    ) -> Option<(
+        HashMap<Multiaddr, ConnectionMonitor>,
+        HashSet<Multiaddr>,
+        HashSet<Multiaddr>,
+    )> {
         let (malicious_peers, unhealthy_peers) = self.analyze_monitors();
 
         // Choose peers to connect with
@@ -145,9 +151,8 @@ where
             HashSet::new()
         };
 
-        self.reset_monitors();
-
-        (peers_to_close, peers_to_connect)
+        self.reset_monitors()
+            .map(|old_monitors| (old_monitors, peers_to_close, peers_to_connect))
     }
 
     /// Find malicious peers and unhealthy peers by analyzing connection monitors.
@@ -180,14 +185,19 @@ where
     /// Reset monitors for all connected peers to be monitored in the next time window.
     /// To avoid false detection, we only monitor peers that were already connected
     /// before the time window started.
-    fn reset_monitors(&mut self) {
-        if let Some(monitors) = self.monitors.as_mut() {
-            *monitors = self
-                .connected_peers
-                .iter()
-                .cloned()
-                .map(|peer| (peer, ConnectionMonitor::new()))
-                .collect();
+    fn reset_monitors(&mut self) -> Option<HashMap<Multiaddr, ConnectionMonitor>> {
+        match self.monitors.take() {
+            Some(old_monitors) => {
+                self.monitors = Some(
+                    self.connected_peers
+                        .iter()
+                        .cloned()
+                        .map(|peer| (peer, ConnectionMonitor::new()))
+                        .collect(),
+                );
+                Some(old_monitors)
+            }
+            None => None,
         }
     }
 
@@ -210,9 +220,9 @@ where
 
 /// Meter to count the number of effective and drop messages sent by a peer
 #[derive(Debug)]
-struct ConnectionMonitor {
-    effective_messages: U57F7,
-    drop_messages: U57F7,
+pub struct ConnectionMonitor {
+    pub effective_messages: U57F7,
+    pub drop_messages: U57F7,
 }
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
@@ -347,7 +357,7 @@ mod tests {
         // Peer 2 sends 1 effective messages, less than expected
         maintenance.record_effective_message(&peers[2]);
 
-        let (peers_to_close, peers_to_connect) = maintenance.reset();
+        let (_, peers_to_close, peers_to_connect) = maintenance.reset().unwrap();
         // Peer 0 is malicious
         assert_eq!(peers_to_close, HashSet::from_iter(vec![peers[0].clone()]));
         // Because Peer 1 is malicious and Peer 2 is unhealthy, 2 new connections should be established
@@ -387,7 +397,7 @@ mod tests {
         maintenance.record_effective_message(&peers[1]);
         maintenance.record_effective_message(&peers[2]);
 
-        let (peers_to_close, peers_to_connect) = maintenance.reset();
+        let (_, peers_to_close, peers_to_connect) = maintenance.reset().unwrap();
         // Peer 0 is malicious
         assert_eq!(peers_to_close, HashSet::from_iter(vec![peers[0].clone()]));
         // Even though we detected 1 malicious and 2 unhealthy peers,
