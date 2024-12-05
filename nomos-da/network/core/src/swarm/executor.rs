@@ -58,6 +58,7 @@ where
         let sampling_events_receiver = UnboundedReceiverStream::new(sampling_events_receiver);
         let validation_events_receiver = UnboundedReceiverStream::new(validation_events_receiver);
         let dispersal_events_receiver = UnboundedReceiverStream::new(dispersal_events_receiver);
+
         (
             Self {
                 swarm: Self::build_swarm(key, membership, addresses),
@@ -161,15 +162,30 @@ where
     async fn handle_behaviour_event(&mut self, event: ExecutorBehaviourEvent<Membership>) {
         match event {
             ExecutorBehaviourEvent::Sampling(event) => {
+                tracing::info!(counter.behaviour_events_received = 1, event = "sampling");
                 self.handle_sampling_event(event).await;
             }
             ExecutorBehaviourEvent::ExecutorDispersal(event) => {
+                tracing::info!(
+                    counter.behaviour_events_received = 1,
+                    event = "dispersal_executor_event"
+                );
                 self.handle_executor_dispersal_event(event).await;
             }
             ExecutorBehaviourEvent::ValidatorDispersal(event) => {
+                tracing::info!(
+                    counter.behaviour_events_received = 1,
+                    event = "validator_dispersal",
+                    blob_size = event.blob_size()
+                );
                 self.handle_validator_dispersal_event(event).await;
             }
             ExecutorBehaviourEvent::Replication(event) => {
+                tracing::info!(
+                    counter.behaviour_events_received = 1,
+                    event = "replication",
+                    blob_size = event.blob_size()
+                );
                 self.handle_replication_event(event).await;
             }
         }
