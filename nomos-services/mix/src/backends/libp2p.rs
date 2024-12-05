@@ -42,11 +42,12 @@ const CHANNEL_SIZE: usize = 64;
 #[async_trait]
 impl MixBackend for Libp2pMixBackend {
     type Settings = Libp2pMixBackendSettings;
+    type Address = Multiaddr;
 
     fn new<R>(
         config: Self::Settings,
         overwatch_handle: OverwatchHandle,
-        membership: Membership<SphinxMessage>,
+        membership: Membership<Self::Address, SphinxMessage>,
         rng: R,
     ) -> Self
     where
@@ -112,7 +113,7 @@ where
 {
     fn new(
         config: Libp2pMixBackendSettings,
-        membership: Membership<SphinxMessage>,
+        membership: Membership<Multiaddr, SphinxMessage>,
         rng: R,
         swarm_messages_receiver: mpsc::Receiver<MixSwarmMessage>,
         incoming_message_sender: broadcast::Sender<Vec<u8>>,

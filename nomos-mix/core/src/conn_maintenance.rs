@@ -1,11 +1,11 @@
 use std::{
     collections::{HashMap, HashSet},
     fmt::Debug,
+    hash::Hash,
     time::Duration,
 };
 
 use fixed::types::U57F7;
-use multiaddr::Multiaddr;
 use nomos_mix_message::MixMessage;
 use rand::RngCore;
 use serde::{Deserialize, Serialize};
@@ -22,28 +22,33 @@ pub struct ConnectionMaintenanceSettings {
 
 /// Connection maintenance to detect malicious and unhealthy peers
 /// based on the number of messages sent by each peer in time windows
-pub struct ConnectionMaintenance<M, R>
+pub struct ConnectionMaintenance<Address, M, R>
 where
     M: MixMessage,
     R: RngCore,
 {
     settings: ConnectionMaintenanceSettings,
-    membership: Membership<M>,
+    membership: Membership<Address, M>,
     rng: R,
-    connected_peers: HashSet<Multiaddr>,
-    malicious_peers: HashSet<Multiaddr>,
+    connected_peers: HashSet<Address>,
+    malicious_peers: HashSet<Address>,
     /// Monitors to measure the number of effective and drop messages sent by each peer
     /// NOTE: We keep this optional until we gain confidence in parameter values that don't cause false detection.
-    monitors: Option<HashMap<Multiaddr, ConnectionMonitor>>,
+    monitors: Option<HashMap<Address, ConnectionMonitor>>,
 }
 
-impl<M, R> ConnectionMaintenance<M, R>
+impl<Address, M, R> ConnectionMaintenance<Address, M, R>
 where
+    Address: Eq + Hash + Clone + Debug,
     M: MixMessage,
     M::PublicKey: PartialEq,
     R: RngCore,
 {
-    pub fn new(settings: ConnectionMaintenanceSettings, membership: Membership<M>, rng: R) -> Self {
+    pub fn new(
+        settings: ConnectionMaintenanceSettings,
+        membership: Membership<Address, M>,
+        rng: R,
+    ) -> Self {
         Self {
             settings,
             membership,
@@ -55,7 +60,7 @@ where
     }
 
     /// Choose the `peering_degree` number of remote nodes to connect to.
-    pub fn bootstrap(&mut self) -> Vec<Multiaddr> {
+    pub fn bootstrap(&mut self) -> Vec<Address> {
         self.membership
             .choose_remote_nodes(&mut self.rng, self.settings.peering_degree)
             .iter()
@@ -65,24 +70,24 @@ where
     }
 
     /// Add a peer, which is fully connected, to the list of connected peers.
-    pub fn add_connected_peer(&mut self, peer: Multiaddr) {
+    pub fn add_connected_peer(&mut self, peer: Address) {
         self.connected_peers.insert(peer);
     }
 
     /// Remove a peer that has been disconnected.
-    pub fn remove_connected_peer(&mut self, peer: &Multiaddr) {
+    pub fn remove_connected_peer(&mut self, peer: &Address) {
         self.connected_peers.remove(peer);
     }
 
     /// Return the set of connected peers.
-    pub fn connected_peers(&self) -> &HashSet<Multiaddr> {
+    pub fn connected_peers(&self) -> &HashSet<Address> {
         &self.connected_peers
     }
 
     /// Record a effective message sent by the [`peer`].
     /// If the peer was added during the current time window, the peer is not monitored
     /// until the next time window, to avoid false detection.
-    pub fn record_effective_message(&mut self, peer: &Multiaddr) {
+    pub fn record_effective_message(&mut self, peer: &Address) {
         if let Some(monitors) = self.monitors.as_mut() {
             if let Some(monitor) = monitors.get_mut(peer) {
                 monitor.effective_messages = monitor
@@ -102,7 +107,7 @@ where
     /// Record a drop message sent by the [`peer`].
     /// If the peer was added during the current time window, the peer is not monitored
     /// until the next time window, to avoid false detection.
-    pub fn record_drop_message(&mut self, peer: &Multiaddr) {
+    pub fn record_drop_message(&mut self, peer: &Address) {
         if let Some(monitors) = self.monitors.as_mut() {
             if let Some(monitor) = monitors.get_mut(peer) {
                 monitor.drop_messages = monitor
@@ -125,9 +130,9 @@ where
     pub fn reset(
         &mut self,
     ) -> Option<(
-        HashMap<Multiaddr, ConnectionMonitor>,
-        HashSet<Multiaddr>,
-        HashSet<Multiaddr>,
+        HashMap<Address, ConnectionMonitor>,
+        HashSet<Address>,
+        HashSet<Address>,
     )> {
         let (malicious_peers, unhealthy_peers) = self.analyze_monitors();
 
@@ -157,7 +162,7 @@ where
 
     /// Find malicious peers and unhealthy peers by analyzing connection monitors.
     /// The set of malicious peers is disjoint from the set of unhealthy peers.
-    fn analyze_monitors(&mut self) -> (HashSet<Multiaddr>, HashSet<Multiaddr>) {
+    fn analyze_monitors(&mut self) -> (HashSet<Address>, HashSet<Address>) {
         let mut malicious_peers = HashSet::new();
         let mut unhealthy_peers = HashSet::new();
 
@@ -185,7 +190,7 @@ where
     /// Reset monitors for all connected peers to be monitored in the next time window.
     /// To avoid false detection, we only monitor peers that were already connected
     /// before the time window started.
-    fn reset_monitors(&mut self) -> Option<HashMap<Multiaddr, ConnectionMonitor>> {
+    fn reset_monitors(&mut self) -> Option<HashMap<Address, ConnectionMonitor>> {
         match self.monitors.take() {
             Some(old_monitors) => {
                 self.monitors = Some(
@@ -410,9 +415,9 @@ mod tests {
     fn init_maintenance(
         settings: ConnectionMaintenanceSettings,
         node_count: usize,
-    ) -> ConnectionMaintenance<MockMixMessage, ThreadRng> {
+    ) -> ConnectionMaintenance<usize, MockMixMessage, ThreadRng> {
         let nodes = nodes(node_count);
-        let mut maintenance = ConnectionMaintenance::<MockMixMessage, ThreadRng>::new(
+        let mut maintenance = ConnectionMaintenance::<usize, MockMixMessage, ThreadRng>::new(
             settings,
             Membership::new(nodes.clone(), nodes[0].public_key),
             thread_rng(),
@@ -424,12 +429,10 @@ mod tests {
         maintenance
     }
 
-    fn nodes(count: usize) -> Vec<Node<<MockMixMessage as MixMessage>::PublicKey>> {
+    fn nodes(count: usize) -> Vec<Node<usize, <MockMixMessage as MixMessage>::PublicKey>> {
         (0..count)
             .map(|i| Node {
-                address: format!("/ip4/127.0.0.1/udp/{}/quic-v1", 1000 + i)
-                    .parse()
-                    .unwrap(),
+                address: i,
                 public_key: [i as u8; 32],
             })
             .collect()

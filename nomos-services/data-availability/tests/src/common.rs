@@ -191,7 +191,7 @@ pub struct TestDaNetworkSettings {
 pub struct TestMixSettings {
     pub backend: Libp2pMixBackendSettings,
     pub private_key: x25519_dalek::StaticSecret,
-    pub membership: Vec<Node<<SphinxMessage as MixMessage>::PublicKey>>,
+    pub membership: Vec<Node<Multiaddr, <SphinxMessage as MixMessage>::PublicKey>>,
 }
 
 pub fn new_node(

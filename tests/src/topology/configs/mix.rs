@@ -11,7 +11,7 @@ use crate::get_available_port;
 pub struct GeneralMixConfig {
     pub backend: Libp2pMixBackendSettings,
     pub private_key: x25519_dalek::StaticSecret,
-    pub membership: Vec<Node<<SphinxMessage as MixMessage>::PublicKey>>,
+    pub membership: Vec<Node<Multiaddr, <SphinxMessage as MixMessage>::PublicKey>>,
 }
 
 pub fn create_mix_configs(ids: &[[u8; 32]]) -> Vec<GeneralMixConfig> {
@@ -50,7 +50,9 @@ pub fn create_mix_configs(ids: &[[u8; 32]]) -> Vec<GeneralMixConfig> {
     configs
 }
 
-fn mix_nodes(configs: &[GeneralMixConfig]) -> Vec<Node<<SphinxMessage as MixMessage>::PublicKey>> {
+fn mix_nodes(
+    configs: &[GeneralMixConfig],
+) -> Vec<Node<Multiaddr, <SphinxMessage as MixMessage>::PublicKey>> {
     configs
         .iter()
         .map(|config| Node {

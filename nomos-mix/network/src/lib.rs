@@ -95,7 +95,7 @@ mod test {
     }
 
     fn new_swarm(
-        membership: Membership<MockMixMessage>,
+        membership: Membership<Multiaddr, MockMixMessage>,
     ) -> Swarm<Behaviour<MockMixMessage, ThreadRng, IntervalStream>> {
         let conn_maintenance_settings = ConnectionMaintenanceSettings {
             peering_degree: membership.size() - 1, // excluding the local node
@@ -151,7 +151,7 @@ mod test {
     fn nodes(
         count: usize,
         base_port: usize,
-    ) -> Vec<Node<<MockMixMessage as MixMessage>::PublicKey>> {
+    ) -> Vec<Node<Multiaddr, <MockMixMessage as MixMessage>::PublicKey>> {
         (0..count)
             .map(|i| Node {
                 address: format!("/ip4/127.0.0.1/udp/{}/quic-v1", base_port + i)

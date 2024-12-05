@@ -1,3 +1,5 @@
+use std::hash::Hash;
+
 use crate::membership::Membership;
 use nomos_mix_message::MixMessage;
 use rand::RngCore;
@@ -5,12 +7,12 @@ use serde::{Deserialize, Serialize};
 
 /// [`CryptographicProcessor`] is responsible for wrapping and unwrapping messages
 /// for the message indistinguishability.
-pub struct CryptographicProcessor<R, M>
+pub struct CryptographicProcessor<R, Address, M>
 where
     M: MixMessage,
 {
     settings: CryptographicProcessorSettings<M::PrivateKey>,
-    membership: Membership<M>,
+    membership: Membership<Address, M>,
     rng: R,
 }
 
@@ -20,15 +22,16 @@ pub struct CryptographicProcessorSettings<K> {
     pub num_mix_layers: usize,
 }
 
-impl<R, M> CryptographicProcessor<R, M>
+impl<R, Address, M> CryptographicProcessor<R, Address, M>
 where
     R: RngCore,
+    Address: Eq + Hash,
     M: MixMessage,
     M::PublicKey: Clone + PartialEq,
 {
     pub fn new(
         settings: CryptographicProcessorSettings<M::PrivateKey>,
-        membership: Membership<M>,
+        membership: Membership<Address, M>,
         rng: R,
     ) -> Self {
         Self {
