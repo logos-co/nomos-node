@@ -10,8 +10,6 @@ use libp2p::swarm::{DialError, SwarmEvent};
 use libp2p::{Multiaddr, PeerId, Swarm, SwarmBuilder, TransportError};
 use log::debug;
 use nomos_core::da::BlobId;
-use opentelemetry::global;
-use opentelemetry::metrics::Counter;
 use tokio::sync::mpsc::{unbounded_channel, UnboundedSender};
 use tokio_stream::wrappers::UnboundedReceiverStream;
 // internal
@@ -38,9 +36,6 @@ pub struct ValidatorSwarm<
     swarm: Swarm<ValidatorBehaviour<Membership>>,
     sampling_events_sender: UnboundedSender<SamplingEvent>,
     validation_events_sender: UnboundedSender<DaBlob>,
-
-    /// Metrics
-    behaviour_events_received_counter: Counter<u64>,
 }
 
 impl<Membership> ValidatorSwarm<Membership>
@@ -58,17 +53,11 @@ where
         let sampling_events_receiver = UnboundedReceiverStream::new(sampling_events_receiver);
         let validation_events_receiver = UnboundedReceiverStream::new(validation_events_receiver);
 
-        let meter = global::meter("nomos-da/network/swarm/validator");
-        let behaviour_events_received_counter = meter
-            .u64_counter("behaviour_events_received")
-            .with_description("Number of behaviour events received")
-            .build();
         (
             Self {
                 swarm: Self::build_swarm(key, membership, addresses),
                 sampling_events_sender,
                 validation_events_sender,
-                behaviour_events_received_counter,
             },
             ValidatorEventsStream {
                 sampling_events_receiver,
@@ -143,15 +132,23 @@ where
     async fn handle_behaviour_event(&mut self, event: ValidatorBehaviourEvent<Membership>) {
         match event {
             ValidatorBehaviourEvent::Sampling(event) => {
-                event.log_with_counter(&mut self.behaviour_events_received_counter);
+                tracing::info!(counter.behaviour_events_received = 1, event = "sampling");
                 self.handle_sampling_event(event).await;
             }
             ValidatorBehaviourEvent::Dispersal(event) => {
-                event.log_with_counter(&mut self.behaviour_events_received_counter);
+                tracing::info!(
+                    counter.behaviour_events_received = 1,
+                    event = "validator_dispersal",
+                    blob_size = event.blob_size()
+                );
                 self.handle_dispersal_event(event).await;
             }
             ValidatorBehaviourEvent::Replication(event) => {
-                event.log_with_counter(&mut self.behaviour_events_received_counter);
+                tracing::info!(
+                    counter.behaviour_events_received = 1,
+                    event = "replication",
+                    blob_size = event.blob_size()
+                );
                 self.handle_replication_event(event).await;
             }
         }

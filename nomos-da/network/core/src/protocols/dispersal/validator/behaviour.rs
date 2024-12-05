@@ -15,7 +15,6 @@ use log::debug;
 use nomos_da_messages::dispersal::dispersal_res::MessageType;
 use nomos_da_messages::dispersal::{DispersalReq, DispersalRes};
 use nomos_da_messages::{pack_message, unpack_from_reader};
-use opentelemetry::{metrics::Counter, KeyValue};
 use std::io::Error;
 use std::task::{Context, Poll};
 use subnetworks_assignations::MembershipHandler;
@@ -27,29 +26,12 @@ pub enum DispersalEvent {
 }
 
 impl DispersalEvent {
-    const EVENT_NAME: &'static str = "validator_dispersal";
-
-    fn blob_size(&self) -> Option<usize> {
+    pub fn blob_size(&self) -> Option<usize> {
         match self {
             DispersalEvent::IncomingMessage { message } => {
                 message.blob.as_ref().map(|blob| blob.data.len())
             }
         }
-    }
-
-    fn blob_size_str(&self) -> String {
-        self.blob_size()
-            .map_or(String::from("unknown"), |size| size.to_string())
-    }
-
-    pub fn log_with_counter(&self, counter: &mut Counter<u64>) {
-        counter.add(
-            1,
-            &[
-                KeyValue::new("event", Self::EVENT_NAME),
-                KeyValue::new("blob_size", self.blob_size_str()),
-            ],
-        );
     }
 }
 

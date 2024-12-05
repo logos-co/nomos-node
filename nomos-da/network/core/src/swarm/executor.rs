@@ -27,8 +27,6 @@ use crate::swarm::common::{
 };
 use crate::swarm::validator::ValidatorEventsStream;
 use crate::SubnetworkId;
-use opentelemetry::global;
-use opentelemetry::metrics::Counter;
 use subnetworks_assignations::MembershipHandler;
 
 pub struct ExecutorEventsStream {
@@ -43,9 +41,6 @@ pub struct ExecutorSwarm<
     sampling_events_sender: UnboundedSender<SamplingEvent>,
     validation_events_sender: UnboundedSender<DaBlob>,
     dispersal_events_sender: UnboundedSender<DispersalExecutorEvent>,
-
-    /// Metrics
-    behaviour_events_received_counter: Counter<u64>,
 }
 
 impl<Membership> ExecutorSwarm<Membership>
@@ -64,18 +59,12 @@ where
         let validation_events_receiver = UnboundedReceiverStream::new(validation_events_receiver);
         let dispersal_events_receiver = UnboundedReceiverStream::new(dispersal_events_receiver);
 
-        let meter = global::meter("nomos-da/network/swarm/executor");
-        let behaviour_events_received_counter = meter
-            .u64_counter("behaviour_events_received")
-            .with_description("Number of behaviour events received")
-            .build();
         (
             Self {
                 swarm: Self::build_swarm(key, membership, addresses),
                 sampling_events_sender,
                 validation_events_sender,
                 dispersal_events_sender,
-                behaviour_events_received_counter,
             },
             ExecutorEventsStream {
                 validator_events_stream: ValidatorEventsStream {
@@ -173,19 +162,30 @@ where
     async fn handle_behaviour_event(&mut self, event: ExecutorBehaviourEvent<Membership>) {
         match event {
             ExecutorBehaviourEvent::Sampling(event) => {
-                event.log_with_counter(&mut self.behaviour_events_received_counter);
+                tracing::info!(counter.behaviour_events_received = 1, event = "sampling");
                 self.handle_sampling_event(event).await;
             }
             ExecutorBehaviourEvent::ExecutorDispersal(event) => {
-                event.log_with_counter(&mut self.behaviour_events_received_counter);
+                tracing::info!(
+                    counter.behaviour_events_received = 1,
+                    event = "dispersal_executor_event"
+                );
                 self.handle_executor_dispersal_event(event).await;
             }
             ExecutorBehaviourEvent::ValidatorDispersal(event) => {
-                event.log_with_counter(&mut self.behaviour_events_received_counter);
+                tracing::info!(
+                    counter.behaviour_events_received = 1,
+                    event = "validator_dispersal",
+                    blob_size = event.blob_size()
+                );
                 self.handle_validator_dispersal_event(event).await;
             }
             ExecutorBehaviourEvent::Replication(event) => {
-                event.log_with_counter(&mut self.behaviour_events_received_counter);
+                tracing::info!(
+                    counter.behaviour_events_received = 1,
+                    event = "replication",
+                    blob_size = event.blob_size()
+                );
                 self.handle_replication_event(event).await;
             }
         }
