@@ -13,16 +13,9 @@ use libp2p::{
     },
     Stream, StreamProtocol,
 };
-use opentelemetry::metrics::{Counter, Gauge};
-use opentelemetry::{global, KeyValue};
 
 use crate::behaviour::Config;
 
-const SERVICE_NAME: &str = "nomos-mix/network/handler";
-const METRIC_PENDING_OUTBOUND_MESSAGES: &str = "pending_outbound_messages";
-const METRIC_PENDING_EVENTS_TO_BEHAVIOUR: &str = "pending_events_to_behaviour";
-const METRIC_CONNECTION_EVENTS: &str = "connection_events";
-const KEY_EVENT: &str = "event";
 const VALUE_FULLY_NEGOTIATED_INBOUND: &str = "fully_negotiated_inbound";
 const VALUE_FULLY_NEGOTIATED_OUTBOUND: &str = "fully_negotiated_outbound";
 const VALUE_DIAL_UPGRADE_ERROR: &str = "dial_upgrade_error";
@@ -39,11 +32,6 @@ pub struct MixConnectionHandler {
     outbound_msgs: VecDeque<Vec<u8>>,
     pending_events_to_behaviour: VecDeque<ToBehaviour>,
     waker: Option<Waker>,
-
-    /// Metrics
-    pending_events_to_behaviour_gauge: Gauge<u64>,
-    pending_outbound_messages_gauge: Gauge<u64>,
-    connection_event_counter: Counter<u64>,
 }
 
 type MsgSendFuture = BoxFuture<'static, Result<Stream, io::Error>>;
@@ -61,29 +49,12 @@ enum OutboundSubstreamState {
 impl MixConnectionHandler {
     pub fn new() -> Self {
     pub fn new(_config: &Config) -> Self {
-        let meter = global::meter(SERVICE_NAME);
-        let pending_outbound_messages_gauge = meter
-            .u64_gauge(METRIC_PENDING_OUTBOUND_MESSAGES)
-            .with_description("Number of pending outbound messages")
-            .build();
-        let pending_events_to_behaviour_gauge = meter
-            .u64_gauge(METRIC_PENDING_EVENTS_TO_BEHAVIOUR)
-            .with_description("Number of pending events to be sent to the behaviour")
-            .build();
-        let connection_event_counter = meter
-            .u64_counter(METRIC_CONNECTION_EVENTS)
-            .with_description("Number of connection events")
-            .build();
-
         Self {
             inbound_substream: None,
             outbound_substream: None,
             outbound_msgs: VecDeque::new(),
             pending_events_to_behaviour: VecDeque::new(),
             waker: None,
-            pending_outbound_messages_gauge,
-            pending_events_to_behaviour_gauge,
-            connection_event_counter,
         }
     }
 
@@ -136,10 +107,10 @@ impl ConnectionHandler for MixConnectionHandler {
     ) -> Poll<
         ConnectionHandlerEvent<Self::OutboundProtocol, Self::OutboundOpenInfo, Self::ToBehaviour>,
     > {
-        self.pending_outbound_messages_gauge
-            .record(self.outbound_msgs.len() as u64, &[]);
-        self.pending_events_to_behaviour_gauge
-            .record(self.pending_events_to_behaviour.len() as u64, &[]);
+        tracing::info!(gauge.pending_outbound_messages = self.outbound_msgs.len() as u64,);
+        tracing::info!(
+            gauge.pending_events_to_behaviour = self.pending_events_to_behaviour.len() as u64,
+        );
 
         // Process pending events to be sent to the behaviour
         if let Some(event) = self.pending_events_to_behaviour.pop_front() {
@@ -291,8 +262,7 @@ impl ConnectionHandler for MixConnectionHandler {
             }
         };
 
-        self.connection_event_counter
-            .add(1, &[KeyValue::new(KEY_EVENT, event_name)]);
+        tracing::info!(counter.connection_event = 1, event = event_name);
         self.try_wake();
     }
 }

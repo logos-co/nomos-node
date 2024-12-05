@@ -11,10 +11,6 @@ use libp2p::{
 use nomos_libp2p::secret_key_serde;
 use nomos_mix::{conn_maintenance::ConnectionMaintenanceSettings, membership::Membership};
 use nomos_mix_message::sphinx::SphinxMessage;
-use opentelemetry::{
-    global,
-    metrics::{Counter, Histogram},
-};
 use overwatch_rs::overwatch::handle::OverwatchHandle;
 use rand::RngCore;
 use serde::{Deserialize, Serialize};
@@ -23,16 +19,6 @@ use tokio::{
     task::JoinHandle,
 };
 use tokio_stream::wrappers::{BroadcastStream, IntervalStream};
-
-const SERVICE_NAME: &str = "nomos-services/mix/backends/libp2p";
-const METRIC_DATA_RECEIVED: &str = "data_received";
-const METRIC_DATA_SENT: &str = "data_sent";
-const METRIC_FAILED_INBOUND_MESSAGES: &str = "failed_inbound_messages";
-const METRIC_SUCCESSFUL_INBOUND_MESSAGES: &str = "successful_inbound_messages";
-const METRIC_FAILED_OUTBOUND_MESSAGES: &str = "failed_outbound_messages";
-const METRIC_SUCCESSFUL_OUTBOUND_MESSAGES: &str = "successful_outbound_messages";
-const METRIC_ERROR: &str = "error";
-const METRIC_IGNORED_EVENT: &str = "ignored_event";
 
 /// A mix backend that uses the libp2p network stack.
 pub struct Libp2pMixBackend {
@@ -113,16 +99,6 @@ where
     swarm: Swarm<nomos_mix_network::Behaviour<SphinxMessage, R, IntervalStream>>,
     swarm_messages_receiver: mpsc::Receiver<MixSwarmMessage>,
     incoming_message_sender: broadcast::Sender<Vec<u8>>,
-
-    /// Metrics
-    failed_outbound_messages_counter: Counter<u64>,
-    successful_outbound_messages_counter: Counter<u64>,
-    sent_data_histogram: Histogram<u64>,
-    failed_inbound_messages_counter: Counter<u64>,
-    successful_inbound_messages_counter: Counter<u64>,
-    received_data_histogram: Histogram<u64>,
-    error_counter: Counter<u64>,
-    ignored_event_counter: Counter<u64>,
 }
 
 #[derive(Debug)]
@@ -166,40 +142,6 @@ where
             })
             .build();
 
-        let meter = global::meter(SERVICE_NAME);
-        let failed_outbound_messages_counter = meter
-            .u64_counter(METRIC_FAILED_OUTBOUND_MESSAGES)
-            .with_description("Number of failed outbound messages")
-            .build();
-        let successful_outbound_messages_counter = meter
-            .u64_counter(METRIC_SUCCESSFUL_OUTBOUND_MESSAGES)
-            .with_description("Number of successful outbound messages")
-            .build();
-        let sent_data_histogram = meter
-            .u64_histogram(METRIC_DATA_SENT)
-            .with_description("Histogram of data sent")
-            .build();
-        let failed_inbound_messages_counter = meter
-            .u64_counter(METRIC_FAILED_INBOUND_MESSAGES)
-            .with_description("Number of failed inbound messages")
-            .build();
-        let successful_inbound_messages_counter = meter
-            .u64_counter(METRIC_SUCCESSFUL_INBOUND_MESSAGES)
-            .with_description("Number of successful inbound messages")
-            .build();
-        let received_data_histogram = meter
-            .u64_histogram(METRIC_DATA_RECEIVED)
-            .with_description("Histogram of data received")
-            .build();
-        let error_counter = meter
-            .u64_counter(METRIC_ERROR)
-            .with_description("Number of errors")
-            .build();
-        let ignored_event_counter = meter
-            .u64_counter(METRIC_IGNORED_EVENT)
-            .with_description("Number of ignored events")
-            .build();
-
         swarm
             .listen_on(config.listening_address)
             .unwrap_or_else(|e| {
@@ -210,14 +152,6 @@ where
             swarm,
             swarm_messages_receiver,
             incoming_message_sender,
-            failed_outbound_messages_counter,
-            successful_outbound_messages_counter,
-            sent_data_histogram,
-            failed_inbound_messages_counter,
-            successful_inbound_messages_counter,
-            received_data_histogram,
-            error_counter,
-            ignored_event_counter,
         }
     }
 
@@ -240,10 +174,10 @@ where
                 let msg_size = msg.len();
                 if let Err(e) = self.swarm.behaviour_mut().publish(msg) {
                     tracing::error!("Failed to publish message to mix network: {e:?}");
-                    self.failed_outbound_messages_counter.add(1, &[]);
+                    tracing::info!(counter.failed_outbound_messages = 1);
                 } else {
-                    self.successful_outbound_messages_counter.add(1, &[]);
-                    self.sent_data_histogram.record(msg_size as u64, &[]);
+                    tracing::info!(counter.successful_outbound_messages = 1);
+                    tracing::info!(histogram.sent_data = msg_size as u64);
                 }
             }
         }
@@ -257,19 +191,19 @@ where
                 let msg_size = msg.len();
                 if let Err(e) = self.incoming_message_sender.send(msg) {
                     tracing::error!("Failed to send incoming message to channel: {e}");
-                    self.failed_inbound_messages_counter.add(1, &[]);
+                    tracing::info!(counter.failed_inbound_messages = 1);
                 } else {
-                    self.successful_inbound_messages_counter.add(1, &[]);
-                    self.received_data_histogram.record(msg_size as u64, &[]);
+                    tracing::info!(counter.successful_inbound_messages = 1);
+                    tracing::info!(histogram.received_data = msg_size as u64);
                 }
             }
             SwarmEvent::Behaviour(nomos_mix_network::Event::Error(e)) => {
                 tracing::error!("Received error from mix network: {e:?}");
-                self.error_counter.add(1, &[]);
+                tracing::info!(counter.error = 1);
             }
             _ => {
                 tracing::debug!("Received event from mix network: {event:?}");
-                self.ignored_event_counter.add(1, &[]);
+                tracing::info!(counter.ignored_event = 1);
             }
         }
     }
