@@ -20,6 +20,7 @@ nomos-mix-service = { path = "../mix" }
 nomos-mempool = { path = "../mempool" }
 nomos-core = { path = "../../nomos-core/chain-defs" }
 overwatch-rs = { git = "https://github.com/logos-co/Overwatch", rev = "2f70806" }
+opentelemetry = "0.27.1"
 nomos-storage = { path = "../storage" }
 rand_chacha = "0.3"
 rand = "0.8"
