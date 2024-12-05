@@ -27,8 +27,6 @@ use nomos_mempool::{
 };
 use nomos_network::NetworkService;
 use nomos_storage::{backends::StorageBackend, StorageMsg, StorageService};
-use opentelemetry::metrics::{Counter, Histogram};
-use opentelemetry::{global, KeyValue, Value};
 use overwatch_rs::services::life_cycle::LifecycleMessage;
 use overwatch_rs::services::relay::{OutboundRelay, Relay, RelayMessage};
 use overwatch_rs::services::{
@@ -52,9 +50,6 @@ use tracing_futures::Instrument;
 
 type MempoolRelay<Payload, Item, Key> = OutboundRelay<MempoolMsg<HeaderId, Payload, Item, Key>>;
 type SamplingRelay<BlobId> = OutboundRelay<DaSamplingServiceMsg<BlobId>>;
-
-// Metrics
-const SERVICE_NAME: &str = "nomos-services/cryptarchia-consensus/lib";
 
 // Limit the number of blocks returned by GetHeaders
 const HEADERS_LIMIT: usize = 512;
@@ -196,10 +191,6 @@ pub struct CryptarchiaConsensus<
     >,
     block_subscription_sender: broadcast::Sender<Block<ClPool::Item, DaPool::Item>>,
     storage_relay: Relay<StorageService<Storage>>,
-
-    /// Metrics
-    received_blocks_counter: Counter<u64>,
-    received_blocks_data_histogram: Histogram<u64>,
 }
 
 impl<
@@ -361,16 +352,6 @@ where
         let sampling_relay = service_state.overwatch_handle.relay();
         let (block_subscription_sender, _) = broadcast::channel(16);
 
-        let meter = global::meter(SERVICE_NAME);
-        let received_blocks_counter = meter
-            .u64_counter("blocks_received")
-            .with_description("Number of blocks received")
-            .build();
-        let received_blocks_data_histogram = meter
-            .u64_histogram("received_blocks_data")
-            .with_description("Data size of received blocks")
-            .build();
-
         Ok(Self {
             service_state,
             network_relay,
@@ -380,8 +361,6 @@ where
             block_subscription_sender,
             storage_relay,
             sampling_relay,
-            received_blocks_counter,
-            received_blocks_data_histogram,
         })
     }
 
@@ -464,7 +443,7 @@ where
             loop {
                 tokio::select! {
                     Some(block) = incoming_blocks.next() => {
-                        Self::log_received_block(&self.received_blocks_counter, &self.received_blocks_data_histogram, &block);
+                        Self::log_received_block(&block);
                         cryptarchia = Self::process_block(
                             cryptarchia,
                             &mut leader,
@@ -828,30 +807,21 @@ where
         validated_blobs
     }
 
-    fn log_received_block(
-        received_blocks_counter: &Counter<u64>,
-        received_blocks_data_histogram: &Histogram<u64>,
-        block: &Block<ClPool::Item, DaPool::Item>,
-    ) {
+    fn log_received_block(block: &Block<ClPool::Item, DaPool::Item>) {
         let content_size = block.header().content_size();
-        let transactions = Value::I64(block.cl_transactions_len() as i64);
-        let blobs = Value::I64(block.bl_blobs_len() as i64);
+        let transactions = block.cl_transactions_len();
+        let blobs = block.bl_blobs_len();
 
-        received_blocks_counter.add(
-            1,
-            &[
-                KeyValue::new("transactions", transactions.clone()),
-                KeyValue::new("blobs", blobs.clone()),
-                KeyValue::new("bytes", Value::I64(i64::from(content_size))),
-            ],
+        tracing::info!(
+            counter.received_blocks = 1,
+            transactions = transactions,
+            blobs = blobs,
+            bytes = content_size
         );
-
-        received_blocks_data_histogram.record(
-            content_size as u64,
-            &[
-                KeyValue::new("transactions", transactions),
-                KeyValue::new("blobs", blobs),
-            ],
+        tracing::info!(
+            histogram.received_blocks_data = content_size,
+            transactions = transactions,
+            blobs = blobs
         );
     }
 }
