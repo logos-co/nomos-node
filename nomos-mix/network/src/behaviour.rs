@@ -157,23 +157,23 @@ where
     }
 
     fn run_conn_maintenance(&mut self) {
-        let (peers_to_close, peers_to_connect) = self.conn_maintenance.reset();
-
-        // Schedule events to close connections
-        peers_to_close.into_iter().for_each(|addr| {
-            if let Some(peer_id) = self.peer_address_map.peer_id(&addr) {
-                self.events.push_back(ToSwarm::CloseConnection {
-                    peer_id,
-                    connection: CloseConnection::All,
-                });
-            }
-        });
-        // Schedule events to connect to peers
-        peers_to_connect.into_iter().for_each(|addr| {
-            self.events.push_back(ToSwarm::Dial {
-                opts: DialOpts::from(addr),
+        if let Some((_, peers_to_close, peers_to_connect)) = self.conn_maintenance.reset() {
+            // Schedule events to close connections
+            peers_to_close.into_iter().for_each(|addr| {
+                if let Some(peer_id) = self.peer_address_map.peer_id(&addr) {
+                    self.events.push_back(ToSwarm::CloseConnection {
+                        peer_id,
+                        connection: CloseConnection::All,
+                    });
+                }
             });
-        });
+            // Schedule events to connect to peers
+            peers_to_connect.into_iter().for_each(|addr| {
+                self.events.push_back(ToSwarm::Dial {
+                    opts: DialOpts::from(addr),
+                });
+            });
+        }
     }
 
     fn try_wake(&mut self) {
