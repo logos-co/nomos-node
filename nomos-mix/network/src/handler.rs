@@ -14,8 +14,6 @@ use libp2p::{
     Stream, StreamProtocol,
 };
 
-use crate::behaviour::Config;
-
 const PROTOCOL_NAME: StreamProtocol = StreamProtocol::new("/nomos/mix/0.1.0");
 
 // TODO: Consider replacing this struct with libp2p_stream ConnectionHandler
@@ -42,7 +40,7 @@ enum OutboundSubstreamState {
 }
 
 impl MixConnectionHandler {
-    pub fn new(_config: &Config) -> Self {
+    pub fn new() -> Self {
         Self {
             inbound_substream: None,
             outbound_substream: None,
@@ -56,6 +54,12 @@ impl MixConnectionHandler {
         if let Some(waker) = self.waker.take() {
             waker.wake();
         }
+    }
+}
+
+impl Default for MixConnectionHandler {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

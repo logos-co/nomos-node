@@ -1,7 +1,7 @@
 use std::str::FromStr;
 
 use nomos_libp2p::{ed25519, Multiaddr};
-use nomos_mix::membership::Node;
+use nomos_mix::{conn_maintenance::ConnectionMaintenanceSettings, membership::Node};
 use nomos_mix_message::{sphinx::SphinxMessage, MixMessage};
 use nomos_mix_service::backends::libp2p::Libp2pMixBackendSettings;
 
@@ -30,7 +30,11 @@ pub fn create_mix_configs(ids: &[[u8; 32]]) -> Vec<GeneralMixConfig> {
                     ))
                     .unwrap(),
                     node_key,
-                    peering_degree: 1,
+                    conn_maintenance: ConnectionMaintenanceSettings {
+                        peering_degree: 1,
+                        max_peering_degree: 3,
+                        monitor: None,
+                    },
                 },
                 private_key: x25519_dalek::StaticSecret::random(),
                 membership: Vec::new(),

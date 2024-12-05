@@ -1,25 +1,24 @@
-use std::{io, pin::Pin, time::Duration};
+use std::{pin::Pin, time::Duration};
 
 use super::MixBackend;
 use async_trait::async_trait;
 use futures::{Stream, StreamExt};
 use libp2p::{
-    core::transport::ListenerId,
     identity::{ed25519, Keypair},
     swarm::SwarmEvent,
-    Multiaddr, Swarm, SwarmBuilder, TransportError,
+    Multiaddr, Swarm, SwarmBuilder,
 };
-use nomos_libp2p::{secret_key_serde, DialError, DialOpts};
-use nomos_mix::membership::Membership;
+use nomos_libp2p::secret_key_serde;
+use nomos_mix::{conn_maintenance::ConnectionMaintenanceSettings, membership::Membership};
 use nomos_mix_message::sphinx::SphinxMessage;
 use overwatch_rs::overwatch::handle::OverwatchHandle;
-use rand::Rng;
+use rand::RngCore;
 use serde::{Deserialize, Serialize};
 use tokio::{
     sync::{broadcast, mpsc},
     task::JoinHandle,
 };
-use tokio_stream::wrappers::BroadcastStream;
+use tokio_stream::wrappers::{BroadcastStream, IntervalStream};
 
 /// A mix backend that uses the libp2p network stack.
 pub struct Libp2pMixBackend {
@@ -35,7 +34,7 @@ pub struct Libp2pMixBackendSettings {
     // A key for deriving PeerId and establishing secure connections (TLS 1.3 by QUIC)
     #[serde(with = "secret_key_serde", default = "ed25519::SecretKey::generate")]
     pub node_key: ed25519::SecretKey,
-    pub peering_degree: usize,
+    pub conn_maintenance: ConnectionMaintenanceSettings,
 }
 
 const CHANNEL_SIZE: usize = 64;
@@ -44,37 +43,25 @@ const CHANNEL_SIZE: usize = 64;
 impl MixBackend for Libp2pMixBackend {
     type Settings = Libp2pMixBackendSettings;
 
-    fn new<R: Rng>(
+    fn new<R>(
         config: Self::Settings,
         overwatch_handle: OverwatchHandle,
         membership: Membership<SphinxMessage>,
-        mut rng: R,
-    ) -> Self {
+        rng: R,
+    ) -> Self
+    where
+        R: RngCore + Send + 'static,
+    {
         let (swarm_message_sender, swarm_message_receiver) = mpsc::channel(CHANNEL_SIZE);
         let (incoming_message_sender, _) = broadcast::channel(CHANNEL_SIZE);
 
-        let keypair = Keypair::from(ed25519::Keypair::from(config.node_key.clone()));
         let mut swarm = MixSwarm::new(
-            keypair,
+            config,
+            membership,
+            rng,
             swarm_message_receiver,
             incoming_message_sender.clone(),
         );
-
-        swarm
-            .listen_on(config.listening_address)
-            .unwrap_or_else(|e| {
-                panic!("Failed to listen on Mix network: {e:?}");
-            });
-
-        // Randomly select peering_degree number of peers, and dial to them
-        membership
-            .choose_remote_nodes(&mut rng, config.peering_degree)
-            .iter()
-            .for_each(|node| {
-                if let Err(e) = swarm.dial(node.address.clone()) {
-                    tracing::error!("failed to dial to {:?}: {:?}", node.address, e);
-                }
-            });
 
         let task = overwatch_handle.runtime().spawn(async move {
             swarm.run().await;
@@ -105,8 +92,11 @@ impl MixBackend for Libp2pMixBackend {
     }
 }
 
-struct MixSwarm {
-    swarm: Swarm<nomos_mix_network::Behaviour<SphinxMessage>>,
+struct MixSwarm<R>
+where
+    R: RngCore + 'static,
+{
+    swarm: Swarm<nomos_mix_network::Behaviour<SphinxMessage, R, IntervalStream>>,
     swarm_messages_receiver: mpsc::Receiver<MixSwarmMessage>,
     incoming_message_sender: broadcast::Sender<Vec<u8>>,
 }
@@ -116,19 +106,35 @@ pub enum MixSwarmMessage {
     Publish(Vec<u8>),
 }
 
-impl MixSwarm {
+impl<R> MixSwarm<R>
+where
+    R: RngCore + 'static,
+{
     fn new(
-        keypair: Keypair,
+        config: Libp2pMixBackendSettings,
+        membership: Membership<SphinxMessage>,
+        rng: R,
         swarm_messages_receiver: mpsc::Receiver<MixSwarmMessage>,
         incoming_message_sender: broadcast::Sender<Vec<u8>>,
     ) -> Self {
-        let swarm = SwarmBuilder::with_existing_identity(keypair)
+        let keypair = Keypair::from(ed25519::Keypair::from(config.node_key.clone()));
+        let mut swarm = SwarmBuilder::with_existing_identity(keypair)
             .with_tokio()
             .with_quic()
             .with_behaviour(|_| {
-                nomos_mix_network::Behaviour::new(nomos_mix_network::Config {
-                    duplicate_cache_lifespan: 60,
-                })
+                let conn_maintenance_interval =
+                    config.conn_maintenance.monitor.as_ref().map(|monitor| {
+                        IntervalStream::new(tokio::time::interval(monitor.time_window))
+                    });
+                nomos_mix_network::Behaviour::new(
+                    nomos_mix_network::Config {
+                        duplicate_cache_lifespan: 60,
+                        conn_maintenance_settings: config.conn_maintenance,
+                        conn_maintenance_interval,
+                    },
+                    membership,
+                    rng,
+                )
             })
             .expect("Mix Behaviour should be built")
             .with_swarm_config(|cfg| {
@@ -136,19 +142,17 @@ impl MixSwarm {
             })
             .build();
 
+        swarm
+            .listen_on(config.listening_address)
+            .unwrap_or_else(|e| {
+                panic!("Failed to listen on Mix network: {e:?}");
+            });
+
         Self {
             swarm,
             swarm_messages_receiver,
             incoming_message_sender,
         }
-    }
-
-    fn listen_on(&mut self, addr: Multiaddr) -> Result<ListenerId, TransportError<io::Error>> {
-        self.swarm.listen_on(addr)
-    }
-
-    fn dial(&mut self, addr: Multiaddr) -> Result<(), DialError> {
-        self.swarm.dial(DialOpts::from(addr))
     }
 
     async fn run(&mut self) {
