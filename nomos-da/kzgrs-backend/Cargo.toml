@@ -42,3 +42,7 @@ harness = false
 [[bench]]
 name = "verifier"
 harness = false
+
+[[bench]]
+name = "reconstruct"
+harness = false
