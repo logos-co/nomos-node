@@ -18,15 +18,15 @@ use opentelemetry::{global, KeyValue};
 
 use crate::behaviour::Config;
 
-const SERVICE_NAME: &'static str = "nomos-mix/network/handler";
-const METRIC_PENDING_OUTBOUND_MESSAGES: &'static str = "pending_outbound_messages";
-const METRIC_PENDING_EVENTS_TO_BEHAVIOUR: &'static str = "pending_events_to_behaviour";
-const METRIC_CONNECTION_EVENTS: &'static str = "connection_events";
-const KEY_EVENT: &'static str = "event";
-const VALUE_FULLY_NEGOTIATED_INBOUND: &'static str = "fully_negotiated_inbound";
-const VALUE_FULLY_NEGOTIATED_OUTBOUND: &'static str = "fully_negotiated_outbound";
-const VALUE_DIAL_UPGRADE_ERROR: &'static str = "dial_upgrade_error";
-const VALUE_IGNORED: &'static str = "ignored";
+const SERVICE_NAME: &str = "nomos-mix/network/handler";
+const METRIC_PENDING_OUTBOUND_MESSAGES: &str = "pending_outbound_messages";
+const METRIC_PENDING_EVENTS_TO_BEHAVIOUR: &str = "pending_events_to_behaviour";
+const METRIC_CONNECTION_EVENTS: &str = "connection_events";
+const KEY_EVENT: &str = "event";
+const VALUE_FULLY_NEGOTIATED_INBOUND: &str = "fully_negotiated_inbound";
+const VALUE_FULLY_NEGOTIATED_OUTBOUND: &str = "fully_negotiated_outbound";
+const VALUE_DIAL_UPGRADE_ERROR: &str = "dial_upgrade_error";
+const VALUE_IGNORED: &str = "ignored";
 
 const PROTOCOL_NAME: StreamProtocol = StreamProtocol::new("/nomos/mix/0.1.0");
 
