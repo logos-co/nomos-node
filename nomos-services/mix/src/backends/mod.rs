@@ -1,7 +1,7 @@
 #[cfg(feature = "libp2p")]
 pub mod libp2p;
 
-use std::{fmt::Debug, pin::Pin};
+use std::{fmt::Debug, hash::Hash, pin::Pin};
 
 use futures::Stream;
 use nomos_mix::membership::Membership;
@@ -13,11 +13,12 @@ use rand::RngCore;
 #[async_trait::async_trait]
 pub trait MixBackend {
     type Settings: Clone + Debug + Send + Sync + 'static;
+    type Address: Eq + Hash + Clone;
 
     fn new<R>(
         config: Self::Settings,
         overwatch_handle: OverwatchHandle,
-        membership: Membership<SphinxMessage>,
+        membership: Membership<Self::Address, SphinxMessage>,
         rng: R,
     ) -> Self
     where

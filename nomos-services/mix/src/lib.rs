@@ -30,6 +30,7 @@ use rand::SeedableRng;
 use rand_chacha::ChaCha12Rng;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::fmt::Debug;
+use std::hash::Hash;
 use std::time::Duration;
 use tokio::sync::mpsc;
 use tokio::time;
@@ -50,7 +51,7 @@ where
     backend: Backend,
     service_state: ServiceStateHandle<Self>,
     network_relay: Relay<NetworkService<Network::Backend>>,
-    membership: Membership<SphinxMessage>,
+    membership: Membership<Backend::Address, SphinxMessage>,
 }
 
 impl<Backend, Network> ServiceData for MixService<Backend, Network>
@@ -61,7 +62,7 @@ where
     Network::BroadcastSettings: Clone + Debug + Serialize + DeserializeOwned,
 {
     const SERVICE_ID: ServiceId = "Mix";
-    type Settings = MixConfig<Backend::Settings>;
+    type Settings = MixConfig<Backend::Settings, Backend::Address>;
     type State = NoState<Self::Settings>;
     type StateOperator = NoOperator<Self::State>;
     type Message = ServiceMessage<Network::BroadcastSettings>;
@@ -72,6 +73,7 @@ impl<Backend, Network> ServiceCore for MixService<Backend, Network>
 where
     Backend: MixBackend + Send + 'static,
     Backend::Settings: Clone,
+    Backend::Address: Unpin + Send + Sync + 'static,
     Network: NetworkAdapter + Send + Sync + 'static,
     Network::BroadcastSettings:
         Clone + Debug + Serialize + DeserializeOwned + Send + Sync + 'static,
@@ -224,7 +226,11 @@ where
 
     fn wrap_and_send_to_persistent_transmission(
         message: Vec<u8>,
-        cryptographic_processor: &mut CryptographicProcessor<ChaCha12Rng, SphinxMessage>,
+        cryptographic_processor: &mut CryptographicProcessor<
+            ChaCha12Rng,
+            Backend::Address,
+            SphinxMessage,
+        >,
         persistent_sender: &mpsc::UnboundedSender<Vec<u8>>,
     ) {
         match cryptographic_processor.wrap_message(&message) {
@@ -241,12 +247,12 @@ where
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct MixConfig<BackendSettings> {
+pub struct MixConfig<BackendSettings, Address> {
     pub backend: BackendSettings,
     pub message_blend: MessageBlendSettings<SphinxMessage>,
     pub persistent_transmission: PersistentTransmissionSettings,
     pub cover_traffic: CoverTrafficExtSettings,
-    pub membership: Vec<Node<<SphinxMessage as nomos_mix_message::MixMessage>::PublicKey>>,
+    pub membership: Vec<Node<Address, <SphinxMessage as nomos_mix_message::MixMessage>::PublicKey>>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -256,13 +262,16 @@ pub struct CoverTrafficExtSettings {
 }
 
 impl CoverTrafficExtSettings {
-    fn cover_traffic_settings(
+    fn cover_traffic_settings<Address>(
         &self,
-        membership: &Membership<SphinxMessage>,
+        membership: &Membership<Address, SphinxMessage>,
         cryptographic_processor_settings: &CryptographicProcessorSettings<
             <SphinxMessage as MixMessage>::PrivateKey,
         >,
-    ) -> CoverTrafficSettings {
+    ) -> CoverTrafficSettings
+    where
+        Address: Eq + Hash,
+    {
         CoverTrafficSettings {
             node_id: membership.local_node().public_key,
             number_of_hops: cryptographic_processor_settings.num_mix_layers,
@@ -301,8 +310,11 @@ impl CoverTrafficExtSettings {
     }
 }
 
-impl<BackendSettings> MixConfig<BackendSettings> {
-    fn membership(&self) -> Membership<SphinxMessage> {
+impl<BackendSettings, Address> MixConfig<BackendSettings, Address>
+where
+    Address: Eq + Hash + Clone,
+{
+    fn membership(&self) -> Membership<Address, SphinxMessage> {
         let public_key = x25519_dalek::PublicKey::from(&x25519_dalek::StaticSecret::from(
             self.message_blend.cryptographic_processor.private_key,
         ))

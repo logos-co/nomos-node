@@ -5,6 +5,7 @@ pub use crypto::CryptographicProcessorSettings;
 use futures::{Stream, StreamExt};
 use rand::RngCore;
 use std::fmt::Debug;
+use std::hash::Hash;
 use std::marker::PhantomData;
 use std::pin::Pin;
 use std::task::{Context, Poll};
@@ -34,22 +35,23 @@ where
 /// [`MessageBlendStream`] handles the entire mixing tiers process
 /// - Unwraps incoming messages received from network using [`CryptographicProcessor`]
 /// - Pushes unwrapped messages to [`TemporalProcessor`]
-pub struct MessageBlendStream<S, Rng, M, Scheduler>
+pub struct MessageBlendStream<S, Rng, Address, M, Scheduler>
 where
     M: MixMessage,
 {
     input_stream: S,
     output_stream: Pin<Box<dyn Stream<Item = MixOutgoingMessage> + Send + Sync + 'static>>,
     temporal_sender: UnboundedSender<MixOutgoingMessage>,
-    cryptographic_processor: CryptographicProcessor<Rng, M>,
+    cryptographic_processor: CryptographicProcessor<Rng, Address, M>,
     _rng: PhantomData<Rng>,
     _scheduler: PhantomData<Scheduler>,
 }
 
-impl<S, Rng, M, Scheduler> MessageBlendStream<S, Rng, M, Scheduler>
+impl<S, Rng, Address, M, Scheduler> MessageBlendStream<S, Rng, Address, M, Scheduler>
 where
     S: Stream<Item = Vec<u8>>,
     Rng: RngCore + Unpin + Send + 'static,
+    Address: Eq + Hash,
     M: MixMessage,
     M::PrivateKey: Serialize + DeserializeOwned,
     M::PublicKey: Clone + PartialEq,
@@ -59,7 +61,7 @@ where
     pub fn new(
         input_stream: S,
         settings: MessageBlendSettings<M>,
-        membership: Membership<M>,
+        membership: Membership<Address, M>,
         scheduler: Scheduler,
         cryptographic_processor_rng: Rng,
     ) -> Self {
@@ -100,10 +102,11 @@ where
     }
 }
 
-impl<S, Rng, M, Scheduler> Stream for MessageBlendStream<S, Rng, M, Scheduler>
+impl<S, Rng, Address, M, Scheduler> Stream for MessageBlendStream<S, Rng, Address, M, Scheduler>
 where
     S: Stream<Item = Vec<u8>> + Unpin,
     Rng: RngCore + Unpin + Send + 'static,
+    Address: Eq + Hash + Unpin,
     M: MixMessage + Unpin,
     M::PrivateKey: Serialize + DeserializeOwned + Unpin,
     M::PublicKey: Clone + PartialEq + Unpin,
@@ -120,9 +123,10 @@ where
     }
 }
 
-pub trait MessageBlendExt<Rng, M, Scheduler>: Stream<Item = Vec<u8>>
+pub trait MessageBlendExt<Rng, Address, M, Scheduler>: Stream<Item = Vec<u8>>
 where
     Rng: RngCore + Send + Unpin + 'static,
+    Address: Eq + Hash,
     M: MixMessage,
     M::PrivateKey: Serialize + DeserializeOwned,
     M::PublicKey: Clone + PartialEq,
@@ -132,10 +136,10 @@ where
     fn blend(
         self,
         message_blend_settings: MessageBlendSettings<M>,
-        membership: Membership<M>,
+        membership: Membership<Address, M>,
         scheduler: Scheduler,
         cryptographic_processor_rng: Rng,
-    ) -> MessageBlendStream<Self, Rng, M, Scheduler>
+    ) -> MessageBlendStream<Self, Rng, Address, M, Scheduler>
     where
         Self: Sized + Unpin,
     {
@@ -149,10 +153,11 @@ where
     }
 }
 
-impl<T, Rng, M, S> MessageBlendExt<Rng, M, S> for T
+impl<T, Rng, Address, M, S> MessageBlendExt<Rng, Address, M, S> for T
 where
     T: Stream<Item = Vec<u8>>,
     Rng: RngCore + Unpin + Send + 'static,
+    Address: Eq + Hash,
     M: MixMessage,
     M::PrivateKey: Clone + Serialize + DeserializeOwned + PartialEq,
     M::PublicKey: Clone + Serialize + DeserializeOwned + PartialEq,

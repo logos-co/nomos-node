@@ -176,8 +176,8 @@ fn update_da_peer_addresses(
 
 fn update_mix_membership(
     hosts: Vec<Host>,
-    membership: Vec<Node<<SphinxMessage as MixMessage>::PublicKey>>,
-) -> Vec<Node<<SphinxMessage as MixMessage>::PublicKey>> {
+    membership: Vec<Node<Multiaddr, <SphinxMessage as MixMessage>::PublicKey>>,
+) -> Vec<Node<Multiaddr, <SphinxMessage as MixMessage>::PublicKey>> {
     membership
         .into_iter()
         .zip(hosts)
