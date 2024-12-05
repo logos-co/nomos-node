@@ -11,8 +11,10 @@ use libp2p::{
 use nomos_libp2p::secret_key_serde;
 use nomos_mix::{conn_maintenance::ConnectionMaintenanceSettings, membership::Membership};
 use nomos_mix_message::sphinx::SphinxMessage;
-use opentelemetry::metrics::{Counter, Histogram};
-use opentelemetry::{global, Key, KeyValue, Value};
+use opentelemetry::{
+    global,
+    metrics::{Counter, Histogram},
+};
 use overwatch_rs::overwatch::handle::OverwatchHandle;
 use rand::RngCore;
 use serde::{Deserialize, Serialize};
@@ -22,15 +24,15 @@ use tokio::{
 };
 use tokio_stream::wrappers::{BroadcastStream, IntervalStream};
 
-const SERVICE_NAME: &'static str = "nomos-services/mix/backends/libp2p";
-const METRIC_DATA_RECEIVED: &'static str = "data_received";
-const METRIC_DATA_SENT: &'static str = "data_sent";
-const METRIC_FAILED_INBOUND_MESSAGES: &'static str = "failed_inbound_messages";
-const METRIC_SUCCESSFUL_INBOUND_MESSAGES: &'static str = "successful_inbound_messages";
-const METRIC_FAILED_OUTBOUND_MESSAGES: &'static str = "failed_outbound_messages";
-const METRIC_SUCCESSFUL_OUTBOUND_MESSAGES: &'static str = "successful_outbound_messages";
-const METRIC_ERROR: &'static str = "error";
-const METRIC_IGNORED_EVENT: &'static str = "ignored_event";
+const SERVICE_NAME: &str = "nomos-services/mix/backends/libp2p";
+const METRIC_DATA_RECEIVED: &str = "data_received";
+const METRIC_DATA_SENT: &str = "data_sent";
+const METRIC_FAILED_INBOUND_MESSAGES: &str = "failed_inbound_messages";
+const METRIC_SUCCESSFUL_INBOUND_MESSAGES: &str = "successful_inbound_messages";
+const METRIC_FAILED_OUTBOUND_MESSAGES: &str = "failed_outbound_messages";
+const METRIC_SUCCESSFUL_OUTBOUND_MESSAGES: &str = "successful_outbound_messages";
+const METRIC_ERROR: &str = "error";
+const METRIC_IGNORED_EVENT: &str = "ignored_event";
 
 /// A mix backend that uses the libp2p network stack.
 pub struct Libp2pMixBackend {
