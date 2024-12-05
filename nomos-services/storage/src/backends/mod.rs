@@ -1,10 +1,11 @@
 #[cfg(feature = "mock")]
 pub mod mock;
-#[cfg(feature = "sled")]
-pub mod sled;
-
 #[cfg(feature = "rocksdb")]
 pub mod rocksdb;
+#[cfg(feature = "sled")]
+pub mod sled;
+#[cfg(feature = "surrealdb-backend")]
+pub mod surrealdb;
 
 // std
 use std::error::Error;
