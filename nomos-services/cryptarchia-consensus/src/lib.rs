@@ -54,7 +54,7 @@ type MempoolRelay<Payload, Item, Key> = OutboundRelay<MempoolMsg<HeaderId, Paylo
 type SamplingRelay<BlobId> = OutboundRelay<DaSamplingServiceMsg<BlobId>>;
 
 // Metrics
-const SERVICE_NAME: &'static str = "nomos-services/cryptarchia-consensus/lib";
+const SERVICE_NAME: &str = "nomos-services/cryptarchia-consensus/lib";
 
 // Limit the number of blocks returned by GetHeaders
 const HEADERS_LIMIT: usize = 512;
