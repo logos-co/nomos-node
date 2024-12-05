@@ -13,17 +13,14 @@ use libp2p::{
     },
     Stream, StreamProtocol,
 };
+use opentelemetry::metrics::{Counter, Gauge};
 use opentelemetry::{global, KeyValue};
 
 use crate::behaviour::Config;
 
 const SERVICE_NAME: &'static str = "nomos-mix/network/handler";
-const METRIC_DATA_RECEIVED: &'static str = "data_received";
-const METRIC_DATA_SENT: &'static str = "data_sent";
-const METRIC_FAILED_INBOUND_MESSAGES: &'static str = "failed_inbound_messages";
-const METRIC_SUCCESSFUL_INBOUND_MESSAGES: &'static str = "successful_inbound_messages";
-const METRIC_FAILED_OUTBOUND_MESSAGES: &'static str = "failed_outbound_messages";
-const METRIC_SUCCESSFUL_OUTBOUND_MESSAGES: &'static str = "successful_outbound_messages";
+const METRIC_PENDING_OUTBOUND_MESSAGES: &'static str = "pending_outbound_messages";
+const METRIC_PENDING_EVENTS_TO_BEHAVIOUR: &'static str = "pending_events_to_behaviour";
 const METRIC_CONNECTION_EVENTS: &'static str = "connection_events";
 const KEY_EVENT: &'static str = "event";
 const VALUE_FULLY_NEGOTIATED_INBOUND: &'static str = "fully_negotiated_inbound";
@@ -42,6 +39,11 @@ pub struct MixConnectionHandler {
     outbound_msgs: VecDeque<Vec<u8>>,
     pending_events_to_behaviour: VecDeque<ToBehaviour>,
     waker: Option<Waker>,
+
+    /// Metrics
+    pending_events_to_behaviour_gauge: Gauge<u64>,
+    pending_outbound_messages_gauge: Gauge<u64>,
+    connection_event_counter: Counter<u64>,
 }
 
 type MsgSendFuture = BoxFuture<'static, Result<Stream, io::Error>>;
@@ -58,12 +60,30 @@ enum OutboundSubstreamState {
 
 impl MixConnectionHandler {
     pub fn new() -> Self {
+    pub fn new(_config: &Config) -> Self {
+        let meter = global::meter(SERVICE_NAME);
+        let pending_outbound_messages_gauge = meter
+            .u64_gauge(METRIC_PENDING_OUTBOUND_MESSAGES)
+            .with_description("Number of pending outbound messages")
+            .build();
+        let pending_events_to_behaviour_gauge = meter
+            .u64_gauge(METRIC_PENDING_EVENTS_TO_BEHAVIOUR)
+            .with_description("Number of pending events to be sent to the behaviour")
+            .build();
+        let connection_event_counter = meter
+            .u64_counter(METRIC_CONNECTION_EVENTS)
+            .with_description("Number of connection events")
+            .build();
+
         Self {
             inbound_substream: None,
             outbound_substream: None,
             outbound_msgs: VecDeque::new(),
             pending_events_to_behaviour: VecDeque::new(),
             waker: None,
+            pending_outbound_messages_gauge,
+            pending_events_to_behaviour_gauge,
+            connection_event_counter,
         }
     }
 
@@ -116,7 +136,10 @@ impl ConnectionHandler for MixConnectionHandler {
     ) -> Poll<
         ConnectionHandlerEvent<Self::OutboundProtocol, Self::OutboundOpenInfo, Self::ToBehaviour>,
     > {
-        let meter = global::meter(SERVICE_NAME);
+        self.pending_outbound_messages_gauge
+            .record(self.outbound_msgs.len() as u64, &[]);
+        self.pending_events_to_behaviour_gauge
+            .record(self.pending_events_to_behaviour.len() as u64, &[]);
 
         // Process pending events to be sent to the behaviour
         if let Some(event) = self.pending_events_to_behaviour.pop_front() {
@@ -130,14 +153,6 @@ impl ConnectionHandler for MixConnectionHandler {
         if let Some(msg_recv_fut) = self.inbound_substream.as_mut() {
             match msg_recv_fut.poll_unpin(cx) {
                 Poll::Ready(Ok((stream, msg))) => {
-                    let successful_inbound_messages_counter = meter
-                        .u64_counter(METRIC_SUCCESSFUL_INBOUND_MESSAGES)
-                        .build();
-                    successful_inbound_messages_counter.add(1, &[]);
-
-                    let received_data_histogram = meter.u64_histogram(METRIC_DATA_RECEIVED).build();
-                    received_data_histogram.record(msg.len() as u64, &[]);
-
                     tracing::debug!("Received message from inbound stream. Notifying behaviour...");
                     self.inbound_substream = Some(recv_msg(stream).boxed());
                     return Poll::Ready(ConnectionHandlerEvent::NotifyBehaviour(
@@ -145,10 +160,6 @@ impl ConnectionHandler for MixConnectionHandler {
                     ));
                 }
                 Poll::Ready(Err(e)) => {
-                    let failed_inbound_messages_counter =
-                        meter.u64_counter(METRIC_FAILED_INBOUND_MESSAGES).build();
-                    failed_inbound_messages_counter.add(1, &[]);
-
                     tracing::error!("Failed to receive message from inbound stream: {:?}", e);
                     self.inbound_substream = None;
                 }
@@ -170,9 +181,6 @@ impl ConnectionHandler for MixConnectionHandler {
                 Some(OutboundSubstreamState::Idle(stream)) => {
                     match self.outbound_msgs.pop_front() {
                         Some(msg) => {
-                            let sent_data_histogram = meter.u64_histogram(METRIC_DATA_SENT).build();
-                            sent_data_histogram.record(msg.len() as u64, &[]);
-
                             tracing::debug!("Sending message to outbound stream: {:?}", msg);
                             self.outbound_substream = Some(OutboundSubstreamState::PendingSend(
                                 send_msg(stream, msg).boxed(),
@@ -190,19 +198,10 @@ impl ConnectionHandler for MixConnectionHandler {
                 Some(OutboundSubstreamState::PendingSend(mut msg_send_fut)) => {
                     match msg_send_fut.poll_unpin(cx) {
                         Poll::Ready(Ok(stream)) => {
-                            let successful_outbound_messages_counter = meter
-                                .u64_counter(METRIC_SUCCESSFUL_OUTBOUND_MESSAGES)
-                                .build();
-                            successful_outbound_messages_counter.add(1, &[]);
-
                             tracing::debug!("Message sent to outbound stream");
                             self.outbound_substream = Some(OutboundSubstreamState::Idle(stream));
                         }
                         Poll::Ready(Err(e)) => {
-                            let failed_outbound_messages_counter =
-                                meter.u64_counter(METRIC_FAILED_OUTBOUND_MESSAGES).build();
-                            failed_outbound_messages_counter.add(1, &[]);
-
                             tracing::error!("Failed to send message to outbound stream: {:?}", e);
                             self.outbound_substream = None;
                             return Poll::Ready(ConnectionHandlerEvent::NotifyBehaviour(
@@ -245,9 +244,6 @@ impl ConnectionHandler for MixConnectionHandler {
             Self::OutboundOpenInfo,
         >,
     ) {
-        let meter = global::meter(SERVICE_NAME);
-        let connection_event_counter = meter.u64_counter(METRIC_CONNECTION_EVENTS).build();
-
         let event_name = match event {
             ConnectionEvent::FullyNegotiatedInbound(FullyNegotiatedInbound {
                 protocol: stream,
@@ -295,7 +291,8 @@ impl ConnectionHandler for MixConnectionHandler {
             }
         };
 
-        connection_event_counter.add(1, &[KeyValue::new(KEY_EVENT, event_name)]);
+        self.connection_event_counter
+            .add(1, &[KeyValue::new(KEY_EVENT, event_name)]);
         self.try_wake();
     }
 }
