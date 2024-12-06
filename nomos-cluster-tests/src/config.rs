@@ -1,14 +1,14 @@
+use clap::{Parser, ValueEnum};
+use color_eyre::eyre::{eyre, Result};
+use serde::{Deserialize, Serialize};
 use std::net::ToSocketAddrs;
 use std::path::PathBuf;
-use clap::{Parser, ValueEnum};
-use serde::{Deserialize, Serialize};
-use color_eyre::eyre::{eyre, Result};
 use tracing::Level;
 
-use nomos_tracing_service::{LoggerLayer, Tracing};
-use overwatch_rs::services::ServiceData;
 use nomos_tracing::logging::gelf::GelfConfig;
 use nomos_tracing::logging::local::FileConfig;
+use nomos_tracing_service::{LoggerLayer, Tracing};
+use overwatch_rs::services::ServiceData;
 
 #[derive(ValueEnum, Clone, Debug, Default)]
 pub enum LoggerLayerType {
@@ -18,7 +18,6 @@ pub enum LoggerLayerType {
     Stdout,
     Stderr,
 }
-
 
 #[derive(Parser, Debug, Clone)]
 pub struct LogArgs {
@@ -48,10 +47,7 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn update_from_args(
-        mut self,
-        log_args: LogArgs,
-    ) -> Result<Self> {
+    pub fn update_from_args(mut self, log_args: LogArgs) -> Result<Self> {
         update_tracing(&mut self.tracing, log_args)?;
         Ok(self)
     }
