@@ -19,7 +19,7 @@ mod test {
 
     use crate::{behaviour::Config, error::Error, Behaviour, Event};
 
-    /// Check that a published messsage arrives in the peers successfully.
+    /// Check that a published message arrives in the peers successfully.
     #[tokio::test]
     async fn behaviour() {
         let k1 = libp2p::identity::Keypair::generate_ed25519();
