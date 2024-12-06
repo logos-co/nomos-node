@@ -233,6 +233,7 @@ pub struct ConnectionMonitor {
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 pub struct ConnectionMonitorSettings {
     /// Time interval to measure/evaluate the number of messages sent by each peer.
+    #[serde(with = "humantime_serde")]
     pub time_window: Duration,
     /// The number of effective (data or cover) messages that a peer is expected to send in a given time window.
     /// If the measured count is greater than (expected * (1 + tolerance)), the peer is considered malicious.
