@@ -92,7 +92,7 @@ pub struct AxumBackend<
         schemas(Status<HeaderId>, MempoolMetrics)
     ),
     tags(
-        (name = "da", description = "data availibility related APIs")
+        (name = "da", description = "data availability related APIs")
     )
 )]
 struct ApiDoc;
