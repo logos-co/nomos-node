@@ -1,0 +1,14 @@
+[package]
+name = "nomos-cluster-tests"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+clap = { version = "4", features = ["derive", "env"] }
+serde_yaml = "0.9"
+serde = { version = "1.0.215", features = ["derive"] }
+nomos-tracing = { path = "../nomos-tracing" }
+nomos-tracing-service = { path = "../nomos-services/tracing" }
+overwatch-rs = { git = "https://github.com/logos-co/Overwatch", rev = "2f70806" }
+color-eyre = "0.6.0"
+tracing = "0.1"
