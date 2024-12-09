@@ -8,6 +8,7 @@ pub use behaviour::{Behaviour, Config, Event};
 mod test {
     use std::time::Duration;
 
+    use fixed::types::U57F7;
     use libp2p::{
         futures::StreamExt,
         swarm::{dummy, NetworkBehaviour, SwarmEvent},
@@ -101,10 +102,10 @@ mod test {
             max_peering_degree: membership.size() * 2,
             monitor: Some(ConnectionMonitorSettings {
                 time_window: Duration::from_secs(60),
-                expected_effective_messages: 1.0,
-                effective_message_tolerance: 0.1,
-                expected_drop_messages: 1.0,
-                drop_message_tolerance: 0.1,
+                expected_effective_messages: U57F7::from_num(1.0),
+                effective_message_tolerance: U57F7::from_num(0.1),
+                expected_drop_messages: U57F7::from_num(1.0),
+                drop_message_tolerance: U57F7::from_num(0.1),
             }),
         };
         let conn_maintenance_interval = conn_maintenance_settings

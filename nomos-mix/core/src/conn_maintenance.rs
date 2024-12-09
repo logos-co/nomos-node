@@ -4,6 +4,7 @@ use std::{
     time::Duration,
 };
 
+use fixed::types::U57F7;
 use multiaddr::Multiaddr;
 use nomos_mix_message::MixMessage;
 use rand::RngCore;
@@ -84,7 +85,16 @@ where
     pub fn record_effective_message(&mut self, peer: &Multiaddr) {
         if let Some(monitors) = self.monitors.as_mut() {
             if let Some(monitor) = monitors.get_mut(peer) {
-                monitor.effective_messages += 1;
+                monitor.effective_messages = monitor
+                    .effective_messages
+                    .checked_add(U57F7::ONE)
+                    .unwrap_or_else(|| {
+                        tracing::warn!(
+                            "Skipping recording an effective message due to overflow: Peer:{:?}",
+                            peer
+                        );
+                        monitor.effective_messages
+                    });
             }
         }
     }
@@ -95,7 +105,16 @@ where
     pub fn record_drop_message(&mut self, peer: &Multiaddr) {
         if let Some(monitors) = self.monitors.as_mut() {
             if let Some(monitor) = monitors.get_mut(peer) {
-                monitor.drop_messages += 1;
+                monitor.drop_messages = monitor
+                    .drop_messages
+                    .checked_add(U57F7::ONE)
+                    .unwrap_or_else(|| {
+                        tracing::warn!(
+                            "Skipping recording a drop message due to overflow: Peer:{:?}",
+                            peer
+                        );
+                        monitor.drop_messages
+                    });
             }
         }
     }
@@ -192,8 +211,8 @@ where
 /// Meter to count the number of effective and drop messages sent by a peer
 #[derive(Debug)]
 struct ConnectionMonitor {
-    effective_messages: usize,
-    drop_messages: usize,
+    effective_messages: U57F7,
+    drop_messages: U57F7,
 }
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
@@ -203,41 +222,39 @@ pub struct ConnectionMonitorSettings {
     /// The number of effective (data or cover) messages that a peer is expected to send in a given time window.
     /// If the measured count is greater than (expected * (1 + tolerance)), the peer is considered malicious.
     /// If the measured count is less than (expected * (1 - tolerance)), the peer is considered unhealthy.
-    pub expected_effective_messages: f32,
-    pub effective_message_tolerance: f32,
+    pub expected_effective_messages: U57F7,
+    pub effective_message_tolerance: U57F7,
     /// The number of drop messages that a peer is expected to send in a given time window.
     /// If the measured count is greater than (expected * (1 + tolerance)), the peer is considered malicious.
     /// If the measured count is less than (expected * (1 - tolerance)), the peer is considered unhealthy.
-    pub expected_drop_messages: f32,
-    pub drop_message_tolerance: f32,
+    pub expected_drop_messages: U57F7,
+    pub drop_message_tolerance: U57F7,
 }
 
 impl ConnectionMonitor {
     fn new() -> Self {
         Self {
-            effective_messages: 0,
-            drop_messages: 0,
+            effective_messages: U57F7::ZERO,
+            drop_messages: U57F7::ZERO,
         }
     }
 
     /// Check if the peer is malicious based on the number of effective and drop messages sent
     fn is_malicious(&self, settings: &ConnectionMonitorSettings) -> bool {
-        let effective_threshold =
-            settings.expected_effective_messages * (1.0 + settings.effective_message_tolerance);
+        let effective_threshold = settings.expected_effective_messages
+            * (U57F7::ONE + settings.effective_message_tolerance);
         let drop_threshold =
-            settings.expected_drop_messages * (1.0 + settings.drop_message_tolerance);
-        self.effective_messages as f32 > effective_threshold
-            || self.drop_messages as f32 > drop_threshold
+            settings.expected_drop_messages * (U57F7::ONE + settings.drop_message_tolerance);
+        self.effective_messages > effective_threshold || self.drop_messages > drop_threshold
     }
 
     /// Check if the peer is unhealthy based on the number of effective and drop messages sent
     fn is_unhealthy(&self, settings: &ConnectionMonitorSettings) -> bool {
-        let effective_threshold =
-            settings.expected_effective_messages * (1.0 - settings.effective_message_tolerance);
+        let effective_threshold = settings.expected_effective_messages
+            * (U57F7::ONE - settings.effective_message_tolerance);
         let drop_threshold =
-            settings.expected_drop_messages * (1.0 - settings.drop_message_tolerance);
-        effective_threshold > self.effective_messages as f32
-            || drop_threshold > self.drop_messages as f32
+            settings.expected_drop_messages * (U57F7::ONE - settings.drop_message_tolerance);
+        effective_threshold > self.effective_messages || drop_threshold > self.drop_messages
     }
 }
 
@@ -254,43 +271,43 @@ mod tests {
     fn meter() {
         let settings = ConnectionMonitorSettings {
             time_window: Duration::from_secs(1),
-            expected_effective_messages: 2.0,
-            effective_message_tolerance: 0.1,
-            expected_drop_messages: 1.0,
-            drop_message_tolerance: 0.0,
+            expected_effective_messages: U57F7::from_num(2.0),
+            effective_message_tolerance: U57F7::from_num(0.1),
+            expected_drop_messages: U57F7::from_num(1.0),
+            drop_message_tolerance: U57F7::from_num(0.0),
         };
 
         let monitor = ConnectionMonitor {
-            effective_messages: 2,
-            drop_messages: 1,
+            effective_messages: U57F7::from_num(2),
+            drop_messages: U57F7::from_num(1),
         };
         assert!(!monitor.is_malicious(&settings));
         assert!(!monitor.is_unhealthy(&settings));
 
         let monitor = ConnectionMonitor {
-            effective_messages: 3,
-            drop_messages: 1,
+            effective_messages: U57F7::from_num(3),
+            drop_messages: U57F7::from_num(1),
         };
         assert!(monitor.is_malicious(&settings));
         assert!(!monitor.is_unhealthy(&settings));
 
         let monitor = ConnectionMonitor {
-            effective_messages: 1,
-            drop_messages: 1,
+            effective_messages: U57F7::from_num(1),
+            drop_messages: U57F7::from_num(1),
         };
         assert!(!monitor.is_malicious(&settings));
         assert!(monitor.is_unhealthy(&settings));
 
         let monitor = ConnectionMonitor {
-            effective_messages: 2,
-            drop_messages: 2,
+            effective_messages: U57F7::from_num(2),
+            drop_messages: U57F7::from_num(2),
         };
         assert!(monitor.is_malicious(&settings));
         assert!(!monitor.is_unhealthy(&settings));
 
         let monitor = ConnectionMonitor {
-            effective_messages: 2,
-            drop_messages: 0,
+            effective_messages: U57F7::from_num(2),
+            drop_messages: U57F7::from_num(0),
         };
         assert!(!monitor.is_malicious(&settings));
         assert!(monitor.is_unhealthy(&settings));
@@ -304,10 +321,10 @@ mod tests {
                 max_peering_degree: 5,
                 monitor: Some(ConnectionMonitorSettings {
                     time_window: Duration::from_secs(1),
-                    expected_effective_messages: 2.0,
-                    effective_message_tolerance: 0.1,
-                    expected_drop_messages: 0.0,
-                    drop_message_tolerance: 0.0,
+                    expected_effective_messages: U57F7::from_num(2.0),
+                    effective_message_tolerance: U57F7::from_num(0.1),
+                    expected_drop_messages: U57F7::from_num(0.0),
+                    drop_message_tolerance: U57F7::from_num(0.0),
                 }),
             },
             10,
@@ -346,10 +363,10 @@ mod tests {
                 max_peering_degree: 4,
                 monitor: Some(ConnectionMonitorSettings {
                     time_window: Duration::from_secs(1),
-                    expected_effective_messages: 2.0,
-                    effective_message_tolerance: 0.1,
-                    expected_drop_messages: 0.0,
-                    drop_message_tolerance: 0.0,
+                    expected_effective_messages: U57F7::from_num(2.0),
+                    effective_message_tolerance: U57F7::from_num(0.1),
+                    expected_drop_messages: U57F7::from_num(0.0),
+                    drop_message_tolerance: U57F7::from_num(0.0),
                 }),
             },
             10,
