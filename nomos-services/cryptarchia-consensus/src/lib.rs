@@ -455,6 +455,7 @@ where
                             &mut self.block_subscription_sender
                         )
                         .await;
+                        tracing::info!(counter.consensus_processed_blocks = 1);
                     }
 
                     _ = slot_timer.next() => {
