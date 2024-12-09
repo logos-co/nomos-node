@@ -1,10 +1,9 @@
 use crate::{GlobalParameters, Polynomial, Proof};
 use ark_bls12_381::{Fr, G1Affine, G1Projective};
 use ark_ec::CurveGroup;
-use ark_ff::{Field, UniformRand};
+use ark_ff::Field;
 use ark_poly::{EvaluationDomain, GeneralEvaluationDomain};
 use num_traits::Zero;
-use rand::rngs::OsRng;
 use std::borrow::Cow;
 use std::ops::Mul;
 
@@ -71,26 +70,12 @@ pub fn fk20_batch_generate_elements_proofs(
         .collect();
     let h_extended_vector = toeplitz2(&toeplitz_coefficients, &extended_vector);
     let h_vector = toeplitz3(h_extended_vector);
-
-    // Initialize a random number generator
-    let mut rng = OsRng;
-
     domain
         .fft(&h_vector)
         .into_iter()
-        .map(|g1| {
-            // Generate a random field element
-            let random_v = Fr::rand(&mut rng);
-
-            // Adjust 'w' using 'random_v'
-            // w = w + random_v * G
-            let generator_g1 = global_parameters.powers_of_g[0]; // Assuming the first element is the generator G
-            let adjusted_g1 = g1 + generator_g1.mul(random_v);
-
-            Proof {
-                w: adjusted_g1.into_affine(),
-                random_v: Some(random_v),
-            }
+        .map(|g1| Proof {
+            w: g1.into_affine(),
+            random_v: None,
         })
         .collect()
 }
