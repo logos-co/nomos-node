@@ -47,4 +47,12 @@ impl<
     pub fn from_bytes(bytes: &[u8]) -> Self {
         wire::deserialize(bytes).unwrap()
     }
+
+    pub fn cl_transactions_len(&self) -> usize {
+        self.cl_transactions.len()
+    }
+
+    pub fn bl_blobs_len(&self) -> usize {
+        self.bl_blobs.len()
+    }
 }

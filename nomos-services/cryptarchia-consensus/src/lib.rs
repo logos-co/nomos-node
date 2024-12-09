@@ -351,6 +351,7 @@ where
         let storage_relay = service_state.overwatch_handle.relay();
         let sampling_relay = service_state.overwatch_handle.relay();
         let (block_subscription_sender, _) = broadcast::channel(16);
+
         Ok(Self {
             service_state,
             network_relay,
@@ -442,6 +443,7 @@ where
             loop {
                 tokio::select! {
                     Some(block) = incoming_blocks.next() => {
+                        Self::log_received_block(&block);
                         cryptarchia = Self::process_block(
                             cryptarchia,
                             &mut leader,
@@ -803,6 +805,24 @@ where
             .blobs()
             .all(|blob| sampled_blobs_ids.contains(&blob.blob_id()));
         validated_blobs
+    }
+
+    fn log_received_block(block: &Block<ClPool::Item, DaPool::Item>) {
+        let content_size = block.header().content_size();
+        let transactions = block.cl_transactions_len();
+        let blobs = block.bl_blobs_len();
+
+        tracing::info!(
+            counter.received_blocks = 1,
+            transactions = transactions,
+            blobs = blobs,
+            bytes = content_size
+        );
+        tracing::info!(
+            histogram.received_blocks_data = content_size,
+            transactions = transactions,
+            blobs = blobs
+        );
     }
 }
 

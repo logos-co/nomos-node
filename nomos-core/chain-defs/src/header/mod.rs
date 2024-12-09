@@ -70,6 +70,10 @@ impl Header {
         &self.orphaned_leader_proofs
     }
 
+    pub fn content_size(&self) -> u32 {
+        self.content_size
+    }
+
     pub fn new(
         parent: HeaderId,
         content_size: u32,
