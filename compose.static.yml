@@ -10,6 +10,8 @@ services:
     image: nomos:latest
     volumes:
       - ./testnet:/etc/nomos
+    depends_on:
+      - grafana
     entrypoint: /etc/nomos/scripts/run_cfgsync.sh
 
   nomos-node-0:

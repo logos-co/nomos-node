@@ -203,7 +203,7 @@ fn tracing_config_for_grafana(params: TracingParams, identifier: String) -> Gene
             }),
             filter: FilterLayer::None,
             metrics: MetricsLayer::Otlp(OtlpMetricsConfig {
-                endpoint: params.metrics_endpoint.try_into().unwrap(),
+                endpoint: params.metrics_endpoint,
                 host_identifier: identifier,
             }),
             level: Level::INFO,
