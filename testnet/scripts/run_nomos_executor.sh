@@ -11,4 +11,4 @@ export CFG_FILE_PATH="/config.yaml" \
        RISC0_DEV_MODE=true
 
 /usr/bin/cfgsync-client && \
-    exec /usr/bin/nomos-executor /config.yaml --with-metrics
+    exec /usr/bin/nomos-executor /config.yaml
