@@ -1,13 +1,15 @@
-use crate::backends::{StorageBackend, StorageSerde, StorageTransaction};
-use async_trait::async_trait;
-use bytes::Bytes;
-use serde::{Deserialize, Serialize};
 use std::marker::PhantomData;
 use std::str::from_utf8;
+
+use async_trait::async_trait;
+use bytes::Bytes;
+use overwatch_rs::overwatch::handle::OverwatchHandle;
+use serde::{Deserialize, Serialize};
 use surrealdb::engine::any::{connect, Any};
 use surrealdb::Surreal;
-use tokio::runtime::Handle;
 use tokio::task::block_in_place;
+
+use crate::backends::{StorageBackend, StorageSerde, StorageTransaction};
 
 #[derive(Debug, Serialize, Deserialize)]
 struct Data {
@@ -37,14 +39,21 @@ pub struct SurrealBackendSettings {
     pub db_path: String,
     pub namespace: String,
     pub database: String,
+    pub overwatch_handle: OverwatchHandle,
 }
 
 impl SurrealBackendSettings {
-    pub fn new(db_path: String, namespace: String, database: String) -> Self {
+    pub fn new(
+        db_path: impl Into<String>,
+        namespace: impl Into<String>,
+        database: impl Into<String>,
+        overwatch_handle: OverwatchHandle,
+    ) -> Self {
         Self {
-            db_path,
-            namespace,
-            database,
+            db_path: db_path.into(),
+            namespace: namespace.into(),
+            database: database.into(),
+            overwatch_handle,
         }
     }
 }
@@ -79,6 +88,7 @@ where
             db_path,
             namespace,
             database,
+            overwatch_handle,
         } = config;
 
         let connect_to_surrealdb = async {
@@ -90,7 +100,7 @@ where
             })
         };
 
-        block_in_place(|| Handle::current().block_on(connect_to_surrealdb))
+        block_in_place(|| overwatch_handle.runtime().block_on(connect_to_surrealdb))
     }
 
     async fn store(&mut self, key: Bytes, value: Bytes) -> Result<(), Self::Error> {
@@ -103,7 +113,7 @@ where
     async fn load(&mut self, key: &[u8]) -> Result<Option<Bytes>, Self::Error> {
         let key = from_utf8(key)?;
         let record: Option<Data> = self.db.select(("kv", key)).await?;
-        Ok(record.map(|data| data.to_bytes()))
+        Ok(record.as_ref().map(Data::to_bytes))
     }
 
     async fn load_prefix(&mut self, prefix: &[u8]) -> Result<Vec<Bytes>, Self::Error> {
@@ -112,14 +122,14 @@ where
             format!("SELECT * FROM kv WHERE string::starts_with(record::id(id), \"{prefix}\")");
         let mut response = self.db.query(query).await?;
         let records: Vec<Data> = response.take(0)?;
-        let records = records.into_iter().map(|data| data.to_bytes()).collect();
+        let records = records.iter().map(Data::to_bytes).collect();
         Ok(records)
     }
 
     async fn remove(&mut self, key: &[u8]) -> Result<Option<Bytes>, Self::Error> {
         let key = from_utf8(key)?;
         let record: Option<Data> = self.db.delete(("kv", key)).await?;
-        Ok(record.map(|data| data.to_bytes()))
+        Ok(record.as_ref().map(Data::to_bytes))
     }
 
     async fn execute(
@@ -134,12 +144,15 @@ where
 mod tests {
     use super::*;
     use crate::backends::testing::NoStorageSerde;
+    use tokio::runtime::Handle;
 
     fn get_test_config() -> SurrealBackendSettings {
+        let (sender, _) = tokio::sync::mpsc::channel(1);
         SurrealBackendSettings::new(
             String::from("mem://"),
             String::from("namespace"),
             String::from("database"),
+            OverwatchHandle::new(Handle::current(), sender),
         )
     }
 
