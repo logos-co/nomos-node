@@ -35,9 +35,9 @@ pub use nomos_mempool::network::adapters::libp2p::{
 };
 pub use nomos_mempool::TxMempoolSettings;
 use nomos_mempool::{backend::mockpool::MockPool, TxMempoolService};
-pub use nomos_mix_service::backends::libp2p::Libp2pMixBackend as MixBackend;
-pub use nomos_mix_service::network::libp2p::Libp2pAdapter as MixNetworkAdapter;
-pub use nomos_mix_service::MixService;
+pub use nomos_blend_service::backends::libp2p::Libp2pBlendBackend as BlendBackend;
+pub use nomos_blend_service::network::libp2p::Libp2pAdapter as BlendNetworkAdapter;
+pub use nomos_blend_service::BlendService;
 pub use nomos_network::backends::libp2p::Libp2p as NetworkBackend;
 pub use nomos_network::NetworkService;
 pub use nomos_storage::{
@@ -86,7 +86,7 @@ pub const MB16: usize = 1024 * 1024 * 16;
 
 pub type Cryptarchia<SamplingAdapter> = cryptarchia_consensus::CryptarchiaConsensus<
     cryptarchia_consensus::network::adapters::libp2p::LibP2pAdapter<Tx, BlobInfo>,
-    cryptarchia_consensus::mix::adapters::libp2p::LibP2pAdapter<MixNetworkAdapter, Tx, BlobInfo>,
+    cryptarchia_consensus::blend::adapters::libp2p::LibP2pAdapter<BlendNetworkAdapter, Tx, BlobInfo>,
     MockPool<HeaderId, Tx, <Tx as Transaction>::Hash>,
     MempoolNetworkAdapter<Tx, <Tx as Transaction>::Hash>,
     MockPool<HeaderId, BlobInfo, <BlobInfo as DispersedBlobInfo>::BlobId>,
@@ -124,7 +124,7 @@ pub type DaIndexer<SamplingAdapter> = DataIndexerService<
     CryptarchiaConsensusAdapter<Tx, BlobInfo>,
     // Cryptarchia specific, should be the same as in `Cryptarchia` type above.
     cryptarchia_consensus::network::adapters::libp2p::LibP2pAdapter<Tx, BlobInfo>,
-    cryptarchia_consensus::mix::adapters::libp2p::LibP2pAdapter<MixNetworkAdapter, Tx, BlobInfo>,
+    cryptarchia_consensus::blend::adapters::libp2p::LibP2pAdapter<BlendNetworkAdapter, Tx, BlobInfo>,
     MockPool<HeaderId, Tx, <Tx as Transaction>::Hash>,
     MempoolNetworkAdapter<Tx, <Tx as Transaction>::Hash>,
     MockPool<HeaderId, BlobInfo, <BlobInfo as DispersedBlobInfo>::BlobId>,
@@ -160,7 +160,7 @@ pub struct Nomos {
     #[cfg(feature = "tracing")]
     tracing: ServiceHandle<Tracing>,
     network: ServiceHandle<NetworkService<NetworkBackend>>,
-    mix: ServiceHandle<MixService<MixBackend, MixNetworkAdapter>>,
+    blend: ServiceHandle<BlendService<BlendBackend, BlendNetworkAdapter>>,
     da_indexer: ServiceHandle<NodeDaIndexer>,
     da_verifier: ServiceHandle<NodeDaVerifier>,
     da_sampling: ServiceHandle<NodeDaSampling>,

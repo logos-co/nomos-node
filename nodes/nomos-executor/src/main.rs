@@ -5,7 +5,7 @@ use color_eyre::eyre::{eyre, Result};
 use nomos_executor::config::Config as ExecutorConfig;
 use nomos_executor::{NomosExecutor, NomosExecutorServiceSettings};
 use nomos_node::{
-    config::MixArgs, BlobInfo, CryptarchiaArgs, DaMempoolSettings, DispersedBlobInfo, HttpArgs,
+    config::BlendArgs, BlobInfo, CryptarchiaArgs, DaMempoolSettings, DispersedBlobInfo, HttpArgs,
     LogArgs, MempoolAdapterSettings, NetworkArgs, Transaction, Tx, TxMempoolSettings, CL_TOPIC,
     DA_TOPIC,
 };
@@ -25,9 +25,9 @@ struct Args {
     /// Overrides network config.
     #[clap(flatten)]
     network_args: NetworkArgs,
-    /// Overrides mix config.
+    /// Overrides blend config.
     #[clap(flatten)]
-    mix_args: MixArgs,
+    blend_args: BlendArgs,
     /// Overrides http config.
     #[clap(flatten)]
     http_args: HttpArgs,
@@ -41,14 +41,14 @@ fn main() -> Result<()> {
         log_args,
         http_args,
         network_args,
-        mix_args,
+        blend_args,
         cryptarchia_args,
     } = Args::parse();
     let config = serde_yaml::from_reader::<_, ExecutorConfig>(std::fs::File::open(config)?)?
         .update_from_args(
             log_args,
             network_args,
-            mix_args,
+            blend_args,
             http_args,
             cryptarchia_args,
         )?;
@@ -63,7 +63,7 @@ fn main() -> Result<()> {
     let app = OverwatchRunner::<NomosExecutor>::run(
         NomosExecutorServiceSettings {
             network: config.network,
-            mix: config.mix,
+            blend: config.blend,
             #[cfg(feature = "tracing")]
             tracing: config.tracing,
             http: config.http,

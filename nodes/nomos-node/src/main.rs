@@ -1,6 +1,6 @@
 use kzgrs_backend::dispersal::BlobInfo;
 use nomos_node::{
-    config::MixArgs, Config, CryptarchiaArgs, HttpArgs, LogArgs, NetworkArgs, Nomos,
+    config::BlendArgs, Config, CryptarchiaArgs, HttpArgs, LogArgs, NetworkArgs, Nomos,
     NomosServiceSettings, Tx,
 };
 
@@ -25,9 +25,9 @@ struct Args {
     /// Overrides network config.
     #[clap(flatten)]
     network_args: NetworkArgs,
-    /// Overrides mix config.
+    /// Overrides blend config.
     #[clap(flatten)]
-    mix_args: MixArgs,
+    blend_args: BlendArgs,
     /// Overrides http config.
     #[clap(flatten)]
     http_args: HttpArgs,
@@ -41,14 +41,14 @@ fn main() -> Result<()> {
         log_args,
         http_args,
         network_args,
-        mix_args,
+        blend_args,
         cryptarchia_args,
     } = Args::parse();
     let config = serde_yaml::from_reader::<_, Config>(std::fs::File::open(config)?)?
         .update_from_args(
             log_args,
             network_args,
-            mix_args,
+            blend_args,
             http_args,
             cryptarchia_args,
         )?;
@@ -63,7 +63,7 @@ fn main() -> Result<()> {
     let app = OverwatchRunner::<Nomos>::run(
         NomosServiceSettings {
             network: config.network,
-            mix: config.mix,
+            blend: config.blend,
             #[cfg(feature = "tracing")]
             tracing: config.tracing,
             http: config.http,

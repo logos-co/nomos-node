@@ -16,7 +16,7 @@ use crate::{
     topology::configs::{
         api::create_api_configs,
         consensus::{create_consensus_configs, ConsensusParams},
-        mix::create_mix_configs,
+        blend::create_blend_configs,
     },
 };
 
@@ -77,7 +77,7 @@ impl Topology {
         let consensus_configs = create_consensus_configs(&ids, config.consensus_params);
         let da_configs = create_da_configs(&ids, config.da_params);
         let network_configs = create_network_configs(&ids, config.network_params);
-        let mix_configs = create_mix_configs(&ids);
+        let blend_configs = create_blend_configs(&ids);
         let api_configs = create_api_configs(&ids);
         let tracing_configs = create_tracing_configs(&ids);
 
@@ -87,7 +87,7 @@ impl Topology {
                 consensus_config: consensus_configs[i].to_owned(),
                 da_config: da_configs[i].to_owned(),
                 network_config: network_configs[i].to_owned(),
-                mix_config: mix_configs[i].to_owned(),
+                blend_config: blend_configs[i].to_owned(),
                 api_config: api_configs[i].to_owned(),
                 tracing_config: tracing_configs[i].to_owned(),
             });
@@ -100,7 +100,7 @@ impl Topology {
                 consensus_config: consensus_configs[i].to_owned(),
                 da_config: da_configs[i].to_owned(),
                 network_config: network_configs[i].to_owned(),
-                mix_config: mix_configs[i].to_owned(),
+                blend_config: blend_configs[i].to_owned(),
                 api_config: api_configs[i].to_owned(),
                 tracing_config: tracing_configs[i].to_owned(),
             });
