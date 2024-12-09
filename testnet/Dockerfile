@@ -14,7 +14,7 @@ RUN cargo install cargo-binstall
 RUN cargo binstall -y cargo-risczero
 RUN cargo risczero install
 
-RUN cargo build --release --all --features metrics
+RUN cargo build --release
 
 # NODE IMAGE ----------------------------------------------------------
 
