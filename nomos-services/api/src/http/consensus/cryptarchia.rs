@@ -12,6 +12,7 @@ use cryptarchia_consensus::{
     CryptarchiaConsensus, CryptarchiaInfo,
 };
 use kzgrs_backend::dispersal::BlobInfo;
+use nomos_blend_service::network::libp2p::Libp2pAdapter as BlendNetworkAdapter;
 use nomos_core::{
     da::{
         blob::{self, select::FillSize as FillSizeWithBlobs},
@@ -24,7 +25,6 @@ use nomos_da_sampling::backend::DaSamplingServiceBackend;
 use nomos_mempool::{
     backend::mockpool::MockPool, network::adapters::libp2p::Libp2pAdapter as MempoolNetworkAdapter,
 };
-use nomos_blend_service::network::libp2p::Libp2pAdapter as BlendNetworkAdapter;
 use nomos_storage::backends::{rocksdb::RocksBackend, StorageSerde};
 
 pub type Cryptarchia<

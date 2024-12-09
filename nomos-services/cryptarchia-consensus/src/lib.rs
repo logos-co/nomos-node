@@ -1,6 +1,6 @@
+pub mod blend;
 mod leadership;
 mod messages;
-pub mod blend;
 pub mod network;
 mod time;
 
@@ -174,7 +174,8 @@ pub struct CryptarchiaConsensus<
     // underlying networking backend. We need this so we can relay and check the types properly
     // when implementing ServiceCore for CryptarchiaConsensus
     network_relay: Relay<NetworkService<A::Backend>>,
-    blend_relay: Relay<nomos_blend_service::BlendService<BlendAdapter::Backend, BlendAdapter::Network>>,
+    blend_relay:
+        Relay<nomos_blend_service::BlendService<BlendAdapter::Backend, BlendAdapter::Network>>,
     cl_mempool_relay: Relay<TxMempoolService<ClPoolAdapter, ClPool>>,
     da_mempool_relay: Relay<
         DaMempoolService<

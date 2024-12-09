@@ -4,6 +4,9 @@ use std::time::Duration;
 use std::{net::SocketAddr, process::Child};
 
 use cryptarchia_consensus::{CryptarchiaInfo, CryptarchiaSettings};
+use nomos_blend::message_blend::{
+    CryptographicProcessorSettings, MessageBlendSettings, TemporalSchedulerSettings,
+};
 use nomos_core::block::Block;
 use nomos_da_indexer::storage::adapters::rocksdb::RocksAdapterSettings as IndexerStorageAdapterSettings;
 use nomos_da_indexer::IndexerSettings;
@@ -14,9 +17,6 @@ use nomos_da_sampling::{backend::kzgrs::KzgrsSamplingBackendSettings, DaSampling
 use nomos_da_verifier::storage::adapters::rocksdb::RocksAdapterSettings as VerifierStorageAdapterSettings;
 use nomos_da_verifier::{backend::kzgrs::KzgrsDaVerifierSettings, DaVerifierServiceSettings};
 use nomos_mempool::MempoolMetrics;
-use nomos_blend::message_blend::{
-    CryptographicProcessorSettings, MessageBlendSettings, TemporalSchedulerSettings,
-};
 use nomos_network::{backends::libp2p::Libp2pConfig, NetworkConfig};
 use nomos_node::api::paths::{
     CL_METRICS, CRYPTARCHIA_HEADERS, CRYPTARCHIA_INFO, DA_GET_RANGE, STORAGE_BLOCK,

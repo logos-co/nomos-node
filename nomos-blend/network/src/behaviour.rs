@@ -1,6 +1,6 @@
 use crate::{
     error::Error,
-    handler::{FromBehaviour, BlendConnectionHandler, ToBehaviour},
+    handler::{BlendConnectionHandler, FromBehaviour, ToBehaviour},
 };
 use cached::{Cached, TimedCache};
 use futures::Stream;

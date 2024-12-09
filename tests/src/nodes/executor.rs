@@ -6,6 +6,9 @@ use std::{net::SocketAddr, process::Child};
 use crate::adjust_timeout;
 use crate::topology::configs::GeneralConfig;
 use cryptarchia_consensus::CryptarchiaSettings;
+use nomos_blend::message_blend::{
+    CryptographicProcessorSettings, MessageBlendSettings, TemporalSchedulerSettings,
+};
 use nomos_da_dispersal::backend::kzgrs::{DispersalKZGRSBackendSettings, EncoderSettings};
 use nomos_da_dispersal::DispersalServiceSettings;
 use nomos_da_indexer::storage::adapters::rocksdb::RocksAdapterSettings as IndexerStorageAdapterSettings;
@@ -22,9 +25,6 @@ use nomos_da_verifier::storage::adapters::rocksdb::RocksAdapterSettings as Verif
 use nomos_da_verifier::DaVerifierServiceSettings;
 use nomos_executor::api::backend::AxumBackendSettings;
 use nomos_executor::config::Config;
-use nomos_blend::message_blend::{
-    CryptographicProcessorSettings, MessageBlendSettings, TemporalSchedulerSettings,
-};
 use nomos_network::{backends::libp2p::Libp2pConfig, NetworkConfig};
 use nomos_node::api::paths::{CL_METRICS, DA_GET_RANGE};
 use nomos_node::RocksBackendSettings;

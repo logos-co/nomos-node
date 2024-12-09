@@ -1,13 +1,13 @@
 use std::{hash::Hash, marker::PhantomData};
 
-use nomos_core::{block::Block, wire};
 use nomos_blend_service::{
     backends::libp2p::Libp2pBlendBackend, network::NetworkAdapter, BlendService, ServiceMessage,
 };
+use nomos_core::{block::Block, wire};
 use overwatch_rs::services::{relay::OutboundRelay, ServiceData};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
-use crate::{messages::NetworkMessage, blend::BlendAdapter};
+use crate::{blend::BlendAdapter, messages::NetworkMessage};
 
 #[derive(Clone)]
 pub struct LibP2pAdapter<Network, Tx, BlobCert>

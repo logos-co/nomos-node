@@ -1,11 +1,11 @@
 use cryptarchia_consensus::LeaderConfig;
 // std
-use nomos_da_network_service::backends::libp2p::common::DaNetworkBackendSettings;
 use nomos_blend::message_blend::{
     CryptographicProcessorSettings, MessageBlendSettings, TemporalSchedulerSettings,
 };
 use nomos_blend::{conn_maintenance::ConnectionMaintenanceSettings, membership::Node};
 use nomos_blend_message::{sphinx::SphinxMessage, BlendMessage};
+use nomos_da_network_service::backends::libp2p::common::DaNetworkBackendSettings;
 use std::path::PathBuf;
 use std::time::Duration;
 // crates
@@ -19,6 +19,10 @@ use libp2p::identity::{
     ed25519::{self, Keypair as Ed25519Keypair},
     Keypair, PeerId,
 };
+use nomos_blend_service::backends::libp2p::{
+    Libp2pBlendBackend as BlendBackend, Libp2pBlendBackendSettings,
+};
+use nomos_blend_service::{BlendConfig, BlendService};
 use nomos_core::{da::blob::info::DispersedBlobInfo, header::HeaderId, tx::Transaction};
 pub use nomos_core::{
     da::blob::select::FillSize as FillSizeWithBlobs, tx::select::FillSize as FillSizeWithTx,
@@ -54,10 +58,6 @@ use nomos_mempool::network::adapters::libp2p::Libp2pAdapter as MempoolNetworkAda
 use nomos_mempool::network::adapters::libp2p::Settings as AdapterSettings;
 use nomos_mempool::{backend::mockpool::MockPool, TxMempoolService};
 use nomos_mempool::{DaMempoolSettings, TxMempoolSettings};
-use nomos_blend_service::backends::libp2p::{
-    Libp2pBlendBackend as BlendBackend, Libp2pBlendBackendSettings,
-};
-use nomos_blend_service::{BlendConfig, BlendService};
 use nomos_network::backends::libp2p::{Libp2p as NetworkBackend, Libp2pConfig};
 use nomos_network::NetworkConfig;
 use nomos_network::NetworkService;
@@ -168,7 +168,9 @@ pub(crate) const MB16: usize = 1024 * 1024 * 16;
 pub struct TestNode {
     //logging: ServiceHandle<Logger>,
     network: ServiceHandle<NetworkService<NetworkBackend>>,
-    blend: ServiceHandle<BlendService<BlendBackend, nomos_blend_service::network::libp2p::Libp2pAdapter>>,
+    blend: ServiceHandle<
+        BlendService<BlendBackend, nomos_blend_service::network::libp2p::Libp2pAdapter>,
+    >,
     cl_mempool: ServiceHandle<TxMempool>,
     da_network: ServiceHandle<DaNetworkService<DaNetworkValidatorBackend<FillFromNodeList>>>,
     da_mempool: ServiceHandle<DaMempool>,

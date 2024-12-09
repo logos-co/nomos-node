@@ -15,8 +15,8 @@ use crate::{
     },
     topology::configs::{
         api::create_api_configs,
-        consensus::{create_consensus_configs, ConsensusParams},
         blend::create_blend_configs,
+        consensus::{create_consensus_configs, ConsensusParams},
     },
 };
 
