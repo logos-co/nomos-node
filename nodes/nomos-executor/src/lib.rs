@@ -18,9 +18,9 @@ use nomos_da_sampling::storage::adapters::rocksdb::RocksAdapter as SamplingStora
 use nomos_da_verifier::backend::kzgrs::KzgrsDaVerifier;
 use nomos_da_verifier::network::adapters::executor::Libp2pAdapter as VerifierNetworkAdapter;
 use nomos_mempool::backend::mockpool::MockPool;
-use nomos_mix_service::backends::libp2p::Libp2pMixBackend as MixBackend;
-use nomos_mix_service::network::libp2p::Libp2pAdapter as MixNetworkAdapter;
-use nomos_mix_service::MixService;
+use nomos_blend_service::backends::libp2p::Libp2pBlendBackend as BlendBackend;
+use nomos_blend_service::network::libp2p::Libp2pAdapter as BlendNetworkAdapter;
+use nomos_blend_service::BlendService;
 use nomos_node::DispersedBlobInfo;
 use nomos_node::HeaderId;
 use nomos_node::MempoolNetworkAdapter;
@@ -88,7 +88,7 @@ pub struct NomosExecutor {
     #[cfg(feature = "tracing")]
     tracing: ServiceHandle<Tracing>,
     network: ServiceHandle<NetworkService<NetworkBackend>>,
-    mix: ServiceHandle<MixService<MixBackend, MixNetworkAdapter>>,
+    blend: ServiceHandle<BlendService<BlendBackend, BlendNetworkAdapter>>,
     da_dispersal: ServiceHandle<DaDispersal>,
     da_indexer: ServiceHandle<ExecutorDaIndexer>,
     da_verifier: ServiceHandle<ExecutorDaVerifier>,

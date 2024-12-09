@@ -1,11 +1,11 @@
 use cryptarchia_consensus::LeaderConfig;
 // std
 use nomos_da_network_service::backends::libp2p::common::DaNetworkBackendSettings;
-use nomos_mix::message_blend::{
+use nomos_blend::message_blend::{
     CryptographicProcessorSettings, MessageBlendSettings, TemporalSchedulerSettings,
 };
-use nomos_mix::{conn_maintenance::ConnectionMaintenanceSettings, membership::Node};
-use nomos_mix_message::{sphinx::SphinxMessage, MixMessage};
+use nomos_blend::{conn_maintenance::ConnectionMaintenanceSettings, membership::Node};
+use nomos_blend_message::{sphinx::SphinxMessage, BlendMessage};
 use std::path::PathBuf;
 use std::time::Duration;
 // crates
@@ -54,10 +54,10 @@ use nomos_mempool::network::adapters::libp2p::Libp2pAdapter as MempoolNetworkAda
 use nomos_mempool::network::adapters::libp2p::Settings as AdapterSettings;
 use nomos_mempool::{backend::mockpool::MockPool, TxMempoolService};
 use nomos_mempool::{DaMempoolSettings, TxMempoolSettings};
-use nomos_mix_service::backends::libp2p::{
-    Libp2pMixBackend as MixBackend, Libp2pMixBackendSettings,
+use nomos_blend_service::backends::libp2p::{
+    Libp2pBlendBackend as BlendBackend, Libp2pBlendBackendSettings,
 };
-use nomos_mix_service::{MixConfig, MixService};
+use nomos_blend_service::{BlendConfig, BlendService};
 use nomos_network::backends::libp2p::{Libp2p as NetworkBackend, Libp2pConfig};
 use nomos_network::NetworkConfig;
 use nomos_network::NetworkService;
@@ -92,8 +92,8 @@ pub static ENCODER: Lazy<DaEncoder> = Lazy::new(|| DaEncoder::new(PARAMS.clone()
 
 pub(crate) type Cryptarchia = cryptarchia_consensus::CryptarchiaConsensus<
     cryptarchia_consensus::network::adapters::libp2p::LibP2pAdapter<Tx, BlobInfo>,
-    cryptarchia_consensus::mix::adapters::libp2p::LibP2pAdapter<
-        nomos_mix_service::network::libp2p::Libp2pAdapter,
+    cryptarchia_consensus::blend::adapters::libp2p::LibP2pAdapter<
+        nomos_blend_service::network::libp2p::Libp2pAdapter,
         Tx,
         BlobInfo,
     >,
@@ -124,8 +124,8 @@ pub(crate) type DaIndexer = DataIndexerService<
     CryptarchiaConsensusAdapter<Tx, BlobInfo>,
     // Cryptarchia specific, should be the same as in `Cryptarchia` type above.
     cryptarchia_consensus::network::adapters::libp2p::LibP2pAdapter<Tx, BlobInfo>,
-    cryptarchia_consensus::mix::adapters::libp2p::LibP2pAdapter<
-        nomos_mix_service::network::libp2p::Libp2pAdapter,
+    cryptarchia_consensus::blend::adapters::libp2p::LibP2pAdapter<
+        nomos_blend_service::network::libp2p::Libp2pAdapter,
         Tx,
         BlobInfo,
     >,
@@ -168,7 +168,7 @@ pub(crate) const MB16: usize = 1024 * 1024 * 16;
 pub struct TestNode {
     //logging: ServiceHandle<Logger>,
     network: ServiceHandle<NetworkService<NetworkBackend>>,
-    mix: ServiceHandle<MixService<MixBackend, nomos_mix_service::network::libp2p::Libp2pAdapter>>,
+    blend: ServiceHandle<BlendService<BlendBackend, nomos_blend_service::network::libp2p::Libp2pAdapter>>,
     cl_mempool: ServiceHandle<TxMempool>,
     da_network: ServiceHandle<DaNetworkService<DaNetworkValidatorBackend<FillFromNodeList>>>,
     da_mempool: ServiceHandle<DaMempool>,
@@ -188,10 +188,10 @@ pub struct TestDaNetworkSettings {
     pub node_key: ed25519::SecretKey,
 }
 
-pub struct TestMixSettings {
-    pub backend: Libp2pMixBackendSettings,
+pub struct TestBlendSettings {
+    pub backend: Libp2pBlendBackendSettings,
     pub private_key: x25519_dalek::StaticSecret,
-    pub membership: Vec<Node<<SphinxMessage as MixMessage>::PublicKey>>,
+    pub membership: Vec<Node<<SphinxMessage as BlendMessage>::PublicKey>>,
 }
 
 pub fn new_node(
@@ -200,7 +200,7 @@ pub fn new_node(
     genesis_state: &LedgerState,
     time_config: &TimeConfig,
     swarm_config: &SwarmConfig,
-    mix_config: &TestMixSettings,
+    blend_config: &TestBlendSettings,
     db_path: PathBuf,
     blobs_dir: &PathBuf,
     initial_peers: Vec<Multiaddr>,
@@ -216,23 +216,23 @@ pub fn new_node(
                     initial_peers,
                 },
             },
-            mix: MixConfig {
-                backend: mix_config.backend.clone(),
+            blend: BlendConfig {
+                backend: blend_config.backend.clone(),
                 persistent_transmission: Default::default(),
                 message_blend: MessageBlendSettings {
                     cryptographic_processor: CryptographicProcessorSettings {
-                        private_key: mix_config.private_key.to_bytes(),
-                        num_mix_layers: 1,
+                        private_key: blend_config.private_key.to_bytes(),
+                        num_blend_layers: 1,
                     },
                     temporal_processor: TemporalSchedulerSettings {
                         max_delay_seconds: 2,
                     },
                 },
-                cover_traffic: nomos_mix_service::CoverTrafficExtSettings {
+                cover_traffic: nomos_blend_service::CoverTrafficExtSettings {
                     epoch_duration: Duration::from_secs(432000),
                     slot_duration: Duration::from_secs(20),
                 },
-                membership: mix_config.membership.clone(),
+                membership: blend_config.membership.clone(),
             },
             da_network: DaNetworkConfig {
                 backend: DaNetworkBackendSettings {
@@ -285,10 +285,10 @@ pub fn new_node(
                     cryptarchia_consensus::network::adapters::libp2p::LibP2pAdapterSettings {
                         topic: String::from(nomos_node::CONSENSUS_TOPIC),
                     },
-                mix_adapter_settings:
-                    cryptarchia_consensus::mix::adapters::libp2p::LibP2pAdapterSettings {
+                blend_adapter_settings:
+                    cryptarchia_consensus::blend::adapters::libp2p::LibP2pAdapterSettings {
                         broadcast_settings:
-                            nomos_mix_service::network::libp2p::Libp2pBroadcastSettings {
+                            nomos_blend_service::network::libp2p::Libp2pBroadcastSettings {
                                 topic: String::from(nomos_node::CONSENSUS_TOPIC),
                             },
                     },
@@ -321,12 +321,12 @@ pub fn new_node(
     .unwrap()
 }
 
-pub fn new_mix_configs(listening_addresses: Vec<Multiaddr>) -> Vec<TestMixSettings> {
+pub fn new_blend_configs(listening_addresses: Vec<Multiaddr>) -> Vec<TestBlendSettings> {
     let settings = listening_addresses
         .iter()
         .map(|listening_address| {
             (
-                Libp2pMixBackendSettings {
+                Libp2pBlendBackendSettings {
                     listening_address: listening_address.clone(),
                     node_key: ed25519::SecretKey::generate(),
                     conn_maintenance: ConnectionMaintenanceSettings {
@@ -353,7 +353,7 @@ pub fn new_mix_configs(listening_addresses: Vec<Multiaddr>) -> Vec<TestMixSettin
 
     settings
         .into_iter()
-        .map(|(backend, private_key)| TestMixSettings {
+        .map(|(backend, private_key)| TestBlendSettings {
             backend,
             private_key,
             membership: membership.clone(),
