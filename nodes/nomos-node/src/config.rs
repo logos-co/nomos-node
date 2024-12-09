@@ -13,13 +13,13 @@ use serde::{Deserialize, Serialize};
 use tracing::Level;
 // internal
 use crate::{NomosApiService, NomosDaMembership, Wire};
+use nomos_blend_service::backends::libp2p::Libp2pBlendBackend as BlendBackend;
+use nomos_blend_service::network::libp2p::Libp2pAdapter as BlendNetworkAdapter;
+use nomos_blend_service::BlendService;
 use nomos_core::{proofs::covenant::CovenantProof, staking::NMO_UNIT};
 use nomos_da_network_service::backends::libp2p::validator::DaNetworkValidatorBackend;
 use nomos_da_network_service::NetworkService as DaNetworkService;
 use nomos_libp2p::{ed25519::SecretKey, Multiaddr};
-use nomos_blend_service::backends::libp2p::Libp2pBlendBackend as BlendBackend;
-use nomos_blend_service::network::libp2p::Libp2pAdapter as BlendNetworkAdapter;
-use nomos_blend_service::BlendService;
 use nomos_network::backends::libp2p::Libp2p as NetworkBackend;
 use nomos_network::NetworkService;
 use nomos_storage::backends::rocksdb::RocksBackend;

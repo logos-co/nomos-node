@@ -1,5 +1,6 @@
 use bytes::Bytes;
 use core::ops::Range;
+use nomos_blend_service::network::libp2p::Libp2pAdapter as BlendNetworkAdapter;
 use nomos_core::da::blob::info::DispersedBlobInfo;
 use nomos_core::da::blob::{metadata, select::FillSize as FillSizeWithBlobs, Blob};
 use nomos_core::da::{BlobId, DaVerifier as CoreDaVerifier};
@@ -23,7 +24,6 @@ use nomos_da_verifier::{DaVerifierMsg, DaVerifierService};
 use nomos_libp2p::PeerId;
 use nomos_mempool::backend::mockpool::MockPool;
 use nomos_mempool::network::adapters::libp2p::Libp2pAdapter as MempoolNetworkAdapter;
-use nomos_blend_service::network::libp2p::Libp2pAdapter as BlendNetworkAdapter;
 use nomos_storage::backends::rocksdb::RocksBackend;
 use nomos_storage::backends::StorageSerde;
 use overwatch_rs::overwatch::handle::OverwatchHandle;

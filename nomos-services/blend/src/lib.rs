@@ -5,7 +5,6 @@ use async_trait::async_trait;
 use backends::BlendBackend;
 use futures::StreamExt;
 use network::NetworkAdapter;
-use nomos_core::wire;
 use nomos_blend::message_blend::temporal::TemporalScheduler;
 use nomos_blend::message_blend::{crypto::CryptographicProcessor, CryptographicProcessorSettings};
 use nomos_blend::message_blend::{MessageBlendExt, MessageBlendSettings};
@@ -18,6 +17,7 @@ use nomos_blend::{
     membership::{Membership, Node},
 };
 use nomos_blend_message::{sphinx::SphinxMessage, BlendMessage};
+use nomos_core::wire;
 use nomos_network::NetworkService;
 use overwatch_rs::services::{
     handle::ServiceStateHandle,
@@ -147,12 +147,13 @@ where
         );
 
         // local messages, are bypassed and send immediately
-        let mut local_messages = service_state
-            .inbound_relay
-            .map(|ServiceMessage::Blend(message)| {
-                wire::serialize(&message)
-                    .expect("Message from internal services should not fail to serialize")
-            });
+        let mut local_messages =
+            service_state
+                .inbound_relay
+                .map(|ServiceMessage::Blend(message)| {
+                    wire::serialize(&message)
+                        .expect("Message from internal services should not fail to serialize")
+                });
 
         let mut lifecycle_stream = service_state.lifecycle_handle.message_stream();
         loop {

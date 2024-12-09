@@ -8,9 +8,9 @@ use libp2p::{
     swarm::SwarmEvent,
     Multiaddr, Swarm, SwarmBuilder,
 };
-use nomos_libp2p::secret_key_serde;
 use nomos_blend::{conn_maintenance::ConnectionMaintenanceSettings, membership::Membership};
 use nomos_blend_message::sphinx::SphinxMessage;
+use nomos_libp2p::secret_key_serde;
 use overwatch_rs::overwatch::handle::OverwatchHandle;
 use rand::RngCore;
 use serde::{Deserialize, Serialize};

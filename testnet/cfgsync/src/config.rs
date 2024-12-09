@@ -1,9 +1,9 @@
 // std
 use std::{collections::HashMap, net::Ipv4Addr, str::FromStr};
 // crates
-use nomos_libp2p::{Multiaddr, PeerId};
 use nomos_blend::membership::Node;
 use nomos_blend_message::{sphinx::SphinxMessage, BlendMessage};
+use nomos_libp2p::{Multiaddr, PeerId};
 use nomos_tracing::{
     logging::loki::LokiConfig, metrics::otlp::OtlpMetricsConfig, tracing::otlp::OtlpTracingConfig,
 };
@@ -11,9 +11,9 @@ use nomos_tracing_service::{FilterLayer, LoggerLayer, MetricsLayer, TracingSetti
 use rand::{thread_rng, Rng};
 use tests::topology::configs::{
     api::GeneralApiConfig,
+    blend::create_blend_configs,
     consensus::{create_consensus_configs, ConsensusParams},
     da::{create_da_configs, DaParams},
-    blend::create_blend_configs,
     network::create_network_configs,
     tracing::GeneralTracingConfig,
     GeneralConfig,

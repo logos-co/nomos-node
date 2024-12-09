@@ -1,14 +1,16 @@
 // std
 // crates
 use color_eyre::eyre::Result;
-use nomos_da_network_service::backends::libp2p::executor::DaNetworkExecutorBackend;
-use nomos_da_network_service::NetworkService as DaNetworkService;
 use nomos_blend_service::backends::libp2p::Libp2pBlendBackend as BlendBackend;
 use nomos_blend_service::network::libp2p::Libp2pAdapter as BlendNetworkAdapter;
 use nomos_blend_service::BlendService;
+use nomos_da_network_service::backends::libp2p::executor::DaNetworkExecutorBackend;
+use nomos_da_network_service::NetworkService as DaNetworkService;
 use nomos_network::backends::libp2p::Libp2p as NetworkBackend;
 use nomos_node::{
-    config::{update_cryptarchia_consensus, update_blend, update_network, update_tracing, BlendArgs},
+    config::{
+        update_blend, update_cryptarchia_consensus, update_network, update_tracing, BlendArgs,
+    },
     CryptarchiaArgs, HttpArgs, LogArgs, NetworkArgs, NetworkService, Tracing, Wire,
 };
 use nomos_storage::backends::rocksdb::RocksBackend;

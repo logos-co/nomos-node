@@ -1,14 +1,14 @@
 pub mod api;
+pub mod blend;
 pub mod consensus;
 pub mod da;
-pub mod blend;
 pub mod network;
 pub mod tracing;
 
 use api::GeneralApiConfig;
+use blend::GeneralBlendConfig;
 use consensus::GeneralConsensusConfig;
 use da::GeneralDaConfig;
-use blend::GeneralBlendConfig;
 use network::GeneralNetworkConfig;
 use tracing::GeneralTracingConfig;
 

@@ -1,9 +1,9 @@
 use std::str::FromStr;
 
-use nomos_libp2p::{ed25519, Multiaddr};
 use nomos_blend::{conn_maintenance::ConnectionMaintenanceSettings, membership::Node};
 use nomos_blend_message::{sphinx::SphinxMessage, BlendMessage};
 use nomos_blend_service::backends::libp2p::Libp2pBlendBackendSettings;
+use nomos_libp2p::{ed25519, Multiaddr};
 
 use crate::get_available_port;
 
@@ -50,7 +50,9 @@ pub fn create_blend_configs(ids: &[[u8; 32]]) -> Vec<GeneralBlendConfig> {
     configs
 }
 
-fn blend_nodes(configs: &[GeneralBlendConfig]) -> Vec<Node<<SphinxMessage as BlendMessage>::PublicKey>> {
+fn blend_nodes(
+    configs: &[GeneralBlendConfig],
+) -> Vec<Node<<SphinxMessage as BlendMessage>::PublicKey>> {
     configs
         .iter()
         .map(|config| Node {
