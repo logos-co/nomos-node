@@ -25,6 +25,11 @@ use crate::swarm::common::{
 use crate::SubnetworkId;
 use subnetworks_assignations::MembershipHandler;
 
+// Metrics
+const EVENT_SAMPLING: &str = "sampling";
+const EVENT_VALIDATOR_DISPERSAL: &str = "validator_dispersal";
+const EVENT_REPLICATION: &str = "replication";
+
 pub struct ValidatorEventsStream {
     pub sampling_events_receiver: UnboundedReceiverStream<SamplingEvent>,
     pub validation_events_receiver: UnboundedReceiverStream<DaBlob>,
@@ -132,13 +137,16 @@ where
     async fn handle_behaviour_event(&mut self, event: ValidatorBehaviourEvent<Membership>) {
         match event {
             ValidatorBehaviourEvent::Sampling(event) => {
-                tracing::info!(counter.behaviour_events_received = 1, event = "sampling");
+                tracing::info!(
+                    counter.behaviour_events_received = 1,
+                    event = EVENT_SAMPLING
+                );
                 self.handle_sampling_event(event).await;
             }
             ValidatorBehaviourEvent::Dispersal(event) => {
                 tracing::info!(
                     counter.behaviour_events_received = 1,
-                    event = "validator_dispersal",
+                    event = EVENT_VALIDATOR_DISPERSAL,
                     blob_size = event.blob_size()
                 );
                 self.handle_dispersal_event(event).await;
@@ -146,7 +154,7 @@ where
             ValidatorBehaviourEvent::Replication(event) => {
                 tracing::info!(
                     counter.behaviour_events_received = 1,
-                    event = "replication",
+                    event = EVENT_REPLICATION,
                     blob_size = event.blob_size()
                 );
                 self.handle_replication_event(event).await;
