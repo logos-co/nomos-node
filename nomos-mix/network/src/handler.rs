@@ -16,6 +16,7 @@ use libp2p::{
 
 use crate::behaviour::Config;
 
+// Metrics
 const VALUE_FULLY_NEGOTIATED_INBOUND: &str = "fully_negotiated_inbound";
 const VALUE_FULLY_NEGOTIATED_OUTBOUND: &str = "fully_negotiated_outbound";
 const VALUE_DIAL_UPGRADE_ERROR: &str = "dial_upgrade_error";
