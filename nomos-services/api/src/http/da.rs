@@ -1,5 +1,6 @@
 use bytes::Bytes;
 use core::ops::Range;
+use nomos_blend_service::network::libp2p::Libp2pAdapter as BlendNetworkAdapter;
 use nomos_core::da::blob::info::DispersedBlobInfo;
 use nomos_core::da::blob::{metadata, select::FillSize as FillSizeWithBlobs, Blob};
 use nomos_core::da::{BlobId, DaVerifier as CoreDaVerifier};
@@ -23,7 +24,6 @@ use nomos_da_verifier::{DaVerifierMsg, DaVerifierService};
 use nomos_libp2p::PeerId;
 use nomos_mempool::backend::mockpool::MockPool;
 use nomos_mempool::network::adapters::libp2p::Libp2pAdapter as MempoolNetworkAdapter;
-use nomos_mix_service::network::libp2p::Libp2pAdapter as MixNetworkAdapter;
 use nomos_storage::backends::rocksdb::RocksBackend;
 use nomos_storage::backends::StorageSerde;
 use overwatch_rs::overwatch::handle::OverwatchHandle;
@@ -54,7 +54,7 @@ pub type DaIndexer<
     CryptarchiaConsensusAdapter<Tx, V>,
     // Cryptarchia specific, should be the same as in `Cryptarchia` type above.
     cryptarchia_consensus::network::adapters::libp2p::LibP2pAdapter<Tx, V>,
-    cryptarchia_consensus::mix::adapters::libp2p::LibP2pAdapter<MixNetworkAdapter, Tx, V>,
+    cryptarchia_consensus::blend::adapters::libp2p::LibP2pAdapter<BlendNetworkAdapter, Tx, V>,
     MockPool<HeaderId, Tx, <Tx as Transaction>::Hash>,
     MempoolNetworkAdapter<Tx, <Tx as Transaction>::Hash>,
     MockPool<HeaderId, V, [u8; 32]>,

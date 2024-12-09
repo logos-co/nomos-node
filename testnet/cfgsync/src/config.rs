@@ -1,9 +1,9 @@
 // std
 use std::{collections::HashMap, net::Ipv4Addr, str::FromStr};
 // crates
+use nomos_blend::membership::Node;
+use nomos_blend_message::{sphinx::SphinxMessage, BlendMessage};
 use nomos_libp2p::{Multiaddr, PeerId};
-use nomos_mix::membership::Node;
-use nomos_mix_message::{sphinx::SphinxMessage, MixMessage};
 use nomos_tracing::{
     logging::loki::LokiConfig, metrics::otlp::OtlpMetricsConfig, tracing::otlp::OtlpTracingConfig,
 };
@@ -11,9 +11,9 @@ use nomos_tracing_service::{FilterLayer, LoggerLayer, MetricsLayer, TracingSetti
 use rand::{thread_rng, Rng};
 use tests::topology::configs::{
     api::GeneralApiConfig,
+    blend::create_blend_configs,
     consensus::{create_consensus_configs, ConsensusParams},
     da::{create_da_configs, DaParams},
-    mix::create_mix_configs,
     network::create_network_configs,
     tracing::GeneralTracingConfig,
     GeneralConfig,
@@ -24,7 +24,7 @@ use crate::TracingParams;
 
 const DEFAULT_LIBP2P_NETWORK_PORT: u16 = 3000;
 const DEFAULT_DA_NETWORK_PORT: u16 = 3300;
-const DEFAULT_MIX_PORT: u16 = 3400;
+const DEFAULT_BLEND_PORT: u16 = 3400;
 const DEFAULT_API_PORT: u16 = 18080;
 
 #[derive(Eq, PartialEq, Hash, Clone)]
@@ -40,7 +40,7 @@ pub struct Host {
     pub identifier: String,
     pub network_port: u16,
     pub da_network_port: u16,
-    pub mix_port: u16,
+    pub blend_port: u16,
 }
 
 impl Host {
@@ -51,7 +51,7 @@ impl Host {
             identifier,
             network_port: DEFAULT_LIBP2P_NETWORK_PORT,
             da_network_port: DEFAULT_DA_NETWORK_PORT,
-            mix_port: DEFAULT_MIX_PORT,
+            blend_port: DEFAULT_BLEND_PORT,
         }
     }
 
@@ -62,7 +62,7 @@ impl Host {
             identifier,
             network_port: DEFAULT_LIBP2P_NETWORK_PORT,
             da_network_port: DEFAULT_DA_NETWORK_PORT,
-            mix_port: DEFAULT_MIX_PORT,
+            blend_port: DEFAULT_BLEND_PORT,
         }
     }
 }
@@ -81,7 +81,7 @@ pub fn create_node_configs(
     let consensus_configs = create_consensus_configs(&ids, consensus_params);
     let da_configs = create_da_configs(&ids, da_params);
     let network_configs = create_network_configs(&ids, Default::default());
-    let mix_configs = create_mix_configs(&ids);
+    let blend_configs = create_blend_configs(&ids);
     let api_configs = ids
         .iter()
         .map(|_| GeneralApiConfig {
@@ -94,8 +94,8 @@ pub fn create_node_configs(
     let peer_addresses = da_configs[0].addresses.clone();
     let host_network_init_peers = update_network_init_peers(hosts.clone());
     let host_da_peer_addresses = update_da_peer_addresses(hosts.clone(), peer_addresses);
-    let host_mix_membership =
-        update_mix_membership(hosts.clone(), mix_configs[0].membership.clone());
+    let host_blend_membership =
+        update_blend_membership(hosts.clone(), blend_configs[0].membership.clone());
 
     let new_peer_addresses: HashMap<PeerId, Multiaddr> = host_da_peer_addresses
         .clone()
@@ -122,11 +122,11 @@ pub fn create_node_configs(
         network_config.swarm_config.port = host.network_port;
         network_config.initial_peers = host_network_init_peers.clone();
 
-        // Mix config.
-        let mut mix_config = mix_configs[i].to_owned();
-        mix_config.backend.listening_address =
-            Multiaddr::from_str(&format!("/ip4/0.0.0.0/udp/{}/quic-v1", host.mix_port)).unwrap();
-        mix_config.membership = host_mix_membership.clone();
+        // Blend config.
+        let mut blend_config = blend_configs[i].to_owned();
+        blend_config.backend.listening_address =
+            Multiaddr::from_str(&format!("/ip4/0.0.0.0/udp/{}/quic-v1", host.blend_port)).unwrap();
+        blend_config.membership = host_blend_membership.clone();
 
         // Tracing config.
         let tracing_config =
@@ -138,7 +138,7 @@ pub fn create_node_configs(
                 consensus_config,
                 da_config,
                 network_config,
-                mix_config,
+                blend_config,
                 api_config,
                 tracing_config,
             },
@@ -174,16 +174,16 @@ fn update_da_peer_addresses(
         .collect()
 }
 
-fn update_mix_membership(
+fn update_blend_membership(
     hosts: Vec<Host>,
-    membership: Vec<Node<<SphinxMessage as MixMessage>::PublicKey>>,
-) -> Vec<Node<<SphinxMessage as MixMessage>::PublicKey>> {
+    membership: Vec<Node<<SphinxMessage as BlendMessage>::PublicKey>>,
+) -> Vec<Node<<SphinxMessage as BlendMessage>::PublicKey>> {
     membership
         .into_iter()
         .zip(hosts)
         .map(|(mut node, host)| {
             node.address =
-                Multiaddr::from_str(&format!("/ip4/{}/udp/{}/quic-v1", host.ip, host.mix_port))
+                Multiaddr::from_str(&format!("/ip4/{}/udp/{}/quic-v1", host.ip, host.blend_port))
                     .unwrap();
             node
         })
@@ -235,7 +235,7 @@ mod cfgsync_tests {
                 identifier: "node".into(),
                 network_port: 3000,
                 da_network_port: 4044,
-                mix_port: 5000,
+                blend_port: 5000,
             })
             .collect();
 
@@ -265,11 +265,11 @@ mod cfgsync_tests {
         for (host, config) in configs.iter() {
             let network_port = config.network_config.swarm_config.port;
             let da_network_port = extract_port(&config.da_config.listening_address);
-            let mix_port = extract_port(&config.mix_config.backend.listening_address);
+            let blend_port = extract_port(&config.blend_config.backend.listening_address);
 
             assert_eq!(network_port, host.network_port);
             assert_eq!(da_network_port, host.da_network_port);
-            assert_eq!(mix_port, host.mix_port);
+            assert_eq!(blend_port, host.blend_port);
         }
     }
 

@@ -13,13 +13,13 @@ use serde::{Deserialize, Serialize};
 use tracing::Level;
 // internal
 use crate::{NomosApiService, NomosDaMembership, Wire};
+use nomos_blend_service::backends::libp2p::Libp2pBlendBackend as BlendBackend;
+use nomos_blend_service::network::libp2p::Libp2pAdapter as BlendNetworkAdapter;
+use nomos_blend_service::BlendService;
 use nomos_core::{proofs::covenant::CovenantProof, staking::NMO_UNIT};
 use nomos_da_network_service::backends::libp2p::validator::DaNetworkValidatorBackend;
 use nomos_da_network_service::NetworkService as DaNetworkService;
 use nomos_libp2p::{ed25519::SecretKey, Multiaddr};
-use nomos_mix_service::backends::libp2p::Libp2pMixBackend as MixBackend;
-use nomos_mix_service::network::libp2p::Libp2pAdapter as MixNetworkAdapter;
-use nomos_mix_service::MixService;
 use nomos_network::backends::libp2p::Libp2p as NetworkBackend;
 use nomos_network::NetworkService;
 use nomos_storage::backends::rocksdb::RocksBackend;
@@ -75,16 +75,16 @@ pub struct NetworkArgs {
 }
 
 #[derive(Parser, Debug, Clone)]
-pub struct MixArgs {
-    #[clap(long = "mix-addr", env = "MIX_ADDR")]
-    mix_addr: Option<Multiaddr>,
+pub struct BlendArgs {
+    #[clap(long = "blend-addr", env = "BLEND_ADDR")]
+    blend_addr: Option<Multiaddr>,
 
     // TODO: Use either the raw bytes or the key type directly to delegate error handling to clap
-    #[clap(long = "mix-node-key", env = "MIX_NODE_KEY")]
-    mix_node_key: Option<String>,
+    #[clap(long = "blend-node-key", env = "BLEND_NODE_KEY")]
+    blend_node_key: Option<String>,
 
-    #[clap(long = "mix-num-mix-layers", env = "MIX_NUM_MIX_LAYERS")]
-    mix_num_mix_layers: Option<usize>,
+    #[clap(long = "blend-num-blend-layers", env = "BLEND_NUM_BLEND_LAYERS")]
+    blend_num_blend_layers: Option<usize>,
 }
 
 #[derive(Parser, Debug, Clone)]
@@ -130,7 +130,7 @@ pub struct CryptarchiaArgs {
 pub struct Config {
     pub tracing: <Tracing as ServiceData>::Settings,
     pub network: <NetworkService<NetworkBackend> as ServiceData>::Settings,
-    pub mix: <MixService<MixBackend, MixNetworkAdapter> as ServiceData>::Settings,
+    pub blend: <BlendService<BlendBackend, BlendNetworkAdapter> as ServiceData>::Settings,
     pub da_network:
         <DaNetworkService<DaNetworkValidatorBackend<FillFromNodeList>> as ServiceData>::Settings,
     pub da_indexer: <crate::NodeDaIndexer as ServiceData>::Settings,
@@ -148,13 +148,13 @@ impl Config {
         mut self,
         log_args: LogArgs,
         network_args: NetworkArgs,
-        mix_args: MixArgs,
+        blend_args: BlendArgs,
         http_args: HttpArgs,
         cryptarchia_args: CryptarchiaArgs,
     ) -> Result<Self> {
         update_tracing(&mut self.tracing, log_args)?;
         update_network(&mut self.network, network_args)?;
-        update_mix(&mut self.mix, mix_args)?;
+        update_blend(&mut self.blend, blend_args)?;
         update_http(&mut self.http, http_args)?;
         update_cryptarchia_consensus(&mut self.cryptarchia, cryptarchia_args)?;
         Ok(self)
@@ -237,27 +237,27 @@ pub fn update_network(
     Ok(())
 }
 
-pub fn update_mix(
-    mix: &mut <MixService<MixBackend, MixNetworkAdapter> as ServiceData>::Settings,
-    mix_args: MixArgs,
+pub fn update_blend(
+    blend: &mut <BlendService<BlendBackend, BlendNetworkAdapter> as ServiceData>::Settings,
+    blend_args: BlendArgs,
 ) -> Result<()> {
-    let MixArgs {
-        mix_addr,
-        mix_node_key,
-        mix_num_mix_layers,
-    } = mix_args;
+    let BlendArgs {
+        blend_addr,
+        blend_node_key,
+        blend_num_blend_layers,
+    } = blend_args;
 
-    if let Some(addr) = mix_addr {
-        mix.backend.listening_address = addr;
+    if let Some(addr) = blend_addr {
+        blend.backend.listening_address = addr;
     }
 
-    if let Some(node_key) = mix_node_key {
+    if let Some(node_key) = blend_node_key {
         let mut key_bytes = hex::decode(node_key)?;
-        mix.backend.node_key = SecretKey::try_from_bytes(key_bytes.as_mut_slice())?;
+        blend.backend.node_key = SecretKey::try_from_bytes(key_bytes.as_mut_slice())?;
     }
 
-    if let Some(num_mix_layers) = mix_num_mix_layers {
-        mix.message_blend.cryptographic_processor.num_mix_layers = num_mix_layers;
+    if let Some(num_blend_layers) = blend_num_blend_layers {
+        blend.message_blend.cryptographic_processor.num_blend_layers = num_blend_layers;
     }
 
     Ok(())

@@ -4,6 +4,9 @@ use std::time::Duration;
 use std::{net::SocketAddr, process::Child};
 
 use cryptarchia_consensus::{CryptarchiaInfo, CryptarchiaSettings};
+use nomos_blend::message_blend::{
+    CryptographicProcessorSettings, MessageBlendSettings, TemporalSchedulerSettings,
+};
 use nomos_core::block::Block;
 use nomos_da_indexer::storage::adapters::rocksdb::RocksAdapterSettings as IndexerStorageAdapterSettings;
 use nomos_da_indexer::IndexerSettings;
@@ -14,9 +17,6 @@ use nomos_da_sampling::{backend::kzgrs::KzgrsSamplingBackendSettings, DaSampling
 use nomos_da_verifier::storage::adapters::rocksdb::RocksAdapterSettings as VerifierStorageAdapterSettings;
 use nomos_da_verifier::{backend::kzgrs::KzgrsDaVerifierSettings, DaVerifierServiceSettings};
 use nomos_mempool::MempoolMetrics;
-use nomos_mix::message_blend::{
-    CryptographicProcessorSettings, MessageBlendSettings, TemporalSchedulerSettings,
-};
 use nomos_network::{backends::libp2p::Libp2pConfig, NetworkConfig};
 use nomos_node::api::paths::{
     CL_METRICS, CRYPTARCHIA_HEADERS, CRYPTARCHIA_INFO, DA_GET_RANGE, STORAGE_BLOCK,
@@ -240,23 +240,23 @@ pub fn create_validator_config(config: GeneralConfig) -> Config {
                 initial_peers: config.network_config.initial_peers,
             },
         },
-        mix: nomos_mix_service::MixConfig {
-            backend: config.mix_config.backend,
+        blend: nomos_blend_service::BlendConfig {
+            backend: config.blend_config.backend,
             persistent_transmission: Default::default(),
             message_blend: MessageBlendSettings {
                 cryptographic_processor: CryptographicProcessorSettings {
-                    private_key: config.mix_config.private_key.to_bytes(),
-                    num_mix_layers: 1,
+                    private_key: config.blend_config.private_key.to_bytes(),
+                    num_blend_layers: 1,
                 },
                 temporal_processor: TemporalSchedulerSettings {
                     max_delay_seconds: 2,
                 },
             },
-            cover_traffic: nomos_mix_service::CoverTrafficExtSettings {
+            cover_traffic: nomos_blend_service::CoverTrafficExtSettings {
                 epoch_duration: Duration::from_secs(432000),
                 slot_duration: Duration::from_secs(20),
             },
-            membership: config.mix_config.membership,
+            membership: config.blend_config.membership,
         },
         cryptarchia: CryptarchiaSettings {
             leader_config: config.consensus_config.leader_config,
@@ -269,10 +269,10 @@ pub fn create_validator_config(config: GeneralConfig) -> Config {
                 cryptarchia_consensus::network::adapters::libp2p::LibP2pAdapterSettings {
                     topic: String::from(nomos_node::CONSENSUS_TOPIC),
                 },
-            mix_adapter_settings:
-                cryptarchia_consensus::mix::adapters::libp2p::LibP2pAdapterSettings {
+            blend_adapter_settings:
+                cryptarchia_consensus::blend::adapters::libp2p::LibP2pAdapterSettings {
                     broadcast_settings:
-                        nomos_mix_service::network::libp2p::Libp2pBroadcastSettings {
+                        nomos_blend_service::network::libp2p::Libp2pBroadcastSettings {
                             topic: String::from(nomos_node::CONSENSUS_TOPIC),
                         },
                 },
