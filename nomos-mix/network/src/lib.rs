@@ -25,7 +25,7 @@ mod test {
 
     use crate::{behaviour::Config, error::Error, Behaviour, Event};
 
-    /// Check that a published messsage arrives in the peers successfully.
+    /// Check that a published message arrives in the peers successfully.
     #[tokio::test]
     async fn behaviour() {
         // Initialize two swarms that support the mix protocol.
