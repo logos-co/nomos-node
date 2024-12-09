@@ -20,6 +20,7 @@ serde = { version = "1.0", features = ["derive"] }
 tokio = { version = "1", features = ["macros", "sync"] }
 tokio-stream = "0.1"
 tracing = "0.1"
+x25519-dalek = { version = "2", features = ["getrandom", "static_secrets"] }
 
 [features]
 default = []

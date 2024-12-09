@@ -62,6 +62,13 @@ mix:
       num_mix_layers: 1
     temporal_processor:
       max_delay_seconds: 5
+  cover_traffic:
+    epoch_duration:
+      secs: 432000
+      nanos: 0
+    slot_duration:
+      secs: 20
+      nanos: 0
   membership:
     - address: /ip4/127.0.0.1/udp/3001/quic-v1
       public_key: [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]

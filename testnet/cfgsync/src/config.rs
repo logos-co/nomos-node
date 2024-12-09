@@ -3,7 +3,7 @@ use std::{collections::HashMap, net::Ipv4Addr, str::FromStr};
 // crates
 use nomos_libp2p::{Multiaddr, PeerId};
 use nomos_mix::membership::Node;
-use nomos_mix_message::{mock::MockMixMessage, MixMessage};
+use nomos_mix_message::{sphinx::SphinxMessage, MixMessage};
 use nomos_tracing::{
     logging::loki::LokiConfig, metrics::otlp::OtlpMetricsConfig, tracing::otlp::OtlpTracingConfig,
 };
@@ -176,8 +176,8 @@ fn update_da_peer_addresses(
 
 fn update_mix_membership(
     hosts: Vec<Host>,
-    membership: Vec<Node<<MockMixMessage as MixMessage>::PublicKey>>,
-) -> Vec<Node<<MockMixMessage as MixMessage>::PublicKey>> {
+    membership: Vec<Node<<SphinxMessage as MixMessage>::PublicKey>>,
+) -> Vec<Node<<SphinxMessage as MixMessage>::PublicKey>> {
     membership
         .into_iter()
         .zip(hosts)

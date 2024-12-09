@@ -41,7 +41,6 @@ impl StorageTransaction for Transaction {
 }
 
 /// Rocks storage backend
-
 pub struct RocksBackend<SerdeOp> {
     rocks: Arc<DB>,
     _serde_op: PhantomData<SerdeOp>,

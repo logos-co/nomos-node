@@ -83,9 +83,6 @@ pub struct MixArgs {
     #[clap(long = "mix-node-key", env = "MIX_NODE_KEY")]
     mix_node_key: Option<String>,
 
-    #[clap(long = "mix-peering-degree", env = "MIX_PEERING_DEGREE")]
-    mix_peering_degree: Option<usize>,
-
     #[clap(long = "mix-num-mix-layers", env = "MIX_NUM_MIX_LAYERS")]
     mix_num_mix_layers: Option<usize>,
 }
@@ -247,7 +244,6 @@ pub fn update_mix(
     let MixArgs {
         mix_addr,
         mix_node_key,
-        mix_peering_degree,
         mix_num_mix_layers,
     } = mix_args;
 
@@ -258,10 +254,6 @@ pub fn update_mix(
     if let Some(node_key) = mix_node_key {
         let mut key_bytes = hex::decode(node_key)?;
         mix.backend.node_key = SecretKey::try_from_bytes(key_bytes.as_mut_slice())?;
-    }
-
-    if let Some(peering_degree) = mix_peering_degree {
-        mix.backend.peering_degree = peering_degree;
     }
 
     if let Some(num_mix_layers) = mix_num_mix_layers {
