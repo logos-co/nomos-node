@@ -58,6 +58,8 @@ pub enum KzgRsError {
     PolyCommitError(#[from] ark_poly_commit::Error),
     #[error("BLST error: {0}")]
     BlstError(BlstError),
+    #[error("Denominator polynomial cannot be zero")]
+    DivisionByZeroPolynomial,
 }
 
 /// Transform chunks of bytes (of size `CHUNK_SIZE`) into `Fr` which are considered evaluations of a

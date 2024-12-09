@@ -5,7 +5,7 @@ use ark_ec::pairing::Pairing;
 use ark_poly::univariate::DensePolynomial;
 use ark_poly::{DenseUVPolynomial, EvaluationDomain, GeneralEvaluationDomain};
 use ark_poly_commit::kzg10::{Commitment, Powers, Proof, UniversalParams, KZG10};
-use num_traits::One;
+use num_traits::{One, Zero};
 use std::borrow::Cow;
 use std::ops::{Mul, Neg};
 
@@ -33,6 +33,10 @@ pub fn generate_element_proof(
     domain: GeneralEvaluationDomain<Fr>,
 ) -> Result<Proof<Bls12_381>, KzgRsError> {
     let u = domain.element(element_index);
+    if u.is_zero() {
+        return Err(KzgRsError::DivisionByZeroPolynomial);
+    };
+
     // Instead of evaluating over the polynomial, we can reuse the evaluation points from the rs encoding
     // let v = polynomial.evaluate(&u);
     let v = evaluations.evals[element_index];
