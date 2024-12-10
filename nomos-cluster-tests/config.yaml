@@ -1,0 +1,5 @@
+log:
+  backend: "Stdout"
+  format: "Json"
+  level: "debug"
+
