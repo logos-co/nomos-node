@@ -112,7 +112,7 @@ where
 
     async fn load(&mut self, key: &[u8]) -> Result<Option<Bytes>, Self::Error> {
         let key = from_utf8(key)?;
-        let record: Option<Data> = self.db.select(("kv", key)).await?;
+        let record: Option<Data> = self.db.select(("kv", key)).await?; // TODO: Fix kv
         Ok(record.as_ref().map(Data::to_bytes))
     }
 
@@ -146,7 +146,7 @@ mod tests {
     use crate::backends::testing::NoStorageSerde;
     use tokio::runtime::Handle;
 
-    fn get_test_config() -> SurrealBackendSettings {
+    pub fn get_test_config() -> SurrealBackendSettings {
         let (sender, _) = tokio::sync::mpsc::channel(1);
         SurrealBackendSettings::new(
             String::from("mem://"),

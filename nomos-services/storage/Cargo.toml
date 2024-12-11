@@ -17,6 +17,7 @@ rocksdb = { version = "0.22", optional = true }
 surrealdb = { version = "2.1.2", optional = true }
 thiserror = "1.0"
 tracing = "0.1"
+serde_json = "1.0.133"
 
 [dev-dependencies]
 tokio = { version = "1", features = ["sync", "macros", "time"] }
