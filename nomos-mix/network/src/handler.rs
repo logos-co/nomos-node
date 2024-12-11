@@ -49,7 +49,6 @@ enum OutboundSubstreamState {
 
 impl MixConnectionHandler {
     pub fn new() -> Self {
-    pub fn new(_config: &Config) -> Self {
         Self {
             inbound_substream: None,
             outbound_substream: None,
