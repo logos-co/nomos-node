@@ -171,8 +171,13 @@ where
     async fn handle_swarm_message(&mut self, msg: MixSwarmMessage) {
         match msg {
             MixSwarmMessage::Publish(msg) => {
+                let msg_size = msg.len();
                 if let Err(e) = self.swarm.behaviour_mut().publish(msg) {
                     tracing::error!("Failed to publish message to mix network: {e:?}");
+                    tracing::info!(counter.failed_outbound_messages = 1);
+                } else {
+                    tracing::info!(counter.successful_outbound_messages = 1);
+                    tracing::info!(histogram.sent_data = msg_size as u64);
                 }
             }
         }
@@ -182,15 +187,23 @@ where
         match event {
             SwarmEvent::Behaviour(nomos_mix_network::Event::Message(msg)) => {
                 tracing::debug!("Received message from a peer: {msg:?}");
+
+                let msg_size = msg.len();
                 if let Err(e) = self.incoming_message_sender.send(msg) {
                     tracing::error!("Failed to send incoming message to channel: {e}");
+                    tracing::info!(counter.failed_inbound_messages = 1);
+                } else {
+                    tracing::info!(counter.successful_inbound_messages = 1);
+                    tracing::info!(histogram.received_data = msg_size as u64);
                 }
             }
             SwarmEvent::Behaviour(nomos_mix_network::Event::Error(e)) => {
                 tracing::error!("Received error from mix network: {e:?}");
+                tracing::info!(counter.error = 1);
             }
             _ => {
                 tracing::debug!("Received event from mix network: {event:?}");
+                tracing::info!(counter.ignored_event = 1);
             }
         }
     }

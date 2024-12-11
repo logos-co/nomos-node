@@ -14,6 +14,12 @@ use libp2p::{
     Stream, StreamProtocol,
 };
 
+// Metrics
+const VALUE_FULLY_NEGOTIATED_INBOUND: &str = "fully_negotiated_inbound";
+const VALUE_FULLY_NEGOTIATED_OUTBOUND: &str = "fully_negotiated_outbound";
+const VALUE_DIAL_UPGRADE_ERROR: &str = "dial_upgrade_error";
+const VALUE_IGNORED: &str = "ignored";
+
 const PROTOCOL_NAME: StreamProtocol = StreamProtocol::new("/nomos/mix/0.1.0");
 
 // TODO: Consider replacing this struct with libp2p_stream ConnectionHandler
@@ -99,6 +105,11 @@ impl ConnectionHandler for MixConnectionHandler {
     ) -> Poll<
         ConnectionHandlerEvent<Self::OutboundProtocol, Self::OutboundOpenInfo, Self::ToBehaviour>,
     > {
+        tracing::info!(gauge.pending_outbound_messages = self.outbound_msgs.len() as u64,);
+        tracing::info!(
+            gauge.pending_events_to_behaviour = self.pending_events_to_behaviour.len() as u64,
+        );
+
         // Process pending events to be sent to the behaviour
         if let Some(event) = self.pending_events_to_behaviour.pop_front() {
             return Poll::Ready(ConnectionHandlerEvent::NotifyBehaviour(event));
@@ -202,13 +213,14 @@ impl ConnectionHandler for MixConnectionHandler {
             Self::OutboundOpenInfo,
         >,
     ) {
-        match event {
+        let event_name = match event {
             ConnectionEvent::FullyNegotiatedInbound(FullyNegotiatedInbound {
                 protocol: stream,
                 ..
             }) => {
                 tracing::debug!("FullyNegotiatedInbound: Creating inbound substream");
-                self.inbound_substream = Some(recv_msg(stream).boxed())
+                self.inbound_substream = Some(recv_msg(stream).boxed());
+                VALUE_FULLY_NEGOTIATED_INBOUND
             }
             ConnectionEvent::FullyNegotiatedOutbound(FullyNegotiatedOutbound {
                 protocol: stream,
@@ -218,6 +230,7 @@ impl ConnectionHandler for MixConnectionHandler {
                 self.outbound_substream = Some(OutboundSubstreamState::Idle(stream));
                 self.pending_events_to_behaviour
                     .push_back(ToBehaviour::FullyNegotiatedOutbound);
+                VALUE_FULLY_NEGOTIATED_OUTBOUND
             }
             ConnectionEvent::DialUpgradeError(e) => {
                 tracing::error!("DialUpgradeError: {:?}", e);
@@ -238,13 +251,16 @@ impl ConnectionHandler for MixConnectionHandler {
                             )));
                     }
                     StreamUpgradeError::Apply(_) => unreachable!(),
-                }
+                };
+                VALUE_DIAL_UPGRADE_ERROR
             }
             event => {
-                tracing::debug!("Ignoring connection event: {:?}", event)
+                tracing::debug!("Ignoring connection event: {:?}", event);
+                VALUE_IGNORED
             }
-        }
+        };
 
+        tracing::info!(counter.connection_event = 1, event = event_name);
         self.try_wake();
     }
 }

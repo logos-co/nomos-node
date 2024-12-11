@@ -13,6 +13,7 @@ nomos-mix = { path = "../core" }
 nomos-mix-message = { path = "../message" }
 sha2 = "0.10"
 rand = "0.8"
+opentelemetry = "0.27.1"
 
 [dev-dependencies]
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "time"] }
