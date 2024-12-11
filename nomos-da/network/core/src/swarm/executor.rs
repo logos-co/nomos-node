@@ -29,6 +29,12 @@ use crate::swarm::validator::ValidatorEventsStream;
 use crate::SubnetworkId;
 use subnetworks_assignations::MembershipHandler;
 
+// Metrics
+const EVENT_SAMPLING: &str = "sampling";
+const EVENT_DISPERSAL_EXECUTOR_DISPERSAL: &str = "dispersal_executor_event";
+const EVENT_VALIDATOR_DISPERSAL: &str = "validator_dispersal";
+const EVENT_REPLICATION: &str = "replication";
+
 pub struct ExecutorEventsStream {
     pub validator_events_stream: ValidatorEventsStream,
     pub dispersal_events_receiver: UnboundedReceiverStream<DispersalExecutorEvent>,
@@ -58,6 +64,7 @@ where
         let sampling_events_receiver = UnboundedReceiverStream::new(sampling_events_receiver);
         let validation_events_receiver = UnboundedReceiverStream::new(validation_events_receiver);
         let dispersal_events_receiver = UnboundedReceiverStream::new(dispersal_events_receiver);
+
         (
             Self {
                 swarm: Self::build_swarm(key, membership, addresses),
@@ -161,15 +168,33 @@ where
     async fn handle_behaviour_event(&mut self, event: ExecutorBehaviourEvent<Membership>) {
         match event {
             ExecutorBehaviourEvent::Sampling(event) => {
+                tracing::info!(
+                    counter.behaviour_events_received = 1,
+                    event = EVENT_SAMPLING
+                );
                 self.handle_sampling_event(event).await;
             }
             ExecutorBehaviourEvent::ExecutorDispersal(event) => {
+                tracing::info!(
+                    counter.behaviour_events_received = 1,
+                    event = EVENT_DISPERSAL_EXECUTOR_DISPERSAL
+                );
                 self.handle_executor_dispersal_event(event).await;
             }
             ExecutorBehaviourEvent::ValidatorDispersal(event) => {
+                tracing::info!(
+                    counter.behaviour_events_received = 1,
+                    event = EVENT_VALIDATOR_DISPERSAL,
+                    blob_size = event.blob_size()
+                );
                 self.handle_validator_dispersal_event(event).await;
             }
             ExecutorBehaviourEvent::Replication(event) => {
+                tracing::info!(
+                    counter.behaviour_events_received = 1,
+                    event = EVENT_REPLICATION,
+                    blob_size = event.blob_size()
+                );
                 self.handle_replication_event(event).await;
             }
         }

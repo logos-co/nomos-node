@@ -24,6 +24,17 @@ pub enum DispersalEvent {
     /// Received a n
     IncomingMessage { message: DispersalReq },
 }
+
+impl DispersalEvent {
+    pub fn blob_size(&self) -> Option<usize> {
+        match self {
+            DispersalEvent::IncomingMessage { message } => {
+                message.blob.as_ref().map(|blob| blob.data.len())
+            }
+        }
+    }
+}
+
 pub struct DispersalValidatorBehaviour<Membership> {
     stream_behaviour: libp2p_stream::Behaviour,
     incoming_streams: IncomingStreams,
