@@ -14,8 +14,6 @@ use libp2p::{
     Stream, StreamProtocol,
 };
 
-use crate::behaviour::Config;
-
 // Metrics
 const VALUE_FULLY_NEGOTIATED_INBOUND: &str = "fully_negotiated_inbound";
 const VALUE_FULLY_NEGOTIATED_OUTBOUND: &str = "fully_negotiated_outbound";
