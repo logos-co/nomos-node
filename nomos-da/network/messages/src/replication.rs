@@ -1,9 +1,19 @@
-use crate::{common, impl_from_for_message};
+use crate::common::Blob;
+use crate::SubnetworkId;
+use serde::{Deserialize, Serialize};
 
-include!(concat!(env!("OUT_DIR"), "/nomos.da.v1.replication.rs"));
+#[repr(C)]
+#[derive(Serialize, Deserialize)]
+pub struct ReplicationRequest {
+    pub blob: Blob,
+    pub subnetwork_id: SubnetworkId,
+}
 
-impl_from_for_message!(
-    Message,
-    ReplicationReq => ReplicationReq,
-    common::SessionReq => SessionReq,
-);
+impl ReplicationRequest {
+    pub fn new(blob: Blob, subnetwork_id: SubnetworkId) -> Self {
+        Self {
+            blob,
+            subnetwork_id,
+        }
+    }
+}
