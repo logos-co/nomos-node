@@ -12,3 +12,4 @@ nomos-tracing-service = { path = "../nomos-services/tracing" }
 overwatch-rs = { git = "https://github.com/logos-co/Overwatch", rev = "2f70806" }
 color-eyre = "0.6.0"
 tracing = "0.1"
+anyhow = "1.0.93"

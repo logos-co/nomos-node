@@ -1,6 +1,6 @@
-mod config;
 
-use crate::config::{Config, LogArgs};
+
+use nomos_cluster_tests::{config::{Config, LogArgs}, test_case::data_integrity_nodes_join_leave::DataIntegrityNodesJoinLeave, TestCase};
 use clap::Parser;
 use color_eyre::eyre::Result;
 
@@ -21,6 +21,8 @@ fn main() -> Result<()> {
         .update_from_args(log_args)?;
 
     // Run the test suite
+    let tc1 = DataIntegrityNodesJoinLeave {};
+    println!("Running test: {}", tc1.name());
 
     Ok(())
 }
