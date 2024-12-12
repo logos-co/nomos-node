@@ -1,8 +1,10 @@
-
-
-use nomos_cluster_tests::{config::{Config, LogArgs}, test_case::data_integrity_nodes_join_leave::DataIntegrityNodesJoinLeave, TestCase};
 use clap::Parser;
 use color_eyre::eyre::Result;
+use nomos_cluster_tests::{
+    config::{Config, LogArgs},
+    test_case::data_integrity_nodes_join_leave::DataIntegrityNodesJoinLeave,
+    TestCase,
+};
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]

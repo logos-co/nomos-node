@@ -1,5 +1,5 @@
-use anyhow::Error;
 use crate::TestCase;
+use anyhow::Error;
 
 pub struct DataIntegrityNodesJoinLeave;
 
