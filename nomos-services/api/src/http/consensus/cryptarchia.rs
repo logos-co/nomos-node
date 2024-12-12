@@ -7,11 +7,12 @@ use tokio::sync::oneshot;
 
 use crate::http::DynError;
 use cryptarchia_consensus::{
-    mix::adapters::libp2p::LibP2pAdapter as MixAdapter,
+    blend::adapters::libp2p::LibP2pAdapter as BlendAdapter,
     network::adapters::libp2p::LibP2pAdapter as ConsensusNetworkAdapter, ConsensusMsg,
     CryptarchiaConsensus, CryptarchiaInfo,
 };
 use kzgrs_backend::dispersal::BlobInfo;
+use nomos_blend_service::network::libp2p::Libp2pAdapter as BlendNetworkAdapter;
 use nomos_core::{
     da::{
         blob::{self, select::FillSize as FillSizeWithBlobs},
@@ -24,7 +25,6 @@ use nomos_da_sampling::backend::DaSamplingServiceBackend;
 use nomos_mempool::{
     backend::mockpool::MockPool, network::adapters::libp2p::Libp2pAdapter as MempoolNetworkAdapter,
 };
-use nomos_mix_service::network::libp2p::Libp2pAdapter as MixNetworkAdapter;
 use nomos_storage::backends::{rocksdb::RocksBackend, StorageSerde};
 
 pub type Cryptarchia<
@@ -37,7 +37,7 @@ pub type Cryptarchia<
     const SIZE: usize,
 > = CryptarchiaConsensus<
     ConsensusNetworkAdapter<Tx, BlobInfo>,
-    MixAdapter<MixNetworkAdapter, Tx, BlobInfo>,
+    BlendAdapter<BlendNetworkAdapter, Tx, BlobInfo>,
     MockPool<HeaderId, Tx, <Tx as Transaction>::Hash>,
     MempoolNetworkAdapter<Tx, <Tx as Transaction>::Hash>,
     MockPool<HeaderId, BlobInfo, <BlobInfo as blob::info::DispersedBlobInfo>::BlobId>,

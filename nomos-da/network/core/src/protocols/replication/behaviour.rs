@@ -12,7 +12,6 @@ use libp2p::swarm::{
 };
 use libp2p::{Multiaddr, PeerId};
 use log::{error, trace};
-
 use subnetworks_assignations::MembershipHandler;
 
 use crate::SubnetworkId;
@@ -29,6 +28,16 @@ type SwarmEvent = ToSwarm<ReplicationEvent, Either<BehaviourEventToHandler, void
 #[derive(Debug)]
 pub enum ReplicationEvent {
     IncomingMessage { peer_id: PeerId, message: DaMessage },
+}
+
+impl ReplicationEvent {
+    pub fn blob_size(&self) -> Option<usize> {
+        match self {
+            ReplicationEvent::IncomingMessage { message, .. } => {
+                message.blob.as_ref().map(|blob| blob.data.len())
+            }
+        }
+    }
 }
 
 /// Nomos DA broadcas network behaviour

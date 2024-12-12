@@ -1,14 +1,16 @@
 // std
 // crates
 use color_eyre::eyre::Result;
+use nomos_blend_service::backends::libp2p::Libp2pBlendBackend as BlendBackend;
+use nomos_blend_service::network::libp2p::Libp2pAdapter as BlendNetworkAdapter;
+use nomos_blend_service::BlendService;
 use nomos_da_network_service::backends::libp2p::executor::DaNetworkExecutorBackend;
 use nomos_da_network_service::NetworkService as DaNetworkService;
-use nomos_mix_service::backends::libp2p::Libp2pMixBackend as MixBackend;
-use nomos_mix_service::network::libp2p::Libp2pAdapter as MixNetworkAdapter;
-use nomos_mix_service::MixService;
 use nomos_network::backends::libp2p::Libp2p as NetworkBackend;
 use nomos_node::{
-    config::{update_cryptarchia_consensus, update_mix, update_network, update_tracing, MixArgs},
+    config::{
+        update_blend, update_cryptarchia_consensus, update_network, update_tracing, BlendArgs,
+    },
     CryptarchiaArgs, HttpArgs, LogArgs, NetworkArgs, NetworkService, Tracing, Wire,
 };
 use nomos_storage::backends::rocksdb::RocksBackend;
@@ -22,7 +24,7 @@ use crate::ExecutorApiService;
 pub struct Config {
     pub tracing: <Tracing as ServiceData>::Settings,
     pub network: <NetworkService<NetworkBackend> as ServiceData>::Settings,
-    pub mix: <MixService<MixBackend, MixNetworkAdapter> as ServiceData>::Settings,
+    pub blend: <BlendService<BlendBackend, BlendNetworkAdapter> as ServiceData>::Settings,
     pub da_dispersal: <crate::DaDispersal as ServiceData>::Settings,
     pub da_network:
         <DaNetworkService<DaNetworkExecutorBackend<FillFromNodeList>> as ServiceData>::Settings,
@@ -39,13 +41,13 @@ impl Config {
         mut self,
         log_args: LogArgs,
         network_args: NetworkArgs,
-        mix_args: MixArgs,
+        blend_args: BlendArgs,
         http_args: HttpArgs,
         cryptarchia_args: CryptarchiaArgs,
     ) -> Result<Self> {
         update_tracing(&mut self.tracing, log_args)?;
         update_network(&mut self.network, network_args)?;
-        update_mix(&mut self.mix, mix_args)?;
+        update_blend(&mut self.blend, blend_args)?;
         update_http(&mut self.http, http_args)?;
         update_cryptarchia_consensus(&mut self.cryptarchia, cryptarchia_args)?;
         Ok(self)

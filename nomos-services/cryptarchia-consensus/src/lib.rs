@@ -1,6 +1,6 @@
+pub mod blend;
 mod leadership;
 mod messages;
-pub mod mix;
 pub mod network;
 mod time;
 
@@ -119,7 +119,7 @@ impl Cryptarchia {
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
-pub struct CryptarchiaSettings<Ts, Bs, NetworkAdapterSettings, MixAdapterSettings> {
+pub struct CryptarchiaSettings<Ts, Bs, NetworkAdapterSettings, BlendAdapterSettings> {
     #[serde(default)]
     pub transaction_selector_settings: Ts,
     #[serde(default)]
@@ -129,12 +129,12 @@ pub struct CryptarchiaSettings<Ts, Bs, NetworkAdapterSettings, MixAdapterSetting
     pub time: TimeConfig,
     pub leader_config: LeaderConfig,
     pub network_adapter_settings: NetworkAdapterSettings,
-    pub mix_adapter_settings: MixAdapterSettings,
+    pub blend_adapter_settings: BlendAdapterSettings,
 }
 
 pub struct CryptarchiaConsensus<
     A,
-    MixAdapter,
+    BlendAdapter,
     ClPool,
     ClPoolAdapter,
     DaPool,
@@ -148,7 +148,7 @@ pub struct CryptarchiaConsensus<
     SamplingStorage,
 > where
     A: NetworkAdapter,
-    MixAdapter: mix::MixAdapter,
+    BlendAdapter: blend::BlendAdapter,
     ClPoolAdapter: MempoolAdapter<Payload = ClPool::Item, Key = ClPool::Key>,
     ClPool: MemPool<BlockId = HeaderId>,
     DaPool: MemPool<BlockId = HeaderId>,
@@ -174,7 +174,8 @@ pub struct CryptarchiaConsensus<
     // underlying networking backend. We need this so we can relay and check the types properly
     // when implementing ServiceCore for CryptarchiaConsensus
     network_relay: Relay<NetworkService<A::Backend>>,
-    mix_relay: Relay<nomos_mix_service::MixService<MixAdapter::Backend, MixAdapter::Network>>,
+    blend_relay:
+        Relay<nomos_blend_service::BlendService<BlendAdapter::Backend, BlendAdapter::Network>>,
     cl_mempool_relay: Relay<TxMempoolService<ClPoolAdapter, ClPool>>,
     da_mempool_relay: Relay<
         DaMempoolService<
@@ -195,7 +196,7 @@ pub struct CryptarchiaConsensus<
 
 impl<
         A,
-        MixAdapter,
+        BlendAdapter,
         ClPool,
         ClPoolAdapter,
         DaPool,
@@ -210,7 +211,7 @@ impl<
     > ServiceData
     for CryptarchiaConsensus<
         A,
-        MixAdapter,
+        BlendAdapter,
         ClPool,
         ClPoolAdapter,
         DaPool,
@@ -225,7 +226,7 @@ impl<
     >
 where
     A: NetworkAdapter,
-    MixAdapter: mix::MixAdapter,
+    BlendAdapter: blend::BlendAdapter,
     ClPool: MemPool<BlockId = HeaderId>,
     ClPool::Item: Clone + Eq + Hash + Debug,
     ClPool::Key: Debug,
@@ -248,7 +249,7 @@ where
 {
     const SERVICE_ID: ServiceId = CRYPTARCHIA_ID;
     type Settings =
-        CryptarchiaSettings<TxS::Settings, BS::Settings, A::Settings, MixAdapter::Settings>;
+        CryptarchiaSettings<TxS::Settings, BS::Settings, A::Settings, BlendAdapter::Settings>;
     type State = NoState<Self::Settings>;
     type StateOperator = NoOperator<Self::State>;
     type Message = ConsensusMsg<Block<ClPool::Item, DaPool::Item>>;
@@ -257,7 +258,7 @@ where
 #[async_trait::async_trait]
 impl<
         A,
-        MixAdapter,
+        BlendAdapter,
         ClPool,
         ClPoolAdapter,
         DaPool,
@@ -272,7 +273,7 @@ impl<
     > ServiceCore
     for CryptarchiaConsensus<
         A,
-        MixAdapter,
+        BlendAdapter,
         ClPool,
         ClPoolAdapter,
         DaPool,
@@ -292,12 +293,12 @@ where
         + Sync
         + 'static,
     A::Settings: Send + Sync + 'static,
-    MixAdapter: mix::MixAdapter<Tx = ClPool::Item, BlobCertificate = DaPool::Item>
+    BlendAdapter: blend::BlendAdapter<Tx = ClPool::Item, BlobCertificate = DaPool::Item>
         + Clone
         + Send
         + Sync
         + 'static,
-    MixAdapter::Settings: Send + Sync + 'static,
+    BlendAdapter::Settings: Send + Sync + 'static,
     ClPool: MemPool<BlockId = HeaderId> + Send + Sync + 'static,
     ClPool::Settings: Send + Sync + 'static,
     DaPool: MemPool<BlockId = HeaderId, Key = SamplingBackend::BlobId> + Send + Sync + 'static,
@@ -345,16 +346,17 @@ where
 {
     fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, overwatch_rs::DynError> {
         let network_relay = service_state.overwatch_handle.relay();
-        let mix_relay = service_state.overwatch_handle.relay();
+        let blend_relay = service_state.overwatch_handle.relay();
         let cl_mempool_relay = service_state.overwatch_handle.relay();
         let da_mempool_relay = service_state.overwatch_handle.relay();
         let storage_relay = service_state.overwatch_handle.relay();
         let sampling_relay = service_state.overwatch_handle.relay();
         let (block_subscription_sender, _) = broadcast::channel(16);
+
         Ok(Self {
             service_state,
             network_relay,
-            mix_relay,
+            blend_relay,
             cl_mempool_relay,
             da_mempool_relay,
             block_subscription_sender,
@@ -370,11 +372,11 @@ where
             .await
             .expect("Relay connection with NetworkService should succeed");
 
-        let mix_relay: OutboundRelay<_> = self
-            .mix_relay
+        let blend_relay: OutboundRelay<_> = self
+            .blend_relay
             .connect()
             .await
-            .expect("Relay connection with nomos_mix_service::MixService should succeed");
+            .expect("Relay connection with nomos_blend_service::BlendService should succeed");
 
         let cl_mempool_relay: OutboundRelay<_> = self
             .cl_mempool_relay
@@ -408,7 +410,7 @@ where
             time,
             leader_config,
             network_adapter_settings,
-            mix_adapter_settings,
+            blend_adapter_settings,
         } = self.service_state.settings_reader.get_updated_settings();
 
         let genesis_id = HeaderId::from([0; 32]);
@@ -434,7 +436,7 @@ where
 
         let mut slot_timer = IntervalStream::new(timer.slot_interval());
 
-        let mix_adapter = MixAdapter::new(mix_adapter_settings, mix_relay).await;
+        let blend_adapter = BlendAdapter::new(blend_adapter_settings, blend_relay).await;
 
         let mut lifecycle_stream = self.service_state.lifecycle_handle.message_stream();
 
@@ -442,6 +444,7 @@ where
             loop {
                 tokio::select! {
                     Some(block) = incoming_blocks.next() => {
+                        Self::log_received_block(&block);
                         cryptarchia = Self::process_block(
                             cryptarchia,
                             &mut leader,
@@ -480,7 +483,7 @@ where
                             ).await;
 
                             if let Some(block) = block {
-                                mix_adapter.mix(block).await;
+                                blend_adapter.blend(block).await;
                             }
                         }
                     }
@@ -505,7 +508,7 @@ where
 
 impl<
         A,
-        MixAdapter,
+        BlendAdapter,
         ClPool,
         ClPoolAdapter,
         DaPool,
@@ -520,7 +523,7 @@ impl<
     >
     CryptarchiaConsensus<
         A,
-        MixAdapter,
+        BlendAdapter,
         ClPool,
         ClPoolAdapter,
         DaPool,
@@ -535,7 +538,7 @@ impl<
     >
 where
     A: NetworkAdapter + Clone + Send + Sync + 'static,
-    MixAdapter: mix::MixAdapter + Clone + Send + Sync + 'static,
+    BlendAdapter: blend::BlendAdapter + Clone + Send + Sync + 'static,
     ClPool: MemPool<BlockId = HeaderId> + Send + Sync + 'static,
     ClPool::Settings: Send + Sync + 'static,
     ClPool::Item: Transaction<Hash = ClPool::Key>
@@ -803,6 +806,24 @@ where
             .blobs()
             .all(|blob| sampled_blobs_ids.contains(&blob.blob_id()));
         validated_blobs
+    }
+
+    fn log_received_block(block: &Block<ClPool::Item, DaPool::Item>) {
+        let content_size = block.header().content_size();
+        let transactions = block.cl_transactions_len();
+        let blobs = block.bl_blobs_len();
+
+        tracing::info!(
+            counter.received_blocks = 1,
+            transactions = transactions,
+            blobs = blobs,
+            bytes = content_size
+        );
+        tracing::info!(
+            histogram.received_blocks_data = content_size,
+            transactions = transactions,
+            blobs = blobs
+        );
     }
 }
 
