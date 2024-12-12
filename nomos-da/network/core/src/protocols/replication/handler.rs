@@ -1,24 +1,24 @@
+use std::io;
 // std
+use async_bincode::tokio::AsyncBincodeStream;
+use bincode::Options;
 use std::io::Error;
 use std::task::{Context, Poll};
-
-use futures::Future;
 // crates
 use futures::future::BoxFuture;
 use futures::prelude::*;
+use futures::Future;
 use libp2p::core::upgrade::ReadyUpgrade;
 use libp2p::swarm::handler::{ConnectionEvent, FullyNegotiatedInbound, FullyNegotiatedOutbound};
 use libp2p::swarm::{ConnectionHandler, ConnectionHandlerEvent, SubstreamProtocol};
 use libp2p::{Stream, StreamProtocol};
 use log::trace;
+use nomos_core::wire;
 use tracing::error;
-
 // internal
-use nomos_da_messages::{pack_message, unpack_from_reader};
-
 use crate::protocol::REPLICATION_PROTOCOL;
 
-pub type DaMessage = nomos_da_messages::replication::ReplicationReq;
+pub type DaMessage = nomos_da_messages::replication::ReplicationRequest;
 
 /// Events that bubbles up from the `BroadcastHandler` to the `NetworkBehaviour`
 #[derive(Debug)]
@@ -92,11 +92,16 @@ impl ReplicationHandler {
         std::mem::swap(&mut self.outgoing_messages, &mut pending_messages);
         async {
             trace!("Writing {} messages", pending_messages.len());
+
             for message in pending_messages {
-                let bytes = pack_message(&message)?;
+                let bytes = wire::serialize(&message).expect(&format!(
+                    "Message should always be serializable.\nMessage: '{:?}'",
+                    message
+                ));
                 stream.write_all(&bytes).await?;
                 stream.flush().await?;
             }
+
             Ok(stream)
         }
     }
@@ -107,7 +112,10 @@ impl ReplicationHandler {
     ) -> impl Future<Output = Result<(DaMessage, Stream), Error>> {
         trace!("Reading messages");
         async move {
-            let msg: DaMessage = unpack_from_reader(&mut stream).await?;
+            let rx = AsyncBincodeStream::from(stream);
+            let msg = rx.deserialize()?;
+
+            let msg: DaMessage = wire::deserialize(rx).await?;
             Ok((msg, stream))
         }
     }
