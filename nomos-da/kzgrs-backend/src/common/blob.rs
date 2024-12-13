@@ -13,7 +13,7 @@ use crate::common::{
     deserialize_canonical, deserialize_vec_canonical, serialize_canonical, serialize_vec_canonical,
 };
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct DaBlob {
     pub column: Column,
     pub column_idx: ColumnIndex,

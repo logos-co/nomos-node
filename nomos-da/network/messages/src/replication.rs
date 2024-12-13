@@ -3,7 +3,7 @@ use crate::SubnetworkId;
 use serde::{Deserialize, Serialize};
 
 #[repr(C)]
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct ReplicationRequest {
     pub blob: Blob,
     pub subnetwork_id: SubnetworkId,

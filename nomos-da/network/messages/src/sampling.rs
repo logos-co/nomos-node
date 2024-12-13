@@ -3,13 +3,13 @@ use nomos_core::da::BlobId;
 use serde::{Deserialize, Serialize};
 
 #[repr(C)]
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub enum SampleErrorType {
     NotFound,
 }
 
 #[repr(C)]
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct SampleError {
     pub blob_id: BlobId,
     pub error_type: SampleErrorType,
@@ -31,7 +31,7 @@ impl SampleError {
 }
 
 #[repr(C)]
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct SampleRequest {
     pub blob_id: BlobId,
     pub column_idx: ColumnIndex,

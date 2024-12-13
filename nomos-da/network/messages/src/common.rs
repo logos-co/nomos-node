@@ -3,7 +3,7 @@ use nomos_core::da::BlobId;
 use serde::{Deserialize, Serialize};
 
 #[repr(C)]
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct Blob {
     pub blob_id: BlobId,
     pub data: DaBlob,
@@ -16,7 +16,7 @@ impl Blob {
 }
 
 #[repr(C)]
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub enum CloseMessageReason {
     GracefulShutdown = 0,
     SubnetChange = 1,
@@ -24,7 +24,7 @@ pub enum CloseMessageReason {
 }
 
 #[repr(C)]
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct CloseMessage {
     pub reason: CloseMessageReason,
 }

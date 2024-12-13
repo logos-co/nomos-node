@@ -16,7 +16,7 @@ use kzgrs::Commitment;
 #[derive(Clone, Eq, PartialEq, Debug, Serialize, Deserialize)]
 pub struct Chunk(pub Vec<u8>);
 pub struct Row(pub Vec<Chunk>);
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct Column(pub Vec<Chunk>);
 pub struct ChunksMatrix(pub Vec<Row>);
 pub type ColumnIndex = u16;

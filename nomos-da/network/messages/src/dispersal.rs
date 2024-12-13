@@ -4,14 +4,14 @@ use nomos_core::da::BlobId;
 use serde::{Deserialize, Serialize};
 
 #[repr(C)]
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub enum DispersalErrorType {
     ChunkSize,
     Verification,
 }
 
 #[repr(C)]
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct DispersalError {
     pub blob_id: BlobId,
     pub error_type: DispersalErrorType,
@@ -33,7 +33,7 @@ impl DispersalError {
 }
 
 #[repr(C)]
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct DispersalRequest {
     pub blob: Blob,
     pub subnetwork_id: SubnetworkId,
