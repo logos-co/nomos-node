@@ -54,6 +54,14 @@ impl DaBlob {
         hasher.update(self.column.as_bytes());
         hasher.finalize().as_slice().to_vec()
     }
+
+    pub fn len(&self) -> usize {
+        self.column.as_bytes().len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
 }
 
 impl blob::Blob for DaBlob {

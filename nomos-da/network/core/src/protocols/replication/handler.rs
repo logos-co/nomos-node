@@ -1,7 +1,4 @@
-use std::io;
 // std
-use async_bincode::tokio::AsyncBincodeStream;
-use bincode::Options;
 use std::io::Error;
 use std::task::{Context, Poll};
 // crates
@@ -13,14 +10,15 @@ use libp2p::swarm::handler::{ConnectionEvent, FullyNegotiatedInbound, FullyNegot
 use libp2p::swarm::{ConnectionHandler, ConnectionHandlerEvent, SubstreamProtocol};
 use libp2p::{Stream, StreamProtocol};
 use log::trace;
-use nomos_core::wire;
+use nomos_da_messages::packing::{pack, unpack_from_reader};
 use tracing::error;
 // internal
 use crate::protocol::REPLICATION_PROTOCOL;
 
 pub type DaMessage = nomos_da_messages::replication::ReplicationRequest;
 
-/// Events that bubbles up from the `BroadcastHandler` to the `NetworkBehaviour`
+/// Events that bubbles up from the `BroadcastHandler` to the `NetworkBehaviour
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug)]
 pub enum HandlerEventToBehaviour {
     IncomingMessage { message: DaMessage },
@@ -94,11 +92,13 @@ impl ReplicationHandler {
             trace!("Writing {} messages", pending_messages.len());
 
             for message in pending_messages {
-                let bytes = wire::serialize(&message).expect(&format!(
-                    "Message should always be serializable.\nMessage: '{:?}'",
-                    message
-                ));
-                stream.write_all(&bytes).await?;
+                let packed_message = pack(&message).unwrap_or_else(|_| {
+                    panic!(
+                        "Message should always be serializable.\nMessage: '{:?}'",
+                        message
+                    )
+                });
+                stream.write_all(&packed_message).await?;
                 stream.flush().await?;
             }
 
@@ -112,11 +112,8 @@ impl ReplicationHandler {
     ) -> impl Future<Output = Result<(DaMessage, Stream), Error>> {
         trace!("Reading messages");
         async move {
-            let rx = AsyncBincodeStream::from(stream);
-            let msg = rx.deserialize()?;
-
-            let msg: DaMessage = wire::deserialize(rx).await?;
-            Ok((msg, stream))
+            let unpacked_message = unpack_from_reader(&mut stream).await?;
+            Ok((unpacked_message, stream))
         }
     }
 

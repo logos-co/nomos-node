@@ -42,7 +42,7 @@ impl FillFromNodeList {
 }
 
 impl MembershipHandler for FillFromNodeList {
-    type NetworkId = u32;
+    type NetworkId = u16;
     type Id = PeerId;
 
     fn membership(&self, id: &Self::Id) -> HashSet<Self::NetworkId> {

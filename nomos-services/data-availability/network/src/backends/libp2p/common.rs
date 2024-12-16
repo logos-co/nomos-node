@@ -120,7 +120,7 @@ pub(crate) async fn handle_validator_events_stream(
                                 let result = match maybe_blob {
                                     Some(blob) => BehaviourSampleRes::SamplingSuccess {
                                         blob_id,
-                                        subnetwork_id: blob.column_idx as u32,
+                                        subnetwork_id: blob.column_idx,
                                         blob: Box::new(blob),
                                     },
                                     None => BehaviourSampleRes::SampleNotFound { blob_id },

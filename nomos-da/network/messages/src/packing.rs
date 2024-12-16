@@ -1,12 +1,10 @@
 // STD
-use std::io;
-
-// Crates
 use futures::AsyncReadExt;
+use std::io;
+// Crates
 use nomos_core::wire;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
-
 // Internal
 use crate::Result;
 
@@ -45,7 +43,7 @@ where
     let serialized_message = wire::serialize(message).map_err(into_failed_to_serialize)?;
 
     let data_length = serialized_message.len();
-    if serialized_message.len() > MAX_MSG_LEN {
+    if data_length > MAX_MSG_LEN {
         return Err(get_message_too_large_error(data_length));
     }
 
@@ -61,7 +59,8 @@ where
 {
     let mut length_prefix = [0u8; MAX_MSG_LEN_BYTES];
     reader.read_exact(&mut length_prefix).await?;
-    Ok(u16::from_be_bytes(length_prefix) as usize)
+    let s = u16::from_be_bytes(length_prefix) as usize;
+    Ok(s)
 }
 
 pub async fn unpack_from_reader<Message, R>(reader: &mut R) -> Result<Message>
@@ -80,10 +79,12 @@ mod tests {
     use super::*;
     use crate::common::Blob;
     use crate::dispersal::{DispersalError, DispersalErrorType, DispersalRequest};
+    use crate::sampling::SampleError;
     use futures::io::BufReader;
     use kzgrs_backend::common::blob::DaBlob;
     use kzgrs_backend::encoder::{self, DaEncoderParams};
     use nomos_core::da::{BlobId, DaEncoder};
+    use serde::Deserialize;
 
     fn get_encoder() -> encoder::DaEncoder {
         const DOMAIN_SIZE: usize = 16;
@@ -141,7 +142,7 @@ mod tests {
     #[tokio::test]
     async fn packing_too_large_message() {
         let blob_id = BlobId::from([0; 32]);
-        let error_description = [". "; MAX_MSG_LEN].concat();
+        let error_description = ["."; MAX_MSG_LEN].concat();
         let message =
             DispersalError::new(blob_id, DispersalErrorType::ChunkSize, error_description);
 

@@ -3,7 +3,7 @@ use nomos_core::da::BlobId;
 use serde::{Deserialize, Serialize};
 
 #[repr(C)]
-#[derive(Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct Blob {
     pub blob_id: BlobId,
     pub data: DaBlob,
@@ -33,4 +33,10 @@ impl CloseMessage {
     pub fn new(reason: CloseMessageReason) -> Self {
         CloseMessage { reason }
     }
+}
+
+#[repr(C)]
+#[derive(Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub enum SessionRequest {
+    CloseMessage(CloseMessage),
 }

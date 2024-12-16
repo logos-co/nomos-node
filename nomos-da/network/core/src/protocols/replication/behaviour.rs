@@ -33,9 +33,7 @@ pub enum ReplicationEvent {
 impl ReplicationEvent {
     pub fn blob_size(&self) -> Option<usize> {
         match self {
-            ReplicationEvent::IncomingMessage { message, .. } => {
-                message.blob.as_ref().map(|blob| blob.data.len())
-            }
+            ReplicationEvent::IncomingMessage { message, .. } => Some(message.blob.data.len()),
         }
     }
 }
@@ -104,10 +102,7 @@ where
     }
 
     fn replicate_message(&mut self, message: DaMessage) {
-        let message_id = (
-            message.blob.as_ref().unwrap().blob_id.clone(),
-            message.subnetwork_id,
-        );
+        let message_id = (message.blob.blob_id.to_vec(), message.subnetwork_id);
         if self.seen_message_cache.contains(&message_id) {
             return;
         }
@@ -246,11 +241,51 @@ where
 mod tests {
     use super::*;
     use futures::task::{waker_ref, ArcWake};
+    use kzgrs_backend::common::blob::DaBlob;
+    use kzgrs_backend::encoder;
+    use kzgrs_backend::encoder::DaEncoderParams;
     use libp2p::{identity, PeerId};
+    use nomos_core::da::{BlobId, DaEncoder};
     use nomos_da_messages::common::Blob;
     use std::collections::HashSet;
     use std::sync::Arc;
     use std::task::{Context, Poll};
+
+    fn get_encoder() -> encoder::DaEncoder {
+        const DOMAIN_SIZE: usize = 16;
+        let params = DaEncoderParams::default_with(DOMAIN_SIZE);
+        encoder::DaEncoder::new(params)
+    }
+
+    fn get_da_blob() -> DaBlob {
+        let encoder = get_encoder();
+        let data = vec![
+            49u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8,
+            0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8,
+        ];
+
+        let encoded_data = encoder.encode(&data).unwrap();
+        let columns: Vec<_> = encoded_data.extended_data.columns().collect();
+
+        let index = 0;
+        let da_blob = DaBlob {
+            column: columns[index].clone(),
+            column_idx: index
+                .try_into()
+                .expect("Column index shouldn't overflow the target type"),
+            column_commitment: encoded_data.column_commitments[index],
+            aggregated_column_commitment: encoded_data.aggregated_column_commitment,
+            aggregated_column_proof: encoded_data.aggregated_column_proofs[index],
+            rows_commitments: encoded_data.row_commitments.clone(),
+            rows_proofs: encoded_data
+                .rows_proofs
+                .iter()
+                .map(|proofs| proofs.get(index).cloned().unwrap())
+                .collect(),
+        };
+
+        da_blob
+    }
 
     #[derive(Clone, Debug)]
     struct MockMembershipHandler {
@@ -295,7 +330,7 @@ mod tests {
 
     fn create_replication_behaviours(
         num_instances: usize,
-        subnet_id: u32,
+        subnetwork_id: SubnetworkId,
         membership: &mut HashMap<PeerId, HashSet<SubnetworkId>>,
     ) -> Vec<ReplicationBehaviour<MockMembershipHandler>> {
         let mut behaviours = Vec::new();
@@ -308,7 +343,7 @@ mod tests {
         }
 
         for peer_id in &peer_ids {
-            membership.insert(*peer_id, HashSet::from([subnet_id]));
+            membership.insert(*peer_id, HashSet::from([subnetwork_id]));
         }
 
         let membership_handler = MockMembershipHandler {
@@ -397,13 +432,7 @@ mod tests {
         }
 
         // Simulate sending a message from the first behavior.
-        let message = DaMessage {
-            blob: Some(Blob {
-                blob_id: vec![1, 2, 3],
-                data: vec![4, 5, 6],
-            }),
-            subnetwork_id: 0,
-        };
+        let message = DaMessage::new(Blob::new(BlobId::from([0; 32]), get_da_blob()), 0);
         all_behaviours[0].replicate_message(message.clone());
 
         let waker = Arc::new(TestWaker);
@@ -473,7 +502,7 @@ mod tests {
         for behaviour in &subnet_0_behaviours {
             assert!(behaviour
                 .seen_message_cache
-                .contains(&(vec![1, 2, 3], message.subnetwork_id)));
+                .contains(&([0; 32].to_vec(), message.subnetwork_id)));
         }
 
         // Assert that no members of other subnets have received the message.

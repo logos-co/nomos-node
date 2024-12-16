@@ -1,3 +1,4 @@
+use crate::SubnetworkId;
 use libp2p::PeerId;
 use std::collections::HashSet;
 use subnetworks_assignations::MembershipHandler;
@@ -8,7 +9,7 @@ pub struct AllNeighbours {
 }
 
 impl MembershipHandler for AllNeighbours {
-    type NetworkId = u32;
+    type NetworkId = SubnetworkId;
     type Id = PeerId;
 
     fn membership(&self, _self_id: &Self::Id) -> HashSet<Self::NetworkId> {

@@ -35,7 +35,7 @@ fn verify<const SIZE: usize>(bencher: Bencher, column_size: usize) {
             let sk = SecretKey::key_gen(&buff, &[]).unwrap();
             let verifier = DaVerifier::new(
                 sk.clone(),
-                (0..column_size as u32).collect(),
+                (0..column_size as u16).collect(),
                 GLOBAL_PARAMETERS.clone(),
             );
             let da_blob = DaBlob {
@@ -48,6 +48,7 @@ fn verify<const SIZE: usize>(bencher: Bencher, column_size: usize) {
                     .copied()
                     .unwrap(),
                 aggregated_column_commitment: encoded_data.aggregated_column_commitment.clone(),
+
                 aggregated_column_proof: encoded_data
                     .aggregated_column_proofs
                     .iter()

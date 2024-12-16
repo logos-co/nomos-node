@@ -161,7 +161,7 @@ mod tests {
             .into_iter()
             .enumerate()
             .map(|(index, sk)| {
-                DaVerifier::new(sk, [index as u32].into(), GLOBAL_PARAMETERS.clone())
+                DaVerifier::new(sk, [index as u16].into(), GLOBAL_PARAMETERS.clone())
             })
             .collect();
 

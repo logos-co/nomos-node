@@ -5,7 +5,7 @@ use crate::SubnetworkId;
 use kzgrs_backend::common::blob::DaBlob;
 use libp2p::PeerId;
 use log::{debug, error};
-use nomos_da_messages::replication::ReplicationReq;
+use nomos_da_messages::replication;
 use subnetworks_assignations::MembershipHandler;
 use tokio::sync::mpsc::UnboundedSender;
 
@@ -19,22 +19,14 @@ pub async fn handle_validator_dispersal_event<Membership>(
     match event {
         // Send message for replication
         DispersalEvent::IncomingMessage { message } => {
-            if let Ok(blob) = bincode::deserialize::<DaBlob>(
-                message
-                    .blob
-                    .as_ref()
-                    .expect("Message blob should not be empty")
-                    .data
-                    .as_slice(),
-            ) {
-                if let Err(e) = validation_events_sender.send(blob) {
-                    error!("Error sending blob to validation: {e:?}");
-                }
+            let blob_message = message.blob;
+            if let Err(e) = validation_events_sender.send(blob_message.data.clone()) {
+                error!("Error sending blob to validation: {e:?}");
             }
-            replication_behaviour.send_message(ReplicationReq {
-                blob: message.blob,
-                subnetwork_id: message.subnetwork_id,
-            });
+            replication_behaviour.send_message(replication::ReplicationRequest::new(
+                blob_message,
+                message.subnetwork_id,
+            ));
         }
     }
 }
@@ -53,16 +45,7 @@ pub async fn handle_replication_event(
     event: ReplicationEvent,
 ) {
     let ReplicationEvent::IncomingMessage { message, .. } = event;
-    if let Ok(blob) = bincode::deserialize::<DaBlob>(
-        message
-            .blob
-            .as_ref()
-            .expect("Message blob should not be empty")
-            .data
-            .as_slice(),
-    ) {
-        if let Err(e) = validation_events_sender.send(blob) {
-            error!("Error sending blob to validation: {e:?}");
-        }
+    if let Err(e) = validation_events_sender.send(message.blob.data) {
+        error!("Error sending blob to validation: {e:?}");
     }
 }

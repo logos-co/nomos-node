@@ -65,7 +65,7 @@ impl FillWithOriginalReplication {
 }
 
 impl MembershipHandler for FillWithOriginalReplication {
-    type NetworkId = u32;
+    type NetworkId = u16;
     type Id = PeerId;
 
     fn membership(&self, id: &Self::Id) -> HashSet<Self::NetworkId> {
