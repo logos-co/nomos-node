@@ -16,8 +16,10 @@ use overwatch_rs::services::{
 };
 use serde::{Deserialize, Serialize};
 use tokio::sync::oneshot;
-use tracing::error;
+use tracing::{error, span, Level};
 // internal
+
+const DA_NETWORK_TAG: ServiceId = "DA-Network";
 
 pub enum DaNetworkMsg<B: NetworkBackend> {
     Process(B::Message),
@@ -61,7 +63,7 @@ pub struct NetworkState<B: NetworkBackend> {
 }
 
 impl<B: NetworkBackend + 'static + Send> ServiceData for NetworkService<B> {
-    const SERVICE_ID: ServiceId = "DaNetwork";
+    const SERVICE_ID: ServiceId = DA_NETWORK_TAG;
     type Settings = NetworkConfig<B>;
     type State = NetworkState<B>;
     type StateOperator = NoOperator<Self::State>;
@@ -94,6 +96,10 @@ where
                 },
             mut backend,
         } = self;
+
+        let trace_span = span!(Level::INFO, "service", service = DA_NETWORK_TAG);
+        let _trace_guard = trace_span.enter();
+
         let mut lifecycle_stream = lifecycle_handle.message_stream();
         loop {
             tokio::select! {

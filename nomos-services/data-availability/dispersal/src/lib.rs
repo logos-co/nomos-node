@@ -4,7 +4,7 @@ use std::marker::PhantomData;
 // crates
 use serde::{Deserialize, Serialize};
 use tokio::sync::oneshot;
-use tracing::log::error;
+use tracing::{log::error, span, Level};
 // internal
 use crate::adapters::mempool::DaMempoolAdapter;
 use crate::adapters::network::DispersalNetworkAdapter;
@@ -120,6 +120,10 @@ where
             service_state,
             ..
         } = self;
+
+        let trace_span = span!(Level::INFO, "service", service = DA_DISPERSAL_TAG);
+        let _trace_guard = trace_span.enter();
+
         let DispersalServiceSettings {
             backend: backend_settings,
         } = service_state.settings_reader.get_updated_settings();
