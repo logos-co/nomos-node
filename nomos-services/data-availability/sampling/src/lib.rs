@@ -225,6 +225,10 @@ where
             mut service_state,
             mut sampler,
         } = self;
+
+        let trace_span = span!(Level::INFO, "service", service = DA_SAMPLING_TAG);
+        let _trace_guard = trace_span.enter();
+
         let DaSamplingServiceSettings {
             storage_adapter_settings,
             ..

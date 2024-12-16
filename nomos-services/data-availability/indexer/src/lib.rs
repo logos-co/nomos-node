@@ -28,7 +28,9 @@ use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use storage::DaStorageAdapter;
 use tokio::sync::oneshot::Sender;
-use tracing::error;
+use tracing::{error, span, Level};
+
+const DA_INDEXER_TAG: ServiceId = "DA-Indexer";
 
 pub type ConsensusRelay<
     A,
@@ -213,7 +215,7 @@ where
     SamplingNetworkAdapter: nomos_da_sampling::network::NetworkAdapter,
     SamplingStorage: nomos_da_sampling::storage::DaStorageAdapter,
 {
-    const SERVICE_ID: ServiceId = "DaIndexer";
+    const SERVICE_ID: ServiceId = DA_INDEXER_TAG;
     type Settings = IndexerSettings<DaStorage::Settings>;
     type State = NoState<Self::Settings>;
     type StateOperator = NoOperator<Self::State>;
@@ -434,6 +436,10 @@ where
             consensus_relay,
             storage_relay,
         } = self;
+
+        let trace_span = span!(Level::INFO, "service", service = DA_INDEXER_TAG);
+        let _trace_guard = trace_span.enter();
+
         let consensus_relay = consensus_relay
             .connect()
             .await

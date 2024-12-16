@@ -159,6 +159,9 @@ where
             verifier,
         } = self;
 
+        let trace_span = span!(Level::INFO, "service", service = DA_VERIFIER_TAG);
+        let _trace_guard = trace_span.enter();
+
         let DaVerifierServiceSettings {
             network_adapter_settings,
             storage_adapter_settings,
