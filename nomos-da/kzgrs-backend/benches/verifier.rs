@@ -48,7 +48,6 @@ fn verify<const SIZE: usize>(bencher: Bencher, column_size: usize) {
                     .copied()
                     .unwrap(),
                 aggregated_column_commitment: encoded_data.aggregated_column_commitment.clone(),
-
                 aggregated_column_proof: encoded_data
                     .aggregated_column_proofs
                     .iter()
