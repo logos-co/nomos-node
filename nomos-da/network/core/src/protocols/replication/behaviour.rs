@@ -33,7 +33,9 @@ pub enum ReplicationEvent {
 impl ReplicationEvent {
     pub fn blob_size(&self) -> Option<usize> {
         match self {
-            ReplicationEvent::IncomingMessage { message, .. } => Some(message.blob.data.len()),
+            ReplicationEvent::IncomingMessage { message, .. } => {
+                Some(message.blob.data.column_len())
+            }
         }
     }
 }

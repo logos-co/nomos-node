@@ -29,7 +29,7 @@ pub enum DispersalEvent {
 impl DispersalEvent {
     pub fn blob_size(&self) -> Option<usize> {
         match self {
-            DispersalEvent::IncomingMessage { message } => Some(message.blob.data.len()),
+            DispersalEvent::IncomingMessage { message } => Some(message.blob.data.column_len()),
         }
     }
 }

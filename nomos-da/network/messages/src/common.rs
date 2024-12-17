@@ -15,7 +15,7 @@ impl Blob {
     }
 }
 
-#[repr(C)]
+#[repr(u8)]
 #[derive(Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub enum CloseMessageReason {
     GracefulShutdown = 0,
@@ -33,10 +33,4 @@ impl CloseMessage {
     pub fn new(reason: CloseMessageReason) -> Self {
         CloseMessage { reason }
     }
-}
-
-#[repr(C)]
-#[derive(Debug, Eq, PartialEq, Serialize, Deserialize)]
-pub enum SessionRequest {
-    CloseMessage(CloseMessage),
 }
