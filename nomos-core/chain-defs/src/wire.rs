@@ -15,6 +15,8 @@ use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 
 pub type Error = bincode::Error;
+pub type ErrorKind = bincode::ErrorKind;
+
 // type composition is cool but also makes naming types a bit akward
 type BincodeOptions = WithOtherTrailing<
     WithOtherIntEncoding<

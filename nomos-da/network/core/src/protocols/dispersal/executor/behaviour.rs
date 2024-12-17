@@ -29,6 +29,7 @@ use crate::protocols::clone_deserialize_error;
 use crate::SubnetworkId;
 use kzgrs_backend::common::blob::DaBlob;
 use nomos_core::da::BlobId;
+use nomos_core::wire;
 use nomos_da_messages::common::Blob;
 use nomos_da_messages::dispersal;
 use nomos_da_messages::packing::{pack_to_writer, unpack_from_reader};
@@ -44,7 +45,7 @@ pub enum DispersalError {
     },
     #[error("Could not serialized: {error}")]
     Serialization {
-        error: bincode::Error,
+        error: wire::Error,
         blob_id: BlobId,
         subnetwork_id: SubnetworkId,
     },
