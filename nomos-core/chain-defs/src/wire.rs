@@ -2,6 +2,7 @@
 
 // TODO: we're using bincode for now, but might need strong guarantees about
 // the underlying format in the future for standardization.
+use crate::wire_errors::Error;
 use bincode::{
     config::{
         Bounded, DefaultOptions, FixintEncoding, LittleEndian, RejectTrailing, WithOtherEndian,
@@ -13,9 +14,6 @@ use bincode::{
 use once_cell::sync::Lazy;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
-
-pub type Error = bincode::Error;
-pub type ErrorKind = bincode::ErrorKind;
 
 // type composition is cool but also makes naming types a bit akward
 type BincodeOptions = WithOtherTrailing<
@@ -54,7 +52,7 @@ impl<'de> Deserializer<'de> {
     }
 
     pub fn deserialize<T: Deserialize<'de>>(&mut self) -> Result<T, Error> {
-        <T>::deserialize(&mut self.inner)
+        <T>::deserialize(&mut self.inner).map_err(Error::Deserialize)
     }
 }
 
@@ -67,7 +65,7 @@ impl<T: std::io::Write> Serializer<T> {
         &mut self,
         item: &U,
     ) -> Result<<&mut BincodeSerializer<T> as serde::Serializer>::Ok, Error> {
-        item.serialize(&mut self.inner)
+        item.serialize(&mut self.inner).map_err(Error::Serialize)
     }
 }
 
@@ -104,7 +102,7 @@ pub fn serializer_into_buffer(buffer: &mut [u8]) -> Serializer<&'_ mut [u8]> {
 
 /// Serialize an object directly into a vec
 pub fn serialize<T: Serialize>(item: &T) -> Result<Vec<u8>, Error> {
-    let size = OPTIONS.serialized_size(item)?;
+    let size = OPTIONS.serialized_size(item).map_err(Error::Serialize)?;
     let mut buf = Vec::with_capacity(size as usize);
     serializer(&mut buf).serialize_into(item)?;
     Ok(buf)
