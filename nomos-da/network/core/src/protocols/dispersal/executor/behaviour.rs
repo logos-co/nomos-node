@@ -5,7 +5,7 @@ use std::task::{Context, Poll};
 use either::Either;
 use futures::future::BoxFuture;
 use futures::stream::{BoxStream, FuturesUnordered};
-use futures::{AsyncWriteExt, FutureExt, StreamExt};
+use futures::{AsyncWriteExt, FutureExt, StreamExt, TryFutureExt};
 use libp2p::core::Endpoint;
 use libp2p::swarm::behaviour::{ConnectionClosed, ConnectionEstablished};
 use libp2p::swarm::dial_opts::DialOpts;
@@ -31,7 +31,7 @@ use kzgrs_backend::common::blob::DaBlob;
 use nomos_core::da::BlobId;
 use nomos_da_messages::common::Blob;
 use nomos_da_messages::dispersal;
-use nomos_da_messages::packing::{pack, unpack_from_reader};
+use nomos_da_messages::packing::{pack_to_writer, unpack_from_reader};
 use subnetworks_assignations::MembershipHandler;
 
 #[derive(Debug, Error)]
@@ -266,20 +266,13 @@ where
         let blob_id = message.id();
         let blob_id: BlobId = blob_id.clone().try_into().unwrap();
         let message = dispersal::DispersalRequest::new(Blob::new(blob_id, message), subnetwork_id);
-        let packed_message = pack(&message).map_err(|error| DispersalError::Io {
-            error,
-            blob_id,
-            subnetwork_id,
-        })?;
-        stream
-            .stream
-            .write_all(packed_message.as_slice())
-            .await
+        pack_to_writer(&message, &mut stream.stream)
             .map_err(|error| DispersalError::Io {
                 error,
                 blob_id,
                 subnetwork_id,
-            })?;
+            })
+            .await?;
         stream
             .stream
             .flush()

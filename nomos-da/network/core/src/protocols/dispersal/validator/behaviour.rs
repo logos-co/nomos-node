@@ -13,7 +13,7 @@ use libp2p::{Multiaddr, PeerId, Stream};
 use libp2p_stream::IncomingStreams;
 use log::debug;
 use nomos_da_messages::dispersal;
-use nomos_da_messages::packing::{pack, unpack_from_reader};
+use nomos_da_messages::packing::{pack_to_writer, unpack_from_reader};
 use std::io::Error;
 use std::task::{Context, Poll};
 use subnetworks_assignations::MembershipHandler;
@@ -71,8 +71,7 @@ impl<Membership: MembershipHandler> DispersalValidatorBehaviour<Membership> {
         let message: dispersal::DispersalRequest = unpack_from_reader(&mut stream).await?;
         let blob_id = message.blob.blob_id;
         let response = dispersal::DispersalResponse::BlobId(blob_id);
-        let message_bytes = pack(&response)?;
-        stream.write_all(&message_bytes).await?;
+        pack_to_writer(&response, &mut stream).await?;
         stream.flush().await?;
         Ok((message, stream))
     }

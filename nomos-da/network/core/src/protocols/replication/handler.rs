@@ -10,7 +10,7 @@ use libp2p::swarm::handler::{ConnectionEvent, FullyNegotiatedInbound, FullyNegot
 use libp2p::swarm::{ConnectionHandler, ConnectionHandlerEvent, SubstreamProtocol};
 use libp2p::{Stream, StreamProtocol};
 use log::trace;
-use nomos_da_messages::packing::{pack, unpack_from_reader};
+use nomos_da_messages::packing::{pack_to_writer, unpack_from_reader};
 use tracing::error;
 // internal
 use crate::protocol::REPLICATION_PROTOCOL;
@@ -92,13 +92,14 @@ impl ReplicationHandler {
             trace!("Writing {} messages", pending_messages.len());
 
             for message in pending_messages {
-                let packed_message = pack(&message).unwrap_or_else(|_| {
-                    panic!(
-                        "Message should always be serializable.\nMessage: '{:?}'",
-                        message
-                    )
-                });
-                stream.write_all(&packed_message).await?;
+                pack_to_writer(&message, &mut stream)
+                    .await
+                    .unwrap_or_else(|_| {
+                        panic!(
+                            "Message should always be serializable.\nMessage: '{:?}'",
+                            message
+                        )
+                    });
                 stream.flush().await?;
             }
 

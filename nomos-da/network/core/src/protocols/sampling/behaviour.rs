@@ -7,7 +7,7 @@ use futures::channel::oneshot;
 use futures::channel::oneshot::{Canceled, Receiver, Sender};
 use futures::future::BoxFuture;
 use futures::stream::{BoxStream, FuturesUnordered};
-use futures::{AsyncWriteExt, FutureExt, StreamExt};
+use futures::{AsyncWriteExt, FutureExt, StreamExt, TryFutureExt};
 use kzgrs_backend::common::blob::DaBlob;
 use kzgrs_backend::common::ColumnIndex;
 use libp2p::core::Endpoint;
@@ -19,7 +19,7 @@ use libp2p::swarm::{
 use libp2p::{Multiaddr, PeerId, Stream};
 use libp2p_stream::{Control, IncomingStreams, OpenStreamError};
 use nomos_core::da::BlobId;
-use nomos_da_messages::packing::{pack, unpack_from_reader};
+use nomos_da_messages::packing::{pack_to_writer, unpack_from_reader};
 use nomos_da_messages::{common, sampling};
 use subnetworks_assignations::MembershipHandler;
 use thiserror::Error;
@@ -340,12 +340,9 @@ where
                 error,
             }
         };
-        let bytes = pack(&message).map_err(into_sampling_error)?;
-        stream
-            .stream
-            .write_all(&bytes)
-            .await
-            .map_err(into_sampling_error)?;
+        pack_to_writer(&message, &mut stream.stream)
+            .map_err(into_sampling_error)
+            .await?;
         stream.stream.flush().await.map_err(into_sampling_error)?;
         let response: sampling::SampleResponse = unpack_from_reader(&mut stream.stream)
             .await
@@ -423,18 +420,12 @@ where
                 peer_id: stream.peer_id,
             })?
             .into();
-        let bytes = pack(&response).map_err(|error| SamplingError::Io {
-            peer_id: stream.peer_id,
-            error,
-        })?;
-        stream
-            .stream
-            .write_all(&bytes)
-            .await
+        pack_to_writer(&response, &mut stream.stream)
             .map_err(|error| SamplingError::Io {
                 peer_id: stream.peer_id,
                 error,
-            })?;
+            })
+            .await?;
         stream
             .stream
             .flush()
