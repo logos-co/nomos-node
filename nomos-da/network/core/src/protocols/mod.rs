@@ -1,10 +1,10 @@
 pub mod dispersal;
 pub mod replication;
 pub mod sampling;
+use nomos_core::wire;
 
-use bincode::ErrorKind;
-
-fn clone_deserialize_error(error: &bincode::Error) -> bincode::Error {
+fn clone_deserialize_error(error: &wire::Error) -> wire::Error {
+    use wire::ErrorKind;
     Box::new(match error.as_ref() {
         ErrorKind::Io(error) => ErrorKind::Io(std::io::Error::new(error.kind(), error.to_string())),
         ErrorKind::InvalidUtf8Encoding(error) => ErrorKind::InvalidUtf8Encoding(*error),
