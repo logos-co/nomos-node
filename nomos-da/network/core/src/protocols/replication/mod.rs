@@ -6,6 +6,7 @@ mod test {
     use crate::protocols::replication::behaviour::{ReplicationBehaviour, ReplicationEvent};
     use crate::protocols::replication::handler::DaMessage;
     use crate::test_utils::AllNeighbours;
+    use blake2::{Blake2s256, Digest};
     use futures::StreamExt;
 
     use kzgrs_backend::testutils::get_da_blob;
@@ -95,12 +96,7 @@ mod test {
                 tokio::select! {
                     // send a message everytime that the channel ticks
                     _  = receiver.recv() => {
-                        // let blob_id_bytes: [u8; 32] = i.to_be_bytes().to_vec().try_into().unwrap();
-
-                        let mut blob_id_bytes = [0; 32];
-                        let b = i.to_be_bytes();
-                        assert!(b.len() <= blob_id_bytes.len());
-                        blob_id_bytes[0..b.len()].copy_from_slice(&b);
+                        let blob_id_bytes = Blake2s256::digest(i.to_be_bytes().as_slice());
                         assert_eq!(blob_id_bytes.len(), 32);
 
                         let blob = Blob::new(

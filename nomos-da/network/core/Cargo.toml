@@ -29,3 +29,4 @@ tokio = { version = "1", features = ["macros", "rt-multi-thread", "time"] }
 libp2p = { version = "0.53", features = ["ed25519", "ping", "macros", "quic", "tcp", "yamux", "noise"] }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 kzgrs-backend = { path = "../../kzgrs-backend", features = ["testutils"] }
+blake2 = "0.10"
