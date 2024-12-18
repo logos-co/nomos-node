@@ -59,7 +59,7 @@ pub struct GeneralDaConfig {
     pub blob_storage_directory: PathBuf,
     pub global_params_path: String,
     pub verifier_sk: String,
-    pub verifier_index: HashSet<u32>,
+    pub verifier_index: HashSet<u16>,
     pub num_samples: u16,
     pub num_subnets: u16,
     pub old_blobs_check_interval: Duration,

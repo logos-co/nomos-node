@@ -12,9 +12,8 @@ use libp2p::swarm::{
 use libp2p::{Multiaddr, PeerId, Stream};
 use libp2p_stream::IncomingStreams;
 use log::debug;
-use nomos_da_messages::dispersal::dispersal_res::MessageType;
-use nomos_da_messages::dispersal::{DispersalReq, DispersalRes};
-use nomos_da_messages::{pack_message, unpack_from_reader};
+use nomos_da_messages::dispersal;
+use nomos_da_messages::packing::{pack_to_writer, unpack_from_reader};
 use std::io::Error;
 use std::task::{Context, Poll};
 use subnetworks_assignations::MembershipHandler;
@@ -22,15 +21,15 @@ use subnetworks_assignations::MembershipHandler;
 #[derive(Debug)]
 pub enum DispersalEvent {
     /// Received a n
-    IncomingMessage { message: DispersalReq },
+    IncomingMessage {
+        message: dispersal::DispersalRequest,
+    },
 }
 
 impl DispersalEvent {
     pub fn blob_size(&self) -> Option<usize> {
         match self {
-            DispersalEvent::IncomingMessage { message } => {
-                message.blob.as_ref().map(|blob| blob.data.len())
-            }
+            DispersalEvent::IncomingMessage { message } => Some(message.blob.data.column_len()),
         }
     }
 }
@@ -38,7 +37,8 @@ impl DispersalEvent {
 pub struct DispersalValidatorBehaviour<Membership> {
     stream_behaviour: libp2p_stream::Behaviour,
     incoming_streams: IncomingStreams,
-    tasks: FuturesUnordered<BoxFuture<'static, Result<(DispersalReq, Stream), Error>>>,
+    tasks:
+        FuturesUnordered<BoxFuture<'static, Result<(dispersal::DispersalRequest, Stream), Error>>>,
     membership: Membership,
 }
 
@@ -65,14 +65,13 @@ impl<Membership: MembershipHandler> DispersalValidatorBehaviour<Membership> {
     /// Stream handling messages task.
     /// This task handles a single message receive. Then it writes up the acknowledgment into the same
     /// stream as response and finish.
-    async fn handle_new_stream(mut stream: Stream) -> Result<(DispersalReq, Stream), Error> {
-        let message: DispersalReq = unpack_from_reader(&mut stream).await?;
-        let blob_id = message.blob.clone().unwrap().blob_id;
-        let response = DispersalRes {
-            message_type: Some(MessageType::BlobId(blob_id)),
-        };
-        let message_bytes = pack_message(&response)?;
-        stream.write_all(&message_bytes).await?;
+    async fn handle_new_stream(
+        mut stream: Stream,
+    ) -> Result<(dispersal::DispersalRequest, Stream), Error> {
+        let message: dispersal::DispersalRequest = unpack_from_reader(&mut stream).await?;
+        let blob_id = message.blob.blob_id;
+        let response = dispersal::DispersalResponse::BlobId(blob_id);
+        pack_to_writer(&response, &mut stream).await?;
         stream.flush().await?;
         Ok((message, stream))
     }

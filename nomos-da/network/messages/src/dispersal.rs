@@ -1,29 +1,56 @@
-use crate::{common, impl_from_for_message};
+use crate::common::Blob;
+use crate::SubnetworkId;
+use nomos_core::da::BlobId;
+use serde::{Deserialize, Serialize};
 
-include!(concat!(env!("OUT_DIR"), "/nomos.da.v1.dispersal.rs"));
+#[repr(C)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub enum DispersalErrorType {
+    ChunkSize,
+    Verification,
+}
 
-impl_from_for_message!(
-    Message,
-    DispersalReq => DispersalReq,
-    DispersalRes => DispersalRes,
-    common::SessionReq => SessionReq,
-);
+#[repr(C)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct DispersalError {
+    pub blob_id: BlobId,
+    pub error_type: DispersalErrorType,
+    pub error_description: String,
+}
 
-#[cfg(test)]
-mod tests {
-    use crate::{common, dispersal};
-
-    #[test]
-    fn dispersal_message() {
-        let blob = common::Blob {
-            blob_id: vec![0; 32],
-            data: vec![1; 32],
-        };
-        let req = dispersal::DispersalReq {
-            blob: Some(blob),
-            subnetwork_id: 0,
-        };
-
-        assert_eq!(req.blob.unwrap().blob_id, vec![0; 32]);
+impl DispersalError {
+    pub fn new(
+        blob_id: BlobId,
+        error_type: DispersalErrorType,
+        error_description: impl Into<String>,
+    ) -> Self {
+        Self {
+            blob_id,
+            error_type,
+            error_description: error_description.into(),
+        }
     }
+}
+
+#[repr(C)]
+#[derive(Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct DispersalRequest {
+    pub blob: Blob,
+    pub subnetwork_id: SubnetworkId,
+}
+
+impl DispersalRequest {
+    pub fn new(blob: Blob, subnetwork_id: SubnetworkId) -> Self {
+        Self {
+            blob,
+            subnetwork_id,
+        }
+    }
+}
+
+#[repr(C)]
+#[derive(Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub enum DispersalResponse {
+    BlobId(BlobId),
+    Error(DispersalError),
 }

@@ -3,20 +3,61 @@ pub mod handler;
 
 #[cfg(test)]
 mod test {
+    use crate::protocols::replication::behaviour::{ReplicationBehaviour, ReplicationEvent};
+    use crate::protocols::replication::handler::DaMessage;
+    use crate::test_utils::AllNeighbours;
     use futures::StreamExt;
+    use kzgrs_backend::common::blob::DaBlob;
+    use kzgrs_backend::encoder;
+    use kzgrs_backend::encoder::DaEncoderParams;
     use libp2p::identity::Keypair;
     use libp2p::swarm::SwarmEvent;
     use libp2p::{quic, Multiaddr, PeerId, Swarm};
     use log::info;
+    use nomos_core::da::{BlobId, DaEncoder};
+    use nomos_da_messages::common::Blob;
     use std::time::Duration;
     use tracing_subscriber::fmt::TestWriter;
     use tracing_subscriber::EnvFilter;
 
-    use nomos_da_messages::common::Blob;
+    fn get_encoder() -> encoder::DaEncoder {
+        const DOMAIN_SIZE: usize = 16;
+        let params = DaEncoderParams::default_with(DOMAIN_SIZE);
+        encoder::DaEncoder::new(params)
+    }
 
-    use crate::protocols::replication::behaviour::{ReplicationBehaviour, ReplicationEvent};
-    use crate::protocols::replication::handler::DaMessage;
-    use crate::test_utils::AllNeighbours;
+    fn get_da_blob(data: Option<Vec<u8>>) -> DaBlob {
+        let encoder = get_encoder();
+
+        let data = data.unwrap_or_else(|| {
+            vec![
+                49u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8,
+                0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8,
+            ]
+        });
+
+        let encoded_data = encoder.encode(&data).unwrap();
+        let columns: Vec<_> = encoded_data.extended_data.columns().collect();
+
+        let index = 0;
+        let da_blob = DaBlob {
+            column: columns[index].clone(),
+            column_idx: index
+                .try_into()
+                .expect("Column index shouldn't overflow the target type"),
+            column_commitment: encoded_data.column_commitments[index],
+            aggregated_column_commitment: encoded_data.aggregated_column_commitment,
+            aggregated_column_proof: encoded_data.aggregated_column_proofs[index],
+            rows_commitments: encoded_data.row_commitments.clone(),
+            rows_proofs: encoded_data
+                .rows_proofs
+                .iter()
+                .map(|proofs| proofs.get(index).cloned().unwrap())
+                .collect(),
+        };
+
+        da_blob
+    }
 
     #[tokio::test]
     async fn test_connects_and_receives_replication_messages() {
@@ -94,13 +135,19 @@ mod test {
                 tokio::select! {
                     // send a message everytime that the channel ticks
                     _  = receiver.recv() => {
-                        swarm_2.behaviour_mut().send_message(DaMessage {
-                            blob: Some(Blob {
-                                blob_id: i.to_be_bytes().to_vec(),
-                                data: i.to_be_bytes().to_vec(),
-                            }),
-                            subnetwork_id: 0,
-                        });
+                        // let blob_id_bytes: [u8; 32] = i.to_be_bytes().to_vec().try_into().unwrap();
+
+                        let mut blob_id_bytes = [0; 32];
+                        let b = i.to_be_bytes();
+                        assert!(b.len() <= blob_id_bytes.len());
+                        blob_id_bytes[0..b.len()].copy_from_slice(&b);
+                        assert_eq!(blob_id_bytes.len(), 32);
+
+                        let blob = Blob::new(
+                            BlobId::from(blob_id_bytes),
+                            get_da_blob(None)
+                        );
+                        swarm_2.behaviour_mut().send_message(DaMessage::new(blob, 0));
                         i += 1;
                     }
                     // print out events

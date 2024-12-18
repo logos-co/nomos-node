@@ -1,26 +1,24 @@
 // std
 use std::io::Error;
 use std::task::{Context, Poll};
-
-use futures::Future;
 // crates
 use futures::future::BoxFuture;
 use futures::prelude::*;
+use futures::Future;
 use libp2p::core::upgrade::ReadyUpgrade;
 use libp2p::swarm::handler::{ConnectionEvent, FullyNegotiatedInbound, FullyNegotiatedOutbound};
 use libp2p::swarm::{ConnectionHandler, ConnectionHandlerEvent, SubstreamProtocol};
 use libp2p::{Stream, StreamProtocol};
 use log::trace;
+use nomos_da_messages::packing::{pack_to_writer, unpack_from_reader};
 use tracing::error;
-
 // internal
-use nomos_da_messages::{pack_message, unpack_from_reader};
-
 use crate::protocol::REPLICATION_PROTOCOL;
 
-pub type DaMessage = nomos_da_messages::replication::ReplicationReq;
+pub type DaMessage = nomos_da_messages::replication::ReplicationRequest;
 
-/// Events that bubbles up from the `BroadcastHandler` to the `NetworkBehaviour`
+/// Events that bubbles up from the `BroadcastHandler` to the `NetworkBehaviour
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug)]
 pub enum HandlerEventToBehaviour {
     IncomingMessage { message: DaMessage },
@@ -92,11 +90,19 @@ impl ReplicationHandler {
         std::mem::swap(&mut self.outgoing_messages, &mut pending_messages);
         async {
             trace!("Writing {} messages", pending_messages.len());
+
             for message in pending_messages {
-                let bytes = pack_message(&message)?;
-                stream.write_all(&bytes).await?;
+                pack_to_writer(&message, &mut stream)
+                    .await
+                    .unwrap_or_else(|_| {
+                        panic!(
+                            "Message should always be serializable.\nMessage: '{:?}'",
+                            message
+                        )
+                    });
                 stream.flush().await?;
             }
+
             Ok(stream)
         }
     }
@@ -107,8 +113,8 @@ impl ReplicationHandler {
     ) -> impl Future<Output = Result<(DaMessage, Stream), Error>> {
         trace!("Reading messages");
         async move {
-            let msg: DaMessage = unpack_from_reader(&mut stream).await?;
-            Ok((msg, stream))
+            let unpacked_message = unpack_from_reader(&mut stream).await?;
+            Ok((unpacked_message, stream))
         }
     }
 

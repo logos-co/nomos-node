@@ -290,7 +290,7 @@ where
     let membership = &config.validator_settings.membership;
 
     // filter out which subnetworks we already have connections with
-    let connected_subnetworks: HashSet<SubnetworkId> = (0..config.num_subnets as u32)
+    let connected_subnetworks: HashSet<SubnetworkId> = (0..config.num_subnets)
         .filter(|subnetwork_id| {
             !membership
                 .members_of(subnetwork_id)
@@ -351,7 +351,7 @@ where
         + 'static,
 {
     let membership = &config.validator_settings.membership;
-    (0..config.num_subnets as u32)
+    (0..config.num_subnets)
         .filter(|subnetwork_id| !filtered_subnetworks.contains(subnetwork_id))
         .filter_map(|subnetwork_id| {
             membership

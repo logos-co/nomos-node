@@ -66,6 +66,6 @@ impl DaVerifier for KzgrsDaVerifier {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct KzgrsDaVerifierSettings {
     pub sk: String,
-    pub index: HashSet<u32>,
+    pub index: HashSet<u16>,
     pub global_params_path: String,
 }

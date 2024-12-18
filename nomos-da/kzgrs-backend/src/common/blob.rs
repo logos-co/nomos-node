@@ -13,7 +13,7 @@ use crate::common::{
     deserialize_canonical, deserialize_vec_canonical, serialize_canonical, serialize_vec_canonical,
 };
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct DaBlob {
     pub column: Column,
     pub column_idx: ColumnIndex,
@@ -53,6 +53,10 @@ impl DaBlob {
         let mut hasher = Sha3_256::new();
         hasher.update(self.column.as_bytes());
         hasher.finalize().as_slice().to_vec()
+    }
+
+    pub fn column_len(&self) -> usize {
+        self.column.as_bytes().len()
     }
 }
 

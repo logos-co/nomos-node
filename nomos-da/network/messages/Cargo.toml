@@ -4,12 +4,11 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-bytes = "1.6.1"
-futures = "0.3.30"
-prost = "0.13.1"
-
-[build-dependencies]
-prost-build = "0.13.1"
+nomos-core = { path = "../../../nomos-core/chain-defs" }
+kzgrs-backend = { path = "../../kzgrs-backend" }
+serde = { version = "1.0.215", features = ["derive"] }
+futures = "0.3.31"
+tokio = "1"
 
 [dev-dependencies]
-tokio = { version = "1", features = ["rt", "macros"] }
+tokio = { version = "1", features = ["macros"] }

@@ -18,12 +18,12 @@ use crate::encoder::DaEncoderParams;
 pub struct DaVerifier {
     // TODO: substitute this for an abstraction to sign things over
     pub sk: SecretKey,
-    pub index: HashSet<u32>,
+    pub index: HashSet<u16>,
     global_parameters: GlobalParameters,
 }
 
 impl DaVerifier {
-    pub fn new(sk: SecretKey, index: HashSet<u32>, global_parameters: GlobalParameters) -> Self {
+    pub fn new(sk: SecretKey, index: HashSet<u16>, global_parameters: GlobalParameters) -> Self {
         Self {
             sk,
             index,
@@ -118,7 +118,7 @@ impl DaVerifier {
     pub fn verify(&self, blob: &DaBlob, rows_domain_size: usize) -> bool {
         let rows_domain = PolynomialEvaluationDomain::new(rows_domain_size)
             .expect("Domain should be able to build");
-        let blob_col_idx = &u16::from_be_bytes(blob.column_idx()).into();
+        let blob_col_idx = &u16::from_be_bytes(blob.column_idx());
         let index = self.index.get(blob_col_idx).unwrap();
 
         let is_column_verified = DaVerifier::verify_column(
@@ -380,7 +380,7 @@ mod test {
             .into_iter()
             .enumerate()
             .map(|(index, sk)| {
-                DaVerifier::new(sk, [index as u32].into(), GLOBAL_PARAMETERS.clone())
+                DaVerifier::new(sk, [index as u16].into(), GLOBAL_PARAMETERS.clone())
             })
             .collect();
         let encoded_data = encoder.encode(&data).unwrap();

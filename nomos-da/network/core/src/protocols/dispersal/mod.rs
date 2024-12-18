@@ -9,6 +9,7 @@ pub mod test {
         DispersalEvent, DispersalValidatorBehaviour,
     };
     use crate::test_utils::AllNeighbours;
+    use crate::SubnetworkId;
     use futures::StreamExt;
     use kzgrs_backend::common::blob::DaBlob;
     use kzgrs_backend::common::Column;
@@ -23,9 +24,9 @@ pub mod test {
     pub fn executor_swarm(
         addressbook: AddressBook,
         key: Keypair,
-        membership: impl MembershipHandler<NetworkId = u32, Id = PeerId> + 'static,
+        membership: impl MembershipHandler<NetworkId = SubnetworkId, Id = PeerId> + 'static,
     ) -> libp2p::Swarm<
-        DispersalExecutorBehaviour<impl MembershipHandler<NetworkId = u32, Id = PeerId>>,
+        DispersalExecutorBehaviour<impl MembershipHandler<NetworkId = SubnetworkId, Id = PeerId>>,
     > {
         let peer_id = PeerId::from_public_key(&key.public());
         libp2p::SwarmBuilder::with_existing_identity(key)
@@ -44,9 +45,9 @@ pub mod test {
 
     pub fn validator_swarm(
         key: Keypair,
-        membership: impl MembershipHandler<NetworkId = u32, Id = PeerId> + 'static,
+        membership: impl MembershipHandler<NetworkId = SubnetworkId, Id = PeerId> + 'static,
     ) -> libp2p::Swarm<
-        DispersalValidatorBehaviour<impl MembershipHandler<NetworkId = u32, Id = PeerId>>,
+        DispersalValidatorBehaviour<impl MembershipHandler<NetworkId = SubnetworkId, Id = PeerId>>,
     > {
         libp2p::SwarmBuilder::with_existing_identity(key)
             .with_tokio()

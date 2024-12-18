@@ -46,7 +46,7 @@ pub struct DispersalFromAdapter<Adapter> {
 impl<Adapter> DaDispersal for DispersalFromAdapter<Adapter>
 where
     Adapter: DispersalNetworkAdapter + Send + Sync,
-    Adapter::SubnetworkId: From<u32> + Send + Sync,
+    Adapter::SubnetworkId: From<u16> + Send + Sync,
 {
     type EncodedData = EncodedData;
     type Error = DynError;
@@ -62,7 +62,7 @@ where
         let reponses_stream = adapter.dispersal_events_stream().await?;
         for (subnetwork_id, blob) in encoded_data_to_da_blobs(encoded_data).enumerate() {
             adapter
-                .disperse((subnetwork_id as u32).into(), blob)
+                .disperse((subnetwork_id as u16).into(), blob)
                 .await?;
         }
 
@@ -88,7 +88,7 @@ impl<NetworkAdapter, MempoolAdapter> DispersalBackend
     for DispersalKZGRSBackend<NetworkAdapter, MempoolAdapter>
 where
     NetworkAdapter: DispersalNetworkAdapter + Send + Sync,
-    NetworkAdapter::SubnetworkId: From<u32> + Send + Sync,
+    NetworkAdapter::SubnetworkId: From<u16> + Send + Sync,
     MempoolAdapter: DaMempoolAdapter<BlobId = BlobId, Metadata = dispersal::Metadata> + Send + Sync,
 {
     type Settings = DispersalKZGRSBackendSettings;

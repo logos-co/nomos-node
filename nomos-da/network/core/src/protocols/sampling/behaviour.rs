@@ -7,7 +7,7 @@ use futures::channel::oneshot;
 use futures::channel::oneshot::{Canceled, Receiver, Sender};
 use futures::future::BoxFuture;
 use futures::stream::{BoxStream, FuturesUnordered};
-use futures::{AsyncWriteExt, FutureExt, StreamExt};
+use futures::{AsyncWriteExt, FutureExt, StreamExt, TryFutureExt};
 use kzgrs_backend::common::blob::DaBlob;
 use kzgrs_backend::common::ColumnIndex;
 use libp2p::core::Endpoint;
@@ -19,9 +19,8 @@ use libp2p::swarm::{
 use libp2p::{Multiaddr, PeerId, Stream};
 use libp2p_stream::{Control, IncomingStreams, OpenStreamError};
 use nomos_core::da::BlobId;
-use nomos_da_messages::sampling::sample_err::SampleErrType;
-use nomos_da_messages::sampling::{sample_res, SampleErr, SampleReq, SampleRes};
-use nomos_da_messages::{common, pack_message, unpack_from_reader};
+use nomos_da_messages::packing::{pack_to_writer, unpack_from_reader};
+use nomos_da_messages::{common, sampling};
 use subnetworks_assignations::MembershipHandler;
 use thiserror::Error;
 use tokio::sync::mpsc;
@@ -45,7 +44,7 @@ pub enum SamplingError {
     Protocol {
         subnetwork_id: SubnetworkId,
         peer_id: PeerId,
-        error: SampleErr,
+        error: sampling::SampleError,
     },
     #[error("Error dialing peer [{peer_id}]: {error}")]
     OpenStream {
@@ -162,12 +161,14 @@ pub struct BehaviourSampleReq {
     pub column_idx: ColumnIndex,
 }
 
-impl TryFrom<SampleReq> for BehaviourSampleReq {
+impl TryFrom<sampling::SampleRequest> for BehaviourSampleReq {
     type Error = Vec<u8>;
 
-    fn try_from(req: SampleReq) -> Result<Self, Self::Error> {
-        let blob_id: BlobId = req.blob_id.try_into()?;
-        let column_idx = req.column_idx as u16; // TODO: This doesn't handle the overflow.
+    fn try_from(req: sampling::SampleRequest) -> Result<Self, Self::Error> {
+        let sampling::SampleRequest {
+            blob_id,
+            column_idx,
+        } = req;
 
         Ok(Self {
             blob_id,
@@ -188,23 +189,19 @@ pub enum BehaviourSampleRes {
     },
 }
 
-impl From<BehaviourSampleRes> for SampleRes {
+impl From<BehaviourSampleRes> for sampling::SampleResponse {
     fn from(res: BehaviourSampleRes) -> Self {
         match res {
-            BehaviourSampleRes::SamplingSuccess { blob, blob_id, .. } => SampleRes {
-                message_type: Some(sample_res::MessageType::Blob(common::Blob {
-                    blob_id: blob_id.to_vec(),
-                    data: bincode::serialize(&blob)
-                        .expect("Blob from service should be serializable"),
-                })),
-            },
-            BehaviourSampleRes::SampleNotFound { blob_id } => SampleRes {
-                message_type: Some(sample_res::MessageType::Err(SampleErr {
-                    blob_id: blob_id.into(),
-                    err_type: SampleErrType::NotFound.into(),
-                    err_description: "Sample not found".to_string(),
-                })),
-            },
+            BehaviourSampleRes::SamplingSuccess { blob, blob_id, .. } => {
+                sampling::SampleResponse::Blob(common::Blob::new(blob_id, *blob))
+            }
+            BehaviourSampleRes::SampleNotFound { blob_id } => {
+                sampling::SampleResponse::Error(sampling::SampleError::new(
+                    blob_id,
+                    sampling::SampleErrorType::NotFound,
+                    "Sample not found",
+                ))
+            }
         }
     }
 }
@@ -238,7 +235,7 @@ struct ResponseChannel {
     response_receiver: Receiver<BehaviourSampleRes>,
 }
 
-type StreamHandlerFutureSuccess = (BlobId, SubnetworkId, SampleRes, SampleStream);
+type StreamHandlerFutureSuccess = (BlobId, SubnetworkId, sampling::SampleResponse, SampleStream);
 type OutgoingStreamHandlerFuture =
     BoxFuture<'static, Result<StreamHandlerFutureSuccess, SamplingError>>;
 type IncomingStreamHandlerFuture = BoxFuture<'static, Result<SampleStream, SamplingError>>;
@@ -333,40 +330,24 @@ where
     /// Writes the request to the stream and waits for a response
     async fn stream_sample(
         mut stream: SampleStream,
-        message: SampleReq,
+        message: sampling::SampleRequest,
         subnetwork_id: SubnetworkId,
         blob_id: BlobId,
     ) -> Result<StreamHandlerFutureSuccess, SamplingError> {
-        let bytes = pack_message(&message).map_err(|error| SamplingError::Io {
-            peer_id: stream.peer_id,
-            error,
-        })?;
-        stream
-            .stream
-            .write_all(&bytes)
-            .await
-            .map_err(|error| SamplingError::Io {
+        let into_sampling_error = |error: std::io::Error| -> SamplingError {
+            SamplingError::Io {
                 peer_id: stream.peer_id,
                 error,
-            })?;
-        stream
-            .stream
-            .flush()
+            }
+        };
+        pack_to_writer(&message, &mut stream.stream)
+            .map_err(into_sampling_error)
+            .await?;
+        stream.stream.flush().await.map_err(into_sampling_error)?;
+        let response: sampling::SampleResponse = unpack_from_reader(&mut stream.stream)
             .await
-            .map_err(|error| SamplingError::Io {
-                peer_id: stream.peer_id,
-                error,
-            })?;
-        let response: SampleRes =
-            unpack_from_reader(&mut stream.stream)
-                .await
-                .map_err(|error| SamplingError::Io {
-                    peer_id: stream.peer_id,
-                    error,
-                })?;
-        // Safety: blob_id should always be a 32bytes hash, currently is abstracted into a `Vec<u8>`
-        // but probably we should have a `[u8; 32]` wrapped in a custom type `BlobId`
-        // TODO: use blob_id when changing types to [u8; 32]
+            .map_err(into_sampling_error)?;
+        // Safety: blob_id should always be a 32bytes hash
         Ok((blob_id, subnetwork_id, response, stream))
     }
 
@@ -389,12 +370,10 @@ where
         mut stream: SampleStream,
     ) {
         let peer = stream.peer_id;
+
         // If there is a pending task schedule next one
         if let Some((subnetwork_id, blob_id)) = Self::next_request(&peer, to_sample) {
-            let sample_request = SampleReq {
-                blob_id: blob_id.to_vec(),
-                column_idx: subnetwork_id,
-            };
+            let sample_request = sampling::SampleRequest::new(blob_id, subnetwork_id);
             outgoing_tasks
                 .push(Self::stream_sample(stream, sample_request, subnetwork_id, blob_id).boxed());
         // if not pop stream from connected ones
@@ -414,7 +393,7 @@ where
         mut stream: SampleStream,
         channel: ResponseChannel,
     ) -> Result<SampleStream, SamplingError> {
-        let request: SampleReq = unpack_from_reader(&mut stream.stream)
+        let request: sampling::SampleRequest = unpack_from_reader(&mut stream.stream)
             .await
             .map_err(|error| SamplingError::Io {
                 peer_id: stream.peer_id,
@@ -433,7 +412,7 @@ where
                 request,
                 peer_id: stream.peer_id,
             })?;
-        let response: SampleRes = channel
+        let response: sampling::SampleResponse = channel
             .response_receiver
             .await
             .map_err(|error| SamplingError::ResponseChannel {
@@ -441,18 +420,12 @@ where
                 peer_id: stream.peer_id,
             })?
             .into();
-        let bytes = pack_message(&response).map_err(|error| SamplingError::Io {
-            peer_id: stream.peer_id,
-            error,
-        })?;
-        stream
-            .stream
-            .write_all(&bytes)
-            .await
+        pack_to_writer(&response, &mut stream.stream)
             .map_err(|error| SamplingError::Io {
                 peer_id: stream.peer_id,
                 error,
-            })?;
+            })
+            .await?;
         stream
             .stream
             .flush()
@@ -516,10 +489,7 @@ impl<Membership: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'sta
         } else {
             connected_peers.insert(peer);
             let control = control.clone();
-            let sample_request = SampleReq {
-                blob_id: blob_id.to_vec(),
-                column_idx: subnetwork_id,
-            };
+            let sample_request = sampling::SampleRequest::new(blob_id, subnetwork_id);
             let with_dial_task: OutgoingStreamHandlerFuture = async move {
                 let stream = Self::open_stream(peer, control).await?;
                 Self::stream_sample(stream, sample_request, subnetwork_id, blob_id).await
@@ -533,13 +503,11 @@ impl<Membership: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'sta
     fn handle_sample_response(
         blob_id: BlobId,
         subnetwork_id: SubnetworkId,
-        sample_response: SampleRes,
+        sample_response: sampling::SampleResponse,
         peer_id: PeerId,
     ) -> Option<Poll<ToSwarm<<Self as NetworkBehaviour>::ToSwarm, THandlerInEvent<Self>>>> {
         match sample_response {
-            SampleRes {
-                message_type: Some(sample_res::MessageType::Err(error)),
-            } => Some(Poll::Ready(ToSwarm::GenerateEvent(
+            sampling::SampleResponse::Error(error) => Some(Poll::Ready(ToSwarm::GenerateEvent(
                 SamplingEvent::SamplingError {
                     error: SamplingError::Protocol {
                         subnetwork_id,
@@ -548,35 +516,13 @@ impl<Membership: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'sta
                     },
                 },
             ))),
-            SampleRes {
-                message_type: Some(sample_res::MessageType::Blob(da_blob)),
-            } => {
-                let blob =
-                    bincode::deserialize::<DaBlob>(da_blob.data.as_slice()).map_err(|error| {
-                        SamplingError::Deserialize {
-                            blob_id,
-                            subnetwork_id,
-                            peer_id,
-                            error,
-                        }
-                    });
-                match blob {
-                    Ok(blob) => Some(Poll::Ready(ToSwarm::GenerateEvent(
-                        SamplingEvent::SamplingSuccess {
-                            blob_id,
-                            subnetwork_id,
-                            blob: Box::new(blob),
-                        },
-                    ))),
-                    Err(error) => Some(Poll::Ready(ToSwarm::GenerateEvent(
-                        SamplingEvent::SamplingError { error },
-                    ))),
-                }
-            }
-            _ => {
-                error!("Invalid sampling response received, empty body");
-                None
-            }
+            sampling::SampleResponse::Blob(blob) => Some(Poll::Ready(ToSwarm::GenerateEvent(
+                SamplingEvent::SamplingSuccess {
+                    blob_id,
+                    subnetwork_id,
+                    blob: Box::new(blob.data),
+                },
+            ))),
         }
     }
 }

@@ -5,7 +5,7 @@ use std::task::{Context, Poll};
 use either::Either;
 use futures::future::BoxFuture;
 use futures::stream::{BoxStream, FuturesUnordered};
-use futures::{AsyncWriteExt, FutureExt, StreamExt};
+use futures::{AsyncWriteExt, FutureExt, StreamExt, TryFutureExt};
 use libp2p::core::Endpoint;
 use libp2p::swarm::behaviour::{ConnectionClosed, ConnectionEstablished};
 use libp2p::swarm::dial_opts::DialOpts;
@@ -30,9 +30,8 @@ use crate::SubnetworkId;
 use kzgrs_backend::common::blob::DaBlob;
 use nomos_core::da::BlobId;
 use nomos_da_messages::common::Blob;
-use nomos_da_messages::dispersal::dispersal_res::MessageType;
-use nomos_da_messages::dispersal::{DispersalErr, DispersalReq, DispersalRes};
-use nomos_da_messages::{pack_message, unpack_from_reader};
+use nomos_da_messages::dispersal;
+use nomos_da_messages::packing::{pack_to_writer, unpack_from_reader};
 use subnetworks_assignations::MembershipHandler;
 
 #[derive(Debug, Error)]
@@ -52,7 +51,7 @@ pub enum DispersalError {
     #[error("Dispersal response error: {error:?}")]
     Protocol {
         subnetwork_id: SubnetworkId,
-        error: DispersalErr,
+        error: dispersal::DispersalError,
     },
     #[error("Error dialing peer [{peer_id}]: {error}")]
     OpenStreamError {
@@ -67,9 +66,9 @@ impl DispersalError {
             DispersalError::Io { blob_id, .. } => Some(*blob_id),
             DispersalError::Serialization { blob_id, .. } => Some(*blob_id),
             DispersalError::Protocol {
-                error: DispersalErr { blob_id, .. },
+                error: dispersal::DispersalError { blob_id, .. },
                 ..
-            } => Some(blob_id.clone().try_into().unwrap()),
+            } => Some(*blob_id),
             DispersalError::OpenStreamError { .. } => None,
         }
     }
@@ -147,7 +146,12 @@ struct DispersalStream {
     peer_id: PeerId,
 }
 
-type StreamHandlerFutureSuccess = (BlobId, SubnetworkId, DispersalRes, DispersalStream);
+type StreamHandlerFutureSuccess = (
+    BlobId,
+    SubnetworkId,
+    dispersal::DispersalResponse,
+    DispersalStream,
+);
 type StreamHandlerFuture = BoxFuture<'static, Result<StreamHandlerFutureSuccess, DispersalError>>;
 
 /// Executor dispersal protocol
@@ -260,52 +264,33 @@ where
         subnetwork_id: SubnetworkId,
     ) -> Result<StreamHandlerFutureSuccess, DispersalError> {
         let blob_id = message.id();
-        let blob = bincode::serialize(&message).map_err(|error| DispersalError::Serialization {
-            error,
-            blob_id: blob_id.clone().try_into().unwrap(),
-            subnetwork_id,
-        })?;
-        let message = DispersalReq {
-            blob: Some(Blob {
-                blob_id: blob_id.clone(),
-                data: blob,
-            }),
-            subnetwork_id,
-        };
-        stream
-            .stream
-            .write_all(&pack_message(&message).map_err(|error| DispersalError::Io {
-                error,
-                blob_id: blob_id.clone().try_into().unwrap(),
-                subnetwork_id,
-            })?)
-            .await
+        let blob_id: BlobId = blob_id.clone().try_into().unwrap();
+        let message = dispersal::DispersalRequest::new(Blob::new(blob_id, message), subnetwork_id);
+        pack_to_writer(&message, &mut stream.stream)
             .map_err(|error| DispersalError::Io {
                 error,
-                blob_id: blob_id.clone().try_into().unwrap(),
+                blob_id,
                 subnetwork_id,
-            })?;
+            })
+            .await?;
         stream
             .stream
             .flush()
             .await
             .map_err(|error| DispersalError::Io {
                 error,
-                blob_id: blob_id.clone().try_into().unwrap(),
+                blob_id,
                 subnetwork_id,
             })?;
-        let response: DispersalRes =
-            unpack_from_reader(&mut stream.stream)
-                .await
-                .map_err(|error| DispersalError::Io {
-                    error,
-                    blob_id: blob_id.clone().try_into().unwrap(),
-                    subnetwork_id,
-                })?;
-        // Safety: blob_id should always be a 32bytes hash, currently is abstracted into a `Vec<u8>`
-        // but probably we should have a `[u8; 32]` wrapped in a custom type `BlobId`
-        // TODO: use blob_id when changing types to [u8; 32]
-        Ok((blob_id.try_into().unwrap(), subnetwork_id, response, stream))
+        let response: dispersal::DispersalResponse = unpack_from_reader(&mut stream.stream)
+            .await
+            .map_err(|error| DispersalError::Io {
+            error,
+            blob_id,
+            subnetwork_id,
+        })?;
+        // Safety: blob_id should always be a 32bytes hash
+        Ok((blob_id, subnetwork_id, response, stream))
     }
 
     /// Run when a stream gets free, if there is a pending task for the stream it will get scheduled to run
@@ -571,10 +556,7 @@ impl<M: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'static> Netw
                     // handle the free stream then return the success
                     Self::handle_stream(tasks, to_disperse, idle_streams, stream);
                     // return an error if there was an error on the other side of the wire
-                    if let DispersalRes {
-                        message_type: Some(MessageType::Err(error)),
-                    } = dispersal_response
-                    {
+                    if let dispersal::DispersalResponse::Error(error) = dispersal_response {
                         return Poll::Ready(ToSwarm::GenerateEvent(
                             DispersalExecutorEvent::DispersalError {
                                 error: DispersalError::Protocol {
