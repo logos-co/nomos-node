@@ -19,6 +19,7 @@ use libp2p::swarm::{
 use libp2p::{Multiaddr, PeerId, Stream};
 use libp2p_stream::{Control, IncomingStreams, OpenStreamError};
 use nomos_core::da::BlobId;
+use nomos_core::wire;
 use nomos_da_messages::packing::{pack_to_writer, unpack_from_reader};
 use nomos_da_messages::{common, sampling};
 use subnetworks_assignations::MembershipHandler;
@@ -56,7 +57,7 @@ pub enum SamplingError {
         blob_id: BlobId,
         subnetwork_id: SubnetworkId,
         peer_id: PeerId,
-        error: bincode::Error,
+        error: wire::Error,
     },
     #[error("Error sending request: {request:?}")]
     RequestChannel {
