@@ -10,10 +10,11 @@ use kzgrs::{
     bytes_to_polynomial, commit_polynomial, encode, Commitment, Evaluations, GlobalParameters,
     KzgRsError, Polynomial, PolynomialEvaluationDomain, Proof, BYTES_PER_FIELD_ELEMENT,
 };
+
 #[cfg(feature = "parallel")]
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
-
 // internal
+use crate::common::blob::DaBlob;
 use crate::common::{hash_column_and_commitment, Chunk, ChunksMatrix, Row};
 use crate::global::GLOBAL_PARAMETERS;
 
@@ -55,6 +56,65 @@ pub struct EncodedData {
     pub column_commitments: Vec<Commitment>,
     pub aggregated_column_commitment: Commitment,
     pub aggregated_column_proofs: Vec<Proof>,
+
+    /// Iterator State
+    current_column_idx: Option<usize>,
+}
+
+impl EncodedData {
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        data: Vec<u8>,
+        chunked_data: ChunksMatrix,
+        extended_data: ChunksMatrix,
+        row_commitments: Vec<Commitment>,
+        rows_proofs: Vec<Vec<Proof>>,
+        column_commitments: Vec<Commitment>,
+        aggregated_column_commitment: Commitment,
+        aggregated_column_proofs: Vec<Proof>,
+    ) -> Self {
+        Self {
+            data,
+            chunked_data,
+            extended_data,
+            row_commitments,
+            rows_proofs,
+            column_commitments,
+            aggregated_column_commitment,
+            aggregated_column_proofs,
+            current_column_idx: None,
+        }
+    }
+}
+
+impl Iterator for EncodedData {
+    type Item = DaBlob;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let next_index = self
+            .current_column_idx
+            .as_ref()
+            .map_or(0, |index| index + 1);
+        let next_column = self.extended_data.columns().nth(next_index)?;
+
+        let da_blob = DaBlob {
+            column: next_column,
+            column_idx: next_index.try_into().unwrap(),
+            column_commitment: self.column_commitments[next_index],
+            aggregated_column_commitment: self.aggregated_column_commitment,
+            aggregated_column_proof: self.aggregated_column_proofs[next_index],
+            rows_commitments: self.row_commitments.clone(),
+            rows_proofs: self
+                .rows_proofs
+                .iter()
+                .map(|proofs| proofs.get(next_index).cloned().unwrap())
+                .collect(),
+        };
+
+        // Update the current column index and return the DaBlob
+        self.current_column_idx = Some(next_index);
+        Some(da_blob)
+    }
 }
 
 pub struct DaEncoder {
@@ -261,8 +321,8 @@ impl nomos_core::da::DaEncoder for DaEncoder {
             &aggregated_polynomial,
             self.params.toeplitz1cache.as_ref(),
         )?;
-        Ok(EncodedData {
-            data: data.to_vec(),
+        Ok(EncodedData::new(
+            data.to_vec(),
             chunked_data,
             extended_data,
             row_commitments,
@@ -270,7 +330,7 @@ impl nomos_core::da::DaEncoder for DaEncoder {
             column_commitments,
             aggregated_column_commitment,
             aggregated_column_proofs,
-        })
+        ))
     }
 }
 
@@ -506,5 +566,18 @@ pub mod test {
                 ));
             }
         }
+    }
+
+    #[test]
+    fn test_encoded_data_iterator() {
+        let encoder = &ENCODER;
+        let data = vec![
+            49u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8,
+            0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8,
+        ];
+        let encoded_data = encoder.encode(&data).unwrap();
+
+        let blobs: Vec<_> = encoded_data.into_iter().collect();
+        assert_eq!(blobs.len(), 16);
     }
 }
