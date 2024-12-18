@@ -15,6 +15,7 @@ pub use nomos_blend_service::backends::libp2p::Libp2pBlendBackend as BlendBacken
 pub use nomos_blend_service::network::libp2p::Libp2pAdapter as BlendNetworkAdapter;
 pub use nomos_blend_service::BlendService;
 pub use nomos_core::da::blob::info::DispersedBlobInfo;
+use nomos_core::wire_errors;
 pub use nomos_core::{
     da::blob::select::FillSize as FillSizeWithBlobs, tx::select::FillSize as FillSizeWithTx,
 };
@@ -184,7 +185,7 @@ pub struct Nomos {
 pub struct Wire;
 
 impl StorageSerde for Wire {
-    type Error = wire::Error;
+    type Error = wire_errors::Error;
 
     fn serialize<T: Serialize>(value: T) -> Bytes {
         wire::serialize(&value).unwrap().into()
