@@ -5,6 +5,7 @@ members = [
     "nomos-da/full-replication",
     "nomos-da/kzgrs",
     "nomos-da/kzgrs-backend",
+    "nomos-da/kzgrs-backend-testutils",
     "nomos-da/storage",
     "nomos-da/network/core",
     "nomos-da/network/messages",

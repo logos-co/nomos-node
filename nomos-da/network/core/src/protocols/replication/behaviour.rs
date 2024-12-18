@@ -243,51 +243,13 @@ where
 mod tests {
     use super::*;
     use futures::task::{waker_ref, ArcWake};
-    use kzgrs_backend::common::blob::DaBlob;
-    use kzgrs_backend::encoder;
-    use kzgrs_backend::encoder::DaEncoderParams;
+    use kzgrs_backend_testutils::get_da_blob;
     use libp2p::{identity, PeerId};
-    use nomos_core::da::{BlobId, DaEncoder};
+    use nomos_core::da::BlobId;
     use nomos_da_messages::common::Blob;
     use std::collections::HashSet;
     use std::sync::Arc;
     use std::task::{Context, Poll};
-
-    fn get_encoder() -> encoder::DaEncoder {
-        const DOMAIN_SIZE: usize = 16;
-        let params = DaEncoderParams::default_with(DOMAIN_SIZE);
-        encoder::DaEncoder::new(params)
-    }
-
-    fn get_da_blob() -> DaBlob {
-        let encoder = get_encoder();
-        let data = vec![
-            49u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8,
-            0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8,
-        ];
-
-        let encoded_data = encoder.encode(&data).unwrap();
-        let columns: Vec<_> = encoded_data.extended_data.columns().collect();
-
-        let index = 0;
-        let da_blob = DaBlob {
-            column: columns[index].clone(),
-            column_idx: index
-                .try_into()
-                .expect("Column index shouldn't overflow the target type"),
-            column_commitment: encoded_data.column_commitments[index],
-            aggregated_column_commitment: encoded_data.aggregated_column_commitment,
-            aggregated_column_proof: encoded_data.aggregated_column_proofs[index],
-            rows_commitments: encoded_data.row_commitments.clone(),
-            rows_proofs: encoded_data
-                .rows_proofs
-                .iter()
-                .map(|proofs| proofs.get(index).cloned().unwrap())
-                .collect(),
-        };
-
-        da_blob
-    }
 
     #[derive(Clone, Debug)]
     struct MockMembershipHandler {
@@ -302,6 +264,10 @@ mod tests {
             self.membership.get(peer_id).cloned().unwrap_or_default()
         }
 
+        fn is_allowed(&self, _id: &Self::Id) -> bool {
+            unimplemented!()
+        }
+
         fn members_of(&self, subnetwork: &Self::NetworkId) -> HashSet<Self::Id> {
             self.membership
                 .iter()
@@ -313,10 +279,6 @@ mod tests {
                     }
                 })
                 .collect()
-        }
-
-        fn is_allowed(&self, _id: &Self::Id) -> bool {
-            unimplemented!()
         }
 
         fn members(&self) -> HashSet<Self::Id> {
@@ -434,7 +396,7 @@ mod tests {
         }
 
         // Simulate sending a message from the first behavior.
-        let message = DaMessage::new(Blob::new(BlobId::from([0; 32]), get_da_blob()), 0);
+        let message = DaMessage::new(Blob::new(BlobId::from([0; 32]), get_da_blob(None)), 0);
         all_behaviours[0].replicate_message(message.clone());
 
         let waker = Arc::new(TestWaker);

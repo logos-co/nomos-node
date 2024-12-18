@@ -7,57 +7,16 @@ mod test {
     use crate::protocols::replication::handler::DaMessage;
     use crate::test_utils::AllNeighbours;
     use futures::StreamExt;
-    use kzgrs_backend::common::blob::DaBlob;
-    use kzgrs_backend::encoder;
-    use kzgrs_backend::encoder::DaEncoderParams;
+    use kzgrs_backend_testutils::get_da_blob;
     use libp2p::identity::Keypair;
     use libp2p::swarm::SwarmEvent;
     use libp2p::{quic, Multiaddr, PeerId, Swarm};
     use log::info;
-    use nomos_core::da::{BlobId, DaEncoder};
+    use nomos_core::da::BlobId;
     use nomos_da_messages::common::Blob;
     use std::time::Duration;
     use tracing_subscriber::fmt::TestWriter;
     use tracing_subscriber::EnvFilter;
-
-    fn get_encoder() -> encoder::DaEncoder {
-        const DOMAIN_SIZE: usize = 16;
-        let params = DaEncoderParams::default_with(DOMAIN_SIZE);
-        encoder::DaEncoder::new(params)
-    }
-
-    fn get_da_blob(data: Option<Vec<u8>>) -> DaBlob {
-        let encoder = get_encoder();
-
-        let data = data.unwrap_or_else(|| {
-            vec![
-                49u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8,
-                0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8,
-            ]
-        });
-
-        let encoded_data = encoder.encode(&data).unwrap();
-        let columns: Vec<_> = encoded_data.extended_data.columns().collect();
-
-        let index = 0;
-        let da_blob = DaBlob {
-            column: columns[index].clone(),
-            column_idx: index
-                .try_into()
-                .expect("Column index shouldn't overflow the target type"),
-            column_commitment: encoded_data.column_commitments[index],
-            aggregated_column_commitment: encoded_data.aggregated_column_commitment,
-            aggregated_column_proof: encoded_data.aggregated_column_proofs[index],
-            rows_commitments: encoded_data.row_commitments.clone(),
-            rows_proofs: encoded_data
-                .rows_proofs
-                .iter()
-                .map(|proofs| proofs.get(index).cloned().unwrap())
-                .collect(),
-        };
-
-        da_blob
-    }
 
     #[tokio::test]
     async fn test_connects_and_receives_replication_messages() {
