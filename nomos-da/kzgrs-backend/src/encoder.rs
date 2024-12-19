@@ -1,6 +1,5 @@
 // std
 use std::ops::Div;
-
 // crates
 use ark_ff::{BigInteger, PrimeField};
 use ark_poly::EvaluationDomain;
@@ -56,9 +55,6 @@ pub struct EncodedData {
     pub column_commitments: Vec<Commitment>,
     pub aggregated_column_commitment: Commitment,
     pub aggregated_column_proofs: Vec<Proof>,
-
-    /// Iterator State
-    current_column_idx: Option<usize>,
 }
 
 impl EncodedData {
@@ -82,38 +78,74 @@ impl EncodedData {
             column_commitments,
             aggregated_column_commitment,
             aggregated_column_proofs,
-            current_column_idx: None,
         }
     }
-}
 
-impl Iterator for EncodedData {
-    type Item = DaBlob;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        let next_index = self
-            .current_column_idx
-            .as_ref()
-            .map_or(0, |index| index + 1);
-        let next_column = self.extended_data.columns().nth(next_index)?;
-
-        let da_blob = DaBlob {
-            column: next_column,
-            column_idx: next_index.try_into().unwrap(),
-            column_commitment: self.column_commitments[next_index],
+    /// Returns a `DaBlob` for the given index.
+    /// If the index is out of bounds, returns `None`.
+    pub fn to_da_blob(&self, index: usize) -> Option<DaBlob> {
+        let column = self.extended_data.columns().nth(index)?;
+        Some(DaBlob {
+            column,
+            column_idx: index.try_into().unwrap(),
+            column_commitment: self.column_commitments[index],
             aggregated_column_commitment: self.aggregated_column_commitment,
-            aggregated_column_proof: self.aggregated_column_proofs[next_index],
+            aggregated_column_proof: self.aggregated_column_proofs[index],
             rows_commitments: self.row_commitments.clone(),
             rows_proofs: self
                 .rows_proofs
                 .iter()
-                .map(|proofs| proofs.get(next_index).cloned().unwrap())
+                .map(|proofs| proofs.get(index).cloned().unwrap())
                 .collect(),
-        };
+        })
+    }
+}
 
-        // Update the current column index and return the DaBlob
-        self.current_column_idx = Some(next_index);
-        Some(da_blob)
+impl<'a> IntoIterator for &'a EncodedData {
+    type Item = DaBlob;
+    type IntoIter = EncodedDataIterator<'a>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        EncodedDataIterator::new(self)
+    }
+}
+
+pub struct OwnedEncodedDataIterator {
+    encoded_data: EncodedData,
+    next_index: usize,
+}
+
+impl Iterator for OwnedEncodedDataIterator {
+    type Item = DaBlob;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let next_da_blob = self.encoded_data.to_da_blob(self.next_index)?;
+        self.next_index += 1;
+        Some(next_da_blob)
+    }
+}
+
+pub struct EncodedDataIterator<'a> {
+    encoded_data: &'a EncodedData,
+    next_index: usize,
+}
+
+impl<'a> EncodedDataIterator<'a> {
+    pub fn new(encoded_data: &'a EncodedData) -> Self {
+        Self {
+            encoded_data,
+            next_index: 0,
+        }
+    }
+}
+
+impl Iterator for EncodedDataIterator<'_> {
+    type Item = DaBlob;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let next_da_blob = self.encoded_data.to_da_blob(self.next_index)?;
+        self.next_index += 1;
+        Some(next_da_blob)
     }
 }
 
@@ -576,6 +608,9 @@ pub mod test {
             0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8,
         ];
         let encoded_data = encoder.encode(&data).unwrap();
+
+        let blobs: Vec<_> = (&encoded_data).into_iter().collect();
+        assert_eq!(blobs.len(), 16);
 
         let blobs: Vec<_> = encoded_data.into_iter().collect();
         assert_eq!(blobs.len(), 16);
