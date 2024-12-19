@@ -1,7 +1,5 @@
 pub mod error;
 
-use std::u8;
-
 use error::Error;
 
 use crate::BlendMessage;
