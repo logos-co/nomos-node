@@ -56,7 +56,7 @@ where
     M::PrivateKey: Serialize + DeserializeOwned,
     M::PublicKey: Clone + PartialEq,
     M::Error: Debug,
-    Scheduler: Stream<Item = ()> + Unpin + Send + Sync + 'static,
+    Scheduler: Stream<Item = String> + Unpin + Send + Sync + 'static,
 {
     pub fn new(
         input_stream: S,
@@ -128,7 +128,7 @@ where
     M::PrivateKey: Serialize + DeserializeOwned + Unpin,
     M::PublicKey: Clone + PartialEq + Unpin,
     M::Error: Debug,
-    Scheduler: Stream<Item = ()> + Unpin + Send + Sync + 'static,
+    Scheduler: Stream<Item = String> + Unpin + Send + Sync + 'static,
 {
     type Item = BlendOutgoingMessage;
 
@@ -147,7 +147,7 @@ where
     M::PrivateKey: Serialize + DeserializeOwned,
     M::PublicKey: Clone + PartialEq,
     M::Error: Debug,
-    Scheduler: Stream<Item = ()> + Unpin + Send + Sync + 'static,
+    Scheduler: Stream<Item = String> + Unpin + Send + Sync + 'static,
 {
     fn blend(
         self,
@@ -177,6 +177,6 @@ where
     M::PrivateKey: Clone + Serialize + DeserializeOwned + PartialEq,
     M::PublicKey: Clone + Serialize + DeserializeOwned + PartialEq,
     M::Error: Debug,
-    S: Stream<Item = ()> + Unpin + Send + Sync + 'static,
+    S: Stream<Item = String> + Unpin + Send + Sync + 'static,
 {
 }

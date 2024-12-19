@@ -64,7 +64,7 @@ impl<Rng> Stream for TemporalScheduler<Rng>
 where
     Rng: RngCore + Unpin,
 {
-    type Item = ();
+    type Item = String;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         // Check whether it's time to run a new lottery to determine the delay.
@@ -78,7 +78,7 @@ where
         if let Some(timer) = self.release_timer.as_mut() {
             if timer.as_mut().poll(cx).is_ready() {
                 self.release_timer.take(); // Reset timer after it's done
-                return Poll::Ready(Some(()));
+                return Poll::Ready(Some("delay test".to_string()));
             }
         }
         Poll::Pending
@@ -116,17 +116,17 @@ impl<M, S> TemporalProcessor<M, S> {
 impl<M, S> Stream for TemporalProcessor<M, S>
 where
     M: Unpin,
-    S: Stream<Item = ()> + Unpin,
+    S: Stream<Item = String> + Unpin,
 {
     type Item = M;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        if self.scheduler.poll_next_unpin(cx).is_ready() {
+        if let Poll::Ready(Some(delay)) = self.scheduler.poll_next_unpin(cx) {
             if let Some(msg) = self.queue.pop_front() {
-                tracing::info!("PoppedFromTemporalQueue");
+                tracing::info!("PoppedFromTemporalQueue: {}", delay);
                 return Poll::Ready(Some(msg));
             } else {
-                tracing::info!("TemporalQueueIsEmpty");
+                tracing::info!("TemporalQueueIsEmpty {}", delay);
             }
         };
         Poll::Pending
@@ -136,7 +136,7 @@ where
 pub struct TemporalStream<WrappedStream, Scheduler>
 where
     WrappedStream: Stream,
-    Scheduler: Stream<Item = ()>,
+    Scheduler: Stream<Item = String>,
 {
     processor: TemporalProcessor<WrappedStream::Item, Scheduler>,
     wrapped_stream: WrappedStream,
@@ -146,7 +146,7 @@ impl<WrappedStream, Scheduler> Stream for TemporalStream<WrappedStream, Schedule
 where
     WrappedStream: Stream + Unpin,
     WrappedStream::Item: Unpin,
-    Scheduler: Stream<Item = ()> + Unpin,
+    Scheduler: Stream<Item = String> + Unpin,
 {
     type Item = WrappedStream::Item;
 
@@ -159,7 +159,7 @@ where
 }
 pub trait TemporalProcessorExt<Scheduler>: Stream
 where
-    Scheduler: Stream<Item = ()>,
+    Scheduler: Stream<Item = String>,
 {
     fn temporal_stream(self, scheduler: Scheduler) -> TemporalStream<Self, Scheduler>
     where
@@ -175,6 +175,6 @@ where
 impl<T, S> TemporalProcessorExt<S> for T
 where
     T: Stream,
-    S: Stream<Item = ()>,
+    S: Stream<Item = String>,
 {
 }
