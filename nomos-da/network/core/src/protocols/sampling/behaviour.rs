@@ -31,7 +31,6 @@ use tracing::error;
 // internal
 use crate::address_book::AddressBook;
 use crate::protocol::SAMPLING_PROTOCOL;
-use crate::protocols::clone_deserialize_error;
 use crate::SubnetworkId;
 
 #[derive(Debug, Error)]
@@ -134,7 +133,7 @@ impl Clone for SamplingError {
                 blob_id: *blob_id,
                 subnetwork_id: *subnetwork_id,
                 peer_id: *peer_id,
-                error: clone_deserialize_error(error),
+                error: error.clone(),
             },
             SamplingError::RequestChannel { request, peer_id } => SamplingError::RequestChannel {
                 request: request.clone(),

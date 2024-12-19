@@ -12,20 +12,6 @@ type LenType = u16;
 const MAX_MSG_LEN_BYTES: usize = size_of::<LenType>();
 const MAX_MSG_LEN: usize = 1 << (MAX_MSG_LEN_BYTES * 8);
 
-fn into_failed_to_serialize(error: wire::Error) -> io::Error {
-    io::Error::new(
-        io::ErrorKind::InvalidData,
-        format!("Failed to serialize message: {}", error),
-    )
-}
-
-fn into_failed_to_deserialize(error: wire::Error) -> io::Error {
-    io::Error::new(
-        io::ErrorKind::InvalidData,
-        format!("Failed to deserialize message: {}", error),
-    )
-}
-
 struct MessageTooLargeError(usize);
 
 impl From<MessageTooLargeError> for io::Error {
@@ -44,7 +30,7 @@ pub fn pack<Message>(message: &Message) -> Result<Vec<u8>>
 where
     Message: Serialize,
 {
-    wire::serialize(message).map_err(into_failed_to_serialize)
+    wire::serialize(message).map_err(io::Error::from)
 }
 
 fn get_packed_message_size(packed_message: &[u8]) -> Result<usize> {
@@ -84,7 +70,7 @@ where
 }
 
 pub fn unpack<M: DeserializeOwned>(data: &[u8]) -> Result<M> {
-    wire::deserialize(data).map_err(into_failed_to_deserialize)
+    wire::deserialize(data).map_err(io::Error::from)
 }
 
 pub async fn unpack_from_reader<Message, R>(reader: &mut R) -> Result<Message>
