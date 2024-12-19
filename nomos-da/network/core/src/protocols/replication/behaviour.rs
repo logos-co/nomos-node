@@ -243,7 +243,7 @@ where
 mod tests {
     use super::*;
     use futures::task::{waker_ref, ArcWake};
-    use kzgrs_backend_testutils::get_da_blob;
+    use kzgrs_backend::testutils::get_da_blob;
     use libp2p::{identity, PeerId};
     use nomos_core::da::BlobId;
     use nomos_da_messages::common::Blob;

@@ -1,18 +1,11 @@
 // STD
 // Crates
-use kzgrs_backend::common::blob::DaBlob;
-use kzgrs_backend::encoder;
 use nomos_core::da::DaEncoder;
 // Internal
+use crate::common::blob::DaBlob;
+use crate::testutils::encoder::get_encoder;
 
-const ENCODER_DOMAIN_SIZE: usize = 16;
-
-pub fn get_encoder() -> encoder::DaEncoder {
-    let params = encoder::DaEncoderParams::default_with(ENCODER_DOMAIN_SIZE);
-    encoder::DaEncoder::new(params)
-}
-
-fn get_default_da_blob_data() -> Vec<u8> {
+pub fn get_default_da_blob_data() -> Vec<u8> {
     vec![
         49u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8,
         0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8,

@@ -104,7 +104,7 @@ mod tests {
     use crate::common::Blob;
     use crate::dispersal::{DispersalError, DispersalErrorType, DispersalRequest};
     use futures::io::BufReader;
-    use kzgrs_backend_testutils::get_da_blob;
+    use kzgrs_backend::testutils::get_da_blob;
     use nomos_core::da::BlobId;
 
     #[tokio::test]

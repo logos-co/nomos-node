@@ -1,8 +1,0 @@
-[package]
-name = "kzgrs-backend-testutils"
-version = "0.1.0"
-edition = "2021"
-
-[dependencies]
-kzgrs-backend = { path = "../kzgrs-backend" }
-nomos-core = { path = "../../nomos-core/chain-defs" }

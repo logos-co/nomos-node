@@ -12,4 +12,4 @@ tokio = "1"
 
 [dev-dependencies]
 tokio = { version = "1", features = ["macros"] }
-kzgrs-backend-testutils = { path = "../../kzgrs-backend-testutils" }
+kzgrs-backend = { path = "../../kzgrs-backend", features = ["testutils"] }

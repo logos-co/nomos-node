@@ -7,7 +7,8 @@ mod test {
     use crate::protocols::replication::handler::DaMessage;
     use crate::test_utils::AllNeighbours;
     use futures::StreamExt;
-    use kzgrs_backend_testutils::get_da_blob;
+
+    use kzgrs_backend::testutils::get_da_blob;
     use libp2p::identity::Keypair;
     use libp2p::swarm::SwarmEvent;
     use libp2p::{quic, Multiaddr, PeerId, Swarm};
