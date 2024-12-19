@@ -34,6 +34,7 @@ parallel = [
     "rayon",
     "kzgrs/parallel"
 ]
+testutils = []
 
 [[bench]]
 name = "encoder"
