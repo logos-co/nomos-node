@@ -12,6 +12,7 @@ const PAYLOAD_PADDING_SEPARATOR_SIZE: usize = 1;
 const MAX_LAYERS: usize = 5;
 pub const MESSAGE_SIZE: usize =
     NODE_ID_SIZE * MAX_LAYERS + MAX_PAYLOAD_SIZE + PAYLOAD_PADDING_SEPARATOR_SIZE;
+const DUMMY_NODE_ID: [u8; NODE_ID_SIZE] = [u8::MAX; NODE_ID_SIZE];
 
 /// A mock implementation of the Sphinx encoding.
 #[derive(Clone, Debug)]
@@ -42,11 +43,14 @@ impl BlendMessage for MockBlendMessage {
 
         let mut message: Vec<u8> = Vec::with_capacity(MESSAGE_SIZE);
 
-        node_ids.iter().for_each(|node_id| {
+        for node_id in node_ids {
+            if node_id == &DUMMY_NODE_ID {
+                return Err(Error::InvalidPublicKey);
+            }
             message.extend(node_id);
-        });
-        // If there is any remaining layers, fill them with zeros.
-        (0..MAX_LAYERS - node_ids.len()).for_each(|_| message.extend(&[0; NODE_ID_SIZE]));
+        }
+        // If there is any remaining layers, fill them with [`DUMMY_NODE_ID`].
+        (0..MAX_LAYERS - node_ids.len()).for_each(|_| message.extend(&DUMMY_NODE_ID));
 
         // Append payload with padding
         message.extend(payload);
@@ -70,7 +74,7 @@ impl BlendMessage for MockBlendMessage {
         }
 
         // If this is the last layer
-        if message[NODE_ID_SIZE..NODE_ID_SIZE * 2] == [0; NODE_ID_SIZE] {
+        if message[NODE_ID_SIZE..NODE_ID_SIZE * 2] == DUMMY_NODE_ID {
             let padded_payload = &message[NODE_ID_SIZE * MAX_LAYERS..];
             // remove the payload padding
             match padded_payload
@@ -86,7 +90,7 @@ impl BlendMessage for MockBlendMessage {
 
         let mut new_message: Vec<u8> = Vec::with_capacity(MESSAGE_SIZE);
         new_message.extend(&message[NODE_ID_SIZE..NODE_ID_SIZE * MAX_LAYERS]);
-        new_message.extend(&[0; NODE_ID_SIZE]);
+        new_message.extend(&DUMMY_NODE_ID);
         new_message.extend(&message[NODE_ID_SIZE * MAX_LAYERS..]); // padded payload
         Ok((new_message, false))
     }
@@ -117,5 +121,16 @@ mod tests {
             MockBlendMessage::unwrap_message(&message, &node_ids[2]).unwrap();
         assert!(is_fully_unwrapped);
         assert_eq!(unwrapped_payload, payload);
+    }
+
+    #[test]
+    fn invalid_node_id() {
+        let mut node_ids = (0..3).map(|i| [i; NODE_ID_SIZE]).collect::<Vec<_>>();
+        node_ids.push(DUMMY_NODE_ID);
+        let payload = [7; 10];
+        assert_eq!(
+            MockBlendMessage::build_message(&payload, &node_ids),
+            Err(Error::InvalidPublicKey)
+        );
     }
 }
