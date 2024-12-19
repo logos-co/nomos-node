@@ -25,7 +25,6 @@ use tracing::error;
 // internal
 use crate::address_book::AddressBook;
 use crate::protocol::DISPERSAL_PROTOCOL;
-use crate::protocols::clone_deserialize_error;
 use crate::SubnetworkId;
 use kzgrs_backend::common::blob::DaBlob;
 use nomos_core::da::BlobId;
@@ -101,7 +100,7 @@ impl Clone for DispersalError {
                 blob_id,
                 subnetwork_id,
             } => DispersalError::Serialization {
-                error: clone_deserialize_error(error),
+                error: error.clone(),
                 blob_id: *blob_id,
                 subnetwork_id: *subnetwork_id,
             },
