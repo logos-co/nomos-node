@@ -18,7 +18,7 @@ mod tests {
     use serde::{Deserialize, Serialize};
 
     #[test]
-    fn ser_de() {
+    fn serialize_deserialize() {
         let tmp = String::from("much wow, very cool");
         let mut buf = Vec::new();
         serializer(&mut buf).serialize_into(&tmp).unwrap();
@@ -27,7 +27,7 @@ mod tests {
     }
 
     #[test]
-    fn ser_de_slice() {
+    fn serialize_deserialize_slice() {
         let tmp = String::from("much wow, very cool");
         let mut buf = vec![0; 1024];
         serializer_into_buffer(&mut buf)
@@ -38,7 +38,7 @@ mod tests {
     }
 
     #[test]
-    fn ser_de_owned() {
+    fn serialize_deserialize_owned() {
         let tmp = String::from("much wow, very cool");
         let serialized = serialize(&tmp).unwrap();
         let deserialized = deserializer(&serialized).deserialize::<String>().unwrap();
@@ -46,7 +46,7 @@ mod tests {
     }
 
     #[test]
-    fn ser_de_inner() {
+    fn serialize_deserialize_inner() {
         let tmp = String::from("much wow, very cool");
         let mut buf = Vec::new();
         let mut serializer = serializer(&mut buf);
