@@ -75,17 +75,7 @@ impl BlendMessage for MockBlendMessage {
 
         // If this is the last layer
         if message[NODE_ID_SIZE..NODE_ID_SIZE * 2] == DUMMY_NODE_ID {
-            let padded_payload = &message[NODE_ID_SIZE * MAX_LAYERS..];
-            // remove the payload padding
-            match padded_payload
-                .iter()
-                .rposition(|&x| x == PAYLOAD_PADDING_SEPARATOR)
-            {
-                Some(pos) => {
-                    return Ok((padded_payload[0..pos].to_vec(), true));
-                }
-                _ => return Err(Error::InvalidBlendMessage),
-            }
+            return Ok((Self::payload(message)?, true));
         }
 
         let mut new_message: Vec<u8> = Vec::with_capacity(MESSAGE_SIZE);
@@ -93,6 +83,20 @@ impl BlendMessage for MockBlendMessage {
         new_message.extend(&DUMMY_NODE_ID);
         new_message.extend(&message[NODE_ID_SIZE * MAX_LAYERS..]); // padded payload
         Ok((new_message, false))
+    }
+}
+
+impl MockBlendMessage {
+    pub fn payload(message: &[u8]) -> Result<Vec<u8>, Error> {
+        let padded_payload = &message[NODE_ID_SIZE * MAX_LAYERS..];
+        // remove the payload padding
+        match padded_payload
+            .iter()
+            .rposition(|&x| x == PAYLOAD_PADDING_SEPARATOR)
+        {
+            Some(pos) => Ok(padded_payload[0..pos].to_vec()),
+            _ => Err(Error::InvalidBlendMessage),
+        }
     }
 }
 
@@ -106,16 +110,19 @@ mod tests {
         let payload = [7; 10];
         let message = MockBlendMessage::build_message(&payload, &node_ids).unwrap();
         assert_eq!(message.len(), MESSAGE_SIZE);
+        assert_eq!(MockBlendMessage::payload(&message).unwrap(), payload);
 
         let (message, is_fully_unwrapped) =
             MockBlendMessage::unwrap_message(&message, &node_ids[0]).unwrap();
         assert!(!is_fully_unwrapped);
         assert_eq!(message.len(), MESSAGE_SIZE);
+        assert_eq!(MockBlendMessage::payload(&message).unwrap(), payload);
 
         let (message, is_fully_unwrapped) =
             MockBlendMessage::unwrap_message(&message, &node_ids[1]).unwrap();
         assert!(!is_fully_unwrapped);
         assert_eq!(message.len(), MESSAGE_SIZE);
+        assert_eq!(MockBlendMessage::payload(&message).unwrap(), payload);
 
         let (unwrapped_payload, is_fully_unwrapped) =
             MockBlendMessage::unwrap_message(&message, &node_ids[2]).unwrap();
