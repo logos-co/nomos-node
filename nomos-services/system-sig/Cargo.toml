@@ -8,7 +8,7 @@ edition = "2021"
 [dependencies]
 async-trait = "0.1"
 async-ctrlc = "1.2"
-overwatch-rs = { git = "https://github.com/logos-co/Overwatch", rev = "2f70806" }
+overwatch-rs = { git = "https://github.com/logos-co/Overwatch", rev = "4160cdd" }
 tokio = "1"
 log = "0.4.20"
 futures = "0.3.28"
