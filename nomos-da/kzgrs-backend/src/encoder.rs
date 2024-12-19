@@ -58,29 +58,6 @@ pub struct EncodedData {
 }
 
 impl EncodedData {
-    #[allow(clippy::too_many_arguments)]
-    pub fn new(
-        data: Vec<u8>,
-        chunked_data: ChunksMatrix,
-        extended_data: ChunksMatrix,
-        row_commitments: Vec<Commitment>,
-        rows_proofs: Vec<Vec<Proof>>,
-        column_commitments: Vec<Commitment>,
-        aggregated_column_commitment: Commitment,
-        aggregated_column_proofs: Vec<Proof>,
-    ) -> Self {
-        Self {
-            data,
-            chunked_data,
-            extended_data,
-            row_commitments,
-            rows_proofs,
-            column_commitments,
-            aggregated_column_commitment,
-            aggregated_column_proofs,
-        }
-    }
-
     /// Returns a `DaBlob` for the given index.
     /// If the index is out of bounds, returns `None`.
     pub fn to_da_blob(&self, index: usize) -> Option<DaBlob> {
@@ -353,8 +330,8 @@ impl nomos_core::da::DaEncoder for DaEncoder {
             &aggregated_polynomial,
             self.params.toeplitz1cache.as_ref(),
         )?;
-        Ok(EncodedData::new(
-            data.to_vec(),
+        Ok(EncodedData {
+            data: data.to_vec(),
             chunked_data,
             extended_data,
             row_commitments,
@@ -362,7 +339,7 @@ impl nomos_core::da::DaEncoder for DaEncoder {
             column_commitments,
             aggregated_column_commitment,
             aggregated_column_proofs,
-        ))
+        })
     }
 }
 
