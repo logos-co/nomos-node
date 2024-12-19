@@ -29,8 +29,8 @@ nomos-blend-message = { path = "../../../nomos-blend/message" }
 nomos-libp2p = { path = "../../../nomos-libp2p" }
 libp2p = { version = "0.53.2", features = ["ed25519"] }
 once_cell = "1.19"
-overwatch-rs = { git = "https://github.com/logos-co/Overwatch", rev = "2f70806" }
-overwatch-derive = { git = "https://github.com/logos-co/Overwatch", rev = "ac28d01" }
+overwatch-rs = { git = "https://github.com/logos-co/Overwatch", rev = "4160cdd" }
+overwatch-derive = { git = "https://github.com/logos-co/Overwatch", rev = "4160cdd" }
 rand = "0.8"
 rand_chacha = "0.3"
 subnetworks-assignations = { path = "../../../nomos-da/network/subnetworks-assignations" }

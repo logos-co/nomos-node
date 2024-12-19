@@ -10,8 +10,8 @@ axum = ["dep:axum", "dep:hyper", "dep:tower-http", "utoipa-swagger-ui/axum"]
 [dependencies]
 async-trait = "0.1"
 bytes = "1.2"
-overwatch-rs = { git = "https://github.com/logos-co/Overwatch", rev = "2f70806" }
-overwatch-derive = { git = "https://github.com/logos-co/Overwatch", rev = "ac28d01" }
+overwatch-rs = { git = "https://github.com/logos-co/Overwatch", rev = "4160cdd" }
+overwatch-derive = { git = "https://github.com/logos-co/Overwatch", rev = "4160cdd" }
 tracing = "0.1"
 nomos-core = { path = "../../nomos-core/chain-defs" }
 cryptarchia-consensus = { path = "../cryptarchia-consensus" }
