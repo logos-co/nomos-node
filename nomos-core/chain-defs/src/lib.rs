@@ -7,4 +7,3 @@ pub mod staking;
 pub mod tx;
 pub mod utils;
 pub mod wire;
-pub mod wire_errors;
