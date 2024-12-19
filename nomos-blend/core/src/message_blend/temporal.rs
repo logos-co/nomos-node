@@ -123,7 +123,10 @@ where
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         if self.scheduler.poll_next_unpin(cx).is_ready() {
             if let Some(msg) = self.queue.pop_front() {
+                tracing::info!("PoppedFromTemporalQueue");
                 return Poll::Ready(Some(msg));
+            } else {
+                tracing::info!("TemporalQueueIsEmpty");
             }
         };
         Poll::Pending

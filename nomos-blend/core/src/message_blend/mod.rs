@@ -3,12 +3,14 @@ pub mod temporal;
 
 pub use crypto::CryptographicProcessorSettings;
 use futures::{Stream, StreamExt};
+use nomos_blend_message::mock::MockBlendMessage;
 use rand::RngCore;
 use std::fmt::Debug;
 use std::marker::PhantomData;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 pub use temporal::TemporalSchedulerSettings;
+use uuid::Uuid;
 
 use crate::membership::Membership;
 use crate::message_blend::crypto::CryptographicProcessor;
@@ -84,11 +86,24 @@ where
     fn process_incoming_message(self: &mut Pin<&mut Self>, message: Vec<u8>) {
         match self.cryptographic_processor.unwrap_message(&message) {
             Ok((unwrapped_message, fully_unwrapped)) => {
-                let message = if fully_unwrapped {
-                    BlendOutgoingMessage::FullyUnwrapped(unwrapped_message)
+                let (message, payload_id) = if fully_unwrapped {
+                    (
+                        BlendOutgoingMessage::FullyUnwrapped(unwrapped_message.clone()),
+                        Uuid::from_slice(&unwrapped_message).unwrap().to_string(),
+                    )
                 } else {
-                    BlendOutgoingMessage::Outbound(unwrapped_message)
+                    (
+                        BlendOutgoingMessage::Outbound(unwrapped_message.clone()),
+                        Uuid::from_slice(&MockBlendMessage::payload(&unwrapped_message).unwrap())
+                            .unwrap()
+                            .to_string(),
+                    )
                 };
+
+                tracing::info!(
+                    "TemporalAfterCryptoScheduled: {}",
+                    serde_json::to_string(&ScheduleLog { payload_id }).unwrap()
+                );
                 if let Err(e) = self.temporal_sender.send(message) {
                     tracing::error!("Failed to send message to the outbound channel: {e:?}");
                 }
@@ -98,6 +113,11 @@ where
             }
         }
     }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct ScheduleLog {
+    payload_id: String,
 }
 
 impl<S, Rng, M, Scheduler> Stream for MessageBlendStream<S, Rng, M, Scheduler>
