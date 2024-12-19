@@ -38,7 +38,7 @@ where
         }
     }
 
-    pub fn wrap_message(&mut self, message: &[u8]) -> Result<Vec<u8>, M::Error> {
+    pub fn wrap_message(&mut self, message: &[u8]) -> Result<WrappedMessage<M>, M::Error> {
         // TODO: Use the actual Sphinx encoding instead of mock.
         let public_keys = self
             .membership
@@ -47,10 +47,21 @@ where
             .map(|node| node.public_key.clone())
             .collect::<Vec<_>>();
 
-        M::build_message(message, &public_keys)
+        Ok(WrappedMessage {
+            message: M::build_message(message, &public_keys)?,
+            public_keys,
+        })
     }
 
     pub fn unwrap_message(&self, message: &[u8]) -> Result<(Vec<u8>, bool), M::Error> {
         M::unwrap_message(message, &self.settings.private_key)
     }
+}
+
+pub struct WrappedMessage<M>
+where
+    M: BlendMessage,
+{
+    pub message: Vec<u8>,
+    pub public_keys: Vec<M::PublicKey>,
 }

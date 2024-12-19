@@ -230,7 +230,7 @@ where
     ) {
         match cryptographic_processor.wrap_message(&message) {
             Ok(wrapped_message) => {
-                if let Err(e) = persistent_sender.send(wrapped_message) {
+                if let Err(e) = persistent_sender.send(wrapped_message.message) {
                     tracing::error!("Error sending message to persistent stream: {e}");
                 }
             }
