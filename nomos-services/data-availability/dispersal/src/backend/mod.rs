@@ -2,7 +2,10 @@ use crate::adapters::{mempool::DaMempoolAdapter, network::DispersalNetworkAdapte
 use std::time::Duration;
 
 use nomos_core::da::{blob::metadata, DaDispersal, DaEncoder};
+use nomos_tracing::info_with_id;
 use overwatch_rs::DynError;
+use std::fmt::Debug;
+use tracing::instrument;
 
 pub mod kzgrs;
 
@@ -13,8 +16,8 @@ pub trait DispersalBackend {
     type Dispersal: DaDispersal<EncodedData = <Self::Encoder as DaEncoder>::EncodedData>;
     type NetworkAdapter: DispersalNetworkAdapter;
     type MempoolAdapter: DaMempoolAdapter;
-    type Metadata: metadata::Metadata + Send;
-    type BlobId: Send;
+    type Metadata: Debug + metadata::Metadata + Send;
+    type BlobId: AsRef<[u8]> + Send;
 
     fn init(
         config: Self::Settings,
@@ -36,12 +39,14 @@ pub trait DispersalBackend {
         metadata: Self::Metadata,
     ) -> Result<(), DynError>;
 
+    #[instrument(skip_all)]
     async fn process_dispersal(
         &self,
         data: Vec<u8>,
         metadata: Self::Metadata,
     ) -> Result<(), DynError> {
         let (blob_id, encoded_data) = self.encode(data).await?;
+        info_with_id!(blob_id.as_ref(), "ProcessDispersal");
         self.disperse(encoded_data).await?;
         // let disperse and replication happen before pushing to mempool
         tokio::time::sleep(Duration::from_secs(1)).await;

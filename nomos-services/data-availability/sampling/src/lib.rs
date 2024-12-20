@@ -22,9 +22,10 @@ use rand::{RngCore, SeedableRng};
 use serde::{Deserialize, Serialize};
 use tokio::sync::oneshot;
 use tokio_stream::StreamExt;
-use tracing::{error, span, Instrument, Level};
+use tracing::{error, instrument, span, Instrument, Level};
 // internal
 use backend::{DaSamplingServiceBackend, SamplingState};
+use nomos_tracing::{error_with_id, info_with_id};
 use storage::DaStorageAdapter;
 
 const DA_SAMPLING_TAG: ServiceId = "DA-Sampling";
@@ -93,6 +94,7 @@ where
         }
     }
 
+    #[instrument(skip_all)]
     async fn handle_service_message(
         msg: <Self as ServiceData>::Message,
         network_adapter: &mut DaNetwork,
@@ -102,13 +104,14 @@ where
             DaSamplingServiceMsg::TriggerSampling { blob_id } => {
                 if let SamplingState::Init(sampling_subnets) = sampler.init_sampling(blob_id).await
                 {
+                    info_with_id!(blob_id, "TriggerSampling");
                     if let Err(e) = network_adapter
                         .start_sampling(blob_id, &sampling_subnets)
                         .await
                     {
                         // we can short circuit the failure from beginning
                         sampler.handle_sampling_error(blob_id).await;
-                        error!("Error sampling for BlobId: {blob_id:?}: {e}");
+                        error_with_id!(blob_id, "Error sampling for BlobId: {blob_id:?}: {e}");
                     }
                 }
             }
@@ -124,6 +127,7 @@ where
         }
     }
 
+    #[instrument(skip_all)]
     async fn handle_sampling_message(
         event: SamplingEvent,
         sampler: &mut Backend,
@@ -131,10 +135,12 @@ where
     ) {
         match event {
             SamplingEvent::SamplingSuccess { blob_id, blob } => {
+                info_with_id!(blob_id, "SamplingSuccess");
                 sampler.handle_sampling_success(blob_id, *blob).await;
             }
             SamplingEvent::SamplingError { error } => {
                 if let Some(blob_id) = error.blob_id() {
+                    info_with_id!(blob_id, "SamplingError");
                     sampler.handle_sampling_error(*blob_id).await;
                     return;
                 }
@@ -145,6 +151,7 @@ where
                 column_idx,
                 response_sender,
             } => {
+                info_with_id!(blob_id, "SamplingRequest");
                 let maybe_blob = storage_adapter
                     .get_blob(blob_id, column_idx)
                     .await
@@ -226,9 +233,6 @@ where
             mut sampler,
         } = self;
 
-        let trace_span = span!(Level::INFO, "service", service = DA_SAMPLING_TAG);
-        let _trace_guard = trace_span.enter();
-
         let DaSamplingServiceSettings {
             storage_adapter_settings,
             ..
@@ -266,7 +270,6 @@ where
                 }
             }
         }
-        .instrument(span!(Level::TRACE, DA_SAMPLING_TAG))
         .await;
 
         Ok(())

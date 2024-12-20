@@ -53,13 +53,6 @@ fn main() -> Result<()> {
             cryptarchia_args,
         )?;
 
-    #[cfg(debug_assertions)]
-    let debug_span = {
-        let debug_id = Uuid::new_v4();
-        span!(Level::DEBUG, "Nomos", debug_id = debug_id.to_string())
-    };
-    #[cfg(debug_assertions)]
-    let _guard = debug_span.enter();
     let app = OverwatchRunner::<Nomos>::run(
         NomosServiceSettings {
             network: config.network,

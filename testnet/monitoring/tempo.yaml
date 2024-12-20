@@ -3,16 +3,6 @@ server:
   http_listen_port: 3200
   log_level: info
 
-
-cache:
-  background:
-    writeback_goroutines: 5
-  caches:
-  - roles:
-    - frontend-search  
-    memcached: 
-      host: memcached:11211
-
 query_frontend:
   search:
     duration_slo: 5s

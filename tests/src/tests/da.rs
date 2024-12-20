@@ -12,7 +12,11 @@ use tests::topology::TopologyConfig;
 
 const APP_ID: &str = "fd3384e132ad02a56c78f45547ee40038dc79002b90d29ed90e08eee762ae715";
 
-async fn disseminate(executor: &Executor, data: &[u8]) {
+async fn disseminate_with_metadata(
+    executor: &Executor,
+    data: &[u8],
+    metadata: kzgrs_backend::dispersal::Metadata,
+) {
     let executor_config = executor.config();
 
     let client = ClientBuilder::new()
@@ -23,8 +27,6 @@ async fn disseminate(executor: &Executor, data: &[u8]) {
     let exec_url = Url::parse(&format!("http://{}", backend_address)).unwrap();
     let client = ExecutorHttpClient::new(client, exec_url);
 
-    let app_id = hex::decode(APP_ID).unwrap();
-    let metadata = kzgrs_backend::dispersal::Metadata::new(app_id.try_into().unwrap(), 0u64.into());
     client.publish_blob(data.to_vec(), metadata).await.unwrap();
 }
 
@@ -34,15 +36,18 @@ async fn disseminate_and_retrieve() {
     let topology = Topology::spawn(TopologyConfig::validator_and_executor()).await;
     let executor = &topology.executors()[0];
     let validator = &topology.validators()[0];
+
     let data = [1u8; 31];
+    let app_id = hex::decode(APP_ID).unwrap();
+    let metadata =
+        kzgrs_backend::dispersal::Metadata::new(app_id.clone().try_into().unwrap(), 0u64.into());
 
     tokio::time::sleep(Duration::from_secs(15)).await;
-    disseminate(executor, &data).await;
+    disseminate_with_metadata(executor, &data, metadata).await;
     tokio::time::sleep(Duration::from_secs(20)).await;
 
     let from = 0u64.to_be_bytes();
     let to = 1u64.to_be_bytes();
-    let app_id = hex::decode(APP_ID).unwrap();
 
     let executor_blobs = executor
         .get_indexer_range(app_id.clone().try_into().unwrap(), from..to)
@@ -80,15 +85,18 @@ async fn disseminate_and_retrieve() {
 async fn disseminate_retrieve_reconstruct() {
     let topology = Topology::spawn(TopologyConfig::validator_and_executor()).await;
     let executor = &topology.executors()[0];
+
     let data = [1u8; 31];
+    let app_id = hex::decode(APP_ID).unwrap();
+    let metadata =
+        kzgrs_backend::dispersal::Metadata::new(app_id.clone().try_into().unwrap(), 0u64.into());
 
     tokio::time::sleep(Duration::from_secs(15)).await;
-    disseminate(executor, &data).await;
+    disseminate_with_metadata(executor, &data, metadata).await;
     tokio::time::sleep(Duration::from_secs(20)).await;
 
     let from = 0u64.to_be_bytes();
     let to = 1u64.to_be_bytes();
-    let app_id = hex::decode(APP_ID).unwrap();
 
     let executor_blobs = executor
         .get_indexer_range(app_id.clone().try_into().unwrap(), from..to)
@@ -106,3 +114,36 @@ async fn disseminate_retrieve_reconstruct() {
     let reconstructed = reconstruct_without_missing_data(&blobs);
     assert_eq!(reconstructed, data);
 }
+
+#[ignore = "for local debugging"]
+#[tokio::test]
+async fn local_testnet() {
+    let topology = Topology::spawn(TopologyConfig::validator_and_executor()).await;
+    let executor = &topology.executors()[0];
+    let app_id = hex::decode(APP_ID).expect("Invalid APP_ID");
+
+    let mut index = 0u64;
+    loop {
+        disseminate_with_metadata(
+            executor,
+            &generate_data(index),
+            create_metadata(&app_id, index),
+        )
+        .await;
+
+        index += 1;
+        tokio::time::sleep(Duration::from_secs(10)).await;
+    }
+}
+
+fn generate_data(index: u64) -> Vec<u8> {
+    (index as u8..index as u8 + 31).collect()
+}
+
+fn create_metadata(app_id: &[u8], index: u64) -> kzgrs_backend::dispersal::Metadata {
+    kzgrs_backend::dispersal::Metadata::new(
+        app_id.try_into().expect("Failed to convert APP_ID"),
+        index.into(),
+    )
+}
+

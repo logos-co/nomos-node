@@ -4,7 +4,7 @@ use std::marker::PhantomData;
 // crates
 use serde::{Deserialize, Serialize};
 use tokio::sync::oneshot;
-use tracing::{log::error, span, Level};
+use tracing::{error, instrument, span, Instrument, Level};
 // internal
 use crate::adapters::mempool::DaMempoolAdapter;
 use crate::adapters::network::DispersalNetworkAdapter;
@@ -121,9 +121,6 @@ where
             ..
         } = self;
 
-        let trace_span = span!(Level::INFO, "service", service = DA_DISPERSAL_TAG);
-        let _trace_guard = trace_span.enter();
-
         let DispersalServiceSettings {
             backend: backend_settings,
         } = service_state.settings_reader.get_updated_settings();
@@ -133,21 +130,25 @@ where
         let mempool_adapter = MempoolAdapter::new(mempool_relay);
         let backend = Backend::init(backend_settings, network_adapter, mempool_adapter);
         let mut inbound_relay = service_state.inbound_relay;
-        while let Some(dispersal_msg) = inbound_relay.recv().await {
-            match dispersal_msg {
-                DaDispersalMsg::Disperse {
-                    data,
-                    metadata,
-                    reply_channel,
-                } => {
-                    if let Err(Err(e)) =
-                        reply_channel.send(backend.process_dispersal(data, metadata).await)
-                    {
-                        error!("Error forwarding dispersal response: {e}");
+        async {
+            while let Some(dispersal_msg) = inbound_relay.recv().await {
+                match dispersal_msg {
+                    DaDispersalMsg::Disperse {
+                        data,
+                        metadata,
+                        reply_channel,
+                    } => {
+                        if let Err(Err(e)) =
+                            reply_channel.send(backend.process_dispersal(data, metadata).await)
+                        {
+                            error!("Error forwarding dispersal response: {e}");
+                        }
                     }
                 }
             }
         }
+        .await;
+
         Ok(())
     }
 }

@@ -11,6 +11,7 @@ use nomos_core::da::BlobId;
 use nomos_da_network_core::swarm::validator::ValidatorSwarm;
 use nomos_da_network_core::SubnetworkId;
 use nomos_libp2p::ed25519;
+use nomos_tracing::info_with_id;
 use overwatch_rs::overwatch::handle::OverwatchHandle;
 use overwatch_rs::services::state::NoState;
 use std::fmt::Debug;
@@ -21,6 +22,7 @@ use tokio::sync::broadcast;
 use tokio::sync::mpsc::UnboundedSender;
 use tokio::task::JoinHandle;
 use tokio_stream::wrappers::BroadcastStream;
+use tracing::instrument;
 
 /// Message that the backend replies to
 #[derive(Debug)]
@@ -148,12 +150,14 @@ where
         replies_handle.abort();
     }
 
+    #[instrument(skip_all)]
     async fn process(&self, msg: Self::Message) {
         match msg {
             DaNetworkMessage::RequestSample {
                 subnetwork_id,
                 blob_id,
             } => {
+                info_with_id!(&blob_id, "RequestSample");
                 handle_sample_request(&self.sampling_request_channel, subnetwork_id, blob_id).await;
             }
         }

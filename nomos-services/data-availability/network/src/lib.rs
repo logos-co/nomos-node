@@ -16,7 +16,7 @@ use overwatch_rs::services::{
 };
 use serde::{Deserialize, Serialize};
 use tokio::sync::oneshot;
-use tracing::{error, span, Level};
+use tracing::{error, instrument, span, Instrument, Level};
 // internal
 
 const DA_NETWORK_TAG: ServiceId = "DA-Network";
@@ -97,23 +97,24 @@ where
             mut backend,
         } = self;
 
-        let trace_span = span!(Level::INFO, "service", service = DA_NETWORK_TAG);
-        let _trace_guard = trace_span.enter();
-
         let mut lifecycle_stream = lifecycle_handle.message_stream();
-        loop {
-            tokio::select! {
-                Some(msg) = inbound_relay.recv() => {
-                    Self::handle_network_service_message(msg, &mut backend).await;
-                }
-                Some(msg) = lifecycle_stream.next() => {
-                    if Self::should_stop_service(msg).await {
-                        backend.shutdown();
-                        break;
+        async {
+            loop {
+                tokio::select! {
+                    Some(msg) = inbound_relay.recv() => {
+                        Self::handle_network_service_message(msg, &mut backend).await;
+                    }
+                    Some(msg) = lifecycle_stream.next() => {
+                        if Self::should_stop_service(msg).await {
+                            backend.shutdown();
+                            break;
+                        }
                     }
                 }
             }
         }
+        .await;
+
         Ok(())
     }
 }

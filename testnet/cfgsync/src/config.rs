@@ -200,6 +200,7 @@ fn tracing_config_for_grafana(params: TracingParams, identifier: String) -> Gene
             tracing: nomos_tracing_service::TracingLayer::Otlp(OtlpTracingConfig {
                 endpoint: params.tempo_endpoint,
                 sample_ratio: 1.0,
+                service_name: identifier.clone(),
             }),
             filter: FilterLayer::None,
             metrics: MetricsLayer::Otlp(OtlpMetricsConfig {

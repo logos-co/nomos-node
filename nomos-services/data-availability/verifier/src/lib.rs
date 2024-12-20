@@ -18,10 +18,12 @@ use overwatch_rs::DynError;
 use serde::{Deserialize, Serialize};
 use tokio::sync::oneshot::Sender;
 use tokio_stream::StreamExt;
+use tracing::instrument;
 use tracing::{error, span, Instrument, Level};
 // internal
 use backend::VerifierBackend;
 use network::NetworkAdapter;
+use nomos_tracing::info_with_id;
 use storage::DaStorageAdapter;
 
 const DA_VERIFIER_TAG: ServiceId = "DA-Verifier";
@@ -66,10 +68,12 @@ where
     Backend::DaBlob: Debug + Send,
     Backend::Error: Error + Send + Sync,
     Backend::Settings: Clone,
+    <Backend::DaBlob as Blob>::BlobId: AsRef<[u8]>,
     N: NetworkAdapter<Blob = Backend::DaBlob> + Send + 'static,
     N::Settings: Clone,
     S: DaStorageAdapter<Blob = Backend::DaBlob, Attestation = ()> + Send + 'static,
 {
+    #[instrument(skip_all)]
     async fn handle_new_blob(
         verifier: &Backend,
         storage_adapter: &S,
@@ -80,8 +84,10 @@ where
             .await?
             .is_some()
         {
+            info_with_id!(blob.id().as_ref(), "VerifierBlobExists");
             Ok(())
         } else {
+            info_with_id!(blob.id().as_ref(), "VerifierAddBlob");
             verifier.verify(blob)?;
             storage_adapter.add_blob(blob, &()).await?;
             Ok(())
@@ -128,6 +134,7 @@ where
     Backend::Settings: Clone + Send + Sync + 'static,
     Backend::DaBlob: Debug + Send + Sync + 'static,
     Backend::Error: Error + Send + Sync + 'static,
+    <Backend::DaBlob as Blob>::BlobId: AsRef<[u8]>,
     N: NetworkAdapter<Blob = Backend::DaBlob> + Send + Sync + 'static,
     N::Settings: Clone + Send + Sync + 'static,
     S: DaStorageAdapter<Blob = Backend::DaBlob, Attestation = ()> + Send + Sync + 'static,
@@ -159,9 +166,6 @@ where
             verifier,
         } = self;
 
-        let trace_span = span!(Level::INFO, "service", service = DA_VERIFIER_TAG);
-        let _trace_guard = trace_span.enter();
-
         let DaVerifierServiceSettings {
             network_adapter_settings,
             storage_adapter_settings,
@@ -187,8 +191,10 @@ where
                     Some(msg) = service_state.inbound_relay.recv() => {
                         let DaVerifierMsg::AddBlob { blob, reply_channel } = msg;
                         match Self::handle_new_blob(&verifier, &storage_adapter, &blob).await {
-                            Ok(attestation) => if let Err(err) = reply_channel.send(Some(attestation)) {
-                                error!("Error replying attestation {err:?}");
+                            Ok(attestation) => {
+                                if let Err(err) = reply_channel.send(Some(attestation)) {
+                                    error!("Error replying attestation {err:?}");
+                                }
                             },
                             Err(err) => {
                                 error!("Error handling blob {blob:?} due to {err:?}");
@@ -205,7 +211,7 @@ where
                     }
                 }
             }
-        }.instrument(span!(Level::TRACE, DA_VERIFIER_TAG)).await;
+        }.await;
 
         Ok(())
     }

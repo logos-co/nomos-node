@@ -18,6 +18,7 @@ datasources:
     is_default: false
     version: 1
     editable: true
+    uid: tempods
 
   - name: Loki
     type: loki
@@ -27,4 +28,10 @@ datasources:
     is_default: false
     version: 1
     editable: true
+    jsonData:
+      derivedFields:
+        - name: trace_id
+          matcherRegex: "\"trace_id\":\"(\\w+)\""
+          url: "$${__value.raw}"
+          datasourceUid: tempods
 
