@@ -17,7 +17,7 @@ cryptarchia-consensus = { path = "../nomos-services/cryptarchia-consensus" }
 nomos-tracing = { path = "../nomos-tracing" }
 nomos-tracing-service = { path = "../nomos-services/tracing" }
 nomos-api = { path = "../nomos-services/api" }
-overwatch-rs = { git = "https://github.com/logos-co/Overwatch", rev = "2f70806" }
+overwatch-rs = { git = "https://github.com/logos-co/Overwatch", rev = "4160cdd" }
 nomos-core = { path = "../nomos-core/chain-defs" }
 cryptarchia-engine = { path = "../consensus/cryptarchia-engine", features = ["serde"] }
 nomos-ledger = { path = "../ledger/nomos-ledger", features = ["serde"] }
