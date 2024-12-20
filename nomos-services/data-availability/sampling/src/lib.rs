@@ -22,7 +22,7 @@ use rand::{RngCore, SeedableRng};
 use serde::{Deserialize, Serialize};
 use tokio::sync::oneshot;
 use tokio_stream::StreamExt;
-use tracing::{error, instrument, span, Instrument, Level};
+use tracing::{error, instrument};
 // internal
 use backend::{DaSamplingServiceBackend, SamplingState};
 use nomos_tracing::{error_with_id, info_with_id};
@@ -248,29 +248,26 @@ where
         let storage_adapter = DaStorage::new(storage_adapter_settings, storage_relay).await;
 
         let mut lifecycle_stream = service_state.lifecycle_handle.message_stream();
-        async {
-            loop {
-                tokio::select! {
-                    Some(service_message) = service_state.inbound_relay.recv() => {
-                        Self::handle_service_message(service_message, &mut network_adapter, &mut sampler).await;
-                    }
-                    Some(sampling_message) = sampling_message_stream.next() => {
-                        Self::handle_sampling_message(sampling_message, &mut sampler, &storage_adapter).await;
-                    }
-                    Some(msg) = lifecycle_stream.next() => {
-                        if Self::should_stop_service(msg).await {
-                            break;
-                        }
-                    }
-                    // cleanup not on time samples
-                    _ = next_prune_tick.tick() => {
-                        sampler.prune();
-                    }
-
+        loop {
+            tokio::select! {
+                Some(service_message) = service_state.inbound_relay.recv() => {
+                    Self::handle_service_message(service_message, &mut network_adapter, &mut sampler).await;
                 }
+                Some(sampling_message) = sampling_message_stream.next() => {
+                    Self::handle_sampling_message(sampling_message, &mut sampler, &storage_adapter).await;
+                }
+                Some(msg) = lifecycle_stream.next() => {
+                    if Self::should_stop_service(msg).await {
+                        break;
+                    }
+                }
+                // cleanup not on time samples
+                _ = next_prune_tick.tick() => {
+                    sampler.prune();
+                }
+
             }
         }
-        .await;
 
         Ok(())
     }

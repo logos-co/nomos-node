@@ -18,8 +18,8 @@ use overwatch_rs::DynError;
 use serde::{Deserialize, Serialize};
 use tokio::sync::oneshot::Sender;
 use tokio_stream::StreamExt;
+use tracing::error;
 use tracing::instrument;
-use tracing::{error, span, Instrument, Level};
 // internal
 use backend::VerifierBackend;
 use network::NetworkAdapter;
@@ -180,38 +180,36 @@ where
         let storage_adapter = S::new(storage_adapter_settings, storage_relay).await;
 
         let mut lifecycle_stream = service_state.lifecycle_handle.message_stream();
-        async {
-            loop {
-                tokio::select! {
-                    Some(blob) = blob_stream.next() => {
-                        if let Err(err) =  Self::handle_new_blob(&verifier,&storage_adapter, &blob).await {
+        loop {
+            tokio::select! {
+                Some(blob) = blob_stream.next() => {
+                    if let Err(err) =  Self::handle_new_blob(&verifier,&storage_adapter, &blob).await {
+                        error!("Error handling blob {blob:?} due to {err:?}");
+                    }
+                }
+                Some(msg) = service_state.inbound_relay.recv() => {
+                    let DaVerifierMsg::AddBlob { blob, reply_channel } = msg;
+                    match Self::handle_new_blob(&verifier, &storage_adapter, &blob).await {
+                        Ok(attestation) => {
+                            if let Err(err) = reply_channel.send(Some(attestation)) {
+                                error!("Error replying attestation {err:?}");
+                            }
+                        },
+                        Err(err) => {
                             error!("Error handling blob {blob:?} due to {err:?}");
-                        }
-                    }
-                    Some(msg) = service_state.inbound_relay.recv() => {
-                        let DaVerifierMsg::AddBlob { blob, reply_channel } = msg;
-                        match Self::handle_new_blob(&verifier, &storage_adapter, &blob).await {
-                            Ok(attestation) => {
-                                if let Err(err) = reply_channel.send(Some(attestation)) {
-                                    error!("Error replying attestation {err:?}");
-                                }
-                            },
-                            Err(err) => {
-                                error!("Error handling blob {blob:?} due to {err:?}");
-                                if let Err(err) = reply_channel.send(None) {
-                                    error!("Error replying attestation {err:?}");
-                                }
-                            },
-                        };
-                    }
-                    Some(msg) = lifecycle_stream.next() => {
-                        if Self::should_stop_service(msg).await {
-                            break;
-                        }
+                            if let Err(err) = reply_channel.send(None) {
+                                error!("Error replying attestation {err:?}");
+                            }
+                        },
+                    };
+                }
+                Some(msg) = lifecycle_stream.next() => {
+                    if Self::should_stop_service(msg).await {
+                        break;
                     }
                 }
             }
-        }.await;
+        }
 
         Ok(())
     }

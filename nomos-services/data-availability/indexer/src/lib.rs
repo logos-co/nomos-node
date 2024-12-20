@@ -29,7 +29,7 @@ use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use storage::DaStorageAdapter;
 use tokio::sync::oneshot::Sender;
-use tracing::{error, instrument, span, Level};
+use tracing::{error, instrument};
 
 const DA_INDEXER_TAG: ServiceId = "DA-Indexer";
 
@@ -463,28 +463,25 @@ where
         .await;
 
         let mut lifecycle_stream = service_state.lifecycle_handle.message_stream();
-        async {
-            loop {
-                tokio::select! {
-                    Some(block) = consensus_blocks.next() => {
-                        if let Err(e) = Self::handle_new_block(&storage_adapter, block).await {
-                            tracing::debug!("Failed to add  a new received block: {e:?}");
-                        }
+        loop {
+            tokio::select! {
+                Some(block) = consensus_blocks.next() => {
+                    if let Err(e) = Self::handle_new_block(&storage_adapter, block).await {
+                        tracing::debug!("Failed to add  a new received block: {e:?}");
                     }
-                    Some(msg) = service_state.inbound_relay.recv() => {
-                        if let Err(e) = Self::handle_da_msg(&storage_adapter, msg).await {
-                            tracing::debug!("Failed to handle da msg: {e:?}");
-                        }
+                }
+                Some(msg) = service_state.inbound_relay.recv() => {
+                    if let Err(e) = Self::handle_da_msg(&storage_adapter, msg).await {
+                        tracing::debug!("Failed to handle da msg: {e:?}");
                     }
-                    Some(msg) = lifecycle_stream.next() => {
-                        if Self::should_stop_service(msg).await {
-                            break;
-                        }
+                }
+                Some(msg) = lifecycle_stream.next() => {
+                    if Self::should_stop_service(msg).await {
+                        break;
                     }
                 }
             }
         }
-        .await;
 
         Ok(())
     }
