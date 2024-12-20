@@ -4,7 +4,7 @@ use std::marker::PhantomData;
 // crates
 use serde::{Deserialize, Serialize};
 use tokio::sync::oneshot;
-use tracing::{error, instrument, span, Instrument, Level};
+use tracing::error;
 // internal
 use crate::adapters::mempool::DaMempoolAdapter;
 use crate::adapters::network::DispersalNetworkAdapter;
@@ -130,24 +130,21 @@ where
         let mempool_adapter = MempoolAdapter::new(mempool_relay);
         let backend = Backend::init(backend_settings, network_adapter, mempool_adapter);
         let mut inbound_relay = service_state.inbound_relay;
-        async {
-            while let Some(dispersal_msg) = inbound_relay.recv().await {
-                match dispersal_msg {
-                    DaDispersalMsg::Disperse {
-                        data,
-                        metadata,
-                        reply_channel,
-                    } => {
-                        if let Err(Err(e)) =
-                            reply_channel.send(backend.process_dispersal(data, metadata).await)
-                        {
-                            error!("Error forwarding dispersal response: {e}");
-                        }
+        while let Some(dispersal_msg) = inbound_relay.recv().await {
+            match dispersal_msg {
+                DaDispersalMsg::Disperse {
+                    data,
+                    metadata,
+                    reply_channel,
+                } => {
+                    if let Err(Err(e)) =
+                        reply_channel.send(backend.process_dispersal(data, metadata).await)
+                    {
+                        error!("Error forwarding dispersal response: {e}");
                     }
                 }
             }
         }
-        .await;
 
         Ok(())
     }

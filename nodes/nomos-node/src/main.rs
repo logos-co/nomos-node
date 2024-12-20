@@ -11,8 +11,6 @@ use nomos_core::{da::blob::info::DispersedBlobInfo, tx::Transaction};
 use nomos_mempool::network::adapters::libp2p::Settings as AdapterSettings;
 
 use overwatch_rs::overwatch::*;
-use tracing::{span, Level};
-use uuid::Uuid;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]

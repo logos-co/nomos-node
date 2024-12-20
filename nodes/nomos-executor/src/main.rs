@@ -10,8 +10,6 @@ use nomos_node::{
     DA_TOPIC,
 };
 use overwatch_rs::overwatch::*;
-use tracing::{span, Level};
-use uuid::Uuid;
 // internal
 
 #[derive(Parser, Debug)]

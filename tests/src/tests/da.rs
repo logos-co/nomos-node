@@ -146,4 +146,3 @@ fn create_metadata(app_id: &[u8], index: u64) -> kzgrs_backend::dispersal::Metad
         index.into(),
     )
 }
-
