@@ -151,7 +151,10 @@ impl ServiceData for Tracing {
 
 #[async_trait::async_trait]
 impl ServiceCore for Tracing {
-    fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, overwatch_rs::DynError> {
+    fn init(
+        service_state: ServiceStateHandle<Self>,
+        _init_state: Self::State,
+    ) -> Result<Self, overwatch_rs::DynError> {
         #[cfg(test)]
         use std::sync::Once;
         #[cfg(test)]
