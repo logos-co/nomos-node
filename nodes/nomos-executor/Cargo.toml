@@ -26,8 +26,8 @@ nomos-network = { path = "../../nomos-services/network", features = ["libp2p"] }
 nomos-blend-service = { path = "../../nomos-services/blend", features = ["libp2p"] }
 nomos-node = { path = "../nomos-node" }
 nomos-storage = { path = "../../nomos-services/storage", features = ["rocksdb"] }
-overwatch-rs = { git = "https://github.com/logos-co/Overwatch", rev = "4160cdd" }
-overwatch-derive = { git = "https://github.com/logos-co/Overwatch", rev = "4160cdd" }
+overwatch-rs = { git = "https://github.com/logos-co/Overwatch", rev = "10ec27e" }
+overwatch-derive = { git = "https://github.com/logos-co/Overwatch", rev = "10ec27e" }
 rand = "0.8"
 rand_chacha = "0.3"
 serde = { version = "1", features = ["derive"] }
