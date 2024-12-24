@@ -139,13 +139,9 @@ impl FromIterator<Row> for ChunksMatrix {
     }
 }
 
-pub fn hash_column_and_commitment<const HASH_SIZE: usize>(
-    column: &Column,
-    commitment: &Commitment,
-) -> [u8; HASH_SIZE] {
+pub fn hash_commitment<const HASH_SIZE: usize>(commitment: &Commitment) -> [u8; HASH_SIZE] {
     let mut hasher = blake2::Blake2bVar::new(HASH_SIZE)
         .unwrap_or_else(|e| panic!("Blake2b should work for size {HASH_SIZE}, {e}"));
-    hasher.update(column.as_bytes().as_ref());
     hasher.update(commitment_to_bytes(commitment).as_ref());
     hasher
         .finalize_boxed()

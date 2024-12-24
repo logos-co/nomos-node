@@ -14,7 +14,7 @@ use kzgrs::{
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 // internal
 use crate::common::blob::DaBlob;
-use crate::common::{hash_column_and_commitment, Chunk, ChunksMatrix, Row};
+use crate::common::{hash_commitment, Chunk, ChunksMatrix, Row};
 use crate::global::GLOBAL_PARAMETERS;
 
 #[derive(Clone)]
@@ -242,20 +242,14 @@ impl DaEncoder {
 
     fn compute_aggregated_column_commitment(
         global_parameters: &GlobalParameters,
-        matrix: &ChunksMatrix,
+
         commitments: &[Commitment],
         polynomial_evaluation_domain: PolynomialEvaluationDomain,
     ) -> Result<((Evaluations, Polynomial), Commitment), KzgRsError> {
-        let hashes: Vec<u8> =
-            matrix
-                .columns()
-                .zip(commitments)
-                .flat_map(|(column, commitment)| {
-                    hash_column_and_commitment::<
-                        { DaEncoderParams::MAX_BLS12_381_ENCODING_CHUNK_SIZE },
-                    >(&column, commitment)
-                })
-                .collect();
+        let hashes: Vec<u8> = commitments
+            .iter()
+            .flat_map(hash_commitment::<{ DaEncoderParams::MAX_BLS12_381_ENCODING_CHUNK_SIZE }>)
+            .collect();
         let (evals, poly) = bytes_to_polynomial::<
             { DaEncoderParams::MAX_BLS12_381_ENCODING_CHUNK_SIZE },
         >(hashes.as_ref(), polynomial_evaluation_domain)?;
@@ -321,7 +315,6 @@ impl nomos_core::da::DaEncoder for DaEncoder {
         let ((_aggregated_evals, aggregated_polynomial), aggregated_column_commitment) =
             Self::compute_aggregated_column_commitment(
                 global_parameters,
-                &extended_data,
                 &column_commitments,
                 row_domain,
             )?;
@@ -519,7 +512,6 @@ pub mod test {
                 .unzip();
         let _ = DaEncoder::compute_aggregated_column_commitment(
             &GLOBAL_PARAMETERS,
-            &matrix,
             &commitments,
             domain,
         )
@@ -539,7 +531,6 @@ pub mod test {
         let ((_evals, polynomial), _aggregated_commitment) =
             DaEncoder::compute_aggregated_column_commitment(
                 &GLOBAL_PARAMETERS,
-                &matrix,
                 &commitments,
                 domain,
             )
