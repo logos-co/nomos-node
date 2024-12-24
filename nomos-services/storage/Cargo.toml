@@ -10,7 +10,7 @@ async-trait = "0.1"
 futures = "0.3"
 tokio = { version = "1", features = ["sync"] }
 bytes = "1.2"
-overwatch-rs = { git = "https://github.com/logos-co/Overwatch", rev = "4160cdd" }
+overwatch-rs = { git = "https://github.com/logos-co/Overwatch", rev = "10ec27e" }
 serde = "1.0"
 sled = { version = "0.34", optional = true }
 rocksdb = { version = "0.22", optional = true }

@@ -76,7 +76,10 @@ where
     B: NetworkBackend + Send + 'static,
     B::State: Send + Sync,
 {
-    fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, overwatch_rs::DynError> {
+    fn init(
+        service_state: ServiceStateHandle<Self>,
+        _init_state: Self::State,
+    ) -> Result<Self, overwatch_rs::DynError> {
         Ok(Self {
             backend: <B as NetworkBackend>::new(
                 service_state.settings_reader.get_updated_settings().backend,

@@ -140,7 +140,10 @@ where
     S: DaStorageAdapter<Blob = Backend::DaBlob, Attestation = ()> + Send + Sync + 'static,
     S::Settings: Clone + Send + Sync + 'static,
 {
-    fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, DynError> {
+    fn init(
+        service_state: ServiceStateHandle<Self>,
+        _init_state: Self::State,
+    ) -> Result<Self, DynError> {
         let DaVerifierServiceSettings {
             verifier_settings, ..
         } = service_state.settings_reader.get_updated_settings();
