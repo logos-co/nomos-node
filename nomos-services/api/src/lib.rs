@@ -53,7 +53,10 @@ where
     B: Backend + Send + Sync + 'static,
 {
     /// Initialize the service with the given state
-    fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, DynError> {
+    fn init(
+        service_state: ServiceStateHandle<Self>,
+        _init_state: Self::State,
+    ) -> Result<Self, DynError> {
         let settings = service_state.settings_reader.get_updated_settings();
         Ok(Self {
             settings,
