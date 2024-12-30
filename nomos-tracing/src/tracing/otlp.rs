@@ -1,9 +1,14 @@
 // std
 use std::error::Error;
 // crates
-use opentelemetry::{global, trace::TracerProvider as _};
+use opentelemetry::{global, trace::TracerProvider as _, KeyValue};
 use opentelemetry_otlp::WithExportConfig;
-use opentelemetry_sdk::trace::{BatchConfig, Sampler, Tracer};
+use opentelemetry_sdk::{
+    propagation::TraceContextPropagator,
+    trace::{BatchConfig, Sampler, Tracer},
+    Resource,
+};
+use opentelemetry_semantic_conventions::resource::SERVICE_NAME;
 use serde::{Deserialize, Serialize};
 use tracing::Subscriber;
 use tracing_opentelemetry::OpenTelemetryLayer;
@@ -15,6 +20,7 @@ use url::Url;
 pub struct OtlpTracingConfig {
     pub endpoint: Url,
     pub sample_ratio: f64,
+    pub service_name: String,
 }
 
 pub fn create_otlp_tracing_layer<S>(
@@ -26,15 +32,21 @@ where
     let otel_exporter = opentelemetry_otlp::new_exporter()
         .tonic()
         .with_endpoint(config.endpoint);
+    let resource = Resource::new(vec![KeyValue::new(SERVICE_NAME, config.service_name)]);
     let tracer_provider = opentelemetry_otlp::new_pipeline()
         .tracing()
-        .with_trace_config(opentelemetry_sdk::trace::Config::default().with_sampler(
-            Sampler::ParentBased(Box::new(Sampler::TraceIdRatioBased(config.sample_ratio))),
-        ))
+        .with_trace_config(
+            opentelemetry_sdk::trace::Config::default()
+                .with_sampler(Sampler::ParentBased(Box::new(Sampler::TraceIdRatioBased(
+                    config.sample_ratio,
+                ))))
+                .with_resource(resource),
+        )
         .with_batch_config(BatchConfig::default())
         .with_exporter(otel_exporter)
         .install_batch(opentelemetry_sdk::runtime::Tokio)?;
 
+    global::set_text_map_propagator(TraceContextPropagator::new());
     global::set_tracer_provider(tracer_provider.clone());
     let tracer: opentelemetry_sdk::trace::Tracer = tracer_provider.tracer("NomosTracer");
 

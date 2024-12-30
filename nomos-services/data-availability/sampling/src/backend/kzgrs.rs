@@ -9,8 +9,10 @@ use rand::prelude::*;
 use serde::{Deserialize, Serialize};
 use tokio::time;
 use tokio::time::Interval;
+use tracing::instrument;
 
 use kzgrs_backend::common::blob::DaBlob;
+use nomos_tracing::info_with_id;
 
 //
 // internal
@@ -71,8 +73,10 @@ impl<R: Rng + Sync + Send> DaSamplingServiceBackend<R> for KzgrsSamplingBackend<
         self.validated_blobs.clone()
     }
 
+    #[instrument(skip_all)]
     async fn mark_completed(&mut self, blobs_ids: &[Self::BlobId]) {
         for id in blobs_ids {
+            info_with_id!(id, "MarkInBlock");
             self.pending_sampling_blobs.remove(id);
             self.validated_blobs.remove(id);
         }

@@ -48,17 +48,6 @@ services:
       - "chown"
       - "10001:10001"
       - "/var/tempo"
-    volumes:
-      - tempo-data:/var/tempo
-
-  memcached:
-    image: memcached:1.6.29
-    container_name: memcached
-    ports:
-      - "11211:11211"
-    environment:
-      - MEMCACHED_MAX_MEMORY=64m
-      - MEMCACHED_THREADS=4
 
   tempo:
     image: *tempoImage
@@ -66,12 +55,7 @@ services:
     command: [ "-config.file=/etc/tempo.yaml" ]
     volumes:
       - ./testnet/monitoring/tempo.yaml:/etc/tempo.yaml:z
-      - tempo-data:/var/tempo
     ports:
       - "4317:4317"  # otlp grpc
     depends_on:
       - tempo-init
-      - memcached
-
-volumes:
-  tempo-data:

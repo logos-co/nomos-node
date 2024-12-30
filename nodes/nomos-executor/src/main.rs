@@ -10,8 +10,6 @@ use nomos_node::{
     DA_TOPIC,
 };
 use overwatch_rs::overwatch::*;
-use tracing::{span, Level};
-use uuid::Uuid;
 // internal
 
 #[derive(Parser, Debug)]
@@ -53,13 +51,6 @@ fn main() -> Result<()> {
             cryptarchia_args,
         )?;
 
-    #[cfg(debug_assertions)]
-    let debug_span = {
-        let debug_id = Uuid::new_v4();
-        span!(Level::DEBUG, "Nomos", debug_id = debug_id.to_string())
-    };
-    #[cfg(debug_assertions)]
-    let _guard = debug_span.enter();
     let app = OverwatchRunner::<NomosExecutor>::run(
         NomosExecutorServiceSettings {
             network: config.network,

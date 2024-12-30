@@ -17,6 +17,7 @@ use nomos_da_sampling::backend::DaSamplingServiceBackend;
 use nomos_mempool::{backend::MemPool, network::NetworkAdapter as MempoolAdapter};
 use nomos_storage::backends::StorageBackend;
 use nomos_storage::StorageService;
+use nomos_tracing::info_with_id;
 use overwatch_rs::services::handle::ServiceStateHandle;
 use overwatch_rs::services::life_cycle::LifecycleMessage;
 use overwatch_rs::services::relay::{Relay, RelayMessage};
@@ -28,7 +29,9 @@ use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use storage::DaStorageAdapter;
 use tokio::sync::oneshot::Sender;
-use tracing::error;
+use tracing::{error, instrument};
+
+const DA_INDEXER_TAG: ServiceId = "DA-Indexer";
 
 pub type ConsensusRelay<
     A,
@@ -213,7 +216,7 @@ where
     SamplingNetworkAdapter: nomos_da_sampling::network::NetworkAdapter,
     SamplingStorage: nomos_da_sampling::storage::DaStorageAdapter,
 {
-    const SERVICE_ID: ServiceId = "DaIndexer";
+    const SERVICE_ID: ServiceId = DA_INDEXER_TAG;
     type Settings = IndexerSettings<DaStorage::Settings>;
     type State = NoState<Self::Settings>;
     type StateOperator = NoOperator<Self::State>;
@@ -267,7 +270,8 @@ where
     DaPoolAdapter::Payload: DispersedBlobInfo + Into<DaPool::Item> + Debug,
     ClPool::Item: Clone + Eq + Hash + Debug + 'static,
     ClPool::Key: Debug + 'static,
-    DaPool::Item: Metadata + Clone + Eq + Hash + Debug + 'static,
+    DaPool::Item: DispersedBlobInfo + Metadata + Clone + Eq + Hash + Debug + 'static,
+    <DaPool::Item as DispersedBlobInfo>::BlobId: AsRef<[u8]>,
     DaPool::Key: Debug + 'static,
     <DaPool::Item as Metadata>::Index: Send + Sync,
     A::Backend: 'static,
@@ -283,22 +287,28 @@ where
     SamplingNetworkAdapter: nomos_da_sampling::network::NetworkAdapter,
     SamplingStorage: nomos_da_sampling::storage::DaStorageAdapter,
 {
+    #[instrument(skip_all)]
     async fn handle_new_block(
         storage_adapter: &DaStorage,
         block: Block<ClPool::Item, DaPool::Item>,
     ) -> Result<(), DynError> {
         for info in block.blobs() {
+            info_with_id!(info.blob_id().as_ref(), "HandleNewBlock");
             storage_adapter.add_index(info).await?;
         }
         Ok(())
     }
 
+    #[instrument(skip_all)]
     async fn handle_da_msg(
         storage_adapter: &DaStorage,
         msg: DaMsg<B, DaPool::Item>,
     ) -> Result<(), DynError> {
         match msg {
-            DaMsg::AddIndex { info } => storage_adapter.add_index(&info).await,
+            DaMsg::AddIndex { info } => {
+                info_with_id!(info.blob_id().as_ref(), "AddIndex");
+                storage_adapter.add_index(&info).await
+            }
             DaMsg::GetRange {
                 app_id,
                 range,
@@ -401,7 +411,7 @@ where
         + 'static,
     <DaPool::Item as Metadata>::AppId: Send + Sync,
     <DaPool::Item as Metadata>::Index: Send + Sync,
-
+    <<DaPool as MemPool>::Item as DispersedBlobInfo>::BlobId: AsRef<[u8]>,
     A::Backend: 'static,
     TxS: TxSelect<Tx = ClPool::Item>,
     BS: BlobSelect<BlobId = DaPool::Item>,
@@ -434,6 +444,7 @@ where
             consensus_relay,
             storage_relay,
         } = self;
+
         let consensus_relay = consensus_relay
             .connect()
             .await
@@ -471,6 +482,7 @@ where
                 }
             }
         }
+
         Ok(())
     }
 }

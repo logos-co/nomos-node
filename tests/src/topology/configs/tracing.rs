@@ -23,7 +23,8 @@ impl GeneralTracingConfig {
                 }),
                 tracing: TracingLayer::Otlp(OtlpTracingConfig {
                     endpoint: "http://localhost:4317".try_into().unwrap(),
-                    sample_ratio: 0.1,
+                    sample_ratio: 0.5,
+                    service_name: host_identifier.clone(),
                 }),
                 filter: FilterLayer::EnvFilter(nomos_tracing::filter::envfilter::EnvFilterConfig {
                     // Allow events only from modules that matches the regex, if it matches - use

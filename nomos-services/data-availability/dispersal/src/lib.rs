@@ -4,7 +4,7 @@ use std::marker::PhantomData;
 // crates
 use serde::{Deserialize, Serialize};
 use tokio::sync::oneshot;
-use tracing::log::error;
+use tracing::error;
 // internal
 use crate::adapters::mempool::DaMempoolAdapter;
 use crate::adapters::network::DispersalNetworkAdapter;
@@ -120,6 +120,7 @@ where
             service_state,
             ..
         } = self;
+
         let DispersalServiceSettings {
             backend: backend_settings,
         } = service_state.settings_reader.get_updated_settings();
@@ -144,6 +145,7 @@ where
                 }
             }
         }
+
         Ok(())
     }
 }

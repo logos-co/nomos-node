@@ -16,6 +16,7 @@ use nomos_da_network_core::protocols::dispersal::executor::behaviour::DispersalE
 use nomos_da_network_core::swarm::executor::ExecutorSwarm;
 use nomos_da_network_core::SubnetworkId;
 use nomos_libp2p::ed25519;
+use nomos_tracing::info_with_id;
 use overwatch_rs::overwatch::handle::OverwatchHandle;
 use overwatch_rs::services::state::NoState;
 use serde::{Deserialize, Serialize};
@@ -29,6 +30,7 @@ use tokio::sync::broadcast;
 use tokio::sync::mpsc::UnboundedSender;
 use tokio::task::JoinHandle;
 use tokio_stream::wrappers::{BroadcastStream, UnboundedReceiverStream};
+use tracing::instrument;
 
 /// Message that the backend replies to
 #[derive(Debug)]
@@ -217,18 +219,21 @@ where
         executor_handle.abort();
     }
 
+    #[instrument(skip_all)]
     async fn process(&self, msg: Self::Message) {
         match msg {
             ExecutorDaNetworkMessage::RequestSample {
                 subnetwork_id,
                 blob_id,
             } => {
+                info_with_id!(&blob_id, "RequestSample");
                 handle_sample_request(&self.sampling_request_channel, subnetwork_id, blob_id).await;
             }
             ExecutorDaNetworkMessage::RequestDispersal {
                 subnetwork_id,
                 da_blob,
             } => {
+                info_with_id!(&da_blob.id(), "RequestDispersal");
                 if let Err(e) = self.dispersal_blobs_sender.send((subnetwork_id, *da_blob)) {
                     error!("Could not send internal blob to underlying dispersal behaviour: {e}");
                 }

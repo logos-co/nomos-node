@@ -12,6 +12,7 @@ nomos-da-network-core = { path = "../../../nomos-da/network/core" }
 nomos-da-network-service = { path = "../../../nomos-services/data-availability/network" }
 nomos-da-sampling = { path = "../sampling" }
 nomos-mempool = { path = "../../mempool", features = ["libp2p"] }
+nomos-tracing = { path = "../../../nomos-tracing" }
 kzgrs-backend = { path = "../../../nomos-da/kzgrs-backend" }
 overwatch-rs = { git = "https://github.com/logos-co/Overwatch", rev = "4160cdd" }
 rand = "0.8"

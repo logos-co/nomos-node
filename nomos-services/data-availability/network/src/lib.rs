@@ -19,6 +19,8 @@ use tokio::sync::oneshot;
 use tracing::error;
 // internal
 
+const DA_NETWORK_TAG: ServiceId = "DA-Network";
+
 pub enum DaNetworkMsg<B: NetworkBackend> {
     Process(B::Message),
     Subscribe {
@@ -61,7 +63,7 @@ pub struct NetworkState<B: NetworkBackend> {
 }
 
 impl<B: NetworkBackend + 'static + Send> ServiceData for NetworkService<B> {
-    const SERVICE_ID: ServiceId = "DaNetwork";
+    const SERVICE_ID: ServiceId = DA_NETWORK_TAG;
     type Settings = NetworkConfig<B>;
     type State = NetworkState<B>;
     type StateOperator = NoOperator<Self::State>;
@@ -94,6 +96,7 @@ where
                 },
             mut backend,
         } = self;
+
         let mut lifecycle_stream = lifecycle_handle.message_stream();
         loop {
             tokio::select! {
@@ -108,6 +111,7 @@ where
                 }
             }
         }
+
         Ok(())
     }
 }
