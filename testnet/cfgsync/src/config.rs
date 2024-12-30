@@ -204,9 +204,7 @@ fn tracing_config_for_grafana(params: TracingParams, identifier: String) -> Gene
             }),
             filter: FilterLayer::None,
             metrics: MetricsLayer::Otlp(OtlpMetricsConfig {
-                endpoint: "http://127.0.0.1:9090/api/v1/otlp/v1/metrics"
-                    .try_into()
-                    .unwrap(),
+                endpoint: params.metrics_endpoint,
                 host_identifier: identifier,
             }),
             level: Level::INFO,
