@@ -12,7 +12,7 @@ use kzgrs::{
 use nomos_core::da::blob::Blob;
 // internal
 use crate::common::blob::DaBlob;
-use crate::common::{hash_column_and_commitment, Chunk, Column};
+use crate::common::{hash_commitment, Chunk, Column};
 use crate::encoder::DaEncoderParams;
 
 pub struct DaVerifier {
@@ -58,11 +58,11 @@ impl DaVerifier {
             return false;
         }
         // 3. compute column hash
-        let column_hash = hash_column_and_commitment::<
+        let commitment_hash = hash_commitment::<
             { DaEncoderParams::MAX_BLS12_381_ENCODING_CHUNK_SIZE },
-        >(column, column_commitment);
+        >(column_commitment);
         // 4. check proof with commitment and proof over the aggregated column commitment
-        let element = field_element_from_bytes_le(column_hash.as_slice());
+        let element = field_element_from_bytes_le(commitment_hash.as_slice());
         verify_element_proof(
             index,
             &element,
@@ -152,7 +152,7 @@ impl DaVerifier {
 #[cfg(test)]
 mod test {
     use crate::common::blob::DaBlob;
-    use crate::common::{hash_column_and_commitment, Chunk, Column};
+    use crate::common::{hash_commitment, Chunk, Column};
     use crate::encoder::test::{rand_data, ENCODER};
     use crate::encoder::DaEncoderParams;
     use crate::global::GLOBAL_PARAMETERS;
@@ -196,16 +196,14 @@ mod test {
             bytes_to_polynomial::<BYTES_PER_FIELD_ELEMENT>(column.as_bytes().as_slice(), domain)?;
         let column_commitment = commit_polynomial(&column_poly, global_params)?;
 
-        let (aggregated_evals, aggregated_poly) = bytes_to_polynomial::<
-            { DaEncoderParams::MAX_BLS12_381_ENCODING_CHUNK_SIZE },
-        >(
-            hash_column_and_commitment::<{ DaEncoderParams::MAX_BLS12_381_ENCODING_CHUNK_SIZE }>(
-                &column,
-                &column_commitment,
-            )
-            .as_slice(),
-            domain,
-        )?;
+        let (aggregated_evals, aggregated_poly) =
+            bytes_to_polynomial::<{ DaEncoderParams::MAX_BLS12_381_ENCODING_CHUNK_SIZE }>(
+                hash_commitment::<{ DaEncoderParams::MAX_BLS12_381_ENCODING_CHUNK_SIZE }>(
+                    &column_commitment,
+                )
+                .as_slice(),
+                domain,
+            )?;
 
         let aggregated_commitment = commit_polynomial(&aggregated_poly, global_params)?;
 
