@@ -1,12 +1,10 @@
 // STD
 use std::fmt::Debug;
 use std::io;
-use std::marker::PhantomData;
 // Crates
 use log::error;
 use overwatch_rs::services::state::{ServiceState, StateOperator};
-use serde::de::DeserializeOwned;
-use serde::{Deserialize, Serialize};
+use serde::{de::DeserializeOwned, Serialize};
 
 trait FromSettings {
     type Settings;
@@ -14,108 +12,61 @@ trait FromSettings {
 }
 
 #[derive(thiserror::Error, Debug)]
-pub enum MyError {
+pub enum RecoveryError {
     #[error(transparent)]
     IoError(#[from] io::Error),
     #[error(transparent)]
     SerdeError(#[from] serde_json::Error),
 }
 
-type _Result<T> = Result<T, MyError>;
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-struct RecoverableState<Backend, Settings>
-where
-    Backend: RecoveryBackend + Debug + Clone,
-    Backend::State: Serialize + DeserializeOwned + Debug + Clone,
-{
-    #[serde(flatten)]
-    state: <Backend as RecoveryBackend>::State,
-    #[serde(skip)]
-    settings: PhantomData<Settings>,
-    #[serde(skip)]
-    backend: PhantomData<Backend>,
-}
-
-impl<Backend, Settings> RecoverableState<Backend, Settings>
-where
-    Backend: RecoveryBackend + Debug + Clone,
-    Backend::State: Serialize + DeserializeOwned + Debug + Clone,
-{
-    fn new(state: <Backend as RecoveryBackend>::State) -> Self {
-        Self {
-            state,
-            settings: Default::default(),
-            backend: Default::default(),
-        }
-    }
-}
-
-impl<Backend, Settings> ServiceState for RecoverableState<Backend, Settings>
-where
-    Backend: RecoveryBackend + FromSettings<Settings = Settings> + Debug + Clone,
-    Backend::State: Default + Serialize + DeserializeOwned + Debug + Clone,
-{
-    type Settings = Settings;
-    type Error = MyError;
-
-    fn from_settings(settings: &Self::Settings) -> Result<Self, Self::Error> {
-        let state = Backend::from_settings(settings)
-            .load_state()
-            .unwrap_or_default();
-        Ok(Self {
-            state,
-            settings: Default::default(),
-            backend: Default::default(),
-        })
-    }
-}
+type _Result<T> = Result<T, RecoveryError>;
 
 trait RecoveryBackend {
-    type State;
+    type State: ServiceState;
     fn load_state(&self) -> _Result<Self::State>;
     fn save_state(&self, state: &Self::State) -> _Result<()>;
 }
 
 #[derive(Debug, Clone)]
-struct RecoveryOperator<Backend, Settings>
+struct RecoveryOperator<Backend>
 where
-    Backend: RecoveryBackend + Clone + Debug,
-    Backend::State: Clone + Debug,
-    Settings: Clone + Debug,
+    Backend: RecoveryBackend + Debug + Clone,
+    Backend::State: Debug + Clone,
 {
     recovery_backend: Backend,
-    settings: PhantomData<Settings>,
 }
 
-impl<Backend: RecoveryBackend, Settings> RecoveryOperator<Backend, Settings>
+impl<Backend: RecoveryBackend> RecoveryOperator<Backend>
 where
-    Backend: RecoveryBackend + FromSettings + Clone + Debug,
-    Backend::State: Clone + Debug,
-    Settings: Clone + Debug,
+    Backend: RecoveryBackend + FromSettings + Debug + Clone,
+    Backend::State: Debug + Clone,
 {
     fn new(recovery_backend: Backend) -> Self {
-        Self {
-            recovery_backend,
-            settings: Default::default(),
-        }
+        Self { recovery_backend }
     }
 }
 
 #[async_trait::async_trait]
-impl<Backend, Settings> StateOperator for RecoveryOperator<Backend, Settings>
+impl<Backend> StateOperator for RecoveryOperator<Backend>
 where
-    Settings: Send + Debug + Clone,
-    Backend: RecoveryBackend + FromSettings<Settings = Settings> + Debug + Clone + Send,
-    Backend::State: Serialize
-        + DeserializeOwned
-        + FromSettings<Settings = Settings>
+    Backend: RecoveryBackend
+        + FromSettings<Settings = <Backend::State as ServiceState>::Settings>
         + Send
-        + Default
         + Debug
         + Clone,
+    Backend::State: Serialize + DeserializeOwned + Default + Send + Debug + Clone,
 {
-    type StateInput = RecoverableState<Backend, Settings>;
+    type StateInput = Backend::State;
+    type LoadError = RecoveryError;
+
+    fn try_load(
+        settings: &<Self::StateInput as ServiceState>::Settings,
+    ) -> Result<Option<Self::StateInput>, Self::LoadError> {
+        Backend::from_settings(settings)
+            .load_state()
+            .map(Option::from)
+            .map_err(RecoveryError::from)
+    }
 
     fn from_settings(settings: <Self::StateInput as ServiceState>::Settings) -> Self {
         let recovery_backend = Backend::from_settings(&settings);
@@ -125,8 +76,8 @@ where
     async fn run(&mut self, state: Self::StateInput) {
         let save_result = self
             .recovery_backend
-            .save_state(&state.state)
-            .map_err(MyError::from);
+            .save_state(&state)
+            .map_err(RecoveryError::from);
         if let Err(error) = save_result {
             error!("{}", error);
         }
@@ -143,52 +94,56 @@ mod tests {
     use overwatch_rs::services::relay::RelayMessage;
     use overwatch_rs::services::{ServiceCore, ServiceData, ServiceId};
     use overwatch_rs::DynError;
+    use serde::Deserialize;
     use std::env::temp_dir;
+    use std::marker::PhantomData;
     use std::path::PathBuf;
 
     #[derive(Debug, Clone)]
     struct FileBackend<State> {
-        directory: PathBuf,
+        recovery_file: PathBuf,
         state: PhantomData<State>,
     }
 
     impl<State> FromSettings for FileBackend<State> {
-        type Settings = MySettings;
+        type Settings = SettingsWithRecovery;
         fn from_settings(settings: &Self::Settings) -> Self {
             Self {
-                directory: settings.recovery_directory.clone(),
+                recovery_file: settings.recovery_file.clone(),
                 state: Default::default(),
             }
         }
     }
 
-    impl<State> FileBackend<State> {
-        fn recovery_file(&self) -> PathBuf {
-            self.directory.join("state.json")
-        }
-    }
-
     impl<State> RecoveryBackend for FileBackend<State>
     where
-        State: Serialize + DeserializeOwned,
+        State: ServiceState + Serialize + DeserializeOwned,
     {
         type State = State;
 
         fn load_state(&self) -> _Result<Self::State> {
             let serialized_state =
-                std::fs::read_to_string(self.recovery_file()).map_err(MyError::from)?;
-            serde_json::from_str(&serialized_state).map_err(MyError::from)
+                std::fs::read_to_string(&self.recovery_file).map_err(RecoveryError::from)?;
+            serde_json::from_str(&serialized_state).map_err(RecoveryError::from)
         }
 
         fn save_state(&self, state: &Self::State) -> _Result<()> {
             let deserialized_state = serde_json::to_string(state)?;
-            std::fs::write(self.recovery_file(), deserialized_state).map_err(MyError::from)
+            std::fs::write(&self.recovery_file, deserialized_state).map_err(RecoveryError::from)
         }
     }
 
     #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-    struct MyActualState {
+    struct MyState {
         value: String,
+    }
+
+    impl ServiceState for MyState {
+        type Settings = SettingsWithRecovery;
+        type Error = DynError;
+        fn from_settings(_settings: &Self::Settings) -> Result<Self, DynError> {
+            Ok(Self::default())
+        }
     }
 
     #[derive(Debug)]
@@ -197,17 +152,8 @@ mod tests {
     impl RelayMessage for MyMessage {}
 
     #[derive(Debug, Clone)]
-    pub struct MySettings {
-        recovery_directory: PathBuf,
-    }
-
-    impl FromSettings for MyActualState {
-        type Settings = MySettings;
-        fn from_settings(_settings: &Self::Settings) -> Self {
-            Self {
-                value: "Hello".to_string(),
-            }
-        }
+    pub struct SettingsWithRecovery {
+        recovery_file: PathBuf,
     }
 
     struct Recovery {
@@ -216,9 +162,9 @@ mod tests {
 
     impl ServiceData for Recovery {
         const SERVICE_ID: ServiceId = "RECOVERY_SERVICE";
-        type Settings = MySettings;
-        type State = RecoverableState<FileBackend<MyActualState>, Self::Settings>;
-        type StateOperator = RecoveryOperator<FileBackend<MyActualState>, Self::Settings>;
+        type Settings = SettingsWithRecovery;
+        type State = MyState;
+        type StateOperator = RecoveryOperator<FileBackend<Self::State>>;
         type Message = MyMessage;
     }
 
@@ -228,7 +174,7 @@ mod tests {
             service_state: ServiceStateHandle<Self>,
             initial_state: Self::State,
         ) -> Result<Self, DynError> {
-            println!("Initial State: {:#?}", initial_state);
+            assert_eq!(initial_state.value, "");
             Ok(Self {
                 service_state_handle: service_state,
             })
@@ -239,11 +185,9 @@ mod tests {
                 service_state_handle,
             } = self;
 
-            service_state_handle
-                .state_updater
-                .update(Self::State::new(MyActualState {
-                    value: "Hello".to_string(),
-                }));
+            service_state_handle.state_updater.update(Self::State {
+                value: "Hello".to_string(),
+            });
 
             service_state_handle.overwatch_handle.shutdown().await;
             Ok(())
@@ -257,30 +201,26 @@ mod tests {
 
     #[test]
     fn test_recovery() {
-        // Initialize the recovery settings
-        let recovery_directory = temp_dir();
-        let recovery_settings = MySettings {
-            recovery_directory: recovery_directory.clone(),
-        };
+        // Initialize recovery file backend
+        let recovery_file = temp_dir().join("recovery_test.json");
+        let recovery_settings = SettingsWithRecovery { recovery_file };
+        let file_backend: FileBackend<MyState> = FileBackend::from_settings(&recovery_settings);
 
-        // Verify that the recovery file does not exist
-        let file_backend: FileBackend<MyActualState> =
-            FileBackend::from_settings(&recovery_settings);
-        assert!(!file_backend.recovery_file().exists());
-
-        // Run the recovery service
+        // Run the service with recovery enabled
         let service_settings = RecoveryTestServiceSettings {
             recovery: recovery_settings,
         };
         let app = OverwatchRunner::<RecoveryTest>::run(service_settings, None).unwrap();
         app.wait_finished();
 
-        // Verify the recovery file content
-        assert!(file_backend.recovery_file().exists());
-        let serialized_state = std::fs::read_to_string(file_backend.recovery_file()).unwrap();
-        assert_eq!(serialized_state, "{\"value\":\"Hello\"}");
+        // Read contents of the recovery file
+        let serialized_state = std::fs::read_to_string(&file_backend.recovery_file);
 
-        // Clean up
-        std::fs::remove_file(file_backend.recovery_file()).unwrap();
+        // Early clean up (to avoid left over due to test failure)
+        std::fs::remove_file(&file_backend.recovery_file).unwrap();
+
+        // Verify the recovery file was created and contains the correct state
+        assert!(serialized_state.is_ok());
+        assert_eq!(serialized_state.unwrap(), "{\"value\":\"Hello\"}");
     }
 }
