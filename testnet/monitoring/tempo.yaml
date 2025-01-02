@@ -23,6 +23,7 @@ distributor:
       protocols:
         http:
         grpc:
+          endpoint: 0.0.0.0:4317
     opencensus:
 
 ingester:

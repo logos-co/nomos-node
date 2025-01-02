@@ -41,7 +41,7 @@ impl GeneralTracingConfig {
                         .unwrap(),
                     host_identifier,
                 }),
-                level: Level::DEBUG,
+                level: Level::INFO,
             },
         }
     }

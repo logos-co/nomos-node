@@ -7,7 +7,8 @@ export CFG_FILE_PATH="/config.yaml" \
        CFG_HOST_IP=$(hostname -i) \
        CFG_HOST_IDENTIFIER="validator-$(hostname -i)" \
        LOG_LEVEL="INFO" \
-       RISC0_DEV_MODE=true
+       RISC0_DEV_MODE=true \
+       RUST_BACKTRACE=1
 
 /usr/bin/cfgsync-client && \
     exec /usr/bin/nomos-node /config.yaml
