@@ -58,6 +58,10 @@ jobs:
         with:
           command: build
 
+      - name: Print artifacts
+        run: |
+          tree target || echo "No artifacts found"
+
 #      - name: Export artifacts
 #        uses: actions/upload-artifact@v2
 #        with:
