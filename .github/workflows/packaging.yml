@@ -61,6 +61,7 @@ jobs:
       - name: Print Folder Tree
         uses: jaywcjlove/github-action-folder-tree@main
         with:
+          exclude: ".fingerprint|build|deps|incremental"
           path: ./target/
           depth: 4
 
