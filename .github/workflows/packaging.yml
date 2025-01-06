@@ -42,12 +42,21 @@ jobs:
       run:
         shell: ${{ matrix.shell }}
     steps:
+      - uses: actions-rs/toolchain@v1
+        name: Install Rust toolchain
+        with:
+          toolchain: stable
+
       - name: Checkout
         uses: actions/checkout@v3
 
-      - name: Build and package
+      - name: Enable packaging on build
         run: |
-          BUILD_PACKAGE=true cargo build
+          echo "BUILD_PACKAGE=true" >> $GITHUB_ENV
+
+      - uses: actions-rs/cargo@v1
+        with:
+          command: build
 
 #      - name: Export artifacts
 #        uses: actions/upload-artifact@v2
