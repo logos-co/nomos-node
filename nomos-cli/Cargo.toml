@@ -3,6 +3,7 @@ name = "nomos-cli"
 version = "0.1.0"
 edition = "2021"
 description = "Cli app to interact with Nomos nodes and perform various tasks"
+default-run = "nomos-cli"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -18,3 +19,9 @@ serde = { version = "1.0", features = ["derive"] }
 tokio = { version = "1", features = ["sync"] }
 tracing = "0.1"
 tracing-subscriber = "0.3"
+
+[build-dependencies]
+tauri-bundler = "2.2.0"
+tauri-utils = "2.1.1"
+log = "0.4.22"
+env_logger = "0.11.6"
