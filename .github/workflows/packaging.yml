@@ -27,30 +27,37 @@ jobs:
           - platform:
               os: linux
             builder: ubuntu-22.04
-          #            shell: bash
           - platform:
               os: macos
             builder: macos-13
-          #            shell: bash
           - platform:
               os: windows
             builder: windows-2022
-    #            shell: msys2 {0}
     runs-on:
       ${{ matrix.builder }}
-    #    defaults:
-    #      run:
-    #        shell: ${{ matrix.shell }}
     steps:
       - uses: actions-rs/toolchain@v1
         name: Install Rust toolchain
         with:
           toolchain: stable
 
+      - name: Install Risc0 toolchain (unix)
+        if: matrix.platform.os == 'linux' || matrix.platform.os == 'macos'
+        run: |
+          curl -L https://risczero.com/install | bash
+          rzup install
+
+      - name: Install Risc0 toolchain (windows)
+        if: matrix.platform.os == 'windows'
+        run: |
+          Invoke-WebRequest -Uri https://risczero.com/install -OutFile install.ps1
+          .\install.ps1
+          rzup install
+
       - name: Checkout
         uses: actions/checkout@v3
 
-      - name: Enable packaging on build (linux)
+      - name: Enable packaging on build (unix)
         if: matrix.platform.os == 'linux' || matrix.platform.os == 'macos'
         run: |
           echo "BUILD_PACKAGE=true" >> $GITHUB_ENV
