@@ -27,20 +27,20 @@ jobs:
           - platform:
               os: linux
             builder: ubuntu-22.04
-            shell: bash
+          #            shell: bash
           - platform:
               os: macos
             builder: macos-13
-            shell: bash
+          #            shell: bash
           - platform:
               os: windows
             builder: windows-2022
-            shell: msys2 {0}
+    #            shell: msys2 {0}
     runs-on:
       ${{ matrix.builder }}
-    defaults:
-      run:
-        shell: ${{ matrix.shell }}
+    #    defaults:
+    #      run:
+    #        shell: ${{ matrix.shell }}
     steps:
       - uses: actions-rs/toolchain@v1
         name: Install Rust toolchain
