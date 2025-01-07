@@ -10,7 +10,7 @@ on:
 
 jobs:
   package:
-    name: Package
+    name: '${{ matrix.platform.os }}-${{ matrix.platform.cpu }}'
     strategy:
       fail-fast: false
       matrix:
@@ -37,7 +37,7 @@ jobs:
             builder: windows-2022
             shell: msys2 {0}
     runs-on:
-      ${{ matrix.platform.os }}
+      ${{ matrix.builder }}
     defaults:
       run:
         shell: ${{ matrix.shell }}
@@ -58,11 +58,25 @@ jobs:
         with:
           command: build
 
-      - name: Print Folder Tree
+      - name: Print Target
         uses: jaywcjlove/github-action-folder-tree@main
         with:
           exclude: ".fingerprint|build|deps|incremental"
           path: ./target/
+          depth: 1
+
+      - name: Print Debug
+        uses: jaywcjlove/github-action-folder-tree@main
+        with:
+          exclude: ".fingerprint|build|deps|incremental"
+          path: ./target/debug/
+          depth: 4
+
+      - name: Print Release
+        uses: jaywcjlove/github-action-folder-tree@main
+        with:
+          exclude: ".fingerprint|build|deps|incremental"
+          path: ./target/release/
           depth: 4
 
 #      - name: Export artifacts
