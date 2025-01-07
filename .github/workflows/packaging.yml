@@ -10,7 +10,7 @@ on:
 
 jobs:
   package:
-    name: '${{ matrix.platform.os }}-${{ matrix.platform.cpu }}'
+    name: 'Packaging on ${{ matrix.platform.os }}-${{ matrix.platform.cpu }}'
     strategy:
       fail-fast: false
       matrix:
@@ -50,9 +50,15 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
 
-      - name: Enable packaging on build
+      - name: Enable packaging on build (linux)
+        if: matrix.platform.os == 'linux' || matrix.platform.os == 'macos'
         run: |
           echo "BUILD_PACKAGE=true" >> $GITHUB_ENV
+
+      - name: Enable packaging on build (windows)
+        if: matrix.platform.os == 'windows'
+        run: |
+          echo "BUILD_PACKAGE=true" | Out-File -FilePath $env:GITHUB_ENV -Append
 
       - uses: actions-rs/cargo@v1
         with:
