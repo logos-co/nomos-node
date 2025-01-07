@@ -39,20 +39,18 @@ jobs:
       - uses: actions-rs/toolchain@v1
         name: Install Rust toolchain
         with:
+          profile: minimal
           toolchain: stable
+          override: true
 
-      - name: Install Risc0 toolchain (unix)
-        if: matrix.platform.os == 'linux' || matrix.platform.os == 'macos'
-        run: |
-          curl -L https://risczero.com/install | bash
-          rzup install
+      - uses: cargo-bins/cargo-binstall@main
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Install Risc0 toolchain (windows)
-        if: matrix.platform.os == 'windows'
-        run: |
-          Invoke-WebRequest -Uri https://risczero.com/install -OutFile install.ps1
-          .\install.ps1
-          rzup install
+      - name: Install risc0
+        run: cargo binstall -y cargo-risczero && cargo risczero install
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Checkout
         uses: actions/checkout@v3
