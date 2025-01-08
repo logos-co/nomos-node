@@ -1,0 +1,12 @@
+[package]
+name = "key-management-system"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+overwatch-rs = { git = "https://github.com/logos-co/Overwatch", rev = "4160cdd" }
+either = "1"
+tokio = "1"
+bytes = "1"
+futures = "0.3"
+async-trait = "0.1"
