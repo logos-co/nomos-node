@@ -3,6 +3,7 @@ use bytes::Bytes;
 use either::Either;
 use overwatch_rs::DynError;
 
+#[async_trait::async_trait]
 pub trait KMSBackend {
     type SupportedKeys;
     type KeyId;
@@ -15,5 +16,5 @@ pub trait KMSBackend {
     ) -> Result<Self::KeyId, DynError>;
     fn public_key(&self, key_id: Self::KeyId) -> Result<Bytes, DynError>;
     fn sign(&self, key_id: Self::KeyId, data: Bytes) -> Result<Bytes, DynError>;
-    fn execute(&mut self, op: KMSOperator);
+    async fn execute(&mut self, op: KMSOperator);
 }
