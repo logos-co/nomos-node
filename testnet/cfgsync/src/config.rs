@@ -216,12 +216,12 @@ fn tracing_config_for_grafana(params: TracingParams, identifier: String) -> Gene
 mod cfgsync_tests {
     use std::str::FromStr;
     use std::{net::Ipv4Addr, time::Duration};
-
+    use tracing::Level;
     use nomos_libp2p::{Multiaddr, Protocol};
     use tests::topology::configs::consensus::ConsensusParams;
     use tests::topology::configs::da::DaParams;
 
-    use crate::TracingParams;
+    use crate::{LogOutput, TracingParams};
 
     use super::{create_node_configs, Host, HostKind};
 
@@ -257,8 +257,8 @@ mod cfgsync_tests {
                 tempo_endpoint: "http://test.com".try_into().unwrap(),
                 loki_endpoint: "http://test.com".try_into().unwrap(),
                 metrics_endpoint: "http://test.com".try_into().unwrap(),
-                log_output: "Stdout".try_into().unwrap(),
-                log_level: "INFO".try_into().unwrap(),
+                log_output: LogOutput::try_from("Stdout").unwrap(),
+                log_level: Level::from_str("INFO").unwrap(),
             },
             hosts,
         );

@@ -1,5 +1,5 @@
 use reqwest::Url;
-use tracing::{log, Level};
+use tracing::Level;
 
 pub mod config;
 pub mod repo;
