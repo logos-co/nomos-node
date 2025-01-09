@@ -257,6 +257,8 @@ mod cfgsync_tests {
                 tempo_endpoint: "http://test.com".try_into().unwrap(),
                 loki_endpoint: "http://test.com".try_into().unwrap(),
                 metrics_endpoint: "http://test.com".try_into().unwrap(),
+                log_output: "Stdout".try_into().unwrap(),
+                log_level: "INFO".try_into().unwrap(),
             },
             hosts,
         );

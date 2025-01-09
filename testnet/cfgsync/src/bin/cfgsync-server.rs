@@ -10,7 +10,7 @@ use axum::Json;
 use axum::{http::StatusCode, response::IntoResponse, routing::post, Router};
 use cfgsync::config::Host;
 use cfgsync::repo::{ConfigRepo, RepoResponse};
-use cfgsync::TracingParams;
+use cfgsync::{LevelExt, LogOutput, TracingParams};
 use clap::Parser;
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
@@ -19,6 +19,7 @@ use tests::nodes::validator::create_validator_config;
 use tests::topology::configs::consensus::ConsensusParams;
 use tests::topology::configs::da::DaParams;
 use tokio::sync::oneshot::channel;
+use tracing::Level;
 // internal
 
 #[derive(Parser, Debug)]
@@ -50,6 +51,8 @@ struct CfgSyncConfig {
     tempo_endpoint: Url,
     loki_endpoint: Url,
     metrics_endpoint: Url,
+    log_output: String,
+    log_level: String,
 }
 
 impl CfgSyncConfig {
@@ -85,6 +88,8 @@ impl CfgSyncConfig {
             tempo_endpoint: self.tempo_endpoint.clone(),
             loki_endpoint: self.loki_endpoint.clone(),
             metrics_endpoint: self.metrics_endpoint.clone(),
+            log_output: LogOutput::try_from(self.log_output.as_str()).unwrap(),
+            log_level: Level::from_str(&self.log_level).unwrap(),
         }
     }
 }
