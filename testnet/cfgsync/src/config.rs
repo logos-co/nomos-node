@@ -214,12 +214,12 @@ fn tracing_config_for_grafana(params: TracingParams, identifier: String) -> Gene
 
 #[cfg(test)]
 mod cfgsync_tests {
+    use nomos_libp2p::{Multiaddr, Protocol};
     use std::str::FromStr;
     use std::{net::Ipv4Addr, time::Duration};
-    use tracing::Level;
-    use nomos_libp2p::{Multiaddr, Protocol};
     use tests::topology::configs::consensus::ConsensusParams;
     use tests::topology::configs::da::DaParams;
+    use tracing::Level;
 
     use crate::{LogOutput, TracingParams};
 
