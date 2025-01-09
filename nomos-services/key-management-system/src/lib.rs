@@ -1,4 +1,4 @@
-use crate::backends::KMSBackend;
+use crate::backend::KMSBackend;
 use crate::secure_key::SecuredKey;
 use bytes::Bytes;
 use either::Either;
@@ -9,10 +9,9 @@ use overwatch_rs::services::{ServiceCore, ServiceData, ServiceId};
 use overwatch_rs::DynError;
 use std::fmt::{Debug, Formatter};
 use std::future::Future;
-use std::marker::PhantomData;
 use tokio::sync::oneshot;
 
-mod backends;
+mod backend;
 mod secure_key;
 
 const KMS_TAG: ServiceId = "KMS";
@@ -76,10 +75,15 @@ where
     }
 }
 
-impl<B: backends::KMSBackend + 'static> RelayMessage for KMSMessage<B> {}
+impl<B: backend::KMSBackend + 'static> RelayMessage for KMSMessage<B> {}
+
+#[derive(Clone)]
+pub struct KMSServiceSettings<BackendSettings> {
+    backend_settings: BackendSettings,
+}
 
 pub struct KMSService<Backend> {
-    _backend: PhantomData<Backend>,
+    backend: Backend,
 }
 
 impl<Backend> ServiceData for KMSService<Backend>
@@ -87,9 +91,10 @@ where
     Backend: KMSBackend + 'static,
     Backend::KeyId: Debug,
     Backend::SupportedKeys: Debug,
+    Backend::Settings: Clone,
 {
     const SERVICE_ID: ServiceId = KMS_TAG;
-    type Settings = ();
+    type Settings = KMSServiceSettings<Backend::Settings>;
     type State = NoState<Self::Settings>;
     type StateOperator = NoOperator<Self::State>;
     type Message = KMSMessage<Backend>;
@@ -101,9 +106,13 @@ where
     Backend: KMSBackend + Send + 'static,
     Backend::KeyId: Debug,
     Backend::SupportedKeys: Debug,
+    Backend::Settings: Clone,
 {
     fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, DynError> {
-        todo!()
+        let KMSServiceSettings { backend_settings } =
+            service_state.settings_reader.get_updated_settings();
+        let backend = Backend::new(backend_settings);
+        Ok(Self { backend })
     }
 
     async fn run(self) -> Result<(), DynError> {
