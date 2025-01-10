@@ -15,7 +15,19 @@ old_blobs_check_interval_secs: 5
 blobs_validity_duration_secs: 60
 global_params_path: "/kzgrs_test_params"
 
-# Tracing params
-tempo_endpoint: "http://tempo:4317"
-loki_endpoint: "http://loki:3100"
-metrics_endpoint: "http://prometheus:9090/api/v1/otlp/v1/metrics"
+# Tracing
+tracing_settings:
+  logger: !Loki
+    endpoint: http://loki:3100/
+    host_identifier: node
+  tracing: !Otlp
+    endpoint: http://tempo:4317/
+    sample_ratio: 0.5
+    service_name: node
+  filter: !EnvFilter
+    filters:
+      nomos: debug
+  metrics: !Otlp
+    endpoint: http://prometheus:9090/api/v1/otlp/v1/metrics
+    host_identifier: node
+  level: INFO

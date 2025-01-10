@@ -36,6 +36,7 @@ blake2 = "0.10"
 default = []
 mock = ["linked-hash-map", "nomos-network/mock", "nomos-core/mock"]
 libp2p = ["nomos-network/libp2p"]
+instrumentation = []
 
 # enable to help generate OpenAPI
 openapi = ["dep:utoipa", "serde_json"]
