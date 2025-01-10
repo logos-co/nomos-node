@@ -18,9 +18,9 @@ use tests::topology::configs::{
     tracing::GeneralTracingConfig,
     GeneralConfig,
 };
-use tracing::Level;
+
 // internal
-use crate::TracingParams;
+use crate::{LogOutput, TracingParams};
 
 const DEFAULT_LIBP2P_NETWORK_PORT: u16 = 3000;
 const DEFAULT_DA_NETWORK_PORT: u16 = 3300;
@@ -191,12 +191,22 @@ fn update_blend_membership(
 }
 
 fn tracing_config_for_grafana(params: TracingParams, identifier: String) -> GeneralTracingConfig {
-    GeneralTracingConfig {
-        tracing_settings: TracingSettings {
-            logger: LoggerLayer::Loki(LokiConfig {
+
+    let logger = match params.log_output {
+        LogOutput::Stdout => {
+            LoggerLayer::Stdout
+        }
+        LogOutput::Loki => {
+            LoggerLayer::Loki(LokiConfig {
                 endpoint: params.loki_endpoint,
                 host_identifier: identifier.clone(),
-            }),
+            })
+        }
+    };
+
+    GeneralTracingConfig {
+        tracing_settings: TracingSettings {
+            logger,
             tracing: nomos_tracing_service::TracingLayer::Otlp(OtlpTracingConfig {
                 endpoint: params.tempo_endpoint,
                 sample_ratio: 1.0,
@@ -207,7 +217,7 @@ fn tracing_config_for_grafana(params: TracingParams, identifier: String) -> Gene
                 endpoint: params.metrics_endpoint,
                 host_identifier: identifier,
             }),
-            level: Level::INFO,
+            level: params.log_level,
         },
     }
 }
