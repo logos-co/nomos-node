@@ -42,3 +42,4 @@ uuid = { version = "1.10.0", features = ["v4"] }
 [features]
 default = ["tracing"]
 tracing = ["nomos-node/tracing"]
+instrumentation = ["nomos-node/instrumentation"]

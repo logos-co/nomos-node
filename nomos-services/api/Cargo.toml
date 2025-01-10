@@ -6,6 +6,7 @@ edition = "2021"
 [features]
 default = ["axum"]
 axum = ["dep:axum", "dep:hyper", "dep:tower-http", "utoipa-swagger-ui/axum"]
+instrumentation = []
 
 [dependencies]
 async-trait = "0.1"

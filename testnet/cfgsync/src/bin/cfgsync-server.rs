@@ -1,7 +1,6 @@
 // std
 use std::net::Ipv4Addr;
 use std::path::PathBuf;
-use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
 use std::{fs, process};
@@ -11,16 +10,14 @@ use axum::Json;
 use axum::{http::StatusCode, response::IntoResponse, routing::post, Router};
 use cfgsync::config::Host;
 use cfgsync::repo::{ConfigRepo, RepoResponse};
-use cfgsync::{LogOutput, TracingParams};
 use clap::Parser;
-use reqwest::Url;
+use nomos_tracing_service::TracingSettings;
 use serde::{Deserialize, Serialize};
 use tests::nodes::executor::create_executor_config;
 use tests::nodes::validator::create_validator_config;
 use tests::topology::configs::consensus::ConsensusParams;
 use tests::topology::configs::da::DaParams;
 use tokio::sync::oneshot::channel;
-use tracing::Level;
 // internal
 
 #[derive(Parser, Debug)]
@@ -49,11 +46,7 @@ struct CfgSyncConfig {
     global_params_path: String,
 
     // Tracing params
-    tempo_endpoint: Url,
-    loki_endpoint: Url,
-    metrics_endpoint: Url,
-    log_output: String,
-    log_level: String,
+    tracing_settings: TracingSettings,
 }
 
 impl CfgSyncConfig {
@@ -84,14 +77,8 @@ impl CfgSyncConfig {
         }
     }
 
-    fn to_tracing_params(&self) -> TracingParams {
-        TracingParams {
-            tempo_endpoint: self.tempo_endpoint.clone(),
-            loki_endpoint: self.loki_endpoint.clone(),
-            metrics_endpoint: self.metrics_endpoint.clone(),
-            log_output: LogOutput::from_str(&self.log_output).unwrap(),
-            log_level: Level::from_str(&self.log_level).unwrap(),
-        }
+    fn to_tracing_settings(&self) -> TracingSettings {
+        self.tracing_settings.clone()
     }
 }
 
@@ -153,13 +140,13 @@ async fn main() {
     });
     let consensus_params = config.to_consensus_params();
     let da_params = config.to_da_params();
-    let tracing_params = config.to_tracing_params();
+    let tracing_settings = config.to_tracing_settings();
 
     let config_repo = ConfigRepo::new(
         config.n_hosts,
         consensus_params,
         da_params,
-        tracing_params,
+        tracing_settings,
         Duration::from_secs(config.timeout),
     );
     let app = Router::new()

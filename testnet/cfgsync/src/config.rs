@@ -4,10 +4,7 @@ use std::{collections::HashMap, net::Ipv4Addr, str::FromStr};
 use nomos_blend::membership::Node;
 use nomos_blend_message::{sphinx::SphinxMessage, BlendMessage};
 use nomos_libp2p::{Multiaddr, PeerId};
-use nomos_tracing::{
-    logging::loki::LokiConfig, metrics::otlp::OtlpMetricsConfig, tracing::otlp::OtlpTracingConfig,
-};
-use nomos_tracing_service::{FilterLayer, LoggerLayer, MetricsLayer, TracingSettings};
+use nomos_tracing_service::{LoggerLayer, MetricsLayer, TracingLayer, TracingSettings};
 use rand::{thread_rng, Rng};
 use tests::topology::configs::{
     api::GeneralApiConfig,
@@ -18,9 +15,6 @@ use tests::topology::configs::{
     tracing::GeneralTracingConfig,
     GeneralConfig,
 };
-
-// internal
-use crate::{LogOutput, TracingParams};
 
 const DEFAULT_LIBP2P_NETWORK_PORT: u16 = 3000;
 const DEFAULT_DA_NETWORK_PORT: u16 = 3300;
@@ -70,7 +64,7 @@ impl Host {
 pub fn create_node_configs(
     consensus_params: ConsensusParams,
     da_params: DaParams,
-    tracing_params: TracingParams,
+    tracing_settings: TracingSettings,
     hosts: Vec<Host>,
 ) -> HashMap<Host, GeneralConfig> {
     let mut ids = vec![[0; 32]; consensus_params.n_participants];
@@ -130,7 +124,7 @@ pub fn create_node_configs(
 
         // Tracing config.
         let tracing_config =
-            tracing_config_for_grafana(tracing_params.clone(), host.identifier.clone());
+            update_tracing_identifier(tracing_settings.clone(), host.identifier.clone());
 
         configured_hosts.insert(
             host.clone(),
@@ -190,29 +184,35 @@ fn update_blend_membership(
         .collect()
 }
 
-fn tracing_config_for_grafana(params: TracingParams, identifier: String) -> GeneralTracingConfig {
-    let logger = match params.log_output {
-        LogOutput::Stdout => LoggerLayer::Stdout,
-        LogOutput::Loki => LoggerLayer::Loki(LokiConfig {
-            endpoint: params.loki_endpoint,
-            host_identifier: identifier.clone(),
-        }),
-    };
-
+fn update_tracing_identifier(
+    settings: TracingSettings,
+    identifier: String,
+) -> GeneralTracingConfig {
     GeneralTracingConfig {
         tracing_settings: TracingSettings {
-            logger,
-            tracing: nomos_tracing_service::TracingLayer::Otlp(OtlpTracingConfig {
-                endpoint: params.tempo_endpoint,
-                sample_ratio: 1.0,
-                service_name: identifier.clone(),
-            }),
-            filter: FilterLayer::None,
-            metrics: MetricsLayer::Otlp(OtlpMetricsConfig {
-                endpoint: params.metrics_endpoint,
-                host_identifier: identifier,
-            }),
-            level: params.log_level,
+            logger: match settings.logger {
+                LoggerLayer::Loki(mut config) => {
+                    config.host_identifier = identifier.clone();
+                    LoggerLayer::Loki(config)
+                }
+                other => other,
+            },
+            tracing: match settings.tracing {
+                TracingLayer::Otlp(mut config) => {
+                    config.service_name = identifier.clone();
+                    TracingLayer::Otlp(config)
+                }
+                other => other,
+            },
+            filter: settings.filter,
+            metrics: match settings.metrics {
+                MetricsLayer::Otlp(mut config) => {
+                    config.host_identifier = identifier.clone();
+                    MetricsLayer::Otlp(config)
+                }
+                other => other,
+            },
+            level: settings.level,
         },
     }
 }
@@ -220,13 +220,14 @@ fn tracing_config_for_grafana(params: TracingParams, identifier: String) -> Gene
 #[cfg(test)]
 mod cfgsync_tests {
     use nomos_libp2p::{Multiaddr, Protocol};
+    use nomos_tracing_service::{
+        FilterLayer, LoggerLayer, MetricsLayer, TracingLayer, TracingSettings,
+    };
     use std::str::FromStr;
     use std::{net::Ipv4Addr, time::Duration};
     use tests::topology::configs::consensus::ConsensusParams;
     use tests::topology::configs::da::DaParams;
     use tracing::Level;
-
-    use crate::{LogOutput, TracingParams};
 
     use super::{create_node_configs, Host, HostKind};
 
@@ -258,12 +259,12 @@ mod cfgsync_tests {
                 blobs_validity_duration: Duration::from_secs(u64::MAX),
                 global_params_path: "".into(),
             },
-            TracingParams {
-                tempo_endpoint: "http://test.com".try_into().unwrap(),
-                loki_endpoint: "http://test.com".try_into().unwrap(),
-                metrics_endpoint: "http://test.com".try_into().unwrap(),
-                log_output: LogOutput::from_str("Stdout").unwrap(),
-                log_level: Level::from_str("INFO").unwrap(),
+            TracingSettings {
+                logger: LoggerLayer::None,
+                tracing: TracingLayer::None,
+                filter: FilterLayer::None,
+                metrics: MetricsLayer::None,
+                level: Level::DEBUG,
             },
             hosts,
         );

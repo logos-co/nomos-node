@@ -1,4 +1,5 @@
 // std
+use nomos_tracing_service::TracingSettings;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -11,7 +12,6 @@ use tokio::time::timeout;
 // internal
 
 use crate::config::{create_node_configs, Host};
-use crate::TracingParams;
 
 pub enum RepoResponse {
     Config(Box<GeneralConfig>),
@@ -23,7 +23,7 @@ pub struct ConfigRepo {
     n_hosts: usize,
     consensus_params: ConsensusParams,
     da_params: DaParams,
-    tracing_params: TracingParams,
+    tracing_settings: TracingSettings,
     timeout_duration: Duration,
 }
 
@@ -32,7 +32,7 @@ impl ConfigRepo {
         n_hosts: usize,
         consensus_params: ConsensusParams,
         da_params: DaParams,
-        tracing_params: TracingParams,
+        tracing_settings: TracingSettings,
         timeout_duration: Duration,
     ) -> Arc<Self> {
         let repo = Arc::new(Self {
@@ -40,7 +40,7 @@ impl ConfigRepo {
             n_hosts,
             consensus_params,
             da_params,
-            tracing_params,
+            tracing_settings,
             timeout_duration,
         });
 
@@ -74,7 +74,7 @@ impl ConfigRepo {
                 let configs = create_node_configs(
                     self.consensus_params.clone(),
                     self.da_params.clone(),
-                    self.tracing_params.clone(),
+                    self.tracing_settings.clone(),
                     hosts,
                 );
 
