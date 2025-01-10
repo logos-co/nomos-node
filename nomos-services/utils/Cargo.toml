@@ -1,0 +1,13 @@
+[package]
+name = "utils"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+overwatch-rs = { git = "https://github.com/logos-co/Overwatch", rev = "703beb9" }
+overwatch-derive = { git = "https://github.com/logos-co/Overwatch", rev = "703beb9" }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0.133"
+thiserror = "1"
+log = "0.4.22"
+async-trait = "0.1.83"
