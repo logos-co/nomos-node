@@ -1,4 +1,5 @@
 use reqwest::Url;
+use std::str::FromStr;
 use tracing::Level;
 
 pub mod config;
@@ -13,36 +14,13 @@ pub enum LogOutput {
 #[derive(Debug)]
 pub struct ParseLogOutputError;
 
-impl TryFrom<&str> for LogOutput {
-    type Error = ParseLogOutputError;
-
-    fn try_from(value: &str) -> Result<Self, Self::Error> {
-        match value {
-            "Stdout" => Ok(LogOutput::Stdout),
-            "Loki" => Ok(LogOutput::Loki),
-            _ => Err(ParseLogOutputError),
-        }
-    }
-}
-
-#[derive(Debug)]
-pub struct ParseLevelError;
-
-pub trait LevelExt {
-    fn from_str(s: &str) -> Result<Self, ParseLevelError>
-    where
-        Self: Sized;
-}
-
-impl LevelExt for Level {
-    fn from_str(s: &str) -> Result<Self, ParseLevelError> {
+impl FromStr for LogOutput {
+    type Err = ParseLogOutputError;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_ascii_lowercase().as_str() {
-            "trace" => Ok(Level::TRACE),
-            "debug" => Ok(Level::DEBUG),
-            "info" => Ok(Level::INFO),
-            "warn" => Ok(Level::WARN),
-            "error" => Ok(Level::ERROR),
-            _ => Err(ParseLevelError),
+            "stdout" => Ok(LogOutput::Stdout),
+            "loki" => Ok(LogOutput::Loki),
+            _ => Err(ParseLogOutputError),
         }
     }
 }

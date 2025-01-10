@@ -191,17 +191,12 @@ fn update_blend_membership(
 }
 
 fn tracing_config_for_grafana(params: TracingParams, identifier: String) -> GeneralTracingConfig {
-
     let logger = match params.log_output {
-        LogOutput::Stdout => {
-            LoggerLayer::Stdout
-        }
-        LogOutput::Loki => {
-            LoggerLayer::Loki(LokiConfig {
-                endpoint: params.loki_endpoint,
-                host_identifier: identifier.clone(),
-            })
-        }
+        LogOutput::Stdout => LoggerLayer::Stdout,
+        LogOutput::Loki => LoggerLayer::Loki(LokiConfig {
+            endpoint: params.loki_endpoint,
+            host_identifier: identifier.clone(),
+        }),
     };
 
     GeneralTracingConfig {
@@ -267,7 +262,7 @@ mod cfgsync_tests {
                 tempo_endpoint: "http://test.com".try_into().unwrap(),
                 loki_endpoint: "http://test.com".try_into().unwrap(),
                 metrics_endpoint: "http://test.com".try_into().unwrap(),
-                log_output: LogOutput::try_from("Stdout").unwrap(),
+                log_output: LogOutput::from_str("Stdout").unwrap(),
                 log_level: Level::from_str("INFO").unwrap(),
             },
             hosts,

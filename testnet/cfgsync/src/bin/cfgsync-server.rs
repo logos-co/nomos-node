@@ -1,6 +1,7 @@
 // std
 use std::net::Ipv4Addr;
 use std::path::PathBuf;
+use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
 use std::{fs, process};
@@ -10,7 +11,7 @@ use axum::Json;
 use axum::{http::StatusCode, response::IntoResponse, routing::post, Router};
 use cfgsync::config::Host;
 use cfgsync::repo::{ConfigRepo, RepoResponse};
-use cfgsync::{LevelExt, LogOutput, TracingParams};
+use cfgsync::{LogOutput, TracingParams};
 use clap::Parser;
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
@@ -88,7 +89,7 @@ impl CfgSyncConfig {
             tempo_endpoint: self.tempo_endpoint.clone(),
             loki_endpoint: self.loki_endpoint.clone(),
             metrics_endpoint: self.metrics_endpoint.clone(),
-            log_output: LogOutput::try_from(self.log_output.as_str()).unwrap(),
+            log_output: LogOutput::from_str(&self.log_output).unwrap(),
             log_level: Level::from_str(&self.log_level).unwrap(),
         }
     }
