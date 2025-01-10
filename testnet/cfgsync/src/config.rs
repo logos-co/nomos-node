@@ -220,13 +220,14 @@ fn update_tracing_identifier(
 #[cfg(test)]
 mod cfgsync_tests {
     use nomos_libp2p::{Multiaddr, Protocol};
+    use nomos_tracing_service::{
+        FilterLayer, LoggerLayer, MetricsLayer, TracingLayer, TracingSettings,
+    };
     use std::str::FromStr;
     use std::{net::Ipv4Addr, time::Duration};
     use tests::topology::configs::consensus::ConsensusParams;
     use tests::topology::configs::da::DaParams;
     use tracing::Level;
-
-    use crate::{LogOutput, TracingParams};
 
     use super::{create_node_configs, Host, HostKind};
 
@@ -258,12 +259,12 @@ mod cfgsync_tests {
                 blobs_validity_duration: Duration::from_secs(u64::MAX),
                 global_params_path: "".into(),
             },
-            TracingParams {
-                tempo_endpoint: "http://test.com".try_into().unwrap(),
-                loki_endpoint: "http://test.com".try_into().unwrap(),
-                metrics_endpoint: "http://test.com".try_into().unwrap(),
-                log_output: LogOutput::from_str("Stdout").unwrap(),
-                log_level: Level::from_str("INFO").unwrap(),
+            TracingSettings {
+                logger: LoggerLayer::None,
+                tracing: TracingLayer::None,
+                filter: FilterLayer::None,
+                metrics: MetricsLayer::None,
+                level: Level::DEBUG,
             },
             hosts,
         );
