@@ -2,14 +2,12 @@
 use std::fmt::Debug;
 use std::io;
 // Crates
+use crate::traits::FromSettings;
 use log::error;
 use overwatch_rs::services::state::{ServiceState, StateOperator};
 use serde::{de::DeserializeOwned, Serialize};
 
-trait FromSettings {
-    type Settings;
-    fn from_settings(settings: &Self::Settings) -> Self;
-}
+type RecoveryResult<T> = Result<T, RecoveryError>;
 
 #[derive(thiserror::Error, Debug)]
 pub enum RecoveryError {
@@ -19,16 +17,14 @@ pub enum RecoveryError {
     SerdeError(#[from] serde_json::Error),
 }
 
-type _Result<T> = Result<T, RecoveryError>;
-
-trait RecoveryBackend {
+pub trait RecoveryBackend {
     type State: ServiceState;
-    fn load_state(&self) -> _Result<Self::State>;
-    fn save_state(&self, state: &Self::State) -> _Result<()>;
+    fn load_state(&self) -> RecoveryResult<Self::State>;
+    fn save_state(&self, state: &Self::State) -> RecoveryResult<()>;
 }
 
 #[derive(Debug, Clone)]
-struct RecoveryOperator<Backend>
+pub struct RecoveryOperator<Backend>
 where
     Backend: RecoveryBackend + Debug + Clone,
     Backend::State: Debug + Clone,
@@ -121,13 +117,13 @@ mod tests {
     {
         type State = State;
 
-        fn load_state(&self) -> _Result<Self::State> {
+        fn load_state(&self) -> RecoveryResult<Self::State> {
             let serialized_state =
                 std::fs::read_to_string(&self.recovery_file).map_err(RecoveryError::from)?;
             serde_json::from_str(&serialized_state).map_err(RecoveryError::from)
         }
 
-        fn save_state(&self, state: &Self::State) -> _Result<()> {
+        fn save_state(&self, state: &Self::State) -> RecoveryResult<()> {
             let deserialized_state = serde_json::to_string(state)?;
             std::fs::write(&self.recovery_file, deserialized_state).map_err(RecoveryError::from)
         }

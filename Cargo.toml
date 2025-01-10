@@ -24,6 +24,7 @@ members = [
     "nomos-services/data-availability/dispersal",
     "nomos-services/data-availability/tests",
     "nomos-services/blend",
+    "nomos-services/utils",
     "nomos-blend/core",
     "nomos-blend/message",
     "nomos-blend/network",
