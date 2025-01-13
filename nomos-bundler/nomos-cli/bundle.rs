@@ -1,12 +1,27 @@
 // STD
+use log::{error, info};
 use std::env::set_var;
 use std::fs::canonicalize;
-
 // Crates
 use tauri_bundler::RpmSettings;
+// Internal
+use bundler::utils::{
+    get_project_identifier, get_target_directory_for_current_profile, get_workspace_root,
+};
 
-pub fn build_package() {
-    let _ = env_logger::try_init();
+const CRATE_NAME: &str = "nomos-cli";
+const RELATIVE_TO_WORKSPACE_PATH: &str = "nomos-cli";
+
+fn build_package() {
+    let crate_path = get_workspace_root().join(RELATIVE_TO_WORKSPACE_PATH);
+    info!("Building package '{}'", crate_path.display());
+    let resources_path = crate_path.join("resources");
+
+    // This simultaneously serves as input directory (where the binary is)
+    // and output (where the bundle will be)
+    let project_target_directory =
+        canonicalize(get_target_directory_for_current_profile()).unwrap();
+    info!("Output directory: '{}'", project_target_directory.display());
 
     // Any level of GZIP compression will make the binary building fail
     let rpm_settings: RpmSettings = RpmSettings {
@@ -14,29 +29,31 @@ pub fn build_package() {
         ..Default::default()
     };
 
-    // This simultaneously serves as input directory (where the binary is)
-    // and output (where the bundle will be)
-    let out_dir = canonicalize("../target/debug").unwrap();
-
     // Building settings
     let settings_builder = tauri_bundler::SettingsBuilder::new()
         .log_level(log::Level::Error)
         .package_settings(tauri_bundler::PackageSettings {
-            product_name: "nomos-cli".to_string(),
+            product_name: String::from(CRATE_NAME),
             version: "1.0.0".to_string(),
             description: "CLI for Nomos".to_string(),
             homepage: None,
             authors: None,
             default_run: None,
         })
-        .project_out_directory(out_dir)
+        .project_out_directory(&project_target_directory)
         .bundle_settings(tauri_bundler::BundleSettings {
-            identifier: Some("com.nomos.nomos-cli".to_string()),
+            identifier: Some(get_project_identifier(CRATE_NAME)),
             publisher: None,
             homepage: None,
             icon: Some(vec![
-                "icons/icon.ico".to_string(),
-                "icons/512x512.png".to_string(),
+                resources_path
+                    .join("icons/icon.ico")
+                    .to_string_lossy()
+                    .to_string(),
+                resources_path
+                    .join("icons/512x512.png")
+                    .to_string_lossy()
+                    .to_string(),
             ]),
             resources: None,
             resources_map: None,
@@ -59,7 +76,7 @@ pub fn build_package() {
             windows: Default::default(),
         })
         .binaries(vec![tauri_bundler::BundleBinary::new(
-            "nomos-cli".to_string(),
+            String::from(CRATE_NAME),
             true,
         )]);
 
@@ -72,7 +89,7 @@ pub fn build_package() {
         .split("-")
         .next()
         .expect("Could not determine target architecture.");
-    println!("Building for '{}'", arch);
+    info!("Building for '{}'", arch);
 
     // Bypass an issue in the current linuxdeploy's version
     set_var("NO_STRIP", "true");
@@ -85,20 +102,13 @@ pub fn build_package() {
     set_var("ARCH", arch);
 
     if let Err(error) = tauri_bundler::bundle_project(&settings) {
-        eprintln!("Error while bundling project: {:?}", error);
+        error!("Error while bundling project: {:?}", error);
+    } else {
+        info!("Package built successfully");
     }
 }
 
 fn main() {
     let _ = env_logger::try_init();
-    let do_build_package = std::env::var("BUILD_PACKAGE")
-        .ok()
-        .and_then(|x| x.parse::<bool>().ok());
-    if let Some(true) = do_build_package {
-        log::info!("Building package.");
-        build_package();
-        log::info!("Package built successfully.");
-    } else {
-        log::info!("Skipping package building.");
-    }
+    build_package();
 }
