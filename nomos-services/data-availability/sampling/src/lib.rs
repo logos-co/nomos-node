@@ -204,7 +204,10 @@ where
     DaNetwork::Settings: Clone + Send + Sync + 'static,
     DaStorage: DaStorageAdapter<Blob = DaBlob> + Sync + Send,
 {
-    fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, DynError> {
+    fn init(
+        service_state: ServiceStateHandle<Self>,
+        _init_state: Self::State,
+    ) -> Result<Self, DynError> {
         let DaSamplingServiceSettings {
             sampling_settings, ..
         } = service_state.settings_reader.get_updated_settings();

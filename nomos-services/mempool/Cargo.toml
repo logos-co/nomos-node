@@ -15,7 +15,7 @@ nomos-da-sampling = { path = "../../nomos-services/data-availability/sampling/" 
 nomos-core = { path = "../../nomos-core/chain-defs" }
 full-replication = { path = "../../nomos-da/full-replication" }
 kzgrs-backend = { path = "../../nomos-da/kzgrs-backend" }
-overwatch-rs = { git = "https://github.com/logos-co/Overwatch", rev = "4160cdd" }
+overwatch-rs = { git = "https://github.com/logos-co/Overwatch", rev = "10ec27e" }
 rand = { version = "0.8" }
 serde = { version = "1.0", features = ["derive"] }
 thiserror = "1.0"
@@ -28,7 +28,7 @@ serde_json = { version = "1", optional = true }
 
 [dev-dependencies]
 nomos-tracing-service = { path = "../tracing" }
-overwatch-derive = { git = "https://github.com/logos-co/Overwatch", rev = "4160cdd" }
+overwatch-derive = { git = "https://github.com/logos-co/Overwatch", rev = "10ec27e" }
 tokio = { version = "1", features = ["full"] }
 blake2 = "0.10"
 

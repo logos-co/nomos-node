@@ -11,8 +11,8 @@ instrumentation = []
 [dependencies]
 async-trait = "0.1"
 bytes = "1.2"
-overwatch-rs = { git = "https://github.com/logos-co/Overwatch", rev = "4160cdd" }
-overwatch-derive = { git = "https://github.com/logos-co/Overwatch", rev = "4160cdd" }
+overwatch-rs = { git = "https://github.com/logos-co/Overwatch", rev = "10ec27e" }
+overwatch-derive = { git = "https://github.com/logos-co/Overwatch", rev = "10ec27e" }
 tracing = "0.1"
 nomos-core = { path = "../../nomos-core/chain-defs" }
 cryptarchia-consensus = { path = "../cryptarchia-consensus" }
