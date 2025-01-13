@@ -23,6 +23,6 @@ RUN mkdir -p /home/jenkins/.local/share/cargo-risczero/toolchains \
 
 USER jenkins
 
-RUN cargo install cargo-binstall
+RUN cargo install cargo-binstall --version 1.10.19
 RUN cargo binstall -y cargo-risczero
 RUN cargo risczero install
