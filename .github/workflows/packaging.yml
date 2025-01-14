@@ -29,6 +29,9 @@ jobs:
             builder: windows-2022
     runs-on: ${{ matrix.platform.builder }}
     steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
       - uses: actions-rs/toolchain@v1
         name: Install Rust toolchain
         with:
@@ -53,9 +56,6 @@ jobs:
             libgtk-3-dev \
             libayatana-appindicator3-dev \
             librsvg2-dev
-
-      - name: Checkout
-        uses: actions/checkout@v3
 
       - uses: actions-rs/cargo@v1
         with:
