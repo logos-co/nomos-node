@@ -125,6 +125,9 @@ where
     pub fn reset(&mut self) -> (HashSet<Multiaddr>, HashSet<Multiaddr>) {
         let (malicious_peers, unhealthy_peers) = self.analyze_monitors();
 
+        // Maintain the list of malicious peers
+        self.malicious_peers.extend(malicious_peers.iter().cloned());
+
         // Choose peers to connect with
         let peers_to_close = malicious_peers;
         let num_to_connect = peers_to_close.len() + unhealthy_peers.len();
@@ -349,10 +352,57 @@ mod tests {
 
         let (peers_to_close, peers_to_connect) = maintenance.reset();
         // Peer 0 is malicious
-        assert_eq!(peers_to_close, HashSet::from_iter(vec![peers[0].clone()]));
+        let peer_0_set = HashSet::from_iter(vec![peers[0].clone()]);
+        // Peer 0 should be returned as one of peers to be closed since it's malicious.
+        // Also, it should be registered in the list of malicious peers.
+        assert_eq!(peers_to_close, peer_0_set);
+        assert_eq!(maintenance.malicious_peers, peer_0_set);
         // Because Peer 1 is malicious and Peer 2 is unhealthy, 2 new connections should be established
         assert_eq!(peers_to_connect.len(), 2);
         assert!(peers_to_connect.is_disjoint(&maintenance.connected_peers));
+    }
+
+    #[test]
+    fn maintain_malicious_peers() {
+        let mut maintenance = init_maintenance(
+            ConnectionMaintenanceSettings {
+                peering_degree: 3,
+                max_peering_degree: 5,
+                monitor: Some(ConnectionMonitorSettings {
+                    time_window: Duration::from_secs(1),
+                    expected_effective_messages: U57F7::from_num(2.0),
+                    effective_message_tolerance: U57F7::from_num(0.0),
+                    expected_drop_messages: U57F7::from_num(0.0),
+                    drop_message_tolerance: U57F7::from_num(0.0),
+                }),
+            },
+            10,
+        );
+
+        let peers = maintenance
+            .connected_peers
+            .iter()
+            .cloned()
+            .collect::<Vec<_>>();
+        assert_eq!(peers.len(), 3);
+
+        // Peer 0 sends 3 effective messages, more than expected
+        (0..3).for_each(|_| maintenance.record_effective_message(&peers[0]));
+        let _ = maintenance.reset();
+        // Peer 0 is malicious
+        assert_eq!(
+            maintenance.malicious_peers,
+            HashSet::from_iter(vec![peers[0].clone()])
+        );
+
+        // In the next time window, peer 1 sends 3 effective messages, more than expected
+        (0..3).for_each(|_| maintenance.record_effective_message(&peers[1]));
+        let _ = maintenance.reset();
+        // Now, peer 0 and 1 are in the list of malicious peers
+        assert_eq!(
+            maintenance.malicious_peers,
+            HashSet::from_iter(vec![peers[0].clone(), peers[1].clone()])
+        );
     }
 
     #[test]
@@ -389,7 +439,9 @@ mod tests {
 
         let (peers_to_close, peers_to_connect) = maintenance.reset();
         // Peer 0 is malicious
-        assert_eq!(peers_to_close, HashSet::from_iter(vec![peers[0].clone()]));
+        let peer_0_set = HashSet::from_iter(vec![peers[0].clone()]);
+        assert_eq!(peers_to_close, peer_0_set);
+        assert_eq!(maintenance.malicious_peers, peer_0_set);
         // Even though we detected 1 malicious and 2 unhealthy peers,
         // we cannot establish 3 new connections due to max_peering_degree.
         // Instead, 2 new connections should be established.
