@@ -74,7 +74,7 @@ jobs:
 
       - name: Upload RPM
         if: matrix.platform.os == 'linux'
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           name: "nomos-cli_${{ github.event.release.tag_name }}.rpm"
           path: "target/debug/bundle/rpm/nomos-cli-v0.0.0-.${{ matrix.platform.rpm_arch }}.rpm"
@@ -83,7 +83,7 @@ jobs:
 
       - name: Upload DEB
         if: matrix.platform.os == 'linux'
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           name: "nomos-cli_${{ github.event.release.tag_name }}.deb"
           path: "target/debug/bundle/deb/nomos-cli_v0.0.0_${{ matrix.platform.arch }}.deb"
@@ -92,7 +92,7 @@ jobs:
 
       - name: Upload AppImage
         if: matrix.platform.os == 'linux'
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           name: "nomos-cli_${{ github.event.release.tag_name }}.AppImage"
           path: "target/debug/bundle/appimage/nomos-cli-v0.0.0-${{ matrix.platform.arch }}.AppImage"
@@ -101,7 +101,7 @@ jobs:
 
       - name: Upload DMG
         if: matrix.platform.os == 'macos'
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           name: "nomos-cli_${{ github.event.release.tag_name }}.dmg"
           path: ""
@@ -109,7 +109,7 @@ jobs:
 
       - name: Upload MSI
         if: matrix.platform.os == 'windows'
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           name: "nomos-cli_${{ github.event.release.tag_name }}.msi"
           path: ""
