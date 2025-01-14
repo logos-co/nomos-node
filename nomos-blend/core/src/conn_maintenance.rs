@@ -353,6 +353,8 @@ mod tests {
         let (peers_to_close, peers_to_connect) = maintenance.reset();
         // Peer 0 is malicious
         let peer_0_set = HashSet::from_iter(vec![peers[0].clone()]);
+        // Peer 0 should be returned as one of peers to be closed since it's malicious.
+        // Also, it should be registered in the list of malicious peers.
         assert_eq!(peers_to_close, peer_0_set);
         assert_eq!(maintenance.malicious_peers, peer_0_set);
         // Because Peer 1 is malicious and Peer 2 is unhealthy, 2 new connections should be established
