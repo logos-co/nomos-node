@@ -1,40 +1,33 @@
 name: Packaging
 
 on:
-  #  push:
-  #    tags:
-  #      - 'v*.*.*'
-  #    branches:
-  #      - master
+  push:
+    tags:
+      - "v*.*.*"
   pull_request:
 
 jobs:
   package:
-    name: 'Packaging on ${{ matrix.platform.os }}-${{ matrix.platform.cpu }}'
+    name: "Packaging on ${{ matrix.platform.os }}-${{ matrix.platform.arch }}"
     strategy:
       fail-fast: false
       matrix:
         platform:
           - os: linux
-            cpu: amd64
-          #          - os: linux
-          #            cpu: i386
-          - os: macos
-            cpu: amd64
-          - os: windows
-            cpu: amd64
-        include:
-          - platform:
-              os: linux
+            arch: amd64
             builder: ubuntu-22.04
-          - platform:
-              os: macos
+            rpm_arch: x86_64
+          - os: linux
+            arch: i386
+            builder: ubuntu-22.04
+            rpm_arch: x86
+          - os: macos
+            arch: amd64
             builder: macos-13
-          - platform:
-              os: windows
+          - os: windows
+            arch: amd64
             builder: windows-2022
-    runs-on:
-      ${{ matrix.builder }}
+    runs-on: ${{ matrix.platform.builder }}
     steps:
       - uses: actions-rs/toolchain@v1
         name: Install Rust toolchain
@@ -43,54 +36,81 @@ jobs:
           toolchain: stable
           override: true
 
-      - uses: cargo-bins/cargo-binstall@main
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Install Risc0
+        uses: nomos/install-risc0@v0
 
-      - name: Install risc0
-        run: cargo binstall -y cargo-risczero && cargo risczero install
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Install dependencies
+        if: matrix.platform.os == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang
+          sudo apt-get install -y libwebkit2gtk-4.0-dev \
+            build-essential \
+            curl \
+            wget \
+            file \
+            libssl-dev \
+            libgtk-3-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev
 
       - name: Checkout
         uses: actions/checkout@v3
 
-      - name: Enable packaging on build (unix)
-        if: matrix.platform.os == 'linux' || matrix.platform.os == 'macos'
-        run: |
-          echo "BUILD_PACKAGE=true" >> $GITHUB_ENV
-
-      - name: Enable packaging on build (windows)
-        if: matrix.platform.os == 'windows'
-        run: |
-          echo "BUILD_PACKAGE=true" | Out-File -FilePath $env:GITHUB_ENV -Append
-
       - uses: actions-rs/cargo@v1
         with:
           command: build
+          args: --all --no-default-features
 
-      - name: Print Target
-        uses: jaywcjlove/github-action-folder-tree@main
+      - name: Bundle
+        run: |
+          ./target/debug/bundle-nomos-cli
+          ls -la target/debug/bundle
+
+      - uses: jaywcjlove/github-action-folder-tree@main
         with:
-          exclude: ".fingerprint|build|deps|incremental"
-          path: ./target/
-          depth: 1
+          path: target/debug/bundle
+          depth: "2"
 
-      - name: Print Debug
-        uses: jaywcjlove/github-action-folder-tree@main
+      - name: Upload RPM
+        if: matrix.platform.os == 'linux'
+        uses: actions/upload-artifact@v2
         with:
-          exclude: ".fingerprint|build|deps|incremental"
-          path: ./target/debug/
-          depth: 4
+          name: "nomos-cli_${{ github.event.release.tag_name }}.rpm"
+          path: "target/debug/bundle/rpm/nomos-cli-v0.0.0-.${{ matrix.platform.rpm_arch }}.rpm"
+          #          path: "target/debug/bundle/rpm/nomos-cli-${{ github.event.release.tag_name }}-.${{ matrix.platform.rpm_arch }}.rpm"
+          if-no-files-found: error
 
-      - name: Print Release
-        uses: jaywcjlove/github-action-folder-tree@main
+      - name: Upload DEB
+        if: matrix.platform.os == 'linux'
+        uses: actions/upload-artifact@v2
         with:
-          exclude: ".fingerprint|build|deps|incremental"
-          path: ./target/release/
-          depth: 4
+          name: "nomos-cli_${{ github.event.release.tag_name }}.deb"
+          path: "target/debug/bundle/deb/nomos-cli_v0.0.0_${{ matrix.platform.arch }}.deb"
+          #          path: "target/debug/bundle/deb/nomos-cli_${{ github.event.release.tag_name }}_${{ matrix.platform.arch }}.deb"
+          if-no-files-found: error
 
-#      - name: Export artifacts
-#        uses: actions/upload-artifact@v2
-#        with:
-#          name: ${{ runner.os }}-${{ matrix.platform.cpu }}-${{ matrix.builder }}
+      - name: Upload AppImage
+        if: matrix.platform.os == 'linux'
+        uses: actions/upload-artifact@v2
+        with:
+          name: "nomos-cli_${{ github.event.release.tag_name }}.AppImage"
+          path: "target/debug/bundle/appimage/nomos-cli-v0.0.0-${{ matrix.platform.arch }}.AppImage"
+          #          path: "target/debug/bundle/appimage/nomos-cli-${{ github.event.release.tag_name }}-${{ matrix.platform.arch }}.AppImage"
+          if-no-files-found: error
+
+      - name: Upload DMG
+        if: matrix.platform.os == 'macos'
+        uses: actions/upload-artifact@v2
+        with:
+          name: "nomos-cli_${{ github.event.release.tag_name }}.dmg"
+          path: ""
+          if-no-files-found: error
+
+      - name: Upload MSI
+        if: matrix.platform.os == 'windows'
+        uses: actions/upload-artifact@v2
+        with:
+          name: "nomos-cli_${{ github.event.release.tag_name }}.msi"
+          path: ""
+          if-no-files-found: error
