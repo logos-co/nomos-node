@@ -12,7 +12,7 @@ use bundler::utils::{
 const CRATE_NAME: &str = "nomos-cli";
 const RELATIVE_TO_WORKSPACE_PATH: &str = "nomos-cli";
 
-fn build_package() {
+fn build_package(version: String) {
     let crate_path = get_workspace_root().join(RELATIVE_TO_WORKSPACE_PATH);
     info!("Building package '{}'", crate_path.display());
     let resources_path = crate_path.join("resources");
@@ -34,7 +34,7 @@ fn build_package() {
         .log_level(log::Level::Error)
         .package_settings(tauri_bundler::PackageSettings {
             product_name: String::from(CRATE_NAME),
-            version: "1.0.0".to_string(),
+            version,
             description: "CLI for Nomos".to_string(),
             homepage: None,
             authors: None,
@@ -110,5 +110,6 @@ fn build_package() {
 
 fn main() {
     let _ = env_logger::try_init();
-    build_package();
+    let version = "v0.0.0".to_string();
+    build_package(version);
 }
