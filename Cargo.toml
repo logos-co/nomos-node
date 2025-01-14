@@ -39,6 +39,7 @@ members = [
     "testnet/cfgsync",
     "tests",
     "clients/executor-http-client",
+    "nomos-services/key-management-system",
 ]
 exclude = ["proof_of_leadership/risc0/risc0_proofs", "nomos-core/risc0_proofs"]
 resolver = "2"
