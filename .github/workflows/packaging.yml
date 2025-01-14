@@ -78,7 +78,7 @@ jobs:
         if: matrix.platform.os == 'linux'
         uses: actions/upload-artifact@v4
         with:
-          name: "nomos-cli_${{ github.event.release.tag_name }}.rpm"
+          name: "nomos-cli_${{ github.event.release.tag_name }}_${{ matrix.platform.arch }}.rpm"
           path: "target/debug/bundle/rpm/nomos-cli-v0.0.0-.${{ matrix.platform.rpm_arch }}.rpm"
           #          path: "target/debug/bundle/rpm/nomos-cli-${{ github.event.release.tag_name }}-.${{ matrix.platform.rpm_arch }}.rpm"
           if-no-files-found: error
@@ -87,7 +87,7 @@ jobs:
         if: matrix.platform.os == 'linux'
         uses: actions/upload-artifact@v4
         with:
-          name: "nomos-cli_${{ github.event.release.tag_name }}.deb"
+          name: "nomos-cli_${{ github.event.release.tag_name }}_${{ matrix.platform.arch }}.deb"
           path: "target/debug/bundle/deb/nomos-cli_v0.0.0_${{ matrix.platform.arch }}.deb"
           #          path: "target/debug/bundle/deb/nomos-cli_${{ github.event.release.tag_name }}_${{ matrix.platform.arch }}.deb"
           if-no-files-found: error
@@ -96,8 +96,8 @@ jobs:
         if: matrix.platform.os == 'linux'
         uses: actions/upload-artifact@v4
         with:
-          name: "nomos-cli_${{ github.event.release.tag_name }}.AppImage"
-          path: "target/debug/bundle/appimage/nomos-cli-v0.0.0-${{ matrix.platform.arch }}.AppImage"
+          name: "nomos-cli_${{ github.event.release.tag_name }}_${{ matrix.platform.arch }}.AppImage"
+          path: "target/debug/bundle/appimage/nomos-cli_v0.0.0_${{ matrix.platform.arch }}.AppImage"
           #          path: "target/debug/bundle/appimage/nomos-cli-${{ github.event.release.tag_name }}-${{ matrix.platform.arch }}.AppImage"
           if-no-files-found: error
 
