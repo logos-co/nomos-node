@@ -1,0 +1,24 @@
+name: "Install Risc0"
+
+description: "Install Risc0 toolchain. Requires the Rust toolchain to be installed."
+
+runs:
+  using: "composite"
+  steps:
+    #    - name: "Install risc0"
+    #      shell: bash
+    #      run: |
+    #        export GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}
+    #        curl -L https://risczero.com/install | bash
+    #        PATH=/root/.risc0/bin/:$PATH # Add Risc0 to PATH, as script doesn't do it correctly.
+    #        rzup install
+
+    - uses: cargo-bins/cargo-binstall@main
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Install risc0
+      run: cargo binstall -y cargo-risczero && cargo risczero install
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
