@@ -1,5 +1,10 @@
 name: "Install Risc0"
 
+inputs:
+  github_token:
+    description: "The GitHub token to use for cloning the repository."
+    required: true
+
 description: "Install Risc0 toolchain. Requires the Rust toolchain to be installed."
 
 runs:
@@ -15,10 +20,10 @@ runs:
 
     - uses: cargo-bins/cargo-binstall@main
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GITHUB_TOKEN: ${{ github_token }}
 
     - name: Install risc0
       run: cargo binstall -y cargo-risczero && cargo risczero install
       shell: bash
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GITHUB_TOKEN: ${{ github_token }}

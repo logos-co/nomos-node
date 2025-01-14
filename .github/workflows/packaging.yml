@@ -41,6 +41,8 @@ jobs:
 
       - name: Install Risc0
         uses: ./.github/actions/install-risc0
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install dependencies
         if: matrix.platform.os == 'linux'
