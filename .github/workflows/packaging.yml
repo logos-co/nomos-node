@@ -37,7 +37,7 @@ jobs:
           override: true
 
       - name: Install Risc0
-        uses: nomos/install-risc0@v0
+        uses: ./.github/actions/install-risc0
 
       - name: Install dependencies
         if: matrix.platform.os == 'linux'
