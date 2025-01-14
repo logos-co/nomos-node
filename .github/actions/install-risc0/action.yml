@@ -20,10 +20,10 @@ runs:
 
     - uses: cargo-bins/cargo-binstall@main
       env:
-        GITHUB_TOKEN: ${{ github_token }}
+        GITHUB_TOKEN: ${{ inputs.github_token }}
 
     - name: Install risc0
       run: cargo binstall -y cargo-risczero && cargo risczero install
       shell: bash
       env:
-        GITHUB_TOKEN: ${{ github_token }}
+        GITHUB_TOKEN: ${{ inputs.github_token }}
