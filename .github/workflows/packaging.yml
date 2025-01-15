@@ -53,11 +53,11 @@ jobs:
       - name: Install dependencies
         if: matrix.platform.os == 'linux'
         run: |
-          apt-get update
+          sudo apt-get update
           # Librocksdb 
-          apt-get install -y clang
+          sudo apt-get install -y clang
           # Tauri
-          apt-get install -y libwebkit2gtk-4.0-dev \
+          sudo apt-get install -y libwebkit2gtk-4.0-dev \
             build-essential \
             curl \
             wget \
