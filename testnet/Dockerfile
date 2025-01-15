@@ -10,9 +10,8 @@ RUN apt-get update && apt-get install -yq \
     git gcc g++ clang libssl-dev \
     pkg-config protobuf-compiler
 
-RUN cargo install cargo-binstall --version 1.10.19
-RUN cargo binstall -y cargo-risczero
-RUN cargo risczero install
+RUN curl -L https://risczero.com/install | bash
+RUN rzup install cargo-risczero v1.2.0
 
 RUN cargo build --release
 
