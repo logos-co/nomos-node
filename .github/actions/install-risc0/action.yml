@@ -4,25 +4,31 @@ inputs:
   github_token:
     description: "The GitHub token to use for cloning the repository."
     required: true
+  os:
+    description: "The operating system to install Risc0 on."
+    required: true
 
 description: "Install Risc0 toolchain. Requires the Rust toolchain to be installed."
 
 runs:
   using: "composite"
   steps:
-    #    - name: "Install risc0"
-    #      shell: bash
-    #      run: |
-    #        export GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}
-    #        curl -L https://risczero.com/install | bash
-    #        PATH=/root/.risc0/bin/:$PATH # Add Risc0 to PATH, as script doesn't do it correctly.
-    #        rzup install
+    - name: Install risc0
+      if: inputs.os != 'linux'
+      shell: bash
+      run: |
+        curl -L https://risczero.com/install | bash
+        PATH=/root/.risc0/bin/:$PATH # Add Risc0 to PATH, as script doesn't do it correctly.
+        rzup install
 
-    - uses: cargo-bins/cargo-binstall@main
+    - name: Install cargo-binstall
+      uses: cargo-bins/cargo-binstall@main
+      if: inputs.os == 'linux'
       env:
         GITHUB_TOKEN: ${{ inputs.github_token }}
 
     - name: Install risc0
+      if: inputs.os == 'linux'
       run: cargo binstall -y cargo-risczero && cargo risczero install
       shell: bash
       env:
