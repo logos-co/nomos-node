@@ -24,8 +24,8 @@ jobs:
           #            builder: ubuntu-22.04
           #            rpm_arch: x86
           - os: macos
-            arch: amd64
-            builder: macos-13
+            arch: aarch64
+            builder: macos-14
           - os: windows
             arch: amd64
             builder: windows-2022
