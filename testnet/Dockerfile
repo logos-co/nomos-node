@@ -7,10 +7,12 @@ COPY . .
 
 # Install dependencies needed for building RocksDB and etcd.
 RUN apt-get update && apt-get install -yq \
-    git gcc g++ clang libssl-dev \
+    git gcc g++ clang libssl-dev curl \
     pkg-config protobuf-compiler
 
+# Install risc0
 RUN curl -L https://risczero.com/install | bash
+ENV PATH="/root/.risc0/bin:$PATH" 
 RUN rzup install cargo-risczero v1.2.0
 
 RUN cargo build --release
