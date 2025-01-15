@@ -197,6 +197,12 @@ where
                     tracing::info!(histogram.received_data = msg_size as u64);
                 }
             }
+            SwarmEvent::Behaviour(nomos_blend_network::Event::PeerMonitorResult {
+                malicious_peers,
+                unhealthy_peers,
+            }) => {
+                todo!("Pass peer monitor results to conn_manager");
+            }
             SwarmEvent::Behaviour(nomos_blend_network::Event::Error(e)) => {
                 tracing::error!("Received error from blend network: {e:?}");
                 tracing::info!(counter.error = 1);

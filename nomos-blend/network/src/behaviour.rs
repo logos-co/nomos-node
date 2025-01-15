@@ -60,6 +60,11 @@ pub struct Config<Interval> {
 pub enum Event {
     /// A message received from one of the peers.
     Message(Vec<u8>),
+    /// A result of peer monitoring performed during a single interval.
+    PeerMonitorResult {
+        malicious_peers: HashSet<PeerId>,
+        unhealthy_peers: HashSet<PeerId>,
+    },
     Error(Error),
 }
 
@@ -200,6 +205,7 @@ where
         _: &Multiaddr,
         remote_addr: &Multiaddr,
     ) -> Result<THandler<Self>, ConnectionDenied> {
+        // TODO: return `ConnectionDenied` if the peering degree is reached
         // Keep PeerId <> Multiaddr mapping
         self.peer_address_map.add(peer_id, remote_addr.clone());
         Ok(BlendConnectionHandler::new())
