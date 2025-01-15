@@ -18,13 +18,16 @@ jobs:
           #            arch: amd64
           #            builder: ubuntu-22.04
           #            rpm_arch: x86_64
-          # Fails
-          #          - os: linux
-          #            arch: i386
-          #            builder: ubuntu-22.04
-          #            rpm_arch: x86
+          - os: linux
+            arch: i386
+            builder: ubuntu-22.04
+            rpm_arch: x86
+          # Works
+          #          - os: macos
+          #            arch: aarch64
+          #            builder: macos-14
           - os: macos
-            arch: aarch64
+            arch: amd64
             builder: macos-14
           - os: windows
             arch: amd64
