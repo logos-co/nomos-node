@@ -14,10 +14,10 @@ jobs:
       matrix:
         platform:
           # Working
-          #          - os: linux
-          #            arch: amd64
-          #            builder: ubuntu-22.04
-          #            rpm_arch: x86_64
+          - os: linux
+            arch: amd64
+            builder: ubuntu-22.04
+            rpm_arch: x86_64
           - os: linux
             arch: i386
             builder: ubuntu-22.04
@@ -28,7 +28,7 @@ jobs:
           #            builder: macos-14
           - os: macos
             arch: amd64
-            builder: macos-14
+            builder: macos-13
           - os: windows
             arch: amd64
             builder: windows-2022
@@ -36,27 +36,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v3
-
-      - name: Install Node.js
-        if: matrix.platform.os == 'macos' && github.event.act # Only run on `act` for MacOS
-        run: |
-          # Install Homebrew:
-          ruby --version
-          # ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)" < /dev/null 2> /dev/null
-
-      # Probably not needed in Github. Required for `act` because the `dockurr/macos` image doesn't provide `node`.
-      - name: Install Node.js
-        uses: actions/setup-node@v4
-        if: matrix.platform.os == 'macos' && github.event.act # Only run on `act` for MacOS
-        with:
-          node-version: '12'
-
-      - name: Check node and npm
-        if: matrix.platform.os == 'macos' && github.event.act # Only run on `act` for MacOS
-        run: |
-          node --version
-          npm --version
-          echo "----------------------"
 
       - uses: actions-rs/toolchain@v1
         name: Install Rust toolchain
@@ -75,7 +54,9 @@ jobs:
         if: matrix.platform.os == 'linux'
         run: |
           sudo apt-get update
+          # Librocksdb 
           sudo apt-get install -y clang
+          # Tauri
           sudo apt-get install -y libwebkit2gtk-4.0-dev \
             build-essential \
             curl \
