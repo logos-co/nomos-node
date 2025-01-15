@@ -13,13 +13,16 @@ description: "Install Risc0 toolchain. Requires the Rust toolchain to be install
 runs:
   using: "composite"
   steps:
-    #    - name: Install risc0
-    #      if: inputs.os != 'linux'
-    #      shell: bash
-    #      run: |
-    #        curl -L https://risczero.com/install | bash
-    #        PATH=/root/.risc0/bin/:$PATH # Add Risc0 to PATH, as script doesn't do it correctly.
-    #        rzup install
+    - name: Install risc0 from risczero.com
+      if: inputs.os != 'linux'
+      shell: bash
+      run: |
+        curl -L https://risczero.com/install | bash
+        echo $PATH
+        ls /root/.risc0/bin/
+        ls /root/.cargo/bin/
+        PATH=/root/.risc0/bin/:$PATH # Add Risc0 to PATH, as script doesn't do it correctly.
+        rzup install
 
     - name: Install cargo-binstall
       uses: cargo-bins/cargo-binstall@main
@@ -27,8 +30,8 @@ runs:
       env:
         GITHUB_TOKEN: ${{ inputs.github_token }}
 
-    - name: Install risc0
-      #      if: inputs.os == 'linux'
+    - name: Install risc0 using cargo-binstall
+      if: inputs.os == 'linux'
       run: cargo binstall -y cargo-risczero && cargo risczero install
       shell: bash
       env:
