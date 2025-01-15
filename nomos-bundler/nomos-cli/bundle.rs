@@ -12,6 +12,18 @@ use bundler::utils::{
 const CRATE_NAME: &str = "nomos-cli";
 const RELATIVE_TO_WORKSPACE_PATH: &str = "nomos-cli";
 
+fn prepare_environment(architecture: &str) {
+    // Bypass an issue in the current linuxdeploy's version
+    set_var("NO_STRIP", "true");
+
+    // Tell `appimagetool` what arch we're building for, without it the tool errors out
+    // This could be due to us making an ad-hoc use of `tauri-bundler` here,
+    // perhaps we are bypassing some `tauri-bundler` piece of code or config that handles that,
+    // but if that's the actual reason I couldn't find where that would be
+    // Regardless, this works.
+    set_var("ARCH", architecture);
+}
+
 fn build_package(version: String) {
     let crate_path = get_workspace_root().join(RELATIVE_TO_WORKSPACE_PATH);
     info!("Building package '{}'", crate_path.display());
@@ -91,15 +103,7 @@ fn build_package(version: String) {
         .expect("Could not determine target architecture.");
     info!("Building for '{}'", arch);
 
-    // Bypass an issue in the current linuxdeploy's version
-    set_var("NO_STRIP", "true");
-
-    // Tell `appimagetool` what arch we're building for, without it the tool errors out
-    // This could be due to us making an ad-hoc use of `tauri-bundler` here,
-    // perhaps we are bypassing some `tauri-bundler` piece of code or config that handles that,
-    // but if that's the actual reason I couldn't find where that would be
-    // Regardless, this works.
-    set_var("ARCH", arch);
+    prepare_environment(arch);
 
     if let Err(error) = tauri_bundler::bundle_project(&settings) {
         error!("Error while bundling project: {:?}", error);
@@ -110,6 +114,7 @@ fn build_package(version: String) {
 
 fn main() {
     let _ = env_logger::try_init();
+    // TODO: Get version from Cargo.toml and parameter (github tag) and double check they match
     let version = "v0.0.0".to_string();
     build_package(version);
 }
