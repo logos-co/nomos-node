@@ -23,7 +23,7 @@ runs:
 
     - name: Install cargo-binstall
       uses: cargo-bins/cargo-binstall@main
-      #      if: inputs.os == 'linux'
+      if: inputs.os == 'linux'
       env:
         GITHUB_TOKEN: ${{ inputs.github_token }}
 

@@ -26,12 +26,12 @@ jobs:
           #          - os: macos
           #            arch: aarch64
           #            builder: macos-14
-          - os: macos
-            arch: amd64
-            builder: macos-13
-          - os: windows
-            arch: amd64
-            builder: windows-2022
+          #          - os: macos
+          #            arch: amd64
+          #            builder: macos-13
+          #          - os: windows
+          #            arch: amd64
+          #            builder: windows-2022
     runs-on: ${{ matrix.platform.builder }}
     steps:
       - name: Checkout
@@ -53,11 +53,11 @@ jobs:
       - name: Install dependencies
         if: matrix.platform.os == 'linux'
         run: |
-          sudo apt-get update
+          apt-get update
           # Librocksdb 
-          sudo apt-get install -y clang
+          apt-get install -y clang
           # Tauri
-          sudo apt-get install -y libwebkit2gtk-4.0-dev \
+          apt-get install -y libwebkit2gtk-4.0-dev \
             build-essential \
             curl \
             wget \
