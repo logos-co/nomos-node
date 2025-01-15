@@ -126,14 +126,14 @@ jobs:
         if: matrix.platform.os == 'macos'
         uses: actions/upload-artifact@v4
         with:
-          name: "nomos-cli_${{ github.event.release.tag_name }}.dmg"
-          path: ""
+          name: "nomos-cli_${{ github.event.release.tag_name }}_${{ matrix.platform.arch }}.dmg"
+          path: "target/debug/bundle/dmg/nomos-cli_${{ github.event.release.tag_name }}_${{ matrix.platform.arch }}.dmg"
           if-no-files-found: error
 
       - name: Upload MSI
         if: matrix.platform.os == 'windows'
         uses: actions/upload-artifact@v4
         with:
-          name: "nomos-cli_${{ github.event.release.tag_name }}.msi"
-          path: ""
+          name: "nomos-cli_${{ github.event.release.tag_name }}_${{ matrix.platform.arch }}.msi"
+          path: "target/debug/bundle/msi/nomos-cli_${{ github.event.release.tag_name }}_${{ matrix.platform.arch }}.msi"
           if-no-files-found: error
