@@ -14,32 +14,32 @@ jobs:
       matrix:
         platform:
           # Works (tested using binstall)
-          # - os: linux
-          #   arch: amd64
-          #   builder: ubuntu-22.04
-          #   rpm_arch: x86_64
-          #   target: x86_64-unknown-linux-gnu
+          - os: linux
+            arch: amd64
+            builder: ubuntu-22.04
+            rpm_arch: x86_64
+            target: x86_64-unknown-linux-gnu
           # WIP
           - os: linux
             arch: i686
             builder: ubuntu-22.04
             rpm_arch: i686
             target: i686-unknown-linux-gnu
-          # Works (tested using binstall)
-          - os: macos
-            arch: aarch64
-            builder: macos-14
-            target: aarch64-apple-darwin
-          # WIP
-          - os: macos
-            arch: amd64
-            builder: macos-13
-            target: x86_64-apple-darwin
-          # WIP
-          - os: windows
-            arch: amd64
-            builder: windows-2022
-            target: x86_64-pc-windows-msvc
+          #          # Works (tested using binstall)
+          #          - os: macos
+          #            arch: aarch64
+          #            builder: macos-14
+          #            target: aarch64-apple-darwin
+          #          # WIP
+          #          - os: macos
+          #            arch: amd64
+          #            builder: macos-13
+          #            target: x86_64-apple-darwin
+          #          # WIP
+          #          - os: windows
+          #            arch: amd64
+          #            builder: windows-2022
+          #            target: x86_64-pc-windows-msvc
     runs-on: ${{ matrix.platform.builder }}
     steps:
       - name: Checkout
