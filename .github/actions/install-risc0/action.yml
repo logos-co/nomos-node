@@ -13,16 +13,41 @@ description: "Install Risc0 toolchain. Requires the Rust toolchain to be install
 runs:
   using: "composite"
   steps:
-    - name: Install risc0 from risczero.com
+    - name: Install risc0 from source (dependencies)
       if: inputs.os != 'linux'
       shell: bash
       run: |
-        curl -L https://risczero.com/install | bash
-        echo $PATH
-        ls /root/.risc0/bin/
-        ls /root/.cargo/bin/
-        PATH=/root/.risc0/bin/:$PATH # Add Risc0 to PATH, as script doesn't do it correctly.
-        rzup install
+        # Set up environment
+        apt-get update
+        apt-get install -y cargo g++
+        apt-get install -y rustup
+        apt-get install -y curl cmake ninja-build
+        # apt-get install -y curl python3 cmake ninja-build
+        rustup default stable
+
+    - name: Install risc0 from source (python3)
+      uses: actions/setup-python@v3
+      if: inputs.os != 'linux'
+
+    - name: Checkout risc
+      uses: actions/checkout@v3
+      if: inputs.os != 'linux'
+      with:
+        repository: risc0/risc0
+
+    - name: Install risc0 from source (build)
+      if: inputs.os != 'linux'
+      shell: bash
+      run: |
+        #        # Repository
+        #        git clone https://github.com/risc0/risc0.git risc0
+        
+        # Build and install
+        cd risc0
+        cargo build --package cargo-risczero # 17m
+        cargo install --path risc0/cargo-risczero
+        cargo risczero --version
+        cargo risczero build-toolchain
 
     - name: Install cargo-binstall
       uses: cargo-bins/cargo-binstall@main
