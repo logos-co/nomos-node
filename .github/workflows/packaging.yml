@@ -62,10 +62,16 @@ jobs:
       - name: Install dependencies
         if: matrix.platform.os == 'linux'
         run: |
+          # Workaround for missing libwebkit2gtk-4.0-dev in Ubuntu 24.04
+          echo "deb http://ftp.de.debian.org/debian bookworm main" | sudo tee /etc/apt/sources.list.d/debian-bookworm-main.list
+
+          # Update package list
           sudo apt-get update
-          # Librocksdb 
+
+          # Librocksdb dependencies 
           sudo apt-get install -y clang
-          # Tauri
+
+          # Tauri dependencies
           sudo apt-get install -y libwebkit2gtk-4.0-dev \
             build-essential \
             curl \
