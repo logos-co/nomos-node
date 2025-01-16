@@ -19,11 +19,10 @@ runs:
       run: |
         # Set up environment
         apt-get update
-        apt-get install -y cargo g++
-        apt-get install -y rustup
-        apt-get install -y curl cmake ninja-build
-        # apt-get install -y curl python3 cmake ninja-build
-        rustup default stable
+        apt-get install -yq cargo g++ curl cmake ninja-build pkg-config libssl-dev clang
+        apt-get install -yq rustup # Needs cargo installed
+        rustup show
+        # apt-get install -yq python3 vim git build-essential
 
     - name: Install risc0 from source (python3)
       uses: actions/setup-python@v3
@@ -35,19 +34,13 @@ runs:
       with:
         repository: risc0/risc0
 
-    - name: Install risc0 from source (build)
+    - name: Install risc0 toolchain
       if: inputs.os != 'linux'
       shell: bash
       run: |
-        #        # Repository
-        #        git clone https://github.com/risc0/risc0.git risc0
-        
-        # Build and install
         cd risc0
-        cargo build --package cargo-risczero # 17m
-        cargo install --path risc0/cargo-risczero
-        cargo risczero --version
-        cargo risczero build-toolchain
+        cargo build --package rzup
+        ./target/debug/rzup toolchain install rust
 
     - name: Install cargo-binstall
       uses: cargo-bins/cargo-binstall@main
