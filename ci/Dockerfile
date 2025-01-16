@@ -7,7 +7,7 @@ LABEL maintainer="augustinas@status.im" \
 # Dependecies for publishing documentation.
 RUN apt-get update && apt-get install -yq \
     libssl-dev openssh-client git gcc g++ \ 
-    clang pkg-config protobuf-compiler
+    clang pkg-config
 
 RUN rustup component add rustfmt clippy
 
