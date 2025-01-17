@@ -69,7 +69,7 @@ jobs:
           sudo chmod 700 /root/.gnupg
           
           # Add Debian keyring
-          sudo gpg --no-default-keyring --keyring /usr/share/keyrings/example-archive-keyring.gpg --keyserver keyserver.ubuntu.com --recv-keys 0E98404D386FA1D9 6ED0E7B82643E131 F8D2585B8783D481
+          apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 0E98404D386FA1D9 6ED0E7B82643E131 F8D2585B8783D481 # Deprecated but works
           echo "deb http://ftp.de.debian.org/debian bookworm main" | sudo tee /etc/apt/sources.list.d/debian-bookworm-main.list
           sudo apt-get update
 
