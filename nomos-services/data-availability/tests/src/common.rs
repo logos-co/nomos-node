@@ -3,7 +3,7 @@ use cryptarchia_consensus::LeaderConfig;
 use nomos_blend::message_blend::{
     CryptographicProcessorSettings, MessageBlendSettings, TemporalSchedulerSettings,
 };
-use nomos_blend::{conn_maintenance::ConnectionMaintenanceSettings, membership::Node};
+use nomos_blend::{conn_monitor::ConnectionMaintenanceSettings, membership::Node};
 use nomos_blend_message::{sphinx::SphinxMessage, BlendMessage};
 use nomos_da_network_service::backends::libp2p::common::DaNetworkBackendSettings;
 use std::path::PathBuf;

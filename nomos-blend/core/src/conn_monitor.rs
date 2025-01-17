@@ -1,0 +1,208 @@
+use std::{
+    fmt::Debug,
+    pin::pin,
+    task::{Context, Poll},
+    time::Duration,
+};
+
+use fixed::types::U57F7;
+use futures::Stream;
+use serde::{Deserialize, Serialize};
+
+/// Meter to count the number of effective and drop messages sent by a peer
+#[derive(Debug)]
+pub struct ConnectionMonitor<Interval> {
+    settings: ConnectionMonitorSettings,
+    interval: Interval,
+    effective_messages: U57F7,
+    drop_messages: U57F7,
+}
+
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+pub struct ConnectionMonitorSettings {
+    /// Time interval to measure/evaluate the number of messages sent by each peer.
+    pub time_window: Duration,
+    /// The number of effective (data or cover) messages that a peer is expected to send in a given time window.
+    /// If the measured count is greater than (expected * (1 + tolerance)), the peer is considered malicious.
+    /// If the measured count is less than (expected * (1 - tolerance)), the peer is considered unhealthy.
+    pub expected_effective_messages: U57F7,
+    pub effective_message_tolerance: U57F7,
+    /// The number of drop messages that a peer is expected to send in a given time window.
+    /// If the measured count is greater than (expected * (1 + tolerance)), the peer is considered malicious.
+    /// If the measured count is less than (expected * (1 - tolerance)), the peer is considered unhealthy.
+    pub expected_drop_messages: U57F7,
+    pub drop_message_tolerance: U57F7,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ConnectionMonitorOutput {
+    Malicious,
+    Unhealthy,
+    Healthy,
+}
+
+impl<Interval> ConnectionMonitor<Interval>
+where
+    Interval: futures::Stream + Unpin + Send + 'static,
+{
+    pub fn new(settings: ConnectionMonitorSettings, interval: Interval) -> Self {
+        Self {
+            settings,
+            interval,
+            effective_messages: U57F7::ZERO,
+            drop_messages: U57F7::ZERO,
+        }
+    }
+
+    pub fn record_effective_message(&mut self) {
+        self.effective_messages = Self::record_message(self.effective_messages);
+    }
+
+    pub fn record_drop_message(&mut self) {
+        self.drop_messages = Self::record_message(self.drop_messages);
+    }
+
+    fn record_message(value: U57F7) -> U57F7 {
+        value.checked_add(U57F7::ONE).unwrap_or_else(|| {
+            tracing::warn!("Skipping recording a message due to overflow");
+            value
+        })
+    }
+
+    pub fn poll(&mut self, cx: &mut Context<'_>) -> Poll<ConnectionMonitorOutput> {
+        if pin!(&mut self.interval).poll_next(cx).is_ready() {
+            let outcome = if self.is_malicious() {
+                ConnectionMonitorOutput::Malicious
+            } else if self.is_unhealthy() {
+                ConnectionMonitorOutput::Unhealthy
+            } else {
+                ConnectionMonitorOutput::Healthy
+            };
+            self.reset();
+            Poll::Ready(outcome)
+        } else {
+            Poll::Pending
+        }
+    }
+
+    fn reset(&mut self) {
+        self.effective_messages = U57F7::ZERO;
+        self.drop_messages = U57F7::ZERO;
+    }
+
+    /// Check if the peer is malicious based on the number of effective and drop messages sent
+    fn is_malicious(&self) -> bool {
+        let effective_threshold = self.settings.expected_effective_messages
+            * (U57F7::ONE + self.settings.effective_message_tolerance);
+        let drop_threshold = self.settings.expected_drop_messages
+            * (U57F7::ONE + self.settings.drop_message_tolerance);
+        self.effective_messages > effective_threshold || self.drop_messages > drop_threshold
+    }
+
+    /// Check if the peer is unhealthy based on the number of effective and drop messages sent
+    fn is_unhealthy(&self) -> bool {
+        let effective_threshold = self.settings.expected_effective_messages
+            * (U57F7::ONE - self.settings.effective_message_tolerance);
+        let drop_threshold = self.settings.expected_drop_messages
+            * (U57F7::ONE - self.settings.drop_message_tolerance);
+        effective_threshold > self.effective_messages || drop_threshold > self.drop_messages
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use futures::task::noop_waker;
+
+    use super::*;
+
+    #[test]
+    fn monitor() {
+        let mut monitor = ConnectionMonitor::new(
+            ConnectionMonitorSettings {
+                time_window: Duration::from_secs(1),
+                expected_effective_messages: U57F7::from_num(2.0),
+                effective_message_tolerance: U57F7::from_num(0.1),
+                expected_drop_messages: U57F7::from_num(1.0),
+                drop_message_tolerance: U57F7::from_num(0.0),
+            },
+            futures::stream::iter(std::iter::repeat(())),
+        );
+
+        // Recording the expected number of messages,
+        // expecting the peer to be healthy
+        monitor.record_effective_message();
+        monitor.record_effective_message();
+        monitor.record_drop_message();
+        assert_eq!(
+            monitor.poll(&mut Context::from_waker(&noop_waker())),
+            Poll::Ready(ConnectionMonitorOutput::Healthy)
+        );
+
+        // Recording more than the expected number of effective messages,
+        // expecting the peer to be malicious
+        monitor.record_effective_message();
+        monitor.record_effective_message();
+        monitor.record_effective_message();
+        monitor.record_drop_message();
+        assert_eq!(
+            monitor.poll(&mut Context::from_waker(&noop_waker())),
+            Poll::Ready(ConnectionMonitorOutput::Malicious)
+        );
+
+        // Recording less than the expected number of effective messages,
+        // expecting the peer to be unhealthy
+        monitor.record_effective_message();
+        monitor.record_drop_message();
+        assert_eq!(
+            monitor.poll(&mut Context::from_waker(&noop_waker())),
+            Poll::Ready(ConnectionMonitorOutput::Unhealthy)
+        );
+
+        // Recording more than the expected number of drop messages,
+        // expecting the peer to be malicious
+        monitor.record_effective_message();
+        monitor.record_effective_message();
+        monitor.record_drop_message();
+        monitor.record_drop_message();
+        assert_eq!(
+            monitor.poll(&mut Context::from_waker(&noop_waker())),
+            Poll::Ready(ConnectionMonitorOutput::Malicious)
+        );
+
+        // Recording less than the expected number of drop messages,
+        // expecting the peer to be unhealthy
+        monitor.record_effective_message();
+        monitor.record_effective_message();
+        assert_eq!(
+            monitor.poll(&mut Context::from_waker(&noop_waker())),
+            Poll::Ready(ConnectionMonitorOutput::Unhealthy)
+        );
+    }
+
+    #[tokio::test]
+    async fn monitor_interval() {
+        let interval = Duration::from_millis(100);
+        let mut monitor = ConnectionMonitor::new(
+            ConnectionMonitorSettings {
+                time_window: Duration::from_secs(1),
+                expected_effective_messages: U57F7::from_num(2.0),
+                effective_message_tolerance: U57F7::from_num(0.1),
+                expected_drop_messages: U57F7::from_num(1.0),
+                drop_message_tolerance: U57F7::from_num(0.0),
+            },
+            tokio_stream::wrappers::IntervalStream::new(tokio::time::interval_at(
+                tokio::time::Instant::now() + interval,
+                interval,
+            )),
+        );
+
+        let waker = noop_waker();
+        let mut cx = Context::from_waker(&waker);
+
+        assert!(monitor.poll(&mut cx).is_pending());
+
+        tokio::time::sleep(interval).await;
+        assert!(monitor.poll(&mut cx).is_ready());
+        assert!(monitor.poll(&mut cx).is_pending());
+    }
+}

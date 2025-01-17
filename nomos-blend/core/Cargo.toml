@@ -19,5 +19,5 @@ fixed = { version = "1", features = ["serde-str"] }
 
 
 [dev-dependencies]
-tokio = { version = "1", features = ["rt-multi-thread"] }
+tokio = { version = "1", features = ["rt-multi-thread", "time"] }
 rand_chacha = "0.3"

@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-use nomos_blend::{conn_maintenance::ConnectionMaintenanceSettings, membership::Node};
+use nomos_blend::{conn_monitor::ConnectionMaintenanceSettings, membership::Node};
 use nomos_blend_message::{sphinx::SphinxMessage, BlendMessage};
 use nomos_blend_service::backends::libp2p::Libp2pBlendBackendSettings;
 use nomos_libp2p::{ed25519, Multiaddr};

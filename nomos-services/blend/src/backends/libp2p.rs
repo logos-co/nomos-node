@@ -1,4 +1,4 @@
-use std::{pin::Pin, time::Duration};
+use std::{collections::HashSet, pin::Pin, time::Duration};
 
 use super::BlendBackend;
 use async_trait::async_trait;
@@ -6,9 +6,9 @@ use futures::{Stream, StreamExt};
 use libp2p::{
     identity::{ed25519, Keypair},
     swarm::SwarmEvent,
-    Multiaddr, Swarm, SwarmBuilder,
+    Multiaddr, PeerId, Swarm, SwarmBuilder,
 };
-use nomos_blend::{conn_maintenance::ConnectionMaintenanceSettings, membership::Membership};
+use nomos_blend::{conn_monitor::ConnectionMaintenanceSettings, membership::Membership};
 use nomos_blend_message::sphinx::SphinxMessage;
 use nomos_libp2p::secret_key_serde;
 use overwatch_rs::overwatch::handle::OverwatchHandle;
@@ -99,6 +99,12 @@ where
     swarm: Swarm<nomos_blend_network::Behaviour<SphinxMessage, R, IntervalStream>>,
     swarm_messages_receiver: mpsc::Receiver<BlendSwarmMessage>,
     incoming_message_sender: broadcast::Sender<Vec<u8>>,
+
+    peering_degree: usize,
+    max_peering_degree: usize,
+    membership: Membership<SphinxMessage>,
+    rng: R,
+    blacklist_peers: HashSet<PeerId>,
 }
 
 #[derive(Debug)]
@@ -197,14 +203,51 @@ where
                     tracing::info!(histogram.received_data = msg_size as u64);
                 }
             }
+            SwarmEvent::Behaviour(nomos_blend_network::Event::MaliciousPeer(peer_id)) => {
+                tracing::debug!("A malicious peer detected: {peer_id}");
+                self.blacklist_peers.insert(peer_id);
+                if let Err(e) = self.select_and_dial_peer() {
+                    tracing::error!("Failed to select and dial a new peer: {e}");
+                }
+            }
+            SwarmEvent::Behaviour(nomos_blend_network::Event::UnhealthyPeer(peer_id)) => {
+                tracing::debug!("A unhealthy peer detected: {peer_id}");
+                if let Err(e) = self.select_and_dial_peer() {
+                    tracing::error!("Failed to select and dial a new peer: {e}");
+                }
+            }
             SwarmEvent::Behaviour(nomos_blend_network::Event::Error(e)) => {
                 tracing::error!("Received error from blend network: {e:?}");
                 tracing::info!(counter.error = 1);
+                //TODO: maybe dial a new peer?
             }
             _ => {
                 tracing::debug!("Received event from blend network: {event:?}");
                 tracing::info!(counter.ignored_event = 1);
             }
+        }
+    }
+
+    fn select_and_dial_peer(&mut self) -> Result<Option<PeerId>, Error> {
+        let negotiated_peers = self.swarm.behaviour().negotiated_peers();
+        if negotiated_peers.len() >= self.max_peering_degree {
+            return Ok(None);
+        }
+
+        let peers_to_exclude = self
+            .blacklist_peers
+            .union(self.swarm.behaviour().negotiated_peers())
+            .cloned()
+            .collect();
+        if let Some(new_peer) = self
+            .membership
+            .filter_and_choose_remote_nodes(&mut self.rng, 1, &peers_to_exclude)
+            .first()
+        {
+            self.swarm.dial(new_peer)?;
+            Ok(Some(new_peer))
+        } else {
+            Ok(None)
         }
     }
 }
