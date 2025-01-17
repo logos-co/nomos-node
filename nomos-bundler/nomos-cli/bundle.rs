@@ -26,14 +26,17 @@ fn prepare_environment(architecture: &str) {
 
 fn build_package(version: String) {
     let crate_path = get_workspace_root().join(RELATIVE_TO_WORKSPACE_PATH);
-    info!("Building package '{}'", crate_path.display());
+    info!("Bundling package '{}'", crate_path.display());
     let resources_path = crate_path.join("resources");
 
     // This simultaneously serves as input directory (where the binary is)
     // and output (where the bundle will be)
     let project_target_directory =
         canonicalize(get_target_directory_for_current_profile()).unwrap();
-    info!("Output directory: '{}'", project_target_directory.display());
+    info!(
+        "Bundle output directory: '{}'",
+        project_target_directory.display()
+    );
 
     // Any level of GZIP compression will make the binary building fail
     let rpm_settings: RpmSettings = RpmSettings {
@@ -101,14 +104,14 @@ fn build_package(version: String) {
         .split("-")
         .next()
         .expect("Could not determine target architecture.");
-    info!("Building for '{}'", arch);
+    info!("Bundling for '{}'", arch);
 
     prepare_environment(arch);
 
     if let Err(error) = tauri_bundler::bundle_project(&settings) {
         error!("Error while bundling project: {:?}", error);
     } else {
-        info!("Package built successfully");
+        info!("Package bundled successfully");
     }
 }
 
