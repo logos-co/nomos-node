@@ -4,6 +4,7 @@ use std::{collections::HashMap, net::Ipv4Addr, str::FromStr};
 use nomos_blend::membership::Node;
 use nomos_blend_message::{sphinx::SphinxMessage, BlendMessage};
 use nomos_libp2p::{Multiaddr, PeerId};
+use nomos_node::BlendBackend;
 use nomos_tracing::{
     logging::loki::LokiConfig, metrics::otlp::OtlpMetricsConfig, tracing::otlp::OtlpTracingConfig,
 };
@@ -176,8 +177,18 @@ fn update_da_peer_addresses(
 
 fn update_blend_membership(
     hosts: Vec<Host>,
-    membership: Vec<Node<<SphinxMessage as BlendMessage>::PublicKey>>,
-) -> Vec<Node<<SphinxMessage as BlendMessage>::PublicKey>> {
+    membership: Vec<
+        Node<
+            <BlendBackend as nomos_blend_service::backends::BlendBackend>::NodeId,
+            <SphinxMessage as BlendMessage>::PublicKey,
+        >,
+    >,
+) -> Vec<
+    Node<
+        <BlendBackend as nomos_blend_service::backends::BlendBackend>::NodeId,
+        <SphinxMessage as BlendMessage>::PublicKey,
+    >,
+> {
     membership
         .into_iter()
         .zip(hosts)

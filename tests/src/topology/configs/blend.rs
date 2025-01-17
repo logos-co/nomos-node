@@ -1,9 +1,12 @@
 use std::str::FromStr;
 
-use nomos_blend::{conn_monitor::ConnectionMaintenanceSettings, membership::Node};
+use nomos_blend::membership::Node;
 use nomos_blend_message::{sphinx::SphinxMessage, BlendMessage};
 use nomos_blend_service::backends::libp2p::Libp2pBlendBackendSettings;
+use nomos_libp2p::identity::{ed25519::Keypair as Ed25519Keypair, Keypair};
+use nomos_libp2p::PeerId;
 use nomos_libp2p::{ed25519, Multiaddr};
+use nomos_node::BlendBackend;
 
 use crate::get_available_port;
 
@@ -11,7 +14,12 @@ use crate::get_available_port;
 pub struct GeneralBlendConfig {
     pub backend: Libp2pBlendBackendSettings,
     pub private_key: x25519_dalek::StaticSecret,
-    pub membership: Vec<Node<<SphinxMessage as BlendMessage>::PublicKey>>,
+    pub membership: Vec<
+        Node<
+            <BlendBackend as nomos_blend_service::backends::BlendBackend>::NodeId,
+            <SphinxMessage as BlendMessage>::PublicKey,
+        >,
+    >,
 }
 
 pub fn create_blend_configs(ids: &[[u8; 32]]) -> Vec<GeneralBlendConfig> {
@@ -30,11 +38,9 @@ pub fn create_blend_configs(ids: &[[u8; 32]]) -> Vec<GeneralBlendConfig> {
                     ))
                     .unwrap(),
                     node_key,
-                    conn_monitor: ConnectionMaintenanceSettings {
-                        peering_degree: 1,
-                        max_peering_degree: 3,
-                        monitor: None,
-                    },
+                    peering_degree: 1,
+                    max_peering_degree: 3,
+                    conn_monitor: None,
                 },
                 private_key: x25519_dalek::StaticSecret::random(),
                 membership: Vec::new(),
@@ -52,10 +58,18 @@ pub fn create_blend_configs(ids: &[[u8; 32]]) -> Vec<GeneralBlendConfig> {
 
 fn blend_nodes(
     configs: &[GeneralBlendConfig],
-) -> Vec<Node<<SphinxMessage as BlendMessage>::PublicKey>> {
+) -> Vec<
+    Node<
+        <BlendBackend as nomos_blend_service::backends::BlendBackend>::NodeId,
+        <SphinxMessage as BlendMessage>::PublicKey,
+    >,
+> {
     configs
         .iter()
         .map(|config| Node {
+            id: PeerId::from_public_key(
+                &Keypair::from(Ed25519Keypair::from(config.backend.node_key.clone())).public(),
+            ),
             address: config.backend.listening_address.clone(),
             public_key: x25519_dalek::PublicKey::from(&x25519_dalek::StaticSecret::from(
                 config.private_key.to_bytes(),
