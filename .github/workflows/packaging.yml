@@ -63,13 +63,13 @@ jobs:
         if: matrix.platform.os == 'linux'
         run: |
           # Workaround for missing libwebkit2gtk-4.0-dev in Ubuntu 24.04
-          apt-get update
-          apt-get install -yq gnupg
-          mkdir -p /root/.gnupg
-          chmod 700 /root/.gnupg
+          sudo apt-get update
+          sudo apt-get install -yq gnupg
+          sudo mkdir -p /root/.gnupg
+          sudo chmod 700 /root/.gnupg
           
           # Add Debian keyring
-          gpg --no-default-keyring --keyring /usr/share/keyrings/example-archive-keyring.gpg --keyserver keyserver.ubuntu.com --recv-keys 0E98404D386FA1D9 6ED0E7B82643E131 F8D2585B8783D481
+          sudo gpg --no-default-keyring --keyring /usr/share/keyrings/example-archive-keyring.gpg --keyserver keyserver.ubuntu.com --recv-keys 0E98404D386FA1D9 6ED0E7B82643E131 F8D2585B8783D481
           echo "deb http://ftp.de.debian.org/debian bookworm main" | sudo tee /etc/apt/sources.list.d/debian-bookworm-main.list
           sudo apt-get update
 
