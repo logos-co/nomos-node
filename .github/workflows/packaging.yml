@@ -53,97 +53,91 @@ jobs:
           override: true
           target: ${{ matrix.platform.target }}
 
-      - name: Print target triple
-        shell: bash
-        run: |
-          rustup show || echo "No rustup"
-          cargo --version
+      - name: Install Risc0
+        uses: ./.github/actions/install-risc0
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          os: ${{ matrix.platform.os }}
 
-#      - name: Install Risc0
-#        uses: ./.github/actions/install-risc0
-#        with:
-#          github_token: ${{ secrets.GITHUB_TOKEN }}
-#          os: ${{ matrix.platform.os }}
-#
-#      - name: Install dependencies
-#        if: matrix.platform.os == 'linux'
-#        run: |
-#          # Workaround for missing libwebkit2gtk-4.0-dev in Ubuntu 24.04
-#          sudo apt-get update
-#          sudo apt-get install -yq gnupg
-#          sudo mkdir -p /root/.gnupg
-#          sudo chmod 700 /root/.gnupg
-#
-#          # Add Debian keyring
-#          sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 0E98404D386FA1D9 6ED0E7B82643E131 F8D2585B8783D481 # Deprecated but works
-#          echo "deb http://ftp.de.debian.org/debian bookworm main" | sudo tee /etc/apt/sources.list.d/debian-bookworm-main.list
-#          sudo apt-get update
-#
-#          # Librocksdb dependencies
-#          sudo apt-get install -y clang
-#
-#          # Tauri dependencies
-#          sudo apt-get install -y libwebkit2gtk-4.0-dev \
-#            build-essential \
-#            curl \
-#            wget \
-#            file \
-#            libssl-dev \
-#            libgtk-3-dev \
-#            libayatana-appindicator3-dev \
-#            librsvg2-dev
-#
-#      - uses: actions-rs/cargo@v1
-#        with:
-#          command: build
-#          args: --all --no-default-features
-#
-#      - name: Bundle
-#        run: |
-#          ./target/debug/bundle-nomos-cli
-#
-#      - name: Print Folder Tree
-#        uses: jaywcjlove/github-action-folder-tree@main
-#        with:
-#          path: ./target/debug/bundle
-#          depth: 2
-#
-#      - name: Upload RPM
-#        if: matrix.platform.os == 'linux'
-#        uses: actions/upload-artifact@v4
-#        with:
-#          name: "nomos-cli_${{ github.event.release.tag_name }}_${{ matrix.platform.arch }}.rpm"
-#          path: "target/debug/bundle/rpm/nomos-cli-${{ github.event.release.tag_name }}-.${{ matrix.platform.rpm_arch }}.rpm"
-#          if-no-files-found: error
-#
-#      - name: Upload DEB
-#        if: matrix.platform.os == 'linux'
-#        uses: actions/upload-artifact@v4
-#        with:
-#          name: "nomos-cli_${{ github.event.release.tag_name }}_${{ matrix.platform.arch }}.deb"
-#          path: "target/debug/bundle/deb/nomos-cli_${{ github.event.release.tag_name }}_${{ matrix.platform.arch }}.deb"
-#          if-no-files-found: error
-#
-#      - name: Upload AppImage
-#        if: matrix.platform.os == 'linux'
-#        uses: actions/upload-artifact@v4
-#        with:
-#          name: "nomos-cli_${{ github.event.release.tag_name }}_${{ matrix.platform.arch }}.AppImage"
-#          path: "target/debug/bundle/appimage/nomos-cli-${{ github.event.release.tag_name }}-${{ matrix.platform.arch }}.AppImage"
-#          if-no-files-found: error
-#
-#      - name: Upload DMG
-#        if: matrix.platform.os == 'macos'
-#        uses: actions/upload-artifact@v4
-#        with:
-#          name: "nomos-cli_${{ github.event.release.tag_name }}_${{ matrix.platform.arch }}.dmg"
-#          path: "target/debug/bundle/dmg/nomos-cli_${{ github.event.release.tag_name }}_${{ matrix.platform.arch }}.dmg"
-#          if-no-files-found: error
-#
-#      - name: Upload MSI
-#        if: matrix.platform.os == 'windows'
-#        uses: actions/upload-artifact@v4
-#        with:
-#          name: "nomos-cli_${{ github.event.release.tag_name }}_${{ matrix.platform.arch }}.msi"
-#          path: "target/debug/bundle/msi/nomos-cli_${{ github.event.release.tag_name }}_${{ matrix.platform.arch }}.msi"
-#          if-no-files-found: error
+      - name: Install dependencies
+        if: matrix.platform.os == 'linux'
+        run: |
+          # Workaround for missing libwebkit2gtk-4.0-dev in Ubuntu 24.04
+          sudo apt-get update
+          sudo apt-get install -yq gnupg
+          sudo mkdir -p /root/.gnupg
+          sudo chmod 700 /root/.gnupg
+          
+          # Add Debian keyring
+          sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 0E98404D386FA1D9 6ED0E7B82643E131 F8D2585B8783D481 # Deprecated but works
+          echo "deb http://ftp.de.debian.org/debian bookworm main" | sudo tee /etc/apt/sources.list.d/debian-bookworm-main.list
+          sudo apt-get update
+
+          # Librocksdb dependencies 
+          sudo apt-get install -y clang
+
+          # Tauri dependencies
+          sudo apt-get install -y libwebkit2gtk-4.0-dev \
+            build-essential \
+            curl \
+            wget \
+            file \
+            libssl-dev \
+            libgtk-3-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev
+
+      - uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --all --no-default-features --target ${{ matrix.platform.target }}
+
+      - name: Bundle
+        run: |
+          ./target/debug/bundle-nomos-cli
+
+      - name: Print Folder Tree
+        uses: jaywcjlove/github-action-folder-tree@main
+        with:
+          path: ./target/debug/bundle
+          depth: 2
+
+      - name: Upload RPM
+        if: matrix.platform.os == 'linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: "nomos-cli_${{ github.event.release.tag_name }}_${{ matrix.platform.arch }}.rpm"
+          path: "target/debug/bundle/rpm/nomos-cli-${{ github.event.release.tag_name }}-.${{ matrix.platform.rpm_arch }}.rpm"
+          if-no-files-found: error
+
+      - name: Upload DEB
+        if: matrix.platform.os == 'linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: "nomos-cli_${{ github.event.release.tag_name }}_${{ matrix.platform.arch }}.deb"
+          path: "target/debug/bundle/deb/nomos-cli_${{ github.event.release.tag_name }}_${{ matrix.platform.arch }}.deb"
+          if-no-files-found: error
+
+      - name: Upload AppImage
+        if: matrix.platform.os == 'linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: "nomos-cli_${{ github.event.release.tag_name }}_${{ matrix.platform.arch }}.AppImage"
+          path: "target/debug/bundle/appimage/nomos-cli-${{ github.event.release.tag_name }}-${{ matrix.platform.arch }}.AppImage"
+          if-no-files-found: error
+
+      - name: Upload DMG
+        if: matrix.platform.os == 'macos'
+        uses: actions/upload-artifact@v4
+        with:
+          name: "nomos-cli_${{ github.event.release.tag_name }}_${{ matrix.platform.arch }}.dmg"
+          path: "target/debug/bundle/dmg/nomos-cli_${{ github.event.release.tag_name }}_${{ matrix.platform.arch }}.dmg"
+          if-no-files-found: error
+
+      - name: Upload MSI
+        if: matrix.platform.os == 'windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: "nomos-cli_${{ github.event.release.tag_name }}_${{ matrix.platform.arch }}.msi"
+          path: "target/debug/bundle/msi/nomos-cli_${{ github.event.release.tag_name }}_${{ matrix.platform.arch }}.msi"
+          if-no-files-found: error
