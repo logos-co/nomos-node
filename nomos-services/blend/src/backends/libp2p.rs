@@ -123,7 +123,7 @@ where
     fn new(
         config: Libp2pBlendBackendSettings,
         membership: Membership<PeerId, SphinxMessage>,
-        rng: R,
+        mut rng: R,
         swarm_messages_receiver: mpsc::Receiver<BlendSwarmMessage>,
         incoming_message_sender: broadcast::Sender<Vec<u8>>,
     ) -> Self {
@@ -150,6 +150,14 @@ where
             .unwrap_or_else(|e| {
                 panic!("Failed to listen on Blend network: {e:?}");
             });
+
+        // Dial the initial peers randomly selected
+        let nodes = membership.choose_remote_nodes(&mut rng, config.peering_degree);
+        nodes.iter().for_each(|peer| {
+            swarm.dial(peer.address.clone()).unwrap_or_else(|e| {
+                panic!("Failed to dial a peer: {e:?}");
+            });
+        });
 
         Self {
             swarm,
