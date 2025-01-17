@@ -331,7 +331,7 @@ pub fn new_blend_configs(listening_addresses: Vec<Multiaddr>) -> Vec<TestBlendSe
                 Libp2pBlendBackendSettings {
                     listening_address: listening_address.clone(),
                     node_key: ed25519::SecretKey::generate(),
-                    conn_maintenance: ConnectionMaintenanceSettings {
+                    conn_monitor: ConnectionMaintenanceSettings {
                         peering_degree: 1,
                         max_peering_degree: 1,
                         monitor: None,

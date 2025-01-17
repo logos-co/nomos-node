@@ -30,6 +30,7 @@ use rand::SeedableRng;
 use rand_chacha::ChaCha12Rng;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::fmt::Debug;
+use std::hash::Hash;
 use std::time::Duration;
 use tokio::sync::mpsc;
 use tokio::time;
@@ -50,7 +51,7 @@ where
     backend: Backend,
     service_state: ServiceStateHandle<Self>,
     network_relay: Relay<NetworkService<Network::Backend>>,
-    membership: Membership<SphinxMessage>,
+    membership: Membership<Backend::NodeId, SphinxMessage>,
 }
 
 impl<Backend, Network> ServiceData for BlendService<Backend, Network>
@@ -61,7 +62,7 @@ where
     Network::BroadcastSettings: Clone + Debug + Serialize + DeserializeOwned,
 {
     const SERVICE_ID: ServiceId = "Blend";
-    type Settings = BlendConfig<Backend::Settings>;
+    type Settings = BlendConfig<Backend::Settings, Backend::NodeId>;
     type State = NoState<Self::Settings>;
     type StateOperator = NoOperator<Self::State>;
     type Message = ServiceMessage<Network::BroadcastSettings>;
@@ -72,6 +73,7 @@ impl<Backend, Network> ServiceCore for BlendService<Backend, Network>
 where
     Backend: BlendBackend + Send + 'static,
     Backend::Settings: Clone,
+    Backend::NodeId: Hash + Eq + Unpin,
     Network: NetworkAdapter + Send + Sync + 'static,
     Network::BroadcastSettings:
         Clone + Debug + Serialize + DeserializeOwned + Send + Sync + 'static,
@@ -204,6 +206,7 @@ impl<Backend, Network> BlendService<Backend, Network>
 where
     Backend: BlendBackend + Send + 'static,
     Backend::Settings: Clone,
+    Backend::NodeId: Hash + Eq,
     Network: NetworkAdapter,
     Network::BroadcastSettings: Clone + Debug + Serialize + DeserializeOwned,
 {
@@ -225,7 +228,11 @@ where
 
     fn wrap_and_send_to_persistent_transmission(
         message: Vec<u8>,
-        cryptographic_processor: &mut CryptographicProcessor<ChaCha12Rng, SphinxMessage>,
+        cryptographic_processor: &mut CryptographicProcessor<
+            ChaCha12Rng,
+            Backend::NodeId,
+            SphinxMessage,
+        >,
         persistent_sender: &mpsc::UnboundedSender<Vec<u8>>,
     ) {
         match cryptographic_processor.wrap_message(&message) {
@@ -242,12 +249,13 @@ where
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct BlendConfig<BackendSettings> {
+pub struct BlendConfig<BackendSettings, BackendNodeId> {
     pub backend: BackendSettings,
     pub message_blend: MessageBlendSettings<SphinxMessage>,
     pub persistent_transmission: PersistentTransmissionSettings,
     pub cover_traffic: CoverTrafficExtSettings,
-    pub membership: Vec<Node<<SphinxMessage as nomos_blend_message::BlendMessage>::PublicKey>>,
+    pub membership:
+        Vec<Node<BackendNodeId, <SphinxMessage as nomos_blend_message::BlendMessage>::PublicKey>>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -257,13 +265,16 @@ pub struct CoverTrafficExtSettings {
 }
 
 impl CoverTrafficExtSettings {
-    fn cover_traffic_settings(
+    fn cover_traffic_settings<NodeId>(
         &self,
-        membership: &Membership<SphinxMessage>,
+        membership: &Membership<NodeId, SphinxMessage>,
         cryptographic_processor_settings: &CryptographicProcessorSettings<
             <SphinxMessage as BlendMessage>::PrivateKey,
         >,
-    ) -> CoverTrafficSettings {
+    ) -> CoverTrafficSettings
+    where
+        NodeId: Hash + Eq,
+    {
         CoverTrafficSettings {
             node_id: membership.local_node().public_key,
             number_of_hops: cryptographic_processor_settings.num_blend_layers,
@@ -302,8 +313,11 @@ impl CoverTrafficExtSettings {
     }
 }
 
-impl<BackendSettings> BlendConfig<BackendSettings> {
-    fn membership(&self) -> Membership<SphinxMessage> {
+impl<BackendSettings, BackendNodeId> BlendConfig<BackendSettings, BackendNodeId>
+where
+    BackendNodeId: Clone + Hash + Eq,
+{
+    fn membership(&self) -> Membership<BackendNodeId, SphinxMessage> {
         let public_key = x25519_dalek::PublicKey::from(&x25519_dalek::StaticSecret::from(
             self.message_blend.cryptographic_processor.private_key,
         ))

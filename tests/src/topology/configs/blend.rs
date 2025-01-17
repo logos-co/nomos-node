@@ -30,7 +30,7 @@ pub fn create_blend_configs(ids: &[[u8; 32]]) -> Vec<GeneralBlendConfig> {
                     ))
                     .unwrap(),
                     node_key,
-                    conn_maintenance: ConnectionMaintenanceSettings {
+                    conn_monitor: ConnectionMaintenanceSettings {
                         peering_degree: 1,
                         max_peering_degree: 3,
                         monitor: None,

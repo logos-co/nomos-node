@@ -2,7 +2,7 @@ mod behaviour;
 mod error;
 mod handler;
 
-pub use behaviour::{Behaviour, Config, Event};
+pub use behaviour::{Behaviour, Config, Event, IntervalStreamProvider};
 
 #[cfg(test)]
 mod test {

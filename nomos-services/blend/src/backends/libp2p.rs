@@ -8,9 +8,10 @@ use libp2p::{
     swarm::SwarmEvent,
     Multiaddr, PeerId, Swarm, SwarmBuilder,
 };
-use nomos_blend::{conn_monitor::ConnectionMaintenanceSettings, membership::Membership};
+use nomos_blend::{conn_monitor::ConnectionMonitorSettings, membership::Membership};
 use nomos_blend_message::sphinx::SphinxMessage;
-use nomos_libp2p::secret_key_serde;
+use nomos_blend_network::IntervalStreamProvider;
+use nomos_libp2p::{secret_key_serde, DialError};
 use overwatch_rs::overwatch::handle::OverwatchHandle;
 use rand::RngCore;
 use serde::{Deserialize, Serialize};
@@ -18,7 +19,7 @@ use tokio::{
     sync::{broadcast, mpsc},
     task::JoinHandle,
 };
-use tokio_stream::wrappers::{BroadcastStream, IntervalStream};
+use tokio_stream::wrappers::BroadcastStream;
 
 /// A blend backend that uses the libp2p network stack.
 pub struct Libp2pBlendBackend {
@@ -34,7 +35,9 @@ pub struct Libp2pBlendBackendSettings {
     // A key for deriving PeerId and establishing secure connections (TLS 1.3 by QUIC)
     #[serde(with = "secret_key_serde", default = "ed25519::SecretKey::generate")]
     pub node_key: ed25519::SecretKey,
-    pub conn_maintenance: ConnectionMaintenanceSettings,
+    pub peering_degree: usize,
+    pub max_peering_degree: usize,
+    pub conn_monitor: Option<ConnectionMonitorSettings>,
 }
 
 const CHANNEL_SIZE: usize = 64;
@@ -42,11 +45,12 @@ const CHANNEL_SIZE: usize = 64;
 #[async_trait]
 impl BlendBackend for Libp2pBlendBackend {
     type Settings = Libp2pBlendBackendSettings;
+    type NodeId = PeerId;
 
     fn new<R>(
         config: Self::Settings,
         overwatch_handle: OverwatchHandle,
-        membership: Membership<SphinxMessage>,
+        membership: Membership<Self::NodeId, SphinxMessage>,
         rng: R,
     ) -> Self
     where
@@ -96,13 +100,13 @@ struct BlendSwarm<R>
 where
     R: RngCore + 'static,
 {
-    swarm: Swarm<nomos_blend_network::Behaviour<SphinxMessage, R, IntervalStream>>,
+    swarm: Swarm<nomos_blend_network::Behaviour<SphinxMessage, TokioIntervalStreamProvider>>,
     swarm_messages_receiver: mpsc::Receiver<BlendSwarmMessage>,
     incoming_message_sender: broadcast::Sender<Vec<u8>>,
 
     peering_degree: usize,
     max_peering_degree: usize,
-    membership: Membership<SphinxMessage>,
+    membership: Membership<PeerId, SphinxMessage>,
     rng: R,
     blacklist_peers: HashSet<PeerId>,
 }
@@ -118,7 +122,7 @@ where
 {
     fn new(
         config: Libp2pBlendBackendSettings,
-        membership: Membership<SphinxMessage>,
+        membership: Membership<PeerId, SphinxMessage>,
         rng: R,
         swarm_messages_receiver: mpsc::Receiver<BlendSwarmMessage>,
         incoming_message_sender: broadcast::Sender<Vec<u8>>,
@@ -128,18 +132,11 @@ where
             .with_tokio()
             .with_quic()
             .with_behaviour(|_| {
-                let conn_maintenance_interval =
-                    config.conn_maintenance.monitor.as_ref().map(|monitor| {
-                        IntervalStream::new(tokio::time::interval(monitor.time_window))
-                    });
-                nomos_blend_network::Behaviour::new(
+                nomos_blend_network::Behaviour::<SphinxMessage, TokioIntervalStreamProvider>::new(
                     nomos_blend_network::Config {
                         duplicate_cache_lifespan: 60,
-                        conn_maintenance_settings: config.conn_maintenance,
-                        conn_maintenance_interval,
+                        conn_monitor_settings: config.conn_monitor,
                     },
-                    membership,
-                    rng,
                 )
             })
             .expect("Blend Behaviour should be built")
@@ -158,6 +155,11 @@ where
             swarm,
             swarm_messages_receiver,
             incoming_message_sender,
+            peering_degree: config.peering_degree,
+            max_peering_degree: config.max_peering_degree,
+            membership,
+            rng,
+            blacklist_peers: HashSet::new(),
         }
     }
 
@@ -203,14 +205,18 @@ where
                     tracing::info!(histogram.received_data = msg_size as u64);
                 }
             }
-            SwarmEvent::Behaviour(nomos_blend_network::Event::MaliciousPeer(peer_id)) => {
+            SwarmEvent::Behaviour(nomos_blend_network::Event::MaliciousPeer {
+                peer_id, ..
+            }) => {
                 tracing::debug!("A malicious peer detected: {peer_id}");
                 self.blacklist_peers.insert(peer_id);
                 if let Err(e) = self.select_and_dial_peer() {
                     tracing::error!("Failed to select and dial a new peer: {e}");
                 }
             }
-            SwarmEvent::Behaviour(nomos_blend_network::Event::UnhealthyPeer(peer_id)) => {
+            SwarmEvent::Behaviour(nomos_blend_network::Event::UnhealthyPeer {
+                peer_id, ..
+            }) => {
                 tracing::debug!("A unhealthy peer detected: {peer_id}");
                 if let Err(e) = self.select_and_dial_peer() {
                     tracing::error!("Failed to select and dial a new peer: {e}");
@@ -228,26 +234,41 @@ where
         }
     }
 
-    fn select_and_dial_peer(&mut self) -> Result<Option<PeerId>, Error> {
-        let negotiated_peers = self.swarm.behaviour().negotiated_peers();
-        if negotiated_peers.len() >= self.max_peering_degree {
+    fn select_and_dial_peer(&mut self) -> Result<Option<PeerId>, DialError> {
+        let peers = self.swarm.behaviour().peers();
+        if peers.len() >= self.max_peering_degree {
             return Ok(None);
         }
 
-        let peers_to_exclude = self
+        let excludes = self
             .blacklist_peers
-            .union(self.swarm.behaviour().negotiated_peers())
+            .union(self.swarm.behaviour().peers())
             .cloned()
             .collect();
         if let Some(new_peer) = self
             .membership
-            .filter_and_choose_remote_nodes(&mut self.rng, 1, &peers_to_exclude)
+            .filter_and_choose_remote_nodes(&mut self.rng, 1, &excludes)
             .first()
         {
-            self.swarm.dial(new_peer)?;
-            Ok(Some(new_peer))
+            self.swarm.dial(new_peer.address.clone())?;
+            Ok(Some(new_peer.id))
         } else {
             Ok(None)
         }
+    }
+}
+
+struct TokioIntervalStreamProvider;
+
+impl IntervalStreamProvider for TokioIntervalStreamProvider {
+    type Stream = tokio_stream::wrappers::IntervalStream;
+
+    fn interval_stream(interval: Duration) -> Self::Stream {
+        // Since tokio::time::interval.tick() returns immediately regardless of the interval,
+        // we need to explicitly specify the time of the first tick we expect.
+        // If not, the peer would be marked as unhealthy immediately
+        // as soon as the connection is established.
+        let start = tokio::time::Instant::now() + interval;
+        tokio_stream::wrappers::IntervalStream::new(tokio::time::interval_at(start, interval))
     }
 }
