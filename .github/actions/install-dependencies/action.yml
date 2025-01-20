@@ -53,14 +53,16 @@ runs:
         sudo apt-get update
         
         # Install (exclusive) i686 dependencies
-        sudo apt-get install -yq libssl-dev:i386 gcc-multilib g++-multilib
+        sudo apt-get install -yq openssl:i386 libssl-dev:i386 gcc-multilib g++-multilib
         
         # Configure libssl for i686
         echo "\n\n\n\n EXPORTING STUFF"
         export OPENSSL_LIB_DIR="/usr/lib/i386-linux-gnu"
         export OPENSSL_INCLUDE_DIR="/usr/include/openssl"
         echo "\n\n"
+        echo "LS STUFF 1"
         ls $OPENSSL_LIB_DIR
+        echo "LS STUFF 2"
         ls $OPENSSL_INCLUDE_DIR
         echo "\n\n\n\n"
 
@@ -69,7 +71,7 @@ runs:
       shell: bash
       run: |
         # Install (exclusive) x86_64 dependencies
-        sudo apt-get install -yq libssl-dev
+        sudo apt-get install -yq openssl libssl-dev
 
     - name: Install Linux dependencies
       if: inputs.os == 'linux'

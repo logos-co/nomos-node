@@ -71,6 +71,7 @@ jobs:
       - name: Print binaries
         uses: jaywcjlove/github-action-folder-tree@main
         with:
+          exclude: 'build|deps|incremental|target|vendor'
           path: ./target/
           depth: 3
 
@@ -81,17 +82,16 @@ jobs:
       - name: Print Folder Tree
         uses: jaywcjlove/github-action-folder-tree@main
         with:
+          exclude: 'build|deps|incremental|target|vendor'
           path: ./target/debug/bundle
           depth: 2
 
-      # TODO: Add to path for Linux
-      # i686-unknown-linux-gnu
       - name: Upload RPM
         if: matrix.platform.os == 'linux'
         uses: actions/upload-artifact@v4
         with:
           name: "nomos-cli_${{ github.event.release.tag_name }}_${{ matrix.platform.arch }}.rpm"
-          path: "target/debug/bundle/rpm/nomos-cli-${{ github.event.release.tag_name }}-.x86_64.rpm"
+          path: "target/${{ matrix.platform.target_triple }}/debug/bundle/rpm/nomos-cli-${{ github.event.release.tag_name }}-.x86_64.rpm"
           if-no-files-found: error
 
       - name: Upload DEB
@@ -99,7 +99,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: "nomos-cli_${{ github.event.release.tag_name }}_${{ matrix.platform.arch }}.deb"
-          path: "target/debug/bundle/deb/nomos-cli_${{ github.event.release.tag_name }}_amd64.deb"
+          path: "target/${{ matrix.platform.target_triple }}/debug/bundle/deb/nomos-cli_${{ github.event.release.tag_name }}_amd64.deb"
           if-no-files-found: error
 
       - name: Upload AppImage
@@ -107,7 +107,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: "nomos-cli_${{ github.event.release.tag_name }}_${{ matrix.platform.arch }}.AppImage"
-          path: "target/debug/bundle/appimage/nomos-cli_${{ github.event.release.tag_name }}_amd64.AppImage"
+          path: "target/${{ matrix.platform.target_triple }}/debug/bundle/appimage/nomos-cli_${{ github.event.release.tag_name }}_amd64.AppImage"
           if-no-files-found: error
 
       - name: Upload DMG
@@ -115,7 +115,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: "nomos-cli_${{ github.event.release.tag_name }}_${{ matrix.platform.arch }}.dmg"
-          path: "target/debug/bundle/dmg/nomos-cli_${{ github.event.release.tag_name }}_amd64.dmg"
+          path: "target/${{ matrix.platform.target_triple }}/debug/bundle/dmg/nomos-cli_${{ github.event.release.tag_name }}_amd64.dmg"
           if-no-files-found: error
 
       - name: Upload MSI
@@ -123,5 +123,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: "nomos-cli_${{ github.event.release.tag_name }}_${{ matrix.platform.arch }}.msi"
-          path: "target/debug/bundle/msi/nomos-cli_${{ github.event.release.tag_name }}_amd64.msi"
+          path: "target/${{ matrix.platform.target_triple }}/debug/bundle/msi/nomos-cli_${{ github.event.release.tag_name }}_amd64.msi"
           if-no-files-found: error
