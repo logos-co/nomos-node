@@ -8,7 +8,6 @@ use tauri_utils::platform::target_triple;
 // Internal
 use bundler::utils::{
     get_project_identifier, get_target_directory_for_current_profile, get_workspace_root,
-    Architecture,
 };
 
 const CRATE_NAME: &str = "nomos-cli";
@@ -34,9 +33,10 @@ fn build_package(version: String) {
     // This simultaneously serves as input directory (where the binary is)
     // and output (where the bundle will be)
     let target_triple = target_triple().expect("Could not determine target triple");
-    let architecture = Architecture::from_target_triple(&target_triple);
-    let project_target_directory =
-        canonicalize(get_target_directory_for_current_profile(architecture)).unwrap();
+    let project_target_directory = canonicalize(get_target_directory_for_current_profile(
+        target_triple.as_str(),
+    ))
+    .unwrap();
     info!(
         "Bundle output directory: '{}'",
         project_target_directory.display()
