@@ -34,7 +34,7 @@ runs:
         
         # Update repositories with the new repo
         sudo apt-get update 
-        sudo apt-get-install openssl
+        sudo apt-get install openssl
 
     - name: Install risc0
       uses: ./.github/actions/install-risc0
