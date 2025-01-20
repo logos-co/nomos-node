@@ -32,7 +32,7 @@ runs:
         sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 0E98404D386FA1D9 6ED0E7B82643E131 F8D2585B8783D481 # Deprecated but works
         echo "deb http://ftp.de.debian.org/debian bookworm main" | sudo tee /etc/apt/sources.list.d/debian-bookworm-main.list
         
-        # Update repository with new repo
+        # Update repositories with the new repo
         sudo apt-get update 
 
     - name: Install risc0
@@ -50,6 +50,7 @@ runs:
 
         # Add i686 architecture 
         sudo dpkg --add-architecture i386
+        sudo apt-get update
         
         # Install (exclusive) i686 dependencies
         sudo apt-get install -yq libssl-dev:i386 gcc-multilib g++-multilib

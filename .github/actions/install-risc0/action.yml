@@ -13,43 +13,43 @@ description: "Install Risc0 toolchain. Requires the Rust toolchain to be install
 runs:
   using: "composite"
   steps:
-    - name: Install risc0 from source (dependencies)
-      if: inputs.os != 'linux'
-      shell: bash
-      run: |
-        # Set up environment
-        apt-get update
-        apt-get install -yq cargo g++ curl cmake ninja-build pkg-config libssl-dev clang
-        apt-get install -yq rustup # Needs cargo installed
-        rustup show
-        # apt-get install -yq python3 vim git build-essential
-
-    - name: Install risc0 from source (python3)
-      uses: actions/setup-python@v3
-      if: inputs.os != 'linux'
-
-    - name: Checkout risc
-      uses: actions/checkout@v3
-      if: inputs.os != 'linux'
-      with:
-        repository: risc0/risc0
-
-    - name: Install risc0 toolchain
-      if: inputs.os != 'linux'
-      shell: bash
-      run: |
-        cd risc0
-        cargo build --package rzup
-        ./target/debug/rzup toolchain install rust
+    #    - name: Install risc0 from source (dependencies)
+    #      if: inputs.os == 'linux'
+    #      shell: bash
+    #      run: |
+    #        # Set up environment
+    #        apt-get update
+    #        apt-get install -yq cargo g++ curl cmake ninja-build pkg-config libssl-dev clang
+    #        apt-get install -yq rustup # Needs cargo installed
+    #        rustup show
+    #        # apt-get install -yq python3 vim git build-essential
+    #
+    #    - name: Install risc0 from source (python3)
+    #      uses: actions/setup-python@v3
+    #      if: inputs.os != 'linux'
+    #
+    #    - name: Checkout risc
+    #      uses: actions/checkout@v3
+    #      if: inputs.os != 'linux'
+    #      with:
+    #        repository: risc0/risc0
+    #
+    #    - name: Install risc0 toolchain
+    #      if: inputs.os != 'linux'
+    #      shell: bash
+    #      run: |
+    #        cd risc0
+    #        cargo build --package rzup
+    #        ./target/debug/rzup toolchain install rust
 
     - name: Install cargo-binstall
       uses: cargo-bins/cargo-binstall@main
-      if: inputs.os == 'linux'
+      if: inputs.os == 'linux' || inputs.os == 'macos'
       env:
         GITHUB_TOKEN: ${{ inputs.github_token }}
 
     - name: Install risc0 using cargo-binstall
-      if: inputs.os == 'linux'
+      if: inputs.os == 'linux' || inputs.os == 'macos'
       run: cargo binstall -y cargo-risczero && cargo risczero install
       shell: bash
       env:
