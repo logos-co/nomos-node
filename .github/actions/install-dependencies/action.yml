@@ -1,0 +1,82 @@
+name: "Install Nomos Dependencies"
+
+inputs:
+  github_token:
+    description: "The GitHub token to use for cloning the repository."
+    required: true
+  os:
+    description: "The operating system to install dependencies for."
+    required: true
+  target_triple:
+    description: "The target triple to install dependencies for."
+    required: true
+
+description: "Install Risc0 toolchain. Requires the Rust toolchain to be installed."
+
+runs:
+  using: "composite"
+  steps:
+    - name: Setup apt-get
+      if: inputs.os == 'linux'
+      shell: bash
+      run: |
+        apt-get update
+        
+        # Prepare system for missing `libwebkit2gtk-4.0-dev` in Ubuntu 24.04
+        ## Prepare environment
+        apt-get install -yq gnupg
+        mkdir -p /root/.gnupg
+        chmod 700 /root/.gnupg
+        
+        ## Add missing `libwebkit2gtk-4.0-dev` repo
+        sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 0E98404D386FA1D9 6ED0E7B82643E131 F8D2585B8783D481 # Deprecated but works
+        echo "deb http://ftp.de.debian.org/debian bookworm main" | sudo tee /etc/apt/sources.list.d/debian-bookworm-main.list
+        apt-get update 
+
+    - name: Install risc0
+      uses: ./.github/actions/install-risc0
+      with:
+        github_token: ${{ inputs.github_token }}
+        os: ${{ inputs.os }}
+
+    - name: Install i686-linux dependencies
+      if: inputs.target_triple == 'i686-unknown-linux-gnu'
+      shell: bash
+      run: |
+        # Add i686 target
+        rustup target add i686-unknown-linux-gnu
+
+        # Add i686 architecture 
+        dpkg --add-architecture i386
+        
+        # Install (exclusive) i686 dependencies
+        apt-get install -yq libssl-dev:i386 gcc-multilib g++-multilib
+        
+        # Configure libssl for i686
+        export OPENSSL_LIB_DIR="/usr/lib/i386-linux-gnu"
+        export OPENSSL_INCLUDE_DIR="/usr/include/openssl"
+
+    - name: Install x86_64-linux dependencies
+      if: inputs.target_triple == 'x86_64-unknown-linux-gnu'
+      shell: bash
+      run: |
+        # Install (exclusive) x86_64 dependencies
+        apt-get install -yq libssl-dev
+
+    - name: Install Linux dependencies
+      if: matrix.platform.os == 'linux'
+      shell: bash
+      run: |
+        # Librocksdb dependencies
+        sudo apt-get install -yq clang
+
+        # Tauri dependencies
+        apt-get install -yq \
+          libgtk-3-dev \
+          libwebkit2gtk-4.0-dev \
+          build-essential \
+          curl \
+          wget \
+          file \
+          libayatana-appindicator3-dev \
+          librsvg2-dev

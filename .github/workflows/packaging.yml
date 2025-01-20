@@ -17,29 +17,32 @@ jobs:
           - os: linux
             arch: amd64
             builder: ubuntu-24.04
-            rpm_arch: x86_64
-            target: x86_64-unknown-linux-gnu
-          # WIP
+            target_triple: x86_64-unknown-linux-gnu
+            bundle_path: "target/debug/bundle"
+          # Works (tested using binstall)
           - os: linux
             arch: i686
             builder: ubuntu-24.04
-            rpm_arch: i686
-            target: i686-unknown-linux-gnu
-          #          # Works (tested using binstall)
-          #          - os: macos
-          #            arch: aarch64
-          #            builder: macos-14
-          #            target: aarch64-apple-darwin
+            target_triple: i686-unknown-linux-gnu
+            bundle_path: "target/i686-unknown-linux-gnu/debug/bundle"
+          # Works (tested using binstall)
+          - os: macos
+            arch: aarch64
+            builder: macos-14
+            target_triple: aarch64-apple-darwin
+            bundle_path: "target/debug/bundle"
           #          # WIP
           #          - os: macos
           #            arch: amd64
           #            builder: macos-13
-          #            target: x86_64-apple-darwin
+          #            target_triple: x86_64-apple-darwin
+          #            bundle_path: "target/debug/bundle"
           #          # WIP
           #          - os: windows
           #            arch: amd64
           #            builder: windows-2022
-          #            target: x86_64-pc-windows-msvc
+          #            target_triple: X8664-pc-windows-msvc
+          #            bundle_path: "target/debug/bundle"
     runs-on: ${{ matrix.platform.builder }}
     steps:
       - name: Checkout
@@ -51,46 +54,19 @@ jobs:
           profile: minimal
           toolchain: stable
           override: true
-          target: ${{ matrix.platform.target }}
+          target: ${{ matrix.platform.target_triple }}
 
-      - name: Install Risc0
-        uses: ./.github/actions/install-risc0
+      - name: Install dependencies
+        uses: ./.github/actions/install-dependencies
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           os: ${{ matrix.platform.os }}
-
-      - name: Install dependencies
-        if: matrix.platform.os == 'linux'
-        run: |
-          # Workaround for missing libwebkit2gtk-4.0-dev in Ubuntu 24.04
-          sudo apt-get update
-          sudo apt-get install -yq gnupg
-          sudo mkdir -p /root/.gnupg
-          sudo chmod 700 /root/.gnupg
-          
-          # Add Debian keyring
-          sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 0E98404D386FA1D9 6ED0E7B82643E131 F8D2585B8783D481 # Deprecated but works
-          echo "deb http://ftp.de.debian.org/debian bookworm main" | sudo tee /etc/apt/sources.list.d/debian-bookworm-main.list
-          sudo apt-get update
-
-          # Librocksdb dependencies 
-          sudo apt-get install -y clang
-
-          # Tauri dependencies
-          sudo apt-get install -y libwebkit2gtk-4.0-dev \
-            build-essential \
-            curl \
-            wget \
-            file \
-            libssl-dev \
-            libgtk-3-dev \
-            libayatana-appindicator3-dev \
-            librsvg2-dev
+          target_triple: ${{ matrix.platform.target_triple }}
 
       - uses: actions-rs/cargo@v1
         with:
           command: build
-          args: --all --no-default-features --target ${{ matrix.platform.target }}
+          args: --all --no-default-features --target ${{ matrix.platform.target_triple }}
 
       - name: Bundle
         run: |
@@ -102,12 +78,14 @@ jobs:
           path: ./target/debug/bundle
           depth: 2
 
+      # TODO: Add to path for Linux
+      # i686-unknown-linux-gnu
       - name: Upload RPM
         if: matrix.platform.os == 'linux'
         uses: actions/upload-artifact@v4
         with:
           name: "nomos-cli_${{ github.event.release.tag_name }}_${{ matrix.platform.arch }}.rpm"
-          path: "target/debug/bundle/rpm/nomos-cli-${{ github.event.release.tag_name }}-.${{ matrix.platform.rpm_arch }}.rpm"
+          path: "target/debug/bundle/rpm/nomos-cli-${{ github.event.release.tag_name }}-.x86_64.rpm"
           if-no-files-found: error
 
       - name: Upload DEB
@@ -115,7 +93,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: "nomos-cli_${{ github.event.release.tag_name }}_${{ matrix.platform.arch }}.deb"
-          path: "target/debug/bundle/deb/nomos-cli_${{ github.event.release.tag_name }}_${{ matrix.platform.arch }}.deb"
+          path: "target/debug/bundle/deb/nomos-cli_${{ github.event.release.tag_name }}_amd64.deb"
           if-no-files-found: error
 
       - name: Upload AppImage
@@ -123,7 +101,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: "nomos-cli_${{ github.event.release.tag_name }}_${{ matrix.platform.arch }}.AppImage"
-          path: "target/debug/bundle/appimage/nomos-cli-${{ github.event.release.tag_name }}-${{ matrix.platform.arch }}.AppImage"
+          path: "target/debug/bundle/appimage/nomos-cli_${{ github.event.release.tag_name }}_amd64.AppImage"
           if-no-files-found: error
 
       - name: Upload DMG
@@ -131,7 +109,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: "nomos-cli_${{ github.event.release.tag_name }}_${{ matrix.platform.arch }}.dmg"
-          path: "target/debug/bundle/dmg/nomos-cli_${{ github.event.release.tag_name }}_${{ matrix.platform.arch }}.dmg"
+          path: "target/debug/bundle/dmg/nomos-cli_${{ github.event.release.tag_name }}_amd64.dmg"
           if-no-files-found: error
 
       - name: Upload MSI
@@ -139,5 +117,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: "nomos-cli_${{ github.event.release.tag_name }}_${{ matrix.platform.arch }}.msi"
-          path: "target/debug/bundle/msi/nomos-cli_${{ github.event.release.tag_name }}_${{ matrix.platform.arch }}.msi"
+          path: "target/debug/bundle/msi/nomos-cli_${{ github.event.release.tag_name }}_amd64.msi"
           if-no-files-found: error
