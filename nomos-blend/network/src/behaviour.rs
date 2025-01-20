@@ -37,7 +37,7 @@ where
 {
     config: Config<Interval>,
     /// Connection maintenance
-    conn_maintenance: ConnectionMaintenance<M, R>,
+    conn_maintenance: ConnectionMaintenance<PeerId, M, R>,
     peer_address_map: PeerAddressMap,
     /// Queue of events to yield to the swarm.
     events: VecDeque<ToSwarm<Event, FromBehaviour>>,
@@ -69,9 +69,12 @@ where
     M::PublicKey: PartialEq,
     R: RngCore,
 {
-    pub fn new(config: Config<Interval>, membership: Membership<M>, rng: R) -> Self {
-        let mut conn_maintenance =
-            ConnectionMaintenance::<M, R>::new(config.conn_maintenance_settings, membership, rng);
+    pub fn new(config: Config<Interval>, membership: Membership<PeerId, M>, rng: R) -> Self {
+        let mut conn_maintenance = ConnectionMaintenance::<PeerId, M, R>::new(
+            config.conn_maintenance_settings,
+            membership,
+            rng,
+        );
 
         // Bootstrap connections with initial peers randomly chosen.
         let peer_addrs: Vec<Multiaddr> = conn_maintenance.bootstrap();

@@ -6,7 +6,7 @@ use futures::{Stream, StreamExt};
 use libp2p::{
     identity::{ed25519, Keypair},
     swarm::SwarmEvent,
-    Multiaddr, Swarm, SwarmBuilder,
+    Multiaddr, PeerId, Swarm, SwarmBuilder,
 };
 use nomos_blend::{conn_maintenance::ConnectionMaintenanceSettings, membership::Membership};
 use nomos_blend_message::sphinx::SphinxMessage;
@@ -42,11 +42,12 @@ const CHANNEL_SIZE: usize = 64;
 #[async_trait]
 impl BlendBackend for Libp2pBlendBackend {
     type Settings = Libp2pBlendBackendSettings;
+    type NodeId = PeerId;
 
     fn new<R>(
         config: Self::Settings,
         overwatch_handle: OverwatchHandle,
-        membership: Membership<SphinxMessage>,
+        membership: Membership<Self::NodeId, SphinxMessage>,
         rng: R,
     ) -> Self
     where
@@ -112,7 +113,7 @@ where
 {
     fn new(
         config: Libp2pBlendBackendSettings,
-        membership: Membership<SphinxMessage>,
+        membership: Membership<PeerId, SphinxMessage>,
         rng: R,
         swarm_messages_receiver: mpsc::Receiver<BlendSwarmMessage>,
         incoming_message_sender: broadcast::Sender<Vec<u8>>,

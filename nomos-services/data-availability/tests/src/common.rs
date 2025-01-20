@@ -193,7 +193,12 @@ pub struct TestDaNetworkSettings {
 pub struct TestBlendSettings {
     pub backend: Libp2pBlendBackendSettings,
     pub private_key: x25519_dalek::StaticSecret,
-    pub membership: Vec<Node<<SphinxMessage as BlendMessage>::PublicKey>>,
+    pub membership: Vec<
+        Node<
+            <BlendBackend as nomos_blend_service::backends::BlendBackend>::NodeId,
+            <SphinxMessage as BlendMessage>::PublicKey,
+        >,
+    >,
 }
 
 pub fn new_node(
@@ -345,6 +350,9 @@ pub fn new_blend_configs(listening_addresses: Vec<Multiaddr>) -> Vec<TestBlendSe
     let membership = settings
         .iter()
         .map(|(backend, private_key)| Node {
+            id: PeerId::from_public_key(
+                &Keypair::from(Ed25519Keypair::from(backend.node_key.clone())).public(),
+            ),
             address: backend.listening_address.clone(),
             public_key: x25519_dalek::PublicKey::from(&x25519_dalek::StaticSecret::from(
                 private_key.to_bytes(),

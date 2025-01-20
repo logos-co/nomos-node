@@ -1,6 +1,7 @@
 use std::{
     collections::{HashMap, HashSet},
     fmt::Debug,
+    hash::Hash,
     time::Duration,
 };
 
@@ -22,13 +23,13 @@ pub struct ConnectionMaintenanceSettings {
 
 /// Connection maintenance to detect malicious and unhealthy peers
 /// based on the number of messages sent by each peer in time windows
-pub struct ConnectionMaintenance<M, R>
+pub struct ConnectionMaintenance<NodeId, M, R>
 where
     M: BlendMessage,
     R: RngCore,
 {
     settings: ConnectionMaintenanceSettings,
-    membership: Membership<M>,
+    membership: Membership<NodeId, M>,
     rng: R,
     connected_peers: HashSet<Multiaddr>,
     malicious_peers: HashSet<Multiaddr>,
@@ -37,13 +38,18 @@ where
     monitors: Option<HashMap<Multiaddr, ConnectionMonitor>>,
 }
 
-impl<M, R> ConnectionMaintenance<M, R>
+impl<NodeId, M, R> ConnectionMaintenance<NodeId, M, R>
 where
+    NodeId: Hash + Eq,
     M: BlendMessage,
     M::PublicKey: PartialEq,
     R: RngCore,
 {
-    pub fn new(settings: ConnectionMaintenanceSettings, membership: Membership<M>, rng: R) -> Self {
+    pub fn new(
+        settings: ConnectionMaintenanceSettings,
+        membership: Membership<NodeId, M>,
+        rng: R,
+    ) -> Self {
         Self {
             settings,
             membership,
@@ -452,9 +458,9 @@ mod tests {
     fn init_maintenance(
         settings: ConnectionMaintenanceSettings,
         node_count: usize,
-    ) -> ConnectionMaintenance<MockBlendMessage, ThreadRng> {
+    ) -> ConnectionMaintenance<usize, MockBlendMessage, ThreadRng> {
         let nodes = nodes(node_count);
-        let mut maintenance = ConnectionMaintenance::<MockBlendMessage, ThreadRng>::new(
+        let mut maintenance = ConnectionMaintenance::<usize, MockBlendMessage, ThreadRng>::new(
             settings,
             Membership::new(nodes.clone(), nodes[0].public_key),
             thread_rng(),
@@ -466,9 +472,10 @@ mod tests {
         maintenance
     }
 
-    fn nodes(count: usize) -> Vec<Node<<MockBlendMessage as BlendMessage>::PublicKey>> {
+    fn nodes(count: usize) -> Vec<Node<usize, <MockBlendMessage as BlendMessage>::PublicKey>> {
         (0..count)
             .map(|i| Node {
+                id: i,
                 address: format!("/ip4/127.0.0.1/udp/{}/quic-v1", 1000 + i)
                     .parse()
                     .unwrap(),
