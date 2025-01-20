@@ -68,6 +68,12 @@ jobs:
           command: build
           args: --all --no-default-features --target ${{ matrix.platform.target_triple }}
 
+      - name: Print binaries
+        uses: jaywcjlove/github-action-folder-tree@main
+        with:
+          path: ./target/
+          depth: 3
+
       - name: Bundle
         run: |
           ./target/debug/bundle-nomos-cli
