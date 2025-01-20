@@ -125,6 +125,10 @@ where
         Ok(())
     }
 
+    pub fn peers(&self) -> &HashSet<PeerId> {
+        &self.peers
+    }
+
     fn message_id(message: &[u8]) -> Vec<u8> {
         let mut hasher = Sha256::new();
         hasher.update(message);
@@ -190,6 +194,12 @@ where
                 remaining_established,
                 ..
             }) => {
+                // This event happens in one of the following cases:
+                // 1. The connection was closed by the peer.
+                // 2. The connection was closed by the local node since no stream is active.
+                //
+                // In both cases, we need to remove the peer from the list of connected peers,
+                // though it may be already removed from list by handling other events.
                 if remaining_established == 0 {
                     self.peers.remove(&peer_id);
                 }
@@ -256,7 +266,7 @@ where
                 // if we need more healthy peers.
             }
             ToBehaviour::IOError(error) => {
-                // TODO: Consider removing the peer from the connected_peers and closing the connection
+                self.peers.remove(&peer_id);
                 self.events
                     .push_back(ToSwarm::GenerateEvent(Event::Error(Error::PeerIOError {
                         error,
