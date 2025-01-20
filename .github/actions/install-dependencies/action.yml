@@ -20,18 +20,20 @@ runs:
       if: inputs.os == 'linux'
       shell: bash
       run: |
-        apt-get update
+        sudo apt-get update
         
         # Prepare system for missing `libwebkit2gtk-4.0-dev` in Ubuntu 24.04
         ## Prepare environment
-        apt-get install -yq gnupg
-        mkdir -p /root/.gnupg
-        chmod 700 /root/.gnupg
+        sudo apt-get install -yq gnupg
+        sudo mkdir -p /root/.gnupg
+        sudo chmod 700 /root/.gnupg
         
         ## Add missing `libwebkit2gtk-4.0-dev` repo
         sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 0E98404D386FA1D9 6ED0E7B82643E131 F8D2585B8783D481 # Deprecated but works
         echo "deb http://ftp.de.debian.org/debian bookworm main" | sudo tee /etc/apt/sources.list.d/debian-bookworm-main.list
-        apt-get update 
+        
+        # Update repository with new repo
+        sudo apt-get update 
 
     - name: Install risc0
       uses: ./.github/actions/install-risc0
@@ -47,10 +49,10 @@ runs:
         rustup target add i686-unknown-linux-gnu
 
         # Add i686 architecture 
-        dpkg --add-architecture i386
+        sudo dpkg --add-architecture i386
         
         # Install (exclusive) i686 dependencies
-        apt-get install -yq libssl-dev:i386 gcc-multilib g++-multilib
+        sudo apt-get install -yq libssl-dev:i386 gcc-multilib g++-multilib
         
         # Configure libssl for i686
         export OPENSSL_LIB_DIR="/usr/lib/i386-linux-gnu"
@@ -61,7 +63,7 @@ runs:
       shell: bash
       run: |
         # Install (exclusive) x86_64 dependencies
-        apt-get install -yq libssl-dev
+        sudo apt-get install -yq libssl-dev
 
     - name: Install Linux dependencies
       if: matrix.platform.os == 'linux'
@@ -71,7 +73,7 @@ runs:
         sudo apt-get install -yq clang
 
         # Tauri dependencies
-        apt-get install -yq \
+        sudo apt-get install -yq \
           libgtk-3-dev \
           libwebkit2gtk-4.0-dev \
           build-essential \
