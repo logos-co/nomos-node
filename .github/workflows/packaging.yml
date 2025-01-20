@@ -77,7 +77,7 @@ jobs:
 
       - name: Bundle
         run: |
-          ./target/debug/bundle-nomos-cli
+          ./target/${{ matrix.platform.target_triple }}/debug/bundle-nomos-cli
 
       - name: Print Folder Tree
         uses: jaywcjlove/github-action-folder-tree@main
