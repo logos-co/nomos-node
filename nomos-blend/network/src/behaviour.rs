@@ -3,42 +3,33 @@ use crate::{
     handler::{BlendConnectionHandler, FromBehaviour, ToBehaviour},
 };
 use cached::{Cached, TimedCache};
-use futures::Stream;
 use libp2p::{
     core::Endpoint,
     swarm::{
-        dial_opts::DialOpts, CloseConnection, ConnectionClosed, ConnectionDenied, ConnectionId,
-        FromSwarm, NetworkBehaviour, NotifyHandler, THandler, THandlerInEvent, THandlerOutEvent,
-        ToSwarm,
+        ConnectionClosed, ConnectionDenied, ConnectionId, FromSwarm, NetworkBehaviour,
+        NotifyHandler, THandler, THandlerInEvent, THandlerOutEvent, ToSwarm,
     },
     Multiaddr, PeerId,
 };
-use nomos_blend::{
-    conn_maintenance::{ConnectionMaintenance, ConnectionMaintenanceSettings},
-    membership::Membership,
-};
+use nomos_blend::conn_maintenance::{ConnectionMonitor, ConnectionMonitorSettings};
 use nomos_blend_message::BlendMessage;
-use rand::RngCore;
 use sha2::{Digest, Sha256};
-use std::marker::PhantomData;
 use std::{
-    collections::{HashMap, HashSet, VecDeque},
-    pin::pin,
+    collections::{HashSet, VecDeque},
     task::{Context, Poll, Waker},
 };
+use std::{marker::PhantomData, time::Duration};
 
 /// A [`NetworkBehaviour`]:
 /// - forwards messages to all connected peers with deduplication.
 /// - receives messages from all connected peers.
-pub struct Behaviour<M, R, Interval>
+pub struct Behaviour<M, IntervalProvider>
 where
     M: BlendMessage,
-    R: RngCore,
+    IntervalProvider: IntervalStreamProvider,
 {
-    config: Config<Interval>,
-    /// Connection maintenance
-    conn_maintenance: ConnectionMaintenance<PeerId, M, R>,
-    peer_address_map: PeerAddressMap,
+    config: Config,
+    peers: HashSet<PeerId>,
     /// Queue of events to yield to the swarm.
     events: VecDeque<ToSwarm<Event, FromBehaviour>>,
     /// Waker that handles polling
@@ -47,13 +38,13 @@ where
     /// duplicates from being propagated on the network.
     duplicate_cache: TimedCache<Vec<u8>, ()>,
     _blend_message: PhantomData<M>,
+    _interval_provider: PhantomData<IntervalProvider>,
 }
 
 #[derive(Debug)]
-pub struct Config<Interval> {
+pub struct Config {
     pub duplicate_cache_lifespan: u64,
-    pub conn_maintenance_settings: ConnectionMaintenanceSettings,
-    pub conn_maintenance_interval: Option<Interval>,
+    pub conn_monitor_settings: Option<ConnectionMonitorSettings>,
 }
 
 #[derive(Debug)]
@@ -63,37 +54,22 @@ pub enum Event {
     Error(Error),
 }
 
-impl<M, R, Interval> Behaviour<M, R, Interval>
+impl<M, IntervalProvider> Behaviour<M, IntervalProvider>
 where
     M: BlendMessage,
     M::PublicKey: PartialEq,
-    R: RngCore,
+    IntervalProvider: IntervalStreamProvider,
 {
-    pub fn new(config: Config<Interval>, membership: Membership<PeerId, M>, rng: R) -> Self {
-        let mut conn_maintenance = ConnectionMaintenance::<PeerId, M, R>::new(
-            config.conn_maintenance_settings,
-            membership,
-            rng,
-        );
-
-        // Bootstrap connections with initial peers randomly chosen.
-        let peer_addrs: Vec<Multiaddr> = conn_maintenance.bootstrap();
-        let events = peer_addrs
-            .into_iter()
-            .map(|peer_addr| ToSwarm::Dial {
-                opts: DialOpts::from(peer_addr),
-            })
-            .collect::<VecDeque<_>>();
-
+    pub fn new(config: Config) -> Self {
         let duplicate_cache = TimedCache::with_lifespan(config.duplicate_cache_lifespan);
         Self {
             config,
-            conn_maintenance,
-            peer_address_map: PeerAddressMap::new(),
-            events,
+            peers: HashSet::new(),
+            events: VecDeque::new(),
             waker: None,
             duplicate_cache,
-            _blend_message: Default::default(),
+            _blend_message: PhantomData,
+            _interval_provider: PhantomData,
         }
     }
 
@@ -126,12 +102,7 @@ where
         message: Vec<u8>,
         excluded_peer: Option<PeerId>,
     ) -> Result<(), Error> {
-        let mut peer_ids = self
-            .conn_maintenance
-            .connected_peers()
-            .iter()
-            .filter_map(|addr| self.peer_address_map.peer_id(addr))
-            .collect::<HashSet<_>>();
+        let mut peer_ids = self.peers.clone();
         if let Some(peer) = &excluded_peer {
             peer_ids.remove(peer);
         }
@@ -140,14 +111,14 @@ where
             return Err(Error::NoPeers);
         }
 
-        for peer_id in peer_ids.into_iter() {
+        peer_ids.into_iter().for_each(|peer_id| {
             tracing::debug!("Registering event for peer {:?} to send msg", peer_id);
             self.events.push_back(ToSwarm::NotifyHandler {
                 peer_id,
                 handler: NotifyHandler::Any,
                 event: FromBehaviour::Message(message.clone()),
             });
-        }
+        });
 
         self.try_wake();
         Ok(())
@@ -159,24 +130,16 @@ where
         hasher.finalize().to_vec()
     }
 
-    fn run_conn_maintenance(&mut self) {
-        let (peers_to_close, peers_to_connect) = self.conn_maintenance.reset();
-
-        // Schedule events to close connections
-        peers_to_close.into_iter().for_each(|addr| {
-            if let Some(peer_id) = self.peer_address_map.peer_id(&addr) {
-                self.events.push_back(ToSwarm::CloseConnection {
-                    peer_id,
-                    connection: CloseConnection::All,
-                });
-            }
+    fn create_connection_handler(
+        &self,
+    ) -> BlendConnectionHandler<M, <IntervalProvider as IntervalStreamProvider>::Stream> {
+        let monitor = self.config.conn_monitor_settings.as_ref().map(|settings| {
+            ConnectionMonitor::new(
+                *settings,
+                IntervalProvider::interval_stream(settings.interval),
+            )
         });
-        // Schedule events to connect to peers
-        peers_to_connect.into_iter().for_each(|addr| {
-            self.events.push_back(ToSwarm::Dial {
-                opts: DialOpts::from(addr),
-            });
-        });
+        BlendConnectionHandler::new(monitor)
     }
 
     fn try_wake(&mut self) {
@@ -186,38 +149,38 @@ where
     }
 }
 
-impl<M, R, Interval> NetworkBehaviour for Behaviour<M, R, Interval>
+impl<M, IntervalProvider> NetworkBehaviour for Behaviour<M, IntervalProvider>
 where
-    M: BlendMessage + 'static,
+    M: BlendMessage + Send + 'static,
     M::PublicKey: PartialEq + 'static,
-    R: RngCore + 'static,
-    Interval: Stream + Unpin + 'static,
+    IntervalProvider: IntervalStreamProvider + 'static,
 {
-    type ConnectionHandler = BlendConnectionHandler;
+    type ConnectionHandler =
+        BlendConnectionHandler<M, <IntervalProvider as IntervalStreamProvider>::Stream>;
     type ToSwarm = Event;
 
     fn handle_established_inbound_connection(
         &mut self,
         _: ConnectionId,
-        peer_id: PeerId,
+        _: PeerId,
         _: &Multiaddr,
-        remote_addr: &Multiaddr,
+        _: &Multiaddr,
     ) -> Result<THandler<Self>, ConnectionDenied> {
-        // Keep PeerId <> Multiaddr mapping
-        self.peer_address_map.add(peer_id, remote_addr.clone());
-        Ok(BlendConnectionHandler::new())
+        // TODO: Deny the connection if max_peering_degree reached or the peer has been detected as malicious
+        //       Also, handle inbound pending connections in the same way.
+        Ok(self.create_connection_handler())
     }
 
     fn handle_established_outbound_connection(
         &mut self,
         _: ConnectionId,
-        peer_id: PeerId,
-        addr: &Multiaddr,
+        _: PeerId,
+        _: &Multiaddr,
         _: Endpoint,
     ) -> Result<THandler<Self>, ConnectionDenied> {
-        // Keep PeerId <> Multiaddr mapping
-        self.peer_address_map.add(peer_id, addr.clone());
-        Ok(BlendConnectionHandler::new())
+        // TODO: Deny the connection if max_peering_degree reached or the peer has been detected as malicious
+        //       Also, handle outbound pending connections in the same way.
+        Ok(self.create_connection_handler())
     }
 
     /// Informs the behaviour about an event from the [`Swarm`].
@@ -229,9 +192,7 @@ where
         }) = event
         {
             if remaining_established == 0 {
-                if let Some(addr) = self.peer_address_map.address(&peer_id) {
-                    self.conn_maintenance.remove_connected_peer(addr);
-                }
+                self.peers.remove(&peer_id);
             }
         }
     }
@@ -248,15 +209,9 @@ where
             // A message was forwarded from the peer.
             ToBehaviour::Message(message) => {
                 // Ignore drop message
+                // TODO: move this check into ConnectionHandler since it now has access to the message type
                 if M::is_drop_message(&message) {
-                    if let Some(addr) = self.peer_address_map.address(&peer_id) {
-                        self.conn_maintenance.record_drop_message(addr);
-                    }
                     return;
-                }
-
-                if let Some(addr) = self.peer_address_map.address(&peer_id) {
-                    self.conn_maintenance.record_effective_message(addr);
                 }
 
                 // Add the message to the cache. If it was already seen, ignore it.
@@ -282,14 +237,16 @@ where
             // The connection was fully negotiated by the peer,
             // which means that the peer supports the blend protocol.
             ToBehaviour::FullyNegotiatedOutbound => {
-                if let Some(addr) = self.peer_address_map.address(&peer_id) {
-                    self.conn_maintenance.add_connected_peer(addr.clone());
-                }
+                self.peers.insert(peer_id);
             }
             ToBehaviour::NegotiationFailed => {
-                if let Some(addr) = self.peer_address_map.address(&peer_id) {
-                    self.conn_maintenance.remove_connected_peer(addr);
-                }
+                self.peers.remove(&peer_id);
+            }
+            ToBehaviour::MaliciousPeer => {
+                todo!("Handle malicious peer");
+            }
+            ToBehaviour::UnhealthyPeer => {
+                todo!("Handle malicious peer");
             }
             ToBehaviour::IOError(error) => {
                 // TODO: Consider removing the peer from the connected_peers and closing the connection
@@ -310,13 +267,6 @@ where
         &mut self,
         cx: &mut Context<'_>,
     ) -> Poll<ToSwarm<Self::ToSwarm, THandlerInEvent<Self>>> {
-        // Run connection maintenance if the interval is reached.
-        if let Some(interval) = &mut self.config.conn_maintenance_interval {
-            if pin!(interval).poll_next(cx).is_ready() {
-                self.run_conn_maintenance();
-            }
-        }
-
         if let Some(event) = self.events.pop_front() {
             Poll::Ready(event)
         } else {
@@ -326,29 +276,8 @@ where
     }
 }
 
-struct PeerAddressMap {
-    peer_to_addr: HashMap<PeerId, Multiaddr>,
-    addr_to_peer: HashMap<Multiaddr, PeerId>,
-}
+pub trait IntervalStreamProvider {
+    type Stream: futures::Stream + Send + Unpin + 'static;
 
-impl PeerAddressMap {
-    fn new() -> Self {
-        Self {
-            peer_to_addr: HashMap::new(),
-            addr_to_peer: HashMap::new(),
-        }
-    }
-
-    fn add(&mut self, peer_id: PeerId, addr: Multiaddr) {
-        self.peer_to_addr.insert(peer_id, addr.clone());
-        self.addr_to_peer.insert(addr, peer_id);
-    }
-
-    fn peer_id(&self, addr: &Multiaddr) -> Option<PeerId> {
-        self.addr_to_peer.get(addr).copied()
-    }
-
-    fn address(&self, peer_id: &PeerId) -> Option<&Multiaddr> {
-        self.peer_to_addr.get(peer_id)
-    }
+    fn interval_stream(interval: Duration) -> Self::Stream;
 }

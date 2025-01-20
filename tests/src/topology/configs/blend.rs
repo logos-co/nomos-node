@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-use nomos_blend::{conn_maintenance::ConnectionMaintenanceSettings, membership::Node};
+use nomos_blend::membership::Node;
 use nomos_blend_message::{sphinx::SphinxMessage, BlendMessage};
 use nomos_blend_service::backends::libp2p::Libp2pBlendBackendSettings;
 use nomos_libp2p::{
@@ -40,11 +40,9 @@ pub fn create_blend_configs(ids: &[[u8; 32]]) -> Vec<GeneralBlendConfig> {
                     ))
                     .unwrap(),
                     node_key,
-                    conn_maintenance: ConnectionMaintenanceSettings {
-                        peering_degree: 1,
-                        max_peering_degree: 3,
-                        monitor: None,
-                    },
+                    peering_degree: 1,
+                    max_peering_degree: 3,
+                    conn_monitor: None,
                 },
                 private_key: x25519_dalek::StaticSecret::random(),
                 membership: Vec::new(),
