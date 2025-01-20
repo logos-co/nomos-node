@@ -34,6 +34,7 @@ runs:
         
         # Update repositories with the new repo
         sudo apt-get update 
+        sudo apt-get-install openssl
 
     - name: Install risc0
       uses: ./.github/actions/install-risc0
@@ -53,7 +54,7 @@ runs:
         sudo apt-get update
         
         # Install (exclusive) i686 dependencies
-        sudo apt-get install -yq openssl:i386 libssl-dev:i386 gcc-multilib g++-multilib
+        sudo apt-get install -yq libssl-dev:i386 gcc-multilib g++-multilib
         
         # Configure libssl for i686
         export OPENSSL_DIR="/usr/bin"
