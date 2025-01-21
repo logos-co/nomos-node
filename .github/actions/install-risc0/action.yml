@@ -21,9 +21,7 @@ runs:
       if: inputs.os == 'windows'
       shell: bash
       run: |
-        # Set up environment
-        apt-get update
-        apt-get install -yq g++ curl cmake ninja-build pkg-config libssl-dev clang
+        choco install mingw curl cmake ninja openssl.light llvm pkgconfiglite -y
 
     - name: Install risc0 from source (dependencies)
       if: inputs.os == 'macos'
