@@ -39,7 +39,7 @@ jobs:
           - os: windows
             arch: amd64
             builder: windows-2022
-            target_triple: X8664-pc-windows-msvc
+            target_triple: x86_64-pc-windows-msvc
             bundle_path: "target/debug/bundle"
     runs-on: ${{ matrix.platform.builder }}
     steps:

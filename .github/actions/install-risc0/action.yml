@@ -16,15 +16,22 @@ description: "Install Risc0 toolchain. Requires the Rust toolchain to be install
 runs:
   using: "composite"
   steps:
-
     # Requires the Rust toolchain to be installed
     - name: Install risc0 from source (dependencies)
-      if: inputs.os != 'linux'
+      if: inputs.os == 'windows'
       shell: bash
       run: |
         # Set up environment
         apt-get update
         apt-get install -yq g++ curl cmake ninja-build pkg-config libssl-dev clang
+
+    - name: Install risc0 from source (dependencies)
+      if: inputs.os == 'macos'
+      shell: bash
+      run: |
+        # Set up environment
+        brew update
+        brew install cmake ninja pkg-config openssl llvm
 
     - name: Install risc0 from source (python3)
       uses: actions/setup-python@v3
