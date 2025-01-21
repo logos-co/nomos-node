@@ -57,9 +57,8 @@ runs:
         sudo apt-get install -yq libssl-dev:i386 gcc-multilib g++-multilib
         
         # Configure libssl for i686
-        export OPENSSL_DIR="/usr/bin"
-        export OPENSSL_LIB_DIR="/usr/lib/i386-linux-gnu"
-        export OPENSSL_INCLUDE_DIR="/usr/include/openssl"
+        #        export OPENSSL_LIB_DIR="/usr/lib/i386-linux-gnu"
+        #        export OPENSSL_INCLUDE_DIR="/usr/include/openssl"
 
     - name: Install x86_64-linux dependencies
       if: inputs.target_triple == 'x86_64-unknown-linux-gnu'
