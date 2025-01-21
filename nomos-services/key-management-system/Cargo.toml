@@ -11,3 +11,18 @@ bytes = "1"
 futures = "0.3"
 async-trait = "0.1"
 log = "0.4.22"
+aes-gcm = { version = "0.10", optional = true }
+pbkdf2 = { version = "0.12", optional = true }
+sha2 = { version = "0.10", optional = true }
+uuid = { version = "1", optional = true, features = ["v4"] }
+rand = "0.8"
+thiserror = "2"
+zeroize = "1"
+ed25519-dalek = { version = "2", features = ["zeroize", "rand_core"] }
+
+[features]
+default = ["fs"]
+fs = ["aes-gcm", "pbkdf2", "sha2", "uuid"]
+
+[dev-dependencies]
+tempfile = "3"
