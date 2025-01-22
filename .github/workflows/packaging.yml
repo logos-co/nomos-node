@@ -114,7 +114,7 @@ jobs:
           path: "target/${{ matrix.platform.target_triple }}/debug/bundle/appimage/nomos-cli_${{ env.VERSION }}_amd64.AppImage"
           if-no-files-found: error
 
-      - name: Upload DMG (aarch64)
+      - name: Upload DMG
         if: matrix.platform.os == 'macos'
         uses: actions/upload-artifact@v4
         with:
