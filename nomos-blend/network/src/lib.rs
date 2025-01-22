@@ -2,9 +2,30 @@ mod behaviour;
 mod error;
 mod handler;
 
+#[cfg(feature = "tokio")]
+use std::time::Duration;
+
 pub use behaviour::{Behaviour, Config, Event, IntervalStreamProvider};
 
+#[cfg(feature = "tokio")]
+pub struct TokioIntervalStreamProvider;
+
+#[cfg(feature = "tokio")]
+impl IntervalStreamProvider for TokioIntervalStreamProvider {
+    type Stream = tokio_stream::wrappers::IntervalStream;
+
+    fn interval_stream(interval: Duration) -> Self::Stream {
+        // Since tokio::time::interval.tick() returns immediately regardless of the interval,
+        // we need to explicitly specify the time of the first tick we expect.
+        // If not, the peer would be marked as unhealthy immediately
+        // as soon as the connection is established.
+        let start = tokio::time::Instant::now() + interval;
+        tokio_stream::wrappers::IntervalStream::new(tokio::time::interval_at(start, interval))
+    }
+}
+
 #[cfg(test)]
+#[cfg(feature = "tokio")]
 mod test {
     use std::time::Duration;
 
@@ -18,11 +39,7 @@ mod test {
     use nomos_blend_message::{mock::MockBlendMessage, BlendMessage};
     use tokio::select;
 
-    use crate::{
-        behaviour::{Config, IntervalStreamProvider},
-        error::Error,
-        Behaviour, Event,
-    };
+    use crate::{behaviour::Config, error::Error, Behaviour, Event, TokioIntervalStreamProvider};
 
     /// Check that a published messsage arrives in the peers successfully.
     #[tokio::test]
@@ -166,20 +183,5 @@ mod test {
         }
 
         (nodes.into_iter(), keypairs.into_iter())
-    }
-
-    struct TokioIntervalStreamProvider;
-
-    impl IntervalStreamProvider for TokioIntervalStreamProvider {
-        type Stream = tokio_stream::wrappers::IntervalStream;
-
-        fn interval_stream(interval: Duration) -> Self::Stream {
-            // Since tokio::time::interval.tick() returns immediately regardless of the interval,
-            // we need to explicitly specify the time of the first tick we expect.
-            // If not, the peer would be marked as unhealthy immediately
-            // as soon as the connection is established.
-            let start = tokio::time::Instant::now() + interval;
-            tokio_stream::wrappers::IntervalStream::new(tokio::time::interval_at(start, interval))
-        }
     }
 }

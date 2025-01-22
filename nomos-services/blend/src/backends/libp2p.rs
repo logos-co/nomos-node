@@ -10,7 +10,7 @@ use libp2p::{
 };
 use nomos_blend::{conn_maintenance::ConnectionMonitorSettings, membership::Membership};
 use nomos_blend_message::sphinx::SphinxMessage;
-use nomos_blend_network::IntervalStreamProvider;
+use nomos_blend_network::TokioIntervalStreamProvider;
 use nomos_libp2p::secret_key_serde;
 use overwatch_rs::overwatch::handle::OverwatchHandle;
 use rand::RngCore;
@@ -210,20 +210,5 @@ impl BlendSwarm {
                 tracing::info!(counter.ignored_event = 1);
             }
         }
-    }
-}
-
-struct TokioIntervalStreamProvider;
-
-impl IntervalStreamProvider for TokioIntervalStreamProvider {
-    type Stream = tokio_stream::wrappers::IntervalStream;
-
-    fn interval_stream(interval: Duration) -> Self::Stream {
-        // Since tokio::time::interval.tick() returns immediately regardless of the interval,
-        // we need to explicitly specify the time of the first tick we expect.
-        // If not, the peer would be marked as unhealthy immediately
-        // as soon as the connection is established.
-        let start = tokio::time::Instant::now() + interval;
-        tokio_stream::wrappers::IntervalStream::new(tokio::time::interval_at(start, interval))
     }
 }
