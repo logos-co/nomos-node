@@ -1,4 +1,4 @@
-name: Packaging
+name: Packaging and Distribution
 
 on:
   push:
@@ -8,39 +8,35 @@ on:
 
 jobs:
   package:
-    name: "Packaging on ${{ matrix.platform.os }}-${{ matrix.platform.arch }}"
+    name: "Packaging for ${{ matrix.platform.arch }}-${{ matrix.platform.os }}"
     strategy:
       fail-fast: false
       matrix:
         platform:
-          # # Works (tested using binstall)
-          # - os: linux
-          #   arch: amd64
-          #   builder: ubuntu-24.04
-          #   target_triple: x86_64-unknown-linux-gnu
-          #   bundle_path: "target/debug/bundle"
-          # # Works (tested using binstall)
-          # - os: linux
-          #   arch: i686
-          #   builder: ubuntu-24.04
-          #   target_triple: i686-unknown-linux-gnu
-          #   bundle_path: "target/i686-unknown-linux-gnu/debug/bundle"
-          # # Works (tested using binstall)
-          # - os: macos
-          #   arch: aarch64
-          #   builder: macos-14
-          #   target_triple: aarch64-apple-darwin
-          #   bundle_path: "target/debug/bundle"
+          - os: linux
+            arch: amd64
+            builder: ubuntu-24.04
+            target_triple: x86_64-unknown-linux-gnu
+          - os: linux
+            arch: i686
+            builder: ubuntu-24.04
+            target_triple: i686-unknown-linux-gnu
           - os: macos
-            arch: amd64
-            builder: macos-13
-            target_triple: x86_64-apple-darwin
-            bundle_path: "target/debug/bundle"
-          - os: windows
-            arch: amd64
-            builder: windows-2022
-            target_triple: x86_64-pc-windows-msvc
-            bundle_path: "target/debug/bundle"
+            arch: aarch64
+            builder: macos-14
+            target_triple: aarch64-apple-darwin
+          # # `rzup` not available for this platform yet.
+          # - os: macos
+          #   arch: amd64
+          #   builder: macos-13
+          #   target_triple: x86_64-apple-darwin
+          #   bundle_path: "target/debug/bundle"
+          # # `rzup` not available for this platform yet.
+          # - os: windows
+          #   arch: amd64
+          #   builder: windows-2022
+          #   target_triple: x86_64-pc-windows-msvc
+          #   bundle_path: "target/debug/bundle"
     runs-on: ${{ matrix.platform.builder }}
     steps:
       - name: Checkout
