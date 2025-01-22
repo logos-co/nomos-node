@@ -6,8 +6,9 @@ use cached::{Cached, TimedCache};
 use libp2p::{
     core::Endpoint,
     swarm::{
-        ConnectionClosed, ConnectionDenied, ConnectionId, FromSwarm, NetworkBehaviour,
-        NotifyHandler, THandler, THandlerInEvent, THandlerOutEvent, ToSwarm,
+        behaviour::ConnectionEstablished, ConnectionClosed, ConnectionDenied, ConnectionId,
+        FromSwarm, NetworkBehaviour, NotifyHandler, THandler, THandlerInEvent, THandlerOutEvent,
+        ToSwarm,
     },
     Multiaddr, PeerId,
 };
@@ -166,8 +167,6 @@ where
         _: &Multiaddr,
         _: &Multiaddr,
     ) -> Result<THandler<Self>, ConnectionDenied> {
-        // TODO: Deny the connection if max_peering_degree reached or the peer has been detected as malicious
-        //       Also, handle inbound pending connections in the same way.
         Ok(self.create_connection_handler())
     }
 
@@ -178,22 +177,27 @@ where
         _: &Multiaddr,
         _: Endpoint,
     ) -> Result<THandler<Self>, ConnectionDenied> {
-        // TODO: Deny the connection if max_peering_degree reached or the peer has been detected as malicious
-        //       Also, handle outbound pending connections in the same way.
         Ok(self.create_connection_handler())
     }
 
     /// Informs the behaviour about an event from the [`Swarm`].
     fn on_swarm_event(&mut self, event: FromSwarm) {
-        if let FromSwarm::ConnectionClosed(ConnectionClosed {
-            peer_id,
-            remaining_established,
-            ..
-        }) = event
-        {
-            if remaining_established == 0 {
-                self.peers.remove(&peer_id);
+        match event {
+            FromSwarm::ConnectionEstablished(ConnectionEstablished { .. }) => {
+                // TODO: Notify the connection handler to deny the stream if necessary
+                // - if max peering degree was reached.
+                // - if the peer has been detected as malicious.
             }
+            FromSwarm::ConnectionClosed(ConnectionClosed {
+                peer_id,
+                remaining_established,
+                ..
+            }) => {
+                if remaining_established == 0 {
+                    self.peers.remove(&peer_id);
+                }
+            }
+            _ => {}
         }
     }
 
@@ -243,10 +247,16 @@ where
                 self.peers.remove(&peer_id);
             }
             ToBehaviour::MaliciousPeer => {
-                todo!("Handle malicious peer");
+                // TODO: Remove the peer from the connected peer list
+                // and add it to the malicious peer list,
+                // so that the peer is excluded from the future connection establishments.
+                // Also, notify the upper layer to try to dial new peers
+                // if we need more healthy peers.
             }
             ToBehaviour::UnhealthyPeer => {
-                todo!("Handle malicious peer");
+                // TODO: Remove the peer from the connected 'healthy' peer list.
+                // Also, notify the upper layer to try to dial new peers
+                // if we need more healthy peers.
             }
             ToBehaviour::IOError(error) => {
                 // TODO: Consider removing the peer from the connected_peers and closing the connection
