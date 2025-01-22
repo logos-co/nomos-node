@@ -91,27 +91,6 @@ jobs:
         run: |
           ./target/${{ matrix.platform.target_triple }}/debug/bundle-nomos-cli
 
-      - name: Print Folder Tree
-        uses: jaywcjlove/github-action-folder-tree@main
-        with:
-          exclude: "dist|incremental|deps|build"
-          path: ./target
-          depth: 2
-
-      - name: Print Folder Tree
-        uses: jaywcjlove/github-action-folder-tree@main
-        with:
-          exclude: "dist|incremental|deps|build"
-          path: ./target/${{ matrix.platform.target_triple }}/debug/bundle
-          depth: 2
-
-      - name: Print tree
-        shell: bash
-        run: |
-          sudo apt-get install tree
-          tree -L 2 target/
-          tree -L 2 target/${{ matrix.platform.target_triple }}/debug/bundle
-
       - name: Upload RPM
         if: matrix.platform.os == 'linux'
         uses: actions/upload-artifact@v4
@@ -136,12 +115,12 @@ jobs:
           path: "target/${{ matrix.platform.target_triple }}/debug/bundle/appimage/nomos-cli_${{ env.VERSION }}_amd64.AppImage"
           if-no-files-found: error
 
-      - name: Upload DMG
+      - name: Upload DMG (aarch64)
         if: matrix.platform.os == 'macos'
         uses: actions/upload-artifact@v4
         with:
           name: "nomos-cli_${{ env.VERSION }}_${{ matrix.platform.arch }}.dmg"
-          path: "target/${{ matrix.platform.target_triple }}/debug/bundle/dmg/nomos-cli_${{ env.VERSION }}_amd64.dmg"
+          path: "target/${{ matrix.platform.target_triple }}/debug/bundle/dmg/nomos-cli_${{ env.VERSION }}_${{ matrix.platform.arch }}.dmg"
           if-no-files-found: error
 
       - name: Upload MSI
