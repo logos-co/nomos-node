@@ -91,6 +91,13 @@ jobs:
         run: |
           ./target/${{ matrix.platform.target_triple }}/debug/bundle-nomos-cli
 
+      - name: Print tree
+        shell: bash
+        run: |
+          sudo apt-get install tree
+          tree -L 2 target/
+          tree -L 2 target/${{ matrix.platform.target_triple }}/debug/bundle
+
       - name: Upload RPM
         if: matrix.platform.os == 'linux'
         uses: actions/upload-artifact@v4
