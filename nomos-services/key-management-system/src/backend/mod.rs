@@ -1,3 +1,6 @@
+#[cfg(feature = "preload")]
+pub mod preload;
+
 use crate::KMSOperator;
 use bytes::Bytes;
 use either::Either;
@@ -15,6 +18,6 @@ pub trait KMSBackend {
         key: Either<Self::SupportedKeys, Self::KeyId>,
     ) -> Result<Self::KeyId, DynError>;
     fn public_key(&self, key_id: Self::KeyId) -> Result<Bytes, DynError>;
-    fn sign(&self, key_id: Self::KeyId, data: Bytes) -> Result<Bytes, DynError>;
-    async fn execute(&mut self, op: KMSOperator);
+    fn sign(&mut self, key_id: Self::KeyId, data: Bytes) -> Result<Bytes, DynError>;
+    async fn execute(&mut self, key_id: Self::KeyId, mut op: KMSOperator) -> Result<(), DynError>;
 }

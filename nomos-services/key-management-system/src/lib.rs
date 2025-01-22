@@ -12,16 +12,22 @@ use overwatch_rs::services::{ServiceCore, ServiceData, ServiceId};
 use overwatch_rs::DynError;
 use std::fmt::{Debug, Formatter};
 use std::future::Future;
+use std::pin::Pin;
 use tokio::sync::oneshot;
 
 mod backend;
+mod keys;
 mod secure_key;
 
 const KMS_TAG: ServiceId = "KMS";
 
 // TODO: Use [`AsyncFnMut`](https://doc.rust-lang.org/stable/std/ops/trait.AsyncFnMut.html#tymethod.async_call_mut) once it is stabilized.
 pub type KMSOperator = Box<
-    dyn FnMut(&mut dyn SecuredKey) -> Box<dyn Future<Output = Result<(), DynError>>> + Send + Sync,
+    dyn FnMut(
+            &mut dyn SecuredKey,
+        ) -> Pin<Box<dyn Future<Output = Result<(), DynError>> + Send + Sync>>
+        + Send
+        + Sync,
 >;
 
 pub enum KMSMessage<Backend>
@@ -42,6 +48,7 @@ where
         reply_channel: oneshot::Sender<Bytes>,
     },
     Execute {
+        key_id: Backend::KeyId,
         operator: KMSOperator,
     },
 }
@@ -202,8 +209,11 @@ where
                     error!("Could not reply public key to request channel");
                 }
             }
-            KMSMessage::Execute { operator } => {
-                backend.execute(operator).await;
+            KMSMessage::Execute { key_id, operator } => {
+                backend
+                    .execute(key_id, operator)
+                    .await
+                    .expect("Could not execute operator");
             }
         }
     }
