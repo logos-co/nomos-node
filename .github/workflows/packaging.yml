@@ -4,7 +4,12 @@ on:
   push:
     tags:
       - "v*.*.*"
-  pull_request:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to release. Follows the format of 'vX.Y.Z'."
+        required: true
+        default: "v0.0.0"
 
 jobs:
   package:
@@ -37,8 +42,21 @@ jobs:
           #   builder: windows-2022
           #   target_triple: x86_64-pc-windows-msvc
           #   bundle_path: "target/debug/bundle"
+
     runs-on: ${{ matrix.platform.builder }}
     steps:
+      - name: Define version
+        env:
+          VERSION: ${{ github.event.release.tag_name || inputs.version }}
+        run: |
+          if [ -z "${{ env.VERSION }}" ]; then
+            echo "Version not set."
+            exit 1
+          fi
+          
+          # If `VERSION` is defined, assume the format is correct (`vX.Y.Z`) and make it available to other steps.
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+
       - name: Checkout
         uses: actions/checkout@v3
 
@@ -62,60 +80,46 @@ jobs:
           command: build
           args: --all --no-default-features --target ${{ matrix.platform.target_triple }}
 
-      - name: Print binaries
-        uses: jaywcjlove/github-action-folder-tree@main
-        with:
-          exclude: 'build|deps|incremental|target|vendor'
-          path: ./target/
-          depth: 3
-
       - name: Bundle
         run: |
           ./target/${{ matrix.platform.target_triple }}/debug/bundle-nomos-cli
-
-      - name: Print Folder Tree
-        uses: jaywcjlove/github-action-folder-tree@main
-        with:
-          exclude: 'build|deps|incremental|target|vendor'
-          path: ./target/debug/bundle
-          depth: 2
 
       - name: Upload RPM
         if: matrix.platform.os == 'linux'
         uses: actions/upload-artifact@v4
         with:
-          name: "nomos-cli_${{ github.event.release.tag_name }}_${{ matrix.platform.arch }}.rpm"
-          path: "target/${{ matrix.platform.target_triple }}/debug/bundle/rpm/nomos-cli-${{ github.event.release.tag_name }}-.x86_64.rpm"
+          name: "nomos-cli_${{ env.VERSION }}_${{ matrix.platform.arch }}.rpm"
+          path: "target/${{ matrix.platform.target_triple }}/debug/bundle/rpm/nomos-cli-${{ env.VERSION }}-.x86_64.rpm"
           if-no-files-found: error
 
       - name: Upload DEB
         if: matrix.platform.os == 'linux'
         uses: actions/upload-artifact@v4
         with:
-          name: "nomos-cli_${{ github.event.release.tag_name }}_${{ matrix.platform.arch }}.deb"
-          path: "target/${{ matrix.platform.target_triple }}/debug/bundle/deb/nomos-cli_${{ github.event.release.tag_name }}_amd64.deb"
+          name: "nomos-cli_${{ env.VERSION }}_${{ matrix.platform.arch }}.deb"
+          path: "target/${{ matrix.platform.target_triple }}/debug/bundle/deb/nomos-cli_${{ env.VERSION }}_amd64.deb"
           if-no-files-found: error
 
       - name: Upload AppImage
         if: matrix.platform.os == 'linux'
         uses: actions/upload-artifact@v4
         with:
-          name: "nomos-cli_${{ github.event.release.tag_name }}_${{ matrix.platform.arch }}.AppImage"
-          path: "target/${{ matrix.platform.target_triple }}/debug/bundle/appimage/nomos-cli_${{ github.event.release.tag_name }}_amd64.AppImage"
+          name: "nomos-cli_${{ env.VERSION }}_${{ matrix.platform.arch }}.AppImage"
+          path: "target/${{ matrix.platform.target_triple }}/debug/bundle/appimage/nomos-cli_${{ env.VERSION }}_amd64.AppImage"
           if-no-files-found: error
 
       - name: Upload DMG
         if: matrix.platform.os == 'macos'
         uses: actions/upload-artifact@v4
         with:
-          name: "nomos-cli_${{ github.event.release.tag_name }}_${{ matrix.platform.arch }}.dmg"
-          path: "target/${{ matrix.platform.target_triple }}/debug/bundle/dmg/nomos-cli_${{ github.event.release.tag_name }}_amd64.dmg"
+          name: "nomos-cli_${{ env.VERSION }}_${{ matrix.platform.arch }}.dmg"
+          path: "target/${{ matrix.platform.target_triple }}/debug/bundle/dmg/nomos-cli_${{ env.VERSION }}_amd64.dmg"
           if-no-files-found: error
 
       - name: Upload MSI
         if: matrix.platform.os == 'windows'
         uses: actions/upload-artifact@v4
         with:
-          name: "nomos-cli_${{ github.event.release.tag_name }}_${{ matrix.platform.arch }}.msi"
-          path: "target/${{ matrix.platform.target_triple }}/debug/bundle/msi/nomos-cli_${{ github.event.release.tag_name }}_amd64.msi"
+          name: "nomos-cli_${{ env.VERSION }}_${{ matrix.platform.arch }}.msi"
+          path: "target/${{ matrix.platform.target_triple }}/debug/bundle/msi/nomos-cli_${{ env.VERSION }}_amd64.msi"
           if-no-files-found: error
