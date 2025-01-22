@@ -10,6 +10,8 @@ on:
         description: "Version to release. Must follow the format of 'vX.Y.Z'."
         required: true
         default: "v0.0.0"
+  # For testing purposes.
+  pull_request:
 
 jobs:
   package:
@@ -49,11 +51,13 @@ jobs:
         env:
           VERSION: ${{ github.event.release.tag_name || inputs.version }}
         run: |
-          if [ -z "${{ env.VERSION }}" ]; then
-            echo "`VERSION` not set."
-            exit 1
-          elif [[ ! ${{ env.VERSION }} =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "`VERSION` must follow the format of 'vX.Y.Z'. Value: '${{ env.VERSION }}'."
+          if [ -z "$VERSION" ]; then
+            echo "VERSION not set."
+            #            exit 1
+            # For testing purposes.
+            VERSION="v0.0.0"
+          elif [[ ! "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "VERSION must follow the format of 'vX.Y.Z'. Value: '$VERSION'."
             exit 2
           fi
 
