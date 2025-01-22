@@ -10,8 +10,6 @@ on:
         description: "Version to release. Must follow the format of 'vX.Y.Z'."
         required: true
         default: "v0.0.0"
-  # For testing purposes.
-  pull_request:
 
 jobs:
   package:
@@ -52,9 +50,7 @@ jobs:
         run: |
           if [ -z "$VERSION" ]; then
             echo "VERSION not set."
-            #            exit 1
-            # For testing purposes.
-            VERSION="v0.1.0"
+            exit 1
           elif [[ ! "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             echo "VERSION must follow the format of 'vX.Y.Z'. Value: '$VERSION'."
             exit 2
