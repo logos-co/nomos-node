@@ -137,6 +137,7 @@ fn main() {
 
     // Check for version mismatch
     if version != cargo_package_version.as_str() {
+        // Maybe this should be a warning instead of a panic?
         panic!(
             "Error: Expected Cargo package version: '{}', but received argument: '{}'. \
             Please ensure the version matches the Cargo package version.",

@@ -54,7 +54,7 @@ jobs:
             echo "VERSION not set."
             #            exit 1
             # For testing purposes.
-            VERSION="v0.0.0"
+            VERSION="v0.1.0"
           elif [[ ! "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             echo "VERSION must follow the format of 'vX.Y.Z'. Value: '$VERSION'."
             exit 2
