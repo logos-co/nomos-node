@@ -37,18 +37,17 @@ jobs:
           #   arch: amd64
           #   builder: macos-13
           #   target_triple: x86_64-apple-darwin
-          #   bundle_path: "target/debug/bundle"
-          # # `rzup` not available for this platform yet.
           # - os: windows
           #   arch: amd64
           #   builder: windows-2022
           #   target_triple: x86_64-pc-windows-msvc
-          #   bundle_path: "target/debug/bundle"
 
     runs-on: ${{ matrix.platform.builder }}
     steps:
       - name: Define version
         env:
+          # Use the tag name if it is available, otherwise use the input version.
+          # This enables calling from the GitHub UI.
           VERSION: ${{ github.event.release.tag_name || inputs.version }}
         run: |
           if [ -z "$VERSION" ]; then
@@ -89,7 +88,7 @@ jobs:
 
       - name: Bundle
         run: |
-          ./target/${{ matrix.platform.target_triple }}/debug/bundle-nomos-cli
+          ./target/${{ matrix.platform.target_triple }}/debug/bundle-nomos-cli ${{ env.VERSION }}
 
       - name: Upload RPM
         if: matrix.platform.os == 'linux'

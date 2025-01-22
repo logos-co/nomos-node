@@ -49,3 +49,21 @@ pub fn get_target_directory_for_current_profile(target_triple: &str) -> PathBuf 
     let profile = get_profile();
     target_directory.join(target_triple).join(profile)
 }
+
+pub fn get_cargo_package_version(package_name: &str) -> String {
+    let metadata = cargo_metadata();
+    let packages = metadata["packages"]
+        .as_array()
+        .expect("Failed to get packages");
+    let package = packages
+        .iter()
+        .find(|package| package["name"].as_str().unwrap() == package_name)
+        .expect("Failed to get package");
+    package["version"].to_string()
+}
+
+pub fn get_formatted_cargo_package_version(package_name: &str) -> String {
+    let version = get_cargo_package_version(package_name);
+    let version = version.trim_matches('"');
+    format!("v{}", version)
+}

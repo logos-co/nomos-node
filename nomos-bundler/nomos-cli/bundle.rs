@@ -1,3 +1,4 @@
+use std::env;
 // STD
 use log::{error, info};
 use std::env::set_var;
@@ -7,7 +8,8 @@ use tauri_bundler::RpmSettings;
 use tauri_utils::platform::target_triple;
 // Internal
 use bundler::utils::{
-    get_project_identifier, get_target_directory_for_current_profile, get_workspace_root,
+    get_formatted_cargo_package_version, get_project_identifier,
+    get_target_directory_for_current_profile, get_workspace_root,
 };
 
 const CRATE_NAME: &str = "nomos-cli";
@@ -25,7 +27,7 @@ fn prepare_environment(architecture: &str) {
     set_var("ARCH", architecture);
 }
 
-fn build_package(version: String) {
+fn build_package(version: &str) {
     let crate_path = get_workspace_root().join(RELATIVE_TO_WORKSPACE_PATH);
     info!("Bundling package '{}'", crate_path.display());
     let resources_path = crate_path.join("resources");
@@ -53,7 +55,7 @@ fn build_package(version: String) {
         .log_level(log::Level::Error)
         .package_settings(tauri_bundler::PackageSettings {
             product_name: String::from(CRATE_NAME),
-            version,
+            version: version.to_string(),
             description: "CLI for Nomos".to_string(),
             homepage: None,
             authors: None,
@@ -121,7 +123,26 @@ fn build_package(version: String) {
 
 fn main() {
     let _ = env_logger::try_init();
-    // TODO: Get version from Cargo.toml and parameter (github tag) and double check they match
-    let version = "v0.0.0".to_string();
+    let cargo_package_version = get_formatted_cargo_package_version(CRATE_NAME);
+
+    // Parse arguments
+    let args: Vec<String> = env::args().collect();
+
+    // Expecting at least one argument (the version)
+    // This is passed by the CI/CD pipeline
+    let version = args.get(1).expect(
+        "Error: A version argument is required in the format 'vX.Y.Z'. \
+        Example usage: `cargo run v1.2.3`",
+    );
+
+    // Check for version mismatch
+    if version != cargo_package_version.as_str() {
+        panic!(
+            "Error: Expected Cargo package version: '{}', but received argument: '{}'. \
+            Please ensure the version matches the Cargo package version.",
+            cargo_package_version, version
+        );
+    }
+
     build_package(version);
 }

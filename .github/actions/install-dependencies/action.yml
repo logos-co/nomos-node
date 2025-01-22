@@ -11,7 +11,7 @@ inputs:
     description: "The target triple to install dependencies for."
     required: true
 
-description: "Install Risc0 toolchain. Requires the Rust toolchain to be installed."
+description: "Install dependencies for building and bundling Nomos."
 
 runs:
   using: "composite"
@@ -23,7 +23,7 @@ runs:
         os: ${{ inputs.os }}
         target_triple: ${{ inputs.target_triple }}
 
-    - name: Setup system
+    - name: Setup linux system
       if: inputs.os == 'linux'
       shell: bash
       run: |
@@ -53,7 +53,7 @@ runs:
       run: |
         sudo apt-get install -yq openssl libssl-dev
 
-    - name: Install Linux dependencies
+    - name: Install linux dependencies
       if: inputs.os == 'linux'
       shell: bash
       run: |
