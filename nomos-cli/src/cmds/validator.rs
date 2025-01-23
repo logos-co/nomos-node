@@ -1,4 +1,5 @@
 // std
+use std::path::PathBuf;
 use std::sync::mpsc::Sender;
 use std::{error::Error, ops::Range};
 // crates
@@ -6,8 +7,8 @@ use clap::Args;
 use reqwest::{Client, Url};
 use serde::{de::DeserializeOwned, Serialize};
 // internal
-use kzgrs_backend::{common::blob::DaBlob, dispersal::Index};
 use kzgrs_backend::reconstruction::reconstruct_without_missing_data;
+use kzgrs_backend::{common::blob::DaBlob, dispersal::Index};
 use nomos_core::da::blob::metadata;
 use nomos_node::api::{handlers::GetRangeReq, paths};
 use nomos_node::wire;
@@ -33,10 +34,12 @@ pub struct Retrieve {
 #[derive(Args, Debug)]
 pub struct Reconstruct {
     /// Blobs to use for reconstruction.
+    #[clap(short, long, required_unless_present("file"))]
+    pub app_blobs: Option<String>,
+    /// File with blobs.
     #[clap(short, long)]
-    pub app_blobs: String,
+    pub file: Option<PathBuf>,
 }
-
 
 impl Retrieve {
     pub fn run(self) -> Result<(), Box<dyn std::error::Error>> {
@@ -130,10 +133,11 @@ impl Reconstruct {
         tracing::subscriber::set_global_default(tracing_subscriber::FmtSubscriber::new())
             .expect("setting tracing default failed");
 
-        let app_blobs: Vec<(Index, Vec<Vec<u8>>)> = serde_json::from_str(self.app_blobs.as_str())?;
-        
+        let app_blobs: Vec<(Index, Vec<Vec<u8>>)> =
+            serde_json::from_str(self.app_blobs.unwrap().as_str())?;
+
         let mut da_blobs = vec![];
-        
+
         for (index, blobs) in app_blobs.iter() {
             tracing::info!("Index {:?} has {:} blobs", (index), blobs.len());
             for blob in blobs.iter() {
@@ -145,7 +149,7 @@ impl Reconstruct {
 
         let reconstructed_data = reconstruct_without_missing_data(&da_blobs);
         tracing::info!("Reconstructed data {:?}", reconstructed_data);
-        
+
         Ok(())
     }
 }
