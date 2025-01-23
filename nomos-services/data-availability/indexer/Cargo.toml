@@ -16,8 +16,8 @@ nomos-storage = { path = "../../../nomos-services/storage" }
 nomos-mempool = { path = "../../../nomos-services/mempool" }
 nomos-tracing = { path = "../../../nomos-tracing" }
 cryptarchia-consensus = { path = "../../../nomos-services/cryptarchia-consensus" }
-overwatch-rs = { git = "https://github.com/logos-co/Overwatch", rev = "1b83775" }
-overwatch-derive = { git = "https://github.com/logos-co/Overwatch", rev = "1b83775" }
+overwatch-rs = { git = "https://github.com/logos-co/Overwatch", rev = "f5f7ea0" }
+overwatch-derive = { git = "https://github.com/logos-co/Overwatch", rev = "f5f7ea0" }
 serde = { version = "1.0", features = ["derive"] }
 rand = "0.8"
 tracing = "0.1"
