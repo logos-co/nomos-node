@@ -1,6 +1,6 @@
 on:
   schedule:
-    - cron:  '0 3 * * *'
+    - cron: '0 3 * * *'
 
   workflow_dispatch:
 
@@ -12,7 +12,7 @@ jobs:
       CARGO_INCREMENTAL: 0
       RUSTFLAGS: "-C instrument-coverage"
       LLVM_PROFILE_FILE: "nomos-node-%p-%m.profraw"
-    runs-on: ['self-hosted']
+    runs-on: [ 'self-hosted' ]
     steps:
       - uses: actions/checkout@v3
         with:
@@ -52,7 +52,7 @@ jobs:
           cargo binstall -y grcov;
           mkdir /tmp/coverage;
           grcov . --binary-path ./target/debug -s . -t lcov --branch --ignore-not-existing --ignore '../*' --ignore "/*" -o /tmp/coverage/tests.lcov;
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         if: failure()
         with:
           name: integration-test-artifacts

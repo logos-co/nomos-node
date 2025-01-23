@@ -121,7 +121,7 @@ jobs:
         with:
           command: bench
           args: --no-run
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         if: failure()
         with:
           name: integration-test-artifacts
