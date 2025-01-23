@@ -11,5 +11,5 @@ log = "0.4.22"
 env_logger = "0.11.6"
 
 [[bin]]
-name = "bundle-nomos-cli"
-path = "nomos-cli/bundle.rs"
+name = "bundle-nomos-node"
+path = "nomos-node/bundle.rs"

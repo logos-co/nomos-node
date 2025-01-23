@@ -12,8 +12,8 @@ use bundler::utils::{
     get_target_directory_for_current_profile, get_workspace_root,
 };
 
-const CRATE_NAME: &str = "nomos-cli";
-const RELATIVE_TO_WORKSPACE_PATH: &str = "nomos-cli";
+const CRATE_NAME: &str = "nomos-node";
+const CRATE_PATH_RELATIVE_TO_WORKSPACE_ROOT: &str = "nodes/nomos-node";
 
 fn prepare_environment(architecture: &str) {
     // Bypass an issue in the current linuxdeploy's version
@@ -28,23 +28,23 @@ fn prepare_environment(architecture: &str) {
 }
 
 fn build_package(version: &str) {
-    let crate_path = get_workspace_root().join(RELATIVE_TO_WORKSPACE_PATH);
+    let crate_path = get_workspace_root().join(CRATE_PATH_RELATIVE_TO_WORKSPACE_ROOT);
     info!("Bundling package '{}'", crate_path.display());
     let resources_path = crate_path.join("resources");
 
     // This simultaneously serves as input directory (where the binary is)
     // and output (where the bundle will be)
     let target_triple = target_triple().expect("Could not determine target triple");
-    let project_target_directory = canonicalize(get_target_directory_for_current_profile(
-        target_triple.as_str(),
-    ))
-    .unwrap();
+    let project_target_directory =
+        canonicalize(get_target_directory_for_current_profile(target_triple.as_str()).unwrap())
+            .unwrap();
     info!(
         "Bundle output directory: '{}'",
         project_target_directory.display()
     );
 
     // Any level of GZIP compression will make the binary building fail
+    // TODO: Re-enable RPM compression when the issue is fixed
     let rpm_settings: RpmSettings = RpmSettings {
         compression: Some(tauri_utils::config::RpmCompression::None),
         ..Default::default()
@@ -56,7 +56,7 @@ fn build_package(version: &str) {
         .package_settings(tauri_bundler::PackageSettings {
             product_name: String::from(CRATE_NAME),
             version: version.to_string(),
-            description: "CLI for Nomos".to_string(),
+            description: "Nomos Node".to_string(),
             homepage: None,
             authors: None,
             default_run: None,

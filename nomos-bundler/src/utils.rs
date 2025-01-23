@@ -44,10 +44,23 @@ pub fn get_workspace_root() -> PathBuf {
 
 /// * `target_triple` - The target triple of the current build. Needs to follow the standard format.
 ///     E.g.: x86_64-unknown-linux-gnu, aarch64-apple-darwin, etc.
-pub fn get_target_directory_for_current_profile(target_triple: &str) -> PathBuf {
+pub fn get_target_directory_for_current_profile(target_triple: &str) -> Result<PathBuf, String> {
     let target_directory = get_target_directory();
     let profile = get_profile();
-    target_directory.join(target_triple).join(profile)
+
+    // GitHub Actions format
+    let target_triple_directory = target_directory.join(target_triple);
+    if target_triple_directory.exists() {
+        return Ok(target_triple_directory.join(profile));
+    }
+
+    // Local format
+    let profile_directory = target_directory.join(profile);
+    if profile_directory.exists() {
+        return Ok(profile_directory);
+    }
+
+    Err("Could not find target directory for profile.".to_string())
 }
 
 pub fn get_cargo_package_version(package_name: &str) -> String {

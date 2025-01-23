@@ -84,44 +84,44 @@ jobs:
 
       - name: Bundle
         run: |
-          ./target/${{ matrix.platform.target_triple }}/debug/bundle-nomos-cli ${{ env.VERSION }}
+          ./target/${{ matrix.platform.target_triple }}/debug/bundle-nomos-node ${{ env.VERSION }}
 
       - name: Upload RPM
         if: matrix.platform.os == 'linux'
         uses: actions/upload-artifact@v4
         with:
-          name: "nomos-cli_${{ env.VERSION }}_${{ matrix.platform.arch }}.rpm"
-          path: "target/${{ matrix.platform.target_triple }}/debug/bundle/rpm/nomos-cli-${{ env.VERSION }}-.x86_64.rpm"
+          name: "nomos-node_${{ env.VERSION }}_${{ matrix.platform.arch }}.rpm"
+          path: "target/${{ matrix.platform.target_triple }}/debug/bundle/rpm/nomos-node-${{ env.VERSION }}-.x86_64.rpm"
           if-no-files-found: error
 
       - name: Upload DEB
         if: matrix.platform.os == 'linux'
         uses: actions/upload-artifact@v4
         with:
-          name: "nomos-cli_${{ env.VERSION }}_${{ matrix.platform.arch }}.deb"
-          path: "target/${{ matrix.platform.target_triple }}/debug/bundle/deb/nomos-cli_${{ env.VERSION }}_amd64.deb"
+          name: "nomos-node_${{ env.VERSION }}_${{ matrix.platform.arch }}.deb"
+          path: "target/${{ matrix.platform.target_triple }}/debug/bundle/deb/nomos-node_${{ env.VERSION }}_amd64.deb"
           if-no-files-found: error
 
       - name: Upload AppImage
         if: matrix.platform.os == 'linux'
         uses: actions/upload-artifact@v4
         with:
-          name: "nomos-cli_${{ env.VERSION }}_${{ matrix.platform.arch }}.AppImage"
-          path: "target/${{ matrix.platform.target_triple }}/debug/bundle/appimage/nomos-cli_${{ env.VERSION }}_amd64.AppImage"
+          name: "nomos-node_${{ env.VERSION }}_${{ matrix.platform.arch }}.AppImage"
+          path: "target/${{ matrix.platform.target_triple }}/debug/bundle/appimage/nomos-node_${{ env.VERSION }}_amd64.AppImage"
           if-no-files-found: error
 
       - name: Upload DMG
         if: matrix.platform.os == 'macos'
         uses: actions/upload-artifact@v4
         with:
-          name: "nomos-cli_${{ env.VERSION }}_${{ matrix.platform.arch }}.dmg"
-          path: "target/${{ matrix.platform.target_triple }}/debug/bundle/dmg/nomos-cli_${{ env.VERSION }}_${{ matrix.platform.arch }}.dmg"
+          name: "nomos-node_${{ env.VERSION }}_${{ matrix.platform.arch }}.dmg"
+          path: "target/${{ matrix.platform.target_triple }}/debug/bundle/dmg/nomos-node_${{ env.VERSION }}_${{ matrix.platform.arch }}.dmg"
           if-no-files-found: error
 
       - name: Upload MSI
         if: matrix.platform.os == 'windows'
         uses: actions/upload-artifact@v4
         with:
-          name: "nomos-cli_${{ env.VERSION }}_${{ matrix.platform.arch }}.msi"
-          path: "target/${{ matrix.platform.target_triple }}/debug/bundle/msi/nomos-cli_${{ env.VERSION }}_amd64.msi"
+          name: "nomos-node_${{ env.VERSION }}_${{ matrix.platform.arch }}.msi"
+          path: "target/${{ matrix.platform.target_triple }}/debug/bundle/msi/nomos-node_${{ env.VERSION }}_amd64.msi"
           if-no-files-found: error
