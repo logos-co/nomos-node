@@ -8,7 +8,7 @@ async-trait = "0.1"
 bytes = "1.2"
 chrono = { version = "0.4", optional = true }
 humantime-serde = { version = "1", optional = true }
-overwatch-rs = { git = "https://github.com/logos-co/Overwatch", rev = "703beb9" }
+overwatch-rs = { git = "https://github.com/logos-co/Overwatch", rev = "1b83775" }
 multiaddr = "0.15"
 serde = { version = "1.0", features = ["derive"] }
 sscanf = { version = "0.4", optional = true }

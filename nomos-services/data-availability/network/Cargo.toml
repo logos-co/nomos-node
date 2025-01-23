@@ -7,7 +7,7 @@ edition = "2021"
 async-trait = "0.1"
 futures = "0.3"
 kzgrs-backend = { path = "../../../nomos-da/kzgrs-backend" }
-overwatch-rs = { git = "https://github.com/logos-co/Overwatch", rev = "703beb9" }
+overwatch-rs = { git = "https://github.com/logos-co/Overwatch", rev = "1b83775" }
 nomos-core = { path = "../../../nomos-core/chain-defs" }
 nomos-libp2p = { path = "../../../nomos-libp2p" }
 nomos-da-network-core = { path = "../../../nomos-da/network/core" }
