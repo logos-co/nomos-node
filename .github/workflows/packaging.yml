@@ -84,7 +84,7 @@ jobs:
 
       - name: Bundle
         run: |
-          ./target/${{ matrix.platform.target_triple }}/debug/bundle-nomos-node ${{ env.VERSION }}
+          ./target/${{ matrix.platform.target_triple }}/debug/bundle-nomos-node -v ${{ env.VERSION }}
 
       - name: Upload RPM
         if: matrix.platform.os == 'linux'

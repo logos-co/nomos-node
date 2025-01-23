@@ -1,9 +1,9 @@
-use std::env;
 // STD
-use log::{error, info};
 use std::env::set_var;
 use std::fs::canonicalize;
 // Crates
+use clap::{arg, Parser};
+use log::{error, info};
 use tauri_bundler::RpmSettings;
 use tauri_utils::platform::target_triple;
 // Internal
@@ -27,7 +27,7 @@ fn prepare_environment(architecture: &str) {
     set_var("ARCH", architecture);
 }
 
-fn build_package(version: &str) {
+fn build_package(version: String) {
     let crate_path = get_workspace_root().join(CRATE_PATH_RELATIVE_TO_WORKSPACE_ROOT);
     info!("Bundling package '{}'", crate_path.display());
     let resources_path = crate_path.join("resources");
@@ -55,7 +55,7 @@ fn build_package(version: &str) {
         .log_level(log::Level::Error)
         .package_settings(tauri_bundler::PackageSettings {
             product_name: String::from(CRATE_NAME),
-            version: version.to_string(),
+            version,
             description: "Nomos Node".to_string(),
             homepage: None,
             authors: None,
@@ -121,29 +121,44 @@ fn build_package(version: &str) {
     }
 }
 
+#[derive(Parser)]
+struct BundleArguments {
+    #[arg(
+        short,
+        long,
+        value_name = "VERSION",
+        help = "Expected Cargo package version. \
+        If passed, this verifies the Cargo package version, panicking if it doesn't match."
+    )]
+    version: Option<String>,
+}
+
+/// If a version argument is provided, verify it matches the Cargo package version
+/// This is passed by the CI/CD pipeline to ensure the version is consistent
+fn parse_version(arguments: BundleArguments, cargo_package_version: String) -> String {
+    if let Some(version) = arguments.version {
+        // Check for version mismatch
+        if version != cargo_package_version {
+            // Maybe this should be a warning instead of a panic?
+            panic!(
+                "Error: Expected Cargo package version: '{}', but received argument: '{}'. \
+            Please ensure the version matches the Cargo package version.",
+                cargo_package_version, version
+            );
+        }
+
+        version
+    } else {
+        cargo_package_version
+    }
+}
+
 fn main() {
     let _ = env_logger::try_init();
+
     let cargo_package_version = get_formatted_cargo_package_version(CRATE_NAME);
-
-    // Parse arguments
-    let args: Vec<String> = env::args().collect();
-
-    // Expecting at least one argument (the version)
-    // This is passed by the CI/CD pipeline
-    let version = args.get(1).expect(
-        "Error: A version argument is required in the format 'vX.Y.Z'. \
-        Example usage: `cargo run v1.2.3`",
-    );
-
-    // Check for version mismatch
-    if version != cargo_package_version.as_str() {
-        // Maybe this should be a warning instead of a panic?
-        panic!(
-            "Error: Expected Cargo package version: '{}', but received argument: '{}'. \
-            Please ensure the version matches the Cargo package version.",
-            cargo_package_version, version
-        );
-    }
+    let bundle_arguments = BundleArguments::parse();
+    let version = parse_version(bundle_arguments, cargo_package_version);
 
     build_package(version);
 }
