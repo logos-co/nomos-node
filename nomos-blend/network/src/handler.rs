@@ -25,12 +25,12 @@ const VALUE_IGNORED: &str = "ignored";
 
 const PROTOCOL_NAME: StreamProtocol = StreamProtocol::new("/nomos/blend/0.1.0");
 
-pub struct BlendConnectionHandler<Msg, Interval> {
+pub struct BlendConnectionHandler<Msg> {
     inbound_substream: Option<MsgRecvFuture>,
     outbound_substream: Option<OutboundSubstreamState>,
     outbound_msgs: VecDeque<Vec<u8>>,
     pending_events_to_behaviour: VecDeque<ToBehaviour>,
-    monitor: Option<ConnectionMonitor<Interval>>,
+    monitor: Option<ConnectionMonitor>,
     waker: Option<Waker>,
     _blend_message: PhantomData<Msg>,
 }
@@ -47,8 +47,8 @@ enum OutboundSubstreamState {
     PendingSend(MsgSendFuture),
 }
 
-impl<Msg, Interval> BlendConnectionHandler<Msg, Interval> {
-    pub fn new(monitor: Option<ConnectionMonitor<Interval>>) -> Self {
+impl<Msg> BlendConnectionHandler<Msg> {
+    pub fn new(monitor: Option<ConnectionMonitor>) -> Self {
         Self {
             inbound_substream: None,
             outbound_substream: None,
@@ -89,10 +89,9 @@ pub enum ToBehaviour {
     IOError(io::Error),
 }
 
-impl<Msg, Interval> ConnectionHandler for BlendConnectionHandler<Msg, Interval>
+impl<Msg> ConnectionHandler for BlendConnectionHandler<Msg>
 where
     Msg: BlendMessage + Send + 'static,
-    Interval: futures::Stream + Unpin + Send + 'static,
 {
     type FromBehaviour = FromBehaviour;
     type ToBehaviour = ToBehaviour;

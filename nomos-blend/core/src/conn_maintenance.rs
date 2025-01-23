@@ -1,19 +1,17 @@
 use std::{
-    pin::pin,
+    pin::Pin,
     task::{Context, Poll},
     time::Duration,
 };
 
 use fixed::types::U57F7;
-use futures::Stream;
 use serde::{Deserialize, Serialize};
 
 /// Counts the number of effective and drop messages received from a peer during an interval.
-/// `Interval` is a generic type to support both sync and async environments.
-#[derive(Debug)]
-pub struct ConnectionMonitor<Interval> {
+/// `interval` is a field that implements [`futures::Stream`] to support both sync and async environments.
+pub struct ConnectionMonitor {
     settings: ConnectionMonitorSettings,
-    interval: Interval,
+    interval: Pin<Box<dyn futures::Stream<Item = ()> + Send>>,
     effective_messages: U57F7,
     drop_messages: U57F7,
 }
@@ -42,14 +40,14 @@ pub enum ConnectionMonitorOutput {
     Healthy,
 }
 
-impl<Interval> ConnectionMonitor<Interval>
-where
-    Interval: futures::Stream + Unpin + Send + 'static,
-{
-    pub fn new(settings: ConnectionMonitorSettings, interval: Interval) -> Self {
+impl ConnectionMonitor {
+    pub fn new(
+        settings: ConnectionMonitorSettings,
+        interval: impl futures::Stream<Item = ()> + Send + 'static,
+    ) -> Self {
         Self {
             settings,
-            interval,
+            interval: Box::pin(interval),
             effective_messages: U57F7::ZERO,
             drop_messages: U57F7::ZERO,
         }
@@ -77,7 +75,7 @@ where
     /// reset the monitor, and return the result as `Poll::Ready`.
     /// If not, return `Poll::Pending`.
     pub fn poll(&mut self, cx: &mut Context<'_>) -> Poll<ConnectionMonitorOutput> {
-        if pin!(&mut self.interval).poll_next(cx).is_ready() {
+        if self.interval.as_mut().poll_next(cx).is_ready() {
             let outcome = if self.is_malicious() {
                 ConnectionMonitorOutput::Malicious
             } else if self.is_unhealthy() {
@@ -119,6 +117,7 @@ where
 #[cfg(test)]
 mod tests {
     use futures::task::noop_waker;
+    use tokio_stream::StreamExt;
 
     use super::*;
 
@@ -200,7 +199,8 @@ mod tests {
             tokio_stream::wrappers::IntervalStream::new(tokio::time::interval_at(
                 tokio::time::Instant::now() + interval,
                 interval,
-            )),
+            ))
+            .map(|_| ()),
         );
 
         let waker = noop_waker();

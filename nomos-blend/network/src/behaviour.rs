@@ -131,9 +131,7 @@ where
         hasher.finalize().to_vec()
     }
 
-    fn create_connection_handler(
-        &self,
-    ) -> BlendConnectionHandler<M, <IntervalProvider as IntervalStreamProvider>::Stream> {
+    fn create_connection_handler(&self) -> BlendConnectionHandler<M> {
         let monitor = self.config.conn_monitor_settings.as_ref().map(|settings| {
             ConnectionMonitor::new(
                 *settings,
@@ -156,8 +154,7 @@ where
     M::PublicKey: PartialEq + 'static,
     IntervalProvider: IntervalStreamProvider + 'static,
 {
-    type ConnectionHandler =
-        BlendConnectionHandler<M, <IntervalProvider as IntervalStreamProvider>::Stream>;
+    type ConnectionHandler = BlendConnectionHandler<M>;
     type ToSwarm = Event;
 
     fn handle_established_inbound_connection(
@@ -287,7 +284,5 @@ where
 }
 
 pub trait IntervalStreamProvider {
-    type Stream: futures::Stream + Send + Unpin + 'static;
-
-    fn interval_stream(interval: Duration) -> Self::Stream;
+    fn interval_stream(interval: Duration) -> impl futures::Stream<Item = ()> + Send + 'static;
 }

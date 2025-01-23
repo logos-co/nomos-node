@@ -6,21 +6,21 @@ mod handler;
 use std::time::Duration;
 
 pub use behaviour::{Behaviour, Config, Event, IntervalStreamProvider};
+use tokio_stream::StreamExt;
 
 #[cfg(feature = "tokio")]
 pub struct TokioIntervalStreamProvider;
 
 #[cfg(feature = "tokio")]
 impl IntervalStreamProvider for TokioIntervalStreamProvider {
-    type Stream = tokio_stream::wrappers::IntervalStream;
-
-    fn interval_stream(interval: Duration) -> Self::Stream {
+    fn interval_stream(interval: Duration) -> impl futures::Stream<Item = ()> + Send + 'static {
         // Since tokio::time::interval.tick() returns immediately regardless of the interval,
         // we need to explicitly specify the time of the first tick we expect.
         // If not, the peer would be marked as unhealthy immediately
         // as soon as the connection is established.
         let start = tokio::time::Instant::now() + interval;
         tokio_stream::wrappers::IntervalStream::new(tokio::time::interval_at(start, interval))
+            .map(|_| ())
     }
 }
 
