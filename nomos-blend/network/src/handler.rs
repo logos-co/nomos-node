@@ -30,6 +30,8 @@ pub struct BlendConnectionHandler<Msg> {
     outbound_substream: Option<OutboundSubstreamState>,
     outbound_msgs: VecDeque<Vec<u8>>,
     pending_events_to_behaviour: VecDeque<ToBehaviour>,
+    // NOTE: Until we figure out optimal parameters for the monitor, we will keep it optional
+    // to avoid unintended side effects.
     monitor: Option<ConnectionMonitor>,
     waker: Option<Waker>,
     _blend_message: PhantomData<Msg>,
