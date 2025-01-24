@@ -69,7 +69,10 @@ where
     P::BlockId: Send + Debug + 'static,
     N: NetworkAdapter<Payload = P::Item, Key = P::Key> + Send + Sync + 'static,
 {
-    fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, overwatch_rs::DynError> {
+    fn init(
+        service_state: ServiceStateHandle<Self>,
+        _init_state: Self::State,
+    ) -> Result<Self, overwatch_rs::DynError> {
         let network_relay = service_state.overwatch_handle.relay();
         let settings = service_state.settings_reader.get_updated_settings();
 

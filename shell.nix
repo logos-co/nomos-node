@@ -21,7 +21,6 @@ pkgs.mkShell {
     clang_14
     llvmPackages_14.libclang
     openssl.dev
-    protobuf
   ];
   shellHook = ''
     export LIBCLANG_PATH="${pkgs.llvmPackages_14.libclang.lib}/lib";
