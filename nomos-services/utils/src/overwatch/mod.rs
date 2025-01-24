@@ -1,3 +1,3 @@
 pub mod recovery;
 
-pub use recovery::{RecoveryError, RecoveryOperator};
+pub use recovery::{FileBackend, JsonFileBackend, RecoveryError, RecoveryOperator};
