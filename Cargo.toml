@@ -41,6 +41,7 @@ members = [
     "tests",
     "clients/executor-http-client",
     "nomos-services/key-management-system",
+    "nomos-bundler",
 ]
 exclude = ["proof_of_leadership/risc0/risc0_proofs", "nomos-core/risc0_proofs"]
 resolver = "2"
