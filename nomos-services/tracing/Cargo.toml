@@ -12,7 +12,7 @@ nomos-tracing = { path = "../../nomos-tracing" }
 opentelemetry = { version = "0.25" }
 opentelemetry-otlp = "0.25"
 opentelemetry_sdk = { version = "0.25", features = ["rt-tokio"] }
-overwatch-rs = { git = "https://github.com/logos-co/Overwatch", rev = "10ec27e" }
+overwatch-rs = { git = "https://github.com/logos-co/Overwatch", rev = "1b83775" }
 serde = { version = "1.0", features = ["derive"] }
 tokio = { version = "1", features = ["time"] }
 tracing = "0.1"

@@ -19,7 +19,7 @@ nomos-network = { path = "../network" }
 nomos-blend-service = { path = "../blend" }
 nomos-mempool = { path = "../mempool" }
 nomos-core = { path = "../../nomos-core/chain-defs" }
-overwatch-rs = { git = "https://github.com/logos-co/Overwatch", rev = "10ec27e" }
+overwatch-rs = { git = "https://github.com/logos-co/Overwatch", rev = "1b83775" }
 nomos-storage = { path = "../storage" }
 rand_chacha = "0.3"
 rand = "0.8"

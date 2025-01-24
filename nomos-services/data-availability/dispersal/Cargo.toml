@@ -14,7 +14,7 @@ nomos-da-sampling = { path = "../sampling" }
 nomos-mempool = { path = "../../mempool", features = ["libp2p"] }
 nomos-tracing = { path = "../../../nomos-tracing" }
 kzgrs-backend = { path = "../../../nomos-da/kzgrs-backend" }
-overwatch-rs = { git = "https://github.com/logos-co/Overwatch", rev = "10ec27e" }
+overwatch-rs = { git = "https://github.com/logos-co/Overwatch", rev = "1b83775" }
 rand = "0.8"
 serde = { version = "1.0", features = ["derive"] }
 subnetworks-assignations = { path = "../../../nomos-da/network/subnetworks-assignations" }
