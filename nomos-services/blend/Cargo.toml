@@ -13,7 +13,7 @@ nomos-core = { path = "../../nomos-core/chain-defs" }
 nomos-blend-network = { path = "../../nomos-blend/network" }
 nomos-blend-message = { path = "../../nomos-blend/message" }
 nomos-network = { path = "../network" }
-overwatch-rs = { git = "https://github.com/logos-co/Overwatch", rev = "10ec27e" }
+overwatch-rs = { git = "https://github.com/logos-co/Overwatch", rev = "1b83775" }
 rand = "0.8.5"
 rand_chacha = "0.3"
 serde = { version = "1.0", features = ["derive"] }
