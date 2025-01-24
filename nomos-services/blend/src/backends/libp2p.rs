@@ -35,8 +35,8 @@ pub struct Libp2pBlendBackendSettings {
     // A key for deriving PeerId and establishing secure connections (TLS 1.3 by QUIC)
     #[serde(with = "secret_key_serde", default = "ed25519::SecretKey::generate")]
     pub node_key: ed25519::SecretKey,
-    pub peering_degree: usize,
-    pub max_peering_degree: usize,
+    pub peering_degree: u16,
+    pub max_peering_degree: u16,
     pub conn_monitor: Option<ConnectionMonitorSettings>,
 }
 
@@ -144,7 +144,7 @@ impl BlendSwarm {
 
         // Dial the initial peers randomly selected
         membership
-            .choose_remote_nodes(&mut rng, config.peering_degree)
+            .choose_remote_nodes(&mut rng, config.peering_degree as usize)
             .iter()
             .for_each(|peer| {
                 if let Err(e) = swarm.dial(peer.address.clone()) {
