@@ -63,9 +63,9 @@ impl KMSBackend for PreloadKMSBackend {
             .as_pk())
     }
 
-    fn sign(&mut self, key_id: Self::KeyId, data: Bytes) -> Result<Bytes, DynError> {
+    fn sign(&self, key_id: Self::KeyId, data: Bytes) -> Result<Bytes, DynError> {
         self.keys
-            .get_mut(&key_id)
+            .get(&key_id)
             .ok_or(Error::KeyNotRegistered(key_id))?
             .sign(data)
     }
@@ -92,7 +92,7 @@ enum Key {
 }
 
 impl SecuredKey for Key {
-    fn sign(&mut self, data: Bytes) -> Result<Bytes, DynError> {
+    fn sign(&self, data: Bytes) -> Result<Bytes, DynError> {
         match self {
             Self::Ed25519(key) => key.sign(data),
         }
@@ -141,7 +141,7 @@ mod tests {
 
         // Check if the result of key operations of the backend are the same as
         // the direct operation on the key itself.
-        let mut key = Ed25519Key(key.clone());
+        let key = Ed25519Key(key.clone());
         assert_eq!(backend.public_key(key_id.clone()).unwrap(), key.as_pk());
         let data = Bytes::from("data");
         assert_eq!(
