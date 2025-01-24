@@ -35,7 +35,7 @@ pub struct Retrieve {
 pub struct Reconstruct {
     /// Blobs to use for reconstruction.
     #[clap(short, long, required_unless_present("file"))]
-    pub app_blobs: Option<String>,
+    pub app_blobs: Option<serde_json::Value>,
     /// File with blobs.
     #[clap(short, long)]
     pub file: Option<PathBuf>,
@@ -134,7 +134,7 @@ impl Reconstruct {
             .expect("setting tracing default failed");
 
         let app_blobs: Vec<(Index, Vec<Vec<u8>>)> =
-            serde_json::from_str(self.app_blobs.unwrap().as_str())?;
+            serde_json::from_value(self.app_blobs.unwrap())?;
 
         let mut da_blobs = vec![];
 
