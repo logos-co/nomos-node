@@ -18,16 +18,14 @@ pub trait RecoveryBackend {
 #[derive(Debug, Clone)]
 pub struct RecoveryOperator<Backend>
 where
-    Backend: RecoveryBackend + Debug + Clone,
-    Backend::State: Debug + Clone,
+    Backend: RecoveryBackend,
 {
     recovery_backend: Backend,
 }
 
 impl<Backend: RecoveryBackend> RecoveryOperator<Backend>
 where
-    Backend: RecoveryBackend + FromSettings + Debug + Clone,
-    Backend::State: Debug + Clone,
+    Backend: RecoveryBackend,
 {
     fn new(recovery_backend: Backend) -> Self {
         Self { recovery_backend }
@@ -39,10 +37,8 @@ impl<Backend> StateOperator for RecoveryOperator<Backend>
 where
     Backend: RecoveryBackend
         + FromSettings<Settings = <Backend::State as ServiceState>::Settings>
-        + Send
-        + Debug
-        + Clone,
-    Backend::State: Serialize + DeserializeOwned + Default + Send + Debug + Clone,
+        + Send,
+    Backend::State: Serialize + DeserializeOwned + Send,
 {
     type StateInput = Backend::State;
     type LoadError = RecoveryError;

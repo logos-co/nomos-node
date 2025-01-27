@@ -3,8 +3,6 @@ use std::marker::PhantomData;
 use std::path::PathBuf;
 // Crates
 use overwatch_rs::services::state::ServiceState;
-use serde::de::DeserializeOwned;
-use serde::Serialize;
 // Internal
 use crate::overwatch::recovery::errors::RecoveryError;
 use crate::overwatch::recovery::operators::RecoveryBackend;
@@ -50,8 +48,8 @@ where
 impl<State, RecoverySettings, Serializer> RecoveryBackend
     for FileBackend<State, RecoverySettings, Serializer>
 where
-    State: ServiceState + Serialize + DeserializeOwned,
-    Serializer: RecoverySerializer<State>,
+    State: ServiceState,
+    Serializer: RecoverySerializer<State = State>,
 {
     type State = State;
 
@@ -67,4 +65,5 @@ where
     }
 }
 
-pub type JsonFileBackend<State, Settings> = FileBackend<State, Settings, JsonRecoverySerializer>;
+pub type JsonFileBackend<State, Settings> =
+    FileBackend<State, Settings, JsonRecoverySerializer<State>>;
