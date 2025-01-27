@@ -29,17 +29,16 @@ use nomos_network::NetworkService;
 use nomos_storage::{backends::StorageBackend, StorageMsg, StorageService};
 use overwatch_rs::services::life_cycle::LifecycleMessage;
 use overwatch_rs::services::relay::{OutboundRelay, Relay, RelayMessage};
-use overwatch_rs::services::{
-    handle::ServiceStateHandle,
-    state::{NoOperator, NoState},
-    ServiceCore, ServiceData, ServiceId,
-};
+use overwatch_rs::services::state::ServiceState;
+use overwatch_rs::services::{handle::ServiceStateHandle, ServiceCore, ServiceData, ServiceId};
 use overwatch_rs::DynError;
 use rand::{RngCore, SeedableRng};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_with::serde_as;
 use std::collections::BTreeSet;
 use std::hash::Hash;
+use std::marker::PhantomData;
+use std::path::PathBuf;
 use thiserror::Error;
 pub use time::Config as TimeConfig;
 use tokio::sync::oneshot::Sender;
@@ -47,6 +46,8 @@ use tokio::sync::{broadcast, oneshot};
 use tokio_stream::wrappers::IntervalStream;
 use tracing::{error, instrument, span, Level};
 use tracing_futures::Instrument;
+use utils::overwatch::recovery::backends::FileBackendSettings;
+use utils::overwatch::{JsonFileBackend, RecoveryOperator};
 
 type MempoolRelay<Payload, Item, Key> = OutboundRelay<MempoolMsg<HeaderId, Payload, Item, Key>>;
 type SamplingRelay<BlobId> = OutboundRelay<DaSamplingServiceMsg<BlobId>>;
@@ -130,6 +131,15 @@ pub struct CryptarchiaSettings<Ts, Bs, NetworkAdapterSettings, BlendAdapterSetti
     pub leader_config: LeaderConfig,
     pub network_adapter_settings: NetworkAdapterSettings,
     pub blend_adapter_settings: BlendAdapterSettings,
+    pub recovery_file: PathBuf,
+}
+
+impl<Ts, Bs, NetworkAdapterSettings, BlendAdapterSettings> FileBackendSettings
+    for CryptarchiaSettings<Ts, Bs, NetworkAdapterSettings, BlendAdapterSettings>
+{
+    fn recovery_file(&self) -> &PathBuf {
+        &self.recovery_file
+    }
 }
 
 pub struct CryptarchiaConsensus<
@@ -250,8 +260,8 @@ where
     const SERVICE_ID: ServiceId = CRYPTARCHIA_ID;
     type Settings =
         CryptarchiaSettings<TxS::Settings, BS::Settings, A::Settings, BlendAdapter::Settings>;
-    type State = NoState<Self::Settings>;
-    type StateOperator = NoOperator<Self::State>;
+    type State = CryptarchiaConsensusState<Self::Settings>;
+    type StateOperator = RecoveryOperator<JsonFileBackend<Self::State, Self::Settings>>;
     type Message = ConsensusMsg<Block<ClPool::Item, DaPool::Item>>;
 }
 
@@ -414,6 +424,7 @@ where
             leader_config,
             network_adapter_settings,
             blend_adapter_settings,
+            ..
         } = self.service_state.settings_reader.get_updated_settings();
 
         let genesis_id = HeaderId::from([0; 32]);
@@ -502,11 +513,27 @@ where
                     }
                 }
             }
-        // it sucks to use "Cryptarchia" when we have the Self::SERVICE_ID.
-        // Somehow it just do not let refer to the type to reference it.
-        // Probably related to too many generics.
+            // it sucks to use "Cryptarchia" when we have the Self::SERVICE_ID.
+            // Somehow it just do not let refer to the type to reference it.
+            // Probably related to too many generics.
         }.instrument(span!(Level::TRACE, CRYPTARCHIA_ID)).await;
         Ok(())
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CryptarchiaConsensusState<Settings> {
+    _settings: PhantomData<Settings>,
+}
+
+impl<Settings> ServiceState for CryptarchiaConsensusState<Settings> {
+    type Settings = Settings;
+    type Error = Error;
+
+    fn from_settings(_settings: &Self::Settings) -> Result<Self, Self::Error> {
+        Ok(Self {
+            _settings: Default::default(),
+        })
     }
 }
 

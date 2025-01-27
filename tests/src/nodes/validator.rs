@@ -1,8 +1,10 @@
+// STD
 use std::ops::Range;
+use std::path::PathBuf;
 use std::process::{Command, Stdio};
 use std::time::Duration;
 use std::{net::SocketAddr, process::Child};
-
+// Crates
 use cryptarchia_consensus::{CryptarchiaInfo, CryptarchiaSettings};
 use nomos_blend::message_blend::{
     CryptographicProcessorSettings, MessageBlendSettings, TemporalSchedulerSettings,
@@ -25,12 +27,11 @@ use nomos_node::{api::backend::AxumBackendSettings, Config, RocksBackendSettings
 use nomos_node::{BlobInfo, HeaderId, Tx};
 use reqwest::Url;
 use tempfile::NamedTempFile;
-
+// Internal
+use super::{create_tempdir, persist_tempdir, GetRangeReq, CLIENT};
 use crate::adjust_timeout;
 use crate::nodes::LOGS_PREFIX;
 use crate::topology::configs::GeneralConfig;
-
-use super::{create_tempdir, persist_tempdir, GetRangeReq, CLIENT};
 
 const BIN_PATH: &str = "../target/debug/nomos-node";
 
@@ -276,6 +277,7 @@ pub fn create_validator_config(config: GeneralConfig) -> Config {
                             topic: String::from(nomos_node::CONSENSUS_TOPIC),
                         },
                 },
+            recovery_file: PathBuf::from("./recovery/cryptarchia.json"),
         },
         da_network: DaNetworkConfig {
             backend: DaNetworkBackendSettings {
