@@ -17,7 +17,7 @@ jobs:
     name: "Determine version"
     runs-on: ubuntu-latest
     outputs:
-      VERSION: ${{ steps.define-version.outputs.VERSION }}
+      version: ${{ steps.define-version.outputs.VERSION }}
     steps:
       - name: Define version
         id: define-version
@@ -35,13 +35,13 @@ jobs:
           fi
 
           # Export the version to be used in the following jobs.
-          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
 
   package:
     name: "Packaging for ${{ matrix.platform.arch }}-${{ matrix.platform.os }}"
     needs: determine-version
     env:
-      VERSION: ${{ needs.determine-version.outputs.VERSION }}
+      VERSION: ${{ needs.determine-version.outputs.version }}
     strategy:
       fail-fast: false
       matrix:
@@ -158,7 +158,9 @@ jobs:
       - package
     runs-on: ubuntu-latest
     env:
-      VERSION: ${{ needs.determine-version.outputs.VERSION }}
+      VERSION: ${{ needs.determine-version.outputs.version }}
+    outputs:
+      upload_url: ${{ steps.create_release.outputs.upload_url }}
     steps:
       - name: Create Release
         uses: actions/create-release@v1
@@ -184,7 +186,7 @@ jobs:
       - create-release
     runs-on: ubuntu-latest
     env:
-      VERSION: ${{ needs.determine-version.outputs.VERSION }}
+      VERSION: ${{ needs.determine-version.outputs.version }}
       UPLOAD_URL: ${{ needs.create-release.outputs.upload_url }}
     steps:
       - name: Download artifacts
