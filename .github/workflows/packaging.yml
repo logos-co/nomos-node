@@ -24,7 +24,7 @@ jobs:
         env:
           # Use the tag name if it is available, otherwise use the input version.
           # This enables calling from the GitHub UI.
-          VERSION: ${{ github.event.release.tag_name || inputs.version }}
+          VERSION: ${{ github.event.release.tag_name || inputs.version || 'v0.0.0' }}
         run: |
           if [ -z "$VERSION" ]; then
             echo "Could not determine version."
