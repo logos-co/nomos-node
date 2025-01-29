@@ -162,7 +162,8 @@ jobs:
         run: |
           ls -la
           echo "####"
-          ls -R | grep ":$" | sed -e 's/:$/\//' -e 's/[^-][^\/]*\//--/g' -e 's/^/   /' -e 's/-/|/'
+          find . | sed -e "s/[^-][^\/]*\// |/g" -e "s/|\([^ ]\)/|-\1/" -e "s/\(.*\)\//\1\//"
+          echo "####"
 
       - name: Create Release
         uses: actions/create-release@v1
