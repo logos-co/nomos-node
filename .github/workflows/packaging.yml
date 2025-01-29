@@ -154,6 +154,7 @@ jobs:
   create-release:
     name: "Create release"
     needs:
+      - determine-version
       - package
     runs-on: ubuntu-latest
     env:
@@ -179,6 +180,7 @@ jobs:
   upload-assets:
     name: "Upload assets to release"
     needs:
+      - determine-version
       - create-release
     runs-on: ubuntu-latest
     env:
