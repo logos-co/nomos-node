@@ -1,6 +1,7 @@
 name: Packaging and Distribution
 
 on:
+  pull_request:
   push:
     tags:
       - "v*.*.*"
