@@ -109,8 +109,6 @@ jobs:
       - name: Upload RPM
         if: matrix.platform.os == 'linux'
         uses: actions/upload-artifact@v4
-        env:
-          VERSION: ${{ steps.determine-version.outputs.VERSION }}
         with:
           name: "nomos-node_${{ env.VERSION }}_${{ matrix.platform.arch }}.rpm"
           path: "target/${{ matrix.platform.target_triple }}/debug/bundle/rpm/nomos-node-${{ env.VERSION }}-.x86_64.rpm"
