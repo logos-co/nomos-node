@@ -94,14 +94,14 @@ jobs:
 
       - name: Bundle
         run: |
-          # Define version parameter for the binary
-          PARAMETER="-v ${{ env.VERSION }}"
-          
-          if [[ ${{ github.event.act || false }} == true ]]; then
-            echo "This workflow is running using ACT, the parameter version will be removed for debugging. The workflow 
-          version need not match the binary version." 
-            PARAMETER=""
-          fi
+          #          # Define version parameter for the binary
+          #          PARAMETER="-v ${{ env.VERSION }}"
+          #          
+          #          if [[ ${{ github.event.act || false }} == true ]]; then
+          #            echo "This workflow is running using ACT, the parameter version will be removed for debugging. The workflow 
+          #          version need not match the binary version." 
+          #            PARAMETER=""
+          #          fi
 
           ./target/${{ matrix.platform.target_triple }}/debug/bundle-nomos-node # $PARAMETER # TODO: Uncomment this line when ready
 
