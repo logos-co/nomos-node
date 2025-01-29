@@ -50,10 +50,10 @@ jobs:
             arch: amd64
             builder: ubuntu-24.04
             target_triple: x86_64-unknown-linux-gnu
-          - os: linux
-            arch: i686
-            builder: ubuntu-24.04
-            target_triple: i686-unknown-linux-gnu
+          #          - os: linux
+          #            arch: i686
+          #            builder: ubuntu-24.04
+          #            target_triple: i686-unknown-linux-gnu
           - os: macos
             arch: aarch64
             builder: macos-14
@@ -146,7 +146,7 @@ jobs:
           path: "target/${{ matrix.platform.target_triple }}/debug/bundle/msi/nomos-node_${{ env.VERSION }}_amd64.msi"
           if-no-files-found: error
 
-  release:
+  create-release:
     name: "Create release"
     needs:
       - determine-version # Implicit dependency due to `package` also needing it
@@ -157,6 +157,12 @@ jobs:
     steps:
       - name: Download artifacts
         uses: actions/download-artifact@v4
+
+      - name: Debug artifacts
+        run: |
+          ls -la
+          echo "####"
+          ls -R | grep ":$" | sed -e 's/:$//' -e 's/[^-][^\/]*\//--/g' -e 's/^/   /' -e 's/-/|/'
 
       - name: Create Release
         uses: actions/create-release@v1
