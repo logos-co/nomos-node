@@ -94,7 +94,16 @@ jobs:
 
       - name: Bundle
         run: |
-          ./target/${{ matrix.platform.target_triple }}/debug/bundle-nomos-node -v ${{ env.VERSION }}
+          # Define version parameter for the binary
+          PARAMETER="-v ${{ env.VERSION }}"
+          
+          if [[ ${{ github.event.act || false }} == true ]]; then
+            echo "This workflow is running using ACT, the parameter version will be removed for debugging. The workflow 
+          version need not match the binary version." 
+            PARAMETER=""
+          fi
+
+          ./target/${{ matrix.platform.target_triple }}/debug/bundle-nomos-node # $PARAMETER # TODO: Uncomment this line when ready
 
       - name: Upload RPM
         if: matrix.platform.os == 'linux'
