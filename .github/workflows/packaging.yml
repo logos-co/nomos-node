@@ -110,7 +110,8 @@ jobs:
         if: matrix.platform.os == 'linux'
         uses: actions/upload-artifact@v4
         with:
-          name: "nomos-node_${{ env.VERSION }}_${{ matrix.platform.arch }}.rpm"
+          # name: "nomos-node_${{ env.VERSION }}_${{ matrix.platform.arch }}.rpm"
+          name: "${{ matrix.platform.arch }}_rpm"
           path: "target/${{ matrix.platform.target_triple }}/debug/bundle/rpm/nomos-node-${{ env.VERSION }}-.x86_64.rpm"
           if-no-files-found: error
 
@@ -118,7 +119,8 @@ jobs:
         if: matrix.platform.os == 'linux'
         uses: actions/upload-artifact@v4
         with:
-          name: "nomos-node_${{ env.VERSION }}_${{ matrix.platform.arch }}.deb"
+          # name: "nomos-node_${{ env.VERSION }}_${{ matrix.platform.arch }}.deb"
+          name: "${{ matrix.platform.arch }}_deb"
           path: "target/${{ matrix.platform.target_triple }}/debug/bundle/deb/nomos-node_${{ env.VERSION }}_amd64.deb"
           if-no-files-found: error
 
@@ -126,7 +128,8 @@ jobs:
         if: matrix.platform.os == 'linux'
         uses: actions/upload-artifact@v4
         with:
-          name: "nomos-node_${{ env.VERSION }}_${{ matrix.platform.arch }}.AppImage"
+          # name: "nomos-node_${{ env.VERSION }}_${{ matrix.platform.arch }}.AppImage"
+          name: "${{ matrix.platform.arch }}_appimage"
           path: "target/${{ matrix.platform.target_triple }}/debug/bundle/appimage/nomos-node_${{ env.VERSION }}_amd64.AppImage"
           if-no-files-found: error
 
@@ -134,7 +137,8 @@ jobs:
         if: matrix.platform.os == 'macos'
         uses: actions/upload-artifact@v4
         with:
-          name: "nomos-node_${{ env.VERSION }}_${{ matrix.platform.arch }}.dmg"
+          # name: "nomos-node_${{ env.VERSION }}_${{ matrix.platform.arch }}.dmg"
+          name: "${{ matrix.platform.arch }}_dmg"
           path: "target/${{ matrix.platform.target_triple }}/debug/bundle/dmg/nomos-node_${{ env.VERSION }}_${{ matrix.platform.arch }}.dmg"
           if-no-files-found: error
 
@@ -142,29 +146,19 @@ jobs:
         if: matrix.platform.os == 'windows'
         uses: actions/upload-artifact@v4
         with:
-          name: "nomos-node_${{ env.VERSION }}_${{ matrix.platform.arch }}.msi"
+          # name: "nomos-node_${{ env.VERSION }}_${{ matrix.platform.arch }}.msi"
+          name: "${{ matrix.platform.arch }}_msi"
           path: "target/${{ matrix.platform.target_triple }}/debug/bundle/msi/nomos-node_${{ env.VERSION }}_amd64.msi"
           if-no-files-found: error
 
   create-release:
     name: "Create release"
     needs:
-      - determine-version # Implicit dependency due to `package` also needing it
       - package
     runs-on: ubuntu-latest
     env:
       VERSION: ${{ needs.determine-version.outputs.VERSION }}
     steps:
-      - name: Download artifacts
-        uses: actions/download-artifact@v4
-
-      - name: Debug artifacts
-        run: |
-          ls -la
-          echo "####"
-          find . | sed -e "s/[^-][^\/]*\// |/g" -e "s/|\([^ ]\)/|-\1/" -e "s/\(.*\)\//\1\//"
-          echo "####"
-
       - name: Create Release
         uses: actions/create-release@v1
         id: create_release
@@ -182,49 +176,94 @@ jobs:
           draft: true
           prerelease: false
 
-      - name: Upload RPM asset
+  upload-assets:
+    name: "Upload assets to release"
+    needs:
+      - create-release
+    runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ needs.determine-version.outputs.VERSION }}
+      UPLOAD_URL: ${{ needs.create-release.outputs.upload_url }}
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+
+      - name: Upload RPM asset (amd64)
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           BINARY_NAME: nomos-node_${{ env.VERSION }}_amd64.rpm
         with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ${{ github.workspace }}/${{ env.BINARY_NAME }}
+          upload_url: ${{ env.UPLOAD_URL }}
+          asset_path: ${{ github.workspace }}/amd64_rpm/nomos-node-${{ env.VERSION }}-.x86_64.rpm
           asset_name: ${{ env.BINARY_NAME }}
-          asset_content_type: application/x-rpm
+          asset_content_type: application/octet-stream
 
-      - name: Upload DEB asset
+      - name: Upload RPM asset (i686)
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BINARY_NAME: nomos-node_${{ env.VERSION }}_i686.rpm
+        with:
+          upload_url: ${{ env.UPLOAD_URL }}
+          asset_path: ${{ github.workspace }}/i686_rpm/nomos-node-${{ env.VERSION }}-.x86_64.rpm
+          asset_name: ${{ env.BINARY_NAME }}
+          asset_content_type: application/octet-stream
+
+      - name: Upload DEB asset (amd64)
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           BINARY_NAME: nomos-node_${{ env.VERSION }}_amd64.deb
         with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ${{ github.workspace }}/${{ env.BINARY_NAME }}
+          upload_url: ${{ env.UPLOAD_URL }}
+          asset_path: ${{ github.workspace }}/amd64_deb/nomos-node_${{ env.VERSION }}_amd64.deb
           asset_name: ${{ env.BINARY_NAME }}
-          asset_content_type: application/x-deb
+          asset_content_type: application/octet-stream
 
-      - name: Upload AppImage asset
+      - name: Upload DEB asset (i686)
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BINARY_NAME: nomos-node_${{ env.VERSION }}_i686.deb
+        with:
+          upload_url: ${{ env.UPLOAD_URL }}
+          asset_path: ${{ github.workspace }}/i686_deb/nomos-node_${{ env.VERSION }}_amd64.deb
+          asset_name: ${{ env.BINARY_NAME }}
+          asset_content_type: application/octet-stream
+
+      - name: Upload AppImage asset (amd64)
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           BINARY_NAME: nomos-node_${{ env.VERSION }}_amd64.AppImage
         with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ${{ github.workspace }}/${{ env.BINARY_NAME }}
+          upload_url: ${{ env.UPLOAD_URL }}
+          asset_path: ${{ github.workspace }}/amd64_appimage/nomos-node_${{ env.VERSION }}_amd64.AppImage
           asset_name: ${{ env.BINARY_NAME }}
-          asset_content_type: application/x-AppImage
+          asset_content_type: application/octet-stream
+
+      - name: Upload AppImage asset (i686)
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BINARY_NAME: nomos-node_${{ env.VERSION }}_i686.AppImage
+        with:
+          upload_url: ${{ env.UPLOAD_URL }}
+          asset_path: ${{ github.workspace }}/i686_appimage/nomos-node_${{ env.VERSION }}_amd64.AppImage
+          asset_name: ${{ env.BINARY_NAME }}
+          asset_content_type: application/octet-stream
 
       - name: Upload DMG asset
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          BINARY_NAME: nomos-node_${{ env.VERSION }}_${{ matrix.platform.arch }}.dmg
+          BINARY_NAME: nomos-node_${{ env.VERSION }}_aarch64.dmg
         with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ${{ github.workspace }}/${{ env.BINARY_NAME }}
+          upload_url: ${{ env.UPLOAD_URL }}
+          asset_path: ${{ github.workspace }}/aarch64_dmg/nomos-node_${{ env.VERSION }}_aarch64.dmg
           asset_name: ${{ env.BINARY_NAME }}
-          asset_content_type: application/x-dmg
+          asset_content_type: application/octet-stream
 
       - name: Upload MSI asset
         uses: actions/upload-release-asset@v1
@@ -232,7 +271,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           BINARY_NAME: nomos-node_${{ env.VERSION }}_amd64.msi
         with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ${{ github.workspace }}/${{ env.BINARY_NAME }}
+          upload_url: ${{ env.UPLOAD_URL }}
+          asset_path: ${{ github.workspace }}/amd64_msi/nomos-node_${{ env.VERSION }}_amd64.msi
           asset_name: ${{ env.BINARY_NAME }}
-          asset_content_type: application/x-msi
+          asset_content_type: application/octet-stream
