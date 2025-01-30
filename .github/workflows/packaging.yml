@@ -10,20 +10,28 @@ on:
       version:
         description: "Version to release. Must follow the format of 'vX.Y.Z'."
         required: true
-        default: "v0.0.0"
+        default: "v0.1.0"
+      profile:
+        description: "Profile to use for the build."
+        options:
+          - "release"
+          - "debug"
+        required: true
+        default: "release"
 
 jobs:
-  determine-version:
-    name: "Determine version"
+  setup:
+    name: "Define variables and configure environment"
     runs-on: ubuntu-latest
     outputs:
-      version: ${{ steps.define-version.outputs.VERSION }}
+      version: ${{ steps.define-version.outputs.version }}
+      profile: ${{ steps.define-profile.outputs.profile }}
     steps:
       - name: Define version
         id: define-version
         env:
           # Use the tag name if it is available, otherwise use the input version.
-          # This enables calling from the GitHub UI.
+          # If neither is available, default to "v0.1.0".
           VERSION: ${{ github.event.release.tag_name || inputs.version || 'v0.1.0' }}
         run: |
           if [ -z "$VERSION" ]; then
@@ -33,13 +41,27 @@ jobs:
             echo "VERSION must follow the format of 'vX.Y.Z'. Value: '$VERSION'."
             exit 2
           fi
-
+          
           # Export the version to be used in the following jobs.
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
+      - name: Define profile
+        id: define-profile
+        env:
+          # Use the input profile if it was provided, otherwise default to "release".
+          PROFILE: ${{ inputs.profile || 'release' }}
+        run: |
+          if [[ ! "$PROFILE" =~ ^(release|debug)$ ]]; then
+            echo "PROFILE must be either 'release' or 'debug'. Value: '$PROFILE'."
+            exit 3
+          fi
+          
+          # Export the profile to be used in the following jobs.
+          echo "profile=$PROFILE" >> $GITHUB_OUTPUT
+
   package:
     name: "Packaging for ${{ matrix.platform.arch }}-${{ matrix.platform.os }}"
-    needs: determine-version
+    needs: setup
     env:
       VERSION: ${{ needs.determine-version.outputs.version }}
     strategy:
@@ -89,9 +111,16 @@ jobs:
           target_triple: ${{ matrix.platform.target_triple }}
 
       - uses: actions-rs/cargo@v1
+        name: Build Nomos Node
         with:
           command: build
-          args: --all --no-default-features --target ${{ matrix.platform.target_triple }}
+          args: --package nomos-node --${{ inputs.profile }} --no-default-features --target ${{ matrix.platform.target_triple }}
+
+      - uses: actions-rs/cargo@v1
+        name: Build Nomos Node Bundler
+        with:
+          command: build
+          args: --bin bundle-nomos-node --${{ inputs.profile }} --target ${{ matrix.platform.target_triple }}
 
       - name: Bundle
         run: |
@@ -103,61 +132,57 @@ jobs:
             PARAMETER=""
           fi
 
-          ./target/${{ matrix.platform.target_triple }}/debug/bundle-nomos-node $PARAMETER
+          ./target/${{ matrix.platform.target_triple }}/${{ inputs.profile }}/bundle-nomos-node $PARAMETER
 
       - name: Upload RPM
         if: matrix.platform.os == 'linux'
         uses: actions/upload-artifact@v4
         with:
-          # name: "nomos-node_${{ env.VERSION }}_${{ matrix.platform.arch }}.rpm"
           name: "${{ matrix.platform.arch }}_rpm"
-          path: "target/${{ matrix.platform.target_triple }}/debug/bundle/rpm/nomos-node-${{ env.VERSION }}-.x86_64.rpm"
+          path: "target/${{ matrix.platform.target_triple }}/${{ inputs.profile }}/bundle/rpm/nomos-node-${{ env.VERSION }}-.x86_64.rpm"
           if-no-files-found: error
 
       - name: Upload DEB
         if: matrix.platform.os == 'linux'
         uses: actions/upload-artifact@v4
         with:
-          # name: "nomos-node_${{ env.VERSION }}_${{ matrix.platform.arch }}.deb"
           name: "${{ matrix.platform.arch }}_deb"
-          path: "target/${{ matrix.platform.target_triple }}/debug/bundle/deb/nomos-node_${{ env.VERSION }}_amd64.deb"
+          path: "target/${{ matrix.platform.target_triple }}/${{ inputs.profile }}/bundle/deb/nomos-node_${{ env.VERSION }}_amd64.deb"
           if-no-files-found: error
 
       - name: Upload AppImage
         if: matrix.platform.os == 'linux'
         uses: actions/upload-artifact@v4
         with:
-          # name: "nomos-node_${{ env.VERSION }}_${{ matrix.platform.arch }}.AppImage"
           name: "${{ matrix.platform.arch }}_appimage"
-          path: "target/${{ matrix.platform.target_triple }}/debug/bundle/appimage/nomos-node_${{ env.VERSION }}_amd64.AppImage"
+          path: "target/${{ matrix.platform.target_triple }}/${{ inputs.profile }}/bundle/appimage/nomos-node_${{ env.VERSION }}_amd64.AppImage"
           if-no-files-found: error
 
       - name: Upload DMG
         if: matrix.platform.os == 'macos'
         uses: actions/upload-artifact@v4
         with:
-          # name: "nomos-node_${{ env.VERSION }}_${{ matrix.platform.arch }}.dmg"
           name: "${{ matrix.platform.arch }}_dmg"
-          path: "target/${{ matrix.platform.target_triple }}/debug/bundle/dmg/nomos-node_${{ env.VERSION }}_${{ matrix.platform.arch }}.dmg"
+          path: "target/${{ matrix.platform.target_triple }}/${{ inputs.profile }}/bundle/dmg/nomos-node_${{ env.VERSION }}_${{ matrix.platform.arch }}.dmg"
           if-no-files-found: error
 
       - name: Upload MSI
         if: matrix.platform.os == 'windows'
         uses: actions/upload-artifact@v4
         with:
-          # name: "nomos-node_${{ env.VERSION }}_${{ matrix.platform.arch }}.msi"
           name: "${{ matrix.platform.arch }}_msi"
-          path: "target/${{ matrix.platform.target_triple }}/debug/bundle/msi/nomos-node_${{ env.VERSION }}_amd64.msi"
+          path: "target/${{ matrix.platform.target_triple }}/${{ inputs.profile }}${{ inputs.profile }}/bundle/msi/nomos-node_${{ env.VERSION }}_amd64.msi"
           if-no-files-found: error
 
   create-release:
     name: "Create release"
     needs:
-      - determine-version
+      - setup
       - package
     runs-on: ubuntu-latest
     env:
-      VERSION: ${{ needs.determine-version.outputs.version }}
+      VERSION: ${{ needs.setup.outputs.version }}
+      PROFILE: ${{ needs.setup.outputs.profile }}
     outputs:
       upload_url: ${{ steps.create_release.outputs.upload_url }}
     steps:
@@ -170,22 +195,29 @@ jobs:
           tag_name: ${{ env.VERSION }}
           release_name: Nomos Node ${{ env.VERSION }}
           body: |
-            This is the release of Nomos Node ${{ env.VERSION }}.
+            This is a release of Nomos Node ${{ env.VERSION }} [${{ env.PROFILE }}].
             ## Changelog
             - feature(X): new feature
             - fix(Y): bug description
             - feature: performance improvement on Z
+            ### Checklist
+            Before publishing please ensure:
+            - [ ] Description is complete
+            - [ ] Changelog is correct
+            - [ ] Assets for all platforms exist
+            - [ ] Pre-release is checked if necessary
+            - [ ] Remove this checklist before publishing the release.
           draft: true
-          prerelease: false
+          prerelease: true
 
   upload-assets:
     name: "Upload assets to release"
     needs:
-      - determine-version
+      - setup
       - create-release
     runs-on: ubuntu-latest
     env:
-      VERSION: ${{ needs.determine-version.outputs.version }}
+      VERSION: ${{ needs.setup.outputs.version }}
       UPLOAD_URL: ${{ needs.create-release.outputs.upload_url }}
     steps:
       - name: Download artifacts
