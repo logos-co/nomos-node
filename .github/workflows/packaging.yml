@@ -63,7 +63,8 @@ jobs:
     name: "Packaging for ${{ matrix.platform.arch }}-${{ matrix.platform.os }}"
     needs: setup
     env:
-      VERSION: ${{ needs.determine-version.outputs.version }}
+      VERSION: ${{ needs.setup.outputs.version }}
+      PROFILE: ${{ needs.setup.outputs.profile }}
     strategy:
       fail-fast: false
       matrix:
@@ -114,13 +115,13 @@ jobs:
         name: Build Nomos Node
         with:
           command: build
-          args: --package nomos-node --${{ inputs.profile }} --no-default-features --target ${{ matrix.platform.target_triple }}
+          args: --package nomos-node --${{ env.PROFILE }} --no-default-features --target ${{ matrix.platform.target_triple }}
 
       - uses: actions-rs/cargo@v1
         name: Build Nomos Node Bundler
         with:
           command: build
-          args: --bin bundle-nomos-node --${{ inputs.profile }} --target ${{ matrix.platform.target_triple }}
+          args: --bin bundle-nomos-node --${{ env.PROFILE }} --target ${{ matrix.platform.target_triple }}
 
       - name: Bundle
         run: |
@@ -132,14 +133,14 @@ jobs:
             PARAMETER=""
           fi
 
-          ./target/${{ matrix.platform.target_triple }}/${{ inputs.profile }}/bundle-nomos-node $PARAMETER
+          ./target/${{ matrix.platform.target_triple }}/${{ env.PROFILE }}/bundle-nomos-node $PARAMETER
 
       - name: Upload RPM
         if: matrix.platform.os == 'linux'
         uses: actions/upload-artifact@v4
         with:
           name: "${{ matrix.platform.arch }}_rpm"
-          path: "target/${{ matrix.platform.target_triple }}/${{ inputs.profile }}/bundle/rpm/nomos-node-${{ env.VERSION }}-.x86_64.rpm"
+          path: "target/${{ matrix.platform.target_triple }}/${{ env.PROFILE }}/bundle/rpm/nomos-node-${{ env.VERSION }}-.x86_64.rpm"
           if-no-files-found: error
 
       - name: Upload DEB
@@ -147,7 +148,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: "${{ matrix.platform.arch }}_deb"
-          path: "target/${{ matrix.platform.target_triple }}/${{ inputs.profile }}/bundle/deb/nomos-node_${{ env.VERSION }}_amd64.deb"
+          path: "target/${{ matrix.platform.target_triple }}/${{ env.PROFILE }}/bundle/deb/nomos-node_${{ env.VERSION }}_amd64.deb"
           if-no-files-found: error
 
       - name: Upload AppImage
@@ -155,7 +156,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: "${{ matrix.platform.arch }}_appimage"
-          path: "target/${{ matrix.platform.target_triple }}/${{ inputs.profile }}/bundle/appimage/nomos-node_${{ env.VERSION }}_amd64.AppImage"
+          path: "target/${{ matrix.platform.target_triple }}/${{ env.PROFILE }}/bundle/appimage/nomos-node_${{ env.VERSION }}_amd64.AppImage"
           if-no-files-found: error
 
       - name: Upload DMG
@@ -163,7 +164,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: "${{ matrix.platform.arch }}_dmg"
-          path: "target/${{ matrix.platform.target_triple }}/${{ inputs.profile }}/bundle/dmg/nomos-node_${{ env.VERSION }}_${{ matrix.platform.arch }}.dmg"
+          path: "target/${{ matrix.platform.target_triple }}/${{ env.PROFILE }}/bundle/dmg/nomos-node_${{ env.VERSION }}_${{ matrix.platform.arch }}.dmg"
           if-no-files-found: error
 
       - name: Upload MSI
@@ -171,7 +172,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: "${{ matrix.platform.arch }}_msi"
-          path: "target/${{ matrix.platform.target_triple }}/${{ inputs.profile }}${{ inputs.profile }}/bundle/msi/nomos-node_${{ env.VERSION }}_amd64.msi"
+          path: "target/${{ matrix.platform.target_triple }}/${{ env.PROFILE }}/bundle/msi/nomos-node_${{ env.VERSION }}_amd64.msi"
           if-no-files-found: error
 
   create-release:
