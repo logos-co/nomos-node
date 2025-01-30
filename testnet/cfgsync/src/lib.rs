@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use nomos_tracing_service::TracingSettings;
 use tests::topology::configs::{consensus::ConsensusParams, da::DaParams};
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct CfgSyncConfig {
     pub port: u16,
     pub n_hosts: usize,

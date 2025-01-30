@@ -1,11 +1,14 @@
 use cfgsync::CfgSyncConfig;
+use std::fs::File;
+use std::io::Write;
 use std::process::{Child, Command, Stdio};
 use std::time::Duration;
 use std::{net::SocketAddr, path::PathBuf};
 use tempfile::NamedTempFile;
+use tests::nodes::create_tempdir;
 use tokio::time::timeout;
 
-const CFGSYNC_BIN_PATH: &str = "../target/debug/cfgsync-server";
+const CFGSYNC_BIN_PATH: &str = "../../target/debug/cfgsync-server";
 
 pub struct CfgSync {
     addr: SocketAddr,
@@ -28,15 +31,15 @@ impl Drop for CfgSync {
 
 impl CfgSync {
     pub async fn spawn(config: CfgSyncConfig) -> Self {
-        let dir = tempfile::tempdir().expect("Failed to create tempdir");
-        let mut file = NamedTempFile::new().expect("Failed to create temp file");
-        let config_path = file.path().to_owned();
+        let dir = create_tempdir().unwrap();
+        let config_path: PathBuf = dir.path().join("cfg.yaml");
 
+        let mut file = File::create(&config_path).expect("Failed to create config file");
         serde_yaml::to_writer(&mut file, &config).expect("Failed to write config file");
+        file.flush().expect("Failed to flush config file");
 
         let child = Command::new(std::env::current_dir().unwrap().join(CFGSYNC_BIN_PATH))
             .arg(&config_path)
-            .current_dir(dir.path())
             .stdout(Stdio::inherit())
             .stderr(Stdio::inherit())
             .spawn()
