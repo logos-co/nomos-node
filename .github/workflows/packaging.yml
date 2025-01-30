@@ -37,8 +37,8 @@ jobs:
           # Export the version to be used in the following jobs.
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
-  package:
-    name: "Packaging for ${{ matrix.platform.arch }}-${{ matrix.platform.os }}"
+  bundle:
+    name: "Bundling for ${{ matrix.platform.arch }}-${{ matrix.platform.os }}"
     needs: setup
     env:
       VERSION: ${{ needs.setup.outputs.version }}
@@ -156,7 +156,7 @@ jobs:
     name: "Create release"
     needs:
       - setup
-      - package
+      - bundle
     runs-on: ubuntu-latest
     env:
       VERSION: ${{ needs.setup.outputs.version }}
