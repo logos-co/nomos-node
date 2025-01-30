@@ -95,16 +95,15 @@ jobs:
 
       - name: Bundle
         run: |
-          #          # Define version parameter for the binary
-          #          PARAMETER="-v ${{ env.VERSION }}"
-          #          
-          #          if [[ ${{ github.event.act || false }} == true ]]; then
-          #            echo "This workflow is running using ACT, the parameter version will be removed for debugging. The workflow 
-          #          version need not match the binary version." 
-          #            PARAMETER=""
-          #          fi
+          # Define version parameter for the binary
+          PARAMETER="-v ${{ env.VERSION }}"
 
-          ./target/${{ matrix.platform.target_triple }}/debug/bundle-nomos-node # $PARAMETER # TODO: Uncomment this line when ready
+          if [[ ${{ github.event.debug || false }} == true ]]; then
+            echo "This workflow is on debug mode: the bundle command's `-v` parameter will be removed for debugging." 
+            PARAMETER=""
+          fi
+
+          ./target/${{ matrix.platform.target_triple }}/debug/bundle-nomos-node $PARAMETER
 
       - name: Upload RPM
         if: matrix.platform.os == 'linux'
@@ -269,13 +268,14 @@ jobs:
           asset_name: ${{ env.BINARY_NAME }}
           asset_content_type: application/octet-stream
 
-      - name: Upload MSI asset
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          BINARY_NAME: nomos-node_${{ env.VERSION }}_amd64.msi
-        with:
-          upload_url: ${{ env.UPLOAD_URL }}
-          asset_path: ${{ github.workspace }}/amd64_msi/nomos-node_${{ env.VERSION }}_amd64.msi
-          asset_name: ${{ env.BINARY_NAME }}
-          asset_content_type: application/octet-stream
+      # Not available yet
+      # - name: Upload MSI asset
+      #   uses: actions/upload-release-asset@v1
+      #   env:
+      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      #     BINARY_NAME: nomos-node_${{ env.VERSION }}_amd64.msi
+      #   with:
+      #     upload_url: ${{ env.UPLOAD_URL }}
+      #     asset_path: ${{ github.workspace }}/amd64_msi/nomos-node_${{ env.VERSION }}_amd64.msi
+      #     asset_name: ${{ env.BINARY_NAME }}
+      #     asset_content_type: application/octet-stream
