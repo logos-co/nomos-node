@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 
 use bytes::Bytes;
-use either::Either;
 use overwatch_rs::DynError;
 use serde::{Deserialize, Serialize};
 use zeroize::ZeroizeOnDrop;
@@ -24,7 +23,7 @@ pub struct PreloadKMSBackendSettings {
 
 #[async_trait::async_trait]
 impl KMSBackend for PreloadKMSBackend {
-    type SupportedKeys = SupportedKeys;
+    type SupportedKeyTypes = SupportedKeyTypes;
     type KeyId = String;
     type Settings = PreloadKMSBackendSettings;
 
@@ -35,24 +34,20 @@ impl KMSBackend for PreloadKMSBackend {
     }
 
     /// This function just checks if the key_id was preloaded successfully.
-    /// This backend doesn't support generating a new key based on the [`SupportedKeys`] provided,
-    /// because this backend preloads all keys from the settings.
-    /// In other words, the users can execute operations with the key_id
-    /// even without the need to register it, if the key was specified in the settings.
+    /// It returns the `key_id` if the key was preloaded and the key type matches.
     fn register(
         &mut self,
-        key: Either<Self::SupportedKeys, Self::KeyId>,
+        key_id: Self::KeyId,
+        key_type: Self::SupportedKeyTypes,
     ) -> Result<Self::KeyId, DynError> {
-        match key {
-            Either::Left(_) => Err(Error::NotSupported.into()),
-            Either::Right(key_id) => {
-                if self.keys.contains_key(&key_id) {
-                    Ok(key_id)
-                } else {
-                    Err(Error::KeyNotRegistered(key_id).into())
-                }
-            }
+        let key = self
+            .keys
+            .get(&key_id)
+            .ok_or(Error::KeyNotRegistered(key_id.clone()))?;
+        if key.key_type() != key_type {
+            return Err(Error::KeyTypeMismatch(key.key_type(), key_type).into());
         }
+        Ok(key_id)
     }
 
     fn public_key(&self, key_id: Self::KeyId) -> Result<Bytes, DynError> {
@@ -82,7 +77,8 @@ impl KMSBackend for PreloadKMSBackend {
 // This enum won't be used outside of this module
 // because [`PreloadKMSBackend`] doesn't support generating new keys.
 #[allow(dead_code)]
-pub enum SupportedKeys {
+#[derive(Debug, PartialEq, Eq)]
+pub enum SupportedKeyTypes {
     Ed25519,
 }
 
@@ -105,12 +101,22 @@ impl SecuredKey for Key {
     }
 }
 
+impl Key {
+    fn key_type(&self) -> SupportedKeyTypes {
+        match self {
+            Self::Ed25519(_) => SupportedKeyTypes::Ed25519,
+        }
+    }
+}
+
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
     #[error("Not supported")]
     NotSupported,
     #[error("Key({0}) was not registered")]
     KeyNotRegistered(String),
+    #[error("KeyType mismatch: {0:?} != {1:?}")]
+    KeyTypeMismatch(SupportedKeyTypes, SupportedKeyTypes),
 }
 
 #[cfg(test)]
@@ -133,9 +139,11 @@ mod tests {
             )]),
         });
 
-        // Check if the key was preloaded successfully
+        // Check if the key was preloaded successfully with the same key type.
         assert_eq!(
-            backend.register(Either::Right(key_id.clone())).unwrap(),
+            backend
+                .register(key_id.clone(), SupportedKeyTypes::Ed25519)
+                .unwrap(),
             key_id
         );
 
@@ -159,35 +167,21 @@ mod tests {
             .unwrap();
     }
 
-    #[test]
-    fn key_generation_not_supported() {
+    #[tokio::test]
+    async fn key_not_registered() {
         let mut backend = PreloadKMSBackend::new(PreloadKMSBackendSettings {
             keys: HashMap::new(),
         });
 
-        // This backend shouldn't support generating new keys.
+        let key_id = "blend/not_registered".to_string();
         assert!(backend
-            .register(Either::Left(SupportedKeys::Ed25519))
+            .register(key_id.clone(), SupportedKeyTypes::Ed25519)
             .is_err());
-    }
-
-    #[tokio::test]
-    async fn key_not_registered() {
-        let mut backend = PreloadKMSBackend::new(PreloadKMSBackendSettings {
-            keys: HashMap::from_iter(vec![(
-                "blend/1".to_string(),
-                Key::Ed25519(Ed25519Key(ed25519_dalek::SigningKey::generate(&mut OsRng))),
-            )]),
-        });
-
-        let unknown_key = "blend/not_registered".to_string();
-        assert!(backend.public_key(unknown_key.clone()).is_err());
-        assert!(backend
-            .sign(unknown_key.clone(), Bytes::from("data"))
-            .is_err());
+        assert!(backend.public_key(key_id.clone()).is_err());
+        assert!(backend.sign(key_id.clone(), Bytes::from("data")).is_err());
         assert!(backend
             .execute(
-                unknown_key,
+                key_id,
                 Box::new(move |_: &mut dyn SecuredKey| Box::pin(async move { Ok(()) })),
             )
             .await
