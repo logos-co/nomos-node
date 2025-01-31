@@ -111,8 +111,6 @@ impl Key {
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
-    #[error("Not supported")]
-    NotSupported,
     #[error("Key({0}) was not registered")]
     KeyNotRegistered(String),
     #[error("KeyType mismatch: {0:?} != {1:?}")]
