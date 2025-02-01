@@ -7,8 +7,7 @@ COPY . .
 
 # Install dependencies needed for building RocksDB and etcd.
 RUN apt-get update && apt-get install -yq \
-    git gcc g++ clang libssl-dev \
-    pkg-config protobuf-compiler
+    git gcc g++ clang libssl-dev pkg-config
 
 RUN cargo install cargo-binstall --version 1.10.19
 RUN cargo binstall -y cargo-risczero

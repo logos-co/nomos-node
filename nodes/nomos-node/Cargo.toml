@@ -17,8 +17,8 @@ hex = "0.4.3"
 kzgrs-backend = { path = "../../nomos-da/kzgrs-backend" }
 subnetworks-assignations = { path = "../../nomos-da/network/subnetworks-assignations" }
 nomos-da-network-core = { path = "../../nomos-da/network/core" }
-overwatch-rs = { git = "https://github.com/logos-co/Overwatch", rev = "4160cdd" }
-overwatch-derive = { git = "https://github.com/logos-co/Overwatch", rev = "4160cdd" }
+overwatch-rs = { git = "https://github.com/logos-co/Overwatch", rev = "f5f7ea0" }
+overwatch-derive = { git = "https://github.com/logos-co/Overwatch", rev = "f5f7ea0" }
 tracing = "0.1"
 multiaddr = "0.18"
 nomos-core = { path = "../../nomos-core/chain-defs" }

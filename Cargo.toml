@@ -24,6 +24,7 @@ members = [
     "nomos-services/data-availability/dispersal",
     "nomos-services/data-availability/tests",
     "nomos-services/blend",
+    "nomos-services/utils",
     "nomos-blend/core",
     "nomos-blend/message",
     "nomos-blend/network",
@@ -40,6 +41,7 @@ members = [
     "tests",
     "clients/executor-http-client",
     "nomos-services/key-management-system",
+    "nomos-bundler",
 ]
 exclude = ["proof_of_leadership/risc0/risc0_proofs", "nomos-core/risc0_proofs"]
 resolver = "2"

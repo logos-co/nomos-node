@@ -102,7 +102,10 @@ where
     MempoolAdapter: DaMempoolAdapter,
     Metadata: metadata::Metadata + Debug + Send + 'static,
 {
-    fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, DynError> {
+    fn init(
+        service_state: ServiceStateHandle<Self>,
+        _init_state: Self::State,
+    ) -> Result<Self, DynError> {
         let network_relay = service_state.overwatch_handle.relay();
         let mempool_relay = service_state.overwatch_handle.relay();
         Ok(Self {
