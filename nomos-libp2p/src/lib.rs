@@ -117,7 +117,7 @@ impl Swarm {
     /// Unsubscribes from a topic
     ///
     /// Returns true if previously subscribed
-    pub fn unsubscribe(&mut self, topic: &str) -> Result<bool, PublishError> {
+    pub fn unsubscribe(&mut self, topic: &str) -> bool {
         self.swarm
             .behaviour_mut()
             .gossipsub

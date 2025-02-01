@@ -4,11 +4,10 @@ use crate::{
 };
 use cached::{Cached, TimedCache};
 use libp2p::{
-    core::Endpoint,
+    core::{transport::PortUse, Endpoint},
     swarm::{
-        behaviour::ConnectionEstablished, ConnectionClosed, ConnectionDenied, ConnectionId,
-        FromSwarm, NetworkBehaviour, NotifyHandler, THandler, THandlerInEvent, THandlerOutEvent,
-        ToSwarm,
+        ConnectionClosed, ConnectionDenied, ConnectionId, FromSwarm, NetworkBehaviour,
+        NotifyHandler, THandler, THandlerInEvent, THandlerOutEvent, ToSwarm,
     },
     Multiaddr, PeerId,
 };
@@ -16,7 +15,7 @@ use nomos_blend::conn_maintenance::{ConnectionMonitor, ConnectionMonitorSettings
 use nomos_blend_message::BlendMessage;
 use sha2::{Digest, Sha256};
 use std::{
-    collections::{HashSet, VecDeque},
+    collections::{HashMap, VecDeque},
     task::{Context, Poll, Waker},
 };
 use std::{marker::PhantomData, time::Duration};
@@ -30,7 +29,7 @@ where
     IntervalProvider: IntervalStreamProvider,
 {
     config: Config,
-    peers: HashSet<PeerId>,
+    negotiated_peers: HashMap<PeerId, NegotiatedPeerState>,
     /// Queue of events to yield to the swarm.
     events: VecDeque<ToSwarm<Event, FromBehaviour>>,
     /// Waker that handles polling
@@ -40,6 +39,12 @@ where
     duplicate_cache: TimedCache<Vec<u8>, ()>,
     _blend_message: PhantomData<M>,
     _interval_provider: PhantomData<IntervalProvider>,
+}
+
+#[derive(Debug, Eq, PartialEq)]
+enum NegotiatedPeerState {
+    Healthy,
+    Unhealthy,
 }
 
 #[derive(Debug)]
@@ -52,6 +57,10 @@ pub struct Config {
 pub enum Event {
     /// A message received from one of the peers.
     Message(Vec<u8>),
+    /// A peer has been detected as malicious.
+    MaliciousPeer(PeerId),
+    /// A peer has been detected as unhealthy.
+    UnhealthyPeer(PeerId),
     Error(Error),
 }
 
@@ -65,7 +74,7 @@ where
         let duplicate_cache = TimedCache::with_lifespan(config.duplicate_cache_lifespan);
         Self {
             config,
-            peers: HashSet::new(),
+            negotiated_peers: HashMap::new(),
             events: VecDeque::new(),
             waker: None,
             duplicate_cache,
@@ -103,36 +112,42 @@ where
         message: Vec<u8>,
         excluded_peer: Option<PeerId>,
     ) -> Result<(), Error> {
-        let mut peer_ids = self.peers.clone();
-        if let Some(peer) = &excluded_peer {
-            peer_ids.remove(peer);
-        }
-
-        if peer_ids.is_empty() {
-            return Err(Error::NoPeers);
-        }
-
-        peer_ids.into_iter().for_each(|peer_id| {
-            tracing::debug!("Registering event for peer {:?} to send msg", peer_id);
-            self.events.push_back(ToSwarm::NotifyHandler {
-                peer_id,
-                handler: NotifyHandler::Any,
-                event: FromBehaviour::Message(message.clone()),
+        let mut num_peers = 0;
+        self.negotiated_peers
+            .keys()
+            .filter(|peer_id| match excluded_peer {
+                Some(excluded_peer) => **peer_id != excluded_peer,
+                None => true,
+            })
+            .for_each(|peer_id| {
+                tracing::debug!("Registering event for peer {:?} to send msg", peer_id);
+                self.events.push_back(ToSwarm::NotifyHandler {
+                    peer_id: *peer_id,
+                    handler: NotifyHandler::Any,
+                    event: FromBehaviour::Message(message.clone()),
+                });
+                num_peers += 1;
             });
-        });
 
-        self.try_wake();
-        Ok(())
-    }
-
-    pub fn peers(&self) -> &HashSet<PeerId> {
-        &self.peers
+        if num_peers == 0 {
+            Err(Error::NoPeers)
+        } else {
+            self.try_wake();
+            Ok(())
+        }
     }
 
     fn message_id(message: &[u8]) -> Vec<u8> {
         let mut hasher = Sha256::new();
         hasher.update(message);
         hasher.finalize().to_vec()
+    }
+
+    pub fn num_healthy_peers(&self) -> usize {
+        self.negotiated_peers
+            .iter()
+            .filter(|(_, state)| **state == NegotiatedPeerState::Healthy)
+            .count()
     }
 
     fn create_connection_handler(&self) -> BlendConnectionHandler<M> {
@@ -177,35 +192,31 @@ where
         _: PeerId,
         _: &Multiaddr,
         _: Endpoint,
+        _: PortUse,
     ) -> Result<THandler<Self>, ConnectionDenied> {
         Ok(self.create_connection_handler())
     }
 
     /// Informs the behaviour about an event from the [`Swarm`].
     fn on_swarm_event(&mut self, event: FromSwarm) {
-        match event {
-            FromSwarm::ConnectionEstablished(ConnectionEstablished { .. }) => {
-                // TODO: Notify the connection handler to deny the stream if necessary
-                // - if max peering degree was reached.
-                // - if the peer has been detected as malicious.
+        if let FromSwarm::ConnectionClosed(ConnectionClosed {
+            peer_id,
+            remaining_established,
+            ..
+        }) = event
+        {
+            // This event happens in one of the following cases:
+            // 1. The connection was closed by the peer.
+            // 2. The connection was closed by the local node since no stream is active.
+            //
+            // In both cases, we need to remove the peer from the list of connected peers,
+            // though it may be already removed from list by handling other events.
+            if remaining_established == 0 {
+                self.negotiated_peers.remove(&peer_id);
             }
-            FromSwarm::ConnectionClosed(ConnectionClosed {
-                peer_id,
-                remaining_established,
-                ..
-            }) => {
-                // This event happens in one of the following cases:
-                // 1. The connection was closed by the peer.
-                // 2. The connection was closed by the local node since no stream is active.
-                //
-                // In both cases, we need to remove the peer from the list of connected peers,
-                // though it may be already removed from list by handling other events.
-                if remaining_established == 0 {
-                    self.peers.remove(&peer_id);
-                }
-            }
-            _ => {}
-        }
+        };
+
+        self.try_wake();
     }
 
     /// Handles an event generated by the [`BlendConnectionHandler`]
@@ -245,28 +256,31 @@ where
                 self.events
                     .push_back(ToSwarm::GenerateEvent(Event::Message(message)));
             }
-            // The connection was fully negotiated by the peer,
+            // The inbound/outbound connection was fully negotiated by the peer,
             // which means that the peer supports the blend protocol.
-            ToBehaviour::FullyNegotiatedOutbound => {
-                self.peers.insert(peer_id);
+            ToBehaviour::FullyNegotiatedInbound | ToBehaviour::FullyNegotiatedOutbound => {
+                self.negotiated_peers
+                    .insert(peer_id, NegotiatedPeerState::Healthy);
             }
-            ToBehaviour::NegotiationFailed => {
-                self.peers.remove(&peer_id);
+            ToBehaviour::DialUpgradeError(_) => {
+                self.negotiated_peers.remove(&peer_id);
             }
             ToBehaviour::MaliciousPeer => {
-                // TODO: Remove the peer from the connected peer list
-                // and add it to the malicious peer list,
-                // so that the peer is excluded from the future connection establishments.
-                // Also, notify the upper layer to try to dial new peers
-                // if we need more healthy peers.
+                tracing::debug!("Peer {:?} has been detected as malicious", peer_id);
+                self.negotiated_peers.remove(&peer_id);
+                self.events
+                    .push_back(ToSwarm::GenerateEvent(Event::MaliciousPeer(peer_id)));
             }
             ToBehaviour::UnhealthyPeer => {
-                // TODO: Remove the peer from the connected 'healthy' peer list.
-                // Also, notify the upper layer to try to dial new peers
-                // if we need more healthy peers.
+                tracing::debug!("Peer {:?} has been detected as unhealthy", peer_id);
+                // TODO: Still the algorithm to revert the peer to healthy state is not defined yet.
+                self.negotiated_peers
+                    .insert(peer_id, NegotiatedPeerState::Unhealthy);
+                self.events
+                    .push_back(ToSwarm::GenerateEvent(Event::UnhealthyPeer(peer_id)));
             }
             ToBehaviour::IOError(error) => {
-                self.peers.remove(&peer_id);
+                self.negotiated_peers.remove(&peer_id);
                 self.events
                     .push_back(ToSwarm::GenerateEvent(Event::Error(Error::PeerIOError {
                         error,

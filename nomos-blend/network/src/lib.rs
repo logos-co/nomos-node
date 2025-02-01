@@ -150,9 +150,14 @@ mod test {
         // Swarm2 sends a message to Swarm1, even though expected_effective_messages is 0.
         // Then, Swarm1 should detect Swarm2 as a malicious peer.
         let task = async {
+            let mut num_events_waiting = 2;
             let mut msg_published = false;
             let mut publish_try_interval = tokio::time::interval(Duration::from_millis(10));
             loop {
+                if num_events_waiting == 0 {
+                    break;
+                }
+
                 select! {
                     _ = publish_try_interval.tick() => {
                         if !msg_published {
@@ -160,16 +165,90 @@ mod test {
                         }
                     }
                     event = swarm1.select_next_some() => {
-                        if let SwarmEvent::ConnectionClosed { peer_id, num_established, .. } = event {
-                            assert_eq!(peer_id, *swarm2.local_peer_id());
-                            assert_eq!(num_established, 0);
-                            assert!(swarm1.connected_peers().next().is_none());
-                            break;
+                        match event {
+                            // We expect the behaviour reports a malicious peer.
+                            SwarmEvent::Behaviour(Event::MaliciousPeer(peer_id)) => {
+                                assert_eq!(peer_id, *swarm2.local_peer_id());
+                                num_events_waiting -= 1;
+                            },
+                            // We expect that the Swarm1 closes the connection proactively.
+                            SwarmEvent::ConnectionClosed { peer_id, num_established, .. } => {
+                                assert_eq!(peer_id, *swarm2.local_peer_id());
+                                assert_eq!(num_established, 0);
+                                assert!(swarm1.connected_peers().next().is_none());
+                                num_events_waiting -= 1;
+                            },
+                            _ => {},
                         }
                     }
                     _ = swarm2.select_next_some() => {}
                 }
             }
+        };
+
+        // Expect for the task to be completed in time
+        assert!(tokio::time::timeout(
+            conn_monitor_settings.interval + Duration::from_secs(1),
+            task
+        )
+        .await
+        .is_ok());
+    }
+
+    #[tokio::test]
+    async fn detect_unhealthy_peer() {
+        // Init two swarms with connection monitoring enabled.
+        let conn_monitor_settings = ConnectionMonitorSettings {
+            interval: Duration::from_secs(1),
+            expected_effective_messages: U57F7::from_num(1.0),
+            effective_message_tolerance: U57F7::from_num(0.0),
+            expected_drop_messages: U57F7::from_num(0.0),
+            drop_message_tolerance: U57F7::from_num(0.0),
+        };
+        let (mut nodes, mut keypairs) = nodes(2, 8390);
+        let node1_addr = nodes.next().unwrap().address;
+        let mut swarm1 = new_blend_swarm(
+            keypairs.next().unwrap(),
+            node1_addr.clone(),
+            Some(conn_monitor_settings),
+        );
+        let mut swarm2 = new_blend_swarm(
+            keypairs.next().unwrap(),
+            nodes.next().unwrap().address,
+            Some(conn_monitor_settings),
+        );
+        swarm2.dial(node1_addr).unwrap();
+
+        // Swarms don't send anything, even though expected_effective_messages is 1.
+        // Then, both should detect the other as unhealthy.
+        // Swarms shouldn't close the connection of the unhealthy peers.
+        let task = async {
+            let mut num_events_waiting = 2;
+            loop {
+                if num_events_waiting == 0 {
+                    break;
+                }
+
+                select! {
+                    event = swarm1.select_next_some() => {
+                        if let SwarmEvent::Behaviour(Event::UnhealthyPeer(peer_id)) = event {
+                            assert_eq!(peer_id, *swarm2.local_peer_id());
+                            num_events_waiting -= 1;
+                        }
+                    }
+                    event = swarm2.select_next_some() => {
+                        if let SwarmEvent::Behaviour(Event::UnhealthyPeer(peer_id)) = event {
+                            assert_eq!(peer_id, *swarm1.local_peer_id());
+                            num_events_waiting -= 1;
+                        }
+                    }
+                }
+            }
+
+            assert_eq!(swarm1.behaviour().num_healthy_peers(), 0);
+            assert_eq!(swarm1.connected_peers().count(), 1);
+            assert_eq!(swarm2.behaviour().num_healthy_peers(), 0);
+            assert_eq!(swarm2.connected_peers().count(), 1);
         };
 
         // Expect for the task to be completed in time
