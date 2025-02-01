@@ -7,17 +7,23 @@ edition = "2021"
 cached = "0.53.1"
 futures = "0.3.30"
 futures-timer = "3.0.3"
-libp2p = "0.53"
+libp2p = "0.55"
 tracing = "0.1"
 nomos-blend = { path = "../core" }
 nomos-blend-message = { path = "../message" }
 sha2 = "0.10"
 rand = "0.8"
 opentelemetry = "0.27.1"
+tokio = { version = "1", features = ["time"], optional = true }
+tokio-stream = { version = "0.1", optional = true }
 
 [dev-dependencies]
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "time"] }
 tokio-stream = "0.1"
-libp2p = { version = "0.53", features = ["ed25519", "tokio", "quic"] }
+libp2p = { version = "0.55", features = ["ed25519", "tokio", "quic"] }
 tracing-subscriber = "0.3.18"
 fixed = "1"
+
+[features]
+default = ["tokio"]
+tokio = ["dep:tokio", "dep:tokio-stream"]
