@@ -29,6 +29,7 @@ impl IntervalStreamProvider for TokioIntervalStreamProvider {
 mod test {
     use std::time::Duration;
 
+    use fixed::types::U57F7;
     use libp2p::{
         futures::StreamExt,
         identity::Keypair,
@@ -122,6 +123,64 @@ mod test {
         }
     }
 
+    #[tokio::test]
+    async fn detect_malicious_peer() {
+        // Init two swarms with connection monitoring enabled.
+        let conn_monitor_settings = ConnectionMonitorSettings {
+            interval: Duration::from_secs(1),
+            expected_effective_messages: U57F7::from_num(0.0),
+            effective_message_tolerance: U57F7::from_num(0.0),
+            expected_drop_messages: U57F7::from_num(0.0),
+            drop_message_tolerance: U57F7::from_num(0.0),
+        };
+        let (mut nodes, mut keypairs) = nodes(2, 8290);
+        let node1_addr = nodes.next().unwrap().address;
+        let mut swarm1 = new_blend_swarm(
+            keypairs.next().unwrap(),
+            node1_addr.clone(),
+            Some(conn_monitor_settings),
+        );
+        let mut swarm2 = new_blend_swarm(
+            keypairs.next().unwrap(),
+            nodes.next().unwrap().address,
+            Some(conn_monitor_settings),
+        );
+        swarm2.dial(node1_addr).unwrap();
+
+        // Swarm2 sends a message to Swarm1, even though expected_effective_messages is 0.
+        // Then, Swarm1 should detect Swarm2 as a malicious peer.
+        let task = async {
+            let mut msg_published = false;
+            let mut publish_try_interval = tokio::time::interval(Duration::from_millis(10));
+            loop {
+                select! {
+                    _ = publish_try_interval.tick() => {
+                        if !msg_published {
+                            msg_published = swarm2.behaviour_mut().publish(vec![1; 10]).is_ok();
+                        }
+                    }
+                    event = swarm1.select_next_some() => {
+                        if let SwarmEvent::ConnectionClosed { peer_id, num_established, .. } = event {
+                            assert_eq!(peer_id, *swarm2.local_peer_id());
+                            assert_eq!(num_established, 0);
+                            assert!(swarm1.connected_peers().next().is_none());
+                            break;
+                        }
+                    }
+                    _ = swarm2.select_next_some() => {}
+                }
+            }
+        };
+
+        // Expect for the task to be completed in time
+        assert!(tokio::time::timeout(
+            conn_monitor_settings.interval + Duration::from_secs(1),
+            task
+        )
+        .await
+        .is_ok());
+    }
+
     fn new_blend_swarm(
         keypair: Keypair,
         addr: Multiaddr,
@@ -154,6 +213,11 @@ mod test {
             .unwrap()
             .with_behaviour(|_| behaviour)
             .unwrap()
+            .with_swarm_config(|config| {
+                // We want connections to be closed immediately as soon as
+                // the corresponding streams are dropped by behaviours.
+                config.with_idle_connection_timeout(Duration::ZERO)
+            })
             .build();
         swarm.listen_on(addr).unwrap();
         swarm

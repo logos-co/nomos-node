@@ -26,7 +26,7 @@ const VALUE_IGNORED: &str = "ignored";
 const PROTOCOL_NAME: StreamProtocol = StreamProtocol::new("/nomos/blend/0.1.0");
 
 pub struct BlendConnectionHandler<Msg> {
-    inbound_substream: Option<MsgRecvFuture>,
+    inbound_substream: Option<InboundSubstreamState>,
     outbound_substream: Option<OutboundSubstreamState>,
     outbound_msgs: VecDeque<Vec<u8>>,
     pending_events_to_behaviour: VecDeque<ToBehaviour>,
@@ -40,6 +40,13 @@ pub struct BlendConnectionHandler<Msg> {
 type MsgSendFuture = BoxFuture<'static, Result<Stream, io::Error>>;
 type MsgRecvFuture = BoxFuture<'static, Result<(Stream, Vec<u8>), io::Error>>;
 
+enum InboundSubstreamState {
+    /// A message is being received on the inbound substream.
+    PendingRecv(MsgRecvFuture),
+    /// A substream has been dropped proactively.
+    Dropped,
+}
+
 enum OutboundSubstreamState {
     /// A request to open a new outbound substream is being processed.
     PendingOpenSubstream,
@@ -47,6 +54,8 @@ enum OutboundSubstreamState {
     Idle(Stream),
     /// A message is being sent on the outbound substream.
     PendingSend(MsgSendFuture),
+    /// A substream has been dropped proactively.
+    Dropped,
 }
 
 impl<Msg> BlendConnectionHandler<Msg> {
@@ -84,10 +93,12 @@ pub enum ToBehaviour {
     /// A message has been received from the connection.
     Message(Vec<u8>),
     /// Notifying that the peer is detected as malicious.
+    /// The inbound/outbound streams to the peer are closed proactively.
     MaliciousPeer,
     /// Notifying that the peer is detected as unhealthy.
     UnhealthyPeer,
-    /// An IO error from the connection
+    /// An IO error from the connection.
+    /// The inbound/outbound streams to the peer are closed proactively.
     IOError(io::Error),
 }
 
@@ -118,14 +129,17 @@ where
         );
 
         // Check if the monitor interval has elapsed, if exists.
+        // TODO: Refactor this to a separate function.
         if let Some(monitor) = &mut self.monitor {
             if let Poll::Ready(output) = monitor.poll(cx) {
                 match output {
                     ConnectionMonitorOutput::Malicious => {
-                        // TODO: Mark the inbound/outbound substream state as Dropped.
+                        // Mark the inbound/outbound substream state as Dropped.
                         // Then the substream hold by the state will be dropped from memory.
                         // As a result, Swarm will decrease the ref count to the connection,
                         // and close the connection when the count is 0.
+                        self.inbound_substream = Some(InboundSubstreamState::Dropped);
+                        self.outbound_substream = Some(OutboundSubstreamState::Dropped);
                         self.pending_events_to_behaviour
                             .push_back(ToBehaviour::MaliciousPeer);
                     }
@@ -144,9 +158,16 @@ where
         }
 
         // Process inbound stream
+        // TODO: Refactor this to a separate function.
         tracing::debug!("Processing inbound stream");
-        if let Some(msg_recv_fut) = self.inbound_substream.as_mut() {
-            match msg_recv_fut.poll_unpin(cx) {
+        match self.inbound_substream.take() {
+            None => {
+                tracing::debug!("Inbound substream is not initialized yet. Doing nothing.");
+                self.inbound_substream = None;
+            }
+            Some(InboundSubstreamState::PendingRecv(mut msg_recv_fut)) => match msg_recv_fut
+                .poll_unpin(cx)
+            {
                 Poll::Ready(Ok((stream, msg))) => {
                     tracing::debug!("Received message from inbound stream. Notifying behaviour...");
 
@@ -159,21 +180,32 @@ where
                         }
                     }
 
-                    self.inbound_substream = Some(recv_msg(stream).boxed());
+                    self.inbound_substream =
+                        Some(InboundSubstreamState::PendingRecv(recv_msg(stream).boxed()));
                     return Poll::Ready(ConnectionHandlerEvent::NotifyBehaviour(
                         ToBehaviour::Message(msg),
                     ));
                 }
                 Poll::Ready(Err(e)) => {
-                    tracing::error!("Failed to receive message from inbound stream: {:?}", e);
-                    // TODO: Mark the inbound/outbound substream state as Dropped.
-                    self.inbound_substream = None;
+                    tracing::error!(
+                        "Failed to receive message from inbound stream: {e:?}. Dropping both inbound/outbound substreams"
+                    );
+                    self.inbound_substream = Some(InboundSubstreamState::Dropped);
+                    self.outbound_substream = Some(OutboundSubstreamState::Dropped);
                 }
-                Poll::Pending => {}
+                Poll::Pending => {
+                    tracing::debug!("No message received from inbound stream yet. Waiting more...");
+                    self.inbound_substream = Some(InboundSubstreamState::PendingRecv(msg_recv_fut));
+                }
+            },
+            Some(InboundSubstreamState::Dropped) => {
+                tracing::debug!("Inbound substream has been dropped proactively. Doing nothing.");
+                self.inbound_substream = Some(InboundSubstreamState::Dropped);
             }
         }
 
         // Process outbound stream
+        // TODO: Refactor this to a separate function.
         tracing::debug!("Processing outbound stream");
         loop {
             match self.outbound_substream.take() {
@@ -208,9 +240,9 @@ where
                             self.outbound_substream = Some(OutboundSubstreamState::Idle(stream));
                         }
                         Poll::Ready(Err(e)) => {
-                            tracing::error!("Failed to send message to outbound stream: {:?}", e);
-                            // TODO: Mark the inbound/outbound substream state as Dropped.
-                            self.outbound_substream = None;
+                            tracing::error!("Failed to send message to outbound stream: {e:?}. Dropping both inbound and outbound substreams");
+                            self.outbound_substream = Some(OutboundSubstreamState::Dropped);
+                            self.inbound_substream = Some(InboundSubstreamState::Dropped);
                             return Poll::Ready(ConnectionHandlerEvent::NotifyBehaviour(
                                 ToBehaviour::IOError(e),
                             ));
@@ -222,6 +254,11 @@ where
                             return Poll::Pending;
                         }
                     }
+                }
+                Some(OutboundSubstreamState::Dropped) => {
+                    tracing::debug!("Outbound substream has been dropped proactively");
+                    self.outbound_substream = Some(OutboundSubstreamState::Dropped);
+                    return Poll::Pending;
                 }
                 // If there is no outbound substream, request to open a new one.
                 None => {
@@ -257,7 +294,8 @@ where
                 ..
             }) => {
                 tracing::debug!("FullyNegotiatedInbound: Creating inbound substream");
-                self.inbound_substream = Some(recv_msg(stream).boxed());
+                self.inbound_substream =
+                    Some(InboundSubstreamState::PendingRecv(recv_msg(stream).boxed()));
                 VALUE_FULLY_NEGOTIATED_INBOUND
             }
             ConnectionEvent::FullyNegotiatedOutbound(FullyNegotiatedOutbound {
