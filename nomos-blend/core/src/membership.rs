@@ -64,11 +64,11 @@ where
         &self,
         rng: &mut R,
         amount: usize,
-        exclude_addrs: &HashSet<Multiaddr>,
+        exclude_peers: &HashSet<NodeId>,
     ) -> Vec<&Node<NodeId, M::PublicKey>> {
         self.remote_nodes
             .iter()
-            .filter(|node| !exclude_addrs.contains(&node.address))
+            .filter(|node| !exclude_peers.contains(&node.id))
             .choose_multiple(rng, amount)
     }
 

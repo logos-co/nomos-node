@@ -9,8 +9,10 @@ use futures::{future::BoxFuture, AsyncReadExt, AsyncWriteExt, FutureExt};
 use libp2p::{
     core::upgrade::ReadyUpgrade,
     swarm::{
-        handler::{ConnectionEvent, FullyNegotiatedInbound, FullyNegotiatedOutbound},
-        ConnectionHandler, ConnectionHandlerEvent, StreamUpgradeError, SubstreamProtocol,
+        handler::{
+            ConnectionEvent, DialUpgradeError, FullyNegotiatedInbound, FullyNegotiatedOutbound,
+        },
+        ConnectionHandler, ConnectionHandlerEvent, SubstreamProtocol,
     },
     Stream, StreamProtocol,
 };
@@ -71,6 +73,20 @@ impl<Msg> BlendConnectionHandler<Msg> {
         }
     }
 
+    /// Mark the inbound/outbound substream state as Dropped.
+    /// Then the substream hold by the state will be dropped from memory.
+    /// As a result, Swarm will decrease the ref count to the connection,
+    /// and close the connection when the count is 0.
+    ///
+    /// Also, this clears all pending messages and events
+    /// to avoid confusions for event recipients.
+    fn close_substreams(&mut self) {
+        self.inbound_substream = Some(InboundSubstreamState::Dropped);
+        self.outbound_substream = Some(OutboundSubstreamState::Dropped);
+        self.outbound_msgs.clear();
+        self.pending_events_to_behaviour.clear();
+    }
+
     fn try_wake(&mut self) {
         if let Some(waker) = self.waker.take() {
             waker.wake();
@@ -82,14 +98,21 @@ impl<Msg> BlendConnectionHandler<Msg> {
 pub enum FromBehaviour {
     /// A message to be sent to the connection.
     Message(Vec<u8>),
+    /// Close inbound/outbound substreams.
+    /// This happens when [`crate::Behaviour`] determines that one of the followings is true.
+    /// - Max peering degree is reached.
+    /// - The peer has been detected as malicious.
+    CloseSubstreams,
 }
 
 #[derive(Debug)]
 pub enum ToBehaviour {
+    /// An inbound substream has been successfully upgraded for the blend protocol.
+    FullyNegotiatedInbound,
     /// An outbound substream has been successfully upgraded for the blend protocol.
     FullyNegotiatedOutbound,
     /// An outbound substream was failed to be upgraded for the blend protocol.
-    NegotiationFailed,
+    DialUpgradeError(DialUpgradeError<(), ReadyUpgrade<StreamProtocol>>),
     /// A message has been received from the connection.
     Message(Vec<u8>),
     /// Notifying that the peer is detected as malicious.
@@ -109,14 +132,18 @@ where
     type FromBehaviour = FromBehaviour;
     type ToBehaviour = ToBehaviour;
     type InboundProtocol = ReadyUpgrade<StreamProtocol>;
+    #[allow(deprecated)]
     type InboundOpenInfo = ();
     type OutboundProtocol = ReadyUpgrade<StreamProtocol>;
+    #[allow(deprecated)]
     type OutboundOpenInfo = ();
 
+    #[allow(deprecated)] // Self::InboundOpenInfo is deprecated
     fn listen_protocol(&self) -> SubstreamProtocol<Self::InboundProtocol, Self::InboundOpenInfo> {
         SubstreamProtocol::new(ReadyUpgrade::new(PROTOCOL_NAME), ())
     }
 
+    #[allow(deprecated)] // Self::OutboundOpenInfo is deprecated
     fn poll(
         &mut self,
         cx: &mut Context<'_>,
@@ -134,12 +161,7 @@ where
             if let Poll::Ready(output) = monitor.poll(cx) {
                 match output {
                     ConnectionMonitorOutput::Malicious => {
-                        // Mark the inbound/outbound substream state as Dropped.
-                        // Then the substream hold by the state will be dropped from memory.
-                        // As a result, Swarm will decrease the ref count to the connection,
-                        // and close the connection when the count is 0.
-                        self.inbound_substream = Some(InboundSubstreamState::Dropped);
-                        self.outbound_substream = Some(OutboundSubstreamState::Dropped);
+                        self.close_substreams();
                         self.pending_events_to_behaviour
                             .push_back(ToBehaviour::MaliciousPeer);
                     }
@@ -190,8 +212,10 @@ where
                     tracing::error!(
                         "Failed to receive message from inbound stream: {e:?}. Dropping both inbound/outbound substreams"
                     );
-                    self.inbound_substream = Some(InboundSubstreamState::Dropped);
-                    self.outbound_substream = Some(OutboundSubstreamState::Dropped);
+                    self.close_substreams();
+                    return Poll::Ready(ConnectionHandlerEvent::NotifyBehaviour(
+                        ToBehaviour::IOError(e),
+                    ));
                 }
                 Poll::Pending => {
                     tracing::debug!("No message received from inbound stream yet. Waiting more...");
@@ -241,8 +265,7 @@ where
                         }
                         Poll::Ready(Err(e)) => {
                             tracing::error!("Failed to send message to outbound stream: {e:?}. Dropping both inbound and outbound substreams");
-                            self.outbound_substream = Some(OutboundSubstreamState::Dropped);
-                            self.inbound_substream = Some(InboundSubstreamState::Dropped);
+                            self.close_substreams();
                             return Poll::Ready(ConnectionHandlerEvent::NotifyBehaviour(
                                 ToBehaviour::IOError(e),
                             ));
@@ -276,9 +299,13 @@ where
             FromBehaviour::Message(msg) => {
                 self.outbound_msgs.push_back(msg);
             }
+            FromBehaviour::CloseSubstreams => {
+                self.close_substreams();
+            }
         }
     }
 
+    #[allow(deprecated)] // Self::InboundOpenInfo and Self::OutboundOpenInfo are deprecated
     fn on_connection_event(
         &mut self,
         event: ConnectionEvent<
@@ -296,6 +323,8 @@ where
                 tracing::debug!("FullyNegotiatedInbound: Creating inbound substream");
                 self.inbound_substream =
                     Some(InboundSubstreamState::PendingRecv(recv_msg(stream).boxed()));
+                self.pending_events_to_behaviour
+                    .push_back(ToBehaviour::FullyNegotiatedInbound);
                 VALUE_FULLY_NEGOTIATED_INBOUND
             }
             ConnectionEvent::FullyNegotiatedOutbound(FullyNegotiatedOutbound {
@@ -310,24 +339,9 @@ where
             }
             ConnectionEvent::DialUpgradeError(e) => {
                 tracing::error!("DialUpgradeError: {:?}", e);
-                match e.error {
-                    StreamUpgradeError::NegotiationFailed => {
-                        self.pending_events_to_behaviour
-                            .push_back(ToBehaviour::NegotiationFailed);
-                    }
-                    StreamUpgradeError::Io(e) => {
-                        self.pending_events_to_behaviour
-                            .push_back(ToBehaviour::IOError(e));
-                    }
-                    StreamUpgradeError::Timeout => {
-                        self.pending_events_to_behaviour
-                            .push_back(ToBehaviour::IOError(io::Error::new(
-                                io::ErrorKind::TimedOut,
-                                "blend protocol negotiation timed out",
-                            )));
-                    }
-                    StreamUpgradeError::Apply(_) => unreachable!(),
-                };
+                self.pending_events_to_behaviour
+                    .push_back(ToBehaviour::DialUpgradeError(e));
+                self.close_substreams();
                 VALUE_DIAL_UPGRADE_ERROR
             }
             event => {

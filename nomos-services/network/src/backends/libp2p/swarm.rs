@@ -138,7 +138,7 @@ impl SwarmHandler {
             }
             Command::Unsubscribe(topic) => {
                 tracing::debug!("unsubscribing to topic: {topic}");
-                log_error!(self.swarm.unsubscribe(&topic));
+                self.swarm.unsubscribe(&topic);
             }
             Command::Info { reply } => {
                 let swarm = self.swarm.swarm();
