@@ -1,6 +1,7 @@
 use std::{
     collections::VecDeque,
     io,
+    marker::PhantomData,
     task::{Context, Poll, Waker},
 };
 
@@ -13,6 +14,8 @@ use libp2p::{
     },
     Stream, StreamProtocol,
 };
+use nomos_blend::conn_maintenance::{ConnectionMonitor, ConnectionMonitorOutput};
+use nomos_blend_message::BlendMessage;
 
 // Metrics
 const VALUE_FULLY_NEGOTIATED_INBOUND: &str = "fully_negotiated_inbound";
@@ -22,15 +25,16 @@ const VALUE_IGNORED: &str = "ignored";
 
 const PROTOCOL_NAME: StreamProtocol = StreamProtocol::new("/nomos/blend/0.1.0");
 
-// TODO: Consider replacing this struct with libp2p_stream ConnectionHandler
-//       because we don't implement persistent emission in the per-connection level anymore.
-/// A [`ConnectionHandler`] that handles the blend protocol.
-pub struct BlendConnectionHandler {
+pub struct BlendConnectionHandler<Msg> {
     inbound_substream: Option<MsgRecvFuture>,
     outbound_substream: Option<OutboundSubstreamState>,
     outbound_msgs: VecDeque<Vec<u8>>,
     pending_events_to_behaviour: VecDeque<ToBehaviour>,
+    // NOTE: Until we figure out optimal parameters for the monitor, we will keep it optional
+    // to avoid unintended side effects.
+    monitor: Option<ConnectionMonitor>,
     waker: Option<Waker>,
+    _blend_message: PhantomData<Msg>,
 }
 
 type MsgSendFuture = BoxFuture<'static, Result<Stream, io::Error>>;
@@ -45,14 +49,16 @@ enum OutboundSubstreamState {
     PendingSend(MsgSendFuture),
 }
 
-impl BlendConnectionHandler {
-    pub fn new() -> Self {
+impl<Msg> BlendConnectionHandler<Msg> {
+    pub fn new(monitor: Option<ConnectionMonitor>) -> Self {
         Self {
             inbound_substream: None,
             outbound_substream: None,
             outbound_msgs: VecDeque::new(),
             pending_events_to_behaviour: VecDeque::new(),
+            monitor,
             waker: None,
+            _blend_message: PhantomData,
         }
     }
 
@@ -60,12 +66,6 @@ impl BlendConnectionHandler {
         if let Some(waker) = self.waker.take() {
             waker.wake();
         }
-    }
-}
-
-impl Default for BlendConnectionHandler {
-    fn default() -> Self {
-        Self::new()
     }
 }
 
@@ -83,11 +83,18 @@ pub enum ToBehaviour {
     NegotiationFailed,
     /// A message has been received from the connection.
     Message(Vec<u8>),
+    /// Notifying that the peer is detected as malicious.
+    MaliciousPeer,
+    /// Notifying that the peer is detected as unhealthy.
+    UnhealthyPeer,
     /// An IO error from the connection
     IOError(io::Error),
 }
 
-impl ConnectionHandler for BlendConnectionHandler {
+impl<Msg> ConnectionHandler for BlendConnectionHandler<Msg>
+where
+    Msg: BlendMessage + Send + 'static,
+{
     type FromBehaviour = FromBehaviour;
     type ToBehaviour = ToBehaviour;
     type InboundProtocol = ReadyUpgrade<StreamProtocol>;
@@ -110,19 +117,48 @@ impl ConnectionHandler for BlendConnectionHandler {
             gauge.pending_events_to_behaviour = self.pending_events_to_behaviour.len() as u64,
         );
 
+        // Check if the monitor interval has elapsed, if exists.
+        if let Some(monitor) = &mut self.monitor {
+            if let Poll::Ready(output) = monitor.poll(cx) {
+                match output {
+                    ConnectionMonitorOutput::Malicious => {
+                        // TODO: Mark the inbound/outbound substream state as Dropped.
+                        // Then the substream hold by the state will be dropped from memory.
+                        // As a result, Swarm will decrease the ref count to the connection,
+                        // and close the connection when the count is 0.
+                        self.pending_events_to_behaviour
+                            .push_back(ToBehaviour::MaliciousPeer);
+                    }
+                    ConnectionMonitorOutput::Unhealthy => {
+                        self.pending_events_to_behaviour
+                            .push_back(ToBehaviour::UnhealthyPeer);
+                    }
+                    ConnectionMonitorOutput::Healthy => {}
+                }
+            }
+        }
+
         // Process pending events to be sent to the behaviour
         if let Some(event) = self.pending_events_to_behaviour.pop_front() {
             return Poll::Ready(ConnectionHandlerEvent::NotifyBehaviour(event));
         }
 
         // Process inbound stream
-        // TODO: Measure message frequencies and compare them to the desired frequencies
-        //       for connection maintenance defined in the Tier 1 spec.
         tracing::debug!("Processing inbound stream");
         if let Some(msg_recv_fut) = self.inbound_substream.as_mut() {
             match msg_recv_fut.poll_unpin(cx) {
                 Poll::Ready(Ok((stream, msg))) => {
                     tracing::debug!("Received message from inbound stream. Notifying behaviour...");
+
+                    // Record the message to the monitor.
+                    if let Some(monitor) = &mut self.monitor {
+                        if Msg::is_drop_message(&msg) {
+                            monitor.record_drop_message();
+                        } else {
+                            monitor.record_effective_message();
+                        }
+                    }
+
                     self.inbound_substream = Some(recv_msg(stream).boxed());
                     return Poll::Ready(ConnectionHandlerEvent::NotifyBehaviour(
                         ToBehaviour::Message(msg),
@@ -130,6 +166,7 @@ impl ConnectionHandler for BlendConnectionHandler {
                 }
                 Poll::Ready(Err(e)) => {
                     tracing::error!("Failed to receive message from inbound stream: {:?}", e);
+                    // TODO: Mark the inbound/outbound substream state as Dropped.
                     self.inbound_substream = None;
                 }
                 Poll::Pending => {}
@@ -172,6 +209,7 @@ impl ConnectionHandler for BlendConnectionHandler {
                         }
                         Poll::Ready(Err(e)) => {
                             tracing::error!("Failed to send message to outbound stream: {:?}", e);
+                            // TODO: Mark the inbound/outbound substream state as Dropped.
                             self.outbound_substream = None;
                             return Poll::Ready(ConnectionHandlerEvent::NotifyBehaviour(
                                 ToBehaviour::IOError(e),

@@ -8,8 +8,9 @@ use libp2p::{
     swarm::SwarmEvent,
     Multiaddr, PeerId, Swarm, SwarmBuilder,
 };
-use nomos_blend::{conn_maintenance::ConnectionMaintenanceSettings, membership::Membership};
+use nomos_blend::{conn_maintenance::ConnectionMonitorSettings, membership::Membership};
 use nomos_blend_message::sphinx::SphinxMessage;
+use nomos_blend_network::TokioIntervalStreamProvider;
 use nomos_libp2p::secret_key_serde;
 use overwatch_rs::overwatch::handle::OverwatchHandle;
 use rand::RngCore;
@@ -18,7 +19,7 @@ use tokio::{
     sync::{broadcast, mpsc},
     task::JoinHandle,
 };
-use tokio_stream::wrappers::{BroadcastStream, IntervalStream};
+use tokio_stream::wrappers::BroadcastStream;
 
 /// A blend backend that uses the libp2p network stack.
 pub struct Libp2pBlendBackend {
@@ -34,7 +35,9 @@ pub struct Libp2pBlendBackendSettings {
     // A key for deriving PeerId and establishing secure connections (TLS 1.3 by QUIC)
     #[serde(with = "secret_key_serde", default = "ed25519::SecretKey::generate")]
     pub node_key: ed25519::SecretKey,
-    pub conn_maintenance: ConnectionMaintenanceSettings,
+    pub peering_degree: u16,
+    pub max_peering_degree: u16,
+    pub conn_monitor: Option<ConnectionMonitorSettings>,
 }
 
 const CHANNEL_SIZE: usize = 64;
@@ -93,11 +96,8 @@ impl BlendBackend for Libp2pBlendBackend {
     }
 }
 
-struct BlendSwarm<R>
-where
-    R: RngCore + 'static,
-{
-    swarm: Swarm<nomos_blend_network::Behaviour<SphinxMessage, R, IntervalStream>>,
+struct BlendSwarm {
+    swarm: Swarm<nomos_blend_network::Behaviour<SphinxMessage, TokioIntervalStreamProvider>>,
     swarm_messages_receiver: mpsc::Receiver<BlendSwarmMessage>,
     incoming_message_sender: broadcast::Sender<Vec<u8>>,
 }
@@ -107,34 +107,27 @@ pub enum BlendSwarmMessage {
     Publish(Vec<u8>),
 }
 
-impl<R> BlendSwarm<R>
-where
-    R: RngCore + 'static,
-{
-    fn new(
+impl BlendSwarm {
+    fn new<R>(
         config: Libp2pBlendBackendSettings,
         membership: Membership<PeerId, SphinxMessage>,
-        rng: R,
+        mut rng: R,
         swarm_messages_receiver: mpsc::Receiver<BlendSwarmMessage>,
         incoming_message_sender: broadcast::Sender<Vec<u8>>,
-    ) -> Self {
+    ) -> Self
+    where
+        R: RngCore,
+    {
         let keypair = Keypair::from(ed25519::Keypair::from(config.node_key.clone()));
         let mut swarm = SwarmBuilder::with_existing_identity(keypair)
             .with_tokio()
             .with_quic()
             .with_behaviour(|_| {
-                let conn_maintenance_interval =
-                    config.conn_maintenance.monitor.as_ref().map(|monitor| {
-                        IntervalStream::new(tokio::time::interval(monitor.time_window))
-                    });
-                nomos_blend_network::Behaviour::new(
+                nomos_blend_network::Behaviour::<SphinxMessage, TokioIntervalStreamProvider>::new(
                     nomos_blend_network::Config {
                         duplicate_cache_lifespan: 60,
-                        conn_maintenance_settings: config.conn_maintenance,
-                        conn_maintenance_interval,
+                        conn_monitor_settings: config.conn_monitor,
                     },
-                    membership,
-                    rng,
                 )
             })
             .expect("Blend Behaviour should be built")
@@ -147,6 +140,16 @@ where
             .listen_on(config.listening_address)
             .unwrap_or_else(|e| {
                 panic!("Failed to listen on Blend network: {e:?}");
+            });
+
+        // Dial the initial peers randomly selected
+        membership
+            .choose_remote_nodes(&mut rng, config.peering_degree as usize)
+            .iter()
+            .for_each(|peer| {
+                if let Err(e) = swarm.dial(peer.address.clone()) {
+                    tracing::error!("Failed to dial a peer: {e:?}");
+                }
             });
 
         Self {

@@ -1,9 +1,9 @@
 use cryptarchia_consensus::LeaderConfig;
 // std
+use nomos_blend::membership::Node;
 use nomos_blend::message_blend::{
     CryptographicProcessorSettings, MessageBlendSettings, TemporalSchedulerSettings,
 };
-use nomos_blend::{conn_maintenance::ConnectionMaintenanceSettings, membership::Node};
 use nomos_blend_message::{sphinx::SphinxMessage, BlendMessage};
 use nomos_da_network_service::backends::libp2p::common::DaNetworkBackendSettings;
 use std::path::PathBuf;
@@ -336,11 +336,9 @@ pub fn new_blend_configs(listening_addresses: Vec<Multiaddr>) -> Vec<TestBlendSe
                 Libp2pBlendBackendSettings {
                     listening_address: listening_address.clone(),
                     node_key: ed25519::SecretKey::generate(),
-                    conn_maintenance: ConnectionMaintenanceSettings {
-                        peering_degree: 1,
-                        max_peering_degree: 1,
-                        monitor: None,
-                    },
+                    peering_degree: 1,
+                    max_peering_degree: 1,
+                    conn_monitor: None,
                 },
                 x25519_dalek::StaticSecret::random(),
             )

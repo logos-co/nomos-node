@@ -2,44 +2,58 @@ mod behaviour;
 mod error;
 mod handler;
 
-pub use behaviour::{Behaviour, Config, Event};
+#[cfg(feature = "tokio")]
+use std::time::Duration;
+
+pub use behaviour::{Behaviour, Config, Event, IntervalStreamProvider};
+use tokio_stream::StreamExt;
+
+#[cfg(feature = "tokio")]
+pub struct TokioIntervalStreamProvider;
+
+#[cfg(feature = "tokio")]
+impl IntervalStreamProvider for TokioIntervalStreamProvider {
+    fn interval_stream(interval: Duration) -> impl futures::Stream<Item = ()> + Send + 'static {
+        // Since tokio::time::interval.tick() returns immediately regardless of the interval,
+        // we need to explicitly specify the time of the first tick we expect.
+        // If not, the peer would be marked as unhealthy immediately
+        // as soon as the connection is established.
+        let start = tokio::time::Instant::now() + interval;
+        tokio_stream::wrappers::IntervalStream::new(tokio::time::interval_at(start, interval))
+            .map(|_| ())
+    }
+}
 
 #[cfg(test)]
+#[cfg(feature = "tokio")]
 mod test {
     use std::time::Duration;
 
-    use fixed::types::U57F7;
     use libp2p::{
         futures::StreamExt,
         identity::Keypair,
         swarm::{dummy, NetworkBehaviour, SwarmEvent},
         Multiaddr, PeerId, Swarm, SwarmBuilder,
     };
-    use nomos_blend::{
-        conn_maintenance::{ConnectionMaintenanceSettings, ConnectionMonitorSettings},
-        membership::{Membership, Node},
-    };
+    use nomos_blend::{conn_maintenance::ConnectionMonitorSettings, membership::Node};
     use nomos_blend_message::{mock::MockBlendMessage, BlendMessage};
-    use rand::{rngs::ThreadRng, thread_rng};
     use tokio::select;
-    use tokio_stream::wrappers::IntervalStream;
 
-    use crate::{behaviour::Config, error::Error, Behaviour, Event};
+    use crate::{behaviour::Config, error::Error, Behaviour, Event, TokioIntervalStreamProvider};
 
     /// Check that a published messsage arrives in the peers successfully.
     #[tokio::test]
     async fn behaviour() {
         // Initialize two swarms that support the blend protocol.
-        let (nodes, keypairs) = nodes(2, 8090);
-        let mut keypairs = keypairs.into_iter();
-        let mut swarm1 = new_swarm(
+        let (mut nodes, mut keypairs) = nodes(2, 8090);
+        let node1_addr = nodes.next().unwrap().address;
+        let mut swarm1 = new_blend_swarm(keypairs.next().unwrap(), node1_addr.clone(), None);
+        let mut swarm2 = new_blend_swarm(
             keypairs.next().unwrap(),
-            Membership::new(nodes.clone(), nodes[0].public_key),
+            nodes.next().unwrap().address,
+            None,
         );
-        let mut swarm2 = new_swarm(
-            keypairs.next().unwrap(),
-            Membership::new(nodes.clone(), nodes[1].public_key),
-        );
+        swarm2.dial(node1_addr).unwrap();
 
         // Swamr2 publishes a message.
         let task = async {
@@ -78,14 +92,15 @@ mod test {
     #[tokio::test]
     async fn peer_not_support_blend_protocol() {
         // Only swarm2 supports the blend protocol.
-        let (nodes, keypairs) = nodes(2, 8190);
-        let mut keypairs = keypairs.into_iter();
-        let mut swarm1 =
-            new_swarm_without_blend(keypairs.next().unwrap(), nodes[0].address.clone());
-        let mut swarm2 = new_swarm(
+        let (mut nodes, mut keypairs) = nodes(2, 8190);
+        let node1_addr = nodes.next().unwrap().address;
+        let mut swarm1 = new_dummy_swarm(keypairs.next().unwrap(), node1_addr.clone());
+        let mut swarm2 = new_blend_swarm(
             keypairs.next().unwrap(),
-            Membership::new(nodes.clone(), nodes[1].public_key),
+            nodes.next().unwrap().address,
+            None,
         );
+        swarm2.dial(node1_addr).unwrap();
 
         // Expect all publish attempts to fail with [`Error::NoPeers`]
         // because swarm2 doesn't have any peers that support the blend protocol.
@@ -107,51 +122,31 @@ mod test {
         }
     }
 
-    fn new_swarm(
+    fn new_blend_swarm(
         keypair: Keypair,
-        membership: Membership<PeerId, MockBlendMessage>,
-    ) -> Swarm<Behaviour<MockBlendMessage, ThreadRng, IntervalStream>> {
-        let conn_maintenance_settings = ConnectionMaintenanceSettings {
-            peering_degree: membership.size() - 1, // excluding the local node
-            max_peering_degree: membership.size() * 2,
-            monitor: Some(ConnectionMonitorSettings {
-                time_window: Duration::from_secs(60),
-                expected_effective_messages: U57F7::from_num(1.0),
-                effective_message_tolerance: U57F7::from_num(0.1),
-                expected_drop_messages: U57F7::from_num(1.0),
-                drop_message_tolerance: U57F7::from_num(0.1),
-            }),
-        };
-        let conn_maintenance_interval = conn_maintenance_settings
-            .monitor
-            .as_ref()
-            .map(|monitor| IntervalStream::new(tokio::time::interval(monitor.time_window)));
-        let mut swarm = new_swarm_with_behaviour(
+        addr: Multiaddr,
+        conn_monitor_settings: Option<ConnectionMonitorSettings>,
+    ) -> Swarm<Behaviour<MockBlendMessage, TokioIntervalStreamProvider>> {
+        new_swarm_with_behaviour(
             keypair,
-            Behaviour::new(
-                Config {
-                    duplicate_cache_lifespan: 60,
-                    conn_maintenance_settings,
-                    conn_maintenance_interval,
-                },
-                membership.clone(),
-                thread_rng(),
-            ),
-        );
-        swarm
-            .listen_on(membership.local_node().address.clone())
-            .unwrap();
-        swarm
+            addr,
+            Behaviour::<MockBlendMessage, TokioIntervalStreamProvider>::new(Config {
+                duplicate_cache_lifespan: 60,
+                conn_monitor_settings,
+            }),
+        )
     }
 
-    fn new_swarm_without_blend(keypair: Keypair, addr: Multiaddr) -> Swarm<dummy::Behaviour> {
-        let mut swarm = new_swarm_with_behaviour(keypair, dummy::Behaviour);
-        swarm.listen_on(addr).unwrap();
-        swarm
+    fn new_dummy_swarm(keypair: Keypair, addr: Multiaddr) -> Swarm<dummy::Behaviour> {
+        new_swarm_with_behaviour(keypair, addr, dummy::Behaviour)
     }
 
-    fn new_swarm_with_behaviour<B: NetworkBehaviour>(keypair: Keypair, behaviour: B) -> Swarm<B> {
-        SwarmBuilder::with_existing_identity(keypair)
+    fn new_swarm_with_behaviour<B: NetworkBehaviour>(
+        keypair: Keypair,
+        addr: Multiaddr,
+        behaviour: B,
+    ) -> Swarm<B> {
+        let mut swarm = SwarmBuilder::with_existing_identity(keypair)
             .with_tokio()
             .with_other_transport(|keypair| {
                 libp2p::quic::tokio::Transport::new(libp2p::quic::Config::new(keypair))
@@ -159,18 +154,17 @@ mod test {
             .unwrap()
             .with_behaviour(|_| behaviour)
             .unwrap()
-            .with_swarm_config(|cfg| {
-                cfg.with_idle_connection_timeout(std::time::Duration::from_secs(u64::MAX))
-            })
-            .build()
+            .build();
+        swarm.listen_on(addr).unwrap();
+        swarm
     }
 
     fn nodes(
         count: usize,
         base_port: usize,
     ) -> (
-        Vec<Node<PeerId, <MockBlendMessage as BlendMessage>::PublicKey>>,
-        Vec<Keypair>,
+        impl Iterator<Item = Node<PeerId, <MockBlendMessage as BlendMessage>::PublicKey>>,
+        impl Iterator<Item = Keypair>,
     ) {
         let mut nodes = Vec::with_capacity(count);
         let mut keypairs = Vec::with_capacity(count);
@@ -188,6 +182,6 @@ mod test {
             keypairs.push(keypair);
         }
 
-        (nodes, keypairs)
+        (nodes.into_iter(), keypairs.into_iter())
     }
 }
