@@ -25,7 +25,7 @@ async fn disseminate_with_metadata(
 
     let backend_address = executor_config.http.backend_settings.address;
     let exec_url = Url::parse(&format!("http://{}", backend_address)).unwrap();
-    let client = ExecutorHttpClient::new(client, exec_url);
+    let client = ExecutorHttpClient::new(client, exec_url, None);
 
     client.publish_blob(data.to_vec(), metadata).await.unwrap();
 }
