@@ -14,10 +14,22 @@ pub enum Error {
 }
 
 #[derive(Clone)]
+pub struct BasicAuthCredentials {
+    username: String,
+    password: Option<String>,
+}
+
+impl BasicAuthCredentials {
+    pub fn new(username: String, password: Option<String>) -> Self {
+        Self { username, password }
+    }
+}
+
+#[derive(Clone)]
 pub struct ExecutorHttpClient {
     client: Client,
     executor_address: Url,
-    auth: Option<(String, String)>, // Optional Basic Auth credentials
+    basic_auth: Option<BasicAuthCredentials>,
 }
 
 impl Default for ExecutorHttpClient {
@@ -29,29 +41,22 @@ impl Default for ExecutorHttpClient {
         Self {
             client,
             executor_address,
-            auth: None,
+            basic_auth: None,
         }
     }
 }
 
 impl ExecutorHttpClient {
-    pub fn new(client: Client, executor_address: Url) -> Self {
+    pub fn new(
+        client: Client,
+        executor_address: Url,
+        basic_auth: Option<BasicAuthCredentials>,
+    ) -> Self {
         Self {
             client,
             executor_address,
-            auth: None,
+            basic_auth,
         }
-    }
-
-    pub fn with_auth(
-        mut self,
-        username: Option<impl Into<String>>,
-        password: Option<impl Into<String>>,
-    ) -> Self {
-        if let (Some(username), Some(password)) = (username, password) {
-            self.auth = Some((username.into(), password.into()));
-        }
-        self
     }
 
     /// Send a `Blob` to be dispersed
@@ -67,8 +72,8 @@ impl ExecutorHttpClient {
             .expect("Url should build properly");
 
         let mut request = self.client.post(url).json(&req);
-        if let Some((ref username, ref password)) = self.auth {
-            request = request.basic_auth(username, Some(password));
+        if let Some(basic_auth) = &self.basic_auth {
+            request = request.basic_auth(&basic_auth.username, basic_auth.password.as_deref());
         }
 
         let response = request.send().await.map_err(Error::Request)?;
