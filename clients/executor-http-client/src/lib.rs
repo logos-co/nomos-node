@@ -17,6 +17,7 @@ pub enum Error {
 pub struct ExecutorHttpClient {
     client: Client,
     executor_address: Url,
+    auth: Option<(String, String)>, // Optional Basic Auth credentials
 }
 
 impl Default for ExecutorHttpClient {
@@ -28,6 +29,7 @@ impl Default for ExecutorHttpClient {
         Self {
             client,
             executor_address,
+            auth: None,
         }
     }
 }
@@ -37,7 +39,19 @@ impl ExecutorHttpClient {
         Self {
             client,
             executor_address,
+            auth: None,
         }
+    }
+
+    pub fn with_auth(
+        mut self,
+        username: Option<impl Into<String>>,
+        password: Option<impl Into<String>>,
+    ) -> Self {
+        if let (Some(username), Some(password)) = (username, password) {
+            self.auth = Some((username.into(), password.into()));
+        }
+        self
     }
 
     /// Send a `Blob` to be dispersed
@@ -49,21 +63,25 @@ impl ExecutorHttpClient {
         let req = DispersalRequest { data, metadata };
         let url = self
             .executor_address
-            .join(paths::DISPERSE_DATA)
+            .join(paths::DISPERSE_DATA.trim_start_matches('/'))
             .expect("Url should build properly");
-        let response = self
-            .client
-            .post(url)
-            .json(&req)
-            .send()
-            .await
-            .map_err(Error::Request)?;
-        match response.status() {
+
+        let mut request = self.client.post(url).json(&req);
+        if let Some((ref username, ref password)) = self.auth {
+            request = request.basic_auth(username, Some(password));
+        }
+
+        let response = request.send().await.map_err(Error::Request)?;
+        let status = response.status();
+        let body = response.text().await.map_err(Error::Request)?;
+
+        match status {
             StatusCode::OK => Ok(()),
-            StatusCode::INTERNAL_SERVER_ERROR => Err(Error::Server(
-                response.text().await.map_err(Error::Request)?,
-            )),
-            _ => unreachable!("As per the documentation it can only return 200 or 500 responses"),
+            StatusCode::INTERNAL_SERVER_ERROR => Err(Error::Server(body)),
+            _ => Err(Error::Server(format!(
+                "Unexpected response [{}]: {}",
+                status, body
+            ))),
         }
     }
 }

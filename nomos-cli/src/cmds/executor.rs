@@ -25,6 +25,12 @@ pub struct Disseminate {
     /// Executor address which is responsible for dissemination.
     #[clap(long)]
     pub addr: Url,
+    /// Optional username for authentication.
+    #[clap(long)]
+    pub username: Option<String>,
+    /// Optional password for authentication.
+    #[clap(long)]
+    pub password: Option<String>,
 }
 
 impl Disseminate {
@@ -32,7 +38,8 @@ impl Disseminate {
         tracing::subscriber::set_global_default(tracing_subscriber::FmtSubscriber::new())
             .expect("setting tracing default failed");
 
-        let client = ExecutorHttpClient::new(reqwest::Client::new(), self.addr.clone());
+        let client = ExecutorHttpClient::new(reqwest::Client::new(), self.addr.clone())
+            .with_auth(self.username, self.password);
 
         let mut bytes: Vec<u8> = if let Some(data) = &self.data {
             data.clone().into_bytes()
