@@ -1,7 +1,6 @@
 use crate::backend::KMSBackend;
 use crate::secure_key::SecuredKey;
 use bytes::Bytes;
-use either::Either;
 use futures::StreamExt;
 use log::error;
 use overwatch_rs::services::handle::ServiceStateHandle;
@@ -12,16 +11,22 @@ use overwatch_rs::services::{ServiceCore, ServiceData, ServiceId};
 use overwatch_rs::DynError;
 use std::fmt::{Debug, Formatter};
 use std::future::Future;
+use std::pin::Pin;
 use tokio::sync::oneshot;
 
 mod backend;
+mod keys;
 mod secure_key;
 
 const KMS_TAG: ServiceId = "KMS";
 
 // TODO: Use [`AsyncFnMut`](https://doc.rust-lang.org/stable/std/ops/trait.AsyncFnMut.html#tymethod.async_call_mut) once it is stabilized.
 pub type KMSOperator = Box<
-    dyn FnMut(&mut dyn SecuredKey) -> Box<dyn Future<Output = Result<(), DynError>>> + Send + Sync,
+    dyn FnMut(
+            &mut dyn SecuredKey,
+        ) -> Pin<Box<dyn Future<Output = Result<(), DynError>> + Send + Sync>>
+        + Send
+        + Sync,
 >;
 
 pub enum KMSMessage<Backend>
@@ -29,7 +34,8 @@ where
     Backend: KMSBackend,
 {
     Register {
-        key: Either<Backend::SupportedKeys, Backend::KeyId>,
+        key_id: Backend::KeyId,
+        key_type: Backend::SupportedKeyTypes,
         reply_channel: oneshot::Sender<Backend::KeyId>,
     },
     PublicKey {
@@ -42,6 +48,7 @@ where
         reply_channel: oneshot::Sender<Bytes>,
     },
     Execute {
+        key_id: Backend::KeyId,
         operator: KMSOperator,
     },
 }
@@ -50,21 +57,17 @@ impl<Backend> Debug for KMSMessage<Backend>
 where
     Backend: KMSBackend,
     Backend::KeyId: Debug,
-    Backend::SupportedKeys: Debug,
+    Backend::SupportedKeyTypes: Debug,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             KMSMessage::Register {
-                key: Either::Right(key_id),
-                ..
+                key_id, key_type, ..
             } => {
-                write!(f, "KMS-Register {{ KeyId: {key_id:?} }}")
-            }
-            KMSMessage::Register {
-                key: Either::Left(key_type),
-                ..
-            } => {
-                write!(f, "KMS-Register {{ KeyType: {key_type:?} }}")
+                write!(
+                    f,
+                    "KMS-Register {{ KeyId: {key_id:?}, KeyScheme: {key_type:?} }}"
+                )
             }
             KMSMessage::PublicKey { key_id, .. } => {
                 write!(f, "KMS-PublicKey {{ KeyId: {key_id:?} }}")
@@ -90,7 +93,7 @@ pub struct KMSService<Backend>
 where
     Backend: KMSBackend + 'static,
     Backend::KeyId: Debug,
-    Backend::SupportedKeys: Debug,
+    Backend::SupportedKeyTypes: Debug,
     Backend::Settings: Clone,
 {
     backend: Backend,
@@ -101,7 +104,7 @@ impl<Backend> ServiceData for KMSService<Backend>
 where
     Backend: KMSBackend + 'static,
     Backend::KeyId: Debug,
-    Backend::SupportedKeys: Debug,
+    Backend::SupportedKeyTypes: Debug,
     Backend::Settings: Clone,
 {
     const SERVICE_ID: ServiceId = KMS_TAG;
@@ -116,7 +119,7 @@ impl<Backend> ServiceCore for KMSService<Backend>
 where
     Backend: KMSBackend + Send + 'static,
     Backend::KeyId: Debug + Send,
-    Backend::SupportedKeys: Debug + Send,
+    Backend::SupportedKeyTypes: Debug + Send,
     Backend::Settings: Clone + Send + Sync,
 {
     fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, DynError> {
@@ -152,7 +155,7 @@ impl<Backend> KMSService<Backend>
 where
     Backend: KMSBackend + 'static,
     Backend::KeyId: Debug,
-    Backend::SupportedKeys: Debug,
+    Backend::SupportedKeyTypes: Debug,
     Backend::Settings: Clone,
 {
     async fn should_stop_service(message: LifecycleMessage) -> bool {
@@ -171,8 +174,12 @@ where
     }
     async fn handle_kms_message(msg: KMSMessage<Backend>, backend: &mut Backend) {
         match msg {
-            KMSMessage::Register { key, reply_channel } => {
-                let Ok(key_id) = backend.register(key) else {
+            KMSMessage::Register {
+                key_id,
+                key_type,
+                reply_channel,
+            } => {
+                let Ok(key_id) = backend.register(key_id, key_type) else {
                     panic!("A key could not be registered");
                 };
                 if let Err(_key_id) = reply_channel.send(key_id) {
@@ -202,8 +209,11 @@ where
                     error!("Could not reply public key to request channel");
                 }
             }
-            KMSMessage::Execute { operator } => {
-                backend.execute(operator).await;
+            KMSMessage::Execute { key_id, operator } => {
+                backend
+                    .execute(key_id, operator)
+                    .await
+                    .expect("Could not execute operator");
             }
         }
     }

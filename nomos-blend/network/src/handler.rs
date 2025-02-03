@@ -1,6 +1,7 @@
 use std::{
     collections::VecDeque,
     io,
+    marker::PhantomData,
     task::{Context, Poll, Waker},
 };
 
@@ -8,11 +9,15 @@ use futures::{future::BoxFuture, AsyncReadExt, AsyncWriteExt, FutureExt};
 use libp2p::{
     core::upgrade::ReadyUpgrade,
     swarm::{
-        handler::{ConnectionEvent, FullyNegotiatedInbound, FullyNegotiatedOutbound},
-        ConnectionHandler, ConnectionHandlerEvent, StreamUpgradeError, SubstreamProtocol,
+        handler::{
+            ConnectionEvent, DialUpgradeError, FullyNegotiatedInbound, FullyNegotiatedOutbound,
+        },
+        ConnectionHandler, ConnectionHandlerEvent, SubstreamProtocol,
     },
     Stream, StreamProtocol,
 };
+use nomos_blend::conn_maintenance::{ConnectionMonitor, ConnectionMonitorOutput};
+use nomos_blend_message::BlendMessage;
 
 // Metrics
 const VALUE_FULLY_NEGOTIATED_INBOUND: &str = "fully_negotiated_inbound";
@@ -22,19 +27,27 @@ const VALUE_IGNORED: &str = "ignored";
 
 const PROTOCOL_NAME: StreamProtocol = StreamProtocol::new("/nomos/blend/0.1.0");
 
-// TODO: Consider replacing this struct with libp2p_stream ConnectionHandler
-//       because we don't implement persistent emission in the per-connection level anymore.
-/// A [`ConnectionHandler`] that handles the blend protocol.
-pub struct BlendConnectionHandler {
-    inbound_substream: Option<MsgRecvFuture>,
+pub struct BlendConnectionHandler<Msg> {
+    inbound_substream: Option<InboundSubstreamState>,
     outbound_substream: Option<OutboundSubstreamState>,
     outbound_msgs: VecDeque<Vec<u8>>,
     pending_events_to_behaviour: VecDeque<ToBehaviour>,
+    // NOTE: Until we figure out optimal parameters for the monitor, we will keep it optional
+    // to avoid unintended side effects.
+    monitor: Option<ConnectionMonitor>,
     waker: Option<Waker>,
+    _blend_message: PhantomData<Msg>,
 }
 
 type MsgSendFuture = BoxFuture<'static, Result<Stream, io::Error>>;
 type MsgRecvFuture = BoxFuture<'static, Result<(Stream, Vec<u8>), io::Error>>;
+
+enum InboundSubstreamState {
+    /// A message is being received on the inbound substream.
+    PendingRecv(MsgRecvFuture),
+    /// A substream has been dropped proactively.
+    Dropped,
+}
 
 enum OutboundSubstreamState {
     /// A request to open a new outbound substream is being processed.
@@ -43,17 +56,35 @@ enum OutboundSubstreamState {
     Idle(Stream),
     /// A message is being sent on the outbound substream.
     PendingSend(MsgSendFuture),
+    /// A substream has been dropped proactively.
+    Dropped,
 }
 
-impl BlendConnectionHandler {
-    pub fn new() -> Self {
+impl<Msg> BlendConnectionHandler<Msg> {
+    pub fn new(monitor: Option<ConnectionMonitor>) -> Self {
         Self {
             inbound_substream: None,
             outbound_substream: None,
             outbound_msgs: VecDeque::new(),
             pending_events_to_behaviour: VecDeque::new(),
+            monitor,
             waker: None,
+            _blend_message: PhantomData,
         }
+    }
+
+    /// Mark the inbound/outbound substream state as Dropped.
+    /// Then the substream hold by the state will be dropped from memory.
+    /// As a result, Swarm will decrease the ref count to the connection,
+    /// and close the connection when the count is 0.
+    ///
+    /// Also, this clears all pending messages and events
+    /// to avoid confusions for event recipients.
+    fn close_substreams(&mut self) {
+        self.inbound_substream = Some(InboundSubstreamState::Dropped);
+        self.outbound_substream = Some(OutboundSubstreamState::Dropped);
+        self.outbound_msgs.clear();
+        self.pending_events_to_behaviour.clear();
     }
 
     fn try_wake(&mut self) {
@@ -63,42 +94,56 @@ impl BlendConnectionHandler {
     }
 }
 
-impl Default for BlendConnectionHandler {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 #[derive(Debug)]
 pub enum FromBehaviour {
     /// A message to be sent to the connection.
     Message(Vec<u8>),
+    /// Close inbound/outbound substreams.
+    /// This happens when [`crate::Behaviour`] determines that one of the followings is true.
+    /// - Max peering degree is reached.
+    /// - The peer has been detected as malicious.
+    CloseSubstreams,
 }
 
 #[derive(Debug)]
 pub enum ToBehaviour {
+    /// An inbound substream has been successfully upgraded for the blend protocol.
+    FullyNegotiatedInbound,
     /// An outbound substream has been successfully upgraded for the blend protocol.
     FullyNegotiatedOutbound,
     /// An outbound substream was failed to be upgraded for the blend protocol.
-    NegotiationFailed,
+    DialUpgradeError(DialUpgradeError<(), ReadyUpgrade<StreamProtocol>>),
     /// A message has been received from the connection.
     Message(Vec<u8>),
-    /// An IO error from the connection
+    /// Notifying that the peer is detected as malicious.
+    /// The inbound/outbound streams to the peer are closed proactively.
+    MaliciousPeer,
+    /// Notifying that the peer is detected as unhealthy.
+    UnhealthyPeer,
+    /// An IO error from the connection.
+    /// The inbound/outbound streams to the peer are closed proactively.
     IOError(io::Error),
 }
 
-impl ConnectionHandler for BlendConnectionHandler {
+impl<Msg> ConnectionHandler for BlendConnectionHandler<Msg>
+where
+    Msg: BlendMessage + Send + 'static,
+{
     type FromBehaviour = FromBehaviour;
     type ToBehaviour = ToBehaviour;
     type InboundProtocol = ReadyUpgrade<StreamProtocol>;
+    #[allow(deprecated)]
     type InboundOpenInfo = ();
     type OutboundProtocol = ReadyUpgrade<StreamProtocol>;
+    #[allow(deprecated)]
     type OutboundOpenInfo = ();
 
+    #[allow(deprecated)] // Self::InboundOpenInfo is deprecated
     fn listen_protocol(&self) -> SubstreamProtocol<Self::InboundProtocol, Self::InboundOpenInfo> {
         SubstreamProtocol::new(ReadyUpgrade::new(PROTOCOL_NAME), ())
     }
 
+    #[allow(deprecated)] // Self::OutboundOpenInfo is deprecated
     fn poll(
         &mut self,
         cx: &mut Context<'_>,
@@ -110,33 +155,81 @@ impl ConnectionHandler for BlendConnectionHandler {
             gauge.pending_events_to_behaviour = self.pending_events_to_behaviour.len() as u64,
         );
 
+        // Check if the monitor interval has elapsed, if exists.
+        // TODO: Refactor this to a separate function.
+        if let Some(monitor) = &mut self.monitor {
+            if let Poll::Ready(output) = monitor.poll(cx) {
+                match output {
+                    ConnectionMonitorOutput::Malicious => {
+                        self.close_substreams();
+                        self.pending_events_to_behaviour
+                            .push_back(ToBehaviour::MaliciousPeer);
+                    }
+                    ConnectionMonitorOutput::Unhealthy => {
+                        self.pending_events_to_behaviour
+                            .push_back(ToBehaviour::UnhealthyPeer);
+                    }
+                    ConnectionMonitorOutput::Healthy => {}
+                }
+            }
+        }
+
         // Process pending events to be sent to the behaviour
         if let Some(event) = self.pending_events_to_behaviour.pop_front() {
             return Poll::Ready(ConnectionHandlerEvent::NotifyBehaviour(event));
         }
 
         // Process inbound stream
-        // TODO: Measure message frequencies and compare them to the desired frequencies
-        //       for connection maintenance defined in the Tier 1 spec.
+        // TODO: Refactor this to a separate function.
         tracing::debug!("Processing inbound stream");
-        if let Some(msg_recv_fut) = self.inbound_substream.as_mut() {
-            match msg_recv_fut.poll_unpin(cx) {
+        match self.inbound_substream.take() {
+            None => {
+                tracing::debug!("Inbound substream is not initialized yet. Doing nothing.");
+                self.inbound_substream = None;
+            }
+            Some(InboundSubstreamState::PendingRecv(mut msg_recv_fut)) => match msg_recv_fut
+                .poll_unpin(cx)
+            {
                 Poll::Ready(Ok((stream, msg))) => {
                     tracing::debug!("Received message from inbound stream. Notifying behaviour...");
-                    self.inbound_substream = Some(recv_msg(stream).boxed());
+
+                    // Record the message to the monitor.
+                    if let Some(monitor) = &mut self.monitor {
+                        if Msg::is_drop_message(&msg) {
+                            monitor.record_drop_message();
+                        } else {
+                            monitor.record_effective_message();
+                        }
+                    }
+
+                    self.inbound_substream =
+                        Some(InboundSubstreamState::PendingRecv(recv_msg(stream).boxed()));
                     return Poll::Ready(ConnectionHandlerEvent::NotifyBehaviour(
                         ToBehaviour::Message(msg),
                     ));
                 }
                 Poll::Ready(Err(e)) => {
-                    tracing::error!("Failed to receive message from inbound stream: {:?}", e);
-                    self.inbound_substream = None;
+                    tracing::error!(
+                        "Failed to receive message from inbound stream: {e:?}. Dropping both inbound/outbound substreams"
+                    );
+                    self.close_substreams();
+                    return Poll::Ready(ConnectionHandlerEvent::NotifyBehaviour(
+                        ToBehaviour::IOError(e),
+                    ));
                 }
-                Poll::Pending => {}
+                Poll::Pending => {
+                    tracing::debug!("No message received from inbound stream yet. Waiting more...");
+                    self.inbound_substream = Some(InboundSubstreamState::PendingRecv(msg_recv_fut));
+                }
+            },
+            Some(InboundSubstreamState::Dropped) => {
+                tracing::debug!("Inbound substream has been dropped proactively. Doing nothing.");
+                self.inbound_substream = Some(InboundSubstreamState::Dropped);
             }
         }
 
         // Process outbound stream
+        // TODO: Refactor this to a separate function.
         tracing::debug!("Processing outbound stream");
         loop {
             match self.outbound_substream.take() {
@@ -171,8 +264,8 @@ impl ConnectionHandler for BlendConnectionHandler {
                             self.outbound_substream = Some(OutboundSubstreamState::Idle(stream));
                         }
                         Poll::Ready(Err(e)) => {
-                            tracing::error!("Failed to send message to outbound stream: {:?}", e);
-                            self.outbound_substream = None;
+                            tracing::error!("Failed to send message to outbound stream: {e:?}. Dropping both inbound and outbound substreams");
+                            self.close_substreams();
                             return Poll::Ready(ConnectionHandlerEvent::NotifyBehaviour(
                                 ToBehaviour::IOError(e),
                             ));
@@ -184,6 +277,11 @@ impl ConnectionHandler for BlendConnectionHandler {
                             return Poll::Pending;
                         }
                     }
+                }
+                Some(OutboundSubstreamState::Dropped) => {
+                    tracing::debug!("Outbound substream has been dropped proactively");
+                    self.outbound_substream = Some(OutboundSubstreamState::Dropped);
+                    return Poll::Pending;
                 }
                 // If there is no outbound substream, request to open a new one.
                 None => {
@@ -201,9 +299,13 @@ impl ConnectionHandler for BlendConnectionHandler {
             FromBehaviour::Message(msg) => {
                 self.outbound_msgs.push_back(msg);
             }
+            FromBehaviour::CloseSubstreams => {
+                self.close_substreams();
+            }
         }
     }
 
+    #[allow(deprecated)] // Self::InboundOpenInfo and Self::OutboundOpenInfo are deprecated
     fn on_connection_event(
         &mut self,
         event: ConnectionEvent<
@@ -219,7 +321,10 @@ impl ConnectionHandler for BlendConnectionHandler {
                 ..
             }) => {
                 tracing::debug!("FullyNegotiatedInbound: Creating inbound substream");
-                self.inbound_substream = Some(recv_msg(stream).boxed());
+                self.inbound_substream =
+                    Some(InboundSubstreamState::PendingRecv(recv_msg(stream).boxed()));
+                self.pending_events_to_behaviour
+                    .push_back(ToBehaviour::FullyNegotiatedInbound);
                 VALUE_FULLY_NEGOTIATED_INBOUND
             }
             ConnectionEvent::FullyNegotiatedOutbound(FullyNegotiatedOutbound {
@@ -234,24 +339,9 @@ impl ConnectionHandler for BlendConnectionHandler {
             }
             ConnectionEvent::DialUpgradeError(e) => {
                 tracing::error!("DialUpgradeError: {:?}", e);
-                match e.error {
-                    StreamUpgradeError::NegotiationFailed => {
-                        self.pending_events_to_behaviour
-                            .push_back(ToBehaviour::NegotiationFailed);
-                    }
-                    StreamUpgradeError::Io(e) => {
-                        self.pending_events_to_behaviour
-                            .push_back(ToBehaviour::IOError(e));
-                    }
-                    StreamUpgradeError::Timeout => {
-                        self.pending_events_to_behaviour
-                            .push_back(ToBehaviour::IOError(io::Error::new(
-                                io::ErrorKind::TimedOut,
-                                "blend protocol negotiation timed out",
-                            )));
-                    }
-                    StreamUpgradeError::Apply(_) => unreachable!(),
-                };
+                self.pending_events_to_behaviour
+                    .push_back(ToBehaviour::DialUpgradeError(e));
+                self.close_substreams();
                 VALUE_DIAL_UPGRADE_ERROR
             }
             event => {

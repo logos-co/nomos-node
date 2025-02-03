@@ -1,16 +1,19 @@
-use std::{pin::Pin, time::Duration};
+use std::{collections::HashSet, pin::Pin, time::Duration};
 
 use super::BlendBackend;
 use async_trait::async_trait;
 use futures::{Stream, StreamExt};
 use libp2p::{
+    allow_block_list::BlockedPeers,
+    connection_limits::ConnectionLimits,
     identity::{ed25519, Keypair},
     swarm::SwarmEvent,
-    Multiaddr, Swarm, SwarmBuilder,
+    Multiaddr, PeerId, Swarm, SwarmBuilder,
 };
-use nomos_blend::{conn_maintenance::ConnectionMaintenanceSettings, membership::Membership};
+use nomos_blend::{conn_maintenance::ConnectionMonitorSettings, membership::Membership};
 use nomos_blend_message::sphinx::SphinxMessage;
-use nomos_libp2p::secret_key_serde;
+use nomos_blend_network::TokioIntervalStreamProvider;
+use nomos_libp2p::{secret_key_serde, NetworkBehaviour};
 use overwatch_rs::overwatch::handle::OverwatchHandle;
 use rand::RngCore;
 use serde::{Deserialize, Serialize};
@@ -18,7 +21,7 @@ use tokio::{
     sync::{broadcast, mpsc},
     task::JoinHandle,
 };
-use tokio_stream::wrappers::{BroadcastStream, IntervalStream};
+use tokio_stream::wrappers::BroadcastStream;
 
 /// A blend backend that uses the libp2p network stack.
 pub struct Libp2pBlendBackend {
@@ -34,7 +37,9 @@ pub struct Libp2pBlendBackendSettings {
     // A key for deriving PeerId and establishing secure connections (TLS 1.3 by QUIC)
     #[serde(with = "secret_key_serde", default = "ed25519::SecretKey::generate")]
     pub node_key: ed25519::SecretKey,
-    pub conn_maintenance: ConnectionMaintenanceSettings,
+    pub peering_degree: u16,
+    pub max_peering_degree: u16,
+    pub conn_monitor: Option<ConnectionMonitorSettings>,
 }
 
 const CHANNEL_SIZE: usize = 64;
@@ -42,11 +47,12 @@ const CHANNEL_SIZE: usize = 64;
 #[async_trait]
 impl BlendBackend for Libp2pBlendBackend {
     type Settings = Libp2pBlendBackendSettings;
+    type NodeId = PeerId;
 
     fn new<R>(
         config: Self::Settings,
         overwatch_handle: OverwatchHandle,
-        membership: Membership<SphinxMessage>,
+        membership: Membership<Self::NodeId, SphinxMessage>,
         rng: R,
     ) -> Self
     where
@@ -92,13 +98,44 @@ impl BlendBackend for Libp2pBlendBackend {
     }
 }
 
-struct BlendSwarm<R>
-where
-    R: RngCore + 'static,
-{
-    swarm: Swarm<nomos_blend_network::Behaviour<SphinxMessage, R, IntervalStream>>,
+struct BlendSwarm<R> {
+    swarm: Swarm<BlendBehaviour>,
     swarm_messages_receiver: mpsc::Receiver<BlendSwarmMessage>,
     incoming_message_sender: broadcast::Sender<Vec<u8>>,
+    // TODO: Instead of holding the membership, we just want a way to get the list of addresses.
+    membership: Membership<PeerId, SphinxMessage>,
+    rng: R,
+    peering_degree: u16,
+}
+
+#[derive(NetworkBehaviour)]
+struct BlendBehaviour {
+    blend: nomos_blend_network::Behaviour<SphinxMessage, TokioIntervalStreamProvider>,
+    limits: libp2p::connection_limits::Behaviour,
+    blocked_peers: libp2p::allow_block_list::Behaviour<BlockedPeers>,
+}
+
+impl BlendBehaviour {
+    fn new(config: &Libp2pBlendBackendSettings) -> Self {
+        BlendBehaviour {
+            blend:
+                nomos_blend_network::Behaviour::<SphinxMessage, TokioIntervalStreamProvider>::new(
+                    nomos_blend_network::Config {
+                        duplicate_cache_lifespan: 60,
+                        conn_monitor_settings: config.conn_monitor,
+                    },
+                ),
+            limits: libp2p::connection_limits::Behaviour::new(
+                ConnectionLimits::default()
+                    .with_max_established(Some(config.max_peering_degree as u32))
+                    .with_max_established_incoming(Some(config.max_peering_degree as u32))
+                    .with_max_established_outgoing(Some(config.max_peering_degree as u32))
+                    // Blend protocol restricts the number of connections per peer to 1.
+                    .with_max_established_per_peer(Some(1)),
+            ),
+            blocked_peers: libp2p::allow_block_list::Behaviour::default(),
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -108,12 +145,12 @@ pub enum BlendSwarmMessage {
 
 impl<R> BlendSwarm<R>
 where
-    R: RngCore + 'static,
+    R: RngCore,
 {
     fn new(
         config: Libp2pBlendBackendSettings,
-        membership: Membership<SphinxMessage>,
-        rng: R,
+        membership: Membership<PeerId, SphinxMessage>,
+        mut rng: R,
         swarm_messages_receiver: mpsc::Receiver<BlendSwarmMessage>,
         incoming_message_sender: broadcast::Sender<Vec<u8>>,
     ) -> Self {
@@ -121,24 +158,12 @@ where
         let mut swarm = SwarmBuilder::with_existing_identity(keypair)
             .with_tokio()
             .with_quic()
-            .with_behaviour(|_| {
-                let conn_maintenance_interval =
-                    config.conn_maintenance.monitor.as_ref().map(|monitor| {
-                        IntervalStream::new(tokio::time::interval(monitor.time_window))
-                    });
-                nomos_blend_network::Behaviour::new(
-                    nomos_blend_network::Config {
-                        duplicate_cache_lifespan: 60,
-                        conn_maintenance_settings: config.conn_maintenance,
-                        conn_maintenance_interval,
-                    },
-                    membership,
-                    rng,
-                )
-            })
+            .with_behaviour(|_| BlendBehaviour::new(&config))
             .expect("Blend Behaviour should be built")
             .with_swarm_config(|cfg| {
-                cfg.with_idle_connection_timeout(Duration::from_secs(u64::MAX))
+                // The idle timeout starts ticking once there are no active streams on a connection.
+                // We want the connection to be closed as soon as all streams are dropped.
+                cfg.with_idle_connection_timeout(Duration::ZERO)
             })
             .build();
 
@@ -148,10 +173,23 @@ where
                 panic!("Failed to listen on Blend network: {e:?}");
             });
 
+        // Dial the initial peers randomly selected
+        membership
+            .choose_remote_nodes(&mut rng, config.peering_degree as usize)
+            .iter()
+            .for_each(|peer| {
+                if let Err(e) = swarm.dial(peer.address.clone()) {
+                    tracing::error!("Failed to dial a peer: {e:?}");
+                }
+            });
+
         Self {
             swarm,
             swarm_messages_receiver,
             incoming_message_sender,
+            membership,
+            rng,
+            peering_degree: config.peering_degree,
         }
     }
 
@@ -172,7 +210,7 @@ where
         match msg {
             BlendSwarmMessage::Publish(msg) => {
                 let msg_size = msg.len();
-                if let Err(e) = self.swarm.behaviour_mut().publish(msg) {
+                if let Err(e) = self.swarm.behaviour_mut().blend.publish(msg) {
                     tracing::error!("Failed to publish message to blend network: {e:?}");
                     tracing::info!(counter.failed_outbound_messages = 1);
                 } else {
@@ -183,9 +221,11 @@ where
         }
     }
 
-    fn handle_event(&mut self, event: SwarmEvent<nomos_blend_network::Event>) {
+    fn handle_event(&mut self, event: SwarmEvent<BlendBehaviourEvent>) {
         match event {
-            SwarmEvent::Behaviour(nomos_blend_network::Event::Message(msg)) => {
+            SwarmEvent::Behaviour(BlendBehaviourEvent::Blend(
+                nomos_blend_network::Event::Message(msg),
+            )) => {
                 tracing::debug!("Received message from a peer: {msg:?}");
 
                 let msg_size = msg.len();
@@ -197,14 +237,71 @@ where
                     tracing::info!(histogram.received_data = msg_size as u64);
                 }
             }
-            SwarmEvent::Behaviour(nomos_blend_network::Event::Error(e)) => {
+            SwarmEvent::Behaviour(BlendBehaviourEvent::Blend(
+                nomos_blend_network::Event::MaliciousPeer(peer_id),
+            )) => {
+                tracing::debug!("Peer {} is malicious", peer_id);
+                self.swarm.behaviour_mut().blocked_peers.block_peer(peer_id);
+                self.check_and_dial_new_peers();
+            }
+            SwarmEvent::Behaviour(BlendBehaviourEvent::Blend(
+                nomos_blend_network::Event::UnhealthyPeer(peer_id),
+            )) => {
+                tracing::debug!("Peer {} is unhealthy", peer_id);
+                self.check_and_dial_new_peers();
+            }
+            SwarmEvent::Behaviour(BlendBehaviourEvent::Blend(
+                nomos_blend_network::Event::Error(e),
+            )) => {
                 tracing::error!("Received error from blend network: {e:?}");
+                self.check_and_dial_new_peers();
                 tracing::info!(counter.error = 1);
+            }
+            SwarmEvent::ConnectionClosed {
+                peer_id,
+                connection_id,
+                ..
+            } => {
+                tracing::error!(
+                    "Connection closed: peer:{}, conn_id:{}",
+                    peer_id,
+                    connection_id
+                );
+                self.check_and_dial_new_peers();
             }
             _ => {
                 tracing::debug!("Received event from blend network: {event:?}");
                 tracing::info!(counter.ignored_event = 1);
             }
         }
+    }
+
+    /// Dial new peers, if necessary, to maintain the peering degree.
+    /// We aim to have at least the peering degree number of "healthy" peers.
+    fn check_and_dial_new_peers(&mut self) {
+        let num_new_conns_needed = (self.peering_degree as usize)
+            .saturating_sub(self.swarm.behaviour().blend.num_healthy_peers());
+        if num_new_conns_needed > 0 {
+            self.dial_random_peers(num_new_conns_needed);
+        }
+    }
+
+    /// Dial random peers from the membership list,
+    /// excluding the currently connected peers and the blocked peers.
+    fn dial_random_peers(&mut self, amount: usize) {
+        let exclude_peers: HashSet<PeerId> = self
+            .swarm
+            .connected_peers()
+            .chain(self.swarm.behaviour().blocked_peers.blocked_peers())
+            .copied()
+            .collect();
+        self.membership
+            .filter_and_choose_remote_nodes(&mut self.rng, amount, &exclude_peers)
+            .iter()
+            .for_each(|peer| {
+                if let Err(e) = self.swarm.dial(peer.address.clone()) {
+                    tracing::error!("Failed to dial a peer: {e:?}");
+                }
+            });
     }
 }

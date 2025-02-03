@@ -13,11 +13,12 @@ use rand::RngCore;
 #[async_trait::async_trait]
 pub trait BlendBackend {
     type Settings: Clone + Debug + Send + Sync + 'static;
+    type NodeId: Clone + Debug + Send + Sync + 'static;
 
     fn new<R>(
         config: Self::Settings,
         overwatch_handle: OverwatchHandle,
-        membership: Membership<SphinxMessage>,
+        membership: Membership<Self::NodeId, SphinxMessage>,
         rng: R,
     ) -> Self
     where
