@@ -7,6 +7,7 @@ pub mod storage;
 mod time;
 
 use crate::relays::CryptarchiaConsensusRelays;
+use crate::storage::adapters::StorageAdapter;
 use core::fmt::Debug;
 use cryptarchia_engine::Slot;
 use futures::StreamExt;
@@ -432,6 +433,7 @@ where
             ..
         } = self.service_state.settings_reader.get_updated_settings();
 
+        let security_param = config.consensus_config.security_param as u64;
         let genesis_id = HeaderId::from([0; 32]);
         let mut cryptarchia = Cryptarchia {
             consensus: <cryptarchia_engine::Cryptarchia<_>>::from_genesis(
@@ -471,7 +473,8 @@ where
                             &mut leader,
                             block,
                             &relays,
-                            &mut self.block_subscription_sender
+                            &mut self.block_subscription_sender,
+                            &security_param
                         )
                         .await;
 
@@ -645,6 +648,15 @@ where
     SamplingRng: SeedableRng + RngCore,
     SamplingStorage: nomos_da_sampling::storage::DaStorageAdapter,
 {
+    async fn get_block(
+        header_id: HeaderId,
+        storage_adapter: &StorageAdapter<Storage, TxS::Tx, BS::BlobId>,
+    ) -> Option<Block<ClPool::Item, DaPool::Item>> {
+        let (msg, receiver) = <StorageMsg<Storage>>::new_load_message(header_id);
+        storage_adapter.storage_relay.send(msg).await.unwrap();
+        receiver.recv().await.unwrap()
+    }
+
     fn process_message(
         cryptarchia: &Cryptarchia,
         block_channel: &broadcast::Sender<Block<ClPool::Item, DaPool::Item>>,
@@ -720,6 +732,7 @@ where
             TxS,
         >,
         block_broadcaster: &mut broadcast::Sender<Block<ClPool::Item, DaPool::Item>>,
+        security_param: &u64,
     ) -> Cryptarchia {
         tracing::debug!("received proposal {:?}", block);
 
@@ -770,6 +783,14 @@ where
                     tracing::error!("Could not send block to storage: {e}");
                 }
 
+                // set as latest savable state
+                Self::try_save_security_block(
+                    block.clone(),
+                    security_param,
+                    relays.storage_adapter(),
+                )
+                .await;
+
                 if let Err(e) = block_broadcaster.send(block) {
                     tracing::error!("Could not notify block to services {e}");
                 }
@@ -785,6 +806,59 @@ where
         }
 
         cryptarchia
+    }
+
+    /// Get the block for a given security parameter (k)
+    /// This function will return the block that is `security_param` blocks behind the given block
+    /// If the block is not found, it will return None
+    ///
+    /// # Arguments
+    ///
+    /// * `block` - The block to start from. Must be the latest block.
+    /// * `security_param` - The number of blocks to go back.
+    ///     This is the number of blocks that are considered stable.
+    /// * `storage_relay` - The relay to send the storage message to.
+    ///
+    /// # Returns
+    ///
+    /// * `Option<Block>` - The block that is `security_param` blocks behind the given block.
+    ///     If there are not enough blocks to go back, it will return None
+    async fn get_block_for_security_param(
+        block: Block<ClPool::Item, DaPool::Item>,
+        security_param: &u64,
+        storage_adapter: &StorageAdapter<Storage, TxS::Tx, BS::BlobId>,
+    ) -> Option<Block<ClPool::Item, DaPool::Item>> {
+        let mut current_block = block;
+        for _ in 0..*security_param {
+            let parent_block_header = current_block.header().parent();
+            let parent_block = Self::get_block(parent_block_header, storage_adapter).await?;
+            current_block = parent_block;
+        }
+        Some(current_block)
+    }
+
+    /// Try to save the block for a given security parameter (k)
+    /// This will try to fetch the block that is `security_param` blocks behind the given block.
+    /// If the block is found, it will save the block id to the storage so it can be
+    /// fetched later in order to rebuild the state.
+    async fn try_save_security_block(
+        block: Block<ClPool::Item, DaPool::Item>,
+        security_param: &u64,
+        storage_adapter: &StorageAdapter<Storage, TxS::Tx, BS::BlobId>,
+    ) {
+        if let Some(security_block) =
+            Self::get_block_for_security_param(block.clone(), security_param, storage_adapter).await
+        {
+            let security_block_header_id = security_block.header().id();
+            let security_block_msg = <StorageMsg<_>>::new_store_message(
+                "security_block_header_id",
+                security_block_header_id,
+            );
+
+            if let Err((e, _msg)) = storage_adapter.storage_relay.send(security_block_msg).await {
+                tracing::error!("Could not send security block id to storage: {e}");
+            }
+        }
     }
 
     #[allow(clippy::too_many_arguments)]
