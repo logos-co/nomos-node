@@ -43,9 +43,6 @@ pub struct Reconstruct {
 
 impl Retrieve {
     pub fn run(self) -> Result<(), Box<dyn std::error::Error>> {
-        tracing::subscriber::set_global_default(tracing_subscriber::FmtSubscriber::new())
-            .expect("setting tracing default failed");
-
         let app_id: [u8; 32] = hex::decode(&self.app_id)?
             .try_into()
             .map_err(|_| "Invalid app_id")?;
