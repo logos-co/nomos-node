@@ -35,9 +35,6 @@ pub struct Disseminate {
 
 impl Disseminate {
     pub fn run(self) -> Result<(), Box<dyn std::error::Error>> {
-        tracing::subscriber::set_global_default(tracing_subscriber::FmtSubscriber::new())
-            .expect("setting tracing default failed");
-
         let basic_auth = self
             .username
             .map(|u| BasicAuthCredentials::new(u, self.password.clone()));
