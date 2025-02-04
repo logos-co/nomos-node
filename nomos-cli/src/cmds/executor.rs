@@ -5,7 +5,7 @@ use std::sync::mpsc::Sender;
 use clap::Args;
 use reqwest::Url;
 // internal
-use executor_http_client::ExecutorHttpClient;
+use executor_http_client::{BasicAuthCredentials, ExecutorHttpClient};
 use kzgrs_backend::{dispersal::Metadata, encoder::DaEncoderParams};
 
 #[derive(Args, Debug)]
@@ -25,6 +25,12 @@ pub struct Disseminate {
     /// Executor address which is responsible for dissemination.
     #[clap(long)]
     pub addr: Url,
+    /// Optional username for authentication.
+    #[clap(long)]
+    pub username: Option<String>,
+    /// Optional password for authentication.
+    #[clap(long)]
+    pub password: Option<String>,
 }
 
 impl Disseminate {
@@ -32,7 +38,11 @@ impl Disseminate {
         tracing::subscriber::set_global_default(tracing_subscriber::FmtSubscriber::new())
             .expect("setting tracing default failed");
 
-        let client = ExecutorHttpClient::new(reqwest::Client::new(), self.addr.clone());
+        let basic_auth = self
+            .username
+            .map(|u| BasicAuthCredentials::new(u, self.password.clone()));
+
+        let client = ExecutorHttpClient::new(reqwest::Client::new(), self.addr.clone(), basic_auth);
 
         let mut bytes: Vec<u8> = if let Some(data) = &self.data {
             data.clone().into_bytes()
