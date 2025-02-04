@@ -16,6 +16,7 @@ sim_config.json
 *.txt
 .env
 .idea/
+.vscode/
 
 # Integration test temp dirs
 tests/.tmp*
