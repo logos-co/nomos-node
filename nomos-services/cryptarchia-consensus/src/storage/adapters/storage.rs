@@ -71,7 +71,7 @@ where
     async fn get_block_for_security_param(
         &self,
         current_block: Self::Block,
-        security_param: &u64,
+        security_param: &u32,
     ) -> Option<Self::Block> {
         let mut current_block = current_block;
         // TODO: This implies fetching from DB `security_param` times. We should optimize this.

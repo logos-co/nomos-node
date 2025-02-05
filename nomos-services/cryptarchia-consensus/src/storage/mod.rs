@@ -38,7 +38,7 @@ pub trait StorageAdapter {
     async fn get_block_for_security_param(
         &self,
         current_block: Self::Block,
-        security_param: &u64,
+        security_param: &u32,
     ) -> Option<Self::Block>;
 
     /// Sends a store message to the storage service to save a block id as the security block
