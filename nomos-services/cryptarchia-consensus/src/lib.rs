@@ -950,7 +950,7 @@ where
     ///
     /// # Arguments
     ///
-    /// * `block` - The block to start from. Must be the latest block.
+    /// * `current_block` - The block to start from. Must be the latest block.
     /// * `security_param` - The number of blocks to go back.
     ///     This is the number of blocks that are considered stable.
     /// * `storage_relay` - The relay to send the storage message to.
@@ -960,12 +960,11 @@ where
     /// * `Option<Block>` - The block that is `security_param` blocks behind the given block.
     ///     If there are not enough blocks to go back, it will return None
     async fn get_block_for_security_param(
-        block: Block<ClPool::Item, DaPool::Item>,
+        mut current_block: Block<ClPool::Item, DaPool::Item>,
         security_param: &u32,
         storage_adapter: &StorageAdapter<Storage, TxS::Tx, BS::BlobId>,
     ) -> Option<Block<ClPool::Item, DaPool::Item>> {
         // TODO: This implies fetching from DB `security_param` times. We should optimize this.
-        let mut current_block = block;
         for _ in 0..*security_param {
             let parent_block_header = current_block.header().parent();
             let parent_block = Self::get_block(parent_block_header, storage_adapter).await?;
