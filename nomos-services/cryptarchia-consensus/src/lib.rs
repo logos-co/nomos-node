@@ -649,7 +649,7 @@ where
 {
     async fn get_block(
         header_id: HeaderId,
-        storage_relay: OutboundRelay<StorageMsg<Storage>>,
+        storage_relay: &OutboundRelay<StorageMsg<Storage>>,
     ) -> Option<Block<ClPool::Item, DaPool::Item>> {
         let (msg, receiver) = <StorageMsg<Storage>>::new_load_message(header_id);
         storage_relay.send(msg).await.unwrap();
@@ -823,7 +823,7 @@ where
     ///
     /// # Arguments
     ///
-    /// * `block` - The block to start from. Must be the latest block.
+    /// * `current_block` - The block to start from. Must be the latest block.
     /// * `security_param` - The number of blocks to go back.
     ///     This is the number of blocks that are considered stable.
     /// * `storage_relay` - The relay to send the storage message to.
@@ -833,15 +833,14 @@ where
     /// * `Option<Block>` - The block that is `security_param` blocks behind the given block.
     ///     If there are not enough blocks to go back, it will return None
     async fn get_block_for_security_param(
-        block: Block<ClPool::Item, DaPool::Item>,
+        mut current_block: Block<ClPool::Item, DaPool::Item>,
         security_param: &u64,
         storage_relay: &OutboundRelay<StorageMsg<Storage>>,
     ) -> Option<Block<ClPool::Item, DaPool::Item>> {
         // TODO: This implies fetching from DB `security_param` times. We should optimize this.
-        let mut current_block = block;
         for _ in 0..*security_param {
             let parent_block_header = current_block.header().parent();
-            let parent_block = Self::get_block(parent_block_header, storage_relay.clone()).await?;
+            let parent_block = Self::get_block(parent_block_header, storage_relay).await?;
             current_block = parent_block;
         }
         Some(current_block)
@@ -852,12 +851,12 @@ where
     /// If the block is found, it will save the block id to the storage so it can be
     /// fetched later in order to rebuild the state.
     async fn try_save_security_block(
-        block: Block<ClPool::Item, DaPool::Item>,
+        current_block: Block<ClPool::Item, DaPool::Item>,
         security_param: &u64,
         storage_relay: &OutboundRelay<StorageMsg<Storage>>,
     ) {
         if let Some(security_block) =
-            Self::get_block_for_security_param(block.clone(), security_param, storage_relay).await
+            Self::get_block_for_security_param(current_block, security_param, storage_relay).await
         {
             let security_block_header_id = security_block.header().id();
             let security_block_msg = <StorageMsg<_>>::new_store_message(
