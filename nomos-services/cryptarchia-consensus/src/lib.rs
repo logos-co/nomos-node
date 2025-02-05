@@ -5,6 +5,8 @@ pub mod network;
 pub mod storage;
 mod time;
 
+use crate::storage::adapters::StorageAdapter;
+use crate::storage::StorageAdapter as StorageAdapterTrait;
 use core::fmt::Debug;
 use cryptarchia_engine::Slot;
 use futures::StreamExt;
@@ -442,6 +444,8 @@ where
         let mut slot_timer = IntervalStream::new(timer.slot_interval());
 
         let blend_adapter = BlendAdapter::new(blend_adapter_settings, blend_relay).await;
+        let storage_adapter =
+            StorageAdapter::<Storage, ClPool, DaPool>::new(storage_relay.clone()).await;
 
         let mut lifecycle_stream = self.service_state.lifecycle_handle.message_stream();
 
@@ -454,7 +458,7 @@ where
                             cryptarchia,
                             &mut leader,
                             block,
-                            storage_relay.clone(),
+                            &storage_adapter,
                             cl_mempool_relay.clone(),
                             da_mempool_relay.clone(),
                             sampling_relay.clone(),
@@ -587,15 +591,6 @@ where
     SamplingNetworkAdapter: nomos_da_sampling::network::NetworkAdapter,
     SamplingStorage: nomos_da_sampling::storage::DaStorageAdapter,
 {
-    async fn get_block(
-        header_id: HeaderId,
-        storage_relay: &OutboundRelay<StorageMsg<Storage>>,
-    ) -> Option<Block<ClPool::Item, DaPool::Item>> {
-        let (msg, receiver) = <StorageMsg<Storage>>::new_load_message(header_id);
-        storage_relay.send(msg).await.unwrap();
-        receiver.recv().await.unwrap()
-    }
-
     async fn should_stop_service(message: LifecycleMessage) -> bool {
         match message {
             LifecycleMessage::Shutdown(sender) => {
@@ -671,7 +666,7 @@ where
         level = "debug",
         skip(
             cryptarchia,
-            storage_relay,
+            storage_adapter,
             cl_mempool_relay,
             da_mempool_relay,
             sampling_relay,
@@ -682,7 +677,7 @@ where
         mut cryptarchia: Cryptarchia,
         leader: &mut leadership::Leader,
         block: Block<ClPool::Item, DaPool::Item>,
-        storage_relay: OutboundRelay<StorageMsg<Storage>>,
+        storage_adapter: &StorageAdapter<Storage, ClPool, DaPool>,
         cl_mempool_relay: OutboundRelay<
             MempoolMsg<HeaderId, ClPool::Item, ClPool::Item, ClPool::Key>,
         >,
@@ -738,12 +733,12 @@ where
 
                 // store block
                 let msg = <StorageMsg<_>>::new_store_message(header.id(), block.clone());
-                if let Err((e, _msg)) = storage_relay.send(msg).await {
+                if let Err((e, _msg)) = storage_adapter.storage_relay.send(msg).await {
                     tracing::error!("Could not send block to storage: {e}");
                 }
 
                 // set as latest savable state
-                Self::try_save_security_block(block.clone(), security_param, &storage_relay).await;
+                Self::try_save_security_block(block.clone(), security_param, storage_adapter).await;
 
                 if let Err(e) = block_broadcaster.send(block) {
                     tracing::error!("Could not notify block to services {e}");
@@ -762,56 +757,19 @@ where
         cryptarchia
     }
 
-    /// Get the block for a given security parameter (k)
-    /// This function will return the block that is `security_param` blocks behind the given block
-    /// If the block is not found, it will return None
-    ///
-    /// # Arguments
-    ///
-    /// * `current_block` - The block to start from. Must be the latest block.
-    /// * `security_param` - The number of blocks to go back.
-    ///     This is the number of blocks that are considered stable.
-    /// * `storage_relay` - The relay to send the storage message to.
-    ///
-    /// # Returns
-    ///
-    /// * `Option<Block>` - The block that is `security_param` blocks behind the given block.
-    ///     If there are not enough blocks to go back, it will return None
-    async fn get_block_for_security_param(
-        mut current_block: Block<ClPool::Item, DaPool::Item>,
-        security_param: &u64,
-        storage_relay: &OutboundRelay<StorageMsg<Storage>>,
-    ) -> Option<Block<ClPool::Item, DaPool::Item>> {
-        // TODO: This implies fetching from DB `security_param` times. We should optimize this.
-        for _ in 0..*security_param {
-            let parent_block_header = current_block.header().parent();
-            let parent_block = Self::get_block(parent_block_header, storage_relay).await?;
-            current_block = parent_block;
-        }
-        Some(current_block)
-    }
-
     /// Try to save the block for a given security parameter (k)
     /// This will try to fetch the block that is `security_param` blocks behind the given block.
-    /// If the block is found, it will save the block id to the storage so it can be
-    /// fetched later in order to rebuild the state.
+    /// If the block is found it will send the block id to the storage
     async fn try_save_security_block(
         current_block: Block<ClPool::Item, DaPool::Item>,
         security_param: &u64,
-        storage_relay: &OutboundRelay<StorageMsg<Storage>>,
+        storage_adapter: &StorageAdapter<Storage, ClPool, DaPool>,
     ) {
-        if let Some(security_block) =
-            Self::get_block_for_security_param(current_block, security_param, storage_relay).await
+        if let Some(security_block) = storage_adapter
+            .get_block_for_security_param(current_block, security_param)
+            .await
         {
-            let security_block_header_id = security_block.header().id();
-            let security_block_msg = <StorageMsg<_>>::new_store_message(
-                "security_block_header_id",
-                security_block_header_id,
-            );
-
-            if let Err((e, _msg)) = storage_relay.send(security_block_msg).await {
-                tracing::error!("Could not send security block id to storage: {e}");
-            }
+            storage_adapter.save_security_block(security_block).await;
         }
     }
 
