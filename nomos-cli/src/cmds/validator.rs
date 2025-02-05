@@ -31,6 +31,7 @@ pub struct Retrieve {
     pub addr: Url,
 }
 
+#[allow(clippy::type_complexity)]
 fn parse_app_blobs(val: &str) -> Result<Vec<(Index, Vec<Vec<u8>>)>, String> {
     let val: String = val.chars().filter(|&c| c != ' ' && c != '\n').collect();
     serde_json::from_str(&val).map_err(|e| e.to_string())
