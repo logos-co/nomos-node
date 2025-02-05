@@ -828,6 +828,7 @@ where
         security_param: &u64,
         storage_adapter: &StorageAdapter<Storage, TxS::Tx, BS::BlobId>,
     ) -> Option<Block<ClPool::Item, DaPool::Item>> {
+        // TODO: This implies fetching from DB `security_param` times. We should optimize this.
         let mut current_block = block;
         for _ in 0..*security_param {
             let parent_block_header = current_block.header().parent();
