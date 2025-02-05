@@ -6,6 +6,7 @@ mod relays;
 pub mod storage;
 
 use crate::storage::adapters::StorageAdapter;
+use crate::storage::StorageAdapter as StorageAdapterTrait;
 use core::fmt::Debug;
 use std::{collections::BTreeSet, hash::Hash, marker::PhantomData, path::PathBuf};
 
@@ -780,15 +781,6 @@ where
     TimeBackend::Settings: Clone + Send + Sync,
     ApiAdapter: nomos_da_sampling::api::ApiAdapter + Send + Sync,
 {
-    async fn get_block(
-        header_id: HeaderId,
-        storage_adapter: &StorageAdapter<Storage, TxS::Tx, BS::BlobId>,
-    ) -> Option<Block<ClPool::Item, DaPool::Item>> {
-        let (msg, receiver) = <StorageMsg<Storage>>::new_load_message(header_id);
-        storage_adapter.storage_relay.send(msg).await.unwrap();
-        receiver.recv().await.unwrap()
-    }
-
     fn process_message(
         cryptarchia: &Cryptarchia,
         block_channel: &broadcast::Sender<Block<ClPool::Item, DaPool::Item>>,
@@ -944,56 +936,19 @@ where
         cryptarchia
     }
 
-    /// Get the block for a given security parameter (k)
-    /// This function will return the block that is `security_param` blocks behind the given block
-    /// If the block is not found, it will return None
-    ///
-    /// # Arguments
-    ///
-    /// * `current_block` - The block to start from. Must be the latest block.
-    /// * `security_param` - The number of blocks to go back.
-    ///     This is the number of blocks that are considered stable.
-    /// * `storage_relay` - The relay to send the storage message to.
-    ///
-    /// # Returns
-    ///
-    /// * `Option<Block>` - The block that is `security_param` blocks behind the given block.
-    ///     If there are not enough blocks to go back, it will return None
-    async fn get_block_for_security_param(
-        mut current_block: Block<ClPool::Item, DaPool::Item>,
-        security_param: &u32,
-        storage_adapter: &StorageAdapter<Storage, TxS::Tx, BS::BlobId>,
-    ) -> Option<Block<ClPool::Item, DaPool::Item>> {
-        // TODO: This implies fetching from DB `security_param` times. We should optimize this.
-        for _ in 0..*security_param {
-            let parent_block_header = current_block.header().parent();
-            let parent_block = Self::get_block(parent_block_header, storage_adapter).await?;
-            current_block = parent_block;
-        }
-        Some(current_block)
-    }
-
     /// Try to save the block for a given security parameter (k)
     /// This will try to fetch the block that is `security_param` blocks behind the given block.
-    /// If the block is found, it will save the block id to the storage so it can be
-    /// fetched later in order to rebuild the state.
+    /// If the block is found it will send the block id to the storage
     async fn try_save_security_block(
-        block: Block<ClPool::Item, DaPool::Item>,
+        block: Block<TxS::Tx, BS::BlobId>,
         security_param: &u32,
         storage_adapter: &StorageAdapter<Storage, TxS::Tx, BS::BlobId>,
     ) {
-        if let Some(security_block) =
-            Self::get_block_for_security_param(block.clone(), security_param, storage_adapter).await
+        if let Some(security_block) = storage_adapter
+            .get_block_for_security_param(block, security_param)
+            .await
         {
-            let security_block_header_id = security_block.header().id();
-            let security_block_msg = <StorageMsg<_>>::new_store_message(
-                "security_block_header_id",
-                security_block_header_id,
-            );
-
-            if let Err((e, _msg)) = storage_adapter.storage_relay.send(security_block_msg).await {
-                tracing::error!("Could not send security block id to storage: {e}");
-            }
+            storage_adapter.save_security_block(security_block).await;
         }
     }
 
