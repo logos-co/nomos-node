@@ -43,4 +43,13 @@ pub trait StorageAdapter {
         current_block: Self::Block,
         security_param: &u64,
     ) -> Option<Self::Block>;
+
+    /// Sends a store message to the storage service to save a block id as the security block
+    /// A security block is the one that is `security_param` blocks behind the current block
+    /// This is used to rebuild the state in case of a crash
+    ///
+    /// # Arguments
+    ///
+    /// * `block` - The block to save as the security block
+    async fn save_security_block(&self, block: Self::Block);
 }

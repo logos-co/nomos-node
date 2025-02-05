@@ -85,4 +85,13 @@ where
         }
         Some(current_block)
     }
+
+    async fn save_security_block(&self, block: Self::Block) {
+        let security_block_msg =
+            <StorageMsg<_>>::new_store_message("security_block_header_id", block.header().id());
+
+        if let Err((e, _msg)) = self.storage_relay.send(security_block_msg).await {
+            tracing::error!("Could not send security block id to storage: {e}");
+        }
+    }
 }
