@@ -70,4 +70,19 @@ where
     async fn get_block(&self, key: &HeaderId) -> Option<Self::Block> {
         self.get_value(key).await
     }
+
+    async fn get_block_for_security_param(
+        &self,
+        current_block: Self::Block,
+        security_param: &u64,
+    ) -> Option<Self::Block> {
+        let mut current_block = current_block;
+        // TODO: This implies fetching from DB `security_param` times. We should optimize this.
+        for _ in 0..*security_param {
+            let parent_block_header = current_block.header().parent();
+            let parent_block = self.get_block(&parent_block_header).await?;
+            current_block = parent_block;
+        }
+        Some(current_block)
+    }
 }
