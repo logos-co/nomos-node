@@ -2,6 +2,7 @@ pub mod blend;
 mod leadership;
 mod messages;
 pub mod network;
+pub mod storage;
 mod time;
 
 use core::fmt::Debug;
