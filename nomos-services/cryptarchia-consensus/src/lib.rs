@@ -445,7 +445,7 @@ where
 
         let blend_adapter = BlendAdapter::new(blend_adapter_settings, blend_relay).await;
         let storage_adapter =
-            StorageAdapter::<Storage, ClPool, DaPool>::new(storage_relay.clone()).await;
+            StorageAdapter::<Storage, ClPool::Item, DaPool::Item>::new(storage_relay.clone()).await;
 
         let mut lifecycle_stream = self.service_state.lifecycle_handle.message_stream();
 
@@ -677,7 +677,7 @@ where
         mut cryptarchia: Cryptarchia,
         leader: &mut leadership::Leader,
         block: Block<ClPool::Item, DaPool::Item>,
-        storage_adapter: &StorageAdapter<Storage, ClPool, DaPool>,
+        storage_adapter: &StorageAdapter<Storage, ClPool::Item, DaPool::Item>,
         cl_mempool_relay: OutboundRelay<
             MempoolMsg<HeaderId, ClPool::Item, ClPool::Item, ClPool::Key>,
         >,
@@ -763,7 +763,7 @@ where
     async fn try_save_security_block(
         current_block: Block<ClPool::Item, DaPool::Item>,
         security_param: &u64,
-        storage_adapter: &StorageAdapter<Storage, ClPool, DaPool>,
+        storage_adapter: &StorageAdapter<Storage, ClPool::Item, DaPool::Item>,
     ) {
         if let Some(security_block) = storage_adapter
             .get_block_for_security_param(current_block, security_param)

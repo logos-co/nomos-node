@@ -4,7 +4,6 @@ use std::marker::PhantomData;
 // Crates
 use nomos_core::block::Block;
 use nomos_core::header::HeaderId;
-use nomos_mempool::backend::MemPool;
 use nomos_storage::backends::StorageBackend;
 use nomos_storage::{StorageMsg, StorageService};
 use overwatch_rs::services::relay::OutboundRelay;
@@ -13,40 +12,37 @@ use serde::de::DeserializeOwned;
 // Internal
 use crate::storage::StorageAdapter as StorageAdapterTrait;
 
-pub struct StorageAdapter<Storage, ClPool, DaPool>
+pub struct StorageAdapter<Storage, Tx, BlobCertificate>
 where
     Storage: StorageBackend + Send + Sync,
 {
     pub storage_relay: OutboundRelay<<StorageService<Storage> as ServiceData>::Message>,
-    _cl_pool: PhantomData<ClPool>,
-    _da_pool: PhantomData<DaPool>,
+    _tx: PhantomData<Tx>,
+    _blob_certificate: PhantomData<BlobCertificate>,
 }
 
 #[async_trait::async_trait]
-impl<Storage, ClPool, DaPool> StorageAdapterTrait for StorageAdapter<Storage, ClPool, DaPool>
+impl<Storage, Tx, BlobCertificate> StorageAdapterTrait
+    for StorageAdapter<Storage, Tx, BlobCertificate>
 where
     Storage: StorageBackend + Send + Sync,
-    DaPool: MemPool<BlockId = HeaderId, Item: Clone + Eq + Hash + Send + DeserializeOwned> + Sync,
-    ClPool: MemPool<BlockId = HeaderId, Item: Clone + Eq + Hash + Send + DeserializeOwned> + Sync,
+    Tx: Clone + Eq + Hash + DeserializeOwned + Send + Sync,
+    BlobCertificate: Clone + Eq + Hash + DeserializeOwned + Send + Sync,
 {
     type Backend = Storage;
-    type ClPool = ClPool;
-    type DaPool = DaPool;
+    type Block = Block<Tx, BlobCertificate>;
 
     async fn new(
         storage_relay: OutboundRelay<<StorageService<Self::Backend> as ServiceData>::Message>,
     ) -> Self {
         Self {
             storage_relay,
-            _cl_pool: Default::default(),
-            _da_pool: Default::default(),
+            _tx: Default::default(),
+            _blob_certificate: Default::default(),
         }
     }
 
-    async fn get_block(
-        &self,
-        header_id: HeaderId,
-    ) -> Option<Block<<Self::ClPool as MemPool>::Item, <Self::DaPool as MemPool>::Item>> {
+    async fn get_block(&self, header_id: HeaderId) -> Option<Self::Block> {
         let (msg, receiver) = <StorageMsg<Storage>>::new_load_message(header_id);
         self.storage_relay.send(msg).await.unwrap();
         receiver.recv().await.unwrap()
@@ -54,9 +50,9 @@ where
 
     async fn get_block_for_security_param(
         &self,
-        current_block: Block<<Self::ClPool as MemPool>::Item, <Self::DaPool as MemPool>::Item>,
+        current_block: Self::Block,
         security_param: &u64,
-    ) -> Option<Block<<Self::ClPool as MemPool>::Item, <Self::DaPool as MemPool>::Item>> {
+    ) -> Option<Self::Block> {
         let mut current_block = current_block;
         // TODO: This implies fetching from DB `security_param` times. We should optimize this.
         for _ in 0..*security_param {
@@ -67,7 +63,7 @@ where
         Some(current_block)
     }
 
-    async fn save_security_block(&self, block: Block<ClPool::Item, DaPool::Item>) {
+    async fn save_security_block(&self, block: Self::Block) {
         let security_block_msg =
             <StorageMsg<_>>::new_store_message("security_block_header_id", block.header().id());
 
