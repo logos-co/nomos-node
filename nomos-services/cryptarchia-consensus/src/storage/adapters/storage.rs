@@ -17,7 +17,7 @@ pub struct StorageAdapter<Storage, ClPool, DaPool>
 where
     Storage: StorageBackend + Send + Sync,
 {
-    storage_relay: OutboundRelay<<StorageService<Storage> as ServiceData>::Message>,
+    pub storage_relay: OutboundRelay<<StorageService<Storage> as ServiceData>::Message>,
     _cl_pool: PhantomData<ClPool>,
     _da_pool: PhantomData<DaPool>,
 }
@@ -52,20 +52,6 @@ where
         receiver.recv().await.unwrap()
     }
 
-    /// Get the block for a given security parameter (k)
-    /// This function will return the block that is `security_param` blocks behind the given block.
-    /// If the block is not found, it will return None.
-    ///
-    /// # Arguments
-    ///
-    /// * `current_block` - The block to start from. Must be the latest block.
-    /// * `security_param` - The number of blocks to go back.
-    ///     This is the number of blocks that are considered stable.
-    ///
-    /// # Returns
-    ///
-    /// * `Option<Block>` - The block that is `security_param` blocks behind the given block.
-    ///     If there are not enough blocks to go back or the block is not found, it will return None.
     async fn get_block_for_security_param(
         &self,
         current_block: Block<<Self::ClPool as MemPool>::Item, <Self::DaPool as MemPool>::Item>,
@@ -79,5 +65,14 @@ where
             current_block = parent_block;
         }
         Some(current_block)
+    }
+
+    async fn save_security_block(&self, block: Block<ClPool::Item, DaPool::Item>) {
+        let security_block_msg =
+            <StorageMsg<_>>::new_store_message("security_block_header_id", block.header().id());
+
+        if let Err((e, _msg)) = self.storage_relay.send(security_block_msg).await {
+            tracing::error!("Could not send security block id to storage: {e}");
+        }
     }
 }
