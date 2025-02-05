@@ -1,9 +1,6 @@
 use futures::{Stream, StreamExt};
-use nomos_blend_message::BlendMessage;
 use rand::{distributions::Uniform, prelude::Distribution, Rng, RngCore};
-use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
-use std::marker::PhantomData;
 use std::pin::{pin, Pin};
 use std::task::{Context, Poll};
 
@@ -25,7 +22,7 @@ impl Default for PersistentTransmissionSettings {
 }
 
 /// Transmit scheduled messages with a persistent rate as a stream.
-pub struct PersistentTransmissionStream<S, Rng, M, Scheduler>
+pub struct PersistentTransmissionStream<S, Rng, Scheduler>
 where
     S: Stream,
     Rng: RngCore,
@@ -33,46 +30,47 @@ where
     coin: Coin<Rng>,
     stream: S,
     scheduler: Scheduler,
-    _blend_message: PhantomData<M>,
+    drop_message: S::Item,
 }
 
-impl<S, Rng, M, Scheduler> PersistentTransmissionStream<S, Rng, M, Scheduler>
+impl<S, Rng, Scheduler> PersistentTransmissionStream<S, Rng, Scheduler>
 where
     S: Stream,
     Rng: RngCore,
-    M: BlendMessage,
     Scheduler: Stream<Item = ()>,
 {
     pub fn new(
         settings: PersistentTransmissionSettings,
         stream: S,
         scheduler: Scheduler,
+        drop_message: S::Item,
         rng: Rng,
-    ) -> PersistentTransmissionStream<S, Rng, M, Scheduler> {
+    ) -> PersistentTransmissionStream<S, Rng, Scheduler> {
         let coin = Coin::<Rng>::new(rng, settings.drop_message_probability).unwrap();
         Self {
             coin,
             stream,
             scheduler,
-            _blend_message: Default::default(),
+            drop_message,
         }
     }
 }
 
-impl<S, Rng, M, Scheduler> Stream for PersistentTransmissionStream<S, Rng, M, Scheduler>
+impl<S, Rng, Scheduler> Stream for PersistentTransmissionStream<S, Rng, Scheduler>
 where
-    S: Stream<Item = Vec<u8>> + Unpin,
+    S: Stream + Unpin,
+    S::Item: Clone + Unpin,
     Rng: RngCore + Unpin,
-    M: BlendMessage + Unpin,
     Scheduler: Stream<Item = ()> + Unpin,
 {
-    type Item = Vec<u8>;
+    type Item = S::Item;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let Self {
             ref mut scheduler,
             ref mut stream,
             ref mut coin,
+            ref drop_message,
             ..
         } = self.get_mut();
         if pin!(scheduler).poll_next_unpin(cx).is_pending() {
@@ -81,17 +79,16 @@ where
         if let Poll::Ready(Some(item)) = pin!(stream).poll_next(cx) {
             Poll::Ready(Some(item))
         } else if coin.flip() {
-            Poll::Ready(Some(M::DROP_MESSAGE.to_vec()))
+            Poll::Ready(Some(drop_message.clone()))
         } else {
             Poll::Pending
         }
     }
 }
 
-pub trait PersistentTransmissionExt<Rng, M, Scheduler>: Stream
+pub trait PersistentTransmissionExt<Rng, Scheduler>: Stream
 where
     Rng: RngCore,
-    M: BlendMessage,
     Scheduler: Stream<Item = ()>,
 {
     fn persistent_transmission(
@@ -99,20 +96,19 @@ where
         settings: PersistentTransmissionSettings,
         rng: Rng,
         scheduler: Scheduler,
-    ) -> PersistentTransmissionStream<Self, Rng, M, Scheduler>
+        drop_message: Self::Item,
+    ) -> PersistentTransmissionStream<Self, Rng, Scheduler>
     where
         Self: Sized + Unpin,
     {
-        PersistentTransmissionStream::new(settings, self, scheduler, rng)
+        PersistentTransmissionStream::new(settings, self, scheduler, drop_message, rng)
     }
 }
 
-impl<S, Rng, M, Scheduler> PersistentTransmissionExt<Rng, M, Scheduler> for S
+impl<S, Rng, Scheduler> PersistentTransmissionExt<Rng, Scheduler> for S
 where
     S: Stream,
     Rng: RngCore,
-    M: BlendMessage,
-    M::PublicKey: Clone + Serialize + DeserializeOwned,
     Scheduler: Stream<Item = ()>,
 {
 }
@@ -151,6 +147,7 @@ mod tests {
     use super::*;
     use futures::StreamExt;
     use nomos_blend_message::mock::MockBlendMessage;
+    use nomos_blend_message::BlendMessage;
     use rand::SeedableRng;
     use rand_chacha::ChaCha8Rng;
     use std::time::Duration;
@@ -196,16 +193,13 @@ mod tests {
         let lower_bound = expected_emission_interval - torelance;
         let upper_bound = expected_emission_interval + torelance;
         // prepare stream
-        let mut persistent_transmission_stream: PersistentTransmissionStream<
-            _,
-            _,
-            MockBlendMessage,
-            _,
-        > = stream.persistent_transmission(
-            settings,
-            ChaCha8Rng::from_entropy(),
-            IntervalStream::new(time::interval(expected_emission_interval)).map(|_| ()),
-        );
+        let mut persistent_transmission_stream: PersistentTransmissionStream<_, _, _> = stream
+            .persistent_transmission(
+                settings,
+                ChaCha8Rng::from_entropy(),
+                IntervalStream::new(time::interval(expected_emission_interval)).map(|_| ()),
+                MockBlendMessage::DROP_MESSAGE.to_vec(),
+            );
         // Messages must be scheduled in non-blocking manner.
         schedule_sender.send(vec![1]).unwrap();
         schedule_sender.send(vec![2]).unwrap();
