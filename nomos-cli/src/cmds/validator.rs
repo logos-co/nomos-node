@@ -31,11 +31,22 @@ pub struct Retrieve {
     pub addr: Url,
 }
 
+fn parse_app_blobs(val: &str) -> Result<Vec<(Index, Vec<Vec<u8>>)>, String> {
+    let val: String = val.chars().filter(|&c| c != ' ' && c != '\n').collect();
+    serde_json::from_str(&val).map_err(|e| e.to_string())
+}
+
 #[derive(Args, Debug)]
 pub struct Reconstruct {
-    /// Blobs to use for reconstruction.
-    #[clap(short, long, required_unless_present("file"))]
-    pub app_blobs: Option<String>,
+    /// Blobs to use for reconstruction. Half of the blobs per index is expected.
+    #[clap(
+        short,
+        long,
+        help = "JSON array of blobs [[[index0], [[blob0],[blob1]...]]...]",
+        value_name = "APP_BLOBS",
+        value_parser(parse_app_blobs)
+    )]
+    pub app_blobs: Option<std::vec::Vec<(Index, Vec<Vec<u8>>)>>,
     /// File with blobs.
     #[clap(short, long)]
     pub file: Option<PathBuf>,
@@ -127,25 +138,13 @@ where
 
 impl Reconstruct {
     pub fn run(self) -> Result<(), Box<dyn std::error::Error>> {
-        tracing::subscriber::set_global_default(tracing_subscriber::FmtSubscriber::new())
-            .expect("setting tracing default failed");
-
-        let json_string: String = if let Some(data) = &self.app_blobs {
-            data.clone()
+        let app_blobs: Vec<(Index, Vec<Vec<u8>>)> = if let Some(blobs) = self.app_blobs {
+            blobs
         } else {
             let file_path = self.file.as_ref().unwrap();
-            String::from_utf8(std::fs::read(file_path)?)?
+            let json_string = String::from_utf8(std::fs::read(file_path)?)?;
+            parse_app_blobs(&json_string)?
         };
-
-        // Cleanup
-        let json_string: String = json_string
-            .chars()
-            .filter(|&c| c != ' ' && c != '\n')
-            .collect();
-
-        tracing::info!("JSON data {:?}", json_string);
-
-        let app_blobs: Vec<(Index, Vec<Vec<u8>>)> = serde_json::from_str(&json_string)?;
 
         let mut da_blobs = vec![];
 
