@@ -36,14 +36,12 @@ members = [
     "consensus/carnot-engine",
     "consensus/cryptarchia-engine",
     "ledger/nomos-ledger",
-    "nomos-core/cl",
     "testnet/cfgsync",
     "tests",
     "clients/executor-http-client",
     "nomos-services/key-management-system",
     "nomos-bundler",
 ]
-exclude = ["proof_of_leadership/risc0/risc0_proofs", "nomos-core/risc0_proofs"]
 resolver = "2"
 
 [workspace.package]
@@ -51,8 +49,7 @@ edition = "2021"
 version = "0.1.0"
 
 [workspace.dependencies]
-
-# Path dependencies
+# Local dependencies
 nomos-core = { path = "nomos-core/chain-defs" }
 cl = { path = "nomos-core/cl" }
 full-replication = { path = "nomos-da/full-replication" }
@@ -70,8 +67,32 @@ nomos-storage = { path = "nomos-services/storage" }
 cryptarchia-consensus = { path = "nomos-services/cryptarchia-consensus" }
 nomos-mempool = { path = "nomos-services/mempool" }
 nomos-system-sig = { path = "nomos-services/system-sig" }
+nomos-da-indexer = { path = "nomos-services/data-availability/indexer" }
+nomos-da-network-service = { path = "nomos-services/data-availability/network" }
+nomos-da-sampling = { path = "nomos-services/data-availability/sampling" }
+nomos-da-verifier = { path = "nomos-services/data-availability/verifier" }
+nomos-da-dispersal = { path = "nomos-services/data-availability/dispersal" }
+nomos-da-tests = { path = "nomos-services/data-availability/tests" }
+nomos-blend-service = { path = "nomos-services/blend" }
+utils = { path = "nomos-services/utils" }
+nomos-blend = { path = "nomos-blend/core" }
+nomos-blend-message = { path = "nomos-blend/message" }
+nomos-blend-network = { path = "nomos-blend/network" }
+nomos-tracing = { path = "nomos-tracing" }
+nomos-cli = { path = "nomos-cli" }
+nomos-utils = { path = "nomos-utils" }
+nomos-node = { path = "nodes/nomos-node" }
+nomos-executor = { path = "nodes/nomos-executor" }
+carnot-engine = { path = "consensus/carnot-engine" }
+cryptarchia-engine = { path = "consensus/cryptarchia-engine" }
+nomos-ledger = { path = "ledger/nomos-ledger" }
+cfgsync = { path = "testnet/cfgsync" }
+tests = { path = "tests" }
+executor-http-client = { path = "clients/executor-http-client" }
+key-management-system = { path = "nomos-services/key-management-system" }
+bundler = { path = "nomos-bundler" }
 
-
+# External dependencies
 async-trait = { version = "0.1" }
 blake2 = { version = "0.10" }
 bytes = { version = "1.3" }
