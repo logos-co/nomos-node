@@ -7,8 +7,6 @@ use serde::{de::DeserializeOwned, Serialize};
 
 use crate::storage::StorageAdapter as StorageAdapterTrait;
 
-const SECURITY_BLOCK_KEY: &str = "security_block_header_id";
-
 pub struct StorageAdapter<Storage, Tx, BlobCertificate>
 where
     Storage: StorageBackend + Send + Sync,
