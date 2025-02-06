@@ -1,13 +1,13 @@
 [package]
 name = "nomos-libp2p"
-version = "0.1.0"
-edition = "2021"
+version = { workspace = true }
+edition = { workspace = true }
 
 [dependencies]
-multiaddr = "0.18"
-tokio = { version = "1", features = ["sync", "macros"] }
-futures = "0.3"
-libp2p = { version = "0.55", features = [
+multiaddr = { workspace = true }
+tokio = { workspace = true, features = ["sync", "macros"] }
+futures = { workspace = true }
+libp2p = { workspace = true, features = [
     "dns",
     "macros",
     "gossipsub",
@@ -15,14 +15,14 @@ libp2p = { version = "0.55", features = [
     "quic",
     "secp256k1",
 ] }
-blake2 = { version = "0.10" }
-serde = { version = "1.0.166", features = ["derive"] }
-hex = "0.4.3"
-log = "0.4.19"
-thiserror = "1.0.40"
-tracing = "0.1"
+blake2 = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+hex = { workspace = true }
+log = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
 
 [dev-dependencies]
-rand = "0.8.5"
-serde_json = "1.0.99"
-tokio = { version = "1", features = ["time"] }
+rand = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true, features = ["time"] }

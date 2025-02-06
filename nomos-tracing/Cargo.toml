@@ -1,22 +1,30 @@
 [package]
 name = "nomos-tracing"
-version = "0.1.0"
-edition = "2021"
+version = { workspace = true }
+edition = { workspace = true }
 
 [dependencies]
-opentelemetry = { version = "0.26" }
-opentelemetry-otlp = { version = "0.26", features = ["grpc-tonic", "http-proto", "opentelemetry-http"] }
-opentelemetry_sdk = { version = "0.26", features = ["rt-tokio"] }
-opentelemetry-http = { version = "0.26", features = ["reqwest"] }
-opentelemetry-semantic-conventions = "0.26"
-rand = "0.8"
-reqwest = "0.12"
-serde = { version = "1.0", features = ["derive"] }
-tokio = "1"
-tracing = "0.1"
-tracing-appender = "0.2"
-tracing-gelf = "0.7"
-tracing-loki = "0.2.5"
-tracing-opentelemetry = "0.27"
-tracing-subscriber =  { version = "0.3", features = ["env-filter", "json", "registry"] }
-url = { version = "2", features = ["serde"] }
+opentelemetry = { workspace = true }
+opentelemetry-otlp = { workspace = true, features = [
+    "grpc-tonic",
+    "http-proto",
+    "opentelemetry-http",
+] }
+opentelemetry_sdk = { workspace = true, features = ["rt-tokio"] }
+opentelemetry-http = { workspace = true, features = ["reqwest"] }
+opentelemetry-semantic-conventions = { workspace = true }
+rand = { workspace = true }
+reqwest = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+tokio = { workspace = true }
+tracing = { workspace = true }
+tracing-appender = { workspace = true }
+tracing-gelf = { workspace = true }
+tracing-loki = { workspace = true }
+tracing-opentelemetry = { workspace = true }
+tracing-subscriber = { workspace = true, features = [
+    "env-filter",
+    "json",
+    "registry",
+] }
+url = { workspace = true, features = ["serde"] }

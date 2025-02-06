@@ -41,6 +41,8 @@ members = [
     "clients/executor-http-client",
     "nomos-services/key-management-system",
     "nomos-bundler",
+    "nomos-core/proof_statements",
+    "nomos-core/risc0_proofs",
 ]
 resolver = "2"
 
@@ -91,6 +93,8 @@ tests = { path = "tests" }
 executor-http-client = { path = "clients/executor-http-client" }
 key-management-system = { path = "nomos-services/key-management-system" }
 bundler = { path = "nomos-bundler" }
+nomos_proof_statements = { path = "nomos-core/proof_statements" }
+nomos_risc0_proofs = { path = "nomos-core/risc0_proofs" }
 
 # External dependencies
 async-trait = { version = "0.1" }

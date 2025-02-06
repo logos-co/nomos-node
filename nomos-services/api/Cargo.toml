@@ -1,57 +1,57 @@
 [package]
 name = "nomos-api"
-version = "0.1.0"
-edition = "2021"
+version = { workspace = true }
+edition = { workspace = true }
+
+
+[dependencies]
+async-trait = { workspace = true }
+bytes = { workspace = true }
+overwatch-rs = { workspace = true, rev = "f5f7ea0" }
+overwatch-derive = { workspace = true, rev = "f5f7ea0" }
+tracing = { workspace = true }
+nomos-core = { workspace = true }
+cryptarchia-consensus = { workspace = true }
+nomos-network = { workspace = true }
+nomos-blend-service = { workspace = true, features = ["libp2p"] }
+nomos-mempool = { workspace = true, features = ["mock", "libp2p", "openapi"] }
+nomos-da-dispersal = { workspace = true }
+nomos-da-indexer = { workspace = true, features = ["rocksdb-backend"] }
+nomos-da-sampling = { workspace = true }
+nomos-da-verifier = { workspace = true, features = [
+    "rocksdb-backend",
+    "libp2p",
+] }
+nomos-storage = { workspace = true, features = ["rocksdb"] }
+nomos-libp2p = { workspace = true }
+full-replication = { workspace = true }
+kzgrs-backend = { workspace = true }
+rand = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+subnetworks-assignations = { workspace = true }
+nomos-da-network-core = { workspace = true }
+tokio = { workspace = true, default-features = false, features = ["sync"] }
+
+
+# axum related dependencies
+axum = { workspace = true, optional = true }
+hyper = { workspace = true, features = ["full"], optional = true }
+tower-http = { workspace = true, optional = true, features = ["cors", "trace"] }
+
+
+# openapi related dependencies
+utoipa = { workspace = true }
+utoipa-swagger-ui = { workspace = true }
+
+[dev-dependencies]
+axum = { workspace = true }
+hyper = { workspace = true, features = ["full"] }
+utoipa-swagger-ui = { workspace = true, features = ["axum"] }
+reqwest = { workspace = true, features = ["blocking", "json"] }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
 
 [features]
 default = ["axum"]
 axum = ["dep:axum", "dep:hyper", "dep:tower-http", "utoipa-swagger-ui/axum"]
 instrumentation = []
-
-[dependencies]
-async-trait = "0.1"
-bytes = "1.2"
-overwatch-rs = { git = "https://github.com/logos-co/Overwatch", rev = "f5f7ea0" }
-overwatch-derive = { git = "https://github.com/logos-co/Overwatch", rev = "f5f7ea0" }
-tracing = "0.1"
-nomos-core = { path = "../../nomos-core/chain-defs" }
-cryptarchia-consensus = { path = "../cryptarchia-consensus" }
-nomos-network = { path = "../../nomos-services/network" }
-nomos-blend-service = { path = "../../nomos-services/blend", features = ["libp2p"] }
-nomos-mempool = { path = "../../nomos-services/mempool", features = [
-    "mock",
-    "libp2p",
-    "openapi",
-] }
-nomos-da-dispersal = { path = "../data-availability/dispersal" }
-nomos-da-indexer = { path = "../data-availability/indexer", features = ["rocksdb-backend"] }
-nomos-da-sampling = { path = "../data-availability/sampling" }
-nomos-da-verifier = { path = "../data-availability/verifier", features = ["rocksdb-backend", "libp2p"] }
-nomos-storage = { path = "../../nomos-services/storage", features = ["rocksdb"] }
-nomos-libp2p = { path = "../../nomos-libp2p" }
-full-replication = { path = "../../nomos-da/full-replication" }
-kzgrs-backend = { path = "../../nomos-da/kzgrs-backend" }
-rand = "0.8"
-serde = { version = "1", features = ["derive"] }
-subnetworks-assignations = { path = "../../nomos-da/network/subnetworks-assignations" }
-nomos-da-network-core = { path = "../../nomos-da/network/core" }
-tokio = { version = "1", default-features = false, features = ["sync"] }
-
-
-# axum related dependencies
-axum = { version = "0.6", optional = true }
-hyper = { version = "0.14", features = ["full"], optional = true }
-tower-http = { version = "0.4", optional = true, features = ["cors", "trace"] }
-
-
-# openapi related dependencies
-utoipa = "4.0"
-utoipa-swagger-ui = { version = "4.0" }
-
-[dev-dependencies]
-axum = "0.6"
-hyper = { version = "0.14", features = ["full"] }
-utoipa-swagger-ui = { version = "4.0", features = ["axum"] }
-reqwest = { version = "0.11", features = ["blocking", "json"] }
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
